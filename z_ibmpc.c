@@ -9,23 +9,9 @@
  *  is called whenever possible.
  *  Modifications by Pete Ruczynski (pjr).
  * $Log: z_ibmpc.c,v $
- * Revision 1.6  1993/08/05 14:29:12  pgf
- * tom's 3.57 changes
+ * Revision 1.7  1994/02/22 11:03:15  pgf
+ * truncated RCS log for 4.0
  *
- * Revision 1.5  1993/07/27  18:06:20  pgf
- * see tom's 3.56 CHANGES entry
- *
- * Revision 1.4  1993/05/04  17:05:14  pgf
- * see tom's CHANGES, 3.45
- *
- * Revision 1.3  1993/04/01  12:53:33  pgf
- * removed redundant includes and declarations
- *
- * Revision 1.2  1992/08/20  23:40:48  foxharp
- * typo fixes -- thanks, eric
- *
- * Revision 1.1  1992/07/01  16:57:45  foxharp
- * Initial revision
  *
  *
  */

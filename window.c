@@ -3,120 +3,9 @@
  * attached to keys that the user actually types.
  *
  * $Log: window.c,v $
- * Revision 1.35  1994/02/03 19:35:12  pgf
- * tom's changes for 3.65
+ * Revision 1.39  1994/02/22 11:03:15  pgf
+ * truncated RCS log for 4.0
  *
- * Revision 1.34  1994/01/31  18:11:03  pgf
- * change kbd_key() to tgetc()
- *
- * Revision 1.33  1994/01/27  18:01:39  pgf
- * use define for min no. of lines/window, rather than '3'
- *
- * Revision 1.32  1993/09/03  09:11:54  pgf
- * tom's 3.60 changes
- *
- * Revision 1.31  1993/08/13  16:32:50  pgf
- * tom's 3.58 changes
- *
- * Revision 1.30  1993/08/05  14:29:12  pgf
- * tom's 3.57 changes
- *
- * Revision 1.29  1993/07/27  18:06:20  pgf
- * see tom's 3.56 CHANGES entry
- *
- * Revision 1.28  1993/07/01  16:15:54  pgf
- * tom's 3.51 changes
- *
- * Revision 1.27  1993/06/18  15:57:06  pgf
- * tom's 3.49 changes
- *
- * Revision 1.26  1993/06/02  14:28:47  pgf
- * see tom's 3.48 CHANGES
- *
- * Revision 1.25  1993/05/24  15:21:37  pgf
- * tom's 3.47 changes, part a
- *
- * Revision 1.24  1993/04/20  12:18:32  pgf
- * see tom's 3.43 CHANGES
- *
- * Revision 1.23  1993/04/20  12:00:59  pgf
- * scroll sideways by a half screen by default in mv{left,right}window()
- *
- * Revision 1.22  1993/04/01  12:57:22  pgf
- * removed redundant includes and declarations
- *
- * Revision 1.21  1993/02/24  10:59:02  pgf
- * see 3.34 changes, in CHANGES file
- *
- * Revision 1.20  1993/01/23  13:38:23  foxharp
- * new unlink_window() function
- *
- * Revision 1.19  1993/01/16  10:43:38  foxharp
- * use new macros, and call updatelistbuffers appropriately
- *
- * Revision 1.18  1992/12/14  09:36:50  foxharp
- * now that sideways scrolling works on short lines, don't need to restrict user to
- * certain cursor positions
- *
- * Revision 1.17  1992/12/14  08:32:20  foxharp
- * fix for the sideways-shifted-but-deextended bug.  thanks to Tom Dickey.
- * also lint cleanup.
- *
- * Revision 1.16  1992/12/04  09:15:38  foxharp
- * delete unused assigns
- *
- * Revision 1.15  1992/08/20  23:40:48  foxharp
- * typo fixes -- thanks, eric
- *
- * Revision 1.14  1992/05/16  12:00:31  pgf
- * prototypes/ansi/void-int stuff/microsoftC
- *
- * Revision 1.13  1992/01/05  00:06:13  pgf
- * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
- * often.  also normalized message appearance somewhat.
- *
- * Revision 1.12  1991/11/04  14:20:18  pgf
- * fixed broken mvdnwind()
- *
- * Revision 1.11  1991/11/01  14:38:00  pgf
- * saber cleanup
- *
- * Revision 1.10  1991/10/22  14:08:23  pgf
- * took out old ifdef BEFORE code
- *
- * Revision 1.9  1991/09/30  01:47:24  pgf
- * keep sideways motions local to a window
- *
- * Revision 1.8  1991/09/26  13:09:55  pgf
- * w_sideways is now one of the window values
- *
- * Revision 1.7  1991/08/07  12:35:07  pgf
- * added RCS log messages
- *
- * revision 1.6
- * date: 1991/08/06 15:27:21;
- * new splitwind algorithm
- * 
- * revision 1.5
- * date: 1991/08/02 10:27:07;
- * added dave lemke's scroll fix to mvupwind()
- * 
- * revision 1.4
- * date: 1991/06/25 19:53:41;
- * massive data structure restructure
- * 
- * revision 1.3
- * date: 1991/02/21 09:14:20;
- * added horizontal scrolling, and made newlength and
- * newwidth into commands
- * 
- * revision 1.2
- * date: 1990/09/25 11:38:28;
- * took out old ifdef BEFORE code
- * 
- * revision 1.1
- * date: 1990/09/21 10:26:21;
- * initial vile RCS revision
  */
 
 #include        "estruct.h"
@@ -517,13 +406,13 @@ int f,n;
         curwp->w_line.l = adjust_back(curwp, curwp->w_line.l, curwp->w_toprow);
         curwp->w_ntrows = term.t_nrow-1;
         curwp->w_toprow = 0;
-        curwp->w_flag  |= WFMODE|WFHARD;
+        curwp->w_flag  |= WFMODE|WFHARD|WFSBAR;
+	curwp->w_split_hist = 0;
         return (TRUE);
 }
 
 /*
- * Delete the current window, placing its space in the window above,
- * or, if it is the top window, the window below.
+ * Delete the current window
  */
 
 /* ARGSUSED */
@@ -533,6 +422,37 @@ int f, n;	/* arguments are ignored for this command */
 {
 	return delwp(curwp);
 }
+
+/* 
+ * We attach to each window structure another field (an unsigned long)
+ * which I called w_split_history.  When we split a window, we shift this
+ * field left by one bit.  The least significant bit for the upper window
+ * is 0, the bottom window's lsb is set to 1.
+ * 
+ * We examine the lsb when deleting windows to decide whether to give up
+ * the space for the deleted window to the upper window or lower window. 
+ * If the lsb is 0, we give it to the lower window.  If it is 1 we give it
+ * to the upper window.  If the lsb of the receiving window is different
+ * from that of the window being deleted, this means that the two match and
+ * so the history is shifted right by one bit for the receiving window. 
+ * Otherwise we leave the history alone.
+ *							kev, 2/94
+ * 
+ * Example:
+ * 
+ * |    |       | 00    | 00    | 00    | 00
+ * |    | 0     -       -       -       -
+ * |    |       | 01    | 01    | 01    | 01
+ * | 0 -->      -   --> -   --> -   --> -   --> |
+ * |    |       |       | 10    |       |
+ * |    | 1     | 1     -       | 1     |
+ * |    |       |       | 11    |       |
+ * 
+ * Full Split   Split   and     Kill    Kill
+ * Screen               Again   Again   either  1
+ *                              10 or
+ *                              11
+ */
 
 int
 delwp(thewp)
@@ -547,13 +467,24 @@ WINDOW *thewp;
 	}
 
 	/* find receiving window and give up our space */
-	if (thewp == wheadp) { /* there's nothing before */
-		/* find the next window down */
+	if (thewp == wheadp 
+	 || ((thewp->w_split_hist & 1) == 0 && thewp->w_wndp)) {
+		/* merge with next window down */
 		wp = thewp->w_wndp;
-                wp->w_line.l = adjust_back(wp, wp->w_line.l, wp->w_toprow);
-		wp->w_ntrows += wp->w_toprow;  /* add in the new rows */
-		wp->w_toprow = 0;	/* and we're at the top of the screen */
-		wheadp = wp;	/* and at the top of the list as well */
+                wp->w_line.l = adjust_back(wp, wp->w_line.l,
+						thewp->w_ntrows+1);
+		wp->w_ntrows += thewp->w_ntrows+1;
+		wp->w_toprow = thewp->w_toprow;
+		if (thewp == wheadp)
+			wheadp = wp;
+		else {
+			WINDOW *pwp = wheadp;
+			while(pwp->w_wndp != thewp)
+				pwp = pwp->w_wndp;
+			pwp->w_wndp = wp;
+		}
+		if (wp->w_split_hist & 1)
+			wp->w_split_hist >>= 1;
 	} else {
 		/* find window before thewp in linked list */
 		wp = wheadp;
@@ -563,6 +494,8 @@ WINDOW *thewp;
 		wp->w_ntrows += thewp->w_ntrows+1;
 		
 		wp->w_wndp = thewp->w_wndp; /* make their next window ours */
+		if ((wp->w_split_hist & 1) == 0)
+			wp->w_split_hist >>= 1;
 	}
 
 	/* get rid of the current window */
@@ -575,6 +508,7 @@ WINDOW *thewp;
 	}
 	free((char *)thewp);
 	upmode();
+	curwp->w_flag |= WFSBAR;
 	return(TRUE);
 }
 
@@ -656,6 +590,9 @@ int f,n;
 		wp->w_line.l = adjust_forw(wp, wp->w_line.l, ntru+1);
 		wp->w_dot.l = wp->w_line.l;
 		wp->w_dot.o = 0;
+		/* update the split history */
+		curwp->w_split_hist <<= 1;
+		wp->w_split_hist = curwp->w_split_hist | 1;
         } else {
 		/* Old is lower window  */
                 wp1 = NULL;
@@ -680,8 +617,11 @@ int f,n;
 		wp->w_dot.o = 0;
 		/* adjust lower window topline */
 		curwp->w_line.l = adjust_forw(curwp, curwp->w_line.l, ntru);
+		/* update the split history */
+		wp->w_split_hist <<= 1;
+		curwp->w_split_hist = wp->w_split_hist | 1;
         }
-        curwp->w_flag |= WFMODE|WFHARD;
+        curwp->w_flag |= WFMODE|WFHARD|WFSBAR;
         wp->w_flag |= WFMODE|WFHARD;
         return wp;
 }
@@ -731,7 +671,7 @@ int f,n;
         }
         curwp->w_ntrows += n;
         adjwp->w_ntrows -= n;
-        curwp->w_flag |= WFMODE|WFHARD|WFINS;
+        curwp->w_flag |= WFMODE|WFHARD|WFINS|WFSBAR;
         adjwp->w_flag |= WFMODE|WFHARD|WFKILLS;
         return (TRUE);
 }
@@ -770,7 +710,7 @@ int f,n;
         }
         curwp->w_ntrows -= n;
         adjwp->w_ntrows += n;
-        curwp->w_flag |= WFMODE|WFHARD|WFKILLS;
+        curwp->w_flag |= WFMODE|WFHARD|WFKILLS|WFSBAR;
         adjwp->w_flag |= WFMODE|WFHARD|WFINS;
         return (TRUE);
 }

@@ -5,292 +5,9 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.94  1994/02/14 15:46:31  pgf
- * tom's interim post-3.65 changes
+ * Revision 1.97  1994/02/22 11:03:15  pgf
+ * truncated RCS log for 4.0
  *
- * Revision 1.93  1994/02/03  19:35:12  pgf
- * tom's changes for 3.65
- *
- * Revision 1.92  1994/02/03  10:18:01  pgf
- * many routines from display.c now static
- *
- * Revision 1.91  1994/02/01  19:40:50  pgf
- * gethostname
- *
- * Revision 1.90  1994/01/31  20:26:14  pgf
- * new routine ffexists() supports ability to not reclaim empty unmodified
- * buffers if they correspond to existing files
- *
- * Revision 1.89  1994/01/31  18:18:33  pgf
- * speckey() is now in main.c
- *
- * Revision 1.88  1994/01/31  12:30:59  pgf
- * protos for djhandl.c
- *
- * Revision 1.87  1994/01/28  20:57:01  pgf
- * added siguninit
- *
- * Revision 1.86  1994/01/11  17:31:29  pgf
- * added not_interrupted() routine
- *
- * Revision 1.85  1994/01/11  17:20:37  pgf
- * added siginit() routine, and interrupted() is now a routine
- *
- * Revision 1.84  1993/12/22  15:28:34  pgf
- * applying tom's 3.64 changes
- *
- * Revision 1.83  1993/12/21  12:40:46  pgf
- * fixed args for indented_newline...()
- *
- * Revision 1.82  1993/12/08  20:47:25  pgf
- * added ask_shouldchange()
- *
- * Revision 1.81  1993/11/04  09:10:51  pgf
- * tom's 3.63 changes
- *
- * Revision 1.80  1993/10/11  17:39:35  pgf
- * added arg to fmatchindent, which is character to match
- *
- * Revision 1.79  1993/10/04  10:24:09  pgf
- * see tom's 3.62 changes
- *
- * Revision 1.78  1993/09/10  16:06:49  pgf
- * tom's 3.61 changes
- *
- * Revision 1.77  1993/09/06  16:32:48  pgf
- * added entries for glob.c
- *
- * Revision 1.76  1993/09/03  09:11:54  pgf
- * tom's 3.60 changes
- *
- * Revision 1.75  1993/08/13  16:32:50  pgf
- * tom's 3.58 changes
- *
- * Revision 1.74  1993/08/05  14:35:57  pgf
- * changed name of setmode to avoid library conflict with djgpp compiler
- * (also changed delmode, setgmode, and delgmode to be consistent)
- *
- * Revision 1.73  1993/08/05  14:29:12  pgf
- * tom's 3.57 changes
- *
- * Revision 1.72  1993/07/27  18:06:20  pgf
- * see tom's 3.56 CHANGES entry
- *
- * Revision 1.71  1993/07/19  15:28:59  pgf
- * prc2kcod now returns unsigned
- *
- * Revision 1.70  1993/07/15  12:00:00  pgf
- * added mlquickask(), which does "raw" single character response queries
- *
- * Revision 1.69  1993/07/15  10:37:58  pgf
- * see 3.55 CHANGES
- *
- * Revision 1.68  1993/07/06  12:31:30  pgf
- * new check_visible_modtimes() routine
- *
- * Revision 1.67  1993/07/01  16:15:54  pgf
- * tom's 3.51 changes
- *
- * Revision 1.66  1993/06/30  10:25:34  pgf
- * added bzero to SUNOS/NeXT prototypes -- it's used in FD_CLR
- *
- * Revision 1.65  1993/06/28  20:05:12  pgf
- * split out insert.c funcs, and added current_modename()
- *
- * Revision 1.64  1993/06/28  14:27:11  pgf
- * new arg to catnap
- *
- * Revision 1.63  1993/06/25  11:25:55  pgf
- * patches for Watcom C/386, from Tuan DANG
- *
- * Revision 1.62  1993/06/24  12:13:55  pgf
- * changed copy_for_undo and tag_for_undo to return void
- *
- * Revision 1.61  1993/06/23  21:29:29  pgf
- * ifdefs for linux -- our ifdefs are obviously not right yet
- *
- * Revision 1.60  1993/06/22  10:24:21  pgf
- * new arg to freeundostacks, and new forw/back undo routines
- *
- * Revision 1.59  1993/06/18  16:16:34  pgf
- * alistair crooks lint/NeXt changes
- *
- * Revision 1.58  1993/06/18  15:57:06  pgf
- * tom's 3.49 changes
- *
- * Revision 1.57  1993/06/10  14:58:10  pgf
- * initial :map support, from Otto Lind
- *
- * Revision 1.56  1993/06/02  14:28:47  pgf
- * see tom's 3.48 CHANGES
- *
- * Revision 1.55  1993/05/24  15:21:37  pgf
- * tom's 3.47 changes, part a
- *
- * Revision 1.54  1993/05/11  16:22:22  pgf
- * see tom's CHANGES, 3.46
- *
- * Revision 1.53  1993/05/04  17:05:14  pgf
- * see tom's CHANGES, 3.45
- *
- * Revision 1.52  1993/05/03  14:24:30  pgf
- * different args to inschar()
- *
- * Revision 1.51  1993/04/29  19:20:47  pgf
- * added getnmmarkname()
- *
- * Revision 1.50  1993/04/28  17:15:56  pgf
- * got rid of LOOKTAGS mode and ifdefs
- *
- * Revision 1.49  1993/04/28  14:34:11  pgf
- * see CHANGES, 3.44 (tom)
- *
- * Revision 1.48  1993/04/22  15:14:39  pgf
- * do_num/rept_proc are now static
- *
- * Revision 1.47  1993/04/21  14:08:28  pgf
- * added do_repeats()
- *
- * Revision 1.46  1993/04/20  12:18:32  pgf
- * see tom's 3.43 CHANGES
- *
- * Revision 1.45  1993/04/12  19:19:58  pgf
- * added finderrbuf routine
- *
- * Revision 1.44  1993/04/09  13:43:18  pgf
- * added a bunch of missing prototypes, found with -Wmissing-prototypes
- *
- * Revision 1.43  1993/04/08  15:00:53  pgf
- * new funcs for insertion
- *
- * Revision 1.42  1993/04/08  11:08:43  pgf
- * arg change to updpos
- *
- * Revision 1.41  1993/04/08  09:48:27  pgf
- * added tb_stuff
- *
- * Revision 1.40  1993/04/01  13:07:50  pgf
- * see tom's 3.40 CHANGES
- *
- * Revision 1.39  1993/03/31  19:36:08  pgf
- * changes for tags.c (tags path implementation)
- *
- * Revision 1.38  1993/03/25  19:50:58  pgf
- * see 3.39 section of CHANGES
- *
- * Revision 1.37  1993/03/18  17:42:20  pgf
- * see 3.38 section of CHANGES
- *
- * Revision 1.36  1993/03/17  10:01:18  pgf
- * overwrite() renamed to overwritechars()
- *
- * Revision 1.35  1993/03/16  10:53:21  pgf
- * see 3.36 section of CHANGES file
- *
- * Revision 1.34  1993/03/05  17:50:54  pgf
- * see CHANGES, 3.35 section
- *
- * Revision 1.33  1993/02/24  10:59:02  pgf
- * see 3.34 changes, in CHANGES file
- *
- * Revision 1.32  1993/02/12  10:43:33  pgf
- * new function, insertion_cmd()
- *
- * Revision 1.31  1993/02/08  14:53:35  pgf
- * see CHANGES, 3.32 section
- *
- * Revision 1.30  1993/01/23  13:38:23  foxharp
- * couple of new funcs, some now static (dfout..)
- *
- * Revision 1.29  1993/01/16  10:41:21  foxharp
- * some new routines, some old are now static, so don't appear here
- *
- * Revision 1.28  1993/01/12  08:48:43  foxharp
- * tom dickey's changes to support "set number", i.e. line numbering
- *
- * Revision 1.27  1992/12/23  09:22:40  foxharp
- * some new, some ifdefed UNUSED
- *
- * Revision 1.26  1992/12/14  09:03:25  foxharp
- * lint cleanup, mostly malloc
- *
- * Revision 1.25  1992/12/05  13:52:20  foxharp
- * make the apollo compiler happy
- *
- * Revision 1.24  1992/12/03  00:32:59  foxharp
- * new system_SHELL and exec_sh_c routines
- *
- * Revision 1.23  1992/11/19  09:16:43  foxharp
- * rename of kdelete() to ksetup(), and new kdone().
- * also, new X11 routines, x_setname, x_setforeground, and x_setbackground
- *
- * Revision 1.22  1992/11/19  08:50:16  foxharp
- * gettagsfile now returns a BUFFER *
- *
- * Revision 1.21  1992/08/19  23:00:37  foxharp
- * new DOS routines for directory manip.
- *
- * Revision 1.20  1992/08/06  23:55:07  foxharp
- * added routines that deal with DOS drives
- *
- * Revision 1.19  1992/08/04  20:09:31  foxharp
- * prototype fixups for xvile
- *
- * Revision 1.18  1992/07/28  22:02:55  foxharp
- * patchstk() renamed applypatch()
- *
- * Revision 1.17  1992/07/24  18:22:51  foxharp
- * deleted local atoi() routine -- now we use the system's copy
- *
- * Revision 1.16  1992/07/24  07:49:38  foxharp
- * shorten_name changes
- *
- * Revision 1.15  1992/07/21  09:09:51  foxharp
- * pass lp to vtset() directly
- *
- * Revision 1.14  1992/07/21  08:57:53  foxharp
- * wp param to vtset(), for list mode choice
- *
- * Revision 1.13  1992/07/20  22:48:42  foxharp
- * changes...
- *
- * Revision 1.12  1992/07/18  13:13:22  foxharp
- * created shorten_path and vtprintf and lssetbuf/_lsprintf
- *
- * Revision 1.11  1992/07/16  22:18:54  foxharp
- * ins() takes an argument -- whether or not to playback, usually FALSE
- *
- * Revision 1.10  1992/07/13  09:27:33  foxharp
- * added getkill, canonpath, and changed current_directory to take int
- *
- * Revision 1.9  1992/07/07  08:34:08  foxharp
- * added not_found_msg, from search.c
- *
- * Revision 1.8  1992/06/26  22:19:10  foxharp
- * added dos argument globber
- *
- * Revision 1.7  1992/06/04  19:42:37  foxharp
- * use #ifdef __STDC__ in favor of #if
- *
- * Revision 1.6  1992/05/29  08:36:53  foxharp
- * added new ..._fence routines
- *
- * Revision 1.5  1992/05/25  21:28:37  foxharp
- * took out extern decls of system and library calls, since they conflict
- * more often than not, and added some more routine declarations that
- * cextract (an old version) missed
- *
- * Revision 1.4  1992/05/19  18:28:04  foxharp
- * more proto-isms
- *
- * Revision 1.3  1992/05/19  09:15:45  foxharp
- * portability stuff
- *
- * Revision 1.2  1992/05/16  14:02:55  pgf
- * header/typedef fixups
- *
- * Revision 1.1  1992/05/16  11:50:17  pgf
- * Initial revision
  *
  */
 
@@ -326,6 +43,7 @@ extern int cntl_af P(( int, int ));
 extern int cntl_xf P(( int, int ));
 extern int unarg P(( int, int ));
 extern int speckey P(( int, int ));
+extern int altspeckey P(( int, int ));
 extern int nullproc P(( int, int ));
 extern void charinit P(( void ));
 #if RAMSIZE
@@ -773,6 +491,7 @@ extern int get_recorded_char P(( int ));
 extern int tgetc P(( int ));
 extern int kbd_key P(( void ));
 extern int kbd_seq P(( void ));
+extern int kbd_escape_seq P(( void ));
 extern int screen_string P(( char *, int, CMASK ));
 extern int end_string P(( void ));
 extern int kbd_delimiter P(( void ));
@@ -1296,6 +1015,7 @@ extern	void ev_leaks P(( void ));
 #endif
 
 #if X11
+extern void update_scrollbar P(( WINDOW *uwp ));
 extern	void x_set_rv P(( void ));
 extern	int x_setfont P(( char * ));
 extern	void x_setname P(( char * ));

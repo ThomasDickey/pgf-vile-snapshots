@@ -8,164 +8,9 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: insert.c,v $
- *	Revision 1.47  1994/02/14 15:46:31  pgf
- *	tom's interim post-3.65 changes
+ *	Revision 1.49  1994/02/22 11:03:15  pgf
+ *	truncated RCS log for 4.0
  *
- * Revision 1.46  1994/02/11  15:20:08  pgf
- * implemented 0^D (patch from kev) and ^^D
- *
- * Revision 1.45  1994/02/11  14:11:25  pgf
- * call kbd_key when doing insertions, so we can interpret function keys.
- * preserve goal when doing function keys.
- *
- * Revision 1.44  1994/02/07  12:46:41  pgf
- * allow backspacing over autoindent, whether the backspacelimit mode
- * is set or not
- *
- * Revision 1.43  1994/02/07  12:27:16  pgf
- * treat brackets like braces and parentheses in cmode
- *
- * Revision 1.42  1994/02/03  19:35:12  pgf
- * tom's changes for 3.65
- *
- * Revision 1.41  1994/02/02  18:41:07  pgf
- * added new openup_no_aindent
- *
- * Revision 1.40  1994/02/02  16:44:04  pgf
- * new mode, meta-insert-bindings, which controls whether bindings to meta
- * keys are honored during insert mode or not, and
- * new commands ^A-i and ^A-o which suppress autoindent and cmode during
- * an insert, for the benefit of mouse pasting.
- *
- * Revision 1.39  1994/02/01  19:14:55  pgf
- * fixed core dump resulting from calculating indentlen and checking for '#'
- * char at start of empty line
- *
- * Revision 1.38  1994/01/31  19:52:25  pgf
- * upcased the 'dot_argument" macro to "DOT_ARGUMENT"
- *
- * Revision 1.37  1994/01/31  18:11:03  pgf
- * change kbd_key() to tgetc()
- *
- * Revision 1.36  1993/12/08  17:19:17  pgf
- * don't copy the indent of lines beginning with '#' in cmode.  this
- * causes us to return to the previous indent level after typing a "#if"
- * or "#else" line, etc.
- *
- * Revision 1.35  1993/10/11  17:39:56  pgf
- * pass char to match to fmatchindent()
- *
- * Revision 1.34  1993/09/16  11:06:43  pgf
- * make parentheses act like braces in c-mode -- for indentation purposes, in
- * languages like scheme (and lisp?)
- *
- * Revision 1.33  1993/09/10  16:06:49  pgf
- * tom's 3.61 changes
- *
- * Revision 1.32  1993/09/03  09:11:54  pgf
- * tom's 3.60 changes
- *
- * Revision 1.31  1993/08/13  16:32:50  pgf
- * tom's 3.58 changes
- *
- * Revision 1.30  1993/08/05  14:29:12  pgf
- * tom's 3.57 changes
- *
- * Revision 1.29  1993/06/30  17:43:14  pgf
- * added call to map_check() when we're about to execute a SPEC binding,
- * to make sure :maps work
- *
- * Revision 1.28  1993/06/28  20:10:27  pgf
- * new variable
- *
- * Revision 1.27  1993/06/28  15:07:35  pgf
- * when killing chars, check for c == killc or wkillc _before_ checking it
- * against backspace, in case DEL is someones killc or wkillc.
- *
- * Revision 1.26  1993/06/28  13:32:04  pgf
- * fixed insstring() to INSERT instead of OVERWRITE (cut/paste error)
- *
- * Revision 1.25  1993/06/02  14:28:47  pgf
- * see tom's 3.48 CHANGES
- *
- * Revision 1.24  1993/05/24  15:21:37  pgf
- * tom's 3.47 changes, part a
- *
- * Revision 1.23  1993/05/05  10:31:30  pgf
- * cleaned up handling of SPEC keys from withing insert mode.  now, any
- * function bound to a SPECkey (i.e. any FN-? thing) can be executed
- * either from inside or outside insert mode.
- *
- * Revision 1.22  1993/05/03  14:22:55  pgf
- * fixed botch of backspace limiting introduced when i created inschar()
- *
- * Revision 1.21  1993/04/28  17:04:09  pgf
- * cosmetics in inschar()
- *
- * Revision 1.20  1993/04/28  09:49:29  pgf
- * fixed indentation if openup used in cmode, with a single word on the
- * current line -- indentation was coming from the _next_ line, instead.
- *
- * Revision 1.19  1993/04/20  12:18:32  pgf
- * see tom's 3.43 CHANGES
- *
- * Revision 1.18  1993/04/08  15:01:05  pgf
- * broke up ins(), to create inschar(), usable by insstring and ovrwstring
- *
- * Revision 1.17  1993/04/01  13:06:31  pgf
- * turbo C support (mostly prototypes for static)
- *
- * Revision 1.16  1993/03/18  17:42:20  pgf
- * see 3.38 section of CHANGES
- *
- * Revision 1.15  1993/03/17  10:01:18  pgf
- * overwrite() renamed to overwritechars()
- *
- * Revision 1.14  1993/03/16  10:53:21  pgf
- * see 3.36 section of CHANGES file
- *
- * Revision 1.13  1993/02/15  10:37:31  pgf
- * cleanup for gcc-2.3's -Wall warnings
- *
- * Revision 1.12  1993/02/08  14:53:35  pgf
- * see CHANGES, 3.32 section
- *
- * Revision 1.11  1993/01/23  14:27:23  foxharp
- * protect against backline() failing in openup(), if we're at top of buf
- *
- * Revision 1.10  1993/01/16  10:36:33  foxharp
- * use isreturn() macro
- *
- * Revision 1.9  1992/12/04  09:25:03  foxharp
- * deleted unused assigns
- *
- * Revision 1.8  1992/12/02  09:13:16  foxharp
- * changes for "c-shiftwidth"
- *
- * Revision 1.7  1992/11/30  23:06:03  foxharp
- * firstchar/lastchar now return -1 for no non-white chars in line
- *
- * Revision 1.6  1992/11/19  09:08:49  foxharp
- * experiment -- cause further indent on lines following lines that end
- * in a ':' when in c-mode, so we indent after labels, case xxx:, and default:
- *
- * Revision 1.5  1992/08/06  23:53:51  foxharp
- * autoindent now goes by shiftwidth, instead of tabstop
- *
- * Revision 1.4  1992/07/15  23:23:46  foxharp
- * made '80i-ESC' work
- *
- * Revision 1.3  1992/07/04  14:34:52  foxharp
- * added ability to call SPEC-key bound functions (motion only) during
- * insert mode, on the assumption that you don't _really_ want to insert
- * function keys into your buffer.
- *
- * Revision 1.2  1992/06/01  20:37:31  foxharp
- * added tabinsert
- * mode
- *
- * Revision 1.1  1992/05/29  09:38:33  foxharp
- * Initial revision
  */
 
 #include	"estruct.h"
@@ -181,6 +26,7 @@ static	int	wrap_at_col P(( void ));
 static	void	advance_one_char P(( void ));
 static	int	ins_n_times P(( int, int, int ));
 static	int	ins_anytime P(( int, int, int, int * ));
+static	int	isallspace P(( LINEPTR, int, int ));
 
 static	int	savedmode;  /* value of insertmode maintained through subfuncs */
 
@@ -642,7 +488,7 @@ int *splice;
 			* presumably something the user will never want to
 			* actually insert -- we never try to insert it, we
 			* always execute instead.  */
-			if ((c == poundc && tungotc >= 0) ||
+			if ((c == poundc && did_tungetc()) ||
 		    		(c == altpoundc && altpoundc != poundc)) {
 		    	is_func_prefix = TRUE;
 			continue;

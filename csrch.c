@@ -2,46 +2,9 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: csrch.c,v $
- * Revision 1.13  1994/02/03 19:35:12  pgf
- * tom's changes for 3.65
+ * Revision 1.14  1994/02/22 11:03:15  pgf
+ * truncated RCS log for 4.0
  *
- * Revision 1.12  1994/01/31  18:11:03  pgf
- * change kbd_key() to tgetc()
- *
- * Revision 1.11  1993/09/06  16:23:08  pgf
- * took out redundant beeps
- *
- * Revision 1.10  1993/09/03  09:11:54  pgf
- * tom's 3.60 changes
- *
- * Revision 1.9  1993/06/14  12:15:02  pgf
- * fixed inverted test on 'f' in bscan()  (thanks alistair)
- *
- * Revision 1.8  1993/05/24  15:21:37  pgf
- * tom's 3.47 changes, part a
- *
- * Revision 1.7  1993/03/16  10:53:21  pgf
- * see 3.36 section of CHANGES file
- *
- * Revision 1.6  1992/12/04  09:12:25  foxharp
- * deleted unused assigns
- *
- * Revision 1.5  1992/05/16  12:00:31  pgf
- * prototypes/ansi/void-int stuff/microsoftC
- *
- * Revision 1.4  1991/11/01  14:38:00  pgf
- * saber cleanup
- *
- * Revision 1.3  1991/08/07  12:35:07  pgf
- * added RCS log messages
- *
- * revision 1.2
- * date: 1991/06/25 19:52:11;
- * massive data structure restructure
- * 
- * revision 1.1
- * date: 1990/09/21 10:24:56;
- * initial vile RCS revision
 */
 
 #include "estruct.h"

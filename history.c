@@ -64,50 +64,9 @@
  *	Allow left/right scrolling of input lines (when they get too long).
  *
  * $Log: history.c,v $
- * Revision 1.15  1994/02/14 15:46:31  pgf
- * tom's interim post-3.65 changes
+ * Revision 1.17  1994/02/22 11:03:15  pgf
+ * truncated RCS log for 4.0
  *
- * Revision 1.14  1994/02/03  19:35:12  pgf
- * tom's changes for 3.65
- *
- * Revision 1.13  1994/01/31  18:11:03  pgf
- * change kbd_key() to tgetc()
- *
- * Revision 1.12  1993/11/04  09:10:51  pgf
- * tom's 3.63 changes
- *
- * Revision 1.11  1993/10/04  10:24:09  pgf
- * see tom's 3.62 changes
- *
- * Revision 1.10  1993/09/20  21:20:00  pgf
- * don't let hst_append run if clexec is set
- *
- * Revision 1.9  1993/09/03  09:11:54  pgf
- * tom's 3.60 changes
- *
- * Revision 1.8  1993/07/27  18:06:20  pgf
- * see tom's 3.56 CHANGES entry
- *
- * Revision 1.7  1993/07/01  16:15:54  pgf
- * tom's 3.51 changes
- *
- * Revision 1.6  1993/05/24  15:21:37  pgf
- * tom's 3.47 changes, part a
- *
- * Revision 1.5  1993/04/20  12:18:32  pgf
- * see tom's 3.43 CHANGES
- *
- * Revision 1.4  1993/04/01  13:06:31  pgf
- * turbo C support (mostly prototypes for static)
- *
- * Revision 1.3  1993/03/16  10:53:21  pgf
- * see 3.36 section of CHANGES file
- *
- * Revision 1.2  1993/03/05  17:50:54  pgf
- * see CHANGES, 3.35 section
- *
- * Revision 1.1  1993/02/24  10:58:31  pgf
- * Initial revision
  *
  */
 
@@ -651,7 +610,7 @@ int	eolchar;
 		} else
 			kbd_alarm();
 
-		c = kbd_seq();
+		c = kbd_escape_seq();
 	}
 }
 #endif	/* OPT_HISTORY */

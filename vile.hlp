@@ -1185,6 +1185,7 @@ Programmed macros
 	$llength	length of current line			(read only)
 	$match		last matched magic pattern		(read only)
 	$mode		current mode ("command","insert","overwrite") (read o.)
+	$ntildes	percent of window filled by ~ chars, at end of buffer
 	$pagelen	number of screen lines in use by editor
 	$pagewid	current screen width
 	$palette	current palette string
@@ -1395,6 +1396,19 @@ Programmed macros
 	~endm
 	bind-key execute-macro-2 ^X-]
 
+	; macro 14 - grep for the word under the cursor, and put the result
+	;	in a buffer named after that word.  set the error-buffer,
+	;	so that ^X-^X may be used to visit the lines found by grep.
+	;	(we have to set error-buffer explicitly, since we renamed
+	;	the buffer -- otherwise it tracks the last pipe read by vile)
+	14 store-macro
+		set-variable %grepfor $identifier
+		edit-file &cat "!egrep -n " &cat %grepfor " *.[chs]"
+		rename-buffer %grepfor
+		error-buffer %grepfor
+	~endm
+	bind-key execute-macro-14 ^A-g
+
 
 Regular Expressions
 -------------------
@@ -1543,7 +1557,7 @@ X Window System specifics:
 	If you are using xvile, the following additions are available:
 
 	Mouse buttons:
-
+	--------------
 	1 -	Sets cursor position and the start of the selection.
 		With any modifier, it will center the buffer at the cursor
 		(this results in a primitive form of scrolling.)
@@ -1555,13 +1569,24 @@ X Window System specifics:
 		the text cursor position.
 	3 -	Extends the current selection.
 
-	Note: the selected area includes all highlighted characters except for
-	the special case in which the last highlighted character is the first
-	character on a line.  This exception is made to provide control over
-	whether the newline is selected as well.
+	Note: the selected area includes all highlighted characters except
+	for the special case in which the last highlighted character is the
+	first character on a line.  This exception is made to provide
+	control over whether the newline is selected as well.
+
+	Scrollbars:
+	-----------
+	If built with scrollbars enabled, you can resize windows by moving
+	the border between corresponding scrollbars (with the mouse).
+
+	Splitting and deleting of windows may now be done with the mouse. 
+	Ctrl<Btn1Down> on a scrollbar will cause the scrollbar and the
+	corresponding vile window to be split with the new border at or
+	near the mouse cursor.  Ctrl<Btn2Down> will delete the window. 
+	Ctrl<Btn3Down> will make the corresponding window the only window.
 
 	Additional command line arguments:
-
+	----------------------------------
 	-f fontname	Font to use.
 	-r 		Use reverse video.
 	-d display	Use an alternate display.
@@ -1571,7 +1596,7 @@ X Window System specifics:
 	=geometry	change window dimensions
 
 	X Resources:
-
+	------------
 	font		Font to use.
 	geometry	Window dimensions.
 	charClass	Character classes for multiple click selections.
@@ -1587,11 +1612,12 @@ X Window System specifics:
 			to change windows, therefore selected text is not
 			lost due to the extra clicking.
 
-	Changing the font on the fly:
 
-	Use the ':setv' command to set the $font variable:
+	Fonts:
+	------
+	To change the font on the fly, use the ':setv' command to set the
+	$font variable, with ":setv $font <fontname>".
 
-	: setv $font <fontname>
 
 DOS specifics
 -------------

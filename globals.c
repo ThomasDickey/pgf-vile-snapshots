@@ -3,96 +3,9 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: globals.c,v $
- * Revision 1.27  1994/02/03 19:35:12  pgf
- * tom's changes for 3.65
+ * Revision 1.28  1994/02/22 11:03:15  pgf
+ * truncated RCS log for 4.0
  *
- * Revision 1.26  1993/12/22  15:28:34  pgf
- * applying tom's 3.64 changes
- *
- * Revision 1.25  1993/11/04  09:10:51  pgf
- * tom's 3.63 changes
- *
- * Revision 1.24  1993/10/04  10:24:09  pgf
- * see tom's 3.62 changes
- *
- * Revision 1.23  1993/09/16  10:57:54  pgf
- * used set_curwp() instead of swbuffer() to restore our window after
- * globber executes a command on the current line
- *
- * Revision 1.22  1993/07/27  18:06:20  pgf
- * see tom's 3.56 CHANGES entry
- *
- * Revision 1.21  1993/07/01  16:15:54  pgf
- * tom's 3.51 changes
- *
- * Revision 1.20  1993/05/24  15:21:37  pgf
- * tom's 3.47 changes, part a
- *
- * Revision 1.19  1993/05/04  17:05:14  pgf
- * see tom's CHANGES, 3.45
- *
- * Revision 1.18  1993/04/01  12:53:33  pgf
- * removed redundant includes and declarations
- *
- * Revision 1.17  1993/03/18  17:42:20  pgf
- * see 3.38 section of CHANGES
- *
- * Revision 1.16  1993/03/16  10:53:21  pgf
- * see 3.36 section of CHANGES file
- *
- * Revision 1.15  1993/02/24  10:59:02  pgf
- * see 3.34 changes, in CHANGES file
- *
- * Revision 1.14  1992/12/20  14:39:48  foxharp
- * implemented 'v' command -- easy -- just do same as 'g', but invert marks
- * before runnning the command
- *
- * Revision 1.13  1992/12/04  09:12:25  foxharp
- * deleted unused assigns
- *
- * Revision 1.12  1992/05/16  12:00:31  pgf
- * prototypes/ansi/void-int stuff/microsoftC
- *
- * Revision 1.11  1992/03/07  10:21:29  pgf
- * arg mismatch on fsearch()
- *
- * Revision 1.10  1992/01/05  00:06:13  pgf
- * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
- * often.  also normalized message appearance somewhat.
- *
- * Revision 1.9  1991/11/01  14:38:00  pgf
- * saber cleanup
- *
- * Revision 1.8  1991/09/10  00:52:55  pgf
- * be careful to not rely on curbp during global ops, since some commands, like
- * print (pregion) change buffers
- *
- * Revision 1.7  1991/08/07  12:35:07  pgf
- * added RCS log messages
- *
- * revision 1.6
- * date: 1991/08/06 15:22:03;
- *  global/local values
- * 
- * revision 1.5
- * date: 1991/06/27 18:43:40;
- * fixed infinite loop if a global referenced '^' or '$' as the search string
- * 
- * revision 1.4
- * date: 1991/06/25 19:52:44;
- * massive data structure restructure
- * 
- * revision 1.3
- * date: 1991/05/31 11:07:32;
- * clean up globals routine, so it doesn't need or provide extra args
- * 
- * revision 1.2
- * date: 1991/04/22 09:02:42;
- * removed non-portable initialization
- * 
- * revision 1.1
- * date: 1990/09/21 10:25:21;
- * initial vile RCS revision
  */
 
 #include	"estruct.h"

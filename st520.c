@@ -5,32 +5,9 @@
  * compiles into nothing if not a 520ST style device.
  *
  * $Log: st520.c,v $
- * Revision 1.8  1993/04/01 12:53:33  pgf
- * removed redundant includes and declarations
+ * Revision 1.9  1994/02/22 11:03:15  pgf
+ * truncated RCS log for 4.0
  *
- * Revision 1.7  1992/08/20  23:40:48  foxharp
- * typo fixes -- thanks, eric
- *
- * Revision 1.6  1992/05/16  12:00:31  pgf
- * prototypes/ansi/void-int stuff/microsoftC
- *
- * Revision 1.5  1992/01/05  00:06:13  pgf
- * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
- * often.  also normalized message appearance somewhat.
- *
- * Revision 1.4  1991/09/10  01:19:35  pgf
- * re-tabbed, and moved ESC and BEL to estruct.h
- *
- * Revision 1.3  1991/08/07  12:35:07  pgf
- * added RCS log messages
- *
- * revision 1.2
- * date: 1990/10/01 12:24:59;
- * changed newsize to newscreensize
- * 
- * revision 1.1
- * date: 1990/09/21 10:26:03;
- * initial vile RCS revision
  */
 
 #define termdef 1			/* don't define "term" external */

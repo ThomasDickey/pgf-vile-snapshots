@@ -4,14 +4,9 @@
  *		Chris Janton's (chj) VMS Icon port.
  *
  * $Log: vmspipe.c,v $
- * Revision 1.3  1993/09/03 09:11:54  pgf
- * tom's 3.60 changes
+ * Revision 1.4  1994/02/22 11:03:15  pgf
+ * truncated RCS log for 4.0
  *
- * Revision 1.2  1993/08/05  14:29:12  pgf
- * tom's 3.57 changes
- *
- * Revision 1.1  1993/04/01  12:54:44  pgf
- * Initial revision
  *
  */
 

@@ -8,36 +8,9 @@
  *  Last Updated: 07/14/87
  *
  * $Log: vmsvt.c,v $
- * Revision 1.10  1993/10/04 10:24:09  pgf
- * see tom's 3.62 changes
+ * Revision 1.11  1994/02/22 11:03:15  pgf
+ * truncated RCS log for 4.0
  *
- * Revision 1.9  1993/07/27  18:06:20  pgf
- * see tom's 3.56 CHANGES entry
- *
- * Revision 1.8  1993/06/18  15:57:06  pgf
- * tom's 3.49 changes
- *
- * Revision 1.7  1993/04/20  12:18:32  pgf
- * see tom's 3.43 CHANGES
- *
- * Revision 1.6  1993/04/01  12:57:22  pgf
- * removed redundant includes and declarations
- *
- * Revision 1.5  1993/03/25  19:50:58  pgf
- * see 3.39 section of CHANGES
- *
- * Revision 1.4  1993/03/17  10:00:29  pgf
- * initial changes to make VMS work again
- *
- * Revision 1.3  1992/08/20  23:40:48  foxharp
- * typo fixes -- thanks, eric
- *
- * Revision 1.2  1991/08/07  12:35:07  pgf
- * added RCS log messages
- *
- * revision 1.1
- * date: 1990/09/21 10:26:19;
- * initial vile RCS revision
  */
 
 #include	"estruct.h"		/* Emacs' structures		*/

@@ -4,220 +4,9 @@
  *	written 11-feb-86 by Daniel Lawrence
  *
  * $Log: bind.c,v $
- * Revision 1.65  1994/02/14 15:46:31  pgf
- * tom's interim post-3.65 changes
+ * Revision 1.67  1994/02/22 11:03:15  pgf
+ * truncated RCS log for 4.0
  *
- * Revision 1.64  1994/02/11  14:04:31  pgf
- * added support for altpoundc special key, and
- * for echoing 8bit chars on the command line in hex or octal
- *
- * Revision 1.63  1994/02/03  19:35:12  pgf
- * tom's changes for 3.65
- *
- * Revision 1.62  1994/01/31  18:11:03  pgf
- * change kbd_key() to tgetc()
- *
- * Revision 1.61  1994/01/31  15:06:13  pgf
- * changes for meta keys (8th bit) and describe-bindings
- *
- * Revision 1.60  1994/01/31  12:28:09  pgf
- * the 'M-' prefix now gives a high bit, rather than a SPEC bit.
- *
- * Revision 1.59  1993/12/22  15:28:34  pgf
- * applying tom's 3.64 changes
- *
- * Revision 1.58  1993/11/04  09:10:51  pgf
- * tom's 3.63 changes
- *
- * Revision 1.57  1993/10/04  10:24:09  pgf
- * see tom's 3.62 changes
- *
- * Revision 1.56  1993/09/03  09:11:54  pgf
- * tom's 3.60 changes
- *
- * Revision 1.55  1993/08/13  16:32:50  pgf
- * tom's 3.58 changes
- *
- * Revision 1.54  1993/08/05  14:29:12  pgf
- * tom's 3.57 changes
- *
- * Revision 1.53  1993/07/27  18:06:20  pgf
- * see tom's 3.56 CHANGES entry
- *
- * Revision 1.52  1993/07/19  15:28:23  pgf
- * moved hex digit processing from prc2kcod to token()
- *
- * Revision 1.51  1993/07/15  10:37:58  pgf
- * see 3.55 CHANGES
- *
- * Revision 1.50  1993/07/01  16:15:54  pgf
- * tom's 3.51 changes
- *
- * Revision 1.49  1993/07/01  10:56:21  pgf
- * bugfix to prc2kcod()
- *
- * Revision 1.48  1993/06/30  14:07:54  pgf
- * made M- synonymous w/ FN-
- *
- * Revision 1.47  1993/06/28  20:03:29  pgf
- * cleaned prc2kcod, and added 0xNN and literal control character support
- *
- * Revision 1.46  1993/06/28  17:11:31  pgf
- * tightened up parsing and error checking for key-sequences
- *
- * Revision 1.45  1993/06/21  14:22:38  pgf
- * don't kbd_putc to the last column, to avoid auto-wrap problems.  should
- * really check ":am:", but this means adding to the TERM struct.
- *
- * Revision 1.44  1993/06/02  14:28:47  pgf
- * see tom's 3.48 CHANGES
- *
- * Revision 1.43  1993/05/11  16:22:22  pgf
- * see tom's CHANGES, 3.46
- *
- * Revision 1.42  1993/05/10  12:04:04  pgf
- * fnc2engl() now trys to return a long name for a function, rather
- * than a real short name
- *
- * Revision 1.41  1993/05/05  12:30:11  pgf
- * name changes for set-terminal stuff, and took out the keys that are
- * bindable with bind-key
- *
- * Revision 1.40  1993/05/04  17:05:14  pgf
- * see tom's CHANGES, 3.45
- *
- * Revision 1.39  1993/04/28  17:11:22  pgf
- * got rid of NeWS ifdefs
- *
- * Revision 1.38  1993/04/28  14:34:11  pgf
- * see CHANGES, 3.44 (tom)
- *
- * Revision 1.37  1993/04/21  15:40:40  pgf
- * change alternate eolchar for kbd_engl_stat to ' ', since NAMEC is now TAB
- *
- * Revision 1.36  1993/04/20  12:18:32  pgf
- * see tom's 3.43 CHANGES
- *
- * Revision 1.35  1993/04/01  13:07:50  pgf
- * see tom's 3.40 CHANGES
- *
- * Revision 1.34  1993/03/25  19:50:58  pgf
- * see 3.39 section of CHANGES
- *
- * Revision 1.33  1993/03/18  17:42:20  pgf
- * see 3.38 section of CHANGES
- *
- * Revision 1.32  1993/03/16  10:53:21  pgf
- * see 3.36 section of CHANGES file
- *
- * Revision 1.31  1993/03/05  17:50:54  pgf
- * see CHANGES, 3.35 section
- *
- * Revision 1.30  1993/02/24  10:59:02  pgf
- * see 3.34 changes, in CHANGES file
- *
- * Revision 1.29  1993/02/15  10:37:31  pgf
- * cleanup for gcc-2.3's -Wall warnings
- *
- * Revision 1.28  1993/02/12  10:41:28  pgf
- * added new function, insertion_cmd(), which returns char that gives
- * us simple insert mode.  used in x11.c and input.c, for pasting and for
- * insert-mode arrow keys
- *
- * Revision 1.27  1993/02/08  14:53:35  pgf
- * see CHANGES, 3.32 section
- *
- * Revision 1.26  1993/01/16  10:21:17  foxharp
- * use new ScratchName, isShellOrPipe, and isreturn macros
- *
- * Revision 1.25  1992/12/04  09:08:45  foxharp
- * deleted unused assigns
- *
- * Revision 1.24  1992/08/20  23:40:48  foxharp
- * typo fixes -- thanks, eric
- *
- * Revision 1.23  1992/06/04  19:45:14  foxharp
- * cast strlen() to int for new ANSI promotion semantics :-(
- *
- * Revision 1.22  1992/05/19  08:55:44  foxharp
- * more prototype and shadowed decl fixups
- *
- * Revision 1.21  1992/05/16  12:00:31  pgf
- * prototypes/ansi/void-int stuff/microsoftC
- *
- * Revision 1.20  1992/03/13  08:44:53  pgf
- * honor \n like \r in kbd_engl_stat
- *
- * Revision 1.19  1992/03/05  09:19:55  pgf
- * changed some mlwrite() to mlforce(), due to new terse support
- *
- * Revision 1.18  1992/01/05  00:06:13  pgf
- * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
- * often.  also normalized message appearance somewhat.
- *
- * Revision 1.17  1992/01/03  23:31:49  pgf
- * use new ch_fname() to manipulate filenames, since b_fname is now
- * a malloc'ed sting, to avoid length limits
- *
- * Revision 1.16  1991/11/01  14:38:00  pgf
- * saber cleanup
- *
- * Revision 1.15  1991/10/22  14:08:23  pgf
- * took out old ifdef BEFORE code
- *
- * Revision 1.14  1991/09/27  02:49:01  pgf
- * removed scalar init of static array
- *
- * Revision 1.13  1991/09/19  13:33:48  pgf
- * MDEXACT changed to MDIGNCASE
- *
- * Revision 1.12  1991/08/12  15:05:14  pgf
- * added fnc2key function, for getting back into insert mode
- *
- * Revision 1.11  1991/08/07  12:35:07  pgf
- * added RCS log messages
- *
- * revision 1.10
- * date: 1991/08/06 15:10:56;
- * global/local values
- * and new printf/list stuff
- *
- * revision 1.9
- * date: 1991/06/27 19:45:08;
- * fixed prompts
- *
- * revision 1.8
- * date: 1991/06/03 17:34:51;
- * switch from "meta" etc. to "ctla" etc.
- *
- * revision 1.7
- * date: 1991/06/03 13:58:22;
- * made bind description list better
- *
- * revision 1.6
- * date: 1991/06/03 10:18:31;
- * fix apropos bug, and a bind nit
- *
- * revision 1.5
- * date: 1991/05/31 10:31:34;
- * new kbd_engl_stat() routine, which returns more status, for use in the
- * new namedcmd() code
- *
- * revision 1.4
- * date: 1990/12/06 19:49:07;
- * always rebuild Binding List buffer on request
- *
- * revision 1.3
- * date: 1990/10/03 16:00:30;
- * make backspace work for everyone
- *
- * revision 1.2
- * date: 1990/09/28 14:34:57;
- * changed prc2kcod decl to int
- *
- * revision 1.1
- * date: 1990/09/21 10:24:44;
- * initial vile RCS revision
  */
 
 #include	"estruct.h"
@@ -456,16 +245,6 @@ char *s;	/* string to output */
 	if (discmd)
 		kbd_puts(s);
 }
-
-#if OPT_UPBUFF
-/* ARGSUSED */
-static int
-update_binding_list(bp)
-BUFFER *bp;
-{
-	return desbind(FALSE,1);
-}
-#endif
 
 /* ARGSUSED */
 int
@@ -738,21 +517,36 @@ int c;		/* command key to unbind */
 
 /* describe bindings bring up a fake buffer and list the key bindings
 		   into it with view mode			*/
+
+/* remember whether we last did "apropos" or "describe-bindings" */
+static char *last_apropos_string;
+
+/* ARGSUSED */
+static int
+update_binding_list(bp)
+BUFFER *bp;
+{
+	return liststuff(BINDINGS_NAME, makebindlist, 1, last_apropos_string);
+}
+
 /* ARGSUSED */
 int
 desbind(f, n)
 int f,n;
 {
-	return liststuff(BINDINGS_NAME, makebindlist, 1, (char *)0);
+	last_apropos_string = (char *)0;
+	return update_binding_list((BUFFER *)0);
 }
 
 #if	APROP
+
+static char mstring[NSTRING];	/* string to match cmd names to */
+
 /* ARGSUSED */
 int
 apro(f, n)	/* Apropos (List functions that match a substring) */
 int f,n;
 {
-	static char mstring[NSTRING];	/* string to match cmd names to */
 	register int    s;
 
 
@@ -760,7 +554,8 @@ int f,n;
 	if (s != TRUE)
 		return(s);
 
-	return liststuff(BINDINGS_NAME, makebindlist, 1, mstring);
+	last_apropos_string = mstring;
+	return update_binding_list((BUFFER *)0);
 }
 #endif
 

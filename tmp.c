@@ -34,26 +34,9 @@
  *	  are in-memory can have space allocated from them.
  *
  * $Log: tmp.c,v $
- * Revision 1.6  1994/02/03 19:35:12  pgf
- * tom's changes for 3.65
+ * Revision 1.7  1994/02/22 11:03:15  pgf
+ * truncated RCS log for 4.0
  *
- * Revision 1.5  1993/11/04  09:10:51  pgf
- * tom's 3.63 changes
- *
- * Revision 1.4  1993/09/03  09:11:54  pgf
- * tom's 3.60 changes
- *
- * Revision 1.3  1993/06/18  15:57:06  pgf
- * tom's 3.49 changes
- *
- * Revision 1.2  1993/06/02  14:28:47  pgf
- * see tom's 3.48 CHANGES
- *
- * Revision 1.1  1993/05/24  15:21:37  pgf
- * tom's 3.47 changes, part a
- *
- * Revision 1.0  1993/05/11  16:26:18  pgf
- * Initial revision
  *
  */
 #include "estruct.h"

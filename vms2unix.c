@@ -4,14 +4,8 @@
  *	Miscellaneous routines for UNIX/VMS compatibility.
  *
  * $Log: vms2unix.c,v $
- * Revision 1.2  1993/06/18 15:57:06  pgf
- * tom's 3.49 changes
- *
- * Revision 1.1  1993/04/01  13:07:50  pgf
- * see tom's 3.40 CHANGES
- *
- * Revision 1.0  1993/03/25  19:48:11  pgf
- * Initial revision
+ * Revision 1.3  1994/02/22 11:03:15  pgf
+ * truncated RCS log for 4.0
  *
  */
 #include	"estruct.h"

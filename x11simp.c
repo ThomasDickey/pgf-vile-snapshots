@@ -1,25 +1,10 @@
 /*
- * 	X11 support, Dave Lemke, 11/91
- *	X Toolkit support, Kevin Buettner, 2/94
+ * 	older, simpler X11 support, Dave Lemke, 11/91
  *
- * $Log: x11.c,v $
- * Revision 1.45  1994/02/22 17:48:19  pgf
- * added kev's openlook and motif support
- *
- * Revision 1.44  1994/02/22  11:03:15  pgf
+ * $Log: x11simp.c,v $
+ * Revision 1.40  1994/02/22 11:03:15  pgf
  * truncated RCS log for 4.0
  *
- */
-
-/*
- * Widget set selection.
- *
- * You must have exactly one of the following defined
- *
- *    NO_WIDGETS	-- Use only Xlib and X toolkit
- *    ATHENA_WIDGETS	-- Use Xlib, Xt, and Athena widget set
- *    MOTIF_WIDGETS	-- Use Xlib, Xt, and Motif widget set
- *    OL_WIDGETS	-- Use Xlib, Xt, and Openlook widget set
  */
 
 #include	"estruct.h"
@@ -29,7 +14,7 @@
 	both ISC and X11, well, you know what to do. */
 #undef ISC
 
-#if X11 && XTOOLKIT
+#if X11
 
 #if VMS
 #undef UNIX
@@ -39,40 +24,19 @@
 #undef strchr
 #undef strrchr
 
-#include	<X11/Intrinsic.h>
-#include	<X11/StringDefs.h>
-
-#if OL_WIDGETS
-#undef BANG
-#include	<Xol/OpenLook.h>
-#include	<Xol/Form.h>
-#include	<Xol/BulletinBo.h>
-#include	<Xol/Slider.h>
-#include	<Xol/Scrollbar.h>
-#endif /* OL_WIDGETS */
-
-#include	<X11/Shell.h>
-#include	<X11/Xmu/Converters.h>
-
+#include	<X11/Xlib.h>
+#include	<X11/Xutil.h>
 #include	<X11/keysym.h>
+#include	<X11/Xos.h>
 #include	<X11/Xatom.h>
 
-#if ATHENA_WIDGETS
-#include	<X11/Xaw/Form.h>
-#include	<X11/Xaw/Paned.h>
-#include	<X11/Xaw/Scrollbar.h>
-#include	<X11/Xaw/Grip.h>
-#endif /* ATHENA_WIDGETS */
-
-#if MOTIF_WIDGETS
-#include	<Xm/Form.h>
-#include	<Xm/PanedW.h>
-#include	<Xm/ScrollBar.h>
-#include	<Xm/SashP.h>
-#endif /* MOTIF_WIDGETS */
-
-
 #define	XCalloc(type)	((type*)calloc(1, sizeof(type)))
+
+#if !APOLLO || defined(__STDCPP__)	/* not in apollo sr10.2 */
+extern	XClassHint *XAllocClassHint P((void)); /* usually in <X11/xutil.h> */
+#else
+#define XAllocClassHint() XCalloc(XClassHint)
+#endif
 
 #define	MARGIN	8
 #define	SCRSIZ	64
@@ -89,22 +53,6 @@
 
 #define X_PIXEL ULONG
 
-#define PANE_WIDTH_MAX 200
-
-#ifdef ATHENA_WIDGETS
-#define PANE_WIDTH_DEFAULT 16
-#define PANE_WIDTH_MIN 6
-#elif MOTIF_WIDGETS | OL_WIDGETS
-#define PANE_WIDTH_DEFAULT 20
-#define PANE_WIDTH_MIN 10
-#endif
-
-#define MAXCOLS 200
-#define MINCOLS	30
-#define MAXROWS	200
-#define MINROWS MINWLNS
-#define MAXSBS	((MAXROWS) / 2)
-
 /* local screen rep flags */
 #define	CELL_DIRTY	0x1
 #define	CELL_REVERSE	0x2
@@ -114,46 +62,24 @@
 /* local screen rep line flags */
 #define	LINE_DIRTY	0x1
 
-/* Keyboard queue size */
-#define KQSIZE 64
-
+static char *displayname;
 static Display *dpy;
 
 typedef struct _text_win {
     /* X stuff */
-    Window	win;		/* window corresponding to screen */
-    XtAppContext
-    		app_context;	/* application context */
-    Widget	top_widget;	/* top level widget */
-    Widget	screen;		/* screen widget */
-#if !NO_WIDGETS
-    Widget	form_widget;	/* form widget */
-    Widget	pane;		/* panes in which scrollbars live */
-    Widget	scrollbars[MAXSBS];	
-    				/* the scrollbars */
-    int		nscrollbars;	/* number of currently active scroll bars */
-#endif
-#if OL_WIDGETS
-    Widget	sliders[MAXSBS-1];
-#endif
-
-    int		base_width;	/* width with screen widgets' width zero */
-    int		base_height;
-    int		pane_width;	/* full width of scrollbar pane */
-    Dimension	top_width;	/* width of top widget as of last resize */
-    Dimension	top_height;	/* height of top widget as of last resize */
-    				
+    Display    *dpy;
+    int         screen;
+    Window      win;
+    unsigned    bw;
     XFontStruct *pfont;
     GC          textgc;
     GC          reversegc;
-    Pixel	fg;
-    Pixel	bg;
+    X_PIXEL	fg;
+    X_PIXEL	bg;
     int         char_width,
                 char_ascent,
                 char_height;
     char       *fontname;
-    Bool	focus_follows_mouse;
-    XtJustify	scrollbar_placement;
 
     /* text stuff */
     Bool        reverse;
@@ -167,7 +93,6 @@ typedef struct _text_win {
     UCHAR *line_attr;	/* pre-line attributes */
 
     /* selection stuff */
-    String	multi_click_char_class;	/* ?? */
     Time        lasttime;	/* for multi-click */
     Time        click_timeout;
     int         numclicks;
@@ -183,25 +108,11 @@ typedef struct _text_win {
     Atom        sel_prop;
     UCHAR *	selection_data;
     int         selection_len;
-
-    /* key press queue */
-    int		kqhead;
-    int		kqtail;
-    int		kq[KQSIZE];
 }           TextWindowRec, *TextWindow;
-
 
 static	TextWindow cur_win;
 static	TBUFF	*PasteBuf;
 static	int	drawing_ruler;	/* for 'ruler' mode */
-
-static	Atom	atom_WM_PROTOCOLS;
-static	Atom	atom_WM_DELETE_WINDOW;
-static	Atom	atom_WM_TAKE_FOCUS;
-
-#if MOTIF_WIDGETS
-static Bool lookfor_sb_resize = FALSE;
-#endif
 
 static	int	x_getc   P(( void )),
 		x_cres   P(( char * ));
@@ -248,12 +159,15 @@ static	void	extend_selection P(( TextWindow, int, int, Bool ));
 static	void	multi_click P(( TextWindow, int, int ));
 static	void	start_selection P(( TextWindow, XButtonPressedEvent *, int, int ));
 static	XMotionEvent * compress_motion P(( XMotionEvent * ));
-static	void	x_process_event P(( Widget, XtPointer, XEvent *, Boolean * ));
-static	void	x_configure_window P(( Widget, XtPointer, XEvent *, Boolean * ));
-static	void	x_change_focus P(( Widget, XtPointer, XEvent *, Boolean * ));
-static	void	x_key_press P(( Widget, XtPointer, XEvent *, Boolean * ));
-static	void	x_wm_delwin P(( Widget, XtPointer, XEvent *, Boolean * ));
+static	void	x_process_event P(( XEvent * ));
+static	int	decoded_key P(( XEvent *, char *, int ));
+#if NEEDED
+static	Bool	check_kbd_ev P(( Display *, XEvent *, char * ));
+#endif
 static	char *	strndup P(( char *, int ));
+static	X_PIXEL	color_value P(( Display *, int, char * ));
+static	char *	any_resource P(( Display *, char * ));
+static	void	x_get_defaults P(( Display *, int ));
 static	void	wait_for_scroll P(( TextWindow ));
 static	void	flush_line P(( UCHAR *, int, Bool, int, int ));
 static	int	set_character_class_range P(( int, int, int ));
@@ -262,25 +176,30 @@ static	int	add2paste P(( TBUFF **, int ));
 static	int	copy_paste P(( TBUFF **, char *, SIZE_T ));
 static	void	x_get_selection P(( TextWindow, Atom, Atom, char *, SIZE_T, int ));
 static	XFontStruct *query_font P(( TextWindow, char * ));
-#if ATHENA_WIDGETS 
-static	void	grip_moved P(( Widget, XEvent *, String *, Cardinal *));
-static	void	configure_bar P(( Widget, XEvent *, String *, Cardinal *));
-#endif /* ATHENA_WIDGETS */
-#if MOTIF_WIDGETS
-static	void	grip_moved P(( Widget, XtPointer, XEvent *, Boolean * ));
-static	void	pane_button P(( Widget, XtPointer, XEvent *, Boolean * ));
-static	void	configure_bar P(( Widget, XEvent *, String *, Cardinal *));
-#endif /* MOTIF_WIDGETS */
-#if OL_WIDGETS
-static	void	configure_bar P(( Widget, XEvent *, String *, Cardinal *));
-#endif /* OL_WIDGETS */
-static	void	kqinit P(( TextWindow ));
-static	int	kqempty P(( TextWindow ));
-static	int	kqfull P(( TextWindow ));
-static	int	kqdel P(( TextWindow ));
-static	void	kqadd P(( TextWindow, int ));
 
+#define MY_NAME         "xvile"
+#define MY_CLASS	"XVile"
 #define	FONTNAME	"7x13"
+
+static	char *	fontname;
+static	char *	geometry;
+static	char *	progname;
+static	char *	wm_title;
+static	Bool	reverse_video;
+static	char *	foreground_name;
+static	char *	background_name;
+static	X_PIXEL	foreground;
+static	X_PIXEL	background;
+static	Bool	focus_follows_mouse;
+
+static int  multi_click_time = 500;
+
+static int  startx = 100,
+            starty = 100;
+
+static unsigned  start_rows = 36,
+                 start_cols = 80;
+
 
 TERM        term = {
     0,				/* these four values are set dynamically at
@@ -380,838 +299,69 @@ free_win_data(tw)
 	}
 }
 
-#if !NO_WIDGETS
-static void
-set_scroll_window(n)
-    int n;
-{
-    register WINDOW *wp;
-    for_each_window(wp) {
-	if (n-- == 0)
-	    break;
-    }
-    if (n < 0)
-	set_curwp(wp);
-}
-
-#if ATHENA_WIDGETS
-static void
-ScrollProc(scrollbar, num, position)
-    Widget scrollbar;
-    XtPointer num;
-    XtPointer position;
-{
-    if ((int) position == 0 || (int) num >= cur_win->nscrollbars)
-	return;
-    set_scroll_window((int)num);
-    mvdnwind(TRUE, (((int) position) / cur_win->char_height) 
-                    + (((int) position) >= 0 ? 1 : -1));
-    (void)update(FALSE);
-    x_flush();
-}
-
-static void
-JumpProc(scrollbar, num, percent_ptr)
-    Widget scrollbar;
-    XtPointer num;
-    XtPointer percent_ptr;
-{
-    if ((int) num >= cur_win->nscrollbars)
-	return;
-    set_scroll_window((int)num);
-    gotoline(TRUE, (int)
-		(line_count(curwp->w_bufp) * *(float *)percent_ptr)+1);
-    curwp->w_flag |= WFFORCE;
-    (void)update(FALSE);
-    x_flush();
-}
-#endif /* ATHENA_WIDGETS */
-
-#ifdef MOTIF_WIDGETS
-static void
-JumpProc(scrollbar, num, cbs)
-    Widget scrollbar;
-    XtPointer num;
-    XmScrollBarCallbackStruct *cbs;
-{
-    lookfor_sb_resize = FALSE;
-    if ((int) num >= cur_win->nscrollbars)
-	return;
-    set_scroll_window((int)num);
-    gotoline(TRUE, cbs->value);
-    curwp->w_flag |= WFFORCE;
-    (void)update(FALSE);
-    x_flush();
-}
-#endif
-
-
-
-#if OL_WIDGETS
-static dont_update_sb = FALSE;
-
-static void
-JumpProc(scrollbar, num, cbs)
-    Widget scrollbar;
-    XtPointer num;
-    OlScrollbarVerify *cbs;
-{
-    if ((int) num >= cur_win->nscrollbars)
-	return;
-    dont_update_sb = TRUE;
-    set_scroll_window((int)num);
-    gotoline(TRUE, cbs->new_location);
-    curwp->w_flag |= WFFORCE;
-    (void)update(FALSE);
-    x_flush();
-    dont_update_sb = FALSE;
-}
-
-static void
-grip_moved(slider, num, cbs)
-    Widget slider;
-    XtPointer num;
-    OlSliderVerify *cbs;
-{
-    register WINDOW *wp, *saved_curwp;
-    int i, nlines;
-    i = (int) num;
-    for_each_window(wp) {
-	if (i-- == 0)
-	    break;
-    }
-    if (!wp)
-	return;
-    saved_curwp = curwp;
-    nlines = - cbs->new_location;
-    if (nlines == 0) {
-	delwp(wp);
-	if (saved_curwp == wp)
-	    saved_curwp = wheadp;
-    }
-    else {
-	curwp = wp;
-	resize(TRUE, nlines);
-    }
-    set_curwp(saved_curwp);
-    (void) update(FALSE);
-    x_flush();
-}
-
-static void
-update_scrollbar_sizes()
-{
-    register WINDOW *wp;
-    int i, newsbcnt;
-    Dimension new_height;
-
-    i=0;
-    for_each_window(wp)
-	i++;
-    newsbcnt=i;
-
-    /* Create any needed new scrollbars and sliders */
-    for (i = cur_win->nscrollbars+1; i <= newsbcnt; i++) 
-	if (cur_win->scrollbars[i] == NULL) {
-	    cur_win->scrollbars[i] = XtVaCreateWidget(
-		    "scrollbar",
-		    scrollbarWidgetClass,
-		    cur_win->pane,
-		    NULL);
-	    XtAddCallback(cur_win->scrollbars[i],
-		    XtNsliderMoved, JumpProc, (XtPointer) i);
-	    cur_win->sliders[i] = XtVaCreateWidget(
-		    "slider",
-		    sliderWidgetClass,
-		    cur_win->pane,
-		    NULL);
-	    XtAddCallback(cur_win->sliders[i],
-		    XtNsliderMoved, grip_moved, (XtPointer) i);
-	}
-
-    /* Unmanage current set of scrollbars */
-    if (cur_win->nscrollbars > 0)
-	XtUnmanageChildren(cur_win->scrollbars, 
-	                   (Cardinal) (cur_win->nscrollbars));
-    if (cur_win->nscrollbars > 1)
-	XtUnmanageChildren(cur_win->sliders, 
-	                   (Cardinal) (cur_win->nscrollbars - 1));
-
-    /* Set sizes and positions on scrollbars and sliders */
-    i=0;
-    for_each_window(wp) {
-	new_height = wp->w_ntrows * cur_win->char_height;
-	XtVaSetValues(cur_win->scrollbars[i],
-	    XtNy,	wp->w_toprow * cur_win->char_height,
-	    XtNheight,	new_height,
-#if 0
-	    XtNwidth,		cur_win->pane_width,
-#endif
-	    XtNsliderMin,	1,
-	    XtNsliderMax,	200,
-	    XtNproportionLength, 2,
-	    XtNsliderValue,	3,
-	    NULL);
-	if (wp->w_wndp) {
-	    XtVaSetValues(cur_win->sliders[i],
-		XtNy,		wp->w_toprow * cur_win->char_height,
-		XtNheight,	(wp->w_ntrows + wp->w_wndp->w_ntrows + 1)
-					    * cur_win->char_height,
-#if 0
-		XtNwidth,	cur_win->pane_width,
-#endif
-		XtNsliderMax,	0,
-		XtNsliderMin,	-(wp->w_ntrows + wp->w_wndp->w_ntrows),
-		XtNsliderValue, -wp->w_ntrows,
-#if 0
-		XtNscale,	10,
-#endif
-		XtNstopPosition, OL_GRANULARITY,
-		XtNendBoxes,	FALSE,
-		XtNdragCBType,	OL_RELEASE,
-		XtNbackground,	cur_win->fg,
-		NULL);
-	}
-	wp->w_flag &= ~WFSBAR;
-	i++;
-    }
-    cur_win->nscrollbars = newsbcnt;
-
-    /* Manage the sliders */
-    if (cur_win->nscrollbars > 1)
-	XtManageChildren(cur_win->sliders,
-			    (Cardinal) (cur_win->nscrollbars - 1));
-
-    /* Manage the current set of scrollbars */
-    XtManageChildren(cur_win->scrollbars, 
-	                   (Cardinal) (cur_win->nscrollbars));
-
-
-    for (i=0; i<cur_win->nscrollbars; i++)
-	XRaiseWindow(dpy, XtWindow(cur_win->scrollbars[i]));
-}
-
-#else /* !OL_WIDGETS */
-
-static void
-update_scrollbar_sizes()
-{
-    register WINDOW *wp;
-    int i, newsbcnt;
-    Dimension new_height;
-
-    i=0;
-    for_each_window(wp)
-	i++;
-    newsbcnt=i;
-
-#if MOTIF_WIDGETS
-    /* Remove event handlers on sashes */
-    {
-	Widget *children;
-	int num_children;
-	XtVaGetValues(cur_win->pane,
-	    XmNchildren, &children,
-	    XmNnumChildren, &num_children,
-	    NULL);
-	while (num_children-- > 0)
-	    if (XmIsSash(children[num_children]))
-		XtRemoveEventHandler(
-		    children[num_children],
-		    ButtonReleaseMask,
-		    FALSE,
-		    pane_button,
-		    NULL);
-    }
-#endif /* MOTIF_WIDGETS */
-
-    /* Create any needed new scrollbars */
-    for (i = cur_win->nscrollbars+1; i <= newsbcnt; i++) 
-	if (cur_win->scrollbars[i] == NULL) {
-#if ATHENA_WIDGETS
-	    cur_win->scrollbars[i] = XtVaCreateWidget(
-		    "scrollbar",
-		    scrollbarWidgetClass,
-		    cur_win->pane,
-		    NULL);
-	    XtAddCallback(cur_win->scrollbars[i],
-		    XtNscrollProc, ScrollProc, (XtPointer) i);
-	    XtAddCallback(cur_win->scrollbars[i],
-	            XtNjumpProc, JumpProc, (XtPointer) i);
-#elif MOTIF_WIDGETS
-	    cur_win->scrollbars[i] = XtVaCreateWidget(
-		    "scrollbar",
-		    xmScrollBarWidgetClass,
-		    cur_win->pane,
-		    XmNminimum,		1,
-		    NULL);
-	    XtAddCallback(cur_win->scrollbars[i],
-	            XmNvalueChangedCallback, JumpProc, (XtPointer) i);
-	    XtAddCallback(cur_win->scrollbars[i],
-	            XmNdragCallback, JumpProc, (XtPointer) i);
-	    XtAddEventHandler(
-		    cur_win->scrollbars[i],
-		    StructureNotifyMask,
-		    FALSE,
-		    grip_moved,
-		    (XtPointer) i);
-#endif /* ATHENA_WIDGETS, MOTIF_WIDGETS */
-	}
-
-    /* Unmanage current set of scrollbars */
-    if (cur_win->nscrollbars >= 0)
-	XtUnmanageChildren(cur_win->scrollbars, 
-	                   (Cardinal) (cur_win->nscrollbars + 1));
-
-    /* Set sizes on scrollbars */
-    i=0;
-    for_each_window(wp) {
-#if ATHENA_WIDGETS
-	new_height = wp->w_ntrows * cur_win->char_height - (i==0);
-#else
-	new_height = wp->w_ntrows * cur_win->char_height;
-#endif /* ATHENA_WIDGETS */
-	XtVaSetValues(cur_win->scrollbars[i],
-#if ATHENA_WIDGETS
-	    XtNskipAdjust,		TRUE,
-	    XtNresizeToPreferred,	TRUE,
-	    XtNshowGrip,		TRUE,
-	    XtNpreferredPaneSize,	new_height,
-	    XtNheight,			new_height,
-	    XtNmin,			1,
-#elif MOTIF_WIDGETS
-	    XmNallowResize,		TRUE,
-	    XmNheight,			new_height,
-	    XmNpaneMinimum,		1,
-	    XmNpaneMaximum,		1000,
-	    XmNshowArrows,		wp->w_ntrows > 3 ? TRUE : FALSE,
-#endif /* ATHENA_WIDGETS */
-	    NULL);
-	wp->w_flag &= ~WFSBAR;
-	i++;
-    }
-    XtVaSetValues(cur_win->scrollbars[i],
-#if ATHENA_WIDGETS
-	    XtNskipAdjust,		TRUE,
-	    XtNshowGrip,		FALSE,
-	    XtNresizeToPreferred,	TRUE,
-	    XtNpreferredPaneSize,	cur_win->char_height-1,
-	    XtNheight,			cur_win->char_height-1,
-#elif MOTIF_WIDGETS
-	    XmNheight,			cur_win->char_height-1,
-	    XmNallowResize,		FALSE,
-	    XmNpaneMinimum,		cur_win->char_height-1,
-	    XmNpaneMaximum,		cur_win->char_height-1,
-	    XmNshowArrows,		FALSE,
-#endif /* ATHENA_WIDGETS */
-	    NULL);
-    cur_win->nscrollbars = newsbcnt;
-
-    /* Manage the current set of scrollbars */
-    XtManageChildren(cur_win->scrollbars, 
-	                   (Cardinal) (cur_win->nscrollbars + 1));
-#if MOTIF_WIDGETS
-    /* Add event handlers for sashes */
-    {
-	Widget *children;
-	int num_children;
-	XtVaGetValues(cur_win->pane,
-	    XmNchildren, &children,
-	    XmNnumChildren, &num_children,
-	    NULL);
-	while (num_children-- > 0)
-	    if (XmIsSash(children[num_children]))
-		XtAddEventHandler(
-		    children[num_children],
-		    ButtonReleaseMask,
-		    FALSE,
-		    pane_button,
-		    NULL);
-    }
-#endif /* MOTIF_WIDGETS */
-}
-#endif /* OL_WIDGETS */
-#endif /* !NO_WIDGETS */
-
-void
-update_scrollbar(uwp)
-    WINDOW *uwp;
-{
-#if !NO_WIDGETS
-    WINDOW *wp;
-    int i;
-    int lcnt;
-
-#if OL_WIDGETS
-    if (dont_update_sb)
-	return;
-#endif /* OL_WIDGETS */
-
-    i = 0;
-    for_each_window(wp) {
-	if (wp == uwp)
-	    break;
-	i++;
-    }
-    if (i >= cur_win->nscrollbars || (wp->w_flag & WFSBAR))
-	update_scrollbar_sizes();
-
-    if (i >= cur_win->nscrollbars)
-	return;
-    lcnt = line_count(wp->w_bufp);
-    if (lcnt <= 0)
-	lcnt = 1;	/* don't want division by zero */
-#if ATHENA_WIDGETS
-    XawScrollbarSetThumb(cur_win->scrollbars[i],
-	    (float) ((float) wp->w_ruler_line / (float) lcnt),
-	    (float) ((float) wp->w_ntrows / (float) lcnt) );
-#elif MOTIF_WIDGETS
-    XtVaSetValues(cur_win->scrollbars[i],
-	    XmNmaximum,		lcnt + wp->w_ntrows,
-	    XmNsliderSize,	wp->w_ntrows,
-	    XmNvalue,		wp->w_ruler_line ? wp->w_ruler_line : 1,
-	    XmNpageIncrement,	wp->w_ntrows > 1 ? wp->w_ntrows-1 : 1,
-	    NULL);
-#elif OL_WIDGETS
-    XtVaSetValues(cur_win->scrollbars[i],
-	    XtNsliderMin,	1,
-	    XtNsliderMax,	lcnt + wp->w_ntrows,
-	    XtNproportionLength, wp->w_ntrows,
-	    XtNsliderValue,	wp->w_ruler_line ? wp->w_ruler_line : 1,
-	    NULL);
-#endif /* ATHENA_WIDGETS, MOTIF_WIDGETS, OL_WIDGETS */
-#endif /* !NO_WIDGETS */
-}
-
-#define XtNscrollbarWidth	"scrollbarWidth"
-#define XtCScrollbarWidth	"ScrollbarWidth"
-#define XtNfocusFollowsMouse	"focusFollowsMouse"
-#define XtCFocusFollowsMouse	"FocusFollowsMouse"
-#define XtNscrollbarPlacement	"scrollbarPlacement"
-#define XtCScrollbarPlacement	"ScrollbarPlacement"
-#define XtNmultiClickTime	"multiClickTime"
-#define XtCMultiClickTime	"MultiClickTime"
-#define XtNcharClass		"charClass"
-#define XtCCharClass		"CharClass"
-
-static XtResource resources[] = {
-    {
-	XtNfont,
-	XtCFont,
-	XtRString,
-	sizeof(String *),
-	XtOffset(TextWindow, fontname),
-	XtRImmediate,
-	XtDefaultFont 	/* used to be FONTNAME */
-    },
-    {
-	XtNforeground,
-	XtCForeground,
-	XtRPixel,
-	sizeof(Pixel),
-	XtOffset(TextWindow, fg),
-	XtRString,
-	XtDefaultForeground
-    },
-    {
-	XtNbackground,
-	XtCBackground,
-	XtRPixel,
-	sizeof(Pixel),
-	XtOffset(TextWindow, bg),
-	XtRString,
-	XtDefaultBackground
-    },
-    {
-	"rows",
-	"Rows",
-	XtRInt,
-	sizeof(int),
-	XtOffset(TextWindow, rows),
-	XtRImmediate,
-	(XtPointer) 36
-    },
-    {
-	"columns",
-	"Columns",
-	XtRInt,
-	sizeof(int),
-	XtOffset(TextWindow, cols),
-	XtRImmediate,
-	(XtPointer) 80
-    },
-    {
-	XtNfocusFollowsMouse,
-	XtCFocusFollowsMouse,
-	XtRBool,
-	sizeof(Bool),
-	XtOffset(TextWindow, focus_follows_mouse),
-	XtRImmediate,
-	(XtPointer) False
-    },
-    {
-	XtNmultiClickTime,
-	XtCMultiClickTime,
-	XtRInt,
-	sizeof(Time),
-	XtOffset(TextWindow, click_timeout),
-	XtRImmediate,
-	(XtPointer) 500
-    },
-    {
-	XtNcharClass,
-	XtCCharClass,
-	XtRString,
-	sizeof(String *),
-	XtOffset(TextWindow, multi_click_char_class),
-	XtRImmediate,
-	NULL
-    },
-#if    !NO_WIDGETS
-    {
-	XtNscrollbarPlacement,
-	XtCScrollbarPlacement,
-	XtRJustify,		/* we equate center with right */
-	sizeof(XtJustify),
-	XtOffset(TextWindow, scrollbar_placement),
-	XtRImmediate,
-	(XtPointer) XtJustifyRight
-    },
-    {
-	XtNscrollbarWidth,
-	XtCScrollbarWidth,
-	XtRInt,
-	sizeof(int),
-	XtOffset(TextWindow, pane_width),
-	XtRImmediate,
-	(XtPointer) PANE_WIDTH_DEFAULT
-    },
-#endif	/* !NO_WIDGETS */
-};
-
-#define CHECK_MIN_MAX(v,min,max)	\
-	do {				\
-	    if ((v) > (max))		\
-		(v)=(max);		\
-	    else if ((v) < (min))	\
-		(v) = (min);		\
-	} while (0)
-
 /* ARGSUSED */
 void
 x_preparse_args(pargc, pargv)
     int        *pargc;
     char     ***pargv;
 {
-    XFontStruct *pfont = 0;
-    XGCValues   gcvals;
-    ULONG	gcmask;
-#if ATHENA_WIDGETS
-    static XtActionsRec new_actions[] = {
-	{ "GripMoved", grip_moved },
-	{ "ConfigureBar", configure_bar }
-    };
-    static String fallback_resources[]= {
-	"*Grip*width:20",
-	"*Grip*height:9",
-	"*scrollbar.translations:#override \\n\\\n\
-		Ctrl<Btn1Down>:ConfigureBar(Split) \\n\\\n\
-		Ctrl<Btn2Down>:ConfigureBar(Kill) \\n\\\n\
-		Ctrl<Btn3Down>:ConfigureBar(Only)",
-	 "*scrollPane.gripTranslations:#override \\n\\\n\
-		Any<BtnDown>:GripAction(Start, ThisBorderOnly) \\n\\\n\
-		Any<BtnMotion>:GripAction(Move, ThisBorderOnly) \\n\\\n\
-	 	Any<BtnUp>:GripAction(Commit) GripMoved()",
-
-	NULL
-    };
-#elif MOTIF_WIDGETS | OL_WIDGETS
-    static XtActionsRec new_actions[] = {
-	{ "ConfigureBar", configure_bar }
-    };
-    static String fallback_resources[]= {
-	"*scrollbar.translations:#override \\n\\\n\
-		Ctrl<Btn1Down>:ConfigureBar(Split) \\n\\\n\
-		Ctrl<Btn2Down>:ConfigureBar(Kill) \\n\\\n\
-		Ctrl<Btn3Down>:ConfigureBar(Only)",
-	"*scrollPane.background:grey80",
-	"*scrollbar.background:grey60",
-	NULL
-    };
-#else /* NO_WIDGETS */
-#define fallback_resources NULL
-#endif /* ATHENA_WIDGETS */
-
-#if !NO_WIDGETS
-    XtAddConverter(XtRString, XtRJustify, XmuCvtStringToJustify, NULL, 0);
-#endif /* !NO_WIDGETS */
-
-    cur_win = (TextWindow) XCalloc(TextWindowRec);
-
-    if (!cur_win) {
-	(void)fprintf(stderr, "insufficient memory, exiting\n");
-	ExitProgram(BAD(-1));
-    }
-
-
-    	
-#if OL_WIDGETS
-    /* There is a cryptic statement in the poor documentation that I have
-     * on OpenLook that OlToolkitInitialize is now preferred to the older
-     * OlInitialize (which is used in the examples and is documented better).
-     * The documentation I have says that OlToolkitInitialize returns a
-     * widget.  I don't believe it, nor do I understand what kind of widget
-     * it would be.  I get the impression that it takes one argument, but
-     * I don't know what that argument is supposed to be.
-     *
-     * Sun's documentation really sucks.
-     */
-    (void) OlToolkitInitialize( NULL );
-#if 0
-    cur_win->top_widget = OlInitialize(*pargv[0], "XVile", NULL, 0, pargc, *pargv);
-    cur_win->app_context = XtWidgetToApplicationContext(cur_win->top_widget);
-#endif /* 0 */
-#endif /* OL_WIDGETS */
-
-    cur_win->top_widget = XtVaAppInitialize(
-	    &cur_win->app_context,
-	    "XVile",
-	    NULL, 0,
-	    pargc, *pargv,
-	    fallback_resources,
-	    NULL);
-    dpy = XtDisplay(cur_win->top_widget);
-
-    XtVaSetValues(cur_win->top_widget,
-	    XtNinput,	TRUE,
-	    NULL);
-
-    XtGetApplicationResources(
-	    cur_win->top_widget, 
-	    cur_win,
-	    resources,
-	    XtNumber(resources),
-	    NULL,
-	    0);
-
-    /* Sanity check values obtained from XtGetApplicationResources */
-#if !NO_WIDGETS
-    CHECK_MIN_MAX(cur_win->pane_width, PANE_WIDTH_MIN, PANE_WIDTH_MAX);
-#endif /* !NO_WIDGETS */
-    CHECK_MIN_MAX(cur_win->rows, MINROWS, MAXROWS);
-    CHECK_MIN_MAX(cur_win->cols, 20, MAXCOLS);
-
-
-    pfont = query_font(cur_win, cur_win->fontname);
-    if (!pfont) {
-	pfont = query_font(cur_win, FONTNAME);
-	if (!pfont) {
-	    (void)fprintf(stderr, "couldn't get font \"%s\" or \"%s\", exiting\n",
-		    cur_win->fontname, FONTNAME);
-	    ExitProgram(BAD(-1));
-	}
-    }
-    (void) set_character_class(cur_win->multi_click_char_class);
-
-#if ATHENA_WIDGETS
-    XtVaSetValues(cur_win->top_widget,
-	    XtNallowShellResize, True,
-	    NULL);
-
-    cur_win->form_widget = XtVaCreateManagedWidget(
-	    "form",
-	    formWidgetClass,
-	    cur_win->top_widget,
-	    XtNdefaultDistance, 0,
-	    XtNborderWidth, 0,
-	    NULL);
-#elif MOTIF_WIDGETS
-    cur_win->form_widget = XtVaCreateManagedWidget(
-	    "form",
-	    xmFormWidgetClass,
-	    cur_win->top_widget,
-	    NULL);
-#elif OL_WIDGETS
-    cur_win->form_widget = XtVaCreateManagedWidget(
-	    "form",
-	    formWidgetClass,
-	    cur_win->top_widget,
-	    NULL);
-#endif /* ATHENA_WIDGETS, MOTIF_WIDGETS, OL_WIDGETS */
-
-    cur_win->screen = XtVaCreateManagedWidget(
-	    "screen",
-#if MOTIF_WIDGETS
-	    xmPrimitiveWidgetClass,
-#else
-	    widgetClass,
-#endif
-#if NO_WIDGETS
-	    cur_win->top_widget,
-#else
-	    cur_win->form_widget,
-#endif
-	    XtNwidth,	x_width(cur_win),
-	    XtNheight,	x_height(cur_win),
-	    XtNborderWidth, 0,
-	    XtNbackground,	cur_win->bg,
-#if ATHENA_WIDGETS
-	    XtNresizable, TRUE,
-#elif MOTIF_WIDGETS
-	    XmNbottomAttachment,	XmATTACH_FORM,
-	    XmNtopAttachment,		XmATTACH_FORM,
-	    XmNleftAttachment,		XmATTACH_FORM,
-#elif OL_WIDGETS
-	    XtNyAttachBottom,		TRUE,
-	    XtNyVaryOffset,		FALSE,
-	    XtNxAddWidth,		TRUE,
-	    XtNyAddHeight,		TRUE,
-#endif
-	    NULL);
-
-    gcmask = GCForeground | GCBackground | GCFont;
-    gcvals.foreground = cur_win->fg;
-    gcvals.background = cur_win->bg;
-    gcvals.font = cur_win->pfont->fid;
-    cur_win->textgc = XCreateGC(dpy,
-            DefaultRootWindow(dpy),
-	    gcmask, &gcvals);
-
-    gcvals.foreground = cur_win->bg;
-    gcvals.background = cur_win->fg;
-    gcvals.font = cur_win->pfont->fid;
-    cur_win->reversegc = XCreateGC(dpy, 
-            DefaultRootWindow(dpy),
-	    gcmask, &gcvals);
-
-#if !NO_WIDGETS
-    XtAppAddActions(cur_win->app_context, new_actions, XtNumber(new_actions));
-#if ATHENA_WIDGETS
-    cur_win->pane = XtVaCreateManagedWidget(
-	    "scrollPane",
-	    panedWidgetClass,
-	    cur_win->form_widget,
-	    XtNwidth,			cur_win->pane_width,
-	    XtNheight,			x_height(cur_win),
-	    XtNfromHoriz,		cur_win->screen,
-	    XtNhorizDistance,		0,
-	    XtNgripIndent,		0,
-	    XtNresizable,		TRUE,
-	    XtNright,			XtChainRight,
-	    XtNinternalBorderWidth,	cur_win->char_height,
-	    XtNinternalBorderColor,	cur_win->fg,
-	    NULL);
-#elif MOTIF_WIDGETS
-    cur_win->pane = XtVaCreateManagedWidget(
-	    "scrollPane",
-	    xmPanedWindowWidgetClass,
-	    cur_win->form_widget,
-	    XtNwidth,			cur_win->pane_width,
-	    XmNbottomAttachment,	XmATTACH_FORM,
-	    XmNtopAttachment,		XmATTACH_FORM,
-	    XmNleftAttachment,		XmATTACH_WIDGET,
-	    XmNleftWidget,		cur_win->screen,
-	    XmNrightAttachment,		XmATTACH_FORM,
-	    XmNspacing,			cur_win->char_height,
-	    XmNsashIndent,		2,
-	    XmNsashWidth,		cur_win->pane_width - 4,
-	    XmNmarginHeight,		0,
-	    XmNmarginWidth,		0,
-	    XmNseparatorOn,		FALSE,
-	    NULL);
-#elif OL_WIDGETS
-    cur_win->pane = XtVaCreateManagedWidget(
-	    "scrollPane",
-	    bulletinBoardWidgetClass,
-	    cur_win->form_widget,
-	    XtNwidth,			cur_win->pane_width,
-	    XtNheight,			x_height(cur_win),
-	    XtNxRefWidget,		cur_win->screen,
-	    XtNyAttachBottom,		TRUE,
-	    XtNyVaryOffset,		FALSE,
-	    XtNxAddWidth,		TRUE,
-	    XtNyAddHeight,		TRUE,
-	    XtNlayout,			OL_IGNORE,
-	    NULL);
-#endif
-
-    cur_win->nscrollbars = -1;
-
-#if ATHENA_WIDGETS
-    /* Move scrollbar to the right if requested via the resources */
-    if (cur_win->scrollbar_placement == XtJustifyLeft) {
-	XtVaSetValues(cur_win->pane,
-	    XtNfromHoriz, NULL,
-	    NULL);
-	XtVaSetValues(cur_win->screen,
-	    XtNfromHoriz, cur_win->pane,
-	    NULL);
-    }
-#endif /* ATHENA_WIDGETS */
-#endif /* !NO_WIDGETS */
-
-    XtAddEventHandler(
-	    cur_win->screen,
-	    KeyPressMask,
-	    FALSE,
-	    x_key_press,
-	    NULL);
-
-    XtAddEventHandler(
-	    cur_win->screen,
-	    ButtonPressMask | PointerMotionMask 
-	    	| ExposureMask | VisibilityChangeMask,
-	    TRUE,
-	    x_process_event,
-	    NULL);
-    
-    XtAddEventHandler(
-	    cur_win->top_widget,
-	    StructureNotifyMask,
-	    FALSE,
-	    x_configure_window,
-	    NULL);
-
-    XtAddEventHandler(
-	    cur_win->top_widget,
-	    EnterWindowMask | LeaveWindowMask | FocusChangeMask,
-	    FALSE,
-	    x_change_focus,
-	    NULL);
-
-    cur_win->base_width = -1;	/* force base width to be set when configured */
-    XtRealizeWidget(cur_win->top_widget);
-    cur_win->win = XtWindow(cur_win->screen);
-
-    /* We wish to participate in the "delete window" protocol */
-    atom_WM_PROTOCOLS = XInternAtom(dpy, "WM_PROTOCOLS", False);
-    atom_WM_DELETE_WINDOW = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
-    atom_WM_TAKE_FOCUS = XInternAtom(dpy, "WM_TAKE_FOCUS", False);
-    {
-	Atom atoms[2];
-	int i = 0;
-	atoms[i++] = atom_WM_DELETE_WINDOW;
-#if 0
-	if (!cur_win->focus_follows_mouse)
-	    atoms[i++] = atom_WM_TAKE_FOCUS;
-#endif
-	XSetWMProtocols(dpy,
-		XtWindow(cur_win->top_widget),
-		atoms,
-		i);
-    }
-    XtAddEventHandler(
-	    cur_win->top_widget,
-	    NoEventMask,
-	    TRUE,
-	    x_wm_delwin,
-	    NULL);
+    progname = pathleaf(*pargv[0]);
 }
 
-char *
+void
+x_setname(name)
+    char     *name;
+{
+    if (name && *name != EOS)
+	progname = name;
+}
+
+void
+x_set_wm_title(name)
+    char     *name;
+{
+    if (name && *name != EOS)
+	wm_title = name;
+}
+
+char       *
 x_current_fontname()
 {
     return cur_win->fontname;
+}
+
+void
+x_set_rv()
+{
+    reverse_video = !reverse_video;
+}
+
+void
+x_set_geometry(g)
+    char       *g;
+{
+    geometry = g;
+}
+
+void
+x_set_dpy(dn)
+    char       *dn;
+{
+    displayname = dn;
+}
+
+void
+x_setforeground(colorname)
+    char       *colorname;
+{
+    foreground_name = colorname;
+}
+
+void
+x_setbackground(colorname)
+    char       *colorname;
+{
+    background_name = colorname;
 }
 
 static XFontStruct *
@@ -1240,44 +390,36 @@ x_setfont(fname)
     char       *fname;
 {
     XFontStruct *pfont;
+    XSizeHints  xsh;
     int         oldw,
                 oldh;
 
+    fontname = fname;
     if (cur_win) {
 	oldw = x_width(cur_win);
 	oldh = x_height(cur_win);
-	if ((pfont = query_font(cur_win, fname)) != 0) {
+	if ((pfont = query_font(cur_win, fontname)) != 0) {
 
 	    XSetFont(dpy, cur_win->textgc, pfont->fid);
 	    XSetFont(dpy, cur_win->reversegc, pfont->fid);
 
-	    /* if size changed, resize it, otherwise refresh */
+	    /* is size changed, resize it, otherwise refresh */
 	    if (oldw != x_width(cur_win) || oldh != x_height(cur_win)) {
-#if ATHENA_WIDGETS
-		XtVaSetValues(cur_win->pane,
-			XtNinternalBorderWidth, cur_win->char_height,
-			NULL);
-#endif
-		XtVaSetValues(cur_win->top_widget,
-			XtNminHeight,	cur_win->base_height
-					    + MINROWS*cur_win->char_height,
-			XtNminWidth,	cur_win->base_width 
-					    + MINCOLS*cur_win->char_width,
-			XtNheightInc,	cur_win->char_height,
-			XtNwidthInc,	cur_win->char_width,
-			NULL);
-		x_touch(cur_win, 0, 0, cur_win->cols, cur_win->rows);
-		XResizeWindow(dpy, XtWindow(cur_win->top_widget),
-			      x_width(cur_win) + cur_win->base_width,
-			      x_height(cur_win) + cur_win->base_height);
-
+		XResizeWindow(dpy, cur_win->win,
+			      x_width(cur_win), x_height(cur_win));
 	    } else {
 		x_touch(cur_win, 0, 0, cur_win->cols, cur_win->rows);
 		x_flush();
 	    }
+	    xsh.flags = PResizeInc | PMaxSize;
+	    xsh.width_inc = cur_win->char_width;
+	    xsh.height_inc = cur_win->char_height;
+	    xsh.max_width = term.t_mcol * cur_win->char_width;
+	    xsh.max_height = term.t_mrow * cur_win->char_height;
+	    XSetNormalHints(dpy, cur_win->win, &xsh);
 
 	    FreeIfNeeded(cur_win->fontname);
-	    cur_win->fontname = strmalloc(fname);
+	    cur_win->fontname = strmalloc(fontname);
 	    return 1;
 	}
 	return 0;
@@ -1339,33 +481,227 @@ x_resize_screen(tw, rows, cols)
         tw->cur_row = tw->rows - 1;
 }
 
+static X_PIXEL
+color_value(disp, screen, t)
+    Display    *disp;
+    int         screen;
+    char       *t;
+{
+    XColor      xc;
+    Colormap    cmap;
+
+    cmap = DefaultColormap(disp, screen);
+
+    XParseColor(disp, cmap, t, &xc);
+    XAllocColor(disp, cmap, &xc);
+    return xc.pixel;
+}
+
+static char *
+any_resource(disp, name)
+	Display *disp;
+	char	*name;
+{
+	register char *it;
+
+	if ((it = XGetDefault(disp, progname, name)) == 0)
+		it = XGetDefault(disp, MY_CLASS, name);
+	return it;
+}
+
+static void
+x_get_defaults(disp, screen)
+	Display    *disp;
+	int         screen;
+{
+	char       *t;
+
+	if (!fontname)
+		fontname = any_resource(disp, "font");
+
+	if (!geometry)
+		geometry = any_resource(disp, "geometry");
+
+	(void) set_character_class( any_resource(disp, "charClass") );
+
+	if ((t = any_resource(disp, "multiClickTime")) != 0)
+		multi_click_time = atoi(t);
+
+	if ((t = any_resource(disp, "reverseVideo")) != 0)
+		reverse_video = stol(t);
+
+	foreground = BlackPixel(dpy, 0);
+	t = any_resource(disp, "foreground");
+	if (foreground_name)
+		t = foreground_name;
+	if (t)
+		foreground = color_value(disp, screen, t);
+
+	background = WhitePixel(dpy, 0);
+	t = any_resource(disp, "background");
+	if (background_name)
+		t = background_name;
+	if (t)
+		background = color_value(disp, screen, t);
+
+	if ((t = any_resource(disp, "focusFollowsMouse")) != 0)
+		focus_follows_mouse = stol(t);
+}
+
 static void
 x_open()
 {
-    ALLOC_T rows = cur_win->rows;
-    ALLOC_T cols = cur_win->cols;
-    cur_win->rows = cur_win->cols = 0;
-    x_resize_screen(cur_win, rows, cols);
+    TextWindow  tw;
+    int         screen;
+    XFontStruct *pfont = 0;
+    XGCValues   gcvals;
+    ULONG	gcmask;
+    XSetWindowAttributes swat;
+    ULONG	winmask;
+    XSizeHints  xsh;
+    XWMHints    xwmh;
+    int         flags;
 
-    kqinit(cur_win);
-    cur_win->sel_prop = XInternAtom(dpy, "VILE_SELECTION", False);
+    tw = (TextWindow)XCalloc(TextWindowRec);
+    if (!tw) {
+	(void)fprintf(stderr, "insufficient memory, exiting\n");
+	ExitProgram(BAD(-1));
+    }
+    dpy = XOpenDisplay(displayname);
+
+#ifdef undef
+    XSynchronize(dpy, 1);
+#endif
+
+    if (!dpy) {
+	(void)fprintf(stderr, "couldn't open X display\n");
+	ExitProgram(GOOD);
+    }
+    tw->dpy = dpy;
+    tw->screen = screen = DefaultScreen(dpy);
+
+    x_get_defaults(dpy, screen);
+
+    if (fontname)
+	pfont = query_font(tw, fontname);
+    if (!pfont) {
+	pfont = query_font(tw, FONTNAME);
+	if (!pfont) {
+	    (void)fprintf(stderr, "couldn't get font \"%s\" or \"%s\", exiting\n",
+		    fontname, FONTNAME);
+	    ExitProgram(BAD(-1));
+	}
+    }
+
+    if (reverse_video) {
+	tw->bg = foreground;
+	tw->fg = background;
+    } else {
+	tw->fg = foreground;
+	tw->bg = background;
+    }
+
+    gcmask = GCForeground | GCBackground | GCFont;
+    gcvals.foreground = tw->fg;
+    gcvals.background = tw->bg;
+    gcvals.font = tw->pfont->fid;
+    tw->textgc = XCreateGC(dpy, RootWindow(dpy, screen), gcmask, &gcvals);
+
+    gcvals.foreground = tw->bg;
+    gcvals.background = tw->fg;
+    gcvals.font = tw->pfont->fid;
+    tw->reversegc = XCreateGC(dpy, RootWindow(dpy, screen), gcmask, &gcvals);
+
+    if (geometry) {
+	flags = XParseGeometry(geometry, &startx, &starty,
+			       &start_cols, &start_rows);
+    } else
+	flags = 0;
+    x_resize_screen(tw, (ALLOC_T)start_rows, (ALLOC_T)start_cols);
+
+    if ((flags & XValue) && (flags & XNegative))
+	startx = DisplayWidth(dpy, screen) - x_width(tw);
+    if ((flags & YValue) && (flags & YNegative))
+	starty = DisplayHeight(dpy, screen) - x_height(tw);
+
+    tw->reverse = False;
+
+    tw->bw = 1;
+
+    tw->click_timeout = multi_click_time;
+
+    swat.background_pixel = tw->bg;
+    swat.border_pixel = tw->fg;
+    swat.event_mask = ExposureMask | KeyPressMask | StructureNotifyMask |
+	ButtonPress | ButtonRelease | ButtonMotionMask | PointerMotionMask |
+	FocusChangeMask | EnterWindowMask | LeaveWindowMask;
+    winmask = CWBackPixel | CWBorderPixel | CWEventMask;
+    tw->win = XCreateWindow(dpy, RootWindow(dpy, screen), startx, starty,
+		x_width(tw), x_height(tw), tw->bw,
+		(int)CopyFromParent, InputOutput,
+		(Visual *)CopyFromParent, winmask, &swat);
+
+
+    /* these can go bigger, but they suck up lots of VM if they do */
+    term.t_mcol = 200;		/* XXX */
+    term.t_mrow = 200;		/* XXX */
+
+    xsh.flags = PPosition | PResizeInc | PSize | PMaxSize;
+    if (flags & (XValue | YValue))
+	xsh.flags |= USPosition;
+    if (flags & (WidthValue | HeightValue))
+	xsh.flags |= USSize;
+
+    xsh.width_inc = tw->char_width;
+    xsh.height_inc = tw->char_height;
+    xsh.x = startx;
+    xsh.y = starty;
+    xsh.width = x_width(tw);
+    xsh.height = x_height(tw);
+    xsh.max_width = term.t_mcol * tw->char_width;
+    xsh.max_height = term.t_mrow * tw->char_height;
+    XSetStandardProperties(dpy, tw->win,
+    		MY_CLASS,	/* application name */
+		MY_CLASS,	/* icon name */
+		(Pixmap) 0,	/* icon pixmap */
+		(char **)0, 0, &xsh);
+
+    xwmh.flags = InputHint;
+    xwmh.input = True;
+    XSetWMHints(dpy, tw->win, &xwmh);
+
+    {
+      XClassHint *class_hints;
+      class_hints = XAllocClassHint();
+      class_hints->res_name = strmalloc(MY_NAME);
+      class_hints->res_class = strmalloc(MY_CLASS);
+      XSetClassHint(dpy,tw->win,class_hints);
+      free(class_hints->res_name);
+      free(class_hints->res_class);
+      XFree((char *)class_hints);
+    }
+    cur_win = tw;
+    XMapWindow(dpy, tw->win);
+
+    XSync(dpy, 0);
+
+    tw->sel_prop = XInternAtom(dpy, "VILE_SELECTION", False);
 
     (void)signal(SIGHUP, x_quit);
     (void)signal(SIGINT, catchintr);
     (void)signal(SIGTERM, x_quit);
 
-    term.t_mcol = MAXCOLS;
-    term.t_mrow = MAXROWS;
     /* main code assumes that it can access a cell at nrow x ncol */
-    term.t_ncol = cur_win->cols;
-    term.t_nrow = cur_win->rows - 1;
+    term.t_ncol = tw->cols;
+    term.t_nrow = tw->rows - 1;
+    if (wm_title)
+    	XStoreName(dpy, tw->win, wm_title);
 }
 
 static void
 x_close()
 {
-    XtDestroyWidget(cur_win->top_widget);
-    /* XCloseDisplay(dpy); */
+    XCloseDisplay(dpy);
 }
 
 static void
@@ -1423,9 +759,9 @@ wait_for_scroll(tw)
     XGraphicsExposeEvent *gev;
 
     while (1) {			/* loop looking for a gfx expose or no expose */
-	if (XCheckTypedEvent(dpy, NoExpose, &ev))
+	if (XCheckTypedEvent(tw->dpy, NoExpose, &ev))
 	    return;
-	if (XCheckTypedEvent(dpy, GraphicsExpose, &ev)) {
+	if (XCheckTypedEvent(tw->dpy, GraphicsExpose, &ev)) {
 	    gev = (XGraphicsExposeEvent *) & ev;
 	    sc = gev->x / tw->char_width;
 	    sr = gev->y / tw->char_height;
@@ -1435,7 +771,7 @@ wait_for_scroll(tw)
 	    x_flush();
 	    return;
 	}
-	XSync(dpy, 0);
+	XSync(tw->dpy, 0);
     }
 }
 
@@ -1522,7 +858,7 @@ x_scroll(from, to, count)
     }
 
 #ifdef copy_area
-    XCopyArea(dpy, cur_win->win, cur_win->win, cur_win->textgc,
+    XCopyArea(cur_win->dpy, cur_win->win, cur_win->win, cur_win->textgc,
 	      x_pos(cur_win, 0), y_pos(cur_win, from),
 	      x_width(cur_win), (unsigned)(count * cur_win->char_height),
 	      x_pos(cur_win, 0), y_pos(cur_win, to));
@@ -1846,6 +1182,19 @@ x_eeop()
                 c;
 
     r = cur_win->cur_row;
+/* XXX the old stuff is faster, but the only place the editot uses this
+ * is to erase the whole page when updating, and in that case it usually
+ * looks worse
+ */
+
+#ifdef old
+    x_eeol();
+    while (r < cur_win->rows) {
+	clear_line(r, 0, cur_win->cols);
+	(void)memset((char *) &(cur_win->sc[r][0]), ' ', cur_win->cols);
+	r++;
+    }
+#else
     sc = cur_win->cur_col;
     while (r < cur_win->rows) {
 	cur_win->line_attr[r] |= LINE_DIRTY;
@@ -1855,6 +1204,7 @@ x_eeop()
 	r++;
 	sc = 0;
     }
+#endif
 }
 
 
@@ -2002,7 +1352,7 @@ set_character_class(s)
     int         base;		/* 8, 10, 16 (octal, decimal, hex) */
     int         numbers;	/* count of numbers per range */
     int         digits;		/* count of digits in a number */
-    static char *errfmt = "xvile:  %s in range string \"%s\" (position %d)\n";
+    static char *errfmt = "%s:  %s in range string \"%s\" (position %d)\n";
 
     if (!s || !s[0])
 	return -1;
@@ -2024,7 +1374,7 @@ set_character_class(s)
 	    low = acc;
 	    acc = 0;
 	    if (digits == 0) {
-		(void)fprintf(stderr, errfmt, "missing number", s, i);
+		(void)fprintf(stderr, errfmt, progname, "missing number", s, i);
 		return (-1);
 	    }
 	    digits = 0;
@@ -2036,7 +1386,7 @@ set_character_class(s)
 	    else if (numbers == 1)
 		high = acc;
 	    else {
-		(void)fprintf(stderr, errfmt, "too many numbers",
+		(void)fprintf(stderr, errfmt, progname, "too many numbers",
 			s, i);
 		return (-1);
 	    }
@@ -2054,10 +1404,10 @@ set_character_class(s)
 		numbers++;
 	    }
 	    if (numbers != 2) {
-		(void)fprintf(stderr, errfmt, "bad value number",
+		(void)fprintf(stderr, errfmt, progname, "bad value number",
 			s, i);
 	    } else if (set_character_class_range(low, high, acc) != 0) {
-		(void)fprintf(stderr, errfmt, "bad range", s, i);
+		(void)fprintf(stderr, errfmt, progname, "bad range", s, i);
 	    }
 	    low = high = -1;
 	    acc = 0;
@@ -2065,7 +1415,7 @@ set_character_class(s)
 	    numbers = 0;
 	    continue;
 	} else {
-	    (void)fprintf(stderr, errfmt, "bad character", s, i);
+	    (void)fprintf(stderr, errfmt, progname, "bad character", s, i);
 	    return (-1);
 	}			/* end if else if ... else */
 
@@ -2081,9 +1431,9 @@ set_character_class(s)
     if (high < 0)
 	high = low;
     if (numbers < 1 || numbers > 2) {
-	(void)fprintf(stderr, errfmt, "bad value number", s, i);
+	(void)fprintf(stderr, errfmt, progname, "bad value number", s, i);
     } else if (set_character_class_range(low, high, acc) != 0) {
-	(void)fprintf(stderr, errfmt, "bad range", s, i);
+	(void)fprintf(stderr, errfmt, progname, "bad range", s, i);
     }
     return (0);
 }
@@ -2375,7 +1725,7 @@ x_get_selection(tw, selection, type, value, length, format)
 				tb_free(&PasteBuf);
 		}
 	}
-#if !(DOALLOC || DBMALLOC) /* cannot intercept that one */
+#if !defined(DOALLOC) || !defined(DBMALLOC) /* cannot intercept that one */
 	free(value);
 #endif
 }
@@ -2392,7 +1742,7 @@ x_paste_selection(tw)
 				strndup((char *) tw->selection_data, tw->selection_len),
 				(SIZE_T)tw->selection_len, 8);
 		} else {
-			XConvertSelection(dpy, XA_PRIMARY, XA_STRING,
+			XConvertSelection(tw->dpy, XA_PRIMARY, XA_STRING,
 				tw->sel_prop, tw->win, CurrentTime);
 	}
 }
@@ -2503,7 +1853,7 @@ x_stash_selection(tw)
 	x_flush();
 
 #ifdef SABER_HACK
-	XChangeProperty(dpy, RootWindow(dpy, tw->screen), XA_CUT_BUFFER0,
+	XChangeProperty(dpy, RootWindow(tw->dpy, tw->screen), XA_CUT_BUFFER0,
 		XA_STRING, 8, PropModeReplace,
 		tw->selection_data, tw->selection_len);
 #endif
@@ -2519,8 +1869,6 @@ x_give_selection(tw, ev, target, prop)
 {
 	if (tw->show_selection)
 		x_stash_selection(tw);
-	if (target != XA_STRING)
-		return False;
 	XChangeProperty(dpy, ev->requestor, prop, XA_STRING, 8,
 		PropModeReplace, tw->selection_data, tw->selection_len);
 	return True;
@@ -2532,7 +1880,7 @@ x_own_selection(tw)
 {
 	free_selection(tw);
 	if (!tw->have_selection)
-		XSetSelectionOwner(dpy, XA_PRIMARY, tw->win, CurrentTime);
+		XSetSelectionOwner(tw->dpy, XA_PRIMARY, tw->win, CurrentTime);
 	change_selection(tw, True, False);
 	x_flush();			/* show the changes */
 	tw->have_selection = True;
@@ -2546,6 +1894,7 @@ extend_selection(tw, nr, nc, wipe)
 	Bool	wipe;
 {
 	WINDOW	*wp0, *wp1;
+
 	/* Don't allow selection to go onto the modeline.
 	 * XXX Later, modify this to cause autoscrolling.
 	 */
@@ -2846,11 +2195,8 @@ compress_motion(ev)
  * handle any non keyboard events
  */
 static void
-x_process_event(w, unused, ev, continue_to_dispatch)
-    Widget	w;
-    XtPointer	unused;
+x_process_event(ev)
     XEvent     *ev;
-    Boolean    *continue_to_dispatch;
 {
     int         sc,
                 sr;
@@ -2859,6 +2205,7 @@ x_process_event(w, unused, ev, continue_to_dispatch)
 
     int         nr,
                 nc;
+    Bool        changed = False;
     XSelectionEvent event;
     XMotionEvent *mev;
     XExposeEvent *gev;
@@ -2920,10 +2267,56 @@ x_process_event(w, unused, ev, continue_to_dispatch)
 	if (ev->xexpose.count == 0)
 		x_flush();
 	break;
+    case EnterNotify:
+    case FocusIn:
+	cur_win->show_cursor = True;
+	turnOnCursor(cur_win);
+	x_flush();
+	break;
+    case LeaveNotify:
+    case FocusOut:
+	cur_win->show_cursor = False;
+	turnOffCursor(cur_win);
+	x_flush();
+	break;
+    case ConfigureNotify:
+	nr = ev->xconfigure.height / cur_win->char_height;
+	nc = ev->xconfigure.width  / cur_win->char_width;
+
+	if (nr < MINWLNS || nc < 10) {
+		/* New size is too small.  Adjust to something acceptable */
+		if (nr < MINWLNS)
+			nr = MINWLNS;
+		if (nc < 10)
+			nc = 10;
+		XResizeWindow(ev->xconfigure.display,
+		              ev->xconfigure.window,
+			      (unsigned)nc * cur_win->char_width,
+			      (unsigned)nr * cur_win->char_height);
+		/* Calling XResizeWindow will cause another ConfigureNotify
+		 * event, so we should break early and let this event occur.
+		 */
+		break;
+	}
+
+	if (nc != cur_win->cols) {
+		changed = True;
+		newwidth(True, nc);
+	}
+	if (nr != cur_win->rows) {
+		changed = True;
+		newlength(True, nr);
+	}
+	if (changed) {
+		x_resize_screen(cur_win, (ALLOC_T)nr, (ALLOC_T)nc);
+		(void) refresh(True, 0);
+		(void) update(False);
+	}
+	break;
     case MotionNotify:
 	do_sel = TRUE;
 	if (ev->xmotion.state != Button1Mask) {
-	    if (!cur_win->focus_follows_mouse)
+	    if (!focus_follows_mouse)
 		return;
 	    else
 		do_sel = FALSE;
@@ -2940,7 +2333,7 @@ x_process_event(w, unused, ev, continue_to_dispatch)
 	if (do_sel)
 	    extend_selection(cur_win, nr, nc, True);
 	else {
-	    if (!reading_msg_line && (wp = row2window(nr)) && wp != curwp) {
+	    if ((wp = row2window(nr)) && wp != curwp) {
 		(void) set_curwp(wp);
 		(void) update(FALSE);
 	    }
@@ -2969,321 +2362,6 @@ x_process_event(w, unused, ev, continue_to_dispatch)
 	    break;
 	}
 	break;
-    }
-}
-
-static void
-x_configure_window(w, unused, ev, continue_to_dispatch)
-    Widget	w;
-    XtPointer	unused;
-    XEvent     *ev;
-    Boolean    *continue_to_dispatch;
-{
-    int nr, nc;
-    Dimension new_width, new_height;
-    Boolean changed = False;
-
-    if (ev->type != ConfigureNotify)
-	return;
-
-    if (cur_win->base_width < 0) {
-	/* First time through...figure out the base width and height */
-	XtVaGetValues(cur_win->top_widget,
-		XtNheight,	&cur_win->top_height,
-		XtNwidth,	&cur_win->top_width,
-		NULL);
-	XtVaGetValues(cur_win->screen,
-		XtNheight,	&new_height,
-		XtNwidth,	&new_width,
-		NULL);
-	cur_win->base_width = cur_win->top_width - new_width;
-	cur_win->base_height = cur_win->base_height;
-	XtVaSetValues(cur_win->top_widget,
-		XtNbaseHeight,	cur_win->base_height,
-		XtNbaseWidth,	cur_win->base_width,
-		XtNminHeight,	cur_win->base_height
-				    + MINROWS*cur_win->char_height,
-		XtNminWidth,	cur_win->base_width 
-				    + MINCOLS*cur_win->char_width,
-		XtNheightInc,	cur_win->char_height,
-		XtNwidthInc,	cur_win->char_width,
-		NULL);
-    }
-
-    if (ev->xconfigure.height == cur_win->top_height
-     && ev->xconfigure.width == cur_win->top_width)
-	return;
-
-    XtVaGetValues(cur_win->top_widget,
-	    XtNheight,	&new_height,
-	    XtNwidth,	&new_width,
-	    NULL);
-    new_height = ((new_height - cur_win->base_height) / cur_win->char_height)
-			     * cur_win->char_height;
-    new_width = ((new_width - cur_win->base_width) / 
-		    cur_win->char_width) * cur_win->char_width;
-#if !NO_WIDGETS
-#if ATHENA_WIDGETS
-    XtVaSetValues(cur_win->top_widget,
-	    XtNallowShellResize, False,
-	    NULL);
-    XawFormDoLayout(cur_win->form_widget, False);
-    XtVaSetValues(cur_win->pane,
-	    XtNwidth,	1,
-	    NULL);
-#endif
-    XtVaSetValues(cur_win->screen,
-	    XtNheight,	new_height,
-	    XtNwidth,	new_width,
-	    NULL);
-    XtVaSetValues(cur_win->pane,
-	    XtNwidth,	cur_win->pane_width,
-#if OL_WIDGETS
-	    XtNheight,	new_height,
-#endif
-	    NULL);
-#if ATHENA_WIDGETS
-    XawFormDoLayout(cur_win->form_widget, True);
-    XtVaSetValues(cur_win->top_widget,
-	    XtNallowShellResize, True,
-	    NULL);
-#endif
-#endif /* !NO_WIDGETS */
-
-    XtVaGetValues(cur_win->top_widget,
-	    XtNheight,	&cur_win->top_height,
-	    XtNwidth,	&cur_win->top_width,
-	    NULL);
-    XtVaGetValues(cur_win->screen,
-	    XtNheight,	&new_height,
-	    XtNwidth,	&new_width,
-	    NULL);
-
-    nr = new_height / cur_win->char_height;
-    nc = new_width / cur_win->char_width;
-
-
-    if (nr < MINROWS || nc < MINCOLS) {
-	if (nr < MINROWS)
-	    nr = MINROWS;
-	if (nc < MINCOLS)
-	    nc = MINCOLS;
-	XResizeWindow(ev->xconfigure.display,
-		      ev->xconfigure.window,
-		      (unsigned)nc * cur_win->char_width 
-			    + cur_win->base_width,
-		      (unsigned)nr * cur_win->char_height
-			    + cur_win->base_height);
-	/* Calling XResizeWindow will cause another ConfigureNotify
-	 * event, so we should return early and let this event occur.
-	 */
-	return;
-    }
-
-    if (nc != cur_win->cols) {
-	changed = True;
-	newwidth(True, nc);
-    }
-    if (nr != cur_win->rows) {
-	changed = True;
-	newlength(True, nr);
-    }
-    if (changed) {
-	x_resize_screen(cur_win, (ALLOC_T)nr, (ALLOC_T)nc);
-	(void) refresh(True, 0);
-	(void) update(False);
-#if !NO_WIDGETS
-	update_scrollbar_sizes();
-#endif
-    }
-#if MOTIF_WIDGETS
-    lookfor_sb_resize = FALSE;
-#endif
-}
-
-#if ATHENA_WIDGETS
-static void
-grip_moved(w, event, params, num_params)
-    Widget w;
-    XEvent *event;
-    String *params;
-    Cardinal *num_params;
-#elif MOTIF_WIDGETS
-static void
-grip_moved(w, unused, ev, continue_to_dispatch)
-    Widget	w;
-    XtPointer	unused;
-    XEvent     *ev;
-    Boolean    *continue_to_dispatch;
-#endif
-#if ATHENA_WIDGETS | MOTIF_WIDGETS
-{
-    int i;
-    register WINDOW *wp, *saved_curwp;
-    Dimension height;
-    int	lines;
-
-#if MOTIF_WIDGETS
-    if (!lookfor_sb_resize)
-	return;
-    lookfor_sb_resize = FALSE;
-#endif
-
-    saved_curwp = curwp;
-
-    i = 0;
-    for_each_window(wp) {
-	XtVaGetValues(cur_win->scrollbars[i],
-		XtNheight, &height,
-		NULL);
-	lines = (height+(cur_win->char_height/2)) / cur_win->char_height;
-	if (lines == 0) {
-	    /* Delete the window */
-	    delwp(wp);
-	    if (saved_curwp == wp)
-		saved_curwp = wheadp;
-	}
-	else {
-	    curwp = wp;
-	    resize(TRUE, lines);
-	}
-	i++;
-    }
-    set_curwp(saved_curwp);
-    (void) update(FALSE);
-    x_flush();
-}
-#endif
-
-#if !NO_WIDGETS
-static void
-configure_bar(w, event, params, num_params)
-    Widget w;
-    XEvent *event;
-    String *params;
-    Cardinal *num_params;
-{
-    WINDOW *wp;
-    int i;
-
-    if (*num_params != 1
-     || (event->type != ButtonPress && event->type != ButtonRelease))
-	return;
-
-    i = 0;
-    for_each_window(wp) {
-	if (cur_win->scrollbars[i] == w) {
-	    if (strcmp(params[0], "Only") == 0) {
-		set_curwp(wp);
-		onlywind(TRUE,0);
-	    }
-	    else if (strcmp(params[0], "Kill") == 0) {
-		set_curwp(wp);
-		delwind(TRUE,0);
-	    }
-	    else if (strcmp(params[0], "Split") == 0) {
-		if (wp->w_ntrows < 3) {
-		    x_beep();
-		    break;
-		}
-		else {
-		    int newsize;
-		    set_curwp(wp);
-		    newsize = CEIL(event->xbutton.y, cur_win->char_height);
-		    if (newsize > wp->w_ntrows - 2)
-			newsize = wp->w_ntrows - 2;
-		    splitwind(TRUE, 1);
-		    resize(TRUE, newsize);
-		}
-	    }
-	    (void) update(FALSE);
-	    x_flush();
-	    break;
-	}
-	i++;
-    }
-}
-#endif /* !NO_WIDGETS */
-
-
-#if MOTIF_WIDGETS
-static void
-pane_button(w, unused, ev, continue_to_dispatch)
-    Widget	w;
-    XtPointer	unused;
-    XEvent     *ev;
-    Boolean    *continue_to_dispatch;
-{
-    lookfor_sb_resize = TRUE;
-}
-#endif /* MOTIF_WIDGETS */
-
-static void
-x_change_focus(w, unused, ev, continue_to_dispatch)
-    Widget	w;
-    XtPointer	unused;
-    XEvent     *ev;
-    Boolean    *continue_to_dispatch;
-{
-    switch (ev->type) {
-    case EnterNotify:
-	if (cur_win->focus_follows_mouse) {
-	    XSetInputFocus( dpy, XtWindow(w), RevertToParent, 
-	                    ev->xcrossing.time );
-	    /* hopefully this will generate a FocusIn event... */
-	}
-	return;
-    case FocusIn:
-	cur_win->show_cursor = True;
-	turnOnCursor(cur_win);
-#if ATHENA_WIDGETS
-	XtSetKeyboardFocus(w, cur_win->screen);
-#elif MOTIF_WIDGETS
-	XmProcessTraversal(cur_win->screen, XmTRAVERSE_CURRENT);
-#elif OL_WIDGETS
-	XtSetKeyboardFocus(cur_win->top_widget, cur_win->screen);
-#endif
-	x_flush();
-	break;
-    case LeaveNotify:
-#if 0
-	/*
-	 * By convention, we shouldn't be giving up focus voluntarily...
-	 */
-	if (cur_win->focus_follows_mouse) {
-	    XSetInputFocus( dpy, PointerRoot, RevertToParent, 
-	                    ev->xcrossing.time );
-	    /* hopefully this will generate a FocusOut event... */
-	}
-#endif
-	return;
-    case FocusOut:
-	cur_win->show_cursor = False;
-	turnOffCursor(cur_win);
-	x_flush();
-	break;
-    }
-}
-
-static void
-x_wm_delwin(w, unused, ev, continue_to_dispatch)
-    Widget	w;
-    XtPointer	unused;
-    XEvent     *ev;
-    Boolean    *continue_to_dispatch;
-{
-    if (ev->type == ClientMessage 
-     && ev->xclient.message_type == atom_WM_PROTOCOLS) {
-	if ((Atom) ev->xclient.data.l[0] == atom_WM_DELETE_WINDOW) {
-	    quit(FALSE, 0);		/* quit might not return */
-	    (void) update(FALSE);
-	    x_flush();
-	}
-	else if ((Atom) ev->xclient.data.l[0] == atom_WM_TAKE_FOCUS) {
-	    XSetInputFocus(XtDisplay(w),XtWindow(w),RevertToParent,
-		    ev->xclient.data.l[1]);
-	    XtSetKeyboardFocus(cur_win->top_widget, cur_win->screen);
-	}
     }
 }
 
@@ -3318,11 +2396,13 @@ x_on_msgline()
 void
 x_working()
 {
-#if 0	/* FIXME */
+	register TextWindow tw = cur_win;
+	char buffer[NLINE];
 	XEvent	ev;
-	while (XPending(dpy)) {
-		if (XCheckTypedEvent(dpy, KeyPress, &ev)) {
-			int	num = decoded_key(&ev);
+
+	while (XPending(tw->dpy)) {
+		if (XCheckTypedEvent(tw->dpy, KeyPress, &ev)) {
+			int	num = decoded_key(&ev, buffer, sizeof(buffer));
 			if (num >= 0) {
 				if (buffer[0] == intrc) {
 					(void)tb_init(&PasteBuf, abortc);
@@ -3331,58 +2411,18 @@ x_working()
 #else
 					(void)signal_pg(SIGINT);
 #endif
-				} else
-					(void)tb_append(&PasteBuf, buffer, num);
+				} else {
+					(void)tb_bappend(&PasteBuf,
+								buffer, num);
+				}
 			}
 		} else {
-			XNextEvent(dpy, &ev);
+			XNextEvent(tw->dpy, &ev);
 			x_process_event(&ev);
 		}
 	}
-#endif
 }
 #endif
-
-static void
-kqinit(tw)
-    TextWindow tw;
-{
-    tw->kqhead = 0;
-    tw->kqtail = 0;
-}
-
-static int
-kqempty(tw)
-    TextWindow tw;
-{
-    return tw->kqhead == tw->kqtail;
-}
-
-static int
-kqfull(tw)
-    TextWindow tw;
-{
-    return tw->kqhead == (tw->kqtail + 1) % KQSIZE;
-}
-
-static int
-kqdel(tw)
-    TextWindow tw;
-{
-    int c;
-    c = tw->kq[tw->kqhead];
-    tw->kqhead = (tw->kqhead + 1) % KQSIZE;
-    return c;
-}
-
-static void
-kqadd(tw, c)
-    TextWindow tw;
-    int c;
-{
-    tw->kq[tw->kqtail] = c;
-    tw->kqtail = (tw->kqtail + 1) % KQSIZE;
-}
 
 /*
  * main event loop.  this means we'll be stuck if an event that needs
@@ -3392,104 +2432,130 @@ kqadd(tw, c)
 static int
 x_getc()
 {
-    XEvent	ev;
+	XEvent	ev;
+	static int	num;
+	static int	i;
+	static char buffer[NLINE];
 
-    while (1) {
+	while (1) {
 
-	if (tb_more(PasteBuf))	/* handle any queued pasted text */
-	    return tb_next(PasteBuf);
+		if (tb_more(PasteBuf))	/* handle any queued pasted text */
+			return tb_next(PasteBuf);
 
-	if (!kqempty(cur_win)) {
-	    save_selection(cur_win);
-	    return kqdel(cur_win);
+		/* drain whatever the last key gave us */
+		if (num) {
+		    	num--;
+			return buffer[i++];
+		}
+
+		XNextEvent(dpy, &ev);
+		if (ev.type == KeyPress) {
+			if ((num = decoded_key(&ev, buffer, sizeof(buffer))) > 0) {
+				save_selection(cur_win);
+			    	i = 0;
+				continue;
+			}
+			/* else, could be shift-key, etc. */
+		} else {
+			x_process_event(&ev);
+		}
 	}
-
-	XtAppNextEvent(cur_win->app_context, &ev);
-	XtDispatchEvent(&ev);
-    }
 }
 
-static void
-x_key_press(w, unused, ev, continue_to_dispatch)
-    Widget	w;
-    XtPointer	unused;
-    XEvent     *ev;
-    Boolean    *continue_to_dispatch;
+static int
+decoded_key(ev, buffer, bufsize)
+	XEvent	*ev;
+	char	*buffer;
+	int	bufsize;
 {
-    char	buffer[128];
-    KeySym	keysym;
-    int		num;
+	KeySym	keysym;
+	int	num;
 
-    if (ev->type != KeyPress)
-	return;
-
-    num = XLookupString((XKeyPressedEvent *) ev, buffer, sizeof(buffer),
+	num = XLookupString((XKeyPressedEvent *) ev, buffer, bufsize,
 		&keysym, (XComposeStatus *) 0);
 
-    /* FIXME: Should do something about queue full conditions */
-    if (num > 0) {
-	register int i;
-	for (i=0; i<num && !kqfull(cur_win); i++)
-	    kqadd(cur_win, buffer[i]);
-	return;
-    }
+	/* if a key is mapped, its data is in the buffer */
+	if (num)
+		return num;
 
-    if (keysym == XK_F11) {
-	kqadd(cur_win, ESC);
-	return;
-    }
+	/* we provide default mappings for unmapped keys */
 
-    switch (keysym) {
+	/* they're all 'FN-' style bindings, so they all start with
+		the '#' key */
+	buffer[0] = poundc;
+
+	switch (keysym) {
 	/* Arrow keys */
-	case XK_Up:		num = 'A';	break;
-	case XK_Down:		num = 'B';	break;
-	case XK_Right:		num = 'C';	break;
-	case XK_Left:		num = 'D';	break;
+	case XK_Up:		buffer[1] = 'A';	return 2;
+	case XK_Down:		buffer[1] = 'B';	return 2;
+	case XK_Right:		buffer[1] = 'C';	return 2;
+	case XK_Left:		buffer[1] = 'D';	return 2;
 	/* page scroll */
-	case XK_Next:		num = 'n';	break;
-	case XK_Prior:		num = 'p';	break;
+	case XK_Next:		buffer[1] = 'n';	return 2;
+	case XK_Prior:		buffer[1] = 'p';	return 2;
 	/* editing */
-	case XK_Insert:		num = 'i';	break;
+	case XK_Insert:		buffer[1] = 'i';	return 2;
 #if (ULTRIX || ultrix)
-	case DXK_Remove:	num = 'r';	break;
+	case DXK_Remove:	buffer[1] = 'r';	return 2;
 #endif
-	case XK_Find:		num = 'f';	break;
-	case XK_Select:		num = 's';	break;
+	case XK_Find:		buffer[1] = 'f';	return 2;
+	case XK_Select:		buffer[1] = 's';	return 2;
 	/* command keys */
-	case XK_Menu:		num = 'm';	break;
-	case XK_Help:		num = 'h';	break;
+	case XK_Menu:		buffer[1] = 'm';	return 2;
+	case XK_Help:		buffer[1] = 'h';	return 2;
 	/* function keys */
-	case XK_F1:		num = '1';	break;
-	case XK_F2:		num = '2';	break;
-	case XK_F3:		num = '3';	break;
-	case XK_F4:		num = '4';	break;
-	case XK_F5:		num = '5';	break;
-	case XK_F6:		num = '6';	break;
-	case XK_F7:		num = '7';	break;
-	case XK_F8:		num = '8';	break;
-	case XK_F9:		num = '9';	break;
-	case XK_F10:		num = '0';	break;
-	case XK_F12:		num = '@';	break;
-	case XK_F13:		num = '#';	break;
-	case XK_F14:		num = '$';	break;
-	case XK_F15:		num = '%';	break;
-	case XK_F16:		num = '^';	break;
-	case XK_F17:		num = '&';	break;
-	case XK_F18:		num = '*';	break;
-	case XK_F19:		num = '(';	break;
-	case XK_F20:		num = ')';	break;
+	case XK_F1:		buffer[1] = '1';	return 2;
+	case XK_F2:		buffer[1] = '2';	return 2;
+	case XK_F3:		buffer[1] = '3';	return 2;
+	case XK_F4:		buffer[1] = '4';	return 2;
+	case XK_F5:		buffer[1] = '5';	return 2;
+	case XK_F6:		buffer[1] = '6';	return 2;
+	case XK_F7:		buffer[1] = '7';	return 2;
+	case XK_F8:		buffer[1] = '8';	return 2;
+	case XK_F9:		buffer[1] = '9';	return 2;
+	case XK_F10:		buffer[1] = '0';	return 2;
+	case XK_F11:		buffer[0] = ESC;	return 1;
+	case XK_F12:		buffer[1] = '@';	return 2;
+	case XK_F13:		buffer[1] = '#';	return 2;
+	case XK_F14:		buffer[1] = '$';	return 2;
+	case XK_F15:		buffer[1] = '%';	return 2;
+	case XK_F16:		buffer[1] = '^';	return 2;
+	case XK_F17:		buffer[1] = '&';	return 2;
+	case XK_F18:		buffer[1] = '*';	return 2;
+	case XK_F19:		buffer[1] = '(';	return 2;
+	case XK_F20:		buffer[1] = ')';	return 2;
 	/* keypad function keys */
-	case XK_KP_F1:		num = 'P';	break;
-	case XK_KP_F2:		num = 'Q';	break;
-	case XK_KP_F3:		num = 'R';	break;
-	case XK_KP_F4:		num = 'S';	break;
-	default:		num = 0;	break;
-    }
-    if (num) {
-	kqadd(cur_win, poundc);
-	kqadd(cur_win, num);
-    }
+	case XK_KP_F1:		buffer[1] = 'P';	return 2;
+	case XK_KP_F2:		buffer[1] = 'Q';	return 2;
+	case XK_KP_F3:		buffer[1] = 'R';	return 2;
+	case XK_KP_F4:		buffer[1] = 'S';	return 2;
+	}
+
+	return 0;
 }
+
+#if NEEDED
+/* ARGSUSED */
+static Bool
+check_kbd_ev(disp, ev, arg)
+    Display    *disp;
+    XEvent     *ev;
+    char       *arg;
+{
+    return (ev->type == KeyPress);
+}
+
+int
+x_key_events_ready()
+{
+    XEvent      ev;
+
+    /* XXX may want to use another mode */
+    if (XEventsQueued(dpy, QueuedAlready))
+	return XPeekIfEvent(dpy, &ev, check_kbd_ev, (char *)0);
+    return FALSE;
+}
+#endif
 
 /*
  * change reverse video status
@@ -3563,7 +2629,7 @@ x_beep()
 		return;
 	}
 #endif
-	XBell(dpy, 0);
+	XBell(cur_win->dpy, 0);
 }
 
 #if NO_LEAKS
@@ -3576,5 +2642,8 @@ x11_leaks()
 		FreeIfNeeded(cur_win->fontname);
 	}
 }
-#endif	/* NO_LEAKS */
+#endif
+
+#else
+x11hello() {}
 #endif				/* X11 */

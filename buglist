@@ -132,9 +132,6 @@ better mimicking vi's behavior).
  - pgf ]
 ----------------------------------------------------------------------
 
-Enhancement:  xvile would be nicer with scroll bars.
-
-----------------------------------------------------------------------
 
 In message <9212231610.AA27630@cuba.Cayman.COM> you write:
 >
@@ -444,6 +441,7 @@ what are the symptoms?
 
 Is it possible to bind keys which give a sequence like ^[[5~, that is other
 than ^[O<char.>, longer than 3 chars?
+[ not currently  -pgf ]
 
 
 ---------------------
@@ -452,4 +450,5 @@ you can't use ! as a regular expression delimiter, as in:
 	:s!pat!replace!g
 because the parser treats ":s!" as if it's ":q!" or ":w!".
 
+---------------------
 

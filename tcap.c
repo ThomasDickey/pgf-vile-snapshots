@@ -2,125 +2,9 @@
  *		for MicroEMACS
  *
  * $Log: tcap.c,v $
- * Revision 1.36  1994/02/03 19:35:12  pgf
- * tom's changes for 3.65
+ * Revision 1.38  1994/02/22 11:03:15  pgf
+ * truncated RCS log for 4.0
  *
- * Revision 1.35  1994/01/27  18:00:52  pgf
- * fix for sys5 handling of tgetent, wrt xterm detection
- *
- * Revision 1.34  1993/12/22  15:15:47  pgf
- * eliminated unused variable
- *
- * Revision 1.33  1993/12/21  11:34:42  pgf
- * upped size of tcbuf, to satisfy buggy SCO
- *
- * Revision 1.32  1993/12/08  18:45:09  pgf
- * assume we're an xterm if the word 'xterm' appears anywhere in first
- * field of the tcbuf
- *
- * Revision 1.31  1993/11/04  09:10:51  pgf
- * tom's 3.63 changes
- *
- * Revision 1.30  1993/09/21  11:00:20  pgf
- * don't call showcpos on mouse-clicks -- call mlerase.  if someone want to
- * know position, they can use ruler mode.
- *
- * Revision 1.29  1993/09/16  11:17:43  pgf
- * added missing args to showcpos
- *
- * Revision 1.28  1993/09/16  10:58:20  pgf
- * xterm mouse motions now cause a call to showcpos()
- *
- * Revision 1.27  1993/09/10  16:06:49  pgf
- * tom's 3.61 changes
- *
- * Revision 1.26  1993/08/21  18:21:08  pgf
- * protect against window sizes less than 2, and fix botch that always
- * set i_am_xterm to TRUE
- *
- * Revision 1.25  1993/08/18  16:50:10  pgf
- * bumped mrow from 100 to 200 -- some people have very good eyesight
- *
- * Revision 1.24  1993/08/17  18:20:16  pgf
- * only require that TERM _end_ in "xterm" to turn on xterm hacks
- *
- * Revision 1.23  1993/08/13  16:32:50  pgf
- * tom's 3.58 changes
- *
- * Revision 1.22  1993/07/08  15:03:52  pgf
- * reduce max rows from 200 to 100.  it would take an _awfully_ big screen
- * to have 200 readable lines of text.
- *
- * Revision 1.21  1993/06/18  15:57:06  pgf
- * tom's 3.49 changes
- *
- * Revision 1.20  1993/06/02  14:28:47  pgf
- * see tom's 3.48 CHANGES
- *
- * Revision 1.19  1993/05/04  17:05:14  pgf
- * see tom's CHANGES, 3.45
- *
- * Revision 1.18  1993/04/01  12:53:33  pgf
- * removed redundant includes and declarations
- *
- * Revision 1.17  1992/12/23  09:27:14  foxharp
- * hack in missing CS or SR for xterms
- *
- * Revision 1.16  1992/12/04  09:18:31  foxharp
- * allow the open routine to be called again, to emit TI, KS
- *
- * Revision 1.15  1992/05/19  08:55:44  foxharp
- * more prototype and shadowed decl fixups
- *
- * Revision 1.14  1992/05/16  12:00:31  pgf
- * prototypes/ansi/void-int stuff/microsoftC
- *
- * Revision 1.13  1992/04/10  18:47:25  pgf
- * change abs to absol to get rid of name conflicts
- *
- * Revision 1.12  1992/03/24  08:46:02  pgf
- * fixed support for AL,DL -- I hope it's really safe to use tgoto as
- * a generic parm capability expander.  I
- *
- * Revision 1.11  1992/03/24  07:46:34  pgf
- * added support for DL and AL capabilities, which are multi-line insert
- * and delete -- much better in an xterm
- *
- * Revision 1.10  1992/01/22  20:27:47  pgf
- * added TI, TE, KS, KE support, per user suggestion (sorry, forgot who)
- *
- * Revision 1.9  1991/11/01  14:38:00  pgf
- * saber cleanup
- *
- * Revision 1.8  1991/10/23  12:05:37  pgf
- * NULL initializations should have been 0 instead
- *
- * Revision 1.7  1991/09/10  01:19:35  pgf
- * re-tabbed, and moved ESC and BEL to estruct.h
- *
- * Revision 1.6  1991/08/07  12:35:07  pgf
- * added RCS log messages
- *
- * revision 1.5
- * date: 1991/08/06 15:26:22;
- * sprintf changes
- * 
- * revision 1.4
- * date: 1991/06/19 01:32:21;
- * change name of howmany 'cuz of HP/UX conflict
- * sheesh
- * 
- * revision 1.3
- * date: 1991/05/31 11:25:14;
- * moved PRETTIER_SCROLL to esturct.h
- * 
- * revision 1.2
- * date: 1990/10/01 10:37:44;
- * un-#ifdef spal()
- * 
- * revision 1.1
- * date: 1990/09/21 10:26:09;
- * initial vile RCS revision
  */
 
 #define termdef 1			/* don't define "term" external */
@@ -151,6 +35,7 @@ char *vb;	/* visible-bell */
 extern char *tgoto P((char *, int, int));
 extern int tgetent P((char *, char *));
 extern int tgetnum P((char * ));
+extern char *tgetstr P((char *, char **));
 extern int tputs P((char *, int, void(*_f)(int) ));
 
 TERM term = {
@@ -203,7 +88,7 @@ static	int	i_am_xterm;
 void
 tcapopen()
 {
-	char *t, *p, *tgetstr P((char *, char **));
+	char *t, *p;
 	char tcbuf[2048];
 	char *tv_stype;
 	char err_str[72];

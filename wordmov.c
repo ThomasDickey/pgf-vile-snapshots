@@ -5,25 +5,9 @@
  *	Written for vile by Paul Fox, (c)1990
  *
  * $Log: wordmov.c,v $
- * Revision 1.6  1993/04/01 12:53:33  pgf
- * removed redundant includes and declarations
+ * Revision 1.7  1994/02/22 11:03:15  pgf
+ * truncated RCS log for 4.0
  *
- * Revision 1.5  1992/05/16  12:00:31  pgf
- * prototypes/ansi/void-int stuff/microsoftC
- *
- * Revision 1.4  1991/11/08  13:02:46  pgf
- * ifdefed unneeded funcs
- *
- * Revision 1.3  1991/08/07  12:35:07  pgf
- * added RCS log messages
- *
- * revision 1.2
- * date: 1991/06/25 19:53:49;
- * massive data structure restructure
- * 
- * revision 1.1
- * date: 1990/09/21 10:26:27;
- * initial vile RCS revision
  */
 
 #include "estruct.h"

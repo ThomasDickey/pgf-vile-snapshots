@@ -8,43 +8,9 @@
  *		editing.
  *
  * $Log: tbuff.c,v $
- * Revision 1.12  1994/02/02 16:39:57  pgf
- * tb_get now returns the more correct 8-bit value, rather than the sign-
- * extended hack we needed for RECORDED_ESC
+ * Revision 1.13  1994/02/22 11:03:15  pgf
+ * truncated RCS log for 4.0
  *
- * Revision 1.11  1993/12/08  19:52:31  pgf
- * initialized tb_last in tb_alloc.  this may fix some of the core
- * dumps we've been seeing in xvile.
- *
- * Revision 1.10  1993/09/10  16:06:49  pgf
- * tom's 3.61 changes
- *
- * Revision 1.9  1993/07/27  18:06:20  pgf
- * see tom's 3.56 CHANGES entry
- *
- * Revision 1.8  1993/04/08  09:49:08  pgf
- * added tb_stuff.c
- *
- * Revision 1.7  1993/04/01  13:06:31  pgf
- * turbo C support (mostly prototypes for static)
- *
- * Revision 1.6  1993/03/25  19:50:58  pgf
- * see 3.39 section of CHANGES
- *
- * Revision 1.5  1993/03/16  10:53:21  pgf
- * see 3.36 section of CHANGES file
- *
- * Revision 1.4  1993/03/05  17:50:54  pgf
- * see CHANGES, 3.35 section
- *
- * Revision 1.3  1993/02/24  10:59:02  pgf
- * see 3.34 changes, in CHANGES file
- *
- * Revision 1.2  1993/02/15  10:37:31  pgf
- * cleanup for gcc-2.3's -Wall warnings
- *
- * Revision 1.1  1993/02/08  14:51:46  pgf
- * Initial revision
  *
  */
 

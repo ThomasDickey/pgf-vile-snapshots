@@ -8,24 +8,9 @@
  * routine is conditionalized on defining BEL.
  *
  * $Log: vt52.c,v $
- * Revision 1.6  1993/06/18 15:57:06  pgf
- * tom's 3.49 changes
+ * Revision 1.7  1994/02/22 11:03:15  pgf
+ * truncated RCS log for 4.0
  *
- * Revision 1.5  1993/04/01  12:57:22  pgf
- * removed redundant includes and declarations
- *
- * Revision 1.4  1991/11/16  18:25:37  pgf
- * ifdef change for UNIX
- *
- * Revision 1.3  1991/09/10  01:19:35  pgf
- * re-tabbed, and moved ESC and BEL to estruct.h
- *
- * Revision 1.2  1991/08/07  12:35:07  pgf
- * added RCS log messages
- *
- * revision 1.1
- * date: 1990/09/21 10:26:20;
- * initial vile RCS revision
  */
 
 #define termdef 1			/* don't define "term" external */

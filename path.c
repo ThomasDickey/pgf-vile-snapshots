@@ -3,73 +3,9 @@
  *		strings.
  *
  * $Log: path.c,v $
- * Revision 1.22  1994/02/14 15:46:31  pgf
- * tom's interim post-3.65 changes
+ * Revision 1.23  1994/02/22 11:03:15  pgf
+ * truncated RCS log for 4.0
  *
- * Revision 1.21  1994/01/11  17:27:42  pgf
- * changed GO32 to DJGPP
- *
- * Revision 1.20  1993/11/04  09:10:51  pgf
- * tom's 3.63 changes
- *
- * Revision 1.19  1993/10/04  10:24:09  pgf
- * see tom's 3.62 changes
- *
- * Revision 1.18  1993/09/22  10:26:08  pgf
- * minor vms path fix, from jim crigler
- *
- * Revision 1.17  1993/09/06  16:31:57  pgf
- * suppress doubled path separators in pathcat()
- *
- * Revision 1.16  1993/09/03  09:11:54  pgf
- * tom's 3.60 changes
- *
- * Revision 1.15  1993/07/09  13:59:37  pgf
- * comment on djgcc ifdef
- *
- * Revision 1.14  1993/07/06  16:39:04  pgf
- * integrated Tuan DANG's changes for the djgpp compiler under DOS
- *
- * Revision 1.13  1993/06/25  11:25:55  pgf
- * patches for Watcom C/386, from Tuan DANG
- *
- * Revision 1.12  1993/06/02  14:28:47  pgf
- * see tom's 3.48 CHANGES
- *
- * Revision 1.11  1993/05/24  15:21:37  pgf
- * tom's 3.47 changes, part a
- *
- * Revision 1.10  1993/05/11  16:22:22  pgf
- * see tom's CHANGES, 3.46
- *
- * Revision 1.9  1993/05/06  11:59:58  pgf
- * added ifdefs for USE_D_NAMLEN, for systems that don't have or don't
- * need it (d_name[] is null-terminated on most systems)
- *
- * Revision 1.8  1993/04/20  12:18:32  pgf
- * see tom's 3.43 CHANGES
- *
- * Revision 1.7  1993/04/09  13:42:32  pgf
- * ifdefed out extern decls for getpw{nam,uid} -- to many type/prototyple
- * clashes
- *
- * Revision 1.6  1993/04/02  11:02:15  pgf
- * ls-based directory routines, and support for "old-style" directories
- *
- * Revision 1.5  1993/04/01  15:55:02  pgf
- * added extern decls for getpw{nam,uid}()
- *
- * Revision 1.4  1993/04/01  13:07:50  pgf
- * see tom's 3.40 CHANGES
- *
- * Revision 1.3  1993/03/25  19:50:58  pgf
- * see 3.39 section of CHANGES
- *
- * Revision 1.2  1993/03/16  16:04:01  pgf
- * fix 'parentheses suggested' warnings
- *
- * Revision 1.1  1993/03/16  10:53:21  pgf
- * see 3.36 section of CHANGES file
  *
  */
 

@@ -260,37 +260,11 @@ xvile.com :
 	@ write sys$output "** made $@"
 
 # $Log: descrip.mms,v $
-# Revision 1.11  1994/02/03 19:35:12  pgf
+# Revision 1.12  1994/02/22 11:12:13  pgf
+# truncated RCS log for 4.0
+#
+# Revision 1.11  1994/02/03  19:35:12  pgf
 # tom's changes for 3.65
 #
-# Revision 1.10  1993/09/03  09:11:54  pgf
-# tom's 3.60 changes
-#
-# Revision 1.9  1993/08/05  14:29:12  pgf
-# tom's 3.57 changes
-#
-# Revision 1.8  1993/07/15  10:37:58  pgf
-# see 3.55 CHANGES
-#
-# Revision 1.7  1993/07/06  16:53:50  pgf
-# added map.c/map.obj
-#
-# Revision 1.6  1993/06/18  15:57:06  pgf
-# tom's 3.49 changes
-#
-# Revision 1.5  1993/04/28  14:34:11  pgf
-# see CHANGES, 3.44 (tom)
-#
-# Revision 1.4  1993/04/20  12:18:32  pgf
-# see tom's 3.43 CHANGES
-#
-# Revision 1.3  1993/04/01  13:07:50  pgf
-# see tom's 3.40 CHANGES
-#
-# Revision 1.2  1993/03/25  19:50:58  pgf
-# see 3.39 section of CHANGES
-#
-# Revision 1.1  1993/03/17  09:50:19  pgf
-# Initial revision
 #
 #

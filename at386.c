@@ -2,37 +2,9 @@
  *		have libtermcap.   grrr.
  *
  * $Log: at386.c,v $
- * Revision 1.9  1993/04/01 12:53:33  pgf
- * removed redundant includes and declarations
+ * Revision 1.10  1994/02/22 11:03:15  pgf
+ * truncated RCS log for 4.0
  *
- * Revision 1.8  1992/05/16  12:00:31  pgf
- * prototypes/ansi/void-int stuff/microsoftC
- *
- * Revision 1.7  1992/04/10  18:47:25  pgf
- * change abs to absol to get rid of name conflicts
- *
- * Revision 1.6  1991/09/10  01:19:35  pgf
- * re-tabbed, and moved ESC and BEL to estruct.h
- *
- * Revision 1.5  1991/08/07  12:34:39  pgf
- * added RCS log messages
- *
- * revision 1.4
- * date: 1991/06/19 01:32:21;
- * change name of howmany 'cuz of HP/UX conflict
- * sheesh
- * 
- * revision 1.3
- * date: 1991/05/31 10:27:03;
- * moved PRETTIER_SCROLL #define to estruct.h
- * 
- * revision 1.2
- * date: 1990/10/01 10:37:32;
- * un-#ifdef spal()
- * 
- * revision 1.1
- * date: 1990/09/21 10:24:39;
- * initial vile RCS revision
  */
 
 #define termdef 1			/* don't define "term" external */

@@ -4,232 +4,9 @@
 	written 1986 by Daniel Lawrence
  *
  * $Log: eval.c,v $
- * Revision 1.73  1994/02/14 15:46:31  pgf
- * tom's interim post-3.65 changes
+ * Revision 1.75  1994/02/22 11:03:15  pgf
+ * truncated RCS log for 4.0
  *
- * Revision 1.72  1994/02/08  13:23:10  pgf
- * fix off-the-end problems related to strncpy
- *
- * Revision 1.71  1994/02/03  19:35:12  pgf
- * tom's changes for 3.65
- *
- * Revision 1.70  1994/01/31  18:11:03  pgf
- * change kbd_key() to tgetc()
- *
- * Revision 1.69  1993/11/04  09:10:51  pgf
- * tom's 3.63 changes
- *
- * Revision 1.68  1993/10/04  10:24:09  pgf
- * see tom's 3.62 changes
- *
- * Revision 1.67  1993/09/10  16:06:49  pgf
- * tom's 3.61 changes
- *
- * Revision 1.66  1993/09/06  16:36:47  pgf
- * changed glob() to doglob() to avoid symbol conflicts
- *
- * Revision 1.65  1993/09/03  09:11:54  pgf
- * tom's 3.60 changes
- *
- * Revision 1.64  1993/08/13  16:32:50  pgf
- * tom's 3.58 changes
- *
- * Revision 1.63  1993/08/05  14:29:12  pgf
- * tom's 3.57 changes
- *
- * Revision 1.62  1993/07/27  18:06:20  pgf
- * see tom's 3.56 CHANGES entry
- *
- * Revision 1.61  1993/07/20  18:08:18  pgf
- * add pyr and AIX to the list of non-constant case identifer machines
- *
- * Revision 1.60  1993/07/15  10:37:58  pgf
- * see 3.55 CHANGES
- *
- * Revision 1.59  1993/07/01  16:15:54  pgf
- * tom's 3.51 changes
- *
- * Revision 1.58  1993/06/28  20:10:27  pgf
- * new variable
- *
- * Revision 1.57  1993/06/24  18:02:13  pgf
- * added AUX as system needing to use if/else instead of switch
- *
- * Revision 1.56  1993/06/18  16:20:37  pgf
- * tom's 3.49 changes
- *
- * Revision 1.55  1993/06/02  14:28:47  pgf
- * see tom's 3.48 CHANGES
- *
- * Revision 1.54  1993/05/24  15:25:41  pgf
- * tom's 3.47 changes, part b
- *
- * Revision 1.53  1993/05/24  15:21:37  pgf
- * tom's 3.47 changes, part a
- *
- * Revision 1.52  1993/05/04  17:05:14  pgf
- * see tom's CHANGES, 3.45
- *
- * Revision 1.51  1993/04/21  15:43:05  pgf
- * folded long line
- *
- * Revision 1.50  1993/04/20  12:18:32  pgf
- * see tom's 3.43 CHANGES
- *
- * Revision 1.49  1993/04/01  13:06:31  pgf
- * turbo C support (mostly prototypes for static)
- *
- * Revision 1.48  1993/03/29  11:18:15  pgf
- * $pagewid was returning length instead of width
- *
- * Revision 1.47  1993/03/16  10:53:21  pgf
- * see 3.36 section of CHANGES file
- *
- * Revision 1.46  1993/03/05  17:50:54  pgf
- * see CHANGES, 3.35 section
- *
- * Revision 1.45  1993/02/24  10:59:02  pgf
- * see 3.34 changes, in CHANGES file
- *
- * Revision 1.44  1993/02/16  20:52:49  pgf
- * eliminate putenv call, which isn't always available.  real vi doesn't
- * push the "shell" variable to the environment anyway.
- *
- * Revision 1.43  1993/02/08  14:53:35  pgf
- * see CHANGES, 3.32 section
- *
- * Revision 1.42  1993/01/23  13:38:23  foxharp
- * now include nevars.h, which is auto-created by mktbls
- *
- * Revision 1.41  1993/01/16  10:30:58  foxharp
- * makevarslist() and listvars()
- *
- * Revision 1.40  1992/12/14  09:03:25  foxharp
- * lint cleanup, mostly malloc
- *
- * Revision 1.39  1992/11/19  09:03:56  foxharp
- * fix identification of single character tokens that happen to be prefixes
- * for special constructs, like '~', '*', etc.
- *
- * Revision 1.38  1992/08/20  23:40:48  foxharp
- * typo fixes -- thanks, eric
- *
- * Revision 1.37  1992/07/24  18:22:51  foxharp
- * deleted local atoi() routine -- now we use the system's copy
- *
- * Revision 1.36  1992/07/13  20:09:57  foxharp
- * "terse" is no longer a variable
- *
- * Revision 1.35  1992/07/13  09:26:16  foxharp
- * added "force" argument to current_directory()
- *
- * Revision 1.34  1992/06/25  23:00:50  foxharp
- * changes for dos/ibmpc
- *
- * Revision 1.33  1992/05/19  08:55:44  foxharp
- * more prototype and shadowed decl fixups
- *
- * Revision 1.32  1992/05/16  12:00:31  pgf
- * prototypes/ansi/void-int stuff/microsoftC
- *
- * Revision 1.30  1992/04/10  18:48:17  pgf
- * change abs to absol to get rid of name conflicts
- *
- * Revision 1.29  1992/03/24  09:02:18  pgf
- * need to glob() filenames for &rd and &wr
- *
- * Revision 1.28  1992/03/24  07:36:23  pgf
- * added &rd and &wr functions, for file access, and fixed off-by-one in $curcol
- *
- * Revision 1.27  1992/03/19  23:19:55  pgf
- * linux prototyped portability
- *
- * Revision 1.26  1992/03/19  23:07:47  pgf
- * variable access cleanup/rearrangement
- *
- * Revision 1.25  1992/03/05  09:17:21  pgf
- * added support for new "terse" variable, to control unnecessary messages
- *
- * Revision 1.24  1992/03/03  09:35:52  pgf
- * added support for getting "words" out of the buffer via variables --
- * needed _nonspace character type
- *
- * Revision 1.23  1992/02/17  09:01:16  pgf
- * took out unused vars for saber
- *
- * Revision 1.22  1992/01/05  00:06:13  pgf
- * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
- * often.  also normalized message appearance somewhat.
- *
- * Revision 1.21  1992/01/03  23:31:49  pgf
- * use new ch_fname() to manipulate filenames, since b_fname is now
- * a malloc'ed sting, to avoid length limits
- *
- * Revision 1.20  1991/12/24  09:18:47  pgf
- * added current/change directory support  (Dave Lemke's changes)
- *
- * Revision 1.19  1991/11/27  10:09:09  pgf
- * bug fix, from pete
- *
- * Revision 1.18  1991/11/13  20:09:27  pgf
- * X11 changes, from dave lemke
- *
- * Revision 1.17  1991/11/08  13:19:01  pgf
- * lint cleanup
- *
- * Revision 1.16  1991/11/04  14:18:09  pgf
- * use lsprintf in itoa
- *
- * Revision 1.15  1991/11/03  17:36:13  pgf
- * picky saber change
- *
- * Revision 1.14  1991/11/01  14:38:00  pgf
- * saber cleanup
- *
- * Revision 1.13  1991/10/28  14:25:06  pgf
- * eliminated some variables that are now buffer-values
- *
- * Revision 1.12  1991/10/24  13:05:52  pgf
- * conversion to new regex package -- much faster
- *
- * Revision 1.11  1991/10/22  14:10:07  pgf
- * more portable #if --> #ifdef
- *
- * Revision 1.10  1991/09/26  13:12:04  pgf
- * new arg. to kbd_string to enable backslash processing
- *
- * Revision 1.9  1991/09/16  23:46:55  pgf
- * more hardening
- *
- * Revision 1.8  1991/09/13  03:27:06  pgf
- * attempt to harden against bad variable names (like lone %)
- *
- * Revision 1.7  1991/08/07  12:35:07  pgf
- * added RCS log messages
- *
- * revision 1.6
- * date: 1991/08/06 15:13:27;
- * global/local values
- * 
- * revision 1.5
- * date: 1991/06/25 19:52:23;
- * massive data structure restructure
- * 
- * revision 1.4
- * date: 1991/06/03 10:19:11;
- * newscreensize() is now named newlength()
- * 
- * revision 1.3
- * date: 1990/10/01 11:05:54;
- * progname --> prognam
- * 
- * revision 1.2
- * date: 1990/09/25 11:38:13;
- * took out old ifdef BEFORE code
- * 
- * revision 1.1
- * date: 1990/09/21 10:25:11;
- * initial vile RCS revision
  */
 
 #include	"estruct.h"
@@ -625,6 +402,8 @@ char *vname;		/* name of environment variable to retrieve */
 				SetEnv(&directory, DftEnv("TMP", P_tmpdir));
 			value = directory;
 
+		ElseIf( EVNTILDES )	value = l_itoa(ntildes);
+
 		EndIf
 	}
 	return value;
@@ -943,6 +722,11 @@ char *value;	/* value to set to */
 
 		ElseIf( EVDIRECTORY )
 			SetEnv(&directory, value);
+
+		ElseIf( EVNTILDES )
+			ntildes = atoi(value);
+			if (ntildes > 100)
+				ntildes = 100;
 
 		Otherwise
 			/* EVPROGNAME */
