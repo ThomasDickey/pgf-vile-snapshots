@@ -9,7 +9,10 @@
 
 /*
  * $Log: edef.h,v $
- * Revision 1.109  1993/07/15 10:37:58  pgf
+ * Revision 1.110  1993/07/27 18:06:20  pgf
+ * see tom's 3.56 CHANGES entry
+ *
+ * Revision 1.109  1993/07/15  10:37:58  pgf
  * see 3.55 CHANGES
  *
  * Revision 1.108  1993/07/09  19:17:35  pgf
@@ -366,7 +369,7 @@
 decl_uninit( char *prog_arg );		/* argv[0] from main.c */
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version 3.55");
+decl_init( char version[], "version 3.56");
 
 decl_init( int slash, '/'); 		/* so DOS can use '\' as path separator */
 
@@ -408,13 +411,6 @@ decl_uninit( regexp *gregexp );		/* compiled version of pat */
 decl_uninit( char *patmatch );
 
 decl_uninit( int ignorecase );
-
-#if	DEBUGM
-/*	vars needed for macro debugging output	*/
-/* global string to hold debug line text */
-decl_uninit( char outline[NSTRING] );
-#endif
-
 
 decl_init( int curgoal, -1 );           /* column goal			*/
 decl_uninit( char *execstr );		/* pointer to string to execute	*/

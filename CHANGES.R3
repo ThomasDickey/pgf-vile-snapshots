@@ -1,4 +1,106 @@
-Changes for vile 3.55:
+Changes for vile 3.56:	(released Tue Jul 27, 1993)
+(pgf)
+	+ after a confirm substitute operation, we now mlerase the confirm
+	  prompt (oneliner.c)
+
+	+ be sure the [vileinit] buffer is marked as scratch while doing the
+	  bprintf into it, so undo record-keeping will be suppressed. (main.c)
+
+	+ rearranged calls to chg_buff and ldelnewline in ldelete, so that
+	  the buffer will still be marked clean on first toss/copy/tag to
+	  undo.  unmodified state is now restored correctly after a :g/^$/d is
+	  undone. (line.c)
+
+	+ In regular expressions, \s and \S are now true atoms.  they both
+	  must now be followed by * or + to match more than one.  also, \s
+	  no longer matches BOL or EOL (thanks to alistair and eric for
+	  pointing out and fixing) (regexp.c)  In practice this means that
+	  one should use \s* or \s\+ where one used to use just \s.  also,
+	  if a match against ^ or $ is necessary, it must be done explicitly,
+	  e.g. /\(^\s*\|\s\+\)word/ instead of /\sword/
+
+	+ adjusted paragraph/section/comment/sentence regexps, with help
+	  from eric, to reflect change to \s and \S
+
+	+ make the #ifdef USE_TERMIO version of ttclean() be a no-op under
+	  X11, as it is in the other cases.  eric's right -- termio.c needs
+	  a rewrite.  (termio.c)
+
+	+ don't pass the (0) to getpgrp if we're POSIX and ANSI -- the
+	  library is probably the right one, and there's a high probability
+	  of a prototype conflict if we _do_ pass it.  (spawn.c)
+
+	+ When looking up X defaults, the old code checked the class first,
+	  then the specific program name.  This is backwards since if the
+	  class value exists, there is no way to override it with the -name
+	  option.  (x11.c)
+
+	+ AIX and pyramid think we have non-constant case expressions (eval.c)
+
+	+ There is no requirement in ANSI C for SCRTCH_LEFT and SCRTCH_RIGHT
+	  to be expanded before the ##.  Some preprocessors do and some don't.
+	  However, the other #define using just #s and string concatenation
+	  seems to work everywhere.  (estruct.h)
+
+	+ clarified usage of &sin function, which searches its first argument
+	  for an occurrence of the second.  (vile.hlp)
+
+(tom)
+	+ renamed UCHARAT to UCHAR_AT; added defs for UCHAR USHORT, UINT and
+	  ULONG for easier linting/reading (bind.c, dirstuff.h, estruct.h,
+	  file.c, history.c, ibmpc.c, input.c, isearch.c, line.c, oneliner.c,
+	  proto.h, tbuff.c, vmalloc.c, vmsvt.c, x11.c, z_ibmpc.c)
+
+	+ make 'prc2kcod()' return an int again, some optimization of 'token()'
+	  (bind.c, file.c).
+
+	+ clean-compiled/tested X11 + DEBUGM + OPT_MAP_MEMORY with gcc
+	  (basic.c, edef.h, exec.c).
+
+	+ disable filename-completion when OPT_MAP_MEMORY is enabled.
+
+	+ added mode 'newline', set to true when reading files that have a
+	  trailing newline (the normal vi-convention), modified (file.c,
+	  buffer.c, random.c).
+ 
+	+ fixed place where ":ww" garbages the screen before reporting
+	  "wrote 0 buffers" (buffer.c).
+
+	+ simplified 'writereg()' and 'ffputline()' (fileio.c, file.c) to allow
+	  'newline' mode to control whether a trailing newline is written to
+	  output files.
+ 
+	+ modified 'kifile()' so that it does not insert the trailing newline
+	  if it wasn't present in the file.
+ 
+	+ made 'ldelete()' return from one point (line.c) to simplify 'report'
+	  mode.
+
+	+ added mode 'report', to specify the number of changes before a
+	  message is emitted:
+		NN lines deleted		6dd
+		NN more lines			u
+		NN fewer lines			u
+		NN fewer lines			:g/^$/d
+		NN lines yanked			"a8yy
+		NN substitutions on MM lines	:%s/x/XX/g
+		NN substitutions		:%s/x/X/
+	  (globals.c, line.c, undo.c, oneliner.c, random.c, region.c)
+
+	+ corrected unnecessary screen-update in 'substline()' (oneliner.c)
+	  introduced in confirm-changes.
+
+	+ added 'linewrap' mode (basic.c, buffer.c, display.c, windows.c).
+
+	+ corrected cursor movement for large repeat counts with 'H' command
+	  (basic.c).
+
+	+ ifdef'd 'screen_string()' to handle apollo compiler warning when
+	  testing SMALLER configuration.
+
+	+ added stubs for modes 'popup-msgs', 'popup-choices'.
+
+Changes for vile 3.55: (released Mon Jul 19, 1993)
 (pgf)
 	+ new routine, mlquickask(), which prompts for and returns a single
 	  key answer from a user.  use this when getting a confirm from a

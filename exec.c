@@ -4,7 +4,10 @@
  *	written 1986 by Daniel Lawrence	
  *
  * $Log: exec.c,v $
- * Revision 1.64  1993/07/19 15:27:06  pgf
+ * Revision 1.65  1993/07/27 18:06:20  pgf
+ * see tom's 3.56 CHANGES entry
+ *
+ * Revision 1.64  1993/07/19  15:27:06  pgf
  * added \OOO and \xXXX input in token(), where OOO and XXX are octal and
  * hex sequences.  also added \e for ESC
  *
@@ -958,7 +961,7 @@ char *src, *tok;	/* source string, destination token string */
 int eolchar;
 {
 	register int quotef = EOS;	/* nonzero iff the current string quoted */
-	register int c;
+	register int c, i, d;
 
 	/* first scan past any whitespace in the source string */
 	while (isspace(*src))
@@ -980,46 +983,34 @@ int eolchar;
 				case 'e':	*tok++ = ESC; break;
 
 				case 'x':
-					{
-					int i = 3; /* allow \xNNN 
-						      (we're on the 'x' now)*/
-					*tok = 0;
-					while(*src && isalnum(*src) && i--) {
-						if (isdigit(*src)) {
-							*tok = *tok * 16 + 
-								*src - '0';
-						} else if (isupper(*src)) {
-							if (*src > 'F')
-								break;
-							*tok = *tok * 16 +
-								*src - 'A' + 10;
-						} else if (islower(*src)) {
-							if (*src > 'f')
-								break;
-							*tok = *tok * 16 +
-								*src - 'a' + 10;
-						}
+					i = 3; /* allow \xNNN hex */
+					c = 0;
+					while (isalnum(*src) && i--) {
+						if (isdigit(*src))
+							d = *src - '0';
+						else
+							d = (isupper(*src)
+								? tolower(*src)
+								: *src) - 'a';
+						if (d > 15)
+							break;
+						c = (c * 16) + d;
 						src++;
 					}
-					tok++;
-					}
+					*tok++ = c;
 					break;
 
-				case '0': case '1': case '2': case '3':
-				case '4': case '5': case '6': case '7':
-					{
-					int i = 2; /* allow \NNN (we have
-						the first N as c, are
-						about to do the second */
-					*tok = c - '0';
-					while(*src && isdigit(*src) &&
-							*src < '8' && i--) {
-						*tok = *tok * 8 + *src++ - '0';
+				default:
+					if (c >= '0' && c <= '7') {
+						i = 2; /* allow \NNN octal */
+						c -= '0';
+						while (isdigit(*src)
+						  && *src < '8'
+						  && i--) {
+							c = (c * 8) + (*src++ - '0');
+						}
 					}
-					tok++;
-					}
-					break;
-				default:	*tok++ = c;
+					*tok++ = c;
 			}
 		} else {
 			/* check for the end of the token */
@@ -1428,6 +1419,7 @@ nxtscan:	/* on to the next line */
 		   ^G will abort the command */
 	
 		if (macbug) {
+			char	outline[NLINE];
 			(void)strcpy(outline, "<<<");
 	
 			/* debug macro name */
@@ -1444,7 +1436,7 @@ nxtscan:	/* on to the next line */
 	
 			/* write out the debug line */
 			mlforce("%s",outline);
-			update(TRUE);
+			(void)update(TRUE);
 	
 			/* and get the keystroke */
 			if (kbd_key() == abortc) {

@@ -4,7 +4,10 @@
  *	written 11-feb-86 by Daniel Lawrence
  *
  * $Log: bind.c,v $
- * Revision 1.52  1993/07/19 15:28:23  pgf
+ * Revision 1.53  1993/07/27 18:06:20  pgf
+ * see tom's 3.56 CHANGES entry
+ *
+ * Revision 1.52  1993/07/19  15:28:23  pgf
  * moved hex digit processing from prc2kcod to token()
  *
  * Revision 1.51  1993/07/15  10:37:58  pgf
@@ -1199,14 +1202,14 @@ char *fname;	/* name to attempt to match */
 }
 
 /* prc2kcod: translate printable code to 10 bit keycode */
-unsigned int 
+int 
 prc2kcod(kk)
 char *kk;		/* name of key to translate to Command key form */
 {
-	register unsigned int c;		/* key sequence to return */
-	register unsigned int pref = 0;	/* key prefixes */
+	register UINT c;	/* key sequence to return */
+	register UINT pref = 0;	/* key prefixes */
 	register int len = strlen(kk);
-	register unsigned char *k = (unsigned char *)kk;
+	register UCHAR *k = (UCHAR *)kk;
 
 	if (len > 3 && *(k+2) == '-') {
 		if (*k == '^') {
@@ -1214,12 +1217,12 @@ char *kk;		/* name of key to translate to Command key form */
 				pref = CTLA;
 			if (*(k+1) == toalpha(cntl_x))
 				pref = CTLX;
-		} else if (!strncmp(k, "FN", 2)) {
+		} else if (!strncmp((char *)k, "FN", 2)) {
 			pref = SPEC;
 		}
 		if (pref != 0)
 			k += 3;
-	} else if (len > 2 && !strncmp(k, "M-", 2)) {
+	} else if (len > 2 && !strncmp((char *)k, "M-", 2)) {
 		pref = SPEC;
 		k += 2;
 	} else if (len > 1) {
@@ -1239,10 +1242,10 @@ char *kk;		/* name of key to translate to Command key form */
 		if (islower(c)) c = toupper(c);
 		c = tocntrl(c);
 		k += 2;
-	} else if (!strcmp(k,"<sp>")) {
+	} else if (!strcmp((char *)k,"<sp>")) {
 		c = ' ';		/* the string <sp> */
 		k += 4;
-	} else if (!strcmp(k,"<tab>")) {
+	} else if (!strcmp((char *)k,"<tab>")) {
 		c = '\t';		/* the string <tab> */
 		k += 5;
 	} else {		/* any single char, control or not */
@@ -1252,7 +1255,7 @@ char *kk;		/* name of key to translate to Command key form */
 	if (*k != EOS)		/* we should have eaten the whole thing */
 		return -1;
 	
-	return pref|c;
+	return (int)(pref|c);
 }
 
 #if ! SMALLER

@@ -8,7 +8,10 @@
  *		editing.
  *
  * $Log: tbuff.c,v $
- * Revision 1.8  1993/04/08 09:49:08  pgf
+ * Revision 1.9  1993/07/27 18:06:20  pgf
+ * see tom's 3.56 CHANGES entry
+ *
+ * Revision 1.8  1993/04/08  09:49:08  pgf
  * added tb_stuff.c
  *
  * Revision 1.7  1993/04/01  13:06:31  pgf
@@ -38,7 +41,6 @@
 #include "edef.h"
 
 #define	NCHUNK	NLINE
-#define	UINT	unsigned
 
 /*******(testing)************************************************************/
 #if NO_LEAKS

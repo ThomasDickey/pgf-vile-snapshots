@@ -4,7 +4,20 @@
  *	Written (except for delins()) for vile by Paul Fox, (c)1990
  *
  * $Log: oneliner.c,v $
- * Revision 1.47  1993/07/15 12:00:36  pgf
+ * Revision 1.51  1993/07/27 18:06:20  pgf
+ * see tom's 3.56 CHANGES entry
+ *
+ * Revision 1.50  1993/07/21  13:08:00  pgf
+ * changed name of 'int *confirm' to 'int *confirmp' for clarity
+ *
+ * Revision 1.49  1993/07/21  13:01:48  pgf
+ * fixed some sloppiness i introduced in the confirmation code (testing
+ * "confirm" instead of "*confirm".
+ *
+ * Revision 1.48  1993/07/20  17:15:22  pgf
+ * added mlerase calls to clear confirmation prompt when operation done
+ *
+ * Revision 1.47  1993/07/15  12:00:36  pgf
  * use mlquickask instead of mlreply when confirming substitutions, so that
  * user needn't hit return for each answer.
  *
@@ -169,6 +182,14 @@
 
 #define PLIST	0x01
 
+static	int	delins P(( regexp *, char * ));
+static	void	showpat P(( regexp *, int ));
+static	int	substreg1 P(( int, int ));
+static	int	substline P(( regexp *, int, int, int, int * ));
+
+static	int	lines_changed,
+		total_changes;
+
 /*
  * put lines in a popup window
  */
@@ -287,7 +308,7 @@ int f,n;
 	return TRUE;
 }
 
-int
+static int
 substreg1(needpats, use_opts)
 int needpats, use_opts;
 {
@@ -378,6 +399,8 @@ int needpats, use_opts;
 			nth_occur = -1;
 	}
 
+	lines_changed =
+	total_changes = 0;
 	DOT.l = region.r_orig.l;	    /* Current line.	    */
 	do {
 		oline = DOT.l;
@@ -391,11 +414,17 @@ int needpats, use_opts;
 	calledbefore = TRUE;
 
 	rls_region();
+	if (do_report(total_changes)) {
+		if (globally)
+			mlforce("[%d changes on %d lines]", total_changes, lines_changed);
+		else
+			mlforce("[%d changes]", total_changes);
+	}
 	return TRUE;
 }
 
 /* show the pattern we've matched */
-void
+static void
 showpat(rp, on)
 regexp	*rp;
 int	on;
@@ -403,30 +432,31 @@ int	on;
 	fast_ptr LINEPTR	lp;
 	int	row;
 
-	for (lp = DOT.l, row = curwp->w_toprow ;
-			!same_ptr(lp, curwp->w_line.l) ; ) {
-		row++;
-		lp = lBACK(lp);
-	}
+	for (lp = curwp->w_line.l, row = curwp->w_toprow;
+		!same_ptr(lp, DOT.l);
+			lp = lFORW(lp))
+		row += line_height(curwp,lp);
+
 	hilite(row,
-		offs2col(curwp, DOT.l, DOT.o),
-		offs2col(curwp, DOT.l, DOT.o + (rp->endp[0] - rp->startp[0])), on);
+		offs2col(curwp, lp, DOT.o),
+		offs2col(curwp, lp, DOT.o + (rp->endp[0] - rp->startp[0])), on);
 }
 
-int
-substline(exp, nth_occur, printit, globally, confirm)
+static int
+substline(exp, nth_occur, printit, globally, confirmp)
 regexp *exp;
-int nth_occur, printit, globally, *confirm;
+int nth_occur, printit, globally, *confirmp;
 {
 	int foundit;
+	int again = 0;
 	register int s;
 	register int which_occur = 0;
 	int matched_at_eol = FALSE;
-	int yes, c;
+	int yes, c, skipped;
 	extern MARK scanboundpos;
 
 	/* if the "magic number" hasn't been set yet... */
-	if (!exp || UCHARAT(exp->program) != REGEXP_MAGIC) {
+	if (!exp || UCHAR_AT(exp->program) != REGEXP_MAGIC) {
 		mlforce("[No pattern set yet]");
 		return FALSE;
 	}
@@ -454,8 +484,10 @@ int nth_occur, printit, globally, *confirm;
 					break;
 				matched_at_eol = TRUE;
 			}
+
 			/* if we need confirmation, get it */
-			if (*confirm) {
+			skipped = FALSE;
+			if (*confirmp) {
 
 				/* force the pattern onto the screen */
 				(void)gomark(FALSE, 0);
@@ -476,6 +508,8 @@ int nth_occur, printit, globally, *confirm;
 				default:
 				case 'n' :
 					yes = FALSE;
+					(void)update(TRUE);
+					skipped = TRUE;
 					/* so we don't match this again */
 					DOT.o += (exp->endp[0] - exp->startp[0]);
 					break;
@@ -484,7 +518,8 @@ int nth_occur, printit, globally, *confirm;
 					return(FALSE);
 				case 'a' :
 					yes = TRUE;
-					*confirm = FALSE;
+					*confirmp = FALSE;
+					mlerase();
 					break;
 				}
 			} else {
@@ -494,8 +529,11 @@ int nth_occur, printit, globally, *confirm;
 				s = delins(exp, &rpat[0]);
 				if (s != TRUE)
 					return s;
+				if (!again++)
+					lines_changed++;
+				total_changes++;
 			}
-			if (confirm)	/* force a screen update */
+			if (*confirmp && !skipped) /* force a screen update */
 				(void)update(TRUE);
 
 			if (exp->mlen == 0 && forwchar(TRUE,1) == FALSE)
@@ -516,6 +554,8 @@ int nth_occur, printit, globally, *confirm;
 		/* back to our buffer */
 		swbuffer(wp->w_bufp);
 	}
+	if (*confirmp)
+		mlerase();
 	return TRUE;
 }
 
@@ -543,7 +583,7 @@ int nth_occur, printit, globally, *confirm;
 /*
  - delins - perform substitutions after a regexp match
  */
-int
+static int
 delins(exp, sourc)
 regexp *exp;
 char *sourc;
@@ -564,7 +604,7 @@ char *sourc;
 		mlforce("BUG: NULL parm to delins");
 		return FALSE;
 	}
-	if (UCHARAT(exp->program) != REGEXP_MAGIC) {
+	if (UCHAR_AT(exp->program) != REGEXP_MAGIC) {
 		regerror("damaged regexp fed to delins");
 		return FALSE;
 	}
@@ -582,7 +622,7 @@ char *sourc;
 	}
 
 	(void)memcpy(buf, exp->startp[0], (SIZE_T)dlength);
-	buf[dlength] = '\0';
+	buf[dlength] = EOS;
 
 	if (ldelete((long) dlength, FALSE) != TRUE) {
 		mlforce("[Error while deleting]");
@@ -590,13 +630,13 @@ char *sourc;
 	}
 	src = sourc;
 	case_next = case_all = NO_CASE;
-	while ((c = *src++) != '\0') {
+	while ((c = *src++) != EOS) {
 	    no = 0;
 	    s = TRUE;
 	    switch(c) {
 	    case '\\':
 		    c = *src++;
-		    if (c == '\0')
+		    if (c == EOS)
 		    	return TRUE;
 		    if (!isdigit(c)) {
 			    /* here's where the \U \E \u \l \t etc.

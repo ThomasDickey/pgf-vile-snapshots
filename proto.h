@@ -5,7 +5,10 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.71  1993/07/19 15:28:59  pgf
+ * Revision 1.72  1993/07/27 18:06:20  pgf
+ * see tom's 3.56 CHANGES entry
+ *
+ * Revision 1.71  1993/07/19  15:28:59  pgf
  * prc2kcod now returns unsigned
  *
  * Revision 1.70  1993/07/15  12:00:00  pgf
@@ -356,7 +359,7 @@ extern char * fnc2engl P(( CMDFUNC * ));
 extern CMDFUNC * engl2fnc P(( char * ));
 extern KBIND * kcode2kbind P(( int ));
 extern CMDFUNC * kcod2fnc P(( int ));
-extern unsigned int prc2kcod P(( char * ));
+extern int prc2kcod P(( char * ));
 extern char * prc2engl P(( char * ));
 extern int fnc2key P(( CMDFUNC * ));
 extern char * kbd_engl P(( char *, char * ));
@@ -435,25 +438,16 @@ extern void vtprintf P(( char *, ... ));
 extern void vteeol P(( void ));
 extern int upscreen P(( int, int ));
 extern void reframe P(( WINDOW * ));
-extern void l_to_vline P(( WINDOW *, LINEPTR, int ));
-extern int updpos P(( int * ));
-extern void upddex P(( void ));
-extern void updgar P(( void ));
 extern int update P(( int ));
 extern void upmode P(( void ));
-extern void updateline P(( int, int, int ));
-extern int offs2col P(( WINDOW *, LINEPTR, C_NUM));
+extern int offs2col P(( WINDOW *, LINEPTR, C_NUM ));
+#ifdef WMDLINEWRAP
+extern int line_height P(( WINDOW *, LINEPTR ));
+#else
+#define line_height(wp,lp) 1
+#endif
 extern void hilite P((int, int, int, int));
-extern void updone P(( WINDOW * ));
-extern void updall P(( WINDOW * ));
-extern void updupd P(( int ));
-extern int scrolls P(( int ));
-extern int texttest P(( int, int ));
 extern void scrscroll P(( int, int, int ));
-extern int endofline P(( char *, int ));
-extern int updext_past P(( int, int ));
-extern int updext_before P(( int ));
-extern void modeline P(( WINDOW * ));
 extern void movecursor P(( int, int ));
 extern void mlerase P(( void ));
 extern void mlsavec P(( int ));
@@ -573,7 +567,6 @@ extern int quickreadf P(( BUFFER *, int * ));
 #endif
 extern int slowreadf P(( BUFFER *, int * ));
 extern int set_dosmode P(( int, int ));
-extern void readlinesmsg P(( int, int, char *, int ));
 extern void makename P(( char [], char [] ));
 extern void unqname P((char *, int));
 extern int filewrite P(( int, int ));
@@ -610,7 +603,7 @@ extern void ffseek P(( long ));
 extern void ffrewind P(( void ));
 #endif
 extern int ffclose P(( void ));
-extern int ffputline P(( char [], int, int ));
+extern int ffputline P(( char [], int, char * ));
 extern int ffputc P(( int ));
 extern int ffhasdata P(( void ));
 
@@ -626,7 +619,6 @@ extern int finderrbuf P(( int, int ));
 /* globals.c */
 extern int globals P(( int, int ));
 extern int vglobals P(( int, int ));
-extern int globber P(( int, int, int ));
 
 /* history.c */
 #if !SMALLER
@@ -716,6 +708,7 @@ extern int isearch P(( int, int ));
 extern int get_char P(( void ));
 
 /* line.c */
+extern int do_report P(( L_NUM ));
 extern LINEPTR lalloc P(( int, BUFFER * ));
 extern void lfree P(( LINEPTR, BUFFER * ));
 #if !OPT_MAP_MEMORY
@@ -793,10 +786,6 @@ extern int plineregion P(( void ));
 extern int substregion P(( void ));
 extern int subst_again_region P(( void ));
 extern int subst_again P(( int, int ));
-extern int substreg1 P(( int, int ));
-extern void showpat P(( regexp *, int ));
-extern int substline P(( regexp *, int, int, int, int *));
-extern int delins P(( regexp *, char * ));
 
 /* opers.c */
 extern int operator P(( int, int, int (*)(void), char * ));
@@ -846,8 +835,10 @@ extern int is_internalname P(( char * ));
 extern int is_directory P(( char * ));
 
 /* random.c */
-extern int line_no P(( BUFFER *, LINEPTR ));
-extern int getcline P(( void ));
+extern void line_report P(( L_NUM ));
+extern L_NUM line_count P(( BUFFER * ));
+extern L_NUM line_no P(( BUFFER *, LINEPTR ));
+extern L_NUM getcline P(( void ));
 extern void set_rdonly P(( BUFFER *, char * ));
 extern int liststuff P(( char *, void (*)(int, char *), int, char * ));
 extern int showcpos P(( int, int ));
@@ -1152,7 +1143,7 @@ extern void update_dos_drv_dir P(( char * ));
 #if UNIX && !LINUX
 #if (SUNOS || NeXT) && defined(lint) || __GNUC__
 extern	int	_filbuf	P(( FILE * ));
-extern	int	_flsbuf	P(( unsigned char, FILE * ));
+extern	int	_flsbuf	P(( UCHAR, FILE * ));
 extern	int	printf	P(( char *, ... ));
 extern	int	fclose	P(( FILE * ));
 extern	int	fflush	P(( FILE * ));

@@ -655,26 +655,27 @@ Editor modes
 	implybuffer (ib) Causes vile to create a buffer when you write to a new
 		file, or read from one (e.g., with ":r").  (U)
 
+	linewrap (lw) Displays lines that are too long to fit on one line as a
+		series of "wrapped" lines.  Overrides left/right scrolling
+		controlled by "sideways" and "horizscroll" modes.  (W)
+
 	list	(li) The buffer will be displayed with tabs and newlines made
 		visible, instead of as whitespace. (W)
 
 	magic	Allow meta-characters in search strings.  See the section 
 		"Regular Expressions" for more detail. (B)
 
-	timeoutlen  To resolve the ambiguity between a user-pressed
-		ESCape key and an ESC character that is part of a function
-		key sequence, vile will wait for a short time after seeing
-		an ESC, in order to check the next character of input.  The
-		waiting time is specified in milliseconds, and defaults to
-		500.  Users of fast local screens, like a local xterm, may
-		wish to reduce this to something like 50 for crisper
-		response to a user-pressed ESC.  (U)
+	newline (nl) The buffer ends with a newline.  This is set when reading
+		a buffer.  (B)
 
 	number	(nu) All lines in the buffer will be prefixed by their line
 		number. (W) 
 
 	paragraphs A regular expression defining where the "next-paragraph"
 		('}') and "previous-paragraph" ('{') commands will go. (B)
+
+	report A threshold value that is used to control messages that report
+		the number of lines deleted, changed, etc.  (U)
 
 	samebangs (sb) Controls whether the "!!" and "^X-!" commands use the
 		same command string.  (U)
@@ -740,6 +741,15 @@ Editor modes
 	terse   vile produces more "status" messages than vi, which may
 		become annoying at low baud rates.  Setting terse mode will
 		suppress many of these.  (B)
+
+	timeoutlen  To resolve the ambiguity between a user-pressed
+		ESCape key and an ESC character that is part of a function
+		key sequence, vile will wait for a short time after seeing
+		an ESC, in order to check the next character of input.  The
+		waiting time is specified in milliseconds, and defaults to
+		500.  Users of fast local screens, like a local xterm, may
+		wish to reduce this to something like 50 for crisper
+		response to a user-pressed ESC.  (U)
 
 	undolimit (ul) Sets a limit on how many undoable buffer-changing
 		commands will be saved.  If set to 0, there is no limit,
@@ -1081,7 +1091,7 @@ Programmed macros
 	&gtk	0	get 1 character
 	&rnd	1	get a random number from 1 to n
 	&abs	1	absolute value of a number
-	&sin	2	find the index of one string in another
+	&sin	2	find the index of second string in first
 	&env	1	retrieve a system environment var
 	&bin	1	lookup what function name is bound to key
 	&rd	1	is a file readable
@@ -1257,16 +1267,11 @@ Regular Expressions
 	other significance (matching that character)."
 	
  \< \>	In addition, vile atoms may be: \< and \>, which match the
- \s \S	beginning and end of a "word", \s and \S, which match sequences of
+ \s \S	beginning and end of a "word", \s and \S, which match characters of
  \w \W	whitespace and "darkspace", \w and \W, which match alphanumerics
  \d \D	(including '_') and non-alphanumerics, \d and \D, which match
  \p \P	digits and non-digits, and \p and \P, which match printable and
 	non-printable characters (whitespace is printable).
-
- \s 	Note that of these special atoms only \s will match the start or
-	end of a line (since newlines count as whitespace), but since no
-	vile regular expression will span more than one line, it will not
-	_cross_ the newline.
 
  [ ]	"A range is a sequence of characters enclosed in `[]'.  It normally
 	matches any single character from the sequence.  If the sequence

@@ -64,7 +64,10 @@
  *	Allow left/right scrolling of input lines (when they get too long).
  *
  * $Log: history.c,v $
- * Revision 1.7  1993/07/01 16:15:54  pgf
+ * Revision 1.8  1993/07/27 18:06:20  pgf
+ * see tom's 3.56 CHANGES entry
+ *
+ * Revision 1.7  1993/07/01  16:15:54  pgf
  * tom's 3.51 changes
  *
  * Revision 1.6  1993/05/24  15:21:37  pgf
@@ -91,7 +94,6 @@
 #include "edef.h"
 
 #if	!SMALLER
-#define	UCHAR	unsigned char
 
 #define	tb_args(p)	tb_values(p), (int)tb_length(p)
 #define	lp_args(p)	p->l_text, llength(p)

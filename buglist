@@ -387,6 +387,14 @@ to wait/do nothing while waiting for the ouput of compiling.  I should be
 able to edit stuff in other buffers or even ^X-^X to edit src codes
 while compilation is still going on.
 
+------------
+similar to above -- sub-commands run from ^X-! or ":[erw] !cmd" should be
+"interactive" to the extent that user's input should be sent to the cmd
+at least on a line-by-line basis (i.e. we can't send raw keystrokes -- we
+have to do canonical processing.  of course, we should really use pty's, and
+reconnect input and capture output.)  some commands like latex prompt for
+more input when partway done.
+
 ========(VMS-VILE)=============================================================
 Unfinished items on vax/vms (dickey@software.org):
 
@@ -495,5 +503,91 @@ accept any input. It is not completely stuck, because it still reacts
 to window resizes, but it can not be backgrounded. Neither does it
 react to a SIGSEGV. I tried to get it to coredump and have it save the
 file and send me a mail.... Sorry I can't be anymore specific.
+
+[ can't reproduce this ]
+
+------------------------------
+
+Can you add the '>' character to the list of comment chars for paragraph
+reformatting?  I would live to be able to reformat mail quotes (like shown
+above).
+
+[ pgf notes: formatregion should use the comments regexp to match a comment
+  delimiter at the beginning of line, and should insert the comment
+  delimiter of the _second_ line (so that boxed C comments work right)in
+  subsequent reformatted lines, including leading but not trailing
+  whitespace.  indentlen should be counted _after_ the width of such a
+  comment delimiter.  this would make paragraphs that are indented way
+  after the delimiter keep their indent.  commented paragraphs should end
+  when exp->mlen for the comment regexp is equal to llength(DOT), i.e. 
+  it's the whole line.  (we'll need to take the $ off the end of the
+  comment regexp).  ]
+
+---------------------
+
+I have the world's most hideous macro to do it now...
+
+11 store-macro
+        set-variable %fred $curline
+        %fred goto-line
+        substitute-til next-paragraph "^> " "# "
+        %fred goto-line
+        update-screen
+        ~force format-til next-paragraph
+        update-screen
+        %fred goto-line
+        use-register y load-register ":g/^\# /s//> /g^M"
+        execute-register y
+        clear-message-line
+        write-message "reformatting done... "
+~endm
+bind-key execute-macro-11 FN-n
+
+
+See the 'use-register y...', 'execute-register y' lines above?  I would
+have used:
+
+        substitute-til next-paragraph "^\# " "> "
+
+instead...
+
+But that doesn't work.  The 'sub..' line does absolutely nothing.  It's
+like it doesn't see the text.  In fact, just about any subsitute command
+after the first one results in absolutely nothing happening.
+
+I tried everything I could think of, like sticking in the update-screen
+stuff, and all kinds of other things.  
+
+In the end, I had to whip out a :g command.  But it isn't a good solution,
+because it will try to reformat everything, not just the paragraph.  
+
+--------------------
+	When I do a ^R or ^W would you be able to make it so that when
+	somebody pressed the tab key that it will complete the file name?
+	(i.e. want filename completion on ^W and ^R)
+--------------------
+
+	Also it might be worth looking at doing the same thing for tags so
+	that if i started looking up tags and pressed the tab key it would
+	complete the line.
+	(tag completion -- good idea.)
+
+--------------------
+	When you use the command line and you do a !<command>
+	to execute something in the shell. Would you be able to make it so that 	it can complete filenames there also??
+	so i could do the following:
+	!ls ~daml/files/rec
+[ hard.  probably not worth it. ]
+
+----------------------------------
+
+By the way the write-til command has problems when the
+file already exists.
+
+--------------------------
+We are running vile under NeXT and we have
+problems to set macros with the meta key.
+Also the editor mode showram does not work (is not so important).
+--------------------------------
 
 

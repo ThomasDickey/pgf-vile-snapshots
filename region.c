@@ -6,7 +6,10 @@
  * internal use.
  *
  * $Log: region.c,v $
- * Revision 1.25  1993/06/23 21:27:54  pgf
+ * Revision 1.26  1993/07/27 18:06:20  pgf
+ * see tom's 3.56 CHANGES entry
+ *
+ * Revision 1.25  1993/06/23  21:27:54  pgf
  * moved calls to chg_buff, to ensure an undo routine is called first.
  * this allows undo to record the initial modified state of the buffer
  * correctly
@@ -165,10 +168,10 @@ yankregion()
                         	++m.o;
                 	}
         	}
-		if (klines)
-			mlwrite("[ %d line%s yanked]", klines, PLURAL(klines));
-		else
-			mlwrite("[ %d character%s yanked]", kchars, PLURAL(kchars));
+		if (do_report(klines+(kchars!=0)))
+			mlwrite("[%d line%s, %d character%s yanked]",
+				klines, PLURAL(klines),
+				kchars, PLURAL(kchars));
 		kdone();
 		ukb = 0;
 	}

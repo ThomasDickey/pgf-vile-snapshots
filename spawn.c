@@ -2,7 +2,15 @@
  *		for MicroEMACS
  *
  * $Log: spawn.c,v $
- * Revision 1.60  1993/07/07 12:32:33  pgf
+ * Revision 1.62  1993/07/27 18:06:20  pgf
+ * see tom's 3.56 CHANGES entry
+ *
+ * Revision 1.61  1993/07/20  18:08:50  pgf
+ * don't pass the (0) to getpgrp if we're POSIX and ANSI -- the library
+ * is probably the right one, and there's a high probability of a prototype
+ * conflict if we _do_ pass it.
+ *
+ * Revision 1.60  1993/07/07  12:32:33  pgf
  * don't reset curwp->w_flag to HARD in rtfrmshell -- it clobbers WFMODE if
  * present
  *
@@ -331,7 +339,9 @@ int f,n;
 #  if BERK
 	killpg(getpgrp(0), SIGTSTP);
 #  else
-#   if AIX || LINUX /* strict prototypes -- doesn't like the (0) */
+/* pass the 0 if we can, since it's safer --- the machines where we
+	can't are probably POSIX machines with ANSI C.  */
+#   if AIX || (defined(__STDC__) && POSIX)
 	kill(-getpgrp(), SIGTSTP);
 #   else
 	kill(-getpgrp(0), SIGTSTP);
@@ -360,7 +370,7 @@ int signo;
 #  endif
 #  if USG
 	signal(SIGCONT,rtfrmshell);	/* suspend & restart */
-	update(TRUE);
+	(void)update(TRUE);
 #  endif
 # endif
 #endif

@@ -6,7 +6,13 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.92  1993/07/15 10:37:58  pgf
+ * Revision 1.94  1993/07/27 18:28:06  pgf
+ * one more change from tom -- missed inequality in reframe()
+ *
+ * Revision 1.93  1993/07/27  18:06:20  pgf
+ * see tom's 3.56 CHANGES entry
+ *
+ * Revision 1.92  1993/07/15  10:37:58  pgf
  * see 3.55 CHANGES
  *
  * Revision 1.91  1993/07/07  12:59:30  pgf
@@ -316,6 +322,9 @@
 #include	"estruct.h"
 #include        "edef.h"
 
+#define	buf_head(bp)	(bp)->b_line.l
+#define	win_head(wp)	buf_head((wp)->w_bufp)
+
 #if UNIX
 # if POSIX
 #  include <termios.h>
@@ -387,6 +396,27 @@ static	int	dfputf P(( void (*f)(int), int ));
 static	void	dofmt P(( char *, va_list * ));
 static	void	erase_remaining_msg P(( int ));
 static	void	PutMode P(( char * ));
+
+static	void	l_to_vline P(( WINDOW *, LINEPTR, int ));
+static	int	updpos P(( int *, int * ));
+static	void	upddex P(( void ));
+static	void	updgar P(( void ));
+static	void	updone P(( WINDOW * ));
+static	void	updall P(( WINDOW * ));
+static	void	updupd P(( int ));
+static	int	updext_past P(( int, int ));
+static	int	updext_before P(( int ));
+static	void	updateline P(( int, int, int ));
+static	int	endofline P(( char *, int ));
+static	void	modeline P(( WINDOW * ));
+static	int	texttest P(( int, int ));
+#if CAN_SCROLL
+static	int	scrolls P(( int ));
+#endif
+#ifdef WMDLINEWRAP
+static	WINDOW	*row2window P(( int ));
+#endif
+
 /*--------------------------------------------------------------------------*/
 /*
  * Do format a string.
@@ -630,6 +660,10 @@ int
 col_limit(wp)
 WINDOW *wp;
 {
+#ifdef WMDLINEWRAP
+	if (w_val(wp,WMDLINEWRAP))
+		return curcol + 1;	/* effectively unlimited */
+#endif
 	return term.t_ncol - 1 - nu_width(wp);
 }
 
@@ -847,6 +881,19 @@ WINDOW *wp;
 			vtlistc(*from++);
 		else
 			vtputc(*from++);
+#ifdef WMDLINEWRAP
+		if (w_val(wp,WMDLINEWRAP)
+		 && (n > 0)
+		 && (vtcol == term.t_ncol)) {
+			if (vtrow < term.t_nrow) {
+				if (vtrow+1 >= wp->w_toprow + wp->w_ntrows)
+					break;
+				vtcol = 0;
+				vtrow++;
+				vscreen[vtrow]->v_flag |= VFCHG;
+			}
+		}
+#endif
 		n--;
 	}
 	if (list && (n >= 0))
@@ -905,7 +952,8 @@ int f,n;
 	return update(TRUE);
 }
 
-int scrflags;
+static	int	scrflags;
+
 /*
  * Make sure that the display is right. This is a three part process. First,
  * scan through all of the windows looking for dirty ones. Check the framing,
@@ -918,7 +966,7 @@ update(force)
 int force;	/* force update past type ahead? */
 {
 	register WINDOW *wp;
-	int screencol;
+	int screenrow, screencol;
 
 	if (!curbp) /* not initialized */
 		return FALSE;
@@ -972,7 +1020,8 @@ int force;	/* force update past type ahead? */
 	curtabval = tabstop_val(curbp);
 
 	/* recalc the current hardware cursor location */
-	if (updpos(&screencol)) /* if true, full horizontal scroll happened */
+	if (updpos(&screenrow, &screencol))
+		/* if true, full horizontal scroll happened */
 		goto restartupdate;
 
 	/* check for lines to de-extend */
@@ -986,8 +1035,7 @@ int force;	/* force update past type ahead? */
 	updupd(force);
 
 	/* update the cursor and flush the buffers */
-	movecursor(currow, screencol +
-		(is_empty_buf(curwp->w_bufp) ? 0 : nu_width(curwp)) );
+	movecursor(screenrow, screencol);
 
 	TTflush();
 	displaying = FALSE;
@@ -1002,14 +1050,16 @@ void
 reframe(wp)
 WINDOW *wp;
 {
-	register LINE *lp;
+	fast_ptr LINEPTR dlp;
+	fast_ptr LINEPTR lp;
 	register int i = 0;
+	register int rows;
 
 	/* if not a requested reframe, check for a needed one */
 	if ((wp->w_flag & WFFORCE) == 0) {
 		/* initial update in main.c may not set these first... */
 		if (l_ref(wp->w_dot.l) == (LINE *)0) {
-			wp->w_dot.l = lFORW(wp->w_bufp->b_line.l);
+			wp->w_dot.l = lFORW(win_head(wp));
 			wp->w_dot.o = 0;
 		}
 		if (l_ref(wp->w_line.l) == (LINE *)0) {
@@ -1018,20 +1068,19 @@ WINDOW *wp;
 		}
 #if CAN_SCROLL
 		/* loop from one line above the window to one line after */
-		lp = lBack(wp->w_line.l);
-		for (i = -1; i <= wp->w_ntrows; i++)
+		lp = lBACK(wp->w_line.l);
+		i  = -line_height(wp,lp);
 #else
 		/* loop through the window */
 		lp = wp->w_line.l;
-		for (i = 0; i < wp->w_ntrows; i++)
+		i  = 0;
 #endif
-		{
-
+		for (;;) {
 			/* if the line is in the window, no reframe */
-			if (lp == l_ref(wp->w_dot.l)) {
+			if (same_ptr(lp, wp->w_dot.l)) {
 #if CAN_SCROLL
 				/* if not _quite_ in, we'll reframe gently */
-				if ( i < 0 || i == wp->w_ntrows) {
+				if ( i < 0 || i >= wp->w_ntrows) {
 					/* if the terminal can't help, then
 						we're simply outside */
 					if (term.t_scroll == NULL)
@@ -1039,23 +1088,35 @@ WINDOW *wp;
 					break;
 				}
 #endif
+#ifdef WMDLINEWRAP
+				if (w_val(wp,WMDLINEWRAP)
+				 && i > 0
+				 && i + line_height(wp,lp) > wp->w_ntrows) {
+					i = wp->w_ntrows;
+					break;
+				}
+#endif
 				return;
 			}
 
 			/* if we are at the end of the file, reframe */
-			if (i >= 0 && lp == l_ref(wp->w_bufp->b_line.l))
+			if (i >= 0 && same_ptr(lp, win_head(wp)))
 				break;
 
 			/* on to the next line */
-			lp = lforw(lp);
+			if ((i += line_height(wp,lp)) > wp->w_ntrows) {
+				i = 0;	/* dot-not-found */
+				break;
+			}
+			lp = lFORW(lp);
 		}
 	}
 
 #if CAN_SCROLL
-	if (i == -1) {	/* we're just above the window */
+	if (i < 0) {	/* we're just above the window */
 		i = 1;	/* put dot at first line */
 		scrflags |= WFINS;
-	} else if (i == wp->w_ntrows) { /* we're just below the window */
+	} else if (i >= wp->w_ntrows) { /* we're just below the window */
 		i = -1;	/* put dot at last line */
 		scrflags |= WFKILLS;
 	} else /* put dot where requested */
@@ -1063,42 +1124,57 @@ WINDOW *wp;
 		i = wp->w_force;  /* (is 0, unless reposition() was called) */
 
 	wp->w_flag |= WFMODE;
-	
+
 	/* w_force specifies which line of the window dot should end up on */
 	/* 	positive --> lines from the top				*/
 	/* 	negative --> lines from the bottom			*/
 	/* 	zero --> middle of window				*/
-	
-	/* enforce some maximums */
-	if (i > 0) {
-		if (--i >= wp->w_ntrows)
-			i = wp->w_ntrows - 1;
-	} else if (i < 0) {	/* negative update???? */
-		i += wp->w_ntrows;
-		if (i < 0)
-			i = 0;
-	} else
-		i = wp->w_ntrows / 2;
 
-	/* backup to new line at top of window */
-	lp = l_ref(wp->w_dot.l);
-	while (i != 0 && lback(lp) != l_ref(wp->w_bufp->b_line.l)) {
-		--i;
-		lp = lback(lp);
+	lp = wp->w_dot.l;
+
+#ifdef WMDLINEWRAP
+	/*
+	 * Center dot in middle of screen with line-wrapping
+	 */
+	if (i == 0 && w_val(wp,WMDLINEWRAP)) {
+		rows = (wp->w_ntrows - line_height(wp,lp) + 2) / 2;
+		while ((rows > 0)
+		  &&   (!same_ptr(dlp = lBACK(lp), win_head(wp)))) {
+			if ((rows -= line_height(wp, dlp)) < 0)
+				break;
+			lp = dlp;
+		}
+	} else
+#endif
+	{
+		rows = (i != 0)
+			? wp->w_ntrows
+			: (wp->w_ntrows+1) / 2;
+		while (rows > 0) {
+			if ((i > 0)
+			 && (--i <= 0))
+				break;
+			if ((rows -= line_height(wp, lp)) < 0)
+				break;
+			if (same_ptr(dlp = lBACK(lp), win_head(wp)))
+				break;
+			lp = dlp;
+		}
+		while (i++ < 0) {
+			if (!same_ptr(dlp = lFORW(lp), win_head(wp)))
+				lp = dlp;
+		}
 	}
 
-	if (lp == l_ref(wp->w_bufp->b_line.l))
-		lp = lback(lp);
-		
 	/* and reset the current line-at-top-of-window */
-	wp->w_line.l = l_ptr(lp);
+	wp->w_line.l = lp;
 	wp->w_flag |= WFHARD;
 	wp->w_flag &= ~WFFORCE;
 }
 
 /*	updone:	update the current line	to the virtual screen		*/
 
-void
+static void
 updone(wp)
 WINDOW *wp;	/* window to update current line in */
 {
@@ -1109,7 +1185,7 @@ WINDOW *wp;	/* window to update current line in */
 	lp = wp->w_line.l;
 	sline = wp->w_toprow;
 	while (!same_ptr(lp, wp->w_dot.l)) {
-		++sline;
+		sline += line_height(wp,lp);
 		lp = lFORW(lp);
 	}
 
@@ -1119,7 +1195,7 @@ WINDOW *wp;	/* window to update current line in */
 
 /*	updall:	update all the lines in a window on the virtual screen */
 
-void
+static void
 updall(wp)
 WINDOW *wp;	/* window to update lines in */
 {
@@ -1132,29 +1208,49 @@ WINDOW *wp;	/* window to update lines in */
 	while (sline < wp->w_toprow + wp->w_ntrows) {
 		l_to_vline(wp,lp,sline);
 		vteeol();
+		sline += line_height(wp,lp);
 		if (!same_ptr(lp, wp->w_bufp->b_line.l))
 			lp = lFORW(lp);
-		++sline;
 	}
 }
 
 /* line to virtual screen line */
-void
+static void
 l_to_vline(wp,lp,sline)
 WINDOW *wp;	/* window to update lines in */
 LINEPTR lp;
 int sline;
 {
+	C_NUM	left;
 
-	/* and update the virtual line */
-	vscreen[sline]->v_flag |= VFCHG;
-	vscreen[sline]->v_flag &= ~VFREQ;
-	if (w_val(wp,WVAL_SIDEWAYS))
-		taboff = w_val(wp,WVAL_SIDEWAYS);
+	/*
+	 * Mark the screen lines changed, resetting the requests for reverse
+	 * video.  Set the global 'taboff' to the amount of horizontal
+	 * scrolling.
+	 */
+#ifdef WMDLINEWRAP
+	if (w_val(wp,WMDLINEWRAP)) {
+		register int	n = sline + line_height(wp, lp);
+		while (n > sline)
+			if (--n < wp->w_toprow + wp->w_ntrows) {
+				vscreen[n]->v_flag |= VFCHG;
+				vscreen[n]->v_flag &= ~VFREQ;
+			}
+		taboff = 0;
+	} else
+#endif
+	{
+		vscreen[sline]->v_flag |= VFCHG;
+		vscreen[sline]->v_flag &= ~VFREQ;
+		if (w_val(wp,WVAL_SIDEWAYS))
+			taboff = w_val(wp,WVAL_SIDEWAYS);
+	}
+	left = taboff;
+
 	if (!same_ptr(lp, wp->w_bufp->b_line.l)) {
-		vtmove(sline, -w_val(wp,WVAL_SIDEWAYS));
+		vtmove(sline, -left);
 		vtset(lp, wp);
-		if (w_val(wp,WVAL_SIDEWAYS)) {
+		if (left) {
 			register int	zero = nu_width(wp);
 			vscreen[sline]->v_text[zero] = MRK_EXTEND_LEFT;
 			if (vtcol <= zero) vtcol = zero+1;
@@ -1174,8 +1270,9 @@ int sline;
 		lines. This is the only update for simple moves.
 		returns the screen column for the cursor, and
 		a boolean indicating if full sideways scroll was necessary */
-int
-updpos(screencolp)
+static int
+updpos(screenrowp, screencolp)
+int *screenrowp;
 int *screencolp;
 {
 	fast_ptr LINEPTR lp;
@@ -1184,16 +1281,18 @@ int *screencolp;
 	register int col, excess;
 	register int collimit;
 	int moved = FALSE;
+	int nuadj = is_empty_buf(curwp->w_bufp) ? 0 : nu_width(curwp);
 
 	/* find the current row */
 	lp = curwp->w_line.l;
 	currow = curwp->w_toprow;
 	while (!same_ptr(lp, DOT.l)) {
-		++currow;
+		currow += line_height(curwp,lp);
 		lp = lFORW(lp);
-		if (same_ptr(lp, curwp->w_line.l) || currow > term.t_nrow) {
+		if (same_ptr(lp, curwp->w_line.l)
+		 || currow > (curwp->w_toprow + curwp->w_ntrows)) {
 			mlforce("BUG:  lost dot updpos().  setting at top");
-			curwp->w_line.l = DOT.l  = lFORW(curbp->b_line.l);
+			lp = curwp->w_line.l = DOT.l = lFORW(curbp->b_line.l);
 			currow = curwp->w_toprow;
 		}
 	}
@@ -1219,13 +1318,38 @@ int *screencolp;
 			col != 0 && DOT.o < lLength(lp))
 		col--;
 
+#ifdef WMDLINEWRAP
+	if (w_val(curwp,WMDLINEWRAP)) {
+		curcol = col;
+		collimit = term.t_ncol - nuadj;
+		*screenrowp = currow;
+		if (col >= collimit) {
+			col -= collimit;
+			*screenrowp += 1;
+			if (col >= term.t_ncol)
+				*screenrowp += (col / term.t_ncol);
+			*screencolp = col % term.t_ncol;
+		} else {
+			*screencolp = col + nuadj;
+		}
+		/* kludge to keep the cursor within the window */
+		i = curwp->w_toprow + curwp->w_ntrows - 1;
+		if (*screenrowp > i) {
+			*screenrowp = i;
+			*screencolp = term.t_ncol - 1;
+		}
+		return FALSE;
+	} else
+#endif
+	 *screenrowp = currow;
+
 	/* ...adjust to offset from shift-margin */
 	curcol = col - w_val(curwp,WVAL_SIDEWAYS);
 
 	/* if extended, flag so and update the virtual line image */
 	collimit = col_limit(curwp);
 	excess = curcol - collimit;
-	if ((excess > 0) || (excess == 0 && 
+	if ((excess > 0) || (excess == 0 &&
 			(DOT.o < lLength(DOT.l) - 1 ))) {
 		if (w_val(curwp,WMDHORSCROLL)) {
 			(void)mvrightwind(TRUE, excess + collimit/2 );
@@ -1249,12 +1373,13 @@ int *screencolp;
 		}
 		*screencolp = curcol;
 	}
+	*screencolp += nuadj;
 	return moved;
 }
 
 /*	upddex:	de-extend any line that deserves it		*/
 
-void
+static void
 upddex()
 {
 	register WINDOW *wp;
@@ -1279,8 +1404,8 @@ upddex()
 					vscreen[i]->v_flag &= ~VFEXT;
 				}
 			}
+			i += line_height(wp,lp);
 			lp = lFORW(lp);
-			++i;
 		}
 	}
 	curtabval = tabstop_val(curbp);
@@ -1291,7 +1416,7 @@ upddex()
 
 extern char mlsave[];
 
-void
+static void
 updgar()
 {
 #if !MEMMAP
@@ -1331,7 +1456,7 @@ updgar()
 
 /*	updupd:	update the physical screen from the virtual screen	*/
 
-void
+static void
 updupd(force)
 int force;	/* forced update flag */
 {
@@ -1370,11 +1495,16 @@ C_NUM	offset;
 	int	column = 0;
 	int	tabs = tabstop_val(wp->w_bufp);
 	int	list = w_val(wp,WMDLIST);
+	int	left =
+#ifdef WMDLINEWRAP	/* overrides left/right scrolling */
+			w_val(wp,WMDLINEWRAP) ? 0 :
+#endif
+			w_val(wp,WVAL_SIDEWAYS);
 
 	register int	n, c;
 
 	for (n = 0; n < offset; n++) {
-		c = l_ref(lp)->l_text[n]; 
+		c = l_ref(lp)->l_text[n];
 		if (isprint(c)) {
 			column++;
 		} else if (list) {
@@ -1383,8 +1513,42 @@ C_NUM	offset;
 			column = ((column / tabs) + 1) * tabs;
 		}
 	}
-	return column - w_val(wp,WVAL_SIDEWAYS) + nu_width(wp);
+	return column - left + nu_width(wp);
 }
+
+/*
+ * Compute the number of rows required for displaying a line.
+ */
+#ifdef WMDLINEWRAP
+int
+line_height(wp, lp)
+WINDOW	*wp;
+LINEPTR	lp;
+{
+	if (w_val(wp,WMDLINEWRAP)) {
+		int	len = lLength(lp);
+		if (len > 0) {
+			return (offs2col(wp,lp,len) + term.t_ncol - 1)
+				/ term.t_ncol;
+		}
+	}
+	return 1;
+}
+#endif
+
+#ifdef WMDLINEWRAP
+static WINDOW *
+row2window (row)
+int	row;
+{
+	register WINDOW *wp;
+
+	for_each_window(wp)
+		if (row > wp->w_toprow && row < wp->w_ntrows + wp->w_toprow)
+		return wp;
+	return 0;
+}
+#endif
 
 /*
  * Highlight the requested portion of the screen.  We're mucking with the video
@@ -1401,20 +1565,42 @@ int	colto;		/* column to end highlighting */
 int	on;		/* start highlighting */
 {
 	register VIDEO *vp1 = vscreen[row];
-	if (on) {
-		vp1->v_flag |= VFREQ;
-		vp1->v_flag &= ~VFREV;
-	} else {
-		vp1->v_flag &= ~VFREQ;
-		vp1->v_flag |= VFREV;
+#ifdef WMDLINEWRAP
+	WINDOW	*wp = row2window(row);
+	if (w_val(wp,WMDLINEWRAP)) {
+		if (colfrom < 0)
+			colfrom = 0;
+		if (colfrom > term.t_ncol) {
+			do {
+				row++;
+				colfrom -= term.t_ncol;
+				colto   -= term.t_ncol;
+				hilite(row, colfrom, colto, on);
+			} while (colto > term.t_ncol);
+			return;
+		}
 	}
-	updateline(row, colfrom, colto);
+#endif
+	if (row < term.t_nrow && (colfrom >= 0 || colto <= term.t_ncol)) {
+		if (on) {
+			vp1->v_flag |= VFREQ;
+			vp1->v_flag &= ~VFREV;
+		} else {
+			vp1->v_flag &= ~VFREQ;
+			vp1->v_flag |= VFREV;
+		}
+		if (colfrom < 0)
+			colfrom = 0;
+		if (colto > term.t_ncol)
+			colto = term.t_ncol;
+		updateline(row, colfrom, colto);
+	}
 }
 
 #if CAN_SCROLL
 /* optimize out scrolls (line breaks, and newlines) */
 /* arg. chooses between looking for inserts or deletes */
-int	
+static int
 scrolls(inserts)	/* returns true if it does something */
 int inserts;
 {
@@ -1538,7 +1724,7 @@ int from, to, count;
 	TTscroll(from,to,count);
 }
 
-int
+static int
 texttest(vrow,prow)		/* return TRUE on text match */
 int	vrow, prow ;		/* virtual, physical rows */
 {
@@ -1549,7 +1735,7 @@ int	vrow, prow ;		/* virtual, physical rows */
 }
 
 /* return the index of the first blank of trailing whitespace */
-int	
+static int
 endofline(s,n)
 char 	*s;
 int	n;
@@ -1567,7 +1753,7 @@ int	n;
 		on at a column greater than the terminal width. The line
 		will be scrolled right or left to let the user see where
 		the cursor is		*/
-int
+static int
 updext_past(col, excess)
 int	col;
 int	excess;
@@ -1600,7 +1786,7 @@ int	excess;
 		on at a column less than the terminal width. The line
 		will be scrolled right or left to let the user see where
 		the cursor is		*/
-int
+static int
 updext_before(col)
 int	col;
 {
@@ -1640,7 +1826,7 @@ int	col;
 #if	MEMMAP
 /*	UPDATELINE specific code for the IBM-PC and other compatibles */
 
-void
+static void
 updateline(row, colfrom, colto)
 
 int	row;		/* row of screen to update */
@@ -1665,7 +1851,7 @@ int	colto;		/* last column on screen */
 
 #else
 
-void
+static void
 updateline(row, colfrom, colto)
 
 int	row;		/* row of screen to update */
@@ -1862,7 +2048,7 @@ char	*name;
  * change the modeline format by hacking at this routine. Called by "update"
  * any time there is a dirty window.
  */
-void
+static void
 modeline(wp)
 WINDOW *wp;
 {
@@ -1960,12 +2146,12 @@ WINDOW *wp;
 	n = term.t_ncol;
 	while (vtcol < n)
 		vtputc(lchar);
-		
+
 	{ /* determine if top line, bottom line, or both are visible */
 		LINE *lp = l_ref(wp->w_line.l);
 		int rows = wp->w_ntrows;
 		char *msg = NULL;
-		
+
 		vtcol = n - 7;  /* strlen(" top ") plus a couple */
 		while (rows--) {
 			lp = lforw(lp);
@@ -2004,7 +2190,11 @@ WINDOW *wp;
 #endif
 
 	/* mark column 80 */
-	left = (w_val(wp,WVAL_SIDEWAYS) - nu_width(wp));
+	left = -nu_width(wp);
+#ifdef WMDLINEWRAP
+	if (!w_val(wp,WMDLINEWRAP))
+#endif
+	 left += w_val(wp,WVAL_SIDEWAYS);
 	n += left;
 	col = 80 - left;
 

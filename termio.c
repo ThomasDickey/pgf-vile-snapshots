@@ -4,7 +4,11 @@
  * All operating systems.
  *
  * $Log: termio.c,v $
- * Revision 1.77  1993/07/15 10:37:58  pgf
+ * Revision 1.78  1993/07/23 12:03:39  pgf
+ * make ttclean a no-op under _all_ variants for X11 -- it was flushing
+ * and closing in the USE_TERMIO case
+ *
+ * Revision 1.77  1993/07/15  10:37:58  pgf
  * see 3.55 CHANGES
  *
  * Revision 1.76  1993/07/08  11:51:39  pgf
@@ -555,10 +559,7 @@ void
 ttclean(f)
 int f;
 {
-#if	X11
-	TTflush();
-	TTclose();
-#else
+#if ! X11
 	if (f) {
 		movecursor(term.t_nrow, ttcol); /* don't care about column */
 		TTputc('\n');

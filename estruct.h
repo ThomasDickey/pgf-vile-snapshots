@@ -10,7 +10,13 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.130  1993/07/15 10:37:58  pgf
+ * Revision 1.132  1993/07/27 18:06:20  pgf
+ * see tom's 3.56 CHANGES entry
+ *
+ * Revision 1.131  1993/07/20  18:07:24  pgf
+ * change which ScratchName macro is used for STDC
+ *
+ * Revision 1.130  1993/07/15  10:37:58  pgf
  * see 3.55 CHANGES
  *
  * Revision 1.129  1993/07/09  14:00:38  pgf
@@ -1024,6 +1030,11 @@ union REGS {
 #define	ENVFUNC	0
 #endif
 
+#define UCHAR	unsigned char
+#define UINT	unsigned int
+#define USHORT	unsigned short
+#define ULONG	unsigned long
+
 /*	internal constants	*/
 
 #if MSDOS
@@ -1149,13 +1160,14 @@ union REGS {
 #define	FORWARD	0			/* forward direction		*/
 #define REVERSE	1			/* backwards direction		*/
 
-#define FIOSUC	0			/* File I/O, success.		*/
-#define FIOFNF	1			/* File I/O, file not found.	*/
-#define FIOEOF	2			/* File I/O, end of file.	*/
-#define FIOERR	3			/* File I/O, error.		*/
-#define	FIOMEM	4			/* File I/O, out of memory	*/
-#define	FIOFUN	5			/* File I/O, eod of file/bad line*/
-#define	FIOABRT	6			/* File I/O, aborted		*/
+#define FIOSUC  0			/* File I/O, success.		*/
+#define FIOFNF  1			/* File I/O, file not found.	*/
+#define FIOEOF  2			/* File I/O, end of file.	*/
+#define FIOERR  3			/* File I/O, error.		*/
+#define FIOMEM  4			/* File I/O, out of memory	*/
+#define FIOABRT 5			/* File I/O, aborted		*/
+	/* nonfatal codes */
+#define FIOFUN  -1			/* File I/O, eod of file/bad line*/
 
 /* three flavors of insert mode	*/
 /* it's FALSE, or one of:	*/
@@ -1312,9 +1324,9 @@ typedef struct regexp {
 #define	REGEXP_MAGIC	0234
 
 #ifndef CHARBITS
-#define	UCHARAT(p)	((int)*(unsigned char *)(p))
+#define	UCHAR_AT(p)	((int)*(UCHAR *)(p))
 #else
-#define	UCHARAT(p)	((int)*(p)&CHARBITS)
+#define	UCHAR_AT(p)	((int)*(p)&CHARBITS)
 #endif
 
 /* end of regexp stuff */
@@ -1337,7 +1349,7 @@ typedef	int		L_NUM;		/* line-number */
 typedef	int		C_NUM;		/* column-number */
 typedef	long		L_FLAG;		/* LINE-flags */
 
-typedef	unsigned long	CMDFLAGS;	/* CMDFUNC flags */
+typedef	ULONG		CMDFLAGS;	/* CMDFUNC flags */
 typedef	long		B_COUNT;	/* byte-count */
 
 /*
@@ -1656,8 +1668,8 @@ typedef struct	BUFFER {
 	LINEPTR	b_LINEs;		/* block-malloced LINE structs */
 	LINEPTR	b_LINEs_end;		/* end of 	"	"	" */
 	LINEPTR	b_freeLINEs;		/* list of free " 	"	" */
-	unsigned char	*b_ltext;	/* block-malloced text */
-	unsigned char	*b_ltext_end;	/* end of block-malloced text */
+	UCHAR	*b_ltext;		/* block-malloced text */
+	UCHAR	*b_ltext_end;		/* end of block-malloced text */
 #endif
 	LINEPTR	b_ulinep;		/* pointer at 'Undo' line	*/
 	int	b_active;		/* window activated flag	*/
@@ -1692,7 +1704,7 @@ typedef struct	BUFFER {
 #define	isInternalName(s) (isShellOrPipe(s) || is_internalname(s))
 #define	isAppendToName(s) (s[0] == '>' && s[1] == '>')
 
-#if NEWDOSCC || NeXT	/* tokens are replaced differently than apollo */
+#if defined(__STDC__) || NEWDOSCC || NeXT
 #define	ScratchName(s) SCRTCH_LEFT    #s    SCRTCH_RIGHT
 #endif
 
@@ -2017,11 +2029,10 @@ typedef struct {
 #define	FILEC_PROMPT   8	/* always prompt (never from screen) */
 #define	FILEC_EXPAND   16	/* allow glob-expansion to multiple files */
 
-#if !SMALLER
+#if !SMALLER && !OPT_MAP_MEMORY
 #define COMPLETE_FILES  (UNIX || MSDOS || VMS)
 #define	COMPLETE_DIRS   (UNIX || MSDOS)
 #else
-#define HAS_FILE_COMPLETION 0
 #define COMPLETE_FILES  0
 #define COMPLETE_DIRS   0
 #endif
@@ -2055,7 +2066,7 @@ typedef struct {
 
 typedef	struct KILL {
 	struct KILL *d_next;	/* link to next chunk, NULL if last */
-	unsigned char d_chunk[KBLOCK];	/* deleted text */
+	UCHAR d_chunk[KBLOCK];	/* deleted text */
 } KILL;
 
 typedef struct KILLREG {

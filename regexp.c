@@ -13,7 +13,15 @@
  *		pgf, 11/91
  * 
  * $Log: regexp.c,v $
- * Revision 1.35  1993/06/30 11:27:24  pgf
+ * Revision 1.37  1993/07/27 18:06:20  pgf
+ * see tom's 3.56 CHANGES entry
+ *
+ * Revision 1.36  1993/07/21  17:04:17  pgf
+ * changes to make \s and \S true atoms.  they both must now be followed
+ * by * or + to match more than one.  also, \s no longer matches BOL or EOL
+ * (thanks to alistair and eric for pointing out and fixing)
+ *
+ * Revision 1.35  1993/06/30  11:27:24  pgf
  * comment typo
  *
  * Revision 1.34  1993/06/18  15:57:06  pgf
@@ -218,8 +226,8 @@
 #define	PLUS	11	/* node	Match this (simple) thing 1 or more times. */
 #define	BEGWORD	12	/* node	Match "" between nonword and word. */
 #define	ENDWORD 13	/* node	Match "" between word and nonword. */
-#define	WHITESP 14	/* node	Match any whitespace, including BOL and EOL */
-#define	NWHITESP 15	/* node	Match nonwhitespace, including BOL and EOL */
+#define	WHITESP 14	/* node	Match single whitespace, excluding BOL and EOL */
+#define	NWHITESP 15	/* node	Match single nonwhitespace, excluding BOL and EOL */
 #define	ALNUM	16	/* node	Match any alphanumeric, include _ */
 #define	NALNUM	17	/* node	inverse above, including BOL and EOL */
 #define	DIGIT	18	/* node	Match any digit */
@@ -713,8 +721,8 @@ int at_bop;
 					if (*regparse == ']' || *regparse == '\0')
 						regc('-');
 					else {
-						class = UCHARAT(regparse-2)+1;
-						classend = UCHARAT(regparse);
+						class = UCHAR_AT(regparse-2)+1;
+						classend = UCHAR_AT(regparse);
 						if (class > classend+1)
 							FAIL("invalid [] range");
 						for (; class <= classend; class++)
@@ -762,6 +770,7 @@ int at_bop;
 #endif
 		case 's':
 			ret = regnode(WHITESP);
+			*flagp |= HASWIDTH|SIMPLE;
 			break;
 		case 'S':
 			ret = regnode(NWHITESP);
@@ -1047,7 +1056,7 @@ register int endoff;
 	}
 
 	/* Check validity of program. */
-	if (UCHARAT(prog->program) != REGEXP_MAGIC) {
+	if (UCHAR_AT(prog->program) != REGEXP_MAGIC) {
 		regerror("corrupted program");
 		return(0);
 	}
@@ -1205,22 +1214,19 @@ char *prog;
  				return(0);
  			break;
 		case WHITESP:
-			/* match bol, eol, or multiple whitespace */
-			if (reginput == regbol || reginput == regnomore
-				|| isspace(*reginput)) {
-				while ( reginput != regnomore &&
-					isspace(*reginput)) {
-					reginput++;
-				}
-				break;
-			}
-			return 0;
-		case NWHITESP:
-			/* don't match eol, or space or tab */
-			if (reginput == regnomore || isspace(*reginput))
+			/* any single whitespace, but not bol or eol */
+			if (reginput == regnomore)
 				return 0;
-			while (reginput != regnomore && !isspace(*reginput))
-				reginput++;
+			if (!isspace(*reginput))
+				return 0;
+			reginput++;
+			break;
+		case NWHITESP:
+			if (reginput == regnomore)
+				return 0;
+			if (isspace(*reginput))
+				return 0;
+			reginput++;
 			break;
 		case ALNUM: /* includes _ */
 			if (reginput == regnomore)
@@ -1485,6 +1491,12 @@ char *p;
 	case ANYBUT:
 		while (scan != regnomore && regstrchr(opnd, *scan,
 						(char *)0) == NULL) {
+			count++;
+			scan++;
+		}
+		break;
+	case WHITESP:
+		while (scan != regnomore && isspace(*scan)) {
 			count++;
 			scan++;
 		}

@@ -14,7 +14,18 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.131  1993/07/15 10:37:58  pgf
+ * Revision 1.134  1993/07/27 18:06:20  pgf
+ * see tom's 3.56 CHANGES entry
+ *
+ * Revision 1.133  1993/07/22  14:02:38  pgf
+ * change the para/section/sentence/comment REs to reflect new status of
+ * \s and \S as strict atoms
+ *
+ * Revision 1.132  1993/07/21  11:34:12  pgf
+ * make sure the BFSCRTCH bit is on while loading up vileinit, to suppress
+ * undo actions
+ *
+ * Revision 1.131  1993/07/15  10:37:58  pgf
  * see 3.55 CHANGES
  *
  * Revision 1.130  1993/07/09  19:12:25  pgf
@@ -880,12 +891,18 @@ char	*argv[];
 				b_set_changed(obp);
 			}
 
-			if ((vbp=bfind(ScratchName(vileinit), OK_CREAT, 0))==NULL)
+			if ((vbp=bfind(ScratchName(vileinit), OK_CREAT,
+						0))==NULL)
 				ExitProgram(BAD(1));
 
-			vbp->b_active = TRUE; /* don't want swbuffer to try to read it */
+			/* don't want swbuffer to try to read it */
+			vbp->b_active = TRUE;
 			swbuffer(vbp);
+			b_set_scratch(vbp);
 			bprintf("%s", vileinit);
+			/* if we leave it scratch, swbuffer(obp) may zot it,
+				and we may zot it again */
+			b_clr_flags(vbp,BFSCRTCH);
 			set_rdonly(vbp, vbp->b_fname);
 
 			/* go execute it! */
@@ -976,7 +993,7 @@ char	*argv[];
 		mlforce(msg);
 
  begin:
-	update(FALSE);
+	(void)update(FALSE);
 
 	/* process commands */
 	loop();
@@ -1021,7 +1038,7 @@ loop()
 		if (mpresf != FALSE) {
 			mlerase();
 			if (s != SORTOFTRUE) /* did nothing due to typeahead */
-				update(FALSE);
+				(void)update(FALSE);
 		}
 
 		f = FALSE;
@@ -1085,6 +1102,9 @@ global_val_init()
 		copy_val(global_w_values.wv, global_w_values.wv, i);
 
 
+	/*
+	 * Universal-mode defaults
+	 */
 	set_global_g_val(GMDABUFF,	TRUE); 	/* auto-buffer */
 	set_global_g_val(GMDALTTABPOS,	FALSE); /* emacs-style tab
 							positioning */
@@ -1094,11 +1114,28 @@ global_val_init()
 #endif
 	set_global_g_val(GVAL_TIMEOUTVAL, 500);	/* catnap time -- how long
 							to wait for ESC seq */
+#ifdef GMDGLOB
+	set_global_g_val(GMDGLOB, TRUE);
+#endif
+#ifdef GVAL_GLOB
+	set_global_g_val_ptr(GVAL_GLOB, strmalloc("!echo %s"));
+#endif
+
 	set_global_g_val(GMDIMPLYBUFF,	FALSE); /* imply-buffer */
+#ifdef GMDPOPUP_FILEC
+	set_global_g_val(GMDPOPUP_FILEC,FALSE); /* popup-choices */
+#endif
+#ifdef GMDPOPUP_MSGS
+	set_global_g_val(GMDPOPUP_MSGS,	FALSE); /* popup-msgs */
+#endif
 #ifdef GMDRAMSIZE
 	set_global_g_val(GMDRAMSIZE,	TRUE);	/* show ram-usage */
 #endif
+	set_global_g_val(GVAL_REPORT,	5);	/* report changes */
 
+	/*
+	 * Buffer-mode defaults
+	 */
 	set_global_b_val(MDAIND,	FALSE); /* auto-indent */
 	set_global_b_val(MDASAVE,	FALSE);	/* auto-save */
 	set_global_b_val(MDBACKLIMIT,	TRUE); 	/* limit backspacing to
@@ -1117,6 +1154,7 @@ global_val_init()
 	set_global_b_val(MDDOS,		FALSE);	/* dos mode */
 #endif
 	set_global_b_val(MDMAGIC,	TRUE); 	/* magic searches */
+	set_global_b_val(MDNEWLINE,	TRUE); 	/* trailing-newline */
 	set_global_b_val(MDSHOWMAT,	FALSE);	/* show-match */
 	set_global_b_val(MDSHOWMODE,	TRUE);	/* show-mode */
 	set_global_b_val(MDSWRAP,	TRUE); 	/* scan wrap */
@@ -1145,37 +1183,36 @@ global_val_init()
 	/* where do paragraphs start? */
 	set_global_b_val_rexp(VAL_PARAGRAPHS,
 		new_regexval(
-			"^\\.[ILPQ]P\\s\\|^\\.P\\s\\|^\\.LI\\s\\|\
-^\\.[plinb]p\\s\\|^\\.\\?\\s$",
+			"^\\.[ILPQ]P\\>\\|^\\.P\\>\\|^\\.LI\\>\\|\
+^\\.[plinb]p\\>\\|^\\.\\?\\s*$",
 			TRUE));
 
 	/* where do comments start and end, for formatting them */
 	set_global_b_val_rexp(VAL_COMMENTS,
 		new_regexval(
-			"^\\s/\\?[#*>]\\+/\\?\\s$",
+			"^\\s*/\\?[#*>]\\+/\\?\\s*$",
 			TRUE));
 
 	/* where do sections start? */
 	set_global_b_val_rexp(VAL_SECTIONS,
 		new_regexval(
-			"^[{\014]\\|^\\.[NS]H\\s\\|^\\.HU\\?\\s\\|\
-^\\.[us]h\\s\\|^+c\\s",
+			"^[{\014]\\|^\\.[NS]H\\>\\|^\\.HU\\?\\>\\|\
+^\\.[us]h\\>\\|^+c\\>",
 			TRUE));
 
 	/* where do sentences start? */
 	set_global_b_val_rexp(VAL_SENTENCES,
 		new_regexval(
-	"[.!?][])\"']* \\?$\\|[.!?][])\"']*  \\|^\\.[ILPQ]P\\s\\|\
-^\\.P\\s\\|^\\.LI\\s\\|^\\.[plinb]p\\s\\|^\\.\\?\\s$",
+	"[.!?][])\"']* \\?$\\|[.!?][])\"']*  \\|^\\.[ILPQ]P\\>\\|\
+^\\.P\\>\\|^\\.LI\\>\\|^\\.[plinb]p\\>\\|^\\.\\?\\s*$",
 			TRUE));
 
-#ifdef GMDGLOB
-	set_global_g_val(GMDGLOB, TRUE);
+	/*
+	 * Window-mode defaults
+	 */
+#ifdef WMDLINEWRAP
+	set_global_w_val(WMDLINEWRAP,	FALSE); /* line-wrap */
 #endif
-#ifdef GVAL_GLOB
-	set_global_g_val_ptr(GVAL_GLOB, strmalloc("!echo %s"));
-#endif
-
 	set_global_w_val(WMDLIST,	FALSE); /* list-mode */
 	set_global_w_val(WMDNUMBER,	FALSE);	/* number */
 	set_global_w_val(WMDHORSCROLL,	TRUE);	/* horizontal scrolling */
