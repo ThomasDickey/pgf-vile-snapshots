@@ -77,6 +77,10 @@ General Remarks
 	you have two windows to the same buffer, and make a change in one,
 	you can undo it in the other.
 
+	Vile is 8-bit clean, allowing it to be used more easily at non-
+	English speaking sites.  The section on "8-Bit Operation" for
+	more information.
+
 Buffer manipulation commands:  
 -----------------------------
 
@@ -326,22 +330,21 @@ Text manipulation command:
 	---------
 	Vi has a class of commands known as "operators".  Operator
 	commands are always immediately followed by a motion command. 
-	The text affected by an operator is bounded by the initial
-	position, and the cursor position after the motion is
-	completed.  Thus the delete operator ('d') can be followed by
-	the word motion command ('w'), causing the next word to be
-	deleted.  The sequence "dG" will delete through the end of the
-	file, and "d/junk" will delete to the next occurrence of the
-	string "junk".  Operators can all be "stuttered" to affect
-	lines.  Thus "dd" deletes one line, "4dd" affects 4 lines,
-	etc. 
+	The region of text affected by an operator is bounded by the
+	initial position, and the cursor position after the motion is
+	completed.  Thus the delete operator ('d') can be followed by the
+	word motion command ('w'), causing the next word to be deleted. 
+	The sequence "dG" will delete through the end of the file, and
+	"d/junk" will delete to the next occurrence of the string "junk". 
+	Operators can all be "stuttered" to affect lines.  Thus "dd"
+	deletes one line, "4dd" affects 4 lines, etc. 
 
-	Some operators in vile can be forced to affect whole lines,
-	though the motion wouldn't normally imply it, by using the ^X
-	form of the command.  For example, "d%" (assuming you are on a
-	curly brace) will delete a C-style block of code.  "^X-d%"
-	will delete that same area, plus anything else on the lines
-	containing the curly- brace endpoints.
+	Some operators in vile can be forced to affect regions of whole
+	lines, though the motion wouldn't normally imply it, by using the
+	^X form of the command.  For example, "d%" (assuming you are on a
+	curly brace) will delete a C-style block of code.  "^X-d%" will
+	delete that same area, plus anything else on the lines containing
+	the curly-brace endpoints.
 
 	Note that some operators always affect whole lines, no matter
 	how the motion is specified.  For instance, "!w" will always
@@ -417,6 +420,11 @@ Text manipulation command:
 		that consist entirely of blanks (as opposed to blank
 		lines).
 
+	^A-i	Like their 'i', 'o', and 'O' counterparts, but any autoindent
+	^A-o    or cmode setting is ignored for the duration of this insert.
+	^A-O	These are most useful when pre-formatted text is being
+		pasted, as when using a mouse.
+
 	Searching
 	---------
 	^X-/	Does a forward search for the "word" located under the
@@ -460,8 +468,9 @@ Text manipulation command:
 	searched in order, and placed in buffers named "[Tags 1]", "[Tags 2]",
 	"[Tags 3]", etc.
 
-	If the ":ta" form of the command is used, tag matches must be
-	exact, unless the mode "taglength" is set non-zero, in which case
+	Tags searched for using '^]' will always be matched exactly.
+	If the ":ta" form of the command is used, tag matches will be
+	exact unless the mode "taglength" is set non-zero, in which case
 	the first tag matching that many characters will be used.
 
 	Filenames referred to in tags files are expanded, so environment
@@ -471,7 +480,7 @@ Text manipulation command:
 Miscellaneous commands
 ----------------------
 
-	^A-o	Remove all blank lines containing or immediately following
+	^A-r	Remove all blank lines containing or immediately following
 		the current line.
 
 	^X-^X	The "error finder".  Goes to the next file/line error pair 
@@ -551,10 +560,14 @@ Editor modes
 	animated Controls whether vile automatically updates the contents of
 		scratch buffers when their contents would change.  The animated
 		buffers include:
-
+			[Binding List]
 			[Buffer List]
+			[Mapped Characters]
 			[Registers]
-		(B)
+			[Settings]
+			[Terminal]
+		Turning off "animated" is rarely necessary: the capability
+		is present mostly as a debugging aid.  (B)
 
 	autobuffer (ab) Controls whether vile uses "most-recently-used"
 		style buffering, or vi-style (command-line order) buffers. 
@@ -697,11 +710,21 @@ Editor modes
 	magic	Allow meta-characters in search strings.  See the section 
 		"Regular Expressions" for more detail. (B)
 
-	multibeep   If a motion command fails then vile, like vi, will
-		sound the bell.  Turning this mode off prevents subsequent
-		identical motion failures from also sounding the bell. 
-		That is, if you repeat a failed motion many times (e.g. by
-		holding down the backspace key), you only get one beep. (U)
+	meta-insert-bindings (mib)  Controls behavior of 8-bit characters
+		during insert.  Normally, key-bindings are only operational
+		when in command mode: when in insert mode, all characters
+		are self-inserting.  If this mode is on, and a meta-character
+		is typed which is bound to a function, then that function
+		binding will be honored and executed from within insert
+		mode.  Any unbound meta-characters will remain self-inserting.
+		(B)
+
+	multibeep If a motion command fails, then vile, like vi, will
+		normally sound the bell.  Turning this mode off prevents
+		subsequent identical motion failures from also sounding the
+		bell.  That is, if you repeat a failed motion many times
+		(e.g. by holding down the backspace key), you only get one
+		beep.  (U)
 
 	newline (nl) The buffer ends with a newline.  This is set when reading
 		a buffer.  (B)
@@ -711,6 +734,16 @@ Editor modes
 
 	paragraphs A regular expression defining where the "next-paragraph"
 		('}') and "previous-paragraph" ('{') commands will go. (B)
+
+	printing-low The integer value repesenting the first of the
+		printable set of "high bit" characters.  Defaults to 0.
+		Most foreign (relative to me!) users would set this to 160,
+		the first printable character in the upper range of the 
+		ISO 8859/1 character set.  (U)
+
+	printing-high The integer value representing the last character of
+		the printable set of "high bit" characters.  Defaults
+		to 0.  Set this to 255 for ISO 8859/1 compatibility.  (U)
 
 	report A threshold value that is used to control messages that report
 		the number of lines deleted, changed, etc.  (U)
@@ -760,10 +793,12 @@ Editor modes
 		tabstops. (B)
 
 	taglength (tl) Sets the significant length for tags.  If non-zero,
-		the first tag matching in that many characters will be used,
-		otherwise, tags must match the lookup pattern exactly.  This
-		will not effect tags picked up from the cursor -- they are
-		always matched exactly. (B)
+		lookups for names longer than the taglength value will only
+		attempt to match that many characters.  If a lookup is for
+		a shorter pattern, or the value of taglength is zero, then
+		the tags must match the lookup pattern exactly.  This will
+		not effect tags picked up from the cursor -- they are
+		always matched exactly.  (B)
 
 	tagrelative (tr) Causes files looked up via the tags mechanism to
 		be found relative to the location of the tags file, rather
@@ -797,6 +832,10 @@ Editor modes
 		commands will be saved.  If set to 0, there is no limit,
 		and all changes are undoable.  The default value is 10. (B)
 
+	unprintable-as-octal (uo) If an 8-bit character is non-printing, it
+		will normally be displayed in hex.  This setting will force
+		octal display.  (B)
+
 	view	View the file only.  No changes are permitted.  This is set
 		automatically for the output of shell commands.  (B)
 
@@ -816,6 +855,43 @@ Editor modes
 	xterm-mouse Enables mouse-clicking if you are running within an xterm.
 		This mode overrides xterm's cut & paste.  Your TERM variable
 		must end with the string "xterm" for this to work.  (U)
+
+8-Bit Operation
+---------------
+
+	Vile allows input, manipulation, and display of all 256 possible
+	byte-wide characters.  (Double-wide characters are not supported.)
+	
+	Output: By default, characters with the high bit set (decimal value
+	128 or greater) will display as hex (or octal; see "non-printing-
+	octal" above) sequences, e.g. \xA5.  A range of characters which
+	should display as themselves (that is, characters understood by the
+	user's display terminal) may be given using the "printing-low" and
+	"printing-high" settings (see above).  Useful values for these
+	settings are 160 and 255, which correspond to the printable range
+	of the ISO-Latin-1 character set.
+
+	Input: If the user's input device can generate all characters, and
+	if the terminal settings are such that these characters pass through
+	unmolested (Using "stty cs8 -parenb -istrip" works for me, on an
+	xterm.  Real serial lines make take more convincing, at both
+	ends.), vile will happily incorporate them into the user's text, or
+	act on them if they are bound to functions.  Users who have no need
+	to enter 8-bit text may want access to the meta-bound functions
+	while in insert mode as well as command mode.  The mode
+	"meta-insert-bindings" controls whether functions bound to meta-
+	keys (characters with the high bit set) are executed only in
+	command mode, or in both command and insert modes.  In either case,
+	if a character is _not_ bound to a function, then it will be
+	self-inserting when in insert mode.  (To bind to a meta key in the
+	.vilerc file, one may specify it as itself, or in hex or octal, or
+	with the shorthand 'M-c' where c is the corresponding character
+	without the high bit set.
+
+	(Although it is possible to edit and view all 256 characters, it is
+	currently impossible to _search_ for a string that contains the NULL
+	character, since this is used internally to terminate the search
+	string.)
 
 Command History
 ---------------
@@ -855,10 +931,8 @@ Key Rebinding
 	up-arrow key, which produces "ESC [ A" is bindable as 'FN-A' (and
 	is bound to "previous-line" by default), and the 4 ANSI function
 	keys, which produce "ESC O P" through "ESC O S" (and sometimes
-	more) are bound to 'FN-P', 'FN-Q', 'FN-R', and 'FN-S'.  If your
-	terminal can generate characters with the eighth bit set (sometimes
-	called a "meta" key), then FN-c can be bound to "meta-c".
-
+	more) are bound to 'FN-P', 'FN-Q', 'FN-R', and 'FN-S'.
+	
 	Any "function" key is also available on using the '#' prefix. 
 	Entering the sequence "# A" is equivalent to hitting the ANSI
 	up-arrow in the above paragraph, and hitting "# 3" will execute
@@ -892,14 +966,16 @@ Key Rebinding
 	characters could also be entered as ^Ax, which would only be two
 	characters.
 
-	Characters can be entered in hex as well, in the form 0xNN, where
+	Characters can be entered in hex or octal as well, in the form 0xNN, where
 	NN is exactly two hex digits.  So if you know the hex value for
 	a key, you can bind to it like:
-		bind-key next-window ^A-0x94
+		bind-key next-window ^A-\x14
 	or
-		bind-key next-window FN-0x14
-	[ These two are equivalent, since the "FN-" prefix simply sets the
-	0x80 bit. ]
+		bind-key next-window FN-\213
+
+	The sequence 'M-', representing a "meta" character, is equivalent
+	to setting the high bit of the following character, so 'M-e' is
+	has the value of (0x80|0x65), or 0xe5.
 
 	Function key bindings are available in insert mode, as well as
 	in command mode.  (But only via the "meta bit" or ANSI ESC sequence
@@ -951,17 +1027,20 @@ Key Rebinding
 			^A	(one char)
 			^X	(one char)
 
-		2) followed by an optional "function" or "meta" prefix:
+		2) followed by an optional "function" prefix:
 			FN-	(three chars)
-			M-	(two chars)
-		    (these two are synonymous)
 
-		3) followed by a character, like this:
+		3) followed by an optional "meta" prefix:
+			M-	(two chars)
+			(this is the same as with specifying a character
+			    in that has the high bit set)
+
+		4) followed by a character, like this:
 			C	(one char)
 			^C	(one char)
 			^C	(two chars)
 			\NNN	(max of four chars, where NNN are octal digits)
-			\xNNN	(max of five chars, where NNN are hex digits)
+			\xNN	(max of four chars, where NN are hex digits)
 			\n,\r,\t,\b,\f (two chars each, usual meanings)
 			\e	(two chars, means ESC)
 			<tab>	(five chars)
@@ -1489,6 +1568,15 @@ DOS specifics
 
 	The vile.rc file can be located in the same directory as your
 	binary executable, since vile searches the PATH for this file.
+
+	All file globbing, including from the command line, is done using
+	UNIX shell-style wild-carding conventions.
+
+	In any version of vile there is a command, "set-dos-mode", which
+	will set the "dos" mode, and strip all carriage-return ('^M')
+	characters from the buffer so you don't end up with two of them per
+	line.  If you give the command an argument (e.g.  "1:set-dos-mode")
+	it will strip CRs but leave you in non-DOS mode.
 
 Differences from vi
 -------------------

@@ -5,7 +5,10 @@
  * Written by T.E.Dickey for vile (march 1993).
  *
  * $Log: filec.c,v $
- * Revision 1.26  1993/11/04 09:10:51  pgf
+ * Revision 1.27  1994/02/03 19:35:12  pgf
+ * tom's changes for 3.65
+ *
+ * Revision 1.26  1993/11/04  09:10:51  pgf
  * tom's 3.63 changes
  *
  * Revision 1.25  1993/10/04  10:24:09  pgf
@@ -95,7 +98,6 @@
 
 #include "estruct.h"
 #include "edef.h"
-#include "glob.h"
 
 #define	SLASH (EOS+1) /* less than everything but EOS */
 
@@ -403,7 +405,7 @@ LINEPTR *lpp;	/* in/out line pointer, for iteration */
 #endif
 
 	if (lpp == NULL || (lp = l_ref(*lpp)) == NULL)
-		lp = l_ref(bp->b_line.l);
+		lp = l_ref(buf_head(bp));
 	lp = lforw(lp);
 
 	for (;;) {
@@ -424,7 +426,7 @@ LINEPTR *lpp;	/* in/out line pointer, for iteration */
 		}
 
 		lp = lforw(lp);
-		if (lp == l_ref(bp->b_line.l)) {
+		if (lp == l_ref(buf_head(bp))) {
 		 	if (!iflag)
 				return FALSE;
 			doit = TRUE;

@@ -1,3 +1,231 @@
+Changes for vile 3.65: (released Mon Feb 7, 1994)
+(pgf)
+    Big change this release is 8-bit cleanliness.  See the help file
+    for 8-bit settings.  
+    
+    NOTE: If you had a FN-key binding which was bound to a "meta" (high
+    bit) key, you must change your binding to be a M- binding.  FN- and M-
+    are no longer synonymous.  In addition, we now preserve more of the
+    termio settings, so you may have to explicitly use "stty" to get
+    your meta-bit back.  (We used to clear istrip and the parity settings.)
+
+    NOTE2: pc vile, if built with djgpp or watcom compilers, cannot change
+    screens to 43 or 50 line mode.  i'm working on it.
+
+	+ fix bug in charprocreg() that allowed a buffer to be marked
+	  modified even if no changes were made and there is nothing to
+	  undo.  (region.c)
+
+	+ Brackets '[' and ']' are now treated like braces and parentheses
+	  when inserting in c-mode. added new #defines for [LR]BRACK to assist
+	  this. (insert.c, estruct.h, main.c)
+
+    	+ A buffer's local "dos" mode is now set to the same as the global
+	  "dos" mode when empty, fresh, or when dos-style lines equal unix-
+	  style lines. (main.c, file.c, random.c)
+
+	+ giving an argument to "set-dos-mode" causes it to turn dos-mode
+	  off rather than on. (file.c)
+
+	+ allow backspacing over autoindented whitespace, whether  or not
+	  backspacelimit is set. (insert.c)
+
+	+ new commands, ^A-i, ^A-o, and ^A-O, corresponding to i, o, and O,
+	  but which do autoindent-override during an insert.  Most useful
+	  when pasting into a buffer, since the pasted text often already
+	  has leading whitespace, and autoindent just adds more.   this
+	  is a different kind of override than used when pasting in xvile.
+	  hmmm.  (insert.c, cmdtbl)
+
+	+ fixed core dump resulting from calculating indentlen and checking
+	  for '#' char at start of empty line.  (insert.c)
+
+	+ add directory and host names to "vile died" message.  added ifdef
+	  and prototype for usage of gethostname.  currently only used #if
+	  BERK is true.  (greg mcfarlane) (file.c, proto.h, estruct.h)
+
+	+ apply (greg mcfarlane's) fix for bug in unqname, when it's being
+	  used at startup, and can't ask for input from user. (file.c)
+
+	+ only reclaim or destroy empty unmodified buffers if they don't
+	  correspond to existing files.  new routine ffexists() to support
+	  this. (buffer.c, file.c, fileio,c, proto.h)
+
+	+ changed calls to kbd_key() to tgetc(), since SPEC is now outside
+	  the range that callers can handle.  (window.c spawn.c
+	  insert.c history.c exec.c eval.c csrch.c bind.c)
+
+	+ changed all references to last1key to refer to lastkey instead,
+	  to accompany above change.  last1key is gone. (basic.c, opers.c,
+	  edef.h)
+
+	+ kbd_key() now translates system-specific function-key sequences
+	  to canonical '#-c' sequences, which kbd_seq() now interprets.
+	  (input.c)
+
+	+ allow 8-bit input, by changing SPEC definition, and some table
+	  sizes. (estruct.h, input.c, mktbls.c)
+
+	+ translate X key-events to a default set of xvile FN-bindings,
+	  without using the SPEC define, since it won't fit through the
+	  8-bit wide pipe we've constructed. (x11.c)
+
+	+ added new modes, printing-low and printing-high, which define
+	  the range of 8-bit chars which should _not_ be displayed in
+	  octal, but rather as themselves.  (modetbl, modes.c, main.c)
+
+	+ change how we display 8-bit chars. (display.c)
+
+	+ new mode, unprintable-as-octal, to control display of non-printing
+	  chars in hex or octal. (display.c, modetbl)
+
+	+ new mode, meta-insert-bindings, which allows meta-bindings (M-c)
+	  to work while in insert mode.  when off, all characters, meta
+	  or not, are simply inserted as themselves.  when on, meta keys
+	  which are bound to functions execute those functions, all others
+	  insert themselves. (insert.c, modetbl)
+
+	+ tb_get now returns a true 8 bits, no sign-extension.  (tbuff.c)
+
+	+ allow focusFollowsMouse to be disabled by XDefaults (x11.c)
+
+	+ apply fix (kev) for infinite loop on extended lines with certain
+	  kinds of tab values. (display.c)
+
+	+ attempt at better video support, and raw i/o, for djgpp (ibmpc.c)
+
+	+ new routines for ctrl-c/ctrl-break/critical-error handling in
+	  djgpp environment. (main.c, proto.h, new file djhandl.c, makefile,
+	  makefile.djg)
+
+    	+ added DJGPP to the direct/dirent ifdef in dirstuff.h
+
+	+ fix for sys5 tgetent behavior, when attempting to determine if
+	  we're an xterm. (tcap.c)
+
+	+ new targets for motorola delta machines (makefile)
+
+ 	+ fixes for core dumps on window resize (from kev) (x11.c)
+
+	+ new define for min no. of lines per window. (estruct.h)
+
+	+ change if_OPT_WORKING to simple ifdefs. (file.c fileio.c display.c
+	  estruct.h)
+
+	+ added vanillashar target to makefile, so i can produce shars
+	  that the gnuish DOS unshar program will unpack.  (makefile)
+
+	+ clarify help file regarding regions as used by the operator
+	  commands (vile.hlp)
+
+	+ applied contributed fix for null fontname (x11.c)
+
+	+ changed logic of tags lookup, so i can understand it, and to
+	  correct logic surrounding "taglength" (again).  if taglength is
+	  0, matches must be exact (i.e.  all characters significant).  if
+	  the user enters less than 'taglength' characters, this match must
+	  also be exact.  if the user enters 'taglength' or more
+	  characters, only that many characters will be significant in the
+	  lookup. (tags.c)
+
+	+ fixed bug with wrap-around reverse searching for a string occurring
+	  on the last line of a buffer.  (search.c)
+
+	+ fixed bug in search/replace operations where replacement string
+	  was of the form 'text\1moretext'.  the length of the \1 replacement
+	  pattern was being obtained incorrectly. (oneliner.c)
+
+	+ changed GO32 ifdef to DJGPP, to avoid name conflict with
+	  predefinition. (input.c, fileio.c, estruct.h, ibmpc.c, path.c,
+	  random.c, termio.c)
+
+	+ changed the 'interrupted' global to a routine, so we can poll for
+	  a control-C character when real signals aren't available. (buffer.c,
+	  edef.h, fences.c, main.c, search.c, word.c)
+
+(tom)
+	+ corrected EVCURCHAR case in 'gtenv()' that tried to return the
+	  characters at the current position, even when the buffer was empty
+	  (eval.c).
+
+	+ added ifdef-controls OPT_SHOW_EVAL, OPT_SHOW_REGS, OPT_SHOW_TAGS
+	  (cmdtbl, eval.c, estruct.h, line.c, proto.h, tags.c), and renamed
+	  OPT_MAP_DISPLAY to OPT_SHOW_MAPS (map.c, estruct.h).
+
+	+ use OPT_UPBUFF in 'killbuffer()' (buffer.c).
+
+	+ added ifdef-control OPT_WIDE_CTYPES (estruct.h, input.c, main.c).
+
+	+ use new macro 'chrBIT()' to fix long/short bitmasks in character
+	  tests (estruct.h, line.c).
+
+	+ changed 'set_bname()' to a procedure so that it can trim trailing
+	  blanks from the buffer-name.  This is done so that a ^X-k command
+	  applied to a buffer-name beginning with "!" will work.
+
+	+ corrected length-computation in 'delins()' so that command
+	  ":s/abc\[\(..\))/abc[\1]/" works properly (oneliner.c).
+
+	+ corrected offset-computation in 'scanner()' so that wrapped search
+	  finds text on the first line after wrapping (search.c).
+
+	+ added call to 'update()' in 'ms_processing()' so that
+	  "show-registers" display will be properly updated at the end of
+	  mouse-selection (ibmpc.c).
+
+	+ corrected logic in 'execute_named_command()' that prevented user from
+	  typing ":0r foo" in an empty buffer (exec.c).
+
+	+ corrected 'bclear()', so that the b_ulinep member is reset if it is
+	  freed (buffer.c).
+
+	+ lint (fileio.c, npopen.c, spawn.c)
+
+	+ absorbed 'fnc2key()' into 'fnc2kcod()' (bind.c), to simplify
+	  unbinding of prefix-keys in 'install_bind()'.
+
+	+ corrected 'install_bind()' by new procedure 'reset_prefix()', so that
+	  mapping characters that happen to be prefix-keys will override their
+	  binding (bind.c).
+
+	+ added definition LTRIMMED, to use in special cases (i.e., scratch
+	  buffers) where we don't really want to show "^J" at the end of lines
+	  when "list" mode is enabled (estruct.h, display.c, file.c, line.c,
+	  map.c).
+
+	+ animated [Mapped Characters] buffer (map.c).
+
+	+ modified display of mappings so that using a repeat-count for the
+	  ":map" command causes the actual characters to be shown, e.g.,
+	  "#1" instead of "FN1", (map.c, modes.c).
+
+	+ added alternate boolean "glob" mode (in contrast to the normal string
+	  mode), for configurations in which vile cannot read filename
+	  expansions via a pipe, e.g., VMS or UNIX (mktbls.c, modetbl, glob.c).
+
+	+ moved "glob.h" definitions into estruct.h and proto.h because
+	  the preceding change requires some definitions to precede inclusion
+	  of "nemode.h" within estruct.h (descrip.mms, eval.c, filec.c, glob.c,
+	  main.c, makefile, makefile.djg, makefile.tbc, makefile.wat, proto.h,
+	  random.c, revlist, tags.c).
+
+	+ corrected test in 'index2ukb()', which caused the unnamed-buffer
+	  to be shown incorrectly when yanking text after lines had been
+	  deleted (line.c).
+
+	+ use 'DOT', 'mode_row()', 'buf_head()' and 'win_head()' macros (basic.c, buffer.c,
+	  csrch.c, display.c, eval.c, exec.c,
+	  file.c, filec.c, finderr.c, globals.c, line.c, random.c, tags.c,
+	  tcap.c, tmp.c, undo.c, window.c, word.c) for consistency and readability.
+
+	+ modified lines/cols initialization so that 24x80 is assumed if all
+	  other lookups fail, needed for apollo sr10.2 dial-in (tcap.c).
+
+	+ added macro 'KbSize()' (file.c, estruct.h, x11.c, spawn.c, line.c).
+
+	+ corrected 'imdying()' to not save temporary buffers, and to suppress
+	  "implybuffer" mode (file.c).
+
 Changes for vile 3.64: (released Wed Dec 23, 1993)
 (pgf)
 	+ change arithmetic expression in mktbls.c, so we don't assume

@@ -3,7 +3,10 @@
  *		strings.
  *
  * $Log: path.c,v $
- * Revision 1.20  1993/11/04 09:10:51  pgf
+ * Revision 1.21  1994/01/11 17:27:42  pgf
+ * changed GO32 to DJGPP
+ *
+ * Revision 1.20  1993/11/04  09:10:51  pgf
  * tom's 3.63 changes
  *
  * Revision 1.19  1993/10/04  10:24:09  pgf
@@ -803,7 +806,7 @@ char *path;
 #endif
 		len = strlen(strcpy(temp, cwd));
 		temp[len++] = slash;
-#if GO32
+#if DJGPP
 		temp[0] = slash;  /* DJGCC returns '/', we may want '\' */
 #endif
 		(void)strcpy(temp + len, f);

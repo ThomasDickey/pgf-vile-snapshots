@@ -5,7 +5,10 @@
  *	Include this after "estruct.h"
  *
  * $Log: dirstuff.h,v $
- * Revision 1.8  1993/07/27 18:06:20  pgf
+ * Revision 1.9  1994/02/06 00:24:06  pgf
+ * added DJGPP to the good guys list
+ *
+ * Revision 1.8  1993/07/27  18:06:20  pgf
  * see tom's 3.56 CHANGES entry
  *
  * Revision 1.7  1993/06/25  11:25:55  pgf
@@ -47,7 +50,7 @@
 #define USE_D_NAMLEN 1
 #endif
 
-#if POSIX || TURBO || WATCOM
+#if POSIX || TURBO || WATCOM || DJGPP
 # if WATCOM
 #   include <direct.h>
 # else

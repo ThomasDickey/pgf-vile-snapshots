@@ -12,7 +12,25 @@
 # The modes are table entries in the BUFFER and WINDOW structures.
 #
 # $Log: modetbl,v $
-# Revision 1.24  1993/12/22 15:28:34  pgf
+# Revision 1.30  1994/02/03 19:35:12  pgf
+# tom's changes for 3.65
+#
+# Revision 1.29  1994/02/03  10:19:28  pgf
+# unprintable-as-octal is now a window mode
+#
+# Revision 1.28  1994/02/02  18:34:21  pgf
+# changed name of new octal display mode -- it can't start with 'no'
+#
+# Revision 1.27  1994/02/02  18:10:59  pgf
+# added non-printing-octal mode
+#
+# Revision 1.26  1994/02/02  16:42:02  pgf
+# new mode, meta-insert-bindings
+#
+# Revision 1.25  1994/01/31  12:30:19  pgf
+# implemented "printing-low" and "printing-high"
+#
+# Revision 1.24  1993/12/22  15:28:34  pgf
 # applying tom's 3.64 changes
 #
 # Revision 1.23  1993/09/10  16:06:49  pgf
@@ -97,6 +115,7 @@ bool								# GMD prefix
 	"Alt-TabPos"	ALTTABPOS	0			# emacs-style cursor positioning
 	"expand-path"	EXPAND_PATH	0			# true iff %/# don't substitute shortened-path
 	"flash"		FLASH		0		OPT_FLASH # visible-bell (flash)
+	"glob"		GLOB		0		!OPT_GLOB_PIPE # enable/disable filename globbing
 	"HIstory"	HISTORY		0		OPT_HISTORY # command-history
 	"ImplyBuffer"	IMPLYBUFF 	0			# imply-buffer (vi-like)
 	"multibeep"	MULTIBEEP	0			# multiple successive identical failed motions all beep
@@ -106,13 +125,15 @@ bool								# GMD prefix
 	"SameBangs"	SAMEBANGS	0			# use same "!!" data for ^X-!
 	"xterm-mouse"	XTERM_MOUSE	0		OPT_XTERM # (patch) mode to control whether we allow mouse-clicking
 int								# VAL_ prefix
+	"printing-low"	PRINT_LOW	WFHARD			# low end of high-bit-set printable range
+	"printing-high"	PRINT_HIGH	WFHARD			# high end of high-bit-set printable range
 	"report"	REPORT		0			# threshold for reporting changes
 	"timeoutlen"	TIMEOUTVAL	0			# how long to catnap for more input
 regex								# VAL_ prefix
 	"C-SUFfixes"	CSUFFIXES	0			# match against filenames to turn on c-mode
 string								# VAL_ prefix
 	"expand-chars"	EXPAND_CHARS	0			# list of chars we can expand (%,#,:)
-	"glob"		GLOB		0			# select filename globbing style
+	"glob"		GLOB		0		OPT_GLOB_PIPE # select filename globbing style
 
 .buffers
 bool								# MD prefix
@@ -126,7 +147,8 @@ bool								# MD prefix
 	"dos"		DOS		WFHARD|WFMODE		# "dos" mode -- lines end in crlf
 	"IgnoreCase"	IGNCASE		0			# Exact matching for searches
 	"magic"		MAGIC		0			# regular expressions in search
-	"NewLine"	NEWLINE		0			# trailing newline (vi-style)
+	"Meta-Insert-Bindings" METAINSBIND 0			# honor meta bindings in insert mode
+	"NewLine"	NEWLINE		WFHARD			# trailing newline (vi-style)
 	"ShowMatch"	SHOWMAT		0			# auto-indent
 	"ShowMoDe"	SHOWMODE	WFMODE			# show insert/replace/command mode
 	"TabInsert"	TABINSERT	0			# okay to insert tab chars
@@ -160,6 +182,7 @@ bool								# WMD prefix
 	"HorizScroll"	HORSCROLL	0			# scroll whole screen
 	"LineWrap"	LINEWRAP	WFHARD		OPT_LINEWRAP # wrap lines wider than screen
 	"ruler"		RULER		WFSTAT		!SMALLER # display line+col in modeline
+	"Unprintable-as-Octal" NONPRINTOCTAL  WFHARD		# print non-printing chars in octal
 int								# VAL_ prefix
 	"SIDEways"	SIDEWAYS	WFMODE|WFHARD		# sideways offset for display
 color

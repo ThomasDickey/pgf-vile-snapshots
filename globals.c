@@ -3,7 +3,10 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: globals.c,v $
- * Revision 1.26  1993/12/22 15:28:34  pgf
+ * Revision 1.27  1994/02/03 19:35:12  pgf
+ * tom's changes for 3.65
+ *
+ * Revision 1.26  1993/12/22  15:28:34  pgf
  * applying tom's 3.64 changes
  *
  * Revision 1.25  1993/11/04  09:10:51  pgf
@@ -168,14 +171,14 @@ int f, n, g_or_v;
 	}
 	/* loop through the buffer -- we must clear the marks no matter what */
 	s = TRUE;
-	lp = lForw(curbp->b_line.l);
+	lp = lForw(buf_head(curbp));
 	wp = curwp;
 	/* loop until there are no marked lines in the buffer */
 	foundone = FALSE;
 	before = line_count(curbp);
 	save_report = global_g_val(GVAL_REPORT);
 	for(;;) {
-		if (lp == l_ref(wp->w_bufp->b_line.l)) {
+		if (lp == l_ref(win_head(wp))) {
 			/* at the end -- only quit if we found no 
 				marks on the last pass through. otherwise,
 				go through again */

@@ -179,7 +179,7 @@ csrch.obj:	$(VILE_CFG) csrch.c
 
 display.obj:	$(VILE_CFG) display.c 
 
-eval.obj:	$(VILE_CFG) eval.c	glob.h nevars.h
+eval.obj:	$(VILE_CFG) eval.c	nevars.h
 
 exec.obj:	$(VILE_CFG) exec.c 
 
@@ -195,7 +195,7 @@ fileio.obj:	$(VILE_CFG) fileio.c
 
 finderr.obj:	$(VILE_CFG) finderr.c 
 
-glob.obj:	$(VILE_CFG) glob.c	dirstuff.h glob.h
+glob.obj:	$(VILE_CFG) glob.c	dirstuff.h
 
 globals.obj:	$(VILE_CFG) globals.c 
 
@@ -221,7 +221,7 @@ opers.obj:	$(VILE_CFG) opers.c
 
 path.obj:	$(VILE_CFG) path.c	dirstuff.h
 
-random.obj:	$(VILE_CFG) random.c	glob.h
+random.obj:	$(VILE_CFG) random.c
 
 regexp.obj:	$(VILE_CFG) regexp.c 
 
@@ -251,7 +251,7 @@ word.obj:	$(VILE_CFG) word.c
 
 wordmov.obj:	$(VILE_CFG) wordmov.c 
 
-main.obj:	$(VILE_CFG) main.c	nevars.h glob.h
+main.obj:	$(VILE_CFG) main.c	nevars.h
 
 ibmpc.obj:	$(VILE_CFG) ibmpc.c 
 
@@ -316,7 +316,10 @@ vile.cfg: $(THIS)
 | vile.cfg
 
 # $Log: makefile.tbc,v $
-# Revision 1.4  1993/12/22 15:28:34  pgf
+# Revision 1.5  1994/02/03 19:35:12  pgf
+# tom's changes for 3.65
+#
+# Revision 1.4  1993/12/22  15:28:34  pgf
 # applying tom's 3.64 changes
 #
 # Revision 1.3  1993/10/04  10:24:09  pgf

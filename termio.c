@@ -4,7 +4,16 @@
  * All operating systems.
  *
  * $Log: termio.c,v $
- * Revision 1.85  1993/12/23 10:06:38  pgf
+ * Revision 1.88  1994/02/04 12:31:44  pgf
+ * preserve more of the iflags in the termio settings.
+ *
+ * Revision 1.87  1994/02/04  12:22:35  pgf
+ * tom's change for 3.65 -- don't turn off istrip gratuitously
+ *
+ * Revision 1.86  1994/01/11  17:27:42  pgf
+ * changed GO32 to DJGPP
+ *
+ * Revision 1.85  1993/12/23  10:06:38  pgf
  * added fallback def'n of VDISABLE -- linux doesn't define it.
  *
  * Revision 1.84  1993/12/22  15:28:34  pgf
@@ -280,7 +289,7 @@
 #include	"estruct.h"
 #include        "edef.h"
 
-#if GO32
+#if DJGPP
 # include <pc.h>   /* for kbhit() */
 #endif
 
@@ -430,8 +439,12 @@ ttopen()
 #if ! X11
 	ntermios = otermios;
 
-	/* setup new settings, preserve flow control, and allow BREAK */
-	ntermios.c_iflag = BRKINT|(otermios.c_iflag & (IXON|IXANY|IXOFF));
+	/* new input settings: turn off crnl mapping, cr-ignoring,
+	 * case-conversion, and allow BREAK
+	 */
+	ntermios.c_iflag = BRKINT | (otermios.c_iflag & 
+				~(INLCR|IGNCR|ICRNL|IUCLC));
+
 	ntermios.c_oflag = 0;
 	ntermios.c_lflag = ISIG;
 	ntermios.c_cc[VMIN] = 1;
@@ -875,7 +888,7 @@ ttmiscinit()
 #include <conio.h>
 #endif
 
-#if GO32
+#if DJGPP
 #include <gppconio.h>
 #endif
 

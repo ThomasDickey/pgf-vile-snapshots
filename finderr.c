@@ -2,7 +2,10 @@
  * Written for vile by Paul Fox, (c)1990
  *
  * $Log: finderr.c,v $
- * Revision 1.31  1993/12/08 17:06:17  pgf
+ * Revision 1.32  1994/02/03 19:35:12  pgf
+ * tom's changes for 3.65
+ *
+ * Revision 1.31  1993/12/08  17:06:17  pgf
  * cleaned up (minimally) the scanf chain, reduced the number of ifdefs
  *
  * Revision 1.30  1993/11/04  09:10:51  pgf
@@ -284,11 +287,11 @@ int f,n;
 			}
 		}
 
-		if (lforw(dotp) == l_ref(sbp->b_line.l)) {
+		if (lforw(dotp) == l_ref(buf_head(sbp))) {
 			mlforce("[No more errors in %s buffer]", febuff);
 			TTbeep();
 			/* start over at the top of file */
-			putdotback(sbp, lForw(sbp->b_line.l));
+			putdotback(sbp, lForw(buf_head(sbp)));
 			while (l)
 				free(dirs[l--]);
 			return FALSE;
@@ -326,7 +329,7 @@ int f,n;
 	mlforce("Error: %*S", dotp->l_used, dotp->l_text);
 
 	/* it's an absolute move */
-	curwp->w_lastdot = curwp->w_dot;
+	curwp->w_lastdot = DOT;
 	s = gotoline(TRUE, -(curbp->b_linecount - errline + 1));
 
 	oerrline = errline;

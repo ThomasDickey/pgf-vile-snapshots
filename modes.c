@@ -8,8 +8,18 @@
  * Major extensions for vile by Paul Fox, 1991
  *
  *	$Log: modes.c,v $
- *	Revision 1.28  1993/11/04 09:10:51  pgf
- *	tom's 3.63 changes
+ *	Revision 1.31  1994/02/03 19:35:12  pgf
+ *	tom's changes for 3.65
+ *
+ * Revision 1.30  1994/01/31  13:24:59  pgf
+ * use strtol() in string_to_number(), so we can easily accept any (mormal)
+ * base.
+ *
+ * Revision 1.29  1994/01/31  12:29:56  pgf
+ * implemented "printing-low" and "printing-high"
+ *
+ * Revision 1.28  1993/11/04  09:10:51  pgf
+ * tom's 3.63 changes
  *
  * Revision 1.27  1993/10/04  10:24:09  pgf
  * see tom's 3.62 changes
@@ -589,21 +599,23 @@ int	*np;
  * Convert a string to number, checking for errors
  */
 int
-string_to_number(base, np)
-char	*base;
+string_to_number(from, np)
+char	*from;
 int	*np;
 {
-	register char *s = base;
-	register int nval = 0;
-	while (isdigit(*s))
-		nval = (nval * 10) + (*s++ - '0');
+	long n;
+	char *p;
+	extern long strtol();
 
-	if (*s != EOS) {
-		mlforce("[Not a number: '%s']", base);
+	/* accept decimal, octal, or hex */
+	n = strtol(from, &p, 0);
+	if (p == from || *p != EOS) {
+		mlforce("[Not a number: '%s']", from);
 		return FALSE;
 	}
-	*np = nval;
+	*np = (int)n;
 	return TRUE;
+
 }
 
 /*
@@ -946,7 +958,7 @@ int global;	/* true = global flag,	false = current buffer flag */
 #if OPT_UPBUFF
 	/* if the settings are up, redisplay them */
 	relist_settings();
-#endif
+#endif /* OPT_UPBUFF */
 
 	if (autobuff != global_g_val(GMDABUFF)) sortlistbuffers();
 
@@ -958,6 +970,18 @@ int global;	/* true = global flag,	false = current buffer flag */
 		set_global_g_val(GMDXTERM_MOUSE,!xterm_mouse);
 	}
 #endif
+	{
+	/* this seems pretty inefficient -- i shouldn't need the extra
+		statics -- i should be told what mode matched, as a return
+		from do_a_mode()/find_mode() */
+	static int printing_8bit_low, printing_8bit_high;
+	if (printing_8bit_low != global_g_val(GVAL_PRINT_LOW) ||
+		printing_8bit_high != global_g_val(GVAL_PRINT_HIGH)) {
+		printing_8bit_low = global_g_val(GVAL_PRINT_LOW);
+		printing_8bit_high = global_g_val(GVAL_PRINT_HIGH);
+		charinit();
+	}
+	}
 
 	if (curbp) {
 		curtabval = tabstop_val(curbp);

@@ -5,7 +5,19 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: tags.c,v $
- * Revision 1.44  1993/12/21 12:40:26  pgf
+ * Revision 1.46  1994/02/03 19:35:12  pgf
+ * tom's changes for 3.65
+ *
+ * Revision 1.45  1994/01/03  15:57:34  pgf
+ * changed logic of tags lookup, so i can understand it, and to
+ * correct logic surrounding "taglength" (again).  if taglength is
+ * 0, matches must be exact (i.e.  all characters significant).  if
+ * the user enters less than 'taglength' characters, this match must
+ * also be exact.  if the user enters 'taglength' or more
+ * characters, only that many characters will be significant in the
+ * lookup.
+ *
+ * Revision 1.44  1993/12/21  12:40:26  pgf
  * included missing glob.h
  *
  * Revision 1.43  1993/12/13  18:02:12  pgf
@@ -153,7 +165,6 @@
  */
 #include	"estruct.h"
 #include        "edef.h"
-#include	"glob.h"
 
 #if TAGS
 
@@ -164,22 +175,23 @@
 	char *u_fname;
 	int u_lineno;
 	UNTAG *u_stklink;
-#if !SMALLER
+#if OPT_SHOW_TAGS
 	char	*u_templ;
 #endif
 };
 
 
-static	LINE *	cheap_scan P(( BUFFER *, char *, SIZE_T, int ));
+static	LINE *	cheap_tag_scan P(( BUFFER *, char *, SIZE_T));
+static	LINE *	cheap_buffer_scan P(( BUFFER *, char *, SIZE_T));
 static	void	free_untag P(( UNTAG * ));
 static	BUFFER *gettagsfile P(( int, int * ));
 static	void	nth_name P(( char *,  char *, int ));
 static	int	popuntag P(( char *, int * ));
-static	void	pushuntag P(( char *, int ));
+static	void	pushuntag P(( char *, int, char * ));
 static	void	tossuntag P(( void ));
 
 static	UNTAG *	untaghead = NULL;
-static	char	tagname[NFILEN];
+static	char	tagname[NFILEN+2];  /* +2 since we may add a tab later */
 
 /* ARGSUSED */
 int
@@ -190,11 +202,11 @@ int f,n;
 	int taglen;
 
 	if (clexec || isnamedcmd) {
-	        if ((s=mlreply("Tag name: ", tagname, sizeof(tagname))) != TRUE)
+	        if ((s=mlreply("Tag name: ", tagname, NFILEN)) != TRUE)
 	                return (s);
 		taglen = b_val(curbp,VAL_TAGLEN);
 	} else {
-		s = screen_string(tagname,sizeof(tagname),(CMASK)_ident);
+		s = screen_string(tagname, NFILEN, _ident);
 		taglen = 0;
 	}
 	if (s == TRUE)
@@ -206,7 +218,8 @@ int
 cmdlinetag(t)
 char *t;
 {
-	(void)strcpy(tagname,t);
+	(void)strncpy(tagname,t,NFILEN);
+	tagname[NFILEN-1] = EOS;
 	return tags(tagname, global_b_val(VAL_TAGLEN));
 }
 
@@ -216,20 +229,17 @@ tags(tag,taglen)
 char *tag;
 int taglen;
 {
-	register LINE *lp, *clp;
+	register LINE *lp;
 	register int i, s;
 	char *tfp, *lplim;
 	char tfname[NFILEN];
-	char tagpat[NPAT];
+	char srchpat[NPAT];
 	int lineno;
 	int changedfile;
 	MARK odot;
 	BUFFER *tagbp;
 	int nomore;
 	int gotafile = FALSE;
-	int exact = (taglen == 0);
-
-	(void)strncpy(tagname, tag, sizeof(tagname));
 
 	i = 0;
 	do {
@@ -237,7 +247,7 @@ int taglen;
 		if (nomore) {
 			if (gotafile) {
 				TTbeep();
-				mlforce("[No such tag: \"%s\"]",tagname);
+				mlforce("[No such tag: \"%s\"]",tag);
 			} else {
 				mlforce("[No tags file available.]");
 			}
@@ -245,7 +255,7 @@ int taglen;
 		}
 
 		if (tagbp) {
-			lp = cheap_scan(tagbp, tagname, (SIZE_T)taglen, exact);
+			lp = cheap_tag_scan(tagbp, tag, (SIZE_T)taglen);
 			gotafile = TRUE;
 		} else {
 			lp = NULL;
@@ -279,11 +289,17 @@ int taglen;
 	}
 
 	if (curbp && curwp) {
+#if SMALLER
+		register LINE *clp;
 		lineno = 1;
-	        for(clp = lForw(curbp->b_line.l); 
-				clp != l_ref(curwp->w_dot.l); clp = lforw(clp))
+	        for(clp = lForw(buf_head(curbp)); 
+				clp != l_ref(DOT.l); clp = lforw(clp))
 			lineno++;
-		pushuntag(curbp->b_fname, lineno);
+#else
+		bsizes(curbp);
+		lineno = DOT.l->l_number;
+#endif
+		pushuntag(curbp->b_fname, lineno, tag);
 	}
 
 	if (curbp == NULL
@@ -296,9 +312,7 @@ int taglen;
 		}
 		changedfile = TRUE;
 	} else {
-		if (tagname[strlen(tagname)-1] == '\t')
-			tagname[strlen(tagname)-1] = EOS; /* get rid of tab we added */
-		mlwrite("Tag \"%s\" in current buffer", tagname);
+		mlwrite("Tag \"%s\" in current buffer", tag);
 		changedfile = FALSE;
 	}
 
@@ -323,13 +337,13 @@ int taglen;
 		i = 0;
 		tfp += 2; /* skip the "/^" */
 		lplim -= 2; /* skip the "$/" */
-		while (i < sizeof(tagpat) && tfp < lplim) {
+		while (i < sizeof(srchpat) && tfp < lplim) {
 			if (*tfp == '\\' && tfp < lplim - 1)
-				tfp++;  /* the backslash escapes the next char */
-			tagpat[i++] = *tfp++;
+				tfp++;  /* the backslash escapes next char */
+			srchpat[i++] = *tfp++;
 		}
-		tagpat[i] = EOS;
-		lp = cheap_scan(curbp, tagpat, (SIZE_T)i, FALSE);
+		srchpat[i] = EOS;
+		lp = cheap_buffer_scan(curbp, srchpat, (SIZE_T)i);
 		if (lp == NULL) {
 			mlforce("[Tag not present]");
 			TTbeep();
@@ -337,7 +351,7 @@ int taglen;
 				tossuntag();
 			return FALSE;
 		}
-		curwp->w_dot.l = l_ptr(lp);
+		DOT.l = l_ptr(lp);
 		curwp->w_flag |= WFMOVE;
 		(void)firstnonwhite(FALSE,1);
 		s = TRUE;
@@ -421,32 +435,64 @@ int *endofpathflagp;
 }
 
 /*
- * Do exact/inexact lookup of string in a buffer.  We only need exact match if
- * the string is a tag (in which case it must be followed by a tab).
+ * Do exact/inexact lookup of an anchored string in a buffer.
+ *	if taglen is 0, matches must be exact (i.e.  all
+ *	characters significant).  if the user enters less than 'taglen'
+ *	characters, this match must also be exact.  if the user enters
+ *	'taglen' or more characters, only that many characters will be
+ *	significant in the lookup.
  */
 static LINE *
-cheap_scan(bp, name, len, exact)
+cheap_tag_scan(bp, name, taglen)
 BUFFER *bp;
 char *name;
+SIZE_T taglen;
+{
+	register LINE *lp,*retlp;
+	int namelen = strlen(name);
+	int exact = (taglen == 0);
+	int added_tab;
+
+	/* force a match of the tab delimiter if we're supposed to do
+		exact matches or if we're searching for something shorter
+		than the "restricted" length */
+	if (exact || namelen < taglen) {
+		name[namelen++] = '\t';
+		name[namelen] = EOS;
+		added_tab = TRUE;
+	} else {
+		added_tab = FALSE;
+	}
+
+	retlp = NULL;
+	for_each_line(lp, bp) {
+		if (llength(lp) > namelen) {
+			if (!strncmp(lp->l_text, name, namelen)) {
+				retlp = lp;
+				break;
+			}
+		}
+	}
+	if (added_tab)
+		name[namelen-1] = EOS;
+	return retlp;
+}
+
+static LINE *
+cheap_buffer_scan(bp, patrn, len)
+BUFFER *bp;
+char *patrn;
 SIZE_T len;
-int exact;
 {
 	register LINE *lp;
-	int actual = strlen(name);
 
-	if (exact)
-		len = actual;
-	else if (actual < len)
-		len = actual;
+	len = strlen(patrn);
 
 	for_each_line(lp, bp) {
-		if (llength(lp) >= len) {
-			if (llength(lp) >= len
-			 && !strncmp(lp->l_text, name, len)) {
-				if (!exact
-				 || (lp->l_text[len] == '\t'))
-					return lp;
-			 }
+		if (llength(lp) == len) {
+			if (!strncmp(lp->l_text, patrn, len)) {
+				return lp;
+			}
 		}
 	}
 	return NULL;
@@ -489,7 +535,7 @@ free_untag(utp)
 UNTAG	*utp;
 {
 	FreeIfNeeded(utp->u_fname);
-#if !SMALLER
+#if OPT_SHOW_TAGS
 	FreeIfNeeded(utp->u_templ);
 #endif
 	free((char *)utp);
@@ -497,9 +543,10 @@ UNTAG	*utp;
 
 
 static void
-pushuntag(fname,lineno)
+pushuntag(fname,lineno,tag)
 char *fname;
 int lineno;
+char *tag;
 {
 	UNTAG *utp;
 	utp = typealloc(UNTAG);
@@ -507,8 +554,8 @@ int lineno;
 		return;
 
 	if ((utp->u_fname = strmalloc(fname)) == 0
-#if !SMALLER
-	 || (utp->u_templ = strmalloc(tagname)) == 0
+#if OPT_SHOW_TAGS
+	 || (utp->u_templ = strmalloc(tag)) == 0
 #endif
 	   ) {
 		free_untag(utp);
@@ -555,7 +602,7 @@ tossuntag()
 	}
 }
 
-#if !SMALLER
+#if OPT_SHOW_TAGS
 static	void	maketagslist P(( int, char * ));
 
 /*ARGSUSED*/
@@ -601,6 +648,6 @@ int	f,n;
 {
 	return liststuff(TAGS_LIST_NAME, maketagslist, f, (char *)0);
 }
-#endif	/* !SMALLER */
+#endif	/* OPT_SHOW_TAGS */
 
 #endif	/* TAGS */

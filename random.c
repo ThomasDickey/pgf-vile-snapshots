@@ -3,7 +3,31 @@
  * commands. There is no functional grouping here, for sure.
  *
  * $Log: random.c,v $
- * Revision 1.107  1993/09/10 16:06:49  pgf
+ * Revision 1.114  1994/02/07 12:29:29  pgf
+ * inherit local dos mode from the global mode when undecided,
+ * rather than setting it FALSE
+ *
+ * Revision 1.113  1994/02/03  19:35:12  pgf
+ * tom's changes for 3.65
+ *
+ * Revision 1.112  1994/01/31  12:18:56  pgf
+ * make dos interrupt testing loop a little more robust, and added
+ * octal char value to ^G output
+ *
+ * Revision 1.111  1994/01/28  21:34:43  pgf
+ * compiler warning suppression
+ *
+ * Revision 1.110  1994/01/28  20:52:47  pgf
+ * added testing hack for user interrupts in go32 environment.
+ * will remove later.
+ *
+ * Revision 1.109  1994/01/21  15:31:10  pgf
+ * support for CDPATH and 'cd -', from S.Suresh.
+ *
+ * Revision 1.108  1994/01/11  17:27:42  pgf
+ * changed GO32 to DJGPP
+ *
+ * Revision 1.107  1993/09/10  16:06:49  pgf
  * tom's 3.61 changes
  *
  * Revision 1.106  1993/09/06  16:33:24  pgf
@@ -376,7 +400,6 @@
 
 #include	"estruct.h"
 #include	"edef.h"
-#include	"glob.h"
 
 #if HAVE_POLL
 # include <poll.h>
@@ -393,7 +416,7 @@
 #   include <dir.h>
 #endif
 
-#if GO32
+#if DJGPP
 #   include <dirent.h>
 #endif
 
@@ -429,7 +452,7 @@ char	*name;
 	set_b_val(bp,VAL_TAB,8);
 
 	make_local_b_val(bp,MDDOS);
-	set_b_val(bp,MDDOS,FALSE);
+	set_b_val(bp, MDDOS, global_b_val(MDDOS) );
 
 	make_local_b_val(bp,MDCMOD);
 	set_b_val(bp,MDCMOD,FALSE);
@@ -497,6 +520,15 @@ int f,n;
 	C_NUM savepos;			/* temp save for current offset */
 	C_NUM ecol;			/* column pos/end of current line */
 
+#if WATCOM || DJGPP /* for testing interrupts */
+	if (f && n == 11) {
+		mlwrite("DOS interrupt test.  hit control-C or control-BREAK");
+		while (!interrupted())
+			;
+		mlwrite("whew.  got interrupted");
+		return ABORT;
+	}
+#endif
 	/* count chars and lines */
 	for_each_line(lp, curbp) {
 		/* if we are on the current line, record it */
@@ -535,9 +567,9 @@ int f,n;
 
 	/* summarize and report the info */
 	mlforce(
-"Line %d of %d, Col %d of %d, Char %D of %D (%D%%) char is 0x%x",
+"Line %d of %d, Col %d of %d, Char %D of %D (%D%%) char is 0x%x or 0%o",
 		predlines+1, numlines, col+1, ecol,
-		predchars+1, numchars, ratio, curchar);
+		predchars+1, numchars, ratio, curchar, curchar);
 	return TRUE;
 }
 
@@ -881,11 +913,11 @@ int f,n;
 	long nld;
 
 	lp1 = l_ref(DOT.l);
-	while (llength(lp1)==0 && (lp2=lback(lp1))!=l_ref(curbp->b_line.l))
+	while (llength(lp1)==0 && (lp2=lback(lp1))!=l_ref(buf_head(curbp)))
 		lp1 = lp2;
 	lp2 = lp1;
 	nld = 0;
-	while ((lp2=lforw(lp2))!=l_ref(curbp->b_line.l) && llength(lp2)==0)
+	while ((lp2=lforw(lp2))!=l_ref(buf_head(curbp)) && llength(lp2)==0)
 		++nld;
 	if (nld == 0)
 		return (TRUE);
@@ -1168,14 +1200,7 @@ int	d;
 int
 curdrive()
 {
-#if GO32
-	union REGS  r;
-	r.h.ah = 0x19;
-	int86(0x21, &r, &r);
-	return drive2char(r.h.al);
-#else
 	return drive2char(bdos(0x19, 0, 0) & 0xff);
-#endif
 }
 
 /* take drive _letter_ as arg. */
@@ -1281,7 +1306,13 @@ int
 set_directory(dir)
 char	*dir;
 {
+    static char prevdir[NFILEN];
     char       exdir[NFILEN];
+#if UNIX
+    char       *cdpath = NULL;
+    char       cdpathcomp[NFILEN];
+    char       cdpathdir[NFILEN];
+#endif
     char *exdp;
 #if MSDOS
     int curd = curdrive();
@@ -1307,11 +1338,56 @@ char	*dir;
 		}
 	}
 #endif
+	/*
+	** "cd -" switches to the previous directory.
+	*/
+	if (!strcmp(exdp, "-"))
+	{
+		if (*prevdir)
+			strcpy(exdp, prevdir);
+		else
+		{
+		    mlforce("[No previous directory");
+		    return FALSE;
+		}
+	}
+
+	/* Save current directory for subsequent "cd -". */
+	strcpy(prevdir, current_directory(FALSE));
+
 	if (chdir(exdp) == 0) {
 		(void)pwd(TRUE,1);
 		updatelistbuffers();
 		return TRUE;
 	}
+
+#if UNIX
+	/*
+	** chdir failed.  If the directory name doesn't begin with any of
+	** "/", "./", or "../", get the CDPATH environment variable and check
+	** if the specified directory name is a subdirectory of a
+	** directory in CDPATH.
+	*/
+	if (*exdp != '/' && strncmp(exdp, "./", 3) && strncmp(exdp, "../", 3))
+	{
+		if ((cdpath = getenv("CDPATH")) != 0)
+		{
+			strcpy(cdpathdir, cdpath);
+
+			/* For each colon-separated component in CDPATH */
+			for (cdpath = strtok(cdpathdir, ":"); cdpath;
+				cdpath = strtok(NULL, ":"))
+			{
+				if (chdir(strcat(strcat(strcpy(cdpathcomp,
+					cdpath), "/"), exdp)) == 0) {
+						(void)pwd(TRUE,1);
+						updatelistbuffers();
+						return TRUE;
+				}
+			}
+		}
+	}
+#endif
     }
 #if MSDOS
     setdrive(curd);

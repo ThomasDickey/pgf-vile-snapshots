@@ -2,7 +2,13 @@
  *		for MicroEMACS
  *
  * $Log: spawn.c,v $
- * Revision 1.67  1993/12/08 17:21:20  pgf
+ * Revision 1.69  1994/02/03 19:35:12  pgf
+ * tom's changes for 3.65
+ *
+ * Revision 1.68  1994/01/31  18:11:03  pgf
+ * change kbd_key() to tgetc()
+ *
+ * Revision 1.67  1993/12/08  17:21:20  pgf
  * attempt to use COMSPEC variable when spawning DOS shells
  *
  * Revision 1.66  1993/10/04  10:24:09  pgf
@@ -398,10 +404,11 @@ pressreturn()
 	mlprompt("[Press return to continue]");
 	TTflush();
 	/* loop for a CR, a space, or a : to do another named command */
-	while ((s = kbd_key()) != '\r' && s != ' ' && s != kcod2key(abortc)) {
+	while ((s = tgetc(FALSE)) != '\r' &&
+			s != ' ' && s != abortc) {
 		extern CMDFUNC f_namedcmd;
 		if (kcod2fnc(s) == &f_namedcmd) {
-			tungetc(kcod2key(s));
+			tungetc(s);
 			break;
 		}
 	}
@@ -806,10 +813,7 @@ filterregion()
 		kregcirculate(FALSE);
 		kp = kbs[ukb].kbufh;
 		while (kp != NULL) {
-			if (kp->d_next == NULL)
-				fwrite((char *)kp->d_chunk, 1, (SIZE_T)kbs[ukb].kused, fw);
-			else
-				fwrite((char *)kp->d_chunk, 1, KBLOCK, fw);
+			fwrite((char *)kp->d_chunk, 1, KbSize(ukb,kp), fw);
 			kp = kp->d_next;
 		}
 #if UNIX
@@ -821,7 +825,7 @@ filterregion()
 		npflush();	/* fake multi-processing */
 #endif
 	}
-	fclose(fw);
+	(void)fclose(fw);
 	DOT.l = lBACK(DOT.l);
 	s = ifile((char *)0,TRUE,fr);
 	npclose(fr);

@@ -8,7 +8,11 @@
  *		editing.
  *
  * $Log: tbuff.c,v $
- * Revision 1.11  1993/12/08 19:52:31  pgf
+ * Revision 1.12  1994/02/02 16:39:57  pgf
+ * tb_get now returns the more correct 8-bit value, rather than the sign-
+ * extended hack we needed for RECORDED_ESC
+ *
+ * Revision 1.11  1993/12/08  19:52:31  pgf
  * initialized tb_last in tb_alloc.  this may fix some of the core
  * dumps we've been seeing in xvile.
  *
@@ -272,8 +276,7 @@ int	tb_get(p, n)
 	if (p != 0)
 		c = (n < p->tb_used) ? p->tb_data[n] : p->tb_endc;
 
-	return (c >= 128) ? (c-256) : c;	/* sign-extend */
-	/* patch, should be char2int(c) */
+	return char2int(c);
 }
 
 /*

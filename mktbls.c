@@ -14,7 +14,22 @@
  *
  *
  * $Log: mktbls.c,v $
- * Revision 1.40  1993/12/23 10:11:19  pgf
+ * Revision 1.45  1994/02/03 19:35:12  pgf
+ * tom's changes for 3.65
+ *
+ * Revision 1.44  1994/01/31  15:08:04  pgf
+ * fixes for setting up bindings to meta (8th-bit) keys
+ *
+ * Revision 1.43  1994/01/31  12:29:38  pgf
+ * the 'M-' prefix now sets the high bit
+ *
+ * Revision 1.42  1994/01/29  00:26:01  pgf
+ * generate 256 keycodes, not just 128
+ *
+ * Revision 1.41  1994/01/11  17:19:25  pgf
+ * wrapped too-long preprocessor line
+ *
+ * Revision 1.40  1993/12/23  10:11:19  pgf
  * change expression so we don't assume boolean expression returns exactly
  * 0 or 1.
  *
@@ -152,7 +167,9 @@
 #define	OPT_IFDEF_MODES	1	/* true iff we can ifdef modes */
 
 /* stuff borrowed/adapted from estruct.h */
-#if defined(__TURBOC__) || defined(__WATCOMC__) || defined(__GO32__) || (defined(__GNUC__) && (defined(apollo) || defined(sun) || defined(__hpux) || defined(linux)))
+#if defined(__TURBOC__) || defined(__WATCOMC__) || defined(__GO32__) || \
+	(defined(__GNUC__) && (defined(apollo) || defined(sun) || \
+	defined(__hpux) || defined(linux)))
 #include <stdlib.h>
 #define P(param) param
 #else
@@ -183,7 +200,7 @@ extern char *malloc();
 #define	MAX_PARSE	5	/* maximum # of tokens on line */
 #define	LEN_BUFFER	50	/* nominal buffer-length */
 #define	MAX_BUFFER	(LEN_BUFFER*10)
-#define	LEN_CHRSET	128	/* total # of chars in set (ascii) */
+#define	LEN_CHRSET	256	/* total # of chars in set (ascii) */
 
 	/* patch: why not use <ctype.h> ? */
 #define	DIFCNTRL	0x40
@@ -347,7 +364,7 @@ static int
 isprint(c)
 int c;
 {
-	return c >= ' ' && c < '\177';
+	return c >= ' ' && c < 0x7f;
 }
 
 /******************************************************************************/
@@ -438,7 +455,7 @@ char	*note;
 	for (p = *headp, q = 0; p != 0; q = p, p = p->nst) {
 		if ((r = strcmp(n->Name, p->Name)) < 0)
 			break;
-		else if (r == 0)
+		else if (r == 0 && !strcmp(n->Cond, p->Cond))
 			badfmt("duplicate name");
 	}
 	n->nst = p;
@@ -997,7 +1014,7 @@ static void
 save_bindings(s,func,cond)
 char *s, *func, *cond;
 {
-	int btype, c;
+	int btype, c, highbit;
 
 	btype = ASCIIBIND;
 
@@ -1011,6 +1028,12 @@ char *s, *func, *cond;
 		btype = CTLXBIND;
 		s += 3;
 	}
+	if (*s == 'M' && *(s+1) == '-') {
+		highbit = 0x80;
+		s += 2;
+	} else {
+		highbit = 0;
+	}
 
 	if (*s == '\\') { /* try for an octal value */
 		c = 0;
@@ -1018,6 +1041,7 @@ char *s, *func, *cond;
 			c = (c*8) + *s - '0';
 		if (c >= LEN_CHRSET)
 			badfmt("octal character too big");
+		c |= highbit;
 		if (bindings[btype][c] != NULL && !two_conds(btype,c,cond))
 			badfmt("duplicate key binding");
 		bindings[btype][c] = StrAlloc(func);
@@ -1025,11 +1049,13 @@ char *s, *func, *cond;
 		if (c > 'a' &&  c < 'z')
 			c = toupper(c);
 		c = tocntrl(c);
+		c |= highbit;
 		if (bindings[btype][c] != NULL && !two_conds(btype,c,cond))
 			badfmt("duplicate key binding");
 		bindings[btype][c] = StrAlloc(func);
 		s += 2;
 	} else if ((c = *s) != 0) {
+		c |= highbit;
 		if (bindings[btype][c] != NULL && !two_conds(btype,c,cond))
 			badfmt("duplicate key binding");
 		bindings[btype][c] = StrAlloc(func);
@@ -1051,7 +1077,7 @@ static void
 dump_bindings()
 {
 	char	temp[MAX_BUFFER];
-	char *sctl;
+	char *sctl, *meta;
 	int i, c, btype;
 
 	btype = ASCIIBIND;
@@ -1063,12 +1089,15 @@ dump_bindings()
 	for (i = 0; i < LEN_CHRSET; i++) {
 		WriteIf(nebind, conditions[btype][i]);
 
-		if (i < ' ' || i > '~' ) {
+		sctl = "";
+		if (i & 0x80)
+		    meta = "meta-";
+		else
+		    meta = "";
+		c = i & 0x7f;
+		if (c < ' ' || c > '~') {
 			sctl = "ctrl-";
-			c = toalpha(i);
-		} else {
-			sctl = "";
-			c = i;
+			c = toalpha(c);
 		}
 
 		if (bindings[btype][i])
@@ -1076,8 +1105,8 @@ dump_bindings()
 		else
 			Sprintf(temp, "\tNULL,");
 
-		Fprintf(nebind, "%s/* %s%c */\n", PadTo(32, temp), sctl, c);
-
+		Fprintf(nebind, "%s/* %s%s%c */\n", PadTo(32, temp),
+							meta, sctl, c);
 		if (conditions[btype][i] != 0)
 			Fprintf(nebind,"#else\n\tNULL,\n");
 		FlushIf(nebind);
@@ -1097,6 +1126,11 @@ dump_bindings()
 						L_CURL,
 						prefname[btype],
 						toalpha(i));
+				} else if (i >= 0x80) {
+					Sprintf(temp,
+					"\t%c %s0x%x,",
+						L_CURL,
+						prefname[btype], i);
 				} else {
 					Sprintf(temp,
 					"\t%c %s'%s%c',",
@@ -1107,7 +1141,8 @@ dump_bindings()
 						i);
 				}
 				Fprintf(nebind, "%s&f_%s %c,\n",
-					PadTo(32, temp), bindings[btype][i], R_CURL);
+					PadTo(32, temp), bindings[btype][i],
+						R_CURL);
 			}
 		}
 		FlushIf(nebind);

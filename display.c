@@ -6,7 +6,30 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.108  1993/12/22 15:28:34  pgf
+ * Revision 1.115  1994/02/03 19:35:12  pgf
+ * tom's changes for 3.65
+ *
+ * Revision 1.114  1994/02/03  10:17:27  pgf
+ * bunch of vt...() stuff is now static, and
+ * unprintable-as-octal mode is now a window mode
+ *
+ * Revision 1.113  1994/02/02  18:11:30  pgf
+ * added non-printing-octal mode
+ *
+ * Revision 1.112  1994/01/31  12:28:44  pgf
+ * use define for HIGHBIT
+ *
+ * Revision 1.111  1994/01/29  00:24:17  pgf
+ * fix display of high-bit-set characters:  display in octal for now
+ *
+ * Revision 1.110  1994/01/28  21:49:52  pgf
+ * apply contributed fix for infinite loop on extended lines with certain
+ * kinds of tab values
+ *
+ * Revision 1.109  1994/01/27  17:39:53  pgf
+ * changed if_OPT_WORKING to simple ifdef
+ *
+ * Revision 1.108  1993/12/22  15:28:34  pgf
  * applying tom's 3.64 changes
  *
  * Revision 1.107  1993/12/08  19:58:43  pgf
@@ -428,6 +451,8 @@ static	int	allow_wrap;
 /* for window size changes */
 int chg_width, chg_height;
 
+static char hexdigits[] = "0123456789ABCDEF";
+
 /******************************************************************************/
 
 typedef	void	(*OutFunc) P(( int ));
@@ -464,6 +489,17 @@ static	int	texttest P(( int, int ));
 #if CAN_SCROLL
 static	int	scrolls P(( int ));
 #endif
+
+static void vtmove P(( int, int ));
+static void vtputc P(( int ));
+static void vtlistc P(( int ));
+static int vtgetc P(( int ));
+static void vtputsn P(( char *, int ));
+static void vtset P(( LINEPTR, WINDOW * ));
+static void vtprintf P(( char *, ... ));
+static void vteeol P(( void ));
+
+static void lspputc P(( int ));
 
 /*--------------------------------------------------------------------------*/
 
@@ -530,7 +566,6 @@ int	dfputi(outfunc,i, r)
 	int i,r;
 {
 	register int q;
-	static char hexdigits[] = "0123456789ABCDEF";
 
 	if (i < 0) {
 		(*outfunc)('-');
@@ -786,7 +821,9 @@ vtinit()
         pscreen[i] = vp;
 #endif
         }
-	if_OPT_WORKING(imworking(0))
+#if OPT_WORKING
+	imworking(0);
+#endif
 }
 
 /*
@@ -806,7 +843,7 @@ int f;
  * Set the virtual cursor to the specified row and column on the virtual
  * screen. There is no checking for nonsense values.
  */
-void
+static void
 vtmove(row, col)
 int row,col;
 {
@@ -821,7 +858,7 @@ int row,col;
    terminal buffers. Only column overflow is checked.
 */
 
-void
+static void
 vtputc(c)
 int c;
 {
@@ -849,7 +886,8 @@ int c;
 	} else if (c == '\t') {
 		do {
 			vtputc(' ');
-		} while (((vtcol + taboff)%curtabval) != 0);
+		} while (((vtcol + taboff)%curtabval) != 0 
+		          && vtcol < term.t_ncol);
 	} else if (c == '\n') {
 		return;
 	} else if (isprint(c)) {
@@ -859,26 +897,44 @@ int c;
 	}
 }
 
+/* how should high-bit unprintable chars be shown? */
+static int vt_octal;
+
 /* shows non-printing character */
-void
+static void
 vtlistc(c)
 int c;
 {
-	if (!isprint(c)) {
-		vtputc('^');
-		c = toalpha(c);
+	if (isprint(c)) {
+	    vtputc(c);
+	    return;
 	}
-	vtputc(c);
+
+	if (c & HIGHBIT) {
+	    vtputc('\\');
+	    if (vt_octal) {
+		vtputc(((c>>6)&3)+'0');
+		vtputc(((c>>3)&7)+'0');
+		vtputc(((c   )&7)+'0');
+	    } else {
+		vtputc('x');
+		vtputc(hexdigits[(c>>4) & 0xf]);
+		vtputc(hexdigits[(c   ) & 0xf]);
+	    }
+	} else {
+	    vtputc('^');
+	    vtputc(toalpha(c));
+	}
 }
 
-int
+static int
 vtgetc(col)
 int col;
 {
 	return vscreen[vtrow]->v_text[col];
 }
 
-void
+static void
 vtputsn(s,n)
 char *s;
 int n;
@@ -889,19 +945,22 @@ int n;
 }
 
 
-void
+static void
 vtset(lp,wp)
 LINEPTR lp;
 WINDOW *wp;
 {
 	register char *from;
 	register int n = lLength(lp);
+	BUFFER	*bp  = wp->w_bufp;
 	int	skip = -vtcol,
 		list = w_val(wp,WMDLIST);
 
+	vt_octal = w_val(wp,WMDNONPRINTOCTAL);
+
 	if (w_val(wp,WMDNUMBER)) {
 		register int j, k, jk;
-		L_NUM	line = line_no(wp->w_bufp, lp);
+		L_NUM	line = line_no(bp, lp);
 		int	fill = ' ';
 		char	temp[NU_WIDTH+2];
 
@@ -916,8 +975,13 @@ WINDOW *wp;
 		for (j = k = jk = 0; (j < n) && (k < skip); j++) {
 			register int	c = from[j];
 			if ((list || (c != '\t')) && !isprint(c)) {
-				k += 2;
-				fill = toalpha(c);
+			    	if (c & HIGHBIT) {
+				    k += 4;
+				    fill = '\\';  /* FIXXXX */
+				} else {
+				    k += 2;
+				    fill = toalpha(c);
+				}
 			} else {
 				if (c == '\t')
 					k += (curtabval - (k % curtabval));
@@ -955,15 +1019,24 @@ WINDOW *wp;
 		n--;
 	}
 
-	if (list && (n >= 0))
-		vtlistc('\n');
+	/* Display a "^J" if 'list' mode is active, unless we've suppressed
+	 * it for some reason.
+	 */
+	if (list && (n >= 0)) {
+		if (b_is_scratch(bp) && listrimmed(l_ref(lp)))
+			;
+		else if (!b_val(bp,MDNEWLINE) && same_ptr(lFORW(lp),buf_head(bp)))
+			;
+		else
+			vtlistc('\n');
+	}
 #ifdef WMDLINEWRAP
 	allow_wrap = 0;
 #endif
 }
 
 /* VARARGS1 */
-void
+static void
 #if	ANSI_VARARGS
 vtprintf( char *fmt, ...)
 #else
@@ -994,7 +1067,7 @@ va_dcl
  * Erase from the end of the software cursor to the end of the line on which
  * the software cursor is located.
  */
-void
+static void
 vteeol()
 {
 	if (vtcol < term.t_ncol) {
@@ -1314,11 +1387,11 @@ WINDOW *wp;	/* window to update lines in */
 	/* search down the lines, updating them */
 	lp = wp->w_line.l;
 	sline = wp->w_toprow;
-	while (sline < wp->w_toprow + wp->w_ntrows) {
+	while (sline < mode_row(wp)) {
 		l_to_vline(wp,lp,sline);
 		vteeol();
 		sline += line_height(wp,lp);
-		if (!same_ptr(lp, wp->w_bufp->b_line.l))
+		if (!same_ptr(lp, win_head(wp)))
 			lp = lFORW(lp);
 	}
 }
@@ -1341,7 +1414,7 @@ int sline;
 	if (w_val(wp,WMDLINEWRAP)) {
 		register int	n = sline + line_height(wp, lp);
 		while (n > sline)
-			if (--n < wp->w_toprow + wp->w_ntrows) {
+			if (--n < mode_row(wp)) {
 				vscreen[n]->v_flag |= VFCHG;
 				vscreen[n]->v_flag &= ~VFREQ;
 			}
@@ -1356,7 +1429,7 @@ int sline;
 	}
 	left = taboff;
 
-	if (!same_ptr(lp, wp->w_bufp->b_line.l)) {
+	if (!same_ptr(lp, win_head(wp))) {
 		vtmove(sline, -left);
 		vtset(lp, wp);
 		if (left) {
@@ -1399,9 +1472,9 @@ int *screencolp;
 		currow += line_height(curwp,lp);
 		lp = lFORW(lp);
 		if (same_ptr(lp, curwp->w_line.l)
-		 || currow > (curwp->w_toprow + curwp->w_ntrows)) {
+		 || currow > mode_row(curwp)) {
 			mlforce("BUG:  lost dot updpos().  setting at top");
-			lp = curwp->w_line.l = DOT.l = lFORW(curbp->b_line.l);
+			lp = curwp->w_line.l = DOT.l = lFORW(buf_head(curbp));
 			currow = curwp->w_toprow;
 		}
 	}
@@ -1417,8 +1490,9 @@ int *screencolp;
 				col++;
 			} while ((col%curtabval) != 0);
 		} else {
-			if (!isprint(c))
-				++col;
+			if (!isprint(c)) {
+				col += (c & HIGHBIT) ? 3 : 1;
+			}
 			++col;
 		}
 
@@ -1443,7 +1517,7 @@ int *screencolp;
 			*screencolp = col + nuadj;
 		}
 		/* kludge to keep the cursor within the window */
-		i = curwp->w_toprow + curwp->w_ntrows - 1;
+		i = mode_row(curwp) - 1;
 		if (*screenrowp > i) {
 			*screenrowp = i;
 			*screencolp = term.t_ncol - 1;
@@ -1503,7 +1577,7 @@ upddex()
 
 		curtabval = tabstop_val(wp->w_bufp);
 
-		while (i < wp->w_toprow + wp->w_ntrows) {
+		while (i < mode_row(wp)) {
 			if (vscreen[i]->v_flag & VFEXT) {
 				if ((wp != curwp)
 				 || (!same_ptr(lp, wp->w_dot.l))
@@ -1623,7 +1697,7 @@ C_NUM	offset;
 			if (isprint(c)) {
 				column++;
 			} else if (list || (c != '\t')) {
-				column += 2;
+				column += (c & HIGHBIT) ? 4 : 2;
 			} else if (c == '\t') {
 				column = ((column / tabs) + 1) * tabs;
 			}
@@ -1669,7 +1743,7 @@ C_NUM	col;
 			if (isprint(c)) {
 				n++;
 			} else if (list || (c != '\t')) {
-				n += 2;
+				n += (c & HIGHBIT) ? 4 : 2;
 			} else if (c == '\t') {
 				n = ((n / tabs) + 1) * tabs;
 			}
@@ -1713,7 +1787,7 @@ int	row;
 	register WINDOW *wp;
 
 	for_each_window(wp)
-		if (row >= wp->w_toprow && row <= wp->w_ntrows + wp->w_toprow)
+		if (row >= wp->w_toprow && row <= mode_row(wp))
 			return wp;
 	return 0;
 }
@@ -2214,7 +2288,7 @@ WINDOW *wp;
 	int	left, col;
 	char	temp[NFILEN];
 
-	n = wp->w_toprow+wp->w_ntrows;      	/* Location. */
+	n = mode_row(wp);      	/* Location. */
 	vscreen[n]->v_flag |= VFCHG | VFREQ | VFCOL;/* Redraw next time. */
 #if	COLOR
 	vscreen[n]->v_rfcolor = w_val(wp,WVAL_FCOLOR);
@@ -2317,14 +2391,14 @@ WINDOW *wp;
 		vtcol = n - 7;  /* strlen(" top ") plus a couple */
 		while (rows--) {
 			lp = lforw(lp);
-			if (lp == l_ref(wp->w_bufp->b_line.l)) {
+			if (lp == l_ref(win_head(wp))) {
 				msg = " bot ";
 				break;
 			}
 		}
-		if (lBack(wp->w_line.l) == l_ref(wp->w_bufp->b_line.l)) {
+		if (lBack(wp->w_line.l) == l_ref(win_head(wp))) {
 			if (msg) {
-				if (same_ptr(wp->w_line.l, wp->w_bufp->b_line.l))
+				if (same_ptr(wp->w_line.l, win_head(wp)))
 					msg = " emp ";
 				else
 					msg = " all ";
@@ -2739,7 +2813,7 @@ char	*s;
 
 char *lsp;
 
-void
+static void
 lspputc(c)
 int c;
 {
@@ -2779,47 +2853,6 @@ va_dcl
 	return lsp;
 }
 
-#ifdef	UNUSED
-static char *lsbuf;
-
-void
-lssetbuf(buf)
-char *buf;
-{
-	lsbuf = buf;
-}
-
-/* VARARGS1 */
-char *
-#if	ANSI_VARARGS
-_lsprintf( char *fmt, ...)
-#else
-_lsprintf(va_alist)
-va_dcl
-#endif
-{
-
-	va_list ap;
-#if	ANSI_VARARGS
-	va_start(ap,fmt);
-#else
-	va_start(ap);
-#endif
-
-	lsp = lsbuf;
-	dfoutfn = lspputc;
-
-#if	ANSI_VARARGS
-	dofmt(fmt,&ap);
-#else
-	dofmt(&ap);
-#endif
-	va_end(ap);
-
-	*lsp = EOS;
-	return lsp;
-}
-#endif	/* UNUSED */
 
 /*
  * Buffer printf -- like regular printf, but puts characters
@@ -2956,9 +2989,6 @@ int h, w;
  * large files.
  */
 #if OPT_WORKING
-
-/* global disabler, to help debugging */
-int no_working = FALSE;
 
 /*ARGSUSED*/
 SIGT

@@ -4,7 +4,13 @@
 	written 1986 by Daniel Lawrence
  *
  * $Log: eval.c,v $
- * Revision 1.69  1993/11/04 09:10:51  pgf
+ * Revision 1.71  1994/02/03 19:35:12  pgf
+ * tom's changes for 3.65
+ *
+ * Revision 1.70  1994/01/31  18:11:03  pgf
+ * change kbd_key() to tgetc()
+ *
+ * Revision 1.69  1993/11/04  09:10:51  pgf
  * tom's 3.63 changes
  *
  * Revision 1.68  1993/10/04  10:24:09  pgf
@@ -223,7 +229,6 @@
 #include	"estruct.h"
 #include	"edef.h"
 #include	"nevars.h"
-#include	"glob.h"
 
 #define	FUNC_NAMELEN	4
 
@@ -262,7 +267,7 @@ static	char *	GetEnv P(( char * ));
 static	char *	DftEnv P(( char *, char * ));
 static	void	SetEnv P(( char **, char * ));
 #endif
-#if !SMALLER
+#if OPT_SHOW_EVAL
 static	void	makevarslist P(( int, char *));
 static	int	is_mode_name P(( char *, int, VALARGS * ));
 static	char *	get_listvalue P(( char *, int ));
@@ -317,7 +322,7 @@ static char *shell;	/* $SHELL environment is "$shell" variable */
 static char *directory;	/* $TMP environment is "$directory" variable */
 #endif
 
-#if ! SMALLER
+#if OPT_SHOW_EVAL
 /* list the current vars into the current buffer */
 /* ARGSUSED */
 static void
@@ -374,10 +379,10 @@ int showall;
 		return gtenv(name);
 	return 0;
 }
-#endif /* !SMALLER */
+#endif /* OPT_SHOW_EVAL */
 
 /* ARGSUSED */
-#if !SMALLER
+#if OPT_SHOW_EVAL
 int
 listvars(f, n)
 int f,n;
@@ -417,7 +422,7 @@ int f,n;
 	swbuffer(wp->w_bufp);
 	return s;
 }
-#endif /* !SMALLER */
+#endif /* OPT_SHOW_EVAL */
 
 #if OPT_EVAL
 static
@@ -568,9 +573,11 @@ char *vname;		/* name of environment variable to retrieve */
 		ElseIf( EVPALETTE )	value = palstr;
 		ElseIf( EVLASTKEY )	value = l_itoa(lastkey);
 		ElseIf( EVCURCHAR )
-			value = is_at_end_of_line(DOT)
-				? l_itoa('\n')
-				: l_itoa(char_at(DOT));
+			if (!is_empty_buf(curbp)) {
+				value = is_at_end_of_line(DOT)
+					? l_itoa('\n')
+					: l_itoa(char_at(DOT));
+			}
 
 		ElseIf( EVDISCMD )	value = ltos(discmd);
 		ElseIf( EVVERSION )	value = version;
@@ -593,7 +600,7 @@ char *vname;		/* name of environment variable to retrieve */
 					value = falsem;
 #endif
 		ElseIf( EVLLENGTH )	value = l_itoa(lLength(DOT.l));
-		ElseIf( EVLINE )	value = getctext(0);
+		ElseIf( EVLINE )	value = getctext((CMASK)0);
 		ElseIf( EVWORD )	value = getctext(_nonspace);
 		ElseIf( EVIDENTIF )	value = getctext(_ident);
 		ElseIf( EVQIDENTIF )	value = getctext(_qident);
@@ -971,7 +978,7 @@ char *value;	/* value to set to */
 		(void)update(TRUE);
 
 		/* and get the keystroke to hold the output */
-		if (kbd_key() == abortc) {
+		if (tgetc(FALSE) == abortc) {
 			mlforce("[Macro aborted]");
 			status = FALSE;
 		}
@@ -1074,7 +1081,7 @@ char *tokn;		/* token to evaluate */
 				/* if the buffer is displayed, get the window
 				   vars instead of the buffer vars */
 				if (bp->b_nwnd > 0) {
-					curbp->b_dot = curwp->w_dot;
+					curbp->b_dot = DOT;
 				}
 
 				/* make sure we are not at the end */
@@ -1101,8 +1108,8 @@ char *tokn;		/* token to evaluate */
 
 				/* if displayed buffer, reset window ptr vars*/
 				if (bp->b_nwnd > 0) {
-					curwp->w_dot.l = curbp->b_dot.l;
-					curwp->w_dot.o = 0;
+					DOT.l = curbp->b_dot.l;
+					DOT.o = 0;
 					curwp->w_flag |= WFMOVE;
 				}
 

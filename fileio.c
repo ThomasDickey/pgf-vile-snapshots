@@ -3,7 +3,23 @@
  * the knowledge about files are here.
  *
  * $Log: fileio.c,v $
- * Revision 1.58  1993/12/22 15:28:34  pgf
+ * Revision 1.63  1994/02/03 19:35:12  pgf
+ * tom's changes for 3.65
+ *
+ * Revision 1.62  1994/02/03  09:21:47  pgf
+ * fixed syntax typos
+ *
+ * Revision 1.61  1994/01/31  20:26:14  pgf
+ * new routine ffexists() supports ability to not reclaim empty unmodified
+ * buffers if they correspond to existing files
+ *
+ * Revision 1.60  1994/01/27  17:39:53  pgf
+ * changed if_OPT_WORKING to simple ifdef
+ *
+ * Revision 1.59  1994/01/11  17:28:33  pgf
+ * 'interrupted' is now a routine, and changed GO32 to DJGPP
+ *
+ * Revision 1.58  1993/12/22  15:28:34  pgf
  * applying tom's 3.64 changes
  *
  * Revision 1.57  1993/09/10  16:06:49  pgf
@@ -215,7 +231,7 @@
 #if WATCOM
 #define	errorIfDir()	set_errno(S_IFDIR)	/* not the same, but... */
 #endif
-#if GO32
+#if DJGPP
 #define	errorIfDir()	set_errno(ENOENT)
 #endif
 
@@ -451,21 +467,45 @@ ffsize()
 	if (fstat(fileno(ffp), &statbuf) == 0) {
 		return (long)statbuf.st_size;
 	}
-        mlforce("[File sizing error]");
-        return -1;
+        return -1L;
+}
+
+int
+ffexists(p)
+char *p;
+{
+	struct stat statbuf;
+	if (stat(p, &statbuf) == 0) {
+		return TRUE;
+	}
+        return FALSE;
 }
 #endif
 
 #if MSDOS
 
-#if GO32
+int
+ffexists(p)
+char *p;
+{
+	if (ffropen(p) == FIOSUC) {
+		ffclose();
+		return TRUE;
+	}
+        return FALSE;
+}
+
+#if DJGPP
 
 long
 ffsize(void)
 {
 	int flen, prev;
-	prev = ftell(ffp); fseek(ffp, 0, 2);
-	flen = ftell(ffp); fseek(ffp, prev, 0);
+	prev = ftell(ffp);
+	if (fseek(ffp, 0, 2) < 0)
+		return -1L;
+	flen = ftell(ffp);
+	fseek(ffp, prev, 0);
 	return flen;
 }
 
@@ -475,6 +515,8 @@ long
 ffsize(void)
 {
 	int fd = fileno(ffp);
+	if (fd < 0)
+		return -1L;
 	return  filelength(fd);
 }
 
@@ -504,7 +546,7 @@ long len;
 	fseek (ffp, len, 1);	/* resynchronize stdio */
 	return total;
 #else
-	int got = read(fileno(ffp), buf, (SIZE_T)len);
+	int got = read(fileno(ffp), buf, len);
 	fseek (ffp, len, 1);	/* resynchronize stdio */
 	return got;
 #endif
@@ -531,7 +573,7 @@ ffrewind()
 	 */
 	char	temp[NFILEN];
 	fgetname(ffp, temp);
-	fclose(ffp);
+	(void)fclose(ffp);
 	ffp = fopen(temp, FOPEN_READ);
 #else
 	fseek (ffp,0L,0);
@@ -554,7 +596,7 @@ ffclose()
 		npclose(ffp);
 		mlforce("[Read %d lines%s]",
 			count_fline,
-			interrupted ? "- Interrupted" : "");
+			interrupted() ? "- Interrupted" : "");
 #ifdef	MDCHK_MODTIME
 		(void)check_visible_modtimes();
 #endif
@@ -565,7 +607,7 @@ ffclose()
                 return(FIOERR);
         }
 #else
-        fclose(ffp);
+        (void)fclose(ffp);
 #endif
         return (FIOSUC);
 }
@@ -651,7 +693,7 @@ int *lenp;	/* to return the final length */
 		c = fgetc(ffp);
 		if ((c == '\n') || feof(ffp) || ferror(ffp))
 			break;
-		if (interrupted) {
+		if (interrupted()) {
 			free_fline();
 			*lenp = 0;
 			return FIOABRT;
@@ -668,7 +710,9 @@ int *lenp;	/* to return the final length */
 			free(fline);
                 	fline = tmpline;
                 }
-		if_OPT_WORKING(cur_working++)
+#if OPT_WORKING
+		cur_working++;
+#endif
         }
 
 #if !DOSFILES
@@ -720,7 +764,7 @@ int *lenp;	/* to return the final length */
  * is _much_much_ faster, and I don't have to futz with non-blocking
  * reads...
  */
-#if WATCOM || GO32
+#if WATCOM
 #define no_isready_c 1 
 #endif
 

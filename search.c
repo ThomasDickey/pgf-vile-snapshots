@@ -4,7 +4,18 @@
  *  heavily modified by Paul Fox, 1990
  *
  * $Log: search.c,v $
- * Revision 1.55  1993/12/22 15:28:34  pgf
+ * Revision 1.58  1994/02/03 19:35:12  pgf
+ * tom's changes for 3.65
+ *
+ * Revision 1.57  1994/01/11  17:27:27  pgf
+ * 'interrupted' is now a routine
+ *
+ * Revision 1.56  1994/01/03  16:00:31  pgf
+ * fix offset calculation when wrapping around on a reverse search -- we
+ * were always setting to 0, based on the length of the header line, rather
+ * than the last line of the file
+ *
+ * Revision 1.55  1993/12/22  15:28:34  pgf
  * applying tom's 3.64 changes
  *
  * Revision 1.54  1993/10/04  10:24:09  pgf
@@ -360,9 +371,7 @@ int f, n;	/* default flag / numeric argument */
 	if (n < 0)		/* search backwards */
 		return(backhunt(f, -n));
 
-	/* Make sure a pattern exists, or that we didn't switch
-	 * into MAGIC mode until after we entered the pattern.
-	 */
+	/* Make sure a pattern exists */
 	if (pat[0] == EOS)
 	{
 		mlforce("[No pattern set]");
@@ -487,12 +496,10 @@ int f, n;	/* default flag / numeric argument */
 
 	wrapok = b_val(curwp->w_bufp, MDSWRAP);
 
-	if (n < 0)
+	if (n < 0)		/* search forwards */
 		return(forwhunt(f, -n));
 
-	/* Make sure a pattern exists, or that we didn't switch
-	 * into MAGIC mode until after we entered the pattern.
-	 */
+	/* Make sure a pattern exists */
 	if (pat[0] == EOS) {
 		mlforce("[No pattern set]");
 		return FALSE;
@@ -584,7 +591,7 @@ int	wrapok;	/* ok to wrap around bottom of buffer? */
 	for(;;) {
 		register int startoff, srchlim;
 
-		if (interrupted) return ABORT;
+		if (interrupted()) return ABORT;
 
 		if (sameline(curpos, scanboundpos)) {
 			if (direct == FORWARD) {
@@ -619,19 +626,19 @@ int	wrapok;	/* ok to wrap around bottom of buffer? */
 			if (direct == REVERSE) { /* find the last one */
 				char *got = exp->startp[0];
 				while (lregexec(exp, l_ref(curpos.l),
-						got+1-l_ref(curpos.l)->l_text,
+						(int)(got+1-l_ref(curpos.l)->l_text),
 						srchlim)) {
 					got = exp->startp[0];
 				}
 				if (!lregexec(exp, l_ref(curpos.l),
-						got-l_ref(curpos.l)->l_text,
+						(int)(got-l_ref(curpos.l)->l_text),
 						srchlim)) {
 					mlforce("BUG: prev. match no good");
 					return FALSE;
 				}
 			}
 			DOT.l = curpos.l;
-			DOT.o = exp->startp[0] - l_ref(curpos.l)->l_text;
+			DOT.o = (C_NUM)(exp->startp[0] - l_ref(curpos.l)->l_text);
 			curwp->w_flag |= WFMOVE; /* flag that we have moved */
 			return TRUE;
 		} else {
@@ -641,11 +648,8 @@ int	wrapok;	/* ok to wrap around bottom of buffer? */
 		}
 		if (direct == FORWARD) {
 			curpos.l = lFORW(curpos.l);
-			curpos.o = 0;
 		} else {
 			curpos.l = lBACK(curpos.l);
-			if ((curpos.o = lLength(curpos.l)-1) < 0)
-				curpos.o = 0;
 		}
 		if (is_header_line(curpos, curbp)) {
 			wrapped++;
@@ -657,6 +661,12 @@ int	wrapok;	/* ok to wrap around bottom of buffer? */
 			} else {
 				curpos.l = lBACK(curpos.l);
 			}
+		}
+		if (direct == FORWARD) {
+			curpos.o = 0;
+		} else {
+			if ((curpos.o = lLength(curpos.l)-1) < 0)
+				curpos.o = 0;
 		}
 
 	}
@@ -726,7 +736,7 @@ int	fromscreen;
 	 * Then, if it's the search string, make a reversed pattern.
 	 */
 	if (fromscreen) {
-		status = screen_string(apat, NPAT, (CMASK)_ident);
+		status = screen_string(apat, NPAT, _ident);
 		if (status != TRUE)
 			return status;
 	} else {

@@ -10,7 +10,31 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.146  1993/12/22 15:28:34  pgf
+ * Revision 1.154  1994/02/07 12:24:48  pgf
+ * added LBRACK/RBRACK defines for [ and ]
+ *
+ * Revision 1.153  1994/02/03  19:35:12  pgf
+ * tom's changes for 3.65
+ *
+ * Revision 1.152  1994/02/01  19:44:49  pgf
+ * added HAVE_GETHOSTNAME
+ *
+ * Revision 1.151  1994/01/31  12:28:59  pgf
+ * added define for HIGHBIT (as 0x80)
+ *
+ * Revision 1.150  1994/01/29  00:24:56  pgf
+ * allow 8-bit input: changed SPEC define, and bumped N_chars to 256
+ *
+ * Revision 1.149  1994/01/27  18:00:15  pgf
+ * new define, for min no. of lines per screen
+ *
+ * Revision 1.148  1994/01/27  17:39:53  pgf
+ * changed if_OPT_WORKING to simple ifdef
+ *
+ * Revision 1.147  1994/01/11  17:27:42  pgf
+ * changed GO32 to DJGPP
+ *
+ * Revision 1.146  1993/12/22  15:28:34  pgf
  * applying tom's 3.64 changes
  *
  * Revision 1.145  1993/11/04  09:10:51  pgf
@@ -602,11 +626,6 @@
 # define HAVE_POLL 0
 #endif
 
-#if ! LINUX && ! GO32 && !defined(__CLCC_) && !APOLLO
-    /* there are probably others that don't want/need const defined */
-# define const
-#endif
-
 #if APOLLO
 # undef POSIX
 # undef BERK
@@ -649,8 +668,7 @@
 #define	ZTC	0	/* Zortech C compiler */
 #define	TURBO	0	/* Turbo C/MSDOS */
 #define	WATCOM	0	/* WATCOM C/386 version 9.0 or above */
-#undef  GO32            /* Sorry, DJ has defined it already */
-#define	GO32	0	/* DJ's GCC version 1.09 */
+#define	DJGPP	0	/* DJ's GCC version 1.09 */
 
 #ifdef __TURBOC__ 	/* Borland C/C++ 3.0 */
 #undef TURBO
@@ -671,26 +689,32 @@
 #endif
 
 #ifdef __GO32__  	/* DJ's GCC version 1.09 */
-#undef GO32
+#undef DJGPP
 #undef SVR3
+#undef BSD
 #undef USG
 #undef MSDOS
 #define SVR3   0
 #define MSDOS  1
-#define GO32   1
+#define DJGPP   1
 #endif
 
 /* As of version 3.51 of vile, NEWDOSCC should be correct for Turbo, Watcom,
  *  and the DJ gcc (GO32) compilers.  I'm betting that it's also probably
  *  correct for MSC (Microsoft C) and ZTC (Zortech), but I'm not sure of those.
  */
-#if TURBO || WATCOM || MSC || GO32 || ZTC
+#if TURBO || WATCOM || MSC || DJGPP || ZTC
 # define NEWDOSCC 1
 #else
 # define NEWDOSCC 0
 #endif
 
 #endif /* os_chosen */
+
+#if ! LINUX && ! DJGPP && !defined(__CLCC_) && !APOLLO
+    /* there are probably others that don't want/need const defined */
+# define const
+#endif
 
 #if SVR3
 # undef BERK
@@ -743,7 +767,7 @@
 # endif
 #endif
 
-#if defined(SIGALRM) && !GO32
+#if defined(SIGALRM) && !DJGPP
 # define HAS_ALARM 1
 #else
 # define HAS_ALARM 0
@@ -807,6 +831,13 @@
 # endif
 #endif
 
+#if	((MSDOS) && (LATTICE || AZTEC || NEWDOSCC)) || UNIX || VMS
+#define	ENVFUNC	1
+#else
+#define	ENVFUNC	0
+#endif
+
+/* ====================================================================== */
 #ifndef scrn_chosen
 /*	Terminal Output definitions		*/
 /* choose ONLY one of the following */
@@ -831,6 +862,7 @@
 /* the WANGPC stuff isn't in the cmdtbl keyboard definitions: sorry -- pgf */
 #endif
 
+/* ====================================================================== */
 /*	Configuration options... pick and choose as you wish */
 
 /* Appearance */
@@ -885,6 +917,7 @@
 	after signals */
 #define OPT_WORKING (!USG && HAS_ALARM && !SMALLER)
 
+/* individual features that are (normally) controlled by SMALLER */
 #define OPT_B_LIMITS    !SMALLER		/* left-margin */
 #define OPT_EVAL        !SMALLER		/* expression-evaluation */
 #define OPT_FLASH       !SMALLER || IBMPC	/* visible-bell */
@@ -893,8 +926,14 @@
 #define OPT_MS_MOUSE    !SMALLER && IBMPC && TURBO 	/* MsDos-mouse */
 #define OPT_TERMCHRS    !SMALLER		/* set/show-terminal */
 #define OPT_UPBUFF      !SMALLER		/* animated buffer-update */
+#define OPT_WIDE_CTYPES !SMALLER		/* extra char-types tests */
 
-#define OPT_MAP_DISPLAY	1		/* display mapping for ":map" */
+/* "show" commands for the optional features */
+#define OPT_SHOW_EVAL   !SMALLER && OPT_EVAL	/* "show-variables" */
+#define OPT_SHOW_MAPS   !SMALLER 		/* display mapping for ":map" */
+#define OPT_SHOW_REGS   !SMALLER		/* "show-registers" */
+#define OPT_SHOW_TAGS   !SMALLER && TAGS	/* ":tags" displays tag-stack */
+
 #define NEW_VI_MAP      0		/* patch: working on ":map" */
 
 #if	(TERMCAP || X11) && !SMALLER
@@ -909,6 +948,22 @@
 
 	/* any mouse capability */
 #define OPT_MOUSE       (X11 || OPT_XTERM || OPT_MS_MOUSE)
+
+/*
+ * Special characters used in globbing
+ */
+#define	GLOB_MULTI	'*'
+#define	GLOB_SINGLE	'?'
+#define	GLOB_ELLIPSIS	"..."
+#define	GLOB_RANGE	"[]"
+
+/*
+ * Configuration options for globbing
+ */
+#define	OPT_GLOB_ENVIRON	ENVFUNC && !SMALLER
+#define	OPT_GLOB_ELLIPSIS	VMS || UNIX || (MSDOS && !SMALLER)
+#define	OPT_GLOB_PIPE		UNIX
+#define	OPT_GLOB_RANGE		UNIX || (MSDOS && !SMALLER)
 
 /*	Debugging options	*/
 #define	RAMSIZE	0	/* dynamic RAM memory usage tracking */
@@ -991,6 +1046,12 @@ extern	char *	sys_errlist[];
 #define USE_BCOPY 1
 #endif
 
+#if BERK
+#define HAVE_GETHOSTNAME 1
+#else
+#define HAVE_GETHOSTNAME 0
+#endif
+
 #ifdef USE_INDEX
 #define strchr index
 #define strrchr rindex
@@ -1022,7 +1083,7 @@ extern char *rindex();
 #include <dos.h>
 #endif
 
-#if	NEWDOSCC && ! GO32
+#if	NEWDOSCC && ! DJGPP
 #undef peek
 #undef poke
 #define	peek(a,b,c,d)	movedata(a,b,FP_SEG(c),FP_OFF(c),d)
@@ -1034,7 +1095,7 @@ extern char *rindex();
 #include      <string.h>
 #endif
 
-#if 	WATCOM || GO32
+#if 	WATCOM || DJGPP
 #define	movmem(a, b, c)		memcpy(b, a, c)
 #endif
 
@@ -1134,12 +1195,6 @@ union REGS {
 
 /*	define some ability flags */
 
-#if OPT_WORKING
-# define if_OPT_WORKING(statement) statement;
-#else
-# define if_OPT_WORKING(statement)
-#endif
-
 	/* intermediate config-controls for filec.c (needed in nemode.h) */
 #if !SMALLER && !OPT_MAP_MEMORY
 #define COMPLETE_FILES  (UNIX || MSDOS || VMS)
@@ -1178,12 +1233,6 @@ union REGS {
 #define	MEMMAP	0
 #endif
 
-#if	((MSDOS) && (LATTICE || AZTEC || NEWDOSCC)) || UNIX || VMS
-#define	ENVFUNC	1
-#else
-#define	ENVFUNC	0
-#endif
-
 #define UCHAR	unsigned char
 #define UINT	unsigned int
 #define USHORT	unsigned short
@@ -1211,15 +1260,16 @@ union REGS {
 #define	KBLOCK	256			/* sizeof kill buffer chunks	*/
 #define	NKREGS	36			/* number of kill buffers	*/
 #define	NBLOCK	16			/* line block chunk size	*/
+#define MINWLNS	3			/* min # lines, window/screen	*/
 
 #define C_BLACK 0
 #define C_WHITE (NCOLORS-1)
 
-/* SPEC is just 8th bit set, for convenience in some systems */
-#define N_chars 128			/* must be a power-of-2		*/
-#define SPEC	0x0080			/* special key (function keys)	*/
+#define N_chars 256			/* must be a power-of-2		*/
+#define HIGHBIT	0x0080			/* the meta bit			*/
 #define CTLA	0x0100			/* ^A flag, or'ed in		*/
 #define CTLX	0x0200			/* ^X flag, or'ed in		*/
+#define SPEC	0x0400			/* special key (function keys)	*/
 
 #define kcod2key(c)	(c & (N_chars-1)) /* strip off the above prefixes */
 #define	isspecial(c)	(c & ~(N_chars-1))
@@ -1346,6 +1396,8 @@ union REGS {
 #define RBRACE '}'
 #define LPAREN '('
 #define RPAREN ')'
+#define LBRACK '['
+#define RBRACK ']'
 
 
 /* separator used when scanning PATH environment variable */
@@ -1385,25 +1437,31 @@ union REGS {
 
 /* these are the bits that go into the _chartypes_ array */
 /* the macros below test for them */
-#define _upper	0x1		/* upper case */
-#define _lower	0x2		/* lower case */
-#define _digit	0x4		/* digits */
-#define _space	0x8		/* whitespace */
-#define _bspace 0x10		/* backspace character (^H, DEL, and user's) */
-#define _cntrl	0x20		/* control characters, including DEL */
-#define _print	0x40		/* printable */
-#define _punct	0x80		/* punctuation */
-#define _ident	0x100		/* is typically legal in "normal" identifier */
-#define _pathn	0x200		/* is typically legal in a file's pathname */
-#define _wild	0x400		/* is typically a shell wildcard char */
-#define _linespec 0x800		/* ex-style line range: 1,$ or 13,15 or % etc.*/
-#define _fence	0x1000		/* a fence, i.e. (, ), [, ], {, } */
-#define _nonspace	0x2000	/* non-whitespace */
-#define _qident	0x4000		/* is typically legal in "qualified" identifier */
+#if OPT_WIDE_CTYPES
+#define chrBIT(n) lBIT(n)
+#else
+#define chrBIT(n) iBIT(n)
+#endif
 
-#if !SMALLER
-#define	_scrtch 0x8000		/* legal in scratch-buffer names */
-#define	_shpipe 0x10000L	/* legal in shell/pipe-buffer names */
+#define _upper    chrBIT(0)		/* upper case */
+#define _lower    chrBIT(1)		/* lower case */
+#define _digit    chrBIT(2)		/* digits */
+#define _space    chrBIT(3)		/* whitespace */
+#define _bspace   chrBIT(4)		/* backspace character (^H, DEL, and user's) */
+#define _cntrl    chrBIT(5)		/* control characters, including DEL */
+#define _print    chrBIT(6)		/* printable */
+#define _punct    chrBIT(7)		/* punctuation */
+#define _ident    chrBIT(8)		/* is typically legal in "normal" identifier */
+#define _pathn    chrBIT(9)		/* is typically legal in a file's pathname */
+#define _wild     chrBIT(10)		/* is typically a shell wildcard char */
+#define _linespec chrBIT(11)		/* ex-style line range: 1,$ or 13,15 or % etc.*/
+#define _fence    chrBIT(12)		/* a fence, i.e. (, ), [, ], {, } */
+#define _nonspace chrBIT(13)		/* non-whitespace */
+#define _qident   chrBIT(14)		/* is typically legal in "qualified" identifier */
+
+#if OPT_WIDE_CTYPES
+#define _scrtch   chrBIT(15)		/* legal in scratch-buffer names */
+#define _shpipe   chrBIT(16)		/* legal in shell/pipe-buffer names */
 
 #define	screen_to_bname(buf)\
 	screen_string(buf,sizeof(buf),(CMASK)(_pathn|_scrtch|_shpipe))
@@ -1415,8 +1473,8 @@ typedef short CMASK;
 #endif
 
 /* these intentionally match the ctypes.h definitions, except that
-	they force the char to 7-bit ascii first */
-#define istype(sometype,c)	((_chartypes_[(c)&(N_chars-1)] & (sometype))!=0)
+	they force the char to valid range first */
+#define istype(sometype,c) ((_chartypes_[(c)&(N_chars-1)] & (sometype))!=0)
 #define islower(c)	istype(_lower, c)
 #define isupper(c)	istype(_upper, c)
 #define isdigit(c)	istype(_digit, c)
@@ -1565,13 +1623,14 @@ typedef struct	LINE {
 #define l_text		lt.l_txt
 #define l_nextsep	lt.l_nxt
 
-/* flag values */
-#define LCOPIED 1	/* original line is already on an undo stack */
-#define LGMARK 2	/* line matched a global scan */
+/* LINE.l_flag values */
+#define LCOPIED  lBIT(0)	/* original line is already on an undo stack */
+#define LGMARK   lBIT(1)	/* line matched a global scan */
+#define LTRIMMED lBIT(2)	/* line doesn't have newline to display */
 
 /* macros to ease the use of lines */
-#define	for_each_line(lp,bp) for (lp = lForw(bp->b_line.l); \
-					lp != l_ref(bp->b_line.l); \
+#define	for_each_line(lp,bp) for (lp = lForw(buf_head(bp)); \
+					lp != l_ref(buf_head(bp)); \
 					lp = lforw(lp))
 
 #define l_nxtundo		l.l_stklnk
@@ -1627,14 +1686,18 @@ typedef struct	LINE {
 
 #define liscopied(lp)		((lp)->l.l_flag & LCOPIED)
 #define lismarked(lp)		((lp)->l.l_flag & LGMARK)
+#define listrimmed(lp)		((lp)->l.l_flag & LTRIMMED)
 #define lsetcopied(lp)		((lp)->l.l_flag |= LCOPIED)
 #define lsetnotcopied(lp)	((lp)->l.l_flag &= ~LCOPIED)
 #define lsetmarked(lp)		((lp)->l.l_flag |= LGMARK)
 #define lsetnotmarked(lp)	((lp)->l.l_flag &= ~LGMARK)
 #define lflipmark(lp)		((lp)->l.l_flag ^= LGMARK)
+#define lsettrimmed(lp)		((lp)->l.l_flag |= LTRIMMED)
+#define lsetnottrimmed(lp)	((lp)->l.l_flag &= ~LTRIMMED)
 #if !OPT_MAP_MEMORY
 #define lsetclear(lp)		((lp)->l.l_flag = 0)
 #endif
+
 #define lisreal(lp)		((lp)->l_used >= 0)
 #define lisnotreal(lp)		((lp)->l_used == LINENOTREAL)
 #define lislinepatch(lp)	((lp)->l_used == LINEUNDOPATCH)
@@ -1700,9 +1763,9 @@ typedef struct MARK {
 #define samepoint(m1,m2)	(sameline(m1,m2) && (m1.o == m2.o))
 #define char_at(m)		(lGetc(m.l,m.o))
 #define put_char_at(m,c)	(lPutc(m.l,m.o,c))
-#define is_header_line(m,bp)	(same_ptr(m.l, bp->b_line.l))
-#define is_last_line(m,bp)	(lForw(m.l) == l_ref(bp->b_line.l))
-#define is_first_line(m,bp)	(lBack(m.l) == l_ref(bp->b_line.l))
+#define is_header_line(m,bp)	(same_ptr(m.l, buf_head(bp)))
+#define is_last_line(m,bp)	(lForw(m.l) == l_ref(buf_head(bp)))
+#define is_first_line(m,bp)	(lBack(m.l) == l_ref(buf_head(bp)))
 
 /* settable values have their names stored here, along with a synonym, and
 	what type they are */
@@ -1934,7 +1997,7 @@ typedef struct	BUFFER {
 #define is_local_b_val(bp,which)  \
 	is_local_val(bp->b_values.bv,which)
 
-#define is_empty_buf(bp) (lForw(bp->b_line.l) == l_ref(bp->b_line.l))
+#define is_empty_buf(bp) (lForw(buf_head(bp)) == l_ref(buf_head(bp)))
 
 #define b_dot     b_wtraits.w_dt
 #ifdef WINMARK
@@ -1943,8 +2006,7 @@ typedef struct	BUFFER {
 #define b_lastdot b_wtraits.w_ld
 #define b_wline   b_wtraits.w_ln
 
-/* buffer-name may not have trailing null */
-#define set_bname(bp,name) (void)strncpy(bp->b_bname, name, NBUFN)
+/* buffer-name may not necessarily have trailing null */
 #define eql_bname(bp,name) !strncmp(bp->b_bname, name, NBUFN)
 
 /* values for b_flag */
@@ -2022,7 +2084,7 @@ typedef struct	WINDOW {
 #define w_values  w_traits.w_vals
 
 #define mode_row(wp)	((wp)->w_toprow + (wp)->w_ntrows)
-#define	buf_head(bp)	(bp)->b_line.l
+#define	buf_head(bp)	((bp)->b_line.l)
 #define	win_head(wp)	buf_head((wp)->w_bufp)
 
 #define DOT curwp->w_dot
@@ -2297,6 +2359,8 @@ typedef struct KILLREG {
 	short kbflag;		/* flags describing kill register	*/
 } KILLREG;
 
+#define	KbSize(i,p)	((p->d_next != 0) ? KBLOCK : kbs[i].kused)
+
 /*	The !WHILE directive in the execution language needs to
 	stack references to pending whiles. These are stored linked
 	to each currently open procedure via a linked list of
@@ -2479,6 +2543,9 @@ extern	void	dofree P((char *));
 #undef	free
 #define	free(p)		dofree(p)
 #endif	/* DOALLOC */
+#if	NO_LEAKS || DOALLOC
+#include "trace.h"
+#endif
 #endif	/* DBMALLOC */
 
 /*	Dynamic RAM tracking and reporting redefinitions	*/

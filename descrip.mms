@@ -40,7 +40,7 @@ ALLTOOLS = $(MAKFILES)
 
 
 # these are normal editable headers
-HDRS = estruct.h epath.h edef.h proto.h dirstuff.h glob.h
+HDRS = estruct.h epath.h edef.h proto.h dirstuff.h
 
 # these headers are built by the mktbls program from the information in cmdtbl
 # and in modetbl
@@ -198,14 +198,12 @@ clobber : clean
 
 $(OBJ) : estruct.h nemode.h edef.h proto.h
 
-main.obj :	nevars.h glob.h
+main.obj :	nevars.h
 bind.obj :	epath.h
-eval.obj :	glob.h
 filec.obj :	dirstuff.h
 eval.obj :	nevars.h
-glob.obj :	dirstuff.h glob.h
+glob.obj :	dirstuff.h
 externs.obj :	nebind.h nename.h nefunc.h
-random.obj :	glob.h
 vmalloc.obj :	nevars.h
 vms2unix.obj :	dirstuff.h
 
@@ -262,7 +260,10 @@ xvile.com :
 	@ write sys$output "** made $@"
 
 # $Log: descrip.mms,v $
-# Revision 1.10  1993/09/03 09:11:54  pgf
+# Revision 1.11  1994/02/03 19:35:12  pgf
+# tom's changes for 3.65
+#
+# Revision 1.10  1993/09/03  09:11:54  pgf
 # tom's 3.60 changes
 #
 # Revision 1.9  1993/08/05  14:29:12  pgf

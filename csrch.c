@@ -2,7 +2,13 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: csrch.c,v $
- * Revision 1.11  1993/09/06 16:23:08  pgf
+ * Revision 1.13  1994/02/03 19:35:12  pgf
+ * tom's changes for 3.65
+ *
+ * Revision 1.12  1994/01/31  18:11:03  pgf
+ * change kbd_key() to tgetc()
+ *
+ * Revision 1.11  1993/09/06  16:23:08  pgf
  * took out redundant beeps
  *
  * Revision 1.10  1993/09/03  09:11:54  pgf
@@ -65,11 +71,11 @@ int f,n,c;
 	lstchar = c;
 	lstscan = FORW;
 
-	doto = curwp->w_dot.o;
+	doto = DOT.o;
 
 	i = doto+1;
-	while(i < lLength(curwp->w_dot.l)) {
-		if ( c == lGetc(curwp->w_dot.l,i)) {
+	while(i < lLength(DOT.l)) {
+		if ( c == lGetc(DOT.l,i)) {
 			doto = i;
 			n--;
 			if (!n) break;
@@ -77,13 +83,13 @@ int f,n,c;
 		i++;
 	}
 
-	if ( i == lLength(curwp->w_dot.l)) {
+	if ( i == lLength(DOT.l)) {
 		return(FALSE);
 	}
 	if (doingopcmd)
 		doto++;
 
-	curwp->w_dot.o = doto;
+	DOT.o = doto;
 	curwp->w_flag |= WFMOVE;
 	return(TRUE);
 			
@@ -102,11 +108,11 @@ int f,n,c;
 	lstchar = c;
 	lstscan = BACK;
 
-	doto = curwp->w_dot.o;
+	doto = DOT.o;
 
 	i = doto-1;
 	while(i >= w_left_margin(curwp)) {
-		if ( c == lGetc(curwp->w_dot.l,i)) {
+		if ( c == lGetc(DOT.l,i)) {
 			doto = i;
 			n--;
 			if (!n) break;
@@ -118,7 +124,7 @@ int f,n,c;
 		return(FALSE);
 	}
 
-	curwp->w_dot.o = doto;
+	DOT.o = doto;
 	curwp->w_flag |= WFMOVE;
 	return(TRUE);
 
@@ -131,13 +137,11 @@ int f,n;
 {
 	register int c;
 
-        c = kbd_key();
+        c = tgetc(FALSE);
 	if (c == quotec)
 		c = tgetc(TRUE);
 	else if (c == abortc)
 		return FALSE;
-	else
-		c = kcod2key(c);
 
 	return(fscan(f,n,c));
 }
@@ -149,13 +153,11 @@ int f,n;
 {
 	register int c;
 
-        c = kbd_key();
+        c = tgetc(FALSE);
 	if (c == quotec)
 		c = tgetc(TRUE);
 	else if (c == abortc)
 		return FALSE;
-	else
-		c = kcod2key(c);
 
 	return(bscan(f,n,c));
 }

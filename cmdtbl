@@ -36,11 +36,13 @@
 #		"funkycom"
 #		'^X-F'
 #		'FN-2'				DOS
+#		'M-s'
 #
 # This says that somefunc() is an absolute motion command, that it should
 #  only be included in the editor if we're running BSD or DOS, that its
 #  english name as one would type on the command line is "funkycom", and
-#  that it is bound to ^X-F, and also to function key 2 under DOS.
+#  that it is bound to ^X-F, to function key 2 under DOS, and to "meta-s",
+#  that is, an 's' with the high bit set.
 #
 # Function flags have the following meanings:
 #	REDO means the dotcmd command recorder should be halted, so that
@@ -72,7 +74,16 @@
 #		here for completeness.
 #
 # $Log: cmdtbl,v $
-# Revision 1.76  1993/12/22 15:28:34  pgf
+# Revision 1.79  1994/02/03 19:35:12  pgf
+# tom's changes for 3.65
+#
+# Revision 1.78  1994/02/02  18:07:38  pgf
+# added no_aindent versions of insert, openup, and opendown
+#
+# Revision 1.77  1994/01/31  12:15:45  pgf
+# commentary changes
+#
+# Revision 1.76  1993/12/22  15:28:34  pgf
 # applying tom's 3.64 changes
 #
 # Revision 1.75  1993/10/04  10:24:09  pgf
@@ -554,7 +565,7 @@ delwind		NONE
 	'^X-0'
 deblank		REDO|UNDO		AEDIT
 	"delete-blank-lines"		!FEWNAMES
-	'^A-o'
+	'^A-d'
 delglobmode	NONE
 	"delete-global-mode"		!FEWNAMES
 	"setgno"
@@ -822,6 +833,9 @@ histbuff	NONE
 insert		REDO|UNDO
 	"insert-chars"			!FEWNAMES
 	'i'
+insert_no_aindent	REDO|UNDO
+	"insert-chars-no-autoindent"	!FEWNAMES
+	'^A-i'
 insertbol	REDO|UNDO
 	"insert-chars-at-bol"	!FEWNAMES
 	'I'
@@ -866,7 +880,7 @@ lineundo	NONE
 	'U'
 loadkreg	NONE
 	"load-register"
-showkreg	NONE			!SMALLER
+showkreg	NONE			OPT_SHOW_REGS
 	"show-registers"
 	"showregisters"			!FEWNAMES
 	"list-registers"		!FEWNAMES
@@ -925,10 +939,16 @@ openup		REDO|UNDO|(FROM)
 	"open-line-above-and-insert-chars"	!FEWNAMES
 	"i"
 	'O'
+openup_no_aindent	REDO|UNDO|(FROM|ZERO)
+	"open-line-above-no-autoindent"	!FEWNAMES
+	'^A-O'
 opendown	REDO|UNDO|(FROM|ZERO)
 	"open-line-below-and-append-chars"	!FEWNAMES
 	"a"
 	'o'
+opendown_no_aindent	REDO|UNDO|(FROM|ZERO)
+	"open-line-below-no-autoindent"	!FEWNAMES
+	'^A-o'
 operchg		OPER|REDO|UNDO
 	"change-til"			!FEWNAMES
 	"delete-and-insert-chars-til"			!FEWNAMES
@@ -1169,15 +1189,15 @@ listmodes	NONE
 	"show-global-modes"
 	"showmodes"
 	"showgmodes"
-listvars	NONE			!SMALLER
-	"list-vars"
+listvars	NONE			OPT_SHOW_EVAL
+	"list-vars"			!FEWNAMES
 	"show-vars"
-	"showvars"
+	"showvars"			!FEWNAMES
 showversion	NONE|(EXRCOK)
 	"version"
 showmemory	NONE			TURBO|WATCOM
 	"memory"
-showtagstack	NONE			!SMALLER
+showtagstack	NONE			OPT_SHOW_TAGS
 	"tags"				!FEWNAMES
 	"tagstack"
 shrinkwind	NONE

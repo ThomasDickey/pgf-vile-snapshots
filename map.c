@@ -3,7 +3,10 @@
  *		6/3/93
  *
  * $Log: map.c,v $
- * Revision 1.10  1993/12/22 15:28:34  pgf
+ * Revision 1.11  1994/02/03 19:35:12  pgf
+ * tom's changes for 3.65
+ *
+ * Revision 1.10  1993/12/22  15:28:34  pgf
  * applying tom's 3.64 changes
  *
  * Revision 1.9  1993/09/03  09:11:54  pgf
@@ -63,10 +66,14 @@ static TBUFF	*MapMacro;
 static Mapping * search_map P(( int ));
 static int install_map P(( int, char * ));
 static int remove_map P(( int ));
-#if OPT_MAP_DISPLAY
+
+#if OPT_SHOW_MAPS
 static void makecharslist P(( int, char * ));
 static int show_mapped_chars P(( void ));
-static int update_mapped_list P(( void ));
+#endif
+
+#if OPT_SHOW_MAPS && OPT_UPBUFF
+static int show_Mappings P(( BUFFER * ));
 #endif
 
 /*
@@ -96,6 +103,12 @@ char	*v;
 	register Mapping	*m;
 	char	temp[NSTRING];
 	int	test;
+	int	status;
+
+	if (key < 0) {
+		mlforce("[Illegal keycode]");
+		return FALSE;	/* not a legal key-code */
+	}
 
 	/* check for attempted recursion
 	 * patch: prc2kcod assumes only a single key-sequence
@@ -117,11 +130,15 @@ char	*v;
 	}
 
 	m->kbdseq = strmalloc(v);
-	if (m->kbdseq == NULL)
-		return FALSE;
-	m->key = key;
-	
-	return install_bind(key, &f_map_proc, &m->oldfunc);
+	if (m->kbdseq == NULL) {
+		status = FALSE;
+	} else {
+		m->key = key;
+		status = install_bind(key, &f_map_proc, &m->oldfunc);
+	}
+	if (status != TRUE)
+		mlforce("[Mapping failed]");
+	return status;
 }	
 
 /*
@@ -152,7 +169,11 @@ int	key;
 	return status;
 }
 
-#if OPT_MAP_DISPLAY
+#if OPT_SHOW_MAPS
+#define MAPS_PREFIX 12
+
+static	int	show_all;
+
 /*ARGSUSED*/
 static void
 makecharslist(flag, ptr)
@@ -162,10 +183,19 @@ char	*ptr;
 	register Mapping *m;
 	char	temp[NSTRING];
 
-	bprintf("--- Mapped Characters %*P", term.t_ncol-1, '-');
+	b_set_left_margin(curbp, MAPS_PREFIX);
 	for (m = mhead; m != 0; m = m->next) {
-		bprintf("\n%s ", kcod2prc(m->key, temp));
-		bprintf("%s", string2prc(temp, m->kbdseq));
+		if (m != mhead) {
+			bputc('\n');
+			lsettrimmed(lBack(DOT.l));
+		}
+		bprintf("%*S", MAPS_PREFIX, show_all
+			? kcod2str(m->key, temp)
+			: kcod2prc(m->key, temp));
+		bprintf("%s", show_all
+			? m->kbdseq
+			: string2prc(temp, m->kbdseq));
+		lsettrimmed(l_ref(DOT.l));
 	}
 }
 
@@ -175,24 +205,27 @@ show_mapped_chars()
 	return liststuff(MAPPED_LIST_NAME, makecharslist, 0, (char *)0);
 }
 
+#if OPT_UPBUFF
 static int
-update_mapped_list()
+show_Mappings(bp)
+BUFFER *bp;
 {
-	int	status = TRUE;
-
-	if (find_b_name(MAPPED_LIST_NAME) != 0) {
-		WINDOW	*savewp = curwp;
-		status = show_mapped_chars();
-		if (curwp != savewp) {
-			(void)swbuffer(savewp->w_bufp);
-			curwp = savewp;
-		}
-	}
-	return status;
+	b_clr_obsolete(bp);
+	return show_mapped_chars();
 }
-#else
-#define update_mapped_list() TRUE
-#endif
+
+void
+relist_mappings()
+{
+	register BUFFER *bp;
+	if ((bp = find_b_name(MAPPED_LIST_NAME)) != 0) {
+		bp->b_upbuff = show_Mappings;
+		b_set_obsolete(bp);
+	}
+}
+#endif	/* OPT_UPBUFF */
+
+#endif	/* OPT_SHOW_MAPS */
 
 /*
 ** if a mapped char, save for subsequent processing
@@ -224,8 +257,9 @@ int f,n;
 	char 	kbuf[NSTRING];
 	char 	val[NSTRING];
 
-#if OPT_MAP_DISPLAY
+#if OPT_SHOW_MAPS
 	if (end_named_cmd()) {
+		show_all = f;
 		return show_mapped_chars();
 	}
 #endif
@@ -240,11 +274,10 @@ int f,n;
 	if (status != TRUE)
 		return status;
 
-	if (install_map(prc2kcod(kbuf), val) != TRUE) {
-		mlforce("[Mapping failed]");
-		return FALSE;
+	if ((status = install_map(prc2kcod(kbuf), val)) == TRUE) {
+		relist_mappings();
 	}
-	return update_mapped_list();
+	return status;
 }
 
 /*
@@ -267,7 +300,8 @@ int f,n;
 		mlforce("[Key not mapped]");
 		return FALSE;
 	}
-	return update_mapped_list();
+	relist_mappings();
+	return TRUE;
 }
 
 /*

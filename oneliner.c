@@ -4,7 +4,13 @@
  *	Written (except for delins()) for vile by Paul Fox, (c)1990
  *
  * $Log: oneliner.c,v $
- * Revision 1.56  1993/10/04 10:24:09  pgf
+ * Revision 1.58  1994/02/03 19:35:12  pgf
+ * tom's changes for 3.65
+ *
+ * Revision 1.57  1994/01/03  15:59:57  pgf
+ * fixed length calculation for numbered replacement tokens
+ *
+ * Revision 1.56  1993/10/04  10:24:09  pgf
  * see tom's 3.62 changes
  *
  * Revision 1.55  1993/09/10  16:06:49  pgf
@@ -654,7 +660,7 @@ char *sourc;
 	    case '\\':
 		    c = *src++;
 		    if (c == EOS)
-		    	return TRUE;
+			return TRUE;
 		    if (!isdigit(c)) {
 			    /* here's where the \U \E \u \l \t etc.
 			    special escapes should be implemented */
@@ -702,21 +708,21 @@ char *sourc;
 	    case '&':
 		    if (exp->startp[no] != NULL && exp->endp[no] != NULL) {
 			    char *cp;
-			    int len = exp->mlen;
+			    int len = exp->endp[no] - exp->startp[no];
 			    cp = (exp->startp[no] - exp->startp[0]) + buf_delins;
-			    while (len--) {
-				    if (!*cp) {
+			    while ((s == TRUE) && len--) {
+				    c = *cp++;
+				    if (c == EOS) {
 					    mlforce( "BUG: mangled replace");
 					    return FALSE;
 				    }
-				    if (*cp == '\n')
+				    if (c == '\n')
 					    s = lnewline();
 				    else if (case_next == NO_CASE && case_all == NO_CASE)
-					    s = linsert(1,*cp);
+					    s = linsert(1,c);
 				    else {
 					    int direction = case_next != NO_CASE ? case_next : case_all;
 					    case_next = NO_CASE;
-					    c = *cp;
 					    /* Somewhat convoluted to handle
 					       \u\L correctly (upper case first
 					       char, lower case remainder).
@@ -727,9 +733,6 @@ char *sourc;
 						    c = toupper(c);
 					    s = linsert(1,c);
 				    }
-				    if (s != TRUE)
-					    goto nomem;
-				    cp++;
 			    }
 		    }
 		    break;
@@ -755,7 +758,6 @@ char *sourc;
 		    break;
 	    }
 	    if (s != TRUE) {
-	    nomem:
 		    mlforce("[Out of memory while inserting]");
 		    return FALSE;
 	    }

@@ -17,7 +17,11 @@
  * ever equalled FALSE.
  *
  * $Log: isearch.c,v $
- * Revision 1.25  1993/10/04 10:24:09  pgf
+ * Revision 1.26  1994/01/31 18:17:04  pgf
+ * changed kbd_key() to tgetc(), and eliminated unnecessary calls on
+ * kcod2key()
+ *
+ * Revision 1.25  1993/10/04  10:24:09  pgf
  * see tom's 3.62 changes
  *
  * Revision 1.24  1993/08/05  14:29:12  pgf
@@ -262,13 +266,13 @@ start_over:
 		/* Check for special characters first: */
 		/* Most cases here change the search */
 
-		if (c == kcod2key(abortc))	/* Want to quit searching? */
+		if (c == abortc)	/* Want to quit searching? */
 			return (TRUE);	/* Quit searching now */
 
 		if (isbackspace(c))
 			c = '\b';
 
-		if (c == kcod2key(quotec))	/* quote character? */
+		if (c == quotec)	/* quote character? */
 			c = kcod2key(get_char());	/* Get the next char */
 
 		switch (c) {	/* dispatch on the input char */
@@ -528,7 +532,7 @@ get_char()
 						 * bitterly */
 		return (abortc);/* And force a quit */
 	}
-	c = kbd_key();		/* Get the next character */
+	c = tgetc(FALSE);		/* Get the next character */
 	cmd_buff[cmd_offset++] = c;	/* Save the char for next time */
 	cmd_buff[cmd_offset] = EOS;	/* And terminate the buffer */
 	return (c);		/* Return the character */

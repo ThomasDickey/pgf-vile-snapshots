@@ -11,7 +11,10 @@
  * which means that the dot and mark values in the buffer headers are nonsense.
  *
  * $Log: line.c,v $
- * Revision 1.56  1993/12/22 15:15:15  pgf
+ * Revision 1.57  1994/02/03 19:35:12  pgf
+ * tom's changes for 3.65
+ *
+ * Revision 1.56  1993/12/22  15:15:15  pgf
  * change name of "roundup" macro, to avoid name conflict on linux
  *
  * Revision 1.55  1993/11/04  09:10:51  pgf
@@ -497,7 +500,7 @@ int n, c;
 	SIZE_T	nsize;
 
 	lp1 = DOT.l;				/* Current line 	*/
-	if (same_ptr(lp1, curbp->b_line.l)) {	/* At the end: special	*/
+	if (same_ptr(lp1, buf_head(curbp))) {	/* At the end: special	*/
 		if (DOT.o != 0) {
 			mlforce("BUG: linsert");
 			return (FALSE);
@@ -637,7 +640,7 @@ lnewline()
 	lp1  = DOT.l;			/* Get the address and	*/
 	doto = DOT.o;			/* offset of "."	*/
 
-	if (same_ptr(lp1, curbp->b_line.l)
+	if (same_ptr(lp1, buf_head(curbp))
 	 && same_ptr(lFORW(lp1), lp1)) {
 		/* empty buffer -- just  create empty line */
 		lp2 = lalloc(doto, curbp);
@@ -764,7 +767,7 @@ int kflag;	/* put killed text in kill buffer flag */
 	while (n > 0) {
 		dotp = DOT.l;
 		doto = DOT.o;
-		if (same_ptr(dotp, curbp->b_line.l)) { /* Hit end of buffer.*/
+		if (same_ptr(dotp, buf_head(curbp))) { /* Hit end of buffer.*/
 			s = FALSE;
 			break;
 		}
@@ -774,7 +777,7 @@ int kflag;	/* put killed text in kill buffer flag */
 		if (chunk == 0) {		/* End of line, merge.	*/
 			/* first take out any whole lines below this one */
 			nlp = lFORW(dotp);
-			while (!same_ptr(nlp, curbp->b_line.l)
+			while (!same_ptr(nlp, buf_head(curbp))
 			   &&  lLength(nlp)+1 < n) {
 				if (kflag) {
 					s = kinsert('\n');
@@ -870,12 +873,16 @@ int kflag;	/* put killed text in kill buffer flag */
 		the current line, consisting of chars of type "type"
 */
 #if OPT_EVAL
+#if ANSI_PROTOS
+char *getctext(CMASK type)
+#else
 char *getctext(type)
-int type;
+CMASK type;
+#endif
 {
 	static char rline[NSTRING];	/* line to return */
 
-	(void)screen_string(rline, NSTRING, (CMASK)type);
+	(void)screen_string(rline, NSTRING, type);
 	return rline;
 }
 #endif
@@ -939,7 +946,7 @@ ldelnewline()
 	/* if the next line is empty, that's "currline\n\n", so we
 		remove the second \n by deleting the next line */
 	/* but never delete the newline on the last non-empty line */
-	if (same_ptr(lp2, curbp->b_line.l))
+	if (same_ptr(lp2, buf_head(curbp)))
 		return (TRUE);
 	else if ((add = lLength(lp2)) == 0) {
 		/* next line blank? */
@@ -1147,7 +1154,7 @@ int
 index2ukb(inx)
 int	inx;
 {
-	if (inx >= 1 && inx < 10) {
+	if (inx >= 0 && inx < 10) {
 		int save = ukb;
 		ukb = inx;
 		kregcirculate(FALSE);
@@ -1348,10 +1355,7 @@ int n,aslines;
 	while (n--) {
 		kp = kbs[ukb].kbufh;
 		while (kp != NULL) {
-			if (kp->d_next == NULL)
-				i = kbs[ukb].kused;
-			else
-				i = KBLOCK;
+			i = KbSize(ukb,kp);
 			sp = (char *)kp->d_chunk;
 			while (i--) {
 				if ((c = *sp++) == '\n') {
@@ -1433,13 +1437,11 @@ int f,n;
 	/* for simplicity, keyboard-string needs a single buffer */
 	if (tb_alloc(&buffer, KBLOCK)
 	 && tb_init(&buffer, abortc)) {
-		while (kp->d_next != 0) {
-			if (!tb_bappend(&buffer, (char *)(kp->d_chunk), KBLOCK))
+		while (kp != 0) {
+			if (!tb_bappend(&buffer, (char *)(kp->d_chunk), KbSize(jj,kp)))
 				return FALSE;
 			kp = kp->d_next;
 		}
-		if (!tb_bappend(&buffer, (char *)(kp->d_chunk), (ALLOC_T)kbs[jj].kused))
-			return FALSE;
 	}
 
 	if ((status = start_kbm(n, j, buffer)) == TRUE) {
@@ -1474,7 +1476,7 @@ int f,n;
 }
 
 /* Show the contents of the kill-buffers */
-#if !SMALLER
+#if OPT_SHOW_REGS
 #define	REGS_PREFIX	12	/* non-editable portion of the display */
 
 static	void	listregisters P(( int, char * ));
@@ -1509,17 +1511,20 @@ char *dummy;
 		ii = index2ukb(i);
 		if ((kp = kbs[ii].kbufh) != 0) {
 			int first = FALSE;
-			if (any++)
+			if (any++) {
 				bputc('\n');
-			if (i > 0)
+				lsettrimmed(lBack(DOT.l));
+			}
+			if (i > 0) {
 				bprintf("%c:%*p",
 					index2reg(i),
 					REGS_PREFIX-2, ' ');
-			else
+			} else {
 				bprintf("%*S",
 					REGS_PREFIX, "(unnamed)");
+			}
 			do {
-				j = (kp->d_next != 0) ? KBLOCK : kbs[ii].kused;
+				j = KbSize(ii,kp);
 				p = kp->d_chunk;
 
 				while (j-- > 0) {
@@ -1530,11 +1535,9 @@ char *dummy;
 					c = *p++;
 					if (isprint(c) || !iflag) {
 						bputc(c);
-					} else {
+					} else if (c != '\n') {
 						bputc('^');
 						bputc(toalpha(c));
-						if (c == '\n')
-							bputc('\n');
 					}
 					if (c == '\n') {
 						first = TRUE;
@@ -1547,6 +1550,7 @@ char *dummy;
 		if (i < 10)
 			ukb = save;
 	}
+	lsettrimmed(l_ref(DOT.l));
 }
 
 #define	REGISTERS_LIST_NAME ScratchName(Registers)
@@ -1579,7 +1583,7 @@ relist_registers()
 }
 #endif	/* OPT_UPBUFF */
 
-#endif	/* !SMALLER */
+#endif	/* OPT_SHOW_REGS */
 
 /* For memory-leak testing (only!), releases all kill-buffer storage. */
 #if NO_LEAKS

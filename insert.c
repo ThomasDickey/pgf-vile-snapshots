@@ -8,10 +8,39 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: insert.c,v $
- *	Revision 1.36  1993/12/08 17:19:17  pgf
- *	don't copy the indent of lines beginning with '#' in cmode.  this
- *	causes us to return to the previous indent level after typing a "#if"
- *	or "#else" line, etc.
+ *	Revision 1.44  1994/02/07 12:46:41  pgf
+ *	allow backspacing over autoindent, whether the backspacelimit mode
+ *	is set or not
+ *
+ * Revision 1.43  1994/02/07  12:27:16  pgf
+ * treat brackets like braces and parentheses in cmode
+ *
+ * Revision 1.42  1994/02/03  19:35:12  pgf
+ * tom's changes for 3.65
+ *
+ * Revision 1.41  1994/02/02  18:41:07  pgf
+ * added new openup_no_aindent
+ *
+ * Revision 1.40  1994/02/02  16:44:04  pgf
+ * new mode, meta-insert-bindings, which controls whether bindings to meta
+ * keys are honored during insert mode or not, and
+ * new commands ^A-i and ^A-o which suppress autoindent and cmode during
+ * an insert, for the benefit of mouse pasting.
+ *
+ * Revision 1.39  1994/02/01  19:14:55  pgf
+ * fixed core dump resulting from calculating indentlen and checking for '#'
+ * char at start of empty line
+ *
+ * Revision 1.38  1994/01/31  19:52:25  pgf
+ * upcased the 'dot_argument" macro to "DOT_ARGUMENT"
+ *
+ * Revision 1.37  1994/01/31  18:11:03  pgf
+ * change kbd_key() to tgetc()
+ *
+ * Revision 1.36  1993/12/08  17:19:17  pgf
+ * don't copy the indent of lines beginning with '#' in cmode.  this
+ * causes us to return to the previous indent level after typing a "#if"
+ * or "#else" line, etc.
  *
  * Revision 1.35  1993/10/11  17:39:56  pgf
  * pass char to match to fmatchindent()
@@ -132,9 +161,9 @@
 #include	"estruct.h"
 #include	"edef.h"
 
-#define	dot_argument	((dotcmdmode == PLAY) && dotcmdarg)
+#define	DOT_ARGUMENT	((dotcmdmode == PLAY) && dotcmdarg)
 
-#define	BackspaceLimit() (b_val(curbp,MDBACKLIMIT))\
+#define	BackspaceLimit() (b_val(curbp,MDBACKLIMIT) && autoindented <= 0)\
 			? DOT.o\
 			: w_left_margin(curwp)
 
@@ -144,6 +173,8 @@ static	int	ins_n_times P(( int, int, int ));
 static	int	ins_anytime P(( int, int, int, int * ));
 
 static	int	savedmode;  /* value of insertmode maintained through subfuncs */
+
+static int allow_aindent = TRUE;
 
 /*--------------------------------------------------------------------------*/
 
@@ -207,8 +238,9 @@ int f,n;
 	(void)gotobol(TRUE,1);
 
 	/* if we are in C mode and this is a default <NL> */
-	if (n == 1 && (b_val(curbp,MDCMOD) || b_val(curbp,MDAIND)) &&
-						!is_header_line(DOT,curbp)) {
+	if (allow_aindent && n == 1 && 
+		(b_val(curbp,MDCMOD) || b_val(curbp,MDAIND)) &&
+				    !is_header_line(DOT,curbp)) {
 		s = indented_newline_above();
 		if (s != TRUE) return (s);
 
@@ -230,6 +262,21 @@ int f,n;
 	return(ins());
 }
 
+/*
+ * as above, but override all autoindenting and cmode-ing
+ */
+int
+openup_no_aindent(f, n)
+int f,n;
+{
+    	int s;
+	int oallow = allow_aindent;
+	allow_aindent = FALSE;
+	s = openup(f,n);
+	allow_aindent = oallow;
+	return s;
+}
+
 /* open lines up after this one */
 int
 opendown(f,n)
@@ -246,6 +293,21 @@ int f,n;
 		return (s);
 
 	return(ins());
+}
+
+/*
+ * as above, but override all autoindenting and cmode-ing
+ */
+int
+opendown_no_aindent(f, n)
+int f,n;
+{
+    	int s;
+	int oallow = allow_aindent;
+	allow_aindent = FALSE;
+	s = opendown(f,n);
+	allow_aindent = oallow;
+	return s;
 }
 
 /*
@@ -286,13 +348,28 @@ int f,n;
 }
 
 /*
+ * as above, but override all autoindenting and cmode-ing
+ */
+int
+insert_no_aindent(f, n)
+int f,n;
+{
+    	int s;
+	int oallow = allow_aindent;
+	allow_aindent = FALSE;
+	s = ins_n_times(f,n,TRUE);
+	allow_aindent = oallow;
+	return s;
+}
+
+/*
  * Implements the vi 'I' command.
  */
 int
 insertbol(f, n)
 int f,n;
 {
-	if (!dot_argument || (dotcmdrep == dotcmdcnt))
+	if (!DOT_ARGUMENT || (dotcmdrep == dotcmdcnt))
 		(void)firstnonwhite(FALSE,1);
 	return ins_n_times(f,n,TRUE);
 }
@@ -306,7 +383,7 @@ int f,n;
 {
 	advance_one_char();
 
-	return ins_n_times(f,n, !dot_argument);
+	return ins_n_times(f,n, !DOT_ARGUMENT);
 }
 
 /*
@@ -369,7 +446,7 @@ int f,n;
 		curwp->w_flag |= WFMODE;
 	if (dotcmdmode != PLAY)
 		(void)update(FALSE);
-	c = kbd_key();
+	c = tgetc(FALSE);
 	insertmode = FALSE;
 	curwp->w_flag |= WFMODE;
 
@@ -378,13 +455,12 @@ int f,n;
 	if (n < 0 || c == abortc)
 		s = FALSE;
 	else {
-		int	vi_fix = (!dot_argument || (dotcmdrep <= 1));
+		int	vi_fix = (!DOT_ARGUMENT || (dotcmdrep <= 1));
 
 		(void)ldelete((long)n, FALSE);
 		if (c == quotec) {
 			t = s = quote(f,n);
 		} else {
-			c = kcod2key(c);
 			if (isreturn(c)) {
 				if (vi_fix)
 					s = lnewline();
@@ -436,7 +512,7 @@ int *splice;
 	static TBUFF *insbuff;
 	int osavedmode;
 
-	if (dot_argument) {
+	if (DOT_ARGUMENT) {
 		max_count = cur_count + dotcmdcnt;
 		cur_count += dotcmdcnt - dotcmdrep;
 	}
@@ -471,7 +547,7 @@ int *splice;
 		if (!playback) {
 			if (dotcmdmode != PLAY)
 				(void)update(FALSE);
-			if (!tb_append(&insbuff, c = kbd_key())) {
+			if (!tb_append(&insbuff, c = tgetc(FALSE))) {
 				status = FALSE;
 				break;
 			}
@@ -479,14 +555,14 @@ int *splice;
 
 		if (isreturn(c)) {
 			if ((cur_count+1) < max_count) {
-				if (dot_argument) {
+				if (DOT_ARGUMENT) {
 					while (tb_more(dotcmd))
 						(void)tgetc(FALSE);
 				}
 				*splice = TRUE;
 				status = TRUE;
 				break;
-			} else if (dot_argument) {
+			} else if (DOT_ARGUMENT) {
 				*splice = TRUE;
 			}
 		}
@@ -525,15 +601,18 @@ int *splice;
 				*splice = TRUE;
 			status = TRUE;
 			break;
-		} else if (c & SPEC) {
+		} else if ((c & HIGHBIT) && b_val(curbp, MDMETAINSBIND)) {
+		    	/* if we're allowed to honor meta-character bindings,
+				then see if it's bound to something, and
+				insert it if not */
 			CMDFUNC *cfp = kcod2fnc(c);
 			if (cfp) {
 				map_check(c);
 				backsp_limit = w_left_margin(curwp);
 				curgoal = getccol(FALSE);
 				(void)execute(cfp,FALSE,1);
+				continue;
 			}
-			continue;
 		}
 
 		if (c == startc || c == stopc) {  /* ^Q and ^S */
@@ -553,7 +632,7 @@ int *splice;
 
 #if CFENCE
 		/* check for CMODE fence matching */
-		if ((c == RBRACE || c == RPAREN || c == ']') &&
+		if ((c == RBRACE || c == RPAREN || c == RBRACK ) &&
 						b_val(curbp, MDSHOWMAT))
 			fmatch(c);
 #endif
@@ -673,7 +752,7 @@ int *backsp_limit_p;
 	   and next char is not a tab or we are at a tab stop,
 	   delete a char forword			*/
 	if ((insertmode == OVERWRITE)
-	 && (!dot_argument || (dotcmdrep <= 1))
+	 && (!DOT_ARGUMENT || (dotcmdrep <= 1))
 	 && (DOT.o < lLength(DOT.l))
 	 && (char_at(DOT) != '\t' || DOT.o % curtabval == curtabval-1)) {
 		autoindented = -1;
@@ -681,10 +760,12 @@ int *backsp_limit_p;
 	}
 
 	/* do the appropriate insertion */
-	if (((c == RBRACE) || (c == RPAREN)) && b_val(curbp, MDCMOD)) {
-		return insbrace(1, c);
-	} else if (c == '#' && b_val(curbp, MDCMOD)) {
-		return inspound();
+	if (allow_aindent && b_val(curbp, MDCMOD)) {
+	    if (((c == RBRACE) || (c == RPAREN) || (c == RBRACK))) {
+		    return insbrace(1, c);
+	    } else if (c == '#') {
+		    return inspound();
+	    }
 	}
 
 	autoindented = -1;
@@ -777,13 +858,10 @@ int f,n;
 	else if (n < 0)
 		return (FALSE);
 
-#if LATER	/* already done for autoindented != 0 in ins() */
-	if (b_val(curbp, MDTRIM))
-		trimline(FALSE);
-#endif
 
 	/* if we are in C or auto-indent modes and this is a default <NL> */
-	if (n == 1 && (b_val(curbp,MDCMOD) || b_val(curbp,MDAIND)) &&
+	if (allow_aindent && n == 1 && 
+		(b_val(curbp,MDCMOD) || b_val(curbp,MDAIND)) &&
 						!is_header_line(DOT,curbp))
 		return indented_newline();
 
@@ -808,7 +886,7 @@ int f,n;
 int
 indented_newline()
 {
-	int cmode = b_val(curbp, MDCMOD);
+	int cmode = allow_aindent && b_val(curbp, MDCMOD);
 	register int indentwas; /* indent to reproduce */
 	int bracef; /* was there a brace at the end of line? */
 
@@ -827,7 +905,7 @@ indented_newline()
 int
 indented_newline_above()
 {
-	int cmode = b_val(curbp, MDCMOD);
+	int cmode = allow_aindent && b_val(curbp, MDCMOD);
 	register int indentwas;	/* indent to reproduce */
 	int bracef; /* was there a brace at the beginning of line? */
 
@@ -850,7 +928,7 @@ previndent(bracefp)
 int *bracefp;
 {
 	int ind;
-	int cmode = b_val(curbp, MDCMOD);
+	int cmode = allow_aindent && b_val(curbp, MDCMOD);
 
 	if (bracefp) *bracefp = FALSE;
 
@@ -858,12 +936,14 @@ int *bracefp;
 
 	/* backword() will leave us either on this line, if there's something
 		non-blank here, or on the nearest previous non-blank line. */
-	if (backword(FALSE,1) == FALSE) {
+	/* (at start of buffer, may leave us on empty line) */
+	if (backword(FALSE,1) == FALSE || llength(DOT.l) == 0) {
 		gomark(FALSE,1);
 		return 0;
 	}
+
 	/* if the line starts with a #, then don't copy its indent */
-	if (cmode && lgetc(DOT.l, 0) == '#') {
+	if (cmode && lGetc(DOT.l, 0) == '#') {
 		DOT.o = 0;
 		if (backword(FALSE,1) == FALSE) {
 			gomark(FALSE,1);
@@ -876,6 +956,7 @@ int *bracefp;
 		*bracefp = (lc >= 0 &&
 			(lGetc(DOT.l,lc) == LBRACE ||
 			 lGetc(DOT.l,lc) == LPAREN ||
+			 lGetc(DOT.l,lc) == LBRACK ||
 			 lGetc(DOT.l,lc) == ':') );
 	}
 
@@ -906,7 +987,8 @@ int *bracefp;
 	ind = indentlen(l_ref(DOT.l));
 	if (bracefp) {
 		*bracefp = ((lGetc(DOT.l,fc) == RBRACE) ||
-				(lGetc(DOT.l,fc) == RPAREN));
+				(lGetc(DOT.l,fc) == RPAREN) ||
+				(lGetc(DOT.l,fc) == RBRACK));
 	}
 
 	DOT = MK;
