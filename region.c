@@ -5,7 +5,7 @@
  * commands. Some functions are just for
  * internal use.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/region.c,v 1.67 1994/12/13 15:39:06 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/region.c,v 1.68 1994/12/19 14:38:37 pgf Exp $
  *
  */
 
@@ -775,7 +775,9 @@ register REGION *rp;
 		return TRUE;
 	}
 
+#if OPT_SELECTIONS
 	rp->r_attr_id = assign_attr_id();
+#endif
 
 #if OPT_MAP_MEMORY
 	rp->r_orig.l = null_ptr;

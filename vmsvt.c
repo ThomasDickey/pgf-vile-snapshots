@@ -7,14 +7,14 @@
  *  Author:  Curtis Smith
  *  Last Updated: 07/14/87
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/vmsvt.c,v 1.17 1994/11/29 04:02:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/vmsvt.c,v 1.18 1994/12/21 14:01:02 pgf Exp $
  *
  */
 
 #include	"estruct.h"		/* Emacs' structures		*/
 #include	"edef.h"		/* Emacs' definitions		*/
 
-#if	VMSVT
+#if	DISP_VMSVT
 
 #include	 <descrip.h>		/* Descriptor definitions	*/
 #include	<iodef.h>		/* to get IO$_SENSEMODE		*/

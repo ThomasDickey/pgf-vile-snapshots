@@ -18,7 +18,7 @@
  * transfering the selection are not dealt with in this file.  Procedures
  * for dealing with the representation are maintained in this file.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/select.c,v 1.30 1994/12/16 22:54:21 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/select.c,v 1.32 1994/12/20 19:35:40 pgf Exp $
  *
  */
 
@@ -29,18 +29,14 @@
 
 extern REGION *haveregion;
 
-#define USE_SEL_FUNCS 1
-
 static	void	detach_attrib		P(( BUFFER *, AREGION * ));
 static	void	attach_attrib		P(( BUFFER *, AREGION * ));
 
-#if USE_SEL_FUNCS
 static	void	fix_dot			P(( void ));
 static	void	output_selection_position_to_message_line P(( int ));
 #if DISP_X11 && XTOOLKIT
 static	WINDOW *push_fake_win		P(( BUFFER * ));
 static	void	pop_fake_win		P(( WINDOW * ));
-#endif
 #endif
 static REGION *extended_region		P(( void ));
 
@@ -64,11 +60,9 @@ static AREGION	startregion;
 static BUFFER *	selbufp = NULL;
 static AREGION	selregion;
 
-#if USE_SEL_FUNCS
 typedef enum { ORIG_FIXED, END_FIXED, UNFIXED } WHICHEND;
 
 static WHICHEND whichend;
-#endif
 
 void
 free_attribs(bp)
@@ -172,7 +166,6 @@ attach_attrib(bp, arp)
  * can happen when selecting with the mouse.
  */
 
-#if USE_SEL_FUNCS
 static void
 fix_dot()
 {
@@ -308,7 +301,6 @@ sel_release()
     detach_attrib(selbufp, &selregion);
     selbufp = NULL;
 }
-#endif /* USE_SEL_FUNCS */
 
 /*
  * Assert/reassert ownership of selection if appropriate.  This is necessary
@@ -336,7 +328,6 @@ sel_reassert_ownership(bp)
  * together with the rest of the window manipulation code.
  */
 
-#if USE_SEL_FUNCS
 #if DISP_X11 && XTOOLKIT
 static WINDOW *
 push_fake_win(bp)
@@ -457,7 +448,6 @@ sel_setshape(shape)
 	return FALSE;
     }
 }
-#endif /* USE_SEL_FUNCS */
 
 /* return a region which goes from DOT to the far end of the current
 	selection region.  shape is maintained.  returns pointer to static
@@ -677,6 +667,8 @@ int f,n;
 	regionshape = shape;
 	/* if sweephack is set here, it's because the last motion had
 		it set */
+    	if (doingopcmd)
+		pre_op_dot = savedot;
 	if (doingopcmd && regionshape != RECTANGLE && sweephack)
     		DOT.o += 1;
 	savedot = DOT;

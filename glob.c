@@ -15,7 +15,7 @@
  *
  *	modify (ifdef-style) 'expand_leaf()' to allow ellipsis.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/glob.c,v 1.27 1994/12/09 22:56:37 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/glob.c,v 1.29 1994/12/19 14:39:53 pgf Exp $
  *
  */
 
@@ -315,6 +315,15 @@ char	*pattern;
 			(void)strcpy(path, ".");
 	} else {
 		len = wild - pattern - 1;
+#if OPT_MSDOS_PATH
+		/* Force the strncpy from 'pattern' to pick up a slash just
+		 * after the ':' in a drive specification.
+		 */
+		if ((s = is_msdos_drive(pattern)) != 0) {
+			if (is_slashc(*s))
+				len++;
+		}
+#endif
 		if (*(s = path) != EOS) {
 			s += strlen(s);
 			*s++ = SLASHC;
@@ -592,7 +601,7 @@ char	*item;
 			char	temp[NFILEN];
 			size_t	len = de->d_namlen;
 			(void)strncpy(temp, de->d_name, len);
-			s[len] = EOS;
+			temp[len] = EOS;
 			if (!record_a_match(temp)) {
 				result = FALSE;
 				break;

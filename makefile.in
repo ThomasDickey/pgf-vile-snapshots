@@ -21,7 +21,7 @@
 # gnu autoconf support by kevin buettner, 5/94
 # original makefile for uemacs: Adam Fritz July 30,1987  (do you recognize it?)
 #
-# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.in,v 1.28 1994/12/07 18:27:49 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.in,v 1.30 1994/12/22 11:03:15 pgf Exp $
 #
 
 #### Start of system configuration section. ####
@@ -171,7 +171,7 @@ $(MKTBLS):  $(srcdir)/mktbls.c
 install: $(INSTALL_DIRS) \
 	$(bindir)/$(TARGET) \
 	$(bindir)/vile-manfilt \
-	$(mandir)/vile.$(manext) \
+	$(mandir)/$(TARGET).$(manext) \
 	$(libdir)/vile.hlp
 	@echo 'Completed installation.'
 
@@ -179,7 +179,7 @@ installdirs: $(INSTALL_DIRS)
 
 uninstall:
 	-$(RM) $(bindir)/$(TARGET) $(bindir)/vile-manfilt \
-	      $(mandir)/vile.$(manext) $(libdir)/vile.hlp
+	      $(mandir)/$(TARGET).$(manext) $(libdir)/vile.hlp
 
 # The makefile is technically dependent upon the config.status file, but
 # gmake gets overly ambitious and remakes the makefile too often.
@@ -298,7 +298,7 @@ patch:	/tmp/vilevers
 	echo Created patch$$ovilevers-$$vilevers 
 
 dpatch:
-	co -p revlist |					 		 \
+	co -p$(PATCH_AGAINST) revlist |			 		 \
 	while read file filerev						;\
 	do								 \
 	  rcsdiff -c -u -r$$filerev $$file 2>/dev/null || true		;\
@@ -366,6 +366,8 @@ $(bindir)/$(TARGET):       $(TARGET)
 $(bindir)/vile-manfilt:    manfilt 
 	$(INSTALL_PROGRAM) manfilt $@
 $(mandir)/vile.$(manext):  $(srcdir)/vile.1 
+	$(INSTALL_DATA)    $(srcdir)/vile.1 $@
+$(mandir)/xvile.$(manext):  $(srcdir)/vile.1 
 	$(INSTALL_DATA)    $(srcdir)/vile.1 $@
 $(libdir)/vile.hlp:        $(srcdir)/vile.hlp 
 	$(INSTALL_DATA)    $(srcdir)/vile.hlp $@

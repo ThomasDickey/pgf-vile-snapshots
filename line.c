@@ -10,7 +10,7 @@
  * editing must be being displayed, which means that "b_nwnd" is non zero,
  * which means that the dot and mark values in the buffer headers are nonsense.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/line.c,v 1.81 1994/12/09 18:06:35 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/line.c,v 1.82 1994/12/21 13:45:26 pgf Exp $
  *
  */
 
@@ -1437,8 +1437,6 @@ REGIONSHAPE shape;
 				    }
 				}
 			} else { /* not rectangle */
-			    if (is_header_line(DOT,curbp))
-				suppressnl = TRUE;
 			    while (i-- > 0) {
 				if (*sp == '\n') {
 				    sp++;
@@ -1447,10 +1445,11 @@ REGIONSHAPE shape;
 					break;
 				    }
 				    wasnl = TRUE;
-				}
-				else {
+				} else {
 				    register char *dp;
 				    register char *ep = sp+1;
+				    if (is_header_line(DOT,curbp))
+					suppressnl = TRUE;
 				    /* Find end of line or end of kill buffer */
 				    while (i > 0 && *ep != '\n') {
 					i--;

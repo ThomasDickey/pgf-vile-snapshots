@@ -78,6 +78,8 @@ Constants
 	\b              ^H      backspace
 	\f              ^L      formfeed
 	\t              ^I      tab
+	\a              ^G      bell
+	\s                      space
 	\"              "       quote
 	\xNN		0xNN	the character in hex
 	\NNN		NNN	the character in octal
@@ -578,5 +580,5 @@ Directives
 		insert-string "You are on an old machine!\n"
 
 -----------------------------------
-  $Header: /usr/build/VCS/pgf-vile/RCS/macros.doc,v 1.8 1994/12/09 15:48:14 pgf Exp $
+  $Header: /usr/build/VCS/pgf-vile/RCS/macros.doc,v 1.9 1994/12/19 15:43:30 pgf Exp $
 -----------------------------------

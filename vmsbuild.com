@@ -1,4 +1,4 @@
-$! $Header: /usr/build/VCS/pgf-vile/RCS/vmsbuild.com,v 1.2 1994/11/23 01:13:23 pgf Exp $
+$! $Header: /usr/build/VCS/pgf-vile/RCS/vmsbuild.com,v 1.3 1994/12/21 14:01:02 pgf Exp $
 $! VMS build-script for vile.  Requires "VAX-C"
 $!
 $! Tested with:
@@ -14,7 +14,7 @@ $
 $! for regular vile, use these:
 $ SCREEN := vmsvt
 $ TARGET := vile
-$ SCRDEF := "VMSVT,scrn_chosen"
+$ SCRDEF := "DISP_VMSVT,scrn_chosen"
 $
 $! for building the X version, xvile, use these:
 $!SCREEN == x11simp
@@ -105,7 +105,6 @@ $	WRITE SYS$ERROR "** no rule for install"
 $	goto build_last
 $	
 $ clean :
-$	if f$search("*.com") .nes. "" then delete *.com;*
 $	if f$search("*.obj") .nes. "" then delete *.obj;*
 $	if f$search("*.bak") .nes. "" then delete *.bak;*
 $	if f$search("*.lis") .nes. "" then delete *.lis;*
@@ -116,6 +115,8 @@ $	if f$search("$(MKTBLS)") .nes. "" then delete $(MKTBLS);
 $	goto build_last
 $
 $ clobber :
+$	if f$search("vile.com") .nes. "" then delete vile.com;*
+$	if f$search("xvile.com") .nes. "" then delete xvile.com;*
 $	if f$search("*.exe") .nes. "" then delete *.exe;*
 $	goto build_last
 $

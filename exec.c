@@ -3,7 +3,7 @@
  *
  *	written 1986 by Daniel Lawrence
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/exec.c,v 1.106 1994/12/16 22:54:21 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/exec.c,v 1.107 1994/12/19 15:43:30 pgf Exp $
  *
  */
 
@@ -872,6 +872,8 @@ int eolchar;
 				case 't':	*tok++ = '\t';  break;
 				case 'b':	*tok++ = '\b';  break;
 				case 'f':	*tok++ = '\f'; break;
+				case 'a':	*tok++ = '\007'; break;
+				case 's':	*tok++ = ' '; break;
 				case 'e':	*tok++ = ESC; break;
 
 				case 'x':

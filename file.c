@@ -5,7 +5,7 @@
  *	reading and writing of the disk are in "fileio.c".
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/file.c,v 1.148 1994/12/15 15:05:26 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/file.c,v 1.149 1994/12/19 14:40:27 pgf Exp $
  *
  */
 
@@ -565,7 +565,7 @@ int lockfl;		/* check the file for locks? */
 		if (!bp)
 			return FALSE;
 	}
-	return bp2swbuffer(bp, isShellOrPipe(fname), lockfl);
+	return bp2swbuffer(bp, isShellOrPipe(bp->b_fname), lockfl);
 }
 
 /*

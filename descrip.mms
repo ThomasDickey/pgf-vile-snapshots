@@ -11,13 +11,13 @@
 # all as "0".  If you use tcap.c, you'll need libtermcap.a too.  If you use
 # x11.c, you'll need libX11.a too.
 #
-# $Header: /usr/build/VCS/pgf-vile/RCS/descrip.mms,v 1.19 1994/12/05 14:08:22 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/descrip.mms,v 1.20 1994/12/21 14:01:02 pgf Exp $
 
 # for regular vile, use these:
 SCREEN = vmsvt
 LIBS =
 TARGET = vile.exe
-SCRDEF = "VMSVT","scrn_chosen"
+SCRDEF = "DISP_VMSVT","scrn_chosen"
 
 # for building the X version, xvile, use these:
 #SCREEN = x11simp
@@ -167,7 +167,6 @@ install :
 	@ WRITE SYS$ERROR "** no rule for $@"
 	
 clean :
-	@- if f$search("*.com") .nes. "" then delete *.com;*
 	@- if f$search("*.obj") .nes. "" then delete *.obj;*
 	@- if f$search("*.bak") .nes. "" then delete *.bak;*
 	@- if f$search("*.lis") .nes. "" then delete *.lis;*
@@ -177,6 +176,8 @@ clean :
 	@- if f$search("$(MKTBLS)") .nes. "" then delete $(MKTBLS);
 
 clobber : clean
+	@- if f$search("vile.com") .nes. "" then delete vile.com;*
+	@- if f$search("xvile.com") .nes. "" then delete xvile.com;*
 	@- if f$search("*.exe") .nes. "" then delete *.exe;*
 
 $(OBJ) : estruct.h nemode.h nefkeys.h edef.h proto.h
