@@ -1,18 +1,12 @@
 /*	EPATH:	This file contains certain info needed to locate the
-		MicroEMACS files on a system dependent basis.
+		certain needed files on a system dependent basis.
 
 									*/
 
 /*	possible names and paths of help files under different OSs	*/
 
 /*
- * $Log: epath.h,v $
- * Revision 1.12  1994/04/18 14:26:27  pgf
- * merge of OS2 port patches, and changes to tungetc operation
- *
- * Revision 1.11  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
- *
+ * $Header: /usr/build/VCS/pgf-vile/RCS/epath.h,v 1.15 1994/07/11 22:56:20 pgf Exp $
  */
 
 /* first two entries are default startup and help files, the rest are
@@ -55,7 +49,7 @@ char *pathname[] =
 };
 #endif
 
-#if	MSDOS || OS2
+#if	MSDOS || WIN31 || OS2 || NT
 {
 	"vile.rc",
 	"vile.hlp",

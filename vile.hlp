@@ -1784,15 +1784,15 @@ Filtering "man" pages
 	certain portions of the manual page text in bold or italics as
 	appropriate.
 
-	The file man-bindings (found in the vile source directory) contains
+	The file manpage.rc (found in the vile source directory) contains
 	a macro which is bound to ^X-m.  It will prompt for a manual page,
 	filter it, attach attributes and display it in the current window. 
-	The text of man-bindings may be either incorporated verbatim into
-	you .vilerc file or may be read from your .vilerc as follows:
+	The text of manpage.rc may be either incorporated verbatim into
+	your .vilerc file or may be read from your .vilerc as follows:
 
-		source ~/man-bindings
+		source ~/manpage.rc
 
-	This assumes that you have moved the man-bindings file to your home
+	This assumes that you have moved the manpage.rc file to your home
 	directory.
 
 	For the above to work, however, the manual page filter needs to be
@@ -2246,6 +2246,18 @@ Sample .vilerc
 		substitute-til goto-line "^" "> "
 	~endm
 
+	; spelling keystroke: write the buffer, invoke ispell, and force
+	; 	it to be read back in.
+	2 store-macro
+		write-file
+		; suppress "press return" with "1" argument to shell-command
+		1 shell-command &cat "ispell " $cfilname
+		replace-with-file $cfilname
+	~endm
+	bind-key execute-macro-2 =
+
+
+
 	; the next three reproduce vile version three behavior
 	bind-key next-window ^N
 	bind-key previous-window ^P
@@ -2339,9 +2351,12 @@ Credits
 	support.  Eric Krohn has done some excellent testing and
 	enhancement.  The implementation of rectangles and their operations
 	was inspired by code from the 'notgnu' editor, by Julie Melbin.
+	Patches to support OS/2 and Windows/NT came from Charles Moschel
+	and Joe Greer, respectively.
 	
 	The initial changes to create vile from micro-Emacs were all done
-	by Paul Fox, who can be reached at pgf@cayman.com, or at home at
-	pgf@foxharp.  boston.ma.us.  (By the way, he is not the Paul D. 
-	Fox that wrote the Crisp editor.)
+	by Paul Fox, who can be reached at home at pgf@foxharp.boston.ma.us.
+	(By the way, he is not the Paul D. Fox that wrote the Crisp editor.)
 
+------------------------------------
+ $Header: /usr/build/VCS/pgf-vile/RCS/vile.hlp,v 1.172 1994/07/11 22:56:20 pgf Exp $

@@ -2,9 +2,20 @@
 README for vile
 ----------------
 
-(more recent additions to this README appear down below)
+vile is a text editor which is extremely compatible with vi in terms
+of "finger feel".  in addition, it has extended capabilities in many areas,
+notably multi-file editing and viewing, key rebinding, and X window system
+support.
 
-(impatient?  just type "make", and choose one of the targets you're offered...)
+the authors of vile are Paul Fox, Tom Dickey, and Kevin Buettner.
+
+many patches have been contributed by a lot of users.  we thank them.
+
+more recent additions to this README appear near the bottom.
+
+impatient?  just type "./configure; make", and get a cup of coffee.
+
+want X11 support?  you'd better look at README.CFG.
 
 
 2/92
@@ -71,7 +82,7 @@ VILE -- VI Like Emacs: a vi workalike put together from Micro-Emacs by Paul Fox
 	Hope you enjoy -- 
 
 	Paul G. Fox	June, 1991, and February, 1992
-	pgf@cayman.com
+	pgf@foxharp.boston.ma.us
 
 p.s. By the way, I'm _not_ the same Paul Fox who wrote Crisp, the Brief
 	work-alike.
@@ -164,6 +175,8 @@ along the line, because Tom and I were getting tired of 3.  There are quite
 a few new "modes", some to support vi functionality, some altogether new. 
 We should have keyboard selections and highlighted regions soon...
 
-pgf, work: pgf@cayman.com,  home: pgf@foxharp.boston.ma.us
+pgf, pgf@foxharp.boston.ma.us
 
+-------------------------------
+$Header: /usr/build/VCS/pgf-vile/RCS/README,v 1.30 1994/07/11 22:56:20 pgf Exp $
 -------------------------------

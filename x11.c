@@ -2,96 +2,7 @@
  * 	X11 support, Dave Lemke, 11/91
  *	X Toolkit support, Kevin Buettner, 2/94
  *
- * $Log: x11.c,v $
- * Revision 1.71  1994/04/25 20:28:14  pgf
- * fixes from kev
- *
- * Revision 1.70  1994/04/25  09:54:11  pgf
- * warning cleanup
- *
- * Revision 1.69  1994/04/22  16:06:18  pgf
- * kev's font changes, mostly
- *
- * Revision 1.68  1994/04/22  15:58:05  pgf
- * misplaced endif
- *
- * Revision 1.67  1994/04/22  14:34:15  pgf
- * changed BAD and GOOD to BADEXIT and GOODEXIT
- *
- * Revision 1.66  1994/04/22  11:33:01  pgf
- * took out resource-based window and icon title maintenance, added support
- * for the variables that can be used to set them ($title, $iconname)
- *
- * Revision 1.65  1994/04/20  11:09:47  pgf
- * eliminated #elif for HP users.  geez, HP, get a life.
- *
- * Revision 1.64  1994/04/14  09:52:17  pgf
- * added support for setting window and icon names from buffer name (m.finken)
- *
- * Revision 1.63  1994/04/13  20:40:21  pgf
- * change kcod2str, fnc2str, string2prc to all deal in "p-strings", so
- * we can store null chars in binding strings.
- *
- * Revision 1.62  1994/04/11  15:50:06  pgf
- * kev's attribute changes
- *
- * Revision 1.61  1994/04/08  21:14:24  pgf
- * kev fixes for scrollbars, new intf'c to sel_extend
- *
- * Revision 1.60  1994/04/07  19:02:20  pgf
- * kev's changes for direct pscreen access
- *
- * Revision 1.59  1994/04/07  18:46:47  pgf
- * eliminate "can't happen" abort() call, fix some off-by-ones on
- * selections (multiclick), and allow multiclicking a whole line, not just
- * a screen's worth
- *
- * Revision 1.58  1994/04/01  14:50:54  pgf
- * persistent selections and blinking cursor
- *
- * Revision 1.57  1994/04/01  14:30:02  pgf
- * tom's warning/lint patch
- *
- * Revision 1.56  1994/03/29  16:28:49  pgf
- * kev's cursor/focus fix
- *
- * Revision 1.55  1994/03/29  16:27:09  pgf
- * tom's change to kev's patch
- *
- * Revision 1.54  1994/03/29  16:24:20  pgf
- * kev's changes: selection and attributes
- *
- * Revision 1.53  1994/03/28  16:24:48  pgf
- * add call to update scrollbars when changing fonts
- *
- * Revision 1.52  1994/03/24  12:12:17  pgf
- * arrow/escape key fixes
- *
- * Revision 1.51  1994/03/11  14:02:19  pgf
- * many many changes from tom and kevin -- no more athena widget support,
- * scrollbars now supplied, a lot of cleanup.  feels good.
- *
- * Revision 1.50  1994/03/08  12:31:22  pgf
- * changed 'fulllineregions' to 'regionshape'.
- *
- * Revision 1.49  1994/03/02  10:02:02  pgf
- * no longer trim leading whitespace from pasted text -- and suppress
- * autoindent on the insertion.
- *
- * Revision 1.48  1994/02/28  11:53:53  pgf
- * kevin's motif resize patch
- *
- * Revision 1.47  1994/02/25  12:02:00  pgf
- * tom's changes for rows/cols --> geometry
- *
- * Revision 1.46  1994/02/23  05:31:58  pgf
- * rows, columns, left/right scrollbar placement
- *
- * Revision 1.45  1994/02/22  17:48:19  pgf
- * added kev's openlook and motif support
- *
- * Revision 1.44  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
+ * $Header: /usr/build/VCS/pgf-vile/RCS/x11.c,v 1.74 1994/07/11 22:56:20 pgf Exp $
  *
  */
 /*
@@ -112,16 +23,16 @@
 #include	<X11/IntrinsicI.h>
 #endif
 
-#include	"estruct.h"
-#include	"edef.h"
-
 #if XtSpecificationRelease < 4
 #define XtPointer caddr_t
 #endif
 
-/* undef for the benefit of some X header files -- if you really _are_
-	both ISC and X11, well, you know what to do. */
-#undef ISC
+/*
+ * Put our include files _after_ X-windows, to avoid conflicts that arise
+ * on various systems, including Apollo and Linux.
+ */
+#include	"estruct.h"
+#include	"edef.h"
 
 #if X11 && XTOOLKIT
 
@@ -160,7 +71,6 @@
 
 #define	MARGIN	8
 #define	SCRSIZ	64
-#define	NPAUSE	10		/* # times thru update to pause */
 #define	absol(x)	((x) > 0 ? (x) : -(x))
 #define	CEIL(a,b)	((a + b - 1) / (b))
 
@@ -169,9 +79,6 @@
 /* XXX -- use xcutsel instead */
 #undef	SABER_HACK		/* hack to support Saber since it doesn't do
 				 * selections right */
-
-
-#define X_PIXEL ULONG
 
 #define PANE_WIDTH_MAX 200
 
@@ -263,6 +170,7 @@ typedef struct _text_win {
     int		blink_status;
     int		blink_interval;
     Cursor	curs_xterm;
+    int		visibility;	/* How visible is the window? */
 
     int		base_width;	/* width with screen widgets' width zero */
     int		base_height;
@@ -433,7 +341,7 @@ TERM        term = {
     0,
     MARGIN,
     SCRSIZ,
-    NPAUSE,
+    0,
     x_open,
     x_close,
     x_kopen,
@@ -639,9 +547,8 @@ JumpProc(scrollbar, num, cbs)
     mvupwind(TRUE, 
              line_no(curwp->w_bufp, curwp->w_line.l) - cbs->new_location);
     dont_update_sb = TRUE;
-    (void)update(FALSE);
+    (void)update(TRUE);
     dont_update_sb = FALSE;
-    x_flush();
 }
 
 static void
@@ -671,8 +578,7 @@ grip_moved(slider, num, cbs)
 	resize(TRUE, nlines);
     }
     set_curwp(saved_curwp);
-    (void) update(FALSE);
-    x_flush();
+    (void) update(TRUE);
 }
 
 static void
@@ -777,9 +683,8 @@ JumpProc(scrollbar, num, call_data)
     lcur = line_no(curwp->w_bufp, curwp->w_line.l);
     mvupwind(TRUE, lcur - ((XmScrollBarCallbackStruct *)call_data)->value);
     dont_update_sb = TRUE;
-    (void)update(FALSE);
+    (void)update(TRUE);
     dont_update_sb = FALSE;
-    x_flush();
 }
 
 static void
@@ -1142,8 +1047,7 @@ do_scroll_common:
 		    cur_win->scroll_repeat_timeout,
 		    repeat_scroll,
 		    (XtPointer) count);
-	    (void)update(FALSE);
-	    x_flush();
+	    (void)update(TRUE);
 	    break;
 	case 'S' :	/* StartDrag */
 	    if (scrollmode == none) {
@@ -1158,8 +1062,7 @@ do_scroll_common:
 		int ltarg = (line_count(curwp->w_bufp) * pos 
 			    	/ cur_win->scrollinfo[i].totlen) + 1;
 		mvupwind(TRUE, lcur-ltarg);
-		(void)update(FALSE);
-		x_flush();
+		(void)update(TRUE);
 	    }
 	    break;
     }
@@ -1171,14 +1074,14 @@ repeat_scroll(count, id)
     XtPointer count;
     XtIntervalId  *id;
 {
-    mvdnwind(TRUE, (int)count);
     cur_win->scroll_repeat_id = XtAppAddTimeOut(
 	    cur_win->app_context,
 	    cur_win->scroll_repeat_interval,
 	    repeat_scroll,
 	    (XtPointer) count);
-    (void)update(FALSE);
-    x_flush();
+    mvdnwind(TRUE, (int)count);
+    (void)update(TRUE);
+    XSync(dpy, False);
 }
 
 static void
@@ -1188,14 +1091,12 @@ resize_bar(w, event, params, num_params)
     String *params;
     Cardinal *num_params;
 {
-    static motion_permitted = False;
-    int pos;
+    static int motion_permitted = False;
+    static int root_y;
+    int pos = 0;			/* stifle -Wall */
     register WINDOW *wp;
     register int i;
     XEvent nev;
-    Window root, child;
-    int rootx, rooty, winx;
-    unsigned int mask;
 
     /* Return immediately if behind in processing motion events */
     if (motion_permitted
@@ -1211,39 +1112,39 @@ resize_bar(w, event, params, num_params)
     switch (**params) {
 	case 'S' :	/* Start */
 	    motion_permitted = True;
+	    root_y = event->xbutton.y_root - event->xbutton.y;
 	    return;
 	case 'D' :	/* Drag */
 	    if (!motion_permitted)
 		return;
+	    /*
+	     * We use kind of convoluted mechanism to determine the vertical
+	     * position with respect to the widget which we are moving. The
+	     * reason is that the x,y position from the event structure is
+	     * unreliable since the widget may have moved in between the
+	     * time when the event was first generated (at the display
+	     * server) and the time at which the event is received (in
+	     * this code here).  So we keep track of the vertical position
+	     * of the widget with respect to the root window and use the
+	     * corresponding field in the event structure to determine
+	     * the vertical position of the pointer with respect to the
+	     * widget of interest.  In the past, XQueryPointer() was
+	     * used to determine the position of the pointer, but this is
+	     * not really what we want since the position returned by
+	     * XQueryPointer is the position of the pointer at a time
+	     * after the event was both generated and received (and thus
+	     * inaccurate).  This is why the resize grip would sometimes
+	     * "follow" the mouse pointer after the button was released.
+	     */
+	    pos = event->xmotion.y_root - root_y;
 	    break;
 	case 'E' :	/* End */
 	    if (!motion_permitted)
 		return;
+	    pos = event->xbutton.y_root - root_y;
 	    motion_permitted = False;
 	    break;
     }
-
-    /* 
-     * Determine vertical position relative to the widget we are moving...
-     *
-     * We call XQueryPointer here because the x,y position from
-     * the event structure is unreliable since the widget may have
-     * moved prior to receiving the event.  Use of position information
-     * from the event structure caused a lot of jumpiness.  Interesting
-     * effect, but not very desirable.
-     */
-
-    if (!XQueryPointer(dpy,
-	    XtWindow(w),
-	    &root, &child,
-	    &rootx, &rooty,
-	    &winx, &pos,
-	    &mask))
-	return;		/* Can't get valid position */
-			/* FIXME: The above is fine for motion events, but
-			 * simply returning will cause problems on
-			 * ButtonRelease events.
-			 */
 
     /* Determine grip number and corresponding vile window (above grip) */
     i = 0;
@@ -1268,10 +1169,10 @@ resize_bar(w, event, params, num_params)
 	nlines = wp->w_ntrows + pos;
 	if (nlines < 1)
 	    nlines = 1;
+	root_y += (nlines - wp->w_ntrows) * cur_win->char_height;
 	set_curwp(wp);
 	resize(TRUE, nlines);
-	(void)update(FALSE);
-	x_flush();
+	(void)update(TRUE);
     }
 }
 #endif /* NO_WIDGETS  */
@@ -1504,14 +1405,10 @@ x_preparse_args(pargc, pargv)
     ULONG	gcmask;
     int		geo_mask, startx, starty;
     Cardinal	start_cols, start_rows;
-    /* Note: apollo compiler doesn't like empty declaration-list */
-#if MOTIF_WIDGETS || NO_WIDGETS
     static XrmOptionDescRec options[] = {
-/* FIXME: Implement scrollbarOnLeft for OL_WIDGETS */
 	{"-leftbar",	"*scrollbarOnLeft", XrmoptionNoArg,	"true" },
 	{"-rightbar",	"*scrollbarOnLeft", XrmoptionNoArg,	"false" },
     };
-#endif /* MOTIF_WIDGETS || NO_WIDGETS*/
 #if MOTIF_WIDGETS || OL_WIDGETS
     static XtActionsRec new_actions[] = {
 	{ "ConfigureBar", configure_bar }
@@ -1577,11 +1474,7 @@ x_preparse_args(pargc, pargv)
     cur_win->top_widget = XtVaAppInitialize(
 	    &cur_win->app_context,
 	    MY_CLASS,
-#if MOTIF_WIDGETS || NO_WIDGETS
 	    options, XtNumber(options),
-#else
-	    (XrmOptionDescRec *)0, 0,
-#endif
 	    (Cardinal *)pargc, *pargv,
 	    fallback_resources,
 	    XtNgeometry,	NULL,
@@ -1721,13 +1614,15 @@ x_preparse_args(pargc, pargv)
 #endif	/* MOTIF_WIDGETS */
 	    NULL);
 
-    gcmask = GCForeground | GCBackground | GCFont;
+    gcmask = GCForeground | GCBackground | GCFont | GCGraphicsExposures;
     gcvals.foreground = cur_win->fg;
     gcvals.background = cur_win->bg;
     gcvals.font = cur_win->pfont->fid;
+    gcvals.graphics_exposures = False;
     cur_win->textgc = XCreateGC(dpy,
             DefaultRootWindow(dpy),
 	    gcmask, &gcvals);
+    cur_win->visibility = VisibilityUnobscured;
 
     gcvals.foreground = cur_win->bg;
     gcvals.background = cur_win->fg;
@@ -1826,7 +1721,6 @@ x_preparse_args(pargc, pargv)
      * Note that this is handled elsewhere for NO_WIDGETS.
      */
     if (cur_win->scrollbar_on_left) {
-/* FIXME: Implement scrollbarOnLeft for OL_WIDGETS */
 #if MOTIF_WIDGETS
 	XtVaSetValues(cur_win->pane,
 	    XmNleftAttachment,	XmATTACH_FORM,
@@ -1837,7 +1731,16 @@ x_preparse_args(pargc, pargv)
 	    XmNleftAttachment,	XmATTACH_NONE,
 	    XmNrightAttachment,	XmATTACH_FORM,
 	    NULL);
-#endif /* MOTIF_WIDGETS */
+#else	/* !MOTIF_WIDGETS */
+# if OL_WIDGETS
+	XtVaSetValues(cur_win->pane,
+	    XtNxRefWidget,	cur_win->form_widget,
+	    NULL);
+	XtVaSetValues(cur_win->screen,
+	    XtNxRefWidget,	cur_win->pane,
+	    NULL);
+# endif	/* OL_WIDGETS */
+#endif	/* !MOTIF_WIDGETS */
     }
 
     XtAddEventHandler(
@@ -2084,7 +1987,7 @@ alternate_font(weight, slant)
     XFontStruct *fsp = NULL;
     if (cur_win->fontname == NULL 
      || cur_win->fontname[0] != '-'
-     || (newname = castalloc(char, strlen(cur_win->fontname)+32)) == NULL)
+     || (newname = castalloc(char, (SIZE_T)strlen(cur_win->fontname)+32)) == NULL)
 	return NULL;
 
     /* copy initial two fields */
@@ -2268,10 +2171,10 @@ wait_for_scroll(tw)
 	    ec = CEIL(gev->x + gev->width,  tw->char_width);
 	    er = CEIL(gev->y + gev->height, tw->char_height);
 	    x_touch(tw, sc, sr, ec, er);
-	    x_flush();
-	    return;
+	    if (gev->count == 0)
+		return;
 	}
-	XSync(dpy, 0);
+	XSync(dpy, False);
     }
 }
 
@@ -2282,6 +2185,9 @@ x_scroll(from, to, count)
     int to;
     int count;
 {
+    if (cur_win->visibility == VisibilityFullyObscured)
+	return;			/* Why bother? */
+
     if (from == to)
 	return;			/* shouldn't happen */
     
@@ -2290,7 +2196,8 @@ x_scroll(from, to, count)
 	      x_width(cur_win), (unsigned)(count * cur_win->char_height),
 	      x_pos(cur_win, 0), y_pos(cur_win, to));
     XFlush(dpy);
-    wait_for_scroll(cur_win);
+    if (cur_win->visibility == VisibilityPartiallyObscured)
+	wait_for_scroll(cur_win);
 
 }
 
@@ -2450,6 +2357,9 @@ x_flush()
 {
     int r, c, sc, ec, cleanlen;
     VIDEO_ATTR attr;
+
+    if (cur_win->visibility == VisibilityFullyObscured)
+	return;		/* Why bother? */
 
     /* 
      * Write out cursor _before_ rest of the screen in order to avoid
@@ -2746,8 +2656,7 @@ x_lose_selection(tw)
 	tw->was_on_msgline = False;
 	sel_release();
 	free_selection(tw);
-	(void) update(FALSE);
-	x_flush();			/* show the changes */
+	(void) update(TRUE);
 }
 
 /*
@@ -3051,13 +2960,10 @@ extend_selection(tw, nr, nc, wipe)
     else {
 	scroll_count = 0;
     }
-    if (setcursor(nr,nc) && sel_extend(wipe)) {
-	update(FALSE);
-	x_flush();
-    }
-    else {
+    if (setcursor(nr,nc) && sel_extend(wipe))
+	update(TRUE);
+    else
 	x_beep();
-    }
 }
 
 static void
@@ -3077,8 +2983,7 @@ multi_click(tw, nr, nc)
     if ((wp = row2window(nr)) != 0 && nr == mode_row(wp)) {
 	set_curwp(wp);
 	sel_release();
-	(void)update(FALSE);
-	x_flush();
+	(void)update(TRUE);
     }
     else {
 	switch (tw->numclicks) {
@@ -3088,7 +2993,7 @@ multi_click(tw, nr, nc)
 		return;
 	case 2:			/* word */
 		/* find word start */
-		p = &CELL_TEXT(nr,sc);
+		p = (UCHAR *)(&CELL_TEXT(nr,sc));
 		cclass = charClass[*p];
 		do {
 			--sc;
@@ -3096,7 +3001,7 @@ multi_click(tw, nr, nc)
 		} while (sc >= 0 && charClass[*p] == cclass);
 		sc++;
 		/* and end */
-		p = &CELL_TEXT(nr,nc);
+		p = (UCHAR *)(&CELL_TEXT(nr,nc));
 		cclass = charClass[*p];
 		do {
 			++nc;
@@ -3118,8 +3023,7 @@ multi_click(tw, nr, nc)
 		 * selection.
 		 */
 		sel_release();
-		(void)update(FALSE);
-		x_flush();
+		(void)update(TRUE);
 		return;
 	}
 	if (setcursor(nr,sc)) {
@@ -3127,8 +3031,7 @@ multi_click(tw, nr, nc)
 	    extend_selection(tw, nr, nc, FALSE);
 	    (void) setcursor(nr,oc);
 	    /* FIXME: Too many updates */
-	    (void) update(FALSE);
-	    x_flush();
+	    (void) update(TRUE);
 	}
     }
 }
@@ -3174,15 +3077,15 @@ start_selection(tw, ev, nr, nc)
 	}
 	else if ((wp = row2window(nr)) != 0 && nr == mode_row(wp)) {
 	    set_curwp(wp);
-	    (void)update(FALSE);
-	    x_flush();
+	    (void)update(TRUE);
 	}
 	else if (setcursor(nr, nc)) {
-	    if (!cur_win->persistent_selections)
+	    if (!cur_win->persistent_selections) {
+		sel_yank();
 		sel_release();
+	    }
 	    (void) sel_begin();
-	    (void)update(FALSE);
-	    x_flush();
+	    (void)update(TRUE);
 	    tw->wipe_permitted = TRUE;
 	}
 	endofDisplay;
@@ -3286,6 +3189,13 @@ x_process_event(w, unused, ev, continue_to_dispatch)
 	if (ev->xexpose.count == 0)
 		x_flush();
 	break;
+
+    case VisibilityNotify:
+	cur_win->visibility = ev->xvisibility.state;
+	XSetGraphicsExposures(dpy, cur_win->textgc, 
+			      cur_win->visibility != VisibilityUnobscured);
+	break;
+
     case MotionNotify:
 	do_sel = cur_win->wipe_permitted;
 	if (!(ev->xmotion.state & (Button1Mask | Button3Mask))) {
@@ -3309,7 +3219,9 @@ x_process_event(w, unused, ev, continue_to_dispatch)
 	    nc = cur_win->cols-1;
 
 	/* ignore any spurious motion during a multi-cick */
-	if (cur_win->numclicks > 1)
+	if (cur_win->numclicks > 1
+	 && cur_win->lasttime != 0
+         && (absol(ev->xmotion.time - cur_win->lasttime) < cur_win->click_timeout))
 	    return;
 	if (do_sel) {
 	    if (ev->xbutton.state & ControlMask) {
@@ -3320,7 +3232,7 @@ x_process_event(w, unused, ev, continue_to_dispatch)
 	else {
 	    if (!reading_msg_line && (wp = row2window(nr)) && wp != curwp) {
 		(void) set_curwp(wp);
-		(void) update(FALSE);
+		(void) update(TRUE);
 	    }
 	}
 	break;
@@ -3517,7 +3429,7 @@ x_configure_window(w, unused, ev, continue_to_dispatch)
 	cur_win->cols = nc;
 	(void) refresh(True, 0);
 	update_scrollbar_sizes();
-	(void) update(False);
+	(void) update(TRUE);
     }
 #if MOTIF_WIDGETS
     lookfor_sb_resize = FALSE;
@@ -3564,8 +3476,7 @@ grip_moved(w, unused, ev, continue_to_dispatch)
 	i++;
     }
     set_curwp(saved_curwp);
-    (void) update(FALSE);
-    x_flush();
+    (void) update(TRUE);
 }
 #endif
 
@@ -3611,8 +3522,7 @@ configure_bar(w, event, params, num_params)
 		    resize(TRUE, newsize);
 		}
 	    }
-	    (void) update(FALSE);
-	    x_flush();
+	    (void) update(TRUE);
 	    break;
 	}
 	i++;
@@ -3684,8 +3594,7 @@ x_wm_delwin(w, unused, ev, continue_to_dispatch)
      && ev->xclient.message_type == atom_WM_PROTOCOLS) {
 	if ((Atom) ev->xclient.data.l[0] == atom_WM_DELETE_WINDOW) {
 	    quit(FALSE, 0);		/* quit might not return */
-	    (void) update(FALSE);
-	    x_flush();
+	    (void) update(TRUE);
 	}
 	else if ((Atom) ev->xclient.data.l[0] == atom_WM_TAKE_FOCUS) {
 	    XSetInputFocus(XtDisplay(w), XtWindow(w), RevertToParent,

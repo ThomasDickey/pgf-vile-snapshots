@@ -1,31 +1,19 @@
 /*	npopen:  like popen, but grabs stderr, too
  *		written by John Hutchinson, heavily modified by Paul Fox
  *
- * $Log: npopen.c,v $
- * Revision 1.35  1994/04/18 14:26:27  pgf
- * merge of OS2 port patches, and changes to tungetc operation
- *
- * Revision 1.34  1994/03/23  12:54:50  pgf
- * both copies of npopen() should be silent on errors
- *
- * Revision 1.33  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
+ * $Header: /usr/build/VCS/pgf-vile/RCS/npopen.c,v 1.39 1994/07/11 22:56:20 pgf Exp $
  *
  */
 
 #include "estruct.h"
 #include "edef.h"
 
-#if UNIX || OS2
+#if UNIX || OS2 || NT
 
 #if UNIX
 #include <sys/param.h>
 #else
 #include <process.h>
-#endif
-
-#if LINUX || APOLLO
-#include <sys/wait.h>
 #endif
 
 #if OPT_EVAL
@@ -50,7 +38,7 @@ char *cmd, *type;
 		return NULL;
 
 	if (*type == 'r') {
-#if OS2
+#if OS2 || NT
  		if ((ff = _popen(cmd,"r")) == NULL)
 #else
   		if (inout_popen(&ff, (FILE **)0, cmd) != TRUE)
@@ -58,7 +46,7 @@ char *cmd, *type;
 			return NULL;
 		return ff;
 	} else {
-#if OS2
+#if OS2 || NT
 		if ((ff = _popen(cmd,"w")) == NULL)
 #else
 		if (inout_popen((FILE **)0, &ff, cmd) != TRUE)
@@ -146,7 +134,7 @@ char *cmd;
 }
 #endif /* UNIX */
 
-#if OS2
+#if OS2 || NT
 void
 npclose (fp)
 FILE *fp;
@@ -255,9 +243,14 @@ softfork()
 
 #endif
 
-#if MSDOS
+#if MSDOS || WIN31
 #include <fcntl.h>		/* defines O_RDWR */
 #include <io.h>			/* defines 'dup2()', etc. */
+
+#if WIN31
+/* FIXME: is it possible to execute a DOS program from Windows? */
+int	system(const char *command) { return (-1); }
+#endif
 
 static	int	createTemp P(( char * ));
 static	void	deleteTemp P(( void ));

@@ -1,3 +1,8 @@
+------------------------
+vile bug/enhancement/wish list
+------------------------
+$Header: /usr/build/VCS/pgf-vile/RCS/buglist,v 1.179 1994/07/11 22:56:20 pgf Exp $
+----------------------
 	(E means enhancement, L,M,H are low, medium, high priority)
 ----------------------
 
@@ -441,7 +446,7 @@ tabs in other lines.
 
 In vile 3.65 on SunOS 4.1.3, when I do execute-keyboard-macro while
 defining a keyboard macro, vile seems to go to an infinite loop (but can
-be stopped by Ctrl-C).  
+be stopped by Ctrl-C).    (still a problem in 4.6)
 
 ------------------------
 
@@ -536,4 +541,22 @@ doing a ":e foo*.c" reads in all matching files.  it should instead read
 in the first, and mark the others as unread, at let them come in later.
 in addition, the order in which they come in is odd, at least under autobuffer
 mode -- i think they should be available with :n, and they are not.
+
+---------------------------
+
+running a SunOS4.1.3 binary of vile on Solaris2.3 causes the "interrupted
+system call" problem, no doubt due to the differing BSD/SysV signal()
+semantics.  we should add a "working" mode, to allow the "working..."
+message to be turned off in cases like this.
+
+----------------------
+
+the DOS versions of vile (Watcom, with ibmpc.c or ansi.c) don't work on
+any machine in the whole wide world _except_ the HP OmniBook.  :-)
+
+----------------------------
+
+it might be nice to have an easy way to deselect text, since it is
+sometimes visually annoying
+
 

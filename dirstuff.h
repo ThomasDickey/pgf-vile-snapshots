@@ -4,13 +4,7 @@
  *	Definitions to interface to unix-like DIRECTORY(3) procedures.
  *	Include this after "estruct.h"
  *
- * $Log: dirstuff.h,v $
- * Revision 1.11  1994/04/18 14:26:27  pgf
- * merge of OS2 port patches, and changes to tungetc operation
- *
- * Revision 1.10  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
- *
+ * $Header: /usr/build/VCS/pgf-vile/RCS/dirstuff.h,v 1.14 1994/07/11 22:56:20 pgf Exp $
  *
  */
 
@@ -27,21 +21,55 @@
 #define USE_D_NAMLEN 1
 #endif
 
-#if POSIX || TURBO || WATCOM || DJGPP || OS2
+#if _POSIX_VERSION || DIRENT || TURBO || WATCOM || DJGPP || OS2
 # if WATCOM
 #   include <direct.h>
 # else
 #   include <dirent.h>
 # endif
+# undef DIRENT
 # define	DIRENT	struct dirent
 #else	/* apollo & other old bsd's */
-# if BERK
-#  include <sys/dir.h>
-#  define	DIRENT	struct direct
-#  define USE_D_NAMLEN 1
+# define	DIRENT	struct direct
+# define USE_D_NAMLEN 1
+# if SYSNDIR
+#  include <sys/ndir.h>
 # else
-#  undef USE_LS_FOR_DIRS
-#  define USE_LS_FOR_DIRS 1
+#  if SYSDIR
+#   include <sys/dir.h>
+#  else
+#   if NDIR
+#    include <ndir.h>
+#   else
+#    undef USE_LS_FOR_DIRS
+#    undef DIRENT
+#    undef USE_D_NAMLEN
+#    define USE_LS_FOR_DIRS 1
+#    if NT
+      struct direct {
+	char *d_name;
+      };
+      struct _dirdesc {
+	HANDLE hFindFile;
+	WIN32_FIND_DATA ffd;
+	int first;
+      };
+
+      typedef struct _dirdesc DIR;
+      typedef struct direct DIRENT;
+
+#     define MAXNAMLEN		255
+#     define DIRECTORY_ENTRY		struct direct
+#     define CLOSE_RETURN_TYPE 	int
+
+#    else /* NT */
+#     undef USE_LS_FOR_DIRS
+#     define USE_LS_FOR_DIRS 1
+#     undef USE_D_NAMLEN
+#     define USE_LS_FOR_DIRS 1
+#    endif /* NT */
+#   endif
+#  endif
 # endif
 #endif
 
@@ -75,7 +103,7 @@ typedef	struct	{
 	} DIRENT;
 #endif
 
-#if VMS || USE_LS_FOR_DIRS
+#if NT || VMS || USE_LS_FOR_DIRS
 extern	DIR *	opendir P(( char * ));
 extern	DIRENT *readdir P(( DIR * ));
 extern	int	closedir P(( DIR * ));

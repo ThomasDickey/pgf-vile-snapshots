@@ -15,13 +15,7 @@
  *
  *	modify (ifdef-style) 'expand_leaf()' to allow ellipsis.
  *
- * $Log: glob.c,v $
- * Revision 1.19  1994/04/18 14:26:27  pgf
- * merge of OS2 port patches, and changes to tungetc operation
- *
- * Revision 1.18  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
- *
+ * $Header: /usr/build/VCS/pgf-vile/RCS/glob.c,v 1.22 1994/07/11 22:56:20 pgf Exp $
  *
  */
 
@@ -29,10 +23,11 @@
 #include "edef.h"	/* defines 'slash' */
 #include "dirstuff.h"	/* directory-scanning interface & definitions */
 
+#define BAKTIK '`'	/* used in UNIX shell for pipe */
 #define	isname(c)	(isalnum(c) || ((c) == '_'))
 #define	isdelim(c)	((c) == '(' || ((c) == '{'))
 
-#if MSDOS || OS2
+#if MSDOS || WIN31 || OS2 || NT
 # define UNIX_GLOBBING !SMALLER
 # if UNIX_GLOBBING
 #  define DirEntryStr(p)		p->d_name
@@ -101,7 +96,7 @@ static int
 string_has_wildcards (item)
 char	*item;
 {
-#if VMS || UNIX || MSDOS || OS2
+#if VMS || UNIX || MSDOS || WIN31 || OS2 || NT
 	while (*item != EOS) {
 #if UNIX_GLOBBING
 		if (iswild(*item))
@@ -170,7 +165,7 @@ char	*path;
 {
 	if (path != 0) {
 		while (*path != EOS) {
-			if (slashc(*path))
+			if (is_slashc(*path))
 				return path+1;
 			path++;
 		}
@@ -189,14 +184,14 @@ char	*pattern;
 	register int	j, k, c, ok;
 
 	/* skip leading slashes */
-	for (j = 0; pattern[j] != EOS && slashc(pattern[j]); j++)
+	for (j = 0; pattern[j] != EOS && is_slashc(pattern[j]); j++)
 		;
 
 	/* skip to the leaf with wildcards */
 	while (pattern[j] != EOS) {
 		int	skip = FALSE;
 		for (k = j+1; (c = pattern[k]) != EOS; k++) {
-			if (slashc(c)) {
+			if (is_slashc(c)) {
 				pattern[k] = EOS;
 				ok = string_has_wildcards(pattern+j);
 				pattern[k] = c;
@@ -306,7 +301,7 @@ char	*pattern;
 		len = wild - pattern - 1;
 		if (*(s = path) != EOS) {
 			s += strlen(s);
-			*s++ = slash;
+			*s++ = SLASHC;
 		}
 		if (len != 0)
 			strncpy(s, pattern, len)[len] = EOS;
@@ -321,9 +316,9 @@ char	*pattern;
 	/* Scan the directory, looking for leaves that match the pattern.
 	 */
 	if ((dp = opendir(path)) != 0) {
-		leaf[-1] = slash;
+		leaf[-1] = SLASHC;
 		while ((de = readdir(dp)) != 0) {
-#if MSDOS || OS2
+#if MSDOS || WIN31 || OS2 || NT
 			(void)mklower(strcpy(leaf, de->d_name));
 			if (strchr(pattern, '.') && !strchr(leaf, '.'))
 				(void)strcat(leaf, ".");
@@ -343,14 +338,14 @@ char	*pattern;
 			if (next != 0) {	/* there are more leaves */
 				if (!string_has_wildcards(next)) {
 					s = leaf + strlen(leaf);
-					*s++ = slash;
+					*s++ = SLASHC;
 					(void)strcpy(s, next);
 					if (!record_a_match(path)) {
 						result = FALSE;
 						break;
 					}
 				} else if (is_directory(path)) {
-#if MSDOS
+#if MSDOS || WIN31
 					s = strrchr(path, '.');
 					if (s[1] == EOS)
 						s[0] = EOS;
@@ -412,35 +407,46 @@ static int
 glob_from_pipe(pattern)
 char	*pattern;
 {
+#ifdef GVAL_GLOB
+	char	*cmd = global_g_val_ptr(GVAL_GLOB);
+	int	single;
+#else
+	static	char	cmd[] = "!echo %s";
+	static	int	single	= TRUE;
+#endif
 	FILE	*cf;
 	char	tmp[NFILEN];
 	int	result = FALSE;
 	register SIZE_T len;
 	register char *s, *d;
+
 #ifdef GVAL_GLOB
-	char	*cmd = global_g_val_ptr(GVAL_GLOB);
-	int	single,
-		save	= EOS;
 
 	/*
-	 * For now, assume that only 'echo' will supply the result all on
-	 * one line.  Other programs (e.g., 'ls' and 'find' do the sensible
-	 * thing and break up the output with newlines.
+	 * For now, assume that only 'echo' will supply the result all on one
+	 * line.  Other programs (e.g., 'ls' and 'find' do the sensible thing
+	 * and break up the output with newlines.
 	 */
-	for (d = cmd+1; *d != EOS && isspace(*d); d++)
-		;
-	for (s = d; *s != EOS; s++)
-		if (isspace(*s)) {
-			save = *s;
-			*s = EOS;
-			break;
+	if (!isShellOrPipe(cmd)) {
+		cmd = "!echo %s";
+		single = TRUE;
+		d = cmd + 1;
+	} else {
+		int	save = EOS;
+		for (d = cmd+1; *d != EOS && isspace(*d); d++)
+			;
+		for (s = d; *s != EOS; s++) {
+			if (isspace(*s)) {
+				save = *s;
+				*s = EOS;
+				break;
+			}
 		}
-	single = !strcmp(pathleaf(d), "echo");
-	if (save != EOS)
-		*s = save;
+		single = !strcmp(pathleaf(d), "echo");
+		if (save != EOS)
+			*s = save;
+	}
 #else
-	static	char	*cmd = "!echo %s";
-	static	int	single = TRUE;
 	d = cmd+1;
 #endif
 
@@ -455,7 +461,6 @@ char	*pattern;
 			 * Split the buffer up.  If 'single', split on all
 			 * whitespace, otherwise only on newlines.
 			 */
-
 			for (s = tmp; s-tmp < len; s++) {
 				if ((single && isspace(*s))
 				 || (!single && (*s == '\n' || *s == EOS))) {
@@ -585,7 +590,17 @@ char	*item;
 #endif
 #if OPT_GLOB_PIPE
 # ifdef GVAL_GLOB
-	if (isShellOrPipe(global_g_val_ptr(GVAL_GLOB))) {
+	/*
+	 * The 'glob' mode value can be on/off or set to a pipe expression,
+	 * e.g., "!echo %s".  This allows using the shell to expand the
+	 * pattern, which is slower than vile's internal code, but may allow
+	 * using specific features to which the user is accustomed.
+	 *
+	 * As a special case, we read from a pipe if the expression begins with
+	 * a back-tick (e.g., `which script`).
+	 */
+	if (isShellOrPipe(global_g_val_ptr(GVAL_GLOB))
+	 || *item == BAKTIK) {
 		result = glob_from_pipe(item);
 	} else
 # else
@@ -603,7 +618,7 @@ char	*item;
 
 	(void)strcpy(pattern, item);
 	*builtup = EOS;
-#if MSDOS || OS2
+#if MSDOS || WIN31 || OS2 || NT
 	(void)mklower(pattern);
 #endif
 	expand_environ(pattern);
@@ -616,7 +631,7 @@ char	*item;
 		result = record_a_match(pattern);
 	}
 #endif				/* UNIX-style globbing */
-#if (MSDOS || OS2) && !UNIX_GLOBBING
+#if (MSDOS || WIN31 || OS2 || NT) && !UNIX_GLOBBING
 	/* native DOS-wildcards */
 	DeclareFind(p);
 	char	temp[FILENAME_MAX + 1];
@@ -659,8 +674,9 @@ char	**list_of_items;
 #endif
 
 /*
- * Expands the items in a list, returning an entirely new list (so it can
- * be freed without knowing where it came from originally).
+ * Expands the items in a list, returning an entirely new list (so it can be
+ * freed without knowing where it came from originally).  This should only
+ * return 0 if we run out of memory.
  */
 char **
 glob_expand (list_of_items)
@@ -776,14 +792,17 @@ doglob (path)
 char	*path;
 {
 	char	**expand = glob_string(path);
+	int	len = glob_length(expand);
 
-	if (glob_length(expand) > 1) {
+	if (len > 1) {
 		if (mlyesno("Too many filenames.  Use first") != TRUE) {
 			(void)glob_free(expand);
 			return FALSE;
 		}
 	}
-	(void)strcpy(path, expand[0]);
-	(void)glob_free(expand);
+	if (len > 0) {
+		(void)strcpy(path, expand[0]);
+		(void)glob_free(expand);
+	}
 	return TRUE;
 }

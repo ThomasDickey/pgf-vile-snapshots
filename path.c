@@ -2,15 +2,7 @@
  *		The routines in this file handle the conversion of pathname
  *		strings.
  *
- * $Log: path.c,v $
- * Revision 1.25  1994/04/18 14:26:27  pgf
- * merge of OS2 port patches, and changes to tungetc operation
- *
- * Revision 1.24  1994/03/24  12:10:07  pgf
- * vms fix
- *
- * Revision 1.23  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
+ * $Header: /usr/build/VCS/pgf-vile/RCS/path.c,v 1.28 1994/07/11 22:56:20 pgf Exp $
  *
  *
  */
@@ -30,6 +22,12 @@
 #include <sys/stat.h>
 
 #include "dirstuff.h"
+
+#if WIN31 && TURBO
+# include <direct.h>
+# define curdrive() _getdrive()
+# define curr_dir_on_drive(d) _getdcwd(d, temp, sizeof(temp))
+#endif
 
 /*
  * Fake directory-routines for system where we cannot otherwise figure out how
@@ -85,7 +83,7 @@ DIR	*dp;
 }
 #endif
 
-#if MSDOS || OS2
+#if MSDOS || WIN31 || OS2 || NT
 /*
  * If the pathname begins with an MSDOS-drive, return the pointer past it.
  * Otherwise, return null.
@@ -219,7 +217,7 @@ char	*path;
 {
 	register char	*s = last_slash(path);
 	if (s == 0) {
-#if MSDOS || OS2
+#if MSDOS || WIN31 || OS2
 		if (!(s = is_msdos_drive(path)))
 #endif
 		s = path;
@@ -240,7 +238,7 @@ char	*path;
 {
 	register char	*s = last_slash(path);
 	if (s == 0) {
-#if MSDOS || OS2
+#if MSDOS || WIN31 || OS2 || NT
 		if (!(s = is_msdos_drive(path)))
 #endif
 		s = path;
@@ -285,8 +283,8 @@ char	*leaf;
 #if VMS
 	if (!is_vms_pathname(dst, TRUE))	/* could be DecShell */
 #endif
-	 if (!slashc(*s)) {
-		*(++s) = slash;
+	 if (!is_slashc(*s)) {
+		*(++s) = SLASHC;
 	 }
 
 	(void)strcpy(s+1, leaf);
@@ -304,7 +302,7 @@ char *fn;
 	register char	*s;
 
 	for (s = fn + strlen(fn) - 1; s >= fn; s--)
-		if (slashc(*s))
+		if (is_slashc(*s))
 			return s;
 	return 0;
 }
@@ -392,7 +390,7 @@ char	*path;
 
 		/* parse out the user-name portion */
 		for (s = path+1, d = temp; (*d = *s) != EOS; d++, s++) {
-			if (slashc(*d)) {
+			if (is_slashc(*d)) {
 				*d = EOS;
 				s++;
 				break;
@@ -423,7 +421,7 @@ char *ss;
 	if (!*s)
 		return s;
 
-#if MSDOS || OS2
+#if MSDOS || WIN31 || OS2 || NT
 	(void)mklower(ss);	/* MS-DOS is case-independent */
 	/* pretend the drive designator isn't there */
 	if ((s = is_msdos_drive(ss)) == 0)
@@ -446,15 +444,15 @@ char *ss;
 	}
 #endif
 
-#if UNIX || MSDOS || OS2
+#if UNIX || MSDOS || WIN31 || OS2 || NT
 	p = pp = s;
-	if (!slashc(*s)) {
+	if (!is_slashc(*s)) {
 		mlforce("BUG: canonpath '%s'", s);
 		return ss;
 	}
 
 #if APOLLO
-	if (!slashc(p[1])) {	/* could be something like "/usr" */
+	if (!is_slashc(p[1])) {	/* could be something like "/usr" */
 		char	*cwd = current_directory(FALSE);
 		char	temp[NFILEN];
 		if (!strncmp(cwd, "//", 2)
@@ -471,13 +469,13 @@ char *ss;
 	while (*pp) {
 		switch (*pp) {
 		case '/':
-#if MSDOS || OS2
+#if MSDOS || WIN31 || OS2 || NT
 		case '\\':
 #endif
 			pp++;
 			continue;
 		case '.':
-			if (slashc(*(pp+1))) {
+			if (is_slashc(*(pp+1))) {
 				pp += 2;
 				continue;
 			}
@@ -493,28 +491,28 @@ char *ss;
 		printf(" s is %s\n",s);
 		printf("pp is %*s%s\n",pp-s,"",pp);
 #endif
-		if (slashc(*pp)) {
-			while (slashc(*(pp+1)))
+		if (is_slashc(*pp)) {
+			while (is_slashc(*(pp+1)))
 				pp++;
-			if (p > s && !slashc(*(p-1)))
-				*p++ = slash;
+			if (p > s && !is_slashc(*(p-1)))
+				*p++ = SLASHC;
 			if (*(pp+1) == '.') {
 				if (*(pp+2) == EOS) {
 					/* change "/." at end to "" */
 					*(p-1) = EOS;	/* and we're done */
 					break;
 				}
-				if (slashc(*(pp+2))) {
+				if (is_slashc(*(pp+2))) {
 					pp += 2;
 					continue;
-				} else if (*(pp+2) == '.' && (slashc(*(pp+3))
+				} else if (*(pp+2) == '.' && (is_slashc(*(pp+3))
 							|| *(pp+3) == EOS)) {
-					while (p-1 > s && slashc(*(p-1)))
+					while (p-1 > s && is_slashc(*(p-1)))
 						p--;
-					while (p > s && !slashc(*(p-1)))
+					while (p > s && !is_slashc(*(p-1)))
 						p--;
 					if (p == s)
-						*p++ = slash;
+						*p++ = SLASHC;
 					pp += 3;
 					continue;
 				}
@@ -525,10 +523,10 @@ char *ss;
 			*p++ = *pp++;
 		}
 	}
-	if (p > s && slashc(*(p-1)))
+	if (p > s && is_slashc(*(p-1)))
 		p--;
 	if (p == s)
-		*p++ = slash;
+		*p++ = SLASHC;
 	*p = EOS;
 #endif	/* UNIX || MSDOS */
 
@@ -612,11 +610,11 @@ int keep_cwd;
 	}
 #endif
 
-#if UNIX || MSDOS || OS2
+#if UNIX || MSDOS || WIN31 || OS2 || NT
 	cwd = current_directory(FALSE);
 	slp = ff = path;
 	while (*cwd && *ff && *cwd == *ff) {
-		if (slashc(*ff))
+		if (is_slashc(*ff))
 			slp = ff;
 		cwd++;
 		ff++;
@@ -627,11 +625,11 @@ int keep_cwd;
 	if (*cwd == EOS) {
 		if (keep_cwd) {
 			temp[0] = '.';
-			temp[1] = slash;
+			temp[1] = SLASHC;
 			temp[2] = EOS;
 		} else
 			*temp = EOS;
-		if (slashc(*ff))
+		if (is_slashc(*ff))
 			return strcpy(path, strcat(temp, ff+1));
 		if (slp == ff - 1)
 			return strcpy(path, strcat(temp, ff));
@@ -669,7 +667,7 @@ char *path;
 	char	*cwd;
 	char	*f;
 	char	temp[NFILEN];
-#if MSDOS || OS2
+#if MSDOS || WIN31 || OS2 || NT
 	char	drive;
 #endif
 
@@ -734,8 +732,8 @@ char *path;
 	}
 #endif
 
-#if UNIX || MSDOS || OS2
-#if MSDOS || OS2
+#if UNIX || MSDOS || WIN31 || OS2 || NT
+#if MSDOS || WIN31 || OS2 || NT
 	if ((f = is_msdos_drive(path)) != 0)
 		drive = *path;
 	else {
@@ -743,21 +741,21 @@ char *path;
 		f = path;
 	}
 #endif
-	if (!slashc(f[0])) {
-#if MSDOS || OS2
+	if (!is_slashc(f[0])) {
+#if MSDOS || WIN31 || OS2
 		cwd = curr_dir_on_drive(drive!=EOS?drive:curdrive());
 #else
 		cwd = current_directory(FALSE);
 #endif
 		len = strlen(strcpy(temp, cwd));
-		temp[len++] = slash;
+		temp[len++] = SLASHC;
 #if DJGPP
-		temp[0] = slash;  /* DJGCC returns '/', we may want '\' */
+		temp[0] = SLASHC;  /* DJGCC returns '/', we may want '\' */
 #endif
 		(void)strcpy(temp + len, f);
 		(void)strcpy(path, temp);
 	}
-#if MSDOS || OS2
+#if MSDOS || WIN31 || OS2
 	if (is_msdos_drive(path) == 0) { /* ensure that we have drive too */
 		temp[0] = curdrive();
 		temp[1] = ':';
@@ -791,18 +789,18 @@ char *path;
 		return TRUE;
 #endif
 
-#if UNIX || MSDOS || VMS || OS2
+#if UNIX || MSDOS || WIN31 || VMS || OS2 || NT
 	if ((f = path) != 0) {
 #if UNIX
 		if (f[0] == '~')
 			return TRUE;
 #endif
-		if (slashc(f[0]))
+		if (is_slashc(f[0]))
 			return TRUE;
 		else if (*f++ == '.') {
 			if (*f == '.')
 				f++;
-			if (slashc(f[0]))
+			if (is_slashc(f[0]))
 				return TRUE;
 		}
 	}
@@ -821,7 +819,7 @@ char *fn;
 {
 	if (is_pathname(fn))	/* test the obvious stuff */
 		return TRUE;
-#if MSDOS || OS2
+#if MSDOS || WIN31 || OS2 || NT
 	if (is_msdos_drive(fn))
 		return TRUE;
 #endif
@@ -925,7 +923,7 @@ char *	path;
 	  &&	((sb.st_mode & S_IFMT) == S_IFDIR));
 }
 
-#if (UNIX||VMS||MSDOS||OS2) && PATHLOOK
+#if (UNIX||VMS||MSDOS||WIN31||OS2||NT) && PATHLOOK
 /*
  * Parse the next entry in a list of pathnames, returning null only when no
  * more entries can be parsed.
@@ -969,3 +967,104 @@ path_leaks()
 #endif
 }
 #endif	/* NO_LEAKS */
+
+#if NT
+/********                                               \\  opendir  //
+ *                                                        ===========
+ * opendir
+ *
+ * Description:
+ *      Prepares to scan the file name entries in a directory.
+ *
+ * Arguments:   filename in NT format
+ *
+ * Returns:     pointer to a (malloc-ed) DIR structure.
+ *
+ * Joseph E. Greer      July 22 1992
+ *
+ ********/
+
+DIR *opendir(fname)
+char * fname;
+{
+	char buf[256];
+	DIR *od;
+
+	strcpy(buf, fname);
+
+	if (!strcmp(buf, ".")) /* if its just a '.', replace with '*.*' */
+		strcpy(buf, "*.*");
+	else
+		strcat(buf, "\\*.*");
+
+	/* allocate the structure to maintain currency */
+	if ((od = (DIR *)malloc(sizeof(DIR))) == NULL)
+		return NULL;
+
+	/* Let's try to find a file matching the given name */
+	if ((od->hFindFile = FindFirstFile(buf, &od->ffd))
+	    == INVALID_HANDLE_VALUE) {
+		free(od);
+		return NULL;
+	}
+	od->first = 1;
+	return od;
+}
+/********                                               \\  readdir  //
+ *                                                        ===========
+ * readdir
+ *
+ * Description:
+ *      Read a directory entry.
+ *
+ * Arguments:   a DIR pointer
+ *
+ * Returns:     A struct direct
+ *
+ * Joseph E. Greer      July 22 1992
+ *
+ ********/
+DIRENT *readdir(dirp)
+DIR *dirp;
+{
+	DIRENT *dep;
+
+	if (!dirp->first) {
+		if (!FindNextFile(dirp->hFindFile, &dirp->ffd))
+			return NULL;
+	}
+	dirp->first = 0;
+
+	if ((dep = (DIRENT *)malloc(sizeof(DIRENT))) == NULL)
+		return NULL;
+
+	if ((dep->d_name = strdup(dirp->ffd.cFileName)) == NULL) {
+		free(dep);
+		return NULL;
+	}
+	return dep;
+}
+																				     
+/********                                               \\  closedir  //
+ *                                                        ===========
+ * closedir
+ *
+ * Description:
+ *      Close a directory entry.
+ *
+ * Arguments:   a DIR pointer
+ *
+ * Returns:     A struct direct
+ *
+ * Joseph E. Greer      July 22 1992
+ *
+ ********/
+int closedir(dirp)
+DIR *dirp;
+{
+	FindClose(dirp->hFindFile);
+	free(dirp);
+	return 0;
+}
+
+#endif /* NT */

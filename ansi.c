@@ -3,13 +3,8 @@
  * over a serial line. The serial I/O services are provided by routines in
  * "termio.c". It compiles into nothing if not an ANSI device.
  *
- * $Log: ansi.c,v $
- * Revision 1.14  1994/04/25 21:07:13  pgf
- * changes for ANSI screen under MSDOS
  *
- * Revision 1.13  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
- *
+ * $Header: /usr/build/VCS/pgf-vile/RCS/ansi.c,v 1.15 1994/07/11 22:56:20 pgf Exp $
  */
 
 #define termdef 1			/* don't define "term" external */

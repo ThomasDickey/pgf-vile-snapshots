@@ -5,26 +5,17 @@
  * to be portable between compilers.
  * Supported monitor cards include CGA, MONO, EGA and VGA.
  *
- *	Differs from standard "ibmpc.c" in that the Zortech display library
- *  is called whenever possible.
- *  Modifications by Pete Ruczynski (pjr).
- * $Log: z_ibmpc.c,v $
- * Revision 1.9  1994/04/08 19:50:30  pgf
- * added #error
+ * Differs from standard "ibmpc.c" in that the Zortech display library
+ * is called whenever possible.
+ * Modifications by Pete Ruczynski (pjr).
  *
- * Revision 1.8  1994/03/11  11:57:01  pgf
- * *** empty log message ***
- *
- * Revision 1.7  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
- *
- *
+ * $Header: /usr/build/VCS/pgf-vile/RCS/z_ibmpc.c,v 1.10 1994/07/11 22:56:20 pgf Exp $
  *
  */
 #error This module is not actively maintained as part of vile.
 #error It can likely be made to work without much difficulty, but unless
 #error  I know someone is using it, i have little incentive to fix it.
-#error  If you use it when you build vile, please let me know.  pgf@cayman.com
+#error  If you use it when you build vile, please let me know.  -pgf
 
 #define	termdef	1			/* don't define "term" external */
 

@@ -2,55 +2,15 @@
  * This file contains the command processing functions for a number of random
  * commands. There is no functional grouping here, for sure.
  *
- * $Log: random.c,v $
- * Revision 1.127  1994/04/22 16:06:18  pgf
- * kev's font changes, mostly
- *
- * Revision 1.126  1994/04/22  13:49:18  pgf
- * more careful hook support
- *
- * Revision 1.125  1994/04/22  11:50:52  pgf
- * use #if PROC around the hook
- *
- * Revision 1.124  1994/04/22  11:33:51  pgf
- * added previous_directory() routine to support $ocwd variable, and
- * added cd hook calling point
- *
- * Revision 1.123  1994/04/18  17:35:51  pgf
- * kev's changes for attribution, man page macros
- *
- * Revision 1.122  1994/04/18  14:26:27  pgf
- * merge of OS2 port patches, and changes to tungetc operation
- *
- * Revision 1.121  1994/03/29  17:53:18  pgf
- * warning cleanup
- *
- * Revision 1.120  1994/03/18  18:30:38  pgf
- * fixes for OPT_MAP_MEMORY compilation
- *
- * Revision 1.119  1994/03/08  12:23:03  pgf
- * reworked the gocol/gotocol/getccol etc routines to provide slightly
- * different interface.  added getoff() routine.  moved region-oriented
- * functions to region.c
- *
- * Revision 1.118  1994/02/22  18:09:24  pgf
- * when choosing dos-mode for an ambiguous buffer, vote in favor of on
- * if the global mode is set, and we're running on DOS.  otherwise, choose
- * no-dos-mode.
- *
- * Revision 1.117  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
+ * $Header: /usr/build/VCS/pgf-vile/RCS/random.c,v 1.133 1994/07/11 22:56:20 pgf Exp $
  *
  */
 
 #include	"estruct.h"
 #include	"edef.h"
 
-#if HAVE_POLL
+#if HAVE_POLL && HAVE_POLL_H
 # include <poll.h>
-#endif
-#if HAVE_SELECT && AIX
-# include <sys/select.h>
 #endif
 
 #if WATCOM
@@ -73,7 +33,7 @@
 extern CMDFUNC f_forwchar, f_backchar, f_forwchar_to_eol, f_backchar_to_bol;
 
 /*--------------------------------------------------------------------------*/
-#if MSDOS || OS2
+#if MSDOS || OS2 || NT
 static	int	drive2char P(( int ));
 static	int	char2drive P(( int ));
 #endif
@@ -643,18 +603,26 @@ int watchinput;
 
 #  endif
 # endif
+#define have_slept 1
 #endif
 
 #if VMS
 	float	seconds = milli/1000.;
 	lib$wait(&seconds);
+#define have_slept 1
 #endif
 
-#if NEWDOSCC
+#if NT
+	Sleep(milli);
+#define have_slept 1
+#endif
+
+#if NEWDOSCC && MSDOS
 	delay(milli);
+#define have_slept 1
 #endif
 
-#if !(UNIX || VMS || NEWDOSCC)
+#ifndef have_slept
 	long i;
 	for (i = 0; i < term.t_pause; i++)
 		;
@@ -676,7 +644,12 @@ int force;
 
 	if (!force && cwd)
 		return cwd;
-#if USG && ! POSIX
+#if HAVE_GETCWD
+	cwd = getcwd(dirname, NFILEN);
+#else
+# if HAVE_GETWD
+	cwd = getwd(dirname);
+# else
 	{
 	FILE *f, *npopen();
 	int n;
@@ -691,19 +664,14 @@ int force;
 	npclose(f);
 	cwd = dirname;
 	}
-#else
-# if NEWDOSCC || POSIX || VMS
-	cwd = getcwd(dirname, NFILEN);
-# else
-	cwd = getwd(dirname);
 # endif
 #endif
-#if MSDOS || OS2
+#if MSDOS || OS2 || NT
 	(void)mklower(cwd);
 #endif
 	if (cwd == NULL) {
 		cwd = dirname;
-		dirname[0] = slash;
+		dirname[0] = SLASHC;
 		dirname[1] = EOS;
 	} else {
 		s = strchr(cwd, '\n');

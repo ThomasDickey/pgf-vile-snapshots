@@ -10,6 +10,8 @@
 # estruct.h to make sure the correct one is #defined as "1", and the others
 # all as "0".  If you use tcap.c, you'll need libtermcap.a too.  If you use
 # x11.c, you'll need libX11.a too.
+#
+# $Header: /usr/build/VCS/pgf-vile/RCS/descrip.mms,v 1.15 1994/07/11 22:56:20 pgf Exp $
 
 # for regular vile, use these:
 SCREEN = vmsvt
@@ -67,7 +69,7 @@ CSRCde = dg10.c display.c eval.c exec.c externs.c
 CSRCfh = fences.c file.c filec.c fileio.c finderr.c glob.c globals.c history.c hp110.c hp150.c
 CSRCim = ibmpc.c input.c insert.c isearch.c line.c main.c map.c modes.c mktbls.c
 CSRCnr = npopen.c opers.c oneliner.c path.c random.c regexp.c region.c
-CSRCst = search.c spawn.c st520.c tags.c tbuff.c tcap.c termio.c tipc.c tmp.c
+CSRCst = search.c select.c spawn.c st520.c tags.c tbuff.c tcap.c termio.c tipc.c tmp.c
 CSRCuw = undo.c version.c vmalloc.c vms2unix.c vmspipe.c vmsvt.c vt52.c window.c word.c wordmov.c
 CSRCxz = x11.c z309.c z_ibmpc.c
 
@@ -118,6 +120,7 @@ SRC =	main.c \
 	regexp.c \
 	region.c \
 	search.c \
+	select.c \
 	spawn.c \
 	tags.c \
 	tbuff.c \
@@ -165,6 +168,7 @@ OBJ =	main.obj,\
 	regexp.obj,\
 	region.obj,\
 	search.obj,\
+	select.obj,\
 	spawn.obj,\
 	tags.obj,\
 	tbuff.obj,\
@@ -271,15 +275,3 @@ xvile.com :
 	@ close test_script
 	@ write sys$output "** made $@"
 
-# $Log: descrip.mms,v $
-# Revision 1.13  1994/03/24 12:04:05  pgf
-# new X support
-#
-# Revision 1.12  1994/02/22  11:12:13  pgf
-# truncated RCS log for 4.0
-#
-# Revision 1.11  1994/02/03  19:35:12  pgf
-# tom's changes for 3.65
-#
-#
-#

@@ -1,31 +1,13 @@
 /*
  * 	older, simpler X11 support, Dave Lemke, 11/91
  *
- * $Log: x11simp.c,v $
- * Revision 1.46  1994/04/22 14:34:15  pgf
- * changed BAD and GOOD to BADEXIT and GOODEXIT
- *
- * Revision 1.45  1994/04/13  20:40:21  pgf
- * change kcod2str, fnc2str, string2prc to all deal in "p-strings", so
- * we can store null chars in binding strings.
- *
- * Revision 1.44  1994/03/24  12:12:45  pgf
- * arrow/escape key fixes
- *
- * Revision 1.43  1994/03/08  12:31:39  pgf
- * changed 'fulllineregions' to 'regionshape'.
- *
- * Revision 1.42  1994/03/02  10:01:23  pgf
- * no longer trim leading whitespace from pasted text -- and suppress
- * autoindent on the insertion.
- *
- * Revision 1.41  1994/02/25  10:23:47  pgf
- * took out redundant global ifdef
- *
- * Revision 1.40  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
+ * $Header: /usr/build/VCS/pgf-vile/RCS/x11simp.c,v 1.47 1994/07/11 22:56:20 pgf Exp $
  *
  */
+#error This module is not actively maintained as part of vile.
+#error It can likely be made to work without much difficulty, but unless
+#error  I know someone is using it, i have little incentive to fix it.
+#error  If you use it when you build vile, please let me know.  -pgf
 
 #include	"estruct.h"
 #include	"edef.h"

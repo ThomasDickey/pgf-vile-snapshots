@@ -2,12 +2,7 @@
  *	matching lines, then for each such line, an action is performed.
  *	written for vile by Paul Fox, (c)1990
  *
- * $Log: globals.c,v $
- * Revision 1.29  1994/04/25 22:32:08  pgf
- * make ":g/foo/p" leave you in the p-lines buffer
- *
- * Revision 1.28  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
+ * $Header: /usr/build/VCS/pgf-vile/RCS/globals.c,v 1.30 1994/07/11 22:56:20 pgf Exp $
  *
  */
 

@@ -1,12 +1,7 @@
 /*	tcap:	Unix V5, V7 and BS4.2 Termcap video driver
  *		for MicroEMACS
  *
- * $Log: tcap.c,v $
- * Revision 1.39  1994/04/22 14:34:15  pgf
- * changed BAD and GOOD to BADEXIT and GOODEXIT
- *
- * Revision 1.38  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
+ * $Header: /usr/build/VCS/pgf-vile/RCS/tcap.c,v 1.40 1994/07/11 22:56:20 pgf Exp $
  *
  */
 

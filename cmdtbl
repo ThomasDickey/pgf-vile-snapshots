@@ -73,40 +73,7 @@
 #		table for the Steve Kirkendall's elvis editor, so I included them
 #		here for completeness.
 #
-# $Log: cmdtbl,v $
-# Revision 1.93  1994/04/25 21:23:02  pgf
-# added w! and x! as synonyms for w and x, since they
-# are the same under vile
-#
-# Revision 1.92  1994/04/22  16:06:18  pgf
-# kev's font changes, mostly
-#
-# Revision 1.91  1994/04/18  17:35:51  pgf
-# kev's changes for attribution, man page macros
-#
-# Revision 1.90  1994/04/18  16:56:16  pgf
-# deleted altspeckey command
-#
-# Revision 1.89  1994/04/18  14:26:27  pgf
-# merge of OS2 port patches, and changes to tungetc operation
-#
-# Revision 1.88  1994/04/13  20:46:38  pgf
-# various fixes (towards 4.4) from kev
-#
-# Revision 1.87  1994/04/11  15:50:06  pgf
-# kev's attribute changes
-#
-# Revision 1.86  1994/04/07  18:12:25  pgf
-# added sel_motion (^S), moved operselect() to ^A-s
-#
-# Revision 1.85  1994/04/04  12:10:55  pgf
-# added select operator, on ^S
-#
-# Revision 1.84  1994/03/08  11:55:28  pgf
-# new rectangle-oriented commands
-#
-# Revision 1.83  1994/02/22  11:03:15  pgf
-# truncated RCS log for 4.0
+# $Header: /usr/build/VCS/pgf-vile/RCS/cmdtbl,v 1.96 1994/07/11 22:56:20 pgf Exp $
 #
 #
 
@@ -921,7 +888,7 @@ risearch	NONE			ISRCH
 revsearch	ABSM|MOTION
 	"reverse-search"		!FEWNAMES
 	'N'
-sel_motion	ABSM|MOTION
+sel_motion	ABSM|MOTION		OPT_SELECTIONS
 	"selection"
 	'^S'
 scrforwsearch	ABSM|MOTION
@@ -999,7 +966,7 @@ listvars	NONE			OPT_SHOW_EVAL
 	"showvars"			!FEWNAMES
 showversion	NONE|(EXRCOK)
 	"version"
-showmemory	NONE			TURBO|WATCOM|DJGPP
+showmemory	NONE			MSDOS&&(TURBO|WATCOM|DJGPP)
 	"memory"
 showtagstack	NONE			OPT_SHOW_TAGS
 	"tags"				!FEWNAMES

@@ -5,27 +5,7 @@
  * functions that adjust the top line in the window and invalidate the
  * framing, are hard.
  *
- * $Log: basic.c,v $
- * Revision 1.69  1994/04/12 11:40:11  pgf
- * corrected cursor position after backpage() -- should be at bottom
- * of window.  call firstnonwhite after both forwpage and backpage.
- *
- * Revision 1.68  1994/04/08  21:14:06  pgf
- * kev removed keyboard selection
- *
- * Revision 1.67  1994/04/07  18:11:15  pgf
- * beep management, and allow mouse to select newlines -- this fixes
- * a selection off-by-one problem as well.
- *
- * Revision 1.66  1994/03/29  16:24:20  pgf
- * kev's changes: selection and attributes
- *
- * Revision 1.65  1994/03/08  11:47:06  pgf
- * changed 'fulllineregions' to 'regionshape'.
- * added gorectnmmark() function.
- *
- * Revision 1.64  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
+ * $Header: /usr/build/VCS/pgf-vile/RCS/basic.c,v 1.71 1994/07/11 22:56:20 pgf Exp $
  *
  */
 
@@ -982,10 +962,10 @@ int f,n;
 	int c,i;
 
 	if (clexec || isnamedcmd) {
-		int stat;
+		int status;
 		static char cbuf[2];
-		if ((stat=mlreply("Set mark: ", cbuf, 2)) != TRUE)
-			return stat;
+		if ((status=mlreply("Set mark: ", cbuf, 2)) != TRUE)
+			return status;
 		c = cbuf[0];
 	} else {
 		c = tgetc(FALSE);
@@ -1073,10 +1053,10 @@ int *cp;
 	int useldmark;
 
 	if (clexec || isnamedcmd) {
-		int stat;
+		int status;
 		static char cbuf[2];
-		if ((stat=mlreply("Goto mark: ", cbuf, 2)) != TRUE)
-			return stat;
+		if ((status=mlreply("Goto mark: ", cbuf, 2)) != TRUE)
+			return status;
 		c = cbuf[0];
 		useldmark = (c == '\'' || c == '`');
 	} else {

@@ -2,15 +2,7 @@
  * Window management. Some of the functions are internal, and some are
  * attached to keys that the user actually types.
  *
- * $Log: window.c,v $
- * Revision 1.41  1994/04/22 14:34:15  pgf
- * changed BAD and GOOD to BADEXIT and GOODEXIT
- *
- * Revision 1.40  1994/04/20  19:24:25  pgf
- * always set WFHARD on receiving window in delwp()
- *
- * Revision 1.39  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
+ * $Header: /usr/build/VCS/pgf-vile/RCS/window.c,v 1.42 1994/07/11 22:56:20 pgf Exp $
  *
  */
 

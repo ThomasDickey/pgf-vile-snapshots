@@ -1,9 +1,7 @@
 /*	Crypt:	Encryption routines for MicroEMACS
  *		written by Dana Hoggatt and Daniel Lawrence
  *
- * $Log: crypt.c,v $
- * Revision 1.10  1994/02/22 11:03:15  pgf
- * truncated RCS log for 4.0
+ * $Header: /usr/build/VCS/pgf-vile/RCS/crypt.c,v 1.11 1994/07/11 22:56:20 pgf Exp $
  *
  */
 

@@ -3,10 +3,7 @@
  * compatible terminals. It goes directly to the graphics RAM to do
  * screen output. It compiles into nothing if not a TI-PC driver
  *
- * $Log: tipc.c,v $
- * Revision 1.5  1994/02/22 11:03:15  pgf
- * truncated RCS log for 4.0
- *
+ * $Header: /usr/build/VCS/pgf-vile/RCS/tipc.c,v 1.6 1994/07/11 22:56:20 pgf Exp $
  */
 
 #define termdef 1			/* don't define "term" external */

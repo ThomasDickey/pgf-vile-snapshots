@@ -11,7 +11,10 @@
  * which means that the dot and mark values in the buffer headers are nonsense.
  *
  * $Log: line.c,v $
- * Revision 1.70  1994/04/20 19:53:07  pgf
+ * Revision 1.71  1994/06/17 00:38:56  pgf
+ * kev's autoconf changes
+ *
+ * Revision 1.70  1994/04/20  19:53:07  pgf
  * changed an llength to lLength
  *
  * Revision 1.69  1994/04/12  17:11:53  pgf
@@ -917,6 +920,9 @@ ldelnewline()
 	return (TRUE);
 }
 
+
+static int kcharpending = -1;
+
 /*
  * Delete all of the text saved in the kill buffer. Called by commands when a
  * new kill context is being created. The kill buffer array is released, just
@@ -931,6 +937,7 @@ ksetup()
 		kregflag = KNEEDCLEAN;
 	kchars = klines = 0;
 	kregwidth = 0;
+	kcharpending = -1;
 
 }
 
@@ -939,8 +946,6 @@ ksetup()
  * if called from other than kinsert, only does anything in the case where
  * nothing was yanked
  */
-
-static int kcharpending = -1;
 
 void
 kdone()

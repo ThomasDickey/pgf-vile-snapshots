@@ -2,27 +2,7 @@
  *		written by Otto Lind
  *		6/3/93
  *
- * $Log: map.c,v $
- * Revision 1.18  1994/04/26 13:48:38  pgf
- * warning cleanup
- *
- * Revision 1.17  1994/04/22  15:57:39  pgf
- * typos
- *
- * Revision 1.16  1994/04/22  14:15:37  pgf
- * be sure and pass any arg through to a mapped string (fixes 1g where
- * g is mapped to G) (lee johnson)
- *
- * Revision 1.15  1994/04/13  20:40:21  pgf
- * change kcod2str, fnc2str, string2prc to all deal in "p-strings", so
- * we can store null chars in binding strings.
- *
- * Revision 1.14  1994/03/22  16:26:53  pgf
- * used updatescratch() for buffer animation triggering
- *
- * Revision 1.13  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
- *
+ * $Header: /usr/build/VCS/pgf-vile/RCS/map.c,v 1.20 1994/07/11 22:56:20 pgf Exp $
  * 
  */
 
@@ -116,7 +96,9 @@ char	*v;
 		status = FALSE;
 	} else {
 		m->key = key;
+#if REBIND
 		status = install_bind(key, &f_map_proc, &m->oldfunc);
+#endif
 	}
 	if (status != TRUE)
 		mlforce("[Mapping failed]");
@@ -140,8 +122,9 @@ int	key;
 				mhead = m->next;
 			else
 				pm->next = m->next;
-
+#if REBIND
 			status = rebind_key(key, m->oldfunc);
+#endif
 			free(m->kbdseq);
 			free((char *)m);
 			break;

@@ -1,25 +1,7 @@
 /* these routines take care of undo operations
  * code by Paul Fox, original algorithm mostly by Julia Harper May, 89
  *
- * $Log: undo.c,v $
- * Revision 1.51  1994/03/29 16:24:20  pgf
- * kev's changes: selection and attributes
- *
- * Revision 1.50  1994/03/18  18:30:38  pgf
- * fixes for OPT_MAP_MEMORY compilation
- *
- * Revision 1.49  1994/03/18  12:00:07  pgf
- * added comments on copied-marks and cookies
- *
- * Revision 1.48  1994/03/16  10:55:56  pgf
- * switch over to cookie method of marking copied lines for undo
- *
- * Revision 1.47  1994/03/08  12:28:21  pgf
- * trial version of repointstuff() which attempts to preserve offsets of
- * marks attached to lines being replaced.
- *
- * Revision 1.46  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
+ * $Header: /usr/build/VCS/pgf-vile/RCS/undo.c,v 1.52 1994/07/11 22:56:20 pgf Exp $
  *
  */
 

@@ -3,10 +3,7 @@
  *		adapted from elvis, in turn from
  *		Chris Janton's (chj) VMS Icon port.
  *
- * $Log: vmspipe.c,v $
- * Revision 1.4  1994/02/22 11:03:15  pgf
- * truncated RCS log for 4.0
- *
+ * $Header: /usr/build/VCS/pgf-vile/RCS/vmspipe.c,v 1.5 1994/07/11 22:56:20 pgf Exp $
  *
  */
 

@@ -8,57 +8,7 @@
  * Modified by Pete Ruczynski (pjr) for auto-sensing and selection of
  * display type.
  *
- * $Log: ibmpc.c,v $
- * Revision 1.54  1994/04/22 14:34:15  pgf
- * changed BAD and GOOD to BADEXIT and GOODEXIT
- *
- * Revision 1.53  1994/04/22  11:47:50  pgf
- * specify max col to scroll operation, since not all video BIOSes treat
- * '0' as max col. (richard hussong)
- *
- * Revision 1.52  1994/04/20  19:54:50  pgf
- * changes to support 'BORLAND' console i/o screen driver
- *
- * Revision 1.51  1994/04/18  14:26:27  pgf
- * merge of OS2 port patches, and changes to tungetc operation
- *
- * Revision 1.50  1994/04/06  10:03:46  pgf
- * warning fixup
- *
- * Revision 1.49  1994/04/04  11:33:46  pgf
- * added and implemented new attribute string argument to scwrite(), to
- * allow support of OPT_VIDEO_ATTR.  this is brute force right now, and
- * i don't quite understand what the relationship and layering should
- * be regarding color and reverse video.  right now fore and back-ground
- * colors are still passed in independently of the attribute string.
- *
- * Revision 1.48  1994/03/16  19:20:15  pgf
- * don't OR in the upper bit to the ctrans value.
- *
- * Revision 1.47  1994/03/16  19:01:44  pgf
- * implement palette string variable -- whitespace separated list of
- * seven "industry standard" color constants
- *
- * Revision 1.46  1994/03/11  12:03:40  pgf
- * cleaned up video driver selection -- now ibmcres is simply a string
- * based interface to scinit, which takes a driver number.  we search
- * the table top to bottom, in case there's more than one entry by the
- * same name, for different screen resolutions.
- *
- * Revision 1.45  1994/03/08  12:09:39  pgf
- * changed 'fulllineregions' to 'regionshape'.
- *
- * Revision 1.44  1994/03/07  11:24:14  pgf
- * took out the omnibook specific modes
- *
- * Revision 1.43  1994/02/25  13:09:00  pgf
- * fixes for watcom compiler and get_vga_bios_info
- *
- * Revision 1.42  1994/02/22  11:55:59  pgf
- * CSENSE should map directly to the original display type/mode
- *
- * Revision 1.41  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
+ * $Header: /usr/build/VCS/pgf-vile/RCS/ibmpc.c,v 1.56 1994/07/11 22:56:20 pgf Exp $
  *
  */
 
@@ -1026,7 +976,7 @@ int bacg;	/* background color */
 		if (ColorDisplay()) {
 			attrnorm = AttrColor(bacg,forg) << 8;
 			attrrev = AttrColor(forg,bacg) << 8;
-		} else 
+		} else
 #endif
 		{
 		attrnorm = AttrMono(bacg<forg) << 8;
@@ -1034,14 +984,14 @@ int bacg;	/* background color */
 		}
 		if (outstr) {
 			for (i = 0; i < nchar; i++) {
-				*lnptr++ = (outstr[i+col] & 255) | 
-					((attrstr[i+col] & VAREV) ? 
+				*lnptr++ = (outstr[i+col] & 255) |
+					((attrstr[i+col] & VAREV) ?
 						attrrev : attrnorm);
 			}
 		} else {
 			for (i = 0; i < nchar; i++) {
-				*lnptr++ = (SPACE & 255) | 
-					((attrstr[i+col] & VAREV) ? 
+				*lnptr++ = (SPACE & 255) |
+					((attrstr[i+col] & VAREV) ?
 						attrrev : attrnorm);
 			}
 		}
@@ -1065,7 +1015,6 @@ int bacg;	/* background color */
 			}
 		}
 	}
-
 
 	if (flickcode && (dtype == CDCGA)) {
 		/* wait for vertical retrace to be off */
@@ -1137,7 +1086,7 @@ void
 ibmscroll(from,to,n)
 int from, to, n;
 {
-#if PRETTIER_SCROLL_patch
+#if PRETTIER_SCROLL
 	if (absol(from-to) > 1) {
 		ibmscroll(from, (from < to) ? to-1 : to+1, n);
 		if (from < to)
@@ -1146,12 +1095,19 @@ int from, to, n;
 			from = to+1;
 	}
 #endif
-	rg.h.ah = 0x06;		/* scroll window up */
-	rg.h.al = n;		/* number of lines to scroll */
+	if (from > to) {
+		rg.h.ah = 0x06;		/* scroll window up */
+		rg.h.al = from - to;	/* number of lines to scroll */
+		rg.h.ch = to;		/* upper window row */
+		rg.h.dh = from + n - 1;	/* lower window row */
+	} else {
+		rg.h.ah = 0x07;		/* scroll window down */
+		rg.h.al = to - from;	/* number of lines to scroll */
+		rg.h.ch = from;		/* upper window row */
+		rg.h.dh = to + n - 1;	/* lower window row */
+	}
 	rg.h.bh = scblank();	/* attribute to use for line-fill */
-	rg.h.ch = min(to,from);	/* upper window row */
 	rg.h.cl = 0;		/* left window column */
-	rg.h.dh = max(to,from);	/* lower window row */
 	rg.h.dl = term.t_ncol - 1; /* lower window column */
 	INTX86(0x10, &rg, &rg);
 }
@@ -1384,7 +1340,11 @@ ms_install()
 	rodent_cursor_display = FALSE; /* safest assumption */
 	if (ms_exists()) {
 		struct SREGS segs;
-		rg.x._AX_ = 0xc;
+		rg.x._AX_ = 0x4;	/* set mouse position */
+		rg.x._CX_ = 0;
+		rg.x._DX_ = 0;
+		MouseCall;
+		rg.x._AX_ = 0xc;	/* define event handler */
 		rg.x._CX_ = MS_MOVEMENT | MS_BTN1_PRESS | MS_BTN1_RELEASE;
 		rg.x._DX_ = FP_OFF(ms_event_handler);
 		segs.es = FP_SEG(ms_event_handler);

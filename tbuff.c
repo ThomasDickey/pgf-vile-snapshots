@@ -7,13 +7,7 @@
  *	To do:	add 'tb_ins()' and 'tb_del()' to support cursor-level command
  *		editing.
  *
- * $Log: tbuff.c,v $
- * Revision 1.14  1994/03/02 09:49:06  pgf
- * eliminated need for strlen() call in tb_sappend
- *
- * Revision 1.13  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
- *
+ * $Header: /usr/build/VCS/pgf-vile/RCS/tbuff.c,v 1.15 1994/07/11 22:56:20 pgf Exp $
  *
  */
 

@@ -3,19 +3,7 @@
  * paragraph at a time.  There are all sorts of word mode commands.  If I
  * do any sentence mode commands, they are likely to be put in this file. 
  *
- * $Log: word.c,v $
- * Revision 1.40  1994/04/08 19:57:30  pgf
- * check getregion() return value.
- *
- * Revision 1.39  1994/03/08  12:30:42  pgf
- * changed 'fulllineregions' to 'regionshape'.
- * added column args to entabline.
- *
- * Revision 1.38  1994/02/28  15:11:30  pgf
- * don't let joinregion() do yanking -- it shouldn't disrupt the kill registers
- *
- * Revision 1.37  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
+ * $Header: /usr/build/VCS/pgf-vile/RCS/word.c,v 1.41 1994/07/11 22:56:20 pgf Exp $
  *
  */
 

@@ -9,24 +9,13 @@
  *
  * Note: Visual flashes are not yet supported.
  *
- * $Log: borland.c,v $
- * Revision 1.3  1994/04/22 16:38:33  pgf
- * *** empty log message ***
  *
- * Revision 1.2  1994/04/20  20:00:26  pgf
- * use putch('\a') to get a beep
- *
- * Revision 1.1  1994/04/20  19:54:50  pgf
- * changes to support 'BORLAND' console i/o screen driver
- *
- * Revision 1.0  1994/04/18  13:52:13  pgf
- * Initial revision
- *
+ * $Header: /usr/build/VCS/pgf-vile/RCS/borland.c,v 1.5 1994/07/11 22:56:20 pgf Exp $
  *
  */
 
 
-#if OS2
+#if defined __OS2__    /* Catch-22: OS2 is not defined until estruct.h */
 #define INCL_VIO
 #define INCL_NOPMAPI
 #include <os2.h>
@@ -54,6 +43,7 @@
 #define	NPAUSE	200			/* # times thru update to pause */
 #define	SPACE	32			/* space character		*/
 
+#define VIO 0				/* TESTING, not working yet	*/
 
 /* We assume that most users have a color display.  */
 
@@ -81,7 +71,7 @@ int	cfcolor = -1;		/* current forground color */
 int	cbcolor = -1;		/* current background color */
 int	ctrans[NCOLORS];
 /* ansi to ibm color translation table */
-char *initpalettestr = "0 4 2 14 1 5 3 15";
+char *initpalettestr = "0 4 2 14 1 5 3 7";  /* 15 is too bright */
 /* black, red, green, yellow, blue, magenta, cyan, white   */
 
 #if	SCROLLCODE
@@ -139,13 +129,19 @@ set_cursor(int cmode)
 
 
 /*--------------------------------------------------------------------------*/
-
+/* FIXX these: the borland textcolor sets attributes for text drawn after
+ * the call, not whats already displayed.  sgarbf will work, by forcing a
+ * redraw, but it's done twice in opening the screen (ugly).  If we don't
+ * do it here, then setting background or foreground color later won't
+ * update the screen (ugly).
+ */
 void
 borfcol(color)		/* set the current output color */
 int color;	/* color to set */
 {
 	cfcolor = ctrans[color];
 	textcolor(cfcolor & 15);
+	sgarbf = TRUE;
 }
 
 void
@@ -154,13 +150,18 @@ int color;	/* color to set */
 {
 	cbcolor = ctrans[color];
 	textbackground(cbcolor & 7);
+	sgarbf = TRUE;
 }
 
 void
 bormove(row, col)
 int row, col;
 {
+#if VIO
+	VioSetCurPos(row, col, 0);
+#else
 	gotoxy(col+1, row+1);
+#endif
 }
 
 /* erase to the end of the line */
@@ -212,11 +213,13 @@ char *res;	/* resolution to change to */
 		if ((i = (int)strtol(res, &dst, 0)) >= 0 && !*dst)
 		{
 		/* only allow valid row selections */
+		/* Are these all valid under dos?  */
 		if (i==2)  status=scinit(25); 
 		if (i==4)  status=scinit(43);
 		if (i==5)  status=scinit(50);
+		if (i==6)  status=scinit(60);
 
-		if (i>5 && i<28) 
+		if (i>6 && i<28) 
 			status=scinit(25);
 			
 		if (i>=28 && i<43) 
@@ -233,6 +236,7 @@ char *res;	/* resolution to change to */
 
 		}
 	}
+	sgarbf = TRUE;
 	return status;
 }
 
@@ -257,10 +261,12 @@ borbeep()
 void
 boropen()
 {
+	spal(initpalettestr);
 	borfcol(gfcolor);
 	borbcol(gbcolor);
 	if (!borcres(current_res_name))
 		(void)scinit(-1);
+	ttopen();
 }
 
 
@@ -288,6 +294,70 @@ borkclose()	/* close the keyboard */
 	/* ms_deinstall(); */
 }
 
+#if OS2  		/* all modes are available under OS/2 */
+static
+int scinit(rows)	/* initialize the screen head pointers */
+int rows;		/* Number of rows. only do 80 col */
+{
+
+	/* and set up the various parameters as needed */
+
+	if (rows == -1)
+	{
+		struct text_info ti;
+		gettextinfo(&ti);
+		rows = ti.screenheight;
+	}
+
+	switch (rows) {
+
+/* these are enum's, and thus cannot easily be checked, ie. #ifdef C80X21 */
+		case 21:	/* color C80X21 */
+				textmode(C80X21);
+				newscreensize(21, term.t_ncol);
+				(void)strcpy(sres, "C80X21");
+				break;
+
+		default:
+		case 25:	/* Color graphics adapter */
+				textmode(C80);
+				newscreensize(25, term.t_ncol);
+				(void)strcpy(sres, "C80");
+				break;
+
+		case 28:	/* Enhanced graphics adapter */
+				textmode(C80X28);
+				newscreensize(28, term.t_ncol);
+				(void)strcpy(sres, "C80X28");
+				break;
+
+		case 43:	/* Enhanced graphics adapter */
+				textmode(C80X43);
+				newscreensize(43, term.t_ncol);
+				(void)strcpy(sres, "C80X43");
+				break;
+
+		case 50:	/* VGA adapter */
+				textmode(C80X50);
+				newscreensize(50, term.t_ncol);
+				(void)strcpy(sres, "C80X50");
+				break;
+
+		case 60:	/* Enhanced graphics adapter */
+				textmode(C80X60);
+				newscreensize(60, term.t_ncol);
+				(void)strcpy(sres, "C80X60");
+				break;
+
+
+	}
+
+	ibmtype = rows;
+
+	return(TRUE);
+}
+
+#else /* OS2 */
 
 static
 int scinit(rows)	/* initialize the screen head pointers */
@@ -305,13 +375,7 @@ int rows;		/* Number of rows. only do 80 col */
 
 	switch (rows) {
 
-#ifdef C80X21
-		case 21:	/* color C80X21 */
-				textmode(C80X21);
-				newscreensize(21, term.t_ncol);
-				(void)strcpy(sres, "C80X21");
-				break;
-#endif
+/* DOS has only (?) BW40, C40, BW80, C80, MONO, and C4350 */
 
 		default:
 		case 25:	/* Color graphics adapter */
@@ -320,48 +384,8 @@ int rows;		/* Number of rows. only do 80 col */
 				(void)strcpy(sres, "C80");
 				break;
 
-#ifdef C80X28
-		case 28:	/* Enhanced graphics adapter */
-				textmode(C80X28);
-				newscreensize(28, term.t_ncol);
-				(void)strcpy(sres, "C80X28");
-				break;
-#endif
-
-#ifdef C80X43
-#define have43 1
-		case 43:	/* Enhanced graphics adapter */
-				textmode(C80X43);
-				newscreensize(43, term.t_ncol);
-				(void)strcpy(sres, "C80X43");
-				break;
-#endif
-
-#ifdef C80X50
-#define have50 1
-		case 50:	/* VGA adapter */
-				textmode(C80X50);
-				newscreensize(50, term.t_ncol);
-				(void)strcpy(sres, "C80X50");
-				break;
-#endif
-
-#ifdef C80X60
-		case 60:	/* Enhanced graphics adapter */
-				textmode(C80X60);
-				newscreensize(60, term.t_ncol);
-				(void)strcpy(sres, "C80X60");
-				break;
-#endif
-
-#if !have43 || !have50
-#ifdef C4350
-#if !have43
 		case 43:
-#endif
-#if !have50
 		case 50:
-#endif
 				/* Enhanced graphics adapter */
 				/* FIXXX this needs to ask how big 
 					we get after C4350, and call
@@ -370,8 +394,6 @@ int rows;		/* Number of rows. only do 80 col */
 				newscreensize(50, term.t_ncol);
 				(void)strcpy(sres, "C80X50");
 				break;
-#endif /* C4350 */
-#endif /* have...*/
 
 	}
 
@@ -380,6 +402,7 @@ int rows;		/* Number of rows. only do 80 col */
 	return(TRUE);
 }
 
+#endif /* OS2 */
 
 /* returns attribute for blank/empty space */
 static int
@@ -402,7 +425,11 @@ borscroll(from,to,n)
 int from, to, n;
 {
 	int i;
+	unsigned char a = (unsigned)scblank();
 	if (to == from) return;
+#if VIO
+	VioScrollUp(min(to,from),0,max(to,from),term.t_ncol,n,&a,0);
+#else
 #if PRETTIER_SCROLL
 	if (absol(from-to) > 1) {
 		borscroll(from, (from<to) ? to-1:to+1, n);
@@ -427,6 +454,7 @@ int from, to, n;
 		for (i = to - from; i > 0; i--)
 			insline();
 	}
+#endif	/* VIO */
 }
 #endif	/* SCROLLCODE */
 

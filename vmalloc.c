@@ -9,9 +9,7 @@
  *	They and the accompanying article were written by Eric White.
  *	(pgf, 1989)
  *
- * $Log: vmalloc.c,v $
- * Revision 1.18  1994/02/22 11:03:15  pgf
- * truncated RCS log for 4.0
+ * $Header: /usr/build/VCS/pgf-vile/RCS/vmalloc.c,v 1.19 1994/07/11 22:56:20 pgf Exp $
  *
  */
 

@@ -5,33 +5,7 @@
  * keys. Like everyone else, they set hints
  * for the display system.
  *
- * $Log: buffer.c,v $
- * Revision 1.90  1994/04/22 15:55:16  pgf
- * missed a bufhook
- *
- * Revision 1.89  1994/04/22  13:47:32  pgf
- * buffer-hook
- *
- * Revision 1.88  1994/04/01  14:30:02  pgf
- * tom's warning/lint patch
- *
- * Revision 1.87  1994/04/01  10:46:02  pgf
- * return readin()'s return value from swbuffer()
- *
- * Revision 1.86  1994/04/01  10:40:33  pgf
- * rearrange new buffer init so that b_dot values aren't clobbered
- *
- * Revision 1.85  1994/03/29  16:24:20  pgf
- * kev's changes: selection and attributes
- *
- * Revision 1.84  1994/03/10  20:02:15  pgf
- * the histbuffer command now stutters with a call to tgetc instead of
- * kbd_seq, so that the pushback of an unused command works okay.
- * also, anycb() now returns a pointer to the first modified buffer
- * it encounters, so callers can treat the single buffer case specially
- *
- * Revision 1.83  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
+ * $Header: /usr/build/VCS/pgf-vile/RCS/buffer.c,v 1.92 1994/07/11 22:56:20 pgf Exp $
  *
  */
 
@@ -1256,7 +1230,8 @@ void	makebufflist(iflag,dummy)
 		char	temp[20];
 		bsizes(curbp);
 		(void)lsprintf(temp, "%7ld", curbp->b_bytecount);
-		(void)memcpy(l_ref(curlp)->l_text + 6, temp, strlen(temp));
+		(void)memcpy(l_ref(curlp)->l_text + 6, temp,
+		             (SIZE_T)strlen(temp));
 	}
 }
 

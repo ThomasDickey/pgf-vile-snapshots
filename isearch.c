@@ -1,4 +1,3 @@
-/* vile note, 6/1/91, pgf -- I haven't tried this code in a long time */
 /*
  * The functions in this file implement commands that perform incremental
  * searches in the forward and backward directions.  This "ISearch" command
@@ -6,22 +5,9 @@
  * implementation (ITS).  Contains references to routines internal to
  * SEARCH.C.
  *
- * REVISION HISTORY:
+ * original author: D. R. Banks 9-May-86
  *
- * D. R. Banks 9-May-86 - added ITS EMACSlike ISearch
- *
- * John M. Gamble 5-Oct-86 - Made iterative search use search.c's scanner()
- * routine. This allowed the elimination of bakscan(). - Put isearch
- * constants into estruct.h - Eliminated the passing of 'status' to
- * scanmore() and checknext(), since there were no circumstances where it
- * ever equalled FALSE.
- *
- * $Log: isearch.c,v $
- * Revision 1.28  1994/04/19 15:13:06  pgf
- * use strncpy0() in likely places
- *
- * Revision 1.27  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
+ * $Header: /usr/build/VCS/pgf-vile/RCS/isearch.c,v 1.30 1994/07/11 22:56:20 pgf Exp $
  *
  */
 
@@ -151,7 +137,7 @@ int f,n;
 	curpos = DOT;		/* Save the current pointer */
 	init_direction = n;	/* Save the initial search direction */
 
-	ignorecase = b_val(curwp->w_bufp, MDIGNCASE);
+	ignorecase = window_b_val(curwp, MDIGNCASE);
 
 	scanboundry(FALSE, DOT, FORWARD);	/* keep scanner() finite */
 
@@ -300,7 +286,7 @@ scanmore(patrn, dir)		/* search forward or back for a pattern */
 	if (!gregexp)
 		return FALSE;
 
-	ignorecase = b_val(curwp->w_bufp, MDIGNCASE);
+	ignorecase = window_b_val(curwp, MDIGNCASE);
 
 	sts = scanner(gregexp, (dir < 0) ? REVERSE : FORWARD, FALSE);
 

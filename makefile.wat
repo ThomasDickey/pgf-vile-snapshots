@@ -3,21 +3,7 @@
 # based on the original makefile of vile 3.46 (see the original makefile)
 # T.DANG (dang@cogit.ign.fr)
 #
-# $Log: makefile.wat,v $
-# Revision 1.10  1994/04/25 21:07:13  pgf
-# changes for ANSI screen under MSDOS
-#
-# Revision 1.9  1994/04/04  11:35:50  pgf
-# added dependencies
-#
-# Revision 1.8  1994/04/01  16:05:54  pgf
-# added select.c
-#
-# Revision 1.7  1994/02/23  05:10:18  pgf
-# added comment about suppressing the dos4gw banner
-#
-# Revision 1.6  1994/02/22  11:03:15  pgf
-# truncated RCS log for 4.0
+# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.wat,v 1.11 1994/07/11 22:56:20 pgf Exp $
 #
 # if you use the watcom version of vile, you may want to "set DOS4G=quiet"
 # to suppress the DOS 4G/W banner that comes up from the Rational Systems

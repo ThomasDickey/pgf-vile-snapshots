@@ -12,10 +12,7 @@
  *
  *		pgf, 11/91
  *
- * $Log: regexp.c,v $
- * Revision 1.40  1994/02/22 11:03:15  pgf
- * truncated RCS log for 4.0
- *
+ * $Header: /usr/build/VCS/pgf-vile/RCS/regexp.c,v 1.41 1994/07/11 22:56:20 pgf Exp $
  *
  */
 

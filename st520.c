@@ -4,18 +4,13 @@
  * using VT52 emulation.  The I/O services are provided here as well.  It
  * compiles into nothing if not a 520ST style device.
  *
- * $Log: st520.c,v $
- * Revision 1.10  1994/04/08 19:50:30  pgf
- * added #error
- *
- * Revision 1.9  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
+ * $Header: /usr/build/VCS/pgf-vile/RCS/st520.c,v 1.11 1994/07/11 22:56:20 pgf Exp $
  *
  */
 #error This module is not actively maintained as part of vile.
 #error It can likely be made to work without much difficulty, but unless
 #error  I know someone is using it, i have little incentive to fix it.
-#error  If you use it when you build vile, please let me know.  pgf@cayman.com
+#error  If you use it when you build vile, please let me know.  -pgf
 
 #define termdef 1			/* don't define "term" external */
 

@@ -7,33 +7,7 @@
  * Most code probably by Dan Lawrence or Dave Conroy for MicroEMACS
  * Extensions for vile by Paul Fox
  *
- *	$Log: insert.c,v $
- *	Revision 1.57  1994/04/18 16:59:09  pgf
- *	don't use poundc as flag when inserting -- just use hardcoded '#'
- *
- * Revision 1.56  1994/04/18  14:26:27  pgf
- * merge of OS2 port patches, and changes to tungetc operation
- *
- * Revision 1.54  1994/04/13  21:39:13  pgf
- * readability
- *
- * Revision 1.53  1994/04/01  14:30:02  pgf
- * tom's warning/lint patch
- *
- * Revision 1.52  1994/03/18  18:30:38  pgf
- * fixes for OPT_MAP_MEMORY compilation
- *
- * Revision 1.51  1994/03/11  13:57:31  pgf
- * make backspace non-destructive in overwrite mode
- *
- * Revision 1.50  1994/03/08  12:10:13  pgf
- * changed 'fulllineregions' to 'regionshape'.
- * fixed inconsistency in autoindent, where breaking a line which ends
- * in a brace in two would cause the second half to be indented, when
- * it shouldn't be.
- *
- * Revision 1.49  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
+ * $Header: /usr/build/VCS/pgf-vile/RCS/insert.c,v 1.58 1994/07/11 22:56:20 pgf Exp $
  *
  */
 

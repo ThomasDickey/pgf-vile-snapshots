@@ -2,51 +2,21 @@
  * The routines in this file read and write ASCII files from the disk. All of
  * the knowledge about files are here.
  *
- * $Log: fileio.c,v $
- * Revision 1.72  1994/04/26 13:47:43  pgf
- * warning cleanup
- *
- * Revision 1.71  1994/04/19  16:03:06  pgf
- * isready_c for new GNU stdio lib
- *
- * Revision 1.70  1994/04/18  14:26:27  pgf
- * merge of OS2 port patches, and changes to tungetc operation
- *
- * Revision 1.69  1994/04/07  18:14:17  pgf
- * beep management
- *
- * Revision 1.68  1994/04/05  12:17:00  pgf
- * warning cleanup
- *
- * Revision 1.67  1994/03/24  12:29:20  pgf
- * eliminate #elif for broken HP/UX compiler
- *
- * Revision 1.66  1994/03/23  12:57:57  pgf
- * rationalized use of mlerror() and FIOERR.  now, the function that
- * first generates FIOERR is guaranteed to have put out a message, probably
- * via mlerror.
- *
- * Revision 1.65  1994/03/18  18:30:38  pgf
- * fixes for OPT_MAP_MEMORY compilation
- *
- * Revision 1.64  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
+ * $Header: /usr/build/VCS/pgf-vile/RCS/fileio.c,v 1.76 1994/07/11 22:56:20 pgf Exp $
  *
  */
 
 #include	"estruct.h"
 #include        "edef.h"
-#if UNIX || VMS || MSDOS || OS2
+#if UNIX || VMS || MSDOS || OS2 || NT
 #include	<sys/stat.h>
 #endif
 
 #if VMS
 #include	<file.h>
-#else
-#include        <fcntl.h>
 #endif
 
-#if BERK
+#if HAVE_SYS_IOCTL_H
 #include	<sys/ioctl.h>
 #endif
 
@@ -62,7 +32,7 @@
 /*--------------------------------------------------------------------------*/
 
 static	void	free_fline P(( void ));
-#if MSDOS || OS2
+#if MSDOS || OS2 || NT
 static	int	copy_file P(( char *, char * ));
 static	int	make_backup P(( char *, int ));
 #endif
@@ -77,7 +47,7 @@ free_fline()
 	flen = 0;
 }
 
-#if MSDOS || OS2
+#if MSDOS || OS2 || NT
 /*
  * Copy file when making a backup, when we are appending.
  */
@@ -160,7 +130,7 @@ char    *fn;
 
 	if (isShellOrPipe(fn)) {
 		ffp = 0;
-#if UNIX || MSDOS || OS2
+#if UNIX || MSDOS || OS2 || NT
 	        ffp = npopen(fn+1, FOPEN_READ);
 #endif
 #if VMS
@@ -199,7 +169,7 @@ int
 ffwopen(fn)
 char    *fn;
 {
-#if UNIX || MSDOS || OS2
+#if UNIX || MSDOS || OS2 || NT
 	char	*name;
 	char	*mode = FOPEN_WRITE;
 
@@ -211,11 +181,11 @@ char    *fn;
 		}
 		fileispipe = TRUE;
 	} else {
-#if MSDOS || OS2
+#if MSDOS || OS2 || NT
 		int	appending = FALSE;
 #endif
 		if ((name = is_appendname(fn)) != NULL) {
-#if MSDOS || OS2
+#if MSDOS || OS2 || NT
 			appending = TRUE;
 #endif
 			fn = name;
@@ -273,7 +243,7 @@ char    *fn;
 	if (isShellOrPipe(fn)) {
 		return TRUE;
 	} else {
-#if UNIX || VMS || OS2
+#if HAVE_ACCESS
 		return (access(fn, 2) != 0);	/* W_OK==2 */
 #else
 		int fd;
@@ -287,7 +257,7 @@ char    *fn;
 }
 
 #if !OPT_MAP_MEMORY
-#if UNIX || VMS || OS2
+#if UNIX || VMS || OS2 || NT
 long
 ffsize()
 {
@@ -329,7 +299,7 @@ ffsize(void)
 #endif
 #endif	/* !OPT_MAP_MEMORY */
 
-#if UNIX || VMS || OS2
+#if UNIX || VMS || OS2 || NT
 
 int
 ffexists(p)
@@ -344,7 +314,7 @@ char *p;
 
 #endif
 
-#if MSDOS
+#if MSDOS || WIN31
 
 int
 ffexists(p)
@@ -427,7 +397,7 @@ ffclose()
 
 	free_fline();	/* free this since we do not need it anymore */
 
-#if UNIX || MSDOS || OS2
+#if UNIX || MSDOS || WIN31 || OS2 || NT
 	if (fileispipe) {
 		npclose(ffp);
 		mlforce("[Read %d lines%s]",
@@ -601,7 +571,7 @@ int *lenp;	/* to return the final length */
  * is _much_much_ faster, and I don't have to futz with non-blocking
  * reads...
  */
-#if WATCOM || OS2
+#if WATCOM || OS2 || NT
 #define no_isready_c 1 
 #endif
 

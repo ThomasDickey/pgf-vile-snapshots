@@ -4,18 +4,7 @@
  *	the cursor.
  *	written for vile by Paul Fox, (c)1990
  *
- * $Log: tags.c,v $
- * Revision 1.52  1994/04/19 15:13:06  pgf
- * use strncpy0() in likely places
- *
- * Revision 1.51  1994/04/01  14:30:02  pgf
- * tom's warning/lint patch
- *
- * Revision 1.50  1994/03/18  18:30:38  pgf
- * fixes for OPT_MAP_MEMORY compilation
- *
- * Revision 1.49  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
+ * $Header: /usr/build/VCS/pgf-vile/RCS/tags.c,v 1.54 1994/07/11 22:56:20 pgf Exp $
  *
  */
 #include	"estruct.h"
@@ -126,7 +115,7 @@ int taglen;
 			break;
 
 	i = 0;
-	if (b_val(curbp,MDTAGSRELTIV) && !slashc(*tfp)) {
+	if (b_val(curbp,MDTAGSRELTIV) && !is_slashc(*tfp)) {
 		register char *first = tagbp->b_fname;
 		char *lastsl = pathleaf(tagbp->b_fname);
 		while (lastsl != first)

@@ -1,15 +1,7 @@
 /* Find the next error in mentioned in the shell output window.
  * Written for vile by Paul Fox, (c)1990
  *
- * $Log: finderr.c,v $
- * Revision 1.35  1994/04/26 13:48:13  pgf
- * warning cleanup
- *
- * Revision 1.34  1994/04/19  15:13:06  pgf
- * use strncpy0() in likely places
- *
- * Revision 1.33  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
+ * $Header: /usr/build/VCS/pgf-vile/RCS/finderr.c,v 1.37 1994/07/11 22:56:20 pgf Exp $
  *
  */
 
@@ -96,7 +88,7 @@ int f,n;
 		*/
 		if (lisreal(dotp)) {
 			static	TBUFF	*tmp;
-#if SUNOS
+#if defined(sun)
 			char *t;
 #endif
 
@@ -136,7 +128,7 @@ int f,n;
 						errfile, &errline) == 2
 #endif
 
-#if HPUX			/* C compiler */
+#if defined(__hpux)			/* HP/UX C compiler */
 /* 	compiler-name: "filename", line line-number ...	*/
 			  ||  sscanf(text,
 			  	"%*s: \"%[^\"]\", line %d",
@@ -147,7 +139,7 @@ int f,n;
 			  ||  sscanf(text,
 			  	"%*s %*s %[^, \t], line %d",
 						errfile, &errline) == 2
-#if SUNOS			/* lint-output */
+#if defined(sun)			/* lint-output */
 			  ||  sscanf(text,
 			  	"%[^:( \t](%d):",  /* ) */
 				errfile, &errline) == 2

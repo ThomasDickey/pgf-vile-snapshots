@@ -33,19 +33,7 @@
  *	  freespace (or have been entirely freed).  Currently, only pages that
  *	  are in-memory can have space allocated from them.
  *
- * $Log: tmp.c,v $
- * Revision 1.10  1994/03/29 16:24:20  pgf
- * kev's changes: selection and attributes
- *
- * Revision 1.9  1994/03/24  12:45:28  pgf
- * compiler workaround, from tom (gcc 2.5.5)
- *
- * Revision 1.8  1994/03/16  10:55:56  pgf
- * switch over to cookie method of marking copied lines for undo
- *
- * Revision 1.7  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
- *
+ * $Header: /usr/build/VCS/pgf-vile/RCS/tmp.c,v 1.11 1994/07/11 22:56:20 pgf Exp $
  *
  */
 #include "estruct.h"

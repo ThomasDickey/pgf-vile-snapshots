@@ -7,16 +7,7 @@
  * Most code probably by Dan Lawrence or Dave Conroy for MicroEMACS
  * Extensions for vile by Paul Fox
  *
- *	$Log: fences.c,v $
- *	Revision 1.21  1994/04/01 14:30:02  pgf
- *	tom's warning/lint patch
- *
- * Revision 1.20  1994/03/08  12:09:24  pgf
- * changed 'fulllineregions' to 'regionshape'.
- *
- * Revision 1.19  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
- *
+ * $Header: /usr/build/VCS/pgf-vile/RCS/fences.c,v 1.22 1994/07/11 22:56:20 pgf Exp $
  *
  */
 
