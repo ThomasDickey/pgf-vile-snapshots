@@ -10,7 +10,11 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.75  1992/07/01 17:00:59  foxharp
+ * Revision 1.76  1992/07/07 08:36:07  foxharp
+ * redefined the command flags as long constants, so the upper 16 bits don't
+ * get lost on 16 bit machines.  (DOS)
+ *
+ * Revision 1.75  1992/07/01  17:00:59  foxharp
  * added ZIBMPC define, and comment re: COLOR support
  *
  * Revision 1.74  1992/06/25  23:00:50  foxharp
@@ -1416,32 +1420,32 @@ typedef struct {
 /* these are the flags which can appear in the CMDFUNC structure, describing
 	a command */
 #define NONE	0
-#define UNDO	0x01	/* command is undo-able, so clean up undo lists */
-#define REDO	0x02	/* command is redo-able, record it for dotcmd */
-#define MOTION	0x04	/* command causes motion, okay after operator cmds */
-#define FL	0x08	/* if command causes motion, opers act on full lines */
-#define ABS	0x10	/* command causes absolute (i.e. non-relative) motion */
-#define GOAL	0x20	/* column goal should be retained */
-#define GLOBOK	0x40	/* permitted after global command */
-#define OPER	0x80	/* function is an operator, affects a region */
-#define LISTED	0x100	/* internal use only -- used in describing bindings
+#define UNDO	1	/* command is undo-able, so clean up undo lists */
+#define REDO	2	/* command is redo-able, record it for dotcmd */
+#define MOTION	4	/* command causes motion, okay after operator cmds */
+#define FL	8	/* if command causes motion, opers act on full lines */
+#define ABS	16	/* command causes absolute (i.e. non-relative) motion */
+#define GOAL	32	/* column goal should be retained */
+#define GLOBOK	64	/* permitted after global command */
+#define OPER	128	/* function is an operator, affects a region */
+#define LISTED	256	/* internal use only -- used in describing bindings
 				to only describe each once */
 
 /* these flags are ex argument descriptors. I simply moved them over 
 	from elvis.  Not all are used or honored or implemented */
-#define FROM	(1<<16)		/* allow a linespec */
-#define	TO	(2<<16)		/* allow a second linespec */
-#define BANG	(4<<16)		/* allow a ! after the command name */
-#define EXTRA	(8<<16)		/* allow extra args after command name */
-#define XFILE	(16<<16)	/* expand wildcards in extra part */
-#define NOSPC	(32<<16)	/* no spaces allowed in the extra part */
-#define	DFLALL	(64<<16)	/* default file range is 1,$ */
-#define DFLNONE	(128<<16)	/* no default file range */
-#define NODFL	(256<<16)	/* do not default to the current file name */
-#define EXRCOK	(512<<16)	/* can be in a .exrc file */
-#define NL	(1024<<16)	/* if !exmode, then write a newline first */
-#define PLUS	(2048<<16)	/* allow a line number, as in ":e +32 foo" */
-#define ZERO	(4096<<16)	/* allow 0 to be given as a line number */
+#define FROM	(1L<<16)	/* allow a linespec */
+#define	TO	(2L<<16)	/* allow a second linespec */
+#define BANG	(4L<<16)	/* allow a ! after the command name */
+#define EXTRA	(8L<<16)	/* allow extra args after command name */
+#define XFILE	(16L<<16)	/* expand wildcards in extra part */
+#define NOSPC	(32L<<16)	/* no spaces allowed in the extra part */
+#define	DFLALL	(64L<<16)	/* default file range is 1,$ */
+#define DFLNONE	(128L<<16)	/* no default file range */
+#define NODFL	(256L<<16)	/* do not default to the current file name */
+#define EXRCOK	(512L<<16)	/* can be in a .exrc file */
+#define NL	(1024L<<16)	/* if !exmode, then write a newline first */
+#define PLUS	(2048L<<16)	/* allow a line number, as in ":e +32 foo" */
+#define ZERO	(4096L<<16)	/* allow 0 to be given as a line number */
 #define FILES	(XFILE + EXTRA)	/* multiple extra files allowed */
 #define WORD1	(EXTRA + NOSPC)	/* one extra word allowed */
 #define FILE1	(FILES + NOSPC)	/* 1 file allowed, defaults to current file */

@@ -5,7 +5,10 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.8  1992/06/26 22:19:10  foxharp
+ * Revision 1.9  1992/07/07 08:34:08  foxharp
+ * added not_found_msg, from search.c
+ *
+ * Revision 1.8  1992/06/26  22:19:10  foxharp
  * added dos argument globber
  *
  * Revision 1.7  1992/06/04  19:42:37  foxharp
@@ -503,6 +506,7 @@ extern int upperregion P(( void ));
 extern int charprocreg P(( int (*)() ));
 extern int getregion P(( REGION * ));
 extern int do_fl_region P(( int (*)(), int ));
+extern void not_found_msg P(( int, int ));
 extern int scrforwsearch P(( int, int ));
 extern int scrbacksearch P(( int, int ));
 extern int forwsearch P(( int, int ));

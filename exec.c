@@ -4,7 +4,12 @@
  *	written 1986 by Daniel Lawrence	
  *
  * $Log: exec.c,v $
- * Revision 1.29  1992/06/25 22:44:06  foxharp
+ * Revision 1.30  1992/07/07 08:37:48  foxharp
+ * set macro buffer's "dot" to first line when done storing, rather than
+ * leaving it at the last line.  less confusing when you bring one up for
+ * editing.
+ *
+ * Revision 1.29  1992/06/25  22:44:06  foxharp
  * better string quoting parse, from pjr
  *
  * Revision 1.28  1992/05/19  08:55:44  foxharp
@@ -116,6 +121,7 @@
 #include	<stdio.h>
 #include	"estruct.h"
 #include	"edef.h"
+
 
 extern CMDFUNC f_gomark;
 
@@ -1263,6 +1269,8 @@ nxtscan:	/* on to the next line */
 			/* service only the ENDM macro here */
 			if (dirnum == DENDM) {
 				mstore = FALSE;
+				bstore->b_dot.l = lforw(bstore->b_line.l);
+				bstore->b_dot.o = 0;
 				bstore = NULL;
 				goto onward;
 			}

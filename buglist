@@ -5,6 +5,10 @@ H	output sometimes doesn't flush properly after a shell escape -- seems
 	to be related to turning on the USE_FCNTL code in termio.c.  If anyone
 	finds this -- let me know!  I'd love to know the answer.
 
+H	The mvrightwind and mvleftwind functions are broken -- visiting lines
+	that are too short to be visible when the screen is shifted will
+	cause junk on the screen.
+
 E	DOS to-do:
 	- glomming (e.g. ":e *.c") does nothing under DOS -- the code in
 	expand_wild_args() can probably be used to accomplish this.
@@ -199,3 +203,12 @@ be nicer to use proper carriage return though.
 
 
 -------------------------------------------------- 
+
+I get lots of scribbles on my screen
+when I use the horizontal scrolling ^X^R and ^X^L.  It appears that the
+last byte or two from the cursor position sequence (cup in terminfo, cm in
+termcap).  Specifics: in an xterm with cup=\E[%i%p1%d;%p2%dH and moving
+around on the line (especially moving left off the screen, or doing __
+back into a window that was ^X^R) gives me a bunch of HH5H8H2H8H scribbled
+in some part of the screen.
+
