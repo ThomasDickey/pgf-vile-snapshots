@@ -5,7 +5,7 @@
  *	reading and writing of the disk are in "fileio.c".
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/file.c,v 1.144 1994/11/29 04:02:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/file.c,v 1.148 1994/12/15 15:05:26 pgf Exp $
  *
  */
 
@@ -153,7 +153,8 @@ char *fn;
 #if OPT_LCKFILES
 		/* release own lock before read the file again */
 		if ( global_g_val(GMDUSEFILELOCK) ) {
-			release_lock(fn);
+			if (!b_val(curbp,MDLOCKED) && !b_val(curbp,MDVIEW))
+				release_lock(fn);
 		}
 #endif
 		status = readin(fn, TRUE, bp, TRUE);
@@ -340,7 +341,8 @@ int f,n;
 #if OPT_LCKFILES
 	/* release own lock before read the replaced file */
 	if ( global_g_val(GMDUSEFILELOCK) ) {
-		release_lock(curbp->b_fname);
+		if (!b_val(curbp,MDLOCKED) && !b_val(curbp,MDVIEW))
+			release_lock(curbp->b_fname);
 	}
 #endif
 
@@ -560,9 +562,10 @@ int lockfl;		/* check the file for locks? */
 	 || (bp = find_b_name(fname)) == NULL) {
 		/* oh well.  canonicalize the name, and try again */
 		bp = getfile2bp(fname);
+		if (!bp)
+			return FALSE;
 	}
-
-	return bp2swbuffer(bp, isShellOrPipe(bp->b_fname), lockfl);
+	return bp2swbuffer(bp, isShellOrPipe(fname), lockfl);
 }
 
 /*
@@ -1621,8 +1624,11 @@ int f,n;
 	make_global_b_val(curbp,MDVIEW); /* no longer read only mode */
 #if OPT_LCKFILES
 	if ( global_g_val(GMDUSEFILELOCK) ) {
-		release_lock(curbp->b_fname);
+		if (!b_val(curbp,MDLOCKED) && !b_val(curbp,MDVIEW))
+			release_lock(curbp->b_fname);
 		ch_fname(curbp, fname);
+		make_global_b_val(curbp,MDLOCKED);
+		make_global_b_val(curbp,VAL_LOCKER);
 		grab_lck_file(curbp, fname);
 	} else
 #endif

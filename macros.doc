@@ -525,10 +525,10 @@ Directives
 	example,
 
 		~while &less $curcol 70
-			insert-string &cat &cat "[" #stuff "]"
+			insert-string &cat &cat "[" <stuff "]"
 		~endwhile
 
-	places items from buffer "item" in the current line until the
+	places items from buffer "stuff" in the current line until the
 	cursor is at or past column 70.  While loops may be nested and can
 	contain and be the targets of ~GOTOs with no ill effects.  Using a
 	while loop to enclose a repeated task will run much faster than the
@@ -543,7 +543,7 @@ Directives
 
 	;       Read in files and substitute "begining" with "beginning"
 
-		setv %filename #list
+		setv %filename <list
 		~while &not &seq %filename "<end>"
 			~force  find-file %filename
 			~if &seq $status FALSE
@@ -553,7 +553,7 @@ Directives
 			beginning-of-file
 			replace-string "begining" "beginning"
 			save-file
-			setv %filename #list
+			setv %filename <list
 		~endwhile
 
 	This while loop will process files until the list is exhausted or
@@ -578,5 +578,5 @@ Directives
 		insert-string "You are on an old machine!\n"
 
 -----------------------------------
-  $Header: /usr/build/VCS/pgf-vile/RCS/macros.doc,v 1.7 1994/10/02 15:08:09 pgf Exp $
+  $Header: /usr/build/VCS/pgf-vile/RCS/macros.doc,v 1.8 1994/12/09 15:48:14 pgf Exp $
 -----------------------------------

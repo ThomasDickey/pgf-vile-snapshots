@@ -270,7 +270,10 @@ File manipulation commands:
 
 
 	The commands ":ww" and ":wwq" correspond roughly to ":w" and ":wq",
-	but they each write all modified buffers.
+	but they each write all modified buffers.  Giving any numeric
+	argument to ":ww" (i.e.  "1:ww") will suppress the per-file and
+	"Press return to continue" message.  This may be useful when using
+	the command from within a macro.
 
 	As in vi, ranges of lines specified by line numbers (including '.',
 	'$', and '%' shorthands) or marks may precede these commands.  
@@ -366,8 +369,8 @@ Text manipulation command:
 
 	The ":&" and '&' commands work much as they do in vi, and repeat
 	the last substitution.  The '^A-&' command is a new operator (see
-	below), so it can work on regions: for example use '&}' to "repeat
-	the previous substitution over the rest of this paragraph".
+	below), so it can work on regions: for example use '^A-&}' to
+	"repeat the previous substitution over the rest of this paragraph".
 
 	Infinite Undo 
 	--------------
@@ -612,11 +615,13 @@ Miscellaneous commands
 		using ^V to escape them.  Then I invoke with @g to execute.)
 		Unfortunately, the parsing of the compiler output to get
 		the file and line numbers is currently hard-coded.
+
 	^X-t Set or report on the tab-stop width.  To set, the spacing must
 		precede the command, as in "4^X-t".  The "set tabstop"
 		command described below does the same thing.  The status
 		output indicates whether the buffer is currently using the
 		local or global copy of the tabstop value.
+
 	^X-f Set the local fill-column to be used with ^A-f and auto-wrap
 		mode on insert.  The default value is 7/8's of the screen
 		size, with a maximum of 70.  Since arguments come before
@@ -624,20 +629,24 @@ Miscellaneous commands
 		the same thing.  The status output indicates whether the
 		buffer is currently using the local or global copy of the
 		tabstop value.
+
 	^X-X	Set encryption key. (not well tested, but hopefully not broken)
 		CRYPT must have been on when vile was built for this to do
 		anything.
+
 	K	Count prefix.  The first time you type it, it is equivalent
 		to an argument of 4 to the following command.  If you repeat 
 		it, it becomes worth 16, the next time 64, etc...  
+
 	%	In addition to finding matching braces, brackets, and
-		parentheses, the '%' command will find matching #ifdef's
-		and C style comments.  If the cursor is on the # of
-		"#ifdef", the '%' command will find the matching "#endif"
-		or "#else".  On an "#else" it will find "#endif", and on
-		"#endif" it will go back up to the "#if".  If the cursor is
-		on any part of a "/*" or "*/" sequence, it will find the
-		appropriate corresponding C comment endpoint.
+		parentheses, the '%' command will find matching #if's,
+		#ifdef's and C style comments.  If the cursor is on the #
+		of "#ifdef"/"#if", the '%' command will find the matching
+		"#endif" or "#else".  On an "#else" it will find "#endif",
+		and on "#endif" it will go back up to the "#ifdef"/"#if". 
+		If the cursor is on any part of a "/*" or "*/" sequence, it
+		will find the appropriate corresponding C comment endpoint.
+
 	\	Identical to the ` motion, in that the cursor moves to
 		the specified mark (i.e. \a moves to mark 'a').  When
 		used with an operator command, the resulting region is
@@ -653,10 +662,15 @@ Miscellaneous commands
 		to delete all of the text between the starting point
 		and the final cursor position.  Any motion command can
 		appear in between the two 'q' commands.  If used alone,
-		i.e. _not_ in an operator context, then the spanned text is
-		selected, highlighted, and yanked as a side effect.  The
+		i.e. _not_ in an operator context, then the spanned text
+		is selected, highlighted, and yanked as a side effect.  The
 		resulting selection can then be manipulated with the ^S
-		pseudo-motion, below.
+		pseudo-motion, below.  If a mouse is available, whether in
+		an xterm via the "xterm-mouse" setting, or in xvile, then
+		button 1 can be clicked to do the extensions, since it, too,
+		is a motion command.  (Of course in xvile, it is easier to
+		simply "click and drag" -- the 'q' command isn't really
+		necessary at all.
 
 	^A-q	As above, but the motions will sweep out rectangular regions.
 
@@ -681,11 +695,15 @@ Miscellaneous commands
 	Portions of the internal "state" may be viewed using various
 	"show-xxx" commands:
 
+	show-abbreviations -- displays list of shortcuts defined with the
+		":abbr" command.  (synonymous with ":abbr<CR>")
+
 	show-buffers -- displays the current list of available buffers.  Given
 		any numeric argument, will list _all_ buffers, even those
 		normally invisible or considered temporary.
 
-	show-bindings -- displays the current list of key bindings.
+	show-commands or show-bindings -- displays the list of commands
+		and the keys bound to them.
 
 	show-global-modes, show-modes -- both synonymous with ":set<CR>"
 
@@ -698,6 +716,9 @@ Miscellaneous commands
 
 	show-mapped!-chars -- displays the strings mapped for insert mode
 		with ":map!".  (synonymous with ":map<CR>")
+
+	show-system-mapped-chars -- displays the strings mapped to
+		represent the terminal's function keys.
 
 	show-registers -- displays the current contents of the named and
 		numbered registers.
@@ -828,6 +849,18 @@ Editor modes
 		drift to the end of the list.  If this mode is not on, then
 		vile will behave more like vi, in that buffers remain in a
 		fixed order, that in which they were edited. (U)
+
+	autowrite (aw)  vile will write out any changed buffers which have
+		this mode turned on before performing a ^Z, "stop",
+		"suspend", ":!<cmd>", or '^X-!<cmd>'.  The ":sh" command is
+		not affected, nor is ":stop!" or ":suspend!".  Since
+		buffers inherit the global value of a mode, simply setting
+		the global autowrite value will cause all buffers to be
+		auto-written.  Individual buffers can be forced or
+		prevented from autowriting by setting the local value of
+		the mode for those buffers appropriately.  [In real vi,
+		autowrite mode will also force buffers to be written when
+		switching between files.  This is unnecessary in vile.] (B)
 
 	autoindent (ai) During insert, newly created lines inherit their
 		leading indent from the previous line in the buffer. (B)
@@ -1021,10 +1054,6 @@ Editor modes
 		map strings will be favored by the editor.  When set, vile
 		will match the longest available mapped string.  When reset,
 		(the default) vile will match the shortest available map. (U)
-
-	modeline-format (mlfmt) The format string to use for displaying
-		mode lines.  See "Mode line customization" for more
-		details.  (U)
 
 	paragraphs A regular expression defining where the "next-paragraph"
 		('}') and "previous-paragraph" ('{') commands will go. (B)
@@ -1239,10 +1268,9 @@ Editor modes
 Command History
 ---------------
 
-	You may scroll through the list of previous replies to the :-prompt by
-	typing up or down arrows (if your configuration supports it).  More
-	generally, vile recognizes the any key bound to the up/down line
-	commands.
+	You may scroll through the list of previous replies to the :-prompt
+	by using the up- or down-arrow special keys on your keyboard (if
+	your configuration supports it).
 
 Special Character Expansion
 ---------------------------
@@ -1371,20 +1399,24 @@ Key Rebinding
 	represented in this help file as two printable characters, to
 	ensure they are not deleted by mailers or file transfer programs.)
 
-	The list of internal function key names, which can be bound to,
-	along with their usual label, are as follows:
+	Function Keys
+	-------------
+	When you bind to a function key, you will see its value printed
+	as a 'poundsign' sequence.  And, if you wish to :map a function
+	key (see below), you will need to use its poundsign sequence.
 
-	   Usual Label    Vile name
-	   -----------    ---------
+	The list of function key labels, along with their "vile name",
+	are as follows:
+
+	   Usual Label    Vile name     Usual Label    Vile name
+	   -----------    ---------     -----------    ---------
 	    Up-arrow        #A          Home            #H
 	    Down-arrow      #B          End             #E
 	    Left-arrow      #D          Insert          #i
 	    Right-arrow     #C          Delete          #d
 	    Prior (PageUp)  #p          Find            #f
 	    Next (PageDown) #n          Select          #s
-					Help            #?
-					Menu            #m
-
+	    Help            #?		Menu            #m
 	    F1              #1          F12             #@
 	    F2              #2          F13             ##
 	    F3              #3          F14             #$
@@ -1395,7 +1427,6 @@ Key Rebinding
 	    F8              #8          F19             #(
 	    F9              #9          F20             #)
 	    F10             #0          F11             #!
-
 	    KeyPad_F1       #P          KeyPad_F3   #R
 	    KeyPad_F2       #Q          KeyPad_F4   #S
 
@@ -1403,8 +1434,8 @@ Key Rebinding
 	    mouse operations in an xterm.
 
 
-	:map, :map!, :noremap, :noremap! 
-	-------------------------------------------------
+	:map, :map!, :noremap, :noremap!
+	---------------------------------
 	The vi "map" and "map!" commands are implemented in vile.  As in
 	vi, mapping works best if the character sequence being bound
 	corresponds to pressing a single key.  Multiple key sequences will
@@ -1430,7 +1461,8 @@ Key Rebinding
 		map #1 <some-user-map-sequence>
 	in the .vilerc file, and have the user-sequence executed when the
 	system F1 key is pressed.  (Otherwise the terminal-specific
-	sequence would have to appear in the .vilerc.)
+	sequence would have to appear in the .vilerc.)  See the section
+	on "Function Keys" above for a full list.
 
 	The "remap" option controls whether the successfully mapped result
 	of a map is reevaluated for more mapping matches.  The "noremap" (and
@@ -1472,9 +1504,43 @@ Key Rebinding
 
 	The current set of mappings or "map!"ings may be viewed with
 	the commands ":map<CR>" (or ":show-mapped-chars") or ":map!<CR>"
-	(or ":show-mapped!-chars").  A preceding numeric argument to
-	either command will force display of the system-defined
-	:map[!] sequences instead (i.e. the function keys).
+	(or ":show-mapped!-chars").  
+
+	The system-defined maps, representing the function keys, may be 
+	shown with ":show-system-mapped-chars".
+
+	:abbr
+	------
+	The "abbr" command is also present in vile.  It is similar to, but
+	slightly different than, "map!".  Whereas "map!" examines
+	characters as they are typed, continuously looking for a match
+	against the stored translation strings, the "abbr" command examines
+	them after they are already in the buffer, and is more sensitive to
+	their surrounding context.
+	
+	First, abbreviations are never expanded unless followed by
+	non-"word" characters.  In addition, abbreviations which begin like
+	a "word" (i.e. with letters, digits, or the '_' character) are not
+	expanded if they immediately follow another "word" character --
+	they must follow whitespace or punctuation or the beginning of the
+	line.  Likewise, abbreviations that begin with a punctuation
+	character are not detected within more punctuation -- they must
+	follow whitespace or a "word", or the beginning of the line.
+	
+	If the "backspacelimit" setting is set (and it is, by default),
+	then characters not inserted during the current insertion command
+	are not considered in the above comparisons -- the start of the
+	current insertion behaves much like the beginning of line in that
+	case.
+
+	Abbreviations are never recursive.
+
+	vile is more lenient than vi regarding what is a valid
+	abbreviation.  vi insists that an abbreviation be all "word"
+	characters, or be all "non-word" characters, except for the last
+	character, which _must_ be a "word" character.  vile allows
+	anything at all to be abbreviated, only enforcing the expansion
+	rules mentioned above.
 
 
 Special "Terminal" Key Rebinding
@@ -1583,6 +1649,7 @@ Programmed procedures and macros
 	$llength	length of current line			(read only)
 	$match		last matched magic pattern		(read only)
 	$mode		current mode ("command","insert","overwrite") (rd. o.)
+	$modeline-format format of mode lines.  see "Mode line customization".
 	$modified	is current buffer modified or not?
 	$ntildes	percent of window filled by ~ chars, at end of buffer
 	$ocwd		previous directory			(read only)
@@ -1620,7 +1687,7 @@ Programmed procedures and macros
 	Response variables (a '@' followed by a prompt-string) cause vile to
 	prompt for input with the given prompt-string.
 
-	Buffer variables (a '#' followed by a buffer name) return the current
+	Buffer variables (a '<' followed by a buffer name) return the current
 	line of the specified buffer, automatically setting the position to the
 	next line.
 
@@ -2067,8 +2134,8 @@ Mode line customization
 	to visually separate windows and to distinguish the mode line from
 	text displayed in the window.  
 
-	The global editor mode "modeline-format" is set to a string which
-	controls formatting of mode lines.  This mode is user settable and
+	The editor variable "modeline-format" is set to a string which
+	controls formatting of mode lines.  This variable is user settable and
 	thus may be used to customize the display of mode lines.  The
 	format specifiers which may appear in the format control strings
 	are as follows:
@@ -2136,9 +2203,8 @@ Filtering "man" pages
 
 	When used in conjunction with the manfilt program (supplied),
 	either vile or xvile may be used to filter and view manual pages.
-	In xvile (with your font set properly), xvile will even display
-	certain portions of the manual page text in bold or italics as
-	appropriate.
+	xvile will even display (with your font set properly) certain
+	portions of the manual page text in bold or italics as appropriate.
 
 	The file manpage.rc (found in the vile source directory) contains
 	a macro which is bound to ^X-m.  It will prompt for a manual page,
@@ -2383,9 +2449,32 @@ X Window System specifics
 	multiClickTime	How long between clicks (in milliseconds) to
 			be accepted as a multi-click.
 
-	foreground	Foreground color.
+	foreground	
+	background	Foreground/Background color of the main xvile text
+			area.
 
-	background	Background color.
+	cursor.foreground 
+	cursor.background   Foreground/Background color of the cursor.
+			By default the cursor location is indicated by
+			inverting the foreground and background colors of
+			the cell the cursor is over.  Thus the color of the
+			cursor will vary depending upon location.  Use of
+			these subresources will cause the cursor to
+			maintain constant coloration of the user's
+			choosing, and may make it easier to see when it
+			appears in a "highlighted" or "selected" area of
+			text.
+
+	modeline.focusForeground
+	modeline.focusBackground   Foreground/Background color of the mode
+			line corresponding to the window with focus, i.e.
+			the "current" window.
+
+	modeline.foreground	
+	modeline.background   Foreground/Background color of mode lines
+			corresponding to windows without the keyboard
+			focus.  modeline.background is also used for the
+			scrollbar borders and resize grips.
 
 	focusFollowsMouse  If true, the "current" window is the window
 			inhabited by the mouse; no clicking is necessary
@@ -2397,6 +2486,20 @@ X Window System specifics
 
 	scrollbarWidth	An integer indicating the width of the scrollbar.
 
+	scrollbar.foreground   
+	scrollbar.background  Foreground/Background color of the slider or
+			one of the colors of the slider if a stippled
+			pixmap is used.  To force the slider to be only the
+			foreground color, you should set sliderIsSolid to
+			true.  (X toolkit version only)
+
+	scrollbar.sliderIsSolid   If false, indicates that the stippled
+			pixmap should be used to simulate grey.  This will
+			be best on monochrome displays.  True works better
+			for color displays.  True indicates the slider will
+			be displayed in only the foreground color.  (X
+			toolkit version only)
+
 	scrollRepeatTimeout  Amount of time in milliseconds to wait initially
 			before repeating scroll when button one or three are
 			held down. (X toolkit version only).
@@ -2405,6 +2508,11 @@ X Window System specifics
 			subsequent scrolls.   This parameter is also used
 			for controlling the speed at which selections are
 			scrolled.
+
+	selection.foreground
+	selection.background Foreground/Background color of the selection
+			regions.  "foreground" is the color that
+			the text is displayed in.
 
 	persistentSelections  If true (the default), highlighting of the
 			selection will persist even when button one is
@@ -2427,45 +2535,15 @@ X Window System specifics
 			such as a selection.  This will make the cursor
 			visible no matter where it is.
 
-	Scrollbar subresources
-	----------------------
-
-	These subresources only pertain X toolkit version of xvile and are
-	specified by prefixing "scrollbar." to the following resource
-	names (see further below for examples):
-
-	foreground	Color of the slider or one of the colors of the
-			slider if a stippled pixmap is used.  To force the
-			slider to be only the foreground color, you should
-			set sliderIsSolid to true.
-
-	background	Background color of scrollbar.
-
-	sliderIsSolid	If false, indicates that the stippled pixmap should
-			be used to simulate grey.  This will be best on
-			monochrome displays.  True works better for color
-			displays.  True indicates the slider will be displayed
-			in only the foreground color.
-
-	Selection subresources
-	----------------------
-
-	The following subresources control coloration of the selection and
-	may be specified by prefixing "selection." to the following
-	resource names (see further below for examples):
-
-	foreground	Foreground color.  This will be the color that the
-			text is displayed in.
-
-	background	Background color of the selection.
 
 	Sample .Xdefault entries
 	------------------------
 
 	You may or may not want to use the following as a starting point
-	for the "XVile" section of you .Xdefaults or .Xresources file.  If
+	for the "XVile" section of your .Xdefaults or .Xresources file.  If
 	you have a monochrome display server, you will probably not want
-	to use any of the color specifications.
+	to use any of the color specifications.  You may, however, wish
+	to set up a blinking cursor, using "blinkInterval"  (see above).
 
 	XVile*font: -*-courier-medium-r-normal-*-*-*-75-75-m-70-iso8859-*
 	XVile*geometry:	80x54
@@ -2473,8 +2551,13 @@ X Window System specifics
 	XVile.foreground: honeydew
 	XVile.scrollbar.foreground: firebrick2
 	XVile.scrollbar.sliderIsSolid: true
-	XVile.selection.background: IndianRed3
+	XVile.selection.background: aquamarine4
 	XVile.selection.foreground: honeydew
+	XVile.cursor.background: yellow
+	XVile.cursor.foreground: darkslategrey
+	XVile.modeline.Background: steelblue
+	XVile.modeline.foreground: darkslategrey
+	XVile.modeline.focusForeground: yellow
 
 	Fonts
 	-----
@@ -2566,9 +2649,6 @@ Differences from vi
 		; set paragraph and section r.e.s for speed on C/C++/perl code.
 		set paragraphs=^$
 		set sections=^[{^L]
-
-
-	The vi command ":abbr" is not supported.
 
 	There is no special lisp support.  But then, when was the last time
 	you heard of a lisp programmer that used vi?
@@ -2753,4 +2833,4 @@ Credits
 	(By the way, he is not the Paul D. Fox that wrote the Crisp editor.)
 
 ------------------------------------
- $Header: /usr/build/VCS/pgf-vile/RCS/vile.hlp,v 1.199 1994/12/05 14:08:22 pgf Exp $
+ $Header: /usr/build/VCS/pgf-vile/RCS/vile.hlp,v 1.210 1994/12/14 20:26:57 pgf Exp $

@@ -21,7 +21,7 @@
 # gnu autoconf support by kevin buettner, 5/94
 # original makefile for uemacs: Adam Fritz July 30,1987  (do you recognize it?)
 #
-# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.in,v 1.26 1994/12/04 15:13:42 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.in,v 1.28 1994/12/07 18:27:49 pgf Exp $
 #
 
 #### Start of system configuration section. ####
@@ -293,7 +293,7 @@ patch:	/tmp/vilevers
 	co -p$$orevlistrev revlist |					 \
 	while read file filerev						;\
 	do								 \
-	  rcsdiff -c -r$$filerev $$file 2>/dev/null || true		;\
+	  rcsdiff -c -u -r$$filerev $$file 2>/dev/null || true		;\
 	done  >patch$$ovilevers-$$vilevers 				;\
 	echo Created patch$$ovilevers-$$vilevers 
 
@@ -301,7 +301,7 @@ dpatch:
 	co -p revlist |					 		 \
 	while read file filerev						;\
 	do								 \
-	  rcsdiff -c -r$$filerev $$file 2>/dev/null || true		;\
+	  rcsdiff -c -u -r$$filerev $$file 2>/dev/null || true		;\
 	done  >patchREL-CUR 						;\
 	echo Created patchREL-CUR
 
@@ -321,7 +321,7 @@ rcsdiffrw:
 		echo 		;\
 		echo $$x	;\
 		echo =========	;\
-		rcsdiff $$x	;\
+		rcsdiff -u $$x	;\
 	done 2>&1		;\
 	echo			;\
 	echo all done
@@ -343,6 +343,11 @@ rw:
 	@ls -l $(DEV_DISTFILES) |\
 		egrep '^[^l].w' | \
 		sed 's;.* ;;'   # strip to last space
+
+populate:
+	for file in $(DEV_DISTFILES); do \
+	test -f $$file || co $$file ;\
+	done
 
 $(OBJ): estruct.h nemode.h edef.h proto.h config.h
 

@@ -1,9 +1,9 @@
 dnl Process this file with autoconf to produce a configure script.
-AC_REVISION($Revision: 1.13 $)
+AC_REVISION($Revision: 1.15 $)
 ### Use "configure -with-screen" to override the default configuration, which is
 ### termcap-based on unix systems.
 
-dnl $Header: /usr/build/VCS/pgf-vile/RCS/configure.in,v 1.13 1994/12/05 14:08:22 pgf Exp $
+dnl $Header: /usr/build/VCS/pgf-vile/RCS/configure.in,v 1.15 1994/12/12 13:43:29 pgf Exp $
 
 dnl
 AC_INIT(mktbls.c)
@@ -14,17 +14,27 @@ AC_PROG_CPP
 AC_GCC_TRADITIONAL
 AC_PROG_INSTALL
 
+###	use option --with-cflags to set default CFLAGS
+AC_WITH(CFLAGS, [cflags=$withval])
+if test -z "$CFLAGS"; then
+	AC_WITH(cflags, [cflags=$withval])
+fi
+
+# if the user specified nothing else, set -O.  user can override
+# with --with-cflags=" "
+if test -n "$cflags"; then
+	CFLAGS="$cflags"
+else
+	CFLAGS="-O"
+fi
+
 ###	use option --with-warnings to turn on all gcc warnings
 AC_WITH(warnings, [with_warnings=$withval])
 if test -n "$GCC"
 then
-	if test -z "$CFLAGS"
-	then
-CFLAGS="-O"
-	fi
 	if test -n "$with_warnings"
 	then
-CFLAGS="$CFLAGS -Wall -Wshadow -Wconversion -Wstrict-prototypes -Wmissing-prototypes"
+		CFLAGS="$CFLAGS -Wall -Wshadow -Wconversion -Wstrict-prototypes -Wmissing-prototypes"
 	fi
 fi
 
@@ -84,8 +94,6 @@ AC_COMPILE_CHECK([to see if switch cases work with structure offsets], [],
  extern getpid();
  switch(getpid()){case ((int) &(((struct foo *)0)->b)) : printf("foo"); } ],
 [],[AC_DEFINE(HAVE_LOSING_SWITCH_WITH_STRUCTURE_OFFSET)])
-
-VC_CPP_SUBS
 
 ###	checks for system services and user specified options
 AC_LONG_FILE_NAMES

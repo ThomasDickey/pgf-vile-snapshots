@@ -4,15 +4,13 @@
  * Support functions for "popup-msgs" mode.
  * Written by T.E.Dickey for vile (august 1994).
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/msgs.c,v 1.3 1994/10/06 14:13:24 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/msgs.c,v 1.4 1994/12/09 18:06:35 pgf Exp $
  */
 #include "estruct.h"
 
 #if	OPT_POPUP_MSGS
 
 #include "edef.h"
-
-#define MSG_BUF_NAME ScratchName(Messages)
 
 static	BUFFER *create_msgs P((void));
 
@@ -22,7 +20,7 @@ static	BUFFER *create_msgs P((void));
 static BUFFER *
 create_msgs()
 {
-	BUFFER	*bp = bfind(MSG_BUF_NAME, BFSCRTCH);
+	BUFFER	*bp = bfind(MESSAGES_BufName, BFSCRTCH);
 
 	if (bp == NULL)
 		return FALSE;
@@ -138,7 +136,7 @@ purge_msgs()
 {
 	if ((global_g_val(GMDPOPUP_MSGS) == -TRUE)
 	 && (warnings == 0)) {
-		BUFFER	*bp = find_b_name(MSG_BUF_NAME);
+		BUFFER	*bp = find_b_name(MESSAGES_BufName);
 		if (bp != 0) {
 			(void)zotbuf(bp);
 		}

@@ -1,7 +1,7 @@
 /*
  * version & usage-messages for vile
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/version.c,v 1.19 1994/11/29 04:02:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/version.c,v 1.20 1994/12/15 15:01:52 pgf Exp $
  *
  */
 
@@ -93,7 +93,7 @@ getversion()
 	(void) lsprintf(version_string, "%s %s for %s", prognam, version, opersys);
 	{
 		char *s;
-		if ((s = flook(prog_arg, FL_PATH)) != NULL) {
+		if ((s = flook(prog_arg, FL_PATH|FL_EXECABLE)) != NULL) {
 			long mtime = file_modified(s);
 			if (mtime != 0) {
 				(void)strcat(version_string, ", installed ");

@@ -8,7 +8,7 @@
 */
 
 /*
- * $Header: /usr/build/VCS/pgf-vile/RCS/edef.h,v 1.160 1994/12/01 18:06:40 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/edef.h,v 1.164 1994/12/15 15:54:09 pgf Exp $
  */
 
 /* I know this declaration stuff is really ugly, and I probably won't ever
@@ -31,7 +31,7 @@ decl_init( char prognam[], "xvile");
 decl_init( char prognam[], "vile");
 #endif
 
-decl_init( char version[], "version 4.10");
+decl_init( char version[], "version 4.11");
 
 #if SYS_UNIX
 decl_init( char opersys[], "unix");
@@ -110,6 +110,9 @@ decl_init( int curgoal, -1 );           /* column goal			*/
 decl_uninit( char *execstr );		/* pointer to string to execute	*/
 #if OPT_EVAL
 decl_uninit( char golabel[NPAT] );	/* current line to go to	*/
+#endif
+#if OPT_MLFORMAT
+decl_uninit( char *modeline_format );	/* modeline formatting string */
 #endif
 decl_uninit( int execlevel );		/* execution IF level		*/
 decl_init( int	eolexist, TRUE );	/* does clear to EOL exist	*/
@@ -247,6 +250,61 @@ decl_uninit( int fileispipe );
 decl_uninit( int eofflag );		/* end-of-file flag */
 
 decl_init( char hexdigits[], "0123456789ABCDEF");
+
+decl_init( char HELP_BufName[],	 	"[Help]");
+#if OPT_REBIND
+decl_init( char BINDINGLIST_BufName[],	"[Binding List]");
+#endif
+# if OPT_TERMCHRS
+decl_init( char TERMINALCHARS_BufName[],"[Terminal Characters]");
+#endif
+#if OPT_POPUPCHOICE
+decl_init( char COMPLETIONS_BufName[],	"[Completions]");
+#endif
+decl_init( char BUFFERLIST_BufName[],	"[Buffer List]");
+#if OPT_SHOW_EVAL
+decl_init( char VARIABLES_BufName[],	"[Variables]");
+#endif
+decl_init( char MACRO_N_BufName[],	"[Macro %d]");
+#if COMPLETE_FILES
+decl_init( char FILECOMPLETION_BufName[],"[FileCompletion]");
+#endif
+#if COMPLETE_DIRS
+decl_init( char DIRCOMPLETION_BufName[],"[DirCompletion]");
+#endif
+decl_init( char OUTPUT_BufName[],	"[Output]");
+#if OPT_HISTORY
+decl_init( char HISTORY_BufName[],	"[History]");
+#endif
+#if OPT_SHOW_REGS
+decl_init( char REGISTERS_BufName[],	"[Registers]");
+#endif
+decl_init( char STDIN_BufName[],	"[Standard Input]");
+decl_init( char UNNAMED_BufName[],	"[unnamed]");
+decl_init( char VILEINIT_BufName[],	"[vileinit]");
+#if OPT_SHOW_MAPS
+decl_init( char MAP_BufName[],		"[Map Sequences]");
+decl_init( char MAPBANG_BufName[],	"[Map! Sequences]");
+decl_init( char ABBR_BufName[],		"[Abbreviations]");
+decl_init( char SYSMAP_BufName[],	"[System Map Sequences]");
+#else
+/* needed anyway, since they're passed around as args */
+decl_init( char MAP_BufName[],		"");
+decl_init( char MAPBANG_BufName[],	"");
+decl_init( char ABBR_BufName[],		"");
+decl_init( char SYSMAP_BufName[],	"");
+#endif
+decl_init( char SETTINGS_BufName[],	"[Settings]");
+#if OPT_POPUP_MSGS
+decl_init( char MESSAGES_BufName[],	"[Messages]");
+#endif
+decl_init( char P_LINES_BufName[],	"[p-lines]");
+#if OPT_SHOW_TAGS
+decl_init( char TAGSTACK_BufName[],	"[Tag Stack]");
+#endif
+#if OPT_TAGS
+decl_init( char TAGFILE_BufName[],	"[Tags %d]");
+#endif
 
 /* defined in nebind.h and nename.h */
 extern NTAB nametbl[];

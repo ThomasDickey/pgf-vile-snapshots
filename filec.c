@@ -5,7 +5,7 @@
  * Written by T.E.Dickey for vile (march 1993).
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/filec.c,v 1.37 1994/11/29 04:02:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/filec.c,v 1.40 1994/12/15 15:01:52 pgf Exp $
  *
  */
 
@@ -456,7 +456,8 @@ char *	name;
 		while ((de = readdir(dp)) != 0) {
 #if SYS_UNIX || SYS_VMS || SYS_OS2 || SYS_WINNT
 # if USE_D_NAMLEN
-			strncpy(s, de->d_name, (SIZE_T)(de->d_namlen))[de->d_namlen] = EOS;
+			(void)strncpy(s, de->d_name, (SIZE_T)(de->d_namlen));
+			s[de->d_namlen] = EOS;
 # else
 			(void)strcpy(s, de->d_name);
 # endif
@@ -710,7 +711,7 @@ char *	result;
 	if (do_prompt && !clexec) {
 		complete = path_completion;
 		MyBuff = 0;
-		MyName = ScratchName(FileCompletion);
+		MyName = FILECOMPLETION_BufName;
 	}
 #endif
 
@@ -778,7 +779,7 @@ char *	result;
 	if (flag <= FILEC_WRITE) {	/* we want to write a file */
 		if (!isInternalName(Reply)
 		 && !same_fname(Reply, curbp, TRUE)
-		 && flook(Reply, FL_HERE)) {
+		 && flook(Reply, FL_HERE|FL_READABLE)) {
 			if (mlyesno("File exists, okay to overwrite") != TRUE) {
 				mlwrite("File not written");
 				return FALSE;
@@ -805,7 +806,7 @@ char *	result;
 	if (isnamedcmd && !clexec) {
 		complete = path_completion;
 		MyBuff = 0;
-		MyName = ScratchName(DirCompletion);
+		MyName = DIRCOMPLETION_BufName;
 	}
 #endif
 	if (clexec || isnamedcmd) {

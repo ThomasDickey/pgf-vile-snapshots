@@ -1,5 +1,5 @@
 #!/bin/sh
-# From configure.in Revision: 1.12 
+# From configure.in Revision: 1.15 
 
 ### Use "configure -with-screen" to override the default configuration, which is
 ### termcap-based on unix systems.
@@ -68,7 +68,7 @@ x_includes=
 x_libraries=
 
 ac_prev=
-for ac_option in $*
+for ac_option
 do
 
   # If the previous option needs an argument, assign it.
@@ -494,6 +494,30 @@ test -z "$INSTALL_DATA" && INSTALL_DATA='${INSTALL} -m 644'
 test -n "$verbose" && echo "	setting INSTALL_DATA to $INSTALL_DATA"
 
 
+###	use option --with-cflags to set default CFLAGS
+# check whether --with-CFLAGS or --without-CFLAGS was given.
+withval="$with_CFLAGS"
+if test -n "$withval"; then
+  cflags=$withval
+fi
+
+if test -z "$CFLAGS"; then
+	# check whether --with-cflags or --without-cflags was given.
+withval="$with_cflags"
+if test -n "$withval"; then
+  cflags=$withval
+fi
+
+fi
+
+# if the user specified nothing else, set -O.  user can override
+# with --with-cflags=" "
+if test -n "$cflags"; then
+	CFLAGS="$cflags"
+else
+	CFLAGS="-O"
+fi
+
 ###	use option --with-warnings to turn on all gcc warnings
 # check whether --with-warnings or --without-warnings was given.
 withval="$with_warnings"
@@ -503,13 +527,9 @@ fi
 
 if test -n "$GCC"
 then
-	if test -z "$CFLAGS"
-	then
-CFLAGS="-O"
-	fi
 	if test -n "$with_warnings"
 	then
-CFLAGS="$CFLAGS -Wall -Wshadow -Wconversion -Wstrict-prototypes -Wmissing-prototypes"
+		CFLAGS="$CFLAGS -Wall -Wshadow -Wconversion -Wstrict-prototypes -Wmissing-prototypes"
 	fi
 fi
 
@@ -1327,75 +1347,6 @@ DEFS="$DEFS -DHAVE_LOSING_SWITCH_WITH_STRUCTURE_OFFSET=1"
 
 fi
 rm -f conftest*
-
-
-test -n "$silent" || echo "checking for ANSI CPP token-splicing/quoting"
- cat > conftest.${ac_ext} <<EOF
-#include "confdefs.h"
-
-#define quote(name) "name"
-int main() { char *y = quote(a b); exit (strcmp(y, "a b"));}
- 
-EOF
-eval $ac_compile
-if test -s conftest && (./conftest; exit) 2>/dev/null; then
-  
-{
-test -n "$verbose" && \
-echo "	defining CPP_SUBS_OLDSTYLE"
-echo "#define" CPP_SUBS_OLDSTYLE "1" >> confdefs.h
-DEFS="$DEFS -DCPP_SUBS_OLDSTYLE=1"
-}
-
-
-else
-  cat > conftest.${ac_ext} <<EOF
-#include "confdefs.h"
-
-#define mark "/"
-#define quote(name) mark ## #name ## mark
- int main() { char *y = quote(a b); exit (strcmp(y, "/a b/"));}
- 
-EOF
-eval $ac_compile
-if test -s conftest && (./conftest; exit) 2>/dev/null; then
-  
-{
-test -n "$verbose" && \
-echo "	defining CPP_SUBS_AFTER_QUOTE"
-echo "#define" CPP_SUBS_AFTER_QUOTE "1" >> confdefs.h
-DEFS="$DEFS -DCPP_SUBS_AFTER_QUOTE=1"
-}
-
-
-else
-  cat > conftest.${ac_ext} <<EOF
-#include "confdefs.h"
-
-#define mark "/"
-#define	quote(s) mark #s mark
-int main() { char *y = quote(a b); exit (strcmp(y, "/a b/"));}
-   
-EOF
-eval $ac_compile
-if test -s conftest && (./conftest; exit) 2>/dev/null; then
-  
-{
-test -n "$verbose" && \
-echo "	defining CPP_SUBS_BEFORE_QUOTE"
-echo "#define" CPP_SUBS_BEFORE_QUOTE "1" >> confdefs.h
-DEFS="$DEFS -DCPP_SUBS_BEFORE_QUOTE=1"
-}
-
-
-fi
-rm -fr conftest*
-  
-fi
-rm -fr conftest*
- 
-fi
-rm -fr conftest*
 
 
 ###	checks for system services and user specified options

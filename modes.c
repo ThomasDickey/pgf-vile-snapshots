@@ -7,14 +7,13 @@
  * Original code probably by Dan Lawrence or Dave Conroy for MicroEMACS.
  * Major extensions for vile by Paul Fox, 1991
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/modes.c,v 1.53 1994/12/03 13:22:56 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/modes.c,v 1.54 1994/12/09 18:06:35 pgf Exp $
  *
  */
 
 #include	"estruct.h"
 #include	"edef.h"
 
-#define MODES_LIST_NAME  ScratchName(Settings)
 #define	NonNull(s)	((s == 0) ? "" : s)
 #define	ONE_COL	26
 #define	NCOLS	3
@@ -858,7 +857,7 @@ int f,n;
 	register WINDOW *wp = curwp;
 	register int s;
 
-	s = liststuff(MODES_LIST_NAME, FALSE, makemodelist,0,(void *)wp);
+	s = liststuff(SETTINGS_BufName, FALSE, makemodelist,0,(void *)wp);
 	/* back to the buffer whose modes we just listed */
 	if (swbuffer(wp->w_bufp))
 		curwp = wp;
@@ -1062,7 +1061,7 @@ BUFFER *bp;
 void
 relist_settings()
 {
-	update_scratch(MODES_LIST_NAME, show_Settings);
+	update_scratch(SETTINGS_BufName, show_Settings);
 }
 #endif	/* OPT_UPBUFF */
 

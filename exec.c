@@ -3,7 +3,7 @@
  *
  *	written 1986 by Daniel Lawrence
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/exec.c,v 1.101 1994/11/29 04:02:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/exec.c,v 1.105 1994/12/15 15:01:52 pgf Exp $
  *
  */
 
@@ -762,7 +762,6 @@ int f,n;
 {
 	register int status;
 	register long flags;
-	MARK odot;
 
 	if (execfunc == NULL) {
 #if OPT_REBIND
@@ -819,10 +818,8 @@ int f,n;
 			ukb = dotcmdkreg;
 	}
 
-	/* if motion is absolute, remember where we are */
-	if (flags & ABSM) {
-		odot = DOT;
-	}
+	if (same_ptr(curwp->w_tentative_lastdot.l, null_ptr))
+		curwp->w_tentative_lastdot = DOT;
 
 	status = (execfunc->c_func)(f, n);
 	if ((flags & GOAL) == 0) { /* goal should not be retained */
@@ -835,9 +832,12 @@ int f,n;
 
 	/* if motion was absolute, and it wasn't just on behalf of an
 		operator, and we moved, update the "last dot" mark */
-	if ((flags & ABSM) && !doingopcmd && !sameline(DOT, odot)) {
-		curwp->w_lastdot = odot;
+	if ((flags & ABSM) && !doingopcmd && 
+			!sameline(DOT, curwp->w_tentative_lastdot)) {
+		curwp->w_lastdot = curwp->w_tentative_lastdot;
 	}
+
+	curwp->w_tentative_lastdot = DOT;
 
 
 	return status;
@@ -1021,7 +1021,7 @@ int n;		/* macro number to use */
 	}
 
 	/* construct the macro buffer name */
-	(void)lsprintf(bname, ScratchName(Macro %d), n);
+	(void)lsprintf(bname, MACRO_N_BufName, n);
 
 	/* set up the new macro buffer */
 	if ((bp = bfind(bname, BFINVS)) == NULL) {
@@ -1668,7 +1668,7 @@ int f, n;	/* default flag and numeric arg to pass on to file */
 		return status;
 
 	/* look up the path for the file */
-	fspec = flook(fname, FL_ANYWHERE);
+	fspec = flook(fname, FL_ANYWHERE|FL_READABLE);
 
 	/* if it isn't around */
 	if (fspec == NULL)
@@ -1737,7 +1737,7 @@ int bufnum;	/* number of buffer to execute */
 	if (!f) n = 1;
 
 	/* make the buffer name */
-	(void)lsprintf(bufname, ScratchName(Macro %d), bufnum);
+	(void)lsprintf(bufname, MACRO_N_BufName, bufnum);
 
 	/* find the pointer to that buffer */
 	if ((bp = find_b_name(bufname)) == NULL) {

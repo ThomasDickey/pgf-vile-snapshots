@@ -1,7 +1,7 @@
 /*	Spawn:	various DOS access commands
  *		for MicroEMACS
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/spawn.c,v 1.90 1994/11/29 04:02:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/spawn.c,v 1.94 1994/12/14 20:26:57 pgf Exp $
  *
  */
 
@@ -131,6 +131,12 @@ bktoshell(f,n)		/* suspend and wait to wake up */
 int f,n;
 {
 #if SYS_UNIX && defined(SIGTSTP) && !DISP_X11
+	int forced = (f && n == SPECIAL_BANG_ARG); /* then it was :stop! */
+
+	/* take care of autowrite */
+	if (!forced && writeall(f,n,FALSE,TRUE,TRUE) != TRUE)
+		return FALSE;
+
 	vttidy(TRUE);
 
 /* #define simulate_job_control_for_debug */
@@ -236,10 +242,12 @@ int	rerun;		/* TRUE/FALSE: spawn, -TRUE: pipecmd */
 		temp[NLINE],
 		line[NLINE+1];
 
-	if ((len = tb_length(*holds)) != 0)
-		strncpy(save, tb_values(*holds), len)[len] = EOS;
-	else
+	if ((len = tb_length(*holds)) != 0) {
+		(void)strncpy(save, tb_values(*holds), len);
+		save[len] = EOS;
+	} else {
 		save[0] = EOS;
+	}
 
 	/* if it doesn't start with '!', or if that's all it is */
 	if (!isShellOrPipe(save) || save[1] == EOS)
@@ -292,6 +300,10 @@ int pressret;
 	if ((s = ShellPrompt(&save_shell[0], line, rerun)) != TRUE)
 		return s;
 #endif	/* COMMON_SH_PROMPT */
+
+	/* take care of autowrite */
+	if (writeall(FALSE,1,FALSE,TRUE,TRUE) != TRUE)
+		return FALSE;
 
 #if SYS_UNIX
 #if DISP_X11
@@ -466,7 +478,6 @@ int f,n;
 	register BUFFER *bp;	/* pointer to buffer to zot */
 	register int	s;
 	char line[NLINE];	/* command line send to shell */
-	static char bname[] = ScratchName(Output);
 
 	/* get the command to pipe in */
 	hst_init('!');
@@ -474,13 +485,20 @@ int f,n;
 	hst_flush();
 
 	/* prompt ok? */
-	if (s == TRUE) {
-		if (((s = ((bp = bfind(bname, 0)) != NULL)) == TRUE)
-		 && ((s = popupbuff(bp)) == TRUE)
-		 && ((s = swbuffer(bp)) == TRUE)
-		 && ((s = readin(line, FALSE, bp, TRUE)) == TRUE))
-			set_rdonly(bp, line);
-	}
+	if (s != TRUE)
+		return s;
+
+	/* take care of autowrite */
+	if (writeall(f,n,FALSE,FALSE,TRUE) != TRUE)
+		return FALSE;
+
+
+	if (((s = ((bp = bfind(OUTPUT_BufName, 0)) != NULL)) == TRUE)
+	 && ((s = popupbuff(bp)) == TRUE)
+	 && ((s = swbuffer(bp)) == TRUE)
+	 && ((s = readin(line, FALSE, bp, TRUE)) == TRUE))
+		set_rdonly(bp, line);
+
 	return (s);
 }
 
@@ -497,7 +515,6 @@ pipecmd(f, n)
 	register BUFFER *bp;	/* pointer to buffer to zot */
 	static char oline[NLINE];	/* command line send to shell */
 	char	line[NLINE];	/* command line send to shell */
-	static char bname[] = ScratchName(Output);
 	WINDOW *ocurwp;		/* save the current window during delete */
 
 #if	SYS_AMIGA
@@ -518,7 +535,7 @@ pipecmd(f, n)
 	(void)strcpy(line,oline);
 
 	/* get rid of the command output buffer if it exists */
-	if ((bp=find_b_name(bname)) != NULL) {
+	if ((bp=find_b_name(OUTPUT_BufName)) != NULL) {
 		/* try to make sure we are off screen */
 		ocurwp = NULL;
 		for_each_window(wp) {
@@ -558,7 +575,7 @@ pipecmd(f, n)
 		return(FALSE);
 
 	/* overwrite its buffer name for consistency */
-	set_bname(curbp, bname);
+	set_bname(curbp, OUTPUT_BufName);
 
 	/* make this window in VIEW mode, update buffer's mode lines */
 	make_local_b_val(curwp->w_bufp,MDVIEW);
@@ -566,7 +583,7 @@ pipecmd(f, n)
 	markWFMODE(curbp);
 
 #if OPT_FINDERR
-	set_febuff(bname);
+	set_febuff(OUTPUT_BufName);
 #endif
 
 	/* and get rid of the temporary file */

@@ -63,7 +63,7 @@
  *
  *	Allow left/right scrolling of input lines (when they get too long).
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/history.c,v 1.22 1994/11/29 04:02:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/history.c,v 1.23 1994/12/09 18:06:35 pgf Exp $
  *
  */
 
@@ -96,7 +96,7 @@ static	void	display_LINE P(( HST *, LINE * ));
 static	void	display_TBUFF P(( HST *, TBUFF * ));
 static	LINE *	hst_scroll P(( LINE *, HST * ));
 
-static	char	*MyBuff = ScratchName(History);
+static	char	*MyBuff = HISTORY_BufName;
 static	TBUFF	*MyText;	/* current command to display */
 static	int	MyGlue,		/* most recent eolchar */
 		MyLevel;	/* logging iff level is 1 */

@@ -6,7 +6,7 @@
  *
  * Note: Visual flashes are not yet supported.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/ntconio.c,v 1.5 1994/11/29 04:02:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/ntconio.c,v 1.6 1994/12/09 15:50:41 pgf Exp $
  *
  */
 
@@ -148,7 +148,10 @@ void
 ntmove(row, col)
 int row, col;
 {
-	COORD coordCursor = {col, row};
+        COORD coordCursor;
+        coordCursor.X   = col;
+        coordCursor.Y   = row;
+
 
 	SetConsoleCursorPosition(hConsoleOutput, coordCursor);
 }

@@ -1,11 +1,9 @@
 ------------------------
 vile bug/enhancement/wish list
 ------------------------
-$Header: /usr/build/VCS/pgf-vile/RCS/buglist,v 1.208 1994/11/30 23:08:04 pgf Exp $
+$Header: /usr/build/VCS/pgf-vile/RCS/buglist,v 1.213 1994/12/14 18:27:28 pgf Exp $
 ----------------------
 	(E means enhancement, L,M,H are low, medium, high priority)
-
-E	add "set autowrite"
 
 E	add ":n file" 
 	    (:n means go to the next file in a series of files.
@@ -347,12 +345,6 @@ shell-command? Although the shell command has a $STATUS=1 the
 status of the status variable is TRUE.
 
 ---------------------------
-Vi has an autowrite option that will write out a modified buffer
-any time a shell command is executed (it also writes out modified
-buffers at other times as well).
-
-This would be most useful for the edit, make, execute cycle.
----------------------------
 
 you can't use ! as a regular expression delimiter, as in:
 	:s!pat!replace!g
@@ -504,7 +496,7 @@ of modes from within macros, so that values can be saved and restored.
 
 -------------------------
 
-regarding the ^X^X find-error code (from tom)
+[regarding the ^X^X find-error code (from tom)]
 Rather than have the long if-then-else-if sequence, we could have a table
 of structs something like
 
@@ -577,20 +569,6 @@ and they'd like vile to scroll rather than jump with the typahead.
         so I can visibly see all the files available.
 ----------------------
 
-still no abbr command
-
-----------------------
-vi's map/map!  has problems in treating numbers of ^V in different
-platforms.  And mail/newstreaders don't like those control
-characters.  consider the bindkey style in tcsh
-that uses \e as ESC, \r as consider return etc.  vile is not
-just a vi emulator anyway.  ]
-----------------------
-
-if a rectangle is selected, and then deleted, a one-column high-lighted
-rectangle is left on the screen.  it should go away completely.
-
-----------------
 
 if you have lines like
 	123
@@ -611,11 +589,6 @@ call only within the current scope (or #if).
 
 ----------------
 xvile:
- Is it possible to customize the color of the cursor ?
-   We haven't seen anything related in the documentation and the code.
-
-----------------
-xvile:
  Is it possible to have an optional horizontal scrollbars ?
    (just for maniac users)
 
@@ -627,18 +600,6 @@ start it without the '&' (i.e. "xvile &").
 
 ------------------
 
-put cursor on first ( after the =.  type 'i<cr><cr>".
-
-    struct maprec *mp = (reading_msg_line) ? map_message_line : 
-			(insertmode) ? map_insert : map_command;
-
-get the following:
-    struct maprec *mp = 
-    (reading_msg_line) ? map_message_line :
-
-			(insertmode) ? map_insert : map_command;
-------------------
-
 why the following in estruct.h?
 
 #if !TERMCAP || (APOLLO && defined(__GNUC__))
@@ -648,25 +609,6 @@ why the following in estruct.h?
 #endif
 
 ------------------
- maplookup should take a function pointer, or two, to do the avail, get,
- and put stuff.
-
-------------------
- :abb should be implemented as a mapping of the _reversed_ abbreviation. 
- the character get function in maplookup would get the next prev char, the
- available func would tell us if we are at BOL or the insertion point yet,
- and the unget would be null.  when inserting, when we hit whitespace or
- newline, we would try mapping backwards, and if successful, do the delete
- of the old and the insert of the new.  but there may be cases where going
- backwards like this is inappropriate -- need to check the "spec" on how
- and when abbr works.  for instance, i think abbreviations are not
- recursive.  but that just means we don't map again until we've inserted
- more.  and i happened to spot this in the vim code: "Historic vi practice:
- The last character of an abbreviation must be an id character ([a-zA-Z0-9_]).
- The characters in front of it must be all id characters or all non-id
- characters.  This allows for abbr.  "#i" to "#include"."
-
------------------
 
 on the first attempt to insert a quoted ^C (i.e. ^V^C) it works, but also
 quotes the next character (e.g. the ESC).  after the first time, ^C doesn't
@@ -674,3 +616,9 @@ work anymore.  (this seems to be linux-specific, and i'm running an old
 (pre 1.0) kernel.  so i'll check it on a newer system. it's not getting the
 later SIGINT's at all, and it returns ^V a _second_ time, after getting
 the first SIGINT.  very strange.)
+
+------------------------
+
+under DOS, ^P character turns on the printer.   argh.
+
+---------------

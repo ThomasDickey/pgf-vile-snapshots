@@ -7,7 +7,7 @@
  * Most code probably by Dan Lawrence or Dave Conroy for MicroEMACS
  * Extensions for vile by Paul Fox
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/insert.c,v 1.68 1994/11/30 20:17:16 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/insert.c,v 1.70 1994/12/12 16:12:55 pgf Exp $
  *
  */
 
@@ -310,10 +310,12 @@ int f,n;
 		if (dotcmdmode != PLAY)
 			(void)update(FALSE);
 		c = keystroke();
-		if (ABORTED(c))
+		if (ABORTED(c)) {
+			insertmode = FALSE;
+			if (b_val(curbp, MDSHOWMODE))
+				curwp->w_flag |= WFMODE;
 			return ABORT;
-		insertmode = FALSE;
-		curwp->w_flag |= WFMODE;
+		}
 
 	}
 	c = kcod2key(c);
@@ -343,6 +345,9 @@ int f,n;
 		if ((t == TRUE) && (DOT.o > w_left_margin(curwp)) && vi_fix)
 			s = backchar(FALSE,1);
 	}
+	insertmode = FALSE;
+	if (b_val(curbp, MDSHOWMODE))
+		curwp->w_flag |= WFMODE;
 	return s;
 }
 
@@ -459,6 +464,10 @@ int *splice;
 			}
 			continue;
 		}
+
+		if (!isident(c))
+			abbr_check(&backsp_limit);
+
 		if (isreturn(c)) {
 			if ((cur_count+1) < max_count) {
 				if (DOT_ARGUMENT) {

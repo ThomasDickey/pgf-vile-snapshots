@@ -15,7 +15,7 @@
  *
  *	modify (ifdef-style) 'expand_leaf()' to allow ellipsis.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/glob.c,v 1.26 1994/12/05 14:08:22 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/glob.c,v 1.27 1994/12/09 22:56:37 pgf Exp $
  *
  */
 
@@ -319,8 +319,10 @@ char	*pattern;
 			s += strlen(s);
 			*s++ = SLASHC;
 		}
-		if (len != 0)
-			strncpy(s, pattern, len)[len] = EOS;
+		if (len != 0) {
+			(void)strncpy(s, pattern, len);
+			s[len] = EOS;
+		}
 	}
 	leaf = path + strlen(path) + 1;
 
@@ -341,7 +343,8 @@ char	*pattern;
 #else
 #if USE_D_NAMLEN
 			len = de->d_namlen;
-			strncpy(leaf, de->d_name, len)[len] = EOS;
+			(void)strncpy(leaf, de->d_name, len);
+			leaf[len] = EOS;
 #else
 			(void)strcpy(leaf, de->d_name);
 #endif
@@ -588,7 +591,8 @@ char	*item;
 		while ((de = readdir(dp)) != 0) {
 			char	temp[NFILEN];
 			size_t	len = de->d_namlen;
-			strncpy(temp, de->d_name, len)[len] = EOS;
+			(void)strncpy(temp, de->d_name, len);
+			s[len] = EOS;
 			if (!record_a_match(temp)) {
 				result = FALSE;
 				break;

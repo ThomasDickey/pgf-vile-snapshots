@@ -5,7 +5,7 @@
  * functions use hints that are left in the windows by the commands.
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/display.c,v 1.172 1994/11/29 17:04:43 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/display.c,v 1.174 1994/12/12 16:13:43 pgf Exp $
  *
  */
 
@@ -380,6 +380,13 @@ vtinit()
 {
     register int i;
     register VIDEO *vp;
+
+#if	OPT_MLFORMAT
+    if (!modeline_format)
+    	modeline_format = strmalloc(
+	    "%-%i%- %b %m:: :%f:is : :%=%F: : :%l:(:,:%c::) :%p::% :%S%-%-%|"
+	);
+#endif
 
     /* allocate new display memory */
     if (vtalloc() == FALSE) /* if we fail, only serious if not a realloc */
@@ -2486,7 +2493,7 @@ modeline(wp)
 WINDOW *wp;
 {
 #if OPT_MLFORMAT
-    char *fs = global_g_val_ptr(GVAL_MLFORMAT);
+    char *fs = modeline_format;
     int fc;
 #endif
     char temp[NFILEN];
@@ -2505,9 +2512,16 @@ WINDOW *wp;
 
     n = mode_row(wp);      	/* Location. */
 #if OPT_VIDEO_ATTRS
-    vscreen[n]->v_flag |= VFCHG;
-    for (col=0; col < term.t_ncol; col++)
-	vscreen[n]->v_attrs[col] = VAREV;
+    {
+	VIDEO_ATTR attr;
+	if (wp == curwp)
+	    attr = VAREV | VAMLFOC;
+	else
+	    attr = VAREV | VAML;
+	vscreen[n]->v_flag |= VFCHG;
+	for (col=0; col < term.t_ncol; col++)
+	    vscreen[n]->v_attrs[col] = attr;
+    }
 #else
     vscreen[n]->v_flag |= VFCHG | VFREQ | VFCOL;/* Redraw next time. */
 #endif

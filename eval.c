@@ -3,7 +3,7 @@
 
 	written 1986 by Daniel Lawrence
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/eval.c,v 1.108 1994/12/05 14:08:22 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/eval.c,v 1.115 1994/12/15 15:01:52 pgf Exp $
  *
  */
 
@@ -101,6 +101,7 @@ char	*value;
 #if OPT_EVAL
 static char *shell;	/* $SHELL environment is "$shell" variable */
 static char *directory;	/* $TMP environment is "$directory" variable */
+extern char *modeline_format;	/* how the modeline is formatted */
 #endif
 
 #if OPT_SHOW_EVAL
@@ -196,7 +197,7 @@ int f,n;
 			v = lsprintf(v, fmt, Names[s], t, vv);
 		}
 	}
-	s = liststuff(ScratchName(Variables), FALSE,
+	s = liststuff(VARIABLES_BufName, FALSE,
 				makevarslist, 0, (void *)values);
 	free(values);
 
@@ -357,10 +358,12 @@ char *fname;		/* name of function to evaluate */
 		it = prc2engl(arg1);
 		break;
 	case UFREADABLE:
-		it = ltos(doglob(arg1) && flook(arg1, FL_HERE) != NULL);
+		it = ltos(doglob(arg1)
+			&& flook(arg1, FL_HERE|FL_READABLE) != NULL);
 		break;
 	case UFWRITABLE:
-		it = ltos(doglob(arg1) && !ffronly(arg1));
+		it = ltos(doglob(arg1)
+			&& flook(arg1, FL_HERE|FL_WRITEABLE) != NULL);
 		break;
 	default:
 		it = errorm;
@@ -450,6 +453,11 @@ char *vname;		/* name of environment variable to retrieve */
 		ElseIf( EVMATCH )	value = (patmatch == NULL) ? 
 							"" : patmatch;
 		ElseIf( EVMODE )	value = current_modename();
+		ElseIf( EVMLFORMAT )
+			if (modeline_format == 0)
+				mlwrite("BUG: modeline_format uninitialized");
+			value = modeline_format;
+
 		ElseIf( EVMODIFIED )	value = ltos(b_is_changed(curbp));
 		ElseIf( EVKILL )	value = getkill();
 		ElseIf( EVTPAUSE )	value = l_itoa(term.t_pause);
@@ -510,8 +518,8 @@ getkill()		/* return some of the contents of the kill buffer */
 			size = kbs[0].kused;
 		else
 			size = NSTRING - 1;
-		strncpy(value, (char *)(kbs[0].kbufh->d_chunk),
-			size)[size] = EOS;
+		(void)strncpy(value, (char *)(kbs[0].kbufh->d_chunk), size);
+		value[size] = EOS;
 	}
 
 	/* and return the constructed value */
@@ -725,10 +733,18 @@ char *value;	/* value to set to */
 			flickcode = stol(value);
 
 		ElseIf( EVCURWIDTH )
+#if DISP_X11
+			x_resize(atoi(value), term.t_nrow);
+#else
 			status = newwidth(TRUE, atoi(value));
+#endif
 
 		ElseIf( EVPAGELEN )
+#if DISP_X11
+			x_resize(term.t_ncol, atoi(value));
+#else
 			status = newlength(TRUE, atoi(value));
+#endif
 
 		ElseIf( EVCBUFNAME )
 			set_bname(curbp, value);
@@ -781,6 +797,9 @@ char *value;	/* value to set to */
 
 		ElseIf( EVCWLINE )
 			status = forwline(TRUE, atoi(value) - getwpos());
+
+		ElseIf( EVMLFORMAT )
+			SetEnv(&modeline_format, value);
 
 		ElseIf( EVSEARCH )
 			(void)strcpy(pat, value);
@@ -936,7 +955,7 @@ char *tokn;	/* token to analyze */
 
 		case '~':	return(TKDIR);
 		case '@':	return(TKARG);
-		case '#':	return(TKBUF);
+		case '<':	return(TKBUF);
 		case '$':	return(TKENV);
 		case '%':	return(TKVAR);
 		case '&':	return(TKFUN);
@@ -1011,9 +1030,10 @@ char *tokn;		/* token to evaluate */
 					blen = 0;
 				if (blen > NSTRING)
 					blen = NSTRING;
-				strncpy(buf,
+				(void)strncpy(buf,
 				    l_ref(bp->b_dot.l)->l_text + bp->b_dot.o,
-					blen)[blen] = EOS;
+					blen);
+				buf[blen] = EOS;
 
 				/* and step the buffer's line ptr
 					ahead a line */

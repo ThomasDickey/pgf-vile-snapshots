@@ -3,7 +3,7 @@
  *	here to support the globals() function.  They now work on regions.
  *	Written (except for delins()) for vile by Paul Fox, (c)1990
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/oneliner.c,v 1.67 1994/11/28 19:04:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/oneliner.c,v 1.68 1994/12/09 18:06:35 pgf Exp $
  */
 
 #include	"estruct.h"
@@ -30,7 +30,6 @@ int flag;
 	register BUFFER *bp;
 	register int	status;
 	REGION		region;
-	static char bname[] = ScratchName(p-lines);
 	fast_ptr LINEPTR linep;
 
 	if ((status = get_fl_region(&region)) != TRUE) {
@@ -41,14 +40,14 @@ int flag;
 	linep = region.r_orig.l;		 /* Current line.	 */
 
 	/* first check if we are already here */
-	bp = bfind(bname, 0);
+	bp = bfind(P_LINES_BufName, 0);
 	if (bp == NULL) {
 		rls_region();
 		return FALSE;
 	}
 
 	if (bp == curbp
-	 || find_b_name(ScratchName(Buffer List)) != 0 /* patch */
+	 || find_b_name(BUFFERLIST_BufName) != 0 /* patch */
 		) {
 		mlforce("[Can't do that from this buffer.]");
 		rls_region();
@@ -72,7 +71,7 @@ int flag;
 		linep = lFORW(linep);
 	} while (!same_ptr(linep, region.r_end.l));
 
-	set_bname(bp, bname);
+	set_bname(bp, P_LINES_BufName);
 	set_rdonly(bp, "");
 	set_b_val(bp,VAL_TAB,tabstop_val(curbp));
 

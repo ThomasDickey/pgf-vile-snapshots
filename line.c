@@ -10,80 +10,7 @@
  * editing must be being displayed, which means that "b_nwnd" is non zero,
  * which means that the dot and mark values in the buffer headers are nonsense.
  *
- * $Log: line.c,v $
- * Revision 1.79  1994/12/03 13:22:56  pgf
- * lint cleanup, questionable pointers
- *
- * Revision 1.78  1994/12/01  18:02:53  pgf
- * added describe-function
- *
- * Revision 1.77  1994/11/21  23:50:23  pgf
- * pgf changes for map/remap etc.
- *
- * Revision 1.76  1994/10/30  16:26:37  pgf
- * changed SIZEOF to TABLESIZE
- *
- * Revision 1.75  1994/10/28  11:16:41  pgf
- * tom's 4.7l changes
- *
- * Revision 1.74  1994/09/07  22:00:47  pgf
- * kev's 4.6g patches
- *
- * Revision 1.73  1994/08/29  22:15:10  pgf
- * changed CMASK to CHARTYPE
- *
- * Revision 1.72  1994/08/08  16:12:29  pgf
- * tom's 4.6e changes
- *
- * Revision 1.71  1994/06/17  00:38:56  pgf
- * kev's autoconf changes
- *
- * Revision 1.70  1994/04/20  19:53:07  pgf
- * changed an llength to lLength
- *
- * Revision 1.69  1994/04/12  17:11:53  pgf
- * move kdone() in kinsert() until after we check for kcharpending,
- * so that kdone doesn't reset it on us.
- *
- * Revision 1.68  1994/04/04  18:51:19  pgf
- * widen a region in kinsertlater() since we will always call this when
- * done to clean up, and if the last line is the longest of the region,
- * we have not yet updated the region width.
- *
- * Revision 1.67  1994/04/04  16:14:58  pgf
- * kev's 4.4 changes
- *
- * Revision 1.66  1994/03/29  17:53:18  pgf
- * warning cleanup
- *
- * Revision 1.65  1994/03/29  16:24:20  pgf
- * kev's changes: selection and attributes
- *
- * Revision 1.64  1994/03/24  12:42:48  pgf
- * warning cleanup
- *
- * Revision 1.63  1994/03/22  16:30:17  pgf
- * fix animation of Registers buffer, using static flag to control
- * work done on each call to relist_registers
- *
- * Revision 1.62  1994/03/18  18:30:38  pgf
- * fixes for OPT_MAP_MEMORY compilation
- *
- * Revision 1.61  1994/03/10  20:09:11  pgf
- * added kinsertlater() routine, for doing delayed insertion of newlines
- *
- * Revision 1.60  1994/03/08  14:17:15  pgf
- * warning cleanup, and alternate form of the put routine.
- *
- * Revision 1.59  1994/03/08  12:17:57  pgf
- * maintain record of longest line in a kill-register, in kregwidth.
- * fixed old bug in the maintenance of MK.o when adjusting duet
- * to character edits.
- * turned off the POISON #define.
- * major changes to the put() routine, to make it rectangle-aware.
- *
- * Revision 1.58  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
+ * $Header: /usr/build/VCS/pgf-vile/RCS/line.c,v 1.81 1994/12/09 18:06:35 pgf Exp $
  *
  */
 
@@ -1724,8 +1651,6 @@ void *dummy;
 	lsettrimmed(l_ref(DOT.l));
 }
 
-#define	REGISTERS_LIST_NAME ScratchName(Registers)
-
 static int will_relist_regs;
 
 /*ARGSUSED*/
@@ -1734,7 +1659,7 @@ showkreg(f,n)
 int f,n;
 {
 	will_relist_regs = FALSE;
-	return liststuff(REGISTERS_LIST_NAME, FALSE,
+	return liststuff(REGISTERS_BufName, FALSE,
 				makereglist, f, (void *)0);
 }
 
@@ -1758,7 +1683,7 @@ relist_registers()
 
 	will_relist_regs = TRUE;
 
-	update_scratch(REGISTERS_LIST_NAME, show_Registers);
+	update_scratch(REGISTERS_BufName, show_Registers);
 }
 #endif	/* OPT_UPBUFF */
 

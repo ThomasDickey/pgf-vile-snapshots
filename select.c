@@ -18,7 +18,7 @@
  * transfering the selection are not dealt with in this file.  Procedures
  * for dealing with the representation are maintained in this file.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/select.c,v 1.27 1994/11/29 04:02:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/select.c,v 1.29 1994/12/13 15:39:06 pgf Exp $
  *
  */
 
@@ -146,7 +146,12 @@ REGION *rp;
     }
 }
 
-static attr_id;
+int
+assign_attr_id()
+{
+    static int attr_id;
+    return attr_id++;
+}
 
 static void
 attach_attrib(bp, arp)
@@ -159,7 +164,7 @@ attach_attrib(bp, arp)
     for_each_window(wp)
 	if (wp->w_bufp == bp)
 	    wp->w_flag |= WFHARD;
-    arp->ar_region.r_attr_id = ++attr_id;
+    arp->ar_region.r_attr_id = assign_attr_id();
 }
 
 /*
@@ -577,8 +582,10 @@ selectregion()
 
 int sweeping;
 
-int
-multimotion(f,n)
+static int multimotionworker P(( int, int ));
+
+static int
+multimotionworker(f,n)
 int f,n;
 {
 	CMDFUNC	*cfp;
@@ -668,7 +675,15 @@ multimotionrectangle(f,n)
 int f,n;
 {
 	regionshape = RECTANGLE;
-	return multimotion(f,n);
+	return multimotionworker(f,n);
+}
+
+int
+multimotion(f,n)
+int f,n;
+{
+	regionshape = EXACT;
+	return multimotionworker(f,n);
 }
 
 
