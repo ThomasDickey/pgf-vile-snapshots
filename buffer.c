@@ -6,7 +6,10 @@
  * for the display system.
  *
  * $Log: buffer.c,v $
- * Revision 1.78  1993/11/04 09:10:51  pgf
+ * Revision 1.79  1993/12/22 15:28:34  pgf
+ * applying tom's 3.64 changes
+ *
+ * Revision 1.78  1993/11/04  09:10:51  pgf
  * tom's 3.63 changes
  *
  * Revision 1.77  1993/10/04  10:24:09  pgf
@@ -974,6 +977,8 @@ register BUFFER *bp;
 		if (bp != find_BufferList())
 			updatelistbuffers();
 		return TRUE;
+	} else if (curwp == 0) {
+		return FALSE;	/* we haven't started displaying yet */
 	}
 
 	/* oh well, suck it into this window */
@@ -1466,7 +1471,6 @@ BUFFER	*bp;
 		this_bp = curbp;
 		that_bp = find_alt();
 		status = liststuff(BUFFER_LIST_NAME, makebufflist, 0, (char *)0);
-		b_clr_flags(curbp, BFUPBUFF);
 	}
 	updating_list--;
 	return status;
@@ -1479,10 +1483,19 @@ BUFFER	*bp;
 void
 updatelistbuffers()
 {
-	register BUFFER	*bp = find_BufferList();
+	update_scratch(BUFFER_LIST_NAME, show_BufferList);
+}
+
+/* mark a scratch/temporary buffer for update */
+void
+update_scratch(name, func)
+char *name;
+int (*func)P((BUFFER *));
+{
+	register BUFFER *bp = find_b_name(name);
 
 	if (bp != 0) {
-		bp->b_upbuff = show_BufferList;
+		bp->b_upbuff = func;
 		b_set_flags(bp,BFUPBUFF);
 	}
 }

@@ -4,7 +4,16 @@
  * All operating systems.
  *
  * $Log: termio.c,v $
- * Revision 1.82  1993/09/10 16:06:49  pgf
+ * Revision 1.85  1993/12/23 10:06:38  pgf
+ * added fallback def'n of VDISABLE -- linux doesn't define it.
+ *
+ * Revision 1.84  1993/12/22  15:28:34  pgf
+ * applying tom's 3.64 changes
+ *
+ * Revision 1.83  1993/12/08  19:58:43  pgf
+ * added BSD386 to list of machines storing ioctl.h in sys
+ *
+ * Revision 1.82  1993/09/10  16:06:49  pgf
  * tom's 3.61 changes
  *
  * Revision 1.81  1993/09/03  09:11:54  pgf
@@ -318,7 +327,7 @@
 # if SUNOS
 #  include "sys/filio.h"
 # else /* if you have trouble including ioctl.h, try "sys/ioctl.h" instead */
-#  if APOLLO || AIX || OSF1 || ULTRIX || AUX2
+#  if APOLLO || AIX || OSF1 || ULTRIX || AUX2 || BSD386
 #   include <sys/ioctl.h>
 #  else
 #   include <ioctl.h>
@@ -368,7 +377,12 @@ extern CMDFUNC f_backchar_to_bol;
 
 #if USE_POSIX_TERMIOS
 
+#include <sys/param.h>		/* defines 'VDISABLE' */
 #include <termios.h>
+
+#ifndef VDISABLE
+# define VDISABLE '\0'
+#endif
 
 struct termios otermios, ntermios;
 
@@ -423,11 +437,11 @@ ttopen()
 	ntermios.c_cc[VMIN] = 1;
 	ntermios.c_cc[VTIME] = 0;
 #ifdef	VSWTCH
-	ntermios.c_cc[VSWTCH] = -1;
+	ntermios.c_cc[VSWTCH] = VDISABLE;
 #endif
-	ntermios.c_cc[VSUSP] = -1;
-	ntermios.c_cc[VSTART] = -1;
-	ntermios.c_cc[VSTOP] = -1;
+	ntermios.c_cc[VSUSP]  = VDISABLE;
+	ntermios.c_cc[VSTART] = VDISABLE;
+	ntermios.c_cc[VSTOP]  = VDISABLE;
 #endif
 
 	ttmiscinit();

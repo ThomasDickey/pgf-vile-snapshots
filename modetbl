@@ -12,7 +12,10 @@
 # The modes are table entries in the BUFFER and WINDOW structures.
 #
 # $Log: modetbl,v $
-# Revision 1.23  1993/09/10 16:06:49  pgf
+# Revision 1.24  1993/12/22 15:28:34  pgf
+# applying tom's 3.64 changes
+#
+# Revision 1.23  1993/09/10  16:06:49  pgf
 # tom's 3.61 changes
 #
 # Revision 1.22  1993/09/06  16:31:19  pgf
@@ -155,7 +158,7 @@ bool								# WMD prefix
 	"LIst"		LIST		WFHARD			# "list" mode -- show tabs and EOL
 	"NUmber"	NUMBER		WFSTAT|WFHARD		# line-numbers shown
 	"HorizScroll"	HORSCROLL	0			# scroll whole screen
-	"LineWrap"	LINEWRAP	WFHARD		!SMALLER # wrap lines wider than screen
+	"LineWrap"	LINEWRAP	WFHARD		OPT_LINEWRAP # wrap lines wider than screen
 	"ruler"		RULER		WFSTAT		!SMALLER # display line+col in modeline
 int								# VAL_ prefix
 	"SIDEways"	SIDEWAYS	WFMODE|WFHARD		# sideways offset for display

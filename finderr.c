@@ -2,7 +2,10 @@
  * Written for vile by Paul Fox, (c)1990
  *
  * $Log: finderr.c,v $
- * Revision 1.30  1993/11/04 09:10:51  pgf
+ * Revision 1.31  1993/12/08 17:06:17  pgf
+ * cleaned up (minimally) the scanf chain, reduced the number of ifdefs
+ *
+ * Revision 1.30  1993/11/04  09:10:51  pgf
  * tom's 3.63 changes
  *
  * Revision 1.29  1993/10/04  10:24:09  pgf
@@ -170,7 +173,10 @@ int f,n;
 		/* to use this line, we need both the filename and the line
 			number in the expected places, and a different line
 			than last time */
-		/* accept lines of the form:
+		/* accepts error forms */
+		/*  (could probably be reduced/simplified -- maybe even 
+			regexps could be used. */
+		/*
 			"file.c", line 223: error....
 			or
 			file.c: 223: error....
@@ -191,9 +197,17 @@ int f,n;
 			else
 				break;	/* out of memory */
 
-			if ( (sscanf(text,
+			if ( (
+			/* "file.c", line 223: error.... */
+			      sscanf(text,
 				"\"%[^\" \t]\", line %d:",
 				errfile, &errline) == 2
+
+			/* file.c: 223: error....	*/
+			  ||  sscanf(text,
+				"%[^: \t]: %d:",
+				errfile, &errline) == 2
+
 #if APOLLO		 	/* C compiler */
 			  ||  sscanf(text,
 				"%32[*] Line %d of \"%[^\" \t]\"",
@@ -212,26 +226,23 @@ int f,n;
 #endif
 
 #if HPUX			/* C compiler */
+/* 	compiler-name: "filename", line line-number ...	*/
 			  ||  sscanf(text,
-			  	"cc: \"%[^\"]\", line %d:",
+			  	"%*s: \"%[^\"]\", line %d",
 						errfile, &errline) == 2
 #endif
-#if OSF1
-/* 	/usr/lib/cmplrs/cc/cfe: Error: test.c, line 8: Syntax Error  */
+/* 	ultrix, sgi, osf1 (alpha only?)  use:			*/
+/* 	compiler-name: Error: filename, line line-number ...	*/
 			  ||  sscanf(text,
 			  	"%*s %*s %[^, \t], line %d",
 						errfile, &errline) == 2
-#endif
-			  ||  sscanf(text,
-				"%[^: \t]: %d:",
-				errfile, &errline) == 2
 #if SUNOS			/* lint-output */
 			  ||  sscanf(text,
-			  	"%[^:( \t](%d):",
+			  	"%[^:( \t](%d):",  /* ) */
 				errfile, &errline) == 2
 			  ||  ((t = strstr(text, "  ::  ")) != 0
 			    && sscanf(t,
-			  	"  ::  %[^( \t](%d)",
+			  	"  ::  %[^( \t](%d)", /* ) */
 				errfile, &errline) == 2)
 #endif
 #if TURBO

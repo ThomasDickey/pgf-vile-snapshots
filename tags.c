@@ -5,7 +5,14 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: tags.c,v $
- * Revision 1.42  1993/11/04 09:10:51  pgf
+ * Revision 1.44  1993/12/21 12:40:26  pgf
+ * included missing glob.h
+ *
+ * Revision 1.43  1993/12/13  18:02:12  pgf
+ * the filename found in a tags file is now globbed, so environment
+ * variables can be used.
+ *
+ * Revision 1.42  1993/11/04  09:10:51  pgf
  * tom's 3.63 changes
  *
  * Revision 1.41  1993/10/04  10:24:09  pgf
@@ -146,6 +153,7 @@
  */
 #include	"estruct.h"
 #include        "edef.h"
+#include	"glob.h"
 
 #if TAGS
 
@@ -280,6 +288,7 @@ int taglen;
 
 	if (curbp == NULL
 	 || !same_fname(tfname, curbp, TRUE)) {
+		(void) doglob(tfname);
 		s = getfile(tfname,TRUE);
 		if (s != TRUE) {
 			tossuntag();

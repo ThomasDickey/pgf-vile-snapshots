@@ -4,7 +4,10 @@
  *  heavily modified by Paul Fox, 1990
  *
  * $Log: search.c,v $
- * Revision 1.54  1993/10/04 10:24:09  pgf
+ * Revision 1.55  1993/12/22 15:28:34  pgf
+ * applying tom's 3.64 changes
+ *
+ * Revision 1.54  1993/10/04  10:24:09  pgf
  * see tom's 3.62 changes
  *
  * Revision 1.53  1993/09/06  16:34:38  pgf
@@ -757,7 +760,7 @@ savematch(curpos,matchlen)
 MARK curpos;		/* last match */
 SIZE_T matchlen;
 {
-	static	ALLOC_T	patlen = -1;	/* length of last malloc */
+	static	ALLOC_T	patlen = 0;	/* length of last malloc */
 
 	/* free any existing match string */
 	if (patmatch == NULL || patlen < matchlen) {

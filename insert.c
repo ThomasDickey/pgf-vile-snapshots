@@ -8,8 +8,13 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: insert.c,v $
- *	Revision 1.35  1993/10/11 17:39:56  pgf
- *	pass char to match to fmatchindent()
+ *	Revision 1.36  1993/12/08 17:19:17  pgf
+ *	don't copy the indent of lines beginning with '#' in cmode.  this
+ *	causes us to return to the previous indent level after typing a "#if"
+ *	or "#else" line, etc.
+ *
+ * Revision 1.35  1993/10/11  17:39:56  pgf
+ * pass char to match to fmatchindent()
  *
  * Revision 1.34  1993/09/16  11:06:43  pgf
  * make parentheses act like braces in c-mode -- for indentation purposes, in
@@ -204,7 +209,7 @@ int f,n;
 	/* if we are in C mode and this is a default <NL> */
 	if (n == 1 && (b_val(curbp,MDCMOD) || b_val(curbp,MDAIND)) &&
 						!is_header_line(DOT,curbp)) {
-		s = indented_newline_above(b_val(curbp, MDCMOD));
+		s = indented_newline_above();
 		if (s != TRUE) return (s);
 
 		return(ins());
@@ -780,7 +785,7 @@ int f,n;
 	/* if we are in C or auto-indent modes and this is a default <NL> */
 	if (n == 1 && (b_val(curbp,MDCMOD) || b_val(curbp,MDAIND)) &&
 						!is_header_line(DOT,curbp))
-		return indented_newline(b_val(curbp, MDCMOD));
+		return indented_newline();
 
 	/*
 	 * If a newline was typed, fill column is defined, the argument is non-
@@ -801,9 +806,9 @@ int f,n;
 
 /* insert a newline and indentation for C */
 int
-indented_newline(cmode)
-int cmode;
+indented_newline()
 {
+	int cmode = b_val(curbp, MDCMOD);
 	register int indentwas; /* indent to reproduce */
 	int bracef; /* was there a brace at the end of line? */
 
@@ -820,9 +825,9 @@ int cmode;
 
 /* insert a newline and indentation for autoindent */
 int
-indented_newline_above(cmode)
-int cmode;
+indented_newline_above()
 {
+	int cmode = b_val(curbp, MDCMOD);
 	register int indentwas;	/* indent to reproduce */
 	int bracef; /* was there a brace at the beginning of line? */
 
@@ -845,15 +850,25 @@ previndent(bracefp)
 int *bracefp;
 {
 	int ind;
+	int cmode = b_val(curbp, MDCMOD);
+
+	if (bracefp) *bracefp = FALSE;
 
 	MK = DOT;
 
 	/* backword() will leave us either on this line, if there's something
 		non-blank here, or on the nearest previous non-blank line. */
 	if (backword(FALSE,1) == FALSE) {
-		if (bracefp) *bracefp = FALSE;
 		gomark(FALSE,1);
 		return 0;
+	}
+	/* if the line starts with a #, then don't copy its indent */
+	if (cmode && lgetc(DOT.l, 0) == '#') {
+		DOT.o = 0;
+		if (backword(FALSE,1) == FALSE) {
+			gomark(FALSE,1);
+			return 0;
+		}
 	}
 	ind = indentlen(l_ref(DOT.l));
 	if (bracefp) {

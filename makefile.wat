@@ -4,7 +4,11 @@
 # T.DANG (dang@cogit.ign.fr)
 #
 # $Log: makefile.wat,v $
-# Revision 1.3  1993/09/03 09:11:54  pgf
+# Revision 1.4  1993/12/08 16:47:00  pgf
+# vile.lnk should depend on makefiles, not object files, and
+# increased stack size
+#
+# Revision 1.3  1993/09/03  09:11:54  pgf
 # tom's 3.60 changes
 #
 # Revision 1.2  1993/07/27  19:20:00  pgf
@@ -20,6 +24,9 @@
 #define PVGA for Paradise VGA (because there are some problems with this card)
 #To fix it, use /dPVGA=1
 #CFLAGS= /dIBMPC=1 /dscrn_chosen=1 /dPVGA=1 
+
+# debugging
+#CFLAGS= /dIBMPC=1 /dscrn_chosen=1 /d2
 CFLAGS= /dIBMPC=1 /dscrn_chosen=1
 
 SCREEN= ibmpc 
@@ -49,9 +56,11 @@ OBJ = 	main.obj $(SCREEN).obj basic.obj bind.obj buffer.obj crypt.obj &
 vile.exe: $(BUILTHDRS) $(OBJ) vile.lnk
 	wlink @vile 
 
-vile.lnk: $(OBJ)
+vile.lnk: makefile makefile.wat
 	echo DEBUG ALL >$^@
         echo NAME vile >>$^@
+        echo OPTION MAP >>$^@
+        echo OPTION STACK=16384 >>$^@
 	for %i in ($(OBJ)) do echo FILE %i >>$^@
 
 .c.obj:	estruct.h nemode.h edef.h proto.h 

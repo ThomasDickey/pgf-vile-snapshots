@@ -11,7 +11,10 @@
  * which means that the dot and mark values in the buffer headers are nonsense.
  *
  * $Log: line.c,v $
- * Revision 1.55  1993/11/04 09:10:51  pgf
+ * Revision 1.56  1993/12/22 15:15:15  pgf
+ * change name of "roundup" macro, to avoid name conflict on linux
+ *
+ * Revision 1.55  1993/11/04  09:10:51  pgf
  * tom's 3.63 changes
  *
  * Revision 1.54  1993/09/10  16:06:49  pgf
@@ -211,7 +214,7 @@
 #include	"estruct.h"
 #include	"edef.h"
 
-#define roundup(n) ((n+NBLOCK-1) & ~(NBLOCK-1))
+#define roundlenup(n) ((n+NBLOCK-1) & ~(NBLOCK-1))
 
 #if OPT_MAP_MEMORY	/* patch: should use this in other places */
 #if HAS_MEMMOVE
@@ -290,7 +293,7 @@ BUFFER *bp;
 	if (used < 0)  {
 		size = 0;
 	} else {
-		size = roundup(used);
+		size = roundlenup(used);
 	}
 #if OPT_MAP_MEMORY
 	lp = l_ref(l_allocate(size));
@@ -530,7 +533,7 @@ int n, c;
 	nsize = llength(tmp) + n;
 	if (nsize > tmp->l_size) {		/* Hard: reallocate	*/
 		/* first, create the new image */
-		nsize = roundup((int)nsize);
+		nsize = roundlenup((int)nsize);
 		copy_for_undo(lp1);
 #if OPT_MAP_MEMORY
 		if ((tmp = l_reallocate(DOT.l, nsize, curbp)) == 0)
@@ -953,7 +956,7 @@ ldelnewline()
 #endif
 		SIZE_T nsize;
 		/* first, create the new image */
-		nsize = roundup(len + add);
+		nsize = roundlenup(len + add);
 #if OPT_MAP_MEMORY
 		lp1 = l_ptr(l_reallocate(lp1, nsize, curbp));
 		if (same_ptr(lp1, null_ptr))

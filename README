@@ -143,7 +143,9 @@ than _less_), please send me mail, and I will add you to my list.  The email
 will probably contain a capsule summary of the most recent changes to the
 code.
 
-Thanks to Tuan Dang for the Watcom and DJ GCC work.
+Thanks to Tuan Dang for the Watcom and DJ GCC work.  I don't know much
+about djgpp, the DOS port of djgcc, but take a look at makefile.djg.
+
 
 pgf
 

@@ -3,7 +3,10 @@
  *		6/3/93
  *
  * $Log: map.c,v $
- * Revision 1.9  1993/09/03 09:11:54  pgf
+ * Revision 1.10  1993/12/22 15:28:34  pgf
+ * applying tom's 3.64 changes
+ *
+ * Revision 1.9  1993/09/03  09:11:54  pgf
  * tom's 3.60 changes
  *
  * Revision 1.8  1993/08/13  16:32:50  pgf
@@ -44,7 +47,6 @@
 
 #define DEFAULT_REG     -1
 
-#define OPT_MAP_DISPLAY	!SMALLER
 #define	MAPPED_LIST_NAME	ScratchName(Mapped Characters)
 
 typedef struct _mapping {

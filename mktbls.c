@@ -14,7 +14,11 @@
  *
  *
  * $Log: mktbls.c,v $
- * Revision 1.39  1993/11/04 09:10:51  pgf
+ * Revision 1.40  1993/12/23 10:11:19  pgf
+ * change expression so we don't assume boolean expression returns exactly
+ * 0 or 1.
+ *
+ * Revision 1.39  1993/11/04  09:10:51  pgf
  * tom's 3.63 changes
  *
  * Revision 1.38  1993/10/04  10:24:09  pgf
@@ -589,7 +593,7 @@ char	**vec;
 			if (expecting && !isspace(c)) {
 				if (count+1 >= MAX_PARSE)
 					break;
-				vec[++count] = input + n - (c != quote);
+				vec[++count] = input + n - ((c != quote)?1:0);
 				expecting = FALSE;
 			}
 		}

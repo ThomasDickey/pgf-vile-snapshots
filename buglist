@@ -128,43 +128,8 @@ PCVILE
 	0x80 as the definition of the SPEC bit.  All this is easy -- it
 	just needs to be done.
 
-===================================================
 
-PCVILE
-
-Firstly - UNISYS 80286, EGA screen, 4DOS command shell & NNANSI.SYS
-
-1) Attempting to shell out to 4dos results in running COMMAND.COM.  Is
-   this because COMSPEC is not checked ?
-
-2) Attempting to redirect the output of a 4DOS internal command into a
-   buffer works erratically.
-
-	a) :e !dir		- never works
-	b) ^X-!dir		- works BUT when followed by;
-	   ^X-!set		- I get the dir listing again.
-
-
-3) During testing I noticed another odd result when running the command;
-
-	:!set
-
-   I notice that the output starts on the status line and will overwrite
-   it before continuing onto other lines.  However running
-
-	:!dir
-
-   appears to print out just fine.
-
-4) Points 1) & 3) I have previuosly raised with Peter Ruczynski on his
-   version.
-
-[ i don't know if any of these are still true -- this was with 3.25 ]
-
-
-
-
-===================================================
+--------------------------------
 486 PC under Dell Unix (svr4) - make:    unixpc
 HP9000/700 under HPUX 8.07    - changes: do not include <Xos.h> in x11.c when
                                          hpux is defined
@@ -536,7 +501,7 @@ apply Alistair's min/max regexp patch
 
 -------------------------------------------------------------------------
 
-	Is there any way to use termcap to define 
+Is there any way to use termcap to define 
 all of the window parameters, but still use ANSI escapes for colors?  Elvis
 allows me to do this under Linux on the terminal screen and a couple of
 systems allow Elvis to change the foreground and background colors under an
@@ -556,74 +521,12 @@ does not find :
 "non-word" character ]
 
 ---------------------------
-would be nice if "file newer" warning could come up on first change to buffer.
 
----------------------------
-
-	xvile has been dumping core rather frequently today.  Not sure
-why, though I did change window managers today.  This is on a Sun4 running
-SunOS 4.1.1.  Here's what adb says.  This is the second time I tried adb
-on the core file, and both times the problem was in tb_get.
-	Eric Krohn
-
-_kill(?)
-__DYNAMIC(0x0,0x46000,0x45c20,0xf7fff585,0x1,0x0) + 8
-_imdying(0xb,0x3,0xf7ffdc48,0x1,0x1,0xf7fff585) + 174
-__sigtramp(?)
-_tb_get(0x89e20,0xdfdfdfdf,0x41000,0x1,0xf83e3000,0x1b) + ac
-_tb_next(0x89d88,0xdfdfdfdf,0x1,0x8000000,0xf83e3000,0x1) + 20
-_x_getc(0x0,0xf7ffe610,0x0,0x0,0xffffffff,0x48400) + 20
-_tgetc(0x0,0x1,0xd0,0x0,0x7a2c8,0xffffffff) + ac
-_kbd_key(0x4d238,0x1,0x79868,0x0,0xffffffff,0x1b) + a0
-_ins_anytime(0x0,0x0,0x1,0xf7ffe75c,0x1,0x1b) + 1bc
-_ins_n_times(0x0,0x1,0x1,0x0,0x0,0x1) + 48
-_insert(0x0,0x1,0x46400,0x1,0x1,0x0) + c
-_execute(0x42f60,0x0,0x1,0x0,0x0,0x3) + 158
-_loop(0x1,0x83bd0,0x80,0x1,0x0,0x42f60) + 164
-_main(0x1,0x4d238,0x1,0x0,0x41408,0x0) + 9f8
-
-0x89d88,8/X
-0x89d88:        89e20           1               1               dfdfdfe0
-                1b              dfdfdfdf        dfdfdfdf        20094120
-
-0x89e20,8/X		# fishy looking data
-0x89e20:        6adfdfdf        dfdfdfdf        18              dfdfdfdf
-                dfdfdfdf        dfdfdfdf        dfdfdfdf        6865206c
-
------------------------------------------------------
-
-the double beep for aborted searches is really annoying
------------------------------------------------------
-
-
-- When using find by repeatedly using n or b give a message like "all
-  occurrences of pattern found" when I have scanned through the whole
-  file. This as an extension of the "only one occurence of pattern"
-  message.
----------------------------
 - I use you example of the ^X-m macro given in the help file to
   read a manual page for some identifier. It would be nice to have a
   shell-command that would NOT wait for me to press return or escape.
 
 ---------------------------
-
-- The wrapmargin option is badly broken. If I set wm=40 and
-  type the preceding sentences from the beginning of the line 
-  I get:
-Thewrapmarginoptionisbadlybroken.If
-
-
-
-
-
-
- I set ....
-
- So it joins all the words in the 1st line, gives me some empty lines,
-and continues. The :ww option seems to work fine, strangely enough.
-
----------------------------
-
 
 It looks like vile is not eight-bit clean. I was trying
 to edit some Japanese text and vile is stripping off the
@@ -632,9 +535,6 @@ top bit if the characters.
 ---------------------------
 
 [ this may be fixed...  ]
-
-    1. Why does :e # default to the current file(buffer) rather than the
-    previously visited buffer?
 
     2. Why, when I use my arrow keys to go back into the :e # history, do
     I see two copys of the current file(buffer) name rather than just one?
@@ -705,7 +605,7 @@ I had a quick lok at the code but I was lost in all the defins for ffopen.
 
 ---------------------------
 
-	When you do a :b you should have line completion for the name.
+When you do a :b you should have line completion for the name.
 
 ---------------------------
 
@@ -716,74 +616,6 @@ to the normally. The some is goiing on when I perform a search.
 
 ---------------------------
 
-I attempted to compile vile 3.62 with MSVC++1.0 and it did compile fine
-although bunch of warnings showed up.  The only file which spit out errors
-was ibmpc.c.  Until this file is fixed, there should be no problem compiling
-it with MSVC++.  I'm currently using 3.59 and it has a few problems that
-sort of borther me:
-	*Once in a while the screen scrambles up (broken text) and I can't
-	 read anything.
-	*Some of the regular expressions hang vile.
-
----------------------------
-
-[ i think i'd rather embed this stuff in estruct.h, or use separate
-	targets....  -pgf ]
-
-for building on NetBSD and FreeBSD:
-
-1. display.c
-line 343, added "|| __NetBSD__ || __386BSD__" at the end of line
-
-2. proto.h
-line 1234: added "#if !defined(__NetBSD__) && !defined(__386BSD__)"
-line 1261: inserted "#endif /* !__NetBSD__ && !__386BSD__ */"
-
-3. termio.c
-line 315, added "|| __NetBSD__ || __386BSD__" at the end of line
-
-4. In the makefile, change the CFLAGS to include "-Xlinker -Z" to
-pass the -Z flag to the linker (this is compiling under NetBSD for
-an executable that will run on NetBSD and FreeBSD). If compiling
-under FreeBSD, no such flags are necessary.
-
-Again, the bsd386 makefile target was used for both systems, as
-it wasn't a big enough deal to make a new target.
-
----------------------------
-
-While using XVile with some selected text and moving elsewhere to paste
-that text, cursor disappeared and window soon followed, with:
-
-Program terminated with signal 11, Segmentation fault.
-No debugging symbols found
-No debugging symbols found
-#0  0xeac8 in bsizes ()
-pdm 1 -> where
-#0  0xeac8 in bsizes ()
-#1  0x1a974 in writeout ()
-#2  0x1b4f0 in imdying ()
-#3  0xf76b2c54 in _sigtramp ()
-#4  0x114bc in col2offs ()
-#5  0xa5bc in setwmark ()
-#6  0xa6a8 in setcursor ()
-#7  0x73c8 in x_putline ()
-#8  0x79e4 in x_putline ()
-#9  0x7bf8 in x_working ()
-#10 0x1fc2c in tgetc ()
-#11 0x1fcec in kbd_key ()
-#12 0x220d4 in replacechar ()
-#13 0x224b8 in ins ()
-#14 0x21ae8 in opendown ()
-#15 0x16910 in execute ()
-#16 0x2e50 in loop ()
-#17 0x2cdc in main ()
-
-XVILE 3.62 on a SPARC SunOS 4.1.1.
-
-
----------------------------
-
 Want to hang vile? Just type
 :../
 Only kill seems to get you unstuck.
@@ -791,6 +623,9 @@ Only kill seems to get you unstuck.
 Maybe you can pass this on to the vile author(s).
 
 It's vile version 3.62 under SunOS 4.1.3
+
+[ I can't reproduce this.  -pgf ]
+
 ---------------------------
 	Here are stack traces from five core dumps :-( I've gotten from
 xvile 3.62.  I don't think I've seen any from plain old vile, but then I
@@ -809,32 +644,6 @@ you know of anyone working on it.  If not, I may play around with it.
 
 	Eric Krohn
 
-
-core dump from xvile 3.62 on SunOS 4.1.1
-
-$C
-_kill(?)
-__DYNAMIC(0x0,0x21,0x1,0x8,0x0,0xf771f018) + 8
-_imdying(0xb,0x3,0xf7ffda98,0x0,0x0,0x0) + 198
-__sigtramp(?)
-_tb_get(0x79e50,0xdfdfdfdf,0x41000,0x5,0xf8401000,0x1b) + ac
-_tb_next(0x83120,0xdfdfdfdf,0x1,0x45fa9,0x2ab7,0x45fac) + 20
-_x_getc(0x0,0x1,0x45f38,0x28,0xffffffff,0x48400) + 20
-_tgetc(0x0,0x0,0x1,0x0,0x0,0x10) + ac
-_kbd_key(0x4,0x0,0x7b530,0x0,0x0,0x4) + 4
-_ins_anytime(0x0,0x1,0x1,0xf7ffe5ac,0x1,0x1b) + 1bc
-_ins(0x0,0x1,0x1b,0xffffffff,0x41000,0x1) + 10
-_chgreg(0x1,0x0,0x1,0x9,0x0,0x1) + 54
-_operator(0x0,0x42c00,0x2941c,0x42ea0,0x0,0x4d2f0) + 210
-_operchg(0x0,0x1,0x46400,0x2,0x2,0x42db0) + 24
-_execute(0x430a8,0x0,0x1,0x0,0x0,0x83) + 158
-_loop(0x1,0x0,0x80,0x1,0x0,0x430a8) + 164
-_main(0x1,0x4d2f0,0x1,0x0,0x4141b,0x0) + a44
-
-0x83120,4/X
-0x83120:        79e50           8               5               dfdfdfe0
-0x79e50,4/X
-0x79e50:        651b6565        65dfdfdf        18              0
 
 xvile 3.62 again (Sun4)
 core file = core -- program ``xvile3.62''
@@ -1021,6 +830,183 @@ show anything obviously wrong to cause the exception.
 
 ---------------------------
 
-I was wondering if it was possible
-to delete/cut the highlighted region (from the selection with mouse button
-one)? 
+I was wondering if it was possible to delete/cut the highlighted region
+(from the selection with mouse button one)? 
+---------------------------
+
+a "suppress autoindent for insert" binding would be great for pasted inserts.
+
+---------------------------
+
+I wanted to sort the text recently, and tried to use the :! vile command
+to do it.
+
+(I know about just ! without the :, and that worked, but I'm used to :!)
+
+Anyway, I mark two spots in the text using the 'm' function, and then
+I tried this:
+
+:'a,'b!sort -nr
+
+Vi is quite happy about doing this, but vile says:
+
+[No such function "!sort -nr"]
+
+But the following command works as expected: 
+
+: !sort -nr
+
+But unfortunately, this is pretty useless, since none of the text in the
+document will be piped to the command without giving a range.  For instance,
+the above command simply sits there, waiting for input under both vile and
+vi.  
+
+Current work around is to mark the end of the region say with a 'a', move
+the cursor to the beginning of the region, and then:
+
+!'asort -nr
+
+which works just fine.
+
+Since all of your other 'ex' emulated commands can accept ranges, would it
+be a simple hack to include the ! operator as well?
+
+---------------------------
+
+sometimes xvile dies when I try to delete a named
+output buffer.  Scenario:  I type * to get the current list of buffers
+in a window.  So that window looks like this:
+
+    Size    Buffer name      Contents
+    ------- ---------------- --------
+0 # 9609    myfile.c         ./myfile.c
+1   134     !ls              !ls -xt *.c
+2   12304   otherfile.c      ./otherfile.c
+           Current dir:     /local/project/cmd/misc
+
+If I put the cursor over '!ls', and try to delete that buffer using
+^X-k I get the message "[No such buffer]", so I put the cursor over the
+buffer number '1', and try again.  Sometimes it works, and sometimes it
+causes xvile to die.
+
+---------------------------
+
+
+   How can I read the status of a shell command when I execute a 
+   shell-command? Although the shell command has a $STATUS=1 the
+   status of the status variable is TRUE.
+
+---------------------------
+Vi has an autowrite option that will write out a modified buffer
+any time a shell command is executed (it also writes out modified
+buffers at other times as well).
+
+This would be most useful for the edit, make, execute cycle.
+---------------------------
+
+Alas, more Turbo/Borland-C-ism have crept into vile.  They actually
+began with 3.62, but I didn't have the time to work with the software...
+I am trying to compile under djgpp.  Anyhow, I am trying to upgrade -- the
+last version I had that compiled under djgpp 1.10 was 3.61.  Unfortunately,
+Turbo/Borland C-isms are creeping in.  Could someone help me with
+translating the following function for use with djgpp.
+
+static int
+get_vga_bios_info(dynamic_VGA_info *buffer)
+{
+	struct SREGS segs;
+
+	rg.h.ah   = 0x1b;
+	rg.x._BX_ = 0;
+	segs.es   = FP_SEG(buffer);
+	rg.x._DI_ = FP_OFF(buffer);
+	INTX86X(0x10, &rg, &rg, &segs); /* Get VGA-BIOS status */
+
+	return (rg.h.al == 0x1b);
+}
+
+
+-----------------------
+
+I'm having problems with the terminal modes in vile under VMS.  I'll
+summarize them here, even though as I recall Tom has done the VMS work.
+Could you pass this on?  Thanks.
+
+The terminal modes under vile (every version I've used, from 3.56
+through 3.63) are not being set according to what I {\em think} you
+want, to wit, PASTHRU mode.  On my VT terminal attached to a VAX via a
+DEC server, the modes is being set to PASSALL even though the source
+code (which I have looked at) specifies PASTHRU.  At 19200 baud (which
+is the only speed at which scrolling is acceptably fast) the display is
+made quite dirty on half-page (^D) scrolls.  (Full-page scrolls are
+okay since they redraw the entire screen.  Presumably, the redraw logic
+is different for the two cases.)  Doing a screen refresh (^L) clears
+up the screen.  Screen drawing is also okay if, after starting vile
+(and the terminal is set up by the editor), I press the `Break' key and
+manually `set sess pasthru' at the server's `Local' prompt.
+
+I'm not a VMS authority (and don't care to be), but if there is quick
+fix or if you could give me a hint about where to start looking in the
+VMS manuals, I'd appreciate it.
+
+-----------------------
+
+change the semicolons on if_OPT_WORKING.  others?
+
+-----------------------
+
+tags is broken -- lengths seem random.  at least, i go to different places
+with ^] and :ta,
+
+----------------
+start with no .vilerc, edit an empty file, do ":show-registers" followed
+by ":show-variables", observe the coredump.  DOT seems to have an odd value,
+given that the buffer is empty.
+----------------
+
+I ran into something a little baffling with version 3.63 of vile
+running on my Silicon Graphics.
+
+I was translating some fortran code to C (yes, I've already used f2c
+on many parts), and had a bunch of records looking like:
+
+abc[q2)
+abc[j3)
+
+So I entered
+
+s/abc\[\(..\))/abc[\1]/
+
+and vile choked, giving me the message "BUG: mangled replace"
+
+Then I switched back to vi, and it worked as I expected.
+
+Vile version 3.57 running on our SUN system worked fine!!!
+
+----------------
+I have installed few weeks ago the release 3.63 of (x)vile.
+It works fine except one point.
+Under X11, I have define with xmodmaprc some keystroke to act as
+accented letters ( eg under latex only one key to do 'e [ quote above e ] )
+With xvile nothing happened, the keystroke produce nothing.
+I use an iso8859=1 font which has 8 bits characters.
+Is it possible to use special characters ??
+Any help appreciated.
+----------------
+Vile's repeat-backwards-search misses an instance of the search target
+if that instance is on the last line and doesn't start in column 1.
+
+For example, given the 3-line file:
+
++-------+
+|       |
+|bug    |
+| bug   |
++-------+
+
+searching backwards for the string "bug" will find line 3's "bug" only
+once (the initial backwards search).  Any subsequent backwards search
+(e.g., 'n' or 'N') will report that line 2's "bug" is the only
+occurrence.
+
+----------------

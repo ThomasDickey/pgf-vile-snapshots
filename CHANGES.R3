@@ -1,3 +1,90 @@
+Changes for vile 3.64: (released Wed Dec 23, 1993)
+(pgf)
+	+ change arithmetic expression in mktbls.c, so we don't assume
+	  boolean expression returns exactly 0 and 1.  this exercised
+	  a bug in an HP compiler (mktbls,c, from chris sherman)
+
+	+ added fallback definition of VDISABLE to termio.c, in case
+	  system doesn'd define it. (termio.c)
+
+	+ increased stack size for Watcom DOS builds to 16K.  probably
+	  overkill, but the other DOS builds seems to use 16K as well.
+
+	+ cleaned up some of the scanf nonsense, but not nearly enough.
+	  (finderr.c)
+
+	+ don't let display-page changes affect the user's chosen cursor.
+	  (ibmpc.c)
+
+	+ use _previous_ indentation level after a line beginning with '#'
+	  in cmode.  (insert.c, proto.h)
+
+	+ use COMSPEC environment variable when spawning a DOS shell (spawn.c)
+
+	+ assume we're an xterm if the word "xterm" appears anywhere in the
+	  first field of the tcbuf, rather than just in the user's TERM
+	  variable. (tcap.c)
+
+	+ increased size of tcbuf since SCO core dumps on overflow (tcap.c)
+
+	+ initialized tb_last in tb_alloc(). (tbuff.c)
+
+	+ couple of minor user suggestions for vile.hlp and the README.
+
+	+ don't beep when motions fail due to being aborted. (main.c)
+
+	+ check modification time on first change to buffer (file.c, exec.c,
+	  proto.h)
+
+	+ the filename found for a tags lookup is now passed through doglob(),
+	  which means tagfiles can now refer to environment variables etc.
+	  (tags.c, from S.Suresh)
+
+	+ new X resource, "focusFollowsMouse", causes xvile's current window
+	  to track with the mouse cursor. (x11.c, from S.Suresh)
+
+	+ added '~' to the characters considered part of a pathname, so
+	  ^X-e will pick up ~pgf/foo correctly (main.c).
+
+(tom)
+	+ corrected last change to allow pipe to vile, in case it is invoked
+	  via 'rsh' and cannot open /dev/tty (main.c).
+
+	+ added config flag OPT_TERMCHRS (estruct.h, bind.c).
+
+	+ animated [Terminal] and [Binding List] buffers (bind.c, buffer.c).
+
+	+ corrected call on 'slowreadf()' that resulted in wrong line numbers
+	  when a file was piped to vile (main.c).
+
+	+ modified TurboC makefile to merge duplicate strings, saving a little
+	  memory (makefile.tbc).
+
+	+ corrected logic that makes ".bak" file on MSDOS so that when
+	  appending to a file (e.g., ":w >>foo") the file is copied after
+	  renaming (fileio.c).
+
+	+ consolidated some code that sets errno when user attempts to read or
+	  write a directory-file (fileio.c).
+
+	+ applied fix from eric krohn to fix uninitialized structure member
+	  (tbuff.c).
+
+	+ corrected "EGA" table entry (ibmpc.c)
+
+	+ prevent 'flash' mode from being used until after 'TTopen()' (ibmpc.c)
+
+	+ corrected a hole in 'swbuffer()' that tried to use a null value for
+	  'curwp' (buffer.c).
+
+	+ modified to allow "@" startup file to have errors w/o defaulting to
+	  "vile.rc", by checking to see if a buffer was created (main.c)
+
+	+ corrected logic of 'vtputc()' and 'vtset()' to make line-wrap display
+	  properly when the line contains control characters (display.c).
+
+	+ corrected limits of highlighting in 'change_selection()' (x11.c)
+
 Changes for vile 3.63: (released  Wed Nov 10, 1993)
 (tom)
 	+ corrected 'pathcat()', to avoid using autoincrement in 'slashc()'

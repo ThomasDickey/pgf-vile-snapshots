@@ -6,7 +6,13 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.106  1993/11/04 09:10:51  pgf
+ * Revision 1.108  1993/12/22 15:28:34  pgf
+ * applying tom's 3.64 changes
+ *
+ * Revision 1.107  1993/12/08  19:58:43  pgf
+ * added BSD386 to list of machines storing ioctl.h in sys
+ *
+ * Revision 1.106  1993/11/04  09:10:51  pgf
  * tom's 3.63 changes
  *
  * Revision 1.105  1993/10/11  17:22:40  pgf
@@ -368,7 +374,7 @@
 #   include <termio.h>
 #  else
 #   if BERK
-#    if APOLLO || AIX || OSF1 || ULTRIX
+#    if APOLLO || AIX || OSF1 || ULTRIX || BSD386
 #     include <sys/ioctl.h>
 #   else
 #     include <ioctl.h>
@@ -414,6 +420,10 @@ VIDEO   **pscreen;                      /* Physical screen. */
 #endif
 
 static	int	displayed;
+
+#ifdef WMDLINEWRAP
+static	int	allow_wrap;
+#endif
 
 /* for window size changes */
 int chg_width, chg_height;
@@ -819,48 +829,46 @@ int c;
 
 	vp = vscreen[vtrow];
 
+	/* XXX: should test for characters > 128, and highlight them */
 	if (isprint(c) && vtcol >= 0 && vtcol < term.t_ncol) {
-		vp->v_text[vtcol] = c;
-		++vtcol;
+		vp->v_text[vtcol++] = (c & (N_chars-1));
+#ifdef WMDLINEWRAP
+		if ((allow_wrap != 0)
+		 && (vtcol == term.t_ncol)
+		 && (vtrow <  allow_wrap)) {
+			vtcol = 0;
+			vtrow++;
+			vscreen[vtrow]->v_flag |= VFCHG;
+		}
+#endif
 		return;
 	}
-	if (c == '\t') {
+
+	if (vtcol >= term.t_ncol) {
+		vp->v_text[term.t_ncol - 1] = MRK_EXTEND_RIGHT;
+	} else if (c == '\t') {
 		do {
 			vtputc(' ');
 		} while (((vtcol + taboff)%curtabval) != 0);
 	} else if (c == '\n') {
 		return;
-	} else if (vtcol >= term.t_ncol) {
-		++vtcol;
-		vp->v_text[term.t_ncol - 1] = MRK_EXTEND_RIGHT;
 	} else if (isprint(c)) {
 		++vtcol;
 	} else {
-		vtputc('^');
-		vtputc(toalpha(c));
+		vtlistc(c);
 	}
 }
 
-/* as above, but tabs and newlines are made visible */
+/* shows non-printing character */
 void
 vtlistc(c)
 int c;
 {
-	register VIDEO *vp;	/* ptr to line being updated */
-
-	vp = vscreen[vtrow];
-
-	if (vtcol >= term.t_ncol) {
-		++vtcol;
-		vp->v_text[term.t_ncol - 1] = MRK_EXTEND_RIGHT;
-	} else if (isprint(c)) {
-		if (vtcol >= 0)
-			vp->v_text[vtcol] = c;
-		++vtcol;
-	} else {
+	if (!isprint(c)) {
 		vtputc('^');
-		vtputc(toalpha(c));
+		c = toalpha(c);
 	}
+	vtputc(c);
 }
 
 int
@@ -907,7 +915,7 @@ WINDOW *wp;
 		from = l_ref(lp)->l_text;
 		for (j = k = jk = 0; (j < n) && (k < skip); j++) {
 			register int	c = from[j];
-			if (list && !isprint(c)) {
+			if ((list || (c != '\t')) && !isprint(c)) {
 				k += 2;
 				fill = toalpha(c);
 			} else {
@@ -931,28 +939,27 @@ WINDOW *wp;
 	taboff -= w_left_margin(wp);
 #endif
 	from = l_ref(lp)->l_text + skip;
-	while ((vtcol <= term.t_ncol) && (n > 0)) {
+#ifdef WMDLINEWRAP
+	allow_wrap = w_val(wp,WMDLINEWRAP) ? mode_row(wp) : 0;
+#endif
+
+	while ((vtcol <= term.t_ncol)
+#ifdef WMDLINEWRAP
+	  &&   (vtrow < mode_row(wp))
+#endif
+	  &&   (n > 0)) {
 		if (list)
 			vtlistc(*from++);
 		else
 			vtputc(*from++);
-#ifdef WMDLINEWRAP
-		if (w_val(wp,WMDLINEWRAP)
-		 && (n > 0)
-		 && (vtcol == term.t_ncol)) {
-			if (vtrow < term.t_nrow) {
-				if (vtrow+1 >= wp->w_toprow + wp->w_ntrows)
-					break;
-				vtcol = 0;
-				vtrow++;
-				vscreen[vtrow]->v_flag |= VFCHG;
-			}
-		}
-#endif
 		n--;
 	}
+
 	if (list && (n >= 0))
 		vtlistc('\n');
+#ifdef WMDLINEWRAP
+	allow_wrap = 0;
+#endif
 }
 
 /* VARARGS1 */
@@ -2466,7 +2473,7 @@ BUFFER	*bp;
 	relisting_b_vals = 0;
 	relisting_w_vals = 0;
 }
-#endif
+#endif	/* OPT_UPBUFF */
 
 /*
  * Send a command to the terminal to move the hardware cursor to row "row"
