@@ -4,7 +4,11 @@
  *	Filename prompting and completion routines
  *
  * $Log: filec.c,v $
- * Revision 1.19  1993/07/01 16:15:54  pgf
+ * Revision 1.20  1993/07/07 10:15:04  pgf
+ * fix coredump on filecompletion, by making sure BFSIZES bit is cleared
+ * when building MyBuff
+ *
+ * Revision 1.19  1993/07/01  16:15:54  pgf
  * tom's 3.51 changes
  *
  * Revision 1.18  1993/06/18  15:57:06  pgf
@@ -407,8 +411,10 @@ LINEPTR *lpp;	/* in/out line pointer, for iteration */
 		}
 	}
 
-	if (doit)
+	if (doit) {
 		lp = makeString(bp, lp, fname);
+		b_clr_counted(bp);
+	}
 
 	if (lpp)
 		*lpp = l_ptr(lp);

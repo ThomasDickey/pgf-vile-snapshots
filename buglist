@@ -4,9 +4,10 @@
 E	everybody and their sibling wants "map", "map!", and "abb".
 	there is now fledgling support for this, courtesy Otto Lind.
 	Still no map! or abb, and nested maps are broken in a couple
-	of ways, but it's a start...  oh yes, one other thing -- currently
-	only supports single key mappings (i.e.  you can map one key to a
-	string, but no string to string mapping).
+	of ways, but it's a start...  oh yes, one other thing -- :map
+	currently only supports single key mappings (i.e.  you can map one
+	vile key-sequnce to a string, but there is no string to string
+	mapping).
 
 	    [ a user writes: vi's map/map!  has problems in treating
 	    numbers of ^V in different platforms.  And mail/newsreaders
@@ -448,4 +449,20 @@ I've accumulated a couple more vi-compatible bugs:
 	+ type "s<nl><esc>" before some whitespace.  Vi trims the whitespace.
 
 -----------
+
+I have a couple of bug reports and suggestions for you, concerning vile
+3.52 on SunOS.
+
+
+4) even more minor
+	I suggest that you redraw the entire screen after an ^X-!
+	command.  It frequently leaves my screen with a lot of garbage
+        which I have to cure with an ^L.
+
+
+5) annoying
+	When I execute a keyboard macro using ^X-& I cannot repeat this
+	using the dot command. Instead, the last command in the macro
+	is repeated.
+
 
