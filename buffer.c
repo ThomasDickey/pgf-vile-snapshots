@@ -6,7 +6,20 @@
  * for the display system.
  *
  * $Log: buffer.c,v $
- * Revision 1.33  1992/05/16 12:00:31  pgf
+ * Revision 1.37  1992/07/24 07:49:38  foxharp
+ * shorten_name changes
+ *
+ * Revision 1.36  1992/07/18  13:13:56  foxharp
+ * put all path-shortening in one place (shorten_path()), and took out some old code now
+ * unnecessary
+ *
+ * Revision 1.35  1992/07/15  08:52:44  foxharp
+ * trim leading `pwd` from buffer names in buffer list
+ *
+ * Revision 1.34  1992/07/13  19:36:13  foxharp
+ * show current directory in buffer list
+ *
+ * Revision 1.33  1992/05/16  12:00:31  pgf
  * prototypes/ansi/void-int stuff/microsoftC
  *
  * Revision 1.32  1992/03/05  09:19:55  pgf
@@ -699,13 +712,25 @@ char *dummy;
 				lp = lforw(lp);
 			}
 		}
-		bprintf("%7ld %*s %s\n",nbytes, NBUFN, 
-						bp->b_bname, bp->b_fname);
+		bprintf("%7ld %*s ",nbytes, NBUFN, bp->b_bname );
+		{
+			char *p;
+			p = shorten_path(bp->b_fname);
+			if (p) {
+				if (p[0] != slash && p[0] != '.')
+					bprintf(".%c",slash);
+				bprintf("%s",p);
+			}
+		}
+		bprintf("\n");
 		bp = bp->b_bufp;
 	}
 
 	if (footnote == TRUE)
 		bprintf("('m' means modified, 'u' means unread)\n");
+
+	bprintf("             %*s %s\n", NBUFN, "Current dir:",
+		current_directory(FALSE));
 }
 
 #ifdef NEEDED

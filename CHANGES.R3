@@ -38,6 +38,10 @@ VI COMPLIANCE:
 - "magic" mode, or rather "nomagic" mode, now works more like vi:  special
 	characters are still available by escaping them in nomagic mode.
 
+- there is a new mode, settable as "set terse" and "set noterse", which will
+	suppress some of the extra messages that vile prints, reducing
+	traffic for slow terminals.
+
 - the '%' command now scans forward for a fence character if you're not on
 	one to begin with (thanks to Dave Lemke).  I also added '^X-%', which
 	scans backward instead.
@@ -73,6 +77,8 @@ VI COMPLIANCE:
 	inserted.
 
 - the H, M, and L commands are now absolute motions
+
+- insert mode now takes a repeat count, so '80i=ESC' inserts 80 '=' chars
 
 - two new functions, to make normal motions more vi compliant --
 	forward-character-to-eol and backward-character-to-bol, which won't
@@ -144,7 +150,7 @@ MISCELLANEOUS
 	keeping the cursor on lines that are too short to be visible at all
 	is still broken.
 
-- the !  filter command for running text through an external filter now
+- the ! filter command for running text through an external filter now
 	works
 
 - quite a bit of code cleanup, at least I think so -- it has ported pretty
@@ -229,10 +235,6 @@ MISCELLANEOUS
 
 - it is now legal to "kill-buffer" a displayed buffer
 
-- there is a new variable, settable as "setv $terse true", which will
-	suppress some of the extra messages that vile prints, reducing
-	traffic for slow terminals.
-
 - there are new variables, $word, $pathname, and $identifier, which return
 	the appropriate type of string from the cursor's location
 
@@ -244,6 +246,18 @@ MISCELLANEOUS
 
 - a new mode, "tabinsert", has been created to fill the needs of the 
 	"I hate tabs" camp.
+
+- filenames are now put into canonical form -- this keeps "junk", "./junk",
+	"./somedir/../junk" from appearing as different files to the editor.
+
+- there is a new mode, "tagsrelative", which, when set, causes filenames
+	looked up via tags to have the directory name of the tags file
+	prepended to them before being accessed.  This allows one to cd into
+	a build tree from within the editor, to facilitate a grep or a local
+	build, and have tags lookups continue to work.
+
+- the find-next-error code now honors the "Entering/Leaving directory"
+	messages that GNU make (and others?) puts out.
 
 IMPLEMENTORS NOTES:
 ===================
@@ -284,6 +298,7 @@ IMPLEMENTORS NOTES:
 	work on full lines -- there isn't yet a similar wrapper for partial
 	line operators.
 
-- use mlwrite() for informative messages that $terse will suppress, mlforce()
-	for messages that _must_ be seen, and mlprompt() for messages that
-	need a response from the user unless they're in a command file.
+- use mlwrite() for informative messages that terse mode will suppress,
+	mlforce() for messages that _must_ be seen, and mlprompt() for
+	messages that need a response from the user unless they're in a
+	command file.

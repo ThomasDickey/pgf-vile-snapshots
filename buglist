@@ -1,10 +1,6 @@
 	(E means enhancement, L,M,H are low, medium, high priority)
 ----------------------
 
-H	output sometimes doesn't flush properly after a shell escape -- seems
-	to be related to turning on the USE_FCNTL code in termio.c.  If anyone
-	finds this -- let me know!  I'd love to know the answer.
-
 H	The mvrightwind and mvleftwind functions are broken -- visiting lines
 	that are too short to be visible when the screen is shifted will
 	cause junk on the screen.
@@ -114,11 +110,6 @@ E	marks should perhaps be linked onto lines.  this would make a lot
         mark.  The "copied" flag needed by undo could be a special
         sort of mark as well.  Implementation of the "tag stack"
 	would be aided by this as well.
-
-E	there is code (in imdying()) that attempts to save unwritten buffers
-	on hangups.  It is fairly crude, having been written quickly
-	in self-defense during debugging.  It should be examined and
-	fixed.
 
 E	:e and :n should be able to deal with multiple filenames resulting
 	from filename globbing.  vi has this problem too.  At least

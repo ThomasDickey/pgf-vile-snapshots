@@ -8,10 +8,13 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: insert.c,v $
- *	Revision 1.3  1992/07/04 14:34:52  foxharp
- *	added ability to call SPEC-key bound functions (motion only) during
- *	insert mode, on the assumption that you don't _really_ want to insert
- *	function keys into your buffer.
+ *	Revision 1.4  1992/07/15 23:23:46  foxharp
+ *	made '80i-ESC' work
+ *
+ * Revision 1.3  1992/07/04  14:34:52  foxharp
+ * added ability to call SPEC-key bound functions (motion only) during
+ * insert mode, on the assumption that you don't _really_ want to insert
+ * function keys into your buffer.
  *
  * Revision 1.2  1992/06/01  20:37:31  foxharp
  * added tabinsert
@@ -40,7 +43,7 @@ int f,n;
 
 	if (!f) n = 1;
 	if (n < 0) return (FALSE);
-	if (n == 0) return ins();
+	if (n == 0) return ins(FALSE);
 
 	gotobol(TRUE,1);
 
@@ -50,7 +53,7 @@ int f,n;
 		s = indented_newline_above(b_val(curbp, MDCMOD));
 		if (s != TRUE) return (s);
 
-		return(ins());
+		return(ins(FALSE));
 	}
 	s = lnewline();
 	if (s != TRUE) return s;
@@ -65,7 +68,7 @@ int f,n;
 		if (s != TRUE) return s;
 	}
 
-	return(ins());
+	return(ins(FALSE));
 }
 
 /* open lines up after this one */
@@ -77,13 +80,13 @@ int f,n;
 
 	if (!f) n = 1;
 	if (n < 0) return (FALSE);
-	if (n == 0) return ins();
+	if (n == 0) return ins(FALSE);
 
 	s = openlines(n);
 	if (s != TRUE)
 		return (s);
 
-	return(ins());
+	return(ins(FALSE));
 }
 
 /*
@@ -116,7 +119,17 @@ int
 insert(f, n)
 int f,n;
 {
-	return ins();
+	int s = TRUE;
+
+	if (!f || n < 0) n = 1;
+
+	s = ins(FALSE);
+
+	while (s && --n)
+		s = ins(TRUE);
+
+	update(FALSE);
+	return s;
 }
 
 /* ARGSUSED */
@@ -124,8 +137,17 @@ int
 insertbol(f, n)
 int f,n;
 {
+	int s = TRUE;
 	firstnonwhite(f,n);
-	return ins();
+
+	if (!f || n < 0) n = 1;
+
+	s = ins(FALSE);
+
+	while (s && --n)
+		s = ins(TRUE);
+
+	return s;
 }
 
 /* ARGSUSED */
@@ -133,11 +155,19 @@ int
 append(f, n)
 int f,n;
 {
-	if (is_header_line(DOT,curbp))
-		return ins();
-	if (!is_at_end_of_line(DOT)) /* END OF LINE HACK */
-		forwchar(TRUE,1);
-	return ins();
+	int s = TRUE;
+
+	if (! is_header_line(DOT,curbp) && !is_at_end_of_line(DOT))
+		forwchar(TRUE,1); /* END OF LINE HACK */
+
+	if (!f || n < 0) n = 1;
+
+	s = ins(FALSE);
+
+	while (s && --n)
+		s = ins(TRUE);
+
+	return s;
 }
 
 /* ARGSUSED */
@@ -145,9 +175,18 @@ int
 appendeol(f, n)
 int f,n;
 {
+	int s = TRUE;
 	if (!is_header_line(DOT,curbp))
 		gotoeol(FALSE,0);
-	return ins();
+
+	if (!f || n < 0) n = 1;
+
+	s = ins(FALSE);
+
+	while (s && --n)
+		s = ins(TRUE);
+
+	return s;
 }
 
 /* ARGSUSED */
@@ -155,10 +194,19 @@ int
 overwrite(f, n)
 int f,n;
 {
+	int s = TRUE;
 	insertmode = OVERWRITE;
 	if (b_val(curbp, MDSHOWMODE))
 		curwp->w_flag |= WFMODE;
-	return ins();
+
+	if (!f || n < 0) n = 1;
+
+	s = ins(FALSE);
+
+	while (s && --n)
+		s = ins(TRUE);
+
+	return s;
 }
 
 int
@@ -207,7 +255,8 @@ int f,n;
 
 /* grunt routine for insert mode */
 int
-ins()
+ins(playback)
+int playback;
 {
 	register int status;
 	int f,n;
@@ -215,6 +264,8 @@ ins()
 	int    c;		/* command character */
 	int newlineyet = FALSE; /* are we on the line we started on? */
 	int startoff = DOT.o;	/* starting offset on that line */
+	static char insbuff[256];
+	char *iptr = insbuff;
 
 	if (insertmode == FALSE) {
 		insertmode = INSERT;
@@ -225,12 +276,19 @@ ins()
 	/* get the next command from the keyboard */
 	while(1) {
 
-		update(FALSE);
-
 		f = FALSE;
 		n = 1;
 
-		c = kbd_key();
+		if (playback) {
+			c = *iptr++;
+		} else {
+			update(FALSE);
+			c = kbd_key();
+			if (iptr - insbuff < 255)
+				*iptr++ = c;
+			else
+				insbuff[255] = abortc;
+		}
 
 		if (c == abortc ) {
 			 /* an unfortunate Vi-ism that ensures one 

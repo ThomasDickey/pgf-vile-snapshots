@@ -14,7 +14,16 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.76  1992/07/04 14:37:49  foxharp
+ * Revision 1.79  1992/07/15 08:56:28  foxharp
+ * find our basename, so we can come up in view mode if named "view".
+ *
+ * Revision 1.78  1992/07/13  22:14:37  foxharp
+ * initialize TERSE and TAGSRELATIVE modes
+ *
+ * Revision 1.77  1992/07/13  09:26:56  foxharp
+ * use canonpath() on args before creating their buffers
+ *
+ * Revision 1.76  1992/07/04  14:37:49  foxharp
  * allow the cursor to rest on the 'newline', in the case where we're in
  * the middle of insert mode, and are only out here due to using arrow
  * keys.  otherwise, there's no way to append to end of line with arrow
@@ -357,10 +366,21 @@ char	*argv[];
 #if	CRYPT
 	char ekey[NPAT];		/* startup encryption key */
 #endif
+	char *us;
 
 #if MSDOS
+	char *simplename( char * );
+	slash = '\\';  /* getswitchar() == '/' ? '\\' : '/'; */
 	expand_wild_args(&argc, &argv);
+#else
+	slash = '/';
 #endif
+
+	us = strrchr(argv[0],slash);
+	if (!us)
+		us = argv[0];
+	else
+		us++;
 
 #ifdef DEBUGLOG
 	start_debug_log(argc,argv);
@@ -369,6 +389,10 @@ char	*argv[];
 	charinit();		/* character types -- we need these pretty
 					early  */
 	global_val_init();	/* global buffer values */
+
+	if (strcmp(us, "view") == 0)
+		set_global_b_val(MDVIEW,TRUE);
+
 
 #if IBMPC	/* pjr */
 	ibmtype = CDSENSE;
@@ -573,7 +597,6 @@ char	*argv[];
 			/* set up a buffer for this file */
 			makename(bname, argv[carg]);
 			unqname(bname,FALSE);
-
 
 			bp = bfind(bname, OK_CREAT, 0);
 			ch_fname(bp, argv[carg]);
@@ -1019,6 +1042,8 @@ global_val_init()
 	set_global_b_val(MDSHOWMAT,FALSE);	/* show-match */
 	set_global_b_val(MDSHOWMODE,TRUE);	/* show-mode */
 	set_global_b_val(MDTABINSERT,TRUE);	/* allow tab insertion */
+	set_global_b_val(MDTAGSRELTIV,FALSE);	/* path relative tag lookups */
+	set_global_b_val(MDTERSE,FALSE);	/* terse messaging */
 	set_global_b_val(VAL_TAB, 8);	/* tab stop */
 	set_global_b_val(VAL_SWIDTH, 8); /* shiftwidth */
 	set_global_b_val(VAL_TAGLEN, 0);	/* significant tag length */

@@ -10,7 +10,22 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.77  1992/07/08 08:20:22  foxharp
+ * Revision 1.81  1992/07/20 22:45:53  foxharp
+ * if using TERMCAP, define TTputc directly as putchar(),
+ * for some performance gain
+ *
+ * Revision 1.80  1992/07/17  19:16:45  foxharp
+ * change "sun" to "SUNOS" to make way for solaris
+ *
+ * Revision 1.79  1992/07/13  20:08:17  foxharp
+ * "terse" is now a boolean mode rather than a variable, and
+ * added "tagsrelative" mode
+ *
+ * Revision 1.78  1992/07/13  09:24:41  foxharp
+ * added b_dispfname, which will allow printing shorter paths
+ * for files by trimming leading 'pwd' matches
+ *
+ * Revision 1.77  1992/07/08  08:20:22  foxharp
  * made the _rest_ of the command flags long.  sigh.
  *
  * Revision 1.76  1992/07/07  08:36:07  foxharp
@@ -306,6 +321,7 @@
 #define ODT	0			/* UNIX OPEN DESK TOP		*/
 #define ULTRIX	0			/* UNIX ULTRIX			*/
 #define ISC	0			/* Interactive Systems */
+#define SUNOS	0			/* SunOS 3 or 4 */
 #define NeXT	0
 #define UNIXPC	0
 #define HPUX	0
@@ -316,7 +332,7 @@
 #define AUX2	0			/* Apple A/UX 2.0 */
 
 /* the following overrides are mostly for convenience only */
-#if ULTRIX || defined(sun)
+#if ULTRIX || SUNOS
 # undef BERK
 # undef USG
 # undef POSIX
@@ -1113,10 +1129,12 @@ typedef struct	W_TRAITS {
 #define	MDSHOWMAT	8		/* auto-indent */
 #define	MDSHOWMODE	9		/* show insert/replace/command mode */
 #define	MDTABINSERT	10		/* okay to insert tab chars 	*/
-#define	MDVIEW		11		/* read-only buffer		*/
-#define	MDSWRAP 	12		/* wrap-around search mode	*/
-#define	MDWRAP		13		/* word wrap			*/
-#define	MAX_BOOL_B_VALUE	13	/* max of boolean values	*/
+#define	MDTAGSRELTIV	11		/* tags are relative to tagsfile path */
+#define	MDTERSE		12		/* be terse -- suppress messages */
+#define	MDVIEW		13		/* read-only buffer		*/
+#define	MDSWRAP 	14		/* wrap-around search mode	*/
+#define	MDWRAP		15		/* word wrap			*/
+#define	MAX_BOOL_B_VALUE	15	/* max of boolean values	*/
 
 #define VAL_ASAVECNT	(MAX_BOOL_B_VALUE+1)
 #define VAL_C_TAB	(MAX_BOOL_B_VALUE+2)
@@ -1332,7 +1350,11 @@ typedef struct	{
 #define	TTkopen		(*term.t_kopen)
 #define	TTkclose	(*term.t_kclose)
 #define	TTgetc		(*term.t_getchar)
+#if ! TERMCAP
 #define	TTputc		(*term.t_putchar)
+#else
+#define	TTputc		putchar
+#endif
 #define	TTflush		(*term.t_flush)
 #define	TTmove		(*term.t_move)
 #define	TTeeol		(*term.t_eeol)

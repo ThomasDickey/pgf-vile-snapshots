@@ -11,7 +11,10 @@
  * which means that the dot and mark values in the buffer headers are nonsense.
  *
  * $Log: line.c,v $
- * Revision 1.24  1992/07/04 14:36:17  foxharp
+ * Revision 1.25  1992/07/10 22:01:14  foxharp
+ * make poison more poisonous
+ *
+ * Revision 1.24  1992/07/04  14:36:17  foxharp
  * added temporary line-poisoner, to catch core dump on buffer/line reuse.
  *
  * Revision 1.23  1992/05/16  12:00:31  pgf
@@ -104,8 +107,12 @@
  * initial vile RCS revision
  */
 
+#define POISON
+#ifdef POISON
 #define poison(p,s) memset(p, 0xdf, s)
-/* #define poison(p,s)  */
+#else
+#define poison(p,s)
+#endif
 
 #include	<stdio.h>
 #include	"estruct.h"
@@ -134,7 +141,7 @@ BUFFER *bp;
 	}
 	/* see if the buffer LINE block has any */
 	if ((lp = bp->b_freeLINEs) != NULL) {
-		bp->b_freeLINEs = lp->l_fp;
+		bp->b_freeLINEs = lp->l_nxtundo;
 	} else if ((lp = (LINE *) malloc(sizeof(LINE))) == NULL) {
 		mlforce("[OUT OF MEMORY]");
 		return NULL;
@@ -191,9 +198,14 @@ register BUFFER *bp;
 		free((char *)lp);
 	} else {
 		/* keep track of freed buffer LINEs here */
-		lp->l_fp = bp->b_freeLINEs;
+		lp->l_nxtundo = bp->b_freeLINEs;
 		bp->b_freeLINEs = lp;
-		lp->l_text = (char *)1; /* catch references hard */
+#ifdef POISON
+		/* catch references hard */
+		lp->l_bp = lp->l_bp = (LINE *)1;
+		lp->l_text = (char *)1;
+		lp->l_size = lp->l_used = -1;
+#endif
 	}
 }
 

@@ -3,7 +3,30 @@
  * commands. There is no functional grouping here, for sure.
  *
  * $Log: random.c,v $
- * Revision 1.65  1992/06/25 23:00:50  foxharp
+ * Revision 1.72  1992/07/20 22:49:51  foxharp
+ * took out ifdef'ed BEFORE code
+ *
+ * Revision 1.71  1992/07/18  13:13:56  foxharp
+ * put all path-shortening in one place (shorten_path()), and took out some old code now
+ * unnecessary
+ *
+ * Revision 1.70  1992/07/17  19:14:57  foxharp
+ * clean up gcc -Wall warnings
+ *
+ * Revision 1.69  1992/07/16  22:18:54  foxharp
+ * ins() takes an argument -- whether or not to playback, usually FALSE
+ *
+ * Revision 1.68  1992/07/15  08:58:46  foxharp
+ * added, and ifdef'ed out, code for dealing with DOS drive designators
+ * in ch_fname()
+ *
+ * Revision 1.67  1992/07/13  19:39:03  foxharp
+ * finished canonicalizing pathnames
+ *
+ * Revision 1.66  1992/07/13  09:28:37  foxharp
+ * preliminary changes for canonical path names
+ *
+ * Revision 1.65  1992/06/25  23:00:50  foxharp
  * changes for dos/ibmpc
  *
  * Revision 1.64  1992/05/29  09:40:53  foxharp
@@ -285,7 +308,11 @@ char *carg;
 	gotobob(FALSE,1);
 	{ char buf[80];
 	  lsprintf(buf, "       %s   %s",prognam,version);
-	  ch_fname(bp, buf);
+	  if (bp->b_fname)
+		free(bp->b_fname);
+	  bp->b_fname = strmalloc(buf);
+	  bp->b_fnlen = strlen(buf);
+	  /* was ch_fname() */
 	}
 	bp->b_flag &= ~BFCHG;
 	bp->b_active = TRUE;
@@ -739,7 +766,7 @@ int f,n;
 	extern CMDFUNC f_gotoeol;
 
 	if (llength(DOT.l) == 0) {
-		return ins();
+		return ins(FALSE);
 	} else {
 		havemotion = &f_gotoeol;
 		return operchg(FALSE,1);
@@ -889,13 +916,17 @@ int f, n;
 
 /* return a string naming the current directory */
 char *
-current_directory()
+current_directory(force)
+int force;
 {
-	char *cwd, *s;
-#if USG
+	char *s;
 	static char	dirname[NFILEN*2];
+	static char *cwd;
+#if USG
 	FILE *f, *npopen();
 	int n;
+	if (!force && cwd)
+		return cwd;
 	f = npopen("/bin/pwd", "r");
 	if (f == NULL) {
 		fclose(f);
@@ -907,7 +938,8 @@ current_directory()
 	fclose(f);
 	cwd = dirname;
 #else
-	static char	dirname[NFILEN*2];
+	if (!force && cwd)
+		return cwd;
 # if MSDOS & MSC
 	cwd = getcwd(dirname, NFILEN*2);
 # else
@@ -941,7 +973,7 @@ int
 pwd(f,n)
 int f, n;
 {
-	mlforce("%s",current_directory());
+	mlforce("%s",current_directory(f));
 	return TRUE;
 }
 
@@ -954,27 +986,13 @@ set_directory(dir)
 char	*dir;
 {
     char       exdir[NFILEN];
-    BUFFER     *bp;
-    char       *cwd;
+    WINDOW *wp;
 
-    /* first fix up all the buffer file names */
-    cwd = current_directory();
-    if (!cwd || ! *cwd)
-	return FALSE;
-    for (bp = bheadp; bp; bp = bp->b_bufp) {
-	/* ignore any that are already absolute or "internal" */
-	if (bp->b_fname[0] == '/' ||
-		bp->b_fname[0] == '\0' || 
-		bp->b_fname[0] == '[' ||
-		bp->b_fname[0] == '!') {
-	    continue;
-	}
-	/* XXX file name is only 80 bytes -- could easily overflow here... */
-	sprintf(exdir, "%s/%s", cwd, bp->b_fname );
-	ch_fname(bp, exdir);
-    }
+    for (wp = wheadp; wp != NULL; wp = wp->w_wndp)
+	wp->w_flag |= WFMODE;
 
     strcpy(exdir, dir);
+
     if (glob(exdir) && (chdir(exdir) == 0)) {
 	pwd(TRUE,1);
 	return TRUE;
@@ -983,3 +1001,62 @@ char	*dir;
     return FALSE;
 }
 
+void
+ch_fname(bp,fname)
+BUFFER *bp;
+char *fname;
+{
+	int len;
+	char nfilen[512];
+	char *np;
+	char *holdp = NULL;
+	char *cwd = NULL;
+	char *name;
+
+	name = fname;
+#if LATER 
+/* not sure whether we need this or not -- it might be
+		taken care of in canonpath()  */
+	/* pretend the drive designator isn't there */
+	if (isalpha(name[0]) && name[1] == ':') {
+		drive = name[0];
+		if (islower(drive))
+			drive = toupper(drive);
+		name += 2;
+	}
+#endif
+
+	/* produce a full pathname, unless already absolute or "internal" */
+	if (name[0] == '\0' || name[0] == '[' || name[0] == '!') {
+		np = name;
+	} else if (name[0] != slash &&
+			(cwd = current_directory(FALSE)) != NULL ) {
+		lsprintf(nfilen, "%s/%s", cwd, name );
+		np = canonpath(nfilen);
+	} else {
+		np = canonpath(name);
+	}
+
+	len = strlen(np)+1;
+
+	if (bp->b_fname && bp->b_fnlen < len ) {
+		/* don't free it yet -- it _may_ have been passed in as name */
+		holdp = bp->b_fname;
+		bp->b_fname = NULL;
+	}
+
+	if (!bp->b_fname) {
+		bp->b_fname = strmalloc(np);
+		if (!bp->b_fname) {
+			bp->b_fname = "NO MEMORY";
+			bp->b_fnlen = 9;
+			return;
+		}
+		bp->b_fnlen = len;
+	}
+
+	/* it'll fit, leave len untouched */
+	strcpy(bp->b_fname, np);
+	if (holdp)
+		free(holdp);
+}

@@ -4,7 +4,10 @@
  *  heavily modified by Paul Fox, 1990
  *
  * $Log: search.c,v $
- * Revision 1.36  1992/07/08 09:08:08  foxharp
+ * Revision 1.37  1992/07/13 20:03:54  foxharp
+ * the "terse" variable is now a boolean mode
+ *
+ * Revision 1.36  1992/07/08  09:08:08  foxharp
  * don't mlforce() the "onlyonemsg", and support terse on "Not found"
  *
  * Revision 1.35  1992/07/07  08:34:50  foxharp
@@ -181,7 +184,7 @@ void
 not_found_msg(wrapok, dir)
 int wrapok, dir;
 {
-	if (wrapok || terse)
+	if (wrapok || global_b_val(MDTERSE))
 		mlforce (notfoundmsg);
 	else
 		mlforce (hitendmsg, dir == FORWARD ? "BOTTOM":"TOP");

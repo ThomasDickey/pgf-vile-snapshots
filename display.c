@@ -6,7 +6,39 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.41  1992/07/01 16:59:46  foxharp
+ * Revision 1.51  1992/07/24 07:49:38  foxharp
+ * shorten_name changes
+ *
+ * Revision 1.50  1992/07/22  19:25:57  foxharp
+ * handle non-printables correctly -- how did I get involved in this, anyway!
+ *
+ * Revision 1.49  1992/07/22  09:18:16  foxharp
+ * got it.  sheesh.
+ *
+ * Revision 1.48  1992/07/22  00:50:43  foxharp
+ * interim -- still dumping core in vtset
+ *
+ * Revision 1.47  1992/07/21  09:08:30  foxharp
+ * now pass lp to vtset()
+ *
+ * Revision 1.46  1992/07/21  08:57:53  foxharp
+ * pushed list mode choice into vtset()
+ *
+ * Revision 1.45  1992/07/20  22:44:44  foxharp
+ * performance improvements -- fewer vtputc's
+ *
+ * Revision 1.44  1992/07/18  13:13:56  foxharp
+ * put all path-shortening in one place (shorten_path()), and took out
+ * some old code now unnecessary
+ *
+ * Revision 1.43  1992/07/13  20:03:54  foxharp
+ * the "terse" variable is now a boolean mode
+ *
+ * Revision 1.42  1992/07/13  19:37:00  foxharp
+ * trim leading `pwd` from filenames in modeline, now that filenames are
+ * usually absolute
+ *
+ * Revision 1.41  1992/07/01  16:59:46  foxharp
  * scwrite() arg changes, and some fore/background color cleanup
  *
  * Revision 1.40  1992/06/26  22:21:05  foxharp
@@ -182,7 +214,6 @@ int displaying = FALSE;
 /* for window size changes */
 int chg_width, chg_height;
 
-extern FILE *FF;
 /*
  * Initialize the data structures used by the display code. The edge vectors
  * used to access the screens are set up. The operating system's terminal I/O
@@ -277,29 +308,54 @@ int row,col;
 */
 
 void
-vtputc(c,list)
-int c,list;
+vtputc(c)
+int c;
 {
 	register VIDEO *vp;	/* ptr to line being updated */
 
 	vp = vscreen[vtrow];
 
-	if (c == '\t' && !list) {
+	if (isprint(c) && vtcol >= 0 && vtcol < term.t_ncol) {
+		vp->v_text[vtcol] = c;
+		++vtcol;
+		return;
+	}
+	if (c == '\t') {
 		do {
-			vtputc(' ',FALSE);
+			vtputc(' ');
 		} while (((vtcol + taboff)%curtabval) != 0);
-	} else if (c == '\n' && !list) {
+	} else if (c == '\n') {
 		return;
 	} else if (vtcol >= term.t_ncol) {
 		++vtcol;
 		vp->v_text[term.t_ncol - 1] = '>';
-	} else if (!isprint(c)) {
-		vtputc('^',FALSE);
-		vtputc(toalpha(c),FALSE);
+	} else if (isprint(c)) {
+		++vtcol;
 	} else {
+		vtputc('^');
+		vtputc(toalpha(c));
+	}
+}
+
+/* as above, but tabs and newlines are made visible */
+void
+vtlistc(c)
+int c;
+{
+	register VIDEO *vp;	/* ptr to line being updated */
+
+	vp = vscreen[vtrow];
+
+	if (vtcol >= term.t_ncol) {
+		++vtcol;
+		vp->v_text[term.t_ncol - 1] = '>';
+	} else if (isprint(c)) {
 		if (vtcol >= 0)
 			vp->v_text[vtcol] = c;
 		++vtcol;
+	} else {
+		vtputc('^');
+		vtputc(toalpha(c));
 	}
 }
 
@@ -317,8 +373,59 @@ int n;
 {
 	int c;
 	while (n-- && (c = *s++) != 0)
-		vtputc(c,FALSE);
+		vtputc(c);
 }
+
+
+void
+vtset(lp,wp)
+LINE *lp;
+WINDOW *wp;
+{
+	register char *from;
+	register int n;
+
+	from = lp->l_text;
+	n = llength(lp);
+
+	if (w_val(wp,WMDLIST)) {
+		while (vtcol <= term.t_ncol && n)
+			vtlistc(*from++), n--;
+		if (!n)
+			vtlistc('\n');
+	} else {
+		while (vtcol <= term.t_ncol && n)
+			vtputc(*from++), n--;
+	}
+}
+
+/* VARARGS1 */
+void
+#ifdef __STDC__
+vtprintf( char *fmt, ...)
+#else
+vtprintf(va_alist)
+va_dcl
+#endif
+{
+
+	va_list ap;
+#ifdef __STDC__
+	va_start(ap,fmt);
+#else
+	va_start(ap);
+#endif
+
+	dfoutfn = vtputc;
+
+#ifdef __STDC__
+	dofmt(fmt,&ap);
+#else
+	dofmt(&ap);
+#endif
+	va_end(ap);
+
+} 
 
 /*
  * Erase from the end of the software cursor to the end of the line on which
@@ -327,8 +434,11 @@ int n;
 void
 vteeol()
 {
-    while (vtcol < term.t_ncol)
-        vtputc(' ',FALSE);
+	if (vtcol < term.t_ncol) {
+		(void)memset(&vscreen[vtrow]->v_text[vtcol],
+			' ', term.t_ncol-vtcol);
+		vtcol = term.t_ncol;
+	}
 }
 
 /* upscreen:	user routine to force a screen update
@@ -583,7 +693,6 @@ WINDOW *wp;	/* window to update lines in */
 LINE *lp;
 int sline;
 {
-	int i;
 
 	/* and update the virtual line */
 	vscreen[sline]->v_flag |= VFCHG;
@@ -592,19 +701,14 @@ int sline;
 		taboff = w_val(wp,WVAL_SIDEWAYS);
 	if (lp != wp->w_bufp->b_line.l) {
 		vtmove(sline, -w_val(wp,WVAL_SIDEWAYS));
-		i = 0;
-		while ( i < llength(lp) ) {
-			vtputc(lgetc(lp, i), w_val(wp, WMDLIST));
-			++i;
-		}
-		vtputc('\n', w_val(wp, WMDLIST));
+		vtset(lp, wp);
 		if (w_val(wp,WVAL_SIDEWAYS)) {
 			vscreen[sline]->v_text[0] = '<';
 			if (vtcol < 1) vtcol = 1;
 		}
 	} else {
 		vtmove(sline, 0);
-		vtputc('~',FALSE);
+		vtputc('~');
 	}
 	taboff = 0;
 #if	COLOR
@@ -626,12 +730,12 @@ updpos()
 	/* find the current row */
 	lp = curwp->w_line.l;
 	currow = curwp->w_toprow;
-	while (lp != curwp->w_dot.l) {
+	while (lp != DOT.l) {
 		++currow;
 		lp = lforw(lp);
 		if (lp == curwp->w_line.l) {
 			mlforce("BUG:  lost dot updpos().  setting at top");
-			curwp->w_line.l = curwp->w_dot.l  = lforw(curbp->b_line.l);
+			curwp->w_line.l = DOT.l  = lforw(curbp->b_line.l);
 			currow = curwp->w_toprow;
 		}
 	}
@@ -639,7 +743,7 @@ updpos()
 	/* find the current column */
 	curcol = -w_val(curwp,WVAL_SIDEWAYS);
 	i = 0;
-	while (i < curwp->w_dot.o) {
+	while (i < DOT.o) {
 		c = lgetc(lp, i++);
 		if (c == '\t' && !w_val(curwp,WMDLIST)) {
 			do {
@@ -935,8 +1039,6 @@ int
 updext_past()
 {
 	register int lbound, rcursor;
-	register LINE *lp;	/* pointer to current line */
-	register int j;		/* index into line */
 
 	/* calculate what column the real cursor will end up in */
 	/* why is term.t_ncol in here? */
@@ -949,10 +1051,7 @@ updext_past()
 
 	/* start scanning offscreen */
 	vtmove(currow, -lbound-w_val(curwp,WVAL_SIDEWAYS));
-	lp = curwp->w_dot.l;		/* line to output */
-	for (j = 0; j < llength(lp); ++j)
-		vtputc(lgetc(lp, j), w_val(curwp,WMDLIST));
-	vtputc('\n', w_val(curwp,WMDLIST));
+	vtset(DOT.l, curwp);
 
 	/* truncate the virtual line, restore tab offset */
 	vteeol();
@@ -972,8 +1071,6 @@ int
 updext_before()
 {
 	register int lbound, rcursor;
-	register LINE *lp;	/* pointer to current line */
-	register int j;		/* index into line */
 
 	/* calculate what column the real cursor will end up in */
 	rcursor = (curcol % (term.t_ncol-term.t_margin));
@@ -983,10 +1080,7 @@ updext_before()
 	/* scan through the line outputing characters to the virtual screen */
 	/* once we reach the left edge					*/
 	vtmove(currow, -lbound);	/* start scanning offscreen */
-	lp = curwp->w_dot.l;		/* line to output */
-	for (j = 0; j < llength(lp); ++j)
-		vtputc(lgetc(lp, j), w_val(curwp,WMDLIST));
-	vtputc('\n', w_val(curwp,WMDLIST));
+	vtset(DOT.l, curwp);
 
 	/* truncate the virtual line, restore tab offset */
 	vteeol();
@@ -1244,7 +1338,7 @@ WINDOW *wp;
 	}
 	bp = wp->w_bufp;
 
-	vtputc(lchar,FALSE);
+	vtputc(lchar);
 	if (b_val(bp, MDSHOWMODE)) {
 		register int ic;
 		ic = lchar;
@@ -1256,42 +1350,36 @@ WINDOW *wp;
 			else if (insertmode == OVERWRITE)
 				ic = 'O';
 		}
-		vtputc(ic,FALSE);
+		vtputc(ic);
 	}
-	vtputc(lchar,FALSE);
-	vtputc(' ',FALSE);
-	vtputsn(bp->b_bname, NBUFN);
+	vtprintf("%c %s",lchar,bp->b_bname);
 	if (b_val(bp,MDVIEW))
 		vtputsn(" [view only]", 20);
 	if (b_val(bp,MDDOS))
 		vtputsn(" [dos-style]", 20);
 	if (bp->b_flag&BFCHG)
 		vtputsn(" [modified]", 20);
-	/* don't print a filename if they're the same, 
-		or the filename is null */
-	if (strcmp(bp->b_fname,bp->b_bname)) {
-		if (bp->b_fname[0] != '\0') {
-			if (isspace(bp->b_fname[0])) {
-				/* some of the internally generated buffers
-					put other info. in filename slot */
-				vtputsn(bp->b_fname, NFILEN);
-			} else {
-				if (ispunct(bp->b_fname[0]))
-					vtputsn(" is \"", 20);
-				else
-					vtputsn(" is file \"", 20);
-				vtputsn(bp->b_fname, NFILEN);
-				vtputsn("\"", 20);
+	if (bp->b_fname && bp->b_fname[0]) {
+		char *p;
+		p = shorten_path(bp->b_fname);
+		if (p && strcmp(p,bp->b_bname) != 0) {
+			if (!isspace(p[0])) {
+				vtprintf(" is ");
+				if (p[0] != slash &&
+					p[0] != '.' &&
+					p[0] != '!')
+					vtprintf(".%c",slash);
 			}
+			vtprintf("%s",p);
 		}
 	}
-	vtputc(' ',FALSE);
+	vtputc(' ');
 
 
 	/* Pad to full width, then go back and overwrite right-end info */
 	n = term.t_ncol;
 	while (vtcol < n)
-		vtputc(lchar,FALSE);
+		vtputc(lchar);
 		
 	{ /* determine if top line, bottom line, or both are visible */
 		LINE *lp = wp->w_line.l;
@@ -1319,7 +1407,8 @@ WINDOW *wp;
 		if (!msg)
 			msg = " mid ";
 		vtputsn(msg,20);
-
+		vtputc(lchar);
+		vtputc(lchar);
 
 	}
 #ifdef show_tabstop_on_modeline
@@ -1327,7 +1416,7 @@ WINDOW *wp;
 		int t = tabstop_val(wp->w_bufp);
 		vtcol = n - 11;
 		while (t) {
-			vtputc((t%10)+'0',FALSE);
+			vtputc((t%10)+'0');
 			t /= 10;
 			vtcol -= 2;
 		}
@@ -1337,7 +1426,7 @@ WINDOW *wp;
 	/* mark column 80 */
 	if (n > 80 && vtgetc(80) == lchar) {
 		vtcol = 80;
-		vtputc('|',FALSE);
+		vtputc('|');
 	}
 }
 
@@ -1449,7 +1538,7 @@ va_dcl
 {
 	va_list ap;
 	/* if we are not currently echoing on the command line, abort this */
-	if (terse || dotcmdmode == PLAY || discmd == FALSE) {
+	if (global_b_val(MDTERSE) || dotcmdmode == PLAY || discmd == FALSE) {
 		movecursor(term.t_nrow, 0);
 		return;
 	}
@@ -1880,6 +1969,46 @@ va_dcl
 	return lsp;
 } 
 
+static char *lsbuf;
+
+void
+lssetbuf(buf)
+char *buf;
+{
+	lsbuf = buf;
+}
+
+/* VARARGS1 */
+char *
+#ifdef __STDC__
+_lsprintf( char *fmt, ...)
+#else
+_lsprintf(va_alist)
+va_dcl
+#endif
+{
+
+	va_list ap;
+#ifdef __STDC__
+	va_start(ap,fmt);
+#else
+	va_start(ap);
+#endif
+
+	lsp = lsbuf;
+	dfoutfn = lspputc;
+
+#ifdef __STDC__
+	dofmt(fmt,&ap);
+#else
+	dofmt(&ap);
+#endif
+	va_end(ap);
+
+	*lsp = '\0';
+	return lsp;
+} 
+
 /*
  * Buffer printf -- like regular printf, but puts characters
  *	into the BUFFER.
@@ -1896,7 +2025,7 @@ int c;
 		linsert(1,c);
 }
 
-/* printf into curbp, at curwp->w_dot */
+/* printf into curbp, at DOT */
 /* VARARGS */
 void
 #ifdef __STDC__

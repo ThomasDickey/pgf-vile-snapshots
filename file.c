@@ -6,7 +6,44 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.42  1992/06/25 23:00:50  foxharp
+ * Revision 1.53  1992/07/24 07:49:38  foxharp
+ * shorten_name changes
+ *
+ * Revision 1.52  1992/07/22  09:16:49  foxharp
+ * shorten_path now prints shell commands as-is
+ *
+ * Revision 1.51  1992/07/20  22:49:19  foxharp
+ * prototyped code sure is picky...
+ *
+ * Revision 1.50  1992/07/18  13:13:56  foxharp
+ * put all path-shortening in one place (shorten_path()), and took out some old code now
+ * unnecessary
+ *
+ * Revision 1.49  1992/07/17  19:14:30  foxharp
+ * deleted unused locals
+ *
+ * Revision 1.48  1992/07/15  08:54:40  foxharp
+ * give up pretense that we can canonicalize relative pathnames -- all
+ * pathnames are stored absolute now anyway.  also, make canonpath
+ * deal with DOS \ path separators
+ *
+ * Revision 1.47  1992/07/13  20:18:51  foxharp
+ * took out old ifdef BEFORE code
+ *
+ * Revision 1.46  1992/07/13  20:03:54  foxharp
+ * the "terse" variable is now a boolean mode
+ *
+ * Revision 1.45  1992/07/13  19:38:03  foxharp
+ * finished canonicalizing pathnames
+ *
+ * Revision 1.44  1992/07/13  09:28:37  foxharp
+ * preliminary changes for canonical path names
+ *
+ * Revision 1.43  1992/07/10  22:00:32  foxharp
+ * in signal handler, don't exit after calling abort, to work around
+ * bug in sunos 4.1.1 on sparcs
+ *
+ * Revision 1.42  1992/06/25  23:00:50  foxharp
  * changes for dos/ibmpc
  *
  * Revision 1.41  1992/05/27  08:32:57  foxharp
@@ -170,32 +207,11 @@
 extern int fileispipe;
 int doslines, unixlines;
 
-
-void
-ch_fname(bp, name)
-BUFFER *bp;
-char *name;
-{
-	int len;
-	char *strmalloc();
-	len = strlen(name)+1;
-
-	if (bp->b_fname && bp->b_fnlen < len ) {
-		free(bp->b_fname);
-		bp->b_fname = NULL;
-	}
-
-	if (!bp->b_fname) {
-		bp->b_fname = strmalloc(name);
-		bp->b_fnlen = len;
-		return;
-	}
-
-	/* it'll fit, leave len untouched */
-	strcpy(bp->b_fname, name);
-	return;
-
-}
+#if MSDOS
+# define slashc(c) (c == '\\' || c == '/')
+#else
+# define slashc(c) (c == '/')
+#endif
 
 /*
  * Read a file into the current
@@ -325,16 +341,27 @@ int f,n;
 
 int
 getfile(fname, lockfl)
-char fname[];		/* file name to find */
+char *fname;		/* file name to find */
 int lockfl;		/* check the file for locks? */
 {
         register BUFFER *bp;
+	static BUFFER *tbp;
         register int    s;
         char bname[NBUFN];	/* buffer name to put file */
 
 #if	MSDOS
 	mklower(fname);		/* msdos isn't case sensitive */
 #endif
+	if (!tbp) {
+		if ((tbp=(BUFFER *)malloc(sizeof(BUFFER))) == NULL)
+			return (NULL);
+	}
+	tbp->b_fname = NULL;
+	ch_fname(tbp,fname);		/* fill it out */
+	fname = tbp->b_fname;
+
+
+		
         if ((bp=bfind(fname, NO_CREAT, 0)) == NULL) {
 		/* it's not already here by that buffer name */
 	        for (bp=bheadp; bp!=NULL; bp=bp->b_bufp) {
@@ -745,7 +772,7 @@ int rdo;
 		case FIOABRT:	m = "ABORTED, ";	break;
 		default:	m = "";			break;
 	}
-	if (!terse)
+	if (!global_b_val(MDTERSE))
 		mlwrite("[%sRead %d line%s from \"%s\"%s]", m,
 			n, n != 1 ? "s":"", f, rdo ? "  (read-only)":"" );
 	else
@@ -1105,7 +1132,7 @@ BUFFER	**bpp;
         if (s == FIOSUC) {                      /* No write error.      */
                 s = ffclose();
                 if (s == FIOSUC && msgf) {      /* No close error.      */
-			if (!terse)
+			if (!global_b_val(MDTERSE))
 				mlwrite("[Wrote %d line%s %ld char%s to %s]", 
 					nline, (nline>1)?"s":"",
 					nchar, (nchar>1)?"s":"", fn);
@@ -1191,7 +1218,7 @@ int	msgf;
 	if (s == FIOSUC) {			/* No write error.	*/
 		s = ffclose();
 		if (s == FIOSUC && msgf) {	/* No close error.	*/
-			if (!terse)
+			if (!global_b_val(MDTERSE))
 				mlwrite("[Wrote %d line%s to %s ]",
 					nline,nline!=1?"s":"", fn);
 			else
@@ -1464,8 +1491,10 @@ int signo;
 		}
 	}
 	vttidy(FALSE);
-	if (signo > 2) abort();
-	exit(wrote);
+	if (signo > 2)
+		abort();
+	else
+		exit(wrote);
 
 	/* NOTREACHED */
 	SIGRET;
@@ -1583,3 +1612,139 @@ BUFFER *bp;
 }
 #endif
 
+
+/* canonicalize a pathname, to eliminate extraneous /./, /../, and ////
+	sequnces.  only guaranteed to work for absolute pathnames */
+char *
+canonpath(ss)
+char *ss;
+{
+	char *p, *pp;
+	char *s;
+	
+	s = ss;
+
+	if (!*s)
+		return s;
+
+#if MSDOS
+	/* pretend the drive designator isn't there */
+	if (isalpha(*s) && *(s+1) == ':')
+		s += 2;
+#endif
+
+	p = pp = s;
+	if (!slashc(*s)) {
+		mlforce("BUG: canonpath called with relative path");
+		return ss;
+	}
+	p++; pp++;	/* leave the leading slash */
+	while (*pp) {
+		switch (*pp) {
+		case '/':
+#if MSDOS
+		case '\\':
+#endif
+			pp++;
+			continue;
+		case '.':
+			if (slashc(*(pp+1))) {
+				pp += 2;
+				continue;
+			}
+		default:
+			break;
+		}
+		break;
+	}
+	while (*pp) {
+#if DEBUG
+		if (pp != p)
+			*p = '\0';
+		printf(" s is %s\n",s);
+		printf("pp is %*s%s\n",pp-s,"",pp);
+#endif
+		if (slashc(*pp)) {
+			while (slashc(*(pp+1)))
+				pp++;
+			if (p > s && !slashc(*(p-1)))
+				*p++ = slash;
+			if (*(pp+1) == '.') {
+				if (*(pp+2) == '\0') {
+					/* change "/." at end to "" */
+					*(p-1) = '\0';	/* and we're done */
+					break;
+				}
+				if (slashc(*(pp+2))) {
+					pp += 2;
+					continue;
+				} else if (*(pp+2) == '.' && (slashc(*(pp+3))
+							|| *(pp+3) == '\0')) {
+					while (p-1 > s && slashc(*(p-1)))
+						p--;
+					while (p > s && !slashc(*(p-1)))
+						p--;
+					if (p == s)
+						*p++ = slash;
+					pp += 3;
+					continue;
+				}
+			}
+			pp++;
+			continue;
+		} else {
+			*p++ = *pp++;
+		}
+	}
+	if (p > s && slashc(*(p-1)))
+		p--;
+	if (p == s)
+		*p++ = slash;
+	*p = 0;
+	return ss;
+}
+
+char *
+shorten_path(f)
+char *f;
+{
+	char *cwd;
+	char *ff;
+	char *slp;
+
+	if (!f || *f == '\0')
+		return NULL;
+
+	if (*f == '!' || *f == '[')
+		return f;
+
+	cwd = current_directory(FALSE);
+	slp = ff = f;
+	while (*cwd && *ff && *cwd == *ff) {
+		if (*ff == slash)
+			slp = ff;
+		cwd++;
+		ff++;
+	}
+
+	/* if we reached the end of cwd, and we're at a path boundary,
+		then the file must be under '.' */
+	if (*cwd == '\0' && *ff == slash)
+		return ff+1;
+	
+	/* if we mismatched during the first path component, we're done */
+	if (slp == f)
+		return f;
+
+	/* if we mismatched in the last component of cwd, then the file
+		is under '..' */
+	if (strchr(cwd,slash) == NULL) {
+		static char path[NFILEN*4];
+		strcpy(path,"..");
+		strcat(path,slp);
+		return path;
+	}
+
+	/* we're off by more than just '..', so use absolute path */
+	return f;
+}

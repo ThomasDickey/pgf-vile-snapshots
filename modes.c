@@ -8,8 +8,11 @@
  * Major extensions for vile by Paul Fox, 1991
  *
  *	$Log: modes.c,v $
- *	Revision 1.1  1992/05/29 09:38:33  foxharp
- *	Initial revision
+ *	Revision 1.2  1992/07/13 20:03:54  foxharp
+ *	the "terse" variable is now a boolean mode
+ *
+ * Revision 1.1  1992/05/29  09:38:33  foxharp
+ * Initial revision
  *
  *
  *
@@ -153,7 +156,7 @@ int f,n;
 		TTbeep();
 		return FALSE;
 	}
-	if (!terse || !f)
+	if (!global_b_val(MDTERSE) || !f)
 		mlwrite("[%sabs are %d columns apart, using %s value.]", whichtabs,
 			curtabval, is_global_b_val(curbp,val)?"global":"local" );
 	return TRUE;
@@ -174,7 +177,7 @@ int f,n;
 		TTbeep();
 		return FALSE;
 	}
-	if (!terse || !f)
+	if (!global_b_val(MDTERSE) || !f)
 		mlwrite("[Fill column is %d, and is %s]", b_val(curbp,VAL_FILL),
 			is_global_b_val(curbp,VAL_FILL) ? "global" : "local" );
 	return(TRUE);

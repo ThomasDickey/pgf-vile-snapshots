@@ -4,7 +4,14 @@
  *	written 1986 by Daniel Lawrence	
  *
  * $Log: exec.c,v $
- * Revision 1.30  1992/07/07 08:37:48  foxharp
+ * Revision 1.32  1992/07/16 22:06:27  foxharp
+ * same change for kbdmode
+ *
+ * Revision 1.31  1992/07/15  23:24:12  foxharp
+ * dotcmdplay() is now undoable, so don't undo individual
+ * commands when "dotcmdmode == PLAY"
+ *
+ * Revision 1.30  1992/07/07  08:37:48  foxharp
  * set macro buffer's "dot" to first line when done storing, rather than
  * leaving it at the last line.  less confusing when you bring one up for
  * editing.
@@ -749,7 +756,8 @@ int f,n;
 			/* undoable command can't be permitted when read-only */
 			if (b_val(curbp,MDVIEW))
 				return rdonly();
-			mayneedundo();
+			if (dotcmdmode != PLAY && kbdmode != PLAY)
+				mayneedundo();
 		}
 	}
 

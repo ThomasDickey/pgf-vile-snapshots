@@ -42,8 +42,9 @@ REMOTE=gutso!foxharp
 
 #CC = gcc
 #LINK = gcc
-#OPTFLAGS = -g -Wall -Wshadow -O
-#GINCS = -I/usr/local/lib/gcc-include
+#OPTFLAGS = -g -Wall -Wshadow -O # -pg
+#gincdir = /usr/local/lib/gcc-include
+#GINCS = -I$(gincdir) -I$(gincdir)/sys
 
 CC = cc
 LINK = cc
@@ -132,7 +133,7 @@ all:
 	echo "	make att	(traditional USG sytems)"		;\
 	echo "	make att_posix	(newer, with POSIX support"		;\
 	echo "	make svr3	(early 386 UNIX, for instance"		;\
-	echo "	make sun	(sunos 3 or 4)"				;\
+	echo "	make sunos	(sunos 3 or 4)"				;\
 	echo "	make ultrix"						;\
 	echo "	make mach	(just pure bsd)"			;\
 	echo "	make svr4	(untested)"				;\
@@ -154,7 +155,7 @@ bsd sony mach:
 	make CFLAGS="$(OPTFLAGS) $(INCS) -DBERK -Dos_chosen" \
 	    MAKE=/usr/bin/make $(TARGET)
 
-bsd_posix ultrix sun:
+bsd_posix ultrix sunos:
 	$(MAKE) CFLAGS="$(OPTFLAGS) $(INCS) -DBERK -DPOSIX -Dos_chosen" \
 		$(TARGET)
 
@@ -172,7 +173,10 @@ att_posix svr4:
 
 svr3:
 	$(MAKE) CFLAGS="$(OPTFLAGS) $(INCS) -DSVR3 -Dos_chosen" \
-		LIBS="-ltermcap -lc_s" $(TARGET)
+		LIBS="-ltermcap" \
+		$(TARGET)
+
+#		LIBS="-ltermcap -lc_s"
 
 mips:
 	$(MAKE) CFLAGS="$(OPTFLAGS) -systype sysv $(INCS) -DSVR3 -Dos_chosen" \
@@ -213,7 +217,7 @@ osf1:
 
 linux:
 	$(MAKE) CFLAGS="$(OPTFLAGS) $(INCS) -DUSG \
-		-DPOSIX -DHAVE_SELECT -DHAVE_POLL=0 -Dos_chosen" \
+		-DPOSIX -DHAVE_SELECT -DHAVE_POLL=0 -DLINUX -Dos_chosen" \
 		$(TARGET)
 
 msc:
@@ -234,6 +238,7 @@ default:
 $(TARGET): $(BUILTHDRS) $(OBJ) makefile
 	-mv $(TARGET) o$(TARGET)
 	$(LINK) -o $(TARGET) $(OBJ) $(LIBS)
+#	$(LINK) -pg -o $(TARGET) $(OBJ) $(LIBS) -lc_p
 #	$(LINK) -Bstatic -o $(TARGET) $(OBJ) $(LIBS)
 
 # this target is more convenient for the nonstandard environments, like DOS
@@ -404,7 +409,20 @@ $(OBJ): estruct.h edef.h
 externs.$O: nebind.h nename.h nefunc.h
 
 # $Log: makefile,v $
-# Revision 1.60  1992/07/01 17:03:12  foxharp
+# Revision 1.64  1992/07/22 00:50:32  foxharp
+# turn off shared libs
+#
+# Revision 1.63  1992/07/20  22:48:17  foxharp
+# profiling support (commented out)
+#
+# Revision 1.62  1992/07/17  19:21:53  foxharp
+# added gcc sys dir to find filio.h, and changed "sun" to "sunos" to make
+# way for solaris
+#
+# Revision 1.61  1992/07/16  22:05:01  foxharp
+# fixed linux rule -- missing -DLINUX
+#
+# Revision 1.60  1992/07/01  17:03:12  foxharp
 # added z_ibmpc.c
 #
 # Revision 1.59  1992/06/25  23:00:50  foxharp

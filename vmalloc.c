@@ -10,7 +10,10 @@
  *	(pgf, 1989)
  *
  * $Log: vmalloc.c,v $
- * Revision 1.6  1992/05/16 12:00:31  pgf
+ * Revision 1.7  1992/07/22 00:51:35  foxharp
+ * took out the counters -- they no longer compile correctly
+ *
+ * Revision 1.6  1992/05/16  12:00:31  pgf
  * prototypes/ansi/void-int stuff/microsoftC
  *
  * Revision 1.5  1992/03/05  09:19:55  pgf
@@ -52,7 +55,6 @@ char *vrealloc();
 char *vcalloc();
 void vdump();
 
-typedef unsigned long ulong;
 
 /* max buffers alloced but not yet freed */
 #define MAXMALLOCS 20000
@@ -305,6 +307,7 @@ int f,n;
 	if (f)
 		doverifys = n;
 	rvverify("requested",__FILE__,__LINE__);
+#if COUNT_THEM
 	for (mp = m, num = 0; mp < &m[MAXMALLOCS]; ++mp) {
 		if (mp->addr != NULL)
 			num++;
@@ -379,6 +382,10 @@ int f,n;
 	}
 	mlforce("doverifys %s %d, outstanding mallocs: %d, %d accounted for.",
 		f ? "set to":"is still", doverifys, num, found);
+#else
+	mlforce("doverifys %s %d",
+		f ? "set to":"is still", doverifys);
+#endif
 	return TRUE;
 }
 

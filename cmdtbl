@@ -71,7 +71,13 @@
 #		here for completeness.
 #
 # $Log: cmdtbl,v $
-# Revision 1.39  1992/07/08 08:19:43  foxharp
+# Revision 1.41  1992/07/16 22:03:35  foxharp
+# made kbd_mac_exec undoable
+#
+# Revision 1.40  1992/07/15  19:26:18  foxharp
+# made dotcmdplay undoable
+#
+# Revision 1.39  1992/07/08  08:19:43  foxharp
 # added DOS function keys
 #
 # Revision 1.38  1992/06/01  20:44:47  foxharp
@@ -322,7 +328,7 @@ kbd_mac_begin		NONE
 kbd_mac_end		NONE
 	"end-keyboard-macro"		!FEWNAMES
 	'^X-)'
-kbd_mac_exec		REDO
+kbd_mac_exec		REDO|UNDO
 	"execute-keyboard-macro"	!FEWNAMES
 	'^X-&'
 kbd_mac_save		NONE
@@ -454,7 +460,7 @@ desbind		NONE			REBIND
 	"list-bindings"
 deskey		NONE			REBIND
 	"describe-key"
-dotcmdplay	NONE
+dotcmdplay	UNDO
 	"repeat-last-cmd"		!FEWNAMES
 	'.'
 ex	NONE|(BANG|FILE1)

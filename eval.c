@@ -4,7 +4,13 @@
 	written 1986 by Daniel Lawrence
  *
  * $Log: eval.c,v $
- * Revision 1.34  1992/06/25 23:00:50  foxharp
+ * Revision 1.36  1992/07/13 20:09:57  foxharp
+ * "terse" is no longer a variable
+ *
+ * Revision 1.35  1992/07/13  09:26:16  foxharp
+ * added "force" argument to current_directory()
+ *
+ * Revision 1.34  1992/06/25  23:00:50  foxharp
  * changes for dos/ibmpc
  *
  * Revision 1.33  1992/05/19  08:55:44  foxharp
@@ -252,8 +258,6 @@ char *gtenv(vname)
 char *vname;		/* name of environment variable to retrieve */
 {
 	register int vnum;	/* ordinal number of var refrenced */
-	char *getkill();
-	char *current_directory();
 #if X11
 	char	*x_current_fontname(); 
 #endif
@@ -277,7 +281,6 @@ char *vname;		/* name of environment variable to retrieve */
 		case EVCURLINE: return(l_itoa(getcline()));
 		case EVRAM:	return(l_itoa((int)(envram / 1024l)));
 		case EVFLICKER:	return(ltos(flickcode));
-		case EVTERSE:	return(ltos(terse));
 		case EVCURWIDTH:return(l_itoa(term.t_nrow));
 		case EVCBUFNAME:return(curbp->b_bname);
 		case EVCFNAME:	return(curbp->b_fname);
@@ -312,7 +315,7 @@ char *vname;		/* name of environment variable to retrieve */
 		case EVWORD:	return(getctext(_nonspace));
 		case EVIDENTIF:	return(getctext(_ident));
 		case EVPATHNAME:return(getctext(_pathn));
-		case EVDIR:	return(current_directory());
+		case EVDIR:	return(current_directory(FALSE));
 #if X11
 		case EVFONT:	return(x_current_fontname());
 #endif
@@ -321,7 +324,6 @@ char *vname;		/* name of environment variable to retrieve */
 }
 
 char *getkill()		/* return some of the contents of the kill buffer */
-
 {
 	register int size;	/* max number of chars to return */
 	char value[NSTRING];	/* temp buffer for value */
@@ -510,8 +512,6 @@ char *value;	/* value to set to */
 		case EVCURCOL:	status = gotocol(TRUE,atoi(value));
 				break;
 		case EVCURLINE:	status = gotoline(TRUE, atoi(value));
-				break;
-		case EVTERSE:	terse = stol(value);
 				break;
 		case EVFLICKER:	flickcode = stol(value);
 				break;

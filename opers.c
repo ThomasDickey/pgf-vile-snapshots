@@ -4,7 +4,10 @@
  * written for vile by Paul Fox, (c)1990
  *
  * $Log: opers.c,v $
- * Revision 1.21  1992/05/25 21:07:48  foxharp
+ * Revision 1.22  1992/07/16 22:18:54  foxharp
+ * ins() takes an argument -- whether or not to playback, usually FALSE
+ *
+ * Revision 1.21  1992/05/25  21:07:48  foxharp
  * extern func declarations moved to header
  *
  * Revision 1.20  1992/05/16  12:00:31  pgf
@@ -223,7 +226,7 @@ chgreg()
 		else
 			return openup(TRUE,1);
 	}
-	return ins();
+	return ins(FALSE);
 }
 
 int
