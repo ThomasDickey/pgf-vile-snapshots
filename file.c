@@ -6,7 +6,11 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.91  1993/06/18 15:57:06  pgf
+ * Revision 1.92  1993/06/24 12:11:08  pgf
+ * tag_for_undo() now returns void -- this was the _only_ place that
+ * checked the return value anyway.
+ *
+ * Revision 1.91  1993/06/18  15:57:06  pgf
  * tom's 3.49 changes
  *
  * Revision 1.90  1993/06/02  14:57:32  pgf
@@ -1599,10 +1603,9 @@ FILE	*haveffp;
 
 		if (nbytes)  /* l_text may be NULL in this case */
 			(void)memcpy(l_ref(lp1)->l_text, fline, nbytes);
-		if (!tag_for_undo(lp1)) {
-			s = FIOMEM;
-			break;
-		}
+
+		tag_for_undo(lp1);
+
 		if (belowthisline)
 			lp0 = lp1;
 		else

@@ -9,7 +9,10 @@
  *	the output structures.
  *
  * $Log: mktbls.c,v $
- * Revision 1.23  1993/06/18 16:16:34  pgf
+ * Revision 1.24  1993/06/23 21:29:29  pgf
+ * ifdefs for linux -- our ifdefs are obviously not right yet
+ *
+ * Revision 1.23  1993/06/18  16:16:34  pgf
  * alistair crooks lint/NeXt changes
  *
  * Revision 1.22  1993/06/18  15:57:06  pgf
@@ -144,7 +147,7 @@ extern char *malloc();
 #define	Sprintf	(void)sprintf
 
 #if defined(lint) || defined(__GNUC__)
-#ifdef __STDC__
+#if !LINUX && defined(__STDC__)		/* this ifdef needs work, clearly */
 extern       int     fprintf(FILE *, char *, ... );
 #else
 extern       int     fprintf();

@@ -14,7 +14,10 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.121  1993/06/18 15:57:06  pgf
+ * Revision 1.122  1993/06/23 21:31:16  pgf
+ * added "undolimit" mode
+ *
+ * Revision 1.121  1993/06/18  15:57:06  pgf
  * tom's 3.49 changes
  *
  * Revision 1.120  1993/06/10  14:58:10  pgf
@@ -1039,39 +1042,40 @@ global_val_init()
 		copy_val(global_w_values.wv, global_w_values.wv, i);
 
 
-	set_global_g_val(GMDABUFF,TRUE); 	/* auto-buffer */
-	set_global_g_val(GMDALTTABPOS,FALSE); 	/* emacs-style tab positioning */
-	set_global_g_val(GMDDIRC,FALSE); 	/* directory-completion */
+	set_global_g_val(GMDABUFF,	TRUE); 	/* auto-buffer */
+	set_global_g_val(GMDALTTABPOS,	FALSE); /* emacs-style tab positioning */
+	set_global_g_val(GMDDIRC,	FALSE); /* directory-completion */
 #ifdef GMDHISTORY
-	set_global_g_val(GMDHISTORY,TRUE);
+	set_global_g_val(GMDHISTORY,	TRUE);
 #endif
-	set_global_g_val(GMDIMPLYBUFF,FALSE); 	/* imply-buffer */
+	set_global_g_val(GMDIMPLYBUFF,	FALSE); /* imply-buffer */
 
-	set_global_b_val(MDAIND,FALSE); 	/* auto-indent */
-	set_global_b_val(MDASAVE,FALSE);	/* auto-save */
-	set_global_b_val(MDBACKLIMIT,TRUE); 	/* limit backspacing to insert point */
-	set_global_b_val(MDCMOD,FALSE); 	/* C mode */
+	set_global_b_val(MDAIND,	FALSE); /* auto-indent */
+	set_global_b_val(MDASAVE,	FALSE);	/* auto-save */
+	set_global_b_val(MDBACKLIMIT,	TRUE); 	/* limit backspacing to insert point */
+	set_global_b_val(MDCMOD,	FALSE); /* C mode */
 #ifdef MDCRYPT
-	set_global_b_val(MDCRYPT,FALSE);	/* crypt */
+	set_global_b_val(MDCRYPT,	FALSE);	/* crypt */
 #endif
-	set_global_b_val(MDIGNCASE,FALSE); 	/* exact matches */
-	set_global_b_val(MDDOS,FALSE);		/* dos mode */
-	set_global_b_val(MDMAGIC,TRUE); 	/* magic searches */
-	set_global_b_val(MDSHOWMAT,FALSE);	/* show-match */
-	set_global_b_val(MDSHOWMODE,TRUE);	/* show-mode */
-	set_global_b_val(MDSWRAP,TRUE); 	/* scan wrap */
-	set_global_b_val(MDTABINSERT,TRUE);	/* allow tab insertion */
-	set_global_b_val(MDTAGSRELTIV,FALSE);	/* path relative tag lookups */
-	set_global_b_val(MDTERSE,FALSE);	/* terse messaging */
-	set_global_b_val(MDVIEW,FALSE); 	/* view-only */
-	set_global_b_val(MDWRAP,FALSE); 	/* wrap */
+	set_global_b_val(MDIGNCASE,	FALSE); /* exact matches */
+	set_global_b_val(MDDOS,		FALSE);	/* dos mode */
+	set_global_b_val(MDMAGIC,	TRUE); 	/* magic searches */
+	set_global_b_val(MDSHOWMAT,	FALSE);	/* show-match */
+	set_global_b_val(MDSHOWMODE,	TRUE);	/* show-mode */
+	set_global_b_val(MDSWRAP,	TRUE); 	/* scan wrap */
+	set_global_b_val(MDTABINSERT,	TRUE);	/* allow tab insertion */
+	set_global_b_val(MDTAGSRELTIV,	FALSE);	/* path relative tag lookups */
+	set_global_b_val(MDTERSE,	FALSE);	/* terse messaging */
+	set_global_b_val(MDVIEW,	FALSE); /* view-only */
+	set_global_b_val(MDWRAP,	FALSE); /* wrap */
 
-	set_global_b_val(VAL_ASAVECNT, 256);	/* autosave count */
-	set_global_b_val(VAL_C_SWIDTH, 8); 	/* C file shiftwidth */
-	set_global_b_val(VAL_C_TAB, 8); 	/* C file tab stop */
-	set_global_b_val(VAL_SWIDTH, 8); 	/* shiftwidth */
-	set_global_b_val(VAL_TAB, 8);		/* tab stop */
-	set_global_b_val(VAL_TAGLEN, 0);	/* significant tag length */
+	set_global_b_val(VAL_ASAVECNT,	256);	/* autosave count */
+	set_global_b_val(VAL_C_SWIDTH,	8); 	/* C file shiftwidth */
+	set_global_b_val(VAL_C_TAB,	8); 	/* C file tab stop */
+	set_global_b_val(VAL_SWIDTH,	8); 	/* shiftwidth */
+	set_global_b_val(VAL_TAB,	8);	/* tab stop */
+	set_global_b_val(VAL_TAGLEN,	0);	/* significant tag length */
+	set_global_b_val(VAL_UNDOLIM,	10);	/* undo limit */
 
 	set_global_b_val_ptr(VAL_TAGS, strmalloc("tags")); /* tags filename */
 
@@ -1115,14 +1119,15 @@ global_val_init()
 	set_global_g_val_ptr(GVAL_GLOB, strmalloc("!echo %s"));
 #endif
 
-	set_global_w_val(WMDLIST,FALSE); /* list-mode */
-	set_global_w_val(WVAL_SIDEWAYS,0); /* list-mode */
+	set_global_w_val(WMDLIST,	FALSE); /* list-mode */
+	set_global_w_val(WMDNUMBER,	FALSE);	/* number */
+	set_global_w_val(WMDHORSCROLL,	TRUE);	/* horizontal scrolling */
+
+	set_global_w_val(WVAL_SIDEWAYS,	0);	/* list-mode */
 #if defined(WVAL_FCOLOR) || defined(WVAL_BCOLOR)
-	set_global_w_val(WVAL_FCOLOR,7); /* foreground color */
-	set_global_w_val(WVAL_BCOLOR,0); /* background color */
+	set_global_w_val(WVAL_FCOLOR,	7);	/* foreground color */
+	set_global_w_val(WVAL_BCOLOR,	0);	/* background color */
 #endif
-	set_global_w_val(WMDNUMBER,FALSE);	/* number */
-	set_global_w_val(WMDHORSCROLL,TRUE);	/* horizontal scrolling */
 
 
 }

@@ -6,7 +6,10 @@
  * for the display system.
  *
  * $Log: buffer.c,v $
- * Revision 1.66  1993/06/22 10:24:21  pgf
+ * Revision 1.67  1993/06/23 21:31:16  pgf
+ * added "undolimit" mode
+ *
+ * Revision 1.66  1993/06/22  10:24:21  pgf
  * new arg to freeundostacks()
  *
  * Revision 1.65  1993/06/21  14:23:41  pgf
@@ -1573,6 +1576,9 @@ char   *bname;
 	bp->b_udstkindx = 0;
 	bp->b_ulinep = null_ptr;
 	bp->b_last_used = 0;
+	bp->b_udtail = null_ptr;
+	bp->b_udlastsep = null_ptr;
+	bp->b_udcount = 0;
 	set_lFORW(lp, lp);
 	set_lBACK(lp, lp);
         

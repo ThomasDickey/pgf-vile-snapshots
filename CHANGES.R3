@@ -1,3 +1,15 @@
+Changes for vile 3.50:
+(pgf)
+	+ finished (yeah, right) the changes for infinite undo. implemented
+	  mode to control how many changes are stored (called "undolimit"). 
+	  the modified bit (BFCHG) now gets reset if the right number of
+	  undos is done.  (estruct.h main.c modetbl undo.c buffer.c vile.hlp)
+	  
+	+ rearranged calls to copy_for/tag_for/toss_to_undo and chg_buff
+	  so that the BFCHG flag is unmodified before the first call to
+	  preundocleanup().  this gives undo the true state of BFCHG. 
+	  (line.c region.c)
+
 Changes for vile 3.49:
 (pgf)
 	+ implemented infinite undo, on keys ^X-u (undo) and ^X-r (redo).

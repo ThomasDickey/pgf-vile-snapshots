@@ -11,7 +11,15 @@
  * which means that the dot and mark values in the buffer headers are nonsense.
  *
  * $Log: line.c,v $
- * Revision 1.45  1993/06/18 15:57:06  pgf
+ * Revision 1.47  1993/06/24 12:10:52  pgf
+ * cosmetics
+ *
+ * Revision 1.46  1993/06/23  21:27:54  pgf
+ * moved calls to chg_buff, to ensure an undo routine is called first.
+ * this allows undo to record the initial modified state of the buffer
+ * correctly
+ *
+ * Revision 1.45  1993/06/18  15:57:06  pgf
  * tom's 3.49 changes
  *
  * Revision 1.44  1993/06/02  14:28:47  pgf
@@ -282,7 +290,8 @@ register BUFFER *bp;
 #if OPT_MAP_MEMORY
 	l_deallocate(lp);
 #else
-	ltextfree(lp,bp);
+	if (lisreal(lp))
+		ltextfree(lp,bp);
 
 	/* if the buffer doesn't have its own block of LINEs, or this
 		one isn't in that range, free it */
@@ -444,7 +453,6 @@ int n, c;
 #endif
 	SIZE_T	nsize;
 
-	chg_buff(curbp, WFEDIT);
 	lp1 = curwp->w_dot.l;			/* Current line 	*/
 	if (same_ptr(lp1, curbp->b_line.l)) {	/* At the end: special	*/
 		if (curwp->w_dot.o != 0) {
@@ -454,9 +462,11 @@ int n, c;
 		lp2 = lalloc(n, curbp);		/* Allocate new line	*/
 		if (same_ptr(lp2, null_ptr))
 			return (FALSE);
+
 		copy_for_undo(lBACK(lp1)); /* don't want preundodot to point
-					   *	at a new line if this is the
-					   *	first change */
+					    *	at a new line if this is the
+					    *	first change
+					    */
 		lp3 = lBACK(lp1);		/* Previous line	*/
 		set_lFORW(lp3, lp2);		/* Link in		*/
 		set_lFORW(lp2, lp1);
@@ -466,6 +476,7 @@ int n, c;
 		curwp->w_dot.l = lp2;
 		curwp->w_dot.o = n;
 		tag_for_undo(lp2);
+		chg_buff(curbp, WFEDIT);
 		return (TRUE);
 	}
 	doto = curwp->w_dot.o;			/* Save for later.	*/
@@ -480,10 +491,12 @@ int n, c;
 			return (FALSE);
 		lp1 = l_ptr(tmp);
 
-		if (tmp->l_size == tmp->l_used)
+		if (tmp->l_size == tmp->l_used) {
+			chg_buff(curbp, WFEDIT);
 			return WouldTruncate();
-		else	/* assume (size > used) */
+		} else {	/* assume (size > used) */
 			n = Truncate(n, (SIZE_T)(tmp->l_size - tmp->l_used));
+		}
 
 		if (n > 0) {
 			(void)MemMove(&tmp->l_text[doto+n], &tmp->l_text[doto], (SIZE_T)(tmp->l_used - doto));
@@ -507,6 +520,7 @@ int n, c;
 #endif
 	} else {		/* Easy: in place	*/
 		copy_for_undo(lp1);
+		chg_buff(curbp, WFEDIT);
 		tmp = l_ref(lp1);
 		/* don't use memcpy:  overlapping regions.... */
 		llength(tmp) += n;
@@ -517,6 +531,7 @@ int n, c;
 		for (i=0; i<n; ++i)		/* Add the characters	*/
 			tmp->l_text[doto+i] = c;
 	}
+	chg_buff(curbp, WFEDIT);
 #if ! WINMARK
 	if (same_ptr(MK.l, lp1)) {
 		if (MK.o > doto)
@@ -570,7 +585,6 @@ lnewline()
 	register int	doto;
 	register WINDOW *wp;
 
-	chg_buff(curbp, WFHARD|WFINS);
 	lp1  = curwp->w_dot.l;		/* Get the address and	*/
 	doto = curwp->w_dot.o;			/* offset of "."	*/
 
@@ -594,6 +608,9 @@ lnewline()
 			if (same_ptr(wp->w_dot.l, lp1))
 				wp->w_dot.l = lp2;
 		}
+
+		chg_buff(curbp, WFHARD|WFINS);
+
 		return lnewline();	/* vi really makes _2_ lines */
 	}
 
@@ -669,6 +686,7 @@ lnewline()
 			}
 		}
 	}
+	chg_buff(curbp, WFHARD|WFINS);
 	return (TRUE);
 }
 
@@ -701,7 +719,6 @@ int kflag;	/* put killed text in kill buffer flag */
 		if (chunk > (int)n)
 			chunk = (int)n;
 		if (chunk == 0) {		/* End of line, merge.	*/
-			chg_buff(curbp, WFHARD|WFKILLS);
 			/* first take out any whole lines below this one */
 			nlp = lFORW(dotp);
 			while (!same_ptr(nlp, curbp->b_line.l)
@@ -719,6 +736,7 @@ int kflag;	/* put killed text in kill buffer flag */
 				n -= lLength(nlp)+1;
 				nlp = lFORW(dotp);
 			}
+			chg_buff(curbp, WFHARD|WFKILLS);
 			if ((s = ldelnewline()) != TRUE)
 				return (s);
 			if (kflag && (s = kinsert('\n')) != TRUE)
@@ -726,8 +744,8 @@ int kflag;	/* put killed text in kill buffer flag */
 			--n;
 			continue;
 		}
-		chg_buff(curbp, WFEDIT);
 		copy_for_undo(DOT.l);
+		chg_buff(curbp, WFEDIT);
 
 		cp1 = l_ref(dotp)->l_text + doto; /* Scrunch text.	*/
 		cp2 = cp1 + chunk;

@@ -12,7 +12,10 @@
 # The modes are table entries in the BUFFER and WINDOW structures.
 #
 # $Log: modetbl,v $
-# Revision 1.11  1993/06/18 15:57:06  pgf
+# Revision 1.12  1993/06/23 21:31:16  pgf
+# added "undolimit" mode
+#
+# Revision 1.11  1993/06/18  15:57:06  pgf
 # tom's 3.49 changes
 #
 # Revision 1.10  1993/04/28  17:15:56  pgf
@@ -60,9 +63,9 @@ bool								# GMD prefix
 	"ImplyBuffer"	IMPLYBUFF 	0			# imply-buffer (vi-like)
 	"SameBangs"	SAMEBANGS	0			# use same "!!" data for ^X-!
 regex								# VAL_ prefix
-	"C-SUFfixes"	CSUFFIXES	0
+	"C-SUFfixes"	CSUFFIXES	0			# match against filenames to turn on c-mode
 string								# VAL_ prefix
-	"glob"		GLOB		0
+	"glob"		GLOB		0			# select filename globbing style
 
 .buffers
 bool								# MD prefix
@@ -83,21 +86,22 @@ bool								# MD prefix
 	"WrapScan"	SWRAP 		0			# wrap-around search mode
 	"WrapWords"	WRAP		0			# word wrap
 int								# VAL_ prefix
-	"AutoSaveCNT"	ASAVECNT	0
-	"C-ShiftWidth"	C_SWIDTH	0
-	"C-TabStop"	C_TAB		WFHARD
-	"FillCol"	FILL		0
-	"ShiftWidth"	SWIDTH		0
-	"TabStop"	TAB		WFHARD
-	"TagLength"	TAGLEN		0
-	"WrapMargin"	WRAPMARGIN	0
+	"AutoSaveCNT"	ASAVECNT	0			# how often auto-saves occur
+	"C-ShiftWidth"	C_SWIDTH	0			# shift-width for C buffers
+	"C-TabStop"	C_TAB		WFHARD			# tab spacing for C buffers
+	"FillCol"	FILL		0			# column for paragraph reformat, and line break
+	"ShiftWidth"	SWIDTH		0			# shiftwidth for ^T/^D/<</>>
+	"TabStop"	TAB		WFHARD			# tab spacing for most buffers
+	"TagLength"	TAGLEN		0			# required significant length for tag lookups
+	"UndoLimit"	UNDOLIM		0			# how much undo stack is saved
+	"WrapMargin"	WRAPMARGIN	0			# width of right margin for autowrap
 string								# VAL_ prefix
-	"tags"		TAGS		0
+	"tags"		TAGS		0			# list of tags files
 regex								# VAL_ prefix
-	"comments"	COMMENTS	0
-	"paragraphs"	PARAGRAPHS	0
-	"sections"	SECTIONS	0
-	"sentences"	SENTENCES	0
+	"comments"	COMMENTS	0			# matches leading comment for comment reformatting
+	"paragraphs"	PARAGRAPHS	0			# delimits a paragraph
+	"sections"	SECTIONS	0			# delimits a section
+	"sentences"	SENTENCES	0			# delimits a sentence
 
 .windows
 bool								# WMD prefix
@@ -105,7 +109,7 @@ bool								# WMD prefix
 	"NUmber"	NUMBER		WFMODE|WFHARD		# line-numbers shown
 	"HorizScroll"	HORSCROLL	0			# scroll whole screen
 int								# VAL_ prefix
-	"SIDEways"	SIDEWAYS	WFMODE|WFHARD
+	"SIDEways"	SIDEWAYS	WFMODE|WFHARD		# sideways offset for display
 color
 	"fcolor"	FCOLOR		WFHARD|WFCOLR	COLOR	# foreground color
 	"bcolor"	BCOLOR		WFHARD|WFCOLR	COLOR	# background color
@@ -171,7 +175,7 @@ color
 "les"	LESS		DYNAMIC		# logical less than
 "low"	LOWER		MONAMIC		# lower case string
 "mid"	MID		TRINAMIC	# mid string(string, pos, len)
-"mod"	MOD		DYNAMIC		# mod
+"mod"	MOD		DYNAMIC		# modulo
 "neg"	NEG		MONAMIC		# negate
 "not"	NOT		MONAMIC		# logical not
 "or"	OR		DYNAMIC		# logical or
