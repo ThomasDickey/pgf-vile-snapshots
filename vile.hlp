@@ -1,5 +1,5 @@
 
-Getting along with vile						(version 5.5)
+Getting along with vile						(version 5.6)
 -----------------------						-------------
 
 	Use Ctrl-D and Ctrl-U to scroll through this help information.
@@ -135,7 +135,7 @@ Buffer manipulation commands:
 	:e	Edit a file.  If the file is already in a buffer, that buffer
 		will be recalled into the current window.  This occurs as
 		follows: If the name given contains no path delimiters
-		(i.e.  slashes), then it will be compared to the existing
+		(i.e. slashes), then it will be compared to the existing
 		vile buffer names.  Failing that comparison (or if there
 		are any slashes in the name), the name will be stretched
 		into an absolute path, and will be compared to the existing
@@ -232,9 +232,19 @@ Window manipulation commands:
 	(The previous four commands are useful when comparing two buffers.
 	 Mnemonic -- think of them as affecting the "A"lternate window.)
 
-	zH zM zL  These are synonyms for vi's 'z+', 'z.', and 'z-', which
+	zH zM zL
+	zt zm zb
+		These are synonyms for vi's 'z+', 'z.', and 'z-', which
 		position the line holding the cursor at the top, middle, or
-		bottom of the screen, respectively.
+		bottom of the screen, respectively.  (Any of the second 
+		characters can be upper or lower case.)  Mnemonically, these
+		correspond to the H, M, and L screen positioning commands,
+		or to "top", "middle", or "bottom" -- take your choice.
+		In a macro, only the first character of the argument is
+		significant, but something like "position-window middle" is
+		most readable.  Supplying a count will offset that far
+		from the top or bottom of window.  (But the middle is
+		always the middle.)
 
 	^X-^R	Scroll the window right or left by 1/3 of a screen, or by the
 	^X-^L	number of columns specified.  Changes the "sideways" value.
@@ -275,7 +285,7 @@ File manipulation commands:
 
 	The commands ":ww" and ":wwq" correspond roughly to ":w" and ":wq",
 	but they each write all modified buffers, rather than just the
-	current one.  Giving any numeric argument to ":ww" (i.e.  "1:ww")
+	current one.  Giving any numeric argument to ":ww" (i.e. "1:ww")
 	will suppress the per-file and "Press return to continue" message.
 	This may be useful when using the command from within a macro.
 
@@ -580,6 +590,8 @@ Text manipulation command:
 		tagname.
 	^T or ^X-^] or ":pop" - pops to the file and location just previous
 		to the last tag command.
+	^A-^] or ":next-tag" continues searching through the tags file(s)
+		for additional matches.
 
 	When one of these commands is used, vile will (by default) look for
 	a file named "tags" in the current directory, and load it into a
@@ -1390,15 +1402,22 @@ Editor modes
 	wrapmargin (wm)  Implements vi's auto-wrap mode.  If nonzero, the
 		wrapmargin specifies the number of columns on the
 		screen's right margin to reserve before breaking the input
-		lines on a preceding space.  (B)
+		lines on a preceding space.  Thus a value of 5 and an
+		80 column screen will result in 75 character lines.  This
+		mode is different from the "wrapwords" mode (below) which
+		uses the "fillcol" setting as its target column.  The two
+		modes probably shouldn't both be used at once.
+		(B)
 
 	wrapscan (ws) Text searches will continue from past the bottom of
 		the file to the top, and vice-versa.  (B)
 
-	wrapwords (ww) Similar to vi's auto-wrap mode (i.e. "wrapmargin").
-		While inserting, words are moved to the next line if the
-		current line gets too long.  Unlike vi, wrapping is only
-		attempted when a space is typed.  (B)
+	wrapwords (ww) [deprecated] Similar to, but different from, vi's
+		auto-wrap mode (i.e. "wrapmargin").  While inserting,
+		words are moved to the next line if the current line gets
+		too long.  Wrapping is only attempted when a space is
+		typed.  The target maximum width of lines is changed with
+		the "fillcol" setting.  (B)
 
 	xterm-mouse Enables mouse-clicking if you are running within an
 		xterm.  That is, it allows vile to receive mouse events.
@@ -1624,7 +1643,7 @@ Key Rebinding
 	corresponds to pressing a single key.  Multiple key sequences will
 	work as long as the next key in the sequence is pressed within a
 	specified number of milliseconds.  The value of "timeoutlen" is
-	used for system-defined character sequences, i.e.  function keys.
+	used for system-defined character sequences, i.e. function keys.
 	User defined sequences will use this too, unless the value of
 	"timeoutlen-user" is non-zero, in which case this value will be
 	used instead.
@@ -1969,7 +1988,7 @@ Programmed procedures and macros
 	~else
 	~endif
 	~return		Return (terminating current macro)
-	~goto *label	Jump to a label in the current macro
+	~goto label	Jump to a label in the current macro
 	~force		Force macro to continue...even if command fails
 	~while cond	Execute a loop if the condition is true
 	~break
@@ -1980,6 +1999,10 @@ Programmed procedures and macros
 	Line Labels begin with a "*" as the first nonblank char, like:
 
 	*LBL01
+
+	(you would jump to this with:
+		~goto LBL01
+	)
 
 	Procedures vs. Macros
 	---------------------
@@ -3254,4 +3277,4 @@ Credits
 
 Copyright 1995 by Paul Fox, Tom Dickey, and Kevin Buettner
 -----------------------------------------------------------
- $Header: /usr/build/VCS/pgf-vile/RCS/vile.hlp,v 1.274 1995/11/21 14:21:07 pgf Exp $
+ $Header: /usr/build/VCS/pgf-vile/RCS/vile.hlp,v 1.280 1995/12/15 01:53:35 pgf Exp $

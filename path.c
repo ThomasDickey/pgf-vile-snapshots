@@ -2,7 +2,7 @@
  *		The routines in this file handle the conversion of pathname
  *		strings.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/path.c,v 1.61 1995/11/21 01:50:52 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/path.c,v 1.62 1995/12/05 23:26:12 pgf Exp $
  *
  *
  */
@@ -23,6 +23,10 @@
 #include <sys/stat.h>
 
 #include "dirstuff.h"
+
+#if !defined(S_ISDIR) && defined(S_IFMT) && defined(S_IFDIR)
+# define S_ISDIR(m)  (((m) & S_IFMT) == S_IFDIR)
+#endif
 
 #if (SYS_WIN31 && CC_TURBO) || SYS_WINNT
 # include <direct.h>

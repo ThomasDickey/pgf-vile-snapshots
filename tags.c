@@ -4,7 +4,7 @@
  *	the cursor.
  *	written for vile: Copyright (c) 1990, 1995 by Paul Fox
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/tags.c,v 1.70 1995/09/08 00:50:23 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/tags.c,v 1.71 1995/12/12 03:59:33 pgf Exp $
  *
  */
 #include	"estruct.h"
@@ -23,14 +23,14 @@
 };
 
 
-static	LINE *	cheap_tag_scan P(( BUFFER *, char *, SIZE_T));
+static	LINE *	cheap_tag_scan P(( BUFFER *, LINEPTR, char *, SIZE_T));
 static	LINE *	cheap_buffer_scan P(( BUFFER *, char *, SIZE_T, int, int));
 static	void	free_untag P(( UNTAG * ));
 static	BUFFER *gettagsfile P(( int, int * ));
 static	void	nth_name P(( char *,  char *, int ));
 static	int	popuntag P(( char *, int * ));
 static	void	pushuntag P(( char *, int, char * ));
-static	int	tags P(( char *, int ));
+static	int	tag_search P(( char *, int, int ));
 static	void	tossuntag P(( void ));
 
 static	UNTAG *	untaghead = NULL;
@@ -59,7 +59,22 @@ int f,n;
 		taglen = 0;
 	}
 	if (s == TRUE)
-		s = tags(tagname,taglen);
+		s = tag_search(tagname,taglen,TRUE);
+	else
+		tagname[0] = EOS;
+	return s;
+}
+
+/*
+ * Continue a tag-search by looking for other references in the tags file.
+ */
+int
+nexttag(f,n)
+int f, n;
+{
+	int	s = FALSE;
+	if (tagname[0] != EOS)
+		s = tag_search(tagname, global_b_val(VAL_TAGLEN), FALSE);
 	return s;
 }
 
@@ -67,15 +82,25 @@ int
 cmdlinetag(t)
 char *t;
 {
-	return tags(strncpy0(tagname, t, NFILEN), global_b_val(VAL_TAGLEN));
+	return tag_search(strncpy0(tagname, t, NFILEN),
+		global_b_val(VAL_TAGLEN),
+		TRUE);
 }
 
 
 static int
-tags(tag,taglen)
+tag_search(tag,taglen,initial)
 char *tag;
 int taglen;
+int initial;
 {
+	/* variables for 'initial'=FALSE */
+	static	int tf_num;
+	static	char last_bname[NBUFN+1];
+#ifdef	MDCHK_MODTIME
+	static	time_t	last_modtime;
+#endif
+
 	register LINE *lp;
 	register int i, s;
 	char *tfp, *lplim;
@@ -88,9 +113,20 @@ int taglen;
 	int nomore;
 	int gotafile = FALSE;
 
-	i = 0;
+	if (initial)
+		tf_num = 0;
+#ifdef	MDCHK_MODTIME
+	else {
+		if ((tagbp = find_b_name(last_bname)) == NULL
+		 || last_modtime != tagbp->b_modtime) {
+			initial = TRUE;
+			tf_num = 0;
+		}
+	}
+#endif
+
 	do {
-		tagbp = gettagsfile(i, &nomore);
+		tagbp = gettagsfile(tf_num, &nomore);
 		if (nomore) {
 			if (gotafile) {
 				mlwarn("[No such tag: \"%s\"]",tag);
@@ -101,16 +137,30 @@ int taglen;
 		}
 
 		if (tagbp) {
-			lp = cheap_tag_scan(tagbp, tag, (SIZE_T)taglen);
+			lp = cheap_tag_scan(tagbp,
+				initial
+				  ? buf_head(tagbp)
+				  : tagbp->b_dot.l,
+				tag, (SIZE_T)taglen);
 			gotafile = TRUE;
 		} else {
 			lp = NULL;
 		}
 
-		i++;
+		tf_num++;
 
 	} while (lp == NULL);
-	
+
+	/* Save the position in the tags-file so "next-tag" will work */
+	tf_num--;
+	strcpy(last_bname, get_bname(tagbp));
+	tagbp->b_dot.l = lp;
+	tagbp->b_dot.o = 0;
+#ifdef	MDCHK_MODTIME
+	last_modtime = tagbp->b_modtime;
+#endif
+
+	/* Parse the line from the tags-file */
 	lplim = &lp->l_text[lp->l_used];
 	tfp = lp->l_text;
 	while (tfp < lplim)
@@ -245,8 +295,8 @@ int taglen;
 	if (s == TRUE && !sameline(DOT, odot)) {
 		curwp->w_lastdot = odot;
 	}
-	return s;
-	
+
+	return s; 	
 }
 
 /* 
@@ -291,7 +341,8 @@ int *endofpathflagp;
 		char *tagf = global_b_val_ptr(VAL_TAGS);
 
 		nth_name(tagfilename, tagf, n);
-		if (tagfilename[0] == EOS) {
+		if (!doglob(tagfilename)
+		 || tagfilename[0] == EOS) {
 			*endofpathflagp = TRUE;
 			return NULL;
 		}
@@ -344,8 +395,9 @@ int *endofpathflagp;
  *	significant in the lookup.
  */
 static LINE *
-cheap_tag_scan(bp, name, taglen)
+cheap_tag_scan(bp, oldlp, name, taglen)
 BUFFER *bp;
+LINEPTR oldlp;
 char *name;
 SIZE_T taglen;
 {
@@ -366,13 +418,15 @@ SIZE_T taglen;
 	}
 
 	retlp = NULL;
-	for_each_line(lp, bp) {
+	lp = lforw(oldlp);
+	while (lp != l_ref(oldlp)) {
 		if (llength(lp) > namelen) {
 			if (!strncmp(lp->l_text, name, namelen)) {
 				retlp = lp;
 				break;
 			}
 		}
+		lp = lforw(lp);
 	}
 	if (added_tab)
 		name[namelen-1] = EOS;

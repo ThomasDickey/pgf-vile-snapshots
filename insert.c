@@ -7,7 +7,7 @@
  * Most code probably by Dan Lawrence or Dave Conroy for MicroEMACS
  * Extensions for vile by Paul Fox
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/insert.c,v 1.87 1995/11/18 00:36:16 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/insert.c,v 1.88 1995/12/08 19:45:12 pgf Exp $
  *
  */
 
@@ -885,14 +885,6 @@ int f,n;
 	 && (b_val(curbp,MDCMOD) || b_val(curbp,MDAIND))
 	 && !is_header_line(DOT,curbp))
 		return indented_newline();
-
-	/*
-	 * If a newline was typed, fill column is defined, the argument is non-
-	 * negative, wrap mode is enabled, and we are now past fill column,
-	 * perform word wrap.
-	 */
-	if (!is_at_end_of_line(DOT) && wrap_at_col(EOS))
-		wrapword(FALSE,1);
 
 	/* insert some lines */
 	while (n--) {

@@ -472,11 +472,14 @@ main(argc, argv)
 		    }
 		}
 		    
-		if ( (isalpha(*s) || *s == '#') && ! literal) {
-		    s = extract_identifier(s);
-		    match_identifier();
-		} else
-		    putchar(*s++);
+		if (*s) {
+			if ( (isalpha(*s) || *s == '#') && ! literal) {
+			    s = extract_identifier(s);
+			    match_identifier();
+			} else {
+			    putchar(*s++);
+			}
+		}
 	    } 
 	}
     }

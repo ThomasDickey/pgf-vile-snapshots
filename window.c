@@ -2,7 +2,7 @@
  * Window management. Some of the functions are internal, and some are
  * attached to keys that the user actually types.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/window.c,v 1.63 1995/08/18 12:32:58 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/window.c,v 1.65 1995/12/15 14:30:15 pgf Exp $
  *
  */
 
@@ -109,7 +109,13 @@ reposition(f, n)
 int f,n;
 {
 	if (f) {
-		curwp->w_force = n;
+		int an;
+		/* clamp the value at the size of the window */
+		an = absol(n);
+		if (an > curwp->w_ntrows)
+			curwp->w_force = curwp->w_ntrows * (n / an);
+		else
+			curwp->w_force = n;
 		curwp->w_flag |= WFFORCE;
 	}
 	return update(TRUE);
@@ -183,30 +189,37 @@ poswind(f,n)
 int f,n;
 {
 	register int c;
-	register int rows;
+	register int row;
 	int s;
 
-	c = keystroke();
-	if (ABORTED(c))
-		return FALSE;
+	if (!f)
+		n = 1;
 
-	if (c == '+' || c == '\r' || c == 'H') {
-		rows = 1;
-	} else if (c == '.' || c == 'M') {
-		rows = 0;
-	} else if (c == '-' || c == 'L') {
-		rows = -1;
+	if (clexec || isnamedcmd) {
+		static char cbuf[20];
+		if ((s=mlreply("Position window with cursor at:  ", cbuf,
+						20)) != TRUE)
+			return s;
+		c = cbuf[0];
 	} else {
-		kbd_alarm();
+		c = keystroke();
+		if (ABORTED(c))
+			return ABORT;
+	}
+
+	if (strchr("+hHtT\r", c)) {
+		row = n;
+	} else if (strchr(".mM", c)) {
+		row = 0;
+	} else if (strchr("-lLbB\r", c)) {
+		row = -n;
+	} else {
+		if (!(clexec || isnamedcmd))
+			kbd_alarm();
 		return FALSE;
 	}
 
-	if (f == TRUE) {
-		s = gotoline(f,n);
-		if (s != TRUE)
-			return(s);
-	}
-	return(reposition(TRUE,rows));
+	return(reposition(TRUE,row));
 }
 
 /*

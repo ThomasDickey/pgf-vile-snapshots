@@ -3,7 +3,7 @@
 
 	written 1986 by Daniel Lawrence
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/eval.c,v 1.125 1995/11/18 00:36:16 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/eval.c,v 1.126 1995/12/14 23:05:22 pgf Exp $
  *
  */
 
@@ -1304,13 +1304,11 @@ register char *str;
 	return base;
 }
 
-#if OPT_EVAL
 int absol(x)	/* take the absolute value of an integer */
 int x;
 {
 	return(x < 0 ? -x : x);
 }
-#endif
 
 #if OPT_EVAL
 static int

@@ -44,7 +44,7 @@
  *	tgetc_avail()     true if a key is avail from tgetc() or below.
  *	keystroke_avail() true if a key is avail from keystroke() or below.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/input.c,v 1.142 1995/10/06 17:07:02 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/input.c,v 1.143 1995/12/06 00:05:23 pgf Exp $
  *
  */
 
@@ -1185,18 +1185,18 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 			kbd_kill_response(buf, &cpos, c);
 			backslashes = countBackSlashes(buf, cpos);
 
+		} else if (firstch == TRUE) {
+			/* clean the buffer on the first char typed */
+			unkeystroke(c);
+			c = killc;
+			goto killit;
+
 		} else if (c == quotec && quotef == FALSE) {
 			quotef = TRUE;
 			show1Char(c);
 			continue;	/* keep firstch==TRUE */
 
 		} else {
-			if (firstch == TRUE) {
-				/* clean the buffer on the first char typed */
-				unkeystroke(c);
-				c = killc;
-				goto killit;
-			}
 
 			if (EscOrQuo
 			 || !expandChar(buf, bufn, &cpos, c, options)) {

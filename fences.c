@@ -7,7 +7,7 @@
  * Most code probably by Dan Lawrence or Dave Conroy for MicroEMACS
  * Extensions for vile by Paul Fox
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/fences.c,v 1.34 1995/07/27 14:13:40 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/fences.c,v 1.35 1995/12/06 00:01:28 pgf Exp $
  *
  */
 
@@ -453,6 +453,7 @@ int rch;
 	register int count; /* current fence level count */
 	register char c;	/* current character in scan */
 	int dir, lch;
+	int backcharfailed = FALSE;
 
 	/* get the matching left-fence char, if it exists */
 	lch = is_user_fence(rch, &dir);
@@ -477,13 +478,16 @@ int rch;
 			++count;
 		if (c == lch)
 			--count;
-		if (backchar(FALSE, 1) != TRUE)
+		if (backchar(FALSE, 1) != TRUE) {
+			backcharfailed = TRUE;
 			break;
+		}
 	}
 
 	/* if count is zero, we have a match, display the sucker */
 	if (count == 0) {
-		forwchar(FALSE, 1);
+		if (!backcharfailed)
+			forwchar(FALSE, 1);
 		if (update(FALSE) == TRUE)
 		/* the idea is to leave the cursor there for about a
 			quarter of a second */

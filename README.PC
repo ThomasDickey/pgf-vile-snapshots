@@ -9,6 +9,8 @@ DOS information
 under DOS, you're best off using a DOS extender of some kind.  either
 the Watcom or DJGPP compiler suites may be used -- DJGPP gives you a
 faster executable, but the Watcom compiler is about 10 times faster.
+currently (version 5.2 and 5.5) the djgpp compiler causes spawning a
+subshell for filtering purposes to fail, and the editor to crash.
 you can use Turbo or Borland C as well, but neither of those support an
 extender, so you end up only being able to edit files that fit in memory.
 if you do this, be sure to '#define SMALLER 1' in estruct.h, to save as
@@ -74,5 +76,5 @@ a console-mode only port.
 paul fox, pgf@foxharp.boston.ma.us (home)
 
 ------------------------
-$Header: /usr/build/VCS/pgf-vile/RCS/README.PC,v 1.8 1995/11/21 14:06:53 pgf Exp $
+$Header: /usr/build/VCS/pgf-vile/RCS/README.PC,v 1.9 1995/12/07 14:02:45 pgf Exp $
 ------------------------

@@ -5,7 +5,7 @@
  * functions use hints that are left in the windows by the commands.
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/display.c,v 1.205 1995/11/17 04:03:42 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/display.c,v 1.206 1995/12/05 23:27:20 pgf Exp $
  *
  */
 
@@ -1698,13 +1698,24 @@ line_height(wp, lp)
 WINDOW	*wp;
 LINEPTR	lp;
 {
+	int hi = 1;
 	if (w_val(wp,WMDLINEWRAP)) {
 		int	len = lLength(lp);
 		if (len > 0) {
-			return (offs2col(wp,lp,len) / term.t_ncol) + 1;
+			int col = offs2col(wp,lp,len) - 1;
+			if (wp->w_traits.insmode
+			 && same_ptr(lp, DOT.l)
+			 && len <= DOT.o) {
+				col++;
+				if (w_val(wp,WMDLIST))
+					col++;
+			} else if (w_val(wp,WMDLIST)) {
+				col += 2;
+			}
+			hi = (col / term.t_ncol) + 1;
 		}
 	}
-	return 1;
+	return hi;
 }
 #endif
 

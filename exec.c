@@ -4,7 +4,7 @@
  *	written 1986 by Daniel Lawrence
  * 	much modified since then.  assign no blame to him.  -pgf
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/exec.c,v 1.114 1995/09/14 02:20:01 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/exec.c,v 1.115 1995/12/12 16:56:46 pgf Exp $
  *
  */
 
@@ -476,9 +476,18 @@ seems like we need one more check here -- is it from a .exrc file?
 	isnamedcmd = FALSE;
 	regionshape = EXACT;
 
-	if (flags & NOMOVE) {	/* don't use this if the command modifies! */
-		DOT = save_DOT;
-		curwp->w_flag &= ~WFMOVE;
+	/* don't use this if the command modifies! */
+	if (flags & NOMOVE) {
+		if (!samepoint(DOT, save_DOT)) {
+			DOT = save_DOT;
+			/* if an update() was called somewhere along
+			   the way (as a result of mlyesno, for instance),
+			   then we _have_ moved, so resetting DOT to
+			   it's first value constitutes another one. */
+			/* i think at worst this means an extra call to
+			   reframe...  */
+			curwp->w_flag |= WFMOVE;
+		}
 	}
 
 	return status;
