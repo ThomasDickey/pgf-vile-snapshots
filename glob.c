@@ -17,7 +17,10 @@
  *	modify (ifdef-style) 'expand_leaf()' to allow ellipsis.
  *
  * $Log: glob.c,v $
- * Revision 1.5  1993/04/22 11:08:03  pgf
+ * Revision 1.6  1993/04/28 14:34:11  pgf
+ * see CHANGES, 3.44 (tom)
+ *
+ * Revision 1.5  1993/04/22  11:08:03  pgf
  * suppress some "may be used before set" warnings
  *
  * Revision 1.4  1993/04/21  16:10:08  pgf
@@ -605,7 +608,7 @@ char	*item;
 		result = record_a_match(pattern);
 	}
 #endif				/* UNIX-style globbing */
-#if MSDOS
+#if MSDOS && !UNIX_GLOBBING
 	/* native DOS-wildcards */
 	DeclareFind(p);
 	char	temp[FILENAME_MAX + 1];

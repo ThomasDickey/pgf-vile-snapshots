@@ -10,7 +10,10 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.109  1993/04/21 15:41:27  pgf
+ * Revision 1.110  1993/04/28 14:34:11  pgf
+ * see CHANGES, 3.44 (tom)
+ *
+ * Revision 1.109  1993/04/21  15:41:27  pgf
  * changed NAMEC from SPACE to TAB
  *
  * Revision 1.108  1993/04/20  12:18:32  pgf
@@ -671,11 +674,9 @@
 /* (But I think X11 may honor colors from the command line or .Xdefaults) */
 /* (and DOS definitely does do things with COLOR, but it may not work) */
 #define	COLOR	0	/* color commands and windows			*/
-#define	CLRMSG	0	/* space clears the message line with no insert	*/
 
 /* Feature turnon/turnoff */
 #define ANSI_SPEC	1 /* ANSI function/arrow keys */
-#define	CTRLZ	0	/* add a ^Z at end of files under MSDOS only	*/
 #define	DOSFILES 1	/* turn on code for DOS mode (lines that end in crlf) */
 			/* use DOSFILES, for instance, if you edit DOS- */
 			/*	created files under UNIX		*/
@@ -709,7 +710,7 @@
 #define	SCROLLCODE 1	/* code in display.c for scrolling the screen.
 			   Only useful if your display can scroll
 			   regions, or at least insert/delete lines. 
-			   ANSI, TERMCAP, and AT386 can do this		 */
+			   ANSI, TERMCAP, IBMPC, VMSVT and AT386 can do this */
 #define CVMVAS	1	/* arguments to forward/back page and half page */
 			/* are in pages	instead of rows */
 #define PRETTIER_SCROLL 1 /* can improve the appearance of a scrolling screen */
@@ -740,6 +741,17 @@
 
 #include <sys/types.h>
 #include <stdio.h>
+
+#include <errno.h>
+#if VMS
+#include <perror.h>	/* defines 'sys_errlist[]' */
+#endif
+#if UNIX
+extern	int	errno;	/* some systems don't define this in <errno.h> */
+extern	int	sys_nerr;
+extern	char *	sys_errlist[];
+#endif
+#define	set_errno(code)	errno = code
 
 /* use 'size_t' if we have it */
 #if POSIX || APOLLO || TURBO || VMS
@@ -911,13 +923,21 @@ union REGS {
 
 /*	internal constants	*/
 
+#if MSDOS
+#define	BITS_PER_INT	16
+#endif
+
+#ifndef	BITS_PER_INT
+#define	BITS_PER_INT	32
+#endif
+
 #define	NBINDS	100			/* max # of bound prefixed keys	*/
 #define NFILEN	256			/* # of bytes, file name	*/
 #define NBUFN	20			/* # of bytes, buffer name	*/
 #define NLINE	256			/* # of bytes, input line	*/
 #define	NSTRING	128			/* # of bytes, string buffers	*/
 #define NPAT	128			/* # of bytes, pattern		*/
-#define HUGE	60000			/* Huge number			*/
+#define HUGE	(1<<(BITS_PER_INT-2))	/* Huge number			*/
 #define	NLOCKS	100			/* max # of file locks active	*/
 #define	NCOLORS	8			/* number of supported colors	*/
 #define	KBLOCK	256			/* sizeof kill buffer chunks	*/
@@ -971,12 +991,13 @@ union REGS {
 #define	TESTC		'?'	/* char for testing name-completion */
 
 /* kbd_string options */
-#define KBD_EXPAND	1	/* do we want to expand %, #, : */
-#define KBD_QUOTES	2	/* do we add and delete '\' chars for the caller */
-#define	KBD_LOWERC	4	/* do we force input to lowercase */
-#define KBD_NOEVAL	8	/* disable 'tokval()' (e.g., from buffer) */
-#define KBD_MAYBEC	0x10	/* may be completed -- or not */
-#define KBD_UPPERC      0x20	/* do we force input to uppercase */
+#define KBD_EXPAND	0x1	/* do we want to expand %, #, : */
+#define KBD_QUOTES	0x2	/* do we add and delete '\' chars for the caller */
+#define KBD_LOWERC	0x4	/* do we force input to lowercase */
+#define KBD_UPPERC	0x8	/* do we force input to uppercase */
+#define KBD_NOEVAL	0x10	/* disable 'tokval()' (e.g., from buffer) */
+#define KBD_MAYBEC	0x20	/* may be completed -- or not */
+#define KBD_NULLOK	0x40	/* may be empty -- or not */
 
 /* default option for 'mlreply' (used in modes.c also) */
 #if !MSDOS
@@ -1117,7 +1138,7 @@ typedef short CMASK;
 
 /* these intentionally match the ctypes.h definitions, except that
 	they force the char to 7-bit ascii first */
-#define istype(sometype,c)	(_chartypes_[(c)&(N_chars-1)] & (sometype))
+#define istype(sometype,c)	((_chartypes_[(c)&(N_chars-1)] & (sometype))!=0)
 #define islower(c)	istype(_lower, c)
 #define isupper(c)	istype(_upper, c)
 #define isdigit(c)	istype(_digit, c)
@@ -1152,29 +1173,6 @@ typedef short CMASK;
 
 #define ESC	tocntrl('[')
 #define BEL	tocntrl('G')	/* ascii bell character		*/
-
-/*	Dynamic RAM tracking and reporting redefinitions	*/
-
-#if	RAMSIZE
-#define	malloc	allocate
-#define	free	release
-#endif
-
-#if VMALLOC
-char *vmalloc();
-void vfree();
-void rvverify();
-char *vrealloc();
-char *vcalloc();
-void vdump();
-# define malloc(x) vmalloc(x,__FILE__,__LINE__)
-# define free(x) vfree(x,__FILE__,__LINE__)
-# define realloc(x,y) vrealloc(x,y,__FILE__,__LINE__)
-# define calloc(x,y) vcalloc(x,y,__FILE__,__LINE__)
-# define vverify(s) rvverify(s,__FILE__,__LINE__)
-#else
-# define vverify(s) ;
-#endif
 
 /*
  * Definitions etc. for regexp(3) routines.
@@ -1223,6 +1221,12 @@ typedef	struct	_tbuff	{
 	} TBUFF;
 
 /*
+ * Line and column primitive types
+ */
+typedef	long	L_NUM;
+typedef	int	C_NUM;
+
+/*
  * All text is kept in circularly linked lists of "LINE" structures. These
  * begin at the header line. This line is pointed to by the "BUFFER".
  * Each line contains:
@@ -1241,7 +1245,7 @@ typedef struct	LINE {
 	int	l_used;			/* Used size			*/
 	char *	l_text;			/* The data for this line	*/
 #if !SMALLER
-	int	l_number;		/* line-# iff b_numlines > 0	*/
+	L_NUM	l_number;		/* line-# iff b_numlines > 0	*/
 #endif
 	union {
 	    struct  LINE *l_stklnk;	/* Link for undo stack		*/
@@ -1282,7 +1286,7 @@ typedef struct	LINE {
 /* marks are a line and an offset into that line */
 typedef struct MARK {
 	LINE *l;
-	int o;
+	C_NUM o;
 } MARK;
 
 /* some macros that take marks as arguments */
@@ -1408,7 +1412,7 @@ typedef struct	BUFFER {
 	struct	W_TRAITS b_wtraits;	/* saved window traits, while we're */
 					/*  not displayed		*/
 	long	b_bytecount;		/* # of chars			*/
-	long	b_linecount;		/* no. lines as of last read/write */
+	L_NUM	b_linecount;		/* no. lines as of last read/write */
 	LINE 	*b_udstks[2];		/* undo stack pointers		*/
 	MARK 	b_uddot[2];		/* Link to "." before undoable op*/
 	short	b_udstkindx;		/* which of above to use	*/
@@ -1860,6 +1864,8 @@ typedef struct WHBLOCK {
  extern char *realloc();
 #  endif
 extern char *getenv();
+extern void exit P((int));
+extern void _exit P((int));
 # endif	/* APOLLO (special handling of lint vs __STDC__) */
 #endif	/* POSIX */
 
@@ -1946,3 +1952,24 @@ extern	void	dofree P((char *));
 #define	free(p)		dofree(p)
 #endif	/* DOALLOC */
 #endif	/* DBMALLOC */
+/*	Dynamic RAM tracking and reporting redefinitions	*/
+#if	RAMSIZE
+#define	malloc	allocate
+#define	free	release
+#endif
+
+#if VMALLOC
+extern	char *vmalloc P(( SIZE_T, char *, int ));
+extern	void vfree P(( unsigned char *, char *, int ));
+extern	void rvverify P(( char *, char *, int ));
+extern	char *vrealloc P(( unsigned char *, SIZE_T, char *, int ));
+extern	char *vcalloc P(( int, SIZE_T, char *, int ));
+extern	void vdump P(( char * ));
+# define malloc(x) vmalloc(x,__FILE__,__LINE__)
+# define free(x) vfree(x,__FILE__,__LINE__)
+# define realloc(x,y) vrealloc(x,y,__FILE__,__LINE__)
+# define calloc(x,y) vcalloc(x,y,__FILE__,__LINE__)
+# define vverify(s) rvverify(s,__FILE__,__LINE__)
+#else
+# define vverify(s) ;
+#endif

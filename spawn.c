@@ -2,7 +2,10 @@
  *		for MicroEMACS
  *
  * $Log: spawn.c,v $
- * Revision 1.48  1993/04/21 14:36:41  pgf
+ * Revision 1.49  1993/04/28 14:34:11  pgf
+ * see CHANGES, 3.44 (tom)
+ *
+ * Revision 1.48  1993/04/21  14:36:41  pgf
  * lint change
  *
  * Revision 1.47  1993/04/20  12:18:32  pgf
@@ -355,7 +358,8 @@ int f,n;
 	return spawn1(FALSE);
 }
 
-#if UNIX || VMS
+#if UNIX || MSDOS || VMS
+static	int	ShellPrompt P(( TBUFF **, char *, int ));
 static	TBUFF	*save_shell[2];
 
 /*
@@ -509,7 +513,7 @@ int rerun;
 			STargs = NULL;
 		else {
 			STargs = castalloc(char, strlen(tptr) + 2);
-/* first byte of STargs is the length of the string */
+			/* first byte of STargs is the length of the string */
 			STargs[0] = strlen(tptr);
 			STargs[1] = NULL; /* fake it for strcat */
 			(void)strcat(STargs,tptr);
@@ -568,7 +572,7 @@ int rerun;
         mlforce("[Not in CP/M-86]");
         return (FALSE);
 #endif
-#if     MSDOS | (ST520 & LATTICE)
+#if     MSDOS || (ST520 & LATTICE)
         register int    s;
         static char oline[NLINE];	/* command line send to shell */
 	char	line[NLINE];	/* command line send to shell */
@@ -590,7 +594,7 @@ int rerun;
 #endif
 }
 
-#if UNIX || VMS
+#if UNIX || MSDOS || VMS
 /*
  * Pipe a one line command into a window
  */
@@ -609,32 +613,15 @@ int f,n;
         s = ShellPrompt(&save_shell[!global_g_val(GMDSAMEBANGS)], line, -TRUE);
 	hst_flush();
 
-	if (s != TRUE)
-                return(s);
-
-	/* first check if we are already here */
-	bp = bfind(bname, OK_CREAT, 0);
-	if (bp == NULL)
-		return FALSE;
-
-	make_local_b_val(bp,MDCMOD);
-	set_b_val(bp,MDCMOD,FALSE);
-
-	make_local_b_val(bp,MDDOS);
-	set_b_val(bp,MDDOS,FALSE);
-
-	make_local_b_val(bp,MDVIEW);
-	set_b_val(bp,MDVIEW,TRUE);
-
-	/* and read the stuff in */
-	if (popupbuff(bp) != TRUE || 
-		swbuffer(bp) != TRUE ||
-		readin(line, FALSE, bp, TRUE) != TRUE) {
-		return(FALSE);
+	/* prompt ok? */
+	if (s == TRUE) {
+		if ((s = ((bp = bfind(bname, OK_CREAT, 0)) != NULL))
+		 && ((s = popupbuff(bp)) == TRUE)
+		 && ((s = swbuffer(bp)) == TRUE)
+		 && ((s = readin(line, FALSE, bp, TRUE)) == TRUE))
+			set_rdonly(bp, line);
 	}
-	ch_fname(bp, line);
-
-	return TRUE;
+	return (s);
 }
 
 #else /* ! UNIX */
@@ -650,7 +637,7 @@ pipecmd(f, n)
 	register BUFFER *bp;	/* pointer to buffer to zot */
         static char oline[NLINE];	/* command line send to shell */
         char	line[NLINE];	/* command line send to shell */
-	static char bname[] = ScratchName(output);
+	static char bname[] = ScratchName(Output);
 	WINDOW *ocurwp;		/* save the current window during delete */
 
 #if	AMIGA
@@ -660,23 +647,6 @@ pipecmd(f, n)
 	static char filnam[NSTRING] = "command";
 #endif
 
-#if	MSDOS
-	char *tmp;
-	FILE *fp;
-#endif
-
-#if	MSDOS
-	if ((tmp = getenv("TMP")) == NULL)
-		(void)strcpy(filnam, "command");
-	else {
-		(void)strcpy(filnam, tmp);
-                (void)strcat(filnam,"\\command");
-        }
-#endif
-#if     VMS
-	mlforce("[Not available under VMS]");
-	return(FALSE);
-#endif
 #if     CPM
         mlforce("[Not available under CP/M-86]");
         return(FALSE);
@@ -688,7 +658,7 @@ pipecmd(f, n)
 	(void)strcpy(line,oline);
 
 	/* get rid of the command output buffer if it exists */
-        if ((bp=bfind(bname, NO_CREAT, 0)) != FALSE) {
+        if ((bp=bfind(bname, NO_CREAT, 0)) != NULL) {
 		/* try to make sure we are off screen */
 		ocurwp = NULL;
 		for_each_window(wp) {
@@ -704,7 +674,6 @@ pipecmd(f, n)
 			}
 		}
 		if (zotbuf(bp) != TRUE)
-
 			return(FALSE);
 	}
 
@@ -717,42 +686,27 @@ pipecmd(f, n)
         Close(newcli);
         sgarbf = TRUE;
 #endif
-#if     MSDOS
-	(void)strcat(line," >>");
-	(void)strcat(line,filnam);
-	movecursor(term.t_nrow - 1, 0);
-	TTkclose();
-        system(line);
-	TTkopen();
-        sgarbf = TRUE;
-	if ((fp = fopen(filnam, "r")) == NULL) {
-		s = FALSE;
-	} else {
-		fclose(fp);
-		s = TRUE;
-	}
-#endif
-
 	if (s != TRUE)
 		return(s);
 
 	/* split the current window to make room for the command output */
 	if (splitwind(FALSE, 1) == FALSE)
-			return(FALSE);
+		return(FALSE);
 
 	/* and read the stuff in */
 	if (getfile(filnam, FALSE) == FALSE)
 		return(FALSE);
 
-	/* make this window in VIEW mode, update all mode lines */
+	/* overwrite its buffer name for consistency */
+	(void)strcpy(curbp->b_bname, bname);
+
+	/* make this window in VIEW mode, update buffer's mode lines */
 	make_local_b_val(curwp->w_bufp,MDVIEW);
 	set_b_val(curwp->w_bufp,MDVIEW,TRUE);
-	for_each_window(wp)
-		wp->w_flag |= WFMODE;
+	markWFMODE(curbp);
 
 #if FINDERR
-	(void)strcpy(febuff,ScratchName(Cmd Output));
-	newfebuff = TRUE;
+	set_febuff(bname);
 #endif
 
 	/* and get rid of the temporary file */

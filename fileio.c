@@ -3,7 +3,10 @@
  * the knowledge about files are here.
  *
  * $Log: fileio.c,v $
- * Revision 1.41  1993/04/20 12:18:32  pgf
+ * Revision 1.42  1993/04/28 14:34:11  pgf
+ * see CHANGES, 3.44 (tom)
+ *
+ * Revision 1.41  1993/04/20  12:18:32  pgf
  * see tom's 3.43 CHANGES
  *
  * Revision 1.40  1993/04/02  11:01:07  pgf
@@ -143,7 +146,6 @@
 #include        "edef.h"
 #if UNIX || VMS
 #include	<sys/stat.h>
-#include        <errno.h>
 #endif
 
 #if VMS
@@ -208,7 +210,7 @@ char    *fn;
 
 	if (isShellOrPipe(fn)) {
 		ffp = 0;
-#if UNIX
+#if UNIX || MSDOS
 	        ffp = npopen(fn+1, FOPEN_READ);
 #endif
 #if VMS
@@ -221,13 +223,14 @@ char    *fn;
 		fileispipe = TRUE;
 		count_fline = 0;
 
+	} else if (is_directory(fn)) {
+		set_errno(EISDIR);
+		return (FIOERR);
+
 	} else if ((ffp=fopen(fn, FOPEN_READ)) == NULL) {
-#if UNIX
-		extern	int	errno;
 		if (errno != ENOENT)
 			return (FIOERR);
-#endif
-                return (FIOFNF);
+		return (FIOFNF);
 	}
 
         return (FIOSUC);
@@ -241,28 +244,34 @@ int
 ffwopen(fn)
 char    *fn;
 {
-#if UNIX
-	char *name;
+#if UNIX || MSDOS
+	char	*name;
+	char	*what = "file";
+	char	*mode = FOPEN_WRITE;
+	char	*action = "writ";
 
 	if (isShellOrPipe(fn)) {
-	        if ((ffp=npopen(fn+1, FOPEN_WRITE)) == NULL) {
+		if ((ffp=npopen(fn+1, mode)) == NULL) {
 	                mlforce("[Cannot open pipe for writing]");
 			TTbeep();
 	                return (FIOERR);
 		}
 		fileispipe = TRUE;
-	} else if ((name = is_appendname(fn)) != NULL) {
-		if ((ffp=fopen(name, FOPEN_APPEND)) == NULL) {
-			mlforce("[Cannot open file for appending]");
+	} else {
+		if ((name = is_appendname(fn)) != NULL) {
+			fn = name;
+			mode = FOPEN_APPEND;
+			action = "append";
+		}
+		if (is_directory(fn)) {
+			set_errno(EISDIR);
+			what = "directory";
+		}
+		if (*what != 'f'
+		 || (ffp = fopen(fn, mode)) == NULL) {
+			mlforce("[Cannot open %s for %sing]", what, action);
 			TTbeep();
 			return (FIOERR);
-		}
-		fileispipe = FALSE;
-	} else {
-	        if ((ffp=fopen(fn, FOPEN_WRITE)) == NULL) {
-	                mlforce("[Cannot open file for writing]");
-			TTbeep();
-	                return (FIOERR);
 		}
 		fileispipe = FALSE;
 	}
@@ -275,7 +284,9 @@ char    *fn;
 	if ((s = strchr(fn = strcpy(temp, fn), ';')))	/* strip version */
 		*s = EOS;
 
-        if ((fd=creat(fn, 0666, "rfm=var", "rat=cr")) < 0
+	if (is_appendname(fn)
+	||  is_directory(fn)
+	|| (fd=creat(fn, 0666, "rfm=var", "rat=cr")) < 0
         || (ffp=fdopen(fd, FOPEN_WRITE)) == NULL) {
                 mlforce("[Cannot open file for writing]");
                 return (FIOERR);
@@ -380,16 +391,13 @@ ffclose()
 
 	free_fline();	/* free this since we do not need it anymore */
 
-#if UNIX | (MSDOS & (LATTICE | MSC | TURBO | ZTC))
-
-#if UNIX
+#if UNIX || MSDOS
 	if (fileispipe) {
 		npclose(ffp);
 		mlforce("[Read %d lines%s]",
 			count_fline,
 			interrupted ? "- Interrupted" : "");
 	} else
-#endif
 		s = fclose(ffp);
         if (s != 0) {
                 mlforce("[Error on close]");
@@ -449,21 +457,22 @@ int	do_cr;
 
         return (FIOSUC);
 }
+
 /*
- * Write a charto the already opened file.
+ * Write a char to the already opened file.
  * Return the status.
  */
 int
 ffputc(c)
 int c;
 {
-	c = char2int(c);
+	char	d = c;
 
 #if	CRYPT
 	if (cryptflag)
-		crypt(&c, 1);
+		crypt(&d, 1);
 #endif
-        fputc(c, ffp);
+	fputc(d, ffp);
 
         if (ferror(ffp)) {
                 mlforce("[Write I/O error]");
@@ -496,8 +505,8 @@ int *lenp;	/* to return the final length */
 			return(FIOMEM);
 
 	/* read the line in */
-        i = 0;
-        while ((c = fgetc(ffp)) != EOF && c != '\n') {
+	i = 0;
+	while ((c = fgetc(ffp)) != EOF && c != '\n') {
 		if (interrupted) {
 			free_fline();
 			*lenp = 0;

@@ -3,7 +3,10 @@
  *		5/9/86
  *
  * $Log: input.c,v $
- * Revision 1.71  1993/04/22 11:17:00  pgf
+ * Revision 1.72  1993/04/28 14:34:11  pgf
+ * see CHANGES, 3.44 (tom)
+ *
+ * Revision 1.71  1993/04/22  11:17:00  pgf
  * support for dotcmdkreg
  *
  * Revision 1.70  1993/04/21  14:08:04  pgf
@@ -1177,7 +1180,9 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 				continue;
 			}
 			kbd_unquery();
-			if ((done && !(options & KBD_MAYBEC))
+			if (done && (options & KBD_NULLOK) && cpos == 0)
+				;
+			else if ((done && !(options & KBD_MAYBEC))
 			 || (!EscOrQuo && (c == TESTC || c == NAMEC))) {
 				int	ok = ((*complete)(c, buf, &cpos));
 
@@ -1185,6 +1190,7 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 					done = TRUE;
 					if (c != NAMEC)	/* cancel the unget */
 						(void)tgetc(FALSE);
+					last_eolchar = c;
 				} else {
 					if (done) {	/* stay til matched! */
 						buf[cpos] = EOS;
@@ -1432,12 +1438,27 @@ int f;
 }
 
 /*
- *
+ * Test if we are replaying either '.' command, or keyboard macro.
  */
 int
-kbd_replaying()
+kbd_replaying(match)
+int	match;
 {
-	return (dotcmdmode == PLAY) || (kbdmode == PLAY);
+	if (dotcmdmode == PLAY) {
+		/*
+		 * Force a false-return if we are in insert-mode and have
+		 * only one character to display.
+		 */
+		if (match
+		 && insertmode == INSERT
+		 && b_val(curbp, MDSHOWMAT)
+		 && KbdStack == 0
+		 && (dotcmd->tb_last+1 >= dotcmd->tb_used)) {
+			return FALSE;
+		}
+		return TRUE;
+	}
+	return (kbdmode == PLAY);
 }
 
 /*

@@ -3,7 +3,10 @@
  * commands. There is no functional grouping here, for sure.
  *
  * $Log: random.c,v $
- * Revision 1.91  1993/04/20 12:18:32  pgf
+ * Revision 1.92  1993/04/28 14:34:11  pgf
+ * see CHANGES, 3.44 (tom)
+ *
+ * Revision 1.91  1993/04/20  12:18:32  pgf
  * see tom's 3.43 CHANGES
  *
  * Revision 1.90  1993/04/08  14:59:16  pgf
@@ -352,6 +355,41 @@ static	int	char2drive P(( int ));
 
 /*--------------------------------------------------------------------------*/
 
+/*
+ * Set default parameters for an automatically-generated, view-only buffer. 
+ * This is invoked after buffer creation, but usually before the buffer is
+ * loaded with text.
+ */
+void
+set_rdonly(bp, name)
+BUFFER	*bp;
+char	*name;
+{
+	if (bp->b_fname == 0
+	 || name == 0
+	 || strcmp(bp->b_fname, name) != 0) {
+		if (bp->b_fname)
+			free(bp->b_fname);
+		bp->b_fname = strmalloc(name);
+		bp->b_fnlen = strlen(bp->b_fname);
+	}
+
+	bp->b_flag &= ~BFCHG;		/* assumes text is loaded... */
+	bp->b_active = TRUE;
+
+	make_local_b_val(bp,MDVIEW);
+	set_b_val(bp,MDVIEW,TRUE);
+
+	make_local_b_val(bp,VAL_TAB);
+	set_b_val(bp,VAL_TAB,8);
+
+	make_local_b_val(bp,MDDOS);
+	set_b_val(bp,MDDOS,FALSE);
+
+	make_local_b_val(bp,MDCMOD);
+	set_b_val(bp,MDCMOD,FALSE);
+}
+
 /* generic "lister", which takes care of popping a window/buffer pair under
 	the given name, and calling "func" with a couple of args to fill in
 	the buffer */
@@ -382,21 +420,7 @@ char *carg;
 	(*func)(iarg,carg);
 	gotobob(FALSE,1);
 
-	if (bp->b_fname)
-		free(bp->b_fname);
-	bp->b_fname = strmalloc(non_filename());
-	bp->b_fnlen = strlen(bp->b_fname);
-	/* was ch_fname() */
-
-	bp->b_flag &= ~BFCHG;
-	bp->b_active = TRUE;
-	make_local_b_val(bp,MDVIEW);
-	set_b_val(bp,MDVIEW,TRUE);
-	make_local_b_val(bp,VAL_TAB);
-	set_b_val(bp,VAL_TAB,8);
-	make_local_b_val(bp,MDDOS);
-	set_b_val(bp,MDDOS,FALSE);
-
+	set_rdonly(bp, non_filename());
 	return TRUE;
 }
 

@@ -4,7 +4,10 @@
  *	Written (except for delins()) for vile by Paul Fox, (c)1990
  *
  * $Log: oneliner.c,v $
- * Revision 1.39  1993/04/01 12:53:33  pgf
+ * Revision 1.40  1993/04/28 14:34:11  pgf
+ * see CHANGES, 3.44 (tom)
+ *
+ * Revision 1.39  1993/04/01  12:53:33  pgf
  * removed redundant includes and declarations
  *
  * Revision 1.38  1993/03/08  10:53:17  pgf
@@ -193,18 +196,10 @@ int flag;
 		linep = lforw(linep);
 	} while (linep != region.r_end.l);
 
-	bp->b_flag &= ~BFCHG;
-        
-	strcpy(bp->b_bname,bname);
-	ch_fname(bp, "");
-
-	make_local_b_val(bp,MDVIEW);
-	set_b_val(bp,MDVIEW,TRUE);
-
-	make_local_b_val(bp,VAL_TAB);
+	(void)strcpy(bp->b_bname,bname);
+	set_rdonly(bp, "");
 	set_b_val(bp,VAL_TAB,tabstop_val(curbp));
 
-	bp->b_active = TRUE;
 	for_each_window(wp) {
 		if (wp->w_bufp == bp) {
 			make_local_w_val(wp,WMDLIST);

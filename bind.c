@@ -4,7 +4,10 @@
  *	written 11-feb-86 by Daniel Lawrence
  *
  * $Log: bind.c,v $
- * Revision 1.37  1993/04/21 15:40:40  pgf
+ * Revision 1.38  1993/04/28 14:34:11  pgf
+ * see CHANGES, 3.44 (tom)
+ *
+ * Revision 1.37  1993/04/21  15:40:40  pgf
  * change alternate eolchar for kbd_engl_stat to ' ', since NAMEC is now TAB
  *
  * Revision 1.36  1993/04/20  12:18:32  pgf
@@ -185,14 +188,10 @@ int f,n;
 			return(FALSE);
 		}
 		(void)strcpy(bp->b_bname, ScratchName(Help));
-		ch_fname(bp, non_filename());
+		set_rdonly(bp, non_filename());
 
-		make_local_b_val(bp,MDVIEW);	/* make it readonly, */
-		set_b_val(bp,MDVIEW,TRUE);
 		make_local_b_val(bp,MDIGNCASE); /* easy to search, */
 		set_b_val(bp,MDIGNCASE,TRUE);
-		make_local_b_val(bp,VAL_TAB);	/* and tabbed by 8 */
-		set_b_val(bp,VAL_TAB,8);
 		bp->b_flag |= BFSCRTCH;
 	}
 	return swbuffer(bp);
@@ -1300,6 +1299,8 @@ kbd_engl_stat(prompt, buffer)
 char	*prompt;
 char	*buffer;
 {
+	int	kbd_flags = KBD_NULLOK|((NAMEC != ' ') ? 0 : KBD_MAYBEC);
+
 	*buffer = EOS;
 	return kbd_reply(
 		prompt,		/* no-prompt => splice */
@@ -1307,6 +1308,6 @@ char	*buffer;
 		NLINE,		/* sizeof(buffer) */
 		eol_command,
 		' ',
-		KBD_MAYBEC,	/* allow blank-return */
+		kbd_flags,	/* allow blank-return */
 		cmd_complete);
 }

@@ -66,7 +66,7 @@ DESTDIR2 = $(HOME)/bin
 REMOTE=gutso!foxharp
 
 #CC = gcc
-#OPTFLAGS = -g -Wall -Wshadow # -pg
+#OPTFLAGS = -g -O -Wall -Wshadow # -pg
 
 CC = cc
 #OPTFLAGS = -g
@@ -505,7 +505,7 @@ $(EVERYTHING):
 	$(CO) -r$(revision) $@
 
 
-$(OBJ): estruct.h nemode.h edef.h # proto.h
+$(OBJ): estruct.h nemode.h edef.h proto.h
 
 ALWAYS:
 
@@ -521,7 +521,13 @@ random.$O:	glob.h
 vmalloc$O:	nevars.h
 
 # $Log: makefile,v $
-# Revision 1.100  1993/04/20 12:18:32  pgf
+# Revision 1.102  1993/04/28 14:34:11  pgf
+# see CHANGES, 3.44 (tom)
+#
+# Revision 1.101  1993/04/28  09:42:25  pgf
+# add -O back into gcc optflags, so gcc will warn of unused variables
+#
+# Revision 1.100  1993/04/20  12:18:32  pgf
 # see tom's 3.43 CHANGES
 #
 # Revision 1.99  1993/04/02  15:23:36  pgf

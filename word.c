@@ -4,7 +4,10 @@
  * do any sentence mode commands, they are likely to be put in this file. 
  *
  * $Log: word.c,v $
- * Revision 1.25  1993/04/01 12:53:33  pgf
+ * Revision 1.26  1993/04/28 14:34:11  pgf
+ * see CHANGES, 3.44 (tom)
+ *
+ * Revision 1.25  1993/04/01  12:53:33  pgf
  * removed redundant includes and declarations
  *
  * Revision 1.24  1993/03/05  17:50:54  pgf
@@ -572,7 +575,7 @@ wordcount(f, n)
 		}
 
 		/* and tabulate it */
-		if ((wordflag = isident(ch)) && !lastword)
+		if (((wordflag = isident(ch)) != 0) && !lastword)
 			++nwords;
 		lastword = wordflag;
 		++nchars;

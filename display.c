@@ -6,7 +6,10 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.79  1993/04/20 12:18:32  pgf
+ * Revision 1.80  1993/04/28 14:34:11  pgf
+ * see CHANGES, 3.44 (tom)
+ *
+ * Revision 1.79  1993/04/20  12:18:32  pgf
  * see tom's 3.43 CHANGES
  *
  * Revision 1.78  1993/04/20  12:03:35  pgf
@@ -881,7 +884,7 @@ int force;	/* force update past type ahead? */
 		return SORTOFTRUE;
 #endif
 #if	VISMAC == 0
-	if (force == FALSE && (dotcmdmode != PLAY) && (get_recorded_char(FALSE) != -1))
+	if (force == FALSE && kbd_replaying(TRUE) && (get_recorded_char(FALSE) != -1))
 		return SORTOFTRUE;
 #endif
 
@@ -1977,7 +1980,7 @@ va_dcl
 {
 	va_list ap;
 	/* if we are not currently echoing on the command line, abort this */
-	if (global_b_val(MDTERSE) || kbd_replaying() || discmd == FALSE) {
+	if (global_b_val(MDTERSE) || kbd_replaying(FALSE) || discmd == FALSE) {
 		movecursor(term.t_nrow, 0);
 		return;
 	}
@@ -2120,6 +2123,19 @@ va_list *app;	/* ptr to current data field */
 	TTflush();
 	mpresf = TRUE;
 	mlsave[0] = '\0';
+}
+
+/*
+ * Do the equivalent of 'perror()' on the message line
+ */
+void
+mlerror(s)
+char	*s;
+{
+#if UNIX || TURBO || VMS
+	if (errno > 0 && errno < sys_nerr)
+		mlforce("[%s: %s]", s, sys_errlist[errno]);
+#endif
 }
 
 /*
@@ -2322,7 +2338,6 @@ sizesignal(signo)
 int signo;
 {
 	int w, h;
-	extern int errno;
 	int old_errno = errno;
 
 	getscreensize (&w, &h);

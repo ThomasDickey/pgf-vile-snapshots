@@ -4,7 +4,10 @@
  * All operating systems.
  *
  * $Log: termio.c,v $
- * Revision 1.64  1993/04/20 12:00:37  pgf
+ * Revision 1.65  1993/04/28 14:34:11  pgf
+ * see CHANGES, 3.44 (tom)
+ *
+ * Revision 1.64  1993/04/20  12:00:37  pgf
  * AIX needs sys/ioctl.h
  *
  * Revision 1.63  1993/04/02  11:02:50  pgf
@@ -216,8 +219,6 @@
 #include        "edef.h"
 
 #if UNIX
-#include	<errno.h>
-extern int errno;
 
 /* there are three copies of the tt...() routines here -- one each for
 	POSIX termios, traditional termio, and sgtty.  If you have a

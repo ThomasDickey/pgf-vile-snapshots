@@ -1,3 +1,80 @@
+Changes for vile 3.44:
+(pgf)
+	+ fixed indentation if openup used in cmode, with a single word on
+	  the current line -- indentation was coming from the _next_ line,
+	  instead (insert.c).
+
+	+ finderrbuf() now remembers its last argument (finderr.c)
+
+Changes for vile 3.44:
+(tom)
+	+ corrected file descrip.mms; the vms_link.opt file no longer applies
+	  to mktbls.exe; also fixed 'clobber' rule.
+
+	+ corrected file glob.c (don't treat '$' as a wildcard on vms).
+
+	+ correction: moved call on 'global_val_init()' before
+	  'expand_wild_args()', to make wildcard globbing work on vms and
+	  ms-dos (file main.c).
+
+	+ corrected logic of 'kbd_reply()'; last_eolchar was not being set
+	  properly when NAMEC wasn't space (file input.c).
+
+	+ modified 'kbd_engl_stat()' in file bind.c so that if NAMEC is not
+	  bound to space, then name-completion for :-commands is turned on.
+
+	+ added option KBD_NULLOK to 'kbd_reply()' and used it in function
+	  'kbd_engl_stat()' to re-allow commands to be empty (files bind.c,
+	  input.c, estruct.h), needed after decoupling NAMEC and space.
+
+	+ corrected 'slowreadf()' in file file.c so that dos-mode files are
+	  read properly.  (The code stripped CR's even when dos-mode wasn't
+	  set).
+
+	+ implemented 'npopen()' and 'npclose()' for MSDOS; used this to make
+	  MSDOS logic for ^X-!  the same as on UNIX (modified files fileio.c,
+	  npopen.c, spawn.c).
+
+	+ modified 'makename()' to yield essentially the same result for
+	  MSDOS as for UNIX (in file.c), because 'npopen()' works similarly.
+
+	+ added tests in 'ffropen()' and 'ffwopen()' to prevent accidentally
+	  opening a directory-file.
+
+	+ corrected handling of FIOFNF in 'readin()'; made this work on MSDOS
+	  as well as UNIX (files file.c, fileio.c, display.c).  The value of
+	  'errno' was not being saved to report in the error message.  Added
+	  'mlerror()' to display.c to encapsulate the error reporting better.
+
+	+ moved 'errno' declarations into 'estruct.h' (files display.c, file.c,
+	  npopen.c, termio.c).
+
+	+ added function 'set_febuff()' to encapsulate the 'febuff[]' and
+	  'newfebuff' variables; moved these to finderr.c (files file.c,
+	  finderr.c, spawn.c).
+
+	+ corrected test in 'filename()' (file.c) for ":f" command.
+
+	+ corrected test in filec.c for pre-existing file (don't prompt if it
+	  is a pipe-command).
+
+	+ corrected tests in filec.c for prompt for re-read (didn't look for
+	  abort-status).
+
+	+ test-compiled CRYPT, VMALLOC configuration flags on TurboC.  Modified
+	  files crypt.c, estruct.h, vmalloc.c
+
+	+ began addressing TurboC warnings for conversion between long/int.
+
+	+ deleted obsolete defines in file estruct.h (CLRMSG, CTRLZ).
+
+	+ added 'set_rdonly()' to encapsulate the places where an automatically
+	  created buffer is made read-only.  This makes them more consistent.
+	  Files: bind.c, exec.c, main.c, oneliner.c, random.c, spawn.c
+
+	+ modified 'update()' in file display.c so that '.' commands don't
+	  redisplay if VISMAC is configured (previously, only keyboard macro
+	  redisplay was suppressed).
 
 Changes for vile 3.43:
 (pgf)

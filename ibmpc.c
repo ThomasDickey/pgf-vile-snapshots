@@ -7,7 +7,10 @@
  * display type.
  *
  * $Log: ibmpc.c,v $
- * Revision 1.12  1993/04/20 12:18:32  pgf
+ * Revision 1.13  1993/04/28 14:34:11  pgf
+ * see CHANGES, 3.44 (tom)
+ *
+ * Revision 1.12  1993/04/20  12:18:32  pgf
  * see tom's 3.43 CHANGES
  *
  * Revision 1.11  1993/04/02  09:48:48  pgf
@@ -643,8 +646,4 @@ int f,n;	/* default flag, numeric argument [unused] */
 }
 #endif
 
-#else
-ibmhello()
-{
-}
-#endif
+#endif	/* IBMPC */
