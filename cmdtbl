@@ -71,7 +71,10 @@
 #		here for completeness.
 #
 # $Log: cmdtbl,v $
-# Revision 1.36  1992/03/19 23:42:49  pgf
+# Revision 1.37  1992/05/25 21:06:46  foxharp
+# emacs --> vile !!  (about time)
+#
+# Revision 1.36  1992/03/19  23:42:49  pgf
 # took out scrsearchforwword stuff -- macros can handle i
 #
 # Revision 1.35  1992/03/13  08:10:37  pgf
@@ -274,7 +277,7 @@ bindkey		NONE			REBIND
 	"bind-key"
 	"rebind-key"
 bktoshell	NONE			UNIX&&defined(SIGTSTP)
-	"suspend-emacs"			!FEWNAMES
+	"suspend-vile"			!FEWNAMES
 	'^Z'
 cd		NONE
 	"cd"

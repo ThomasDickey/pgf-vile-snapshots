@@ -151,8 +151,9 @@ MISCELLANEOUS
 	easily to a R6000, linux, 386bsd, Sony NeWS, NeXT, and the UNIXPC. 
 	it's close to lint-free, and Saber has very few problems with the
 	code.  it'll now use prototypes if __STDC__ is defined, and it
-	passes gcc -Wall -Wshadow with no warnings.  the code should now be
-	more portable, to various compilers and systems.  there are new
+	passes gcc -Wall -Wshadow with no warnings, if you ignore implicit
+	declarations of system calls and lib routines.  the code should now
+	be more portable, to various compilers and systems.  there are new
 	targets in the makefile to make building on various platforms
 	easier.  the makefile even supports microsoft C, even if the code
 	doesn't quite yet.

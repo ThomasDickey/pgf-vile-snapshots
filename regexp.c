@@ -13,7 +13,10 @@
  *		pgf, 11/91
  * 
  * $Log: regexp.c,v $
- * Revision 1.25  1992/05/19 23:46:09  pgf
+ * Revision 1.26  1992/05/25 21:44:45  foxharp
+ * moved func declarations to header
+ *
+ * Revision 1.25  1992/05/19  23:46:09  pgf
  * took newline out of the \W, \D, and \p matches
  *
  * Revision 1.24  1992/05/19  23:24:27  foxharp
@@ -349,7 +352,6 @@ int magic;
 	int flags;
 	static char *exp;
 	static int explen;
-	extern char *malloc();
 
 	if (origexp == NULL)
 		FAIL("NULL argument");
@@ -1125,7 +1127,6 @@ char *prog;
 {
 	register char *scan;	/* Current node. */
 	char *next;		/* Next node. */
-	extern char *regstrchr();
 
 	scan = prog;
 #ifdef REGDEBUG

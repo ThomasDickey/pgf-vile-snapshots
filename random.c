@@ -3,7 +3,10 @@
  * commands. There is no functional grouping here, for sure.
  *
  * $Log: random.c,v $
- * Revision 1.61  1992/05/20 18:55:08  foxharp
+ * Revision 1.62  1992/05/25 21:07:48  foxharp
+ * extern func declarations moved to header
+ *
+ * Revision 1.61  1992/05/20  18:55:08  foxharp
  * better confirmation output from cd command
  *
  * Revision 1.60  1992/05/19  08:55:44  foxharp
@@ -1045,8 +1048,6 @@ ins()
 	int f,n;
 	int (*execfunc)();		/* ptr to function to execute */
 	int    c;		/* command character */
-	extern int quote(), backspace(), tab(), newline(), nullproc();
-	extern int shiftwidth();
 	int newlineyet = FALSE; /* are we on the line we started on? */
 	int startoff = DOT.o;	/* starting offset on that line */
 
@@ -1168,7 +1169,6 @@ ins()
 
 #if UNIX && defined(SIGTSTP)	/* job control, ^Z */
 			} else if (c == suspc) {
-				extern int bktoshell();
 				execfunc = bktoshell;
 
 #endif
@@ -1757,7 +1757,6 @@ register struct VAL *values;
 	int rplen = 0;
 	int no;
 	int nval, s;
-	extern char *strmalloc();
 
 	no = 0;
 	if (strncmp(cp, "no", 2) == 0) {
@@ -2356,7 +2355,6 @@ current_directory()
 	fclose(f);
 	cwd = dirname;
 #else
-	extern char	*getwd(), *getcwd();
 	static char	dirname[NFILEN*2];
 # if MSDOS & MSC
 	cwd = getcwd(dirname, NFILEN*2);

@@ -4,7 +4,10 @@
  * All operating systems.
  *
  * $Log: termio.c,v $
- * Revision 1.34  1992/05/20 18:55:42  foxharp
+ * Revision 1.36  1992/05/25 21:34:29  foxharp
+ * moved extern func declarations to header
+ *
+ * Revision 1.34  1992/05/20  18:55:42  foxharp
  * don't use fcntl on a/ux, either
  *
  * Revision 1.33  1992/05/16  12:00:31  pgf
@@ -246,7 +249,6 @@ ttopen()
 #endif
 
 	{ /* this could probably be done more POSIX'ish? */
-	extern	SIGT rtfrmshell();
 	signal(SIGTSTP,SIG_DFL);	/* set signals so that we can */
 	signal(SIGCONT,rtfrmshell);	/* suspend & restart */
 	signal(SIGTTOU,SIG_IGN);	/* ignore output prevention */
@@ -378,7 +380,6 @@ ttopen()
 #  endif
 # endif
 	{
-	extern	SIGT rtfrmshell();	/* return from suspended shell */
 	signal(SIGTSTP,SIG_DFL);	/* set signals so that we can */
 	signal(SIGCONT,rtfrmshell);	/* suspend & restart */
 	signal(SIGTTOU,SIG_IGN);	/* ignore output prevention */
@@ -511,7 +512,6 @@ ttopen()
 #endif
 #if ! X11
 	{
-	extern	SIGT rtfrmshell();	/* return from suspended shell */
 	signal(SIGTSTP,SIG_DFL);	/* set signals so that we can */
 	signal(SIGCONT,rtfrmshell);	/* suspend & restart */
 	signal(SIGTTOU,SIG_IGN);	/* ignore output prevention */

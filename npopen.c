@@ -2,7 +2,10 @@
  *		written by John Hutchinson, heavily modified by Paul Fox
  *
  * $Log: npopen.c,v $
- * Revision 1.12  1992/05/16 12:00:31  pgf
+ * Revision 1.13  1992/05/25 21:07:48  foxharp
+ * extern func declarations moved to header
+ *
+ * Revision 1.12  1992/05/16  12:00:31  pgf
  * prototypes/ansi/void-int stuff/microsoftC
  *
  * Revision 1.11  1992/03/25  19:13:17  pgf
@@ -55,8 +58,6 @@
 
 #define R 0
 #define W 1
-
-extern char *getenv();
 
 static int pid;
 

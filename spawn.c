@@ -2,7 +2,10 @@
  *		for MicroEMACS
  *
  * $Log: spawn.c,v $
- * Revision 1.23  1992/05/19 08:55:44  foxharp
+ * Revision 1.25  1992/05/25 21:34:29  foxharp
+ * added f,n args to bktoshell command
+ *
+ * Revision 1.23  1992/05/19  08:55:44  foxharp
  * more prototype and shadowed decl fixups
  *
  * Revision 1.22  1992/05/16  14:02:55  pgf
@@ -212,8 +215,10 @@ int f,n;
 
 #if UNIX && defined(SIGTSTP)
 
+/* ARGSUSED */
 int
-bktoshell()		/* suspend and wait to wake up */
+bktoshell(f,n)		/* suspend and wait to wake up */
+int f,n;
 {
 #if     NeWS
 	mlforce("[Not availible under NeWS]");

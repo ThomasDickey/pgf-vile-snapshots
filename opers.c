@@ -4,7 +4,10 @@
  * written for vile by Paul Fox, (c)1990
  *
  * $Log: opers.c,v $
- * Revision 1.20  1992/05/16 12:00:31  pgf
+ * Revision 1.21  1992/05/25 21:07:48  foxharp
+ * extern func declarations moved to header
+ *
+ * Revision 1.20  1992/05/16  12:00:31  pgf
  * prototypes/ansi/void-int stuff/microsoftC
  *
  * Revision 1.19  1992/01/06  23:09:33  pgf
@@ -197,8 +200,6 @@ int
 operdel(f,n)
 int f,n;
 {
-	extern int killregion();
-
 	opcmd = OPDEL;
 	return operator(f,n,killregion,"Delete");
 }
@@ -207,8 +208,6 @@ int
 operlinedel(f,n)
 int f,n;
 {
-	extern int killregion();
-
 	fulllineregions = TRUE;
 	opcmd = OPDEL;
 	return operator(f,n,killregion,"Delete of full lines");
@@ -256,7 +255,6 @@ int
 operyank(f,n)
 int f,n;
 {
-	extern int yankregion();
 	opcmd = OPOTHER;
 	return operator(f,n,yankregion,"Yank");
 }
@@ -265,8 +263,6 @@ int
 operlineyank(f,n)
 int f,n;
 {
-	extern int yankregion();
-
 	fulllineregions = TRUE;
 	opcmd = OPOTHER;
 	return operator(f,n,yankregion,"Yank of full lines");
@@ -276,8 +272,6 @@ int
 operflip(f,n)
 int f,n;
 {
-	extern int flipregion();
-
 	opcmd = OPOTHER;
 	return operator(f,n,flipregion,"Flip case");
 }
@@ -286,8 +280,6 @@ int
 operupper(f,n)
 int f,n;
 {
-	extern int upperregion();
-
 	opcmd = OPOTHER;
 	return operator(f,n,upperregion,"Upper case");
 }
@@ -296,8 +288,6 @@ int
 operlower(f,n)
 int f,n;
 {
-	extern int lowerregion();
-
 	opcmd = OPOTHER;
 	return operator(f,n,lowerregion,"Lower case");
 }
@@ -307,8 +297,6 @@ int
 operlshift(f,n)
 int f,n;
 {
-	extern int shiftlregion();
-
 	fulllineregions = TRUE;
 	opcmd = OPOTHER;
 	return operator(f,n,shiftlregion,"Left shift");
@@ -318,8 +306,6 @@ int
 operrshift(f,n)
 int f,n;
 {
-	extern int shiftrregion();
-
 	fulllineregions = TRUE;
 	opcmd = OPOTHER;
 	return operator(f,n,shiftrregion,"Right shift");
@@ -331,8 +317,6 @@ int f,n;
 {
         register int    s;
         static char fname[NFILEN];
-	extern int writeregion();
-
 	if (ukb != 0) {
 	        if ((s=mlreply("Write to file: ", fname, NFILEN)) != TRUE)
 	                return s;
@@ -347,8 +331,6 @@ int
 operformat(f,n)
 int f,n;
 {
-	extern int formatregion();
-
 	fulllineregions = TRUE;
 	opcmd = OPOTHER;
 	return operator(f,n,formatregion,"Format");
@@ -358,8 +340,6 @@ int
 operfilter(f,n)
 int f,n;
 {
-	extern int filterregion();
-
 	fulllineregions = TRUE;
 	opcmd = OPOTHER;
 	return operator(f,n,filterregion,"Filter");
@@ -370,8 +350,6 @@ int
 operprint(f,n)
 int f,n;
 {
-	extern int plineregion();
-
 	fulllineregions = TRUE;
 	opcmd = OPOTHER;
 	return operator(f,n,plineregion,"Line print");
@@ -381,8 +359,6 @@ int
 operlist(f,n)
 int f,n;
 {
-	extern int llineregion();
-
 	fulllineregions = TRUE;
 	opcmd = OPOTHER;
 	return operator(f,n,llineregion,"Line list");
@@ -392,8 +368,6 @@ int
 opersubst(f,n)
 int f,n;
 {
-	extern int substregion();
-
 	fulllineregions = TRUE;
 	opcmd = OPOTHER;
 	return operator(f,n,substregion,"Substitute");
@@ -403,8 +377,6 @@ int
 opersubstagain(f,n)
 int f,n;
 {
-	extern int subst_again_region();
-
 	fulllineregions = TRUE;
 	opcmd = OPOTHER;
 	return operator(f,n,subst_again_region,"Substitute-again");
@@ -414,8 +386,6 @@ int
 operentab(f,n)
 int f,n;
 {
-	extern int entab_region();
-
 	fulllineregions = TRUE;
 	opcmd = OPOTHER;
 	return operator(f,n,entab_region,"Spaces-->Tabs");
@@ -425,8 +395,6 @@ int
 operdetab(f,n)
 int f,n;
 {
-	extern int detab_region();
-
 	fulllineregions = TRUE;
 	opcmd = OPOTHER;
 	return operator(f,n,detab_region,"Tabs-->Spaces");
@@ -436,8 +404,6 @@ int
 opertrim(f,n)
 int f,n;
 {
-	extern int trim_region();
-
 	fulllineregions = TRUE;
 	opcmd = OPOTHER;
 	return operator(f,n,trim_region,"Trim whitespace");
