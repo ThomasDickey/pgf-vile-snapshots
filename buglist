@@ -132,50 +132,6 @@ E	can't search for a NUL in a buffer.
 
 ===================================================
 
-I just noticed this.  Given the following (view with :set list), if you
-move to the blank line right before aaa, and do d} you will notice that the
-cursor is left out at column 10.  In my opinion this should not happen.  It
-is certainly not vi-like.  First vi would not accept a line with ten blanks
-on it as a paragraph break.  I can live with this incompatibility.  Second
-vi would leave the cursor at column 1.  This is annoying.  Each time I do
-d}, the cursor jumps to the end of the resulting "blank" line.
-
-It starts to get really amusing (pathetic) at the start of the last
-paragraph in the buffer (no blank lines at the end of the buffer) as each
-d} merely chops one byte at a time from the current line until the current
-line becomes blank, then the last real paragraph gets deleted.  Hmm, on
-this short test case I cannot reproduce this last behavior.  Actually I
-get slightly differing behavior depending on what's in that last
-paragraph.  Also, y} moves the cursor when I'm at the beginning of one of
-these funny "blank" lines.  That's not nice either.
-
-aaa
-bbb
-ccc
-  
-ddd
-eeeeee
-ffffff
-           
-gggggggggggggggggggggggg
-hhhhhhhhhhhhhhhhhhhhhhhh
-iiiiiiiiiiiiiiiiiiiiiiii
-       
-jjjjjjjjjjjjjjjjjjjjjjjjjjjjj
-kkkkkkkkkkkkk
-llllllllllllllll   
-                
-ddd
-eeeeee
-ffffff
-       
-jjjjjjjjjjjjjjjjjjjjjjjjjjjjj
-kkkkkkkkkkkkk
-llllllllllllllll   
-
-===================================================
-
-
     Is it possible to get vile to prompt you if you try to exit without
     viewing all the files that were given on the command line?
 
@@ -191,8 +147,8 @@ llllllllllllllll
 ===================================================
 
     There is a bug in the regular expression code.  The expression
-'s/./=/g' should change all the characters on the lines to an equal
-sign.  Yet, here is what happens:
+	's/./=/g' should change all the characters on the lines to an equal
+	sign.  Yet, here is what happens:
 
 	This line should turn into all equals:
 
@@ -200,9 +156,6 @@ sign.  Yet, here is what happens:
         =h=s=l=n= =h=u=d=t=r= =n=o=a=l=e=u=l=:
 
     Every other character is skipped.  (A pointer incrementing problem?)
-I wish I had time to pry into the regular expression code, but with two 
-kernels crying out to be fixed, I can't see that happening anytime soon.  
-Sorry!
 
     The ed 'transfer' and 'move' commands don't work. 
     (to copy and move text around.  e.g., :'a,'bt$.)
@@ -329,3 +282,58 @@ PCVILE
    line overflow (but you knew that).
 
 ===================================================
+486 PC under Dell Unix (svr4) - make:    unixpc
+HP9000/700 under HPUX 8.07    - changes: do not include <Xos.h> in x11.c when
+                                         hpux is defined
+                                incs:    add -I/usr/include/X11R4
+                                libs:    add -L/usr/lib/X11R4
+                                make:    hpux
+Tektronix XD88/10 under UTekV - changes: removed LIBS definition from svr3 rule
+                                         in makefile to make xvile
+                                cflags:  add -DSYSV -X28
+                                make:    svr3
+----------------------------------------------------------------------
+
+Though I use it, I'm still not quite satisfied with the qident stuff.  It
+needs to be more flexible.  That is, I'd like to make it user defined. 
+For example
+	find-tag $qidentifier
+should be expressable as a character class like
+	find-tag &anyof "a-zA-Z_0-9:"
+in a macro.  Or even more generally, as a regular expression:
+	find-tag &scan "[a-zA-Z_][a-zA-Z_0-9:]\\*"
+A leading ^ would root the search at the current cursor position.
+Absence of a leading ^ would start at the current cursor position but would
+scan ahead until it found a match.  That way I can redefine ^] to pick
+up the next word even if the cursor is before the start of the word (thus
+better mimicking vi's behavior).
+
+[ This can almost be done with the $match variable, e.g.
+	7 store-macro
+		search-forward "[a-zA-Z_][a-zA-Z_0-9:]*"
+		find-tag $match
+	~endm
+
+	bind-key execute-macro-7 ^A-g
+ - pgf ]
+----------------------------------------------------------------------
+What about the possibility of adding vi's (and perl's) \u \U \l \L \E.
+
+----------------------------------------------------------------------
+
+Xvile works nicely with the middle mouse button to paste text.  It mangles
+text a bit when doing the selection, however.  Multiline selections
+include all that (visual) whitespace at the end of the line (yes, after
+the newline), so when I paste them I get n lines each 80 bytes long!
+Plus long lines (that have a > indicator at the right column) get
+truncated at 80 columns.
+----------------------------------------------------------------------
+
+Xvile has problems with mouse selections if the line has been sideways
+scrolled.  It moves to an earlier part of the line.  This is obviously a
+problem of convert mouse coordinates to a column position but neglecting
+to offset by the horizontally scrolling.
+----------------------------------------------------------------------
+
+Enhancement:  xvile would be nicer with scroll bars.
+

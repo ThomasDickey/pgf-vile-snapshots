@@ -4,7 +4,10 @@
  *	written 1986 by Daniel Lawrence	
  *
  * $Log: exec.c,v $
- * Revision 1.33  1992/08/20 23:40:48  foxharp
+ * Revision 1.34  1992/12/04 09:12:25  foxharp
+ * deleted unused assigns
+ *
+ * Revision 1.33  1992/08/20  23:40:48  foxharp
  * typo fixes -- thanks, eric
  *
  * Revision 1.32  1992/07/16  22:06:27  foxharp
@@ -1392,7 +1395,7 @@ nxtscan:	/* on to the next line */
 				if (execlevel == 0) {
 
 					/* grab label to jump to */
-					eline = token(eline, golabel);
+					(void) token(eline, golabel);
 					linlen = strlen(golabel);
 					glp = hlp->l_fp;
 					while (glp != hlp) {

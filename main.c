@@ -14,7 +14,13 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.86  1992/11/19 09:11:45  foxharp
+ * Revision 1.88  1992/12/04 09:24:12  foxharp
+ * deleted unused assigns
+ *
+ * Revision 1.87  1992/12/02  09:13:16  foxharp
+ * changes for "c-shiftwidth"
+ *
+ * Revision 1.86  1992/11/19  09:11:45  foxharp
  * eric krohn's changes for xvile "foreground", "background", and "name"
  * arguments, and
  * the "_qident" class of characters, useful for C++ "qualified" identifiers
@@ -774,7 +780,7 @@ char	*argv[];
 					startstat = TRUE;
 			}
 		}
-		ranstartup = TRUE;
+		/* ranstartup = TRUE; (unneeded) */
 	}
 
 
@@ -1077,26 +1083,27 @@ global_val_init()
 		global_w_values.wv[i].vp = &(global_w_values.wv[i].v);
 
 
-	set_global_b_val(MDWRAP,FALSE); /* wrap */
-	set_global_b_val(MDCMOD,FALSE); /* C mode */
-	set_global_b_val(MDBACKLIMIT,TRUE); /* limit backspacing to insert point */
-	set_global_b_val(MDSWRAP,TRUE); /* scan wrap */
-	set_global_b_val(MDIGNCASE,FALSE); /* exact matches */
-	set_global_b_val(MDVIEW,FALSE); /* view-only */
-	set_global_b_val(MDMAGIC,TRUE); /* magic searches */
+	set_global_b_val(MDWRAP,FALSE); 	/* wrap */
+	set_global_b_val(MDCMOD,FALSE); 	/* C mode */
+	set_global_b_val(MDBACKLIMIT,TRUE); 	/* limit backspacing to insert point */
+	set_global_b_val(MDSWRAP,TRUE); 	/* scan wrap */
+	set_global_b_val(MDIGNCASE,FALSE); 	/* exact matches */
+	set_global_b_val(MDVIEW,FALSE); 	/* view-only */
+	set_global_b_val(MDMAGIC,TRUE); 	/* magic searches */
 	set_global_b_val(MDCRYPT,FALSE);	/* crypt */
 	set_global_b_val(MDASAVE,FALSE);	/* auto-save */
-	set_global_b_val(MDDOS,FALSE);	/* dos mode */
-	set_global_b_val(MDAIND,FALSE); /* auto-indent */
+	set_global_b_val(MDDOS,FALSE);		/* dos mode */
+	set_global_b_val(MDAIND,FALSE); 	/* auto-indent */
 	set_global_b_val(MDSHOWMAT,FALSE);	/* show-match */
 	set_global_b_val(MDSHOWMODE,TRUE);	/* show-mode */
 	set_global_b_val(MDTABINSERT,TRUE);	/* allow tab insertion */
 	set_global_b_val(MDTAGSRELTIV,FALSE);	/* path relative tag lookups */
 	set_global_b_val(MDTERSE,FALSE);	/* terse messaging */
-	set_global_b_val(VAL_TAB, 8);	/* tab stop */
-	set_global_b_val(VAL_SWIDTH, 8); /* shiftwidth */
+	set_global_b_val(VAL_TAB, 8);		/* tab stop */
+	set_global_b_val(VAL_SWIDTH, 8); 	/* shiftwidth */
 	set_global_b_val(VAL_TAGLEN, 0);	/* significant tag length */
-	set_global_b_val(VAL_C_TAB, 8); /* C file tab stop */
+	set_global_b_val(VAL_C_TAB, 8); 	/* C file tab stop */
+	set_global_b_val(VAL_C_SWIDTH, 8); 	/* C file shiftwidth */
 	set_global_b_val(VAL_ASAVECNT, 256);	/* autosave count */
 	set_global_b_val_ptr(VAL_CWD, NULL);	/* current directory */
 	set_global_b_val_ptr(VAL_TAGS, strmalloc("tags")); /* tags filename */
@@ -1214,8 +1221,6 @@ int *cp, *fp, *np;
 	register int c, f, n;
 	register int	mflag;
 	c = *cp;
-	f = *fp;
-	n = *np;
 
 	if (c != reptc) 
 		return;

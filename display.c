@@ -6,7 +6,10 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.53  1992/08/20 23:40:48  foxharp
+ * Revision 1.54  1992/12/04 09:12:25  foxharp
+ * deleted unused assigns
+ *
+ * Revision 1.53  1992/08/20  23:40:48  foxharp
  * typo fixes -- thanks, eric
  *
  * Revision 1.52  1992/08/05  21:55:16  foxharp
@@ -934,7 +937,6 @@ int inserts;
 	}
 
 	/* find the matching shifted area */
-	match = -1 ;
 	longmatch = -1;
 	longcount = 0;
 	for (i = from+1; i < rows; i++) {

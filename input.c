@@ -3,7 +3,18 @@
  *		5/9/86
  *
  * $Log: input.c,v $
- * Revision 1.46  1992/11/19 09:07:30  foxharp
+ * Revision 1.49  1992/12/05 13:22:10  foxharp
+ * make sure we escape eolchar with '\' if passed in in kbd_strings buffer,
+ * since the user would have had to type the '\' to put it there themselves
+ *
+ * Revision 1.48  1992/12/04  09:25:34  foxharp
+ * deleted unused assigns, no longer propagate pointer to block local
+ * in kbd_string, and fix expansion arg to mlreply_no_bs()
+ *
+ * Revision 1.47  1992/12/03  00:32:59  foxharp
+ * added new mlreply_no_bs, which doesn't do backslash processing
+ *
+ * Revision 1.46  1992/11/19  09:07:30  foxharp
  * added check on recursive replay in dotcmdplay() -- I think we should
  * never play or record a call to dotcmdplay, so we abort if we find ourselves
  * doing so.
@@ -246,6 +257,16 @@ int bufn;
 	return kbd_string(prompt, buf, bufn, '\n',NO_EXPAND,TRUE);
 }
 #endif
+
+/* as above, but don't do anything to backslashes */
+int
+mlreply_no_bs(prompt, buf, bufn)
+char *prompt;
+char *buf;
+int bufn;
+{
+	return kbd_string(prompt, buf, bufn, '\n',EXPAND,FALSE);
+}
 
 /*	kcod2key:	translate 10-bit keycode to single key value */
 /* probably defined as a macro in estruct.h */
@@ -631,23 +652,28 @@ int dobackslashes;	/* do we add and delete '\' chars for the caller */
 	register int backslashes; /* are we quoting the next expandable char? */
 	int firstch = TRUE;
 	char buf[256];
+#if ! MSDOS
+	char str[80];
+#endif
 
 	if (clexec)
 		return nextarg(extbuf);
 
 	lineinput = TRUE;
 
-	cpos = extcpos = 0;
 	quotef = FALSE;
-	backslashes = 0;
-
 
 	/* prompt the user for the input string */
 	mlprompt(prompt);
 
+	if (bufn > 256) bufn = 256;
+
+	cpos = extcpos = 0;
 	/* add backslash escapes in front of volatile characters */
-	while((c = extbuf[extcpos]) != '\0' && extcpos < bufn-1) {
-		switch(extbuf[extcpos]) {
+	while((c = extbuf[extcpos++]) != '\0' && extcpos < bufn) {
+		if (c == eolchar && eolchar != '\n')
+			goto is_eolchar;
+		switch(c) {
 		case '%':
 		case '#':
 #if ! MSDOS
@@ -658,14 +684,12 @@ int dobackslashes;	/* do we add and delete '\' chars for the caller */
 		default:
 			break;
 		case '\\':
+		is_eolchar:
 			if (dobackslashes)
 				buf[cpos++] = '\\'; /* add extra */
 			break;
 		}
-		buf[cpos] = extbuf[extcpos];
-
-		++extcpos;
-		++cpos;
+		buf[cpos++] = c;
 	}
 	buf[cpos] = '\0';
 
@@ -781,7 +805,7 @@ int dobackslashes;	/* do we add and delete '\' chars for the caller */
 		} else if (expand == EXPAND && ((backslashes & 1 ) == 0)) {
 			/* we prefer to expand to filenames, but a buffer name
 				will do */
-			char *cp = NULL;
+			char *cp;
 			char *hist_lookup();
 			if (firstch == TRUE) {
 				tungetc(c);
@@ -815,12 +839,11 @@ int dobackslashes;	/* do we add and delete '\' chars for the caller */
 #if ! MSDOS
 /* drive letters get in the way */
 			case ':':
-				{
-				char str[80];
 				if (screen_string(str, 80, _pathn))
 					cp = str;
+				else
+					cp = NULL;
 				break;
-				}
 #endif
 			default:
 				goto trymore;

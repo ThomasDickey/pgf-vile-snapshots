@@ -3,7 +3,10 @@
  * code by Paul Fox, original algorithm mostly by Julia Harper May, 89
  *
  * $Log: undo.c,v $
- * Revision 1.19  1992/11/30 23:07:03  foxharp
+ * Revision 1.20  1992/12/04 09:14:36  foxharp
+ * deleted unused assigns
+ *
+ * Revision 1.19  1992/11/30  23:07:03  foxharp
  * firstchar/lastchar now return -1 for no non-white chars on line
  *
  * Revision 1.18  1992/07/28  22:02:55  foxharp
@@ -383,7 +386,6 @@ int f,n;
 
 	{
 		/* it's an absolute move -- remember where we are */
-		int fc;
 		MARK odot;
 		odot = DOT;
 

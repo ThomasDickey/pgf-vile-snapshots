@@ -4,7 +4,10 @@
  *	written 11-feb-86 by Daniel Lawrence
  *
  * $Log: bind.c,v $
- * Revision 1.24  1992/08/20 23:40:48  foxharp
+ * Revision 1.25  1992/12/04 09:08:45  foxharp
+ * deleted unused assigns
+ *
+ * Revision 1.24  1992/08/20  23:40:48  foxharp
  * typo fixes -- thanks, eric
  *
  * Revision 1.23  1992/06/04  19:45:14  foxharp
@@ -245,7 +248,6 @@ int f, n;	/* command arguments [IGNORED] */
 	    kcmd == &f_unarg || kcmd == &f_esc) {
 	    	register CMDFUNC **cfp;
 		/* search for an existing binding for the prefix key */
-		cfp = asciitbl;
 		for (cfp = asciitbl; cfp < &asciitbl[128]; cfp++) {
 			if (*cfp == kcmd) {
 				(void)unbindchar(cfp - asciitbl);

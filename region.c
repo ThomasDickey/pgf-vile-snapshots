@@ -6,7 +6,13 @@
  * internal use.
  *
  * $Log: region.c,v $
- * Revision 1.17  1992/11/19 09:18:45  foxharp
+ * Revision 1.19  1992/12/04 09:20:58  foxharp
+ * deleted unused assigns
+ *
+ * Revision 1.18  1992/12/02  09:13:16  foxharp
+ * changes for "c-shiftwidth"
+ *
+ * Revision 1.17  1992/11/19  09:18:45  foxharp
  * name change of kdelete() to ksetup(), and close off with kdone()
  *
  * Revision 1.16  1992/06/01  20:42:15  foxharp
@@ -159,16 +165,16 @@ shift_right_line()
 	if (b_val(curbp, MDCMOD) &&
 		llength(DOT.l) > 0 && char_at(DOT) == '#')
 		return TRUE;
-	s = b_val(curbp, VAL_SWIDTH);
+	s = curswval;
 	t = curtabval;
 	DOT.o = 0;
 	if (s) {  /* try to just insert tabs if possible */
 		if (b_val(curbp,MDTABINSERT) && s >= t && (s % t == 0)) {
-			s = linsert(s/t, '\t');
+			linsert(s/t, '\t');
 		} else {
 			detabline(TRUE);
 			DOT.o = 0;
-			s = linsert(s, ' ');
+			linsert(s, ' ');
 		}
 		if (b_val(curbp,MDTABINSERT))
 			entabline(TRUE);
@@ -199,7 +205,7 @@ shift_left_line()
 
 	i = 0;
 
-	s = b_val(curbp, VAL_SWIDTH);
+	s = curswval;
 
 	detabline(TRUE);
 

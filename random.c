@@ -3,7 +3,13 @@
  * commands. There is no functional grouping here, for sure.
  *
  * $Log: random.c,v $
- * Revision 1.77  1992/08/20 23:40:48  foxharp
+ * Revision 1.79  1992/12/04 09:51:00  foxharp
+ * assume POSIX machines have getcwd.  they should.
+ *
+ * Revision 1.78  1992/12/04  09:14:36  foxharp
+ * deleted unused assigns
+ *
+ * Revision 1.77  1992/08/20  23:40:48  foxharp
  * typo fixes -- thanks, eric
  *
  * Revision 1.76  1992/08/19  23:06:06  foxharp
@@ -945,7 +951,7 @@ int force;
 
 	if (!force && cwd)
 		return cwd;
-#if USG
+#if USG && ! POSIX
 	{
 	FILE *f, *npopen();
 	int n;
@@ -961,7 +967,7 @@ int force;
 	cwd = dirname;
 	}
 #else
-# if MSDOS & MSC
+# if (MSDOS & MSC) || POSIX
 
 	cwd = getcwd(dirname, NFILEN);
 # else
@@ -1134,7 +1140,7 @@ char *fname;
 	char nfilen[512];
 	char *np;
 	char *holdp = NULL;
-	char *cwd = NULL;
+	char *cwd;
 	char *name;
 
 	name = fname;

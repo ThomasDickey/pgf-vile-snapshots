@@ -8,8 +8,11 @@
  * Major extensions for vile by Paul Fox, 1991
  *
  *	$Log: modes.c,v $
- *	Revision 1.3  1992/08/20 23:40:48  foxharp
- *	typo fixes -- thanks, eric
+ *	Revision 1.4  1992/12/04 09:14:36  foxharp
+ *	deleted unused assigns
+ *
+ * Revision 1.3  1992/08/20  23:40:48  foxharp
+ * typo fixes -- thanks, eric
  *
  * Revision 1.2  1992/07/13  20:03:54  foxharp
  * the "terse" variable is now a boolean mode
@@ -335,8 +338,8 @@ struct VALNAMES *names;
 register struct VAL *values;
 {
 	char respbuf[NFILEN];
-	char *rp = NULL;
-	char *equp = NULL;
+	char *rp;
+	char *equp;
 	int rplen = 0;
 	int no;
 	int nval, s;

@@ -4,7 +4,10 @@
  *	Written (except for delins()) for vile by Paul Fox, (c)1990
  *
  * $Log: oneliner.c,v $
- * Revision 1.32  1992/05/19 09:14:27  foxharp
+ * Revision 1.33  1992/12/07 23:32:29  foxharp
+ * fix backslash processing in the replacement pattern in delins()
+ *
+ * Revision 1.32  1992/05/19  09:14:27  foxharp
  * drop cntrl char in comment
  *
  * Revision 1.31  1992/05/19  08:55:44  foxharp
@@ -455,6 +458,7 @@ char *sourc;
 	register int no;
 	static char *buf = NULL;
 	static buflen = -1;
+	int s;
 
 	if (exp == NULL || sourc == NULL) {
 		mlforce("BUG: NULL parm to delins");
@@ -486,35 +490,57 @@ char *sourc;
 	}
 	src = sourc;
 	while ((c = *src++) != '\0') {
-		if (c == '&')
-			no = 0;
-		else if (c == '\\' && '0' <= *src && *src <= '9')
-			no = *src++ - '0';
-		else {
-			if ((c == '\n'? lnewline(): linsert(1, c)) != TRUE) {
-			nomem:
-				mlforce("[Out of memory while inserting]");
-				return FALSE;
-			}
-			continue;
-		}
+	    no = 0;
+	    s = TRUE;
+	    switch(c) {
+	    case '\\':
+		    c = *src++;
+		    if (c == '\0')
+		    	return TRUE;
+		    if (!isdigit(c)) {
+			    /* here's where the \U \E \u \l \t etc.
+			    special escapes should be implemented */
+			    s = linsert(1,c);
+			    break;
+		    }
+		    /* else it's a digit --
+		    	get pattern number, and fall through */
+		    no = c - '0';
+	    case '&':
+		    if (exp->startp[no] != NULL && exp->endp[no] != NULL) {
+			    char *cp;
+			    int len;
+			    len = (exp->endp[no] - exp->startp[no]);
+			    cp = (exp->startp[no] - exp->startp[0]) + buf;
+			    while (len--) {
+				    if (!*cp) {
+					    mlforce( "BUG: mangled replace");
+					    return FALSE;
+				    }
+				    if (*cp == '\n')
+					    s = lnewline();
+				    else
+					    s = linsert(1,*cp);
+				    if (s != TRUE)
+					    goto nomem;
+				    cp++;
+			    }
+		    }
+		    break;
 
-		if (exp->startp[no] != NULL && exp->endp[no] != NULL) {
-			char *cp;
-			int len;
-			len = (exp->endp[no] - exp->startp[no]);
-			cp = (exp->startp[no] - exp->startp[0]) + buf;
-			while (len--) {
-				if ((*cp == '\n' ? lnewline() : linsert(1, *cp)) != TRUE) {
-					goto nomem;
-				}
-				if (!*cp) {
-					mlforce("BUG: mangled replace");
-					return FALSE;
-				}
-				cp++;
-			}
-		}
+	    case '\n':
+		    s = lnewline();
+		    break;
+
+	    default:
+		    s = linsert(1,c);
+		    break;
+	    }
+	    if (s != TRUE) {
+	    nomem:
+		    mlforce("[Out of memory while inserting]");
+		    return FALSE;
+	    }
 	}
 	return TRUE;
 }

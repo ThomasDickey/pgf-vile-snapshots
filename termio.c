@@ -4,7 +4,14 @@
  * All operating systems.
  *
  * $Log: termio.c,v $
- * Revision 1.49  1992/08/20 23:40:48  foxharp
+ * Revision 1.51  1992/12/05 13:58:20  foxharp
+ * added missing TTclose to ttclean, for Tom Dickey on his apollo -- I'm not
+ * convinced this seems right, but I'll try it for now.
+ *
+ * Revision 1.50  1992/12/04  09:18:04  foxharp
+ * added another flush
+ *
+ * Revision 1.49  1992/08/20  23:40:48  foxharp
  * typo fixes -- thanks, eric
  *
  * Revision 1.48  1992/08/19  23:02:47  foxharp
@@ -352,6 +359,7 @@ int f;
 #endif
 	tcsetattr(0, TCSADRAIN, &otermios);
 	TTclose();
+	TTflush();
 #if USE_FCNTL
 	fcntl(0, F_SETFL, kbd_flags);
 	kbd_is_polled = FALSE;
@@ -585,6 +593,7 @@ int f;
 		TTputc('\r');
 	}
 	TTflush();
+	TTclose();
 	ioctl(0, TIOCSETN, &ostate);
 	ioctl(0, TIOCSETC, &otchars);
 	ioctl(0, TIOCSLTC, &oltchars);

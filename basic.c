@@ -6,7 +6,13 @@
  * framing, are hard.
  *
  * $Log: basic.c,v $
- * Revision 1.39  1992/11/30 23:06:03  foxharp
+ * Revision 1.41  1992/12/05 13:12:16  foxharp
+ * fix paragraph problem -- i didn't fix all the firstchar() calls before
+ *
+ * Revision 1.40  1992/12/04  09:08:45  foxharp
+ * deleted unused assigns
+ *
+ * Revision 1.39  1992/11/30  23:06:03  foxharp
  * firstchar/lastchar now return -1 for no non-white chars in line
  *
  * Revision 1.38  1992/08/20  23:40:48  foxharp
@@ -551,7 +557,7 @@ int f,n;
 
 	fc = firstchar(DOT.l);
 	if (doingopcmd && 
-		((fc > 0 && DOT.o <= fc) || fc < 0) && 
+		((fc >= 0 && DOT.o <= fc) || fc < 0) && 
 		!is_first_line(DOT,curbp)) {
 		backchar(TRUE,DOT.o+1);
 		pre_op_dot = DOT;
@@ -575,10 +581,10 @@ int f,n;
 		n--;
 	}
 	if (doingopcmd) {
-		int fc = firstchar(DOT.l);
+		fc = firstchar(DOT.l);
 		if (!sameline(DOT,odot) && 
 			(pre_op_dot.o > lastchar(pre_op_dot.l)) &&
-			((fc > 0 && DOT.o <= fc) || fc < 0)) {
+			((fc >= 0 && DOT.o <= fc) || fc < 0)) {
 			fulllineregions = TRUE;
 		}
 	}
@@ -592,11 +598,13 @@ int f,n;
 	MARK odot;
 	int was_at_bol;
 	int was_on_empty;
+	int fc;
 
 	if (!f) n = 1;
 
+	fc = firstchar(DOT.l);
 	was_on_empty = (llength(DOT.l) == 0);
-	was_at_bol = (DOT.o <= firstchar(DOT.l));
+	was_at_bol = ((fc >= 0 && DOT.o <= fc) || fc < 0);
 	odot = DOT;
 
 	while (n) {
@@ -620,8 +628,8 @@ int f,n;
 	if (doingopcmd) {
 		/* if we're now at the beginning of a line and we can back up,
 		  do so to avoid eating the newline and leading whitespace */
-		int fc = firstchar(DOT.l);
-		if (((fc > 0 && DOT.o <= fc) || fc < 0) && 
+		fc = firstchar(DOT.l);
+		if (((fc >= 0 && DOT.o <= fc) || fc < 0) && 
 			!is_first_line(DOT,curbp) &&
 			!sameline(DOT,odot) ) {
 			backchar(TRUE,DOT.o+1);
