@@ -12,7 +12,15 @@ H	The mvrightwind and mvleftwind functions are broken -- visiting lines
 E	DOS to-do:
 	- glomming (e.g. ":e *.c") does nothing under DOS -- the code in
 	expand_wild_args() can probably be used to accomplish this.
-	- filter-region
+	- filter-region -- this would be easier if I had used named pipes
+	as the conduit between child and parent, instead of regular pipes,
+	'cause then I could just replace the named pipe with a tmp file
+	under DOS.	
+	- some function keys return 8 bit characters on the PC.  This means
+	the input path, through tgetc, has to be 8-bit clean, we need to
+	allow 256 bindings instead of the current 128, and we can't use
+	0x80 as the definition of the SPEC bit.  All this is easy -- it
+	just needs to be done.
 
 E	should add a "show-vars" command
 

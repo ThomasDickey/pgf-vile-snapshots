@@ -7,7 +7,10 @@
  * display type.
  *
  * $Log: ibmpc.c,v $
- * Revision 1.8  1992/07/01 17:06:32  foxharp
+ * Revision 1.9  1992/07/08 08:23:57  foxharp
+ * set screen attributes correctly in ibmeeop()
+ *
+ * Revision 1.8  1992/07/01  17:06:32  foxharp
  * pgf cleanup (in general I can't leave well enough alone...).  somewhere
  * along the way I made it work properly -- I think the problem was a missing
  * page number in ibmputc() -- but it might have been a badly calculated
@@ -155,7 +158,6 @@ ibmmove(row, col)
 /* erase to the end of the line */
 ibmeeol()
 {
-	unsigned short attr;	/* attribute byte mask to place in RAM */
 	unsigned short *lnptr;	/* pointer to the destination line */
 	int i;
 	int ccol,crow;	/* current column,row for cursor */
@@ -202,7 +204,7 @@ ibmeeop()
 		attr = ((ctrans[gbcolor] & 15) << 4) | (ctrans[gfcolor] & 15);
 	else
 #endif
-	 attr = 0;
+	 attr = 0x07;
 	rg.h.bh = attr;
 	int86(0x10, &rg, &rg);
 }

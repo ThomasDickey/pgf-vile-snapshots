@@ -4,7 +4,10 @@
  *  heavily modified by Paul Fox, 1990
  *
  * $Log: search.c,v $
- * Revision 1.35  1992/07/07 08:34:50  foxharp
+ * Revision 1.36  1992/07/08 09:08:08  foxharp
+ * don't mlforce() the "onlyonemsg", and support terse on "Not found"
+ *
+ * Revision 1.35  1992/07/07  08:34:50  foxharp
  * added not_found_msg(), to that non-wrapping searches give appropriate
  * message.  thanks leora!
  *
@@ -178,7 +181,7 @@ void
 not_found_msg(wrapok, dir)
 int wrapok, dir;
 {
-	if (wrapok)
+	if (wrapok || terse)
 		mlforce (notfoundmsg);
 	else
 		mlforce (hitendmsg, dir == FORWARD ? "BOTTOM":"TOP");
@@ -281,7 +284,7 @@ int marking, fromscreen;
 	} else if (status) {
 		savematch(DOT,gregexp->mlen);
 		if (samepoint(DOT,curpos)) {
-			mlforce(onlyonemsg);
+			mlwrite(onlyonemsg);
 			TTbeep();
 		}
 	}
@@ -342,7 +345,7 @@ int f, n;	/* default flag / numeric argument */
 	if (status == TRUE) {
 		savematch(DOT,gregexp->mlen);
 		if (samepoint(DOT,curpos)) {
-			mlforce(onlyonemsg);
+			mlwrite(onlyonemsg);
 			TTbeep();
 		}
 	} else if (status == FALSE) {
@@ -410,7 +413,7 @@ int dummy, fromscreen;
 		if (status == TRUE)
 			savematch(DOT,gregexp->mlen);
 			if (samepoint(DOT,curpos)) {
-				mlforce(onlyonemsg);
+				mlwrite(onlyonemsg);
 				TTbeep();
 			}
 		else if (status == FALSE) {
@@ -474,7 +477,7 @@ int f, n;	/* default flag / numeric argument */
 	if (status == TRUE) {
 		savematch(DOT,gregexp->mlen);
 		if (samepoint(DOT, curpos)) {
-			mlforce(onlyonemsg);
+			mlwrite(onlyonemsg);
 			TTbeep();
 		}
 	} else if (status == FALSE) {
