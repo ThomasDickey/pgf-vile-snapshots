@@ -12,7 +12,10 @@
 # The modes are table entries in the BUFFER and WINDOW structures.
 #
 # $Log: modetbl,v $
-# Revision 1.16  1993/07/01 16:15:54  pgf
+# Revision 1.17  1993/07/06 16:54:27  pgf
+# changed "timeout-value" to "timeoutlen"
+#
+# Revision 1.16  1993/07/01  16:15:54  pgf
 # tom's 3.51 changes
 #
 # Revision 1.15  1993/06/29  11:09:47  pgf
@@ -76,7 +79,7 @@ bool								# GMD prefix
 	"ShowRam"	RAMSIZE		0		RAMSIZE	# show ram-usage
 	"SameBangs"	SAMEBANGS	0			# use same "!!" data for ^X-!
 int								# VAL_ prefix
-	"timeout-value"	TIMEOUTVAL	0			# how long to catnap for more input
+	"timeoutlen"	TIMEOUTVAL	0			# how long to catnap for more input
 regex								# VAL_ prefix
 	"C-SUFfixes"	CSUFFIXES	0			# match against filenames to turn on c-mode
 string								# VAL_ prefix

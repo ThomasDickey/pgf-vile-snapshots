@@ -4,7 +4,11 @@
  *	written 1986 by Daniel Lawrence	
  *
  * $Log: exec.c,v $
- * Revision 1.61  1993/07/01 16:15:54  pgf
+ * Revision 1.62  1993/07/06 17:23:33  pgf
+ * take out dbgwrite if toline is null after call to linespec -- this can
+ * happen, and the upper layers catch it correctly
+ *
+ * Revision 1.61  1993/07/01  16:15:54  pgf
  * tom's 3.51 changes
  *
  * Revision 1.60  1993/06/30  10:05:54  pgf
@@ -710,8 +714,7 @@ int		*zerop;
 			scan = linespec(scan, &toline);
 		}
 		if (same_ptr(toline,null_ptr)) {
-			/* faulty line spec -- fault already described */
-			dbgwrite("null toline");
+			/* faulty line spec */
 			return FALSE;
 		}
 	}

@@ -96,7 +96,8 @@ VMSMAK = descrip.mms vms_link.opt		# on VMS
 TURBOMAK = makmktbl.tbc makvile.tbc		# on DOS, using TURBO
 WATMAK = makefile.wat				# on DOS, using Watcom C/386
 MSCMAK =	# still waiting for this one	# on DOS, using Microsoft C
-MAKFILES = $(UNIXMAK) $(VMSMAK) $(TURBOMAK) $(WATMAK) $(MSCMAK)
+DJGPPMAK = makefile.djg				# on DOS, DJGCC v1.09
+MAKFILES = $(UNIXMAK) $(VMSMAK) $(TURBOMAK) $(WATMAK) $(DJGPPMAK) $(MSCMAK)
 
 MKTBLS = ./mktbls
 
@@ -541,7 +542,10 @@ random.$O:	glob.h
 vmalloc$O:	nevars.h
 
 # $Log: makefile,v $
-# Revision 1.111  1993/06/25 15:05:12  pgf
+# Revision 1.112  1993/07/06 16:55:58  pgf
+# added makefile.djg for dj gcc
+#
+# Revision 1.111  1993/06/25  15:05:12  pgf
 # added watcom makefile, renamed the turbo makefiles
 #
 # Revision 1.110  1993/06/18  15:57:06  pgf

@@ -1,5 +1,35 @@
+Changes for vile 3.52:
+(pgf)
+	+ added a couple of tweaks to tom's check-modtime changes -- prompts
+	  are not suppressed if you're writing the buffer out, and running
+	  a shell only checks visible buffers for modtime changes, rather
+	  than all buffers. (mostly file.c, estruct.h, random.c)
+
+	+ changed name of "timeout-value" to "timeoutlen", to match some
+	  versions of vi.  (modetbl, vile.hlp)
+
+	+ applied patches from Tuan DANG (dang@cogit.ign.fr) to support
+	  DJGCC v1.09 (display.c, estruct.h fileio.c ibmpc.c main.c mktbls.c
+	  modes.c path.c random.c spawn.c termio.c)
+
+	+ consolidated TURBO, WATCOM, MSC, ZTC, and GO32 under a new,
+	  presumptious #define, called NEWDOSCC. (mostly same files as djgpp
+	  changes)
+
+	+ fixed calloc macro (estruct.h) in RAMSIZE ifdef
+
+	+ added map.c/map.obj source file for VMS (descrip.mms, vms_link.opt)
+
+	+ removed bogus dbgwrite in exec.c, where linespec returns a value
+	  for "toline" which can be null.
+
 Changes for vile 3.51:
 (pgf)
+	+ added a couple of tweaks to tom's check-modtime changes -- prompts
+	  are not suppressed if you're writing the buffer out, and running
+	  a shell only checks visible buffers for modtime changes, rather
+	  than all buffers.
+
 	+ added regexp metacharacter "index" in margin of vile.hlp.
 
 	+ renested some limit setting in scanner(), so I can understand it

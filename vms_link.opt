@@ -1,6 +1,9 @@
 ! Link with sharable C-runtime library
 ! $Log: vms_link.opt,v $
-! Revision 1.3  1993/06/18 15:57:06  pgf
+! Revision 1.4  1993/07/06 16:53:50  pgf
+! added map.c/map.obj
+!
+! Revision 1.3  1993/06/18  15:57:06  pgf
 ! tom's 3.49 changes
 !
 ! Revision 1.2  1993/04/20  12:18:32  pgf
@@ -31,6 +34,7 @@ input.obj
 insert.obj
 isearch.obj
 line.obj
+map.obj
 modes.obj
 npopen.obj
 oneliner.obj

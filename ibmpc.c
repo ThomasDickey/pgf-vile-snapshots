@@ -10,7 +10,10 @@
  * display type.
  *
  * $Log: ibmpc.c,v $
- * Revision 1.17  1993/06/25 11:25:55  pgf
+ * Revision 1.18  1993/07/06 16:39:04  pgf
+ * integrated Tuan DANG's changes for the djgpp compiler under DOS
+ *
+ * Revision 1.17  1993/06/25  11:25:55  pgf
  * patches for Watcom C/386, from Tuan DANG
  *
  * Revision 1.16  1993/06/18  15:57:06  pgf
@@ -69,6 +72,15 @@
 
 #if     IBMPC
 
+#if GO32
+#include <pc.h>
+#define min(a,b) (((a) < (b)) ? (a) : (b))
+#define max(a,b) (((a) > (b)) ? (a) : (b))
+#define outp(p,v) outportb(p,v)
+#define inp(p) inportb(p,v)
+#endif
+  
+
 #define NROW	50			/* Max Screen size.		*/
 #define NCOL    80			/* Edit if you want to.         */
 #define	MARGIN	8			/* size of minimum margin and	*/
@@ -76,14 +88,27 @@
 #define	NPAUSE	200			/* # times thru update to pause */
 #define	SPACE	32			/* space character		*/
 
-#ifdef __WATCOMC__
+#if WATCOM
 #define	SCADC	(0xb800 << 4)		/* CGA address of screen RAM	*/
 #define	SCADM	(0xb000 << 4)		/* MONO address of screen RAM	*/
 #define SCADE	(0xb800 << 4)		/* EGA address of screen RAM	*/
-#else
+#endif
+
+#  if GO32  /* version 1.09 */
+#define FAR_POINTER(s,o) (0xe0000000 + s*16 + o)
+#define	SCADC	0xb800			/* CGA address of screen RAM	*/
+#define	SCADM	0xb000			/* MONO address of screen RAM	*/
+#define SCADE	0xb800			/* EGA address of screen RAM	*/
+#endif
+
+#ifndef SCADC
 #define	SCADC	0xb8000000L		/* CGA address of screen RAM	*/
 #define	SCADM	0xb0000000L		/* MONO address of screen RAM	*/
 #define SCADE	0xb8000000L		/* EGA address of screen RAM	*/
+#endif
+
+#ifndef FAR_POINTER
+#define FAR_POINTER(s,o) (s)
 #endif
 
 #ifdef __WATCOMC__
@@ -293,7 +318,7 @@ set_vertical_resolution(int code)
 {
 	rg.h.ah = 0x12;
 	rg.h.al = code;
-	rg.h.bl = 30;
+	rg.h.bl = 0x30;
 	INTX86(0x10, &rg, &rg);	/* VIDEO - SELECT VERTICAL RESOLUTION */
 
 }
@@ -318,6 +343,7 @@ int color;	/* color to set */
 
 void
 ibmmove(row, col)
+int row, col;
 {
 	rg.h.ah = 2;		/* set cursor position function code */
 	rg.h.dl = col;
@@ -416,7 +442,8 @@ char *res;	/* resolution to change to */
 }
 
 void
-spal()	/* reset the palette registers */
+spal(dummy)	/* reset the palette registers */
+char *dummy;
 {
 	/* nothing here now..... */
 }
@@ -445,8 +472,8 @@ ibmopen()
 
 	rg.h.ah = 3;
 	rg.h.bh = 0;
-	original_curs = rg.x._CX_;
 	INTX86(0x10, &rg, &rg);	/* VIDEO - GET CURSOR POSITION */
+	original_curs = rg.x._CX_;
 
 #ifdef PVGA
 	rg.h.ah = 0;
@@ -541,11 +568,11 @@ int n;		/* type of adapter to init for */
 
 	/* initialize the screen pointer array */
 	if (monochrome)
-		addr.laddr = ScreenAddress[CDMONO];
+		addr.laddr = FAR_POINTER(ScreenAddress[CDMONO],0x0000);
 	else if (type == CDMONO)
-		addr.laddr = ScreenAddress[CDCGA];
+		addr.laddr = FAR_POINTER(ScreenAddress[CDCGA],0x0000);
 	else
-		addr.laddr = ScreenAddress[type];
+		addr.laddr = FAR_POINTER(ScreenAddress[type],0x0000);
 
 	for (i = 0; i < NROW; i++) {
 		scptr[i] = addr.paddr + term.t_ncol * i;

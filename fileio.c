@@ -3,7 +3,13 @@
  * the knowledge about files are here.
  *
  * $Log: fileio.c,v $
- * Revision 1.51  1993/07/01 16:15:54  pgf
+ * Revision 1.53  1993/07/06 16:39:04  pgf
+ * integrated Tuan DANG's changes for the djgpp compiler under DOS
+ *
+ * Revision 1.52  1993/07/06  12:32:00  pgf
+ * only check visible buffers' modtimes after shell escape or pipe
+ *
+ * Revision 1.51  1993/07/01  16:15:54  pgf
  * tom's 3.51 changes
  *
  * Revision 1.50  1993/06/25  11:25:55  pgf
@@ -188,7 +194,7 @@
 
 #if MSDOS
 #include	<sys/stat.h>
-#if TURBO || WATCOM
+#if NEWDOSCC
 #include	<io.h>
 #endif
 #endif
@@ -200,6 +206,7 @@ static	void	free_fline P(( void ));
 static	int	make_backup P(( char * ));
 #endif
 static	int	count_fline;	/* # of lines read with 'ffgetline()' */
+  
 
 /*--------------------------------------------------------------------------*/
 static void
@@ -264,6 +271,9 @@ char    *fn;
 #if TURBO
 		set_errno(EISDIR);
 #endif
+#if GO32
+ 		set_errno(ENOENT);
+#endif
 		return (FIOERR);
 
 	} else if ((ffp=fopen(fn, FOPEN_READ)) == NULL) {
@@ -308,6 +318,9 @@ char    *fn;
 #endif
 #if TURBO
 		        set_errno(EISDIR);
+#endif
+#if GO32
+			set_errno(ENOENT);
 #endif
 			what = "directory";
 		}
@@ -385,12 +398,28 @@ ffsize()
 #endif
 
 #if MSDOS
+
+#if GO32
+
+long
+ffsize(void)
+{
+	int flen, prev;
+	prev = ftell(ffp); fseek(ffp, 0, 2);
+	flen = ftell(ffp); fseek(ffp, prev, 0);
+	return flen;
+}
+
+#else
+
 long
 ffsize(void)
 {
 	int fd = fileno(ffp);
 	return  filelength(fd);
 }
+
+#endif
 #endif
 #endif	/* !OPT_MAP_MEMORY */
 
@@ -453,7 +482,7 @@ ffclose()
 			count_fline,
 			interrupted ? "- Interrupted" : "");
 #ifdef	MDCHK_MODTIME
-		(void)check_all_modtimes();
+		(void)check_visible_modtimes();
 #endif
 	} else
 		s = fclose(ffp);
@@ -619,7 +648,7 @@ int *lenp;	/* to return the final length */
  * is _much_much_ faster, and I don't have to futz with non-blocking
  * reads...
  */
-#if WATCOM
+#if WATCOM || GO32
 #define no_isready_c 1 
 #endif
 
@@ -639,7 +668,7 @@ int *lenp;	/* to return the final length */
 #    if VMS
 #     define	isready_c(p)	( (*p)->_cnt > 0)
 #    endif
-#    if TURBO 
+#    if TURBO
 #     define    isready_c(p)	( (p)->bsize > ((p)->curp - (p)->buffer) )
 #    endif
 #    ifndef isready_c	/* most other stdio's (?) */

@@ -3,7 +3,13 @@
  * commands. There is no functional grouping here, for sure.
  *
  * $Log: random.c,v $
- * Revision 1.99  1993/07/01 16:15:54  pgf
+ * Revision 1.101  1993/07/06 16:39:04  pgf
+ * integrated Tuan DANG's changes for the djgpp compiler under DOS
+ *
+ * Revision 1.100  1993/07/06  12:33:47  pgf
+ * initialize b_modtime_at_warn properly in ch_fname
+ *
+ * Revision 1.99  1993/07/01  16:15:54  pgf
  * tom's 3.51 changes
  *
  * Revision 1.98  1993/06/28  14:30:28  pgf
@@ -369,6 +375,10 @@
 
 #if TURBO
 #   include <dir.h>
+#endif
+
+#if GO32
+#   include <dirent.h>
 #endif
 
 extern CMDFUNC f_forwchar, f_backchar, f_forwchar_to_eol, f_backchar_to_bol;
@@ -1041,7 +1051,7 @@ int force;
 	cwd = dirname;
 	}
 #else
-# if (MSDOS & (MSC || TURBO || WATCOM)) || POSIX || VMS
+# if (MSDOS & NEWDOSCC) || POSIX || VMS
 	cwd = getcwd(dirname, NFILEN);
 # else
 	cwd = getwd(dirname);
@@ -1053,7 +1063,7 @@ int force;
 	s = strchr(cwd, '\n');
 	if (s)
 		*s = EOS;
-#if MSDOS & (MSC || TURBO || WATCOM)
+#if MSDOS & NEWDOSCC
 	update_dos_drv_dir(cwd);
 #endif
 
@@ -1093,7 +1103,14 @@ int	d;
 int
 curdrive()
 {
+#if GO32
+	union REGS  r;
+	r.h.ah = 0x19;
+	int86(0x21, &r, &r);
+	return drive2char(r.h.al);
+#else
 	return drive2char(bdos(0x19, 0, 0) & 0xff);
+#endif
 }
 
 /* take drive _letter_ as arg. */
@@ -1286,5 +1303,6 @@ char *fname;
 	}
 #ifdef	MDCHK_MODTIME
 	(void)get_modtime(bp, &(bp->b_modtime));
+	bp->b_modtime_at_warn = 0;
 #endif
 }

@@ -53,7 +53,7 @@ ALLHDRS = $(HDRS)
 CSRCac = ansi.c at386.c basic.c bind.c buffer.c crypt.c csrch.c
 CSRCde = dg10.c display.c eval.c exec.c externs.c
 CSRCfh = fences.c file.c filec.c fileio.c finderr.c glob.c globals.c history.c hp110.c hp150.c
-CSRCim = ibmpc.c input.c insert.c isearch.c line.c main.c modes.c mktbls.c
+CSRCim = ibmpc.c input.c insert.c isearch.c line.c main.c map.c modes.c mktbls.c
 CSRCnr = npopen.c opers.c oneliner.c path.c random.c regexp.c region.c
 CSRCst = search.c spawn.c st520.c tags.c tbuff.c tcap.c termio.c tipc.c tmp.c
 CSRCuw = undo.c vmalloc.c vms2unix.c vmspipe.c vmsvt.c vt52.c window.c word.c wordmov.c
@@ -96,6 +96,7 @@ SRC =	main.c \
 	insert.c \
 	isearch.c \
 	line.c \
+	map.c \
 	modes.c \
 	npopen.c \
 	oneliner.c \
@@ -141,6 +142,7 @@ OBJ =	main.obj,\
 	insert.obj,\
 	isearch.obj,\
 	line.obj,\
+	map.obj \
 	modes.obj,\
 	npopen.obj,\
 	oneliner.obj,\
@@ -245,7 +247,10 @@ vile.com :
 	@ write sys$output "** made $@"
 
 # $Log: descrip.mms,v $
-# Revision 1.6  1993/06/18 15:57:06  pgf
+# Revision 1.7  1993/07/06 16:53:50  pgf
+# added map.c/map.obj
+#
+# Revision 1.6  1993/06/18  15:57:06  pgf
 # tom's 3.49 changes
 #
 # Revision 1.5  1993/04/28  14:34:11  pgf

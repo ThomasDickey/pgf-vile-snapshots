@@ -9,7 +9,10 @@
  *	the output structures.
  *
  * $Log: mktbls.c,v $
- * Revision 1.26  1993/07/01 16:15:54  pgf
+ * Revision 1.27  1993/07/06 16:39:04  pgf
+ * integrated Tuan DANG's changes for the djgpp compiler under DOS
+ *
+ * Revision 1.26  1993/07/01  16:15:54  pgf
  * tom's 3.51 changes
  *
  * Revision 1.25  1993/06/25  11:25:55  pgf
@@ -100,7 +103,7 @@
 #define	OPT_IFDEF_MODES	1	/* true iff we can ifdef modes */
 
 /* stuff borrowed/adapted from estruct.h */
-#if defined(__TURBOC__) || defined(__WATCOMC__) || \
+#if defined(__TURBOC__) || defined(__WATCOMC__) || defined(__GO32__) || \
 		(defined(__GNUC__) && defined(sun))
 #include <stdlib.h>
 #define P(param) param
