@@ -4,7 +4,7 @@
  *	need to back up to get to the char. before the transition.
  *	Written for vile: Copyright (c) 1990, 1995 by Paul Fox
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/wordmov.c,v 1.15 1995/04/22 03:22:53 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/wordmov.c,v 1.14 1995/03/25 02:53:53 pgf Exp $
  *
  */
 
@@ -22,15 +22,13 @@
 
 static int ochartype;
 
-static	int	getchartype P(( void ));
-
 void
 setchartype()
 {
 	ochartype = getchartype();
 }
 
-static int
+int
 getchartype()
 {
 	register int	c;

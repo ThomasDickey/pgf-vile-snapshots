@@ -1,7 +1,7 @@
 /*	AT386:	 hacked tcap.c for the 386 console, when you don't
  *		have libtermcap.   grrr.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/at386.c,v 1.16 1995/11/17 04:03:42 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/at386.c,v 1.14 1994/11/28 19:46:13 pgf Exp $
  *
  */
 #error This module is not actively maintained as part of vile.
@@ -14,7 +14,7 @@
 #include	"estruct.h"
 #include	"edef.h"
 
-#if DISP_AT386
+#if AT386
 
 #define NROW	25			/* Screen size. 		*/
 #define NCOL	80			/* Edit if you want to. 	*/
@@ -39,17 +39,21 @@ extern int	at386cres();
 extern int	at386open();
 extern int	tput();
 extern char	*tgoto();
-#if	OPT_COLOR
+#if	COLOR
 extern	int	at386fcol();
 extern	int	at386bcol();
 #endif
+#if	SCROLLCODE
 extern	int	at386scroll_delins();
+#endif
 
 #define TCAPSLEN 315
 char at386buf[TCAPSLEN];
 char *UP, PC, *CM, *CE, *CL, *SO, *SE;
 
+#if	SCROLLCODE
 char *DL, *AL, *SF, *SR;
+#endif
 
 TERM term = {
 	NROW,
@@ -73,12 +77,13 @@ TERM term = {
 	at386beep,
 	at386rev,
 	at386cres
-#if	OPT_COLOR
-	, at386fcol
-	, at386bcol
-	, 0
+#if	COLOR
+	, at386fcol,
+	at386bcol
 #endif
+#if	SCROLLCODE
 	, NULL		/* set dynamically at open time */
+#endif
 };
 
 at386open()
@@ -95,9 +100,12 @@ at386open()
 	SO = "\033[7m";
 	revexist = TRUE;
 
+
+#if SCROLLCODE
 	DL = "\033[1M";
 	AL = "\033[1L";
 	term.t_scroll = at386scroll_delins;
+#endif
 	ttopen();
 }
 
@@ -173,9 +181,10 @@ at386cres()	/* change screen resolution */
 	return(TRUE);
 }
 
+#if SCROLLCODE
 
 /* 
-OPT_PRETTIER_SCROLL is prettier but slower -- it scrolls 
+PRETTIER_SCROLL is prettier but slower -- it scrolls 
 		a line at a time instead of all at once.
 */
 
@@ -184,7 +193,7 @@ at386scroll_delins(from,to,n)
 {
 	int i;
 	if (to == from) return;
-#if OPT_PRETTIER_SCROLL
+#if PRETTIER_SCROLL
 	if (absol(from-to) > 1) {
 		at386scroll_delins(from, (from<to) ? to-1:to+1, n);
 		if (from < to)
@@ -210,9 +219,15 @@ at386scroll_delins(from,to,n)
 	}
 }
 
+#endif
+
+spal(dummy)	/* change palette string */
+{
+	/*	Does nothing here	*/
+}
 
 
-#if	OPT_COLOR
+#if	COLOR
 at386fcol()	/* no colors here, ignore this */
 {
 }
@@ -227,6 +242,16 @@ at386beep()
 	ttputc(BEL);
 }
 
+
+#if	FLABEL
+int
+fnclabel(f, n)		/* label a function key */
+int f,n;	/* default flag, numeric argument [unused] */
+{
+	/* on machines with no function keys...don't bother */
+	return(TRUE);
+}
+#endif
 #else
 
 hello()

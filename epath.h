@@ -1,12 +1,24 @@
 /*	EPATH:	This file contains certain info needed to locate the
-		certain needed files on a system dependent basis.
+		MicroEMACS files on a system dependent basis.
 
 									*/
 
 /*	possible names and paths of help files under different OSs	*/
 
 /*
- * $Header: /usr/build/VCS/pgf-vile/RCS/epath.h,v 1.18 1995/02/28 16:55:40 pgf Exp $
+ * $Log: epath.h,v $
+ * Revision 1.14  1994/06/30 14:08:29  pgf
+ * tom's patch, and pgf fixups
+ *
+ * Revision 1.13  1994/06/17  01:29:44  pgf
+ * windows/nt changes, from joe greer
+ *
+ * Revision 1.12  1994/04/18  14:26:27  pgf
+ * merge of OS2 port patches, and changes to tungetc operation
+ *
+ * Revision 1.11  1994/02/22  11:03:15  pgf
+ * truncated RCS log for 4.0
+ *
  */
 
 /* first two entries are default startup and help files, the rest are
@@ -14,11 +26,11 @@
 
 char *pathname[] =
 
-#if	SYS_AMIGA
+#if	AMIGA
 {
 	".vilerc",
 	"vile.hlp",
-	NULL,
+	"",
 	"sys:c/",
 	"sys:t/",
 	"sys:s/",
@@ -28,50 +40,62 @@ char *pathname[] =
 };
 #endif
 
-#if	SYS_ST520
+#if	ST520
 {
 	"vile.rc",
 	"vile.hlp",
-	NULL,
 	"\\",
 	"\\bin\\",
-	"\\util\\"
+	"\\util\\",
+	""
 };
 #endif
 
-#if	SYS_MSDOS || SYS_WIN31 || SYS_OS2 || SYS_WINNT
+#if	FINDER
 {
 	"vile.rc",
 	"vile.hlp",
-	NULL,
+	"/bin/",
+	"/sys/public/",
+	""
+};
+#endif
+
+#if	MSDOS || WIN31 || OS2 || NT
+{
+	"vile.rc",
+	"vile.hlp",
 	"\\sys\\public\\",
 	"\\usr\\bin\\",
 	"\\bin\\",
-	"\\"
+	"\\",
+	""
 };
 #endif
 
-#if	SYS_UNIX
+#if	UNIX
 {
 	".vilerc",
 	"vile.hlp",
 	".",		/* replaced at runtime with path-head of argv[0] */
+	"/usr/local/",
+	"/usr/lib/",
+	"/usr/local/bin/",
+	"/usr/local/lib/",
 #ifdef HELP_LOC
 #ifndef lint	/* makefile gives inconsistent quoting for lint, compiler */
 	HELP_LOC,
 #endif	/* lint */
 #endif
-	"/usr/local/lib/",
-	"/usr/local/",
-	"/usr/lib/"
+	""
 };
 #endif
 
-#if	SYS_VMS
+#if	VMS
 {
 	"vile.rc",
 	"vile.hlp",
-	NULL,		/* replaced at runtime with path-head of argv[0] */
+	".",		/* replaced at runtime with path-head of argv[0] */
 	"sys$login:",
 	"",
 	"sys$sysdevice:[vmstools]"
