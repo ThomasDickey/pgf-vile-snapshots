@@ -15,7 +15,7 @@
  *
  *	modify (ifdef-style) 'expand_leaf()' to allow ellipsis.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/glob.c,v 1.29 1994/12/19 14:39:53 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/glob.c,v 1.37 1995/02/06 04:06:39 pgf Exp $
  *
  */
 
@@ -28,7 +28,7 @@
 #define	isdelim(c)	((c) == '(' || ((c) == '{'))
 
 #if SYS_MSDOS || SYS_WIN31 || SYS_OS2 || SYS_WINNT
-# define UNIX_GLOBBING !SMALLER
+# define UNIX_GLOBBING OPT_GLOB_ENVIRON
 # if UNIX_GLOBBING
 #  define DirEntryStr(p)		p->d_name
 # else
@@ -97,7 +97,7 @@
 static	int	string_has_wildcards P((char *));
 static	int	record_a_match P((char *));
 static	int	expand_pattern P((char *));
-#if OPT_GLOB_ENVIRON
+#if OPT_GLOB_ENVIRON && UNIX_GLOBBING
 static	void	expand_environ P(( char * ));
 #endif
 
@@ -313,17 +313,9 @@ char	*pattern;
 	if (wild == pattern) {	/* top-level, first leaf is wild */
 		if (*path == EOS)
 			(void)strcpy(path, ".");
+		leaf = path + strlen(path) + 1;
 	} else {
-		len = wild - pattern - 1;
-#if OPT_MSDOS_PATH
-		/* Force the strncpy from 'pattern' to pick up a slash just
-		 * after the ':' in a drive specification.
-		 */
-		if ((s = is_msdos_drive(pattern)) != 0) {
-			if (is_slashc(*s))
-				len++;
-		}
-#endif
+		len = (int)(wild - pattern) - 1;
 		if (*(s = path) != EOS) {
 			s += strlen(s);
 			*s++ = SLASHC;
@@ -332,8 +324,26 @@ char	*pattern;
 			(void)strncpy(s, pattern, len);
 			s[len] = EOS;
 		}
+		if (*path == EOS) {
+			path[0] = SLASHC;
+			path[1] = EOS;
+			leaf = path + 1;
+		}
+#if OPT_MSDOS_PATH
+		/* Force the strncpy from 'pattern' to pick up a slash just
+		 * after the ':' in a drive specification.
+		 */
+		else if ((s = is_msdos_drive(path)) != 0 && s[0] == EOS) {
+			s[0] = SLASHC;  /* make sure it's the right
+						slash, for Watcom */
+			s[1] = EOS;
+			leaf = s + 1;
+		}
+#endif
+		else {
+			leaf = path + strlen(path) + 1;
+		}
 	}
-	leaf = path + strlen(path) + 1;
 
 	if (next != 0) {
 		save = next[-1];
@@ -343,7 +353,7 @@ char	*pattern;
 	/* Scan the directory, looking for leaves that match the pattern.
 	 */
 	if ((dp = opendir(path)) != 0) {
-		leaf[-1] = SLASHC;
+		leaf[-1] = SLASHC;	/* connect the path to the leaf */
 		while ((de = readdir(dp)) != 0) {
 #if OPT_MSDOS_PATH
 			(void)mklower(strcpy(leaf, de->d_name));
@@ -399,30 +409,15 @@ char	*pattern;
 	return result;
 }
 
-/*
- * Comparison-function for 'qsort()'
- */
-#if __STDC__ || defined(CC_TURBO) || CC_WATCOM || defined(__CLCC__)
-#if defined(apollo) && !(defined(__STDCPP__) || defined(__GNUC__))
-#define	ANSI_QSORT 0	/* cc 6.7 */
-#else
-#define	ANSI_QSORT 1
-#endif
-#else
-#define	ANSI_QSORT 0
-#endif
 
-#if !ANSI_QSORT
+#if ! ANSI_QSORT
 static	int	compar P(( char **, char ** ));
-#endif
-
 static int
-#if ANSI_QSORT
-compar (const void *a, const void *b)
-#else
 compar (a, b)
 char	**a;
 char	**b;
+#else
+static int compar (const void *a, const void *b)
 #endif
 {
 	return strcmp(*(char **)a, *(char **)b);
@@ -513,7 +508,7 @@ char	*pattern;
 }
 #endif
 
-#if OPT_GLOB_ENVIRON
+#if OPT_GLOB_ENVIRON && UNIX_GLOBBING
 /*
  * Expand environment variables in 'pattern[]'
  * It allows names of the form
@@ -557,6 +552,8 @@ char	*pattern;
 					break;
 				}
 			}
+			if (delim == EOS)
+				right = k;
 
 			(void)strcpy(save, pattern+k);
 			if (right != left) {
@@ -590,13 +587,13 @@ static int
 expand_pattern (item)
 char	*item;
 {
-	int	result;
+	int	result = FALSE;
 #if OPT_VMS_PATH
 	DIR	*dp;
 	DIRENT	*de;
 
-	result = TRUE;
 	if ((dp = opendir(item)) != 0) {
+		result = TRUE;
 		while ((de = readdir(dp)) != 0) {
 			char	temp[NFILEN];
 			size_t	len = de->d_namlen;
@@ -608,8 +605,7 @@ char	*item;
 			}
 		}
 		(void)closedir(dp);
-	} else
-		result = FALSE;
+	}
 
 #else	/* UNIX or MSDOS, etc. */
 
@@ -650,7 +646,8 @@ char	*item;
 	if (string_has_wildcards(pattern)) {
 		if ((result = expand_leaf(builtup, pattern)) != FALSE
 		 && (myLen-first > 1)) {
-			qsort((char *)&myVec[first], myLen-first, sizeof(*myVec), compar);
+			qsort((char *)&myVec[first], myLen-first,
+						sizeof(*myVec), compar);
 		}
 	} else
 		result = record_a_match(pattern);
@@ -665,8 +662,8 @@ char	*item;
 			strcpy(temp,
 				strcpy(path, item)));
 
-	result = TRUE;
 	if (DirFindFirst(path,p)) {
+		result = TRUE;
 		do {
 			(void)strcpy(cp, DirEntryStr(p));
 			if (!record_a_match(temp)) {

@@ -2,9 +2,15 @@
  * 	X11 support, Dave Lemke, 11/91
  *	X Toolkit support, Kevin Buettner, 2/94
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/x11.c,v 1.101 1994/12/13 13:49:21 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/x11.c,v 1.108 1995/02/09 13:39:07 pgf Exp $
  *
  */
+
+/* Note on COLOR support -- if you're thinking of adding it, please be
+ *	patient.  color should be supported in the next release or two...
+ *			-pgf 2/95
+ */
+
 /*
  * Widget set selection.
  *
@@ -255,7 +261,6 @@ static	TBUFF	*PasteBuf;
 
 static	Atom	atom_WM_PROTOCOLS;
 static	Atom	atom_WM_DELETE_WINDOW;
-static	Atom	atom_WM_TAKE_FOCUS;
 static	Atom	atom_FONT;
 static	Atom	atom_FOUNDRY;
 static	Atom	atom_WEIGHT_NAME;
@@ -273,7 +278,6 @@ static	Atom	atom_CHARSET_ENCODING;
 static Bool lookfor_sb_resize = FALSE;
 #endif
 
-#if OPT_WORKING
 struct eventqueue {
     XEvent event;
     struct eventqueue *next;
@@ -281,7 +285,6 @@ struct eventqueue {
 
 static struct eventqueue *evqhead = NULL;
 static struct eventqueue *evqtail = NULL;
-#endif
 
 static	int	x_getc   P(( void )),
 		x_cres   P(( char * ));
@@ -366,10 +369,10 @@ static	void	resize_bar P(( Widget, XEvent *, String *, Cardinal *));
 #endif /* MOTIF_WIDGETS */
 #if OPT_WORKING
 static	void	x_set_watch_cursor P(( int ));
+#endif /* OPT_WORKING */
 static	int	evqempty P(( void ));
 static	void	evqadd P(( const XEvent * ));
 static	void	evqdel P(( XEvent * ));
-#endif /* OPT_WORKING */
 
 #define	FONTNAME	"7x13"
 
@@ -1637,16 +1640,13 @@ x_preparse_args(pargc, pargv)
 	    pargc, *pargv,
 	    fallback_resources,
 	    XtNgeometry,	NULL,
+	    XtNinput,		TRUE,
 	    NULL);
     dpy = XtDisplay(cur_win->top_widget);
 
 #if 0
     check_visuals();
 #endif
-
-    XtVaSetValues(cur_win->top_widget,
-	    XtNinput,	TRUE,
-	    NULL);
 
     XtGetApplicationResources(
 	    cur_win->top_widget, 
@@ -2108,15 +2108,10 @@ x_preparse_args(pargc, pargv)
     /* We wish to participate in the "delete window" protocol */
     atom_WM_PROTOCOLS = XInternAtom(dpy, "WM_PROTOCOLS", False);
     atom_WM_DELETE_WINDOW = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
-    atom_WM_TAKE_FOCUS = XInternAtom(dpy, "WM_TAKE_FOCUS", False);
     {
 	Atom atoms[2];
 	int i = 0;
 	atoms[i++] = atom_WM_DELETE_WINDOW;
-#if 0
-	if (!cur_win->focus_follows_mouse)
-	    atoms[i++] = atom_WM_TAKE_FOCUS;
-#endif
 	XSetWMProtocols(dpy,
 		XtWindow(cur_win->top_widget),
 		atoms,
@@ -2463,29 +2458,13 @@ x_open()
     cur_win->sliders = NULL;
 #endif
 
-    (void)signal(SIGHUP, x_quit);
-    (void)signal(SIGINT, catchintr);
-    (void)signal(SIGTERM, x_quit);
+    setup_handler(SIGHUP, x_quit);
+    setup_handler(SIGINT, catchintr);
+    setup_handler(SIGTERM, x_quit);
 
     /* main code assumes that it can access a cell at nrow x ncol */
     term.t_mcol = term.t_ncol = cur_win->cols;
     term.t_mrow = term.t_nrow = cur_win->rows;
-
-#ifndef HAVE_BSD_SETPGRP
-    /* 
-     * I've taken out the call to setpgrp for bsd compat systems since it
-     * seems that job control no longer works when I do this.  Some systems
-     * such as the NeXT simply ignore the job control signal.  Other systems
-     * such as SunOS actually kill the xvile process!   - kev 8-5-94
-     */
-
-    /* Break association with controlling terminal */
-# ifdef HAVE_SETSID
-    (void) setsid();
-# else 
-    (void) setpgrp();
-# endif /* HAVE_SETSID */
-#endif /* HAVE_BSD_SETPGRP */
 
     if (check_scrollbar_allocs() != TRUE)
 	ExitProgram(BADEXIT);
@@ -2591,7 +2570,6 @@ x_scroll(from, to, count)
 	XFlush(dpy);
 	wait_for_scroll(cur_win);
     }
-
 }
 
 /*
@@ -3298,9 +3276,12 @@ scroll_selection(rowcol, idp)
 	XtRemoveTimeOut(cur_win->sel_scroll_id);	/* shouldn't happen */
     cur_win->sel_scroll_id = (XtIntervalId) 0;
 
-    /* Assumption: sizeof(XtPointer) == sizeof(long) */
-    row = ((long) rowcol) >> 16;
-    col = (((long) rowcol) << 16) >> 16;
+    row = (((long) rowcol) >> 16) & 0xffff;
+    col = ((long) rowcol) & 0xffff;
+    if (row & 0x8000) 
+	row |= -1 << 16;
+    if (col & 0x8000)
+	col |= -1 << 16;
     extend_selection(cur_win, row, col, TRUE);
 }
 
@@ -3347,6 +3328,9 @@ extend_selection(tw, nr, nc, wipe)
     Bool wipe;
 {
     static long scroll_count = 0;
+    long rowcol = 0;
+    unsigned long interval = 0;
+
     if (cur_win->sel_scroll_id != (XtIntervalId) 0) {
 	if (nr < curwp->w_toprow || nr >= mode_row(curwp))
 	    return;		/* Only let timer extend selection */
@@ -3356,11 +3340,8 @@ extend_selection(tw, nr, nc, wipe)
 
     if (nr < curwp->w_toprow) {
 	if (wipe) {
-	    unsigned long interval;
 	    mvupwind(TRUE, line_count_and_interval(scroll_count++, &interval));
-	    cur_win->sel_scroll_id = XtAppAddTimeOut(
-		    cur_win->app_context, interval, scroll_selection,
-		    (XtPointer) ((long) ((nr << 16) | (nc & 0xffff))));
+	    rowcol = (nr << 16) | (nc & 0xffff);
 	}
 	else {
 	    scroll_count = 0;
@@ -3369,11 +3350,8 @@ extend_selection(tw, nr, nc, wipe)
     }
     else if (nr >= mode_row(curwp)) {
 	if (wipe) {
-	    unsigned long interval;
 	    mvdnwind(TRUE, line_count_and_interval(scroll_count++, &interval));
-	    cur_win->sel_scroll_id = XtAppAddTimeOut(
-		    cur_win->app_context, interval, scroll_selection,
-		    (XtPointer) ((long) ((nr << 16) | (nc & 0xffff))));
+	    rowcol = (nr << 16) | (nc & 0xffff);
 	}
 	else {
 	    scroll_count = 0;
@@ -3383,8 +3361,16 @@ extend_selection(tw, nr, nc, wipe)
     else {
 	scroll_count = 0;
     }
-    if (setcursor(nr,nc) && sel_extend(wipe,TRUE))
+    if (setcursor(nr,nc) && sel_extend(wipe,TRUE)) {
 	update(TRUE);
+	if (scroll_count > 0) {
+	    x_flush();
+	    cur_win->sel_scroll_id = XtAppAddTimeOut(cur_win->app_context,
+	                                             interval,
+						     scroll_selection,
+						     (XtPointer) rowcol);
+	}
+    }
     else
 	x_beep();
 }
@@ -3910,12 +3896,9 @@ grip_moved(w, unused, ev, continue_to_dispatch)
     Dimension height;
     int	lines;
 
-#if MOTIF_WIDGETS
     if (!lookfor_sb_resize)
 	return;
     lookfor_sb_resize = FALSE;
-#endif
-
     saved_curwp = curwp;
 
     i = 0;
@@ -4011,35 +3994,36 @@ x_change_focus(w, unused, ev, continue_to_dispatch)
     XEvent     *ev;
     Boolean    *continue_to_dispatch;
 {
+    static int got_focus_event = FALSE;
+
     switch (ev->type) {
-    case EnterNotify:
-	if (cur_win->focus_follows_mouse) {
-	    XSetInputFocus( dpy, XtWindow(w), RevertToParent, 
-	                    ev->xcrossing.time );
-	    /* hopefully this will generate a FocusIn event... */
-	}
-	return;
-    case FocusIn:
-	cur_win->show_cursor = True;
-#if NO_WIDGETS
-	XtSetKeyboardFocus(w, cur_win->screen);
-#else
+	case EnterNotify:
+	    if (!ev->xcrossing.focus || got_focus_event)
+		return;
+	    goto focus_in;
+	case FocusIn:
+	    got_focus_event = TRUE;
+focus_in:
+	    cur_win->show_cursor = True;
 #if MOTIF_WIDGETS
-	XmProcessTraversal(cur_win->screen, XmTRAVERSE_CURRENT);
-#else
-#if OL_WIDGETS
-	XtSetKeyboardFocus(cur_win->top_widget, cur_win->screen);
+	    XmProcessTraversal(cur_win->screen, XmTRAVERSE_CURRENT);
+#else /* OL_WIDGETS || NO_WIDGETS */
+	    XtSetKeyboardFocus(w, cur_win->screen);
 #endif
-#endif
-#endif
-	x_flush();
-	break;
-    case LeaveNotify:
-	return;
-    case FocusOut:
-	cur_win->show_cursor = False;
-	x_flush();
-	break;
+	    x_flush();
+	    break;
+	case LeaveNotify:
+	    if ( !ev->xcrossing.focus 
+	      || got_focus_event 
+	      || ev->xcrossing.detail == NotifyInferior)
+		return;
+	    goto focus_out;
+	case FocusOut:
+	    got_focus_event = TRUE;
+focus_out:
+	    cur_win->show_cursor = False;
+	    x_flush();
+	    break;
     }
 }
 
@@ -4051,17 +4035,11 @@ x_wm_delwin(w, unused, ev, continue_to_dispatch)
     XEvent     *ev;
     Boolean    *continue_to_dispatch;
 {
-    if (ev->type == ClientMessage 
-     && ev->xclient.message_type == atom_WM_PROTOCOLS) {
-	if ((Atom) ev->xclient.data.l[0] == atom_WM_DELETE_WINDOW) {
-	    quit(FALSE, 0);		/* quit might not return */
-	    (void) update(TRUE);
-	}
-	else if ((Atom) ev->xclient.data.l[0] == atom_WM_TAKE_FOCUS) {
-	    XSetInputFocus(XtDisplay(w), XtWindow(w), RevertToParent,
-		    (Time) ev->xclient.data.l[1]);
-	    XtSetKeyboardFocus(cur_win->top_widget, cur_win->screen);
-	}
+    if ( ev->type == ClientMessage 
+      && ev->xclient.message_type == atom_WM_PROTOCOLS
+      && (Atom) ev->xclient.data.l[0] == atom_WM_DELETE_WINDOW) {
+	quit(FALSE, 0);		/* quit might not return */
+	(void) update(TRUE);
     }
 }
 
@@ -4082,12 +4060,10 @@ x_on_msgline()
  * handle the exposure-events, and to get keypress-events (i.e., for stopping a
  * lengthy process).
  */
-#if OPT_WORKING
 void
-x_working()
+x_move_events()
 {
     XEvent ev;
-    x_set_watch_cursor(TRUE);
     while ((XtAppPending(cur_win->app_context) & XtIMXEvent)
         && !kqfull(cur_win)) {
 
@@ -4154,6 +4130,14 @@ x_working()
     }
 }
 
+#if OPT_WORKING
+void
+x_working()
+{
+    x_set_watch_cursor(TRUE);
+    x_move_events();
+}
+
 static void
 x_set_watch_cursor(onflag)
     int onflag;
@@ -4194,6 +4178,7 @@ x_set_watch_cursor(onflag)
 #endif /* NO_WIDGETS */
     }
 }
+#endif /* OPT_WORKING */
 
 static int
 evqempty()
@@ -4232,7 +4217,6 @@ evqdel(evp)
 	evqtail = NULL;
     free(delentry);
 }
-#endif /* OPT_WORKING */
 
 static void
 kqinit(tw)
@@ -4374,18 +4358,19 @@ x_getc()
 {
     int c;
 
-#if OPT_WORKING
     while (!evqempty()) {
 	XEvent ev;
 	evqdel(&ev);
 	XtDispatchEvent(&ev);
     }
+#if OPT_WORKING
     x_set_watch_cursor(FALSE);
 #endif
     while (1) {
 
 	if (tb_more(PasteBuf)) {	/* handle any queued pasted text */
 	    c = tb_next(PasteBuf);
+	    c |= NOREMAP;	/* pasted chars are not subject to mapping */
 	    break;
 	}
 
@@ -4445,12 +4430,12 @@ x_typahead(milli)
 	else
 	    timedout = 1;
 
-#if OPT_WORKING
 	while (kqempty(cur_win) && !evqempty()) {
 	    XEvent ev;
 	    evqdel(&ev);
 	    XtDispatchEvent(&ev);
 	}
+#if OPT_WORKING
 	x_set_watch_cursor(FALSE);
 #endif
 

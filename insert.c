@@ -7,7 +7,7 @@
  * Most code probably by Dan Lawrence or Dave Conroy for MicroEMACS
  * Extensions for vile by Paul Fox
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/insert.c,v 1.70 1994/12/12 16:12:55 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/insert.c,v 1.71 1995/02/06 04:06:39 pgf Exp $
  *
  */
 
@@ -711,6 +711,14 @@ int *backsp_limit_p;
 }
 
 #if ! SMALLER
+int
+appstring(f, n)
+int f, n;
+{
+	advance_one_char();
+	return istring(f,n,INSERT);
+}
+
 int
 insstring(f, n)
 int f, n;

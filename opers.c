@@ -1,9 +1,9 @@
 /*
  * This file contains the command processing functions for the commands
  * that take motion operators.
- * written for vile by Paul Fox, (c)1990
+ * written for vile: Copyright (c) 1990, 1995 by Paul Fox
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/opers.c,v 1.51 1994/11/29 04:02:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/opers.c,v 1.52 1995/02/08 03:29:23 pgf Exp $
  *
  */
 

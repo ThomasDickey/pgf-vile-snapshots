@@ -7,7 +7,7 @@
  *  Author:  Curtis Smith
  *  Last Updated: 07/14/87
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/vmsvt.c,v 1.18 1994/12/21 14:01:02 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/vmsvt.c,v 1.19 1995/01/27 13:52:56 pgf Exp $
  *
  */
 
@@ -321,12 +321,12 @@ vmsgtty()
 	$DESCRIPTOR(devnam, "SYS$INPUT");
 
 	/* Assign input to a channel */
-	status = sys$assign(&devnam, &fd, 0, 0);
+	status = SYS$ASSIGN(&devnam, &fd, 0, 0);
 	if ((status & 1) == 0)
 		ExitProgram(status);
 
 	/* Get terminal characteristics */
-	status = sys$qiow(		/* Queue and wait		*/
+	status = SYS$QIOW(		/* Queue and wait		*/
 		0,			/* Wait on event flag zero	*/
 		fd,			/* Channel to input terminal	*/
 		IO$_SENSEMODE,		/* Get current characteristic	*/
@@ -337,7 +337,7 @@ vmsgtty()
 		0, 0, 0, 0);		/* P3-P6 unused			*/
 
 	/* De-assign the input device */
-	if ((sys$dassgn(fd) & 1) == 0)
+	if ((SYS$DASSGN(fd) & 1) == 0)
 		ExitProgram(status);
 
 	/* Jump out if bad status */

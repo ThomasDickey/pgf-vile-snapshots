@@ -1,0 +1,225 @@
+Changes for vile 5.0 (released Fri Feb 10, 1995)
+(pgf)
+	+ rearranged ifdefs leading to OPT_WORKING def'n for clarity.
+	  (estruct.h)
+
+	+ a couple of the new scratch buffer names were too long.  (edef.h)
+
+	+ added commands for undoing system maps ("unmap-system-chars")
+	  and abbreviations ("unabbreviate").  (map.c, cmdtbl,
+	  vile.hlp, proto.h)
+
+	+ NetBSD, FreeBSD, etc. all seem to define the termcap "kD" attribute
+	  as DEL.  i consider this questionable, since they also produce
+	  DEL from the Backspace key, but in any case, it means we shouldn't
+	  define a system map for the DEL key.  we should really have separate
+	  system maps for insert and command modes, but i think that might be
+	  overly complicated.  so instead, i suppress the mapping of an ASCII
+	  DEL to anything else (at the system level -- the user can still do
+	  whatever they want.)  (tcap.c)
+
+	+ renamed our signal() wrapper to setup_handler(), and always use it.
+	  on systems with sigaction(), use it in place of calling signal() to
+	  ensure system calls are restartable.  setup_handler() is now in
+	  main.c, moved from termio.c (buglist, display.c, file.c, main.c,
+	  proto.h, spawn.c, termio.c, x11.c, x11simp.c)
+
+	+ use test for restartable reads on pipes rather than stock
+	  restartable system call test, when trying to configure OPT_WORKING.
+	  OSF/1 3.0 has restartable system calls, but reads (and writes) on
+	  pipes will return EINTR regardless of SA_RESTART state.  they
+	  call this a feature, based on the POSIX spec.  i haven't been
+	  able to check.  (if you link against -lsys5 on OSF/1, you _can_
+	  turn on OPT_WORKING.  but they claim that may be a bug, and
+	  a "libsys5.a" may exist on other system, so i'm not going to
+	  trust or use it.) (aclocal.m4, configure, configure.in, estruct.h)
+
+	+ pasted characters now have the NOREMAP bit set, to prevent map
+	  expansion of pasted text. (x11.c, estruct.h)
+
+	+ changed token parsing to no longer treat ^L and ^M (i.e. formfeed
+	  and carriage return) as whitespace.  this fix is mostly for :map,
+	  so that carriage returns can appear in the lhs and at the start
+	  of the rhs, but it should also allow those characters in other
+	  response contexts as well.  (exec.c)
+
+	+ implemented "flow-control-enable" command, which re-enables
+	  software flow control for those users who still need it.  not all
+	  implementations (posix/sgtty/termio) were disabling it in the
+	  first place -- i'm surprised selections worked there (they may
+	  not have.) (termio.c, cmdtbl, proto.h, vile.hlp)
+
+	+ protect against infinite recursion when attempting to print
+	  0x80000000 as a signed integer.  (display.c)
+
+	+ changed file completion buffer to show the full prefix of the
+	  thing that's being completed (patch from jukka keto). (bind.c)
+
+	+ added jukka keto's c-filt.c program to the distribution. (c-filt.c,
+	  makefile.in)
+
+	+ changed HAS_ALARM define to HAVE_ALARM, and let it be autoconf'ed.
+	  (estruct.h, configure.in, configure)
+
+	+ added code in ffgetline(), which is where pipes are read, to
+	  check for EINTR from a SIGALRM and redo the read() if we're
+	  on a system where the read() isn't restartable. this lets
+	  us turn on working on all system that have alarm(). THEN, i
+	  backed this change out with ifdefs, since i think some old
+	  kernels can lose data if they get a signal during a
+	  read().  (fileio.c, display,c, estruct.h, edef.h)
+
+	+ put start of child process status reporting in system_SHELL().
+	  ifdef'ed it out, since the WIFSIGNALED etc. macros probably
+	  aren't on all systems, and i don't want to break this release.
+	  (npopen.c)
+
+	+ introduce checks for SCO systems, which are probably not so odd
+	  when compared with their peers, it's just that their peers have
+	  all gone away.  (configure.in, configure, termio.c, estruct.h)
+
+	+ fix globbing in root directory (i.e. ":e /j*k" now gets "/junk"),
+	  and move DOS check for this same thing ("c:auto*.bat") slightly.
+	  ensure what we don't end up with doubled or trailing slashes
+	  ("//foo", "/foo/") anywhere, since DOS won't open those or stat
+	  them properly.  (glob.c)
+
+	+ fixed benign wp/curwp mixup in l_to_vcol().  (display.c)
+
+	+ change expression for lint. (map.c)
+
+	+ move ifdef for ANSI_QSORT into estruct.h, so it can be used in
+	  proto.h as well as glob.c (proto.h, glob.c, estruct.h)
+
+	+ added a couple of SIZE_T casts to keep "new ansi semantics" warnings
+	  at bay.  (file.c, history.c)
+
+	+ fixed some typos in the vile.hlp, added a version number, to
+	  correspond to the version it's distributed with.
+
+	+ change name of __MAXINT to not have __ on front, add cast to (int).
+	  (display.c)
+
+	+ changed the FL_PATH search order to look in the table first.  this
+	  a) seems more correct, and b) will help ensure that the new helpfile
+	  location (/usr/local/lib) will be checked before the old (which was
+	  /usr/local/bin).  took /usr/local/bin out of the internal table.
+	  i have more changes pending for this area, having to do with bugs
+	  in how we determine where the executable came from.  but i'll hold
+	  them until next release.  (bind.c, epath.h)
+
+	+ added note about old helpfiles to README and README.CFG.
+
+	+ added some more reminders for myself to the release_warnings
+	  target. (makefile.in)
+
+	+ created patchlev.h file.  include and use it it in version.c.
+
+	+ added missing range checks to EXACTLY case of regrepeat() to
+	  prevent going off end of line when matching 'cc*' on a line
+	  that ends in 'c'. (regexp.c)
+
+	+ fixed ifdefs for signal_pg(), to negate pid when killing a pgrp
+	  with kill().  (estruct.h)
+
+	+ moved setting of new process group out of x_open(), and into a
+	  command, which can be used in a .vilerc if someone needs it.  it
+	  seemed like the cases we were trying to catch were bugs in other
+	  programs (shells and window managers).  this seems like the most
+	  flexible approach, at least until i understand the problems a little
+	  better.  (x11.c, main.c, cmdtbl, vile.hlp, proto.h)
+
+	+ simplified, and moved non_filename() to version.c, so it can more
+	  easily use the PATCHLEVEL string.  (proto.h, version.c, path.c)
+	 
+	+ changed PATCHLEVEL from a char constant to a string, for more
+	  flexibility in naming patches.  duh.  (version.c, patchlev.h)
+
+	+ added GNU General Public License to distribution, as required by
+	  configure/configure.in.  (makefile.in, COPYING)
+
+	+ tweaked/updated copyrights, added some vile specific caveats and
+	  info to the COPYING file.
+
+	+ reenabled '!' expansion in shell commands.  more vi's than not
+	  seem to do it.  (input.c)
+
+	+ arrange to check the X event queue when doing updates() during
+	  a pipe read.  we were only checking in x_working() before, which
+	  isn't called if "set noworking" or OPT_WORKING == FALSE. (proto.h,
+	  x11.c, file.c)
+
+(tom)
+	+ modified column shown by ruler to be the actual cursor column, rather
+	  than the effective column (display.c).
+
+	+ made vms sys$/lib$ calls consistent (uppercase) to simplify greps
+	  (path.c, random.c, termio.c, vms2unix.c, vmspipe.c, vmsvt.c).
+
+	+ changed input-buffer size and error checks for vms to avoid
+	  data overrun problems (termio.c).
+
+	+ corrected glob-expansion for environment-variables, e.g., $FOO
+	  (glob.c).
+
+	+ updated tests for memory leaks (bind.c, map.c).
+
+	+ corrected glob-expansion of msdos pathnames that use '/' (glob.c).
+
+	+ corrected bug that prevented '!' from being inserted into shell
+	  commands without being escaped (input.c).
+
+	+ added command 'append-string' for symmetry with 'insert-string'
+	  (insert.c, cmdtbl).
+
+	+ modified vax scripts to compile on AXP hardware under OpenVMS
+	  (descrip.mms, display.c, vms_link.opt, vmsbuild.com, vmsshare.opt)
+
+	+ corrected shadowing of 'stat' in npopen.c
+
+	+ added version.o: patchlev.h dependency to all makefiles.
+	  (descrip.mms makefile.djg makefile.tbc makefile.wat makefile.wnt)
+
+(kev)
+	+ main.c (newprocessgroup): Changed XHAVE_SETSID to HAVE_SETSID.
+	  Added HAVE_BSD_SETPGRP ifdef which is necessary due to the fact
+	  that setpgrp on BSD systems requires two arguments.
+
+	+ x11.c (scroll_selection): Sign extend row and col.  It's possible
+	  to sign extend in fewer lines of code if we make certain
+	  assumptions about the widths of ints, shorts, and longs.  Not as
+	  portable though.
+
+	  (extend_selection): Add scrolling timeout _after_ updating the
+	  display.
+
+	+ vile.hlp: did a lot of tweaking/rewording/correcting.
+
+	+ display.c (l_to_vcol): Use wp->w_dot instead of DOT.  DOT uses
+	  curwp which is not what we want here.  This problem was causing
+	  core dumps when I got into xvile and did the following:
+
+	  	:help
+		/fmt
+
+	+ x11.c (x_change_focus): Do not attempt to give ourselves focus
+	  when focusFollowsMouse is true and we enter the window.  Also,
+	  don't rely on the receipt of FocusIn/FocusOut events for deciding
+	  whether or not to show the cursor.
+
+	  (x_preparse_args): Set the XtNinput resource to TRUE in the
+	  call to XtVaAppInitialize() instead of in a separate call to
+	  XtVaSetValues(). [This is how Volume 4 in the O'Reilly series
+	  recommends doing it].
+
+	  (x_wm_delwin): Removed the unused WM_TAKE_FOCUS stuff from this
+	  function.
+
+	  (grip_moved): Removed superfluous "#if MOTIF_WIDGETS" / "#endif"
+	  pair.
+
+	  (scroll_selection): Cleaned up decoding of row and col.
+
+	  (x_preparse_args): Took out WM_TAKE_FOCUS stuff.
+
+This change log started on Wed Jan 11, 1995.

@@ -3,7 +3,7 @@
  *
  *	written 11-feb-86 by Daniel Lawrence
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/bind.c,v 1.107 1994/12/20 23:41:04 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/bind.c,v 1.111 1995/01/31 01:58:47 pgf Exp $
  *
  */
 
@@ -890,6 +890,13 @@ int hflag;	/* Look in the HOME environment variable first? */
 
 	if (hflag & FL_PATH) {
 
+		/* look it up via the old table method */
+		for (i=2; i < NPNAMES; i++) {
+			if (ffaccess(pathcat(fspec, pathname[i], fname),mode)) {
+				return(fspec);
+			}
+		}
+
 #if OPT_PATHLOOKUP
 #if SYS_VMS
 		/* On VAX/VMS, the PATH environment variable is only the
@@ -923,12 +930,6 @@ int hflag;	/* Look in the HOME environment variable first? */
 #endif	/* OPT_PATHLOOKUP */
 #endif	/* ENVFUNC */
 
-		/* look it up via the old table method */
-		for (i=2; i < NPNAMES; i++) {
-			if (ffaccess(pathcat(fspec, pathname[i], fname),mode)) {
-				return(fspec);
-			}
-		}
 	}
 
 	return NULL;	/* no such luck */
@@ -1465,10 +1466,12 @@ makecmpllist(dummy, cinfop)
 
     slashcol = (int)(pathleaf(buf) - buf);
     if (slashcol != 0) {
-	char b[NLINE];
-	(void)strncpy(b, buf, (SIZE_T)slashcol);
-	b[slashcol] = EOS;
-	bprintf("Completions prefixed by %s:\n", b);
+        char b[NLINE];
+        (void)strncpy(b, buf, (SIZE_T)slashcol);
+        (void)strncpy(&b[slashcol], &(THIS_NAME(first))[slashcol],
+			(len-slashcol));
+        b[slashcol+(len-slashcol)] = EOS;
+        bprintf("Completions prefixed by %s:\n", b);
     }
 
     cmplcols = term.t_ncol / (maxlen - slashcol + 1);
@@ -1890,3 +1893,17 @@ char	*buffer;
 		kbd_flags,	/* allow blank-return */
 		cmd_complete);
 }
+
+#if NO_LEAKS
+void
+bind_leaks()
+{
+#if OPT_REBIND
+	while (KeyBindings != kbindtbl) {
+		KBIND *kbp = KeyBindings;
+		KeyBindings = kbp->k_link;
+		free((char *)kbp);
+	}
+#endif
+}
+#endif	/* NO_LEAKS */

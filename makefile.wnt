@@ -1,7 +1,7 @@
 #
 # makefile for vile using Microsoft 8.50.4102
 #
-# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.wnt,v 1.4 1994/11/23 01:13:23 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.wnt,v 1.5 1995/02/10 14:10:45 pgf Exp $
 #
 #
 !include <ntwin32.mak>
@@ -79,4 +79,5 @@ glob.obj:	dirstuff.h
 externs.obj:	nebind.h nename.h nefunc.h
 path.obj:	dirstuff.h
 vmalloc.obj:	nevars.h
+version.obj:	patchlev.h
 

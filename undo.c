@@ -1,7 +1,9 @@
 /* these routines take care of undo operations
  * code by Paul Fox, original algorithm mostly by Julia Harper May, 89
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/undo.c,v 1.55 1994/11/22 02:38:52 pgf Exp $
+ * written for vile: Copyright (c) 1990, 1995 by Paul Fox
+ *
+ * $Header: /usr/build/VCS/pgf-vile/RCS/undo.c,v 1.56 1995/02/08 03:29:23 pgf Exp $
  *
  */
 

@@ -1,7 +1,7 @@
 /*
  * 	older, simpler X11 support, Dave Lemke, 11/91
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/x11simp.c,v 1.54 1994/11/29 04:02:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/x11simp.c,v 1.55 1995/01/04 18:07:46 pgf Exp $
  *
  */
 #error This module is not actively maintained as part of vile.
@@ -682,9 +682,9 @@ x_open()
 
     tw->sel_prop = XInternAtom(dpy, "VILE_SELECTION", False);
 
-    (void)signal(SIGHUP, x_quit);
-    (void)signal(SIGINT, catchintr);
-    (void)signal(SIGTERM, x_quit);
+    setup_handler(SIGHUP, x_quit);
+    setup_handler(SIGINT, catchintr);
+    setup_handler(SIGTERM, x_quit);
 
     /* main code assumes that it can access a cell at nrow x ncol */
     term.t_ncol = tw->cols;

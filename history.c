@@ -63,7 +63,7 @@
  *
  *	Allow left/right scrolling of input lines (when they get too long).
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/history.c,v 1.23 1994/12/09 18:06:35 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/history.c,v 1.24 1995/01/26 02:55:00 pgf Exp $
  *
  */
 
@@ -256,7 +256,7 @@ int	glue;
 		return;
 
 	if (willExtend(cmd, (int)strlen(cmd))
-	 && strlen(cmd) > skip) {
+	 && strlen(cmd) > (SIZE_T)skip) {
 		kbd_pushback(cmd, skip);
 	}
 

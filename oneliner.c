@@ -1,9 +1,10 @@
 /*
  *	A few functions that used to operate on single whole lines, mostly
  *	here to support the globals() function.  They now work on regions.
- *	Written (except for delins()) for vile by Paul Fox, (c)1990
+ *	Copyright (c) 1990, 1995 by Paul Fox, except for delins(), which is
+ *	Copyright (c) 1986 by University of Toronto, as noted below.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/oneliner.c,v 1.68 1994/12/09 18:06:35 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/oneliner.c,v 1.69 1995/02/08 03:29:23 pgf Exp $
  */
 
 #include	"estruct.h"

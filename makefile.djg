@@ -3,7 +3,7 @@
 #
 # T.DANG (dang@cogit.ign.fr)
 #
-# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.djg,v 1.12 1994/11/29 04:02:03 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.djg,v 1.13 1995/02/10 14:10:45 pgf Exp $
 #
 #
 
@@ -97,4 +97,5 @@ glob.o:	dirstuff.h
 externs.o:	nebind.h nename.h nefunc.h
 path.o:	dirstuff.h
 vmalloc.o:	nevars.h
+version.o:	patchlev.h
 

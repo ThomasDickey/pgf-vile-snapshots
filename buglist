@@ -1,7 +1,7 @@
 ------------------------
 vile bug/enhancement/wish list
 ------------------------
-$Header: /usr/build/VCS/pgf-vile/RCS/buglist,v 1.214 1994/12/16 14:31:36 pgf Exp $
+$Header: /usr/build/VCS/pgf-vile/RCS/buglist,v 1.223 1995/02/10 00:02:08 pgf Exp $
 ----------------------
 	(E means enhancement, L,M,H are low, medium, high priority)
 
@@ -63,11 +63,6 @@ E	can't search for a NUL in a buffer.
 E	":e" and ":e!" should share the same prompt data, which should be
 	editable / history.  They both should default (like vi!) to the
 	current buffer.
-
-E	the "ww" command (e.g., 'writeall()') emits multiple messages via
-	'mlforce()'; these go by too quickly to follow.
-	[ the alternative currently is to require a press-return, which some
-	  folks don't like. ]
 
 E	for consistency, 'execute-macro-nn' should be 'execute-macro nn';
 	doing this would allow modification to eliminate a fixed number of
@@ -185,7 +180,7 @@ reconnect input and capture output.)  some commands like latex prompt for
 more input when partway done.
 
 ========(VMS-VILE)=============================================================
-Unfinished items on vax/vms (dickey@software.org):
+Unfinished items on vax/vms (dickey@clark.net):
 
 	+ the response time seems a bit slow (compared with other applications
 	  running on the same machine).  possible problem areas include:
@@ -329,16 +324,6 @@ When you do a :b you should have line completion for the name.
 
 ---------------------------
 
-We are running vile version 3.61 under NeXT and we have problems with
-the redraw. I mean, when I press ^F or ^b (next-page or previous-page)
-I get some spurious charactersa in the screen. With a ^L all is back
-to the normally. The some is goiing on when I perform a search.
-
-Also we have problems when we accidentally press ^J.  Vile is hanging
-in this situation.
-
----------------------------
-
 
 How can I read the status of a shell command when I execute a
 shell-command? Although the shell command has a $STATUS=1 the
@@ -465,11 +450,6 @@ long-running operations.
 
 ----------------------
 
-should switch to distributing with a tar archive instead of shar.   much
-faster, and probably portable, these days.
-
--------------------------
-
 could the attribute selection logic be used to emulate vi's behavior
 of replacing the last char of a change operation to '$'?  (but only for
 text which does not span a line)
@@ -481,15 +461,6 @@ text which does not span a line)
  screen always 'hops'.  (scrolls 1 line forward and backward)
 
 -------------------------
-
-the local copy of signal() in termio.c should get a new name e.g. 
-vilesignal().  we should call it in all cases.  we should ifdef things so
-on systems where we don't need our routine, we simply act as a wrapper for
-the real signal().  (someone reported getting a multiply-defined error
-on signal, on a Sequent machine.  probably from a bad shared-lib
-implementation.
-
---------------------
 
 there should be a way to reference both the global and local values
 of modes from within macros, so that values can be saved and restored.
@@ -532,7 +503,7 @@ Otherwise, great work!
 	Tjl
 -----------------
 
-when motion keys or pasting is used during an insertion, perhaps we should
+when motion keys or pasting is used during an insertion, we should
 break the insertion into multiple undoable chunks.
 -----------------
 
@@ -594,22 +565,6 @@ xvile:
 
 ----------------------------
 
-we disassociate xvile from the terminal that starts it just a little
-too well.  it's not possible to suspend and background the job if you
-start it without the '&' (i.e. "xvile &").
-
-------------------
-
-why the following in estruct.h?
-
-#if !TERMCAP || (APOLLO && defined(__GNUC__))
-#define	TTputc		(*term.t_putchar)
-#else
-#define	TTputc		(void)putchar
-#endif
-
-------------------
-
 on the first attempt to insert a quoted ^C (i.e. ^V^C) it works, but also
 quotes the next character (e.g. the ESC).  after the first time, ^C doesn't
 work anymore.  (this seems to be linux-specific, and i'm running an old
@@ -625,3 +580,43 @@ instead of intdos() to get the char.  (see ttgetc())  that's probably
 at least part of the answer.
 
 ---------------
+how about a mode that supports autosaving to the backup-file,
+instead of to the original file -- useful for system crashes.
+
+-----------------
+
+rectangular operations don't work right if there are control characters
+to the left of the rectangle.  (physically they work, but the visual
+effect is wrong.  i'm not sure what the right thing to do is.)
+
+-------------------------
+double quote characters (and probably other special chars) are interpreted
+incorrectly on the lhs of a map command.  for instance:
+	map ^K" WBi"^[Ea"^[
+will result in 
+	^K WBi
+as the lhs, leaving
+	^[Ea"^[
+as the rhs.  the workaround is to escape the " in the lhs:
+	map ^K\" WBi"^[Ea"^[
+
+(this map surrounds the current word in double quotes)
+
+-----------------------------
+
+It should be fine if the tabulate key (to have the file completion)
+understands the SHELL variables.  For example, if I type $HOME<TAB>, xvile
+gives the choice.
+
+-----------------------------
+
+Would you please add another hook: modify-hook.  I thought this is useful,
+for example, if I attempt to insert, delete (in general, modify) text
+in a read-only file, I like it to prompt if the user wants to PVCS-lock it.
+A message would look something like this:
+	File is read-only, check out?
+
+-----------------------------
+
+contrary to the vile.hlp text, binding to the interrupt{} terminal
+character does not fully change intrc and the user's interrupt character.

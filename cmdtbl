@@ -95,7 +95,7 @@
 #		in '!' listed, then the flag does nothing, and should be
 #		viewed simply as documentation.
 #
-# $Header: /usr/build/VCS/pgf-vile/RCS/cmdtbl,v 1.118 1994/12/14 18:27:28 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/cmdtbl,v 1.124 1995/02/06 04:06:39 pgf Exp $
 #
 #
 
@@ -111,6 +111,9 @@ append		REDO|UNDO
 	"append-chars"			!FEWNAMES
 	'a'
 	<insert (CNT copies of) text after the cursor>
+appstring	REDO|UNDO		!SMALLER
+	"append-string"
+	<append the given string after the cursor>
 appendeol	REDO|UNDO
 	"append-chars-at-eol"		!FEWNAMES
 	'A'
@@ -473,6 +476,9 @@ esc_func	NONE
 	'^['
 	'FN-!'				KEY_F11
 	<the abort key, normally bound to ESC; it terminates lots of things>
+flow_control_enable	NONE		SYS_UNIX
+	"flow-control-enable"
+	<enable software flow-control (disable with arg)>
 fcsrch		MOTION
 	"forward-char-scan"		!FEWNAMES
 	'f'
@@ -847,6 +853,9 @@ map_bang	NONE|(EXRCOK|EXTRA)
 	"map!"
 	"show-mapped!-chars"
 	<create a new map, or show list of the current insert-mode maps>
+newprocessgroup	NONE
+	"new-process-group"
+	<put editor into its own process group (X11 version only)>
 noremap		NONE|(EXRCOK|EXTRA)
 	"noremap"
 	<create a new unremappable command-mode map>
@@ -1189,6 +1198,7 @@ revsearch	ABSM|MOTION
 sel_motion	ABSM|MOTION		OPT_SELECTIONS
 	"selection"
 	'^S'
+	'^A-S'
 	<move to selection.  if used with operator, region is the selection>
 scrforwsearch	ABSM|MOTION
 	"screen-search-forward"		!FEWNAMES
@@ -1355,6 +1365,9 @@ forwredo	NONE
 	"redo-changes-forward"		!FEWNAMES
 	'^X-r'
 	<redo changes made to a buffer, after they have been undone>
+unabbr		NONE|(EXRCOK|BANG|EXTRA)
+	"unabbreviate"
+	<delete an abbreviation>
 unarg_func		NONE
 	"universal-argument"		!FEWNAMES
 	'K'
@@ -1367,10 +1380,13 @@ unmark		NONE
 	<clear the \"modified\" status of a buffer>
 unmap		NONE|(EXRCOK|BANG|EXTRA)
 	"unmap"
-	<undo a command-mode mapping>
+	<delete a command-mode mapping>
 unmap_bang	NONE|(EXRCOK|EXTRA)
 	"unmap!"
-	<undo an insert-mode mapping>
+	<delete an insert-mode mapping>
+unmap_system	NONE|(EXRCOK|EXTRA)
+	"unmap-system-chars"
+	<delete a system function-key mapping>
 untagpop	NONE			OPT_TAGS
 	"tag-pop"			!FEWNAMES
 	"pop"

@@ -1,7 +1,7 @@
 /* Find the next error in mentioned in the shell output window.
- * Written for vile by Paul Fox, (c)1990
+ * written for vile: Copyright (c) 1990, 1995 by Paul Fox
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/finderr.c,v 1.42 1994/12/09 18:06:35 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/finderr.c,v 1.43 1995/02/08 03:29:23 pgf Exp $
  *
  */
 

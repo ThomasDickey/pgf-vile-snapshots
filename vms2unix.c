@@ -3,7 +3,7 @@
  *
  *	Miscellaneous routines for UNIX/VMS compatibility.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/vms2unix.c,v 1.8 1994/11/29 04:02:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/vms2unix.c,v 1.9 1995/01/27 13:52:56 pgf Exp $
  *
  */
 #include	"estruct.h"
@@ -43,7 +43,7 @@ opendir(char *filename)
 	znam.nam$b_rss = NAM$C_MAXRSS;
 	znam.nam$l_rsa = zrsa;
 
-	if (sys$parse(&zfab) != RMS$_NORMAL) {
+	if (SYS$PARSE(&zfab) != RMS$_NORMAL) {
 		(void)closedir(dirp);
 		dirp = 0;
 	}
@@ -53,7 +53,7 @@ opendir(char *filename)
 DIRENT *
 readdir(DIR *dirp)
 {
-	if (sys$search(&zfab) == RMS$_NORMAL) {
+	if (SYS$SEARCH(&zfab) == RMS$_NORMAL) {
 		zrsl = znam.nam$b_rsl;
 		zrsa[znam.nam$b_rsl];
 		return (&(dirp->dd_ret));

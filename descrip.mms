@@ -11,7 +11,7 @@
 # all as "0".  If you use tcap.c, you'll need libtermcap.a too.  If you use
 # x11.c, you'll need libX11.a too.
 #
-# $Header: /usr/build/VCS/pgf-vile/RCS/descrip.mms,v 1.20 1994/12/21 14:01:02 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/descrip.mms,v 1.22 1995/02/10 14:10:45 pgf Exp $
 
 # for regular vile, use these:
 SCREEN = vmsvt
@@ -149,8 +149,32 @@ OBJ =	main.obj,\
 	word.obj,\
 	wordmov.obj
 
-all :	$(TARGET)
-	@ WRITE SYS$OUTPUT "** made $@"
+all :
+        @ decc = f$search("SYS$SYSTEM:DECC$COMPILER.EXE").nes.""
+        @ axp = f$getsyi("HW_MODEL").ge.1024
+        @ macro = ""
+        @ if axp.or.decc then macro = "/MACRO=("
+        @ if decc then macro = macro + "__DECC__=1,"
+        @ if axp then macro = macro + "__ALPHA__=1,"
+        @ if macro.nes."" then macro = f$extract(0,f$length(macro)-1,macro)+ ")"
+        $(MMS)$(MMSQUALIFIERS)'macro' $(TARGET)
+
+.IFDEF __ALPHA__
+CC_OPTIONS = /STANDARD=VAXC
+CC_DEFS = ,HAVE_ALARM
+OPTFILE =
+OPTIONS =
+.ELSE
+.IFDEF __DECC__
+CC_OPTIONS = /STANDARD=VAXC
+CC_DEFS = ,HAVE_ALARM,
+.ELSE
+CC_OPTIONS =
+CC_DEFS = ,HAVE_SYS_ERRLIST
+.ENDIF
+OPTFILE = ,vmsshare.opt
+OPTIONS = $(OPTFILE)/OPTIONS
+.ENDIF
 
 nebind.h \
 nefkeys.h \
@@ -190,6 +214,7 @@ glob.obj :	dirstuff.h
 externs.obj :	nebind.h nename.h nefunc.h
 vmalloc.obj :	nevars.h
 vms2unix.obj :	dirstuff.h
+version.obj :	patchlev.h
 
 .first :
 	@ define/nolog SYS SYS$LIBRARY		! fix includes to <sys/...>
@@ -206,18 +231,18 @@ vms2unix.obj :	dirstuff.h
 # used /G_FLOAT with vaxcrtlg/share in vms_link.opt
 # can also use /Debug /Listing, /Show=All
 CFLAGS =-
-	/Diagnostics /Define=("os_chosen",$(SCRDEF)) -
-	/Object=$@ /Include=($(INCS))
+	/Diagnostics /Define=("os_chosen",$(SCRDEF)$(CC_DEFS)) -
+	/Object=$@ /Include=($(INCS)) $(CC_OPTIONS)
 
 .C.OBJ :
 	$(CC) $(CFLAGS) $(MMS$SOURCE)
 	@- delete $(MMS$TARGET_NAME).dia;*
 
-$(MKTBLS) : mktbls.obj
-	$(LINK) $(LINKFLAGS) mktbls.obj,SYS$LIBRARY:VAXCRTL/LIB
+$(MKTBLS) : mktbls.obj $(OPTFILE)
+	$(LINK) $(LINKFLAGS) mktbls.obj $(OPTIONS)
 
-$(TARGET) : $(OBJ), vms_link.opt, descrip.mms
-	$(LINK) $(LINKFLAGS) main.obj, $(SCREEN).obj, vms_link/opt
+$(TARGET) : $(OBJ), vms_link.opt, descrip.mms $(OPTFILE)
+	$(LINK) $(LINKFLAGS) main.obj, $(SCREEN).obj, vms_link/opt $(OPTIONS)
 
 # Runs VILE from the current directory (used for testing)
 vile.com :

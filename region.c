@@ -5,7 +5,7 @@
  * commands. Some functions are just for
  * internal use.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/region.c,v 1.68 1994/12/19 14:38:37 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/region.c,v 1.69 1995/01/13 13:26:40 pgf Exp $
  *
  */
 
@@ -456,11 +456,11 @@ int	l, r;
 
 	/* may return -1 if no non-white on line.  but
 		that's okay, since the math still works. */
-	off = lastchar(DOT.l);
+	off = lastchar(lp);
 
 	odoto = DOT.o;
 	DOT.o = off+1;
-	s = ldelete((B_COUNT)(llength(DOT.l) - off - 1),FALSE);
+	s = ldelete((B_COUNT)(llength(lp) - off - 1),FALSE);
 
 	/* but now we need to ensure DOT.o doesn't become -1 */
 	if (off < 0)

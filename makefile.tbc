@@ -1,5 +1,5 @@
 # This is a makefile for mktbls and vile under Turbo-C
-# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.tbc,v 1.15 1994/12/05 14:08:22 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.tbc,v 1.16 1995/02/10 14:10:45 pgf Exp $
 
 .AUTODEPEND
 
@@ -285,7 +285,7 @@ tmp.obj:	$(VILE_CFG) tmp.c
 
 undo.obj:	$(VILE_CFG) undo.c 
 
-version.obj:	$(VILE_CFG) version.c 
+version.obj:	$(VILE_CFG) version.c   patchlev.h
 
 vmalloc.obj:	$(VILE_CFG) vmalloc.c	nevars.h
 

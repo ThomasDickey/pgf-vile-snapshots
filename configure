@@ -1,5 +1,5 @@
 #!/bin/sh
-# From configure.in Revision: 1.15 
+# From configure.in Revision: 1.19 
 
 ### Use "configure -with-screen" to override the default configuration, which is
 ### termcap-based on unix systems.
@@ -673,6 +673,39 @@ else
 fi
 
 
+
+# check for SCO.  this is a hack, and should be split into individual
+# features -- the sys/time.h and select.h conflict, and the need for
+# ptem.h due to winsize struct.
+test -n "$silent" || echo "checking for SCO by checking on /usr/bin/scosh"
+if test -z "$COULD_BE_SCO"; then
+  # Extract the first word of `scosh', so it can be a program name with args.
+  set ac_dummy scosh; ac_word=$2
+  test -n "$silent" || echo "checking for $ac_word"
+  IFS="${IFS= 	}"; ac_save_ifs="$IFS"; IFS="${IFS}:"
+  for ac_dir in $PATH; do
+    test -z "$ac_dir" && ac_dir=.
+    if test -f $ac_dir/$ac_word; then
+      COULD_BE_SCO="maybe"
+      break
+    fi
+  done
+  IFS="$ac_save_ifs"
+fi
+test -z "$COULD_BE_SCO" && COULD_BE_SCO="maybenot"
+test -n "$COULD_BE_SCO" && test -n "$verbose" && echo "	setting COULD_BE_SCO to $COULD_BE_SCO"
+
+if test "$COULD_BE_SCO" = "maybe"
+then
+	
+{
+test -n "$verbose" && \
+echo "	defining SYSTEM_LOOKS_LIKE_SCO"
+echo "#define" SYSTEM_LOOKS_LIKE_SCO "1" >> confdefs.h
+DEFS="$DEFS -DSYSTEM_LOOKS_LIKE_SCO=1"
+}
+
+fi
 
 ###	checks for header files
 test -n "$silent" || echo "checking for ANSI C header files"
@@ -1378,7 +1411,7 @@ DEFS="$DEFS -DHAVE_LONG_FILE_NAMES=1"
 }
 
 
-test -n "$silent" || echo "checking for restartable system calls"
+test -n "$silent" || echo "checking for restartable reads on pipes"
 cat > conftest.${ac_ext} <<EOF
 #include "confdefs.h"
 /* Exit 0 (true) if wait returns something other than -1,
@@ -1386,13 +1419,41 @@ cat > conftest.${ac_ext} <<EOF
    after getting the signal.  */
 #include <sys/types.h>
 #include <signal.h>
+#ifdef SA_RESTART
+sigwrapper(sig, disp)
+int sig;
+void (*disp)();
+{
+    struct sigaction act, oact;
+
+    act.sa_handler = disp;
+    sigemptyset(&act.sa_mask);
+    act.sa_flags = SA_RESTART;
+
+    (void)sigaction(sig, &act, &oact);
+
+}
+#else
+# define sigwrapper signal
+#endif
 ucatch (isig) { }
 main () {
-  int i = fork (), status;
-  if (i == 0) { sleep (3); kill (getppid (), SIGINT); sleep (3); exit (0); }
-  signal (SIGINT, ucatch);
-  status = wait(&i);
-  if (status == -1) wait(&i);
+  int i, status;
+  int fd[2];
+  char buff[2];
+  pipe(fd);
+  i = fork();
+  if (i == 0) {
+      sleep (2);
+      kill (getppid (), SIGINT);
+      sleep (2);
+      write(fd[1],"done",4);
+      close(fd[1]);
+      exit (0);
+  }
+  sigwrapper (SIGINT, ucatch);
+  status = read(fd[0], buff, sizeof(buff));
+  wait (&i);
   exit (status == -1);
 }
 
@@ -1402,15 +1463,15 @@ if test -s conftest && (./conftest; exit) 2>/dev/null; then
   
 {
 test -n "$verbose" && \
-echo "	defining HAVE_RESTARTABLE_SYSCALLS"
-echo "#define" HAVE_RESTARTABLE_SYSCALLS "1" >> confdefs.h
-DEFS="$DEFS -DHAVE_RESTARTABLE_SYSCALLS=1"
+echo "	defining HAVE_RESTARTABLE_PIPEREAD"
+echo "#define" HAVE_RESTARTABLE_PIPEREAD "1" >> confdefs.h
+DEFS="$DEFS -DHAVE_RESTARTABLE_PIPEREAD=1"
 }
 
 
 fi
 rm -fr conftest*
-
+		# is a read() of a pipe restartable?
 ac_save_LIBS="${LIBS}"
 LIBS="-lnsl ${LIBS}"
 ac_have_lib=""
@@ -1543,7 +1604,7 @@ rm -f conftest*
 
 for ac_func in sigprocmask setsid select poll strchr strrchr gethostname \
 	getcwd getwd killpg setvbuf access mkdir tcgetattr ttyname link \
-	utime utimes
+	utime utimes alarm
 do
 ac_tr_func=HAVE_`echo $ac_func | tr '[a-z]' '[A-Z]'`
 test -n "$silent" || echo "checking for ${ac_func}"
@@ -2891,6 +2952,7 @@ CPP='$CPP'
 INSTALL='$INSTALL'
 INSTALL_PROGRAM='$INSTALL_PROGRAM'
 INSTALL_DATA='$INSTALL_DATA'
+COULD_BE_SCO='$COULD_BE_SCO'
 LIBOBJS='$LIBOBJS'
 CFLAGS='$CFLAGS'
 LIBS='$LIBS'
@@ -2952,6 +3014,7 @@ s%@CPP@%$CPP%g
 s%@INSTALL@%$INSTALL%g
 s%@INSTALL_PROGRAM@%$INSTALL_PROGRAM%g
 s%@INSTALL_DATA@%$INSTALL_DATA%g
+s%@COULD_BE_SCO@%$COULD_BE_SCO%g
 s%@LIBOBJS@%$LIBOBJS%g
 s%@CFLAGS@%$CFLAGS%g
 s%@LIBS@%$LIBS%g

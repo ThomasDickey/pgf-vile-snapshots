@@ -1,7 +1,7 @@
 /*	npopen:  like popen, but grabs stderr, too
  *		written by John Hutchinson, heavily modified by Paul Fox
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/npopen.c,v 1.40 1994/11/29 04:02:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/npopen.c,v 1.42 1995/02/10 03:42:18 pgf Exp $
  *
  */
 
@@ -194,6 +194,26 @@ char *cmd;
 	exit (-1);
 }
 
+
+#if LATER
+
+int shellstatus;
+
+static int
+process_exit_status(status)
+int status;
+{
+    if (WIFSIGNALED(status))
+	return (128 + WTERMSIG(status));
+    else if (!WIFSTOPPED(status))
+	return (WEXITSTATUS(status));
+    else
+	return (EXECUTION_SUCCESS);
+}
+
+#endif /* LATER */
+
+
 int
 system_SHELL(cmd)
 char *cmd;
@@ -208,13 +228,17 @@ char *cmd;
 
 	if (cpid) { /* parent */
 		int child;
+		int status;
 		beginDisplay;
-		while ((child = wait ((int *)0)) != cpid) {
+		while ((child = wait (&status)) != cpid) {
 			if (child < 0 && errno == EINTR) {
 				(void) kill (SIGKILL, cpid);
 			}
 		}
 		endofDisplay;
+#if LATER
+		shellstatus = process_exit_status(status);
+#endif
 		return 0;
 	} else {
 		exec_sh_c(cmd);

@@ -5,7 +5,7 @@
  *	reading and writing of the disk are in "fileio.c".
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/file.c,v 1.149 1994/12/19 14:40:27 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/file.c,v 1.152 1995/02/09 01:08:14 pgf Exp $
  *
  */
 
@@ -456,7 +456,7 @@ char *fname;		/* file name to find */
 
 	/* user may have renamed buffer to look like filename */
 	if ((bp = find_b_name(fname)) == NULL
-	 || (strlen(fname) > NBUFN)) {
+	 || (strlen(fname) > (SIZE_T)NBUFN)) {
 
 		/* It's not already here by that buffer name.
 		 * Try to find it assuming we're given the file name.
@@ -557,7 +557,7 @@ int lockfl;		/* check the file for locks? */
 	/* if there are no path delimiters in the name, then the user
 		is likely asking for an existing buffer -- try for that
 		first */
-        if (strlen(fname) > NBUFN
+        if (strlen(fname) > (SIZE_T)NBUFN
 	 || maybe_pathname(fname)
 	 || (bp = find_b_name(fname)) == NULL) {
 		/* oh well.  canonicalize the name, and try again */
@@ -1054,6 +1054,10 @@ int *nlinep;
 					s = FIOERR;
 					break;
 				}
+#if DISP_X11
+				/* to pick up intrc if it's been hit */
+				x_move_events();
+#endif
 				done_update = TRUE;
 				flag = 0;
 			} else {
@@ -1799,7 +1803,7 @@ ACTUAL_SIG_DECL
 #endif	/* SYS_APOLLO */
 
 #if OPT_WORKING && defined(SIGALRM)
-	(void)signal(SIGALRM, SIG_IGN);
+	setup_handler(SIGALRM, SIG_IGN);
 #endif
 
 #if SYS_APOLLO
