@@ -4,7 +4,10 @@
  *	Miscellaneous routines for UNIX/VMS compatibility.
  *
  * $Log: vms2unix.c,v $
- * Revision 1.1  1993/04/01 13:07:50  pgf
+ * Revision 1.2  1993/06/18 15:57:06  pgf
+ * tom's 3.49 changes
+ *
+ * Revision 1.1  1993/04/01  13:07:50  pgf
  * see tom's 3.40 CHANGES
  *
  * Revision 1.0  1993/03/25  19:48:11  pgf
@@ -13,7 +16,8 @@
  */
 #include	"estruct.h"
 #include	"dirstuff.h"
-#include "edef.h"	/* patch */
+
+#include	<unixio.h>
 
 #define	zfab	dirp->dd_fab
 #define	znam	dirp->dd_nam
@@ -67,4 +71,18 @@ int
 closedir(DIR *dirp)
 {
 	cfree(dirp);
+}
+
+char *
+tempnam(head, tail)
+char	*head;
+char	*tail;
+{
+	char	temp[NFILEN];
+	char	leaf[NFILEN];
+	return mktemp(
+		strmalloc(
+			pathcat(temp,
+				head,
+				strcat(strcpy(leaf, tail), "XXXXXX"))));
 }

@@ -5,7 +5,10 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: tags.c,v $
- * Revision 1.36  1993/06/02 14:28:47  pgf
+ * Revision 1.37  1993/06/18 15:57:06  pgf
+ * tom's 3.49 changes
+ *
+ * Revision 1.36  1993/06/02  14:28:47  pgf
  * see tom's 3.48 CHANGES
  *
  * Revision 1.35  1993/05/24  15:21:37  pgf
@@ -334,7 +337,7 @@ int *endofpathflagp;
 
 	*endofpathflagp = FALSE;
 	
-	lsprintf(tagbufname, ScratchName(Tags %d), n+1);
+	(void)lsprintf(tagbufname, ScratchName(Tags %d), n+1);
 
 	/* is the buffer around? */
         if ((tagbp=bfind(tagbufname, NO_CREAT, 0)) == NULL) {

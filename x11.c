@@ -2,7 +2,10 @@
  * 	X11 support, Dave Lemke, 11/91
  *
  * $Log: x11.c,v $
- * Revision 1.17  1993/05/05 11:18:08  pgf
+ * Revision 1.18  1993/06/18 15:57:06  pgf
+ * tom's 3.49 changes
+ *
+ * Revision 1.17  1993/05/05  11:18:08  pgf
  * fixed off by one in column accounting
  *
  * Revision 1.16  1993/04/28  15:37:54  pgf
@@ -368,8 +371,7 @@ x_setfont(fname)
 	    xsh.max_height = term.t_mcol * cur_win->char_width;
 	    XSetNormalHints(dpy, cur_win->win, &xsh);
 
-	    if (cur_win->fontname)
-		free(cur_win->fontname);
+	    FreeIfNeeded(cur_win->fontname);
 	    cur_win->fontname = strmalloc(fontname);
 	    return 1;
 	}
@@ -385,7 +387,7 @@ x_quit(signo)
 int signo;
 {
     x_close();
-    exit(GOOD);
+    ExitProgram(GOOD);
     /* NOTREACHED */
     SIGRET;
 }
@@ -421,7 +423,7 @@ x_resize_screen(tw, rows, cols)
 
     if (!tw->sc || !tw->attr || !tw->line_attr) {
 	fprintf(stderr, "couldn't allocate memory for screen\n");
-	exit(BAD(-1));
+	ExitProgram(BAD(-1));
     }
     /* init it */
     for (r = 0; r < tw->rows; r++) {
@@ -429,7 +431,7 @@ x_resize_screen(tw, rows, cols)
 	tw->attr[r] = (unsigned char *) malloc(sizeof(unsigned char) * tw->cols);
 	if (!tw->sc[r] || !tw->attr[r]) {
 	    fprintf(stderr, "couldn't allocate memory for screen\n");
-	    exit(BAD(-1));
+	    ExitProgram(BAD(-1));
 	}
 	tw->line_attr[r] = LINE_DIRTY;
 	memset((char *) tw->sc[r], ' ', tw->cols);
@@ -569,7 +571,7 @@ x_open()
     tw = (TextWindow) calloc(1, sizeof(TextWindowRec));
     if (!tw) {
 	fprintf(stderr, "insufficient memory, exiting\n");
-	exit(BAD(-1));
+	ExitProgram(BAD(-1));
     }
     dpy = XOpenDisplay(displayname);
 
@@ -579,7 +581,7 @@ x_open()
 
     if (!dpy) {
 	fprintf(stderr, "couldn't open X display\n");
-	exit(GOOD);
+	ExitProgram(GOOD);
     }
     tw->dpy = dpy;
     tw->screen = screen = DefaultScreen(dpy);
@@ -592,7 +594,7 @@ x_open()
 	if (!pfont) {
 	    fprintf(stderr, "couldn't get font \"%s\" or \"%s\", exiting\n",
 		    fontname, FONTNAME);
-	    exit(BAD(-1));
+	    ExitProgram(BAD(-1));
 	}
 	fontname = FONTNAME;
     }

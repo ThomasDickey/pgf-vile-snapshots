@@ -9,7 +9,13 @@
  *	the output structures.
  *
  * $Log: mktbls.c,v $
- * Revision 1.21  1993/05/11 16:22:22  pgf
+ * Revision 1.23  1993/06/18 16:16:34  pgf
+ * alistair crooks lint/NeXt changes
+ *
+ * Revision 1.22  1993/06/18  15:57:06  pgf
+ * tom's 3.49 changes
+ *
+ * Revision 1.21  1993/05/11  16:22:22  pgf
  * see tom's CHANGES, 3.46
  *
  * Revision 1.20  1993/04/01  13:06:31  pgf
@@ -82,6 +88,8 @@
  * initial vile RCS revision
  */
 
+#define	OPT_IFDEF_MODES	1	/* true iff we can ifdef modes */
+
 /* stuff borrowed/adapted from estruct.h */
 #if defined(__TURBOC__)
 #include <stdlib.h>
@@ -135,6 +143,14 @@ extern char *malloc();
 #define	Fprintf	(void)fprintf
 #define	Sprintf	(void)sprintf
 
+#if defined(lint) || defined(__GNUC__)
+#ifdef __STDC__
+extern       int     fprintf(FILE *, char *, ... );
+#else
+extern       int     fprintf();
+#endif
+#endif /* lint || __GNUC__ */
+
 #define	SaveEndif(head)	InsertOnEnd(&head, "#endif")
 
 /*--------------------------------------------------------------------------*/
@@ -160,48 +176,70 @@ static	LIST	*all_names,
 
 static	int	isspace P((int));
 static	int	isprint P((int));
+
 static	char *	StrAlloc P((char *));
 static	LIST *	ListAlloc P((void));
+
 static	void	badfmt P((char *));
 static	void	badfmt2 P((char *, int));
+
 static	void	WriteLines P((FILE *, char **, int));
 static	FILE *	OpenHeader P((char *, char **));
+
 static	void	InsertSorted P((LIST **, char *, char *, char *, char *, char *));
 static	void	InsertOnEnd P((LIST **, char *));
+
 static	char *	append P((char *, char *));
 static	char *	formcond P((char *, char *));
 static	int	LastCol P((char *));
 static	char *	PadTo P((int, char *));
 static	int	two_conds P((int, int, char *));
 static	int	Parse P((char *, char **));
+
+static	void	BeginIf P((void));
+static	void	WriteIf P((FILE *, char *));
+static	void	FlushIf P((FILE *));
+
 static	char *	AbbrevMode P((char *));
 static	char *	NormalMode P((char *));
 static	char *	c2TYPE P((int));
-static	char *	Mode2Key P((char *, char *));
+static	char *	Mode2Key P((char *, char *, char *));
 static	char *	Name2Symbol P((char *));
 static	char *	Name2Address P((char *, char *));
+
+static	void	DefineOffset P((FILE *));
+static	void	WriteIndexStruct P((FILE *, LIST *, char *));
 static	void	WriteModeDefines P((LIST *, char *));
 static	void	WriteModeSymbols P((LIST *));
-static	void	save_all_modes P((char *, char *, char *));
+
+static	void	save_all_modes P((char *, char *, char *, char *));
 static	void	dump_all_modes P((void));
+
 static	void	save_bindings P((char *, char *, char *));
 static	void	dump_bindings P((void));
+
 static	void	save_bmodes P((char *, char **));
 static	void	dump_bmodes P((void));
+
 static	void	start_evar_h P((char **));
 static	void	finish_evar_h P((void));
 static	void	init_envars P((void));
 static	void	save_envars P((char **));
 static	void	dump_envars P((void));
+
 static	void	save_funcs P((char *, char *, char *, char *));
 static	void	dump_funcs P((LIST *));
+
 static	void	save_gmodes P((char *, char **));
 static	void	dump_gmodes P((void));
+
 static	void	save_names P((char *, char *, char *));
 static	void	dump_names P((void));
+
 static	void	init_ufuncs P((void));
 static	void	save_ufuncs P((char **));
 static	void	dump_ufuncs P((void));
+
 static	void	save_wmodes P((char *, char **));
 static	void	dump_wmodes P((void));
 
@@ -381,9 +419,9 @@ char *c1, *c2;
 {
 	static char cond[LEN_BUFFER];
 	if (c1[0] && c2[0])
-		Sprintf(cond,"#if (%s) & (%s)\n",c1,c2);
+		Sprintf(cond, "(%s) & (%s)", c1, c2);
 	else if (c1[0] || c2[0])
-		Sprintf(cond,"#if (%s%s)\n",c1,c2);
+		Sprintf(cond, "(%s%s)", c1, c2);
 	else
 		cond[0] = '\0';
 	return cond;
@@ -459,7 +497,7 @@ char	**vec;
 			quote = 0,
 			c;
 
-	for (c = 0; c < MAX_BIND; c++)
+	for (c = 0; c < MAX_PARSE; c++)
 		vec[c] = "";
 	for (c = strlen(input); c > 0 && isspace(input[c-1]); c--)
 		input[c-1] = '\0';
@@ -493,6 +531,43 @@ char	**vec;
 		}
 	}
 	return count;
+}
+
+/******************************************************************************/
+static	char	*lastIfdef;
+
+static void
+BeginIf()
+{
+	lastIfdef = 0;
+}
+
+static void
+WriteIf(fp, cond)
+FILE	*fp;
+char	*cond;
+{
+	if (cond == 0)
+		cond = "";
+	if (cond[0] != '\0') {
+		if (lastIfdef != 0) {
+			if (!strcmp(lastIfdef, cond))
+				return;
+			FlushIf(fp);
+		}
+		Fprintf(fp, "#if %s\n", lastIfdef = cond);
+	} else
+		FlushIf(fp);
+}
+
+static void
+FlushIf(fp)
+FILE	*fp;
+{
+	if (lastIfdef != 0) {
+		Fprintf(fp, "#endif\n");
+		lastIfdef = 0;
+	}
 }
 
 /******************************************************************************/
@@ -547,8 +622,8 @@ int	c;
 
 /* make a sort-key for mode-name */
 static char *
-Mode2Key(type, name)
-char	*type, *name;
+Mode2Key(type, name, cond)
+char	*type, *name, *cond;
 {
 	int	c;
 	char	*abbrev = AbbrevMode(name),
@@ -563,7 +638,7 @@ char	*type, *name;
 	case 'r':	c = 'x';	/* make this sort after strings */
 	}
 
-	save_all_modes(type, normal, abbrev);
+	save_all_modes(type, normal, abbrev, cond);
 
 	(void)sprintf(tmp, "%s\n%c\n%s", normal, c, abbrev);
 	return tmp;
@@ -577,6 +652,7 @@ char	*name;
 	char	*base, *dst;
 	register char c;
 
+	/* allocate enough for adjustment in 'Name2Address()' */
 	base = dst = malloc((unsigned)(strlen(name) + 3));
 
 	*dst++ = 's';
@@ -597,12 +673,63 @@ char	*name;
 char	*type;
 {
 	char	*base = malloc((unsigned)(strlen(name) + 7));
+	char	*temp;
 
-	name = Name2Symbol(name);
-	(void)strcpy(base, name);
+	temp = Name2Symbol(name);
+	(void)strcpy(base, temp);
 	if (*type == 'b')
-		(void)strcat(strcat(strcpy(base+2, "no"), name+2), "+2");
+		(void)strcat(strcat(strcpy(base+2, "no"), temp+2), "+2");
+	free(temp);
 	return base;
+}
+
+/* define OFFSETOF macro, used in index-definitions */
+static void
+DefineOffset(fp)
+FILE	*fp;
+{
+#if	OPT_IFDEF_MODES
+	Fprintf(fp,
+"#ifndef\tOFFSETOF\n\
+#define\tOFFSETOF(T, M)\t(((int)&(((T*)0)->M))/\\\n\
+\t\t\t\t ((int)&(((T*)0)->Q1) - (int)&(((T*)0)->s_MAX)))\n\
+#endif\n");
+#endif
+}
+
+/* generate the index-struct (used for deriving ifdef-able index definitions) */
+static void
+WriteIndexStruct(fp, p, ppref)
+FILE	*fp;
+LIST	*p;
+char	*ppref;
+{
+#if	OPT_IFDEF_MODES
+	char	*s,
+		temp[MAX_BUFFER],
+		line[MAX_BUFFER],
+		*vec[MAX_PARSE];
+
+	BeginIf();
+	Fprintf(fp, "typedef\tstruct\t%c\n", L_CURL);
+	while (p != 0) {
+		WriteIf(fp, p->Cond);
+		(void)Parse(strcpy(line, p->Name), vec);
+		Sprintf(temp, "\tchar\t%s;", s = Name2Symbol(vec[1]));
+		free(s);
+		if (p->Note[0]) {
+			(void)PadTo(32, temp);
+			Sprintf(temp+strlen(temp), "/* %s */", p->Note);
+		}
+		Fprintf(fp, "%s\n", temp);
+		p = p->nst;
+	}
+
+	FlushIf(fp);
+	Fprintf(fp, "\tchar\ts_MAX;\n");
+	Fprintf(fp, "\tchar\tQ1;\n");
+	Fprintf(fp, "\t%c Index%s;\n\n", R_CURL, ppref);
+#endif	/* OPT_IFDEF_MODES */
 }
 
 /* generate the index-definitions */
@@ -612,32 +739,50 @@ LIST	*p;
 char	*ppref;
 {
 	char	temp[MAX_BUFFER],
-		line[MAX_BUFFER];
-	char	*vec[MAX_PARSE];
+		line[MAX_BUFFER],
+		*vec[MAX_PARSE];
 	int	count	= 0;
+#if OPT_IFDEF_MODES
+	char	*s;
+	BeginIf();
+#endif
 
-	while (p != 0) {
+	for (; p != 0; p = p->nst, count++) {
 		(void)Parse(strcpy(line, p->Name), vec);
 		Sprintf(temp, "#define %.1s%s%s ",
 			(*ppref == 'B') ? "" : ppref,
 			(*vec[2] == 'b') ? "MD" : "VAL_",
 			p->Func);
 		(void)PadTo(24, temp);
-		Sprintf(temp+strlen(temp), "%d", count++);
+#if OPT_IFDEF_MODES
+		WriteIf(nemode, p->Cond);
+		Sprintf(temp+strlen(temp), "OFFSETOF(Index%s, %s)",
+			ppref, s = Name2Symbol(vec[1]));
+		free(s);
+#else
+		Sprintf(temp+strlen(temp), "%d", count);
 		if (p->Note[0]) {
 			(void)PadTo(32, temp);
 			Sprintf(temp+strlen(temp), "/* %s */", p->Note);
 		}
+#endif /* OPT_IFDEF_MODES */
 		Fprintf(nemode, "%s\n", temp);
-		p = p->nst;
 	}
 
 	Fprintf(nemode, "\n");
-	Sprintf(temp, "#define MAX_%c_VALUES\t%d", *ppref, count);
+#if OPT_IFDEF_MODES
+	FlushIf(nemode);
+	Sprintf(temp, "#define NUM_%c_VALUES\tOFFSETOF(Index%s, s_MAX)",
+		*ppref, ppref);
+#else
+	Sprintf(temp, "#define NUM_%c_VALUES\t%d", *ppref, count);
+#endif /* OPT_IFDEF_MODES */
+
 	(void)PadTo(32, temp);
 	Sprintf(temp+strlen(temp), "/* SIZEOF(%c_valuenames) -- %s */\n",
 		tolower(*ppref), ppref);
-	Fprintf(nemode, "%s\n", temp);
+	Fprintf(nemode, "%s", temp);
+	Fprintf(nemode, "#define MAX_%c_VALUES\t%d\n\n", *ppref, count);
 }
 
 static void
@@ -646,32 +791,45 @@ LIST	*p;
 {
 	char	temp[MAX_BUFFER],
 		line[MAX_BUFFER];
-	char	*vec[MAX_PARSE];
+	char	*vec[MAX_PARSE],
+		*s;
 
 	/* generate the symbol-table */
+	BeginIf();
 	while (p != 0) {
+#if OPT_IFDEF_MODES
+		WriteIf(nemode, p->Cond);
+#endif
 		(void)Parse(strcpy(line, p->Name), vec);
-		Sprintf(temp, "\t{ %s,",
-			Name2Address(vec[1], vec[2]));
+		Sprintf(temp, "\t%c %s,",
+			L_CURL, s = Name2Address(vec[1], vec[2]));
 		(void)PadTo(32, temp);
+		free(s);
+		s = 0;
+
 		Sprintf(temp+strlen(temp), "%s,",
-			*vec[3] ? Name2Address(vec[3], vec[2]) : "\"X\"");
+			*vec[3] ? (s = Name2Address(vec[3], vec[2])) : "\"X\"");
 		(void)PadTo(48, temp);
+		if (s != 0)
+			free(s);
+
 		Sprintf(temp+strlen(temp), "VALTYPE_%s,", c2TYPE(*vec[2]));
 		(void)PadTo(64, temp);
-		Sprintf(temp+strlen(temp), "%s },", p->Cond);
+		Sprintf(temp+strlen(temp), "%s },", p->Data);
 		Fprintf(nemode, "%s\n", temp);
 		p = p->nst;
 	}
+	FlushIf(nemode);
 
 }
 
 /******************************************************************************/
 static void
-save_all_modes(type, normal, abbrev)
+save_all_modes(type, normal, abbrev, cond)
 char	*type;
 char	*normal;
 char	*abbrev;
+char	*cond;
 {
 	if (*type == 'b') {
 		char	t_normal[LEN_BUFFER],
@@ -680,11 +838,12 @@ char	*abbrev;
 			strcat(strcpy(t_normal, "no"), normal),
 			*abbrev
 				? strcat(strcpy(t_abbrev, "no"), abbrev)
-				: "");
+				: "",
+			cond);
 	}
-	InsertSorted(&all_modes, normal, type, "", "", "");
+	InsertSorted(&all_modes, normal, type, "", cond, "");
 	if (*abbrev)
-		InsertSorted(&all_modes, abbrev, type, "", "", "");
+		InsertSorted(&all_modes, abbrev, type, "", cond, "");
 }
 
 static void
@@ -711,29 +870,40 @@ dump_all_modes()
 		"extern char *all_modes[];",
 		"#endif /* realdef */",
 		};
-	char	temp[MAX_BUFFER];
+	char	temp[MAX_BUFFER], *s;
 	register LIST *p, *q;
 
 	InsertSorted(&all_modes, "all", "?", "", "", "");
 	write_lines(nemode, top);
+	BeginIf();
 	for (p = all_modes; p; p = p->nst) {
 		if (p->Func[0] != 'b') {
 			for (q = p->nst; q != 0; q = q->nst)
 				if (q->Func[0] != 'b')
 					break;
-			Sprintf(temp, "\t%s[]", Name2Symbol(p->Name));
+#if OPT_IFDEF_MODES
+			WriteIf(nemode, p->Cond);
+#endif
+			Sprintf(temp, "\t%s[]", s = Name2Symbol(p->Name));
 			(void)PadTo(32, temp);
+			free(s);
 			Sprintf(temp+strlen(temp), "= \"%s\"%c",
 				p->Name, (q != 0) ? ',' : ';');
 			(void)PadTo(64, temp);
 			Fprintf(nemode, "%s/* %s */\n", temp, p->Func);
 		}
 	}
+	FlushIf(nemode);
 
 	write_lines(nemode, middle);
 	for (p = all_modes; p; p = p->nst) {
-		Fprintf(nemode, "\t%s,\n", Name2Address(p->Name, p->Func));
+#if OPT_IFDEF_MODES
+		WriteIf(nemode, p->Cond);
+#endif
+		Fprintf(nemode, "\t%s,\n", s = Name2Address(p->Name, p->Func));
+		free(s);
 	}
+	FlushIf(nemode);
 
 	write_lines(nemode, bottom);
 }
@@ -797,17 +967,18 @@ static void
 dump_bindings()
 {
 	char	temp[MAX_BUFFER];
-	char	old_cond[LEN_BUFFER], *new_cond;
 	char *sctl;
 	int i, c, btype;
 
 	btype = ASCIIBIND;
 
-	Fprintf(nebind,"\nCMDFUNC *%s[%d] = {\n",tblname[btype], LEN_CHRSET);
+	Fprintf(nebind,"\nCMDFUNC *%s[%d] = %c\n",
+		tblname[btype], LEN_CHRSET, L_CURL);
+
+	BeginIf();
 	for (i = 0; i < LEN_CHRSET; i++) {
-		if (conditions[btype][i]) {
-			Fprintf(nebind,"%s", conditions[btype][i]);
-		}
+		WriteIf(nebind, conditions[btype][i]);
+
 		if (i < ' ' || i > '~' ) {
 			sctl = "ctrl-";
 			c = toalpha(i);
@@ -823,29 +994,23 @@ dump_bindings()
 
 		Fprintf(nebind, "%s/* %s%c */\n", PadTo(32, temp), sctl, c);
 
-		if (conditions[btype][i]) {
-			Fprintf(nebind,"#else\n\tNULL,\n#endif\n");
-		}
+		if (conditions[btype][i] != 0)
+			Fprintf(nebind,"#else\n\tNULL,\n");
+		FlushIf(nebind);
 
 	}
-	Fprintf(nebind,"};\n");
+	Fprintf(nebind, "%c;\n", R_CURL);
 
 	Fprintf(nebind,"\nKBIND kbindtbl[NBINDS] = %c\n", L_CURL);
 	for (btype = 1; btype <= 3; btype++) {
-		*old_cond = '\0';
+		BeginIf();
 		for (i = 0; i < LEN_CHRSET; i++) {
 			if (bindings[btype][i]) {
-				if (!(new_cond = conditions[btype][i]))
-					new_cond = "";
-				if (strcmp(old_cond, new_cond)) {
-					if (*old_cond)
-						Fprintf(nebind,"#endif\n");
-					Fprintf(nebind,"%s",new_cond);
-					(void)strcpy(old_cond,new_cond);
-				}
+				WriteIf(nebind, conditions[btype][i]);
 				if (i < ' ') {
 					Sprintf(temp,
-					"\t{ %stocntrl('%c'),",
+					"\t%c %stocntrl('%c'),",
+						L_CURL,
 						prefname[btype],
 						toalpha(i));
 				} else {
@@ -857,12 +1022,11 @@ dump_bindings()
 							"\\":"",
 						i);
 				}
-				Fprintf(nebind, "%s&f_%s },\n",
-					PadTo(32, temp), bindings[btype][i]);
+				Fprintf(nebind, "%s&f_%s %c,\n",
+					PadTo(32, temp), bindings[btype][i], R_CURL);
 			}
 		}
-		if (*old_cond)
-			Fprintf(nebind,"#endif\n");
+		FlushIf(nebind);
 	}
 	Fprintf(nebind,"\t{ 0, NULL }\n");
 	Fprintf(nebind,"%c;\n", R_CURL);
@@ -874,7 +1038,7 @@ save_bmodes(type, vec)
 char	*type;
 char	**vec;
 {
-	InsertSorted(&all_bmodes, Mode2Key(type,vec[1]), vec[2], "", vec[3], vec[0]);
+	InsertSorted(&all_bmodes, Mode2Key(type,vec[1],vec[4]), vec[2], vec[3], vec[4], vec[0]);
 }
 
 static void
@@ -905,6 +1069,7 @@ dump_bmodes()
 		};
 
 	write_lines(nemode, top);
+	WriteIndexStruct(nemode, all_bmodes, "Buffers");
 	WriteModeDefines(all_bmodes, "Buffers");
 	write_lines(nemode, middle);
 	WriteModeSymbols(all_bmodes);
@@ -931,7 +1096,11 @@ char	**argv;
 		"",
 		"#define\tMAXVARS\t\t10 \t/* was 255 */",
 		"",
+		"#ifdef realdef",
 		"UVAR uv[MAXVARS];\t/* user variables */",
+		"#else",
+		"extern UVAR uv[];",
+		"#endif",
 		};
 
 	if (!nevars) {
@@ -955,6 +1124,7 @@ init_envars()
 		"",
 		"/*\tlist of recognized environment variables\t*/",
 		"",
+		"#ifdef realdef",
 		"char *envars[] = {"
 		};
 	static	int	done;
@@ -967,6 +1137,10 @@ static void
 save_envars(vec)
 char	**vec;
 {
+	/* insert into 'all_modes' to provide for common name-completion
+	 * table, and into 'all_envars' to get name/index correspondence.
+	 */
+	InsertSorted(&all_modes,  vec[1], "env",  "", formcond("!SMALLER", vec[3]), "");
 	InsertSorted(&all_envars, vec[1], vec[2], "", vec[3], vec[0]);
 }
 
@@ -976,8 +1150,9 @@ dump_envars()
 	static	char *middle[] = {
 		"\tNULL\t/* ends table for name-completion */",
 		"};",
-		"",
-		"#define\tNEVARS\t(SIZEOF(envars)-1)",
+		"#else",
+		"extern char *envars[];",
+		"#endif",
 		"",
 		"/* \tand its preprocesor definitions\t\t*/",
 		""
@@ -985,27 +1160,42 @@ dump_envars()
 	char	temp[MAX_BUFFER];
 	register LIST *p;
 	register int count;
+#if OPT_IFDEF_MODES
+	char	*s;
+#endif
 
+	BeginIf();
 	for (p = all_envars, count = 0; p != 0; p = p->nst) {
 		if (!count++)
 			init_envars();
-		if (p->Cond[0])
-			Fprintf(nevars, "#if %s\n", p->Cond);
-		Sprintf(temp, "\t\"%s\",", p->Name);
-		if (p->Note[0]) {
-			(void)PadTo(24, temp);
-			Sprintf(temp+strlen(temp), "/* %s */", p->Note);
-		}
-		Fprintf(nevars, "%s\n", temp);
-		if (p->Cond[0])
-			Fprintf(nevars, "#endif\n");
+#if OPT_IFDEF_MODES
+		WriteIf(nevars, p->Cond);
+#endif
+		Fprintf(nevars, "\t%s,\n", s = Name2Symbol(p->Name));
+		free(s);
 	}
+	FlushIf(nevars);
+
 	for (p = all_envars, count = 0; p != 0; p = p->nst) {
-		if (!count)
+		if (!count++) {
 			write_lines(nevars, middle);
+			BeginIf();
+			WriteIndexStruct(nevars, all_envars, "Vars");
+		}
+#if OPT_IFDEF_MODES
+		WriteIf(nevars, p->Cond);
 		Sprintf(temp, "#define\tEV%s", p->Func);
-		Fprintf(nevars, "%s%d\n", PadTo(24, temp), count++);
+		(void)PadTo(24, temp);
+		Sprintf(temp + strlen(temp), "OFFSETOF(IndexVars, %s)",
+			s = Name2Symbol(p->Name));
+		free(s);
+		Fprintf(nevars, "%s\n", temp);
+#else
+		Sprintf(temp, "#define\tEV%s", p->Func);
+		Fprintf(nevars, "%s%d\n", PadTo(24, temp), count-1);
+#endif
 	}
+	FlushIf(nevars);
 }
 
 /******************************************************************************/
@@ -1057,7 +1247,7 @@ save_gmodes(type, vec)
 char	*type;
 char	**vec;
 {
-	InsertSorted(&all_gmodes, Mode2Key(type,vec[1]), vec[2], "", vec[3], vec[0]);
+	InsertSorted(&all_gmodes, Mode2Key(type,vec[1],vec[4]), vec[2], vec[3], vec[4], vec[0]);
 }
 
 static void
@@ -1088,6 +1278,7 @@ dump_gmodes()
 		};
 
 	write_lines(nemode, top);
+	WriteIndexStruct(nemode, all_gmodes, "Globals");
 	WriteModeDefines(all_gmodes, "Globals");
 	write_lines(nemode, middle);
 	WriteModeSymbols(all_gmodes);
@@ -1110,26 +1301,18 @@ dump_names()
 {
 	register LIST *m;
 	char	temp[MAX_BUFFER];
-	char	old_Cond[LEN_BUFFER];
 
 	Fprintf(nename,"\n/* if you maintain this by hand, keep it in */\n");
 	Fprintf(nename,"/* alphabetical order!!!! */\n\n");
 	Fprintf(nename,"NTAB nametbl[] = {\n");
-	*old_Cond = '\0';
 
+	BeginIf();
 	for (m = all_names; m != NULL; m = m->nst) {
-		if (strcmp(old_Cond, m->Cond)) {
-			if (*old_Cond)
-				Fprintf(nename,"#endif\n");
-			if (m->Cond[0])
-				Fprintf(nename,"%s",m->Cond);
-			(void)strcpy(old_Cond, m->Cond);
-		}
+		WriteIf(nename, m->Cond);
 		Sprintf(temp, "\t{ \"%s\",", m->Name);
 		Fprintf(nename, "%s&f_%s },\n", PadTo(40, temp), m->Func);
 	}
-	if (*old_Cond)
-		Fprintf(nename,"#endif\n");
+	FlushIf(nename);
 	Fprintf(nename,"\t{ NULL, NULL }\n};\n");
 }
 
@@ -1151,6 +1334,7 @@ init_ufuncs()
 		"#define\tDYNAMIC\t\t2",
 		"#define\tTRINAMIC\t3",
 		"",
+		"#ifdef realdef",
 		"UFUNC funcs[] = {",
 		};
 	static	int	done;
@@ -1163,7 +1347,7 @@ static void
 save_ufuncs(vec)
 char	**vec;
 {
-	InsertSorted(&all_ufuncs, vec[1], vec[2], "", vec[3], vec[0]);
+	InsertSorted(&all_ufuncs, vec[1], vec[2], vec[3], "", vec[0]);
 }
 
 static void
@@ -1171,8 +1355,9 @@ dump_ufuncs()
 {
 	static	char	*middle[] = {
 		"};",
-		"",
-		"#define\tNFUNCS\tSIZEOF(funcs)",
+		"#else",
+		"extern UFUNC funcs[];",
+		"#endif",
 		"",
 		"/* \tand its preprocesor definitions\t\t*/",
 		"",
@@ -1186,7 +1371,7 @@ dump_ufuncs()
 			init_ufuncs();
 		Sprintf(temp, "\t{\"%s\",", p->Name);
 		(void)PadTo(15, temp);
-		Sprintf(temp+strlen(temp), "%s},", p->Cond);
+		Sprintf(temp+strlen(temp), "%s},", p->Data);
 		if (p->Note[0]) {
 			(void)PadTo(32, temp);
 			Sprintf(temp+strlen(temp), "/* %s */", p->Note);
@@ -1199,6 +1384,7 @@ dump_ufuncs()
 		Sprintf(temp, "#define\tUF%s", p->Func);
 		Fprintf(nevars, "%s%d\n", PadTo(24, temp), count++);
 	}
+	Fprintf(nevars, "\n#define\tNFUNCS\t\t%d\n", count);
 }
 
 /******************************************************************************/
@@ -1207,7 +1393,7 @@ save_wmodes(type, vec)
 char	*type;
 char	**vec;
 {
-	InsertSorted(&all_wmodes, Mode2Key(type,vec[1]), vec[2], "", vec[3], vec[0]);
+	InsertSorted(&all_wmodes, Mode2Key(type,vec[1],vec[4]), vec[2], vec[3], vec[4], vec[0]);
 }
 
 static void
@@ -1240,6 +1426,7 @@ dump_wmodes()
 		};
 
 	write_lines(nemode, top);
+	WriteIndexStruct(nemode, all_wmodes, "Windows");
 	WriteModeDefines(all_wmodes, "Windows");
 	write_lines(nemode, middle);
 	WriteModeSymbols(all_wmodes);
@@ -1337,19 +1524,19 @@ char    *argv[];
 				break;
 
 			case SECT_GBLS:
-				if (r < 2 || r > 3)
+				if (r < 2 || r > 4)
 					badfmt("looking for GLOBAL modes");
 				save_gmodes(modetype, vec);
 				break;
 
 			case SECT_BUFF:
-				if (r < 2 || r > 3)
+				if (r < 2 || r > 4)
 					badfmt("looking for BUFFER modes");
 				save_bmodes(modetype, vec);
 				break;
 
 			case SECT_WIND:
-				if (r < 2 || r > 3)
+				if (r < 2 || r > 4)
 					badfmt("looking for WINDOW modes");
 				save_wmodes(modetype, vec);
 				break;
@@ -1426,6 +1613,7 @@ char    *argv[];
 
 	if (all_wmodes || all_bmodes) {
 		nemode = OpenHeader("nemode.h", argv);
+		DefineOffset(nemode);
 		dump_all_modes();
 		dump_gmodes();
 		dump_wmodes();

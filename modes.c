@@ -8,8 +8,11 @@
  * Major extensions for vile by Paul Fox, 1991
  *
  *	$Log: modes.c,v $
- *	Revision 1.16  1993/04/28 17:11:22  pgf
- *	got rid of NeWS ifdefs
+ *	Revision 1.17  1993/06/18 15:57:06  pgf
+ *	tom's 3.49 changes
+ *
+ * Revision 1.16  1993/04/28  17:11:22  pgf
+ * got rid of NeWS ifdefs
  *
  * Revision 1.15  1993/04/21  14:37:52  pgf
  * special cases for validating glob strings
@@ -78,18 +81,17 @@ static	int	string_to_number P(( char *, int * ));
 #if defined(GMD_GLOB) || defined(GVAL_GLOB)
 static	int	legal_glob_mode P(( char * ));
 #endif
-static	int	adjvalueset P(( char *, int, struct VALNAMES *, int, struct VAL * ));
 static	int	mode_complete P(( int, char *, int * ));
 static	int	mode_eol P(( char *, int, int, int ));
 static	int	do_a_mode P(( int, int ));
 static	int	adjustmode P(( int, int ));
 
+#if COLOR
 static	char	*cname[] = {	/* names of colors */
 	"black", "red",     "green", "yellow",
 	"blue",  "magenta", "cyan",  "white"
 	};
-
-static	int	found_mode;	/* flag to suppress redundant error-message */
+#endif
 
 /*--------------------------------------------------------------------------*/
 
@@ -133,7 +135,7 @@ struct VAL *values;
 	register char	*s = 0;
 
 	switch (names->type) {
-#if	!SMALLER	/* will show the color name too */
+#if	COLOR && !SMALLER	/* will show the color name too */
 	case VALTYPE_COLOR:
 		n += 4;
 		s = cname[values->vp->i];
@@ -147,6 +149,37 @@ struct VAL *values;
 		break;
 	}
 	return	n + strlen(NonNull(s));
+}
+
+/*
+ * Returns a mode-value formatted as a string
+ */
+char *
+string_mode_val(names, values)
+register struct VALNAMES *names;
+register struct VAL *values;
+{
+	switch(names->type) {
+	case VALTYPE_BOOL:
+		return values->vp->i ? truem : falsem;
+	case VALTYPE_COLOR:
+#if COLOR && !SMALLER
+		{
+		static	char	temp[20];
+		(void)lsprintf(temp, "%d (%s)",
+			values->vp->i,
+			cname[values->vp->i]);
+		return temp;
+		}
+#endif				/* else, fall-thru to use int-code */
+	case VALTYPE_INT:
+		return l_itoa(values->vp->i);
+	case VALTYPE_STRING:
+		return NonNull(values->vp->p);
+	case VALTYPE_REGEX:
+		return NonNull(values->vp->r->pat);
+	}
+	return errorm;
 }
 
 /* listvalueset: print each value in the array according to type,
@@ -243,40 +276,16 @@ struct VAL *values, *globvalues;
 
 			if (col == 0)
 				bputc(' ');
-			switch(names[j].type) {
-			case VALTYPE_BOOL:
+			if (names[j].type == VALTYPE_BOOL) {
 				bprintf("%s%s%*P",
 					values[j].vp->i ? "" : "no",
 					names[j].name,
 					ONE_COL, ' ');
-				break;
-			case VALTYPE_COLOR:
-#if	!SMALLER
-				bprintf("%s=%d (%s)%*P",
-					names[j].name,
-					values[j].vp->i,
-					cname[values[j].vp->i],
-					ONE_COL, ' ');
-				break;
-#endif				/* else, fall-thru to use int-code */
-			case VALTYPE_INT:
-				bprintf("%s=%d%*P",
-					names[j].name,
-					values[j].vp->i,
-					ONE_COL, ' ');
-				break;
-			case VALTYPE_STRING:
+			} else {
 				bprintf("%s=%s%*P",
 					names[j].name,
-					NonNull(values[j].vp->p),
+					string_mode_val(names+j, values+j),
 					ONE_COL, ' ');
-				break;
-			case VALTYPE_REGEX:
-				bprintf("%s=%s%*P",
-					names[j].name,
-					NonNull(values[j].vp->r->pat),
-					ONE_COL, ' ');
-				break;
 			}
 			if (++col >= perline) {
 				col = 0;
@@ -422,8 +431,8 @@ free_regexval(rp)
 register REGEXVAL *rp;
 {
 	if (rp != 0) {
-		if (rp->pat) free(rp->pat);
-		if (rp->reg) free((char *)rp->reg);
+		FreeAndNull(rp->pat);
+		FreeAndNull(rp->reg);
 		free((char *)rp);
 	}
 }
@@ -436,15 +445,12 @@ free_val(names, values)
 struct VALNAMES *names;
 struct VAL *values;
 {
-	register char *s;
-
 	if (values->refs > 0) {
 		values->refs -= 1;
 		if (values->refs == 0) {
 			switch (names->type) {
 			case VALTYPE_STRING:
-				if ((s = values->v.p) != 0)
-					free(s);
+				FreeAndNull(values->v.p);
 				break;
 			case VALTYPE_REGEX:
 				free_regexval(values->v.r);
@@ -485,9 +491,9 @@ string_to_bool(base, np)
 char	*base;
 int	*np;
 {
-	if (!strcmp(base, "yes") || !strcmp(base, "true"))
+	if (is_truem(base))
 		*np = TRUE;
-	else if (!strcmp(base, "no") || !strcmp(base, "false"))
+	else if (is_falsem(base))
 		*np = FALSE;
 	else {
 		mlforce("[Not a boolean: '%s']", base);
@@ -560,7 +566,7 @@ char	*base;
 /*
  * Lookup the mode named with 'cp[]' and adjust its value.
  */
-static int
+int
 adjvalueset(cp, kind, names, global, values)
 char *cp;
 int kind;
@@ -574,26 +580,15 @@ register struct VAL *values;
 	int no = !strncmp(cp, "no", 2);
 	char *rp = no ? cp+2 : cp;
 	int nval, s;
+#if COLOR
 	register int i;
+#endif
 
-	if (values == 0)
-		return FALSE;
 	if (no)
 		kind = !kind;
 
-	while (names->name != NULL) {
-		if (!strcmp(rp, names->name)
-		 || !strcmp(rp, names->shortname))
-			break;
-		names++;
-		values++;
-	}
-	if (names->name == NULL)
-		return FALSE;
-
 	if (no && (names->type != VALTYPE_BOOL))
 		return FALSE;		/* this shouldn't happen */
-	found_mode = TRUE;
 
 	/* get a value if we need one */
 	if ((end_string() == '=')
@@ -640,6 +635,7 @@ register struct VAL *values;
 		values->vp->i = kind;
 		break;
 
+#if COLOR
 	case VALTYPE_COLOR:
 		nval = -1;
 		(void)mklower(rp);
@@ -657,6 +653,7 @@ register struct VAL *values;
 		}
 		values->vp->i = nval;
 		break;
+#endif /* COLOR */
 
 	case VALTYPE_INT:
 		if (!string_to_number(rp, &nval))
@@ -679,7 +676,7 @@ register struct VAL *values;
 
 	if (!same_val(names, values, &oldvalue)) {
 		if (names->winflags) {
-			if (global) {
+			if (global == TRUE) {
 				register WINDOW *wp;
 				for_each_window(wp) {
 					wp->w_flag |= names->winflags;
@@ -732,6 +729,50 @@ int	eolchar;
 	return (c == ' ' || c == eolchar);
 }
 
+int
+find_mode(mode, global, namesp, valuep)
+char	*mode;
+int	global;
+struct VALNAMES **namesp;
+struct VAL **valuep;
+{
+	register char *rp = !strncmp(mode, "no", 2) ? mode+2 : mode;
+	register struct VALNAMES *nn;
+	register struct VAL *vv;
+	register int	class;
+
+	for (class = 0; class < 3; class++) {
+		switch (class) {
+		default: /* universal modes */
+			nn = g_valuenames;
+			vv = (global != FALSE) ? global_g_values.gv : (struct VAL *)0;
+			break;
+		case 1:	/* buffer modes */
+			nn = b_valuenames;
+			vv = (global == TRUE) ? global_b_values.bv : curbp->b_values.bv;
+			break;
+		case 2:	/* window modes */
+			nn = w_valuenames;
+			vv = (global == TRUE) ? global_w_values.wv : curwp->w_values.wv;
+			break;
+		}
+
+		if (vv != 0) {
+			while (nn->name != NULL) {
+				if (!strcmp(rp, nn->name)
+				 || !strcmp(rp, nn->shortname)) {
+					*namesp = nn;
+					*valuep = vv;
+					return TRUE;
+				}
+				nn++;
+				vv++;
+			}
+		}
+	}
+	return FALSE;
+}
+
 /*
  * Process a single mode-setting
  */
@@ -740,6 +781,8 @@ do_a_mode(kind, global)
 int	kind;
 int	global;
 {
+	struct VALNAMES	*nn;
+	struct VAL	*vv;
 	register int	s;
 	static char cbuf[NLINE]; 	/* buffer to receive mode name into */
 
@@ -757,20 +800,18 @@ int	global;
 		return listmodes(FALSE,1);
 	}
 
-	found_mode = FALSE;
-	if (((s = adjvalueset(cbuf, kind, g_valuenames,
-		global, global ? global_g_values.gv : (struct VAL *)0 )) != 0)
-	 || ((s = adjvalueset(cbuf, kind, b_valuenames,
-		global, global ? global_b_values.bv : curbp->b_values.bv )) != 0)
-	 || ((s = adjvalueset(cbuf, kind, w_valuenames,
-		global, global ? global_w_values.wv : curwp->w_values.wv )) != 0)) {
+	if ((s = find_mode(cbuf, global, &nn, &vv)) != TRUE) {
+#if !SMALLER
+		return set_variable(cbuf);
+#else
+		mlforce("[Not a legal set option: \"%s\"]", cbuf);
+#endif
+	} else if ((s = adjvalueset(cbuf, kind, nn, global, vv)) != 0) {
 		if (s == TRUE)
 			mlerase();	/* erase the junk */
 		return s;
 	}
 
-	if (!found_mode)
-		mlforce("[Not a legal set option: \"%s\"]", cbuf);
 	return FALSE;
 }
 

@@ -5,7 +5,19 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.56  1993/06/02 14:28:47  pgf
+ * Revision 1.60  1993/06/22 10:24:21  pgf
+ * new arg to freeundostacks, and new forw/back undo routines
+ *
+ * Revision 1.59  1993/06/18  16:16:34  pgf
+ * alistair crooks lint/NeXt changes
+ *
+ * Revision 1.58  1993/06/18  15:57:06  pgf
+ * tom's 3.49 changes
+ *
+ * Revision 1.57  1993/06/10  14:58:10  pgf
+ * initial :map support, from Otto Lind
+ *
+ * Revision 1.56  1993/06/02  14:28:47  pgf
  * see tom's 3.48 CHANGES
  *
  * Revision 1.55  1993/05/24  15:21:37  pgf
@@ -200,8 +212,6 @@ extern int opermove P(( int, int ));
 extern int opertransf P(( int, int ));
 extern int operglobals P(( int, int ));
 extern int opervglobals P(( int, int ));
-extern int map P(( int, int ));
-extern int unmap P(( int, int ));
 extern int source P(( int, int ));
 extern int visual P(( int, int ));
 extern int ex P(( int, int ));
@@ -211,6 +221,11 @@ extern int unarg P(( int, int ));
 extern int nullproc P(( int, int ));
 extern void charinit P(( void ));
 extern void start_debug_log P(( int , char ** ));
+#if OPT_MAP_MEMORY
+extern void exit_program P(( int ));
+#endif
+
+/* tcap.c and other screen-drivers */
 extern void tcapopen P(( void ));
 extern void tcapclose P(( void ));
 extern void tcapkopen P(( void ));
@@ -418,17 +433,18 @@ extern void newscreensize P(( int, int ));
 extern char * l_itoa P(( int ));
 extern char * ltos P(( int ));
 extern int absol P(( int ));
+extern int is_truem P(( char * ));
+extern int is_falsem P(( char * ));
 extern int stol P(( char * ));
 extern int gtlbl P(( char * ));
 extern char * gtenv P(( char * ));
-extern char * getkill P(( void ));
 extern char * gtusr P(( char * ));
 extern char * mklower P(( char * ));
 extern char * mkupper P(( char * ));
-extern int svar P(( VDESC *, char * ));
 extern void varinit P(( void ));
 extern int listvars P(( int, int ));
 extern int setvar P(( int, int ));
+extern int set_variable P(( char * ));
 extern int sindex P(( char *, char * ));
 extern int ernd P(( void ));
 
@@ -612,7 +628,6 @@ extern void finish_kbm P(( void ));
 extern int risearch P(( int, int ));
 extern int fisearch P(( int, int ));
 extern int isearch P(( int, int ));
-extern int promptpattern P(( char * ));
 extern int get_char P(( void ));
 
 /* line.c */
@@ -646,13 +661,21 @@ extern int execkreg P(( int, int ));
 extern int loadkreg P(( int, int ));
 extern int showkreg P(( int, int ));
 
+/* map.c */
+extern int map P(( int, int ));
+extern int unmap P(( int, int ));
+extern void map_check P(( int ));
+extern int map_proc P((int, int));
+
 /* modes.c */
 extern int setmode P(( int, int ));
 extern int delmode P(( int, int ));
 extern int setgmode P(( int, int ));
 extern int delgmode P(( int, int ));
 extern int settab P(( int, int ));
+extern int adjvalueset P(( char *, int, struct VALNAMES *, int, struct VAL * ));
 extern int setfillcol P(( int, int ));
+extern char *string_mode_val P(( struct VALNAMES *, struct VAL * ));
 extern REGEXVAL *new_regexval P(( char *, int ));
 extern void copy_val P(( struct VAL *, struct VAL *, int ));
 extern void free_regexval P(( REGEXVAL * ));
@@ -661,6 +684,7 @@ extern void free_val P(( struct VALNAMES *, struct VAL * ));
 extern void free_local_vals P(( struct VALNAMES *, struct VAL *, struct VAL * ));
 #endif
 extern int listmodes P(( int, int ));
+extern int find_mode P(( char *, int, struct VALNAMES **, struct VAL ** ));
 
 /* npopen.c */
 #if UNIX || MSDOS
@@ -900,8 +924,10 @@ extern void ttmiscinit P(( void ));
 extern void toss_to_undo P(( LINEPTR ));
 extern int copy_for_undo P(( LINEPTR ));
 extern int tag_for_undo P(( LINEPTR ));
-extern void freeundostacks P(( BUFFER * ));
+extern void freeundostacks P(( BUFFER *, int ));
 extern int undo P(( int, int ));
+extern int backundo P(( int, int ));
+extern int forwredo P(( int, int ));
 extern void mayneedundo P(( void ));
 extern int lineundo P(( int, int ));
 extern void dumpuline P(( LINEPTR ));
@@ -966,7 +992,6 @@ extern int ffgetline P(( int * ));
 extern int macarg P(( char * ));
 extern int echochar P(( int, int ));
 extern int scanmore P(( char *, int ));
-extern int expandp P(( char *, char *, int ));
 extern int scanner P((regexp *, int, int ));
 extern int insbrace P(( int, int ));
 extern int inspound P(( void ));
@@ -997,6 +1022,7 @@ unsigned tb_length P(( TBUFF * ));
 
 /* tmp.c */
 #if OPT_MAP_MEMORY
+extern	void	tmp_cleanup	P(( void ));
 extern	LINEPTR	l_allocate	P(( SIZE_T ));
 extern	void	l_deallocate	P(( LINEPTR ));
 extern	LINE *	l_reallocate	P(( LINEPTR, SIZE_T, BUFFER * ));
@@ -1034,6 +1060,7 @@ extern	void ev_leaks P(( void ));
 extern	void x_set_rv P(( void ));
 extern	int x_setfont P(( char * ));
 extern	void x_setname P(( char * ));
+extern	char *x_current_fontname P(( void ));
 extern	void x_setforeground P(( char * ));
 extern	void x_setbackground P(( char * ));
 extern	void x_preparse_args P(( int *, char *** ));
@@ -1057,7 +1084,7 @@ extern void dos_crit_handler P(( void ));
 #endif
 
 #if UNIX
-#if SUNOS && (defined(lint) || __GNUC__)
+#if (SUNOS || NeXT) && defined(lint) || __GNUC__
 extern	int	_filbuf	P(( FILE * ));
 extern	int	_flsbuf	P(( unsigned char, FILE * ));
 extern	int	printf	P(( char *, ... ));
@@ -1072,7 +1099,9 @@ extern	int	fwrite	P(( char *, int, int, FILE * ));
 extern	int	ioctl	P(( int, int, caddr_t ));
 extern	int	killpg	P(( int, int ));
 extern	int	mkdir	P(( char *, int ));
+#ifndef NeXT
 extern	void	perror	P(( char * ));
+#endif /* !NeXT */
 extern	int	puts	P(( char * ));
 extern	int	sscanf	P(( char *, char *, ... ));
 extern	int	select	P(( int, fd_set*, fd_set*, fd_set*, struct timeval* ));
@@ -1080,5 +1109,29 @@ extern	void	setbuf	P(( FILE *, char * ));
 extern	void	setbuffer P(( FILE *, char *, int ));
 extern	int	system	P(( char * ));
 extern	int	wait	P(( int * ));
-#endif
+extern	long	strtol	P(( char *, char **, int ));
+#endif /* lint || __GNUC__ */
+#ifdef NeXT
+extern int	isatty	P((int));
+extern int	atoi	P((char *));
+extern int	dup	P((int));
+extern int	close	P((int));
+extern void	free	P((void *ptr));
+extern void	memset	P((char*, int ch, int n));
+extern int	access	P((char *, int));
+extern int	read	P((int, char *, int));
+extern int	write	P((int, char *, int));
+extern void	*qsort	P((void *, size_t, size_t , int (*compar)(void *, void *)));
+extern int	pipe	P((int *));
+extern int	kill	P((int, int));
+extern int	execlp	P((char *, char *, ...));
+extern int	fork	P((void));
+extern int	sleep	P((int));
+extern int	getuid	P((void));
+extern int	chdir	P((char *));
+extern int	getpgrp	P((int));
+extern int	unlink	P((char *));
+extern int	setjmp	P((jmp_buf env));
+extern void	longjmp	P((jmp_buf env, int val));
+#endif /* NeXT */
 #endif /* UNIX */

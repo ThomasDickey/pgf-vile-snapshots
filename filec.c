@@ -4,7 +4,10 @@
  *	Filename prompting and completion routines
  *
  * $Log: filec.c,v $
- * Revision 1.17  1993/06/02 14:58:17  pgf
+ * Revision 1.18  1993/06/18 15:57:06  pgf
+ * tom's 3.49 changes
+ *
+ * Revision 1.17  1993/06/02  14:58:17  pgf
  * folded some long lines
  *
  * Revision 1.16  1993/06/02  14:28:47  pgf
@@ -500,7 +503,7 @@ char *	name;
 			strncpy(s, de->d_name, (int)(de->d_namlen));
 			s[de->d_namlen] = EOS;
 # else
-			strcpy(s, de->d_name);
+			(void)strcpy(s, de->d_name);
 # endif
 #else
 # if MSDOS
@@ -575,11 +578,8 @@ makeMyList()
 static void
 freeMyList()
 {
-	if (MyList != 0) {
-		free((char *)MyList);
-		MyList = 0;
-		MySize = 0;
-	}
+	FreeAndNull(MyList);
+	MySize = 0;
 }
 #else
 #define	freeMyList()

@@ -4,7 +4,10 @@
 	written 1986 by Daniel Lawrence
  *
  * $Log: eval.c,v $
- * Revision 1.55  1993/06/02 14:28:47  pgf
+ * Revision 1.56  1993/06/18 16:20:37  pgf
+ * tom's 3.49 changes
+ *
+ * Revision 1.55  1993/06/02  14:28:47  pgf
  * see tom's 3.48 CHANGES
  *
  * Revision 1.54  1993/05/24  15:25:41  pgf
@@ -183,34 +186,77 @@
 #include	"nevars.h"
 #include	"glob.h"
 
+#define	FUNC_NAMELEN	4
+#define	ILLEGAL_NUM	-1
+#define	MODE_NUM	-2
+
+	/* macros for environment-variable switch */
+#if VMS
+#define	If(N)		if (vnum == N) {
+#define	ElseIf(N)	} else If(N)
+#define	Otherwise	} else {
+#define	EndIf		}
+#else			/* more compact if it works... */
+#define	If(N)		switch (vnum) { case N: {
+#define	ElseIf(N)	break; } case N: {
+#define	Otherwise	break; } default: {
+#define	EndIf		}}
+#endif
+
 #if ! SMALLER
 #if ENVFUNC
-static	char	*GetEnv P(( char * ));
+static	char *	GetEnv P(( char * ));
+static	char *	DftEnv P(( char *, char * ));
+static	void	SetEnv P(( char **, char * ));
 #endif
 static	void	makevarslist P(( int, char *));
+static	int	is_mode_name P(( char *, int, struct VALNAMES **, struct VAL ** ));
+static	char *	get_listvalue P(( char *, int ));
 static	char *	gtfun P(( char * ));
-static	void	findvar P(( char *, VDESC * ));
+static	void	FindVar P(( char *, VDESC * ));
 static	int	vars_complete P(( int, char *, int * ));
+static	int	PromptAndSet P(( char *, int, int ));
+static	int	SetVarValue P(( VDESC *, char * ));
+static	char *	getkill P(( void ));
 #endif
 
 /*--------------------------------------------------------------------------*/
 
 #if	ENVFUNC && !SMALLER
-static
-char	*GetEnv(s)
+static char *
+GetEnv(s)
 	char	*s;
 {
 	register char *v = getenv(s);
 	return v ? v : "";
 }
+
+static char *
+DftEnv(name, dft)
+register char	*name;
+register char	*dft;
+{
+	name = GetEnv(name);
+	return (name == 0) ? dft : name;
+}
+
+static void
+SetEnv(namep, value)
+char	**namep;
+char	*value;
+{
+	FreeIfNeeded(*namep);
+	*namep = strmalloc(value);
+}
 #else
 #define	GetEnv(s)	""
+#define	DftEnv(s,d)	d
+#define	SetEnv(np,s)	(*(np) = strmalloc(s))
 #endif
 
-/* points to current "shell" environment variable, either in malloc'ed
-	if user set it, or in environment ($SHELL) otherwise */
 #if !SMALLER
-static char *shell;
+static char *shell;	/* $SHELL environment is "$shell" variable */
+static char *directory;	/* $TMP environment is "$directory" variable */
 #endif
 
 void
@@ -220,7 +266,7 @@ varinit()		/* initialize the user variable list */
 	register int i;
 
 	for (i=0; i < MAXVARS; i++)
-		uv[i].u_name[0] = 0;
+		uv[i].u_name[0] = EOS;
 #endif
 }
 
@@ -244,6 +290,46 @@ char *ptr;
 		}
 	}
 }
+
+/* Test a name to ensure that it is a mode-name, filtering out modish-stuff
+ * such as "all" and "noview"
+ */
+static int
+is_mode_name(name, showall, nn, vv)
+char *name;
+int showall;
+struct VALNAMES	**nn;
+struct VAL	**vv;
+{
+
+	if (strncmp(name, "no", 2)
+	 && strcmp(name, "all")) {
+		if (find_mode(name, -TRUE, nn, vv)) {
+			if (!showall || !strcmp(name, (*nn)->shortname))
+				return FALSE;
+			return TRUE;
+		}
+		return SORTOFTRUE;
+	}
+	return FALSE;
+}
+
+/* filter out mode-names that apply only to abbreviations */
+static char *
+get_listvalue(name, showall)
+char *name;
+int showall;
+{
+	struct VALNAMES	*nn;
+	struct VAL	*vv;
+	register int	s;
+
+	if ((s = is_mode_name(name, showall, &nn, &vv)) == TRUE)
+		return string_mode_val(nn, vv);
+	else if (s == SORTOFTRUE)
+		return gtenv(name);
+	return 0;
+}
 #endif
 
 /* ARGSUSED */
@@ -257,28 +343,27 @@ int f,n;
 	register int s;
 	register unsigned t;
 	register char *v, *vv;
-	static	char *fmt = "$%s = %.*s\n";
+	static	char *fmt = "$%s = %*S\n";
+	char	**Names = f ? all_modes : envars;
+	int	showall = f ? (n > 1) : FALSE;
 
 	/* collect data for environment-variables, since some depend on window */
-	for (s = t = 0; s < NEVARS; s++) {
-		vv = gtenv(envars[s]);
-		if (vv != errorm)
-			t += strlen(envars[s]) + strlen(fmt) + strlen(vv);
+	for (s = t = 0; Names[s] != 0; s++) {
+		if ((vv = get_listvalue(Names[s], showall)) != 0)
+			t += strlen(Names[s]) + strlen(fmt) + strlen(vv);
 	}
 	if (!(values = malloc(t)))
 		return FALSE;
 
-	for (s = 0, v = values; s < NEVARS; s++) {
-		vv = gtenv(envars[s]);
-		if (vv != errorm) {
+	for (s = 0, v = values; Names[s] != 0; s++) {
+		if ((vv = get_listvalue(Names[s], showall)) != 0) {
 			t = strlen(vv);
 			if (t == 0) {
 				t = 1;
 				vv = "";
 			} else if (vv[t-1] == '\n')
 				t--;	/* suppress trailing newline */
-			(void)sprintf(v, fmt, envars[s], t, vv);
-			v += strlen(v);
+			v = lsprintf(v, fmt, Names[s], t, vv);
 		}
 	}
 	s = liststuff(ScratchName(Variables), makevarslist, 0, (char *)values);
@@ -307,8 +392,7 @@ char *fname;		/* name of function to evaluate */
 		return(errorm);
 
 	/* look the function up in the function table */
-	fname[3] = 0;	/* only first 3 chars significant */
-	(void)mklower(fname);	/* and let it be upper or lower case */
+	mklower(fname)[FUNC_NAMELEN-1] = EOS; /* case-independent */
 	for (fnum = 0; fnum < NFUNCS; fnum++)
 		if (strcmp(fname, funcs[fnum].f_name) == 0)
 			break;
@@ -326,14 +410,13 @@ char *fname;		/* name of function to evaluate */
 		if (funcs[fnum].f_type >= DYNAMIC) {
 			if (macarg(arg2) != TRUE)
 				return(errorm);
-	
+
 			/* if needed, retrieve the third argument */
 			if (funcs[fnum].f_type >= TRINAMIC)
 				if (macarg(arg3) != TRUE)
 					return(errorm);
 		}
 	}
-		
 
 	/* and now evaluate it! */
 	switch (fnum) {
@@ -343,8 +426,7 @@ char *fname;		/* name of function to evaluate */
 		case UFDIV:	return(l_itoa(atoi(arg1) / atoi(arg2)));
 		case UFMOD:	return(l_itoa(atoi(arg1) % atoi(arg2)));
 		case UFNEG:	return(l_itoa(-atoi(arg1)));
-		case UFCAT:	strcpy(result, arg1);
-				return(strcat(result, arg2));
+		case UFCAT:	return(strcat(strcpy(result, arg1), arg2));
 		case UFLEFT:	return(strncpy(result, arg1, atoi(arg2)));
 		case UFRIGHT:	return(strcpy(result, &arg1[atoi(arg2)-1]));
 		case UFMID:	return(strncpy(result, &arg1[atoi(arg2)-1],
@@ -362,14 +444,14 @@ char *fname;		/* name of function to evaluate */
 		case UFLENGTH:	return(l_itoa((int)strlen(arg1)));
 		case UFUPPER:	return(mkupper(arg1));
 		case UFLOWER:	return(mklower(arg1));
-				/* patch: why 42? */
+				/* patch: why 42? (that's an '*') */
 		case UFTRUTH:	return(ltos(atoi(arg1) == 42));
 		case UFASCII:	return(l_itoa((int)arg1[0]));
 		case UFCHR:	result[0] = atoi(arg1);
-				result[1] = 0;
+				result[1] = EOS;
 				return(result);
 		case UFGTKEY:	result[0] = tgetc(TRUE);
-				result[1] = 0;
+				result[1] = EOS;
 				return(result);
 		case UFRND:	return(l_itoa((ernd() % absol(atoi(arg1))) + 1));
 		case UFABS:	return(l_itoa(absol(atoi(arg1))));
@@ -409,87 +491,96 @@ char *gtenv(vname)
 char *vname;		/* name of environment variable to retrieve */
 {
 	register int vnum;	/* ordinal number of var referenced */
-#if X11
-	char	*x_current_fontname(); 
-#endif
+	register char *value = errorm;
 
-	if (!vname[0])
-		return (errorm);
+	if (vname[0] != EOS) {
 
-	/* scan the list, looking for the referenced name */
-	for (vnum = 0; vnum < NEVARS; vnum++)
-		if (strcmp(vname, envars[vnum]) == 0)
-			break;
+		/* scan the list, looking for the referenced name */
+		for (vnum = 0; envars[vnum] != 0; vnum++)
+			if (strcmp(vname, envars[vnum]) == 0)
+				break;
 
-	/* return errorm on a bad reference */
-	if (vnum == NEVARS)
-		return(errorm);
+		/* return errorm on a bad reference */
+		if (envars[vnum] == 0) {
+			struct VALNAMES	*nn;
+			struct VAL	*vv;
 
-	/* otherwise, fetch the appropriate value */
-	switch (vnum) {
-		case EVPAGELEN:	return(l_itoa(term.t_nrow + 1));
-		case EVCURCOL:	return(l_itoa(getccol(FALSE) + 1));
-		case EVCURLINE: return(l_itoa(getcline()));
-		case EVRAM:	return(l_itoa((int)(envram / 1024l)));
-		case EVFLICKER:	return(ltos(flickcode));
-		case EVCURWIDTH:return(l_itoa(term.t_ncol));
-		case EVCBUFNAME:return(curbp->b_bname);
-		case EVCFNAME:	return(curbp->b_fname);
-		case EVSRES:	return(sres);
-		case EVDEBUG:	return(ltos(macbug));
-		case EVSTATUS:	return(ltos(cmdstatus));
-		case EVPALETTE:	return(palstr);
-		case EVLASTKEY: return(l_itoa(lastkey));
-		case EVCURCHAR:
-			return(is_at_end_of_line(DOT) ? l_itoa('\n') :
-				l_itoa(char_at(DOT)));
-		case EVDISCMD:	return(ltos(discmd));
-		case EVVERSION:	return(version);
-		case EVPROGNAME:return(prognam);
-		case EVSEED:	return(l_itoa(seed));
-		case EVDISINP:	return(ltos(disinp));
-		case EVWLINE:	return(l_itoa(curwp->w_ntrows));
-		case EVCWLINE:	return(l_itoa(getwpos()));
-		case EVSEARCH:	return(pat);
-		case EVREPLACE:	return(rpat);
-		case EVMATCH:	return((patmatch == NULL)? "": patmatch);
-		case EVKILL:	return(getkill());
-		case EVTPAUSE:	return(l_itoa(term.t_pause));
-		case EVPENDING:
+			if (is_mode_name(vname, TRUE, &nn, &vv) == TRUE)
+				value = string_mode_val(nn, vv);
+			return (value);
+		}
+
+		/* otherwise, fetch the appropriate value */
+		If( EVPAGELEN )		value = l_itoa(term.t_nrow + 1);
+		ElseIf( EVCURCOL )	value = l_itoa(getccol(FALSE) + 1);
+		ElseIf( EVCURLINE )	value = l_itoa(getcline());
+		ElseIf( EVRAM )		value = l_itoa((int)(envram / 1024l));
+		ElseIf( EVFLICKER )	value = ltos(flickcode);
+		ElseIf( EVCURWIDTH )	value = l_itoa(term.t_ncol);
+		ElseIf( EVCBUFNAME )	value = curbp->b_bname;
+		ElseIf( EVCFNAME )	value = curbp->b_fname;
+		ElseIf( EVSRES )	value = sres;
+		ElseIf( EVDEBUG )	value = ltos(macbug);
+		ElseIf( EVSTATUS )	value = ltos(cmdstatus);
+		ElseIf( EVPALETTE )	value = palstr;
+		ElseIf( EVLASTKEY )	value = l_itoa(lastkey);
+		ElseIf( EVCURCHAR )
+			value = is_at_end_of_line(DOT)
+				? l_itoa('\n')
+				: l_itoa(char_at(DOT));
+
+		ElseIf( EVDISCMD )	value = ltos(discmd);
+		ElseIf( EVVERSION )	value = version;
+		ElseIf( EVPROGNAME )	value = prognam;
+		ElseIf( EVSEED )	value = l_itoa(seed);
+		ElseIf( EVDISINP )	value = ltos(disinp);
+		ElseIf( EVWLINE )	value = l_itoa(curwp->w_ntrows);
+		ElseIf( EVCWLINE )	value = l_itoa(getwpos());
+		ElseIf( EVSEARCH )	value = pat;
+		ElseIf( EVREPLACE )	value = rpat;
+		ElseIf( EVMATCH )	value = (patmatch == NULL) ? "" : patmatch;
+		ElseIf( EVKILL )	value = getkill();
+		ElseIf( EVTPAUSE )	value = l_itoa(term.t_pause);
+		ElseIf( EVPENDING )
 #if	TYPEAH
-				return(ltos(typahead()));
+					value = ltos(typahead());
 #else
-				return(falsem);
+					value = falsem;
 #endif
-		case EVLLENGTH:	return(l_itoa(lLength(DOT.l)));
-		case EVLINE:	return(getctext(0));
-		case EVWORD:	return(getctext(_nonspace));
-		case EVIDENTIF:	return(getctext(_ident));
-		case EVQIDENTIF:return(getctext(_qident));
-		case EVPATHNAME:return(getctext(_pathn));
-		case EVDIR:	return(current_directory(FALSE));
+		ElseIf( EVLLENGTH )	value = l_itoa(lLength(DOT.l));
+		ElseIf( EVLINE )	value = getctext(0);
+		ElseIf( EVWORD )	value = getctext(_nonspace);
+		ElseIf( EVIDENTIF )	value = getctext(_ident);
+		ElseIf( EVQIDENTIF )	value = getctext(_qident);
+		ElseIf( EVPATHNAME )	value = getctext(_pathn);
+		ElseIf( EVCWD )		value = current_directory(FALSE);
 #if X11
-		case EVFONT:	return(x_current_fontname());
+		ElseIf( EVFONT )	value = x_current_fontname();
 #endif
-		case EVSHELL:	if (!shell) {
-					shell = GetEnv("SHELL");
-					if (!shell)  /* only search once */
-						shell = "/bin/sh";
-					shell = strmalloc(shell);
-				}
-				return shell;
+		ElseIf( EVSHELL )
+			if (shell == 0)
+				SetEnv(&shell, DftEnv("SHELL", "/bin/sh"));
+			value = shell;
+
+		ElseIf( EVDIRECTORY )
+			if (directory == 0)
+				SetEnv(&directory, DftEnv("TMP", P_tmpdir));
+			value = directory;
+
+		EndIf
 	}
-	return errorm;
+	return value;
 }
 
-char *getkill()		/* return some of the contents of the kill buffer */
+static char *
+getkill()		/* return some of the contents of the kill buffer */
 {
 	register int size;	/* max number of chars to return */
 	static char value[NSTRING];	/* temp buffer for value */
 
 	if (kbs[0].kbufh == NULL)
 		/* no kill buffer....just a null string */
-		value[0] = 0;
+		value[0] = EOS;
 	else {
 		/* copy in the contents... */
 		if (kbs[0].kused < NSTRING)
@@ -504,7 +595,7 @@ char *getkill()		/* return some of the contents of the kill buffer */
 }
 
 static void
-findvar(var, vd)	/* find a variables type and name */
+FindVar(var, vd)	/* find a variables type and name */
 char *var;	/* name of var to get */
 VDESC *vd;	/* structure to hold type and ptr */
 {
@@ -512,7 +603,7 @@ VDESC *vd;	/* structure to hold type and ptr */
 	register int vtype;	/* type to return */
 
 fvar:
-	vtype = vnum = -1;
+	vtype = vnum = ILLEGAL_NUM;
 	if (!var[1]) {
 		vd->v_type = vtype;
 		return;
@@ -520,11 +611,20 @@ fvar:
 	switch (var[0]) {
 
 		case '$': /* check for legal enviromnent var */
-			for (vnum = 0; vnum < NEVARS; vnum++)
+			for (vnum = 0; envars[vnum] != 0; vnum++)
 				if (strcmp(&var[1], envars[vnum]) == 0) {
 					vtype = TKENV;
 					break;
 				}
+			if (vtype == ILLEGAL_NUM) {
+				struct VALNAMES	*nn;
+				struct VAL	*vv;
+
+				if (is_mode_name(&var[1], TRUE, &nn, &vv) == TRUE) {
+					vnum  = MODE_NUM;
+					vtype = TKENV;
+				}
+			}
 			break;
 
 		case '%': /* check for existing legal user variable */
@@ -540,17 +640,17 @@ fvar:
 			for (vnum = 0; vnum < MAXVARS; vnum++)
 				if (uv[vnum].u_name[0] == 0) {
 					vtype = TKVAR;
-					strcpy(uv[vnum].u_name, &var[1]);
+					(void)strcpy(uv[vnum].u_name, &var[1]);
 					break;
 				}
 			break;
 
 		case '&':	/* indirect operator? */
-			var[4] = 0;
+			var[FUNC_NAMELEN] = EOS;
 			if (strcmp(&var[1], "ind") == 0) {
 				/* grab token, and eval it */
 				execstr = token(execstr, var, EOS);
-				strcpy(var, tokval(var));
+				(void)strcpy(var, tokval(var));
 				goto fvar;
 			}
 	}
@@ -572,7 +672,7 @@ int	*pos;
 	if (buf[0] == '$') {
 		int	cpos = *pos;
 		*pos -= 1;	/* account for leading '$', not in tables */
-		if (kbd_complete(c, buf+1, pos, (char *)&envars[0], sizeof(envars[0])))
+		if (kbd_complete(c, buf+1, pos, (char *)&all_modes[0], sizeof(all_modes[0])))
 			*pos += 1;
 		else {
 			*pos = cpos;
@@ -582,16 +682,13 @@ int	*pos;
 	return TRUE;
 }
 
-int 
+int
 setvar(f, n)		/* set a variable */
 int f;		/* default flag */
 int n;		/* numeric arg (can overide prompted value) */
 {
 	register int status;	/* status return */
-	VDESC vd;		/* variable num/type */
 	static char var[NLINE+3];	/* name of variable to fetch */
-	char prompt[NLINE];
-	char value[NLINE];	/* value to set variable to */
 
 	/* first get the variable to set.. */
 	status = kbd_string("Variable to set: ",
@@ -599,19 +696,36 @@ int n;		/* numeric arg (can overide prompted value) */
 		'=', KBD_NOEVAL|KBD_LOWERC, vars_complete);
 	if (status != TRUE)
 		return(status);
+	return PromptAndSet(var, f, n);
+}
+
+static int
+PromptAndSet(var, f, n)
+char	*var;
+int	f,n;
+{
+	register int status;	/* status return */
+	VDESC vd;		/* variable num/type */
+	char prompt[NLINE];
+	char value[NLINE];	/* value to set variable to */
 
 	/* check the legality and find the var */
-	findvar(var, &vd);
-	
+	FindVar(var, &vd);
+
 	/* if its not legal....bitch */
-	if (vd.v_type == -1) {
+	if (vd.v_type == ILLEGAL_NUM) {
 		mlforce("[No such variable as '%s']", var);
 		return(FALSE);
+	} else if (vd.v_type == TKENV && vd.v_num == MODE_NUM) {
+		struct VALNAMES	*nn;
+		struct VAL	*vv;
+		(void)find_mode(var+1, -TRUE, &nn, &vv);
+		return adjvalueset(var+1, TRUE, nn, -TRUE, vv);
 	}
 
 	/* get the value for that variable */
 	if (f == TRUE)
-		strcpy(value, l_itoa(n));
+		(void)strcpy(value, l_itoa(n));
 	else {
 		value[0] = EOS;
 		(void)lsprintf(prompt, "Value of %s: ", var);
@@ -621,26 +735,172 @@ int n;		/* numeric arg (can overide prompted value) */
 	}
 
 	/* and set the appropriate value */
-	status = svar(&vd, value);
+	status = SetVarValue(&vd, value);
 
+	if (status == ABORT)
+		mlforce("[Variable %s is readonly]", var);
+	else if (status != TRUE)
+		mlforce("[Cannot set %s to %s]", var, value);
+	/* and return it */
+	return(status);
+}
+
+/* entrypoint from modes.c, used to set environment variables */
+int
+set_variable(name)
+char	*name;
+{
+	char	temp[NLINE];
+	if (*name != '$')
+		name = strcat(strcpy(temp, "$"), name);
+	return PromptAndSet(name, FALSE, 0);
+}
+
+static int
+SetVarValue(var, value)	/* set a variable */
+VDESC *var;	/* variable to set */
+char *value;	/* value to set to */
+{
+	register int vnum;	/* ordinal number of var referenced */
+	register int vtype;	/* type of variable to set */
+	register int status;	/* status return */
+	register int c;		/* translated character */
+
+	/* simplify the vd structure (we are gonna look at it a lot) */
+	vnum = var->v_num;
+	vtype = var->v_type;
+
+	/* and set the appropriate value */
+	status = TRUE;
+	switch (vtype) {
+	case TKVAR: /* set a user variable */
+		FreeIfNeeded(uv[vnum].u_value);
+		if ((uv[vnum].u_value = strmalloc(value)) == 0)
+			status = FALSE;
+		break;
+
+	case TKENV: /* set an environment variable */
+		status = TRUE;	/* by default */
+		If( EVCURCOL )
+			status = gotocol(TRUE,atoi(value));
+
+		ElseIf( EVCURLINE )
+			status = gotoline(TRUE, atoi(value));
+
+		ElseIf( EVFLICKER )
+			flickcode = stol(value);
+
+		ElseIf( EVCURWIDTH )
+			status = newwidth(TRUE, atoi(value));
+
+		ElseIf( EVPAGELEN )
+			status = newlength(TRUE,atoi(value));
+
+		ElseIf( EVCBUFNAME )
+			(void)strcpy(curbp->b_bname, value);
+			curwp->w_flag |= WFMODE;
+
+		ElseIf( EVCFNAME )
+			ch_fname(curbp, value);
+			curwp->w_flag |= WFMODE;
+
+		ElseIf( EVSRES )
+			status = TTrez(value);
+
+		ElseIf( EVDEBUG )
+			macbug = stol(value);
+
+		ElseIf( EVSTATUS )
+			cmdstatus = stol(value);
+
+		ElseIf( EVPALETTE )
+			strncpy(palstr, value, 48);
+			spal(palstr);
+
+		ElseIf( EVLASTKEY )
+			lastkey = atoi(value);
+
+		ElseIf( EVCURCHAR )
+			ldelete(1L, FALSE);	/* delete 1 char */
+			c = atoi(value);
+			if (c == '\n')
+				lnewline();
+			else
+				linsert(1, c);
+			backchar(FALSE, 1);
+
+		ElseIf( EVDISCMD )
+			discmd = stol(value);
+
+		ElseIf( EVSEED )
+			seed = atoi(value);
+
+		ElseIf( EVDISINP )
+			disinp = stol(value);
+
+		ElseIf( EVWLINE )
+			status = resize(TRUE, atoi(value));
+
+		ElseIf( EVCWLINE )
+			status = forwline(TRUE, atoi(value) - getwpos());
+
+		ElseIf( EVSEARCH )
+			(void)strcpy(pat, value);
+			FreeIfNeeded(gregexp);
+			gregexp = regcomp(pat, b_val(curbp, MDMAGIC));
+
+		ElseIf( EVREPLACE )
+			(void)strcpy(rpat, value);
+
+		ElseIf( EVTPAUSE )
+			term.t_pause = atoi(value);
+
+		ElseIf( EVLINE )
+			(void)putctext(value);
+
+		ElseIf( EVCWD )
+			status = set_directory(value);
+#if X11
+		ElseIf( EVFONT )
+			status = x_setfont(value);
+#endif
+		ElseIf( EVSHELL )
+			SetEnv(&shell, value);
+
+		ElseIf( EVDIRECTORY )
+			SetEnv(&directory, value);
+
+		Otherwise
+			/* EVPROGNAME */
+			/* EVVERSION */
+			/* EVMATCH */
+			/* EVKILL */
+			/* EVPENDING */
+			/* EVLLENGTH */
+			/* EVRAM */
+			status = ABORT;	/* must be readonly */
+		EndIf
+		break;
+	}
 #if	DEBUGM
 	/* if $debug == TRUE, every assignment will echo a statment to
 	   that effect here. */
-	
+
 	if (macbug) {
-		strcpy(outline, "(((");
+		char	outline[NLINE];
+		(void)strcpy(outline, "(((");
 
 		/* assignment status */
-		strcat(outline, ltos(status));
-		strcat(outline, ":");
+		(void)strcat(outline, ltos(status));
+		(void)strcat(outline, ":");
 
 		/* variable name */
-		strcat(outline, var);
-		strcat(outline, ":");
+		(void)strcat(outline, var);
+		(void)strcat(outline, ":");
 
 		/* and lastly the value we tried to assign */
-		strcat(outline, value);
-		strcat(outline, ")))");
+		(void)strcat(outline, value);
+		(void)strcat(outline, ")))");
 
 
 		/* write out the debug line */
@@ -654,128 +914,9 @@ int n;		/* numeric arg (can overide prompted value) */
 		}
 	}
 #endif
-
-	if (status == ABORT)
-		mlforce("[Variable %s is readonly]", var);
-	else if (status != TRUE)
-		mlforce("[Cannot set %s to %s]", var, value);
-	/* and return it */
-	return(status);
-}
-
-int svar(var, value)		/* set a variable */
-VDESC *var;	/* variable to set */
-char *value;	/* value to set to */
-{
-	register int vnum;	/* ordinal number of var referenced */
-	register int vtype;	/* type of variable to set */
-	register int status;	/* status return */
-	register int c;		/* translated character */
-	register char * sp;	/* scratch string pointer */
-
-	/* simplify the vd structure (we are gonna look at it a lot) */
-	vnum = var->v_num;
-	vtype = var->v_type;
-
-	/* and set the appropriate value */
-	status = TRUE;
-	switch (vtype) {
-	case TKVAR: /* set a user variable */
-		if (uv[vnum].u_value != NULL)
-			free(uv[vnum].u_value);
-		sp = castalloc(char, strlen(value) + 1);
-		if (sp == NULL)
-			return(FALSE);
-		strcpy(sp, value);
-		uv[vnum].u_value = sp;
-		break;
-
-	case TKENV: /* set an environment variable */
-		status = TRUE;	/* by default */
-		switch (vnum) {
-		case EVCURCOL:	status = gotocol(TRUE,atoi(value));
-				break;
-		case EVCURLINE:	status = gotoline(TRUE, atoi(value));
-				break;
-		case EVFLICKER:	flickcode = stol(value);
-				break;
-		case EVCURWIDTH:status = newwidth(TRUE, atoi(value));
-				break;
-		case EVPAGELEN:	status = newlength(TRUE,atoi(value));
-				break;
-		case EVCBUFNAME:strcpy(curbp->b_bname, value);
-				curwp->w_flag |= WFMODE;
-				break;
-		case EVCFNAME:	ch_fname(curbp, value);
-				curwp->w_flag |= WFMODE;
-				break;
-		case EVSRES:	status = TTrez(value);
-				break;
-		case EVDEBUG:	macbug = stol(value);
-				break;
-		case EVSTATUS:	cmdstatus = stol(value);
-				break;
-		case EVPALETTE:	strncpy(palstr, value, 48);
-				spal(palstr);
-				break;
-		case EVLASTKEY:	lastkey = atoi(value);
-				break;
-		case EVCURCHAR:	ldelete(1L, FALSE);	/* delete 1 char */
-				c = atoi(value);
-				if (c == '\n')
-					lnewline();
-				else
-					linsert(1, c);
-				backchar(FALSE, 1);
-				break;
-		case EVDISCMD:	discmd = stol(value);
-				break;
-		case EVSEED:	seed = atoi(value);
-				break;
-		case EVDISINP:	disinp = stol(value);
-				break;
-		case EVWLINE:	status = resize(TRUE, atoi(value));
-				break;
-		case EVCWLINE:	status = forwline(TRUE,
-						atoi(value) - getwpos());
-				break;
-		case EVSEARCH:	strcpy(pat, value);
-				if (gregexp) free((char *)gregexp);
-				gregexp = regcomp(pat, b_val(curbp, MDMAGIC));
-				break;
-		case EVREPLACE:	strcpy(rpat, value);
-				break;
-		case EVTPAUSE:	term.t_pause = atoi(value);
-				break;
-		case EVPROGNAME:
-		case EVVERSION:
-		case EVMATCH:
-		case EVKILL:
-		case EVPENDING:
-		case EVLLENGTH:
-		case EVRAM:	break;
-		case EVLINE:	(void)putctext(value);
-				break;
-		case EVDIR:	status = set_directory(value);
-				break;
-#if X11
-		case EVFONT:	status = x_setfont(value);
-				break;
-#endif
-		case EVSHELL:	if (shell)
-					free(shell);
-				shell = strmalloc(value);
-				break;
-		default:	status = ABORT;	/* must be readonly */
-		}
-		break;
-	}
 	return(status);
 }
 #endif
-
-
-#if ! SMALLER
 
 /*	l_itoa:	integer to ascii string.......... This is too
 		inconsistent to use the system's	*/
@@ -784,10 +925,9 @@ char *l_itoa(i)
 int i;	/* integer to translate to a string */
 {
 	static char result[INTWIDTH+1];	/* resulting string */
-	lsprintf(result,"%d",i);
+	(void)lsprintf(result,"%d",i);
 	return result;
 }
-#endif
 
 int toktyp(tokn)	/* find the type of a passed token */
 char *tokn;	/* token to analyze */
@@ -845,13 +985,13 @@ char *tokn;		/* token to evaluate */
 		case TKARG:	/* interactive argument */
 				oclexec = clexec;
 
-				strcpy(tokn, tokval(&tokn[1]));
+				(void)strcpy(tokn, tokval(&tokn[1]));
 				distmp = discmd;	/* echo it always! */
 				discmd = TRUE;
 				clexec = FALSE;
-				buf[0] = 0;
-				status = kbd_string(tokn, buf, 
-						sizeof(buf), '\n', 
+				buf[0] = EOS;
+				status = kbd_string(tokn, buf,
+						sizeof(buf), '\n',
 						KBD_EXPAND|KBD_QUOTES,
 						no_completion);
 				discmd = distmp;
@@ -864,11 +1004,11 @@ char *tokn;		/* token to evaluate */
 		case TKBUF:	/* buffer contents fetch */
 
 				/* grab the right buffer */
-				strcpy(tokn, tokval(&tokn[1]));
+				(void)strcpy(tokn, tokval(&tokn[1]));
 				bp = bfind(tokn, NO_CREAT, 0);
 				if (bp == NULL)
 					return(errorm);
-		
+
 				/* if the buffer is displayed, get the window
 				   vars instead of the buffer vars */
 				if (bp->b_nwnd > 0) {
@@ -878,15 +1018,15 @@ char *tokn;		/* token to evaluate */
 				/* make sure we are not at the end */
 				if (is_header_line(bp->b_dot,bp))
 					return(errorm);
-		
+
 				/* grab the line as an argument */
 				blen = lLength(bp->b_dot.l) - bp->b_dot.o;
 				if (blen > NSTRING)
 					blen = NSTRING;
 				strncpy(buf, l_ref(bp->b_dot.l)->l_text + bp->b_dot.o,
 					blen);
-				buf[blen] = 0;
-		
+				buf[blen] = EOS;
+
 				/* and step the buffer's line ptr
 					ahead a line */
 				bp->b_dot.l = lFORW(bp->b_dot.l);
@@ -900,7 +1040,7 @@ char *tokn;		/* token to evaluate */
 				}
 
 				/* and return the spoils */
-				return(buf);		
+				return(buf);
 
 		case TKVAR:	return(gtusr(tokn+1));
 		case TKENV:	return(gtenv(tokn+1));
@@ -917,6 +1057,38 @@ char *tokn;		/* token to evaluate */
 #endif
 }
 
+/*
+ * Return true if the argument is one of the strings that we accept as a
+ * synonym for "true".
+ */
+int
+is_truem(val)
+char *val;
+{
+	char	temp[8];
+	(void)mklower(strncpy(temp, val, sizeof(temp)));
+	return (!strcmp(temp, "yes")
+	   ||   !strcmp(temp, "true")
+	   ||   !strcmp(temp, "t")
+	   ||   !strcmp(temp, "y"));
+}
+
+/*
+ * Return true if the argument is one of the strings that we accept as a
+ * synonym for "false".
+ */
+int
+is_falsem(val)
+char *val;
+{
+	char	temp[8];
+	(void)mklower(strncpy(temp, val, sizeof(temp)));
+	return (!strcmp(temp, "no")
+	   ||   !strcmp(temp, "false")
+	   ||   !strcmp(temp, "f")
+	   ||   !strcmp(temp, "n"));
+}
+
 #if ! SMALLER
 
 /* ARGSUSED */
@@ -931,9 +1103,9 @@ int stol(val)	/* convert a string to a numeric logical */
 char *val;	/* value to check for stol */
 {
 	/* check for logical values */
-	if (val[0] == 'F' || val[0] == 'f')
+	if (is_falsem(val))
 		return(FALSE);
-	if (val[0] == 'T' || val[0] == 't')
+	if (is_truem(val))
 		return(TRUE);
 
 	/* check for numeric truth (!= 0) */
@@ -1030,9 +1202,7 @@ char *pattern;	/* string to look for */
 #if NO_LEAKS
 void ev_leaks()
 {
-	if (shell) {
-		free(shell);
-		shell = 0;
-	}
+	FreeAndNull(shell);
+	FreeAndNull(directory);
 }
 #endif

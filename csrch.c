@@ -2,7 +2,10 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: csrch.c,v $
- * Revision 1.8  1993/05/24 15:21:37  pgf
+ * Revision 1.9  1993/06/14 12:15:02  pgf
+ * fixed inverted test on 'f' in bscan()  (thanks alistair)
+ *
+ * Revision 1.8  1993/05/24  15:21:37  pgf
  * tom's 3.47 changes, part a
  *
  * Revision 1.7  1993/03/16  10:53:21  pgf
@@ -88,7 +91,7 @@ int f,n,c;
 	int i;
 	int doto;
 
-	if (f || n <= 0)
+	if (!f || n <= 0)
 		n = 1;
 
 	lstchar = c;

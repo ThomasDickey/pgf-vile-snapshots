@@ -3,7 +3,10 @@
  * the knowledge about files are here.
  *
  * $Log: fileio.c,v $
- * Revision 1.48  1993/06/02 14:28:47  pgf
+ * Revision 1.49  1993/06/18 15:57:06  pgf
+ * tom's 3.49 changes
+ *
+ * Revision 1.48  1993/06/02  14:28:47  pgf
  * see tom's 3.48 CHANGES
  *
  * Revision 1.47  1993/05/24  15:21:37  pgf
@@ -184,18 +187,6 @@
 #endif
 #endif
 
-/* on MS-DOS we have to open files in binary mode to see the ^Z characters. */
-
-#if MSDOS
-#define	FOPEN_READ	"rb"
-#define	FOPEN_WRITE	"wb"
-#define	FOPEN_APPEND	"ab"
-#else
-#define	FOPEN_READ	"r"
-#define	FOPEN_WRITE	"w"
-#define	FOPEN_APPEND	"a"
-#endif
-
 /*--------------------------------------------------------------------------*/
 
 static	void	free_fline P(( void ));
@@ -208,11 +199,8 @@ static	int	count_fline;	/* # of lines read with 'ffgetline()' */
 static void
 free_fline()
 {
-	if (fline != NULL) {
-		free(fline);
-		fline = NULL;
-		flen = 0;
-	}
+	FreeAndNull(fline);
+	flen = 0;
 }
 
 #if MSDOS
@@ -559,7 +547,7 @@ int *lenp;	/* to return the final length */
                 		return(FIOMEM);
                 	(void)memcpy(tmpline, fline, (SIZE_T)flen);
                 	flen += growth;
-                	free(fline);
+			free(fline);
                 	fline = tmpline;
                 }
         }

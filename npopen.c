@@ -2,7 +2,10 @@
  *		written by John Hutchinson, heavily modified by Paul Fox
  *
  * $Log: npopen.c,v $
- * Revision 1.24  1993/05/04 17:05:14  pgf
+ * Revision 1.25  1993/06/18 15:57:06  pgf
+ * tom's 3.49 changes
+ *
+ * Revision 1.24  1993/05/04  17:05:14  pgf
  * see tom's CHANGES, 3.45
  *
  * Revision 1.23  1993/04/28  14:34:11  pgf
@@ -315,7 +318,7 @@ char	*type;
 	register int n = (*type == 'r');
 	register int fd;
 
-	myName[n] = tempnam((char *)0 /* directory */, type);
+	myName[n] = tempnam(TMPDIR, type);
 	if (myName[n] == 0)
 		return -1;
 	(void)close(creat(myName[n], 0666));
@@ -334,8 +337,7 @@ deleteTemp ()
 	for (n = 0; n < 2; n++) {
 		if (myName[n] != 0) {
 			(void)unlink(myName[n]);
-			free(myName[n]);
-			myName[n] = 0;
+			FreeAndNull(myName[n]);
 		}
 	}
 }
@@ -449,8 +451,7 @@ npflush ()
 			rewind(*myWrtr);
 			*myPipe = readPipe(myCmds, fileno(*myWrtr), createTemp("r"));
 		}
-		free(myCmds);
-		myCmds = 0;
+		FreeAndNull(myCmds);
 	}
 }
 

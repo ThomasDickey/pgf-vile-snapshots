@@ -10,7 +10,10 @@
  * display type.
  *
  * $Log: ibmpc.c,v $
- * Revision 1.15  1993/05/11 16:22:22  pgf
+ * Revision 1.16  1993/06/18 15:57:06  pgf
+ * tom's 3.49 changes
+ *
+ * Revision 1.15  1993/05/11  16:22:22  pgf
  * see tom's CHANGES, 3.46
  *
  * Revision 1.14  1993/05/04  17:05:14  pgf
@@ -651,7 +654,7 @@ int row;
 		if (mine == 0) {
 			mine = typeallocplus(VIDEO, term.t_mcol - 4);
 			if (mine == NULL)
-			    exit(BAD(1));
+			    ExitProgram(BAD(1));
 		}
 		vp = mine;
 	}

@@ -4,7 +4,10 @@
  *	Written (except for delins()) for vile by Paul Fox, (c)1990
  *
  * $Log: oneliner.c,v $
- * Revision 1.43  1993/06/02 14:28:47  pgf
+ * Revision 1.44  1993/06/18 15:57:06  pgf
+ * tom's 3.49 changes
+ *
+ * Revision 1.43  1993/06/02  14:28:47  pgf
  * see tom's 3.48 CHANGES
  *
  * Revision 1.42  1993/05/24  15:21:37  pgf
@@ -298,8 +301,7 @@ int needpats, use_opts;
 		}
 
 		if (gregexp) {
-			if (substexp)
-				free((char *)substexp);
+			FreeIfNeeded(substexp);
 			substexp = castalloc(regexp,gregexp->size);
 			(void)memcpy((char *)substexp, (char *)gregexp, (SIZE_T)gregexp->size);
 		}

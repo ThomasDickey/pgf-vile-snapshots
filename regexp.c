@@ -13,7 +13,10 @@
  *		pgf, 11/91
  * 
  * $Log: regexp.c,v $
- * Revision 1.33  1993/04/01 13:06:31  pgf
+ * Revision 1.34  1993/06/18 15:57:06  pgf
+ * tom's 3.49 changes
+ *
+ * Revision 1.33  1993/04/01  13:06:31  pgf
  * turbo C support (mostly prototypes for static)
  *
  * Revision 1.32  1993/03/25  19:50:58  pgf
@@ -1688,7 +1691,7 @@ char *op;
 	case OPEN+7:
 	case OPEN+8:
 	case OPEN+9:
-		sprintf(buf+strlen(buf), "OPEN%d", OP(op)-OPEN);
+		(void)sprintf(buf+strlen(buf), "OPEN%d", OP(op)-OPEN);
 		p = NULL;
 		break;
 	case CLOSE+1:
@@ -1700,7 +1703,7 @@ char *op;
 	case CLOSE+7:
 	case CLOSE+8:
 	case CLOSE+9:
-		sprintf(buf+strlen(buf), "CLOSE%d", OP(op)-CLOSE);
+		(void)sprintf(buf+strlen(buf), "CLOSE%d", OP(op)-CLOSE);
 		p = NULL;
 		break;
 	case STAR:

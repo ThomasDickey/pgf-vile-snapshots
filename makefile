@@ -112,15 +112,18 @@ ALLHDRS = $(HDRS)
 #  (including tools, like mktbls.c, unused screen drivers, etc.)
 CSRCac = ansi.c at386.c basic.c bind.c buffer.c crypt.c csrch.c
 CSRCde = dg10.c display.c eval.c exec.c externs.c
-CSRCfh = fences.c file.c filec.c fileio.c finderr.c glob.c globals.c history.c hp110.c hp150.c
-CSRCim = ibmpc.c input.c insert.c isearch.c line.c main.c modes.c mktbls.c
+CSRCf = fences.c file.c filec.c fileio.c finderr.c
+CSRCgh = glob.c globals.c history.c hp110.c hp150.c
+CSRCil = ibmpc.c input.c insert.c isearch.c line.c
+CSRCm = main.c map.c modes.c mktbls.c
 CSRCnr = npopen.c opers.c oneliner.c path.c random.c regexp.c region.c
 CSRCst = search.c spawn.c st520.c tags.c tbuff.c tcap.c termio.c tipc.c tmp.c
-CSRCuw = undo.c vmalloc.c vms2unix.c vmspipe.c vmsvt.c vt52.c window.c word.c wordmov.c
+CSRCuv = undo.c vmalloc.c vms2unix.c vmspipe.c vmsvt.c vt52.c
+CSRCw = window.c word.c wordmov.c
 CSRCxz = x11.c z309.c z_ibmpc.c
 
-CSRC = $(CSRCac) $(CSRCde) $(CSRCfh) $(CSRCim) $(CSRCnr) \
-	$(CSRCst) $(CSRCuw) $(CSRCxz)
+CSRC = $(CSRCac) $(CSRCde) $(CSRCf) $(CSRCgh) $(CSRCil) $(CSRCm) $(CSRCnr) \
+	$(CSRCst) $(CSRCuv) $(CSRCw) $(CSRCxz)
 
 # non-C source code
 OTHERSRC = z100bios.asm
@@ -135,17 +138,25 @@ EVERYTHING = $(ALLTOOLS) $(ALLHDRS) $(ALLSRC) $(TEXTFILES) $(SHORTSTUFF)
 
 
 SRC = main.c $(SCREEN).c basic.c bind.c buffer.c crypt.c \
-	csrch.c display.c eval.c exec.c externs.c fences.c file.c filec.c \
-	fileio.c finderr.c glob.c globals.c history.c input.c insert.c isearch.c \
-	line.c modes.c npopen.c oneliner.c opers.c path.c random.c regexp.c \
-	region.c search.c spawn.c tags.c tbuff.c termio.c tmp.c undo.c \
+	csrch.c display.c eval.c exec.c externs.c \
+	fences.c file.c filec.c \
+	fileio.c finderr.c glob.c globals.c history.c \
+	input.c insert.c isearch.c \
+	line.c map.c modes.c npopen.c oneliner.c \
+	opers.c path.c random.c regexp.c \
+	region.c search.c spawn.c tags.c tbuff.c \
+	termio.c tmp.c undo.c \
 	vmalloc.c window.c word.c wordmov.c
 
 OBJ = main.$O $(SCREEN).$O basic.$O bind.$O buffer.$O crypt.$O \
-	csrch.$O display.$O eval.$O exec.$O externs.$O fences.$O file.$O filec.$O \
-	fileio.$O finderr.$O glob.$O globals.$O history.$O input.$O insert.$O isearch.$O \
-	line.$O modes.$O npopen.$O oneliner.$O opers.$O path.$O random.$O regexp.$O \
-	region.$O search.$O spawn.$O tags.$O tbuff.$O termio.$O tmp.$O undo.$O \
+	csrch.$O display.$O eval.$O exec.$O externs.$O \
+	fences.$O file.$O filec.$O \
+	fileio.$O finderr.$O glob.$O globals.$O history.$O \
+	input.$O insert.$O isearch.$O \
+	line.$O map.$O modes.$O npopen.$O oneliner.$O \
+	opers.$O path.$O random.$O regexp.$O \
+	region.$O search.$O spawn.$O tags.$O tbuff.$O \
+	termio.$O tmp.$O undo.$O \
 	vmalloc.$O window.$O word.$O wordmov.$O
 
 
@@ -343,10 +354,10 @@ saber_obj: $(OBJ)
 
 nebind.h \
 nefunc.h \
-nename.h \
-nevars.h :	cmdtbl $(MKTBLS)
+nename.h :	cmdtbl $(MKTBLS)
 	$(MKTBLS) cmdtbl
 
+nevars.h \
 nemode.h:	modetbl $(MKTBLS)
 	$(MKTBLS) modetbl
 
@@ -514,7 +525,7 @@ $(OBJ): estruct.h nemode.h edef.h proto.h
 
 ALWAYS:
 
-main.$O:	glob.h
+main.$O:	nevars.h glob.h
 bind.$O:	epath.h
 eval.$O:	glob.h
 filec.$O:	dirstuff.h
@@ -526,7 +537,13 @@ random.$O:	glob.h
 vmalloc$O:	nevars.h
 
 # $Log: makefile,v $
-# Revision 1.108  1993/06/02 14:46:13  pgf
+# Revision 1.110  1993/06/18 15:57:06  pgf
+# tom's 3.49 changes
+#
+# Revision 1.109  1993/06/10  14:57:25  pgf
+# added map.c
+#
+# Revision 1.108  1993/06/02  14:46:13  pgf
 # added more gcc warnings
 #
 # Revision 1.107  1993/05/11  16:22:22  pgf
