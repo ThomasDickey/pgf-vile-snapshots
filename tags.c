@@ -2,9 +2,9 @@
  *	Invoked either by ":ta routine-name" or by "^]" while sitting
  *	on a string.  In the latter case, the tag is the word under
  *	the cursor.
- *	written for vile by Paul Fox, (c)1990
+ *	written for vile: Copyright (c) 1990, 1995 by Paul Fox
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/tags.c,v 1.66 1994/12/15 15:01:52 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/tags.c,v 1.67 1995/02/08 03:29:23 pgf Exp $
  *
  */
 #include	"estruct.h"

@@ -3,7 +3,7 @@
  *	Original interface by Otto Lind, 6/3/93
  *	Additional map and map! support by Kevin Buettner, 9/17/94
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/map.c,v 1.47 1994/12/20 19:39:40 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/map.c,v 1.53 1995/02/06 04:06:39 pgf Exp $
  * 
  */
 
@@ -11,6 +11,7 @@
 #include "edef.h"
 
 #define MAXLHS	NSTRING
+
 
 /*
  * Picture for struct maprec
@@ -70,6 +71,8 @@ struct maprec {
 #define MAPF_TIMERS	0x03
 #define MAPF_NOREMAP	0x04
 
+static int suppress_sysmap;
+
 static struct maprec *map_command = NULL;
 static struct maprec *map_insert = NULL;
 static struct maprec *map_syskey = NULL;
@@ -120,8 +123,6 @@ makemaplist(dummy, mapp)
     int depth = 0;
     int footnote = 0;
     int i;
-    
-    
 
     for (;;) {
 	if (mp) {
@@ -140,7 +141,7 @@ makemaplist(dummy, mapp)
 		mapstr = esc_seq;
 	    }
 	    if (mapstr) {
-		    if (mp == abbr_map) {
+    		    if (mapp && (struct maprec *)mapp == abbr_map) {
 			    /* the abbr map is stored inverted */
 			    for (i = depth; i > 0; )
 				bputc(lhsstr[--i]);	/* may contain nulls */
@@ -331,6 +332,22 @@ unmap_bang(f, n)
     return unmap_common(&map_insert, MAPBANG_BufName);
 }
 
+/* ARGSUSED */
+int
+unmap_system(f, n)
+    int f, n;
+{
+    return unmap_common(&map_syskey, SYSMAP_BufName);
+}
+
+/* ARGSUSED */
+int
+unabbr(f, n)
+    int f, n;
+{
+    return unmap_common(&abbr_map, ABBR_BufName);
+}
+
 static int
 unmap_common(mpp, bufname)
     struct maprec **mpp;
@@ -339,11 +356,27 @@ unmap_common(mpp, bufname)
     int	 status;
     char kbuf[NSTRING];
 
+    /* otherwise it'll be mapped, and not found when looked up */
+    if (mpp && mpp == &map_syskey)
+    	suppress_sysmap = TRUE;
+
     kbuf[0] = EOS;
     status = kbd_string("unmap string: ", kbuf, sizeof(kbuf),
 			' ', KBD_NOMAP, no_completion);
+    suppress_sysmap = FALSE;
     if (status != TRUE)
 	return status;
+
+    if ((*mpp && *mpp == abbr_map) || (strcmp(bufname, ABBR_BufName) == 0)) {
+	/* reverse the lhs */
+	int i, t;
+    	int len = strlen(kbuf);
+	for (i = 0; i < len/2; i++) {
+	    t = kbuf[len-i-1];
+	    kbuf[len-i-1] = kbuf[i];
+	    kbuf[i] = t;
+	}
+    }
 
     if (delfrommap(mpp, kbuf) != TRUE) {
 	mlforce("[Sequence not mapped]");
@@ -353,29 +386,6 @@ unmap_common(mpp, bufname)
     return TRUE;
 }
     
-#if BEFORE
-/* addtomaps is used to initialize both the command and input maps
-	with the system default function key maps
-*/
-void
-addtomaps(seq, seqlen, code)
-    char * seq;
-    int    seqlen;
-    int    code;
-{
-    addtomap(&map_command, seq, seqlen, MAPF_SYSTIMER,
-    			code, (char *)0);
-    addtomap(&map_insert,  seq, seqlen, MAPF_SYSTIMER,
-    			code, (char *)0);
-    switch (code) {
-    case KEY_Up:
-    case KEY_Down:
-    	addtomap(&map_message_line, seq, seqlen, MAPF_SYSTIMER,
-			code, (char *)0);
-    }
-}
-#endif
-
 /* addtosysmap is used to initialize the system default function key map
 */
 void
@@ -415,7 +425,8 @@ addtomap(mpp, ks, kslen, flags, irv, srv)
     }
 
     while (kslen) {
-	if (!(mp = typealloc(struct maprec)))
+	mp = typealloc(struct maprec);
+	if (mp == 0)
 	    break;
 	*mpp = mp;
 	mp->dlink = mp->flink = NULL;
@@ -466,9 +477,11 @@ delfrommap(mpp, ks)
     if ((*mstk[depth])->srv) {
 	free((*mstk[depth])->srv);
 	(*mstk[depth])->srv = NULL;
-    }
-    else
+    } else if ((*mstk[depth])->irv != -1) {
+	(*mstk[depth])->irv = -1;
+    } else {
 	return FALSE;
+    }
 
     for (; depth >= 0; depth--) {
 	struct maprec *mp = *mstk[depth];
@@ -516,6 +529,9 @@ sysmapped_c()
 	return itb_last(sysmappedchars);
 
     c = TTgetc();
+
+    if (suppress_sysmap)
+    	return c;
 
     /* will push back on sysmappedchars successful, or not */
     (void)maplookup(c, &sysmappedchars, map_syskey, 
@@ -650,7 +666,7 @@ abbr_getc()
 {
     if (abbr_curr_off <= abbr_search_lim)
     	return -1; /* won't match anything in the tree */
-    return lgetc(DOT.l, --abbr_curr_off);
+    return lGetc(DOT.l, --abbr_curr_off);
 }
 
 static int
@@ -667,7 +683,7 @@ int *backsp_limit_p;
     ITBUFF *abbr_chars = NULL;
     int status = TRUE;
 
-    if (llength(DOT.l) < 1)
+    if (lLength(DOT.l) < 1)
     	return;
     abbr_curr_off = DOT.o;
     abbr_search_lim = *backsp_limit_p;
@@ -687,8 +703,8 @@ int *backsp_limit_p;
 		   match is good.
 		 */
 		char first, prev;
-		first = lgetc(DOT.l,abbr_curr_off);
-		prev = lgetc(DOT.l,abbr_curr_off-1);
+		first = lGetc(DOT.l,abbr_curr_off);
+		prev = lGetc(DOT.l,abbr_curr_off-1);
 		if ((isident(first) && isident(prev)) ||
 		    (!isident(first) && !(isident(prev) || isspace(prev))))
 		    	return;
@@ -719,9 +735,9 @@ maplookup(c, outp, mp, get, avail)
 {
     struct maprec *rmp = NULL;
     int unmatched[MAXLHS];
-    register int *s = unmatched;
     int matchedcnt;
     int use_sys_timing;
+    register int count = 0;	/* index into 'unmatched[]' */
 
     /* 
      * we don't want to delay for a user-specified :map!  starting with
@@ -734,14 +750,14 @@ maplookup(c, outp, mp, get, avail)
     use_sys_timing = (insertmode && c == poundc &&
     				(isprint(poundc) || isspace(poundc)));
 
-    *s++ = c;
+    unmatched[count++] = c;
     matchedcnt = 0;
-    while (mp) {
+    while (mp != 0) {
 	if (c == mp->ch) {
 	    if (mp->irv != -1 || mp->srv != NULL) {
 		rmp = mp;
-		matchedcnt += (s - unmatched);
-		s = unmatched;
+		matchedcnt += count;
+		count = 0;
 
 		/* our code supports matching the longer of two maps one of
 		 * which is a subset of the other.  vi matches the shorter
@@ -781,7 +797,7 @@ maplookup(c, outp, mp, get, avail)
 		    break;
 	    }
 
-	    *s++ = c = (*get)() & ~NOREMAP;
+	    unmatched[count++] = c = (*get)() & ~NOREMAP;
 
 	}
 	else
@@ -790,8 +806,8 @@ maplookup(c, outp, mp, get, avail)
 
     if (rmp) {
 	/* unget the unmatched suffix */
-	while (s > unmatched)
-	    itb_append(outp,*--s);
+	while (count > 0)
+	    itb_append(outp, unmatched[--count]);
 	/* unget the mapping and elide correct number of recorded chars */
 	if (rmp->srv) {
 	    int remapflag;
@@ -812,8 +828,35 @@ maplookup(c, outp, mp, get, avail)
 	return matchedcnt;
     }
     else {	/* didn't find a match */
-	while (s > unmatched)
-	    itb_append(outp, *--s);
+	while (count > 0)
+	    itb_append(outp, unmatched[--count]);
 	return 0;
     }
 }
+
+#if NO_LEAKS
+static	void	free_maprec P((struct maprec **));
+
+static void
+free_maprec(p)
+struct maprec **p;
+{
+	struct	maprec *q;
+	if ((q = *p) != 0) {
+		free_maprec(&(q->flink));
+		free_maprec(&(q->dlink));
+		FreeAndNull(q->srv);
+		*p = 0;
+		free((char *)q);
+	}
+}
+
+void
+map_leaks()
+{
+	free_maprec(&map_command);
+	free_maprec(&map_insert);
+	free_maprec(&map_syskey);
+	free_maprec(&abbr_map);
+}
+#endif	/* NO_LEAKS */

@@ -1,7 +1,7 @@
 /*	Spawn:	various DOS access commands
  *		for MicroEMACS
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/spawn.c,v 1.94 1994/12/14 20:26:57 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/spawn.c,v 1.95 1995/01/04 18:07:46 pgf Exp $
  *
  */
 
@@ -165,7 +165,7 @@ ACTUAL_SIG_DECL
 	(void)TTgetc();		/* have to skip a character */
 	ttunclean();		/* ...so that I can finally suppress echo */
 #  endif
-	(void)signal(SIGCONT,rtfrmshell); /* suspend & restart */
+	setup_handler(SIGCONT,rtfrmshell); /* suspend & restart */
 	(void)update(TRUE);
 # endif
 #endif

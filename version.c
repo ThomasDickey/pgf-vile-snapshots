@@ -1,12 +1,13 @@
 /*
  * version & usage-messages for vile
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/version.c,v 1.20 1994/12/15 15:01:52 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/version.c,v 1.22 1995/02/05 04:28:30 pgf Exp $
  *
  */
 
 #include	"estruct.h"	/* global structures and defines */
 #include	"edef.h"	/* global definitions */
+#include	"patchlev.h"
 
 extern char *pathname[];	/* startup file path/name array */
 
@@ -62,6 +63,7 @@ print_usage P((void))
 char *
 getversion()
 {
+
 	if (*version_string)
 		return version_string;
 #if SYS_UNIX || SYS_VMS
@@ -90,7 +92,8 @@ getversion()
 	 * Getting the executable's modification-time is a reasonable
 	 * compromise.
 	 */
-	(void) lsprintf(version_string, "%s %s for %s", prognam, version, opersys);
+	(void) lsprintf(version_string, "%s %s%s for %s", 
+				prognam, version, PATCHLEVEL, opersys);
 	{
 		char *s;
 		if ((s = flook(prog_arg, FL_PATH|FL_EXECABLE)) != NULL) {
@@ -106,8 +109,8 @@ getversion()
 #else
 # if SYS_MSDOS || SYS_OS2
 #  if defined(__DATE__) && !SMALLER
-	(void)lsprintf(version_string,"%s %s for %s, built %s %s with %s", 
-		prognam, version, opersys, __DATE__, __TIME__,
+	(void)lsprintf(version_string,"%s %s%s for %s, built %s %s with %s", 
+		prognam, version, PATCHLEVEL, opersys, __DATE__, __TIME__,
 #   if CC_WATCOM
 		"Watcom C/386"
 #   endif
@@ -132,3 +135,19 @@ int f,n;
 	mlforce(getversion());
 	return TRUE;
 }
+
+/*
+ * Returns the special string consisting of program name + version, used to
+ * fill in the filename-field for scratch buffers that are not associated with
+ * an external file.
+ */
+char *
+non_filename()
+{
+	static	char	buf[80];
+	if (buf[0] == EOS)
+		(void)lsprintf(buf, "       %s   %s%s",
+				prognam, version, PATCHLEVEL);
+	return buf;
+}
+

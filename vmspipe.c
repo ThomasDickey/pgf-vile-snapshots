@@ -3,7 +3,7 @@
  *		adapted from elvis, in turn from
  *		Chris Janton's (chj) VMS Icon port.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/vmspipe.c,v 1.6 1994/10/30 16:26:37 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/vmspipe.c,v 1.7 1995/01/27 13:52:56 pgf Exp $
  *
  */
 
@@ -93,7 +93,7 @@ vms_pread (int pfile, char *buffer, int size)
 		int	request = size > MAXBFR ? MAXBFR : size - 1;
 		register int	got;
 
-		if (OK(sys$qiow(0, pd->ochan, IO$_READVBLK, &iosb, 0, 0,
+		if (OK(SYS$QIOW(0, pd->ochan, IO$_READVBLK, &iosb, 0, 0,
 				buffer, request, 0, 0, 0, 0))) {
 
 			if (iosb.status == SS$_ENDOFFILE)
@@ -191,7 +191,7 @@ vms_rpipe (char *cmd, int fd, char *input_file)
 		strcpy (pre_command, "DEFINE/USER SYS$INPUT ");
 		strcat (pre_command, input_file);
 		if (!OK(
-			sys$qiow(0,
+			SYS$QIOW(0,
 				ichan,
 				IO$_WRITEVBLK | IO$M_NOW,
 				0, 0, 0,
@@ -205,13 +205,13 @@ vms_rpipe (char *cmd, int fd, char *input_file)
 	}
 
 	if (!OK(
-		sys$qiow(0,
+		SYS$QIOW(0,
 		ichan,
 		IO$_WRITEVBLK | IO$M_NOW,
 		0, 0, 0, cmd, strlen(cmd), 0, 0, 0, 0))) {
 		;
 	} else if (!OK(
-		sys$qiow(0,
+		SYS$QIOW(0,
 			ichan,
 			IO$_WRITEOF | IO$M_NOW,
 			0, 0, 0, 0, 0, 0, 0, 0, 0))) {

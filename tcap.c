@@ -1,7 +1,7 @@
 /*	tcap:	Unix V5, V7 and BS4.2 Termcap video driver
  *		for MicroEMACS
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/tcap.c,v 1.57 1994/12/12 19:25:50 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/tcap.c,v 1.60 1995/01/05 15:03:23 pgf Exp $
  *
  */
 
@@ -304,9 +304,24 @@ tcapopen()
 
 	for (i = TABLESIZE(keyseqs); i--; ) {
 	    keyseqs[i].seq = tgetstr(keyseqs[i].capname, &p);
-	    if (keyseqs[i].seq)
+	    if (keyseqs[i].seq) {
+#define DONT_MAP_DEL 1
+#if DONT_MAP_DEL
+		/* NetBSD, FreeBSD, etc. have the kD (delete) function key
+		    defined as the DEL char.  i don't like this hack, but
+		    until we (and we may never) have separate system "map"
+		    and "map!" maps, we can't allow this -- DEL has different
+		    semantics in insert and command mode, whereas KEY_Delete
+		    has the same semantics (whatever they may be) in both. 
+		    KEY_Delete is the only non-motion system map, by the
+		    way -- so the rest are benign in insert or command
+		    mode.  */
+		if (strcmp(keyseqs[i].seq,"\177") == 0)
+		    continue;
+#endif
 		addtosysmap(keyseqs[i].seq, (int)strlen(keyseqs[i].seq), 
 					keyseqs[i].code);
+	    }
 	}
 #if OPT_XTERM
 	addtosysmap("\033[M", 3, KEY_Mouse);

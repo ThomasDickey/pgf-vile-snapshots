@@ -3,11 +3,11 @@
  * characters, and write characters in a barely buffered fashion on the display.
  * All operating systems.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/termio.c,v 1.113 1994/12/20 22:34:53 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/termio.c,v 1.119 1995/01/28 18:55:21 pgf Exp $
  *
  */
 #include	"estruct.h"
-#include        "edef.h"
+#include	"edef.h"
 
 #if CC_DJGPP
 # include <pc.h>   /* for kbhit() */
@@ -22,7 +22,7 @@
 /* ttopen() and ttclose() are responsible for putting the terminal in raw
 	mode, setting up terminal signals, etc.
    ttclean() prepares the terminal for shell escapes, and ttunclean() gets
-   	us back into vile's mode
+	us back into vile's mode
 */
 
 /* I suppose this config stuff should move to estruct.h */
@@ -78,7 +78,7 @@
 # if defined(FIONREAD)
   /* there seems to be a bug in someone's implementation of fcntl -- it
    * causes output to be flushed if you change to ndelay input while output
-   * is pending.  for these systems, we use FIONREAD instead, if possible. 
+   * is pending.  for these systems, we use FIONREAD instead, if possible.
    * In fact, if try and use FIONREAD in any case if present.  If you have
    * the problem with fcntl, you'll notice that the screen doesn't always
    * refresh correctly, as if the fcntl is interfering with the output drain
@@ -100,11 +100,11 @@ char kbd_char;			/* the char we've already read	*/
 #define SMALL_STDOUT 1
 
 #if defined(SMALL_STDOUT) && (defined (USE_FCNTL) || defined(USE_FIONREAD))
-#define	TBUFSIZ	128 /* Provide a smaller terminal output buffer so that
+#define TBUFSIZ 128 /* Provide a smaller terminal output buffer so that
 	   the type-ahead detection works better (more often).
 	   That is, we overlap screen writing with more keyboard polling */
 #else
-#define	TBUFSIZ	1024	/* reduces the number of writes */
+#define TBUFSIZ 1024	/* reduces the number of writes */
 #endif
 
 extern CMDFUNC f_backchar;
@@ -115,6 +115,13 @@ extern CMDFUNC f_backchar_to_bol;
 
 #include <sys/param.h>		/* defines 'VDISABLE' */
 #include <termios.h>
+
+#if SYSTEM_LOOKS_LIKE_SCO
+/* they neglected to define struct winsize in termios.h -- it's only
+   in termio.h	*/
+#include	<sys/stream.h>
+#include	<sys/ptem.h>
+#endif
 
 #ifndef VDISABLE
 # define VDISABLE '\0'
@@ -141,7 +148,7 @@ ttopen()
 	setvbuf(stdout, tobuf, _IOFBF, TBUFSIZ);
 # endif
 #else /* !HAVE_SETVBUF */
-  	setbuffer(stdout, tobuf, TBUFSIZ);
+	setbuffer(stdout, tobuf, TBUFSIZ);
 #endif /* !HAVE_SETVBUF */
 #endif /* !DISP_X11 */
 
@@ -151,16 +158,16 @@ ttopen()
 	startc =  otermios.c_cc[VSTART];
 	stopc =   otermios.c_cc[VSTOP];
 	backspc = otermios.c_cc[VERASE];
-#ifdef VWERASE  /* Sun has it.  any others? */
+#ifdef VWERASE	/* Sun has it.	any others? */
 	wkillc = otermios.c_cc[VWERASE];
 #else
 	wkillc =  tocntrl('W');
 #endif
 
 	/* this could probably be done more POSIX'ish? */
-	(void)signal(SIGTSTP,SIG_DFL);		/* set signals so that we can */
-	(void)signal(SIGCONT,rtfrmshell);	/* suspend & restart */
-	(void)signal(SIGTTOU,SIG_IGN);		/* ignore output prevention */
+	setup_handler(SIGTSTP,SIG_DFL); 	/* set signals so that we can */
+	setup_handler(SIGCONT,rtfrmshell);	/* suspend & restart */
+	setup_handler(SIGTTOU,SIG_IGN); 	/* ignore output prevention */
 
 #if USE_FCNTL
 	kbd_flags = fcntl( 0, F_GETFL, 0 );
@@ -173,10 +180,10 @@ ttopen()
 	/* new input settings: turn off crnl mapping, cr-ignoring,
 	 * case-conversion, and allow BREAK
 	 */
-	ntermios.c_iflag = BRKINT | (otermios.c_iflag & 
+	ntermios.c_iflag = BRKINT | (otermios.c_iflag &
 		(unsigned long) ~(INLCR | IGNCR | ICRNL
 #ifdef IUCLC
-				        | IUCLC
+					| IUCLC
 #endif
 				 ));
 
@@ -190,11 +197,35 @@ ttopen()
 	ntermios.c_cc[VSUSP]  = VDISABLE;
 	ntermios.c_cc[VSTART] = VDISABLE;
 	ntermios.c_cc[VSTOP]  = VDISABLE;
-#endif
+#endif /* ! DISP_X11 */
 
 	ttmiscinit();
 
 	ttunclean();
+}
+
+/* we disable the flow control chars so we can use ^S as a command, but
+  some folks still need it.  they can put "flow-control-enable" in their
+  .vilerc
+  no argument:	re-enable ^S/^Q processing in the driver
+  with arg:	disable it
+*/
+/* ARGSUSED */
+int
+flow_control_enable(f,n)
+int f,n;
+{
+#if !DISP_X11
+	if (!f) {
+		ntermios.c_cc[VSTART] = startc;
+		ntermios.c_cc[VSTOP]  = stopc;
+	} else {
+		ntermios.c_cc[VSTART] = VDISABLE;
+		ntermios.c_cc[VSTOP]  = VDISABLE;
+	}
+	ttunclean();
+#endif
+	return TRUE;
 }
 
 void
@@ -276,8 +307,6 @@ ttopen()
 /* be careful here -- VSUSP is sometimes out of the range of the c_cc array */
 # ifdef VSUSP /* ODT (all POSIX?) uses this... */
 	ntermio.c_cc[VSUSP] = -1;
-	ntermio.c_cc[VSTART] = -1;
-	ntermio.c_cc[VSTOP] = -1;
 	suspc =   otermio.c_cc[VSUSP];
 # else /* use V_SUSP */
 #  ifdef V_SUSP
@@ -291,9 +320,9 @@ ttopen()
 #  endif
 # endif
 
-	(void)signal(SIGTSTP,SIG_DFL);		/* set signals so that we can */
-	(void)signal(SIGCONT,rtfrmshell);	/* suspend & restart */
-	(void)signal(SIGTTOU,SIG_IGN);		/* ignore output prevention */
+	setup_handler(SIGTSTP,SIG_DFL); 	/* set signals so that we can */
+	setup_handler(SIGCONT,rtfrmshell);	/* suspend & restart */
+	setup_handler(SIGTTOU,SIG_IGN); 	/* ignore output prevention */
 
 #else /* no SIGTSTP */
 	suspc =   tocntrl('Z');
@@ -302,8 +331,8 @@ ttopen()
 #if ! DISP_X11
 	ntermio = otermio;
 
-	/* setup new settings, preserve flow control, and allow BREAK */
-	ntermio.c_iflag = BRKINT|(otermio.c_iflag & IXON|IXANY|IXOFF);
+	/* setup new settings, allow BREAK */
+	ntermio.c_iflag = BRKINT;
 	ntermio.c_oflag = 0;
 	ntermio.c_lflag = ISIG;
 	ntermio.c_cc[VMIN] = 1;
@@ -316,6 +345,23 @@ ttopen()
 	ttmiscinit();
 	ttunclean();
 
+}
+
+/* we disable the flow control chars so we can use ^S as a command, but
+  some folks still need it.  they can put "flow-control-enable" in their
+  .vilerc */
+/* ARGSUSED */
+int
+flow_control_enable(f,n)
+int f,n;
+{
+#if !DISP_X11
+	ntermio.c_iflag &= ~(IXON|IXANY|IXOFF);
+	if (!f)
+		ntermio.c_iflag |= otermio.c_iflag & (IXON|IXANY|IXOFF);
+	ttunclean();
+#endif
+	return TRUE;
 }
 
 void
@@ -364,10 +410,10 @@ char tobuf[TBUFSIZ];		/* terminal output buffer */
 #endif
 
 #undef	CTRL
-#include        <sgtty.h>        /* for stty/gtty functions */
-struct  sgttyb  ostate;          /* saved tty state */
-struct  sgttyb  nstate;          /* values for editor mode */
-struct  sgttyb  rnstate;          /* values for raw editor mode */
+#include	<sgtty.h>	 /* for stty/gtty functions */
+struct	sgttyb	ostate; 	 /* saved tty state */
+struct	sgttyb	nstate; 	 /* values for editor mode */
+struct	sgttyb	rnstate;	  /* values for raw editor mode */
 int olstate;		/* Saved local mode values */
 int nlstate;		/* new local mode values */
 struct ltchars	oltchars;	/* Saved terminal special character set */
@@ -384,14 +430,14 @@ ttopen()
 
 #if ! DISP_X11
 	nstate = ostate;
-        nstate.sg_flags |= CBREAK;
-        nstate.sg_flags &= ~(ECHO|CRMOD);       /* no echo for now... */
+	nstate.sg_flags |= CBREAK;
+	nstate.sg_flags &= ~(ECHO|CRMOD);	/* no echo for now... */
 	ioctl(0,TIOCSETN,(char *)&nstate); /* set new state */
 #endif
 
 	rnstate = nstate;
-        rnstate.sg_flags &= ~CBREAK;
-        rnstate.sg_flags |= RAW;
+	rnstate.sg_flags &= ~CBREAK;
+	rnstate.sg_flags |= RAW;
 
 	ioctl(0, TIOCGETC, (char *)&otchars);	/* Save old characters */
 	intrc =  otchars.t_intrc;
@@ -402,6 +448,8 @@ ttopen()
 	ntchars = otchars;
 	ntchars.t_brkc = -1;
 	ntchars.t_eofc = -1;
+	ntchars.t_startc = -1;
+	ntchars.t_stopc = -1;
 	ioctl(0, TIOCSETC, (char *)&ntchars);	/* Place new character into K */
 #endif
 
@@ -425,13 +473,34 @@ ttopen()
 #endif
 #if ! DISP_X11
 
-	(void)signal(SIGTSTP,SIG_DFL);		/* set signals so that we can */
-	(void)signal(SIGCONT,rtfrmshell);	/* suspend & restart */
-	(void)signal(SIGTTOU,SIG_IGN);		/* ignore output prevention */
+	setup_handler(SIGTSTP,SIG_DFL); 	/* set signals so that we can */
+	setup_handler(SIGCONT,rtfrmshell);	/* suspend & restart */
+	setup_handler(SIGTTOU,SIG_IGN); 	/* ignore output prevention */
 
 #endif
 
 	ttmiscinit();
+}
+
+/* we disable the flow control chars so we can use ^S as a command, but
+  some folks still need it.  they can put "flow-control-enable" in their
+  .vilerc */
+/* ARGSUSED */
+int
+flow_control_enable(f,n)
+int f,n;
+{
+#if !DISP_X11
+	if (!f) {
+		ntchars.t_startc = startc;
+		ntchars.t_stopc = stopc;
+	} else {
+		ntchars.t_startc = -1;
+		ntchars.t_stopc = -1;
+	}
+	ttunclean();
+#endif
+	return TRUE;
 }
 
 void
@@ -501,13 +570,13 @@ void
 ttputc(c)
 int c;
 {
-        (void)putchar(c);
+	(void)putchar(c);
 }
 
 void
 ttflush()
 {
-        (void)fflush(stdout);
+	(void)fflush(stdout);
 }
 
 /*
@@ -543,7 +612,7 @@ ttgetc()
 	 */
 	int	c;
 	ioctl(0, TIOCSETN, (char *)&rnstate);
-        c = getchar();
+	c = getchar();
 	ioctl(0, TIOCSETN, (char *)&nstate);
 #else
 	int c;
@@ -607,33 +676,6 @@ ttmiscinit()
 #endif
 }
 
-#if defined(SA_RESTART)
-/*
- * Redefine signal in terms of sigaction for systems which have the
- * SA_RESTART flag defined through <signal.h>
- *
- * This definition of signal will cause system calls to get restarted for a
- * more BSD-ish behavior.  This will allow us to use the OPT_WORKING feature
- * for such systems.
- */
-
-void (*signal(sig,disp))(DEFINE_SIG_ARGS)
-    int sig;
-    void (*disp) (DEFINE_SIG_ARGS);
-{
-    struct sigaction act, oact;
-    int status;
-
-    act.sa_handler = disp;
-    sigemptyset(&act.sa_mask);
-    act.sa_flags = SA_RESTART;
-
-    status = sigaction(sig, &act, &oact);
-
-    return (status < 0) ? SIG_ERR : oact.sa_handler;
-}
-#endif
-
 #else /* not SYS_UNIX */
 
 #if SYS_MSDOS || SYS_OS2 || SYS_WINNT
@@ -646,46 +688,52 @@ void (*signal(sig,disp))(DEFINE_SIG_ARGS)
 # endif
 #endif
 
-#if     SYS_AMIGA
+#if	SYS_AMIGA
 #define NEW 1006L
-#define AMG_MAXBUF      1024L
+#define AMG_MAXBUF	1024L
 static long terminal;
-static char     scrn_tmp[AMG_MAXBUF+1];
-static long     scrn_tmp_p = 0;
+static char	scrn_tmp[AMG_MAXBUF+1];
+static long	scrn_tmp_p = 0;
 #endif
 
 #if SYS_ST520 && MEGAMAX
 #include <osbind.h>
-	int STscancode = 0;	
+	int STscancode = 0;
 #endif
 
-#if     SYS_VMS
-#include        <stsdef.h>
-#include        <ssdef.h>
-#include        <descrip.h>
-#include        <iodef.h>
-#include        <ttdef.h>
+#if	SYS_VMS
+#include	<stsdef.h>
+#include	<ssdef.h>
+#include	<descrip.h>
+#include	<iodef.h>
+#include	<ttdef.h>
 #include	<tt2def.h>
 
-#define NIBUF   128                     /* Input buffer size            */
-#define NOBUF   1024			/* MM says big buffers win!	*/
-#define EFN     0			/* Event flag			*/
+typedef struct	{
+	unsigned short int status;	/* I/O completion status */
+	unsigned short int count;	/* byte transfer count	 */
+	int dev_dep_data;		/* device dependant data */
+	} QIO_SB;			/* This is a QIO I/O Status Block */
+
+#define NIBUF	1024			/* Input buffer size		*/
+#define NOBUF	1024			/* MM says big buffers win!	*/
+#define EFN	0			/* Event flag			*/
 
 char	obuf[NOBUF];			/* Output buffer		*/
 int	nobuf;				/* # of bytes in above		*/
-char	ibuf[NIBUF];			/* Input buffer			*/
+char	ibuf[NIBUF];			/* Input buffer 		*/
 int	nibuf;				/* # of bytes in above		*/
 int	ibufi;				/* Read index			*/
 int	oldmode[3];			/* Old TTY mode bits		*/
 int	newmode[3];			/* New TTY mode bits		*/
-short	iochan;				/* TTY I/O channel		*/
+short	iochan; 			/* TTY I/O channel		*/
 #endif
 
-#if     SYS_CPM
-#include        <bdos.h>
+#if	SYS_CPM
+#include	<bdos.h>
 #endif
 
-#if     SYS_MSDOS && CC_NEWDOSCC && !CC_MSC
+#if	SYS_MSDOS && CC_NEWDOSCC && !CC_MSC
 union REGS rg;		/* cpu register for use of DOS calls (ibmpc.c) */
 int nxtchar = -1;	/* character held from type ahead    */
 #endif
@@ -696,7 +744,7 @@ extern CMDFUNC f_backchar_to_bol;
 void
 ttopen()
 {
-#if     SYS_AMIGA
+#if	SYS_AMIGA
 	char oline[NSTRING];
 #if	CC_AZTEC
 	extern	Enable_Abort;	/* Turn off ctrl-C interrupt */
@@ -708,54 +756,56 @@ ttopen()
 	strcat(oline, " ");
 	strcat(oline, VERSION);
 	strcat(oline, "/Amiga");
-        terminal = Open(oline, NEW);
+	terminal = Open(oline, NEW);
 #endif
-#if     SYS_VMS
-        struct  dsc$descriptor  idsc;
-        struct  dsc$descriptor  odsc;
-        char    oname[40];
-        int     iosb[2];
-        int     status;
+#if	SYS_VMS
+	struct	dsc$descriptor	idsc;
+	struct	dsc$descriptor	odsc;
+	char	oname[40];
+	QIO_SB	iosb;
+	int	status;
 
-        odsc.dsc$a_pointer = "TT";
-        odsc.dsc$w_length  = strlen(odsc.dsc$a_pointer);
-        odsc.dsc$b_dtype        = DSC$K_DTYPE_T;
-        odsc.dsc$b_class        = DSC$K_CLASS_S;
-        idsc.dsc$b_dtype        = DSC$K_DTYPE_T;
-        idsc.dsc$b_class        = DSC$K_CLASS_S;
-        do {
-                idsc.dsc$a_pointer = odsc.dsc$a_pointer;
-                idsc.dsc$w_length  = odsc.dsc$w_length;
-                odsc.dsc$a_pointer = &oname[0];
-                odsc.dsc$w_length  = sizeof(oname);
-                status = LIB$SYS_TRNLOG(&idsc, &odsc.dsc$w_length, &odsc);
-                if (status!=SS$_NORMAL && status!=SS$_NOTRAN)
+	odsc.dsc$a_pointer = "TT";
+	odsc.dsc$w_length  = strlen(odsc.dsc$a_pointer);
+	odsc.dsc$b_dtype	= DSC$K_DTYPE_T;
+	odsc.dsc$b_class	= DSC$K_CLASS_S;
+	idsc.dsc$b_dtype	= DSC$K_DTYPE_T;
+	idsc.dsc$b_class	= DSC$K_CLASS_S;
+	do {
+		idsc.dsc$a_pointer = odsc.dsc$a_pointer;
+		idsc.dsc$w_length  = odsc.dsc$w_length;
+		odsc.dsc$a_pointer = &oname[0];
+		odsc.dsc$w_length  = sizeof(oname);
+		status = LIB$SYS_TRNLOG(&idsc, &odsc.dsc$w_length, &odsc);
+		if (status!=SS$_NORMAL && status!=SS$_NOTRAN)
 			ExitProgram(status);
-                if (oname[0] == 0x1B) {
-                        odsc.dsc$a_pointer += 4;
-                        odsc.dsc$w_length  -= 4;
-                }
-        } while (status == SS$_NORMAL);
-        status = SYS$ASSIGN(&odsc, &iochan, 0, 0);
-        if (status != SS$_NORMAL)
+		if (oname[0] == 0x1B) {
+			odsc.dsc$a_pointer += 4;
+			odsc.dsc$w_length  -= 4;
+		}
+	} while (status == SS$_NORMAL);
+	status = SYS$ASSIGN(&odsc, &iochan, 0, 0);
+	if (status != SS$_NORMAL)
 		ExitProgram(status);
-        status = SYS$QIOW(EFN, iochan, IO$_SENSEMODE, iosb, 0, 0,
-                          oldmode, sizeof(oldmode), 0, 0, 0, 0);
-        if (status!=SS$_NORMAL || (iosb[0]&0xFFFF)!=SS$_NORMAL)
+	status = SYS$QIOW(EFN, iochan, IO$_SENSEMODE, &iosb, 0, 0,
+			  oldmode, sizeof(oldmode), 0, 0, 0, 0);
+	if (status != SS$_NORMAL
+	 || iosb.status != SS$_NORMAL)
 		ExitProgram(status);
-        newmode[0] = oldmode[0];
-        newmode[1] = oldmode[1] | TT$M_NOECHO;
-        newmode[1] &= ~(TT$M_TTSYNC|TT$M_HOSTSYNC);
-        newmode[2] = oldmode[2] | TT2$M_PASTHRU;
-        status = SYS$QIOW(EFN, iochan, IO$_SETMODE, iosb, 0, 0,
-                          newmode, sizeof(newmode), 0, 0, 0, 0);
-        if (status!=SS$_NORMAL || (iosb[0]&0xFFFF)!=SS$_NORMAL)
+	newmode[0] = oldmode[0];
+	newmode[1] = oldmode[1];
+	newmode[1] &= ~(TT$M_TTSYNC|TT$M_HOSTSYNC);
+	newmode[2] = oldmode[2] | TT2$M_PASTHRU;
+	status = SYS$QIOW(EFN, iochan, IO$_SETMODE, &iosb, 0, 0,
+			  newmode, sizeof(newmode), 0, 0, 0, 0);
+	if (status != SS$_NORMAL
+	 || iosb.status != SS$_NORMAL)
 		ExitProgram(status);
-        term.t_nrow = (newmode[1]>>24);
-        term.t_ncol = newmode[0]>>16;
+	term.t_nrow = (newmode[1]>>24);
+	term.t_ncol = newmode[0]>>16;
 
 #endif
-#if     SYS_CPM
+#if	SYS_CPM
 #endif
 
 	/* make sure backspace is bound to backspace */
@@ -766,34 +816,34 @@ ttopen()
 void
 ttclose()
 {
-#if     SYS_AMIGA
+#if	SYS_AMIGA
 #if	CC_LATTICE
-        amg_flush();
-        Close(terminal);
+	amg_flush();
+	Close(terminal);
 #endif
 #if	CC_AZTEC
-        amg_flush();
+	amg_flush();
 	Enable_Abort = 1;	/* Fix for Manx */
-        Close(terminal);
+	Close(terminal);
 #endif
 #endif
 
-#if     SYS_VMS
+#if	SYS_VMS
 	/*
 	 * Note: this code used to check for errors when closing the output,
 	 * but it didn't work properly (left the screen set in 1-line mode)
 	 * when I was running as system manager, so I took out the error
 	 * checking -- T.Dickey 94/7/15.
 	 */
-        int     status;
-        int     iosb[2];
+	int	status;
+	QIO_SB	iosb;
 
-        ttflush();
-        status = SYS$QIOW(EFN, iochan, IO$_SETMODE, iosb, 0, 0,
-                 oldmode, sizeof(oldmode), 0, 0, 0, 0);
+	ttflush();
+	status = SYS$QIOW(EFN, iochan, IO$_SETMODE, &iosb, 0, 0,
+		 oldmode, sizeof(oldmode), 0, 0, 0, 0);
 	if (status == SS$_IVCHAN)
-		return;	/* already closed it */
-        status = SYS$DASSGN(iochan);
+		return; /* already closed it */
+	(void) SYS$DASSGN(iochan);
 #endif
 #if	!SYS_VMS
 	ttclean(TRUE);
@@ -830,21 +880,21 @@ void
 ttputc(c)
 int c;
 {
-#if     SYS_AMIGA
-        scrn_tmp[scrn_tmp_p++] = c;
-        if(scrn_tmp_p>=AMG_MAXBUF)
-                amg_flush();
+#if	SYS_AMIGA
+	scrn_tmp[scrn_tmp_p++] = c;
+	if(scrn_tmp_p>=AMG_MAXBUF)
+		amg_flush();
 #endif
 #if	SYS_ST520 && MEGAMAX
 	Bconout(2,c);
 #endif
-#if     SYS_VMS
-        if (nobuf >= NOBUF)
-                ttflush();
-        obuf[nobuf++] = c;
+#if	SYS_VMS
+	if (nobuf >= NOBUF)
+		ttflush();
+	obuf[nobuf++] = c;
 #endif
-#if     SYS_CPM
-        bios(BCONOUT, c, 0);
+#if	SYS_CPM
+	bios(BCONOUT, c, 0);
 #endif
 #if	SYS_OS2
 	putch(c);
@@ -862,9 +912,9 @@ int c;
 #if	SYS_AMIGA
 amg_flush()
 {
-        if(scrn_tmp_p)
-                Write(terminal,scrn_tmp,scrn_tmp_p);
-        scrn_tmp_p = 0;
+	if(scrn_tmp_p)
+		Write(terminal,scrn_tmp,scrn_tmp_p);
+	scrn_tmp_p = 0;
 }
 #endif
 
@@ -875,32 +925,53 @@ amg_flush()
 void
 ttflush()
 {
-#if     SYS_AMIGA
-        amg_flush();
+#if	SYS_AMIGA
+	amg_flush();
 #endif
-#if     SYS_VMS
-        int     status;
-        int     iosb[2];
+#if	SYS_VMS
+	QIO_SB	iosb;
 
-        status = SS$_NORMAL;
-        if (nobuf != 0) {
-                status = SYS$QIOW(EFN, iochan, IO$_WRITELBLK|IO$M_NOFORMAT,
-                         iosb, 0, 0, obuf, nobuf, 0, 0, 0, 0);
-                if (status == SS$_NORMAL)
-                        status = iosb[0] & 0xFFFF;
-                nobuf = 0;
-        }
+	if (nobuf != 0) {
+		(void) SYS$QIOW(EFN, iochan, IO$_WRITELBLK|IO$M_NOFORMAT,
+			 &iosb, 0, 0, obuf, nobuf, 0, 0, 0, 0);
+		nobuf = 0;
+	}
 #endif
 
-#if     SYS_CPM
+#if	SYS_CPM
 #endif
 
-#if     SYS_MSDOS
+#if	SYS_MSDOS
 # if DISP_ANSI
 	fflush(stdout);
 # endif
 #endif
 }
+
+#if SYS_VMS
+static void
+read_vms_tty(int length)
+{
+	int	status;
+	QIO_SB	iosb;
+	int	term[2] = {0,0};
+
+	status = SYS$QIOW(EFN, iochan,
+		(length == 1)
+			? IO$_READLBLK|IO$M_NOECHO|IO$M_NOFILTR
+			: IO$_READLBLK|IO$M_NOECHO|IO$M_NOFILTR|IO$M_TIMED,
+		&iosb, 0, 0, ibuf, length, 0, term, 0, 0);
+
+	if (status != SS$_NORMAL)
+		ExitProgram(status);
+	if (iosb.status == SS$_ENDOFFILE)
+		ExitProgram(status);
+
+		/* FIXME: check documentation */
+	nibuf = iosb.count + (iosb.dev_dep_data >> 16);
+	ibufi = 0;
+}
+#endif
 
 /*
  * Read a character from the terminal, performing no editing and doing no echo
@@ -910,13 +981,13 @@ ttflush()
 int
 ttgetc()
 {
-#if     SYS_AMIGA
+#if	SYS_AMIGA
 	{
-        char ch;
+	char ch;
 
-        amg_flush();
-        Read(terminal, &ch, 1L);
-        return(255 & (int)ch);
+	amg_flush();
+	Read(terminal, &ch, 1L);
+	return(255 & (int)ch);
 	}
 #endif
 #if	SYS_ST520 && MEGAMAX
@@ -931,34 +1002,19 @@ ttgetc()
 	ch = Bconin(2);
 	STcurblink(FALSE); /* the cursor is steady while we work */
 	STscancode = (ch >> 16) & 0xff;
-       	return(255 & (int)ch);
+	return(255 & (int)ch);
 	}
 #endif
-#if     SYS_VMS
-	{
-        int     status;
-        int     iosb[2];
-        int     term[2];
-
-        while (ibufi >= nibuf) {
-		term[0] =
-		term[1] = 0;
-		if (!tttypahead()) {
-                        status = SYS$QIOW(EFN, iochan, IO$_READLBLK,
-                                 iosb, 0, 0, ibuf, 1, 0, term, 0, 0);
-                        if (status != SS$_NORMAL
-                        || (status = (iosb[0]&0xFFFF)) != SS$_NORMAL)
-				ExitProgram(status);
-                        nibuf = (iosb[0]>>16) + (iosb[1]>>16);
-                }
-        }
-        return (ibuf[ibufi++] & 0xFF);    /* Allow multinational  */
-
+#if	SYS_VMS
+	while (ibufi >= nibuf) {
+		if (!tttypahead())
+			read_vms_tty(1);
 	}
+	return (ibuf[ibufi++] & 0xFF);	  /* Allow multinational  */
 #endif
-#if     SYS_CPM
+#if	SYS_CPM
 	{
-        return (biosb(BCONIN, 0, 0));
+	return (biosb(BCONIN, 0, 0));
 
 	}
 #endif
@@ -1019,23 +1075,8 @@ tttypahead()
 
 #if	DISP_VMSVT
 	if (ibufi >= nibuf) {
-		int	status,
-			iosb[2],
-			term[2];
-
-                ibufi = 0;
-                term[0] = 0;
-                term[1] = 0;
-
-                status = SYS$QIOW(EFN, iochan, IO$_READLBLK|IO$M_TIMED,
-                         iosb, 0, 0, ibuf, NIBUF, 0, term, 0, 0);
-                if (status != SS$_NORMAL)
-			ExitProgram(status);
-                status = iosb[0] & 0xFFFF;
-                if (status!=SS$_NORMAL && status!=SS$_TIMEOUT)
-			ExitProgram(status);
-                nibuf = (iosb[0]>>16) + (iosb[1]>>16);
-                return (nibuf > 0);
+		read_vms_tty(NIBUF);
+		return (nibuf > 0);
 	}
 	return TRUE;
 #endif

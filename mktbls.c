@@ -3,7 +3,8 @@
  *	desired default relationships among the three entities.  Output
  *	is nebind.h, nefunc.h, and nename.h, all of which are then included
  *	in main.c
- *	This code written by Paul Fox, (c)1990
+ *	Copyright (c) 1990 by Paul Fox
+ *	Copyright (c) 1990, 1995 by Paul Fox and Tom Dickey
  *
  *	See the file "cmdtbls" for input data formats, and "estruct.h" for
  *	the output structures.
@@ -13,7 +14,7 @@
  * by Tom Dickey, 1993.    -pgf
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/mktbls.c,v 1.59 1994/12/01 14:39:04 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/mktbls.c,v 1.61 1995/02/08 03:29:23 pgf Exp $
  *
  */
 
@@ -1542,7 +1543,7 @@ LIST **p;
 static void
 free_mktbls ()
 {
-	register int j, k;
+	register int k;
 
 	free_LIST(&all_names);
 	free_LIST(&all_funcs);

@@ -4,7 +4,7 @@
  *
  *   Created: Thu May 14 15:44:40 1992
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/proto.h,v 1.170 1994/12/15 16:53:08 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/proto.h,v 1.180 1995/02/09 01:08:14 pgf Exp $
  *
  */
 
@@ -53,6 +53,8 @@ extern void start_debug_log P(( int , char ** ));
 extern void exit_program P(( int ));
 #endif
 extern char *strncpy0 P(( char *, char *, SIZE_T ));
+extern void setup_handler P(( int, void (*) (DEFINE_SIG_ARGS) ));
+extern int newprocessgroup P(( int, int ));
 
 /* tcap.c and other screen-drivers */
 #if DISP_TERMCAP
@@ -583,6 +585,7 @@ extern int appendeol P(( int, int ));
 extern int overwritechars P(( int, int ));
 extern int ins P(( void ));
 #if !SMALLER
+extern int appstring P(( int, int ));
 extern int insstring P(( int, int ));
 extern int overwstring P(( int, int ));
 extern int istring P(( int, int, int ));
@@ -668,6 +671,8 @@ extern int abbrev P(( int, int ));
 extern int sysmap P(( int, int ));
 extern int unmap P(( int, int ));
 extern int unmap_bang P(( int, int ));
+extern int unmap_system P(( int, int ));
+extern int unabbr P(( int, int ));
 extern void addtosysmap P(( char *, int, int ));
 extern int sysmapped_c P(( void ));
 extern int sysmapped_c_avail P(( void ));
@@ -777,7 +782,6 @@ extern char * lengthen_path P(( char * ));
 extern int is_pathname P(( char * ));
 extern int maybe_pathname P(( char * ));
 extern char * is_appendname P(( char * ));
-extern char * non_filename P(( void ));
 extern int is_internalname P(( char * ));
 extern int is_directory P(( char * ));
 #if (SYS_UNIX||OPT_MSDOS_PATH) && OPT_PATHLOOKUP
@@ -944,6 +948,9 @@ extern int showtagstack P(( int, int ));
 #endif /* OPT_TAGS */
 
 /* termio.c */
+#if SYS_UNIX
+extern int flow_control_enable P(( int, int ));
+#endif
 extern void ttopen P(( void ));
 extern void ttclose P(( void ));
 extern void ttclean P(( int ));
@@ -971,6 +978,7 @@ extern void dumpuline P(( LINEPTR ));
 extern void print_usage P(( void ));
 extern char *getversion P(( void ));
 extern int showversion P(( int, int ));
+extern char * non_filename P(( void ));
 
 /* window.c */
 extern int set_curwp P(( WINDOW * ));
@@ -1127,10 +1135,13 @@ extern	void	set_lback_p2p	P(( LINEPTR, LINEPTR ));
 #endif
 
 #if NO_LEAKS
+extern	void bind_leaks P(( void ));
 extern	void onel_leaks P(( void ));
 extern	void path_leaks P(( void ));
 extern	void kbs_leaks P(( void ));
+extern	void map_leaks P(( void ));
 extern	void tmp_leaks P(( void ));
+extern	void itb_leaks P(( void ));
 extern	void tb_leaks P(( void ));
 extern	void wp_leaks P(( void ));
 extern	void bp_leaks P(( void ));
@@ -1158,6 +1169,7 @@ extern	void	x_preparse_args		P(( int *, char *** ));
 extern	void	x_putline		P(( int, char *, int ));
 extern	int	x_typahead		P(( int ));
 extern	int	x_on_msgline		P((void));
+extern	void	x_move_events		P(( void ));
 #if OPT_WORKING
 extern	void	x_working		P(( void ));
 #endif
@@ -1320,7 +1332,11 @@ extern	int	printf	P(( const char *, ... ));
 extern	int	puts	P(( const char * ));
 #endif
 #if MISSING_EXTERN_QSORT
-extern void	qsort	P((void *, size_t, size_t , int (*compar)(void *, void *)));
+#if ANSI_QSORT
+extern void qsort P((void *, size_t, size_t , int (*compar)(const void *, const void *)));
+#else
+extern void qsort P((void *, size_t, size_t , int (*compar)(char**, char**)));
+#endif
 #endif
 #if MISSING_EXTERN_READ
 extern	int	read	P(( int, char *, SIZE_T ));

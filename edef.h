@@ -8,7 +8,7 @@
 */
 
 /*
- * $Header: /usr/build/VCS/pgf-vile/RCS/edef.h,v 1.167 1994/12/22 11:39:30 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/edef.h,v 1.170 1995/01/12 21:52:11 pgf Exp $
  */
 
 /* I know this declaration stuff is really ugly, and I probably won't ever
@@ -31,7 +31,7 @@ decl_init( char prognam[], "xvile");
 decl_init( char prognam[], "vile");
 #endif
 
-decl_init( char version[], "version 4.13");
+decl_init( char version[], "version 5.0");
 
 #if SYS_UNIX
 decl_init( char opersys[], "unix");
@@ -222,6 +222,7 @@ decl_uninit( B_COUNT cur_working );	/* current-value for slowreadf	*/
 decl_uninit( B_COUNT old_working );	/* previous-value for slowreadf	*/
 decl_uninit( int no_working );		/* disabling flag */
 #endif
+decl_uninit( int signal_was );		/* what was the last signal */
 
 	/* These pointers are nonnull only while animating a given buffer or
 	 * window.  They are used to obtain local mode-values.
@@ -258,7 +259,7 @@ decl_init( char HELP_BufName[],	 	"[Help]");
 decl_init( char BINDINGLIST_BufName[],	"[Binding List]");
 #endif
 # if OPT_TERMCHRS
-decl_init( char TERMINALCHARS_BufName[],"[Terminal Characters]");
+decl_init( char TERMINALCHARS_BufName[],"[Terminal Chars]");
 #endif
 #if OPT_POPUPCHOICE
 decl_init( char COMPLETIONS_BufName[],	"[Completions]");
@@ -288,7 +289,7 @@ decl_init( char VILEINIT_BufName[],	"[vileinit]");
 decl_init( char MAP_BufName[],		"[Map Sequences]");
 decl_init( char MAPBANG_BufName[],	"[Map! Sequences]");
 decl_init( char ABBR_BufName[],		"[Abbreviations]");
-decl_init( char SYSMAP_BufName[],	"[System Map Sequences]");
+decl_init( char SYSMAP_BufName[],	"[System Maps]");
 #else
 /* needed anyway, since they're passed around as args */
 decl_init( char MAP_BufName[],		"");

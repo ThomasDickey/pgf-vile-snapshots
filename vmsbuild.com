@@ -1,4 +1,4 @@
-$! $Header: /usr/build/VCS/pgf-vile/RCS/vmsbuild.com,v 1.3 1994/12/21 14:01:02 pgf Exp $
+$! $Header: /usr/build/VCS/pgf-vile/RCS/vmsbuild.com,v 1.4 1995/02/10 03:42:18 pgf Exp $
 $! VMS build-script for vile.  Requires "VAX-C"
 $!
 $! Tested with:
@@ -33,7 +33,32 @@ $!SCRDEF := "MOTIF_WIDGETS,XTOOLKIT,X11,scrn_chosen"
 $
 $! used /G_FLOAT with vaxcrtlg/share in vms_link.opt
 $! can also use /Debug /Listing, /Show=All
-$ CFLAGS := /Diagnostics /Define=("os_chosen","''SCRDEF'") /Include=([])
+$
+$!
+$ axp  = f$getsyi("HW_MODEL").ge.1024
+$ CC   = "CC"
+$ DEFS = ""
+$ OPTS = ""
+$
+$ if axp
+$ then
+$! assume we have DEC C
+$	CFLAGS = "/standard=vaxc"
+$	DEFS = ",HAVE_ALARM"
+$ else
+$! we have either VAX C or GNU C
+$	CFLAGS = ""
+$	DEFS = ",HAVE_SYS_ERRLIST"
+$	OPTS = ",VMSSHARE.OPT/OPTIONS"
+$	if (f$search("SYS$SYSTEM:VAXC.EXE").eqs."" .and. -
+		f$trnlnm("GNU_CC").nes."") .or. (p1.eqs."GCC")
+$	then
+$		CC = "gcc"
+$		OPTS = "''OPTS',GNU_CC:[000000]GCCLIB.OLB/LIB"
+$	endif
+$ endif
+$
+$ CFLAGS := 'CFLAGS/Diagnostics /Define=("os_chosen","''SCRDEF'''DEFS'") /Include=([])
 $
 $	if "''p1'" .nes. "" then goto 'p1
 $
@@ -97,7 +122,7 @@ $	call make window
 $	call make word
 $	call make wordmov
 $
-$	link /exec='target/map/cross main.obj, 'SCREEN.obj, vms_link/opt
+$	link /exec='target/map/cross main.obj, 'SCREEN.obj, vms_link/opt 'OPTS
 $	goto build_last
 $
 $ install :
@@ -159,7 +184,7 @@ $ make: subroutine
 $	if f$search("''p1'.obj") .eqs. ""
 $	then
 $		write sys$output "compiling ''p1'"
-$		cc 'CFLAGS 'p1
+$		'CC 'CFLAGS 'p1
 $		if f$search("''p1'.dia") .nes. "" then delete 'p1.dia;*
 $	endif
 $exit

@@ -15,15 +15,26 @@ more recent additions to this README appear near the bottom.  that is, most
 of the newest stuff is at the end, not up here where you are.
 
 impatient?  just type "./configure; make", and get a cup of coffee, decaf
-if necessary.
+if necessary.  
 
 want X11 support?  you'd better look at README.CFG, although 
-"./configure --with-screen=x11"; make" may well do what you want
+"./configure --with-screen=x11"; make" may well do what you want.
+
+if you've installed older vile releases (4.5 or earlier) in the past, be
+sure you eradicate the old help file -- it was installed to a different
+location by default than it is now (it used to go in /usr/local/bin), and
+getting the wrong help when you ask for it might be worse than no help at
+all.  (but mostly you'll just miss out on descriptions of newer features...)
+
+if you like vile, and wish to be informed of new releases, let me
+know -- i maintain a mailing list for that purpose.  don't worry -- the
+volume won't fill your inbox.
 
 paul fox, pgf@foxharp.boston.ma.us
 
----------------------------
-February, 1992
+------------------------------------------------------
+
+original README, from February, 1992:
 
 VILE -- VI Like Emacs: a vi workalike put together from Micro-Emacs by Paul Fox
 -------------------------------------------------------------------------------
@@ -63,8 +74,9 @@ VILE -- VI Like Emacs: a vi workalike put together from Micro-Emacs by Paul Fox
 		- a larger set of operator commands
 		- the possibility of porting to your favorite micro.
 		- "next error" cursor positioning after compilation
-	      [	- infinite undo  - 7/93 ]
+	      [	- infinite undo  -pgf 7/93 ]
 	Of course, it _may_ lack some of vi's reliability. :-)
+	[but not much -- it's _very_ stable these days. -pgf 1/95]
 
 	Take a look at vile.hlp for more information about features
 	and differences. 
@@ -267,5 +279,5 @@ hmmmm -- lets see.  new stuff.  see the CHANGES and help files for details.
 	- lots of bug fixes
 
 -------------------------------
-$Header: /usr/build/VCS/pgf-vile/RCS/README,v 1.44 1994/12/22 10:50:00 pgf Exp $
+$Header: /usr/build/VCS/pgf-vile/RCS/README,v 1.46 1995/01/31 01:58:32 pgf Exp $
 -------------------------------

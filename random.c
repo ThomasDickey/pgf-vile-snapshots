@@ -2,7 +2,7 @@
  * This file contains the command processing functions for a number of random
  * commands. There is no functional grouping here, for sure.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/random.c,v 1.148 1994/12/03 13:22:56 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/random.c,v 1.149 1995/01/27 13:52:56 pgf Exp $
  *
  */
 
@@ -667,13 +667,13 @@ int watchinput;
 	if (watchinput)  {
 		float tenth = .1;
 		while(seconds > 0.1) {
-			lib$wait(&tenth);
+			LIB$WAIT(&tenth);
 			if (TTtypahead())
 				return;
 			seconds -= tenth;
 		}
 	}
-	lib$wait(&seconds);
+	LIB$WAIT(&seconds);
 #define have_slept 1
 #endif
 

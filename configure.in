@@ -1,9 +1,9 @@
 dnl Process this file with autoconf to produce a configure script.
-AC_REVISION($Revision: 1.15 $)
+AC_REVISION($Revision: 1.19 $)
 ### Use "configure -with-screen" to override the default configuration, which is
 ### termcap-based on unix systems.
 
-dnl $Header: /usr/build/VCS/pgf-vile/RCS/configure.in,v 1.15 1994/12/12 13:43:29 pgf Exp $
+dnl $Header: /usr/build/VCS/pgf-vile/RCS/configure.in,v 1.19 1995/01/24 02:44:45 pgf Exp $
 
 dnl
 AC_INIT(mktbls.c)
@@ -48,6 +48,16 @@ AC_ISC_POSIX
 AC_MINIX
 AC_DYNIX_SEQ
 AC_IRIX_SUN
+
+# check for SCO.  this is a hack, and should be split into individual
+# features -- the sys/time.h and select.h conflict, and the need for
+# ptem.h due to winsize struct.
+AC_CHECKING([for SCO by checking on /usr/bin/scosh])
+AC_PROGRAM_CHECK(COULD_BE_SCO, [scosh], maybe, maybenot)
+if test "$COULD_BE_SCO" = "maybe"
+then
+	AC_DEFINE(SYSTEM_LOOKS_LIKE_SCO)
+fi
 
 ###	checks for header files
 AC_STDC_HEADERS
@@ -97,7 +107,7 @@ AC_COMPILE_CHECK([to see if switch cases work with structure offsets], [],
 
 ###	checks for system services and user specified options
 AC_LONG_FILE_NAMES
-AC_RESTARTABLE_SYSCALLS
+VC_RESTARTABLE_PIPEREAD		# is a read() of a pipe restartable?
 VC_HAVE_LIBRARY(nsl)		# needed on some systems to find gethostname
 
 AC_SUBST(CFLAGS)
@@ -122,7 +132,7 @@ VC_KILLPG
 VC_SYS_ERRLIST
 AC_HAVE_FUNCS(sigprocmask setsid select poll strchr strrchr gethostname \
 	getcwd getwd killpg setvbuf access mkdir tcgetattr ttyname link \
-	utime utimes)
+	utime utimes alarm)
 
 AC_DEFINE(SYS_UNIX)
 AC_DEFINE(scrn_chosen)

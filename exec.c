@@ -2,14 +2,16 @@
  *	commands, command lines, buffers, files and startup files
  *
  *	written 1986 by Daniel Lawrence
+ * 	much modified since then.  assign no blame to him.  -pgf
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/exec.c,v 1.107 1994/12/19 15:43:30 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/exec.c,v 1.108 1995/01/10 15:07:38 pgf Exp $
  *
  */
 
 #include	"estruct.h"
 #include	"edef.h"
 
+#define isSPorTAB(c) ((c) == ' ' || (c) == '\t')
 
 extern CMDFUNC f_gomark;
 
@@ -495,7 +497,7 @@ LINEPTR		*markptr;	/* where to store the mark's value */
 			s++;
 
 		/* skip leading spaces */
-		while (isspace(*s))
+		while (isSPorTAB(*s))
 			s++;
 
 		/* dot means current position */
@@ -612,7 +614,7 @@ CMDFLAGS	*flagp;
 	}
 
 	/* permit extra colons at the start of the line */
-	while (isspace(*specp) || *specp == ':') {
+	while (isSPorTAB(*specp) || *specp == ':') {
 		specp++;
 	}
 
@@ -652,7 +654,7 @@ CMDFLAGS	*flagp;
 		*flagp |= DFLALL;
 
 	/* skip whitespace */
-	while (isspace(*scan))
+	while (isSPorTAB(*scan))
 		scan++;
 
 	if (*scan) {
@@ -856,7 +858,7 @@ int eolchar;
 	register int c, i, d;
 
 	/* first scan past any whitespace in the source string */
-	while (isspace(*src))
+	while (isSPorTAB(*src))
 		++src;
 
 	/* scan through the source string */
@@ -917,14 +919,14 @@ int eolchar;
 				}
 			} else {
 				if (c == eolchar) {
-					if (!isspace(c))
+					if (!isSPorTAB(c))
 						src++;
 					break;
 				} else if (c == '"') {
 					quotef = c;
 					/* note that leading quote
 						is included */
-				} else if (isspace(c)) {
+				} else if (isSPorTAB(c)) {
 					break;
 				}
 			}
@@ -934,7 +936,7 @@ int eolchar;
 	}
 
 	/* scan past any whitespace remaining in the source string */
-	while (isspace(*src))
+	while (isSPorTAB(*src))
 		++src;
 	token_ended_line = isreturn(*src) || *src == EOS;
 

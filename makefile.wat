@@ -3,7 +3,7 @@
 # based on the original makefile of vile 3.46 (see the original makefile)
 # T.DANG (dang@cogit.ign.fr)
 #
-# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.wat,v 1.14 1994/11/29 04:02:03 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.wat,v 1.15 1995/02/10 14:10:45 pgf Exp $
 #
 # if you use the watcom version of vile, you may want to "set DOS4G=quiet"
 # to suppress the DOS 4G/W banner that comes up from the Rational Systems
@@ -84,6 +84,7 @@ eval.obj:	nevars.h
 glob.obj:	dirstuff.h
 externs.obj:	nebind.h nename.h nefunc.h
 path.obj:	dirstuff.h
+version.obj:	patchlev.h
 
 MKTBLS.EXE:  mktbls.c
 	wcl386/p mktbls.c

@@ -21,7 +21,7 @@
 # gnu autoconf support by kevin buettner, 5/94
 # original makefile for uemacs: Adam Fritz July 30,1987  (do you recognize it?)
 #
-# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.in,v 1.30 1994/12/22 11:03:15 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.in,v 1.37 1995/02/10 03:42:18 pgf Exp $
 #
 
 #### Start of system configuration section. ####
@@ -71,7 +71,7 @@ INSTALL_DIRS    = $(bindir) $(libdir) $(mandir)
 
 # All of the makefiles which should be preserved and distributed
 UNIXMAKIN = makefile.in				# for use with configure
-VMSMAK =   descrip.mms vms_link.opt vmsbuild.com # on VMS
+VMSMAK =   descrip.mms vms_link.opt vmsbuild.com vmsshare.opt # on VMS
 TURBOMAK = makefile.tbc				# on DOS or OS/2, TURBO C or Borland C
 WATMAK =   makefile.wat				# on DOS, using Watcom C/386
 MSCMAK =	# still waiting for this one	# on DOS, using Microsoft C
@@ -94,14 +94,15 @@ SCREENS = tcap.c x11.c ibmpc.c borland.c ansi.c ntconio.c vmsvt.c \
 
 # other source code, some used in other makefiles, some possibly obsolete
 OTHERSRC = z100bios.asm vms2unix.c vmspipe.c djhandl.c \
-	manpage.rc manfilt.pl manfilt.c
+	manpage.rc manfilt.pl manfilt.c c-filt.c
 
 # documentation, such as it is
 DOCS = vile.hlp vile.1 macros.doc
 
 # miscellaneous text files
 TEXTFILES = README README.CFG README.PC \
-	INSTALL CHANGES CHANGES.R3 buglist revlist
+	INSTALL CHANGES CHANGES.R4 CHANGES.R3 \
+	buglist revlist patchlev.h COPYING
 
 VILESRC = main.c basic.c bind.c buffer.c crypt.c csrch.c \
 	display.c eval.c exec.c externs.c fences.c file.c \
@@ -311,9 +312,20 @@ dpatch:
 	@echo Current version is `cat /tmp/vilevers`
 
 release_warnings:
-	@echo 'Do you need to rebuild the revlist????'
-	@echo 'or maybe date the CHANGES file?'
-	@sleep 3
+	@echo
+	@echo 'Do you need to rebuild the revlist????  top comment is:'
+	@rlog revlist | sed -n -e '/date/,/---------/p' | \
+		sed -n '/date\|------------/!p' | sed -e 's/^/	/' -e 1q
+	@echo 'or maybe date the CHANGES file?  it says:'
+	@sed -n -e '/Changes/s/^/	/p' -e '2q' CHANGES
+	@echo 'or maybe update the version info in edef.h?  it contains:'
+	@sed -n -e '/.*decl_init.*version.*,/s//	/p' edef.h
+	@echo 'or in vile.hlp?  it has:'
+	@sed -n -e '/.*Getting along with vile	*/s//	/p' -e '5q' vile.hlp
+	@echo 'did you reset patchlev.h?'
+	@sed -n -e 's/^/	/' -e '/PATCH/p' patchlev.h
+	@echo -n "Hit return to continue..."
+	@read a
 
 rcsdiffrw:
 	@-for x in `$(MAKE) -f makefile.in rw`	;\
@@ -358,6 +370,7 @@ eval.o:	nevars.h
 glob.o:	dirstuff.h
 externs.o:	nebind.h nename.h nefunc.h
 path.o:	dirstuff.h
+version.o: patchlev.h
 vmalloc.o:	nevars.h
 
 # dependency-rules for install/installdirs

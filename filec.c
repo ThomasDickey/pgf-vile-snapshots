@@ -5,7 +5,7 @@
  * Written by T.E.Dickey for vile (march 1993).
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/filec.c,v 1.40 1994/12/15 15:01:52 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/filec.c,v 1.41 1995/02/06 04:06:39 pgf Exp $
  *
  */
 
@@ -649,6 +649,15 @@ int	*pos;
 			for (d = path; (*d++ = *s++) != EOS; )
 				;
 		}
+#if OPT_MSDOS_PATH
+		/* If the user typed "c:/x", we've got to translate it to
+		 * "c:\x" since that's how we stored the names in the file
+		 * completion buffer.
+		 */
+		for (s = path; *s != EOS; s++)
+			if (*s == '/')
+				*s = SLASHC;
+#endif
 
 		newlen =
 		oldlen = strlen(path);

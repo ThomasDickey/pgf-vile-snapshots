@@ -1,7 +1,7 @@
 dnl
 dnl Local definitions for autoconf.
 dnl ------------------------
-dnl $Header: /usr/build/VCS/pgf-vile/RCS/aclocal.m4,v 1.9 1994/12/09 18:05:28 pgf Exp $
+dnl $Header: /usr/build/VCS/pgf-vile/RCS/aclocal.m4,v 1.10 1995/01/09 17:56:37 pgf Exp $
 dnl ------------------------
 dnl
 dnl VC_HAVE_LIBRARY is a slightly modifid version of AC_HAVE_LIBRARY from 
@@ -75,6 +75,61 @@ main()
     (void) kill(-getpid(), SIGINT);
     exit(1);
 }], ,AC_DEFINE(HAVE_KILLPG))
+])dnl
+dnl
+dnl----------------------------
+dnl VC_RESTARTABLE_PIPEREAD is a modified version of AC_RESTARTABLE_SYSCALLS
+dnl from acspecific.m4, which uses a read on a pipe (surprise!) rather than
+dnl a wait() as the test code.  apparently there is a POSIX change, which OSF/1
+dnl at least has adapted to, which says reads (or writes) on pipes for which
+dnl no data has been transferred are interruptable _regardless_ of the 
+dnl SA_RESTART bit.  yuck.
+define(VC_RESTARTABLE_PIPEREAD,
+[AC_CHECKING(for restartable reads on pipes)
+AC_TEST_PROGRAM(
+[/* Exit 0 (true) if wait returns something other than -1,
+   i.e. the pid of the child, which means that wait was restarted
+   after getting the signal.  */
+#include <sys/types.h>
+#include <signal.h>
+#ifdef SA_RESTART
+sigwrapper(sig, disp)
+int sig;
+void (*disp)();
+{
+    struct sigaction act, oact;
+
+    act.sa_handler = disp;
+    sigemptyset(&act.sa_mask);
+    act.sa_flags = SA_RESTART;
+
+    (void)sigaction(sig, &act, &oact);
+
+}
+#else
+# define sigwrapper signal
+#endif
+ucatch (isig) { }
+main () {
+  int i, status;
+  int fd[2];
+  char buff[2];
+  pipe(fd);
+  i = fork();
+  if (i == 0) {
+      sleep (2);
+      kill (getppid (), SIGINT);
+      sleep (2);
+      write(fd[1],"done",4);
+      close(fd[1]);
+      exit (0);
+  }
+  sigwrapper (SIGINT, ucatch);
+  status = read(fd[0], buff, sizeof(buff));
+  wait (&i);
+  exit (status == -1);
+}
+], AC_DEFINE(HAVE_RESTARTABLE_PIPEREAD))
 ])dnl
 dnl
 dnl----------------------------

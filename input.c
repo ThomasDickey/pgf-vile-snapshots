@@ -44,7 +44,7 @@
  *	tgetc_avail()     true if a key is avail from tgetc() or below.
  *	keystroke_avail() true if a key is avail from keystroke() or below.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/input.c,v 1.127 1994/12/04 15:06:46 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/input.c,v 1.129 1995/02/08 13:29:39 pgf Exp $
  *
  */
 
@@ -774,7 +774,13 @@ int	options;
 			cp = str;
 		else
 			cp = NULL;
-	} else if ((c == '!') && shell) {
+	} else if (shell && (c == '!')
+#ifdef only_expand_first_bang
+			/* without this check, do as vi does -- expand '!'
+			   to previous command anywhere it's typed */
+			&& cpos <= (buf[0] == '!')
+#endif
+		) {
 		cp = tb_values(save_shell[!isShellOrPipe(buf)]);
 		if (cp != NULL && isShellOrPipe(cp))
 			cp++;	/* skip the '!' */

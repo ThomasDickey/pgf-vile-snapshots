@@ -2,9 +2,9 @@
  *	in the punctuated vi sense, and in the whitespace/darkspace
  *	sense.  The transition is reported _after_ it has occurred.  You
  *	need to back up to get to the char. before the transition.
- *	Written for vile by Paul Fox, (c)1990
+ *	Written for vile: Copyright (c) 1990, 1995 by Paul Fox
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/wordmov.c,v 1.12 1994/12/16 22:54:21 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/wordmov.c,v 1.13 1995/02/08 03:29:23 pgf Exp $
  *
  */
 

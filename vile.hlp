@@ -1,6 +1,6 @@
 
-Getting along with vile
------------------------
+Getting along with vile						(version 5.0)
+-----------------------						-------------
 
 	Use Ctrl-D and Ctrl-U to scroll through this help information.
 
@@ -25,16 +25,15 @@ Getting along with vile
 		^X-h
 		^A-h
 
-	The only vile commands described herein are those not 
-	present in vi, or differing greatly from those in vi.
-	There is a section at the bottom describing other differences
-	between vile and vi.
+	The only vile commands described herein are those not present in
+	vi, or differing greatly from those in vi.  There is a section at
+	the bottom describing other differences between vile and vi.
 
-	To get a complete list of all commands, type ":list-commands".
-	To get a list of all commands that contain the strings "name",
-	type ":apropos name".  These lists will show all command synonyms
-	and key sequences that are bound to the same function, along with
-	a short description of the command, and whether it is a motion or
+	To get a complete list of all commands, type ":list-commands".  To
+	get a list of all commands that contain the string "name", type
+	":apropos name".  These lists will show all command synonyms and
+	key sequences that are bound to the same function, along with a
+	short description of the command, and whether it is a motion or
 	operator command.
 
 	To get information on a specific key-binding or function, use the
@@ -46,19 +45,6 @@ Getting along with vile
 	hit TAB to perform command completion.  Hitting a second TAB will
 	pop up a window containing the list of possible completions.
 	
-	You can also type a question mark to display a list of the
-	characters that you would have to type to complete the command. 
-	For example, to complete
-
-		:unm?			-- you type
-		:unm{a}[pr]		-- you see
-
-	The completion-display shows curly braces around the string that
-	will be supplied by pressing TAB, and square brackets around
-	characters that you must type to make the command unique.
-	(Name-completion applies as well to mode and environment-variable
-	names.)
-
 	If your screen hops around a lot when you scroll, see the "Note on
 	Scrolling" section near the bottom of this file.
 
@@ -87,7 +73,6 @@ General Remarks
 	you have two windows to the same buffer, and make a change in one,
 	you can undo it in the other.
 
-
 	vile is 8-bit clean, allowing it to be used more easily at non-
 	English speaking sites.  See the section on "8-Bit Operation" for
 	more information.
@@ -96,14 +81,14 @@ Command Prefixes
 ----------------
 
 	To extend the vi command set in vile, two (or three, depending on
-	how how you count them) command "prefixes" exist.  These keystrokes,
+	how you count them) command "prefixes" exist.  These keystrokes,
 	in combination with another key, can be bound as a pair to execute
 	any vile function.  The default values for these prefixes are
                 Key:                    Bound to dummy function:                
 		^X     Control-X 	cntl_x-prefix
 		^A     Control-A 	cntl_a-prefix
 		#      poundsign	function-prefix
-	IF you find any of these keys hard to type, or would prefer that
+	If you find any of these keys hard to type, or would prefer that
 	they are all control characters (or all non-control), they can
 	be changed by binding a new key to the function listed above.  See
 	the section on "Key Rebinding" below.  If you do change the values
@@ -115,7 +100,6 @@ Command Prefixes
 	to function key bindings.  This is also true in vile -- if something
 	is bound to '#2', then it is also probably available with key F2
 	on your keyboard.)
-
 
 Buffer manipulation commands:  
 -----------------------------
@@ -141,9 +125,9 @@ Buffer manipulation commands:
 			:e#
 			^^   (ctrl-^)  (but many keyboards can't produce this)
 
-		The buffer number may also preceded the _ command.  This is
+		The buffer number may also precede the '_' command.  This is
 		necessary when visiting buffers numbered higher than '9'.  For
-		example, one would use "13_" to visit buffer 13 in the list.  
+		example, one would type "13_" to visit buffer 13 in the list.  
 		
 		[ See the note under "Differences", below, for comments on
 		vi's use of '_'.]
@@ -173,8 +157,10 @@ Buffer manipulation commands:
 		necessary in vile as it is in vi, since multiple buffers may
 		have outstanding unwritten changes.
 
-	:n	Go to the next buffer.  "next" means least recently used.
-		(The ":n file ..." version of the command is not supported.)
+	:n	Go to the next buffer.  "Next" means "least recently used"
+		in autobuffer mode.  In noautobuffer mode, "next" means
+		next in numeric sequence.  (The ":n file ..." version of
+		the command is not supported.)
 
 	:rename-buffer   Rename the current buffer.  Prompts for a new name. 
 		Does not affect the filename associated with the buffer. 
@@ -183,20 +169,22 @@ Buffer manipulation commands:
 		contents, but run a new command. 
 
 	:rewind	Go to the first buffer.  This is used only in 'noautobuffer'
-		(vi-style buffering) mode.
+		(vi-style buffering) mode.  It does nothing in "autobuffer"
+		mode.  Remember that "autobuffer" mode is the default.
 
 	:b	Edit a buffer.  Recalls the named buffer.  Does not look for
 		a file of that name.  Will find "invisible" buffers.
 
 	:ki	Kill a buffer.  Remove the buffer and its contents from the
-		editor.  Will ask if changes to the buffer should be discarded.
+		editor.  Will ask if changes to the buffer should be
+		discarded.
 
 	^X-e	Edit the file whose pathname appears under the cursor.  For
 		example, if you are editing a makefile, you could edit one
 		of the source files by placing the cursor at the start of
 		its name and using this command.  Note that this does not
-		know about characters that your shell might usually translate
-		for you, like '~' or '$HOME'.
+		know about some characters that your shell might usually
+		translate for you, like the '$' in '$HOME'.
 
 	^X-k	Kill the buffer whose name or filename appears under the
 		cursor.
@@ -211,13 +199,17 @@ Buffer manipulation commands:
 		single following digit.)  The order of the list is either
 		most-recently-used, or fixed, depending on the setting 
 		of "autobuffer" mode (see below).  vile attempts to keep
-		the contents of the buffer list window up to date.
+		the contents of the buffer list window up to date if it
+		is left up on the screen while other buffer manipulation
+		commands are given.
 
 	^A-*	Always display a list of all buffers.  Useful for updating the
 		list if it's already on the screen but may be out of date.
 		Any argument will cause the list to include _all_ buffers,
 		even those normally considered "invisible".  (For example,
-		macros are stored in "invisible" buffers.)
+		macros are stored in "invisible" buffers.)  [This command
+		isn't as necessary now that the buffer list is maintained
+		dynamically...]
 
 Window manipulation commands:  
 -----------------------------
@@ -254,26 +246,34 @@ Window manipulation commands:
 	commands (which take their args (number of rows or columns
 	respectively) before you type the ":").
 
+	[ Personally, I put the following bindings in my .vilerc:
+	    bind-key split-current-window ^T	; split into 'T'wo windows
+	    bind-key next-window ^N		; 'N'ext window
+	    bind-key previous-window ^P		; 'P'revious window
+	Since ^K already 'K'ills a window, and ^O makes it the 'O'nly window,
+	these give more mnemonic, and faster, access to multiple windows.
+	(These would be the default, but ^N, ^P, and ^T have other meanings
+	in real vi (all of which have alternate bindings in vile.) ]
+
 File manipulation commands:  
 ---------------------------
 
 	The usual ":e", ":r", ":f", ":w" commands are available, though
-	only ":e!" is available of the "!" options.  The ":r" command reads
-	the named file in after the current line.  To read a file before
-	the first line, use ":0r".  File completion works like command
-	completion: using the TAB and '?' keys you can complete or see next
-	character choices.  The ":w!" and ":x!" are present, and are
-	synonymous with ":w" and ":x" since there is no "readonly" mode to
-	override.  (Actually, ":w!" is not quite synonymous -- it can be
+	only ":e!" and ":w!" are available of the "!" options.  The ":r"
+	command reads the named file in after the current line.  To read a
+	file before the first line, use ":0r".  File completion works like
+	command completion: using the TAB and '?' keys you can complete or
+	see next character choices.  The ":w!" and ":x!" are present, and
+	are synonymous with ":w" and ":x" since there is no "readonly" mode
+	to override.  (Actually, ":w!" is not quite synonymous -- it can be
 	used to force a write when an attempt to create a backup file has
 	failed.  See the "backup-style" mode, below.)
 
-
 	The commands ":ww" and ":wwq" correspond roughly to ":w" and ":wq",
-	but they each write all modified buffers.  Giving any numeric
-	argument to ":ww" (i.e.  "1:ww") will suppress the per-file and
-	"Press return to continue" message.  This may be useful when using
-	the command from within a macro.
+	but they each write all modified buffers, rather than just the
+	current one.  Giving any numeric argument to ":ww" (i.e.  "1:ww")
+	will suppress the per-file and "Press return to continue" message. 
+	This may be useful when using the command from within a macro.
 
 	As in vi, ranges of lines specified by line numbers (including '.',
 	'$', and '%' shorthands) or marks may precede these commands.  
@@ -314,7 +314,7 @@ Shell Access
 	almost identical to ":e !cmd", except that in that case the buffer
 	is named according to the command name.
 
-	These output capture commands are most useful in conjunction with
+	These "output capture" commands are most useful in conjunction with
 	the "error finder", '^X-^X', described below.
 
 	On systems supporting job control, ^Z (or ":stop") will suspend vile.
@@ -385,15 +385,17 @@ Text manipulation command:
 	command will undo changes, one by one (or given a count, several at
 	a time).  The '^X-r' command will walk forward, redoing the
 	previously undone changes one by one.  A fresh change to the buffer
-	will cause previously undone changes to no longer be redoable.
+	will cause previously undone changes to no longer be redoable. 
+	Remember that with key rebinding, you can change your 'u' or 'U'
+	command to be an infinite undo, making it easier to type.
 
 	The number of changes stored in the undo "history" is controlled by
 	the numeric mode "undolimit".  The default history length is 10 --
 	that is, only 10 changes may be undone.  Set the undolimit to 0 for
 	truly infinite undo.  This can consume a lot of memory.
 
-	The cursor position after an undo may not always be
-	the same as it would be in vi.
+	The cursor position after an undo may not always be the same as it
+	would be in vi.
 
 	Operators
 	---------
@@ -454,7 +456,7 @@ Text manipulation command:
 	^A-u	Like ^A-~, but converts the region to upper case.
 	^A-l	Like ^A-~, but converts the region to lower case.
 
-	^A-f Format the region based on the current fill column.  The
+	^A-f	Format the region based on the current fill column.  The
 		initial indentation of both the first and second lines of
 		each "paragraph" in the region are preserved, and all
 		subsequent lines get the second line's indentation.  This
@@ -465,8 +467,8 @@ Text manipulation command:
 		"^A-f}", which reformats the current paragraph.  The
 		re-formatting begins again with each new paragraph, where a
 		paragraph has the same boundaries used by the '{' and '}'
-		commands -- i.e.  blank lines, or lines beginning in .I .L
-		.P .Q or .b.  This make is possible to use "3^A-f}" or
+		commands -- i.e. blank lines, or lines beginning in .I .L
+		.P .Q or .b.  This makes it possible to use "3^A-f}" or
 		"^A-fG" to reformat multiple paragraphs.  The reformatting
 		operation knows a little about both C and shell comments,
 		and will attempt to do the "right" thing with lines that
@@ -589,7 +591,6 @@ Text manipulation command:
 	"show-tagstack" command.  The "[Tag Stack]" buffer is animated --
 	it will dynamically keep track of current tag references.
 
-
 Miscellaneous commands
 ----------------------
 
@@ -598,23 +599,26 @@ Miscellaneous commands
 
 	^X-^X	The "error finder".  Goes to the next file/line error pair 
 		specified in the last buffer captured from a command's
-		output.  This buffer is usually created with the ^X-! command.
-		For example, "^X-!cc -c junk.c" puts all of the compiler output
-		into the buffer named "[Output]".  Repeatedly hitting ^X-^X 
-		will position the editor at each error in turn, and will
-		eventually start over again at the top.  The buffer searched
-		for "errors" will be the last shell command run, or the buffer
-		named with the "error-buffer" command.  The "Entering directory
-		XXX" and "Leaving directory XXX" messages that GNU make puts
-		out with the -w switch are honored, so that files are found
-		with the correct path.  (Tip: I use the following
-		macro to quickly grep a source directory for the string under
-		the cursor:
+		output.  This buffer is usually created with the ^X-! 
+		command.  For example, "^X-!cc -c junk.c" puts all of the
+		compiler output into the buffer named "[Output]". 
+		Repeatedly hitting ^X-^X will position the editor at each
+		error in turn, and will eventually start over again at the
+		top.  The buffer searched for "errors" will be the last
+		shell command run, or the buffer named with the "error-
+		buffer" command.  The "Entering directory XXX" and "Leaving
+		directory XXX" messages that GNU make puts out with the -w
+		switch are honored, so that files are found with the
+		correct path.  (Tip: I use the following macro to quickly
+		grep a source directory for the string under the cursor:
 		    use-register g load-register "^X!egrep -n : *.[chs]^M"
-		where the ^X and ^M are each single control characters, entered
-		using ^V to escape them.  Then I invoke with @g to execute.)
-		Unfortunately, the parsing of the compiler output to get
-		the file and line numbers is currently hard-coded.
+		where the ^X and ^M are each single control characters,
+		entered using ^V to escape them.  Then I invoke with @g to
+		execute.)
+
+		Unfortunately, the parsing of the command output that vile
+		does to get the file and line numbers is currently
+		hard-coded.
 
 	^X-t Set or report on the tab-stop width.  To set, the spacing must
 		precede the command, as in "4^X-t".  The "set tabstop"
@@ -630,9 +634,9 @@ Miscellaneous commands
 		buffer is currently using the local or global copy of the
 		tabstop value.
 
-	^X-X	Set encryption key. (not well tested, but hopefully not broken)
-		CRYPT must have been on when vile was built for this to do
-		anything.
+	^X-X	Set encryption key.  (not well tested, but hopefully not
+		broken)  OPT_ENCRYPT must have been on when vile was built
+		for this to do anything.
 
 	K	Count prefix.  The first time you type it, it is equivalent
 		to an argument of 4 to the following command.  If you repeat 
@@ -640,7 +644,7 @@ Miscellaneous commands
 
 	%	In addition to finding matching braces, brackets, and
 		parentheses, the '%' command will find matching #if's,
-		#ifdef's and C style comments.  If the cursor is on the #
+		#ifdef's and C-style comments.  If the cursor is on the #
 		of "#ifdef"/"#if", the '%' command will find the matching
 		"#endif" or "#else".  On an "#else" it will find "#endif",
 		and on "#endif" it will go back up to the "#ifdef"/"#if". 
@@ -730,7 +734,7 @@ Miscellaneous commands
 		with ":map".  (synonymous with ":map<CR>")
 
 	show-mapped!-chars -- displays the strings mapped for insert mode
-		with ":map!".  (synonymous with ":map<CR>")
+		with ":map!".  (synonymous with ":map!<CR>")
 
 	show-system-mapped-chars -- displays the strings mapped to
 		represent the terminal's function keys.
@@ -747,18 +751,41 @@ Miscellaneous commands
 		associated with the TTY driver, i.e. backspace, interrupt,
 		suspend, etc.
 
-	show-variables -- displays the list of vile $variables, and their
-		values.
+	show-variables -- displays the list of vile $variables and user
+		%variables, and their values.
+
+Completion
+----------
+	Many responses to vile prompts need not be typed in their entirety.
+	vile can complete the response for you.  This applies to command
+	names, file names, vile modes, vile variables, and the "terminal
+	characters".
+
+	To invoke vile completion, type a few characters and hit TAB (or
+	your current "name-complete" terminal character).  Hitting it a
+	second time will pop up a window containing the list of possible
+	completions.  The window will go away when the current command
+	is finished.
+	
+	You can also type a question mark (or the current "test-completions"
+	terminal character) to display a list of the characters that you
+	would have to type to complete the command.  For example, to
+	complete
+		:unm?			-- you type
+		:unm{a}[pr]		-- you see
+
+	This style of completion-display shows curly braces around the
+	string that will be supplied by pressing TAB, and square brackets
+	around characters that you must type to make the command unique. 
 
 Arrow keys
 ----------
 
-	vile understands ANSI-style arrow keys, which are produced by
-	the keypad on VT100-style terminals and terminal emulators,
-	including xterm.  The keys are interpreted as function keys, and
-	are by default bound to the up, down, left, and right screen
-	motions.  These bindings are honored in insert mode as well as
-	command mode.  
+	vile will understand your terminal's arrow keys, as long as they
+	are described correctly in the termcap/terminfo database.
+	The keys are interpreted as function keys, and are by default bound
+	to the up, down, left, and right screen motions.  These bindings
+	are honored in insert mode as well as command mode. 
 	
 Rectangular regions
 -------------------
@@ -808,27 +835,28 @@ Rectangular regions
 	arguably a bug, and may be fixed.  In the meantime, you've been
 	warned. ]
 
-	[If anyone has ideas on other or more useful ways of integrating
-	rectangles into the vile command set, please let me know...]
-
-
-
 Editor modes
 ------------
 
-	Modes are universal, and affect the editor generally, or are
-	associated with either windows or buffers, and are usually
-	inherited from a set of global buffer and window modes.  The value
-	of a buffer or window mode will track changes to the respective
-	global mode, until the "local" value is set independently of the
-	global one.  To set or change a global mode, use ":set", to remove
-	the mode, use ":unset", ":setno", or ":set" with the modename
-	prefixed with "no".  To set and reset local modes, use ":setl",
-	":unsetl", ":setlno".  To display modes, use ":setall", ":modes",
-	":set all".  Local values are only shown if they differ from the
-	global values, whether they have been independently set or not. 
-	The "local" version of the set/unset commands ("setl"/"unsetl") do
-	not make sense when used with universal modes.
+	Modes come in three "flavors".  They are universal, and affect the
+	editor generally, or are associated with either buffers or with
+	windows, and are usually inherited from a set of "global" buffer
+	and window modes.  The value of a buffer or window mode will track
+	changes to the respective global mode, until the "local" value is
+	set independently of the global one.  
+	
+	To set or change a global mode, use ":set".  To remove the mode,
+	use ":unset", ":setno", or ":set" with the modename prefixed with
+	"no". 
+	
+	To set and reset local modes, use ":setl", ":unsetl", ":setlno". 
+	
+	To display modes, use ":setall", ":modes", or ":set all".  Local
+	mode values are only shown if they differ from the global values,
+	whether they have been independently set or not.  The "local"
+	version of the set/unset commands ("setl"/"unsetl") do not make
+	sense when used with universal modes, since there is only one
+	copy of these.
 
 	The possible modes, with synonyms in parentheses, and a trailing U,
 	B or W indicating whether the mode is universal, or belongs to
@@ -865,12 +893,12 @@ Editor modes
 		vile will behave more like vi, in that buffers remain in a
 		fixed order, that in which they were edited. (U)
 
-	autowrite (aw)  vile will write out any changed buffers which have
-		this mode turned on before performing a ^Z, "stop",
-		"suspend", ":!<cmd>", or '^X-!<cmd>'.  The ":sh" command is
-		not affected, nor is ":stop!" or ":suspend!".  Since
-		buffers inherit the global value of a mode, simply setting
-		the global autowrite value will cause all buffers to be
+	autowrite (aw)  vile will write out any changed buffers for which
+		this mode is set before performing a ^Z, "stop", "suspend",
+		":!<cmd>", or '^X-!<cmd>'.  The ":sh" command is not
+		affected, nor is ":stop!" or ":suspend!".  Since buffers
+		inherit the global value of a mode, simply setting the
+		global autowrite value will cause all buffers to be
 		auto-written.  Individual buffers can be forced or
 		prevented from autowriting by setting the local value of
 		the mode for those buffers appropriately.  [In real vi,
@@ -914,31 +942,34 @@ Editor modes
 		autoindent, above.  If a line ends with a '{', '(', or ':',
 		then the next line indents further.  If a line begins with
 		a '}' or ')', it is lined up with the line containing the
-		matching '{' or '('.  If a line starts with '#' it is moved
-		to column 1.  If the global cmode is set, then the buffer's
-		C mode is turned on automatically only for files ending in
-		a character from c-suffixes.  Additionally, if a line
+		matching '{' or '('.  If a line starting with '#' is
+		inserted it is moved to column 1.  Additionally, if a line
 		begins with a '#' character, it will not shift right with
-		the '>>' command.  (B)
+		the '>>' command.  If the global cmode is set, then the
+		buffer's C mode is turned on automatically only for files
+		whose names are matched by the c-suffixes regular
+		expression (see below).  (B)
 
 	crypt	Causes files to be encrypted.  This is NOT compatible
-		with the UNIX crypt(1) routines. (B)
+		with the UNIX crypt(1) routines, and may not be built
+		into your version of vile by default. (B)
 
-	c-shiftwidth (csw)  Will prompt for a new value for the shiftwidth
-		(see below) which will be used if a file is in cmode. (B)
+	c-shiftwidth (csw) Sets the value for the shiftwidth (see below)
+		which will be used if a file is in cmode.  (B)
 
-	c-tabstop (cts)  Will prompt for a new value for spacing of tabstops
-		which will be used if a file is in cmode. (B)
+	c-tabstop (cts) Sets the value for spacing of tabstops which will
+		be used if a file is in cmode.  (B)
 
-	c-suffixes (csuf) A regular expression defining filename-endings that
-		set cmode.  (U)
+	c-suffixes (csuf) A regular expression describing filenames for
+		which cmode will be set.  This is arguably misnamed, since
+		the regular expression need not describe only suffixes. (U)
 
 	comments A regular expression defining commented paragraph
 		delimiters.  This is used in addition to the "paragraphs"
 		expression (see below) when reformatting a region.  The net
-		effect is that paragraphs inside of comments are preserved
-		when reformatting, but are not reachable with the '}' and
-		'{' motions.  (B)
+		effect is that paragraphs inside of these comments are
+		preserved when doing text reformatting, but are not
+		reachable with the '}' and '{' motions.  (B)
 
 	dirc	Causes vile to check each name when scanning directories for
 		filename completion.  This is slower, but provides additional
@@ -948,9 +979,10 @@ Editor modes
 	dos	On input, if the global copy of this mode is set, then
 		incoming CR/LF pairs are taken as line terminators, the CR
 		characters are stripped out, and the local dos mode is set
-		for the buffer, if the majority of lines had CR characters
-		at the end.  If global dos mode is _not_ set, then incoming
-		CR characters will be left visible on the screen (as '^M'),
+		for the buffer.  (Actually, the local dos mode is only set
+		if the _majority_ of lines had CR characters at the end.)
+		If global dos mode is _not_ set, then incoming CR
+		characters will be left visible on the screen (as '^M'),
 		and the local mode will not be set.
 
 		On output, when writing a buffer with local dos mode set,
@@ -968,18 +1000,19 @@ Editor modes
 		doing binary editing.  (B)
 
 	errorbells (eb) Controls whether a bell sounds (or whether the
-		screen flashes, if "flash" mode is on") when an error occurs (U)
+		screen flashes, if "flash" mode is on") when an error
+		occurs. (U)
 
-	expand-chars Controls the set of characters that are expanded in command
-		lines.  These include
-
+	expand-chars Controls the set of characters that are expanded in
+		command lines.  These include
 			'%' (the current buffer),
 			'#' (the alternate buffer) and
 			':' (the token at the cursor position).
 		(U)
 
 	expand-path Controls whether %/# are expanded to the full pathname
-		of a buffer. (U)
+		of a buffer, or just to its basename (i.e. the name with
+		the path stripped off).  (U)
 
 	fcolor	On systems supporting this, will set the foreground color.
 		Currently only DOS can do color, although the X11 version
@@ -987,9 +1020,9 @@ Editor modes
 		See notes about the color palette down below, under DOS
 		specifics.
 
-	backup-style Specifies the style used for creating file backups
+	backup-style  Specifies the style used for creating file backups
 		when a file is written.  Can have values of "off", ".bak",
-		and (under UNIX) "tilde", for no backups, DOS-style .bak
+		and (under UNIX) "tilde", for no backups, DOS-style .BAK
 		files, and file.c~ style backups, respectively.  Files
 		are copied before being written, to protect links to
 		the original file.  Permissions, modification and access
@@ -997,25 +1030,29 @@ Editor modes
 		the write of the file will fail, unless it is forced
 		using the ":w!" form of the write command.  (U)
 
-	fillcol (fc) Will prompt for a new value for the fill column, where
-		auto-wrapping and region formatting will break lines. (B)
+	fillcol (fc)  Sets the value for the fill column, which is the
+		column at which autowrapping and region formatting will
+		break lines.  (B)
 
 	flash   If your terminal can, will flash the screen rather than
 		beeping on errors.  No audible or visible indication will
-		occur at all if "errorbells" mode is not on.  (U)
+		occur at all if "errorbells" mode is not set on.  (U)
 
 	glob	Controls how wildcard characters (e.g., '*' and '?') are
 		treated in prompts for filenames.  Set glob to 'off' to
-		disable expansion, to 'on' to use the internal globber. 
+		disable expansion, or to 'on' to use the internal globber. 
 		The internal globber will handle *, ?, [a-z] style ranges,
-		and environment variables.
+		environment variables, and the ~user notation for finding
+		home directories.
 
-		On UNIX, set glob to a pipe command to use that command to
-		expand more wildcards.  The default value of glob on UNIX is
-		"!echo %s".  If set to a command that will separate filenames
-		with newlines or nulls rather than spaces, then filenames
-		containing spaces may be more easily edited.  ("!/bin/ls -d %s"
-		is one possibility, "!glob %s" is another if you use csh.) (U).
+		On UNIX, glob can be set to be a pipe command that
+		will expand more wildcards.  The default value of
+		glob on UNIX is "!echo %s", which should provide globbing
+		that matches that of your shell.  If set to a command that
+		will separate filenames with newlines or nulls rather than
+		spaces, then filenames containing spaces may be more easily
+		edited.  ("!/bin/ls -d %s" is one possibility, "!glob %s"
+		is another if you use csh.) (U).
 
 	history (hi) When true (the default), commands from the :-line are
 		logged in a buffer [History].  Turning this off causes the
@@ -1040,8 +1077,8 @@ Editor modes
 	list	(li) The buffer will be displayed with tabs and newlines made
 		visible, instead of as whitespace. (W)
 
-	magic	Allow meta-characters in search strings.  See the section 
-		"Regular Expressions" for more detail. (B)
+	magic   Honor unescaped meta-characters in search strings.  See the
+		section "Regular Expressions" for more detail.  (B)
 
 	meta-insert-bindings (mib)  Controls behavior of 8-bit characters
 		during insert.  Normally, key-bindings are only operational
@@ -1118,8 +1155,8 @@ Editor modes
 		that given by ^G (the "position" function), which gives a
 		percentage of characters rather than lines.) (B)
 
-	samebangs (sb) Controls whether the "!!" and "^X-!" commands use the
-		same command string.  (U)
+	samebangs (sb) Controls whether the ":!!" and "^X-!" commands 
+		remember the same command string.  (U)
 
 	sections A regular expression defining where the "next-section" (']')
 		and "previous-section" ('[') commands will go. (B)
@@ -1139,7 +1176,7 @@ Editor modes
 		command (none).  (B)
 
 	showram (sr) Displays the amount of ram currently allocated at the
-		end of the message line. (U)
+		end of the message line. (not in all versions) (U)
 
 	sideways  Will prompt for a new value for the sideways scroll offset,
 		which allow display of a section of code normally off the
@@ -1147,16 +1184,16 @@ Editor modes
 		commands.  (W)
 
 	tabinsert (ti) Allow the physical insertion of tab characters into
-		the buffer.  If "notabinsert", and an attempt is made to
-		insert a tab character by explicitly typing it or by using
-		shiftwidth or the line shifting commands, then the
-		appropriate number of space characters will be inserted
+		the buffer.  If turned off ("notabinsert"), and an attempt
+		is made to insert a tab character by explicitly typing it
+		or by using shiftwidth or the line shifting commands, then
+		the appropriate number of space characters will be inserted
 		instead.  Use '^V^I' to insert a real tab, and remember
-                that pre-existing tabs will not be affected.  Use '^A-<SP>'
-                to eliminate pre-existing tabs from a region of text. (B)
+		that pre-existing tabs will not be affected.  Use the
+		'^A-<SP>' operator command to eliminate pre-existing tabs
+		from a region of text.  (B)
 
-	tabstop (ts) Will prompt for a new value for spacing of normal
-		tabstops. (B)
+	tabstop (ts) Set the value for spacing of normal tabstops. (B)
 
 	taglength (tl) Sets the significant length for tags.  If non-zero,
 		lookups for names longer than the taglength value will only
@@ -1172,14 +1209,14 @@ Editor modes
 		same tags file to be useful from different locations, while
 		not requiring absolute filenames.  For example, using 
 		`set tags "tags ../tags"' would allow a single tags file
-		to be used in a small source hierarchy from either the
-		parent or a child directory. (B)
+		(located in the parent) to be used in a small source
+		hierarchy from either the parent or a child directory.  (B)
 
-	tags	This gives the names of the file(s) in which to look up
+	tags	Gives a path of names of file(s) in which to look up
 		tag references.  It is a whitespace-separated list of
-		filenames.  Relative pathnames are evaluated with respect
-		to the current directory of vile at the time of the tags
-		lookup. (B)
+		filenames.  Relative pathnames in this list are evaluated
+		with respect to the current directory of vile at the time
+		of the tags lookup.  (B)
 
 	terse   vile produces more "status" messages than vi, which may
 		become annoying at low baud rates.  Setting terse mode will
@@ -1190,15 +1227,15 @@ Editor modes
 		starting and ending positions of the selection are displayed
 		as the selection is extended.  The default is true. (W)
 
-	timeoutlen  How long to wait for characters of a :map'd sequence. 
-		To resolve the ambiguity between a user-pressed ESCape key
-		and an ESC character that is part of a function key
-		sequence, vile will wait for "timeoutlen" milliseconds
-		after seeing an ESC, in order to check the next character
-		of input.  The time defaults to 500, or half a second. 
-		Users of fast local screens, like a local xterm, may wish
-		to reduce this to something like 50 for crisper response to
-		a user-pressed ESC.  (U)
+	timeoutlen  How long to wait for the characters of a :map'd sequence. 
+		Typically needed to resolve the ambiguity between a
+		user-pressed ESCape key and an ESC character that is part
+		of a function key sequence.  vile will wait for "timeoutlen"
+		milliseconds after seeing an ESC, in order to check the
+		next character of input.  The time defaults to 500, or half
+		a second.  Users of fast local screens, like a local xterm,
+		may wish to reduce this to something like 50 for crisper
+		response to a user-pressed ESC.  (U)
 
 	timeoutlen-user  If set non-zero, this will enforce a maximum
 		waiting time for characters in a user-defined :map sequence.
@@ -1218,20 +1255,23 @@ Editor modes
 
 	unprintable-as-octal (uo) If an 8-bit character is non-printing, it
 		will normally be displayed in hex.  This setting will force
-		octal display.  (B)
+		octal display.  Non-printing characters whose 8th bit is
+		not set are always displayed in control character (e.g. '^C')
+		notation.  (B)
 
 	view	View the file only.  No changes are permitted.  This is set
 		automatically for the output of shell commands.  (B)
 
 	view-on-readonly  Causes "view" mode to be set for read-only files. (U)
 
-	working  If turned off (noworking), will suppress the long-running
-		activity indicator ("working..."/"...working").  (U)
+	working If turned off (noworking), will suppress the activity
+		indicator ("working..."/"...working") which appears during
+		long-running operations.  (U)
 
 	wrapmargin (wm) Implements vi's auto-wrap mode.  If nonzero, the wrap-
-		margin specifies the number of columns on the screen's right
-		margin to reserve before breaking the input lines on a space.
-		(B)
+		margin specifies the number of columns on the screen's
+		right margin to reserve before breaking the input lines on
+		a preceding space.  (B)
 
 	wrapscan (ws) Text searches will continue from past the bottom of
 		the file to the top, and vice-versa.  (B)
@@ -1241,9 +1281,13 @@ Editor modes
 		too long.  Unlike vi, wrapping is only attempted when a
 		space is typed. (B)
 
-	xterm-mouse Enables mouse-clicking if you are running within an xterm.
-		This mode overrides xterm's cut & paste.  Your TERM variable
-		must end with the string "xterm" for this to work.  (U)
+	xterm-mouse Enables mouse-clicking if you are running within an
+		xterm.  That is, it allows vile to receive mouse events. 
+		Since this mode overrides xterm's cut & paste, you will
+		need to use the Shift key when pressing the mouse buttons
+		to cut and paste between X windows.  Your TERM variable's
+		termcap entry must contain the string "xterm" for this to
+		work.  (U)
 
 8-Bit Operation
 ---------------
@@ -1251,20 +1295,24 @@ Editor modes
 	vile allows input, manipulation, and display of all 256 possible
 	byte-wide characters.  (Double-wide characters are not supported.)
 	
-	Output: By default, characters with the high bit set (decimal value
-	128 or greater) will display as hex (or octal; see "non-printing-
-	octal" above) sequences, e.g. \xA5.  A range of characters which
-	should display as themselves (that is, characters understood by the
-	user's display terminal) may be given using the "printing-low" and
+	Output 
+	------
+	By default, characters with the high bit set (decimal value 128 or
+	greater) will display as hex (or octal; see "non-printing- octal"
+	above) sequences, e.g.  \xA5.  A range of characters which should
+	display as themselves (that is, characters understood by the user's
+	display terminal) may be given using the "printing-low" and
 	"printing-high" settings (see above).  Useful values for these
 	settings are 160 and 255, which correspond to the printable range
 	of the ISO-Latin-1 character set.
 
-	Input: If the user's input device can generate all characters, and
-	if the terminal settings are such that these characters pass through
+	Input
+	-----
+	If the user's input device can generate all characters, and if the
+	terminal settings are such that these characters pass through
 	unmolested (Using "stty cs8 -parenb -istrip" works for me, on an
-	xterm.  Real serial lines may take more convincing, at both
-	ends.), vile will happily incorporate them into the user's text, or
+	xterm.  Real serial lines may take more convincing, at both ends.),
+	then vile will happily incorporate them into the user's text, or
 	act on them if they are bound to functions.  Users who have no need
 	to enter 8-bit text may want access to the meta-bound functions
 	while in insert mode as well as command mode.  The mode
@@ -1295,8 +1343,9 @@ Special Character Expansion
 	As in vi, the % and # characters typed while responding to a prompt
 	will expand to the current or "alternate" filename.  In addition,
 	the colon character (":") expands to the identifier name under the
-	cursor.  Expansion of ! to the last command run is not implemented.
-	The expansion can be suppressed by prefixing with a '\'.
+	cursor.  Expansion of ! to the last command run is not implemented,
+	except when a shell command is being entered.  These expansions can
+	be suppressed by prefixing with a '\'.
 
 Key Rebinding
 -------------
@@ -1313,16 +1362,18 @@ Key Rebinding
 	sequence, e.g. ^A-a or ^X-S.   (A summary of how key-sequences can
 	be represented appears at the end of this section.)
 
-	Commands can also be bound to meta keys, which are regular
-	ASCII characters with the eighth bit (0x80) bit set.  The
-	"printable" form for these keys is 'M-c'.
+	Commands can also be bound to meta keys, which are regular ASCII
+	characters with the eighth bit (0x80) bit set.  The "printable"
+	form for these keys is 'M-c'.
 
 	Commands bound to '#-c' key sequences are usually also available
 	by using the function keys on the terminal.  Thus the up-arrow
 	function key can be bound to as '#-A'.
 	
-	(The '#' key itself can be rebound -- it is represented by the
-	command name "function-prefix".)
+	Even the ^A and ^X prefix characters can be rebound, using the
+	dummy functions "cntl_a-prefix" and "cntl_x-prefix", and the '#'
+	key itself can be rebound -- it is represented by the command name
+	"function-prefix".
 
 	Examples:
 	 To cause the / and ? commands to perform incremental
@@ -1337,12 +1388,8 @@ Key Rebinding
 	  command, use:
 		bind-key next-page \s
 
-	(Space and tab can be represented with: "\s" and 
-	"\t".)  The englishname "rebind-key" is synonymous with "bind-key".
-
-	Note that even the ^A and ^X prefix characters can be rebound, using
-	the dummy functions "cntl_a-prefix" and "cntl_x-prefix".
-
+	(Space and tab can be represented with: "\s" and "\t".)
+	
 	Note that when interactive, ^A and ^X are typed using the control
 	key.  In a file, however, they can be either a caret (^) followed
 	by a letter, or the literal control key.  In the latter case you
@@ -1446,7 +1493,9 @@ Key Rebinding
 	    KeyPad_F2       #Q          KeyPad_F4   #S
 
 	    In addition, #M, #t, and #T are used internally to support
-	    mouse operations in an xterm.
+	    mouse operations in an xterm.  To undo the relationship
+	    between a "system-defined" function key and the poundsign
+	    sequence it produces, use ":unmap-system-chars".
 
 
 	:map, :map!, :noremap, :noremap!
@@ -1530,6 +1579,8 @@ Key Rebinding
 	The system-defined maps, representing the function keys, may be 
 	shown with ":show-system-mapped-chars".
 
+	To undo a mapping, use "unmap", "unmap!", or "unmap-system-chars".
+
 	:abbr
 	------
 	The "abbr" command is also present in vile.  It is similar to, but
@@ -1563,6 +1614,7 @@ Key Rebinding
 	anything at all to be abbreviated, only enforcing the expansion
 	rules mentioned above.
 
+	To undo an abbreviation, use "unabbreviate".
 
 Special "Terminal" Key Rebinding
 --------------------------------
@@ -1589,10 +1641,38 @@ Special "Terminal" Key Rebinding
 	test-completions	?
 	word-kill		from tty settings	(^W)
 
-Macros
-------
+Flow-control
+------------
+	Historically, the flow of data between the computing host and the
+	user's terminal was throttled through the use of special characters
+	in the input stream, known as XON and XOFF (whose values are ^Q and
+	^S respectively).  Most modern systems do not need these
+	characters, and regulate the flow in an "out-of-band" manner.  The
+	terminal device driver, however, is usually still set up with
+	software flow control enabled, to allow the user to manually start
+	and stop output with the ^S and ^Q characters.
+	
+	vile normally resets the driver to allow the ^S and ^Q characters
+	to be bound to commands, since most systems no longer need software
+	flow control, and since there is usually no reason for a user to
+	wish to suspend output when running vile.  Some older devices
+	(usually older slower terminals), however, still need to be able to
+	automatically control the data flow by generating ^S/^Q without the
+	user's intervention.
+	
+	To accomodate these situations, the "flow-control-enable" command
+	will reset the terminal driver to its original state.  Software
+	flow-control will be re-enabled, and commands bound only to the ^S
+	and ^Q characters will be inaccessible.  The characters affected
+	in this way may be seen with the "show-terminal-chars" command,
+	where they will appear as the "start/stop-output" characters.
+	The action of the "flow-control-enable" command will be reversed
+	if it is given any argument.
 
-	The first type of macro in vile, is for temporary, quick macro
+Recorded macros
+---------------
+
+	The first type of macro in vile is for temporary, quick macro
 	usage, and lets you record a macro as you execute vile commands.
 	You can then replay those keystrokes with a single key. 
 
@@ -1617,11 +1697,11 @@ Macros
 Programmed procedures and macros
 --------------------------------
 
-	[ For more/difference information on programmed macros, refer
+	[ For more/different information on programmed macros, refer
 	to the file "macros.doc", supplied with the vile source code. ]
 
 	vile can also be extended by defining macros and then binding
-	execution of those macros to key sequences.  For instance, if
+	the execution of those macros to key sequences.  For instance, if
 	the following lines appear in a .vilerc file:
 		1 store-macro
 		 5 delete-til next-word
@@ -1807,8 +1887,8 @@ Programmed procedures and macros
 		run "Macro 9"
 	or
 		execute-macro-9
-	Most of the exampled given below use the macro form of definition,
-	since on most often wants to bind macros to keys.
+	Most of the examples given below use the macro form of definition,
+	since one most often wants to bind macros to keys.
 
 	Hooks
 	-----
@@ -1833,15 +1913,15 @@ Programmed procedures and macros
 
 	Be careful with "buffer-hook".  Executing commands in the hook
 	which themselves switch buffers is not recommended.  In general,
-	all the hooks are a little dangerous, since vile is not in general
-	written with re-entancy in mind.  So one should avoid putting
-	actions hooks which might cause the hook to be re-executed.  (vile
-	keeps the hook procedure itself from being re-executed, to prevent
-	recursion, but the code surrounding the call to it may not be
-	safe.)
+	all the hooks are a little dangerous, since vile has not been
+	written with re-entancy foremost in mind.  One should avoid putting
+	actions in hooks which might cause the hook to be re-executed. 
+	(vile keeps the hook procedure itself from being re-executed, to
+	prevent recursion, but the code surrounding the call to it may not
+	be safe either.)
 
-	Examples
-	--------
+	Macro examples
+	--------------
 	To prevent vile from thinking that a failed command is an error in
 	the macro, you can put "~force" in front of it.  So, to write a
 	macro which will run the "man" command on the identifier under the
@@ -1855,7 +1935,7 @@ Programmed procedures and macros
 
 	(The argument '1' suppresses the "press return" prompt which
 	normally appears after a command runs, since man runs a pager
-	anyway which does this anyway.)
+	which does this anyway.)
 
 	The "screen-search-forward" command could be re-implemented as:
 		10 store-macro
@@ -1876,8 +1956,7 @@ Programmed procedures and macros
 		12 store-macro
 			~force search-forward &cat "\\<" &cat $identifier "\\>"
 		~endm
-	This works by surrounding the string with the \< and \> meta-
-	characters.
+	This works by surrounding the string with the \< and \> meta-characters.
 
 
 	Here's another example, which finds C++ qualified identifiers, and
@@ -1910,7 +1989,7 @@ Programmed procedures and macros
 
 	then both g and G go to the end of the file, but whereas 1000G goes
 	to line 1000, 1000g goes to the end of the file 1000 times.  It is
-	easier (and works correctly) to do:
+	easier (and more correct) to do:
 
 		bind-key goto-line g
 
@@ -1999,8 +2078,6 @@ Programmed procedures and macros
 	    map ^A-w ":!chmod +w %^M:setl noview^M:w^M"
 
 	(Of course you need to replace the ^M's with real carriage-returns.)
-
-
 
 Regular Expressions
 -------------------
@@ -2091,7 +2168,7 @@ Command files
 	below), vile will attempt to read the file ".vilerc" in the current
 	directory, and then in $HOME, and will execute the commands found
 	therein.  [This file is called "vile.rc" under DOS, and is searched
-	for in the current directory and along the PATH.] It is possible to
+	for in the current directory and along the PATH.]  It is possible to
 	nest such executions.  For example, you might keep your general
 	default settings in your home directory, and put the following
 	lines in a .vilerc in a directory in which you prefer tabs be set
@@ -2100,13 +2177,14 @@ Command files
 		source "$HOME/.vilerc"
 		set tabstop 8
 
-	The quotes surrounding the filename part are necessary to
-	protect the name from interpretation as a vile variable. 
+	The quotes surrounding the filename are necessary to protect the
+	name from interpretation as a vile variable, since it starts with
+	the '$' character.
 
 	Files can be executed at any time with the ":source" (or
-	":execute-file") command.  There are (mostly untested) control
-	structures available, such as ~while, ~if, etc.  Refer to the
-	source code for more information.
+	":execute-file") command.  There are control structures available,
+	such as ~while, ~if, etc.  Refer to the file macros.doc which
+	is distributed with vile for more information.
 
 	Nesting of source'd files is limited to a depth of ten, to prevent
 	infinite recursion.
@@ -2117,12 +2195,12 @@ Command files
 Invocation
 ----------
 
-	If set in the environment, the variable VILEINIT is used as a set
-	of vile commands to initialize the editor.  If unset, vile looks
-	for files called "./.vilerc" and "$HOME/.vilerc, and executes the
-	first one found.  As a not-very-useful example of a VILEINIT
-	sequence, the following setting will exactly recreate the default
-	(i.e. no VILEINIT variable) behavior:
+	As mentioned above, vile normally looks for files called "./.vilerc"
+	and "$HOME/.vilerc", and executes the first one found.  If the
+	variable VILEINIT is set in the environment, it is used as a set of
+	vile commands to initialize the editor.  As a not-very-useful
+	example of a VILEINIT sequence, the following setting will exactly
+	recreate the default (i.e. no VILEINIT variable) behavior:
 
 		export VILEINIT
 		VILEINIT="
@@ -2140,10 +2218,10 @@ Invocation
 	The command line options are fairly straightforward.  vile does not
 	support running just _any_ command after a '+', as does vi, but does
 	support the commonly used '+400' to go to line 400 and '+/foo' to
-	search for foo.  Command files (see below) can be explicitly
-	executed on startup by prefixing them with the '@' character, as in
-	"vile @mycmds file.c".  This will suppress the operation of VILEINIT
-	and the .vilerc files.
+	search for foo.  Command files can be explicitly executed on
+	startup by prefixing them with the '@' character, as in "vile
+	@mycmds file.c".  This will suppress the operation of VILEINIT and
+	the .vilerc files.
 
 	Use "vile -?" to get the usage message.
 
@@ -2169,13 +2247,26 @@ Invocation
 		file, and will bypass any normal startup file (i.e.
 		.vilerc) or environment variable (i.e. $VILEINIT).
 
+Crash Recovery
+--------------
+
+	The "vi -r" option, used to recover an edited buffer after a system
+	crash, is not present in vile.  If vile itself crashes (usually
+	(though infrequently :-) due to a bug, but perhaps due to an
+	externally applied signal), it will attempt to save any modified
+	buffers in a directory under /tmp, and send mail to the user to
+	that affect.  If system crashes are frequent on your system, you
+	should stop using it.  You might also consider the "autosave" and
+	"autowrite" options, which will cause more frequent saves of your
+	work.
+
 
 Mode line customization
 -----------------------
 
 	At the bottom of each window is a mode (or "status") line which
 	is used for displaying certain characteristics of the window and
-	the buffer associated with it.  On many displays, this mode line
+	the buffer associated with it.  On most displays, this mode line
 	will be highlighted in reverse video or via other means in order
 	to visually separate windows and to distinguish the mode line from
 	text displayed in the window.  
@@ -2262,7 +2353,7 @@ Filtering "man" pages
 		source ~/manpage.rc
 
 	This assumes that you have moved the manpage.rc file to your home
-	directory.  If you do all of this and use vile rather than xvile,
+	directory.  If you do all of this but use vile rather than xvile,
 	you will still end up with a legible man page, albeit without the
 	spiffy formatting.
 
@@ -2316,72 +2407,14 @@ Filtering "man" pages
 	~endm
 	bind-key execute-macro-29 ^X-m
 
-
-	Fonts
-	-----
-
-	At present, only xvile is capable of displaying bold and italic (or
-	underline) text associated with attributes.  It is anticipated that
-	other versions of vile will catch up to the best of their ability. 
-	Users of xvile will find that the italic font in particular is not
-	always available with the font that they've chosen (or have had
-	chosen for them).  If an italic font is unavailable, xvile will
-	underline text which is meant to be italic.  The program xfontsel is
-	quite useful for determining which fonts are available on your
-	display server and whether there are corresponding bold and/or
-	italic fonts available.
-
-	Here are some tips on using xfontsel to find an appropriate font.
-
-		1) Set rgstry (registry) to iso8859
-		2) Set spc (spacing) to either "c" (cell font) or "m"
-		   (monospaced font).  You will be more likely to find a
-		   font which will work as italic if you choose a
-		   monospaced font, however.  You definitely do not want
-		   a proportional font.
-		3) Now pull down the slant menu.  Select either "i"
-		   (italic) or "o" (oblique).  If neither of these are
-		   available, go back to step 2 and choose a different
-		   spacing.
-		4) Set avgWdth (average width) next. If you divide the
-		   value you've chosen by ten, this will be width of a
-		   glyph in the font in pixels.
-		5) Set wght (weight) to medium.  If you have a hard time
-		   seeing the characters, you might want to choose bold,
-		   but xvile will not be able to use the bold font for
-		   displaying bold text.  It will be forced to overwrite
-		   text that it wants to be bold with the text shifted by
-		   one pixel.  This works fairly well for larger fonts.
-		6) Set fmly (family) to a value according to personal taste. 
-		   By this step, you might not have any choice on the matter
-		   anyway.
-		7) If only one font is available at this point, the other
-		   fields don't matter that much.  Otherwise set these
-		   according to taste.
-		8) Go back to the slant menu and change either the "i" or
-		   "o" to "r".
-
-		This will be the font to use.  xvile will be attempt to get
-		the italic font when needed by substituting either "o" or
-		"i" for the "r".
-
-	If the above seems too tedious, you can just try the following font
-	which (on many display servers) is pretty close to the size of the
-	default font that xvile will start up with.
-
-		-*-courier-medium-r-*-*-*-*-*-*-*-70-*-*
-
-	You can try it out by issuing the appropriate "set font" command
-	from xvile.  For longer term use, you will probably want to put it
-	in your .Xdefaults file.  It will look something like this:
-
-		XVile*font: -*-courier-medium-r-*-*-*-*-*-*-*-70-*-*
-
-	You may also set the font from your .vilerc file.  This is not
-	recommended, however, as you lose the ability to choose a different
-	font from the command line or resource file.  It may also cause the
-	xvile window to be unnecessarily resized during initialization.
-
+Filtering C programs
+--------------------
+	C program text may be displayed with keywords and comments
+	highlighted in a similar fashion to the man page filtering
+	described above.  The filter which performs this is supplied with
+	vile, and is called "c-filt.c".  Since this program relies on an
+	ANSI compiler, it is not built and installed by default.  Its use
+	is described fully in comments at the head of the source file.
 
 X Window System specifics
 -------------------------
@@ -2425,7 +2458,7 @@ X Window System specifics
 		window open to the same buffer as which the selection was
 		started in.
 
-	Selected areas of text can be operated on with any vile operator
+	Areas of selected text can be operated on with any vile operator
 	command, in conjunction with the special "motion" command '^S',
 	which applies the operator to the selected region.  For example,
 	after selecting text with the mouse, it can be converted to
@@ -2439,7 +2472,7 @@ X Window System specifics
 	The X toolkit version of xvile provides default translations
 	similar to the translations for scrollbars found in the Athena
 	widget set.  (If you know how to use xterm's scrollbars, you know
-	how to use these scrollbars.) Button one scrolls forward.  Button
+	how to use these scrollbars.)  Button one scrolls forward.  Button
 	three scrolls backward.  The amount of scrolling obtained by these
 	buttons depends on the position at which they were pressed on the
 	scrollbar.  Clicking near the top of the scrollbar will scroll the
@@ -2475,7 +2508,7 @@ X Window System specifics
 
 	In all versions built with scrollbars enabled, you can resize
 	windows by moving the border between corresponding scrollbars (with
-	the mouse).  The X toolkit version is probably the most functional
+	the mouse).  The X toolkit version is probably the most functional,
 	with the windows being continuously resized as the mouse is moved. 
 	The OpenLook and Motif versions wait until after a position is
 	selected to resize the windows.  The OpenLook version is perhaps
@@ -2513,6 +2546,29 @@ X Window System specifics
 
 	-leftbar	Put scrollbar(s) on left.
 	-rightbar	Put scrollbar(s) on right (default).
+
+	Setting a new process group
+	---------------------------
+	Some systems and/or some shells and display managers seem to want
+	xvile to run in its own process group, to help isolate its signals
+	and actions from the signals and actions of the parent process
+	(i.e. the shell or window manager that starts xvile).  xvile can
+	be forced into its own process group with the "new-process-group"
+	command, which one would put in the .vilerc file.  Using this will
+	cause a call to "setpgrp()" or "setsid()".  This behavior is not
+	the default because a) it can't be undone, and b) it seems
+	undesirable on some systems, in that xvile cannot be suspended and
+	put in the background after startup if it's in its own group.
+
+	Additionally, if given a count as argument, this command will cause
+	xvile to fork(), and the parent to exit before the new process
+	group is set by the child.  This will further isolate it from its
+	process environment (and in fact will move xvile into the background
+	if started from the shell).
+
+	The "new-process-group" command has no effect in non-X11 versions
+	of vile.
+
 
 	X Resources
 	-----------
@@ -2643,6 +2699,70 @@ X Window System specifics
 	To change the font on the fly, use the ':setv' command to set the
 	$font variable, with ":setv $font <fontname>".
 
+	At present, only xvile is capable of displaying bold and italic (or
+	underline) text associated with attributes.  It is anticipated that
+	other versions of vile will catch up to the best of their ability. 
+	Users of xvile will find that the italic font in particular is not
+	always available with the font that they've chosen (or have had
+	chosen for them).  If an italic font is unavailable, xvile will
+	underline text which is meant to be italic.  The program xfontsel is
+	quite useful for determining which fonts are available on your
+	display server and whether there are corresponding bold and/or
+	italic fonts available.
+
+	Here are some tips on using xfontsel to find an appropriate font.
+
+		1) Set rgstry (registry) to iso8859
+		2) Set spc (spacing) to either "c" (cell font) or "m"
+		   (monospaced font).  You will be more likely to find a
+		   font which will work as italic if you choose a
+		   monospaced font, however.  You definitely do not want
+		   a proportional font.
+		3) Now pull down the slant menu.  Select either "i"
+		   (italic) or "o" (oblique).  If neither of these are
+		   available, go back to step 2 and choose a different
+		   spacing.
+		4) Set avgWdth (average width) next. If you divide the
+		   value you've chosen by ten, this will be width of a
+		   glyph in the font in pixels.
+		5) Set wght (weight) to medium.  If you have a hard time
+		   seeing the characters, you might want to choose bold,
+		   but xvile will not be able to use the bold font for
+		   displaying bold text.  It will be forced to overwrite
+		   text that it wants to be bold with the text shifted by
+		   one pixel.  This works fairly well for larger fonts.
+		6) Set fmly (family) to a value according to personal taste. 
+		   By this step, you might not have any choice on the matter
+		   anyway.
+		7) If only one font is available at this point, the other
+		   fields don't matter that much.  Otherwise set these
+		   according to taste.
+		8) Go back to the slant menu and change either the "i" or
+		   "o" to "r".
+
+		This will be the font to use.  xvile will be attempt to get
+		the italic font when needed by substituting either "o" or
+		"i" for the "r".
+
+	If the above seems too tedious, you can just try the following font
+	which (on many display servers) is pretty close to the size of the
+	default font that xvile will start up with.
+
+		-*-courier-medium-r-*-*-*-*-*-*-*-70-*-*
+
+	You can try it out by issuing the appropriate "set font" command
+	from xvile.  For longer term use, you will probably want to put it
+	in your .Xdefaults file.  It will look something like this:
+
+		XVile*font: -*-courier-medium-r-*-*-*-*-*-*-*-70-*-*
+
+	You may also set the font from your .vilerc file.  This is not
+	recommended, however, as you lose the ability to choose a different
+	font from the command line or resource file.  It may also cause the
+	xvile window to be unnecessarily resized during initialization.
+
+
+
 
 DOS specifics
 -------------
@@ -2650,8 +2770,8 @@ DOS specifics
 	The .vilerc file is called vile.rc under DOS.
 
 	vile should leave your screen in the mode you're in when you
-	enter it, unless you change it to a different mode with a
-	"set sres=" line in your vile.rc, or if you use a command line
+	enter it, unless you explicitly change it to a different mode with
+	a "set sres=" line in your vile.rc, or if you use a command line
 	option to change it.  Command line options consist of a dash
 	followed by one of the following selectors (these are the same
 	values that can be assigned to "sres"):
@@ -2694,7 +2814,6 @@ DOS specifics
 	blinking characters.
 
 
-
 Differences from vi
 -------------------
 
@@ -2704,18 +2823,16 @@ Differences from vi
 	The parser for the ':' commands is not very vi-like.  For instance,
 	":e" will prompt you for a file name.  Most commands remember their
 	last argument, and will present it as the default reply to their
-	prompt. 
+	prompt.
 
-	The backspace, line kill, word kill, job control, etc.  characters
+	The backspace, line kill, word kill, job control, etc. characters
 	are not rebindable.  They are, however, read from the tty settings
 	on startup.
 
-	There is no expansion of ! in filenames or shell escapes.  The
-	command ":!!" does rerun the previous shell command.  Occurrences of
-	'#' and '%' are recognized and expanded to the previous or current
-	filename.  Other punctuation (e.g.  '~') may be expanded by your
-	shell (sh, csh), since it is handed filenames for expansion if they
-	contain any of these characters: * ? ~ [ ] $ { }
+	There is no expansion of ! in filenames.  It is expanded in shell
+	escapes, so the command ":!!" does rerun the previous shell command. 
+	Occurrences of '#' and '%' are recognized and expanded to the
+	previous or current filename.  
 
 	Paragraph and section boundaries, for the {, }, [, and ] commands
 	are configurable, but may not exactly match those in vi.  They are
@@ -2805,7 +2922,7 @@ Sample .vilerc
 
 
 
-	; the next three reproduce vile version three behavior
+	; the next three give more mnemonic window commands
 	bind-key next-window ^N
 	bind-key previous-window ^P
 	bind-key split-current-window ^T
@@ -2819,12 +2936,12 @@ Notes on TERM types and Scrolling
 ---------------------------------
 
 	vile will determine the window size in one of three ways: first it
-	will ask the tty driver (using a TIOCGWINSZ ioctl call under UNIX),
-	then it will use the LINES and COLUMNS environment variables, and
-	as a last resort will use the size specified in the TERMCAP entry
-	corresponding to the TERM variable.  In addition, vile will attempt
-	to support the SIGWINCH signal, which allows it to track changes to
-	the size of the window in which it is running.
+	will ask the tty driver (using a TIOCGWINSZ ioctl call under UNIX).
+	Failing that, it will use the LINES and COLUMNS environment
+	variables.  As a last resort it will use the size specified in the
+	TERMCAP entry corresponding to the TERM variable.  In addition,
+	vile will attempt to support the SIGWINCH signal, which allows it
+	to track changes to the size of the window in which it is running.
 
 	If scrolling is really slow, or really ugly (the status line hops
 	around a lot), and you're using a vt102 or compatible terminal that
@@ -2856,7 +2973,7 @@ Notes on TERM types and Scrolling
 	instead of deleting them all and then inserting them all.  This
 	makes it look a _little_ better, but it's slower.
 
-	( The terminfo entry equivalent to the above termcap entry:
+	( Here is the terminfo entry equivalent to the above termcap entry:
 
 	vt102|vt-102|dec vt102,
 		xon,
@@ -2901,14 +3018,18 @@ Credits
 	excellent testing and enhancement.  The implementation of
 	rectangles and their operations was inspired by code from the
 	'notgnu' editor, by Julie Melbin.  Patches to support OS/2 and
-	Windows/NT came from Charles Moschel and Joe Greer, respectively.
+	Windows/NT came from Charles Moschel and Joe Greer, respectively. 
+	Clark Morgan and Greg McFarlane seem to run full regression tests
+	on each new release, and always seem to find something to report. 
 	The reference.doc file supplied with Bram Moolenaar's excellent Vim
 	editor was useful in unravelling some of the less obvious parts of
-	:map functionality.
+	:map functionality.  Thanks to Jukka Keto for contributing the
+	c-filt.c code.
 	
 	The initial changes to create vile from micro-Emacs were all done
 	by Paul Fox, who can be reached at home at pgf@foxharp.boston.ma.us.
 	(By the way, he is not the Paul D. Fox that wrote the Crisp editor.)
 
-------------------------------------
- $Header: /usr/build/VCS/pgf-vile/RCS/vile.hlp,v 1.215 1994/12/22 11:10:44 pgf Exp $
+Copyright 1995 by Paul Fox, Tom Dickey, and Kevin Buettner
+-----------------------------------------------------------
+ $Header: /usr/build/VCS/pgf-vile/RCS/vile.hlp,v 1.228 1995/02/10 04:07:17 pgf Exp $

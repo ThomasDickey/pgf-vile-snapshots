@@ -1,7 +1,7 @@
 /* These functions perform vi's on-this-line character scanning functions.
- *	written for vile by Paul Fox, (c)1990
+ * written for vile: Copyright (c) 1990, 1995 by Paul Fox
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/csrch.c,v 1.20 1994/12/16 22:54:21 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/csrch.c,v 1.21 1995/02/08 03:29:23 pgf Exp $
  *
 */
 

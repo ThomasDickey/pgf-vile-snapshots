@@ -6,7 +6,7 @@
 /*	possible names and paths of help files under different OSs	*/
 
 /*
- * $Header: /usr/build/VCS/pgf-vile/RCS/epath.h,v 1.16 1994/11/29 04:02:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/epath.h,v 1.17 1995/01/31 01:58:47 pgf Exp $
  */
 
 /* first two entries are default startup and help files, the rest are
@@ -56,15 +56,14 @@ char *pathname[] =
 	".vilerc",
 	"vile.hlp",
 	".",		/* replaced at runtime with path-head of argv[0] */
-	"/usr/local/",
-	"/usr/lib/",
-	"/usr/local/bin/",
-	"/usr/local/lib/",
 #ifdef HELP_LOC
 #ifndef lint	/* makefile gives inconsistent quoting for lint, compiler */
 	HELP_LOC,
 #endif	/* lint */
 #endif
+	"/usr/local/lib/",
+	"/usr/local/",
+	"/usr/lib/",
 	""
 };
 #endif

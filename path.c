@@ -2,7 +2,7 @@
  *		The routines in this file handle the conversion of pathname
  *		strings.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/path.c,v 1.35 1994/12/15 15:01:52 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/path.c,v 1.37 1995/02/05 04:28:30 pgf Exp $
  *
  *
  */
@@ -829,7 +829,7 @@ char *path;
 		my_nam.nam$b_rss = NAM$C_MAXRSS;
 		my_nam.nam$l_rsa = my_rsa;
 
-		if ((status = sys$parse(&my_fab)) == RMS$_NORMAL) {
+		if ((status = SYS$PARSE(&my_fab)) == RMS$_NORMAL) {
 			my_esa[my_nam.nam$b_esl] = EOS;
 			return strcpy(path, my_esa);
 		} else {
@@ -971,23 +971,6 @@ char *fn;
 		}
 	}
 	return 0;
-}
-
-/*
- * Returns the special string consisting of program name + version, used to
- * fill in the filename-field for scratch buffers that are not associated with
- * an external file.
- */
-char *
-non_filename()
-{
-	static	TBUFF	*ptr;
-	if (!ptr) {
-		char	buf[80];
-		(void)lsprintf(buf, "       %s   %s",prognam,version);
-		(void)tb_scopy(&ptr, buf);
-	}
-	return tb_values(ptr);
 }
 
 /*

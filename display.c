@@ -5,7 +5,7 @@
  * functions use hints that are left in the windows by the commands.
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/display.c,v 1.175 1994/12/16 22:09:09 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/display.c,v 1.185 1995/02/10 03:42:18 pgf Exp $
  *
  */
 
@@ -69,6 +69,7 @@ static	void	mlmsg P(( char *, va_list * ));
 static	void	erase_remaining_msg P(( int ));
 
 static	void	l_to_vline P(( WINDOW *, LINEPTR, int ));
+static	int	l_to_vcol  P(( WINDOW *, int ));
 static	int	updpos P(( int *, int * ));
 static	void	upddex P(( void ));
 static	void	updgar P(( void ));
@@ -169,6 +170,8 @@ int	dfputsn(outfunc,s,n)
 /*
  * Do format an integer, in the specified radix.
  */
+#define vMAXINT ((int)((unsigned)(~0)>>1))	/* 0x7fffffff */
+#define vMAXNEG (-vMAXINT)			/* 0x80000001 */
 static
 int	dfputi(outfunc,i, r)
 	OutFunc outfunc;
@@ -177,6 +180,9 @@ int	dfputi(outfunc,i, r)
 	register int q;
 
 	if (i < 0) {
+		if (i < vMAXNEG) {
+			return dfputs(outfunc,"OVFL");
+		}
 		(*outfunc)('-');
 		return dfputi(outfunc, -i, r) + 1;
 	}
@@ -742,6 +748,39 @@ int f,n;
 
 static	int	scrflags;
 
+/* line to virtual column */
+static int
+l_to_vcol (wp, base)
+WINDOW *wp;
+int base;
+{
+	int	col = 0;
+	int	i = base;
+	int	c;
+	LINEPTR lp = wp->w_dot.l;
+
+	while (i < wp->w_dot.o || (!global_g_val(GMDALTTABPOS) && !insertmode &&
+				i <= wp->w_dot.o && i < lLength(lp))) {
+		c = lGetc(lp, i++);
+		if (c == '\t' && !w_val(wp,WMDLIST)) {
+			do {
+				col++;
+			} while ((col%curtabval) != 0);
+		} else {
+			if (!isprint(c)) {
+				col += (c & HIGHBIT) ? 3 : 1;
+			}
+			++col;
+		}
+
+	}
+	col += base;
+	if (!global_g_val(GMDALTTABPOS) && !insertmode &&
+			col != 0 && wp->w_dot.o < lLength(lp))
+		col--;
+	return col;
+}
+
 /*
  * Make sure that the display is right. This is a three part process. First,
  * scan through all of the windows looking for dirty ones. Check the framing,
@@ -799,13 +838,8 @@ int force;	/* force update past type ahead? */
 #ifdef WMDRULER
 	for_each_window(wp) {
 		if (w_val(wp,WMDRULER)) {
-			WINDOW	*save = curwp;
-			int	line, col;
-
-			curwp = wp;
-			col   = getccol(FALSE) + 1;
-			curwp = save;
-			line  = line_no(wp->w_bufp, wp->w_dot.l);
+			int	line  = line_no(wp->w_bufp, wp->w_dot.l);
+			int	col   = l_to_vcol(wp, 0) + 1;
 
 			if (line != wp->w_ruler_line
 			 || col  != wp->w_ruler_col) {
@@ -1148,8 +1182,9 @@ int *screenrowp;
 int *screencolp;
 {
 	fast_ptr LINEPTR lp;
-	register int c;
+#ifdef WMDLINEWRAP
 	register int i;
+#endif
 	register int col, excess;
 	register int collimit;
 	int moved = FALSE;
@@ -1170,27 +1205,7 @@ int *screencolp;
 	}
 
 	/* find the current column */
-	col = 0;
-	i = w_left_margin(curwp);
-	while (i < DOT.o || (!global_g_val(GMDALTTABPOS) && !insertmode &&
-				i <= DOT.o && i < lLength(lp))) {
-		c = lGetc(lp, i++);
-		if (c == '\t' && !w_val(curwp,WMDLIST)) {
-			do {
-				col++;
-			} while ((col%curtabval) != 0);
-		} else {
-			if (!isprint(c)) {
-				col += (c & HIGHBIT) ? 3 : 1;
-			}
-			++col;
-		}
-
-	}
-	col += w_left_margin(curwp);
-	if (!global_g_val(GMDALTTABPOS) && !insertmode &&
-			col != 0 && DOT.o < lLength(lp))
-		col--;
+	col = l_to_vcol(curwp, w_left_margin(curwp));
 
 #ifdef WMDLINEWRAP
 	if (w_val(curwp,WMDLINEWRAP)) {
@@ -3083,7 +3098,7 @@ void
 mlerror(s)
 char	*s;
 {
-#if SYS_UNIX || SYS_VMS || CC_NEWDOSCC
+#if SYS_UNIX || HAVE_SYS_ERRLIST || CC_NEWDOSCC
 
 	if (errno > 0 && errno < sys_nerr)
 		mlwarn("[Error %s: %s]", s, sys_errlist[errno]);
@@ -3091,7 +3106,7 @@ char	*s;
 		mlwarn("[Error %s: unknown system error %d]", s, errno);
 
 #else
-	mlwarn("[Error %s]", s);
+	mlwarn("[Error %s, errno=%d]", s, errno);
 #endif
 }
 
@@ -3223,7 +3238,7 @@ ACTUAL_SIG_DECL
 	if ((h > 1 && h != term.t_nrow) || (w > 1 && w != term.t_ncol))
 		newscreensize(h, w);
 
-	(void)signal(SIGWINCH, sizesignal);
+	setup_handler(SIGWINCH, sizesignal);
 	errno = old_errno;
 	SIGRET;
 }
@@ -3277,6 +3292,8 @@ ACTUAL_SIG_DECL
 	static	char	*msg[] = {"working", "..."};
 	static	int	flip;
 	static	int	skip;
+
+	signal_was = SIGALRM;	/* remember this was an alarm */
 
 	if (no_working) /* brute force, for debugging */
 		return;
@@ -3344,7 +3361,7 @@ ACTUAL_SIG_DECL
 		if (!ShowWorking())
 			return;
 	}
-	(void)signal(SIGALRM,imworking);
+	setup_handler(SIGALRM,imworking);
 	(void)alarm(1);
 	flip = !flip;
 }

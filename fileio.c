@@ -2,7 +2,7 @@
  * The routines in this file read and write ASCII files from the disk. All of
  * the knowledge about files are here.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/fileio.c,v 1.92 1994/12/15 16:53:08 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/fileio.c,v 1.94 1995/01/15 16:30:14 pgf Exp $
  *
  */
 
@@ -614,6 +614,7 @@ int c;
  * "flen" is the length of the buffer. Reallocate and copy as necessary.
  * Check for I/O errors. Return status.
  */
+
 int
 ffgetline(lenp)
 int *lenp;	/* to return the final length */
@@ -634,7 +635,25 @@ int *lenp;	/* to return the final length */
 	/* read the line in */
 	i = 0;
 	for (;;) {
+#if NEVER && OPT_WORKING && ! HAVE_RESTARTABLE_PIPEREAD
+/* i think some older kernels may lose data if a signal is
+received after some data has been tranferred to the user's buffer, so
+i don't think this code is safe... */
+		while(1) {
+			/* clear our signal memory.  this should
+			  become a bitmap if we need to notice more than
+			  just alarm signals */
+			signal_was = 0;
+			errno = 0;
+			c = fgetc(ffp);
+			if (!ferror(ffp) || errno != EINTR ||
+					signal_was != SIGALRM)
+				break;
+			clearerr(ffp);
+		}
+#else
 		c = fgetc(ffp);
+#endif
 		if ((c == '\n') || feof(ffp) || ferror(ffp))
 			break;
 		if (interrupted()) {

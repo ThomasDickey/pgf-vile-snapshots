@@ -12,7 +12,7 @@
  *
  *		pgf, 11/91
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/regexp.c,v 1.43 1994/11/29 04:02:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/regexp.c,v 1.44 1995/02/01 05:52:39 pgf Exp $
  *
  */
 
@@ -1345,12 +1345,12 @@ char *p;
 		break;
 	case EXACTLY:
 		if (ignorecase)
-			while (nocase_eq(*opnd,*scan)) {
+			while (scan != regnomore && nocase_eq(*opnd,*scan)) {
 				count++;
 				scan++;
 			}
 		else
-			while (*opnd == *scan) {
+			while (scan != regnomore && *opnd == *scan) {
 				count++;
 				scan++;
 			}

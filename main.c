@@ -10,10 +10,10 @@
  *	non-commercial purposes. MicroEMACS 3.9 can only be incorporated
  *	into commercial software with the permission of the current author.
  *
- *	The same goes for vile.  -pgf
+ *	The same goes for vile.  -pgf, 1990-1995
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/main.c,v 1.218 1994/12/22 11:22:11 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/main.c,v 1.224 1995/02/08 03:29:23 pgf Exp $
  *
  */
 
@@ -824,7 +824,7 @@ catchintr (ACTUAL_SIG_ARGS)
 #if SYS_MSDOS || SYS_OS2 || SYS_WINNT
 	sgarbf = TRUE;	/* there's probably a ^C on the screen. */
 #endif
-	(void)signal(SIGINT,catchintr);
+	setup_handler(SIGINT,catchintr);
 	if (doing_kbd_read)
 		longjmp(read_jmp_buf, signo);
 	SIGRET;
@@ -890,28 +890,28 @@ void
 siginit()
 {
 #if SYS_UNIX
-	(void)signal(SIGINT,catchintr);
-	(void)signal(SIGHUP,imdying);
+	setup_handler(SIGINT,catchintr);
+	setup_handler(SIGHUP,imdying);
 #ifdef SIGBUS
-	(void)signal(SIGBUS,imdying);
+	setup_handler(SIGBUS,imdying);
 #endif
 #ifdef SIGSYS
-	(void)signal(SIGSYS,imdying);
+	setup_handler(SIGSYS,imdying);
 #endif
-	(void)signal(SIGSEGV,imdying);
-	(void)signal(SIGTERM,imdying);
+	setup_handler(SIGSEGV,imdying);
+	setup_handler(SIGTERM,imdying);
 #if DEBUG
-	(void)signal(SIGQUIT,imdying);
+	setup_handler(SIGQUIT,imdying);
 #else
-	(void)signal(SIGQUIT,SIG_IGN);
+	setup_handler(SIGQUIT,SIG_IGN);
 #endif
-	(void)signal(SIGPIPE,SIG_IGN);
+	setup_handler(SIGPIPE,SIG_IGN);
 #if defined(SIGWINCH) && ! DISP_X11
-	(void)signal(SIGWINCH,sizesignal);
+	setup_handler(SIGWINCH,sizesignal);
 #endif
 #else
 # if SYS_MSDOS
-	(void)signal(SIGINT,catchintr);
+	setup_handler(SIGINT,catchintr);
 #  if CC_DJGPP
 	_go32_want_ctrl_break(TRUE);
 	setcbrk(FALSE);
@@ -930,7 +930,7 @@ siginit()
 #  endif
 # endif
 # if SYS_OS2 || SYS_WINNT
-	(void)signal(SIGINT,catchintr);
+	setup_handler(SIGINT,catchintr);
 #endif
 #endif
 
@@ -1205,9 +1205,7 @@ int f,n;
 #endif
 	siguninit();
 #if OPT_WORKING
-# if defined(SIGALRM)
-	(void)signal(SIGALRM, SIG_IGN);
-# endif
+	setup_handler(SIGALRM, SIG_IGN);
 #if NEEDED	/* i'm not sure when we'd end up with a "working..."
 			left on the line, and if we _do_ need to
 			clear it, i'd like to figure out how to
@@ -1227,6 +1225,9 @@ int f,n;
 		onel_leaks();
 		path_leaks();
 		kbs_leaks();
+		bind_leaks();
+		map_leaks();
+		itb_leaks();
 		tb_leaks();
 		wp_leaks();
 		bp_leaks();
@@ -1243,6 +1244,9 @@ int f,n;
 
 		FreeAndNull(gregexp);
 		FreeAndNull(patmatch);
+#if	OPT_MLFORMAT
+    		FreeAndNull(modeline_format);
+#endif
 
 #if SYS_UNIX
 		if (strcmp(pathname[2], ".")) free(pathname[2]);
@@ -1684,3 +1688,81 @@ SIZE_T l;
 	t[l-1] = EOS;
     return t;
 }
+
+#if defined(SA_RESTART)
+/* several systems (SCO, SunOS) have sigaction without SA_RESTART */
+/*
+ * Redefine signal in terms of sigaction for systems which have the
+ * SA_RESTART flag defined through <signal.h>
+ *
+ * This definition of signal will cause system calls to get restarted for a
+ * more BSD-ish behavior.  This will allow us to use the OPT_WORKING feature
+ * for such systems.
+ */
+
+void
+setup_handler(sig,disp)
+int sig;
+void (*disp) (DEFINE_SIG_ARGS);
+{
+    struct sigaction act, oact;
+
+    act.sa_handler = disp;
+    sigemptyset(&act.sa_mask);
+#ifdef SA_NODEFER	/* don't rely on it.  if it's not there, signals
+    				probably aren't deferred anyway. */
+    act.sa_flags = SA_RESTART|SA_NODEFER ;
+#else
+    act.sa_flags = SA_RESTART;
+#endif
+
+    (void)sigaction(sig, &act, &oact);
+
+}
+#else
+void
+setup_handler(sig,disp)
+int sig;
+void (*disp) (DEFINE_SIG_ARGS);
+{
+    (void)signal(sig, disp);
+}
+#endif
+
+
+/* put us in a new process group, on command.  we don't do this all the
+* time since it interferes with suspending xvile on some systems with some
+* shells.  but we _want_ it other times, to better isolate us from signals,
+* and isolate those around us (like buggy window/display managers) from
+* _our_ signals.  so we punt, and leave it up to the user.
+*/
+/* ARGSUSED */
+int
+newprocessgroup(f,n)
+int f,n;
+{
+#if DISP_X11
+
+    int pid;
+
+    if (f) {
+	    pid = fork();
+
+	    if (pid > 0)
+		ExitProgram(GOODEXIT);
+    }
+
+# ifdef HAVE_SETSID
+    (void)setsid();
+# else 
+#  ifdef HAVE_BSD_SETPGRP
+    (void) setpgrp(0, 0);
+#  else
+    (void)setpgrp();
+#  endif /* HAVE_BSD_SETPGRP */
+# endif /* HAVE_SETSID */
+#endif /* DISP_X11 */
+    return TRUE;
+}
+
+

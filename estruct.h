@@ -9,7 +9,7 @@
 */
 
 /*
- * $Header: /usr/build/VCS/pgf-vile/RCS/estruct.h,v 1.224 1994/12/19 14:38:37 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/estruct.h,v 1.234 1995/02/05 04:43:45 pgf Exp $
  */
 
 #ifdef HAVE_CONFIG_H
@@ -188,18 +188,20 @@
 #endif
 #endif
 
+#if HAVE_SYS_TIME_H && ! SYSTEM_LOOKS_LIKE_SCO
+/* on SCO, sys/time.h conflicts with select.h, and we don't need it */
+#include <sys/time.h>
 #ifdef TIME_WITH_SYS_TIME
-#include <sys/time.h>
-#include <time.h>
-#else
-#ifdef HAVE_SYS_TIME_H
-#include <sys/time.h>
-#else
-#include <time.h>
+# include <time.h>
 #endif
+#else
+#include <time.h>
 #endif
 
-#if HAVE_SYS_RESOURCE_H
+#if HAVE_SYS_RESOURCE_H && ! SYSTEM_LOOKS_LIKE_SCO
+/* On SunOS, struct rusage is referred to in <sys/wait.h>.  struct rusage
+   is defined in <sys/resource.h>.   NeXT may be similar.  On SCO,
+   resource.h needs time.h, which we excluded above.  */
 #include <sys/resource.h>
 #endif
 
@@ -246,20 +248,6 @@
 #   define DEFINE_SIG_ARGS ACTUAL_SIG_ARGS
 #  endif
 # endif
-#endif
-
-/* We use 'alarm()' as a timer to control a "working..." message */
-#if defined(SIGALRM) && !CC_DJGPP
-# define HAS_ALARM 1
-#else
-# define HAS_ALARM 0
-#endif
-
-/* We suppress this on USG machines in case system calls are not restartable
-	after signals */
-#if !HAVE_RESTARTABLE_SYSCALLS && !defined(SA_RESTART)
-# undef HAS_ALARM
-# define HAS_ALARM 0
 #endif
 
 #ifndef ACTUAL_SIG_ARGS
@@ -375,7 +363,11 @@
 				   stuttered in real vi, I prefer them not
 				   to be */
 
-#define OPT_WORKING (HAS_ALARM && !SMALLER)	/* show "working..." message */
+/* the "working..." message -- we must have the alarm() syscall, and
+   system calls must be restartable after an interrupt by default or be
+   made restartable with sigaction() */
+#define OPT_WORKING (!SMALLER && HAVE_ALARM && HAVE_RESTARTABLE_PIPEREAD)
+
 #define OPT_SCROLLBARS XTOOLKIT			/* scrollbars */
 #define OPT_VMS_PATH    (SYS_VMS)  /* vax/vms path parsing (testing/porting)*/
 
@@ -540,12 +532,12 @@ extern	char *	sys_errlist[];
 # define P(a) ()
 #endif
 
-#if !(HAVE_STRCHR && HAVE_STRRCHR)
-#define USE_INDEX 1
-#endif
-
 #ifndef HAVE_GETHOSTNAME
 #define HAVE_GETHOSTNAME 0
+#endif
+
+#if !(HAVE_STRCHR && HAVE_STRRCHR)
+#define USE_INDEX 1
 #endif
 
 #ifdef USE_INDEX
@@ -659,17 +651,20 @@ extern char *rindex P((const char *, int));
 #define ShowWorking() (!global_b_val(MDTERSE))
 #endif
 
-	/* how to signal this process group:
-	 * Pass the 0 to 'getpgrp()' if we can, since it's safer --- the
-	 * machines where we can't are probably POSIX machines with ANSI C.
-	 */
-#if !HAVE_KILLPG
-# define killpg kill
-#endif
+/* how to signal our process group: pass the 0 to 'getpgrp()' if we can,
+ * since it's safer --- the machines where we can't are probably POSIX
+ * machines with ANSI C.
+ */
 #if GETPGRP_HAS_ARG || MISSING_EXTERN_GETPGRP
-# define signal_pg(sig) killpg(getpgrp(0), sig)
+# define GETPGRPCALL getpgrp(0)
 #else
-# define signal_pg(sig) killpg(getpgrp(), sig)
+# define GETPGRPCALL getpgrp()
+#endif
+
+#if HAVE_KILLPG
+# define signal_pg(sig) killpg( GETPGRPCALL, sig)
+#else
+# define signal_pg(sig)   kill(-GETPGRPCALL, sig)
 #endif
 
 #if	DISP_IBMPC || DISP_Z309
@@ -724,7 +719,7 @@ extern char *rindex P((const char *, int));
 #define CTLA	0x0100		/* ^A flag, or'ed in		*/
 #define CTLX	0x0200		/* ^X flag, or'ed in		*/
 #define SPEC	0x0400		/* special key (function keys)	*/
-#define NOREMAP	0x0800		/* unremappable -- _only_ appears in map.c */
+#define NOREMAP	0x0800		/* unremappable */
 
 #define kcod2key(c)	(c & (N_chars-1)) /* strip off the above prefixes */
 #define	isspecial(c)	(c & ~(N_chars-1))
@@ -1341,7 +1336,7 @@ typedef unsigned char VIDEO_ATTR;
 		return FALSE; \
  \
 	if (ptr) { \
-		memcpy((char *)tmpp, (char *)ptr, tmpold * sizeof(type)); \
+		(void) memcpy((char *)tmpp, (char *)ptr, tmpold * sizeof(type)); \
 		free((char *)ptr); \
 	} else { \
 		tmpold = 0; \
@@ -1783,11 +1778,7 @@ typedef struct	{
 #define	TTkopen		(*term.t_kopen)
 #define	TTkclose	(*term.t_kclose)
 #define	TTgetc		(*term.t_getchar)
-#if !DISP_TERMCAP || (SYS_APOLLO && defined(__GNUC__))
 #define	TTputc		(*term.t_putchar)
-#else
-#define	TTputc		(void)putchar
-#endif
 #define	TTtypahead	(*term.t_typahead)
 #define	TTflush		(*term.t_flush)
 #define	TTmove		(*term.t_move)
@@ -2163,6 +2154,18 @@ extern char *getcwd P(( char *, int ));
 # include <utime.h>
 #endif
 
+/*
+ * Comparison-function for 'qsort()'
+ */
+#if __STDC__ || defined(CC_TURBO) || CC_WATCOM || defined(__CLCC__)
+#if defined(apollo) && !(defined(__STDCPP__) || defined(__GNUC__))
+#define	ANSI_QSORT 0	/* cc 6.7 */
+#else
+#define	ANSI_QSORT 1
+#endif
+#else
+#define	ANSI_QSORT 0
+#endif
 
 /*
  * Local prototypes

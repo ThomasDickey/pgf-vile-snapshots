@@ -6,9 +6,9 @@ Programmed Macros in vile
 	[ The following documentation is copied almost verbatim from
 	chapter 13 of "MicroEMACS Full Screen Text Editor Reference Manual,
 	Version 3.10 March 19, 1989" The copyright for that document is
-	"(C)opyright 1988, 1989 by Brian Straight and Daniel M.  Lawrence". 
+	"(C)opyright 1988, 1989 by Brian Straight and Daniel M. Lawrence". 
 	I have done a global substitute of "vile" for "MicroEMACS", and
-	adjusted the docuement in various other small ways to make it match
+	adjusted the document in various other small ways to make it match
 	vile's current functionality.  (Paul Fox, 4/94) ]
 
 	[ Some more examples of vile macros can be found in the file
@@ -580,5 +580,5 @@ Directives
 		insert-string "You are on an old machine!\n"
 
 -----------------------------------
-  $Header: /usr/build/VCS/pgf-vile/RCS/macros.doc,v 1.9 1994/12/19 15:43:30 pgf Exp $
+  $Header: /usr/build/VCS/pgf-vile/RCS/macros.doc,v 1.10 1995/02/08 03:29:23 pgf Exp $
 -----------------------------------

@@ -7,7 +7,7 @@
  *	To do:	add 'itb_ins()' and 'itb_del()' to support cursor-level command
  *		editing.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/itbuff.c,v 1.4 1994/11/29 17:04:43 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/itbuff.c,v 1.5 1995/01/27 13:52:56 pgf Exp $
  *
  */
 
@@ -121,7 +121,7 @@ void	itb_free(p)
 	register ITBUFF *q = *p;
 
 	if (q != 0) {
-		free(q->itb_data);
+		free((char *)(q->itb_data));
 		free((char *)q);
 		FreedBuffer(q)
 	}
