@@ -4,7 +4,10 @@
  *  heavily modified by Paul Fox, 1990
  *
  * $Log: search.c,v $
- * Revision 1.60  1994/03/29 14:51:27  pgf
+ * Revision 1.61  1994/04/18 14:26:27  pgf
+ * merge of OS2 port patches, and changes to tungetc operation
+ *
+ * Revision 1.60  1994/03/29  14:51:27  pgf
  * fix for alternate search delimiters
  *
  * Revision 1.59  1994/02/22  11:03:15  pgf
@@ -18,10 +21,6 @@
 
 #include	"estruct.h"
 #include        "edef.h"
-
-#if	LATTICE
-#define	void	int
-#endif
 
 int lastdirec;
 

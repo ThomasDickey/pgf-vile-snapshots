@@ -14,7 +14,40 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.171  1994/03/24 12:59:47  pgf
+ * Revision 1.182  1994/04/25 22:12:32  pgf
+ * change nextbuffer() to swbuffer(firstbp) to start things off, to fix
+ * problem with noautobuffer skipping first buffer
+ *
+ * Revision 1.181  1994/04/22  14:34:15  pgf
+ * changed BAD and GOOD to BADEXIT and GOODEXIT
+ *
+ * Revision 1.180  1994/04/22  13:49:43  pgf
+ * exit hook support
+ *
+ * Revision 1.179  1994/04/20  19:54:50  pgf
+ * changes to support 'BORLAND' console i/o screen driver
+ *
+ * Revision 1.178  1994/04/19  15:13:06  pgf
+ * use strncpy0() in likely places
+ *
+ * Revision 1.177  1994/04/18  16:58:28  pgf
+ * removed dummy speckey command, in lieu of going back to using a real
+ * speckey command, in input.c
+ *
+ * Revision 1.176  1994/04/18  14:26:27  pgf
+ * merge of OS2 port patches, and changes to tungetc operation
+ *
+ * Revision 1.174  1994/04/04  16:14:58  pgf
+ * kev's 4.4 changes
+ *
+ * Revision 1.173  1994/04/01  10:46:31  pgf
+ * set startstat to result of nextbuffer(), so any file-open errors
+ * aren't clobbered by the help message.
+ *
+ * Revision 1.172  1994/03/29  16:24:20  pgf
+ * kev's changes: selection and attributes
+ *
+ * Revision 1.171  1994/03/24  12:59:47  pgf
  * replace lost bug
  *
  * Revision 1.170  1994/03/15  18:45:06  pgf
@@ -54,7 +87,7 @@
 #include        <fcntl.h>	/* defines 'open()' on SunOS */
 #endif
 
-#if MSDOS
+#if NEWDOSCC
 #include <io.h>
 #if DJGPP
 #include <dpmi.h>
@@ -65,23 +98,7 @@
 extern char *pathname[];	/* startup file path/name array */
 
 /* for MSDOS, increase the default stack space */
-
-#if	MSDOS & LATTICE
-unsigned _stack = 32767;
-#endif
-
-#if	ATARI & LATTICE & 0
-int _mneed = 256000;		/* reset memory pool size */
-#endif
-
-#if	MSDOS & AZTEC
-int _STKSIZ = 32767/16; 	/* stack size in paragraphs */
-int _STKRED = 1024;		/* stack checking limit */
-int _HEAPSIZ = 4096/16; 	/* (in paragraphs) */
-int _STKLOW = 0;		/* default is stack above heap (small only) */
-#endif
-
-#if	MSDOS & TURBO
+#if	MSDOS && TURBO
 unsigned _stklen = 32768U;
 #endif
 
@@ -133,14 +150,10 @@ char	*argv[];
 #if NEW_VI_MAP
 	map_init();
 #endif
-#if MSDOS
+#if MSDOS || OS2 || ST520
 	slash = '\\';
 #else
-#if ST520
-	slash = '\\';
-#else	/* UNIX */
 	slash = '/';
-#endif
 #endif
 #if !UNIX
 	expand_wild_args(&argc, &argv);
@@ -173,7 +186,7 @@ char	*argv[];
 		/* Process Switches */
 		if (*param == '-') {
 			++param;
-#if IBMPC
+#if IBMPC || BORLAND
 		    	/* if it's a digit, it's probably a screen
 				resolution */
 			if (isdigit(*param)) {
@@ -255,7 +268,7 @@ char	*argv[];
 		dosearch:
 				searchflag = TRUE;
 				GetArgVal(param);
-				(void)strncpy(pat, param, NPAT);
+				(void)strncpy0(pat, param, NPAT);
 				gregexp = regcomp(pat, global_b_val(MDMAGIC));
 				break;
 #if TAGS
@@ -267,7 +280,7 @@ char	*argv[];
 #endif
 			case 'V':
 				(void)printf("vile %s\n", version);
-				ExitProgram(GOOD);
+				ExitProgram(GOODEXIT);
 
 			case 'v':	/* -v for View File */
 				set_global_b_val(MDVIEW,TRUE);
@@ -316,7 +329,7 @@ char	*argv[];
 	/* if stdin isn't a terminal, assume the user is trying to pipe a
 	 * file into a buffer.
 	 */
-#if UNIX || VMS || MSDOS
+#if UNIX || VMS || MSDOS || OS2
 	if (!isatty(fileno(stdin))) {
 		BUFFER	*lastbp = firstbp;
 		FILE	*in;
@@ -334,7 +347,7 @@ char	*argv[];
 #if VMS
 		fd = open("tt:", 0);	/* or sys$command */
 #endif
-#if MSDOS
+#if MSDOS || OS2
 		fd = fileno(stderr);	/* this normally cannot be redirected */
 #endif
 		if ((fd >= 0)
@@ -380,7 +393,7 @@ char	*argv[];
 		bp->b_active = TRUE;
 #if DOSFILES
 		make_local_b_val(bp,MDDOS);
-		set_b_val(bp, MDDOS, MSDOS && global_b_val(MDDOS) );
+		set_b_val(bp, MDDOS, CRLF_LINES && global_b_val(MDDOS) );
 #endif
 		swbuffer(bp);
 	}
@@ -403,7 +416,7 @@ char	*argv[];
 			}
 
 			if ((vbp=bfind(ScratchName(vileinit), 0))==NULL)
-				ExitProgram(BAD(1));
+				ExitProgram(BADEXIT);
 
 			/* don't want swbuffer to try to read it */
 			vbp->b_active = TRUE;
@@ -433,7 +446,7 @@ char	*argv[];
 			char *fname;
 			/* if .vilerc is one of the input files....
 					don't clobber it */
-#if MSDOS
+#if MSDOS || OS2
 			/* search PATH for vilerc under dos */
 	 		fname = flook(pathname[0], FL_ANYWHERE);
 #else
@@ -459,7 +472,7 @@ char	*argv[];
 
 	/* if there are any files to read, read the first one! */
 	if (firstbp != 0) {
-		nextbuffer(FALSE,0);
+		startstat = swbuffer(firstbp);
 	}
 #if TAGS
 	else if (tname) {
@@ -509,7 +522,7 @@ char	*argv[];
 	loop();
 
 	/* NOTREACHED */
-	return BAD(1);
+	return BADEXIT;
 }
 
 /* this is nothing but the main command loop */
@@ -527,7 +540,7 @@ loop()
 			suppress.  this happens if we're using arrow keys
 			during insert */
 		if (is_at_end_of_line(DOT) && (DOT.o > w_left_margin(curwp)) &&
-				!insertmode && !insert_mode_was)
+				!insertmode)
 			backchar(TRUE,1);
 
 		/* same goes for end-of-file -- I'm actually not sure if
@@ -554,6 +567,22 @@ loop()
 
 		f = FALSE;
 		n = 1;
+
+#if LATERMAYBE
+/* insertion is too complicated to pop in
+	and out of so glibly...   -pgf */
+#ifdef insertmode
+		/* FIXME: Paul and Tom should check this over. */
+		if (insertmode != FALSE) {
+			if (!kbd_replaying(FALSE))
+			    mayneedundo();
+			tungetc(c);
+			insert(f,n);
+			dotcmdfinish();
+			continue;
+		}
+#endif /* insertmode */
+#endif /* LATERMAYBE */
 
 		do_repeats(&c,&f,&n);
 		map_check(c);
@@ -652,7 +681,7 @@ global_val_init()
 
 	set_global_g_val(GVAL_TIMEOUTVAL, 500);	/* catnap time -- how long
 							to wait for ESC seq */
-#if VMS || MSDOS			/* ':' gets in the way of drives */
+#if VMS || MSDOS || OS2			/* ':' gets in the way of drives */
 	set_global_g_val_ptr(GVAL_EXPAND_CHARS,strmalloc("!%#"));
 #else	/* UNIX */
 	set_global_g_val_ptr(GVAL_EXPAND_CHARS,strmalloc("!%#:"));
@@ -695,7 +724,7 @@ global_val_init()
 	set_global_b_val(MDCRYPT,	FALSE);	/* crypt */
 #endif
 	set_global_b_val(MDIGNCASE,	FALSE); /* exact matches */
-	set_global_b_val(MDDOS, MSDOS);	/* on by default on DOS, off others */
+	set_global_b_val(MDDOS, CRLF_LINES); /* on by default on DOS, off others */
 	set_global_b_val(MDMAGIC,	TRUE); 	/* magic searches */
 	set_global_b_val( MDMETAINSBIND, TRUE); /* honor meta-bindings when
 							in insert mode */
@@ -728,7 +757,7 @@ global_val_init()
 #if MSDOS
 #define	DEFAULT_CSUFFIX	"\\.\\(\\([chis]\\)\\|cpp\\|cxx\\|hxx\\)$"
 #endif
-#ifndef DEFAULT_CSUFFIX	/* UNIX (mixed-case names) */
+#ifndef DEFAULT_CSUFFIX	/* UNIX or OS2/HPFS (mixed-case names) */
 #define	DEFAULT_CSUFFIX	"\\.\\(\\([Cchis]\\)\\|CC\\|cpp\\|cxx\\|hxx\\|scm\\)$"
 #endif
 
@@ -774,6 +803,9 @@ global_val_init()
 	set_global_w_val(WMDLIST,	FALSE); /* list-mode */
 	set_global_w_val(WMDNUMBER,	FALSE);	/* number */
 	set_global_w_val(WMDHORSCROLL,	TRUE);	/* horizontal scrolling */
+#ifdef WMDTERSELECT
+	set_global_w_val(WMDTERSELECT,	TRUE);	/* terse selections */
+#endif
 
 	set_global_w_val(WVAL_SIDEWAYS,	0);	/* list-mode */
 #if defined(WVAL_FCOLOR) || defined(WVAL_BCOLOR)
@@ -781,10 +813,9 @@ global_val_init()
 	set_global_w_val(WVAL_BCOLOR,	C_BLACK); /* background color */
 #endif
 
-
 }
 
-#if UNIX || MSDOS || VMS
+#if UNIX || MSDOS || OS2 || VMS
 
 /* have we been interrupted/ */
 static int am_interrupted = FALSE;
@@ -794,10 +825,10 @@ SIGT
 catchintr (ACTUAL_SIG_ARGS)
 {
 	am_interrupted = TRUE;
-#if MSDOS
+#if MSDOS || OS2
 	sgarbf = TRUE;	/* there's probably a ^C on the screen. */
 #endif
-#if USG || MSDOS
+#if USG || MSDOS || OS2
 	(void)signal(SIGINT,catchintr);
 #endif
 	if (doing_kbd_read)
@@ -824,15 +855,6 @@ interrupted()
 
 	if (am_interrupted)
 		return TRUE;
-#ifdef NEEDED
-	if (typahead()) {
-		int c;
-		c = tgetc(FALSE);
-		if (c == tocntrl('C'))
-			return TRUE;
-		tungetc(c);
-	}
-#endif
 	return FALSE;
 #else
 	return am_interrupted;
@@ -913,6 +935,9 @@ siginit()
 #   endif
 #  endif
 # endif
+# if OS2
+	(void)signal(SIGINT,catchintr);
+#endif
 #endif
 
 }
@@ -1137,6 +1162,17 @@ int f,n;
 	int cnt;
 	BUFFER *bp;
 
+#if PROC
+	{ 
+	    static int exithooking;
+	    if (!exithooking && *exithook) {
+		    exithooking = TRUE;
+		    run_procedure(exithook);
+		    exithooking = FALSE;
+	    }
+	}
+#endif
+
 	if (f == FALSE && (cnt = anycb(&bp)) != 0) {
 		if (cnt == 1)
 			mlforce(
@@ -1151,7 +1187,7 @@ int f,n;
 	vttidy(TRUE);
 #if	FILOCK
 	if (lockrel() != TRUE) {
-		ExitProgram(BAD(1));
+		ExitProgram(BADEXIT);
 		/* NOTREACHED */
 	}
 #endif
@@ -1193,7 +1229,7 @@ int f,n;
 		show_alloc();
 	}
 #endif
-	ExitProgram(GOOD);
+	ExitProgram(GOODEXIT);
 	/* NOTREACHED */
 	return FALSE;
 }
@@ -1294,21 +1330,6 @@ int f,n;
 	return TRUE;
 }
 
-/* ARGSUSED */
-int
-speckey(f,n) /* dummy function for binding to pseudo-function prefix, '#' */
-int f,n;
-{
-	return TRUE;
-}
-
-/* ARGSUSED */
-int
-altspeckey(f,n)
-int f,n;
-{
-	return TRUE;
-}
 
 /* initialize our version of the "chartypes" stuff normally in ctypes.h */
 /* also called later, if charset-affecting modes change, for instance */
@@ -1437,18 +1458,6 @@ charinit()
 
 /*****		Compiler specific Library functions	****/
 
-#if	MWC86 & MSDOS
-movmem(source, dest, size)
-char *source;	/* mem location to move memory from */
-char *dest;	/* memory location to move text to */
-int size;	/* number of bytes to move */
-{
-	register int i;
-
-	for (i=0; i < size; i++)
-		*dest++ = *source++;
-}
-#endif
 
 #if	RAMSIZE
 /*	These routines will allow me to track memory usage by placing
@@ -1632,3 +1641,14 @@ int	code;
 	exit(code);
 }
 #endif
+
+char *
+strncpy0(t, f, l)
+char *t, *f;
+SIZE_T l;
+{
+    (void)strncpy(t, f, l);
+    if (l)
+	t[l-1] = EOS;
+    return t;
+}

@@ -8,8 +8,11 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: fences.c,v $
- *	Revision 1.20  1994/03/08 12:09:24  pgf
- *	changed 'fulllineregions' to 'regionshape'.
+ *	Revision 1.21  1994/04/01 14:30:02  pgf
+ *	tom's warning/lint patch
+ *
+ * Revision 1.20  1994/03/08  12:09:24  pgf
+ * changed 'fulllineregions' to 'regionshape'.
  *
  * Revision 1.19  1994/02/22  11:03:15  pgf
  * truncated RCS log for 4.0
@@ -447,13 +450,13 @@ int c;
 	MK = DOT;
 	    
 	if (getfence(c,FORWARD) == FALSE) {
-		gomark(FALSE,1);
+		(void)gomark(FALSE,1);
 		return previndent((int *)0);
 	}
 
 	ind = indentlen(l_ref(DOT.l));
 
-	gomark(FALSE,1);
+	(void)gomark(FALSE,1);
 	    
 	return ind;
 }
@@ -462,7 +465,7 @@ int c;
 
 /*	Close fences are matched against their partners, and if
 	on screen the cursor briefly lights there		*/
-int
+void
 fmatch(ch)
 int ch;	/* fence type to match against */
 {
@@ -518,8 +521,6 @@ int ch;	/* fence type to match against */
 
 	/* restore the current position */
 	DOT = oldpos;
-
-	return(TRUE);
 }
 
 #endif /* CFENCE */

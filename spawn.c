@@ -2,7 +2,20 @@
  *		for MicroEMACS
  *
  * $Log: spawn.c,v $
- * Revision 1.75  1994/03/24 12:10:58  pgf
+ * Revision 1.79  1994/04/22 14:34:15  pgf
+ * changed BAD and GOOD to BADEXIT and GOODEXIT
+ *
+ * Revision 1.78  1994/04/20  19:54:50  pgf
+ * changes to support 'BORLAND' console i/o screen driver
+ *
+ * Revision 1.77  1994/04/18  14:26:27  pgf
+ * merge of OS2 port patches, and changes to tungetc operation
+ *
+ * Revision 1.76  1994/04/11  11:39:36  pgf
+ * giving an arg to :! or :!! or "shell-command" now suppresses the
+ * "press return to continue" prompt
+ *
+ * Revision 1.75  1994/03/24  12:10:58  pgf
  * warning cleanup
  *
  * Revision 1.74  1994/03/23  16:04:05  pgf
@@ -24,7 +37,7 @@
 
 #include	"estruct.h"
 #include	"edef.h"
-#if UNIX
+#if UNIX || OS2
 #include	<sys/stat.h>
 #endif
 
@@ -54,7 +67,7 @@ extern  int	newmode[3];			/* In "termio.c"	*/
 extern  short	iochan;				/* In "termio.c"	*/
 #endif
 
-#if	MSDOS & (MSC | TURBO | ZTC | WATCOM)
+#if NEWSDOSCC && !DJGPP
 #include	<process.h>
 #endif
 
@@ -117,25 +130,31 @@ int f,n;
 	mlforce("[Not in TOS]");
 	return FALSE;
 #endif
-#if	MSDOS && (AZTEC || NEWDOSCC)
+#if	MSDOS || OS2
 	movecursor(term.t_nrow, 0);		/* Seek to last line.	*/
 	TTflush();
 	TTkclose();
 	{ 
 		char *shell;
-		if ((shell = getenv("COMSPEC")) == NULL)
+		if ((shell = getenv("COMSPEC")) == NULL) {
+#if OS2
+			shell = "cmd.exe";
+#else
 			shell = "command.com";
-		system(shell);
-	}
-	TTkopen();
-	sgarbf = TRUE;
-	return AfterShell();
 #endif
-#if	MSDOS && LATTICE
-	movecursor(term.t_nrow, 0);		/* Seek to last line.	*/
-	TTflush();
-	TTkclose();
-	sys("\\command.com", "");		/* Run CLI.		*/
+			system(shell);          /* Will search path     */
+		} else {
+#if OS2
+/*
+ *	spawn it if we know it.  Some 3rd party command processors fail
+ *	if they system themselves (eg 4OS2).  CCM 24-MAR-94
+ */
+			spawnl( P_WAIT, shell, shell, NULL);
+#else
+			system(shell);
+#endif
+		}
+	}
 	TTkopen();
 	sgarbf = TRUE;
 	return AfterShell();
@@ -193,8 +212,12 @@ void
 pressreturn()
 {
 	int s;
+	int odiscmd;
 
+	odiscmd = discmd;
+	discmd = TRUE;
 	mlprompt("[Press return to continue]");
+	discmd = odiscmd;
 	TTflush();
 	/* loop for a CR, a space, or a : to do another named command */
 	while ((s = tgetc(FALSE)) != '\r' &&
@@ -214,7 +237,7 @@ int
 respawn(f,n)
 int f,n;
 {
-	return spawn1(TRUE);
+	return spawn1(TRUE, !f);
 }
 
 /* ARGSUSED */
@@ -222,10 +245,10 @@ int
 spawn(f,n)
 int f,n;
 {
-	return spawn1(FALSE);
+	return spawn1(FALSE, !f);
 }
 
-#define COMMON_SH_PROMPT (UNIX || VMS || MSDOS || (ST520 & LATTICE))
+#define COMMON_SH_PROMPT (UNIX || VMS || MSDOS || OS2 || (ST520 & LATTICE))
 
 #if COMMON_SH_PROMPT
 static	int	ShellPrompt P(( TBUFF **, char *, int ));
@@ -294,8 +317,9 @@ int	rerun;		/* TRUE/FALSE: spawn, -TRUE: pipecmd */
  */
 /* the #ifdefs have been totally separated, for readability */
 int
-spawn1(rerun)
+spawn1(rerun,pressret)
 int rerun;
+int pressret;
 {
 #if IBMPC
 	int	closed;
@@ -316,7 +340,8 @@ int rerun;
 	(void)system_SHELL(line);
 	TTflush();
 	ttunclean();
-	pressreturn();
+	if (pressret)
+		pressreturn();
 	TTopen();
 	TTflush();
 	sgarbf = TRUE;
@@ -433,7 +458,7 @@ int rerun;
 	mlforce("[Not in CP/M-86]");
 	return (FALSE);
 #endif
-#if	MSDOS || (ST520 & LATTICE)
+#if	MSDOS || OS2 || (ST520 & LATTICE)
 	movecursor(term.t_nrow, 0);
 	TTputc('\n');
 	TTflush();
@@ -449,7 +474,7 @@ int rerun;
 	system(line);
 	TTkopen();
 	/* if we are interactive, pause here */
-	if (clexec == FALSE) {
+	if (pressret) {
 		pressreturn();
 	}
 #if	IBMPC
@@ -464,7 +489,7 @@ int rerun;
 #endif
 }
 
-#if UNIX || MSDOS || VMS
+#if UNIX || MSDOS || VMS || OS2
 /*
  * Pipe a one line command into a window
  */
@@ -589,7 +614,8 @@ pipecmd(f, n)
 int
 filterregion()
 {
-#if UNIX||MSDOS
+/* FIXX work on this for OS2, need inout_popen support, or named pipe? */
+#if UNIX || MSDOS
 	static char oline[NLINE];	/* command line send to shell */
 	char	line[NLINE];	/* command line send to shell */
 	FILE *fr, *fw;
@@ -616,7 +642,7 @@ filterregion()
 #if UNIX
 		(void)fflush(fw);
 		(void)fclose(fw);
-		ExitProgram (GOOD);
+		ExitProgram (GOODEXIT);
 		/* NOTREACHED */
 #else
 		npflush();	/* fake multi-processing */
@@ -693,7 +719,7 @@ int f,n;
 	Close(newcli);
 	sgarbf = TRUE;
 #endif
-#if	MSDOS
+#if	MSDOS || OS2
 	(void)strcat(line," <fltinp >fltout");
 	movecursor(term.t_nrow - 1, 0);
 	TTkclose();
@@ -774,85 +800,4 @@ register char	*cmd;
 }
 #endif
 
-#if	MSDOS && MWC86
 
-/*
- * This routine, once again by Bob McNamara, is a C translation of the "system"
- * routine in the MWC-86 run time library. It differs from the "system" routine
- * in that it does not unconditionally append the string ".exe" to the end of
- * the command name. We needed to do this because we want to be able to spawn
- * off "command.com". We really do not understand what it does, but if you don't
- * do it exactly "malloc" starts doing very very strange things.
- */
-int
-sys(cmd, tail)
-char	*cmd;
-char	*tail;
-{
-	register unsigned n;
-	extern   char	*__end;
-
-	n = __end + 15;
-	n >>= 4;
-	n = ((n + dsreg() + 16) & 0xFFF0) + 16;
-	return(execall(cmd, tail, n));
-
-}
-#endif
-
-#if LATTICE
-int
-sys(cmd, tail)
-char	*cmd;
-char	*tail;
-{
-	return(forklp(cmd, tail, (char *)NULL));
-}
-#endif
-
-#if	MSDOS && LATTICE
-/*	System: a modified version of lattice's system() function
-		that detects the proper switchar and uses it
-		written by Dana Hogget				*/
-
-int
-system(cmd)
-
-char *cmd;	/*  Incoming command line to execute  */
-
-{
-	static char *swchar = "/C";	/*  Execution switch  */
-	union REGS inregs;	/*  parameters for dos call  */
-	union REGS outregs;	/*  Return results from dos call  */
-	char *shell;		/*  Name of system command processor  */
-	char *p;		/*  Temporary pointer  */
-	int ferr;		/*  Error condition if any  */
-
-	/*  get name of system shell  */
-	if ((shell = getenv("COMSPEC")) == NULL) {
-		return (-1);		/*  No shell located  */
-	}
-
-	p = cmd;
-	while (isspace(*p)) {		/*  find out if null command */
-		p++;
-	}
-
-	/**  If the command line is not empty, bring up the shell  **/
-	/**  and execute the command.  Otherwise, bring up the     **/
-	/**  shell in interactive mode.   **/
-
-	if (p && *p) {
-		/**  detect current switch character and us it  **/
-		inregs.h.ah = 0x37;	/*  get setting data  */
-		inregs.h.al = 0x00;	/*  get switch character  */
-		intdos(&inregs, &outregs);
-		*swchar = outregs.h.dl;
-		ferr = forkl(shell, "command", swchar, cmd, (char *)NULL);
-	} else {
-		ferr = forkl(shell, "command", (char *)NULL);
-	}
-
-	return (ferr ? ferr : wait());
-}
-#endif

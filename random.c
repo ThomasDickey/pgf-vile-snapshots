@@ -3,7 +3,29 @@
  * commands. There is no functional grouping here, for sure.
  *
  * $Log: random.c,v $
- * Revision 1.120  1994/03/18 18:30:38  pgf
+ * Revision 1.127  1994/04/22 16:06:18  pgf
+ * kev's font changes, mostly
+ *
+ * Revision 1.126  1994/04/22  13:49:18  pgf
+ * more careful hook support
+ *
+ * Revision 1.125  1994/04/22  11:50:52  pgf
+ * use #if PROC around the hook
+ *
+ * Revision 1.124  1994/04/22  11:33:51  pgf
+ * added previous_directory() routine to support $ocwd variable, and
+ * added cd hook calling point
+ *
+ * Revision 1.123  1994/04/18  17:35:51  pgf
+ * kev's changes for attribution, man page macros
+ *
+ * Revision 1.122  1994/04/18  14:26:27  pgf
+ * merge of OS2 port patches, and changes to tungetc operation
+ *
+ * Revision 1.121  1994/03/29  17:53:18  pgf
+ * warning cleanup
+ *
+ * Revision 1.120  1994/03/18  18:30:38  pgf
  * fixes for OPT_MAP_MEMORY compilation
  *
  * Revision 1.119  1994/03/08  12:23:03  pgf
@@ -43,10 +65,15 @@
 #   include <dirent.h>
 #endif
 
+#if OS2
+#   include <dos.h>  /* for _dos_getdrive */
+#   include <dir.h>
+#endif
+
 extern CMDFUNC f_forwchar, f_backchar, f_forwchar_to_eol, f_backchar_to_bol;
 
 /*--------------------------------------------------------------------------*/
-#if MSDOS
+#if MSDOS || OS2
 static	int	drive2char P(( int ));
 static	int	char2drive P(( int ));
 #endif
@@ -75,7 +102,7 @@ char	*name;
 	set_b_val(bp,VAL_TAB,8);
 
 	make_local_b_val(bp,MDDOS);
-	set_b_val(bp, MDDOS, MSDOS && global_b_val(MDDOS) );
+	set_b_val(bp, MDDOS, CRLF_LINES && global_b_val(MDDOS) );
 
 	make_local_b_val(bp,MDCMOD);
 	set_b_val(bp,MDCMOD,FALSE);
@@ -224,6 +251,9 @@ L_NUM
 line_count(the_buffer)
 BUFFER *the_buffer;
 {
+    if (the_buffer == (BUFFER *) 0)
+	return 0;
+    else {
 #if !SMALLER
 	(void)bsizes(the_buffer);
 	return the_buffer->b_linecount;
@@ -236,6 +266,7 @@ BUFFER *the_buffer;
 
 	return numlines;
 #endif
+    }
 }
 
 L_NUM
@@ -289,12 +320,13 @@ int bflg;
 {
 	register C_NUM c, i, col;
 	col = 0;
-	for (i = w_left_margin(curwp); i < offs; ++i) {
-		c = lGetc(lp, i);
-		if (!isspace(c) && bflg)
-			break;
-		col = next_column(c,col);	/* assumes curbp */
-	}
+	if (lLength(lp))
+		for (i = w_left_margin(curwp); i < offs; ++i) {
+			c = lGetc(lp, i);
+			if (!isspace(c) && bflg)
+				break;
+			col = next_column(c,col);	/* assumes curbp */
+		}
 	return col;
 }
 
@@ -365,7 +397,7 @@ int n;
 {
 	register int offs;	/* current cursor column   */
 
-	offs = getoff(n,NULL);
+	offs = getoff(n, (C_NUM *)0);
 
 	if (offs >= 0) {
 		DOT.o = offs;
@@ -622,7 +654,7 @@ int watchinput;
 	delay(milli);
 #endif
 
-#if !(UNIX|VMS|NEWDOSCC)
+#if !(UNIX || VMS || NEWDOSCC)
 	long i;
 	for (i = 0; i < term.t_pause; i++)
 		;
@@ -660,13 +692,13 @@ int force;
 	cwd = dirname;
 	}
 #else
-# if (MSDOS & NEWDOSCC) || POSIX || VMS
+# if NEWDOSCC || POSIX || VMS
 	cwd = getcwd(dirname, NFILEN);
 # else
 	cwd = getwd(dirname);
 # endif
 #endif
-#if MSDOS
+#if MSDOS || OS2
 	(void)mklower(cwd);
 #endif
 	if (cwd == NULL) {
@@ -679,14 +711,14 @@ int force;
 			*s = EOS;
 	}
 
-#if MSDOS && NEWDOSCC
+#if MSDOS || OS2
 	update_dos_drv_dir(cwd);
 #endif
 
 	return cwd;
 }
 
-#if MSDOS
+#if MSDOS || OS2
 
 /* convert drive index to _letter_ */
 static int
@@ -719,7 +751,13 @@ int	d;
 int
 curdrive()
 {
+#if OS2
+	int d;
+	_dos_getdrive(&d);  	/* A=1 B=2 ... */
+	return drive2char((d-1) & 0xff);
+#else
 	return drive2char(bdos(0x19, 0, 0) & 0xff);
+#endif
 }
 
 /* take drive _letter_ as arg. */
@@ -728,7 +766,12 @@ setdrive(d)
 int d;
 {
 	if (isalpha(d)) {
-		bdos(0x0e, char2drive(d), 0);
+#if OS2
+		int maxdrives;
+		_dos_setdrive(char2drive(d)+1, &maxdrives); /* 1 based */
+#else
+		bdos(0x0e, char2drive(d), 0); /* 0 based */
+#endif
 		return TRUE;
 	}
 	mlforce("[Bad drive specifier]");
@@ -820,22 +863,35 @@ int f, n;
 	return TRUE;
 }
 
+static char prevdir[NFILEN];
+
+char *
+previous_directory()
+{
+	if (*prevdir)
+		return prevdir;
+	else
+		return current_directory(FALSE);
+}
+
 /* move to the named directory.  (Dave Lemke) */
 int
 set_directory(dir)
 char	*dir;
 {
-    static char prevdir[NFILEN];
     char       exdir[NFILEN];
 #if UNIX
     char       *cdpath;
     char       cdpathdir[NFILEN];
 #endif
     char *exdp;
-#if MSDOS
+#if MSDOS || OS2
     int curd = curdrive();
 #endif
     WINDOW *wp;
+#if PROC
+    static int cdhooking;
+#endif
 
     for_each_window(wp)
 	wp->w_flag |= WFMODE;
@@ -843,7 +899,7 @@ char	*dir;
     exdp = strcpy(exdir, dir);
 
     if (doglob(exdp)) {
-#if MSDOS
+#if MSDOS || OS2
 	char	*s;
 	if ((s = is_msdos_drive(exdp)) != 0) {
 		if (setdrive(*exdp) == TRUE) {
@@ -875,6 +931,15 @@ char	*dir;
 
 	if (chdir(exdp) == 0) {
 		(void)pwd(TRUE,1);
+#if PROC
+	{ 
+	    if (!cdhooking && *cdhook) {
+		    cdhooking = TRUE;
+		    run_procedure(cdhook);
+		    cdhooking = FALSE;
+	    }
+	}
+#endif
 		updatelistbuffers();
 		return TRUE;
 	}
@@ -892,6 +957,15 @@ char	*dir;
 		while ((cdpath = parse_pathlist(cdpath, cdpathdir)) != 0) {
 			if (chdir(pathcat(cdpathdir, cdpathdir, exdp)) == 0) {
 				(void)pwd(TRUE,1);
+#if PROC
+				{ 
+				    if (!cdhooking && *cdhook) {
+					    cdhooking = TRUE;
+					    run_procedure(cdhook);
+					    cdhooking = FALSE;
+				    }
+				}
+#endif
 				updatelistbuffers();
 				return TRUE;
 			}
@@ -899,7 +973,7 @@ char	*dir;
 	}
 #endif
     }
-#if MSDOS
+#if MSDOS || OS2
     setdrive(curd);
     current_directory(TRUE);
 #endif

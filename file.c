@@ -6,7 +6,29 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.121  1994/03/23 12:57:57  pgf
+ * Revision 1.128  1994/04/22 14:34:15  pgf
+ * changed BAD and GOOD to BADEXIT and GOODEXIT
+ *
+ * Revision 1.127  1994/04/22  13:49:00  pgf
+ * read and write hooks
+ *
+ * Revision 1.126  1994/04/18  14:26:27  pgf
+ * merge of OS2 port patches, and changes to tungetc operation
+ *
+ * Revision 1.125  1994/04/13  20:46:38  pgf
+ * various fixes (towards 4.4) from kev
+ *
+ * Revision 1.124  1994/04/07  18:13:56  pgf
+ * beep management
+ *
+ * Revision 1.123  1994/04/05  14:04:02  pgf
+ * added "view-on-readonly" mode
+ *
+ * Revision 1.122  1994/04/01  10:47:10  pgf
+ * don't just return on FIOERR in readin -- the rest of the routine needs
+ * to run, to set cmode correctly, for example
+ *
+ * Revision 1.121  1994/03/23  12:57:57  pgf
  * rationalized use of mlerror() and FIOERR.  now, the function that
  * first generates FIOERR is guaranteed to have put out a message, probably
  * via mlerror.
@@ -223,6 +245,7 @@ no_such_file(fname)
 char *	fname;
 {
 	mlforce("[No such file \"%s\"]", fname);
+	TTbeep();
 	return FALSE;
 }
 
@@ -457,7 +480,7 @@ int lockfl;		/* check the file for locks? */
 						swbuffer(bp);
 			}
 			/* old buffer name conflict code */
-			if (unqname(bname,TRUE))
+			if (unqname(bname,!clexec) || clexec)
 				continue;
 			hst_glue(' ');
 			s = mlreply("Will use buffer name: ", bname, sizeof(bname));
@@ -469,6 +492,7 @@ int lockfl;		/* check the file for locks? */
 		/* okay, we've got a unique name -- create it */
 		if (bp==NULL && (bp=bfind(bname, 0))==NULL) {
 			mlforce("[Cannot create buffer]");
+			TTbeep();
 	                return FALSE;
 	        }
 		/* switch and read it in. */
@@ -582,7 +606,7 @@ int	mflg;		/* print messages? */
 	ch_fname(bp,fname);
 #if DOSFILES
 	make_local_b_val(bp,MDDOS);
-	set_b_val(bp, MDDOS, MSDOS && global_b_val(MDDOS) );
+	set_b_val(bp, MDDOS, CRLF_LINES && global_b_val(MDDOS) );
 #endif
 	make_local_b_val(bp,MDNEWLINE);
 	set_b_val(bp, MDNEWLINE, TRUE);		/* assume we've got it */
@@ -590,14 +614,15 @@ int	mflg;		/* print messages? */
 	/* turn off ALL keyboard translation in case we get a dos error */
 	TTkclose();
 
-        if ((s = ffropen(fname)) == FIOERR) {	/* Hard file open.      */
-		TTkopen();	/* open the keyboard again */
-		return FALSE;
+        if ((s = ffropen(fname)) == FIOERR) {	/* Hard file error.      */
+			/* do nothing -- error has been reported,
+				and it will appear as empty buffer */
+			;
         } else if (s == FIOFNF) {		/* File not found.      */
                 if (mflg)
 			mlwrite("[New file]");
 #if DOSFILES
-		set_b_val(bp, MDDOS, MSDOS && global_b_val(MDDOS));
+		set_b_val(bp, MDDOS, CRLF_LINES && global_b_val(MDDOS));
 #endif
         } else {
 
@@ -643,11 +668,8 @@ int	mflg;		/* print messages? */
 				readlinesmsg(nline, s, fname, ffronly(fname));
 
 			/* set read-only mode for read-only files */
-			if (isShellOrPipe(fname)
-#if RONLYVIEW
-			 || ffronly(fname) 
-#endif
-			) {
+			if (isShellOrPipe(fname) ||
+			    (global_g_val(GMDRONLYVIEW) && ffronly(fname) )) {
 				make_local_b_val(bp, MDVIEW);
 				set_b_val(bp, MDVIEW, TRUE);
 			}
@@ -665,21 +687,31 @@ int	mflg;		/* print messages? */
 
 	TTkopen();	/* open the keyboard again */
 
-        for_each_window(wp) {
-                if (wp->w_bufp == bp) {
-			wp->w_line.l = lFORW(buf_head(bp));
-			wp->w_dot.l  = lFORW(buf_head(bp));
-                        wp->w_dot.o  = 0;
+	for_each_window(wp) {
+			if (wp->w_bufp == bp) {
+		wp->w_line.l = lFORW(buf_head(bp));
+		wp->w_dot.l  = lFORW(buf_head(bp));
+					wp->w_dot.o  = 0;
 #ifdef WINMARK
-                        wp->w_mark = nullmark;
+					wp->w_mark = nullmark;
 #endif
-                        wp->w_lastdot = nullmark;
-                        wp->w_flag |= WFMODE|WFHARD;
-                }
-        }
+					wp->w_lastdot = nullmark;
+					wp->w_flag |= WFMODE|WFHARD;
+			}
+	}
 	imply_alt(fname, FALSE, lockfl);
 	updatelistbuffers();
 
+#if PROC
+	if (s == TRUE) { 
+	    static int readhooking;
+	    if (!readhooking && *readhook) {
+		    readhooking = TRUE;
+		    run_procedure(readhook);
+		    readhooking = FALSE;
+	    }
+	}
+#endif
 	return (s != FIOERR);
 }
 
@@ -697,6 +729,7 @@ int *nlinep;
 
 	if ((len = ffsize()) < 0) {
 	    	mlforce("[Can't size file]");
+		TTbeep();
 		return FIOERR;
 	}
 
@@ -856,7 +889,7 @@ int *nlinep;
 	int	doslines = 0,
 		unixlines = 0;
 #endif
-#if UNIX || MSDOS	/* i.e., we can read from a pipe */
+#if UNIX || MSDOS || OS2	/* i.e., we can read from a pipe */
 	int	flag = 0;
 	int	done_update = FALSE;
 #endif
@@ -883,7 +916,7 @@ int *nlinep;
                         s = FIOMEM;             /* Keep message on the  */
                         break;                  /* display.             */
                 } 
-#if UNIX || MSDOS
+#if UNIX || MSDOS || OS2
 		else {
                 	/* reading from a pipe, and internal? */
 			if (slowtime(&last_updated)) {
@@ -999,7 +1032,7 @@ char    fname[];
 	fcp = &fname[strlen(fname)];
 	/* trim trailing whitespace */
 	while (fcp != fname && (isblank(fcp[-1])
-#if UNIX || MSDOS /* trim trailing slashes as well */
+#if UNIX || MSDOS || OS2 /* trim trailing slashes as well */
 					 || slashc(fcp[-1])
 #endif
 							) )
@@ -1009,7 +1042,7 @@ char    fname[];
 	while (isblank(*fcp))
 		fcp++;
 
-#if     UNIX || MSDOS || VMS
+#if     UNIX || MSDOS || VMS || OS2
 	bcp = bname;
 	if (isShellOrPipe(fcp)) { 
 		/* ...it's a shell command; bname is first word */
@@ -1162,6 +1195,7 @@ int f,n;
 
         if (curbp->b_fname[0] == EOS) {		/* Must have a name.    */
                 mlforce("[No file name]");
+		TTbeep();
                 return FALSE;
         }
         if ((s=writeout(curbp->b_fname,curbp,TRUE)) == TRUE)
@@ -1251,6 +1285,7 @@ BUFFER	*bp;
 
 	if (is_internalname(fn)) {
 		mlforce("[No filename]");
+		TTbeep();
 		return FALSE;
 	}
 
@@ -1262,9 +1297,21 @@ BUFFER	*bp;
 		return FALSE;
 	}
 
+#if PROC
+	{ 
+	    static int writehooking;
+	    if (!writehooking && *writehook) {
+		    writehooking = TRUE;
+		    run_procedure(writehook);
+		    writehooking = FALSE;
+	    }
+	}
+#endif
+
 	fn = lengthen_path(strcpy(fname, fn));
 	if (same_fname(fn, bp, FALSE) && b_val(bp,MDVIEW)) {
 		mlforce("[Can't write-back from view mode]");
+		TTbeep();
 		return FALSE;
 	}
 
@@ -1650,7 +1697,7 @@ ACTUAL_SIG_DECL
 				(void)mktemp(dirnam);
 				if(mkdir(dirnam,0700) != 0) {
 					vttidy(FALSE);
-					ExitProgram(BAD(1));
+					ExitProgram(BADEXIT);
 				}
 				created = TRUE;
 			}
@@ -1662,7 +1709,7 @@ ACTUAL_SIG_DECL
 			set_b_val(bp,MDVIEW,FALSE);
 			if (writeout(filnam,bp,FALSE) != TRUE) {
 				vttidy(FALSE);
-				ExitProgram(BAD(1));
+				ExitProgram(BADEXIT);
 			}
 			wrote++;
 		}
@@ -1699,10 +1746,14 @@ ACTUAL_SIG_DECL
 		}
 	}
 	vttidy(FALSE);
-	if (signo > 2)
+	if (signo > 2) {
 		abort();
-	else
-		ExitProgram(wrote ? BAD(wrote) : GOOD);
+	} else {
+	    	if (wrote)
+		    ExitProgram(BADEXIT);
+		else
+		    ExitProgram(GOODEXIT);
+	}
 
 	/* NOTREACHED */
 	SIGRET;

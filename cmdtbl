@@ -74,7 +74,35 @@
 #		here for completeness.
 #
 # $Log: cmdtbl,v $
-# Revision 1.84  1994/03/08 11:55:28  pgf
+# Revision 1.93  1994/04/25 21:23:02  pgf
+# added w! and x! as synonyms for w and x, since they
+# are the same under vile
+#
+# Revision 1.92  1994/04/22  16:06:18  pgf
+# kev's font changes, mostly
+#
+# Revision 1.91  1994/04/18  17:35:51  pgf
+# kev's changes for attribution, man page macros
+#
+# Revision 1.90  1994/04/18  16:56:16  pgf
+# deleted altspeckey command
+#
+# Revision 1.89  1994/04/18  14:26:27  pgf
+# merge of OS2 port patches, and changes to tungetc operation
+#
+# Revision 1.88  1994/04/13  20:46:38  pgf
+# various fixes (towards 4.4) from kev
+#
+# Revision 1.87  1994/04/11  15:50:06  pgf
+# kev's attribute changes
+#
+# Revision 1.86  1994/04/07  18:12:25  pgf
+# added sel_motion (^S), moved operselect() to ^A-s
+#
+# Revision 1.85  1994/04/04  12:10:55  pgf
+# added select operator, on ^S
+#
+# Revision 1.84  1994/03/08  11:55:28  pgf
 # new rectangle-oriented commands
 #
 # Revision 1.83  1994/02/22  11:03:15  pgf
@@ -102,7 +130,7 @@ backchar_to_bol	MOTION
 	'^H'
 	'^?'
 	'FN-D'				ANSI_SPEC
-	'FN-\113'			MSDOS
+	'FN-\113'			IBM_KBD
 backdelchar	REDO|UNDO
 	"delete-previous-character"	!FEWNAMES
 	'X'
@@ -120,7 +148,7 @@ backline	GOAL|MOTION|FL
 	'k'
 	'^P'
 	'FN-A'				ANSI_SPEC
-	'FN-\110'			MSDOS
+	'FN-\110'			IBM_KBD
 backbline	MOTION|FL
 	"previous-line-at-bol"		!FEWNAMES
 	"back-line-at-bol"		!FEWNAMES
@@ -130,12 +158,12 @@ backpage	MOTION
 	"previous-page"			!FEWNAMES
 	"back-page"			!FEWNAMES
 	'^B'
-	'FN-\111'			MSDOS
+	'FN-\111'			IBM_KBD
 backword	MOTION
 	"previous-word"			!FEWNAMES
 	"back-word"			!FEWNAMES
 	'B'
-	'FN-\163'			MSDOS
+	'FN-\163'			IBM_KBD
 backviword	MOTION
 	"previous-punctuated-word"		!FEWNAMES
 	"back-punctuated-word"		!FEWNAMES
@@ -204,37 +232,37 @@ cbuf2		REDO
 	"execute-macro-2"		!FEWNAMES
 	'FN-2'				UNIX
 	'FN-Q'				ANSI_SPEC
-	'FN-\125'			MSDOS
+	'FN-\125'			IBM_KBD
 cbuf3		REDO
 	"execute-macro-3"		!FEWNAMES
 	'FN-3'				UNIX
 	'FN-R'				ANSI_SPEC
-	'FN-\126'			MSDOS
+	'FN-\126'			IBM_KBD
 cbuf4		REDO
 	"execute-macro-4"		!FEWNAMES
 	'FN-4'				UNIX
 	'FN-S'				ANSI_SPEC
-	'FN-\127'			MSDOS
+	'FN-\127'			IBM_KBD
 cbuf5		REDO
 	"execute-macro-5"		!FEWNAMES
 	'FN-5'				UNIX
-	'FN-\130'			MSDOS
+	'FN-\130'			IBM_KBD
 cbuf6		REDO
 	"execute-macro-6"		!FEWNAMES
 	'FN-6'				UNIX
-	'FN-\131'			MSDOS
+	'FN-\131'			IBM_KBD
 cbuf7		REDO
 	"execute-macro-7"		!FEWNAMES
 	'FN-7'				UNIX
-	'FN-\132'			MSDOS
+	'FN-\132'			IBM_KBD
 cbuf8		REDO
 	"execute-macro-8"		!FEWNAMES
 	'FN-8'				UNIX
-	'FN-\133'			MSDOS
+	'FN-\133'			IBM_KBD
 cbuf9		REDO
 	"execute-macro-9"		!FEWNAMES
 	'FN-9'				UNIX
-	'FN-\134'			MSDOS
+	'FN-\134'			IBM_KBD
 cbuf10		REDO
 	"execute-macro-10"		!FEWNAMES
 cbuf11		REDO			!SMALLER
@@ -398,7 +426,7 @@ fnclabel	NONE			FLABEL
 forwdelchar	REDO|UNDO
 	"delete-next-character"		!FEWNAMES
 	'x'
-	'FN-\123'			MSDOS
+	'FN-\123'			IBM_KBD
 forwhpage	MOTION
 	"forward-half-page"		!FEWNAMES
 	"next-half-page"		!FEWNAMES
@@ -413,13 +441,13 @@ forwchar_to_eol	MOTION
 	' '
 	'l'
 	'FN-C'				ANSI_SPEC
-	'FN-\115'			MSDOS
+	'FN-\115'			IBM_KBD
 forwpage	MOTION
 	"forward-page"			!FEWNAMES
 	"next-page"			!FEWNAMES
 	"down-page"			!FEWNAMES
 	'^F'
-	'FN-\121'			MSDOS
+	'FN-\121'			IBM_KBD
 forwline	GOAL|MOTION|FL
 	"forward-line"			!FEWNAMES
 	"next-line"			!FEWNAMES
@@ -428,7 +456,7 @@ forwline	GOAL|MOTION|FL
 	'^J'
 	'^N'
 	'FN-B'				ANSI_SPEC
-	'FN-\120'			MSDOS
+	'FN-\120'			IBM_KBD
 forwbline	MOTION|FL
 	"forward-line-at-bol"		!FEWNAMES
 	"next-line-at-bol"		!FEWNAMES
@@ -439,7 +467,7 @@ forwword	MOTION
 	"forward-word"			!FEWNAMES
 	"next-word"			!FEWNAMES
 	'W'
-	'FN-\164'			MSDOS
+	'FN-\164'			IBM_KBD
 forwviword	MOTION
 	"forward-punctuated-word"		!FEWNAMES
 	"next-punctuated-word"		!FEWNAMES
@@ -480,21 +508,21 @@ gotobop		ABSM|MOTION		WORDPRO
 	"back-paragraph"		!FEWNAMES
 	"up-paragraph"			!FEWNAMES
 	'{'
-#	'FN-\204'			MSDOS
+#	'FN-\204'			IBM_KBD
 gotoeop		ABSM|MOTION		WORDPRO
 	"forward-paragraph"		!FEWNAMES
 	"next-paragraph"		!FEWNAMES
 	"down-paragraph"		!FEWNAMES
 	'}'
-	'FN-\166'			MSDOS
+	'FN-\166'			IBM_KBD
 gotobob		ABSM|MOTION		!SMALLER
 	"beginning-of-file"		!FEWNAMES
 	"goto-beginning-of-file"	!FEWNAMES
-	'FN-\107'			MSDOS
+	'FN-\107'			IBM_KBD
 gotoeob		ABSM|MOTION		!SMALLER
 	"goto-end-of-file"		!FEWNAMES
 	"end-of-file"			!FEWNAMES
-	'FN-\117'			MSDOS
+	'FN-\117'			IBM_KBD
 gotobol		MOTION
 	"goto-bol"			!FEWNAMES
 	"beginning-of-line"		!FEWNAMES
@@ -674,11 +702,9 @@ newwidth	NONE
 nextwind	NONE
 	"next-window"			!FEWNAMES
 	'^X-o'
-#	'^N'
 nullproc	NONE
 	"nop"				!FEWNAMES
 	'^Q'
-	'^S'
 onamedcmd	NONE			UNUSED
 	"execute-named-command-old"	!FEWNAMES
 	'^A-:'
@@ -703,6 +729,18 @@ opendown_no_aindent	REDO|UNDO|(FROM|ZERO)
 operopenrect	REDO|UNDO|GLOBOK|UNDO|(RANGE)
 	"open-rectangle"
 	'^A-r'
+operattrbold	OPER			OPT_SELECTIONS
+	"attribute-bold-til"		!FEWNAMES
+	'^A-B'
+operattrcaseq	OPER			OPT_SELECTIONS
+	"attribute-cntl_a-sequences-til"	!FEWNAMES
+	'^A-A'
+operattrital	OPER			OPT_SELECTIONS
+	"attribute-italic-til"		!FEWNAMES
+	'^A-I'
+operattrul	OPER			OPT_SELECTIONS
+	"attribute-underline-til"	!FEWNAMES
+	'^A-U'
 operchg		OPER|REDO|UNDO
 	"change-til"			!FEWNAMES
 	"delete-and-insert-chars-til"			!FEWNAMES
@@ -760,6 +798,9 @@ operlist	OPER|GLOBOK|(RANGE)		GLOBALS
 operprint	OPER|GLOBOK|(RANGE)		GLOBALS
 	"print-lines-til"		!FEWNAMES
 	"p"
+operselect	OPER			OPT_SELECTIONS
+	"select-til"			!FEWNAMES
+	'^A-s'
 operupper	OPER|REDO|UNDO|GLOBOK|(RANGE)
 	"upper-til"			!FEWNAMES
 	"U"
@@ -800,6 +841,7 @@ opertransf	OPER|(RANGE|EXTRA)
 	"t"
 operwrite	OPER|(RANGE|BANG|FILE1|DFLALL|NOMOVE)
 	"w"
+	"w!"
 	"W"
 	"write-til"			!FEWNAMES
 	'^W'
@@ -844,6 +886,7 @@ quithard	NONE
 	"Q!"
 quickexit	NONE|(BANG|NL)
 	"x"
+	"x!"
 	"xit"
 	"wwq"
 	"write-changed-buffers-and-quit" !FEWNAMES
@@ -878,6 +921,9 @@ risearch	NONE			ISRCH
 revsearch	ABSM|MOTION
 	"reverse-search"		!FEWNAMES
 	'N'
+sel_motion	ABSM|MOTION
+	"selection"
+	'^S'
 scrforwsearch	ABSM|MOTION
 	"screen-search-forward"		!FEWNAMES
 	'^X-/'
@@ -969,11 +1015,8 @@ spawn		NONE
 speckey		NONE
 	"function-prefix"
 	'#'
-altspeckey		NONE
-	"alt-function-prefix"
 splitwind	NONE
 	"split-current-window"		!FEWNAMES
-#	'^T'
 	'^X-2'
 storemac	NONE
 	"store-macro"

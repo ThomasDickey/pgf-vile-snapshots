@@ -2,7 +2,10 @@
  *		for MicroEMACS
  *
  * $Log: tcap.c,v $
- * Revision 1.38  1994/02/22 11:03:15  pgf
+ * Revision 1.39  1994/04/22 14:34:15  pgf
+ * changed BAD and GOOD to BADEXIT and GOODEXIT
+ *
+ * Revision 1.38  1994/02/22  11:03:15  pgf
  * truncated RCS log for 4.0
  *
  */
@@ -106,14 +109,14 @@ tcapopen()
 	if ((tv_stype = getenv("TERM")) == NULL)
 	{
 		puts("Environment variable TERM not defined!");
-		ExitProgram(BAD(1));
+		ExitProgram(BADEXIT);
 	}
 
 	if ((tgetent(tcbuf, tv_stype)) != 1)
 	{
 		(void)lsprintf(err_str, "Unknown terminal type %s!", tv_stype);
 		puts(err_str);
-		ExitProgram(BAD(1));
+		ExitProgram(BADEXIT);
 	}
 
 	/* Get screen size from system, or else from termcap.  */
@@ -172,7 +175,7 @@ tcapopen()
 	if(CL == NULL || CM == NULL || UP == NULL)
 	{
 		puts("Incomplete termcap entry\n");
-		ExitProgram(BAD(1));
+		ExitProgram(BADEXIT);
 	}
 
 	if (CE == NULL) 	/* will we be able to use clear to EOL? */
@@ -210,7 +213,7 @@ tcapopen()
 	if (p >= &tcapbuf[TCAPSLEN])
 	{
 		puts("Terminal description too big!\n");
-		ExitProgram(BAD(1));
+		ExitProgram(BADEXIT);
 	}
 	ttopen();
 	if (TI)

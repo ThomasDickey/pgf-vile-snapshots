@@ -2,7 +2,13 @@
  * Written for vile by Paul Fox, (c)1990
  *
  * $Log: finderr.c,v $
- * Revision 1.33  1994/02/22 11:03:15  pgf
+ * Revision 1.35  1994/04/26 13:48:13  pgf
+ * warning cleanup
+ *
+ * Revision 1.34  1994/04/19  15:13:06  pgf
+ * use strncpy0() in likely places
+ *
+ * Revision 1.33  1994/02/22  11:03:15  pgf
  * truncated RCS log for 4.0
  *
  */
@@ -19,7 +25,7 @@ void
 set_febuff(name)
 char	*name;
 {
-	(void)strncpy(febuff, name, NBUFN);
+	(void)strncpy0(febuff, name, (SIZE_T)(NBUFN+1));
 	newfebuff = TRUE;
 }
 

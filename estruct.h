@@ -10,7 +10,43 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.167  1994/03/18 18:31:26  pgf
+ * Revision 1.179  1994/04/25 21:07:13  pgf
+ * changes for ANSI screen under MSDOS
+ *
+ * Revision 1.178  1994/04/25  20:28:14  pgf
+ * fixes from kev
+ *
+ * Revision 1.177  1994/04/22  14:34:15  pgf
+ * changed BAD and GOOD to BADEXIT and GOODEXIT
+ *
+ * Revision 1.176  1994/04/22  13:47:56  pgf
+ * make sure X11 is always defined
+ *
+ * Revision 1.175  1994/04/20  19:54:50  pgf
+ * changes to support 'BORLAND' console i/o screen driver
+ *
+ * Revision 1.174  1994/04/18  14:26:27  pgf
+ * merge of OS2 port patches, and changes to tungetc operation
+ *
+ * Revision 1.173  1994/04/13  20:46:38  pgf
+ * various fixes (towards 4.4) from kev
+ *
+ * Revision 1.172  1994/04/11  15:50:06  pgf
+ * kev's attribute changes
+ *
+ * Revision 1.171  1994/04/07  19:02:20  pgf
+ * kev's changes for direct pscreen access
+ *
+ * Revision 1.170  1994/04/04  16:14:58  pgf
+ * kev's 4.4 changes
+ *
+ * Revision 1.169  1994/04/01  14:30:02  pgf
+ * tom's warning/lint patch
+ *
+ * Revision 1.168  1994/03/29  16:24:20  pgf
+ * kev's changes: selection and attributes
+ *
+ * Revision 1.167  1994/03/18  18:31:26  pgf
  * cleanup of OPT_WORKING ifdefs
  *
  * Revision 1.166  1994/03/16  10:54:56  pgf
@@ -157,34 +193,31 @@
 #endif
 
 /* non-unix flavors */
-#undef	LATTICE		/* don't use their definitions...use ours	*/
 #undef	MSDOS
 #undef	CPM
 #undef	AMIGA
 #undef	EGA
 
 #define AMIGA	0			/* AmigaDOS			*/
-#define ST520	0			/* ST520, TOS		       */
-#define MSDOS	0			/* MS-DOS		       */
-#define CPM	0			/* CP/M-86		       */
+#define ST520	0			/* ST520, TOS			*/
+#define MSDOS	0			/* MS-DOS			*/
+#define OS2	0			/* son of DOS			*/
+#define CPM	0			/* CP/M-86			*/
 
 /*	Compiler definitions			*/
-#define MWC86	0	/* marc williams compiler */
-#define	LATTICE	0	/* Lattice 2.14 through 3.0 compilers */
-#define	AZTEC	0	/* Aztec C 3.20e */
 #define	MSC	0	/* MicroSoft C compile version 3 & 4 & 5 & 6 */
 #define	ZTC	0	/* Zortech C compiler */
-#define	TURBO	0	/* Turbo C/MSDOS */
+#define	TURBO	0	/* Turbo C/MSDOS or Borland C++ */
 #define	WATCOM	0	/* WATCOM C/386 version 9.0 or above */
 #define	DJGPP	0	/* DJ's GCC version 1.09 */
 
-#ifdef __TURBOC__ 	/* Borland C/C++ 3.0 */
+#ifdef __TURBOC__
 #undef TURBO
 #undef SVR3
 #undef MSDOS
 #define SVR3   0
-#define TURBO  1
 #define MSDOS  1
+#define TURBO  1
 #endif
 
 #ifdef __WATCOMC__
@@ -194,6 +227,13 @@
 #define SVR3   0
 #define MSDOS  1
 #define WATCOM 1
+#endif
+
+#ifdef __OS2__
+/* assume compiler already chosen */
+#undef MSDOS
+#undef OS2
+#define OS2
 #endif
 
 #ifdef __GO32__  	/* DJ's GCC version 1.09 */
@@ -207,9 +247,10 @@
 #define DJGPP   1
 #endif
 
-/* As of version 3.51 of vile, NEWDOSCC should be correct for Turbo, Watcom,
- *  and the DJ gcc (GO32) compilers.  I'm betting that it's also probably
- *  correct for MSC (Microsoft C) and ZTC (Zortech), but I'm not sure of those.
+/* As of version 3.51 of vile, NEWDOSCC should be correct for Turbo,
+ * Watcom, and the DJ gcc (GO32) compilers.  I'm betting that it's also
+ * probably correct for MSC (Microsoft C) and ZTC (Zortech), but I'm not
+ * sure of those.  (It implies a lot of ANSI and POSIX behavior.)
  */
 #if TURBO || WATCOM || MSC || DJGPP || ZTC
 # define NEWDOSCC 1
@@ -217,13 +258,24 @@
 # define NEWDOSCC 0
 #endif
 
+
 #endif /* os_chosen */
 
-/* some code uses this as a value in expressions,
- * so we always want it defined */
+/* some code uses these as values in expressions,
+ * so we always want them defined */
 #ifndef MSDOS
-#define MSDOS 0
+# define MSDOS 0
 #endif
+#ifndef OS2
+# define OS2 0
+#endif
+#ifndef X11
+# define X11 0
+#endif
+
+#define IBM_KBD (MSDOS || OS2)
+#define CRLF_LINES (MSDOS || OS2)
+
 
 #if ! LINUX && ! DJGPP && !defined(__CLCC_) && !defined(__GNUC__) && !APOLLO
     /* there are probably others that don't want/need const defined */
@@ -270,7 +322,7 @@
 # define SIGRET return 0
 #endif
 
-#if UNIX || MSDOS || VMS
+#if UNIX || MSDOS || VMS || OS2
 #include	<signal.h>
 # if APOLLO
 #  if APOLLO_STDLIB && !defined(lint)	/* SR10.3, CC 6.8 */
@@ -314,20 +366,18 @@
 # define SIG_IGN	(SIGT (*)(DEFINE_SIG_ARGS))1
 #endif
 
-#if UNIX || MSDOS || VMS
+#if UNIX || MSDOS || VMS || OS2
 #include	<setjmp.h>
 #endif
 
 /* argument for 'exit()' or '_exit()' */
 #if	VMS
 #include	<stsdef.h>
-#define GOOD	(STS$M_INHIB_MSG | STS$K_SUCCESS)
-#define BAD(c)	(STS$M_INHIB_MSG | STS$K_ERROR)
-#endif
-
-#ifndef GOOD
-#define GOOD	0
-#define BAD(c)	(c)
+#define GOODEXIT	(STS$M_INHIB_MSG | STS$K_SUCCESS)
+#define BADEXIT		(STS$M_INHIB_MSG | STS$K_ERROR)
+#else
+#define GOODEXIT	0
+#define BADEXIT		1
 #endif
 
 /*	Porting constraints			*/
@@ -353,7 +403,7 @@
 # endif
 #endif
 
-#if	((MSDOS) && (LATTICE || AZTEC || NEWDOSCC)) || UNIX || VMS
+#if UNIX || MSDOS || VMS || OS2
 #define	ENVFUNC	1
 #else
 #define	ENVFUNC	0
@@ -370,7 +420,8 @@
 #define	HP110	0			/* HP110 screen driver		*/
 #define	VMSVT	0			/* various VMS terminal entries	*/
 #define VT52	0			/* VT52 terminal (Zenith).	*/
-#define	IBMPC	MSDOS			/* IBM-PC CGA/MONO/EGA driver	*/
+#define	BORLAND	0			/* Borland console I/O routines */
+#define	IBMPC	(MSDOS && !BORLAND && !ANSI) /* IBM-PC CGA/MONO/EGA driver */
 #define	ZIBMPC	0			/* Zortech lib IBM-PC CGA/MONO/EGA driver	*/
 #define	DG10	0			/* Data General system/10	*/
 #define	TIPC	0			/* TI Professional PC driver	*/
@@ -394,7 +445,7 @@
 /* NOTE -- COLOR doesn't currently do anything if you're using X or TERMCAP */
 /* (But I think X11 may honor colors from the command line or .Xdefaults) */
 /* (and DOS definitely does do things with COLOR, but it may not work) */
-#define	COLOR	(ANSI|MSDOS|X11)	/* color commands and windows			*/
+#define	COLOR	(ANSI|MSDOS|OS2|X11)	/* color commands and windows			*/
 
 /* Feature turnon/turnoff */
 #define ANSI_SPEC	1 /* ANSI function/arrow keys */
@@ -457,6 +508,16 @@
 #define OPT_SHOW_REGS   !SMALLER		/* "show-registers" */
 #define OPT_SHOW_TAGS   !SMALLER && TAGS	/* ":tags" displays tag-stack */
 
+/* selections and attributed regions */
+#define OPT_VIDEO_ATTRS	!SMALLER
+#define OPT_SELECTIONS	OPT_VIDEO_ATTRS
+
+/* OPT_PSCREEN permits a direct interface to the pscreen data structure
+ * in display.c. This allows us to avoid storing the screen data on the
+ * screen interface side.
+ */
+#define OPT_PSCREEN	(XTOOLKIT && OPT_VIDEO_ATTRS)
+
 #define NEW_VI_MAP      0		/* patch: working on ":map" */
 
 #if	(TERMCAP || X11) && !SMALLER
@@ -471,6 +532,17 @@
 
 	/* any mouse capability */
 #define OPT_MOUSE       (X11 || OPT_XTERM || OPT_MS_MOUSE)
+
+/*
+ * If selections will be used to communicate between vile and other
+ * applications, OWN_SELECTION must be defined to call the procedure
+ * for establishing ownership of the selection.
+ */
+#if OPT_SELECTIONS && (XTOOLKIT /* || ... */)
+#define OWN_SELECTION() own_selection()
+#else
+#define OWN_SELECTION()
+#endif
 
 /*
  * Special characters used in globbing
@@ -623,41 +695,10 @@ extern char *rindex();
 #include <memory.h>
 #endif
 
-#if	LATTICE
-#define	unsigned
-#endif
-
-#if	AZTEC
-#undef	fputc
-#undef	fgetc
-#if	MSDOS
-#define	fgetc	a1getc
-#else
-#define	fgetc	agetc
-#endif
-#define	fputc	aputc
-#define	int86	sysint
-#define	intdos(a, b)	sysint(33, a, b)
-#define	inp	inportb
-#define	outp	outportb
-
-struct XREG {
-	int ax,bx,cx,dx,si,di;
-};
-
-struct HREG {
-	char al,ah,bl,bh,cl,ch,dl,dh;
-};
-
-union REGS {
-	struct XREG x;
-	struct HREG h;
-};
-#endif
 
 /* on MS-DOS we have to open files in binary mode to see the ^Z characters. */
 
-#if MSDOS
+#if MSDOS || OS2
 #define FOPEN_READ	"rb"
 #define FOPEN_WRITE	"wb"
 #define FOPEN_APPEND	"ab"
@@ -670,7 +711,7 @@ union REGS {
 #endif
 
 
-#if MSDOS
+#if MSDOS || OS2
 # define slashc(c) (c == '\\' || c == '/')
 #endif
 
@@ -682,33 +723,6 @@ union REGS {
 # define slashc(c) (c == '/')
 #endif
 
-#if	MSDOS && MWC86
-#include	<dos.h>
-#define	int86(a, b, c)	intcall(b, c, a)
-#define	inp	in
-
-struct XREG {
-	int ax,bx,cx,dx,si,di,ds,es,flags;
-};
-
-struct HREG {
-	char al,ah,bl,bh,cl,ch,dl,dh;
-	int ds,es,flags;
-};
-
-union REGS {
-	struct XREG x;
-	struct HREG h;
-};
-#endif
-
-#if	MSDOS && LATTICE
-#undef	CPM
-#undef	LATTICE
-#include	<dos.h>
-#undef	CPM
-#endif
-
 #if	VMS
 #define	unlink(a)	delete(a)
 #endif
@@ -717,8 +731,8 @@ union REGS {
 
 	/* intermediate config-controls for filec.c (needed in nemode.h) */
 #if !SMALLER && !OPT_MAP_MEMORY
-#define COMPLETE_FILES  (UNIX || MSDOS || VMS)
-#define	COMPLETE_DIRS   (UNIX || MSDOS)
+#define COMPLETE_FILES  (UNIX || MSDOS || VMS || OS2)
+#define	COMPLETE_DIRS   (UNIX || MSDOS || OS2)
 #else
 #define COMPLETE_FILES  0
 #define COMPLETE_DIRS   0
@@ -778,9 +792,19 @@ union REGS {
 #define	NLOCKS	100			/* max # of file locks active	*/
 #define	NCOLORS	8			/* number of supported colors	*/
 #define	KBLOCK	256			/* sizeof kill buffer chunks	*/
+#if !OPT_SELECTIONS
 #define	NKREGS	36			/* number of kill buffers	*/
+#else
+#define NKREGS	37			/* When selections are enabled, we
+					 * allocate an extra kill buffer for
+					 * the current selection.
+					 */
+#define SEL_KREG (NKREGS-1)
+#endif
 #define	NBLOCK	16			/* line block chunk size	*/
 #define MINWLNS	3			/* min # lines, window/screen	*/
+#define MAXROWS	200			/* max # lines per screen	*/
+#define MAXCOLS	200			/* max # cols per screen	*/
 
 #define C_BLACK 0
 #define C_WHITE (NCOLORS-1)
@@ -796,7 +820,7 @@ union REGS {
 
 #define	char2int(c)	((int)(c & 0xff)) /* mask off sign-extension, etc. */
 
-#define did_tungetc()   (tungotc >= 0)	/* true iff we have a char saved */
+#define did_tungetc()   (tungotcnt > 0) /* test how many ungotten chars */
 #define	PLURAL(n)	((n!=1)?"s":"")
 
 #define	EOS     '\0'
@@ -819,9 +843,11 @@ union REGS {
 #define	RECORD	2			/*	"     "   recording	*/
 
 /* values for regionshape */
-#define EXACT		0
-#define FULLLINE	1
-#define RECTANGLE	2
+typedef enum {
+	EXACT,
+	FULLLINE,
+	RECTANGLE
+} REGIONSHAPE;
 
 /* flook options */
 #define FL_HERE 1
@@ -844,7 +870,7 @@ union REGS {
 #define KBD_SHPIPE	iBIT(8)	/* expand, assuming shell-command */
 
 /* default option for 'mlreply' (used in modes.c also) */
-#if !MSDOS
+#if !(MSDOS || OS2)
 #define	KBD_NORMAL	KBD_EXPAND|KBD_QUOTES
 #else
 #define	KBD_NORMAL	KBD_EXPAND
@@ -932,7 +958,7 @@ union REGS {
 #define	PATHCHR	','
 #endif
 
-#if MSDOS
+#if MSDOS || OS2
 #define	PATHCHR	';'
 #endif
 
@@ -986,6 +1012,7 @@ union REGS {
 #define _nonspace chrBIT(13)		/* non-whitespace */
 #define _qident   chrBIT(14)		/* is typically legal in "qualified" identifier */
 
+#undef CMASK				/* ...in case it's in <sys/param.h> */
 #if OPT_WIDE_CTYPES
 #define _scrtch   chrBIT(15)		/* legal in scratch-buffer names */
 #define _shpipe   chrBIT(16)		/* legal in shell/pipe-buffer names */
@@ -1302,6 +1329,56 @@ typedef struct MARK {
 #define is_last_line(m,bp)	(lForw(m.l) == l_ref(buf_head(bp)))
 #define is_first_line(m,bp)	(lBack(m.l) == l_ref(buf_head(bp)))
 
+/*
+ * The starting position of a region, and the size of the region in
+ * characters, is kept in a region structure.  Used by the region commands.
+ */
+typedef struct	{
+	MARK 	r_orig;			/* Origin LINE address. 	*/
+	MARK	r_end;			/* Ending LINE address. 	*/
+	C_NUM	r_leftcol;		/* Leftmost column. 		*/
+	C_NUM	r_rightcol;		/* Rightmost column. 		*/
+	B_COUNT	r_size; 		/* Length in characters.	*/
+}	REGION;
+
+#if COLOR
+typedef unsigned short VIDEO_ATTR;	/* assumption: short is at least 16 bits */
+#else
+typedef unsigned char VIDEO_ATTR;
+#endif
+
+#define	VAREV	0x10			/* reverse video		*/
+#define	VAUL	0x20			/* underline			*/
+#define	VAITAL	0x40			/* italics			*/
+#define	VABOLD	0x80			/* bold				*/
+#define VAFGCOL	0xf000			/* foreground color mask	*/
+#define VABGCOL	0x0f00			/* background color mask	*/
+
+/* The VATTRIB macro masks out those bits which should not be considered
+ * for comparison purposes
+ */
+
+#if OPT_PSCREEN
+#define VADIRTY	0x01			/* cell needs to be written out */
+#define VATTRIB(attr) ((attr) & ~VADIRTY)
+#else
+#define VADIRTY 0x0			/* nop for all others */
+#define VATTRIB(attr) (attr)
+#endif
+
+/*
+ * An attributed region is attached to a buffer and indicates how the
+ * region should be displayed; eg. inverse video, underlined, etc.
+ */
+
+typedef struct _aregion {
+	struct _aregion	*ar_next;
+	REGION		ar_region;
+	VIDEO_ATTR	ar_vattr;
+	REGIONSHAPE	ar_shape;
+}	AREGION;
+
+
 /* settable values have their names stored here, along with a synonym, and
 	what type they are */
 struct VALNAMES {
@@ -1383,6 +1460,9 @@ typedef struct	{
 #endif
 	MARK 	w_ld;	        	/* Line containing "lastdotmark"*/
 	MARK 	w_ln;		/* Top line in the window (offset unused) */
+#if OPT_MOUSE
+	int	insmode;	
+#endif
 	W_VALUES w_vals;
 } W_TRAITS;
 
@@ -1427,6 +1507,9 @@ typedef struct	BUFFER {
 	MARK 	b_line;		/* Link to the header LINE (offset unused) */
 	struct	BUFFER *b_bufp; 	/* Link to next BUFFER		*/
 	MARK 	*b_nmmarks;		/* named marks a-z		*/
+#if OPT_SELECTIONS
+	AREGION	*b_attribs;		/* attributed regions		*/
+#endif
 	B_VALUES b_values;		/* buffer traits we inherit from */
 					/*  global values		*/
 	W_TRAITS b_wtraits;		/* saved window traits, while we're */
@@ -1584,6 +1667,44 @@ typedef struct	BUFFER {
 #define b_set_left_margin(bp,n)
 #endif
 
+/* macro for iterating over the marks associated with the current buffer */
+
+#if OPT_VIDEO_ATTRS
+#define do_mark_iterate(mp, statement)			\
+    do {						\
+	struct MARK *mp;				\
+	int	     dmi_idx;				\
+	AREGION     *dmi_ap = curbp->b_attribs;		\
+	if (curbp->b_nmmarks != NULL)			\
+	    for (dmi_idx=0; dmi_idx < 26; dmi_idx++) {	\
+		mp = &(curbp->b_nmmarks[dmi_idx]);	\
+		statement				\
+	    }						\
+	if (dmi_ap != NULL) {				\
+	    while (dmi_ap != NULL) {			\
+		mp = &dmi_ap->ar_region.r_orig;		\
+		statement				\
+		mp = &dmi_ap->ar_region.r_end;		\
+		statement				\
+		dmi_ap = dmi_ap->ar_next;		\
+	    }						\
+	    sel_reassert_ownership(curbp);		\
+	}						\
+    } while (0)
+#else /* OPT_VIDEO_ATTRS */
+#define do_mark_iterate(mp, statement)			\
+    do							\
+	if (curbp->b_nmmarks != NULL) {			\
+	    struct MARK *mp;				\
+	    int dmi_idx;				\
+	    for (dmi_idx=0; dmi_idx < 26; dmi_idx++) {	\
+		mp = &(curbp->b_nmmarks[dmi_idx]);	\
+		statement				\
+	    }						\
+	}						\
+    while (0)
+#endif /* OPT_VIDEO_ATTRS */
+
 /*
  * There is a window structure allocated for every active display window. The
  * windows are kept in a big list, in top to bottom screen order, with the
@@ -1625,6 +1746,9 @@ typedef struct	WINDOW {
 #define	win_head(wp)	buf_head((wp)->w_bufp)
 
 #define DOT curwp->w_dot
+#if OPT_MOUSE
+#define insertmode (curwp->w_traits.insmode)
+#endif /* OPT_MOUSE */
 #ifdef WINMARK
 #define MK curwp->w_mark
 #else
@@ -1635,18 +1759,6 @@ typedef struct	WINDOW {
 	 * from cut/paste selection.
 	 */
 #define w_left_margin(wp) b_left_margin(wp->w_bufp)
-
-/*
- * The starting position of a region, and the size of the region in
- * characters, is kept in a region structure.  Used by the region commands.
- */
-typedef struct	{
-	MARK 	r_orig;			/* Origin LINE address. 	*/
-	MARK	r_end;			/* Ending LINE address. 	*/
-	C_NUM	r_leftcol;		/* Leftmost column. 		*/
-	C_NUM	r_rightcol;		/* Rightmost column. 		*/
-	B_COUNT	r_size; 		/* Length in characters.	*/
-}	REGION;
 
 /*
  * The editor communicates with the display using a high level interface. A
@@ -1685,6 +1797,9 @@ typedef struct	{
 #if	SCROLLCODE
 	void	(*t_scroll) P((int,int,int)); /* scroll a region of the screen */
 #endif
+#if 	OPT_PSCREEN
+	void	(*t_pflush) P((void));	/* really flush */
+#endif	/* OPT_PSCREEN */
 }	TERM;
 
 /*	TEMPORARY macros for terminal I/O  (to be placed in a machine
@@ -1714,6 +1829,9 @@ typedef struct	{
 #if	SCROLLCODE
 #define	TTscroll	(*term.t_scroll)
 #endif
+#if	OPT_PSCREEN
+#define	TTpflush	(*term.t_pflush)
+#endif
 
 typedef struct  VIDEO {
         int	v_flag;                 /* Flags */
@@ -1722,6 +1840,9 @@ typedef struct  VIDEO {
 	int	v_bcolor;		/* current background color */
 	int	v_rfcolor;		/* requested forground color */
 	int	v_rbcolor;		/* requested background color */
+#endif
+#if	OPT_VIDEO_ATTRS
+	VIDEO_ATTR *v_attrs;		/* screen data attributes */
 #endif
 	/* allocate 4 bytes here, and malloc 4 bytes less than we need,
 		to keep malloc from rounding up. */
@@ -1861,7 +1982,7 @@ typedef struct {
 #define	FILEC_EXPAND   16	/* allow glob-expansion to multiple files */
 
 #ifndef P_tmpdir		/* not all systems define this */
-#if MSDOS
+#if MSDOS || OS2
 #define P_tmpdir ""
 #endif
 #if UNIX

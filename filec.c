@@ -5,7 +5,14 @@
  * Written by T.E.Dickey for vile (march 1993).
  *
  * $Log: filec.c,v $
- * Revision 1.28  1994/02/22 11:03:15  pgf
+ * Revision 1.30  1994/04/18 14:26:27  pgf
+ * merge of OS2 port patches, and changes to tungetc operation
+ *
+ * Revision 1.29  1994/04/04  11:32:20  pgf
+ * turned off KBD_LOWERC in dos KBD_OPTIONS, as a trial.  i don't see
+ * any problems yet.  they're probably lying in wait.
+ *
+ * Revision 1.28  1994/02/22  11:03:15  pgf
  * truncated RCS log for 4.0
  *
  *
@@ -20,8 +27,10 @@
 #define	KBD_OPTIONS	KBD_NORMAL|KBD_UPPERC
 #endif
 
+#ifdef problemwithlowercasenames  /* ? */
 #if MSDOS
 #define	KBD_OPTIONS	KBD_NORMAL|KBD_LOWERC
+#endif
 #endif
 
 #ifndef	KBD_OPTIONS
@@ -168,7 +177,7 @@ char *	text;
 	conv_path(ref, lp->l_text, reflen);
 	conv_path(tst, text,       tstlen);
 
-#if MSDOS
+#if MSDOS || OS2
 	/*
 	 * Check to see if the drives are the same.  If not, there is no
 	 * point in further comparison.
@@ -445,7 +454,7 @@ char *	name;
 		s += force_slash(path);
 
 		while ((de = readdir(dp)) != 0) {
-#if UNIX || VMS
+#if UNIX || VMS || OS2
 # if USE_D_NAMLEN
 			strncpy(s, de->d_name, (SIZE_T)(de->d_namlen))[de->d_namlen] = EOS;
 # else
@@ -458,7 +467,7 @@ char *	name;
 			huh??
 # endif
 #endif
-#if UNIX || MSDOS
+#if UNIX || MSDOS || OS2
 			if (!strcmp(s, ".")
 			 || !strcmp(s, ".."))
 			 	continue;
@@ -584,7 +593,7 @@ int	*pos;
 		/*
 		 * Copy 'buf' into 'path', making it canonical-form.
 		 */
-#if UNIX || MSDOS
+#if UNIX || MSDOS || OS2
 		/* trim trailing "." if it is a "/." */
 		if ((s = last_slash(buf)) != 0
 		 && !strcmp(s+1, "."))

@@ -341,14 +341,6 @@ it doesn't get the right screen size or exits with incorrect colors).
 -----------------------------
 
 
-- I use your example of the ^X-m macro given in the help file to
-  read a manual page for some identifier. It would be nice to have a
-  shell-command that would NOT wait for me to press return or escape.
-
----------------------------
-
-
-
 With vim 1.27 you can configure its behaviour regarding backspace using
 the 'backspace' variable. From the help file:
 
@@ -538,4 +530,49 @@ Hi, This is to report a 'xvile' v3.65 problem:
   However I couldn't reproduce this... I don't know what exactly I
   typed... Just let you know...
 
--------------------------
+------------------------
+
+
+
+2) When I use the MKS "fmt" program to format a paragraph in vile, a
+   tmp file (aaxxx.tmp) is always dropped out in my current working
+   directory.  This was not a problem in the previous version of PCVILE
+   (the one I compiled with Turbo C++).
+
+    I.E., when I exit vile43 after using the fmt command, I've got a temp
+    file called "aaac1.tmp" (for example) in my current working directory.
+    It's annoying.
+
+
+-----------------------------
+
+
+sel_motion (^S) will attempt to move me to the selection, even if it's
+gone (deleted, say), causing "BUG: lost dot updpos, setting at top."
+
+------------------------------
+
+
+I'm using the DOS version and I prefer to use 80x28 or even higher res like
+80x50 by setting set sres=80x50 in vile.rc.  The problem is that when a
+command is executed with :!<shell-command> the mode switches back to 80x25.
+It switches back to 80x25 permanently. I think it's acceptable that it
+switches to 80x25 when it's in shell command execution.  However, technically
+it should switch back to the preferred mode when it's done.
+
+[ I don't see this on my omnibook... ]
+
+---------------------------
+
+the borland console driver won't display the cursor on blank lines until
+after you've refreshed the screen at least once, e.g. with ^L.  must
+be something to do with color initialization, or something like that...
+
+
+---------------------------
+
+doing a ":e foo*.c" reads in all matching files.  it should instead read
+in the first, and mark the others as unread, at let them come in later.
+in addition, the order in which they come in is odd, at least under autobuffer
+mode -- i think they should be available with :n, and they are not.
+

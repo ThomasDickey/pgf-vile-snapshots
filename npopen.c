@@ -2,7 +2,10 @@
  *		written by John Hutchinson, heavily modified by Paul Fox
  *
  * $Log: npopen.c,v $
- * Revision 1.34  1994/03/23 12:54:50  pgf
+ * Revision 1.35  1994/04/18 14:26:27  pgf
+ * merge of OS2 port patches, and changes to tungetc operation
+ *
+ * Revision 1.34  1994/03/23  12:54:50  pgf
  * both copies of npopen() should be silent on errors
  *
  * Revision 1.33  1994/02/22  11:03:15  pgf
@@ -13,9 +16,13 @@
 #include "estruct.h"
 #include "edef.h"
 
-#if UNIX
+#if UNIX || OS2
 
+#if UNIX
 #include <sys/param.h>
+#else
+#include <process.h>
+#endif
 
 #if LINUX || APOLLO
 #include <sys/wait.h>
@@ -43,15 +50,26 @@ char *cmd, *type;
 		return NULL;
 
 	if (*type == 'r') {
-		if (inout_popen(&ff, (FILE **)0, cmd) != TRUE)
+#if OS2
+ 		if ((ff = _popen(cmd,"r")) == NULL)
+#else
+  		if (inout_popen(&ff, (FILE **)0, cmd) != TRUE)
+#endif
 			return NULL;
 		return ff;
 	} else {
+#if OS2
+		if ((ff = _popen(cmd,"w")) == NULL)
+#else
 		if (inout_popen((FILE **)0, &ff, cmd) != TRUE)
+#endif
 			return NULL;
 		return ff;
 	}
 }
+#endif /* UNIX || OS2 */
+
+#if UNIX
 
 int
 inout_popen(fr, fw, cmd)
@@ -126,7 +144,18 @@ char *cmd;
 	}
 	return TRUE;
 }
+#endif /* UNIX */
 
+#if OS2
+void
+npclose (fp)
+FILE *fp;
+{
+	_pclose(fp);
+}
+#endif
+
+#if UNIX
 void
 npclose (fp)
 FILE *fp;
@@ -402,4 +431,4 @@ softfork()	/* dummy function to make filter-region work */
 {
 	return 0;
 }
-#endif
+#endif /* MSDOS */

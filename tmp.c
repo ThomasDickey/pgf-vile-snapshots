@@ -34,7 +34,10 @@
  *	  are in-memory can have space allocated from them.
  *
  * $Log: tmp.c,v $
- * Revision 1.9  1994/03/24 12:45:28  pgf
+ * Revision 1.10  1994/03/29 16:24:20  pgf
+ * kev's changes: selection and attributes
+ *
+ * Revision 1.9  1994/03/24  12:45:28  pgf
  * compiler workaround, from tom (gcc 2.5.5)
  *
  * Revision 1.8  1994/03/16  10:55:56  pgf
@@ -231,9 +234,14 @@ BUFFER	*bp;
 		}
 	}
 
+#if 0
 	if (bp->b_nmmarks != 0)
 		for (n = 0; n < 26; n++)
 			(void)dumpMark(bp->b_nmmarks[n]);
+#endif
+	do_mark_iterate(mp,
+			(void)dumpMark((*mp));
+	);
 
 	for (n = 0; n < 2; n++) {
 		(void)dumpMark(bp->b_uddot[n]);
@@ -589,9 +597,14 @@ BUFFER	*bp;
 	}
 
 	/* adjust pointers in marks */
+#if 0
 	if (bp->b_nmmarks != 0)
 		for (n = 0; n < 26; n++)
 			AdjustMark(bp->b_nmmarks[n]);
+#endif
+	do_mark_iterate(mp,
+			AdjustMark((*mp));
+	);
 
 	/* adjust pointers in the undo-stacks */
 	for (n = 0; n < 2; n++) {

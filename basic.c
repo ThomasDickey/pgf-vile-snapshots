@@ -6,7 +6,21 @@
  * framing, are hard.
  *
  * $Log: basic.c,v $
- * Revision 1.65  1994/03/08 11:47:06  pgf
+ * Revision 1.69  1994/04/12 11:40:11  pgf
+ * corrected cursor position after backpage() -- should be at bottom
+ * of window.  call firstnonwhite after both forwpage and backpage.
+ *
+ * Revision 1.68  1994/04/08  21:14:06  pgf
+ * kev removed keyboard selection
+ *
+ * Revision 1.67  1994/04/07  18:11:15  pgf
+ * beep management, and allow mouse to select newlines -- this fixes
+ * a selection off-by-one problem as well.
+ *
+ * Revision 1.66  1994/03/29  16:24:20  pgf
+ * kev's changes: selection and attributes
+ *
+ * Revision 1.65  1994/03/08  11:47:06  pgf
  * changed 'fulllineregions' to 'regionshape'.
  * added gorectnmmark() function.
  *
@@ -672,7 +686,6 @@ getstutter()
 		thiskey = lastkey;
 		kbd_seq();
 		if (thiskey != lastkey) {
-			TTbeep();
 			return FALSE;
 		}
 	}
@@ -850,7 +863,7 @@ register int	n;
 		if (n < 0)
 			curwp->w_line.l = lp;
 		DOT.l  = lp;
-		DOT.o  = w_left_margin(curwp);
+		(void)firstnonwhite(FALSE,1);
 		curwp->w_flag |= WFHARD|WFMODE;
 	}
 	return status;
@@ -878,8 +891,7 @@ register int	n;
 		  &&   !same_ptr(lBACK(lp), buf_head(curbp)))
 			lp = lBACK(lp);
 		curwp->w_line.l = lp;
-		DOT.l  = lp;
-		DOT.o  = w_left_margin(curwp);
+		(void)gotoeos(FALSE,1);
 		curwp->w_flag |= WFHARD|WFMODE;
 	}
 	return status;
@@ -978,8 +990,8 @@ int f,n;
 	} else {
 		c = tgetc(FALSE);
 	}
+
 	if (c < 'a' || c > 'z') {
-		TTbeep();
 		mlforce("[Invalid mark name]");
 		return FALSE;
 	}
@@ -1089,7 +1101,6 @@ int c;
 	int found;
 
 	if (!islower(c) && c != '\'') {
-		TTbeep();
 		mlforce("[Invalid mark name]");
 		return FALSE;
 	}
@@ -1114,7 +1125,6 @@ int c;
 		}
 	}
 	if (!found) {
-		TTbeep();
 		mlforce("[Mark not set]");
 		return (FALSE);
 	}
@@ -1227,11 +1237,14 @@ int row, col;
 #endif
 		DOT.o = col2offs(curwp, dlp, col);
 
+#if dont_allow_mouse_to_select_newline
 		/* don't allow the cursor to be set past end of line unless we
 		 * are in insert mode
 		 */
-		if (DOT.o >= lLength(dlp) && DOT.o > w_left_margin(curwp) && !insertmode)
+		if (DOT.o >= lLength(dlp) && DOT.o > w_left_margin(curwp) && 
+					!insertmode)
 			DOT.o--;
+#endif
 	}
 	MK  = DOT;
 	DOT = save;

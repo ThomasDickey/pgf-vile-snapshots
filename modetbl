@@ -12,7 +12,27 @@
 # The modes are table entries in the BUFFER and WINDOW structures.
 #
 # $Log: modetbl,v $
-# Revision 1.32  1994/02/22 11:03:15  pgf
+# Revision 1.38  1994/04/22 13:49:11  pgf
+# new hooks
+#
+# Revision 1.37  1994/04/22  11:30:50  pgf
+# added cd-hook, ocwd, title, iconname, xvile, pcvile variables.  title,
+# iconname, and font are now conditional on X11.  $xvile can be used
+# to test whether to set them or not
+#
+# Revision 1.36  1994/04/08  19:55:36  pgf
+# deleted obsolescent "target" variable
+#
+# Revision 1.35  1994/04/05  14:04:02  pgf
+# added "view-on-readonly" mode
+#
+# Revision 1.34  1994/04/04  16:14:58  pgf
+# kev's 4.4 changes
+#
+# Revision 1.33  1994/03/29  16:24:20  pgf
+# kev's changes: selection and attributes
+#
+# Revision 1.32  1994/02/22  11:03:15  pgf
 # truncated RCS log for 4.0
 #
 #
@@ -36,6 +56,7 @@ bool								# GMD prefix
 	"Popup-Msgs"	POPUP_MSGS	0		NOTYET	# popup buffer when multiple messages emitted
 	"ShowRam"	RAMSIZE		0		RAMSIZE	# show ram-usage
 	"SameBangs"	SAMEBANGS	0			# use same "!!" data for ^X-!
+	"view-on-readonly" RONLYVIEW	0		# set view mode for readonly files
 	"xterm-mouse"	XTERM_MOUSE	0		OPT_XTERM # (patch) mode to control whether we allow mouse-clicking
 int								# VAL_ prefix
 	"printing-low"	PRINT_LOW	WFHARD			# low end of high-bit-set printable range
@@ -96,6 +117,7 @@ bool								# WMD prefix
 	"LineWrap"	LINEWRAP	WFHARD		OPT_LINEWRAP # wrap lines wider than screen
 	"ruler"		RULER		WFSTAT		!SMALLER # display line+col in modeline
 	"Unprintable-as-Octal" NONPRINTOCTAL  WFHARD		# print non-printing chars in octal
+	"Terse-SELections" TERSELECT	0		OPT_SELECTIONS # don't display extent of selections on message line
 int								# VAL_ prefix
 	"SIDEways"	SIDEWAYS	WFMODE|WFHARD		# sideways offset for display
 color
@@ -105,7 +127,10 @@ color
 # The "environment" variables are similar to modes, but are not so neatly
 # organized into groups of universal/buffer/window.
 .environment
+"abufname"	ABUFNAME		# alternate buffer name (i.e. '#')
 "cbufname"	CBUFNAME		# current buffer name
+"buffer-hook"	BUFHOOK		PROC	# procedure to run when entering buf
+"cd-hook"	CDHOOK		PROC	# procedure to run when cd'ing
 "cfilname"	CFNAME			# current file name
 "char"		CURCHAR			# current character under the cursor
 "curcol"	CURCOL			# current column pos of cursor
@@ -116,8 +141,10 @@ color
 "directory"	DIRECTORY		# controls location of temp-files
 "discmd"	DISCMD			# display commands on command line
 "disinp"	DISINP			# display command line input characters
+"exit-hook"	EXITHOOK	PROC	# procedure to run when quitting
 "flicker"	FLICKER			# flicker suppression
 "font"		FONT		X11	# current font
+"iconname"	ICONNAM		X11	# current font
 "identifier"	IDENTIF			# current identifier
 "kill"		KILL			# kill buffer (read only)
 "lastkey"	LASTKEY			# last keyboard char struck
@@ -126,6 +153,7 @@ color
 "match"		MATCH			# last matched magic pattern
 "mode"		MODE			# are we inserting/overwriting/command
 "ntildes"	NTILDES			# number of tildes displayed at eob
+"ocwd"		OCWD			# previous directory
 "pagelen"	PAGELEN			# number of lines used by editor
 "pagewid"	CURWIDTH		# current screen width
 "palette"	PALETTE			# current palette string
@@ -134,17 +162,21 @@ color
 "progname"	PROGNAME		# returns current prog name - "vile"
 "qidentifier"	QIDENTIF		# current qualified identifier
 "ram"		RAM		RAMSIZE	# ram in use by malloc
+"read-hook"	RDHOOK		PROC	# procedure to run when reading
 "replace"	REPLACE			# replacement pattern
 "search"	SEARCH			# search pattern
 "seed"		SEED			# current random number seed
 "shell"		SHELL			# shell-environment variable 
 "sres"		SRES			# current screen resolution
 "status"	STATUS			# returns the status of the last command
-"target"	TARGET			# target for line moves
 "tpause"	TPAUSE			# length to pause for paren matching
+"title"		TITLE		X11	# window title
 "version"	VERSION			# current version number
 "wline"		WLINE			# # of lines in current window
 "word"		WORD			# current word
+"write-hook"	WRHOOK		PROC	# procedure to run when writing
+"xvile"		XVILE			# are we xvile?
+"pcvile"	PCVILE			# are we on a pc?
 
 .functions
 "abs"	ABS		MONAMIC		# absolute value of a number

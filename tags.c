@@ -5,7 +5,13 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: tags.c,v $
- * Revision 1.50  1994/03/18 18:30:38  pgf
+ * Revision 1.52  1994/04/19 15:13:06  pgf
+ * use strncpy0() in likely places
+ *
+ * Revision 1.51  1994/04/01  14:30:02  pgf
+ * tom's warning/lint patch
+ *
+ * Revision 1.50  1994/03/18  18:30:38  pgf
  * fixes for OPT_MAP_MEMORY compilation
  *
  * Revision 1.49  1994/02/22  11:03:15  pgf
@@ -67,8 +73,7 @@ int
 cmdlinetag(t)
 char *t;
 {
-	(void)strncpy(tagname,t,NFILEN);
-	tagname[NFILEN-1] = EOS;
+	strncpy0(tagname,t,NFILEN);
 	return tags(tagname, global_b_val(VAL_TAGLEN));
 }
 
@@ -397,6 +402,7 @@ UNTAG	*utp;
 }
 
 
+/*ARGSUSED*/
 static void
 pushuntag(fname,lineno,tag)
 char *fname;

@@ -3,10 +3,13 @@
 #
 # T.DANG (dang@cogit.ign.fr)
 #
-# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.djg,v 1.7 1994/02/22 11:03:15 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.djg,v 1.8 1994/04/01 16:05:54 pgf Exp $
 #
 # $Log: makefile.djg,v $
-# Revision 1.7  1994/02/22 11:03:15  pgf
+# Revision 1.8  1994/04/01 16:05:54  pgf
+# added select.c
+#
+# Revision 1.7  1994/02/22  11:03:15  pgf
 # truncated RCS log for 4.0
 #
 #
@@ -26,14 +29,16 @@ SRC = 	main.c ibmpc.c basic.c bind.c buffer.c crypt.c \
 	csrch.c display.c eval.c exec.c externs.c fences.c file.c filec.c \
 	fileio.c finderr.c glob.c globals.c history.c input.c insert.c isearch.c \
 	line.c modes.c npopen.c oneliner.c opers.c path.c random.c regexp.c \
-	region.c search.c spawn.c tags.c tbuff.c termio.c tmp.c undo.c \
+	region.c search.c select.c spawn.c \
+	tags.c tbuff.c termio.c tmp.c undo.c \
 	version.c vmalloc.c window.c word.c wordmov.c map.c djhandl.c
 
 OBJ = 	main.o ibmpc.o basic.o bind.o buffer.o crypt.o \
       	csrch.o display.o eval.o exec.o externs.o fences.o file.o filec.o \
 	fileio.o finderr.o glob.o globals.o history.o input.o insert.o isearch.o \
 	line.o modes.o npopen.o oneliner.o opers.o path.o random.o regexp.o \
-	region.o search.o spawn.o tags.o tbuff.o termio.o tmp.o undo.o \
+	region.o search.o select.o spawn.o \
+	tags.o tbuff.o termio.o tmp.o undo.o \
 	version.o vmalloc.o window.o word.o wordmov.o map.o djhandl.o
 
 %.o:	%.c estruct.h nemode.h edef.h proto.h 

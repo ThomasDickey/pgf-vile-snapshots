@@ -17,7 +17,10 @@
  * ever equalled FALSE.
  *
  * $Log: isearch.c,v $
- * Revision 1.27  1994/02/22 11:03:15  pgf
+ * Revision 1.28  1994/04/19 15:13:06  pgf
+ * use strncpy0() in likely places
+ *
+ * Revision 1.27  1994/02/22  11:03:15  pgf
  * truncated RCS log for 4.0
  *
  */
@@ -144,7 +147,7 @@ int f,n;
 	cmd_reexecute = -1;	/* We're not re-executing (yet?) */
 	cmd_offset = 0;		/* Start at the beginning of the buff */
 	cmd_buff[0] = EOS;	/* Init the command buffer */
-	(void)strncpy(pat_save, pat, NPAT); /* Save the old pattern string */
+	(void)strncpy0(pat_save, pat, NPAT); /* Save the old pattern string */
 	curpos = DOT;		/* Save the current pointer */
 	init_direction = n;	/* Save the initial search direction */
 
@@ -239,7 +242,7 @@ start_over:
 			cmd_buff[--cmd_offset] = EOS;	/* Yes, del last char */
 			DOT = curpos;	/* Reset the pointer */
 			n = init_direction;	/* Reset the search direction */
-			(void)strncpy(pat, pat_save, NPAT);
+			(void)strncpy0(pat, pat_save, NPAT);
 						/* Restore the old search str */
 			cmd_reexecute = 0;	/* Start the whole mess over */
 			goto start_over;	/* Let it take care of itself */

@@ -6,7 +6,28 @@
  * internal use.
  *
  * $Log: region.c,v $
- * Revision 1.44  1994/03/29 14:51:00  pgf
+ * Revision 1.50  1994/04/08 20:00:25  pgf
+ * don't let getregion loop forever if we hit the end, and null out
+ * haveregion after using it
+ *
+ * Revision 1.49  1994/04/07  18:17:39  pgf
+ * moved selectregion to select.c, and added "haveregion" backdoor, to
+ * shorten getregions work sometimes
+ *
+ * Revision 1.48  1994/04/04  18:52:33  pgf
+ * account (in selectregion()) for the off-by-one nature of r_end vs.
+ * the right column of rectangular regions.
+ *
+ * Revision 1.47  1994/04/04  12:36:36  pgf
+ * make selectregion do a yankregion by default.  this may change.
+ *
+ * Revision 1.46  1994/04/04  11:37:11  pgf
+ * added selectregion() to support operselect()
+ *
+ * Revision 1.45  1994/03/29  17:53:18  pgf
+ * warning cleanup
+ *
+ * Revision 1.44  1994/03/29  14:51:00  pgf
  * fix buffer size passed to mlreply
  *
  * Revision 1.43  1994/03/28  17:16:51  pgf
@@ -121,7 +142,7 @@ int 	l, r;
 	    r = llength(lp);
 
 	if (r > l) {
-	    s = ldelete(r - l, save);
+	    s = ldelete((B_COUNT)(r - l), save);
 	    if (s != TRUE) return s;
 	}
 
@@ -554,7 +575,7 @@ int	l, r;
 
 	if (llength(lp) <= r) {
 	    	/* then the rect doesn't extend to the end of line */
-		ldelete(llength(lp) - l, FALSE);
+		ldelete((B_COUNT)(llength(lp) - l), FALSE);
 
 		/* so there's nothing beyond the rect, so insert at
 			most r-l chars of the string, or nothing */
@@ -567,7 +588,7 @@ int	l, r;
 		}
 	} else {
 	    	/* the line goes on, so delete and reinsert exactly */
-		ldelete(r - l, FALSE);
+		ldelete((B_COUNT)(r - l), FALSE);
 	    	len = r - l;
 	}
 
@@ -775,6 +796,9 @@ register REGION *rp;
  * close together, we scan outward from dot looking for
  * mark. This should save time. Return a standard code.
  */
+
+REGION *haveregion;
+
 int
 getregion(rp)
 register REGION *rp;
@@ -783,6 +807,13 @@ register REGION *rp;
 	register LINE   *blp;
 	B_COUNT fsize;
 	B_COUNT bsize;
+
+	if (haveregion) {
+		*rp = *haveregion;
+		haveregion = NULL;
+		return TRUE;
+	}
+
 
 #if OPT_MAP_MEMORY
 	rp->r_orig.l = null_ptr;
@@ -842,6 +873,7 @@ register REGION *rp;
 			    fsize += line_length(flp) - w_left_margin(curwp);
 			else {
 			    mlwrite ("BUG: hit buf end in getregion");
+			    return FALSE;
 			}
 				
 			if (flp == blp) {

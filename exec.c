@@ -4,7 +4,22 @@
  *	written 1986 by Daniel Lawrence
  *
  * $Log: exec.c,v $
- * Revision 1.83  1994/03/08 12:09:11  pgf
+ * Revision 1.88  1994/04/22 15:56:58  pgf
+ * fixups to storeproc()
+ *
+ * Revision 1.87  1994/04/22  11:29:59  pgf
+ * split execproc() in two, so run_procedure() can now be called internally
+ *
+ * Revision 1.86  1994/04/11  15:50:06  pgf
+ * kev's attribute changes
+ *
+ * Revision 1.85  1994/04/08  19:53:49  pgf
+ * fix core dump on macro goto lookup
+ *
+ * Revision 1.84  1994/04/01  10:37:45  pgf
+ * fix core from line-count ops on empty buffers
+ *
+ * Revision 1.83  1994/03/08  12:09:11  pgf
  * changed 'fulllineregions' to 'regionshape'.
  *
  * Revision 1.82  1994/02/22  11:03:15  pgf
@@ -428,6 +443,11 @@ seems like we need one more check here -- is it from a .exrc file?
 			else if (status != TRUE)
 				break;
 			if (this == 2) {
+				if (is_empty_buf(curbp)) {
+				    mlforce(
+			    "[No line count possible in empty buffer]", fnp);
+				    return FALSE;
+				}
 				swapmark();
 				DOT.l = fromline;
 				(void)forwline(TRUE, num-1);
@@ -855,7 +875,7 @@ int f,n;
 		/* but if we're in insertmode, it's okay, since we must
 			be executing a function key, like an arrow key,
 			that the user will want to have replayed later */
-		if (!insertmode && (flags & REDO) == 0)
+		if ((curwp == NULL || !insertmode) && (flags & REDO) == 0)
 			dotcmdstop();
 		if (flags & UNDO) {
 			/* undoable command can't be permitted when read-only */
@@ -1127,12 +1147,16 @@ int n;		/* macro number to use */
 
 	/* set up the new macro buffer */
 	if ((bp = bfind(bname, BFINVS)) == NULL) {
-		mlforce("[Cannot create macro]");
+		mlforce("[Cannot create procedure]");
 		return FALSE;
 	}
 
 	/* and make sure it is empty */
-	bclear(bp);
+	if (!bclear(bp))
+		return FALSE;
+
+
+	set_rdonly(bp, bp->b_fname);
 
 	/* and set the macro store pointers to it */
 	mstore = TRUE;
@@ -1146,19 +1170,41 @@ int
 execproc(f, n)
 int f, n;	/* default flag and numeric arg */
 {
+	static char name[NBUFN-1];	/* name of buffer to execute */
+	int status;
+
+	/* find out what buffer the user wants to execute */
+	if ((status = mlreply("Execute procedure: ", 
+					name, sizeof(name))) != TRUE) {
+		return status;
+	}
+
+	status = TRUE;
+	if (!f)
+		n = 1;
+
+	while (status == TRUE && n--)
+		status = run_procedure(name);
+
+	return status;
+
+}
+
+int
+run_procedure(name)
+char *name;
+{
 	register BUFFER *bp;		/* ptr to buffer to execute */
 	register int status;		/* status return */
-	static char obufn[NBUFN-1];	/* name of buffer to execute */
 	char bufn[NBUFN+1];		/* name of buffer to execute */
 	register int odiscmd;
 
-	/* find out what buffer the user wants to execute */
-	if ((status = mlreply("Execute procedure: ", obufn, sizeof(obufn))) != TRUE)
-		return status;
+	if (!*name)
+		return FALSE;
 
 	/* construct the buffer name */
 	bufn[0] = SCRTCH_LEFT[0];
-	(void)strcat(strcpy(&bufn[1], obufn), SCRTCH_RIGHT);
+	(void)strcat(strcpy(&bufn[1], name), SCRTCH_RIGHT);
 
 	/* find the pointer to that buffer */
 	if ((bp = find_b_name(bufn)) == NULL) {
@@ -1166,16 +1212,10 @@ int f, n;	/* default flag and numeric arg */
 		return FALSE;
 	}
 
-	if (!f)
-		n = 1;
-
 	odiscmd = discmd;
 	discmd = FALSE;
-	status = TRUE;
 
-	/* and now execute it as asked */
-	while (n-- > 0 && status == TRUE)
-		status = dobuf(bp);
+	status = dobuf(bp);
 
 	discmd = odiscmd;
 	return status;
@@ -1574,9 +1614,10 @@ nxtscan:	/* on to the next line */
 					linlen = strlen(golabel);
 					glp = lForw(hlp);
 					while (glp != l_ref(hlp)) {
-						if (glp->l_text[0] == '*' &&
-						    (strncmp(&glp->l_text[1], golabel,
-							    linlen) == 0)) {
+						if (glp->l_text &&
+						    glp->l_text[0] == '*' &&
+						    (strncmp(&glp->l_text[1],
+						    golabel, linlen) == 0)) {
 							lp = l_ptr(glp);
 							goto onward;
 						}

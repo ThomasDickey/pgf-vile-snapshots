@@ -4,7 +4,22 @@
  * All operating systems.
  *
  * $Log: termio.c,v $
- * Revision 1.93  1994/02/22 11:03:15  pgf
+ * Revision 1.99  1994/04/25 21:07:13  pgf
+ * changes for ANSI screen under MSDOS
+ *
+ * Revision 1.98  1994/04/22  14:34:15  pgf
+ * changed BAD and GOOD to BADEXIT and GOODEXIT
+ *
+ * Revision 1.97  1994/04/20  19:54:50  pgf
+ * changes to support 'BORLAND' console i/o screen driver
+ *
+ * Revision 1.96  1994/04/18  14:26:27  pgf
+ * merge of OS2 port patches, and changes to tungetc operation
+ *
+ * Revision 1.94  1994/04/13  20:56:25  pgf
+ * added SONY to sys/ioctl list
+ *
+ * Revision 1.93  1994/02/22  11:03:15  pgf
  * truncated RCS log for 4.0
  *
  */
@@ -58,7 +73,7 @@
 # if SUNOS
 #  include "sys/filio.h"
 # else /* if you have trouble including ioctl.h, try "sys/ioctl.h" instead */
-#  if APOLLO || AIX || OSF1 || ULTRIX || AUX2 || NETBSD
+#  if APOLLO || AIX || OSF1 || ULTRIX || AUX2 || NETBSD || SONY
 #   include <sys/ioctl.h>
 #  else
 #   include <ioctl.h>
@@ -126,7 +141,7 @@ ttopen()
 	s = tcgetattr(0, &otermios);
 	if (s < 0) {
 		perror("ttopen tcgetattr");
-		ExitProgram(BAD(1));
+		ExitProgram(BADEXIT);
 	}
  /* the "|| USG" below is to support SVR4 -- let me know if
  	it conflicts on other systems */
@@ -562,7 +577,7 @@ typahead()
 this seems to think there is something ready more often than there really is
 	return x_key_events_ready();
 #else
-	return x_is_pasting();
+	return x_is_pasting() || did_tungetc();
 #endif
 #else
 
@@ -633,12 +648,14 @@ void (*signal(sig,disp))()
 
 #else /* not UNIX */
 
-#if   MSDOS && (TURBO || MSC || WATCOM)
-#include <conio.h>
-#endif
-
-#if DJGPP
-#include <gppconio.h>
+#if MSDOS || OS2
+# if DJGPP
+#  include <gppconio.h>
+# else
+#  if NEWDOSCC
+#   include <conio.h>
+#  endif
+# endif
 #endif
 
 #if     AMIGA
@@ -680,7 +697,7 @@ short	iochan;				/* TTY I/O channel		*/
 #include        <bdos.h>
 #endif
 
-#if     MSDOS && ((!MSC && NEWDOSCC) || LATTICE || AZTEC)
+#if     MSDOS && NEWDOSCC && !MSC
 union REGS rg;		/* cpu register for use of DOS calls (ibmpc.c) */
 int nxtchar = -1;	/* character held from type ahead    */
 #endif
@@ -753,14 +770,6 @@ ttopen()
 #if     CPM
 #endif
 
-#if     MSDOS && (HP150 == 0) && LATTICE
-	/* kill the ctrl-break interrupt */
-	rg.h.ah = 0x33;		/* control-break check dos call */
-	rg.h.al = 1;		/* set the current state */
-	rg.h.dl = 0;		/* set it OFF */
-	intdos(&rg, &rg);	/* go for it! */
-#endif
-
 	/* make sure backspace is bound to backspace */
 	asciitbl[backspc] = &f_backchar_to_bol;
 
@@ -795,13 +804,6 @@ ttclose()
         status = SYS$DASSGN(iochan);
         if (status != SS$_NORMAL)
 		ExitProgram(status);
-#endif
-#if     MSDOS && (HP150 == 0) && LATTICE
-	/* restore the ctrl-break interrupt */
-	rg.h.ah = 0x33;		/* control-break check dos call */
-	rg.h.al = 1;		/* set the current state */
-	rg.h.dl = 1;		/* set it ON */
-	intdos(&rg, &rg);	/* go for it! */
 #endif
 #if	!VMS
 	ttclean(TRUE);
@@ -854,13 +856,17 @@ int c;
 #if     CPM
         bios(BCONOUT, c, 0);
 #endif
-#if	MSDOS && !IBMPC
-#if     MWC86
-	putcnb(c);
-#else	/* LATTICE || AZTEC || TURBO */
-	bdos(6, c, 0);
+#if	OS2
+	putch(c);
 #endif
-#endif	/* MSDOS && !IBMPC */
+#if	MSDOS
+# if IBMPC
+	/* unneeded currently -- output is memory-mapped */
+# endif
+# if ANSI
+	putchar(c);
+# endif
+#endif
 }
 
 #if	AMIGA
@@ -894,15 +900,15 @@ ttflush()
                         status = iosb[0] & 0xFFFF;
                 nobuf = 0;
         }
-#if NEVER
-        return (status);
-#endif
 #endif
 
 #if     CPM
 #endif
 
 #if     MSDOS
+# if ANSI
+	fflush(stdout);
+# endif
 #endif
 }
 
@@ -967,7 +973,7 @@ ttgetc()
 	}
 #endif
 
-#if MSDOS
+#if MSDOS || OS2
 	/*
 	 * If we've got a mouse, poll waiting for mouse movement and mouse
 	 * clicks until we've got a character to return.
@@ -981,13 +987,10 @@ ttgetc()
 		}
 	}
 # endif /* OPT_MS_MOUSE */
-#if     MWC86
-	return getcnb();
-#endif
-#if	MSC || TURBO
+#if	MSC || TURBO || OS2
 	return getch();
 #endif
-#if	((!(MSC||TURBO) && NEWDOSCC) || LATTICE || AZTEC)
+#if	NEWDOSCC && !(MSC||TURBO)
 	{
 	int c;
 
@@ -1046,35 +1049,10 @@ typahead()
 	return TRUE;
 #endif
 
-#if	MSDOS && NEWDOSCC
+#if	MSDOS || OS2
 	return (kbhit() != 0);
 #endif
 
-#if	MSDOS && (LATTICE || AZTEC || MWC86)
-	int c;		/* character read */
-	int flags;	/* cpu flags from dos call */
-
-	if (nxtchar >= 0)
-		return(TRUE);
-
-	rg.h.ah = 6;	/* Direct Console I/O call */
-	rg.h.dl = 255;	/*         does console input */
-#if	LATTICE || AZTEC
-	flags = intdos(&rg, &rg);
-#else
-	intcall(&rg, &rg, 0x21);
-	flags = rg.x.flags;
-#endif
-	c = rg.h.al;	/* grab the character */
-
-	/* no character pending */
-	if ((flags & 0x40) != 0)
-		return(FALSE);
-
-	/* save the character and return true */
-	nxtchar = c;
-	return(TRUE);
-#endif
 }
 
 #endif /* not UNIX */

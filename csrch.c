@@ -2,7 +2,10 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: csrch.c,v $
- * Revision 1.14  1994/02/22 11:03:15  pgf
+ * Revision 1.15  1994/04/22 15:55:46  pgf
+ * forward-char-scan et al now usable from macros
+ *
+ * Revision 1.14  1994/02/22  11:03:15  pgf
  * truncated RCS log for 4.0
  *
 */
@@ -93,18 +96,40 @@ int f,n,c;
 
 }
 
+int
+get_csrch_char(cp)
+int *cp;
+{
+	int c;
+
+	if (clexec || isnamedcmd) {
+		int stat;
+		static char cbuf[2];
+		if ((stat=mlreply("Scan for: ", cbuf, 2)) != TRUE)
+			return stat;
+		c = cbuf[0];
+	} else {
+		c = tgetc(FALSE);
+		if (c == quotec)
+			c = tgetc(TRUE);
+		else if (c == abortc)
+			return FALSE;
+	}
+
+	*cp = c;
+	return TRUE;
+}
+
 /* f */
 int
 fcsrch(f,n)
 int f,n;
 {
-	register int c;
+	int c, s;
 
-        c = tgetc(FALSE);
-	if (c == quotec)
-		c = tgetc(TRUE);
-	else if (c == abortc)
-		return FALSE;
+	s = get_csrch_char(&c);
+	if (s != TRUE)
+		return s;
 
 	return(fscan(f,n,c));
 }
@@ -114,13 +139,11 @@ int
 bcsrch(f,n)
 int f,n;
 {
-	register int c;
+	int c, s;
 
-        c = tgetc(FALSE);
-	if (c == quotec)
-		c = tgetc(TRUE);
-	else if (c == abortc)
-		return FALSE;
+	s = get_csrch_char(&c);
+	if (s != TRUE)
+		return s;
 
 	return(bscan(f,n,c));
 }

@@ -3,7 +3,10 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: globals.c,v $
- * Revision 1.28  1994/02/22 11:03:15  pgf
+ * Revision 1.29  1994/04/25 22:32:08  pgf
+ * make ":g/foo/p" leave you in the p-lines buffer
+ *
+ * Revision 1.28  1994/02/22  11:03:15  pgf
  * truncated RCS log for 4.0
  *
  */
@@ -40,7 +43,7 @@ int f, n, g_or_v;
 	char	cmd[NLINE];
 	CMDFUNC *cfp;
 	int foundone;
-	WINDOW *wp;
+	WINDOW *wp, *sw_wp;
 	L_NUM	before;
 	int	save_report;
 
@@ -85,7 +88,7 @@ int f, n, g_or_v;
 	/* loop through the buffer -- we must clear the marks no matter what */
 	s = TRUE;
 	lp = lForw(buf_head(curbp));
-	wp = curwp;
+	wp = sw_wp = curwp;
 	/* loop until there are no marked lines in the buffer */
 	foundone = FALSE;
 	before = line_count(curbp);
@@ -117,8 +120,11 @@ int f, n, g_or_v;
 				wp->w_dot.l = l_ptr(lp);
 				wp->w_dot.o = 0;
 				s = (cfp->c_func)(FALSE, 1);
-				/* function may have switched on us */
-				(void)set_curwp(wp);
+				if (curwp != wp) {
+				    /* function may have switched on us */
+				    sw_wp = curwp;
+				    (void)set_curwp(wp);
+				}
 				lp = l_ref(wp->w_dot.l);
 				havemotion = NULL;
 				calledbefore = TRUE;
@@ -128,6 +134,8 @@ int f, n, g_or_v;
 	}
 	set_global_g_val(GVAL_REPORT,save_report);
 	line_report(before);
+	/* if it tried to switch, do it now */
+	(void)set_curwp(sw_wp);
 
 	return s;
 }

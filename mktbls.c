@@ -14,7 +14,10 @@
  *
  *
  * $Log: mktbls.c,v $
- * Revision 1.47  1994/02/22 11:03:15  pgf
+ * Revision 1.48  1994/04/22 14:34:15  pgf
+ * changed BAD and GOOD to BADEXIT and GOODEXIT
+ *
+ * Revision 1.47  1994/02/22  11:03:15  pgf
  * truncated RCS log for 4.0
  *
  */
@@ -68,13 +71,11 @@ extern char *malloc();
 /* argument for 'exit()' or '_exit()' */
 #if	VMS
 #include	<stsdef.h>
-#define GOOD	(STS$M_INHIB_MSG | STS$K_SUCCESS)
-#define BAD(c)	(STS$M_INHIB_MSG | STS$K_ERROR)
-#endif
-
-#ifndef GOOD
-#define GOOD	0
-#define BAD(c)	(c)
+#define GOODEXIT	(STS$M_INHIB_MSG | STS$K_SUCCESS)
+#define BADEXIT		(STS$M_INHIB_MSG | STS$K_ERROR)
+#else
+#define GOODEXIT	0
+#define BADEXIT		1
 #endif
 
 #define	SIZEOF(v)	(sizeof(v)/sizeof(v[0]))
@@ -273,7 +274,7 @@ char *s;
 {
 	Fprintf(stderr,"\"%s\", line %d: bad format:", inputfile, l);
 	Fprintf(stderr,"\t%s\n",s);
-	exit(BAD(1));
+	exit(BADEXIT);
 }
 
 static void
@@ -311,7 +312,7 @@ char	**argv;
 
 	if ((fp = fopen(name, "w")) == 0) {
 		Fprintf(stderr,"mktbls: couldn't open header file %s\n", name);
-		exit(BAD(1));
+		exit(BADEXIT);
 	}
 	Fprintf(fp, progcreat, name, argv[0], argv[1]);
 	return fp;
@@ -1448,12 +1449,12 @@ char    *argv[];
 
 	if (argc != 2) {
 		Fprintf(stderr, "usage: mktbls cmd-file\n");
-		exit(BAD(1));
+		exit(BADEXIT);
 	}
 
 	if ((cmdtbl = fopen(inputfile = argv[1],"r")) == NULL ) {
 		Fprintf(stderr,"mktbls: couldn't open cmd-file\n");
-		exit(BAD(1));
+		exit(BADEXIT);
 	}
 
 	*old_fcond = EOS;
@@ -1618,6 +1619,6 @@ char    *argv[];
 		dump_bmodes();
 	}
 
-	return(GOOD);
+	return(GOODEXIT);
 	/*NOTREACHED*/
 }

@@ -5,7 +5,10 @@
  *	Include this after "estruct.h"
  *
  * $Log: dirstuff.h,v $
- * Revision 1.10  1994/02/22 11:03:15  pgf
+ * Revision 1.11  1994/04/18 14:26:27  pgf
+ * merge of OS2 port patches, and changes to tungetc operation
+ *
+ * Revision 1.10  1994/02/22  11:03:15  pgf
  * truncated RCS log for 4.0
  *
  *
@@ -24,7 +27,7 @@
 #define USE_D_NAMLEN 1
 #endif
 
-#if POSIX || TURBO || WATCOM || DJGPP
+#if POSIX || TURBO || WATCOM || DJGPP || OS2
 # if WATCOM
 #   include <direct.h>
 # else
