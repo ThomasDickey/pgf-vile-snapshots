@@ -8,8 +8,14 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: fences.c,v $
- *	Revision 1.16  1993/10/11 17:39:19  pgf
- *	fmatchindent now looks for a specific match
+ *	Revision 1.18  1994/02/07 12:25:12  pgf
+ *	use LBRACK/RBRACK/LPAREN/RPAREN in lieu of the real chars
+ *
+ * Revision 1.17  1994/01/11  17:27:27  pgf
+ * 'interrupted' is now a routine
+ *
+ * Revision 1.16  1993/10/11  17:39:19  pgf
+ * fmatchindent now looks for a specific match
  *
  * Revision 1.15  1993/09/16  11:06:43  pgf
  * make parentheses act like braces in c-mode -- for indentation purposes, in
@@ -180,7 +186,7 @@ int key;
 		else
 			DOT.l = lFORW(DOT.l);
 
-		if (is_header_line(DOT,curbp) || interrupted)
+		if (is_header_line(DOT,curbp) || interrupted())
 			return FALSE;
 	}
 	if (count == 0) {
@@ -282,12 +288,12 @@ int sdir; /* direction to scan if we're not on a fence to begin with */
 			ofence = LBRACE;
 			sdir = REVERSE;
 			break;
-		case '[':
-			ofence = ']';
+		case LBRACK:
+			ofence = RBRACK;
 			sdir = FORWARD;
 			break;
-		case ']':
-			ofence = '[';
+		case RBRACK:
+			ofence = LBRACK;
 			sdir = REVERSE;
 			break;
 		case '#':
@@ -385,7 +391,7 @@ int ofence;
 		} else
 			s = backchar(FALSE, 1);
 
-		if (s == FALSE || interrupted)
+		if (s == FALSE || interrupted())
 			return FALSE;
 	}
 
@@ -465,7 +471,7 @@ int sdir;
 			return FALSE;
 		}
 
-		if (interrupted)
+		if (interrupted())
 			return FALSE;
 	}
 
@@ -527,12 +533,12 @@ int ch;	/* fence type to match against */
 	oldpos = DOT;
 
 	/* setup proper open fence for passed close fence */
-	if (ch == ')')
-		opench = '(';
+	if (ch == RPAREN)
+		opench = LPAREN;
 	else if (ch == RBRACE)
 		opench = LBRACE;
 	else
-		opench = '[';
+		opench = LBRACK;
 
 	/* find the top line and set up for scan */
 	toplp = lBack(curwp->w_line.l);

@@ -4,7 +4,19 @@
  *	written 11-feb-86 by Daniel Lawrence
  *
  * $Log: bind.c,v $
- * Revision 1.59  1993/12/22 15:28:34  pgf
+ * Revision 1.63  1994/02/03 19:35:12  pgf
+ * tom's changes for 3.65
+ *
+ * Revision 1.62  1994/01/31  18:11:03  pgf
+ * change kbd_key() to tgetc()
+ *
+ * Revision 1.61  1994/01/31  15:06:13  pgf
+ * changes for meta keys (8th bit) and describe-bindings
+ *
+ * Revision 1.60  1994/01/31  12:28:09  pgf
+ * the 'M-' prefix now gives a high bit, rather than a SPEC bit.
+ *
+ * Revision 1.59  1993/12/22  15:28:34  pgf
  * applying tom's 3.64 changes
  *
  * Revision 1.58  1993/11/04  09:10:51  pgf
@@ -234,6 +246,7 @@ static	void	ostring P(( char * ));
 static	char *	quoted P(( char *, char * ));
 static	void	convert_kcode P(( int, char * ));
 static	int	key_to_bind P(( CMDFUNC * ));
+static	void	reset_prefix P(( int, CMDFUNC * ));
 static	int	converted_len P(( char * ));
 static	char *	to_tabstop P(( char * ));
 static	int	is_shift_cmd P(( char *, int ));
@@ -283,8 +296,6 @@ int f,n;
 	}
 	return swbuffer(bp);
 }
-
-static	int	poundc	= '#';	/* mark for special-bindings */
 
 #if REBIND
 
@@ -536,7 +547,7 @@ register CMDFUNC *kcmd;
 		/* perhaps we only want a single key, not a sequence */
 		/* 	(see more comments below) */
 		if (isSpecialCmd(kcmd))
-			c = kbd_key();
+			c = tgetc(FALSE);
 		else
 			c = kbd_seq();
 	}
@@ -565,32 +576,21 @@ register CMDFUNC *kcmd;
 }
 
 /*
- * Bind a command-function pointer to a given key-code (saving the old
- * value of the function-pointer via an pointer given by the caller).
+ * Prefix-keys can be only bound to one value. This procedure tests the
+ * argument 'kcmd' to see if it is a prefix key, and if so, unbinds the
+ * key, and sets the corresponding global variable to the new value.
+ * The calling procedure will then do the binding per se.
  */
-int
-install_bind (c, kcmd, oldfunc)
+static void
+reset_prefix (c, kcmd)
 register int	c;
 register CMDFUNC *kcmd;
-CMDFUNC **oldfunc;
 {
-	register KBIND *kbp;	/* pointer into a binding table */
-	register int j;
-
-	if (c < 0)
-		return FALSE;	/* not a legal key-code */
-
-	/* if the function is a prefix key, i.e. we're changing the definition
-		of a prefix key, then they typed a dummy function name, which
-		has been translated into a dummy function pointer */
 	if (isSpecialCmd(kcmd)) {
+		register int j;
 		/* search for an existing binding for the prefix key */
-		for (j = 0; j < N_chars; j++) {
-			if (asciitbl[j] == kcmd) {
-				(void)unbindchar(j);
-				break;
-			}
-		}
+		if ((j = fnc2kcod(kcmd)) >= 0)
+			(void)unbindchar(j);
 		/* reset the appropriate global prefix variable */
 		if (kcmd == &f_cntl_af)
 			cntl_a = c;
@@ -603,14 +603,35 @@ CMDFUNC **oldfunc;
 		if (kcmd == &f_speckey)
 			poundc = c;
 	}
+}
+
+/*
+ * Bind a command-function pointer to a given key-code (saving the old
+ * value of the function-pointer via an pointer given by the caller).
+ */
+int
+install_bind (c, kcmd, oldfunc)
+register int	c;
+register CMDFUNC *kcmd;
+CMDFUNC **oldfunc;
+{
+	register KBIND *kbp;	/* pointer into a binding table */
+
+	if (c < 0)
+		return FALSE;	/* not a legal key-code */
+
+	/* if the function is a prefix key, i.e. we're changing the definition
+		of a prefix key, then they typed a dummy function name, which
+		has been translated into a dummy function pointer */
+	*oldfunc = kcod2fnc(c);
+	reset_prefix(-1, *oldfunc);
+	reset_prefix(c, kcmd);
 
 	if (!isspecial(c)) {
-		*oldfunc = asciitbl[c];
 		asciitbl[c] = kcmd;
 	} else {
 		kbp = kcode2kbind(c);
 		if (kbp->k_cmd) { /* found it, change it in place */
-			*oldfunc = kbp->k_cmd;
 			kbp->k_cmd = kcmd;
 		} else {
 			if (kbp >= &kbindtbl[NBINDS-1]) {
@@ -622,7 +643,6 @@ CMDFUNC **oldfunc;
 			++kbp;		/* and make sure the next is null */
 			kbp->k_code = 0;
 			kbp->k_cmd = NULL;
-			*oldfunc   = NULL;
 		}
 	}
 	update_scratch(BINDINGS_NAME, update_binding_list);
@@ -1067,25 +1087,33 @@ char	*src;
 	for (base = dst; (c = (*dst = *src)) != EOS; dst++, src++) {
 		tmp = NULL;
 
-		if (c == ' ')
+		if (c & HIGHBIT) {
+			*dst++ = 'M';
+			*dst++ = '-';
+			c &= ~HIGHBIT;
+		}
+		if (c == ' ') {
 			tmp = "<sp>";
-		else if (c == '\t')
+		} else if (c == '\t') {
 			tmp = "<tab>";
-		else if (iscntrl(c)) {
+		} else if (iscntrl(c)) {
 			*dst++ = '^';
 			*dst = tocntrl(c);
-		} else if (c == poundc && src[1] != EOS)
+		} else if (c == poundc && src[1] != EOS) {
 			tmp = "FN";
-		else
+		} else {
 			*dst = c;
+		}
 
 		if (tmp != NULL) {
 			while ((*dst++ = *tmp++) != EOS)
 				;
 			dst -= 2;	/* point back to last nonnull */
 		}
-		if (src[1] != EOS)
+
+		if (src[1] != EOS) {
 			*++dst = '-';
+		}
 	}
 	return base;
 }
@@ -1113,11 +1141,13 @@ int direction;
 	register int	c;
 
 	switch (direction) {
-	case -1:	c = fnc2key(&f_openup);		break;
-	case 0:		c = fnc2key(&f_insert);		break;
-	case 1:		c = fnc2key(&f_opendown);	break;
+	case -1:	c = fnc2kcod(&f_openup);	break;
+	case 0:		c = fnc2kcod(&f_insert);	break;
+	case 1:		c = fnc2kcod(&f_opendown);	break;
 	default:	c = -1;
 	}
+	if (isspecial(c))	/* sorry, we really need a character! */
+		c = -1;
 	return c;
 }
 #endif /* X11 */
@@ -1149,7 +1179,6 @@ int c;	/* key to find what is bound to it */
 }
 
 /* fnc2kcod: translate a function pointer to a keycode */
-#ifdef GMDDOTMACRO
 int
 fnc2kcod(f)
 CMDFUNC *f;
@@ -1168,7 +1197,6 @@ CMDFUNC *f;
 
 	return -1;	/* none found */
 }
-#endif
 
 /* fnc2engl: translate a function pointer to the english name for
 		that function
@@ -1198,45 +1226,6 @@ CMDFUNC *cfp;	/* ptr to the requested function to bind to */
 
 	return NULL;
 }
-
-/* fnc2key: translate a function pointer to a simple key that is bound
-		to that function
-*/
-
-#if X11
-int
-fnc2key(cfp)
-CMDFUNC *cfp;	/* ptr to the requested function to bind to */
-{
-	register int i;
-
-	for (i = 0; i < N_chars; i++) {
-		if (cfp == asciitbl[i])
-			return i;
-	}
-	return -1;
-}
-#endif
-
-#if NEEDED
-/* translate a function pointer to its associated flags */
-fnc2flags(func)
-CMDFUNC *cfp;	/* ptr to the requested function to bind to */
-{
-	register NTAB *nptr;	/* pointer into the name binding table */
-
-	/* skim through the table, looking for a match */
-	nptr = nametbl;
-	while (nptr->n_cmd != NULL) {
-		if (nptr->n_cmd == cfp) {
-			return nptr->n_flags;
-		}
-		++nptr;
-	}
-	return NONE;
-}
-#endif
-
 
 /* engl2fnc: match name to a function in the names table
 	translate english name to function pointer
@@ -1289,7 +1278,7 @@ char *kk;		/* name of key to translate to Command key form */
 		if (pref != 0)
 			k += 3;
 	} else if (len > 2 && !strncmp((char *)k, "M-", (SIZE_T)2)) {
-		pref = SPEC;
+		pref = HIGHBIT;
 		k += 2;
 	} else if (len > 1) {
 		if (*k == cntl_a)
@@ -1383,8 +1372,15 @@ kbd_putc(c)
 	} else if ((kbd_expand < 0) && (c == '\t')) {
 		kbd_putc(' ');
 	} else {
-		kbd_putc('^');
-		kbd_putc(toalpha(c));
+		if (c & HIGHBIT) {
+		    kbd_putc('\\');
+		    kbd_putc(((c>>6)&3)+'0');
+		    kbd_putc(((c>>3)&7)+'0');
+		    kbd_putc(((c   )&7)+'0');
+		} else {
+		    kbd_putc('^');
+		    kbd_putc(toalpha(c));
+		}
 	}
 	endofDisplay;
 }

@@ -64,7 +64,13 @@
  *	Allow left/right scrolling of input lines (when they get too long).
  *
  * $Log: history.c,v $
- * Revision 1.12  1993/11/04 09:10:51  pgf
+ * Revision 1.14  1994/02/03 19:35:12  pgf
+ * tom's changes for 3.65
+ *
+ * Revision 1.13  1994/01/31  18:11:03  pgf
+ * change kbd_key() to tgetc()
+ *
+ * Revision 1.12  1993/11/04  09:10:51  pgf
  * tom's 3.63 changes
  *
  * Revision 1.11  1993/10/04  10:24:09  pgf
@@ -331,8 +337,8 @@ hst_flush()
 	 && ((bp = makeMyBuff()) != 0)) {
 
 		/* suppress if this is the same as previous line */
-		if (((lp = lBack(bp->b_line.l)) != 0)
-		 && (lp != l_ref(bp->b_line.l))
+		if (((lp = lBack(buf_head(bp))) != 0)
+		 && (lp != l_ref(buf_head(bp)))
 		 && (sameLine(lp, tb_args(MyText)) == 0)) {
 			(void)tb_init(&MyText, abortc);
 			return;
@@ -351,8 +357,8 @@ hst_flush()
 					continue;
 				/* force dot to the beginning of last-line */
 				wp->w_force = -1;
-				if (l_ref(wp->w_dot.l) != lBack(bp->b_line.l)) {
-					wp->w_dot.l = lBACK(bp->b_line.l);
+				if (l_ref(wp->w_dot.l) != lBack(buf_head(bp))) {
+					wp->w_dot.l = lBACK(buf_head(bp));
 					wp->w_dot.o = 0;
 					wp->w_flag |= WFMOVE;
 				}
@@ -388,7 +394,7 @@ BUFFER *bp;
 LINE *	lp;
 int	direction;
 {
-	LINE	*base	= l_ref(bp->b_line.l),
+	LINE	*base	= l_ref(buf_head(bp)),
 		*lp0	= lp;
 
 	if ((lp0 == 0)
@@ -518,7 +524,7 @@ LINE *	lp1;
 HST *	parm;
 {
 	BUFFER	*bp = makeMyBuff();
-	LINE	*lp0 = l_ref(bp->b_line.l),
+	LINE	*lp0 = l_ref(buf_head(bp)),
 		*lp2 = hst_find(parm, bp, lp1, direction);
 
 	if (lp1 != lp2) {
@@ -580,7 +586,7 @@ int	eolchar;
 	if ((bp = makeMyBuff()) == 0)		/* something is very wrong */
 		return FALSE;
 
-	if ((lp1 = l_ref(bp->b_line.l)) == 0)
+	if ((lp1 = l_ref(buf_head(bp))) == 0)
 		return FALSE;
 
 	/* slightly better than global data... */
@@ -642,7 +648,7 @@ int	eolchar;
 		} else
 			kbd_alarm();
 
-		c = kbd_key();
+		c = tgetc(FALSE);
 	}
 }
 #endif	/* OPT_HISTORY */

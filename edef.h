@@ -9,7 +9,20 @@
 
 /*
  * $Log: edef.h,v $
- * Revision 1.118  1993/12/22 15:28:34  pgf
+ * Revision 1.122  1994/02/03 19:35:12  pgf
+ * tom's changes for 3.65
+ *
+ * Revision 1.121  1994/02/03  10:18:59  pgf
+ * moved no_working from display.c to here
+ *
+ * Revision 1.120  1994/01/31  18:14:27  pgf
+ * eliminate last1key: lastkey serves the purpose now, and poundc is now
+ * a global
+ *
+ * Revision 1.119  1994/01/11  17:27:27  pgf
+ * 'interrupted' is now a routine
+ *
+ * Revision 1.118  1993/12/22  15:28:34  pgf
  * applying tom's 3.64 changes
  *
  * Revision 1.116  1993/10/04  10:24:09  pgf
@@ -390,7 +403,7 @@
 decl_uninit( char *prog_arg );		/* argv[0] from main.c */
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version 3.64");
+decl_init( char version[], "version 3.65");
 
 decl_init( int slash, '/'); 		/* so DOS can use '\' as path separator */
 
@@ -398,7 +411,6 @@ decl_init( int autoindented , -1);	/* how many chars (not cols) indented */
 decl_uninit( int isnamedcmd );		/* are we typing a command name */
 decl_uninit( int calledbefore );	/* called before during this command? */
 decl_uninit( CMASK _chartypes_[N_chars] );	/* character types	*/
-decl_uninit( int interrupted );		/* interrupt signal?		*/
 decl_uninit( int displaying );		/* flag set during screen updates */
 decl_uninit( int doing_kbd_read );	/* flag set during keyboard reading */
 decl_uninit( int reading_msg_line );	/* flag set during msgline reading */
@@ -408,7 +420,6 @@ decl_uninit( int insert_mode_was );	/* were we (and will we be?)	*/
 					/*	inserting or overwriting? */
 decl_uninit( int lastkey );		/* last keystoke (tgetc)	*/
 decl_init( int tungotc , -1);		/* last un-gotten key (tungetc) */
-decl_uninit( int last1key );		/* last keystoke (kbd_key)	*/
 decl_uninit( int lastcmd );		/* last command	(kbd_seq)	*/
 decl_uninit( short fulllineregions );   /* regions should be full lines */
 decl_uninit( short doingopcmd );        /* operator command in progress */
@@ -488,6 +499,7 @@ decl_init( int cntl_a, tocntrl('A') );	/* current meta character	*/
 decl_init( int cntl_x, tocntrl('X') );	/* current control X prefix char */
 decl_init( int reptc, 'K' );		/* current universal repeat char */
 decl_init( int abortc, tocntrl('[') );	/* ESC: current abort command char */
+decl_init( int poundc, '#' );		/* pseudo function key prefix */
 decl_init( int quotec, tocntrl('V') );	/* quote char during mlreply()	*/
 decl_init( int killc, tocntrl('U') );	/* current line kill char	*/
 decl_init( int wkillc, tocntrl('W') );	/* current word kill char	*/
@@ -537,6 +549,7 @@ decl_uninit( int macbug );		/* macro debugging flag		*/
 decl_uninit( B_COUNT max_working );	/* 100% value for slowreadf	*/
 decl_uninit( B_COUNT cur_working );	/* current-value for slowreadf	*/
 decl_uninit( B_COUNT old_working );	/* previous-value for slowreadf	*/
+decl_uninit( int no_working );		/* disabling flag */
 #endif
 
 	/* These pointers are nonnull only while animating a given buffer or

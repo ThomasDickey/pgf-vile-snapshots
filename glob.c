@@ -16,7 +16,10 @@
  *	modify (ifdef-style) 'expand_leaf()' to allow ellipsis.
  *
  * $Log: glob.c,v $
- * Revision 1.16  1993/11/04 09:10:51  pgf
+ * Revision 1.17  1994/02/03 19:35:12  pgf
+ * tom's changes for 3.65
+ *
+ * Revision 1.16  1993/11/04  09:10:51  pgf
  * tom's 3.63 changes
  *
  * Revision 1.15  1993/10/04  10:24:09  pgf
@@ -74,7 +77,6 @@
 #include "estruct.h"	/* global structures and defines */
 #include "edef.h"	/* defines 'slash' */
 #include "dirstuff.h"	/* directory-scanning interface & definitions */
-#include "glob.h"	/* interface & definitions for this module */
 
 #define	isname(c)	(isalnum(c) || ((c) == '_'))
 #define	isdelim(c)	((c) == '(' || ((c) == '{'))
@@ -118,10 +120,10 @@
 	huh??
 #else
 # ifdef GMDGLOB		/* boolean */
-#  define globbing_active() global_g_val(GVAL_GLOB)
+#  define globbing_active() global_g_val(GMDGLOB)
 # endif
 # ifdef GVAL_GLOB	/* string */
-#  define globbing_active() strcmp("off", global_g_val_ptr(GVAL_GLOB))
+#  define globbing_active() !is_falsem(global_g_val_ptr(GVAL_GLOB))
 # endif
 # ifndef globbing_active
 #  define globbing_active() TRUE

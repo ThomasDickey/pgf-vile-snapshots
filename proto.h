@@ -5,7 +5,35 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.84  1993/12/22 15:28:34  pgf
+ * Revision 1.93  1994/02/03 19:35:12  pgf
+ * tom's changes for 3.65
+ *
+ * Revision 1.92  1994/02/03  10:18:01  pgf
+ * many routines from display.c now static
+ *
+ * Revision 1.91  1994/02/01  19:40:50  pgf
+ * gethostname
+ *
+ * Revision 1.90  1994/01/31  20:26:14  pgf
+ * new routine ffexists() supports ability to not reclaim empty unmodified
+ * buffers if they correspond to existing files
+ *
+ * Revision 1.89  1994/01/31  18:18:33  pgf
+ * speckey() is now in main.c
+ *
+ * Revision 1.88  1994/01/31  12:30:59  pgf
+ * protos for djhandl.c
+ *
+ * Revision 1.87  1994/01/28  20:57:01  pgf
+ * added siguninit
+ *
+ * Revision 1.86  1994/01/11  17:31:29  pgf
+ * added not_interrupted() routine
+ *
+ * Revision 1.85  1994/01/11  17:20:37  pgf
+ * added siginit() routine, and interrupted() is now a routine
+ *
+ * Revision 1.84  1993/12/22  15:28:34  pgf
  * applying tom's 3.64 changes
  *
  * Revision 1.83  1993/12/21  12:40:46  pgf
@@ -268,7 +296,11 @@ extern void loop P(( void ));
 extern char * strmalloc P(( char * ));
 extern int no_memory P(( char * ));
 extern void global_val_init P(( void ));
+extern void siginit P(( void ));
+extern void siguninit P(( void ));
 extern SIGT catchintr (DEFINE_SIG_ARGS);
+extern int interrupted P(( void ));
+extern void not_interrupted P(( void ));
 extern void do_repeats P(( int *, int *, int * ));
 extern int writeall P(( int, int ));
 extern int zzquit P(( int, int ));
@@ -290,6 +322,7 @@ extern int ex P(( int, int ));
 extern int cntl_af P(( int, int ));
 extern int cntl_xf P(( int, int ));
 extern int unarg P(( int, int ));
+extern int speckey P(( int, int ));
 extern int nullproc P(( int, int ));
 extern void charinit P(( void ));
 #if RAMSIZE
@@ -401,9 +434,7 @@ extern char * kcod2prc P(( int, char * ));
 #if X11
 extern int insertion_cmd P(( int ));
 #endif
-#ifdef GMDDOTMACRO
 extern int fnc2kcod P(( CMDFUNC * ));
-#endif
 extern char * fnc2engl P(( CMDFUNC * ));
 extern CMDFUNC * engl2fnc P(( char * ));
 extern KBIND * kcode2kbind P(( int ));
@@ -411,9 +442,6 @@ extern CMDFUNC * kcod2fnc P(( int ));
 extern int prc2kcod P(( char * ));
 #if OPT_EVAL
 extern char * prc2engl P(( char * ));
-#endif
-#if X11
-extern int fnc2key P(( CMDFUNC * ));
 #endif
 extern char * kbd_engl P(( char *, char * ));
 extern void kbd_alarm P(( void ));
@@ -458,6 +486,7 @@ void update_scratch P(( char *, int (*func)(BUFFER *) ));
 extern int addline P(( BUFFER *, char *, int ));
 extern int add_line_at P(( BUFFER *, LINEPTR, char *, int ));
 extern int anycb P(( void ));
+extern void set_bname P(( BUFFER *, char * ));
 extern char * get_bname P(( BUFFER * ));
 extern BUFFER * find_b_name P(( char * ));
 extern BUFFER * bfind P(( char *, int ));
@@ -489,14 +518,6 @@ extern int nu_width P(( WINDOW * ));
 extern int col_limit P(( WINDOW * ));
 extern void vtinit P(( void ));
 extern void vttidy P(( int ));
-extern void vtmove P(( int, int ));
-extern void vtputc P(( int ));
-extern void vtlistc P(( int ));
-extern int vtgetc P(( int ));
-extern void vtputsn P(( char *, int ));
-extern void vtset P(( LINEPTR, WINDOW * ));
-extern void vtprintf P(( char *, ... ));
-extern void vteeol P(( void ));
 #if !SMALLER
 extern int upscreen P(( int, int ));
 #endif
@@ -525,7 +546,6 @@ extern void mlforce P((char *, ... ));
 extern void mlprompt P((char *, ... ));
 extern void mlerror P(( char * ));
 extern void dbgwrite P((char *, ... ));
-extern void lspputc P(( int ));
 extern char * lsprintf P((char *, char *, ... ));
 #ifdef	UNUSED
 extern void lssetbuf P(( char * ));
@@ -678,8 +698,9 @@ extern char *filec_expand P(( void ));
 extern int ffropen P(( char * ));
 extern int ffwopen P(( char * ));
 extern int ffronly P(( char * ));
-#if !MSDOS && !OPT_MAP_MEMORY
 extern long ffsize P(( void ));
+extern int ffexists P(( char * ));
+#if !MSDOS && !OPT_MAP_MEMORY
 extern int ffread P(( char *, long ));
 extern void ffseek P(( long ));
 extern void ffrewind P(( void ));
@@ -698,7 +719,20 @@ extern void putdotback P(( BUFFER *, LINE * ));
 extern int finderrbuf P(( int, int ));
 #endif
 
-/* glob.c (see glob.h) */
+/* glob.c */
+#if !UNIX
+extern	int	glob_needed P((char **));
+#endif
+extern	char **	glob_expand P((char **));
+extern	char **	glob_string P((char *));
+extern	int	glob_length P((char **));
+extern	char **	glob_free   P((char **));
+
+#if !UNIX
+extern	void	expand_wild_args P(( int * , char ***));
+#endif
+
+extern	int	doglob P(( char * ));
 
 /* globals.c */
 extern int globals P(( int, int ));
@@ -745,7 +779,6 @@ extern int kbd_show_response P(( char *, char *, int, int, int ));
 extern void kbd_pushback P(( char *, int ));
 extern int kbd_string P(( char *, char *, int, int, int, int (*func)(int,char*,int*) ));
 extern int kbd_reply P(( char *, char *, int, int (*efunc)(char *,int,int,int), int, int, int (*cfunc)(int,char*,int*) ));
-extern int speckey P(( int, int ));
 extern int dotcmdbegin P(( void ));
 extern int dotcmdfinish P(( void ));
 extern void dotcmdstop P(( void ));
@@ -812,7 +845,7 @@ extern int linsert P(( int, int ));
 extern int lnewline P(( void ));
 extern int ldelete P(( long, int ));
 #if OPT_EVAL
-extern char * getctext P(( int ));
+extern char * getctext P(( CMASK ));
 extern int putctext P(( char * ));
 #endif
 extern int ldelnewline P(( void ));
@@ -832,10 +865,10 @@ extern int doput P(( int, int, int, int ));
 extern int put P(( int, int ));
 extern int execkreg P(( int, int ));
 extern int loadkreg P(( int, int ));
-#if !SMALLER
+#if OPT_SHOW_REGS
 extern int showkreg P(( int, int ));
 #endif
-#if !SMALLER && OPT_UPBUFF
+#if OPT_SHOW_REGS && OPT_UPBUFF
 extern void relist_registers P(( void ));
 #else
 #define relist_registers()
@@ -846,6 +879,11 @@ extern int map P(( int, int ));
 extern int unmap P(( int, int ));
 extern void map_check P(( int ));
 extern int map_proc P((int, int));
+#if OPT_UPBUFF
+extern void relist_mappings P(( void ));
+#else
+#define relist_mappings()
+#endif
 
 /* modes.c */
 extern int string_to_number P(( char *, int * ));
@@ -1069,7 +1107,7 @@ extern int gototag P(( int, int ));
 extern int cmdlinetag P(( char * ));
 extern int tags P(( char *, int ));
 extern int untagpop P(( int, int ));
-#if !SMALLER
+#if OPT_SHOW_TAGS
 extern int showtagstack P(( int, int ));
 #endif
 #endif /* TAGS */
@@ -1296,6 +1334,7 @@ extern	int	fork	P(( void ));
 extern	int	getpgrp	P(( int ));
 extern	int	getpid	P(( void ));
 extern	int	getuid	P(( void ));
+extern	char *	getwd	P(( char * ));
 extern	int	ioctl	P(( int, ULONG, caddr_t ));
 extern	int	isatty	P(( int ));
 extern	int	killpg	P(( int, int ));
@@ -1373,4 +1412,18 @@ extern int	unlink	P((char *));
 extern int	setjmp	P((jmp_buf env));
 extern void	longjmp	P((jmp_buf env, int val));
 #endif /* NeXT */
+#if HAVE_GETHOSTNAME
+extern int	gethostname P((char *, int));
+#endif
 #endif /* UNIX */
+
+#if DJGPP
+/* djhandl.c */
+extern u_long was_ctrl_c_hit P(( void ));
+extern void want_ctrl_c P(( int ));
+extern void clear_hard_error P(( void ));
+extern void hard_error_catch_setup P(( void ));
+extern void hard_error_teardown P(( void ));
+extern int did_hard_error_occur P(( void ));
+extern void delay P(( int ));
+#endif

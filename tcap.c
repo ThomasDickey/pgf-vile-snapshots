@@ -2,7 +2,13 @@
  *		for MicroEMACS
  *
  * $Log: tcap.c,v $
- * Revision 1.34  1993/12/22 15:15:47  pgf
+ * Revision 1.36  1994/02/03 19:35:12  pgf
+ * tom's changes for 3.65
+ *
+ * Revision 1.35  1994/01/27  18:00:52  pgf
+ * fix for sys5 handling of tgetent, wrt xterm detection
+ *
+ * Revision 1.34  1993/12/22  15:15:47  pgf
  * eliminated unused variable
  *
  * Revision 1.33  1993/12/21  11:34:42  pgf
@@ -229,29 +235,29 @@ tcapopen()
 	getscreensize(&term.t_ncol, &term.t_nrow);
  
 	if ((term.t_nrow <= 1) && (term.t_nrow=(short)tgetnum("li")) == -1) {
-		puts("Termcap entry incomplete (lines)");
-		ExitProgram(BAD(1));
+		term.t_nrow = 24;
 	}
 	term.t_nrow -= 1;
 
 
 	if ((term.t_ncol <= 1) &&(term.t_ncol=(short)tgetnum("co")) == -1){
-		puts("Termcap entry incomplete (columns)");
-		ExitProgram(BAD(1));
+		term.t_ncol = 80;
 	}
 
 	/* are we probably an xterm?  */
 	p = tcbuf;
 	i_am_xterm = FALSE;
-	while (*p && *p != ':') {
-		if (*p == 'x') {
-			if (strncmp(p, "xterm", sizeof("xterm") - 1) == 0) {
-			    i_am_xterm = TRUE;
-			    break;
+	if (strncmp(tv_stype, "xterm", sizeof("xterm") - 1) == 0)
+		i_am_xterm = TRUE;
+	else
+		while (*p && *p != ':') {
+			if (*p == 'x' 
+			    && strncmp(p, "xterm", sizeof("xterm") - 1) == 0) {
+				i_am_xterm = TRUE;
+				break;
 			}
+			p++;
 		}
-		p++;
-	}
 
 #ifdef SIGWINCH
 	term.t_mcol = 200;
@@ -612,7 +618,7 @@ int	c;
 			 */
 			if (wp != 0) {
 				firstrow = wp->w_toprow + 1;
-				lastrow  = wp->w_toprow + wp->w_ntrows + 1;
+				lastrow  = mode_row(wp) + 1;
 			} else {		/* from message-line */
 				firstrow = term.t_nrow + 1;
 				lastrow  = term.t_nrow + 2;

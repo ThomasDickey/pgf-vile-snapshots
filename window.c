@@ -3,7 +3,16 @@
  * attached to keys that the user actually types.
  *
  * $Log: window.c,v $
- * Revision 1.32  1993/09/03 09:11:54  pgf
+ * Revision 1.35  1994/02/03 19:35:12  pgf
+ * tom's changes for 3.65
+ *
+ * Revision 1.34  1994/01/31  18:11:03  pgf
+ * change kbd_key() to tgetc()
+ *
+ * Revision 1.33  1994/01/27  18:01:39  pgf
+ * use define for min no. of lines/window, rather than '3'
+ *
+ * Revision 1.32  1993/09/03  09:11:54  pgf
  * tom's 3.60 changes
  *
  * Revision 1.31  1993/08/13  16:32:50  pgf
@@ -168,7 +177,7 @@ LINEPTR	lp;
 int	n;
 {
 	register int i;
-	for (i = n; i > 0 && !same_ptr(lp, wp->w_bufp->b_line.l); ) {
+	for (i = n; i > 0 && !same_ptr(lp, win_head(wp)); ) {
 		if ((i -= line_height(wp, lp)) < 0)
 			break;
 		lp = lFORW(lp);
@@ -187,7 +196,7 @@ LINEPTR	lp;
 int	n;
 {
 	register int i;
-	for (i = n; i > 0 && !same_ptr(lp, wp->w_bufp->b_line.l); ) {
+	for (i = n; i > 0 && !same_ptr(lp, win_head(wp)); ) {
 		if ((i -= line_height(wp, lp)) < 0)
 			break;
 		lp = lBACK(lp);
@@ -283,7 +292,7 @@ int f,n;
 	register int rows;
 	int s;
 
-	c = kbd_key();
+	c = tgetc(FALSE);
 	if (c == abortc)
 		return FALSE;
 
@@ -376,10 +385,10 @@ int f,n;
 		curwp->w_flag |= WFINS;
 
 	if (n < 0) {
-		while (n++ && lforw(lp) != l_ref(curbp->b_line.l))
+		while (n++ && lforw(lp) != l_ref(buf_head(curbp)))
 			lp = lforw(lp);
 	} else {
-		while (n-- && lback(lp) != l_ref(curbp->b_line.l))
+		while (n-- && lback(lp) != l_ref(buf_head(curbp)))
 			lp = lback(lp);
 	}
 
@@ -392,7 +401,7 @@ int f,n;
 			break;
 		if (lp == l_ref(DOT.l))
 			return (TRUE);
-		if (lforw(lp) == l_ref(curbp->b_line.l))
+		if (lforw(lp) == l_ref(buf_head(curbp)))
 			break;
 	}
 	/*
@@ -601,7 +610,7 @@ int f,n;
         register WINDOW *wp1;
         register WINDOW *wp2;
 
-        if (curwp->w_ntrows < 3) {
+        if (curwp->w_ntrows < MINWLNS) {
                 mlforce("[Cannot split a %d line window]", curwp->w_ntrows);
                 return NULL;
         }
@@ -887,7 +896,7 @@ int f,n;	/* numeric argument */
 	}
 
 	/* make sure it's in range */
-	if (n < 3 || n > term.t_mrow + 1) {
+	if (n < MINWLNS || n > term.t_mrow + 1) {
 		mlforce("[Screen length out of range]");
 		return(FALSE);
 	}
@@ -935,7 +944,7 @@ int f,n;	/* numeric argument */
 
 			} else {
 				/* need to change this window size? */
-				lastline = wp->w_toprow + wp->w_ntrows - 1;
+				lastline = mode_row(wp) - 1;
 				if (lastline >= n - 2) {
 					wp->w_ntrows = n - wp->w_toprow - 2;
 					wp->w_flag |= WFHARD|WFMODE;

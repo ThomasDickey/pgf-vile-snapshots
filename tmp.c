@@ -34,7 +34,10 @@
  *	  are in-memory can have space allocated from them.
  *
  * $Log: tmp.c,v $
- * Revision 1.5  1993/11/04 09:10:51  pgf
+ * Revision 1.6  1994/02/03 19:35:12  pgf
+ * tom's changes for 3.65
+ *
+ * Revision 1.5  1993/11/04  09:10:51  pgf
  * tom's 3.63 changes
  *
  * Revision 1.4  1993/09/03  09:11:54  pgf
@@ -261,7 +264,7 @@ BUFFER	*bp;
 		if (!dumpLine(p->l_nxtundo))	break;
 	}
 
-	(void)dump_line("HEAD", bp->b_line.l);
+	(void)dump_line("HEAD", buf_head(bp));
 	for_each_line(p,bp) {
 		(void)dump_line("text", l_ptr(p));
 	}
@@ -705,7 +708,7 @@ int	list;		/* ...list from which to remove the space */
 			ShrinkSpace(temp, size);
 		}
 	} else {
-		for (temp = first, next = 0; temp != 0; temp = next) {
+		for (temp = first; temp != 0; temp = next) {
 			next = NextSpace(temp);
 			if (next == area) {
 				if (area->size == size) {
@@ -756,7 +759,7 @@ int	list;		/* ...list from which to remove the space */
 
 	/* merge adjacent areas in the freespace list */
 	if (!list) {
-		for (temp = FirstSpace(page,0), next = 0; temp != 0; temp = next) {
+		for (temp = FirstSpace(page,0); temp != 0; temp = next) {
 			next = NextSpace(temp);
 			if (temp->skip != 0
 			 && temp->skip == temp->size) {

@@ -4,7 +4,19 @@
  *	written 1986 by Daniel Lawrence
  *
  * $Log: exec.c,v $
- * Revision 1.76  1993/12/22 15:28:34  pgf
+ * Revision 1.80  1994/02/03 19:35:12  pgf
+ * tom's changes for 3.65
+ *
+ * Revision 1.79  1994/01/31  19:52:59  pgf
+ * reset the dotcmdarg if we're executing a redoable command
+ *
+ * Revision 1.78  1994/01/31  18:11:03  pgf
+ * change kbd_key() to tgetc()
+ *
+ * Revision 1.77  1994/01/31  16:21:25  pgf
+ * fix bug in hex character parsing
+ *
+ * Revision 1.76  1993/12/22  15:28:34  pgf
  * applying tom's 3.64 changes
  *
  * Revision 1.75  1993/12/08  20:47:45  pgf
@@ -532,10 +544,9 @@ seems like we need one more check here -- is it from a .exrc file?
 			mlforce("[Can't use address 0 with \"%s\" command]", fnp);
 			return FALSE;
 		}
-		if (same_ptr(fromline,null_ptr)) {
-			mlforce("[Buffer is empty]");
-			return FALSE;
-		}
+		if (same_ptr(fromline,null_ptr))
+			fromline = buf_head(curbp); /* buffer is empty */
+
 		/*  we're positioned at fromline == curbp->b_linep, so commands
 			must be willing to go _down_ from there.  Seems easiest
 			to special case the commands that prefer going up */
@@ -561,7 +572,7 @@ seems like we need one more check here -- is it from a .exrc file?
 		the current line, and there's more than one line */
 	if (!(flags & FROM) && !same_ptr(fromline, DOT.l) &&
 			!is_empty_buf(curbp) &&
-		  (lforw(lForw(curbp->b_line.l)) != l_ref(curbp->b_line.l)) ) {
+		  (lforw(lForw(buf_head(curbp))) != l_ref(buf_head(curbp))) ) {
 		mlforce("[Can't use address with \"%s\" command.]", fnp);
 		return FALSE;
 	}
@@ -570,7 +581,7 @@ seems like we need one more check here -- is it from a .exrc file?
 		one line */
 	if (!(flags & TO) && !same_ptr(toline, fromline) &&
 			!is_empty_buf(curbp) &&
-		  (lforw(lForw(curbp->b_line.l)) != l_ref(curbp->b_line.l)) ) {
+		  (lforw(lForw(buf_head(curbp))) != l_ref(buf_head(curbp))) ) {
 		mlforce("[Can't use a range with \"%s\" command.]", fnp);
 		return FALSE;
 	}
@@ -895,13 +906,13 @@ CMDFLAGS	*flagp;
 	/* parse the line specifier */
 	scan = specp;
 	if (*scan == '0') {
-		fromline = toline = curbp->b_line.l; /* _very_ top of buffer */
+		fromline = toline = buf_head(curbp); /* _very_ top of buffer */
 		*flagp |= (FROM|ZERO);
 		scan++;
 	} else if (*scan == '%') {
 		/* '%' means all lines */
-		fromline = lFORW(curbp->b_line.l);
-		toline = lBACK(curbp->b_line.l);
+		fromline = lFORW(buf_head(curbp));
+		toline = lBACK(buf_head(curbp));
 		scan++;
 		*flagp |= (FROM|TO);
 	} else {
@@ -1122,10 +1133,18 @@ int f,n;
 
 	if (dotcmdmode != PLAY) {
 		extern CMDFUNC f_dotcmdplay;
-		/* reset dotcmdkreg on any command where ukb is unspecified.
-			usekreg() does it on the one's where it is specified. */
-		if (execfunc != &f_dotcmdplay && ukb == 0)
-			dotcmdkreg = 0;
+		if (execfunc != &f_dotcmdplay) {
+			/* reset dotcmdkreg on any command where ukb is
+			 * unspecified.  usekreg() does it on the one's
+			 * where it is specified.  */
+			if (ukb == 0)
+			    dotcmdkreg = 0;
+
+			/* override the saved dot-cmd argument, if this
+				is a new redoable command */
+			if (flags & REDO)
+			    dotcmdarg = FALSE;
+		}
 	} else {
 		/* if we _are_ playing, re-use the previously kreg */
 		if (dotcmdkreg != 0)
@@ -1188,15 +1207,17 @@ int eolchar;
 				case 'e':	*tok++ = ESC; break;
 
 				case 'x':
-					i = 3; /* allow \xNNN hex */
+				case 'X':
+					i = 2; /* allow \xNN hex */
 					c = 0;
 					while (isalnum(*src) && i--) {
-						if (isdigit(*src))
+						if (isdigit(*src)) {
 							d = *src - '0';
-						else
-							d = (isupper(*src)
-								? tolower(*src)
-								: *src) - 'a';
+						} else if (islower(*src)) {
+							d = *src - 'a' + 10;
+						} else {
+							d = *src - 'A' + 10;
+						}
 						if (d > 15)
 							break;
 						c = (c * 16) + d;
@@ -1538,7 +1559,7 @@ BUFFER *bp;	/* buffer to execute */
 #if ! SMALLER
 	scanpt = NULL;
 	/* scan the buffer to execute, building WHILE header blocks */
-	hlp = bp->b_line.l;
+	hlp = buf_head(bp);
 	lp = lFORW(hlp);
 	bp->b_dot.o = 0;
 	while (!same_ptr(lp, hlp)) {
@@ -1621,7 +1642,7 @@ nxtscan:	/* on to the next line */
 #endif
 
 	/* starting at the beginning of the buffer */
-	hlp = bp->b_line.l;
+	hlp = buf_head(bp);
 	lp = lFORW(hlp);
 	while (!same_ptr(lp, hlp)) {
 		bp->b_dot.l = lp;
@@ -1674,7 +1695,7 @@ nxtscan:	/* on to the next line */
 			(void)update(TRUE);
 
 			/* and get the keystroke */
-			if (kbd_key() == abortc) {
+			if (tgetc() == abortc) {
 				mlforce("[Macro aborted]");
 				freewhile(whlist);
 				mstore = FALSE;
@@ -1706,7 +1727,7 @@ nxtscan:	/* on to the next line */
 			/* service only the ENDM macro here */
 			if (dirnum == DENDM) {
 				mstore = FALSE;
-				bstore->b_dot.l = lFORW(bstore->b_line.l);
+				bstore->b_dot.l = lFORW(buf_head(bstore));
 				bstore->b_dot.o = 0;
 				bstore = NULL;
 				goto onward;
@@ -1885,7 +1906,7 @@ nxtscan:	/* on to the next line */
 			/* in any case set the buffer's dot */
 			bp->b_dot.l = lp;
 			bp->b_dot.o = 0;
-			bp->b_wline.l = lFORW(bp->b_line.l);
+			bp->b_wline.l = lFORW(buf_head(bp));
 			free(einit);
 			execlevel = 0;
 			mstore = FALSE;

@@ -6,7 +6,17 @@
  * for the display system.
  *
  * $Log: buffer.c,v $
- * Revision 1.79  1993/12/22 15:28:34  pgf
+ * Revision 1.82  1994/02/03 19:35:12  pgf
+ * tom's changes for 3.65
+ *
+ * Revision 1.81  1994/01/31  20:26:14  pgf
+ * new routine ffexists() supports ability to not reclaim empty unmodified
+ * buffers if they correspond to existing files
+ *
+ * Revision 1.80  1994/01/11  17:27:27  pgf
+ * 'interrupted' is now a routine
+ *
+ * Revision 1.79  1993/12/22  15:28:34  pgf
  * applying tom's 3.64 changes
  *
  * Revision 1.78  1993/11/04  09:10:51  pgf
@@ -536,12 +546,12 @@ void	FreeBuffer(bp)
 		FreeIfNeeded(bp->b_fname);
 
 #if !WINMARK
-	if (same_ptr(MK.l, bp->b_line.l)) {
+	if (same_ptr(MK.l, buf_head(bp))) {
 		MK.l = null_ptr;
 		MK.o = 0;
 	}
 #endif
-	lfree(bp->b_line.l, bp);		/* Release header line. */
+	lfree(buf_head(bp), bp);		/* Release header line. */
 	bp1 = NULL;				/* Find the header.	*/
 	bp2 = bheadp;
 	while (bp2 != bp) {
@@ -749,7 +759,7 @@ int	lockfl;
 	char bname[NBUFN+1];
 	char nfname[NFILEN];
 
-	if (interrupted || fname == 0)	/* didn't really have a filename */
+	if (interrupted() || fname == 0) /* didn't really have a filename */
 		return;
 
 	(void)lengthen_path(strcpy(nfname, fname));
@@ -778,7 +788,7 @@ int	lockfl;
 			make_local_b_val(bp,MDNEWLINE);
 			if (curwp != 0 && curwp->w_bufp == curbp) {
 				top = line_no(curbp, curwp->w_line.l);
-				now = line_no(curbp, curwp->w_dot.l);
+				now = line_no(curbp, DOT.l);
 			} else
 				top = now = -1;
 
@@ -974,8 +984,10 @@ register BUFFER *bp;
 #ifdef MDCHK_MODTIME
 		(void)check_modtime( bp, bp->b_fname );
 #endif
+#if OPT_UPBUFF
 		if (bp != find_BufferList())
 			updatelistbuffers();
+#endif
 		return TRUE;
 	} else if (curwp == 0) {
 		return FALSE;	/* we haven't started displaying yet */
@@ -991,8 +1003,8 @@ register BUFFER *bp;
 	if (bp->b_active != TRUE) {		/* buffer not active yet*/
 		/* read it in and activate it */
 		(void)readin(bp->b_fname, TRUE, bp, TRUE);
-		curwp->w_dot.l = lFORW(bp->b_line.l);
-		curwp->w_dot.o = 0;
+		DOT.l = lFORW(buf_head(bp));
+		DOT.o = 0;
 		bp->b_active = TRUE;
 	}
 #ifdef MDCHK_MODTIME
@@ -1012,7 +1024,8 @@ register WINDOW *wp;
 	/* get rid of it completely if it's a scratch buffer,
 		or it's empty and unmodified */
 	if (b_is_scratch(bp)
-	 || ( global_g_val(GMDABUFF) && !b_is_changed(bp) && is_empty_buf(bp)) ) {
+	 || ( global_g_val(GMDABUFF) && !b_is_changed(bp) &&
+		    is_empty_buf(bp) && !ffexists(bp->b_fname)) ) {
 		(void)zotbuf(bp);
 	} else {  /* otherwise just adjust it off the screen */
 		copy_traits(&(bp->b_wtraits), &(wp->w_traits));
@@ -1086,7 +1099,7 @@ int f,n;
 	register int	s;
 	char bufn[NFILEN];
 
-#if !SMALLER
+#if OPT_UPBUFF
 	C_NUM	save_COL;
 	MARK	save_DOT;
 	MARK	save_TOP;
@@ -1098,7 +1111,7 @@ int f,n;
 
 	if (animated && !special) {
 		save_COL = getccol(FALSE);
-		save_DOT = curwp->w_dot;
+		save_DOT = DOT;
 		save_TOP = curwp->w_line;
 	} else
 		save_COL = 0;	/* appease gcc */
@@ -1139,7 +1152,7 @@ int f,n;
 			break;
 		mlwrite("Buffer %s gone", bufn);
 		if (--n > 0) {
-#if !SMALLER
+#if OPT_UPBUFF
 			if (special)
 				(void)update(TRUE);
 			else
@@ -1150,7 +1163,7 @@ int f,n;
 			break;
 	}
 
-#if !SMALLER
+#if OPT_UPBUFF
 	if (animated && !special) {
 		curgoal = save_COL;
 		DOT     = save_DOT;
@@ -1253,8 +1266,8 @@ BUFFER *bp;
 
 	for_each_window(wp) {
 		if (wp->w_bufp == bp) {
-			wp->w_line.l = lFORW(bp->b_line.l);
-			wp->w_dot.l  = lFORW(bp->b_line.l);
+			wp->w_line.l = lFORW(buf_head(bp));
+			wp->w_dot.l  = lFORW(buf_head(bp));
 			wp->w_dot.o  = 0;
 #ifdef WINMARK
 			wp->w_mark = nullmark;
@@ -1440,7 +1453,7 @@ void	makebufflist(iflag,dummy)
 		}
 		bprintf("\n");
 		if (bp == curbp)
-			curlp = lBACK(lBACK(curbp->b_line.l));
+			curlp = lBACK(lBACK(buf_head(curbp)));
 	}
 	ShowNotes();
 	bprintf("             %*s %s", NBUFN, "Current dir:",
@@ -1540,10 +1553,10 @@ register BUFFER *bp;
 char	*text;
 int len;
 {
-	if (add_line_at (bp, lBACK(bp->b_line.l), text, len) == TRUE) {
+	if (add_line_at (bp, lBACK(buf_head(bp)), text, len) == TRUE) {
 		/* If "." is at the end, move it to new line  */
 		if (sameline(bp->b_dot, bp->b_line))
-			bp->b_dot.l = lBACK(bp->b_line.l);
+			bp->b_dot.l = lBACK(buf_head(bp));
 		return TRUE;
 	}
 	return FALSE;
@@ -1580,7 +1593,7 @@ int	len;
 
 	/* try to maintain byte/line counts? */
 	if (b_is_counted(bp)) {
-		if (same_ptr(nextp, bp->b_line.l)) {
+		if (same_ptr(nextp, buf_head(bp))) {
 			make_local_b_val(bp,MDNEWLINE);
 			set_b_val(bp, MDNEWLINE, TRUE);
 			bp->b_bytecount += (ntext+1);
@@ -1624,6 +1637,26 @@ anycb()
 }
 
 /*
+ * Copies string to a buffer-name, trimming trailing blanks for consistency.
+ */
+void
+set_bname(bp, name)
+BUFFER *bp;
+char *name;
+{
+	register int j, k;
+	register char *d = strncpy(bp->b_bname, name, NBUFN);
+	for (j = 0, k = -1; j < NBUFN && d[j] != EOS; j++) {
+		if (!isspace(d[j]))
+			k = -1;
+		else if (k < 0)
+			k = j;
+	}
+	if (k >= 0)
+		d[k] = EOS;
+}
+
+/*
  * Copies buffer-name to a null-terminated buffer (for use in code that
  * cannot conveniently use the name without a null-termination).
  */
@@ -1646,9 +1679,11 @@ find_b_name(bname)
 char *bname;
 {
 	register BUFFER *bp;
+	BUFFER	temp;
+	set_bname(&temp, bname); /* make a canonical buffer-name */
 
 	for_each_buffer(bp)
-		if (eql_bname(bp, bname))
+		if (eql_bname(bp, temp.b_bname))
 			return bp;
 	return 0;
 }
@@ -1770,13 +1805,15 @@ register BUFFER *bp;
 	}
 	b_clr_changed(bp);		/* Not changed		*/
 	freeundostacks(bp,TRUE);	/* do this before removing lines */
-	while ((l_ref(lp=lFORW(bp->b_line.l))) != l_ref(bp->b_line.l)) {
+	while ((l_ref(lp=lFORW(buf_head(bp)))) != l_ref(buf_head(bp))) {
 		lremove(bp,lp);
 		lfree(lp,bp);
 	}
 
-	if (!same_ptr(bp->b_ulinep, null_ptr))
+	if (!same_ptr(bp->b_ulinep, null_ptr)) {
 		lfree(bp->b_ulinep, bp);
+		bp->b_ulinep = null_ptr;
+	}
 #if !OPT_MAP_MEMORY
 	FreeAndNull(bp->b_ltext);
 	bp->b_ltext_end = NULL;

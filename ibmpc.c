@@ -10,7 +10,26 @@
  * display type.
  *
  * $Log: ibmpc.c,v $
- * Revision 1.31  1993/12/23 10:24:53  pgf
+ * Revision 1.37  1994/02/04 18:24:47  pgf
+ * latest djgpp attempts at a successful get_vga_bios_info.  no luck yet.
+ *
+ * Revision 1.36  1994/02/03  19:35:12  pgf
+ * tom's changes for 3.65
+ *
+ * Revision 1.35  1994/01/31  12:16:45  pgf
+ * botched ifdef fix
+ *
+ * Revision 1.34  1994/01/28  21:02:38  pgf
+ * better (?) support for DJGPP
+ *
+ * Revision 1.33  1994/01/11  17:27:42  pgf
+ * changed GO32 to DJGPP
+ *
+ * Revision 1.32  1994/01/11  17:15:53  pgf
+ * added testing driver table entries for omnibook -- 480-line-only displays
+ * don't work yet
+ *
+ * Revision 1.31  1993/12/23  10:24:53  pgf
  * took out debugging ifdef
  *
  * Revision 1.30  1993/12/22  15:28:34  pgf
@@ -113,17 +132,21 @@
 
 #if     IBMPC
 
-#if GO32
+#if DJGPP
 #include <pc.h>
 #define min(a,b) (((a) < (b)) ? (a) : (b))
 #define max(a,b) (((a) > (b)) ? (a) : (b))
 #define outp(p,v) outportb(p,v)
 #define inp(p) inportb(p)
 #define far
+#include <io.h> /* for setmode() */
+#include <fcntl.h> /* for O_BINARY */
+#include <dpmi.h> /* for the register struct */
+#include <go32.h>
 #endif
 
 
-#define NROW	50			/* Max Screen size.		*/
+#define NROW	60			/* Max Screen size.		*/
 #define NCOL    80			/* Edit if you want to.         */
 #define	MARGIN	8			/* size of minimum margin and	*/
 #define	SCRSIZ	64			/* scroll size for extended lines */
@@ -136,8 +159,10 @@
 #define SCADE	(0xb800 << 4)		/* EGA address of screen RAM	*/
 #endif
 
-#  if GO32  /* version 1.09 */
+#if DJGPP
 #define FAR_POINTER(s,o) (0xe0000000 + s*16 + o)
+#define FP_SEG(a)	((unsigned long)(a) >> 4L)
+#define FP_OFF(a)	((unsigned long)(a) & 0x0fL)
 #define	SCADC	0xb800			/* CGA address of screen RAM	*/
 #define	SCADM	0xb000			/* MONO address of screen RAM	*/
 #define SCADE	0xb800			/* EGA address of screen RAM	*/
@@ -276,6 +301,11 @@ static	DRIVERS drivers[] = {
 		{"80x28",  CDVGA,	3,	C8x14,  28,  80, RES_400},
 		{"80x43",  CDVGA,	3,	C8x8,   43,  80, RES_350},
 		{"80x50",  CDVGA,	3,	C8x8,	50,  80, RES_400},
+		{"omni",  CDVGA,	3,	C8x16,	25,  80, RES_480},
+	/* none of the rest work */
+		{"omni2",  CDVGA,	3,	C8x8,	60,  80, RES_480},
+		{"omni3",  CDVGA,	3,	C8x16,	30,  80, RES_480},
+		{"omni4",  CDVGA,	3,	C8x8,	50,  80, RES_480},
 	};
 
 static	long	ScreenAddress[] = {
@@ -378,18 +408,47 @@ TERM    term    = {
 #endif
 };
 
+#if DJGPP
+_go32_dpmi_seginfo vgainfo;
+#endif
+
 static int
 get_vga_bios_info(dynamic_VGA_info *buffer)
 {
+#if WATCOM || DJGPP
+# if XXXXDJGPP 	/* this should work, but doesn't seem to */
+	_go32_dpmi_registers regs;
+	vgainfo.size = (sizeof (dynamic_VGA_info)+15) / 16;
+	if (_go32_dpmi_allocate_dos_memory(&vgainfo) != 0) {
+		fprintf(stderr,"Couldn't allocate vgainfo memory\n");
+		exit(1);
+	}
+	/* _go32_dpmi_free_dos_memory(&vgainfo); */
+
+	regs.x.ax = 0x1b00;
+	regs.x.bx = 0;
+	regs.x.ss = regs.x.sp = 0;
+	regs.x.es = vgainfo.rm_segment;
+	regs.x.di = 0;
+	_go32_dpmi_simulate_int(0x10, &regs);
+
+	dosmemget( vgainfo.rm_segment*16, vgainfo.size, buffer);
+	return (regs.h.al == 0x1b);
+# else
+/* FIXXXXX */
+	return FALSE;
+# endif
+#else
 	struct SREGS segs;
 
-	rg.h.ah   = 0x1b;
+	rg.x._AX_ = 0x1b00;
 	rg.x._BX_ = 0;
 	segs.es   = FP_SEG(buffer);
 	rg.x._DI_ = FP_OFF(buffer);
 	INTX86X(0x10, &rg, &rg, &segs); /* Get VGA-BIOS status */
 
 	return (rg.h.al == 0x1b);
+#endif
 }
 
 static void
@@ -445,7 +504,8 @@ set_cursor(int start_stop)
 	INTX86(0x10, &rg, &rg);	/* VIDEO - SET TEXT-MODE CURSOR SHAPE */
 }
 
-get_cursor()
+static int
+get_cursor(void)
 {
 	rg.h.ah = 3;
 	rg.h.bh = 0;
@@ -553,7 +613,7 @@ char *res;	/* resolution to change to */
 {
 	char	*dst;
 	register int i;		/* index */
-	int	status;
+	int	status = FALSE;
 
 	/* find the default configuration */
 	if (!strcmp(res, "?")) {
@@ -729,8 +789,31 @@ ibmopen()
 			case 16:	driver->vchr = C8x16;	break;
 			}
 			driver->rows = buffer.num_rows;
-			driver->vres = buffer.num_pixel_rows;
+#if !DJGPP
 			allowed_vres = buffer.static_info->text_scanlines;
+#else
+			{ u_long staticinfop;
+			static_VGA_info static_info;
+			staticinfop = ((u_long)buffer.static_info & 0xffffL);
+			staticinfop += (((u_long)buffer.static_info >> 12) & 
+						0xffff0L);
+			dosmemget( staticinfop, sizeof(static_info),
+					&static_info);
+			allowed_vres = static_info.text_scanlines;
+			}
+#endif
+			driver->vres = buffer.num_pixel_rows;
+			if (driver->vres == 0) {
+				/* my HP omnibook returns 0 here, so */
+				/* set it to a supported resolution */
+				int b,j;
+				for (b = 1, j = 0; b != 0x100; b <<= 1, j++) {
+					if (b & allowed_vres) {
+						driver->vres = j;
+						break;
+					}
+				}
+			}
 		}
 	} else if (driver->type == CDEGA) {
 		allowed_vres |= (1<<RES_350);
@@ -778,11 +861,17 @@ void
 ibmkopen()	/* open the keyboard */
 {
 	ms_install();
+#if DJGPP
+	setmode(0,O_BINARY);
+#endif
 }
 
 void
 ibmkclose()	/* close the keyboard */
 {
+#if DJGPP
+	setmode(0,O_TEXT);
+#endif
 	ms_deinstall();
 }
 
@@ -804,7 +893,11 @@ int n;		/* type of adapter to init for */
 	 * map into our default for this driver-type
 	 */
 	if (n == CDSENSE)
+#ifdef BEFORE
 		n = drivers[original_type].type;
+#else
+		n = original_type;
+#endif
 
 	driver = &drivers[n];
 	type = driver->type;
@@ -1175,6 +1268,7 @@ ms_processing ()
 				 || DOT.o != MK.o) {
 					fulllineregions = FALSE;
 					(void)yankregion();
+					(void)update(TRUE);
 				}
 				movecursor(pixels2row(first_y),
 					 pixels2col(first_x));

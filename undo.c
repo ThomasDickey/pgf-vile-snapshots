@@ -2,7 +2,10 @@
  * code by Paul Fox, original algorithm mostly by Julia Harper May, 89
  *
  * $Log: undo.c,v $
- * Revision 1.44  1993/10/04 10:24:09  pgf
+ * Revision 1.45  1994/02/03 19:35:12  pgf
+ * tom's changes for 3.65
+ *
+ * Revision 1.44  1993/10/04  10:24:09  pgf
  * see tom's 3.62 changes
  *
  * Revision 1.43  1993/09/10  16:06:49  pgf
@@ -322,7 +325,7 @@ LINEPTR lp;
 
 	/* need to save a dot -- either the next line or 
 		the previous one */
-	if (same_ptr(next, curbp->b_line.l)) {
+	if (same_ptr(next, buf_head(curbp))) {
 		prev = lBACK(lp);
 		FORWDOT(curbp).l = prev;
 		fc =  firstchar(l_ref(prev));

@@ -6,7 +6,11 @@
  * internal use.
  *
  * $Log: region.c,v $
- * Revision 1.29  1993/09/10 16:06:49  pgf
+ * Revision 1.30  1994/02/07 13:01:02  pgf
+ * don't mark buffer as modified in charprocreg() unless changes were
+ * made.
+ *
+ * Revision 1.29  1993/09/10  16:06:49  pgf
  * tom's 3.61 changes
  *
  * Revision 1.28  1993/09/03  09:11:54  pgf
@@ -332,6 +336,7 @@ int (*func) P((int));
 	register int    c,nc;
 	register int    status;
 	REGION          region;
+	int 		changed = 0;
 
 	if ((status = getregion(&region)) == TRUE) {
 		m = region.r_orig;
@@ -345,13 +350,15 @@ int (*func) P((int));
 				if (nc != -1) {
 					copy_for_undo(m.l);
 					put_char_at(m, nc);
+					changed++;
 				}
 				++m.o;
 			}
 		}
 	}
 	rls_region();
-	chg_buff(curbp, WFHARD);
+	if (changed)
+	    chg_buff(curbp, WFHARD);
 	return (status);
 }
 

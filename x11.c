@@ -2,7 +2,26 @@
  * 	X11 support, Dave Lemke, 11/91
  *
  * $Log: x11.c,v $
- * Revision 1.33  1993/12/22 15:28:34  pgf
+ * Revision 1.38  1994/02/03 19:35:12  pgf
+ * tom's changes for 3.65
+ *
+ * Revision 1.37  1994/01/31  21:37:32  pgf
+ * fix the interface to decode_key so it does what i think it was supposed
+ * to do.  did this in the process of eliminating SPEC from the return
+ * value of x_getc() -- it now returns a sequence of #-c for the mapped
+ * keys.  we also no longer override a mapping already given to a key by X.
+ *
+ * Revision 1.36  1994/01/29  00:23:26  pgf
+ * allow focusFollowsMouse to be disabled by XDefaults.  previously, mere
+ * presence turned it on.
+ *
+ * Revision 1.35  1994/01/27  17:43:37  pgf
+ * fixes for core dumps on window resize (from 'kev')
+ *
+ * Revision 1.34  1994/01/21  13:57:01  pgf
+ * protect against null fontnames
+ *
+ * Revision 1.33  1993/12/22  15:28:34  pgf
  * applying tom's 3.64 changes
  *
  * Revision 1.32  1993/12/13  18:04:26  pgf
@@ -261,7 +280,7 @@ static	void	multi_click P(( TextWindow, int, int ));
 static	void	start_selection P(( TextWindow, XButtonPressedEvent *, int, int ));
 static	XMotionEvent * compress_motion P(( XMotionEvent * ));
 static	void	x_process_event P(( XEvent * ));
-static	int	decoded_key P(( XEvent * ));
+static	int	decoded_key P(( XEvent *, char *, int ));
 #if NEEDED
 static	Bool	check_kbd_ev P(( Display *, XEvent *, char * ));
 #endif
@@ -291,7 +310,7 @@ static	char *	foreground_name;
 static	char *	background_name;
 static	X_PIXEL	foreground;
 static	X_PIXEL	background;
-static	Bool	focus_follows_mouse = (Bool) FALSE;
+static	Bool	focus_follows_mouse;
 
 static int  multi_click_time = 500;
 
@@ -515,8 +534,8 @@ x_setfont(fname)
 	    xsh.flags = PResizeInc | PMaxSize;
 	    xsh.width_inc = cur_win->char_width;
 	    xsh.height_inc = cur_win->char_height;
-	    xsh.max_width = term.t_mrow * cur_win->char_height;
-	    xsh.max_height = term.t_mcol * cur_win->char_width;
+	    xsh.max_width = term.t_mcol * cur_win->char_width;
+	    xsh.max_height = term.t_mrow * cur_win->char_height;
 	    XSetNormalHints(dpy, cur_win->win, &xsh);
 
 	    FreeIfNeeded(cur_win->fontname);
@@ -547,6 +566,7 @@ x_resize_screen(tw, rows, cols)
     unsigned    r,
                 c;
 
+    save_selection(tw);
     if (rows != tw->rows) {
 	free_win_data(tw);
 	tw->rows = rows;
@@ -645,7 +665,7 @@ x_get_defaults(disp, screen)
 		background = color_value(disp, screen, t);
 
 	if ((t = any_resource(disp, "focusFollowsMouse")) != 0)
-		focus_follows_mouse = TRUE;
+		focus_follows_mouse = stol(t);
 }
 
 static void
@@ -653,7 +673,7 @@ x_open()
 {
     TextWindow  tw;
     int         screen;
-    XFontStruct *pfont;
+    XFontStruct *pfont = 0;
     XGCValues   gcvals;
     ULONG	gcmask;
     XSetWindowAttributes swat;
@@ -662,7 +682,7 @@ x_open()
     XWMHints    xwmh;
     int         flags;
 
-    tw = XCalloc(TextWindowRec);
+    tw = (TextWindow)XCalloc(TextWindowRec);
     if (!tw) {
 	(void)fprintf(stderr, "insufficient memory, exiting\n");
 	ExitProgram(BAD(-1));
@@ -682,7 +702,8 @@ x_open()
 
     x_get_defaults(dpy, screen);
 
-    pfont = query_font(tw, fontname);
+    if (fontname)
+	pfont = query_font(tw, fontname);
     if (!pfont) {
 	pfont = query_font(tw, FONTNAME);
 	if (!pfont) {
@@ -757,8 +778,8 @@ x_open()
     xsh.y = starty;
     xsh.width = x_width(tw);
     xsh.height = x_height(tw);
-    xsh.max_width = term.t_mrow * tw->char_height;
-    xsh.max_height = term.t_mcol * tw->char_width;
+    xsh.max_width = term.t_mcol * tw->char_width;
+    xsh.max_height = term.t_mrow * tw->char_height;
     XSetStandardProperties(dpy, tw->win,
     		MY_CLASS,	/* application name */
 		MY_CLASS,	/* icon name */
@@ -1854,6 +1875,7 @@ x_stash_selection(tw)
 	UCHAR	*data;
 	UCHAR	*dp;
 	SIZE_T	length;
+	int	nn;
 
 	if (!tw->have_selection)
 		return;
@@ -1920,17 +1942,18 @@ x_stash_selection(tw)
 		set_global_g_val(GVAL_REPORT,report_flag);
 		endofDisplay;
 
+		nn = index2ukb(0);	/* find the "unnamed" buffer */
 		if ((length = kchars) == 0
 		 || (dp = data = castalloc(UCHAR, length)) == 0
-		 || (kp = kbs[0].kbufh) == 0)
+		 || (kp = kbs[nn].kbufh) == 0)
 			return;
 
-		while (kp->d_next != 0) {
-			(void)memcpy((char *)dp, (char *)kp->d_chunk, KBLOCK);
+		while (kp != NULL) {
+			SIZE_T len = KbSize(nn,kp);
+			(void)memcpy((char *)dp, (char *)kp->d_chunk, len);
 			kp = kp->d_next;
-			dp += KBLOCK;
+			dp += len;
 		}
-		(void)memcpy((char *)dp, (char *)kp->d_chunk, (SIZE_T)(kbs[0].kused));
 
 	} else {	/* must be message-line */
 		length = tw->sel_end_col - tw->sel_start_col + 1;
@@ -2380,6 +2403,22 @@ x_process_event(ev)
 	nr = ev->xconfigure.height / cur_win->char_height;
 	nc = ev->xconfigure.width  / cur_win->char_width;
 
+	if (nr < MINWLNS || nc < 10) {
+		/* New size is too small.  Adjust to something acceptable */
+		if (nr < MINWLNS)
+			nr = MINWLNS;
+		if (nc < 10)
+			nc = 10;
+		XResizeWindow(ev->xconfigure.display,
+		              ev->xconfigure.window,
+			      (unsigned)nc * cur_win->char_width,
+			      (unsigned)nr * cur_win->char_height);
+		/* Calling XResizeWindow will cause another ConfigureNotify
+		 * event, so we should break early and let this event occur.
+		 */
+		break;
+	}
+
 	if (nc != cur_win->cols) {
 		changed = True;
 		newwidth(True, nc);
@@ -2478,21 +2517,24 @@ void
 x_working()
 {
 	register TextWindow tw = cur_win;
+	char buffer[100];
 	XEvent	ev;
 
 	while (XPending(tw->dpy)) {
 		if (XCheckTypedEvent(tw->dpy, KeyPress, &ev)) {
-			int	num = decoded_key(&ev);
+			int	num = decoded_key(&ev, buffer, 100);
 			if (num >= 0) {
-				if (num == intrc) {
+				if (buffer[0] == intrc) {
 					(void)tb_init(&PasteBuf, abortc);
 #if VMS
 					kbd_alarm(); /* signals? */
 #else
 					(void)signal_pg(SIGINT);
 #endif
-				} else
-					(void)tb_append(&PasteBuf, num);
+				} else {
+					(void)tb_bappend(&PasteBuf,
+								buffer, num);
+				}
 			}
 		} else {
 			XNextEvent(tw->dpy, &ev);
@@ -2511,18 +2553,27 @@ static int
 x_getc()
 {
 	XEvent	ev;
-	int	num;
+	static int	num;
+	static int	i;
+	static char buffer[100];
 
 	while (1) {
 
 		if (tb_more(PasteBuf))	/* handle any queued pasted text */
 			return tb_next(PasteBuf);
 
+		/* drain whatever the last key gave us */
+		if (num) {
+		    	num--;
+			return buffer[i++];
+		}
+
 		XNextEvent(dpy, &ev);
 		if (ev.type == KeyPress) {
-			if ((num = decoded_key(&ev)) >= 0) {
+			if ((num = decoded_key(&ev, buffer, 100)) > 0) {
 				save_selection(cur_win);
-				return num;
+			    	i = 0;
+				continue;
 			}
 			/* else, could be shift-key, etc. */
 		} else {
@@ -2532,64 +2583,75 @@ x_getc()
 }
 
 static int
-decoded_key(ev)
+decoded_key(ev, buffer, bufsize)
 	XEvent	*ev;
+	char	*buffer;
+	int	bufsize;
 {
-	char	buffer[10];
 	KeySym	keysym;
 	int	num;
 
-	num = XLookupString((XKeyPressedEvent *) ev, buffer, sizeof(buffer),
+	num = XLookupString((XKeyPressedEvent *) ev, buffer, bufsize,
 		&keysym, (XComposeStatus *) 0);
+
+	/* if a key is mapped, its data is in the buffer */
+	if (num)
+		return num;
+
+	/* we provide default mappings for unmapped keys */
+
+	/* they're all 'FN-' style bindings, so they all start with
+		the '#' key */
+	buffer[0] = poundc;
 
 	switch (keysym) {
 	/* Arrow keys */
-	case XK_Up:		return SPEC|'A';
-	case XK_Down:		return SPEC|'B';
-	case XK_Right:		return SPEC|'C';
-	case XK_Left:		return SPEC|'D';
+	case XK_Up:		buffer[1] = 'A';	return 2;
+	case XK_Down:		buffer[1] = 'B';	return 2;
+	case XK_Right:		buffer[1] = 'C';	return 2;
+	case XK_Left:		buffer[1] = 'D';	return 2;
 	/* page scroll */
-	case XK_Next:		return SPEC|'n';
-	case XK_Prior:		return SPEC|'p';
+	case XK_Next:		buffer[1] = 'n';	return 2;
+	case XK_Prior:		buffer[1] = 'p';	return 2;
 	/* editing */
-	case XK_Insert:		return SPEC|'i';
+	case XK_Insert:		buffer[1] = 'i';	return 2;
 #if (ULTRIX || ultrix)
-	case DXK_Remove:	return SPEC|'r';
+	case DXK_Remove:	buffer[1] = 'r';	return 2;
 #endif
-	case XK_Find:		return SPEC|'f';
-	case XK_Select:		return SPEC|'s';
+	case XK_Find:		buffer[1] = 'f';	return 2;
+	case XK_Select:		buffer[1] = 's';	return 2;
 	/* command keys */
-	case XK_Menu:		return SPEC|'m';
-	case XK_Help:		return SPEC|'h';
+	case XK_Menu:		buffer[1] = 'm';	return 2;
+	case XK_Help:		buffer[1] = 'h';	return 2;
 	/* function keys */
-	case XK_F1:		return SPEC|'1';
-	case XK_F2:		return SPEC|'2';
-	case XK_F3:		return SPEC|'3';
-	case XK_F4:		return SPEC|'4';
-	case XK_F5:		return SPEC|'5';
-	case XK_F6:		return SPEC|'6';
-	case XK_F7:		return SPEC|'7';
-	case XK_F8:		return SPEC|'8';
-	case XK_F9:		return SPEC|'9';
-	case XK_F10:		return SPEC|'0';
-	case XK_F11:		return ESC;
-	case XK_F12:		return SPEC|'@';
-	case XK_F13:		return SPEC|'#';
-	case XK_F14:		return SPEC|'$';
-	case XK_F15:		return SPEC|'%';
-	case XK_F16:		return SPEC|'^';
-	case XK_F17:		return SPEC|'&';
-	case XK_F18:		return SPEC|'*';
-	case XK_F19:		return SPEC|'(';
-	case XK_F20:		return SPEC|')';
+	case XK_F1:		buffer[1] = '1';	return 2;
+	case XK_F2:		buffer[1] = '2';	return 2;
+	case XK_F3:		buffer[1] = '3';	return 2;
+	case XK_F4:		buffer[1] = '4';	return 2;
+	case XK_F5:		buffer[1] = '5';	return 2;
+	case XK_F6:		buffer[1] = '6';	return 2;
+	case XK_F7:		buffer[1] = '7';	return 2;
+	case XK_F8:		buffer[1] = '8';	return 2;
+	case XK_F9:		buffer[1] = '9';	return 2;
+	case XK_F10:		buffer[1] = '0';	return 2;
+	case XK_F11:		buffer[0] = ESC;	return 1;
+	case XK_F12:		buffer[1] = '@';	return 2;
+	case XK_F13:		buffer[1] = '#';	return 2;
+	case XK_F14:		buffer[1] = '$';	return 2;
+	case XK_F15:		buffer[1] = '%';	return 2;
+	case XK_F16:		buffer[1] = '^';	return 2;
+	case XK_F17:		buffer[1] = '&';	return 2;
+	case XK_F18:		buffer[1] = '*';	return 2;
+	case XK_F19:		buffer[1] = '(';	return 2;
+	case XK_F20:		buffer[1] = ')';	return 2;
 	/* keypad function keys */
-	case XK_KP_F1:		return SPEC|'P';
-	case XK_KP_F2:		return SPEC|'Q';
-	case XK_KP_F3:		return SPEC|'R';
-	case XK_KP_F4:		return SPEC|'S';
-	/* ordinary keys */
-	default:		return num ? buffer[0] : -1;
+	case XK_KP_F1:		buffer[1] = 'P';	return 2;
+	case XK_KP_F2:		buffer[1] = 'Q';	return 2;
+	case XK_KP_F3:		buffer[1] = 'R';	return 2;
+	case XK_KP_F4:		buffer[1] = 'S';	return 2;
 	}
+
+	return 0;
 }
 
 #if NEEDED

@@ -6,7 +6,35 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.108  1993/12/08 20:48:23  pgf
+ * Revision 1.116  1994/02/07 12:25:45  pgf
+ * if running under DOS, and there are equal no. of doslines and unixlines,
+ * vote in favor of dos-mode, rather than against.
+ * new capability to set_dosmode -- if it gets an argument, will clear
+ * dos mode instead.
+ *
+ * Revision 1.115  1994/02/03  19:35:12  pgf
+ * tom's changes for 3.65
+ *
+ * Revision 1.114  1994/02/01  19:43:11  pgf
+ * fixed ifdef typo
+ *
+ * Revision 1.113  1994/02/01  19:40:08  pgf
+ * semd hostname and directory name with "vile died" message
+ *
+ * Revision 1.112  1994/01/31  21:41:14  pgf
+ * fix off-by-one in unqname().  (greg mcfarlane)
+ *
+ * Revision 1.111  1994/01/31  20:26:14  pgf
+ * new routine ffexists() supports ability to not reclaim empty unmodified
+ * buffers if they correspond to existing files
+ *
+ * Revision 1.110  1994/01/27  17:39:53  pgf
+ * changed if_OPT_WORKING to simple ifdef
+ *
+ * Revision 1.109  1994/01/21  13:56:43  pgf
+ * minor comment change
+ *
+ * Revision 1.108  1993/12/08  20:48:23  pgf
  * added new routine ask_shouldchange()
  *
  * Revision 1.107  1993/11/04  09:10:51  pgf
@@ -392,6 +420,12 @@ static	void	readlinesmsg P(( int, int, char *, int ));
 static	int	getfile2 P(( char *, int ));
 #if DOSFILES
 static	void	guess_dosmode P(( BUFFER * ));
+/* give DOS the benefit of the doubt on ambiguous files */
+# if MSDOS
+#  define MORETHAN >=
+# else
+#  define MORETHAN >
+# endif
 #endif
 static	int	writereg P(( REGION *, char *, int, BUFFER * ));
 #if UNIX
@@ -802,7 +836,8 @@ int lockfl;		/* check the file for locks? */
 	        makename(bname, fname);            /* New buffer name.     */
 		/* make sure the buffer name doesn't exist */
 		while ((bp = find_b_name(bname)) != NULL) {
-			if ( !b_is_changed(bp) && is_empty_buf(bp)) {
+			if ( !b_is_changed(bp) && is_empty_buf(bp) &&
+			    		!ffexists(bp->b_fname)) {
 				/* empty and unmodified -- then it's okay 
 					to re-use this buffer */
 				bp->b_active = FALSE;
@@ -874,13 +909,14 @@ BUFFER *bp;
 				unixlines++;
 			}
 		}
-		set_b_val(bp, MDDOS, doslines > unixlines);
+		set_b_val(bp, MDDOS, doslines MORETHAN unixlines);
 		bp->b_bytecount -= doslines;
 	}
 }
 
 /*
  * Forces the current buffer to be in DOS-mode, stripping any trailing CR's.
+ * ( any argument forces non-DOS mode, trailing CR's still stripped )
  */
 /*ARGSUSED*/
 int
@@ -888,9 +924,9 @@ set_dosmode(f,n)
 int	f,n;
 {
 	make_local_b_val(curbp, MDDOS);
-	set_b_val(curbp, MDDOS, TRUE);
+	set_b_val(curbp, MDDOS, !f);
 	guess_dosmode(curbp);
-	set_b_val(curbp, MDDOS, TRUE);
+	set_b_val(curbp, MDDOS, !f);
 	markWFMODE(curbp);
 	return TRUE;
 }
@@ -948,7 +984,7 @@ int	mflg;		/* print messages? */
                 if (mflg)
 			mlwrite("[New file]");
 #if DOSFILES
-		set_b_val(bp, MDDOS, FALSE);
+		set_b_val(bp, MDDOS, global_b_val(MDDOS));
 #endif
         } else {
 
@@ -965,7 +1001,9 @@ int	mflg;		/* print messages? */
 		odv = doverifys;
 		doverifys = 0;
 #endif
-		if_OPT_WORKING(max_working = cur_working = old_working = 0)
+#if OPT_WORKING
+		max_working = cur_working = old_working = 0;
+#endif
 #if ! MSDOS && !OPT_MAP_MEMORY
 		if (fileispipe || (s = quickreadf(bp, &nline)) == FIOMEM)
 #endif
@@ -973,11 +1011,15 @@ int	mflg;		/* print messages? */
 #if VMALLOC
 		doverifys = odv;
 #endif
-		if_OPT_WORKING(cur_working = 0)
+#if OPT_WORKING
+		cur_working = 0;
+#endif
 		if (s == FIOERR) {
 			mlerror(fname);
 		} else {
 
+			if (s == FIOFUN)	/* last line is incomplete */
+				set_b_val(bp, MDNEWLINE, FALSE);
 			b_clr_changed(bp);
 #if FINDERR
 			if (fileispipe == TRUE)
@@ -1012,8 +1054,8 @@ int	mflg;		/* print messages? */
 
         for_each_window(wp) {
                 if (wp->w_bufp == bp) {
-                        wp->w_line.l = lFORW(bp->b_line.l);
-                        wp->w_dot.l  = lFORW(bp->b_line.l);
+			wp->w_line.l = lFORW(buf_head(bp));
+			wp->w_dot.l  = lFORW(buf_head(bp));
                         wp->w_dot.o  = 0;
 #ifdef WINMARK
                         wp->w_mark = nullmark;
@@ -1046,7 +1088,9 @@ int *nlinep;
 	/* avoid malloc(0) problems down below; let slowreadf() do the work */
 	if (len == 0)
 		return FIOMEM;
-	if_OPT_WORKING(max_working = len)
+#if OPT_WORKING
+	max_working = len;
+#endif
 #if     MSDOS
 	/* cannot allocate more than 64K in dos */
 	if (len >= 65535)
@@ -1092,7 +1136,9 @@ int *nlinep;
 		if (*textp == '\n') {
 			if (textp - countp >= 255) {
 				UCHAR *np;
-				if_OPT_WORKING(max_working = bp->b_ltext_end - countp)
+#if OPT_WORKING
+				max_working = bp->b_ltext_end - countp;
+#endif
 				len = (B_COUNT)(countp - bp->b_ltext);
 				incomplete = TRUE;
 				/* we'll re-read the rest later */
@@ -1167,12 +1213,12 @@ int *nlinep;
 			lp--;  /* point at last line again */
 
 			/* connect the end of the list */
-			set_lforw(lp, bp->b_line.l);
-			set_lback(bp->b_line.l, lp);
+			set_lforw(lp, buf_head(bp));
+			set_lback(buf_head(bp), lp);
 
 			/* connect the front of the list */
-			set_lback(bp->b_LINEs, bp->b_line.l);
-			set_lforw(bp->b_line.l, bp->b_LINEs);
+			set_lback(bp->b_LINEs, buf_head(bp));
+			set_lforw(buf_head(bp), bp->b_LINEs);
 		}
 	}
 
@@ -1236,12 +1282,12 @@ int *nlinep;
 
 				if (!done_update || bp->b_nwnd > 1)
 					flag |= WFHARD;
-			        for_each_window(wp) {
+				for_each_window(wp) {
 			                if (wp->w_bufp == bp) {
 			                        wp->w_line.l=
-							lFORW(bp->b_line.l);
+							lFORW(buf_head(bp));
 			                        wp->w_dot.l =
-							lBACK(bp->b_line.l);
+							lBACK(buf_head(bp));
 			                        wp->w_dot.o = 0;
 						wp->w_flag |= flag;
 						wp->w_force = -1;
@@ -1252,7 +1298,7 @@ int *nlinep;
 #if DOSFILES
 				if (global_b_val(MDDOS))
 					set_b_val(bp, MDDOS, 
-						doslines > unixlines);
+						doslines MORETHAN unixlines);
 #endif
 				curwp->w_flag |= WFMODE|WFKILLS;
 				if (!update(TRUE)) {
@@ -1275,7 +1321,7 @@ int *nlinep;
         }
 #if DOSFILES
 	if (global_b_val(MDDOS))
-		set_b_val(bp, MDDOS, doslines > unixlines);
+		set_b_val(bp, MDDOS, doslines MORETHAN unixlines);
 #endif
 	return s;
 }
@@ -1459,7 +1505,7 @@ int ok_to_ask;  /* prompts allowed? */
 					j--;
 					sp--;
 				}
-				(void)strncpy(sp, "-1", NBUFN-j);
+				(void)strncpy(sp+1, "-1", NBUFN-j);
 			}
 		}
 	}
@@ -1530,7 +1576,7 @@ int msgf;
 
 	bsizes(bp);	/* make sure we have current count */
 	/* starting at the beginning of the buffer */
-        region.r_orig.l = lFORW(bp->b_line.l);
+	region.r_orig.l = lFORW(buf_head(bp));
         region.r_orig.o = 0;
         region.r_size   = bp->b_bytecount;
         region.r_end    = bp->b_line;
@@ -1589,8 +1635,8 @@ BUFFER	*bp;
 	C_NUM	offset = rp->r_orig.o;
 
 	/* this is adequate as long as we cannot write parts of lines */
-	int	whole_file = (l_ref(rp->r_orig.l) == lForw(bp->b_line.l))
-	        	  && (same_ptr(rp->r_end.l, bp->b_line.l));
+	int	whole_file = (l_ref(rp->r_orig.l) == lForw(buf_head(bp)))
+			  && (same_ptr(rp->r_end.l, buf_head(bp)));
 
 	if (is_internalname(fn)) {
 		mlforce("[No filename]");
@@ -1746,10 +1792,7 @@ int	msgf;
 
 	kp = kbs[ukb].kbufh;
 	while (kp != NULL) {
-		if (kp->d_next == NULL)
-			i = kbs[ukb].kused;
-		else
-			i = KBLOCK;
+		i = KbSize(ukb,kp);
 		sp = (char *)kp->d_chunk;
 		while (i--) {
 			if ((c = *sp++) == '\n')
@@ -1848,8 +1891,8 @@ FILE	*haveffp;
 	} else { /* we already have the file pointer */
 		ffp = haveffp;
 	}
-	prevp = curwp->w_dot.l;
-	curwp->w_dot.o = 0;
+	prevp = DOT.l;
+	DOT.o = 0;
 	MK = DOT;
 
 	nline = 0;
@@ -1884,7 +1927,7 @@ FILE	*haveffp;
 	}
 out:
 	/* advance to the next line and mark the window for changes */
-	curwp->w_dot.l = lFORW(curwp->w_dot.l);
+	DOT.l = lFORW(DOT.l);
 
 	/* copy window parameters back to the buffer structure */
 	copy_traits(&(curbp->b_wtraits), &(curwp->w_traits));
@@ -1985,10 +2028,12 @@ ACTUAL_SIG_DECL
 	(void)system(cmd);
 #endif	/* APOLLO */
 
+	/* write all modified buffers to the temp directory */
+	set_global_g_val(GMDIMPLYBUFF,FALSE);	/* avoid side-effects! */
 	for_each_buffer(bp) {
-		if (!b_is_invisible(bp) && 
-			 bp->b_active == TRUE && 
-	                 b_is_changed(bp)) {
+		if (!b_is_temporary(bp) &&
+			bp->b_active == TRUE &&
+			b_is_changed(bp)) {
 #if HAVE_MKDIR
 			if (!created) {
 				(void)mktemp(dirnam);
@@ -2014,8 +2059,20 @@ ACTUAL_SIG_DECL
 	if (wrote) {
 		if ((np = getenv("LOGNAME")) != 0
 		 || (np = getenv("USER")) != 0) {
-			(void)lsprintf(cmd, "%s%s%s%s%s%s",
-			"(echo Subject: vile died; echo Files saved: ;",
+#if HAVE_GETHOSTNAME
+			char hostname[128];
+			gethostname(hostname, 128);
+			hostname[127] = '\0';
+#endif
+			(void)lsprintf(cmd, "%s%s%s%s%s%s%s%s%s%s%s%s%s%s",
+			"(echo To: ", np, ";", "echo Subject: vile died; ",
+			"echo Files saved in directory ", dirnam,
+#if HAVE_GETHOSTNAME
+			" on host ", hostname, 
+#else
+			", host unknown", "",
+#endif
+			": ;",
 #if HAVE_MKDIR
 			"ls -a ", dirnam, " | sort -r)",
 #else
@@ -2023,6 +2080,10 @@ ACTUAL_SIG_DECL
 #endif
 			" | /bin/mail ", np);
 			(void)system(cmd);
+
+
+
+
 		}
 	}
 	vttidy(FALSE);

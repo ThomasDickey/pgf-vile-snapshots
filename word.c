@@ -4,7 +4,13 @@
  * do any sentence mode commands, they are likely to be put in this file. 
  *
  * $Log: word.c,v $
- * Revision 1.34  1993/10/12 18:46:33  pgf
+ * Revision 1.36  1994/02/03 19:35:12  pgf
+ * tom's changes for 3.65
+ *
+ * Revision 1.35  1994/01/11  17:27:27  pgf
+ * 'interrupted' is now a routine
+ *
+ * Revision 1.34  1993/10/12  18:46:33  pgf
  * the change to using entabline broke formatting in some cases.  this fixes
  * it.
  *
@@ -441,7 +447,7 @@ formatregion()
 		rls_region();
 	}
 	pastline = MK.l;
-	if (!same_ptr(pastline, curbp->b_line.l))
+	if (!same_ptr(pastline, buf_head(curbp)))
 		pastline = lFORW(pastline);
 
 	expP = b_val_rexp(curbp,VAL_PARAGRAPHS)->reg;
@@ -488,7 +494,7 @@ formatregion()
 		finished = FALSE;
 		while (finished == FALSE) { /* i.e. is not TRUE  */
 					    /* or SORTOFTRUE */
-			if (interrupted) return ABORT;
+			if (interrupted()) return ABORT;
 
 			/* get the next character */
 			if (is_at_end_of_line(DOT)) {

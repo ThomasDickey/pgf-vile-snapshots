@@ -3,10 +3,24 @@
 #
 # T.DANG (dang@cogit.ign.fr)
 #
-# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.djg,v 1.1 1993/09/03 09:11:54 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.djg,v 1.5 1994/02/07 12:28:24 pgf Exp $
 #
 # $Log: makefile.djg,v $
-# Revision 1.1  1993/09/03 09:11:54  pgf
+# Revision 1.5  1994/02/07 12:28:24  pgf
+# use ld in favor of gcc for linking, since real-mode gcc (gcc-rm) can't
+# deal with long argument lists.  also, added my incremental link targets
+# (rvile.o and ivile)
+#
+# Revision 1.4  1994/02/03  19:35:12  pgf
+# tom's changes for 3.65
+#
+# Revision 1.3  1994/01/28  21:00:20  pgf
+# added -g, and djhandl.c
+#
+# Revision 1.2  1994/01/11  17:19:54  pgf
+# switch from aout2exe to coff2exe (djgpp 1.11)
+#
+# Revision 1.1  1993/09/03  09:11:54  pgf
 # tom's 3.60 changes
 #
 # Revision 1.0  1993/07/06  16:53:05  pgf
@@ -18,7 +32,7 @@ LONGARGS = gcc
 CFLAGS= -Wall -O -DIBMPC -Dscrn_chosen 
 
 # these are normal editable headers
-HDRS = estruct.h epath.h edef.h proto.h dirstuff.h glob.h
+HDRS = estruct.h epath.h edef.h proto.h dirstuff.h
 
 # these headers are built by the mktbls program from the information in cmdtbl
 # and in modetbl
@@ -29,20 +43,45 @@ SRC = 	main.c ibmpc.c basic.c bind.c buffer.c crypt.c \
 	fileio.c finderr.c glob.c globals.c history.c input.c insert.c isearch.c \
 	line.c modes.c npopen.c oneliner.c opers.c path.c random.c regexp.c \
 	region.c search.c spawn.c tags.c tbuff.c termio.c tmp.c undo.c \
-	version.c vmalloc.c window.c word.c wordmov.c map.c
+	version.c vmalloc.c window.c word.c wordmov.c map.c djhandl.c
 
 OBJ = 	main.o ibmpc.o basic.o bind.o buffer.o crypt.o \
       	csrch.o display.o eval.o exec.o externs.o fences.o file.o filec.o \
 	fileio.o finderr.o glob.o globals.o history.o input.o insert.o isearch.o \
 	line.o modes.o npopen.o oneliner.o opers.o path.o random.o regexp.o \
 	region.o search.o spawn.o tags.o tbuff.o termio.o tmp.o undo.o \
-	version.o vmalloc.o window.o word.o wordmov.o map.o
+	version.o vmalloc.o window.o word.o wordmov.o map.o djhandl.o
 
 %.o:	%.c estruct.h nemode.h edef.h proto.h 
 	gcc $(CFLAGS) -c $< -o $@ 
 
 vile: 	$(BUILTHDRS) $(OBJ)
-	gcc -o vile $(OBJ) -lpc 
+#	gcc -o vile $(OBJ) -lpc 
+	ld -o vile /djgpp/lib/crt0.o $(OBJ) -L/djgpp/lib -lpc -lc -lgcc
+	coff2exe vile
+	stubedit vile.exe globbing=no
+
+dist:	vile
+#	coff2exe -s /djgpp/bin/go32.exe vile
+#	stubedit vile.exe globbing=no
+	pkzip pcvile.zip readme.pc readme vile.exe vile.hlp \\djgpp\\bin\\go32.exe
+
+
+
+# for my poor slow omnibook, i do incremental linking when working on
+# just a couple of modules...
+NOBJ = $(OBJ)
+NOBJ := $(filter-out ibmpc.o, $(NOBJ))
+NOBJ := $(filter-out filec.o, $(NOBJ))
+NOBJ := $(filter-out glob.o, $(NOBJ))
+XOBJ =  ibmpc.o filec.o glob.o
+
+rvile.o: $(NOBJ)
+	ld -r -o rvile.o $(NOBJ) -L/djgpp/lib -lpc -lc -lgcc
+
+ivile: $(XOBJ) rvile.o
+	ld -o vile /djgpp/lib/crt0.o rvile.o $(XOBJ) -L/djgpp/lib -lpc -lc -lgcc
+	coff2exe vile
 
 nebind.h \
 nefunc.h \
@@ -55,7 +94,7 @@ nemode.h:	modetbl mktbls.exe
 
 mktbls.exe:  mktbls.c
 	gcc mktbls.c -o mktbls
-	aout2exe mktbls
+	coff2exe mktbls
 	rm mktbls
 
 clean:

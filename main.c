@@ -14,7 +14,43 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.147  1993/12/22 15:28:34  pgf
+ * Revision 1.158  1994/02/07 12:31:30  pgf
+ * fix preprocessor syntax to suit older compilers
+ *
+ * Revision 1.157  1994/02/07  12:27:51  pgf
+ * inherit local dos mode from the global mode when undecided, rather than
+ * turning it off.
+ *
+ * Revision 1.156  1994/02/03  19:35:12  pgf
+ * tom's changes for 3.65
+ *
+ * Revision 1.155  1994/02/03  10:16:53  pgf
+ * if there might be a working message on the status line, clear it
+ * before quitting
+ *
+ * Revision 1.154  1994/02/02  18:11:45  pgf
+ * initialize meta-insert-bindings mode
+ *
+ * Revision 1.153  1994/02/01  18:45:17  pgf
+ * changed printing-xxx defaults to 0
+ *
+ * Revision 1.152  1994/01/31  18:18:33  pgf
+ * speckey() is now in main.c
+ *
+ * Revision 1.151  1994/01/31  12:17:28  pgf
+ * make charinit() recallable, so we can change the printable set of
+ * characters for 8-bit usage
+ *
+ * Revision 1.150  1994/01/28  20:55:32  pgf
+ * ctrl-c/ctrl-break/crit-error handling for djgpp
+ *
+ * Revision 1.149  1994/01/11  17:31:29  pgf
+ * added not_interrupted() routine
+ *
+ * Revision 1.148  1994/01/11  17:27:27  pgf
+ * 'interrupted' is now a routine
+ *
+ * Revision 1.147  1993/12/22  15:28:34  pgf
  * applying tom's 3.64 changes
  *
  * Revision 1.146  1993/12/14  11:10:51  pgf
@@ -516,7 +552,6 @@
 #define realdef
 #include	"estruct.h"	/* global structures and defines */
 #include	"edef.h"	/* global definitions */
-#include	"glob.h"
 #include	"nevars.h"
 
 #if UNIX
@@ -525,6 +560,10 @@
 
 #if MSDOS
 #include <io.h>
+#if DJGPP
+#include <dpmi.h>
+#include <go32.h>
+#endif
 #endif
 
 extern char *pathname[];	/* startup file path/name array */
@@ -593,13 +632,11 @@ char	*argv[];
 	Mark.l = null_ptr;	/* ...so we don't confuse with blk 0 */
 #endif
 #endif
-	charinit();		/* character types -- we need these pretty
-					early  */
-
 	global_val_init();	/* global buffer values */
+	charinit();	/* character types -- we need these pretty early  */
 
 #if MSDOS
-	slash = '\\';  /* getswitchar() == '/' ? '\\' : '/'; */
+	slash = '\\';
 #else
 #if ST520
 	slash = '\\';
@@ -801,6 +838,7 @@ char	*argv[];
 	 */
 #if UNIX || VMS || MSDOS
 	if (!isatty(fileno(stdin))) {
+		BUFFER	*lastbp = firstbp;
 		FILE	*in;
 		int	fd;
 		int	nline = 0;
@@ -831,7 +869,7 @@ char	*argv[];
 
 		if (!isatty(fileno(stdout)) && is_empty_buf(bp)) {
 			(void)zotbuf(bp);
-			firstbp = 0;
+			firstbp = lastbp;
 		}
 #if FINDERR
 		else set_febuff(get_bname(bp));
@@ -844,43 +882,8 @@ char	*argv[];
 	curbp = NULL;
 
 	/* initialize the editor */
-#if UNIX
-	(void)signal(SIGINT,catchintr);
-	(void)signal(SIGHUP,imdying);
-#ifdef SIGBUS
-	(void)signal(SIGBUS,imdying);
-#endif
-#ifdef SIGSYS
-	(void)signal(SIGSYS,imdying);
-#endif
-	(void)signal(SIGSEGV,imdying);
-	(void)signal(SIGTERM,imdying);
-#if DEBUG
-	(void)signal(SIGQUIT,imdying);
-#else
-	(void)signal(SIGQUIT,SIG_IGN);
-#endif
-	(void)signal(SIGPIPE,SIG_IGN);
-#if defined(SIGWINCH) && ! X11
-	(void)signal(SIGWINCH,sizesignal);
-#endif
-#else
-# if MSDOS
-	(void)signal(SIGINT,catchintr);
-#  if ! GO32
-#   if WATCOM
-	{
-	/* clean up Warning from Watcom C */
-	void *ptrfunc = dos_crit_handler;
-	_harderr(ptrfunc);
-	}
-#   else	/* TURBO */
-	_harderr(dos_crit_handler);
-#   endif
-#  endif
-# endif
-#endif
 
+	siginit();
 	vtinit();		/* Display */
 	winit();		/* windows */
 
@@ -897,7 +900,7 @@ char	*argv[];
 		bp->b_active = TRUE;
 #if DOSFILES
 		make_local_b_val(bp,MDDOS);
-		set_b_val(bp, MDDOS, FALSE );
+		set_b_val(bp, MDDOS, global_b_val(MDDOS) );
 #endif
 		swbuffer(bp);
 	}
@@ -1162,6 +1165,11 @@ global_val_init()
 #endif
 	set_global_g_val(GMDMULTIBEEP,	TRUE); /* multiple beeps for multiple
 						motion failures */
+	/* which 8 bit chars are printable? */
+	set_global_g_val(GVAL_PRINT_LOW, 0);
+	set_global_g_val(GVAL_PRINT_HIGH, 0);
+
+
 	set_global_g_val(GVAL_TIMEOUTVAL, 500);	/* catnap time -- how long
 							to wait for ESC seq */
 #if VMS || MSDOS			/* ':' gets in the way of drives */
@@ -1208,11 +1216,13 @@ global_val_init()
 #endif
 	set_global_b_val(MDIGNCASE,	FALSE); /* exact matches */
 #if MSDOS
-	set_global_b_val(MDDOS,		TRUE);	/* dos mode */
+	set_global_b_val(MDDOS, TRUE);	/* on by default */
 #else
-	set_global_b_val(MDDOS,		FALSE);	/* dos mode */
+	set_global_b_val(MDDOS, FALSE);	/* off by default */
 #endif
 	set_global_b_val(MDMAGIC,	TRUE); 	/* magic searches */
+	set_global_b_val( MDMETAINSBIND, TRUE); /* honor meta-bindings when
+							in insert mode */
 	set_global_b_val(MDNEWLINE,	TRUE); 	/* trailing-newline */
 	set_global_b_val(MDSHOWMAT,	FALSE);	/* show-match */
 	set_global_b_val(MDSHOWMODE,	TRUE);	/* show-mode */
@@ -1299,11 +1309,18 @@ global_val_init()
 }
 
 #if UNIX || MSDOS || VMS
+
+/* have we been interrupted/ */
+static int am_interrupted = FALSE;
+
 /* ARGSUSED */
 SIGT
 catchintr (ACTUAL_SIG_ARGS)
 {
-	interrupted = TRUE;
+	am_interrupted = TRUE;
+#if MSDOS
+	sgarbf = TRUE;	/* there's probably a ^C on the screen. */
+#endif
 #if USG || MSDOS
 	(void)signal(SIGINT,catchintr);
 #endif
@@ -1312,6 +1329,49 @@ catchintr (ACTUAL_SIG_ARGS)
 	SIGRET;
 }
 #endif
+
+int
+interrupted()
+{
+#if MSDOS
+	int c;
+#if DJGPP
+	if (_go32_was_ctrl_break_hit() != 0) {
+		while(typahead())
+			(void)tgetc(FALSE);
+		return TRUE;
+	}
+	if (was_ctrl_c_hit() != 0) {
+		while(typahead())
+			(void)tgetc(FALSE);
+		return TRUE;
+	}
+#endif
+	if (am_interrupted)
+		return TRUE;
+	if (typahead()) {
+		c = tgetc(FALSE);
+		if (c == tocntrl('C'))
+			return TRUE;
+		tungetc(c);
+	}
+	return FALSE;
+#else
+	return am_interrupted;
+#endif
+}
+
+void
+not_interrupted()
+{
+    am_interrupted = FALSE;
+#if MSDOS
+# if DJGPP
+    (void)_go32_was_ctrl_break_hit();  /* flush any pending kbd ctrl-breaks */
+    (void)was_ctrl_c_hit();  /* flush any pending kbd ctrl-breaks */
+# endif
+#endif
+}
 
 #if MSDOS
 # if WATCOM
@@ -1324,12 +1384,73 @@ catchintr (ACTUAL_SIG_ARGS)
 	_hardresume((int)_HARDERR_FAIL);
 	return (int)_HARDERR_FAIL;
 # else
-#  if ! GO32
+#  if ! DJGPP
 	_hardresume(_HARDERR_FAIL);
 #  endif
 # endif
 }
 #endif
+
+
+void
+siginit()
+{
+#if UNIX
+	(void)signal(SIGINT,catchintr);
+	(void)signal(SIGHUP,imdying);
+#ifdef SIGBUS
+	(void)signal(SIGBUS,imdying);
+#endif
+#ifdef SIGSYS
+	(void)signal(SIGSYS,imdying);
+#endif
+	(void)signal(SIGSEGV,imdying);
+	(void)signal(SIGTERM,imdying);
+#if DEBUG
+	(void)signal(SIGQUIT,imdying);
+#else
+	(void)signal(SIGQUIT,SIG_IGN);
+#endif
+	(void)signal(SIGPIPE,SIG_IGN);
+#if defined(SIGWINCH) && ! X11
+	(void)signal(SIGWINCH,sizesignal);
+#endif
+#else
+# if MSDOS
+	(void)signal(SIGINT,catchintr);
+#  if DJGPP
+	_go32_want_ctrl_break(TRUE);
+	setcbrk(FALSE);
+	want_ctrl_c(TRUE);
+	hard_error_catch_setup();
+#  else
+#   if WATCOM
+	{
+	/* clean up Warning from Watcom C */
+	void *ptrfunc = dos_crit_handler;
+	_harderr(ptrfunc);
+	}
+#   else	/* TURBO */
+	_harderr(dos_crit_handler);
+#   endif
+#  endif
+# endif
+#endif
+
+}
+
+void
+siguninit()
+{
+#if MSDOS
+# if DJGPP
+	_go32_want_ctrl_break(FALSE);
+	want_ctrl_c(FALSE);
+	hard_error_teardown();
+	setcbrk(TRUE);
+# endif
+#endif
+}
 
 /* do number processing if needed */
 static void
@@ -1548,8 +1669,11 @@ int f,n;
 		/* NOTREACHED */
 	}
 #endif
-#if UNIX
-	(void)signal(SIGHUP,SIG_DFL);	/* I don't care anymore */
+	siguninit();
+#if OPT_WORKING
+	/* force the message line clear */
+	mpresf = 1;
+	mlerase();
 #endif
 #if NO_LEAKS
 	{
@@ -1684,11 +1808,22 @@ int f,n;
 	return TRUE;
 }
 
+/* ARGSUSED */
+int
+speckey(f,n) /* dummy function for binding to pseudo-function prefix, '#' */
+int f,n;
+{
+	return TRUE;
+}
+
 /* initialize our version of the "chartypes" stuff normally in ctypes.h */
+/* also called later, if charset-affecting modes change, for instance */
 void
 charinit()
 {
 	register int c;
+
+	(void)memset(_chartypes_, 0, sizeof(_chartypes_));
 
 	/* legal in pathnames */
 	_chartypes_['.'] =
@@ -1733,15 +1868,18 @@ charinit()
 		_chartypes_[c] |= _punct;
 	for (c = '['; c <= '`'; c++)
 		_chartypes_[c] |= _punct;
-	for (c = '{'; c <= '~'; c++)
+	for (c = LBRACE; c <= '~'; c++)
 		_chartypes_[c] |= _punct;
 
 	/* printable */
 	for (c = ' '; c <= '~'; c++)
 		_chartypes_[c] |= _print;
+	c = global_g_val(GVAL_PRINT_LOW);
+	if (c < HIGHBIT) c = HIGHBIT;
+	while ( c <= global_g_val(GVAL_PRINT_HIGH) && c < N_chars)
+		_chartypes_[c++] |= _print;
 
-	/* backspacers: ^H, rubout, and the user's backspace char */
-	/* we'll add the user's char later */
+	/* backspacers: ^H, rubout */
 	_chartypes_['\b'] |= _bspace;
 	_chartypes_[127] |= _bspace;
 
@@ -1750,11 +1888,11 @@ charinit()
 	_chartypes_['?'] |= _wild;
 #if !VMS
 	_chartypes_['~'] |= _wild;
-	_chartypes_['['] |= _wild;
-	_chartypes_[']'] |= _wild;
+	_chartypes_[LBRACK] |= _wild;
+	_chartypes_[RBRACK] |= _wild;
+	_chartypes_[LBRACE] |= _wild;
+	_chartypes_[RBRACE] |= _wild;
 	_chartypes_['$'] |= _wild;
-	_chartypes_['{'] |= _wild;
-	_chartypes_['}'] |= _wild;
 	_chartypes_['`'] |= _wild;
 #endif
 
@@ -1768,22 +1906,22 @@ charinit()
 	_chartypes_['\''] |= _linespec;
 
 	/* fences */
-	_chartypes_['('] |= _fence;
-	_chartypes_[')'] |= _fence;
-	_chartypes_['['] |= _fence;
-	_chartypes_[']'] |= _fence;
-	_chartypes_['{'] |= _fence;
-	_chartypes_['}'] |= _fence;
+	_chartypes_[LBRACE] |= _fence;
+	_chartypes_[RBRACE] |= _fence;
+	_chartypes_[LPAREN] |= _fence;
+	_chartypes_[RPAREN] |= _fence;
+	_chartypes_[LBRACK] |= _fence;
+	_chartypes_[RBRACK] |= _fence;
 
 #if VMS
-	_chartypes_['['] |= _pathn;	/* actually, "<", ">" too */
-	_chartypes_[']'] |= _pathn;
+	_chartypes_[LBRACK] |= _pathn;	/* actually, "<", ">" too */
+	_chartypes_[RBRACK] |= _pathn;
 	_chartypes_['$'] |= _pathn;
 	_chartypes_[':'] |= _pathn;
 	_chartypes_[';'] |= _pathn;
 #endif
 
-#if !SMALLER
+#if OPT_WIDE_CTYPES
 	/* scratch-buffer-names (usually superset of _pathn) */
 	_chartypes_[(unsigned)SCRTCH_LEFT[0]]  |= _scrtch;
 	_chartypes_[(unsigned)SCRTCH_RIGHT[0]] |= _scrtch;
@@ -1791,7 +1929,7 @@ charinit()
 #endif
 
 	for (c = 0; c < N_chars; c++) {
-#if !SMALLER
+#if OPT_WIDE_CTYPES
 		if (isspace(c) || isprint(c))
 			_chartypes_[c] |= _shpipe;
 		if (ispath(c))
@@ -1800,8 +1938,8 @@ charinit()
 		if ((_chartypes_[c] & _space) == 0)
 			_chartypes_[c] |= _nonspace;
 	}
-}
 
+}
 
 /*****		Compiler specific Library functions	****/
 

@@ -4,7 +4,10 @@
  * written for vile by Paul Fox, (c)1990
  *
  * $Log: opers.c,v $
- * Revision 1.34  1993/09/10 16:06:49  pgf
+ * Revision 1.35  1994/01/31 18:13:58  pgf
+ * change kbd_key() to tgetc(), and last1key to lastkey
+ *
+ * Revision 1.34  1993/09/10  16:06:49  pgf
  * tom's 3.61 changes
  *
  * Revision 1.33  1993/09/03  09:11:54  pgf
@@ -146,7 +149,7 @@ OpsFunc fn;
 char *str;
 {
 	int c;
-	int this1key;
+	int thiskey;
 	int status;
 	CMDFUNC *cfp;			/* function to execute */
 	char tok[NSTRING];		/* command incoming */
@@ -173,13 +176,13 @@ char *str;
 			else
 				cfp = engl2fnc(tok);
 		} else {
-			this1key = last1key;
+			thiskey = lastkey;
 			c = kbd_seq();
 
 			/* allow second chance for entering counts */
 			do_repeats(&c,&f,&n);
 
-			if (this1key == last1key)
+			if (thiskey == lastkey)
 				cfp = &f_godotplus;
 			else
 				cfp = kcod2fnc(c);

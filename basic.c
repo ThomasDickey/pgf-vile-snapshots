@@ -6,7 +6,13 @@
  * framing, are hard.
  *
  * $Log: basic.c,v $
- * Revision 1.61  1993/11/04 09:10:51  pgf
+ * Revision 1.63  1994/02/03 19:35:12  pgf
+ * tom's changes for 3.65
+ *
+ * Revision 1.62  1994/01/31  18:13:58  pgf
+ * change kbd_key() to tgetc(), and last1key to lastkey
+ *
+ * Revision 1.61  1993/11/04  09:10:51  pgf
  * tom's 3.63 changes
  *
  * Revision 1.60  1993/10/04  10:24:09  pgf
@@ -299,7 +305,7 @@ register int n;
 		return (forwchar(f, -n));
 	while (n--) {
 		if (DOT.o == w_left_margin(curwp)) {
-			if ((lp=lBack(DOT.l)) == l_ref(curbp->b_line.l))
+			if ((lp=lBack(DOT.l)) == l_ref(buf_head(curbp)))
 				return (FALSE);
 			DOT.l  = l_ptr(lp);
 			DOT.o  = llength(lp);
@@ -430,10 +436,10 @@ int f,n;
 
 	DOT.o  = w_left_margin(curwp);
 	if (n < 0) {
-		DOT.l  = lBACK(curbp->b_line.l);
+		DOT.l  = lBACK(buf_head(curbp));
 		status = backline(f, -n - 1 );
 	} else {
-		DOT.l  = lFORW(curbp->b_line.l);
+		DOT.l  = lFORW(buf_head(curbp));
 		status = forwline(f, n-1);
 	}
 	if (status == TRUE)
@@ -451,7 +457,7 @@ int
 gotobob(f, n)
 int f,n;
 {
-	DOT.l  = lFORW(curbp->b_line.l);
+	DOT.l  = lFORW(buf_head(curbp));
 	DOT.o  = w_left_margin(curwp);
 	curwp->w_flag |= WFMOVE;
 	return (TRUE);
@@ -465,7 +471,7 @@ int
 gotoeob(f, n)
 int f,n;
 {
-	DOT.l  = lBACK(curbp->b_line.l);
+	DOT.l  = lBACK(buf_head(curbp));
 	curwp->w_flag |= WFMOVE;
 	return firstnonwhite(FALSE,1);
 }
@@ -509,7 +515,7 @@ int f,n;
 	fast_ptr LINEPTR lp, head;
 	int	half = (curwp->w_ntrows+1) / 2;
 
-	head = curbp->b_line.l;
+	head = buf_head(curbp);
 	for (n = 0, lp = curwp->w_line.l; !same_ptr(lp,head); lp = lFORW(lp)) {
 		if (n < half)
 			DOT.l = lp;
@@ -597,7 +603,7 @@ int f,n;
 	dlp = l_ref(DOT.l);
 	while (n-- > 0) {
 		register LINE *nlp = lforw(dlp);
-		if (nlp == l_ref(curbp->b_line.l))
+		if (nlp == l_ref(buf_head(curbp)))
 			break;
 		dlp = nlp;
 	}
@@ -744,7 +750,7 @@ int f,n;
 
 	/* and move the point up */
 	dlp = l_ref(DOT.l);
-	while (n-- && lback(dlp) != l_ref(curbp->b_line.l))
+	while (n-- && lback(dlp) != l_ref(buf_head(curbp)))
 		dlp = lback(dlp);
 
 	/* reseting the current position */
@@ -863,25 +869,25 @@ int f,n;
 void
 skipblanksf()
 {
-	while (lForw(DOT.l) != l_ref(curbp->b_line.l) && lLength(DOT.l) == 0)
+	while (lForw(DOT.l) != l_ref(buf_head(curbp)) && lLength(DOT.l) == 0)
 		DOT.l = lFORW(DOT.l);
 }
 
 void
 skipblanksb()
 {
-	while (lBack(DOT.l) != l_ref(curbp->b_line.l) && lLength(DOT.l) == 0)
+	while (lBack(DOT.l) != l_ref(buf_head(curbp)) && lLength(DOT.l) == 0)
 		DOT.l = lBACK(DOT.l);
 }
 
 #if STUTTER_SEC_CMD
 getstutter()
 {
-	int this1key;
+	int thiskey;
 	if (!clexec) {
-		this1key = last1key;
+		thiskey = lastkey;
 		kbd_seq();
-		if (this1key != last1key) {
+		if (thiskey != lastkey) {
 			TTbeep();
 			return FALSE;
 		}
@@ -1186,7 +1192,7 @@ int f,n;
 			return stat;
 		c = cbuf[0];
 	} else {
-		c = kbd_key();
+		c = tgetc(FALSE);
 	}
 	if (c < 'a' || c > 'z') {
 		TTbeep();
@@ -1251,7 +1257,7 @@ getnmmarkname(cp)
 int *cp;
 {
 	int c;
-	int this1key;
+	int thiskey;
 	int useldmark;
 
 	if (clexec || isnamedcmd) {
@@ -1262,9 +1268,9 @@ int *cp;
 		c = cbuf[0];
 		useldmark = (c == '\'' || c == '`');
 	} else {
-		this1key = last1key;
-		c = kbd_key();
-		useldmark = (last1key == this1key);  /* usually '' or `` */
+		thiskey = lastkey;
+		c = tgetc(FALSE);
+		useldmark = (lastkey == thiskey);  /* usually '' or `` */
 	}
 
 	if (useldmark)
@@ -1410,7 +1416,7 @@ int row, col;
 		row -= curwp->w_toprow;
 		dlp = curwp->w_line.l;	/* get pointer to 1st line */
 		while ((row -= line_height(curwp,dlp)) >= 0
-		  &&   !same_ptr(dlp, curbp->b_line.l))
+		  &&   !same_ptr(dlp, buf_head(curbp)))
 			dlp = lFORW(dlp);
 		DOT.l = dlp;			/* set dot line pointer */
 

@@ -3,7 +3,26 @@
  *		5/9/86
  *
  * $Log: input.c,v $
- * Revision 1.90  1993/11/04 09:10:51  pgf
+ * Revision 1.95  1994/02/03 19:35:12  pgf
+ * tom's changes for 3.65
+ *
+ * Revision 1.94  1994/01/31  18:19:09  pgf
+ * calls to kbd_key() changed to tgetc(), and kbd_key() no longer sets
+ * the SPEC bit -- instead, it translates system-dependent function codes
+ * to a canonical representation: a 'poundc' followed by the character.
+ * also, eliminated ifdefed code.
+ *
+ * Revision 1.93  1994/01/31  15:07:25  pgf
+ * eraseChar now knows about 8-bit chars and their octal format
+ *
+ * Revision 1.92  1994/01/29  00:25:26  pgf
+ * ifdef out all references to RECORDED_ESC.  it wasn't doing anything
+ * anyway, not for a long time now.  really.
+ *
+ * Revision 1.91  1994/01/11  17:32:07  pgf
+ * 'interrupted' is now a routine
+ *
+ * Revision 1.90  1993/11/04  09:10:51  pgf
  * tom's 3.63 changes
  *
  * Revision 1.89  1993/10/04  10:24:09  pgf
@@ -324,8 +343,6 @@
 
 #define	DEFAULT_REG	-1
 
-#define RECORDED_ESC	-2
-
 typedef	struct	_kstack	{
 	struct	_kstack	*m_link;
 	int	m_save;		/* old value of 'kbdmode'		*/
@@ -411,7 +428,7 @@ char *prompt;
 		mlprompt("%s [y/n]? ",prompt);
 		c = tgetc(FALSE);	/* get the response */
 
-		if (c == kcod2key(abortc))		/* Bail out! */
+		if (c == abortc)		/* Bail out! */
 			return(ABORT);
 
 		if (c=='y' || c=='Y')
@@ -438,7 +455,7 @@ int *cp;
 		mlprompt("%s ",prompt);
 		*cp = tgetc(FALSE);	/* get the response */
 
-		if (*cp == kcod2key(abortc))	/* Bail out! */
+		if (*cp == abortc)	/* Bail out! */
 			return(ABORT);
 
 		if (strchr(respchars,*cp))
@@ -466,7 +483,7 @@ int	at_dft;		/* default-value (e.g., for "@@" command) */
 			return status;
 		c = cbuf[0];
 	} else {
-		c = kbd_key();
+		c = tgetc(FALSE);
 	}
 
 	if (c == '@' && at_dft != -1) {
@@ -580,16 +597,6 @@ int bufn;
 	return kbd_string(prompt, buf, bufn, '\n', 0, no_completion);
 }
 
-/*	kcod2key:	translate 10-bit keycode to single key value */
-/* probably defined as a macro in estruct.h */
-#ifndef kcod2key
-kcod2key(c)
-int c;
-{
-	return c & (N_chars-1);
-}
-#endif
-
 
 /* the numbered buffer names increment each time they are referenced */
 void
@@ -645,9 +652,6 @@ static void
 record_char(c)
 int c;
 {
-	if (c == ESC)
-		c = RECORDED_ESC;
-
 	record_dot_char(c);
 	record_kbd_char(c);
 }
@@ -662,10 +666,9 @@ int eatit;  /* consume the character? */
 
 	if (dotcmdmode == PLAY) {
 
-		if (interrupted) {
+		if (interrupted()) {
 			dotcmdmode = STOP;
-			c = kcod2key(abortc);
-			return c;
+			return abortc;
 		} else {
 
 			if (!tb_more(buffer = dotcmd)) {
@@ -701,10 +704,10 @@ int eatit;  /* consume the character? */
 
 	if (kbdmode == PLAY) { /* if we are playing a keyboard macro back, */
 
-		if (interrupted) {
+		if (interrupted()) {
 			while (kbdmode == PLAY)
 				finish_kbm();
-			c = kcod2key(abortc);
+			return abortc;
 		} else {
 
 			if (!tb_more(buffer = KbdStack->m_kbdm)) {
@@ -742,7 +745,7 @@ int quoted;
 	} else {
 		if ((c = get_recorded_char(TRUE)) == -1) {
 			/* fetch a character from the terminal driver */ 
-			interrupted = FALSE;
+			not_interrupted();
 			if (setjmp(read_jmp_buf)) {
 				c = kcod2key(intrc);
 			} else {
@@ -756,14 +759,11 @@ int quoted;
 			}
 			doing_kbd_read = FALSE;
 			if (!quoted && (c == kcod2key(intrc)))
-				c = kcod2key(abortc);
+				c = abortc;
 			else
 				record_char(c);
 		}
 	}
-
-	if (!quoted && (c == RECORDED_ESC))
-		c = ESC;
 
 	/* and finally give the char back */
 	return(lastkey = c);
@@ -784,14 +784,6 @@ kbd_key_loop:
 
 #if ANSI_SPEC
 
-	if ((UCHAR)c == (UCHAR)RECORDED_ESC) {
-		/* if this is being replayed... */
-		/* ...then only look for esc sequences if there's input left */
-		if (get_recorded_char(FALSE) != -1)
-			c = ESC;
-		else
-			return (last1key = ESC);
-	}
 
 	if (c == ESC) {
 		int nextc;
@@ -819,27 +811,30 @@ kbd_key_loop:
 					goto kbd_key_loop;
 				}
 #endif
-				if (abortc != ESC || !insertmode)
-					return (last1key = SPEC | c);
+				if (abortc != ESC || !insertmode) {
+				    	tungetc(c);
+					return poundc;
+				}
 				if (insertmode == REPLACECHAR) {
 					/* eat the sequence, but return abort */
 					return abortc;
 				}
-				return (lastkey = SPEC|c);
+				tungetc(c);
+				return poundc;
 			} else {
 				if (abortc != ESC)
-					return (last1key = c);
+					return (c);
 				tungetc(c);
-				return (last1key = ESC);
+				return (ESC);
 			}
 		}
 	}
 #endif
-
 #if	MSDOS | ST520
 	if (c == 0) {			/* Apply SPEC prefix	*/
 		c = tgetc(FALSE);
-		return(last1key = SPEC | c);
+		tungetc(c);
+		return poundc;
 	}
 #endif
 
@@ -851,15 +846,19 @@ kbd_key_loop:
 
 		/* first try to see if it is a cursor key */
 		if ((c >= 'A' && c <= 'D') || c == 'S' || c == 'T') {
-			if (!insertmode)
-				return(last1key = SPEC | c);
+			if (!insertmode) {
+				tungetc(c);
+				return poundc;
+			}
 		}
 
 		/* next, a 2 char sequence */
 		d = tgetc(FALSE);
 		if (d == '~') {
-			if (!insertmode)
-				return(last1key = SPEC | c);
+			if (!insertmode) {
+				tungetc(c);
+				return poundc;
+			}
 		}
 
 		/* decode a 3 char sequence */
@@ -867,20 +866,35 @@ kbd_key_loop:
 		/* if a shifted function key, eat the tilde */
 		if (d >= '0' && d <= '9')
 			d = tgetc(FALSE);
-		if (!insertmode)
-			return(last1key = SPEC | c);
+		if (!insertmode) {
+			tungetc(c);
+			return poundc;
+		}
 	}
 #endif
 
 #if  WANGPC
 	if (c == 0x1F) {	/* Apply SPEC prefix	*/
 		c = tgetc(FALSE);
-		if (!insertmode)
-			return(last1key = SPEC | c);
+		if (!insertmode) {
+			tungetc(c);
+			return poundc;
+		}
 	}
 #endif
 
-	return (last1key = c);
+#ifdef DOCUMENTATION
+	/* this code clearly isn't needed, but be careful to preserve
+		this behavior, since user-typed # keys must become
+		function keys at the outer layer. */
+	if (c == poundc) {	/* Apply pseudo function-key prefix	*/
+		c = tgetc(FALSE);
+		tungetc(c);
+		return poundc;
+	}
+#endif
+
+	return (c);
 }
 
 /*	KBD_SEQ:	Get a command sequence (multiple keystrokes) from 
@@ -893,6 +907,7 @@ kbd_seq()
 {
 	int c;		/* fetched keystroke */
 
+#ifdef BEFORE
 	/* get initial character */
 	c = kbd_key();
 
@@ -907,6 +922,26 @@ kbd_seq()
 		c = kbd_key();
 		return (lastcmd = CTLX | c);
 	}
+#else
+	int prefix = 0;	/* accumulate prefix */
+
+	c = kbd_key();
+
+	if (c == cntl_a) {
+		prefix = CTLA;
+		c = kbd_key();
+	} else if (c == cntl_x) {
+		prefix = CTLX;
+		c = kbd_key();
+	}
+
+	if (c == poundc) {
+		prefix |= SPEC;
+		c = kbd_key();
+	}
+
+	c |= prefix;
+#endif
 
 	/* otherwise, just return it */
 	return (lastcmd = c);
@@ -929,9 +964,9 @@ CMASK inclchartype;
 	MARK mk;
 
 	mk = DOT;
-	while ( i < bufn && !is_at_end_of_line(DOT)) {
+	while ( i < (bufn-1) && !is_at_end_of_line(DOT)) {
 		buf[i] = char_at(DOT);
-#if !SMALLER
+#if OPT_WIDE_CTYPES
 		if (i == 0) {
 			if (inclchartype & _scrtch) {
 				if (buf[0] != SCRTCH_LEFT[0])
@@ -952,7 +987,7 @@ CMASK inclchartype;
 			break;
 		DOT.o++;
 		i++;
-#if !SMALLER
+#if OPT_WIDE_CTYPES
 		if (inclchartype & _scrtch) {
 			if ((i < bufn)
 			 && (inclchartype & _pathn)
@@ -964,7 +999,7 @@ CMASK inclchartype;
 #endif
 	}
 
-#if !SMALLER
+#if OPT_WIDE_CTYPES
 #if VMS
 	if (inclchartype & _pathn) {
 		;	/* override conflict with "[]" */
@@ -976,9 +1011,7 @@ CMASK inclchartype;
 	}
 #endif
 
-	buf[bufn-1] = EOS;
-	if (i < bufn)
-		buf[i] = EOS;
+	buf[i] = EOS;
 	DOT = mk;
 
 	return buf[0] != EOS;
@@ -1085,8 +1118,13 @@ int	c;
 {
 	if (disinp) {
 		kbd_erase();
-		if (!isprint(c))
-			kbd_erase();
+		if (!isprint(c)) {
+			kbd_erase();		/* e.g. back up over ^H */
+		    	if (c & HIGHBIT) {
+			    kbd_erase();	/* e.g. back up over \200 */
+			    kbd_erase();
+			}
+		}
 	}
 }
 
@@ -1126,7 +1164,7 @@ int	options;
 		else if (!global_g_val(GMDEXPAND_PATH))
 			cp = shorten_path(strcpy(str, cp), FALSE);
 	} else if (c == ':') {
-		if (screen_string(str, sizeof(str), (CMASK)_pathn))
+		if (screen_string(str, sizeof(str), _pathn))
 			cp = str;
 		else
 			cp = NULL;
@@ -1548,6 +1586,7 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 	return status;
 }
 
+#ifdef BEFORE
 /* ARGSUSED */
 int
 speckey(f,n)
@@ -1558,6 +1597,7 @@ int f,n;
 
 	return TRUE;
 }
+#endif
 
 /*
  * Make the "." replay the keyboard macro
@@ -1633,7 +1673,7 @@ dotcmdstop()
 }
 
 /*
- * Execute a the '.' command, by putting us in PLAY mode.
+ * Execute the '.' command, by putting us in PLAY mode.
  * The command argument is the number of times to loop. Quit as soon as a
  * command gets an error. Return TRUE if all ok, else FALSE.
  */
@@ -1808,7 +1848,7 @@ TBUFF *	ptr;			/* data to interpret */
 	register KSTACK *sp;
 	TBUFF  *tp = 0;
 
-	if (interrupted)
+	if (interrupted())
 		return FALSE;
 
 	if (kbdmode == RECORD && KbdStack != 0)

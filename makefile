@@ -71,17 +71,17 @@ DESTDIR2 = $(HOME)/bin
 
 REMOTE=gutso!foxharp
 
-# CenterLine:
-# Use -Xt option to compile quasi-K&R code with some ANSI semantics
-#CC = clcc 
-#OPTFLAGS = -O -Xt
-
 #CC = gcc
 #OPTFLAGS = -g -O -Wall -Wshadow # -Wconversion -Wstrict-prototypes -Wmissing-prototypes
 
 CC = cc
 #OPTFLAGS = -g
 OPTFLAGS = -O
+
+# CenterLine:
+# Use -Xt option to compile quasi-K&R code with some ANSI semantics
+#CC = clcc 
+#OPTFLAGS = -O -Xt
 
 LINK = $(CC)
 LDFLAGS =
@@ -114,7 +114,7 @@ ALLTOOLS = $(MAKFILES)
 
 
 # these are normal editable headers
-HDRS = estruct.h epath.h edef.h proto.h dirstuff.h glob.h
+HDRS = estruct.h epath.h edef.h proto.h dirstuff.h
 
 # these headers are built by the mktbls program from the information in cmdtbl
 # and in modetbl
@@ -125,7 +125,7 @@ ALLHDRS = $(HDRS)
 # All the C files which should be saved
 #  (including tools, like mktbls.c, unused screen drivers, etc.)
 CSRCac = ansi.c at386.c basic.c bind.c buffer.c crypt.c csrch.c
-CSRCde = dg10.c display.c eval.c exec.c externs.c
+CSRCde = dg10.c display.c djhandl.c eval.c exec.c externs.c
 CSRCf = fences.c file.c filec.c fileio.c finderr.c
 CSRCgh = glob.c globals.c history.c hp110.c hp150.c
 CSRCil = ibmpc.c input.c insert.c isearch.c line.c
@@ -143,8 +143,9 @@ CSRC = $(CSRCac) $(CSRCde) $(CSRCf) $(CSRCgh) $(CSRCil) $(CSRCm) $(CSRCnr) \
 OTHERSRC = z100bios.asm
 
 # text and data files
-TEXTFILES = README CHANGES cmdtbl modetbl vile.hlp vile.1 buglist revlist \
-	README.X11
+TEXTFILES = README CHANGES \
+	cmdtbl modetbl vile.hlp vile.1 buglist revlist \
+	README.X11 README.PC
 
 ALLSRC = $(CSRC) $(OTHERSRC)
 
@@ -196,7 +197,7 @@ all:
 	echo "	make sunos	(sunos 3 or 4)"				;\
 	echo "	make ultrix"						;\
 	echo "	make mach	(just pure bsd)"			;\
-	echo "	make svr4	(Solaris 2.1, 2.2)"			;\
+	echo "	make svr4	(Solaris 2.1, 2.2, 2.3)"		;\
 	echo "	make mips	(uses systemV stuff)"			;\
 	echo "	make odt	(SCO Open DeskTop -- variant of svr3)"	;\
 	echo "	make isc	(interactive -- another such variant)"	;\
@@ -212,6 +213,8 @@ all:
 	echo "	make apollo	(HP/Apollo SR10.3 CC 6.8)"		;\
 	echo "	nmake msc	(MicroSoft C 6.0) (buggy?)"		;\
 	echo "	make sx1100	(SX1100 running on Unisys 1100)"	;\
+	echo "	make delta88r3	(Motorola Delta 88, SVR3)"		;\
+	echo "	make delta88r4	(Motorola Delta 88, SVR4)"		;\
 	echo "	make default	(to use config internal to estruct.h)"
 
 bsd sony mach:
@@ -238,8 +241,20 @@ att_posix svr4:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DUSG -DPOSIX -Dos_chosen" \
 		$(TARGET) $(ENVIR)
 
+# these would be the same as above, but some system headers need
+# the MOTOROLA, SYSV, and SVR4 definitaions.
+delta88r3:
+	$(MAKE) CFLAGS="$(CFLAGS1) -DUSG -DPOSIX -DMOTOROLA -DSYSV -Dos_chosen" \
+		$(TARGET) $(ENVIR)
+
+delta88r4:
+	$(MAKE) CFLAGS="$(CFLAGS1) -DUSG -DPOSIX -DMOTOROLA -DSVR4 -DSYSV -Dos_chosen" \
+		$(TARGET) $(ENVIR)
+
 sgi:
-	@echo "Use 'make att_posix' after adding "-D__STDC__" to OPT_FLAGS"
+	@echo "Use 'make att_posix' after adding '-D__STDC__' to OPTFLAGS"
+	@echo "You can also try adding '-cckr' to OPTFLAGS"
+	@echo "Would someone who gets it to work please send me detailed info?"
 
 svr3:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DSVR3 -Dos_chosen" \
@@ -431,6 +446,16 @@ bigshar: link.msc /tmp/vilevers
 	    sed '/^README$$/d'` link.msc ; \
 	mv vile$${vilevers}shar.01 vile$${vilevers}shar
 
+vanillashar: link.msc
+	shar -V \
+	    -o vileshar README `ls $(EVERYTHING) | \
+	    sed '/^README$$/d'` link.msc ; \
+	mv vileshar.01 vileshar
+
+zipfile: /tmp/vilevers
+	vilevers=`cat /tmp/vilevers | sed 's/\.//'`; \
+	zip -k vile$${vilevers}.zip $(EVERYTHING)
+
 patch:	link.msc /tmp/vilevers
 	@orevlistrev=`rlog -h revlist | egrep head: | cut -f2 -d'.'`	;\
 	orevlistrev=1.`expr $$orevlistrev - 1`				;\
@@ -558,19 +583,39 @@ $(OBJ): estruct.h nemode.h edef.h proto.h
 
 ALWAYS:
 
-main.$O:	nevars.h glob.h
+main.$O:	nevars.h
 bind.$O:	epath.h
-eval.$O:	glob.h
 filec.$O:	dirstuff.h
 eval.$O:	nevars.h
-glob.$O:	dirstuff.h glob.h
+glob.$O:	dirstuff.h
 externs.$O:	nebind.h nename.h nefunc.h
 path.$O:	dirstuff.h
-random.$O:	glob.h
 vmalloc$O:	nevars.h
 
 # $Log: makefile,v $
-# Revision 1.122  1993/11/10 10:19:40  pgf
+# Revision 1.129  1994/02/07 12:52:00  pgf
+# added README.PC as a textfile
+#
+# Revision 1.128  1994/02/04  18:22:15  pgf
+# added sgi hints
+#
+# Revision 1.127  1994/02/03  19:35:12  pgf
+# tom's changes for 3.65
+#
+# Revision 1.126  1994/01/31  21:54:11  pgf
+# added zipfile target
+#
+# Revision 1.125  1994/01/28  20:59:11  pgf
+# added new file, djhandl.c, and
+# added targets for Motorola Delta88 processors
+#
+# Revision 1.124  1994/01/21  14:00:04  pgf
+# added vanillashar target, so my DOS unshar can unpack
+#
+# Revision 1.123  1993/12/23  11:27:47  pgf
+# solaris 2.3 works
+#
+# Revision 1.122  1993/11/10  10:19:40  pgf
 # added SHELL=/bin/sh for broken makes
 #
 # Revision 1.121  1993/11/04  09:10:51  pgf

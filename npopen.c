@@ -2,7 +2,10 @@
  *		written by John Hutchinson, heavily modified by Paul Fox
  *
  * $Log: npopen.c,v $
- * Revision 1.31  1993/11/04 09:10:51  pgf
+ * Revision 1.32  1994/02/03 19:35:12  pgf
+ * tom's changes for 3.65
+ *
+ * Revision 1.31  1993/11/04  09:10:51  pgf
  * tom's 3.63 changes
  *
  * Revision 1.30  1993/10/04  10:24:09  pgf
@@ -191,7 +194,7 @@ char *cmd;
 		if (fw) {
 			(void)close (0);
 			if (dup (wp[0]) != 0) {
-				write(2,"dup 0 failed\r\n",15);
+				(void)write(2,"dup 0 failed\r\n",15);
 				exit(-1);
 			}
 		}
@@ -199,12 +202,12 @@ char *cmd;
 		if (fr) {
 			(void)close (1);
 			if (dup (rp[1]) != 1) {
-				write(2,"dup 1 failed\r\n",15);
+				(void)write(2,"dup 1 failed\r\n",15);
 				exit(-1);
 			}
 			(void)close (2);
 			if (dup (rp[1]) != 2) {
-				write(1,"dup 2 failed\r\n",15);
+				(void)write(1,"dup 2 failed\r\n",15);
 				exit(-1);
 			}
 		} else {
@@ -263,7 +266,7 @@ char *cmd;
 		(void) execlp (sh, shname, "-c", cmd, 0);
 	else
 		(void) execlp (sh, shname, 0);
-	write(2,"exec failed\r\n",14);
+	(void)write(2,"exec failed\r\n",14);
 	exit (-1);
 }
 
@@ -275,7 +278,7 @@ char *cmd;
 
 	cpid = softfork();
 	if (cpid < 0) {
-		write(2,"cannot fork\n",13);
+		(void)write(2,"cannot fork\n",13);
 		return cpid;
 	}
 
@@ -291,7 +294,7 @@ char *cmd;
 		return 0;
 	} else {
 		exec_sh_c(cmd);
-		write(2,"cannot exec\n",13);
+		(void)write(2,"cannot exec\n",13);
 		return -1;
 	}
 
@@ -469,7 +472,7 @@ npflush ()
 		if (myWrtr != 0) {
 			(void)fflush(*myWrtr);
 #if UNUSED
-			fclose(*myWrtr);
+			(void)fclose(*myWrtr);
 			*myWrtr = fopen(myName[0], "r");
 #endif
 			rewind(*myWrtr);

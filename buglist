@@ -65,22 +65,11 @@ E	marks should perhaps be linked onto lines.  this would make a lot
         sort of mark as well.  Implementation of the "tag stack"
 	would be aided by this as well.
 
-E	:e and :n should be able to deal with multiple filenames resulting
-	from filename globbing.  vi has this problem too.  At least
-	vile lets you choose to choose the first such name.  it should show
-	you the first name, so you know whether to accept it or not.
-
-E	When a line is too long to fit on the screen, you have to move
-	over it to see the rest, and when you get to the edge of the screen,
-	it jumps. I would prefer a smooth(er) scroll.
-
 L	vile really ought to use unix-crypt if it is available.
 
 E	in autoindent mode: 0^D and ^^D don't work
 
 E	can't search for a NUL in a buffer.
-
-E	if a file has zero-length, it is treated as not-modified
 
 E	":e" and ":e!" should share the same prompt data, which should be
 	editable / history.  They both should default (like vi!) to the
@@ -98,36 +87,15 @@ E	for consistency, 'execute-macro-nn' should be 'execute-macro nn';
 E	should ifdef the 'autobuffer' code for users who do not need vi-style
 	buffering.
 
-===================================================
+--------------
 
     Is it possible to get vile to prompt you if you try to exit without
     viewing all the files that were given on the command line?
 
-    It would be nice if the cmode-style autoindenting would do the
-    same thing with () and [] as it does with {}.  This would be
-    useful for writing function calls with lots of arguments.
-[ hard ]
-
-    In cmode, is it possible to get vile to return to the previous
-    indentation on the line after a # directive?
-
-
-===================================================
+--------------
 
     The ed 'transfer' and 'move' commands don't work.
     (to copy and move text around.  e.g., :'a,'bt$.)
-
-===================================================
-
-
-PCVILE
-
-	- some function keys return 8 bit characters on the PC.  This means
-	the input path, through tgetc, has to be 8-bit clean, we need to
-	allow 256 bindings instead of the current 128, and we can't use
-	0x80 as the definition of the SPEC bit.  All this is easy -- it
-	just needs to be done.
-
 
 --------------------------------
 486 PC under Dell Unix (svr4) - make:    unixpc
@@ -227,49 +195,6 @@ be nice in vile.
           ^A.
 
 
-     2.8.  Preserve
-
-     Rather than use vi's UNIX-specific method for  preservation,  xvi
-     does  periodic  preservation  of all files currently being edited
-     into a temporary file in the same directory.   Xvi  tries  to  do
-     this  when you are not typing, so that you won't notice the short
-     delay when the temporary file is written  out.   Obviously,  only
-     changed  files  are preserved in this way, and the temporary file
-     is normally removed once the  real  file  has  been  successfully
-     written.   As  an  additional  safety  measure,  when  a  file is
-     explicitly saved and  it  appears  not  to  have  been  preserved
-     recently,  it  is  normally  preserved first.  This ensures that,
-     even if the operating system crashes while the real file is being
-     created, there should always be at least one recent copy of it in
-     the filesystem.  The :preserve command is available as in  vi  to
-     preserve a specific buffer manually.
-
-     The level of safety provided by the preservation facility may  be
-     configured   by   changing   the   values  of  the  preserve  and
-     preservetime parameters.  The following values are available  for
-     preserve:
-
-     unsafe    Never preserve any  buffer  before  an  explicit  save.
-               This  can  be useful on old, slow, floppy-only systems,
-               but is not generally recommended.
-
-     standard  The default value.  Only preserve a  buffer  before  an
-               explicit  save if it appears not to have been preserved
-               recently.
-
-     safe      Always preserve buffers before they are written.
-
-     paranoid  As for safe, but the preserve file  is  never  removed,
-               even after the file has been successfully written.
-
-     In all cases, all modified buffers  are  preserved  automatically
-     after no user events have been received for preservetime seconds,
-     if a minimum number of events (currently 60) have  been  received
-     since  the  last  automatic  preservation.  This behaviour can be
-     more or less disabled by setting  preservetime  to  a  very  high
-     value.
-
-
 ------------------------
 I wish ^X-!  could execute shell commands async'ly, i.e.  I should not have
 to wait/do nothing while waiting for the ouput of compiling.  I should be
@@ -336,43 +261,20 @@ it would be nice if vile would fold text...
 	This feature appeared in uEmacs version 3.10.23 and you can
 use archie/xarchie to file fue.tar.Z (fue - folding-micro-emacs).
 
-[ i believe joseph rajkumar is working on this ]
+[ someone said they were going to fold this in, so to speak.  i'm not
+real comfortable with the idea, since the uemacs code causes the LINE
+struct to grow _enormously_ ]
 
 
 -----------
 
-I have a couple of bug reports and suggestions for you, concerning vile
-3.52 on SunOS.
-
-
-5) annoying
 	When I execute a keyboard macro using ^X-& I cannot repeat this
 	using the dot command. Instead, the last command in the macro
 	is repeated.
-    [ this is because . doesn't do @ macros either...]
-
-------------------------------
-I found a bug in vile3.54 with file completion. If I type:
-        :r ~/c/headed/aut<TAB>
-It correctly expands it to
-        ~/c/headed/author
-But says [No such file "~/c/headed/author"] while this file definitely
-exists.
-
-[ can't reproduce this ]
+    [ this is because '.' doesn't do @ macros either...]
 
 ------------------------------
 
-I also found a hard-to-reproduce-bug where I would type some input very
-fast, usually involving ^X-!, :w, etc. after which vile would no longer
-accept any input. It is not completely stuck, because it still reacts
-to window resizes, but it can not be backgrounded. Neither does it
-react to a SIGSEGV. I tried to get it to coredump and have it save the
-file and send me a mail.... Sorry I can't be anymore specific.
-
-[ can't reproduce this ]
-
-------------------------------
 
 Can you add the '>' character to the list of comment chars for paragraph
 reformatting?  I would live to be able to reformat mail quotes (like shown
@@ -391,42 +293,13 @@ above).
 
 --------------------
 
-	(wibni) if i started looking up tags and pressed the tab key it should
-	complete the line.
-	(tag completion -- good idea -- requires a buffer as in filec.c)
-
---------------------
-	When you use the command line and you do a !<command>
-	to execute something in the shell. Would you be able to make it so that 	it can complete filenames there also??
-	so i could do the following:
-	!ls ~daml/files/rec
-[ hard.  probably not worth it. ]
-
-----------------------------------
-
-We are running vile under NeXT and we have
-problems to set macros with the meta key.
---------------------------------
-
-I got to compile vile at home over the weekend.  The version of
-djgpp (gcc 2.4.2 - sorry, I don't know the djgpp version number)
-I have didn't like this bit from estruct.h, lines (561-563):
-
-#if ! LINUX	/* there are probably others that don't want const defined */
-# define const
-#endif
-
-----------------------------------
 
 enhancement:  reimplement error finder using regexps.
 
 ------------------------------
-core dump on startup in xterm with too many rows.
-
-------------------------------
-	Another enhacement.
-	How about a history file.  say I have been using vile and
-	quit and come back in later I can use the history file.
+Another enhacement.
+How about a history file.  say I have been using vile and
+quit and come back in later I can use the history file.
 
 --------------------------
 
@@ -441,45 +314,6 @@ on the 690.
 
 I just ran vile locally and didn't see the problem.
 -------------------------------
-
-PC Vile --
-
-   1) Open a 50-line DOS box under windows.
-
-   2) Invoke pc vile (dos box stays at 50 lines, as I would expect).
-
-   3) Exit pc vile and the dos box goes to 25 lines. I wish PC vile would
-     leave the dos box at 50 lines.
-
-[ is this still true?  i don't see why it's happening -- we restore the
-    screen mode... ]
-----------------------------------
-
-
-On the Sun 4, Sun os 4.1.1 vile doesn't seem to work in cmdtool or
-shelltool windows (and, of course, vi does). Can you provide any help
-on that? Personally, I don't use cmdtool (I prefer xterm) but a lot
-of our users do use cmdtool.
-
-I found an ugly workaround. Turning off SCROLLCODE does the job.
-
-[ cannot duplicate this on SunOs 4.1.3 ]
-
-----------------------------------
-
-I found a bug with vile 3.59, compiled on a SparcStation running SunOS
-4.1.2. Using an xterm inserting a formfeed character gives some very
-strange behaviour. When I type:
-        0i^V^L
-the visual line under the cursor is deleted, and the cursor moves to
-the next line, 3rd row. When I now type a space the ^L appears and
-everything goes seemingly back to normal. If I insert the ^L on any but
-the 1st row there is no problem. Weird eh! vile 3.55 did not have this
-problem.
-
-[ cannot duplicate this on SunOs 4.1.3 ]
-
--------------------------------------------------------------------------
 
 
 I found a bug (new with 3.59) on our Pyramid SVR4 (but not Pyramid SVR3,
@@ -511,97 +345,27 @@ it doesn't get the right screen size or exits with incorrect colors).
 
 -----------------------------
 
-In vile version 3.61 (SunOS 4.2.3 xterm)
 
-The search pattern:
-	/:\>/
-does not find :
-
-[ should it? the \> looks for a "word" to "non-word" transition, and ':' is a
-"non-word" character ]
-
----------------------------
-
-- I use you example of the ^X-m macro given in the help file to
+- I use your example of the ^X-m macro given in the help file to
   read a manual page for some identifier. It would be nice to have a
   shell-command that would NOT wait for me to press return or escape.
 
 ---------------------------
 
-It looks like vile is not eight-bit clean. I was trying
-to edit some Japanese text and vile is stripping off the
-top bit if the characters.
-
----------------------------
-
-[ this may be fixed...  ]
-
-    2. Why, when I use my arrow keys to go back into the :e # history, do
-    I see two copys of the current file(buffer) name rather than just one?
-
-[ and... ]
-
-    something I keep hitting that I would love to see change is that I will
-    type :e and then hit the up arrow before remembering to hit the #. 
-    This causes the :e to abort and then in my case causes insert mode to
-    kick in (the escape from the arrow key perhaps is getting dropped or
-    something).
-
-    Could either that escape not be dropped or even better the up arrow be
-    treated just like it is in :e# mode?
-
-[ and... ]
-
-    Sigh - I am seeing about 25% or more of the time that when I use :e #
-    and the up arrow key (and sometimes just by typing!!!) that the file
-    name selected fails as not being found.  Yet trying again, immediately,
-    I a) find one less copy of the current buffer in the history buffer and
-    b) find the file without a change in the string.
-
-    I am using SunOS 4.1.2 and a SPARC 1 and the latest (10/13 or so) version
-    of vile.
-
----------------------------
 
 
 With vim 1.27 you can configure its behaviour regarding backspace using
 the 'backspace' variable. From the help file:
 
 backspace (bs)	    number    0     0 standard Vi, 1 delete NL, 2 delete all
+i.e. if bs is non-zero, you can backup to the previous line, and if it's
+a 2, you can backup past the insertion point.
 
----------------------------
+i don't think this is optimal -- i think you should be able to choose
+independently whether you backup past the newline or past the insertion point.
 
-I was using xvile and it crashed and deleted my file.  It never saved one
-in /tmp.  I have the core for it also.
-
-Here are the details:
-
-Operating Version: SunOS nutmeg 4.1.2 1 sun4c
-compiled with gcc -g
-
-The error happened in the function
-
-putc(d,ffp);
-
-inside the function
-
-ffputc
-
-in file fileio.c line 556
-
-d had the value of '/'
-
-and ffp was corrupt
-
-it was pointing to the wrong place.
-
-I was just thinking when most of the error's occur and that is when
-somebody does a :w
-
-Could it have something to do with opening a file or appending?
-
-I had a quick lok at the code but I was lost in all the defins for ffopen.
-
+in any case, vile won't let you back up past the newline during an insert.
+when _not_ in insert, you can rebind ^H to backward-character.
 
 ---------------------------
 
@@ -614,219 +378,8 @@ the redraw. I mean, when I press ^F or ^b (next-page or previous-page)
 I get some spurious charactersa in the screen. With a ^L all is back
 to the normally. The some is goiing on when I perform a search.
 
----------------------------
-
-Want to hang vile? Just type
-:../
-Only kill seems to get you unstuck.
-
-Maybe you can pass this on to the vile author(s).
-
-It's vile version 3.62 under SunOS 4.1.3
-
-[ I can't reproduce this.  -pgf ]
-
----------------------------
-	Here are stack traces from five core dumps :-( I've gotten from
-xvile 3.62.  I don't think I've seen any from plain old vile, but then I
-don't use it nearly as much.
-
-	No rush on any of these; I've sort of learned to live with the
-instability.  I just wanted to get these in the mail before they disappear
-off the bottom of my stack....  Let me know if there are additional bits
-of information you'd like when I report core dumps in the future.
-
-	Another sad thing is that a Purify-ed xvile runs so slowly that I
-don't do it very often.
-
-	On a lighter note, I've been thinking about :abbr for vile.  Do
-you know of anyone working on it.  If not, I may play around with it.
-
-	Eric Krohn
-
-
-xvile 3.62 again (Sun4)
-core file = core -- program ``xvile3.62''
-SIGBUS 10: bus error
-$C
-_bsizes() + 34
-_writeout(0xf7ffdac8,0x4d2f0,0x0,0x1,0x48790,0x45c5a) + 4
-_imdying(0xa,0x2,0xf7ffdd18,0x1,0x0,0x4d2f0) + c4
-__sigtramp(?)
-_bsizes(0x4d2f0,0xa,0x4d508,0xbde,0x5f,0x1) + ac
-_line_count(0x4d2f0,0x88,0x86aa0,0x7b,0x0,0x0) + 4
-_line_report(0xea,0x1b,0x7a6c5,0x7a688,0x86800,0x1) + 8
-_put(0xffffffff,0x1,0x1,0x7b218,0x1,0x0) + 1e0
-_doput(0x1,0x1,0x0,0x0,0x0,0x1) + 150
-_putbefore(0x0,0x1,0x46400,0x2,0x2,0x42db0) + 10
-_execute(0x431b0,0x0,0x1,0x0,0x0,0x3) + 158
-_loop(0x1,0x4d508,0x80,0x1,0x0,0x431b0) + 164
-_main(0x1,0x4d2f0,0x1,0x0,0x4141b,0x0) + a44
-0x4d2f0,4/X
-_end+0x2cc0:    4d508           0               7b978           0
-
-
-core dump in xvile 3.62 on Pyramid SVR3.
-
-
-$C
-_kill(6690,6,0,C00CD508,C00CD50C,C00CD510,E000000,0,C00CD51C,C00CD520,C00CD524,C00CD528) from 53658
-_abort(0,200350,7BE64,5B2F4,0,0,1,C00CD454,C00CD49C,C00CD4A0,C00CD4A4,C00CD4A8) from 4a4e0
-_imdying(A,1,C00CD454,200350,1BF8C,C00CD400,6EBDC,21,C00CD41C,C00CD420,C00CD424,FF1962EC) from 1c17c
-?(6EF4C,6EF4C,1,6EF4C,77,20,1,B9440,0,17C,F3010800,FF1962EC) from c00cc000
-_add_line_at(BFB80,CD31C,70318,1,20,80,AE48,21,C00CD31C,C00CD320,C00CD324,C00CD328) from d414
-_addline(BFB80,70318,1,C00CD2F4,9EA58,10,7099C,0,C00CD29C,C00CD2A0,C00CD2A4,C00CD2A8) from d274
-_hst_flush(1,1,1,154,0,1,0,3A,3C,C00CD220,C00CD224,FF1962EC) from 1fa08
-_namedcmd(1,1,16274,B9440,0,9,0,6,C00CD19C,C00CD1A0,C00CD1A4,FF1962EC) from 1629c
-_execute(58030,0,1,C00CD108,C00CD10C,C00CD110,0,B9440,C00CD11C,C00CD120,C00CD124,C00CD128) from 16b48
-_loop(1,0,B,20,0,C00CD080,0,0,0,0,0,0) from ca8
-_main(6,C00CB428,C00CB444) from b44
-
-
-0xBFB80,40/X
-BFB80:          7099c           0               0               0
-1               6132c           1               61334
-1               6133c           100             61344
-1               6134c           8               61354
-8               6135c           0               61364
-0               bfbd0           6da80           61374
-0               bfbe0           4a              61384
-0               6138c           1               61394
-1               bfc00           943dc           613a4
-6da74           613ac           6da98           613b4
-8               613bc           0               613c4
-1               613cc           1               613d4
-8               bfc40           0               613e4
-0               613ec           6da5c           613f4
-0               613fc           a               61404
-1               bfc70           0               61414
-
-
-0x70318/s
-70318:          w! trimoutputpenamen (""); }/
-
-0xCD31C,4/X
-CD31C:          cd31c           cd31c           10              0
-		This LINEPTR looks fishy.
-
-
-This was followed soon by a core dump in xvile 3.62 on SunOS 4.1.1!
-
-$C
-_kill(?)
-__DYNAMIC(0x0,0x21,0x1,0x0,0x0,0xf771f018) + 8
-_imdying(0xb,0x4,0xf7ffe118,0x0,0x0,0x0) + 198
-__sigtramp(?)
-_x_putline(0x41000,0x10,0xd0022064,0x50,0x0,0x0) + ac
-		^ These arguments look wildly wrong.
-_updateline(0x0,0x0,0x50,0x32f84,0x6306c,0x32f84) + f4
-_updupd(0x0,0x48800,0x8edb4,0x23,0x0,0x0) + a4
-_update(0x0,0x0,0x1,0x0,0x10,0x0) + 34c
-_loop(0x1,0x80150,0x80,0x0,0x42ec0,0x42ec0) + d8
-_main(0x1,0x4d2e0,0x1,0x0,0x4141b,0x0) + a44
-
-
-
-core dump in xvile 3.62 on Pyramid SVR3.  I was typing a s,^, and I was trying
-select and paste text for the replacement string.
-
-
-$C
-_kill(2445,6,0,34,FFFFFFFF,FFFFFFFF,E000000,0,0,0,0,FF1962EC) from 53658
-_abort(0,200361,34,0,0,0,1,C00CDAD4,C00CD31C,C00CD320,C00CD324,FF1962EC) from 4a4e0
-_imdying(A,1,C00CDAD4,200361,1BF8C,C00CDA80,14,D,C00CD29C,C00CD2A0,C00CD2A4,FF1962EC) from 1c17c
-?(7CB80,72656475,0,64,E,1,70728,72656475,C00CD21C,C00CD220,C00CD224,FF1962EC) from c00cc000
-_malloc(10,0,0,6EF10,1,F,0,1,C00CD1AC,C00CB000,C00CB004,C00CB008) from 536e0
-_strndup(6EF10,E,20,D2,2D0,8,9ED70,9EA74,C00CA85C,C00CD928,C00CD980,FF1962EC) from 2498
-_x_paste_selection(70728,0,FFFFFFFE,4,0,1,2,70728,C00CA85C,0,0,0) from 5074
-_x_process_event(C00CAFA0,C00CAFA0,0,D2,2DF,9E966,5B922,0,7D3DC,0,0,0) from 63c8
-_x_getc(0,0,6868,8,15,1,0,6414,7D3C8,C00CD7A0,C00CD7A4,C00CD7A8) from 64b0
-_tgetc(0,C00CD700,C00CD704,C00CD708,C00CD70C,C00CD710,C00CD714,3BD8,C00CD71C,C00CD720,C00CD724,C00CD728) from 20ad0
-_kbd_key(0,61168,80,2C,0,0,0,CC118,0,1B5B58,0,FF1962EC) from 20b54
-_kbd_reply(5C18C,61168,80,21658,2C,0,202A4,0,0,C00CD628,39DF,FF1962EC) from 2195c
-_kbd_string(5C18C,61168,80,2C,0,202A4,7D3C8,9EF7C,0,118,C00CD5A4,FF1962EC) from 21724
-_readpattern(5C18C,61168,0,2C,0,1,0,CC11C,C00CD51C,C00CD520,C00CD524,C00CD528) from 31330
-_substreg1(1,1,8B2C,1,8,1,70728,3BD8,C00CD49C,C00CD4A0,C00CD4A4,FF1962EC) from 29abc
-_substregion(1,610A4,1,C00CB1B8,8,1,0,6128C,1,C00CD380,C00CD424,FF1962EC) from 298b8
-_operator(0,1,298A8,5C484,73,20,C00CB0C0,0,0,0,0,FF1962EC) from 2a970
-_opersubst(0,1,2AEBC,CA560,20,80,AE48,580E0,C00CD31C,C00CD320,C00CD324,C00CD328) from 2aeec
-_execute(580E0,0,1,C00CD2F4,9EA58,2,0,9EA60,C00CD29C,C00CD2A0,C00CD2A4,C00CD2A8) from 16b48
-_execute_named_command(0,1,0,2D0,0,1,0,70728,C00CD21C,C00CD220,C00CD224,FF1962EC) from 16204
-_namedcmd(0,1,16274,8,B60,C00CD180,0,6,C00CD19C,C00CD1A0,C00CD1A4,FF1962EC) from 16290
-_execute(58030,0,1,C00CD108,C00CD10C,C00CD110,9,CA560,C00CD11C,C00CD120,C00CD124,C00CD128) from 16b48
-_loop(1,0,B,20,0,C00CD080,0,0,0,0,0,0) from ca8
-_main(6,C00CB428,C00CB444) from b44
-
-0x6EF10/s
-6EF10:                  s/^Rules never reduced:$/
-						 $&/;
-This looks like the previous pattern I have used.  It was certainly not what
-I had just selected.
-
----------------------------
-
-Hi, we are running vile under NeXT. We have the following three problems:
-
-I've tried only to delete a char using `x'...
-
-\def\impldby{\raise 2pt\hbox{$
-            {\scriptstyle\sim\hspace*{-memory allocation error: attempt to free 
-or realloc space not in heap
-\def\impls{\raise 2pt\hbox{$bad zone
-          {\scriptstyle<\hspace*{-1.IOT trap\hspace*{-1mm}\sim\hspace*{-1mm}\si>
-}                
-
 Also we have problems when we accidentally press ^J.  Vile is hanging
 in this situation.
-
-
-We still have problems with the automatic  redraw.
-
----------------------------
-
-boggs% gdb /usr/local/bin/xvile core
-GDB is free software and you are welcome to distribute copies of it
- under certain conditions; type "show copying" to see the conditions.
-There is absolutely no warranty for GDB; type "show warranty" for details.
-GDB 4.10.pl1 (sparc-sun-sunos4.1.1), 
-Copyright 1993 Free Software Foundation, Inc...(no debugging symbols found)...
-Core was generated by `xvile'.
-Program terminated with signal 6, Abort.
-Reading symbols from /usr/lib/libX11.so.4.10...(no debugging symbols found)...
-done.
-Reading symbols from /usr/lib/libc.so.1.6...(no debugging symbols found)...
-done.
-#0  0xf76dc120 in kill ()
-(gdb) where
-#0  0xf76dc120 in kill ()
-#1  0xf76f447c in abort ()
-#2  0x1b5c4 in imdying ()
-#3  0xf76b2c54 in _sigtramp ()
-#4  0x30c28 in tb_put ()
-#5  0x30c9c in tb_append ()
-#6  0x6544 in add2paste ()
-#7  0x67a8 in copy_paste ()
-#8  0x6878 in x_get_selection ()
-#9  0x6914 in x_paste_selection ()
-#10 0x7a2c in x_process_event ()
-#11 0x7bf8 in x_getc ()
-#12 0x1fc2c in tgetc ()
-#13 0x1fcec in kbd_key ()
-#14 0x220d4 in ins_anytime ()
-#15 0x21904 in ins_n_times ()
-#16 0x21b94 in insert ()
-#17 0x16910 in execute ()
-#18 0x2e50 in loop ()
-#19 0x2cdc in main ()
-(gdb) 
-
-This occurred when I had selected a word to paste and then hit MB2 without
-moving, still inside the selection area, not in insert mode. I hadn't realized
-the cursor moved with the selection and so was pasting into the wrong
-area in the wrong mode.
-
-I wasn't able to reproduce this, and a quick check of the code doesn't
-show anything obviously wrong to cause the exception. 
 
 ---------------------------
 
@@ -834,67 +387,9 @@ I was wondering if it was possible to delete/cut the highlighted region
 (from the selection with mouse button one)? 
 ---------------------------
 
-a "suppress autoindent for insert" binding would be great for pasted inserts.
-
----------------------------
-
-I wanted to sort the text recently, and tried to use the :! vile command
-to do it.
-
-(I know about just ! without the :, and that worked, but I'm used to :!)
-
-Anyway, I mark two spots in the text using the 'm' function, and then
-I tried this:
-
-:'a,'b!sort -nr
-
-Vi is quite happy about doing this, but vile says:
-
-[No such function "!sort -nr"]
-
-But the following command works as expected: 
-
-: !sort -nr
-
-But unfortunately, this is pretty useless, since none of the text in the
-document will be piped to the command without giving a range.  For instance,
-the above command simply sits there, waiting for input under both vile and
-vi.  
-
-Current work around is to mark the end of the region say with a 'a', move
-the cursor to the beginning of the region, and then:
-
-!'asort -nr
-
-which works just fine.
-
-Since all of your other 'ex' emulated commands can accept ranges, would it
-be a simple hack to include the ! operator as well?
-
----------------------------
-
-sometimes xvile dies when I try to delete a named
-output buffer.  Scenario:  I type * to get the current list of buffers
-in a window.  So that window looks like this:
-
-    Size    Buffer name      Contents
-    ------- ---------------- --------
-0 # 9609    myfile.c         ./myfile.c
-1   134     !ls              !ls -xt *.c
-2   12304   otherfile.c      ./otherfile.c
-           Current dir:     /local/project/cmd/misc
-
-If I put the cursor over '!ls', and try to delete that buffer using
-^X-k I get the message "[No such buffer]", so I put the cursor over the
-buffer number '1', and try again.  Sometimes it works, and sometimes it
-causes xvile to die.
-
----------------------------
-
-
-   How can I read the status of a shell command when I execute a 
-   shell-command? Although the shell command has a $STATUS=1 the
-   status of the status variable is TRUE.
+How can I read the status of a shell command when I execute a
+shell-command? Although the shell command has a $STATUS=1 the
+status of the status variable is TRUE.
 
 ---------------------------
 Vi has an autowrite option that will write out a modified buffer
@@ -904,109 +399,47 @@ buffers at other times as well).
 This would be most useful for the edit, make, execute cycle.
 ---------------------------
 
-Alas, more Turbo/Borland-C-ism have crept into vile.  They actually
-began with 3.62, but I didn't have the time to work with the software...
-I am trying to compile under djgpp.  Anyhow, I am trying to upgrade -- the
-last version I had that compiled under djgpp 1.10 was 3.61.  Unfortunately,
-Turbo/Borland C-isms are creeping in.  Could someone help me with
-translating the following function for use with djgpp.
+When I'm editing a big file using vile/xvile and when I click on the
+status line (where the file name etc. are displayed) the document
+scrolls up one line (actually xvile sometimes does, sometimes doesn't).
+Is it intended? Thanks.
 
-static int
-get_vga_bios_info(dynamic_VGA_info *buffer)
-{
-	struct SREGS segs;
+--------------------------
+when in 'xvile': in one window I press 'A' and
+there will be an "I" on the status line saying that I can insert. Then
+I move the mouse to another window -- the "I" on the status line of the
+previous window disappears!
 
-	rg.h.ah   = 0x1b;
-	rg.x._BX_ = 0;
-	segs.es   = FP_SEG(buffer);
-	rg.x._DI_ = FP_OFF(buffer);
-	INTX86X(0x10, &rg, &rg, &segs); /* Get VGA-BIOS status */
+--------------------------
+xvile: I can't "cut and paste" between two different windows...
 
-	return (rg.h.al == 0x1b);
-}
+--------------------------
 
+pcvile, compiled with djgpp or watcom:
+	screen limited to 25 line mode -- i can't figure out how to
+	get the vga bios info successfully from a 32-bit application.
 
------------------------
+--------------------------
 
-I'm having problems with the terminal modes in vile under VMS.  I'll
-summarize them here, even though as I recall Tom has done the VMS work.
-Could you pass this on?  Thanks.
+the defeat-autoindent heuristics used by X pasting and by the ^A-i/o/O
+commands are different.  X trims all whitespace and lets autoindent
+do the formatting, the commands leave whitespace and turn off autoindenting.
+don't know yet which is better.
 
-The terminal modes under vile (every version I've used, from 3.56
-through 3.63) are not being set according to what I {\em think} you
-want, to wit, PASTHRU mode.  On my VT terminal attached to a VAX via a
-DEC server, the modes is being set to PASSALL even though the source
-code (which I have looked at) specifies PASTHRU.  At 19200 baud (which
-is the only speed at which scrolling is acceptably fast) the display is
-made quite dirty on half-page (^D) scrolls.  (Full-page scrolls are
-okay since they redraw the entire screen.  Presumably, the redraw logic
-is different for the two cases.)  Doing a screen refresh (^L) clears
-up the screen.  Screen drawing is also okay if, after starting vile
-(and the terminal is set up by the editor), I press the `Break' key and
-manually `set sess pasthru' at the server's `Local' prompt.
+------------------
 
-I'm not a VMS authority (and don't care to be), but if there is quick
-fix or if you could give me a hint about where to start looking in the
-VMS manuals, I'd appreciate it.
+ > 
+ > 2) In xvile :set cmode does not work. :set all keeps giving nocmode.
+ >    (Linux)
+are you sure you're setting the right cmode?  the local vs. global setting
+can be a little confusing...
+
+ > 
+ > 3) I cannot give xvile a filename at startup. (Linux)
+it ignores the argument?
+
+ > 
+ > 4) I cannot run xvile in the background. (Linux)
+what are the symptoms?
 
 -----------------------
-
-change the semicolons on if_OPT_WORKING.  others?
-
------------------------
-
-tags is broken -- lengths seem random.  at least, i go to different places
-with ^] and :ta,
-
-----------------
-start with no .vilerc, edit an empty file, do ":show-registers" followed
-by ":show-variables", observe the coredump.  DOT seems to have an odd value,
-given that the buffer is empty.
-----------------
-
-I ran into something a little baffling with version 3.63 of vile
-running on my Silicon Graphics.
-
-I was translating some fortran code to C (yes, I've already used f2c
-on many parts), and had a bunch of records looking like:
-
-abc[q2)
-abc[j3)
-
-So I entered
-
-s/abc\[\(..\))/abc[\1]/
-
-and vile choked, giving me the message "BUG: mangled replace"
-
-Then I switched back to vi, and it worked as I expected.
-
-Vile version 3.57 running on our SUN system worked fine!!!
-
-----------------
-I have installed few weeks ago the release 3.63 of (x)vile.
-It works fine except one point.
-Under X11, I have define with xmodmaprc some keystroke to act as
-accented letters ( eg under latex only one key to do 'e [ quote above e ] )
-With xvile nothing happened, the keystroke produce nothing.
-I use an iso8859=1 font which has 8 bits characters.
-Is it possible to use special characters ??
-Any help appreciated.
-----------------
-Vile's repeat-backwards-search misses an instance of the search target
-if that instance is on the last line and doesn't start in column 1.
-
-For example, given the 3-line file:
-
-+-------+
-|       |
-|bug    |
-| bug   |
-+-------+
-
-searching backwards for the string "bug" will find line 3's "bug" only
-once (the initial backwards search).  Any subsequent backwards search
-(e.g., 'n' or 'N') will report that line 2's "bug" is the only
-occurrence.
-
-----------------

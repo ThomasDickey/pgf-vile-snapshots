@@ -4,7 +4,10 @@
 # T.DANG (dang@cogit.ign.fr)
 #
 # $Log: makefile.wat,v $
-# Revision 1.4  1993/12/08 16:47:00  pgf
+# Revision 1.5  1994/02/03 19:35:12  pgf
+# tom's changes for 3.65
+#
+# Revision 1.4  1993/12/08  16:47:00  pgf
 # vile.lnk should depend on makefiles, not object files, and
 # increased stack size
 #
@@ -32,7 +35,7 @@ CFLAGS= /dIBMPC=1 /dscrn_chosen=1
 SCREEN= ibmpc 
 
 # these are normal editable headers
-HDRS = estruct.h epath.h edef.h proto.h dirstuff.h glob.h
+HDRS = estruct.h epath.h edef.h proto.h dirstuff.h
 
 # these headers are built by the mktbls program from the information in cmdtbl
 # and in modetbl
