@@ -1027,6 +1027,55 @@ Programmed macros
 
 		bind-key goto-line g
 
+	A couple more examples of slightly more complex macros:
+	They cause a jump to the next (or previous) line of the same (or
+	lesser) indent, skipping over empty lines.  (Thanks to MIURA Masahiro)
+
+	; macro 1 - back to the line of same indent
+	;
+	1 store-macro
+		first-nonwhite
+		set-variable %indlev $curcol
+		~force back-line-at-bol
+		~if &equ $llength 0
+			~goto L1
+		~endif
+		~while &les %indlev $curcol
+			*L1
+			~force back-line-at-bol
+			~if &seq $status "FALSE"
+				~return
+			~endif
+			~if &equ $llength 0
+				~goto L1
+			~endif
+		~endwhile
+	~endm
+	bind-key execute-macro-1 ^X-[
+
+	; macro 2 - forward to the line of same indent
+	;
+	2 store-macro
+		first-nonwhite
+		set-variable %indlev $curcol
+		~force down-line-at-bol
+		~if &equ $llength 0
+			~goto L2
+		~endif
+		~while &les %indlev $curcol
+			*L2
+			~force down-line-at-bol
+			~if &seq $status "FALSE"
+				~return
+			~endif
+			~if &equ $llength 0
+				~goto L2
+			~endif
+		~endwhile
+	~endm
+	bind-key execute-macro-2 ^X-]
+
+
 Regular Expressions
 -------------------
 

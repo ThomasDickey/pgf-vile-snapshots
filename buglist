@@ -436,3 +436,17 @@ Unfinished items on vax/vms (dickey@software.org):
 	  	:e []foo		- read and determined version # ok
 		:r [-.temp]foo		- current filename reset to [-.temp]foo
 
+--------------------------------------------------------
+
+Hi with xvile i tried to excecute xvile -r to reverse the video but alaas
+it did no t work.  Then I tried to change the font by using xvile -f 7x7
+and alas it did not work.  Is that the create syntax?
+
+------------------------------------------------------------
+
+Start vile without specifying filenames, and type [i][return].
+(The cursor remains in the first line!)
+Now type [return][a][ESC][>][L][.]  ...  vile dies.
+
+[ I think this one's been fixed...  pgf ]
+

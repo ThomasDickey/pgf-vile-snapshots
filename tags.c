@@ -5,7 +5,10 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: tags.c,v $
- * Revision 1.35  1993/05/24 15:21:37  pgf
+ * Revision 1.36  1993/06/02 14:28:47  pgf
+ * see tom's 3.48 CHANGES
+ *
+ * Revision 1.35  1993/05/24  15:21:37  pgf
  * tom's 3.47 changes, part a
  *
  * Revision 1.34  1993/05/04  17:05:14  pgf
@@ -174,7 +177,6 @@ int taglen;
 	int lineno;
 	int changedfile;
 	MARK odot;
-	LINE *cheap_scan();
 	BUFFER *tagbp;
 	int nomore;
 	int gotafile = FALSE;
@@ -196,7 +198,7 @@ int taglen;
 
 		if (tagbp) {
 			lp = cheap_scan(tagbp, tname, taglen ? 
-					taglen : strlen(tname));
+					taglen : (int)strlen(tname));
 			gotafile = TRUE;
 		} else {
 			lp = NULL;

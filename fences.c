@@ -8,8 +8,11 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: fences.c,v $
- *	Revision 1.12  1993/05/24 15:21:37  pgf
- *	tom's 3.47 changes, part a
+ *	Revision 1.13  1993/06/02 14:28:47  pgf
+ *	see tom's 3.48 CHANGES
+ *
+ * Revision 1.12  1993/05/24  15:21:37  pgf
+ * tom's 3.47 changes, part a
  *
  * Revision 1.11  1993/04/01  13:06:31  pgf
  * turbo C support (mostly prototypes for static)
@@ -406,7 +409,7 @@ int sdir;
 	else
 		forwchar(FALSE, 1);
 
-	comstartpos.l = l_ptr((LINE *)0);
+	comstartpos.l = null_ptr;
 
 	while (count > 0) {
 		if (is_at_end_of_line(DOT))

@@ -6,7 +6,14 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.88  1993/05/24 15:21:37  pgf
+ * Revision 1.90  1993/06/02 14:57:32  pgf
+ * added FILEC_PROMPT to writeregion's call to mlreply_file to force
+ * prompting, and folded some long lines
+ *
+ * Revision 1.89  1993/06/02  14:28:47  pgf
+ * see tom's 3.48 CHANGES
+ *
+ * Revision 1.88  1993/05/24  15:21:37  pgf
  * tom's 3.47 changes, part a
  *
  * Revision 1.87  1993/05/11  16:22:22  pgf
@@ -479,7 +486,8 @@ int f,n;
 	char *actual;
 	static	TBUFF	*last;
 
-	if ((s = mlreply_file("Find file: ", &last, FILEC_READ|FILEC_EXPAND, fname)) == TRUE) {
+	if ((s = mlreply_file("Find file: ", &last, FILEC_READ|FILEC_EXPAND,
+			fname)) == TRUE) {
 		while ((actual = filec_expand()) != 0) {
 			if ((s = getfile(actual, TRUE)) != TRUE)
 				break;
@@ -498,7 +506,8 @@ int f,n;
 	char	*actual;
 	static	TBUFF	*last;
 
-	if ((s = mlreply_file("View file: ", &last, FILEC_READ|FILEC_EXPAND, fname)) == TRUE) {
+	if ((s = mlreply_file("View file: ", &last, FILEC_READ|FILEC_EXPAND,
+			fname)) == TRUE) {
 		while ((actual = filec_expand()) != 0) {
 			if ((s = getfile(actual, FALSE)) != TRUE)
 				break;
@@ -913,7 +922,7 @@ int *nlinep;
 				set_lforw(lp, lp + 1);
 				set_lback(lp, lp - 1);
 				lsetclear(lp);
-				lp->l_nxtundo = l_ptr(NULL);
+				lp->l_nxtundo = null_ptr;
 				lp++;
 				textp += *textp + 1;
 			}
@@ -1261,7 +1270,7 @@ int
 writeregion()
 {
         REGION region;
-	int s;
+	int status;
         char fname[NFILEN];
 
 	if (isnamedcmd && isreturn(end_string())) {
@@ -1271,14 +1280,14 @@ writeregion()
 		}
 		(void)strcpy(fname, curbp->b_fname);
 	} else {
-	        if ((s= mlreply_file("Write region to file: ", 
-				(TBUFF **)0, FILEC_WRITE, fname)) != TRUE)
-	                return s;
+	        if ((status = mlreply_file("Write region to file: ", 
+			(TBUFF **)0, FILEC_WRITE|FILEC_PROMPT, fname)) != TRUE)
+	                return status;
         }
-        if ((s=getregion(&region)) != TRUE)
-                return s;
-
-	return writereg(&region, fname, TRUE, b_val(curbp, MDDOS), curbp);
+        if ((status=getregion(&region)) == TRUE)
+		status = writereg(&region, fname, TRUE, b_val(curbp, MDDOS),
+			curbp);
+	return status;
 }
 
 
@@ -1300,7 +1309,7 @@ BUFFER	*bp;
 
 	/* this is adequate as long as we cannot write parts of lines */
 	int	whole_file = (l_ref(rp->r_orig.l) == lForw(bp->b_line.l))
-	        	  && (l_ref(rp->r_end.l)  == l_ref(bp->b_line.l));
+	        	  && (same_ptr(rp->r_end.l, bp->b_line.l));
 
 	fn = lengthen_path(strcpy(fname, fn));
 	if (same_fname(fn, bp, FALSE) && b_val(bp,MDVIEW)) {
@@ -1537,9 +1546,9 @@ char    *fname;
 int	belowthisline;
 FILE	*haveffp;
 {
-        register LINE   *lp0;
-        register LINE   *lp1;
-        register LINE   *lp2;
+	fast_ptr LINEPTR lp0;
+	fast_ptr LINEPTR lp1;
+	fast_ptr LINEPTR lp2;
         register BUFFER *bp;
         register int    s;
         int    nbytes;
@@ -1562,31 +1571,36 @@ FILE	*haveffp;
 	} else { /* we already have the file pointer */
 		ffp = haveffp;
 	}
-	lp0 = l_ref(curwp->w_dot.l);
+	lp0 = curwp->w_dot.l;
 	curwp->w_dot.o = 0;
 	MK = DOT;
 
 	nline = 0;
 	while ((s=ffgetline(&nbytes)) == FIOSUC) {
-		if ((lp1=lalloc(nbytes,curbp)) == NULL) {
+		lp1 = lalloc(nbytes, curbp);
+		if (same_ptr(lp1, null_ptr)) {
 			s = FIOMEM;		/* Keep message on the	*/
 			break;			/* display.		*/
 		}
+#if OPT_MAP_MEMORY
+		if (nbytes > l_ref(lp1)->l_size)
+			nbytes = l_ref(lp1)->l_size;
+#endif
 		if (belowthisline) {
-			lp2 = lforw(lp0);	/* line after insert */
+			lp2 = lFORW(lp0);	/* line after insert */
 		} else {
 			lp2 = lp0;
-			lp0 = lback(lp0);
+			lp0 = lBACK(lp0);
 		}
 
 		/* re-link new line between lp0 and lp2 */
-		set_lback(lp2, lp1);
-		set_lforw(lp0, lp1);
-		set_lback(lp1, lp0);
-		set_lforw(lp1, lp2);
+		set_lBACK(lp2, lp1);
+		set_lFORW(lp0, lp1);
+		set_lBACK(lp1, lp0);
+		set_lFORW(lp1, lp2);
 
 		if (nbytes)  /* l_text may be NULL in this case */
-			(void)memcpy(lp1->l_text, fline, nbytes);
+			(void)memcpy(l_ref(lp1)->l_text, fline, nbytes);
 		if (!tag_for_undo(lp1)) {
 			s = FIOMEM;
 			break;
@@ -1686,7 +1700,7 @@ int signo;
 	char *np;
 	int wrote = 0;
 	int created = 0;
-	extern char *mktemp();
+	extern char *mktemp P(( char * ));
 
 #if APOLLO
 	extern	char	*getlogin();

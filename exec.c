@@ -4,7 +4,10 @@
  *	written 1986 by Daniel Lawrence	
  *
  * $Log: exec.c,v $
- * Revision 1.55  1993/05/24 15:21:37  pgf
+ * Revision 1.56  1993/06/02 14:28:47  pgf
+ * see tom's 3.48 CHANGES
+ *
+ * Revision 1.55  1993/05/24  15:21:37  pgf
  * tom's 3.47 changes, part a
  *
  * Revision 1.54  1993/05/11  16:22:22  pgf
@@ -204,7 +207,7 @@ static	int	eol_range P(( char *, int, int, int ));
 #if !SMALLER
 static	int	execute_named_command P(( int, int ));
 #endif
-static	char *	linespec P(( char *, LINE ** ));
+static	char *	linespec P(( char *, LINEPTR * ));
 static	void	freewhile P(( WHBLOCK * ));
 
 /* directive name table:
@@ -262,8 +265,8 @@ int f, n;
 	register CMDFUNC *cfp;	/* function to execute */
 	register char *fnp;	/* ptr to the name of the cmd to exec */
 
-	LINE *fromline;	/* first linespec */
-	LINE *toline;	/* second linespec */
+	LINEPTR fromline;	/* first linespec */
+	LINEPTR toline;		/* second linespec */
 	char lspec[NLINE];
 	char cspec[NLINE];
 	int cmode = 0;
@@ -377,12 +380,12 @@ seems like we need one more check here -- is it from a .exrc file?
 			/* EMPTY */ /* works okay, or acts down normally */ ;
 		} else if (cfp == &f_lineputafter) {
 			cfp = &f_lineputbefore;
-			fromline = lforw(fromline);
+			fromline = lFORW(fromline);
 		} else if (cfp == &f_opendown) {
 			cfp = &f_openup;
-			fromline = lforw(fromline);
+			fromline = lFORW(fromline);
 		} else if (cfp == &f_gomark) {
-			fromline = lforw(fromline);
+			fromline = lFORW(fromline);
 		} else {
 			mlforce("[Configuration error: ZERO]");
 			return FALSE;
@@ -393,7 +396,7 @@ seems like we need one more check here -- is it from a .exrc file?
 
 	/* if we're not supposed to have a line no., and the line no. isn't
 		the current line, and there's more than one line */
-	if (!(flags & FROM) && fromline != l_ref(DOT.l) &&
+	if (!(flags & FROM) && !same_ptr(fromline, DOT.l) &&
 			!is_empty_buf(curbp) &&
 		  (lforw(lForw(curbp->b_line.l)) != l_ref(curbp->b_line.l)) ) {
 		mlforce("[Can't use address with \"%s\" command.]", fnp);
@@ -402,7 +405,7 @@ seems like we need one more check here -- is it from a .exrc file?
 	/* if we're not supposed to have a second line no., and the line no. 
 		isn't the same as the first line no., and there's more than
 		one line */
-	if (!(flags & TO) && toline != fromline &&
+	if (!(flags & TO) && !same_ptr(toline, fromline) &&
 			!is_empty_buf(curbp) &&
 		  (lforw(lForw(curbp->b_line.l)) != l_ref(curbp->b_line.l)) ) {
 		mlforce("[Can't use a range with \"%s\" command.]", fnp);
@@ -465,7 +468,7 @@ seems like we need one more check here -- is it from a .exrc file?
 				mlforce("[Configuration error: DFLNONE]");
 				return FALSE;
 			}
-			fromline = toline = NULL;
+			fromline = toline = null_ptr;
 		}
 	}
 
@@ -477,19 +480,21 @@ seems like we need one more check here -- is it from a .exrc file?
 	}
 #endif
 
-	if (toline || fromline) {  /* assume it's an absolute motion */
-				   /* we could probably do better */
+	if (!same_ptr(toline, null_ptr)
+	 || !same_ptr(fromline, null_ptr)) {
+		/* assume it's an absolute motion */
+		/* we could probably do better */
 		curwp->w_lastdot = DOT;
 	}
-	if (toline && (flags & TO)) {
-		DOT.l = l_ptr(toline);
+	if (!same_ptr(toline, null_ptr) && (flags & TO)) {
+		DOT.l = toline;
 		firstnonwhite(f,n);
 		setmark();
 	}
-	if (fromline && (flags & FROM)) {
-		DOT.l = l_ptr(fromline);
+	if (!same_ptr(fromline, null_ptr) && (flags & FROM)) {
+		DOT.l = fromline;
 		firstnonwhite(f,n);
-		if (!toline)
+		if (same_ptr(toline, null_ptr))
 			setmark();
 	}
 
@@ -529,7 +534,7 @@ int f,n;
 static char *
 linespec(s, markptr)
 register char	*s;		/* start of the line specifier */
-LINE		**markptr;	/* where to store the mark's value */
+LINEPTR		*markptr;	/* where to store the mark's value */
 {
 	int		num;
 	LINE		*lp;	/* where the linespec takes us */
@@ -617,7 +622,7 @@ LINE		**markptr;	/* where to store the mark's value */
 	
 		/* if linespec was faulty, quit now */
 		if (!lp) {
-			*markptr = lp;
+			*markptr = l_ptr(lp);
 			swapmark();
 			return s;
 		}
@@ -636,7 +641,7 @@ LINE		**markptr;	/* where to store the mark's value */
 		}
 	} while (*s == ';' || *s == '+' || *s == '-');
 
-	*markptr = lp;
+	*markptr = l_ptr(lp);
 	swapmark();
 	return s;
 }
@@ -647,20 +652,20 @@ LINE		**markptr;	/* where to store the mark's value */
 int
 rangespec(specp,fromlinep,tolinep,isdefaultp,zerop)
 char		*specp;	/* string containing a line range */
-LINE		**fromlinep;	/* first linespec */
-LINE		**tolinep;	/* second linespec */
+LINEPTR		*fromlinep;	/* first linespec */
+LINEPTR		*tolinep;	/* second linespec */
 int		*isdefaultp;
 int		*zerop;
 {
 	register char	*scan;		/* used to scan thru specp */
-	LINE		*fromline;	/* first linespec */
-	LINE		*toline;	/* second linespec */
+	LINEPTR		fromline;	/* first linespec */
+	LINEPTR		toline;		/* second linespec */
 
 	*zerop = FALSE;
 
 	/* ignore command lines that start with a double-quote */
 	if (*specp == '"') {
-		*fromlinep = *tolinep = l_ref(DOT.l);
+		*fromlinep = *tolinep = DOT.l;
 		return TRUE;
 	}
 
@@ -672,24 +677,24 @@ int		*zerop;
 	/* parse the line specifier */
 	scan = specp;
 	if (*scan == '0') {
-		fromline = toline = l_ref(curbp->b_line.l); /* _very_ top of buffer */
+		fromline = toline = curbp->b_line.l; /* _very_ top of buffer */
 		*zerop = TRUE;
 		scan++;
 	} else if (*scan == '%') {
 		/* '%' means all lines */
-		fromline = lForw(curbp->b_line.l);
-		toline = lBack(curbp->b_line.l);
+		fromline = lFORW(curbp->b_line.l);
+		toline = lBACK(curbp->b_line.l);
 		scan++;
 	} else {
 		scan = linespec(scan, &fromline);
-		if (!fromline)
-			fromline = l_ref(DOT.l);
+		if (same_ptr(fromline, null_ptr))
+			fromline = DOT.l;
 		toline = fromline;
 		if (*scan == ',') {
 			scan++;
 			scan = linespec(scan, &toline);
 		}
-		if (!toline) {
+		if (same_ptr(toline,null_ptr)) {
 			/* faulty line spec -- fault already described */
 			dbgwrite("null toline");
 			return FALSE;
@@ -697,7 +702,7 @@ int		*zerop;
 	}
 
 	if (is_empty_buf(curbp))
-		fromline = toline = NULL;
+		fromline = toline = null_ptr;
 
 	*isdefaultp = (scan == specp);
 
@@ -1186,12 +1191,10 @@ dobuf(bp)
 BUFFER *bp;	/* buffer to execute */
 {
         register int status;	/* status return */
-	register LINE *lp;	/* pointer to line to execute */
-	register LINE *hlp;	/* pointer to line header */
-	LINE *mp;		/* Macro line storage temp */
+	fast_ptr LINEPTR lp;	/* pointer to line to execute */
+	fast_ptr LINEPTR hlp;	/* pointer to line header */
 	int dirnum;		/* directive index */
 	int linlen;		/* length of line to execute */
-	int i;			/* index */
 	int force;		/* force TRUE result? */
 	WINDOW *wp;		/* ptr to windows to scan */
 	WHBLOCK *whlist;	/* ptr to WHILE list */
@@ -1221,14 +1224,16 @@ BUFFER *bp;	/* buffer to execute */
 #if ! SMALLER
 	scanpt = NULL;
 	/* scan the buffer to execute, building WHILE header blocks */
-	hlp = l_ref(bp->b_line.l);
-	lp = lforw(hlp);
+	hlp = bp->b_line.l;
+	lp = lFORW(hlp);
 	bp->b_dot.o = 0;
-	while (lp != hlp) {
-		bp->b_dot.l = l_ptr(lp);
+	while (!same_ptr(lp, hlp)) {
+		int i;			/* index */
+
+		bp->b_dot.l = lp;
 		/* scan the current line */
-		eline = lp->l_text;
-		i = lp->l_used;
+		eline = l_ref(lp)->l_text;
+		i = l_ref(lp)->l_used;
 
 		/* trim leading whitespace */
 		while (i-- > 0 && (*eline == ' ' || *eline == '\t'))
@@ -1249,7 +1254,7 @@ failexit:			freewhile(scanpt);
 				dobufnesting--;
 				return FALSE;
 			}
-			whtemp->w_begin = l_ptr(lp);
+			whtemp->w_begin = lp;
 			whtemp->w_type = BTWHILE;
 			whtemp->w_next = scanpt;
 			scanpt = whtemp;
@@ -1264,7 +1269,7 @@ failexit:			freewhile(scanpt);
 			whtemp = typealloc(WHBLOCK);
 			if (whtemp == NULL)
 				goto noram;
-			whtemp->w_begin = l_ptr(lp);
+			whtemp->w_begin = lp;
 			whtemp->w_type = BTBREAK;
 			whtemp->w_next = scanpt;
 			scanpt = whtemp;
@@ -1281,7 +1286,7 @@ failexit:			freewhile(scanpt);
 			   whlist until we have moved all BREAK records
 			   and one WHILE record */
 			do {
-				scanpt->w_end = l_ptr(lp);
+				scanpt->w_end = lp;
 				whtemp = whlist;
 				whlist = scanpt;
 				scanpt = scanpt->w_next;
@@ -1290,7 +1295,7 @@ failexit:			freewhile(scanpt);
 		}
 
 nxtscan:	/* on to the next line */
-		lp = lforw(lp);
+		lp = lFORW(lp);
 	}
 
 	/* while and endwhile should match! */
@@ -1302,12 +1307,12 @@ nxtscan:	/* on to the next line */
 #endif
 
 	/* starting at the beginning of the buffer */
-	hlp = l_ref(bp->b_line.l);
-	lp = lforw(hlp);
-	while (lp != hlp) {
-		bp->b_dot.l = l_ptr(lp);
+	hlp = bp->b_line.l;
+	lp = lFORW(hlp);
+	while (!same_ptr(lp, hlp)) {
+		bp->b_dot.l = lp;
 		/* allocate eline and copy macro line to it */
-		linlen = lp->l_used;
+		linlen = l_ref(lp)->l_used;
 		if ((einit = eline = castalloc(char, linlen+1)) == NULL) {
 			mlforce("[Out of Memory during macro execution]");
 			freewhile(whlist);
@@ -1318,7 +1323,7 @@ nxtscan:	/* on to the next line */
 
 		/* pjr - must check for empty line before copy */
 		if (linlen)
-			strncpy(eline, lp->l_text, linlen);
+			strncpy(eline, l_ref(lp)->l_text, linlen);
 		eline[linlen] = 0;	/* make sure it ends */
 
 		/* trim leading whitespace */
@@ -1399,23 +1404,12 @@ nxtscan:	/* on to the next line */
 		/* if macro store is on, just salt this away */
 		if (mstore) {
 			/* allocate the space for the line */
-			linlen = strlen(eline);
-			if ((mp=lalloc((int)linlen,bstore)) == NULL) {
+			if (addline(bstore, eline, -1) == FALSE) {
 				mlforce("[Out of memory while storing macro]");
 				mstore = FALSE;
 				dobufnesting--;
 				return FALSE;
 			}
-	
-			/* copy the text into the new line */
-			for (i=0; i<linlen; ++i)
-				lputc(mp, i, eline[i]);
-	
-			/* attach the line to the end of the buffer */
-	       		set_lforw(lBack(bstore->b_line.l), mp);
-			set_lback(mp, lBack(bstore->b_line.l));
-			set_lback(l_ref(bstore->b_line.l), mp);
-			set_lforw(mp, l_ref(bstore->b_line.l));
 			goto onward;
 		}
 	
@@ -1464,7 +1458,7 @@ nxtscan:	/* on to the next line */
 				/* find the right while loop */
 				whtemp = whlist;
 				while (whtemp) {
-					if (l_ref(whtemp->w_begin) == lp)
+					if (same_ptr(whtemp->w_begin, lp))
 						break;
 					whtemp = whtemp->w_next;
 				}
@@ -1478,7 +1472,7 @@ nxtscan:	/* on to the next line */
 				}
 			
 				/* reset the line pointer back.. */
-				lp = l_ref(whtemp->w_end);
+				lp = whtemp->w_end;
 				goto onward;
 
 			case DELSE:	/* ELSE directive */
@@ -1500,12 +1494,12 @@ nxtscan:	/* on to the next line */
 					/* grab label to jump to */
 					(void) token(eline, golabel, EOS);
 					linlen = strlen(golabel);
-					glp = lforw(hlp);
-					while (glp != hlp) {
-						if (*glp->l_text == '*' &&
+					glp = lForw(hlp);
+					while (glp != l_ref(hlp)) {
+						if (glp->l_text[0] == '*' &&
 						    (strncmp(&glp->l_text[1], golabel,
 						            linlen) == 0)) {
-							lp = glp;
+							lp = l_ptr(glp);
 							goto onward;
 						}
 						glp = lforw(glp);
@@ -1532,7 +1526,7 @@ nxtscan:	/* on to the next line */
 					whtemp = whlist;
 					while (whtemp) {
 						if (whtemp->w_type == BTWHILE &&
-						    l_ref(whtemp->w_end) == lp)
+						    same_ptr(whtemp->w_end, lp))
 							break;
 						whtemp = whtemp->w_next;
 					}
@@ -1546,7 +1540,7 @@ nxtscan:	/* on to the next line */
 					}
 		
 					/* reset the line pointer back.. */
-					lp = lBack(whtemp->w_begin);
+					lp = lBACK(whtemp->w_begin);
 					goto onward;
 				}
 
@@ -1568,13 +1562,13 @@ nxtscan:	/* on to the next line */
 			for_each_window(wp) {
 				if (wp->w_bufp == bp) {
 					/* and point it */
-					wp->w_dot.l = l_ptr(lp);
+					wp->w_dot.l = lp;
 					wp->w_dot.o = 0;
 					wp->w_flag |= WFHARD;
 				}
 			}
 			/* in any case set the buffer's dot */
-			bp->b_dot.l = l_ptr(lp);
+			bp->b_dot.l = lp;
 			bp->b_dot.o = 0;
 			bp->b_wline.l = lFORW(bp->b_line.l);
 			free(einit);
@@ -1588,7 +1582,7 @@ nxtscan:	/* on to the next line */
 
 onward:		/* on to the next line */
 		free(einit);
-		lp = lforw(lp);
+		lp = lFORW(lp);
 	}
 
 #if ! SMALLER

@@ -1,3 +1,73 @@
+Changes for vile 3.48:
+(pgf)
+	+ added FILEC_PROMPT flag to mlreply_file call in writeregion, to
+	  make ^W file-writing operator work.
+
+	+ folded some long lines (opers.c filec.c file.c)
+(tom)
+	+ corrections to make undo work properly with mapped-memory option
+	  (files buffer.c and tmp.c).
+
+	+ use symbol 'null_ptr' to tidy up references to '(LINE *)0'
+	  (files buffer.c fences.c line.c main.c undo.c)
+
+	+ changed LINE.l_size to SIZE_T (to make it lintable)
+
+	+ corrected "poison" code in 'lfree()' (file line.c)
+
+	+ added logic to finderr.c to handle lint output on apollo.
+
+	+ added logic to handle line truncation (files buffer.c, file.c,
+	  line.c, tmp.c)
+
+	+ added function 'l_region()' to file tmp.c; use this (with some
+	  reorganization) in files file.c, oneliner.c, region.c, word.c to
+	  track LINEPTR adjustments in REGION structs.  (Converted most of the
+	  calling procedures to single-return to clarify this).
+
+	+ moved options-logic in 'substreg1()' (file oneliner.c) down to make
+	  this simpler (and avoid unnecessary goto).  (This procedure has too
+	  much logic to convert to single-return).  Also fixed a place that
+	  should have used 'end_string()'.
+
+	+ used macro 'same_ptr()' to compare LINEPTR's directly (a bit more
+	  efficient).
+
+	+ implemented page-swapping logic in file tmp.c
+
+	+ modified ifdefs in files bind.c, eval.c, finderr.c to get rid of
+	  compiler warnings when SMALLER, REBIND and APROP ifdefs are turned
+	  off.
+
+	+ used 'memcpy()' and 'memset()' in files buffer.c, line.c to simplify
+	  loops copying text into LINE's.
+
+	+ modified interfaces of functions that may modify 'LINE *' pointers
+	  (or, equivalently, cause swapping of a LINE to a different address)
+	  to use LINEPTR arguments (for example, 'line_no()' can iterate over
+	  all lines, causing swapping).  Also modified functions (especially in
+	  files line.c and undo.c) to use LINEPTR variables where they call
+	  lower-level functions that may page-swapping.  Affects files
+	  buffer.c, display.c, exec.c, file.c, filec.c, input.c, line.c,
+	  oneliner.c, random.c, region.c, search.c, vmalloc.c, word.c
+
+	+ replaced call on 'lalloc()' in file exec.c with 'addline()' (only
+	  difference is that the latter also sets b_dot).
+
+	+ converted several functions in file undo.c to static (to simplify
+	  tinkering with LINE/LINEPTR tradeoffs).
+
+	+ modified calls on 'lalloc()' in file undo.c to use special codes for
+	  l_used member directly.
+
+	+ added options -Wconversion -Wstrict-prototypes -Wmissing-prototypes
+	  to gcc flags in makefile; addressed these warnings (except for
+	  'signal()' arguments, which cannot be fixed) on sunos.  Modified
+	  files bind.c, file.c, filec.c, fileio.c, glob.c, insert.c, line.c,
+	  path.c, random.c, region.c, spawn.c, tcap.c.
+
+	+ corrected ifdef in 'string_has_wildcards()' (file glob.c) for VMS.
+
 Changes for vile 3.47:
 (tom)
 

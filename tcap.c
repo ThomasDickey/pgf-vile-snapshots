@@ -2,7 +2,10 @@
  *		for MicroEMACS
  *
  * $Log: tcap.c,v $
- * Revision 1.19  1993/05/04 17:05:14  pgf
+ * Revision 1.20  1993/06/02 14:28:47  pgf
+ * see tom's 3.48 CHANGES
+ *
+ * Revision 1.19  1993/05/04  17:05:14  pgf
  * see tom's CHANGES, 3.45
  *
  * Revision 1.18  1993/04/01  12:53:33  pgf
@@ -127,7 +130,7 @@ TERM term = {
 void
 tcapopen()
 {
-	char *t, *p, *tgetstr();
+	char *t, *p, *tgetstr P((char *, char **));
 	char tcbuf[1024];
 	char *tv_stype;
 	char err_str[72];

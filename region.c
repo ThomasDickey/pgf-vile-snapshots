@@ -6,7 +6,10 @@
  * internal use.
  *
  * $Log: region.c,v $
- * Revision 1.23  1993/05/24 15:21:37  pgf
+ * Revision 1.24  1993/06/02 14:28:47  pgf
+ * see tom's 3.48 CHANGES
+ *
+ * Revision 1.23  1993/05/24  15:21:37  pgf
  * tom's 3.47 changes, part a
  *
  * Revision 1.22  1993/04/01  12:53:33  pgf
@@ -103,20 +106,21 @@ overlay	"region"
 int
 killregion()
 {
-        register int    s;
+        register int    status;
         REGION          region;
 
-        if ((s=getregion(&region)) != TRUE)
-                return s;
-	kregcirculate(TRUE);
-        ksetup();                      /* command, so do magic */
-	DOT = region.r_orig;
-	if (fulllineregions)
-		kregflag |= KLINES;
-	s = ldelete(region.r_size, TRUE);
-	kdone();
-	ukb = 0;
-        return s;
+        if ((status = getregion(&region)) == TRUE) {
+		kregcirculate(TRUE);
+        	ksetup();		/* command, so do magic */
+		DOT = region.r_orig;
+		if (fulllineregions)
+			kregflag |= KLINES;
+		status = ldelete(region.r_size, TRUE);
+		kdone();
+		ukb = 0;
+	}
+	rls_region();
+        return status;
 }
 
 /*
@@ -129,49 +133,52 @@ int
 yankregion()
 {
 	MARK		m;
-        register int    s;
+        register int    status;
         REGION          region;
 
-        if ((s=getregion(&region)) != TRUE)
-                return s;
-	kregcirculate(TRUE);
-        ksetup();
-	m = region.r_orig;
-	if (fulllineregions)
-		kregflag |= KLINES|KYANK;
-        while (region.r_size--) {
-                if (is_at_end_of_line(m)) {  /* End of line.         */
-                        if ((s=kinsert('\n')) != TRUE) {
-				ukb = 0;
-                                return s;
-			}
-                        m.l = lFORW(m.l);
-                        m.o = 0;
-                } else {                        /* Middle of line.      */
-                        if ((s=kinsert(char_at(m))) != TRUE) {
-				ukb = 0;
-                                return s;
-			}
-                        ++m.o;
-                }
-        }
-	if (klines)
-		mlwrite("[ %d line%c yanked]", klines,
-					klines == 1 ? ' ':'s');
-	else
-		mlwrite("[ %d character%c yanked]", kchars, 
-					kchars == 1 ? ' ':'s');
-	kdone();
-	ukb = 0;
-        return TRUE;
+        if ((status = getregion(&region)) == TRUE) {
+		kregcirculate(TRUE);
+        	ksetup();
+		m = region.r_orig;
+		if (fulllineregions)
+			kregflag |= KLINES|KYANK;
+        	while (region.r_size--) {
+                	if (is_at_end_of_line(m)) { /* End of line.         */
+                        	if ((status = kinsert('\n')) != TRUE) {
+					ukb = 0;
+					rls_region();
+                                	return status;
+				}
+                        	m.l = lFORW(m.l);
+                        	m.o = 0;
+                	} else {                    /* Middle of line.      */
+                        	if ((status = kinsert(char_at(m))) != TRUE) {
+					ukb = 0;
+					rls_region();
+                                	return status;
+				}
+                        	++m.o;
+                	}
+        	}
+		if (klines)
+			mlwrite("[ %d line%s yanked]", klines, PLURAL(klines));
+		else
+			mlwrite("[ %d character%s yanked]", kchars, PLURAL(kchars));
+		kdone();
+		ukb = 0;
+	}
+	rls_region();
+        return (status);
 }
 
 /*
  * insert a shiftwidth at the front of the line
  * don't do it if we're in cmode and the line starts with '#'
  */
+/*ARGSUSED*/
 int
-shift_right_line()
+shift_right_line(flag)
+int	flag;
 {
 	int s, t;
 	if (b_val(curbp, MDCMOD) &&
@@ -207,8 +214,10 @@ shiftrregion()
 /*
  * delete a shiftwidth-equivalent from the front of the line
  */
+/*ARGSUSED*/
 int
-shift_left_line()
+shift_left_line(flag)
+int	flag;
 {
 	register int	i;
 	register int	lim;
@@ -301,28 +310,29 @@ int (*func) P((int));
 {
 	MARK		m;
         register int    c,nc;
-        register int    s;
+        register int    status;
         REGION          region;
 
-        if ((s=getregion(&region)) != TRUE)
-                return s;
-        chg_buff(curbp, WFHARD);
-	m = region.r_orig;
-        while (region.r_size--) {
-                if (is_at_end_of_line(m)) {
-                        m.l = lFORW(m.l);
-                        m.o = 0;
-                } else {
-                        c = char_at(m);
-			nc = (func)(c);
-			if (nc != -1) {
-				copy_for_undo(l_ref(m.l));
-                                put_char_at(m, nc);
-			}
-                        ++m.o;
-                }
-        }
-        return TRUE;
+        if ((status = getregion(&region)) == TRUE) {
+        	chg_buff(curbp, WFHARD);
+		m = region.r_orig;
+        	while (region.r_size--) {
+                	if (is_at_end_of_line(m)) {
+                        	m.l = lFORW(m.l);
+                        	m.o = 0;
+                	} else {
+                        	c = char_at(m);
+				nc = (func)(c);
+				if (nc != -1) {
+					copy_for_undo(m.l);
+                                	put_char_at(m, nc);
+				}
+                        	++m.o;
+                	}
+        	}
+	}
+	rls_region();
+        return (status);
 }
 
 /*
@@ -342,6 +352,11 @@ register REGION *rp;
         long fsize;
         long bsize;
 
+#if OPT_MAP_MEMORY
+	rp->r_orig.l = null_ptr;
+	rp->r_end.l  = null_ptr;
+	l_region(rp);
+#endif
         if (l_ref(MK.l) == NULL) {
                 mlforce("BUG: getregion: no mark set in this window");
                 return FALSE;
@@ -417,36 +432,51 @@ register REGION *rp;
 }
 
 int
+get_fl_region(rp)
+REGION	*rp;
+{
+	int	status;
+
+	fulllineregions = TRUE;
+	status = getregion(rp);
+	fulllineregions = FALSE;
+
+	return status;
+}
+
+int
 do_fl_region(lineprocfunc,arg)
 int (*lineprocfunc) P((int));
 int arg;
 {
         register LINE   *linep;
-        register int    s;
+        register int    status;
         REGION          region;
 
 	fulllineregions = TRUE;
-        if ((s=getregion(&region)) != TRUE)
-                return s;
+        if ((status=getregion(&region)) == TRUE) {
 
-	/* for each line in the region, ... */
-	for ( linep = l_ref(region.r_orig.l);
+		/* for each line in the region, ... */
+		for ( linep = l_ref(region.r_orig.l);
 			linep != l_ref(region.r_end.l); linep = lforw(linep) ) {
 
-		/* nothing on the line? */
-		if (llength(linep) == 0)
-			continue;
+			/* nothing on the line? */
+			if (llength(linep) == 0)
+				continue;
 
-		/* move through the region... */
-		DOT.l = l_ptr(linep);
-		DOT.o = 0;
+			/* move through the region... */
+			DOT.l = l_ptr(linep);
+			DOT.o = 0;
 
-		/* ...and process each line */
-		if ((s = (*lineprocfunc)(arg)) != TRUE)
-			return s;
+			/* ...and process each line */
+			if ((status = (*lineprocfunc)(arg)) != TRUE) {
+				rls_region();
+				return status;
+			}
 
-        }
-	firstnonwhite(FALSE,1);
-        return TRUE;
+        	}
+		firstnonwhite(FALSE,1);
+	}
+	rls_region();
+        return status;
 }
-

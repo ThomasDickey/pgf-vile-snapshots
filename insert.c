@@ -8,8 +8,11 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: insert.c,v $
- *	Revision 1.24  1993/05/24 15:21:37  pgf
- *	tom's 3.47 changes, part a
+ *	Revision 1.25  1993/06/02 14:28:47  pgf
+ *	see tom's 3.48 CHANGES
+ *
+ * Revision 1.24  1993/05/24  15:21:37  pgf
+ * tom's 3.47 changes, part a
  *
  * Revision 1.23  1993/05/05  10:31:30  pgf
  * cleaned up handling of SPEC keys from withing insert mode.  now, any
@@ -384,7 +387,7 @@ int playback;
 			if (DOT.o != 0)
 				backchar(TRUE,1);
 			if (autoindented >= 0) {
-				trimline();
+				trimline(FALSE);
 				autoindented = -1;
 			}
 			status = TRUE;
@@ -480,7 +483,7 @@ int *backsp_limit_p;
 			c ==  tocntrl('M')) { /* CR and NL */
 			execfunc = newline;
 			if (autoindented >= 0) {
-				trimline();
+				trimline(FALSE);
 				autoindented = -1;
 			}
 			*backsp_limit_p = 0;
@@ -650,7 +653,7 @@ int f,n;
 
 #if LATER	/* already done for autoindented != 0 in ins() */
 	if (b_val(curbp, MDTRIM))
-		trimline();
+		trimline(FALSE);
 #endif
 	    
 	/* if we are in C or auto-indent modes and this is a default <NL> */
@@ -836,7 +839,7 @@ int c;	/* brace to insert (always { for now) */
 #endif
 
 	if (autoindented >= 0) {
-		trimline();
+		trimline(FALSE);
 	}
 	else {
 		return linsert(n,c);

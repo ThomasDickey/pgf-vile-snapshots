@@ -5,7 +5,10 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.55  1993/05/24 15:21:37  pgf
+ * Revision 1.56  1993/06/02 14:28:47  pgf
+ * see tom's 3.48 CHANGES
+ *
+ * Revision 1.55  1993/05/24  15:21:37  pgf
  * tom's 3.47 changes, part a
  *
  * Revision 1.54  1993/05/11  16:22:22  pgf
@@ -368,12 +371,12 @@ extern void vtputc P(( int ));
 extern void vtlistc P(( int ));
 extern int vtgetc P(( int ));
 extern void vtputsn P(( char *, int ));
-extern void vtset P(( LINE *, WINDOW * ));
+extern void vtset P(( LINEPTR, WINDOW * ));
 extern void vtprintf P(( char *, ... ));
 extern void vteeol P(( void ));
 extern int upscreen P(( int, int ));
 extern void reframe P(( WINDOW * ));
-extern void l_to_vline P(( WINDOW *, LINE *, int ));
+extern void l_to_vline P(( WINDOW *, LINEPTR, int ));
 extern int updpos P(( int * ));
 extern void upddex P(( void ));
 extern void updgar P(( void ));
@@ -431,7 +434,7 @@ extern int ernd P(( void ));
 
 /* exec.c */
 extern int namedcmd P(( int, int ));
-extern int rangespec P(( char *, LINE **, LINE **, int *, int * ));
+extern int rangespec P(( char *, LINEPTR *, LINEPTR *, int *, int * ));
 extern int docmd P(( char *, int, int, int ));
 extern int dobuf P(( BUFFER * ));
 extern int dofile P(( char * ));
@@ -518,7 +521,7 @@ extern int resetkey P(( BUFFER *, char * ));
 /* filec.c */
 #if COMPLETE_DIRS || COMPLETE_FILES
 extern BUFFER *bs_init P(( char *, int ));
-extern int bs_find P(( char *, int, BUFFER *, int, LINE ** ));
+extern int bs_find P(( char *, int, BUFFER *, int, LINEPTR * ));
 #endif
 extern int mlreply_file P(( char *, TBUFF **, int, char * ));
 extern int mlreply_dir P(( char *, TBUFF **, char * ));
@@ -543,7 +546,7 @@ extern int ffhasdata P(( void ));
 #if FINDERR
 extern void set_febuff P(( char * ));
 extern int finderr P(( int, int ));
-extern struct LINE * getdot P(( struct BUFFER * ));
+extern LINE * getdot P(( BUFFER * ));
 extern void putdotback P(( BUFFER *, LINE * ));
 extern int finderrbuf P(( int, int ));
 #endif
@@ -613,12 +616,12 @@ extern int promptpattern P(( char * ));
 extern int get_char P(( void ));
 
 /* line.c */
-extern LINE * lalloc P(( int, BUFFER * ));
-extern void lfree P(( LINE *, BUFFER * ));
+extern LINEPTR lalloc P(( int, BUFFER * ));
+extern void lfree P(( LINEPTR, BUFFER * ));
 #if !OPT_MAP_MEMORY
 extern void ltextfree P(( LINE *, BUFFER * ));
 #endif
-extern void lremove P(( BUFFER *, LINE * ));
+extern void lremove P(( BUFFER *, LINEPTR ));
 extern int insspace P(( int, int ));
 extern int linsert P(( int, int ));
 extern int lnewline P(( void ));
@@ -686,7 +689,7 @@ extern int substline P(( regexp *, int, int, int ));
 extern int delins P(( regexp *, char * ));
 
 /* opers.c */
-extern int operator P(( int, int, int (*)(), char * ));
+extern int operator P(( int, int, int (*)(void), char * ));
 extern int operdel P(( int, int ));
 extern int operlinedel P(( int, int ));
 extern int chgreg P(( void ));
@@ -733,10 +736,10 @@ extern int is_internalname P(( char * ));
 extern int is_directory P(( char * ));
 
 /* random.c */
-extern int line_no P(( BUFFER *, LINE * ));
+extern int line_no P(( BUFFER *, LINEPTR ));
 extern int getcline P(( void ));
 extern void set_rdonly P(( BUFFER *, char * ));
-extern int liststuff P(( char *, void (*)(), int, char * ));
+extern int liststuff P(( char *, void (*)(int, char *), int, char * ));
 extern int showcpos P(( int, int ));
 extern int showlength P(( int, int ));
 extern int getccol P(( int ));
@@ -751,7 +754,7 @@ extern int detabline P(( int ));
 extern int detab_region P(( void ));
 extern int entabline P(( int ));
 extern int entab_region P(( void ));
-extern int trimline P(( void ));
+extern int trimline P(( int ));
 extern int trim_region P(( void ));
 extern int openup P(( int, int ));
 extern int opendown P(( int, int ));
@@ -820,9 +823,9 @@ extern int lregexec P(( regexp *, LINE *, int, int ));
 /* region.c */
 extern int killregion P(( void ));
 extern int yankregion P(( void ));
-extern int shift_right_line P(( void ));
+extern int shift_right_line P(( int ));
 extern int shiftrregion P(( void ));
-extern int shift_left_line P(( void ));
+extern int shift_left_line P(( int ));
 extern int shiftlregion P(( void ));
 extern int _to_lower P(( int ));
 extern int _to_upper P(( int ));
@@ -830,9 +833,10 @@ extern int _to_caseflip P(( int ));
 extern int flipregion P(( void ));
 extern int lowerregion P(( void ));
 extern int upperregion P(( void ));
-extern int charprocreg P(( int (*)() ));
+extern int charprocreg P(( int (*)(int) ));
 extern int getregion P(( REGION * ));
-extern int do_fl_region P(( int (*)(), int ));
+extern int get_fl_region P(( REGION * ));
+extern int do_fl_region P(( int (*)(int), int ));
 
 /* search.c */
 extern void not_found_msg P(( int, int ));
@@ -893,24 +897,14 @@ extern int typahead P(( void ));
 extern void ttmiscinit P(( void ));
 
 /* undo.c */
-extern void toss_to_undo P(( LINE * ));
-extern int copy_for_undo P(( LINE * ));
-extern int tag_for_undo P(( LINE * ));
-extern void pushline P(( LINE *, LINEPTR * ));
-extern LINE * popline P(( LINEPTR * ));
-extern void make_undo_patch P(( LINE *, LINE *, int ));
-extern void applypatch P(( LINE *, LINE * ));
-extern LINE * copyline P(( LINE * ));
+extern void toss_to_undo P(( LINEPTR ));
+extern int copy_for_undo P(( LINEPTR ));
+extern int tag_for_undo P(( LINEPTR ));
 extern void freeundostacks P(( BUFFER * ));
 extern int undo P(( int, int ));
 extern void mayneedundo P(( void ));
-extern void preundocleanup P(( void ));
 extern int lineundo P(( int, int ));
-extern void repointstuff P(( LINE *, LINE * ));
-extern int linesmatch P(( LINE *, LINE * ));
-extern void dumpuline P(( LINE * ));
-extern void setupuline P(( LINE * ));
-extern void resetuline P(( LINE *, LINE * ));
+extern void dumpuline P(( LINEPTR ));
 
 /* window.c */
 extern int getwpos P(( void ));
@@ -980,7 +974,6 @@ extern int fmatch P(( int ));
 extern int getfence P(( int, int ));
 extern int comment_fence P(( int ));
 extern int simple_fence P(( int, int, int ));
-extern void putdotback P(( BUFFER *, LINE * ));
 
 /* tbuff.c */
 TBUFF *	tb_alloc P(( TBUFF **, unsigned ));
@@ -1005,16 +998,26 @@ unsigned tb_length P(( TBUFF * ));
 /* tmp.c */
 #if OPT_MAP_MEMORY
 extern	LINEPTR	l_allocate	P(( SIZE_T ));
-extern	void	l_deallocate	P(( LINEPTR, BUFFER * ));
+extern	void	l_deallocate	P(( LINEPTR ));
 extern	LINE *	l_reallocate	P(( LINEPTR, SIZE_T, BUFFER * ));
-extern	void	l_changed	P(( LINEPTR ));
+extern	int	l_truncated	P(( void ));
+extern	void	l_region	P(( REGION * ));
 extern	LINE *	l_ref		P(( LINEPTR ));
 extern	LINEPTR	l_ptr		P(( LINE * ));
-extern	LINE *	set_lforw	P(( LINE *, LINE * ));
-extern	LINE *	set_lback	P(( LINE *, LINE * ));
+extern	void	set_lforw	P(( LINE *, LINE * ));
+extern	void	set_lback	P(( LINE *, LINE * ));
 extern	LINE *	lforw		P(( LINE * ));
 extern	LINE *	lback		P(( LINE * ));
 extern	void	lsetclear	P(( LINE * ));
+extern	LINE *	lforw_p2r	P(( LINEPTR ));
+extern	LINE *	lback_p2r	P(( LINEPTR ));
+extern	LINEPTR	lforw_p2p	P(( LINEPTR ));
+extern	LINEPTR	lback_p2p	P(( LINEPTR ));
+extern	void	set_lforw_p2r	P(( LINE *, LINEPTR ));
+extern	void	set_lback_p2r	P(( LINE *, LINEPTR ));
+extern	void	set_lforw_p2p	P(( LINEPTR, LINEPTR ));
+extern	void	set_lback_p2p	P(( LINEPTR, LINEPTR ));
+
 #endif
 
 #if NO_LEAKS

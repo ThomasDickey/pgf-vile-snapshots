@@ -2,7 +2,10 @@
  *		for MicroEMACS
  *
  * $Log: spawn.c,v $
- * Revision 1.52  1993/05/24 15:21:37  pgf
+ * Revision 1.53  1993/06/02 14:28:47  pgf
+ * see tom's 3.48 CHANGES
+ *
+ * Revision 1.52  1993/05/24  15:21:37  pgf
  * tom's 3.47 changes, part a
  *
  * Revision 1.51  1993/05/04  17:05:14  pgf
@@ -745,7 +748,7 @@ filterregion()
 		kp = kbs[ukb].kbufh;
 		while (kp != NULL) {
 			if (kp->d_next == NULL)
-				fwrite((char *)kp->d_chunk, 1, kbs[ukb].kused, fw);
+				fwrite((char *)kp->d_chunk, 1, (SIZE_T)kbs[ukb].kused, fw);
 			else
 				fwrite((char *)kp->d_chunk, 1, KBLOCK, fw);
 			kp = kp->d_next;

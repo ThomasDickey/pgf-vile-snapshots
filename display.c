@@ -6,7 +6,10 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.84  1993/05/24 15:25:41  pgf
+ * Revision 1.85  1993/06/02 14:28:47  pgf
+ * see tom's 3.48 CHANGES
+ *
+ * Revision 1.84  1993/05/24  15:25:41  pgf
  * tom's 3.47 changes, part b
  *
  * Revision 1.83  1993/05/24  15:21:37  pgf
@@ -766,11 +769,11 @@ int n;
 
 void
 vtset(lp,wp)
-LINE *lp;
+LINEPTR lp;
 WINDOW *wp;
 {
-	register char *from = lp->l_text;
-	register int n = llength(lp);
+	register char *from;
+	register int n = lLength(lp);
 	int	skip = -vtcol,
 		list = w_val(wp,WMDLIST);
 
@@ -787,6 +790,7 @@ WINDOW *wp;
 
 		/* account for leading fill; this repeats logic in vtputc so
 		 * I don't have to introduce a global variable... */
+		from = l_ref(lp)->l_text;
 		for (j = k = jk = 0; (j < n) && (k < skip); j++) {
 			register int	c = from[j];
 			if (list && !isprint(c)) {
@@ -803,14 +807,13 @@ WINDOW *wp;
 		}
 		while (k-- > skip)
 			vtputc(fill);
-		skip = jk;
+		if ((skip = jk) < 0)
+			skip = 0;
+		n -= skip;
+	} else
+		skip = 0;
 
-		if (skip > 0) {
-			n    -= skip;
-			from += skip;
-		}
-	}
-
+	from = l_ref(lp)->l_text + skip;
 	while ((vtcol <= term.t_ncol) && (n > 0)) {
 		if (list)
 			vtlistc(*from++);
@@ -1070,15 +1073,15 @@ void
 updone(wp)
 WINDOW *wp;	/* window to update current line in */
 {
-	register LINE *lp;	/* line to update */
+	fast_ptr LINEPTR lp;	/* line to update */
 	register int sline;	/* physical screen line to update */
 
 	/* search down the line we want */
-	lp = l_ref(wp->w_line.l);
+	lp = wp->w_line.l;
 	sline = wp->w_toprow;
-	while (lp != l_ref(wp->w_dot.l)) {
+	while (!same_ptr(lp, wp->w_dot.l)) {
 		++sline;
-		lp = lforw(lp);
+		lp = lFORW(lp);
 	}
 
 	l_to_vline(wp,lp,sline);
@@ -1091,27 +1094,26 @@ void
 updall(wp)
 WINDOW *wp;	/* window to update lines in */
 {
-	register LINE *lp;	/* line to update */
+	fast_ptr LINEPTR lp;	/* line to update */
 	register int sline;	/* physical screen line to update */
 
 	/* search down the lines, updating them */
-	lp = l_ref(wp->w_line.l);
+	lp = wp->w_line.l;
 	sline = wp->w_toprow;
 	while (sline < wp->w_toprow + wp->w_ntrows) {
 		l_to_vline(wp,lp,sline);
 		vteeol();
-		if (lp != l_ref(wp->w_bufp->b_line.l))
-			lp = lforw(lp);
+		if (!same_ptr(lp, wp->w_bufp->b_line.l))
+			lp = lFORW(lp);
 		++sline;
 	}
-
 }
 
 /* line to virtual screen line */
 void
 l_to_vline(wp,lp,sline)
 WINDOW *wp;	/* window to update lines in */
-LINE *lp;
+LINEPTR lp;
 int sline;
 {
 
@@ -1120,7 +1122,7 @@ int sline;
 	vscreen[sline]->v_flag &= ~VFREQ;
 	if (w_val(wp,WVAL_SIDEWAYS))
 		taboff = w_val(wp,WVAL_SIDEWAYS);
-	if (lp != l_ref(wp->w_bufp->b_line.l)) {
+	if (!same_ptr(lp, wp->w_bufp->b_line.l)) {
 		vtmove(sline, -w_val(wp,WVAL_SIDEWAYS));
 		vtset(lp, wp);
 		if (w_val(wp,WVAL_SIDEWAYS)) {
@@ -1147,7 +1149,7 @@ int
 updpos(screencolp)
 int *screencolp;
 {
-	register LINE *lp;
+	fast_ptr LINEPTR lp;
 	register int c;
 	register int i;
 	register int col, excess;
@@ -1155,12 +1157,12 @@ int *screencolp;
 	int moved = FALSE;
 
 	/* find the current row */
-	lp = l_ref(curwp->w_line.l);
+	lp = curwp->w_line.l;
 	currow = curwp->w_toprow;
-	while (lp != l_ref(DOT.l)) {
+	while (!same_ptr(lp, DOT.l)) {
 		++currow;
-		lp = lforw(lp);
-		if (lp == l_ref(curwp->w_line.l) || currow > term.t_nrow) {
+		lp = lFORW(lp);
+		if (same_ptr(lp, curwp->w_line.l) || currow > term.t_nrow) {
 			mlforce("BUG:  lost dot updpos().  setting at top");
 			curwp->w_line.l = DOT.l  = lFORW(curbp->b_line.l);
 			currow = curwp->w_toprow;
@@ -1171,8 +1173,8 @@ int *screencolp;
 	col = 0;
 	i = 0;
 	while (i < DOT.o || (!global_g_val(GMDALTTABPOS) && !insertmode &&
-				i <= DOT.o && i < llength(lp))) {
-		c = lgetc(lp, i++);
+				i <= DOT.o && i < lLength(lp))) {
+		c = lGetc(lp, i++);
 		if (c == '\t' && !w_val(curwp,WMDLIST)) {
 			do {
 				col++;
@@ -1185,7 +1187,7 @@ int *screencolp;
 
 	}
 	if (!global_g_val(GMDALTTABPOS) && !insertmode &&
-			col != 0 && DOT.o < llength(lp))
+			col != 0 && DOT.o < lLength(lp))
 		col--;
 
 	/* ...adjust to offset from shift-margin */
@@ -1227,11 +1229,11 @@ void
 upddex()
 {
 	register WINDOW *wp;
-	register LINE *lp;
+	fast_ptr LINEPTR lp;
 	register int i;
 
 	for_each_window(wp) {
-		lp = l_ref(wp->w_line.l);
+		lp = wp->w_line.l;
 		i = wp->w_toprow;
 
 		curtabval = tabstop_val(wp->w_bufp);
@@ -1239,7 +1241,7 @@ upddex()
 		while (i < wp->w_toprow + wp->w_ntrows) {
 			if (vscreen[i]->v_flag & VFEXT) {
 				if ((wp != curwp)
-				 || (lp != l_ref(wp->w_dot.l))
+				 || (!same_ptr(lp, wp->w_dot.l))
 				 || ((i != currow)
 				  && (curcol < col_limit(wp)))) {
 					l_to_vline(wp,lp,i);
@@ -1248,7 +1250,7 @@ upddex()
 					vscreen[i]->v_flag &= ~VFEXT;
 				}
 			}
-			lp = lforw(lp);
+			lp = lFORW(lp);
 			++i;
 		}
 	}
@@ -1506,7 +1508,7 @@ int	excess;
 
 	/* start scanning offscreen */
 	vtmove(currow, -taboff);
-	vtset(l_ref(DOT.l), curwp);
+	vtset(DOT.l, curwp);
 
 	/* truncate the virtual line, restore tab offset */
 	vteeol();
@@ -1537,7 +1539,7 @@ int	col;
 	/* scan through the line outputing characters to the virtual screen */
 	/* once we reach the left edge					*/
 	vtmove(currow, -taboff);	/* start scanning offscreen */
-	vtset(l_ref(DOT.l), curwp);
+	vtset(DOT.l, curwp);
 
 	/* truncate the virtual line, restore tab offset */
 	vteeol();
@@ -1878,7 +1880,7 @@ WINDOW *wp;
 		}
 		if (lBack(wp->w_line.l) == l_ref(wp->w_bufp->b_line.l)) {
 			if (msg) {
-				if (l_ref(wp->w_line.l) == l_ref(wp->w_bufp->b_line.l))
+				if (same_ptr(wp->w_line.l, wp->w_bufp->b_line.l))
 					msg = " emp ";
 				else
 					msg = " all ";
