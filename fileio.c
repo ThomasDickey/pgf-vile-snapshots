@@ -3,7 +3,10 @@
  * the knowledge about files are here.
  *
  * $Log: fileio.c,v $
- * Revision 1.57  1993/09/10 16:06:49  pgf
+ * Revision 1.58  1993/12/22 15:28:34  pgf
+ * applying tom's 3.64 changes
+ *
+ * Revision 1.57  1993/09/10  16:06:49  pgf
  * tom's 3.61 changes
  *
  * Revision 1.56  1993/09/03  09:11:54  pgf
@@ -208,11 +211,24 @@
 #include	<io.h>
 #endif
 
+
+#if WATCOM
+#define	errorIfDir()	set_errno(S_IFDIR)	/* not the same, but... */
+#endif
+#if GO32
+#define	errorIfDir()	set_errno(ENOENT)
+#endif
+
+#ifndef errorIfDir
+#define	errorIfDir()	set_errno(EISDIR)	/* e.g., the UNIX convention */
+#endif
+
 /*--------------------------------------------------------------------------*/
 
 static	void	free_fline P(( void ));
 #if MSDOS
-static	int	make_backup P(( char * ));
+static	int	copy_file P(( char *, char * ));
+static	int	make_backup P(( char *, int ));
 #endif
 static	int	count_fline;	/* # of lines read with 'ffgetline()' */
   
@@ -227,13 +243,54 @@ free_fline()
 
 #if MSDOS
 /*
- * Before overwriting a file, rename any existing version as a backup
+ * Copy file when making a backup, when we are appending.
  */
 static int
-make_backup (fname)
+copy_file (src, dst)
+char	*src;
+char	*dst;
+{
+	FILE	*ifp;
+	FILE	*ofp;
+	int	chr;
+	int	ok = FALSE;
+
+	if ((ifp = fopen(src, FOPEN_READ)) != 0) {
+		if ((ofp = fopen(dst, FOPEN_WRITE)) != 0) {
+			ok = TRUE;
+			for (;;) {
+				chr = fgetc(ifp);
+				if (feof(ifp))
+					break;
+				fputc(chr, ofp);
+				if (ferror(ifp) || ferror(ofp)) {
+					ok = FALSE;
+					break;
+				}
+			}
+			(void)fclose(ofp);
+		}
+		(void)fclose(ifp);
+	}
+	return ok;
+}
+
+/*
+ * Before overwriting a file, rename any existing version as a backup.
+ * If appending, copy-back (retaining the modification-date of the original
+ * file).
+ *
+ * Note: for UNIX, the direction of file-copy should be reversed, if the
+ *       original file happens to be a symbolic link.
+ */
+static int
+make_backup (fname, appending)
 char	*fname;
+int	appending;
 {
 	struct	stat	sb;
+	int	ok	= TRUE;
+
 	if (stat(fname, &sb) >= 0) {
 		char	tname[NFILEN];
 		char	*s = pathleaf(strcpy(tname, fname)),
@@ -242,9 +299,16 @@ char	*fname;
 			t = s + strlen(s);
 		(void)strcpy(t, ".bak");
 		(void)unlink(tname);
-		return (rename(fname, tname) >= 0);
+		ok = (rename(fname, tname) >= 0);
+		if (ok && appending) {
+			ok = copy_file(tname, fname);
+			if (!ok) {	/* try to put things back together */
+				(void)unlink(fname);
+				(void)rename(tname, fname);
+			}
+		}
 	}
-	return TRUE;
+	return ok;
 }
 #endif
 
@@ -274,15 +338,7 @@ char    *fn;
 		count_fline = 0;
 
 	} else if (is_directory(fn)) {
-#if WATCOM
-		set_errno(S_IFDIR);  /* not the same, but... */
-#endif
-#if TURBO
-		set_errno(EISDIR);
-#endif
-#if GO32
- 		set_errno(ENOENT);
-#endif
+		errorIfDir();
 		return (FIOERR);
 
 	} else if ((ffp=fopen(fn, FOPEN_READ)) == NULL) {
@@ -316,25 +372,19 @@ char    *fn;
 		}
 		fileispipe = TRUE;
 	} else {
+		int	appending = FALSE;
 		if ((name = is_appendname(fn)) != NULL) {
+			appending = TRUE;
 			fn = name;
 			mode = FOPEN_APPEND;
 			action = "append";
 		}
 		if (is_directory(fn)) {
-#if WATCOM
-		        set_errno(S_IFDIR);
-#endif
-#if TURBO
-		        set_errno(EISDIR);
-#endif
-#if GO32
-			set_errno(ENOENT);
-#endif
+			errorIfDir();
 			what = "directory";
 		}
 #if MSDOS	/* patch: should make this a mode */
-		if (!make_backup(fn))
+		if (!make_backup(fn, appending))
 			return (FIOERR);
 #endif
 		if (*what != 'f'
@@ -454,7 +504,7 @@ long len;
 	fseek (ffp, len, 1);	/* resynchronize stdio */
 	return total;
 #else
-	int got = read(fileno(ffp), buf, (int)len);
+	int got = read(fileno(ffp), buf, (SIZE_T)len);
 	fseek (ffp, len, 1);	/* resynchronize stdio */
 	return got;
 #endif

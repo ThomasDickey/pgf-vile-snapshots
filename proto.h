@@ -5,7 +5,16 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.81  1993/11/04 09:10:51  pgf
+ * Revision 1.84  1993/12/22 15:28:34  pgf
+ * applying tom's 3.64 changes
+ *
+ * Revision 1.83  1993/12/21  12:40:46  pgf
+ * fixed args for indented_newline...()
+ *
+ * Revision 1.82  1993/12/08  20:47:25  pgf
+ * added ask_shouldchange()
+ *
+ * Revision 1.81  1993/11/04  09:10:51  pgf
  * tom's 3.63 changes
  *
  * Revision 1.80  1993/10/11  17:39:35  pgf
@@ -369,7 +378,7 @@ extern	int setcursor P(( int, int ));
 #endif
 
 /* bind.c */
-#if !SMALLER
+#if OPT_TERMCHRS
 extern int set_termchrs P(( int, int ));
 extern int show_termchrs P(( int, int ));
 #endif
@@ -441,8 +450,10 @@ extern int togglelistbuffers P(( int, int ));
 extern int listbuffers P(( int, int ));
 #if OPT_UPBUFF
 void updatelistbuffers P((void));
+void update_scratch P(( char *, int (*func)(BUFFER *) ));
 #else
 #define updatelistbuffers()
+#define update_scratch(name, func)
 #endif
 extern int addline P(( BUFFER *, char *, int ));
 extern int add_line_at P(( BUFFER *, LINEPTR, char *, int ));
@@ -618,6 +629,7 @@ extern int cbuf40 P(( int, int ));
 
 /* file.c */
 #ifdef MDCHK_MODTIME
+extern int ask_shouldchange P(( BUFFER * ));
 extern int get_modtime P(( BUFFER *, long * ));
 extern void set_modtime P(( BUFFER *, char * ));
 extern int check_modtime P(( BUFFER *, char * ));
@@ -769,8 +781,8 @@ extern int istring P(( int, int, int ));
 extern int inschar P(( int, int * ));
 extern int backspace P(( void ));
 extern int newline P(( int, int ));
-extern int indented_newline P(( int ));
-extern int indented_newline_above P(( int ));
+extern int indented_newline P(( void ));
+extern int indented_newline_above P(( void ));
 extern int previndent P(( int * ));
 extern int nextindent P(( int * ));
 extern int doindent P(( int ));
@@ -1320,8 +1332,10 @@ extern	int	fseek	P(( FILE *, long, int ));
 extern	int	fwrite	P(( const char *, SIZE_T, SIZE_T, FILE * ));
 extern	int	ioctl	P(( int, ULONG, caddr_t ));
 extern	int	killpg	P(( int, int ));
+#ifndef	__GNUC__
 extern	int	mkdir	P(( char *, int ));
 extern	int	open	P(( char *, int ));
+#endif
 #ifndef NeXT
 extern	void	perror	P(( const char * ));
 #endif /* !NeXT */

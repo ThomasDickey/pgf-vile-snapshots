@@ -140,7 +140,9 @@ Buffer manipulation commands:
 	^X-e	Edit the file whose pathname appears under the cursor.  For
 		example, if you are editing a makefile, you could edit one
 		of the source files by placing the cursor at the start of
-		its name and using this command.
+		its name and using this command.  Note that this does not
+		know about characters that your shell might usually translate
+		for you, like '~' or '$HOME'.
 
 	^X-k	Kill the buffer whose name or filename appears under the
 		cursor.
@@ -204,7 +206,9 @@ File manipulation commands:
 	The usual ":e", ":r", ":f", ":w" commands are available, though only
 	":e!" is available of the "!" options.  The ":r" command reads the
 	named file in after the current line.  To read a file before the
-	first line, use ":0r".
+	first line, use ":0r".  File completion works like command completion:
+	using the TAB and '?' keys you can complete or see next character
+	choices.
 
 	The commands ":ww" and ":wwq" correspond roughly to ":w" and ":wq",
 	but they each write all modified buffers.
@@ -251,7 +255,7 @@ Shell Access
 	These output capture commands are most useful in conjunction with
 	the "error finder", '^X-^X', described below.
 
-	On systems supporting job control, ^Z will suspend vile.
+	On systems supporting job control, ^Z (or ":stop") will suspend vile.
 
 Text manipulation command:
 --------------------------
@@ -459,6 +463,9 @@ Text manipulation command:
 	If the ":ta" form of the command is used, tag matches must be
 	exact, unless the mode "taglength" is set non-zero, in which case
 	the first tag matching that many characters will be used.
+
+	Filenames referred to in tags files are expanded, so environment
+	variables and shell special characters like ~ may be used.
 
 
 Miscellaneous commands
@@ -1457,6 +1464,11 @@ X Window System specifics:
     	reverseVideo	Foreground/background reversal.
 	foreground	Foreground color.
 	background	Background color.
+
+	focusFollowsMouse  If true, the "current" window is the window
+			inhabited by the mouse; no clicking is necessary
+			to change windows, therefore selected text is not
+			lost due to the extra clicking.
 
 	Changing the font on the fly:
 

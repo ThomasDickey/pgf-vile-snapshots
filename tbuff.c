@@ -8,7 +8,11 @@
  *		editing.
  *
  * $Log: tbuff.c,v $
- * Revision 1.10  1993/09/10 16:06:49  pgf
+ * Revision 1.11  1993/12/08 19:52:31  pgf
+ * initialized tb_last in tb_alloc.  this may fix some of the core
+ * dumps we've been seeing in xvile.
+ *
+ * Revision 1.10  1993/09/10  16:06:49  pgf
  * tom's 3.61 changes
  *
  * Revision 1.9  1993/07/27  18:06:20  pgf
@@ -115,6 +119,7 @@ TBUFF *	tb_alloc(p, n)
 		q = *p = typealloc(TBUFF);
 		q->tb_data = typeallocn(char, q->tb_size = n);
 		q->tb_used = 0;
+		q->tb_last = 0;
 		q->tb_endc = abortc;
 		AllocatedBuffer(q)
 	} else if (n >= q->tb_size) {

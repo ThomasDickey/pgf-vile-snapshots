@@ -72,7 +72,10 @@
 #		here for completeness.
 #
 # $Log: cmdtbl,v $
-# Revision 1.75  1993/10/04 10:24:09  pgf
+# Revision 1.76  1993/12/22 15:28:34  pgf
+# applying tom's 3.64 changes
+#
+# Revision 1.75  1993/10/04  10:24:09  pgf
 # see tom's 3.62 changes
 #
 # Revision 1.74  1993/09/10  16:06:49  pgf
@@ -1112,9 +1115,9 @@ settab		NONE
 	"handle-tab"			!FEWNAMES
 	"set-tab"
 	'^X-t'
-set_termchrs	NONE			REBIND&&!SMALLER
+set_termchrs	NONE			REBIND&&OPT_TERMCHRS
 	"set-terminal"
-show_termchrs	NONE			REBIND&&!SMALLER
+show_termchrs	NONE			REBIND&&OPT_TERMCHRS
 	"show-terminal"
 spawncli	NONE
 	"sh"

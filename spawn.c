@@ -2,7 +2,10 @@
  *		for MicroEMACS
  *
  * $Log: spawn.c,v $
- * Revision 1.66  1993/10/04 10:24:09  pgf
+ * Revision 1.67  1993/12/08 17:21:20  pgf
+ * attempt to use COMSPEC variable when spawning DOS shells
+ *
+ * Revision 1.66  1993/10/04  10:24:09  pgf
  * see tom's 3.62 changes
  *
  * Revision 1.65  1993/09/03  09:11:54  pgf
@@ -319,7 +322,12 @@ int f,n;
 	movecursor(term.t_nrow, 0);		/* Seek to last line.	*/
 	TTflush();
 	TTkclose();
-	system("command.com");
+	{ 
+		char *shell;
+		if ((shell = getenv("COMSPEC")) == NULL)
+			shell = "command.com";
+		system(shell);
+	}
 	TTkopen();
 	sgarbf = TRUE;
 	return AfterShell();

@@ -4,7 +4,14 @@
  *	written 1986 by Daniel Lawrence
  *
  * $Log: exec.c,v $
- * Revision 1.74  1993/11/04 09:10:51  pgf
+ * Revision 1.76  1993/12/22 15:28:34  pgf
+ * applying tom's 3.64 changes
+ *
+ * Revision 1.75  1993/12/08  20:47:45  pgf
+ * check mod time before doing a command you wouldn't be permitted
+ * in view mode
+ *
+ * Revision 1.74  1993/11/04  09:10:51  pgf
  * tom's 3.63 changes
  *
  * Revision 1.73  1993/10/04  10:24:09  pgf
@@ -1099,8 +1106,15 @@ int f,n;
 			dotcmdstop();
 		if (flags & UNDO) {
 			/* undoable command can't be permitted when read-only */
-			if (!(flags & VIEWOK) && b_val(curbp,MDVIEW))
-				return rdonly();
+			if (!(flags & VIEWOK)) {
+				if (b_val(curbp,MDVIEW))
+					return rdonly();
+#ifdef MDCHK_MODTIME
+				if (!b_is_changed(curbp) &&
+					!ask_shouldchange(curbp))
+					return FALSE;
+#endif
+			}
 			if (!kbd_replaying(FALSE))
 				mayneedundo();
 		}
@@ -1879,7 +1893,7 @@ nxtscan:	/* on to the next line */
 			dobufnesting--;
 			if (dobuferrbp == NULL) {
 				dobuferrbp = bp;
-				swbuffer(bp);
+				(void)swbuffer(bp);
 				TTbeep();
 			}
 			return status;

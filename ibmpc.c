@@ -10,7 +10,17 @@
  * display type.
  *
  * $Log: ibmpc.c,v $
- * Revision 1.28  1993/11/04 09:10:51  pgf
+ * Revision 1.31  1993/12/23 10:24:53  pgf
+ * took out debugging ifdef
+ *
+ * Revision 1.30  1993/12/22  15:28:34  pgf
+ * applying tom's 3.64 changes
+ *
+ * Revision 1.29  1993/12/08  17:04:45  pgf
+ * save and restore cursor properly, even in the face of some display
+ * changing traps that seem to want to reset it on us.
+ *
+ * Revision 1.28  1993/11/04  09:10:51  pgf
  * tom's 3.63 changes
  *
  * Revision 1.27  1993/10/11  18:50:10  pgf
@@ -251,7 +261,7 @@ static	DRIVERS drivers[] = {
 		/* the first 4 entries are reserved as synonyms for card-types */
 		{"CGA",    CDCGA,	3,	C8x8,	25,  80, RES_200},
 		{"MONO",   CDMONO,	3,	C8x8,	25,  80, RES_200},
-		{"EGA",    CDEGA,	3,	C8x14,	43,  80, RES_350},
+		{"EGA",    CDEGA,	3,	C8x8,	43,  80, RES_350},
 		{"VGA",    CDVGA,	3,	C8x8,	50,  80, RES_400},
 		/* store original info in this slot */
 		{"default",CDSENSE,     3,      C8x8,   25,  80, RES_200},
@@ -260,6 +270,7 @@ static	DRIVERS drivers[] = {
 		{"40x21",  CDVGA,	1,	C8x16,	21,  40, RES_350},
 		{"40x25",  CDVGA,	1,	C8x16,	25,  40, RES_400},
 		{"40x28",  CDVGA,	1,	C8x14,  28,  40, RES_400},
+		{"40x50",  CDVGA,	1,	C8x8,   50,  40, RES_400},
 		{"80x14",  CDVGA,	3,	C8x14,  14,  80, RES_200},
 		{"80x25",  CDVGA,	3,	C8x16,	25,  80, RES_400},
 		{"80x28",  CDVGA,	3,	C8x14,  28,  80, RES_400},
@@ -279,12 +290,11 @@ USHORT *s2ptr[NROW];			/* pointer to page-1 lines	*/
 USHORT sline[NCOL];			/* screen line image		*/
 extern union REGS rg;			/* cpu register for use of DOS calls */
 
-static	int	original_page,		/* display-page (we use 0)	*/
+static	int	ibm_opened,
+		original_page,		/* display-page (we use 0)	*/
 		allowed_vres,		/* possible scan-lines, 1 bit per value */
 		original_type	= CDVGA+1, /* one past CDMONO ... CDVGA	*/
-#ifdef MUCK_WITH_CURSOR
 		original_curs,		/* start/stop scan lines	*/
-#endif
 		monochrome	= FALSE;
 
 static	int	egaexist = FALSE;	/* is an EGA card available?	*/
@@ -426,15 +436,22 @@ set_char_size(int code)
 	INTX86(0x10, &rg, &rg);	/* VIDEO - TEXT-MODE CHARACTER GENERATOR FUNCTIONS */
 }
 
-#ifdef MUCK_WITH_CURSOR
 static void
 set_cursor(int start_stop)
 {
 	rg.h.ah = 1;		/* set cursor size function code */
-	rg.x._CX_ = start_stop;	/* turn cursor on code */
+	rg.x._CX_ = (drivers[original_type].mode <= 3) ?
+		start_stop & 0x707 : start_stop;
 	INTX86(0x10, &rg, &rg);	/* VIDEO - SET TEXT-MODE CURSOR SHAPE */
 }
-#endif
+
+get_cursor()
+{
+	rg.h.ah = 3;
+	rg.h.bh = 0;
+	INTX86(0x10, &rg, &rg);	/* VIDEO - GET CURSOR POSITION */
+	return rg.x._CX_;
+}
 
 static void
 set_vertical_resolution(int code)
@@ -673,7 +690,7 @@ void
 ibmbeep()
 {
 #if	OPT_FLASH
-	if (global_g_val(GMDFLASH)) {
+	if (global_g_val(GMDFLASH) && ibm_opened) {
 		flash_display();
 		return;
 	}
@@ -719,12 +736,7 @@ ibmopen()
 		allowed_vres |= (1<<RES_350);
 	}
 
-#ifdef MUCK_WITH_CURSOR
-	rg.h.ah = 3;
-	rg.h.bh = 0;
-	INTX86(0x10, &rg, &rg);	/* VIDEO - GET CURSOR POSITION */
-	original_curs = rg.x._CX_;
-#endif
+	original_curs = get_cursor();
 
 #ifdef PVGA
 	set_display(10);	/* set graphic 640x350 mode */
@@ -743,6 +755,7 @@ ibmopen()
 #ifdef MUCK_WITH_KBD_RATE
 	maxkbdrate();   /* set the keyboard rate to max */
 #endif
+	ibm_opened = TRUE;	/* now safe to use 'flash', etc. */
 }
 
 void
@@ -753,11 +766,7 @@ ibmclose()
 	scinit(original_type);
 	if (original_page != 0)
 		set_page(original_page);
-#ifdef MUCK_WITH_CURSOR
-	set_cursor(drivers[original_type].mode <= 3
-		? original_curs & 0x707
-		: original_curs);
-#endif
+	set_cursor(original_curs);
 	ibmtype = current_type;	/* ...so subsequent TTopen restores us */
 
 	dtype = CDMONO;		/* ...force monochrome */
@@ -812,6 +821,9 @@ int n;		/* type of adapter to init for */
 	set_display(driver->mode);
 	set_vertical_resolution(driver->vres);
 	set_char_size(driver->vchr);
+
+	/* reset the original cursor -- it gets changed above somewhere */
+	set_cursor(original_curs);
 
 	/*
 	 * Install an alternative hardcopy routine which prints as many lines

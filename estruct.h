@@ -10,7 +10,10 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.145  1993/11/04 09:10:51  pgf
+ * Revision 1.146  1993/12/22 15:28:34  pgf
+ * applying tom's 3.64 changes
+ *
+ * Revision 1.145  1993/11/04  09:10:51  pgf
  * tom's 3.63 changes
  *
  * Revision 1.144  1993/10/11  18:50:37  pgf
@@ -862,7 +865,7 @@
 #define	PATHLOOK 1	/* look along $PATH for startup and help files	*/
 #define	SCROLLCODE 1	/* code in display.c for scrolling the screen.
 			   Only useful if your display can scroll
-			   regions, or at least insert/delete lines. 
+			   regions, or at least insert/delete lines.
 			   ANSI, TERMCAP, IBMPC, VMSVT and AT386 can do this */
 #define CVMVAS	1	/* arguments to forward/back page and half page */
 			/* are in pages	instead of rows */
@@ -886,8 +889,13 @@
 #define OPT_EVAL        !SMALLER		/* expression-evaluation */
 #define OPT_FLASH       !SMALLER || IBMPC	/* visible-bell */
 #define OPT_HISTORY     !SMALLER		/* command-history */
+#define OPT_LINEWRAP    !SMALLER		/* line-wrap mode */
 #define OPT_MS_MOUSE    !SMALLER && IBMPC && TURBO 	/* MsDos-mouse */
+#define OPT_TERMCHRS    !SMALLER		/* set/show-terminal */
 #define OPT_UPBUFF      !SMALLER		/* animated buffer-update */
+
+#define OPT_MAP_DISPLAY	1		/* display mapping for ":map" */
+#define NEW_VI_MAP      0		/* patch: working on ":map" */
 
 #if	(TERMCAP || X11) && !SMALLER
 /* we turn on OPT_XTERM under X11 _only_ because it's then easier for users to
@@ -2375,7 +2383,7 @@ extern void _exit P((int));
 # endif	/* APOLLO (special handling of lint vs __STDC__) */
 #endif	/* POSIX */
 
-#if ! USG
+#if ! USG && !defined(__GNUC__)
 extern char *getwd P(( char * ));
 extern char *getcwd P(( char *, int ));
 #endif

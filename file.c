@@ -6,7 +6,10 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.107  1993/11/04 09:10:51  pgf
+ * Revision 1.108  1993/12/08 20:48:23  pgf
+ * added new routine ask_shouldchange()
+ *
+ * Revision 1.107  1993/11/04  09:10:51  pgf
  * tom's 3.63 changes
  *
  * Revision 1.106  1993/10/11  17:21:42  pgf
@@ -444,6 +447,15 @@ int	iswrite;
 		}
 	}
 	return status;
+}
+
+int
+ask_shouldchange(bp)
+BUFFER *bp;
+{
+	int status;
+	status = PromptModtime(bp, bp->b_fname, "Continue", FALSE);
+	return (status == TRUE || status == SORTOFTRUE);
 }
 
 int

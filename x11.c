@@ -2,7 +2,14 @@
  * 	X11 support, Dave Lemke, 11/91
  *
  * $Log: x11.c,v $
- * Revision 1.31  1993/11/04 09:10:51  pgf
+ * Revision 1.33  1993/12/22 15:28:34  pgf
+ * applying tom's 3.64 changes
+ *
+ * Revision 1.32  1993/12/13  18:04:26  pgf
+ * current window now tracks mouse position if "focusFollowsMouse" is
+ * set in Xdefaults.
+ *
+ * Revision 1.31  1993/11/04  09:10:51  pgf
  * tom's 3.63 changes
  *
  * Revision 1.30  1993/10/04  10:24:09  pgf
@@ -284,6 +291,7 @@ static	char *	foreground_name;
 static	char *	background_name;
 static	X_PIXEL	foreground;
 static	X_PIXEL	background;
+static	Bool	focus_follows_mouse = (Bool) FALSE;
 
 static int  multi_click_time = 500;
 
@@ -635,6 +643,9 @@ x_get_defaults(disp, screen)
 		t = background_name;
 	if (t)
 		background = color_value(disp, screen, t);
+
+	if ((t = any_resource(disp, "focusFollowsMouse")) != 0)
+		focus_follows_mouse = TRUE;
 }
 
 static void
@@ -721,7 +732,7 @@ x_open()
     swat.background_pixel = tw->bg;
     swat.border_pixel = tw->fg;
     swat.event_mask = ExposureMask | KeyPressMask | StructureNotifyMask |
-	ButtonPress | ButtonRelease | ButtonMotionMask |
+	ButtonPress | ButtonRelease | ButtonMotionMask | PointerMotionMask |
 	FocusChangeMask | EnterWindowMask | LeaveWindowMask;
     winmask = CWBackPixel | CWBorderPixel | CWEventMask;
     tw->win = XCreateWindow(dpy, RootWindow(dpy, screen), startx, starty,
@@ -1195,11 +1206,8 @@ x_putline(row, str, len)
 
     turnOffCursor(cur_win);
 
-    (void)memcpy(
-    	(char *) &(cur_win->sc[row][cur_win->cur_col]),
-    	(char *) str,
-	(SIZE_T) len);
     for (i = 0, c = cur_win->cur_col; i < len; c++, i++) {
+    	cur_win->sc[row][c] = str[i] & (N_chars - 1);
 	if (cur_win->reverse)
 	    cur_win->attr[row][c] |= CELL_REVERSE;
 	else
@@ -1232,7 +1240,7 @@ x_putc(c)
 	    cur_win->attr[cur_win->cur_row][cur_win->cur_col] |= CELL_REVERSE;
 	else
 	    cur_win->attr[cur_win->cur_row][cur_win->cur_col] &= ~CELL_REVERSE;
-	cur_win->sc[cur_win->cur_row][cur_win->cur_col] = c;
+	cur_win->sc[cur_win->cur_row][cur_win->cur_col] = c & (N_chars - 1);
 	cur_win->cur_col++;
     } else if (c == '\b') {
 	cur_win->cur_col--;
@@ -1610,15 +1618,31 @@ change_selection(tw, set, save)
 				if (w_val(wp, WMDLINEWRAP) && (next > 1)) {
 					if (row != r)
 						left = 0;
-					if ((row + next - 1) == r)
-						right -= (radj = tw->cols * (next-1));
-					else
-						right = tw->cols;
+					radj   = (r - row) * tw->cols;
+					right -= radj;
 					if (r != row
 					 && r != tw->sel_start_row)
 						start = left = 0;
 				}
 #endif
+				if (lLength(lp) > 0) {
+					/* test for control-char at starting-col */
+					if (r == tw->sel_start_row) {
+						int	offs = col2offs(wp,lp,start+radj);
+						if (!isprint(lGetc(lp,offs))) {
+							start = offs2col(wp,lp,offs) - radj;
+						}
+					}
+
+					/* test for control-char at ending-col */
+					if (r == tw->sel_end_row) {
+						int	offs = col2offs(wp,lp,end+radj);
+						if (!isprint(lGetc(lp,offs))) {
+							end = offs2col(wp,lp,offs+1) - 1 - radj;
+						}
+					}
+				}
+
 				if (start >= right)
 					start = right-1;
 				if (end >= right) {
@@ -1626,27 +1650,8 @@ change_selection(tw, set, save)
 					if (end < left)
 						end = left;
 				}
-
-				if (lLength(lp) > 0) {
-					/* test for control-char at start */
-					if (r == tw->sel_start_row) {
-						int	offs = col2offs(wp,lp,start+radj);
-						if (!isprint(lGetc(lp,offs))) {
-							start = offs2col(wp,lp,offs-1);
-							if (start != w_left_margin(wp))
-								start++;
-						}
-					}
-
-					/* test for control-char at end */
-					if (r == tw->sel_end_row) {
-						int	offs = col2offs(wp,lp,end+radj);
-						if (!isprint(lGetc(lp,offs)))
-							end = offs2col(wp,lp,offs+1)-1;
-					}
-				}
 			} else {
-				end = left-1;
+				break;
 			}
 		}
 		if (start < left)
@@ -1848,7 +1853,7 @@ x_stash_selection(tw)
 	WINDOW	*wp;
 	UCHAR	*data;
 	UCHAR	*dp;
-	int	length;
+	SIZE_T	length;
 
 	if (!tw->have_selection)
 		return;
@@ -1916,7 +1921,7 @@ x_stash_selection(tw)
 		endofDisplay;
 
 		if ((length = kchars) == 0
-		 || (dp = data = castalloc(UCHAR, kchars)) == 0
+		 || (dp = data = castalloc(UCHAR, length)) == 0
 		 || (kp = kbs[0].kbufh) == 0)
 			return;
 
@@ -2301,6 +2306,8 @@ x_process_event(ev)
     XSelectionEvent event;
     XMotionEvent *mev;
     XExposeEvent *gev;
+    Bool	do_sel;
+    WINDOW	*wp;
 
     switch (ev->type) {
     case SelectionClear:
@@ -2388,8 +2395,13 @@ x_process_event(ev)
 	}
 	break;
     case MotionNotify:
-	if (ev->xmotion.state != Button1Mask)
-	    return;
+	do_sel = TRUE;
+	if (ev->xmotion.state != Button1Mask) {
+	    if (!focus_follows_mouse)
+		return;
+	    else
+		do_sel = FALSE;
+	}
 	mev = compress_motion((XMotionEvent *) ev);
 	nc = mev->x / cur_win->char_width;
 	nr = mev->y / cur_win->char_height;
@@ -2399,7 +2411,14 @@ x_process_event(ev)
 	/* ignore any spurious motion during a multi-cick */
 	if (cur_win->numclicks > 1)
 	    return;
-	extend_selection(cur_win, nr, nc, True);
+	if (do_sel)
+	    extend_selection(cur_win, nr, nc, True);
+	else {
+	    if ((wp = row2window(nr)) && wp != curwp) {
+		(void) set_curwp(wp);
+		(void) update(FALSE);
+	    }
+	}
 	break;
     case ButtonPress:
 	nc = ev->xbutton.x / cur_win->char_width;

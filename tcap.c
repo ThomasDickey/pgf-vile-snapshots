@@ -2,7 +2,17 @@
  *		for MicroEMACS
  *
  * $Log: tcap.c,v $
- * Revision 1.31  1993/11/04 09:10:51  pgf
+ * Revision 1.34  1993/12/22 15:15:47  pgf
+ * eliminated unused variable
+ *
+ * Revision 1.33  1993/12/21  11:34:42  pgf
+ * upped size of tcbuf, to satisfy buggy SCO
+ *
+ * Revision 1.32  1993/12/08  18:45:09  pgf
+ * assume we're an xterm if the word 'xterm' appears anywhere in first
+ * field of the tcbuf
+ *
+ * Revision 1.31  1993/11/04  09:10:51  pgf
  * tom's 3.63 changes
  *
  * Revision 1.30  1993/09/21  11:00:20  pgf
@@ -188,7 +198,7 @@ void
 tcapopen()
 {
 	char *t, *p, *tgetstr P((char *, char **));
-	char tcbuf[1024];
+	char tcbuf[2048];
 	char *tv_stype;
 	char err_str[72];
 	static int already_open = 0;
@@ -230,11 +240,17 @@ tcapopen()
 		ExitProgram(BAD(1));
 	}
 
-	{ 	/* are we probably an xterm? 
-			(anything starting or ending with...) */
-		int l = strlen(tv_stype);
-		i_am_xterm = (strncmp(tv_stype, "xterm", 5) == 0 || 
-			(l >= 5 && strcmp(tv_stype + l - 5, "xterm") == 0));
+	/* are we probably an xterm?  */
+	p = tcbuf;
+	i_am_xterm = FALSE;
+	while (*p && *p != ':') {
+		if (*p == 'x') {
+			if (strncmp(p, "xterm", sizeof("xterm") - 1) == 0) {
+			    i_am_xterm = TRUE;
+			    break;
+			}
+		}
+		p++;
 	}
 
 #ifdef SIGWINCH

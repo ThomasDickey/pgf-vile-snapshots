@@ -14,7 +14,17 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.144  1993/11/04 09:10:51  pgf
+ * Revision 1.147  1993/12/22 15:28:34  pgf
+ * applying tom's 3.64 changes
+ *
+ * Revision 1.146  1993/12/14  11:10:51  pgf
+ * added '~' to ispath() character set
+ *
+ * Revision 1.145  1993/12/08  20:06:27  pgf
+ * only beep on failed motions that return FALSE, since if they're ABORTed,
+ * we've probably already been beeped. (like if you abort a search with ESC)
+ *
+ * Revision 1.144  1993/11/04  09:10:51  pgf
  * tom's 3.63 changes
  *
  * Revision 1.143  1993/10/04  10:24:09  pgf
@@ -509,6 +519,10 @@
 #include	"glob.h"
 #include	"nevars.h"
 
+#if UNIX
+#include        <fcntl.h>	/* defines 'open()' on SunOS */
+#endif
+
 #if MSDOS
 #include <io.h>
 #endif
@@ -755,8 +769,10 @@ char	*argv[];
 			gotoflag = TRUE;
 			gline = atoi(param);
 		} else if (*param == '@') {
+			BUFFER *oldbp = curbp;
 			/* Process Startup macros */
-			if ((startstat = startup(++param)) == TRUE)
+			if ((startstat = startup(++param)) == TRUE
+			 || (curbp != oldbp))
 				ranstartup = TRUE; /* don't execute .vilerc */
 		} else if (*param != EOS) {
 
@@ -787,6 +803,7 @@ char	*argv[];
 	if (!isatty(fileno(stdin))) {
 		FILE	*in;
 		int	fd;
+		int	nline = 0;
 
 		bp = bfind(ScratchName(Standard Input), BFARGS);
 		make_current(bp); /* pull it to the front */
@@ -802,21 +819,22 @@ char	*argv[];
 #if MSDOS
 		fd = fileno(stderr);	/* this normally cannot be redirected */
 #endif
-		if ((fd < 0)
-		 || (close(0) < 0)
-		 || (fd = dup(fd)) != 0
-		 || (in = fdopen(fd, "r")) == 0) {
-			(void) fprintf(stderr, "Cannot reopen stdin\n");
-			ExitProgram(BAD(1));
-		} else {
+		if ((fd >= 0)
+		 && (close(0) >= 0)
+		 && (fd = dup(fd)) == 0
+		 && (in = fdopen(fd, "r")) != 0)
 			*stdin = *in;
-		}
 
-		(void)slowreadf(bp, &(bp->b_linecount));
+		(void)slowreadf(bp, &nline);
 		set_rdonly(bp, bp->b_fname);
 		(void)ffclose();
+
+		if (!isatty(fileno(stdout)) && is_empty_buf(bp)) {
+			(void)zotbuf(bp);
+			firstbp = 0;
+		}
 #if FINDERR
-		set_febuff(get_bname(bp));
+		else set_febuff(get_bname(bp));
 #endif
 	}
 #endif
@@ -1078,7 +1096,7 @@ loop()
 		 */
 		if ( (cfp != NULL)
 		 && ((cfp->c_flags & MOTION) != 0)
-		 && (s != TRUE) ) {
+		 && (s == FALSE) ) {
 			if (cfp != last_cfp || global_g_val(GMDMULTIBEEP)) {
 				last_cfp = cfp;
 				kbd_alarm();
@@ -1675,6 +1693,7 @@ charinit()
 	/* legal in pathnames */
 	_chartypes_['.'] =
 		_chartypes_['_'] =
+		_chartypes_['~'] =
 		_chartypes_['-'] =
 		_chartypes_['*'] =
 		_chartypes_['/'] = _pathn;

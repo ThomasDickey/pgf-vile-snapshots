@@ -3,7 +3,10 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: globals.c,v $
- * Revision 1.25  1993/11/04 09:10:51  pgf
+ * Revision 1.26  1993/12/22 15:28:34  pgf
+ * applying tom's 3.64 changes
+ *
+ * Revision 1.25  1993/11/04  09:10:51  pgf
  * tom's 3.63 changes
  *
  * Revision 1.24  1993/10/04  10:24:09  pgf
@@ -212,7 +215,4 @@ int f, n, g_or_v;
 
 	return s;
 }
-
-#else
-globalhello() { }
 #endif
