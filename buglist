@@ -1,0 +1,114 @@
+
+	(E means enhancement, L,M,H are low, medium, high priority)
+----------------------
+
+L	formatregion code leaves an extra space after reformatting a paragraph
+
+L	mode lines aren't kept in sync if a buffer is displayed more than once.
+	for instance, unmark() only fixed modeline for current window.
+
+L	why does file reading seem so slow?
+
+L	the ^A-* command doesn't work as advertised -- won't replace
+	list if already there.
+
+E	The "0r" command, for reading a file in above line 1 doesn't work,
+	because token parsing sees the zero as a number, not part of the
+	command.  The "R" synonym does, however -- okay for now.
+
+E	need a "file newer than buffer" warning.  Should stat the file, and
+	store it's mod time, compare to current when going back to that window,
+	after performing some shell command.  e.g., if you're editing a file
+	that is created by a script you're testing, then you want to be warned
+	that the file is out of date after doing a test run of the script.
+
+E	should be able to refer to remote tags file, and have paths
+	contained there be relative to _its_ location, rather than the current
+	directory.
+
+E	wrap mode doesn't autoindent, even with cmode set.  kinda useless.
+
+E	add a command-line expansion character to be the list of files
+	mentioned in "tags"
+
+E	should there be a "significant-length" for tags?
+
+E	add another mode, which will "!get -p" an SCCS or RCS file if 
+	the clear-text file isn't found
+
+E	add _another_ mode, similar to the above, which will do a caseless 
+	match against filenames mentioned in tags
+
+E	it would be nice if ^X!! reran the last command into [Output]
+
+E	add support for sh comments to format() code
+
+E	why can't I kill a displayed buffer?  simply bring up the previous.
+	
+E	can g become an operator?  It should, since we don't have addresses.
+
+E	add C comments to CFENCE matching code
+
+E	add support for C comments to format() code
+
+E	adjust window size of popups based on length of buffer
+
+E	collapse command execution code to as few places as possible.
+	Its currently spread through main(), execute(), operator(),
+	docmd(), and usekreg(). The usekreg() function should be 
+	moved into getcmd(), since it is really processing prefixes,
+	and isn't really a command.
+	
+E	mlreply line should ideally be a one line buffer, so editing
+	can be done on it.  or possibly have a subset of line-
+	oriented commands that would work on it.
+
+E	BSD interrupt processing is botched during a read() of the keyboard.
+	The read doesn't return -1 as it does under sysV (USG).
+	So you can bang on ^C all day and nothing will happen.
+	[I'm not sure this is true anymore  -pgf]
+	
+E	The ! operator shouldn't be too hard to add.  A combination of
+	^W, killregion, fork, and ^R should do it.  Use a named
+	pipe (i.e. popen("command >pipe &","w"); fork; read("pipe"))
+	to make #ifdefing with the non-unix versions easier.
+
+E	This editor does not virtualize buffers out to disk.  It is quite 
+	a memory hog.  But isn't that what /dev/swap is for?  But
+	seriously, I haven't even come close to testing it for
+	memory-full conditions.  Some malloc() packages give 95%
+	warnings -- perhaps something like that should be done for
+	safety.
+
+E	to make the code shrink, could probably try to eliminate
+	sprintf and its brethren.  mlwrite already does format
+	expansion, it could probably be turned into a doprnt-like
+	beast, and that used as a basis for our own sprintf,fprintf
+	How does one write [sfp]printf and doprnt using varargs?
+
+E	marks should perhaps be linked onto lines.  this would make a lot
+        of things a lot easier, since a mark would travel with the
+        line, instead of having to be moved when the line is
+        reallocated etc.  the U line could be treated as a special
+        mark.  The "copied" flag needed by undo could be a special
+        sort of mark as well.  Implementation of the "tag stack"
+	would be aided by this as well.
+
+E	there is currently no way to change working directories -- it's
+	not clear whether that should be a global thing, or perhaps
+	a per-buffer notion.
+
+E	there is code (in imdying()) that attempts to save unwritten buffers
+	on hangups.  It is fairly crude, having been written quickly
+	in self-defense during debugging.  It should be examined and
+	fixed.
+
+E	:e and :n should be able to deal with multiple filenames resulting
+	from filename globbing.  vi has this problem too.  At least
+	vile lets you choose to choose the first such name.
+
+E	^W should erase word in input mode
+E	killc should erase line in input mode
+
+E	All code should pass lint.  This won't be easy...
+	

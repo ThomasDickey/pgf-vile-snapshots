@@ -1,0 +1,63 @@
+
+
+
+VILE -- VI Like Emacs: a vi workalike put together from Micro-Emacs by Paul Fox
+-------------------------------------------------------------------------------
+
+	This editor grew out of a frustration that although lots of eager
+	programmers have tackled rewrites of Emacs, with new and better 
+	features (not to mention free source), I've not seen anything
+	similar done with the Second True Editor.  (The First, of course,
+	being /bin/ed)
+
+	So I took a copy of MicroEmacs 3.9 (which I've since discovered was
+        out of date, unfortunately) and bashed and badgered it into a vi
+        work-alike.  It retains the multiple buffer/multiple window
+        features of uemacs, but the "finger-feel", if you will, is very
+        much that of vi.  The collective developers of Micro-Emacs should be
+        complimented that the changes were as easy as they were.  The code
+        was pretty clean and well designed before I started on it.  I'm not
+	sure that the same can be said anymore...
+
+	Although I can't imagine the emacs folks wanting to buy much of this
+	stuff back (insert mode, anyone? (grin), they might want to look at:
+		- full global undo
+		- tags support
+		- better (maybe?) UNIX terminal handling
+		- better UNIX shell escapes
+		- terminal scroll support
+		- multiple yank registers (formerly called kill buffers)
+		- multiple marks  (actually kind of messy)
+		- improved aesthetics of window splitting and deleting
+		- "next error" cursor positioning
+		- list mode
+
+	The benefits over standard vi include:
+		- multiple files open at once
+		- multiple windows on the screen
+		- a larger set of operator commands
+		- the possibility of porting to your favorite micro.
+			(mind you, I haven't even tried this on a small
+				UNIX machine, let alone DOS etc...)
+		- more uniform undo/yank register treatment
+		- tags doesn't lose your last search pattern
+		- "next error" cursor positioning
+	  Of course, it _may_ lack some of vi's reliability. (grin)
+
+	Take a look at vile.hlp for more information about features and
+	differences.
+
+	I have not tried this on a small system, or even _any_ non-UNIX
+	system.  I'm sure some work will be required to make it work on
+	DOS again, for instance -- especially for spawning sub-shells, etc.
+
+	I ifdef'ed out the language features (user-defined procs, etc.) a
+	long time ago -- I don't know if they still work, though I didn't
+	actively try to break them.
+
+	Hope you enjoy -- 
+
+	Paul Fox
+	pgf@cayman.com
+
+
