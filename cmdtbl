@@ -32,7 +32,7 @@
 #
 # For example, consider the following entry:
 #
-# 	somefunc	ABS|MOTION		BSD|DOS
+# 	somefunc	ABSM|MOTION		BSD|DOS
 #		"funkycom"
 #		'^X-F'
 #		'FN-2'				DOS
@@ -54,7 +54,7 @@
 #		with the operator commands.
 #	FL only occurs with MOTION, means that if the motion is an argument
 #		to an operator, the operation should affect Full Lines
-#	ABS only occurs with MOTION, means that the motion is absolute,
+#	ABSM only occurs with MOTION, means that the motion is absolute,
 #		i.e. not relative to the current position or screen.  It causes
 #		the "lastdotmark", ldmark to be set to dot before the move
 #		takes place.
@@ -72,7 +72,13 @@
 #		here for completeness.
 #
 # $Log: cmdtbl,v $
-# Revision 1.64  1993/06/22 10:28:03  pgf
+# Revision 1.66  1993/06/30 10:05:54  pgf
+# change ABS to ABSM, since osf/1 defines ABS in a system header
+#
+# Revision 1.65  1993/06/25  11:25:55  pgf
+# patches for Watcom C/386, from Tuan DANG
+#
+# Revision 1.64  1993/06/22  10:28:03  pgf
 # new backundo and forwredo functions, for infinite undo
 #
 # Revision 1.63  1993/06/18  15:57:06  pgf
@@ -319,7 +325,7 @@ backchar_to_bol	MOTION
 backdelchar	REDO|UNDO
 	"delete-previous-character"	!FEWNAMES
 	'X'
-backhunt	ABS|MOTION		!SMALLER
+backhunt	ABSM|MOTION		!SMALLER
 	"hunt-backward"
 backhpage	NONE
 	"previous-half-page"		!FEWNAMES
@@ -353,7 +359,7 @@ backviword	MOTION
 	"previous-punctuated-word"		!FEWNAMES
 	"back-punctuated-word"		!FEWNAMES
 	'b'
-backsearch	ABS|MOTION
+backsearch	ABSM|MOTION
 	"search-reverse"		!FEWNAMES
 	'?'
 bcsrch		MOTION
@@ -388,7 +394,7 @@ chgtoeol	REDO|UNDO
 	'C'
 clrmes		NONE
 	"clear-message-line"		!FEWNAMES
-consearch	ABS|MOTION
+consearch	ABSM|MOTION
 	"continue-search"		!FEWNAMES
 	'n'
 wordcount	RANGE			WORDCOUNT
@@ -664,15 +670,15 @@ forwviendw	MOTION
 	"forward-punctuated-word-end"		!FEWNAMES
 	"next-punctuated-word-end"		!FEWNAMES
 	'e'
-forwhunt	ABS|MOTION		!SMALLER
+forwhunt	ABSM|MOTION		!SMALLER
 	"hunt-forward"			!FEWNAMES
-forwsearch	ABS|MOTION
+forwsearch	ABSM|MOTION
 	"search-forward"		!FEWNAMES
 	'/'
-matchfence	ABS|MOTION		CFENCE
+matchfence	ABSM|MOTION		CFENCE
 	"goto-matching-fence"		!FEWNAMES
 	'%'
-matchfenceback	ABS|MOTION		CFENCE
+matchfenceback	ABSM|MOTION		CFENCE
 	"goto-matching-fence-behind"	!FEWNAMES
 	'^X-%'
 globals		NONE			GLOBALS
@@ -687,23 +693,23 @@ godotplus	MOTION|FL
 # this function is for internal use only, for ex commands
 gomark		MOTION|FL|(RANGE|ZERO)
 
-gotobop		ABS|MOTION		WORDPRO
+gotobop		ABSM|MOTION		WORDPRO
 	"previous-paragraph"		!FEWNAMES
 	"back-paragraph"		!FEWNAMES
 	"up-paragraph"			!FEWNAMES
 	'{'
 #	'FN-\204'			MSDOS
-gotoeop		ABS|MOTION		WORDPRO
+gotoeop		ABSM|MOTION		WORDPRO
 	"forward-paragraph"		!FEWNAMES
 	"next-paragraph"		!FEWNAMES
 	"down-paragraph"		!FEWNAMES
 	'}'
 	'FN-\166'			MSDOS
-gotobob		ABS|MOTION		!SMALLER
+gotobob		ABSM|MOTION		!SMALLER
 	"beginning-of-file"		!FEWNAMES
 	"goto-beginning-of-file"	!FEWNAMES
 	'FN-\107'			MSDOS
-gotoeob		ABS|MOTION		!SMALLER
+gotoeob		ABSM|MOTION		!SMALLER
 	"goto-end-of-file"		!FEWNAMES
 	"end-of-file"			!FEWNAMES
 	'FN-\117'			MSDOS
@@ -717,34 +723,34 @@ gotoeol		MOTION|GOAL
 	"end-of-line"			!FEWNAMES
 	"eol"				!FEWNAMES
 	'$'
-gotobos		ABS|MOTION|FL
+gotobos		ABSM|MOTION|FL
 	"goto-beginning-of-screen"	!FEWNAMES
 	"beginning-of-screen"		!FEWNAMES
 	'H'
-gotomos		ABS|MOTION|FL
+gotomos		ABSM|MOTION|FL
 	"goto-middle-of-screen"		!FEWNAMES
 	"middle-of-screen"		!FEWNAMES
 	'M'
-gotoeos		ABS|MOTION|FL
+gotoeos		ABSM|MOTION|FL
 	"goto-end-of-screen"		!FEWNAMES
 	"end-of-screen"			!FEWNAMES
 	'L'
-gotobosec	ABS|MOTION		WORDPRO
+gotobosec	ABSM|MOTION		WORDPRO
 	"previous-section"		!FEWNAMES
 	"back-section"			!FEWNAMES
 	"up-section"			!FEWNAMES
 	'['
-gotoeosec	ABS|MOTION		WORDPRO
+gotoeosec	ABSM|MOTION		WORDPRO
 	"forward-section"		!FEWNAMES
 	"next-section"			!FEWNAMES
 	"down-section"			!FEWNAMES
 	']'
-gotobosent	ABS|MOTION		WORDPRO
+gotobosent	ABSM|MOTION		WORDPRO
 	"previous-sentence"		!FEWNAMES
 	"back-sentence"			!FEWNAMES
 	"up-sentence"			!FEWNAMES
 	'('
-gotoeosent	ABS|MOTION		WORDPRO
+gotoeosent	ABSM|MOTION		WORDPRO
 	"forward-sentence"		!FEWNAMES
 	"next-sentence"			!FEWNAMES
 	"down-sentence"			!FEWNAMES
@@ -757,11 +763,11 @@ gototag		NONE|(BANG|WORD1)		TAGS
 gotocol		MOTION
 	"goto-column"			!FEWNAMES
 	'|'
-gotoline	ABS|MOTION|FL|(RANGE)
+gotoline	ABSM|MOTION|FL|(RANGE)
 	"goto-line"			!FEWNAMES
 	'G'
 # golinenmmark and goexactnmmark are special cases--	
-# 	no ABS even though they are absolute, since these are the commands
+# 	no ABSM even though they are absolute, since these are the commands
 #	that use the last-dot-mark
 golinenmmark	MOTION|FL
 	"goto-named-mark"		!FEWNAMES
@@ -1058,13 +1064,13 @@ rev_csrch	MOTION
 risearch	NONE			ISRCH
 	"reverse-incremental-search"	!FEWNAMES
 	'^X-R'
-revsearch	ABS|MOTION
+revsearch	ABSM|MOTION
 	"reverse-search"		!FEWNAMES
 	'N'
-scrforwsearch	ABS|MOTION
+scrforwsearch	ABSM|MOTION
 	"screen-search-forward"		!FEWNAMES
 	'^X-/'
-scrbacksearch	ABS|MOTION
+scrbacksearch	ABSM|MOTION
 	"screen-search-reverse"		!FEWNAMES
 	'^X-?'
 scrsearchpat	NONE
@@ -1135,7 +1141,7 @@ listvars	NONE
 	"showvars"
 showversion	NONE|(EXRCOK)
 	"version"
-showmemory	NONE			TURBO
+showmemory	NONE			TURBO|WATCOM
 	"memory"
 shrinkwind	NONE
 	"shrink-window"			!FEWNAMES

@@ -5,7 +5,10 @@
  *	Include this after "estruct.h"
  *
  * $Log: dirstuff.h,v $
- * Revision 1.6  1993/05/06 12:18:06  pgf
+ * Revision 1.7  1993/06/25 11:25:55  pgf
+ * patches for Watcom C/386, from Tuan DANG
+ *
+ * Revision 1.6  1993/05/06  12:18:06  pgf
  * oops. typo.
  *
  * Revision 1.5  1993/05/06  11:59:58  pgf
@@ -41,8 +44,12 @@
 #define USE_D_NAMLEN 1
 #endif
 
-#if POSIX || TURBO
-# include <dirent.h>
+#if POSIX || TURBO || WATCOM
+# if WATCOM
+#   include <direct.h>
+# else
+#   include <dirent.h>
+# endif
 # define	DIRENT	struct dirent
 #else	/* apollo & other old bsd's */
 # if BERK
@@ -58,9 +65,7 @@
 #else /* VMS */
 
 #include	<rms.h>
-#ifndef	$DESCRIPTOR
 #include	<descrip.h>
-#endif
 
 #define USE_D_NAMLEN 1
 

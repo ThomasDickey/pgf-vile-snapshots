@@ -8,8 +8,11 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: fences.c,v $
- *	Revision 1.13  1993/06/02 14:28:47  pgf
- *	see tom's 3.48 CHANGES
+ *	Revision 1.14  1993/06/28 14:27:25  pgf
+ *	new arg to catnap()
+ *
+ * Revision 1.13  1993/06/02  14:28:47  pgf
+ * see tom's 3.48 CHANGES
  *
  * Revision 1.12  1993/05/24  15:21:37  pgf
  * tom's 3.47 changes, part a
@@ -550,7 +553,7 @@ int ch;	/* fence type to match against */
 		if (update(FALSE) == TRUE)
 		/* the idea is to leave the cursor there for about a
 			quarter of a second */
-			catnap(250);
+			catnap(250, FALSE);
 	}
 
 	/* restore the current position */

@@ -2,7 +2,14 @@
  * code by Paul Fox, original algorithm mostly by Julia Harper May, 89
  *
  * $Log: undo.c,v $
- * Revision 1.32  1993/06/24 17:27:25  pgf
+ * Revision 1.34  1993/07/01 16:15:54  pgf
+ * tom's 3.51 changes
+ *
+ * Revision 1.33  1993/06/29  17:58:56  pgf
+ * allow undo to preserve DOT's offset, by overloading two more fields in
+ * the LINE struct to hold the forward and backward offsets
+ *
+ * Revision 1.32  1993/06/24  17:27:25  pgf
  * fixed compilation errors _only_ when OPT_MAP_MEMORY is on.  no testing
  *
  * Revision 1.31  1993/06/24  12:12:30  pgf
@@ -218,7 +225,6 @@ static	void	pushline P(( LINEPTR, LINEPTR * ));
 static	LINE *	popline P(( LINEPTR *, int ));
 static	LINE *	peekline P(( LINEPTR * ));
 static	int	undoworker P(( int ));
-static	void	fixupdot P(( LINEPTR ));
 static	void	preundocleanup P(( void ));
 static	void	repointstuff P(( LINEPTR, LINEPTR ));
 static	int	linesmatch P(( LINE *, LINE * ));
@@ -255,7 +261,7 @@ OkUndo()
 {
 #define SCRATCH 1
 #if SCRATCH
-	if (curbp->b_flag & BFSCRTCH)
+	if (b_is_scratch(curbp))
 #else
 	if (b_val(curbp, MDVIEW))
 #endif
@@ -521,11 +527,17 @@ preundocleanup()
 
 	curbp->b_udstkindx = BACK;
 
-	BACKDOT(curbp) = DOT;
+	if (doingopcmd)
+		BACKDOT(curbp) = pre_op_dot;
+	else
+		BACKDOT(curbp) = DOT;
+
+	/* be sure FORWDOT has _some_ value (may be null the first time)
 	if (sameline(FORWDOT(curbp), nullmark))
-		FORWDOT(curbp) = DOT;
+		FORWDOT(curbp) = BACKDOT(curbp);
+	*/
 	freshstack(BACK);
-	FORWDOT(curbp) = DOT;
+	FORWDOT(curbp) = BACKDOT(curbp);
 
 	needundocleanup = FALSE;
 }
@@ -575,7 +587,7 @@ int stkindx;
 {
 	fast_ptr LINEPTR plp;
 	/* push on a stack delimiter, so we know where this undo ends */
-	if (curbp->b_flag & BFCHG) {
+	if (b_is_changed(curbp)) {
 		plp = lalloc(STACKSEP, curbp);
 	} else { /* if the buffer is unmodified, use special separator */
 		plp = lalloc(PURESTACKSEP, curbp);
@@ -586,7 +598,9 @@ int stkindx;
 	if (same_ptr(plp, null_ptr))
 		return;
 	set_lBACK(plp, BACKDOT(curbp).l);
+	plp->l_back_offs = BACKDOT(curbp).o;
 	set_lFORW(plp, FORWDOT(curbp).l);
+	plp->l_forw_offs = FORWDOT(curbp).o;
 	pushline(plp, STACK(stkindx));
 	if (stkindx == BACK) {
 		l_ref(plp)->l_nextsep = null_ptr;
@@ -782,11 +796,19 @@ int stkindx;
 	
 	lp = l_ptr(popline(STACK(stkindx),TRUE));
 	FORWDOT(curbp).l = lFORW(lp);
+	FORWDOT(curbp).o = lp->l_forw_offs;
 	BACKDOT(curbp).l = lBACK(lp);
+	BACKDOT(curbp).o = lp->l_back_offs;
 	if (stkindx == FORW) {
-		fixupdot(lFORW(lp));
+		/* if we moved, update the "last dot" mark */
+		if (!sameline(DOT, FORWDOT(curbp)))
+			curwp->w_lastdot = DOT;
+		DOT = FORWDOT(curbp);
 	} else {
-		fixupdot(lBACK(lp));
+		/* if we moved, update the "last dot" mark */
+		if (!sameline(DOT, BACKDOT(curbp)))
+			curwp->w_lastdot = DOT;
+		DOT = BACKDOT(curbp);
 		/* dbgwrite("about to decr undocount %d", curbp->b_udcount); */
 		curbp->b_udcount--;
 		curbp->b_udlastsep = null_ptr;  /* it's only a hint */
@@ -802,6 +824,7 @@ int stkindx;
 		}
 	}
 
+	b_clr_counted(curbp);	/* don't know the size! */
 	if (lispurestacksep(l_ref(lp)))
 		unchg_buff(curbp, 0);
 	else
@@ -810,28 +833,6 @@ int stkindx;
 	lfree(lp,curbp);
 
 	return TRUE;
-}
-
-static void
-fixupdot(dotl)
-LINEPTR dotl;
-{
-	/* it's an absolute move -- remember where we are */
-	MARK odot;
-	odot = DOT;
-
-	DOT.l = dotl;
-	DOT.o = firstchar(l_ref(DOT.l));
-	if (DOT.o < 0) {
-		DOT.o = lLength(DOT.l) - 1;
-		if (DOT.o < 0)
-			DOT.o = 0;
-	}
-
-	/* if we moved, update the "last dot" mark */
-	if (!sameline(DOT, odot)) {
-		curwp->w_lastdot = odot;
-	}
 }
 
 void
@@ -922,11 +923,6 @@ int f,n;
 		if (l_ref(wp->w_lastdot.l) == lp)
 			wp->w_lastdot.o = 0;
 	}
-#ifdef BEFORE
-/* need to FIXXX  -- this BACKDOT is really now on the stack in the stacksep */
-	if (l_ref(BACKDOT(curbp).l) == lp)
-		BACKDOT(curbp).o = 0;
-#endif
 	if (curbp->b_nmmarks != NULL) {
 		/* fix the named marks */
 		int i;
@@ -981,15 +977,6 @@ fast_ptr LINEPTR olp;
 			wp->w_lastdot.o = 0;
 		}
 	}
-#ifdef BEFORE
-	if (same_ptr(BACKDOT(curbp).l, olp)) {
-		if (usenew) {
-			BACKDOT(curbp).l = point;
-		} else {
-		    mlforce("BUG: preundodot points at newly inserted line!");
-		}
-	}
-#endif
 	if (curbp->b_nmmarks != NULL) {
 		/* fix the named marks */
 		int i;

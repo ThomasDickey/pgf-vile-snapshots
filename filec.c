@@ -4,7 +4,10 @@
  *	Filename prompting and completion routines
  *
  * $Log: filec.c,v $
- * Revision 1.18  1993/06/18 15:57:06  pgf
+ * Revision 1.19  1993/07/01 16:15:54  pgf
+ * tom's 3.51 changes
+ *
+ * Revision 1.18  1993/06/18  15:57:06  pgf
  * tom's 3.49 changes
  *
  * Revision 1.17  1993/06/02  14:58:17  pgf
@@ -330,7 +333,7 @@ int	first;
 	register BUFFER *bp;
 
 	if ((bp = bfind(name, OK_CREAT, BFINVS)) != 0) {
-		bp->b_flag &= ~BFSCRTCH;	/* make it nonvolatile */
+		b_clr_flags(bp, BFSCRTCH);	/* make it nonvolatile */
 		if (first == -TRUE) {
 			(void)bclear(bp);
 			bp->b_active = TRUE;
@@ -500,8 +503,7 @@ char *	name;
 		while ((de = readdir(dp)) != 0) {
 #if UNIX || VMS
 # if USE_D_NAMLEN
-			strncpy(s, de->d_name, (int)(de->d_namlen));
-			s[de->d_namlen] = EOS;
+			strncpy(s, de->d_name, (int)(de->d_namlen))[de->d_namlen] = EOS;
 # else
 			(void)strcpy(s, de->d_name);
 # endif

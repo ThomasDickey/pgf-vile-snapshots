@@ -4,7 +4,16 @@
 	written 1986 by Daniel Lawrence
  *
  * $Log: eval.c,v $
- * Revision 1.56  1993/06/18 16:20:37  pgf
+ * Revision 1.59  1993/07/01 16:15:54  pgf
+ * tom's 3.51 changes
+ *
+ * Revision 1.58  1993/06/28  20:10:27  pgf
+ * new variable
+ *
+ * Revision 1.57  1993/06/24  18:02:13  pgf
+ * added AUX as system needing to use if/else instead of switch
+ *
+ * Revision 1.56  1993/06/18  16:20:37  pgf
  * tom's 3.49 changes
  *
  * Revision 1.55  1993/06/02  14:28:47  pgf
@@ -191,7 +200,8 @@
 #define	MODE_NUM	-2
 
 	/* macros for environment-variable switch */
-#if VMS
+	/*  (if your compiler balks with "non-constant case expression" */
+#if VMS || AUX2
 #define	If(N)		if (vnum == N) {
 #define	ElseIf(N)	} else If(N)
 #define	Otherwise	} else {
@@ -510,11 +520,20 @@ char *vname;		/* name of environment variable to retrieve */
 			return (value);
 		}
 
+
 		/* otherwise, fetch the appropriate value */
+
+		/* NOTE -- if you get a compiler error from this code, find
+			the definitions of If and ElseIf up above, and add your
+			system to the set of those with broken compilers that need
+			to use ifs instead of a switch statement */
+
 		If( EVPAGELEN )		value = l_itoa(term.t_nrow + 1);
 		ElseIf( EVCURCOL )	value = l_itoa(getccol(FALSE) + 1);
 		ElseIf( EVCURLINE )	value = l_itoa(getcline());
+#if RAMSIZE
 		ElseIf( EVRAM )		value = l_itoa((int)(envram / 1024l));
+#endif
 		ElseIf( EVFLICKER )	value = ltos(flickcode);
 		ElseIf( EVCURWIDTH )	value = l_itoa(term.t_ncol);
 		ElseIf( EVCBUFNAME )	value = curbp->b_bname;
@@ -538,7 +557,9 @@ char *vname;		/* name of environment variable to retrieve */
 		ElseIf( EVCWLINE )	value = l_itoa(getwpos());
 		ElseIf( EVSEARCH )	value = pat;
 		ElseIf( EVREPLACE )	value = rpat;
-		ElseIf( EVMATCH )	value = (patmatch == NULL) ? "" : patmatch;
+		ElseIf( EVMATCH )	value = (patmatch == NULL) ? 
+							"" : patmatch;
+		ElseIf( EVMODE )	value = current_modename();
 		ElseIf( EVKILL )	value = getkill();
 		ElseIf( EVTPAUSE )	value = l_itoa(term.t_pause);
 		ElseIf( EVPENDING )
@@ -587,7 +608,7 @@ getkill()		/* return some of the contents of the kill buffer */
 			size = kbs[0].kused;
 		else
 			size = NSTRING - 1;
-		strncpy(value, (char *)(kbs[0].kbufh->d_chunk), size);
+		(void)strncpy(value, (char *)(kbs[0].kbufh->d_chunk), size);
 	}
 
 	/* and return the constructed value */
@@ -814,20 +835,24 @@ char *value;	/* value to set to */
 			cmdstatus = stol(value);
 
 		ElseIf( EVPALETTE )
-			strncpy(palstr, value, 48);
+			(void)strncpy(palstr, value, 48);
 			spal(palstr);
 
 		ElseIf( EVLASTKEY )
 			lastkey = atoi(value);
 
 		ElseIf( EVCURCHAR )
-			ldelete(1L, FALSE);	/* delete 1 char */
-			c = atoi(value);
-			if (c == '\n')
-				lnewline();
-			else
-				linsert(1, c);
-			backchar(FALSE, 1);
+			if (b_val(curbp,MDVIEW))
+				status = rdonly();
+			else {
+				(void)ldelete(1L, FALSE); /* delete 1 char */
+				c = atoi(value);
+				if (c == '\n')
+					status = lnewline();
+				else
+					status = linsert(1, c);
+				(void)backchar(FALSE, 1);
+			}
 
 		ElseIf( EVDISCMD )
 			discmd = stol(value);
@@ -856,7 +881,10 @@ char *value;	/* value to set to */
 			term.t_pause = atoi(value);
 
 		ElseIf( EVLINE )
-			(void)putctext(value);
+			if (b_val(curbp,MDVIEW))
+				status = rdonly();
+			else
+				status = putctext(value);
 
 		ElseIf( EVCWD )
 			status = set_directory(value);
@@ -878,6 +906,7 @@ char *value;	/* value to set to */
 			/* EVPENDING */
 			/* EVLLENGTH */
 			/* EVRAM */
+			/* EVMODE */
 			status = ABORT;	/* must be readonly */
 		EndIf
 		break;
@@ -1023,7 +1052,8 @@ char *tokn;		/* token to evaluate */
 				blen = lLength(bp->b_dot.l) - bp->b_dot.o;
 				if (blen > NSTRING)
 					blen = NSTRING;
-				strncpy(buf, l_ref(bp->b_dot.l)->l_text + bp->b_dot.o,
+				(void)strncpy(buf,
+					l_ref(bp->b_dot.l)->l_text + bp->b_dot.o,
 					blen);
 				buf[blen] = EOS;
 

@@ -5,7 +5,10 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: tags.c,v $
- * Revision 1.37  1993/06/18 15:57:06  pgf
+ * Revision 1.38  1993/07/01 16:15:54  pgf
+ * tom's 3.51 changes
+ *
+ * Revision 1.37  1993/06/18  15:57:06  pgf
  * tom's 3.49 changes
  *
  * Revision 1.36  1993/06/02  14:28:47  pgf
@@ -369,7 +372,7 @@ int *endofpathflagp;
 		}
 		/* be sure it has the right name */
 		(void)strcpy(tagbp->b_bname, tagbufname);
-		tagbp->b_flag |= BFINVS;
+		b_set_invisible(tagbp);
 			
         }
 	return tagbp;
@@ -381,15 +384,14 @@ BUFFER *bp;
 char *name;
 int len;
 {
-	LINE *lp;
-	lp = lForw(bp->b_line.l);
-	while (lp != l_ref(bp->b_line.l)) {
+	register LINE *lp;
+
+	for_each_line(lp, bp) {
 		if (llength(lp) >= len) {
 			if (llength(lp) >= len &&
 				 !strncmp(lp->l_text, name, len))
 				return lp;
 		}
-		lp = lforw(lp);
 	}
 	return NULL;
 }

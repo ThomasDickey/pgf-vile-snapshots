@@ -14,7 +14,25 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.122  1993/06/23 21:31:16  pgf
+ * Revision 1.128  1993/07/01 16:18:26  pgf
+ * oops -- mismerge
+ *
+ * Revision 1.127  1993/07/01  16:15:54  pgf
+ * tom's 3.51 changes
+ *
+ * Revision 1.126  1993/06/29  11:09:47  pgf
+ * changed 'naptime' to 'timeout-value'
+ *
+ * Revision 1.125  1993/06/28  16:59:53  pgf
+ * if startup() fails, go straight to update() and loop()
+ *
+ * Revision 1.124  1993/06/28  14:31:40  pgf
+ * implemented new mode, "naptime"
+ *
+ * Revision 1.123  1993/06/25  11:25:55  pgf
+ * patches for Watcom C/386, from Tuan DANG
+ *
+ * Revision 1.122  1993/06/23  21:31:16  pgf
  * added "undolimit" mode
  *
  * Revision 1.121  1993/06/18  15:57:06  pgf
@@ -488,6 +506,7 @@ static	void print_usage P((void))
 	"-f fontname    to change font",
 	"-d displayname to change the default display",
 	"-r             for reverse video",
+	"=geometry	to set window size (like '=80x50')",
 #endif
 #if MSDOS
 	"-2             25-line mode",
@@ -582,7 +601,7 @@ char	*argv[];
 		set_global_b_val(MDVIEW,TRUE);
 
 #if IBMPC	/* pjr */
-	ibmtype = CDSENSE;
+	ibmtype = CDSENSE;   
 #endif	/* IBMPC */
 
 #if X11
@@ -799,7 +818,11 @@ char	*argv[];
 #else
 # if MSDOS
 	signal(SIGINT,catchintr);
-	_harderr(dos_crit_handler);
+	{
+	/* clean up Warning from Watcom C */
+	void *ptrfunc = dos_crit_handler;
+	_harderr(ptrfunc);
+	}
 # endif
 #endif
 
@@ -839,7 +862,7 @@ char	*argv[];
 			obp = curbp;
 			if (obp) {
 				oflags = obp->b_flag;
-				obp->b_flag |= BFCHG;
+				b_set_changed(obp);
 			}
 
 			if ((vbp=bfind(ScratchName(vileinit), OK_CREAT, 0))==NULL)
@@ -855,12 +878,14 @@ char	*argv[];
 			discmd = FALSE;
 			startstat = dobuf(vbp);
 			discmd = odiscmd;
+			if (startstat != TRUE)
+				goto begin;
 			if (obp) {
 				swbuffer(obp);
 				obp->b_flag = oflags;
 			}
 			/* remove the now unneeded buffer */
-			vbp->b_flag |= BFSCRTCH;  /* make sure it will go */
+			b_set_scratch(vbp);  /* make sure it will go */
 			zotbuf(vbp);
 		} else {
 			char *fname;
@@ -884,6 +909,8 @@ char	*argv[];
 				else
 					startstat = TRUE;
 			}
+			if (startstat != TRUE)
+				goto begin;
 		}
 	}
 
@@ -933,6 +960,7 @@ char	*argv[];
 	if (startstat == TRUE)  /* else there's probably an error message */
 		mlforce(msg);
 
+ begin:
 	update(FALSE);
 
 	/* process commands */
@@ -1043,16 +1071,26 @@ global_val_init()
 
 
 	set_global_g_val(GMDABUFF,	TRUE); 	/* auto-buffer */
-	set_global_g_val(GMDALTTABPOS,	FALSE); /* emacs-style tab positioning */
+	set_global_g_val(GMDALTTABPOS,	FALSE); /* emacs-style tab
+							positioning */
 	set_global_g_val(GMDDIRC,	FALSE); /* directory-completion */
 #ifdef GMDHISTORY
 	set_global_g_val(GMDHISTORY,	TRUE);
 #endif
+	set_global_g_val(GVAL_TIMEOUTVAL, 500);	/* catnap time -- how long
+							to wait for ESC seq */
 	set_global_g_val(GMDIMPLYBUFF,	FALSE); /* imply-buffer */
+#ifdef GMDRAMSIZE
+	set_global_g_val(GMDRAMSIZE,	TRUE);	/* show ram-usage */
+#endif
 
 	set_global_b_val(MDAIND,	FALSE); /* auto-indent */
 	set_global_b_val(MDASAVE,	FALSE);	/* auto-save */
-	set_global_b_val(MDBACKLIMIT,	TRUE); 	/* limit backspacing to insert point */
+	set_global_b_val(MDBACKLIMIT,	TRUE); 	/* limit backspacing to
+							insert point */
+#ifdef	MDCHK_MODTIME
+	set_global_b_val(MDCHK_MODTIME,	FALSE); /* modtime-check */
+#endif
 	set_global_b_val(MDCMOD,	FALSE); /* C mode */
 #ifdef MDCRYPT
 	set_global_b_val(MDCRYPT,	FALSE);	/* crypt */
@@ -1147,10 +1185,18 @@ ACTUAL_SIGNAL(catchintr)
 #endif
 
 #if MSDOS
-void
-dos_crit_handler()
+# if WATCOM
+    int  dos_crit_handler(unsigned deverror, unsigned errcode, unsigned *devhdr)
+# else
+    void dos_crit_handler()
+# endif
 {
+# if WATCOM
+	_hardresume((int)_HARDERR_FAIL);
+	return (int)_HARDERR_FAIL;
+# else
 	_hardresume(_HARDERR_FAIL);
+# endif
 }
 #endif
 
@@ -1673,7 +1719,7 @@ int maxlen;	/* maximum length */
 }
 #endif
 
-#if	RAMSIZE & LATTICE & MSDOS
+#if	RAMSIZE
 /*	These routines will allow me to track memory usage by placing
 	a layer on top of the standard system malloc() and free() calls.
 	with this code defined, the environment variable, $RAM, will
@@ -1683,60 +1729,85 @@ int maxlen;	/* maximum length */
 	end of the bottom mode line and is updated whenever it is changed.
 */
 
+#undef	realloc
 #undef	malloc
 #undef	free
 
-char *allocate(nbytes)	/* allocate nbytes and track */
+	/* display the amount of RAM currently malloc'ed */
+static void
+display_ram_usage P((void))
+{
+	if (global_g_val(GMDRAMSIZE)) {
+		char mbuf[20];
+		int	saverow = ttrow;
+		int	savecol = ttcol;
+
+		if (saverow >= 0 && saverow <= term.t_nrow
+		 && savecol >= 0 && savecol <= term.t_ncol) {
+			movecursor(term.t_nrow, LastMsgCol);
+#if	COLOR
+			TTforg(gfcolor);
+			TTbacg(gbcolor);
+#endif
+			(void)lsprintf(mbuf, "[%ld]", envram);
+			kbd_puts(mbuf);
+			movecursor(saverow, savecol);
+			TTflush();
+		}
+	}
+}
+
+	/* reallocate mp with nbytes and track */
+char *reallocate(mp, nbytes)
+char *mp;
+unsigned nbytes;
+{
+	if (mp != 0) {
+		mp -= sizeof(SIZE_T);
+		envram -= *((SIZE_T *)mp);
+		nbytes += sizeof(SIZE_T);
+		mp = realloc(mp, nbytes);
+		if (mp != 0) {
+			*((SIZE_T *)mp) = nbytes;
+			envram += nbytes;
+		}
+		display_ram_usage();
+	} else
+		mp = allocate(nbytes);
+	return mp;
+}
+
+	/* allocate nbytes and track */
+char *allocate(nbytes)
 unsigned nbytes;	/* # of bytes to allocate */
 {
 	char *mp;	/* ptr returned from malloc */
 
-	mp = malloc(nbytes);
-	if (mp) {
+	nbytes += sizeof(SIZE_T);
+	if ((mp = malloc(nbytes)) != 0) {
+		(void)memset(mp, 0, nbytes);	/* so we can use for calloc */
+		*((SIZE_T *)mp) = nbytes;
 		envram += nbytes;
-#if	RAMSHOW
-		dspram();
-#endif
+		mp += sizeof(SIZE_T);
+		display_ram_usage();
 	}
 
 	return mp;
 }
 
-release(mp)	/* release malloced memory and track */
+	/* release malloced memory and track */
+void
+release(mp)
 char *mp;	/* chunk of RAM to release */
 {
-	unsigned *lp;	/* ptr to the long containing the block size */
-
 	if (mp) {
-		lp = ((unsigned *)mp) - 1;
-
-		/* update amount of ram currently malloced */
-		envram -= (long)*lp - 2;
+		mp -= sizeof(SIZE_T);
+		envram -= *((SIZE_T *)mp);
 		free(mp);
-#if	RAMSHOW
-		dspram();
-#endif
+		display_ram_usage();
 	}
 }
-
-#if	RAMSHOW
-dspram()	/* display the amount of RAM currently malloced */
-{
-	char mbuf[20];
-	char *sp;
-
-	TTmove(term.t_nrow - 1, 70);
-#if	COLOR
-	TTforg(7);
-	TTbacg(0);
-#endif
-	(void)lsprintf(mbuf, "[%ld]", envram);
-	kbd_puts(mbuf);
-	TTmove(term.t_nrow, 0);
-	movecursor(term.t_nrow, 0);
-}
-#endif
-#endif
+#endif	/* RAMSIZE */
 
 #if MALLOCDEBUG
 mallocdbg(f,n)
@@ -1789,6 +1860,17 @@ int	f,n;
 {
 	extern	long	coreleft(void);
 	mlforce("Memory left: %D bytes", coreleft());
+	return TRUE;
+}
+#endif
+
+#if WATCOM
+int
+showmemory(f,n)
+int	f,n;
+{
+	extern	long	_memavl(void);
+	mlforce("Memory left: %D bytes", _memavl());
 	return TRUE;
 }
 #endif

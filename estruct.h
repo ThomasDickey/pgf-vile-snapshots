@@ -10,7 +10,23 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.120  1993/06/23 21:32:25  pgf
+ * Revision 1.125  1993/07/01 16:15:54  pgf
+ * tom's 3.51 changes
+ *
+ * Revision 1.124  1993/06/30  10:05:54  pgf
+ * change ABS to ABSM, since osf/1 defines ABS in a system header
+ *
+ * Revision 1.123  1993/06/29  17:58:56  pgf
+ * allow undo to preserve DOT's offset, by overloading two more fields in
+ * the LINE struct to hold the forward and backward offsets
+ *
+ * Revision 1.122  1993/06/28  15:27:40  pgf
+ * deleted vestigial #define TIMING
+ *
+ * Revision 1.121  1993/06/25  11:25:55  pgf
+ * patches for Watcom C/386, from Tuan DANG
+ *
+ * Revision 1.120  1993/06/23  21:32:25  pgf
  * added "undolimit" mode, and made undo able to restore unmodified state
  * to buffer, based on a new type of stack separator
  *
@@ -566,14 +582,24 @@
 #define	MSC	0	/* MicroSoft C compile version 3 & 4 & 5 & 6 */
 #define	ZTC	0	/* Zortech C compiler */
 #define	TURBO	0	/* Turbo C/MSDOS */
+#define	WATCOM	0	/* WATCOM C/386 version 9.0 or above */
 
-#ifdef __TURBOC__	/* Borland C/C++ 3.0 */
+#ifdef __TURBOC__ 	/* Borland C/C++ 3.0 */
 #undef TURBO
 #undef SVR3
 #undef MSDOS
 #define SVR3   0
 #define TURBO  1
 #define MSDOS  1
+#endif
+
+#ifdef __WATCOMC__
+#undef SVR3
+#undef MSDOS
+#undef WATCOM
+#define SVR3   0
+#define MSDOS  1
+#define WATCOM 1
 #endif
 
 #endif /* os_chosen */
@@ -601,7 +627,7 @@
 
 /* choose between void and int signal handler return type.
   "typedefs?  we don't need no steenking typedefs..." */
-#if POSIX || (BERK && BSD386) || SVR3 || APOLLO || TURBO
+#if POSIX || (BERK && BSD386) || SVR3 || APOLLO || TURBO || WATCOM
 # define SIGT void
 # define SIGRET
 #else
@@ -746,11 +772,8 @@
 
 /*	Debugging options	*/
 #define	RAMSIZE	0	/* dynamic RAM memory usage tracking */
-#define	RAMSHOW	0	/* auto dynamic RAM reporting */
 #define	VMALLOC	0	/* verify malloc operation (slow!) */
 #define	DEBUG	0	/* allows core dump from keyboard under UNIX */
-#define	TIMING	0	/* shows user time spent on each user command */
-			/* TIMING doesn't work yet... sorry  -pgf */ 
 #define DEBUGM	0	/* $debug triggers macro debugging		*/
 #define	VISMAC	0	/* update display during keyboard macros	*/
 
@@ -774,7 +797,7 @@ extern	char *	sys_errlist[];
 #define	set_errno(code)	errno = code
 
 /* use 'size_t' if we have it */
-#if POSIX || APOLLO || TURBO || VMS
+#if POSIX || APOLLO || TURBO || VMS || WATCOM
 #define	SIZE_T	size_t
 #else
 #define	SIZE_T	int
@@ -788,7 +811,7 @@ extern	char *	sys_errlist[];
 #endif
 
 #ifndef ANSI_PROTOS
-#  if defined(__STDC__) || VMS || TURBO
+#  if defined(__STDC__) || VMS || TURBO || WATCOM
 #    define ANSI_PROTOS 1
 #  else
 #    define ANSI_PROTOS 0
@@ -796,7 +819,7 @@ extern	char *	sys_errlist[];
 #endif
 
 #ifndef ANSI_VARARGS
-# if defined(__STDC__) || VMS || TURBO
+# if defined(__STDC__) || VMS || TURBO || WATCOM
 #  define ANSI_VARARGS 1	/* look in <stdarg.h> */
 # else
 #  define ANSI_VARARGS 0	/* look in <varargs.h> */
@@ -834,6 +857,15 @@ extern char *rindex();
 #endif
 
 /*	System dependent library redefinitions, structures and includes	*/
+
+#if 	WATCOM
+#include      <dos.h>
+#include      <string.h>
+#undef peek
+#undef poke
+#define       peek(a,b,c,d)   movedata(a,b,FP_SEG(c),FP_OFF(c),d)
+#define       poke(a,b,c,d)   movedata(FP_SEG(c),FP_OFF(c),a,b,d)
+#endif
 
 #if	TURBO
 #include      <dos.h>
@@ -931,6 +963,11 @@ union REGS {
 #define	movmem(a, b, c)		memcpy(b, a, c)
 #endif
 
+#if WATCOM
+#include <string.h>
+#define	movmem(a, b, c)		memcpy(b, a, c)
+#endif
+
 #if	MSDOS && LATTICE
 #undef	CPM
 #undef	LATTICE
@@ -950,7 +987,7 @@ union REGS {
 #define	MEMMAP	0
 #endif
 
-#if	((MSDOS) && (LATTICE || AZTEC || MSC || TURBO || ZTC)) || UNIX || VMS
+#if	((MSDOS) && (LATTICE || AZTEC || MSC || TURBO || ZTC || WATCOM)) || UNIX || VMS
 #define	ENVFUNC	1
 #else
 #define	ENVFUNC	0
@@ -1039,6 +1076,13 @@ union REGS {
 #define	KBD_NORMAL	KBD_EXPAND|KBD_QUOTES
 #else
 #define	KBD_NORMAL	KBD_EXPAND
+#endif
+
+/* reserve space for ram-usage option */
+#if RAMSIZE
+#define	LastMsgCol	(term.t_ncol - 10)
+#else
+#define	LastMsgCol	(term.t_ncol - 1)
 #endif
 
 /*	Directive definitions	*/
@@ -1288,15 +1332,19 @@ typedef	struct	LINE*	LINEPTR;
 typedef struct	LINE {
 	LINEPTR l_fp;			/* Link to the next line	*/
 	LINEPTR l_bp;			/* Link to the previous line	*/
-	SIZE_T	l_size;			/* Allocated size 		*/
+	union {
+		SIZE_T	l_sze;		/* Allocated size 		*/
+		C_NUM	l_fo;		/* forward undo dot offs (undo only) */
+	} l_s_fo;
+	union {
+		L_NUM	l_nmbr;		/* line-# iff b_numlines > 0	*/
+		C_NUM	l_bo;		/* backward undo dot offs (undo only) */
+	} l_n_bo;
 	int	l_used;			/* Used size (may be negative)	*/
 	union {
 	    char *l_txt;		/* The data for this line	*/
 	    LINEPTR l_nxt;		/* if an undo stack separator,	*/
 	} lt;				/*  a pointer to the next one	*/
-#if !SMALLER
-	L_NUM	l_number;		/* line-# iff b_numlines > 0	*/
-#endif
 #if OPT_MAP_MEMORY
 	struct
 #else
@@ -1308,8 +1356,12 @@ typedef struct	LINE {
 	} l;
 }	LINE;
 
-#define l_text lt.l_txt
-#define l_nextsep lt.l_nxt
+#define l_size		l_s_fo.l_sze
+#define l_forw_offs	l_s_fo.l_fo
+#define l_number	l_n_bo.l_nmbr
+#define l_back_offs	l_n_bo.l_bo
+#define l_text		lt.l_txt
+#define l_nextsep	lt.l_nxt
 
 /* flag values */
 #define LCOPIED 1	/* original line is already on an undo stack */
@@ -1587,6 +1639,9 @@ typedef struct	BUFFER {
 #if	CRYPT
 	char	b_key[NPAT];		/* current encrypted key	*/
 #endif
+#ifdef	MDCHK_MODTIME
+	long	b_modtime;		/* file's last-modification time */
+#endif
 	struct	BUFFER *b_relink; 	/* Link to next BUFFER (sorting) */
 	int	b_created;
 	int	b_last_used;
@@ -1605,7 +1660,7 @@ typedef struct	BUFFER {
 #define	isInternalName(s) (isShellOrPipe(s) || is_internalname(s))
 #define	isAppendToName(s) (s[0] == '>' && s[1] == '>')
 
-#if TURBO || NeXT	/* tokens are replaced differently than apollo */
+#if TURBO || WATCOM || NeXT	/* tokens are replaced differently than apollo */
 #define	ScratchName(s) SCRTCH_LEFT    #s    SCRTCH_RIGHT
 #endif
 
@@ -1665,6 +1720,27 @@ typedef struct	BUFFER {
 #define BFSCRTCH   0x04			/* scratch -- gone on last close */
 #define BFARGS     0x08			/* set for ":args" buffers */
 #define BFIMPLY    0x010		/* set for implied-# buffers */
+#define BFSIZES    0x020		/* set if byte/line counts current */
+
+/* macros for manipulating b_flag */
+#define b_is_implied(bp)        ((bp)->b_flag & (BFIMPLY))
+#define b_is_argument(bp)       ((bp)->b_flag & (BFARGS))
+#define b_is_changed(bp)        ((bp)->b_flag & (BFCHG))
+#define b_is_invisible(bp)      ((bp)->b_flag & (BFINVS))
+#define b_is_scratch(bp)        ((bp)->b_flag & (BFSCRTCH))
+#define b_is_temporary(bp)      ((bp)->b_flag & (BFINVS|BFSCRTCH))
+#define b_is_counted(bp)        ((bp)->b_flag & (BFSIZES))
+
+#define b_set_flags(bp,flags)   (bp)->b_flag |= (flags)
+#define b_set_changed(bp)       b_set_flags(bp, BFCHG)
+#define b_set_counted(bp)       b_set_flags(bp, BFSIZES)
+#define b_set_invisible(bp)     b_set_flags(bp, BFINVS)
+#define b_set_scratch(bp)       b_set_flags(bp, BFSCRTCH)
+
+#define b_clr_flags(bp,flags)   (bp)->b_flag &= ~(flags)
+#define b_clr_changed(bp)       b_clr_flags(bp, BFCHG)
+#define b_clr_counted(bp)       b_clr_flags(bp, BFSIZES)
+
 
 /*
  * There is a window structure allocated for every active display window. The
@@ -1871,7 +1947,7 @@ typedef struct {
 #define REDO	2L	/* command is redo-able, record it for dotcmd */
 #define MOTION	4L	/* command causes motion, okay after operator cmds */
 #define FL	8L	/* if command causes motion, opers act on full lines */
-#define ABS	16L	/* command causes absolute (i.e. non-relative) motion */
+#define ABSM	16L	/* command causes absolute (i.e. non-relative) motion */
 #define GOAL	32L	/* column goal should be retained */
 #define GLOBOK	64L	/* permitted after global command */
 #define OPER	128L	/* function is an operator, affects a region */
@@ -2037,14 +2113,15 @@ typedef struct WHBLOCK {
 #include "unistd.h"
 #include "stdlib.h"
 #else
-# if APOLLO_STDLIB || VMS || TURBO
+# if APOLLO_STDLIB || VMS || TURBO || WATCOM
 #include <stdlib.h>
 # else
 #  if ! VMALLOC
  extern char *malloc();
  extern char *realloc();
 #  endif
-extern char *getenv();
+extern long strtol P((char *, char **, int));
+extern char *getenv P((char *));
 extern void exit P((int));
 extern void _exit P((int));
 # endif	/* APOLLO (special handling of lint vs __STDC__) */
@@ -2147,9 +2224,16 @@ extern	void	dofree P((char *));
 #define	free(p)		dofree(p)
 #endif	/* DOALLOC */
 #endif	/* DBMALLOC */
+
 /*	Dynamic RAM tracking and reporting redefinitions	*/
 #if	RAMSIZE
+#undef	realloc
+#define	realloc	reallocate
+#undef	calloc
+#define	calloc	allocate
+#undef	malloc
 #define	malloc	allocate
+#undef	free
 #define	free	release
 #endif
 

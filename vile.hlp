@@ -497,12 +497,13 @@ Miscellaneous commands
 		to an argument of 4 to the following command.  If you repeat 
 		it, it becomes worth 16, the next time 64, etc...  
 	%	In addition to finding matching braces, brackets, and
-		parentheses, the '%' command will find matching #ifdef's and
-		C style comments.  If the cursor is on the # of "#ifdef", the '%' command will
-		find the matching "#endif" or "#else".  On an "#else" it will
-		find "#endif", and on "#endif" it will go back up to the "#if".
-		If the cursor is on any part of a "/*" or "*/" sequence, it
-		will find the appropriate corresponding C comment endpoint.
+		parentheses, the '%' command will find matching #ifdef's
+		and C style comments.  If the cursor is on the # of
+		"#ifdef", the '%' command will find the matching "#endif"
+		or "#else".  On an "#else" it will find "#endif", and on
+		"#endif" it will go back up to the "#if".  If the cursor is
+		on any part of a "/*" or "*/" sequence, it will find the
+		appropriate corresponding C comment endpoint.
 
 Editor modes
 ------------
@@ -540,7 +541,7 @@ Editor modes
 		order of use, in that buffers not frequently used will
 		drift to the end of the list.  If this mode is not on, then
 		vile will behave more like vi, in that buffers remain in a
-		fixed order, that in which they were edited.
+		fixed order, that in which they were edited. (U)
 
 	autoindent (ai) During insert, newly created lines inherit their
 		leading indent from the previous line in the buffer. (B)
@@ -555,6 +556,12 @@ Editor modes
 	bcolor	On systems supporting this, will set the background color.
 		Currently only DOS can do color, although the X11 version
 		(xvile) can be given colors at startup or via .Xdefaults.
+
+	check-modtime Check modification-time..  Issues a "file newer than
+		buffer" warning and prompts you if needed when popping up a
+		window on an existing buffer, reading or writing the buffer, or
+		after performing some shell command.
+
 
 	cmode	C-code mode..  Maintains current indentation level
 		automatically during insert, like autoindent, above.  If a
@@ -642,6 +649,15 @@ Editor modes
 	magic	Allow meta-characters in search strings.  See the section 
 		"Regular Expressions" for more detail. (B)
 
+	timeout-value  To resolve the ambiguity between a user-pressed
+		ESCape key and an ESC character that is part of a function
+		key sequence, vile will wait for a short time after seeing
+		an ESC, in order to check the next character of input.  The
+		waiting time is specified in milliseconds, and defaults to
+		500.  Users of fast local screens, like a local xterm, may
+		wish to reduce this to something like 50 for crisper
+		response to a user-pressed ESC.  (U)
+
 	number	(nu) All lines in the buffer will be prefixed by their line
 		number. (W) 
 
@@ -658,7 +674,7 @@ Editor modes
 		independent of hardware tabs and tab characters.  It is the
 		number of columns a line will shift by if the '<<' or '>>'
 		commands are used, and it chooses the next column stop for
-		the cursor if a '^T' or '^D' is typed during insert mode.
+		the cursor if a '^T' or '^D' is typed during insert mode. (B)
 
 	showmatch (sm) During insert, if a closing '}', ']', or ')' character
 		is typed, the cursor will highlight the matching member
@@ -667,6 +683,9 @@ Editor modes
 	showmode (smd) Causes an indicator on the modeline to indicate what
 		mode vile is currently in: insert (I), replace (R), or
 		command (none).  (B)
+
+	showram (sr) Displays the amount of ram currently allocated at the
+		end of the message line. (U)
 
 	sideways  Will prompt for a new value for the sideways scroll offset,
 		which allow display of a section of code normally off the
@@ -704,7 +723,7 @@ Editor modes
 		tag references.  It is a whitespace-separated list of
 		filenames.  Relative pathnames are evaluated with respect
 		to the current directory of vile at the time of the tags
-		lookup.
+		lookup. (B)
 
 	terse   vile produces more "status" messages than vi, which may
 		become annoying at low baud rates.  Setting terse mode will
@@ -750,8 +769,6 @@ Special Character Expansion
 Key Rebinding
 -------------
 
-	The vi "map", "map!", and "abbr" commands are not currently supported.
-
 	There is a key rebinding facility (if vile is built to include it),
 	which is invoked as follows.  One must know the "english" name for the
 	command being rebound.  Use ":describe-bindings" or ":apropos string"
@@ -759,8 +776,10 @@ Key Rebinding
 		":bind-key englishname keyseq"
 	where keyseq is the exact keyboard sequence (i.e. single character,
 	or ^X or ^A followed by a single character) to which the
-	command should be bound.  In a .vilerc file, keyseq should be the
-	printable representation of the sequence, e.g. ^A-a or ^X-S.
+	command should be bound.  In a .vilerc file, keyseq can be either
+	the literal sequence, or the printable representation of the
+	sequence, e.g. ^A-a or ^X-S.   (A summary of how key-sequences can
+	be represented appears at the end of this section.)
 
 	Commands can be bound to function keys, which are either regular
 	ASCII characters with the eighth bit (0x80) bit set, or else ANSI
@@ -799,12 +818,91 @@ Key Rebinding
 	the dummy functions "cntl_a-prefix" and "cntl_x-prefix".
 
 	Note that when interactive, ^A and ^X are typed using the control
-	key.  In a file, however, they should be a caret (^) followed by a
-	letter.
+	key.  In a file, however, they can be either a caret (^) followed
+	by a letter, or the literal control key.  In the latter case you
+	would not use the '-' separator.  So ^A-x as four distinct
+	characters could also be entered as ^Ax, which would only be two
+	characters.
+
+	Characters can be entered in hex as well, in the form 0xNN, where
+	NN is exactly two hex digits.  So if you know the hex value for
+	a key, you can bind to it like:
+		bind-key next-window ^A-0x94
+	or
+		bind-key next-window FN-0x14
+	[ These two are equivalent, since the "FN-" prefix simply sets the
+	0x80 bit. ]
 
 	Function key bindings are available in insert mode, as well as
 	in command mode.  (But only via the "meta bit" or ANSI ESC sequence
-	form -- the '#' prefix will not work in insert mode.)
+	form -- the '#' prefix will not work in insert mode.)  So the
+	following macro will work corrently in both command and insert
+	modes:
+
+		15 store-macro
+			insert-string "fprintf(stderr, \""
+			set-named-mark z
+			insert-string "\\n\");\n"
+			goto-named-mark-exact z
+			; enter insert mode if we weren't already there
+			~if &seq $mode "command"
+				insert-chars
+			~endif
+		~endm
+		; bind to Meta-f
+		bind-key execute-macro-15 FN-f
+
+
+	:map 
+	----
+	The vi "map" command is available in a restricted form.  The sequence
+	being mapped can only be a single valid bindable vile key-sequence,
+	like any single character, or ^A or ^X or "FN-" followed by a
+	single character.  The other limitation is that although mappings
+	can be nested, there is currently NO way for vile to detect infinite
+	recursion, and serious consequences (including data loss) may
+	result if mapping are set up in an infinite loop.  The key being
+	bound to may be specified in any of the literal or printable ways
+	mentioned above.  The sequence that map should generate must be
+	entered literally -- as in real vi, there is no translation of ^
+	to control characters.  To enter control characters into a .vilerc
+	file, use the ^V escaping mechanism.
+
+	The :map! and :abbr commands have not yet been implemented, but
+	as mentioned above, function key ("FN-") bindings work in input
+	mode as well as command mode.
+
+
+	Syntax for key-sequences:
+	-------------------------
+	To summarize, a key-sequence being bound to or mapped is specified
+	with:
+		1) an optional prefix, like this:
+			^A-	(three chars)
+			^X-	(three chars)
+			^A	(one char)
+			^X	(one char)
+
+		2) followed by an optional "function" or "meta" prefix:
+			FN-	(three chars)
+			M-	(two chars)
+		    (these two are synonymous)
+
+		3) followed by a character, like this:
+			C	(one char)
+			^C	(one char)
+			^C	(two chars)
+			0xNN	(four chars)
+			0XNN	(four chars)
+			<tab>	(five chars)
+			<sp>	(four chars)
+
+	Currently, the caret ('^') character must be specified in hex.
+
+	(The "one char" control character entries in the above table are
+	represented in this help file as two printable characters, to
+	ensure they are not deleted by mailers or file transfer programs.)
+
 
 Special "Terminal" Key Rebinding
 --------------------------------
@@ -900,6 +998,7 @@ Programmed macros
 	$line		text of current line
 	$llength	length of current line			(read only)
 	$match		last matched magic pattern		(read only)
+	$mode		current mode ("command","insert","overwrite") (read o.)
 	$pagelen	number of screen lines in use by editor
 	$pagewid	current screen width
 	$palette	current palette string
@@ -1117,41 +1216,46 @@ Regular Expressions
 	Searches use regular expressions, which, as in vi, may be magic
 	by default or not.
 
-	There are new magic metacharacters.
+	vile introduces some new magic metacharacters.
 
 	The code that implements the expressions is based directly on
 	Henry Spencer's regexp code.  Quoting from the original man page:
 
-	"A regular expression is zero or more branches, separated by `\|'. 
+	[For ease of reference, the metacharacters are noted in the margin.)
+
+   \|	"A regular expression is zero or more branches, separated by `\|'. 
 	It matches anything that matches one of the branches."
 
 	"A branch is zero or more pieces, concatenated.  It matches a match
 	for the first, followed by a match for the second, etc."
 
 	"A piece is an atom possibly followed by `*', `\+', or `\?'.  An atom
-	followed by `*' matches a sequence of 0 or more matches of the
-	atom.  An atom followed by `\+' matches a sequence of 1 or more
-	matches of the atom.  An atom followed by `\?' matches a match of
+   *	followed by `*' matches a sequence of 0 or more matches of the
+   +	atom.  An atom followed by `\+' matches a sequence of 1 or more
+   \?	matches of the atom.  An atom followed by `\?' matches a match of
 	the atom, or the null string." [i.e., `\?' matches 0 or 1 occurrences]
 
-	"An atom is a regular expression in backslashed parentheses
+ \( \)	"An atom is a regular expression in backslashed parentheses
 	(matching a match for the regular expression), a range (see below),
-	`.' (matching any single character), `^' (matching the null string
-	at the beginning of the input string), `$' (matching the null
-	string at the end of the input string), a `\' followed by a single
-	character (matching that character), or a single character with no
-	other significance (matching that character)." [ In addition, vile
-	atoms may be: \< and \>, which match the beginning and end of a
-	"word", \s and \S, which match sequences of whitespace and
-	"darkspace", \w and \W, which match alphanumerics (including '_')
-	and non-alphanumerics, \d and \D, which match digits and
-	non-digits, and \p and \P, which match printable and non-printable
-	characters (whitespace is printable).  (Note: only \s will match the
-	start or end of a line (since newlines count as whitespace), but
-	since no vile regular expression will span more than one line, it
-	will not _cross_ the newline.) ]
+  . ^	`.' (matching any single character), `^' (matching the null string
+   $	at the beginning of the input string), `$' (matching the null
+   \c	string at the end of the input string), a `\' followed by a single
+   c	character (matching that character), or a single character with no
+	other significance (matching that character)."
+	
+ \< \>	In addition, vile atoms may be: \< and \>, which match the
+ \s \S	beginning and end of a "word", \s and \S, which match sequences of
+ \w \W	whitespace and "darkspace", \w and \W, which match alphanumerics
+ \d \D	(including '_') and non-alphanumerics, \d and \D, which match
+ \p \P	digits and non-digits, and \p and \P, which match printable and
+	non-printable characters (whitespace is printable).
 
-	"A range is a sequence of characters enclosed in `[]'.  It normally
+ \s 	Note that of these special atoms only \s will match the start or
+	end of a line (since newlines count as whitespace), but since no
+	vile regular expression will span more than one line, it will not
+	_cross_ the newline.
+
+ [ ]	"A range is a sequence of characters enclosed in `[]'.  It normally
 	matches any single character from the sequence.  If the sequence
 	begins with `^', it matches any single character not from the
 	rest of the sequence.  If two characters in the sequence are
@@ -1179,15 +1283,15 @@ Regular Expressions
 	Replacement subexpressions are supported when substituting.  That
 	is, if part of an expression is contained in \( and \), then the
 	part of the matched text in between those symbols will be
-	substituted for an occurrence of \1 in the replacement pattern.  Up
+ \1 \9	substituted for an occurrence of \1 in the replacement pattern.  Up
 	to 9 such substitutions can be made.  The special symbol & will
-	substitute for the entire match string.
+  &	substitute for the entire match string.
 
 	The replacement part of the substitution may also contain the
-	special sequences \U and \L, which cause the replacement to be
-	forced to uppercase or lowercase until a terminating \E is found;
-	\u and \l, which force the case of a single character; and \b,
-	\f, \r, \t, \n, which insert the usual ASCII character.
+ \U \L	special sequences \U and \L, which cause the replacement to be
+ \E	forced to uppercase or lowercase until a terminating \E is found;
+ \u \l	\u and \l, which force the case of a single character; and \b,
+ \bfrtn	\f, \r, \t, \n, which insert the usual ASCII character.
 	Note that vile mimics perl's handling of \u\L\1\E instead of vi's. 
 	Given :s/\(abc\)/\u\L\1\E/ vi will replace with "abc" whereas vile
 	and perl will replace with "Abc".  This is somewhat more useful for
@@ -1278,14 +1382,19 @@ X Window System specifics:
 	-fg color	change foreground color (or -foreground)
 	-bg color	change background color (or -background)
 	-name name	change window name
+	=geometry	change window dimensions
 
 	X Resources:
 
 	font		Font to use.
+	geometry	Window dimensions.
 	charClass	Character classes for multiple click selections.
 			The format is identical to that of xterm(1).
 	multiClickTime	How long between clicks (in milliseconds) to
 			be accepted as a multi-click.
+    	reverseVideo	Foreground/background reversal.
+	foreground	Foreground color.
+	background	Background color.
 
 	Changing the font on the fly:
 
@@ -1340,7 +1449,7 @@ Differences from vi
 		set sections=^[{]
 
 
-	The vi ":map", ":map!", and ":abbr" are not supported.
+	The vi ":map!", and ":abbr" are not supported.
 
 	There is no special lisp support.  But then, when was the last time
 	you heard of a lisp programmer that used vi?

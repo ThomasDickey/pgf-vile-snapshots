@@ -10,7 +10,10 @@
  *	(pgf, 1989)
  *
  * $Log: vmalloc.c,v $
- * Revision 1.13  1993/05/24 15:21:37  pgf
+ * Revision 1.14  1993/07/01 16:15:54  pgf
+ * tom's 3.51 changes
+ *
+ * Revision 1.13  1993/05/24  15:21:37  pgf
  * tom's 3.47 changes, part a
  *
  * Revision 1.12  1993/05/11  16:22:22  pgf
@@ -347,8 +350,7 @@ int f,n;
 		for_each_buffer(bp) {
 			LINE *lp;
 			found++; /* for b_linep */
-			for(lp = bp->b_line.l; lforw(lp) != bp->b_line.l;
-								lp = lforw(lp))
+			for_each_line(lp, bp)
 				found++;
 			if (bp->b_nmmarks)
 				found++;

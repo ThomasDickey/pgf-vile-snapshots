@@ -5,7 +5,22 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.62  1993/06/24 12:13:55  pgf
+ * Revision 1.67  1993/07/01 16:15:54  pgf
+ * tom's 3.51 changes
+ *
+ * Revision 1.66  1993/06/30  10:25:34  pgf
+ * added bzero to SUNOS/NeXT prototypes -- it's used in FD_CLR
+ *
+ * Revision 1.65  1993/06/28  20:05:12  pgf
+ * split out insert.c funcs, and added current_modename()
+ *
+ * Revision 1.64  1993/06/28  14:27:11  pgf
+ * new arg to catnap
+ *
+ * Revision 1.63  1993/06/25  11:25:55  pgf
+ * patches for Watcom C/386, from Tuan DANG
+ *
+ * Revision 1.62  1993/06/24  12:13:55  pgf
  * changed copy_for_undo and tag_for_undo to return void
  *
  * Revision 1.61  1993/06/23  21:29:29  pgf
@@ -226,6 +241,11 @@ extern int cntl_xf P(( int, int ));
 extern int unarg P(( int, int ));
 extern int nullproc P(( int, int ));
 extern void charinit P(( void ));
+#if RAMSIZE
+extern char *reallocate P(( char *, unsigned ));
+extern char *allocate P(( unsigned ));
+extern void release P(( char * ));
+#endif
 extern void start_debug_log P(( int , char ** ));
 #if OPT_MAP_MEMORY
 extern void exit_program P(( int ));
@@ -344,6 +364,7 @@ extern int nextbuffer P(( int, int ));
 extern void make_current P(( BUFFER * ));
 extern int swbuffer P(( BUFFER * ));
 extern void undispbuff P(( BUFFER *, WINDOW * ));
+extern int cmode_active P(( BUFFER * ));
 extern int tabstop_val P(( BUFFER * ));
 extern int shiftwid_val P(( BUFFER * ));
 extern int has_C_suffix P(( BUFFER * ));
@@ -356,6 +377,7 @@ extern int togglelistbuffers P(( int, int ));
 extern int listbuffers P(( int, int ));
 void updatelistbuffers P((void));
 extern int addline P(( BUFFER *, char *, int ));
+extern int add_line_at P(( BUFFER *, LINEPTR, char *, int ));
 extern int anycb P(( void ));
 extern BUFFER * bfind P(( char *, int, int ));
 extern int bclear P(( BUFFER * ));
@@ -510,6 +532,13 @@ extern int cbuf39 P(( int, int ));
 extern int cbuf40 P(( int, int ));
 
 /* file.c */
+#ifdef MDCHK_MODTIME
+extern int get_modtime P(( BUFFER *, long * ));
+extern void set_modtime P(( BUFFER *, char * ));
+extern int check_modtime P(( BUFFER *, char * ));
+extern int inquire_modtime P(( BUFFER *, char * ));
+extern int check_all_modtimes P(( void ));
+#endif
 extern int no_such_file P(( char * ));
 extern int same_fname P(( char *, BUFFER *, int ));
 extern int fileread P(( int, int ));
@@ -629,6 +658,34 @@ extern int kbd_mac_save P(( int, int ));
 extern int kbm_started P(( int, int ));
 extern int start_kbm P(( int, int, TBUFF * ));
 extern void finish_kbm P(( void ));
+
+/* insert.c */
+extern int quote P(( int, int ));
+extern int replacechar P(( int, int ));
+extern int tab P(( int, int ));
+extern int shiftwidth P(( int, int ));
+extern int openup P(( int, int ));
+extern int opendown P(( int, int ));
+extern int openlines P(( int ));
+extern int insert P(( int, int ));
+extern int insertbol P(( int, int ));
+extern int append P(( int, int ));
+extern int appendeol P(( int, int ));
+extern int overwritechars P(( int, int ));
+extern int ins P(( int ));
+extern int insstring P(( int, int ));
+extern int overwstring P(( int, int ));
+extern int istring P(( int, int, int ));
+extern int inschar P(( int, int * ));
+extern int backspace P(( void ));
+extern int newline P(( int, int ));
+extern int indented_newline P(( int ));
+extern int indented_newline_above P(( int ));
+extern int previndent P(( int * ));
+extern int nextindent P(( int * ));
+extern int doindent P(( int ));
+extern int indentlen P(( LINE * ));
+extern char *current_modename P(( void ));
 
 /* isearch.c */
 extern int risearch P(( int, int ));
@@ -776,37 +833,12 @@ extern int getccol P(( int ));
 extern int gotocol P(( int, int ));
 extern int gocol P(( int ));
 extern int twiddle P(( int, int ));
-extern int quote P(( int, int ));
-extern int replacechar P(( int, int ));
-extern int tab P(( int, int ));
-extern int shiftwidth P(( int, int ));
 extern int detabline P(( int ));
 extern int detab_region P(( void ));
 extern int entabline P(( int ));
 extern int entab_region P(( void ));
 extern int trimline P(( int ));
 extern int trim_region P(( void ));
-extern int openup P(( int, int ));
-extern int opendown P(( int, int ));
-extern int openlines P(( int ));
-extern int insert P(( int, int ));
-extern int insertbol P(( int, int ));
-extern int append P(( int, int ));
-extern int appendeol P(( int, int ));
-extern int overwritechars P(( int, int ));
-extern int ins P(( int ));
-extern int insstring P(( int, int ));
-extern int overwstring P(( int, int ));
-extern int istring P(( int, int, int ));
-extern int inschar P(( int, int * ));
-extern int backspace P(( void ));
-extern int newline P(( int, int ));
-extern int indented_newline P(( int ));
-extern int indented_newline_above P(( int ));
-extern int previndent P(( int * ));
-extern int nextindent P(( int * ));
-extern int doindent P(( int ));
-extern int indentlen P(( LINE * ));
 extern int deblank P(( int, int ));
 extern int flipchar P(( int, int ));
 extern int forwdelchar P(( int, int ));
@@ -821,7 +853,7 @@ extern int matchfenceback P(( int, int ));
 extern int clrmes P(( int, int ));
 extern int writemsg P(( int, int ));
 extern int fmatchindent P(( void ));
-extern void catnap P(( int ));
+extern void catnap P(( int, int ));
 extern char * current_directory P(( int ));
 extern int cd P(( int, int ));
 extern int pwd P(( int, int ));
@@ -1087,7 +1119,11 @@ extern char * curr_dir_on_drive P(( int ));
 extern int curdrive P(( void ));
 extern int setdrive P(( int ));
 extern void update_dos_drv_dir P(( char * ));
-extern void dos_crit_handler P(( void ));
+# if WATCOM
+     extern int dos_crit_handler P(( unsigned, unsigned, unsigned *));
+# else
+     extern void dos_crit_handler P(( void ));
+# endif
 #endif
 
 #if UNIX && !LINUX
@@ -1106,6 +1142,7 @@ extern	int	fwrite	P(( char *, int, int, FILE * ));
 extern	int	ioctl	P(( int, int, caddr_t ));
 extern	int	killpg	P(( int, int ));
 extern	int	mkdir	P(( char *, int ));
+extern	void	bzero	P(( char *, int ));
 #ifndef NeXT
 extern	void	perror	P(( char * ));
 #endif /* !NeXT */

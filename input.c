@@ -3,7 +3,21 @@
  *		5/9/86
  *
  * $Log: input.c,v $
- * Revision 1.77  1993/06/02 14:28:47  pgf
+ * Revision 1.81  1993/06/29 11:09:47  pgf
+ * changed 'naptime' to 'timeout-value'
+ *
+ * Revision 1.80  1993/06/28  20:05:49  pgf
+ * removed ifdef BEFORE stuff
+ *
+ * Revision 1.79  1993/06/28  15:07:35  pgf
+ * when killing chars, check for c == killc or wkillc _before_ checking it
+ * against backspace, in case DEL is someones killc or wkillc.
+ *
+ * Revision 1.78  1993/06/28  14:27:38  pgf
+ * implemented GVAL_NAPTIME, as argument to catnap().  also added new arg
+ * to catnap call, that terminates the nap when user input observed.
+ *
+ * Revision 1.77  1993/06/02  14:28:47  pgf
  * see tom's 3.48 CHANGES
  *
  * Revision 1.76  1993/05/24  15:25:41  pgf
@@ -630,18 +644,6 @@ kbd_key()
 	c = tgetc(FALSE);
 
 #if ANSI_SPEC
-#if BEFORE
-	if (insert_mode_was && last1key == -abortc) {
-		int ic;
-		/* then we just read the command we pushed before */
-		if ((ic = insertion_cmd()) == -1) /* can we re-enter? */
-			mlforce("[Can't re-enter insert mode]");
-		else
-			tungetc(ic);
-		insertmode = insert_mode_was;
-		insert_mode_was = FALSE;
-	}
-#endif
 
 	if ((unsigned char)c == (unsigned char)RECORDED_ESC) {
 		/* if this is being replayed... */
@@ -656,8 +658,10 @@ kbd_key()
 		int nextc;
 
 		/* if there's no recorded input, and no user typeahead */
-		if ((nextc = get_recorded_char(FALSE)) == -1 && !typahead())
-			catnap(50); /* give it a little extra time... */
+		if ((nextc = get_recorded_char(FALSE)) == -1 && !typahead()) {
+			/* give it a little extra time... */
+			catnap(global_g_val(GVAL_TIMEOUTVAL),TRUE);
+		}
 
 		/* and then, if there _was_ recorded input or new typahead... */
 		if (nextc != -1 || typahead()) {
@@ -671,16 +675,7 @@ kbd_key()
 					/* eat the sequence, but return abort */
 					return abortc;
 				}
-#ifdef BEFORE
-				/* remember we were in insert mode */
-				insert_mode_was = insertmode;
-				/* save the code, but return flag to
-					ins() so it can clean up */
-				tungetc(SPEC | c);
-				return(last1key = -abortc);
-#else
 				return (lastkey = SPEC|c);
-#endif
 			} else {
 				if (abortc != ESC)
 					return (last1key = c);
@@ -1016,7 +1011,7 @@ int	c;
 			}
 		}
 
-		if (isbackspace(c))
+		if (c != killc && c != wkillc)
 			break;
 	}
 	if (disinp)

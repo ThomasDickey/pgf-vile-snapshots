@@ -6,7 +6,13 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.87  1993/06/22 10:26:53  pgf
+ * Revision 1.89  1993/07/01 16:15:54  pgf
+ * tom's 3.51 changes
+ *
+ * Revision 1.88  1993/06/25  11:25:55  pgf
+ * patches for Watcom C/386, from Tuan DANG
+ *
+ * Revision 1.87  1993/06/22  10:26:53  pgf
  * dbgwrite now loops for a ^G to be typed -- safer when typing fast than
  * a simple getchar()
  *
@@ -366,6 +372,8 @@ static	int	dfputi P(( void (*f)(int), int, int ));
 static	int	dfputli P(( void (*f)(int), long, int ));
 static	int	dfputf P(( void (*f)(int), int ));
 static	void	dofmt P(( char *, va_list * ));
+static	void	erase_remaining_msg P(( int ));
+static	void	PutMode P(( char * ));
 /*--------------------------------------------------------------------------*/
 /*
  * Do format a string.
@@ -595,7 +603,7 @@ nu_mode(wp)
 WINDOW *wp;
 {
 	register BUFFER *bp = wp->w_bufp;
-	return	!(bp->b_flag & (BFINVS|BFSCRTCH)) && w_val(wp,WMDNUMBER);
+	return	!b_is_temporary(bp) && w_val(wp,WMDNUMBER);
 }
 
 int
@@ -1774,6 +1782,16 @@ struct VIDEO *vp2;	/* physical screen image */
 }
 #endif
 
+static	char *	PutMode_gap;
+
+static void
+PutMode (name)
+char	*name;
+{
+	vtputsn(PutMode_gap, 10);
+	vtputsn(name, 20);
+	PutMode_gap = " ";
+}
 
 /*
  * Redisplay the mode line for the window pointed to by the "wp". This is the
@@ -1796,11 +1814,11 @@ WINDOW *wp;
 
 
 #if	COLOR
-	vscreen[n]->v_rfcolor = gbcolor;		/* black on */
-	vscreen[n]->v_rbcolor = gfcolor;		/* white.....*/
+	vscreen[n]->v_rbcolor = w_val(wp,WVAL_FCOLOR);
+	vscreen[n]->v_rfcolor = w_val(wp,WVAL_BCOLOR);
 #endif
 	vtmove(n, 0);                       	/* Seek to right line. */
-	if (wp == curwp) {				/* mark the current buffer */
+	if (wp == curwp) {			/* mark the current buffer */
 		lchar = '=';
 	} else {
 #if	REVSTA
@@ -1827,15 +1845,23 @@ WINDOW *wp;
 		vtputc(ic);
 	}
 	vtprintf("%c %s",lchar,bp->b_bname);
+
+	/* show the major-modes of the buffer */
+	PutMode_gap = " [";
+	if (b_val(bp,MDCMOD))
+		PutMode("cmode");
 #if CRYPT
 	if (b_val(bp,MDCRYPT))
-		vtputsn(" [crypt]", 20);
+		PutMode("crypt");
 #endif
-	if (b_val(bp,MDVIEW))
-		vtputsn(" [view only]", 20);
 	if (b_val(bp,MDDOS))
-		vtputsn(" [dos-style]", 20);
-	if (bp->b_flag&BFCHG)
+		PutMode("dos-style");
+	if (b_val(bp,MDVIEW))
+		PutMode("view-only");
+	if (!PutMode_gap[1])
+		vtputc(']');
+
+	if (b_is_changed(bp))
 		vtputsn(" [modified]", 20);
 	if (bp->b_fname != 0 && bp->b_fname[0] != EOS) {
 		char *p;
@@ -1951,7 +1977,32 @@ int row,col;
         }
 }
 
-
+/* Erase the message-line from the current position */
+static void
+erase_remaining_msg (column)
+int	column;
+{
+#if !RAMSIZE
+	if (eolexist == TRUE)
+		TTeeol();
+	else
+#endif
+	{
+		register int i;
+#if RAMSIZE
+		int	limit = global_g_val(GMDRAMSIZE)
+				? LastMsgCol
+				: term.t_ncol - 1;
+#else
+		int	limit = term.t_ncol - 1;
+#endif
+		for (i = ttcol; i < limit; i++)
+			TTputc(' ');
+		ttrow = term.t_nrow-1;	/* force the move! */
+		movecursor(term.t_nrow, column);
+	}
+	TTflush();
+}
 
 
 /*
@@ -1962,28 +2013,17 @@ int row,col;
 void
 mlerase()
 {
-    int i;
-
-    if (mpresf == FALSE)
-		return;
-    movecursor(term.t_nrow, 0);
-    if (discmd == FALSE)
-    	return;
-
+	if (mpresf != FALSE) {
+		movecursor(term.t_nrow, 0);
+		if (discmd != FALSE) {
 #if	COLOR
-     TTforg(gfcolor);
-     TTbacg(gbcolor);
+			TTforg(gfcolor);
+			TTbacg(gbcolor);
 #endif
-    if (eolexist == TRUE)
-	    TTeeol();
-    else {
-        for (i = 0; i < term.t_ncol - 1; i++)
-            TTputc(' ');
-        movecursor(term.t_nrow, 1);	/* force the move! */
-        movecursor(term.t_nrow, 0);
-    }
-    TTflush();
-    mpresf = FALSE;
+			erase_remaining_msg(0);
+			mpresf = FALSE;
+		}
+	}
 }
 
 char *mlsavep;
@@ -2134,13 +2174,6 @@ va_list *app;	/* ptr to current data field */
 	TTbacg(gbcolor);
 #endif
 
-	/* if we cannot erase to end-of-line, do it manually */
-	if (eolexist == FALSE) {
-		mlerase();
-		TTflush();
-	}
-
-
 	movecursor(term.t_nrow, 0);
 
 	kbd_expand = -1;
@@ -2153,9 +2186,7 @@ va_list *app;	/* ptr to current data field */
 	kbd_expand = 0;
 
 	/* if we can, erase to the end of screen */
-	if (eolexist == TRUE)
-		TTeeol();
-	TTflush();
+	erase_remaining_msg(ttcol);
 	mpresf = TRUE;
 	mlsave[0] = '\0';
 }
@@ -2167,7 +2198,7 @@ void
 mlerror(s)
 char	*s;
 {
-#if UNIX || TURBO || VMS
+#if UNIX || TURBO || VMS || WATCOM
 	if (errno > 0 && errno < sys_nerr)
 		mlforce("[%s: %s]", s, sys_errlist[errno]);
 #endif
@@ -2316,7 +2347,7 @@ char buf[];
 
     n = strlen(buf);
     if (col + n - 1 > term.t_ncol)
-        n = term.t_ncol - col + 1;
+	n = term.t_ncol - col + 1;
     Put_Data(row, col, n, buf);
 }
 #endif

@@ -12,7 +12,19 @@
 # The modes are table entries in the BUFFER and WINDOW structures.
 #
 # $Log: modetbl,v $
-# Revision 1.12  1993/06/23 21:31:16  pgf
+# Revision 1.16  1993/07/01 16:15:54  pgf
+# tom's 3.51 changes
+#
+# Revision 1.15  1993/06/29  11:09:47  pgf
+# changed 'naptime' to 'timeout-value'
+#
+# Revision 1.14  1993/06/28  20:10:36  pgf
+# new variable
+#
+# Revision 1.13  1993/06/28  14:31:40  pgf
+# implemented new mode, "naptime"
+#
+# Revision 1.12  1993/06/23  21:31:16  pgf
 # added "undolimit" mode
 #
 # Revision 1.11  1993/06/18  15:57:06  pgf
@@ -61,7 +73,10 @@ bool								# GMD prefix
 	"Alt-TabPos"	ALTTABPOS	0			# emacs-style cursor positioning
 	"HIstory"	HISTORY		0			# command-history
 	"ImplyBuffer"	IMPLYBUFF 	0			# imply-buffer (vi-like)
+	"ShowRam"	RAMSIZE		0		RAMSIZE	# show ram-usage
 	"SameBangs"	SAMEBANGS	0			# use same "!!" data for ^X-!
+int								# VAL_ prefix
+	"timeout-value"	TIMEOUTVAL	0			# how long to catnap for more input
 regex								# VAL_ prefix
 	"C-SUFfixes"	CSUFFIXES	0			# match against filenames to turn on c-mode
 string								# VAL_ prefix
@@ -72,7 +87,8 @@ bool								# MD prefix
 	"AutoIndent"	AIND		0			# auto-indent
 	"AutoSave"	ASAVE		0			# auto-save mode
 	"BackspaceLimit" BACKLIMIT	0			# backspace limited in insert mode
-	"cmode"		CMOD		WFHARD			# C indentation and fence match
+	"check-modtime" CHK_MODTIME	0		!SMALLER # check buffer-modtime
+	"cmode"		CMOD		WFHARD|WFMODE		# C indentation and fence match
 	"crypt"		CRYPT		0		CRYPT	# encrytion mode active
 	"dos"		DOS		WFHARD|WFMODE		# "dos" mode -- lines end in crlf
 	"IgnoreCase"	IGNCASE		0			# Exact matching for searches
@@ -88,10 +104,10 @@ bool								# MD prefix
 int								# VAL_ prefix
 	"AutoSaveCNT"	ASAVECNT	0			# how often auto-saves occur
 	"C-ShiftWidth"	C_SWIDTH	0			# shift-width for C buffers
-	"C-TabStop"	C_TAB		WFHARD			# tab spacing for C buffers
+	"C-TabStop"	C_TAB		WFHARD|WFMODE		# tab spacing for C buffers
 	"FillCol"	FILL		0			# column for paragraph reformat, and line break
 	"ShiftWidth"	SWIDTH		0			# shiftwidth for ^T/^D/<</>>
-	"TabStop"	TAB		WFHARD			# tab spacing for most buffers
+	"TabStop"	TAB		WFHARD|WFMODE		# tab spacing for most buffers
 	"TagLength"	TAGLEN		0			# required significant length for tag lookups
 	"UndoLimit"	UNDOLIM		0			# how much undo stack is saved
 	"WrapMargin"	WRAPMARGIN	0			# width of right margin for autowrap
@@ -136,6 +152,7 @@ color
 "line"		LINE			# text of current line
 "llength"	LLENGTH			# length of current line
 "match"		MATCH			# last matched magic pattern
+"mode"		MODE			# are we inserting/overwriting/command
 "pagelen"	PAGELEN			# number of lines used by editor
 "pagewid"	CURWIDTH		# current screen width
 "palette"	PALETTE			# current palette string
@@ -143,7 +160,7 @@ color
 "pending"	PENDING			# type ahead pending flag
 "progname"	PROGNAME		# returns current prog name - "vile"
 "qidentifier"	QIDENTIF		# current qualified identifier
-"ram"		RAM			# ram in use by malloc
+"ram"		RAM		RAMSIZE	# ram in use by malloc
 "replace"	REPLACE			# replacement pattern
 "search"	SEARCH			# search pattern
 "seed"		SEED			# current random number seed

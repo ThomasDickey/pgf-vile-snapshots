@@ -4,7 +4,22 @@
  *	written 11-feb-86 by Daniel Lawrence
  *
  * $Log: bind.c,v $
- * Revision 1.45  1993/06/21 14:22:38  pgf
+ * Revision 1.50  1993/07/01 16:15:54  pgf
+ * tom's 3.51 changes
+ *
+ * Revision 1.49  1993/07/01  10:56:21  pgf
+ * bugfix to prc2kcod()
+ *
+ * Revision 1.48  1993/06/30  14:07:54  pgf
+ * made M- synonymous w/ FN-
+ *
+ * Revision 1.47  1993/06/28  20:03:29  pgf
+ * cleaned prc2kcod, and added 0xNN and literal control character support
+ *
+ * Revision 1.46  1993/06/28  17:11:31  pgf
+ * tightened up parsing and error checking for key-sequences
+ *
+ * Revision 1.45  1993/06/21  14:22:38  pgf
  * don't kbd_putc to the last column, to avoid auto-wrap problems.  should
  * really check ":am:", but this means adding to the TERM struct.
  *
@@ -227,7 +242,7 @@ int f,n;
 
 		make_local_b_val(bp,MDIGNCASE); /* easy to search, */
 		set_b_val(bp,MDIGNCASE,TRUE);
-		bp->b_flag |= BFSCRTCH;
+		b_set_scratch(bp);
 	}
 	return swbuffer(bp);
 }
@@ -305,7 +320,8 @@ int	c;
 char	*buf;
 int	*pos;
 {
-	return kbd_complete(c, buf, pos, (char *)&TermChrs[0], sizeof(TermChrs[0]));
+	return kbd_complete(c, buf, pos, (char *)&TermChrs[0],
+		sizeof(TermChrs[0]));
 }
 
 static int
@@ -326,6 +342,7 @@ int f,n;
 {
 	register int s, j;
 	char	name[NLINE];
+	int c;
 #ifdef BEFORE
 	CMDFUNC	*kcmd;
 #endif
@@ -340,12 +357,18 @@ int f,n;
 #ifdef BEFORE
 		case 'b':
 			kcmd = engl2fnc(name);
-			s = rebind_key(key_to_bind(kcmd), kcmd);
+			c = key_to_bind(kcmd);
+			if (c < 0)
+				return(FALSE);
+			s = rebind_key(c);
 			break;
 #endif
 		case 's':
 		default:
-			*(TermChrs[j].value) = key_to_bind((CMDFUNC *)0);
+			c = key_to_bind((CMDFUNC *)0);
+			if (c < 0)
+				return(FALSE);
+			*(TermChrs[j].value) = c;
 			break;
 		}
 	}
@@ -389,9 +412,18 @@ int f,n;
 		char tok[NSTRING];
 		macarg(tok);	/* get the next token */
 		c = prc2kcod(tok);
+		if (c < 0) {
+			mlforce("[Illegal key-sequence \"%s\"]",tok);
+			return(FALSE);
+		}
 	} else {
 		c = kbd_seq();
+		if (c < 0) {
+			mlforce("[Not a bindable key-sequence]");
+			return(FALSE);
+		}
 	}
+
 	ostring(kcod2prc(c, outseq));
 	ostring(" ");
 
@@ -414,6 +446,7 @@ int f, n;	/* command arguments [IGNORED] */
 	register CMDFUNC *kcmd;	/* ptr to the requested function to bind to */
 	char cmd[NLINE];
 	char *fnp;
+	int c;
 
 	/* prompt the user to type in a key to bind */
 	/* and get the function name to bind it to */
@@ -424,7 +457,10 @@ int f, n;	/* command arguments [IGNORED] */
 		return(FALSE);
 	}
 
-	return rebind_key(key_to_bind(kcmd), kcmd);
+	c = key_to_bind(kcmd);
+	if (c < 0)
+		return(FALSE);
+	return rebind_key(c, kcmd);
 }
 
 /*
@@ -453,8 +489,12 @@ register CMDFUNC *kcmd;
 			c = kbd_seq();
 	}
 
-	/* change it to something we can print as well */
-	ostring(kcod2prc(c, outseq));
+	if (c >= 0) {
+		/* change it to something we can print as well */
+		ostring(kcod2prc(c, outseq));
+	} else {
+		mlforce("[Not a proper key-sequence]");
+	}
 	return c;
 }
 
@@ -535,8 +575,16 @@ int f, n;	/* command arguments [IGNORED] */
 		char tok[NSTRING];
 		macarg(tok);	/* get the next token */
 		c = prc2kcod(tok);
+		if (c < 0) {
+			mlforce("[Illegal key-sequence \"%s\"]",tok);
+			return FALSE;
+		}
 	} else {
 		c = kbd_seq();
+		if (c < 0) {
+			mlforce("[Not a bindable key-sequence]");
+			return(FALSE);
+		}
 	}
 
 	/* change it to something we can print as well */
@@ -1117,40 +1165,70 @@ prc2kcod(k)
 char *k;		/* name of key to translate to Command key form */
 {
 	register int c = 0;	/* key sequence to return */
+	register int pref = 0;	/* key prefixes */
 
 	/* first, the CTLA prefix */
-	if (*k == '^' && *(k+1) == toalpha(cntl_a) && *(k+2) == '-') {
-		c = CTLA;
+	if (iscntrl(cntl_a) &&
+		(*k == '^' && *(k+1) == toalpha(cntl_a) && *(k+2) == '-')) {
+		pref = CTLA;	/* ^A- as 3 chars */
 		k += 3;
+	} else if (iscntrl(cntl_x) &&
+		(*k == '^' && *(k+1) == toalpha(cntl_x) && *(k+2) == '-')) {
+		pref |= CTLX;	/* ^X- as 3 chars */
+		k += 3;
+	} else if (*k == cntl_a) {
+		pref = CTLA;	/* ^A as one char */
+		k++;
+	} else if (*k == cntl_x) {
+		pref |= CTLX;	/* ^X as one char */
+		k++;
 	}
 
-	/* next the function prefix */
-	if (*k == 'F' && *(k+1) == 'N' && *(k+2) == '-') {
-		c |= SPEC;
+	/* next possibly the "function" prefix */
+	if (strncmp(k, "FN-", 3) == 0) {
+		pref |= SPEC;		/* FN- as 3 chars */
 		k += 3;
-	}
-
-	/* control-x as well... (but not with FN) */
-	if (*k == '^' && *(k+1) == toalpha(cntl_x) && 
-				*(k+2) == '-' && !(c & SPEC)) {
-		c |= CTLX;
-		k += 3;
+	} else if (strncmp(k, "M-", 2) == 0) {
+		pref |= SPEC;		/* M- as 2 chars */
+		k += 2;
 	}
 
 	/* a control char? */
-	if (*k == '^' && *(k+1) != 0) {
-		++k;
-		c |= *k;
-		if (islower(c)) c = toupper(c);
-		c = tocntrl(c);
+	if (*k == '^' && ('?' <= *(k+1) && *(k+1) <= '_')) {
+		c = tocntrl(*(k+1));
+		k += 2;
 	} else if (!strcmp(k,"<sp>")) {
-		c |= ' ';
+		return pref | ' ';		/* the string <sp> */
 	} else if (!strcmp(k,"<tab>")) {
-		c |= '\t';
-	} else {
-		c |= *k;
+		return pref | '\t';		/* the string <tab> */
+	} else if (*k == '0' && (*(k+1) == 'x' || *(k+1) == 'X') &&
+		isalnum(*(k+2)) && isalnum(*(k+3))) {
+		k += 2;				/* 0xNN or 0XNN */
+		c = 0;
+		if (isdigit(*k))
+			c = *k - '0';
+		else if (isupper(*k))
+			c = *k - 'A' + 10;
+		else if (islower(*k))
+			c = *k - 'a' + 10;
+		k++;
+		c *= 16;
+		if (isdigit(*k))
+			c += *k - '0';
+		else if (isupper(*k))
+			c += *k - 'A' + 10;
+		else if (islower(*k))
+			c += *k - 'a' + 10;
+		k++;
+
+	} else {		/* any single char, control or not */
+		c = *k++;
 	}
-	return c;
+
+	if (*k != '\0')		/* we should have eaten the whole thing */
+		return -1;
+	
+	return pref|c;
 }
 
 #if ! SMALLER
@@ -1161,8 +1239,13 @@ prc2engl(skey)	/* string key name to binding name.... */
 char *skey;	/* name of key to get binding for */
 {
 	char *bindname;
+	int c;
 
-	bindname = fnc2engl(kcod2fnc(prc2kcod(skey)));
+	c = prc2kcod(skey);
+	if (c >= 0)
+		return "ERROR";
+
+	bindname = fnc2engl(kcod2fnc(c));
 	if (bindname == NULL)
 		bindname = "ERROR";
 

@@ -6,7 +6,10 @@
  * for the display system.
  *
  * $Log: buffer.c,v $
- * Revision 1.67  1993/06/23 21:31:16  pgf
+ * Revision 1.68  1993/07/01 16:15:54  pgf
+ * tom's 3.51 changes
+ *
+ * Revision 1.67  1993/06/23  21:31:16  pgf
  * added "undolimit" mode
  *
  * Revision 1.66  1993/06/22  10:24:21  pgf
@@ -238,13 +241,6 @@
 
 #define BUFFER_LIST_NAME ScratchName(Buffer List)
 
-#define	ImpliedBfr(bp)		(bp->b_flag & (BFIMPLY))
-#define	CmdLine(bp)		(bp->b_flag & (BFARGS))
-#define	Changed(bp)		(bp->b_flag & (BFCHG))
-#define	Invisible(bp)		(bp->b_flag & (BFINVS))
-#define	Scratch(bp)		(bp->b_flag & (BFSCRTCH))
-#define	InvisibleOrScratch(bp)	(bp->b_flag & (BFINVS|BFSCRTCH))
-
 /*--------------------------------------------------------------------------*/
 static	BUFFER *find_BufferList P(( void ));
 static	int	update_on_chg P(( BUFFER * ));
@@ -299,7 +295,7 @@ int	update_on_chg(bp)
 	BUFFER *bp;
 {
 	return (strcmp(BUFFER_LIST_NAME, bp->b_bname) != 0 &&
-			(!Invisible(bp) || show_all));
+			(!b_is_invisible(bp) || show_all));
 }
 
 /*
@@ -418,7 +414,7 @@ BUFFER *find_b_hist(number)
 	register BUFFER *bp;
 
 	for_each_buffer(bp)
-		if (!InvisibleOrScratch(bp) && (number-- <= 0))
+		if (!b_is_temporary(bp) && (number-- <= 0))
 			break;
 	return bp;
 }
@@ -604,7 +600,7 @@ int	lookup_hist(bp1)
 	register int	count = -1;
 
 	for_each_buffer(bp)
-		if (!InvisibleOrScratch(bp)) {
+		if (!b_is_temporary(bp)) {
 			count++;
 			if (bp == bp1)
 				return count;
@@ -621,11 +617,11 @@ int	hist_show()
 
 	(void)strcpy(line,"");
 	for_each_buffer(bp) {
-		if (!InvisibleOrScratch(bp)) {
+		if (!b_is_temporary(bp)) {
 			if (bp != curbp) {	/* don't bother with current */
 				(void)lsprintf(line+strlen(line), "  %d%s%s",
 					i,
-					Changed(bp) ? "* " : " ",
+					b_is_changed(bp) ? "* " : " ",
 					bp->b_bname);
 			}
 			if (++i > 9)	/* limit to single-digit */
@@ -690,9 +686,11 @@ BUFFER *find_alt()
 
 	if (global_g_val(GMDABUFF)) {
 		BUFFER *any_bp = 0;
-		for (bp = curbp; bp; bp = bp->b_bufp) {
+		if ((bp = find_bp(curbp)) == 0)
+			bp = bheadp;
+		for (; bp; bp = bp->b_bufp) {
 			if (bp != curbp) {
-				if (Scratch(bp)) {
+				if (b_is_scratch(bp)) {
 					if (!any_bp)
 						any_bp = bp;
 				} else
@@ -753,8 +751,8 @@ int	lockfl;
 			}
 
 			/* fill the buffer */
-			bp->b_flag &= ~(BFINVS|BFCHG);
-			bp->b_flag |= BFIMPLY;
+			b_clr_flags(bp, BFINVS|BFCHG);
+			b_set_flags(bp, BFIMPLY);
 			bp->b_active = TRUE;
 			ch_fname(bp, nfname);
 			if (curwp != 0 && curwp->w_bufp == curbp) {
@@ -866,7 +864,7 @@ int f, n;	/* default flag, numeric argument */
 			while(bp->b_bufp != stopatbp)
 				bp = bp->b_bufp;
 			/* if that one's invisible, back up and try again */
-			if (Invisible(bp))
+			if (b_is_invisible(bp))
 				stopatbp = bp;
 			else
 				return swbuffer(bp);
@@ -878,7 +876,7 @@ int f, n;	/* default flag, numeric argument */
 			last_bp = find_b_hist(0);
 		if (last_bp != 0) {
 			for (bp = last_bp->b_bufp; bp; bp = bp->b_bufp) {
-				if (CmdLine(bp))
+				if (b_is_argument(bp))
 					return swbuffer(last_bp = bp);
 			}
 		}
@@ -948,6 +946,7 @@ register BUFFER *bp;
 			mlforce("BUG: swbuffer: wp still NULL");
 		curwp = wp;
 		upmode();
+		(void)check_modtime( bp, bp->b_fname );
 		if (bp != find_BufferList())
 			updatelistbuffers();
 		return TRUE;
@@ -959,13 +958,16 @@ register BUFFER *bp;
 	if (bp->b_nwnd++ == 0) {		/* First use.		*/
 		curwp->w_traits = bp->b_wtraits;
 	}
+
 	if (bp->b_active != TRUE) {		/* buffer not active yet*/
 		/* read it in and activate it */
 		(void)readin(bp->b_fname, TRUE, bp, TRUE);
 		curwp->w_dot.l = lFORW(bp->b_line.l);
 		curwp->w_dot.o = 0;
 		bp->b_active = TRUE;
-	}
+	} else
+		(void)check_modtime( bp, bp->b_fname );
+
 	updatelistbuffers();
 	return TRUE;
 }
@@ -978,26 +980,32 @@ register WINDOW *wp;
 {
 	/* get rid of it completely if it's a scratch buffer,
 		or it's empty and unmodified */
-	if (Scratch(bp)
-	 || ( global_g_val(GMDABUFF) && !Changed(bp) && is_empty_buf(bp)) ) {
+	if (b_is_scratch(bp)
+	 || ( global_g_val(GMDABUFF) && !b_is_changed(bp) && is_empty_buf(bp)) ) {
 		(void)zotbuf(bp);
 	} else {  /* otherwise just adjust it off the screen */
 		bp->b_wtraits  = wp->w_traits;
 	}
 }
 
+/* return true iff c-mode is active for this buffer */
+int
+cmode_active(bp)
+register BUFFER *bp;
+{
+	if (is_local_b_val(bp,MDCMOD))
+		return b_val(bp, MDCMOD);
+	else
+		return (b_val(bp, MDCMOD) && has_C_suffix(bp));
+}
+
+
 /* return the correct tabstop setting for this buffer */
 int
 tabstop_val(bp)
 register BUFFER *bp;
 {
-	if (is_local_b_val(bp,MDCMOD))
-		return b_val(bp,
-			b_val(bp, MDCMOD) ? VAL_C_TAB : VAL_TAB);
-	else
-		return b_val(bp,
-			(b_val(bp, MDCMOD) && has_C_suffix(bp))
-					 ? VAL_C_TAB : VAL_TAB);
+	return b_val(bp, (cmode_active(bp) ? VAL_C_TAB : VAL_TAB));
 }
 
 /* return the correct shiftwidth setting for this buffer */
@@ -1005,13 +1013,7 @@ int
 shiftwid_val(bp)
 register BUFFER *bp;
 {
-	if (is_local_b_val(bp,MDCMOD))
-		return b_val(bp,
-			b_val(bp, MDCMOD) ? VAL_C_SWIDTH : VAL_SWIDTH);
-	else
-		return b_val(bp,
-			(b_val(bp, MDCMOD) && has_C_suffix(bp))
-					 ? VAL_C_SWIDTH : VAL_SWIDTH);
+	return b_val(bp, (cmode_active(bp) ? VAL_C_SWIDTH : VAL_SWIDTH));
 }
 
 int
@@ -1057,7 +1059,7 @@ int f,n;
 		return FALSE;
 
 #ifdef BEFORE /* now allow killing the specials, like "tags" */
-	if (Invisible(bp)) 		/* Deal with special buffers	*/
+	if (b_is_invisible(bp)) 	/* Deal with special buffers	*/
 		return (TRUE);		/* by doing nothing.	*/
 #endif
 	if (curbp == bp) {
@@ -1302,9 +1304,11 @@ void	makebufflist(iflag,dummy)
 	char *dummy;
 {
 	register BUFFER *bp;
+	LINEPTR curlp;		/* entry corresponding to buffer-list */
 	int nbuf = 0;		/* no. of buffers */
 	int this_or_that;
 
+	curlp = null_ptr;
 	show_all = iflag;	/* save this to use in 'updatelistbuffers()' */
 
 	bprintf("      %7s %*s %s\n", "Size",NBUFN,"Buffer name","Contents");
@@ -1313,26 +1317,23 @@ void	makebufflist(iflag,dummy)
 	/* output the list of buffers */
 	for_each_buffer(bp) {
 		/* skip invisible buffers and ourself if iflag is false */
-		if ((InvisibleOrScratch(bp)) && !show_all) {
+		if ((b_is_temporary(bp)) && !show_all) {
 			continue;
 		}
-		/* output status of ACTIVE flag (has the file been read in? */
-		if (bp->b_active == TRUE) {   /* if activated	    */
-			if (Changed(bp)) {	/* if changed     */
-				MakeNote('m');
-			} else if (ImpliedBfr(bp)) {
-				MakeNote('a');
-			} else {
-				bputc(' ');
-			}
-		} else {
-			if (Invisible(bp))
-				MakeNote('i');
-			else if (Scratch(bp))
-				MakeNote('s');
-			else
-				MakeNote('u');
-		}
+
+		/* output status flag (e.g., has the file been read in?) */
+		if (!(bp->b_active))
+			MakeNote('u');
+		else if (b_is_implied(bp))
+			MakeNote('a');
+		else if (b_is_invisible(bp))
+			MakeNote('i');
+		else if (b_is_scratch(bp))
+			MakeNote('s');
+		else if (b_is_changed(bp))
+			MakeNote('m');
+		else
+			bputc(' ');
 
 		this_or_that = (bp == this_bp)
 			? '%'
@@ -1340,7 +1341,7 @@ void	makebufflist(iflag,dummy)
 				? '#'
 				: ' ';
 
-		if (InvisibleOrScratch(bp))
+		if (b_is_temporary(bp))
 			bprintf("   %c ", this_or_that);
 		else
 			bprintf(" %2d%c ", nbuf++, this_or_that);
@@ -1358,10 +1359,20 @@ void	makebufflist(iflag,dummy)
 				bprintf("%s",p);
 		}
 		bprintf("\n");
+		if (bp == curbp)
+			curlp = lBACK(lBACK(curbp->b_line.l));
 	}
 	ShowNotes();
 	bprintf("             %*s %s", NBUFN, "Current dir:",
 		current_directory(FALSE));
+
+	/* show the actual size of the buffer-list */
+	if (!same_ptr(curlp, null_ptr)) {
+		char	temp[20];
+		bsizes(curbp);
+		(void)lsprintf(temp, "%7ld", curbp->b_bytecount);
+		(void)memcpy(l_ref(curlp)->l_text + 6, temp, strlen(temp));
+	}
 }
 
 /* ARGSUSED */
@@ -1449,26 +1460,60 @@ register BUFFER *bp;
 char	*text;
 int len;
 {
-	fast_ptr LINEPTR lp;
+	if (add_line_at (bp, lBACK(bp->b_line.l), text, len) == TRUE) {
+		/* If "." is at the end, move it to new line  */
+		if (sameline(bp->b_dot, bp->b_line))
+			bp->b_dot.l = lBACK(bp->b_line.l);
+		return TRUE;
+	}
+	return FALSE;
+}
+
+/*
+ * Add a LINE filled with the given text after the specified LINE.
+ */
+int
+add_line_at (bp, prevp, text, len)
+register BUFFER	*bp;
+LINEPTR	prevp;
+char	*text;
+int	len;
+{
+	fast_ptr LINEPTR newlp;
+	fast_ptr LINEPTR nextp = lFORW(prevp);
+	register LINE *	lp;
 	register int	ntext;
 
 	ntext = (len < 0) ? strlen(text) : len;
-	lp = lalloc(ntext, bp);
-	if (same_ptr(lp, null_ptr))
+	newlp = lalloc(ntext, bp);
+	if (same_ptr(newlp, null_ptr))
 		return (FALSE);
+
+	lp = l_ref(newlp);
 #if OPT_MAP_MEMORY
-	if (ntext > l_ref(lp)->l_size)
-		ntext = l_ref(lp)->l_size;
+	if (ntext > lp->l_size)
+		ntext = lp->l_size;
 #endif
 	if (ntext > 0)
-		(void)memcpy(l_ref(lp)->l_text, text, (SIZE_T)ntext);
+		(void)memcpy(lp->l_text, text, (SIZE_T)ntext);
 
-	set_lForw(lBack(bp->b_line.l), lp);	/* Hook onto the end    */
-	set_lBACK(lp, lBACK(bp->b_line.l));
-	set_lBACK(bp->b_line.l, lp);
-	set_lFORW(lp, bp->b_line.l);
-	if (sameline(bp->b_dot, bp->b_line))  /* If "." is at the end */
-		bp->b_dot.l = lp;		/* move it to new line  */
+	/* try to maintain byte/line counts? */
+	if (b_is_counted(bp)) {
+		if (same_ptr(nextp, bp->b_line.l)) {
+			bp->b_bytecount += (ntext+1);
+			bp->b_linecount += 1;
+#if !SMALLER		/* tradeoff between codesize & data */
+			lp->l_number = bp->b_linecount;
+#endif
+		} else
+			b_clr_counted(bp);
+	}
+
+	set_lFORW(prevp, newlp);	/* link into the buffer */
+	set_lBACK(newlp, prevp);
+	set_lBACK(nextp, newlp);
+	set_lFORW(newlp, nextp);
+
 	return (TRUE);
 }
 
@@ -1489,7 +1534,7 @@ anycb()
 	register int cnt = 0;
 
 	for_each_buffer(bp) {
-		if (!Invisible(bp) && Changed(bp))
+		if (!b_is_invisible(bp) && b_is_changed(bp))
 			cnt++;
 	}
 	return (cnt);
@@ -1523,6 +1568,9 @@ char   *bname;
 		(void)no_memory("BUFFER");
 		return (NULL);
 	}
+
+	/* set this first, to make it simple to trace */
+	(void)strcpy(bp->b_bname, bname);
 
 	/* these affect lalloc(), below */
 #if !OPT_MAP_MEMORY
@@ -1560,7 +1608,6 @@ char   *bname;
 	bp->b_acount = b_val(bp, VAL_ASAVECNT);
 	bp->b_fname = NULL;
 	ch_fname(bp, "");
-	(void)strcpy(bp->b_bname, bname);
 #if	CRYPT
 	if (cryptkey != 0 && *cryptkey != EOS) {
 		(void)strcpy(bp->b_key, cryptkey);
@@ -1568,6 +1615,9 @@ char   *bname;
 		set_b_val(bp, MDCRYPT, TRUE);
 	} else
 		bp->b_key[0] = EOS;
+#endif
+#ifdef	MDCHK_MODTIME
+	bp->b_modtime = 0;
 #endif
 	bp->b_udstks[0] = bp->b_udstks[1] = null_ptr;
 #if OPT_MAP_MEMORY	/* _all_ pointers must be clean */
@@ -1579,6 +1629,10 @@ char   *bname;
 	bp->b_udtail = null_ptr;
 	bp->b_udlastsep = null_ptr;
 	bp->b_udcount = 0;
+
+	b_set_counted(bp);	/* buffer is empty */
+	bp->b_bytecount = 0;
+	bp->b_linecount = 0;
 	set_lFORW(lp, lp);
 	set_lBACK(lp, lp);
         
@@ -1609,14 +1663,14 @@ register BUFFER *bp;
 {
 	fast_ptr LINEPTR lp;
 
-	if (!InvisibleOrScratch(bp) /* Not invisible or scratch */
-	 &&  Changed(bp)) {	    /* Something changed    */
+	if (!b_is_temporary(bp) /* Not invisible or scratch */
+	 &&  b_is_changed(bp)) {	/* Something changed    */
 		char ques[50];
 		(void)strcat(strcpy(ques,"Discard changes to "), bp->b_bname);
 		if (mlyesno(ques) != TRUE)
 			return FALSE;
 	}
-	bp->b_flag  &= ~BFCHG;			/* Not changed		*/
+	b_clr_changed(bp);		/* Not changed		*/
 	freeundostacks(bp,TRUE);	/* do this before removing lines */
 	while ((l_ref(lp=lFORW(bp->b_line.l))) != l_ref(bp->b_line.l)) {
 		lremove(bp,lp);
@@ -1633,13 +1687,16 @@ register BUFFER *bp;
 	bp->b_freeLINEs = NULL;
 #endif
 
-	bp->b_dot  = bp->b_line;		/* Fix "."		*/
+	bp->b_dot  = bp->b_line;	/* Fix "."		*/
 #if WINMARK
-	bp->b_mark = nullmark;			/* Invalidate "mark"	*/
+	bp->b_mark = nullmark;		/* Invalidate "mark"	*/
 #endif
-	bp->b_lastdot = nullmark;		/* Invalidate "mark"	*/
+	bp->b_lastdot = nullmark;	/* Invalidate "mark"	*/
 	FreeAndNull(bp->b_nmmarks);	/* free the named marks */
 
+	b_set_counted(bp);
+	bp->b_bytecount = 0;
+	bp->b_linecount = 0;
 
 #if NO_LEAKS
 	free_local_vals(b_valuenames, bp->b_values.bv, global_b_values.bv);
@@ -1660,25 +1717,20 @@ BUFFER *bp;
 	register long	numchars = 0;	/* # of chars in file */
 	register int	numlines = 0;	/* # of lines in file */
 
-	static int cache_up_to_date = FALSE;
-
-	if (cache_up_to_date)		/* patch */
+	if (b_is_counted(bp))
 		return FALSE;
 
-	/* starting at the beginning of the buffer */
-	lp = lForw(bp->b_line.l);
-
-	/* start counting chars and lines */
-	while (lp != l_ref(bp->b_line.l)) {
+	/* count chars and lines */
+	for_each_line(lp,bp) {
 		++numlines;
 		numchars += llength(lp) + 1;
 #if !SMALLER	/* tradeoff between codesize & data */
 		lp->l_number = numlines;
 #endif
-		lp = lforw(lp);
 	}
 	bp->b_bytecount = numchars;
 	bp->b_linecount = numlines;
+	b_set_counted(bp);
 	return TRUE;
 }
 
@@ -1692,11 +1744,12 @@ register int	flag;
 {
 	register WINDOW *wp;
 
+	b_clr_counted(bp);
 	if (bp->b_nwnd != 1)		/* Ensure hard. 	*/
 		flag |= WFHARD;
-	if (!Changed(bp)) {		/* First change, so	*/
+	if (!b_is_changed(bp)) {	/* First change, so	*/
 		flag |= WFMODE; 	/* update mode lines.	*/
-		bp->b_flag |= BFCHG;
+		b_set_changed(bp);
 
 		if (update_on_chg(bp))
 			updatelistbuffers();
@@ -1716,11 +1769,12 @@ register int	flag;
 {
 	register WINDOW *wp;
 
-	if (Changed(bp)) {
+	if (b_is_changed(bp)) {
 		if (bp->b_nwnd != 1)		/* Ensure hard. 	*/
 			flag |= WFHARD;
 		flag |= WFMODE; 		/* update mode lines.	*/
-		bp->b_flag &= ~BFCHG;
+		b_clr_changed(bp);
+		b_clr_counted(bp);
 
 		for_each_window(wp) {
 			if (wp->w_bufp == bp)
@@ -1753,7 +1807,7 @@ int f,n;
 	oldbp = curbp;				/* save in case we fail */
 
 	for_each_buffer(bp) {
-		if (Changed(bp) && !Invisible(bp)) {
+		if (b_is_changed(bp) && !b_is_invisible(bp)) {
 			make_current(bp);
 			mlforce("[Saving %s]",bp->b_fname);
 			mlforce("\n");
@@ -1782,7 +1836,7 @@ void	bp_leaks()
 	register BUFFER *bp;
 
 	while ((bp = bheadp) != 0) {
-		bp->b_flag &= ~BFCHG;	/* discard any changes */
+		b_clr_changed(bp);	/* discard any changes */
 		bclear(bheadp);
 		FreeBuffer(bheadp);
 	}
