@@ -6,7 +6,44 @@
  * for the display system.
  *
  * $Log: buffer.c,v $
- * Revision 1.20  1991/10/22 14:08:23  pgf
+ * Revision 1.31  1992/01/05 00:06:13  pgf
+ * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
+ * often.  also normalized message appearance somewhat.
+ *
+ * Revision 1.30  1992/01/03  23:33:50  pgf
+ * use new ch_fname() routine to manipulate filenames
+ *
+ * Revision 1.29  1991/11/12  23:50:10  pgf
+ * no longer allocate text for the header line -- the scanner doesn't
+ * need it
+ *
+ * Revision 1.28  1991/11/12  23:43:23  pgf
+ * pass stringend param to regexp, for end of string
+ *
+ * Revision 1.27  1991/11/08  13:08:44  pgf
+ * ifdefed unused func
+ *
+ * Revision 1.26  1991/11/03  17:48:11  pgf
+ * pass -1 to regexec to indicate no srchlim specified -- 0 was ambiguous
+ *
+ * Revision 1.25  1991/11/01  14:38:00  pgf
+ * saber cleanup
+ *
+ * Revision 1.24  1991/10/28  14:21:05  pgf
+ * renamed curtabstopval to curtabval, initialized new b_acount field
+ * in BUFFER struct
+ *
+ * Revision 1.23  1991/10/28  01:01:06  pgf
+ * added start offset and end offset to regexec calls
+ *
+ * Revision 1.22  1991/10/26  00:10:35  pgf
+ * use regexec for c suffixes
+ *
+ * Revision 1.21  1991/10/23  14:19:53  pgf
+ * allocate some text for a buffer's header line, and put a -1 there as the
+ * first and only character.  this helps the search engine.
+ *
+ * Revision 1.20  1991/10/22  14:08:23  pgf
  * took out old ifdef BEFORE code
  *
  * Revision 1.19  1991/10/10  12:33:33  pgf
@@ -87,18 +124,18 @@
 #include	"estruct.h"
 #include	"edef.h"
 
-static lastlookup = -1;
 
 /* c is either first character of a filename, or an index into buffer list */
 char *
 hist_lookup(c)
+int c;
 {
 	register BUFFER *bp;
 	static char buf[NBUFN];
 	buf[0] = '\0';
 
 	if (curbp != bheadp)
-		mlwrite("BUG: hist_lookup: curbp != bheadp");
+		mlforce("BUG: hist_lookup: curbp != bheadp");
 	        
 	bp = curbp->b_bufp; /* always skip the current */
 	while (bp != NULL) {
@@ -118,7 +155,7 @@ hist_show()
 	BUFFER *bp;
         
 	if (curbp != bheadp)
-		mlwrite("BUG: hist_show: curbp != bheadp");
+		mlforce("BUG: hist_show: curbp != bheadp");
         
 	strcpy(line,"");
 	for (i = 0, bp = curbp->b_bufp; i < 10 && bp != NULL; bp = bp->b_bufp) {
@@ -141,6 +178,7 @@ hist_show()
 }
 
 histbuff(f,n)
+int f,n;
 {
 	register int thiscmd, c;
 	register BUFFER *bp;
@@ -148,7 +186,7 @@ histbuff(f,n)
 
 	if (curbp->b_bufp == NULL) {
 		TTbeep();
-		mlwrite("No other buffers.");
+		mlforce("[No other buffers.]");
 		return(FALSE);
 	}
 
@@ -172,7 +210,7 @@ histbuff(f,n)
 	bufn = hist_lookup(c);
 	if (bufn == NULL) {
 		TTbeep();
-		mlwrite("No such buffer.");
+		mlforce("[No such buffer.]");
 		return FALSE;
 	}
 	/* first assume its a buffer name, then a file name */
@@ -184,7 +222,9 @@ histbuff(f,n)
 }
 
 /* switch back to the most recent buffer */
+/* ARGSUSED */
 altbuff(f,n)
+int f,n;
 {
 	return histbuff(TRUE,1);
 }
@@ -195,7 +235,9 @@ altbuff(f,n)
  * if the use count is 0. Otherwise, they come
  * from some other window.
  */
+/* ARGSUSED */
 usebuffer(f, n)
+int f,n;
 {
 	register BUFFER *bp;
 	register int	s;
@@ -209,6 +251,7 @@ usebuffer(f, n)
 	return swbuffer(bp);
 }
 
+/* ARGSUSED */
 nextbuffer(f, n)	/* switch to the next buffer in the buffer list */
 int f, n;	/* default flag, numeric argument */
 {
@@ -218,8 +261,9 @@ int f, n;	/* default flag, numeric argument */
 	stopatbp = NULL;
 	while (stopatbp != bheadp) {
 		/* get the last buffer in the list */
-		for (bp = bheadp; bp->b_bufp != stopatbp; bp = bp->b_bufp)
-			;
+		bp = bheadp;
+		while(bp->b_bufp != stopatbp)
+			bp = bp->b_bufp;
 		/* if that one's invisible, back up and try again */
 		if (bp->b_flag & BFINVS)
 			stopatbp = bp;
@@ -235,10 +279,9 @@ int f, n;	/* default flag, numeric argument */
 swbuffer(bp)	/* make buffer BP current */
 register BUFFER *bp;
 {
-	register WINDOW *wp;
 
 	if (!bp) {
-		mlwrite("BUG:  swbuffer passed null bp");
+		mlforce("BUG:  swbuffer passed null bp");
 		return FALSE;
 	}
 
@@ -256,11 +299,11 @@ register BUFFER *bp;
 	/* get it already on the screen if possible */
 	if (bp->b_nwnd > 0)  { /* then it's on the screen somewhere */
 		register WINDOW *wp;
-		for (wp = wheadp;
-			 wp->w_bufp != bp && wp->w_wndp != NULL; wp = wp->w_wndp)
-			;
+		wp = wheadp;
+		while (wp->w_bufp != bp && wp->w_wndp != NULL)
+			wp = wp->w_wndp;
 		if (!wp)
-			mlwrite("BUG: swbuffer: wp still NULL");
+			mlforce("BUG: swbuffer: wp still NULL");
 		curwp = wp;
 		upmode();
 		return TRUE;
@@ -308,13 +351,13 @@ BUFFER *nbp;
         
 	if (nbp == bheadp) {	/* already at the head */
 		curbp = bheadp;
-		curtabstopval = tabstop_val(curbp);
+		curtabval = tabstop_val(curbp);
 		return;
 	}
 	        
 	/* remove nbp from the list */
-	for (bp = bheadp; bp->b_bufp != nbp; bp = bp->b_bufp)
-		;
+	bp = bheadp; while(bp->b_bufp != nbp)
+		bp = bp->b_bufp;
 	bp->b_bufp = nbp->b_bufp;
         
 	/* put it at the head */
@@ -323,7 +366,7 @@ BUFFER *nbp;
 	bheadp = nbp;
 	curbp = nbp;
 
-	curtabstopval = tabstop_val(curbp);
+	curtabval = tabstop_val(curbp);
 }
 
 tabstop_val(bp)
@@ -341,10 +384,11 @@ register BUFFER *bp;
 has_C_suffix(bp)
 register BUFFER *bp;
 {
-	char *cp;
-	cp = &bp->b_fname[strlen(bp->b_fname)-2];
-	return cp >= bp->b_fname && cp[0] == '.' && 
-		strchr(b_val_ptr(bp,VAL_CSUFFIXES),cp[1]);
+	int s;
+	ignorecase = FALSE;
+	s =  regexec(b_val_rexp(bp,VAL_CSUFFIXES)->reg,
+			bp->b_fname, NULL, 0, -1);
+	return s;
 }
 
 /*
@@ -355,27 +399,27 @@ register BUFFER *bp;
  * if the buffer has been changed). Then free the header
  * line and the buffer header.
  */
+/* ARGSUSED */
 killbuffer(f, n)
+int f,n;
 {
 	register BUFFER *bp;
 	register int	s;
 	char bufn[NBUFN];
 	register BUFFER *bp1;
-	register int	didswitch = FALSE;
 
 	bufn[0] = 0;
 	if ((s=mlreply("Kill buffer: ", bufn, NBUFN)) != TRUE)
 		return(s);
 	if ((bp=bfind(bufn, NO_CREAT, 0)) == NULL) { /* Easy if unknown.     */
-		mlwrite("No such buffer");
+		mlforce("[No such buffer]");
 		return FALSE;
 	}
 	if(bp->b_flag & BFINVS) 	/* Deal with special buffers	*/
 			return (TRUE);		/* by doing nothing.	*/
 	if (curbp == bp) {
-		didswitch = TRUE;
 		if (histbuff(TRUE,1) != TRUE) {
-			mlwrite("Can't kill that buffer");
+			mlforce("[Can't kill that buffer]");
 			return FALSE;
 		}
 	}
@@ -417,7 +461,7 @@ register BUFFER *bp;
 	if (curbp == bp) {
 		didswitch = TRUE;
 		if (histbuff(TRUE,1) != TRUE) {
-			mlwrite("Can't kill that buffer");
+			mlforce("[Can't kill that buffer]");
 			return FALSE;
 		}
 	}
@@ -462,6 +506,7 @@ register BUFFER *bp;
 	return (TRUE);
 }
 
+/* ARGSUSED */
 namebuffer(f,n) 	/*	Rename the current buffer	*/
 int f, n;		/* default Flag & Numeric arg */
 {
@@ -545,6 +590,7 @@ BUFFER *bp;
 #define BUFFER_LIST_NAME "[Buffer List]"
 
 togglelistbuffers(f, n)
+int f,n;
 {
 	register WINDOW *wp;
 	register BUFFER *bp;
@@ -568,7 +614,9 @@ togglelistbuffers(f, n)
 	return s;
 }
 
+/* ARGSUSED */
 listbuffers(f, n)
+int f,n;
 {
 	int makebufflist();
 	return liststuff(BUFFER_LIST_NAME, makebufflist, f, NULL);
@@ -583,11 +631,11 @@ listbuffers(f, n)
  * is an error (if there is no memory). Iflag
  * indicates whether to list hidden buffers.
  */
+/* ARGSUSED */
 makebufflist(iflag,dummy)
 int iflag;	/* list hidden buffer flag */
 char *dummy;
 {
-	register int	i, j;
 	register BUFFER *bp;
 	int nbuf = 1;	/* no. of buffers */
 	long nbytes;		/* # of bytes in current buffer */
@@ -638,6 +686,7 @@ char *dummy;
 		bprintf("('m' means modified, 'u' means unread)\n");
 }
 
+#ifdef NEEDED
 ltoa(buf, width, num)
 char   buf[];
 int    width;
@@ -652,6 +701,7 @@ long   num;
 	while (width != 0)			/* Pad with blanks.	*/
 		buf[--width] = ' ';
 }
+#endif
 
 /*
  * The argument "text" points to
@@ -716,12 +766,12 @@ anycb()
  */
 BUFFER	*
 bfind(bname, cflag, bflag)
+int cflag, bflag;
 char   *bname;
 {
 	register BUFFER *bp;
 	register LINE	*lp;
 	register BUFFER *lastb = NULL;	/* buffer to insert after */
-	register int i;
 
 	bp = bheadp;
 	while (bp != NULL) {
@@ -765,7 +815,9 @@ char   *bname;
 	bp->b_wline.o = 0;  /* unused */
 	bp->b_line.l = lp;
 	bp->b_line.o = 0;
-	strcpy(bp->b_fname, "");
+	bp->b_acount = b_val(bp, VAL_ASAVECNT);
+	bp->b_fname = NULL;
+	ch_fname(bp, "");
 	strcpy(bp->b_bname, bname);
 #if	CRYPT
 	bp->b_key[0] = 0;
@@ -800,7 +852,6 @@ bclear(bp)
 register BUFFER *bp;
 {
 	register LINE	*lp;
-	register int	s;
 
 	if ((bp->b_flag&(BFINVS|BFSCRTCH)) == 0 /* Not invisible or scratch */
 			&& (bp->b_flag&BFCHG) != 0 ) {	    /* Something changed    */
@@ -839,6 +890,7 @@ register BUFFER *bp;
 	return (TRUE);
 }
 
+/* ARGSUSED */
 unmark(f, n)	/* unmark the current buffers change flag */
 int f, n;	/* unused command arguments */
 {

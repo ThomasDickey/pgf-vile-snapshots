@@ -6,7 +6,20 @@
 
 /*
  * $Log: evar.h,v $
- * Revision 1.3  1991/08/07 11:51:32  pgf
+ * Revision 1.7  1991/12/24 09:18:47  pgf
+ * added current/change directory support  (Dave Lemke's changes)
+ *
+ * Revision 1.6  1991/11/13  20:09:27  pgf
+ * X11 changes, from dave lemke
+ *
+ * Revision 1.5  1991/11/04  14:18:36  pgf
+ * not so many user vars (255 -> 10) and
+ * made defines and string lists match for the internal "env" vars
+ *
+ * Revision 1.4  1991/10/28  14:20:29  pgf
+ * removed obsoletes, renumbered
+ *
+ * Revision 1.3  1991/08/07  11:51:32  pgf
  * added RCS log entries
  *
  * revision 1.2	locked by: pgf;
@@ -29,14 +42,13 @@ typedef struct UVAR {
 
 /*	current user variables (This structure will probably change)	*/
 
-#define	MAXVARS		255
+#define	MAXVARS		10 	/* was 255 */
 
 UVAR uv[MAXVARS];	/* user variables */
 
 /*	list of recognized environment variables	*/
 
 char *envars[] = {
-	"fillcol",		/* current fill column */
 	"pagelen",		/* number of lines used by editor */
 	"curcol",		/* current column pos of cursor */
 	"curline",		/* current line in file */
@@ -49,8 +61,6 @@ char *envars[] = {
 	"debug",		/* macro debugging */
 	"status",		/* returns the status of the last command */
 	"palette",		/* current palette string */
-	"asave",		/* # of chars between auto-saves */
-	"acount",		/* # of chars until next auto-save */
 	"lastkey",		/* last keyboard char struck */
 	"curchar",		/* current character under the cursor */
 	"discmd",		/* display commands on command line */
@@ -66,52 +76,53 @@ char *envars[] = {
 	"match",		/* last matched magic pattern */
 	"kill",			/* kill buffer (read only) */
 	"cmode",		/* mode of current buffer */
-	"gmode",		/* global modes */
 	"tpause",		/* length to pause for paren matching */
 	"pending",		/* type ahead pending flag */
 	"lwidth",		/* width of current line */
 	"line",			/* text of current line */
+	"directory",		/* current directory */
+#if X11
+	"font",
+#endif
 };
 
 #define	NEVARS	sizeof(envars) / sizeof(char *)
 
 /* 	and its preprocesor definitions		*/
 
-#define	EVFILLCOL	0
-#define	EVPAGELEN	1
-#define	EVCURCOL	2
-#define	EVCURLINE	3
-#define	EVRAM		4
-#define	EVFLICKER	5
-#define	EVCURWIDTH	6
-#define	EVCBUFNAME	7
-#define	EVCFNAME	8
-#define	EVSRES		9
-#define	EVDEBUG		10
-#define	EVSTATUS	11
-#define	EVPALETTE	12
-#define	EVASAVE		13
-#define	EVACOUNT	14
-#define	EVLASTKEY	15
-#define	EVCURCHAR	16
-#define	EVDISCMD	17
-#define	EVVERSION	18
-#define	EVPROGNAME	19
-#define	EVSEED		20
-#define	EVDISINP	21
-#define	EVWLINE		22
-#define EVCWLINE	23
-#define	EVTARGET	24
-#define	EVSEARCH	25
-#define	EVREPLACE	26
-#define	EVMATCH		27
-#define	EVKILL		28
-#define	EVCMODE		29
-#define	EVGMODE		30
-#define	EVTPAUSE	31
-#define	EVPENDING	32
-#define	EVLWIDTH	33
-#define	EVLINE		34
+#define	EVPAGELEN	0
+#define	EVCURCOL	1
+#define	EVCURLINE	2
+#define	EVRAM		3
+#define	EVFLICKER	4
+#define	EVCURWIDTH	5
+#define	EVCBUFNAME	6
+#define	EVCFNAME	7
+#define	EVSRES		8
+#define	EVDEBUG		9
+#define	EVSTATUS	10
+#define	EVPALETTE	11
+#define	EVLASTKEY	12
+#define	EVCURCHAR	13
+#define	EVDISCMD	14
+#define	EVVERSION	15
+#define	EVPROGNAME	16
+#define	EVSEED		17
+#define	EVDISINP	18
+#define	EVWLINE		19
+#define EVCWLINE	20
+#define	EVTARGET	21
+#define	EVSEARCH	22
+#define	EVREPLACE	23
+#define	EVMATCH		24
+#define	EVKILL		25
+#define	EVCMODE		26
+#define	EVTPAUSE	27
+#define	EVPENDING	28
+#define	EVLWIDTH	29
+#define	EVLINE		30
+#define	EVDIR		31
+#define	EVFONT		32
 
 /*	list of recognized user functions	*/
 

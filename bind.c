@@ -4,7 +4,18 @@
  *	written 11-feb-86 by Daniel Lawrence
  *
  * $Log: bind.c,v $
- * Revision 1.15  1991/10/22 14:08:23  pgf
+ * Revision 1.18  1992/01/05 00:06:13  pgf
+ * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
+ * often.  also normalized message appearance somewhat.
+ *
+ * Revision 1.17  1992/01/03  23:31:49  pgf
+ * use new ch_fname() to manipulate filenames, since b_fname is now
+ * a malloc'ed sting, to avoid length limits
+ *
+ * Revision 1.16  1991/11/01  14:38:00  pgf
+ * saber cleanup
+ *
+ * Revision 1.15  1991/10/22  14:08:23  pgf
  * took out old ifdef BEFORE code
  *
  * Revision 1.14  1991/09/27  02:49:01  pgf
@@ -71,9 +82,10 @@
 extern CMDFUNC f_cntl_af, f_cntl_xf, f_unarg, f_esc;
 
 /* give me some help!!!! bring up a buffer and read the help file into it */
+/* ARGSUSED */
 help(f, n)
+int f,n;
 {
-	register WINDOW *wp;	/* scaning pointer to windows */
 	register BUFFER *bp;	/* buffer pointer to help */
 	char *fname;		/* ptr to file returned by flook() */
 
@@ -85,7 +97,7 @@ help(f, n)
 	if (bp->b_active == FALSE) { /* never been used */
 		fname = flook(pathname[1], FL_ANYWHERE);
 		if (fname == NULL) {
-			mlwrite("[Sorry, can't find the help information]");
+			mlforce("[Sorry, can't find the help information]");
 			zotbuf(bp);
 			return(FALSE);
 		}
@@ -96,7 +108,11 @@ help(f, n)
 			return(FALSE);
 		}
 		strcpy(bp->b_bname,"[Help]");
-	        lsprintf(bp->b_fname, "       %s   %s",prognam,version);
+		{
+			char buf[80];
+	        	lsprintf(buf, "       %s   %s",prognam,version);
+			ch_fname(bp, buf);
+		}
 		make_local_b_val(bp,MDVIEW);	/* make it readonly, */
 		set_b_val(bp,MDVIEW,TRUE);
 		make_local_b_val(bp,MDIGNCASE); /* easy to search, */
@@ -110,7 +126,9 @@ help(f, n)
 
 #if REBIND
 
+/* ARGSUSED */
 deskey(f, n)	/* describe the command for a certain key */
+int f,n;
 {
 	register int c;		/* key to describe */
 	register char *ptr;	/* string pointer to scan output strings */
@@ -147,13 +165,13 @@ deskey(f, n)	/* describe the command for a certain key */
 
 /* bindkey:	add a new key to the key binding table		*/
 
+/* ARGSUSED */
 bindkey(f, n)
 int f, n;	/* command arguments [IGNORED] */
 {
 	register int c;		/* command key to bind */
 	register CMDFUNC *kcmd;	/* ptr to the requested function to bind to */
 	register KBIND *kbp;	/* pointer into a binding table */
-	register int found;	/* matched command flag */
 	char outseq[80];	/* output buffer for keystroke sequence */
 	char *fnp;
 	char *kbd_engl();
@@ -172,7 +190,7 @@ int f, n;	/* command arguments [IGNORED] */
 #endif
 
 	if (fnp == NULL || (kcmd = engl2fnc(fnp)) == NULL) {
-		mlwrite("[No such function]");
+		mlforce("[No such function]");
 		return(FALSE);
 	}
 	mlwrite("...to keyboard sequence (type it exactly): ");
@@ -206,7 +224,6 @@ int f, n;	/* command arguments [IGNORED] */
 	    	register CMDFUNC **cfp;
 		/* search for an existing binding for the prefix key */
 		cfp = asciitbl;
-		found = FALSE;
 		for (cfp = asciitbl; cfp < &asciitbl[128]; cfp++) {
 			if (*cfp == kcmd) {
 				unbindchar(cfp - asciitbl);
@@ -228,13 +245,14 @@ int f, n;	/* command arguments [IGNORED] */
 	if ((c & (CTLA|SPEC|CTLX)) == 0) {
 		asciitbl[c] = kcmd;
 	} else {
-		for(kbp = kbindtbl; kbp->k_cmd && kbp->k_code != c; kbp++)
-			;
+		kbp = kbindtbl;
+		while (kbp->k_cmd && kbp->k_code != c)
+			kbp++;
 		if (kbp->k_cmd) { /* found it, change it in place */
 			kbp->k_cmd = kcmd;
 		} else {
 			if (kbp >= &kbindtbl[NBINDS-1]) {
-				mlwrite("Prefixed binding table full");
+				mlforce("[Prefixed binding table full]");
 				return(FALSE);
 			}
 			kbp->k_code = c;	/* add keycode */
@@ -250,6 +268,7 @@ int f, n;	/* command arguments [IGNORED] */
 
 /* unbindkey:	delete a key from the key binding table	*/
 
+/* ARGSUSED */
 unbindkey(f, n)
 int f, n;	/* command arguments [IGNORED] */
 {
@@ -277,7 +296,7 @@ int f, n;	/* command arguments [IGNORED] */
 
 	/* if it isn't bound, bitch */
 	if (unbindchar(c) == FALSE) {
-		mlwrite("[Key not bound]");
+		mlforce("[Key not bound]");
 		return(FALSE);
 	}
 	return(TRUE);
@@ -288,14 +307,14 @@ int c;		/* command key to unbind */
 {
 	register KBIND *kbp;	/* pointer into the command table */
 	register KBIND *skbp;	/* saved pointer into the command table */
-	register int found;	/* matched command flag */
 
 	if ((c & (CTLA|SPEC|CTLX)) == 0) {
 		asciitbl[c] = NULL;
 	} else {
 		/* search the table to see if the key exists */
-		for (kbp = kbindtbl; kbp->k_cmd && kbp->k_code != c; kbp++)
-			;
+		kbp = kbindtbl;
+		while (kbp->k_cmd && kbp->k_code != c)
+			kbp++;
 
 		/* if it isn't bound, bitch */
 		if (kbp->k_cmd == NULL)
@@ -320,14 +339,18 @@ int c;		/* command key to unbind */
 
 /* describe bindings bring up a fake buffer and list the key bindings
 		   into it with view mode			*/
+/* ARGSUSED */
 desbind(f, n)
+int f,n;
 {
 	int makebindlist();
         return liststuff("[Binding List]",makebindlist,1,NULL);
 }
 
 #if	APROP
+/* ARGSUSED */
 apro(f, n)	/* Apropos (List functions that match a substring) */
+int f,n;
 {
 	static char mstring[NSTRING];	/* string to match cmd names to */
 	int makebindlist();
@@ -343,6 +366,7 @@ apro(f, n)	/* Apropos (List functions that match a substring) */
 #endif
 
 /* build a binding list (limited or full) */
+/* ARGSUSED */
 makebindlist(dummy, mstring)
 int dummy;
 char *mstring;		/* match string if partial list, NULL to list all */
@@ -350,11 +374,9 @@ char *mstring;		/* match string if partial list, NULL to list all */
 #if	ST520 & LATTICE
 #define	register		
 #endif
-	register WINDOW *wp;	/* scanning pointer to windows */
 	register KBIND *kbp;	/* pointer into a key binding table */
 	register CMDFUNC **cfp;	/* pointer into the ascii table */
 	register NTAB *nptr,*nptr2;	/* pointer into the name table */
-	char *strp;		/* pointer int string to send */
 	int cpos;		/* current position to use in outseq */
 	char outseq[81];	/* output buffer for keystroke sequence */
 	int i,pass;
@@ -446,7 +468,7 @@ char *mstring;		/* match string if partial list, NULL to list all */
 	for (nptr = nametbl; nptr->n_name != NULL; ++nptr)
 		nptr->n_cmd->c_flags &= ~LISTED; /* mark it as unlisted */
 
-	mlwrite("");	/* clear the mode line */
+	mlwrite("");	/* clear the message line */
 	return(TRUE);
 }
 
@@ -499,7 +521,7 @@ char *sfname;	/* name of startup file  */
 
 	/* if it isn't around, don't sweat it */
 	if (fname == NULL) {
-		mlwrite("[Can't find startup file %s]",sfname);
+		mlforce("[Can't find startup file %s]",sfname);
 		return(TRUE);
 	}
 
@@ -673,8 +695,9 @@ int c;	/* key to find what is bound to it */
 	if ((c & (CTLA|SPEC|CTLX)) == 0) {
 		return asciitbl[c];
 	} else {
-		for (kbp = kbindtbl; kbp->k_cmd && kbp->k_code != c; kbp++)
-			;
+		kbp = kbindtbl;
+		while (kbp->k_cmd && kbp->k_code != c)
+			kbp++;
 		return kbp->k_cmd;
 	}
 }

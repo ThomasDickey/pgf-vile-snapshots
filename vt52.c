@@ -8,7 +8,10 @@
  * routine is conditionalized on defining BEL.
  *
  * $Log: vt52.c,v $
- * Revision 1.3  1991/09/10 01:19:35  pgf
+ * Revision 1.4  1991/11/16 18:25:37  pgf
+ * ifdef change for UNIX
+ *
+ * Revision 1.3  1991/09/10  01:19:35  pgf
  * re-tabbed, and moved ESC and BEL to estruct.h
  *
  * Revision 1.2  1991/08/07  12:35:07  pgf
@@ -145,7 +148,7 @@ vt52beep()
 
 vt52open()
 {
-#if	V7 | BSD
+#if	UNIX
 	register char *cp;
 	char *getenv();
 

@@ -9,7 +9,13 @@
  *	the output structures.
  *
  * $Log: mktbls.c,v $
- * Revision 1.4  1991/08/07 12:35:07  pgf
+ * Revision 1.6  1991/11/07 03:29:12  pgf
+ * lint cleanup
+ *
+ * Revision 1.5  1991/11/01  14:38:00  pgf
+ * saber cleanup
+ *
+ * Revision 1.4  1991/08/07  12:35:07  pgf
  * added RCS log messages
  *
  * revision 1.3
@@ -26,6 +32,7 @@
  */
 
 #include <stdio.h>
+#include <string.h>
 
 char *progcreat = "/* %s: this header file was produced automatically by\n\
  * the %s program, based on input from the file %s\n */\n";
@@ -42,6 +49,8 @@ FILE *nebind, *nefunc, *nename, *cmdtbl;
 
 char *malloc();
 char *formcond();
+void exit();
+
 
 struct stringl {
 	char *s1;
@@ -51,6 +60,7 @@ struct stringl {
 };
 	
 main(argc, argv)
+int	argc;
 char    *argv[];
 {
 	char line[100];
@@ -60,7 +70,6 @@ char    *argv[];
 	char fcond[50];
 	char ncond[50];
 	char key[50];
-	char bcond[50];
 	int r;
 	
 	if (argc != 2) {
@@ -136,6 +145,7 @@ char    *argv[];
 	dumpbindings();
 	
 	exit(0);
+	/* NOTREACHED */
 }
 
 char *
@@ -153,6 +163,7 @@ char *c1, *c2;
 }
 
 badfmt(s)
+char *s;
 {
 	fprintf(stderr,"\"cmdtbl\", line %d: bad format:",l);
 	fprintf(stderr,"	%s\n",s);
@@ -228,7 +239,6 @@ char *s, *func, *cond;
 
 dumpbindings()
 {
-	char **bindptr;
 	char *sctl;
 	int i, c, btype;
 	
@@ -289,9 +299,7 @@ dumpbindings()
 }
 
 struct stringl lastname = {"\177\177\177\177\177\177", "", "", NULL};
-struct stringl lnamecond = {"", "", "", NULL};
 struct stringl firstname = {"", "", "", &lastname};
-struct stringl fnamecond = {"", "", "", &lnamecond};
 
 savenames(name,func,cond)
 char *name, *func, *cond;
@@ -301,8 +309,6 @@ char *name, *func, *cond;
 	int r;
 	
 	n = (struct stringl *)malloc(sizeof (struct stringl));
-	
-	/* strtolower(name); */
 	
 	n->s1 = (char *)malloc(strlen(name)+1);
 	strcpy(n->s1, name);
@@ -343,6 +349,7 @@ dumpnames()
 	fprintf(nename,"	{ NULL, NULL }\n};\n");
 }
 
+#ifdef NEEDED
 strtolower(s)
 char *s;
 {
@@ -352,3 +359,4 @@ char *s;
 		s++;
 	}
 }
+#endif

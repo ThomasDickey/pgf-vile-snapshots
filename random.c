@@ -3,7 +3,71 @@
  * commands. There is no functional grouping here, for sure.
  *
  * $Log: random.c,v $
- * Revision 1.30  1991/10/18 10:56:54  pgf
+ * Revision 1.48  1992/02/17 08:55:57  pgf
+ * added showmode support, and
+ * fixed backspace-after-wrapword bug, and
+ * fixed '=' parsing in set commands, and
+ * some small changes for saber cleanup
+ *
+ * Revision 1.47  1992/01/13  23:33:32  pgf
+ * finished shiftwidth implementation -- ^D works now
+ *
+ * Revision 1.46  1992/01/10  08:08:46  pgf
+ * added shiftwidth(), and some bug fixes to en/detabline()
+ *
+ * Revision 1.45  1992/01/05  00:06:13  pgf
+ * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
+ * often.  also normalized message appearance somewhat.
+ *
+ * Revision 1.44  1992/01/03  23:31:49  pgf
+ * use new ch_fname() to manipulate filenames, since b_fname is now
+ * a malloc'ed sting, to avoid length limits
+ *
+ * Revision 1.43  1991/12/24  09:18:47  pgf
+ * added current/change directory support  (Dave Lemke's changes)
+ *
+ * Revision 1.42  1991/11/16  18:39:50  pgf
+ * pass new magic arg to regcomp, and
+ * fixed bug in openup/opendown pair
+ *
+ * Revision 1.41  1991/11/13  20:09:27  pgf
+ * X11 changes, from dave lemke
+ *
+ * Revision 1.40  1991/11/10  22:02:09  pgf
+ * fixed bug in openup(), and made counts work right
+ *
+ * Revision 1.39  1991/11/08  14:13:58  pgf
+ * fixed settab() and setfillcol()
+ *
+ * Revision 1.38  1991/11/08  13:10:26  pgf
+ * lint cleanup, and
+ * put in dave lemke's "autoinsert works going up" fix, and
+ * made autoinsert clean up pre-existing leading whitespace
+ *
+ * Revision 1.37  1991/11/06  23:28:08  pgf
+ * getfence() will scan for a fence if not on one to begin with.  it'll
+ * scan in either direction, depending on arg to matchfence or matchfenceback
+ *
+ * Revision 1.36  1991/11/03  17:46:30  pgf
+ * removed f,n args from all region functions -- they don't use them,
+ * since they're no longer directly called by the user
+ *
+ * Revision 1.35  1991/11/01  14:38:00  pgf
+ * saber cleanup
+ *
+ * Revision 1.34  1991/10/29  03:04:45  pgf
+ * fixed argument mismatches
+ *
+ * Revision 1.33  1991/10/28  14:21:52  pgf
+ * eliminated TABVAL and fillcol macros, converted gasave to per-buffer
+ *
+ * Revision 1.32  1991/10/27  01:51:48  pgf
+ * new regex values are now settable and displayable
+ *
+ * Revision 1.31  1991/10/24  13:01:03  pgf
+ * bug fix for append'ing in empty buffer
+ *
+ * Revision 1.30  1991/10/18  10:56:54  pgf
  * added code to use modified VALUE structures and lists to display settings
  * more easily (adjvalueset).  also removed some old ifdefs.
  *
@@ -127,6 +191,7 @@
 #include	<stdio.h>
 #include	"estruct.h"
 #include	"edef.h"
+#include	<string.h>
 #if UNIX
 #include	<signal.h>
 #endif
@@ -164,7 +229,7 @@ char *carg;
 	bp->b_flag |= BFSCRTCH;
 	s = TRUE;
 	if (!s || popupbuff(bp) == FALSE) {
-		mlwrite("[Sorry, can't list. ]");
+		mlforce("[Can't list. ]");
 		zotbuf(bp);
 		return (FALSE);
 	}
@@ -172,7 +237,10 @@ char *carg;
 		character pointer arguments */
 	(*func)(iarg,carg);
 	gotobob(FALSE,1);
-	lsprintf(bp->b_fname, "       %s   %s",prognam,version);
+	{ char buf[80];
+	  lsprintf(buf, "       %s   %s",prognam,version);
+	  ch_fname(bp, buf);
+	}
 	bp->b_flag &= ~BFCHG;
 	bp->b_active = TRUE;
 	make_local_b_val(bp,MDVIEW);
@@ -185,13 +253,15 @@ char *carg;
 	return TRUE;
 }
 
+/* ARGSUSED */
 listmodes(f, n)
+int f,n;
 {
 	int makemodelist();
 	register WINDOW *wp = curwp;
 	register int s;
 
-	s = liststuff("[Settings]",makemodelist,0,wp);
+	s = liststuff("[Settings]",makemodelist,0,(char *)wp);
 	/* back to the buffer whose modes we just listed */
 	swbuffer(wp->w_bufp);
 	return s;
@@ -199,6 +269,7 @@ listmodes(f, n)
 
 
 /* list the current modes into the current buffer */
+/* ARGSUSED */
 makemodelist(dum1,ptr)
 int dum1;
 char *ptr;
@@ -229,7 +300,8 @@ listvalueset(names, values, globvalues)
 struct VALNAMES *names;
 struct VAL *values, *globvalues;
 {
-	register int j;
+	register int j, perline;
+	perline = 3;
 	j = 0;
 	while(names->name != NULL) {
 		switch(names->type) {
@@ -248,6 +320,11 @@ struct VAL *values, *globvalues;
 			}
 			break;
 		case VALTYPE_STRING:
+			perline = 1;
+			if (j && j >= perline) {
+				bputc('\n');
+				j = 0;
+			}
 			if (!globvalues || ( values->vp->p && globvalues->v.p &&
 				(strcmp( values->vp->p, globvalues->v.p)))) {
 				bprintf("%s=%s%*P", names->name,
@@ -256,11 +333,20 @@ struct VAL *values, *globvalues;
 				j++;
 			}
 			break;
+		case VALTYPE_REGEX:
+			if (!globvalues || (values->vp->r->pat && globvalues->v.r->pat &&
+				(strcmp( values->vp->r->pat, globvalues->v.r->pat)))) {
+				bprintf("%s=%s%*P", names->name,
+					values->vp->r->pat ? values->vp->r->pat : "",
+					26, ' ');
+				j++;
+			}
+			break;
 		default:
-			mlwrite("BUG: bad type %s %d",names->name,names->type);
+			mlforce("BUG: bad type %s %d",names->name,names->type);
 			return FALSE;
 		}
-		if (j && j % 3 == 0) { /* 3 per line */
+		if (j && j >= perline) {
 			bputc('\n');
 			j = 0;
 		}
@@ -270,18 +356,24 @@ struct VAL *values, *globvalues;
 	}
 	if (j % 3 != 0)
 		bputc('\n');
+	return TRUE;
 }
 /*
  * Set fill column to n.
  */
 setfillcol(f, n)
+int f,n;
 {
-	if (f) {
+	if (f && n >= 1) {
 		make_local_b_val(curbp,VAL_FILL);
 		set_b_val(curbp,VAL_FILL,n);
+	} else if (f) {
+		mlforce("[Illegal fill-column value]");
+		TTbeep();
+		return FALSE;
 	}
-	mlwrite("[Fill column is %d%s]",n, is_global_b_val(curbp,VAL_FILL) ?
-						" (global)" : " (local)" );
+	mlwrite("[Fill column is %d, and is %s]", b_val(curbp,VAL_FILL),
+		is_global_b_val(curbp,VAL_FILL) ? "global" : "local" );
 	return(TRUE);
 }
 
@@ -291,7 +383,9 @@ setfillcol(f, n)
  * text that is before the cursor. The displayed column is not the current
  * column, but the column that would be used on an infinite width display.
  */
+/* ARGSUSED */
 showcpos(f, n)
+int f,n;
 {
 	register LINE	*lp;		/* current line */
 	register long	numchars;	/* # of chars in file */
@@ -351,7 +445,9 @@ showcpos(f, n)
 	return TRUE;
 }
 
+/* ARGSUSED */
 showlength(f,n)
+int f,n;
 {
 	register LINE	*lp;		/* current line */
 	register int	numlines = 0;	/* # of lines in file */
@@ -412,6 +508,7 @@ int bflg;
  * Set current column.
  */
 gotocol(f,n)
+int f,n;
 {
 	register int c; 	/* character being scanned */
 	register int i; 	/* index into current line */
@@ -420,7 +517,8 @@ gotocol(f,n)
 
 	col = 0;
 	llen = llength(DOT.l);
-	if ( n <= 0) n = 1;
+	if (!f || n <= 0)
+		n = 1;
 
 	/* scan the line until we are at or past the target column */
 	for (i = 0; i < llen; ++i) {
@@ -448,7 +546,9 @@ gotocol(f,n)
  * work. This fixes up a very common typo with a single stroke.
  * This always works within a line, so "WFEDIT" is good enough.
  */
+/* ARGSUSED */
 twiddle(f, n)
+int f,n;
 {
 	MARK		dot;
 	register int	cl;
@@ -478,11 +578,14 @@ twiddle(f, n)
  * inserted 0 times, for regularity.
  */
 quote(f, n)
+int f,n;
 {
 	register int	s;
 	register int	c;
 
 	c = tgetc();
+	if (!f)
+		n = 1;
 	if (n < 0)
 		return FALSE;
 	if (n == 0)
@@ -497,6 +600,7 @@ quote(f, n)
 }
 
 replacechar(f, n)
+int f,n;
 {
 	register int	s;
 	register int	c;
@@ -505,7 +609,8 @@ replacechar(f, n)
 		return FALSE;
 
 	insertmode = REPLACECHAR;  /* need to fool the SPEC prefix code */
-	curwp->w_flag |= WFMODE;
+	if (b_val(curbp, MDSHOWMODE))
+		curwp->w_flag |= WFMODE;
 	update(FALSE);
 	c = kbd_key();
 	insertmode = FALSE;
@@ -541,79 +646,138 @@ replacechar(f, n)
  * Set tab size
  */
 settab(f, n)
+int f,n;
 {
 	register WINDOW *wp;
+	int val;
+	char *whichtabs;
+	if (b_val(curbp, MDCMOD)) {
+		val = VAL_C_TAB;
+		whichtabs = "C-t";
+	} else {
+		val = VAL_TAB;
+		whichtabs = "T";
+	}
 	if (f && n >= 1) {
-		make_local_b_val(curbp,VAL_TAB);
-		set_b_val(curbp,VAL_TAB,n);
-		curtabstopval = n;
+		make_local_b_val(curbp,val);
+		set_b_val(curbp,val,n);
+		curtabval = n;
 		for (wp = wheadp; wp != NULL; wp = wp->w_wndp)
-			wp->w_flag |= WFHARD;
-		refresh(FALSE,1);
+			if (wp->w_bufp == curbp) wp->w_flag |= WFHARD;
 	} else if (f) {
-		mlwrite("Sorry, illegal tabstop value");
+		mlforce("[Illegal tabstop value]");
 		TTbeep();
 		return FALSE;
 	}
-	mlwrite("Tabs are %d columns apart%s",TABVAL,
-		is_global_b_val(curbp,VAL_TAB) ? " (global)" : " (local)" );
+	mlwrite("[%sabs are %d columns apart, using %s value.]", whichtabs,
+		curtabval, is_global_b_val(curbp,val)?"global":"local" );
 	return TRUE;
 }
 
 /* insert a tab into the file */
+/* ARGSUSED */
 tab(f, n)
+int f,n;
 {
 	return linsert(1, '\t');
 }
 
-#if AEDIT
+shiftwidth()
+{
+	int s;
+	int fc;
+	fc = firstchar(DOT.l);
+	if (fc < DOT.o) {
+		s = linsert(b_val(curbp, VAL_SWIDTH), ' ');
+		/* should entab mult ^T inserts */
+		return s;
+	}
+	detabline(fc);
+	s = b_val(curbp, VAL_SWIDTH) - 
+		(getccol(FALSE) % b_val(curbp,VAL_SWIDTH));
+	if (s)
+		s = linsert(s, ' ');
+	entabline(firstchar(DOT.l));
+	if (autoindented >= 0) {
+		autoindented = firstchar(DOT.l);
+	}
+	return TRUE;
+}
+
 
 /*
  * change all tabs in the line to the right number of spaces
+ * upto says do upto that column
  */
-detabline()
+detabline(upto)
+int upto;
 {
 	register int	s;
+	register int	c;
+	int	ocol;
+
+	ocol = getccol(FALSE);
+
+	DOT.o = 0;
+
+	if (upto < 0)
+		upto = llength(DOT.l);
+
+	MK.l = DOT.l;
+	MK.o = upto;
 
 	/* detab the entire current line */
-	while (DOT.o < llength(DOT.l)) {
+	while (DOT.o < MK.o) {
+		c = char_at(DOT);
 		/* if we have a tab */
-		if (char_at(DOT) == '\t') {
-			if ((s = ldelete(1L, FALSE)) != TRUE)
+		if (c == '\t') {
+			if ((s = ldelete(1L, FALSE)) != TRUE) {
 				return s;
-			insspace( TRUE, TABVAL - (DOT.o % TABVAL) );
+			}
+			insspace( TRUE, curtabval - (DOT.o % curtabval) );
 		}
 		DOT.o++;
 	}
+	gotocol(TRUE,ocol);
 	return TRUE;
 }
 
 /*
  * change all tabs in the region to the right number of spaces
  */
-detab_region(f, n)
+detab_region()
 {
-	return do_fl_region(detabline);
+	return do_fl_region(detabline,-1);
 }
 
 /*
  * convert all appropriate spaces in the line to tab characters
  */
-entabline()
+entabline(upto)
+int upto;
 {
 	register int fspace;	/* pointer to first space if in a run */
 	register int ccol;	/* current cursor column */
 	register char cchar;	/* current character */
+	int	ocol;
 
-	detabline();	/* get rid of possible existing tabs */
+	ocol = getccol(FALSE);
+
+	detabline(upto);	/* get rid of possible existing tabs */
 	DOT.o = 0;
 
-	/* entab the entire current line */
+	/* entab the current line */
 	/* would this have been easier if it had started at
 		the _end_ of the line, rather than the beginning?  -pgf */
 	fspace = -1;
 	ccol = 0;
-	while (DOT.o < llength(DOT.l)) {
+	if (upto < 0)
+		upto = llength(DOT.l);
+
+	MK.l = DOT.l;
+	MK.o = upto;
+
+	while (1) {
 		/* see if it is time to compress */
 		if ((fspace >= 0) && (nextab(fspace) <= ccol))
 			if (ccol - fspace < 2)
@@ -624,6 +788,9 @@ entabline()
 				linsert(1, '\t');	    
 				fspace = -1;
 			}
+
+		if (DOT.o >= MK.o)
+			break;
 
 		/* get the current character */
 		cchar = char_at(DOT);
@@ -637,15 +804,16 @@ entabline()
 		ccol++;
 		DOT.o++;
 	}
+	gotocol(TRUE,ocol);
 	return TRUE;
 }
 
 /*
  * convert all appropriate spaces in the region to tab characters
  */
-entab_region(f, n)
+entab_region()
 {
-	return do_fl_region(entabline);
+	return do_fl_region(entabline,-1);
 }
 
 /* trim trailing whitespace from a line.  leave dot at end of line */
@@ -669,116 +837,157 @@ trimline()
 
 	DOT.o = off+1;
 		    
-	return ldelete(orig - off,FALSE);
+	return ldelete((long)(orig - off),FALSE);
 }
 
 /*
  * trim trailing whitespace from a region
  */
-trim_region(f, n)
+trim_region()
 {
-	return do_fl_region(trimline);
+	return do_fl_region(trimline,0);
 }
 
-#endif
 
 
 /* open lines up before this one */
 openup(f,n)
+int f,n;
 {
-	int backline();
-	int s;
+	register int s;
+
+	if (!f) n = 1;
+	if (n < 0) return (FALSE);
+	if (n == 0) return ins();
+
 	gotobol(TRUE,1);
+
+	/* if we are in C mode and this is a default <NL> */
+	if (n == 1 && (b_val(curbp,MDCMOD) || b_val(curbp,MDAIND)) &&
+						!is_header_line(DOT,curbp)) {
+		s = indented_newline_above(b_val(curbp, MDCMOD));
+		if (s != TRUE) return (s);
+
+		return(ins());
+	}
 	s = lnewline();
+	if (s != TRUE) return s;
+
+	s = backline(TRUE,1);		/* back to the blank line */
+	if (s != TRUE) return s;
+
+	if ( n > 1) {
+		s = openlines(n-1);
+		if (s != TRUE) return s;
+		s = backline(TRUE, 1);	/* backup over the first one */
+		if (s != TRUE) return s;
+	}
+
+	return(ins());
+}
+
+/* open lines up after this one */
+opendown(f,n)
+int f,n;
+{
+	register int	s;
+
+	if (!f) n = 1;
+	if (n < 0) return (FALSE);
+	if (n == 0) return ins();
+
+	s = openlines(n);
 	if (s != TRUE)
-		return(s);
-	s = backline(TRUE,1);
-	if (s != TRUE)
-		return(s);
-	/* there's a bug here with counts.	I don't particularly care
-		right now.	*/
-	return(opendown(f,n-1));
+		return (s);
+
+	return(ins());
 }
 
 /*
  * Open up some blank space. The basic plan is to insert a bunch of newlines,
  * and then back up over them.
  */
-
-/* open lines up after this one */
-opendown(f,n)
+openlines(n)
+int n;
 {
-	register int	i;
-	register int	s;
-
-	if (n < 0)
-		return (FALSE);
-	if (n == 0)
-		return ins(f,n);
-
-	i = n;					/* Insert newlines. */
-	do {
+	register int i = n;			/* Insert newlines. */
+	register int s = TRUE;
+	while (i-- && s==TRUE) {
 		gotoeol(FALSE,1);
 		s = newline(TRUE,1);
-	} while (s==TRUE && --i);
-	if (s == TRUE)				/* Then back up overtop */
-		s = backline(TRUE, n-1);	/* of them all.		 */
+	}
+	if (s == TRUE && n)			/* Then back up overtop */
+		backline(TRUE, n-1);	/* of them all.		 */
 
 	curgoal = -1;
 
-	if (s != TRUE)
-		return (s);
-
-	return(ins(f,n));
+	return s;
 }
 
 /*
  * Go into insert mode.  I guess this isn't emacs anymore...
  */
+/* ARGSUSED */
 insert(f, n)
+int f,n;
 {
-	return ins(f,n);
+	return ins();
 }
 
+/* ARGSUSED */
 insertbol(f, n)
+int f,n;
 {
 	firstnonwhite(f,n);
-	return ins(f,n);
+	return ins();
 }
 
+/* ARGSUSED */
 append(f, n)
+int f,n;
 {
-	if (DOT.o != llength(DOT.l)) /* END OF LINE HACK */
+	if (is_header_line(DOT,curbp))
+		return ins();
+	if (!is_at_end_of_line(DOT)) /* END OF LINE HACK */
 		forwchar(TRUE,1);
-	return ins(f,n);
+	return ins();
 }
 
+/* ARGSUSED */
 appendeol(f, n)
+int f,n;
 {
-	gotoeol(FALSE,0);
-	return ins(f,n);
+	if (!is_header_line(DOT,curbp))
+		gotoeol(FALSE,0);
+	return ins();
 }
 
+/* ARGSUSED */
 overwrite(f, n)
+int f,n;
 {
 	insertmode = OVERWRITE;
-	curwp->w_flag |= WFMODE;
-	return ins(f,n);
+	if (b_val(curbp, MDSHOWMODE))
+		curwp->w_flag |= WFMODE;
+	return ins();
 }
 
 /* grunt routine for insert mode */
-ins(f,n)
+ins()
 {
 	register int status;
+	int f,n;
 	int (*execfunc)();		/* ptr to function to execute */
 	int    c;		/* command character */
 	extern int quote(), backspace(), tab(), newline(), nullproc();
+	extern int shiftwidth();
 	int newlineyet = FALSE; /* are we on the line we started on? */
 	int startoff = DOT.o;	/* starting offset on that line */
 
 	if (insertmode == FALSE) {
-	insertmode = INSERT;
-	curwp->w_flag |= WFMODE;
+		insertmode = INSERT;
+		if (b_val(curbp, MDSHOWMODE))
+			curwp->w_flag |= WFMODE;
 	}
 
 	/* get the next command from the keyboard */
@@ -798,17 +1007,19 @@ ins(f,n)
 			if (DOT.o != 0)
 				backchar(TRUE,1);
 			if (autoindented >= 0) {
-				trimline(FALSE,1);
+				trimline();
 				autoindented = -1;
 			}
 			insertmode = FALSE;
-			curwp->w_flag |= WFMODE;
+			if (b_val(curbp, MDSHOWMODE))
+				curwp->w_flag |= WFMODE;
 			return (TRUE);
 		} else if (c == -abortc ) {
 			/* we use the negative to suppress that
 				junk, for the benefit of SPEC keys */
 			insertmode = FALSE;
-			curwp->w_flag |= WFMODE;
+			if (b_val(curbp, MDSHOWMODE))
+				curwp->w_flag |= WFMODE;
 			return (TRUE);
 		}
 
@@ -822,63 +1033,81 @@ ins(f,n)
 			 * we are now past fill column, perform word wrap. 
 			 */
 			if (isspace(c) && b_val(curwp->w_bufp,MDWRAP) &&
-					fillcol > 0 && n >= 0 &&
-					getccol(FALSE) > fillcol )
-				wrapword();
+				b_val(curbp,VAL_FILL) > 0 && n >= 0 &&
+				getccol(FALSE) > b_val(curbp,VAL_FILL)) {
+				wrapword(FALSE,1);
+				newlineyet = TRUE;
+			}
 
-				/* ^D and ^T are aliased to ^H and tab, for 
-					users accustomed to "shiftwidth" */
-				if ( c ==  tocntrl('I') ||
-					c ==  tocntrl('T')) { /* tab and ^T */
-					execfunc = tab;
+			if ( c ==  '\t') { /* tab */
+				execfunc = tab;
+				autoindented = -1;
+			} else if (c ==  tocntrl('J') ||
+				c ==  tocntrl('M')) { /* CR and NL */
+				execfunc = newline;
+				if (autoindented >= 0) {
+					trimline();
 					autoindented = -1;
-				} else if (c ==  tocntrl('J') ||
-					c ==  tocntrl('M')) { /* CR and NL */
-					execfunc = newline;
-					if (autoindented >= 0) {
-						trimline(FALSE,1);
-						autoindented = -1;
-					}
-					newlineyet = TRUE;
-				} else if ( isbackspace(c) ||
-						c == tocntrl('D') || 
-						c == killc ||
-						c == wkillc) { /* ^U and ^W */
-					/* how far can we back up? */
-					register int backlimit;
-					/* have we backed thru a "word" yet? */
-					int saw_word = FALSE;
-					if (newlineyet ||
-						!b_val(curbp,MDBACKLIMIT))
-						backlimit = 0;
+				}
+				newlineyet = TRUE;
+			} else if ( isbackspace(c) ||
+					c == tocntrl('D') || 
+					c == killc ||
+					c == wkillc) { /* ^U and ^W */
+				/* how far can we back up? */
+				register int backlimit;
+				/* have we backed thru a "word" yet? */
+				int saw_word = FALSE;
+				if (newlineyet || !b_val(curbp,MDBACKLIMIT))
+					backlimit = 0;
+				else
+					backlimit = startoff;
+				execfunc = nullproc;
+				if (c == tocntrl('D')) {
+					int goal;
+					int col;
+					int sw = 
+					 b_val(curbp, VAL_SWIDTH);
+					col = getccol(FALSE);
+					if (col > 0)
+						goal = ((col-1)/sw)*sw;
 					else
-						backlimit = startoff;
-					while (DOT.o > backlimit) {
-						if (c == wkillc) {
-							if (isspace(
-							lgetc(DOT.l,DOT.o-1))) {
-								if (saw_word)
-									break;
-							} else {
-								saw_word = TRUE;
-							}
-						}
+						goal = 0;
+					while (col > goal &&
+						DOT.o > backlimit) {
 						backspace();
-						autoindented--;
-						if (isbackspace(c) ||
-							c == tocntrl('D'))
-							break;
+						col = getccol(FALSE);
 					}
-					execfunc = nullproc;
+					if (col < goal)
+						linsert(goal - col,' ');
+				} else while (DOT.o > backlimit) {
+					if (c == wkillc) {
+						if (isspace(
+							lgetc(DOT.l,DOT.o-1))) {
+							if (saw_word)
+								break;
+						} else {
+							saw_word = TRUE;
+						}
+					}
+					backspace();
+					autoindented--;
+					if (isbackspace(c) ||
+						c == tocntrl('D'))
+						break;
+				}
+			} else if ( c ==  tocntrl('T')) { /* ^T */
+				execfunc = shiftwidth;
+
 #if UNIX && defined(SIGTSTP)	/* job control, ^Z */
-				} else if (c == suspc) {
-					extern int bktoshell();
-					execfunc = bktoshell;
+			} else if (c == suspc) {
+				extern int bktoshell();
+				execfunc = bktoshell;
 
 #endif
-				} else if (c == startc ||
-						c == stopc) {  /* ^Q and ^S */
-					execfunc = nullproc;
+			} else if (c == startc ||
+					c == stopc) {  /* ^Q and ^S */
+				execfunc = nullproc;
 			}
 		}
 
@@ -886,7 +1115,8 @@ ins(f,n)
 			status	 = (*execfunc)(f, n);
 			if (status != TRUE) {
 				insertmode = FALSE;
-				curwp->w_flag |= WFMODE;
+				if (b_val(curbp, MDSHOWMODE))
+					curwp->w_flag |= WFMODE;
 				return (status);
 			}
 			continue;
@@ -902,7 +1132,7 @@ ins(f,n)
 		if (insertmode == OVERWRITE &&
 				DOT.o < llength(DOT.l) &&
 				(char_at(DOT) != '\t' ||
-					(DOT.o) % TABVAL == TABVAL-1)) {
+					(DOT.o) % curtabval == curtabval-1)) {
 			autoindented = -1;
 			ldelete(1L, FALSE);
 		}
@@ -926,16 +1156,17 @@ ins(f,n)
 
 		/* check auto-save mode */
 		if (b_val(curbp, MDASAVE))
-			if (--gacount == 0) {
+			if (--curbp->b_acount <= 0) {
 				/* and save the file if needed */
 				upscreen(FALSE, 0);
 				filesave(FALSE, 0);
-				gacount = gasave;
+				curbp->b_acount = b_val(curbp,VAL_ASAVECNT);
 			}
 
 		if (status != TRUE) {
 			insertmode = FALSE;
-			curwp->w_flag |= WFMODE;
+			if (b_val(curbp, MDSHOWMODE))
+				curwp->w_flag |= WFMODE;
 			return (status);
 		}
 	}
@@ -955,15 +1186,18 @@ backspace()
  * indentation as specified.
  */
 newline(f, n)
+int f,n;
 {
 	register int	s;
 
-	if (n < 0)
+	if (!f)
+		n = 1;
+	else if (n < 0)
 		return (FALSE);
 
 #if LATER	/* already done for autoindented != 0 in ins() */
 	if (b_val(curbp, MDTRIM))
-		trimline(f,n);
+		trimline();
 #endif
 	    
 	/* if we are in C or auto-indent modes and this is a default <NL> */
@@ -976,9 +1210,9 @@ newline(f, n)
 	 * negative, wrap mode is enabled, and we are now past fill column,
 	 * perform word wrap.
 	 */
-	if (b_val(curwp->w_bufp, MDWRAP) && fillcol > 0 &&
-						getccol(FALSE) > fillcol)
-		wrapword();
+	if (b_val(curwp->w_bufp, MDWRAP) && b_val(curbp,VAL_FILL)> 0 &&
+				getccol(FALSE) > b_val(curbp,VAL_FILL))
+		wrapword(FALSE,1);
 
 	/* insert some lines */
 	while (n--) {
@@ -991,11 +1225,13 @@ newline(f, n)
 
 /* insert a newline and indentation for C */
 indented_newline(cmode)
+int cmode;
 {
 	register int indentwas; /* indent to reproduce */
 	int bracef; /* was there a brace at the end of line? */
 	    
 	indentwas = previndent(&bracef);
+
 	if (lnewline() == FALSE)
 		return FALSE;
 	if (cmode && bracef)
@@ -1005,6 +1241,24 @@ indented_newline(cmode)
 	return TRUE;
 }
 
+/* insert a newline and indentation for autoindent */
+indented_newline_above(cmode)
+int cmode;
+{
+	register int indentwas;	/* indent to reproduce */
+	int bracef; /* was there a brace at the beginning of line? */
+	
+	indentwas = nextindent(&bracef);
+	if (lnewline() == FALSE)
+		return FALSE;
+	if (backline(TRUE,1) == FALSE)
+		return FALSE;
+	if (cmode && bracef)
+		indentwas = nextab(indentwas);
+	if (doindent(indentwas) != TRUE)
+		return FALSE;
+	return TRUE;
+}
 /* get the indent of the last previous non-blank line.	also, if arg
 	is non-null, check if line ended in a brace */
 int
@@ -1017,32 +1271,62 @@ int *bracefp;
 	    
 	if (backword(FALSE,1) == FALSE) {
 		if (bracefp) *bracefp = FALSE;
-		gomark();
+		gomark(FALSE,1);
 		return 0;
 	}
 	ind = indentlen(DOT.l);
 	if (bracefp)
 		*bracefp = (llength(DOT.l) > 0 &&
-			lgetc(DOT.l,llength(DOT.l)-1) == '{');
+			lgetc(DOT.l,lastchar(DOT.l)) == '{');
 		    
-	gomark();
+	gomark(FALSE,1);
+	    
+	return ind;
+}
+
+/* get the indent of the next non-blank line.	also, if arg
+	is non-null, check if line starts in a brace */
+int
+nextindent(bracefp)
+int *bracefp;
+{
+	int ind;
+	    
+	MK = DOT;
+	    
+	if (forwword(FALSE,1) == FALSE) {
+		if (bracefp) *bracefp = FALSE;
+		gomark(FALSE,1);
+		return 0;
+	}
+	ind = indentlen(DOT.l);
+	if (bracefp)
+		*bracefp = (llength(DOT.l) > 0 &&
+			lgetc(DOT.l,firstchar(DOT.l)) == '}');
+		    
+	gomark(FALSE,1);
 	    
 	return ind;
 }
 
 doindent(ind)
+int ind;
 {
 	int i;
 	/* if no indent was asked for, we're done */
 	if (ind <= 0)
 		return TRUE;
 	autoindented = 0;
-	if ((i=ind/TABVAL)!=0) {
+	/* first clean up existing leading whitespace */
+	i = firstchar(DOT.l);
+	if (i)
+		ldelete((long)i,FALSE);
+	if ((i=ind/curtabval)!=0) {
 		autoindented += i;
 		if (linsert(i, '\t') == FALSE)
 			return FALSE;
 	}
-	if ((i=ind%TABVAL) != 0) {
+	if ((i=ind%curtabval) != 0) {
 		autoindented += i;
 		if (linsert(i,	' ') == FALSE)
 			return FALSE;
@@ -1072,13 +1356,11 @@ LINE *lp;
 	return ind;
 }
 
+
 insbrace(n, c)	/* insert a brace into the text here...we are in CMODE */
 int n;	/* repeat count */
 int c;	/* brace to insert (always { for now) */
 {
-	register int ch;	/* last character before input */
-	register int i;
-	register int target;	/* column brace should go after */
 
 #if ! CFENCE
 	/* wouldn't want to back up from here, but fences might take us 
@@ -1089,13 +1371,13 @@ int c;	/* brace to insert (always { for now) */
 #endif
 
 	if (autoindented >= 0) {
-		trimline(FALSE,1);
+		trimline();
 	}
 	else {
 		return linsert(n,c);
 	}
 #if ! CFENCE /* no fences?	then put brace one tab in from previous line */
-	doindent(((previndent(NULL)-1) / TABVAL) * TABVAL);
+	doindent(((previndent(NULL)-1) / curtabval) * curtabval);
 #else /* line up brace with the line containing its match */
 	doindent(fmatchindent());
 #endif
@@ -1107,8 +1389,6 @@ int c;	/* brace to insert (always { for now) */
 
 inspound()	/* insert a # into the text here...we are in CMODE */
 {
-	register int ch;	/* last character before input */
-	register int i;
 
 	/* if we are at the beginning of the line, no go */
 	if (DOT.o == 0)
@@ -1116,7 +1396,7 @@ inspound()	/* insert a # into the text here...we are in CMODE */
 
 	if (autoindented > 0) { /* must all be whitespace before us */
 		DOT.o = 0;
-		ldelete(autoindented,FALSE);
+		ldelete((long)autoindented,FALSE);
 	}
 	autoindented = -1;
 
@@ -1132,7 +1412,9 @@ inspound()	/* insert a # into the text here...we are in CMODE */
  * sitting on a non blank line then it deletes all of the blank lines after
  * the line. Any argument is ignored.
  */
+/* ARGSUSED */
 deblank(f, n)
+int f,n;
 {
 	register LINE	*lp1;
 	register LINE	*lp2;
@@ -1156,17 +1438,20 @@ deblank(f, n)
 
 /* '~' is synonymous with 'M-~<space>' */
 flipchar(f, n)
+int f,n;
 {
 	int s;
 
 	havemotion = &f_forwchar_to_eol;
 	s = operflip(f,n);
-	if (s == TRUE)
-		return forwchar_to_eol(f,n);
+	if (s != TRUE)
+		return s;
+	return forwchar_to_eol(f,n);
 }
 
 /* 'x' is synonymous with 'd<space>' */
 forwdelchar(f, n)
+int f,n;
 {
 
 	havemotion = &f_forwchar_to_eol;
@@ -1175,13 +1460,16 @@ forwdelchar(f, n)
 
 /* 'X' is synonymous with 'd<backspace>' */
 backdelchar(f, n)
+int f,n;
 {
 	havemotion = &f_backchar_to_bol;
 	return operdel(f,n);
 }
 
 /* 'D' is synonymous with 'd$' */
+/* ARGSUSED */
 deltoeol(f, n)
+int f,n;
 {
 	extern CMDFUNC f_gotoeol;
 
@@ -1193,12 +1481,14 @@ deltoeol(f, n)
 }
 
 /* 'C' is synonymous with 'c$' */
+/* ARGSUSED */
 chgtoeol(f, n)
+int f,n;
 {
 	extern CMDFUNC f_gotoeol;
 
 	if (llength(DOT.l) == 0) {
-		return ins(f,n);
+		return ins();
 	} else {
 		havemotion = &f_gotoeol;
 		return operchg(FALSE,1);
@@ -1207,6 +1497,7 @@ chgtoeol(f, n)
 
 /* 'Y' is synonymous with 'yy' */
 yankline(f, n)
+int f,n;
 {
 	extern CMDFUNC f_godotplus;
 	havemotion = &f_godotplus;
@@ -1215,6 +1506,7 @@ yankline(f, n)
 
 /* 'S' is synonymous with 'cc' */
 chgline(f, n)
+int f,n;
 {
 	extern CMDFUNC f_godotplus;
 	havemotion = &f_godotplus;
@@ -1223,29 +1515,34 @@ chgline(f, n)
 
 /* 's' is synonymous with 'c<space>' */
 chgchar(f, n)
+int f,n;
 {
 	havemotion = &f_forwchar_to_eol;
 	return(operchg(f,n));
 }
 
+/* ARGSUSED */
 setmode(f, n)	/* prompt and set an editor mode */
 int f, n;	/* default and argument */
 {
 	return adjustmode(TRUE, FALSE);
 }
 
+/* ARGSUSED */
 delmode(f, n)	/* prompt and delete an editor mode */
 int f, n;	/* default and argument */
 {
 	return adjustmode(FALSE, FALSE);
 }
 
+/* ARGSUSED */
 setgmode(f, n)	/* prompt and set a global editor mode */
 int f, n;	/* default and argument */
 {
 	return adjustmode(TRUE, TRUE);
 }
 
+/* ARGSUSED */
 delgmode(f, n)	/* prompt and delete a global editor mode */
 int f, n;	/* default and argument */
 {
@@ -1263,8 +1560,6 @@ int global; /* true = global flag,	false = current buffer flag */
 #if COLOR
 	register int uflag; 	/* was modename uppercase?	*/
 #endif
-	int no = 0;
-	int okind;
 	char prompt[50];	/* string to prompt user with */
 	static char cbuf[NPAT]; 	/* buffer to recieve mode name into */
 
@@ -1287,16 +1582,23 @@ int global; /* true = global flag,	false = current buffer flag */
 #if COLOR
 	uflag = isupper(*scan);
 #endif
-	while (*scan != 0) {
+	while (*scan != '\0' && *scan != '=') {
 		if (isupper(*scan))
 			*scan = tolower(*scan);
 		scan++;
+	}
+
+	if (scan == cbuf) { /* no string */
+		s = FALSE;
+		goto errout;
 	}
 
 	if (!strcmp(cbuf,"all")) {
 		return listmodes(FALSE,1);
 	}
 
+	/* colors should become another kind of value, i.e. VAL_TYPE_COLOR,
+		and then this could be handled generically in adjvalueset() */
 	/* test it first against the colors we know */
 	for (i=0; i<NCOLORS; i++) {
 		if (strcmp(cbuf, cname[i]) == 0) {
@@ -1329,15 +1631,19 @@ int global; /* true = global flag,	false = current buffer flag */
 		global ? global_w_values.wv : curwp->w_values.wv );
 	if (s == TRUE)
 		goto success;
-	if (s == FALSE)
-		mlwrite("Not a legal setting");
+	if (s == FALSE) {
+	errout:
+		mlforce("[Not a legal set option: \"%s\"]", cbuf);
+	}
 	return s;
 
 success:
 	if (global) {
 		register WINDOW *wp;
 		for (wp = wheadp; wp != NULL; wp = wp->w_wndp)
-			wp->w_flag |= WFHARD;
+			wp->w_flag |= WFHARD|WFMODE;
+	} else {
+		curwp->w_flag |= WFHARD|WFMODE;
 	}
 
 	/* if the settings are up, redisplay them */
@@ -1354,31 +1660,30 @@ adjvalueset(cp, kind, names, values)
 char *cp;
 int kind;
 struct VALNAMES *names;
-struct VAL *values;
+register struct VAL *values;
 {
-	register int j;
-	int okind;
 	char respbuf[NFILEN];
 	char *rp = NULL;
+	char *equp = NULL;
 	int rplen = 0;
 	int no;
-	int nval, status;
+	int nval, s;
 	extern char *strchr();
+	extern char *strmalloc();
 
 	no = 0;
 	if (strncmp(cp, "no", 2) == 0) {
-		okind = kind;
 		kind = !kind;
 		no = 2;
 	}
-	if (rp = strchr(cp, '=')) {
+	equp = rp = strchr(cp, '=');
+	if (rp) {
 		*rp = '\0';
 		rp++;
 		rplen = strlen(rp);
 		if (!rplen)
 			goto err;
 	}
-	j = 0;
 	while(names->name != NULL) {
 		if (strncmp(cp + no, names->name, strlen(cp) - no) == 0)
 			break;
@@ -1388,7 +1693,8 @@ struct VAL *values;
 		values++;
 	}
 	if (names->name == NULL) {
-	err:	/* mlwrite("Not a legal setting"); */
+	err:	if (equp)
+			*equp = '=';
 		return FALSE;
 	}
 
@@ -1411,33 +1717,58 @@ struct VAL *values;
 
 	case VALTYPE_INT:
 	case VALTYPE_STRING:
+	case VALTYPE_REGEX:
 		if (no) goto err;
 		if (!rp) {
 			respbuf[0] = '\0';
-			status = mlreply("New value: ", respbuf, NFILEN - 1);
-			if (status != TRUE)
-				return status;
+			if (names->type != VALTYPE_REGEX)
+				s = mlreply("New value: ", respbuf, NFILEN - 1);
+			else
+				s = kbd_string("New pattern: ", respbuf,
+					NFILEN - 1, '\n', NO_EXPAND, FALSE);
+			if (s != TRUE) {
+				if (equp)
+					*equp = '=';
+				return s;
+			}
 			rp = respbuf;
 			rplen = strlen(rp);
 			if (!rplen)
 				goto err;
 		}
 		values->vp = &(values->v);
-		if (names->type == VALTYPE_INT) {
+		switch (names->type) {
+		case VALTYPE_INT:
 			nval = 0;
 			while (isdigit(*rp))
 				nval = (nval * 10) + (*rp++ - '0');
 			values->vp->i = nval;
-		} else {
-			extern char *strmalloc();
+			break;
+		case VALTYPE_STRING:
 			if (values->vp->p)
 				free(values->vp->p);
 			values->vp->p = strmalloc(rp);
+			break;
+		case VALTYPE_REGEX:
+			if (!values->vp->r) {
+				values->vp->r = (struct regexval *)malloc(
+											sizeof (struct regexval));
+			} else {
+				if (values->vp->r->pat)
+					free(values->vp->r->pat);
+				if (values->vp->r->reg)
+					free(values->vp->r->reg);
+			}
+			values->vp->r->pat = strmalloc(rp);
+			values->vp->r->reg = regcomp(values->vp->r->pat, TRUE);
+			break;
 		}
 		break;
 
 	default:
-		mlwrite("BUG: bad type %s %d",names->name,names->type);
+		mlforce("BUG: bad type %s %d",names->name,names->type);
+		if (equp)
+			*equp = '=';
 		return FALSE;
 	}
 	return TRUE;
@@ -1528,6 +1859,7 @@ newsadjustmode()	/* change the editor mode status */
 /*	This function simply clears the message line,
 		mainly for macro usage			*/
 
+/* ARGSUSED */
 clrmes(f, n)
 int f, n;	/* arguments ignored */
 {
@@ -1540,41 +1872,40 @@ int f, n;	/* arguments ignored */
 /*	This function writes a string on the message line
 		mainly for macro usage			*/
 
+/* ARGSUSED */
 writemsg(f, n)
 int f, n;	/* arguments ignored */
 {
-	register char *sp;	/* pointer into buf to expand %s */
-	register char *np;	/* ptr into nbuf */
 	register int status;
 	char buf[NPAT]; 	/* buffer to recieve message into */
-	char nbuf[NPAT*2];	/* buffer to expand string into */
 
 	buf[0] = 0;
 	if ((status = mlreply("Message to write: ", buf, NPAT - 1)) != TRUE)
 		return(status);
 
-	/* expand all '%' to "%%" so mlwrite won't expect arguments */
-	sp = buf;
-	np = nbuf;
-	while (*sp) {
-		*np++ = *sp;
-		if (*sp++ == '%')
-			*np++ = '%';
-	}
-	*np = '\0';
-
 	/* write the message out */
-	mlforce(nbuf);
+	mlforce("%s",buf);
 	return(TRUE);
 }
 #endif
 
 #if CFENCE
 /*	the cursor is moved to a matching fence */
+matchfence(f,n)
+int f,n;
+{
+	return getfence(0, (!f || n > 0) ? FORWARD:REVERSE);
+}
 
-getfence(f, n, ch)
-int f, n;	/* not used */
+matchfenceback(f,n)
+int f,n;
+{
+	return getfence(0, (!f || n > 0) ? REVERSE:FORWARD);
+}
+
+getfence(ch,scandir)
 int ch; /* fence type to match against */
+int scandir; /* direction to scan if we're not on a fence to begin with */
 {
 	MARK	oldpos; 	/* original pointer */
 	register int sdir;	/* direction of search (1/-1) */
@@ -1586,12 +1917,32 @@ int ch; /* fence type to match against */
 	/* save the original cursor position */
 	oldpos = DOT;
 
-	if (!ch) {	/* ch may have been passed, if being used internally */
-		/* get the current character */
-		if (is_at_end_of_line(oldpos))
-			ch = '\n';
-		else
-			ch = char_at(oldpos);
+	/* ch may have been passed, if being used internally */
+	if (!ch) {
+		if (scandir == FORWARD) {
+			/* get the current character */
+			do {
+				ch = char_at(oldpos);
+			} while(!isfence(ch) && ++oldpos.o < llength(oldpos.l));
+
+			if (is_at_end_of_line(oldpos)) {
+				TTbeep();
+				return FALSE;
+			}
+		} else {
+			/* get the current character */
+			do {
+				ch = char_at(oldpos);
+			} while(!isfence(ch) && --oldpos.o >= 0);
+
+			if (oldpos.o < 0) {
+				TTbeep();
+				return FALSE;
+			}
+		}
+
+		/* we've at least found a fence -- move us that far */
+		DOT.o = oldpos.o;
 	}
 
 	/* setup proper matching fence */
@@ -1670,14 +2021,14 @@ fmatchindent()
 	    
 	MK = DOT;
 	    
-	if (getfence(FALSE,1,RBRACE) == FALSE) {
-		gomark();
+	if (getfence(RBRACE,FORWARD) == FALSE) {
+		gomark(FALSE,1);
 		return previndent(NULL);
 	}
 
 	ind = indentlen(DOT.l);
 
-	gomark();
+	gomark(FALSE,1);
 	    
 	return ind;
 }
@@ -1694,7 +2045,6 @@ char ch;	/* fence type to match against */
 	register int count; /* current fence level count */
 	register char opench;	/* open fence */
 	register char c;	/* current character in scan */
-	register int i;
 
 	/* first get the display update out there */
 	update(FALSE);
@@ -1749,6 +2099,7 @@ char ch;	/* fence type to match against */
 #endif /* CFENCE */
 
 catnap(milli)
+int milli;
 {
 #if ! UNIX
 	for (i = 0; i < term.t_pause; i++)
@@ -1758,14 +2109,14 @@ catnap(milli)
 
 	struct timeval tval;
 	tval.tv_sec = 0;
-	tval.tv_usec = 250000;	/* 250000 microseconds */
+	tval.tv_usec = milli * 1000;	/* microseconds */
 	select (0, NULL, NULL, NULL, &tval);
 
 # else
 #  if HAVE_POLL
 
 	struct pollfd pfd;
-	poll(&pfd, 0, 250); /* 250 milliseconds */
+	poll(&pfd, 0, milli); /* milliseconds */
 
 #  else
 
@@ -1780,7 +2131,7 @@ catnap(milli)
 #if ! SMALLER
 istring(f, n)	/* ask for and insert a string into the current
 		   buffer at the current point */
-int f, n;	/* ignored arguments */
+int f, n;
 {
 	register char *tp;	/* pointer into string to add */
 	register int status;	/* status return code */
@@ -1813,4 +2164,99 @@ int f, n;	/* ignored arguments */
 
 	return(TRUE);
 }
+#endif
+
+#if UNIX
+/* yes, I know DOS has directories... */
+
+#include	<sys/param.h>
+
+/* return a string naming the current directory */
+char *
+current_directory()
+{
+	char *cd, *s;
+#if USG
+	static char	dirname[NFILEN];
+	FILE *f, *npopen();
+	int n;
+	f = npopen("/bin/pwd", "r");
+	if (f == NULL) {
+		fclose(f);
+		return NULL;
+	}
+	n = fread(dirname, 1, NFILEN, f);
+
+	dirname[n] = '\0';
+	fclose(f);
+	cd = dirname;
+#else
+	extern char	*getwd();
+	static char	dirname[MAXPATHLEN];
+	cd = getwd(dirname);
+#endif
+	s = strchr(cd, '\n');
+	if (s)
+		*s = '\0';
+	return cd;
+}
+
+
+/* ARGSUSED */
+cd(f,n)
+{
+	int status;
+	static char cdirname[NFILEN];
+	status = mlreply("Change to directory: ", cdirname, NFILEN);
+	if (status != TRUE) {
+		/* should go HOME here */
+		return status;
+	}
+	return set_directory(cdirname);
+}
+
+/* ARGSUSED */
+pwd(f,n)
+{
+	mlwrite("%s",current_directory());
+	return TRUE;
+}
+
+/* move to the named directory.  adjust all non-absolute filenames
+	to be absolute.
+	(Dave Lemke)
+*/
+int
+set_directory(dir)
+char	*dir;
+{
+    char       exdir[NFILEN];
+    BUFFER     *bp;
+    char       *cwd;
+
+    /* first fix up all the buffer file names */
+    cwd = current_directory();
+    if (!cwd || ! *cwd)
+	return FALSE;
+    for (bp = bheadp; bp; bp = bp->b_bufp) {
+	/* ignore any that are already absolute or "internal" */
+	if (bp->b_fname[0] == '/' ||
+		bp->b_fname[0] == '\0' || 
+		bp->b_fname[0] == '[' ||
+		bp->b_fname[0] == '!') {
+	    continue;
+	}
+	/* XXX file name is only 80 bytes -- could easily overflow here... */
+	sprintf(exdir, "%s/%s", cwd, bp->b_fname );
+	ch_fname(bp, exdir);
+    }
+
+    strcpy(exdir, dir);
+    if (!glob(exdir))
+	return FALSE;
+    if (chdir(exdir) == 0)
+	return TRUE;
+    return FALSE;
+}
+
 #endif

@@ -6,7 +6,41 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.17  1991/10/08 01:28:43  pgf
+ * Revision 1.28  1992/02/17 08:57:36  pgf
+ * added "showmode" support
+ *
+ * Revision 1.27  1992/01/22  20:26:00  pgf
+ * fixed ifdef conflict: SVR3_PTEM
+ *
+ * Revision 1.26  1992/01/05  00:05:24  pgf
+ * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
+ * often.  also normalized message appearance somewhat.
+ *
+ * Revision 1.25  1991/11/13  20:09:27  pgf
+ * X11 changes, from dave lemke
+ *
+ * Revision 1.24  1991/11/08  13:14:40  pgf
+ * more lint
+ *
+ * Revision 1.23  1991/11/07  03:58:31  pgf
+ * lint cleanup
+ *
+ * Revision 1.22  1991/11/03  17:35:06  pgf
+ * don't access unset vt column 80 if screen isn't that wide
+ *
+ * Revision 1.21  1991/11/01  14:38:00  pgf
+ * saber cleanup
+ *
+ * Revision 1.20  1991/10/28  14:22:46  pgf
+ * no more TABVAL macro, curtabstopval renamed curtabval
+ *
+ * Revision 1.19  1991/10/26  00:14:56  pgf
+ * put termio.h back in, and switch to SVR3 around ptem.h
+ *
+ * Revision 1.18  1991/10/23  12:05:37  pgf
+ * we don't need termio.h
+ *
+ * Revision 1.17  1991/10/08  01:28:43  pgf
  * dbgwrite now uses raw'est i/o
  *
  * Revision 1.16  1991/09/26  13:16:19  pgf
@@ -82,7 +116,7 @@
 #if UNIX
 #include <signal.h>
 #include <termio.h>
-#if POSIX
+#if SVR3_PTEM
 #include <sys/types.h>
 #include <sys/stream.h>
 #include <sys/ptem.h>
@@ -154,6 +188,8 @@ vtinit()
         if (vp == NULL)
             exit(1);
 
+	/* unnecessary */
+	/* (void)memset(vp, ' ', sizeof(struct VIDEO) + term.t_mcol - 4); */
 	vp->v_flag = 0;
 #if	COLOR
 	vp->v_rfcolor = gfcolor;
@@ -166,6 +202,9 @@ vtinit()
 
         if (vp == NULL)
             exit(1);
+
+	/* unnecessary */
+	/* (void)memset(vp, 0, sizeof(struct VIDEO) + term.t_mcol - 4); */
 
 	vp->v_flag = 0;
         pscreen[i] = vp;
@@ -180,6 +219,7 @@ vtinit()
  * terminal.
  */
 vttidy(f)
+int f;
 {
 	ttclean(f);	/* does it all now */
 }
@@ -189,6 +229,7 @@ vttidy(f)
  * screen. There is no checking for nonsense values.
  */
 vtmove(row, col)
+int row,col;
 {
     vtrow = row;
     vtcol = col;
@@ -211,7 +252,7 @@ int c,list;
 	if (c == '\t' && !list) {
 		do {
 			vtputc(' ',FALSE);
-		} while (((vtcol + taboff)%TABVAL) != 0);
+		} while (((vtcol + taboff)%curtabval) != 0);
 	} else if (c == '\n' && !list) {
 		return;
 	} else if (vtcol >= term.t_ncol) {
@@ -228,12 +269,14 @@ int c,list;
 }
 
 vtgetc(col)
+int col;
 {
 	return vscreen[vtrow]->v_text[col];
 }
 
 vtputsn(s,n)
 char *s;
+int n;
 {
 	int c;
 	while (n-- && (c = *s++) != 0)
@@ -252,7 +295,9 @@ vteeol()
 
 /* upscreen:	user routine to force a screen update
 		always finishes complete update		*/
+/* ARGSUSED */
 upscreen(f, n)
+int f,n;
 {
 	update(TRUE);
 	return(TRUE);
@@ -273,14 +318,14 @@ int force;	/* force update past type ahead? */
 	register int screencol;
 
 	if (!curbp) /* not initialized */
-		return;
+		return FALSE;
 #if	TYPEAH
 	if (force == FALSE && typahead())
-		return(SORTOFTRUE);
+		return SORTOFTRUE;
 #endif
 #if	VISMAC == 0
 	if (force == FALSE && (get_recorded_char(FALSE) != -1))
-		return(SORTOFTRUE);
+		return SORTOFTRUE;
 #endif
 
 	displaying = TRUE;
@@ -308,7 +353,7 @@ int force;	/* force update past type ahead? */
 	wp = wheadp;
 	while (wp != NULL) {
 		if (wp->w_flag) {
-			curtabstopval = tabstop_val(wp->w_bufp);
+			curtabval = tabstop_val(wp->w_bufp);
 			/* if the window has changed, service it */
 			reframe(wp);	/* check the framing */
 			if (wp->w_flag & (WFKILLS|WFINS)) {
@@ -327,7 +372,7 @@ int force;	/* force update past type ahead? */
 		/* on to the next window */
 		wp = wp->w_wndp;
 	}
-	curtabstopval = tabstop_val(curbp);
+	curtabval = tabstop_val(curbp);
 
 	/* recalc the current hardware cursor location */
 	screencol = updpos();
@@ -498,8 +543,9 @@ WINDOW *wp;	/* window to update lines in */
 l_to_vline(wp,lp,sline)
 WINDOW *wp;	/* window to update lines in */
 LINE *lp;
+int sline;
 {
-	int i,c;
+	int i;
 
 	/* and update the virtual line */
 	vscreen[sline]->v_flag |= VFCHG;
@@ -545,7 +591,7 @@ updpos()
 		++currow;
 		lp = lforw(lp);
 		if (lp == curwp->w_line.l) {
-			mlwrite("Bug:  lost dot updpos().  setting at top");
+			mlforce("BUG:  lost dot updpos().  setting at top");
 			curwp->w_line.l = curwp->w_dot.l  = lforw(curbp->b_line.l);
 			currow = curwp->w_toprow;
 		}
@@ -560,7 +606,7 @@ updpos()
 			do {
 				curcol++;
 			} while (((curcol +
-				w_val(curwp,WVAL_SIDEWAYS))%TABVAL) != 0);
+				w_val(curwp,WVAL_SIDEWAYS))%curtabval) != 0);
 		} else {
 			if (!isprint(c))
 				++curcol;
@@ -585,7 +631,7 @@ upddex()
 {
 	register WINDOW *wp;
 	register LINE *lp;
-	register int i,j;
+	register int i;
 
 	wp = wheadp;
 
@@ -593,7 +639,7 @@ upddex()
 		lp = wp->w_line.l;
 		i = wp->w_toprow;
 
-		curtabstopval = tabstop_val(wp->w_bufp);
+		curtabval = tabstop_val(wp->w_bufp);
 
 		while (i < wp->w_toprow + wp->w_ntrows) {
 			if (vscreen[i]->v_flag & VFEXT) {
@@ -611,11 +657,13 @@ upddex()
 		/* and onward to the next window */
 		wp = wp->w_wndp;
 	}
-	curtabstopval = tabstop_val(curbp);
+	curtabval = tabstop_val(curbp);
 }
 
 /*	updgar:	if the screen is garbage, clear the physical screen and
 		the virtual screen and force a full update		*/
+
+extern char mlsave[];
 
 updgar()
 {
@@ -642,6 +690,8 @@ updgar()
 	(*term.t_eeop)();
 	sgarbf = FALSE;			 /* Erase-page clears */
 	mpresf = FALSE;			 /* the message area. */
+	if (mlsave[0])
+		mlwrite(mlsave);
 #if	COLOR
 	mlerase();			/* needs to be cleared if colored */
 #endif
@@ -686,6 +736,7 @@ int force;	/* forced update flag */
 /* arg. chooses between looking for inserts or deletes */
 int	
 scrolls(inserts)	/* returns true if it does something */
+int inserts;
 {
 	struct	VIDEO *vpv ;	/* virtual screen image */
 	struct	VIDEO *vpp ;	/* physical screen image */
@@ -801,6 +852,7 @@ scrolls(inserts)	/* returns true if it does something */
 
 /* move the "count" lines starting at "from" to "to" */
 scrscroll(from, to, count)
+int from, to, count;
 {
 	ttrow = ttcol = -1;
 	(*term.t_scroll)(from,to,count);
@@ -809,8 +861,8 @@ scrscroll(from, to, count)
 texttest(vrow,prow)		/* return TRUE on text match */
 int	vrow, prow ;		/* virtual, physical rows */
 {
-struct	VIDEO *vpv = vscreen[vrow] ;	/* virtual screen image */
-struct	VIDEO *vpp = pscreen[prow]  ;	/* physical screen image */
+	struct	VIDEO *vpv = vscreen[vrow] ;	/* virtual screen image */
+	struct	VIDEO *vpp = pscreen[prow]  ;	/* physical screen image */
 
 	return (!memcmp(vpv->v_text, vpp->v_text, term.t_ncol)) ;
 }
@@ -818,9 +870,10 @@ struct	VIDEO *vpp = pscreen[prow]  ;	/* physical screen image */
 /* return the index of the first blank of trailing whitespace */
 int	
 endofline(s,n) 
-char 	*s ;
+char 	*s;
+int	n;
 {
-int	i ;
+	int	i;
 	for (i = n - 1; i >= 0; i--)
 		if (s[i] != ' ') return(i+1) ;
 	return(0) ;
@@ -1285,8 +1338,13 @@ struct VIDEO *vp2;	/* physical screen image */
 		/* scan through the line and dump it to the screen and
 		   the virtual screen array				*/
 		cp3 = &vp1->v_text[term.t_ncol];
+#if X11
+		x_putline(row, cp1, cp3 - cp1);
+#endif
 		while (cp1 < cp3) {
+#if !X11
 			TTputc(*cp1);
+#endif
 			++ttcol;
 			*cp2++ = *cp1++;
 		}
@@ -1354,8 +1412,13 @@ struct VIDEO *vp2;	/* physical screen image */
 	TTrev(rev);
 #endif
 
+#if X11
+	x_putline(row, cp1, cp5 - cp1 + 1);
+#endif
 	while (cp1 != cp5) {		/* Ordinary. */
+#if !X11
 		TTputc(*cp1);
+#endif
 		++ttcol;
 		*cp2++ = *cp1++;
 	}
@@ -1422,7 +1485,7 @@ WINDOW *wp;
 	bp = wp->w_bufp;
 
 	vtputc(lchar,FALSE);
-	{
+	if (b_val(bp, MDSHOWMODE)) {
 		register int ic;
 		if (wp == curwp) {
 			if (insertmode == FALSE)
@@ -1514,7 +1577,7 @@ WINDOW *wp;
 #endif
 
 	/* mark column 80 */
-	if (vtgetc(80) == lchar) {
+	if (n > 80 && vtgetc(80) == lchar) {
 		vtcol = 80;
 		vtputc('|',FALSE);
 	}
@@ -1540,6 +1603,7 @@ upmode()	/* update all the mode lines */
  * random calls. Update "ttrow" and "ttcol".
  */
 movecursor(row, col)
+int row,col;
 {
 #if	! NeWS		/* "line buffered" */
 	if (row!=ttrow || col!=ttcol)
@@ -1622,28 +1686,89 @@ typedef char *va_list;
 
 #endif
 
-dbgwrite(s,x,y,z)
+char *mlsavep;
+char mlsave[NSTRING];
+
+mlsavec(c)
+int c;
 {
-	mlwrite(s,x,y,z);
+	if (mlsavep - mlsave < NSTRING)
+		*mlsavep++ = c;
+}
+
+/*
+ * Write a message into the message line only if appropriate.
+ */
+/* VARARGS1 */
+mlwrite(va_alist)
+va_dcl
+{
+	va_list ap;
+	/* if we are not currently echoing on the command line, abort this */
+	if (dotcmdmode == PLAY || discmd == FALSE) {
+		movecursor(term.t_nrow, 0);
+		return;
+	}
+	va_start(ap);
+	mlmsg(&ap);
+	va_end(ap);
+}
+
+/*	Put a string out to the message line regardless of the
+	current $discmd setting. This is needed when $debug is TRUE
+	and for the write-message and clear-message-line commands
+	Also used for most errors, to be sure they're seen.
+*/
+/* VARARGS1 */
+mlforce(va_alist)
+va_dcl
+{
+	va_list ap;
+	va_start(ap);
+	mlmsg(&ap);
+	va_end(ap);
+}
+
+/* VARARGS1 */
+mlprompt(va_alist)
+va_dcl
+{
+	va_list ap;
+	int osgarbf = sgarbf;
+	sgarbf = FALSE;
+	va_start(ap);
+	mlmsg(&ap);
+	va_end(ap);
+	sgarbf = osgarbf;
+}
+
+/* VARARGS */
+dbgwrite(va_alist)
+va_dcl
+{
+	va_list ap;	/* ptr to current data field */
+	va_start(ap);
+	mlmsg(&ap);
+	va_end(ap);
 	TTgetc();
 }
 
 /*
- * Write a message into the message line. Keep track of the physical cursor
+ * Do the real message-line work.  Keep track of the physical cursor
  * position. A small class of printf like format items is handled.
  * Set the "message line" flag TRUE.
  */
-
-/* VARARGS */
-mlwrite(va_alist)
-va_dcl
+mlmsg(app)
+va_list *app;	/* ptr to current data field */
 {
-	va_list ap;	/* ptr to current data field */
 	int mlputc();
 
-	/* if we are not currently echoing on the command line, abort this */
-	if (dotcmdmode == PLAY || discmd == FALSE) {
-		movecursor(term.t_nrow, 0);
+	if (sgarbf) {
+		/* then we'll lose the message on the next update(), so save it now */
+		mlsavep = mlsave;
+		dfoutfn = mlsavec;
+		dofmt(app);
+		*mlsavep = '\0';
 		return;
 	}
 
@@ -1653,7 +1778,7 @@ va_dcl
 	TTbacg(0);
 #endif
 
-	/* if we can not erase to end-of-line, do it manually */
+	/* if we cannot erase to end-of-line, do it manually */
 	if (eolexist == FALSE) {
 		mlerase();
 		TTflush();
@@ -1662,16 +1787,15 @@ va_dcl
 
 	movecursor(term.t_nrow, 0);
 
-	va_start(ap);
 	dfoutfn = mlputc;
-	dofmt(&ap);
-	va_end(ap);
+	dofmt(app);
 
 	/* if we can, erase to the end of screen */
 	if (eolexist == TRUE)
 		TTeeol();
 	TTflush();
 	mpresf = TRUE;
+	mlsave[0] = '\0';
 } 
 
 /*
@@ -1687,21 +1811,6 @@ char c;
 	        TTputc(c);
 	        ++ttcol;
 	}
-}
-
-/*	Force a string out to the message line regardless of the
-	current $discmd setting. This is needed when $debug is TRUE
-	and for the write-message and clear-message-line commands
-*/
-mlforce(s)
-char *s;	/* string to force out */
-{
-	register oldcmd;	/* original command display flag */
-
-	oldcmd = discmd;	/* save the discmd value */
-	discmd = TRUE;		/* and turn display on */
-	mlwrite("%s",s);	/* write the string out */
-	discmd = oldcmd;	/* and restore the original setting */
 }
 
 /* 
@@ -1832,6 +1941,7 @@ char *s;
 /* as above, but takes a count for s's length */
 dfputsn(s,n)
 char *s;
+int n;
 {
 	register int c;
 	register int l = 0;
@@ -1846,6 +1956,7 @@ char *s;
  * Do format an integer, in the specified radix.
  */
 dfputi(i, r)
+int i,r;
 {
     register int q;
     static char hexdigits[] = "0123456789ABCDEF";
@@ -1870,6 +1981,7 @@ dfputi(i, r)
  */
 dfputli(l, r)
 long l;
+int r;
 {
     register long q;
 
@@ -1919,11 +2031,12 @@ int s;	/* scaled integer to output */
 char *lsp;
 
 lspputc(c)
+int c;
 {
 	*lsp++ = c;
 }
 
-/* VARARGS */
+/* VARARGS1 */
 char *
 lsprintf(buf,va_alist)
 char *buf;
@@ -1949,6 +2062,7 @@ va_dcl
  */
 
 bputc(c)
+int c;
 {
 	if (c == '\n')
 		lnewline();
@@ -1957,6 +2071,7 @@ bputc(c)
 }
 
 /* printf into curbp, at curwp->w_dot */
+/* VARARGS */
 bprintf(va_alist)
 va_dcl
 {
@@ -2039,7 +2154,7 @@ int h, w;
 		newwidth(TRUE,w);
 
 	update(TRUE);
-	return TRUE;
+	return;
 }
 
 #endif

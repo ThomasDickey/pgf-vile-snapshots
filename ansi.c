@@ -4,7 +4,10 @@
  * "termio.c". It compiles into nothing if not an ANSI device.
  *
  * $Log: ansi.c,v $
- * Revision 1.5  1991/09/10 01:19:35  pgf
+ * Revision 1.6  1991/11/16 18:28:25  pgf
+ * removed an old ifdef
+ *
+ * Revision 1.5  1991/09/10  01:19:35  pgf
  * re-tabbed, and moved ESC and BEL to estruct.h
  *
  * Revision 1.4  1991/08/07  12:34:39  pgf
@@ -320,21 +323,6 @@ register int	n;
 
 ansiopen()
 {
-#if	V7 | USG | BSD
-#if 0
-	register char *cp;
-	char *getenv();
-
-	if ((cp = getenv("TERM")) == NULL) {
-		puts("Shell variable TERM not defined!");
-		exit(1);
-	}
-	if (strcmp(cp, "vt100") != 0 && strcmp(cp, "ansi") != 0) {
-		puts("Terminal type not 'vt100' or 'ansi'!");
-		exit(1);
-	}
-#endif
-#endif
 	strcpy(sres, "NORMAL");
 	revexist = TRUE;
 	ttopen();

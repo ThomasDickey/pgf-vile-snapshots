@@ -6,7 +6,45 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.22  1991/10/20 23:07:13  pgf
+ * Revision 1.32  1992/02/17 09:04:03  pgf
+ * fix null filename dereference, and
+ * kill registers now hold unsigned chars
+ *
+ * Revision 1.31  1992/01/05  00:06:13  pgf
+ * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
+ * often.  also normalized message appearance somewhat.
+ *
+ * Revision 1.30  1992/01/03  23:31:49  pgf
+ * use new ch_fname() to manipulate filenames, since b_fname is now
+ * a malloc'ed sting, to avoid length limits
+ *
+ * Revision 1.29  1991/11/10  21:21:20  pgf
+ * don't look for cr/nl pairs on empty lines
+ *
+ * Revision 1.28  1991/11/08  13:20:18  pgf
+ * lint cleanup, and took out lazy filename matching, and
+ * changed the DOSFILES code so it's all in this routine, and made it
+ * work with quickreadf, where we don't read every line, and fixed
+ * core dumps on long-lined files, and allowed for aborting file read
+ * operations
+ *
+ * Revision 1.27  1991/11/07  03:58:31  pgf
+ * lint cleanup
+ *
+ * Revision 1.26  1991/11/03  17:46:30  pgf
+ * removed f,n args from all region functions -- they don't use them,
+ * since they're no longer directly called by the user
+ *
+ * Revision 1.25  1991/11/01  14:38:00  pgf
+ * saber cleanup
+ *
+ * Revision 1.24  1991/10/31  02:35:04  pgf
+ * avoid malloc(0) in quickreadf
+ *
+ * Revision 1.23  1991/10/27  01:44:06  pgf
+ * used has_C_suffix routine to determine c-mode or not
+ *
+ * Revision 1.22  1991/10/20  23:07:13  pgf
  * shorten the big file buffer if we don't use it all due to long lines
  *
  * Revision 1.21  1991/10/18  01:17:34  pgf
@@ -100,9 +138,33 @@ char *strchr();
 char *strrchr();
 
 extern int fileispipe;
-#if DOSFILES
-extern int dosfile;
-#endif
+int doslines, unixlines;
+
+
+ch_fname(bp, name)
+BUFFER *bp;
+char *name;
+{
+	int len;
+	char *strmalloc();
+	len = strlen(name)+1;
+
+	if (bp->b_fname && bp->b_fnlen < len ) {
+		free(bp->b_fname);
+		bp->b_fname = NULL;
+	}
+
+	if (!bp->b_fname) {
+		bp->b_fname = strmalloc(name);
+		bp->b_fnlen = len;
+		return;
+	}
+
+	/* it'll fit, leave len untouched */
+	strcpy(bp->b_fname, name);
+	return;
+
+}
 
 /*
  * Read a file into the current
@@ -110,12 +172,13 @@ extern int dosfile;
  * find the name of the file, and call the standard
  * "read a file into the current buffer" code.
  */
+/* ARGSUSED */
 fileread(f, n)
+int f,n;
 {
         register int    s;
         static char fname[NFILEN];
         char bname[NBUFN];
-        char bname1[NBUFN];
 
         if ((s=mlreply("Replace with file: ", fname, NFILEN)) != TRUE)
                 return s;
@@ -140,13 +203,13 @@ fileread(f, n)
  * text, and switch to the new buffer.
  * This is ": e"
  */
+/* ARGSUSED */
 filefind(f, n)
+int f,n;
 {
         static char fname[NFILEN];	/* file user wishes to find */
 	char nfname[NFILEN];
-	char rnfname[NFILEN];
         register int s;		/* status return */
-	LINE *lp;
 
 	if (clexec || isnamedcmd) {
 	        if ((s=mlreply("Find file: ", fname, NFILEN)) != TRUE)
@@ -157,8 +220,10 @@ filefind(f, n)
 	if ((s = glob(fname)) != TRUE)
 		return FALSE;
 	strcpy (nfname, fname);
-#if TAGS
+#ifdef LAZINESS
 	if (othmode & OTH_LAZY) {
+		char rnfname[NFILEN];
+		LINE *lp;
 		extern BUFFER *filesbp;
 		lp = NULL;
 		while (flook(nfname, FL_HERE) == NULL) {
@@ -176,7 +241,9 @@ filefind(f, n)
 	return getfile(nfname, TRUE);
 }
 
+/* ARGSUSED */
 viewfile(f, n)	/* visit a file in VIEW mode */
+int f,n;
 {
         char fname[NFILEN];	/* file user wishes to find */
         register int s;		/* status return */
@@ -203,7 +270,9 @@ viewfile(f, n)	/* visit a file in VIEW mode */
  */
 static char insfname[NFILEN];
 
+/* ARGSUSED */
 insfile(f, n)
+int f,n;
 {
         register int    s;
 
@@ -224,8 +293,6 @@ char fname[];		/* file name to find */
 int lockfl;		/* check the file for locks? */
 {
         register BUFFER *bp;
-        register LINE   *lp;
-        register int    i;
         register int    s;
         char bname[NBUFN];	/* buffer name to put file */
 
@@ -273,11 +340,11 @@ int lockfl;		/* check the file for locks? */
 	        }
 		/* okay, we've got a unique name -- create it */
 	        if (bp==NULL && (bp=bfind(bname, OK_CREAT, 0))==NULL) {
-	                mlwrite("Cannot create buffer");
+	                mlforce("[Cannot create buffer]");
 	                return FALSE;
 	        }
 		/* switch and read it in. */
-	        strcpy(bp->b_fname, fname);
+		ch_fname(bp,fname);
 	}
 	return swbuffer(bp);
 }
@@ -287,6 +354,7 @@ int lockfl;		/* check the file for locks? */
 	found there.  Returns the final status of the read.
 */
 
+/* ARGSUSED */
 readin(fname, lockfl, bp, mflg)
 char    *fname;		/* name of file to read */
 int	lockfl;		/* check for file locks? */
@@ -296,7 +364,6 @@ int	mflg;		/* print messages? */
         register WINDOW *wp;
         register int    s;
         int    nline;
-	char *errst;
 #if VMALLOC
 	extern int doverifys;
 	int odv;
@@ -314,7 +381,7 @@ int	mflg;		/* print messages? */
         if ((s=bclear(bp)) != TRUE)             /* Might be old.        */
                 return s;
         bp->b_flag &= ~(BFINVS|BFCHG);
-        strcpy(bp->b_fname, fname);
+	ch_fname(bp,fname);
 #if DOSFILES
 	make_local_b_val(bp,MDDOS);
 	set_b_val(bp, MDDOS, global_b_val(MDDOS) );
@@ -332,7 +399,7 @@ int	mflg;		/* print messages? */
         }
 
         if (mflg) {
-		 mlwrite("[Reading %s ]", fname);
+		 mlforce("[Reading %s ]", fname);
 	}
 
 #if UNIX & before
@@ -379,22 +446,25 @@ int	mflg;		/* print messages? */
 
 out:
 #if DOSFILES
-	set_b_val(bp, MDDOS, dosfile && global_b_val(MDDOS) );
+	if (b_val(bp, MDDOS)) { /* should we check for dos files? */
+		LINE *lp = lforw(bp->b_line.l);
+		while (lp != bp->b_line.l) {
+			if (llength(lp) && lgetc(lp,llength(lp)-1) == '\r') {
+				llength(lp)--;
+				doslines++;
+			} else {
+				unixlines++;
+			}
+			lp = lforw(lp);
+		}
+		set_b_val(bp, MDDOS, doslines > unixlines);
+	}
 #endif
 	/* set C mode for C files */
 	make_local_b_val(bp,MDCMOD); /* make it local for all, so that
 					subsequent changes to global value
 					will _not_ affect this buffer */
-	set_b_val(bp,MDCMOD,FALSE); /* assume non-C */
-	if (global_b_val(MDCMOD)) { 
-		char *cp;
-		cp = &fname[strlen(fname)-2];
-		if (cp >= fname && cp[0] == '.' && 
-			strchr(b_val_ptr(bp,VAL_CSUFFIXES),cp[1]) ) {
-			/* assumption proven wrong */
-			set_b_val(bp,MDCMOD,TRUE);
-		}
-	}
+	set_b_val(bp,MDCMOD, (global_b_val(MDCMOD) && has_C_suffix(bp)));
 
 	TTkopen();	/* open the keyboard again */
         for (wp=wheadp; wp!=NULL; wp=wp->w_wndp) {
@@ -414,7 +484,7 @@ out:
 		extern int sys_nerr, errno;
 		extern char *sys_errlist[];
 		if (errno > 0 && errno < sys_nerr)
-			mlwrite("%s: %s",fname,sys_errlist[errno]);
+			mlforce("[%s: %s]",fname,sys_errlist[errno]);
 #endif
                 return FALSE;
 	}
@@ -430,18 +500,17 @@ int *nlinep;
 {
         register unsigned char *textp;
         unsigned char *countp;
-        WINDOW *wp;
-	int s;
-	int flag = 0;
         int nlines;
         int incomplete = FALSE;
 	long len;
 	long ffsize();
-#if UNIX
-        int    done_update = FALSE;
-#endif
+
 	if ((len = ffsize()) < 0)
 		return FIOERR;
+
+	/* avoid malloc(0) problems down below; let slowreadf() do the work */
+	if (len == 0)
+		return FIOMEM;
 
 	/* leave an extra byte at the front, for the length of the first
 		line.  after that, lengths go in place of the newline at
@@ -450,7 +519,7 @@ int *nlinep;
 	if (bp->b_ltext == NULL)
 		return FIOMEM;
 
-	if ((len = ffread(&bp->b_ltext[1], len)) < 0) {
+	if ((len = ffread((char *)&bp->b_ltext[1], len)) < 0) {
 		free(bp->b_ltext);
 		bp->b_ltext = NULL;
 		return FIOERR;
@@ -466,20 +535,17 @@ int *nlinep;
         nlines = 0;
 	while (len--) {
 		if (*textp == '\n') {
-			if (textp - countp < 255) {
-				*countp = textp - countp - 1;
-				countp = textp;
-			} else {
+			if (textp - countp >= 255) {
 				len = (long)(countp - bp->b_ltext);
 				incomplete = TRUE;
 				/* we'll re-read the rest later */
 				ffseek(len);
 				if ((unsigned char *)realloc(bp->b_ltext, len)
-													!= bp->b_ltext) {
+							!= bp->b_ltext) {
 					/* ugh.  can this happen?
 						we're reducing the size... */
 					ffrewind();
-					if ((len = ffread(&bp->b_ltext[1],
+					if ((len = ffread((char *)&bp->b_ltext[1],
 							len)) < 0) {
 						free(bp->b_ltext);
 						bp->b_ltext = NULL;
@@ -487,56 +553,66 @@ int *nlinep;
 					}
 					goto retry;
 				}
+				bp->b_ltext_end = bp->b_ltext + len + 1;
 				break;
 			}
+			*countp = textp - countp - 1;
+			countp = textp;
 			nlines++;
 		}
 		++textp;
 	}
 
 	/* dbgwrite("lines %d, chars %d", nlines, textp - bp->b_ltext); */
-
-	/* allocate all of the line structs we'll need */
-	bp->b_LINEs = (LINE *)malloc(nlines * sizeof(LINE));
-	if (bp->b_LINEs == NULL) {
-		free(bp->b_ltext);
-		bp->b_ltext = NULL;
+	if (nlines == 0) {
 		ffrewind();
-		return FIOMEM;
-	}
-	bp->b_LINEs_end = bp->b_LINEs + nlines;
-
-	/* loop through the buffer again, creating line data structure for
-		each line */
-	{
-		register LINE *lp;
-		lp = bp->b_LINEs;
-		textp = bp->b_ltext;
-		while (lp != bp->b_LINEs_end) {
-			lp->l_used = *textp;
-			lp->l_size = *textp + 1;
-			lp->l_text = (char *)textp + 1;
-			lp->l_fp = lp + 1;
-			lp->l_bp = lp - 1;
-			lsetclear(lp);
-			lp->l_nxtundo = NULL;
-			lp++;
-			textp += *textp + 1;
+		if (bp->b_ltext)
+			free(bp->b_ltext);
+		bp->b_ltext = NULL;
+		incomplete = TRUE;
+	} else {
+		/* allocate all of the line structs we'll need */
+		bp->b_LINEs = (LINE *)malloc(nlines * sizeof(LINE));
+		if (bp->b_LINEs == NULL) {
+			free(bp->b_ltext);
+			bp->b_ltext = NULL;
+			ffrewind();
+			return FIOMEM;
 		}
-		/*
-		if (textp != bp->b_ltext_end - 1)
-			mlwrite("BUG: textp not equal to l_text_end %d %d",
-				textp,bp->b_ltext_end);
-		*/
-		lp--;  /* point at last line again */
+		bp->b_LINEs_end = bp->b_LINEs + nlines;
 
-		/* connect the end of the list */
-		lp->l_fp = bp->b_line.l;
-		bp->b_line.l->l_bp = lp;
+		/* loop through the buffer again, creating
+			line data structure for each line */
+		{
+			register LINE *lp;
+			lp = bp->b_LINEs;
+			textp = bp->b_ltext;
+			while (lp != bp->b_LINEs_end) {
+				lp->l_used = *textp;
+				lp->l_size = *textp + 1;
+				lp->l_text = (char *)textp + 1;
+				lp->l_fp = lp + 1;
+				lp->l_bp = lp - 1;
+				lsetclear(lp);
+				lp->l_nxtundo = NULL;
+				lp++;
+				textp += *textp + 1;
+			}
+			/*
+			if (textp != bp->b_ltext_end - 1)
+				mlwrite("BUG: textp not equal to end %d %d",
+					textp,bp->b_ltext_end);
+			*/
+			lp--;  /* point at last line again */
 
-		/* connect the front of the list */
-		bp->b_LINEs->l_bp = bp->b_line.l;
-		bp->b_line.l->l_fp = bp->b_LINEs;
+			/* connect the end of the list */
+			lp->l_fp = bp->b_line.l;
+			bp->b_line.l->l_bp = lp;
+
+			/* connect the front of the list */
+			bp->b_LINEs->l_bp = bp->b_line.l;
+			bp->b_line.l->l_fp = bp->b_LINEs;
+		}
 	}
 
 	*nlinep = nlines;
@@ -548,7 +624,7 @@ int *nlinep;
 
 slowreadf(bp, nlinep)
 register BUFFER *bp;
-long *nlinep;
+int *nlinep;
 {
         register WINDOW *wp;
 	int s;
@@ -558,6 +634,14 @@ long *nlinep;
         int    done_update = FALSE;
 #endif
         while ((s = ffgetline(&len)) == FIOSUC) {
+#if DOSFILES
+		if (fline[len-1] == '\r') {
+			len--;
+			doslines++;
+		} else {
+			unixlines++;
+		}
+#endif
 		if (addline(bp,fline,len) != TRUE) {
                         s = FIOMEM;             /* Keep message on the  */
                         break;                  /* display.             */
@@ -580,7 +664,7 @@ long *nlinep;
 			        }
 				/* track changes in dosfile as lines arrive */
 				set_b_val(bp, MDDOS, 
-					dosfile && global_b_val(MDDOS) );
+				 doslines > unixlines && global_b_val(MDDOS) );
 				curwp->w_flag |= WFMODE|WFKILLS;
 				update(FALSE);
 				done_update = TRUE;
@@ -598,11 +682,20 @@ long *nlinep;
 
 /* utility routine for no. of lines read */
 readlinesmsg(n,s,f,rdonly)
-long n;
+int n;
+int s;
+char *f;
+int rdonly;
 {
-	mlwrite("[%sRead %ld line%s from \"%s\"%s]",
-     (s==FIOERR ? "I/O ERROR, " : (s == FIOMEM ? "OUT OF MEMORY, ":"")),
-	n, n != 1 ? "s":"", f, rdonly ? "  (read-only)":"" );
+	char *m;
+	switch(s) {
+		case FIOERR:	m = "I/O ERROR, ";	break;
+		case FIOMEM:	m = "OUT OF MEMORY, ";	break;
+		case FIOABRT:	m = "ABORTED, ";	break;
+		default:	m = "";			break;
+	}
+	mlwrite("[%sRead %d line%s from \"%s\"%s]", m,
+		n, n != 1 ? "s":"", f, rdonly ? "  (read-only)":"" );
 }
 
 /*
@@ -617,7 +710,6 @@ makename(bname, fname)
 char    bname[];
 char    fname[];
 {
-        register char *cp2;
         register char *lastsl;
 
         register char *fcp;
@@ -660,14 +752,16 @@ char    fname[];
 	bcp = bname;
 	if (*fcp == '!') { /* then it's a shell command.  bname is first word */
 		*bcp++ = '!';
-		while (isspace(*++fcp))
-			;
+		do {
+			++fcp;
+		} while (isspace(*fcp));
 		while (!isspace(*fcp) && bcp < &bname[NBUFN-1])
 			*bcp++ = *fcp++;
 		*bcp = '\0';
 		return;
 	}
-	if (lastsl = strrchr(fcp,'/')) {
+	lastsl = strrchr(fcp,'/');
+	if (lastsl) {
 		strncpy(bcp,lastsl+1,NBUFN);
 		bcp[NBUFN-1] = '\0';
 	} else {  /* no slashes, use the filename as is */
@@ -677,15 +771,19 @@ char    fname[];
 	return;
 
 #else
+	{
+        register char *cp2;
         cp2 = &bname[0];
         while (cp2!=&bname[NBUFN-1] && *cp1!=0 && *cp1!=';')
                 *cp2++ = *cp1++;
         *cp2 = 0;
+	}
 #endif
 }
 
 unqname(name,ok_to_ask)	/* make sure a buffer name is unique */
 char *name;	/* name to check on */
+int ok_to_ask;  /* prompts allowed? */
 {
 	register char *sp;
 
@@ -721,7 +819,9 @@ char *name;	/* name to check on */
  * Ask for a file name, and write the
  * contents of the current buffer to that file.
  */
+/* ARGSUSED */
 filewrite(f, n)
+int f,n;
 {
         register int    s;
         static char            fname[NFILEN];
@@ -743,7 +843,7 @@ filewrite(f, n)
 		}
         }
 	if (!strcmp(fname,curbp->b_fname) && b_val(curbp,MDVIEW)) {
-		mlwrite("[Can't write-back from view mode]");
+		mlforce("[Can't write-back from view mode]");
 		return FALSE;
 	}
         if ((s=writeout(fname,curbp,TRUE)) == TRUE) {
@@ -755,21 +855,18 @@ filewrite(f, n)
 
 /*
  * Save the contents of the current
- * buffer in its associatd file. Do nothing
- * if nothing has changed (this may be a bug, not a
- * feature). Error if there is no remembered file
+ * buffer in its associatd file.
+ * Error if there is no remembered file
  * name for the buffer.
  */
+/* ARGSUSED */
 filesave(f, n)
+int f,n;
 {
         register int    s;
 
-#if its_a_bug
-        if ((curbp->b_flag&BFCHG) == 0)         /* Return, no changes.  */
-                return TRUE;
-#endif
         if (curbp->b_fname[0] == 0) {           /* Must have a name.    */
-                mlwrite("No file name");
+                mlforce("[No file name]");
                 return FALSE;
         }
         if ((s=writeout(curbp->b_fname,curbp,TRUE)) == TRUE) {
@@ -790,6 +887,7 @@ filesave(f, n)
 writeout(fn,bp,msgf)
 char    *fn;
 BUFFER *bp;
+int msgf;
 {
         register LINE   *lp;		/* current line */
         register long   numchars;	/* # of chars in file */
@@ -809,14 +907,10 @@ BUFFER *bp;
         region.r_size = numchars;
         region.r_end = bp->b_line;
         
-#if DOSFILES
-	dosfile = b_val(bp, MDDOS);
-#endif
-
-	return writereg(&region,fn,msgf);
+	return writereg(&region,fn,msgf,b_val(bp, MDDOS));
 }
 
-writeregion(f,n)
+writeregion()
 {
         REGION region;
 	int s;
@@ -846,19 +940,18 @@ writeregion(f,n)
 			}
 		}
         }
-        if ((s=getregion(&region,NULL)) != TRUE)
+        if ((s=getregion(&region)) != TRUE)
                 return s;
-#if DOSFILES
-	dosfile = b_val(curbp, MDDOS);
-#endif
-	s = writereg(&region,fname,TRUE);
+	s = writereg(&region,fname,TRUE,b_val(curbp, MDDOS));
         return s;
 }
 
 
-writereg(rp,fn,msgf)
-REGION *rp;
+writereg(rp,fn,msgf, do_cr)
+REGION	*rp;
 char    *fn;
+int 	msgf;
+int	do_cr;
 {
         register int    s;
         register LINE   *lp;
@@ -873,7 +966,7 @@ char    *fn;
 		return s;
 #endif
         if (*fn == '[' || *fn == ' ') {
-        	mlwrite("No filename");
+        	mlforce("[No filename]");
         	return FALSE;
         }
         
@@ -909,6 +1002,8 @@ char    *fn;
 		if (rp->r_size <= 0)
 			goto out;
 
+		if (do_cr && (s=ffputc('\r')) != FIOSUC)
+	                goto out;
 	        if ((s=ffputc('\n')) != FIOSUC)
 	                goto out;
 
@@ -921,7 +1016,8 @@ char    *fn;
 
 	/* whole lines */
         while (rp->r_size >= llength(lp)+1) {
-                if ((s=ffputline(&lp->l_text[0], llength(lp))) != FIOSUC)
+                if ((s=ffputline(&lp->l_text[0], llength(lp), do_cr))
+						!= FIOSUC)
                         goto out;
                 ++nline;
 		nchar += llength(lp) + 1;
@@ -940,13 +1036,13 @@ char    *fn;
 		}
 	}
 	if (rp->r_size != 0)
-		mlwrite("Bug: writereg, rsize == %d",rp->r_size);
+		mlforce("BUG: writereg, rsize == %d",rp->r_size);
 
  out:
         if (s == FIOSUC) {                      /* No write error.      */
                 s = ffclose();
                 if (s == FIOSUC && msgf) {      /* No close error.      */
-	                mlwrite("[Wrote %d line%s %d char%s to %s]", 
+	                mlwrite("[Wrote %d line%s %ld char%s to %s]", 
 				nline, (nline>1)?"s":"",
 				nchar, (nchar>1)?"s":"", fn);
                 }
@@ -957,8 +1053,8 @@ char    *fn;
 	if (fileispipe == TRUE) {
 		ttunclean();
 	        TTflush();
-		sgarbf = TRUE;
 		pressreturn();
+		sgarbf = TRUE;
 	}
 #else
 	TTkopen();
@@ -976,6 +1072,7 @@ char    *fn;
  */
 kwrite(fn,msgf)
 char    *fn;
+int	msgf;
 {
 	register KILL *kp;		/* pointer into kill register */
 	register int	nline;
@@ -1013,7 +1110,7 @@ char    *fn;
 			i = kbs[ukb].kused;
 		else
 			i = KBLOCK;
-		sp = kp->d_chunk;
+		sp = (char *)kp->d_chunk;
 		while (i--) {
 			if ((c = *sp++) == '\n')
 				nline++;
@@ -1047,22 +1144,24 @@ char    *fn;
  * as needing an update. You can type a blank line at the
  * prompt if you wish.
  */
+/* ARGSUSED */
 filename(f, n)
+int f,n;
 {
         register int    s;
         static char            fname[NFILEN];
 
 	if (isnamedcmd && lastkey == '\r') {
-		return showcpos();
+		return showcpos(FALSE,1);
 	}
         if ((s=mlreply("Name: ", fname, NFILEN)) == ABORT)
                 return s;
 	if ((s = glob(fname)) != TRUE)
 		return FALSE;
         if (s == FALSE)
-                strcpy(curbp->b_fname, "");
+                ch_fname(curbp, "");
         else
-                strcpy(curbp->b_fname, fname);
+                ch_fname(curbp, fname);
 	make_global_b_val(curbp,MDVIEW); /* no longer read only mode */
 	markWFMODE(curbp);
         return TRUE;
@@ -1074,18 +1173,17 @@ filename(f, n)
  * status of the read.
  */
 ifile(fname,belowthisline,haveffp)
-char    fname[];
-FILE *haveffp;
+char    *fname;
+int	belowthisline;
+FILE	*haveffp;
 {
         register LINE   *lp0;
         register LINE   *lp1;
         register LINE   *lp2;
-        register int    i;
         register BUFFER *bp;
         register int    s;
         int    nbytes;
         register int    nline;
-	char mesg[NSTRING];
 	extern FILE	*ffp;
 
         bp = curbp;                             /* Cheap.               */
@@ -1095,7 +1193,7 @@ FILE *haveffp;
 	        if ((s=ffropen(fname)) == FIOERR)       /* Hard file open.      */
 	                goto out;
 	        if (s == FIOFNF) {                      /* File not found.      */
-	                mlwrite("[No such file \"%s\" ]", fname);
+	                mlforce("[No such file \"%s\" ]", fname);
 			return FALSE;
 	        }
 	        mlwrite("[Inserting...]");
@@ -1174,7 +1272,7 @@ out:
  * status of the read.
  */
 kifile(fname)
-char    fname[];
+char    *fname;
 {
         register int    i;
         register int    s;
@@ -1185,7 +1283,7 @@ char    fname[];
         if ((s=ffropen(fname)) == FIOERR)       /* Hard file open.      */
                 goto out;
         if (s == FIOFNF) {                      /* File not found.      */
-                mlwrite("[No such file \"%s\"]", fname);
+                mlforce("[No such file \"%s\"]", fname);
 		return FALSE;
         }
         mlwrite("[Reading...]");
@@ -1230,6 +1328,7 @@ out:
 	robust, or probably very secure.  I whipped it up to save
 	myself while debugging...		pgf */
 imdying(signo)
+int signo;
 {
 #if HAVE_MKDIR
 	static char dirnam[NSTRING] = "/tmp/vileDXXXXXX";

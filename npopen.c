@@ -2,7 +2,13 @@
  *		written by John Hutchinson, heavily modified by Paul Fox
  *
  * $Log: npopen.c,v $
- * Revision 1.7  1991/10/22 14:08:23  pgf
+ * Revision 1.9  1991/11/18 08:33:25  pgf
+ * added missing arg to strrchr
+ *
+ * Revision 1.8  1991/11/16  18:36:46  pgf
+ * no #define for strrchr needed here
+ *
+ * Revision 1.7  1991/10/22  14:08:23  pgf
  * took out old ifdef BEFORE code
  *
  * Revision 1.6  1991/10/21  13:39:54  pgf
@@ -38,10 +44,6 @@
 #include <errno.h>
 #include <sys/param.h>
 
-#if BSD
-#define strrchr rindex
-#endif
-
 #define R 0
 #define W 1
 
@@ -49,6 +51,8 @@ extern char *getenv();
 extern char *strrchr();
 
 static int pid;
+
+/* define MY_EXEC to use $SHELL -- you probably don't want to do that */
 
 FILE *
 npopen (cmd, type)
@@ -177,7 +181,7 @@ register char *cmd;
 		argv[0] = "/bin/sh";
 		argv[1] = "sh";
 	} else {
-		argv[1] = strrchr(argv[0]);
+		argv[1] = strrchr(argv[0],'/');
 		if (argv[1] == NULL) {
 			argv[1] = argv[0];
 		} else {

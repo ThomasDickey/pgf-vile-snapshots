@@ -3,7 +3,38 @@
  * the knowledge about files are here.
  *
  * $Log: fileio.c,v $
- * Revision 1.11  1991/10/22 14:08:23  pgf
+ * Revision 1.20  1992/01/05 00:06:13  pgf
+ * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
+ * often.  also normalized message appearance somewhat.
+ *
+ * Revision 1.19  1992/01/01  16:17:46  pgf
+ * improve behavior of long line reads (from Eric Krohn)
+ *
+ * Revision 1.18  1991/11/27  10:09:09  pgf
+ * move some ifdef, so as not to leave empty if body
+ *
+ * Revision 1.17  1991/11/16  18:31:39  pgf
+ * ifdef with FIONREAD instead of BSD in typahead()
+ *
+ * Revision 1.16  1991/11/08  13:22:56  pgf
+ * moved dosfiles processing out to file.c, and
+ * made aborts of file reads report FIOABRT, and
+ * hopefully, editing binary files should work better (don't
+ * use strncpy on lines)
+ *
+ * Revision 1.15  1991/11/07  02:00:32  pgf
+ * lint cleanup
+ *
+ * Revision 1.14  1991/11/03  17:38:38  pgf
+ * fixed some slop in the cr/nl checking
+ *
+ * Revision 1.13  1991/11/01  14:38:00  pgf
+ * saber cleanup
+ *
+ * Revision 1.12  1991/10/23  12:05:37  pgf
+ * changed filio.h to ioctl.h as the source of FIONREAD
+ *
+ * Revision 1.11  1991/10/22  14:08:23  pgf
  * took out old ifdef BEFORE code
  *
  * Revision 1.10  1991/10/10  12:31:53  pgf
@@ -52,17 +83,12 @@
 #include        <fcntl.h>
 #endif
 #if	BSD
-#include "sys/filio.h"
+#include "sys/ioctl.h"
 #endif
 
 FILE	*ffp;		/* File pointer, all functions. */
 int fileispipe;
 int eofflag;		/* end-of-file flag */
-#if DOSFILES
-int doslines, unixlines;
-int dosfile;
-#endif
-
 
 /*
  * Open a file for reading.
@@ -74,10 +100,6 @@ char    *fn;
 	FILE *npopen();
 #endif
 
-#if DOSFILES
-	doslines = unixlines = 0;
-	dosfile = FALSE;
-#endif
 
 #if UNIX
 	
@@ -112,14 +134,14 @@ char    *fn;
 	FILE *npopen();
 	if (*fn == '!') {
 	        if ((ffp=npopen(fn+1, "w")) == NULL) {
-	                mlwrite("Cannot open pipe for writing");
+	                mlforce("[Cannot open pipe for writing]");
 			TTbeep();
 	                return (FIOERR);
 		}
 		fileispipe = TRUE;
 	} else {
 	        if ((ffp=fopen(fn, "w")) == NULL) {
-	                mlwrite("Cannot open file for writing");
+	                mlforce("[Cannot open file for writing]");
 			TTbeep();
 	                return (FIOERR);
 		}
@@ -131,12 +153,12 @@ char    *fn;
 
         if ((fd=creat(fn, 0666, "rfm=var", "rat=cr")) < 0
         || (ffp=fdopen(fd, "w")) == NULL) {
-                mlwrite("Cannot open file for writing");
+                mlforce("[Cannot open file for writing]");
                 return (FIOERR);
         }
 #else
         if ((ffp=fopen(fn, "w")) == NULL) {
-                mlwrite("Cannot open file for writing");
+                mlforce("[Cannot open file for writing]");
                 return (FIOERR);
         }
 #endif
@@ -175,7 +197,7 @@ ffsize()
 	if (fstat(fileno(ffp), &statbuf) == 0) {
 		return (long)statbuf.st_size;
 	}
-        mlwrite("File sizing error");
+        mlforce("[File sizing error]");
         return -1;
 }
 
@@ -218,11 +240,6 @@ ffclose()
 	fputc(26, ffp);		/* add a ^Z at the end of the file */
 #endif
 	
-#if DOSFILES
-	/* did we get more dos-style lines than unix-style? */
-	dosfile = (doslines > unixlines);
-	unixlines = 0;
-#endif
 #if UNIX | (MSDOS & (LATTICE | MSC | TURBO))
 #if UNIX
 	
@@ -232,7 +249,7 @@ ffclose()
 #endif
 		s = fclose(ffp);
         if (s != 0) {
-                mlwrite("Error on close");
+                mlforce("[Error on close]");
                 return(FIOERR);
         }
         return(FIOSUC);
@@ -247,8 +264,10 @@ ffclose()
  * and the "nbuf" is its length, less the free newline. Return the status.
  * Check only at the newline.
  */
-ffputline(buf, nbuf)
+ffputline(buf, nbuf, do_cr)
 char    buf[];
+int	nbuf;
+int	do_cr;
 {
         register int    i;
 #if	CRYPT
@@ -272,8 +291,7 @@ char    buf[];
         fputc('\r', ffp);
 #endif        
 #if DOSFILES
-	if (dosfile) {
-		/* put out CR, unless we just did */
+	if (do_cr) { /* put out CR, unless we just did */
 		if (i == 0 || buf[i-1] != '\r')
 		        fputc('\r', ffp);
 	}
@@ -281,7 +299,7 @@ char    buf[];
         fputc('\n', ffp);
 
         if (ferror(ffp)) {
-                mlwrite("Write I/O error");
+                mlforce("[Write I/O error]");
                 return (FIOERR);
         }
 
@@ -292,13 +310,10 @@ char    buf[];
  * Return the status.
  */
 ffputc(c)
+int c;
 {
 	static lastc;
 	c &= 0xff;
-#if DOSFILES
-	if (dosfile && c == '\n' && lastc != '\r')
-		 fputc('\r',ffp);
-#endif
 	lastc = c;
 
 #if	CRYPT
@@ -308,7 +323,7 @@ ffputc(c)
         fputc(c, ffp);
 
         if (ferror(ffp)) {
-                mlwrite("Write I/O error");
+                mlforce("[Write I/O error]");
                 return (FIOERR);
         }
 
@@ -339,32 +354,34 @@ int *lenp;	/* to return the final length */
 	/* read the line in */
         i = 0;
         while ((c = fgetc(ffp)) != EOF && c != '\n') {
+		if (interrupted) {
+			free(fline);
+			fline = NULL;
+			*lenp = 0;
+			return FIOABRT;
+		}
                 fline[i++] = c;
 		/* if it's longer, get more room */
                 if (i >= flen) {
-                	if ((tmpline = malloc(flen+NSTRING)) == NULL)
+			/* "Small" exponential growth - EJK */
+			long growth = (flen >> 3) + NSTRING;
+			if ((tmpline = malloc(flen+growth)) == NULL)
                 		return(FIOMEM);
-                	strncpy(tmpline, fline, flen);
-                	flen += NSTRING;
+                	memcpy(tmpline, fline, flen);
+                	flen += growth;
                 	free(fline);
                 	fline = tmpline;
                 }
         }
 
 #if !DOSFILES
-#if	ST520
-	if(fline[i-1] == '\r') {
-		i--;
+# if	ST520
+	if(c == '\n') {
+		if(i > 0 && fline[i-1] == '\r') {
+			i--;
+		}
 	}
-#endif
-#else
-	if(fline[i-1] == '\r') {
-		doslines++;
-		i--;
-	} else {
-		unixlines++;
-	}
-	dosfile = (doslines > unixlines);
+# endif
 #endif
 
 	*lenp = i;	/* return the length, not including final null */
@@ -373,7 +390,7 @@ int *lenp;	/* to return the final length */
 	/* test for any errors that may have occured */
         if (c == EOF) {
                 if (ferror(ffp)) {
-                        mlwrite("File read error");
+                        mlforce("[File read error]");
                         return(FIOERR);
                 }
 
@@ -384,9 +401,9 @@ int *lenp;	/* to return the final length */
         }
 
 #if	CRYPT
-	/* decrypt the string */
+	/* decrypt the line */
 	if (cryptflag)
-		crypt(fline, strlen(fline));
+		crypt(fline, i);
 #endif
         return(FIOSUC);
 }
@@ -399,11 +416,13 @@ int *lenp;	/* to return the final length */
 
 ffhasdata()
 {
-	long x;
 	if (isready_c(ffp))
 		return TRUE;
-#if	BSD
+#ifdef	FIONREAD
+	{
+	long x;
 	return(((ioctl(fileno(ffp),FIONREAD,&x) < 0) || x == 0) ? FALSE : TRUE);
+	}
 #else
 	return FALSE;
 #endif

@@ -2,7 +2,28 @@
  *		for MicroEMACS
  *
  * $Log: spawn.c,v $
- * Revision 1.10  1991/09/13 01:47:59  pgf
+ * Revision 1.16  1992/01/05 00:06:13  pgf
+ * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
+ * often.  also normalized message appearance somewhat.
+ *
+ * Revision 1.15  1992/01/03  23:31:49  pgf
+ * use new ch_fname() to manipulate filenames, since b_fname is now
+ * a malloc'ed sting, to avoid length limits
+ *
+ * Revision 1.14  1991/11/16  18:38:21  pgf
+ * use UNIX ifdef instead of BSD|USG
+ *
+ * Revision 1.13  1991/11/13  20:09:27  pgf
+ * X11 changes, from dave lemke
+ *
+ * Revision 1.12  1991/11/03  17:46:30  pgf
+ * removed f,n args from all region functions -- they don't use them,
+ * since they're no longer directly called by the user
+ *
+ * Revision 1.11  1991/11/01  14:38:00  pgf
+ * saber cleanup
+ *
+ * Revision 1.10  1991/09/13  01:47:59  pgf
  * child now runs and exits correctly if there is no input for it in
  * filterregion
  *
@@ -46,7 +67,7 @@
 #include        <stdio.h>
 #include	"estruct.h"
 #include        "edef.h"
-#if BSD | USG
+#if UNIX
 #include	<sys/types.h>
 #include	<sys/stat.h>
 #endif
@@ -93,13 +114,19 @@ extern  short   iochan;                         /* In "termio.c"        */
  * repaint. The message at the start in VMS puts out a newline.
  * Under some (unknown) condition, you don't get one free when DCL starts up.
  */
+/* ARGSUSED */
 spawncli(f, n)
+int f,n;
 {
 #if     UNIX
 # if     NeWS
-	mlwrite("Not availible under NeWS");
+	mlforce("[Not availible under NeWS]");
 	return(FALSE);
 # else
+#  if 	X11
+	mlforce("[Not availible under X11]");
+	return(FALSE);
+#  else
         register char *cp;
         char    *getenv();
         
@@ -114,14 +141,15 @@ spawncli(f, n)
 	ttunclean();
         sgarbf = TRUE;
         return(TRUE);
+#  endif /* X11 */
 # endif /* News */
 #endif /* UNIX */
 
 #if	AMIGA
         long newcli;
         mlwrite("[Starting new CLI]");
-        sgarbf = TRUE;
         Execute("NEWCLI \"CON:0/0/640/200/MicroEMACS Subprocess\"", 0L, 0L);
+        sgarbf = TRUE;
         return(TRUE);
 #endif
 
@@ -129,15 +157,16 @@ spawncli(f, n)
         movecursor(term.t_nrow, 0);             /* In last line.        */
         mlwrite("[Starting DCL]\r\n");
         TTflush(); 	                     /* Ignore "ttcol".      */
+	s = sys(NULL);                     /* NULL => DCL.         */
         sgarbf = TRUE;
-        return (sys(NULL));                     /* NULL => DCL.         */
+        return (s);
 #endif
 #if     CPM
-        mlwrite("Not in CP/M-86");
+        mlforce("[Not in CP/M-86]");
 	return FALSE;
 #endif
 #if	ST520
-	mlwrite("Not in TOS");
+	mlforce("[Not in TOS]");
 	return FALSE;
 #endif
 #if     MSDOS & (AZTEC | MSC | TURBO)
@@ -162,32 +191,42 @@ spawncli(f, n)
 
 #if UNIX && defined(SIGTSTP)
 
-bktoshell()		/* suspend MicroEMACS and wait to wake up */
+bktoshell()		/* suspend and wait to wake up */
 {
 #if     NeWS
-	mlwrite("Not availible under NeWS");
+	mlforce("[Not availible under NeWS]");
 	return(FALSE);
 #else
+# if X11
+	mlforce("[Not availible under X11]");
+	return(FALSE);
+# else
 	int pid;
 
 	vttidy(TRUE);
 	pid = getpid();
 	kill(pid,SIGTSTP);
+# endif
 #endif
 }
 
 rtfrmshell()
 {
 #if     NeWS
-	mlwrite("Not available under NeWS");
+	mlforce("[Not available under NeWS]");
 	return(FALSE);
 #else
+# if X11
+	mlforce("[Not available under X11]");
+	return(FALSE);
+# else
 	ttunclean();
 	curwp->w_flag = WFHARD;  /* is this needed, with sgarbf == TRUE? */
 	sgarbf = TRUE;
 #if USG
 	signal(SIGCONT,rtfrmshell);	/* suspend & restart */
 	update(TRUE);
+#endif
 #endif
 #endif
 }
@@ -198,7 +237,7 @@ pressreturn()
 {
 	int s;
 
-        mlwrite("[Press return to continue]");
+        mlprompt("[Press return to continue]");
         TTflush();
 	/* loop for a CR, a space, or a : to do another named command */
         while ((s = kbd_key()) != '\r' && s != ' ' && s != kcod2key(abortc)) {
@@ -211,8 +250,18 @@ pressreturn()
 }
 #endif
 
-respawn(f,n) {
-	spawn(f,n,TRUE);
+/* ARGSUSED */
+respawn(f,n)
+int f,n;
+{
+	spawn1(TRUE);
+}
+
+/* ARGSUSED */
+spawn(f,n)
+int f,n;
+{
+	spawn1(FALSE);
 }
 
 /*
@@ -221,7 +270,8 @@ respawn(f,n) {
  * done.
  */
 /* the #ifdefs have been totally separated, for readability */
-spawn(f, n, rerun)
+spawn1(rerun)
+int rerun;
 {
 
 #if  UNIX
@@ -235,7 +285,8 @@ spawn(f, n, rerun)
 	char *getenv();
 
 	if (!rerun) {
-		if (cb = anycb())
+		cb = anycb();
+		if (cb)
 			lsprintf(prompt,"Warning: %d modified buffer%s: !",
 				cb, cb>1 ? "s":"");
 		else
@@ -252,15 +303,15 @@ spawn(f, n, rerun)
         if ((cp = getenv("SHELL")) == NULL || *cp == '\0')
                 cp = "/bin/sh";
 	lsprintf(line2, "%s -c \"%s\"", cp, line);
-#if	NeWS
+#if	NeWS || X11
 	system(line2);
 #else
 	ttclean(TRUE);
 	system(line2);
         TTflush();
 	ttunclean();
-        sgarbf = TRUE;
 	pressreturn();
+        sgarbf = TRUE;
 #endif /* NeWS */
         return (TRUE);
 #endif /* UNIX */
@@ -379,7 +430,7 @@ spawn(f, n, rerun)
         return (s);
 #endif
 #if     CPM
-        mlwrite("Not in CP/M-86");
+        mlforce("[Not in CP/M-86]");
         return (FALSE);
 #endif
 #if     MSDOS | (ST520 & LATTICE)
@@ -411,9 +462,10 @@ spawn(f, n, rerun)
 /*
  * Pipe a one line command into a window
  */
+/* ARGSUSED */
 pipecmd(f, n)
+int f,n;
 {
-	register WINDOW *wp;	/* pointer to new window */
 	register BUFFER *bp;	/* pointer to buffer to zot */
         static char oline[NLINE];	/* command line send to shell */
         register int    s;
@@ -428,7 +480,8 @@ pipecmd(f, n)
 		oline[1] = '\0';
 	}
 
-	if (cb = anycb())
+	cb = anycb();
+	if (cb)
 		lsprintf(prompt,"Warning: %d modified buffer%s. !",
 			cb, cb>1 ? "s":"");
 	else
@@ -459,7 +512,7 @@ pipecmd(f, n)
 		return(FALSE);
 	}
 	strcpy(bp->b_bname,bname);
-	strncpy(bp->b_fname, oline, NFILEN-1);
+	ch_fname(bp, oline);
 
 	return TRUE;
 }
@@ -502,11 +555,11 @@ pipecmd(f, n)
         }
 #endif
 #if     VMS
-	mlwrite("Not availible under VMS");
+	mlforce("[Not availible under VMS]");
 	return(FALSE);
 #endif
 #if     CPM
-        mlwrite("Not availible under CP/M-86");
+        mlforce("[Not availible under CP/M-86]");
         return(FALSE);
 #endif
 	/* get the command to pipe in */
@@ -567,7 +620,7 @@ pipecmd(f, n)
 		return(s);
 
 	/* split the current window to make room for the command output */
-	if (splitwind(FALSE, 1) == NULL)
+	if (splitw(FALSE, 1) == NULL)
 			return(FALSE);
 
 	/* and read the stuff in */
@@ -595,7 +648,7 @@ pipecmd(f, n)
 #endif /* UNIX */
 
 /* run a region through an external filter, replace it with its output */
-filterregion(f,n)
+filterregion()
 {
         static char oline[NLINE];	/* command line send to shell */
         char	line[NLINE];	/* command line send to shell */
@@ -607,21 +660,12 @@ filterregion(f,n)
                 return(s);
 	strcpy(line,oline);
 	if ((s = inout_popen(&fr, &fw, line)) != TRUE) {
-		mlwrite("Couldn't open pipe or command");
+		mlforce("[Couldn't open pipe or command]");
 		return s;
 	}
 
-	killregion(f,n);
-	if (fork()) {
-		fclose(fw);
-		/* backline(FALSE,1); */
-		DOT.l = lback(DOT.l);
-		s = ifile(NULL,TRUE,fr);
-		npclose(fr);
-		firstnonwhite();
-		setmark();
-		return s;
-	} else {
+	killregion();
+	if (!fork()) {
 		KILL *kp;		/* pointer into kill register */
 		kregcirculate(FALSE);
 		kp = kbs[ukb].kbufh;
@@ -635,14 +679,25 @@ filterregion(f,n)
 		fflush(fw);
 		fclose(fw);
 		exit (0);
+		/* NOTREACHED */
 	}
+	fclose(fw);
+	/* backline(FALSE,1); */
+	DOT.l = lback(DOT.l);
+	s = ifile(NULL,TRUE,fr);
+	npclose(fr);
+	firstnonwhite(FALSE,1);
+	setmark();
+	return s;
 }
 
 /*
  * filter a buffer through an external DOS program
  * this is obsolete, the filterregion code is better.
  */
+/* ARGSUSED */
 filter(f, n)
+int f,n;
 {
         register int    s;	/* return status from CLI */
 	register BUFFER *bp;	/* pointer to buffer to zot */
@@ -661,11 +716,11 @@ filter(f, n)
 #endif
 
 #if     VMS
-	mlwrite("Not availible under VMS");
+	mlforce("[Not available under VMS]");
 	return(FALSE);
 #endif
 #if     CPM
-        mlwrite("Not availible under CP/M-86");
+        mlforce("[Not available under CP/M-86]");
         return(FALSE);
 #endif
 	/* get the filter name and its args */
@@ -676,12 +731,12 @@ filter(f, n)
 	/* setup the proper file names */
 	bp = curbp;
 	strcpy(tmpnam, bp->b_fname);	/* save the original name */
-	strcpy(bp->b_fname, bname1);	/* set it to our new one */
+	ch_fname(bp, bname1);		/* set it to our new one */
 
 	/* write it out, checking for errors */
 	if (writeout(filnam1,curbp,TRUE) != TRUE) {
-		mlwrite("[Cannot write filter file]");
-		strcpy(bp->b_fname, tmpnam);
+		mlforce("[Cannot write filter file]");
+		ch_fname(bp, tmpnam);
 		return(FALSE);
 	}
 
@@ -718,15 +773,14 @@ filter(f, n)
 
 	/* on failure, escape gracefully */
 	if (s != TRUE || (readin(filnam2,FALSE,curbp,TRUE) == FALSE)) {
-		mlwrite("[Execution failed]");
-		strcpy(bp->b_fname, tmpnam);
+		mlforce("[Execution failed]");
+		ch_fname(bp, tmpnam);
 		unlink(filnam1);
 		unlink(filnam2);
 		return(s);
 	}
 
-	/* reset file name */
-	strcpy(bp->b_fname, tmpnam);	/* restore name */
+	ch_fname(bp, tmpnam); /* restore name */
 	bp->b_flag |= BFCHG;		/* flag it as changed */
 
 	/* and get rid of the temporary file */

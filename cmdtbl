@@ -71,7 +71,37 @@
 #		here for completeness.
 #
 # $Log: cmdtbl,v $
-# Revision 1.24  1991/10/20 23:33:06  pgf
+# Revision 1.33  1991/12/24 09:18:47  pgf
+# added current/change directory support  (Dave Lemke's changes)
+#
+# Revision 1.32  1991/11/07  14:56:59  pgf
+# added "pop" synonym
+#
+# Revision 1.31  1991/11/06  23:28:08  pgf
+# getfence() will scan for a fence if not on one to begin with.  it'll
+# scan in either direction, depending on arg to matchfence or matchfenceback
+#
+# Revision 1.30  1991/11/03  17:45:15  pgf
+# change getfence to matchfence
+#
+# Revision 1.29  1991/11/01  14:21:17  pgf
+# cleanup
+#
+# Revision 1.28  1991/10/31  02:36:14  pgf
+# implement vi-like substagain
+#
+# Revision 1.27  1991/10/29  14:35:29  pgf
+# implemented the & commands: substagain
+#
+# Revision 1.26  1991/10/29  03:08:54  pgf
+# changes for new function keys (ESC O x and # x) bindings, for
+# executing named registers, for loading named registers, and for
+# saving the keyboard macro to a named register
+#
+# Revision 1.25  1991/10/26  00:13:48  pgf
+# the sentence motions are now implemented
+#
+# Revision 1.24  1991/10/20  23:33:06  pgf
 # made ^N, ^P, and ^T vi-compliant
 #
 # Revision 1.23  1991/09/17  13:02:57  pgf
@@ -236,6 +266,9 @@ bindkey		NONE			REBIND
 bktoshell	NONE			UNIX&&defined(SIGTSTP)
 	"suspend-emacs"			!FEWNAMES
 	'^Z'
+cd		NONE
+	"cd"
+	"change-directory"
 cntl_xf		NONE
 	"cntl_x-prefix"			!FEWNAMES
 	'^X'
@@ -259,42 +292,49 @@ consearch	ABS|MOTION
 opercopy		OPER|(RANGE|EXTRA)
 	"copy-til"
 	"c"
-ctlxlp		NONE
-	"begin-macro"			!FEWNAMES
+kbd_mac_begin		NONE
+	"begin-keyboard-macro"		!FEWNAMES
 	'^X-('
-ctlxrp		NONE
-	"end-macro"			!FEWNAMES
+kbd_mac_end		NONE
+	"end-keyboard-macro"		!FEWNAMES
 	'^X-)'
-ctlxe		REDO
-	"execute-macro"			!FEWNAMES
+kbd_mac_exec		REDO
+	"execute-keyboard-macro"	!FEWNAMES
 	'^X-&'
+kbd_mac_save		NONE
+	"save-keyboard-macro"
+	'^X-^'
 cbuf1		REDO
 	"execute-macro-1"		!FEWNAMES
-	'FN-1'				TERMCAP
+	'FN-1'
+	'FN-P'				ANSI_SPEC
 cbuf2		REDO
 	"execute-macro-2"		!FEWNAMES
-	'FN-2'				TERMCAP
+	'FN-2'
+	'FN-Q'				ANSI_SPEC
 cbuf3		REDO
 	"execute-macro-3"		!FEWNAMES
-	'FN-3'				TERMCAP
+	'FN-3'
+	'FN-R'				ANSI_SPEC
 cbuf4		REDO
 	"execute-macro-4"		!FEWNAMES
-	'FN-4'				TERMCAP
+	'FN-4'
+	'FN-S'				ANSI_SPEC
 cbuf5		REDO
 	"execute-macro-5"		!FEWNAMES
-	'FN-5'				TERMCAP
+	'FN-5'
 cbuf6		REDO
 	"execute-macro-6"		!FEWNAMES
-	'FN-6'				TERMCAP
+	'FN-6'
 cbuf7		REDO
 	"execute-macro-7"		!FEWNAMES
-	'FN-7'				TERMCAP
+	'FN-7'
 cbuf8		REDO
 	"execute-macro-8"		!FEWNAMES
-	'FN-8'				TERMCAP
+	'FN-8'
 cbuf9		REDO
 	"execute-macro-9"		!FEWNAMES
-	'FN-9'				TERMCAP
+	'FN-9'
 cbuf10		REDO
 	"execute-macro-10"		!FEWNAMES
 cbuf11		REDO			!SMALLER
@@ -385,6 +425,8 @@ deskey		NONE			REBIND
 dotcmdplay	NONE
 	"repeat-last-cmd"		!FEWNAMES
 	'.'
+ex	NONE|(BANG|FILE1)
+	"ex"
 execbuf		NONE			!SMALLER
 	"execute-buffer"		!FEWNAMES
 execcmd		NONE			NEVER
@@ -392,6 +434,9 @@ execcmd		NONE			NEVER
 execfile	NONE			!SMALLER
 	"execute-file"			!FEWNAMES
 	"source"
+execkreg	NONE
+	"execute-register"
+	'@'
 execproc	REDO			PROC
 	"execute-procedure"		!FEWNAMES
 	"run"
@@ -502,9 +547,12 @@ forwhunt	ABS|MOTION		!SMALLER
 forwsearch	ABS|MOTION
 	"search-forward"		!FEWNAMES
 	'/'
-getfence	ABS|MOTION		CFENCE
+matchfence	ABS|MOTION		CFENCE
 	"goto-matching-fence"		!FEWNAMES
 	'%'
+matchfenceback	ABS|MOTION		CFENCE
+	"goto-matching-fence-behind"	!FEWNAMES
+	'^X-%'
 globals		NONE			GLOBALS
 	"og"
 # this function is for internal use only, for the operator commands
@@ -561,6 +609,16 @@ gotoeosec	ABS|MOTION		WORDPRO
 	"next-section"			!FEWNAMES
 	"down-section"			!FEWNAMES
 	']'
+gotobosent	ABS|MOTION		WORDPRO
+	"previous-sentence"		!FEWNAMES
+	"back-sentence"			!FEWNAMES
+	"up-sentence"			!FEWNAMES
+	'('
+gotoeosent	ABS|MOTION		WORDPRO
+	"forward-sentence"		!FEWNAMES
+	"next-sentence"			!FEWNAMES
+	"down-sentence"			!FEWNAMES
+	')'
 gototag		NONE|(BANG|WORD1)		TAGS
 	"ta"
 	"tag"
@@ -633,6 +691,8 @@ lineputbefore	REDO|UNDO|GLOBOK|(FROM|WORD1)
 lineundo	NONE
 	"undo-line-changes"		!FEWNAMES
 	'U'
+loadkreg	NONE
+	"load-register"
 map		NONE|(EXRCOK|BANG|EXTRA)
 	"map"
 cntl_af		NONE
@@ -682,8 +742,14 @@ namedcmd	NONE
 	"execute-named-command"		!FEWNAMES
 	":"
 	':'
-ex	NONE|(BANG|FILE1)
-	"ex"
+openup		REDO|UNDO|(FROM)
+	"open-line-above-and-insert-chars"	!FEWNAMES
+	"i"
+	'O'
+opendown	REDO|UNDO|(FROM|ZERO)
+	"open-line-below-and-append-chars"	!FEWNAMES
+	"a"
+	'o'
 operchg		OPER|REDO|UNDO
 	"change-til"			!FEWNAMES
 	"delete-and-insert-chars-til"			!FEWNAMES
@@ -765,14 +831,13 @@ operlineyank	OPER|(RANGE|WORD1)
 	"yank-lines-til"		!FEWNAMES
 	"y"
 	'^X-y'
-openup		REDO|UNDO|(FROM)
-	"open-line-above-and-insert-chars"	!FEWNAMES
-	"i"
-	'O'
-opendown	REDO|UNDO|(FROM|ZERO)
-	"open-line-below-and-append-chars"	!FEWNAMES
-	"a"
-	'o'
+opersubstagain	OPER|REDO|UNDO|GLOBOK|(RANGE|EXTRA)
+	"substitute-again-til"		!FEWNAMES
+	"&"
+	'^A-&'
+opertransf	OPER|(RANGE+EXTRA)
+	"transfer-til"
+	"t"
 operwrite	OPER|(RANGE|BANG|FILE1|DFLALL)
 	"w"
 	"W"
@@ -801,6 +866,9 @@ putafter	REDO|UNDO
 putbefore	REDO|UNDO
 	"put-before"			!FEWNAMES
 	'P'
+pwd		NONE
+	"pwd"
+	"print-directory"
 quit		NONE|(BANG)
 	"q"
 	"Q"
@@ -864,7 +932,7 @@ settab		NONE
 spawncli	NONE
 	"sh"
 	"shell"
-	"i-shell"			!FEWNAMES
+	"interactive-shell"		!FEWNAMES
 savewnd		NONE			!SMALLER
 	"save-window"
 scrnextup	NONE
@@ -909,8 +977,6 @@ listmodes	NONE
 	"gmodes"
 	"show-global-modes"
 	"showmodes"
-showmodes	NONE			BEFORE
-showgmodes	NONE			BEFORE
 	"showgmodes"
 showversion	NONE|(EXRCOK)
 	"version"
@@ -922,6 +988,8 @@ source		NONE|(EXRCOK|NAMEDF)
 spawn		NONE
 #	"!"
 	"shell-command"			!FEWNAMES
+speckey		NONE
+	'#'
 splitwind	NONE
 	"split-current-window"		!FEWNAMES
 #	'^T'
@@ -930,12 +998,9 @@ storemac	NONE
 	"store-macro"
 storeproc	NONE			PROC
 	"store-procedure"
-subst_again	REDO|UNDO|GLOBOK|(RANGE|EXTRA)
+subst_again	REDO|UNDO|GLOBOK
 	"substitute-again"		!FEWNAMES
-	"&"
-opertransf	OPER|(RANGE+EXTRA)
-	"transfer-til"
-	"t"
+	'&'
 togglelistbuffers	NONE
 	"*"
 	"toggle-buffer-list"		!FEWNAMES
@@ -952,13 +1017,12 @@ unarg		NONE
 	'K'
 unimpl		NONE
 	"unimplemented-command"		!FEWNAMES
-	'('
-	')'
 unmark		NONE
 	"unmark-buffer"
 unmap		NONE|(EXRCOK|BANG|EXTRA)
 	"unmap"
 untagpop	NONE			TAGS
+	"pop"
 	"untag-pop"			!FEWNAMES
 	'^X-^]'
 	'^T'
@@ -969,7 +1033,7 @@ usebuffer	NONE
 	"buffer"
 	"select-buffer"			!FEWNAMES
 usekreg		REDO
-	"use-named-kill-register"	!FEWNAMES
+	"use-register"		!FEWNAMES
 	'"'
 visual		NONE
 	"visual"

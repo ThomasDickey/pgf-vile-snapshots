@@ -2,7 +2,10 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: csrch.c,v $
- * Revision 1.3  1991/08/07 12:35:07  pgf
+ * Revision 1.4  1991/11/01 14:38:00  pgf
+ * saber cleanup
+ *
+ * Revision 1.3  1991/08/07  12:35:07  pgf
  * added RCS log messages
  *
  * revision 1.2
@@ -29,11 +32,13 @@ static short lastchar;
 
 
 fscan(f,n,c)
+int f,n,c;
 {
 	int i = 0;
 	int doto;
 
-	if (n <= 0) n = 1;
+	if (!f || n <= 0)
+		n = 1;
 
 	lastchar = c;
 	lastscan = FORW;
@@ -64,11 +69,13 @@ fscan(f,n,c)
 }
 
 bscan(f,n,c)
+int f,n,c;
 {
 	int i = 0;
 	int doto;
 
-	if (n <= 0) n = 1;
+	if (f || n <= 0)
+		n = 1;
 
 	lastchar = c;
 	lastscan = BACK;
@@ -98,6 +105,7 @@ bscan(f,n,c)
 
 /* f */
 fcsrch(f,n)
+int f,n;
 {
 	register int c;
 
@@ -114,6 +122,7 @@ fcsrch(f,n)
 
 /* F */
 bcsrch(f,n)
+int f,n;
 {
 	register int c;
 
@@ -130,6 +139,7 @@ bcsrch(f,n)
 
 /* t */
 fcsrch_to(f,n)
+int f,n;
 {
 	int s;
 	s = fcsrch(f,n);
@@ -141,6 +151,7 @@ fcsrch_to(f,n)
 
 /* T */
 bcsrch_to(f,n)
+int f,n;
 {
 	int s;
 	s = bcsrch(f,n);
@@ -152,6 +163,7 @@ bcsrch_to(f,n)
 
 /* ; */
 rep_csrch(f,n)
+int f,n;
 {
 	int s;
 	int ls = lastscan;
@@ -177,6 +189,7 @@ rep_csrch(f,n)
 
 /* , */
 rev_csrch(f,n)
+int f,n;
 {
 	int s;
 

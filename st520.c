@@ -5,7 +5,11 @@
  * compiles into nothing if not a 520ST style device.
  *
  * $Log: st520.c,v $
- * Revision 1.4  1991/09/10 01:19:35  pgf
+ * Revision 1.5  1992/01/05 00:06:13  pgf
+ * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
+ * often.  also normalized message appearance somewhat.
+ *
+ * Revision 1.4  1991/09/10  01:19:35  pgf
  * re-tabbed, and moved ESC and BEL to estruct.h
  *
  * Revision 1.3  1991/08/07  12:35:07  pgf
@@ -340,7 +344,7 @@ int nurez;
 				onlywind(1,1);
 				break;
 			default:
-				mlwrite("Invalid resolution");
+				mlforce("[Invalid resolution]");
 				return(FALSE);
 				break;
 		}
@@ -368,7 +372,7 @@ int nurez;
 				onlywind(1,1);
 				break;
 			default:
-				mlwrite("%Invalid resolution");
+				mlforce("[Invalid resolution]");
 				return(FALSE);
 				break;
 		}
@@ -924,13 +928,13 @@ char *newrez;	/* requested resolution */
 		if (strcmp(newrez, resname[nrez]) == 0)
 			break;
 	if (nrez == 4) {
-		mlwrite("%%No such resolution");
+		mlforce("[No such resolution]");
 		return(FALSE);
 	}
 
 	/* next, make sure this resolution is legal for this monitor */
 	if ((currez < 2 && nrez > 1) || (currez > 1 && nrez < 2)) {
-		mlwrite("%%Resolution illegal for this monitor");
+		mlforce("[Resolution illegal for this monitor]");
 		return(FALSE);
 	}
 

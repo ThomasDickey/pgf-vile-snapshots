@@ -8,7 +8,54 @@
 
 /*
  * $Log: edef.h,v $
- * Revision 1.20  1991/10/22 03:07:34  pgf
+ * Revision 1.35  1992/02/17 09:18:32  pgf
+ * v 3.9
+ *
+ * Revision 1.34  1992/02/17  08:59:33  pgf
+ * added "showmode", and
+ * macros, and dotcmd, kill registers all now hold unsigned chars
+ *
+ * Revision 1.33  1992/01/10  08:22:58  pgf
+ * v. 3.85
+ *
+ * Revision 1.32  1992/01/10  07:11:20  pgf
+ * added shiftwidth
+ *
+ * Revision 1.31  1992/01/03  23:30:35  pgf
+ * added pre_op_dot as a global -- it's the current position at the start
+ * of an operator command
+ *
+ * Revision 1.30  1991/12/30  23:15:04  pgf
+ * version 3.8
+ *
+ * Revision 1.29  1991/12/04  09:23:48  pgf
+ * now version three seven
+ *
+ * Revision 1.28  1991/11/08  13:17:40  pgf
+ * lint cleanup (deleted unused's), and added klines/kchars
+ *
+ * Revision 1.27  1991/11/04  14:23:36  pgf
+ * got rid of unused matchlen, matchpos, and mlenold
+ *
+ * Revision 1.26  1991/10/29  03:06:26  pgf
+ * changes for replaying named registers
+ *
+ * Revision 1.25  1991/10/28  14:23:31  pgf
+ * renamed curtabstopval to curtabval
+ *
+ * Revision 1.24  1991/10/28  01:11:56  pgf
+ * version three point six
+ *
+ * Revision 1.23  1991/10/27  16:09:38  pgf
+ * added gregexp, the compiled pattern
+ *
+ * Revision 1.22  1991/10/26  00:17:07  pgf
+ * paragraph, sentence, sectino, and suffix regex values
+ *
+ * Revision 1.21  1991/10/24  13:05:52  pgf
+ * conversion to new regex package -- much faster
+ *
+ * Revision 1.20  1991/10/22  03:07:34  pgf
  * bumped to version three 5ive
  *
  * Revision 1.19  1991/10/20  23:05:44  pgf
@@ -129,7 +176,7 @@ LINE    *lalloc();              /* Allocate a line              */
 #endif
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version three point five");
+decl_init( char version[], "version three point nine");
 
 decl_init( int autoindented , -1);	/* how many chars (not cols) indented */
 decl_uninit( int isnamedcmd );		/* are we typing a command name */
@@ -143,12 +190,13 @@ decl_uninit( int last1key );		/* last keystoke (kbd_key)	*/
 decl_uninit( int lastcmd );		/* last command	(kbd_seq)	*/
 decl_uninit( short fulllineregions );   /* regions should be full lines */
 decl_uninit( short doingopcmd );        /* operator command in progress */
+decl_uninit( MARK pre_op_dot );		/* current pos. before operator cmd */
 decl_uninit( short opcmd );             /* what sort of operator?	*/
 decl_uninit( CMDFUNC *havemotion );	/* so we can use "oper" routines
 					   internally */
-decl_uninit( short kbdm[NKBDM] );	/* Macro                        */
-decl_uninit( short dotcmdm[NKBDM] );	/* dot commands			*/
-decl_uninit( short tmpcmdm[NKBDM] );	/* dot commands, 'til we're sure */
+decl_uninit( unsigned char kbdm[KBLOCK] );	/* Macro                        */
+decl_uninit( unsigned char dotcmdm[KBLOCK] );	/* dot commands			*/
+decl_uninit( unsigned char tmpcmdm[KBLOCK] );	/* dot commands, 'til we're sure */
 decl_uninit( int currow );              /* Cursor row                   */
 decl_uninit( int curcol );              /* Cursor column                */
 decl_uninit( WINDOW *curwp );           /* Current window               */
@@ -159,32 +207,14 @@ decl_uninit( BUFFER *bheadp );          /* Head of list of buffers      */
 decl_uninit( char sres[NBUFN] );		/* current screen resolution	*/
 
 decl_uninit( char pat[NPAT] );          /* Search pattern		*/
-decl_uninit( char tap[NPAT] );		/* Reversed pattern array.	*/
 decl_uninit( char rpat[NPAT] );		/* replacement pattern		*/
 
-/* The variable matchlen holds the length of the matched
- * string - used by the replace functions.
- * The variable patmatch holds the string that satisfies
- * the search command.
- * The mark matchpos holds the line and
- * offset position of the start of match.
- */
-decl_uninit( int matchlen );
-decl_uninit( int mlenold );
+decl_uninit( regexp *gregexp );		/* compiled version of pat */
+
+/* patmatch holds the string that satisfied the search command.  */
 decl_uninit( char *patmatch );
-decl_uninit( MARK matchpos );
 
-#if	MAGIC
-/*
- * The variable magical determines if there are actual
- * metacharacters in the string - if not, then we don't
- * have to use the slower MAGIC mode search functions.
- */
-decl_uninit( short int magical );
-decl_uninit( MC	mcpat[NPAT] );		/* the magic pattern		*/
-decl_uninit( MC	tapcm[NPAT] );		/* the reversed magic pattern	*/
-
-#endif
+decl_uninit( int ignorecase );
 
 /* directive name table:
 	This holds the names of all the directives....	*/
@@ -220,20 +250,12 @@ decl_uninit( int execlevel );		/* execution IF level		*/
 decl_init( int	eolexist, TRUE );	/* does clear to EOL exist	*/
 decl_uninit( int revexist );		/* does reverse video exist?	*/
 decl_uninit( int flickcode );		/* do flicker supression?	*/
-decl_uninit( int curtabstopval );	/* current tab width		*/
+decl_uninit( int curtabval );		/* current tab width		*/
 
 decl_init( MARK nullmark, { NULL comma 0 } );
 #if ! WINMARK
 decl_uninit( MARK Mark );		/* the worker mark */
 #endif
-
-/* THE FOLLOWING MODE NAME TABLES MUST CORRESPOND EXACTLY WITH THE #DEFINES
-	IN ESTRUCT.H */
-
-decl_init( char	*othermodes[] , {
-	"lazy" comma
-	"versionctrl" } );
-decl_init( int othmode, 0);   /* "other" global modes	*/
 
 /* these get their initial values in main.c, in global_val_init() */
 decl_uninit( B_VALUES global_b_values );
@@ -242,6 +264,8 @@ decl_uninit( B_VALUES global_b_values );
 extern struct VALNAMES b_valuenames[];
 extern struct VALNAMES w_valuenames[];
 #else
+/* THE FOLLOWING MODE NAME TABLES MUST CORRESPOND EXACTLY WITH THE #DEFINES
+	IN ESTRUCT.H */
 struct VALNAMES b_valuenames[] = {
 	{ "autoindent"	comma "ai" comma VALTYPE_BOOL } comma
 	{ "autosave"	comma "as" comma VALTYPE_BOOL } comma
@@ -252,6 +276,7 @@ struct VALNAMES b_valuenames[] = {
 	{ "ignorecase"	comma "ic" comma VALTYPE_BOOL } comma
 	{ "magic"	comma "X"  comma VALTYPE_BOOL } comma
 	{ "showmatch"	comma "sm" comma VALTYPE_BOOL } comma
+	{ "showmode"	comma "smd" comma VALTYPE_BOOL } comma
 	{ "view"	comma "X"  comma VALTYPE_BOOL } comma
 	{ "wrapscan"	comma "ws" comma VALTYPE_BOOL } comma
 	{ "wrapwords"	comma "ww" comma VALTYPE_BOOL } comma
@@ -259,12 +284,18 @@ struct VALNAMES b_valuenames[] = {
 	{ "autosavecnt"	comma "ascnt" comma VALTYPE_INT } comma
 	{ "c-tabstop"	comma "cts" comma VALTYPE_INT } comma
 	{ "fillcol"	comma "fc" comma VALTYPE_INT } comma
+	{ "shiftwidth"	comma "sw" comma VALTYPE_INT } comma
 	{ "tabstop"	comma "ts" comma VALTYPE_INT } comma
 	{ "taglength"	comma "tl" comma VALTYPE_INT } comma
 
-	{ "c-suffixes"	comma "csuf" comma VALTYPE_STRING } comma
 	{ "cwd"		comma "X"  comma VALTYPE_STRING } comma
 	{ "tags"	comma "tag" comma VALTYPE_STRING } comma
+
+	{ "c-suffixes"	comma "csuf" comma VALTYPE_REGEX } comma
+	{ "paragraphs"	comma "X" comma VALTYPE_REGEX } comma
+	{ "sections"	comma "X" comma VALTYPE_REGEX } comma
+	{ "sentences"	comma "X" comma VALTYPE_REGEX } comma
+
 	{ NULL		comma NULL comma VALTYPE_INT }
 };
 
@@ -278,9 +309,7 @@ struct VALNAMES w_valuenames[] = {
 };
 #endif
 
-decl_init( char	modecode[], "wcsevmyaldi" );/* letters to represent modes */
 
-decl_init( int gacount, 256 );		/* count until next ASAVE	*/
 decl_init( int sgarbf, TRUE );          /* TRUE if screen is garbage	*/
 decl_uninit( int mpresf );              /* TRUE if message in last line */
 decl_uninit( int clexec	);		/* command line execution flag	*/
@@ -317,29 +346,30 @@ decl_init( char	*cname[], {		/* names of colors		*/
 	"MAGENTA" comma "CYAN" comma "WHITE"} );
 #endif
 
-/*  window modes */
-/*  sideways offset */
-/* foregound color (white) */
-/* background color (black) */
 /* these get their initial values in main.c, in global_val_init() */
 decl_uninit( W_VALUES global_w_values );
-
-decl_uninit( int exmode );
 
 decl_uninit( KILLREG kbs[NKREGS] );	/* all chars, 1 thru 9, and default */
 decl_uninit( short ukb );		/* index of current kbuffs */
 decl_uninit( int kregflag );		/* info for pending kill into reg */
+decl_uninit( int kchars );		/* how much did we kill? */
+decl_uninit( int klines );
+
 decl_uninit( WINDOW *swindow );		/* saved window pointer		*/
+#if CRYPT
 decl_uninit( int cryptflag );		/* currently encrypting?	*/
-decl_uninit( short *tmpcmdptr );	/* current position in dot cmd buf */
-decl_init( short *tmpcmdend, &tmpcmdm[0] );/* ptr to end of the dot cmd */
-decl_uninit( short *dotcmdptr );	/* current position in dot cmd buf */
-decl_init( short *dotcmdend, &dotcmdm[0] );/* ptr to end of the dot command */
+#endif
+decl_uninit( unsigned char *tmpcmdptr );	/* current position in dot cmd buf */
+decl_init( unsigned char *tmpcmdend, &tmpcmdm[0] );/* ptr to end of the dot cmd */
+decl_uninit( unsigned char *dotcmdptr );	/* current position in dot cmd buf */
+decl_init( unsigned char *dotcmdend, &dotcmdm[0] );/* ptr to end of the dot command */
 decl_init( int dotcmdmode, RECORD );	/* current dot command mode	*/
 decl_uninit( int dotcmdrep );		/* number of repetitions	*/
-decl_uninit( short *kbdptr );		/* current position in keyboard buf */
-decl_init( short *kbdend, &kbdm[0] );	/* ptr to end of the keyboard */
+decl_uninit( unsigned char *kbdptr );		/* current position in keyboard buf */
+decl_init( unsigned char *kbdend, &kbdm[0] );	/* volatile to end of the keyboard */
+decl_uninit( unsigned char *kbdlim);		/* perm. ptr to end of the keyboard */
 decl_init( int	kbdmode, STOP );	/* current keyboard macro mode	*/
+decl_init( int	kbdplayreg, -1 );	/* register currently playing back */
 decl_uninit( int kbdrep );		/* number of repetitions	*/
 decl_uninit( int seed );		/* random number seed		*/
 decl_uninit( long envram );		/* # of bytes current used malloc */

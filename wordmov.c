@@ -5,7 +5,10 @@
  *	Written for vile by Paul Fox, (c)1990
  *
  * $Log: wordmov.c,v $
- * Revision 1.3  1991/08/07 12:35:07  pgf
+ * Revision 1.4  1991/11/08 13:02:46  pgf
+ * ifdefed unneeded funcs
+ *
+ * Revision 1.3  1991/08/07  12:35:07  pgf
  * added RCS log messages
  *
  * revision 1.2
@@ -188,6 +191,7 @@ isnewviwordb()
 }
 
 
+#ifdef NEEDED
 isendwordb()
 {
 	register int	ret;
@@ -250,6 +254,7 @@ isendviwordb()
 	ochartype = type;
 	return (ret);
 }
+#endif /* NEEDED */
 
 isendwordf()
 {

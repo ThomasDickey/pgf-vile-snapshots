@@ -2,7 +2,16 @@
  *		for MicroEMACS
  *
  * $Log: tcap.c,v $
- * Revision 1.7  1991/09/10 01:19:35  pgf
+ * Revision 1.10  1992/01/22 20:27:47  pgf
+ * added TI, TE, KS, KE support, per user suggestion (sorry, forgot who)
+ *
+ * Revision 1.9  1991/11/01  14:38:00  pgf
+ * saber cleanup
+ *
+ * Revision 1.8  1991/10/23  12:05:37  pgf
+ * NULL initializations should have been 0 instead
+ *
+ * Revision 1.7  1991/09/10  01:19:35  pgf
  * re-tabbed, and moved ESC and BEL to estruct.h
  *
  * Revision 1.6  1991/08/07  12:35:07  pgf
@@ -48,7 +57,7 @@ extern int	ttgetc();
 extern int	ttputc();
 extern int	tgetnum();
 extern int	ttflush();
-extern int	ttclose();
+extern int	tcapclose();
 extern int	tcapkopen();
 extern int	tcapkclose();
 extern int	tcapmove();
@@ -72,21 +81,22 @@ extern	int	tcapscroll_delins();
 #define TCAPSLEN 315
 char tcapbuf[TCAPSLEN];
 char *UP, PC, *CM, *CE, *CL, *SO, *SE;
+char *TI, *TE, *KS, *KE;
 
 #if	SCROLLCODE
 char *CS, *DL, *AL, *SF, *SR;
 #endif
 
 TERM term = {
-	NULL,	/* these four values are set dynamically at open time */
-	NULL,
-	NULL,
-	NULL,
+	0,	/* these four values are set dynamically at open time */
+	0,
+	0,
+	0,
 	MARGIN,
 	SCRSIZ,
 	NPAUSE,
 	tcapopen,
-	ttclose,
+	tcapclose,
 	tcapkopen,
 	tcapkclose,
 	ttgetc,
@@ -161,6 +171,10 @@ tcapopen()
 	UP = tgetstr("up", &p);
 	SE = tgetstr("se", &p);
 	SO = tgetstr("so", &p);
+	TI = tgetstr("ti", &p);
+	TE = tgetstr("te", &p);
+	KS = tgetstr("ks", &p);
+	KE = tgetstr("ke", &p);
 	if (SO != NULL)
 		revexist = TRUE;
 
@@ -196,6 +210,18 @@ tcapopen()
 		exit(1);
 	}
 	ttopen();
+	if (TI)
+		putnpad(TI, strlen(TI));
+	if (KS)
+		putpad(KS);
+}
+
+tcapclose()
+{
+	if (TE)
+		putnpad(TE, strlen(TE));
+	if (KE)
+		putpad(KE);
 }
 
 tcapkopen()
@@ -248,6 +274,7 @@ tcapcres()	/* change screen resolution */
 
 /* move howmany lines starting at from to to */
 tcapscroll_reg(from,to,n)
+int from, to, n;
 {
 	int i;
 	if (to == from) return;
@@ -272,6 +299,7 @@ PRETTIER_SCROLL is prettier but slower -- it scrolls
 
 /* move howmany lines starting at from to to */
 tcapscroll_delins(from,to,n)
+int from, to, n;
 {
 	int i;
 	if (to == from) return;
@@ -303,13 +331,16 @@ tcapscroll_delins(from,to,n)
 
 /* cs is set up just like cm, so we use tgoto... */
 tcapscrollregion(top,bot)
+int top,bot;
 {
 	putpad(tgoto(CS, bot, top));
 }
 
 #endif
 
+/* ARGSUSED */
 spal(dummy)	/* change palette string */
+char *dummy;
 {
 	/*	Does nothing here	*/
 }
@@ -337,12 +368,14 @@ char	*str;
 
 putnpad(str, n)
 char	*str;
+int n;
 {
 	tputs(str, n, ttputc);
 }
 
 
 #if	FLABEL
+/* ARGSUSED */
 fnclabel(f, n)		/* label a function key */
 int f,n;	/* default flag, numeric argument [unused] */
 {

@@ -3,7 +3,20 @@
  * code by Paul Fox, original algorithm mostly by Julia Harper May, 89
  *
  * $Log: undo.c,v $
- * Revision 1.12  1991/10/08 01:30:00  pgf
+ * Revision 1.16  1992/01/05 00:06:13  pgf
+ * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
+ * often.  also normalized message appearance somewhat.
+ *
+ * Revision 1.15  1991/11/08  13:06:42  pgf
+ * moved firstchar() to basic.c
+ *
+ * Revision 1.14  1991/11/02  19:40:06  pgf
+ * fixed bad free in lineundo()
+ *
+ * Revision 1.13  1991/11/01  14:38:00  pgf
+ * saber cleanup
+ *
+ * Revision 1.12  1991/10/08  01:30:00  pgf
  * added new bp arg to lfree and lalloc
  *
  * Revision 1.11  1991/09/30  01:47:24  pgf
@@ -101,7 +114,7 @@ toss_to_undo(lp)
 LINE *lp;
 {
 	if (curbp->b_flag & BFSCRTCH)
-		return TRUE;
+		return;
 	if (needundocleanup)
 		preundocleanup();
 	pushline(lp,CURSTK(curbp));
@@ -210,12 +223,13 @@ LINE **stk;
 
 make_undo_patch(olp,nlp,type)
 LINE *olp,*nlp;
+int type;
 {
 	register LINE *plp;
 	/* push on a tag that matches up the copy with the original */
 	plp = lalloc(-1,curbp);
 	if (plp == NULL)
-		return(FALSE);
+		return;
 	llength(plp) = type;
 	plp->l_fp = olp;	/* l_fp is the original line */
 	plp->l_bp = nlp;	/* l_bp is the copy */
@@ -240,7 +254,6 @@ LINE *
 copyline(lp)
 register LINE *lp;
 {
-	int i;
 	register LINE *nlp;
 	
 	nlp = lalloc(lp->l_used,curbp);
@@ -283,7 +296,9 @@ register BUFFER *bp;
 
 }
 
+/* ARGSUSED */
 undo(f,n)
+int f,n;
 {
 	LINE *lp, *alp;
 	int nopops = TRUE;
@@ -321,7 +336,7 @@ undo(f,n)
 				lp->l_bp->l_fp = alp->l_fp;
 				alp->l_fp->l_bp = alp->l_bp;
 			} else { /* there is more than one line there */
-				mlwrite("Bug! no stacked line for an insert");
+				mlforce("BUG: no stacked line for an insert");
 				/* cleanup ? naw, a bugs a bug */
 				return(FALSE);
 			}
@@ -390,7 +405,9 @@ preundocleanup()
 	needundocleanup = FALSE;
 }
 
+/* ARGSUSED */
 lineundo(f,n)
+int f,n;
 {
 	register LINE *ulp;	/* the Undo line */
 	register LINE *lp;	/* the line we may replace */
@@ -429,7 +446,7 @@ lineundo(f,n)
 
 	if (ntext && lp->l_text) {
 		memcpy(ntext, ulp->l_text, llength(ulp));
-		free(lp->l_text);
+		ltextfree(lp,curbp);
 	}
 	lp->l_text = ntext;
 	lp->l_used = ulp->l_used;
@@ -530,7 +547,7 @@ no code for ALTDOT, but this was ifdefed out before I put that in...  pgf
 		if (lisreal(nlp)) {
 			ALTDOT(curbp).l = nlp;
 		} else {
-		    mlwrite("Bug: preundodot points at newly inserted line!");
+		    mlforce("BUG: preundodot points at newly inserted line!");
 		}
 	}
 #endif
@@ -538,7 +555,7 @@ no code for ALTDOT, but this was ifdefed out before I put that in...  pgf
 		if (lisreal(nlp)) {
 			CURDOT(curbp).l = nlp;
 		} else {
-		    mlwrite("Bug: preundodot points at newly inserted line!");
+		    mlforce("BUG: preundodot points at newly inserted line!");
 		}
 	}
 	if (curbp->b_nmmarks != NULL) {
@@ -552,7 +569,7 @@ no code for ALTDOT, but this was ifdefed out before I put that in...  pgf
 					mp->l = nlp;
 					mp->o = 0;
 				} else {
-					mlwrite("Sorry, lost the mark.");
+					mlforce("[Lost mark]");
 				}
 			}
 		}
@@ -565,7 +582,6 @@ no code for ALTDOT, but this was ifdefed out before I put that in...  pgf
 linesmatch(lp1,lp2)
 register LINE *lp1,*lp2;
 {
-	int i;
 	if (llength(lp1) != llength(lp2))
 		return FALSE;
 	if (llength(lp1) == 0)
@@ -603,16 +619,8 @@ register LINE *olp,*nlp;
 		if (lisreal(nlp)) {
 			curbp->b_ulinep->l_nxtundo = nlp;
 		} else {
-			mlwrite("Bug: b_ulinep pointed at inserted line!");
+			mlforce("BUG: b_ulinep pointed at inserted line!");
 		}
 	}
 }
 
-firstchar(lp)
-LINE *lp;
-{
-	int off = 0;
-	while ( off != llength(lp) && isspace(lgetc(lp, off)) )
-		off++;
-	return off;
-}

@@ -3,7 +3,17 @@
  * attached to keys that the user actually types.
  *
  * $Log: window.c,v $
- * Revision 1.10  1991/10/22 14:08:23  pgf
+ * Revision 1.13  1992/01/05 00:06:13  pgf
+ * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
+ * often.  also normalized message appearance somewhat.
+ *
+ * Revision 1.12  1991/11/04  14:20:18  pgf
+ * fixed broken mvdnwind()
+ *
+ * Revision 1.11  1991/11/01  14:38:00  pgf
+ * saber cleanup
+ *
+ * Revision 1.10  1991/10/22  14:08:23  pgf
  * took out old ifdef BEFORE code
  *
  * Revision 1.9  1991/09/30  01:47:24  pgf
@@ -56,19 +66,22 @@ overlay	"window"
  * the standard redisplay code does). Defaults to 0.
  */
 reposition(f, n)
+int f,n;
 {
-    if (f == FALSE)	/* default to 0 to center screen */
-	n = 0;
-    curwp->w_force = n;
-    curwp->w_flag |= WFFORCE;
-    return (TRUE);
+	if (f == FALSE)		/* default to 0 to center screen */
+		n = 0;
+	curwp->w_force = n;
+	curwp->w_flag |= WFFORCE;
+	return (TRUE);
 }
 
 /*
  * Refresh the screen. With no argument, it just does the refresh. With an
  * argument it recenters "." in the current window.
  */
+/* ARGSUSED */
 refresh(f, n)
+int f,n;
 {
 #if	NeWS	/* see if the window has changed size */
     newsrefresh() ;
@@ -122,7 +135,7 @@ int f, n;	/* default flag and numeric argument */
 			while (--n)
 				wp = wp->w_wndp;
 		} else {
-			mlwrite("Window number out of range");
+			mlforce("[Window number out of range]");
 			return(FALSE);
 		}
 	} else {
@@ -136,6 +149,7 @@ int f, n;	/* default flag and numeric argument */
 }
 
 poswind(f,n)
+int f,n;
 {
 	register int c;
 	register int rows;
@@ -170,6 +184,7 @@ poswind(f,n)
  * lot if there is 1 window.
  */
 prevwind(f, n)
+int f,n;
 {
 	register WINDOW *wp1;
 	register WINDOW *wp2;
@@ -201,9 +216,11 @@ prevwind(f, n)
  * "move up". Magic.
  */
 mvdnwind(f, n)
-int n;
+int f,n;
 {
-	return (mvupwind(f, -n));
+	if (!f)
+		n = 1;
+	return (mvupwind(TRUE, -n));
 }
 
 /*
@@ -214,54 +231,60 @@ int n;
  * frame).
  */
 mvupwind(f, n)
-int n;
+int f,n;
 {
-    register LINE *lp;
-    register int i;
-    int was_n = n;
+	register LINE  *lp;
+	register int    i;
+	int             was_n = n;
 
-    lp = curwp->w_line.l;
+	lp = curwp->w_line.l;
+
+	if (!f)
+		n = 1;
 
 	if (n < 0)
 		curwp->w_flag |= WFKILLS;
 	else
 		curwp->w_flag |= WFINS;
 
-    if (n < 0) {
-        while (n++ && lforw(lp) != curbp->b_line.l)
-            lp = lforw(lp);
-    } else {
-        while (n-- && lback(lp)!=curbp->b_line.l)
-            lp = lback(lp);
-    }
+	if (n < 0) {
+		while (n++ && lforw(lp) != curbp->b_line.l)
+			lp = lforw(lp);
+	} else {
+		while (n-- && lback(lp) != curbp->b_line.l)
+			lp = lback(lp);
+	}
 
-    curwp->w_line.l = lp;
-    curwp->w_flag |= WFHARD|WFMODE;
+	curwp->w_line.l = lp;
+	curwp->w_flag |= WFHARD | WFMODE;
 
 	/* is it still in the window */
-    for (i = 0; i < curwp->w_ntrows; ++i) {
-        if (lp == curwp->w_dot.l)
-            return (TRUE);
-        if (lforw(lp) == curbp->b_line.l)
-            break;
-        lp = lforw(lp);
-    }
-	/* now lp is either just past the window bottom, or
-		it's the last line of the file */
+	for (i = 0; i < curwp->w_ntrows; ++i) {
+		if (lp == curwp->w_dot.l)
+			return (TRUE);
+		if (lforw(lp) == curbp->b_line.l)
+			break;
+		lp = lforw(lp);
+	}
+	/*
+	 * now lp is either just past the window bottom, or it's the last
+	 * line of the file
+	 */
 
 	/* preserve the current column */
-    if (curgoal < 0)
-        curgoal = getccol(FALSE);
+	if (curgoal < 0)
+		curgoal = getccol(FALSE);
 
-    if (was_n < 0)
-	    curwp->w_dot.l  = curwp->w_line.l;
-    else
-	    curwp->w_dot.l  = lback(lp);
-    curwp->w_dot.o  = getgoal(curwp->w_dot.l);
-    return (TRUE);
+	if (was_n < 0)
+		curwp->w_dot.l = curwp->w_line.l;
+	else
+		curwp->w_dot.l = lback(lp);
+	curwp->w_dot.o = getgoal(curwp->w_dot.l);
+	return (TRUE);
 }
 
 mvdnnxtwind(f, n)
+int f,n;
 {
 	nextwind(FALSE, 1);
 	mvdnwind(f, n);
@@ -269,6 +292,7 @@ mvdnnxtwind(f, n)
 }
 
 mvupnxtwind(f, n)
+int f,n;
 {
 	nextwind(FALSE, 1);
 	mvupwind(f, n);
@@ -276,15 +300,16 @@ mvupnxtwind(f, n)
 }
 
 mvrightwind(f,n)
+int f,n;
 {
-	int move, col;
+	int move;
 
 	if (f)
 		move = n;
 	else
 		move = term.t_ncol/3;
 
-	if (w_val(curwp, WVAL_SIDEWAYS) + move > (col = getccol(FALSE)) - 1) {
+	if (w_val(curwp, WVAL_SIDEWAYS) + move > getccol(FALSE) - 1) {
 		TTbeep();
 		return FALSE;
 	}
@@ -299,6 +324,7 @@ mvrightwind(f,n)
 }
 
 mvleftwind(f,n)
+int f,n;
 {
 	make_local_w_val(curwp,WVAL_SIDEWAYS);
 	if (f)
@@ -321,7 +347,9 @@ mvleftwind(f,n)
  * the buffer structures right if the distruction of a window makes a buffer
  * become undisplayed.
  */
+/* ARGSUSED */
 onlywind(f, n)
+int f,n;
 {
         register WINDOW *wp;
         register LINE   *lp;
@@ -358,6 +386,7 @@ onlywind(f, n)
  * or, if it is the top window, the window below.
  */
 
+/* ARGSUSED */
 delwind(f,n)
 int f, n;	/* arguments are ignored for this command */
 {
@@ -373,7 +402,7 @@ WINDOW *thewp;
 
 	/* if there is only one window, don't delete it */
 	if (wheadp->w_wndp == NULL) {
-		mlwrite("Cannot delete the only window");
+		mlforce("[Cannot delete the only window]");
 		return(FALSE);
 	}
 
@@ -392,8 +421,9 @@ WINDOW *thewp;
 		wheadp = wp;	/* and at the top of the list as well */
 	} else {
 		/* find window before thewp in linked list */
-		for (wp = wheadp; wp->w_wndp != thewp; wp = wp->w_wndp)
-			;
+		wp = wheadp;
+		while(wp->w_wndp != thewp)
+			wp = wp->w_wndp;
 		/* add thewp's rows to the next window up */
 		wp->w_ntrows += thewp->w_ntrows+1;
 		
@@ -403,12 +433,12 @@ WINDOW *thewp;
 	/* get rid of the current window */
 	if (--thewp->w_bufp->b_nwnd == 0)
 		undispbuff(thewp->w_bufp,thewp);
-	free((char *)thewp);
 	if (thewp == curwp) {
 		curwp = wp;
 		curwp->w_flag |= WFHARD;
 		make_current(curwp->w_bufp);
 	}
+	free((char *)thewp);
 	upmode();
 	return(TRUE);
 }
@@ -421,7 +451,8 @@ WINDOW *thewp;
 	for the new window.
  */
 WINDOW *
-splitwind(f, n)
+splitw(f, n)
+int f,n;
 {
         register WINDOW *wp;
         register LINE   *lp;
@@ -433,12 +464,12 @@ splitwind(f, n)
 	register int i;
 
         if (curwp->w_ntrows < 3) {
-                mlwrite("Cannot split a %d line window", curwp->w_ntrows);
-                return (FALSE);
+                mlforce("[Cannot split a %d line window]", curwp->w_ntrows);
+                return NULL;
         }
         if ((wp = (WINDOW *) malloc(sizeof(WINDOW))) == NULL) {
-                mlwrite("[OUT OF MEMORY]");
-                return (FALSE);
+                mlforce("[OUT OF MEMORY]");
+                return NULL;
         }
 	++curwp->w_bufp->b_nwnd;	       /* Displayed twice.     */
         wp->w_bufp  = curwp->w_bufp;
@@ -513,13 +544,22 @@ splitwind(f, n)
         return wp;
 }
 
+/* externall callable version -- return int instead of (WINDOW *) */
+splitwind(f,n)
+int f,n;
+{
+	return (splitw(f,n)) ? TRUE:FALSE;
+}
+
 /*
  * Enlarge the current window. Find the window that loses space. Make sure it
  * is big enough. If so, hack the window descriptions, and ask redisplay to do
  * all the hard work. You don't just set "force reframe" because dot would
  * move.
  */
+/* ARGSUSED */
 enlargewind(f, n)
+int f,n;
 {
         register WINDOW *adjwp;
         register LINE   *lp;
@@ -528,7 +568,7 @@ enlargewind(f, n)
         if (n < 0)
                 return (shrinkwind(f, -n));
         if (wheadp->w_wndp == NULL) {
-                mlwrite("Only one window");
+                mlforce("[Only one window]");
                 return (FALSE);
         }
         if ((adjwp=curwp->w_wndp) == NULL) {
@@ -537,7 +577,7 @@ enlargewind(f, n)
                         adjwp = adjwp->w_wndp;
         }
         if (adjwp->w_ntrows <= n) {
-                mlwrite("Impossible change");
+                mlforce("[Impossible change]");
                 return (FALSE);
         }
         if (curwp->w_wndp == adjwp) {           /* Shrink below.        */
@@ -565,6 +605,7 @@ enlargewind(f, n)
  * window descriptions. Ask the redisplay to do all the hard work.
  */
 shrinkwind(f, n)
+int f,n;
 {
         register WINDOW *adjwp;
         register LINE   *lp;
@@ -573,7 +614,7 @@ shrinkwind(f, n)
         if (n < 0)
                 return (enlargewind(f, -n));
         if (wheadp->w_wndp == NULL) {
-                mlwrite("Only one window");
+                mlforce("[Only one window]");
                 return (FALSE);
         }
         if ((adjwp=curwp->w_wndp) == NULL) {
@@ -582,7 +623,7 @@ shrinkwind(f, n)
                         adjwp = adjwp->w_wndp;
         }
         if (curwp->w_ntrows <= n) {
-                mlwrite("Impossible change");
+                mlforce("[Impossible change]");
                 return (FALSE);
         }
         if (curwp->w_wndp == adjwp) {           /* Grow below.          */
@@ -639,7 +680,6 @@ wpopup()
         register WINDOW *wp;
         register WINDOW *owp;
         register WINDOW *biggest_wp;
-	int s;
 
 	owp = curwp;
         wp = biggest_wp = wheadp;                /* Find window to split   */
@@ -649,9 +689,9 @@ wpopup()
 			biggest_wp = wp;
 	}
 	curwp = biggest_wp;
-	wp = splitwind(FALSE,0); /* yes -- choose the unoccupied half */
+	wp = splitw(FALSE,0); /* yes -- choose the unoccupied half */
 	curwp = owp;
-	if (s == FALSE ) { /* maybe biggest_wp was too small  */
+	if (wp == NULL ) { /* maybe biggest_wp was too small  */
 		wp = wheadp;		/* Find window to use	*/
 	        while (wp!=NULL && wp==curwp) /* uppermost non-current window */
 	                wp = wp->w_wndp;
@@ -660,6 +700,7 @@ wpopup()
 }
 
 scrnextup(f, n)		/* scroll the next window up (back) a page */
+int f,n;
 {
 	nextwind(FALSE, 1);
 	backhpage(f, n);
@@ -667,6 +708,7 @@ scrnextup(f, n)		/* scroll the next window up (back) a page */
 }
 
 scrnextdw(f, n)		/* scroll the next window down (forward) a page */
+int f,n;
 {
 	nextwind(FALSE, 1);
 	forwhpage(f, n);
@@ -674,13 +716,17 @@ scrnextdw(f, n)		/* scroll the next window down (forward) a page */
 }
 
 #if ! SMALLER
+/* ARGSUSED */
 savewnd(f, n)		/* save ptr to current window */
+int f,n;
 {
 	swindow = curwp;
 	return(TRUE);
 }
 
+/* ARGSUSED */
 restwnd(f, n)		/* restore the saved screen */
+int f,n;
 {
 	register WINDOW *wp;
 
@@ -696,13 +742,13 @@ restwnd(f, n)		/* restore the saved screen */
 		wp = wp->w_wndp;
 	}
 
-	mlwrite("[No such window exists]");
+	mlforce("[No such window exists]");
 	return(FALSE);
 }
 #endif
 
 newlength(f,n)	/* resize the screen, re-writing the screen */
-int n;	/* numeric argument */
+int f,n;	/* numeric argument */
 {
 	WINDOW *wp;	/* current window being examined */
 	WINDOW *nextwp;	/* next window to scan */
@@ -710,13 +756,13 @@ int n;	/* numeric argument */
 	int lastline;	/* screen line of last line of current window */
 
 	if (!f) {
-		mlwrite("No length given");
+		mlforce("[No length given]");
 		return FALSE;
 	}
 
 	/* make sure it's in range */
 	if (n < 3 || n > term.t_mrow + 1) {
-		mlwrite("Screen size out of range");
+		mlforce("[Screen length out of range]");
 		return(FALSE);
 	}
 
@@ -781,12 +827,12 @@ int n;	/* numeric argument */
 }
 
 newwidth(f,n)	/* resize the screen, re-writing the screen */
-int n;	/* numeric argument */
+int f,n;	/* numeric argument */
 {
 	register WINDOW *wp;
 
 	if (!f) {
-		mlwrite("No width given");
+		mlforce("[No width given]");
 		return FALSE;
 	}
 
@@ -797,7 +843,7 @@ int n;	/* numeric argument */
 		newsclose() ;
 		exit(1) ;
 #else
-		mlwrite("Screen width out of range");
+		mlforce("[Screen width out of range]");
 		return(FALSE);
 #endif
 	}
@@ -851,6 +897,7 @@ winit()
         curwp  = wp;
         wp->w_wndp  = NULL;                     /* Initialize window    */
         wp->w_dot  = nullmark;
+	wp->w_line = nullmark;
 #if WINMARK
         wp->w_mark = nullmark;
 #endif
@@ -860,6 +907,7 @@ winit()
         wp->w_ntrows = term.t_nrow-1;           /* "-1" for mode line.  */
         wp->w_force = 0;
         wp->w_flag  = WFMODE|WFHARD;            /* Full.                */
+	wp->w_bufp = NULL;
 }
 
 

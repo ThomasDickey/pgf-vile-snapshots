@@ -3,7 +3,37 @@
  *		5/9/86
  *
  * $Log: input.c,v $
- * Revision 1.23  1991/10/22 14:36:21  pgf
+ * Revision 1.31  1992/02/17 09:05:12  pgf
+ * make "RECORDED_ESC" work on machines whose natural chars are unsigned, and
+ * add support for "pre_colon_pos", which is the value of DOT just before the
+ * named command was run -- this lets ':' expand correctly in all cases
+ *
+ * Revision 1.30  1992/01/06  23:10:56  pgf
+ * try no update() in get_recorded_char() -- don't know why it's
+ * necessary
+ *
+ * Revision 1.29  1992/01/05  00:06:13  pgf
+ * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
+ * often.  also normalized message appearance somewhat.
+ *
+ * Revision 1.28  1991/12/11  06:30:58  pgf
+ * fixed backslashing, yet again -- should now be able to search for a
+ * slash in a buffer
+ *
+ * Revision 1.27  1991/11/08  13:24:05  pgf
+ * ifdefed unused function
+ *
+ * Revision 1.26  1991/11/01  14:38:00  pgf
+ * saber cleanup
+ *
+ * Revision 1.25  1991/10/29  03:00:53  pgf
+ * added speckey function, for '#' prefixing, and allow ESC O x in addition
+ * to ESC [ x as ANSI fkeys
+ *
+ * Revision 1.24  1991/10/23  14:20:53  pgf
+ * changes to fix interactions between dotcmdmode and kbdmode and tungetc
+ *
+ * Revision 1.23  1991/10/22  14:36:21  pgf
  * bug in ANSI_SPEC -- local declaration of f_insert hid global
  *
  * Revision 1.22  1991/10/22  03:08:09  pgf
@@ -110,11 +140,11 @@ char *prompt;
 	for (;;) {
 #if	NeWS
 		newsimmediateon() ;
-		mlwrite(,"%s [y/n]? ",prompt);
+		mlprompt(,"%s [y/n]? ",prompt);
 		c = tgetc();		/* get the responce */
 		newsimmediateoff() ;
 #else
-		mlwrite("%s [y/n]? ",prompt);
+		mlprompt("%s [y/n]? ",prompt);
 		c = tgetc();		/* get the responce */
 #endif
 
@@ -140,17 +170,21 @@ char *prompt;
 mlreply(prompt, buf, bufn)
 char *prompt;
 char *buf;
+int bufn;
 {
 	return kbd_string(prompt, buf, bufn, '\n',EXPAND,TRUE);
 }
 
+#ifdef NEEDED
 /* as above, but don't expand special punctuation, like #, %, ~, etc. */
 mlreply_no_exp(prompt, buf, bufn)
 char *prompt;
 char *buf;
+int bufn;
 {
 	return kbd_string(prompt, buf, bufn, '\n',NO_EXPAND,TRUE);
 }
+#endif
 
 /*	kcod2key:	translate 10-bit keycode to single key value */
 /* probably defined as a macro in estruct.h */
@@ -175,6 +209,7 @@ incr_dot_kregnum()
 int tungotc = -1;
 
 tungetc(c)
+int c;
 {
 	tungotc = c;
 	if (dotcmdmode == RECORD) {
@@ -226,9 +261,11 @@ int eatit;  /* consume the character? */
 			dotcmdmode = STOP;
 			dotcmdbegin(); /* immediately start recording
 					   again, just in case */
+#if BEFORE
 #if	VISMAC == 0
 			/* force a screen update after all is done */
 			update(FALSE);
+#endif
 #endif
 			return -1;
 		} else {
@@ -259,9 +296,11 @@ int eatit;  /* consume the character? */
 		/* at the end of last repitition? */
 		if (--kbdrep < 1) {
 			kbdmode = STOP;
+#if BEFORE
 #if	VISMAC == 0
 			/* force a screen update after all is done */
 			update(FALSE);
+#endif
 #endif
 		} else {
 
@@ -318,14 +357,14 @@ tgetc()
 {
 	int c;	/* fetched character */
 
-	c = get_recorded_char(TRUE);
-	if (c != -1)
-		return lastkey = c;
-
 	if (tungotc >= 0) {
 		c = tungotc;
 		tungotc = -1;
-	} else { /* fetch a character from the terminal driver */
+	} else {
+		c = get_recorded_char(TRUE);
+		if (c != -1)
+			return lastkey = c;
+		/* fetch a character from the terminal driver */
 		interrupted = 0;
 		c = TTgetc();
 		if (c == -1 || c == kcod2key(intrc)) {
@@ -360,14 +399,15 @@ kbd_key()
 		if (back_to_ins_char == -1) /* try to initialize it.. */
 			back_to_ins_char = fnc2key(&f_insert);
 		if (back_to_ins_char == -1) /* ... but couldn't */
-			mlwrite("Can't re-enter insert mode");
+			mlforce("[Can't re-enter insert mode]");
 		else
 			tungetc(back_to_ins_char);
 		insertmode = insert_mode_was;
 		insert_mode_was = FALSE;
 	}
 
-	if (c == RECORDED_ESC) { /* if this is being replayed... */
+	if (c == (unsigned char)RECORDED_ESC) {
+		/* if this is being replayed... */
 		/* ...then only look for esc sequences if there's input left */
 		if (get_recorded_char(FALSE) != -1)
 			c = ESC;
@@ -395,7 +435,8 @@ kbd_key()
 
 		/* and then, if there _was_ recorded input or new typahead... */
 		if (nextc != -1 || typahead()) {
-			if ((c = tgetc()) == '[') {  /* eat ansi sequences */
+			if ((c = tgetc()) == '[' || c == 'O') {
+				/* eat ansi sequences */
 				c = tgetc();
 				if (insertmode == REPLACECHAR) {
 					/* eat the sequence, but return abort */
@@ -497,11 +538,16 @@ kbd_seq()
 
 screen_string(buf,bufn,inclchartype)
 char *buf;
+int bufn, inclchartype;
 {
 	register int i = 0;
 	register int s = TRUE;
+	MARK mk;
+	extern MARK pre_colon_pos;
 
-	MK = DOT;
+	mk = DOT;
+	if (pre_colon_pos.l)
+		DOT = pre_colon_pos;
 	while (s == TRUE && i < bufn && !is_at_end_of_line(DOT)) {
 		buf[i] = char_at(DOT);
 		if (!istype(inclchartype, buf[i]))
@@ -510,7 +556,7 @@ char *buf;
 		i++;
 	}
 	buf[i] = '\0';
-	swapmark();
+	DOT = mk;
 
 	return buf[0] != '\0';
 }
@@ -521,9 +567,12 @@ char *buf;
 	null) string to use as the default response.
 */
 kbd_string(prompt, extbuf, bufn, eolchar, expand, dobackslashes)
-char *prompt;
-char *extbuf;
-int eolchar;
+char *prompt;		/* put this out first */
+char *extbuf;		/* the caller's (possibly full) buffer */
+int bufn;		/* the length of  " */
+int eolchar;		/* char we can terminate on, in addition to '\n' */
+int expand;		/* do we want to expand %, #, : */
+int dobackslashes;	/* do we add and delete '\' chars for the caller */
 {
 	register int cpos, extcpos;/* current character position in string */
 	register int c;
@@ -543,7 +592,7 @@ int eolchar;
 
 
 	/* prompt the user for the input string */
-	mlwrite(prompt);
+	mlprompt(prompt);
 
 	/* add backslash escapes in front of volatile characters */
 	while((c = extbuf[extcpos]) != '\0' && extcpos < bufn-1) {
@@ -601,9 +650,8 @@ int eolchar;
 			problems, especially when searching for patterns
 			containing them -pgf */
 		/* terminate with newline, or unescaped eolchar */
-		if ((c == '\n') || (c == eolchar && (
-			(quotef == FALSE && (backslashes & 1) == 0))))
-		{
+		if ((c == '\n') || (c == eolchar && (quotef == FALSE && 
+				(backslashes & 1) == 0))) {
 			/* if (buf[cpos] != '\0')
 				buf[cpos++] = '\0'; */
 
@@ -661,11 +709,13 @@ int eolchar;
 					outstring("\b \b");
 					--ttcol;
 				}
-				if (backslashes && buf[cpos-1] == '\\') {
+				if (cpos && buf[cpos-1] == '\\') {
 					backslashes = 1;
 					while (backslashes+1 <= cpos &&
 						buf[cpos-1-backslashes] == '\\')
 						backslashes++;
+				} else {
+					backslashes = 0;
 				}
 
 				buf[cpos] = '\0';
@@ -736,16 +786,18 @@ int eolchar;
 			if (c == kcod2key(quotec) && quotef == FALSE) {
 				quotef = TRUE;
 			} else	{
-				if (dobackslashes && c == '\\')
-					backslashes++;
-				else
-					backslashes = 0;
-				quotef = FALSE;
 				if (firstchar == TRUE) {
+					/* we always clean the buf on the
+						first char typed */
 					tungetc(c);
 					c = killc;
 					goto killit;
 				}
+				if (c == '\\')
+					backslashes++;
+				else
+					backslashes = 0;
+				quotef = FALSE;
 				if (cpos < bufn-1) {
 					buf[cpos++] = c;
 					buf[cpos] = '\0';
@@ -796,4 +848,14 @@ char *s;	/* string to output */
 	if (discmd)
 		while (*s)
 			TTputc(*s++);
+}
+
+/* ARGSUSED */
+speckey(f,n)
+int f,n;
+{
+
+	tungetc( SPEC | kbd_key() );
+
+	return TRUE;
 }

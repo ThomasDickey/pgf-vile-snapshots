@@ -5,7 +5,11 @@
  * added by Daniel Lawrence
  *
  * $Log: hp150.c,v $
- * Revision 1.3  1991/09/10 01:19:35  pgf
+ * Revision 1.4  1992/01/05 00:06:13  pgf
+ * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
+ * often.  also normalized message appearance somewhat.
+ *
+ * Revision 1.3  1991/09/10  01:19:35  pgf
  * re-tabbed, and moved ESC and BEL to estruct.h
  *
  * Revision 1.2  1991/08/07  12:35:07  pgf
@@ -427,13 +431,13 @@ int f,n;	/* default flag, numeric argument */
 
 	/* must have a numeric argument */
 	if (f == FALSE) {
-		mlwrite("%Need function key number");
+		mlforce("[Need function key number]");
 		return(FALSE);
 	}
 
 	/* and it must be a legal key number */
 	if (n < 1 || n > 8) {
-		mlwrite("%Function key number out of range");
+		mlforce("[Function key number out of range]");
 		return(FALSE);
 	}
 
