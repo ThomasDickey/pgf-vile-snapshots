@@ -6,7 +6,10 @@
  * internal use.
  *
  * $Log: region.c,v $
- * Revision 1.15  1992/05/16 12:00:31  pgf
+ * Revision 1.16  1992/06/01 20:42:15  foxharp
+ * honor "tabinsert" mode in {en,de}tabline()
+ *
+ * Revision 1.15  1992/05/16  12:00:31  pgf
  * prototypes/ansi/void-int stuff/microsoftC
  *
  * Revision 1.14  1992/02/26  21:57:20  pgf
@@ -155,14 +158,15 @@ shift_right_line()
 	t = curtabval;
 	DOT.o = 0;
 	if (s) {  /* try to just insert tabs if possible */
-		if (s >= t && (s % t == 0)) {
+		if (b_val(curbp,MDTABINSERT) && s >= t && (s % t == 0)) {
 			s = linsert(s/t, '\t');
 		} else {
 			detabline(TRUE);
 			DOT.o = 0;
 			s = linsert(s, ' ');
 		}
-		entabline(TRUE);
+		if (b_val(curbp,MDTABINSERT))
+			entabline(TRUE);
 	}
 	firstnonwhite(FALSE,1);
 	return TRUE;
@@ -211,7 +215,8 @@ shift_left_line()
 	}
 
 	DOT.o = 0;
-	entabline(TRUE);
+	if (b_val(curbp,MDTABINSERT))
+		entabline(TRUE);
 	return TRUE;
 }
 

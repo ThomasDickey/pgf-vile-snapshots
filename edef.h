@@ -1,14 +1,24 @@
-/*	EDEF:		Global variable definitions for
-			MicroEMACS 3.9
+/*	EDEF:		Global variable definitions for vile
+			
 
-			written by Dave G. Conroy
+			written for MicroEMACS 3.9 by Dave G. Conroy
 			modified by Steve Wilhite, George Jones
 			greatly modified by Daniel Lawrence
+			modified even more than that by Paul Fox.  honest.
 */
 
 /*
  * $Log: edef.h,v $
- * Revision 1.49  1992/05/27 08:32:57  foxharp
+ * Revision 1.52  1992/06/12 22:23:42  foxharp
+ * changes for separate 'comments' r.e. for formatregion
+ *
+ * Revision 1.51  1992/06/03  22:19:49  foxharp
+ * v. 3.19
+ *
+ * Revision 1.50  1992/06/01  20:35:59  foxharp
+ * added "tabinsert" support
+ *
+ * Revision 1.49  1992/05/27  08:32:57  foxharp
  * v 3.18
  *
  * Revision 1.48  1992/05/25  22:07:45  foxharp
@@ -188,7 +198,7 @@
 #endif
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version three point eighteen");
+decl_init( char version[], "version three point nineteen");
 
 decl_init( int autoindented , -1);	/* how many chars (not cols) indented */
 decl_uninit( int isnamedcmd );		/* are we typing a command name */
@@ -290,6 +300,7 @@ struct VALNAMES b_valuenames[] = {
 	{ "magic"	comma "X"  comma VALTYPE_BOOL } comma
 	{ "showmatch"	comma "sm" comma VALTYPE_BOOL } comma
 	{ "showmode"	comma "smd" comma VALTYPE_BOOL } comma
+	{ "tabinsert"	comma "ti" comma VALTYPE_BOOL } comma
 	{ "view"	comma "X"  comma VALTYPE_BOOL } comma
 	{ "wrapscan"	comma "ws" comma VALTYPE_BOOL } comma
 	{ "wrapwords"	comma "ww" comma VALTYPE_BOOL } comma
@@ -305,6 +316,7 @@ struct VALNAMES b_valuenames[] = {
 	{ "tags"	comma "tag" comma VALTYPE_STRING } comma
 
 	{ "c-suffixes"	comma "csuf" comma VALTYPE_REGEX } comma
+	{ "comments"	comma "X" comma VALTYPE_REGEX } comma
 	{ "paragraphs"	comma "X" comma VALTYPE_REGEX } comma
 	{ "sections"	comma "X" comma VALTYPE_REGEX } comma
 	{ "sentences"	comma "X" comma VALTYPE_REGEX } comma

@@ -2,14 +2,23 @@
  *
  *	fences.c
  *
- * Match up various fenceposts, like (), [], {}, /* *_/, #if #el #en
+ * Match up various fenceposts, like (), [], {}, */ /*, #if, #el, #en
  *
  * Most code probably by Dan Lawrence or Dave Conroy for MicroEMACS
  * Extensions for vile by Paul Fox
  *
  *	$Log: fences.c,v $
- *	Revision 1.1  1992/05/29 09:38:33  foxharp
- *	Initial revision
+ *	Revision 1.3  1992/06/08 08:56:05  foxharp
+ *	fixed infinite loop if simple fence not found, and
+ *	suppressed beeping in input mode if fence not found
+ *	,.
+ *	
+ *
+ * Revision 1.2  1992/06/03  08:37:23  foxharp
+ * removed nested comment
+ *
+ * Revision 1.1  1992/05/29  09:38:33  foxharp
+ * Initial revision
  *
  *
  *
@@ -26,14 +35,20 @@ int
 matchfence(f,n)
 int f,n;
 {
-	return getfence(0, (!f || n > 0) ? FORWARD:REVERSE);
+	int s = getfence(0, (!f || n > 0) ? FORWARD:REVERSE);
+	if (s == FALSE)
+		TTbeep();
+	return s;
 }
 
 int
 matchfenceback(f,n)
 int f,n;
 {
-	return getfence(0, (!f || n > 0) ? REVERSE:FORWARD);
+	int s = getfence(0, (!f || n > 0) ? REVERSE:FORWARD);
+	if (s == FALSE)
+		TTbeep();
+	return s;
 }
 
 int
@@ -66,7 +81,6 @@ int sdir; /* direction to scan if we're not on a fence to begin with */
 					++oldpos.o < llength(oldpos.l));
 			}
 			if (is_at_end_of_line(oldpos)) {
-				TTbeep();
 				return FALSE;
 			}
 		} else {
@@ -78,7 +92,6 @@ int sdir; /* direction to scan if we're not on a fence to begin with */
 			}
 
 			if (oldpos.o < 0) {
-				TTbeep();
 				return FALSE;
 			}
 		}
@@ -145,7 +158,6 @@ int sdir; /* direction to scan if we're not on a fence to begin with */
 					break;
 				}
 			}
-			TTbeep();
 			return FALSE;
 		case '*':
 			ch = '/';
@@ -162,7 +174,6 @@ int sdir; /* direction to scan if we're not on a fence to begin with */
 					pre_op_dot = DOT;
 				break;
 			}
-			TTbeep();
 			return FALSE;
 		case '/':
 			if (DOT.o+1 < llength(DOT.l) &&
@@ -176,7 +187,6 @@ int sdir; /* direction to scan if we're not on a fence to begin with */
 			}
 			/* FALL THROUGH */
 		default: 
-			TTbeep();
 			return(FALSE);
 	}
 
@@ -200,7 +210,6 @@ int sdir; /* direction to scan if we're not on a fence to begin with */
 
 	/* restore the current position */
 	DOT = oldpos;
-	TTbeep();
 	return(FALSE);
 }
 
@@ -235,7 +244,7 @@ int ofence;
 		else
 			s = backchar(FALSE, 1);
 
-		if (interrupted)
+		if (s == FALSE || interrupted)
 			return FALSE;
 	}
 
@@ -377,7 +386,7 @@ char *key, *otherkey, *lookingforkey;
 		else
 			DOT.l = lforw(DOT.l);
 
-		if (interrupted)
+		if (is_header_line(DOT,curbp) || interrupted)
 			return FALSE;
 	}
 	if (count == 0) {

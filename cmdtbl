@@ -71,7 +71,11 @@
 #		here for completeness.
 #
 # $Log: cmdtbl,v $
-# Revision 1.37  1992/05/25 21:06:46  foxharp
+# Revision 1.38  1992/06/01 20:44:47  foxharp
+# always define bktoshell -- we make it a null routine instead of leaving
+# it out...
+#
+# Revision 1.37  1992/05/25  21:06:46  foxharp
 # emacs --> vile !!  (about time)
 #
 # Revision 1.36  1992/03/19  23:42:49  pgf
@@ -276,7 +280,7 @@ bcsrch_to	MOTION
 bindkey		NONE			REBIND
 	"bind-key"
 	"rebind-key"
-bktoshell	NONE			UNIX&&defined(SIGTSTP)
+bktoshell	NONE
 	"suspend-vile"			!FEWNAMES
 	'^Z'
 cd		NONE

@@ -42,16 +42,17 @@ REMOTE=gutso!foxharp
 
 #CC = gcc
 #LINK = gcc
-#OPTFLAGS = -g -Wall -Wshadow -O -Dpgf_and_no_fixincludes
+#OPTFLAGS = -g -Wall -Wshadow -O
+#GINCS = -I/usr/local/lib/gcc-include
 
 CC = cc
 LINK = cc
-OPTFLAGS = -O
 #OPTFLAGS = -g
+OPTFLAGS = -O
 
 # some older bsd systems keep ioctl in sys only -- easier to
 # search both places than to ifdef the code.  color me lazy.
-INCS = -I. -I/usr/include -I/usr/include/sys
+INCS = -I. $(GINCS) -I/usr/include -I/usr/include/sys
 
 # suffix for object files.
 # this get changes to "obj" for DOS builds
@@ -132,6 +133,7 @@ all:
 	echo "	make svr3	(early 386 UNIX, for instance"		;\
 	echo "	make sun	(sunos 3 or 4)"				;\
 	echo "	make ultrix"						;\
+	echo "	make mach	(just pure bsd)"			;\
 	echo "	make svr4	(untested)"				;\
 	echo "	make mips	(uses systemV stuff)"			;\
 	echo "	make odt	(open desktop -- variant of svr3)"	;\
@@ -147,7 +149,7 @@ all:
 	echo "	nmake msc	(MicroSoft C 6.0) (buggy)"		;\
 	echo "	make default	(to use config internal to estruct.h)"
 
-bsd sony:
+bsd sony mach:
 	make CFLAGS="$(OPTFLAGS) $(INCS) -DBERK -Dos_chosen" \
 	    MAKE=/usr/bin/make $(TARGET)
 
@@ -169,7 +171,7 @@ att_posix svr4:
 
 svr3:
 	$(MAKE) CFLAGS="$(OPTFLAGS) -DSVR3 -Dos_chosen" \
-		$(TARGET)
+		LIBS="-ltermcap -lc_s" $(TARGET)
 
 mips:
 	$(MAKE) CFLAGS="$(OPTFLAGS) -systype sysv -DSVR3 -Dos_chosen" \
@@ -200,7 +202,7 @@ unixpc:
 
 aix:
 	$(MAKE) CFLAGS="$(OPTFLAGS) -DUSG \
-		-DPOSIX -DHAVE_SELECT -U__STR__ -Dos_chosen -qpgmsize=l" \
+		-DPOSIX -DAIX -DHAVE_SELECT -U__STR__ -Dos_chosen -qpgmsize=l" \
 		LIBS=-lcurses \
 		$(TARGET)
 
@@ -214,7 +216,7 @@ linux:
 		$(TARGET)
 
 msc:
-	$(MAKE) MKTBLS=mktbls.exe CFLAGS="/qc /AL /nologo \
+	$(MAKE) MKTBLS=mktbls.exe CFLAGS="/EM /qc /AL /nologo \
 		-DMSDOS -DMSC -Dos_chosen -DIBMPC -Dscrn_chosen" \
 		O=obj CC=cl SCREEN=ibmpc \
 		LINK="link /ST:8192 @link.msc" $(TARGET)2
@@ -357,6 +359,9 @@ lint:	$(SRC)
 	#lint -hbvxac $(SRC) >lint.out 
 	lint  $(SRC) >lint.out 
 
+cflow:	$(SRC)
+	cflow  $(SRC) >cflow.out 
+
 clean:
 	rm -f *.$O o$(TARGET) $(BUILTHDRS) $(MKTBLS) core *~ *.BAK
 
@@ -377,8 +382,28 @@ populate: $(EVERYTHING)
 $(EVERYTHING):
 	co -r$(revision) $@
 
+
+$(OBJ): estruct.h edef.h
+
+externs.$O: nebind.h nename.h nefunc.h
+
 # $Log: makefile,v $
-# Revision 1.52  1992/05/29 09:40:53  foxharp
+# Revision 1.57  1992/06/14 11:33:17  foxharp
+# added -DAIX
+#
+# Revision 1.56  1992/06/12  20:21:28  foxharp
+# use shared libs in svr3 -- should this be done for others?  isc? odt?
+#
+# Revision 1.55  1992/06/04  19:44:40  foxharp
+# added mach and cflow targets
+#
+# Revision 1.54  1992/06/03  08:39:23  foxharp
+# look explicitly for gcc include files
+#
+# Revision 1.53  1992/06/01  20:41:07  foxharp
+# added dependency of externs.o on ne....h
+#
+# Revision 1.52  1992/05/29  09:40:53  foxharp
 # split out modes.c, fences.c, and insert.c from random.c
 #
 # Revision 1.51  1992/05/29  08:40:05  foxharp
@@ -554,4 +579,3 @@ $(EVERYTHING):
 # date: 1990/09/21 10:25:38;
 # initial vile RCS revision
 #
-$(OBJ): estruct.h edef.h

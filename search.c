@@ -4,7 +4,10 @@
  *  heavily modified by Paul Fox, 1990
  *
  * $Log: search.c,v $
- * Revision 1.33  1992/05/16 12:00:31  pgf
+ * Revision 1.34  1992/06/03 08:37:48  foxharp
+ * stop searching if we've wrapped when we hit the boundary
+ *
+ * Revision 1.33  1992/05/16  12:00:31  pgf
  * prototypes/ansi/void-int stuff/microsoftC
  *
  * Revision 1.32  1992/03/19  23:46:24  pgf
@@ -579,9 +582,10 @@ int	wrapok;	/* ok to wrap around bottom of buffer? */
 				curpos.o = 0;
 		}
 		if (is_header_line(curpos, curbp)) {
-			if (sameline(curpos,scanboundpos) && !wrapok)
-				break;
 			wrapped++;
+			if (sameline(curpos,scanboundpos) &&
+						(!wrapok || wrapped) )
+				break;
 			if (direct == FORWARD) {
 				curpos.l = lforw(curpos.l);
 			} else {
