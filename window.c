@@ -3,7 +3,13 @@
  * attached to keys that the user actually types.
  *
  * $Log: window.c,v $
- * Revision 1.18  1992/12/14 09:36:50  foxharp
+ * Revision 1.20  1993/01/23 13:38:23  foxharp
+ * new unlink_window() function
+ *
+ * Revision 1.19  1993/01/16  10:43:38  foxharp
+ * use new macros, and call updatelistbuffers appropriately
+ *
+ * Revision 1.18  1992/12/14  09:36:50  foxharp
  * now that sideways scrolling works on short lines, don't need to restrict user to
  * certain cursor positions
  *
@@ -77,6 +83,25 @@ overlay	"window"
 #endif
 
 /*
+ * Unlink the given window-pointer from the list
+ */
+static
+void	unlink_window(thewp)
+	WINDOW	*thewp;
+{
+	register WINDOW *p, *q;
+
+	for (p = wheadp, q = 0; p != 0; q = p, p = p->w_wndp)
+		if (p == thewp) {
+			if (q != 0)
+				q->w_wndp = p->w_wndp;
+			else
+				wheadp = p->w_wndp;
+			break;
+		}
+}
+
+/*
  * Reposition dot's line to line "n" of the window. If the argument is
  * positive, it is that line. If it is negative it is that line from the
  * bottom. If it is 0 the window is centered around dot (this is what 
@@ -131,12 +156,9 @@ int f, n;	/* default flag and numeric argument */
 	if (f) {
 
 		/* first count the # of windows */
-		wp = wheadp;
 		nwindows = 1;
-		while (wp->w_wndp != NULL) {
+		for_each_window(wp)
 			nwindows++;
-			wp = wp->w_wndp;
-		}
 
 		/* if the argument is negative, it is the nth window
 		   from the bottom of the screen			*/
@@ -159,6 +181,7 @@ int f, n;	/* default flag and numeric argument */
 	curwp = wp;
 	make_current(curwp->w_bufp);
 	upmode();
+	updatelistbuffers();
 	return (TRUE);
 }
 
@@ -221,6 +244,7 @@ int f,n;
 	curwp = wp1;
 	make_current(curwp->w_bufp);
 	upmode();
+	updatelistbuffers();
 	return (TRUE);
 }
 
@@ -336,7 +360,7 @@ int f,n;
 
 	w_val(curwp, WVAL_SIDEWAYS) += move;
 
-        curwp->w_flag  |= WFHARD|WFMOVE;
+        curwp->w_flag  |= WFHARD|WFMOVE|WFMODE;
 
 	return TRUE;
 }
@@ -359,7 +383,7 @@ int f,n;
 		w_val(curwp, WVAL_SIDEWAYS) = 0;
 	}
 
-        curwp->w_flag  |= WFHARD|WFMOVE;
+        curwp->w_flag  |= WFHARD|WFMOVE|WFMODE;
 
 	return TRUE;
 }
@@ -387,6 +411,7 @@ int f,n;
         	if (wp != curwp) {
 	                if (--wp->w_bufp->b_nwnd == 0)
 	                        undispbuff(wp->w_bufp,wp);
+			unlink_window(wp);
 	                free((char *) wp);
 	        }
                 wp = nwp;
@@ -768,15 +793,13 @@ int f,n;
 	register WINDOW *wp;
 
 	/* find the window */
-	wp = wheadp;
-	while (wp != NULL) {
+	for_each_window(wp) {
 		if (wp == swindow) {
 			curwp = wp;
 			make_current(curwp->w_bufp);
 			upmode();
 			return (TRUE);
 		}
-		wp = wp->w_wndp;
 	}
 
 	mlforce("[No such window exists]");
@@ -886,11 +909,9 @@ int f,n;	/* numeric argument */
 	term.t_scrsiz = n - (term.t_margin * 2);
 
 	/* force all windows to redraw */
-	wp = wheadp;
-	while (wp) {
+	for_each_window(wp)
 		wp->w_flag |= WFHARD | WFMOVE | WFMODE;
-		wp = wp->w_wndp;
-	}
+
 	sgarbf = TRUE;
 
 	return(TRUE);
@@ -926,7 +947,7 @@ winit()
 
         wp = typealloc(WINDOW);			/* First window         */
         if (wp==NULL )
-                exit(1);
+                exit(BAD(1));
         wheadp = wp;
         curwp  = wp;
         wp->w_wndp  = NULL;                     /* Initialize window    */

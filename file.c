@@ -6,7 +6,16 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.66  1992/12/30 19:54:56  foxharp
+ * Revision 1.68  1993/01/23 13:38:23  foxharp
+ * changes for updating buffer list when writing files out,
+ * apollo-specific change for death conditions,
+ * use new exit code macros
+ *
+ * Revision 1.67  1993/01/16  10:32:28  foxharp
+ * some lint, some macro-ization of special filenames, a couple pathname
+ * manipulators (lengthen_path(), is_pathname())
+ *
+ * Revision 1.66  1992/12/30  19:54:56  foxharp
  * avoid inf. loop when choosing unique name for buffers that have names
  * containing "-x" in the NBUFN-1 position
  *
@@ -259,8 +268,6 @@ int doslines, unixlines;
 # define slashc(c) (c == '/')
 #endif
 
-#define	InternalName(s)	((s[0] == '!') || (s[0] == '['))
-
 /*
  * Read a file into the current
  * buffer. This is really easy; all you do it
@@ -291,6 +298,7 @@ int f,n;
 	makename(bname, fname);
 	unqname(bname, TRUE);
 	(void)strcpy(curbp->b_bname, bname);
+	updatelistbuffers();
 	return s;
 }
 
@@ -315,8 +323,8 @@ int f,n;
 	if (clexec || isnamedcmd) {
 	        if ((s=mlreply("Find file: ", fname, NFILEN)) != TRUE)
 	                return s;
-        } else {
-		screen_string(fname,NFILEN,_pathn);
+        } else if (!screen_to_bname(fname)) {
+		return FALSE;
         }
 	if ((s = glob(fname)) != TRUE)
 		return FALSE;
@@ -465,12 +473,12 @@ int lockfl;		/* check the file for locks? */
 
         if ((bp=bfind(fname, NO_CREAT, 0)) == NULL) {
 		/* it's not already here by that buffer name */
-	        for (bp=bheadp; bp!=NULL; bp=bp->b_bufp) {
+	        for_each_buffer(bp) {
 			/* is it here by that filename? */
 	                if (strcmp(bp->b_fname, fname)==0) {
-				swbuffer(bp);
+				(void)swbuffer(bp);
 	                        curwp->w_flag |= WFMODE|WFHARD;
-				if (fname[0] != '!') {
+				if (!isShellOrPipe(fname)) {
 		                        mlwrite("[Old buffer]");
 				} else {
 		                        if (mlyesno(
@@ -595,14 +603,14 @@ int	mflg;		/* print messages? */
 		newfebuff = TRUE;
 	}
 #endif
-        ffclose();                              /* Ignore errors.       */
+        (void)ffclose();                         /* Ignore errors.       */
 	if (mflg)
 		readlinesmsg(nline,s,fname,ffronly(fname));
 
 	bp->b_linecount = nline;
 
 	/* set read-only mode for read-only files */
-	if (fname[0] == '!' 
+	if (isShellOrPipe(fname)
 #if RONLYVIEW
 		|| ffronly(fname) 
 #endif
@@ -636,7 +644,7 @@ out:
 	set_b_val(bp,MDCMOD, (global_b_val(MDCMOD) && has_C_suffix(bp)));
 
 	TTkopen();	/* open the keyboard again */
-        for (wp=wheadp; wp!=NULL; wp=wp->w_wndp) {
+        for_each_window(wp) {
                 if (wp->w_bufp == bp) {
                         wp->w_line.l = lforw(bp->b_line.l);
                         wp->w_dot.l  = lforw(bp->b_line.l);
@@ -648,6 +656,8 @@ out:
                         wp->w_flag |= WFMODE|WFHARD;
                 }
         }
+	imply_alt(fname);
+	updatelistbuffers();
         if (s == FIOERR || s == FIOFNF) {	/* False if error.      */
 #if UNIX
 		extern int sys_nerr, errno;
@@ -828,7 +838,7 @@ int *nlinep;
 				flag |= WFEDIT;
 				if (!done_update || bp->b_nwnd > 1)
 					flag |= WFHARD;
-			        for (wp=wheadp; wp!=NULL; wp=wp->w_wndp) {
+			        for_each_window(wp) {
 			                if (wp->w_bufp == bp) {
 			                        wp->w_line.l=
 							lforw(bp->b_line.l);
@@ -842,7 +852,10 @@ int *nlinep;
 				set_b_val(bp, MDDOS, 
 				 doslines > unixlines && global_b_val(MDDOS) );
 				curwp->w_flag |= WFMODE|WFKILLS;
-				update(TRUE);
+				if (!update(TRUE)) {
+					s = FIOERR;
+					break;
+				}
 				done_update = TRUE;
 				flag = 0;
 			} else {
@@ -934,8 +947,8 @@ char    fname[];
 #endif
 #if     UNIX
 	bcp = bname;
-	if (*fcp == '!') { /* then it's a shell command.  bname is first word */
-		*bcp++ = '!';
+	if (isShellOrPipe(fcp)) { /* ...it's a shell command; bname is first word */
+		*bcp++ = SHPIPE_LEFT[0];
 		do {
 			++fcp;
 		} while (isspace(*fcp));
@@ -990,7 +1003,7 @@ int ok_to_ask;  /* prompts allowed? */
 		choosename:
 			if (ok_to_ask) {
 				do {
-					mlreply("Choose a unique buffer name: ",
+					(void)mlreply("Choose a unique buffer name: ",
 						 name, NBUFN);
 				} while (name[0] == '\0');
 			} else { /* can't ask, just overwrite end of name */
@@ -1022,7 +1035,7 @@ int f,n;
 		if ((s = glob(fname)) != TRUE)
 			return FALSE;
 		if (strcmp(fname,curbp->b_fname) &&
-			fname[0] != '!' && flook(fname,FL_HERE)) {
+			!isShellOrPipe(fname) && flook(fname,FL_HERE)) {
 			if (mlyesno("File exists, okay to overwrite") != TRUE) {
 				mlwrite("File not written");
 				return FALSE;
@@ -1033,10 +1046,8 @@ int f,n;
 		mlforce("[Can't write-back from view mode]");
 		return FALSE;
 	}
-        if ((s=writeout(fname,curbp,TRUE)) == TRUE) {
-                curbp->b_flag &= ~BFCHG;
-		markWFMODE(curbp);
-        }
+        if ((s=writeout(fname,curbp,TRUE)) == TRUE)
+		unchg_buff(curbp, 0);
         return s;
 }
 
@@ -1057,10 +1068,8 @@ int f,n;
                 mlforce("[No file name]");
                 return FALSE;
         }
-        if ((s=writeout(curbp->b_fname,curbp,TRUE)) == TRUE) {
-                curbp->b_flag &= ~BFCHG;
-		markWFMODE(curbp);
-        }
+        if ((s=writeout(curbp->b_fname,curbp,TRUE)) == TRUE)
+		unchg_buff(curbp, 0);
         return s;
 }
 
@@ -1122,7 +1131,7 @@ writeregion()
 		if ((s = glob(fname)) != TRUE)
 			return FALSE;
 		if (strcmp(fname,curbp->b_fname) &&
-			fname[0] != '!' && flook(fname,FL_HERE)) {
+			!isShellOrPipe(fname) && flook(fname,FL_HERE)) {
 			if (mlyesno("File exists, okay to overwrite")
 							!= TRUE) {
 				mlwrite("File not written");
@@ -1157,7 +1166,7 @@ BUFFER	**bpp;
 	if (s != TRUE)
 		return s;
 #endif
-        if (*fn == '[' || *fn == ' ') {
+        if (*fn == SCRTCH_LEFT[0] || *fn == ' ') {
         	mlforce("[No filename]");
         	return FALSE;
         }
@@ -1168,6 +1177,8 @@ BUFFER	**bpp;
 	/* tell us we're writing */
 	if (msgf == TRUE)
 		mlwrite("[Writing...]");
+
+	imply_alt(fn);
 
 #if UNIX & ! NeWS
 	if (fileispipe)
@@ -1242,7 +1253,7 @@ BUFFER	**bpp;
 				mlforce("[%d lines]", nline);
                 }
         } else {                                /* Ignore close error   */
-                ffclose();                      /* if a write error.    */
+                (void)ffclose();                /* if a write error.    */
 	}
 	if (bpp)
 		(*bpp)->b_linecount = nline;
@@ -1327,7 +1338,7 @@ int	msgf;
 				mlforce("[%d lines]", nline);
 		}
 	} else	{				/* Ignore close error	*/
-		ffclose();			/* if a write error.	*/
+		(void)ffclose();		/* if a write error.	*/
 	}
 	TTkopen();
 	if (s != FIOSUC)			/* Some sort of error.	*/
@@ -1366,6 +1377,7 @@ int f,n;
                 ch_fname(curbp, fname);
 	make_global_b_val(curbp,MDVIEW); /* no longer read only mode */
 	markWFMODE(curbp);
+	updatelistbuffers();
         return TRUE;
 }
 
@@ -1390,8 +1402,7 @@ FILE	*haveffp;
 	extern FILE	*ffp;
 
         bp = curbp;                             /* Cheap.               */
-        bp->b_flag |= BFCHG;			/* we have changed	*/
-	bp->b_flag &= ~BFINVS;			/* and are not temporary*/
+	bp->b_flag &= ~BFINVS;			/* we are not temporary*/
 	if (!haveffp) {
 	        if ((s=ffropen(fname)) == FIOERR)       /* Hard file open.      */
 	                goto out;
@@ -1438,7 +1449,10 @@ FILE	*haveffp;
 
 		if (nbytes)  /* l_text may be NULL in this case */
 			(void)memcpy(lp1->l_text, fline, nbytes);
-		tag_for_undo(lp1);
+		if (!tag_for_undo(lp1)) {
+			s = FIOMEM;
+			break;
+		}
 		if (belowthisline)
 			lp0 = lp1;
 		else
@@ -1453,17 +1467,18 @@ FILE	*haveffp;
 			sgarbf = TRUE;
 		}
 #endif
-		ffclose();				/* Ignore errors.	*/
+		(void)ffclose();		/* Ignore errors.	*/
 		readlinesmsg(nline,s,fname,FALSE);
 	}
 out:
 	/* advance to the next line and mark the window for changes */
 	curwp->w_dot.l = lforw(curwp->w_dot.l);
-	curwp->w_flag |= WFHARD | WFMODE;
 
 	/* copy window parameters back to the buffer structure */
 	curbp->b_wtraits = curwp->w_traits;
 
+	imply_alt(fname);
+	chg_buff (curbp, WFHARD);
         if (s == FIOERR)                        /* False if error.      */
                 return FALSE;
         return TRUE;
@@ -1504,8 +1519,10 @@ char    *fname;
 #endif
 		while ((s=ffgetline(&nbytes)) == FIOSUC) {
 			for (i=0; i<nbytes; ++i)
-				kinsert(fline[i]);
-			kinsert('\n');
+				if (!kinsert(fline[i]))
+					return FIOMEM;
+			if (!kinsert('\n'))
+				return FIOMEM;
 			++nline;
 		}
 #if UNIX
@@ -1516,7 +1533,7 @@ char    *fname;
 	}
 #endif
 	kdone();
-        ffclose();                              /* Ignore errors.       */
+        (void)ffclose();                        /* Ignore errors.       */
 	readlinesmsg(nline,s,fname,FALSE);
 
 out:
@@ -1550,9 +1567,19 @@ int signo;
 	char *getenv();
 	char *mktemp();
 
+#if APOLLO
+	extern	char	*getlogin();
+	static	int	i_am_dead;
 
-	bp = bheadp;
-	while (bp != NULL) {
+	if (i_am_dead++)	/* prevent recursive faults */
+		_exit(signo);
+	(void)lsprintf(cmd,
+		"(echo signal %d killed vile;/com/tb %d)| /bin/mail %s",
+		signo, getpid(), getlogin());
+	(void)system(cmd);
+#endif
+
+	for_each_buffer(bp) {
 		if (((bp->b_flag & BFINVS) == 0) && 
 			 bp->b_active == TRUE && 
 	                 (bp->b_flag&BFCHG) != 0) {
@@ -1561,7 +1588,7 @@ int signo;
 				(void)mktemp(dirnam);
 				if(mkdir(dirnam,0700) != 0) {
 					vttidy(FALSE);
-					exit(1);
+					exit(BAD(1));
 				}
 				created = 1;
 			}
@@ -1573,15 +1600,14 @@ int signo;
 			(void)strcat(filnam,bp->b_bname);
 			if (writeout(filnam,bp,FALSE) != TRUE) {
 				vttidy(FALSE);
-				exit(1);
+				exit(BAD(1));
 			}
 			wrote++;
 		}
-		bp = bp->b_bufp;
 	}
 	if (wrote) {
 		if ((np = getenv("LOGNAME")) || (np = getenv("USER"))) {
-			lsprintf(cmd,
+			(void)lsprintf(cmd,
 #if HAVE_MKDIR
     "(echo Subject: vile died; echo Files saved: ; ls %s/* ) | /bin/mail %s",
 #else
@@ -1595,7 +1621,7 @@ int signo;
 	if (signo > 2)
 		abort();
 	else
-		exit(wrote);
+		exit(wrote ? BAD(wrote) : GOOD);
 
 	/* NOTREACHED */
 	SIGRET;
@@ -1607,11 +1633,9 @@ markWFMODE(bp)
 BUFFER *bp;
 {
 	register WINDOW *wp;	/* scan for windows that need updating */
-        wp = wheadp;                    /* Update mode lines.   */
-        while (wp != NULL) {
+        for_each_window(wp) {
                 if (wp->w_bufp == bp)
                         wp->w_flag |= WFMODE;
-                wp = wp->w_wndp;
         }
 }
 
@@ -1637,12 +1661,12 @@ char *buf;
 	}
 
 	cp = buf;
-	if (InternalName(cp))		/* it's a shell command, or an */
+	if (isInternalName(cp))		/* it's a shell command, or an */
 		return TRUE;		/* internal name, don't bother */
 
 	while (*cp) {
 		if (iswild(*cp)) {
-			lsprintf(cmd, "echo %s", buf);
+			(void)lsprintf(cmd, "echo %s", buf);
 			cf = npopen(cmd,"r");
 			if (cf == NULL) {
 				return TRUE;
@@ -1826,7 +1850,7 @@ char *f;
 	if (!f || *f == '\0')
 		return NULL;
 
-	if (InternalName(f))
+	if (isInternalName(f))
 		return f;
 
 	cwd = current_directory(FALSE);
@@ -1861,4 +1885,41 @@ char *f;
 
 	/* we're off by more than just '..', so use absolute path */
 	return f;
+}
+
+/*
+ * Undo nominal effect of 'shorten_path()'
+ */
+char *
+lengthen_path(f)
+char *f;
+{
+	register int len;
+	char	temp[NFILEN];
+
+	if (!slashc(f[0])) {
+		len = strlen(strcpy(temp, current_directory(FALSE)));
+		temp[len++] = slash;
+		(void)strcpy(temp + len, f);
+		(void)strcpy(f, temp);
+	}
+	return canonpath(f);
+}
+
+/*
+ * Returns true if the argument looks more like a pathname than anything else.
+ */
+int
+is_pathname(f)
+char *f;
+{
+	if (slashc(f[0]))
+		return TRUE;
+	else if (*f++ == '.') {
+		if (*f == '.')
+			f++;
+		if (slashc(f[0]))
+			return TRUE;
+	}
+	return FALSE;
 }

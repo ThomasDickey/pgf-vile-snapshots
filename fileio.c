@@ -3,7 +3,10 @@
  * the knowledge about files are here.
  *
  * $Log: fileio.c,v $
- * Revision 1.31  1992/12/14 09:03:25  foxharp
+ * Revision 1.32  1993/01/16 10:33:59  foxharp
+ * macro-ization of checks for shell-buffers
+ *
+ * Revision 1.31  1992/12/14  09:03:25  foxharp
  * lint cleanup, mostly malloc
  *
  * Revision 1.30  1992/08/20  23:40:48  foxharp
@@ -142,7 +145,7 @@ char    *fn;
 
 #if UNIX
 	
-	if (*fn == '!') {
+	if (isShellOrPipe(fn)) {
 	        if ((ffp=npopen(fn+1, "r")) == NULL)
 	                return (FIOERR);
 		fileispipe = TRUE;
@@ -173,7 +176,7 @@ char    *fn;
 {
 #if UNIX
 	FILE *npopen();
-	if (*fn == '!') {
+	if (isShellOrPipe(fn)) {
 	        if ((ffp=npopen(fn+1, "w")) == NULL) {
 	                mlforce("[Cannot open pipe for writing]");
 			TTbeep();
@@ -215,7 +218,7 @@ char    *fn;
 {
 	int fd;
 
-	if (*fn == '!') {
+	if (isShellOrPipe(fn)) {
 		return TRUE;
 	} else {
 	        if ((fd=open(fn, O_WRONLY)) < 0) {

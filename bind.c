@@ -4,7 +4,10 @@
  *	written 11-feb-86 by Daniel Lawrence
  *
  * $Log: bind.c,v $
- * Revision 1.25  1992/12/04 09:08:45  foxharp
+ * Revision 1.26  1993/01/16 10:21:17  foxharp
+ * use new ScratchName, isShellOrPipe, and isreturn macros
+ *
+ * Revision 1.25  1992/12/04  09:08:45  foxharp
  * deleted unused assigns
  *
  * Revision 1.24  1992/08/20  23:40:48  foxharp
@@ -112,7 +115,7 @@ int f,n;
 	char *fname;		/* ptr to file returned by flook() */
 
 	/* first check if we are already here */
-	bp = bfind("[Help]", OK_CREAT, BFSCRTCH);
+	bp = bfind(ScratchName(Help), OK_CREAT, BFSCRTCH);
 	if (bp == NULL)
 		return FALSE;
 
@@ -129,7 +132,7 @@ int f,n;
 			zotbuf(bp);
 			return(FALSE);
 		}
-		strcpy(bp->b_bname,"[Help]");
+		strcpy(bp->b_bname, ScratchName(Help));
 		{
 			char buf[80];
 	        	lsprintf(buf, "       %s   %s",prognam,version);
@@ -370,7 +373,7 @@ int
 desbind(f, n)
 int f,n;
 {
-        return liststuff("[Binding List]",makebindlist,1,NULL);
+        return liststuff(ScratchName(Binding List),makebindlist,1,NULL);
 }
 
 #if	APROP
@@ -387,7 +390,7 @@ int f,n;
 	if (s != TRUE)
 		return(s);
 
-        return liststuff("[Binding List]",makebindlist,1,mstring);
+        return liststuff(ScratchName(Binding List),makebindlist,1,mstring);
 }
 #endif
 
@@ -577,7 +580,7 @@ int hflag;	/* Look in the HOME environment variable first? */
 	/* tak care of special cases */
 	if (!fname || !fname[0] || isspace(fname[0]))
 		return NULL;
-	else if (fname[0] == '!')
+	else if (isShellOrPipe(fname))
 		return fname;
 		
 	/* always try the current directory first */
@@ -928,15 +931,14 @@ char **bufp;
 			if (isbackspace(c) ||
 			    c == kcod2key(abortc) ||
 			    c == kcod2key(killc) ||
-			    c == '\r' ||
-			    c == '\n' ||
+			    isreturn(c) ||
 			    islinespecchar(c) ) {
 				tungetc(c);
 				return SORTOFTRUE;
 			}
 		}
 
-		if (c == '\r' || c == '\n') {
+		if (isreturn(c)) {
 			buf[cpos] = 0;
 			lineinput = FALSE;
 			*bufp = buf;

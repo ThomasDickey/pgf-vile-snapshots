@@ -6,7 +6,22 @@
  * for the display system.
  *
  * $Log: buffer.c,v $
- * Revision 1.44  1992/12/23 09:15:49  foxharp
+ * Revision 1.48  1993/01/23 14:25:14  foxharp
+ * use strcmp against buffer-list name instead of trying to find it
+ *
+ * Revision 1.47  1993/01/23  13:38:23  foxharp
+ * tom's changes for changed-buffers
+ *
+ * Revision 1.46  1993/01/18  20:25:59  foxharp
+ * added missing f,n declaration
+ *
+ * Revision 1.45  1993/01/16  10:21:59  foxharp
+ * a _lot_ of changes, to support tom dickey's autobuffer mode.  this allows
+ * keeping the buffers in lru (traditional vile) order, or in command-line order
+ * (as in traditional vi).  also allows auto-creation of buffers written to
+ * alternate filenames.  some changes to buffer-list maintenance.
+ *
+ * Revision 1.44  1992/12/23  09:15:49  foxharp
  * tom dickey's changes for keeping the buffer list up to date when on screen
  *
  * Revision 1.43  1992/12/14  09:03:25  foxharp
@@ -164,145 +179,336 @@
 #include	"estruct.h"
 #include	"edef.h"
 
-#define BUFFER_LIST_NAME "[Buffer List]"
+#define BUFFER_LIST_NAME ScratchName(Buffer List)
 
+#define	ImpliedBfr(bp)		(bp->b_flag & (BFIMPLY))
+#define	CmdLine(bp)		(bp->b_flag & (BFARGS))
 #define	Changed(bp)		(bp->b_flag & (BFCHG))
 #define	Invisible(bp)		(bp->b_flag & (BFINVS))
 #define	Scratch(bp)		(bp->b_flag & (BFSCRTCH))
 #define	InvisibleOrScratch(bp)	(bp->b_flag & (BFINVS|BFSCRTCH))
 
-static	int	show_all;
+static	BUFFER	*last_bp,	/* noautobuffer value */
+		*this_bp,	/* '%' buffer */
+		*that_bp;	/* '#' buffer */
+static	int	show_all,	/* true iff we show all buffers */
+		updating_list;
 
 /*
  * Returns the buffer-list pointer, if it exists.
  */
-BUFFER *
-find_listbuffers()
+static
+BUFFER *find_BufferList()
 {
 	return bfind(BUFFER_LIST_NAME, NO_CREAT, BFSCRTCH);
 }
 
 /*
+ * Returns true iff we update the buffer list on changes to the given buffer.
+ */
+static
+int	update_on_chg(bp)
+	BUFFER *bp;
+{
+	return (strcmp(BUFFER_LIST_NAME, bp->b_bname) != 0 &&
+			(!Invisible(bp) || show_all));
+}
+
+/*
  * Look for a buffer-pointer in the list, to see if it has been delinked yet.
  */
-BUFFER *
-find_bp(bp)
-BUFFER *bp;
+static
+BUFFER *find_bp(bp1)
+	BUFFER *bp1;
 {
-	register BUFFER *bp1;
-	for (bp1 = bheadp; bp1; bp1 = bp1->b_bufp) {
-		if (bp1 == bp)
-			return bp1;
-	}
+	register BUFFER *bp;
+	for_each_buffer(bp)
+		if (bp == bp1)
+			return bp;
 	return 0;
+}
+
+/*
+ * Returns the total number of buffers in the list.
+ */
+static
+int	countBuffers()
+{
+	register BUFFER *bp;
+	register int	count = 0;
+	for_each_buffer(bp)
+		count++;
+	return count;
+}
+
+/*
+ * Returns the n'th buffer created
+ */
+static
+BUFFER *find_nth_created(n)
+	int	n;
+{
+	register BUFFER *bp;
+
+	for_each_buffer(bp)
+		if (bp->b_created == n)
+			return bp;
+	return 0;
+}
+
+/*
+ * Returns the n'th buffer used
+ */
+static
+BUFFER *find_nth_used(n)
+	int	n;
+{
+	register BUFFER *bp;
+
+	for_each_buffer(bp)
+		if (bp->b_last_used == n)
+			return bp;
+	return 0;
+}
+
+/*
+ * Returns the buffer with the largest value of 'b_last_used'.
+ */
+static
+BUFFER *find_latest()
+{
+	register BUFFER *bp, *maxbp = 0;
+
+	for_each_buffer(bp) {
+		if (maxbp == 0)
+			maxbp = bp;
+		else if (maxbp->b_last_used < bp->b_last_used)
+			maxbp = bp;
+	}
+	return maxbp;
+}
+
+/*
+ * Look for a buffer-name in the buffer-list
+ */
+static
+BUFFER *find_b_name(bname)
+	char *bname;
+{
+	register BUFFER *bp;
+
+	for_each_buffer(bp)
+		if (!strcmp(bname, bp->b_bname))
+			return bp;
+	return 0;
+}
+
+/*
+ * Look for a filename in the buffer-list
+ */
+static
+BUFFER *find_b_file(fname)
+	char *fname;
+{
+	register BUFFER *bp;
+	char	nfname[NFILEN];
+
+	(void)lengthen_path(strcpy(nfname, fname));
+	for_each_buffer(bp)
+		if (!strcmp(nfname, bp->b_fname))
+			return bp;
+	return 0;
+}
+
+/*
+ * Look for a specific buffer number
+ */
+static
+BUFFER *find_b_hist(number)
+	int number;
+{
+	register BUFFER *bp;
+
+	for_each_buffer(bp)
+		if (!InvisibleOrScratch(bp) && (number-- <= 0))
+			break;
+	return bp;
+}
+
+/*
+ * Look for a buffer-number (i.e., one from the buffer-list display)
+ */
+static
+BUFFER *find_b_number(number)
+	char *number;
+{
+	register int	c = 0;
+	while (isdigit(*number))
+		c = (c * 10) + (*number++ - '0');
+	if (!*number)
+		return find_b_hist(c);
+	return 0;
+}
+
+/*
+ * Find buffer, given (possibly) filename, buffer name or buffer number
+ */
+static
+BUFFER *find_any_buffer(name)
+	char *name;
+{
+	register BUFFER *bp;
+
+	if (!(bp=bfind(name, NO_CREAT, 0))	/* Try buffer */
+	 && !(bp=find_b_file(name))		/* ...then filename */
+	 && !(bp=find_b_number(name))) {	/* ...then number */
+		mlforce("[No such buffer] %s", name);
+		return 0;
+	}
+
+	return bp;
 }
 
 /*
  * Given a buffer, returns the corresponding WINDOW pointer
  */
-WINDOW *
-bp2wp(bp)
-BUFFER *bp;
+static
+WINDOW *bp2wp(bp)
+	BUFFER *bp;
 {
 	register WINDOW *wp;
-	wp = wheadp;
-	while (wp->w_bufp != bp && wp->w_wndp != NULL)
-		wp = wp->w_wndp;
+	for_each_window(wp)
+		if (wp->w_bufp == bp)
+			break;
 	return wp;
 }
 
 /*
  * Delete all instances of window pointer for a given buffer pointer
  */
-int
-zotwp(bp)
-BUFFER *bp;
+static
+int	zotwp(bp)
+	BUFFER *bp;
 {
 	register WINDOW *wp;
+	WINDOW	dummy;
 	int s = FALSE;
-	for (wp = wheadp; wp != NULL; wp = wp->w_wndp) {
+
+	for_each_window(wp) {
 		if (wp->w_bufp == bp) {
+			dummy.w_wndp = wp->w_wndp;
 			s = delwp(wp);
+			wp = &dummy;
 		}
 	}
 	return s;
 }
 
 /*
- * If the list-buffers window is visible, update it after operations that
- * would modify the list.
+ * Mark a buffer's created member to 0 (unused), adjusting the other buffers
+ * so that there are no gaps.
  */
-void
-updatelistbuffers()
+static
+void	MarkDeleted(bp)
+	register BUFFER *bp;
 {
-	static	int	updating_list;
+	int	created = bp->b_created;
 
-	if (!updating_list++) {
-		BUFFER *savebp = curbp, *bp;
-		WINDOW *savewp = curwp;
-
-		if ((bp = find_listbuffers()) != 0) {
-			liststuff(BUFFER_LIST_NAME, makebufflist, show_all, NULL);
-			if ((savebp != bp) && (find_bp(savebp) != 0)) {
-				make_current(savebp);	/* sets curbp */
-				curwp = bp2wp(savebp);
-			}
-			else {
-				curwp = savewp;
-				curbp = savebp;
-			}
+	if (created) {
+		bp->b_created = 0;
+		for_each_buffer(bp) {
+			if (bp->b_created > created)
+				bp->b_created -= 1;
 		}
 	}
-	updating_list--;
 }
 
-/* c is either first character of a filename, or an index into buffer list */
-char *
-hist_lookup(c)
-int c;
+/*
+ * Mark a buffer's last-used member to 0 (unused), adjusting the other buffers
+ * so that there are no gaps.
+ */
+static
+void	MarkUnused(bp)
+	register BUFFER *bp;
+{
+	int	used = bp->b_last_used;
+
+	if (used) {
+		bp->b_last_used = 0;
+		for_each_buffer(bp) {
+			if (bp->b_last_used > used)
+				bp->b_last_used -= 1;
+		}
+	}
+}
+
+/*
+ * Adjust buffer-list's last-used member to account for a new buffer.
+ */
+static
+void	TrackAlternate(newbp)
+	BUFFER *newbp;
 {
 	register BUFFER *bp;
-	static char buf[NBUFN];
-	buf[0] = '\0';
 
-	if (curbp != bheadp)
-		mlforce("BUG: hist_lookup: curbp != bheadp");
-	        
-	bp = curbp->b_bufp; /* always skip the current */
-	while (bp != NULL) {
-		if (!InvisibleOrScratch(bp) && (--c == 0))
-			break;
-		bp = bp->b_bufp;
+	if (!updating_list) {
+		MarkUnused(newbp);
+		if (bp = find_latest()) {
+			if (bp != newbp)
+				newbp->b_last_used = (bp->b_last_used + 1);
+		} else
+			newbp->b_last_used = 1;
 	}
-	if (bp)
-		return bp->b_bname;
-	return NULL;
 }
 
-int
-hist_show()
+/* c is an index (counting only visible/nonscratch) into buffer list */
+static
+char *	hist_lookup(c)
+	int c;
 {
-	int i;
-	char line[NLINE];
-	BUFFER *bp;
-        
-	if (curbp != bheadp)
-		mlforce("BUG: hist_show: curbp != bheadp");
-        
-	strcpy(line,"");
-	for (i = 0, bp = curbp->b_bufp; i < 10 && bp != NULL; bp = bp->b_bufp) {
+	register BUFFER *bp = find_b_hist(c);
+
+	return (bp != 0) ? bp->b_bname : NULL;
+}
+
+/* returns the buffer corresponding to the given number in the history */
+static
+int	lookup_hist(bp1)
+	BUFFER *bp1;
+{
+	register BUFFER *bp;
+	register int	count = -1;
+
+	for_each_buffer(bp)
 		if (!InvisibleOrScratch(bp)) {
-			strcat(line, "  %d");
-			if (Changed(bp))
-				strcat(line, "* ");
-			else
-				strcat(line, " ");
-			strcat(line, bp->b_bname);
-			i++;
+			count++;
+			if (bp == bp1)
+				return count;
+		}
+	return -1;	/* no match */
+}
+
+static
+int	hist_show()
+{
+	register BUFFER *bp;
+	register int i = 0;
+	char line[NLINE];
+
+	(void)strcpy(line,"");
+	for_each_buffer(bp) {
+		if (!InvisibleOrScratch(bp)) {
+			if (bp != curbp) {	/* don't bother with current */
+				(void)sprintf(line+strlen(line), "  %d", i);
+				(void)strcat(line, Changed(bp) ? "* " : " ");
+				(void)strcat(line, bp->b_bname);
+			}
+			if (++i > 9)	/* limit to single-digit */
+				break;
 		}
 	}
 	if (strcmp(line,"")) {
-		mlforce(line,1,2,3,4,5,6,7,8,9,10);
+		mlforce(line);
 		return TRUE;
 	} else {
 		return FALSE;
@@ -317,29 +523,25 @@ int f,n;
 	register BUFFER *bp;
 	char *bufn;
 
-	if (curbp->b_bufp == NULL) {
-		TTbeep();
-		mlforce("[No other buffers.]");
-		return(FALSE);
-	}
-
 	if (f == FALSE) {
-		hist_show();
+		if (!hist_show())
+			return FALSE;
 		thiscmd = lastcmd;
 		c = kbd_seq();
 		mlerase();
 		if (c == thiscmd) {
-			c = 1;
+			c = lookup_hist(find_alt());
 		} else if (isdigit(c)) {
 			c = c - '0';
 		} else {
-			tungetc(c);
+			if (!isreturn(c))
+				tungetc(c);
 			return FALSE;
 		}
 	} else {
 		c = n;
 	}
-        
+
 	bufn = hist_lookup(c);
 	if (bufn == NULL) {
 		TTbeep();
@@ -354,13 +556,109 @@ int f,n;
 	}
 }
 
+/*
+ * Returns the alternate-buffer pointer, if any
+ */
+BUFFER *find_alt()
+{
+	register BUFFER *bp;
+
+	if (global_b_val(MDABUFF)) {
+		BUFFER *any_bp = 0;
+		for (bp = curbp; bp; bp = bp->b_bufp) {
+			if (bp != curbp) {
+				if (Scratch(bp)) {
+					if (!any_bp)
+						any_bp = bp;
+				} else
+					return bp;
+			}
+		}
+		return any_bp;
+	} else {
+		register BUFFER *last = 0,
+				*next = find_latest();
+
+		for_each_buffer(bp) {
+			if ((bp != next)
+			 && (bp->b_active)) {
+				if (last) {
+					if (last->b_last_used < bp->b_last_used)
+						last = bp;
+				} else
+					last = bp;
+			}
+		}
+		return last;
+	}
+}
+
+/* make '#' buffer in noautobuffer-mode, given filename */
+void
+imply_alt(fname)
+char *fname;
+{
+	register BUFFER *bp;
+	register LINE	*lp;
+	BUFFER *savebp;
+        char bname[NBUFN*10];
+        char nfname[NFILEN];
+
+	fname = lengthen_path(strcpy(nfname, fname));
+	if (!global_b_val(MDABUFF)
+	 && strcmp(fname, curbp->b_fname)
+	 && !isInternalName(fname)) {
+		savebp = curbp;
+		if (!(bp = find_b_file(fname))) {
+			makename(bname, fname);
+			/* patch: worry about unique bname! */
+
+	        	if (!(bp=bfind(bname, OK_CREAT, 0))) {
+	                	mlforce("[Cannot create buffer]");
+	                	return;
+			}
+
+			/* fill the buffer */
+        		bp->b_flag &= ~(BFINVS|BFCHG);
+			bp->b_flag |= BFIMPLY;
+			bp->b_active = TRUE;
+
+			lp = lforw(savebp->b_line.l);
+			while (lp != savebp->b_line.l) {
+				if (addline(bp,lp->l_text,lp->l_used) != TRUE) {
+					mlforce("[Copy-buffer failed]");
+					return;
+				}
+				lp = lforw(lp);
+			}
+
+			/* set last-used */
+			make_current(bp);
+			make_current(savebp);
+
+			/* finally, set the filename & update buffer-list */
+			ch_fname(bp, fname);
+		} else {	/* buffer already exists */
+			make_current(bp);
+			make_current(savebp);
+		}
+	}
+}
+
 /* switch back to the most recent buffer */
 /* ARGSUSED */
 int
 altbuff(f,n)
 int f,n;
 {
-	return histbuff(TRUE,1);
+	register BUFFER *bp = find_alt();
+	if (bp == 0) {
+		TTbeep();
+		mlforce("[No alternate filename to substitute for #]");
+		return FALSE;
+	} else {
+		return swbuffer(bp);
+	}
 }
 
 /*
@@ -379,11 +677,23 @@ int f,n;
 	char		bufn[NBUFN];
 
 	bufn[0] = 0;
-	if ((s=mlreply("Use buffer: ", bufn, NBUFN)) != TRUE)
+	if ((s=mlreply("Use buffer: ", bufn, sizeof(bufn))) != TRUE)
 		return s;
-	if ((bp=bfind(bufn, OK_CREAT, 0)) == NULL)
+	if (!(bp=find_any_buffer(bufn)))	/* Try buffer */
 		return FALSE;
 	return swbuffer(bp);
+}
+
+/* switch back to the first buffer (i.e., ":rewind") */
+/* ARGSUSED */
+int
+firstbuffer(f,n)
+int f, n;
+{
+	int s = histbuff(TRUE,0);
+	if (!global_b_val(MDABUFF))
+		last_bp = s ? curbp : 0;
+	return s;
 }
 
 /* ARGSUSED */
@@ -393,41 +703,60 @@ int f, n;	/* default flag, numeric argument */
 {
 	register BUFFER *bp;	/* eligible buffer to switch to*/
 	register BUFFER *stopatbp;	/* eligible buffer to switch to*/
-        
-	stopatbp = NULL;
-	while (stopatbp != bheadp) {
-		/* get the last buffer in the list */
-		bp = bheadp;
-		while(bp->b_bufp != stopatbp)
-			bp = bp->b_bufp;
-		/* if that one's invisible, back up and try again */
-		if (Invisible(bp))
-			stopatbp = bp;
-		else
-			return swbuffer(bp);
+
+	if (global_b_val(MDABUFF)) {	/* go backward thru buffer-list */
+		stopatbp = NULL;
+		while (stopatbp != bheadp) {
+			/* get the last buffer in the list */
+			bp = bheadp;
+			while(bp->b_bufp != stopatbp)
+				bp = bp->b_bufp;
+			/* if that one's invisible, back up and try again */
+			if (Invisible(bp))
+				stopatbp = bp;
+			else
+				return swbuffer(bp);
+		}
+	} else {			/* go forward thru args-list */
+		stopatbp = curbp;
+		if (last_bp == 0)
+			last_bp = find_b_hist(0);
+		if (last_bp != 0) {
+			for (bp = last_bp->b_bufp; bp; bp = bp->b_bufp) {
+				if (CmdLine(bp))
+					return swbuffer(last_bp = bp);
+			}
+		}
+		mlforce("[No more files to edit]");
 	}
 	/* we're back to the top -- they were all invisible */
 	return swbuffer(stopatbp);
 }
 
-/* bring nbp to the top of the list, where curbp _always_ lives */
+/* bring nbp to the top of the list, where curbp usually lives */
 void
 make_current(nbp)
 BUFFER *nbp;
 {
 	register BUFFER *bp;
 
-	if (nbp != bheadp) { /* remove nbp from the list */
-		bp = bheadp; while(bp->b_bufp != nbp)
-			bp = bp->b_bufp;
-		bp->b_bufp = nbp->b_bufp;
+	TrackAlternate(nbp);
 
-		/* put it at the head */
-		nbp->b_bufp = bheadp;
+	if (!updating_list && global_b_val(MDABUFF)) {
+		if (nbp != bheadp) {	/* remove nbp from the list */
+			bp = bheadp; while(bp->b_bufp != nbp)
+				bp = bp->b_bufp;
+			bp->b_bufp = nbp->b_bufp;
 
-		bheadp = nbp;
-	}
-	curbp = bheadp; 
+			/* put it at the head */
+			nbp->b_bufp = bheadp;
+
+			bheadp = nbp;
+		}
+		curbp = bheadp;
+	} else
+		curbp = nbp;
+
 	curtabval = tabstop_val(curbp);
 	curswval = shiftwid_val(curbp);
 }
@@ -461,10 +790,11 @@ register BUFFER *bp;
 			mlforce("BUG: swbuffer: wp still NULL");
 		curwp = wp;
 		upmode();
-		updatelistbuffers();
+		if (bp != find_BufferList())
+			updatelistbuffers();
 		return TRUE;
 	}
-        
+
 	/* oh well, suck it into this window */
 	curwp->w_bufp  = bp;
 	curwp->w_flag |= WFMODE|WFHARD; /* Quite nasty. 	*/
@@ -493,8 +823,8 @@ register WINDOW *wp;
 {
 	/* get rid of it completely if it's a scratch buffer,
 		or it's empty and unmodified */
-	if ( Scratch(bp)
-	 || ( !Changed(bp) && is_empty_buf(bp)) ) {
+	if (Scratch(bp)
+	 || ( global_b_val(MDABUFF) && !Changed(bp) && is_empty_buf(bp)) ) {
 		(void)zotbuf(bp);
 	} else {  /* otherwise just adjust it off the screen */
 		bp->b_wtraits  = wp->w_traits;
@@ -557,25 +887,31 @@ int f,n;
 {
 	register BUFFER *bp;
 	register int	s;
-	char bufn[NBUFN];
+	char bufn[NFILEN];
 
 	bufn[0] = 0;
-	if ((s=mlreply("Kill buffer: ", bufn, NBUFN)) != TRUE)
-		return(s);
-	if ((bp=bfind(bufn, NO_CREAT, 0)) == NULL) { /* Easy if unknown.     */
-		mlforce("[No such buffer]");
+	if (clexec || isnamedcmd) {
+	        if ((s=mlreply("Kill buffer: ", bufn, sizeof(bufn))) != TRUE)
+	                return s;
+        } else if (!screen_to_bname(bufn)) {
+		mlforce("[Nothing selected]");
 		return FALSE;
-	}
+        }
+
+	if (!(bp=find_any_buffer(bufn)))	/* Try buffer */
+		return FALSE;
+
 #ifdef BEFORE /* now allow killing the specials, like "tags" */
 	if (Invisible(bp)) 		/* Deal with special buffers	*/
 		return (TRUE);		/* by doing nothing.	*/
 #endif
 	if (curbp == bp) {
-		if (histbuff(TRUE,1) != TRUE) {
+		if (find_alt() == 0) {
 			mlforce("[Can't kill that buffer]");
 			return FALSE;
 		}
 	}
+
 	if (bp->b_nwnd > 0)  { /* then it's on the screen somewhere */
 		(void)zotwp(bp);
 		if (find_bp(bp) == 0) /* delwp must have zotted us */
@@ -605,7 +941,7 @@ register BUFFER *bp;
 #else
 	if (curbp == bp) {
 		didswitch = TRUE;
-		if (histbuff(TRUE,1) != TRUE) {
+		if (find_alt() == 0) {
 			mlforce("[Can't kill that buffer]");
 			return FALSE;
 		}
@@ -621,10 +957,10 @@ register BUFFER *bp;
 	if ((s=bclear(bp)) != TRUE) {
 		/* the user must have answered no */
 		if (didswitch)
-			swbuffer(bp);
+			(void)swbuffer(bp);
 		return (s);
 	}
-	        
+
 	lfree(bp->b_line.l,bp);	 /* Release header line. */
 	bp1 = NULL;				/* Find the header.	*/
 	bp2 = bheadp;
@@ -637,6 +973,10 @@ register BUFFER *bp;
 		bheadp = bp2;
 	else
 		bp1->b_bufp = bp2;
+	MarkUnused(bp);
+	MarkDeleted(bp);
+	if (bp == last_bp)
+		last_bp = 0;
 	free((char *) bp);			/* Release buffer block */
 	updatelistbuffers();
 	return (TRUE);
@@ -652,23 +992,16 @@ int f, n;		/* default Flag & Numeric arg */
 	char *prompt = "New name for buffer: ";
 
 	/* prompt for and get the new buffer name */
-ask:	if (mlreply(prompt, bufn, NBUFN) != TRUE)
-		return(FALSE);
+	do {
+		if (mlreply(prompt, bufn, sizeof(bufn)) != TRUE)
+			return(FALSE);
+		prompt = "That name's been used.  New name: ";
+		bp = find_b_name(bufn);
+		if (bp == curbp)	/* no change */
+			return(FALSE);
+	} while (bp != 0);
 
-	/* and check for duplicates */
-	bp = bheadp;
-	while (bp != NULL) {
-		if (bp != curbp) {
-			/* if the names the same */
-			if (strcmp(bufn, bp->b_bname) == 0) {
-				prompt = "That name's been used.  New name: ";
-				goto ask;  /* try again */
-			}
-		}
-		bp = bp->b_bufp;	/* onward */
-	}
-
-	strcpy(curbp->b_bname, bufn);	/* copy buffer name to structure */
+	(void)strcpy(curbp->b_bname, bufn); /* copy buffer name to structure */
 	curwp->w_flag |= WFMODE;	/* make mode line replot */
 	mlerase();
 	updatelistbuffers();
@@ -696,8 +1029,8 @@ BUFFER *bp;
 		wp->w_bufp  = bp;
 		++bp->b_nwnd;
 	}
-	wp = wheadp;
-	while (wp != NULL) {
+
+	for_each_window(wp) {
 		if (wp->w_bufp == bp) {
 			wp->w_line.l = lforw(bp->b_line.l);
 			wp->w_dot.l  = lforw(bp->b_line.l);
@@ -710,10 +1043,40 @@ BUFFER *bp;
 			wp->w_flag |= WFMODE|WFHARD;
 			        
 		}
-		wp = wp->w_wndp;
 	}
-	swbuffer(bp);
+	(void)swbuffer(bp);
 	return TRUE;
+}
+
+/*
+ * Invoked after changing mode 'autobuffer', this relinks the list of buffers
+ * sorted according to the mode: by creation or last-used order.
+ */
+void
+sortlistbuffers()
+{
+	register BUFFER *bp, *newhead = 0;
+	register int	c;
+
+	if (global_b_val(MDABUFF)) {
+		c = 1;
+		while (bp = find_nth_used(c++)) {
+			bp->b_relink = newhead;
+			newhead = bp;
+		}
+	} else {
+		c = countBuffers();
+		while (bp = find_nth_created(c--)) {
+			bp->b_relink = newhead;
+			newhead = bp;
+		}
+	}
+
+	for (bp = newhead; bp; bp = bp->b_relink)
+		bp->b_bufp = bp->b_relink;
+	bheadp = newhead;
+
+	updatelistbuffers();
 }
 
 /*
@@ -733,7 +1096,7 @@ int f,n;
 	register BUFFER *bp;
 
 	/* if it doesn't exist, create it */
-	if ((bp = find_listbuffers()) == NULL)
+	if ((bp = find_BufferList()) == NULL)
 		return listbuffers(f,n);
 
 	/* if it does exist, delete the window, which in turn 
@@ -741,13 +1104,50 @@ int f,n;
 	return zotwp(bp);
 }
 
-/* ARGSUSED */
-int
-listbuffers(f, n)
-int f,n;
+/*
+ * Track/emit footnotes for 'makebufflist()', showing only the ones we use.
+ */
+#if !SMALLER
+static
+void	footnote(c)
+	int	c;
 {
-	return liststuff(BUFFER_LIST_NAME, makebufflist, f, NULL);
+	static	struct	{
+		char	*name;
+		int	flag;
+	} table[] = {
+		"automatic",	0,
+		"invisible",	0,
+		"modified",	0,
+		"scratch",	0,
+		"unread",	0,
+		};
+	register int	j, next;
+
+	for (j = next = 0; j < SIZEOF(table); j++) {
+		if (c != 0) {
+			if (table[j].name[0] == c) {
+				bputc(c);
+				table[j].flag = TRUE;
+				break;
+			}
+		} else if (table[j].flag) {
+			bprintf("%s '%c'%s %s",
+				next ? "," : "notes:",	table[j].name[0],
+				next ? ""  : " is",	table[j].name);
+			next++;
+			table[j].flag = 0;
+		}
+	}
+	if (next)
+		bputc('\n');
 }
+#define	MakeNote(c)	footnote(c)
+#define	ShowNotes()	footnote(0)
+#else
+#define	MakeNote(c)	bputc(c)
+#define	ShowNotes()
+#endif
 
 /*
  * This routine rebuilds the
@@ -759,53 +1159,55 @@ int f,n;
  * indicates whether to list hidden buffers.
  */
 /* ARGSUSED */
-void
-makebufflist(iflag,dummy)
-int iflag;	/* list hidden buffer flag */
-char *dummy;
+static
+void	makebufflist(iflag,dummy)
+	int iflag;	/* list hidden buffer flag */
+	char *dummy;
 {
 	register BUFFER *bp;
-	int nbuf = 1;	/* no. of buffers */
+	int nbuf = 0;		/* no. of buffers */
 	long nbytes;		/* # of bytes in current buffer */
-	int footnote = FALSE;
+	int this_or_that;
 
-	show_all = iflag;	/* save this to use in 'updatebufflist()' */
+	show_all = iflag;	/* save this to use in 'updatelistbuffers()' */
 
-	bclear(curbp);
-	bprintf("     %7s %*s %s\n", "Size",NBUFN,"Buffer name","Contents");
-	bprintf("     %7p %*p %30p\n", '-',NBUFN,'-','-');
-
-	bp = bheadp;				/* For all buffers	*/
+	bprintf("      %7s %*s %s\n", "Size",NBUFN,"Buffer name","Contents");
+	bprintf("      %7p %*p %30p\n", '-',NBUFN,'-','-');
 
 	/* output the list of buffers */
-	while (bp != NULL) {
+	for_each_buffer(bp) {
 		/* skip invisible buffers and ourself if iflag is false */
 		if ((InvisibleOrScratch(bp)) && !show_all) {
-			bp = bp->b_bufp;
 			continue;
 		}
 		/* output status of ACTIVE flag (has the file been read in? */
 		if (bp->b_active == TRUE) {   /* if activated	    */
 			if (Changed(bp)) {	/* if changed     */
-				bputc('m');
-				footnote = TRUE;
+				MakeNote('m');
+			} else if (ImpliedBfr(bp)) {
+				MakeNote('a');
 			} else {
 				bputc(' ');
 			}
 		} else {
 			if (Invisible(bp))
-				bputc('i');
+				MakeNote('i');
 			else if (Scratch(bp))
-				bputc('s');
+				MakeNote('s');
 			else
-				bputc('u');
-			footnote = TRUE;
+				MakeNote('u');
 		}
 
+		this_or_that = (bp == this_bp)
+			? '%'
+			: (bp == that_bp)
+				? '#'
+				: ' ';
+
 		if (InvisibleOrScratch(bp))
-			bprintf("    ");
+			bprintf("   %c ", this_or_that);
 		else
-			bprintf(" %2d ",nbuf++);
+			bprintf(" %2d%c ", nbuf++, this_or_that);
 
 		{	/* Count bytes in buf.	*/
 			register LINE	*lp;
@@ -827,39 +1229,91 @@ char *dummy;
 					p += 2;
 				}
 #endif
-				if (p[0] != slash && p[0] != '.' && 
-						p[0] != '!' && !isspace(p[0]))
+				if (!is_pathname(p)
+				 && !isShellOrPipe(p)
+				 && !isspace(p[0]))
 					bprintf(".%c",slash);
 				bprintf("%s",p);
 			}
 		}
 		bprintf("\n");
-		bp = bp->b_bufp;
 	}
-
-	if (footnote == TRUE)
-		bprintf("notes: 'm' is modified, 'u' unread, 's' scratch, 'i' invisible\n");
-
-	bprintf("             %*s %s\n", NBUFN, "Current dir:",
+	ShowNotes();
+	bprintf("             %*s %s", NBUFN, "Current dir:",
 		current_directory(FALSE));
 }
 
-#ifdef NEEDED
-ltoa(buf, width, num)
-char   buf[];
-int    width;
-long   num;
+/* ARGSUSED */
+int
+listbuffers(f, n)
+int f,n;
 {
-	buf[width] = 0; 			/* End of string.	*/
-	while (num >= 10) {			/* Conditional digits.	*/
-		buf[--width] = (int)(num%10L) + '0';
-		num /= 10L;
-	}
-	buf[--width] = (int)num + '0';		/* Always 1 digit.	*/
-	while (width != 0)			/* Pad with blanks.	*/
-		buf[--width] = ' ';
+	this_bp = curbp;
+	that_bp = find_alt();
+	return liststuff(BUFFER_LIST_NAME, makebufflist, f, NULL);
 }
-#endif
+
+/*
+ * If the list-buffers window is visible, update it after operations that
+ * would modify the list.
+ */
+void
+updatelistbuffers()
+{
+	if (!updating_list) {
+		register BUFFER *bp;
+		register WINDOW *wp;
+		updating_list = TRUE;
+
+		if (bp = find_BufferList()) {
+			struct	{
+				WINDOW	*wp;
+				int	top, line, col;
+			} tbl[20/*patch*/];
+			int	num = 0;
+			BUFFER *savebp = curbp;
+			WINDOW *savewp = curwp;
+
+			/* remember where we are, to reposition */
+			/* ...in case line is deleted from buffer-list */
+			if (curbp != bp) {
+				curbp = bp;
+				curwp = bp2wp(bp);
+			}
+			for_each_window(wp) {
+				if (wp->w_bufp == bp) {
+					tbl[num].wp   = wp;
+					tbl[num].top  = line_no(bp, wp->w_line.l);
+					tbl[num].line = line_no(bp, wp->w_dot.l);
+					tbl[num].col  = wp->w_dot.o;
+					if (++num >= SIZEOF(tbl))
+						break;
+				}
+			}
+			curwp = savewp;
+			curbp = savebp;
+
+			this_bp = curbp;
+			that_bp = find_alt();
+			(void)liststuff(BUFFER_LIST_NAME, makebufflist, show_all, NULL);
+
+			/* reposition and restore */
+			while (num-- > 0) {
+				curwp = wp = tbl[num].wp;
+				(void) gotoline(TRUE, tbl[num].top);
+				wp->w_line.l = wp->w_dot.l;
+				wp->w_line.o = 0;
+				if (tbl[num].line != tbl[num].top)
+					(void) gotoline(TRUE, tbl[num].line);
+				(void) gocol (tbl[num].col);
+        			wp->w_flag |= WFMOVE;
+			}
+			curwp = savewp;
+			curbp = savebp;
+		}
+		updating_list = FALSE;
+	}
+}
 
 /*
  * The argument "text" points to
@@ -908,11 +1362,9 @@ anycb()
 	register BUFFER *bp;
 	register int cnt = 0;
 
-	bp = bheadp;
-	while (bp != NULL) {
+	for_each_buffer(bp) {
 		if (!Invisible(bp) && Changed(bp))
 			cnt++;
-		bp = bp->b_bufp;
 	}
 	return (cnt);
 }
@@ -933,12 +1385,10 @@ char   *bname;
 	register LINE	*lp;
 	register BUFFER *lastb = NULL;	/* buffer to insert after */
 
-	bp = bheadp;
-	while (bp != NULL) {
+	for_each_buffer(bp) {
 		if (strncmp(bname, bp->b_bname, NBUFN) == 0)
 			return (bp);
 		lastb = bp;
-		bp = bp->b_bufp;
 	}
 	if (cflag == NO_CREAT)	/* don't create it */
 		return NULL;
@@ -978,13 +1428,14 @@ char   *bname;
 	bp->b_acount = b_val(bp, VAL_ASAVECNT);
 	bp->b_fname = NULL;
 	ch_fname(bp, "");
-	strcpy(bp->b_bname, bname);
+	(void)strcpy(bp->b_bname, bname);
 #if	CRYPT
 	bp->b_key[0] = 0;
 #endif
 	bp->b_udstks[0] = bp->b_udstks[1] = NULL;
 	bp->b_udstkindx = 0;
 	bp->b_ulinep = NULL;
+	bp->b_last_used = 0;
 	lp->l_fp = lp;
 	lp->l_bp = lp;
         
@@ -994,6 +1445,7 @@ char   *bname;
 	else
 		bheadp = bp;
 	bp->b_bufp = NULL;
+	bp->b_created = countBuffers();
 
 	return (bp);
 }
@@ -1017,8 +1469,7 @@ register BUFFER *bp;
 	if (!InvisibleOrScratch(bp) /* Not invisible or scratch */
 	 &&  Changed(bp)) {	    /* Something changed    */
 		char ques[50];
-		strcpy(ques,"Discard changes to ");
-		strcat(ques,bp->b_bname);
+		(void)strcat(strcpy(ques,"Discard changes to "), bp->b_bname);
 		if (mlyesno(ques) != TRUE)
 			return FALSE;
 	}
@@ -1051,12 +1502,95 @@ register BUFFER *bp;
 	return (TRUE);
 }
 
+/*
+ * Mark a buffer 'changed'
+ */
+void
+chg_buff(bp, flag)
+register BUFFER *bp;
+register int	flag;
+{
+	register WINDOW *wp;
+
+	if (bp->b_nwnd != 1)		/* Ensure hard. 	*/
+		flag |= WFHARD;
+	if (!Changed(bp)) {		/* First change, so	*/
+		flag |= WFMODE; 	/* update mode lines.	*/
+		bp->b_flag |= BFCHG;
+
+		if (update_on_chg(bp))
+			updatelistbuffers();
+	}
+	for_each_window(wp)
+		if (wp->w_bufp == bp)
+			wp->w_flag |= flag;
+}
+
+/*
+ * Mark a buffer 'unchanged'
+ */
+void
+unchg_buff(bp, flag)
+register BUFFER *bp;
+register int	flag;
+{
+	register WINDOW *wp;
+
+	if (Changed(bp)) {
+		if (bp->b_nwnd != 1)		/* Ensure hard. 	*/
+			flag |= WFHARD;
+		flag |= WFMODE; 		/* update mode lines.	*/
+		bp->b_flag &= ~BFCHG;
+
+		for_each_window(wp) {
+			if (wp->w_bufp == bp)
+				wp->w_flag |= flag;
+		}
+		if (update_on_chg(bp))
+			updatelistbuffers();
+	}
+}
+
 /* ARGSUSED */
 int
 unmark(f, n)	/* unmark the current buffers change flag */
 int f, n;	/* unused command arguments */
 {
-	curbp->b_flag &= ~BFCHG;
-	curwp->w_flag |= WFMODE;
-	return(TRUE);
+	unchg_buff(curbp, 0);
+	return (TRUE);
+}
+
+/* write all _changed_ buffers */
+int
+writeall(f,n)
+int f,n;
+{
+	register BUFFER *bp;	/* scanning pointer to buffers */
+	register BUFFER *oldbp; /* original current buffer */
+	register int status = TRUE;
+	int count = 0;
+
+	oldbp = curbp;				/* save in case we fail */
+
+	for_each_buffer(bp) {
+		if (Changed(bp) && !Invisible(bp)) {
+			make_current(bp);
+			mlforce("[Saving %s]",bp->b_fname);
+			mlforce("\n");
+			if ((status = filesave(f, n)) != TRUE)
+				break;
+			count++;
+			mlforce("\n");
+		}
+	}
+	make_current(oldbp);
+	mlforce("\n");
+	if (status != TRUE) {
+		pressreturn();
+		sgarbf = TRUE;
+	} else {
+		sgarbf = TRUE;
+		mlwrite("[Wrote %d buffer%c]",count,(count==1)?' ':'s');
+	}
+	return status;
 }

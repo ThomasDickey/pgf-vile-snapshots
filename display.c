@@ -6,7 +6,17 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.56  1992/12/23 09:17:17  foxharp
+ * Revision 1.59  1993/01/23 13:38:23  foxharp
+ * tom's changes -- reverse video works better, fix for list mode,
+ * dfoutfn now re-entrant, dfputli now does hex
+ *
+ * Revision 1.58  1993/01/16  10:26:13  foxharp
+ * for_each_window and other new macros, and fixes for column 80 indicator
+ *
+ * Revision 1.57  1993/01/12  08:48:43  foxharp
+ * tom dickey's changes to support "set number", i.e. line numbering
+ *
+ * Revision 1.56  1992/12/23  09:17:17  foxharp
  * ifdef of unused code
  *
  * Revision 1.55  1992/12/14  08:32:20  foxharp
@@ -219,6 +229,12 @@
 # endif
 #endif
 
+#define	NU_WIDTH 8
+
+#define	MRK_EMPTY        '~'
+#define	MRK_EXTEND_LEFT  '<'
+#define	MRK_EXTEND_RIGHT '>'
+
 #ifndef __STDC__
 
 #ifndef va_dcl	 /* then try these out */
@@ -252,6 +268,255 @@ int displaying = FALSE;
 /* for window size changes */
 int chg_width, chg_height;
 
+/******************************************************************************/
+
+static	void	(*dfoutfn) P(( int ));
+
+/*
+ * Do format a string.
+ */
+static
+int	dfputs(outfunc, s)
+	void (*outfunc)();
+	char *s;
+{
+	register int c;
+	register int l = 0;
+
+	while ((c = *s++) != 0) {
+	        (*outfunc)(c);
+		l++;
+	}
+	return l;
+}
+
+/* as above, but takes a count for s's length */
+static
+int	dfputsn(outfunc,s,n)
+	void (*outfunc)();
+	char *s;
+	int n;
+{
+	register int c;
+	register int l = 0;
+	while ((c = *s++) != 0 && n-- != 0) {
+	        (*outfunc)(c);
+		l++;
+	}
+	return l;
+}
+
+/*
+ * Do format an integer, in the specified radix.
+ */
+static
+int	dfputi(outfunc,i, r)
+	void (*outfunc)();
+	int i,r;
+{
+	register int q;
+	static char hexdigits[] = "0123456789ABCDEF";
+
+	if (i < 0) {
+		(*outfunc)('-');
+		return dfputi(outfunc, -i, r) + 1;
+	}
+
+	q = (i >= r) ? dfputi(outfunc, i/r, r) : 0;
+
+	(*outfunc)(hexdigits[i%r]);
+	return q + 1; /* number of digits printed */
+}
+
+/*
+ * do the same except as a long integer.
+ */
+static
+int	dfputli(outfunc,l, r)
+	void (*outfunc)();
+	long l;
+	int r;
+{
+	register long q;
+
+	if (l < 0) {
+		(*outfunc)('-');
+		return dfputli(outfunc, -l, r) + 1;
+	}
+
+	q = (l >= r) ? dfputli(outfunc, l/r, r) : 0;
+
+	return q + dfputi(outfunc, (int)(l%r), r);
+}
+
+/*
+ *	Do format a scaled integer with two decimal places
+ */
+static
+int	dfputf(outfunc,s)
+	void (*outfunc)();
+	int s;	/* scaled integer to output */
+{
+	register int i;	/* integer portion of number */
+	register int f;	/* fractional portion of number */
+
+	/* break it up */
+	i = s / 100;
+	f = s % 100;
+
+	/* send out the integer portion */
+	i = dfputi(outfunc, i, 10);
+	(*outfunc)('.');
+	(*outfunc)((f / 10) + '0');
+	(*outfunc)((f % 10) + '0');
+	return i + 3;
+}
+
+/*
+ * Generic string formatter.  Takes printf-like args, and calls
+ * the global function (*dfoutfn)(c) for each c
+ */
+static
+void
+#ifdef __STDC__
+dofmt( char *fmt, va_list *app)
+#else
+dofmt(app)
+va_list *app;
+#endif
+{
+#ifndef __STDC__
+	register char *fmt = va_arg(*app, char *);
+#endif
+	register int c;		/* current char in format string */
+	register int wid;
+	register int n;
+	register int nchars = 0;
+	int islong;
+	void (*outfunc)() = dfoutfn;  /* local copy, for recursion */
+
+	while ((c = *fmt++) != 0 ) {
+		if (c != '%') {
+			(*outfunc)(c);
+			nchars++;
+			continue;
+		}
+		c = *fmt++;
+		wid = 0;
+		islong = FALSE;
+		if (c == '*') {
+			wid = va_arg(*app,int);
+			c = *fmt++;
+		} else while (isdigit(c)) {
+			wid = (wid * 10) + c - '0';
+			c = *fmt++;
+		}
+		if (c == 'l') {
+			islong = TRUE;
+			c = *fmt++;
+		}
+		switch (c) {
+			case '\0':
+				n = 0;
+				break;
+			case 'c':
+				(*outfunc)(va_arg(*app,int));
+				n = 1;
+				break;
+
+			case 'd':
+				if (!islong) {
+					n = dfputi(outfunc, va_arg(*app,int), 10);
+					break;
+				}
+				/* fall through */
+			case 'D':
+				n = dfputli(outfunc, va_arg(*app,long), 10);
+				break;
+
+			case 'o':
+				n = dfputi(outfunc, va_arg(*app,int), 8);
+				break;
+
+			case 'x':
+				if (!islong) {
+					n = dfputi(outfunc, va_arg(*app,int), 16);
+					break;
+				}
+				/* fall through */
+			case 'X':
+				n = dfputli(outfunc, va_arg(*app,long), 16);
+				break;
+
+			case 's':
+				n = dfputs(outfunc, va_arg(*app,char *));
+				break;
+
+			case 'S': /* use wid as max width */
+				n = dfputsn(outfunc, va_arg(*app,char *),wid);
+				break;
+
+			case 'f':
+				n = dfputf(outfunc, va_arg(*app,int));
+				break;
+
+			case 'P': /* output padding -- pads total output to
+					"wid" chars, using c as the pad char */
+				wid -= nchars;
+				/* fall through */
+
+			case 'p': /* field padding -- puts out "wid"
+					copies of c */
+				n = 0;
+				c = va_arg(*app,int);
+				while (n < wid) {
+					(*outfunc)(c);
+					n++;
+				}
+				break;
+
+
+			default:
+				(*outfunc)(c);
+				n = 1;
+		}
+		wid -= n;
+		nchars += n;
+		while (wid-- > 0) {
+			(*outfunc)(' ');
+			nchars++;
+		}
+	}
+
+}
+
+/******************************************************************************/
+
+/*
+ * Line-number mode
+ */
+int
+nu_mode(wp)
+WINDOW *wp;
+{
+	register BUFFER *bp = wp->w_bufp;
+	return	!(bp->b_flag & (BFINVS|BFSCRTCH)) && w_val(wp,WMDNUMBER);
+}
+
+int
+nu_width(wp)
+WINDOW *wp;
+{
+	return nu_mode(wp) ? NU_WIDTH : 0;
+}
+
+int
+col_limit(wp)
+WINDOW *wp;
+{
+	return term.t_ncol - 1 - nu_width(wp);
+}
+
 /*
  * Initialize the data structures used by the display code. The edge vectors
  * used to access the screens are set up. The operating system's terminal I/O
@@ -271,14 +536,14 @@ vtinit()
     vscreen = typeallocn(VIDEO *,term.t_mrow);
 
     if (vscreen == NULL)
-        exit(1);
+        exit(BAD(1));
 
 
 #if	! MEMMAP
     pscreen = typeallocn(VIDEO *,term.t_mrow);
 
     if (pscreen == NULL)
-        exit(1);
+        exit(BAD(1));
 #endif
 
     for (i = 0; i < term.t_mrow; ++i) {
@@ -286,7 +551,7 @@ vtinit()
         vp = typeallocplus(VIDEO, term.t_mcol - 4);
 
         if (vp == NULL)
-            exit(1);
+            exit(BAD(1));
 
 
 	/* unnecessary */
@@ -302,7 +567,7 @@ vtinit()
         vp = typeallocplus(VIDEO, term.t_mcol - 4);
 
         if (vp == NULL)
-            exit(1);
+            exit(BAD(1));
 
 	/* unnecessary */
 	/* (void)memset(vp, 0, sizeof(struct VIDEO) + term.t_mcol - 4); */
@@ -366,7 +631,7 @@ int c;
 		return;
 	} else if (vtcol >= term.t_ncol) {
 		++vtcol;
-		vp->v_text[term.t_ncol - 1] = '>';
+		vp->v_text[term.t_ncol - 1] = MRK_EXTEND_RIGHT;
 	} else if (isprint(c)) {
 		++vtcol;
 	} else {
@@ -386,7 +651,7 @@ int c;
 
 	if (vtcol >= term.t_ncol) {
 		++vtcol;
-		vp->v_text[term.t_ncol - 1] = '>';
+		vp->v_text[term.t_ncol - 1] = MRK_EXTEND_RIGHT;
 	} else if (isprint(c)) {
 		if (vtcol >= 0)
 			vp->v_text[vtcol] = c;
@@ -420,21 +685,57 @@ vtset(lp,wp)
 LINE *lp;
 WINDOW *wp;
 {
-	register char *from;
-	register int n;
+	register char *from = lp->l_text;
+	register int n = llength(lp);
+	int	skip = -vtcol,
+		list = w_val(wp,WMDLIST);
 
-	from = lp->l_text;
-	n = llength(lp);
+	if (nu_mode(wp)) {
+		register int j, k, jk;
+		int	line = line_no(wp->w_bufp, lp);
+		int	fill = ' ';
+		char	temp[NU_WIDTH+2];
 
-	if (w_val(wp,WMDLIST)) {
-		while (vtcol <= term.t_ncol && n)
-			vtlistc(*from++), n--;
-		if (!n)
-			vtlistc('\n');
-	} else {
-		while (vtcol <= term.t_ncol && n)
-			vtputc(*from++), n--;
+		(void)sprintf(temp, "%*d  ", NU_WIDTH-2, line);
+		vtcol = 0;	/* make sure we always see line numbers */
+		vtputsn(temp, NU_WIDTH);
+		taboff = skip - vtcol;
+
+		/* account for leading fill; this repeats logic in vtputc so
+		 * I don't have to introduce a global variable... */
+		for (j = k = jk = 0; (j < n) && (k < skip); j++) {
+			register int	c = from[j];
+			if (list && !isprint(c)) {
+				k += 2;
+				fill = toalpha(c);
+			} else {
+				if (c == '\t')
+					k += (curtabval - (k % curtabval));
+				else if (isprint(c))
+					k++;
+				fill = ' ';
+			}
+			jk = j+1;
+		}
+		while (k-- > skip)
+			vtputc(fill);
+		skip = jk;
+
+		if (skip > 0) {
+			n    -= skip;
+			from += skip;
+		}
 	}
+
+	while ((vtcol <= term.t_ncol) && (n > 0)) {
+		if (list)
+			vtlistc(*from++);
+		else
+			vtputc(*from++);
+		n--;
+	}
+	if (list && (n >= 0))
+		vtlistc('\n');
 }
 
 /* VARARGS1 */
@@ -463,7 +764,7 @@ va_dcl
 #endif
 	va_end(ap);
 
-} 
+}
 
 /*
  * Erase from the end of the software cursor to the end of the line on which
@@ -520,26 +821,20 @@ int force;	/* force update past type ahead? */
 
 	/* first, propagate mode line changes to all instances of
 		a buffer displayed in more than one window */
-	wp = wheadp;
-	while (wp != NULL) {
+	for_each_window(wp) {
 		if (wp->w_flag & WFMODE) {
 			if (wp->w_bufp->b_nwnd > 1) {
 				/* make sure all previous windows have this */
 				register WINDOW *owp;
-				owp = wheadp;
-				while (owp != NULL) {
+				for_each_window(owp)
 					if (owp->w_bufp == wp->w_bufp)
 						owp->w_flag |= WFMODE;
-					owp = owp->w_wndp;
-				}
 			}
 		}
-		wp = wp->w_wndp;
 	}
 
 	/* update any windows that need refreshing */
-	wp = wheadp;
-	while (wp != NULL) {
+	for_each_window(wp) {
 		if (wp->w_flag) {
 			curtabval = tabstop_val(wp->w_bufp);
 			/* if the window has changed, service it */
@@ -557,8 +852,6 @@ int force;	/* force update past type ahead? */
 			wp->w_flag = 0;
 			wp->w_force = 0;
 		}
-		/* on to the next window */
-		wp = wp->w_wndp;
 	}
 	curtabval = tabstop_val(curbp);
 
@@ -581,8 +874,8 @@ int force;	/* force update past type ahead? */
 	updupd(force);
 
 	/* update the cursor and flush the buffers */
-	movecursor(currow, screencol);
-    
+	movecursor(currow, screencol + nu_width(curwp));
+
 	TTflush();
 	displaying = FALSE;
 	while (chg_width || chg_height)
@@ -741,12 +1034,13 @@ int sline;
 		vtmove(sline, -w_val(wp,WVAL_SIDEWAYS));
 		vtset(lp, wp);
 		if (w_val(wp,WVAL_SIDEWAYS)) {
-			vscreen[sline]->v_text[0] = '<';
-			if (vtcol < 1) vtcol = 1;
+			register int	zero = nu_width(wp);
+			vscreen[sline]->v_text[zero] = MRK_EXTEND_LEFT;
+			if (vtcol <= zero) vtcol = zero+1;
 		}
 	} else {
 		vtmove(sline, 0);
-		vtputc('~');
+		vtputc(MRK_EMPTY);
 	}
 	taboff = 0;
 #if	COLOR
@@ -764,6 +1058,7 @@ updpos()
 	register LINE *lp;
 	register int c;
 	register int i;
+	register int col, excess;
 
 	/* find the current row */
 	lp = curwp->w_line.l;
@@ -779,28 +1074,29 @@ updpos()
 	}
 
 	/* find the current column */
-	curcol = -w_val(curwp,WVAL_SIDEWAYS);
+	col = 0;
 	i = 0;
 	while (i < DOT.o) {
 		c = lgetc(lp, i++);
 		if (c == '\t' && !w_val(curwp,WMDLIST)) {
 			do {
-				curcol++;
-			} while (((curcol +
-				w_val(curwp,WVAL_SIDEWAYS))%curtabval) != 0);
+				col++;
+			} while ((col%curtabval) != 0);
 		} else {
 			if (!isprint(c))
-				++curcol;
-			++curcol;
+				++col;
+			++col;
 		}
 
 	}
+	/* ...adjust to offset from shift-margin */
+	curcol = col - w_val(curwp,WVAL_SIDEWAYS);
 
 	/* if extended, flag so and update the virtual line image */
-	if (curcol >=  term.t_ncol - 1) {
-		return updext_past();
-	} else if (w_val(curwp,WVAL_SIDEWAYS) && curcol < 1) {
-		return updext_before();
+	if ((excess = curcol - col_limit(curwp)) >= 0) {
+		return updext_past(col, excess);
+	} else if (w_val(curwp,WVAL_SIDEWAYS) && (curcol < 1)) {
+		return updext_before(col);
 	} else {
 		if (vscreen[currow]->v_flag & VFEXT) {
 			l_to_vline(curwp,lp,currow);
@@ -821,9 +1117,7 @@ upddex()
 	register LINE *lp;
 	register int i;
 
-	wp = wheadp;
-
-	while (wp != NULL) {
+	for_each_window(wp) {
 		lp = wp->w_line.l;
 		i = wp->w_toprow;
 
@@ -834,7 +1128,7 @@ upddex()
 				if ((wp != curwp)
 				 || (lp != wp->w_dot.l)
 				 || ((i != currow)
-				  && (curcol < term.t_ncol - 1))) {
+				  && (curcol < col_limit(wp)))) {
 					l_to_vline(wp,lp,i);
 					vteeol();
 					/* this line no longer is extended */
@@ -844,8 +1138,6 @@ upddex()
 			lp = lforw(lp);
 			++i;
 		}
-		/* and onward to the next window */
-		wp = wp->w_wndp;
 	}
 	curtabval = tabstop_val(curbp);
 }
@@ -878,7 +1170,7 @@ updgar()
 	}
 
 	movecursor(0, 0);		 /* Erase the screen. */
-	(*term.t_eeop)();
+	TTeeop();
 	sgarbf = FALSE;			 /* Erase-page clears */
 	mpresf = FALSE;			 /* the message area. */
 	if (mlsave[0]) {
@@ -966,7 +1258,7 @@ int inserts;
 			ptarget = first ;		/* newlines */
 		else if ( strncmp(vpp->v_text, vpv->v_text, end) == 0 )
 			ptarget = first + 1 ;	/* broken line newlines */
-		else 
+		else
 			ptarget = first ;
 		from = ptarget;
 	} else {
@@ -1021,7 +1313,7 @@ int inserts;
 		for (i = 0; i < count; i++) {
 			vpp = pscreen[to+i] ;
 			vpv = vscreen[to+i];
-			strncpy(vpp->v_text, vpv->v_text, cols) ;
+			(void)strncpy(vpp->v_text, vpv->v_text, cols) ;
 		}
 		if (inserts) {
 			from = ptarget;
@@ -1063,7 +1355,7 @@ int	vrow, prow ;		/* virtual, physical rows */
 
 /* return the index of the first blank of trailing whitespace */
 int	
-endofline(s,n) 
+endofline(s,n)
 char 	*s;
 int	n;
 {
@@ -1081,14 +1373,16 @@ int	n;
 		will be scrolled right or left to let the user see where
 		the cursor is		*/
 int
-updext_past()
+updext_past(col, excess)
+int	col;
+int	excess;
 {
 	register int rcursor;
+	register int zero = nu_width(curwp);
 
 	/* calculate what column the real cursor will end up in */
-	/* why is term.t_ncol in here? */
-	rcursor = ((curcol - term.t_ncol) % term.t_scrsiz) + term.t_margin;
-	taboff = curcol - rcursor + w_val(curwp,WVAL_SIDEWAYS);
+	rcursor = ((excess - 1) % term.t_scrsiz) + term.t_margin;
+	taboff = col - rcursor;
 
 	/* scan through the line outputing characters to the virtual screen */
 	/* once we reach the left edge					*/
@@ -1101,8 +1395,8 @@ updext_past()
 	vteeol();
 	taboff = 0;
 
-	/* and put a '<' in column 1 */
-	vscreen[currow]->v_text[0] = '<';
+	/* and put a marker in column 1 */
+	vscreen[currow]->v_text[zero] = MRK_EXTEND_LEFT;
 	vscreen[currow]->v_flag |= (VFEXT | VFCHG);
 	return rcursor;
 }
@@ -1112,15 +1406,16 @@ updext_past()
 		will be scrolled right or left to let the user see where
 		the cursor is		*/
 int
-updext_before()
+updext_before(col)
+int	col;
 {
 	register int rcursor;
 
-	curcol = w_val(curwp,WVAL_SIDEWAYS) + curcol;
+	curcol = col;
 
 	/* calculate what column the real cursor will end up in */
-	rcursor = (curcol % (term.t_ncol - term.t_margin));
-	taboff = curcol - rcursor;
+	rcursor = (col % (term.t_ncol - term.t_margin));
+	taboff = col - rcursor;
 
 	/* scan through the line outputing characters to the virtual screen */
 	/* once we reach the left edge					*/
@@ -1131,8 +1426,8 @@ updext_before()
 	vteeol();
 	taboff = 0;
 
-	if (curcol != rcursor) { /* ... put a '<' in column 1 */
-		vscreen[currow]->v_text[0] = '<';
+	if (col != rcursor) { /* ... put a marker in column 1 */
+		vscreen[currow]->v_text[nu_width(curwp)] = MRK_EXTEND_LEFT;
 		vscreen[currow]->v_flag |= VFEXT;
 	}
 	vscreen[currow]->v_flag |= (VFEXT|VFCHG);
@@ -1245,7 +1540,7 @@ struct VIDEO *vp2;	/* physical screen image */
 		movecursor(row, 0);	/* Go to start of line. */
 		/* set rev video if needed */
 		if (rev != req)
-			(*term.t_rev)(req);
+			TTrev(req);
 
 		/* scan through the line and dump it to the screen and
 		   the virtual screen array				*/
@@ -1262,7 +1557,7 @@ struct VIDEO *vp2;	/* physical screen image */
 		}
 		/* turn rev video off */
 		if (rev != req)
-			(*term.t_rev)(FALSE);
+			TTrev(FALSE);
 
 		/* update the needed flags */
 		vp1->v_flag &= ~VFCHG;
@@ -1276,13 +1571,16 @@ struct VIDEO *vp2;	/* physical screen image */
 #endif
 		return;
 	}
+#else
+	rev = FALSE;
 #endif
 
 	/* advance past any common chars at the left */
-	while (cp1 != &vp1->v_text[term.t_ncol] && *cp1 == *cp2) {
-		++cp1;
-		++cp2;
-	}
+	if (!rev)
+		while (cp1 != &vp1->v_text[term.t_ncol] && *cp1 == *cp2) {
+			++cp1;
+			++cp2;
+		}
 
 /* This can still happen, even though we only call this routine on changed
  * lines. A hard update is always done when a line splits, a massive
@@ -1301,12 +1599,13 @@ struct VIDEO *vp2;	/* physical screen image */
 	cp3 = &vp1->v_text[term.t_ncol];
 	cp4 = &vp2->v_text[term.t_ncol];
 
-	while (cp3[-1] == cp4[-1]) {
-		--cp3;
-		--cp4;
-		if (cp3[0] != ' ')		/* Note if any nonblank */
-			nbflag = TRUE;		/* in right match. */
-	}
+	if (!rev)
+		while (cp3[-1] == cp4[-1]) {
+			--cp3;
+			--cp4;
+			if (cp3[0] != ' ')		/* Note if any nonblank */
+				nbflag = TRUE;		/* in right match. */
+		}
 
 	cp5 = cp3;
 
@@ -1363,6 +1662,7 @@ WINDOW *wp;
 	register int n;
 	register BUFFER *bp;
 	register lchar;		/* character to draw line in buffer with */
+	int	left, col;
 
 	n = wp->w_toprow+wp->w_ntrows;      	/* Location. */
 	vscreen[n]->v_flag |= VFCHG | VFREQ | VFCOL;/* Redraw next time. */
@@ -1418,16 +1718,14 @@ WINDOW *wp;
 					p += 2;
 				}
 #endif
-				if (p[0] != slash &&
-					p[0] != '.' &&
-					p[0] != '!')
+				if (!is_pathname(p)
+				 && !isShellOrPipe(p))
 					vtprintf(".%c",slash);
 			}
 			vtprintf("%s",p);
 		}
 	}
 	vtputc(' ');
-
 
 	/* Pad to full width, then go back and overwrite right-end info */
 	n = term.t_ncol;
@@ -1451,7 +1749,7 @@ WINDOW *wp;
 			if (msg) {
 				if (wp->w_line.l == wp->w_bufp->b_line.l)
 					msg = " emp ";
-				else 
+				else
 					msg = " all ";
 			} else {
 				msg = " top ";
@@ -1477,8 +1775,12 @@ WINDOW *wp;
 #endif
 
 	/* mark column 80 */
-	if (n > 80 && vtgetc(80) == lchar) {
-		vtcol = 80;
+	left = (w_val(wp,WVAL_SIDEWAYS) - nu_width(wp));
+	n += left;
+	col = 80 - left;
+
+	if ((n > 80) && (col >= 0) && (vtgetc(col) == lchar)) {
+		vtcol = col;
 		vtputc('|');
 	}
 }
@@ -1488,11 +1790,8 @@ upmode()	/* update all the mode lines */
 {
 	register WINDOW *wp;
 
-	wp = wheadp;
-	while (wp != NULL) {
+	for_each_window(wp)
 		wp->w_flag |= WFMODE;
-		wp = wp->w_wndp;
-	}
 }
 
 /*
@@ -1716,7 +2015,7 @@ va_list *app;	/* ptr to current data field */
 	TTflush();
 	mpresf = TRUE;
 	mlsave[0] = '\0';
-} 
+}
 
 /*
  * Write out a character. Update the physical cursor position. This assumes that
@@ -1735,228 +2034,7 @@ int c;
 	}
 }
 
-/* 
- * Generic string formatter.  Takes printf-like args, and calls
- * the global function (*dfoutfn)(c) for each c
- */
-void
-#ifdef __STDC__
-dofmt( char *fmt, va_list *app)
-#else
-dofmt(app)
-va_list *app;
-#endif
-{
-#ifndef __STDC__
-	register char *fmt;
-#endif
-	register int c;		/* current char in format string */
-	register int wid;
-	register int n;
-	register int nchars = 0;
-	int islong;
-#ifndef __STDC__
-	fmt = va_arg(*app, char *);
-#endif
-	while ((c = *fmt++) != 0 ) {
-		if (c != '%') {
-			(*dfoutfn)(c);
-			nchars++;
-			continue;
-		}
-		c = *fmt++;
-		wid = 0;
-		islong = FALSE;
-		if (c == '*') {
-			wid = va_arg(*app,int);
-			c = *fmt++;
-		} else while (isdigit(c)) {
-			wid = (wid * 10) + c - '0';
-			c = *fmt++;
-		}
-		if (c == 'l') {
-			islong = TRUE;
-			c = *fmt++;
-		}
-		switch (c) {
-			case '\0':
-				n = 0;
-				break;
-			case 'c':
-				(*dfoutfn)(va_arg(*app,int));
-				n = 1;
-				break;
-
-			case 'd':
-				if (!islong) {
-					n = dfputi(va_arg(*app,int), 10);
-					break;
-				}
-				/* fall through */
-			case 'D':
-				n = dfputli(va_arg(*app,long), 10);
-				break;
-
-			case 'o':
-				n = dfputi(va_arg(*app,int), 8);
-				break;
-
-			case 'x':
-				if (!islong) {
-					n = dfputi(va_arg(*app,int), 16);
-					break;
-				}
-				/* fall through */
-			case 'X':
-				n = dfputli(va_arg(*app,long), 16);
-				break;
-
-			case 's':
-				n = dfputs(va_arg(*app,char *));
-				break;
-
-			case 'S': /* use wid as max width */
-				n = dfputsn(va_arg(*app,char *),wid);
-				break;
-
-			case 'f':
-				n = dfputf(va_arg(*app,int));
-				break;
-
-			case 'P': /* output padding -- pads total output to
-					"wid" chars, using c as the pad char */
-				wid -= nchars;
-				/* fall through */
-
-			case 'p': /* field padding -- puts out "wid"
-					copies of c */
-				n = 0;
-				c = va_arg(*app,int);
-				while (n < wid) {
-					(*dfoutfn)(c);
-					n++;
-				}
-				break;
-
-
-			default:
-				(*dfoutfn)(c);
-				n = 1;
-		}
-		wid -= n;
-		nchars += n;
-		while (wid-- > 0) {
-			(*dfoutfn)(' ');
-			nchars++;
-		}
-	}
-
-}
-
 /*
- * Do format a string.
- */
-int
-dfputs(s)
-char *s;
-{
-	register int c;
-	register int l = 0;
-
-	while ((c = *s++) != 0) {
-	        (*dfoutfn)(c);
-		l++;
-	}
-	return l;
-}
-
-/* as above, but takes a count for s's length */
-int
-dfputsn(s,n)
-char *s;
-int n;
-{
-	register int c;
-	register int l = 0;
-	while ((c = *s++) != 0 && n-- != 0) {
-	        (*dfoutfn)(c);
-		l++;
-	}
-	return l;
-}
-
-/*
- * Do format an integer, in the specified radix.
- */
-int
-dfputi(i, r)
-int i,r;
-{
-    register int q;
-    static char hexdigits[] = "0123456789ABCDEF";
-
-    if (i < 0) {
-        (*dfoutfn)('-');
-        i = -i;
-	return dfputi(i, r) + 1;
-    }
-
-    q = i/r;
-
-    if (q != 0)
-        q = dfputi(q, r);
-
-    (*dfoutfn)(hexdigits[i%r]);
-    return q + 1; /* number of digits printed */
-}
-
-/*
- * do the same except as a long integer.
- */
-int
-dfputli(l, r)
-long l;
-int r;
-{
-    register long q;
-
-    if (l < 0) {
-        l = -l;
-        (*dfoutfn)('-');
-    }
-
-    q = l/r;
-
-    if (q != 0)
-        q = dfputli(q, r);
-
-    (*dfoutfn)((int)(l%r)+'0');
-    return q + 1;
-}
-
-/*
- *	Do format a scaled integer with two decimal places
- */
-int
-dfputf(s)
-int s;	/* scaled integer to output */
-{
-	register int i;	/* integer portion of number */
-	register int f;	/* fractional portion of number */
-
-	/* break it up */
-	i = s / 100;
-	f = s % 100;
-
-	/* send out the integer portion */
-	i = dfputi(i, 10);
-	(*dfoutfn)('.');
-	(*dfoutfn)((f / 10) + '0');
-	(*dfoutfn)((f % 10) + '0');
-	return i + 3;
-}	
-
-/* 
  * Local sprintf -- similar to standard libc, but
  *  returns pointer to null character at end of buffer, so it can
  *  be called repeatedly, as in:
@@ -2004,7 +2082,7 @@ va_dcl
 
 	*lsp = '\0';
 	return lsp;
-} 
+}
 
 #ifdef	UNUSED
 static char *lsbuf;
@@ -2045,7 +2123,7 @@ va_dcl
 
 	*lsp = '\0';
 	return lsp;
-} 
+}
 #endif	/* UNUSED */
 
 /*
@@ -2087,7 +2165,7 @@ va_dcl
 #endif
 	va_end(ap);
 
-} 
+}
 
 #if RAINBOW
 
@@ -2141,7 +2219,7 @@ int signo;
 	if ((h && h-1 != term.t_nrow) || (w && w != term.t_ncol))
 		newscreensize(h, w);
 
-	signal (SIGWINCH, sizesignal);
+	(void) signal (SIGWINCH, sizesignal);
 	errno = old_errno;
 	SIGRET;
 }
@@ -2159,10 +2237,11 @@ int h, w;
 	}
 	chg_width = chg_height = 0;
 	if (h - 1 < term.t_mrow)
-		newlength(TRUE,h);
+		if (!newlength(TRUE,h))
+			return;
 	if (w < term.t_mcol)
-		newwidth(TRUE,w);
+		if (!newwidth(TRUE,w))
+			return;
 
 	update(TRUE);
 }
-

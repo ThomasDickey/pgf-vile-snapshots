@@ -4,7 +4,13 @@
  *	written 1986 by Daniel Lawrence	
  *
  * $Log: exec.c,v $
- * Revision 1.35  1992/12/14 09:03:25  foxharp
+ * Revision 1.37  1993/01/23 13:38:23  foxharp
+ * check return from bclear before blowing away a macro
+ *
+ * Revision 1.36  1993/01/16  10:31:54  foxharp
+ * use new isreturn, isScratchName, etc. macros
+ *
+ * Revision 1.35  1992/12/14  09:03:25  foxharp
  * lint cleanup, mostly malloc
  *
  * Revision 1.34  1992/12/04  09:12:25  foxharp
@@ -169,7 +175,7 @@ int f, n;
 
 	while(1) {
 		c = tgetc();
-		if (c == '\r' || c == '\n') {
+		if (isreturn(c)) {
 			lspec[cpos] = 0;
 			fnp = NULL;
 			break;
@@ -904,7 +910,7 @@ int n;		/* macro number to use */
 	}
 
 	/* construct the macro buffer name */
-	strcpy(bname, "[Macro xx]");
+	strcpy(bname, ScratchName(Macro xx));
 	bname[7] = '0' + (n / 10);
 	bname[8] = '0' + (n % 10);
 
@@ -915,8 +921,9 @@ int n;		/* macro number to use */
 	}
 
 	/* and make sure it is empty */
-	bclear(bp);
-	bp->b_flag &= ~BFCHG;
+	if (!bclear(bp))
+		return FALSE;
+
 	bp->b_active = TRUE;
 	make_local_b_val(bp,MDVIEW);
 	set_b_val(bp,MDVIEW,TRUE);
@@ -954,8 +961,8 @@ int n;		/* macro number to use */
                 return status;
 
 	/* construct the macro buffer name */
-	bname[0] = '[';
-	strcat(bname, "]");
+	bname[0] = SCRTCH_LEFT[0];
+	strcat(bname, SCRTCH_RIGHT);
 
 	/* set up the new macro buffer */
 	if ((bp = bfind(bname, OK_CREAT, BFINVS)) == NULL) {
@@ -988,9 +995,9 @@ int f, n;	/* default flag and numeric arg */
                 return status;
 
 	/* construct the buffer name */
-	bufn[0] = '[';
+	bufn[0] = SCRTCH_LEFT[0];
 	strcpy(&bufn[1], obufn);
-	strcat(bufn, "]");
+	strcat(bufn, SCRTCH_RIGHT);
 
 	/* find the pointer to that buffer */
         if ((bp=bfind(bufn, NO_CREAT, 0)) == NULL) {
@@ -1465,15 +1472,13 @@ nxtscan:	/* on to the next line */
 		/* check for a command error */
 		if (status != TRUE) {
 			/* look if buffer is showing */
-			wp = wheadp;
-			while (wp != NULL) {
+			for_each_window(wp) {
 				if (wp->w_bufp == bp) {
 					/* and point it */
 					wp->w_dot.l = lp;
 					wp->w_dot.o = 0;
 					wp->w_flag |= WFHARD;
 				}
-				wp = wp->w_wndp;
 			}
 			/* in any case set the buffer's dot */
 			bp->b_dot.l = lp;
@@ -1590,7 +1595,7 @@ int bufnum;	/* number of buffer to execute */
 {
         register BUFFER *bp;		/* ptr to buffer to execute */
         register int status;		/* status return */
-	static char bufname[] = "[Macro xx]";
+	static char bufname[] = ScratchName(Macro xx);
 
 	if (!f) n = 1;
 

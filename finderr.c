@@ -2,7 +2,10 @@
  * Written for vile by Paul Fox, (c)1990
  *
  * $Log: finderr.c,v $
- * Revision 1.13  1992/12/04 09:12:25  foxharp
+ * Revision 1.14  1993/01/16 10:34:20  foxharp
+ * use for_each_window macro
+ *
+ * Revision 1.13  1992/12/04  09:12:25  foxharp
  * deleted unused assigns
  *
  * Revision 1.12  1992/08/19  22:57:45  foxharp
@@ -163,12 +166,10 @@ int f,n;
 		strcmp(ferrfile,curbp->b_fname)) {
 		/* if we must change windows */
 		struct WINDOW *wp;
-		wp = wheadp;
-		while (wp != NULL) {
+		for_each_window(wp) {
 			if (!strcmp(wp->w_bufp->b_bname,ferrfile) ||
 				!strcmp(wp->w_bufp->b_fname,ferrfile))
 				break;
-			wp = wp->w_wndp;
 		}
 		if (wp) {
 			curwp = wp;
@@ -202,12 +203,10 @@ struct BUFFER *bp;
 	if (bp->b_nwnd) {
 		/* scan for windows holding that buffer, 
 					pull dot from the first */
-	        wp = wheadp;
-	        while (wp != NULL) {
+	        for_each_window(wp) {
 	                if (wp->w_bufp == bp) {
 	                        return wp->w_dot.l;
 			}
-	                wp = wp->w_wndp;
 	        }
 	}
         return bp->b_dot.l;
@@ -221,14 +220,12 @@ struct LINE *dotp;
 	register WINDOW *wp;
 
 	if (bp->b_nwnd) {
-	        wp = wheadp;
-	        while (wp != NULL) {
+	        for_each_window(wp) {
 	                if (wp->w_bufp == bp) {
 		                wp->w_dot.l = dotp;
 		                wp->w_dot.o = 0;
 			        wp->w_flag |= WFMOVE;
 			}
-	                wp = wp->w_wndp;
 	        }
 		return;
 	}

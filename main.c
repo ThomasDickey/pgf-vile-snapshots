@@ -14,7 +14,14 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.90  1992/12/23 09:20:50  foxharp
+ * Revision 1.92  1993/01/23 13:38:23  foxharp
+ * writeall is now in file.c,
+ * use new exit code macros
+ *
+ * Revision 1.91  1993/01/16  10:37:36  foxharp
+ * macro-ization of special filenames, and re-ordering of bval initializations
+ *
+ * Revision 1.90  1992/12/23  09:20:50  foxharp
  * added .C, .i to cmode suffixes, for C++ and cpp output files
  *
  * Revision 1.89  1992/12/14  09:03:25  foxharp
@@ -366,15 +373,6 @@ unsigned _stklen = 32768;
 #define realdef
 #include	"edef.h"	/* global definitions */
 
-#if	VMS
-#include	<ssdef.h>
-#define GOOD	(SS$_NORMAL)
-#endif
-
-#ifndef GOOD
-#define GOOD	0
-#endif
-
 int
 main(argc, argv)
 int	argc;
@@ -559,7 +557,7 @@ char	*argv[];
 			case 'V':
 #ifndef DOS
 				printf("vile %s\n", version);
-				exit(0);
+				exit(GOOD);
 #endif
 			case 'v':	/* -v for View File */
 				set_global_b_val(MDVIEW,TRUE);
@@ -633,7 +631,7 @@ char	*argv[];
 	fprintf(stderr, "	use @filename to run filename as commands\n");
 	fprintf(stderr, "	 (this will suppress .vilerc)\n");
 	fprintf(stderr, "	This is vile %s\n",version);
-				exit(1);
+				exit(BAD(1));
 			}
 
 		} else if (argv[carg][0]== '+') { /* alternate form of -g */
@@ -656,7 +654,7 @@ char	*argv[];
 			makename(bname, argv[carg]);
 			unqname(bname,FALSE);
 
-			bp = bfind(bname, OK_CREAT, 0);
+			bp = bfind(bname, OK_CREAT, BFARGS);
 			ch_fname(bp, argv[carg]);
 			make_current(bp); /* pull it to the front */
 			if (!gotafile) {
@@ -667,7 +665,7 @@ char	*argv[];
 		}
 	}
 
-	/* we made some calls to makecurrent() above, to shuffle the
+	/* we made some calls to make_current() above, to shuffle the
 		list order.  this set curbp, which isn't actually kosher */
 	curbp = NULL;
 
@@ -711,7 +709,7 @@ char	*argv[];
 
 	/* pull in an unnamed buffer, if we were given none to work with */
 	if (!gotafile) {
-		bp = bfind("[unnamed]", OK_CREAT, 0);
+		bp = bfind(ScratchName(unnamed), OK_CREAT, 0);
 		bp->b_active = TRUE;
 #if DOSFILES
 		make_local_b_val(bp,MDDOS);
@@ -739,8 +737,8 @@ char	*argv[];
 				obp->b_flag |= BFCHG;
 			}
 
-			if ((vbp=bfind("[vileinit]", OK_CREAT, 0))==NULL)
-				exit(1);
+			if ((vbp=bfind(ScratchName(vileinit), OK_CREAT, 0))==NULL)
+				exit(BAD(1));
 			/* mark the buffer as read only */
 			make_local_b_val(vbp,MDVIEW);
 			set_b_val(vbp,MDVIEW,TRUE);
@@ -776,7 +774,7 @@ char	*argv[];
 			if (gotafile && 
 				strcmp(pathname[0], firstbp->b_bname) == 0) {
 				c = firstbp->b_bname[0];
-				firstbp->b_bname[0] = '[';
+				firstbp->b_bname[0] = SCRTCH_LEFT[0];
 				startstat = startup(fname);
 				firstbp->b_bname[0] = c;
 			} else {
@@ -1051,10 +1049,6 @@ loop()
 		/* and execute the command */
 		execute(kcod2fnc(c), f, n);
 	        
-		if (bheadp != curbp)
-			mlforce("BUG: main: bheadp != curbp, bhead name is %s",
-					 bheadp->b_bname);
-
 		/* stop recording for '.' command */
 		dotcmdfinish();
 	}
@@ -1090,28 +1084,32 @@ global_val_init()
 		global_w_values.wv[i].vp = &(global_w_values.wv[i].v);
 
 
-	set_global_b_val(MDWRAP,FALSE); 	/* wrap */
-	set_global_b_val(MDCMOD,FALSE); 	/* C mode */
-	set_global_b_val(MDBACKLIMIT,TRUE); 	/* limit backspacing to insert point */
-	set_global_b_val(MDSWRAP,TRUE); 	/* scan wrap */
-	set_global_b_val(MDIGNCASE,FALSE); 	/* exact matches */
-	set_global_b_val(MDVIEW,FALSE); 	/* view-only */
-	set_global_b_val(MDMAGIC,TRUE); 	/* magic searches */
-	set_global_b_val(MDCRYPT,FALSE);	/* crypt */
-	set_global_b_val(MDASAVE,FALSE);	/* auto-save */
-	set_global_b_val(MDDOS,FALSE);		/* dos mode */
+	set_global_b_val(MDABUFF,TRUE); 	/* auto-buffer */
 	set_global_b_val(MDAIND,FALSE); 	/* auto-indent */
+	set_global_b_val(MDASAVE,FALSE);	/* auto-save */
+	set_global_b_val(MDBACKLIMIT,TRUE); 	/* limit backspacing to insert point */
+	set_global_b_val(MDCMOD,FALSE); 	/* C mode */
+	set_global_b_val(MDCRYPT,FALSE);	/* crypt */
+	set_global_b_val(MDIGNCASE,FALSE); 	/* exact matches */
+	set_global_b_val(MDDOS,FALSE);		/* dos mode */
+	set_global_b_val(MDMAGIC,TRUE); 	/* magic searches */
+	set_global_b_val(WMDNUMBER,FALSE);	/* number */
 	set_global_b_val(MDSHOWMAT,FALSE);	/* show-match */
 	set_global_b_val(MDSHOWMODE,TRUE);	/* show-mode */
+	set_global_b_val(MDSWRAP,TRUE); 	/* scan wrap */
 	set_global_b_val(MDTABINSERT,TRUE);	/* allow tab insertion */
 	set_global_b_val(MDTAGSRELTIV,FALSE);	/* path relative tag lookups */
 	set_global_b_val(MDTERSE,FALSE);	/* terse messaging */
-	set_global_b_val(VAL_TAB, 8);		/* tab stop */
-	set_global_b_val(VAL_SWIDTH, 8); 	/* shiftwidth */
-	set_global_b_val(VAL_TAGLEN, 0);	/* significant tag length */
-	set_global_b_val(VAL_C_TAB, 8); 	/* C file tab stop */
-	set_global_b_val(VAL_C_SWIDTH, 8); 	/* C file shiftwidth */
+	set_global_b_val(MDVIEW,FALSE); 	/* view-only */
+	set_global_b_val(MDWRAP,FALSE); 	/* wrap */
+
 	set_global_b_val(VAL_ASAVECNT, 256);	/* autosave count */
+	set_global_b_val(VAL_C_SWIDTH, 8); 	/* C file shiftwidth */
+	set_global_b_val(VAL_C_TAB, 8); 	/* C file tab stop */
+	set_global_b_val(VAL_SWIDTH, 8); 	/* shiftwidth */
+	set_global_b_val(VAL_TAB, 8);		/* tab stop */
+	set_global_b_val(VAL_TAGLEN, 0);	/* significant tag length */
+
 	set_global_b_val_ptr(VAL_CWD, NULL);	/* current directory */
 	set_global_b_val_ptr(VAL_TAGS, strmalloc("tags")); /* tags filename */
 
@@ -1281,44 +1279,6 @@ int *cp, *fp, *np;
 	*np = n;
 }
 
-
-/* write all _changed_ buffers */
-int
-writeall(f,n)
-int f,n;
-{
-	register BUFFER *bp;	/* scanning pointer to buffers */
-	register BUFFER *oldbp; /* original current buffer */
-	register int status = TRUE;
-	int count = 0;
-
-	oldbp = curbp;				/* save in case we fail */
-
-	bp = bheadp;
-	while (bp != NULL) {
-		if ((bp->b_flag&BFCHG) != 0 && (bp->b_flag&BFINVS) == 0) {
-			make_current(bp);
-			mlforce("[Saving %s]",bp->b_fname);
-			mlforce("\n");
-			if ((status = filesave(f, n)) != TRUE)
-				break;
-			count++;
-			mlforce("\n");
-		}
-		bp = bp->b_bufp;	/* on to the next buffer */
-	}
-	make_current(oldbp);
-	mlforce("\n");
-	if (status != TRUE) {
-		pressreturn();
-		sgarbf = TRUE;
-	} else {
-		sgarbf = TRUE;
-		mlwrite("[Wrote %d buffer%c]",count,(count==1)?' ':'s');
-	}
-	return status;
-}
-
 /* the vi ZZ command -- write all, then quit */
 int
 zzquit(f,n)
@@ -1396,9 +1356,12 @@ int f,n;
 	vttidy(TRUE);
 #if	FILOCK
 	if (lockrel() != TRUE) {
-		exit(1);
+		exit(BAD(1));
 		/* NOTREACHED */
 	}
+#endif
+#if UNIX
+	signal(SIGHUP,SIG_DFL);	/* I don't care anymore */
 #endif
 	exit(GOOD);
 	/* NOTREACHED */
@@ -1595,10 +1558,22 @@ charinit()
 	_chartypes_['{'] |= _fence;
 	_chartypes_['}'] |= _fence;
 
-	for (c = 0; c < N_chars; c++)
-			if ((_chartypes_[c] & _space) == 0)
-					_chartypes_[c] |= _nonspace;
+#if !SMALLER
+	/* scratch-buffer-names (superset of _pathn) */
+	_chartypes_[SCRTCH_LEFT[0]]  |= _scrtch;
+	_chartypes_[SCRTCH_RIGHT[0]] |= _scrtch;
+#endif
 
+	for (c = 0; c < N_chars; c++) {
+#if !SMALLER
+		if (isspace(c) || isprint(c))
+			_chartypes_[c] |= _shpipe;
+		if (isspace(c) || isalnum(c))
+			_chartypes_[c] |= _scrtch;
+#endif
+		if ((_chartypes_[c] & _space) == 0)
+			_chartypes_[c] |= _nonspace;
+	}
 }
 
 

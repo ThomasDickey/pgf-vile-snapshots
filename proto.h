@@ -5,7 +5,16 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.27  1992/12/23 09:22:40  foxharp
+ * Revision 1.30  1993/01/23 13:38:23  foxharp
+ * couple of new funcs, some now static (dfout..)
+ *
+ * Revision 1.29  1993/01/16  10:41:21  foxharp
+ * some new routines, some old are now static, so don't appear here
+ *
+ * Revision 1.28  1993/01/12  08:48:43  foxharp
+ * tom dickey's changes to support "set number", i.e. line numbering
+ *
+ * Revision 1.27  1992/12/23  09:22:40  foxharp
  * some new, some ifdefed UNUSED
  *
  * Revision 1.26  1992/12/14  09:03:25  foxharp
@@ -205,15 +214,12 @@ extern int unbindchar P(( int ));
 extern int apro P(( int, int ));
 extern char * kbd_engl P(( void ));
 extern int kbd_engl_stat P(( char ** ));
-BUFFER * find_listbuffers P((void));
-WINDOW * bp2wp P((BUFFER *));
-int zotwp P((BUFFER *));
-void updatelistbuffers P((void));
-extern char * hist_lookup P(( int ));
-extern int hist_show P(( void ));
 extern int histbuff P(( int, int ));
+extern void imply_alt P(( char * ));
+extern BUFFER * find_alt P(( void ));
 extern int altbuff P(( int, int ));
 extern int usebuffer P(( int, int ));
+extern int firstbuffer P(( int, int ));
 extern int nextbuffer P(( int, int ));
 extern void make_current P(( BUFFER * ));
 extern int swbuffer P(( BUFFER * ));
@@ -225,14 +231,18 @@ extern int killbuffer P(( int, int ));
 extern int zotbuf P(( BUFFER * ));
 extern int popupbuff P(( BUFFER * ));
 extern int readin P((char *, int, BUFFER *, int ));
+extern void sortlistbuffers P(( void ));
 extern int togglelistbuffers P(( int, int ));
 extern int listbuffers P(( int, int ));
-extern void makebufflist P(( int, char * ));
+void updatelistbuffers P((void));
 extern int startup P(( char *));
 extern int addline P(( BUFFER *, char *, int ));
 extern int anycb P(( void ));
 extern BUFFER * bfind P(( char *, int, int ));
 extern int bclear P(( BUFFER * ));
+extern void chg_buff P(( BUFFER *, int ));
+extern void unchg_buff P(( BUFFER *, int ));
+extern int unmark P(( int, int ));
 #if	CRYPT
 extern	int	setkey P((int, int));
 extern	void	crypt P((char *, int));
@@ -247,6 +257,9 @@ extern int fcsrch_to P(( int, int ));
 extern int bcsrch_to P(( int, int ));
 extern int rep_csrch P(( int, int ));
 extern int rev_csrch P(( int, int ));
+extern int nu_mode P(( WINDOW * ));
+extern int nu_width P(( WINDOW * ));
+extern int col_limit P(( WINDOW * ));
 extern void vtinit P(( void ));
 extern void vttidy P(( int ));
 extern void vtmove P(( int, int ));
@@ -273,8 +286,8 @@ extern int scrolls P(( int ));
 extern int texttest P(( int, int ));
 extern void scrscroll P(( int, int, int ));
 extern int endofline P(( char *, int ));
-extern int updext_past P(( void ));
-extern int updext_before P(( void ));
+extern int updext_past P(( int, int ));
+extern int updext_before P(( int ));
 extern void modeline P(( WINDOW * ));
 extern void movecursor P(( int, int ));
 extern void mlerase P(( void ));
@@ -285,12 +298,6 @@ extern void mlprompt P((char *, ... ));
 extern void mlmsg P((char *, va_list * ));
 extern void dbgwrite P((char *, ... ));
 extern void mlputc P(( int ));
-extern void dofmt P((char *, va_list * ));
-extern int dfputs P(( char * ));
-extern int dfputsn P(( char *, int ));
-extern int dfputf P(( int ));
-extern int dfputi P(( int, int ));
-extern int dfputli P(( long, int ));
 extern void lspputc P(( int ));
 extern char * lsprintf P((char *, char *, ... ));
 #ifdef	UNUSED
@@ -316,6 +323,7 @@ extern char * mklower P(( char * ));
 extern char * mkupper P(( char * ));
 extern int sindex P(( char *, char * ));
 extern int ernd P(( void ));
+extern int line_no P(( BUFFER *, LINE * ));
 extern int getcline P(( void ));
 extern int getwpos P(( void ));
 extern int svar P(( VDESC *, char * ));
@@ -391,6 +399,8 @@ extern void markWFMODE P(( BUFFER * ));
 extern int glob P(( char * ));
 extern char * canonpath P(( char * ));
 extern char * shorten_path P(( char * ));
+extern char * lengthen_path P(( char * ));
+extern int is_pathname P(( char * ));
 extern char * flook P(( char *, int ));
 extern int ffropen P(( char * ));
 extern int ffwopen P(( char * ));
@@ -447,7 +457,6 @@ extern int lgrow P(( LINE *, int, BUFFER * ));
 extern void lfree P(( LINE *, BUFFER * ));
 extern void ltextfree P(( LINE *, BUFFER * ));
 extern void lremove P(( BUFFER *, LINE * ));
-extern void lchange P(( int ));
 extern int linsert P(( int, int ));
 extern int ldelete P(( long, int ));
 extern int lnewline P(( void ));
@@ -506,8 +515,6 @@ extern int operdetab P(( int, int ));
 extern int opertrim P(( int, int ));
 extern int liststuff P(( char *, void (*)(), int, char * ));
 extern int listmodes P(( int, int ));
-extern void makemodelist P(( int, char * ));
-extern int listvalueset P(( struct VALNAMES *, struct VAL *, struct VAL * ));
 extern int setfillcol P(( int, int ));
 extern int showcpos P(( int, int ));
 extern int showlength P(( int, int ));
@@ -552,7 +559,6 @@ extern int chgtoeol P(( int, int ));
 extern int yankline P(( int, int ));
 extern int chgline P(( int, int ));
 extern int chgchar P(( int, int ));
-extern int adjvalueset P(( char *, int, struct VALNAMES *, struct VAL * ));
 extern int matchfence P(( int, int ));
 extern int matchfenceback P(( int, int ));
 extern int fmatchindent P(( void ));
@@ -731,7 +737,6 @@ extern int getfence P(( int, int ));
 extern int cpp_fence P((int, char *, char *, char * ));
 extern int comment_fence P(( int ));
 extern int simple_fence P(( int, int, int ));
-extern int adjustmode P(( int, int ));
 extern void putdotback P(( BUFFER *, LINE * ));
 
 #if X11

@@ -1,3 +1,144 @@
+Changes in 3.31:  (Tom Dickey)
+
+	* corrected test in 'find_alt()', which caused the %/# toggle to work
+	  incorrectly in noautobuffer mode.
+
+	* updatelistbuffers after 'cd' command
+
+	* added 'chg_buff()' & 'unchg_buff()' to encapsulate logic to update
+	  buffer-list after buffers are modified.  The function 'lchange()'
+	  is replaced by 'chg_buff()'.
+
+	* modified 'histbuffer' to toggle according to 'find_alt()'
+
+	* make the filename/buffer/number change for 'killbuffer' apply to
+	  'usebuffer()'
+
+	* corrected handling of repeat-count in 'C' command.
+
+	* updated vile.hlp
+
+	* revised 'mktbls.c':
+
+		* filter out redundant ifdef's
+		* tab-align data items for readability
+		* modify 'nefunc.h' to use prototypes rather than K&R style
+		  definition, also split the extern-definitions from the
+		  data items for readability.
+		* make procedures static, linted
+		* modified so that 'evar.h' definitions are automatically
+		  generated, so that "show-variables" can show a sorted
+		  list of variables.  The new filename is "nevars.h".
+
+	* corrected window refresh flag for 'U' (lineundo) command.
+
+	* added an apollo-specific code in 'imdying()' to generate a walkback
+	  for debugging.
+
+	* corrected an error in 'zotwp()': reference to data that had been
+	  deleted.
+
+	* corrected an error in 'onlywind()': it did not delink window-pointer
+	  after freeing it.
+
+	* noticed that references to 'dfoutfn' weren't reentrant:  I did a
+	  ":show-var" from the buffer-list and got only part of the heading.
+	  Reorganized display.c to ensure that it is reentrant by using a
+	  local copy of 'dfoutfn'.  Note that I didn't add 'dfoutfn' as an
+	  argument to 'dofmt()' to avoid complications with varargs.
+
+	* corrected 'dfputli()': it didn't do hexadecimal.
+
+	* corrected 'updateline()': it sometimes failed to highlight the ends
+	  of the mode-line.
+
+	* corrected (my last change) to 'vtset()' so that "^J" is shown in
+	  list-mode.
+
+	* moved 'writeall()' from main.c to buffer.c; it belonged there, and
+	  I used local macros for simplifying it.
+
+	* remove SIGHUP handler before normal call on 'exit()' to avoid
+	  vile-died messages when running it in an xterm.
+
+	* corrected VMS definition of exit codes; added def of BAD-macro.
+	  modified main.c, display.c, window.c accordingly.
+
+Changes in 3.30, mostly from Tom Dickey:
+
+This is lots of changes, mostly in buffer.c:
+
+	* lint-clean: buffer.c
+
+	* linted also: file.c, modes.c (though I left size_t alone for now).
+
+	* added "list-vars" & "show-vars" to show the current variables
+
+	* modified 'killbuffer' so I could add binding ^X-k to point to
+	  a buffer-name in the buffer-list and kill it.
+
+	* also modified 'killbuffer' to recognize filename if buffer-name is
+	  not found, also buffer-number.
+
+	* modify buffer.c so that the number shown by '_' and '*' is consistent
+
+	* fixed ^X-o and ^X-O so they update buffer-list, as well as some
+	  other places I missed before.
+
+	* make some functions static (where they are really private), because
+	  my per-module lint library got too large.  (I believe there are
+	  too many externals).  In modes.c, this involved reordering, since
+	  my practice is not to have forward-refs on static functions, to
+	  make this work with some awful compilers.  This meant that I
+	  deleted lines from 'proto.h'.
+
+	* introduced new macro 'isreturn()', used this in correction in
+	  'histbuff()'.  I used it in one bug fix & also where I could find
+	  explicit compare for \r, \n.
+
+	* added mode 'autobuffer':
+
+		* the default is 'autobuffer' (the vile lru buffering)
+		* curbp no longer is necessarily equal to bheadp
+		* added members b_created, b_last_used, b_relink to support
+		  the autobuffer/noautobuffer mode.
+		* if "noautobuffer" is set, ":rewind" and ":n" apply only
+		  to the original command-line files.
+
+	* added macros SCRTCH_LEFT, SCRTCH_RIGHT, ScratchName, IsInternalName
+	  to encapsulate use of '[' in names.
+
+	* added macros SHPIPE_LEFT, isShellOrPipe to encapsulate use of '!' in
+	  names.
+
+	* added function is_pathname to encapsulate tests for pathnames
+	  beginning with '.'.  This fixes the display of ".vilerc" from the current
+	  directory as "./.vilerc".
+
+	* added new char-types _scrtch and _shpipe to support killbuffer from
+	  screen.  Use these types in new macro 'screen_to_bname()' which uses
+	  modification of 'screen_string()'.  Used 'screen_to_bname()' to
+	  make ^X-e and ^X-k "correctly" parse the bname, fname columns from
+	  buffer-list.
+
+	* fixed the error you mentioned in modeline (the position of col-80 mark
+	  taking into account sideways and number modes).
+
+	* supplied a missing TTflush in input.c
+
+	* modified 'makebufflist()' to show only the flags actually used in the
+	  footnote.
+
+	* modified 'makebufflist()' to show '%' and '#' by the corresponding
+	  buffer/filename.
+
+	* added macros 'for_each_buffer()' and 'for_each_window()' to simplify
+	  code as well as to keep visible references to bheadp & wheadp
+	  confined to buffer.c and window.c respectively.
+
+	* added/used macro SIZEOF
+
+-------------------------------------------------------------------------------
 
 Changes in 3.29:
 -----------------
@@ -343,3 +484,4 @@ IMPLEMENTORS NOTES:
 	mlforce() for messages that _must_ be seen, and mlprompt() for
 	messages that need a response from the user unless they're in a
 	command file.
+

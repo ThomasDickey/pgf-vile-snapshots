@@ -4,7 +4,10 @@
  * written for vile by Paul Fox, (c)1990
  *
  * $Log: opers.c,v $
- * Revision 1.23  1992/11/19 09:15:37  foxharp
+ * Revision 1.24  1993/01/23 14:28:07  foxharp
+ * report failed motions with message
+ *
+ * Revision 1.23  1992/11/19  09:15:37  foxharp
  * be sure to turn doingopcmd off if the motion fails or is aborted.
  * also, allow null regions -- i don't know why i didn't used to allow them
  *
@@ -183,6 +186,7 @@ char *str;
 		) {
 		doingopcmd = FALSE;
 		fulllineregions = FALSE;
+		mlforce("[Motion failed]");
 		return FALSE;
 	}
 

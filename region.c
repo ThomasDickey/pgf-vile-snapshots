@@ -6,7 +6,10 @@
  * internal use.
  *
  * $Log: region.c,v $
- * Revision 1.20  1992/12/13 13:34:25  foxharp
+ * Revision 1.21  1993/01/23 13:38:23  foxharp
+ * lchange is now chg_buff
+ *
+ * Revision 1.20  1992/12/13  13:34:25  foxharp
  * got rid of extraneous assign
  *
  * Revision 1.19  1992/12/04  09:20:58  foxharp
@@ -297,7 +300,7 @@ int (*func)();
 
         if ((s=getregion(&region)) != TRUE)
                 return s;
-        lchange(WFHARD);
+        chg_buff(curbp, WFHARD);
 	m = region.r_orig;
         while (region.r_size--) {
                 if (is_at_end_of_line(m)) {

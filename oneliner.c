@@ -4,7 +4,10 @@
  *	Written (except for delins()) for vile by Paul Fox, (c)1990
  *
  * $Log: oneliner.c,v $
- * Revision 1.36  1992/12/29 23:18:00  foxharp
+ * Revision 1.37  1993/01/16 10:40:58  foxharp
+ * use new macros
+ *
+ * Revision 1.36  1992/12/29  23:18:00  foxharp
  * don't allow pregion to be used if the p-lines buffer is current, and
  * set the WINDOW list mode, not the BUFFER list mode, so :l works again
  *
@@ -146,7 +149,7 @@ int flag;
 	register BUFFER *bp;
 	register int	s;
 	REGION		region;
-	static char bname[] = "[p-lines]";
+	static char bname[] = ScratchName(p-lines);
 	register LINE *linep;
 
 	fulllineregions = TRUE;
@@ -196,7 +199,7 @@ int flag;
 	set_b_val(bp,VAL_TAB,tabstop_val(curbp));
 
 	bp->b_active = TRUE;
-	for (wp=wheadp; wp!=NULL; wp=wp->w_wndp) {
+	for_each_window(wp) {
 		if (wp->w_bufp == bp) {
 			make_local_w_val(wp,WMDLIST);
 			set_w_val(wp, WMDLIST, ((flag & PLIST) != 0) );

@@ -8,8 +8,11 @@
  * Major extensions for vile by Paul Fox, 1991
  *
  *	$Log: modes.c,v $
- *	Revision 1.6  1992/12/23 09:21:56  foxharp
- *	macro-ized the "[Settings]" name
+ *	Revision 1.7  1993/01/16 10:38:56  foxharp
+ *	reordering to support some new static routines
+ *
+ * Revision 1.6  1992/12/23  09:21:56  foxharp
+ * macro-ized the "[Settings]" name
  *
  * Revision 1.5  1992/12/14  09:03:25  foxharp
  * lint cleanup, mostly malloc
@@ -34,51 +37,12 @@
 #include	"estruct.h"
 #include	"edef.h"
  
-#define MODES_LIST_NAME "[Settings]"
-
-/* ARGSUSED */
-int
-listmodes(f, n)
-int f,n;
-{
-	register WINDOW *wp = curwp;
-	register int s;
-
-	s = liststuff(MODES_LIST_NAME, makemodelist,0,(char *)wp);
-	/* back to the buffer whose modes we just listed */
-	swbuffer(wp->w_bufp);
-	return s;
-}
-
-
-/* list the current modes into the current buffer */
-/* ARGSUSED */
-void
-makemodelist(dum1,ptr)
-int dum1;
-char *ptr;
-{
-	register WINDOW *localwp = (WINDOW *)ptr;  /* alignment okay */
-	register BUFFER *localbp = localwp->w_bufp;
-	bprintf("--- \"%s\" settings, if different than globals %*P\n",
-			localbp->b_bname, term.t_ncol-1, '-');
-	listvalueset(b_valuenames, localbp->b_values.bv, global_b_values.bv);
-	bputc('\n');
-	listvalueset(w_valuenames, localwp->w_values.wv, global_w_values.wv);
-	bprintf("--- Global settings %*P\n", term.t_ncol-1, '-');
-	listvalueset(b_valuenames, global_b_values.bv, NULL);
-	bputc('\n');
-	listvalueset(w_valuenames, global_w_values.wv, NULL);
-#if LAZY
-	lsprintf(line," lazy filename matching is %s",
-					(othmode & OTH_LAZY) ? "on":"off");
-	addline(blistp,line,-1);
-#endif
-}
+#define MODES_LIST_NAME  ScratchName(Settings)
 
 /* listvalueset: print each value in the array according to type,
 	along with its name, until a NULL name is encountered.  Only print
 	if the value in the two arrays differs, or the second array is nil */
+static
 int
 listvalueset(names, values, globvalues)
 struct VALNAMES *names;
@@ -142,6 +106,32 @@ struct VAL *values, *globvalues;
 		bputc('\n');
 	return TRUE;
 }
+
+/* list the current modes into the current buffer */
+/* ARGSUSED */
+static
+void	makemodelist(dum1,ptr)
+	int dum1;
+	char *ptr;
+{
+	register WINDOW *localwp = (WINDOW *)ptr;  /* alignment okay */
+	register BUFFER *localbp = localwp->w_bufp;
+	bprintf("--- \"%s\" settings, if different than globals %*P\n",
+			localbp->b_bname, term.t_ncol-1, '-');
+	listvalueset(b_valuenames, localbp->b_values.bv, global_b_values.bv);
+	bputc('\n');
+	listvalueset(w_valuenames, localwp->w_values.wv, global_w_values.wv);
+	bprintf("--- Global settings %*P\n", term.t_ncol-1, '-');
+	listvalueset(b_valuenames, global_b_values.bv, (struct VAL *)0);
+	bputc('\n');
+	listvalueset(w_valuenames, global_w_values.wv, (struct VAL *)0);
+#if LAZY
+	lsprintf(line," lazy filename matching is %s",
+					(othmode & OTH_LAZY) ? "on":"off");
+	addline(blistp,line,-1);
+#endif
+}
+
 /*
  * Set tab size
  */
@@ -163,7 +153,7 @@ int f,n;
 		make_local_b_val(curbp,val);
 		set_b_val(curbp,val,n);
 		curtabval = n;
-		for (wp = wheadp; wp != NULL; wp = wp->w_wndp)
+		for_each_window(wp)
 			if (wp->w_bufp == curbp) wp->w_flag |= WFHARD;
 	} else if (f) {
 		mlforce("[Illegal tabstop value]");
@@ -197,147 +187,7 @@ int f,n;
 	return(TRUE);
 }
 
-
-/* ARGSUSED */
-int
-setmode(f, n)	/* prompt and set an editor mode */
-int f, n;	/* default and argument */
-{
-	return adjustmode(TRUE, FALSE);
-}
-
-/* ARGSUSED */
-int
-delmode(f, n)	/* prompt and delete an editor mode */
-int f, n;	/* default and argument */
-{
-	return adjustmode(FALSE, FALSE);
-}
-
-/* ARGSUSED */
-int
-setgmode(f, n)	/* prompt and set a global editor mode */
-int f, n;	/* default and argument */
-{
-	return adjustmode(TRUE, TRUE);
-}
-
-/* ARGSUSED */
-int
-delgmode(f, n)	/* prompt and delete a global editor mode */
-int f, n;	/* default and argument */
-{
-	return adjustmode(FALSE, TRUE);
-}
-
-
-int
-adjustmode(kind, global)	/* change the editor mode status */
-int kind;	/* true = set,		false = delete */
-int global; /* true = global flag,	false = current buffer flag */
-{
-	register char *scan;		/* scanning pointer to convert prompt */
-	register int i; 		/* loop index */
-	register s;		/* error return on input */
-#if COLOR
-	register int uflag; 	/* was modename uppercase?	*/
-#endif
-	char prompt[50];	/* string to prompt user with */
-	static char cbuf[NPAT]; 	/* buffer to receive mode name into */
-
-	/* build the proper prompt string */
-	if (global)
-		strcpy(prompt,"Global value: ");
-	else
-		strcpy(prompt,"Local value: ");
-
-
-	/* prompt the user and get an answer */
-
-	s = mlreply(prompt, cbuf, NPAT - 1);
-	if (s != TRUE)
-		return(s);
-
-	/* make it lowercase */
-
-	scan = cbuf;
-#if COLOR
-	uflag = isupper(*scan);
-#endif
-	while (*scan != '\0' && *scan != '=') {
-		if (isupper(*scan))
-			*scan = tolower(*scan);
-		scan++;
-	}
-
-	if (scan == cbuf) { /* no string */
-		s = FALSE;
-		goto errout;
-	}
-
-	if (!strcmp(cbuf,"all")) {
-		return listmodes(FALSE,1);
-	}
-
-	/* colors should become another kind of value, i.e. VAL_TYPE_COLOR,
-		and then this could be handled generically in adjvalueset() */
-	/* test it first against the colors we know */
-	for (i=0; i<NCOLORS; i++) {
-		if (strcmp(cbuf, cname[i]) == 0) {
-			/* finding the match, we set the color */
-#if COLOR
-			if (uflag)
-				if (global)
-					gfcolor = i;
-				else if (curwp)
-					set_w_val(curwp, WVAL_FCOLOR, i);
-			else
-				if (global)
-					gbcolor = i;
-				else if (curwp)
-					set_w_val(curwp, WVAL_BCOLOR, i);
-
-			if (curwp)
-				curwp->w_flag |= WFCOLR;
-#endif
-			mlerase();
-			return(TRUE);
-		}
-	}
-
-	s = adjvalueset(cbuf, kind, b_valuenames,
-		global ? global_b_values.bv : curbp->b_values.bv );
-	if (s == TRUE)
-		goto success;
-	s = adjvalueset(cbuf, kind, w_valuenames,
-		global ? global_w_values.wv : curwp->w_values.wv );
-	if (s == TRUE)
-		goto success;
-	if (s == FALSE) {
-	errout:
-		mlforce("[Not a legal set option: \"%s\"]", cbuf);
-	}
-	return s;
-
-success:
-	if (global) {
-		register WINDOW *wp;
-		for (wp = wheadp; wp != NULL; wp = wp->w_wndp)
-			wp->w_flag |= WFHARD|WFMODE;
-	} else {
-		curwp->w_flag |= WFHARD|WFMODE;
-	}
-
-	/* if the settings are up, redisplay them */
-	if (bfind(MODES_LIST_NAME, NO_CREAT, BFSCRTCH))
-		listmodes(FALSE,1);
-
-	refresh(FALSE,1);
-	mlerase();	/* erase the junk */
-
-	return TRUE;
-}
-
+static
 int
 adjvalueset(cp, kind, names, values)
 char *cp;
@@ -454,3 +304,158 @@ register struct VAL *values;
 	return TRUE;
 }
 
+/* ARGSUSED */
+int
+listmodes(f, n)
+int f,n;
+{
+	register WINDOW *wp = curwp;
+	register int s;
+
+	s = liststuff(MODES_LIST_NAME, makemodelist,0,(char *)wp);
+	/* back to the buffer whose modes we just listed */
+	(void)swbuffer(wp->w_bufp);
+	return s;
+}
+
+static
+int
+adjustmode(kind, global)	/* change the editor mode status */
+int kind;	/* true = set,		false = delete */
+int global; /* true = global flag,	false = current buffer flag */
+{
+	register char *scan;		/* scanning pointer to convert prompt */
+	register int i; 		/* loop index */
+	register s;		/* error return on input */
+#if COLOR
+	register int uflag; 	/* was modename uppercase?	*/
+#endif
+	char prompt[50];	/* string to prompt user with */
+	int autobuff = global_b_val(MDABUFF);
+	static char cbuf[NPAT]; 	/* buffer to receive mode name into */
+
+	/* build the proper prompt string */
+	(void)strcpy(prompt, global
+		? "Global value: "
+		: "Local value: ");
+
+
+	/* prompt the user and get an answer */
+
+	s = mlreply(prompt, cbuf, NPAT - 1);
+	if (s != TRUE)
+		return(s);
+
+	/* make it lowercase */
+
+	scan = cbuf;
+#if COLOR
+	uflag = isupper(*scan);
+#endif
+	while (*scan != '\0' && *scan != '=') {
+		if (isupper(*scan))
+			*scan = tolower(*scan);
+		scan++;
+	}
+
+	if (scan == cbuf) { /* no string */
+		s = FALSE;
+		goto errout;
+	}
+
+	if (!strcmp(cbuf,"all")) {
+		return listmodes(FALSE,1);
+	}
+
+	/* colors should become another kind of value, i.e. VAL_TYPE_COLOR,
+		and then this could be handled generically in adjvalueset() */
+	/* test it first against the colors we know */
+	for (i=0; i<NCOLORS; i++) {
+		if (strcmp(cbuf, cname[i]) == 0) {
+			/* finding the match, we set the color */
+#if COLOR
+			if (uflag)
+				if (global)
+					gfcolor = i;
+				else if (curwp)
+					set_w_val(curwp, WVAL_FCOLOR, i);
+			else
+				if (global)
+					gbcolor = i;
+				else if (curwp)
+					set_w_val(curwp, WVAL_BCOLOR, i);
+
+			if (curwp)
+				curwp->w_flag |= WFCOLR;
+#endif
+			mlerase();
+			return(TRUE);
+		}
+	}
+
+	s = adjvalueset(cbuf, kind, b_valuenames,
+		global ? global_b_values.bv : curbp->b_values.bv );
+	if (s == TRUE)
+		goto success;
+	s = adjvalueset(cbuf, kind, w_valuenames,
+		global ? global_w_values.wv : curwp->w_values.wv );
+	if (s == TRUE)
+		goto success;
+	if (s == FALSE) {
+	errout:
+		mlforce("[Not a legal set option: \"%s\"]", cbuf);
+	}
+	return s;
+
+success:
+	if (global) {
+		register WINDOW *wp;
+		for_each_window(wp)
+			wp->w_flag |= WFHARD|WFMODE;
+	} else {
+		curwp->w_flag |= WFHARD|WFMODE;
+	}
+
+	/* if the settings are up, redisplay them */
+	if (bfind(MODES_LIST_NAME, NO_CREAT, BFSCRTCH))
+		(void)listmodes(FALSE,1);
+
+	if (autobuff != global_b_val(MDABUFF)) sortlistbuffers();
+
+	(void)refresh(FALSE,1);
+	mlerase();	/* erase the junk */
+
+	return TRUE;
+}
+
+/* ARGSUSED */
+int
+setmode(f, n)	/* prompt and set an editor mode */
+int f, n;	/* default and argument */
+{
+	return adjustmode(TRUE, FALSE);
+}
+
+/* ARGSUSED */
+int
+delmode(f, n)	/* prompt and delete an editor mode */
+int f, n;	/* default and argument */
+{
+	return adjustmode(FALSE, FALSE);
+}
+
+/* ARGSUSED */
+int
+setgmode(f, n)	/* prompt and set a global editor mode */
+int f, n;	/* default and argument */
+{
+	return adjustmode(TRUE, TRUE);
+}
+
+/* ARGSUSED */
+int
+delgmode(f, n)	/* prompt and delete a global editor mode */
+int f, n;	/* default and argument */
+{
+	return adjustmode(FALSE, TRUE);
+}
