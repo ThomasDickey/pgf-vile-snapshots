@@ -3,7 +3,16 @@
  * attached to keys that the user actually types.
  *
  * $Log: window.c,v $
- * Revision 1.7  1991/08/07 12:35:07  pgf
+ * Revision 1.10  1991/10/22 14:08:23  pgf
+ * took out old ifdef BEFORE code
+ *
+ * Revision 1.9  1991/09/30  01:47:24  pgf
+ * keep sideways motions local to a window
+ *
+ * Revision 1.8  1991/09/26  13:09:55  pgf
+ * w_sideways is now one of the window values
+ *
+ * Revision 1.7  1991/08/07  12:35:07  pgf
  * added RCS log messages
  *
  * revision 1.6
@@ -275,12 +284,14 @@ mvrightwind(f,n)
 	else
 		move = term.t_ncol/3;
 
-	if (curwp->w_sideways + move > (col = getccol(FALSE)) - 1) {
+	if (w_val(curwp, WVAL_SIDEWAYS) + move > (col = getccol(FALSE)) - 1) {
 		TTbeep();
 		return FALSE;
 	}
 
-	curwp->w_sideways += move;
+	make_local_w_val(curwp,WVAL_SIDEWAYS);
+
+	w_val(curwp, WVAL_SIDEWAYS) += move;
 
         curwp->w_flag  |= WFHARD|WFMOVE;
 
@@ -289,13 +300,14 @@ mvrightwind(f,n)
 
 mvleftwind(f,n)
 {
+	make_local_w_val(curwp,WVAL_SIDEWAYS);
 	if (f)
-		curwp->w_sideways -= n;
+		w_val(curwp, WVAL_SIDEWAYS) -= n;
 	else
-		curwp->w_sideways -= term.t_ncol/3;
+		w_val(curwp, WVAL_SIDEWAYS) -= term.t_ncol/3;
 
-	if (curwp->w_sideways < 0)
-		curwp->w_sideways = 0;
+	if (w_val(curwp, WVAL_SIDEWAYS) < 0)
+		w_val(curwp, WVAL_SIDEWAYS) = 0;
 
         curwp->w_flag  |= WFHARD|WFMOVE;
 
@@ -625,15 +637,6 @@ WINDOW  *
 wpopup()
 {
         register WINDOW *wp;
-#if BEFORE
-        if (wheadp->w_wndp == NULL              /* Only 1 window        */
-        	&& splitwind(FALSE, 0) == NULL) /* and it won't split   */
-                return (NULL);
-        wp = wheadp;                            /* Find window to use   */
-        while (wp!=NULL && wp==curwp)
-                wp = wp->w_wndp;
-        return wp;
-#else
         register WINDOW *owp;
         register WINDOW *biggest_wp;
 	int s;
@@ -649,17 +652,11 @@ wpopup()
 	wp = splitwind(FALSE,0); /* yes -- choose the unoccupied half */
 	curwp = owp;
 	if (s == FALSE ) { /* maybe biggest_wp was too small  */
-#ifdef NEEDED
-		if (wheadp->w_wndp == NULL	/* Only 1 window	*/
-			&& splitwind(FALSE, 0) == NULL)/* and it won't split */
-			return (NULL);
-#endif
 		wp = wheadp;		/* Find window to use	*/
 	        while (wp!=NULL && wp==curwp) /* uppermost non-current window */
 	                wp = wp->w_wndp;
 	}
         return wp;
-#endif
 }
 
 scrnextup(f, n)		/* scroll the next window up (back) a page */

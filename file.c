@@ -6,7 +6,32 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.15  1991/08/12 09:25:10  pgf
+ * Revision 1.22  1991/10/20 23:07:13  pgf
+ * shorten the big file buffer if we don't use it all due to long lines
+ *
+ * Revision 1.21  1991/10/18  01:17:34  pgf
+ * don't seek too far when long lines found in quickread
+ *
+ * Revision 1.20  1991/10/10  12:33:33  pgf
+ * changes to support "block malloc" of line text -- now for most files
+ * there is are two mallocs and a single read, no copies.  previously there
+ * were two mallocs per line, and two copies (stdio's and ours).  This change
+ * implies that lines and line text should not move between buffers, without
+ * checking that the text and line struct do not "belong" to the buffer.
+ *
+ * Revision 1.19  1991/09/24  01:19:14  pgf
+ * don't let buffer name change needlessly in fileread() (:e!)
+ *
+ * Revision 1.18  1991/09/13  01:47:09  pgf
+ * lone ":f" now gives same info as ^G
+ *
+ * Revision 1.17  1991/09/10  01:52:21  pgf
+ * buffer name now changes to match filename after ":e!" command (fileread)
+ *
+ * Revision 1.16  1991/08/16  10:59:35  pgf
+ * added WFKILLS to pipe-reading updates, so scrolling gets invoked
+ *
+ * Revision 1.15  1991/08/12  09:25:10  pgf
  * now store w_line in w_traits while buffer is offscreen, so reframe
  * isn't always necessary.  don't force reframe on redisplay.
  *
@@ -89,6 +114,8 @@ fileread(f, n)
 {
         register int    s;
         static char fname[NFILEN];
+        char bname[NBUFN];
+        char bname1[NBUFN];
 
         if ((s=mlreply("Replace with file: ", fname, NFILEN)) != TRUE)
                 return s;
@@ -96,7 +123,12 @@ fileread(f, n)
 		return FALSE;
 	/* we want no errors or complaints, so mark it unchanged */
 	curbp->b_flag &= ~BFCHG;
-        return readin(fname, TRUE, curbp, TRUE);
+        s = readin(fname, TRUE, curbp, TRUE);
+	curbp->b_bname[0] = 0;
+	makename(bname, fname);
+	unqname(bname, TRUE);
+	strcpy(curbp->b_bname, bname);
+	return s;
 }
 
 /*
@@ -263,13 +295,8 @@ int	mflg;		/* print messages? */
 {
         register WINDOW *wp;
         register int    s;
-        register int    nline;
-        int    len;
+        int    nline;
 	char *errst;
-	int flag = 0;
-#if UNIX
-        int    done_update = FALSE;
-#endif
 #if VMALLOC
 	extern int doverifys;
 	int odv;
@@ -319,41 +346,11 @@ int	mflg;		/* print messages? */
 	odv = doverifys;
 	doverifys = 0;
 #endif
-        while ((s = ffgetline(&len)) == FIOSUC) {
-		if (addline(bp,fline,len) != TRUE) {
-                        s = FIOMEM;             /* Keep message on the  */
-                        break;                  /* display.             */
-                } else {
-#if UNIX
-                	/* reading from a pipe, and internal? */
-			if (fileispipe && !ffhasdata()) {
-				flag |= WFEDIT;
-				if (!done_update || bp->b_nwnd > 1)
-					flag |= WFHARD;
-			        for (wp=wheadp; wp!=NULL; wp=wp->w_wndp) {
-			                if (wp->w_bufp == bp) {
-			                        wp->w_line.l=
-							lforw(bp->b_line.l);
-			                        wp->w_dot.l =
-							lback(bp->b_line.l);
-			                        wp->w_dot.o = 0;
-						wp->w_flag |= flag;
-			                }
-			        }
-				set_b_val(bp, MDDOS, 
-					dosfile && global_b_val(MDDOS) );
-				curwp->w_flag |= WFMODE;
-				update(FALSE);
-				done_update = TRUE;
-				flag = 0;
-			} else {
-				flag |= WFHARD;
-			}
-			
-		}
-#endif
-                ++nline;
-        }
+	if (fileispipe || (s = quickreadf(bp, &nline)) == FIOMEM)
+		s = slowreadf(bp, &nline);
+
+	if (s == FIOERR)
+		goto out;
 #if VMALLOC
 	doverifys = odv;
 #endif
@@ -427,10 +424,183 @@ out:
         return TRUE;
 }
 
+quickreadf(bp, nlinep)
+register BUFFER *bp;
+int *nlinep;
+{
+        register unsigned char *textp;
+        unsigned char *countp;
+        WINDOW *wp;
+	int s;
+	int flag = 0;
+        int nlines;
+        int incomplete = FALSE;
+	long len;
+	long ffsize();
+#if UNIX
+        int    done_update = FALSE;
+#endif
+	if ((len = ffsize()) < 0)
+		return FIOERR;
+
+	/* leave an extra byte at the front, for the length of the first
+		line.  after that, lengths go in place of the newline at
+		the end of the previous line */
+	bp->b_ltext = (unsigned char *)malloc(len + 1);
+	if (bp->b_ltext == NULL)
+		return FIOMEM;
+
+	if ((len = ffread(&bp->b_ltext[1], len)) < 0) {
+		free(bp->b_ltext);
+		bp->b_ltext = NULL;
+		return FIOERR;
+	}
+
+
+ retry:
+	/* loop through the buffer, replacing all newlines with the
+		length of the _following_ line */
+	bp->b_ltext_end = bp->b_ltext + len + 1;
+	countp = bp->b_ltext;
+	textp = countp + 1;
+        nlines = 0;
+	while (len--) {
+		if (*textp == '\n') {
+			if (textp - countp < 255) {
+				*countp = textp - countp - 1;
+				countp = textp;
+			} else {
+				len = (long)(countp - bp->b_ltext);
+				incomplete = TRUE;
+				/* we'll re-read the rest later */
+				ffseek(len);
+				if ((unsigned char *)realloc(bp->b_ltext, len)
+													!= bp->b_ltext) {
+					/* ugh.  can this happen?
+						we're reducing the size... */
+					ffrewind();
+					if ((len = ffread(&bp->b_ltext[1],
+							len)) < 0) {
+						free(bp->b_ltext);
+						bp->b_ltext = NULL;
+						return FIOERR;
+					}
+					goto retry;
+				}
+				break;
+			}
+			nlines++;
+		}
+		++textp;
+	}
+
+	/* dbgwrite("lines %d, chars %d", nlines, textp - bp->b_ltext); */
+
+	/* allocate all of the line structs we'll need */
+	bp->b_LINEs = (LINE *)malloc(nlines * sizeof(LINE));
+	if (bp->b_LINEs == NULL) {
+		free(bp->b_ltext);
+		bp->b_ltext = NULL;
+		ffrewind();
+		return FIOMEM;
+	}
+	bp->b_LINEs_end = bp->b_LINEs + nlines;
+
+	/* loop through the buffer again, creating line data structure for
+		each line */
+	{
+		register LINE *lp;
+		lp = bp->b_LINEs;
+		textp = bp->b_ltext;
+		while (lp != bp->b_LINEs_end) {
+			lp->l_used = *textp;
+			lp->l_size = *textp + 1;
+			lp->l_text = (char *)textp + 1;
+			lp->l_fp = lp + 1;
+			lp->l_bp = lp - 1;
+			lsetclear(lp);
+			lp->l_nxtundo = NULL;
+			lp++;
+			textp += *textp + 1;
+		}
+		/*
+		if (textp != bp->b_ltext_end - 1)
+			mlwrite("BUG: textp not equal to l_text_end %d %d",
+				textp,bp->b_ltext_end);
+		*/
+		lp--;  /* point at last line again */
+
+		/* connect the end of the list */
+		lp->l_fp = bp->b_line.l;
+		bp->b_line.l->l_bp = lp;
+
+		/* connect the front of the list */
+		bp->b_LINEs->l_bp = bp->b_line.l;
+		bp->b_line.l->l_fp = bp->b_LINEs;
+	}
+
+	*nlinep = nlines;
+
+	if (incomplete)
+		return FIOMEM;
+	return FIOSUC;
+}
+
+slowreadf(bp, nlinep)
+register BUFFER *bp;
+long *nlinep;
+{
+        register WINDOW *wp;
+	int s;
+	int flag = 0;
+        int len;
+#if UNIX
+        int    done_update = FALSE;
+#endif
+        while ((s = ffgetline(&len)) == FIOSUC) {
+		if (addline(bp,fline,len) != TRUE) {
+                        s = FIOMEM;             /* Keep message on the  */
+                        break;                  /* display.             */
+                } else {
+#if UNIX
+                	/* reading from a pipe, and internal? */
+			if (fileispipe && !ffhasdata()) {
+				flag |= WFEDIT;
+				if (!done_update || bp->b_nwnd > 1)
+					flag |= WFHARD;
+			        for (wp=wheadp; wp!=NULL; wp=wp->w_wndp) {
+			                if (wp->w_bufp == bp) {
+			                        wp->w_line.l=
+							lforw(bp->b_line.l);
+			                        wp->w_dot.l =
+							lback(bp->b_line.l);
+			                        wp->w_dot.o = 0;
+						wp->w_flag |= flag;
+			                }
+			        }
+				/* track changes in dosfile as lines arrive */
+				set_b_val(bp, MDDOS, 
+					dosfile && global_b_val(MDDOS) );
+				curwp->w_flag |= WFMODE|WFKILLS;
+				update(FALSE);
+				done_update = TRUE;
+				flag = 0;
+			} else {
+				flag |= WFHARD;
+			}
+			
+		}
+#endif
+                ++(*nlinep);
+        }
+	return s;
+}
+
 /* utility routine for no. of lines read */
 readlinesmsg(n,s,f,rdonly)
+long n;
 {
-	mlwrite("[%sRead %d line%s from \"%s\"%s]",
+	mlwrite("[%sRead %ld line%s from \"%s\"%s]",
      (s==FIOERR ? "I/O ERROR, " : (s == FIOMEM ? "OUT OF MEMORY, ":"")),
 	n, n != 1 ? "s":"", f, rdonly ? "  (read-only)":"" );
 }
@@ -882,6 +1052,9 @@ filename(f, n)
         register int    s;
         static char            fname[NFILEN];
 
+	if (isnamedcmd && lastkey == '\r') {
+		return showcpos();
+	}
         if ((s=mlreply("Name: ", fname, NFILEN)) == ABORT)
                 return s;
 	if ((s = glob(fname)) != TRUE)
@@ -945,7 +1118,7 @@ FILE *haveffp;
 
 	nline = 0;
 	while ((s=ffgetline(&nbytes)) == FIOSUC) {
-		if ((lp1=lalloc(nbytes)) == NULL) {
+		if ((lp1=lalloc(nbytes,curbp)) == NULL) {
 			s = FIOMEM;		/* Keep message on the	*/
 			break;			/* display.		*/
 		}

@@ -2,7 +2,13 @@
  *		written by John Hutchinson, heavily modified by Paul Fox
  *
  * $Log: npopen.c,v $
- * Revision 1.5  1991/08/07 12:35:07  pgf
+ * Revision 1.7  1991/10/22 14:08:23  pgf
+ * took out old ifdef BEFORE code
+ *
+ * Revision 1.6  1991/10/21  13:39:54  pgf
+ * plugged file descriptor leak
+ *
+ * Revision 1.5  1991/08/07  12:35:07  pgf
  * added RCS log messages
  *
  * revision 1.4
@@ -56,10 +62,13 @@ char *cmd, *type;
 	if (inout_popen(&fr, &fw, cmd) != TRUE)
 		return NULL;
 
-	if (*type == 'r')
+	if (*type == 'r') {
+		fclose(fw);
 		return fr;
-	else
+	} else {
+		fclose(fr);
 		return fw;
+	}
 }
 
 inout_popen(fr, fw, cmd)
@@ -93,19 +102,13 @@ char *cmd;
 			fprintf(stderr,"fdopen r failed\n");
 			abort();
 		}
-#ifdef BEFORE
-		setbuf(*fr,NULL);
-#endif
 		(void) close (rp[1]);
 
 		*fw = fdopen (wp[1], "w");
 		if (*fw == NULL) {
-			fprintf(stderr,"fdopen r failed\n");
+			fprintf(stderr,"fdopen w failed\n");
 			abort();
 		}
-#ifdef BEFORE
-		setbuf(*fw,NULL);
-#endif
 		(void) close (wp[0]);
 		return TRUE;
 

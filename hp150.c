@@ -5,7 +5,10 @@
  * added by Daniel Lawrence
  *
  * $Log: hp150.c,v $
- * Revision 1.2  1991/08/07 12:35:07  pgf
+ * Revision 1.3  1991/09/10 01:19:35  pgf
+ * re-tabbed, and moved ESC and BEL to estruct.h
+ *
+ * Revision 1.2  1991/08/07  12:35:07  pgf
  * added RCS log messages
  *
  * revision 1.1
@@ -13,34 +16,32 @@
  * initial vile RCS revision
  */
 
-#define	termdef	1			/* don't define "term" external */
+#define termdef 1			/* don't define "term" external */
 
-#include        <stdio.h>
-#include        "estruct.h"
+#include	<stdio.h>
+#include	"estruct.h"
 #include	"edef.h"
 
-#if     HP150
+#if	HP150
 
-#define NROW    24                      /* Screen size.                 */
-#define NCOL    80                      /* Edit if you want to.         */
-#define	MARGIN	8			/* size of minimim margin and	*/
-#define	SCRSIZ	64			/* scroll size for extended lines */
-#define	NPAUSE	15			/* # times thru update to pause */
-#define BEL     0x07                    /* BEL character.               */
-#define ESC     0x1B                    /* ESC character.               */
+#define NROW	24			/* Screen size. 		*/
+#define NCOL	80			/* Edit if you want to. 	*/
+#define MARGIN	8			/* size of minimim margin and	*/
+#define SCRSIZ	64			/* scroll size for extended lines */
+#define NPAUSE	15			/* # times thru update to pause */
 
-extern  int     openhp();               /* Forward references.          */
-extern  int     ttgetc();
-extern  int     ttputc();
-extern  int     ttflush();
+extern	int	openhp();		/* Forward references.		*/
+extern	int	ttgetc();
+extern	int	ttputc();
+extern	int	ttflush();
 extern	int	hpflush();
-extern  int     closehp();
+extern	int	closehp();
 extern	int	hp15kopen();
 extern	int	hp15kclose();
-extern  int     hp15move();
-extern  int     hp15eeol();
-extern  int     hp15eeop();
-extern  int     hp15beep();
+extern	int	hp15move();
+extern	int	hp15eeol();
+extern	int	hp15eeop();
+extern	int	hp15beep();
 extern	int	gethpkey();
 extern	int	hp15rev();
 extern	int	hp15cres();
@@ -88,27 +89,27 @@ int capslock = 0;	/* caps lock flag */
  * Standard terminal interface dispatch table. Most of the fields point into
  * "termio" code.
  */
-TERM    term    = {
+TERM	term	= {
 	NROW-1,
-        NROW-1,
-        NCOL,
-        NCOL,
+	NROW-1,
+	NCOL,
+	NCOL,
 	MARGIN,
 	SCRSIZ,
 	NPAUSE,
 	openhp,
-        closehp,
+	closehp,
 	hp15kopen,
 	hp15kclose,
 	gethpkey,
-        ttputc,
-        hpflush,
-        hp15move,
-        hp15eeol,
-        hp15eeop,
-        hp15beep,
-        hp15rev,
-        hp15cres
+	ttputc,
+	hpflush,
+	hp15move,
+	hp15eeol,
+	hp15eeop,
+	hp15beep,
+	hp15rev,
+	hp15cres
 #if	COLOR
 	, hp15fcol,
 	hp15bcol
@@ -117,13 +118,13 @@ TERM    term    = {
 
 hp15move(row, col)
 {
-        ttputc(ESC);
-        ttputc('&');
-        ttputc('a');
-        hp15parm(col);
-        ttputc('c');
-        hp15parm(row);
-        ttputc('R');
+	ttputc(ESC);
+	ttputc('&');
+	ttputc('a');
+	hp15parm(col);
+	ttputc('c');
+	hp15parm(row);
+	ttputc('R');
 }
 
 hpflush()
@@ -134,17 +135,17 @@ hpflush()
 
 hp15eeol()
 {
-        ttputc(ESC);
-        ttputc('K');
+	ttputc(ESC);
+	ttputc('K');
 }
 
 hp15eeop()
 {
-        ttputc(ESC);
-        ttputc('J');
+	ttputc(ESC);
+	ttputc('J');
 }
 
-hp15rev(status)		/* change the reverse video status */
+hp15rev(status) 	/* change the reverse video status */
 
 int status;	/* TRUE = on, FALSE = off */
 
@@ -169,19 +170,19 @@ spal()		/* change pallette register */
 
 hp15beep()
 {
-        ttputc(BEL);
-        ttflush();
+	ttputc(BEL);
+	ttflush();
 }
 
 hp15parm(n)
-register int    n;
+register int	n;
 {
-        register int    q;
+	register int	q;
 
-        q = n/10;
-        if (q != 0)
-                hp15parm(q);
-        ttputc((n%10) + '0');
+	q = n/10;
+	if (q != 0)
+		hp15parm(q);
+	ttputc((n%10) + '0');
 }
 
 #if	COLOR
@@ -204,7 +205,7 @@ gethpkey()	/* get a key from the HP keyboard while in keycode mode */
 	int ctype;			/* type of character gotten */
 	int shiftb;			/* state of shift keys */
 	int i;
-	
+        
 	/* if we are in an extended char sequence, finish it */
 	if (keepflag != 0) {
 		keepflag = 0;
@@ -216,7 +217,7 @@ next:	shiftb = ttgetc();
 	devid = ttgetc();
 	c = ttgetc();
 	ttgetc();		/* skip null byte */
-	
+        
 	/* make sure we are from the keyboard */
 	if (devid != 192)
 		goto next;
@@ -266,7 +267,7 @@ hp15kopen()		/* open the HP150 keyboard for input */
 	/* Turn on RAW mode with MSDOS call 44h */
 	rawon();
 
-	/* Turn off Control-C checking  MS-DOS 33h */
+	/* Turn off Control-C checking	MS-DOS 33h */
 	ckeyoff();
 
 	/* Turn on keycode mode with AGIOS call (0,43) */
@@ -281,7 +282,7 @@ hp15kclose()		/* close the HP150 keyboard for input */
 {
 	/* define key charectoristics with AGIOS call (0, 40) */
 	undefkey();
-	
+        
 	/* Turn off RAW mode with MSDOS call 44h */
 	rawoff();
 
@@ -292,23 +293,23 @@ hp15kclose()		/* close the HP150 keyboard for input */
 	keycoff();
 }
 
-rawon()		/* put the HP150 keyboard into RAW mode */
+rawon() 	/* put the HP150 keyboard into RAW mode */
 
 {
 	/* get the IO control info */
 
 	r.x.ax = 0x4400;	/* IO ctrl get device information */
 	r.x.bx = 0x0001;	/* File handle; 1 for console */
-	intdos(&r, &r);		/* go fer it */
+	intdos(&r, &r); 	/* go fer it */
 
 	r.h.dh = 0;		/* clear high byte for put */
-	r.h.dl |= 0x20;		/* set raw bit */
+	r.h.dl |= 0x20; 	/* set raw bit */
 
 	/* and put it back */
 
 	r.x.ax = 0x4401;	/* IO ctrl put device information */
 	r.x.bx = 0x0001;	/* File handle; 1 for console */
-	intdos(&r, &r);		/* go fer it */
+	intdos(&r, &r); 	/* go fer it */
 }
 
 rawoff()	/* put the HP150 keyboard into COOKED mode */
@@ -318,16 +319,16 @@ rawoff()	/* put the HP150 keyboard into COOKED mode */
 
 	r.x.ax = 0x4400;	/* IO ctrl get device information */
 	r.x.bx = 0x0001;	/* File handle; 1 for console */
-	intdos(&r, &r);		/* go fer it */
+	intdos(&r, &r); 	/* go fer it */
 
 	r.h.dh = 0;		/* clear high byte for put */
-	r.h.dl &= 0xdf;		/* set raw bit */
+	r.h.dl &= 0xdf; 	/* set raw bit */
 
 	/* and put it back */
 
 	r.x.ax = 0x4401;	/* IO ctrl put device information */
 	r.x.bx = 0x0001;	/* File handle; 1 for console */
-	intdos(&r, &r);		/* go fer it */
+	intdos(&r, &r); 	/* go fer it */
 }
 
 
@@ -353,7 +354,7 @@ ckeyon()	/* turn control-C trapping on */
 #undef	unsigned
 #endif
 
-agios(buf, len)	/* perform an AGIOS call */
+agios(buf, len) /* perform an AGIOS call */
 
 char *buf;	/* sequence of bytes in command */
 int len;	/* length of command in bytes */
@@ -362,8 +363,8 @@ int len;	/* length of command in bytes */
 	r.x.ax = 0x4403;	/* I/O ctrl write */
 	r.x.bx = 1;		/* console handle */
 	r.x.cx = len;		/* buffer length */
-	r.x.dx = (unsigned)buf;	/* buffer address */
-	return(intdos(&r, &r));	/* do it */
+	r.x.dx = (unsigned)buf; /* buffer address */
+	return(intdos(&r, &r)); /* do it */
 }
 
 keycon()	/* turn keycode mode on */
@@ -413,13 +414,13 @@ int f,n;	/* default flag, numeric argument */
 
 {
 	register int status;	/* return status */
-	register int i;		/* loop index */
+	register int i; 	/* loop index */
 	char lbl[17];	/* returned label contents */
 	/* AGIOS command buffer */
 	static char cmd[] = {8, 0, 1, 0, 7, 7, 7, 7, 10, 0, 10, 0};
-	/*                   code  key#  ptr to      top    bottom
-	                                 label string  attribute */
-	union {		/* union to cast ptr into AGIOS arg string */
+	/*		     code  key#  ptr to      top    bottom
+					 label string  attribute */
+	union { 	/* union to cast ptr into AGIOS arg string */
 		char *ptr;	/* pointer to arg string */
 		char cstr[4];
 	} ptru;

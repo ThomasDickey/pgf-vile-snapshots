@@ -14,12 +14,12 @@ Getting along with vile
 		:q
 		:quit
 		:exit
-		:wq	(writes the file before quitting)
-		:q!	(quits without writing changes!)
+		:wq	(writes current buffer before quitting)
+		:q!	(quits without writing any changes!)
 		Q
-		ZZ	(will write all unwritten buffers)
+		:wwq or ZZ	(will write all changed buffers)
 		^X-^C	(don't know why.  _They_ don't put in ":q" for _us_!
-			 actually, if ^C is your interrupt character, this
+			 Actually, if ^C is your interrupt character, this
 			 won't get you out of vile.)
 
 	To get help (probably just this text), use any of:
@@ -78,8 +78,10 @@ Buffer manipulation commands:
 	:e	Edit a file.  If the file is already in a buffer, that buffer
 		will be recalled into the current window.
 
-	:e!	Re-edit a file.  A different filename can be given, but the 
-		buffer name will not change to match it. 
+	:e!	Re-edit a file.  A different filename can be given, and the 
+		buffer name will change to match it.  This command is not as
+		necessary in vile as it is in vi, since multiple buffers may
+		have outstanding unwritten changes.
 
 	^X-e	Edit the file whose pathname appears under the cursor.  That
 		is, if you are editing a makefile, you could edit one of the
@@ -123,16 +125,13 @@ Buffer manipulation commands:
 
 Window manipulation commands:  
 -----------------------------
-	^T	Make Two windows.  Splits the current window in half. This
+	^X-2	Make Two windows.  Splits the current window in half. This
 		is the usual way to create a new window.
 	^K	Get rid of (Kill) this window.
 	^O	Make this the Only window on the screen.
 
-		The emacs-style commands ^X-2, ^X-0, and ^X-1 are also 
-		included, and are synonymous with ^T, ^K, and ^O.
-
-	^N	Go to the next window on the screen.
-	^P	Go to the previous window on the screen.
+		The emacs-style commands ^X-0, and ^X-1 are also 
+		included, and are synonymous with ^K, and ^O.
 
 		These two commands may be disturbing to vi users who use
 		^N and ^P to move between lines.  See the examples under
@@ -153,9 +152,9 @@ Window manipulation commands:
 		bottom of the screen, respectively.
 
 	^X-^R	Scroll the window right by 1/3 of a screen, or by the
-		number of lines specifed.
+		number of lines specifed.  Changes the "sideways" value.
 	^X-^L	Scroll the window left by 1/3 of a screen, or by the
-		number of lines specifed.
+		number of lines specifed.  Changes the "sideways" value.
 
 	If for some reason you can't get your screen set right via a
 	TERM variable, try the ":screen-rows" or ":screen-columns"
@@ -164,10 +163,13 @@ Window manipulation commands:
 
 File manipulation commands:  
 ---------------------------
-	The usual :e, :r, :f, :w commands are available, though only
-	":e!" is available of the "!" options.  The :r command reads the
+	The usual ":e", ":r", ":f", ":w" commands are available, though only
+	":e!" is available of the "!" options.  The ":r" command reads the
 	named file in after the current line.  To read a file before the
 	first line, use ":0r".
+
+	The commands ":ww" and ":wwq" correspond roughly to ":w" and ":wq",
+	but they each write all modified buffers.
 	
 	As in vi, ranges of lines specified by line numbers (including '.',
 	'$', and '%' shorthands) or marks may precede these commands.  
@@ -244,6 +246,10 @@ Text manipulation command:
 	trim (trim trailing whitespace).  For example, ":g/pattern/Put"
 	will insert the contents of the default yank register just
 	above every line containing "pattern". 
+
+	The substiture command can be followed by any of 'g', a digit, or
+	'p', to do the substitution for all occurrences, the n'th
+	occurrence, or to print the resulting line respectively.
 
 	Operators
 	---------
@@ -344,20 +350,21 @@ Text manipulation command:
 		to that file and location.
 	^]	Uses the identifier currently under the cursor as the 
 		tagname.
-	^X-^] "Un-tag" - pops to the file and location just previous to the
-		last tag command.  (Some versions of vi have this command
-		attached to ^T.  You can use ":bind-key untag-pop ^T" to
-		get this back, if you're willing to lose '^T' as the window
-		splitting command.  You can use '^X-2' (or rebind it) for
-		that instead.)
-
+	^T or ^X-^] "Un-tag" - pops to the file and location just previous
+		to the last tag command.  (Some versions of vi have this
+		command attached to ^T.  You can use ":bind-key untag-pop
+		^T" to get this back, if you're willing to lose '^T' as the
+		window splitting command.  You can use '^X-2' (or rebind
+		it) for that instead.)
 	When one of these commands is used, vile will look for a file named
 	"tags" in the current directory, and load it into a hidden buffer
 	for use during tag searches.  This buffer is editable if you wish
 	(":e tags"), but will not appear in the buffer lists.  If a buffer
 	named "tags" is already available when a tag is first requested, it
 	will be used instead of a file called "tags", and of course will
-	remain visible.
+	remain visible.  If the ":ta" form of the command is used, tag
+	matches must be exact, unless "taglength" is set non-zero, in which
+	case the first tag matching that many characters will be used.
 
 	^A-o	Remove all blank lines containing or immediately following
 		the current line.
@@ -387,56 +394,37 @@ Miscellaneous commands
 
 Editor modes
 ------------
-	Modes are associated with buffers, and are inherited from a set of
-	global modes.  To set a mode on a buffer, use ":set", to remove the
-	mode, use ":unset", ":setno", or ":set" with the modename prefixed
-	with "no".  To set and reset global modes, use ":setg", ":unsetg",
-	":setgno".  To display modes, use ":setall", ":modes", or
-	":setgall", ":gmodes".  (The modename "all" is also accepted as a
-	dummy mode, which sets nothing, but display instead.  So vi's "set all"
-	works as well.)  The possible modes are:
+	Modes are associated with either windows or buffers, and are
+	usually inherited from a set of global modes.  The value of the
+	mode will track changes to the global modes, until the "local"
+	value is set independently of the global one.  To set or change a
+	global mode, use ":set", to remove the mode, use ":unset",
+	":setno", or ":set" with the modename prefixed with "no".  To set
+	and reset local modes, use ":setl", ":unsetl", ":setlno".  To
+	display modes, use ":setall", ":modes", ":set all".  Local values
+	are only shown if they differ from the global values, whether they
+	have been independently set or not.  The possible modes (with
+	synonyms in parentheses, and a trailing B or W indicating whether
+	the mode belongs to buffers or windows) are:
 
-	wrap	similar to vi's auto-wrap mode.  While inserting, words are
-		moved to the next line if the current line gets too long.
-		Unlike vi, wrapping is only attempted when a space is typed.
+	autoindent (ai) During insert, newly created lines inherit their
+		leading indent from the line above in the buffer. (B)
+
+	autosave (as) Automatic file saving.  Writes the file after every
+		256 characters of inserted text.  Other file changes are
+		not counted. (B)
 
 	cmode	C-code mode..  Maintains current indentation level
-		automatically during insert.  If a line ends with a '{',
-		then the next line tabs in further.  If a line begins with
-		a '}', it is lined up with its matching paired brace.  If a
-		line starts with '#' it is started at the beginning of
-		line.  If the global CMODE is set, then the buffer's mode
-		is turned on automatically only for files ending in ".c" or
-		".h".  A common mistake is to put "set cmode" in a .vilerc
-		file.  One almost always wants "setg cmode".
-
-	swrap	Scanwrap mode.  Text searches will continue from past the
-		bottom of the file to the top, and vice-versa.
-
-	exact	Text searches must match the pattern exactly.  Otherwise,
-		searches are case-insensitive.
-
-	view	View the file only.  No changes are permitted.  This is set
-		automatically for the output of shell commands. 
-
-	magic	Allow meta-characters in search strings.  Otherwise,
-		strings are taken literally.  Meta characters available are:
-		^ - matches beginning of line
-		$ - matches end of line
-		. - matches any single character
-		* - matches any number of the previous character
-		[...] - matches a character class
-		\ - take the next character literally
-
-	asave	Automatic file saving.  Writes the file after every 256 
-		characters of inserted text.  Other file changes are not 
-		counted.
+		automatically during insert, like autoindent, above.  If a
+		line ends with a '{', then the next line indents further. 
+		If a line begins with a '}', it is lined up with the line
+		containing its matching paired brace.  If a line starts
+		with '#' it is moved to column 1.  If the global cmode is
+		set, then the buffer's C mode is turned on automatically
+		only for files ending in a character from c-suffixes. (B)
 
 	crypt	Causes files to be encrypted.  This is NOT compatible
-		with the UNIX crypt(1) routines.
-
-	list	The buffer will be displayed with tabs and newlines made
-		visible, instead of as whitespace.
+		with the UNIX crypt(1) routines. (B)
 
 	dos	When writing the buffer, terminate lines with CR/LF pairs,
                 rather than the usual single LF.  On input, if the global
@@ -444,27 +432,57 @@ Editor modes
 		line terminators, and the local DOS mode is set on the
 		buffer if the majority of lines ended that way.  If global
 		DOS mode is _not_ set, then incoming CR characters will be
-		visible on the screen. 
+		visible on the screen.  (B)
 
-	aindent Similar to C mode, above, but works for any buffer, and is
-		not sensitive to {, }, or #.  Attempts to align new lines
-		of text with previous lines.
+	ignorecase (ic) Text searches normally match the pattern exactly.
+		With this set, searches are case-insensitive. (B)
 
-	lazy	If an attempt is made to edit a file (with ":e filename")
-		which does not exist in the current directory, vile will
-		try looking for a file of the same name (but in a different
-		directory) which has been referenced in the tags file. 
-		This mode is global to the editor, and is not "inherited"
-		by buffers.  It's not very fast, either.
+	list	(li) The buffer will be displayed with tabs and newlines made
+		visible, instead of as whitespace. (W)
 
-	tabstop Will prompt for a new value for spacing of tabstops.  The
-		only supported values are 2, 4, 8, and 16.  This value is,
-		unfortunately, not settable on a per-buffer basis. 
+	magic	Allow meta-characters in search strings.  Otherwise,
+		strings are taken literally.  Meta characters available are: (B)
+		^ - matches beginning of line
+		$ - matches end of line
+		. - matches any single character
+		* - matches any number of the previous character
+		[...] - matches a character class
+		\ - take the next character literally
 
-	fillcol Will prompt for a new value for the fill column, where
-		auto-wrapping and region formatting will break lines.  This
-		value is, unfortunately, not settable on a per-buffer
-		basis. 
+	showmatch (sm) During insert, if a closing '}', ']', or ')' character
+		is typed, the cursor will highlight the matching member
+		of the pair for about a quarter second. (B)
+
+	wrapscan (ws) Scanwrap mode.  Text searches will continue from past
+		the bottom of the file to the top, and vice-versa. (B)
+
+	view	View the file only.  No changes are permitted.  This is set
+		automatically for the output of shell commands.  (B)
+
+	wrapwords (ww) Similar to vi's auto-wrap mode.  While inserting,
+		words are moved to the next line if the current line gets
+		too long.  Unlike vi, wrapping is only attempted when a
+		space is typed. (B)
+
+	c-tabstop Will prompt for a new value for spacing of tabstops for
+		use if a file is in cmode. (B)
+
+	tabstop (ts) Will prompt for a new value for spacing of normal
+		tabstops. (B)
+
+	taglength (tl) Sets the significant length for tags.  If non-zero,
+		the first tag matching in that many characters will be used,
+		otherwise, tags must match the lookup pattern exactly.  This
+		will not effect tags picked up from the cursor -- they are
+		always matched exactly. (B)
+
+	fillcol (fc) Will prompt for a new value for the fill column, where
+		auto-wrapping and region formatting will break lines. (B)
+
+	sideways  Will prompt for a new value for the sideways scroll offset,
+		which allow display of a section of code normally off the
+		screen to the right.  Also affected by the ^X-^R and ^X-^L
+		commands.  (W)
 
 Special Character Expansion
 ---------------------------
@@ -575,9 +593,9 @@ Differences
 	last argument, and will present it as the default reply to their
 	prompt. 
 
-	The backspace, line kill, job control, etc. characters are not
-	taken from the terminal settings on startup, but are hard-coded.
-	The insert-mode command characters cannot even be rebound.
+	The backspace, line kill, word kill, job control, etc.  characters
+	are not rebindable.  They are, however, read from the tty settings
+	on startup.
 
 	In insert mode there is no word kill (^W) or line kill (^U or @).
 
@@ -594,8 +612,9 @@ Differences
 	Paragraph and section boundaries, for the {, }, [, and ] commands
 	are not configurable, and do not exactly match those in vi.  The
 	current set is:
-	  Paragraphs: blank lines, or lines beginning in .I .L .P .Q or .b
 	  Sections: lines beginning in {, formfeeds, or .S .H .N
+	  Paragraphs: blank lines, or lines beginning in .I .L .P .Q .S
+	  		.H .N or .b
 	I think these will find more boundaries than vi, rather than fewer.
 
 	There is no special lisp support.  But then, when was the last time
@@ -619,10 +638,10 @@ Sample .vilerc
 	Here's a sample .vilerc, to help get you started with the
 	syntax and style of vile macros:
 
-	setg aindent
-	setg cmode
-	setg fillcol 70
-	setg tabstop 4
+	set autoindent
+	set cmode
+	set fillcol 75
+	set tabstop 4
 	
 	; sitting on a brace, run the C code block through indent
 	1 store-macro
@@ -654,6 +673,11 @@ Sample .vilerc
 	4 store-macro
 		substitute goto-line "^" "> "
 	~endm
+
+	; the next three reproduce vile version three behavior
+	bind-key next-window ^N
+	bind-key previous-window ^P
+	bind-key split-current-window ^T
 	
 	bind-key execute-macro-1 ^A-C
 	bind-key execute-macro-2 ^A-F
@@ -682,8 +706,8 @@ Note on Scrolling
 
 	The crucial entries are cs and sr -- without both of them,
 	vile will attempt to use dl and al, and will scroll by
-	deleting and inserting a block of lines, giving the behavior
-	ugly you see.  If you define PRETTIER_SCROLL when building
+	deleting and inserting a block of lines, giving the ugly
+	behavior you see.  If you define PRETTIER_SCROLL when building
 	vile, it will alternately delete and insert lines, instead of
 	deleting them all and then inserting them all.  This makes it
 	look a _little_ better, but it's slower.

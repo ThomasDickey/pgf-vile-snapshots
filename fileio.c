@@ -3,7 +3,17 @@
  * the knowledge about files are here.
  *
  * $Log: fileio.c,v $
- * Revision 1.8  1991/08/08 13:20:23  pgf
+ * Revision 1.11  1991/10/22 14:08:23  pgf
+ * took out old ifdef BEFORE code
+ *
+ * Revision 1.10  1991/10/10  12:31:53  pgf
+ * added more "ff" utilities:  ffread, ffseek, ffrewind, ffsize
+ *
+ * Revision 1.9  1991/09/25  00:24:27  pgf
+ * ffhasdata now works most of the time for system V, by simply checking
+ * the stdio buffer -- no system call necessary
+ *
+ * Revision 1.8  1991/08/08  13:20:23  pgf
  * set "dosfile" global after reading each line
  *
  * Revision 1.7  1991/08/07  12:35:07  pgf
@@ -44,9 +54,6 @@
 #if	BSD
 #include "sys/filio.h"
 #endif
-
-/* possibly non-portable addition to stdio set of macros */
-#define	isready_c(p)	((p)->_cnt>0? TRUE:FALSE)
 
 FILE	*ffp;		/* File pointer, all functions. */
 int fileispipe;
@@ -155,6 +162,42 @@ char    *fn;
 	}
 }
 #endif
+
+#ifdef UNIX
+
+#include "sys/types.h"
+#include "sys/stat.h"
+
+long
+ffsize()
+{
+	struct stat statbuf;
+	if (fstat(fileno(ffp), &statbuf) == 0) {
+		return (long)statbuf.st_size;
+	}
+        mlwrite("File sizing error");
+        return -1;
+}
+
+#endif
+
+ffread(buf,len)
+char *buf;
+off_t len;
+{
+	return read(fileno(ffp), buf, (int)len);
+}
+
+ffseek(n)
+long n;
+{
+	fseek (ffp,n,0);
+}
+
+ffrewind()
+{
+	fseek (ffp,0L,0);
+}
 
 /*
  * Close a file. Should look at the status in all systems.
@@ -288,15 +331,6 @@ int *lenp;	/* to return the final length */
 	if (eofflag)
 		return(FIOEOF);
 
-#if BEFORE	/* no no no -- malloc is expensive... */
-	/* dump fline if it ended up too big */
-	if (flen > NSTRING) {
-		free(fline);
-		fline = NULL;
-		flen = 0;
-	}
-#endif
-
 	/* if we don't have an fline, allocate one */
 	if (fline == NULL)
 		if ((fline = malloc(flen = NSTRING)) == NULL)
@@ -335,21 +369,7 @@ int *lenp;	/* to return the final length */
 
 	*lenp = i;	/* return the length, not including final null */
         fline[i] = 0;
-#if TESTING
-if (i > 0) {
-	if (isready_c(ffp))
-		fline[0] = 'y';
-	else
-		fline[0] = 'n';
-	if (i > 1) {
-		long x;
-		if ((ioctl(fileno(ffp),FIONREAD,&x) < 0) || x == 0)
-			fline[1] = 'n';
-		else
-			fline[1] = 'y';
-	}	
-}	
-#endif
+
 	/* test for any errors that may have occured */
         if (c == EOF) {
                 if (ferror(ffp)) {
@@ -371,12 +391,18 @@ if (i > 0) {
         return(FIOSUC);
 }
 
+/* this possibly non-portable addition to the stdio set of macros 
+	is used to see if stdio has data for us, without actually
+	reading it and possibly blocking.  if you have trouble building
+	this, just force ffhasdata() to always return FALSE */
+#define	isready_c(p)	( (p)->_cnt > 0)
+
 ffhasdata()
 {
 	long x;
-#if	BSD
 	if (isready_c(ffp))
 		return TRUE;
+#if	BSD
 	return(((ioctl(fileno(ffp),FIONREAD,&x) < 0) || x == 0) ? FALSE : TRUE);
 #else
 	return FALSE;

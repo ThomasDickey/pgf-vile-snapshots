@@ -4,7 +4,16 @@
  *	written 11-feb-86 by Daniel Lawrence
  *
  * $Log: bind.c,v $
- * Revision 1.12  1991/08/12 15:05:14  pgf
+ * Revision 1.15  1991/10/22 14:08:23  pgf
+ * took out old ifdef BEFORE code
+ *
+ * Revision 1.14  1991/09/27  02:49:01  pgf
+ * removed scalar init of static array
+ *
+ * Revision 1.13  1991/09/19  13:33:48  pgf
+ * MDEXACT changed to MDIGNCASE
+ *
+ * Revision 1.12  1991/08/12  15:05:14  pgf
  * added fnc2key function, for getting back into insert mode
  *
  * Revision 1.11  1991/08/07  12:35:07  pgf
@@ -88,11 +97,11 @@ help(f, n)
 		}
 		strcpy(bp->b_bname,"[Help]");
 	        lsprintf(bp->b_fname, "       %s   %s",prognam,version);
-		make_local_b_val(bp,MDVIEW);
+		make_local_b_val(bp,MDVIEW);	/* make it readonly, */
 		set_b_val(bp,MDVIEW,TRUE);
-		make_local_b_val(bp,MDEXACT);
-		set_b_val(bp,MDEXACT,FALSE);
-		make_local_b_val(bp,VAL_TAB);
+		make_local_b_val(bp,MDIGNCASE); /* easy to search, */
+		set_b_val(bp,MDIGNCASE,TRUE);
+		make_local_b_val(bp,VAL_TAB);	/* and tabbed by 8 */
 		set_b_val(bp,VAL_TAB,8);
 		bp->b_flag |= BFSCRTCH;
 	}
@@ -313,18 +322,14 @@ int c;		/* command key to unbind */
 		   into it with view mode			*/
 desbind(f, n)
 {
-#if ! BEFORE
 	int makebindlist();
         return liststuff("[Binding List]",makebindlist,1,NULL);
-#else
-	return mkblist(1,NULL);
-#endif
 }
 
 #if	APROP
 apro(f, n)	/* Apropos (List functions that match a substring) */
 {
-	static char mstring[NSTRING] = 0;	/* string to match cmd names to */
+	static char mstring[NSTRING];	/* string to match cmd names to */
 	int makebindlist();
         register int    s;
 
@@ -333,47 +338,9 @@ apro(f, n)	/* Apropos (List functions that match a substring) */
 	if (s != TRUE)
 		return(s);
 
-#if ! BEFORE
         return liststuff("[Binding List]",makebindlist,1,mstring);
-#else
-	return mkblist(1,mstring);
-#endif
 }
 #endif
-
-#if BEFORE
-mkblist(mstring)
-char *mstring;
-{
-        register BUFFER *bp;
-        register int    s;
-
-	/* create the binding list buffer   */
-	bp = bfind("[Binding List]", OK_CREAT, BFSCRTCH);
-	if (bp == NULL)
-		return FALSE;
-	
-        if ((s=bclear(bp)) != TRUE) /* clear old text (?) */
-                return (s);
-        s = makebindlist(1,mstring,bp);
-	if (s != TRUE || popupbuff(bp) == FALSE) {
-		mlwrite("[Sorry, can't list.]");
-		zotbuf(bp);
-                return (s);
-        }
-        strcpy(bp->b_fname, "");
-	make_local_b_val(bp,MDVIEW);
-	set_b_val(bp,MDVIEW,TRUE);
-	make_local_b_val(bp,VAL_TAB);
-	set_b_val(bp,VAL_TAB,8);
-	bp->b_flag |= BFSCRTCH;
-        bp->b_flag &= ~BFCHG;        /* Don't complain!      */
-        bp->b_active = TRUE;
-
-        return TRUE;
-}
-#endif
-
 
 /* build a binding list (limited or full) */
 makebindlist(dummy, mstring)

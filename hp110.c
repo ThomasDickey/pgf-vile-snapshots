@@ -2,7 +2,10 @@
  *	HP110:	Hewlett Packard 110 Screen Driver
  *
  * $Log: hp110.c,v $
- * Revision 1.2  1991/08/07 12:35:07  pgf
+ * Revision 1.3  1991/09/10 01:19:35  pgf
+ * re-tabbed, and moved ESC and BEL to estruct.h
+ *
+ * Revision 1.2  1991/08/07  12:35:07  pgf
  * added RCS log messages
  *
  * revision 1.1
@@ -10,32 +13,30 @@
  * initial vile RCS revision
  */
 
-#define	termdef	1			/* don't define "term" external */
+#define termdef 1			/* don't define "term" external */
 
-#include        <stdio.h>
+#include	<stdio.h>
 #include	"estruct.h"
-#include        "edef.h"
+#include	"edef.h"
 
-#if     HP110
+#if	HP110
 
-#define NROW    16                      /* Screen size.                 */
-#define NCOL    80                      /* Edit if you want to.         */
-#define	NPAUSE	100			/* # times thru update to pause */
-#define	MARGIN	8			/* size of minimim margin and	*/
-#define	SCRSIZ	64			/* scroll size for extended lines */
-#define BEL     0x07                    /* BEL character.               */
-#define ESC     0x1B                    /* ESC character.               */
+#define NROW	16			/* Screen size. 		*/
+#define NCOL	80			/* Edit if you want to. 	*/
+#define NPAUSE	100			/* # times thru update to pause */
+#define MARGIN	8			/* size of minimim margin and	*/
+#define SCRSIZ	64			/* scroll size for extended lines */
 
-extern  int     ttopen();               /* Forward references.          */
-extern  int     ttgetc();
-extern  int     ttputc();
-extern  int     ttflush();
-extern  int     ttclose();
-extern  int     h110move();
-extern  int     h110eeol();
-extern  int     h110eeop();
-extern  int     h110beep();
-extern  int     h110open();
+extern	int	ttopen();		/* Forward references.		*/
+extern	int	ttgetc();
+extern	int	ttputc();
+extern	int	ttflush();
+extern	int	ttclose();
+extern	int	h110move();
+extern	int	h110eeol();
+extern	int	h110eeop();
+extern	int	h110beep();
+extern	int	h110open();
 extern	int	h110rev();
 extern	int	h110cres();
 extern	int	h110close();
@@ -54,25 +55,25 @@ int	cbcolor = -1;		/* current background color */
  * Standard terminal interface dispatch table. Most of the fields point into
  * "termio" code.
  */
-TERM    term    = {
+TERM	term	= {
 	NROW-1,
-        NROW-1,
-        NCOL,
-        NCOL,
+	NROW-1,
+	NCOL,
+	NCOL,
 	MARGIN,
 	SCRSIZ,
 	NPAUSE,
-        h110open,
-        h110close,
+	h110open,
+	h110close,
 	h110kopen,
 	h110kclose,
-        ttgetc,
-        ttputc,
-        ttflush,
-        h110move,
-        h110eeol,
-        h110eeop,
-        h110beep,
+	ttgetc,
+	ttputc,
+	ttflush,
+	h110move,
+	h110eeol,
+	h110eeop,
+	h110beep,
 	h110rev,
 	h110cres
 #if	COLOR
@@ -82,7 +83,7 @@ TERM    term    = {
 };
 
 #if	COLOR
-h110fcol(color)		/* set the current output color */
+h110fcol(color) 	/* set the current output color */
 
 int color;	/* color to set */
 
@@ -96,7 +97,7 @@ int color;	/* color to set */
 	cfcolor = color;
 }
 
-h110bcol(color)		/* set the current background color */
+h110bcol(color) 	/* set the current background color */
 
 int color;	/* color to set */
 
@@ -107,26 +108,26 @@ int color;	/* color to set */
 	ttputc('[');
 	h110parm(color+40);
 	ttputc('m');
-        cbcolor = color;
+	cbcolor = color;
 }
 #endif
 
 h110move(row, col)
 {
-        ttputc(ESC);
-        ttputc('[');
-        h110parm(row+1);
-        ttputc(';');
-        h110parm(col+1);
-        ttputc('H');
+	ttputc(ESC);
+	ttputc('[');
+	h110parm(row+1);
+	ttputc(';');
+	h110parm(col+1);
+	ttputc('H');
 }
 
 h110eeol()
 {
-        ttputc(ESC);
-        ttputc('[');
+	ttputc(ESC);
+	ttputc('[');
 	ttputc('0');
-        ttputc('K');
+	ttputc('K');
 }
 
 h110eeop()
@@ -135,10 +136,10 @@ h110eeop()
 	h110fcol(gfcolor);
 	h110bcol(gbcolor);
 #endif
-        ttputc(ESC);
-        ttputc('[');
+	ttputc(ESC);
+	ttputc('[');
 	ttputc('0');
-        ttputc('J');
+	ttputc('J');
 }
 
 h110rev(state)		/* change reverse video state */
@@ -147,7 +148,7 @@ int state;	/* TRUE = reverse, FALSE = normal */
 
 {
 #if	COLOR
-	int ftmp, btmp;		/* temporaries for colors */
+	int ftmp, btmp; 	/* temporaries for colors */
 #endif
 
 	ttputc(ESC);
@@ -180,31 +181,31 @@ spal()		/* change pallette register */
 
 h110beep()
 {
-        ttputc(BEL);
-        ttflush();
+	ttputc(BEL);
+	ttflush();
 }
 
 h110parm(n)
-register int    n;
+register int	n;
 {
-        register int q,r;
+	register int q,r;
 
-        q = n/10;
-        if (q != 0) {
+	q = n/10;
+	if (q != 0) {
 		r = q/10;
 		if (r != 0) {
 			ttputc((r%10)+'0');
 		}
 		ttputc((q%10) + '0');
-        }
-        ttputc((n%10) + '0');
+	}
+	ttputc((n%10) + '0');
 }
 
 h110open()
 {
 	strcpy(sres, "15LINE");
 	revexist = TRUE;
-        ttopen();
+	ttopen();
 }
 
 h110close()

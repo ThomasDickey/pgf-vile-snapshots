@@ -10,7 +10,38 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.25  1991/08/13 02:48:59  pgf
+ * Revision 1.34  1991/10/18 10:56:54  pgf
+ * modified VALUE structures and lists to make them more easily settable
+ *
+ * Revision 1.33  1991/10/15  03:10:00  pgf
+ * added backspacelimit and taglength
+ *
+ * Revision 1.32  1991/10/10  12:33:33  pgf
+ * changes to support "block malloc" of line text -- now for most files
+ * there is are two mallocs and a single read, no copies.  previously there
+ * were two mallocs per line, and two copies (stdio's and ours).  This change
+ * implies that lines and line text should not move between buffers, without
+ * checking that the text and line struct do not "belong" to the buffer.
+ *
+ * Revision 1.31  1991/09/26  13:08:55  pgf
+ * created window values, moved list mode there
+ *
+ * Revision 1.30  1991/09/19  13:35:29  pgf
+ * MDEXACT is now MDIGNCASE, and names are now more vi-compliant
+ *
+ * Revision 1.29  1991/09/10  12:29:57  pgf
+ * added b_wline macro into b_wtraits
+ *
+ * Revision 1.28  1991/09/10  01:08:28  pgf
+ * added BEL define
+ *
+ * Revision 1.27  1991/09/10  00:44:29  pgf
+ * added ESC defines
+ *
+ * Revision 1.26  1991/08/16  10:58:54  pgf
+ * added the third flavor of insertmode
+ *
+ * Revision 1.25  1991/08/13  02:48:59  pgf
  * added select and poll selectors, and alphabetized the VAL_XXX's
  *
  * Revision 1.24  1991/08/12  15:06:21  pgf
@@ -264,15 +295,6 @@
 			   Only useful if your display can scroll
 			   regions, or at least insert/delete lines. 
 			   ANSI, TERMCAP, and AT386 can do this		 */
-#define LOCAL_VALUES 1	/* this causes buffers to have local copies of the
-			    tabstop and fillcol values, which they inherit
-			    from global copies, much as other modes are
-			    inherited.	Otherwise, only the global copies
-			    of these values are used.  I find it confusing
-			    to have a copy with each buffer, since then
-			    changing the tabstop for all (already edited)
-			    files at once is difficult */
-
 #define CVMVAS	1	/* arguments to forward/back page and half page */
 			/* are in pages	instead of rows */
 #define PRETTIER_SCROLL 1 /* can improve the appearance of a scrolling screen */
@@ -507,9 +529,11 @@ union REGS {
 #define	FIOMEM	4			/* File I/O, out of memory	*/
 #define	FIOFUN	5			/* File I/O, eod of file/bad line*/
 
-/* two flavors of insert mode */
+/* three flavors of insert mode	*/
+/* it's FALSE, or one of:	*/
 #define INSERT 1
 #define OVERWRITE 2
+#define REPLACECHAR 3
 
 /* kill register control */
 #define KNEEDCLEAN   0x01		/* Kill register needs cleaning */
@@ -603,6 +627,11 @@ union REGS {
 #define tocntrl(c)	((c)^DIFCNTRL)
 #define toalpha(c)	((c)^DIFCNTRL)
 
+#define ESC	tocntrl('[')
+#define RECORDED_ESC	-2
+
+#define BEL	tocntrl('G')	/* ascii bell character		*/
+
 /*	Dynamic RAM tracking and reporting redefinitions	*/
 
 #if	RAMSIZE
@@ -695,29 +724,54 @@ typedef struct MARK {
 #define is_last_line(m,bp)	( lforw(m.l) == bp->b_line.l)
 #define is_first_line(m,bp)	( lback(m.l) == bp->b_line.l)
 
-/*
- * Text is kept in buffers. A buffer header, described below, exists for every
- * buffer in the system. The buffers are kept in a big list, so that commands
- * that search for a buffer by name can find the buffer header. There is a
- * safe store for the dot and mark in the header, but this is only valid if
- * the buffer is not being displayed (that is, if "b_nwnd" is 0). The text for
- * the buffer is kept in a circularly linked list of lines, with a pointer to
- * the header line in "b_line"	Buffers may be "Inactive" which means the files associated with them
- * have not been read in yet. These get read in at "use buffer" time.
- */
+/* settable values have their names stored here, along with a synonym, and
+	what type they are */
+struct VALNAMES {
+		char *name;
+		char *shortname;
+		short type;
+};
+/* the values of VALNAMES->type */
+#define VALTYPE_INT 0
+#define VALTYPE_STRING 1
+#define VALTYPE_BOOL 2
 
-/* these are window properties inherited from editor globals */
-typedef struct	W_VALS {
-	int	w_mod;	       /* window modes */
-	int	w_side;		       /* sideways offset */
-#if	COLOR
-	int	w_fcol;			/* current forground color	*/
-	int	w_bcol;			/* current background color	*/
-#endif
-} W_VALS;
 
-#define gfcolor global_w_values.w_fcol
-#define gbcolor global_w_values.w_bcol
+/* this is to ensure values can be of any type we wish.
+   more can be added if needed.  */
+union V {
+	int i;
+	char *p;
+};
+
+struct VAL {
+	union V v;
+	union V *vp;
+};
+
+/* these are the boolean, integer, and pointer value'd settings that are
+	associated with a window, and usually settable by a user.  There
+	is a global set that is inherited into a buffer, and its windows
+	in turn are inherit the buffer's set. */
+#define	WMDLIST		0		/* "list" mode -- show tabs and EOL */
+/* put more boolean-valued things here */
+#define	MAX_BOOL_W_VALUE	0	/* max of boolean values	*/
+
+#define WVAL_SIDEWAYS	(MAX_BOOL_W_VALUE+1)
+#define WVAL_FCOLOR	(MAX_BOOL_W_VALUE+2)
+#define WVAL_BCOLOR	(MAX_BOOL_W_VALUE+3)
+/* put more int-valued things here */
+#define	MAX_INT_W_VALUE	(MAX_BOOL_W_VALUE+3) /* max of integer-valued modes */
+
+/* put more string-valued things here */
+#define	MAX_STRING_W_VALUE (MAX_INT_W_VALUE+0) /* max of string-valued modes */
+#define	MAX_W_VALUES	(MAX_STRING_W_VALUE) /* max of buffer values */
+
+typedef struct W_VALUES {
+	/* each entry is a val, and a ptr to a val */
+	struct VAL wv[MAX_W_VALUES+1];
+} W_VALUES;
+
 
 /* these are window properties affecting window appearance _only_ */
 typedef struct	W_TRAITS {
@@ -729,53 +783,78 @@ typedef struct	W_TRAITS {
 #endif
 	MARK 	w_ld;	        	/* Line containing "lastdotmark"*/
 	MARK 	w_ln;		/* Top line in the window (offset unused) */
-	W_VALS	w_vals;
+	W_VALUES w_vals;
 } W_TRAITS;
+
+#define global_w_val(which) global_w_values.wv[which].v.i
+#define set_global_w_val(which,val) global_w_val(which) = val
+#define global_w_val_ptr(which) global_w_values.wv[which].v.p
+#define set_global_w_val_ptr(which,val) global_w_val_ptr(which) = val
+
+#define w_val(wp,val) (wp->w_traits.w_vals.wv[val].vp->i)
+#define set_w_val(wp,which,val) w_val(wp,which) = val
+#define w_val_ptr(wp,val) (wp->w_traits.w_vals.wv[val].vp->p)
+#define set_w_val_ptr(wp,which,val) w_val_ptr(wp,which) = val
+
+#define make_local_w_val(wp,which)  \
+	wp->w_traits.w_vals.wv[which].vp = &(wp->w_traits.w_vals.wv[which].v)
+#define make_global_w_val(wp,which)  \
+	wp->w_traits.w_vals.wv[which].vp = &(global_wvalues.wv[which].v)
+
+#define is_global_w_val(wp,which)  \
+	(wp->w_traits.w_vals.wv[which].vp == &(global_w_values.wv[which].v))
+#define is_local_w_val(wp,which)  \
+	(wp->w_traits.w_vals.wv[which].vp == &(wp->w_traits.w_vals.wv[which].v))
+
+#define gfcolor global_w_val(WVAL_FCOLOR)
+#define gbcolor global_w_val(WVAL_BCOLOR)
 
 /* buffer mode flags	*/
 /* the indices of B_VALUES.v[] */
 /* the first set are boolean */
 #define	MDAIND		0		/* auto-indent */
 #define	MDASAVE		1		/* auto-save mode		*/
-#define	MDCMOD		2		/* C indentation and fence match*/
-#define	MDCRYPT		3		/* encrytion mode active	*/
-#define	MDDOS		4		/* "dos" mode -- lines end in crlf */
-#define	MDEXACT		5		/* Exact matching for searches	*/
-#define	MDLIST		6		/* "list" mode -- show tabs and EOL */
+#define	MDBACKLIMIT	2		/* backspace limited in insert mode */
+#define	MDCMOD		3		/* C indentation and fence match*/
+#define	MDCRYPT		4		/* encrytion mode active	*/
+#define	MDDOS		5		/* "dos" mode -- lines end in crlf */
+#define	MDIGNCASE	6		/* Exact matching for searches	*/
 #define MDMAGIC		7		/* regular expresions in search */
 #define	MDSHOWMAT	8		/* auto-indent */
-#define	MDSWRAP 	9		/* wrap-around search mode	*/
-#define	MDVIEW		10		/* read-only buffer		*/
+#define	MDVIEW		9		/* read-only buffer		*/
+#define	MDSWRAP 	10		/* wrap-around search mode	*/
 #define	MDWRAP		11		/* word wrap			*/
-#define	MAX_BOOL_VALUE	11		/* max of boolean values	*/
+#define	MAX_BOOL_B_VALUE	11	/* max of boolean values	*/
 
-#define VAL_ASAVE	(MAX_BOOL_VALUE+1)
-#define VAL_C_TAB	(MAX_BOOL_VALUE+2)
-#define VAL_FILL	(MAX_BOOL_VALUE+3)
-#define VAL_TAB		(MAX_BOOL_VALUE+4)
-#define	MAX_INT_VALUE	(MAX_BOOL_VALUE+4) /* max of integer-valued modes */
+#define VAL_ASAVE	(MAX_BOOL_B_VALUE+1)
+#define VAL_C_TAB	(MAX_BOOL_B_VALUE+2)
+#define VAL_FILL	(MAX_BOOL_B_VALUE+3)
+#define VAL_TAB		(MAX_BOOL_B_VALUE+4)
+#define VAL_TAGLEN	(MAX_BOOL_B_VALUE+5)
+#define	MAX_INT_B_VALUE	(MAX_BOOL_B_VALUE+5) /* max of integer-valued modes */
 
-#define VAL_CSUFFIXES	(MAX_INT_VALUE+1)
-#define VAL_CWD		(MAX_INT_VALUE+2)
-#define	MAX_STRING_VALUE (MAX_INT_VALUE+2) /* max of string-valued modes */
+#define VAL_CSUFFIXES	(MAX_INT_B_VALUE+1)
+#define VAL_CWD		(MAX_INT_B_VALUE+2)
+#define VAL_TAGS	(MAX_INT_B_VALUE+3)
+#define	MAX_STRING_B_VALUE (MAX_INT_B_VALUE+3) /* max of string-valued modes */
 
-#define	MAX_B_VALUES	(MAX_STRING_VALUE) /* max of buffer values */
-
-#define VALTYPE_INT 0
-#define VALTYPE_STRING 1
-#define VALTYPE_BOOL 2
-
-/* this is to ensure b_values can be of any type we wish.
-   more can be added if needed.  */
-union v {
-	int i;
-	char *p;
-};
+#define	MAX_B_VALUES	(MAX_STRING_B_VALUE) /* max of buffer values */
 
 typedef struct B_VALUES {
-	union v v[MAX_B_VALUES+1];	/* either an ints or (char *)s */
-	union v *vp[MAX_B_VALUES+1];	/* pointer to local or global values */
+	/* each entry is a val, and a ptr to a val */
+	struct VAL bv[MAX_B_VALUES+1];
 } B_VALUES;
+
+/*
+ * Text is kept in buffers. A buffer header, described below, exists for every
+ * buffer in the system. The buffers are kept in a big list, so that commands
+ * that search for a buffer by name can find the buffer header. There is a
+ * safe store for the dot and mark in the header, but this is only valid if
+ * the buffer is not being displayed (that is, if "b_nwnd" is 0). The text for
+ * the buffer is kept in a circularly linked list of lines, with a pointer to
+ * the header line in "b_line"	Buffers may be "Inactive" which means the files associated with them
+ * have not been read in yet. These get read in at "use buffer" time.
+ */
 
 typedef struct	BUFFER {
 	MARK 	b_line;		/* Link to the header LINE (offset unused) */
@@ -788,6 +867,11 @@ typedef struct	BUFFER {
 	LINE 	*b_udstks[2];		/* undo stack pointers		*/
 	MARK 	b_uddot[2];		/* Link to "." before undoable op*/
 	short	b_udstkindx;		/* which of above to use	*/
+	LINE	*b_LINEs;		/* block-malloced LINE structs */
+	LINE	*b_LINEs_end;		/* end of 	"	"	" */
+	LINE	*b_freeLINEs;		/* list of free " 	"	" */
+	unsigned char	*b_ltext;	/* block-malloced text */
+	unsigned char	*b_ltext_end;	/* end of block-malloced text */
 	LINE 	*b_ulinep;		/* pointer at 'Undo' line	*/
 	int	b_active;		/* window activated flag	*/
 	int	b_nwnd;		        /* Count of windows on buffer   */
@@ -799,36 +883,25 @@ typedef struct	BUFFER {
 #endif
 }	BUFFER;
 
-#define global_b_val(which) global_b_values.v[which].i
+#define global_b_val(which) global_b_values.bv[which].v.i
 #define set_global_b_val(which,val) global_b_val(which) = val
-#define global_b_val_ptr(which) global_b_values.v[which].p
+#define global_b_val_ptr(which) global_b_values.bv[which].v.p
 #define set_global_b_val_ptr(which,val) global_b_val_ptr(which) = val
 
-#define b_val(bp,val) (bp->b_values.vp[val]->i)
+#define b_val(bp,val) (bp->b_values.bv[val].vp->i)
 #define set_b_val(bp,which,val) b_val(bp,which) = val
-#define b_val_ptr(bp,val) (bp->b_values.vp[val]->p)
+#define b_val_ptr(bp,val) (bp->b_values.bv[val].vp->p)
 #define set_b_val_ptr(bp,which,val) b_val_ptr(bp,which) = val
 
 #define make_local_b_val(bp,which)  \
-		bp->b_values.vp[which] = &(bp->b_values.v[which])
+		bp->b_values.bv[which].vp = &(bp->b_values.bv[which].v)
 #define make_global_b_val(bp,which)  \
-		bp->b_values.vp[which] = &(global_b_values.v[which])
+		bp->b_values.bv[which].vp = &(global_b_values.bv[which].v)
 
 #define is_global_b_val(bp,which)  \
-		(bp->b_values.vp[which] == &(global_b_values.v[which]))
+		(bp->b_values.bv[which].vp == &(global_b_values.bv[which].v))
 #define is_local_b_val(bp,which)  \
-		(bp->b_values.vp[which] == &(bp->b_values.v[which]))
-
-#if BEFORE
-#define global_b_val(val, type) global_b_values.v[val].type
-
-#if LOCAL_VALUES
-# define local_b_val(bp, val, type) (bp->b_values.vp[val]->type)
-# define b_mode b_values.vp[VAL_MODES]->i
-#else
-# define local_b_val(bp, val, type) global_b_val(val,type)
-#endif
-#endif
+		(bp->b_values.bv[which].vp == &(bp->b_values.bv[which].v))
 
 #define is_empty_buf(bp) (lforw(bp->b_line.l) == bp->b_line.l)
 #define b_sideways b_wtraits.w_vals.w_side
@@ -837,9 +910,10 @@ typedef struct	BUFFER {
 #define b_mark b_wtraits.w_mk
 #endif
 #define b_lastdot b_wtraits.w_ld
+#define b_wline b_wtraits.w_ln
 
 /* values for b_flag */
-#define BFINVS	0x01			/* Internal invisable buffer	*/
+#define BFINVS	0x01			/* Internal invisible buffer	*/
 #define BFCHG	0x02			/* Changed since last write	*/
 #define BFSCRTCH   0x04 		/* scratch -- gone on last close */
 

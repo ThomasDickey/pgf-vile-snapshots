@@ -4,7 +4,10 @@
  * All operating systems.
  *
  * $Log: termio.c,v $
- * Revision 1.10  1991/08/12 15:05:43  pgf
+ * Revision 1.11  1991/10/15 12:18:39  pgf
+ * fetch more termio chars at startup, like wkillc, suspc, etc.
+ *
+ * Revision 1.10  1991/08/12  15:05:43  pgf
  * rearranged read-ahead in one of the tgetc options
  *
  * Revision 1.9  1991/08/07  12:35:07  pgf
@@ -229,15 +232,24 @@ ttopen()
 	ntermio.c_cc[VSUSP] = -1;
 	ntermio.c_cc[VSTART] = -1;
 	ntermio.c_cc[VSTOP] = -1;
+	suspc =   otermio.c_cc[VSUSP];
 #else
 	ntermio.c_cc[V_SUSP] = -1;
 	ntermio.c_cc[V_DSUSP] = -1;
+	suspc =   otermio.c_cc[V_SUSP];
 #endif
+#else
+	suspc =   tocntrl('Z');
 #endif
-	intrc = ntermio.c_cc[VINTR];
-	killc = ntermio.c_cc[VKILL];
-	backspc = ntermio.c_cc[VERASE];
 	ioctl(0, TCSETA, &ntermio);	/* and activate them */
+
+	intrc =   otermio.c_cc[VINTR];
+	killc =   otermio.c_cc[VKILL];
+	startc =  tocntrl('Q');
+	stopc =   tocntrl('S');
+	backspc = otermio.c_cc[VERASE];
+	wkillc =  tocntrl('W');
+
 	kbdflgs = fcntl( 0, F_GETFL, 0 );
 	kbdpoll = FALSE;
 #endif
@@ -257,7 +269,9 @@ ttopen()
         rnstate.sg_flags |= RAW;
 
 	ioctl(0, TIOCGETC, &otchars);		/* Save old characters */
-	intrc = otchars.t_intrc;
+	intrc =  otchars.t_intrc;
+	startc = otchars.t_startc;
+	stopc =  otchars.t_stopc;
 
 	ntchars = otchars;
 	ntchars.t_brkc = -1;
@@ -265,6 +279,8 @@ ttopen()
 	ioctl(0, TIOCSETC, &ntchars);		/* Place new character into K */
 
 	ioctl(0, TIOCGLTC, &oltchars);		/* Save old characters */
+	wkillc = oltchars.t_werasc;
+	suspc = oltchars.t_suspc;
 	ioctl(0, TIOCSLTC, &nltchars);		/* Place new character into K */
 
 #if	BSD

@@ -4,7 +4,13 @@
  *  heavily modified by Paul Fox, 1990
  *
  * $Log: search.c,v $
- * Revision 1.11  1991/08/07 12:35:07  pgf
+ * Revision 1.13  1991/09/26 13:10:32  pgf
+ * new arg. to kbd_string, to suppress backslash processing
+ *
+ * Revision 1.12  1991/09/19  13:40:30  pgf
+ * MDEXACT is now MDIGNCASE
+ *
+ * Revision 1.11  1991/08/07  12:35:07  pgf
  * added RCS log messages
  *
  * revision 1.10
@@ -673,14 +679,14 @@ MARK		*pcwpos;	/* current point during scan */
 
 /*
  * eq -- Compare two characters.  The "bc" comes from the buffer, "pc"
- *	from the pattern.  If we are not in EXACT mode, fold out the case.
+ *	from the pattern.  If we are in IGNCASE mode, fold out the case.
  */
 int	
 eq(bc, pc)
 register char	bc;
 register char	pc;
 {
-	if (b_val(curwp->w_bufp, MDEXACT))
+	if (!b_val(curwp->w_bufp, MDIGNCASE))
 		return bc == pc;
 	/* take out the bit that makes upper and lowercase different */
 	return ((bc ^ pc) & ~DIFCASE) == 0;
@@ -722,7 +728,7 @@ int	fromscreen;
 		if (status != TRUE)
 			return status;
 	} else {
-	 	status = kbd_string(prompt, apat, NPAT, c, NO_EXPAND);
+	 	status = kbd_string(prompt, apat, NPAT, c, NO_EXPAND, FALSE);
 	}
  	if (status == TRUE) {
 		if (srch) {	/* If we are doing the search string.*/
@@ -1388,7 +1394,7 @@ MC	*mt;
 		case CCL:
 			if (!(result = biteq(bc, mt->u.cclmap)))
 			{
-				if (!b_val(curwp->w_bufp, MDEXACT) &&
+				if (b_val(curwp->w_bufp, MDIGNCASE) &&
 				    isalpha(bc))
 				{
 					result = biteq(CHCASE(bc),mt->u.cclmap);
@@ -1403,7 +1409,7 @@ MC	*mt;
 			} else {
 				result = !biteq(bc, mt->u.cclmap);
 
-				if (!b_val(curwp->w_bufp, MDEXACT) &&
+				if (b_val(curwp->w_bufp, MDIGNCASE) &&
 					    isalpha(bc))
 				{
 					result &= !biteq(CHCASE(bc),

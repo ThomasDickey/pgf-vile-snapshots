@@ -71,7 +71,16 @@
 #		here for completeness.
 #
 # $Log: cmdtbl,v $
-# Revision 1.21  1991/08/14 12:08:54  pgf
+# Revision 1.24  1991/10/20 23:33:06  pgf
+# made ^N, ^P, and ^T vi-compliant
+#
+# Revision 1.23  1991/09/17  13:02:57  pgf
+# added write-all and brethren
+#
+# Revision 1.22  1991/09/10  00:40:05  pgf
+# took out obsolete "showgmodes"
+#
+# Revision 1.21  1991/08/14  12:08:54  pgf
 # showmodes command now does new-style show
 #
 # Revision 1.20  1991/08/12  15:06:21  pgf
@@ -193,6 +202,7 @@ backline	GOAL|MOTION|FL
 	"back-line"			!FEWNAMES
 	"up-line"			!FEWNAMES
 	'k'
+	'^P'
 	'FN-A'				ANSI_SPEC
 backbline	MOTION|FL
 	"previous-line-at-bol"		!FEWNAMES
@@ -463,6 +473,7 @@ forwline	GOAL|MOTION|FL
 	"down-line"			!FEWNAMES
 	'j'
 	'^J'
+	'^N'
 	'FN-B'				ANSI_SPEC
 forwbline	MOTION|FL
 	"forward-line-at-bol"		!FEWNAMES
@@ -658,7 +669,8 @@ newwidth	NONE
 	"screen-columns"
 nextwind	NONE
 	"next-window"			!FEWNAMES
-	'^N'
+	'^X-o'
+#	'^N'
 nullproc	NONE
 	"nop"				!FEWNAMES
 	'^Q'
@@ -778,7 +790,8 @@ poswind		NONE
 	'z'
 prevwind	NONE
 	"previous-window"		!FEWNAMES
-	'^P'
+	'^X-O'
+#	'^P'
 pipecmd		NONE
 	"pipe-command"			!FEWNAMES
 	'^X-!'
@@ -802,8 +815,9 @@ quithard	NONE
 quickexit	NONE|(BANG|NL)
 	"x"
 	"xit"
+	"wwq"
+	"write-changed-buffers-and-quit" !FEWNAMES
 	"quick-exit"			!FEWNAMES
-	'Z'
 quote		REDO|UNDO
 	"quote-next-character"		!FEWNAMES
 	'^V'
@@ -896,7 +910,7 @@ listmodes	NONE
 	"show-global-modes"
 	"showmodes"
 showmodes	NONE			BEFORE
-showgmodes	NONE
+showgmodes	NONE			BEFORE
 	"showgmodes"
 showversion	NONE|(EXRCOK)
 	"version"
@@ -910,7 +924,7 @@ spawn		NONE
 	"shell-command"			!FEWNAMES
 splitwind	NONE
 	"split-current-window"		!FEWNAMES
-	'^T'
+#	'^T'
 	'^X-2'
 storemac	NONE
 	"store-macro"
@@ -947,6 +961,7 @@ unmap		NONE|(EXRCOK|BANG|EXTRA)
 untagpop	NONE			TAGS
 	"untag-pop"			!FEWNAMES
 	'^X-^]'
+	'^T'
 upscreen	NONE			!SMALLER
 	"update-screen"
 usebuffer	NONE
@@ -962,6 +977,9 @@ vglobals	NONE			GLOBALS
 	"ov"
 viewfile	NONE
 	"view-file"
+writeall	NONE|(NL)
+	"ww"
+	"write-changed-buffers"		!FEWNAMES
 writequit	NONE|(NL)
 	"wq"
 	"Wq"
@@ -974,4 +992,6 @@ writemsg	NONE			!SMALLER
 yankline	NONE
 	"yank-line"			!FEWNAMES
 	'Y'
-
+zzquit		NONE|(BANG|NL)
+	'Z'
+	"stuttered-write-all-and-quit"

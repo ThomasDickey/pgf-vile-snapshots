@@ -6,7 +6,20 @@
  * framing, are hard.
  *
  * $Log: basic.c,v $
- * Revision 1.10  1991/08/07 12:35:07  pgf
+ * Revision 1.14  1991/09/27 02:48:16  pgf
+ * remove unused automatics
+ *
+ * Revision 1.13  1991/09/26  13:05:45  pgf
+ * undid forw/backline optimization, since it causes flags to not be set,
+ * and moved LIST mode to window
+ *
+ * Revision 1.12  1991/09/24  01:04:33  pgf
+ * forwline and backline now do nothing if passed 0 arg
+ *
+ * Revision 1.11  1991/09/19  12:22:57  pgf
+ * paragraphs now end at nroff-style section boundaries as well
+ *
+ * Revision 1.10  1991/08/07  12:35:07  pgf
  * added RCS log messages
  *
  * revision 1.9
@@ -95,7 +108,6 @@ register int    n;
 backchar_to_bol(f, n)
 register int    n;
 {
-        register LINE   *lp;
 
 	if (f == FALSE) n = 1;
         if (n < 0)
@@ -278,7 +290,6 @@ forwline(f, n)
 
 firstnonwhite(f,n)
 {
-	int c;
         curwp->w_dot.o  = 0;
 	while ( !is_at_end_of_line(curwp->w_dot) &&
 			isspace(char_at(curwp->w_dot)) )
@@ -334,7 +345,6 @@ backline(f, n)
         if (n < 0)
                 return (forwline(f, -n));
 
-
 	/* if we are on the first line as we start....fail the command */
 	if (is_first_line(curwp->w_dot, curbp))
 		return(FALSE);
@@ -360,11 +370,11 @@ backline(f, n)
 
 gotobop(f,n)
 {
-	return(backlinebeg(f,n,"\n.","ILPQb"));
+	return(backlinebeg(f,n,"\n.","ILPQbSHN"));
 }
 gotoeop(f,n)
 {
-	return(forwlinebeg(f,n,"\n.","ILPQb"));
+	return(forwlinebeg(f,n,"\n.","ILPQbSHN"));
 }
 gotobosec(f,n)
 {
@@ -538,7 +548,7 @@ register LINE   *dlp;
 /* return the next column index, given the current char and column */
 next_column(c,col)
 {
-	if (c == '\t' && (!b_val(curwp->w_bufp,MDLIST)))
+	if (c == '\t' && (!w_val(curwp,WMDLIST)))
                 return nextab(col);
         else if (!isprint(c))
                 return col+2;

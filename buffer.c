@@ -6,11 +6,44 @@
  * for the display system.
  *
  * $Log: buffer.c,v $
- * Revision 1.11  1991/08/12 09:25:10  pgf
+ * Revision 1.20  1991/10/22 14:08:23  pgf
+ * took out old ifdef BEFORE code
+ *
+ * Revision 1.19  1991/10/10  12:33:33  pgf
+ * changes to support "block malloc" of line text -- now for most files
+ * there is are two mallocs and a single read, no copies.  previously there
+ * were two mallocs per line, and two copies (stdio's and ours).  This change
+ * implies that lines and line text should not move between buffers, without
+ * checking that the text and line struct do not "belong" to the buffer.
+ *
+ * Revision 1.18  1991/09/30  01:47:24  pgf
+ * don't allow recursive zotbuf() via delwp()
+ *
+ * Revision 1.17  1991/09/26  13:17:11  pgf
+ * can now kill a displayed buffer, and
+ * we initialize window values at creation time
+ *
+ * Revision 1.16  1991/09/20  13:11:53  pgf
+ * protect against null curtabstopval after make_current() returns
+ *
+ * Revision 1.15  1991/09/10  12:30:45  pgf
+ * initialize b_wline when creating buffer
+ *
+ * Revision 1.14  1991/09/10  01:52:05  pgf
+ * fixed bug caused by re-tabbing
+ *
+ * Revision 1.13  1991/09/10  00:50:23  pgf
+ * re-tab, and elim. unused local in swbuffer
+ *
+ * Revision 1.12  1991/08/16  11:03:50	pgf
+ * since we now switch to popped up buffers, the numbering in the buffer
+ * list was off by one -- now we number from 1
+ *
+ * Revision 1.11  1991/08/12  09:25:10	pgf
  * now store w_line in w_traits while buffer is offscreen, so reframe
  * isn't always necessary.  don't force reframe on redisplay.
  *
- * Revision 1.10  1991/08/08  13:15:25  pgf
+ * Revision 1.10  1991/08/08  13:15:25	pgf
  * removed some ifdef BEFORE
  *
  * Revision 1.9  1991/08/07  12:35:07  pgf
@@ -50,9 +83,9 @@
  * date: 1990/09/21 10:24:46;
  * initial vile RCS revision
  */
-#include        <stdio.h>
+#include	<stdio.h>
 #include	"estruct.h"
-#include        "edef.h"
+#include	"edef.h"
 
 static lastlookup = -1;
 
@@ -66,7 +99,7 @@ hist_lookup(c)
 
 	if (curbp != bheadp)
 		mlwrite("BUG: hist_lookup: curbp != bheadp");
-		
+	        
 	bp = curbp->b_bufp; /* always skip the current */
 	while (bp != NULL) {
 		if (!(bp->b_flag & (BFINVS|BFSCRTCH)) && (--c == 0))
@@ -83,10 +116,10 @@ hist_show()
 	int i;
 	char line[NLINE];
 	BUFFER *bp;
-	
+        
 	if (curbp != bheadp)
 		mlwrite("BUG: hist_show: curbp != bheadp");
-	
+        
 	strcpy(line,"");
 	for (i = 0, bp = curbp->b_bufp; i < 10 && bp != NULL; bp = bp->b_bufp) {
 		if (!(bp->b_flag & (BFINVS|BFSCRTCH))) {
@@ -110,7 +143,7 @@ hist_show()
 histbuff(f,n)
 {
 	register int thiscmd, c;
-        register BUFFER *bp;
+	register BUFFER *bp;
 	char *bufn;
 
 	if (curbp->b_bufp == NULL) {
@@ -135,7 +168,7 @@ histbuff(f,n)
 	} else {
 		c = n;
 	}
-	
+        
 	bufn = hist_lookup(c);
 	if (bufn == NULL) {
 		TTbeep();
@@ -143,7 +176,7 @@ histbuff(f,n)
 		return FALSE;
 	}
 	/* first assume its a buffer name, then a file name */
-        if ((bp=bfind(bufn, NO_CREAT, 0)) == NULL)
+	if ((bp=bfind(bufn, NO_CREAT, 0)) == NULL)
 		return getfile(bufn,TRUE);
 	else {
 		return swbuffer(bp);
@@ -164,15 +197,15 @@ altbuff(f,n)
  */
 usebuffer(f, n)
 {
-        register BUFFER *bp;
-        register int    s;
-        char            bufn[NBUFN];
+	register BUFFER *bp;
+	register int	s;
+	char		bufn[NBUFN];
 
 	bufn[0] = 0;
-        if ((s=mlreply("Use buffer: ", bufn, NBUFN)) != TRUE)
-                return s;
-        if ((bp=bfind(bufn, OK_CREAT, 0)) == NULL)
-                return FALSE;
+	if ((s=mlreply("Use buffer: ", bufn, NBUFN)) != TRUE)
+		return s;
+	if ((bp=bfind(bufn, OK_CREAT, 0)) == NULL)
+		return FALSE;
 	return swbuffer(bp);
 }
 
@@ -181,7 +214,7 @@ int f, n;	/* default flag, numeric argument */
 {
 	register BUFFER *bp;	/* eligable buffer to switch to*/
 	register BUFFER *stopatbp;	/* eligable buffer to switch to*/
-	
+        
 	stopatbp = NULL;
 	while (stopatbp != bheadp) {
 		/* get the last buffer in the list */
@@ -195,33 +228,36 @@ int f, n;	/* default flag, numeric argument */
 	}
 	/* we're back to the top -- they were all invisible */
 	return swbuffer(stopatbp);
-	
+        
 }
 
 
 swbuffer(bp)	/* make buffer BP current */
 register BUFFER *bp;
 {
-        register WINDOW *wp;
+	register WINDOW *wp;
+
+	if (!bp) {
+		mlwrite("BUG:  swbuffer passed null bp");
+		return FALSE;
+	}
 
 	if (curbp == bp)  /* no switching to be done */
 		return TRUE;
 
-        if (curbp) {
-        	/* if we'll have to take over this window, and it's the last */
+	if (curbp) {
+		/* if we'll have to take over this window, and it's the last */
 		if (bp->b_nwnd == 0 && --curbp->b_nwnd == 0) {
 			undispbuff(curbp,curwp);
 		}
-        }
+	}
 	make_current(bp);	/* sets curbp */
 
 	/* get it already on the screen if possible */
-        if (bp->b_nwnd > 0)  { /* then it's on the screen somewhere */
-        	register WINDOW *wp;
-        	int nw;
-		for (wp = wheadp, nw= 1;
-			 wp->w_bufp != bp && wp->w_wndp != NULL;
-					 nw++, wp = wp->w_wndp)
+	if (bp->b_nwnd > 0)  { /* then it's on the screen somewhere */
+		register WINDOW *wp;
+		for (wp = wheadp;
+			 wp->w_bufp != bp && wp->w_wndp != NULL; wp = wp->w_wndp)
 			;
 		if (!wp)
 			mlwrite("BUG: swbuffer: wp still NULL");
@@ -229,13 +265,13 @@ register BUFFER *bp;
 		upmode();
 		return TRUE;
 	}
-	
+        
 	/* oh well, suck it into this window */
-        curwp->w_bufp  = bp;
-        curwp->w_flag |= WFMODE|WFHARD; /* Quite nasty.         */
-        if (bp->b_nwnd++ == 0) {                /* First use.           */
+	curwp->w_bufp  = bp;
+	curwp->w_flag |= WFMODE|WFHARD; /* Quite nasty. 	*/
+	if (bp->b_nwnd++ == 0) {		/* First use.		*/
 		curwp->w_traits = bp->b_wtraits;
-        }
+	}
 	if (bp->b_active != TRUE) {		/* buffer not active yet*/
 		/* read it in and activate it */
 		(void)readin(bp->b_fname, TRUE, bp, TRUE);
@@ -243,10 +279,10 @@ register BUFFER *bp;
 		curwp->w_dot.o = 0;
 		bp->b_active = TRUE;
 	}
-#if     NeWS
-        newsreportmodes() ;
+#if	NeWS
+	newsreportmodes() ;
 #endif
-        return TRUE;
+	return TRUE;
 }
 
 
@@ -269,20 +305,21 @@ make_current(nbp)
 BUFFER *nbp;
 {
 	register BUFFER *bp;
-	
+        
 	if (nbp == bheadp) {	/* already at the head */
 		curbp = bheadp;
+		curtabstopval = tabstop_val(curbp);
 		return;
 	}
-		
+	        
 	/* remove nbp from the list */
 	for (bp = bheadp; bp->b_bufp != nbp; bp = bp->b_bufp)
 		;
 	bp->b_bufp = nbp->b_bufp;
-	
+        
 	/* put it at the head */
 	nbp->b_bufp = bheadp;
-	
+        
 	bheadp = nbp;
 	curbp = nbp;
 
@@ -321,55 +358,111 @@ register BUFFER *bp;
 killbuffer(f, n)
 {
 	register BUFFER *bp;
-        register int    s;
-        char bufn[NBUFN];
+	register int	s;
+	char bufn[NBUFN];
+	register BUFFER *bp1;
+	register int	didswitch = FALSE;
 
 	bufn[0] = 0;
-        if ((s=mlreply("Kill buffer: ", bufn, NBUFN)) != TRUE)
-                return(s);
-        if ((bp=bfind(bufn, NO_CREAT, 0)) == NULL) { /* Easy if unknown.     */
-        	mlwrite("No such buffer");
-                return FALSE;
-        }
-	if(bp->b_flag & BFINVS)		/* Deal with special buffers	*/
+	if ((s=mlreply("Kill buffer: ", bufn, NBUFN)) != TRUE)
+		return(s);
+	if ((bp=bfind(bufn, NO_CREAT, 0)) == NULL) { /* Easy if unknown.     */
+		mlwrite("No such buffer");
+		return FALSE;
+	}
+	if(bp->b_flag & BFINVS) 	/* Deal with special buffers	*/
 			return (TRUE);		/* by doing nothing.	*/
+	if (curbp == bp) {
+		didswitch = TRUE;
+		if (histbuff(TRUE,1) != TRUE) {
+			mlwrite("Can't kill that buffer");
+			return FALSE;
+		}
+	}
+	if (bp->b_nwnd > 0)  { /* then it's on the screen somewhere */
+		register WINDOW *wp;
+		for (wp = wheadp; wp != NULL; wp = wp->w_wndp) {
+			if (wp->w_bufp == bp) {
+				delwp(wp);
+			}
+		}
+		for (bp1 = bheadp; bp1; bp1 = bp1->b_bufp) {
+			if (bp1 == bp)
+				break;
+		}
+		if (bp1 == NULL)  /* delwp must have zotted us */
+			return TRUE;
+	}
 	s = zotbuf(bp);
 	if (s == TRUE)
-                mlwrite("Buffer %s gone", bufn);
+		mlwrite("Buffer %s gone", bufn);
 	return s;
 }
 
 zotbuf(bp)	/* kill the buffer pointed to by bp */
 register BUFFER *bp;
 {
-        register BUFFER *bp1;
-        register BUFFER *bp2;
-        register int    s;
+	register BUFFER *bp1;
+	register BUFFER *bp2;
+	register int	s;
+	register int	didswitch = FALSE;
 
-        if (bp->b_nwnd != 0) {                  /* Error if on screen.  */
-                mlwrite("Buffer is being displayed");
-                return (FALSE);
-        }
-        if ((s=bclear(bp)) != TRUE)             /* Blow text away.      */
-                return (s);
-                
-        lfree(bp->b_line.l);             /* Release header line. */
-        bp1 = NULL;                             /* Find the header.     */
-        bp2 = bheadp;
-        while (bp2 != bp) {
-                bp1 = bp2;
-                bp2 = bp2->b_bufp;
-        }
-        bp2 = bp2->b_bufp;                      /* Next one in chain.   */
-        if (bp1 == NULL)                        /* Unlink it.           */
-                bheadp = bp2;
-        else
-                bp1->b_bufp = bp2;
-        free((char *) bp);                      /* Release buffer block */
-        return (TRUE);
+#define no_del 
+#ifdef no_del
+	if (bp->b_nwnd != 0) {			/* Error if on screen.	*/
+		mlwrite("Buffer is being displayed");
+		return (FALSE);
+	}
+#else
+	if (curbp == bp) {
+		didswitch = TRUE;
+		if (histbuff(TRUE,1) != TRUE) {
+			mlwrite("Can't kill that buffer");
+			return FALSE;
+		}
+	}
+	if (bp->b_nwnd > 0)  { /* then it's on the screen somewhere */
+		register WINDOW *wp;
+		for (wp = wheadp; wp != NULL; wp = wp->w_wndp) {
+			if (wp->w_bufp == bp) {
+				delwp(wp);
+			}
+		}
+		for (bp1 = bheadp; bp1; bp1 = bp1->b_bufp) {
+			if (bp1 == bp)
+				break;
+		}
+		if (bp1 == NULL)  /* delwp must have zotted us */
+			return TRUE;
+	}
+
+		
+#endif
+	/* Blow text away.	*/
+	if ((s=bclear(bp)) != TRUE) {
+		/* the user must have answered no */
+		if (didswitch)
+			swbuffer(bp);
+		return (s);
+	}
+	        
+	lfree(bp->b_line.l,bp);	 /* Release header line. */
+	bp1 = NULL;				/* Find the header.	*/
+	bp2 = bheadp;
+	while (bp2 != bp) {
+		bp1 = bp2;
+		bp2 = bp2->b_bufp;
+	}
+	bp2 = bp2->b_bufp;			/* Next one in chain.	*/
+	if (bp1 == NULL)			/* Unlink it.		*/
+		bheadp = bp2;
+	else
+		bp1->b_bufp = bp2;
+	free((char *) bp);			/* Release buffer block */
+	return (TRUE);
 }
 
-namebuffer(f,n)		/*	Rename the current buffer	*/
+namebuffer(f,n) 	/*	Rename the current buffer	*/
 int f, n;		/* default Flag & Numeric arg */
 {
 	register BUFFER *bp;	/* pointer to scan through all buffers */
@@ -405,38 +498,38 @@ ask:	if (mlreply(prompt, bufn, NBUFN) != TRUE)
 popupbuff(bp)
 BUFFER *bp;
 {
-        register WINDOW *wp;
+	register WINDOW *wp;
 
 	if (!curbp) {
 		curbp = bp;  /* possibly at startup time */
 		curwp->w_bufp = curbp;
-                ++curbp->b_nwnd;
-	} else if (bp->b_nwnd == 0) {              /* Not on screen yet.   */
-                if ((wp = wpopup()) == NULL)
-                        return FALSE;
-                if (--wp->w_bufp->b_nwnd == 0)
-                	undispbuff(wp->w_bufp,wp);
-                wp->w_bufp  = bp;
-                ++bp->b_nwnd;
-        }
-        wp = wheadp;
-        while (wp != NULL) {
-                if (wp->w_bufp == bp) {
-                        wp->w_line.l = lforw(bp->b_line.l);
-                        wp->w_dot.l  = lforw(bp->b_line.l);
-                        wp->w_dot.o  = 0;
+		++curbp->b_nwnd;
+	} else if (bp->b_nwnd == 0) {		   /* Not on screen yet.   */
+		if ((wp = wpopup()) == NULL)
+			return FALSE;
+		if (--wp->w_bufp->b_nwnd == 0)
+			undispbuff(wp->w_bufp,wp);
+		wp->w_bufp  = bp;
+		++bp->b_nwnd;
+	}
+	wp = wheadp;
+	while (wp != NULL) {
+		if (wp->w_bufp == bp) {
+			wp->w_line.l = lforw(bp->b_line.l);
+			wp->w_dot.l  = lforw(bp->b_line.l);
+			wp->w_dot.o  = 0;
 #ifdef WINMARK
-                        wp->w_mark = nullmark;
+			wp->w_mark = nullmark;
 #endif
-                        wp->w_lastdot = nullmark;
-                        wp->w_values = global_w_values;
-                        wp->w_flag |= WFMODE|WFHARD;
-				
-                }
-                wp = wp->w_wndp;
-        }
+			wp->w_lastdot = nullmark;
+			wp->w_values = global_w_values;
+			wp->w_flag |= WFMODE|WFHARD;
+			        
+		}
+		wp = wp->w_wndp;
+	}
 	swbuffer(bp);
-        return TRUE;
+	return TRUE;
 }
 
 /*
@@ -453,8 +546,8 @@ BUFFER *bp;
 
 togglelistbuffers(f, n)
 {
-        register WINDOW *wp;
-        register BUFFER *bp;
+	register WINDOW *wp;
+	register BUFFER *bp;
 	int s;
 
 	/* if it doesn't exist, create it */
@@ -463,14 +556,14 @@ togglelistbuffers(f, n)
 
 	/* if it does exist, delete the window, which in turn 
 		will kill the BFSCRTCH buffer */
-        wp = wheadp;
+	wp = wheadp;
 	s = TRUE;
-        while (wp != NULL && s) {
-                if (wp->w_bufp == bp) {
+	while (wp != NULL && s) {
+		if (wp->w_bufp == bp) {
 			s = delwp(wp);
-                	break;
+			break;
 		}
-                wp = wp->w_wndp;
+		wp = wp->w_wndp;
 	}
 	return s;
 }
@@ -478,7 +571,7 @@ togglelistbuffers(f, n)
 listbuffers(f, n)
 {
 	int makebufflist();
-        return liststuff(BUFFER_LIST_NAME, makebufflist, f, NULL);
+	return liststuff(BUFFER_LIST_NAME, makebufflist, f, NULL);
 }
 
 /*
@@ -494,30 +587,30 @@ makebufflist(iflag,dummy)
 int iflag;	/* list hidden buffer flag */
 char *dummy;
 {
-        register int    i, j;
-        register BUFFER *bp;
-	int nbuf = 0;	/* no. of buffers */
-        long nbytes;		/* # of bytes in current buffer */
+	register int	i, j;
+	register BUFFER *bp;
+	int nbuf = 1;	/* no. of buffers */
+	long nbytes;		/* # of bytes in current buffer */
 	int footnote = FALSE;
 
 	bprintf("     %7s %*s %s\n", "Size",NBUFN,"Buffer name","Contents");
 	bprintf("     %7p %*p %30p\n", '-',NBUFN,'-','-');
-                
-        bp = bheadp;                            /* For all buffers      */
+	        
+	bp = bheadp;				/* For all buffers	*/
 
 	/* output the list of buffers */
-        while (bp != NULL) {
+	while (bp != NULL) {
 		/* skip invisible buffers and ourself if iflag is false */
-                if (((bp->b_flag&(BFINVS|BFSCRTCH)) != 0) && (iflag != TRUE)) {
-                        bp = bp->b_bufp;
-                        continue;
-                }
+		if (((bp->b_flag&(BFINVS|BFSCRTCH)) != 0) && (iflag != TRUE)) {
+			bp = bp->b_bufp;
+			continue;
+		}
 		/* output status of ACTIVE flag (has the file been read in? */
-                if (bp->b_active == TRUE) {   /* if activated       */
-	                if ((bp->b_flag&BFCHG) != 0) {    /* if changed     */
+		if (bp->b_active == TRUE) {   /* if activated	    */
+			if ((bp->b_flag&BFCHG) != 0) {	  /* if changed     */
 				bputc('m');
 				footnote = TRUE;
-	                } else {
+			} else {
 				bputc(' ');
 			}
 		} else {
@@ -527,28 +620,22 @@ char *dummy;
 
 		bprintf(" %2d ",nbuf++);
 
-#if BEFORE
-		/* output the mode codes */
-		for (i = 0; i <= MAX_BOOL_VALUE; i++)
-			bputc(b_val(bp,i) ? modecode[i] : '.');
-		bputc('\n');
-#endif
-        	{ 	/* Count bytes in buf.	*/
-			register LINE   *lp;
+		{	/* Count bytes in buf.	*/
+			register LINE	*lp;
 			nbytes = 0L;
-	                lp = lforw(bp->b_line.l);
-	                while (lp != bp->b_line.l) {
-	                        nbytes += (long)llength(lp)+1L;
-	                        lp = lforw(lp);
-	                }
+			lp = lforw(bp->b_line.l);
+			while (lp != bp->b_line.l) {
+				nbytes += (long)llength(lp)+1L;
+				lp = lforw(lp);
+			}
 		}
 		bprintf("%7ld %*s %s\n",nbytes, NBUFN, 
 						bp->b_bname, bp->b_fname);
-                bp = bp->b_bufp;
-        }
+		bp = bp->b_bufp;
+	}
 
 	if (footnote == TRUE)
-        	bprintf("('m' means modified, 'u' means unread)\n");
+		bprintf("('m' means modified, 'u' means unread)\n");
 }
 
 ltoa(buf, width, num)
@@ -556,14 +643,14 @@ char   buf[];
 int    width;
 long   num;
 {
-        buf[width] = 0;                         /* End of string.       */
-        while (num >= 10) {                     /* Conditional digits.  */
-                buf[--width] = (int)(num%10L) + '0';
-                num /= 10L;
-        }
-        buf[--width] = (int)num + '0';          /* Always 1 digit.      */
-        while (width != 0)                      /* Pad with blanks.     */
-                buf[--width] = ' ';
+	buf[width] = 0; 			/* End of string.	*/
+	while (num >= 10) {			/* Conditional digits.	*/
+		buf[--width] = (int)(num%10L) + '0';
+		num /= 10L;
+	}
+	buf[--width] = (int)num + '0';		/* Always 1 digit.	*/
+	while (width != 0)			/* Pad with blanks.	*/
+		buf[--width] = ' ';
 }
 
 /*
@@ -575,25 +662,25 @@ long   num;
  */
 addline(bp,text,len)
 register BUFFER *bp;
-char    *text;
+char	*text;
 int len;
 {
-        register LINE   *lp;
-        register int    i;
-        register int    ntext;
+	register LINE	*lp;
+	register int	i;
+	register int	ntext;
 
-        ntext = (len < 0) ? strlen(text) : len;
-        if ((lp=lalloc(ntext)) == NULL)
-                return (FALSE);
-        for (i=0; i<ntext; ++i)
-                lputc(lp, i, text[i]);
-        bp->b_line.l->l_bp->l_fp = lp;       /* Hook onto the end    */
-        lp->l_bp = bp->b_line.l->l_bp;
-        bp->b_line.l->l_bp = lp;
-        lp->l_fp = bp->b_line.l;
-        if (sameline(bp->b_dot, bp->b_line))  /* If "." is at the end */
-                bp->b_dot.l = lp;            /* move it to new line  */
-        return (TRUE);
+	ntext = (len < 0) ? strlen(text) : len;
+	if ((lp=lalloc(ntext,bp)) == NULL)
+		return (FALSE);
+	for (i=0; i<ntext; ++i)
+		lputc(lp, i, text[i]);
+	bp->b_line.l->l_bp->l_fp = lp;	     /* Hook onto the end    */
+	lp->l_bp = bp->b_line.l->l_bp;
+	bp->b_line.l->l_bp = lp;
+	lp->l_fp = bp->b_line.l;
+	if (sameline(bp->b_dot, bp->b_line))  /* If "." is at the end */
+		bp->b_dot.l = lp;	     /* move it to new line  */
+	return (TRUE);
 }
 
 /*
@@ -608,16 +695,16 @@ int len;
  */
 anycb()
 {
-        register BUFFER *bp;
+	register BUFFER *bp;
 	register int cnt = 0;
 
-        bp = bheadp;
-        while (bp != NULL) {
-                if ((bp->b_flag&BFINVS)==0 && (bp->b_flag&BFCHG)!=0)
+	bp = bheadp;
+	while (bp != NULL) {
+		if ((bp->b_flag&BFINVS)==0 && (bp->b_flag&BFCHG)!=0)
 			cnt++;
-                bp = bp->b_bufp;
-        }
-        return (cnt);
+		bp = bp->b_bufp;
+	}
+	return (cnt);
 }
 
 /*
@@ -627,66 +714,76 @@ anycb()
  * and the "cflag" is OK_CREAT, create it. The "bflag" is
  * the settings for the flags in in buffer.
  */
-BUFFER  *
+BUFFER	*
 bfind(bname, cflag, bflag)
 char   *bname;
 {
-        register BUFFER *bp;
-        register LINE   *lp;
+	register BUFFER *bp;
+	register LINE	*lp;
 	register BUFFER *lastb = NULL;	/* buffer to insert after */
 	register int i;
 
-        bp = bheadp;
-        while (bp != NULL) {
-                if (strncmp(bname, bp->b_bname, NBUFN) == 0)
-                        return (bp);
-                lastb = bp;
-                bp = bp->b_bufp;
-        }
+	bp = bheadp;
+	while (bp != NULL) {
+		if (strncmp(bname, bp->b_bname, NBUFN) == 0)
+			return (bp);
+		lastb = bp;
+		bp = bp->b_bufp;
+	}
 	if (cflag == NO_CREAT)	/* don't create it */
 		return NULL;
-	
-        if ((bp=(BUFFER *)malloc(sizeof(BUFFER))) == NULL)
-                return (NULL);
-        if ((lp=lalloc(0)) == NULL) {
-                free((char *) bp);
-                return (NULL);
-        }
+        
+	if ((bp=(BUFFER *)malloc(sizeof(BUFFER))) == NULL)
+		return (NULL);
+
+	/* these affect lalloc(), below */
+	bp->b_LINEs = NULL;
+	bp->b_LINEs_end = NULL;
+	bp->b_freeLINEs = NULL;
+	bp->b_ltext = NULL;
+	bp->b_ltext_end = NULL;
+
+	if ((lp=lalloc(0,bp)) == NULL) {
+		free((char *) bp);
+		return (NULL);
+	}
 
 	/* and set up the other buffer fields */
 	bp->b_active = FALSE;
-        bp->b_dot.l  = lp;
-        bp->b_dot.o  = 0;
+	bp->b_dot.l  = lp;
+	bp->b_dot.o  = 0;
 #if WINMARK
-        bp->b_mark = nullmark;
+	bp->b_mark = nullmark;
 #endif
-        bp->b_lastdot = nullmark;
-        bp->b_nmmarks = NULL;
-        bp->b_flag  = bflag;
+	bp->b_lastdot = nullmark;
+	bp->b_nmmarks = NULL;
+	bp->b_flag  = bflag;
 	bp->b_values = global_b_values;
-        bp->b_nwnd  = 0;
-        bp->b_sideways = 0;
-        bp->b_line.l = lp;
-        bp->b_line.o = 0;
-        strcpy(bp->b_fname, "");
-        strcpy(bp->b_bname, bname);
+	bp->b_wtraits.w_vals = global_w_values;
+	bp->b_nwnd  = 0;
+	bp->b_wline.l = lp;
+	bp->b_wline.o = 0;  /* unused */
+	bp->b_line.l = lp;
+	bp->b_line.o = 0;
+	strcpy(bp->b_fname, "");
+	strcpy(bp->b_bname, bname);
 #if	CRYPT
 	bp->b_key[0] = 0;
 #endif
 	bp->b_udstks[0] = bp->b_udstks[1] = NULL;
 	bp->b_udstkindx = 0;
-        bp->b_ulinep = NULL;
-        lp->l_fp = lp;
-        lp->l_bp = lp;
+	bp->b_ulinep = NULL;
+	lp->l_fp = lp;
+	lp->l_bp = lp;
         
 	/* append at the end */
 	if (lastb)
-	        lastb->b_bufp = bp;
+		lastb->b_bufp = bp;
 	else
 		bheadp = bp;
-        bp->b_bufp = NULL;
+	bp->b_bufp = NULL;
 
-        return (bp);
+	return (bp);
 }
 
 /*
@@ -702,33 +799,44 @@ char   *bname;
 bclear(bp)
 register BUFFER *bp;
 {
-        register LINE   *lp;
-        register int    s;
+	register LINE	*lp;
+	register int	s;
 
-        if ((bp->b_flag&(BFINVS|BFSCRTCH)) == 0 /* Not invisible or scratch */
-		        && (bp->b_flag&BFCHG) != 0 ) {      /* Something changed    */
+	if ((bp->b_flag&(BFINVS|BFSCRTCH)) == 0 /* Not invisible or scratch */
+			&& (bp->b_flag&BFCHG) != 0 ) {	    /* Something changed    */
 		char ques[50];
 		strcpy(ques,"Discard changes to ");
 		strcat(ques,bp->b_bname);
-	        if (mlyesno(ques) != TRUE)
-	                return FALSE;
+		if (mlyesno(ques) != TRUE)
+			return FALSE;
 	}
-        bp->b_flag  &= ~BFCHG;                  /* Not changed          */
+	bp->b_flag  &= ~BFCHG;			/* Not changed		*/
 	freeundostacks(bp);	/* do this before removing lines */
-        while ((lp=lforw(bp->b_line.l)) != bp->b_line.l) {
-                lremove(bp,lp);
-                lfree(lp);
+	while ((lp=lforw(bp->b_line.l)) != bp->b_line.l) {
+		lremove(bp,lp);
+		lfree(lp,bp);
 	}
-        bp->b_dot  = bp->b_line;                /* Fix "."              */
+	if (bp->b_ltext) {
+		free(bp->b_ltext);
+		bp->b_ltext = NULL;
+		bp->b_ltext_end = NULL;
+	}
+	if (bp->b_LINEs) {
+		free(bp->b_LINEs);
+		bp->b_LINEs = NULL;
+		bp->b_LINEs_end = NULL;
+	}
+	bp->b_freeLINEs = NULL;
+	bp->b_dot  = bp->b_line;		/* Fix "."		*/
 #if WINMARK
-        bp->b_mark = nullmark;                  /* Invalidate "mark"    */
+	bp->b_mark = nullmark;			/* Invalidate "mark"	*/
 #endif
-        bp->b_lastdot = nullmark;               /* Invalidate "mark"    */
+	bp->b_lastdot = nullmark;		/* Invalidate "mark"	*/
 	if (bp->b_nmmarks != NULL) { /* free the named marks */
 		free((char *)(bp->b_nmmarks));
 		bp->b_nmmarks = NULL;
 	}
-        return (TRUE);
+	return (TRUE);
 }
 
 unmark(f, n)	/* unmark the current buffers change flag */

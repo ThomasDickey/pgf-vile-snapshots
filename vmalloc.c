@@ -1,5 +1,8 @@
 #include "estruct.h"
 #include "edef.h"
+#if ! SMALLER && LATER
+# include "evar.h"
+#endif
 
 /* these routines copied without permission from "The C User's Journal",
  *	issue of Feb. 1989.  I assume they are Copyright 1989 by them.
@@ -7,7 +10,12 @@
  *	(pgf, 1989)
  *
  * $Log: vmalloc.c,v $
- * Revision 1.2  1991/08/07 12:35:07  pgf
+ * Revision 1.3  1991/10/08 01:30:59  pgf
+ * brought up to date, and ifdef LATER'd some stuff in
+ * the accounting section -- doesn't work due to header inclusion
+ * problems
+ *
+ * Revision 1.2  1991/08/07  12:35:07  pgf
  * added RCS log messages
  *
  * revision 1.1
@@ -301,7 +309,7 @@ setvmalloc(f,n)
 		for (bp=bheadp; bp != NULL; bp = bp->b_bufp) {
 			LINE *lp;
 			found++; /* for b_linep */
-			for(lp = bp->b_linep; lp->l_fp != bp->b_linep;
+			for(lp = bp->b_line.l; lp->l_fp != bp->b_line.l;
 								lp = lp->l_fp)
 				found++;
 			if (bp->b_nmmarks)
@@ -322,7 +330,7 @@ setvmalloc(f,n)
 #endif
 	if (fline)
 		found++;
-#if ! SMALLER
+#if ! SMALLER && LATER
 	{ /* user vars */
 		extern UVAR uv[MAXVARS];
 		for (i=0; i < MAXVARS; i++)

@@ -5,7 +5,10 @@
  * Supported monitor cards include CGA, MONO and EGA.
  *
  * $Log: ibmpc.c,v $
- * Revision 1.3  1991/08/07 12:35:07  pgf
+ * Revision 1.4  1991/09/10 01:19:35  pgf
+ * re-tabbed, and moved ESC and BEL to estruct.h
+ *
+ * Revision 1.3  1991/08/07  12:35:07  pgf
  * added RCS log messages
  *
  * revision 1.2
@@ -17,38 +20,35 @@
  * initial vile RCS revision
  */
 
-#define	termdef	1			/* don't define "term" external */
+#define termdef 1			/* don't define "term" external */
 
-#include        <stdio.h>
+#include	<stdio.h>
 #include	"estruct.h"
-#include        "edef.h"
+#include	"edef.h"
 
-#if     IBMPC
+#if	IBMPC
 #define NROW	43			/* Max Screen size.		*/
-#define NCOL    80                      /* Edit if you want to.         */
-#define	MARGIN	8			/* size of minimim margin and	*/
-#define	SCRSIZ	64			/* scroll size for extended lines */
-#define	NPAUSE	200			/* # times thru update to pause */
-#define BEL     0x07                    /* BEL character.               */
-#define ESC     0x1B                    /* ESC character.               */
-#define	SPACE	32			/* space character		*/
+#define NCOL	80			/* Edit if you want to. 	*/
+#define MARGIN	8			/* size of minimim margin and	*/
+#define SCRSIZ	64			/* scroll size for extended lines */
+#define NPAUSE	200			/* # times thru update to pause */
 
-#define	SCADC	0xb8000000L		/* CGA address of screen RAM	*/
-#define	SCADM	0xb0000000L		/* MONO address of screen RAM	*/
+#define SCADC	0xb8000000L		/* CGA address of screen RAM	*/
+#define SCADM	0xb0000000L		/* MONO address of screen RAM	*/
 #define SCADE	0xb8000000L		/* EGA address of screen RAM	*/
 
-#define MONOCRSR 0x0B0D			/* monochrome cursor	    */
+#define MONOCRSR 0x0B0D 		/* monochrome cursor	    */
 #define CGACRSR 0x0607			/* CGA cursor		    */
 #define EGACRSR 0x0709			/* EGA cursor		    */
 
-#define	CDCGA	0			/* color graphics card		*/
-#define	CDMONO	1			/* monochrome text card		*/
-#define	CDEGA	2			/* EGA color adapter		*/
-#define	CDSENSE	9			/* detect the card type		*/
+#define CDCGA	0			/* color graphics card		*/
+#define CDMONO	1			/* monochrome text card 	*/
+#define CDEGA	2			/* EGA color adapter		*/
+#define CDSENSE 9			/* detect the card type 	*/
 
 #define NDRIVE	3			/* number of screen drivers	*/
 
-int dtype = -1;				/* current display type		*/
+int dtype = -1; 			/* current display type 	*/
 char drvname[][8] = {			/* screen resolution names	*/
 	"CGA", "MONO", "EGA"
 };
@@ -58,16 +58,16 @@ unsigned int sline[NCOL];		/* screen line image		*/
 int egaexist = FALSE;			/* is an EGA card available?	*/
 extern union REGS rg;			/* cpu register for use of DOS calls */
 
-extern  int     ttopen();               /* Forward references.          */
-extern  int     ttgetc();
-extern  int     ttputc();
-extern  int     ttflush();
-extern  int     ttclose();
-extern  int     ibmmove();
-extern  int     ibmeeol();
-extern  int     ibmeeop();
-extern  int     ibmbeep();
-extern  int     ibmopen();
+extern	int	ttopen();		/* Forward references.		*/
+extern	int	ttgetc();
+extern	int	ttputc();
+extern	int	ttflush();
+extern	int	ttclose();
+extern	int	ibmmove();
+extern	int	ibmeeol();
+extern	int	ibmeeop();
+extern	int	ibmbeep();
+extern	int	ibmopen();
 extern	int	ibmrev();
 extern	int	ibmcres();
 extern	int	ibmclose();
@@ -89,25 +89,25 @@ int	ctrans[] =		/* ansi to ibm color translation table */
  * Standard terminal interface dispatch table. Most of the fields point into
  * "termio" code.
  */
-TERM    term    = {
+TERM	term	= {
 	NROW-1,
-        NROW-1,
-        NCOL,
-        NCOL,
+	NROW-1,
+	NCOL,
+	NCOL,
 	MARGIN,
 	SCRSIZ,
 	NPAUSE,
-        ibmopen,
-        ibmclose,
+	ibmopen,
+	ibmclose,
 	ibmkopen,
 	ibmkclose,
-        ttgetc,
+	ttgetc,
 	ibmputc,
-        ttflush,
-        ibmmove,
-        ibmeeol,
-        ibmeeop,
-        ibmbeep,
+	ttflush,
+	ibmmove,
+	ibmeeol,
+	ibmeeop,
+	ibmbeep,
 	ibmrev,
 	ibmcres
 #if	COLOR
@@ -130,7 +130,7 @@ ibmbcol(color)		/* set the current background color */
 int color;	/* color to set */
 
 {
-        cbcolor = ctrans[color];
+	cbcolor = ctrans[color];
 }
 #endif
 
@@ -156,8 +156,8 @@ ibmeeol()	/* erase to the end of the line */
 	rg.h.ah = 3;		/* read cursor position function code */
 	rg.h.bh = 0;		/* current video page */
 	int86(0x10, &rg, &rg);
-	ccol = rg.h.dl;		/* record current column */
-	crow = rg.h.dh;		/* and row */
+	ccol = rg.h.dl; 	/* record current column */
+	crow = rg.h.dh; 	/* and row */
 
 	/* build the attribute byte and setup the screen pointer */
 #if	COLOR
@@ -170,17 +170,17 @@ ibmeeol()	/* erase to the end of the line */
 #endif
 	lnptr = &sline[0];
 	for (i=0; i < term.t_ncol; i++)
-		*lnptr++ = SPACE | attr;
+		*lnptr++ = ' ' | attr;
 
 	if (flickcode && (dtype == CDCGA)) {
 		/* wait for vertical retrace to be off */
 		while ((inp(0x3da) & 8))
 			;
-	
+        
 		/* and to be back on */
 		while ((inp(0x3da) & 8) == 0)
 			;
-	}			
+	}		        
 
 	/* and send the string out */
 	movmem(&sline[0], scptr[crow]+ccol, (term.t_ncol-ccol)*2);
@@ -269,7 +269,7 @@ ibmopen()
 {
 	scinit(CDSENSE);
 	revexist = TRUE;
-        ttopen();
+	ttopen();
 }
 
 ibmclose()
@@ -363,7 +363,7 @@ int type;	/* type of adapter to init for */
 */
 
 /* getbaord:	Detect the current display adapter
-		if MONO		set to MONO
+		if MONO 	set to MONO
 		   CGA		set to CGA	EGAexist = FALSE
 		   EGA		set to CGA	EGAexist = TRUE
 */
@@ -382,7 +382,7 @@ int getboard()
 	rg.x.ax = 0x1200;
 	rg.x.bx = 0xff10;
 	int86(0x10,&rg, &rg);		/* If EGA, bh=0-1 and bl=0-3 */
-	egaexist = !(rg.x.bx & 0xfefc);	/* Yes, it's EGA */
+	egaexist = !(rg.x.bx & 0xfefc); /* Yes, it's EGA */
 	return(type);
 }
 
@@ -394,13 +394,13 @@ egaopen()	/* init the computer to work with the EGA */
 	int86(16, &rg, &rg);
 
 	rg.h.ah = 17;		/* set char. generator function code */
-	rg.h.al = 18;		/*  to 8 by 8 double dot ROM         */
-	rg.h.bl = 0;		/* block 0                           */
+	rg.h.al = 18;		/*  to 8 by 8 double dot ROM	     */
+	rg.h.bl = 0;		/* block 0			     */
 	int86(16, &rg, &rg);
 
 	rg.h.ah = 18;		/* alternate select function code    */
-	rg.h.al = 0;		/* clear AL for no good reason       */
-	rg.h.bl = 32;		/* alt. print screen routine         */
+	rg.h.al = 0;		/* clear AL for no good reason	     */
+	rg.h.bl = 32;		/* alt. print screen routine	     */
 	int86(16, &rg, &rg);
 
 	rg.h.ah = 1;		/* set cursor size function code */
@@ -448,7 +448,7 @@ int bacg;	/* background color */
 		/* wait for vertical retrace to be off */
 		while ((inp(0x3da) & 8))
 			;
-	
+        
 		/* and to be back on */
 		while ((inp(0x3da) & 8) == 0)
 			;

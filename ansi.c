@@ -4,7 +4,10 @@
  * "termio.c". It compiles into nothing if not an ANSI device.
  *
  * $Log: ansi.c,v $
- * Revision 1.4  1991/08/07 12:34:39  pgf
+ * Revision 1.5  1991/09/10 01:19:35  pgf
+ * re-tabbed, and moved ESC and BEL to estruct.h
+ *
+ * Revision 1.4  1991/08/07  12:34:39  pgf
  * added RCS log messages
  *
  * revision 1.3
@@ -21,37 +24,35 @@
  * initial vile RCS revision
  */
 
-#define	termdef	1			/* don't define "term" external */
+#define termdef 1			/* don't define "term" external */
 
-#include        <stdio.h>
+#include	<stdio.h>
 #include	"estruct.h"
-#include        "edef.h"
+#include	"edef.h"
 
-#if     ANSI
+#if	ANSI
 
 #if	AMIGA
-#define NROW    23                      /* Screen size.                 */
-#define NCOL    77                      /* Edit if you want to.         */
+#define NROW	23			/* Screen size. 		*/
+#define NCOL	77			/* Edit if you want to. 	*/
 #else
-#define NROW    24                      /* Screen size.                 */
-#define NCOL    80                      /* Edit if you want to.         */
+#define NROW	24			/* Screen size. 		*/
+#define NCOL	80			/* Edit if you want to. 	*/
 #endif
-#define	NPAUSE	100			/* # times thru update to pause */
-#define	MARGIN	8			/* size of minimim margin and	*/
-#define	SCRSIZ	64			/* scroll size for extended lines */
-#define BEL     0x07                    /* BEL character.               */
-#define ESC     0x1B                    /* ESC character.               */
+#define NPAUSE	100			/* # times thru update to pause */
+#define MARGIN	8			/* size of minimim margin and	*/
+#define SCRSIZ	64			/* scroll size for extended lines */
 
-extern  int     ttopen();               /* Forward references.          */
-extern  int     ttgetc();
-extern  int     ttputc();
-extern  int     ttflush();
-extern  int     ttclose();
-extern  int     ansimove();
-extern  int     ansieeol();
-extern  int     ansieeop();
-extern  int     ansibeep();
-extern  int     ansiopen();
+extern	int	ttopen();		/* Forward references.		*/
+extern	int	ttgetc();
+extern	int	ttputc();
+extern	int	ttflush();
+extern	int	ttclose();
+extern	int	ansimove();
+extern	int	ansieeol();
+extern	int	ansieeop();
+extern	int	ansibeep();
+extern	int	ansiopen();
 extern	int	ansirev();
 extern	int	ansiclose();
 extern	int	ansikopen();
@@ -82,25 +83,25 @@ int coltran[8] = {2, 3, 5, 7, 0, 4, 6, 1};	/* color translation table */
  * Standard terminal interface dispatch table. Most of the fields point into
  * "termio" code.
  */
-TERM    term    = {
+TERM	term	= {
 	NROW-1,
-        NROW-1,
-        NCOL,
-        NCOL,
+	NROW-1,
+	NCOL,
+	NCOL,
 	MARGIN,
 	SCRSIZ,
 	NPAUSE,
-        ansiopen,
-        ansiclose,
+	ansiopen,
+	ansiclose,
 	ansikopen,
 	ansikclose,
-        ttgetc,
-        ttputc,
-        ttflush,
-        ansimove,
-        ansieeol,
-        ansieeop,
-        ansibeep,
+	ttgetc,
+	ttputc,
+	ttflush,
+	ansimove,
+	ansieeol,
+	ansieeop,
+	ansibeep,
 	ansirev,
 	ansicres
 #if	COLOR
@@ -119,7 +120,7 @@ csi()
 }
 
 #if	COLOR
-ansifcol(color)		/* set the current output color */
+ansifcol(color) 	/* set the current output color */
 
 int color;	/* color to set */
 
@@ -136,7 +137,7 @@ int color;	/* color to set */
 	cfcolor = color;
 }
 
-ansibcol(color)		/* set the current background color */
+ansibcol(color) 	/* set the current background color */
 
 int color;	/* color to set */
 
@@ -150,23 +151,23 @@ int color;	/* color to set */
 	ansiparm(color+40);
 #endif
 	ttputc('m');
-        cbcolor = color;
+	cbcolor = color;
 }
 #endif
 
 ansimove(row, col)
 {
 	csi();
-        if (row) ansiparm(row+1);
-        ttputc(';');
-        if (col) ansiparm(col+1);
-        ttputc('H');
+	if (row) ansiparm(row+1);
+	ttputc(';');
+	if (col) ansiparm(col+1);
+	ttputc('H');
 }
 
 ansieeol()
 {
 	csi();
-        ttputc('K');
+	ttputc('K');
 }
 
 ansieeop()
@@ -176,7 +177,7 @@ ansieeop()
 	ansibcol(gbcolor);
 #endif
 	csi();
-        ttputc('J');
+	ttputc('J');
 }
 
 
@@ -186,7 +187,7 @@ int state;	/* TRUE = reverse, FALSE = normal */
 
 {
 #if	COLOR
-	int ftmp, btmp;		/* temporaries for colors */
+	int ftmp, btmp; 	/* temporaries for colors */
 #else
 	static int revstate = -1;
 	if (state == revstate)
@@ -221,8 +222,8 @@ spal(dummy)		/* change pallette settings */
 
 ansibeep()
 {
-        ttputc(BEL);
-        ttflush();
+	ttputc(BEL);
+	ttflush();
 }
 
 #if SCROLLCODE
@@ -255,7 +256,7 @@ ansiscroll(from,to,n)
 		}
 	}
 	ansiscrollregion(0, term.t_mrow);
-		
+	        
 #else /* use insert and delete line */
 #if PRETTIER_SCROLL
 	if (abs(from-to) > 1) {
@@ -263,7 +264,7 @@ ansiscroll(from,to,n)
 		if (from < to)
 			from = to-1;
 		else
-			from = to+1;	
+			from = to+1;    
 	}
 #endif
 	if (to < from) {
@@ -302,41 +303,41 @@ ansiscrollregion(top,bot)
 #endif
 
 ansiparm(n)
-register int    n;
+register int	n;
 {
-        register int q,r;
+	register int q,r;
 
-        q = n/10;
-        if (q != 0) {
+	q = n/10;
+	if (q != 0) {
 		r = q/10;
 		if (r != 0) {
 			ttputc((r%10)+'0');
 		}
 		ttputc((q%10) + '0');
-        }
-        ttputc((n%10) + '0');
+	}
+	ttputc((n%10) + '0');
 }
 
 ansiopen()
 {
-#if     V7 | USG | BSD
+#if	V7 | USG | BSD
 #if 0
-        register char *cp;
-        char *getenv();
+	register char *cp;
+	char *getenv();
 
-        if ((cp = getenv("TERM")) == NULL) {
-                puts("Shell variable TERM not defined!");
-                exit(1);
-        }
-        if (strcmp(cp, "vt100") != 0 && strcmp(cp, "ansi") != 0) {
-                puts("Terminal type not 'vt100' or 'ansi'!");
-                exit(1);
-        }
+	if ((cp = getenv("TERM")) == NULL) {
+		puts("Shell variable TERM not defined!");
+		exit(1);
+	}
+	if (strcmp(cp, "vt100") != 0 && strcmp(cp, "ansi") != 0) {
+		puts("Terminal type not 'vt100' or 'ansi'!");
+		exit(1);
+	}
 #endif
 #endif
 	strcpy(sres, "NORMAL");
 	revexist = TRUE;
-        ttopen();
+	ttopen();
 }
 
 ansiclose()

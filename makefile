@@ -13,7 +13,16 @@
 # original makefile for uemacs:	Adam Fritz	July 30,1987
 #
 # $Log: makefile,v $
-# Revision 1.17  1991/08/10 01:24:28  pgf
+# Revision 1.20  1991/10/22 14:36:01  pgf
+# added the CHANGES file
+#
+# Revision 1.19  1991/10/10  12:20:26  pgf
+# added vmalloc.o dependencies
+#
+# Revision 1.18  1991/09/27  02:49:30  pgf
+# initial saber support
+#
+# Revision 1.17  1991/08/10  01:24:28  pgf
 # added update target, and
 # removed the BUILTHDRS list
 #
@@ -150,7 +159,7 @@ CSRC = $(CSRCac) $(CSRCde) $(CSRCfh) $(CSRCim) $(CSRCnr) \
 OTHERSRC = z100bios.asm news.cps
 
 # text and data files
-TEXTFILES = README cmdtbl vile.hlp tags buglist readme.news
+TEXTFILES = README CHANGES cmdtbl vile.hlp tags buglist readme.news
 
 ALLSRC = $(CSRC) $(OTHERSRC)
 
@@ -175,6 +184,13 @@ all: $(TARGET)
 $(TARGET) : $(BUILTHDRS) $(OBJ) makefile
 	-mv $(TARGET) o$(TARGET)
 	$(CC) $(CFLAGS) -o $(TARGET) $(OBJ) $(LIBS)
+
+saber_src: 
+	#load $(CFLAGS) $(SRC) $(LIBS) 
+
+saber_obj: $(OBJ) 
+	#load $(CFLAGS) $(OBJ) $(LIBS) 
+
 
 $(BUILTHDRS): cmdtbl $(HEADER_BUILDER)
 	$(HEADER_BUILDER) cmdtbl
@@ -453,3 +469,5 @@ oneliner.o: edef.h
 globals.o: globals.c
 globals.o: estruct.h
 globals.o: edef.h
+vmalloc.o: estruct.h
+vmalloc.o: edef.h

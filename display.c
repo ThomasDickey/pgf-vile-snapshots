@@ -6,7 +6,20 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.13  1991/08/07 12:35:07  pgf
+ * Revision 1.17  1991/10/08 01:28:43  pgf
+ * dbgwrite now uses raw'est i/o
+ *
+ * Revision 1.16  1991/09/26  13:16:19  pgf
+ * LIST mode and w_sideways are now both window values
+ *
+ * Revision 1.15  1991/09/11  02:30:22  pgf
+ * use get_recorded_char, now that we have it
+ *
+ * Revision 1.14  1991/08/16  11:10:46  pgf
+ * added insert mode indicator to modeline: I for insert, O for overwrite, and
+ * R for replace-char
+ *
+ * Revision 1.13  1991/08/07  12:35:07  pgf
  * added RCS log messages
  *
  * revision 1.12
@@ -143,8 +156,8 @@ vtinit()
 
 	vp->v_flag = 0;
 #if	COLOR
-	vp->v_rfcolor = 7;
-	vp->v_rbcolor = 0;
+	vp->v_rfcolor = gfcolor;
+	vp->v_rbcolor = gbcolor;
 #endif
         vscreen[i] = vp;
 #if	! MEMMAP
@@ -266,8 +279,8 @@ int force;	/* force update past type ahead? */
 		return(SORTOFTRUE);
 #endif
 #if	VISMAC == 0
-	if (force == FALSE && (kbdmode == PLAY || dotcmdmode == PLAY))
-		return(TRUE);
+	if (force == FALSE && (get_recorded_char(FALSE) != -1))
+		return(SORTOFTRUE);
 #endif
 
 	displaying = TRUE;
@@ -491,17 +504,17 @@ LINE *lp;
 	/* and update the virtual line */
 	vscreen[sline]->v_flag |= VFCHG;
 	vscreen[sline]->v_flag &= ~VFREQ;
-	if (wp->w_sideways)
-		taboff = wp->w_sideways;
+	if (w_val(wp,WVAL_SIDEWAYS))
+		taboff = w_val(wp,WVAL_SIDEWAYS);
 	if (lp != wp->w_bufp->b_line.l) {
-		vtmove(sline, -wp->w_sideways);
+		vtmove(sline, -w_val(wp,WVAL_SIDEWAYS));
 		i = 0;
 		while ( i < llength(lp) ) {
-			vtputc(lgetc(lp, i), b_val(wp->w_bufp, MDLIST));
+			vtputc(lgetc(lp, i), w_val(wp, WMDLIST));
 			++i;
 		}
-		vtputc('\n', b_val(wp->w_bufp, MDLIST));
-		if (wp->w_sideways) {
+		vtputc('\n', w_val(wp, WMDLIST));
+		if (w_val(wp,WVAL_SIDEWAYS)) {
 			vscreen[sline]->v_text[0] = '<';
 			if (vtcol < 1) vtcol = 1;
 		}
@@ -539,14 +552,15 @@ updpos()
 	}
 
 	/* find the current column */
-	curcol = -curwp->w_sideways;
+	curcol = -w_val(curwp,WVAL_SIDEWAYS);
 	i = 0;
 	while (i < curwp->w_dot.o) {
 		c = lgetc(lp, i++);
-		if (c == '\t' && !b_val(curwp->w_bufp,MDLIST)) {
+		if (c == '\t' && !w_val(curwp,WMDLIST)) {
 			do {
 				curcol++;
-			} while (((curcol + curwp->w_sideways)%TABVAL) != 0);
+			} while (((curcol +
+				w_val(curwp,WVAL_SIDEWAYS))%TABVAL) != 0);
 		} else {
 			if (!isprint(c))
 				++curcol;
@@ -558,7 +572,7 @@ updpos()
 	/* if extended, flag so and update the virtual line image */
 	if (curcol >=  term.t_ncol - 1) {
 		return updext_past();
-	} else if (curwp->w_sideways && curcol < 1){
+	} else if (w_val(curwp,WVAL_SIDEWAYS) && curcol < 1) {
 		return updext_before();
 	} else {
 		return curcol;
@@ -829,15 +843,17 @@ updext_past()
 	/* why is term.t_ncol in here? */
 	rcursor = ((curcol - term.t_ncol) % term.t_scrsiz) + term.t_margin;
 	lbound = curcol - rcursor;
-	taboff = lbound + curwp->w_sideways;
+	taboff = lbound + w_val(curwp,WVAL_SIDEWAYS);
 
 	/* scan through the line outputing characters to the virtual screen */
 	/* once we reach the left edge					*/
-	vtmove(currow, -lbound-curwp->w_sideways);	/* start scanning offscreen */
+
+	/* start scanning offscreen */
+	vtmove(currow, -lbound-w_val(curwp,WVAL_SIDEWAYS));
 	lp = curwp->w_dot.l;		/* line to output */
 	for (j = 0; j < llength(lp); ++j)
-		vtputc(lgetc(lp, j), b_val(curwp->w_bufp,MDLIST));
-	vtputc('\n', b_val(curwp->w_bufp,MDLIST));
+		vtputc(lgetc(lp, j), w_val(curwp,WMDLIST));
+	vtputc('\n', w_val(curwp,WMDLIST));
 
 	/* truncate the virtual line, restore tab offset */
 	vteeol();
@@ -869,8 +885,8 @@ updext_before()
 	vtmove(currow, -lbound);	/* start scanning offscreen */
 	lp = curwp->w_dot.l;		/* line to output */
 	for (j = 0; j < llength(lp); ++j)
-		vtputc(lgetc(lp, j), b_val(curwp->w_bufp,MDLIST));
-	vtputc('\n', b_val(curwp->w_bufp,MDLIST));
+		vtputc(lgetc(lp, j), w_val(curwp,WMDLIST));
+	vtputc('\n', w_val(curwp,WMDLIST));
 
 	/* truncate the virtual line, restore tab offset */
 	vteeol();
@@ -1406,6 +1422,22 @@ WINDOW *wp;
 	bp = wp->w_bufp;
 
 	vtputc(lchar,FALSE);
+	{
+		register int ic;
+		if (wp == curwp) {
+			if (insertmode == FALSE)
+				ic = lchar;
+			else if (insertmode == INSERT)
+				ic = 'I';
+			else if (insertmode == REPLACECHAR)
+				ic = 'R';
+			else if (insertmode == OVERWRITE)
+				ic = 'O';
+		} else
+			ic = lchar;
+		vtputc(ic,FALSE);
+	}
+	vtputc(lchar,FALSE);
 	vtputc(' ',FALSE);
 	vtputsn(bp->b_bname, NBUFN);
 	if (b_val(bp,MDVIEW))
@@ -1593,7 +1625,7 @@ typedef char *va_list;
 dbgwrite(s,x,y,z)
 {
 	mlwrite(s,x,y,z);
-	tgetc();
+	TTgetc();
 }
 
 /*
