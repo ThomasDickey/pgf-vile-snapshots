@@ -1,7 +1,7 @@
 ------------------------
 vile bug/enhancement/wish list
 ------------------------
-$Header: /usr/build/VCS/pgf-vile/RCS/buglist,v 1.213 1994/12/14 18:27:28 pgf Exp $
+$Header: /usr/build/VCS/pgf-vile/RCS/buglist,v 1.214 1994/12/16 14:31:36 pgf Exp $
 ----------------------
 	(E means enhancement, L,M,H are low, medium, high priority)
 
@@ -620,5 +620,8 @@ the first SIGINT.  very strange.)
 ------------------------
 
 under DOS, ^P character turns on the printer.   argh.
+actually, this only happens if compiled with borland.  it uses getch()
+instead of intdos() to get the char.  (see ttgetc())  that's probably
+at least part of the answer.
 
 ---------------

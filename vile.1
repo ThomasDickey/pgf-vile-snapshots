@@ -1,5 +1,5 @@
 .\" obligatory man page for vile
-.\" $Header: /usr/build/VCS/pgf-vile/RCS/vile.1,v 1.7 1994/12/06 20:51:50 pgf Exp $
+.\" $Header: /usr/build/VCS/pgf-vile/RCS/vile.1,v 1.8 1994/12/16 14:30:29 pgf Exp $
 .TH VILE 1
 .SH NAME
 vile \- \fBVI L\fRike\fR \fBE\fRmacs
@@ -96,12 +96,17 @@ in which case it
 behaves as a native X Windows application, with scrollbars, better mouse
 support, etc.  The help file has more information on this.
 .PP
-There is a script distributed with the vile source called
-.I manfilt
-which may be used in conjunction with
+There is a program distributed with the vile source which
+is usually installed as
+.IR vile-manfilt .
+(Two versions of the source for 
+.I vile-manfilt
+are available, in C (manfilt.c) and in Perl (manfilt.pl).)
+It may be used in conjunction with
 .I vile
 or
 .I xvile
+(which the help of the macro in the file manpage.rc)
 to filter and view system manual pages.
 .I xvile
 will even 

@@ -5,7 +5,7 @@
  * functions use hints that are left in the windows by the commands.
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/display.c,v 1.174 1994/12/12 16:13:43 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/display.c,v 1.175 1994/12/16 22:09:09 pgf Exp $
  *
  */
 
@@ -2586,6 +2586,7 @@ WINDOW *wp;
 		    char *p;
 		    if (bp->b_fname != 0
 		     && (p = shorten_path(strcpy(temp,bp->b_fname), FALSE)) != 0
+		     && *p
 		     && !eql_bname(bp,p) 
 		     && (fc == 'f' ? !is_internalname(p) 
 			           : is_internalname(p))) {
