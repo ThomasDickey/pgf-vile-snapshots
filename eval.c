@@ -3,7 +3,7 @@
 
 	written 1986 by Daniel Lawrence
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/eval.c,v 1.100 1994/10/27 21:46:42 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/eval.c,v 1.104 1994/11/29 04:02:03 pgf Exp $
  *
  */
 
@@ -24,7 +24,7 @@
 
 	/* macros for environment-variable switch */
 	/*  (if your compiler balks with "non-constant case expression" */
-#if VMS || HAVE_LOSING_SWITCH_WITH_STRUCTURE_OFFSET
+#if SYS_VMS || HAVE_LOSING_SWITCH_WITH_STRUCTURE_OFFSET
 #define	If(N)		if (vnum == N) {
 #define	ElseIf(N)	} else If(N)
 #define	Otherwise	} else {
@@ -320,6 +320,9 @@ char *fname;		/* name of function to evaluate */
 	case UFLOWER:
 		it = mklower(arg1);
 		break;
+	case UFTRIM:
+		it = mktrimmed(arg1);
+		break;
 	case UFTRUTH:
 		/* is it the answer to everything? */
 		it = ltos(l_strtol(arg1) == 42);
@@ -333,7 +336,7 @@ char *fname;		/* name of function to evaluate */
 		it = result;
 		break;
 	case UFGTKEY:
-		result[0] = tgetc(TRUE);
+		result[0] = keystroke_raw8();
 		result[1] = EOS;
 		it = result;
 		break;
@@ -413,7 +416,7 @@ char *vname;		/* name of environment variable to retrieve */
 		If( EVPAGELEN )		value = l_itoa(term.t_nrow);
 		ElseIf( EVCURCOL )	value = l_itoa(getccol(FALSE) + 1);
 		ElseIf( EVCURLINE )	value = l_itoa(getcline());
-#if RAMSIZE
+#if OPT_RAMSIZE
 		ElseIf( EVRAM )		value = l_itoa((int)(envram / 1024l));
 #endif
 		ElseIf( EVFLICKER )	value = ltos(flickcode);
@@ -446,30 +449,27 @@ char *vname;		/* name of environment variable to retrieve */
 		ElseIf( EVMATCH )	value = (patmatch == NULL) ? 
 							"" : patmatch;
 		ElseIf( EVMODE )	value = current_modename();
+		ElseIf( EVMODIFIED )	value = ltos(b_is_changed(curbp));
 		ElseIf( EVKILL )	value = getkill();
 		ElseIf( EVTPAUSE )	value = l_itoa(term.t_pause);
-		ElseIf( EVPENDING )
-#if	TYPEAH
-					value = ltos(typahead());
-#else
-					value = falsem;
-#endif
+		ElseIf( EVPENDING )	value = ltos(keystroke_avail());
 		ElseIf( EVLLENGTH )	value = l_itoa(lLength(DOT.l));
 		ElseIf( EVLINE )	value = getctext((CHARTYPE)0);
 		ElseIf( EVWORD )	value = getctext(_nonspace);
 		ElseIf( EVIDENTIF )	value = getctext(_ident);
 		ElseIf( EVQIDENTIF )	value = getctext(_qident);
 		ElseIf( EVPATHNAME )	value = getctext(_pathn);
+		ElseIf( EVPROCESSID )	value = l_itoa(getpid());
 		ElseIf( EVCWD )		value = current_directory(FALSE);
 		ElseIf( EVOCWD )	value = previous_directory();
-#if PROC
+#if OPT_PROCEDURES
 		ElseIf( EVCDHOOK )	value = cdhook;
 		ElseIf( EVRDHOOK )	value = readhook;
 		ElseIf( EVWRHOOK )	value = writehook;
 		ElseIf( EVBUFHOOK )	value = bufhook;
 		ElseIf( EVEXITHOOK )	value = exithook;
 #endif
-#if X11
+#if DISP_X11
 		ElseIf( EVFONT )	value = x_current_fontname();
 		ElseIf( EVTITLE )	value = x_get_window_name();
 		ElseIf( EVICONNAM )	value = x_get_icon_name();
@@ -606,7 +606,7 @@ int	*pos;
 			return FALSE;
 		}
 	} else if (c != NAMEC) /* cancel the unget */
-		tungetc(c);
+		unkeystroke(c);
 	return TRUE;
 }
 
@@ -800,7 +800,7 @@ char *value;	/* value to set to */
 
 		ElseIf( EVCWD )
 			status = set_directory(value);
-#if X11
+#if DISP_X11
 		ElseIf( EVFONT ) status = x_setfont(value);
 		ElseIf( EVTITLE ) x_set_window_name(value); status = TRUE;
 		ElseIf( EVICONNAM ) x_set_icon_name(value); status = TRUE;
@@ -811,7 +811,7 @@ char *value;	/* value to set to */
 		ElseIf( EVDIRECTORY )
 			SetEnv(&directory, value);
 
-#if PROC
+#if OPT_PROCEDURES
 		ElseIf( EVCDHOOK )     (void)strcpy(cdhook, value);
 		ElseIf( EVRDHOOK )     (void)strcpy(readhook, value);
 		ElseIf( EVWRHOOK )     (void)strcpy(writehook, value);
@@ -832,6 +832,8 @@ char *value;	/* value to set to */
 			/* EVKILL */
 			/* EVPENDING */
 			/* EVLLENGTH */
+			/* EVMODIFIED */
+			/* EVPROCESSID */
 			/* EVRAM */
 			/* EVMODE */
 			/* EVOS */
@@ -839,7 +841,7 @@ char *value;	/* value to set to */
 		EndIf
 		break;
 	}
-#if	DEBUGM
+#if	OPT_DEBUGMACROS
 	/* if $debug == TRUE, every assignment will echo a statment to
 	   that effect here. */
 
@@ -871,7 +873,7 @@ char *value;	/* value to set to */
 		(void)update(TRUE);
 
 		/* and get the keystroke to hold the output */
-		if (ABORTED(tgetc(FALSE))) {
+		if (ABORTED(keystroke())) {
 			mlforce("[Macro aborted]");
 			status = FALSE;
 		}
@@ -1029,7 +1031,7 @@ char *tokn;		/* token to evaluate */
 		case TKENV:	return(gtenv(tokn+1));
 		case TKFUN:	return(gtfun(tokn+1));
 		case TKDIR:
-#if UNIX
+#if SYS_UNIX
 				return(lengthen_path(strcpy(buf,tokn)));
 #else
 				return(errorm);
@@ -1079,7 +1081,7 @@ char *val;
 	   ||   !strcmp(temp, "off"));
 }
 
-#if OPT_EVAL || X11
+#if OPT_EVAL || DISP_X11
 int stol(val)	/* convert a string to a numeric logical */
 char *val;	/* value to check for stol */
 {
@@ -1169,6 +1171,29 @@ char *str;		/* string to lower case */
 		++sp;
 	}
 	return(str);
+}
+
+char *mktrimmed(str)	/* trim whitespace */
+register char *str;
+{
+	char *base = str;
+	register char *dst = str;
+
+	while (*str != EOS) {
+		if (isspace(*str)) {
+			if (dst != base)
+				*dst++ = ' ';
+			while (isspace(*str))
+				str++;
+		} else {
+			*dst++ = *str++;
+		}
+	}
+	if (dst != base
+	 && isspace(dst[-1]))
+	 	dst--;
+	*dst = EOS;
+	return base;
 }
 
 #if OPT_EVAL

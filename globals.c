@@ -2,14 +2,13 @@
  *	matching lines, then for each such line, an action is performed.
  *	written for vile by Paul Fox, (c)1990
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/globals.c,v 1.30 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/globals.c,v 1.31 1994/11/29 04:02:03 pgf Exp $
  *
  */
 
 #include	"estruct.h"
 #include        "edef.h"
 
-#if GLOBALS
 
 static	int	globber P(( int, int, int ));
 
@@ -134,4 +133,3 @@ int f, n, g_or_v;
 
 	return s;
 }
-#endif

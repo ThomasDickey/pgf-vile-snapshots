@@ -1,14 +1,14 @@
 /*	Crypt:	Encryption routines for MicroEMACS
  *		written by Dana Hoggatt and Daniel Lawrence
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/crypt.c,v 1.11 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/crypt.c,v 1.12 1994/11/29 04:02:03 pgf Exp $
  *
  */
 
 #include	"estruct.h"
 #include	"edef.h"
 
-#if	CRYPT
+#if	OPT_ENCRYPT
 static	int	mod95 P((int));
 
 int

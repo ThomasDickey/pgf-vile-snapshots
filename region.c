@@ -5,14 +5,14 @@
  * commands. Some functions are just for
  * internal use.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/region.c,v 1.56 1994/10/28 11:16:41 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/region.c,v 1.61 1994/11/29 04:02:03 pgf Exp $
  *
  */
 
 #include	"estruct.h"
 #include        "edef.h"
 
-#if	MEGAMAX & ST520
+#if	MEGAMAX & SYS_ST520
 overlay	"region"
 #endif
 
@@ -50,6 +50,7 @@ int save;
 			ukb = 0;
 		}
 	}
+	find_release_attr(curbp, &region);
 	rls_region();
 	return status;
 }
@@ -351,12 +352,14 @@ int l, r;
 /*
  * change all tabs in the region to the right number of spaces
  */
+#if OPT_AEDIT
 int
 detab_region()
 {
 	regionshape = FULLLINE;
 	return do_lines_in_region(detabline,(void *)FALSE, FALSE);
 }
+#endif
 
 /*
  * convert all appropriate spaces in the line to tab characters.
@@ -424,12 +427,14 @@ int l, r;
 /*
  * convert all appropriate spaces in the region to tab characters
  */
+#if OPT_AEDIT
 int
 entab_region()
 {
 	regionshape = FULLLINE;
 	return do_lines_in_region(entabline,(void *)FALSE, FALSE);
 }
+#endif
 
 /* trim trailing whitespace from a line.  leave dot at end of line */
 /*ARGSUSED*/
@@ -466,12 +471,14 @@ int	l, r;
 /*
  * trim trailing whitespace from a region
  */
+#if OPT_AEDIT
 int
 trim_region()
 {
 	regionshape = FULLLINE;
-	return do_lines_in_region(trimline,0, FALSE);
+	return do_lines_in_region(trimline, (void *)0, FALSE);
 }
+#endif
 
 /* turn line, or part, to whitespace */
 /*ARGSUSED*/
@@ -637,11 +644,13 @@ int c;
 /*
  * turn region to whitespace
  */
+#if OPT_AEDIT
 int
 blank_region()
 {
 	return do_lines_in_region(blankline, (void *)NULL, FALSE);
 }
+#endif
 
 int
 flipregion()
@@ -754,6 +763,7 @@ register REGION *rp;
 		return TRUE;
 	}
 
+	rp->r_attr_id = 0;
 
 #if OPT_MAP_MEMORY
 	rp->r_orig.l = null_ptr;
@@ -975,6 +985,8 @@ int convert_cols; /* if rectangle, convert columns to offsets */
 		    (void)firstnonwhite(FALSE,1);
 		}
 	}
+	if (linefunc == kill_line) /* yuck.  it's the only one that deletes */
+		find_release_attr(curbp, &region);
 	rls_region();
 	return status;
 }

@@ -4,7 +4,7 @@
  * Test-driver routines for VAX/VMS filename parsing.
  * Written by T.E.Dickey for vile (august 1994).
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/fakevms.c,v 1.1 1994/10/03 13:23:51 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/fakevms.c,v 1.2 1994/11/29 04:02:03 pgf Exp $
  */
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -14,7 +14,7 @@
 
 #define	dotname(s)	(!strcmp(s,".") || !strcmp(s,".."))
 
-#if OPT_VMS_PATH && UNIX
+#if OPT_VMS_PATH && SYS_UNIX
 
 static	void	abspath P((char *));
 
@@ -253,4 +253,4 @@ int	fakevms_stat(path, sb)
 	}
 	return stat(path, sb);
 }
-#endif	/* OPT_VMS_PATH && UNIX */
+#endif	/* OPT_VMS_PATH && SYS_UNIX */

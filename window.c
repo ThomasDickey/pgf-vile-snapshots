@@ -2,14 +2,14 @@
  * Window management. Some of the functions are internal, and some are
  * attached to keys that the user actually types.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/window.c,v 1.50 1994/10/27 21:46:42 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/window.c,v 1.54 1994/11/29 04:02:03 pgf Exp $
  *
  */
 
 #include        "estruct.h"
 #include	"edef.h"
 
-#if	MEGAMAX & ST520
+#if	MEGAMAX & SYS_ST520
 overlay	"window"
 #endif
 
@@ -181,7 +181,7 @@ int f,n;
 	register int rows;
 	int s;
 
-	c = tgetc(FALSE);
+	c = keystroke();
 	if (ABORTED(c))
 		return FALSE;
 
@@ -547,15 +547,14 @@ int f,n;
                 mlforce("[Cannot split a %d line window]", curwp->w_ntrows);
                 return NULL;
         }
-        if ((wp = typealloc(WINDOW)) == NULL) {
+	/* set everything to 0's unless we want nonzero */
+        if ((wp = typecalloc(WINDOW)) == NULL) {
 		(void)no_memory("WINDOW");
                 return NULL;
         }
 	++curwp->w_bufp->b_nwnd;	       /* Displayed twice.     */
         wp->w_bufp  = curwp->w_bufp;
         copy_traits(&(wp->w_traits), &(curwp->w_traits));
-        wp->w_flag  = 0;
-        wp->w_force = 0;
         ntru = (curwp->w_ntrows-1) / 2;         /* Upper size           */
         ntrl = (curwp->w_ntrows-1) - ntru;      /* Lower size           */
 
@@ -792,26 +791,30 @@ shrinkwrap()
 	return;
 
     if ((curwp->w_split_hist & 1) == 0 || wheadp == curwp) {
-	int nrows;
+	int nrows, snrows;
 	/* give/steal from lower window */
 	nrows = curwp->w_ntrows + curwp->w_wndp->w_ntrows - 1;
-	if (nlines > nrows)
-	    nlines = nrows;
+	/* don't take more than 3/4 of its rows */
+	snrows = (nrows*3)/4;
+	if (nlines > snrows)
+	    nlines = snrows;
 	resize(TRUE, nlines);
     }
     else {
 	/* give/steal from upper window; need to find upper window */
 	register WINDOW *wp;
 	WINDOW *savewp = curwp;
-	int nrows;
+	int nrows, snrows;
 	for (wp = wheadp; 
 	     wp->w_wndp != curwp && wp->w_wndp != NULL; 
 	     wp = wp->w_wndp)
 	    ;
 	curwp = wp;
 	nrows = curwp->w_ntrows + curwp->w_wndp->w_ntrows - 1;
-	if (nlines > nrows)
-	    nlines = nrows;
+	/* don't take more than 3/4 of its rows */
+	snrows = (nrows*3)/4;
+	if (nlines > snrows)
+	    nlines = snrows;
 	resize(TRUE, nrows - nlines + 1);
 	curwp = savewp;
     }

@@ -1,7 +1,7 @@
 /* these routines take care of undo operations
  * code by Paul Fox, original algorithm mostly by Julia Harper May, 89
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/undo.c,v 1.53 1994/08/08 16:12:29 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/undo.c,v 1.55 1994/11/22 02:38:52 pgf Exp $
  *
  */
 
@@ -856,69 +856,6 @@ int f,n;
 
 }
 
-#ifdef BEFORE
-static void
-repointstuff(nlp,olp)
-fast_ptr LINEPTR nlp;
-fast_ptr LINEPTR olp;
-{
-	register WINDOW *wp;
-	int	usenew = lisreal(l_ref(nlp));
-	fast_ptr LINEPTR point;
-	register LINE *  ulp;
-
-	point = usenew ? nlp : lFORW(olp);
-#if ! WINMARK
-	if (same_ptr(MK.l, olp)) {
-		MK.l = point;
-		MK.o = b_left_margin(curbp);
-	}
-#endif
-	/* fix anything important that points to it */
-	for_each_window(wp) {
-		if (same_ptr(wp->w_dot.l, olp)) {
-			wp->w_dot.l = point;
-			wp->w_dot.o = b_left_margin(curbp);
-		}
-		if (same_ptr(wp->w_line.l, olp))
-			wp->w_line.l = point;
-#if WINMARK
-		if (same_ptr(wp->w_mark.l, olp)) {
-			wp->w_mark.l = point;
-			wp->w_mark.o = b_left_margin(curbp);
-		}
-#endif
-		if (same_ptr(wp->w_lastdot.l, olp)) {
-			wp->w_lastdot.l = point;
-			wp->w_lastdot.o = b_left_margin(curbp);
-		}
-	}
-	do_mark_iterate(mp,
-			if (same_ptr(mp->l, olp)) {
-				if (usenew) {
-					mp->l = point;
-					mp->o = b_left_margin(curbp);
-				} else {
-					mlforce("[Lost mark]");
-				}
-			}
-	);
-
-	/* reset the uline */
-	if ((ulp = l_ref(curbp->b_ulinep)) != NULL
-	 && same_ptr(ulp->l_nxtundo, olp)) {
-		if (usenew) {
-			ulp->l_nxtundo = point;
-		} else {
-			/* we lose the ability to undo all changes
-				to this line, since it's going away */
-			curbp->b_ulinep = null_ptr;
-		}
-	}
-
-}
-#else
-
 
 #define _min(a,b) ((a) < (b)) ? (a) : (b)
 
@@ -958,16 +895,25 @@ fast_ptr LINEPTR olp;
 			wp->w_lastdot.o = _min(wp->w_lastdot.o, lLength(point));
 		}
 	}
+#if BEFORE
 	do_mark_iterate(mp,
 			if (same_ptr(mp->l, olp)) {
 				if (usenew) {
 					mp->l = point;
-					mp->o = _min(mp->o, lLength(point));
+					mp->o = b_left_margin(curbp);
 				} else {
 					mlforce("[Lost mark]");
 				}
 			}
 	);
+#else
+	do_mark_iterate(mp,
+			if (same_ptr(mp->l, olp)) {
+					mp->l = point;
+					mp->o = _min(mp->o, lLength(point));
+			}
+	);
+#endif
 
 	/* reset the uline */
 	if ((ulp = l_ref(curbp->b_ulinep)) != NULL
@@ -982,7 +928,7 @@ fast_ptr LINEPTR olp;
 	}
 
 }
-#endif
+
 
 static int
 linesmatch(lp1,lp2)

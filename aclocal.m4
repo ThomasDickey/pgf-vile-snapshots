@@ -1,7 +1,7 @@
 dnl
 dnl Local definitions for autoconf.
 dnl ------------------------
-dnl $Header: /usr/build/VCS/pgf-vile/RCS/aclocal.m4,v 1.5 1994/10/31 03:49:26 pgf Exp $
+dnl $Header: /usr/build/VCS/pgf-vile/RCS/aclocal.m4,v 1.7 1994/11/04 15:35:56 pgf Exp $
 dnl ------------------------
 dnl
 dnl VC_HAVE_LIBRARY is a slightly modifid version of AC_HAVE_LIBRARY from 
@@ -110,6 +110,9 @@ define(VC_MISSING_CHECK,
 #endif
 #ifdef HAVE_STDDEF_H
 #include <stddef.h>
+#endif
+#if HAVE_UTIME_H
+# include <utime.h>
 #endif
 
 #if STDC_HEADERS || HAVE_STRING_H
@@ -313,4 +316,4 @@ define([VC_SYS_ERRLIST],
 #include <errno.h>
 ],
 [ char *c = (char *) *sys_errlist; ],
-[AC_DEFINE(HAVE_EXTERN_SYS_ERRLIST)])])
+[AC_DEFINE(HAVE_EXTERN_SYS_ERRLIST)])])dnl

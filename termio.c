@@ -3,17 +3,17 @@
  * characters, and write characters in a barely buffered fashion on the display.
  * All operating systems.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/termio.c,v 1.109 1994/10/13 13:03:25 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/termio.c,v 1.111 1994/11/29 04:02:03 pgf Exp $
  *
  */
 #include	"estruct.h"
 #include        "edef.h"
 
-#if DJGPP
+#if CC_DJGPP
 # include <pc.h>   /* for kbhit() */
 #endif
 
-#if UNIX
+#if SYS_UNIX
 
 /* there are three copies of the tt...() routines here -- one each for
 	POSIX termios, traditional termio, and sgtty.  If you have a
@@ -71,7 +71,7 @@
 # endif
 #endif
 
-#if X11	/* don't use either one */
+#if DISP_X11	/* don't use either one */
 # undef USE_FCNTL
 # undef USE_FIONREAD
 #else
@@ -133,7 +133,7 @@ ttopen()
 		perror("ttopen tcgetattr");
 		ExitProgram(BADEXIT);
 	}
-#if !X11
+#if !DISP_X11
 #if HAVE_SETVBUF
 # if SETVBUF_REVERSED
 	setvbuf(stdout, _IOLBF, tobuf, TBUFSIZ);
@@ -143,7 +143,7 @@ ttopen()
 #else /* !HAVE_SETVBUF */
   	setbuffer(stdout, tobuf, TBUFSIZ);
 #endif /* !HAVE_SETVBUF */
-#endif /* !X11 */
+#endif /* !DISP_X11 */
 
 	suspc =   otermios.c_cc[VSUSP];
 	intrc =   otermios.c_cc[VINTR];
@@ -167,7 +167,7 @@ ttopen()
 	kbd_is_polled = FALSE;
 #endif
 
-#if ! X11
+#if ! DISP_X11
 	ntermios = otermios;
 
 	/* new input settings: turn off crnl mapping, cr-ignoring,
@@ -208,7 +208,7 @@ void
 ttclean(f)
 int f;
 {
-#if !X11
+#if !DISP_X11
 	if (f) {
 		bottomleft();
 		TTputc('\n');
@@ -230,7 +230,7 @@ int f;
 void
 ttunclean()
 {
-#if ! X11
+#if ! DISP_X11
 	tcdrain(1);
 	tcsetattr(0, TCSADRAIN, &ntermios);
 #endif
@@ -256,7 +256,7 @@ ttopen()
 {
 
 	ioctl(0, TCGETA, (char *)&otermio);	/* save old settings */
-#if defined(AVAILABLE) && !X11
+#if defined(AVAILABLE) && !DISP_X11
 	setbuffer(stdout, tobuf, TBUFSIZ);
 #endif
 
@@ -299,7 +299,7 @@ ttopen()
 	suspc =   tocntrl('Z');
 #endif
 
-#if ! X11
+#if ! DISP_X11
 	ntermio = otermio;
 
 	/* setup new settings, preserve flow control, and allow BREAK */
@@ -328,7 +328,7 @@ void
 ttclean(f)
 int f;
 {
-#if ! X11
+#if ! DISP_X11
 	if (f) {
 		bottomleft();
 		TTputc('\n');
@@ -343,13 +343,13 @@ int f;
 	fcntl(0, F_SETFL, kbd_flags);
 	kbd_is_polled = FALSE;
 #endif
-#endif	/* X11 */
+#endif	/* DISP_X11 */
 }
 
 void
 ttunclean()
 {
-#if ! X11
+#if ! DISP_X11
 	ioctl(0, TCSETAW, (char *)&ntermio);
 #endif
 	TTkopen();	/* xterm */
@@ -382,7 +382,7 @@ ttopen()
 	killc = ostate.sg_kill;
 	backspc = ostate.sg_erase;
 
-#if ! X11
+#if ! DISP_X11
 	nstate = ostate;
         nstate.sg_flags |= CBREAK;
         nstate.sg_flags &= ~(ECHO|CRMOD);       /* no echo for now... */
@@ -398,7 +398,7 @@ ttopen()
 	startc = otchars.t_startc;
 	stopc =  otchars.t_stopc;
 
-#if ! X11
+#if ! DISP_X11
 	ntchars = otchars;
 	ntchars.t_brkc = -1;
 	ntchars.t_eofc = -1;
@@ -408,13 +408,13 @@ ttopen()
 	ioctl(0, TIOCGLTC, (char *)&oltchars);	/* Save old characters */
 	wkillc = oltchars.t_werasc;
 	suspc = oltchars.t_suspc;
-#if ! X11
+#if ! DISP_X11
 	ioctl(0, TIOCSLTC, (char *)&nltchars);	/* Place new character into K */
 #endif
 
 #ifdef	TIOCLGET
 	ioctl(0, TIOCLGET, (char *)&olstate);
-#if ! X11
+#if ! DISP_X11
 	nlstate = olstate;
 	nlstate |= LLITOUT;
 	ioctl(0, TIOCLSET, (char *)&nlstate);
@@ -423,7 +423,7 @@ ttopen()
 #if USE_FIONREAD
 	setbuffer(stdout, tobuf, TBUFSIZ);
 #endif
-#if ! X11
+#if ! DISP_X11
 
 	(void)signal(SIGTSTP,SIG_DFL);		/* set signals so that we can */
 	(void)signal(SIGCONT,rtfrmshell);	/* suspend & restart */
@@ -444,7 +444,7 @@ void
 ttclean(f)
 int f;
 {
-#if ! X11
+#if ! DISP_X11
 	if (f) {
 		bottomleft();
 		TTputc('\n');
@@ -459,7 +459,7 @@ int f;
 #ifdef	TIOCLSET
 	ioctl(0, TIOCLSET, (char *)&olstate);
 #endif
-#if APOLLO
+#if SYS_APOLLO
 	TTflush();
 #endif
 #endif
@@ -468,8 +468,8 @@ int f;
 void
 ttunclean()
 {
-#if ! X11
-#if APOLLO
+#if ! DISP_X11
+#if SYS_APOLLO
 	int literal = LLITOUT;
 
 	(void)fflush(stdout);
@@ -489,14 +489,14 @@ ttunclean()
 	ioctl(0, TIOCLSET, (char *)&nlstate);
 #endif
 
-#endif	/* APOLLO */
+#endif	/* SYS_APOLLO */
 	TTkopen();	/* xterm */
-#endif	/* !X11 */
+#endif	/* !DISP_X11 */
 }
 
 #endif /* USE_SGTTY */
 
-#if !X11
+#if !DISP_X11
 void
 ttputc(c)
 int c;
@@ -534,7 +534,7 @@ ttgetc()
 	}
 	return ( kbd_char );
 #else /* USE_FCNTL */
-#if APOLLO
+#if SYS_APOLLO
 	/*
 	 * If we try to read a ^C in cooked mode it will echo anyway.  Also,
 	 * the 'getchar()' won't be interruptable.  Setting raw-mode
@@ -557,18 +557,16 @@ ttgetc()
 	return c;
 #endif
 }
-#endif /* !X11 */
+#endif /* !DISP_X11 */
 
-/* typahead:	Check to see if any characters are already in the
+/* tttypahead:	Check to see if any characters are already in the
 		keyboard buffer
 */
 int
-typahead()
+tttypahead()
 {
-	if (did_tungetc())
-		return TRUE;
 
-#if X11
+#if DISP_X11
 	return x_typahead(0);
 #else
 
@@ -592,7 +590,7 @@ typahead()
 	return FALSE;
 #  endif/* USE_FCNTL */
 # endif/* USE_FIONREAD */
-#endif	/* X11 */
+#endif	/* DISP_X11 */
 }
 
 /* this takes care of some stuff that's common across all ttopen's.  Some of
@@ -603,7 +601,7 @@ ttmiscinit()
 	/* make sure backspace is bound to backspace */
 	asciitbl[backspc] = &f_backchar_to_bol;
 
-#if !X11
+#if !DISP_X11
 	/* no buffering on input */
 	setbuf(stdin, (char *)0);
 #endif
@@ -636,19 +634,19 @@ void (*signal(sig,disp))(DEFINE_SIG_ARGS)
 }
 #endif
 
-#else /* not UNIX */
+#else /* not SYS_UNIX */
 
-#if MSDOS || OS2 || NT
-# if DJGPP
+#if SYS_MSDOS || SYS_OS2 || SYS_WINNT
+# if CC_DJGPP
 #  include <gppconio.h>
 # else
-#  if NEWDOSCC
+#  if CC_NEWDOSCC
 #   include <conio.h>
 #  endif
 # endif
 #endif
 
-#if     AMIGA
+#if     SYS_AMIGA
 #define NEW 1006L
 #define AMG_MAXBUF      1024L
 static long terminal;
@@ -656,12 +654,12 @@ static char     scrn_tmp[AMG_MAXBUF+1];
 static long     scrn_tmp_p = 0;
 #endif
 
-#if ST520 && MEGAMAX
+#if SYS_ST520 && MEGAMAX
 #include <osbind.h>
 	int STscancode = 0;	
 #endif
 
-#if     VMS
+#if     SYS_VMS
 #include        <stsdef.h>
 #include        <ssdef.h>
 #include        <descrip.h>
@@ -683,11 +681,11 @@ int	newmode[3];			/* New TTY mode bits		*/
 short	iochan;				/* TTY I/O channel		*/
 #endif
 
-#if     CPM
+#if     SYS_CPM
 #include        <bdos.h>
 #endif
 
-#if     MSDOS && NEWDOSCC && !MSC
+#if     SYS_MSDOS && CC_NEWDOSCC && !CC_MSC
 union REGS rg;		/* cpu register for use of DOS calls (ibmpc.c) */
 int nxtchar = -1;	/* character held from type ahead    */
 #endif
@@ -698,9 +696,9 @@ extern CMDFUNC f_backchar_to_bol;
 void
 ttopen()
 {
-#if     AMIGA
+#if     SYS_AMIGA
 	char oline[NSTRING];
-#if	AZTEC
+#if	CC_AZTEC
 	extern	Enable_Abort;	/* Turn off ctrl-C interrupt */
 
 	Enable_Abort = 0;	/* for the Manx compiler */
@@ -712,7 +710,7 @@ ttopen()
 	strcat(oline, "/Amiga");
         terminal = Open(oline, NEW);
 #endif
-#if     VMS
+#if     SYS_VMS
         struct  dsc$descriptor  idsc;
         struct  dsc$descriptor  odsc;
         char    oname[40];
@@ -757,7 +755,7 @@ ttopen()
         term.t_ncol = newmode[0]>>16;
 
 #endif
-#if     CPM
+#if     SYS_CPM
 #endif
 
 	/* make sure backspace is bound to backspace */
@@ -768,19 +766,19 @@ ttopen()
 void
 ttclose()
 {
-#if     AMIGA
-#if	LATTICE
+#if     SYS_AMIGA
+#if	CC_LATTICE
         amg_flush();
         Close(terminal);
 #endif
-#if	AZTEC
+#if	CC_AZTEC
         amg_flush();
 	Enable_Abort = 1;	/* Fix for Manx */
         Close(terminal);
 #endif
 #endif
 
-#if     VMS
+#if     SYS_VMS
 	/*
 	 * Note: this code used to check for errors when closing the output,
 	 * but it didn't work properly (left the screen set in 1-line mode)
@@ -797,7 +795,7 @@ ttclose()
 		return;	/* already closed it */
         status = SYS$DASSGN(iochan);
 #endif
-#if	!VMS
+#if	!SYS_VMS
 	ttclean(TRUE);
 #endif
 }
@@ -832,36 +830,36 @@ void
 ttputc(c)
 int c;
 {
-#if     AMIGA
+#if     SYS_AMIGA
         scrn_tmp[scrn_tmp_p++] = c;
         if(scrn_tmp_p>=AMG_MAXBUF)
                 amg_flush();
 #endif
-#if	ST520 && MEGAMAX
+#if	SYS_ST520 && MEGAMAX
 	Bconout(2,c);
 #endif
-#if     VMS
+#if     SYS_VMS
         if (nobuf >= NOBUF)
                 ttflush();
         obuf[nobuf++] = c;
 #endif
-#if     CPM
+#if     SYS_CPM
         bios(BCONOUT, c, 0);
 #endif
-#if	OS2
+#if	SYS_OS2
 	putch(c);
 #endif
-#if	MSDOS
-# if IBMPC
+#if	SYS_MSDOS
+# if DISP_IBMPC
 	/* unneeded currently -- output is memory-mapped */
 # endif
-# if ANSI
+# if DISP_ANSI
 	putchar(c);
 # endif
 #endif
 }
 
-#if	AMIGA
+#if	SYS_AMIGA
 amg_flush()
 {
         if(scrn_tmp_p)
@@ -877,10 +875,10 @@ amg_flush()
 void
 ttflush()
 {
-#if     AMIGA
+#if     SYS_AMIGA
         amg_flush();
 #endif
-#if     VMS
+#if     SYS_VMS
         int     status;
         int     iosb[2];
 
@@ -894,11 +892,11 @@ ttflush()
         }
 #endif
 
-#if     CPM
+#if     SYS_CPM
 #endif
 
-#if     MSDOS
-# if ANSI
+#if     SYS_MSDOS
+# if DISP_ANSI
 	fflush(stdout);
 # endif
 #endif
@@ -912,7 +910,7 @@ ttflush()
 int
 ttgetc()
 {
-#if     AMIGA
+#if     SYS_AMIGA
 	{
         char ch;
 
@@ -921,7 +919,7 @@ ttgetc()
         return(255 & (int)ch);
 	}
 #endif
-#if	ST520 && MEGAMAX
+#if	SYS_ST520 && MEGAMAX
 	{
 	long ch;
 
@@ -936,7 +934,7 @@ ttgetc()
        	return(255 & (int)ch);
 	}
 #endif
-#if     VMS
+#if     SYS_VMS
 	{
         int     status;
         int     iosb[2];
@@ -945,7 +943,7 @@ ttgetc()
         while (ibufi >= nibuf) {
 		term[0] =
 		term[1] = 0;
-		if (!typahead()) {
+		if (!tttypahead()) {
                         status = SYS$QIOW(EFN, iochan, IO$_READLBLK,
                                  iosb, 0, 0, ibuf, 1, 0, term, 0, 0);
                         if (status != SS$_NORMAL
@@ -958,17 +956,17 @@ ttgetc()
 
 	}
 #endif
-#if     CPM
+#if     SYS_CPM
 	{
         return (biosb(BCONIN, 0, 0));
 
 	}
 #endif
 
-#if NT
+#if SYS_WINNT
 	return ntgetch();
-#endif /* NT */
-#if MSDOS || OS2
+#endif /* SYS_WINNT */
+#if SYS_MSDOS || SYS_OS2
 	/*
 	 * If we've got a mouse, poll waiting for mouse movement and mouse
 	 * clicks until we've got a character to return.
@@ -976,16 +974,16 @@ ttgetc()
 # if OPT_MS_MOUSE
 	if (ms_exists()) {
 		for(;;) {
-			if (typahead())
+			if (tttypahead())
 				break;
 			ms_processing();
 		}
 	}
 # endif /* OPT_MS_MOUSE */
-#if	MSC || TURBO || OS2 || NT
+#if	CC_MSC || CC_TURBO || SYS_OS2 || SYS_WINNT
 	return getch();
 #endif
-#if	NEWDOSCC && !(MSC||TURBO||OS2||NT)
+#if	CC_NEWDOSCC && !(CC_MSC||CC_TURBO||SYS_OS2||SYS_WINNT)
 	{
 	int c;
 
@@ -1003,25 +1001,23 @@ ttgetc()
 	return(c & 0xff);
 	}
 #endif
-#endif	/* MSDOS */
+#endif	/* SYS_MSDOS */
 
 }
 
 
-/* typahead:	Check to see if any characters are already in the
+/* tttypahead:	Check to see if any characters are already in the
 		keyboard buffer
 */
 int
-typahead()
+tttypahead()
 {
-	if (did_tungetc())
-		return TRUE;
 
-#if	X11
+#if	DISP_X11
 	return x_typahead(0);
 #endif
 
-#if	VMSVT
+#if	DISP_VMSVT
 	if (ibufi >= nibuf) {
 		int	status,
 			iosb[2],
@@ -1044,13 +1040,13 @@ typahead()
 	return TRUE;
 #endif
 
-#if	MSDOS || OS2 || NT
+#if	SYS_MSDOS || SYS_OS2 || SYS_WINNT
 	return (kbhit() != 0);
 #endif
 
 }
 
-#endif /* not UNIX */
+#endif /* not SYS_UNIX */
 
 
 /* Get terminal size from system, first trying the driver, and then
@@ -1059,7 +1055,7 @@ typahead()
  * is not valid.  This may be fixed (in the tcap.c case) by the TERM
  * variable.
  */
-#if ! X11
+#if ! DISP_X11
 void
 getscreensize (widthp, heightp)
 int *widthp, *heightp;

@@ -4,14 +4,14 @@
  *	Definitions to interface to unix-like DIRECTORY(3) procedures.
  *	Include this after "estruct.h"
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/dirstuff.h,v 1.15 1994/10/03 13:24:35 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/dirstuff.h,v 1.16 1994/11/29 04:02:03 pgf Exp $
  *
  */
 
 #ifndef DIRSTUFF_H
 #define DIRSTUFF_H
 
-#if ! VMS
+#if ! SYS_VMS
 
 #define USE_LS_FOR_DIRS 0
 #define OLD_STYLE_DIRS 0	/* e.g., pre-SysV.2 14-char names */
@@ -23,8 +23,8 @@
 #define USE_D_NAMLEN 1
 #endif
 
-#if _POSIX_VERSION || DIRENT || TURBO || WATCOM || DJGPP || OS2
-# if WATCOM
+#if _POSIX_VERSION || DIRENT || CC_TURBO || CC_WATCOM || CC_DJGPP || SYS_OS2
+# if CC_WATCOM
 #   include <direct.h>
 # else
 #   include <dirent.h>
@@ -47,7 +47,7 @@
 #    undef DIRENT
 #    undef USE_D_NAMLEN
 #    define USE_LS_FOR_DIRS 1
-#    if NT
+#    if SYS_WINNT
       struct direct {
 	char *d_name;
       };
@@ -64,18 +64,18 @@
 #     define DIRECTORY_ENTRY		struct direct
 #     define CLOSE_RETURN_TYPE 	int
 
-#    else /* NT */
+#    else /* SYS_WINNT */
 #     undef USE_LS_FOR_DIRS
 #     define USE_LS_FOR_DIRS 1
 #     undef USE_D_NAMLEN
 #     define USE_LS_FOR_DIRS 1
-#    endif /* NT */
+#    endif /* SYS_WINNT */
 #   endif
 #  endif
 # endif
 #endif
 
-#else /* VMS */
+#else /* SYS_VMS */
 
 #include	<rms.h>
 #include	<descrip.h>
@@ -96,7 +96,7 @@ typedef	struct	{
 	char		dd_esa[NAM$C_MAXRSS];	/* expanded: SYS$PARSE */
 	} DIR;
 
-#endif	/* VMS */
+#endif	/* SYS_VMS */
 
 #if USE_LS_FOR_DIRS
 #define	DIR	FILE
@@ -105,7 +105,7 @@ typedef	struct	{
 	} DIRENT;
 #endif
 
-#if NT || VMS || USE_LS_FOR_DIRS
+#if SYS_WINNT || SYS_VMS || USE_LS_FOR_DIRS
 extern	DIR *	opendir P(( char * ));
 extern	DIRENT *readdir P(( DIR * ));
 extern	int	closedir P(( DIR * ));

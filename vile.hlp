@@ -80,26 +80,66 @@ General Remarks
 	you have two windows to the same buffer, and make a change in one,
 	you can undo it in the other.
 
+
 	vile is 8-bit clean, allowing it to be used more easily at non-
 	English speaking sites.  See the section on "8-Bit Operation" for
 	more information.
 
+Command Prefixes
+----------------
+
+	To extend the vi command set in vile, two (or three, depending on
+	how how you count them) command "prefixes" exist.  These keystrokes,
+	in combination with another key, can be bound as a pair to execute
+	any vile function.  The default values for these prefixes are
+                Key:                    Bound to dummy function:                
+		^X     Control-X 	cntl_x-prefix
+		^A     Control-A 	cntl_a-prefix
+		#      poundsign	function-prefix
+	IF you find any of these keys hard to type, or would prefer that
+	they are all control characters (or all non-control), they can
+	be changed by binding a new key to the function listed above.  See
+	the section on "Key Rebinding" below.  If you do change the values
+	of these keys, most of vile's informational displays (the Binding
+	List, for instance) will reflect these changes.  This documentation,
+	of course, will not change.
+
+	(The '#' key is used in vi to give terminal independent access
+	to function key bindings.  This is also true in vile -- if something
+	is bound to '#2', then it is also probably available with key F2
+	on your keyboard.)
+
+
 Buffer manipulation commands:  
 -----------------------------
 
-	_	Show a history list of the up to 9 most recently visited 
-		buffers.  Follow this command with a digit to select that
-		buffer, or simply repeat it ("__") as a synonym for "_1".
-		Modified buffers are preceded by a '*' in the history list.
-		There are many different ways to get the previous file:
+	vile stores buffers in a sorted list.  Depending on the
+	setting of the "autobuffer" mode, this list is either sorted
+	in "most-recently-used" order (this is the vile default), or in a
+	fixed order dependent on the order of editing (this is how vi
+	normally does it, and can be attained by turning "autobuffer"
+	off, with "set noautobuffer"). 
+
+	_	Show a list of the first 9 buffers.  Follow this command 
+		with a digit to select that buffer, or simply repeat it
+		("__") to select the buffer most-recently visited.  In
+		autobuffer mode, this is identical to "_1".  If autobuffer
+		mode is off, the buffer which will be visited with "__" is
+		flagged with a '#' character in the list.  Modified buffers
+		are preceded by a '*' in the history list.  There are many
+		different ways to get the previous file:
 			__
-			_1
-			1_
+			_1	(autobuffer mode on)
+			1_	(    "       "    ")
 			:e#
 			^^   (ctrl-^)  (but many keyboards can't produce this)
 
-		[ See the note under "Differences", below, for comments
-		on vi's use of '_'.]
+		The buffer number may also preceded the _ command.  This is
+		necessary when visiting buffers numbered higher than '9'.  For
+		example, one would use "13_" to visit buffer 13 in the list.  
+		
+		[ See the note under "Differences", below, for comments on
+		vi's use of '_'.]
 
 	:e	Edit a file.  If the file is already in a buffer, that buffer
 		will be recalled into the current window.  This occurs as
@@ -129,11 +169,11 @@ Buffer manipulation commands:
 	:n	Go to the next buffer.  "next" means least recently used.
 		(The ":n file ..." version of the command is not supported.)
 
-	:rename	Rename the current buffer.  Prompts for a new name.  Does
-		not affect the filename associated with the buffer.  Use ":f"
-		to do that.
-		This command is useful for renaming the "[Output]" buffer, if
-		you wish to preserve its contents, but run a new command. 
+	:rename-buffer   Rename the current buffer.  Prompts for a new name. 
+		Does not affect the filename associated with the buffer. 
+		Use ":f" to do that.  This command is useful for renaming
+		the "[Output]" buffer, if you wish to preserve its
+		contents, but run a new command. 
 
 	:rewind	Go to the first buffer.  This is used only in 'noautobuffer'
 		(vi-style buffering) mode.
@@ -530,6 +570,11 @@ Text manipulation command:
 	Filenames referred to in tags files are expanded, so environment
 	variables and shell special characters like ~ may be used.
 
+	The stack of buffer locations waiting to be "popped" to with the
+	'^T' (or '^X-^]' or ":pop") command may be viewed with the
+	"show-tagstack" command.  The "[Tag Stack]" buffer is animated --
+	it will dynamically keep track of current tag references.
+
 
 Miscellaneous commands
 ----------------------
@@ -589,19 +634,18 @@ Miscellaneous commands
 		the ' motion, which also goes to [the line holding] the
 		mark, and causes regions to become "full line" regions.
 
-	q	A "multiple motion", or "quoted motion" command.  After
-		entering 'q', more motion commands are accepted until
-		another 'q' is entered.  The result of the motion is
-		the cumulative effect of all the entered motions.  Thus,
-		one might type:
+	q	A "quoted motion" command.  After entering 'q', more motion
+		commands are accepted until another 'q' is entered.  The
+		result of the motion is the cumulative effect of all the
+		entered motions.  Thus, one might type:
 			dq<arrow><arrow><arrow>...<arrow>q
 		to delete all of the text between the starting point
 		and the final cursor position.  Any motion command can
 		appear in between the two 'q' commands.  If used alone,
 		i.e. _not_ in an operator context, then the spanned text is
-		selected and highlighted as a side effect.  The resulting
-		selection can then be manipulated with the ^S pseudo-motion,
-		below.
+		selected, highlighted, and yanked as a side effect.  The
+		resulting selection can then be manipulated with the ^S
+		pseudo-motion, below.
 
 	^A-q	As above, but the motions will sweep out rectangular regions.
 
@@ -620,6 +664,43 @@ Miscellaneous commands
 		^S makes it possible to select any region (including
 		rectangular regions) of text with a mouse, and then apply
 		any vi operator to that region.
+
+	Many more parts of the editors "state" can be viewed in vile
+	than in traditional vi.  For the most part, these parts can be
+	viewed using various "show-xxx" commands:
+
+	show-buffers -- displays the current list of available buffers.  Given
+		any numeric argument, will list _all_ buffers, even those
+		normally invisible or considered temporary.
+
+	show-bindings -- displays the current list of key bindings.
+
+	show-global-modes, show-modes -- both synonymous with ":set<CR>"
+
+	show-help -- synonymous with ":help", '^A-h', etc.
+
+	show-history -- will display the user's command line history.
+
+	show-mapped-chars -- displays the strings mapped for command mode
+		with ":map".  (synonymous with ":map<CR>")
+
+	show-mapped!-chars -- displays the strings mapped for insert mode
+		with ":map!".  (synonymous with ":map<CR>")
+
+	show-registers -- displays the current contents of the named and
+		numbered registers.
+
+	show-tagstack -- displays the contents of the "tags stack", the 
+		list of locations from which the ":ta" or '^]' commands have
+		been used, and to which the ":pop" and '^T' (or '^X-^]')
+		commands will return.
+
+	show-terminal-chars -- displays the list of special chars normally
+		associated with the TTY driver, i.e. backspace, interrupt,
+		suspend, etc.
+
+	show-variables -- displays the list of vile $variables, and their
+		values.
 
 Arrow keys
 ----------
@@ -720,9 +801,11 @@ Editor modes
 			[Binding List]
 			[Buffer List]
 			[Mapped Characters]
+			[Map! Characters]
 			[Registers]
 			[Settings]
 			[Terminal]
+			[Tag Stack]
 		Turning off "animated" is rarely necessary: the capability
 		is present mostly as a debugging aid.  (B)
 
@@ -922,6 +1005,11 @@ Editor modes
 	number	(nu) All lines in the buffer will be prefixed by their line
 		number. (W) 
 
+	maplonger Controls whether the longer or shorter of two "nested"
+		map strings will be favored by the editor.  When set, vile
+		will match the longest available mapped string.  When reset
+		(the default) vile will match the shortest available map. (U)
+
 	modeline-format (mlfmt) The format string to use for displaying
 		mode lines.  See "Mode line customization" for more
 		details.  (U)
@@ -947,14 +1035,23 @@ Editor modes
 		overwriting a previous one.  (U)
 
 	printing-low The integer value representing the first of the
-		printable set of "high bit" characters.  Defaults to 0.
-		Most foreign (relative to me!) users would set this to 160,
-		the first printable character in the upper range of the 
-		ISO 8859/1 character set.  (U)
+		printable set of "high bit" (i.e. 8-bit) characters. 
+		Defaults to 0.  Most foreign (relative to me!) users would
+		set this to 160, the first printable character in the upper
+		range of the ISO 8859/1 character set.  (U)
 
 	printing-high The integer value representing the last character of
-		the printable set of "high bit" characters.  Defaults
-		to 0.  Set this to 255 for ISO 8859/1 compatibility.  (U)
+		the printable set of "high bit" (i.e. 8-bit) characters. 
+		Defaults to 0.  Set this to 255 for ISO 8859/1
+		compatibility.  (U)
+
+	remap   Controls whether :map or :map! sequences entered with
+		no explicit remapping control should be subject to remapping
+		(i.e. recursive mapping).  (U)
+
+	remapfirst Controls whether the first character of a map expanded
+		due to :map or :map! is eligible for remapping.  This is
+		off by default for vi compatibility.
 
 	report A threshold value that is used to control messages that report
 		the number of lines deleted, changed, etc.  (U)
@@ -1035,14 +1132,26 @@ Editor modes
 		starting and ending positions of the selection are displayed
 		as the selection is extended.  The default is true. (W)
 
-	timeoutlen  To resolve the ambiguity between a user-pressed
-		ESCape key and an ESC character that is part of a function
-		key sequence, vile will wait for a short time after seeing
-		an ESC, in order to check the next character of input.  The
-		waiting time is specified in milliseconds, and defaults to
-		500.  Users of fast local screens, like a local xterm, may
-		wish to reduce this to something like 50 for crisper
-		response to a user-pressed ESC.  (U)
+	timeoutlen  How long to wait for characters of a :map'ped sequnce. 
+		To resolve the ambiguity between a user-pressed ESCape key
+		and an ESC character that is part of a function key
+		sequence, vile will wait for "timeoutlen" milliseconds
+		after seeing an ESC, in order to check the next character
+		of input.  The time defaults to 500, or half a second. 
+		Users of fast local screens, like a local xterm, may wish
+		to reduce this to something like 50 for crisper response to
+		a user-pressed ESC.  (U)
+
+	timeoutlen-user  If set non-zero, this will enforce a maximum
+		waiting time for characters in a user-defined :map sequence.
+		If zero, the value of timeoutlen, above, will be used for
+		both "system" and user sequences.  It is likely that a
+		short time is desired for system sequences, and a long time
+		for user sequences.  For this reason the default value of
+		timeoutlen-user is 60000.  This will give a full minute to
+		type each character of a user-defined :map.  Be careful --
+		extremely large values may overflow the word size on
+		smaller machines.  (U)
 
 	undolimit (ul) Sets a limit on how many undoable buffer-changing
 		commands will be saved.  If set to 0, there is no limit,
@@ -1140,24 +1249,20 @@ Key Rebinding
 	to find englishnames containing "string".  Then use the command:
 		":bind-key englishname keyseq"
 	where keyseq is the exact keyboard sequence (i.e. single character,
-	or ^X or ^A followed by a single character) to which the
+	or '^X', '^A', or '#' followed by a single character) to which the
 	command should be bound.  In a .vilerc file, keyseq can be either
 	the literal sequence, or the printable representation of the
 	sequence, e.g. ^A-a or ^X-S.   (A summary of how key-sequences can
 	be represented appears at the end of this section.)
 
-	Commands can be bound to function keys, which are either regular
-	ASCII characters with the eighth bit (0x80) bit set, or else ANSI
-	escape sequences of the form "ESC [ c" or "ESC O c".  Thus the ANSI
-	up-arrow key, which produces "ESC [ A" is bindable as 'FN-A' (and
-	is bound to "previous-line" by default), and the 4 ANSI function
-	keys, which produce "ESC O P" through "ESC O S" (and sometimes
-	more) are bound to 'FN-P', 'FN-Q', 'FN-R', and 'FN-S'.
+	Commands can also be bound to meta keys, which are regular
+	ASCII characters with the eighth bit (0x80) bit set.  The
+	"printable" form for these keys is 'M-c'.
+
+	Commands bound to '#-c' key sequences are usually also available
+	by using the function keys on the terminal.  Thus the up-arrow
+	function key can be bound to as '#-A'.
 	
-	Any "function" key is also available on using the '#' prefix. 
-	Entering the sequence "# A" is equivalent to hitting the ANSI
-	up-arrow in the above paragraph, and hitting "# 3" will execute
-	whatever is bound to 'FN-3' (which is "execute-macro-3" by default. 
 	(The '#' key itself can be rebound -- it is represented by the
 	command name "function-prefix".)
 
@@ -1192,7 +1297,7 @@ Key Rebinding
 	value for a key, you can bind to it like:
 		bind-key next-window ^A-\x14
 	or
-		bind-key next-window FN-\213
+		bind-key next-window #-\213
 
 	The sequence 'M-', representing a "meta" character, is equivalent
 	to setting the high bit of the following character, so 'M-e' is
@@ -1200,9 +1305,9 @@ Key Rebinding
 
 	Function and meta key bindings are available in insert mode, as
 	well as in command mode.  (But only via either the "meta bit" or
-	ANSI ESC sequence form -- the '#' prefix will not work in insert
-	mode.) So the following macro will work correctly in both command
-	and insert modes:
+	ESC sequence form -- the '#' prefix will not work in insert mode.)
+	So the following macro will work correctly in both command and
+	insert modes:
 
 		15 store-macro
 			insert-string "fprintf(stderr, \""
@@ -1215,7 +1320,7 @@ Key Rebinding
 			~endif
 		~endm
 		; bind to function key f
-		bind-key execute-macro-15 FN-f
+		bind-key execute-macro-15 #-f
 		; also bind to meta-A
 		bind-key execute-macro-15 M-A
 
@@ -1230,7 +1335,7 @@ Key Rebinding
 			^X	(one char)
 
 		2) followed by an optional "function" prefix:
-			FN-	(three chars)
+			#-	(two chars)
 
 		3) followed by an optional "meta" prefix:
 			M-	(two chars)
@@ -1253,23 +1358,49 @@ Key Rebinding
 	represented in this help file as two printable characters, to
 	ensure they are not deleted by mailers or file transfer programs.)
 
+	The list of internal function key names, which can be bound to,
+	along with their usual label, are as follows:
 
-	:map 
-	----
-	The vi "map" and "map!" commands are implemented in vile.  As in vi,
-	mapping works best if the character sequence being bound corresponds
-	to pressing a single key.  Multiple key sequences will work however
-	so long as the next key in the sequence is pressed within the number
-	of milliseconds specified by timeoutlen.  Though not recommended,
-	this mechanism even permits the following type of mappings:
+	   Usual Label    Vile name
+	   -----------    ---------
+	    Up-arrow        #A          Home            #H
+	    Down-arrow      #B          End             #E
+	    Left-arrow      #D          Insert          #i
+	    Right-arrow     #C          Delete          #d
+	    Prior (PageUp)  #p          Find            #f
+	    Next (PageDown) #n          Select          #s
+					Help            #?
+					Menu            #m
 
-		:map z j
-		:map zz k
+	    F1              #1          F12             #@
+	    F2              #2          F13             ##
+	    F3              #3          F14             #$
+	    F4              #4          F15             #%
+	    F5              #5          F16             #^
+	    F6              #6          F17             #&
+	    F7              #7          F18             #*
+	    F8              #8          F19             #(
+	    F9              #9          F20             #)
+	    F10             #0          F11             #!
 
-	What this says is that 'z' pressed by itself will cause vile to move
-	down one line (assuming j has not been rebound or remapped).  But
-	if 'z' is pressed twice rapidly enough in succession, vile will
-	move to the previous line.
+	    KeyPad_F1       #P          KeyPad_F3   #R
+	    KeyPad_F2       #Q          KeyPad_F4   #S
+
+	    In addition, #M, #t, and #T are used internally to support
+	    mouse operations in an xterm.
+
+
+	:map, :map!, :noremap, :noremap! 
+	-------------------------------------------------
+	The vi "map" and "map!" commands are implemented in vile.  As in
+	vi, mapping works best if the character sequence being bound
+	corresponds to pressing a single key.  Multiple key sequences will
+	work as long as the next key in the sequence is pressed within a
+	specified number of milliseconds.  The value of "timeoutlen" is
+	used for system-defined character sequences, i.e.  function keys. 
+	User defined sequences will use this too, unless the value of
+	"timeoutlen-user" is non-zero, in which case this value will be
+	used instead.
 
 	Because "map" and "map!" may be used to remap arbitrary sequences,
 	these sequences must be entered literally, i.e, the syntax for
@@ -1278,15 +1409,59 @@ Key Rebinding
 	mechanism.  A map command entered from the command line will require
 	fewer characters be escaped with ^V.
 
-	Vile duplicates real vi's behavior (but not vim's) in that the first
-	character of the sequence being mapped to is not subject to
-	recursive (map) evaluation.  Thus, pressing 'j' when ":map j jh" is
-	in effect will not cause an infinite loop.  Assuming the motion is
-	possible, pressing 'j' with this map in effect will cause vile to
-	move down one line and then left one character.  But pressing 'j'
-	when ":map j hj" is in effect will cause an infinite loop.  Long
-	running loops are detected and assumed to be infinite.  When an
-	(assumed) infinite loop is detected, execution is aborted.
+	To provide a relatively portable way of specifying function key
+	mappings, vile will reapply mapping to the result of a system-
+	defined map.  System function keys are mapped to "poundsign"
+	sequences, like '#1' for function key 1, and '#B' for the down-arrow
+	key.  The remapping allows one to put
+		map #1 <some-user-map-sequence>
+	in the .vilerc file, and have the user-sequence executed when the
+	system F1 key is pressed.  (Otherwise the terminal-specific
+	sequence would have to appear in the .vilerc.)
+
+	The "remap" option controls whether the successfully mapped result
+	of a map is reevaluated for more mapping matches.  The "noremap" (and
+	"noremap!") variants of the map commands will force that particular
+	mapping to be applied without subsequent remapping, regardless of
+	the current setting of the global "remap" setting.
+
+	Long running loops caused by recursive :map definitions are
+	detected and assumed to be infinite.  When an (assumed) infinite
+	loop is detected, execution is aborted.  Turning off the "remap"
+	option, or doing some of the maps with the ":noremap/:noremap!"
+	form of the map commands will eliminate most such loops.
+
+	Vile normally duplicates real vi's behavior (but not vim's) in that
+	the first character of the sequence being mapped to is not subject
+	to recursive (map) evaluation.  Assuming "remap" is on, pressing
+	'j' when ":map j jh" is in effect will not cause an infinite loop,
+	whereas ":map j hj" _wlll_ cause such a loop.  Setting the
+	"remapfirst" option will allow this sort of remapping (and will
+	cause an infinite loops for both examples).
+
+	The "maplonger" option controls whether the longer or shorter of
+	two "nested" map strings will be favored by the editor.  That is,
+	if both "foo" and "foobar" are mapped (to presumably different
+	values), then with "maplonger" set, vile will not expand "foo" until
+	it is sure (either because the next character is not 'b', or a
+	timeout has expired) that "foobar" will not be seen.  Real vi will
+	always expand "foo" immediately, and this is the default behavior. 
+	Though not particularly recommended, the "maplonger" mechanism even
+	permits the following types of mappings:
+
+		:map z j
+		:map zz k
+
+	When 'z' is pressed by itself it will cause vile to move down one
+	line (assuming j has not been rebound or remapped).  But if 'z' is
+	pressed twice rapidly (enough) in succession, vile will move to the
+	previous line. 
+
+	The current set of mappings or "map!"ings may be viewed with
+	the commands ":map<CR>" (or ":show-mapped-chars") or ":map!<CR>"
+	(or ":show-mapped!-chars").  A preceding numeric argument to
+	either command will force display of the system-defined
+	:map[!] sequences instead (i.e. the function keys).
 
 
 Special "Terminal" Key Rebinding
@@ -1395,6 +1570,7 @@ Programmed procedures and macros
 	$llength	length of current line			(read only)
 	$match		last matched magic pattern		(read only)
 	$mode		current mode ("command","insert","overwrite") (rd. o.)
+	$modified	is current buffer modified or not?
 	$ntildes	percent of window filled by ~ chars, at end of buffer
 	$ocwd		previous directory			(read only)
 	$os		operating system ("unix", "dos", "vms", "os/2") (rd. o.)
@@ -1403,6 +1579,7 @@ Programmed procedures and macros
 	$palette	current palette string
 	$pathname	current path-like word
 	$pending	typeahead pending flag			(read only)
+	$pid		returns vile's process-id
 	$progname	returns "vile" or "xvile". (read-only)
 	$qidentifier	current qualified name (as with C++ ::)
 	$read-hook	name of procedure to run after a file is read
@@ -1466,6 +1643,7 @@ Programmed procedures and macros
 	&len	1	string length
 	&upp	1	uppercase string
 	&low	1	lower case string
+	&tri	1	trim whitespace from string
 	&tru	1	Truth of the universe logical test
 	&asc	1	char to integer conversion
 	&chr	1	integer to char conversion
@@ -2553,10 +2731,13 @@ Credits
 	rectangles and their operations was inspired by code from the
 	'notgnu' editor, by Julie Melbin.  Patches to support OS/2 and
 	Windows/NT came from Charles Moschel and Joe Greer, respectively.
+	The reference.doc file supplied with Bram Moolenaar's excellent Vim
+	editor was useful in unravelling some of the less obvious parts of
+	:map functionality.
 	
 	The initial changes to create vile from micro-Emacs were all done
 	by Paul Fox, who can be reached at home at pgf@foxharp.boston.ma.us.
 	(By the way, he is not the Paul D. Fox that wrote the Crisp editor.)
 
 ------------------------------------
- $Header: /usr/build/VCS/pgf-vile/RCS/vile.hlp,v 1.187 1994/10/27 14:21:56 pgf Exp $
+ $Header: /usr/build/VCS/pgf-vile/RCS/vile.hlp,v 1.195 1994/11/28 19:04:20 pgf Exp $

@@ -63,7 +63,7 @@
  *
  *	Allow left/right scrolling of input lines (when they get too long).
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/history.c,v 1.20 1994/10/27 21:46:42 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/history.c,v 1.22 1994/11/29 04:02:03 pgf Exp $
  *
  */
 
@@ -530,7 +530,7 @@ int	eolchar;
 
 	register int	c = *given;
 
-#if	KSH_HISTORY
+#if	OPT_KSH_HISTORY
 	if (c != ESC)				/* suppress immediate-return */
 #endif
 	if (!isspecial(c)) {
@@ -580,7 +580,7 @@ int	eolchar;
 			else if (p->c_func == forwline)
 				direction = 1;
 		}
-#if	KSH_HISTORY
+#if	OPT_KSH_HISTORY
 		if (c == ESC) {
 			escaped = !escaped;
 		} else
@@ -595,19 +595,19 @@ int	eolchar;
 				lp1 = lp2;
 			else	/* cannot scroll */
 				kbd_alarm();
-#if	KSH_HISTORY
+#if	OPT_KSH_HISTORY
 		/* patch: inline-editing should be done at this point */
 #endif
 		} else if (!escaped) {
 			*given = c;
 			if (any_edit)
-				tungetc(c);
+				unkeystroke(c);
 			return any_edit;
 
 		} else
 			kbd_alarm();
 
-		c = kbd_key();
+		c = keystroke();
 	}
 }
 #endif	/* OPT_HISTORY */

@@ -1,16 +1,12 @@
 /*
  * version & usage-messages for vile
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/version.c,v 1.17 1994/10/30 16:26:37 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/version.c,v 1.19 1994/11/29 04:02:03 pgf Exp $
  *
  */
 
 #include	"estruct.h"	/* global structures and defines */
 #include	"edef.h"	/* global definitions */
-
-#if UNIX || VMS
-#include <sys/stat.h>		/* ...for 'struct stat' */
-#endif
 
 extern char *pathname[];	/* startup file path/name array */
 
@@ -23,14 +19,14 @@ print_usage P((void))
 	"-h             to get help on startup",
 	"-gNNN          or simply +NNN to go to line NNN",
 	"-sstring       or +/string to search for \"string\"",
-#if TAGS
+#if OPT_TAGS
 	"-ttagname      to look up a tag",
 #endif
 	"-v             to view files as read-only",
-#if CRYPT
+#if OPT_ENCRYPT
 	"-kcryptkey     for encrypted files",
 #endif
-#if X11
+#if DISP_X11
 	"-name name     to change program name for X resources",
 	"-title name	to set name in title bar",
 	"-fg color      to change foreground color",
@@ -43,11 +39,11 @@ print_usage P((void))
 	"-leftbar	Put scrollbar(s) on left",
 	"-rightbar	Put scrollbar(s) on right (default)",
 #endif
-#if IBMPC || BORLAND
+#if DISP_IBMPC || DISP_BORLAND
 	"-2             25-line mode",
 	"-4             43-line mode",
 	"-5             50-line mode",
-#if OS2
+#if SYS_OS2
 	"-6		60-line mode",
 #endif
 	"(see help file for more screen resolutions)",
@@ -68,7 +64,7 @@ getversion()
 {
 	if (*version_string)
 		return version_string;
-#if UNIX || VMS
+#if SYS_UNIX || SYS_VMS
 	/*
 	 * Remember the directory from which we were run, to use in finding the
 	 * help-file.
@@ -79,7 +75,7 @@ getversion()
 		s = strmalloc(lengthen_path(strcpy(temp, prog_arg)));
 		t = pathleaf(s);
 		if (t != s) {
-# if UNIX	/* 't' points past slash */
+# if SYS_UNIX	/* 't' points past slash */
 			t[-1] = EOS;
 # else		/* 't' points to ']' */
 			*t = EOS;
@@ -97,34 +93,34 @@ getversion()
 	(void) lsprintf(version_string, "%s %s for %s", prognam, version, opersys);
 	{
 		char *s;
-		if ((s = flook(prog_arg, FL_ANYWHERE)) != NULL) {
-			struct	stat	sb;
-			if (stat(s, &sb) >= 0) {
+		if ((s = flook(prog_arg, FL_PATH)) != NULL) {
+			long mtime = file_modified(s);
+			if (mtime != 0) {
 				(void)strcat(version_string, ", installed ");
-				(void)strcat(version_string, ctime(&sb.st_mtime));
+				(void)strcat(version_string, ctime(&mtime));
 				/* trim the newline */
 				version_string[strlen(version_string)-1] = EOS;
 			}
 		}
 	}
 #else
-# if MSDOS || OS2
+# if SYS_MSDOS || SYS_OS2
 #  if defined(__DATE__) && !SMALLER
 	(void)lsprintf(version_string,"%s %s for %s, built %s %s with %s", 
 		prognam, version, opersys, __DATE__, __TIME__,
-#   if WATCOM
+#   if CC_WATCOM
 		"Watcom C/386"
 #   endif
-#   if DJGPP
+#   if CC_DJGPP
 		"DJGPP"
 #   endif
-#   if TURBO
+#   if CC_TURBO
 		"TurboC/BorlandC++"
 #   endif
 	);
 #  endif
-# endif /* MSDOS || OS2 */
-#endif /* not UNIX or VMS */
+# endif /* SYS_MSDOS || SYS_OS2 */
+#endif /* not SYS_UNIX or SYS_VMS */
 	return version_string;
 }
 

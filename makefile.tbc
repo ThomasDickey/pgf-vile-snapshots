@@ -1,5 +1,5 @@
 # This is a makefile for mktbls and vile under Turbo-C
-# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.tbc,v 1.12 1994/08/08 16:12:29 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.tbc,v 1.14 1994/11/29 04:02:03 pgf Exp $
 
 .AUTODEPEND
 
@@ -12,7 +12,7 @@ CC = tcc +vile.cfg
 #to use the faster direct video driver:
 SCREEN=ibmpc
 #to use the "console i/o" driver:
-# (also need to change to "#define BORLAND 1" in estruct.h)
+# (also need to change to "#define DISP_BORLAND 1" in estruct.h)
 #SCREEN=borland
 
 # where are the libs?
@@ -106,6 +106,7 @@ VILE_DEPS =  \
  history.obj \
  input.obj \
  insert.obj \
+ itbuff.obj \
  isearch.obj \
  line.obj \
  map.obj \

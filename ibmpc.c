@@ -8,7 +8,7 @@
  * Modified by Pete Ruczynski (pjr) for auto-sensing and selection of
  * display type.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/ibmpc.c,v 1.62 1994/10/30 16:26:37 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/ibmpc.c,v 1.68 1994/11/29 04:02:03 pgf Exp $
  *
  */
 
@@ -17,12 +17,12 @@
 #include        "estruct.h"
 #include        "edef.h"
 
-#if BORLAND || !IBMPC
-#error misconfigured:  IBMPC should be defined if using ibmpc.c
-#error (and BORLAND should not be defined)
+#if DISP_BORLAND || !DISP_IBMPC
+#error misconfigured:  DISP_IBMPC should be defined if using ibmpc.c
+#error (and DISP_BORLAND should not be defined)
 #endif
 
-#if DJGPP
+#if CC_DJGPP
 #include <pc.h>
 #define min(a,b) (((a) < (b)) ? (a) : (b))
 #define max(a,b) (((a) > (b)) ? (a) : (b))
@@ -43,13 +43,13 @@
 #define	NPAUSE	200			/* # times thru update to pause */
 #define	SPACE	32			/* space character		*/
 
-#if WATCOM
+#if CC_WATCOM
 #define	SCADC	(0xb800 << 4)		/* CGA address of screen RAM	*/
 #define	SCADM	(0xb000 << 4)		/* MONO address of screen RAM	*/
 #define SCADE	(0xb800 << 4)		/* EGA address of screen RAM	*/
 #endif
 
-#if DJGPP
+#if CC_DJGPP
 #define FAR_POINTER(s,o) (0xe0000000 + s*16 + o)
 #define FP_SEG(a)	((unsigned long)(a) >> 4L)
 #define FP_OFF(a)	((unsigned long)(a) & 0x0fL)
@@ -68,7 +68,7 @@
 #define FAR_POINTER(s,o) (s)
 #endif
 
-#ifdef __WATCOMC__
+#if CC_WATCOM
 #define	INTX86(a,b,c)		int386(a, b, c)
 #define	INTX86X(a,b,c,d)	int386x(a, b, c, d)
 #define	_AX_		eax
@@ -105,7 +105,7 @@
 #endif
 
 static	int	dtype = -1;	/* current display type		*/
-#if DJGPP
+#if CC_DJGPP
 #define PACKED __attribute__ ((packed))
 #else
 #define PACKED
@@ -248,7 +248,7 @@ extern	void	ibmputc   P((int));
 extern	void	ibmkopen  P((void));
 extern	void	ibmkclose P((void));
 
-#if	COLOR
+#if	OPT_COLOR
 extern	void	ibmfcol   P((int));
 extern	void	ibmbcol   P((int));
 
@@ -259,9 +259,7 @@ int	ctrans[NCOLORS];
 char *initpalettestr = "0 4 2 14 1 5 3 15";
 /* black, red, green, yellow, blue, magenta, cyan, white   */
 #endif
-#if	SCROLLCODE
 extern	void	ibmscroll P((int,int,int));
-#endif
 
 static	int	scinit    P((int));
 static	int	getboard  P((void));
@@ -270,6 +268,36 @@ static	int	scblank   P((void));
 #ifdef MUCK_WITH_KBD_RATE
 static	void	maxkbdrate   P((void));
 #endif
+
+static struct {
+	char  *seq;
+	int   code;
+} keyseqs[] = {	/* use 'Z' in place of leading 0, so these can be C-strings */
+	/* Arrow keys */
+	{"Z\110",     KEY_Up},
+	{"Z\120",     KEY_Down},
+	{"Z\115",     KEY_Right},
+	{"Z\113",     KEY_Left},
+	/* page scroll */
+	{"Z\121",     KEY_Next},
+	{"Z\111",     KEY_Prior},
+	{"Z\107",     KEY_Home},
+	{"Z\117",     KEY_End},
+	/* editing */
+        {"ZR",        KEY_Insert},
+	{"Z\123",     KEY_Delete},
+	/* function keys */
+        {"Z;",      KEY_F1},
+	{"Z<",      KEY_F2},
+	{"Z=",      KEY_F3},
+	{"Z>",      KEY_F4},
+	{"Z?",      KEY_F5},
+	{"Z@",      KEY_F6},
+	{"ZA",      KEY_F7},
+	{"ZB",      KEY_F8},
+	{"ZC",      KEY_F9},
+        {"ZD",      KEY_F10},
+};
 
 static int current_ibmtype;
 
@@ -291,6 +319,7 @@ TERM    term    = {
 	ibmkclose,
 	ttgetc,
 	ibmputc,
+	tttypahead,
 	ttflush,
 	ibmmove,
 	ibmeeol,
@@ -298,23 +327,21 @@ TERM    term    = {
 	ibmbeep,
 	ibmrev,
 	ibmcres,
-#if	COLOR
+#if	OPT_COLOR
 	ibmfcol,
 	ibmbcol,
 #endif
-#if	SCROLLCODE
 	ibmscroll
-#endif
 };
 
-#if DJGPP
+#if CC_DJGPP
 _go32_dpmi_seginfo vgainfo;
 #endif
 
 static int
 get_vga_bios_info(dynamic_VGA_info *buffer)
 {
-# if DJGPP
+# if CC_DJGPP
 	_go32_dpmi_registers regs;
 	vgainfo.size = (sizeof (dynamic_VGA_info)+15) / 16;
 	if (_go32_dpmi_allocate_dos_memory(&vgainfo) != 0) {
@@ -337,7 +364,7 @@ get_vga_bios_info(dynamic_VGA_info *buffer)
 #else
 	struct SREGS segs;
 
-#if WATCOM
+#if CC_WATCOM
 	segread(&segs);
 #else
 	segs.es   = FP_SEG(buffer);
@@ -426,7 +453,7 @@ set_vertical_resolution(int code)
 
 /*--------------------------------------------------------------------------*/
 
-#if	COLOR
+#if	OPT_COLOR
 void
 ibmfcol(color)		/* set the current output color */
 int color;	/* color to set */
@@ -478,7 +505,7 @@ int ch;
 {
 	rg.h.ah = 14;		/* write char to screen with current attrs */
 	rg.h.al = ch;
-#if	COLOR
+#if	OPT_COLOR
 	if (ColorDisplay())
 		rg.h.bl = cfcolor;
 	else
@@ -533,7 +560,7 @@ void
 spal(palstr)	/* reset the palette registers */
 char *palstr;
 {
-#if COLOR
+#if OPT_COLOR
     	/* this is pretty simplistic.  big deal. */
 	(void)sscanf(palstr,"%i %i %i %i %i %i %i %i",
 	    	&ctrans[0], &ctrans[1], &ctrans[2], &ctrans[3],
@@ -555,7 +582,7 @@ VIDEO	*vp;
 int	inverted;
 {
 	int	attr;
-#if	COLOR
+#if	OPT_COLOR
 	if (ColorDisplay())
 		attr = AttrColor(
 			inverted ? ReqFcolor(vp) : ReqBcolor(vp),
@@ -645,6 +672,7 @@ void
 ibmopen()
 {
 	register DRIVERS *driver = &drivers[ORIGTYPE];
+	int i;
 
 	if (sizeof(dynamic_VGA_info) != 64) {
 		printf("DOS vile build error -- dynamic_VGA_info struct"
@@ -684,7 +712,7 @@ ibmopen()
 			case 16:	driver->vchr = C8x16;	break;
 			}
 			driver->rows = buffer.num_rows;
-#if DJGPP
+#if CC_DJGPP
 			{ u_long staticinfop;
 			static_VGA_info static_info;
 			staticinfop = ((u_long)buffer.static_info & 0xffffL);
@@ -694,7 +722,7 @@ ibmopen()
 					&static_info);
 			allowed_vres = static_info.text_scanlines;
 			}
-#elif WATCOM
+#elif CC_WATCOM
 			{
 			static_VGA_info __far *staticinfop;
 			staticinfop = MK_FP (
@@ -723,7 +751,7 @@ ibmopen()
 	current_res_name = "25";
 #endif
 
-#if	COLOR
+#if	OPT_COLOR
 	spal(initpalettestr);
 #endif
 	if (!ibmcres(current_res_name))
@@ -734,6 +762,18 @@ ibmopen()
 #ifdef MUCK_WITH_KBD_RATE
 	maxkbdrate();   /* set the keyboard rate to max */
 #endif
+	for (i = TABLESIZE(keyseqs); i--; ) {
+	 	int len = strlen(keyseqs[i].seq);
+		if (keyseqs[i].seq[0] == 'Z') {
+#if  DISP_WANGPC
+			keyseqs[i].seq[0] = 0x1f; /* this _may_ work */
+#else
+			keyseqs[i].seq[0] = '\0';
+#endif
+		}
+		addtosysmap(keyseqs[i].seq, len, keyseqs[i].code);
+	}
+
 	ibm_opened = TRUE;	/* now safe to use 'flash', etc. */
 }
 
@@ -758,7 +798,7 @@ void
 ibmkopen()	/* open the keyboard */
 {
 	ms_install();
-#if DJGPP
+#if CC_DJGPP
 	setmode(0,O_BINARY);
 #endif
 }
@@ -766,7 +806,7 @@ ibmkopen()	/* open the keyboard */
 void
 ibmkclose()	/* close the keyboard */
 {
-#if DJGPP
+#if CC_DJGPP
 	setmode(0,O_TEXT);
 #endif
 	ms_deinstall();
@@ -974,7 +1014,7 @@ int bacg;	/* background color */
 	if (attrstr) {
 		register USHORT attrnorm;
 		register USHORT attrrev;
-#if	COLOR
+#if	OPT_COLOR
 		if (ColorDisplay()) {
 			attrnorm = AttrColor(bacg,forg) << 8;
 			attrrev = AttrColor(forg,bacg) << 8;
@@ -994,7 +1034,7 @@ int bacg;	/* background color */
 	} else {
 		register USHORT attr; /* attribute byte mask to place in RAM */
 		/* build the attribute byte and setup the screen pointer */
-#if	COLOR
+#if	OPT_COLOR
 		if (ColorDisplay())
 			attr = AttrColor(bacg,forg);
 		else
@@ -1049,7 +1089,7 @@ static int
 scblank()
 {
 	register int attr;
-#if	COLOR
+#if	OPT_COLOR
 	if (ColorDisplay())
 		attr = AttrColor(gbcolor,gfcolor);
 	else
@@ -1058,18 +1098,17 @@ scblank()
 	return attr;
 }
 
-#if SCROLLCODE
 /*
  * Move 'n' lines starting at 'from' to 'to'
  *
- * PRETTIER_SCROLL is prettier but slower -- it scrolls a line at a time
+ * OPT_PRETTIER_SCROLL is prettier but slower -- it scrolls a line at a time
  *	instead of all at once.
  */
 void
 ibmscroll(from,to,n)
 int from, to, n;
 {
-#if PRETTIER_SCROLL
+#if OPT_PRETTIER_SCROLL
 	if (absol(from-to) > 1) {
 		ibmscroll(from, (from < to) ? to-1 : to+1, n);
 		if (from < to)
@@ -1094,16 +1133,7 @@ int from, to, n;
 	rg.h.dl = term.t_ncol - 1; /* lower window column */
 	INTX86(0x10, &rg, &rg);
 }
-#endif	/* SCROLLCODE */
 
-#if	FLABEL
-fnclabel(f, n)		/* label a function key */
-int f,n;		/* default flag, numeric argument [unused] */
-{
-	/* on machines with no function keys...don't bother */
-	return(TRUE);
-}
-#endif
 
 /*--------------------------------------------------------------------------*/
 

@@ -21,14 +21,14 @@
  *		buffer will be marked readonly.  the .lck file will be
  *		deleted at most of the appropriate times.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/lckfiles.c,v 1.2 1994/10/28 22:35:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/lckfiles.c,v 1.3 1994/11/29 04:02:03 pgf Exp $
  *
  */
 
 #include	"estruct.h"
 #include	"edef.h"
 
-#if LCKFILES
+#if OPT_LCKFILES
 
 #if ! HAVE_LONG_FILE_NAMES
 you probably do not want this code -- there are no checks on filename

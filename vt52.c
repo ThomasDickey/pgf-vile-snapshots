@@ -7,7 +7,7 @@
  * bell on the VT52 is terrible, so the "beep"
  * routine is conditionalized on defining BEL.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/vt52.c,v 1.10 1994/09/13 17:15:48 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/vt52.c,v 1.12 1994/11/29 04:02:03 pgf Exp $
  *
  */
 #error This module is not actively maintained as part of vile.
@@ -20,7 +20,7 @@
 #include	"estruct.h"
 #include	"edef.h"
 
-#if	VT52
+#if	DISP_VT52
 
 #define NROW	24			/* Screen size. 		*/
 #define NCOL	80			/* Edit if you want to. 	*/
@@ -44,7 +44,7 @@ extern	int	vt52cres();
 extern	int	vt52kopen();
 extern	int	vt52kclose();
 
-#if	COLOR
+#if	OPT_COLOR
 extern	int	vt52fcol();
 extern	int	vt52bcol();
 #endif
@@ -68,6 +68,7 @@ TERM	term	= {
 	&vt52kclose,
 	&ttgetc,
 	&ttputc,
+	&tttypahead,
 	&ttflush,
 	&vt52move,
 	&vt52eeol,
@@ -75,7 +76,7 @@ TERM	term	= {
 	&vt52beep,
 	&vt52rev,
 	&vt52cres
-#if	COLOR
+#if	OPT_COLOR
 	, &vt52fcol,
 	&vt52bcol
 #endif
@@ -121,7 +122,7 @@ spal()		/* change palette string */
 	/*	Does nothing here	*/
 }
 
-#if	COLOR
+#if	OPT_COLOR
 vt52fcol()	/* set the forground color [NOT IMPLIMENTED] */
 {
 }
@@ -141,7 +142,7 @@ vt52beep()
 
 vt52open()
 {
-#if	UNIX
+#if	SYS_UNIX
 	register char *cp;
 
 	if ((cp = getenv("TERM")) == NULL) {
@@ -167,16 +168,6 @@ vt52kclose()
 }
 
 
-#if	FLABEL
-fnclabel(f, n)		/* label a function key */
-
-int f,n;	/* default flag, numeric argument [unused] */
-
-{
-	/* on machines with no function keys...don't bother */
-	return(TRUE);
-}
-#endif
 #else
 
 vt52hello()

@@ -12,7 +12,7 @@
  *
  *		pgf, 11/91
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/regexp.c,v 1.41 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/regexp.c,v 1.43 1994/11/29 04:02:03 pgf Exp $
  *
  */
 
@@ -632,7 +632,7 @@ int at_bop;
 	case '\\':
 		switch(*regparse) {
 		case EOS:
-#ifdef BEFORE
+#ifdef FAIL_TRAILING_BS
 			FAIL("trailing \\");
 #else
 			/* as a special case, treat a trailing '\' char as
@@ -873,10 +873,10 @@ int n;
 	if (e == NULL)
 		e = &a[strlen(a)];
 	if (ignorecase) {
-		while (--n >=0 && nocase_eq(*a,*b) && a != e && *b)
+		while (--n >=0 && (a != e) && nocase_eq(*a,*b) && *b)
 			a++, b++;
 	} else {
-		while (--n >=0 && *a == *b && a != e && *b)
+		while (--n >=0 && (a != e) && (*a == *b) && *b)
 			a++, b++;
 	}
 

@@ -3,7 +3,7 @@
  *
  *	written 11-feb-86 by Daniel Lawrence
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/bind.c,v 1.90 1994/10/16 02:57:55 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/bind.c,v 1.95 1994/11/29 04:02:03 pgf Exp $
  *
  */
 
@@ -19,15 +19,15 @@ static char COMPLETIONS_NAME[] = ScratchName(Completions);
 #endif
 
 /* dummy prefix binding functions */
-extern CMDFUNC f_cntl_af, f_cntl_xf, f_unarg, f_esc, f_speckey;
+extern CMDFUNC f_cntl_a_func, f_cntl_x_func, f_unarg_func, f_esc_func, f_poundc_func;
 
 #if OPT_REBIND
 #define	isSpecialCmd(k) \
-		( (k == &f_cntl_af)\
-		||(k == &f_cntl_xf)\
-		||(k == &f_unarg)\
-		||(k == &f_esc)\
-		||(k == &f_speckey)\
+		( (k == &f_cntl_a_func)\
+		||(k == &f_cntl_x_func)\
+		||(k == &f_poundc_func)\
+		||(k == &f_unarg_func)\
+		||(k == &f_esc_func)\
 		)
 # if OPT_TERMCHRS
 static	int	chr_complete P(( int, char *, int * ));
@@ -337,7 +337,7 @@ register CMDFUNC *kcmd;
 		/* perhaps we only want a single key, not a sequence */
 		/* 	(see more comments below) */
 		if (isSpecialCmd(kcmd))
-			c = tgetc(FALSE);
+			c = keystroke();
 		else
 			c = kbd_seq();
 	}
@@ -382,16 +382,16 @@ register CMDFUNC *kcmd;
 		if ((j = fnc2kcod(kcmd)) >= 0)
 			(void)unbindchar(j);
 		/* reset the appropriate global prefix variable */
-		if (kcmd == &f_cntl_af)
+		if (kcmd == &f_cntl_a_func)
 			cntl_a = c;
-		if (kcmd == &f_cntl_xf)
+		if (kcmd == &f_cntl_x_func)
 			cntl_x = c;
-		if (kcmd == &f_unarg)
-			reptc = c;
-		if (kcmd == &f_esc)
-			abortc = c;
-		if (kcmd == &f_speckey)
+		if (kcmd == &f_poundc_func)
 			poundc = c;
+		if (kcmd == &f_unarg_func)
+			reptc = c;
+		if (kcmd == &f_esc_func)
+			abortc = c;
 	}
 }
 
@@ -532,7 +532,6 @@ int f,n;
 	return update_binding_list((BUFFER *)0);
 }
 
-#if	APROP
 
 
 /* ARGSUSED */
@@ -551,7 +550,6 @@ int f,n;
 	last_apropos_string = mstring;
 	return update_binding_list((BUFFER *)0);
 }
-#endif
 
 /* returns a name in double-quotes */
 static char *
@@ -629,12 +627,11 @@ char *mstring;		/* match string if partial list, NULL to list all */
 		while (converted_len(outseq) < 32)
 			(void)strcat(outseq, "\t");
 
-#if	APROP
 		/* if we are executing an apropos command
 		   and current string doesn't include the search string */
 		if (mstring && (strinc(outseq, mstring) == FALSE))
 			continue;
-#endif
+
 		/* look in the simple ascii binding table first */
 		for (i = 0; i < N_chars; i++)
 			if (asciitbl[i] == nptr->n_cmd)
@@ -681,7 +678,6 @@ char *mstring;		/* match string if partial list, NULL to list all */
 		mlerase();	/* clear the message line */
 }
 
-#if	APROP
 int
 strinc(sourc, sub)	/* does source include sub? */
 char *sourc;	/* string to search in */
@@ -714,7 +710,6 @@ char *sub;	/* substring to look for */
 	}
 	return(FALSE);
 }
-#endif
 
 #endif /* OPT_REBIND */
 
@@ -751,12 +746,12 @@ char *fname;	/* base file name to search for */
 int hflag;	/* Look in the HOME environment variable first? */
 {
 	register char *home;	/* path to home directory */
-#if ENVFUNC && PATHLOOK
+#if ENVFUNC && OPT_PATHLOOKUP
 	register char *path;	/* environmental PATH variable */
 #endif
 	register int i;		/* index */
 	static char fspec[NSTRING];	/* full path spec to search */
-#if VMS
+#if SYS_VMS
 	register char *sp;	/* pointer into path spec */
 	static TBUFF *myfiles;
 #endif
@@ -767,73 +762,67 @@ int hflag;	/* Look in the HOME environment variable first? */
 	else if (isShellOrPipe(fname))
 		return fname;
 
-	/* always try the current directory first */
-	if (ffropen(fname) == FIOSUC) {
-		ffclose();
-		return(fname);
+	if (hflag & FL_HERE) {
+		/* always try the current directory first */
+		if (ffreadable(fname)) {
+			return(fname);
+		}
 	}
-
-	if (hflag == FL_HERE)
-		return NULL;
 
 #if	ENVFUNC
 
-	if (hflag) {
+	if (hflag & FL_HOME) {
 		home = getenv("HOME");
 		if (home != NULL) {
 			/* try home dir file spec */
-			if (ffropen(pathcat(fspec,home,fname)) == FIOSUC) {
-				ffclose();
+			if (ffreadable(pathcat(fspec,home,fname))) {
 				return(fspec);
 			}
 		}
 	}
 
-	if (hflag == FL_HERE_HOME)
-		return NULL;
+	if (hflag & FL_PATH) {
 
-#if PATHLOOK
-#if VMS
-	/* On VAX/VMS, the PATH environment variable is only the current-dir.
-	 * Fake up an acceptable alternative.
-	 */
-	if (!tb_length(myfiles)) {
-		char	mypath[NFILEN];
+#if OPT_PATHLOOKUP
+#if SYS_VMS
+		/* On VAX/VMS, the PATH environment variable is only the
+		 * current-dir.  Fake up an acceptable alternative.
+		 */
+		if (!tb_length(myfiles)) {
+			char	mypath[NFILEN];
 
-		(void)strcpy(mypath, prog_arg);
-		if ((sp = vms_pathleaf(mypath)) == mypath)
-			(void)strcpy(mypath, current_directory(FALSE));
-		else
-			*sp = EOS;
+			(void)strcpy(mypath, prog_arg);
+			if ((sp = vms_pathleaf(mypath)) == mypath)
+				(void)strcpy(mypath, current_directory(FALSE));
+			else
+				*sp = EOS;
 
-		if (!tb_init(&myfiles, EOS)
-		 || !tb_sappend(&myfiles, mypath)
-		 || !tb_sappend(&myfiles, ",SYS$SYSTEM:,SYS$LIBRARY:")
-		 || !tb_append(&myfiles, EOS))
-		return NULL;
-	}
-	path = tb_values(myfiles);
+			if (!tb_init(&myfiles, EOS)
+			 || !tb_sappend(&myfiles, mypath)
+			 || !tb_sappend(&myfiles, ",SYS$SYSTEM:,SYS$LIBRARY:")
+			 || !tb_append(&myfiles, EOS))
+			return NULL;
+		}
+		path = tb_values(myfiles);
 #else	/* UNIX or MSDOS */
-	path = getenv("PATH");	/* get the PATH variable */
+		path = getenv("PATH");	/* get the PATH variable */
 #endif
 
-	while ((path = parse_pathlist(path, fspec)) != 0) {
-		if (ffropen(pathcat(fspec, fspec, fname)) == FIOSUC) {
-			ffclose();
-			return(fspec);
+		while ((path = parse_pathlist(path, fspec)) != 0) {
+			if (ffreadable(pathcat(fspec, fspec, fname))) {
+				return(fspec);
+			}
 		}
-	}
-#endif	/* PATHLOOK */
+#endif	/* OPT_PATHLOOKUP */
 #endif	/* ENVFUNC */
 
-	/* look it up via the old table method */
-	for (i=2; i < NPNAMES; i++) {
-		if (ffropen(pathcat(fspec, pathname[i], fname)) == FIOSUC) {
-			ffclose();
-			return(fspec);
+		/* look it up via the old table method */
+		for (i=2; i < NPNAMES; i++) {
+			if (ffreadable(pathcat(fspec, pathname[i], fname))) {
+				return(fspec);
+			}
 		}
 	}
-
 
 	return NULL;	/* no such luck */
 }
@@ -844,25 +833,30 @@ kcod2pstr(c, seq)
 int c;		/* sequence to translate */
 char *seq;	/* destination string for sequence */
 {
-	/* pointer into current position in sequence */
-	register char *ptr = seq + 1; 
-
-	if (c & CTLA)
-		*ptr++ = cntl_a;
-
-	if (c & CTLX)
-		*ptr++ = cntl_x;
-
-	if (c & SPEC) {
-		*ptr++ = ESC;
-		*ptr++ = '[';
-	}
-
-	*ptr++ = kcod2key(c);
-	*ptr = EOS;
-	*seq = ptr - seq - 1;
+	seq[0] = kcod2escape_seq(c, &seq[1]);
 	return seq;
 }
+
+/* Translate a 16-bit keycode to a string that will replay into the same
+ * code.
+ */
+int
+kcod2escape_seq (c, ptr)
+int	c;
+char *	ptr;
+{
+	char	*base = ptr;
+
+	/* ...just for completeness */
+	if (c & CTLA)		*ptr++ = cntl_a;
+	else if (c & CTLX)	*ptr++ = cntl_x;
+	else if (c & SPEC)	*ptr++ = poundc;
+
+	*ptr++ = c;
+	*ptr = EOS;
+	return (int)(ptr - base);
+}
+
 
 /* translates a binding string into printable form */
 char *
@@ -890,10 +884,6 @@ int	n;
 			tmp = "<sp>";
 		} else if (c == '\t') {
 			tmp = "<tab>";
-		} else if (c == ESC && n > 2 && *(src+1) == '[') {
-			tmp = "FN";
-			src++;
-			n--;
 		} else if (iscntrl(c)) {
 			*dst++ = '^';
 			*dst = tocntrl(c);
@@ -983,7 +973,7 @@ CMDFUNC *f;
 
 /* fnc2pstr: translate a function pointer to a pascal-string that a user
 	could enter.  returns a pointer to a static array */
-#if X11
+#if DISP_X11
 char *
 fnc2pstr(f)
 CMDFUNC *f;
@@ -1003,7 +993,7 @@ CMDFUNC *f;
 /* fnc2engl: translate a function pointer to the english name for
 		that function
 */
-
+#if OPT_EVAL || OPT_REBIND
 char *
 fnc2engl(cfp)
 CMDFUNC *cfp;	/* ptr to the requested function to bind to */
@@ -1028,6 +1018,7 @@ CMDFUNC *cfp;	/* ptr to the requested function to bind to */
 
 	return NULL;
 }
+#endif
 
 /* engl2fnc: match name to a function in the names table
 	translate english name to function pointer
@@ -1058,7 +1049,9 @@ char *fname;	/* name to attempt to match */
 	return NULL;
 }
 
+
 /* prc2kcod: translate printable code to 10 bit keycode */
+#if OPT_EVAL || OPT_REBIND
 int
 prc2kcod(kk)
 char *kk;		/* name of key to translate to Command key form */
@@ -1070,10 +1063,12 @@ char *kk;		/* name of key to translate to Command key form */
 
 	if (len > 3 && *(k+2) == '-') {
 		if (*k == '^') {
-			if (*(k+1) == toalpha(cntl_a))
+			if (iscntrl(cntl_a) && *(k+1) == toalpha(cntl_a))
 				pref = CTLA;
-			if (*(k+1) == toalpha(cntl_x))
+			if (iscntrl(cntl_x) && *(k+1) == toalpha(cntl_x))
 				pref = CTLX;
+			if (iscntrl(poundc) && *(k+1) == toalpha(poundc))
+				pref = SPEC;
 		} else if (!strncmp((char *)k, "FN", (SIZE_T)2)) {
 			pref = SPEC;
 		}
@@ -1089,8 +1084,11 @@ char *kk;		/* name of key to translate to Command key form */
 			pref = CTLX;
 		else if (*k == poundc)
 			pref = SPEC;
-		if (pref != 0)
+		if (pref != 0) {
 			k++;
+			if (len > 2 && *k == '-')
+				k++;
+		}
 	}
 
 	/* a control char? */
@@ -1114,6 +1112,7 @@ char *kk;		/* name of key to translate to Command key form */
 
 	return (int)(pref|c);
 }
+#endif
 
 
 #if OPT_EVAL
@@ -1590,7 +1589,7 @@ SIZE_T	size_entry;
 					TTflush();
 				}
 				if (c != NAMEC)  /* put it back */
-					tungetc(c);
+					unkeystroke(c);
 				/* return complete name */
 				(void)strncpy0(buf, THIS_NAME(nbp),
 						(SIZE_T)(NLINE - 1));
@@ -1746,7 +1745,7 @@ int	*pos;
 	 if ((*pos > 0) && isShellOrPipe(buf)) {
 		status = isreturn(c);
 		if (c != NAMEC)
-			tungetc(c);
+			unkeystroke(c);
 	} else
 
 	 status = kbd_complete(c, buf, pos, (char *)&nametbl[0], sizeof(nametbl[0]));

@@ -11,7 +11,7 @@
 # all as "0".  If you use tcap.c, you'll need libtermcap.a too.  If you use
 # x11.c, you'll need libX11.a too.
 #
-# $Header: /usr/build/VCS/pgf-vile/RCS/descrip.mms,v 1.17 1994/10/03 13:24:35 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/descrip.mms,v 1.18 1994/11/23 01:13:23 pgf Exp $
 
 # for regular vile, use these:
 SCREEN = vmsvt
@@ -46,46 +46,8 @@ LINKFLAGS = /MAP=$(MMS$TARGET_NAME)/CROSS_REFERENCE/EXEC=$(MMS$TARGET_NAME).EXE
 
 INCS = []
 
-# All of the makefiles which should be preserved
-MAKFILES = makefile make.ini descrip.mms
 MKTBLS = mktbls.EXE
 
-ALLTOOLS = $(MAKFILES)
-
-
-# these are normal editable headers
-HDRS = estruct.h epath.h edef.h proto.h dirstuff.h
-
-# these headers are built by the mktbls program from the information in cmdtbl
-# and in modetbl
-BUILTHDRS = nebind.h nefunc.h nemode.h nename.h nevars.h
-
-ALLHDRS = $(HDRS)
-
-# All the C files which should be saved
-#  (including tools, like mktbls.c, unused screen drivers, etc.)
-CSRCac = ansi.c at386.c basic.c bind.c buffer.c crypt.c csrch.c
-CSRCde = dg10.c display.c eval.c exec.c externs.c
-CSRCfh = fences.c file.c filec.c fileio.c finderr.c glob.c globals.c history.c hp110.c hp150.c
-CSRCim = ibmpc.c input.c insert.c isearch.c line.c main.c map.c modes.c msgs.c mktbls.c
-CSRCnr = npopen.c opers.c oneliner.c path.c random.c regexp.c region.c
-CSRCst = search.c select.c spawn.c st520.c tags.c tbuff.c tcap.c termio.c tipc.c tmp.c
-CSRCuw = undo.c version.c vmalloc.c vms2unix.c vmspipe.c vmsvt.c vt52.c window.c word.c wordmov.c
-CSRCxz = x11.c z309.c z_ibmpc.c
-
-CSRC = $(CSRCac) $(CSRCde) $(CSRCfh) $(CSRCim) $(CSRCnr) \
-	$(CSRCst) $(CSRCuw) $(CSRCxz)
-
-# non-C source code
-OTHERSRC = z100bios.asm
-
-# text and data files
-TEXTFILES = README CHANGES cmdtbl modetbl vile.hlp buglist revlist \
-	README.X11
-
-ALLSRC = $(CSRC) $(OTHERSRC)
-
-EVERYTHING = $(ALLTOOLS) $(ALLHDRS) $(ALLSRC) $(TEXTFILES) $(SHORTSTUFF)
 
 SRC =	main.c \
 	$(SCREEN).c \
@@ -108,6 +70,7 @@ SRC =	main.c \
 	history.c \
 	input.c \
 	insert.c \
+	itbuff.c \
 	isearch.c \
 	line.c \
 	map.c \
@@ -157,6 +120,7 @@ OBJ =	main.obj,\
 	history.obj,\
 	input.obj,\
 	insert.obj,\
+	itbuff.obj,\
 	isearch.obj,\
 	line.obj,\
 	map.obj, \

@@ -6,7 +6,7 @@
  *
  * Note: Visual flashes are not yet supported.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/ntconio.c,v 1.3 1994/09/13 17:15:48 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/ntconio.c,v 1.5 1994/11/29 04:02:03 pgf Exp $
  *
  */
 
@@ -60,9 +60,7 @@ int	ctrans[NCOLORS];
 char *initpalettestr = "0 4 2 14 1 5 3 15";
 /* black, red, green, yellow, blue, magenta, cyan, white   */
 
-#if	SCROLLCODE
 extern	void	ntscroll P((int,int,int));
-#endif
 
 static	int	scinit    P((int));
 static	int	scblank   P((void));
@@ -88,6 +86,7 @@ TERM    term    = {
 	ntkclose,
 	ttgetc,
 	ntputc,
+	tttypahead,
 	ttflush,
 	ntmove,
 	nteeol,
@@ -97,9 +96,7 @@ TERM    term    = {
 	ntcres,
 	ntfcol,
 	ntbcol,
-#if	SCROLLCODE
 	ntscroll
-#endif
 };
 
 
@@ -500,11 +497,10 @@ scblank()
 	return AttrColor(gbcolor,gfcolor);
 }
 
-#if SCROLLCODE
 /*
  * Move 'n' lines starting at 'from' to 'to'
  *
- * PRETTIER_SCROLL is prettier but slower -- it scrolls a line at a time
+ * OPT_PRETTIER_SCROLL is prettier but slower -- it scrolls a line at a time
  *	instead of all at once.
  */
 
@@ -520,7 +516,7 @@ int from, to, n;
 	CHAR_INFO fill;
 
 	if (to == from) return;
-#if PRETTIER_SCROLL
+#if OPT_PRETTIER_SCROLL
 	if (absol(from-to) > 1) {
 		ntscroll(from, (from<to) ? to-1:to+1, n);
 		if (from < to)
@@ -554,5 +550,4 @@ int from, to, n;
 	    &fill
 	    );
 }
-#endif	/* SCROLLCODE */
 

@@ -4,19 +4,18 @@
  *	need to back up to get to the char. before the transition.
  *	Written for vile by Paul Fox, (c)1990
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/wordmov.c,v 1.9 1994/10/25 19:09:30 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/wordmov.c,v 1.11 1994/11/29 04:02:03 pgf Exp $
  *
  */
 
 #include "estruct.h"
 #include "edef.h"
 
+#if OPT_SELECTIONS
 extern int sweeping;
-
-#if BEFORE
-#define SPECIAL (doingopcmd)
+# define SPECIAL (doingopcmd && !sweeping)
 #else
-#define SPECIAL (doingopcmd && !sweeping)
+# define SPECIAL (doingopcmd)
 #endif
 
 #define WASSPACE 0
@@ -189,74 +188,6 @@ isnewviwordb()
 	ochartype = type;
 	return (ret);
 }
-
-
-#ifdef NEEDED
-int
-isendwordb()
-{
-	register int	ret = FALSE;
-	register int	type;
-
-	type = getchartype();
-
-	switch (ochartype) {
-	case WASNL:
-	case WASSPACE:
-		switch (type) {
-		case ISNL:
-		case ISSPACE: ret = FALSE;	break;
-		case ISIDENT:
-		case ISOTHER: ret = TRUE;	break;
-		}
-		break;
-	case WASIDENT:
-	case WASOTHER:
-		ret = FALSE;	break;
-	}
-	ochartype = type;
-	return (ret);
-}
-
-int
-isendviwordb()
-{
-	register int	ret = FALSE;
-	register int	type;
-
-	type = getchartype();
-
-	switch (ochartype) {
-	case WASNL:
-	case WASSPACE:
-		switch (type) {
-		case ISNL:
-		case ISSPACE: ret = FALSE;	break;
-		case ISOTHER:
-		case ISIDENT: ret = TRUE;	break;
-		}
-		break;
-	case WASIDENT:
-		switch (type) {
-		case ISNL:
-		case ISSPACE:
-		case ISOTHER: ret = TRUE;	break;
-		case ISIDENT: ret = FALSE;	break;
-		}
-		break;
-	case WASOTHER:
-		switch (type) {
-		case ISNL:
-		case ISSPACE:
-		case ISIDENT: ret = TRUE;	break;
-		case ISOTHER: ret = FALSE;	break;
-		}
-		break;
-	}
-	ochartype = type;
-	return (ret);
-}
-#endif /* NEEDED */
 
 int
 isendwordf()

@@ -1,7 +1,7 @@
 /*
  * debugging support -- tom dickey.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/trace.c,v 1.3 1994/10/03 13:24:35 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/trace.c,v 1.4 1994/11/29 04:02:03 pgf Exp $
  *
  */
 #ifdef __TURBOC__
@@ -20,7 +20,7 @@
 #include "trace.h"
 #endif
 
-#if UNIX
+#if SYS_UNIX
 #include <sys/time.h>
 #endif
 
@@ -91,7 +91,7 @@ void
 Elapsed(msg)
 	char	*msg;
 {
-#if UNIX
+#if SYS_UNIX
 	static	struct	timeval		tv0, tv1;
 	static	struct	timezone	tz0, tz1;
 	static	int	init;

@@ -7,14 +7,14 @@
  * Most code probably by Dan Lawrence or Dave Conroy for MicroEMACS
  * Extensions for vile by Paul Fox
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/fences.c,v 1.24 1994/10/30 16:26:37 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/fences.c,v 1.25 1994/11/29 04:02:03 pgf Exp $
  *
  */
 
 #include	"estruct.h"
 #include	"edef.h"
 
-#if CFENCE
+#if OPT_CFENCE
 
 #define	CPP_UNKNOWN -1
 #define	CPP_IF       0
@@ -514,4 +514,4 @@ int ch;	/* fence type to match against */
 	DOT = oldpos;
 }
 
-#endif /* CFENCE */
+#endif /* OPT_CFENCE */

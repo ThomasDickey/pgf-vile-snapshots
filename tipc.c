@@ -3,7 +3,7 @@
  * compatible terminals. It goes directly to the graphics RAM to do
  * screen output. It compiles into nothing if not a TI-PC driver
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/tipc.c,v 1.7 1994/09/13 17:15:48 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/tipc.c,v 1.9 1994/11/29 04:02:03 pgf Exp $
  */
 
 #define termdef 1			/* don't define "term" external */
@@ -11,7 +11,7 @@
 #include	"estruct.h"
 #include	"edef.h"
 
-#if	TIPC
+#if	DISP_TIPC
 
 #define NROW	25			/* Screen size. 		*/
 #define NCOL	80			/* Edit if you want to. 	*/
@@ -46,7 +46,7 @@ extern	int	ticres();
 extern	int	ticlose();
 extern	int	tiputc();
 
-#if	COLOR
+#if	OPT_COLOR
 extern	int	tifcol();
 extern	int	tibcol();
 
@@ -72,6 +72,7 @@ TERM	term	= {
 	ticlose,
 	ttgetc,
 	tiputc,
+	tttypahead,
 	ttflush,
 	timove,
 	tieeol,
@@ -79,7 +80,7 @@ TERM	term	= {
 	tibeep,
 	tirev,
 	ticres
-#if	COLOR
+#if	OPT_COLOR
 	, tifcol,
 	tibcol
 #endif
@@ -87,7 +88,7 @@ TERM	term	= {
 
 extern union REGS rg;
 
-#if	COLOR
+#if	OPT_COLOR
 setatt( attr )
 int attr;
 {
@@ -195,7 +196,7 @@ tiopen()
 ticlose()
 
 {
-#if	COLOR
+#if	OPT_COLOR
 	tifcol(7);
 	tibcol(0);
 #endif

@@ -10,13 +10,13 @@
  *	    otherwise TurboC finds a syntax error.
  *	(2) must compile with a LARGE model
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/win31drv.c,v 1.3 1994/09/05 19:30:54 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/win31drv.c,v 1.4 1994/11/29 04:02:03 pgf Exp $
  */
 
 #include <windows.h>
 #include "estruct.h"
 
-#if	WIN31
+#if	SYS_WIN31
 
 #include "edef.h"
 
@@ -35,7 +35,7 @@ static	char	szAppName[] = "WinVile";
 #define MARGIN	8			/* size of minimim margin and	*/
 #define SCRSIZ	64			/* scroll size for extended lines */
 
-#if	COLOR
+#if	OPT_COLOR
 int	cfcolor = -1;		/* current forground color */
 int	cbcolor = -1;		/* current background color */
 #endif
@@ -52,7 +52,7 @@ csi P((void))
 	ttputc('[');
 }
 
-#if	COLOR
+#if	OPT_COLOR
 void
 win31_fcol(color)		/* set the current output color */
 	int	color;	/* color to set */
@@ -60,7 +60,7 @@ win31_fcol(color)		/* set the current output color */
 	if (color == cfcolor)
 		return;
 	csi();
-#if	AMIGA
+#if	SYS_AMIGA
 	win31_parm(coltran[color]+30);
 #else
 	win31_parm(color+30);
@@ -76,7 +76,7 @@ win31_bcol(color)		/* set the current background color */
 	if (color == cbcolor)
 		return;
 	csi();
-#if	AMIGA
+#if	SYS_AMIGA
 	win31_parm(coltran[color]+40);
 #else
 	win31_parm(color+40);
@@ -108,7 +108,7 @@ win31_eeol()
 void
 win31_eeop()
 {
-#if	COLOR
+#if	OPT_COLOR
 	win31_fcol(gfcolor);
 	win31_bcol(gbcolor);
 #endif
@@ -153,7 +153,6 @@ win31_beep()
 	ttflush();
 }
 
-#if SCROLLCODE
 
 /* move howmany lines starting at from to to */
 void
@@ -181,7 +180,7 @@ int	n;
 	win31_scrollregion(0, term.t_mrow);
 
 #else /* use insert and delete line */
-#if PRETTIER_SCROLL
+#if OPT_PRETTIER_SCROLL
 	if (absol(from-to) > 1) {
 		win31_scroll(from, (from<to) ? to-1:to+1, n);
 		if (from < to)
@@ -226,7 +225,6 @@ int	bot;
 }
 #endif
 
-#endif
 
 void
 win31_parm(n)
@@ -256,7 +254,7 @@ win31_open()
 void
 win31_close()
 {
-#if	COLOR
+#if	OPT_COLOR
 	win31_fcol(7);
 	win31_bcol(0);
 #endif
@@ -273,15 +271,6 @@ win31_kclose()	/* close the keyboard (a noop here) */
 {
 }
 
-#if	FLABEL
-int
-fnclabel(f, n)		/* label a function key */
-int f,n;	/* default flag, numeric argument [unused] */
-{
-	/* on machines with no function keys...don't bother */
-	return(TRUE);
-}
-#endif
 
 /*
  * Process events for the main window
@@ -381,13 +370,11 @@ TERM	term	= {
 	win31_beep,
 	win31_rev,
 	win31_cres
-#if	COLOR
+#if	OPT_COLOR
 	, win31_fcol,
 	win31_bcol
 #endif
-#if SCROLLCODE
 	, win31_scroll
-#endif
 };
 
-#endif	/* WIN31 */
+#endif	/* SYS_WIN31 */

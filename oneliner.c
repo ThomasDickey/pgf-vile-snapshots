@@ -3,7 +3,7 @@
  *	here to support the globals() function.  They now work on regions.
  *	Written (except for delins()) for vile by Paul Fox, (c)1990
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/oneliner.c,v 1.66 1994/10/16 02:57:55 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/oneliner.c,v 1.67 1994/11/28 19:04:20 pgf Exp $
  */
 
 #include	"estruct.h"
@@ -188,7 +188,7 @@ int needpats, use_opts;
 			printit = globally = FALSE;
 		} else {
 			if (more_named_cmd()) {
-				tungetc(lastkey);
+				unkeystroke(lastkey);
 				nth_occur = -1;
 				printit = globally = FALSE;
 				getopts = TRUE;

@@ -7,7 +7,7 @@
  *	To do:	add 'tb_ins()' and 'tb_del()' to support cursor-level command
  *		editing.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/tbuff.c,v 1.15 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/tbuff.c,v 1.20 1994/11/29 17:04:43 pgf Exp $
  *
  */
 
@@ -146,6 +146,7 @@ TBUFF *	tb_put(p, n, c)
 	return q;
 }
 
+#if NEEDED
 /*
  * stuff the nth character into the temp-buff -- assumes space already there
  *  it's sort of the opposite of tb_peek
@@ -159,6 +160,7 @@ void	tb_stuff(p, c)
 	else
 		p->tb_endc = c;
 }
+#endif
 /*
  * append a character to the temp-buff
  */
@@ -229,6 +231,7 @@ TBUFF *	tb_scopy(p, s)
 
 /*******(retrieval)************************************************************/
 
+#if DISP_X11
 /*
  * get the nth character from the temp-buff
  */
@@ -243,6 +246,7 @@ int	tb_get(p, n)
 
 	return char2int(c);
 }
+#endif
 
 /*
  * undo the last 'tb_put'
@@ -257,6 +261,7 @@ void	tb_unput(p)
 
 /*******(iterators)************************************************************/
 
+#if NEEDED
 /*
  * Reset the iteration-count
  */
@@ -266,7 +271,9 @@ void	tb_first(p)
 	if (p != 0)
 		p->tb_last = 0;
 }
+#endif
 
+#if DISP_X11
 /*
  * Returns true iff the iteration-count has not gone past the end of temp-buff.
  */
@@ -286,6 +293,20 @@ int	tb_next(p)
 		return tb_get(p, p->tb_last++);
 	return abortc;
 }
+#endif
+
+#if NEEDED
+/*
+ * undo a tb_next
+ */
+void	tb_unnext(p)
+	TBUFF	*p;
+{
+	if (p == 0)
+		return;
+	if (p->tb_last > 0)
+		p->tb_last--;
+}
 
 /*
  * get the next character from the temp-buff w/o incrementing index
@@ -297,6 +318,7 @@ int	tb_peek(p)
 		return tb_get(p, p->tb_last);
 	return abortc;
 }
+#endif  /* NEEDED */
 
 /*******(bulk-data)************************************************************/
 

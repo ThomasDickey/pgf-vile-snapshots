@@ -4,7 +4,7 @@
  * It compiles into nothing if not an HP150 screen device.
  * added by Daniel Lawrence
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/hp150.c,v 1.11 1994/09/13 17:15:48 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/hp150.c,v 1.13 1994/11/29 04:02:03 pgf Exp $
  *
  */
 #error This module is not actively maintained as part of vile.
@@ -17,7 +17,7 @@
 #include	"estruct.h"
 #include	"edef.h"
 
-#if	HP150
+#if	DISP_HP150
 
 #define NROW	24			/* Screen size. 		*/
 #define NCOL	80			/* Edit if you want to. 	*/
@@ -40,7 +40,7 @@ extern	int	hp15beep();
 extern	int	gethpkey();
 extern	int	hp15rev();
 extern	int	hp15cres();
-#if	COLOR
+#if	OPT_COLOR
 extern	int	hp15fcol();
 extern	int	hp15bcol();
 #endif
@@ -98,6 +98,7 @@ TERM	term	= {
 	hp15kclose,
 	gethpkey,
 	ttputc,
+	tttypahead,
 	hpflush,
 	hp15move,
 	hp15eeol,
@@ -105,7 +106,7 @@ TERM	term	= {
 	hp15beep,
 	hp15rev,
 	hp15cres
-#if	COLOR
+#if	OPT_COLOR
 	, hp15fcol,
 	hp15bcol
 #endif
@@ -180,7 +181,7 @@ register int	n;
 	ttputc((n%10) + '0');
 }
 
-#if	COLOR
+#if	OPT_COLOR
 hp15fcol()	/* we really can't do colors here, so just ignore it */
 {
 }
@@ -403,7 +404,6 @@ dsplbls()	/* display the application softkey labels on the screen */
 	return(agios(&cmd[0], 2));
 }
 
-#if	FLABEL
 int
 fnclabel(f, n)		/* label a function key */
 
@@ -461,7 +461,6 @@ force:	cmd[4] = ptru.cstr[0];
 	agios(&cmd[0], 12);
 	return(TRUE);
 }
-#endif
 #else
 
 h15hello()

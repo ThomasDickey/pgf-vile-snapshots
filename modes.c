@@ -7,7 +7,7 @@
  * Original code probably by Dan Lawrence or Dave Conroy for MicroEMACS.
  * Major extensions for vile by Paul Fox, 1991
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/modes.c,v 1.48 1994/10/30 16:26:37 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/modes.c,v 1.51 1994/11/29 04:02:03 pgf Exp $
  *
  */
 
@@ -45,7 +45,7 @@ static	int	adjustmode P(( int, int ));
 static	int	show_Settings P(( BUFFER * ));
 #endif
 
-#if COLOR
+#if OPT_COLOR
 static	char	*cname[] = {	/* names of colors */
 	"black", "red",     "green", "yellow",
 	"blue",  "magenta", "cyan",  "white"
@@ -94,7 +94,7 @@ struct VAL *values;
 	register char	*s = 0;
 
 	switch (names->type) {
-#if	COLOR && !SMALLER	/* will show the color name too */
+#if	OPT_COLOR && !SMALLER	/* will show the color name too */
 	case VALTYPE_COLOR:
 		n += 4;
 		s = cname[values->vp->i];
@@ -123,7 +123,7 @@ VALARGS *args;
 	case VALTYPE_BOOL:
 		return values->vp->i ? truem : falsem;
 	case VALTYPE_COLOR:
-#if COLOR && !SMALLER
+#if OPT_COLOR && !SMALLER
 		{
 		static	char	temp[20];
 		(void)lsprintf(temp, "%d (%s)",
@@ -240,7 +240,7 @@ struct VAL *values, *globvalues;
 			padded = (col+1) < perline ? ONE_COL : 1;
 			if (names[j].type == VALTYPE_BOOL) {
 				bprintf("%s%s%*P",
-					values[j].vp->i ? "" : "no",
+					values[j].vp->i ? "  " : "no",
 					names[j].name,
 					padded, ' ');
 			} else {
@@ -248,7 +248,7 @@ struct VAL *values, *globvalues;
 				args.names  = names+j;
 				args.local  = values+j;
 				args.global = 0;
-				bprintf("%s=%s%*P",
+				bprintf("  %s=%s%*P",
 					names[j].name,
 					string_mode_val(&args),
 					padded, ' ');
@@ -609,7 +609,7 @@ FSM_CHOICES fsm_error[] = {
 FSM_CHOICES fsm_backupstyle[] = {
     "off",
     ".bak",
-#if UNIX
+#if SYS_UNIX
     "tilde",
     /* "tilde_N_existing", */
     /* "tilde_N", */
@@ -707,14 +707,14 @@ VALARGS *args;			/* symbol-table entry for the mode */
 	char *rp = no ? cp+2 : cp;
 	int nval, s;
 	int unsetting = !setting && !global;
-#if COLOR
+#if OPT_COLOR
 	register int i;
 #endif
 
 	if (no && (names->type != VALTYPE_BOOL))
 		return FALSE;		/* this shouldn't happen */
 
-#if LCKFILES
+#if OPT_LCKFILES
 	/* Prevent that user changes lockmode or locker-name */
 	if ( ! strcmp(names->name,"locked") || ! strcmp(names->name,"locker") ) {
 		mlforce("[Cannot change \"%s\" ]",names->name);
@@ -788,7 +788,7 @@ VALARGS *args;			/* symbol-table entry for the mode */
 			values->vp->i = no ? !setting : setting;
 			break;
 
-#if COLOR
+#if OPT_COLOR
 		case VALTYPE_COLOR:
 			nval = -1;
 			(void)mklower(rp);
@@ -807,7 +807,7 @@ VALARGS *args;			/* symbol-table entry for the mode */
 			values->vp->i = nval;
 			refresh(FALSE, 0);
 			break;
-#endif /* COLOR */
+#endif /* OPT_COLOR */
 
 		case VALTYPE_INT:
 			if (!string_to_number(rp, &nval))
@@ -993,7 +993,7 @@ int global;	/* true = global flag,	false = current buffer flag */
 	int s;
 	int autobuff = global_g_val(GMDABUFF);
 	int anything = 0;
-#if	OPT_XTERM && !X11
+#if	OPT_XTERM
 	int xterm_mouse = global_g_val(GMDXTERM_MOUSE);
 #endif
 #if	OPT_WORKING
@@ -1012,7 +1012,7 @@ int global;	/* true = global flag,	false = current buffer flag */
 
 	if (autobuff != global_g_val(GMDABUFF)) sortlistbuffers();
 
-#if	OPT_XTERM && !X11
+#if	OPT_XTERM
 	if (xterm_mouse != global_g_val(GMDXTERM_MOUSE)) {
 		set_global_g_val(GMDXTERM_MOUSE,TRUE);
 		if (xterm_mouse)	TTkclose();

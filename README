@@ -190,8 +190,8 @@ hmmmm -- lets see.  new stuff.  see the CHANGES and help files for details.
 	either "./configure; make" or "./configure --with-screen=x11" to build
 	it on any (unix-like) platform. 
 
-	- :map and :map! are now much more complete, but by no means still
-	not done.  expect to have to edit your favorite macros to make
+	- :map and :map! are now much more complete, but still by no means
+	done.  expect to have to edit your favorite macros to make
 	them work.
 
 	- along with proper :map support comes proper function key support.
@@ -239,5 +239,5 @@ hmmmm -- lets see.  new stuff.  see the CHANGES and help files for details.
 	- lots of bug fixes
 
 -------------------------------
-$Header: /usr/build/VCS/pgf-vile/RCS/README,v 1.34 1994/10/28 22:35:40 pgf Exp $
+$Header: /usr/build/VCS/pgf-vile/RCS/README,v 1.35 1994/11/03 13:50:48 pgf Exp $
 -------------------------------

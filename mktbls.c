@@ -13,7 +13,7 @@
  * by Tom Dickey, 1993.    -pgf
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/mktbls.c,v 1.56 1994/10/30 16:26:37 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/mktbls.c,v 1.58 1994/11/29 04:02:03 pgf Exp $
  *
  */
 
@@ -97,7 +97,7 @@ extern	void	free	P(( char * ));
 #include <setjmp.h>
 
 /* argument for 'exit()' or '_exit()' */
-#if	VMS
+#if	SYS_VMS
 #include	<stsdef.h>
 #define GOODEXIT	(STS$M_INHIB_MSG | STS$K_SUCCESS)
 #define BADEXIT		(STS$M_INHIB_MSG | STS$K_ERROR)
@@ -267,7 +267,7 @@ static	char *prefname  [MAX_BIND] = {"",         "CTLX|",   "CTLA|",   "SPEC|" }
 static	char *inputfile;
 static	int l = 0;
 static	FILE *nebind, *nefunc, *nename, *cmdtbl;
-static	FILE *nevars, *nemode;
+static	FILE *nevars, *nemode, *nefkeys;
 static	jmp_buf my_top;
 
 /******************************************************************************/
@@ -1643,6 +1643,15 @@ char    *argv[];
 					if (r < 1 || r > 2)
 						badfmt("looking for key binding");
 
+					if (strncmp("KEY_",vec[2],4) == 0) {
+						if (strncmp("FN-",vec[1],3) != 0)
+							badfmt("KEY_xxx definition must for FN- binding");
+						if (!nefkeys)
+								nefkeys = OpenHeader("nefkeys.h", argv);
+						Fprintf(nefkeys, "#define\t%s\t(SPEC|'%c')\n",
+								vec[2],vec[1][3]);
+						vec[2] = vec[3];
+					}
 					save_bindings(vec[1], func, formcond(fcond,vec[2]));
 					break;
 

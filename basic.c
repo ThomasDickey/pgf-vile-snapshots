@@ -5,7 +5,7 @@
  * functions that adjust the top line in the window and invalidate the
  * framing, are hard.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/basic.c,v 1.72 1994/07/15 01:49:10 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/basic.c,v 1.74 1994/11/29 04:02:03 pgf Exp $
  *
  */
 
@@ -27,7 +27,7 @@ int	f, n;
 		if (n <= 0)			/* Don't blow up if the */
 			n = 1;			/* window is tiny.	*/
 	}
-#if	CVMVAS
+#if	OPT_CVMVAS
 	else if (n > 0)				/* Convert from pages	*/
 		n *= curwp->w_ntrows;		/* to lines.		*/
 #endif
@@ -44,7 +44,7 @@ int	f, n;
 		if (n <= 0)			/* Forget the overlap	*/
 			n = 1;			/* if tiny window.	*/
 	}
-#if	CVMVAS
+#if	OPT_CVMVAS
 	else if (n > 0)				/* Convert from pages	*/
 		n *= curwp->w_ntrows/2;		/* to lines.		*/
 #endif
@@ -538,7 +538,6 @@ int f,n;
 	return (TRUE);
 }
 
-#if	WORDPRO
 /*
  * Go to the beginning of the current paragraph.
  */
@@ -658,7 +657,7 @@ skipblanksb()
 		DOT.l = lBACK(DOT.l);
 }
 
-#if STUTTER_SEC_CMD
+#if OPT_STUTTER_SEC_CMD
 getstutter()
 {
 	int thiskey;
@@ -681,7 +680,7 @@ int
 gotobosec(f,n)
 int f,n;
 {
-#if STUTTER_SEC_CMD
+#if OPT_STUTTER_SEC_CMD
 	if (!getstutter())
 		return FALSE;
 #endif
@@ -700,7 +699,7 @@ int
 gotoeosec(f,n)
 int f,n;
 {
-#if STUTTER_SEC_CMD
+#if OPT_STUTTER_SEC_CMD
 	if (!getstutter())
 		return FALSE;
 #endif
@@ -776,7 +775,6 @@ int f,n;
 	return TRUE;
 }
 
-#endif /* WORDPRO */
 
 /*
  * This routine, given a pointer to a LINE, and the current cursor goal
@@ -883,7 +881,7 @@ register int	n;
  * Scroll forward by a half-page.  If a repeat count is given, interpret that
  * as the number of half-pages to scroll.
  *
- * Unlike vi, the CVMVAS option causes the repeat-count to be interpreted as
+ * Unlike vi, the OPT_CVMVAS option causes the repeat-count to be interpreted as
  * half-page, rather than lines.
  */
 int
@@ -919,7 +917,7 @@ register int	n;
  * This command is like "forwpage", but it goes backwards.  It returns false
  * only if the cursor is on the first line of the buffer.
  *
- * Unlike vi, the CVMVAS option causes the repeat-count to be interpreted as
+ * Unlike vi, the OPT_CVMVAS option causes the repeat-count to be interpreted as
  * half-pages, rather than lines.
  */
 int
@@ -968,7 +966,9 @@ int f,n;
 			return status;
 		c = cbuf[0];
 	} else {
-		c = tgetc(FALSE);
+		c = keystroke();
+		if (ABORTED(c))
+			return ABORT;
 	}
 
 	if (c < 'a' || c > 'z') {
@@ -1061,7 +1061,9 @@ int *cp;
 		useldmark = (c == '\'' || c == '`');
 	} else {
 		thiskey = lastkey;
-		c = tgetc(FALSE);
+		c = keystroke();
+		if (ABORTED(c))
+			return ABORT;
 		useldmark = (lastkey == thiskey);  /* usually '' or `` */
 	}
 

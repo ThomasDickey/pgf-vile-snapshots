@@ -1,7 +1,7 @@
 /*	tcap:	Unix V5, V7 and BS4.2 Termcap video driver
  *		for MicroEMACS
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/tcap.c,v 1.46 1994/10/30 16:26:37 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/tcap.c,v 1.54 1994/11/29 04:02:03 pgf Exp $
  *
  */
 
@@ -10,7 +10,7 @@
 #include	"estruct.h"
 #include	"edef.h"
 
-#if TERMCAP
+#if DISP_TERMCAP
 
 #define MARGIN	8
 #define SCRSIZ	64
@@ -22,9 +22,7 @@ char tcapbuf[TCAPSLEN];
 char *UP, PC, *CM, *CE, *CL, *SO, *SE;
 char *TI, *TE, *KS, *KE;
 
-#if	SCROLLCODE
 char *CS, *dl, *al, *DL, *AL, *SF, *SR;
-#endif
 
 #if OPT_VIDEO_ATTRS
 static char *US;	/* underline-start */
@@ -37,7 +35,7 @@ static char *MD;
 char *vb;	/* visible-bell */
 #endif
 
-#if COLOR
+#if OPT_COLOR
 static	int	ctrans[NCOLORS];
 	/* ansi to ibm color translation table */
 static	char *	initpalettestr = "0 1 2 11 4 5 6 7";
@@ -50,7 +48,7 @@ static	char *	initpalettestr = "0 1 2 11 4 5 6 7";
 static	int	current_fcolor = -1;
 static	int	current_bcolor = -1;
 
-#endif /* COLOR */
+#endif /* OPT_COLOR */
 
 static struct {
     char * capname;
@@ -58,44 +56,44 @@ static struct {
     char * seq;
 } keyseqs[] = {
     /* Arrow keys */
-    { "ku",	SPEC|'A',	NULL },		/* up */
-    { "kd",	SPEC|'B',	NULL },		/* down */
-    { "kr",	SPEC|'C',	NULL },		/* right */
-    { "kl",	SPEC|'D',	NULL },		/* left */
+    { "ku",	KEY_Up,		NULL },		/* up */
+    { "kd",	KEY_Down,	NULL },		/* down */
+    { "kr",	KEY_Right,	NULL },		/* right */
+    { "kl",	KEY_Left,	NULL },		/* left */
     /* other cursor-movement */
-    { "kh",	SPEC|'h',	NULL },		/* home */
-    { "kH",	SPEC|'H',	NULL },		/* end */
+    { "kh",	KEY_Home,	NULL },		/* home */
+    { "kH",	KEY_End,	NULL },		/* end */
     /* page scroll */
-    { "kN",	SPEC|'n',	NULL },		/* next page */
-    { "kP",	SPEC|'p',	NULL },		/* previous page */
+    { "kN",	KEY_Next,	NULL },		/* next page */
+    { "kP",	KEY_Prior,	NULL },		/* previous page */
     /* editing */
-    { "kI",	SPEC|'i',	NULL },		/* Insert */
-    { "kD",	SPEC|'d',	NULL },		/* Delete */
-    { "@0",	SPEC|'f',	NULL },		/* Find */
-    { "*6",	SPEC|'s',	NULL },		/* Select */
+    { "kI",	KEY_Insert,	NULL },		/* Insert */
+    { "kD",	KEY_Delete,	NULL },		/* Delete */
+    { "@0",	KEY_Find,	NULL },		/* Find */
+    { "*6",	KEY_Select,	NULL },		/* Select */
     /* command */
-    { "%1",	SPEC|'h',	NULL },		/* Help */
+    { "%1",	KEY_Help,	NULL },		/* Help */
     /* function keys */
-    { "k1",	SPEC|'1',	NULL },		/* F1 */
-    { "k2",	SPEC|'2',	NULL },
-    { "k3",	SPEC|'3',	NULL },
-    { "k4",	SPEC|'4',	NULL },
-    { "k5",	SPEC|'5',	NULL },
-    { "k6",	SPEC|'6',	NULL },
-    { "k7",	SPEC|'7',	NULL },
-    { "k8",	SPEC|'8',	NULL },
-    { "k9",	SPEC|'9',	NULL },
-    { "k;",	SPEC|'0',	NULL },		/* F10 */
-    { "F1",	ESC,		NULL },		/* F11 */
-    { "F2",	SPEC|'@',	NULL },		/* F12 */
-    { "F3",	SPEC|'#',	NULL },		/* F13 */
-    { "F4",	SPEC|'$',	NULL },
-    { "F5",	SPEC|'%',	NULL },
-    { "F6",	SPEC|'^',	NULL },
-    { "F7",	SPEC|'&',	NULL },
-    { "F8",	SPEC|'*',	NULL },
-    { "F9",	SPEC|'(',	NULL },		/* F19 */
-    { "FA",	SPEC|')',	NULL }		/* F20 */
+    { "k1",	KEY_F1,		NULL },		/* F1 */
+    { "k2",	KEY_F2,		NULL },
+    { "k3",	KEY_F3,		NULL },
+    { "k4",	KEY_F4,		NULL },
+    { "k5",	KEY_F5,		NULL },
+    { "k6",	KEY_F6,		NULL },
+    { "k7",	KEY_F7,		NULL },
+    { "k8",	KEY_F8,		NULL },
+    { "k9",	KEY_F9,		NULL },
+    { "k;",	KEY_F10,	NULL },		/* F10 */
+    { "F1",	KEY_F11,	NULL },		/* F11 */
+    { "F2",	KEY_F12,	NULL },		/* F12 */
+    { "F3",	KEY_F13,	NULL },		/* F13 */
+    { "F4",	KEY_F14,	NULL },
+    { "F5",	KEY_F15,	NULL },
+    { "F6",	KEY_F16,	NULL },
+    { "F7",	KEY_F17,	NULL },
+    { "F8",	KEY_F18,	NULL },
+    { "F9",	KEY_F19,	NULL },		/* F19 */
+    { "FA",	KEY_F20,	NULL }		/* F20 */
 };
 
 extern char *tgoto P((char *, int, int));
@@ -104,7 +102,7 @@ extern int tgetnum P((char * ));
 extern char *tgetstr P((char *, char **));
 extern int tputs P((char *, int, void(*_f)(int) ));
 
-#if COLOR
+#if OPT_COLOR
 extern void tcapfcol P(( int ));
 extern void tcapbcol P(( int ));
 #endif
@@ -129,6 +127,7 @@ TERM term = {
 	tcapkclose,
 	ttgetc,
 	ttputc,
+	tttypahead,
 	ttflush,
 	tcapmove,
 	tcapeeol,
@@ -140,13 +139,11 @@ TERM term = {
 	tcaprev,
 #endif
 	tcapcres
-#if	COLOR
+#if	OPT_COLOR
 	, tcapfcol
 	, tcapbcol
 #endif
-#if	SCROLLCODE
 	, NULL		/* set dynamically at open time */
-#endif
 };
 
 #define	XtermPos()	TTgetc() - 040
@@ -262,7 +259,6 @@ tcapopen()
 
 	if (CE == NULL) 	/* will we be able to use clear to EOL? */
 		eolexist = FALSE;
-#if SCROLLCODE
 	CS = tgetstr("cs", &p);
 	SF = tgetstr("sf", &p);
 	SR = tgetstr("sr", &p);
@@ -287,17 +283,16 @@ tcapopen()
 	} else {
 		term.t_scroll = NULL;
 	}
-#endif
 #if OPT_FLASH
 	vb = tgetstr("vb", &p);
 #endif
-#if	COLOR
+#if	OPT_COLOR
 	spal(initpalettestr);
 #endif
 #if OPT_VIDEO_ATTRS
 	ME = tgetstr("me", &p);
 	MD = tgetstr("md", &p);
-#if !(IBM_VIDEO && COLOR)
+#if !(IBM_VIDEO && OPT_COLOR)
 	US = tgetstr("us", &p);		/* underline-start */
 	UE = tgetstr("ue", &p);		/* underline-end */
 	if (US == 0 && UE == 0) {	/* if we don't have underline, do bold */
@@ -310,8 +305,12 @@ tcapopen()
 	for (i = TABLESIZE(keyseqs); i--; ) {
 	    keyseqs[i].seq = tgetstr(keyseqs[i].capname, &p);
 	    if (keyseqs[i].seq)
-		addtomaps(keyseqs[i].seq, keyseqs[i].code);
+		addtosysmap(keyseqs[i].seq, (int)strlen(keyseqs[i].seq), 
+					keyseqs[i].code);
 	}
+#if OPT_XTERM
+	addtosysmap("\033[M", 3, KEY_Mouse);
+#endif
 	        
 	if (p >= &tcapbuf[TCAPSLEN])
 	{
@@ -329,11 +328,13 @@ tcapopen()
 void
 tcapclose()
 {
+#if OPT_VIDEO_ATTRS
 	if (ME)	/* end special attributes (including color) */
 		putpad(ME);
+#endif
 	tcapmove(term.t_nrow-1, 0);
 	tcapeeol();
-#if COLOR
+#if OPT_COLOR
 	current_fcolor =
 	current_bcolor = -1;
 #endif
@@ -379,7 +380,7 @@ tcapeeol()
 void
 tcapeeop()
 {
-#if	COLOR
+#if	OPT_COLOR
 	tcapfcol(gfcolor);
 	tcapbcol(gbcolor);
 #endif
@@ -394,7 +395,6 @@ char *	res;
 	return(TRUE);
 }
 
-#if SCROLLCODE
 
 /* move howmany lines starting at from to to */
 void
@@ -418,7 +418,7 @@ int from, to, n;
 }
 
 /* 
-PRETTIER_SCROLL is prettier but slower -- it scrolls 
+OPT_PRETTIER_SCROLL is prettier but slower -- it scrolls 
 		a line at a time instead of all at once.
 */
 
@@ -442,7 +442,7 @@ int from, to, n;
 			putpad(tgoto(AL,0,to-from));
 		}
 	} else { /* must be dl and al */
-#if PRETTIER_SCROLL
+#if OPT_PRETTIER_SCROLL
 		if (absol(from-to) > 1) {
 			tcapscroll_delins(from, (from<to) ? to-1:to+1, n);
 			if (from < to)
@@ -477,15 +477,14 @@ int top,bot;
 	putpad(tgoto(CS, bot, top));
 }
 
-#endif
 
-#if OPT_EVAL || COLOR
+#if OPT_EVAL || OPT_COLOR
 /* ARGSUSED */
 void
 spal(thePalette)	/* reset the palette registers */
 char *thePalette;
 {
-#if COLOR
+#if OPT_COLOR
     	/* this is pretty simplistic.  big deal. */
 	(void)sscanf(thePalette,"%i %i %i %i %i %i %i %i",
 	    	&ctrans[0], &ctrans[1], &ctrans[2], &ctrans[3],
@@ -494,25 +493,44 @@ char *thePalette;
 }
 #endif /* OPT_EVAL */
 
-#if	COLOR
+#if	OPT_COLOR && IBM_VIDEO
+static void
+show_ansi_colors P((void))
+{
+	char	str[20], *s, c = '[';
+
+	s = lsprintf(str, "%c", ESC);
+	if (current_fcolor >= 0) {
+		s = lsprintf(s, "%c%d;%d",
+			c,
+			(ctrans[current_fcolor] > 7),		/* bold? */
+			30 + (ctrans[current_fcolor] & 7));	/* foreground */
+		c = ';';
+	}
+	if (current_bcolor >= 0) {
+		s = lsprintf(s, "%c%d",
+			c,
+			40 + (ctrans[current_bcolor] & 7));	/* background */
+	}
+	s = lsprintf(s, "m");
+	putpad(str);
+}
+#endif
+
+#if	OPT_COLOR
 void
 tcapfcol(color)
 int color;
 {
 	if (color != current_fcolor) {
 #if IBM_VIDEO
-		char	str[20];
+		current_fcolor = color;
 # ifdef linux
 		if (i_am_xterm)
 			return;
 # endif
-		(void) lsprintf(str, "%c[%d;%dm",
-			ESC,
-			(ctrans[color] > 7),		/* bold? */
-			30 + (ctrans[color] & 7));	/* foreground */
-		putpad(str);
+		show_ansi_colors();
 #endif
-		current_fcolor = color;
 	}
 }
 
@@ -522,20 +540,16 @@ int color;
 {
 	if (color != current_bcolor) {
 #if IBM_VIDEO
-		char	str[20];
+		current_bcolor = color;
 # ifdef linux
 		if (i_am_xterm)
 			return;
 # endif
-		(void) lsprintf(str, "%c[%dm",
-			ESC,
-			40 + (ctrans[color] & 7));	/* background */
-		putpad(str);
+		show_ansi_colors();
 #endif
-		current_bcolor = color;
 	}
 }
-#endif /* COLOR */
+#endif /* OPT_COLOR */
 
 #if OPT_VIDEO_ATTRS
 /*
@@ -562,7 +576,7 @@ int attr;
 	} tbl[] = {
 		{ &SO, &SE, VASEL|VAREV },
 		{ &US, &UE, VAUL },
-#if !(IBM_VIDEO && COLOR)
+#if !(IBM_VIDEO && OPT_COLOR)
 		{ &US, &UE, VAITAL },
 		{ &MD, &ME, VABOLD },
 #else
@@ -662,16 +676,6 @@ int n;
 }
 
 
-#if	FLABEL
-/* ARGSUSED */
-int
-fnclabel(f, n)		/* label a function key */
-int f,n;	/* default flag, numeric argument [unused] */
-{
-	/* on machines with no function keys...don't bother */
-	return(TRUE);
-}
-#endif
 
 #if OPT_XTERM
 /* Finish decoding a mouse-click in an xterm, after the ESC and '[' chars.
@@ -703,6 +707,33 @@ int f,n;	/* default flag, numeric argument [unused] */
  *
  *	1993/aug/6 dickey@software.org
  */
+
+/*ARGSUSED*/
+int
+xterm_mouse_M(f,n)
+int f,n;
+{
+	return xterm_button('M');
+}
+
+#if OPT_XTERM >= 3
+/*ARGSUSED*/
+int
+xterm_mouse_t(f,n)
+int f,n;
+{
+	return xterm_button('t');
+}
+
+/*ARGSUSED*/
+int
+xterm_mouse_T(f,n)
+int f,n;
+{
+	return xterm_button('T');
+}
+#endif	/* OPT_XTERM >= 3 */
+
 int
 xterm_button(c)
 int	c;
@@ -723,6 +754,9 @@ int	c;
 	char	temp[NSTRING];
 	static	char	*fmt = "\033[%d;%d;%d;%d;%dT";
 #endif	/* OPT_XTERM >= 3 */
+
+	if (insertmode)
+		return ABORT;
 
 	if ((status = (i_am_xterm && global_g_val(GMDXTERM_MOUSE))) != 0) {
 		beginDisplay;
@@ -824,4 +858,4 @@ int	c;
 }
 #endif	/* OPT_XTERM */
 
-#endif	/* TERMCAP */
+#endif	/* DISP_TERMCAP */

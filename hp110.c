@@ -1,7 +1,7 @@
 /*
  *	HP110:	Hewlett Packard 110 Screen Driver
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/hp110.c,v 1.10 1994/09/13 17:15:48 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/hp110.c,v 1.12 1994/11/29 04:02:03 pgf Exp $
  *
  */
 #error This module is not actively maintained as part of vile.
@@ -14,7 +14,7 @@
 #include	"estruct.h"
 #include	"edef.h"
 
-#if	HP110
+#if	DISP_HP110
 
 #define NROW	16			/* Screen size. 		*/
 #define NCOL	80			/* Edit if you want to. 	*/
@@ -38,7 +38,7 @@ extern	int	h110close();
 extern	int	h110kopen();
 extern	int	h110kclose();
 
-#if	COLOR
+#if	OPT_COLOR
 extern	int	h110fcol();
 extern	int	h110bcol();
 
@@ -64,6 +64,7 @@ TERM	term	= {
 	h110kclose,
 	ttgetc,
 	ttputc,
+	tttypahead,
 	ttflush,
 	h110move,
 	h110eeol,
@@ -71,13 +72,13 @@ TERM	term	= {
 	h110beep,
 	h110rev,
 	h110cres
-#if	COLOR
+#if	OPT_COLOR
 	, h110fcol,
 	h110bcol
 #endif
 };
 
-#if	COLOR
+#if	OPT_COLOR
 h110fcol(color) 	/* set the current output color */
 
 int color;	/* color to set */
@@ -127,7 +128,7 @@ h110eeol()
 
 h110eeop()
 {
-#if	COLOR
+#if	OPT_COLOR
 	h110fcol(gfcolor);
 	h110bcol(gbcolor);
 #endif
@@ -142,7 +143,7 @@ h110rev(state)		/* change reverse video state */
 int state;	/* TRUE = reverse, FALSE = normal */
 
 {
-#if	COLOR
+#if	OPT_COLOR
 	int ftmp, btmp; 	/* temporaries for colors */
 #endif
 
@@ -150,7 +151,7 @@ int state;	/* TRUE = reverse, FALSE = normal */
 	ttputc('[');
 	ttputc(state ? '7': '0');
 	ttputc('m');
-#if	COLOR
+#if	OPT_COLOR
 	if (state == FALSE) {
 		ftmp = cfcolor;
 		btmp = cbcolor;
@@ -206,7 +207,7 @@ h110open()
 h110close()
 
 {
-#if	COLOR
+#if	OPT_COLOR
 	h110fcol(7);
 	h110bcol(0);
 #endif
@@ -222,18 +223,6 @@ h110kclose()
 
 {
 }
-
-#if	FLABEL
-int
-fnclabel(f, n)		/* label a function key */
-
-int f,n;	/* default flag, numeric argument [unused] */
-
-{
-	/* on machines with no function keys...don't bother */
-	return(TRUE);
-}
-#endif
 #else
 h110hello()
 {

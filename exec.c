@@ -3,7 +3,7 @@
  *
  *	written 1986 by Daniel Lawrence
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/exec.c,v 1.98 1994/10/27 21:46:42 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/exec.c,v 1.101 1994/11/29 04:02:03 pgf Exp $
  *
  */
 
@@ -152,14 +152,14 @@ int f, n;
 			c = end_string();
 			if (status != TRUE && status != FALSE) {
 				if (status == SORTOFTRUE) {
-					(void)tgetc(FALSE); /* cancel the tungetc */
+					(void)keystroke(); /* cancel ungetc */
 					return FALSE;
 				}
 				return status;
 			} else if (isreturn(c) && (status == FALSE)) {
 				return FALSE;
 			} else {
-				tungetc(c);	/* ...so we can splice */
+				unkeystroke(c);	/* ...so we can splice */
 			}
 			cmode = 1;
 			repeat_cmd = EOS;
@@ -176,7 +176,7 @@ int f, n;
 				} else
 #endif
 				 if (isRepeatable(*fnp) && (*fnp == end_string())) {
-					tungetc(*fnp);
+					unkeystroke(*fnp);
 					repeat_cmd = *fnp;
 					cmode++;
 					hst_glue(EOS);
@@ -187,21 +187,21 @@ int f, n;
 						if (c != NAMEC
 						 && c != ' '
 						 && !isreturn(c)) {
-							tungetc(c);
+							unkeystroke(c);
 							/* e.g., !-command */
 						 }
 					} else {	/* e.g., ":e#" */
 						c = end_string();
 						if (ispunct(c)
 						 && strchr(global_g_val_ptr(GVAL_EXPAND_CHARS),c) != 0)
-							tungetc(c);
+							unkeystroke(c);
 					}
 					break;
 				}
 			} else if (status == SORTOFTRUE) {
 				hst_remove((cmode > 1) ? "*" : "");
 				if (cmode > 1)
-					(void)tgetc(FALSE); /* eat the delete */
+					(void)keystroke(); /* eat the delete */
 				if (--cmode <= 1) {
 					cmode = 0;
 					hst_remove(lspec);
@@ -328,37 +328,6 @@ seems like we need one more check here -- is it from a .exrc file?
 		return FALSE;
 	}
 
-#ifdef NEEDED
-	if (!(flags & EXTRA) && *scan) {
-		mlforce("[Extra characters after \"%s\" command.]",
-						cmdnames[cmdidx].name);
-		return FALSE;
-	}
-#endif
-#ifdef NEEDED
-	if ((flags & NOSPC) && !(cmd == CMD_READ && (forceit || *scan == '!'))) {
-		build = scan;
-#ifndef CRUNCH  /* what is this for? -pgf */
-		if ((flags & PLUS) && *build == '+') {
-			while (*build && !(isspace(*build))) {
-				build++;
-			}
-			while (*build && isspace(*build)) {
-				build++;
-			}
-		}
-#endif /* not CRUNCH */
-		for (; *build; build++) {
-			if (isspace(*build)) {
-				mlforce("[Too many %s to \"%s\" command.]",
-					(flags & XFILE) ? "filenames" : "arguments",
-					cmdnames[cmdidx].name);
-				return FALSE;
-			}
-		}
-	}
-#endif /* NEEDED */
-
 	/* some commands have special default ranges */
 	if (lflag & DFLALL) {
 		if (flags & DFLALL) {
@@ -370,12 +339,10 @@ seems like we need one more check here -- is it from a .exrc file?
 				toline   = lBACK(buf_head(curbp));
 			} else if (cfp == &f_operwrite) {
 				cfp = &f_filewrite;
-#if GLOBALS
 			} else if (cfp == &f_operglobals) {
 				cfp = &f_globals;
 			} else if (cfp == &f_opervglobals) {
 				cfp = &f_vglobals;
-#endif
 			} else {
 				mlforce("[Configuration error: DFLALL]");
 				return FALSE;
@@ -395,14 +362,6 @@ seems like we need one more check here -- is it from a .exrc file?
 		} else
 			lflag &= ~DFLALL;
 	}
-
-#ifdef NEEDED
-	/* write a newline if called from visual mode */
-	if ((flags & NL) && !exmode /* && !exwrote */) {
-		TTputc('\n');
-		/* exrefresh(); */
-	}
-#endif
 
 	/* Process argument(s) for named-buffer & line-count, if present.  The
 	 * line-count is expected only if no "to" address specification was
@@ -707,54 +666,6 @@ CMDFLAGS	*flagp;
 	return TRUE;
 }
 
-#ifdef UNUSED
-/* old namedcmd:	execute a named command even if it is not bound */
-int
-onamedcmd(f, n)
-int f, n;	/* command arguments [passed through to command executed] */
-{
-	register char *fnp;	/* ptr to the name of the cmd to exec */
-	int s;
-	char cmd[NLINE];
-
-	/* get the function name to execute */
-
-	fnp = kbd_engl(": ", cmd);
-
-
-	if (fnp == NULL) {
-		mlforce("[No such function]");
-		return FALSE;
-	}
-
-	/* and then execute the command */
-	isnamedcmd = TRUE;
-	s = docmd(fnp,FALSE,f,n);
-	isnamedcmd = FALSE;
-
-	return s;
-}
-#endif
-
-#if NEVER
-/*	execcmd:	Execute a command line command by name alone */
-int
-execcmd(f, n)
-int f, n;	/* default Flag and Numeric argument */
-{
-	register int status;		/* status return */
-	char cmdbuf[NSTRING];		/* string holding command to execute */
-
-	/* get the line wanted */
-	cmdbuf[0] = EOS;
-	if ((status = mlreply("cmd: ", cmdbuf, NSTRING)) != TRUE)
-		return status;
-
-	execlevel = 0;
-	return docmd(cmdbuf,TRUE,f,n);
-}
-#endif
-
 /*	docmd:	take a passed string as a command line and translate
 		it to be executed as a command. This function will be
 		used by execute-command-line and by all source and
@@ -917,7 +828,7 @@ int f,n;
 	if ((flags & GOAL) == 0) { /* goal should not be retained */
 		curgoal = -1;
 	}
-#if VMALLOC
+#if OPT_VRFY_MALLOC
 	if (flags & UNDO)	/* verify malloc arena after line changers */
 		vverify("main");
 #endif
@@ -1130,7 +1041,7 @@ int n;		/* macro number to use */
 	return TRUE;
 }
 
-#if	PROC
+#if	OPT_PROCEDURES
 /*	storeproc:	Set up a procedure buffer and flag to store all
 			executed command lines there			*/
 
@@ -1468,7 +1379,7 @@ nxtscan:	/* on to the next line */
 		if (*eline == ';' || *eline == '"' || *eline == EOS)
 			goto onward;
 
-#if	DEBUGM
+#if	OPT_DEBUGMACROS
 		/* if $debug == TRUE, every line to execute
 		   gets echoed and a key needs to be pressed to continue
 		   ^G will abort the command */
@@ -1494,7 +1405,7 @@ nxtscan:	/* on to the next line */
 			(void)update(TRUE);
 
 			/* and get the keystroke */
-			if (ABORTED(tgetc(FALSE))) {
+			if (ABORTED(keystroke())) {
 				mlforce("[Macro aborted]");
 				freewhile(whlist);
 				mstore = FALSE;
@@ -1782,13 +1693,9 @@ char *fname;	/* file name to execute */
 	register BUFFER *bp;	/* buffer to place file to execute */
 	register int status;	/* results of various calls */
 	register int odiscmd;
-	char bname[NBUFN+1];	/* name of buffer */
-
-	makename(bname, fname);	/* derive the name of the buffer */
-	(void)unqname(bname, FALSE);
 
 	/* okay, we've got a unique name -- create it */
-	if ((bp=bfind(bname, 0))==NULL) {
+	if ((bp = make_bp(fname, 0, FALSE)) == 0) {
 		return FALSE;
 	}
 

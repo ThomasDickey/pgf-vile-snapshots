@@ -1,7 +1,7 @@
 /*
  * 	older, simpler X11 support, Dave Lemke, 11/91
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/x11simp.c,v 1.50 1994/10/30 16:26:37 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/x11simp.c,v 1.54 1994/11/29 04:02:03 pgf Exp $
  *
  */
 #error This module is not actively maintained as part of vile.
@@ -16,8 +16,8 @@
 	both ISC and X11, well, you know what to do. */
 #undef ISC
 
-#if VMS
-#undef UNIX
+#if SYS_VMS
+#undef SYS_UNIX
 #endif
 
 /* redefined in X11/Xos.h */
@@ -32,7 +32,7 @@
 
 #define	XCalloc(type)	typecalloc(type)
 
-#if !APOLLO || defined(__STDCPP__)	/* not in apollo sr10.2 */
+#if !SYS_APOLLO || defined(__STDCPP__)	/* not in apollo sr10.2 */
 extern	XClassHint *XAllocClassHint P((void)); /* usually in <X11/xutil.h> */
 #else
 #define XAllocClassHint() XCalloc(XClassHint)
@@ -129,15 +129,12 @@ static	void	x_open   P(( void )),
 		x_beep   P(( void )),
 		x_rev    P(( int ));
 
-#if COLOR
+#if OPT_COLOR
 static	void	x_fcol   P(( int )),
 		x_bcol   P(( int ));
 #endif
 
-#ifdef SCROLLCODE
 static	void	x_scroll P(( int, int, int ));
-#endif
-
 static	SIGT	x_quit (DEFINE_SIG_ARGS);
 
 static	void	turnOffCursor P(( TextWindow ));
@@ -216,6 +213,7 @@ TERM        term = {
     x_kclose,
     x_getc,
     x_putc,
+    tttypahead,
     x_flush,
     x_move,
     x_eeol,
@@ -224,14 +222,11 @@ TERM        term = {
     x_rev,
     x_cres
 
-#if	COLOR
+#if	OPT_COLOR
     ,x_fcol,
     x_bcol
 #endif
-
-#if SCROLLCODE
     ,x_scroll
-#endif
 };
 
 
@@ -2392,7 +2387,7 @@ x_working()
 			if (num != 0) {
 				if (buffer[0] == intrc) {
 					(void)tb_init(&PasteBuf, abortc);
-#if VMS
+#if SYS_VMS
 					kbd_alarm(); /* signals? */
 #else
 					(void)signal_pg(SIGINT);
@@ -2454,50 +2449,52 @@ decoded_key(ev, buffer, bufsize)
 		KeySym  key;
 		int     code;
 	} escapes[] = {
-		{XK_F11,     ESC},
-		/* Arrow keys */
-		{XK_Up,      SPEC|'A'},
-		{XK_Down,    SPEC|'B'},
-		{XK_Right,   SPEC|'C'},
-		{XK_Left,    SPEC|'D'},
-		/* page scroll */
-		{XK_Next,    SPEC|'n'},
-		{XK_Prior,   SPEC|'p'},
-		/* editing */
-		{XK_Insert,  SPEC|'i'},
+	/* Arrow keys */
+	{XK_Up,      KEY_Up},
+	{XK_Down,    KEY_Down},
+	{XK_Right,   KEY_Right},
+	{XK_Left,    KEY_Left},
+	/* page scroll */
+	{XK_Next,    KEY_Next},
+	{XK_Prior,   KEY_Prior},
+	{XK_Home,    KEY_Home},
+	{XK_End,     KEY_End},
+	/* editing */
+	{XK_Insert,  KEY_Insert},
 #if (ULTRIX || ultrix)
-		{DXK_Remove, SPEC|'r'},
+	{DXK_Remove, KEY_Remove},
 #endif
-		{XK_Find,    SPEC|'f'},
-		{XK_Select,  SPEC|'s'},
-		/* command keys */
-		{XK_Menu,    SPEC|'m'},
-		{XK_Help,    SPEC|'h'},
-		/* function keys */
-		{XK_F1,      SPEC|'1'},
-		{XK_F2,      SPEC|'2'},
-		{XK_F3,      SPEC|'3'},
-		{XK_F4,      SPEC|'4'},
-		{XK_F5,      SPEC|'5'},
-		{XK_F6,      SPEC|'6'},
-		{XK_F7,      SPEC|'7'},
-		{XK_F8,      SPEC|'8'},
-		{XK_F9,      SPEC|'9'},
-		{XK_F10,     SPEC|'0'},
-		{XK_F12,     SPEC|'@'},
-		{XK_F13,     SPEC|'#'},
-		{XK_F14,     SPEC|'$'},
-		{XK_F15,     SPEC|'%'},
-		{XK_F16,     SPEC|'^'},
-		{XK_F17,     SPEC|'&'},
-		{XK_F18,     SPEC|'*'},
-		{XK_F19,     SPEC|'('},
-		{XK_F20,     SPEC|')'},
-		/* keypad function keys */
-		{XK_KP_F1,   SPEC|'P'},
-		{XK_KP_F2,   SPEC|'Q'},
-		{XK_KP_F3,   SPEC|'R'},
-		{XK_KP_F4,   SPEC|'S'},
+	{XK_Find,    KEY_Find},
+	{XK_Select,  KEY_Select},
+	/* command keys */
+	{XK_Menu,    KEY_Menu},
+	{XK_Help,    KEY_Help},
+	/* function keys */
+	{XK_F1,      KEY_F1},
+	{XK_F2,      KEY_F2},
+	{XK_F3,      KEY_F3},
+	{XK_F4,      KEY_F4},
+	{XK_F5,      KEY_F5},
+	{XK_F6,      KEY_F6},
+	{XK_F7,      KEY_F7},
+	{XK_F8,      KEY_F8},
+	{XK_F9,      KEY_F9},
+	{XK_F10,     KEY_F10},
+	{XK_F11,     KEY_F11},
+	{XK_F12,     KEY_F12},
+	{XK_F13,     KEY_F13},
+	{XK_F14,     KEY_F14},
+	{XK_F15,     KEY_F15},
+	{XK_F16,     KEY_F16},
+	{XK_F17,     KEY_F17},
+	{XK_F18,     KEY_F18},
+	{XK_F19,     KEY_F19},
+	{XK_F20,     KEY_F20},
+	/* keypad function keys */
+	{XK_KP_F1,   KEY_KP_F1},
+	{XK_KP_F2,   KEY_KP_F2},
+	{XK_KP_F3,   KEY_KP_F3},
+	{XK_KP_F4,   KEY_KP_F4}
 	};
 
 	num = XLookupString((XKeyPressedEvent *) ev, buffer, bufsize,
@@ -2559,7 +2556,7 @@ char *flag;
     return TRUE;
 }
 
-#if COLOR
+#if OPT_COLOR
 static void
 x_fcol(color)
 int color;

@@ -4,13 +4,13 @@
  *	the cursor.
  *	written for vile by Paul Fox, (c)1990
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/tags.c,v 1.58 1994/08/08 16:12:29 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/tags.c,v 1.61 1994/11/29 04:02:03 pgf Exp $
  *
  */
 #include	"estruct.h"
 #include        "edef.h"
 
-#if TAGS
+#if OPT_TAGS
 
 #define	TAGS_LIST_NAME	ScratchName(Tag Stack)
 
@@ -36,6 +36,12 @@ static	void	tossuntag P(( void ));
 
 static	UNTAG *	untaghead = NULL;
 static	char	tagname[NFILEN+2];  /* +2 since we may add a tab later */
+
+#if OPT_SHOW_TAGS
+#  if OPT_UPBUFF
+static	int	update_tagstack P(( BUFFER * ));
+#  endif
+#endif	/* OPT_SHOW_TAGS */
 
 /* ARGSUSED */
 int
@@ -260,9 +266,12 @@ gettagsfile(n, endofpathflagp)
 int n;
 int *endofpathflagp;
 {
+#ifdef	MDCHK_MODTIME
+	long current;
+#endif
 	char *tagsfile;
 	BUFFER *tagbp;
-	static char tagbufname[NBUFN+1];
+	char tagbufname[NBUFN+1];
 	char tagfilename[NFILEN];
 
 	*endofpathflagp = FALSE;
@@ -289,7 +298,7 @@ int *endofpathflagp;
 		}
 
 		/* find the pointer to that buffer */
-		if ((tagbp=bfind(tagf, BFINVS)) == NULL) {
+		if ((tagbp=bfind(tagbufname, BFINVS)) == NULL) {
 			mlforce("[Can't create tags buffer]");
 			return NULL;
 		}
@@ -297,11 +306,24 @@ int *endofpathflagp;
 		if (readin(tagsfile, FALSE, tagbp, FALSE) != TRUE) {
 			return NULL;
 		}
-		/* be sure it has the right name */
-		set_bname(tagbp, tagbufname);
-		b_set_invisible(tagbp);
-			
         }
+#ifdef	MDCHK_MODTIME
+	/*
+	 * Re-read the tags buffer if we are checking modification-times and
+	 * find that the tags file's been changed. We check the global mode
+	 * value because it's too awkward to set the local mode value for a
+	 * scratch buffer.
+	 */
+	else if (global_b_val(MDCHK_MODTIME)
+	 && get_modtime(tagbp, &current)
+	 && tagbp->b_modtime != current) {
+		if (readin(tagbp->b_fname, FALSE, tagbp, FALSE) != TRUE) {
+			return NULL;
+		}
+	 	set_modtime(tagbp, tagbp->b_fname);
+	}
+#endif
+	b_set_invisible(tagbp);
 	return tagbp;
 }
 
@@ -377,27 +399,27 @@ int f,n;
 	int lineno;
 	char fname[NFILEN];
 	MARK odot;
+	int s;
 
 	if (!f) n = 1;
 	while (n && popuntag(fname,&lineno))
 		n--;
 	if (lineno && fname[0]) {
-		int s;
 		s = getfile(fname,FALSE);
-		if (s != TRUE)
-			return s;
-
-		/* it's an absolute move -- remember where we are */
-		odot = DOT;
-		s = gotoline(TRUE,lineno);
-		/* if we moved, update the "last dot" mark */
-		if (s == TRUE && !sameline(DOT, odot)) {
-			curwp->w_lastdot = odot;
+		if (s == TRUE) {
+			/* it's an absolute move -- remember where we are */
+			odot = DOT;
+			s = gotoline(TRUE,lineno);
+			/* if we moved, update the "last dot" mark */
+			if (s == TRUE && !sameline(DOT, odot)) {
+				curwp->w_lastdot = odot;
+			}
 		}
-		return s;
+	} else {
+		mlwarn("[No stacked un-tags]");
+		s = FALSE;
 	}
-	mlwarn("[No stacked un-tags]");
-	return FALSE;
+	return s;
 }
 
 
@@ -437,6 +459,7 @@ char *tag;
 	utp->u_lineno = lineno;
 	utp->u_stklink = untaghead;
 	untaghead = utp;
+	update_scratch(TAGS_LIST_NAME, update_tagstack);
 }
 
 
@@ -453,6 +476,7 @@ int *linenop;
 		(void)strcpy(fname, utp->u_fname);
 		*linenop = utp->u_lineno;
 		free_untag(utp);
+		update_scratch(TAGS_LIST_NAME, update_tagstack);
 		return TRUE;
 	}
 	fname[0] = EOS;
@@ -471,6 +495,7 @@ tossuntag()
 		utp = untaghead;
 		untaghead = utp->u_stklink;
 		free_untag(utp);
+		update_scratch(TAGS_LIST_NAME, update_tagstack);
 	}
 }
 
@@ -510,6 +535,16 @@ char	*ptr;
 }
 
 
+#if OPT_UPBUFF
+/* ARGSUSED */
+static int
+update_tagstack(bp)
+BUFFER *bp;
+{
+	return showtagstack(FALSE,1);
+}
+#endif
+
 /*
  * Display the contents of the tag-stack
  */
@@ -522,4 +557,4 @@ int	f,n;
 }
 #endif	/* OPT_SHOW_TAGS */
 
-#endif	/* TAGS */
+#endif	/* OPT_TAGS */

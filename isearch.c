@@ -7,14 +7,14 @@
  *
  * original author: D. R. Banks 9-May-86
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/isearch.c,v 1.35 1994/10/27 21:46:42 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/isearch.c,v 1.38 1994/11/29 04:02:03 pgf Exp $
  *
  */
 
 #include	"estruct.h"
 #include        "edef.h"
 
-#if	ISRCH
+#if	OPT_ISRCH
 
 static	int	promptpattern P(( char * ));
 static	char *	expandp P(( char *, char *, int ));
@@ -236,7 +236,7 @@ start_over:
 		default:	/* All other chars */
 			if (c < ' ') {	/* Is it printable? *//* Nop
 					 * e. */
-				tungetc(c);	/* Re-eat the char */
+				unkeystroke(c);	/* Re-eat the char */
 				return (TRUE);	/* And return the last status */
 			}
 		}		/* Switch */
@@ -292,50 +292,6 @@ scanmore(patrn, dir)		/* search forward or back for a pattern */
 	return (sts);		/* else, don't even try */
 }
 
-/*
- * The following is a worker subroutine used by the reverse search.  It
- * compares the pattern string with the characters at "." for equality. If
- * any characters mismatch, it will return FALSE.
- *
- * This isn't used for forward searches, because forward searches leave "." at
- * the end of the search string (instead of in front), so all that needs to
- * be done is match the last char input.
- */
-
-#ifdef	UNUSED
-int
-match_pat(patrn)		/* See if the pattern string matches string
-				 * at "." */
-	char           *patrn;	/* String to match to buffer */
-{
-	register int    i;	/* Generic loop index/offset */
-	register int    buffchar;	/* character at current position */
-	MARK            curpos;
-
-	/* setup the local scan pointer to current "." */
-	curpos = DOT;		/* Get the current point */
-
-	/* top of per character compare loop: */
-	for (i = 0; i < strlen(patrn); i++) {	/* Loop for all characters in
-						 * patrn */
-		if (is_at_end_of_line(curpos)) {	/* If at end of line */
-			curpos.l = lforw(curpos.l);	/* Skip to the next line */
-			curpos.o = 0;	/* Start at the beginning of the line */
-			if (is_header_line(curpos, curbp))
-				return (FALSE);	/* Abort if at end of buffer */
-			buffchar = '\n';	/* And say the next char is
-						 * NL */
-		} else {
-			buffchar = char_at(curpos);	/* Get the next char */
-			curpos.o++;
-		}
-		if (!eq(buffchar, patrn[i]))	/* Is it what we're looking
-						 * for? */
-			return (FALSE);	/* Nope, just punt it then */
-	}
-	return (TRUE);		/* Everything matched? Let's celebrate */
-}
-#endif	/* UNUSED */
 
 /* Routine to prompt for I-Search string. */
 
@@ -445,7 +401,7 @@ get_char()
 						 * bitterly */
 		return (abortc);/* And force a quit */
 	}
-	c = tgetc(FALSE);		/* Get the next character */
+	c = keystroke8();		/* Get the next character */
 	cmd_buff[cmd_offset++] = c;	/* Save the char for next time */
 	cmd_buff[cmd_offset] = EOS;	/* And terminate the buffer */
 	return (c);		/* Return the character */

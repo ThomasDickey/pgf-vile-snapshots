@@ -5,7 +5,7 @@
  * Written by T.E.Dickey for vile (march 1993).
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/filec.c,v 1.36 1994/10/03 13:24:35 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/filec.c,v 1.37 1994/11/29 04:02:03 pgf Exp $
  *
  */
 
@@ -22,7 +22,7 @@
 #endif
 
 #ifdef problemwithlowercasenames  /* ? */
-#if MSDOS
+#if SYS_MSDOS
 #define	KBD_OPTIONS	KBD_NORMAL|KBD_LOWERC
 #endif
 #endif
@@ -395,7 +395,7 @@ char *path;
 	 * version, but doesn't store it in the buffer returned to the caller.
 	 */
 	if ((s = strrchr(path, ';')) != 0) {
-#if UNIX
+#if SYS_UNIX
 		*s = EOS;	/* ...we're only simulating */
 #else
 		*s = '.';	/* this'll be interpreted as version-mark */
@@ -454,14 +454,14 @@ char *	name;
 #endif
 
 		while ((de = readdir(dp)) != 0) {
-#if UNIX || VMS || OS2 || NT
+#if SYS_UNIX || SYS_VMS || SYS_OS2 || SYS_WINNT
 # if USE_D_NAMLEN
 			strncpy(s, de->d_name, (SIZE_T)(de->d_namlen))[de->d_namlen] = EOS;
 # else
 			(void)strcpy(s, de->d_name);
 # endif
 #else
-# if MSDOS
+# if SYS_MSDOS
 			(void)mklower(strcpy(s, de->d_name));
 # else
 			huh??
@@ -480,7 +480,7 @@ char *	name;
 			}
 			s = path;	/* reset for next readdir */
 #else
-# if UNIX || MSDOS || OS2 || NT
+# if SYS_UNIX || SYS_MSDOS || SYS_OS2 || SYS_WINNT
 			if (!strcmp(s, ".")
 			 || !strcmp(s, ".."))
 			 	continue;
@@ -628,7 +628,7 @@ int	*pos;
 		if (is_vms_pathname(path, -TRUE))
 			vms2hybrid(path);
 #else
-# if UNIX || OPT_MSDOS_PATH
+# if SYS_UNIX || OPT_MSDOS_PATH
 		/* trim trailing "." if it is a "/." */
 		if ((s = last_slash(buf)) != 0
 		 && !strcmp(s+1, "."))

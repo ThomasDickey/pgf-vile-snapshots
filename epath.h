@@ -6,7 +6,7 @@
 /*	possible names and paths of help files under different OSs	*/
 
 /*
- * $Header: /usr/build/VCS/pgf-vile/RCS/epath.h,v 1.15 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/epath.h,v 1.16 1994/11/29 04:02:03 pgf Exp $
  */
 
 /* first two entries are default startup and help files, the rest are
@@ -14,7 +14,7 @@
 
 char *pathname[] =
 
-#if	AMIGA
+#if	SYS_AMIGA
 {
 	".vilerc",
 	"vile.hlp",
@@ -28,7 +28,7 @@ char *pathname[] =
 };
 #endif
 
-#if	ST520
+#if	SYS_ST520
 {
 	"vile.rc",
 	"vile.hlp",
@@ -39,17 +39,7 @@ char *pathname[] =
 };
 #endif
 
-#if	FINDER
-{
-	"vile.rc",
-	"vile.hlp",
-	"/bin/",
-	"/sys/public/",
-	""
-};
-#endif
-
-#if	MSDOS || WIN31 || OS2 || NT
+#if	SYS_MSDOS || SYS_WIN31 || SYS_OS2 || SYS_WINNT
 {
 	"vile.rc",
 	"vile.hlp",
@@ -61,7 +51,7 @@ char *pathname[] =
 };
 #endif
 
-#if	UNIX
+#if	SYS_UNIX
 {
 	".vilerc",
 	"vile.hlp",
@@ -79,7 +69,7 @@ char *pathname[] =
 };
 #endif
 
-#if	VMS
+#if	SYS_VMS
 {
 	"vile.rc",
 	"vile.hlp",

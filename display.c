@@ -5,14 +5,14 @@
  * functions use hints that are left in the windows by the commands.
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/display.c,v 1.162 1994/10/30 16:26:37 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/display.c,v 1.172 1994/11/29 17:04:43 pgf Exp $
  *
  */
 
 #include	"estruct.h"
 #include        "edef.h"
 
-#if BORLAND
+#if DISP_BORLAND
 #include 	<conio.h>
 #endif
 
@@ -31,13 +31,13 @@ VIDEO	**pscreen;			/* Physical screen. */
 #endif
 int *lmap;
 
-#if IBMPC
+#if DISP_IBMPC
 #define PScreen(n) scread((VIDEO *)0,n)
 #else
 #define	PScreen(n) pscreen[n]
 #endif
 
-#if SCROLLCODE && (IBMPC || !MEMMAP)
+#if OPT_SCROLLCODE && (DISP_IBMPC || !MEMMAP)
 #define CAN_SCROLL 1
 #else
 #define CAN_SCROLL 0
@@ -389,7 +389,7 @@ vtinit()
 
         vp = vscreen[i];
 	vp->v_flag = 0;
-#if COLOR
+#if OPT_COLOR
 	ReqFcolor(vp) = gfcolor;
 	ReqBcolor(vp) = gbcolor;
 #endif
@@ -421,7 +421,7 @@ VIDEO **vpp;
 	vp = typeallocplus(VIDEO, term.t_mcol - 4);
 	if (vp == 0)
 		return FALSE;
-	(void)memset(vp, 0, sizeof(VIDEO) + term.t_mcol - 4);
+	(void)memset((char *)vp, 0, sizeof(VIDEO) + term.t_mcol - 4);
 
 #if OPT_VIDEO_ATTRS
 	vp->v_attrs = (VIDEO_ATTR *)calloc(sizeof(VIDEO_ATTR), (ALLOC_T)term.t_mcol);
@@ -758,11 +758,9 @@ int force;	/* force update past type ahead? */
 
 	if (!curbp) /* not initialized */
 		return FALSE;
-#if	TYPEAH
-	if (force == FALSE && typahead())
+	if (force == FALSE && keystroke_avail())
 		return SORTOFTRUE;
-#endif
-#if	VISMAC == 0
+#if	OPT_VISIBLE_MACROS == 0
 	if (force == FALSE && kbd_replaying(TRUE) && (get_recorded_char(FALSE) != -1))
 		return SORTOFTRUE;
 #endif
@@ -1127,7 +1125,7 @@ int sline;
 		vtputc(MRK_EMPTY);
 	}
 	taboff = 0;
-#if	COLOR
+#if	OPT_COLOR
 	ReqFcolor(vscreen[sline]) = w_val(wp,WVAL_FCOLOR);
 	ReqBcolor(vscreen[sline]) = w_val(wp,WVAL_BCOLOR);
 #endif
@@ -1297,10 +1295,10 @@ updgar()
 
 	for (i = 0; i < term.t_nrow-1; ++i) {
 		vscreen[i]->v_flag |= VFCHG;
-#if	REVSTA
+#if	OPT_REVSTA
 		vscreen[i]->v_flag &= ~VFREV;
 #endif
-#if	COLOR
+#if	OPT_COLOR
 		CurFcolor(vscreen[i]) = gfcolor;
 		CurBcolor(vscreen[i]) = gbcolor;
 #endif
@@ -1327,7 +1325,7 @@ updgar()
 	if (mlsave[0]) {
 		mlforce("%s", mlsave);
 	}
-#if	COLOR
+#if	OPT_COLOR
 	else
 		mlerase();		/* needs to be cleared if colored */
 #endif
@@ -1343,17 +1341,17 @@ int force;	/* forced update flag */
 
 #if CAN_SCROLL
 	if (scrflags & WFKILLS)
-		scrolls(FALSE);
+		(void)scrolls(FALSE);
 	if (scrflags & WFINS)
-		scrolls(TRUE);
+		(void)scrolls(TRUE);
 	scrflags = 0;
 #endif
 
 	for (i = 0; i < term.t_nrow-1; ++i) {
 		/* for each line that needs to be updated*/
 		if ((vscreen[i]->v_flag & (VFCHG|VFCOL)) != 0) {
-#if	TYPEAH && !X11
-			if (force == FALSE && typahead())
+#if !DISP_X11
+			if (force == FALSE && keystroke_avail())
 				return;
 #endif
 			updateline(i, 0, term.t_ncol);
@@ -1504,7 +1502,7 @@ WINDOW	*wp;
 LINEPTR	lp;
 C_NUM	offset;
 {
-	SIZE_T	length = lLength(lp);
+	int	length = lLength(lp);
 	int	column = 0;
 	int	tabs = tabstop_val(wp->w_bufp);
 	int	list = w_val(wp,WMDLIST);
@@ -1524,7 +1522,7 @@ C_NUM	offset;
 		column = 0;
 	} else {
 		for (n = w_left_margin(wp); (n < offset) && (n <= length); n++) {
-			c = (n == length) ? '\n' : l_ref(lp)->l_text[n];
+			c = (n >= length) ? '\n' : l_ref(lp)->l_text[n];
 			if (isprint(c)) {
 				column++;
 			} else if (list || (c != '\t')) {
@@ -1906,7 +1904,7 @@ int	n;
 	return(0) ;
 }
 
-#endif /* SCROLLCODE */
+#endif /* CAN_SCROLL */
 
 
 /*	updext_past: update the extended line which the cursor is currently
@@ -1996,7 +1994,7 @@ int	colto;		/* last column on screen */
 	register struct VIDEO *vp1 = vscreen[row];	/* virtual screen image */
 	register int	req = (vp1->v_flag & VFREQ) == VFREQ;
 
-#if	COLOR
+#if	OPT_COLOR
 	CurFcolor(vp1) = ReqFcolor(vp1);
 	CurBcolor(vp1) = ReqBcolor(vp1);
 #endif
@@ -2092,22 +2090,22 @@ int	colto;		/* first column on screen */
 #endif
 
 #if !OPT_VIDEO_ATTRS
-#if	COLOR
+#if	OPT_COLOR
 	TTforg(ReqFcolor(vp1));
 	TTbacg(ReqBcolor(vp1));
 #endif
 
-#if	REVSTA || COLOR
+#if	OPT_REVSTA || OPT_COLOR
 	/* if we need to change the reverse video status of the
 	   current line, we need to re-write the entire line     */
 	rev = (vp1->v_flag & VFREV) == VFREV;
 	req = (vp1->v_flag & VFREQ) == VFREQ;
 	if ((rev != req)
-#if	COLOR
+#if	OPT_COLOR
 	    || (CurFcolor(vp1) != ReqFcolor(vp1))
 	    || (CurBcolor(vp1) != ReqBcolor(vp1))
 #endif
-#if	HP150
+#if	DISP_HP150
 	/* the HP150 has some reverse video problems */
 	    || req || rev
 #endif
@@ -2119,11 +2117,11 @@ int	colto;		/* first column on screen */
 
 		/* scan through the line and dump it to the screen and
 		   the virtual screen array				*/
-#if X11
+#if DISP_X11
 		x_putline(row, cp1 + xl, colto - xl);
 #endif
 		for (; xl < colto; xl++) {
-#if !X11
+#if !DISP_X11
 			TTputc(cp1[xl]);
 #endif
 			++ttcol;
@@ -2139,7 +2137,7 @@ int	colto;		/* first column on screen */
 			vp1->v_flag |= VFREV;
 		else
 			vp1->v_flag &= ~VFREV;
-#if	COLOR
+#if	OPT_COLOR
 		CurFcolor(vp1) = ReqFcolor(vp1);
 		CurBcolor(vp1) = ReqBcolor(vp1);
 #endif
@@ -2147,7 +2145,7 @@ int	colto;		/* first column on screen */
 	}
 #else
 	rev = FALSE;
-#endif	/* REVSTA || COLOR */
+#endif	/* OPT_REVSTA || OPT_COLOR */
 #endif	/* !OPT_VIDEO_ATTRS */
 
 	/* advance past any common chars at the left */
@@ -2201,7 +2199,7 @@ int	colto;		/* first column on screen */
 	/* Erase to EOL ? */
 	if (nbflag == FALSE
 	 && eolexist == TRUE 
-#if	REVSTA && !OPT_VIDEO_ATTRS
+#if	OPT_REVSTA && !OPT_VIDEO_ATTRS
 	 && (req != TRUE)
 #endif
 	   ) {
@@ -2222,14 +2220,14 @@ int	colto;		/* first column on screen */
 	while (xl < xx) {
 		register int j = xl;
 		VIDEO_ATTR attr = VATTRIB(ap1[j]);
-		while (attr == VATTRIB(ap1[j]) && j < xx)
+		while ((j < xx) && (attr == VATTRIB(ap1[j])))
 			j++;
 		TTattr(attr);
-#if X11
+#if DISP_X11
 		x_putline(row, cp1 + xl, j - xl);
 #endif
 		for (; xl < j; xl++) {
-#if !X11
+#if !DISP_X11
 			TTputc(cp1[xl]);
 #endif
 			++ttcol;
@@ -2249,15 +2247,15 @@ int	colto;		/* first column on screen */
 		}
 	}
 #else /* OPT_VIDEO_ATTRS */
-#if	REVSTA
+#if	OPT_REVSTA
 	TTrev(rev);
 #endif
 
-#if X11
+#if DISP_X11
 	x_putline(row, cp1 + xl, xx - xl + 1);
 #endif
 	for (; xl < xr; xl++) {		/* Ordinary. */
-#if !X11
+#if !DISP_X11
 		TTputc(cp1[xl]);
 #endif
 		++ttcol;
@@ -2270,7 +2268,7 @@ int	colto;		/* first column on screen */
 			cp2[xl] = cp1[xl];
 		}
 	}
-#if	REVSTA
+#if	OPT_REVSTA
 	TTrev(FALSE);
 #endif
 #endif /* OPT_VIDEO_ATTRS */
@@ -2355,39 +2353,56 @@ mlfs_skipfix(fsp)
 }
 #endif /* OPT_MLFORMAT */
 
+#define PutMode(mode,name) \
+	if (b_val(bp, mode)) { \
+		if (ms != 0) { \
+			ms = lsprintf(ms, "%c%s", \
+				mcnt ? ' ' : '[', \
+				name); \
+		} \
+		mcnt++; \
+	}
+
 static int
 modeline_modes(bp, msptr)
 BUFFER *bp;
 char	**msptr;
 {
 	register char *ms = msptr ? *msptr : 0;
+	register int mcnt = 0;
+
+#if SYS_VMS || HAVE_LOSING_SWITCH_WITH_STRUCTURE_OFFSET
+	PutMode(MDCMOD,		"cmode")
+#if OPT_ENCRYPT
+	PutMode(MDCRYPT,	"crypt")
+#endif
+	PutMode(MDDOS,		"dos-style")
+	PutMode(MDVIEW,		"view-only")
+#if OPT_LCKFILES
+	PutMode(MDLOCKED,	"locked by")
+#endif
+#else
 	static struct {
 		int   mode;
 		char *name;
 	} table[] = {
-		{MDCMOD,  "cmode"},
-#if CRYPT
-		{MDCRYPT, "crypt"},
+		 {MDCMOD,    "cmode"}
+#if OPT_ENCRYPT
+		,{MDCRYPT,   "crypt"}
 #endif
-		{MDDOS,   "dos-style"},
-		{MDVIEW,  "view-only"},
-#if LCKFILES
-		{MDLOCKED,  "locked by"}  /* keep this last */
+		,{MDDOS,     "dos-style"}
+		,{MDVIEW,    "view-only"}
+#if OPT_LCKFILES
+		,{MDLOCKED,  "locked by"}  /* keep this last */
 #endif
 	};
-	register int j, mcnt;
+	register int j;
 
 	for (j = mcnt = 0; j < TABLESIZE(table); j++) {
-		if (b_val(bp, table[j].mode)) {
-			if (ms != 0) {
-				ms = lsprintf(ms, "%c%s",
-					mcnt ? ' ' : '[',
-					table[j].name);
-			}
-			mcnt++;
-		}
+		PutMode(table[j].mode, table[j].name)
 	}
-#if LCKFILES
+#endif
+#if OPT_LCKFILES
 	if (ms != 0 && b_val(bp, MDLOCKED))
 		ms = lsprintf(ms, " %s", b_val_ptr(bp,VAL_LOCKER));
 #endif
@@ -2429,7 +2444,7 @@ int lchar;
 				ic = 'O';
 		}
 #endif /* !defined(insertmode) */
-#if BORLAND
+#if DISP_BORLAND
 		set_cursor (ic != lchar);
 #endif
 	}
@@ -2496,7 +2511,7 @@ WINDOW *wp;
 #else
     vscreen[n]->v_flag |= VFCHG | VFREQ | VFCOL;/* Redraw next time. */
 #endif
-#if	COLOR
+#if	OPT_COLOR
     ReqFcolor(vscreen[n]) = w_val(wp,WVAL_FCOLOR);
     ReqBcolor(vscreen[n]) = w_val(wp,WVAL_BCOLOR);
 #endif
@@ -2505,7 +2520,7 @@ WINDOW *wp;
     if (wp == curwp) {				/* mark the current buffer */
 	lchar = '=';
     } else {
-#if	REVSTA
+#if	OPT_REVSTA
 	if (revexist)
 	    lchar = ' ';
 	else
@@ -2546,7 +2561,7 @@ WINDOW *wp;
 		case 'm' :
 		    if (modeline_modes(bp, (char **)0)) {
 			mlfs_prefix(&fs, &ms, lchar);
-			modeline_modes(bp, &ms);
+			(void)modeline_modes(bp, &ms);
 			mlfs_suffix(&fs, &ms, lchar);
 		    }
 		    else
@@ -2808,14 +2823,14 @@ erase_remaining_msg (column)
 int	column;
 {
 	beginDisplay;
-#if !RAMSIZE
+#if !OPT_RAMSIZE
 	if (eolexist == TRUE)
 		TTeeol();
 	else
 #endif
 	{
 		register int i;
-#if RAMSIZE
+#if OPT_RAMSIZE
 		int	limit = global_g_val(GMDRAMSIZE)
 				? LastMsgCol
 				: term.t_ncol - 1;
@@ -2844,7 +2859,7 @@ mlerase()
 	if (mpresf != 0) {
 		bottomleft();
 		if (discmd != FALSE) {
-#if	COLOR
+#if	OPT_COLOR
 			TTforg(gfcolor);
 			TTbacg(gbcolor);
 #endif
@@ -3007,7 +3022,7 @@ va_list *app;	/* ptr to current data field */
 #endif
 	} else {
 
-#if	COLOR
+#if	OPT_COLOR
 		/* set up the proper colors for the command line */
 		TTforg(gfcolor);
 		TTbacg(gbcolor);
@@ -3053,15 +3068,13 @@ void
 mlerror(s)
 char	*s;
 {
-#if UNIX || VMS || NEWDOSCC
-    	char *es;
+#if SYS_UNIX || SYS_VMS || CC_NEWDOSCC
 
 	if (errno > 0 && errno < sys_nerr)
-		es = sys_errlist[errno];
+		mlwarn("[Error %s: %s]", s, sys_errlist[errno]);
 	else
-		es = "unknown system error";
+		mlwarn("[Error %s: unknown system error %d]", s, errno);
 
-	mlwarn("[Error %s: %s]", s, es);
 #else
 	mlwarn("[Error %s]", s);
 #endif
@@ -3181,7 +3194,7 @@ va_dcl
 
 }
 
-#if defined( SIGWINCH) && ! X11
+#if defined( SIGWINCH) && ! DISP_X11
 /* ARGSUSED */
 SIGT
 sizesignal (ACTUAL_SIG_ARGS)
@@ -3295,7 +3308,7 @@ ACTUAL_SIG_DECL
 			if (mpresf >= 0)
 				mpresf = -(mpresf+1);
 			TTflush();
-#if X11
+#if DISP_X11
 			x_working();
 #endif
 		}
@@ -3394,6 +3407,7 @@ psc_eeop()
     ttcol = savecol;
 }
 
+/* ARGSUSED */
 void
 psc_rev(huh)
     int huh;
