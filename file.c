@@ -6,7 +6,10 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.77  1993/04/02 11:00:02  pgf
+ * Revision 1.78  1993/04/09 13:36:47  pgf
+ * include sys/stat.h to try to get extern decl for mkdir
+ *
+ * Revision 1.77  1993/04/02  11:00:02  pgf
  * force scrolling from bottom line when reading pipe
  *
  * Revision 1.76  1993/04/01  13:07:50  pgf
@@ -282,6 +285,10 @@
 
 #include	"estruct.h"
 #include        "edef.h"
+
+#if UNIX
+#include	<sys/stat.h>  /* for mkdir() declaration */
+#endif
 
 extern int fileispipe;
 

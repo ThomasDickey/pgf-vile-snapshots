@@ -6,7 +6,21 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.72  1993/04/02 10:58:37  pgf
+ * Revision 1.76  1993/04/09 16:50:17  pgf
+ * fix off-by-one when doing auto-horizontal-scroll leftward, and
+ * allow the cursor to sit on the last column if it's the last char on the
+ * line
+ *
+ * Revision 1.75  1993/04/09  13:36:01  pgf
+ * include ioctl.h if LINUX
+ *
+ * Revision 1.74  1993/04/08  11:16:21  pgf
+ * changed offset for horiz scrolling from 1/3 to 1/4
+ *
+ * Revision 1.73  1993/04/08  11:09:27  pgf
+ * implemented horizscroll mode
+ *
+ * Revision 1.72  1993/04/02  10:58:37  pgf
  * first of probably many ioctl.h fixups :-(
  *
  * Revision 1.71  1993/04/01  13:06:31  pgf
@@ -262,7 +276,7 @@
 #    if APOLLO
 #     include <sys/ioctl.h>
 #   else
-#     include "ioctl.h"
+#     include <ioctl.h>
 #    endif
 #   endif
 #  endif
@@ -275,7 +289,10 @@
 #endif
 
 #if OSF1
-# include "ioctl.h"
+# include <ioctl.h>
+#endif
+#if LINUX
+# include <sys/ioctl.h>
 #endif
 
 #define	NU_WIDTH 8
@@ -834,7 +851,7 @@ update(force)
 int force;	/* force update past type ahead? */
 {
 	register WINDOW *wp;
-	register int screencol;
+	int screencol;
 
 	if (!curbp) /* not initialized */
 		return FALSE;
@@ -863,6 +880,8 @@ int force;	/* force update past type ahead? */
 		}
 	}
 
+ restartupdate:
+
 	/* update any windows that need refreshing */
 	for_each_window(wp) {
 		if (wp->w_flag) {
@@ -886,7 +905,8 @@ int force;	/* force update past type ahead? */
 	curtabval = tabstop_val(curbp);
 
 	/* recalc the current hardware cursor location */
-	screencol = updpos();
+	if (updpos(&screencol)) /* if true, full horizontal scroll happened */
+		goto restartupdate;
 
 #if	MEMMAP
 	/* update the cursor and flush the buffers */
@@ -1081,14 +1101,18 @@ int sline;
 
 /*	updpos:	update the position of the hardware cursor and handle extended
 		lines. This is the only update for simple moves.
-		returns the screen column for the cursor	*/
+		returns the screen column for the cursor, and
+		a boolean indicating if full sideways scroll was necessary */
 int
-updpos()
+updpos(screencolp)
+int *screencolp;
 {
 	register LINE *lp;
 	register int c;
 	register int i;
 	register int col, excess;
+	register int collimit;
+	int moved = FALSE;
 
 	/* find the current row */
 	lp = curwp->w_line.l;
@@ -1128,10 +1152,23 @@ updpos()
 	curcol = col - w_val(curwp,WVAL_SIDEWAYS);
 
 	/* if extended, flag so and update the virtual line image */
-	if ((excess = curcol - col_limit(curwp)) >= 0) {
-		return updext_past(col, excess);
+	collimit = col_limit(curwp);
+	excess = curcol - collimit;
+	if ((excess > 0) || (excess == 0 && 
+			(DOT.o < llength(DOT.l) - 1 ))) {
+		if (w_val(curwp,WMDHORSCROLL)) {
+			mvrightwind(TRUE, excess + 3*collimit/4 );
+			moved = TRUE;
+		} else {
+			*screencolp = updext_past(col, excess);
+		}
 	} else if (w_val(curwp,WVAL_SIDEWAYS) && (curcol < 1)) {
-		return updext_before(col);
+		if (w_val(curwp,WMDHORSCROLL)) {
+			mvleftwind(TRUE, -curcol + 3*collimit/4 + 1);
+			moved = TRUE;
+		} else {
+			*screencolp = updext_before(col);
+		}
 	} else {
 		if (vscreen[currow]->v_flag & VFEXT) {
 			l_to_vline(curwp,lp,currow);
@@ -1139,8 +1176,9 @@ updpos()
 			/* this line no longer is extended */
 			vscreen[currow]->v_flag &= ~VFEXT;
 		}
-		return curcol;
+		*screencolp = curcol;
 	}
+	return moved;
 }
 
 /*	upddex:	de-extend any line that deserves it		*/

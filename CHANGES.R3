@@ -1,4 +1,46 @@
 
+Changes for vile 3.42:
+(pgf)
+	+ added routine tb_stuff() (tbuff.c), which is roughly the
+	  converse of tb_peek(), to allow simple replacement of a character
+	  in a tbuff.
+
+	+ used tb_stuff() to increment the buffer number when referencing
+	  the numbered buffers -- i.e. "1p becomes "2p in a '.' command.
+	  (input.c)
+
+	+ backed out change to 'get_recorded_char()' (input.c) that caused
+	  dd..."1P... to continue deleting lines after the P operation.
+
+	+ added horizontal scrolling mode, to cause whole screen to shift
+	  instead of just one line when cursor goes "off screen".  this 
+	  mode ("set hs", or "set horizscroll" is now the default. (display.c,
+	  vile.hlp, main.c, modetbl, proto.h)
+
+	+ allow cursor to rest in last column, if line is just that long, to
+	  prevent extra horizontal scrolling. (display.c)
+
+	+ split up the ins() function, to provide an inschar() function that
+	  istring could use.  istring() now called by insstring() and
+	  overwstring(), which are bound to "insert-string" and new 
+	  "overwrite-string" commands.  all this to allow "insert-string"
+	  to take advantage of autoindent, cmode, wordwrap, etc.  will
+	  need tweaks later when tty chars are rebindable (^U, ^W, etc.)
+
+	+ compiled with "-Wmissing-prototypes", which turned up a bunch of 'em.
+	  (proto.h)
+
+	+ some linux gcc cleanup, mostly just including some more headers
+	  (display.c file.c main.c)
+
+	+ ifdefed out the onamedcmd() function, and it's binding (cmdtbl,
+	  exec.c)
+
+	+ took out the extern declarations of getpwnam and getpwuid that i
+	  put in recently.  they seem to be causing more problems than they
+	  were fixing.  in general, providing prototypes for system routines
+	  is a real pain.  i wish there were an "ifnprototype" construct.
+
 Changes for vile 3.41:
 (tom)
 	+ ifdef ioctl.h for APOLLO (note: you shouldn't use '"'-form for system

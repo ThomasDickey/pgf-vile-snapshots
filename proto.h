@@ -5,7 +5,19 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.40  1993/04/01 13:07:50  pgf
+ * Revision 1.44  1993/04/09 13:43:18  pgf
+ * added a bunch of missing prototypes, found with -Wmissing-prototypes
+ *
+ * Revision 1.43  1993/04/08  15:00:53  pgf
+ * new funcs for insertion
+ *
+ * Revision 1.42  1993/04/08  11:08:43  pgf
+ * arg change to updpos
+ *
+ * Revision 1.41  1993/04/08  09:48:27  pgf
+ * added tb_stuff
+ *
+ * Revision 1.40  1993/04/01  13:07:50  pgf
  * see tom's 3.40 CHANGES
  *
  * Revision 1.39  1993/03/31  19:36:08  pgf
@@ -160,6 +172,9 @@ extern int unmap P(( int, int ));
 extern int source P(( int, int ));
 extern int visual P(( int, int ));
 extern int ex P(( int, int ));
+extern int cntl_af P(( int, int ));
+extern int cntl_xf P(( int, int ));
+extern int unarg P(( int, int ));
 extern int nullproc P(( int, int ));
 extern void charinit P(( void ));
 extern void start_debug_log P(( int , char ** ));
@@ -228,6 +243,7 @@ extern void swapmark P(( void ));
 /* bind.c */
 extern int help P(( int, int ));
 extern int deskey P(( int, int ));
+extern int bindkey P(( int, int ));
 extern int desbind P(( int, int ));
 extern void makebindlist P(( int, char *));
 extern int strinc P(( char *, char *));
@@ -272,6 +288,7 @@ extern int shiftwid_val P(( BUFFER * ));
 extern int has_C_suffix P(( BUFFER * ));
 extern int killbuffer P(( int, int ));
 extern int zotbuf P(( BUFFER * ));
+extern int namebuffer P(( int, int ));
 extern int popupbuff P(( BUFFER * ));
 extern void sortlistbuffers P(( void ));
 extern int togglelistbuffers P(( int, int ));
@@ -319,7 +336,7 @@ extern void vteeol P(( void ));
 extern int upscreen P(( int, int ));
 extern void reframe P(( WINDOW * ));
 extern void l_to_vline P(( WINDOW *, LINE *, int ));
-extern int updpos P(( void ));
+extern int updpos P(( int * ));
 extern void upddex P(( void ));
 extern void updgar P(( void ));
 extern int update P(( int ));
@@ -354,8 +371,8 @@ extern void bprintf P((char *, ... ));
 extern void getscreensize P(( int *, int * ));
 extern DEFINE_SIGNAL(sizesignal);
 extern void newscreensize P(( int, int ));
-extern int newwidth P(( int, int ));
-extern int newlength P(( int, int ));
+
+/* eval.c */
 extern char * l_itoa P(( int ));
 extern char * ltos P(( int ));
 extern int absol P(( int ));
@@ -366,13 +383,12 @@ extern char * getkill P(( void ));
 extern char * gtusr P(( char * ));
 extern char * mklower P(( char * ));
 extern char * mkupper P(( char * ));
+extern int svar P(( VDESC *, char * ));
+extern void varinit P(( void ));
+extern int listvars P(( int, int ));
+extern int setvar P(( int, int ));
 extern int sindex P(( char *, char * ));
 extern int ernd P(( void ));
-extern int line_no P(( BUFFER *, LINE * ));
-extern int getcline P(( void ));
-extern int getwpos P(( void ));
-extern int svar P(( VDESC *, char * ));
-extern int resize P(( int, int ));
 
 /* exec.c */
 extern int namedcmd P(( int, int ));
@@ -380,6 +396,8 @@ extern int rangespec P(( char *, LINE **, LINE **, int *, int * ));
 extern int docmd P(( char *, int, int, int ));
 extern int dobuf P(( BUFFER * ));
 extern int dofile P(( char * ));
+extern int execbuf P(( int, int ));
+extern int execfile P(( int, int ));
 extern int execute P(( CMDFUNC *, int, int ));
 extern int storemac P(( int, int ));
 #if PROC
@@ -437,6 +455,7 @@ extern int getfile P(( char *, int ));
 extern int readin P((char *, int, BUFFER *, int ));
 extern int quickreadf P(( BUFFER *, int * ));
 extern int slowreadf P(( BUFFER *, int * ));
+extern int set_dosmode P(( int, int ));
 extern void readlinesmsg P(( int, int, char *, int ));
 extern void makename P(( char [], char [] ));
 extern void unqname P((char *, int));
@@ -568,6 +587,10 @@ extern int loadkreg P(( int, int ));
 extern int showkreg P(( int, int ));
 
 /* modes.c */
+extern int setmode P(( int, int ));
+extern int delmode P(( int, int ));
+extern int setgmode P(( int, int ));
+extern int delgmode P(( int, int ));
 extern int settab P(( int, int ));
 extern int setfillcol P(( int, int ));
 extern REGEXVAL *new_regexval P(( char *, int ));
@@ -648,6 +671,8 @@ extern char * non_filename P(( void ));
 extern int is_internalname P(( char * ));
 
 /* random.c */
+extern int line_no P(( BUFFER *, LINE * ));
+extern int getcline P(( void ));
 extern int liststuff P(( char *, void (*)(), int, char * ));
 extern int showcpos P(( int, int ));
 extern int showlength P(( int, int ));
@@ -674,6 +699,10 @@ extern int append P(( int, int ));
 extern int appendeol P(( int, int ));
 extern int overwritechars P(( int, int ));
 extern int ins P(( int ));
+extern int insstring P(( int, int ));
+extern int overwstring P(( int, int ));
+extern int istring P(( int, int, int ));
+extern int inschar P(( int, int ));
 extern int backspace P(( void ));
 extern int newline P(( int, int ));
 extern int indented_newline P(( int ));
@@ -693,9 +722,10 @@ extern int chgline P(( int, int ));
 extern int chgchar P(( int, int ));
 extern int matchfence P(( int, int ));
 extern int matchfenceback P(( int, int ));
+extern int clrmes P(( int, int ));
+extern int writemsg P(( int, int ));
 extern int fmatchindent P(( void ));
 extern void catnap P(( int ));
-extern int istring P(( int, int ));
 extern char * current_directory P(( int ));
 extern int cd P(( int, int ));
 extern int pwd P(( int, int ));
@@ -823,6 +853,7 @@ extern void setupuline P(( LINE * ));
 extern void resetuline P(( LINE *, LINE * ));
 
 /* window.c */
+extern int getwpos P(( void ));
 extern int reposition P(( int, int ));
 extern int refresh P(( int, int ));
 extern int poswind P(( int, int ));
@@ -834,6 +865,8 @@ extern int mvdnnxtwind P(( int, int ));
 extern int mvupnxtwind P(( int, int ));
 extern int mvrightwind P(( int, int ));
 extern int mvleftwind P(( int, int ));
+extern int newwidth P(( int, int ));
+extern int newlength P(( int, int ));
 extern int onlywind P(( int, int ));
 extern int delwind P(( int, int ));
 extern int delwp P(( WINDOW * ));
@@ -846,8 +879,8 @@ extern int scrnextup P(( int, int ));
 extern int scrnextdw P(( int, int ));
 extern int savewnd P(( int, int ));
 extern int restwnd P(( int, int ));
+extern int resize P(( int, int ));
 extern void winit P(( void ));
-extern void varinit P(( void ));
 
 /* word.c */
 extern int wrapword P(( int, int ));
@@ -894,6 +927,7 @@ TBUFF *	tb_alloc P(( TBUFF **, unsigned ));
 TBUFF *	tb_init P(( TBUFF **, int ));
 void	tb_free P(( TBUFF ** ));
 TBUFF *	tb_put P(( TBUFF **, unsigned, int ));
+void	tb_stuff P(( TBUFF *, int ));
 int	tb_get P(( TBUFF *, unsigned ));
 void	tb_unput P(( TBUFF * ));
 TBUFF *	tb_append P(( TBUFF **, int ));

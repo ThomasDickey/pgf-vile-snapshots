@@ -3,7 +3,17 @@
  *		5/9/86
  *
  * $Log: input.c,v $
- * Revision 1.65  1993/04/01 13:07:50  pgf
+ * Revision 1.67  1993/04/07 13:54:23  pgf
+ * fix bug in incr_dot_kregnum so "1P...  works correctly again.  this
+ * was a mistranslation when the tbuffs were introduced
+ *
+ * Revision 1.66  1993/04/07  13:51:52  pgf
+ * undo the recording glitch fix (1.61) which used to be reproducible with
+ * ix<ESC>j.j.j.j.j.j.j typed very quickly.  this doesn't happen anymore,
+ * and now i can do dd..."1P... and only have deletes happen when they're
+ * supposed to.
+ *
+ * Revision 1.65  1993/04/01  13:07:50  pgf
  * see tom's 3.40 CHANGES
  *
  * Revision 1.64  1993/04/01  12:05:46  pgf
@@ -409,7 +419,7 @@ incr_dot_kregnum()
 	if (dotcmdmode == PLAY) {
 		register int	c = tb_peek(dotcmd);
 		if (isdigit(c) && c < '9')
-			(void)tb_next(dotcmd);
+			tb_stuff(dotcmd, ++c);
 	}
 }
 
@@ -491,9 +501,8 @@ int eatit;  /* consume the character? */
 						return tb_get(buffer, 0);
 				} else { /* at the end of last repetition?  */
 					if (--dotcmdrep < 1) {
-						TBUFF *tmp = TempDot(FALSE);
-						dotcmdmode = RECORD;
-						(void)tb_copy(&tmp, buffer);
+						dotcmdmode = STOP;
+						(void)dotcmdbegin();
 						/* immediately start recording
 						 * again, just in case.
 						 */

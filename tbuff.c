@@ -8,7 +8,10 @@
  *		editing.
  *
  * $Log: tbuff.c,v $
- * Revision 1.7  1993/04/01 13:06:31  pgf
+ * Revision 1.8  1993/04/08 09:49:08  pgf
+ * added tb_stuff.c
+ *
+ * Revision 1.7  1993/04/01  13:06:31  pgf
  * turbo C support (mostly prototypes for static)
  *
  * Revision 1.6  1993/03/25  19:50:58  pgf
@@ -126,6 +129,7 @@ TBUFF *	tb_init(p, c)
 	if (q == 0)
 		q = tb_alloc(p, NCHUNK);
 	q->tb_used = 0;
+	q->tb_last = 0;
 	q->tb_endc = c;
 	return (*p = q);
 }
@@ -165,6 +169,19 @@ TBUFF *	tb_put(p, n, c)
 	return q;
 }
 
+/*
+ * stuff the nth character into the temp-buff -- assumes space already there
+ *  it's sort of the opposite of tb_peek
+ */
+void	tb_stuff(p, c)
+	TBUFF	*p;
+	int	c;
+{
+	if (p->tb_last < p->tb_used)
+		p->tb_data[p->tb_last] = c;
+	else
+		p->tb_endc = c;
+}
 /*
  * append a character to the temp-buff
  */

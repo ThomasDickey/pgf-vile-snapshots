@@ -72,7 +72,14 @@
 #		here for completeness.
 #
 # $Log: cmdtbl,v $
-# Revision 1.54  1993/03/31 19:31:48  pgf
+# Revision 1.56  1993/04/09 13:35:14  pgf
+# take "onamedcmd" out of action
+#
+# Revision 1.55  1993/04/08  15:08:16  pgf
+# new insstring and overwstring, bound to "insert-string" and
+# "overwrite-string"
+#
+# Revision 1.54  1993/03/31  19:31:48  pgf
 # make the godotplus() function bindable as "whole-lines"
 #
 # Revision 1.53  1993/03/17  10:01:18  pgf
@@ -759,7 +766,7 @@ insfile		REDO|UNDO|GLOBOK|(FROM|ZERO|NAMEDF)
 	'^R'
 insspace	REDO|UNDO		!SMALLER
 	"insert-space"			!FEWNAMES
-istring		REDO|UNDO		!SMALLER
+insstring	REDO|UNDO		!SMALLER
 	"insert-string"
 joinlines	REDO|UNDO
 	"join-lines"			!FEWNAMES
@@ -839,7 +846,7 @@ nullproc	NONE
 	"nop"				!FEWNAMES
 	'^Q'
 	'^S'
-onamedcmd	NONE
+onamedcmd	NONE			UNUSED
 	"execute-named-command-old"	!FEWNAMES
 	'^A-:'
 namedcmd	NONE
@@ -953,6 +960,8 @@ operwrite	OPER|(RANGE|BANG|FILE1|DFLALL)
 overwritechars	REDO|UNDO
 	"overwrite-chars"		!FEWNAMES
 	'R'
+overwstring	REDO|UNDO		!SMALLER
+	"overwrite-string"
 onlywind	NONE
 	"delete-other-windows"		!FEWNAMES
 	'^O'

@@ -8,8 +8,11 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: insert.c,v $
- *	Revision 1.17  1993/04/01 13:06:31  pgf
- *	turbo C support (mostly prototypes for static)
+ *	Revision 1.18  1993/04/08 15:01:05  pgf
+ *	broke up ins(), to create inschar(), usable by insstring and ovrwstring
+ *
+ * Revision 1.17  1993/04/01  13:06:31  pgf
+ * turbo C support (mostly prototypes for static)
  *
  * Revision 1.16  1993/03/18  17:42:20  pgf
  * see 3.38 section of CHANGES
@@ -323,9 +326,7 @@ int playback;
 {
 	register int status;
 	int f,n;
-	int (*execfunc) P((int, int));	/* ptr to function to execute */
 	int    c;		/* command character */
-	int newlineyet = FALSE; /* are we on the line we started on? */
 	int startoff = DOT.o;	/* starting offset on that line */
 	static TBUFF *insbuff;
 
@@ -364,17 +365,13 @@ int playback;
 				trimline();
 				autoindented = -1;
 			}
-			insertmode = FALSE;
-			if (b_val(curbp, MDSHOWMODE))
-				curwp->w_flag |= WFMODE;
-			return (TRUE);
+			status = TRUE;
+			goto leaveinsert;
 		} else if (c == -abortc ) {
 			/* we use the negative to suppress that
 				junk, for the benefit of SPEC keys */
-			insertmode = FALSE;
-			if (b_val(curbp, MDSHOWMODE))
-				curwp->w_flag |= WFMODE;
-			return (TRUE);
+			status = TRUE;
+			goto leaveinsert;
 		}
 
 		if (c & SPEC) {
@@ -389,126 +386,23 @@ int playback;
 			continue;
 		}
 
-		execfunc = NULL;
-		if (c == quotec) {
-			execfunc = quote;
-		} else {
-			/*
-			 * If a space was typed, fill column is defined, the
-			 * argument is non- negative, wrap mode is enabled, and
-			 * we are now past fill column, perform word wrap. 
-			 */
-			if (isspace(c)
-			 && getccol(FALSE) > wrap_at_col()) {
-				wrapword(FALSE,1);
-				newlineyet = TRUE;
-			}
-
-			if ( c ==  '\t') { /* tab */
-				execfunc = tab;
-				autoindented = -1;
-			} else if (c ==  tocntrl('J') ||
-				c ==  tocntrl('M')) { /* CR and NL */
-				execfunc = newline;
-				if (autoindented >= 0) {
-					trimline();
-					autoindented = -1;
-				}
-				newlineyet = TRUE;
-			} else if ( isbackspace(c) ||
-					c == tocntrl('D') || 
-					c == killc ||
-					c == wkillc) { /* ^U and ^W */
-				/* how far can we back up? */
-				register int backlimit;
-				/* have we backed thru a "word" yet? */
-				int saw_word = FALSE;
-				if ((c == tocntrl('D') && autoindented >=0) ||
-					newlineyet || !b_val(curbp,MDBACKLIMIT))
-					backlimit = 0;
-				else
-					backlimit = startoff;
-				execfunc = nullproc;
-				if (c == tocntrl('D')) {
-					int goal;
-					int col;
-					int sw = curswval;
-					col = getccol(FALSE);
-					if (col > 0)
-						goal = ((col-1)/sw)*sw;
-					else
-						goal = 0;
-					while (col > goal &&
-						DOT.o > backlimit) {
-						backspace();
-						col = getccol(FALSE);
-					}
-					if (col < goal)
-						linsert(goal - col,' ');
-				} else while (DOT.o > backlimit) {
-					if (c == wkillc) {
-						if (isspace(
-							lgetc(DOT.l,DOT.o-1))) {
-							if (saw_word)
-								break;
-						} else {
-							saw_word = TRUE;
-						}
-					}
-					backspace();
-					autoindented--;
-					if (isbackspace(c) ||
-						c == tocntrl('D'))
-						break;
-				}
-			} else if ( c ==  tocntrl('T')) { /* ^T */
-				execfunc = shiftwidth;
-
-#if UNIX && defined(SIGTSTP)	/* job control, ^Z */
-			} else if (c == suspc) {
-				execfunc = bktoshell;
-
-#endif
-			} else if (c == startc ||
-					c == stopc) {  /* ^Q and ^S */
-				execfunc = nullproc;
-			}
-		}
-
-		if (execfunc != NULL) {
-			status	 = (*execfunc)(f, n);
-			if (status != TRUE) {
-				insertmode = FALSE;
-				if (b_val(curbp, MDSHOWMODE))
-					curwp->w_flag |= WFMODE;
-				return (status);
-			}
+		if (c == startc || c == stopc) {  /* ^Q and ^S */
 			continue;
 		}
-
-		    
-		/* make it a real character again */
-		c = kcod2key(c);
-
-		/* if we are in overwrite mode, not at eol,
-		   and next char is not a tab or we are at a tab stop,
-		   delete a char forword			*/
-		if (insertmode == OVERWRITE &&
-				DOT.o < llength(DOT.l) &&
-				(char_at(DOT) != '\t' ||
-					(DOT.o) % curtabval == curtabval-1)) {
-			autoindented = -1;
-			ldelete(1L, FALSE);
+#if UNIX && defined(SIGTSTP)	/* job control, ^Z */
+		else if (c == suspc) {
+			status = bktoshell(FALSE,1);
 		}
+#endif
+		else
+			status = inschar(c,startoff);
 
-		/* do the appropriate insertion */
-		if ((c == RBRACE) && b_val(curbp, MDCMOD)) {
-			status = insbrace(n, c);
-		} else if (c == '#' && b_val(curbp, MDCMOD)) {
-			status = inspound();
-		} else {
-			autoindented = -1;
-			status = linsert(n, c);
+		if (status != TRUE) {
+ leaveinsert:
+			insertmode = FALSE;
+			if (b_val(curbp, MDSHOWMODE))
+				curwp->w_flag |= WFMODE;
+			return (status);
 		}
 
 #if CFENCE
@@ -526,15 +420,178 @@ int playback;
 				filesave(FALSE, 0);
 				curbp->b_acount = b_val(curbp,VAL_ASAVECNT);
 			}
-
-		if (status != TRUE) {
-			insertmode = FALSE;
-			if (b_val(curbp, MDSHOWMODE))
-				curwp->w_flag |= WFMODE;
-			return (status);
-		}
 	}
 }
+
+int
+inschar(c,startoff)
+int c;
+int startoff;
+{
+	int (*execfunc) P((int, int));	/* ptr to function to execute */
+	int newlineyet = FALSE; /* are we on the line we started on? */
+
+	execfunc = NULL;
+	if (c == quotec) {
+		execfunc = quote;
+	} else {
+		/*
+		 * If a space was typed, fill column is defined, the
+		 * argument is non- negative, wrap mode is enabled, and
+		 * we are now past fill column, perform word wrap. 
+		 */
+		if (isspace(c) && getccol(FALSE) > wrap_at_col()) {
+			wrapword(FALSE,1);
+			newlineyet = TRUE;
+		}
+
+		if ( c == '\t') { /* tab */
+			execfunc = tab;
+			autoindented = -1;
+		} else if (c ==  tocntrl('J') ||
+			c ==  tocntrl('M')) { /* CR and NL */
+			execfunc = newline;
+			if (autoindented >= 0) {
+				trimline();
+				autoindented = -1;
+			}
+			newlineyet = TRUE;
+		} else if ( isbackspace(c) ||
+				c == tocntrl('D') || 
+				c == killc ||
+				c == wkillc) { /* ^U and ^W */
+			/* how far can we back up? */
+			register int backlimit;
+			/* have we backed thru a "word" yet? */
+			int saw_word = FALSE;
+			if ((c == tocntrl('D') && autoindented >=0) ||
+				newlineyet || !b_val(curbp,MDBACKLIMIT))
+				backlimit = 0;
+			else
+				backlimit = startoff;
+			execfunc = nullproc;
+			if (c == tocntrl('D')) {
+				int goal;
+				int col;
+				int sw = curswval;
+				col = getccol(FALSE);
+				if (col > 0)
+					goal = ((col-1)/sw)*sw;
+				else
+					goal = 0;
+				while (col > goal &&
+					DOT.o > backlimit) {
+					backspace();
+					col = getccol(FALSE);
+				}
+				if (col < goal)
+					linsert(goal - col,' ');
+			} else while (DOT.o > backlimit) {
+				if (c == wkillc) {
+					if (isspace(
+						lgetc(DOT.l,DOT.o-1))) {
+						if (saw_word)
+							break;
+					} else {
+						saw_word = TRUE;
+					}
+				}
+				backspace();
+				autoindented--;
+				if (isbackspace(c) ||
+					c == tocntrl('D'))
+					break;
+			}
+		} else if ( c ==  tocntrl('T')) { /* ^T */
+			execfunc = shiftwidth;
+		}
+
+	}
+
+	if (execfunc != NULL)
+		return (*execfunc)(FALSE, 1);
+		
+	/* make it a real character again */
+	c = kcod2key(c);
+
+	/* if we are in overwrite mode, not at eol,
+	   and next char is not a tab or we are at a tab stop,
+	   delete a char forword			*/
+	if (insertmode == OVERWRITE && DOT.o < llength(DOT.l) &&
+			(char_at(DOT) != '\t' ||
+				(DOT.o) % curtabval == curtabval-1)) {
+		autoindented = -1;
+		ldelete(1L, FALSE);
+	}
+
+	/* do the appropriate insertion */
+	if ((c == RBRACE) && b_val(curbp, MDCMOD)) {
+		return insbrace(1, c);
+	} else if (c == '#' && b_val(curbp, MDCMOD)) {
+		return inspound();
+	}
+
+	autoindented = -1;
+	return linsert(1, c);
+
+}
+
+#if ! SMALLER
+int
+insstring(f, n)
+int f, n;
+{
+	return istring(f,n,OVERWRITE);
+}
+
+int
+overwstring(f, n)
+int f, n;
+{
+	return istring(f,n,OVERWRITE);
+}
+
+/* ask for and insert or overwrite a string into the current */
+/* buffer at the current point */
+int
+istring(f,n,mode)
+int f,n;
+int mode;
+{
+	register char *tp;	/* pointer into string to add */
+	register int status;	/* status return code */
+	static char tstring[NPAT+1];	/* string to add */
+
+	/* ask for string to insert */
+	status = mlreply("String to insert: ", tstring, NPAT);
+	if (status != TRUE)
+		return(status);
+
+
+	if (f == FALSE)
+		n = 1;
+
+	if (n < 0)
+		n = - n;
+
+	insertmode = mode;
+
+	/* insert it */
+	while (n--) {
+		tp = &tstring[0];
+		while (*tp) {
+			inschar(*tp++,0);
+			if (status != TRUE) {
+				insertmode = FALSE;
+				return(status);
+			}
+		}
+	}
+
+	insertmode = FALSE;
+	return(TRUE);
+}
+#endif
 
 int
 backspace()

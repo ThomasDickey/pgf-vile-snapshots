@@ -3,7 +3,11 @@
  *		strings.
  *
  * $Log: path.c,v $
- * Revision 1.6  1993/04/02 11:02:15  pgf
+ * Revision 1.7  1993/04/09 13:42:32  pgf
+ * ifdefed out extern decls for getpw{nam,uid} -- to many type/prototyple
+ * clashes
+ *
+ * Revision 1.6  1993/04/02  11:02:15  pgf
  * ls-based directory routines, and support for "old-style" directories
  *
  * Revision 1.5  1993/04/01  15:55:02  pgf
@@ -27,6 +31,7 @@
 #include        "edef.h"
 
 #if UNIX
+#include <sys/types.h>
 #include <pwd.h>
 #endif
 
@@ -290,8 +295,10 @@ char	*path;
 		char	temp[NFILEN];
 		struct	passwd *p;
 		char	*s, *d;
+#if BEFORE
 		extern struct	passwd *getpwnam P((char *));
 		extern struct	passwd *getpwuid P((int));
+#endif
 
 		/* parse out the user-name portion */
 		for (s = path+1, d = temp; (*d = *s) != 0; d++, s++) {
