@@ -7,7 +7,7 @@
  * Original code probably by Dan Lawrence or Dave Conroy for MicroEMACS.
  * Major extensions for vile by Paul Fox, 1991
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/modes.c,v 1.42 1994/09/07 22:00:47 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/modes.c,v 1.48 1994/10/30 16:26:37 pgf Exp $
  *
  */
 
@@ -32,9 +32,11 @@ static	int	string_to_bool P(( char *, int * ));
 #if defined(GMD_GLOB) || defined(GVAL_GLOB)
 static	int	legal_glob_mode P(( char * ));
 #endif
+#if OPT_ENUM_MODES
 static	int	is_fsm		P(( struct VALNAMES * ));
 static	int	legal_fsm	P(( char * ));
 static	int	fsm_complete	P(( int, char *, int * ));
+#endif
 static	int	mode_complete P(( int, char *, int * ));
 static	int	mode_eol P(( char *, int, int, int ));
 static	int	do_a_mode P(( int, int ));
@@ -576,7 +578,7 @@ char	*base;
  * 	:set error beep
  * 	:set error flash
  */
-
+#if OPT_ENUM_MODES
 typedef char * FSM_CHOICES;
 
 struct FSM {
@@ -585,25 +587,50 @@ struct FSM {
     FSM_CHOICES * choices;
 };
 
+#if OPT_POPUPCHOICE
 FSM_CHOICES fsm_popup_choices[] = {
     "off",
     "immediate",
     "delayed",
     (char *) 0
 };
+#endif
 
+#if NEVER
 FSM_CHOICES fsm_error[] = {
     "quiet",
     "beep",
     "flash",
     (char *) 0
 };
+#endif
 
-#define fsm_choice(mode_name, choices) { mode_name, SIZEOF(choices)-1, choices }
+#if OPT_FILEBACK
+FSM_CHOICES fsm_backupstyle[] = {
+    "off",
+    ".bak",
+#if UNIX
+    "tilde",
+    /* "tilde_N_existing", */
+    /* "tilde_N", */
+#endif
+    (char *) 0
+};
+#endif
+
+#define fsm_choice(mode_name, choices) \
+	{ mode_name, TABLESIZE(choices)-1, choices }
 
 struct FSM fsm_tbl[] = {
+#if OPT_POPUPCHOICE
     fsm_choice("popup-choices", fsm_popup_choices),
+#endif
+#if NEVER
     fsm_choice("error", fsm_error),
+#endif
+#if OPT_FILEBACK
+    fsm_choice("backup-style", fsm_backupstyle),
+#endif
 };
 
 static int fsm_idx;
@@ -614,7 +641,7 @@ is_fsm(names)
 {
     if (names->type == VALTYPE_STRING) {
 	int i;
-	for (i = 0; i < SIZEOF(fsm_tbl); i++)
+	for (i = 0; i < TABLESIZE(fsm_tbl); i++)
 	    if (strcmp(fsm_tbl[i].mode_name, names->name) == 0) {
 		fsm_idx = i;
 		return TRUE;
@@ -657,6 +684,7 @@ fsm_complete(c, buf, pos)
                         (char *)&fsm_tbl[fsm_idx].choices[0],
 			sizeof (&fsm_tbl[fsm_idx].choices[0]) );
 }
+#endif	/* OPT_ENUM_MODES */
 
 /*
  * Lookup the mode named with 'cp[]' and adjust its value.
@@ -686,6 +714,13 @@ VALARGS *args;			/* symbol-table entry for the mode */
 	if (no && (names->type != VALTYPE_BOOL))
 		return FALSE;		/* this shouldn't happen */
 
+#if LCKFILES
+	/* Prevent that user changes lockmode or locker-name */
+	if ( ! strcmp(names->name,"locked") || ! strcmp(names->name,"locker") ) {
+		mlforce("[Cannot change \"%s\" ]",names->name);
+		return FALSE;
+	}
+#endif
 	/* prevent major-mode changes for scratch-buffers */
 	if ((global != TRUE)
 	 && (names->winflags & WFMODE)
@@ -709,8 +744,10 @@ VALARGS *args;			/* symbol-table entry for the mode */
 			cp,
 			regex ? "pattern" : "value");
 
+#if OPT_ENUM_MODES
 		if (is_fsm(names))
 			complete = fsm_complete;
+#endif
 
 		s = kbd_string(prompt, respbuf, sizeof(respbuf), eolchar,
 		               opts, complete);
@@ -727,9 +764,10 @@ VALARGS *args;			/* symbol-table entry for the mode */
 		 && !legal_glob_mode(rp))
 		 	return FALSE;
 #endif
+#if OPT_ENUM_MODES
 		 if (!legal_fsm(rp))
 		    return FALSE;
-		 
+#endif  
 	}
 #if OPT_HISTORY
 	else
@@ -958,11 +996,9 @@ int global;	/* true = global flag,	false = current buffer flag */
 #if	OPT_XTERM && !X11
 	int xterm_mouse = global_g_val(GMDXTERM_MOUSE);
 #endif
-	int was_working = 
 #if	OPT_WORKING
-		global_g_val(GMDWORKING) && 
+	int was_working = ShowWorking();
 #endif
-			!global_b_val(MDTERSE);
 
 	while (((s = do_a_mode(kind, global)) == TRUE) && (end_string() == ' '))
 		anything++;
@@ -984,13 +1020,12 @@ int global;	/* true = global flag,	false = current buffer flag */
 		set_global_g_val(GMDXTERM_MOUSE,!xterm_mouse);
 	}
 #endif
-	if (was_working != 
+
 #if OPT_WORKING
-		(global_g_val(GMDWORKING) && 
-#endif
-			!global_b_val(MDTERSE))) {
+	if (was_working != ShowWorking())
 		imworking(0);
-	}
+#endif
+
 	{
 	/* this seems pretty inefficient -- i shouldn't need the extra
 		statics -- i should be told what mode matched, as a return

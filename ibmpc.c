@@ -8,7 +8,7 @@
  * Modified by Pete Ruczynski (pjr) for auto-sensing and selection of
  * display type.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/ibmpc.c,v 1.58 1994/09/13 17:15:48 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/ibmpc.c,v 1.62 1994/10/30 16:26:37 pgf Exp $
  *
  */
 
@@ -266,7 +266,6 @@ extern	void	ibmscroll P((int,int,int));
 static	int	scinit    P((int));
 static	int	getboard  P((void));
 static	int	scblank   P((void));
-static	VIDEO * videoAlloc P(( VIDEO ** ));
 
 #ifdef MUCK_WITH_KBD_RATE
 static	void	maxkbdrate   P((void));
@@ -520,7 +519,7 @@ char *res;	/* resolution to change to */
 
 	/* try for a name match on all drivers, until we find it
 		and succeed or fall off the bottom */
-	for (i = 0; i < SIZEOF(drivers); i++) {
+	for (i = 0; i < TABLESIZE(drivers); i++) {
 		if (strcmp(res, drivers[i].name) == 0) {
 			if ((status = scinit(i)) == TRUE) {
 				break;
@@ -559,8 +558,8 @@ int	inverted;
 #if	COLOR
 	if (ColorDisplay())
 		attr = AttrColor(
-			inverted ? vp->v_rfcolor : vp->v_rbcolor,
-			inverted ? vp->v_rbcolor : vp->v_rfcolor);
+			inverted ? ReqFcolor(vp) : ReqBcolor(vp),
+			inverted ? ReqBcolor(vp) : ReqFcolor(vp));
 	else
 #endif
 	 attr = AttrMono(!inverted);
@@ -985,18 +984,12 @@ int bacg;	/* background color */
 		attrnorm = AttrMono(bacg<forg) << 8;
 		attrrev = AttrMono(forg<bacg) << 8;
 		}
-		if (outstr) {
-			for (i = 0; i < nchar; i++) {
-				*lnptr++ = (outstr[i+col] & 255) |
-					((attrstr[i+col] & VAREV) ?
-						attrrev : attrnorm);
-			}
-		} else {
-			for (i = 0; i < nchar; i++) {
-				*lnptr++ = (SPACE & 255) |
-					((attrstr[i+col] & VAREV) ?
-						attrrev : attrnorm);
-			}
+		for (i = 0; i < nchar; i++) {
+			*lnptr++ = ((outstr != 0)
+				? (outstr[i+col] & 0xff)
+				: SPACE) | ((attrstr[i+col] & (VAREV|VASEL))
+					? attrrev
+					: attrnorm);
 		}
 	} else {
 		register USHORT attr; /* attribute byte mask to place in RAM */
@@ -1008,14 +1001,10 @@ int bacg;	/* background color */
 #endif
 		attr = AttrMono(bacg<forg);
 		attr <<= 8;
-		if (outstr) {
-			for (i = 0; i < nchar; i++) {
-				*lnptr++ = (outstr[i+col] & 255) | attr;
-			}
-		} else {
-			for (i = 0; i < nchar; i++) {
-				*lnptr++ = (SPACE & 255) | attr;
-			}
+		for (i = 0; i < nchar; i++) {
+			*lnptr++ = ((outstr != 0)
+				? (outstr[i+col] & 0xff)
+				: SPACE) | attr;
 		}
 	}
 
@@ -1031,18 +1020,6 @@ int bacg;	/* background color */
 	}
 }
 
-static VIDEO *
-videoAlloc(vpp)
-VIDEO **vpp;
-{
-	if (*vpp == 0) {
-		*vpp = typeallocplus(VIDEO, term.t_mcol - 4);
-		if (*vpp == NULL)
-		ExitProgram(BADEXIT);
-	}
-	return *vpp;
-}
-
 /* reads back a line into a VIDEO struct, used in line-update computation */
 VIDEO *
 scread(vp, row)
@@ -1056,7 +1033,10 @@ int row;
 
 	if (vp == 0) {
 		static	VIDEO	*mine;
-		vp = videoAlloc(&mine);
+		if (video_alloc(&mine))
+			vp = mine;
+		else
+			ExitProgram(BADEXIT);
 	}
 	movmem(scptr[row], &sline[0], term.t_ncol*sizeof(short));
 	for (i = 0; i < term.t_ncol; i++)

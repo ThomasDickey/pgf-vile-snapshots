@@ -7,7 +7,7 @@
  * Most code probably by Dan Lawrence or Dave Conroy for MicroEMACS
  * Extensions for vile by Paul Fox
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/insert.c,v 1.60 1994/09/23 04:21:19 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/insert.c,v 1.63 1994/10/27 21:46:42 pgf Exp $
  *
  */
 
@@ -308,12 +308,12 @@ int f,n;
 
 	if (!f || !n)
 		n = 1;
-	if (n < 0 || c == abortc)
+	if (n < 0 || ABORTED(c))
 		s = FALSE;
 	else {
 		int	vi_fix = (!DOT_ARGUMENT || (dotcmdrep <= 1));
 
-		(void)ldelete((long)n, FALSE);
+		(void)ldelete((B_COUNT)n, FALSE);
 		if (c == quotec) {
 			t = s = quote(f,n);
 		} else {
@@ -361,7 +361,9 @@ int cur_count;
 int max_count;
 int *splice;
 {
+#if OPT_MOUSE || OPT_B_LIMITS
 	WINDOW	*wp0 = curwp;
+#endif
 	register int status;
 	int	c;		/* command character */
 	int backsp_limit;
@@ -499,15 +501,17 @@ int *splice;
 		/*
 		 * Decode the character
 		 */
-		if (c == abortc) {
+		if (ABORTED(c)) {
+#if OPT_MOUSE
 	leave:
+#endif
 			 /* an unfortunate Vi-ism that ensures one
 				can always type "ESC a" if you're not sure
 				you're in insert mode. */
 			if (DOT.o > w_left_margin(wp0))
 				backchar(TRUE,1);
 			if (autoindented >= 0) {
-				trimline(FALSE,0,0);
+				(void)trimline((void *)0,0,0);
 				autoindented = -1;
 			}
 			if (cur_count+1 == max_count)
@@ -618,7 +622,7 @@ int *backsp_limit_p;
 		} else if (isreturn(c)) {
 			execfunc = newline;
 			if (autoindented >= 0) {
-				trimline(FALSE,0,0);
+				(void)trimline((void *)0,0,0);
 				autoindented = -1;
 			}
 			*backsp_limit_p = w_left_margin(curwp);
@@ -954,7 +958,7 @@ int ind;
 	DOT.o = w_left_margin(curwp);
 	i = firstchar(l_ref(DOT.l));
 	if (i > 0)
-		(void)ldelete((long)i,FALSE);
+		(void)ldelete((B_COUNT)i,FALSE);
 
 	autoindented = 0;
 	/* if no indent was asked for, we're done */
@@ -1012,7 +1016,7 @@ int c;	/* brace/paren to insert (always '}' or ')' for now) */
 #endif
 
 	if (autoindented >= 0) {
-		trimline(NULL,0,0);
+		(void)trimline((void *)0,0,0);
 	} else {
 		return linsert(n,c);
 	}
@@ -1038,7 +1042,7 @@ inspound()	/* insert a # into the text here...we are in CMODE */
 
 	if (autoindented > 0) { /* must all be whitespace before us */
 		DOT.o = w_left_margin(curwp);
-		(void)ldelete((long)autoindented,FALSE);
+		(void)ldelete((B_COUNT)autoindented,FALSE);
 	}
 	autoindented = -1;
 

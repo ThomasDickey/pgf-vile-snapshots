@@ -1,7 +1,7 @@
 /*
  * debugging support -- tom dickey.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/trace.h,v 1.2 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/trace.h,v 1.3 1994/10/03 13:24:35 pgf Exp $
  *
  */
 #ifndef	_trace_h
@@ -30,8 +30,12 @@ extern	void	dofree P((char *));
 #define	free(p)		dofree(p)
 #endif	/* DOALLOC */
 
+#if !(defined(__GNUC__) || defined(__attribute__))
+#define __attribute__(p)
+#endif
+
 extern	void	fail_alloc P(( char *, char * ));
-extern	void	Trace P(( char *, ... ));
+extern	void	Trace P(( char *, ... )) __attribute__ ((format(printf,1,2)));
 extern	void	Elapsed P(( char * ));
 extern	void	WalkBack P(( void ));
 extern	void	show_alloc P(( void ));
@@ -40,5 +44,8 @@ extern	void	show_alloc P(( void ));
 extern	void	lp_dump P(( char *, LINE * ));
 extern	void	bp_dump P(( BUFFER * ));
 #endif
+
+#undef TRACE
+#define TRACE(p) Trace p;
 
 #endif	/* _trace_h */

@@ -15,7 +15,7 @@
  *
  *	modify (ifdef-style) 'expand_leaf()' to allow ellipsis.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/glob.c,v 1.22 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/glob.c,v 1.23 1994/10/03 13:24:35 pgf Exp $
  *
  */
 
@@ -51,7 +51,7 @@
  * Make the default unix globbing code use 'echo' rather than our internal
  * globber if we do not configure the 'glob' string-mode.
  */
-#if UNIX && defined(GVAL_GLOB)
+#if UNIX && defined(GVAL_GLOB) && !OPT_VMS_PATH
 # define UNIX_GLOBBING 1
 #endif
 
@@ -76,6 +76,22 @@
 # endif
 #endif
 
+/*
+ * Some things simply don't work on VMS: pipes and $variables
+ */
+#if OPT_VMS_PATH
+#
+# undef  UNIX_GLOBBING
+# define UNIX_GLOBBING 0
+#
+# undef  OPT_GLOB_ENVIRON
+# define OPT_GLOB_ENVIRON 0
+#
+# undef  OPT_GLOB_PIPE
+# define OPT_GLOB_PIPE 0
+#
+#endif
+
 /*--------------------------------------------------------------------------*/
 
 static	int	string_has_wildcards P((char *));
@@ -96,7 +112,7 @@ static int
 string_has_wildcards (item)
 char	*item;
 {
-#if VMS || UNIX || MSDOS || WIN31 || OS2 || NT
+#if OPT_VMS_PATH || UNIX || OPT_MSDOS_PATH
 	while (*item != EOS) {
 #if UNIX_GLOBBING
 		if (iswild(*item))
@@ -108,11 +124,11 @@ char	*item;
 		if (!strncmp(item, GLOB_ELLIPSIS, sizeof(GLOB_ELLIPSIS)-1))
 			return TRUE;
 #endif
-#if OPT_GLOB_RANGE && !VMS
+#if OPT_GLOB_RANGE && !OPT_VMS_PATH
 		if (*item == GLOB_RANGE[0])
 			return TRUE;
 #endif
-#if OPT_GLOB_ENVIRON && !VMS
+#if OPT_GLOB_ENVIRON && !OPT_VMS_PATH
 		if (*item == '$' && (isname(item[1]) || isdelim(item[1])))
 			return TRUE;
 #endif
@@ -318,7 +334,7 @@ char	*pattern;
 	if ((dp = opendir(path)) != 0) {
 		leaf[-1] = SLASHC;
 		while ((de = readdir(dp)) != 0) {
-#if MSDOS || WIN31 || OS2 || NT
+#if OPT_MSDOS_PATH
 			(void)mklower(strcpy(leaf, de->d_name));
 			if (strchr(pattern, '.') && !strchr(leaf, '.'))
 				(void)strcat(leaf, ".");
@@ -562,32 +578,27 @@ expand_pattern (item)
 char	*item;
 {
 	int	result;
-#if VMS
+#if OPT_VMS_PATH
 	DIR	*dp;
 	DIRENT	*de;
 
 	result = TRUE;
-	if (dp = opendir(item)) {
-		while (de = readdir(dp)) {
-#if USE_D_NAMLEN
+	if ((dp = opendir(item)) != 0) {
+		while ((de = readdir(dp)) != 0) {
 			char	temp[NFILEN];
-			int	len = de->d_namlen;
+			size_t	len = de->d_namlen;
 			strncpy(temp, de->d_name, len)[len] = EOS;
 			if (!record_a_match(temp)) {
 				result = FALSE;
 				break;
 			}
-#else
-			if (!record_a_match(strcpy(temp, de->d_name))) {
-				result = FALSE;
-				break;
-			}
-#endif
 		}
 		(void)closedir(dp);
 	} else
 		result = FALSE;
-#endif
+
+#else	/* UNIX or MSDOS, etc. */
+
 #if OPT_GLOB_PIPE
 # ifdef GVAL_GLOB
 	/*
@@ -618,7 +629,7 @@ char	*item;
 
 	(void)strcpy(pattern, item);
 	*builtup = EOS;
-#if MSDOS || WIN31 || OS2 || NT
+#if OPT_MSDOS_PATH
 	(void)mklower(pattern);
 #endif
 	expand_environ(pattern);
@@ -651,6 +662,7 @@ char	*item;
 		} while (DirFindNext(p));
 	}
 #endif				/* native MS-DOS globbing */
+#endif	/* OPT_VMS_PATH */
 	return result;		/* true iff no errors noticed */
 }
 

@@ -2,7 +2,7 @@
  * Window management. Some of the functions are internal, and some are
  * attached to keys that the user actually types.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/window.c,v 1.47 1994/09/05 19:30:21 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/window.c,v 1.50 1994/10/27 21:46:42 pgf Exp $
  *
  */
 
@@ -182,7 +182,7 @@ int f,n;
 	int s;
 
 	c = tgetc(FALSE);
-	if (c == abortc)
+	if (ABORTED(c))
 		return FALSE;
 
 	if (c == '+' || c == '\r' || c == 'H') {
@@ -714,8 +714,6 @@ int f,n;
         return (TRUE);
 }
 
-#if !SMALLER || OPT_EVAL
-
 /*	Resize the current window to the requested size	*/
 int
 resize(f, n)
@@ -736,7 +734,6 @@ int f, n;	/* default flag and numeric argument */
 
 	return(enlargewind(TRUE, n - clines));
 }
-#endif
 
 /*
  * Pick a window for a pop-up. Split the screen if there is only one window.
@@ -1009,7 +1006,7 @@ winit()
 {
         register WINDOW *wp;
 
-        wp = typealloc(WINDOW);			/* First window         */
+        wp = typecalloc(WINDOW);		/* First window         */
         if (wp==NULL)
 		ExitProgram(BADEXIT);
         wheadp = wp;

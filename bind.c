@@ -3,7 +3,7 @@
  *
  *	written 11-feb-86 by Daniel Lawrence
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/bind.c,v 1.87 1994/09/07 22:00:47 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/bind.c,v 1.90 1994/10/16 02:57:55 pgf Exp $
  *
  */
 
@@ -21,7 +21,7 @@ static char COMPLETIONS_NAME[] = ScratchName(Completions);
 /* dummy prefix binding functions */
 extern CMDFUNC f_cntl_af, f_cntl_xf, f_unarg, f_esc, f_speckey;
 
-#if REBIND
+#if OPT_REBIND
 #define	isSpecialCmd(k) \
 		( (k == &f_cntl_af)\
 		||(k == &f_cntl_xf)\
@@ -45,7 +45,7 @@ static	int	key_to_bind P(( CMDFUNC * ));
 static	void	reset_prefix P(( int, CMDFUNC * ));
 static	int	converted_len P(( char * ));
 static	char *	to_tabstop P(( char * ));
-#endif	/* REBIND */
+#endif	/* OPT_REBIND */
 
 static	int	is_shift_cmd P(( char *, int ));
 static	char *	skip_partial P(( char *, SIZE_T, char *, SIZE_T ));
@@ -58,6 +58,10 @@ static	void	scroll_completions P(( char *, SIZE_T, char *, SIZE_T ));
 static	int	fill_partial P(( char *, SIZE_T, char *, char *, SIZE_T ));
 static	int	cmd_complete P(( int, char *, int * ));
 static	int	eol_command  P(( char *, int, int, int ));
+
+#if OPT_REBIND
+static	KBIND	*KeyBindings = kbindtbl;
+#endif
 
 /*----------------------------------------------------------------------------*/
 
@@ -102,7 +106,7 @@ int f,n;
 	return swbuffer(bp);
 }
 
-#if REBIND
+#if OPT_REBIND
 
 #if OPT_TERMCHRS
 
@@ -416,19 +420,16 @@ CMDFUNC **oldfunc;
 	if (!isspecial(c)) {
 		asciitbl[c] = kcmd;
 	} else {
-		kbp = kcode2kbind(c);
-		if (kbp->k_cmd) { /* found it, change it in place */
+		if ((kbp = kcode2kbind(c)) != 0) { /* change it in place */
 			kbp->k_cmd = kcmd;
 		} else {
-			if (kbp >= &kbindtbl[NBINDS-1]) {
-				mlforce("[Prefixed binding table full]");
-				return(FALSE);
+			if ((kbp = typealloc(KBIND)) == 0) {
+				return no_memory("Key-Binding");
 			}
+			kbp->k_link = KeyBindings;
 			kbp->k_code = c;	/* add keycode */
-			kbp->k_cmd = kcmd;	/* and func pointer */
-			++kbp;		/* and make sure the next is null */
-			kbp->k_code = 0;
-			kbp->k_cmd = NULL;
+			kbp->k_cmd  = kcmd;	/* and func pointer */
+			KeyBindings = kbp;
 		}
 	}
 	update_scratch(BINDINGS_NAME, update_binding_list);
@@ -488,10 +489,7 @@ int c;		/* command key to unbind */
 		asciitbl[c] = NULL;
 	} else {
 		/* search the table to see if the key exists */
-		kbp = kcode2kbind(c);
-
-		/* if it isn't bound, bitch */
-		if (kbp->k_cmd == NULL)
+		if ((kbp = kcode2kbind(c)) == 0)
 			return(FALSE);
 
 		/* save the pointer and scan to the end of the table */
@@ -718,7 +716,7 @@ char *sub;	/* substring to look for */
 }
 #endif
 
-#endif /* REBIND */
+#endif /* OPT_REBIND */
 
 
 /* execute the startup file */
@@ -937,9 +935,17 @@ register int code;
 {
 	register KBIND	*kbp;	/* pointer into a binding table */
 
-	for (kbp = kbindtbl; kbp->k_cmd && kbp->k_code != code; kbp++)
-		;
-	return kbp;
+#if OPT_REBIND
+	for (kbp = KeyBindings; kbp != kbindtbl; kbp = kbp->k_link) {
+		if (kbp->k_code == code)
+			return kbp;
+	}
+#endif
+	for (kbp = kbindtbl; kbp->k_cmd; kbp++) {
+		if (kbp->k_code == code)
+			return kbp;
+	}
+	return 0;
 }
 
 /* kcod2fnc:  translate a 10-bit keycode to a function pointer */
@@ -948,11 +954,11 @@ CMDFUNC *
 kcod2fnc(c)
 int c;	/* key to find what is bound to it */
 {
-	if (!isspecial(c)) {
-		return asciitbl[c];
-	} else {
-		return kcode2kbind(c)->k_cmd;
+	if (isspecial(c)) {
+		register KBIND *kp = kcode2kbind(c);
+		return (kp != 0) ? kp->k_cmd : 0;
 	}
+	return asciitbl[c];
 }
 
 /* fnc2kcod: translate a function pointer to a keycode */
@@ -977,6 +983,7 @@ CMDFUNC *f;
 
 /* fnc2pstr: translate a function pointer to a pascal-string that a user
 	could enter.  returns a pointer to a static array */
+#if X11
 char *
 fnc2pstr(f)
 CMDFUNC *f;
@@ -991,6 +998,8 @@ CMDFUNC *f;
 
 	return kcod2pstr(c, seq);
 }
+#endif
+
 /* fnc2engl: translate a function pointer to the english name for
 		that function
 */
@@ -1301,15 +1310,22 @@ struct compl_rec {
     SIZE_T size_entry;
 };
 
+#ifdef lint
+#define c2ComplRec(c) ((struct compl_rec *)0)
+#else
+#define c2ComplRec(c) ((struct compl_rec *)c)
+#endif
+
+/*ARGSUSED*/
 static void
 makecmpllist(dummy, cinfo)
     int dummy;
     char *cinfo;
 {
-    char * buf		= ((struct compl_rec *)cinfo)->buf;
-    SIZE_T len		= ((struct compl_rec *)cinfo)->len;
-    char * first	= ((struct compl_rec *)cinfo)->table;
-    SIZE_T size_entry	= ((struct compl_rec *)cinfo)->size_entry;
+    char * buf		= c2ComplRec(cinfo)->buf;
+    SIZE_T len		= c2ComplRec(cinfo)->len;
+    char * first	= c2ComplRec(cinfo)->table;
+    SIZE_T size_entry	= c2ComplRec(cinfo)->size_entry;
     register char *last = skip_partial(buf, len, first, size_entry);
     register char *p;
     SIZE_T maxlen;
@@ -1328,15 +1344,10 @@ makecmpllist(dummy, cinfo)
 	    maxlen = l;
     }
 
-    for (slashcol = len; slashcol > 0; slashcol--)
-	if (is_slashc(buf[slashcol]))
-	    break;
-
-    if (is_slashc(buf[slashcol])) {
+    slashcol = (int)(pathleaf(buf) - buf);
+    if (slashcol != 0) {
 	char b[NLINE];
-	slashcol++;		/* now slashcol is one past the slash */
-	strncpy(b, buf, (SIZE_T)slashcol);
-	b[slashcol] = 0;
+	strncpy(b, buf, (SIZE_T)slashcol)[slashcol] = EOS;
 	bprintf("Completions prefixed by %s:\n", b);
     }
 
@@ -1345,7 +1356,7 @@ makecmpllist(dummy, cinfo)
     if (cmplcols == 0)
 	cmplcols = 1;
 
-    nentries = (last - first) / size_entry;
+    nentries = (int)(last - first) / size_entry;
     cmplrows = nentries / cmplcols;
     cmpllen  = term.t_ncol / cmplcols;
     if (cmplrows * cmplcols < nentries)
@@ -1381,17 +1392,14 @@ SIZE_T	size_entry;
 {
     struct compl_rec cinfo;
     BUFFER *bp;
-    L_NUM prior_nlines = 0;
     int alreadypopped = 0;
 
     /*
-     * Find out if completions buffer exists and how many lines its window
-     * has prior to popping it up.
+     * Find out if completions buffer exists; so we can take the time to
+     * shrink/grow the window to the latest size.
      */
     if ((bp = find_b_name(COMPLETIONS_NAME)) != NULL) {
 	alreadypopped = (bp->b_nwnd != 0);
-	if (alreadypopped)
-	    prior_nlines = bp2any_wp(bp)->w_ntrows;
     }
 
     cinfo.buf = buf;
@@ -1400,7 +1408,7 @@ SIZE_T	size_entry;
     cinfo.size_entry = size_entry;
     liststuff(COMPLETIONS_NAME, makecmpllist, 0, (char *) &cinfo);
 
-    if (alreadypopped && line_count(bp) > prior_nlines)
+    if (alreadypopped)
 	shrinkwrap();
 
     update(TRUE);
@@ -1468,7 +1476,11 @@ SIZE_T	size_entry;
 				buf[n] = EOS;
 				if (n == pos
 #if OPT_POPUPCHOICE
+# if OPT_ENUM_MODES
 				 && !global_g_val(GVAL_POPUP_CHOICES)
+# else
+				 && !global_g_val(GMDPOPUP_CHOICES)
+# endif
 #endif
 				)
 					kbd_alarm();
@@ -1544,7 +1556,11 @@ SIZE_T	size_entry;
 	register char *nbp;	/* first ptr to entry in name binding table */
 	int status = FALSE;
 #if OPT_POPUPCHOICE
+# if OPT_ENUM_MODES
 	int gvalpopup_choices = *global_g_val_ptr(GVAL_POPUP_CHOICES);
+# else
+	int gvalpopup_choices = global_g_val(GMDPOPUP_CHOICES);
+# endif
 #endif
 
 	kbd_init();		/* nothing to erase */
@@ -1593,16 +1609,7 @@ SIZE_T	size_entry;
 					size_entry);
 			}
 #if OPT_POPUPCHOICE
-#if 0
-			if (!clexec && gvalpopup_choices 
-			 && c == NAMEC && *pos == cpos) {
-				show_completions(buf, cpos, nbp, size_entry);
-				cmplcol = -ttcol;
-			}
-			else
-				cmplcol = 0;
-#endif
-
+# if OPT_ENUM_MODES
 			if (!clexec && gvalpopup_choices != 'o' && c == NAMEC && *pos == cpos) {
 				if (gvalpopup_choices == 'i' || cmplcol == ttcol) {
 					show_completions(buf, cpos, nbp, size_entry);
@@ -1613,6 +1620,15 @@ SIZE_T	size_entry;
 			}
 			else
 				cmplcol = 0;
+# else
+			if (!clexec && gvalpopup_choices 
+			 && c == NAMEC && *pos == cpos) {
+				show_completions(buf, cpos, nbp, size_entry);
+				cmplcol = -ttcol;
+			}
+			else
+				cmplcol = 0;
+# endif
 #endif
 			return status;
 		}

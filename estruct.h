@@ -9,7 +9,7 @@
 */
 
 /*
- * $Header: /usr/build/VCS/pgf-vile/RCS/estruct.h,v 1.194 1994/09/23 04:21:19 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/estruct.h,v 1.206 1994/10/31 03:49:26 pgf Exp $
  */
 
 #ifdef HAVE_CONFIG_H
@@ -116,6 +116,10 @@
 # define HAVE_MKDIR	1	/* if your system has the mkdir() system call */
 #endif
 
+#ifndef HAVE_UTIME
+# define HAVE_UTIME	1	/* if your system has the utime() system call */
+#endif
+
 #ifndef HAVE_SETJMP_H
 # define HAVE_SETJMP_H  1	/* if your system has <setjmp.h> */
 #endif
@@ -165,8 +169,10 @@
 # define SUNOS 1	/* FIXME: need to tweak lint ifdefs */
 #endif
 
+/* Linux runs on other hardware than pc's? */
 
 #define IBM_KBD 	(MSDOS || OS2 || NT)
+#define IBM_VIDEO 	(MSDOS || OS2 || NT || defined(linux))
 #define CRLF_LINES 	(MSDOS || OS2 || NT)
 
 
@@ -344,7 +350,7 @@
 /* NOTE -- COLOR doesn't currently do anything if you're using X or TERMCAP */
 /* (But I think X11 may honor colors from the command line or .Xdefaults) */
 /* (and DOS definitely does do things with COLOR, but it may not work) */
-#define	COLOR	(ANSI|MSDOS|OS2|X11|NT)	/* color commands and windows			*/
+#define	COLOR	(ANSI|IBM_VIDEO|X11)	/* color commands and windows	*/
 
 /* Feature turnon/turnoff */
 #define ANSI_SPEC	1 /* ANSI function/arrow keys */
@@ -352,9 +358,9 @@
 			/* use DOSFILES, for instance, if you edit DOS- */
 			/*	created files under UNIX		*/
 #define	CFENCE	1	/* do fence matching in CMODE			*/
-#define	REBIND	1	/* permit rebinding of keys at run-time		*/
-#define	APROP	1	/* Add code for Apropos command	(needs REBIND)	*/
+#define	APROP	1	/* Add code for Apropos command	(needs OPT_REBIND) */
 #define	FILOCK	0	/* file locking under unix BSD 4.2 (uses scanf) */
+#define	LCKFILES 0	/* create lock files (file.lck style) 		*/
 #define	ISRCH	1	/* Incremental searches like ITS EMACS		*/
 #define	FLABEL	0	/* function key label code [HP150]		*/
 #define	CRYPT	0	/* file encryption (not crypt(1) compatible!)	*/
@@ -390,15 +396,25 @@
 /* scrollbars */
 #define OPT_SCROLLBARS XTOOLKIT
 
+/* vms pathnames (testing/porting) */
+#define OPT_VMS_PATH    (VMS)			/* vax/vms pathname parsing */
+
+/* systems with MSDOS-like filename syntax */
+#define OPT_MSDOS_PATH  (MSDOS || WIN31 || OS2 || NT)
+
 /* individual features that are (normally) controlled by SMALLER */
 #define OPT_B_LIMITS    !SMALLER		/* left-margin */
-#define OPT_POPUPCHOICE !SMALLER		/* popup-choices mode */
-#define OPT_POPUP_MSGS  !SMALLER		/* popup-msgs mode */
+#define OPT_ENUM_MODES  !SMALLER		/* fixed-string modes */
 #define OPT_EVAL        !SMALLER		/* expression-evaluation */
 #define OPT_FLASH       !SMALLER || IBMPC	/* visible-bell */
 #define OPT_HISTORY     !SMALLER		/* command-history */
 #define OPT_LINEWRAP    !SMALLER		/* line-wrap mode */
+#define OPT_MLFORMAT    !SMALLER		/* modeline-format */
 #define OPT_MS_MOUSE    !SMALLER && IBMPC && TURBO 	/* MsDos-mouse */
+#define OPT_POPUPCHOICE !SMALLER		/* popup-choices mode */
+#define OPT_POPUP_MSGS  !SMALLER		/* popup-msgs mode */
+#define OPT_REBIND	!SMALLER		/* permit rebinding of keys at run-time	*/
+#define OPT_FILEBACK	!SMALLER && !VMS	/* file backup style */
 #define OPT_TERMCHRS    !SMALLER		/* set/show-terminal */
 #define OPT_UPBUFF      !SMALLER		/* animated buffer-update */
 #define OPT_WIDE_CTYPES !SMALLER		/* extra char-types tests */
@@ -463,7 +479,6 @@
 
 /*	Debugging options	*/
 #define	RAMSIZE		0	/* dynamic RAM memory usage tracking */
-#define	DEBUG		0	/* allows core dump from keyboard under UNIX */
 #define DEBUGM		0	/* $debug triggers macro debugging	*/
 #define	VISMAC		0	/* update display during keyboard macros*/
 #define	VMALLOC		0	/* verify malloc operation (slow!) */
@@ -471,6 +486,7 @@
 #define	DBMALLOC	0 	/* the dbmalloc package */
 #endif
 
+#define OPT_TRACE	0	/* turn on debug/trace (link with trace.o) */
 
 /* That's the end of the user selections -- the rest is static definition */
 /* (i.e. you shouldn't need to touch anything below here */
@@ -483,7 +499,9 @@
 #if UNIX
 extern	int	errno;	/* some systems don't define this in <errno.h> */
 extern	int	sys_nerr;
+# ifndef HAVE_EXTERN_SYS_ERRLIST
 extern	char *	sys_errlist[];
+# endif
 #endif
 #define	set_errno(code)	errno = code
 
@@ -616,7 +634,7 @@ extern char *rindex P((const char *, int));
 #endif
 
 
-#if MSDOS || WIN31 || OS2 || NT
+#if OPT_MSDOS_PATH
 # define SLASHC '\\'
 # define is_slashc(c) (c == '\\' || c == '/')
 #endif
@@ -655,6 +673,12 @@ extern char *rindex P((const char *, int));
 # define endofDisplay
 #endif
 
+#if OPT_WORKING
+#define ShowWorking() (!global_b_val(MDTERSE) && global_g_val(GMDWORKING))
+#else
+#define ShowWorking() (!global_b_val(MDTERSE))
+#endif
+
 	/* how to signal this process group */
 #if HAVE_KILLPG
 # define signal_pg(sig) killpg(getpgrp(0), sig)
@@ -690,7 +714,6 @@ extern char *rindex P((const char *, int));
 #define	BITS_PER_INT	32
 #endif
 
-#define	NBINDS	100			/* max # of bound prefixed keys	*/
 #define NFILEN	256			/* # of bytes, file name	*/
 #define NBUFN	20			/* # of bytes, buffer name	*/
 #define NLINE	256			/* # of bytes, input line	*/
@@ -867,7 +890,7 @@ typedef enum {
 #define	PATHCHR	','
 #endif
 
-#if MSDOS || WIN31 || OS2 || NT
+#if OPT_MSDOS_PATH
 #define	PATHCHR	';'
 #endif
 
@@ -987,6 +1010,8 @@ typedef short CHARTYPE;
 
 #define ESC	tocntrl('[')
 #define BEL	tocntrl('G')	/* ascii bell character		*/
+
+#define ABORTED(c) ((c) == abortc || (c) == intrc || interrupted())
 
 /*
  * Definitions etc. for regexp(3) routines.
@@ -1303,13 +1328,13 @@ typedef unsigned char VIDEO_ATTR;
 		return FALSE; \
  \
 	if (ptr) { \
-		memcpy(tmpp, ptr, tmpold * sizeof(type)); \
+		memcpy((char *)tmpp, (char *)ptr, tmpold * sizeof(type)); \
 		free((char *)ptr); \
 	} else { \
 		tmpold = 0; \
 	} \
 	ptr = tmpp; \
-	memset (ptr+tmpold, 0, (newsize - tmpold) * sizeof(type)); \
+	(void) memset ((char *)(ptr+tmpold), 0, (newsize - tmpold) * sizeof(type)); \
 }
 
 /*
@@ -1796,6 +1821,21 @@ typedef struct  VIDEO {
         char    v_text[4];              /* Screen data. */
 }       VIDEO;
 
+#define VideoText(vp) (vp)->v_text
+#define VideoAttr(vp) (vp)->v_attrs
+
+#if COLOR
+#define CurFcolor(vp) (vp)->v_fcolor
+#define CurBcolor(vp) (vp)->v_bcolor
+#define ReqFcolor(vp) (vp)->v_rfcolor
+#define ReqBcolor(vp) (vp)->v_rbcolor
+#else
+#define CurFcolor(vp) gfcolor
+#define CurBcolor(vp) gbcolor
+#define ReqFcolor(vp) gfcolor
+#define ReqBcolor(vp) gbcolor
+#endif
+
 #define VFCHG   0x0001                  /* Changed flag			*/
 #define	VFEXT	0x0002			/* extended (beyond column 80)	*/
 #define	VFREV	0x0004			/* reverse video status		*/
@@ -1858,19 +1898,22 @@ typedef struct {
 }	NTAB;
 
 /* when a command is referenced by bound key (like h,j,k,l, or "dd"), it
- *	is looked up one of two ways:  single character 7-bit ascii commands
- *	(by far the majority) are simply indexed into a 128 element array of
- *	CMDFUNC pointers.  Other commands (those with ^A, ^X, or SPEC
- *	prefixes) are searched for in a binding table, made up of KBIND
- *	structures.  This structure contains the command code, and again, a
- *	pointer to the CMDFUNC structure for the command 
+ *	is looked up one of two ways: single character 7-bit ascii commands (by
+ *	far the majority) are simply indexed into an array of CMDFUNC pointers. 
+ *	Other commands (those with ^A, ^X, or SPEC prefixes) are searched for
+ *	in a binding table, made up of KBIND structures.  This structure
+ *	contains the command code, and again, a pointer to the CMDFUNC
+ *	structure for the command
  *
  *	The asciitbl array, and the kbindtbl array are generated automatically
  *	from the cmdtbl file, and can be found in the file nebind.h
  */
-typedef struct {
+typedef struct  k_bind {
 	short	k_code; 		/* Key code			*/
 	CMDFUNC	*k_cmd;
+#if OPT_REBIND
+	struct  k_bind *k_link;
+#endif
 }	KBIND;
 
 
@@ -1918,6 +1961,9 @@ typedef struct {
 #define NAMEDF  (FILE1 | NODFL)	/* 1 file allowed, defaults to "" */
 #define NAMEDFS (FILES | NODFL)	/* multiple files allowed, default is "" */
 #define RANGE   (FROM  | TO)	/* range of linespecs allowed */
+
+#define SPECIAL_BANG_ARG -42	/* arg passed as 'n' to functions which
+ 					were invoked by their "xxx!" name */
 
 /* definitions for 'mlreply_file()' and other filename-completion */
 #define	FILEC_REREAD   4
@@ -2065,7 +2111,7 @@ extern char *getcwd P(( char *, int ));
 #endif
 
 /* array/table size */
-#define	SIZEOF(v)	(sizeof(v)/sizeof(v[0]))
+#define	TABLESIZE(v)	(sizeof(v)/sizeof(v[0]))
 
 #ifndef	offsetof	/* <stddef.h> */
 #define	offsetof(type, member)	((size_t)&(((type*)0)->member))
@@ -2075,6 +2121,7 @@ extern char *getcwd P(( char *, int ));
 #ifdef	lint
 #define	castalloc(cast,nbytes)		((cast *)0)
 #define	castrealloc(cast,ptr,nbytes)	((ptr)+(nbytes))
+#define	typecalloc(cast)		((cast *)0)
 #define	typealloc(cast)			((cast *)0)
 #define	typeallocn(cast,ntypes)		(((cast *)0)+(ntypes))
 #define	typereallocn(cast,ptr,ntypes)	((ptr)+(ntypes))
@@ -2082,6 +2129,7 @@ extern char *getcwd P(( char *, int ));
 #else
 #define	castalloc(cast,nbytes)		(cast *)malloc(nbytes)
 #define	castrealloc(cast,ptr,nbytes)	(cast *)realloc((char *)(ptr),(nbytes))
+#define	typecalloc(cast)		(cast *)calloc(sizeof(cast),1)
 #define	typealloc(cast)			(cast *)malloc(sizeof(cast))
 #define	typeallocn(cast,ntypes)		(cast *)malloc((ntypes)*sizeof(cast))
 #define	typereallocn(cast,ptr,ntypes)	(cast *)realloc((char *)(ptr),\
@@ -2108,6 +2156,10 @@ extern char *getcwd P(( char *, int ));
 # endif
 #endif
 
+#if HAVE_UTIME
+# include <utime.h>
+#endif
+
 
 /*
  * Local prototypes
@@ -2129,6 +2181,8 @@ extern char *getcwd P(( char *, int ));
 #define	NO_LEAKS	0
 #endif
 
+#undef TRACE
+
 #if	DBMALLOC
 #undef strchr
 #undef strrchr
@@ -2139,10 +2193,15 @@ extern char *getcwd P(( char *, int ));
 #undef free
 #include "malloc.h"
 #else
-#if	NO_LEAKS || DOALLOC
+#if	NO_LEAKS || DOALLOC || OPT_TRACE
 #include "trace.h"
 #endif
 #endif	/* DBMALLOC */
+
+/* Normally defined in "trace.h" */
+#ifndef TRACE
+#define TRACE(p) /* nothing */
+#endif
 
 /*	Dynamic RAM tracking and reporting redefinitions	*/
 #if	RAMSIZE
@@ -2170,4 +2229,9 @@ extern	void vdump P(( char * ));
 # define vverify(s) rvverify(s,__FILE__,__LINE__)
 #else
 # define vverify(s) ;
+#endif
+
+/* for debugging VMS pathnames on UNIX... */
+#if UNIX && OPT_VMS_PATH
+#include "fakevms.h"
 #endif

@@ -50,8 +50,8 @@
 #	UNDO means the undo stacks should be cleared, in preparation for
 #		an undoable command.
 #	OPER means the command is an "operator", that is, it acts on a region
-#		demarcated by the current cursor position and the cursor position
-#		following a subsequent motion command.
+#		demarcated by the current cursor position and the cursor 
+#		position following a subsequent motion command.
 #	MOTION means this command moves dot, and specifically is compatible
 #		with the operator commands.
 #	FL only occurs with MOTION, means that if the motion is an argument
@@ -69,11 +69,24 @@
 #
 #	The flags given in parentheses are "ex" flags, related to what
 #		kind of line-range arguments the command can take.  Not all are
-#		currently used or implemented, but they were defined in the command
-#		table for the Steve Kirkendall's elvis editor, so I included them
-#		here for completeness.
+#		currently used or implemented, but they were defined in the
+#		command table for the Steve Kirkendall's elvis editor, so I
+#		included them here for completeness.
+#	BANG says the command (in real vi) can take a trailing ! character,
+#		and will behave differently.  In vile, most such commands
+#		have separate entries, e.g. quit and quithard and separate
+#		functions which are executed.  in some cases this is very
+#		impractical, as is the case with w and w!  -- so, if a command
+#		is entered ending with a '!' (it must be in this table by
+#		that name) _and_ the BANG flag is set for that command, then
+#		the function will be invoked with "special" values for f and
+#		n (i.e. values unlikely to be typed) so the function can
+#		distinguish the two cases.
+#		If the BANG flag appears, and there is no command-name ending
+#		in '!' listed, then the flag does nothing, and should be
+#		viewed simply as documentation.
 #
-# $Header: /usr/build/VCS/pgf-vile/RCS/cmdtbl,v 1.98 1994/09/23 04:21:19 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/cmdtbl,v 1.102 1994/10/27 14:26:35 pgf Exp $
 #
 #
 
@@ -86,7 +99,7 @@ append		REDO|UNDO
 appendeol	REDO|UNDO
 	"append-chars-at-eol"			!FEWNAMES
 	'A'
-apro		NONE			APROP&&REBIND
+apro		NONE			APROP&&OPT_REBIND
 	"apropos"
 	"list-commands-apropos-to"
 backchar	MOTION
@@ -125,6 +138,7 @@ backpage	MOTION
 	"previous-page"			!FEWNAMES
 	"back-page"			!FEWNAMES
 	'^B'
+	'FN-p'				defined(linux)
 	'FN-\111'			IBM_KBD
 backword	MOTION
 	"previous-word"			!FEWNAMES
@@ -144,7 +158,7 @@ bcsrch		MOTION
 bcsrch_to	MOTION
 	"backward-char-scan-to"		!FEWNAMES
 	'T'
-bindkey		NONE			REBIND
+bindkey		NONE			OPT_REBIND
 	"bind-key"
 	"rebind-key"
 bktoshell	NONE
@@ -312,10 +326,10 @@ dellocmode	NONE|(EXRCOK|EXTRA)
 deltoeol	REDO|UNDO
 	"delete-to-eol"		!FEWNAMES
 	'D'
-desbind		NONE			REBIND
+desbind		NONE			OPT_REBIND
 	"describe-bindings"
 	"list-bindings"
-deskey		NONE			REBIND
+deskey		NONE			OPT_REBIND
 	"describe-key"
 dotcmdplay	UNDO
 	"repeat-last-cmd"		!FEWNAMES
@@ -353,20 +367,20 @@ filefind	NONE|(BANG|FILE1|PLUS)
 	"edit-file"			!FEWNAMES
 	"find-file"			!FEWNAMES
 	'^X-e'
+fileread	NONE
+	"e!"
+	"replace-with-file"		!FEWNAMES
 filename	NONE|(NAMEDF)
 	"change-file-name"		!FEWNAMES
 	"f"
 	"file"
 	"filename"
-fileread	NONE
-	"e!"
-	"replace-with-file"		!FEWNAMES
-filesave	NONE			!SMALLER
+filesave	NONE|BANG		!SMALLER
 	"save-file"
-filewrite	NONE
-#	"w"
-#	"W"
+	"save-file!"
+filewrite	NONE|BANG
 	"write-file"			!FEWNAMES
+	"write-file!"			!FEWNAMES
 filter		REDO|UNDO
 	"|"
 	"filter-buffer"			!FEWNAMES
@@ -393,6 +407,7 @@ fnclabel	NONE			FLABEL
 forwdelchar	REDO|UNDO
 	"delete-next-character"		!FEWNAMES
 	'x'
+	'FN-d'				defined(linux)
 	'FN-\123'			IBM_KBD
 forwhpage	MOTION
 	"forward-half-page"		!FEWNAMES
@@ -414,6 +429,7 @@ forwpage	MOTION
 	"next-page"			!FEWNAMES
 	"down-page"			!FEWNAMES
 	'^F'
+	'FN-n'				defined(linux)
 	'FN-\121'			IBM_KBD
 forwline	GOAL|MOTION|FL
 	"forward-line"			!FEWNAMES
@@ -494,11 +510,13 @@ gotobol		MOTION
 	"goto-bol"			!FEWNAMES
 	"beginning-of-line"		!FEWNAMES
 	"bol"				!FEWNAMES
+	'FN-h'				defined(linux)
 	'0'
 gotoeol		MOTION|GOAL
 	"goto-eol"			!FEWNAMES
 	"end-of-line"			!FEWNAMES
 	"eol"				!FEWNAMES
+	'FN-H'				defined(linux)
 	'$'
 gotobos		ABSM|MOTION|FL
 	"goto-beginning-of-screen"	!FEWNAMES
@@ -568,6 +586,7 @@ histbuff	NONE
 	"_"
 insert		REDO|UNDO
 	"insert-chars"			!FEWNAMES
+	'FN-i'				defined(linux)
 	'i'
 insert_no_aindent	REDO|UNDO
 	"insert-chars-no-autoindent"	!FEWNAMES
@@ -628,11 +647,11 @@ showkreg	NONE			OPT_SHOW_REGS
 	"show-registers"
 	"showregisters"			!FEWNAMES
 	"list-registers"		!FEWNAMES
-map		NONE|(EXRCOK|BANG|EXTRA)
+map		NONE|(EXRCOK|EXTRA)
 	"map"
-map_bang		NONE|(EXRCOK|BANG|EXTRA)
+map_bang	NONE|(EXRCOK|EXTRA)
 	"map!"
-map_set		NONE|(EXRCOK|BANG|EXTRA) NEW_VI_MAP
+map_set		NONE|(EXRCOK|EXTRA) NEW_VI_MAP
 	"MAP"
 cntl_af		NONE
 	"cntl_a-prefix"
@@ -657,6 +676,7 @@ mvleftwind	GOAL
 	'^X-^L'
 nextbuffer	NONE|(BANG|NAMEDFS)
 	"n"
+	"n!"
 	"next-buffer"			!FEWNAMES
 namebuffer	NONE
 	"rename-buffer"
@@ -696,21 +716,24 @@ opendown_no_aindent	REDO|UNDO|(FROM|ZERO)
 operopenrect	REDO|UNDO|GLOBOK|UNDO|(RANGE)
 	"open-rectangle"
 	'^A-r'
-operattrbold	OPER			OPT_SELECTIONS
+operattrbold	OPER|GLOBOK|RANGE	OPT_SELECTIONS
 	"attribute-bold-til"		!FEWNAMES
 	'^A-B'
-operattrcaseq	OPER			OPT_SELECTIONS
+operattrcaseq	REDO|UNDO|OPER|GLOBOK|RANGE	OPT_SELECTIONS
 	"attribute-cntl_a-sequences-til"	!FEWNAMES
 	'^A-A'
-operattrital	OPER			OPT_SELECTIONS
+operattrital	OPER|GLOBOK|RANGE	OPT_SELECTIONS
 	"attribute-italic-til"		!FEWNAMES
 	'^A-I'
-operattrul	OPER			OPT_SELECTIONS
+operattrno	OPER|GLOBOK|RANGE	OPT_SELECTIONS
+	"attribute-normal-til"		!FEWNAMES
+	'^A-N'
+operattrul	OPER|GLOBOK|RANGE	OPT_SELECTIONS
 	"attribute-underline-til"	!FEWNAMES
 	'^A-U'
 operchg		OPER|REDO|UNDO
 	"change-til"			!FEWNAMES
-	"delete-and-insert-chars-til"			!FEWNAMES
+	"delete-and-insert-chars-til"	!FEWNAMES
 	'c'
 operdetab	OPER|REDO|UNDO|GLOBOK|(RANGE)	AEDIT
 	"detab-lines-til"		!FEWNAMES
@@ -723,7 +746,7 @@ opermove	OPER|(RANGE|EXTRA)
 	"m"
 operlinechg	OPER|REDO|UNDO|(RANGE)
 	"change-lines-til"		!FEWNAMES
-	"delete-lines-and-insert-chars-til"		!FEWNAMES
+	"delete-lines-and-insert-chars-til"	!FEWNAMES
 	"ch"
 	'^X-c'
 operdel		OPER|REDO|UNDO
@@ -765,7 +788,7 @@ operlist	OPER|GLOBOK|(RANGE)		GLOBALS
 operprint	OPER|GLOBOK|(RANGE)		GLOBALS
 	"print-lines-til"		!FEWNAMES
 	"p"
-operselect	OPER			OPT_SELECTIONS
+operselect	OPER|GLOBOK|(RANGE)	OPT_SELECTIONS
 	"select-til"			!FEWNAMES
 	'^A-s'
 operupper	OPER|REDO|UNDO|GLOBOK|(RANGE)
@@ -906,9 +929,9 @@ settab		NONE
 	"handle-tab"			!FEWNAMES
 	"set-tab"
 	'^X-t'
-set_termchrs	NONE			REBIND&&OPT_TERMCHRS
+set_termchrs	NONE			OPT_REBIND&&OPT_TERMCHRS
 	"set-terminal"
-show_termchrs	NONE			REBIND&&OPT_TERMCHRS
+show_termchrs	NONE			OPT_REBIND&&OPT_TERMCHRS
 	"show-terminal"
 spawncli	NONE
 	"sh"
@@ -925,6 +948,12 @@ scrnextdw	NONE
 setfillcol	NONE
 	"set-fill-column"
 	'^X-f'
+multimotion		MOTION
+	"multi-motion"			!FEWNAMES
+	'q'
+multimotionrectangle		MOTION
+	"multi-rectangular-motion"	!FEWNAMES
+	'^A-q'
 ue_setkey	NONE			CRYPT
 	"set-crypt-key"
 	'^X-X'
@@ -998,7 +1027,7 @@ togglelistbuffers	NONE
 	'*'
 twiddle		REDO|UNDO		!SMALLER
 	"transpose-characters"		!FEWNAMES
-unbindkey	NONE			REBIND
+unbindkey	NONE			OPT_REBIND
 	"unbind-key"
 undo		NONE
 	"undo-change"			!FEWNAMES
@@ -1018,7 +1047,7 @@ unmark		NONE
 	"unmark-buffer"
 unmap		NONE|(EXRCOK|BANG|EXTRA)
 	"unmap"
-unmap_bang	NONE|(EXRCOK|BANG|EXTRA)
+unmap_bang	NONE|(EXRCOK|EXTRA)
 	"unmap!"
 untagpop	NONE			TAGS
 	"pop"

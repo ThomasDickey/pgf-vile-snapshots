@@ -3,7 +3,7 @@
  * characters, and write characters in a barely buffered fashion on the display.
  * All operating systems.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/termio.c,v 1.108 1994/09/23 04:21:19 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/termio.c,v 1.109 1994/10/13 13:03:25 pgf Exp $
  *
  */
 #include	"estruct.h"
@@ -174,7 +174,11 @@ ttopen()
 	 * case-conversion, and allow BREAK
 	 */
 	ntermios.c_iflag = BRKINT | (otermios.c_iflag & 
-				~(INLCR|IGNCR|ICRNL|IUCLC));
+				~(INLCR | IGNCR | ICRNL
+#ifdef IUCLC
+				        | IUCLC
+#endif
+				 ));
 
 	ntermios.c_oflag = 0;
 	ntermios.c_lflag = ISIG;

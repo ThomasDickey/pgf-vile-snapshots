@@ -4,10 +4,12 @@
  *	Definitions to interface to unix-like DIRECTORY(3) procedures.
  *	Include this after "estruct.h"
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/dirstuff.h,v 1.14 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/dirstuff.h,v 1.15 1994/10/03 13:24:35 pgf Exp $
  *
  */
 
+#ifndef DIRSTUFF_H
+#define DIRSTUFF_H
 
 #if ! VMS
 
@@ -122,3 +124,5 @@ extern	DIRENT *readdir P(( DIR * ));
 #ifndef USE_D_NAMLEN
 #define USE_D_NAMLEN 0
 #endif
+
+#endif /* DIRSTUFF_H */

@@ -11,7 +11,7 @@
 #
 # The modes are table entries in the BUFFER and WINDOW structures.
 #
-# $Header: /usr/build/VCS/pgf-vile/RCS/modetbl,v 1.43 1994/09/07 22:00:47 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/modetbl,v 1.47 1994/10/28 22:35:40 pgf Exp $
 #
 #
 # Mode-table entries.  Capitalized letters are used for abbreviations.
@@ -30,10 +30,12 @@ bool								# GMD prefix
 	"HIstory"	HISTORY		0		OPT_HISTORY # command-history
 	"ImplyBuffer"	IMPLYBUFF 	0			# imply-buffer (vi-like)
 	"multibeep"	MULTIBEEP	0			# multiple successive identical failed motions all beep
+	"Popup-Choices"	POPUP_CHOICES	0		OPT_POPUPCHOICE&&!OPT_ENUM_MODES # popup buffer showing file-completion choices
 	"Popup-Msgs"	POPUP_MSGS	0		OPT_POPUP_MSGS	# popup buffer when multiple messages emitted
 	"ShowRam"	RAMSIZE		0		RAMSIZE	# show ram-usage
 	"SameBangs"	SAMEBANGS	0			# use same "!!" data for ^X-!
 	"working"	WORKING		0		OPT_WORKING # "working" message
+	"usefilelock"	USEFILELOCK	0		LCKFILES # okay use filelocks
 	"view-on-readonly" RONLYVIEW	0		# set view mode for readonly files
 	"xterm-mouse"	XTERM_MOUSE	0		OPT_XTERM # (patch) mode to control whether we allow mouse-clicking
 int								# VAL_ prefix
@@ -46,7 +48,9 @@ regex								# VAL_ prefix
 string								# VAL_ prefix
 	"expand-chars"	EXPAND_CHARS	0			# list of chars we can expand (%,#,:)
 	"glob"		GLOB		0		OPT_GLOB_PIPE # select filename globbing style
-	"Popup-Choices"	POPUP_CHOICES	0		OPT_POPUPCHOICE	# popup buffer showing file-completion choices
+	"Popup-Choices"	POPUP_CHOICES	0		OPT_POPUPCHOICE&&OPT_ENUM_MODES # popup buffer showing file-completion choices
+	"ModeLine-ForMaT" MLFORMAT	0		OPT_MLFORMAT # modeline format string
+	"backup-style"  BACKUPSTYLE	0		OPT_FILEBACK # file backup style
 
 .buffers
 bool								# MD prefix
@@ -59,6 +63,7 @@ bool								# MD prefix
 	"crypt"		CRYPT		0		CRYPT	# encrytion mode active
 	"dos"		DOS		WFHARD|WFMODE		# "dos" mode -- lines end in crlf
 	"IgnoreCase"	IGNCASE		0			# Exact matching for searches
+	"locked"	LOCKED		WFMODE		LCKFILES # mode locked
 	"magic"		MAGIC		0			# regular expressions in search
 	"Meta-Insert-Bindings" METAINSBIND 0			# honor meta bindings in insert mode
 	"NewLine"	NEWLINE		WFHARD			# trailing newline (vi-style)
@@ -81,6 +86,7 @@ int								# VAL_ prefix
 	"UndoLimit"	UNDOLIM		0			# how much undo stack is saved
 	"WrapMargin"	WRAPMARGIN	0			# width of right margin for autowrap
 string								# VAL_ prefix
+	"locker"	LOCKER		0	      	LCKFILES  # Name of locker
 	"tags"		TAGS		0			# list of tags files
 regex								# VAL_ prefix
 	"comments"	COMMENTS	0			# matches leading comment for comment reformatting

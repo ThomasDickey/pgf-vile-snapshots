@@ -7,7 +7,7 @@
  * Most code probably by Dan Lawrence or Dave Conroy for MicroEMACS
  * Extensions for vile by Paul Fox
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/fences.c,v 1.23 1994/08/08 16:12:29 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/fences.c,v 1.24 1994/10/30 16:26:37 pgf Exp $
  *
  */
 
@@ -55,7 +55,7 @@ int	off;
 	}
 	*d = EOS;
 
-	for (n = 0; n < SIZEOF(keyword_table); n++)
+	for (n = 0; n < TABLESIZE(keyword_table); n++)
 		if (!strcmp(temp, keyword_table[n].name))
 			return keyword_table[n].code;
 	return CPP_UNKNOWN;

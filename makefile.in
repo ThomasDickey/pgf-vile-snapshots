@@ -21,7 +21,7 @@
 # gnu autoconf support by kevin buettner, 5/94
 # original makefile for uemacs: Adam Fritz July 30,1987  (do you recognize it?)
 #
-# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.in,v 1.13 1994/09/27 01:58:03 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.in,v 1.19 1994/10/31 15:26:44 pgf Exp $
 #
 
 #### Start of system configuration section. ####
@@ -71,7 +71,7 @@ INSTALL_DIRS    = $(bindir) $(libdir) $(mandir)
 
 # All of the makefiles which should be preserved and distributed
 UNIXMAKIN = makefile.in				# for use with configure
-VMSMAK =   descrip.mms vms_link.opt		# on VMS
+VMSMAK =   descrip.mms vms_link.opt vmsbuild.com # on VMS
 TURBOMAK = makefile.tbc				# on DOS or OS/2, TURBO C or Borland C
 WATMAK =   makefile.wat				# on DOS, using Watcom C/386
 MSCMAK =	# still waiting for this one	# on DOS, using Microsoft C
@@ -106,7 +106,7 @@ TEXTFILES = README README.CFG README.X11 README.PC \
 VILESRC = main.c basic.c bind.c buffer.c crypt.c csrch.c \
 	display.c eval.c exec.c externs.c fences.c file.c \
 	filec.c fileio.c finderr.c glob.c globals.c \
-	history.c input.c insert.c isearch.c line.c map.c \
+	history.c input.c insert.c isearch.c lckfiles.c line.c map.c \
 	modes.c msgs.c npopen.c oneliner.c opers.c path.c random.c \
 	regexp.c region.c search.c select.c spawn.c tags.c \
 	tbuff.c termio.c tmp.c undo.c version.c vmalloc.c \
@@ -120,6 +120,7 @@ DEVELOPER_ONLY = empty.rc mktbls.bat \
 	win31drv.c win31drv.def win31tbl.c win31tbl.def \
 	win31tbl.h win31tbl.rc  commdlg.msg \
 	trace.c trace.h \
+	fakevms.c fakevms.h \
 	mapchars.c mapchars.h
 
 # these are the files that go to everyone
@@ -140,7 +141,7 @@ OBJ = $(SCREEN).o \
 	main.o basic.o bind.o buffer.o crypt.o csrch.o \
 	display.o eval.o exec.o externs.o fences.o file.o \
 	filec.o fileio.o finderr.o glob.o globals.o \
-	history.o input.o insert.o isearch.o line.o map.o \
+	history.o input.o insert.o isearch.o lckfiles.o line.o map.o \
 	modes.o msgs.o npopen.o oneliner.o opers.o path.o random.o \
 	regexp.o region.o search.o select.o spawn.o tags.o \
 	tbuff.o termio.o tmp.o undo.o version.o vmalloc.o \
@@ -151,6 +152,9 @@ all:	$(TARGET) manfilt
 $(TARGET): $(BUILTHDRS) $(OBJ)
 	-mv $(TARGET) o$(TARGET)
 	$(LINK) $(LDFLAGS) -o $(TARGET) $(OBJ) $(X_LIBS) $(LIBS) $(X_EXTRA_LIBS)
+
+manfilt: manfilt.o
+	$(LINK) $(LDFLAGS) -o manfilt manfilt.o
 
 nebind.h \
 nefunc.h \
@@ -209,9 +213,8 @@ tags:
 TAGS:
 	etags $(SRC) $(HDRS)
 
-dist:	$(DEV_DISTFILES) /tmp/vilevers
-	@echo 'Do you need to rebuild the revlist????'
-	@sleep 3
+#	 this builds vile-N.Ndev.tar.gz, including all development files
+devtar:	$(DEV_DISTFILES) /tmp/vilevers release_warnings
 	echo vile-`cat /tmp/vilevers` > .fname
 	rm -rf `cat .fname`
 	mkdir `cat .fname`
@@ -221,25 +224,28 @@ dist:	$(DEV_DISTFILES) /tmp/vilevers
 	  ln $$SRCDIR/$$file `cat .fname` \
 	    || { echo copying $$file instead; cp -p $$file `cat .fname`; }; \
 	done
-	tar -cf - `cat .fname` | gzip >`cat .fname`.tar.gz
+#	tar -cf - `cat .fname` | gzip >`cat .fname`dev.tar.gz
+	gtar -czf `cat .fname`dev.tar.gz `cat .fname`
+	@echo Created `cat .fname`dev.tar.gz 
 	rm -rf `cat .fname` .fname
 
-# shar args: add -a for archive headers, add -s pgf@site.net for "submitted-by"
-shar: /tmp/vilevers
-	[ -d shardir ] || mkdir shardir
-	vilevers=`cat /tmp/vilevers`; \
-	shar -x -a -spgf@foxharp.boston.ma.us -nvile$${vilevers} -L60 \
-			-o shardir/vileshar `ls $(DEV_DISTFILES)`
+#	 this builds vile-N.N.tar.gz, for general release
+tar:	$(DISTFILES) /tmp/vilevers release_warnings
+	echo vile-`cat /tmp/vilevers` > .fname
+	rm -rf `cat .fname`
+	mkdir `cat .fname`
+	SRCDIR=. ;\
+	test $(srcdir) = "\@srcdir\@" && SRCDIR=$(srcdir) ;\
+	for file in $(DISTFILES); do \
+	  ln $$SRCDIR/$$file `cat .fname` \
+	    || { echo copying $$file instead; cp -p $$file `cat .fname`; }; \
+	done
+	gtar -czf `cat .fname`.tar.gz `cat .fname`
+	@echo Created `cat .fname`.tar.gz 
+	rm -rf `cat .fname` .fname
 
-compr-shar: /tmp/vilevers
-	[ -d cshardir ] || mkdir cshardir
-	vilevers=`cat /tmp/vilevers`; \
-	shar -p -nvile$${vilevers} -L60 -o cshardir/vileshar \
-		-C `ls $(DEV_DISTFILES)`
-
-bigshar: /tmp/vilevers
-	@echo 'Do you need to rebuild the revlist????'
-	@sleep 3
+	# this builds vileN.Nshar, for general release
+bigshar: $(DISTFILES) /tmp/vilevers release_warnings
 	vilevers=`cat /tmp/vilevers`; \
 	shar -spgf@foxharp.boston.ma.us -nvile$${vilevers} \
 	    -o vile$${vilevers}shar README `ls $(DISTFILES) | \
@@ -247,7 +253,21 @@ bigshar: /tmp/vilevers
 	mv vile$${vilevers}shar.01 vile$${vilevers}shar	; \
 	echo Created vile$${vilevers}shar
 
-zipfile: /tmp/vilevers
+
+# shar args: add -a for archive headers, add -s pgf@site.net for "submitted-by"
+multishar: $(DISTFILES) /tmp/vilevers
+	[ -d shardir ] || mkdir shardir
+	vilevers=`cat /tmp/vilevers`; \
+	shar -x -a -spgf@foxharp.boston.ma.us -nvile$${vilevers} -L60 \
+			-o shardir/vileshar `ls $(DISTFILES)`
+
+multicshar: $(DISTFILES) /tmp/vilevers
+	[ -d cshardir ] || mkdir cshardir
+	vilevers=`cat /tmp/vilevers`; \
+	shar -p -nvile$${vilevers} -L60 -o cshardir/vileshar \
+		-C `ls $(DISTFILES)`
+
+zipfile: $(DISTFILES) /tmp/vilevers
 	vilevers=`cat /tmp/vilevers | sed 's/\.//'`; \
 	zip -k vile$${vilevers}.zip $(DISTFILES) ;\
 	echo Created vile$${vilevers}.zip
@@ -271,6 +291,11 @@ patch:	/tmp/vilevers
 	@expr "`egrep 'version\[\].*' edef.h`" : \
 		'.* \([0-9][0-9]*\.[0-9].*\)".*' >/tmp/vilevers
 	@echo Current version is `cat /tmp/vilevers`
+
+release_warnings:
+	@echo 'Do you need to rebuild the revlist????'
+	@echo 'or maybe date the CHANGES file?'
+	@sleep 3
 
 rcsdiffrw:
 	@-for x in `$(MAKE) -f makefile.in rw`	;\

@@ -25,7 +25,7 @@
  *
  *	add a Font option (so the user can see the transcript in a fixed font).
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/win31tbl.c,v 1.2 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/win31tbl.c,v 1.3 1994/10/16 02:57:55 pgf Exp $
  */
 #include <windows.h>
 #include <commdlg.h>	/* Common Dialogs */
@@ -257,7 +257,7 @@ static void getFilename (HWND hwnd)
 	}
 
 	/* Set unused members to zero */
-	memset (&ofn, 0, sizeof(ofn)) ;
+	(void) memset (&ofn, 0, sizeof(ofn)) ;
 
 	ofn.lStructSize     = sizeof(ofn) ;
 	ofn.hwndOwner       = hwnd ;

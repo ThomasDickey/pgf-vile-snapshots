@@ -210,13 +210,16 @@ Window manipulation commands:
 File manipulation commands:  
 ---------------------------
 
-	The usual ":e", ":r", ":f", ":w" commands are available, though only
-	":e!" is available of the "!" options.  The ":r" command reads the
-	named file in after the current line.  To read a file before the
-	first line, use ":0r".  File completion works like command completion:
-	using the TAB and '?' keys you can complete or see next character
-	choices.  (The ":w!" and ":x!" are present, and are synonymous with
-	":w" and ":x" since there is no "readonly" mode to override.)
+	The usual ":e", ":r", ":f", ":w" commands are available, though
+	only ":e!" is available of the "!" options.  The ":r" command reads
+	the named file in after the current line.  To read a file before
+	the first line, use ":0r".  File completion works like command
+	completion: using the TAB and '?' keys you can complete or see next
+	character choices.  The ":w!" and ":x!" are present, and are
+	synonymous with ":w" and ":x" since there is no "readonly" mode to
+	override.  (Actually, ":w!" is not quite synonymous -- it can be
+	used to force a write when an attempt to create a backup file has
+	failed.  See the "backup-style" mode, below.)
 
 
 	The commands ":ww" and ":wwq" correspond roughly to ":w" and ":wq",
@@ -357,15 +360,15 @@ Text manipulation command:
 	"dd" deletes one line, "4dd" affects 4 lines, etc. 
 
 	Most operators affect the region exactly, but some cause only whole
-	lines to be affected.  This is usually a function of what sort of  motion
-	follows the operator, but can sometimes be affected by the operator
-	itself.  The best example of motions having different effects is
-	the 'goto-mark' motions, the ''' and '`' commands.  If a mark
-	is set, say mark 'a', with the 'ma' command, then if the
-	command d` is executed, the exact text between the cursor and
-	the mark will be deleted.  If, on the other hand, the d' command
-	is used, the deleted region will include the lines containing
-	the cursor and the mark in their entirety.
+	lines to be affected.  This is usually a function of what sort of
+	motion follows the operator, but can sometimes be affected by the
+	operator itself.  The best example of motions having different
+	effects is the 'goto-mark' motions, the ''' and '`' commands.  If a
+	mark is set, say mark 'a', with the 'ma' command, then if the
+	command d`a is executed, the exact text between the cursor and the
+	mark will be deleted.  If, on the other hand, the d'a command is
+	used, the deleted region will include the lines containing the
+	cursor and the mark in their entirety.
 
 	Some operators in vile can be "forced" to affect regions of whole
 	lines, though the motion wouldn't normally imply it, by using the
@@ -440,6 +443,8 @@ Text manipulation command:
 	^A-r	Open up a rectangle.  Text to the right of the left edge
 		of the rectangular region will shift to the right by the
 		width of the rectangle, leaving a whitespace "hole".
+	^A-q	Sweep out a rectangle with multiple motion commands.  See
+		description at 'q', below.
 
 	^A-s	Select and yank a region.  The region will be highlighted
 		on the screen, as if it had been swept by a mouse.  It
@@ -584,6 +589,22 @@ Miscellaneous commands
 		the ' motion, which also goes to [the line holding] the
 		mark, and causes regions to become "full line" regions.
 
+	q	A "multiple motion", or "quoted motion" command.  After
+		entering 'q', more motion commands are accepted until
+		another 'q' is entered.  The result of the motion is
+		the cumulative effect of all the entered motions.  Thus,
+		one might type:
+			dq<arrow><arrow><arrow>...<arrow>q
+		to delete all of the text between the starting point
+		and the final cursor position.  Any motion command can
+		appear in between the two 'q' commands.  If used alone,
+		i.e. _not_ in an operator context, then the spanned text is
+		selected and highlighted as a side effect.  The resulting
+		selection can then be manipulated with the ^S pseudo-motion,
+		below.
+
+	^A-q	As above, but the motions will sweep out rectangular regions.
+
 	^S	A motion, or "pseudo-motion" command.  If a region of
 		text has been previously selected, either with the mouse
 		(if available) or with the keyboard selection operator
@@ -612,6 +633,7 @@ Arrow keys
 	
 Rectangular regions
 -------------------
+
 	Just as the regions defined by vi's commands and motions can either
 	be "exact", or encompass "full lines", regions in vile can in
 	addition be "rectangular".  The easiest way to use a rectangular
@@ -822,6 +844,16 @@ Editor modes
 		See notes about the color palette down below, under DOS
 		specifics.
 
+	backup-style Specifies the style used for creating file backups
+		when a file is written.  Can have values of "off", ".bak",
+		and (under UNIX) "tilde", for no backups, DOS-style .bak
+		files, and file.c~ style backups, respectively.  Files
+		are copied before being written, to protect links to
+		the original file.  Permissions, modification and access
+		times are all preserved.  If creation of the backup fails,
+		the write of the file will fail, unless it is forced
+		using the ":w!" form of the write command.  (U)
+
 	fillcol (fc) Will prompt for a new value for the fill column, where
 		auto-wrapping and region formatting will break lines. (B)
 
@@ -889,6 +921,10 @@ Editor modes
 
 	number	(nu) All lines in the buffer will be prefixed by their line
 		number. (W) 
+
+	modeline-format (mlfmt) The format string to use for displaying
+		mode lines.  See "Mode line customization" for more
+		details.  (U)
 
 	paragraphs A regular expression defining where the "next-paragraph"
 		('}') and "previous-paragraph" ('{') commands will go. (B)
@@ -1151,9 +1187,9 @@ Key Rebinding
 	characters could also be entered as ^Ax, which would only be two
 	characters.
 
-	Characters can be entered in hex or octal as well, in the form 0xNN, where
-	NN is exactly two hex digits.  So if you know the hex value for
-	a key, you can bind to it like:
+	Characters can be entered in hex or octal as well, in the form
+	0xNN, where NN is exactly two hex digits.  So if you know the hex
+	value for a key, you can bind to it like:
 		bind-key next-window ^A-\x14
 	or
 		bind-key next-window FN-\213
@@ -1237,10 +1273,10 @@ Key Rebinding
 
 	Because "map" and "map!" may be used to remap arbitrary sequences,
 	these sequences must be entered literally, i.e, the syntax for
-	key sequences as listed below will not work for "map" and "map!".
+	key sequences as listed above will not work for "map" and "map!".
 	To enter control characters into a .vilerc file, use the ^V escaping
 	mechanism.  A map command entered from the command line will require
-	few characters to be escaped with ^V.
+	fewer characters be escaped with ^V.
 
 	Vile duplicates real vi's behavior (but not vim's) in that the first
 	character of the sequence being mapped to is not subject to
@@ -1479,7 +1515,7 @@ Programmed procedures and macros
 	    store-procedure my_cd_action
 		write-message &cat &cat &cat "moved from " $ocwd " to " $cwd
 		~if &seq $progname "xvile"
-		    set $title $cwd
+		    set title $cwd
 		~endif
 	    ~endm
 
@@ -1830,6 +1866,80 @@ Invocation
 
 	Use "vile -?" to get the usage message.
 
+Mode line customization
+-----------------------
+
+	At the bottom of each window is a mode (or "status") line which
+	is used for displaying certain characteristics of the window and
+	the buffer associated with it.  On many displays, this mode line
+	will be highlighted in reverse video or via other means in order
+	to visually separate windows and to distinguish the mode line from
+	text displayed in the window.  
+
+	The global editor mode "modeline-format" is set to a string which
+	controls formatting of mode lines.  This mode is user settable and
+	thus may be used to customize the display of mode lines.  The
+	format specifiers which may appear in the format control strings
+	are as follows:
+
+		%i 	insert/overwrite/replace mode indicator, displayed
+			only when in insert, overwrite, or replace mode. 
+			When not in one of these modes, the separator
+			character (often "-", "=", or " ") will be displayed.
+		%b	buffer name
+		%f	file name when not internal buffer and when not the
+			same as the buffer name.
+		%F	internal buffer name
+		%m	major mode(s), e.g, cmode, view-only, etc.  Displayed
+			in square brackets.
+		%l	line number to be displayed if "ruler" is set
+		%c	column number if "ruler" is set
+		%p	line number as percentage of number of lines if
+			"ruler" is set
+		%S	rough position of window with respect to buffer (top,
+			bot, all, emp, mid) when ruler not set (or ruler is
+			set, but buffer is empty).
+		%L	number of lines in buffer, if ruler is set
+		%=	middle separator; should appear at most once in a
+			format string.  This indicates where to separate the
+			left and right hand portions of the mode line with a
+			long string of dashes (or whatever the separator
+			character is).
+		%-	single occurrence of separator character
+		%|	eighty column indicator
+		%%	percent sign
+		%:	colon
+
+	Some of the format specifiers (%f, %F, %m, %l, %c, %p, %S, %L) are
+	conditionally displayed.  For example "%m" will display the major
+	modes only if there are some major modes set or if the buffer has
+	been modified (which is sort of a major mode).  Similarly, "%F" and
+	"%f" will cause the associated file name to be displayed when the
+	buffer is of the appropriate type (a scratch buffer or not) and the
+	shortened file name is different from the buffer name.  It is
+	desirable at times to cause a prefix string and/or a suffix string
+	to be emitted along with the string obtained after conversion of
+	the format specifier.  This may be done by following the format
+	specifier with a colon, the prefix string, another colon, the
+	suffix string, and another colon.  For example, "%l:(:,:%c::) :"
+	might be used to display the line and column number for "ruler"
+	mode.  Note that either or both of the prefix and suffix strings
+	may be empty.
+
+	Characters in the string which are not part of a format specifier
+	are output verbatim.
+
+	The default format control string is as follows:
+
+	    "%-%i%- %b %m:: :%f:is : :%=%F: : :%l:(:,:%c::) :%p::% :%S%-%-%|"
+
+	Mode lines for some versions of vile previous to version 4.7 can be
+	obtained with the following format string.  This will remove the
+	percentage indication from the mode line when in ruler mode and
+	also shift the ruler indicator to the far right in the mode line.
+
+	    "%-%i%- %b %m:: :%f:is : :%=%F: : %-%-%-%-:%l:(:,:%c::):%S::%-%-:%|"
+
 Filtering "man" pages
 ---------------------
 
@@ -1848,25 +1958,9 @@ Filtering "man" pages
 		source ~/manpage.rc
 
 	This assumes that you have moved the manpage.rc file to your home
-	directory.
-
-	For the above to work, however, the manual page filter needs to be
-	compiled and installed as vile-manfilt somewhere in your search
-	path.  From your vile build directory, this may be accomplished as
-	follows:
-
-		# you will need an ANSI compiler to compile manfilt.c
-		gcc -o manfilt manfilt.c
-		cp manfilt /usr/local/bin/vile-manfilt
-
-	Substitute /usr/local/bin for the place where you've installed
-	vile or xvile.  (A perl script (manfilt.pl) is also available for
-	doing the filtering.  It is quite a bit slower however than the
-	corresponding C version.)
-
-	If you do all of this and use vile rather than xvile, you will
-	still end up with a legible man page, albeit without the spiffy
-	formatting.
+	directory.  If you do all of this and use vile rather than xvile,
+	you will still end up with a legible man page, albeit without the
+	spiffy formatting.
 
 	The manual page filtering program may also be used to look at other
 	text formatted with nroff.  From the vile source directory, for
@@ -1960,8 +2054,9 @@ X Window System specifics
 	If you are using xvile under X11, the following additions are
 	available:
 
-	Mouse buttons:
-	--------------
+	Mouse buttons
+	-------------
+
 	1 -	Sets cursor position and the start of the selection when
 		mouse pointer is positioned in any vile window (but not the
 		message line).	Clicking on a mode line will set the
@@ -2003,13 +2098,9 @@ X Window System specifics
 	shell-filtering operator, '!') are only capable of working on full
 	lines of text.
 
-	Note: The selected area includes all highlighted characters except
-	for the special case in which the last highlighted character is the
-	first character on a line.  This exception is made to provide
-	control over whether the newline is selected as well.
-  
-	Scrollbars:
-	-----------
+	Scrollbars
+	----------
+
 	The X toolkit version of xvile provides default translations
 	similar to the translations for scrollbars found in the Athena
 	widget set.  (If you know how to use xterm's scrollbars, you know
@@ -2057,7 +2148,7 @@ X Window System specifics
 	the position of the mouse pointer) to indicate where the new border
 	will be.
   
-	Splitting and deleting of windows may now be done with the mouse. 
+	Splitting and deleting of windows may also be done with the mouse. 
 	In each case the action is selected by pressing one of the mouse
 	buttons over a scrollbar with the control key held down.  Button
 	one (with the control key held down) will split the scrollbar and
@@ -2066,8 +2157,9 @@ X Window System specifics
 	scrollbar and corresponding window.  Button three (with control
 	key) will make the corresponding window the only window.
 
-	Standard X command line arguments:
-	----------------------------------
+	Standard X command line arguments
+	---------------------------------
+
 	-fn fontname	Font to use (or -font).
 	-rv		Use reverse video (also -reverse).
 	+rv		Don't use reverse video.
@@ -2081,16 +2173,18 @@ X Window System specifics
 	-iconic 	Start xvile iconified.
 	-xrm Resource	Specify or change an X resource internal to xvile.
 
-	Additional xvile command line arguments:
-	----------------------------------------
+	Additional xvile command line arguments
+	---------------------------------------
+
 	-leftbar	Put scrollbar(s) on left.
 	-rightbar	Put scrollbar(s) on right (default).
 
-	X Resources:
-	------------
+	X Resources
+	-----------
+
 	font		Font to use.
 
-	geometry	Window dimensions.
+	geometry	Window dimensions in characters.
 
 	charClass	Character classes for multiple click selections.
 			The format is identical to that of xterm(1).
@@ -2142,10 +2236,58 @@ X Window System specifics
 			such as a selection.  This will make the cursor
 			visible no matter where it is.
 
+	Scrollbar subresources
+	----------------------
 
+	These subresources only pertain X toolkit version of xvile and are
+	specified by prefixing "scrollbar." to the following resource
+	names (see further below for examples):
 
-	Fonts:
-	------
+	foreground	Color of the slider or one of the colors of the
+			slider if a stippled pixmap is used.  To force the
+			slider to be only the foreground color, you should
+			set sliderIsSolid to true.
+
+	background	Background color of scrollbar.
+
+	sliderIsSolid	If false, indicates that the stippled pixmap should
+			be used to simulate grey.  This will be best on
+			monochrome displays.  True works better for color
+			displays.  True indicates the slider will be displayed
+			in only the foreground color.
+
+	Selection subresources
+	----------------------
+
+	The following subresources control coloration of the selection and
+	may be specified by prefixing "selection." to the following
+	resource names (see further below for examples):
+
+	foreground	Foreground color.  This will be the color that the
+			text is displayed in.
+
+	background	Background color of the selection.
+
+	Sample .Xdefault entries
+	------------------------
+
+	You may or may not want to use the following as a starting point
+	for the "XVile" section of you .Xdefaults or .Xresources file.  If
+	you have a monochrome display server, you will probably not want
+	to use any of the color specifications.
+
+	XVile*font: -*-courier-medium-r-normal-*-*-*-75-75-m-70-iso8859-*
+	XVile*geometry:	80x54
+	XVile.background: darkslategrey
+	XVile.foreground: honeydew
+	XVile.scrollbar.foreground: firebrick2
+	XVile.scrollbar.sliderIsSolid: true
+	XVile.selection.background: IndianRed3
+	XVile.selection.foreground: honeydew
+
+	Fonts
+	-----
+
 	To change the font on the fly, use the ':setv' command to set the
 	$font variable, with ":setv $font <fontname>".
 
@@ -2224,10 +2366,11 @@ Differences from vi
 	contain any of these characters: * ? ~ [ ] $ { }
 
 	Paragraph and section boundaries, for the {, }, [, and ] commands
-	are configurable, but may not exactly match those in vi.  They
-	are expressed via regular expressions.  The default regular expressions
-	are quite complex, to support the traditional nroff and troff boundaries.
-	If you are just editing code, you may want to replace them:
+	are configurable, but may not exactly match those in vi.  They are
+	expressed via regular expressions.  The default regular expressions
+	are quite complex, to support the traditional nroff and troff
+	boundaries.  If you are just editing code, you may want to replace
+	them:
 
 		; set paragraph and section r.e.s for speed on C/C++/perl code.
 		set paragraphs=^$
@@ -2416,4 +2559,4 @@ Credits
 	(By the way, he is not the Paul D. Fox that wrote the Crisp editor.)
 
 ------------------------------------
- $Header: /usr/build/VCS/pgf-vile/RCS/vile.hlp,v 1.181 1994/09/27 01:49:15 pgf Exp $
+ $Header: /usr/build/VCS/pgf-vile/RCS/vile.hlp,v 1.187 1994/10/27 14:21:56 pgf Exp $

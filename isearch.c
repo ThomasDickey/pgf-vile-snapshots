@@ -7,7 +7,7 @@
  *
  * original author: D. R. Banks 9-May-86
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/isearch.c,v 1.33 1994/09/05 19:30:21 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/isearch.c,v 1.35 1994/10/27 21:46:42 pgf Exp $
  *
  */
 
@@ -182,7 +182,7 @@ start_over:
 		/* Check for special characters first: */
 		/* Most cases here change the search */
 
-		if (c == abortc)	/* Want to quit searching? */
+		if (ABORTED(c))	/* Want to quit searching? */
 			return (TRUE);	/* Quit searching now */
 
 		if (isbackspace(c))
@@ -285,7 +285,7 @@ scanmore(patrn, dir)		/* search forward or back for a pattern */
 
 	ignorecase = window_b_val(curwp, MDIGNCASE);
 
-	sts = scanner(gregexp, (dir < 0) ? REVERSE : FORWARD, FALSE, NULL);
+	sts = scanner(gregexp, (dir < 0) ? REVERSE : FORWARD, FALSE, (int *)0);
 
 	if (!sts)
 		kbd_alarm();	/* Feep if search fails */

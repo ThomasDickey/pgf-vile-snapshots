@@ -1,7 +1,7 @@
 /*
  * version & usage-messages for vile
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/version.c,v 1.15 1994/07/22 01:45:44 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/version.c,v 1.17 1994/10/30 16:26:37 pgf Exp $
  *
  */
 
@@ -58,7 +58,7 @@ print_usage P((void))
 	register int	j;
 
 	(void)fprintf(stderr, "usage: %s [-flags] [@cmdfile] files...\n", prog_arg);
-	for (j = 0; j < SIZEOF(options); j++)
+	for (j = 0; j < TABLESIZE(options); j++)
 		(void)fprintf(stderr, "\t%s\n", options[j]);
 	ExitProgram(BADEXIT);
 }
@@ -94,7 +94,7 @@ getversion()
 	 * Getting the executable's modification-time is a reasonable
 	 * compromise.
 	 */
-	lsprintf(version_string, "%s %s for %s", prognam, version, opersys);
+	(void) lsprintf(version_string, "%s %s for %s", prognam, version, opersys);
 	{
 		char *s;
 		if ((s = flook(prog_arg, FL_ANYWHERE)) != NULL) {

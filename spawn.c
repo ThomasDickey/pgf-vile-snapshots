@@ -1,7 +1,7 @@
 /*	Spawn:	various DOS access commands
  *		for MicroEMACS
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/spawn.c,v 1.86 1994/09/05 19:30:21 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/spawn.c,v 1.87 1994/10/27 21:46:42 pgf Exp $
  *
  */
 
@@ -172,7 +172,7 @@ ACTUAL_SIG_DECL
 void
 pressreturn()
 {
-	int s;
+	int c;
 	int odiscmd;
 
 	odiscmd = discmd;
@@ -181,11 +181,11 @@ pressreturn()
 	discmd = odiscmd;
 	TTflush();
 	/* loop for a CR, a space, or a : to do another named command */
-	while ((s = tgetc(FALSE)) != '\r' &&
-			s != ' ' && s != abortc) {
+	while ((c = tgetc(FALSE)) != '\r' &&
+			c != ' ' && !ABORTED(c)) {
 		extern CMDFUNC f_namedcmd;
-		if (kcod2fnc(s) == &f_namedcmd) {
-			tungetc(s);
+		if (kcod2fnc(c) == &f_namedcmd) {
+			tungetc(c);
 			break;
 		}
 	}
@@ -621,7 +621,7 @@ filterregion()
 	(void)setmark();
 	return s;
 #else
-	mlforce("[Region filtering not available]");
+	mlforce("[Region filtering not available -- try buffer filtering]");
 	return FALSE;
 #endif
 }
@@ -635,6 +635,7 @@ int
 filter(f, n)
 int f,n;
 {
+#if !(UNIX||MSDOS) /* filterregion up above is better */
 	register int	s;	/* return status from CLI */
 	register BUFFER *bp;	/* pointer to buffer to zot */
 	static char oline[NLINE];	/* command line send to shell */
@@ -673,7 +674,7 @@ int f,n;
 	ch_fname(bp, bname1);		/* set it to our new one */
 
 	/* write it out, checking for errors */
-	if (writeout(filnam1,curbp,TRUE) != TRUE) {
+	if (writeout(filnam1,curbp,TRUE,TRUE) != TRUE) {
 		mlforce("[Cannot write filter file]");
 		ch_fname(bp, tnam);
 		return(FALSE);
@@ -732,6 +733,10 @@ int f,n;
 	unlink(filnam1);
 	unlink(filnam2);
 	return AfterShell();
+#else
+	mlforce("[Buffer filtering not available -- use filter operator]");
+	return FALSE;
+#endif
 }
 
 #if	VMS

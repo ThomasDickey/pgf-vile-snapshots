@@ -2,7 +2,7 @@
  *		The routines in this file handle the conversion of pathname
  *		strings.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/path.c,v 1.30 1994/09/05 19:38:34 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/path.c,v 1.31 1994/10/03 13:24:35 pgf Exp $
  *
  *
  */
@@ -83,7 +83,7 @@ DIR	*dp;
 }
 #endif
 
-#if MSDOS || WIN31 || OS2 || NT
+#if OPT_MSDOS_PATH
 /*
  * If the pathname begins with an MSDOS-drive, return the pointer past it.
  * Otherwise, return null.
@@ -100,7 +100,7 @@ char	*path;
 }
 #endif
 
-#if VMS
+#if OPT_VMS_PATH
 #define VMSPATH_END_NODE   1
 #define VMSPATH_END_DEV    2
 #define VMSPATH_BEGIN_DIR  3
@@ -128,6 +128,9 @@ int	option;		/* true:directory, false:file, -true:don't care */
 	int	this	= 0,
 		next	= -1;
 
+	if (*path == EOS)	/* this can happen with null buffer-name */
+		return FALSE;
+
 	while (ispath(*path)) {
 		switch (*path) {
 		case '[':
@@ -144,6 +147,8 @@ int	option;		/* true:directory, false:file, -true:don't care */
 				next = VMSPATH_END_DIR;
 			break;
 		case '.':
+			if (this >= VMSPATH_BEGIN_TYP)
+				return FALSE;
 			next = (this >= VMSPATH_END_DIR)
 				? VMSPATH_BEGIN_TYP
 				: (this >= VMSPATH_BEGIN_DIR
@@ -194,7 +199,7 @@ int	option;		/* true:directory, false:file, -true:don't care */
 }
 #endif
 
-#if VMS
+#if OPT_VMS_PATH
 /*
  * Returns a pointer to the argument's last path-leaf (i.e., filename).
  */
@@ -223,7 +228,7 @@ char	*path;
 {
 	register char	*s = last_slash(path);
 	if (s == 0) {
-#if MSDOS || WIN31 || OS2
+#if OPT_MSDOS_PATH
 		if (!(s = is_msdos_drive(path)))
 #endif
 		s = path;
@@ -234,7 +239,7 @@ char	*path;
 
 #else
 
-#if !VMS
+#if !OPT_VMS_PATH
 #define	unix_pathleaf	pathleaf
 #endif
 
@@ -244,7 +249,7 @@ char	*path;
 {
 	register char	*s = last_slash(path);
 	if (s == 0) {
-#if MSDOS || WIN31 || OS2 || NT
+#if OPT_MSDOS_PATH
 		if (!(s = is_msdos_drive(path)))
 #endif
 		s = path;
@@ -255,7 +260,7 @@ char	*path;
 #endif /* __WATCOMC__ */
 
 
-#if VMS
+#if OPT_VMS_PATH
 char *pathleaf(path)
 char	*path;
 {
@@ -277,7 +282,7 @@ char	*leaf;
 	char	temp[NFILEN];
 	register char	*s = dst;
 
-	if (path == 0)
+	if (path == 0 || *path == EOS)
 		return strcpy(dst, leaf);
 
 	leaf = strcpy(temp, leaf);		/* in case leaf is in dst */
@@ -286,7 +291,7 @@ char	*leaf;
 		(void)strcpy(s, path);
 	s += strlen(s) - 1;
 
-#if VMS
+#if OPT_VMS_PATH
 	if (!is_vms_pathname(dst, TRUE))	/* could be DecShell */
 #endif
 	 if (!is_slashc(*s)) {
@@ -328,6 +333,7 @@ typedef	struct	_upath {
 static	UPATH	*user_paths;
 
 static	char *	save_user P(( char *, char * ));
+
 static char *
 save_user(name, path)
 char	*name;
@@ -403,6 +409,9 @@ char	*path;
 			}
 		}
 
+#if OPT_VMS_PATH
+		(void)mklower(temp);
+#endif
 		if ((d = find_user(temp)) != NULL)
 			(void)pathcat(path, d, s);
 	}
@@ -419,6 +428,7 @@ char *ss;
 	char *p, *pp;
 	char *s;
 
+	TRACE(("canonpath '%s'\n", ss))
 	if ((s = is_appendname(ss)) != 0)
 		return (canonpath(s) != 0) ? ss : 0;
 
@@ -427,7 +437,7 @@ char *ss;
 	if (!*s)
 		return s;
 
-#if MSDOS || WIN31 || OS2 || NT
+#if OPT_MSDOS_PATH
 	(void)mklower(ss);	/* MS-DOS is case-independent */
 	/* pretend the drive designator isn't there */
 	if ((s = is_msdos_drive(ss)) == 0)
@@ -438,19 +448,19 @@ char *ss;
 	(void)home_path(s);
 #endif
 
-#if VMS
+#if OPT_VMS_PATH
 	/*
 	 * If the code in 'lengthen_path()', as well as the scattered calls on
 	 * 'fgetname()' are correct, the path given to this procedure should
-	 * be a fully-resolved VMS pathname.
+	 * be a fully-resolved VMS pathname.  The logic in filec.c will allow a
+	 * unix-style name, so we'll fall-thru if we find one.
 	 */
-	if (!is_vms_pathname(s, -TRUE)) {
-		mlforce("BUG: canonpath '%s'", s);
-		return ss;
+	if (is_vms_pathname(s, -TRUE)) {
+		return mkupper(ss);
 	}
 #endif
 
-#if UNIX || MSDOS || WIN31 || OS2 || NT
+#if UNIX || OPT_MSDOS_PATH || OPT_VMS_PATH
 	p = pp = s;
 	if (!is_slashc(*s)) {
 		mlforce("BUG: canonpath '%s'", s);
@@ -475,7 +485,7 @@ char *ss;
 	while (*pp) {
 		switch (*pp) {
 		case '/':
-#if MSDOS || WIN31 || OS2 || NT
+#if OPT_MSDOS_PATH
 		case '\\':
 #endif
 			pp++;
@@ -491,12 +501,6 @@ char *ss;
 		break;
 	}
 	while (*pp) {
-#if PDEBUG
-		if (pp != p)
-			*p = EOS;
-		printf(" s is %s\n",s);
-		printf("pp is %*s%s\n",pp-s,"",pp);
-#endif
 		if (is_slashc(*pp)) {
 			while (is_slashc(*(pp+1)))
 				pp++;
@@ -536,6 +540,39 @@ char *ss;
 	*p = EOS;
 #endif	/* UNIX || MSDOS */
 
+#if OPT_VMS_PATH
+	if (!is_vms_pathname(ss, -TRUE)) {
+		char *tt = ss + strlen(ss);
+		struct stat sb;
+#if VMS
+		(void)strcpy(tt, ".DIR");
+#else
+		(void)mklower(ss);
+#endif
+		if ((stat(ss, &sb) >= 0)
+		 && ((sb.st_mode & S_IFMT) == S_IFDIR))
+			(void)strcpy(tt, "/");
+		else
+			*tt = EOS;
+
+		/* FIXME: this is a hack to prevent this function from
+		 * returning device-level strings, since (at the moment) I
+		 * don't have anything that returns a list of the mounted
+		 * devices on a VMS system.
+		 */
+		if (!strcmp(ss, "/")) {
+			(void)strcpy(ss, current_directory(FALSE));
+			if ((tt = strchr(ss, ':')) != 0)
+				(void)strcpy(tt+1, "[000000]");
+			else
+				(void)strcat(ss, ":");
+			(void)mkupper(ss);
+		} else {
+			unix2vms_path(ss, ss);
+		}
+	}
+#endif
+	TRACE((" -> '%s' canonpath\n", ss))
 	return ss;
 }
 
@@ -549,7 +586,7 @@ int keep_cwd;
 	char *ff;
 	char *slp;
 	char *f;
-#if VMS
+#if OPT_VMS_PATH
 	char *dot;
 #endif
 
@@ -559,64 +596,76 @@ int keep_cwd;
 	if (isInternalName(path))
 		return path;
 
+	TRACE(("shorten '%s'\n", path))
 	if ((f = is_appendname(path)) != 0)
 		return (shorten_path(f, keep_cwd) != 0) ? path : 0;
 
-#if VMS
+#if OPT_VMS_PATH
 	/*
 	 * This assumes that 'path' is in canonical form.
 	 */
 	cwd = current_directory(FALSE);
-	slp = ff = path;
+	ff  = path;
 	dot = 0;
+	TRACE(("current '%s'\n", cwd))
 
-	(void)strcpy(temp, "[");	/* hoping for relative-path */
-	while (*cwd && *ff) {
-		if (*cwd != *ff) {
-			if (*cwd == ']' && *ff == '.') {
-				;	/* "[.DIRNAME]FILENAME.TYP;1" */
-			} else if (*cwd == '.' && *ff == ']') {
-				/* "[-]FILENAME.TYP;1" */
-				while (*cwd != EOS) {
-					if (*cwd++ == '.')
-						(void)strcat(temp, "-");
-				}
-			} else if (dot != 0) {
-				/* "[-.DIRNAME]FILENAME.TYP;1" */
-				while (*dot != EOS) {
-					if (*dot == ']')
-						break;
-					if (*dot++ == '.') {
-						(void)strcat(temp, "-");
-						if (dot == ff) {
-							(void)strcat(temp, ".");
-							break;
+	if ((slp = strchr(cwd, '[')) != 0
+	 && (slp == cwd
+	  || !strncmp(cwd, path, (SIZE_T)(slp-cwd)))) { /* same device? */
+	  	ff += (slp-cwd);
+		cwd = slp;
+		(void)strcpy(temp, "[");	/* hoping for relative-path */
+		while (*cwd && *ff) {
+			if (*cwd != *ff) {
+				if (*cwd == ']' && *ff == '.') {
+					/* "[.DIRNAME]FILENAME.TYP;1" */
+					;
+				} else if (*cwd == '.' && *ff == ']') {
+					/* "[-]FILENAME.TYP;1" */
+					while (*cwd != EOS) {
+						if (*cwd++ == '.')
+							(void)strcat(temp, "-");
+					}
+					(void)strcat(temp, "]");
+					ff++;
+				} else if (dot != 0) {
+					/* "[-.DIRNAME]FILENAME.TYP;1" */
+					while (*cwd != EOS) {
+						if (*cwd++ == '.')
+							(void)strcat(temp, "-");
+					}
+					if (dot != ff) {
+						while (dot != ff) {
+							if (*dot++ == '.')
+								(void)strcat(temp, "-");
 						}
+						(void)strcat(temp, ".");
 					}
 				}
-				ff = dot;
-			} else
 				break;
-			return strcpy(path, strcat(temp, ff));
+			} else if (*cwd == ']') {
+				(void)strcat(temp, cwd);
+				ff++;	/* path-leaf, if any */
+				break;
+			}
+
+			if (*ff == '.')
+				dot = ff;
+			cwd++;
+			ff++;
 		}
-		switch (*ff) {
-		case ']':	slp = ff;	break;
-		case '.':	dot = ff;
-		}
-		cwd++;
-		ff++;
+	} else {
+		*temp = EOS;		/* different device, cannot relate */
 	}
 
-	if (*cwd == EOS) {	/* "[]FILENAME.TYP;1" */
-		if (keep_cwd)
-			(void)strcat(temp, "]");
-		else
-			*temp = EOS;
-		return strcpy(path, strcat(temp, ff));
-	}
-#endif
+	if (!strcmp(temp, "[]")		/* "[]FILENAME.TYP;1" */
+	 && !keep_cwd)
+		*temp = EOS;
 
-#if UNIX || MSDOS || WIN31 || OS2 || NT
+	(void) strcpy(path, strcat(temp, ff));
+	TRACE(("     -> '%s' shorten\n", path))
+#else
+# if UNIX || OPT_MSDOS_PATH
 	cwd = current_directory(FALSE);
 	slp = ff = path;
 	while (*cwd && *ff && *cwd == *ff) {
@@ -651,10 +700,29 @@ int keep_cwd;
 		return strcpy(path, strcat(strcpy(temp, ".."), slp));
 
 	/* we're off by more than just '..', so use absolute path */
-#endif	/* UNIX || MSDOS */
+# endif	/* UNIX || MSDOS */
+#endif	/* OPT_VMS_PATH */
 
 	return path;
 }
+
+#if OPT_VMS_PATH
+static int mixed_case P((char *));
+
+static int
+mixed_case(path)
+char *path;
+{
+	register int c;
+	int	had_upper = FALSE;
+	int	had_lower = FALSE;
+	while ((c = *path++) != EOS) {
+		if (islower(c))	had_lower = TRUE;
+		if (isupper(c))	had_upper = TRUE;
+	}
+	return (had_upper && had_lower);
+}
+#endif
 
 /*
  * Undo nominal effect of 'shorten_path()'
@@ -673,7 +741,7 @@ char *path;
 	char	*cwd;
 	char	*f;
 	char	temp[NFILEN];
-#if MSDOS || WIN31 || OS2 || NT
+#if OPT_MSDOS_PATH
 	char	drive;
 #endif
 
@@ -683,13 +751,29 @@ char *path;
 	if ((f = path) == 0)
 		return path;
 
-	if (*path != EOS && isInternalName(path))
+	if (*path != EOS && isInternalName(path)) {
+#if OPT_VMS_PATH
+	    /*
+	     * The conflict between VMS pathnames (e.g., "[-]") and Vile's
+	     * scratch-buffer names is a little ambiguous.  On VMS, though,
+	     * we'll have to give VMS pathnames the edge.  We cheat a little,
+	     * by exploiting the fact (?) that the system calls return paths
+	     * in uppercase only.
+	     */
+	    if (!is_vms_pathname(path, TRUE) && !mixed_case(path))
+#endif
 		return path;
+	}
 
 #if UNIX
 	(void)home_path(f);
 #endif
 
+#if OPT_VMS_PATH2_patch
+	if (!is_vms_pathname(path, -TRUE)) {
+		unix2vms_path(path, path);
+	}
+#endif
 #if VMS
 	/*
 	 * If the file exists, we can ask VMS to tell the full pathname.
@@ -733,13 +817,19 @@ char *path;
 			my_esa[my_nam.nam$b_esl] = EOS;
 			return strcpy(path, my_esa);
 		} else {
-			/* later: try to expand partial directory specs, etc. */
+			/* FIXME: try to expand partial directory specs, etc. */
 		}
 	}
+#else
+# if OPT_VMS_PATH
+	/* this is only for testing! */
+	if (fakevms_filename(path))
+		return path;
+# endif
 #endif
 
-#if UNIX || MSDOS || WIN31 || OS2 || NT
-#if MSDOS || WIN31 || OS2 || NT
+#if UNIX || OPT_MSDOS_PATH || OPT_VMS_PATH
+#if OPT_MSDOS_PATH
 	if ((f = is_msdos_drive(path)) != 0)
 		drive = *path;
 	else {
@@ -753,7 +843,13 @@ char *path;
 #else
 		cwd = current_directory(FALSE);
 #endif
-		len = strlen(strcpy(temp, cwd));
+		(void)strcpy(temp, cwd);
+#if OPT_VMS_PATH
+		vms2unix_path(temp, cwd);
+#else
+		(void)strcpy(temp, cwd);
+#endif
+		len = strlen(temp);
 		temp[len++] = SLASHC;
 #if DJGPP
 		temp[0] = SLASHC;  /* DJGCC returns '/', we may want '\' */
@@ -761,7 +857,7 @@ char *path;
 		(void)strcpy(temp + len, f);
 		(void)strcpy(path, temp);
 	}
-#if MSDOS || WIN31 || OS2
+#if OPT_MSDOS_PATH
 	if (is_msdos_drive(path) == 0) { /* ensure that we have drive too */
 		temp[0] = curdrive();
 		temp[1] = ':';
@@ -790,12 +886,12 @@ char *path;
 	if ((f = is_appendname(path)) != 0)
 		return is_pathname(f);
 
-#if VMS
+#if OPT_VMS_PATH
 	if (is_vms_pathname(path, -TRUE))
 		return TRUE;
 #endif
 
-#if UNIX || MSDOS || WIN31 || VMS || OS2 || NT
+#if UNIX || OPT_MSDOS_PATH || VMS
 	if ((f = path) != 0) {
 #if UNIX
 		if (f[0] == '~')
@@ -810,7 +906,7 @@ char *path;
 				return TRUE;
 		}
 	}
-#endif	/* UNIX || MSDOS */
+#endif	/* UNIX || OPT_MSDOS_PATH || VMS */
 
 	return FALSE;
 }
@@ -825,13 +921,13 @@ char *fn;
 {
 	if (is_pathname(fn))	/* test the obvious stuff */
 		return TRUE;
-#if MSDOS || WIN31 || OS2 || NT
+#if OPT_MSDOS_PATH
 	if (is_msdos_drive(fn))
 		return TRUE;
 #endif
 	if (last_slash(fn) != 0)
 		return TRUE;
-#if VMS
+#if OPT_VMS_PATH
 	while (*fn != EOS) {
 		if (ispath(*fn) && !isident(*fn))
 			return TRUE;
@@ -888,7 +984,7 @@ int
 is_internalname(fn)
 char *fn;
 {
-#if VMS
+#if OPT_VMS_PATH
 	if (is_vms_pathname(fn, FALSE))
 		return FALSE;
 #endif
@@ -906,7 +1002,7 @@ char *	path;
 {
 	struct	stat	sb;
 
-#if VMS
+#if OPT_VMS_PATH
 	register char *s;
 	if (is_vms_pathname(path, TRUE)) {
 		return TRUE;
@@ -929,7 +1025,7 @@ char *	path;
 	  &&	((sb.st_mode & S_IFMT) == S_IFDIR));
 }
 
-#if (UNIX||VMS||MSDOS||WIN31||OS2||NT) && PATHLOOK
+#if (UNIX||VMS||OPT_MSDOS_PATH) && PATHLOOK
 /*
  * Parse the next entry in a list of pathnames, returning null only when no
  * more entries can be parsed.

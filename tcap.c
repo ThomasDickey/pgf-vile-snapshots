@@ -1,7 +1,7 @@
 /*	tcap:	Unix V5, V7 and BS4.2 Termcap video driver
  *		for MicroEMACS
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/tcap.c,v 1.42 1994/09/23 04:21:19 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/tcap.c,v 1.46 1994/10/30 16:26:37 pgf Exp $
  *
  */
 
@@ -26,9 +26,31 @@ char *TI, *TE, *KS, *KE;
 char *CS, *dl, *al, *DL, *AL, *SF, *SR;
 #endif
 
+#if OPT_VIDEO_ATTRS
+static char *US;	/* underline-start */
+static char *UE;	/* underline-end */
+static char *ME;
+static char *MD;
+#endif
+
 #if OPT_FLASH
 char *vb;	/* visible-bell */
 #endif
+
+#if COLOR
+static	int	ctrans[NCOLORS];
+	/* ansi to ibm color translation table */
+static	char *	initpalettestr = "0 1 2 11 4 5 6 7";
+	/* black, red, green, yellow, blue, magenta, cyan, white   */
+/*
+ * We don't really _know_ what the default colors are set to, so the initial
+ * values of the current_[fb]color are set to an illegal value to force the
+ * colors to be set.
+ */
+static	int	current_fcolor = -1;
+static	int	current_bcolor = -1;
+
+#endif /* COLOR */
 
 static struct {
     char * capname;
@@ -40,11 +62,15 @@ static struct {
     { "kd",	SPEC|'B',	NULL },		/* down */
     { "kr",	SPEC|'C',	NULL },		/* right */
     { "kl",	SPEC|'D',	NULL },		/* left */
+    /* other cursor-movement */
+    { "kh",	SPEC|'h',	NULL },		/* home */
+    { "kH",	SPEC|'H',	NULL },		/* end */
     /* page scroll */
     { "kN",	SPEC|'n',	NULL },		/* next page */
     { "kP",	SPEC|'p',	NULL },		/* previous page */
     /* editing */
     { "kI",	SPEC|'i',	NULL },		/* Insert */
+    { "kD",	SPEC|'d',	NULL },		/* Delete */
     { "@0",	SPEC|'f',	NULL },		/* Find */
     { "*6",	SPEC|'s',	NULL },		/* Select */
     /* command */
@@ -78,6 +104,17 @@ extern int tgetnum P((char * ));
 extern char *tgetstr P((char *, char **));
 extern int tputs P((char *, int, void(*_f)(int) ));
 
+#if COLOR
+extern void tcapfcol P(( int ));
+extern void tcapbcol P(( int ));
+#endif
+
+#if OPT_VIDEO_ATTRS
+extern void tcapattr P(( int ));
+#else
+extern void tcaprev  P(( int ));
+#endif
+
 TERM term = {
 	0,	/* these four values are set dynamically at open time */
 	0,
@@ -97,11 +134,15 @@ TERM term = {
 	tcapeeol,
 	tcapeeop,
 	tcapbeep,
+#if OPT_VIDEO_ATTRS
+	tcapattr,
+#else
 	tcaprev,
+#endif
 	tcapcres
 #if	COLOR
-	, tcapfcol,
-	tcapbcol
+	, tcapfcol
+	, tcapbcol
 #endif
 #if	SCROLLCODE
 	, NULL		/* set dynamically at open time */
@@ -163,7 +204,6 @@ tcapopen()
 	if ((term.t_nrow <= 1) && (term.t_nrow=(short)tgetnum("li")) == -1) {
 		term.t_nrow = 24;
 	}
-
 
 	if ((term.t_ncol <= 1) &&(term.t_ncol=(short)tgetnum("co")) == -1){
 		term.t_ncol = 80;
@@ -251,8 +291,23 @@ tcapopen()
 #if OPT_FLASH
 	vb = tgetstr("vb", &p);
 #endif
+#if	COLOR
+	spal(initpalettestr);
+#endif
+#if OPT_VIDEO_ATTRS
+	ME = tgetstr("me", &p);
+	MD = tgetstr("md", &p);
+#if !(IBM_VIDEO && COLOR)
+	US = tgetstr("us", &p);		/* underline-start */
+	UE = tgetstr("ue", &p);		/* underline-end */
+	if (US == 0 && UE == 0) {	/* if we don't have underline, do bold */
+		US = MD;
+		UE = ME;
+	}
+#endif
+#endif
 
-	for (i = SIZEOF(keyseqs); i--; ) {
+	for (i = TABLESIZE(keyseqs); i--; ) {
 	    keyseqs[i].seq = tgetstr(keyseqs[i].capname, &p);
 	    if (keyseqs[i].seq)
 		addtomaps(keyseqs[i].seq, keyseqs[i].code);
@@ -274,6 +329,15 @@ tcapopen()
 void
 tcapclose()
 {
+	if (ME)	/* end special attributes (including color) */
+		putpad(ME);
+	tcapmove(term.t_nrow-1, 0);
+	tcapeeol();
+#if COLOR
+	current_fcolor =
+	current_bcolor = -1;
+#endif
+
 	if (TE)
 		putnpad(TE, (int)strlen(TE));
 	if (KE)
@@ -315,24 +379,11 @@ tcapeeol()
 void
 tcapeeop()
 {
+#if	COLOR
+	tcapfcol(gfcolor);
+	tcapbcol(gbcolor);
+#endif
 	putpad(CL);
-}
-
-void
-tcaprev(state)		/* change reverse video status */
-int state;		/* FALSE = normal video, TRUE = reverse video */
-{
-	static int revstate = -1;
-	if (state == revstate)
-		return;
-	revstate = state;
-	if (state) {
-		if (SO != NULL)
-			putpad(SO);
-	} else {
-		if (SE != NULL)
-			putpad(SE);
-	}
 }
 
 /*ARGSUSED*/
@@ -428,25 +479,160 @@ int top,bot;
 
 #endif
 
+#if OPT_EVAL || COLOR
 /* ARGSUSED */
 void
-spal(dummy)	/* change palette string */
-char *dummy;
+spal(thePalette)	/* reset the palette registers */
+char *thePalette;
 {
-	/*	Does nothing here	*/
+#if COLOR
+    	/* this is pretty simplistic.  big deal. */
+	(void)sscanf(thePalette,"%i %i %i %i %i %i %i %i",
+	    	&ctrans[0], &ctrans[1], &ctrans[2], &ctrans[3],
+	    	&ctrans[4], &ctrans[5], &ctrans[6], &ctrans[7] );
+#endif
 }
+#endif /* OPT_EVAL */
 
 #if	COLOR
 void
-tcapfcol()	/* no colors here, ignore this */
+tcapfcol(color)
+int color;
 {
+	if (color != current_fcolor) {
+#if IBM_VIDEO
+		char	str[20];
+# ifdef linux
+		if (i_am_xterm)
+			return;
+# endif
+		(void) lsprintf(str, "%c[%d;%dm",
+			ESC,
+			(ctrans[color] > 7),		/* bold? */
+			30 + (ctrans[color] & 7));	/* foreground */
+		putpad(str);
+#endif
+		current_fcolor = color;
+	}
 }
 
 void
-tcapbcol()	/* no colors here, ignore this */
+tcapbcol(color)
+int color;
 {
-}
+	if (color != current_bcolor) {
+#if IBM_VIDEO
+		char	str[20];
+# ifdef linux
+		if (i_am_xterm)
+			return;
+# endif
+		(void) lsprintf(str, "%c[%dm",
+			ESC,
+			40 + (ctrans[color] & 7));	/* background */
+		putpad(str);
 #endif
+		current_bcolor = color;
+	}
+}
+#endif /* COLOR */
+
+#if OPT_VIDEO_ATTRS
+/*
+ * NOTE:
+ * On Linux console, the 'me' termcap setting \E[m resets _all_ attributes,
+ * including color.  However, if we use 'se' instead, it doesn't clear the
+ * boldface.  To compensate, we reset the colors when we put out 'me'.
+ *
+ * The color logic is disabled for Linux xterm, because the eeop and eeol
+ * operations don't seem to propagate the colors (they're left untouched). 
+ * Also, setting _any_ attribute seems to clobber the color settings.  (The
+ * latter problem could be "fixed" by alway emitting a complete escape sequence
+ * for all attributes - boldface, reverse, color), but the former breaks the
+ * screen optimization logic.
+ */
+void
+tcapattr(attr)
+int attr;
+{
+	static	struct	{
+		char	**start;
+		char	**end;
+		int	mask;
+	} tbl[] = {
+		{ &SO, &SE, VASEL|VAREV },
+		{ &US, &UE, VAUL },
+#if !(IBM_VIDEO && COLOR)
+		{ &US, &UE, VAITAL },
+		{ &MD, &ME, VABOLD },
+#else
+		{ &MD, &ME, VAITAL|VABOLD }, /* treat italics like bold */
+#endif
+	};
+	static	int last;
+
+	attr = VATTRIB(attr);	/* FIXME: color? */
+
+	if (attr != last) {
+		register int n;
+		register char *s;
+		int	diff = attr ^ last;
+		int	ends = FALSE;
+
+		for (n = 0; n < TABLESIZE(tbl); n++) {
+			if (tbl[n].mask & diff) {
+				if (tbl[n].mask & attr) {
+					if ((s = *(tbl[n].start)) != 0) {
+						putpad(s);
+					}
+				} else if ((s = *(tbl[n].end)) != 0) {
+					putpad(s);
+					if (s == ME || s == UE) {
+#ifdef linux
+						int save_fc = current_fcolor;
+						int save_bc = current_bcolor;
+						current_fcolor = -1;
+						current_bcolor = -1;
+						tcapfcol(save_fc);
+						tcapbcol(save_bc);
+#endif
+						ends = TRUE;
+					}
+				}
+				diff &= ~(tbl[n].mask);
+			}
+		}
+		if (SO != 0 && SE != 0) {
+			if (ends && (attr & (VAREV|VASEL))) {
+				putpad(SO);
+			} else if (diff) {	/* we didn't find it */
+				putpad(SE);
+			}
+		}
+		last = attr;
+	}
+}
+
+#else	/* highlighting is a minimum attribute */
+
+void
+tcaprev(state)		/* change reverse video status */
+int state;		/* FALSE = normal video, TRUE = reverse video */
+{
+	static int revstate = -1;
+	if (state == revstate)
+		return;
+	revstate = state;
+	if (state) {
+		if (SO != NULL)
+			putpad(SO);
+	} else {
+		if (SE != NULL)
+			putpad(SE);
+	}
+}
+
+#endif	/* OPT_VIDEO_ATTRS */
 
 void
 tcapbeep()

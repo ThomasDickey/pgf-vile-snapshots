@@ -1,7 +1,7 @@
 ------------------------
 vile bug/enhancement/wish list
 ------------------------
-$Header: /usr/build/VCS/pgf-vile/RCS/buglist,v 1.194 1994/09/27 01:49:15 pgf Exp $
+$Header: /usr/build/VCS/pgf-vile/RCS/buglist,v 1.200 1994/10/31 15:16:01 pgf Exp $
 ----------------------
 	(E means enhancement, L,M,H are low, medium, high priority)
 
@@ -12,7 +12,6 @@ E	add ":n file"
 	    :n file means go to that specific file - one can specify a
 	    +<cmd> before file to indicate the vi command which should be
 	    executed when entering the command.)
-
 
 E	now that paragraphs, sections, and sentences are all selectable
 	with regexps, they (and the tabstop value) are prime candidates for
@@ -38,9 +37,6 @@ E	the scrsearch functions could become region based -- as in "search for
 
 E	g should become a region command.  Then it could take ranges, as
 	it should, and could also become an operator command.
-
-E	adjust window size of popups based on length of buffer.  currently
-	popups get half the window they're splitting, no matter what
 
 E	collapse command execution code to as few places as possible.
 	Its currently spread through execute(), operator(),
@@ -93,17 +89,6 @@ E	should ifdef the 'autobuffer' code for users who do not need vi-style
     (to copy and move text around.  e.g., :'a,'bt$.)
 
 --------------------------------
-486 PC under Dell Unix (svr4) - make:    unixpc
-HP9000/700 under HPUX 8.07    - changes: do not include <Xos.h> in x11.c when
-                                         hpux is defined
-                                incs:    add -I/usr/include/X11R4
-                                libs:    add -L/usr/lib/X11R4
-                                make:    hpux
-Tektronix XD88/10 under UTekV - changes: removed LIBS definition from svr3 rule
-                                         in makefile to make xvile
-                                cflags:  add -DSYSV -X28
-                                make:    svr3
-----------------------------------------------------------------------
 
 Though I use it, I'm still not quite satisfied with the qident stuff.  It
 needs to be more flexible.  That is, I'd like to make it user defined.
@@ -218,23 +203,12 @@ Unfinished items on vax/vms (dickey@software.org):
 	  (Note that if the _device_ portion has changed, the original
 	  directory should be restored anyway!).
 
-	+ filename-completion works too slowly on vms; may be doing stat calls
-	  or something else.  Also, it does not seem to start properly with
-
-	  	":e e?".
-
 	+ add key bindings and other support to make the vt100 keypad work for
 	  me (e.g., like EDT).
 
 	+ see if I can decode ".dia" files, if so connect it to finderr.c
 
 	+ catch exception/signals, and restore terminal settings.
-
-	+ make dec-shell names work in file-completion.  These are quasi-unix
-	  filenames, which most of the VAX-C runtime routines accept.  If _all_
-	  runtime code could use dec-shell names, I wouldn't have done any
-	  native vms pathnames (sigh).  As it is, all dec-shell names are
-	  automatically converted to vms-pathnames (i.e., by 'getname()').
 
 	+ make write-pipes work (actually, flesh out to use 'npopen' coding
 	  scheme, like the MSDOS stuff).
@@ -380,13 +354,6 @@ buffers at other times as well).
 This would be most useful for the edit, make, execute cycle.
 ---------------------------
 
-Is it possible to bind keys which give a sequence like ^[[5~, that is other
-than ^[O<char.>, longer than 3 chars?
-[ not currently  -pgf ]
-
-
----------------------
-
 you can't use ! as a regular expression delimiter, as in:
 	:s!pat!replace!g
 because the parser treats ":s!" as if it's ":q!" or ":w!".
@@ -417,60 +384,6 @@ defining a keyboard macro, vile seems to go to an infinite loop (but can
 be stopped by Ctrl-C).    (still a problem in 4.6)
 
 ------------------------
-
-
-I found something strange in xvile: if a specify a startup file with @
-it dumps core:
-
-xvile @.vilerc
-
-segmentation fault (core dumped)
-
-[unreproducible here.  -pgf ]
-
-------------------------
-
-I compiled Xvile for hpux and had a problem with x11.c, because the X11R4
-Xos.h include file does its own definitions for struct timeval when USG
-is defined.  Thus I undefined USG before Xos.h was included and re-defined it
-afterwards, like
-
-#include        <X11/keysym.h>
-#ifdef USG
-#define RESTORE_USG
-#undef USG
-#endif
-#include        <X11/Xos.h>
-#ifdef RESTORE_USG
-#define USG
-#endif
-#include        <X11/Xatom.h>
-
-
--------------------------------------------------------------------------------
-
-Hi, This is to report a 'xvile' v3.65 problem:
-
-- With the defaults (no ~/.vilerc), if I use :e to edit a file, then
-  use :e again, but instead of inputing a filename, if I press ^C it
-  aborts the action. However if I have ~/.vilerc
-	set-terminal name-complete \e
-  the above doesn't work (the interrupt function
-  doesn't work when completing a filename)...
-
-- Once I got a very strange thing -- with the "set-terminal" command in
-  my ~/.vilerc, I was editing several files. Then I tried to use the :e
-  command to bring in another file. But then I realized that's not what
-  I wanted, so I hit ^C (I'm not sure whether I hit ESC by accident or
-  not). Then 'xvile' displayed a "working..." note at the bottom right
-  corner -- after 2 or 3 seconds, the X server (X11R5, patch level 24,
-  SunOS 4.1.3) crashed!
-
-  However I couldn't reproduce this... I don't know what exactly I
-  typed... Just let you know...
-
-------------------------
-
 
 
 2) When I use the MKS "fmt" program to format a paragraph in vile, a
@@ -525,11 +438,6 @@ any machine in the whole wide world _except_ the HP OmniBook.  :-)
 
 ----------------------------
 
-it might be nice to have an easy way to deselect text, since it is
-sometimes visually annoying
-
-----------------------------
-
 I was wondering if there was a list anywhere of which commands take what
 arguments.  I have the definitive list of commands, but I wasn't able to
 find anywhere in the source code that there is a list of the commands AND
@@ -539,10 +447,6 @@ their arguments.  This would really help in macro programming.
 
 Another thing that would be really helpful would be a description of the
 $debug variable, and what it does, how it works.
-
-------------------------------------
-
-the "yW" command doesn't eat whitespace.  it should, just as "dW" does.
 
 -------------------------------
 
@@ -566,10 +470,6 @@ make it possible for users to filter it.
 
 -----------------
 
-the .bak backups under DOS should be optional and/or they should be available
-under UNIX as well.
-
-----------
 
 autoindent skips blank lines when looking for the
 indent value.  apparently real vi doesn't?
@@ -588,60 +488,6 @@ long-running operations.
 
 should switch to distributing with a tar archive instead of shar.   much
 faster, and probably portable, these days.
-
--------------------------
-
-[ need to verify this: ]
-
-    I played around with the new selection feature and noticed that
-    "backward" selection extension does not work the same as
-    "forward" selection extension.  Briefly, "forward" selection
-    extension does what is documented in vile.hlp.  "Backward"
-    selection extension, however, does not always extend the
-    selection, but sometimes starts it from a new point of reference
-    in the buffer.
-
-    A concrete example...
-
-    Mappings:
-
-    ; rebind Select functionality
-    bind-key selection  ^O
-    bind-key select-til S
-
-    Buffer contents (4 lines and only these 4 lines):
-
-    1
-    22
-    333
-    4444
-
-    Place the cursor on line #1 (text == 1) and enter these keystrokes:
-
-	Sj     ; select top 2 lines of buffer
-
-    Place the cursor on line #4 (text == 4444) and enter these keystrokes:
-
-	S^O    ; extend selection to end of buffer
-
-    At this point, all text in the buffer is highlighted (as expected).
-    No problems so far.  Now, here's the behavior I would classify as a
-    possible bug:
-
-    Place the cursor on line #3 (text == 333) and enter these keystrokes:
-
-	SG     ; select bottom two lines of buffer.
-
-    Place the cursor on line #1 (text == 1) and enter these keystrokes:
-
-	S^O    ; extend selection to top of buffer.
-
-    At this point, only the first three lines of the buffer are selected.
-    I would have expected all lines in the buffer to be selected.
-
-    I also dropped core once while fooling around with backward 
-    selection, but was unable to duplicate the problem.
-
 
 -------------------------
 
@@ -668,12 +514,6 @@ implementation.
 
 there should be a way to reference both the global and local values
 of modes from within macros, so that values can be saved and restored.
-
--------------------------
-
-from tom, a while ago.  still true?
-        + I ran into a bug in line-wrap: I don't think it takes tabs into
-          account (I saved the test case at work).
 
 -------------------------
 
@@ -724,29 +564,9 @@ there's no way to get buffer status from within a macro, like "modified"
 
 ----------------------------
 
-Carriage returns in the replacement pattern should become newlines:
-
-example:
-    darkstar brad kgillesp zerrenner amylia
-
-    vile: after :%s/ /^M/g
-
-    darkstar^Mbrad^Mkgillesp^Mzerrenner^Mamylia
-
-    vi: after :%s/ /^M/g
-
-    darkstar
-    brad
-    kgillesp
-    zerrenner
-    amylia
-
----------------
-
 some folks would like to see smooth-scrolling enforced.  it seems they
 have keyboards that repeat just a little faster than their screen can keep up,
 and they'd like vile to scroll rather than jump with the typahead.
-
 
 -----------
 
@@ -761,6 +581,12 @@ and they'd like vile to scroll rather than jump with the typahead.
 	I am use vile 4.5 and xvile on HP/UX 9.01.
 	I use vuewm as my window manager (a motif variant).
 
+      [I would guess that the suspicion of the person reporting the bug
+       is correct concerning the behavior of the window manager during
+       maximization.  I don't have this problem with fvwm. pgf's changes
+       to eliminate the hardcoded maximum width and height will probably
+       fix the core dumps.  I'll look into seeing if there is some protocol
+       which we're not observing with regard to maximization.  -kev]
 
 ------------------
       - I would like an option whereby if I have more than one file on
@@ -777,3 +603,17 @@ characters.  consider the bindkey style in tcsh
 that uses \e as ESC, \r as consider return etc.  vile is not
 just a vi emulator anyway.  ]
 ----------------------
+
+if a rectangle is selected, and then deleted, a one-column high-lighted
+rectangle is left on the screen.  it should go away completely.
+
+----------------
+
+if you have lines like
+	123
+	1234
+	12
+it's impossible to select them as a rectangle, since the middle line is
+longest.
+
+
