@@ -6,7 +6,17 @@
  * internal use.
  *
  * $Log: region.c,v $
- * Revision 1.41  1994/03/18 18:30:38  pgf
+ * Revision 1.44  1994/03/29 14:51:00  pgf
+ * fix buffer size passed to mlreply
+ *
+ * Revision 1.43  1994/03/28  17:16:51  pgf
+ * typo
+ *
+ * Revision 1.42  1994/03/28  16:21:01  pgf
+ * make sure all functions called by do_lines_in_region() are prepared
+ * to handle empty lines, since they may now get them
+ *
+ * Revision 1.41  1994/03/18  18:30:38  pgf
  * fixes for OPT_MAP_MEMORY compilation
  *
  * Revision 1.40  1994/03/15  18:33:09  pgf
@@ -100,14 +110,15 @@ int 	l, r;
 {
 	int s;
 	int save = *(int *)flagp;
+	LINE *lp = l_ref(DOT.l);
 
 	s = detabline((void *)FALSE, 0, 0);
 	if (s != TRUE) return s;
 
 	DOT.o = l;
 
-	if (r > lLength(DOT.l))
-	    r = lLength(DOT.l);
+	if (r > llength(lp))
+	    r = llength(lp);
 
 	if (r > l) {
 	    s = ldelete(r - l, save);
@@ -174,19 +185,21 @@ int 	l, r;
 	int len;
 	int s;
 	int saveo = DOT.o;
+	LINE *lp = l_ref(DOT.l);
 
 	s = detabline((void *)FALSE, 0, 0);
 	if (s != TRUE) return s;
 
-	if (lLength(DOT.l) <= l) {	/* nothing to do if no string */
+	if (llength(lp) <= l) {	/* nothing to do if no string */
 		if (!string) {
 		    if (b_val(curbp,MDTABINSERT))
 			    s = entabline((void *)TRUE, 0, 0);
 		    DOT.o = saveo;
 		    return s;
 		} else {
-		    DOT.o = lLength(DOT.l);
-		    linsert(l - DOT.o, ' ');
+		    DOT.o = llength(lp);
+		    if (l - DOT.o)
+			linsert(l - DOT.o, ' ');
 		}
 	}
 	DOT.o = l;
@@ -225,7 +238,7 @@ stringrect()
 	int             s;
 	static char     buf[NLINE];
 
-	s = mlreply("Rectangle text: ", buf, sizeof(buf) -1 );
+	s = mlreply("Rectangle text: ", buf, sizeof(buf) );
 	if (s != TRUE)
 		return s;
 
@@ -249,9 +262,12 @@ void 	*flagp;
 int 	l, r;
 {
 	int s, t;
-	if (b_val(curbp, MDCMOD) &&
-		lLength(DOT.l) > 0 && char_at(DOT) == '#')
+	LINE *lp = l_ref(DOT.l);
+	if (llength(lp) == 0 || (b_val(curbp, MDCMOD) && 
+					llength(lp) > 0 && 
+					char_at(DOT) == '#')) {
 		return TRUE;
+	}
 	s = curswval;
 	t = curtabval;
 	DOT.o = w_left_margin(curwp);
@@ -296,6 +312,9 @@ int	l,r;
 	register int	lim;
 	register int	s;
 	register LINE *linep = l_ref(DOT.l);
+
+	if (llength(linep) == 0)
+		return TRUE;
 
 	s = curswval;
 
@@ -349,13 +368,17 @@ int l, r;
 	register int	c;
 	int	ocol;
 	int leadingonly = (int)flagp;
+	LINE *lp = l_ref(DOT.l);
+
+	if (llength(lp) == 0)
+		return TRUE;
 
 	ocol = getccol(FALSE);
 
 	DOT.o = 0;
 
 	/* detab the entire current line */
-	while (DOT.o < lLength(DOT.l)) {
+	while (DOT.o < llength(lp)) {
 		c = char_at(DOT);
 		if (leadingonly && !isspace(c))
 			break;
@@ -397,6 +420,10 @@ int l, r;
 	register char cchar;	/* current character */
 	int	ocol;
 	int leadingonly = (int)flagp;
+	LINE *lp = l_ref(DOT.l);
+
+	if (llength(lp) == 0)
+		return TRUE;
 
 	ocol = getccol(FALSE);
 
@@ -420,7 +447,7 @@ int l, r;
 				fspace = -1;
 			}
 
-		if (DOT.o >= lLength(DOT.l))
+		if (DOT.o >= llength(lp))
 			break;
 
 		/* get the current character */
@@ -463,6 +490,10 @@ int	l, r;
 
 	lp = l_ref(DOT.l);
 
+	if (llength(lp) == 0)
+		return TRUE;
+
+
 	off = llength(lp)-1;
 	orig = off;
 	while (off >= 0) {
@@ -500,28 +531,30 @@ int	l, r;
 	int len;
 	int s;
 	int saveo;
+	LINE *lp = l_ref(DOT.l);
 
 	saveo = l;
 
 	s = detabline((void *)FALSE, 0, 0);
 
-	if (lLength(DOT.l) <= l) {	/* nothing to do if no string */
+	if (llength(lp) <= l) {	/* nothing to do if no string */
 		if (!string) {
 		    if (b_val(curbp,MDTABINSERT))
 			    s = entabline((void *)TRUE, 0, 0);
 		    DOT.o = saveo;
 		    return s;
 		} else {
-		    DOT.o = lLength(DOT.l);
-		    linsert(l - DOT.o, ' ');
+		    DOT.o = llength(lp);
+		    if (l - DOT.o)
+			linsert(l - DOT.o, ' ');
 		}
 	}
 
 	DOT.o = l;
 
-	if (lLength(DOT.l) <= r) {
+	if (llength(lp) <= r) {
 	    	/* then the rect doesn't extend to the end of line */
-		ldelete(lLength(DOT.l) - l, FALSE);
+		ldelete(llength(lp) - l, FALSE);
 
 		/* so there's nothing beyond the rect, so insert at
 			most r-l chars of the string, or nothing */
@@ -893,6 +926,9 @@ REGION	*rp;
 	return status;
 }
 
+
+/* the (*linefunc)() routine that this calls _must_ be prepared to
+	to get empty lines passed to it from this routine. */
 int
 do_lines_in_region(linefunc,argp,convert_cols)
 int (*linefunc) P((void *, int, int));
@@ -992,12 +1028,12 @@ int	ll, rr;		/* offsets of of chars to be processed */
 	lp = l_ref(DOT.l);
 
 
-	if (lLength(DOT.l) < ll)
+	if (llength(lp) < ll)
 		return TRUE;
 
 	DOT.o = ll;
-	if (rr > lLength(DOT.l))
-		rr = lLength(DOT.l);
+	if (rr > llength(lp))
+		rr = llength(lp);
 
 	for (i = ll; i < rr; i++) {
 		c = lgetc(lp,i);

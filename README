@@ -149,3 +149,19 @@ about djgpp, the DOS port of djgcc, but take a look at makefile.djg.
 
 pgf
 
+
+-------------------------------
+
+3/94
+
+The X support in xvile has been given a huge boost with contributions from
+Kevin Buettner -- scrollbars, Motif widget support make it feel like a real
+application...  We now have rectangular regions.  DOS support is getting
+better all the time.  The major version number got bumped to 4 somewhere
+along the line, because Tom and I were getting tired of 3.  There are quite
+a few new "modes", some to support vi functionality, some altogether new. 
+We should have keyboard selections and highlighted regions soon...
+
+pgf, work: pgf@cayman.com,  home: pgf@foxharp.boston.ma.us
+
+-------------------------------

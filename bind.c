@@ -4,7 +4,10 @@
  *	written 11-feb-86 by Daniel Lawrence
  *
  * $Log: bind.c,v $
- * Revision 1.69  1994/03/02 09:47:48  pgf
+ * Revision 1.70  1994/03/29 14:30:04  pgf
+ * allow for '-' in command names (i.e. it's not punctuation in that case)
+ *
+ * Revision 1.69  1994/03/02  09:47:48  pgf
  * new routine fnc2str() to replace insertion_cmd()
  *
  * Revision 1.68  1994/02/23  05:07:49  pgf
@@ -1300,13 +1303,14 @@ SIZE_T	size_entry;
 		buf[n+1] = EOS;
 
 		/* scan through the candidates */
-		for (p = NEXT_DATA(first); p != last; p = NEXT_DATA(p))
+		for (p = NEXT_DATA(first); p != last; p = NEXT_DATA(p)) {
 			if (THIS_NAME(p)[n] != buf[n]) {
 				buf[n] = EOS;
 				if (n == pos) TTbeep();
 				TTflush();
 				return n;
 			}
+		}
 
 		if (!clexec)
 			kbd_putc(buf[n]); /* add the character */
@@ -1422,19 +1426,26 @@ int	cpos;
 /*
  * The following mess causes the command to terminate if:
  *
- *	we've got a space
+ *	we've got the eolchar
  *		-or-
  *	we're in the first few chars and we're switching from punctuation
- *	to alphanumerics, or vice-versa.  oh yeah -- '!' is considered
- *	alphanumeric today.
+ *	(i.e., delimiters) to non-punctuation (i.e., characters that are part
+ *	of command-names), or vice-versa.  oh yeah -- '-' isn't punctuation
+ *	today, and '!' isn't either, in one direction, at any rate.
  *	All this allows things like:
  *		: e#
+ *		: e!%
  *		: !ls
  *		: q!
+ *		: up-line
  *	to work properly.
+ *
  *	If we pass this "if" with c != NAMEC, then c is ungotten below,
  *	so it can be picked up by the commands argument getter later.
  */
+
+#define ismostpunct(c) (ispunct(c) && (c) != '-')
+
 static int
 eol_command(buffer, cpos, c, eolchar)
 char *	buffer;
@@ -1456,14 +1467,13 @@ int	eolchar;
 
 	return	(c == eolchar)
 	  ||	(
-		  cpos > 0
-	      &&  cpos < 3
+		  cpos > 0 &&  cpos < 3
 	      &&(
-		  (!ispunct(c)
-		&&  ispunct(buffer[cpos-1])
+		  (!ismostpunct(c)
+		&&  ismostpunct(buffer[cpos-1])
 		  )
-		|| ((c != '!' && ispunct(c))
-		  && (buffer[cpos-1] == '!' || !ispunct(buffer[cpos-1]))
+		|| ((c != '!' && ismostpunct(c))
+		  && (buffer[cpos-1] == '!' || !ismostpunct(buffer[cpos-1]))
 		  )
 		)
 	      );

@@ -4,7 +4,10 @@
  *  heavily modified by Paul Fox, 1990
  *
  * $Log: search.c,v $
- * Revision 1.59  1994/02/22 11:03:15  pgf
+ * Revision 1.60  1994/03/29 14:51:27  pgf
+ * fix for alternate search delimiters
+ *
+ * Revision 1.59  1994/02/22  11:03:15  pgf
  * truncated RCS log for 4.0
  *
  *
@@ -531,6 +534,9 @@ int	c;
 int	fromscreen;
 {
 	int status;
+
+	if (did_tungetc()) /* cf: execute_named_command */
+		tgetc(TRUE);
 
 	/* Read a pattern.  Either we get one,
 	 * or we don't, and use the previous pattern.
