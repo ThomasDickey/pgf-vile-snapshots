@@ -2,7 +2,7 @@
  *		The routines in this file handle the conversion of pathname
  *		strings.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/path.c,v 1.73 1996/06/12 18:14:19 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/path.c,v 1.75 1996/08/13 02:10:07 pgf Exp $
  *
  *
  */
@@ -322,9 +322,9 @@ last_slash(const char *fn)
 	register char *s;
 
 	if (*fn != EOS)
-		for (s = strend(fn) - 1; s >= fn; s--)
-			if (is_slashc(*s))
-				return s;
+		for (s = strend(fn); s > fn; s--)
+			if (is_slashc(s[-1]))
+				return s - 1;
 	return 0;
 }
 
@@ -1649,7 +1649,7 @@ is_directory(const char * path)
 			return 1;
 	}
 #endif
-	return ( (stat(SL_TO_BSL(path), &sb) >= 0)
+	return ( (stat((char *)SL_TO_BSL(path), &sb) >= 0)
 #if SYS_OS2 && CC_CSETPP
 		&& ((sb.st_mode & S_IFDIR) != 0)
 #else

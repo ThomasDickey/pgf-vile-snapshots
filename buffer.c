@@ -5,7 +5,7 @@
  * keys. Like everyone else, they set hints
  * for the display system.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/buffer.c,v 1.145 1996/05/22 22:54:16 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/buffer.c,v 1.148 1996/08/13 03:06:48 pgf Exp $
  *
  */
 
@@ -292,6 +292,12 @@ FreeBuffer(BUFFER *bp)
 #endif
 	lfree(buf_head(bp), bp);		/* Release header line. */
 	delink_bp(bp);
+	if (curbp == bp)
+		curbp = NULL;
+
+#if OPT_HILITEMATCH
+	clobber_save_curbp(bp);
+#endif
 	free((char *) bp);			/* Release buffer block */
 }
 
