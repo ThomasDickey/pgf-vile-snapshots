@@ -10,7 +10,10 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.96  1993/02/08 14:53:35  pgf
+ * Revision 1.97  1993/02/12 10:42:32  pgf
+ * don't redefine "const" on linux
+ *
+ * Revision 1.96  1993/02/08  14:53:35  pgf
  * see CHANGES, 3.32 section
  *
  * Revision 1.95  1993/01/23  13:38:23  foxharp
@@ -345,8 +348,6 @@
  * initial vile RCS revision
  */
 
-#define const
-
 #ifndef os_chosen
 
 /* Note that as of vile 3.15, most of these choices can be made
@@ -448,6 +449,10 @@
 #if LINUX
 # define HAVE_SELECT 1
 # define HAVE_POLL 0
+#endif
+
+#if ! LINUX	/* there are probably others that don't want const defined */
+# define const
 #endif
 
 #if APOLLO

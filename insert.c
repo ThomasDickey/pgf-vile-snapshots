@@ -8,8 +8,11 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: insert.c,v $
- *	Revision 1.12  1993/02/08 14:53:35  pgf
- *	see CHANGES, 3.32 section
+ *	Revision 1.13  1993/02/15 10:37:31  pgf
+ *	cleanup for gcc-2.3's -Wall warnings
+ *
+ * Revision 1.12  1993/02/08  14:53:35  pgf
+ * see CHANGES, 3.32 section
  *
  * Revision 1.11  1993/01/23  14:27:23  foxharp
  * protect against backline() failing in openup(), if we're at top of buf
@@ -346,7 +349,7 @@ int playback;
 		if (c & SPEC) {
 			CMDFUNC *cfp;
 			cfp = kcod2fnc(c);
-			if (!cfp || ((cfp->c_flags & MOTION|REDO|UNDO)
+			if (!cfp || ((cfp->c_flags & (MOTION|REDO|UNDO))
 						!= MOTION)) {
 				startoff = 0;
 				curgoal = getccol(FALSE);

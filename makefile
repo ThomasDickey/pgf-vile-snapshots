@@ -31,13 +31,13 @@
 # all as "0".  If you use tcap.c, you'll need libtermcap.a too.  If you use
 # x11.c, you'll need libX11.a too.
 
-# for regular use
+# for regular vile, use these:
 SCREEN = tcap
 LIBS = -ltermcap
 TARGET = vile
 SCRDEF = -DTERMCAP -Dscrn_chosen
 
-# for building the X version
+# for building the X version, xvile, use these:
 #SCREEN = x11
 #LIBS = -lX11
 #TARGET = xvile
@@ -47,7 +47,8 @@ CO=co
 #CO="@echo co"
 
 # for passing along the above settings to sub-makes
-ENV = SCREEN="$(SCREEN)" LIBS="$(LIBS)" TARGET="$(TARGET)" SCRDEF="$(SCRDEF)" \
+ENVIR = SCREEN="$(SCREEN)" LIBS="$(LIBS)" TARGET="$(TARGET)" \
+	SCRDEF="$(SCRDEF)" \
 	CO="$(CO)" CC="$(CC)" LINK="$(LINK)" OPTFLAGS="$(OPTFLAGS)" \
 	GINCS="$(GINCS)"
 
@@ -64,14 +65,14 @@ DESTDIR2 = $(HOME)/bin
 
 REMOTE=gutso!foxharp
 
-CC = gcc
-OPTFLAGS = -g -Wall -Wshadow -O # -pg
-gincdir = /usr/local/lib/gcc-include
-GINCS = -I$(gincdir) -I$(gincdir)/sys
+#CC = gcc
+#OPTFLAGS = -g -Wall -Wshadow -O # -pg
+#gincdir = /usr/local/lib/gcc-include
+#GINCS = -I$(gincdir) -I$(gincdir)/sys
 
-#CC = cc
+CC = cc
 #OPTFLAGS = -g
-##OPTFLAGS = -O
+OPTFLAGS = -O
 
 LINK = $(CC)
 LDFLAGS = 
@@ -173,7 +174,7 @@ all:
 	echo "	make next	(NeXT)"					;\
 	echo "	make sony	(Sony News -- very BSD)"		;\
 	echo "	make unixpc	(AT&T 3B1)"				;\
-	echo "	make aix	(r6000)"				;\
+	echo "	make aix	(but probably only rs6000)"		;\
 	echo "	make osf1	(OSF/1)"				;\
 	echo "	make linux	(ported to 0.95)"			;\
 	echo "	make aux2	(A/UX 2.0) (3.0 is probably svr3)"	;\
@@ -184,77 +185,84 @@ all:
 
 bsd sony mach:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DBERK -Dos_chosen" \
-	    MAKE=/usr/bin/make $(TARGET) $(ENV)
+	    MAKE=/usr/bin/make $(TARGET) $(ENVIR)
 
 bsd_posix ultrix:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DBERK -DPOSIX -Dos_chosen" \
-		$(TARGET) $(ENV)
+		$(TARGET) $(ENVIR)
 
 sunos:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DBERK -DPOSIX -DSUNOS -Dos_chosen" \
-		$(TARGET) $(ENV)
+		$(TARGET) $(ENVIR)
 
 bsd386:
 	make CFLAGS="$(CFLAGS1) -DBERK -DBSD386 -Dos_chosen" \
-	    MAKE=/usr/bin/make $(TARGET) $(ENV)
+	    MAKE=/usr/bin/make $(TARGET) $(ENVIR)
 
 att:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DUSG -Dos_chosen" \
-		$(TARGET) $(ENV)
+		$(TARGET) $(ENVIR)
 
 att_posix svr4:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DUSG -DPOSIX -Dos_chosen" \
-		$(TARGET) $(ENV)
+		$(TARGET) $(ENVIR)
 
 svr3:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DSVR3 -Dos_chosen" \
-		$(TARGET) $(ENV)
+		$(TARGET) $(ENVIR)
 
 mips:
 	$(MAKE) CFLAGS="$(CFLAGS1) -systype sysv $(INCS) -DSVR3 -Dos_chosen" \
-		$(TARGET) $(ENV)
+		$(TARGET) $(ENVIR)
 
 odt:
 	$(MAKE) \
 	CFLAGS="$(CFLAGS1) -DODT -DUSG -DPOSIX -DSVR3_PTEM -Dos_chosen" \
-		$(TARGET) $(ENV)
+		$(TARGET) $(ENVIR)
 
 isc:
 	$(MAKE) \
 	CFLAGS="$(CFLAGS1) -DISC -DUSG -DPOSIX -DSVR3_PTEM -Dos_chosen" \
-		$(TARGET) $(ENV)
+		$(TARGET) $(ENVIR)
 
 hpux:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DUSG -DHAVE_SELECT -Dos_chosen" \
-		$(TARGET) $(ENV)
+		$(TARGET) $(ENVIR)
 
 next:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DBERK -D__STRICT_BSD__ \
-		-Dos_chosen" $(TARGET) $(ENV)
+		-Dos_chosen" $(TARGET) $(ENVIR)
 
 unixpc:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DUSG -DHAVE_SELECT \
 		-DHAVE_MKDIR=0 -Dwinit=xxwinit -Dos_chosen -DUNIXPC" \
-		$(TARGET) $(ENV)
+		$(TARGET) $(ENVIR)
 
+# i've had reports that the curses lib is broken under AIX.  on the other
+#  hand, the termcap lib doesn't appear in all versions of AIX, and when it
+#  does, it limits you to an 80x24 window.  since I don't have any AIX machine
+#  to try this on, i'm afraid you may have to experiment
+# in addition, since I didn't know that aix varies so much from platform to
+#  platform, i used "AIX" as the ifdef in the code.  it may not work for
+#  all the other platforms.  sorry.
 aix:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DUSG \
 		-DPOSIX -DAIX -DHAVE_SELECT -U__STR__ -Dos_chosen -qpgmsize=l" \
 		LIBS=-lcurses \
-		$(TARGET) $(ENV)
+		$(TARGET) $(ENVIR)
 
 apollo:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DBERK -DAPOLLO -Dos_chosen" \
-	    MAKE=/usr/bin/make $(TARGET) $(ENV)
+	    MAKE=/usr/bin/make $(TARGET) $(ENVIR)
 
 osf1:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DBERK -DPOSIX -DOSF1 -Dos_chosen" \
-		$(TARGET) $(ENV)
+		$(TARGET) $(ENVIR)
 
 linux:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DUSG \
 		-DPOSIX -DHAVE_SELECT -DHAVE_POLL=0 -DLINUX -Dos_chosen" \
-		$(TARGET) $(ENV)
+		$(TARGET) $(ENVIR)
 
 # It has been pointed out to me that the stock COMMAND.COM can't possibly
 # handle the length of the commands that this causes.  You may have to
@@ -271,16 +279,16 @@ msc:
 
 aux2:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DUSG -DAUX2 -Dos_chosen" \
-		$(TARGET) $(ENV)
+		$(TARGET) $(ENVIR)
 
 sx1100:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DSVR3 -Dos_chosen" \
 		LDFLAGS="-h 400000" \
-		$(TARGET) $(ENV)
+		$(TARGET) $(ENVIR)
 
 default:
 	$(MAKE) CFLAGS="$(CFLAGS1) -Uos_chosen" \
-		$(TARGET) $(ENV)
+		$(TARGET) $(ENVIR)
 
 $(TARGET): $(BUILTHDRS) $(OBJ) makefile
 	-mv $(TARGET) o$(TARGET)
@@ -439,7 +447,7 @@ tagfile:
 
 lint:	$(SRC)
 	#lint -hbvxac $(SRC) >lint.out 
-	#lint $(CFLAGS0) $(ENV) $(SRC) >lint.out 
+	#lint $(CFLAGS0) $(ENVIR) $(SRC) >lint.out 
 	#lint $(CFLAGS0) -DBERK -DPOSIX -DSUNOS -Dos_chosen  $(SRC) >lint.out 
 	lint $(CFLAGS0) -DSVR3 -Dos_chosen  $(SRC) >lint.out 
 
@@ -475,7 +483,16 @@ externs.$O:	nebind.h nename.h nefunc.h
 vmalloc$O:	nevars.h
 
 # $Log: makefile,v $
-# Revision 1.82  1993/02/08 14:53:35  pgf
+# Revision 1.85  1993/02/15 10:50:47  pgf
+# added aix warnings
+#
+# Revision 1.84  1993/02/15  10:36:34  pgf
+# back to cc
+#
+# Revision 1.83  1993/02/12  10:46:18  pgf
+# changed name of ENV to ENVIR, due to name conflict with linux make
+#
+# Revision 1.82  1993/02/08  14:53:35  pgf
 # see CHANGES, 3.32 section
 #
 # Revision 1.81  1993/01/23  13:38:23  foxharp
@@ -497,7 +514,7 @@ vmalloc$O:	nevars.h
 # svr3 lint command
 #
 # Revision 1.75  1992/12/13  13:27:04  foxharp
-# various changes, for easier command-line ENV setting, and for linting
+# various changes, for easier command-line ENVIR setting, and for linting
 #
 # Revision 1.74  1992/12/04  09:50:24  foxharp
 # pass SCREEN etc. to lower makes via ENV variable

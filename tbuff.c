@@ -8,7 +8,10 @@
  *		editing.
  *
  * $Log: tbuff.c,v $
- * Revision 1.1  1993/02/08 14:51:46  pgf
+ * Revision 1.2  1993/02/15 10:37:31  pgf
+ * cleanup for gcc-2.3's -Wall warnings
+ *
+ * Revision 1.1  1993/02/08  14:51:46  pgf
  * Initial revision
  *
  */
@@ -83,7 +86,7 @@ TBUFF *	tb_put(p, n, c)
 {
 	register TBUFF *q;
 
-	if (q = tb_alloc(p, n+1)) {
+	if ((q = tb_alloc(p, n+1)) != 0) {
 		q->tb_data[n] = c;
 		q->tb_used = n+1;
 	}

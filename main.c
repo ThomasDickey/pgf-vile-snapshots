@@ -14,7 +14,10 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.93  1993/02/08 14:53:35  pgf
+ * Revision 1.94  1993/02/15 10:37:31  pgf
+ * cleanup for gcc-2.3's -Wall warnings
+ *
+ * Revision 1.93  1993/02/08  14:53:35  pgf
  * see CHANGES, 3.32 section
  *
  * Revision 1.92  1993/01/23  13:38:23  foxharp
@@ -1562,8 +1565,8 @@ charinit()
 
 #if !SMALLER
 	/* scratch-buffer-names (superset of _pathn) */
-	_chartypes_[SCRTCH_LEFT[0]]  |= _scrtch;
-	_chartypes_[SCRTCH_RIGHT[0]] |= _scrtch;
+	_chartypes_[(unsigned)SCRTCH_LEFT[0]]  |= _scrtch;
+	_chartypes_[(unsigned)SCRTCH_RIGHT[0]] |= _scrtch;
 #endif
 
 	for (c = 0; c < N_chars; c++) {
