@@ -4,7 +4,11 @@
  *	Written (except for delins()) for vile by Paul Fox, (c)1990
  *
  * $Log: oneliner.c,v $
- * Revision 1.37  1993/01/16 10:40:58  foxharp
+ * Revision 1.38  1993/03/08 10:53:17  pgf
+ * fix for lengthy multiple substitutions:  need to track the growing line
+ * length so we don't stop scanning too early
+ *
+ * Revision 1.37  1993/01/16  10:40:58  foxharp
  * use new macros
  *
  * Revision 1.36  1992/12/29  23:18:00  foxharp
@@ -378,7 +382,6 @@ substline(exp, nth_occur, printit, globally)
 regexp *exp;
 int nth_occur, printit, globally;
 {
-	MARK eol;
 	int foundit;
 	register int s;
 	register int which_occur = 0;
@@ -394,11 +397,10 @@ int nth_occur, printit, globally;
 	ignorecase = b_val(curwp->w_bufp, MDIGNCASE);
 
 	foundit = FALSE;
-	eol.l = DOT.l;
-	eol.o = llength(DOT.l);
-	scanboundpos = eol;
+	scanboundpos.l = DOT.l;
 	DOT.o = 0;
 	do {
+		scanboundpos.o = llength(DOT.l);
 		s = scanner(exp, FORWARD, FALSE);
 		if (s != TRUE)
 			break;
@@ -427,7 +429,7 @@ int nth_occur, printit, globally;
 			if (s != TRUE)
 				return s;
 		}
-	} while (globally && sameline(eol,DOT));
+	} while (globally && sameline(scanboundpos,DOT));
 	if (foundit && printit) {
 		register WINDOW *wp = curwp;
 		setmark();

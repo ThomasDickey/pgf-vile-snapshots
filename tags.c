@@ -5,7 +5,10 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: tags.c,v $
- * Revision 1.27  1993/01/16 10:42:25  foxharp
+ * Revision 1.28  1993/03/05 17:50:54  pgf
+ * see CHANGES, 3.35 section
+ *
+ * Revision 1.27  1993/01/16  10:42:25  foxharp
  * use new macros
  *
  * Revision 1.26  1992/12/14  09:02:46  foxharp
@@ -102,23 +105,15 @@
 
 #if TAGS
 
-
-#ifndef NULL
-#define NULL 0
-#endif
-
 static char tagname[NFILEN];
 static char tagprefix[NFILEN];
-
-void pushuntag();
-
 
 /* ARGSUSED */
 int
 gototag(f,n)
 int f,n;
 {
-	register int s = TRUE;
+	register int s;
 	int taglen;
 
 	if (clexec || isnamedcmd) {
@@ -126,7 +121,7 @@ int f,n;
 	                return (s);
 		taglen = b_val(curbp,VAL_TAGLEN);
 	} else {
-		screen_string(tagname,NFILEN,_ident);
+		s = screen_string(tagname,NFILEN,_ident);
 		taglen = 0;
 	}
 	if (s == TRUE)
@@ -138,7 +133,7 @@ int
 cmdlinetag(t)
 char *t;
 {
-	strcpy(tagname,t);
+	(void)strcpy(tagname,t);
 	return tags(tagname, global_b_val(VAL_TAGLEN));
 }
 
@@ -160,7 +155,7 @@ int taglen;
 	LINE *cheap_scan();
 	BUFFER *tagbp;
 
-	strcpy(tname,tag);
+	(void)strcpy(tname,tag);
 
 	if ((tagbp = gettagsfile()) == NULL )
 		return FALSE;
@@ -180,7 +175,7 @@ int taglen;
 
 	i = 0;
 	if (b_val(curbp,MDTAGSRELTIV) && *tfp != '/') {
-		strcpy(tfname, tagprefix);
+		(void)strcpy(tfname, tagprefix);
 		i += strlen(tagprefix);
 	}
 	while (i < NFILEN && tfp < lplim && *tfp != '\t') {
@@ -252,7 +247,7 @@ int taglen;
 		}
 		curwp->w_dot.l = lp;
 		curwp->w_flag |= WFMOVE;
-		firstnonwhite(FALSE,1);
+		(void)firstnonwhite(FALSE,1);
 		s = TRUE;
 	}
 	/* if we moved, update the "last dot" mark */
@@ -293,12 +288,12 @@ gettagsfile()
 			return NULL;
 		}
 		/* be sure it's named TAGBUF */
-		strcpy(tagbp->b_bname, TAGBUF);
+		(void)strcpy(tagbp->b_bname, TAGBUF);
 		tagbp->b_flag |= BFINVS;
 			
         }
 	if (strrchr(tagbp->b_fname,'/')) {
-		strcpy(tagprefix, tagbp->b_fname);
+		(void)strcpy(tagprefix, tagbp->b_fname);
 		*(strrchr(tagprefix,'/')+1) = '\0';
 	} else {
 		tagprefix[0] = '\0';
@@ -381,7 +376,7 @@ int lineno;
 		return;
 	}
 
-	strcpy(utp->u_fname, fname);
+	(void)strcpy(utp->u_fname, fname);
 	utp->u_lineno = lineno;
 	utp->u_stklink = untaghead;
 	untaghead = utp;
@@ -397,7 +392,7 @@ int *linenop;
 	if (untaghead) {
 		utp = untaghead;
 		untaghead = utp->u_stklink;
-		strcpy(fname, utp->u_fname);
+		(void)strcpy(fname, utp->u_fname);
 		*linenop = utp->u_lineno;
 		free(utp->u_fname);
 		free((char *)utp);
@@ -422,126 +417,54 @@ tossuntag()
 	}
 }
 
-#ifdef LAZINESS
-BUFFER *filesbp;
+#ifdef GMDTAGSLOOK
 
-
-/* create a filelist from the contents of
- *	the tags file.  for "dir1/dir2/file" include both that and
- *	"dir1/dir2/"
- */
-int
-makeflist()
+/* create a filelist from the contents of the tags file. */
+/* patch: when does the buffer get reset? */
+BUFFER *
+look_tags(sequence)
+int	sequence;
 {
 	register LINE *tlp;
 	register char *fnp;
-	register int i;
-	char fname[NFILEN];
+	register int i, n;
+	BUFFER *filesbp;
 	BUFFER *tagbp;
 
-	if (!(othmode & OTH_LAZY))
-		return TRUE;
+	if (!global_g_val(GMDTAGSLOOK))
+		return 0;
 
 	if ((tagbp = gettagsfile()) == NULL)
-			return FALSE;
+		return 0;
 
-	if (filesbp != NULL)
-		return TRUE;
+	/* create/lookup the file list buffer   */
+	if ((filesbp = bs_init(ScratchName(files), (sequence == 0))) != NULL
+	 && !filesbp->b_active) {
 
-	/* create the file list buffer   */
-	filesbp = bfind(ScratchName(files), OK_CREAT, BFINVS);
-	if (filesbp == NULL)
-		return FALSE;
-	filesbp->b_active = TRUE;
+		filesbp->b_active = TRUE;
 
-	/* loop through the tags file */
-	tlp = lforw(tagbp->b_line.l);
-	while (tlp != tagbp->b_line.l) {
-		/* skip the tagname */
-		i = 0;
-		while (i < llength(tlp) && lgetc(tlp,i) != '\t')
-			i++;
-		/* we're going to store the pathnames reversed, so that
-			the sorting puts all directories together (they'll
-			all start with their trailing slash) and all 
-			files with matching basenames will be grouped
-			together as well.
-		*/
-		/* pull out the filename, in reverse */
-		fnp = &fname[NFILEN-1];
-		*fnp-- = '\0';
-		while (i < llength(tlp)  && fnp >= fname && 
-					(*fnp = lgetc(tlp,i++)) != '\t') {
-			fnp--;
+		/* loop through the tags file */
+		for_each_line(tlp, tagbp) {
+
+			/* skip the tagname */
+			i = 0;
+			while (i < llength(tlp) && lgetc(tlp,i) != '\t')
+				i++;
+			n = i++;	/* skip the tab */
+			fnp = tlp->l_text + i;
+			while (i < llength(tlp) && lgetc(tlp,i) != '\t')
+				i++;
+
+			/* patch: should test for tab-found */
+
+			/* insert into the file list */
+			if (bs_find(fnp, i-1-n, filesbp, TRUE, (LINE **)0) == NULL)
+				break;
 		}
-		fnp++; /* forward past the tab */
-
-		/* insert into the file list */
-		if (sortsearch(fnp, &fname[NFILEN-1]-fnp, filesbp,
-							TRUE, NULL) == NULL)
-			return FALSE;
-
-		/* first (really last) slash */
-		if ((fnp = strchr(fnp, slash)) != NULL) {
-			/* insert the directory name into the file list again */
-			if (sortsearch(fnp, &fname[NFILEN-1]-fnp, filesbp,
-							TRUE, NULL) == NULL)
-				return FALSE;
-		}
-		tlp = lforw(tlp);
 	}
-	return TRUE;
-}
-
-/* look for or insert a text string into the given buffer.  start looking
-	at the given line if non-null. */
-int
-sortsearch(text, len,  bp, insert, lpp)
-char *text;
-int len;
-BUFFER *bp;
-int insert;
-LINE **lpp;
-{
-	LINE *nlp, *lp;
-	register int r, cmplen;
-
-	if (lpp == NULL) {
-		lp = lforw(bp->b_line.l);
-	} else {
-		lp = *lpp;
-		if (lp == NULL)
-			lp = lforw(bp->b_line.l);
-		else
-			lp = lforw(lp);
-	}
-
-	while (1) {
-		cmplen = (len < llength(lp) && !insert) ? len : llength(lp);
-		if ((r = strncmp(text, lp->l_text, cmplen)) > 0 ||
-		     lp == bp->b_line.l) { /* stick line into buffer */
-		     	if (!insert)
-				return FALSE;
-		        if ((nlp=lalloc(len,bp)) == NULL)
-		                return FALSE;
-			memcpy(nlp->l_text, text, len);
-		        lp->l_bp->l_fp = nlp;
-		        nlp->l_bp = lp->l_bp;
-		        lp->l_bp = nlp;
-		        nlp->l_fp = lp;
-			if (lpp)
-				*lpp = nlp;
-			return TRUE;
-		} else if (r == 0) { /* it's already here, don't insert twice */
-			if (lpp)
-				*lpp = lp;
-			return TRUE;
-		}
-		lp = lforw(lp);
-	}
+	return filesbp;
 }
 #endif
-
 
 #else
 void taghello() { }

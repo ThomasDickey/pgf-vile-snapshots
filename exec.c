@@ -4,7 +4,16 @@
  *	written 1986 by Daniel Lawrence	
  *
  * $Log: exec.c,v $
- * Revision 1.38  1993/02/08 14:53:35  pgf
+ * Revision 1.41  1993/03/16 10:53:21  pgf
+ * see 3.36 section of CHANGES file
+ *
+ * Revision 1.40  1993/03/05  17:50:54  pgf
+ * see CHANGES, 3.35 section
+ *
+ * Revision 1.39  1993/02/24  10:59:02  pgf
+ * see 3.34 changes, in CHANGES file
+ *
+ * Revision 1.38  1993/02/08  14:53:35  pgf
  * see CHANGES, 3.32 section
  *
  * Revision 1.37  1993/01/23  13:38:23  foxharp
@@ -150,23 +159,52 @@
 
 extern CMDFUNC f_gomark;
 
+/*ARGSUSED*/
+static int
+eol_range(buffer, cpos, c, eolchar)
+char *	buffer;
+int	cpos;
+int	c;
+int	eolchar;
+{
+	if (is_edit_char(c))
+		return FALSE;
+
+	if (isspecial(c)	/* sorry, cannot scroll with arrow keys */
+	 || iscntrl(c))
+		return TRUE;
+
+	if (islinespecchar(c)
+	 || /* special test for 'a style mark references */
+		(cpos > 0
+		&& buffer[cpos-1] == '\''
+		&& (islower(c) || (c == '\'') ) ) )
+		return FALSE;
+	return TRUE;
+}
+
 /* namedcmd:	execute a named command even if it is not bound */
+#if SMALLER
+#define execute_named_command namedcmd
+#endif
 
 int
-namedcmd(f, n)
+execute_named_command(f, n)
 int f, n;
 {
-	char *fnp;	/* ptr to the name of the cmd to exec */
+	register int	status;
+	register CMDFUNC *cfp;	/* function to execute */
+	register char *fnp;	/* ptr to the name of the cmd to exec */
+
 	LINE *fromline;	/* first linespec */
 	LINE *toline;	/* second linespec */
 	char lspec[NLINE];
-	int cpos = 0;
-	int s,c,isdfl,zero;
+	char cspec[NLINE];
+	int cmode = 0;
+	int c,isdfl,zero;
 	long flags;
-	CMDFUNC *cfp;		/* function to execute */
 
-	lspec[0] = '\0';
-	fnp = NULL;
+	lspec[0] = EOS;
 
 	/* prompt the user to type a named command */
 	mlprompt(": ");
@@ -175,55 +213,53 @@ int f, n;
 #if	NeWS
 	newsimmediateon() ;
 #endif
-
 	while(1) {
-		c = tgetc();
-		if (isreturn(c)) {
-			lspec[cpos] = 0;
-			fnp = NULL;
-			break;
-		} else if (c == kcod2key(abortc)) {	/* Bell, abort */
-			lspec[0] = '\0';
-			return FALSE;
-		} else if (isbackspace(c)) {
-			if (cpos != 0) {
-				kbd_erase();
-				--cpos;
-			} else {
-				lspec[0] = '\0';
-				lineinput = FALSE;
+		if (cmode == 0) {	/* looking for range-spec, if any */
+			status = kbd_reply(
+				(char *)0,	/* no-prompt => splice */
+				lspec,		/* in/out buffer */
+				sizeof(lspec),
+				eol_range,
+				EOS,		/* may be a conflict */
+				0,		/* no expansion, etc. */
+				no_completion);
+			c = end_string();
+			if (status != TRUE && status != FALSE) {
+				return status;
+			} else if (isreturn(c) && (status == FALSE)) {
 				return FALSE;
+			} else if (isbackspace(c)) {
+				(void)tgetc(FALSE); /* cancel the tungetc */
+				return FALSE;
+			} else {
+				tungetc(c);	/* ...so we can splice */
 			}
-
-		} else if (c == kcod2key(killc)) {	/* ^U, kill */
-			while (cpos != 0) {
-				kbd_erase();
-				--cpos;
-			}
-		} else if (islinespecchar(c) ||
-			/* special test for 'a style mark references */
-				(cpos > 0 &&
-				 lspec[cpos-1] == '\'' &&
-				 (islower(c) || (c == '\'') )
-				)
-			 ) {
-			lspec[cpos++] = c;
-			kbd_putc(c);
-		} else {
-			int status;
-			tungetc(c);
-			lspec[cpos] = 0;
-			status = kbd_engl_stat(&fnp);
+			cmode = 1;
+		} else {		/* looking for command-name */
+			fnp = NULL;
+			status = kbd_engl_stat((char *)0, cspec);
 			if (status == TRUE) {
+				fnp = cspec;
+				c = end_string();
+				if (c != NAMEC && !isreturn(c))
+					tungetc(c);	/* e.g., !-command */
 				break;
 			} else if (status == SORTOFTRUE) {
+				if (lspec[0] == EOS)
+					return FALSE;
+				cmode = 0;
+				hst_remove(lspec);
 				continue;
-			} else {
+			} else if (status != FALSE || lspec[0] == EOS) {
 				return status;
+			} else {
+				break;	/* range-only */
 			}
 		}
-		TTflush();
 	}
+#if	NeWS
+	newsimmediateoff() ;
+#endif
 
 	/* parse the accumulated lspec */
 	if (rangespec(lspec,&fromline,&toline,&isdfl,&zero) != TRUE) {
@@ -236,10 +272,6 @@ int f, n;
 		mlforce("[No range possible in empty buffer]", fnp);
 		return FALSE;
 	}
-
-#if	NeWS
-	newsimmediateoff() ;
-#endif
 
 	/* did we get a name? */
 	if (fnp == NULL) {
@@ -267,7 +299,7 @@ seems like we need one more check here -- is it from a .exrc file?
 	}
 #endif
 
-	/* was: if (!(flags & (ZERO | EXRCOK)) && fromline == NULL ) { */
+	/* was: if (!(flags & (ZERO | EXRCOK)) && fromline == NULL ) */
 	if (zero) {
 		extern CMDFUNC f_lineputafter, f_opendown, f_insfile;
 		extern CMDFUNC f_lineputbefore, f_openup;
@@ -403,14 +435,30 @@ seems like we need one more check here -- is it from a .exrc file?
 	havemotion = &f_gomark;
 	fulllineregions = TRUE;
 
-	s = execute(cfp,f,n);
+	status = execute(cfp,f,n);
 
 	havemotion = NULL;
 	isnamedcmd = FALSE;
 	fulllineregions = FALSE;
 
-	return s;
+	return status;
 }
+
+#if !SMALLER
+/* intercept calls on 'namedcmd()' to allow logging of all commands, even
+ * those that have errors in them.
+ */
+int
+namedcmd(f,n)
+int f,n;
+{
+	int status;
+	hst_init(EOS);
+	status = execute_named_command(f,n);
+	hst_flush();
+	return status;
+}
+#endif
 
 /* parse an ex-style line spec -- code culled from elvis, file ex.c, by
 	Steve Kirkendall
@@ -611,18 +659,15 @@ onamedcmd(f, n)
 int f, n;	/* command arguments [passed through to command executed] */
 {
 	register char *fnp;	/* ptr to the name of the cmd to exec */
-	char *kbd_engl();
 	int s;
+	char cmd[NLINE];
 
-	/* prompt the user to type a named command */
-	mlprompt(": ");
-
-	/* and now get the function name to execute */
+	/* get the function name to execute */
 #if	NeWS
 	newsimmediateon() ;
 #endif
 
-	fnp = kbd_engl();
+	fnp = kbd_engl(": ", cmd);
 
 #if	NeWS
 	newsimmediateoff() ;
@@ -766,7 +811,7 @@ int f,n;
 			/* undoable command can't be permitted when read-only */
 			if (b_val(curbp,MDVIEW))
 				return rdonly();
-			if (dotcmdmode != PLAY && kbdmode != PLAY)
+			if (!kbd_replaying())
 				mayneedundo();
 		}
 	}
@@ -828,18 +873,19 @@ int eolchar;
 			}
 		} else {
 			/* check for the end of the token */
-			if (quotef) {
+			if (quotef != EOS) {
 				if (c == quotef) {
 					src++;
 					break;
 				}
 			} else {
 				if (c == eolchar) {
-					src++;
+					if (!isspace(c))
+						src++;
 					break;
 				} else if (c == '"') {
 					quotef = c;
-					/* patch: note that leading quote is included */
+					/* note that leading quote is included */
 				} else if (isspace(c)) {
 					break;
 				}
@@ -1499,15 +1545,10 @@ execfile(f, n)	/* execute a series of commands in a file */
 int f, n;	/* default flag and numeric arg to pass on to file */
 {
 	register int status;	/* return status of name query */
-	static char ofname[NSTRING];	/* name of file to execute */
-	char fname[NSTRING];	/* name of file to execute */
+	char fname[NFILEN];	/* name of file to execute */
 	char *fspec;		/* full file spec */
 
-	if ((status = mlreply("File to execute: ", ofname, NSTRING -1)) != TRUE)
-		return status;
-	strcpy(fname,ofname);
-
-	if ((status = glob(fname)) != TRUE)
+	if ((status = mlreply_file("File to execute: ", (TBUFF **)0, FILEC_READ, fname)) != TRUE)
 		return status;
 
 	/* look up the path for the file */
@@ -1515,7 +1556,7 @@ int f, n;	/* default flag and numeric arg to pass on to file */
 
 	/* if it isn't around */
 	if (fspec == NULL)
-		return FALSE;
+		return no_such_file(fname);
 
 	/* otherwise, execute it */
 	while (n-- > 0)

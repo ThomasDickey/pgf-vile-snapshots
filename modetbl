@@ -12,22 +12,45 @@
 # The modes are table entries in the BUFFER and WINDOW structures.
 #
 # $Log: modetbl,v $
-# Revision 1.1  1993/02/08 14:52:04  pgf
+# Revision 1.5  1993/03/16 10:53:21  pgf
+# see 3.36 section of CHANGES file
+#
+# Revision 1.4  1993/03/05  18:46:39  pgf
+# fix for tab cursor positioning in insert mode, and mode to control
+# positioning style
+#
+# Revision 1.3  1993/03/05  17:50:54  pgf
+# see CHANGES, 3.35 section
+#
+# Revision 1.2  1993/02/24  10:59:02  pgf
+# see 3.34 changes, in CHANGES file
+#
+# Revision 1.1  1993/02/08  14:52:04  pgf
 # Initial revision
 #
 #
 # Mode-table entries.  Capitalized letters are used for abbreviations.
 # The second column is the root of the index-definition.
 # The third column is flags used to control updates after a mode is changed.
+.globals
+bool						# GMD prefix
+	"AutoBuffer"	ABUFF 		0	# auto-buffer (lru)
+	"dirc"		DIRC		0	# directory-completion (slow!)
+	"Alt-TabPos"	VITABPOS	0	# vi-style cursor positioning
+	"ImplyBuffer"	IMPLYBUFF 	0	# imply-buffer (vi-like)
+#?	"LookTags"	TAGSLOOK	0	# use tags to find files
+	"SameBangs"	SAMEBANGS	0	# use same "!!" data for ^X-!
+regex						# VAL_ prefix
+	"C-SUFfixes"	CSUFFIXES	0
+
 .buffers
 bool						# MD prefix
-	"AutoBuffer"	ABUFF 		0	# auto-buffer (lru)
 	"AutoIndent"	AIND		0	# auto-indent
 	"AutoSave"	ASAVE		0	# auto-save mode
 	"BackspaceLimit" BACKLIMIT	0	# backspace limited in insert mode
 	"cmode"		CMOD		WFHARD	# C indentation and fence match
 	"crypt"		CRYPT		0	# encrytion mode active
-	"dos"		DOS		WFHARD	# "dos" mode -- lines end in crlf
+	"dos"		DOS		WFHARD|WFMODE	# "dos" mode -- lines end in crlf
 	"IgnoreCase"	IGNCASE		0	# Exact matching for searches
 	"magic"		MAGIC		0	# regular expressions in search
 	"ShowMatch"	SHOWMAT		0	# auto-indent
@@ -48,10 +71,8 @@ int						# VAL_ prefix
 	"TagLength"	TAGLEN		0
 	"WrapMargin"	WRAPMARGIN	0
 string						# VAL_ prefix
-	"cwd"		CWD		0
 	"tags"		TAGS		0
 regex						# VAL_ prefix
-	"C-SUFfixes"	CSUFFIXES	0
 	"comments"	COMMENTS	0
 	"paragraphs"	PARAGRAPHS	0
 	"sections"	SECTIONS	0

@@ -9,7 +9,16 @@
  *	the output structures.
  *
  * $Log: mktbls.c,v $
- * Revision 1.15  1993/02/15 10:37:31  pgf
+ * Revision 1.18  1993/03/05 17:50:54  pgf
+ * see CHANGES, 3.35 section
+ *
+ * Revision 1.17  1993/02/24  10:59:02  pgf
+ * see 3.34 changes, in CHANGES file
+ *
+ * Revision 1.16  1993/02/23  12:03:49  pgf
+ * moved nested static func decl -- it's not ansi
+ *
+ * Revision 1.15  1993/02/15  10:37:31  pgf
  * cleanup for gcc-2.3's -Wall warnings
  *
  * Revision 1.14  1993/02/11  19:08:32  pgf
@@ -73,6 +82,7 @@
 #define	MAX_BUFFER	(LEN_BUFFER*10)
 #define	LEN_CHRSET	128	/* total # of chars in set (ascii) */
 
+	/* patch: why not use <ctype.h> ? */
 #define	DIFCNTRL	0x40
 #define tocntrl(c)	((c)^DIFCNTRL)
 #define toalpha(c)	((c)^DIFCNTRL)
@@ -94,6 +104,7 @@
 
 extern char *malloc();
 
+static	void	save_all_modes();
 
 typedef	struct stringl {
 	char *s1;	/* stores primary-data */
@@ -109,6 +120,7 @@ static	LIST	*all_names,
 		*all_envars,
 		*all_ufuncs,
 		*all_modes,	/* data for name-completion of modes */
+		*all_gmodes,	/* data for GLOBAL modes */
 		*all_bmodes,	/* data for BUFFER modes */
 		*all_wmodes;	/* data for WINDOW modes */
 
@@ -116,8 +128,9 @@ static	LIST	*all_names,
 #define	SECT_CMDS 0
 #define	SECT_FUNC 1
 #define	SECT_VARS 2
-#define	SECT_BUFF 3
-#define	SECT_WIND 4
+#define	SECT_GBLS 3
+#define	SECT_BUFF 4
+#define	SECT_WIND 5
 
 	/* definitions for [MAX_BIND] indices */
 #define ASCIIBIND 0
@@ -431,23 +444,6 @@ char *src;
 	return dst;
 }
 
-/* given single-char type-key (cf: Mode2Key), return type-string */
-static char *
-c2type(c)
-int	c;
-{
-	char	*value;
-	switch (c) {
-	case 'b':	value	= "boolean";	break;
-	case 'c':	value	= "color";	break;
-	case 'i':	value	= "integer";	break;
-	case 's':	value	= "string";	break;
-	case 'x':	value	= "regex";	break;
-	default:	value	= "?";
-	}
-	return value;
-}
-
 /* given single-char type-key (cf: Mode2Key), return define-string */
 static char *
 c2TYPE(c)
@@ -465,12 +461,12 @@ int	c;
 	return value;
 }
 
+
 /* make a sort-key for mode-name */
 static char *
 Mode2Key(type, name)
 char	*type, *name;
 {
-	static	void	save_all_modes();
 	int	c;
 	char	*abbrev = AbbrevMode(name),
 		*normal = NormalMode(name),
@@ -486,19 +482,8 @@ char	*type, *name;
 
 	save_all_modes(type, normal, abbrev);
 
-	(void)sprintf(tmp, "%c\n%s\n%s", c, normal, abbrev);
+	(void)sprintf(tmp, "%s\n%c\n%s", normal, c, abbrev);
 	return tmp;
-}
-
-/* generates a symbol used for delimiting ranges of bool/int/string */
-static char *
-ModeBase(c, ppref)
-int	c;
-char	*ppref;
-{
-	char	value[LEN_BUFFER];
-	Sprintf(value, "MAX_%s_%s_VALUE", c2TYPE(c), *ppref ? "W" : "B");
-	return StrAlloc(value);
 }
 
 /* converts a mode-name to a legal (hopefully unique!) symbol */
@@ -537,29 +522,6 @@ char	*type;
 	return base;
 }
 
-static void
-WriteTypeMax(base1, base0, code1, count)
-char	*base1;
-char	*base0;
-int	code1;
-int	count;
-{
-	if (*base1) {
-		char	temp[MAX_BUFFER], *s = temp;
-		Sprintf(s, "#define %s", base1);
-		(void)PadTo(24, temp);
-		s += strlen(s);
-		if (*base0)
-			Sprintf(s, "(%s+%d)", base0, count);
-		else
-			Sprintf(s, "%d", count-1);
-		(void)PadTo(32, temp);
-		s += strlen(s);
-		Sprintf(s, "/* max of %s-valued modes */\n\n", c2type(code1));
-		Fprintf(nemode, "%s\n", temp);
-	}
-}
-
 /* generate the index-definitions */
 static void
 WriteModeDefines(p, ppref)
@@ -568,33 +530,17 @@ char	*ppref;
 {
 	char	temp[MAX_BUFFER],
 		line[MAX_BUFFER];
-	char	*base0	= "",
-		*base1	= "",
-		code1	= '\0',
-		codex;
 	char	*vec[MAX_PARSE];
 	int	count	= 0;
 
 	while (p != 0) {
 		(void)Parse(strcpy(line, p->s1), vec);
-		codex	= *vec[1];
-		if (code1 != codex) {
-			WriteTypeMax(base1, base0, code1, count);
-			count = 0;
-			base0 = base1;
-			base1 = ModeBase(codex, ppref);
-			code1 = codex;
-		}
-		Sprintf(temp, "#define %s%s%s ",
-			ppref,
-			(codex == 'b') ? "MD" : "VAL_",
+		Sprintf(temp, "#define %.1s%s%s ",
+			(*ppref == 'B') ? "" : ppref,
+			(*vec[2] == 'b') ? "MD" : "VAL_",
 			p->s2);
 		(void)PadTo(24, temp);
-		if (*base0)
-			Sprintf(temp+strlen(temp), "(%s+%d)", base0, count+1);
-		else
-			Sprintf(temp+strlen(temp), "%d", count);
-		count++;
+		Sprintf(temp+strlen(temp), "%d", count++);
 		if (p->s4[0]) {
 			(void)PadTo(32, temp);
 			Sprintf(temp+strlen(temp), "/* %s */", p->s4);
@@ -602,16 +548,13 @@ char	*ppref;
 		Fprintf(nemode, "%s\n", temp);
 		p = p->nst;
 	}
-	if (*base1) {
-		WriteTypeMax(base1, base0, code1, count);
-		Sprintf(temp, "#define MAX_%s_VALUES\t(%s)",
-			*ppref ? ppref : "B",
-			base1);
-		(void)PadTo(32, temp);
-		Sprintf(temp+strlen(temp), "/* max of %s values */\n",
-			*ppref ? "window" : "buffer");
-		Fprintf(nemode, "%s\n", temp);
-	}
+
+	Fprintf(nemode, "\n");
+	Sprintf(temp, "#define MAX_%c_VALUES\t%d", *ppref, count);
+	(void)PadTo(32, temp);
+	Sprintf(temp+strlen(temp), "/* SIZEOF(%c_valuenames) -- %s */\n",
+		tolower(*ppref), ppref);
+	Fprintf(nemode, "%s\n", temp);
 }
 
 static void
@@ -621,21 +564,19 @@ LIST	*p;
 	char	temp[MAX_BUFFER],
 		line[MAX_BUFFER];
 	char	*vec[MAX_PARSE];
-	int	code	= 0;
 
 	/* generate the symbol-table */
 	while (p != 0) {
 		(void)Parse(strcpy(line, p->s1), vec);
-		if (code != 0 && code != *vec[1])
-			Fprintf(nemode, "\n");
-		code = *vec[1];
 		Sprintf(temp, "\t{ %s,",
-			Name2Address(vec[2], vec[1]));
+			Name2Address(vec[1], vec[2]));
 		(void)PadTo(32, temp);
 		Sprintf(temp+strlen(temp), "%s,",
-			*vec[3] ? Name2Address(vec[3], vec[1]) : "\"X\"");
+			*vec[3] ? Name2Address(vec[3], vec[2]) : "\"X\"");
 		(void)PadTo(48, temp);
-		Sprintf(temp+strlen(temp), "VALTYPE_%s },", c2TYPE(code));
+		Sprintf(temp+strlen(temp), "VALTYPE_%s,", c2TYPE(*vec[2]));
+		(void)PadTo(64, temp);
+		Sprintf(temp+strlen(temp), "%s },", p->s3);
 		Fprintf(nemode, "%s\n", temp);
 		p = p->nst;
 	}
@@ -677,7 +618,6 @@ dump_all_modes()
 	static	char	*middle[] = {
 		"#endif /* realdef */",
 		"",
-		"#if !SMALLER",
 		"#ifdef realdef",
 		"char *all_modes[] = {",
 		};
@@ -687,7 +627,6 @@ dump_all_modes()
 		"#else",
 		"extern char *all_modes[];",
 		"#endif /* realdef */",
-		"#endif /* !SMALLER */",
 		};
 	char	temp[MAX_BUFFER];
 	register LIST *p, *q;
@@ -861,7 +800,6 @@ dump_bmodes()
 		"",
 		"/* buffer mode flags	*/",
 		"/* the indices of B_VALUES.v[] */",
-		"/* the first set are boolean */",
 		};
 	static	char	*middle[] = {
 		"",
@@ -875,7 +813,7 @@ dump_bmodes()
 		};
 	static	char	*bottom[] = {
 		"",
-		"\t{ NULL,\tNULL,\tVALTYPE_INT }",
+		"\t{ NULL,\tNULL,\tVALTYPE_INT, 0 }",
 		"};",
 		"#else",
 		"extern struct VALNAMES b_valuenames[];",
@@ -883,7 +821,7 @@ dump_bmodes()
 		};
 
 	write_lines(nemode, top);
-	WriteModeDefines(all_bmodes, "");
+	WriteModeDefines(all_bmodes, "Buffers");
 	write_lines(nemode, middle);
 	WriteModeSymbols(all_bmodes);
 	write_lines(nemode, bottom);
@@ -1031,6 +969,49 @@ LIST	*head;
 
 /******************************************************************************/
 static void
+save_gmodes(type, vec)
+char	*type;
+char	**vec;
+{
+	InsertSorted(&all_gmodes, Mode2Key(type,vec[1]), vec[2], vec[3], vec[0]);
+}
+
+static void
+dump_gmodes()
+{
+	static	char	*top[] = {
+		"",
+		"/* global mode flags	*/",
+		"/* the indices of G_VALUES.v[] */",
+		};
+	static	char	*middle[] = {
+		"",
+		"typedef struct G_VALUES {",
+		"\t/* each entry is a val, and a ptr to a val */",
+		"\tstruct VAL gv[MAX_G_VALUES+1];",
+		"} G_VALUES;",
+		"",
+		"#ifdef realdef",
+		"struct VALNAMES g_valuenames[] = {",
+		};
+	static	char	*bottom[] = {
+		"",
+		"\t{ NULL,\tNULL,\tVALTYPE_INT, 0 }",
+		"};",
+		"#else",
+		"extern struct VALNAMES g_valuenames[];",
+		"#endif",
+		};
+
+	write_lines(nemode, top);
+	WriteModeDefines(all_gmodes, "Globals");
+	write_lines(nemode, middle);
+	WriteModeSymbols(all_gmodes);
+	write_lines(nemode, bottom);
+}
+
+/******************************************************************************/
+static void
 save_names(name,func,cond)
 char *name, *func, *cond;
 {
@@ -1167,7 +1148,7 @@ dump_wmodes()
 		};
 	static	char	*bottom[] = {
 		"",
-		"\t{ NULL,\tNULL,\tVALTYPE_INT}",
+		"\t{ NULL,\tNULL,\tVALTYPE_INT, 0 }",
 		"};",
 		"#else",
 		"extern struct VALNAMES w_valuenames[];",
@@ -1175,7 +1156,7 @@ dump_wmodes()
 		};
 
 	write_lines(nemode, top);
-	WriteModeDefines(all_wmodes, "W");
+	WriteModeDefines(all_wmodes, "Windows");
 	write_lines(nemode, middle);
 	WriteModeSymbols(all_wmodes);
 	write_lines(nemode, bottom);
@@ -1234,6 +1215,9 @@ char    *argv[];
 				section = SECT_FUNC;
 				start_evar_h(argv);
 				break;
+			case 'g':
+				section = SECT_GBLS;
+				break;
 			case 'b':
 				section = SECT_BUFF;
 				break;
@@ -1266,6 +1250,12 @@ char    *argv[];
 				default:
 					badfmt("bad line");
 				}
+				break;
+
+			case SECT_GBLS:
+				if (r < 2 || r > 3)
+					badfmt("looking for GLOBAL modes");
+				save_gmodes(modetype, vec);
 				break;
 
 			case SECT_BUFF:
@@ -1310,6 +1300,7 @@ char    *argv[];
 				save_ufuncs(vec);
 				break;
 
+			case SECT_GBLS:
 			case SECT_BUFF:
 			case SECT_WIND:
 				if (r != 1
@@ -1352,6 +1343,7 @@ char    *argv[];
 	if (all_wmodes || all_bmodes) {
 		nemode = OpenHeader("nemode.h", argv);
 		dump_all_modes();
+		dump_gmodes();
 		dump_wmodes();
 		dump_bmodes();
 	}

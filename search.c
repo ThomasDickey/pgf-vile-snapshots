@@ -4,7 +4,16 @@
  *  heavily modified by Paul Fox, 1990
  *
  * $Log: search.c,v $
- * Revision 1.43  1993/02/08 14:53:35  pgf
+ * Revision 1.46  1993/03/09 19:57:33  pgf
+ * fixed pointer/integer mismatch on calls to fsearch/rsearch
+ *
+ * Revision 1.45  1993/03/05  17:50:54  pgf
+ * see CHANGES, 3.35 section
+ *
+ * Revision 1.44  1993/02/24  10:59:02  pgf
+ * see 3.34 changes, in CHANGES file
+ *
+ * Revision 1.43  1993/02/08  14:53:35  pgf
  * see CHANGES, 3.32 section
  *
  * Revision 1.42  1992/12/14  09:03:25  foxharp
@@ -171,12 +180,6 @@
 #define	void	int
 #endif
 
-int    readpattern();
-
-void savematch();
-void scanboundry();
-void nextch();
-
 int lastdirec;
 
 MARK scanboundpos;
@@ -219,7 +222,11 @@ int
 forwsearch(f, n)
 int f, n;
 {
-	return fsearch(f, n, FALSE, FALSE);
+	register int status;
+	hst_init('/');
+	status = fsearch(f, n, FALSE, FALSE);
+	hst_flush();
+	return status;
 }
 
 /* extra args -- marking if called from globals, and should mark lines, and
@@ -236,7 +243,7 @@ int marking, fromscreen;
 	int didmark = FALSE;
 
 	if (f && n < 0)
-		return rsearch(f, -n, NULL, FALSE);
+		return rsearch(f, -n, FALSE, FALSE);
 
 	wrapok = marking || b_val(curwp->w_bufp, MDSWRAP);
 
@@ -380,7 +387,11 @@ int
 backsearch(f, n)
 int f, n;
 {
-	return rsearch(f, n, FALSE, FALSE);
+	register int status;
+	hst_init('?');
+	status = rsearch(f, n, FALSE, FALSE);
+	hst_flush();
+	return status;
 }
 
 /* ARGSUSED */
@@ -394,7 +405,7 @@ int dummy, fromscreen;
 	MARK curpos;
 	
 	if (n < 0)
-		return fsearch(f, -n, NULL, fromscreen);
+		return fsearch(f, -n, FALSE, fromscreen);
 
 	wrapok = b_val(curwp->w_bufp, MDSWRAP);
 
@@ -692,6 +703,7 @@ int	fromscreen;
 			since they're handled by regexp directly for the
 			search pattern, and in delins() for the replacement
 			pattern */
+		hst_glue(c);
 	 	status = kbd_string(prompt, apat, NPAT, c, 0, no_completion);
 	}
  	if (status == TRUE) {
@@ -730,7 +742,7 @@ int matchlen;
 			return;
 	}
 
-	strncpy(patmatch, &curpos.l->l_text[curpos.o], matchlen);
+	(void)strncpy(patmatch, &curpos.l->l_text[curpos.o], matchlen);
 
 	/* null terminate the match string */
 	patmatch[matchlen] = '\0';

@@ -7,7 +7,13 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: globals.c,v $
- * Revision 1.14  1992/12/20 14:39:48  foxharp
+ * Revision 1.16  1993/03/16 10:53:21  pgf
+ * see 3.36 section of CHANGES file
+ *
+ * Revision 1.15  1993/02/24  10:59:02  pgf
+ * see 3.34 changes, in CHANGES file
+ *
+ * Revision 1.14  1992/12/20  14:39:48  foxharp
  * implemented 'v' command -- easy -- just do same as 'g', but invert marks
  * before runnning the command
  *
@@ -82,8 +88,7 @@ int f, n, g_or_v;
 	int c, s;
 	register LINE *lp;
 	register char *fnp;	/* ptr to the name of the cmd to exec */
-	char *kbd_engl();
-	CMDFUNC *engl2fnc();
+	char	cmd[NLINE];
 	CMDFUNC *cfp;
 	int foundone;
 	WINDOW *wp;
@@ -110,10 +115,9 @@ int f, n, g_or_v;
                 searching delay is too long, and unexpected in the
                 middle of a command.  */
 
-	mlprompt("action to perform on each matching line: ");
-	/* and now get the name of, and then the function to execute */
-	fnp = kbd_engl();
-	if (!fnp || !fnp[0]) {
+	fnp = kbd_engl("action to perform on each matching line: ", cmd);
+	/* get the name of, and then the function to execute */
+	if (!fnp) {
 	        mlforce("[No function]");
 		return FALSE;
 	} else if (!(cfp = engl2fnc(fnp))) {
@@ -170,7 +174,7 @@ int f, n, g_or_v;
 				havemotion = &f_godotplus;
 				wp->w_dot.l = lp;
 				wp->w_dot.o = 0;
-				s = (cfp->c_func)(FALSE, 1, NULL, NULL);
+				s = (cfp->c_func)(FALSE, 1);
 				/* function may have switched on us */
 				swbuffer(wp->w_bufp);
 				lp = wp->w_dot.l;

@@ -4,7 +4,13 @@
  * written for vile by Paul Fox, (c)1990
  *
  * $Log: opers.c,v $
- * Revision 1.24  1993/01/23 14:28:07  foxharp
+ * Revision 1.26  1993/03/16 10:53:21  pgf
+ * see 3.36 section of CHANGES file
+ *
+ * Revision 1.25  1993/03/05  17:50:54  pgf
+ * see CHANGES, 3.35 section
+ *
+ * Revision 1.24  1993/01/23  14:28:07  foxharp
  * report failed motions with message
  *
  * Revision 1.23  1992/11/19  09:15:37  foxharp
@@ -270,6 +276,14 @@ int f,n;
 }
 
 int
+operjoin(f,n)
+int f,n;
+{
+	opcmd = OPOTHER;
+	return operator(f,n,joinregion,"Join");
+}
+
+int
 operyank(f,n)
 int f,n;
 {
@@ -334,9 +348,10 @@ operwrite(f,n)
 int f,n;
 {
         register int    s;
-        static char fname[NFILEN];
+        char fname[NFILEN];
+
 	if (ukb != 0) {
-	        if ((s=mlreply("Write to file: ", fname, NFILEN)) != TRUE)
+	        if ((s=mlreply_file("Write to file: ", (TBUFF **)0, FILEC_WRITE|FILEC_PROMPT, fname)) != TRUE)
 	                return s;
 		return kwrite(fname,TRUE);
 	} else {

@@ -6,7 +6,20 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.60  1993/02/08 14:53:35  pgf
+ * Revision 1.64  1993/03/16 10:53:21  pgf
+ * see 3.36 section of CHANGES file
+ *
+ * Revision 1.63  1993/03/05  18:46:39  pgf
+ * fix for tab cursor positioning in insert mode, and mode to control
+ * positioning style
+ *
+ * Revision 1.62  1993/03/05  17:50:54  pgf
+ * see CHANGES, 3.35 section
+ *
+ * Revision 1.61  1993/02/24  10:59:02  pgf
+ * see 3.34 changes, in CHANGES file
+ *
+ * Revision 1.60  1993/02/08  14:53:35  pgf
  * see CHANGES, 3.32 section
  *
  * Revision 1.59  1993/01/23  13:38:23  foxharp
@@ -540,7 +553,6 @@ vtinit()
 
     if (vscreen == NULL)
         exit(BAD(1));
-
 
 #if	! MEMMAP
     pscreen = typeallocn(VIDEO *,term.t_mrow);
@@ -1079,7 +1091,8 @@ updpos()
 	/* find the current column */
 	col = 0;
 	i = 0;
-	while (i < DOT.o) {
+	while (i < DOT.o || (global_g_val(GMDVITABPOS) && !insertmode &&
+				i <= DOT.o && i < llength(lp))) {
 		c = lgetc(lp, i++);
 		if (c == '\t' && !w_val(curwp,WMDLIST)) {
 			do {
@@ -1092,6 +1105,10 @@ updpos()
 		}
 
 	}
+	if (global_g_val(GMDVITABPOS) && !insertmode &&
+			col != 0 && DOT.o < llength(lp))
+		col--;
+
 	/* ...adjust to offset from shift-margin */
 	curcol = col - w_val(curwp,WVAL_SIDEWAYS);
 
@@ -1877,7 +1894,7 @@ va_dcl
 {
 	va_list ap;
 	/* if we are not currently echoing on the command line, abort this */
-	if (global_b_val(MDTERSE) || dotcmdmode == PLAY || discmd == FALSE) {
+	if (global_b_val(MDTERSE) || kbd_replaying() || discmd == FALSE) {
 		movecursor(term.t_nrow, 0);
 		return;
 	}
@@ -2005,12 +2022,14 @@ va_list *app;	/* ptr to current data field */
 
 	movecursor(term.t_nrow, 0);
 
+	kbd_expand = -1;
 	dfoutfn = kbd_putc;
 #if	ANSI_VARARGS
 	dofmt(fmt,app);
 #else
 	dofmt(app);
 #endif
+	kbd_expand = 0;
 
 	/* if we can, erase to the end of screen */
 	if (eolexist == TRUE)
@@ -2180,7 +2199,7 @@ int *widthp, *heightp;
 	struct winsize size;
 	*widthp = 0;
 	*heightp = 0;
-	if (ioctl (0, TIOCGWINSZ, &size) < 0)
+	if (ioctl (0, TIOCGWINSZ, (caddr_t)&size) < 0)
 		return;
 	*widthp = size.ws_col;
 	*heightp = size.ws_row;
@@ -2231,3 +2250,22 @@ int h, w;
 
 	update(TRUE);
 }
+
+/* For memory-leak testing (only!), releases all display storage. */
+#if NO_LEAKS
+void	vt_leaks()
+{
+	register int i;
+
+	for (i = 0; i < term.t_mrow; ++i) {
+		free ((char *)vscreen[i]);
+#if	! MEMMAP
+		free ((char *)pscreen[i]);
+#endif
+	}
+	free ((char *)vscreen);
+#if	! MEMMAP
+	free ((char *)pscreen);
+#endif
+}
+#endif

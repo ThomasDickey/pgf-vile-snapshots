@@ -4,7 +4,16 @@
  *	written 11-feb-86 by Daniel Lawrence
  *
  * $Log: bind.c,v $
- * Revision 1.29  1993/02/15 10:37:31  pgf
+ * Revision 1.32  1993/03/16 10:53:21  pgf
+ * see 3.36 section of CHANGES file
+ *
+ * Revision 1.31  1993/03/05  17:50:54  pgf
+ * see CHANGES, 3.35 section
+ *
+ * Revision 1.30  1993/02/24  10:59:02  pgf
+ * see 3.34 changes, in CHANGES file
+ *
+ * Revision 1.29  1993/02/15  10:37:31  pgf
  * cleanup for gcc-2.3's -Wall warnings
  *
  * Revision 1.28  1993/02/12  10:41:28  pgf
@@ -220,18 +229,16 @@ int f, n;	/* command arguments [IGNORED] */
 	register CMDFUNC *kcmd;	/* ptr to the requested function to bind to */
 	register KBIND *kbp;	/* pointer into a binding table */
 	char outseq[80];	/* output buffer for keystroke sequence */
+	char cmd[NLINE];
 	char *fnp;
-	char *kbd_engl();
 	char *kcod2prc();
 
 	/* prompt the user to type in a key to bind */
-	mlprompt("Bind function with english name: ");
-
-	/* get the function name to bind it to */
+	/* and get the function name to bind it to */
 #if	NeWS
 	newsimmediateon() ;
 #endif
-	fnp = kbd_engl();
+	fnp = kbd_engl("Bind function with english name: ", cmd);
 #if	NeWS
 	newsimmediateoff() ;
 #endif
@@ -520,7 +527,7 @@ char *mstring;		/* match string if partial list, NULL to list all */
 	for (nptr = nametbl; nptr->n_name != NULL; ++nptr)
 		nptr->n_cmd->c_flags &= ~LISTED; /* mark it as unlisted */
 
-	mlwrite("");	/* clear the message line */
+	mlerase();	/* clear the message line */
 }
 
 #if	APROP
@@ -907,12 +914,12 @@ char *skey;	/* name of key to get binding for */
  * name if it is unique.
  */
 char *
-kbd_engl()
+kbd_engl(prompt, buffer)
+char *prompt;		/* null pointer to splice calls */
+char *buffer;
 {
-	char *buf;
-
-	if (kbd_engl_stat(&buf) == TRUE)
-		return buf;
+	if (kbd_engl_stat(prompt, buffer) == TRUE)
+		return buffer;
 	return NULL;
 }
 
@@ -929,12 +936,15 @@ void
 kbd_putc(c)
 	int	c;
 {
-	if (isreturn(c)) {
+	if ((kbd_expand <= 0) && isreturn(c)) {
+		TTputc(c);
 		ttcol = 0;
 	} else if (isprint(c)) {
 		if (ttcol < term.t_ncol)
 			TTputc(c);
 		ttcol++;
+	} else if ((kbd_expand < 0) && (c == '\t')) {
+		kbd_putc(' ');
 	} else {
 		kbd_putc('^');
 		kbd_putc(toalpha(c));
@@ -1064,6 +1074,7 @@ unsigned size_entry;
 		/* scan through the candidates */
 		for (p = NEXT_DATA(first); p != last; p = NEXT_DATA(p))
 			if (THIS_NAME(p)[n] != buf[n]) {
+				buf[n] = EOS;
 				TTflush();
 				return n;
 			}
@@ -1123,7 +1134,7 @@ unsigned size_entry;
 	register char *nbp;	/* first ptr to entry in name binding table */
 
 	kbd_init();		/* nothing to erase */
-	buf[cpos] = 0;		/* terminate it for us */
+	buf[cpos] = EOS;	/* terminate it for us */
 	nbp = table;		/* scan for matches */
 
 	while (THIS_NAME(nbp) != NULL) {
@@ -1145,7 +1156,6 @@ unsigned size_entry;
 				}
 				if (c != NAMEC)  /* put it back */
 					tungetc(c);
-				lineinput = FALSE;
 				/* return complete name */
 				(void)strncpy(buf, THIS_NAME(nbp), NLINE);
 				*pos = cpos;
@@ -1168,114 +1178,68 @@ unsigned size_entry;
 }
 
 /*
- * Returns:
- *	TRUE		- loads '*bufp' as a side-effect
- *	SORTOFTRUE	- '*bufp' is null (command was empty)
- *	FALSE		- '*bufp' is null (command was aborted)
+ * The following mess causes the command to terminate if:
+ *
+ *	we've got a space
+ *		-or-
+ *	we're in the first few chars and we're switching from punctuation
+ *	to alphanumerics, or vice-versa.  oh yeah -- '!' is considered
+ *	alphanumeric today.
+ *	All this allows things like:
+ *		: e#
+ *		: !ls
+ *		: q!
+ *	to work properly.
+ *	If we pass this "if" with c != ' ', then c is ungotten below,
+ *	so it can be picked up by the commands argument getter later.
  */
-int
-kbd_engl_stat(bufp)
-char **bufp;
+static int
+eol_command(buffer, cpos, c, eolchar)
+char *	buffer;
+int	cpos;
+int	c;
+int	eolchar;
 {
-	register int c;
-	int	cpos = 0;		/* current column on screen output */
-	static char buf[NLINE]; /* buffer to hold tentative command name */
+	return	(c == eolchar)
+	  ||	(
+	          cpos > 0
+	      &&  cpos < 3
+	      &&(
+	          (!ispunct(c)
+	        &&  ispunct(buffer[cpos-1])
+		  )
+		|| ((c != '!' && ispunct(c))
+		  && (buffer[cpos-1] == '!' || !ispunct(buffer[cpos-1]))
+		  )
+		)
+	      );
+}
 
-	*bufp = NULL;
+/*
+ * This procedure is invoked from 'kbd_string()' to setup the command-name
+ * completion and query displays.
+ */
+static int
+cmd_complete(c, buf, pos)
+int	c;
+char	*buf;
+int	*pos;
+{
+	return kbd_complete(c, buf, pos, (char *)&nametbl[0], sizeof(nametbl[0]));
+}
 
-	/* if we are executing a command line just get the next arg and return */
-	if (clexec) {
-		if (macarg(buf) != TRUE) {
-			return FALSE;
-		}
-		*bufp = buf;
-		return TRUE;
-	}
-
-	testcol = -1;
-	lineinput = TRUE;
-
-	/* build a name string from the keyboard */
-	while (TRUE) {
-		c = tgetc();
-		kbd_unquery();
-
-		if (cpos == 0) {
-			if (isbackspace(c) ||
-			    c == kcod2key(abortc) ||
-			    c == kcod2key(killc)  ||
-			    c == kcod2key(wkillc) ||
-			    isreturn(c) ||
-			    islinespecchar(c) ) {
-				return SORTOFTRUE;
-			}
-		}
-
-		if (isreturn(c)) {
-			buf[cpos] = 0;
-			lineinput = FALSE;
-			*bufp = buf;
-			return TRUE;
-
-		} else if (c == kcod2key(abortc)) {	/* Bell, abort */
-			buf[0] = EOS;
-			lineinput = FALSE;
-			return FALSE;
-
-		} else if (isbackspace(c)) {
-			kbd_erase();
-			--cpos;
-			TTflush();
-
-		} else if (c == kcod2key(killc)		/* ^U, kill */
-		       ||  c == kcod2key(wkillc)) {	/* ^W, word-kill */
-			while (cpos != 0) {
-				kbd_erase();
-				--cpos;
-			}
-			TTflush();
-			return SORTOFTRUE;
-
-		} /* else... */
-/* the following mess causes the command to terminate if:
-	we've got a space
-		-or-
-	we're in the first few chars and we're switching from punctuation
-	to alphanumerics, or vice-versa.  oh yeah -- '!' is considered
-	alphanumeric today.
-	All this allows things like:
-		: e#
-		: !ls
-		: q!
-	to work properly.
-	If we pass this "if" with c != ' ', then c is ungotten below,
-	so it can be picked up by the commands argument getter later.
-*/
-		else if (
-		      (c == NAMEC)
-		    ||(c == TESTC)
-		    ||(
-		          cpos > 0
-		      &&  cpos < 3
-		      &&(
-		          (!ispunct(c)
-		        &&  ispunct(buf[cpos-1])
-			  )
-			|| ((c != '!' && ispunct(c))
-			  && (buf[cpos-1] == '!' || !ispunct(buf[cpos-1]))
-			  )
-			)
-		      )
-		    ) {
-			if (kbd_complete(c, buf, &cpos, (char *)&nametbl[0], sizeof(NTAB))) {
-				lineinput = FALSE;
-				*bufp = buf;
-				return TRUE;
-			}
-		} else if (cpos < NLINE-1 && isprint(c)) {
-			kbd_putc(buf[cpos++] = c);
-			TTflush();
-		} else
-			kbd_alarm();
-	}
+int
+kbd_engl_stat(prompt, buffer)
+char	*prompt;
+char	*buffer;
+{
+	*buffer = EOS;
+	return kbd_reply(
+		prompt,		/* no-prompt => splice */
+		buffer,		/* in/out buffer */
+		NLINE,		/* sizeof(buffer) */
+		eol_command,
+		NAMEC,		/* may be a conflict */
+		KBD_MAYBEC,	/* allow blank-return */
+		cmd_complete);
 }

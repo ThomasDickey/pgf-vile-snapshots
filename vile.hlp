@@ -1,6 +1,7 @@
 
 Getting along with vile
 -----------------------
+
 	Use Ctrl-D and Ctrl-U to scroll through this help information.
 
 	Type Ctrl-O to make this the only window on the screen.
@@ -54,6 +55,7 @@ Getting along with vile
 
 General Remarks
 ---------------
+
 	Vile holds text in "buffers".  Usually, these correspond to a file
 	that you are editing, but not always.  For instance, a buffer
 	might be used to display this help text, or to hold the output
@@ -76,10 +78,9 @@ General Remarks
 	you have two windows to the same buffer, and make a change in one,
 	you can undo it in the other.
 
-
-
 Buffer manipulation commands:  
 -----------------------------
+
 	_	Show a history list of the up to 9 most recently visited 
 		buffers.  Follow this command with a digit to select that
 		buffer, or simply repeat it ("__") as a synonym for "_1".
@@ -162,6 +163,7 @@ Buffer manipulation commands:
 
 Window manipulation commands:  
 -----------------------------
+
 	^X-2	Make Two windows.  Splits the current window in half. This
 		is the usual way to create a new window.
 	^K or ^X-0	Get rid of (Kill) this window.
@@ -196,6 +198,7 @@ Window manipulation commands:
 
 File manipulation commands:  
 ---------------------------
+
 	The usual ":e", ":r", ":f", ":w" commands are available, though only
 	":e!" is available of the "!" options.  The ":r" command reads the
 	named file in after the current line.  To read a file before the
@@ -226,6 +229,7 @@ File manipulation commands:
 
 Shell Access
 ------------
+
 	Anywhere a filename is valid, a command name is also
 	valid, entered in the form "!shell-command".  The whole line is
 	handed to the shell, and the read or write operation is done on
@@ -249,6 +253,7 @@ Shell Access
 
 Text manipulation command:
 --------------------------
+
 	Remember, these are only the new or different commands.  The 
 	standard vi set should still work.
 
@@ -425,11 +430,12 @@ Text manipulation command:
 	If your tags file is not named "tags", simply edit it and name the
 	buffer "tags" with the ":rename-buffer" command.
 
+Miscellaneous commands
+----------------------
+
 	^A-o	Remove all blank lines containing or immediately following
 		the current line.
 
-Miscellaneous commands
-----------------------
 	^X-^X	The "error finder".  Goes to the next file/line error pair 
 		specified in the last buffer captured from a command's
 		output.  This buffer is usually created with the ^X-! command.
@@ -437,7 +443,7 @@ Miscellaneous commands
 		into the buffer named "[Output]".  Repeatedly hitting ^X-^X 
 		will position the editor at each error in turn, and will
 		eventually start over again at the top.  The "Entering directory
-		XXX" and "Leavind directory XXX" messages that GNU make puts
+		XXX" and "Leaving directory XXX" messages that GNU make puts
 		out with the -w switch are honored, so that files are found
 		with the correct path.  (Tip: I use the following
 		macro to quickly grep a source directory for the string under
@@ -473,18 +479,31 @@ Miscellaneous commands
 
 Editor modes
 ------------
-	Modes are associated with either windows or buffers, and are
-	usually inherited from a set of global modes.  The value of the
-	mode will track changes to the global modes, until the "local"
-	value is set independently of the global one.  To set or change a
-	global mode, use ":set", to remove the mode, use ":unset",
-	":setno", or ":set" with the modename prefixed with "no".  To set
-	and reset local modes, use ":setl", ":unsetl", ":setlno".  To
-	display modes, use ":setall", ":modes", ":set all".  Local values
-	are only shown if they differ from the global values, whether they
-	have been independently set or not.  The possible modes (with
-	synonyms in parentheses, and a trailing G, B or W indicating whether
-	the mode belongs to globals, buffers or windows) are:
+
+	Modes are universal, and affect the editor generally, or are
+	associated with either windows or buffers, and are usually
+	inherited from a set of global buffer and window modes.  The value
+	of a buffer or window mode will track changes to the respective
+	global mode, until the "local" value is set independently of the
+	global one.  To set or change a global mode, use ":set", to remove
+	the mode, use ":unset", ":setno", or ":set" with the modename
+	prefixed with "no".  To set and reset local modes, use ":setl",
+	":unsetl", ":setlno".  To display modes, use ":setall", ":modes",
+	":set all".  Local values are only shown if they differ from the
+	global values, whether they have been independently set or not. 
+	The "local" version of the set/unset commands ("setl"/"unsetl") do
+	not make sense when used with univeral modes.
+
+	The possible modes, with synonyms in parentheses, and a trailing U,
+	B or W indicating whether the mode is universal, or belongs to
+	buffers or windows, are:
+
+	alt-tabpos (atp) Position the cursor over tab and control characters
+		the way vi would, that is, at the end of the tab or control
+		character display sequence.  If turned off, the cursor is
+		positioned over tabs and control characters the way it would be
+		in emacs, i.e.  at the start of the tab or control character
+		display sequence.  (U)
 
 	autobuffer (ab) Controls whether vile uses "most-recently-used"
 		style buffering, or vi-style (command-line order) buffers. 
@@ -521,12 +540,20 @@ Editor modes
 	c-tabstop (cts)  Will prompt for a new value for spacing of tabstops
 		which will be used if a file is in cmode. (B)
 
+	c-suffixes (csuf) A regular expression defining filename-endings that
+		set cmode.  (U)
+
 	comments A regular expression defining commented paragraph
 		delimiters.  This is used in addition to the "paragraphs"
 		expression (see below) when reformatting a region.  The net
 		effect is that paragraphs inside of comments are preserved
 		when reformatting, but are not reachable with the '}' and
 		'{' motions.  (B)
+
+	dirc	Causes vile to check each name when scanning directories for
+		filename completion.  This is slower, but provides additional
+		information allowing you to distinguish between directory and
+		file names in the prompt.  (U)
 
 	dos	When writing the buffer, terminate lines with CR/LF pairs,
                 rather than the usual single LF.  On input, if the global
@@ -543,8 +570,15 @@ Editor modes
 	ignorecase (ic) Text searches normally match the pattern exactly.
 		With this set, searches are case-insensitive. (B)
 
+	implybuffer (ib) Causes vile to create a buffer when you write to a new
+		file, or read from one (e.g., with ":r").  (U)
+
 	list	(li) The buffer will be displayed with tabs and newlines made
 		visible, instead of as whitespace. (W)
+
+	looktags (lt) In commands prompting to open a file, use tags to find
+		list of possibilities.  This overrides normal file name
+		completion.  (U)
 
 	magic	Allow meta-characters in search strings.  See the section 
 		"Regular Expressions" for more detail. (B)
@@ -554,6 +588,9 @@ Editor modes
 
 	paragraphs A regular expression defining where the "next-paragraph"
 		('}') and "previous-paragraph" ('{') commands will go. (B)
+
+	samebangs (sb) Controls whether the "!!" and "^X-!" commands use the
+		same command string.  (U)
 
 	sections A regular expression defining where the "next-section" (']')
 		and "previous-section" ('[') commands will go. (B)
@@ -603,6 +640,9 @@ Editor modes
 		become annoying at low baud rates.  Setting terse mode will
 		suppress many of these.  (B)
 
+	view	View the file only.  No changes are permitted.  This is set
+		automatically for the output of shell commands.  (B)
+
 	wrapmargin (wm) Implements vi's auto-wrap mode.  If nonzero, the wrap-
 		margin specifies the number of columns on the screen's right
 		margin to reserve before breaking the input lines on a space.
@@ -616,8 +656,13 @@ Editor modes
 		too long.  Unlike vi, wrapping is only attempted when a
 		space is typed. (B)
 
-	view	View the file only.  No changes are permitted.  This is set
-		automatically for the output of shell commands.  (B)
+Command History
+---------------
+
+	You may scroll through the list of previous replies to the :-prompt by
+	typing up or down arrows (if your configuration supports it).  More
+	generally, vile recognizes the any key bound to the up/down line
+	commands.
 
 Special Character Expansion
 ---------------------------
@@ -680,9 +725,9 @@ Key Rebinding
 	Note that when interactive, ^A is typed using the control key.  In a
 	file, however, it should be a caret (^) followed by a letter.
 
-
 Macros
 ------
+
 	The first type of macro in vile, is for temporary, quick macro
 	usage, and lets you record a macro as you execute vile commands.
 	You can then replay those keystrokes with a single key. 
@@ -707,6 +752,7 @@ Macros
 
 Programmed macros
 -----------------
+
 	Vile can also be extended (though I confess this has only been
 	lightly used or tested) by defining macros and then binding
 	execution of those macros to key sequences.  For example, if
@@ -896,6 +942,7 @@ Programmed macros
 
 Regular Expressions
 -------------------
+
 	Searches use regular expressions, which, as in vi, may be magic
 	by default or not.
 
@@ -977,6 +1024,7 @@ Regular Expressions
 
 Command files
 -------------
+
 	On startup (in the absence of '@' arguments -- see Invocation
 	below), vile will attempt to read the file ".vilerc" in the current
 	directory, and then in $HOME, and will execute the commands found
@@ -1004,6 +1052,7 @@ Command files
 
 Invocation
 ----------
+
 	If set in the environment, the variable VILEINIT is used as a set
 	of vile commands to initialize the editor.  If unset, vile looks
 	for files called "./.vilerc" and "$HOME/.vilerc, and executes the
@@ -1075,6 +1124,7 @@ X Window System specifics:
 
 DOS specifics
 -------------
+
 	You can force vile into one of three screen modes: 25, 43 and 50
 	lines.  It auto-senses, but can be overridden with a command
 	line option: -2, -4, and -5 give 25, 43 and 50 lines respectively.
@@ -1088,6 +1138,7 @@ DOS specifics
 
 Differences from vi
 -------------------
+
 	Of course, this really isn't vi.  Some of the following differences
 	deserve changing, others do not.
 
@@ -1136,6 +1187,7 @@ Differences from vi
 
 Sample .vilerc
 --------------
+
 	Here's a sample .vilerc, to help get you started with the
 	syntax and style of vile macros:
 
@@ -1187,6 +1239,7 @@ Sample .vilerc
 
 Note on Scrolling
 -----------------
+
 	If scrolling is really slow, or really ugly (the status line hops
 	around a lot), and you're using a vt102 or compatible terminal that
 	you think should be able to scroll okay, then the problem is almost
@@ -1239,6 +1292,7 @@ Note on Scrolling
 
 Credits
 -------
+
 	This code has been written by a _lot_ of people.  Names appearing
 	within comments in the micro-Emacs source code are: Dave
 	Conroy, Daniel Lawrence, John Gamble, Roger Ove, Dana Hoggatt,

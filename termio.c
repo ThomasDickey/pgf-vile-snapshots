@@ -4,7 +4,13 @@
  * All operating systems.
  *
  * $Log: termio.c,v $
- * Revision 1.55  1993/02/15 10:37:31  pgf
+ * Revision 1.57  1993/03/16 10:53:21  pgf
+ * see 3.36 section of CHANGES file
+ *
+ * Revision 1.56  1993/03/05  17:50:54  pgf
+ * see CHANGES, 3.35 section
+ *
+ * Revision 1.55  1993/02/15  10:37:31  pgf
  * cleanup for gcc-2.3's -Wall warnings
  *
  * Revision 1.54  1993/02/08  14:53:35  pgf
@@ -408,7 +414,7 @@ void
 ttopen()
 {
 
-	ioctl(0, TCGETA, &otermio);	/* save old settings */
+	ioctl(0, TCGETA, (char *)&otermio);	/* save old settings */
 #ifdef AVAILABLE
 	setbuffer(stdout, tobuf, TBUFSIZ);
 #endif
@@ -493,7 +499,7 @@ int f;
 	fflush(stdout);
 	TTflush();
 	TTclose();
-	ioctl(0, TCSETAF, &otermio);
+	ioctl(0, TCSETAF, (char *)&otermio);
 #if USE_FCNTL
 	fcntl(0, F_SETFL, kbd_flags);
 	kbd_is_polled = FALSE;
@@ -505,7 +511,7 @@ void
 ttunclean()
 {
 #if ! X11
-	ioctl(0, TCSETAW, &ntermio);
+	ioctl(0, TCSETAW, (char *)&ntermio);
 #endif
 }
 
@@ -532,25 +538,22 @@ struct tchars	ntchars; /*  = { -1, -1, -1, -1, -1, -1 }; */
 void
 ttopen()
 {
-	ioctl(0,TIOCGETP,&ostate); /* save old state */
+	ioctl(0,TIOCGETP,(char *)&ostate); /* save old state */
 	killc = ostate.sg_kill;
 	backspc = ostate.sg_erase;
 
 #if ! X11
 	nstate = ostate;
-#if APOLLO
-        nstate.sg_flags |= RAW;		/* makes ^C, ^U work properly */
-#endif
         nstate.sg_flags |= CBREAK;
         nstate.sg_flags &= ~(ECHO|CRMOD);       /* no echo for now... */
-	ioctl(0,TIOCSETN,&nstate); /* set new state */
+	ioctl(0,TIOCSETN,(char *)&nstate); /* set new state */
 #endif
 
 	rnstate = nstate;
         rnstate.sg_flags &= ~CBREAK;
         rnstate.sg_flags |= RAW;
 
-	ioctl(0, TIOCGETC, &otchars);		/* Save old characters */
+	ioctl(0, TIOCGETC, (char *)&otchars);	/* Save old characters */
 	intrc =  otchars.t_intrc;
 	startc = otchars.t_startc;
 	stopc =  otchars.t_stopc;
@@ -559,22 +562,22 @@ ttopen()
 	ntchars = otchars;
 	ntchars.t_brkc = -1;
 	ntchars.t_eofc = -1;
-	ioctl(0, TIOCSETC, &ntchars);		/* Place new character into K */
+	ioctl(0, TIOCSETC, (char *)&ntchars);	/* Place new character into K */
 #endif
 
-	ioctl(0, TIOCGLTC, &oltchars);		/* Save old characters */
+	ioctl(0, TIOCGLTC, (char *)&oltchars);	/* Save old characters */
 	wkillc = oltchars.t_werasc;
 	suspc = oltchars.t_suspc;
 #if ! X11
-	ioctl(0, TIOCSLTC, &nltchars);		/* Place new character into K */
+	ioctl(0, TIOCSLTC, (char *)&nltchars);	/* Place new character into K */
 #endif
 
 #ifdef	TIOCLGET
-	ioctl(0, TIOCLGET, &olstate);
+	ioctl(0, TIOCLGET, (char *)&olstate);
 #if ! X11
 	nlstate = olstate;
 	nlstate |= LLITOUT;
-	ioctl(0, TIOCLSET, &nlstate);
+	ioctl(0, TIOCLSET, (char *)&nlstate);
 #endif
 #endif
 #if USE_FIONREAD
@@ -589,7 +592,6 @@ ttopen()
 #endif
 
 	ttmiscinit();
-
 }
 
 void
@@ -610,11 +612,11 @@ int f;
 	}
 	TTflush();
 	TTclose();
-	ioctl(0, TIOCSETN, &ostate);
-	ioctl(0, TIOCSETC, &otchars);
-	ioctl(0, TIOCSLTC, &oltchars);
+	ioctl(0, TIOCSETN, (char *)&ostate);
+	ioctl(0, TIOCSETC, (char *)&otchars);
+	ioctl(0, TIOCSLTC, (char *)&oltchars);
 #ifdef	TIOCLSET
-	ioctl(0, TIOCLSET, &olstate);
+	ioctl(0, TIOCLSET, (char *)&olstate);
 #endif
 #if APOLLO
 	TTflush();
@@ -626,13 +628,28 @@ void
 ttunclean()
 {
 #if ! X11
-	ioctl(0, TIOCSETN, &nstate);
-	ioctl(0, TIOCSETC, &ntchars);
-	ioctl(0, TIOCSLTC, &nltchars);
+#if APOLLO
+	int literal = LLITOUT;
+
+	fflush(stdout);
+	ioctl(0, TIOCLSET, (caddr_t)&olstate);
+	ioctl(0, TIOCSETP, (caddr_t)&nstate);	/* setting nlstate changes sb_flags */
+	TTflush();
+	ioctl(0, TIOCLBIS, (caddr_t)&literal);	/* set this before nltchars! */
+	ioctl(0, TIOCSETC, (caddr_t)&ntchars);
+	ioctl(0, TIOCSLTC, (caddr_t)&nltchars);
+
+#else
+
+	ioctl(0, TIOCSETN, (char *)&nstate);
+	ioctl(0, TIOCSETC, (char *)&ntchars);
+	ioctl(0, TIOCSLTC, (char *)&nltchars);
 #ifdef	TIOCLSET
-	ioctl(0, TIOCLSET, &nlstate);
+	ioctl(0, TIOCLSET, (char *)&nlstate);
 #endif
-#endif
+
+#endif	/* APOLLO */
+#endif	/* !X11 */
 }
 
 #endif /* USE_SGTTY */
@@ -676,8 +693,21 @@ ttgetc()
 	}
 	return ( kbd_char & 0x7f );
 #else /* USE_FCNTL */
-	int c;
+#if APOLLO
+	/*
+	 * If we try to read a ^C in cooked mode it will echo anyway.  Also,
+	 * the 'getchar()' won't be interruptable.  Setting raw-mode
+	 * temporarily here still allows the program to be interrupted when we
+	 * are not actually looking for a character.
+	 */
+	int	c;
+	ioctl(0, TIOCSETN, (char *)&rnstate);
         c = getchar();
+	ioctl(0, TIOCSETN, (char *)&nstate);
+#else
+	int c;
+	c = getchar();
+#endif
 	if (c == EOF) {
 		if (errno == EINTR)
 			return -1;
@@ -709,7 +739,7 @@ typahead()
 #  if	USE_FIONREAD
 	{
 	long x;
-	return((ioctl(0,FIONREAD,&x) < 0) ? 0 : (int)x);
+	return((ioctl(0,FIONREAD,(caddr_t)&x) < 0) ? 0 : (int)x);
 	}
 #  else
 #   if	USE_FCNTL

@@ -4,7 +4,20 @@
 	written 1986 by Daniel Lawrence
  *
  * $Log: eval.c,v $
- * Revision 1.43  1993/02/08 14:53:35  pgf
+ * Revision 1.47  1993/03/16 10:53:21  pgf
+ * see 3.36 section of CHANGES file
+ *
+ * Revision 1.46  1993/03/05  17:50:54  pgf
+ * see CHANGES, 3.35 section
+ *
+ * Revision 1.45  1993/02/24  10:59:02  pgf
+ * see 3.34 changes, in CHANGES file
+ *
+ * Revision 1.44  1993/02/16  20:52:49  pgf
+ * eliminate putenv call, which isn't always available.  real vi doesn't
+ * push the "shell" variable to the environment anyway.
+ *
+ * Revision 1.43  1993/02/08  14:53:35  pgf
  * see CHANGES, 3.32 section
  *
  * Revision 1.42  1993/01/23  13:38:23  foxharp
@@ -146,9 +159,22 @@
 #include	"edef.h"
 #include	"nevars.h"
 
-#if	ENVFUNC
-extern	char *getenv();
+#if	ENVFUNC && !SMALLER
+static
+char	*GetEnv(s)
+	char	*s;
+{
+	extern	char *getenv();
+	register char *v = getenv(s);
+	return v ? v : "";
+}
+#else
+#define	GetEnv(s)	""
 #endif
+
+/* points to current "shell" environment variable, either in malloc'ed
+	if user set it, or in environment ($SHELL) otherwise */
+static char *shell;
 
 void
 varinit()		/* initialize the user variable list */
@@ -242,7 +268,7 @@ char *fname;		/* name of function to evaluate */
 
 	/* look the function up in the function table */
 	fname[3] = 0;	/* only first 3 chars significant */
-	mklower(fname);	/* and let it be upper or lower case */
+	(void)mklower(fname);	/* and let it be upper or lower case */
 	for (fnum = 0; fnum < NFUNCS; fnum++)
 		if (strcmp(fname, funcs[fnum].f_name) == 0)
 			break;
@@ -296,23 +322,19 @@ char *fname;		/* name of function to evaluate */
 		case UFLENGTH:	return(l_itoa((int)strlen(arg1)));
 		case UFUPPER:	return(mkupper(arg1));
 		case UFLOWER:	return(mklower(arg1));
+				/* patch: why 42? */
 		case UFTRUTH:	return(ltos(atoi(arg1) == 42));
 		case UFASCII:	return(l_itoa((int)arg1[0]));
 		case UFCHR:	result[0] = atoi(arg1);
 				result[1] = 0;
 				return(result);
-		case UFGTKEY:	result[0] = tgetc();
+		case UFGTKEY:	result[0] = tgetc(TRUE);
 				result[1] = 0;
 				return(result);
 		case UFRND:	return(l_itoa((ernd() % absol(atoi(arg1))) + 1));
 		case UFABS:	return(l_itoa(absol(atoi(arg1))));
 		case UFSINDEX:	return(l_itoa(sindex(arg1, arg2)));
-		case UFENV:
-#if	ENVFUNC
-				return(getenv(arg1) == NULL ? "" : getenv(arg1));
-#else
-				return("");
-#endif
+		case UFENV:	return(GetEnv(arg1));
 		case UFBIND:	return(prc2engl(arg1));
 		case UFREADABLE:glob(arg1);
 				return(ltos(flook(arg1, FL_HERE) != NULL));
@@ -409,9 +431,13 @@ char *vname;		/* name of environment variable to retrieve */
 #if X11
 		case EVFONT:	return(x_current_fontname());
 #endif
-#if ENVFUNC
-		case EVSHELL:	return(getenv("SHELL"));
-#endif
+		case EVSHELL:	if (!shell) {
+					shell = GetEnv("SHELL");
+					if (!shell)  /* only search once */
+						shell = "/bin/sh";
+					shell = strmalloc(shell);
+				}
+				return shell;
 	}
 	return errorm;
 }
@@ -602,9 +628,6 @@ char *value;	/* value to set to */
 	register int status;	/* status return */
 	register int c;		/* translated character */
 	register char * sp;	/* scratch string pointer */
-#if	ENVFUNC
-	char	temp[NFILEN];
-#endif
 
 	/* simplify the vd structure (we are gonna look at it a lot) */
 	vnum = var->v_num;
@@ -689,17 +712,16 @@ char *value;	/* value to set to */
 		case EVRAM:	break;
 		case EVLINE:	(void)putctext(value);
 				break;
-		case EVDIR:	set_directory(value);
+		case EVDIR:	status = set_directory(value);
 				break;
 #if X11
 		case EVFONT:	status = x_setfont(value);
 				break;
 #endif
-#if ENVFUNC
-		case EVSHELL:	lsprintf(temp, "SHELL=%s", value);
-				status = (putenv(temp) == 0);
+		case EVSHELL:	if (shell)
+					free(shell);
+				shell = strmalloc(value);
 				break;
-#endif
 		}
 		break;
 	}
@@ -913,14 +935,13 @@ char *str;		/* string to lower case */
 }
 #endif
 
-#if ! SMALLER
-
 int absol(x)	/* take the absolute value of an integer */
 int x;
 {
 	return(x < 0 ? -x : x);
 }
 
+#if ! SMALLER
 int ernd()	/* returns a random integer */
 {
 	seed = absol(seed * 1721 + 10007);
@@ -958,4 +979,14 @@ char *pattern;	/* string to look for */
 	return(0);
 }
 
+#endif
+
+#if NO_LEAKS
+void ev_leaks()
+{
+	if (shell) {
+		free(shell);
+		shell = 0;
+	}
+}
 #endif

@@ -81,6 +81,10 @@ LDFLAGS =
 # search both places than to ifdef the code.  color me lazy.
 INCS = -I. $(GINCS) -I/usr/include -I/usr/include/sys
 
+# the backslashes around HELP_LOC don't make it through all makes.  if
+#  you have trouble, use the following line instead, and edit epath.h to
+#  hardcode your HELP_LOC path if you need one.
+# CFLAGS0 = $(INCS) $(SCRDEF)
 CFLAGS0 = $(INCS) $(SCRDEF) -DHELP_LOC=\\\"$(HELP_LOC)\\\"
 CFLAGS1 = $(OPTFLAGS) $(CFLAGS0)
 
@@ -108,9 +112,9 @@ ALLHDRS = $(HDRS)
 #  (including tools, like mktbls.c, unused screen drivers, etc.)
 CSRCac = ansi.c at386.c basic.c bind.c buffer.c crypt.c csrch.c
 CSRCde = dg10.c display.c eval.c exec.c externs.c
-CSRCfh = fences.c file.c fileio.c finderr.c globals.c hp110.c hp150.c
+CSRCfh = fences.c file.c filec.c fileio.c finderr.c globals.c history.c hp110.c hp150.c
 CSRCim = ibmpc.c input.c insert.c isearch.c line.c main.c modes.c mktbls.c
-CSRCnr = npopen.c opers.c oneliner.c random.c regexp.c region.c
+CSRCnr = npopen.c opers.c oneliner.c path.c random.c regexp.c region.c
 CSRCst = search.c spawn.c st520.c tags.c tbuff.c tcap.c termio.c tipc.c
 CSRCuw = undo.c vmalloc.c vmsvt.c vt52.c window.c word.c wordmov.c
 CSRCxz = x11.c z309.c z_ibmpc.c
@@ -131,16 +135,16 @@ EVERYTHING = $(ALLTOOLS) $(ALLHDRS) $(ALLSRC) $(TEXTFILES) $(SHORTSTUFF)
 
 
 SRC = main.c $(SCREEN).c basic.c bind.c buffer.c crypt.c \
-	csrch.c display.c eval.c exec.c externs.c fences.c file.c \
-	fileio.c finderr.c globals.c input.c insert.c isearch.c \
-	line.c modes.c npopen.c oneliner.c opers.c random.c regexp.c \
+	csrch.c display.c eval.c exec.c externs.c fences.c file.c filec.c \
+	fileio.c finderr.c globals.c history.c input.c insert.c isearch.c \
+	line.c modes.c npopen.c oneliner.c opers.c path.c random.c regexp.c \
 	region.c search.c spawn.c tags.c tbuff.c termio.c undo.c \
 	vmalloc.c window.c word.c wordmov.c
 
 OBJ = main.$O $(SCREEN).$O basic.$O bind.$O buffer.$O crypt.$O \
-	csrch.$O display.$O eval.$O exec.$O externs.$O fences.$O file.$O \
-	fileio.$O finderr.$O globals.$O input.$O insert.$O isearch.$O \
-	line.$O modes.$O npopen.$O oneliner.$O opers.$O random.$O regexp.$O \
+	csrch.$O display.$O eval.$O exec.$O externs.$O fences.$O file.$O filec.$O \
+	fileio.$O finderr.$O globals.$O history.$O input.$O insert.$O isearch.$O \
+	line.$O modes.$O npopen.$O oneliner.$O opers.$O path.$O random.$O regexp.$O \
 	region.$O search.$O spawn.$O tags.$O tbuff.$O termio.$O undo.$O \
 	vmalloc.$O window.$O word.$O wordmov.$O
 
@@ -174,6 +178,7 @@ all:
 	echo "	make next	(NeXT)"					;\
 	echo "	make sony	(Sony News -- very BSD)"		;\
 	echo "	make unixpc	(AT&T 3B1)"				;\
+	echo "	make uts	(Amdahl UTS 2.1.5)"			;\
 	echo "	make aix	(but probably only rs6000)"		;\
 	echo "	make osf1	(OSF/1)"				;\
 	echo "	make linux	(ported to 0.95)"			;\
@@ -230,12 +235,18 @@ hpux:
 		$(TARGET) $(ENVIR)
 
 next:
-	$(MAKE) CFLAGS="$(CFLAGS1) -DBERK -D__STRICT_BSD__ \
-		-Dos_chosen" $(TARGET) $(ENVIR)
+	$(MAKE) CFLAGS="$(CFLAGS1) -DBERK -D__STRICT_BSD__ -Dos_chosen	\
+		-I/NextDeveloper/Headers -I/NextDeveloper/Headers/bsd \
+		-I/NextDeveloper/Headers/bsd/sys" \
+		$(TARGET) $(ENVIR)
 
 unixpc:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DUSG -DHAVE_SELECT \
 		-DHAVE_MKDIR=0 -Dwinit=xxwinit -Dos_chosen -DUNIXPC" \
+		$(TARGET) $(ENVIR)
+
+uts:
+	$(MAKE) CFLAGS='$(CFLAGS1) -DUSG -Dos_chosen' \
 		$(TARGET) $(ENVIR)
 
 # i've had reports that the curses lib is broken under AIX.  on the other
@@ -345,6 +356,19 @@ $(MKTBLS):  mktbls.c
 install:
 	@[ -x $(TARGET) ] || (echo must make $(TARGET) first && exit 1)
 	@[ -w $(DESTDIR1) ] && dest=$(DESTDIR1) || dest=$(DESTDIR2) ;\
+	[ -f $$dest/$(TARGET) ] && mv $$dest/$(TARGET) $$dest/o$(TARGET) ;\
+	echo Installing $(TARGET) to $$dest ; \
+	cp $(TARGET) $$dest ;\
+	test -f vile.hlp && /bin/rm -f $$dest/vile.hlp ;\
+	[ "$(HELP_LOC)" ] && dest="$(HELP_LOC)" ; \
+	echo Installing vile.hlp to $$dest ; \
+	cp vile.hlp $$dest; \
+	chmod 0644 $$dest/vile.hlp
+
+# only install to DESTDIR2
+install2:
+	@[ -x $(TARGET) ] || (echo must make $(TARGET) first && exit 1)
+	@dest=$(DESTDIR2) ;\
 	[ -f $$dest/$(TARGET) ] && mv $$dest/$(TARGET) $$dest/o$(TARGET) ;\
 	echo Installing $(TARGET) to $$dest ; \
 	cp $(TARGET) $$dest ;\
@@ -483,7 +507,22 @@ externs.$O:	nebind.h nename.h nefunc.h
 vmalloc$O:	nevars.h
 
 # $Log: makefile,v $
-# Revision 1.85  1993/02/15 10:50:47  pgf
+# Revision 1.90  1993/03/16 10:53:21  pgf
+# see 3.36 section of CHANGES file
+#
+# Revision 1.89  1993/03/08  15:24:00  pgf
+# added install2 target, which typically installs to your home directory
+#
+# Revision 1.88  1993/03/05  17:50:54  pgf
+# see CHANGES, 3.35 section
+#
+# Revision 1.87  1993/02/24  10:59:02  pgf
+# see 3.34 changes, in CHANGES file
+#
+# Revision 1.86  1993/02/24  09:31:53  pgf
+# warning re: HELP_LOC backslashes, uts support, and better (?) NeXT support
+#
+# Revision 1.85  1993/02/15  10:50:47  pgf
 # added aix warnings
 #
 # Revision 1.84  1993/02/15  10:36:34  pgf

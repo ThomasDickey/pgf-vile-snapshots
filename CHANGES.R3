@@ -1,3 +1,321 @@
+Changes for vile 3.36 (from Tom Dickey):
+
+	+ supplied initial value for dirc-mode
+
+	+ guarded 'mlreply_file()' against missing curbp->b_fname (for use in
+	  .vilerc startup).
+
+	+ corrected logic in 'kbd_reply()' (file input.c) that caused backspace
+	  to be treated as a command-delimiter.
+
+	+ corrected logic in 'kbd_reply()' (file input.c) that caused '/'
+	  character in complex substitutions to be eaten, e.g.,
+		:g/pattern/s//newpattern/g
+	  broke after the 's'.
+
+	+ corrected calls (broke in 3.35) on 'mlreply_file()' from 'insfile()'
+	  and 'operwrite()' (mods to files estruct.h, filec.c, file.c and
+	  opers.c).  The ^R and ^W commands always prompt for name, rather than
+	  taking it from the screen.
+
+	+ corrected end-of-line logic in 'do_a_mode()' (file modes.c).  This
+	  had allowed history scrolling to display keywords that were separated
+	  by blanks; fixed this by testing for both space and "=" characters.
+
+	+ added calls to 'hst_glue()' in 'unqname()' and 'getfile2()' to add
+	  blank in command history before the responses these functions solicit
+	  from 'mlreply()'
+
+	+ added macro 'char2int()' to file estruct.h, use this in fileio.c and
+	  tbuff.c to hide byte-masking.
+
+	+ changed data in TBUFF to 'char' (unsigned char does not buy that much
+	  conciseness); absorbed macros 'tb_values()' and 'tb_length()' into
+	  file tbuff.c as functions.
+
+	+ corrected logic of 'tb_leaks()' (file tbuff.c); I had only exercised
+	  this at the end of execution.
+
+	+ removed unused define for TMPSTOP
+
+	+ recoded handling of keyboard macros in file input.c to use TBUFF
+	  structs (so there is no limit on length of keyboard macros).
+
+	+ modified 'execkreg()' to remove length-limit on macros there as well
+	  (file line.c)
+
+	+ modified 'execkreg()' to allow invoking registers 0-9 (file line.c)
+
+	+ modified files input.c and line.c so that "." and @-commands can be
+	  invoked from within a keyboard-macro (i.e., ^X-&).
+
+	+ modified files insert.c and input.c so that repeated "." command
+	  works properly for i,I,R commands (the cursor must appear at the end
+	  of the insertion).
+
+	+ modified so that ^Z (job suspension) works properly on apollo sr10.3
+	  (files termio.c and spawn.c).
+
+	+ modified 'ttgetc()' in file termio.c so that (for apollo) it reads in
+	  raw-mode.
+
+	+ added flag to 'tgetc()', allowing it to suppress the conversion of
+	  intrc to abortc (files basic.c csrch.c eval.c exec.c input.c
+	  insert.c).  This change also lets users quote ESC characters.
+
+	+ corrected unused args in 'globber()' (file globals.c)
+
+	+ corrected special case in use of 'canonpath()' on apollo (user could
+	  type in path beginning with "/", which was not getting "//" portion
+	  of pathname prepended.
+
+	+ renamed "vitabpos" mode to "alt-tabpos" mode, avoiding conflict with
+	  "view" mode.
+
+	+ added "implybuffer" (ib) mode to use in splitting out vi-style
+	  buffer-implication from 'autobuffer' mode (files modetbl and main.c).
+
+	+ added "samebangs" (sb) mode to allow the ^X-!!  and :!!  commands to
+	  be optionally the same.
+
+	+ Corrected logic of 'imply_alt()' so that it works with files read, as
+	  well as written (files buffer.c and file.c).
+
+	+ split out the pathname functions into file path.c
+
+	+ added function 'is_appendname()' to path.c to better encapsulate the
+	  isAppendToName macro's knowlege of the ">>" length (files path.c,
+	  filec.c, fileio.c, random.c).  Used this to make functions
+	  'canonpath()', 'lengthen_path()', 'shorten_path()' and
+	  'is_pathname()' work properly with ">>" prefix.
+
+	+ added code to 'path.c' to resolve "~" as user's home-directory.
+
+	+ corrected code in 'makebufflist()' that caused b_bfname member to
+	  be modified (file buffer.c).
+
+	+ moved MSDOS drive-logic from 'ch_fname()' into 'lengthen_path()'
+	  (files random.c and path.c)
+
+	+ added procedure 'copy_val()' to modes.c to encapsulate the make-local
+	  and make-global macros.  This fixes a case in which memory could be
+	  freed more than once: if the user had done 'setl' commands for two
+	  different buffers.
+
+	+ made variables 'doslines' and 'unixlines' local to the procedures
+	  'slowreadf()' 'readin()' in file.c; initialized these so that
+	  successive reads of a set of files will treat the dos/unix line
+	  counts separately.
+
+	+ added command "set-dos-mode" to force the current buffer to be
+	  in DOS-mode (trimming CR's).
+
+Changes for vile 3.35 (from Tom Dickey):
+
+	+ addressed compiler warnings from gcc 1.36 on apollo sr10.3.  (I know
+	  it is old, but it gives useful warnings).  This required some minor
+	  adjustments to defines/includes in files estruct.h, proto.h, main.c,
+	  fileio.c, npopen.c, random.c to accommodate order-of-definition
+	  problems in stdio.h and signal.h
+
+	+ tested with gcc 1.40 on sunos 4.1.1
+
+	+ tested compiling with SMALLER=1; fixes to files eval.c, input.c,
+	  mktbls.c, npopen.c, proto.h, random.c (On my machine, this only cuts
+	  about 10% from the binary).
+
+	+ added EOS at mismatch-point in 'fill_partial()' in file bind.c, fixes
+	  bug that caused incorrect display after repeated name completion and
+	  query operations.
+
+	+ quarded 'kbd_complete()' against embedded nulls in its buf-argument,
+	  by testing for nulls before completion logic in file input.c
+
+	+ added a flag 'kbd_expand' to make calls on 'kbd_putc()' via
+	  'mlforce()' and related functions show tabs as a space.  This
+	  modifies files bind.c, edef.h, display.c to fix a problem I
+	  introduced in 3.32
+
+	+ use 'kbd_expand' flag in file input.c to fix non-displaying ^M; other
+	  fixes include quoting and backslash fixes, as well as correction to
+	  wkillc handling.
+
+	+ modified finderr.c to make the embedded tabs as "\t" digraphs, so
+	  they are visible.  Added pattern to use with apollo C compiler.
+
+	+ corrected logic in 'updpos()' (file display.c) so that vile displays
+	  cursor location just-like-vi for tabs and control characters.
+
+	+ made 'wordcount()' code (file word.c) work properly.
+
+	+ corrected 'join()' (file word.c) so that blanks are not inserted when
+	  joining after a space, or joining a blank line.  Also (like 'vi'), if
+	  there is trailing whitespace on the first line, don't modify it.
+
+	+ corrected flags for join-lines in file cmdtbl so that the region-
+	  oriented code can work.
+
+	+ made join-lines work with regions (files opers.c, word.c).
+
+	+ restored GLOBOK flag for join-lines-til (regions work now).
+
+	+ interchanged order of calls on 'toss_to_undo()' and 'lremove()' in
+	  'ldelnewline()', since this was causing incorrect cursor placement
+	  after an undo.  (The particular case arose in the rewritten
+	  join-lines, when joining a blank line to a non-blank line).
+
+	+ modified 'edithistory()' in file history.c to ifdef out the ESC code
+	  (with new symbol KSH_HISTORY), merge the loops to use 'escaped' flag
+	  to avoid redundant logic, and pick up control chars (e.g., ^N and ^P)
+	  for scrolling.  This also modified files input.c and exec.c
+
+	+ corrected logic in history.c (from 3.34) that uses the function
+	  'WillExtend()' to modify/macroize !-commands.  The code did not
+	  provide for the case in which the user would modify the text after
+	  scrolling to it.
+
+	+ corrected call on 'hst_flush()' in file pipecmd.c (it was not called
+	  if the pipe-command failed).
+
+	+ revised 'tgetc()' in file input.c to make it use a single return
+	  point (simplifies testing and debugging).
+
+	+ corrected file modes.c so that user can abort from a set command.
+
+	+ deleted code for unused global 'lineinput' (files bind.c, input.c,
+	  edef.h).
+
+	+ renamed ifdef for LAZINESS to (global mode) TAGSLOOK, added an entry
+	  to modetbl for "looktags" to test/update this code.  Note that this
+	  is turned off by commenting out the "LookTags" line in modetbl.  This
+	  affects also files main.c, file.c modes.c and tags.c
+
+	+ added file 'filec.c' to perform filename completion.  Moved code that
+	  was ifdef'd LAZINESS there, and recoded so that it stores paths
+	  normally (not reversed!).
+
+	+ created function 'mlreply_file()' in filec.c, used this to
+	  consolidate prompting for filenames in file.c (Note that now all
+	  filename prompts can get data from the screen).
+
+	+ made most of the calls on 'mlreply_file()' default to the current
+	  filename; this is simpler than the last name given to the command.
+
+	+ moved check for writing view-only buffer from 'filewrite()' as new
+	  local function 'writable()', before calls on 'writereg()' This
+	  affects 'filewrite()', 'filesave()', 'imdying()' and 'writeregion()'
+	  implicitly.
+
+	+ use 'mlreply_file()' in 'execfile()' (file exec.c)
+
+	+ use 'mlreply_file()' in 'operwrite()' (file opers.c)
+
+	+ added 'no_such_file()' to file.c; use this in 'execfile()' so that
+	  ":source" will report an error if the file is not found.
+
+	+ created function 'mkreply_dir()' modeled after 'mlreply_file()' in
+	  filec.c, used this to allow pathname completion in 'cd()' in random.c
+
+	+ added mode "dirc" to file modetbl, to support directory name
+	  completion.
+
+	+ added l_number to LINE struct, b_bytecount to BUFFER struct (file
+	  estruct.h) to use in caches for # of bytes and lines displays.
+
+	+ added macro 'for_each_line' to file estruct.h
+
+	+ added procedure 'bsizes()' to buffer.c to compute values for l_number
+	  and b_numchars, b_numlines values.  Will later get this to cache
+	  results to speed up 'line_no()' and related code.
+
+	+ corrected column-splitting in file modes.c (error in 3.34 changes)
+	  which caused dos-mode to not be shown.
+
+	+ corrected flag in 'modetbl' for dos-mode: this makes dos-mode show in
+	  the status-line.
+
+	+ added new entrypoints to tbuff.c: tb_copy, tb_scopy, tb_bappend
+
+	+ merged code in 'spawn1()' and 'pipecmd()' (file spawn.c) so that
+	  !-commands and !!-commands work consistently.
+
+Changes for vile 3.34 (from Tom Dickey):
+
+	+ modified mktbls.c to use 3rd column of modetbl (window-flags).  Moved
+	  window-flag defines in estruct.h to allow their use in nemode.h
+
+	+ in modes.c, moved the code that updates window hints-flags from the
+	  'adjustmode()' to 'adjvalueset()' procedure so that it can use the
+	  new window-flags entry in nemode.h
+
+	+ modified mktbls.c (and estruct.h, edef.h) to support global modes.
+
+	+ added to modes.c: 'new_regexval()', 'free_regexval()', and
+	  'free_val()'.  Use these in main.c and modes.c to simplify
+	  leak-testing.
+
+	+ added to estruct.h defines to use in testing memory leaks using both
+	  dbmalloc as well as apollo-specific traces.
+
+	+ added to main.c ifdef for NO_LEAKS; used this in testing for
+	  permanent memory leaks (freeing data also finds specific types of
+	  allocator corruption).  Added test-code for this purpose to:
+	  buffer.c, display.c, line.c, regexp.c, tbuff.c, window.c
+
+	+ plugged memory-leak in 'getfile()' in file.c by splitting it after
+	  the temporary-buffer allocation, making tbp a static value, and
+	  deleting the line that set the tbp.b_fname pointer to null.
+
+	+ revised the value-checking in 'adjvalset()' (file modes.c) so that
+	  unnecessary changes are ignored.
+
+	+ further modified file modes.c so that typing ' ' (except after string
+	  or pattern values) will continue the prompting for further set-modes,
+	  as in noninteractive use.
+
+	+ put the TTputc for '\r' back into 'kbd_putc()'; omitted this when
+	  taking code for 'mlmsg()' from display.c
+
+	+ added new function 'GetEnv()' to eval.c to guard against
+	  null-return from 'getenv()'.
+
+	+ added new command (to file line.c) "show-registers" to show the
+	  contents of kill-buffers and registers.
+
+	+ added new module 'history.c'.  This implements up/down scrolling in
+	  an invisible buffer "[History]", which logs all :-commands.
+
+	+ coded-around apollo sr10.3 optimizer-bug in 'execkreg()':
+		kbdend = &kp->d_chunk[i];
+	  resulted in kbdend == kp->d_chunk.
+
+	+ moved autobuffer and c-suffixes modes to global-table.  Deleted 'cwd'
+	  mode.
+
+	+ modified mktbls.c so that each table will be sorted by name (not by
+	  type&name).  Modified modes.c to take advantage of this and display
+	  the modes sorted in columns (more like 'vi'), except for long strings
+	  (which are deferred to the bottom of the display, still).
+
+	+ make modes.c show the actual color name in addition to the index.
+
+	+ rewrote 'kbd_string()' to interface it with 'edithistory()'.  Split
+	  out entrypoint 'kbd_reply()' to support integration of history with
+	  'namedcmd()'.
+
+	+ redefined 'kcod2key()' in terms of N_chars; added macro 'isspecial()'
+	  to estruct.h
+
+	+ revised 'kbd_engl_stat()' and 'namedcmd()' to use the 'kbd_reply()'
+	  entrypoint so that user can scroll through history of any portion of
+	  commands.
+
+	+ modified 'search.c' to log history for '/' and '?' commands.
+
+	+ modified x11.c to use memcpy rather than bcopy (for consistency).
+
+	+ made x11.c compile properly on apollo sr10.3 (there is a conflict
+	  between prototypes in <string.h> and <strings.h>).
 
 Changes for vile 3.33:
 

@@ -4,7 +4,10 @@
  * do any sentence mode commands, they are likely to be put in this file. 
  *
  * $Log: word.c,v $
- * Revision 1.23  1992/12/23 09:28:15  foxharp
+ * Revision 1.24  1993/03/05 17:50:54  pgf
+ * see CHANGES, 3.35 section
+ *
+ * Revision 1.23  1992/12/23  09:28:15  foxharp
  * fix counts on 'J' command
  *
  * Revision 1.22  1992/12/16  21:19:07  foxharp
@@ -297,52 +300,35 @@ int f,n;
 	return (forwchar(FALSE, 1));
 }
 
-#ifdef NEEDED
-/*
- * Return TRUE if the character at dot is a character that is considered to be
- * part of a word. The word character list is hard coded. Should be setable.
- */
 int
-inword()
+joinregion()
 {
-	register int	c;
+	register int s;
+	register int doto, c;
+	LINE	*end;
+	REGION	region;
+	int	done = FALSE;
 
-	if (is_at_end_of_line(DOT))
-		return (FALSE);
-	c = char_at(DOT);
-	if (islower(c))
-		return (TRUE);
-	if (isupper(c))
-		return (TRUE);
-	if (isdigit(c))
-		return (TRUE);
-	return (FALSE);
-}
-#endif
+	if ((s = getregion(&region)) != TRUE)
+		return(s);
 
-int
-join(f,n)
-int f,n;
-{
-	register int s = TRUE;
-	register int doto;
-
-	if (!f) {
-		n = 1;
-	} else {
-		if (n < 0) return FALSE;
-		if (n == 0) return TRUE;
-	}
-	if (n > 1)		/* in 'vi', "1J" and "2J" are the same */
-		n--;
-	if (is_last_line(DOT, curbp))
+	if (is_last_line(region.r_orig, curbp))
 		return FALSE;
-	while(n-- > 0) {
-		s = lastnonwhite(f,n);
-		if (s == TRUE) s = forwchar_to_eol(FALSE,1);
+
+	DOT = region.r_orig;
+	end = region.r_end.l;
+	fulllineregions = FALSE;
+
+	while (!done) {
+		c = EOS;
+		s = gotoeol(FALSE,1);
+		if (DOT.o > 0)
+			c = lgetc(DOT.l, DOT.o-1);
 		if (s == TRUE) s = setmark();
-		if (s == TRUE) s = forwline(f,1);
-		if (s == TRUE) s = firstnonwhite(f,1);
+		if (s == TRUE) s = forwline(FALSE,1);
+		if (s == TRUE) s = firstnonwhite(FALSE,1);
+
+		done = ((DOT.l == end) || (lforw(DOT.l) == end));
 		if (s == TRUE) s = killregion();
 		if (s != TRUE)
 			return s ;
@@ -350,15 +336,26 @@ int f,n;
 		doto = DOT.o;
 		if (doto == 0)
 			;	/* join at column 0 to empty line */
-		else if (lgetc(DOT.l, doto) == ')')
-			;	/* join after parentheses */
-		else if (lgetc(DOT.l, doto-1) == '.')
-			s = linsert(2,' ');
-		else
-			s = linsert(1,' ');
+		else if (doto < llength(DOT.l)) {
+			if (lgetc(DOT.l, doto) == ')')
+				;	/* join after parentheses */
+			else if (lgetc(DOT.l, doto-1) == '.')
+				s = linsert(2,' ');
+			else if (!isspace(c))
+				s = linsert(1,' ');
+		}
 	}
 
 	return s;
+}
+
+int
+joinlines(f,n)
+int f,n;
+{
+	extern CMDFUNC f_godotplus;
+	havemotion = &f_godotplus;
+	return(operjoin(f,n));
 }
 
 int
@@ -527,7 +524,7 @@ formatregion()
 }
 
 
-#if	WORDCOUNT	/* who cares? -pgf */
+#if	WORDCOUNT
 /*	wordcount:	count the # of words in the marked region,
 			along with average word sizes, # of chars, etc,
 			and report on them.			*/
@@ -550,9 +547,9 @@ wordcount(f, n)
 	/* make sure we have a region to count */
 	if ((status = getregion(&region)) != TRUE)
 		return(status);
-	lp = region.r_linep;
-	offset = region.r_offset;
-	size = region.r_size;
+	lp     = region.r_orig.l;
+	offset = region.r_orig.o;
+	size   = region.r_size;
 
 	/* count up things */
 	lastword = FALSE;
@@ -573,10 +570,7 @@ wordcount(f, n)
 		}
 
 		/* and tabulate it */
-		wordflag = ((ch >= 'a' && ch <= 'z') ||
-			    (ch >= 'A' && ch <= 'Z') ||
-			    (ch >= '0' && ch <= '9'));
-		if (wordflag == TRUE && lastword == FALSE)
+		if ((wordflag = isident(ch)) && !lastword)
 			++nwords;
 		lastword = wordflag;
 		++nchars;
@@ -588,8 +582,8 @@ wordcount(f, n)
 	else
 		avgch = 0;
 
-	mlforce("lines %d, words, %D chars %D  avg chars/word %f",
-		nlines + 1, nwords, nchars, avgch);
+	mlforce("lines %d, words %D, chars %D, avg chars/word %f",
+		nlines, nwords, nchars, avgch);
 	return(TRUE);
 }
 #endif

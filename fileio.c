@@ -3,7 +3,16 @@
  * the knowledge about files are here.
  *
  * $Log: fileio.c,v $
- * Revision 1.32  1993/01/16 10:33:59  foxharp
+ * Revision 1.35  1993/03/16 10:53:21  pgf
+ * see 3.36 section of CHANGES file
+ *
+ * Revision 1.34  1993/03/05  17:50:54  pgf
+ * see CHANGES, 3.35 section
+ *
+ * Revision 1.33  1993/02/23  12:04:46  pgf
+ * added support for appending to file (from alistair crooks)
+ *
+ * Revision 1.32  1993/01/16  10:33:59  foxharp
  * macro-ization of checks for shell-buffers
  *
  * Revision 1.31  1992/12/14  09:03:25  foxharp
@@ -112,7 +121,6 @@
  * initial vile RCS revision
  */
 
-#include        <stdio.h>
 #include	"estruct.h"
 #include        "edef.h"
 #if UNIX
@@ -176,6 +184,8 @@ char    *fn;
 {
 #if UNIX
 	FILE *npopen();
+	char *name;
+
 	if (isShellOrPipe(fn)) {
 	        if ((ffp=npopen(fn+1, "w")) == NULL) {
 	                mlforce("[Cannot open pipe for writing]");
@@ -183,6 +193,13 @@ char    *fn;
 	                return (FIOERR);
 		}
 		fileispipe = TRUE;
+	} else if ((name = is_appendname(fn)) != NULL) {
+		if ((ffp=fopen(name, "a")) == NULL) {
+			mlforce("[Cannot open file for appending]");
+			TTbeep();
+			return (FIOERR);
+		}
+		fileispipe = FALSE;
 	} else {
 	        if ((ffp=fopen(fn, "w")) == NULL) {
 	                mlforce("[Cannot open file for writing]");
@@ -324,16 +341,16 @@ int	do_cr;
 
 	if (cryptflag) {
 	        for (i = 0; i < nbuf; ++i) {
-			c = buf[i] & 0xff;
+			c = char2int(buf[i]);
 			crypt(&c, 1);
 			fputc(c, ffp);
 		}
 	} else
 	        for (i = 0; i < nbuf; ++i)
-        	        fputc(buf[i]&0xFF, ffp);
+        	        fputc(char2int(buf[i]), ffp);
 #else
         for (i = 0; i < nbuf; ++i)
-                fputc(buf[i]&0xFF, ffp);
+                fputc(char2int(buf[i]), ffp);
 #endif
 
 #if	ST520
@@ -362,7 +379,7 @@ int
 ffputc(c)
 int c;
 {
-	c &= 0xff;
+	c = char2int(c);
 
 #if	CRYPT
 	if (cryptflag)
@@ -505,7 +522,7 @@ ffhasdata()
 #ifdef	FIONREAD
 	{
 	long x;
-	return(((ioctl(fileno(ffp),FIONREAD,&x) < 0) || x == 0) ? FALSE : TRUE);
+	return(((ioctl(fileno(ffp),FIONREAD,(caddr_t)&x) < 0) || x == 0) ? FALSE : TRUE);
 	}
 #else
 	return FALSE;
