@@ -3,7 +3,10 @@
  *	X Toolkit support, Kevin Buettner, 2/94
  *
  * $Log: x11.c,v $
- * Revision 1.52  1994/03/24 12:12:17  pgf
+ * Revision 1.53  1994/03/28 16:24:48  pgf
+ * add call to update scrollbars when changing fonts
+ *
+ * Revision 1.52  1994/03/24  12:12:17  pgf
  * arrow/escape key fixes
  *
  * Revision 1.51  1994/03/11  14:02:19  pgf
@@ -1797,6 +1800,7 @@ x_setfont(fname)
 			XtNheightInc,	cur_win->char_height,
 			XtNwidthInc,	cur_win->char_width,
 			NULL);
+		update_scrollbar_sizes();
 		x_touch(cur_win, 0, 0, cur_win->cols, cur_win->rows);
 		XResizeWindow(dpy, XtWindow(cur_win->top_widget),
 			      x_width(cur_win) + cur_win->base_width,

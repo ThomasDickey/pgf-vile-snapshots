@@ -6,7 +6,10 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.123  1994/03/23 12:56:02  pgf
+ * Revision 1.124  1994/03/29 14:50:18  pgf
+ * fix to mlerror
+ *
+ * Revision 1.123  1994/03/23  12:56:02  pgf
  * gave mlerror a default message
  *
  * Revision 1.122  1994/03/18  18:30:38  pgf
@@ -2470,7 +2473,7 @@ char	*s;
 	else
 		es = "unknown system error";
 
-	mlforce("[Error %s: %s]", s, sys_errlist[errno]);
+	mlforce("[Error %s: %s]", s, es);
 #endif
 }
 

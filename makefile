@@ -587,7 +587,7 @@ update:
 protos:
 	cextract -D__STDC__ +E +P +s +r -o nproto.h $(SRC)
 
-TAGS tagfile:
+tags TAGS tagfile:
 	dotags $(SRC) $(HDRS)
 
 lint:	$(SRC)
@@ -634,7 +634,10 @@ path.o:	dirstuff.h
 vmalloco:	nevars.h
 
 # $Log: makefile,v $
-# Revision 1.139  1994/03/11 14:00:52  pgf
+# Revision 1.140  1994/03/29 12:34:32  pgf
+# added "tags" target
+#
+# Revision 1.139  1994/03/11  14:00:52  pgf
 # new X configs -- no support for athena widgets.
 #
 # Revision 1.138  1994/03/10  20:25:21  pgf

@@ -4,7 +4,10 @@
 	written 1986 by Daniel Lawrence
  *
  * $Log: eval.c,v $
- * Revision 1.77  1994/03/16 19:00:09  pgf
+ * Revision 1.78  1994/03/29 14:50:30  pgf
+ * warning cleanup
+ *
+ * Revision 1.77  1994/03/16  19:00:09  pgf
  * use #define for palette string length
  *
  * Revision 1.76  1994/02/23  05:09:21  pgf
@@ -667,7 +670,7 @@ char *value;	/* value to set to */
 			cmdstatus = stol(value);
 
 		ElseIf( EVPALETTE )
-			spal(strncpy(palstr, value, NSTRING-1));
+			spal(strncpy(palstr, value, (SIZE_T)(NSTRING-1)));
 
 		ElseIf( EVLASTKEY )
 			lastkey = atoi(value);
