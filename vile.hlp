@@ -1,5 +1,5 @@
 
-Getting along with vile						(version 5.0)
+Getting along with vile						(version 5.1)
 -----------------------						-------------
 
 	Use Ctrl-D and Ctrl-U to scroll through this help information.
@@ -2338,10 +2338,11 @@ Mode line customization
 Filtering "man" pages
 ---------------------
 
-	When used in conjunction with the manfilt program (supplied),
-	either vile or xvile may be used to filter and view manual pages.
-	xvile will even display (with your font set properly) certain
-	portions of the manual page text in bold or italics as appropriate.
+	When used in conjunction with the vile-manfilt program (supplied as
+	source file "manfilt.c"), either vile or xvile may be used to filter
+	and view manual pages.  xvile will even display (with your font set
+	properly) certain portions of the manual page text in bold or
+	italics as appropriate.
 
 	The file manpage.rc (found in the vile source directory, and also
 	copied below) contains a macro which is bound to ^X-m.  It will
@@ -2411,10 +2412,58 @@ Filtering C programs
 --------------------
 	C program text may be displayed with keywords and comments
 	highlighted in a similar fashion to the man page filtering
-	described above.  The filter which performs this is supplied with
-	vile, and is called "c-filt.c".  Since this program relies on an
-	ANSI compiler, it is not built and installed by default.  Its use
-	is described fully in comments at the head of the source file.
+	described above.  A filter which performs this is supplied with
+	vile, and is called "vile-c-filt" (source is "c-filt.c").  Its use
+	is described more fully in comments at the head of the source file. 
+	It doesn't provide what one would describe as "tightly integrated
+	syntax coloring".  Its usefulness is limited by reliance on an
+	external filter to do the coloring, and the fact that the filter
+	interferes with the normal undo history of the buffer (since it
+	must modify the buffer to do its work).  Nonetheless, it's an
+	interesting adjunct to the editor. 
+
+	Here is a macro one might use to invoke the colorizer:
+	    30 store-macro
+		    write-message "[Attaching C/C++ attributes...]"
+		    set-variable %savcol $curcol
+		    set-variable %savline $curline
+		    set-variable %modified $modified
+		    goto-beginning-of-file
+		    filter-til end-of-file "vile-c-filt"
+		    goto-beginning-of-file
+		    attribute-cntl_a-sequences-til end-of-file
+		    ~if &not %modified
+			    unmark-buffer
+		    ~endif
+		    %savline goto-line
+		    %savcol goto-column
+		    write-message "[Attaching C/C++ attributes...done ]"
+	    ~endm
+	    bind-key execute-macro-30 -q
+
+	The vile-c-filt program does its work based on the contents of
+	$HOME/.vile.keywords, which contains a set of keyword/attribute
+	pairs.  An example (and probably insufficient) .vile.keywords file
+	might contain:
+		Comments:B
+		#if:U
+		#else:U
+		#endif:U
+		#define:U
+		if:C3
+		else:C3
+		for:C3
+		while:C3
+		do:C3
+		typedef:I
+		struct:I
+	(The "Comments" keyword is a pseudo-keyword which determines the
+	attribute given to C and C++ style comments.)
+
+	An alternative filter, written using "flex", is available in
+	c-filt.flx.  It might suit your needs better, or be a better
+	starting point for creating similar coloring mechanisms for other
+	languages.
 
 X Window System specifics
 -------------------------
@@ -2668,6 +2717,26 @@ X Window System specifics
 			blink only when situated in a highlighted region
 			such as a selection.  This will make the cursor
 			visible no matter where it is.
+
+	color.fcolor1,
+	color.bcolor1, ..., 
+	color.fcolor15, 
+	color.bcolor15
+			When doing text attribution with the 
+			"attribute-cntl_a-sequences-til" command (bound to
+			^A-A), the attribute may be of the form "Cn", where
+			'n' is a hex digit.  This digit picks one of the 16
+			fcolor/bcolor pairs set up in the color
+			subresource.  For example, if the buffer contained
+			the text:
+				^A6C3:foobar
+			then after the ^A-A command was applied, the leading
+			"^A3C3:" would be gone, and the word "foobar" would
+			appear in the foreground and background colors
+			specified by color.fcolor3 and color.bcolor3.  Either
+			of the pair can be left unspecified, and will default
+			to the natural foreground or background color of 
+			normal text.
 
 
 	Sample .Xdefault entries
@@ -3032,4 +3101,4 @@ Credits
 
 Copyright 1995 by Paul Fox, Tom Dickey, and Kevin Buettner
 -----------------------------------------------------------
- $Header: /usr/build/VCS/pgf-vile/RCS/vile.hlp,v 1.228 1995/02/10 04:07:17 pgf Exp $
+ $Header: /usr/build/VCS/pgf-vile/RCS/vile.hlp,v 1.235 1995/02/20 13:48:14 pgf Exp $

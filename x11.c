@@ -2,7 +2,7 @@
  * 	X11 support, Dave Lemke, 11/91
  *	X Toolkit support, Kevin Buettner, 2/94
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/x11.c,v 1.108 1995/02/09 13:39:07 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/x11.c,v 1.111 1995/02/20 13:50:27 pgf Exp $
  *
  */
 
@@ -204,8 +204,12 @@ typedef struct _text_win {
     GC		revcursgc;
     GC		modeline_focus_gc;	/* GC for modeline w/ focus */
     GC		modeline_gc;		/* GC for other modelines  */
+    GC		colors_fgc[16];
+    GC		colors_bgc[16];
     Pixel	fg;
     Pixel	bg;
+    Pixel	colors_fg[16];
+    Pixel	colors_bg[16];
     Pixel	modeline_fg;
     Pixel	modeline_bg;
     Pixel	modeline_focus_fg;
@@ -844,9 +848,8 @@ update_scrollbar_sizes()
     newsbcnt=i;
 
     /* Create any needed new scrollbars and grips */
-    for (i = cur_win->nscrollbars; i < newsbcnt; i++) 
-	if (cur_win->scrollbars[i] == NULL) {
-	    cur_win->scrollbars[i] = XtVaCreateWidget(
+    for (i = newsbcnt-1; i >= 0 && cur_win->scrollbars[i] == NULL; i--)
+	cur_win->scrollbars[i] = XtVaCreateWidget(
 		    "scrollbar",
 		    coreWidgetClass,
 		    cur_win->pane,
@@ -855,7 +858,8 @@ update_scrollbar_sizes()
 		    XtNheight,		1,
 		    XtNwidth,		1,
 		    NULL);
-	    cur_win->grips[i] = XtVaCreateWidget(
+    for (i = newsbcnt-2; i >= 0 && cur_win->grips[i] == NULL; i--)
+	cur_win->grips[i] = XtVaCreateWidget(
 		    "resizeGrip",
 		    coreWidgetClass,
 		    cur_win->pane,
@@ -864,7 +868,6 @@ update_scrollbar_sizes()
 		    XtNheight,		1,
 		    XtNwidth,		1,
 		    NULL);
-	}
 
     if (cur_win->nscrollbars > newsbcnt) {
 	nchildren = cur_win->nscrollbars - newsbcnt;
@@ -1313,6 +1316,86 @@ update_scrollbar(uwp)
 #define	XtNfocusForeground	"focusForeground"
 #define	XtNfocusBackground	"focusBackground"
 
+#define XtNfcolor0		XtNforeground
+#define XtCFcolor0		XtCForeground
+#define XtNbcolor0		XtNbackground
+#define XtCBcolor0		XtCBackground
+
+#define XtNfcolor1		"fcolor1"
+#define XtCFcolor1		"Fcolor1"
+#define XtNbcolor1		"bcolor1"
+#define XtCBcolor1		"Bcolor1"
+
+#define XtNfcolor2		"fcolor2"
+#define XtCFcolor2		"Fcolor2"
+#define XtNbcolor2		"bcolor2"
+#define XtCBcolor2		"Bcolor2"
+
+#define XtNfcolor3		"fcolor3"
+#define XtCFcolor3		"Fcolor3"
+#define XtNbcolor3		"bcolor3"
+#define XtCBcolor3		"Bcolor3"
+
+#define XtNfcolor4		"fcolor4"
+#define XtCFcolor4		"Fcolor4"
+#define XtNbcolor4		"bcolor4"
+#define XtCBcolor4		"Bcolor4"
+
+#define XtNfcolor5		"fcolor5"
+#define XtCFcolor5		"Fcolor5"
+#define XtNbcolor5		"bcolor5"
+#define XtCBcolor5		"Bcolor5"
+
+#define XtNfcolor6		"fcolor6"
+#define XtCFcolor6		"Fcolor6"
+#define XtNbcolor6		"bcolor6"
+#define XtCBcolor6		"Bcolor6"
+
+#define XtNfcolor7		"fcolor7"
+#define XtCFcolor7		"Fcolor7"
+#define XtNbcolor7		"bcolor7"
+#define XtCBcolor7		"Bcolor7"
+
+#define XtNfcolor8		"fcolor8"
+#define XtCFcolor8		"Fcolor8"
+#define XtNbcolor8		"bcolor8"
+#define XtCBcolor8		"Bcolor8"
+
+#define XtNfcolor9		"fcolor9"
+#define XtCFcolor9		"Fcolor9"
+#define XtNbcolor9		"bcolor9"
+#define XtCBcolor9		"Bcolor9"
+
+#define XtNfcolorA		"fcolor10"
+#define XtCFcolorA		"Fcolor10"
+#define XtNbcolorA		"bcolor10"
+#define XtCBcolorA		"Bcolor10"
+
+#define XtNfcolorB		"fcolor11"
+#define XtCFcolorB		"Fcolor11"
+#define XtNbcolorB		"bcolor11"
+#define XtCBcolorB		"Bcolor11"
+
+#define XtNfcolorC		"fcolor12"
+#define XtCFcolorC		"Fcolor12"
+#define XtNbcolorC		"bcolor12"
+#define XtCBcolorC		"Bcolor12"
+
+#define XtNfcolorD		"fcolor13"
+#define XtCFcolorD		"Fcolor13"
+#define XtNbcolorD		"bcolor13"
+#define XtCBcolorD		"Bcolor13"
+
+#define XtNfcolorE		"fcolor14"
+#define XtCFcolorE		"Fcolor14"
+#define XtNbcolorE		"bcolor14"
+#define XtCBcolorE		"Bcolor14"
+
+#define XtNfcolorF		"fcolor15"
+#define XtCFcolorF		"Fcolor15"
+#define XtNbcolorF		"bcolor15"
+#define XtCBcolorF		"Bcolor15"
+
 static XtResource resources[] = {
 #if NO_WIDGETS
     {
@@ -1432,6 +1515,297 @@ static XtResource resources[] = {
 	XtOffset(TextWindow, blink_interval),
 	XtRImmediate,
 	(XtPointer) -666		/* 2/3 second; only when highlighted */
+    },
+};
+
+static XtResource color_resources[] = {
+    {
+	XtNfcolor0,
+	XtCFcolor0,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, colors_fg[0]),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.fg
+    },
+    {
+	XtNbcolor0,
+	XtCBcolor0,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, colors_bg[0]),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.bg
+    },
+    {
+	XtNfcolor1,
+	XtCFcolor1,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, colors_fg[1]),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.fg
+    },
+    {
+	XtNbcolor1,
+	XtCBcolor1,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, colors_bg[1]),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.bg
+    },
+    {
+	XtNfcolor2,
+	XtCFcolor2,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, colors_fg[2]),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.fg
+    },
+    {
+	XtNbcolor2,
+	XtCBcolor2,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, colors_bg[2]),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.bg
+    },
+    {
+	XtNfcolor3,
+	XtCFcolor3,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, colors_fg[3]),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.fg
+    },
+    {
+	XtNbcolor3,
+	XtCBcolor3,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, colors_bg[3]),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.bg
+    },
+    {
+	XtNfcolor4,
+	XtCFcolor4,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, colors_fg[4]),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.fg
+    },
+    {
+	XtNbcolor4,
+	XtCBcolor4,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, colors_bg[4]),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.bg
+    },
+    {
+	XtNfcolor5,
+	XtCFcolor5,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, colors_fg[5]),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.fg
+    },
+    {
+	XtNbcolor5,
+	XtCBcolor5,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, colors_bg[5]),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.bg
+    },
+    {
+	XtNfcolor6,
+	XtCFcolor6,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, colors_fg[6]),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.fg
+    },
+    {
+	XtNbcolor6,
+	XtCBcolor6,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, colors_bg[6]),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.bg
+    },
+    {
+	XtNfcolor7,
+	XtCFcolor7,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, colors_fg[7]),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.fg
+    },
+    {
+	XtNbcolor7,
+	XtCBcolor7,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, colors_bg[7]),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.bg
+    },
+    {
+	XtNfcolor8,
+	XtCFcolor8,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, colors_fg[8]),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.fg
+    },
+    {
+	XtNbcolor8,
+	XtCBcolor8,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, colors_bg[8]),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.bg
+    },
+    {
+	XtNfcolor9,
+	XtCFcolor9,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, colors_fg[9]),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.fg
+    },
+    {
+	XtNbcolor9,
+	XtCBcolor9,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, colors_bg[9]),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.bg
+    },
+    {
+	XtNfcolorA,
+	XtCFcolorA,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, colors_fg[10]),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.fg
+    },
+    {
+	XtNbcolorA,
+	XtCBcolorA,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, colors_bg[10]),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.bg
+    },
+    {
+	XtNfcolorB,
+	XtCFcolorB,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, colors_fg[11]),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.fg
+    },
+    {
+	XtNbcolorB,
+	XtCBcolorB,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, colors_bg[11]),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.bg
+    },
+    {
+	XtNfcolorC,
+	XtCFcolorC,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, colors_fg[12]),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.fg
+    },
+    {
+	XtNbcolorC,
+	XtCBcolorC,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, colors_bg[12]),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.bg
+    },
+    {
+	XtNfcolorD,
+	XtCFcolorD,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, colors_fg[13]),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.fg
+    },
+    {
+	XtNbcolorD,
+	XtCBcolorD,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, colors_bg[13]),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.bg
+    },
+    {
+	XtNfcolorE,
+	XtCFcolorE,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, colors_fg[14]),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.fg
+    },
+    {
+	XtNbcolorE,
+	XtCBcolorE,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, colors_bg[14]),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.bg
+    },
+    {
+	XtNfcolorF,
+	XtCFcolorF,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, colors_fg[15]),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.fg
+    },
+    {
+	XtNbcolorF,
+	XtCBcolorF,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, colors_bg[15]),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.bg
     },
 };
 
@@ -1576,6 +1950,7 @@ x_preparse_args(pargc, pargv)
     XGCValues   gcvals;
     ULONG	gcmask;
     int		geo_mask, startx, starty, screen_depth;
+    int		i;
     Cardinal	start_cols, start_rows;
     static XrmOptionDescRec options[] = {
 	{"-leftbar",	"*scrollbarOnLeft", XrmoptionNoArg,	"true" },
@@ -1695,6 +2070,16 @@ x_preparse_args(pargc, pargv)
 	    "Cursor",
 	    cursor_resources,
 	    XtNumber(cursor_resources),
+	    (ArgList)0,
+	    0);
+
+    XtGetSubresources(
+	    cur_win->top_widget,
+	    (XtPointer)cur_win,
+	    "color",
+	    "Color",
+	    color_resources,
+	    XtNumber(color_resources),
 	    (ArgList)0,
 	    0);
 
@@ -1845,6 +2230,28 @@ x_preparse_args(pargc, pargv)
     XtVaGetValues(cur_win->screen,
 		XtNdepth, &screen_depth,
 		NULL);
+
+    for (i = 0; i < NCOLORS; i++) {
+	if ( screen_depth == 1
+	  || cur_win->colors_fg[i] == cur_win->colors_bg[i]
+	  || ( cur_win->colors_fg[i] == cur_win->fg
+	    && cur_win->colors_bg[i] == cur_win->bg )) {
+	    /* Reuse the standard GCs if possible */
+	    cur_win->colors_fgc[i] = cur_win->textgc;
+	    cur_win->colors_bgc[i] = cur_win->reversegc;
+	} else {
+	    gcvals.foreground = cur_win->colors_fg[i];
+	    gcvals.background = cur_win->colors_bg[i];
+	    cur_win->colors_fgc[i] = XCreateGC(dpy, 
+		                               DefaultRootWindow(dpy),
+		                               gcmask, &gcvals);
+	    gcvals.foreground = cur_win->colors_bg[i];
+	    gcvals.background = cur_win->colors_fg[i];
+	    cur_win->colors_bgc[i] = XCreateGC(dpy,
+		                               DefaultRootWindow(dpy),
+		                               gcmask, &gcvals);
+	}
+    }
 
     /* Initialize graphics context for display of selections */
     if (screen_depth == 1
@@ -2110,7 +2517,7 @@ x_preparse_args(pargc, pargv)
     atom_WM_DELETE_WINDOW = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
     {
 	Atom atoms[2];
-	int i = 0;
+	i = 0;
 	atoms[i++] = atom_WM_DELETE_WINDOW;
 	XSetWMProtocols(dpy,
 		XtWindow(cur_win->top_widget),
@@ -2390,6 +2797,7 @@ x_setfont(fname)
 	oldw = x_width(cur_win);
 	oldh = x_height(cur_win);
 	if ((pfont = query_font(cur_win, fname)) != 0) {
+	    int i;
 
 	    XSetFont(dpy, cur_win->textgc, pfont->fid);
 	    XSetFont(dpy, cur_win->reversegc, pfont->fid);
@@ -2402,6 +2810,12 @@ x_setfont(fname)
 	    if (cur_win->textgc != cur_win->revselgc) {
 		XSetFont(dpy, cur_win->selgc, pfont->fid);
 		XSetFont(dpy, cur_win->revselgc, pfont->fid);
+	    }
+	    for (i = 0; i < NCOLORS; i++) {
+		if (cur_win->colors_fgc[i] != cur_win->textgc) {
+		    XSetFont(dpy, cur_win->colors_fgc[i], pfont->fid);
+		    XSetFont(dpy, cur_win->colors_bgc[i], pfont->fid);
+		}
 	    }
 
 	    /* if size changed, resize it, otherwise refresh */
@@ -2607,7 +3021,11 @@ flush_line(text, len, attr, sr, sc)
     int   cc, tlen, i, startcol;
     int   fontchanged = FALSE;
 
-    if ((attr & VACURS) && cur_win->is_color_cursor) {
+    if (attr == 0) {	/* This is the most common case, so we list it first */
+	fore_gc = cur_win->textgc;
+	back_gc = cur_win->reversegc;
+    }
+    else if ((attr & VACURS) && cur_win->is_color_cursor) {
 	fore_gc = cur_win->cursgc;
 	back_gc = cur_win->revcursgc;
 	attr &= ~VACURS;
@@ -2620,6 +3038,10 @@ flush_line(text, len, attr, sr, sc)
 	fore_gc = back_gc = cur_win->modeline_focus_gc;
     else if (attr & VAML)
 	fore_gc = back_gc = cur_win->modeline_gc;
+    else if (attr & (VACOLOR)) {
+	fore_gc = cur_win->colors_fgc[VCOLORNUM(attr)];
+	back_gc = cur_win->colors_bgc[VCOLORNUM(attr)];
+    }
     else {
 	fore_gc = cur_win->textgc;
 	back_gc = cur_win->reversegc;
@@ -3871,11 +4293,11 @@ int check_scrollbar_allocs()
 
 		GROW(cur_win->scrollbars, Widget, oldmax, newmax);
 #if OL_WIDGETS
-		GROW(cur_win->sliders, Widget, oldmax-1, newmax-1);
+		GROW(cur_win->sliders, Widget, oldmax, newmax);
 #endif
 #if NO_WIDGETS
 		GROW(cur_win->scrollinfo, ScrollInfo, oldmax, newmax);
-		GROW(cur_win->grips, Widget, oldmax-1, newmax-1);
+		GROW(cur_win->grips, Widget, oldmax, newmax);
 #endif
 
 		cur_win->maxscrollbars = newmax;

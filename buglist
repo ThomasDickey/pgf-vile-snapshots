@@ -1,7 +1,7 @@
 ------------------------
 vile bug/enhancement/wish list
 ------------------------
-$Header: /usr/build/VCS/pgf-vile/RCS/buglist,v 1.223 1995/02/10 00:02:08 pgf Exp $
+$Header: /usr/build/VCS/pgf-vile/RCS/buglist,v 1.226 1995/02/20 00:18:09 pgf Exp $
 ----------------------
 	(E means enhancement, L,M,H are low, medium, high priority)
 
@@ -356,13 +356,6 @@ tabs in other lines.
 
 -------------------------
 
-In vile 3.65 on SunOS 4.1.3, when I do execute-keyboard-macro while
-defining a keyboard macro, vile seems to go to an infinite loop (but can
-be stopped by Ctrl-C).    (still a problem in 4.6)
-
-------------------------
-
-
 2) When I use the MKS "fmt" program to format a paragraph in vile, a
    tmp file (aaxxx.tmp) is always dropped out in my current working
    directory.  This was not a problem in the previous version of PCVILE
@@ -372,10 +365,7 @@ be stopped by Ctrl-C).    (still a problem in 4.6)
     file called "aaac1.tmp" (for example) in my current working directory.
     It's annoying.
 
-
 -----------------------------
-
-
 
 I'm using the DOS version and I prefer to use 80x28 or even higher res like
 80x50 by setting set sres=80x50 in vile.rc.  The problem is that when a
@@ -384,14 +374,13 @@ It switches back to 80x25 permanently. I think it's acceptable that it
 switches to 80x25 when it's in shell command execution.  However, technically
 it should switch back to the preferred mode when it's done.
 
-[ I don't see this on my omnibook... ]
+[ can anyone confirm or deny this is still true? ]
 
 ---------------------------
 
 the borland console driver won't display the cursor on blank lines until
 after you've refreshed the screen at least once, e.g. with ^L.  must
 be something to do with color initialization, or something like that...
-
 
 ---------------------------
 
@@ -400,20 +389,6 @@ system call" problem, no doubt due to the differing BSD/SysV signal()
 semantics.  [ probable workaround:  ":set noworking" ]
 
 ----------------------
-
-the DOS versions of vile (Watcom, with ibmpc.c or ansi.c) don't work on
-any machine in the whole wide world _except_ the HP OmniBook.  :-)
-
-[TurboC works fine, but there's no memory extender -- tom ]
-
-----------------------------
-
-I was wondering if there was a list anywhere of which commands take what
-arguments.  I have the definitive list of commands, but I wasn't able to
-find anywhere in the source code that there is a list of the commands AND
-their arguments.  This would really help in macro programming.
-
-------------------------------------
 
 Another thing that would be really helpful would be a description of the
 $debug variable, and what it does, how it works.
@@ -440,8 +415,8 @@ indent value.  apparently real vi doesn't?
 
 ----------------------
 
-[really?  why is this?]
 currently can't pop/untag from within macro
+[really?  why is this?]
 
 ------------------
 
@@ -498,9 +473,7 @@ In xvile, when the load is high and the machine stalls for a while
 and I key in several keystrokes ahead, it takes the first of those keystrokes
 and replaces the later keys by it i.e. when several events simultaneously
 arrive, it doesn't do the right thing (process them in order).
-Otherwise, great work!
 
-	Tjl
 -----------------
 
 when motion keys or pasting is used during an insertion, we should
@@ -620,3 +593,85 @@ A message would look something like this:
 
 contrary to the vile.hlp text, binding to the interrupt{} terminal
 character does not fully change intrc and the user's interrupt character.
+
+-----------------------------
+
+We use xvile with french characters (8 bit).
+And the change/delete word (cw, dw) does not work with a word
+including 8 bit character. The substitution/delete is done up to
+the 8 bit character not including it.
+
+-----------------------------------------------------------------
+VMS6.0 on VAXstation 4000/90.  DEC C for OpenVMS VAX compiler
+version V4.0-000.  Shared library (specified in VMSSHARE.OPT)
+is DECC$SHR.EXE instead of the default VAXCRTL.EXE.
+
+symptoms:
+	vile can't read vile.rc, or vile.hlp.
+
+reason:
+	on this setup, the access() library routine seems broken.
+	my test program showed that it returned -1 for existant
+	and non-existant files.
+
+solution:
+	I had to add a
+#define HAVE_ACCESS 0
+	in estruct.h (actually, I just put it in fileio.c).
+
+-----------------------------------------------------------------
+VMS6.0 on VAXstation 4000/90.  DEC C for OpenVMS VAX compiler
+version V4.0-000.  Shared library (specified in VMSSHARE.OPT)
+is DECC$SHR.EXE instead of the default VAXCRTL.EXE.
+
+symptoms:
+	the arrow keys did not move the cursor on my VMS version.
+
+reason:
+	it seems these things now get added to the system map
+	via addtosysmap calls.  The VMSVT function vmsopen
+	wasn't updated when ibmpc.c and tcap.c were.
+
+solution:
+	I added the following lines to the end of vmsopen() in
+	vmsvt.c:
+
+	addtosysmap("\33\133\101", 3, KEY_Up);
+	addtosysmap("\33\133\102", 3, KEY_Down);
+	addtosysmap("\33\133\103", 3, KEY_Right);
+	addtosysmap("\33\133\104", 3, KEY_Left);
+
+	This is somewhat ugly - I tried to be consistent and use the
+	SMG$ routines to obtain the character sequences, but they
+	apparently return the wrong strings for some reason (they
+	stick a decimal 48 character before the last character,
+	which doesn't get detected by the ttgetc).  In any event, the
+	above fixed the problem for me.
+
+-----------------------------------------------------------------
+
+it sure looks like flush_line() in x11.c should take (char *) as arg 1
+rather than (uchar *).  i don't want to change it for 5.1 though.
+
+-----------------------------------------------------------------
+
+DOS:  wildcarding in the top directory:
+   c:
+   cd \
+   vile a*.bat             (will not open autoexec.bat)
+does not work, because Watcom's opendir() routine only succeeds on the root
+directory if it is specified as '\'.  no other name for it seems to work.
+stat won't work on it either.  (we try to open it as ".", not an unreasonable
+thing to do.)
+
+sigh.  i hate DOS.
+
+-----------------------------------------------------------------
+
+ Mips RISCos5.0 machines:
+    Error: random.c, line 625: 'SIG_BLOCK' undefined, ...
+    Error: random.c, line 637: 'SIG_SETMASK' undefined, ...
+ [ i thought i could provide fallback definitions of those, but
+   the values are different on sunos and linux, and are probably
+   different again on Mips RISCos5.0, bless it's broken little heart. ]
+

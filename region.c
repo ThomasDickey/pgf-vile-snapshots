@@ -5,7 +5,7 @@
  * commands. Some functions are just for
  * internal use.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/region.c,v 1.69 1995/01/13 13:26:40 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/region.c,v 1.70 1995/02/18 02:01:09 pgf Exp $
  *
  */
 
@@ -439,6 +439,7 @@ entab_region()
 #endif
 
 /* trim trailing whitespace from a line.  dot is preserved if possible. */
+/* (dot is even preserved if it was sitting on the newline) */
 /*ARGSUSED*/
 int
 trimline(flag, l, r)
@@ -448,26 +449,37 @@ int	l, r;
 	register int off;
 	register LINE *lp;
 	int odoto, s;
+	int delcnt, was_at_eol;
 
 	lp = l_ref(DOT.l);
 
 	if (llength(lp) == 0)
 		return TRUE;
 
-	/* may return -1 if no non-white on line.  but
+	/* may return -1 if line is all whitespace.  but
 		that's okay, since the math still works. */
 	off = lastchar(lp);
 
-	odoto = DOT.o;
-	DOT.o = off+1;
-	s = ldelete((B_COUNT)(llength(lp) - off - 1),FALSE);
+	delcnt = llength(lp) - (off + 1);
+	if (!delcnt)
+		return TRUE;
 
-	/* but now we need to ensure DOT.o doesn't become -1 */
-	if (off < 0)
-		off = 0;
-	DOT.o = odoto;
-	if (DOT.o > off)
-		DOT.o = off;
+	odoto = DOT.o;
+	was_at_eol = (odoto == llength(lp));
+
+	DOT.o = off + 1;
+	s = ldelete((B_COUNT)delcnt,FALSE);
+
+	if (odoto > off) {	/* do we need to back up? */
+		odoto = llength(lp);
+		if (!was_at_eol)
+			odoto--; /* usually we want the last char on line */
+	}
+
+	if (odoto < 0)
+		DOT.o = 0;
+	else
+		DOT.o = odoto;
 	return s;
 }
 

@@ -11,7 +11,7 @@
 # all as "0".  If you use tcap.c, you'll need libtermcap.a too.  If you use
 # x11.c, you'll need libX11.a too.
 #
-# $Header: /usr/build/VCS/pgf-vile/RCS/descrip.mms,v 1.22 1995/02/10 14:10:45 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/descrip.mms,v 1.23 1995/02/15 16:08:53 pgf Exp $
 
 # for regular vile, use these:
 SCREEN = vmsvt
@@ -23,19 +23,19 @@ SCRDEF = "DISP_VMSVT","scrn_chosen"
 #SCREEN = x11simp
 #LIBS = #-lX11
 #TARGET = xvile.exe
-#SCRDEF = "X11","scrn_chosen"
+#SCRDEF = "DISP_X11","scrn_chosen"
 
 # for building the X-toolkit version:
 #SCREEN = x11
 #LIBS = #-lX11
 #TARGET = xvile.exe
-#SCRDEF = "NO_WIDGETS","XTOOLKIT","X11","scrn_chosen"
+#SCRDEF = "NO_WIDGETS","XTOOLKIT","DISP_X11","scrn_chosen"
 
 # for building the Motif version (untested):
 #SCREEN = x11
 #LIBS = #-lX11
 #TARGET = xvile.exe
-#SCRDEF = "MOTIF_WIDGETS","XTOOLKIT","X11","scrn_chosen"
+#SCRDEF = "MOTIF_WIDGETS","XTOOLKIT","DISP_X11","scrn_chosen"
 
 # if you want the help file (vile.hlp) to go somewhere other than your $PATH
 #  or one of the hard-code paths in epath.h  (it goes to the same place vile

@@ -7,7 +7,7 @@
  *  Author:  Curtis Smith
  *  Last Updated: 07/14/87
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/vmsvt.c,v 1.19 1995/01/27 13:52:56 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/vmsvt.c,v 1.20 1995/02/21 02:37:07 pgf Exp $
  *
  */
 
@@ -82,6 +82,20 @@ TERM	term	= {
 	vmsbcol				/* Set background color		*/
 #endif
 	, NULL				/* set at init-time		*/
+};
+
+static	struct	{
+	char	*seq;
+	int	code;
+} keyseqs[] = {
+	{ "\33[A",  KEY_Up },    { "\33A", KEY_Up },
+	{ "\33[B",  KEY_Down },  { "\33B", KEY_Down },
+	{ "\33[C",  KEY_Right }, { "\33C", KEY_Right },
+	{ "\33[D",  KEY_Left },  { "\33D", KEY_Left },
+	{ "\33OP",  KEY_KP_F1 }, { "\33P", KEY_KP_F1 },
+	{ "\33OQ",  KEY_KP_F2 }, { "\33Q", KEY_KP_F2 },
+	{ "\33OR",  KEY_KP_F3 }, { "\33R", KEY_KP_F3 },
+	{ "\33OS",  KEY_KP_F4 }, { "\33S", KEY_KP_F4 },
 };
 
 /***
@@ -355,6 +369,8 @@ vmsgtty()
  ***/
 void vmsopen(void)
 {
+	int	i;
+
 	/* Get terminal type */
 	vmsgtty();
 	if (tc.t_type == TT$_UNKNOWN) {
@@ -418,6 +434,11 @@ void vmsopen(void)
 
 	/* Open terminal I/O drivers */
 	ttopen();
+
+	/* Set predefined keys */
+	for (i = TABLESIZE(keyseqs); i--; ) {
+		addtosysmap(keyseqs[i].seq, strlen(keyseqs[i].seq), keyseqs[i].code);
+	}
 }
 
 

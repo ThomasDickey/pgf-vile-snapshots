@@ -1,4 +1,4 @@
-$! $Header: /usr/build/VCS/pgf-vile/RCS/vmsbuild.com,v 1.4 1995/02/10 03:42:18 pgf Exp $
+$! $Header: /usr/build/VCS/pgf-vile/RCS/vmsbuild.com,v 1.5 1995/02/15 16:08:53 pgf Exp $
 $! VMS build-script for vile.  Requires "VAX-C"
 $!
 $! Tested with:
@@ -19,17 +19,17 @@ $
 $! for building the X version, xvile, use these:
 $!SCREEN == x11simp
 $!TARGET == xvile
-$!SCRDEF == "X11,scrn_chosen"
+$!SCRDEF == "DISP_X11,scrn_chosen"
 $
 $! for building the X-toolkit version:
 $!SCREEN := x11
 $!TARGET := xvile
-$!SCRDEF := "NO_WIDGETS,XTOOLKIT,X11,scrn_chosen"
+$!SCRDEF := "NO_WIDGETS,XTOOLKIT,DISP_X11,scrn_chosen"
 $
 $! for building the Motif version (untested):
 $!SCREEN := x11
 $!TARGET := xvile
-$!SCRDEF := "MOTIF_WIDGETS,XTOOLKIT,X11,scrn_chosen"
+$!SCRDEF := "MOTIF_WIDGETS,XTOOLKIT,DISP_X11,scrn_chosen"
 $
 $! used /G_FLOAT with vaxcrtlg/share in vms_link.opt
 $! can also use /Debug /Listing, /Show=All

@@ -279,5 +279,12 @@ hmmmm -- lets see.  new stuff.  see the CHANGES and help files for details.
 	- lots of bug fixes
 
 -------------------------------
-$Header: /usr/build/VCS/pgf-vile/RCS/README,v 1.46 1995/01/31 01:58:32 pgf Exp $
+Febrary, 1995
+	xvile now supports color attributes, which means we can do some
+	primitive syntax coloring of C programs, using the external filter,
+	"c-filt".  this is still pretty new stuff.  expect it to get better
+	with age.
+
+-------------------------------
+$Header: /usr/build/VCS/pgf-vile/RCS/README,v 1.47 1995/02/19 18:10:40 pgf Exp $
 -------------------------------
