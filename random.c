@@ -281,7 +281,7 @@ replacechar(f, n)
                         s = lnewline();
                 } while (s==TRUE && --n);
                 return (s);
-        } else if (c == '\b')
+        } else if (isbackspace(c))
 		s = TRUE;
 	else
 		s = linsert(n, c);
@@ -626,11 +626,13 @@ ins(f,n)
 	if (c == quotec) {
 		execfunc = quote;
 	} else {
+		if (isbackspace(c))
+			c = '\b';
 		switch(c) {
 			/* ^D and ^T are aliased to ^H and tab, for 
 				users accustomed to "shiftwidth" */
-			case tocntrl('H'):
 			case tocntrl('D'):
+			case '\b':
 				execfunc = (curwp->w_doto == 0) ?
 						nullproc:backspace;
 				autoindented--;
@@ -648,7 +650,7 @@ ins(f,n)
 					autoindented = -1;
 				}
 				break;
-#if BSD
+#if UNIX && defined(SIGTSTP)	/* job control */
 			case tocntrl('Z'):		
 				execfunc = bktoshell;
 				break;

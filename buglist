@@ -2,15 +2,20 @@
 	(E means enhancement, L,M,H are low, medium, high priority)
 ----------------------
 
-L	formatregion code leaves an extra space after reformatting a paragraph
+M	longnames cause severe portability constraint -- does the shortnames
+	stuff take care of this?
 
-L	mode lines aren't kept in sync if a buffer is displayed more than once.
-	for instance, unmark() only fixed modeline for current window.
+L	formatregion code leaves an extra space after reformatting a paragraph
 
 L	why does file reading seem so slow?
 
+L	why is searching so slow?
+
 L	the ^A-* command doesn't work as advertised -- won't replace
 	list if already there.
+
+L	there may be a bug in queryreplace due to output of thescanner() not
+	being checked for ABORT, but it's ifdefed BEFORE anyway
 
 E	The "0r" command, for reading a file in above line 1 doesn't work,
 	because token parsing sees the zero as a number, not part of the

@@ -60,4 +60,8 @@ VILE -- VI Like Emacs: a vi workalike put together from Micro-Emacs by Paul Fox
 	Paul Fox
 	pgf@cayman.com
 
+p.s.  The code distributed with vile in the "shortnames" subdirectory
+	is covered by GNU Public License.  The vile code itself in the upper
+	level directory is _not_ covered by the GNU public license.
+
 

@@ -315,18 +315,18 @@ int type;	/* type of adapter to init for */
 	switch (type) {
 		case CDMONO:	/* Monochrome adapter */
 				scadd = SCADM;
-				newsize(TRUE, 25);
+				newscreensize(25, term.t_ncol);
 				break;
 
 		case CDCGA:	/* Color graphics adapter */
 				scadd = SCADC;
-				newsize(TRUE, 25);
+				newscreensize(25, term.t_ncol);
 				break;
 
 		case CDEGA:	/* Enhanced graphics adapter */
 				scadd = SCADE;
 				egaopen();
-				newsize(TRUE, 43);
+				newscreensize(43, term.t_ncol);
 				break;
 	}
 

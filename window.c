@@ -210,22 +210,11 @@ int n;
     if (curgoal < 0)
         curgoal = getccol(FALSE);
 
-#if BEFORE
-    lp = curwp->w_linep;
-    i  = curwp->w_ntrows/2;
-
-    while (i-- && lforw(lp) != curbp->b_linep)
-        lp = lforw(lp);
-
-    curwp->w_dotp  = lp;
-    curwp->w_doto  = 0;
-#else
     if (was_n < 0)
 	    curwp->w_dotp  = curwp->w_linep;
     else
 	    curwp->w_dotp  = lback(lp);
     curwp->w_doto  = getgoal(curwp->w_dotp);
-#endif
     return (TRUE);
 }
 
@@ -307,64 +296,6 @@ WINDOW *thewp;
 		return(FALSE);
 	}
 
-#if BEFORE
-	/* find window before thewp in linked list */
-	wp = wheadp;
-	lwp = NULL;
-	while (wp != NULL) {
-		if (wp == thewp)
-			break;
-		lwp = wp;
-		wp = wp->w_wndp;
-	}
-	/* find recieving window and give up our space */
-	wp = wheadp;
-	if (thewp->w_toprow == 0) {
-		/* find the next window down */
-		target = thewp->w_ntrows + 1;
-		while (wp != NULL) {
-			if (wp->w_toprow == target)
-				break;
-			wp = wp->w_wndp;
-		}
-		if (wp == NULL)
-			return(FALSE);
-                lp = wp->w_linep;
-                for (i=target; i > 0 && lback(lp)!=wp->w_bufp->b_linep; --i)
-                        lp = lback(lp);
-                wp->w_linep  = lp;
-		wp->w_toprow = 0;
-		wp->w_ntrows += target;
-	} else {
-		/* find the next window up */
-		target = thewp->w_toprow - 1;
-		while (wp != NULL) {
-			if ((wp->w_toprow + wp->w_ntrows) == target)
-				break;
-			wp = wp->w_wndp;
-		}
-		if (wp == NULL)
-			return(FALSE);
-		wp->w_ntrows += 1 + thewp->w_ntrows;
-	}
-
-	/* get rid of the current window */
-	if (--thewp->w_bufp->b_nwnd == 0) {
-		undispbuff(thewp->w_bufp,thewp);
-	}
-	if (lwp == NULL)
-		wheadp = thewp->w_wndp;
-	else
-		lwp->w_wndp = thewp->w_wndp;
-	free((char *)thewp);
-	if (thewp == curwp) {
-		curwp = wp;
-		curwp->w_flag |= WFHARD;
-		make_current(curwp->w_bufp);
-	}
-	upmode();
-	return(TRUE);
-#else
 	/* find recieving window and give up our space */
 	if (thewp == wheadp) { /* there's nothing before */
 		/* find the next window down */
@@ -399,7 +330,6 @@ WINDOW *thewp;
 	}
 	upmode();
 	return(TRUE);
-#endif
 }
 
 /*

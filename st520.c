@@ -943,13 +943,13 @@ char *newrez;	/* requested resolution */
 			break;
 
 		case 2:	/* High resolution - 2 colors - 25 lines */
-			newsize(TRUE, 25);
+			newscreensize(25, term.t_ncol);
 			strcpy(palstr, HIGHPAL);
 			/* change char set back to normal */
 			break;
 
 		case 3:	/* Dense resolution - 2 colors - 40 lines */
-			/* newsize(TRUE, 40); */
+			newscreensize(40, term.t_ncol);
 			strcpy(palstr, HIGHPAL);
 			/*change char set size */
 			break;

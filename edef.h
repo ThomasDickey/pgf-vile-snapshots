@@ -50,7 +50,7 @@ LINE    *lalloc();              /* Allocate a line              */
 #endif
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version two point one");
+decl_init( char version[], "version two point two");
 
 decl_init( int tabval, 8);		/* which column tabs are on,
 						 always power of two */
@@ -196,6 +196,7 @@ decl_init( int ttcol, HUGE );           /* Column location of HW cursor */
 decl_uninit( int lbound	);		/* leftmost column of current line
 					   being displayed */
 decl_uninit( int taboff	);		/* tab offset for display	*/
+
 decl_init( int metac, tocntrl('A') );	/* current meta character	*/
 decl_init( int ctlxc, tocntrl('X') );	/* current control X prefix char */
 decl_init( int reptc, 'K' );		/* current universal repeat char */
@@ -203,6 +204,7 @@ decl_init( int abortc, tocntrl('[') );	/* ESC: current abort command char */
 decl_init( int quotec, tocntrl('V') );	/* quote char during mlreply()	*/
 decl_init( int killc, tocntrl('U') );	/* current line kill char	*/
 decl_init( int intrc, tocntrl('C') );	/* current interrupt char	*/
+decl_init( int backspc, '\b');		/* current backspace char	*/
 
 #if	NeWS
 decl_init( char	*cname[], {		/* names of colors		*/
