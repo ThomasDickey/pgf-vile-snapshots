@@ -10,7 +10,13 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.139  1993/09/03 09:11:54  pgf
+ * Revision 1.141  1993/09/16 11:07:32  pgf
+ * added LPAREN/RPAREN
+ *
+ * Revision 1.140  1993/09/10  16:06:49  pgf
+ * tom's 3.61 changes
+ *
+ * Revision 1.139  1993/09/03  09:11:54  pgf
  * tom's 3.60 changes
  *
  * Revision 1.138  1993/08/18  16:45:00  pgf
@@ -863,7 +869,9 @@
 
 #define OPT_B_LIMITS    !SMALLER		/* left-margin */
 #define OPT_EVAL        !SMALLER		/* expression-evaluation */
+#define OPT_FLASH       !SMALLER || IBMPC	/* visible-bell */
 #define OPT_HISTORY     !SMALLER		/* command-history */
+#define OPT_MS_MOUSE    !SMALLER && IBMPC	/* MsDos-mouse */
 #define OPT_UPBUFF      !SMALLER		/* animated buffer-update */
 
 #if	(TERMCAP || X11) && !SMALLER
@@ -875,6 +883,9 @@
 #else
 #define	OPT_XTERM	0	/* vile doesn't recognize xterm mouse */
 #endif
+
+	/* any mouse capability */
+#define OPT_MOUSE       (X11 || OPT_XTERM || OPT_MS_MOUSE)
 
 /*	Debugging options	*/
 #define	RAMSIZE	0	/* dynamic RAM memory usage tracking */
@@ -899,11 +910,21 @@ extern	char *	sys_errlist[];
 #endif
 #define	set_errno(code)	errno = code
 
+	/* bit-mask definitions */
+#define	lBIT(n)	(1L<<(n))
+#define	iBIT(n) (1 <<(n))
+
 /* use 'size_t' if we have it */
 #if POSIX || APOLLO || VMS || NEWDOSCC
-#define	SIZE_T	size_t
+# define SIZE_T  size_t
+# if defined(lint) && (SUNOS||APOLLO)
+#  define ALLOC_T unsigned
+# else
+#  define ALLOC_T size_t
+# endif
 #else
-#define	SIZE_T	int
+# define SIZE_T  int
+# define ALLOC_T unsigned
 #endif
 
 #if APOLLO
@@ -1089,6 +1110,15 @@ union REGS {
 # define if_OPT_WORKING(statement) statement;
 #else
 # define if_OPT_WORKING(statement)
+#endif
+
+	/* intermediate config-controls for filec.c (needed in nemode.h) */
+#if !SMALLER && !OPT_MAP_MEMORY
+#define COMPLETE_FILES  (UNIX || MSDOS || VMS)
+#define	COMPLETE_DIRS   (UNIX || MSDOS)
+#else
+#define COMPLETE_FILES  0
+#define COMPLETE_DIRS   0
 #endif
 
 	/* semaphore may be needed to prevent interrupt of display-code */
@@ -1285,6 +1315,8 @@ union REGS {
 	the cfence code itself */
 #define LBRACE '{'
 #define RBRACE '}'
+#define LPAREN '('
+#define RPAREN ')'
 
 
 /* separator used when scanning PATH environment variable */
@@ -1433,11 +1465,11 @@ typedef struct regexp {
  * Definitions for 'tbuff.c' (temporary/dynamic char-buffers)
  */
 typedef	struct	_tbuff	{
-	char *		tb_data;	/* the buffer-data */
-	unsigned	tb_size;	/* allocated size */
-	unsigned	tb_used;	/* total used in */
-	unsigned	tb_last;	/* last put/get index */
-	int		tb_endc;
+	char *	tb_data;	/* the buffer-data */
+	ALLOC_T	tb_size;	/* allocated size */
+	ALLOC_T	tb_used;	/* total used in */
+	ALLOC_T	tb_last;	/* last put/get index */
+	int	tb_endc;
 	} TBUFF;
 
 /*
@@ -2144,44 +2176,49 @@ typedef struct {
 }	KBIND;
 
 
-/* these are the flags which can appear in the CMDFUNC structure, describing
-	a command */
-#define NONE	0L
-#define UNDO	1L	/* command is undo-able, so clean up undo lists */
-#define REDO	2L	/* command is redo-able, record it for dotcmd */
-#define MOTION	4L	/* command causes motion, okay after operator cmds */
-#define FL	8L	/* if command causes motion, opers act on full lines */
-#define ABSM	16L	/* command causes absolute (i.e. non-relative) motion */
-#define GOAL	32L	/* column goal should be retained */
-#define GLOBOK	64L	/* permitted after global command */
-#define OPER	128L	/* function is an operator, affects a region */
-#define LISTED	256L	/* internal use only -- used in describing bindings
-				to only describe each once */
-#define NOMOVE  512L	/* dot doesn't move (although address may be used) */
-#define VIEWOK  1024L	/* command is okay in view mode, even though it _may_
-				be undoable (macros and maps) */
+/* These are the flags which can appear in the CMDFUNC structure, describing a
+ * command.
+ */
+#define NONE    0L
+#define cmdBIT(n) lBIT(n)	/* ...to simplify typing */
+#define UNDO    cmdBIT(0)	/* command is undo-able, so clean up undo lists */
+#define REDO    cmdBIT(1)	/* command is redo-able, record it for dotcmd */
+#define MOTION  cmdBIT(2)	/* command causes motion, okay after operator cmds */
+#define FL      cmdBIT(3)	/* if command causes motion, opers act on full lines */
+#define ABSM    cmdBIT(4)	/* command causes absolute (i.e. non-relative) motion */
+#define GOAL    cmdBIT(5)	/* column goal should be retained */
+#define GLOBOK  cmdBIT(6)	/* permitted after global command */
+#define OPER    cmdBIT(7)	/* function is an operator, affects a region */
+#define LISTED  cmdBIT(8)	/* internal use only -- used in describing
+				 * bindings to only describe each once */
+#define NOMOVE  cmdBIT(9)	/* dot doesn't move (although address may be used) */
+#define VIEWOK  cmdBIT(10)	/* command is okay in view mode, even though it
+				 * _may_ be undoable (macros and maps) */
 
-/* these flags are ex argument descriptors. I simply moved them over 
-	from elvis.  Not all are used or honored or implemented */
-#define FROM	(1L<<16)	/* allow a linespec */
-#define	TO	(2L<<16)	/* allow a second linespec */
-#define BANG	(4L<<16)	/* allow a ! after the command name */
-#define EXTRA	(8L<<16)	/* allow extra args after command name */
-#define XFILE	(16L<<16)	/* expand wildcards in extra part */
-#define NOSPC	(32L<<16)	/* no spaces allowed in the extra part */
-#define	DFLALL	(64L<<16)	/* default file range is 1,$ */
-#define DFLNONE	(128L<<16)	/* no default file range */
-#define NODFL	(256L<<16)	/* do not default to the current file name */
-#define EXRCOK	(512L<<16)	/* can be in a .exrc file */
-#define NL	(1024L<<16)	/* if !exmode, then write a newline first */
-#define PLUS	(2048L<<16)	/* allow a line number, as in ":e +32 foo" */
-#define ZERO	(4096L<<16)	/* allow 0 to be given as a line number */
-#define FILES	(XFILE + EXTRA)	/* multiple extra files allowed */
-#define WORD1	(EXTRA + NOSPC)	/* one extra word allowed */
-#define FILE1	(FILES + NOSPC)	/* 1 file allowed, defaults to current file */
-#define NAMEDF	(FILE1 + NODFL)	/* 1 file allowed, defaults to "" */
-#define NAMEDFS	(FILES + NODFL)	/* multiple files allowed, default is "" */
-#define RANGE	(FROM + TO)	/* range of linespecs allowed */
+/* These flags are 'ex' argument descriptors, adapted from elvis.  Not all are
+ * used or honored or implemented.
+ */
+#define argBIT(n) cmdBIT(n+10)	/* ...to simplify adding bits */
+#define FROM    argBIT(1)	/* allow a linespec */
+#define TO      argBIT(2)	/* allow a second linespec */
+#define BANG    argBIT(3)	/* allow a ! after the command name */
+#define EXTRA   argBIT(4)	/* allow extra args after command name */
+#define XFILE   argBIT(5)	/* expand wildcards in extra part */
+#define NOSPC   argBIT(6)	/* no spaces allowed in the extra part */
+#define DFLALL  argBIT(7)	/* default file range is 1,$ */
+#define DFLNONE argBIT(9)	/* no default file range */
+#define NODFL   argBIT(10)	/* do not default to the current file name */
+#define EXRCOK  argBIT(11)	/* can be in a .exrc file */
+#define NL      argBIT(12)	/* if !exmode, then write a newline first */
+#define PLUS    argBIT(13)	/* allow a line number, as in ":e +32 foo" */
+#define ZERO    argBIT(14)	/* allow 0 to be given as a line number */
+#define OPTREG  argBIT(15)	/* allow optional register-name */
+#define FILES   (XFILE | EXTRA)	/* multiple extra files allowed */
+#define WORD1   (EXTRA | NOSPC)	/* one extra word allowed */
+#define FILE1   (FILES | NOSPC)	/* 1 file allowed, defaults to current file */
+#define NAMEDF  (FILE1 | NODFL)	/* 1 file allowed, defaults to "" */
+#define NAMEDFS (FILES | NODFL)	/* multiple files allowed, default is "" */
+#define RANGE   (FROM  | TO)	/* range of linespecs allowed */
 
 /* definitions for 'mlreply_file()' and other filename-completion */
 #define	FILEC_REREAD   4
@@ -2191,14 +2228,6 @@ typedef struct {
 
 #define	FILEC_PROMPT   8	/* always prompt (never from screen) */
 #define	FILEC_EXPAND   16	/* allow glob-expansion to multiple files */
-
-#if !SMALLER && !OPT_MAP_MEMORY
-#define COMPLETE_FILES  (UNIX || MSDOS || VMS)
-#define	COMPLETE_DIRS   (UNIX || MSDOS)
-#else
-#define COMPLETE_FILES  0
-#define COMPLETE_DIRS   0
-#endif
 
 #ifndef P_tmpdir		/* not all systems define this */
 #if MSDOS

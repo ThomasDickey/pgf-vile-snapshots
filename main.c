@@ -14,7 +14,14 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.139  1993/09/06 16:29:26  pgf
+ * Revision 1.141  1993/09/16 11:07:58  pgf
+ * added .scm to c-suffixes list.  for scheme.  this is getting a little
+ * unwieldly.
+ *
+ * Revision 1.140  1993/09/10  16:06:49  pgf
+ * tom's 3.61 changes
+ *
+ * Revision 1.139  1993/09/06  16:29:26  pgf
  * added multibeep mode
  *
  * Revision 1.138  1993/09/03  09:11:54  pgf
@@ -984,7 +991,7 @@ loop()
 		/* if we're inserting, or will be inserting again, then
 			suppress.  this happens if we're using arrow keys
 			during insert */
-		if (is_at_end_of_line(DOT) && !is_empty_line(DOT) &&
+		if (is_at_end_of_line(DOT) && (DOT.o > w_left_margin(curwp)) &&
 				!insertmode && !insert_mode_was)
 			backchar(TRUE,1);
 
@@ -1092,12 +1099,17 @@ global_val_init()
 	set_global_g_val(GMDABUFF,	TRUE); 	/* auto-buffer */
 	set_global_g_val(GMDALTTABPOS,	FALSE); /* emacs-style tab
 							positioning */
+#ifdef GMDDIRC
 	set_global_g_val(GMDDIRC,	FALSE); /* directory-completion */
-	set_global_g_val(GMDMULTIBEEP,	TRUE); /* multiple beeps for multiple
-						motion failures */
+#endif
+#if OPT_FLASH
+	set_global_g_val(GMDFLASH,  	TRUE);	/* use it if we've got it */
+#endif
 #ifdef GMDHISTORY
 	set_global_g_val(GMDHISTORY,	TRUE);
 #endif
+	set_global_g_val(GMDMULTIBEEP,	TRUE); /* multiple beeps for multiple
+						motion failures */
 	set_global_g_val(GVAL_TIMEOUTVAL, 500);	/* catnap time -- how long
 							to wait for ESC seq */
 #if VMS || MSDOS			/* ':' gets in the way of drives */
@@ -1179,7 +1191,7 @@ global_val_init()
 #define	DEFAULT_CSUFFIX	"\\.\\(\\([chis]\\)\\|cpp\\|cxx\\|hxx\\)$"
 #endif
 #ifndef DEFAULT_CSUFFIX	/* UNIX (mixed-case names) */
-#define	DEFAULT_CSUFFIX	"\\.\\(\\([Cchis]\\)\\|CC\\|cpp\\|cxx\\|hxx\\)$"
+#define	DEFAULT_CSUFFIX	"\\.\\(\\([Cchis]\\)\\|CC\\|cpp\\|cxx\\|hxx\\|scm\\)$"
 #endif
 
 	/* suffixes for C mode */

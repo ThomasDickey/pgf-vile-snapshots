@@ -13,7 +13,10 @@
  *		pgf, 11/91
  * 
  * $Log: regexp.c,v $
- * Revision 1.37  1993/07/27 18:06:20  pgf
+ * Revision 1.38  1993/09/10 16:06:49  pgf
+ * tom's 3.61 changes
+ *
+ * Revision 1.37  1993/07/27  18:06:20  pgf
  * see tom's 3.56 CHANGES entry
  *
  * Revision 1.36  1993/07/21  17:04:17  pgf
@@ -383,7 +386,7 @@ int magic;
 	register regexp *r;
 	register char *scan;
 	register char *longest;
-	register unsigned len;
+	register ALLOC_T len;
 	int flags;
 	static char *exp;
 	static int explen;

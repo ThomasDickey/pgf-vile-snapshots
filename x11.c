@@ -2,7 +2,10 @@
  * 	X11 support, Dave Lemke, 11/91
  *
  * $Log: x11.c,v $
- * Revision 1.28  1993/09/03 09:11:54  pgf
+ * Revision 1.29  1993/09/10 16:06:49  pgf
+ * tom's 3.61 changes
+ *
+ * Revision 1.28  1993/09/03  09:11:54  pgf
  * tom's 3.60 changes
  *
  * Revision 1.27  1993/08/18  16:50:10  pgf
@@ -236,7 +239,7 @@ static	void	change_selection P(( TextWindow, Bool, Bool ));
 static	void	x_stash_selection P(( TextWindow ));
 static	int	set_character_class P(( char * ));
 static	void	x_touch P(( TextWindow, int, int, UINT, UINT ));
-static	void	x_resize_screen P(( TextWindow, unsigned, unsigned ));
+static	void	x_resize_screen P(( TextWindow, ALLOC_T, ALLOC_T ));
 static	void	x_paste_selection P(( TextWindow ));
 static	Bool	x_give_selection P(( TextWindow, XSelectionRequestEvent *, Atom, Atom ));
 static	void	x_own_selection P(( TextWindow ));
@@ -349,7 +352,7 @@ strndup(str, n)
 {
     register char *t;
 
-    if ((t = malloc((unsigned)n)) != 0)
+    if ((t = malloc((ALLOC_T)n)) != 0)
     	(void)memcpy(t, str, n);
     return t;
 }
@@ -514,8 +517,8 @@ SIGT x_quit (ACTUAL_SIG_ARGS)
 static void
 x_resize_screen(tw, rows, cols)
     TextWindow  tw;
-    unsigned    rows;
-    unsigned    cols;
+    ALLOC_T     rows;
+    ALLOC_T     cols;
 {
     unsigned    r,
                 c;
@@ -524,9 +527,9 @@ x_resize_screen(tw, rows, cols)
 	free_win_data(tw);
 	tw->rows = rows;
 	/* allocate screen */
-	tw->sc   = typeallocn(UCHAR *, tw->rows);
-	tw->attr = typeallocn(UCHAR *, tw->rows);
-	tw->line_attr = typeallocn(UCHAR, tw->rows);
+	tw->sc   = typeallocn(UCHAR *, rows);
+	tw->attr = typeallocn(UCHAR *, rows);
+	tw->line_attr = typeallocn(UCHAR, rows);
     }
     tw->cols = cols;
     if (tw->cur_col >= tw->cols)
@@ -538,8 +541,8 @@ x_resize_screen(tw, rows, cols)
     }
     /* init it */
     for (r = 0; r < tw->rows; r++) {
-	tw->sc[r] = typeallocn(UCHAR, tw->cols);
-	tw->attr[r] = typeallocn(UCHAR, tw->cols);
+	tw->sc[r] = typeallocn(UCHAR, cols);
+	tw->attr[r] = typeallocn(UCHAR, cols);
 	if (!tw->sc[r] || !tw->attr[r]) {
 	    (void)fprintf(stderr, "couldn't allocate memory for screen\n");
 	    ExitProgram(BAD(-1));
@@ -686,7 +689,7 @@ x_open()
 			       &start_cols, &start_rows);
     } else
 	flags = 0;
-    x_resize_screen(tw, start_rows, start_cols);
+    x_resize_screen(tw, (ALLOC_T)start_rows, (ALLOC_T)start_cols);
 
     if ((flags & XValue) && (flags & XNegative))
 	startx = DisplayWidth(dpy, screen) - x_width(tw);
@@ -2359,7 +2362,7 @@ x_process_event(ev)
 		newlength(True, nr);
 	}
 	if (changed) {
-		x_resize_screen(cur_win, (unsigned)nr, (unsigned)nc);
+		x_resize_screen(cur_win, (ALLOC_T)nr, (ALLOC_T)nc);
 		(void) refresh(True, 0);
 		(void) update(False);
 	}
@@ -2615,11 +2618,37 @@ char *dummy;
 {
 }
 
+#if OPT_FLASH
+static void
+invert_display P(( void ))
+{
+	register int r, c;
+
+	for (r = 0; r < cur_win->rows; r++) {
+		cur_win->line_attr[r] |= LINE_DIRTY;
+		for (c = 0; c < cur_win->cols; c++) {
+			cur_win->attr[r][c] ^= CELL_REVERSE;
+			cur_win->attr[r][c] |= CELL_DIRTY;
+		}
+	}
+	x_flush();
+}
+#endif
+
 /* beep */
 static void
 x_beep()
 {
-    XBell(cur_win->dpy, 0);
+#if OPT_FLASH
+	if (global_g_val(GMDFLASH)) {
+		beginDisplay;
+		invert_display();
+		invert_display();
+		endofDisplay;
+		return;
+	}
+#endif
+	XBell(cur_win->dpy, 0);
 }
 
 #if NO_LEAKS

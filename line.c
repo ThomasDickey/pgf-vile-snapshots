@@ -11,7 +11,10 @@
  * which means that the dot and mark values in the buffer headers are nonsense.
  *
  * $Log: line.c,v $
- * Revision 1.53  1993/09/03 09:11:54  pgf
+ * Revision 1.54  1993/09/10 16:06:49  pgf
+ * tom's 3.61 changes
+ *
+ * Revision 1.53  1993/09/03  09:11:54  pgf
  * tom's 3.60 changes
  *
  * Revision 1.52  1993/08/13  16:32:50  pgf
@@ -487,9 +490,9 @@ int n, c;
 #endif
 	SIZE_T	nsize;
 
-	lp1 = curwp->w_dot.l;			/* Current line 	*/
+	lp1 = DOT.l;				/* Current line 	*/
 	if (same_ptr(lp1, curbp->b_line.l)) {	/* At the end: special	*/
-		if (curwp->w_dot.o != 0) {
+		if (DOT.o != 0) {
 			mlforce("BUG: linsert");
 			return (FALSE);
 		}
@@ -514,12 +517,12 @@ int n, c;
 
 		/* don't move DOT until after tagging for undo */
 		/*  (it's important in an empty buffer) */
-		curwp->w_dot.l = lp2;
-		curwp->w_dot.o = n;
+		DOT.l = lp2;
+		DOT.o = n;
 		chg_buff(curbp, WFINS|WFEDIT);
 		return (TRUE);
 	}
-	doto = curwp->w_dot.o;			/* Save for later.	*/
+	doto = DOT.o;				/* Save for later.	*/
 	tmp  = l_ref(lp1);
 	nsize = llength(tmp) + n;
 	if (nsize > tmp->l_size) {		/* Hard: reallocate	*/
@@ -527,7 +530,7 @@ int n, c;
 		nsize = roundup(nsize);
 		copy_for_undo(lp1);
 #if OPT_MAP_MEMORY
-		if ((tmp = l_reallocate(curwp->w_dot.l, nsize, curbp)) == 0)
+		if ((tmp = l_reallocate(DOT.l, nsize, curbp)) == 0)
 			return (FALSE);
 		lp1 = l_ptr(tmp);
 
@@ -625,8 +628,8 @@ lnewline()
 	register int	doto;
 	register WINDOW *wp;
 
-	lp1  = curwp->w_dot.l;		/* Get the address and	*/
-	doto = curwp->w_dot.o;			/* offset of "."	*/
+	lp1  = DOT.l;			/* Get the address and	*/
+	doto = DOT.o;			/* offset of "."	*/
 
 	if (same_ptr(lp1, curbp->b_line.l)
 	 && same_ptr(lFORW(lp1), lp1)) {
@@ -750,8 +753,8 @@ int kflag;	/* put killed text in kill buffer flag */
 	register WINDOW *wp;
 	register int i;
 	register int s = TRUE;
-	L_NUM	deleted = 0;
 
+	lines_deleted = 0;
 	while (n > 0) {
 		dotp = DOT.l;
 		doto = DOT.o;
@@ -776,7 +779,7 @@ int kflag;	/* put killed text in kill buffer flag */
 				if (s != TRUE)
 					break;
 				lremove(curbp, nlp);
-				deleted++;
+				lines_deleted++;
 				toss_to_undo(nlp);
 				n -= lLength(nlp)+1;
 				nlp = lFORW(dotp);
@@ -790,7 +793,7 @@ int kflag;	/* put killed text in kill buffer flag */
 			if (kflag && (s = kinsert('\n')) != TRUE)
 				break;
 			--n;
-			deleted++;
+			lines_deleted++;
 			continue;
 		}
 		copy_for_undo(DOT.l);
@@ -854,8 +857,6 @@ int kflag;	/* put killed text in kill buffer flag */
 		}
 		n -= chunk;
 	}
-	if (do_report(deleted))
-		mlforce("[%d lines deleted]", deleted);
 	return (s);
 }
 
@@ -883,7 +884,7 @@ char *iline;	/* contents of new line */
 	register int status;
 
 	/* delete the current line */
-	curwp->w_dot.o = 0;	/* starting at the beginning of the line */
+	DOT.o = w_left_margin(curwp); /* start at the beginning of the line */
 	if ((status = deltoeol(TRUE, 1)) != TRUE)
 		return(status);
 
@@ -920,7 +921,7 @@ ldelnewline()
 	register WINDOW *wp;
 	int	len, add;
 
-	lp1 = curwp->w_dot.l;
+	lp1 = DOT.l;
 	len = lLength(lp1);
 	/* if the current line is empty, remove it */
 	if (len == 0) {			/* Blank line.		*/
@@ -940,7 +941,7 @@ ldelnewline()
 		lremove(curbp, lp2);
 		return (TRUE);
 	}
-	copy_for_undo(curwp->w_dot.l);
+	copy_for_undo(DOT.l);
 
 	/* no room in line above, make room */
 	if (add > l_ref(lp1)->l_size - len) {
@@ -1121,11 +1122,7 @@ int	c;
 	register int n;
 
 	if (isdigit(c)) {
-		int	save = ukb;
-		ukb = c - '0';
-		kregcirculate(FALSE);
-		n = ukb;
-		ukb = save;
+		n = c - '0';
 	} else if (islower(c))
 		n = c - 'a' + 10;  /* named buffs are in 10 through 36 */
 	else if (isupper(c))
@@ -1134,6 +1131,24 @@ int	c;
 		n = -1;
 
 	return n;
+}
+
+/*
+ * Translates a kill-buffer index into the actual offset into the kill buffer,
+ * handling the translation of "1 .. "9
+ */
+int
+index2ukb(inx)
+int	inx;
+{
+	if (inx >= 1 && inx < 10) {
+		int save = ukb;
+		ukb = inx;
+		kregcirculate(FALSE);
+		inx = ukb;
+		ukb = save;
+	}
+	return inx;
 }
 
 /* select one of the named registers for use with the following command */
@@ -1269,7 +1284,7 @@ int f,n,after,putlines;
 		n = 1;
 
 	oukb = ukb;
-	kregcirculate(FALSE);
+	kregcirculate(FALSE);	/* cf: 'index2ukb()' */
 	if (kbs[ukb].kbufh == NULL) {
 		if (ukb != 0)
 			mlforce("[Nothing in register %c]", index2reg(oukb));
@@ -1278,19 +1293,19 @@ int f,n,after,putlines;
 	}
 	lining = (putlines == TRUE || (kbs[ukb].kbflag & (KLINES|KAPPEND)));
 	if (lining) {
-		if (after && !is_header_line(curwp->w_dot, curbp))
-			curwp->w_dot.l = lFORW(curwp->w_dot.l);
-		curwp->w_dot.o = 0;
+		if (after && !is_header_line(DOT, curbp))
+			DOT.l = lFORW(DOT.l);
+		DOT.o = 0;
 	} else {
-		if (after && !is_at_end_of_line(curwp->w_dot))
+		if (after && !is_at_end_of_line(DOT))
 			forwchar(TRUE,1);
 	}
 	(void)setmark();
 	s = put(n,lining);
 	if (s == TRUE)
 		swapmark();
-	if (is_header_line(curwp->w_dot, curbp))
-		curwp->w_dot.l = lBACK(curwp->w_dot.l);
+	if (is_header_line(DOT, curbp))
+		DOT.l = lBACK(DOT.l);
 	if (lining)
 		(void)firstnonwhite(FALSE,1);
 	ukb = 0;
@@ -1340,7 +1355,7 @@ int n,aslines;
 					}
 					wasnl = TRUE;
 				} else {
-					if (is_header_line(curwp->w_dot,curbp))
+					if (is_header_line(DOT,curbp))
 						suppressnl = TRUE;
 					if (linsert(1, c) != TRUE) {
 						status = FALSE;
@@ -1383,7 +1398,7 @@ int
 execkreg(f,n)
 int f,n;
 {
-	int c, j, status;
+	int c, j, jj, status;
 	KILL *kp;		/* pointer into kill register */
 	static TBUFF	*buffer;
 	static	char	cbuf[2];
@@ -1404,7 +1419,8 @@ int f,n;
 	relist_registers();
 
 	/* make sure there is something to execute */
-	kp = kbs[j].kbufh;
+	jj = index2ukb(j);
+	kp = kbs[jj].kbufh;
 	if (kp == NULL)
 		return TRUE;		/* not an error, just nothing */
 
@@ -1416,7 +1432,7 @@ int f,n;
 				return FALSE;
 			kp = kp->d_next;
 		}
-		if (!tb_bappend(&buffer, (char *)(kp->d_chunk), kbs[j].kused))
+		if (!tb_bappend(&buffer, (char *)(kp->d_chunk), (ALLOC_T)kbs[jj].kused))
 			return FALSE;
 	}
 
@@ -1484,12 +1500,7 @@ char *dummy;
 	for (i = 0; i < SIZEOF(kbs); i++) {
 		int	save = ukb;
 
-		ii = i;
-		if (i >= 1 && i < 10) {	/* "1 ... "9 are special */
-			ukb = i;
-			kregcirculate(FALSE);
-			ii = ukb;
-		}
+		ii = index2ukb(i);
 		if ((kp = kbs[ii].kbufh) != 0) {
 			int first = FALSE;
 			if (any++)

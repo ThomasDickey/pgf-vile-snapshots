@@ -8,8 +8,15 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: insert.c,v $
- *	Revision 1.32  1993/09/03 09:11:54  pgf
- *	tom's 3.60 changes
+ *	Revision 1.34  1993/09/16 11:06:43  pgf
+ *	make parentheses act like braces in c-mode -- for indentation purposes, in
+ *	languages like scheme (and lisp?)
+ *
+ * Revision 1.33  1993/09/10  16:06:49  pgf
+ * tom's 3.61 changes
+ *
+ * Revision 1.32  1993/09/03  09:11:54  pgf
+ * tom's 3.60 changes
  *
  * Revision 1.31  1993/08/13  16:32:50  pgf
  * tom's 3.58 changes
@@ -118,6 +125,10 @@
 #include	"edef.h"
 
 #define	dot_argument	((dotcmdmode == PLAY) && dotcmdarg)
+
+#define	BackspaceLimit() (b_val(curbp,MDBACKLIMIT))\
+			? DOT.o\
+			: w_left_margin(curwp)
 
 static	int	wrap_at_col P(( void ));
 static	void	advance_one_char P(( void ));
@@ -377,7 +388,7 @@ int f,n;
 				}
 			}
 		}
-		if ((t == TRUE) && DOT.o && vi_fix)
+		if ((t == TRUE) && (DOT.o > w_left_margin(curwp)) && vi_fix)
 			s = backchar(FALSE,1);
 	}
 	return s;
@@ -408,6 +419,9 @@ int cur_count;
 int max_count;
 int *splice;
 {
+#if OPT_MOUSE
+	WINDOW	*wp0 = curwp;
+#endif
 	register int status;
 	int	c;		/* command character */
 	int backsp_limit;
@@ -432,16 +446,14 @@ int *splice;
 	osavedmode = savedmode;
 	savedmode = insertmode;
 
-	if (b_val(curbp,MDBACKLIMIT))
-		backsp_limit = DOT.o;	/* starting offset */
-	else
-		backsp_limit = 0;	/* no limit on backspaces */
+	backsp_limit = BackspaceLimit();
 
 	while(1) {
 
 		/*
 		 * Read another character from the insertion-string.
 		 */
+		c = abortc;
 		if (playback) {
 			if (*splice && !tb_more(insbuff))
 				playback = FALSE;
@@ -470,6 +482,23 @@ int *splice;
 				*splice = TRUE;
 			}
 		}
+#if OPT_MOUSE
+		/*
+		 * Prevent user from starting insertion into a modifiable
+		 * buffer, then clicking on a readonly buffer to continue
+		 * inserting.  This assumes that 'setcursor()' handles entry
+		 * into the readonly buffer.
+		 */
+		if (curwp != wp0) {
+			if (b_val(curbp, MDVIEW) || !insertmode) {
+				tungetc(c);
+				status = FALSE;
+				break;
+			}
+			wp0 = curwp;
+			backsp_limit = BackspaceLimit();
+		}
+#endif
 
 		/*
 		 * Decode the character
@@ -478,7 +507,7 @@ int *splice;
 			 /* an unfortunate Vi-ism that ensures one
 				can always type "ESC a" if you're not sure
 				you're in insert mode. */
-			if (DOT.o != 0)
+			if (DOT.o > w_left_margin(curwp))
 				backchar(TRUE,1);
 			if (autoindented >= 0) {
 				trimline(FALSE);
@@ -489,17 +518,12 @@ int *splice;
 			status = TRUE;
 			break;
 		} else if (c & SPEC) {
-			CMDFUNC *cfp;
-			int oins;
-			cfp = kcod2fnc(c);
+			CMDFUNC *cfp = kcod2fnc(c);
 			if (cfp) {
 				map_check(c);
-				oins = insertmode;
-				insertmode = FALSE;
-				backsp_limit = 0;
+				backsp_limit = w_left_margin(curwp);
 				curgoal = getccol(FALSE);
 				(void)execute(cfp,FALSE,1);
-				insertmode = oins;
 			}
 			continue;
 		}
@@ -521,7 +545,7 @@ int *splice;
 
 #if CFENCE
 		/* check for CMODE fence matching */
-		if ((c == RBRACE || c == ')' || c == ']') &&
+		if ((c == RBRACE || c == RPAREN || c == ']') &&
 						b_val(curbp, MDSHOWMAT))
 			fmatch(c);
 #endif
@@ -570,7 +594,7 @@ int *backsp_limit_p;
 		 */
 		if (isspace(c) && getccol(FALSE) > wrap_at_col()) {
 			wrapword(FALSE,1);
-			*backsp_limit_p = 0;
+			*backsp_limit_p = w_left_margin(curwp);
 		}
 
 		if ( c == '\t') { /* tab */
@@ -582,7 +606,7 @@ int *backsp_limit_p;
 				trimline(FALSE);
 				autoindented = -1;
 			}
-			*backsp_limit_p = 0;
+			*backsp_limit_p = w_left_margin(curwp);
 		} else if ( isbackspace(c) ||
 				c == tocntrl('D') ||
 				c == killc ||
@@ -595,7 +619,7 @@ int *backsp_limit_p;
 
 				sw = curswval;
 				if (autoindented >=0)
-					*backsp_limit_p = 0;
+					*backsp_limit_p = w_left_margin(curwp);
 				col = getccol(FALSE);
 				if (col > 0)
 					goal = ((col-1)/sw)*sw;
@@ -649,7 +673,7 @@ int *backsp_limit_p;
 	}
 
 	/* do the appropriate insertion */
-	if ((c == RBRACE) && b_val(curbp, MDCMOD)) {
+	if (((c == RBRACE) || (c == RPAREN)) && b_val(curbp, MDCMOD)) {
 		return insbrace(1, c);
 	} else if (c == '#' && b_val(curbp, MDCMOD)) {
 		return inspound();
@@ -701,10 +725,7 @@ int mode;
 
 	insertmode = mode;
 
-	if (b_val(curbp,MDBACKLIMIT))
-		backsp_limit = DOT.o;	/* starting offset */
-	else
-		backsp_limit = 0;	/* no limit on backspaces */
+	backsp_limit = BackspaceLimit();
 
 	/* insert it */
 	while (n--) {
@@ -836,6 +857,7 @@ int *bracefp;
 		int lc = lastchar(l_ref(DOT.l));
 		*bracefp = (lc >= 0 &&
 			(lGetc(DOT.l,lc) == LBRACE ||
+			 lGetc(DOT.l,lc) == LPAREN ||
 			 lGetc(DOT.l,lc) == ':') );
 	}
 
@@ -865,7 +887,8 @@ int *bracefp;
 	}
 	ind = indentlen(l_ref(DOT.l));
 	if (bracefp) {
-		*bracefp = (lGetc(DOT.l,fc) == RBRACE);
+		*bracefp = ((lGetc(DOT.l,fc) == RBRACE) ||
+				(lGetc(DOT.l,fc) == RPAREN));
 	}
 
 	DOT = MK;
@@ -880,7 +903,7 @@ int ind;
 	register int i;
 
 	/* first clean up existing leading whitespace */
-	DOT.o = 0;
+	DOT.o = w_left_margin(curwp);
 	i = firstchar(l_ref(DOT.l));
 	if (i > 0)
 		(void)ldelete((long)i,FALSE);
@@ -935,7 +958,7 @@ int c;	/* brace to insert (always { for now) */
 	/* wouldn't want to back up from here, but fences might take us
 		forward */
 	/* if we are at the beginning of the line, no go */
-	if (DOT.o == 0)
+	if (DOT.o <= w_left_margin(curwp))
 		return(linsert(n,c));
 #endif
 
@@ -961,11 +984,11 @@ inspound()	/* insert a # into the text here...we are in CMODE */
 {
 
 	/* if we are at the beginning of the line, no go */
-	if (DOT.o == 0)
+	if (DOT.o <= w_left_margin(curwp))
 		return(linsert(1,'#'));
 
 	if (autoindented > 0) { /* must all be whitespace before us */
-		DOT.o = 0;
+		DOT.o = w_left_margin(curwp);
 		(void)ldelete((long)autoindented,FALSE);
 	}
 	autoindented = -1;
@@ -999,7 +1022,7 @@ int f,n;
 	int s;
 	int fc;
 	fc = firstchar(l_ref(DOT.l));
-	if (fc >= 0 && fc < DOT.o) {
+	if (fc >= w_left_margin(curwp) && fc < DOT.o) {
 		s = linsert(curswval, ' ');
 		/* should entab mult ^T inserts */
 		return s;

@@ -424,17 +424,11 @@ above).
   equal to llength(DOT), i.e.  it's the whole line.  (we'll need to take
   the $ off the end of the comment regexp).  ]
 
-
---------------------
-	When I do a ^R or ^W would you be able to make it so that when
-	somebody pressed the tab key that it will complete the file name?
-	(i.e. want filename completion on ^W and ^R)
 --------------------
 
-	Also it might be worth looking at doing the same thing for tags so
-	that if i started looking up tags and pressed the tab key it would
+	(wibni) if i started looking up tags and pressed the tab key it should
 	complete the line.
-	(tag completion -- good idea.)
+	(tag completion -- good idea -- requires a buffer as in filec.c)
 
 --------------------
 	When you use the command line and you do a !<command>
@@ -517,6 +511,7 @@ everything goes seemingly back to normal. If I insert the ^L on any but
 the 1st row there is no problem. Weird eh! vile 3.55 did not have this
 problem.
 
+[ cannot duplicate this on SunOs 4.1.3 ]
 
 -------------------------------------------------------------------------
 
@@ -533,28 +528,6 @@ works fine, except that the process is in the foreground.
 
 -------------------------------------------------------------------------
 
-I just did a :.,+s/User/Sys/g in xvile and it said 3 changes
-on 2 lines, sat for a while, then dumped core.  Here's the stack trace for
-what it's worth (happened on Pyramid SVR3).  The death in malloc indicates
-heap corruption.
-
-_kill(2FF9,6,0,C00CD608,C00CD60C,C00CD610,C00CD614,C00CB107,C00CD61C,C00CD620,C00CD624,C00CD628) from 50898
-_abort(0,58DC4,58960,C00CB6EB,0,0,1,14F3D8,C00CD59C,C00CD5A0,C00CD5A4,C00CD5A8)from 48800
-_imdying(A,1,C00CD554,200341,1AFF4,C00CD500,79F08,1,0,C00CD520,C00CD524,C00CD528) from 1b1c0
-?(E,6961676E,B5644,C00CB038,2DF,9B49F,0,6961676E,C00CD49C,C00CD4A0,C00CD4A4,FF1962EC) from c00cc000
-_malloc(10,5E3C0,1,C00CB0D8,8,1,6DAB0,0,C00CD41C,C00CD420,C00CD424,FF1962EC) from 50920
-_lalloc(F,B5F80,FFFFFFF5,59DF0,73,20,C00CAFE0,0,0,21C,C00CD3A4,FF1962EC) from 23ad0
-_add_line_at(B5F80,1528D0,6C460,F,20,0,A794,55B40,C00CD31C,C00CD320,C00CD324,C00CD328) from cac8
-_addline(B5F80,6C460,F,C00CD2F8,C00CD2D4,B5644,968B4,0,C00CD29C,C00CD2A0,C00CD2A4,FF1962EC) from ca64
-_hst_flush(1,1,1,1F4,10,1,0,3A,69,C00CD220,C00CD224,FF1962EC) from 1eb84
-_namedcmd(1,1,1556C,14F3C0,0,9,0,48,C00CD19C,C00CD1A0,C00CD1A4,FF1962EC) from 15594
-_execute(55A90,0,1,C00CD108,C00CD10C,C00CD110,0,B5644,C00CD11C,C00CD120,C00CD124,C00CD128) from 15e14
-_loop(1,0,0,20,0,C00CD080,0,0,0,0,0,0) from cf0
-_main(5,C00CB44C,C00CB464) from ba0
-
-
-
------------------------------
 apply Alistair's min/max regexp patch
 
 -------------------------------------------------------------------------
@@ -572,37 +545,12 @@ xterm.  If I tell Vile to compile using ANSI instead of termcap it works
 but it doesn't seem to recognize any of my termcap variables (which means
 it doesn't get the right screen size or exits with incorrect colors).
 
-	Thanks for any help.
 -------------------------------------------------------------------------
 
-shell commands aren't redisplayed with ' ' anymore, only '\r'.
-(i think because the space doesn't do the command completion that it used
-to do?)
+When vile saves files before it dies, it puts them in /tmp on the
+machine where you are editing.  In a networked environment, a person
+may be editing files on several different machines and so it would be
+convenient if the e-mail message stated which machine's /tmp contains
+the saved files.
 
--------------------------------------------------------------------------
-the :s/pat/repl/ command prompts for "Specify line-count"
-
--------------------------------------------------------------------------
-c<sp> on last character of a line no longer works.  why did you need to
-introduce "forwchar_on_line()"?
-
--------------------------------------------------------------------------
-register naming is broken for "1, "2 etc seem to reference "8, "9 instead.
-
--------------------------------------------------------------------------
-buffer naming for piped commands is weird: for examle, a second "!co args"
-becomes "!co-1 args args"  (the -1, -2 etc. seem to get stuck in the wrong
-place?  or else the buffer name's too long to begin with.  this is no doubt
-a result of the non-null-termination.  can you tell me again (i've forgotten)
-why we couldn't just fix the couple of places where the bufn wasn't terminated?
-
--------------------------------------------------------------------------
-if i filter a region, i get a "deleted" report for all the lines that were
-deleted.  it's a little unnerving, esp. since undo/redo then get it right
-
--------------------------------------------------------------------------
-[from a user]
-Is there perhaps a bug in is_at_end_of_line? I noticed that,
-in forwchar_to_eol it never reports true, even when it should.
-Is it considering the newline to be at eol, when in fact the
-newline is at eol+1?
+-----------------------------

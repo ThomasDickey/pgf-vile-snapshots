@@ -6,7 +6,10 @@
  * framing, are hard.
  *
  * $Log: basic.c,v $
- * Revision 1.58  1993/09/06 16:19:31  pgf
+ * Revision 1.59  1993/09/10 16:06:49  pgf
+ * tom's 3.61 changes
+ *
+ * Revision 1.58  1993/09/06  16:19:31  pgf
  * eliminated infinite loop in gotobosent()
  *
  * Revision 1.57  1993/09/03  09:11:54  pgf
@@ -315,7 +318,7 @@ register int	n;
 		return forwchar_to_eol(f, -n);
 	while (n--) {
 		if (DOT.o == w_left_margin(curwp))
-			return FALSE;
+			return doingopcmd;
 		else
 			DOT.o--;
 	}
@@ -372,9 +375,13 @@ register int	n;
 }
 
 /*
- * Implements a vi "l"-like motion for internal use.  The end-of-line test is
- * off-by-one from the true "l" command to allow for substitutions at the end
- * of a line.
+ * Implements the vi "l" command.
+ *
+ * Move the cursor forwards by "n" characters. Don't go past end-of-line
+ *
+ * If the flag 'doingopcmd' is set, implements a vi "l"-like motion for
+ * internal use.  The end-of-line test is off-by-one from the true "l" command
+ * to allow for substitutions at the end of a line.
  */
 int
 forwchar_to_eol(f, n)
@@ -385,36 +392,13 @@ register int	n;
 	if (n < 0)
 		return backchar_to_bol(f, -n);
 	while (n--) {
-		if (is_at_end_of_line(DOT))
-			return FALSE;
+		if ((DOT.o + !doingopcmd) >= lLength(DOT.l) + (insertmode != 0))
+			return doingopcmd;
 		else
 			DOT.o++;
 	}
 	return TRUE;
 }
-
-/*
- * Implements the vi "l" command.
- *
- * Move the cursor forwards by "n" characters. Don't go past end-of-line
- */
-int
-forwchar_in_line(f, n)
-int f;
-register int	n;
-{
-	if (f == FALSE) n = 1;
-	if (n < 0)
-		return backchar_to_bol(f, -n);
-	while (n--) {
-		if (DOT.o+1 >= lLength(DOT.l))
-			return FALSE;
-		else
-			DOT.o++;
-	}
-	return TRUE;
-}
-
 
 /*
  * Implements the vi "G" command.
@@ -1397,7 +1381,7 @@ swapmark()
 	return;
 }
 
-#if X11 || OPT_XTERM
+#if OPT_MOUSE
 /*
  * Given row & column from the screen, set the MK value.
  * Note that the resulting position may be past the end-of-buffer.
@@ -1449,12 +1433,23 @@ setcursor (row, col)
 int	row;
 int	col;
 {
-	register WINDOW *wp0;
+	register WINDOW *wp0 = curwp;
+	register WINDOW *wp1;
 
-	if ((wp0 = row2window(row)) != 0
-	 && set_curwp(wp0)
-	 && setwmark(row, col))
+	if ((wp1 = row2window(row)) != 0
+	 && set_curwp(wp1)
+	 && setwmark(row, col)) {
+		if (insertmode != FALSE
+		 && b_val(wp1->w_bufp, MDVIEW)
+		 && b_val(wp1->w_bufp, MDSHOWMODE)) {
+			if (b_val(wp0->w_bufp, MDSHOWMODE))
+				wp0->w_flag |= WFMODE;
+			if (b_val(wp1->w_bufp, MDSHOWMODE))
+				wp1->w_flag |= WFMODE;
+			insertmode = FALSE;
+		}
 		return gomark(FALSE,1);
+	}
 
 	return FALSE;
 }

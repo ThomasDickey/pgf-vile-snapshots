@@ -8,7 +8,10 @@
  *		editing.
  *
  * $Log: tbuff.c,v $
- * Revision 1.9  1993/07/27 18:06:20  pgf
+ * Revision 1.10  1993/09/10 16:06:49  pgf
+ * tom's 3.61 changes
+ *
+ * Revision 1.9  1993/07/27  18:06:20  pgf
  * see tom's 3.56 CHANGES entry
  *
  * Revision 1.8  1993/04/08  09:49:08  pgf
@@ -105,7 +108,7 @@ void	tb_leaks()
  */
 TBUFF *	tb_alloc(p, n)
 	TBUFF	**p;
-	UINT	n;
+	ALLOC_T	n;
 {
 	register TBUFF *q = *p;
 	if (q == 0) {
@@ -159,7 +162,7 @@ void	tb_free(p)
  */
 TBUFF *	tb_put(p, n, c)
 	TBUFF	**p;
-	UINT	n;
+	ALLOC_T	n;
 	int	c;
 {
 	register TBUFF *q;
@@ -192,7 +195,7 @@ TBUFF *	tb_append(p, c)
 	int	c;
 {
 	register TBUFF *q = *p;
-	register UINT	n = (q != 0) ? q->tb_used : 0;
+	register ALLOC_T n = (q != 0) ? q->tb_used : 0;
 	
 	return tb_put(p, n, c);
 }
@@ -220,7 +223,7 @@ TBUFF *	tb_copy(d, s)
 TBUFF *	tb_bappend(p, s, len)
 	TBUFF	**p;
 	char	*s;
-	unsigned len;
+	ALLOC_T len;
 {
 	while ((len-- != 0) && tb_append(p, (int)(*s++)) != 0)
 		;
@@ -235,7 +238,7 @@ TBUFF *	tb_sappend(p, s)
 {
 	if (!s)
 		s = "";
-	return tb_bappend(p, s, (unsigned)strlen(s));
+	return tb_bappend(p, s, (ALLOC_T)strlen(s));
 }
 
 /*
@@ -257,7 +260,7 @@ TBUFF *	tb_scopy(p, s)
  */
 int	tb_get(p, n)
 	TBUFF	*p;
-	UINT	n;
+	ALLOC_T	n;
 {
 	register int	c = abortc;
 
@@ -336,7 +339,7 @@ char *	tb_values(p)
 /*
  * returns the length of the data
  */
-unsigned tb_length(p)
+ALLOC_T tb_length(p)
 	TBUFF	*p;
 {
 	return (p != 0) ? p->tb_used : 0;

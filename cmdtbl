@@ -72,7 +72,10 @@
 #		here for completeness.
 #
 # $Log: cmdtbl,v $
-# Revision 1.73  1993/09/06 16:22:28  pgf
+# Revision 1.74  1993/09/10 16:06:49  pgf
+# tom's 3.61 changes
+#
+# Revision 1.73  1993/09/06  16:22:28  pgf
 # added "stop" command
 #
 # Revision 1.72  1993/09/03  09:11:54  pgf
@@ -652,9 +655,6 @@ forwchar	MOTION
 forwchar_to_eol	MOTION
 	"forward-character-to-eol"	!FEWNAMES
 	"next-character-to-eol"		!FEWNAMES
-forwchar_in_line MOTION
-	"forward-character-in-line"	!FEWNAMES
-	"next-character-in-line"	!FEWNAMES
 	' '
 	'l'
 	'FN-C'				ANSI_SPEC
@@ -847,11 +847,11 @@ listbuffers	NONE
 	'^A-*'
 showhistory	NONE			OPT_HISTORY
 	"show-history"
-lineputafter	REDO|UNDO|GLOBOK|(FROM|ZERO|WORD1)
+lineputafter	REDO|UNDO|GLOBOK|(FROM|ZERO|OPTREG)
 	"put-as-lines-after"		!FEWNAMES
 	"put"
 	'^X-p'
-lineputbefore	REDO|UNDO|GLOBOK|(FROM|WORD1)
+lineputbefore	REDO|UNDO|GLOBOK|(FROM|OPTREG)
 	"put-as-lines-before"		!FEWNAMES
 	"Put"
 	'^X-P'
@@ -947,7 +947,7 @@ operdel		OPER|REDO|UNDO
 operjoin	OPER|REDO|UNDO|GLOBOK|RANGE
 	"j"
 	"join-lines-til"		!FEWNAMES
-operlinedel	OPER|REDO|UNDO|GLOBOK|(RANGE|WORD1)
+operlinedel	OPER|REDO|UNDO|GLOBOK|(RANGE|OPTREG)
 	"delete-lines-til"		!FEWNAMES
 	"d"
 	'^X-d'
@@ -1003,7 +1003,7 @@ opertrim	REDO|UNDO|GLOBOK|UNDO|(RANGE)	AEDIT
 operyank	OPER
 	"yank-til"			!FEWNAMES
 	'y'
-operlineyank	OPER|(RANGE|WORD1|NOMOVE)
+operlineyank	OPER|(RANGE|OPTREG|NOMOVE)
 	"yank-lines-til"		!FEWNAMES
 	"y"
 	'^X-y'

@@ -3,7 +3,11 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: globals.c,v $
- * Revision 1.22  1993/07/27 18:06:20  pgf
+ * Revision 1.23  1993/09/16 10:57:54  pgf
+ * used set_curwp() instead of swbuffer() to restore our window after
+ * globber executes a command on the current line
+ *
+ * Revision 1.22  1993/07/27  18:06:20  pgf
  * see tom's 3.56 CHANGES entry
  *
  * Revision 1.21  1993/07/01  16:15:54  pgf
@@ -189,7 +193,7 @@ int f, n, g_or_v;
 				wp->w_dot.o = 0;
 				s = (cfp->c_func)(FALSE, 1);
 				/* function may have switched on us */
-				swbuffer(wp->w_bufp);
+				set_curwp(wp);
 				lp = l_ref(wp->w_dot.l);
 				havemotion = NULL;
 				calledbefore = TRUE;

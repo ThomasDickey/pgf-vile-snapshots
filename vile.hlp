@@ -584,16 +584,17 @@ Editor modes
 		will cause all visible buffers (those currently in windows)
 		to have their times checked immediately.
 
-	cmode	C-code mode..  Maintains current indentation level
-		automatically during insert, like autoindent, above.  If a
-		line ends with a '{' or a ':', then the next line indents
-		further.  If a line begins with a '}', it is lined up with
-		the line containing its matching paired brace.  If a line
-		starts with '#' it is moved to column 1.  If the global
-		cmode is set, then the buffer's C mode is turned on
-		automatically only for files ending in a character from
-		c-suffixes.  Additionally, if a line begins with a '#'
-		character, it will not shift right with the '>>' command. (B)
+	cmode   C-code mode.  Also useful for other languages.  Maintains
+		current indentation level automatically during insert, like
+		autoindent, above.  If a line ends with a '{', '(', or ':',
+		then the next line indents further.  If a line begins with
+		a '}' or ')', it is lined up with the line containing the
+		matching '{' or '('.  If a line starts with '#' it is moved
+		to column 1.  If the global cmode is set, then the buffer's
+		C mode is turned on automatically only for files ending in
+		a character from c-suffixes.  Additionally, if a line
+		begins with a '#' character, it will not shift right with
+		the '>>' command.  (B)
 
 	crypt	Causes files to be encrypted.  This is NOT compatible
 		with the UNIX crypt(1) routines. (B)
@@ -646,6 +647,9 @@ Editor modes
 
 	expand-path Controls whether %/# are expanded to the full pathname
 		of a buffer. (U)
+
+	flash	If your terminal can, flashes the screen rather than beeping on
+		errors.  (U)
 
 	glob	Controls how wildcard characters (e.g., '*' and '?') are
 		treated in prompts for filenames.  Set glob to 'off' to

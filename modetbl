@@ -12,7 +12,10 @@
 # The modes are table entries in the BUFFER and WINDOW structures.
 #
 # $Log: modetbl,v $
-# Revision 1.22  1993/09/06 16:31:19  pgf
+# Revision 1.23  1993/09/10 16:06:49  pgf
+# tom's 3.61 changes
+#
+# Revision 1.22  1993/09/06  16:31:19  pgf
 # added multibeep mode
 #
 # Revision 1.21  1993/09/03  09:11:54  pgf
@@ -87,10 +90,11 @@
 .globals
 bool								# GMD prefix
 	"AutoBuffer"	ABUFF 		0			# auto-buffer (lru)
-	"dirc"		DIRC		0			# directory-completion (slow!)
+	"dirc"		DIRC		0		COMPLETE_DIRS # directory-completion (slow!)
 	"Alt-TabPos"	ALTTABPOS	0			# emacs-style cursor positioning
 	"expand-path"	EXPAND_PATH	0			# true iff %/# don't substitute shortened-path
-	"HIstory"	HISTORY		0			# command-history
+	"flash"		FLASH		0		OPT_FLASH # visible-bell (flash)
+	"HIstory"	HISTORY		0		OPT_HISTORY # command-history
 	"ImplyBuffer"	IMPLYBUFF 	0			# imply-buffer (vi-like)
 	"multibeep"	MULTIBEEP	0			# multiple successive identical failed motions all beep
 	"Popup-Choices"	POPUP_FILEC	0		NOTYET	# popup buffer showing file-completion choices
@@ -149,7 +153,7 @@ regex								# VAL_ prefix
 .windows
 bool								# WMD prefix
 	"LIst"		LIST		WFHARD			# "list" mode -- show tabs and EOL
-	"NUmber"	NUMBER		WFMODE|WFHARD		# line-numbers shown
+	"NUmber"	NUMBER		WFSTAT|WFHARD		# line-numbers shown
 	"HorizScroll"	HORSCROLL	0			# scroll whole screen
 	"LineWrap"	LINEWRAP	WFHARD		!SMALLER # wrap lines wider than screen
 	"ruler"		RULER		WFSTAT		!SMALLER # display line+col in modeline

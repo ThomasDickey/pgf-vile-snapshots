@@ -3,7 +3,7 @@
 .AUTODEPEND
 
 #		*Translator Definitions*
-CC = tcc +MKTBLS.CFG
+CC = tcc +vile.cfg
 TASM = TASM
 TLIB = tlib
 TLINK = tlink
@@ -11,19 +11,21 @@ LIBPATH = C:\TC\LIB
 INCLUDEPATH = C:\TC\INCLUDE
 
 THIS = makefile.tbc
+MKTBLS = .\mktbls.exe
+TARGET = vile.exe
 
 BUILTHDRS = nebind.h nefunc.h nemode.h nename.h nevars.h
 
-all:	vile.exe
+all:	$(TARGET)
 
 clean:
-	del *.obj
-	del *.cfg
-	del *.bak
-	del ne*.h
+	-del *.obj
+	-del *.cfg
+	-del *.bak
+	-del ne*.h
 
 clobber:	clean
-	del vile.exe
+	-del $(TARGET)
 
 #		*Implicit Rules*
 .c.obj:
@@ -39,54 +41,20 @@ MKTBLS_DEPS =  \
  mktbls.obj
 
 #		*Explicit Rules*
-mktbls.exe: mktbls.cfg $(MKTBLS_DEPS)
+$(MKTBLS): vile.cfg $(MKTBLS_DEPS)
   $(TLINK) /v/x/c/L$(LIBPATH) @&&|
-c0c.obj+
+c0l.obj+
 mktbls.obj
 mktbls
 		# no map file
 emu.lib+
-mathc.lib+
-cc.lib
+mathl.lib+
+cl.lib
 |
 
 
 #		*Individual File Dependencies*
-mktbls.obj: mktbls.cfg mktbls.c 
-
-#		*Compiler Configuration File*
-mktbls.cfg: $(THIS)
-  copy &&|
--mc
--v
--vi-
--w-ret
--w-nci
--w-inl
--wpin
--w-par
--wasm
--wcln
--w-cpt
--wdef
--w-dup
--w-pia
--wsig
--wnod
--w-ill
--w-sus
--wstv
--wucp
--wuse
--w-ext
--w-ias
--w-ibc
--w-pre
--w-nst
--I$(INCLUDEPATH)
--L$(LIBPATH)
-| mktbls.cfg
-
+mktbls.obj: vile.cfg mktbls.c 
 
 
 VILE_DEPS =  \
@@ -111,6 +79,7 @@ VILE_DEPS =  \
  insert.obj \
  isearch.obj \
  line.obj \
+ map.obj \
  modes.obj \
  npopen.obj \
  oneliner.obj \
@@ -135,7 +104,8 @@ VILE_DEPS =  \
  ibmpc.obj
 
 #		*Explicit Rules*
-vile.exe: vile.cfg $(VILE_DEPS)
+$(TARGET): vile.cfg $(VILE_DEPS)
+  $(CC) -c version.c
   $(TLINK) /v/x/c/L$(LIBPATH) @&&|
 c0l.obj+
 basic.obj+
@@ -159,6 +129,7 @@ input.obj+
 insert.obj+
 isearch.obj+
 line.obj+
+map.obj+
 modes.obj+
 npopen.obj+
 oneliner.obj+
@@ -190,112 +161,148 @@ cl.lib
 
 
 #		*Individual File Dependencies*
-basic.obj: vile.cfg basic.c 
+VILE_CFG=	vile.cfg estruct.h nemode.h edef.h proto.h
 
-bind.obj: vile.cfg bind.c 
+basic.obj:	$(VILE_CFG) basic.c 
 
-buffer.obj: vile.cfg buffer.c 
+bind.obj:	$(VILE_CFG) bind.c	epath.h
 
-crypt.obj: vile.cfg crypt.c 
+buffer.obj:	$(VILE_CFG) buffer.c 
 
-csrch.obj: vile.cfg csrch.c 
+crypt.obj:	$(VILE_CFG) crypt.c 
 
-display.obj: vile.cfg display.c 
+csrch.obj:	$(VILE_CFG) csrch.c 
 
-eval.obj: vile.cfg eval.c 
+display.obj:	$(VILE_CFG) display.c 
 
-exec.obj: vile.cfg exec.c 
+eval.obj:	$(VILE_CFG) eval.c	glob.h nevars.h
 
-externs.obj: vile.cfg externs.c 
+exec.obj:	$(VILE_CFG) exec.c 
 
-fences.obj: vile.cfg fences.c 
+externs.obj:	$(VILE_CFG) externs.c	nebind.h nename.h nefunc.h
 
-file.obj: vile.cfg file.c 
+fences.obj:	$(VILE_CFG) fences.c 
 
-filec.obj: vile.cfg filec.c 
+file.obj:	$(VILE_CFG) file.c 
 
-fileio.obj: vile.cfg fileio.c 
+filec.obj:	$(VILE_CFG) filec.c	dirstuff.h
 
-finderr.obj: vile.cfg finderr.c 
+fileio.obj:	$(VILE_CFG) fileio.c 
 
-glob.obj: vile.cfg glob.c 
+finderr.obj:	$(VILE_CFG) finderr.c 
 
-globals.obj: vile.cfg globals.c 
+glob.obj:	$(VILE_CFG) glob.c	dirstuff.h glob.h
 
-history.obj: vile.cfg history.c 
+globals.obj:	$(VILE_CFG) globals.c 
 
-input.obj: vile.cfg input.c 
+history.obj:	$(VILE_CFG) history.c 
 
-insert.obj: vile.cfg insert.c 
+input.obj:	$(VILE_CFG) input.c 
 
-isearch.obj: vile.cfg isearch.c 
+insert.obj:	$(VILE_CFG) insert.c 
 
-line.obj: vile.cfg line.c 
+isearch.obj:	$(VILE_CFG) isearch.c 
 
-modes.obj: vile.cfg modes.c 
+line.obj:	$(VILE_CFG) line.c 
 
-npopen.obj: vile.cfg npopen.c 
+map.obj:	$(VILE_CFG) map.c 
 
-oneliner.obj: vile.cfg oneliner.c 
+modes.obj:	$(VILE_CFG) modes.c 
 
-opers.obj: vile.cfg opers.c 
+npopen.obj:	$(VILE_CFG) npopen.c 
 
-path.obj: vile.cfg path.c 
+oneliner.obj:	$(VILE_CFG) oneliner.c 
 
-random.obj: vile.cfg random.c 
+opers.obj:	$(VILE_CFG) opers.c 
 
-regexp.obj: vile.cfg regexp.c 
+path.obj:	$(VILE_CFG) path.c	dirstuff.h
 
-region.obj: vile.cfg region.c 
+random.obj:	$(VILE_CFG) random.c	glob.h
 
-search.obj: vile.cfg search.c 
+regexp.obj:	$(VILE_CFG) regexp.c 
 
-spawn.obj: vile.cfg spawn.c 
+region.obj:	$(VILE_CFG) region.c 
 
-tags.obj: vile.cfg tags.c 
+search.obj:	$(VILE_CFG) search.c 
 
-tbuff.obj: vile.cfg tbuff.c 
+spawn.obj:	$(VILE_CFG) spawn.c 
 
-termio.obj: vile.cfg termio.c 
+tags.obj:	$(VILE_CFG) tags.c 
 
-tmp.obj: vile.cfg tmp.c 
+tbuff.obj:	$(VILE_CFG) tbuff.c 
 
-undo.obj: vile.cfg undo.c 
+termio.obj:	$(VILE_CFG) termio.c 
 
-version.obj: vile.cfg version.c 
+tmp.obj:	$(VILE_CFG) tmp.c 
 
-vmalloc.obj: vile.cfg vmalloc.c 
+undo.obj:	$(VILE_CFG) undo.c 
 
-window.obj: vile.cfg window.c 
+version.obj:	$(VILE_CFG) version.c 
 
-word.obj: vile.cfg word.c 
+vmalloc.obj:	$(VILE_CFG) vmalloc.c	nevars.h
 
-wordmov.obj: vile.cfg wordmov.c 
+window.obj:	$(VILE_CFG) window.c 
 
-main.obj: vile.cfg main.c 
+word.obj:	$(VILE_CFG) word.c 
 
-ibmpc.obj: vile.cfg ibmpc.c 
+wordmov.obj:	$(VILE_CFG) wordmov.c 
+
+main.obj:	$(VILE_CFG) main.c	nevars.h glob.h
+
+ibmpc.obj:	$(VILE_CFG) ibmpc.c 
+
+nebind.h \
+nefunc.h \
+nename.h :	cmdtbl $(MKTBLS)
+	@echo making $@
+	$(MKTBLS) cmdtbl
+
+nevars.h \
+nemode.h:	modetbl $(MKTBLS)
+	@echo making $@
+	$(MKTBLS) modetbl
 
 #		*Compiler Configuration File*
-vile.cfg: mktbls.exe cmdtbl modetbl $(THIS)
-  ./mktbls cmdtbl
-  ./mktbls modetbl
+# Except for unused-parameters, this turns on all applicable warning messages.
+vile.cfg: $(THIS)
   copy &&|
 -ml
 -v
 -vi-
--w-ret
+-wamb
+-wamp
+-wasm
+-waus
+-wbbf
+-wbig
+-wccc
+-wcln
+-wcpt
+-wdef
+-wdpu
+-wdup
+-weas
+-weff
+-wext
+-will
+-wnod
+-w-par
+-wpia
+-wpin
+-wpro
+-wrch
+-wret
+-wrvl
+-wsig
+-wstu
+-wstv
+-wsus
+-wucp
+-wuse
+-wvoi
+-wzdi
 -w-nci
 -w-inl
--wasm
--w-cpt
--w-dup
--w-pia
--w-ill
--w-sus
--wstv
--w-ext
--w-ias
 -w-ibc
 -w-pre
 -w-nst
@@ -303,4 +310,7 @@ vile.cfg: mktbls.exe cmdtbl modetbl $(THIS)
 -L$(LIBPATH)
 | vile.cfg
 
-
+# $Log: makefile.tbc,v $
+# Revision 1.2  1993/09/10 16:06:49  pgf
+# tom's 3.61 changes
+#

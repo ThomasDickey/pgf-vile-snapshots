@@ -5,7 +5,10 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.77  1993/09/06 16:32:48  pgf
+ * Revision 1.78  1993/09/10 16:06:49  pgf
+ * tom's 3.61 changes
+ *
+ * Revision 1.77  1993/09/06  16:32:48  pgf
  * added entries for glob.c
  *
  * Revision 1.76  1993/09/03  09:11:54  pgf
@@ -311,7 +314,6 @@ extern int backchar_to_bol P(( int, int ));
 extern int gotoeol P(( int, int ));
 extern int forwchar P(( int, int ));
 extern int forwchar_to_eol P(( int, int ));
-extern int forwchar_in_line P(( int, int ));
 extern int gotoline P(( int, int ));
 extern int gotobob P(( int, int ));
 extern int gotoeob P(( int, int ));
@@ -352,7 +354,7 @@ extern int setmark P(( void ));
 extern int gomark P(( int, int ));
 extern int godotplus P(( int, int ));
 extern void swapmark P(( void ));
-#if X11 || OPT_XTERM
+#if OPT_MOUSE
 extern	int setwmark P(( int, int ));
 extern	int setcursor P(( int, int ));
 #endif
@@ -463,7 +465,6 @@ extern int rep_csrch P(( int, int ));
 extern int rev_csrch P(( int, int ));
 
 /* display.c */
-extern int nu_mode P(( WINDOW * ));
 extern int nu_width P(( WINDOW * ));
 extern int col_limit P(( WINDOW * ));
 extern void vtinit P(( void ));
@@ -483,7 +484,7 @@ extern void reframe P(( WINDOW * ));
 extern int update P(( int ));
 extern void upmode P(( void ));
 extern int offs2col P(( WINDOW *, LINEPTR, C_NUM ));
-#if X11 || OPT_XTERM
+#if OPT_MOUSE
 extern int col2offs P(( WINDOW *, LINEPTR, C_NUM ));
 #endif
 #ifdef WMDLINEWRAP
@@ -491,7 +492,7 @@ extern int line_height P(( WINDOW *, LINEPTR ));
 #else
 #define line_height(wp,lp) 1
 #endif
-#if defined(WMDLINEWRAP) || X11
+#if defined(WMDLINEWRAP) || OPT_MOUSE
 extern WINDOW *row2window P(( int ));
 #endif
 extern void hilite P((int, int, int, int));
@@ -677,16 +678,7 @@ extern void putdotback P(( BUFFER *, LINE * ));
 extern int finderrbuf P(( int, int ));
 #endif
 
-/* glob.c */
-extern char ** glob_expand P(( char ** ));
-extern char ** glob_string P(( char * ));
-extern int glob_length P(( char ** ));
-extern char ** glob_free P(( char ** ));
-extern int doglob P(( char * ));
-#if !UNIX
-extern void expand_wild_args P(( int *, char *** ));
-extern int glob_needed P(( char	** ));
-#endif
+/* glob.c (see glob.h) */
 
 /* globals.c */
 extern int globals P(( int, int ));
@@ -808,6 +800,7 @@ extern void kdone P(( void ));
 extern int kinsert P(( int ));
 extern int index2reg P(( int ));
 extern int reg2index P(( int ));
+extern int index2ukb P(( int ));
 extern int usekreg P(( int, int ));
 extern void kregcirculate P(( int ));
 extern int putbefore P(( int, int ));
@@ -1167,16 +1160,16 @@ extern int comment_fence P(( int ));
 extern int simple_fence P(( int, int, int ));
 
 /* tbuff.c */
-TBUFF *	tb_alloc P(( TBUFF **, unsigned ));
+TBUFF *	tb_alloc P(( TBUFF **, ALLOC_T ));
 TBUFF *	tb_init P(( TBUFF **, int ));
 void	tb_free P(( TBUFF ** ));
-TBUFF *	tb_put P(( TBUFF **, unsigned, int ));
+TBUFF *	tb_put P(( TBUFF **, ALLOC_T, int ));
 void	tb_stuff P(( TBUFF *, int ));
-int	tb_get P(( TBUFF *, unsigned ));
+int	tb_get P(( TBUFF *, ALLOC_T ));
 void	tb_unput P(( TBUFF * ));
 TBUFF *	tb_append P(( TBUFF **, int ));
 TBUFF *	tb_copy P(( TBUFF **, TBUFF * ));
-TBUFF *	tb_bappend P(( TBUFF **, char *, unsigned ));
+TBUFF *	tb_bappend P(( TBUFF **, char *, ALLOC_T ));
 TBUFF *	tb_sappend P(( TBUFF **, char * ));
 TBUFF *	tb_scopy P(( TBUFF **, char * ));
 void	tb_first P(( TBUFF * ));
@@ -1184,7 +1177,7 @@ int	tb_more P(( TBUFF * ));
 int	tb_next P(( TBUFF * ));
 int	tb_peek P(( TBUFF * ));
 char *	tb_values P(( TBUFF * ));
-unsigned tb_length P(( TBUFF * ));
+ALLOC_T	tb_length P(( TBUFF * ));
 
 /* tmp.c */
 #if OPT_MAP_MEMORY
@@ -1259,6 +1252,10 @@ extern void update_dos_drv_dir P(( char * ));
      extern int dos_crit_handler P(( unsigned, unsigned, unsigned *));
 # else
      extern void dos_crit_handler P(( void ));
+# endif
+# if OPT_MS_MOUSE
+     extern int ms_exists P(( void ));
+     extern void ms_processing P(( void ));
 # endif
 #endif
 

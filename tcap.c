@@ -2,7 +2,16 @@
  *		for MicroEMACS
  *
  * $Log: tcap.c,v $
- * Revision 1.26  1993/08/21 18:21:08  pgf
+ * Revision 1.29  1993/09/16 11:17:43  pgf
+ * added missing args to showcpos
+ *
+ * Revision 1.28  1993/09/16  10:58:20  pgf
+ * xterm mouse motions now cause a call to showcpos()
+ *
+ * Revision 1.27  1993/09/10  16:06:49  pgf
+ * tom's 3.61 changes
+ *
+ * Revision 1.26  1993/08/21  18:21:08  pgf
  * protect against window sizes less than 2, and fix botch that always
  * set i_am_xterm to TRUE
  *
@@ -110,6 +119,10 @@ char *TI, *TE, *KS, *KE;
 
 #if	SCROLLCODE
 char *CS, *dl, *al, *DL, *AL, *SF, *SR;
+#endif
+
+#if OPT_FLASH
+char *vb;	/* visible-bell */
 #endif
 
 extern char *tgoto P((char *, int, int));
@@ -275,6 +288,9 @@ tcapopen()
 	} else {
 		term.t_scroll = NULL;
 	}
+#endif
+#if OPT_FLASH
+	vb = tgetstr("vb", &p);
 #endif
 	        
 	if (p >= &tcapbuf[TCAPSLEN])
@@ -470,6 +486,12 @@ tcapbcol()	/* no colors here, ignore this */
 void
 tcapbeep()
 {
+#if OPT_FLASH
+	if (global_g_val(GMDFLASH)
+	 && vb != NULL) {
+		putpad(vb);
+	} else
+#endif
 	ttputc(BEL);
 }
 
@@ -585,6 +607,7 @@ int	c;
 			 && button == 1
 			 && ttrow != term.t_nrow
 			 && setcursor(y-1, x-1)) {
+				showcpos(FALSE,1);
 				(void)update(TRUE);
 			} else if (button <= 3) {
 #if OPT_XTERM >= 3
@@ -605,6 +628,7 @@ int	c;
 			yankregion();
 
 			movecursor(save_row, save_col);
+			mlerase();
 			(void)update(TRUE);
 			break;
 		case 'T':	/* reports invalid text-location */
@@ -636,6 +660,7 @@ int	c;
 
 			DOT = save_dot;
 			movecursor(save_row, save_col);
+			mlerase();
 			(void)update(TRUE);
 			break;
 #endif /* OPT_XTERM >= 3 */

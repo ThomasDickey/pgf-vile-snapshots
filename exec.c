@@ -4,7 +4,10 @@
  *	written 1986 by Daniel Lawrence
  *
  * $Log: exec.c,v $
- * Revision 1.71  1993/09/06 16:25:18  pgf
+ * Revision 1.72  1993/09/10 16:06:49  pgf
+ * tom's 3.61 changes
+ *
+ * Revision 1.71  1993/09/06  16:25:18  pgf
  * took out leftover dbgwrite() call
  *
  * Revision 1.70  1993/09/03  09:11:54  pgf
@@ -627,14 +630,16 @@ seems like we need one more check here -- is it from a .exrc file?
 	 * line-count is expected only if no "to" address specification was
 	 * given.
 	 */
-	maybe_reg = (*fnp != EOS)
-		&&  ((flags & WORD1) == WORD1)
-		&& !((flags & FILES) == FILES);
-	maybe_num = (*fnp != EOS)
-		&&  ((flags & TO) == TO)
-		&& !((lflag & TO) == TO);
+	if ((*fnp != EOS) && !end_of_cmd() && !ispunct(end_string())) {
+		maybe_reg = ((flags & OPTREG) == OPTREG);
+		maybe_num = ((flags & TO) == TO)
+			&& !((lflag & TO) == TO);
+	} else {
+		maybe_reg =
+		maybe_num = FALSE;
+	}
 
-	if (!end_of_cmd() && (maybe_reg || maybe_num)) {
+	if (maybe_reg || maybe_num) {
 		int	num,
 			this = (maybe_num && maybe_reg)
 				? 0

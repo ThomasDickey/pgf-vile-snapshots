@@ -10,7 +10,10 @@
  * display type.
  *
  * $Log: ibmpc.c,v $
- * Revision 1.23  1993/09/06 16:28:01  pgf
+ * Revision 1.24  1993/09/10 16:06:49  pgf
+ * tom's 3.61 changes
+ *
+ * Revision 1.23  1993/09/06  16:28:01  pgf
  * don't change cursor shape or keyboard rate gratuitously
  * also, attempt to restore old page
  *
@@ -95,7 +98,7 @@
 #define outp(p,v) outportb(p,v)
 #define inp(p) inportb(p)
 #endif
-  
+
 
 #define NROW	50			/* Max Screen size.		*/
 #define NCOL    80			/* Edit if you want to.         */
@@ -138,10 +141,20 @@
 #endif
 
 #define	ColorDisplay()	(dtype != CDMONO && !monochrome)
-#define	AttrColor(b,f)	(((ctrans[b] & 7) << 4) | (ctrans[f] & 15))
+#define	AttrColor(b,f)	(((ctrans[b] & 7) << 4) | ((ctrans[f]|8) & 15))
 #define	Black(n)	((n) ? 0 : 7)
 #define	White(n)	((n) ? 7 : 0)
 #define	AttrMono(f)	(((Black(f) & 7) << 4) | (White(f) & 15))
+
+#if OPT_MS_MOUSE
+	static	void	ms_deinstall P(( void ));
+	static	void	ms_install P(( void ));
+	static	void	ms_movecrsr  P(( int, int ));
+	static	void	ms_showcrsr  P(( void ));
+#else
+# define ms_deinstall()
+# define ms_install()
+#endif
 
 static	int	dtype = -1;		/* current display type		*/
 
@@ -157,6 +170,10 @@ static	int	dtype = -1;		/* current display type		*/
 #define	C8x16	4
 #define	C7x9	8
 #define	C7x16	16
+
+	/* character-size in pixels, for mouse-positioning */
+static	int	char_width  = 8;
+static	int	char_height = 8;
 
 static	struct	{
 	char	*name;
@@ -233,11 +250,11 @@ int	ctrans[] = {		/* ansi to ibm color translation table */
 		0,		/* black	*/
 		4,		/* red		*/
 		2,		/* green	*/
-		14,		/* yellow	*/
+		6,		/* yellow	*/
 		1,		/* blue		*/
 		5,		/* magenta	*/
 		3,		/* cyan		*/
-		15		/* white	*/
+		7		/* white	*/
 	};
 #endif
 #if	SCROLLCODE
@@ -249,6 +266,7 @@ static	void	egaopen   P((void));
 static	int	scinit    P((int));
 static	int	getboard  P((void));
 static	int	scblank   P((void));
+static	VIDEO * videoAlloc P(( VIDEO ** ));
 
 #ifdef MUCK_WITH_KBD_RATE
 static	void	maxkbdrate   P((void));
@@ -313,8 +331,8 @@ maxkbdrate (void)
 {
 	rg.h.ah = 0x3;
 	rg.h.al = 0x5;
-        rg.h.bh = 0x0;
-        rg.h.bl = 0x0;
+	rg.h.bh = 0x0;
+	rg.h.bl = 0x0;
 	INTX86(0x16, &rg, &rg);
 }
 #endif
@@ -479,9 +497,53 @@ char *dummy;
 	/* nothing here now..... */
 }
 
+#if OPT_FLASH
+static int
+index_ctrans(int c)
+{
+	register int n;
+	for (n = 0; n < SIZEOF(ctrans); n++)
+	if (ctrans[n] == c)
+	return n;
+	return 0;
+}
+
+#define	fg_color(attr) index_ctrans((attr >>  8) & 7)
+#define bg_color(attr) index_ctrans((attr >> 12) & 7)
+
+static void
+invert_display(void)
+{
+	static	VIDEO *mine;
+	VIDEO	*vp;
+	USHORT	*lp;	/* pointer to the destination line */
+	int	row, col, nchar;
+
+	for (row = 0; row < term.t_nrow; row++) {
+		vp = scread(videoAlloc(&mine), row);
+		lp = scptr[row];
+		for (col = 0; col < term.t_ncol; col += nchar) {
+			for (nchar = 1; nchar + col < term.t_ncol; nchar++)
+			if ((0xff00 & lp[col])
+			!= (0xff00 & lp[col+nchar]))
+			break;
+			scwrite(row, col, nchar, &vp->v_text[col],
+			bg_color(lp[col]), fg_color(lp[col]));
+		}
+	}
+}
+#endif	/* OPT_FLASH */
+
 void
 ibmbeep()
 {
+#if	OPT_FLASH
+	if (global_g_val(GMDFLASH)) {
+		invert_display();
+		invert_display();
+		return;
+	}
+#endif
 #if	MWC86
 	putcnb(BEL);
 #else
@@ -511,13 +573,13 @@ ibmopen()
 #ifdef PVGA
 	rg.h.ah = 0;
 	rg.h.al = 10;		/* set graphic 640x350 mode */
-	INTX86(0x10,&rg, &rg);	
-	rg.x.ax = 0x007F;      
+	INTX86(0x10,&rg, &rg);
+	rg.x.ax = 0x007F;
 	rg.h.bh = 0x01;		/* set non-VGA mode */
 	INTX86(0x10,&rg, &rg);
 	rg.h.ah = 0x00;
 	rg.h.al = 0x07;		/* set Hercule mode */
-	INTX86(0x10,&rg, &rg);	
+	INTX86(0x10,&rg, &rg);
 	ibmtype = CD_25LINE;
 #endif
 
@@ -527,13 +589,12 @@ ibmopen()
 	ttopen();
 
 #ifdef MUCK_WITH_KBD_RATE
-        maxkbdrate();   /* set the keyboard rate to max */
+	maxkbdrate();   /* set the keyboard rate to max */
 #endif
 }
 
 void
 ibmclose()
-
 {
 	set_display(original_mode);
 	if (original_page != 0)
@@ -546,11 +607,13 @@ ibmclose()
 void
 ibmkopen()	/* open the keyboard */
 {
+	ms_install();
 }
 
 void
 ibmkclose()	/* close the keyboard */
 {
+	ms_deinstall();
 }
 
 static int
@@ -757,6 +820,18 @@ int bacg;	/* background color */
 	}
 }
 
+static VIDEO *
+videoAlloc(vpp)
+VIDEO **vpp;
+{
+	if (*vpp == 0) {
+		*vpp = typeallocplus(VIDEO, term.t_mcol - 4);
+		if (*vpp == NULL)
+		ExitProgram(BAD(1));
+	}
+	return *vpp;
+}
+
 /* reads back a line into a VIDEO struct, used in line-update computation */
 VIDEO *
 scread(vp, row)
@@ -764,15 +839,10 @@ VIDEO *vp;
 int row;
 {
 	register int	i;
-	static	VIDEO	*mine;
 
 	if (vp == 0) {
-		if (mine == 0) {
-			mine = typeallocplus(VIDEO, term.t_mcol - 4);
-			if (mine == NULL)
-			    ExitProgram(BAD(1));
-		}
-		vp = mine;
+		static	VIDEO	*mine;
+		vp = videoAlloc(&mine);
 	}
 	movmem(scptr[row], &sline[0], term.t_ncol*sizeof(short));
 	for (i = 0; i < term.t_ncol; i++)
@@ -827,11 +897,172 @@ int from, to, n;
 
 #if	FLABEL
 fnclabel(f, n)		/* label a function key */
-int f,n;	/* default flag, numeric argument [unused] */
+int f,n;		/* default flag, numeric argument [unused] */
 {
 	/* on machines with no function keys...don't bother */
 	return(TRUE);
 }
 #endif
+
+/*--------------------------------------------------------------------------*/
+
+#if OPT_MS_MOUSE
+/* Define a macro for calling mouse services */
+#define MouseCall INTX86(0x33, &rg, &rg)
+
+#define MS_MOVEMENT     iBIT(0)	/* mouse cursor movement */
+#define MS_BTN1_PRESS   iBIT(1)	/* left button */
+#define MS_BTN1_RELEASE iBIT(2)
+#define MS_BTN2_PRESS   iBIT(3)	/* right button */
+#define MS_BTN2_RELEASE iBIT(4)
+#define MS_BTN3_PRESS   iBIT(5)	/* center button */
+#define MS_BTN3_RELEASE iBIT(6)
+
+/* Define a structure to hold information that the mouse functions */
+/* return and use */
+struct mousedata {
+	int	exists;		/* Greater than 0 if mouse exists */
+	int	cursor_display;	/* 1 if cursor displayed, 0 if hidden */
+	int	btnstatus;	/* Current button status (up or down) */
+	int	btnclicks;	/* Times button has been clicked */
+	int	column;		/* Mouse cursor column position */
+	int	row;		/* Mouse cursor row position */
+	int	hmovement;	/* Horizontal mouse movement */
+	int	vmovement;	/* Vertical mouse movement */
+} rodent;
+
+	/* These have to be "far", otherwise TurboC doesn't force the
+	 * segment register to be specified from 'ms_event_handler()'
+	 */
+int	far	button_pending;	/* 0=none, 1=pressed, 2=released */
+int	far	button_number;	/* 1=left, 2=right, 3=center */
+int	far	button_press_x;
+int	far	button_press_y;
+int	far	button_relsd_x;
+int	far	button_relsd_y;
+
+int
+ms_exists()
+{
+	return rodent.exists;
+}
+
+void
+ms_processing()
+{
+	if (button_pending == 2) {
+		button_pending = 0;
+		if (button_press_x != button_relsd_x
+		 || button_press_y != button_relsd_y) {
+			ms_movecrsr(ttrow,ttcol);
+			/* kbd_alarm();	-- selection not yet implemented */
+		} else
+		if (button_number == 1) {
+			int	x = button_press_x / char_width;
+			int	y = button_press_y / char_height;
+			WINDOW	*wp = row2window(y);
+			/* Set the dot-location if button 1 was pressed in a
+			 * window.
+			 */
+			if (wp != 0
+			 && ttrow != term.t_nrow
+			 && setcursor(y, x)) {
+				(void)update(TRUE);
+			} else {
+				ms_movecrsr(ttrow,ttcol);
+				/*kbd_alarm(); -- cannot reposition */
+			}
+		}
+	}
+}
+
+static void
+ms_deinstall(void)
+{
+	rg.x.ax = 0;	/* reset the mouse */
+	MouseCall;
+}
+
+	/* This event-handler cannot do I/O; tracing it can be tricky...
+	 */
+void far
+ms_event_handler P((void))
+{
+	UINT	ms_event  = _AX;
+/*	UINT	ms_button = _BX;*/
+	UINT	ms_horz   = _CX;
+	UINT	ms_vert   = _DX;
+
+	if (ms_event & MS_BTN1_PRESS) {
+		button_pending = 1;
+		button_number  = 1;
+		button_press_x = ms_horz;
+		button_press_y = ms_vert;
+	} else if (ms_event & MS_BTN1_RELEASE) {
+		button_pending = 2;
+		button_relsd_x = ms_horz;
+		button_relsd_y = ms_vert;
+	}
+	return;
+}
+
+static void
+ms_install(void)
+{
+	/* If a mouse is installed, initializes the mouse and
+	 * sets rodent.exists to 1. If no mouse is installed,
+	 * sets rodent.exists to 0.
+	 */
+	rg.x.ax = 0;
+	MouseCall;
+	rodent.exists = rg.x.ax;
+	if (ms_exists()) {
+		struct SREGS segregs;
+		rg.x.ax = 0xc;
+		rg.x.cx = MS_BTN1_PRESS | MS_BTN1_RELEASE;
+		rg.x.dx = FP_OFF(ms_event_handler);
+		segregs.es = FP_SEG(ms_event_handler);
+		int86x(0x33, &rg, &rg, &segregs);
+		ms_movecrsr(0,0);	/* patch */
+		ms_showcrsr();
+	}
+}
+
+static void
+ms_movecrsr(int row, int col)
+{
+	/* Moves the mouse cursor to the screen position specified
+	 * in characters by the parameters.
+	 */
+#if 0
+	rg.x.ax = 0x04;
+	rg.x.cx = col * char_width;
+	rg.x.dx = row * char_height;
+	MouseCall;
+#endif
+	ibmmove(row,col);
+} /* End of ms_movecrsr() */
+
+static void
+ms_showcrsr(void)
+{
+	/* Displays the mouse cursor */
+	int i, counter;
+
+	/* Call Int 33H Function 2AH to get the value of the display counter */
+	rg.x.ax = 0x2A;
+	MouseCall;
+	counter = rg.x.ax;
+
+	/* Call Int 33H Function 01H as many times as needed to display */
+	/* the mouse cursor */
+	for (i = 1; i < counter; i++) {
+		rg.x.ax = 0x01;
+		MouseCall;
+	}
+
+	rodent.cursor_display = 1;
+} /* End of ms_showcrsr() */
+#endif OPT_MS_MOUSE
 
 #endif	/* IBMPC */

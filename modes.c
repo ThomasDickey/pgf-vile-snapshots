@@ -8,9 +8,12 @@
  * Major extensions for vile by Paul Fox, 1991
  *
  *	$Log: modes.c,v $
- *	Revision 1.25  1993/09/06 16:30:22  pgf
- *	set shiftwidth and tabstop globals after any mode change, to ensure
- *	they're consistently set with cmode/csw/cts/sw/ts
+ *	Revision 1.26  1993/09/10 16:06:49  pgf
+ *	tom's 3.61 changes
+ *
+ * Revision 1.25  1993/09/06  16:30:22  pgf
+ * set shiftwidth and tabstop globals after any mode change, to ensure
+ * they're consistently set with cmode/csw/cts/sw/ts
  *
  * Revision 1.24  1993/09/03  09:11:54  pgf
  * tom's 3.60 changes
@@ -352,15 +355,16 @@ void	makemodelist(dum1,ptr)
 	static	char	gg[] = "Universal",
 			bb[] = "Buffer",
 			ww[] = "Window";
-	int	nflag;
+	int	nflag, nflg2;
 
 	register WINDOW *localwp = ptr2WINDOW(ptr);  /* alignment okay */
 	register BUFFER *localbp = localwp->w_bufp;
 
 	bprintf("--- \"%s\" settings, if different than globals %*P\n",
 			get_bname(localbp), term.t_ncol-1, '-');
-	if (!(nflag = listvalueset(bb, FALSE, b_valuenames, localbp->b_values.bv, global_b_values.bv))
-	 && !(nflag = listvalueset(ww, nflag, w_valuenames, localwp->w_values.wv, global_w_values.wv)))
+	nflag = listvalueset(bb, FALSE, b_valuenames, localbp->b_values.bv, global_b_values.bv);
+	nflg2 = listvalueset(ww, nflag, w_valuenames, localwp->w_values.wv, global_w_values.wv);
+	if (!(nflag || nflg2))
 	 	bputc('\n');
 	bputc('\n');
 
