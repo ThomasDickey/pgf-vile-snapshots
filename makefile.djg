@@ -1,0 +1,100 @@
+#
+# makefile for vile using DJGCC 1.09 and  GNU's MAKE 3.58
+#
+# T.DANG (dang@cogit.ign.fr)
+#
+# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.djg,v 1.12 1994/11/29 04:02:03 pgf Exp $
+#
+#
+
+LONGARGS = gcc
+
+CFLAGS= -Wall -O -DDISP_IBMPC -Dscrn_chosen 
+
+# these are normal editable headers
+HDRS = estruct.h epath.h edef.h proto.h dirstuff.h
+
+# these headers are built by the mktbls program from the information in cmdtbl
+# and in modetbl
+BUILTHDRS = nebind.h nefunc.h nemode.h nename.h nevars.h
+
+SRC = 	main.c ibmpc.c basic.c bind.c buffer.c crypt.c \
+	csrch.c display.c eval.c exec.c externs.c fences.c file.c filec.c \
+	fileio.c finderr.c glob.c globals.c history.c \
+	input.c insert.c itbuff.c isearch.c \
+	line.c modes.c msgs.c npopen.c oneliner.c opers.c \
+	path.c random.c regexp.c \
+	region.c search.c select.c spawn.c \
+	tags.c tbuff.c termio.c tmp.c undo.c \
+	version.c vmalloc.c window.c word.c wordmov.c map.c djhandl.c
+
+OBJ = 	main.o ibmpc.o basic.o bind.o buffer.o crypt.o \
+      	csrch.o display.o eval.o exec.o externs.o fences.o file.o filec.o \
+	fileio.o finderr.o glob.o globals.o history.o \
+	input.o insert.o itbuff.o isearch.o \
+	line.o modes.o msgs.o npopen.o oneliner.o opers.o \
+	path.o random.o regexp.o \
+	region.o search.o select.o spawn.o \
+	tags.o tbuff.o termio.o tmp.o undo.o \
+	version.o vmalloc.o window.o word.o wordmov.o map.o djhandl.o
+
+%.o:	%.c estruct.h nemode.h edef.h proto.h 
+	gcc $(CFLAGS) -c $< -o $@ 
+
+vile: 	$(BUILTHDRS) $(OBJ)
+#	gcc -o vile $(OBJ) -lpc 
+	ld -o vile /djgpp/lib/crt0.o $(OBJ) -L/djgpp/lib -lpc -lc -lgcc
+	coff2exe vile
+	stubedit vile.exe globbing=no
+
+dist:	vile
+	strip vile
+	coff2exe vile
+	stubedit vile.exe globbing=no
+	pkzip pcvile.zip readme.pc readme vile.exe vile.hlp \\djgpp\\bin\\go32.exe
+
+
+
+# for my poor slow omnibook, i do incremental linking when working on
+# just a couple of modules...
+NOBJ = $(OBJ)
+NOBJ := $(filter-out ibmpc.o, $(NOBJ))
+NOBJ := $(filter-out filec.o, $(NOBJ))
+NOBJ := $(filter-out glob.o, $(NOBJ))
+XOBJ =  ibmpc.o filec.o glob.o
+
+rvile.o: $(NOBJ)
+	ld -r -o rvile.o $(NOBJ) -L/djgpp/lib -lpc -lc -lgcc
+
+ivile: $(XOBJ) rvile.o
+	ld -o vile /djgpp/lib/crt0.o rvile.o $(XOBJ) -L/djgpp/lib -lpc -lc -lgcc
+	coff2exe vile
+
+nebind.h \
+nefunc.h \
+nename.h \
+nevars.h :	cmdtbl mktbls.exe
+	mktbls.exe cmdtbl
+
+nemode.h:	modetbl mktbls.exe
+	mktbls.exe modetbl
+
+mktbls.exe:  mktbls.c
+	gcc mktbls.c -o mktbls
+	coff2exe mktbls
+	rm mktbls
+
+clean:
+	rm mktbls.exe
+	rm *.o
+	rm $(BUILTHDRS)
+
+main.o:	nevars.h
+bind.o:	epath.h
+filec.o:	dirstuff.h
+eval.o:	nevars.h
+glob.o:	dirstuff.h
+externs.o:	nebind.h nename.h nefunc.h
+path.o:	dirstuff.h
+vmalloc.o:	nevars.h
+
