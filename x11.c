@@ -2,7 +2,10 @@
  * 	X11 support, Dave Lemke, 11/91
  *
  * $Log: x11.c,v $
- * Revision 1.29  1993/09/10 16:06:49  pgf
+ * Revision 1.30  1993/10/04 10:24:09  pgf
+ * see tom's 3.62 changes
+ *
+ * Revision 1.29  1993/09/10  16:06:49  pgf
  * tom's 3.61 changes
  *
  * Revision 1.28  1993/09/03  09:11:54  pgf
@@ -272,6 +275,7 @@ static	XFontStruct *query_font P(( TextWindow, char * ));
 static	char *	fontname;
 static	char *	geometry;
 static	char *	progname;
+static	char *	wm_title;
 static	Bool	reverse_video;
 static	char *	foreground_name;
 static	char *	background_name;
@@ -392,13 +396,20 @@ x_preparse_args(pargc, pargv)
     progname = pathleaf(*pargv[0]);
 }
 
-/* ARGSUSED */
 void
 x_setname(name)
     char     *name;
 {
     if (name && *name != EOS)
 	progname = name;
+}
+
+void
+x_set_wm_title(name)
+    char     *name;
+{
+    if (name && *name != EOS)
+	wm_title = name;
 }
 
 char       *
@@ -766,6 +777,8 @@ x_open()
     /* main code assumes that it can access a cell at nrow x ncol */
     term.t_ncol = tw->cols;
     term.t_nrow = tw->rows - 1;
+    if (wm_title)
+    	XStoreName(dpy, tw->win, wm_title);
 }
 
 static void

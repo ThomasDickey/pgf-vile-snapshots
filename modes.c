@@ -8,8 +8,11 @@
  * Major extensions for vile by Paul Fox, 1991
  *
  *	$Log: modes.c,v $
- *	Revision 1.26  1993/09/10 16:06:49  pgf
- *	tom's 3.61 changes
+ *	Revision 1.27  1993/10/04 10:24:09  pgf
+ *	see tom's 3.62 changes
+ *
+ * Revision 1.26  1993/09/10  16:06:49  pgf
+ * tom's 3.61 changes
  *
  * Revision 1.25  1993/09/06  16:30:22  pgf
  * set shiftwidth and tabstop globals after any mode change, to ensure
@@ -116,6 +119,9 @@ static	int	mode_complete P(( int, char *, int * ));
 static	int	mode_eol P(( char *, int, int, int ));
 static	int	do_a_mode P(( int, int ));
 static	int	adjustmode P(( int, int ));
+#if OPT_UPBUFF
+static	int	show_Settings P(( BUFFER * ));
+#endif
 
 #if COLOR
 static	char	*cname[] = {	/* names of colors */
@@ -359,11 +365,19 @@ void	makemodelist(dum1,ptr)
 
 	register WINDOW *localwp = ptr2WINDOW(ptr);  /* alignment okay */
 	register BUFFER *localbp = localwp->w_bufp;
+	struct VAL	*local_b_vals = localbp->b_values.bv;
+	struct VAL	*local_w_vals = localwp->w_values.wv;
+#if OPT_UPBUFF
+	if (relisting_b_vals != 0)
+		local_b_vals = relisting_b_vals;
+	if (relisting_w_vals != 0)
+		local_w_vals = relisting_w_vals;
+#endif
 
 	bprintf("--- \"%s\" settings, if different than globals %*P\n",
 			get_bname(localbp), term.t_ncol-1, '-');
-	nflag = listvalueset(bb, FALSE, b_valuenames, localbp->b_values.bv, global_b_values.bv);
-	nflg2 = listvalueset(ww, nflag, w_valuenames, localwp->w_values.wv, global_w_values.wv);
+	nflag = listvalueset(bb, FALSE, b_valuenames, local_b_vals, global_b_values.bv);
+	nflg2 = listvalueset(ww, nflag, w_valuenames, local_w_vals, global_w_values.wv);
 	if (!(nflag || nflg2))
 	 	bputc('\n');
 	bputc('\n');
@@ -535,15 +549,18 @@ struct VAL *src;
  * all other storage associated with a buffer or window.
  */
 void
-free_local_vals(names, val)
+free_local_vals(names, gbl, val)
 struct VALNAMES *names;
+struct VAL *gbl;
 struct VAL *val;
 {
 	register int	j;
 
 	for (j = 0; names[j].name != 0; j++)
-		if (is_local_val(val,j))
+		if (is_local_val(val,j)) {
+			make_global_val(val, gbl, j);
 			free_val(names+j, val+j);
+		}
 }
 
 /*
@@ -923,9 +940,10 @@ int global;	/* true = global flag,	false = current buffer flag */
 	if ((s == SORTOFTRUE) && anything) /* fix for trailing whitespace */
 		return TRUE;
 
+#if OPT_UPBUFF
 	/* if the settings are up, redisplay them */
-	if (find_b_name(MODES_LIST_NAME))
-		(void)listmodes(FALSE,1);
+	relist_settings();
+#endif
 
 	if (autobuff != global_g_val(GMDABUFF)) sortlistbuffers();
 
@@ -945,6 +963,29 @@ int global;	/* true = global flag,	false = current buffer flag */
 
 	return s;
 }
+
+/*
+ * Buffer-animation for [Settings]
+ */
+#if OPT_UPBUFF
+static int
+show_Settings(bp)
+BUFFER *bp;
+{
+	b_clr_obsolete(bp);
+	return listmodes(FALSE, 1);
+}
+
+void
+relist_settings()
+{
+	register BUFFER *bp;
+	if ((bp = find_b_name(MODES_LIST_NAME)) != 0) {
+		bp->b_upbuff = show_Settings;
+		b_set_obsolete(bp);
+	}
+}
+#endif	/* OPT_UPBUFF */
 
 /* ARGSUSED */
 int

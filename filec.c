@@ -1,10 +1,14 @@
 /*
  *	filec.c
  *
- *	Filename prompting and completion routines
+ * Filename prompting and completion routines
+ * Written by T.E.Dickey for vile (march 1993).
  *
  * $Log: filec.c,v $
- * Revision 1.24  1993/09/10 16:06:49  pgf
+ * Revision 1.25  1993/10/04 10:24:09  pgf
+ * see tom's 3.62 changes
+ *
+ * Revision 1.24  1993/09/10  16:06:49  pgf
  * tom's 3.61 changes
  *
  * Revision 1.23  1993/09/06  16:36:47  pgf
@@ -120,7 +124,7 @@ free_expansion P(( void ))
 #include "dirstuff.h"
 
 static	int	trailing_slash P((char *));
-static	int	force_slash P((char *));
+static	SIZE_T	force_slash P((char *));
 static	int	trailing__SLASH P((char *));
 static	int	force__SLASH P((char *));
 static	void	conv_path P((char *, char *, int));
@@ -152,11 +156,11 @@ char *	path;
  * Force a trailing slash on the end of the path, returns the length of the
  * resulting path.
  */
-static int
+static SIZE_T
 force_slash(path)
 char *	path;
 {
-	register int	len = strlen(path);
+	register SIZE_T	len = strlen(path);
 
 #if VMS
 	if (!is_vms_pathname(path, -TRUE))	/* must be unix-style name */
@@ -367,7 +371,7 @@ int	first;
 int
 bs_find(text, len,  bp, iflag, lpp)
 char *	text;	/* pathname to find */
-int	len;	/* ...its length */
+SIZE_T	len;	/* ...its length */
 BUFFER *bp;	/* buffer to search */
 int	iflag;	/* true to insert if not found, -true if it is directory */
 LINEPTR *lpp;	/* in/out line pointer, for iteration */
@@ -465,7 +469,7 @@ already_scanned(path)
 char *	path;
 {
 	register LINE	*lp;
-	register int	len;
+	register SIZE_T	len;
 	char	fname[NFILEN];
 
 	len = force_slash(strcpy(fname, path));
@@ -523,7 +527,7 @@ char *	name;
 		while ((de = readdir(dp)) != 0) {
 #if UNIX || VMS
 # if USE_D_NAMLEN
-			strncpy(s, de->d_name, (int)(de->d_namlen))[de->d_namlen] = EOS;
+			strncpy(s, de->d_name, (SIZE_T)(de->d_namlen))[de->d_namlen] = EOS;
 # else
 			(void)strcpy(s, de->d_name);
 # endif
@@ -567,7 +571,7 @@ char *	name;
 				iflag = TRUE;
 #endif
 			}
-			(void)bs_find(path, (int)strlen(path), MyBuff, iflag,
+			(void)bs_find(path, strlen(path), MyBuff, iflag,
 					(LINEPTR*)0);
 		}
 		(void)closedir(dp);
@@ -803,9 +807,17 @@ char *	result;
 	free_expansion();
 	if (ok_expand) {
 		if ((MyGlob = glob_string(Reply)) == 0
-		 || glob_length(MyGlob) == 0) {
+		 || (s = glob_length(MyGlob)) == 0) {
 			mlforce("[No files found] %s", Reply);
 			return FALSE;
+		}
+		if (s > 1) {
+			char	tmp[80];
+			(void)lsprintf(tmp, "Will read %d files. Okay", s);
+			s = mlyesno(tmp);
+			mlerase();
+			if (s != TRUE)
+				return s;
 		}
 	} else if (doglob(Reply) != TRUE) {
 		return FALSE;

@@ -6,7 +6,17 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.102  1993/09/10 16:06:49  pgf
+ * Revision 1.105  1993/10/11 17:22:40  pgf
+ * re-ifdef getscreensize
+ *
+ * Revision 1.104  1993/10/04  10:24:09  pgf
+ * see tom's 3.62 changes
+ *
+ * Revision 1.103  1993/09/20  21:16:58  pgf
+ * added "no_working" global, which can be used to shut off the "working..."
+ * message during debugging
+ *
+ * Revision 1.102  1993/09/10  16:06:49  pgf
  * tom's 3.61 changes
  *
  * Revision 1.101  1993/09/06  16:24:28  pgf
@@ -474,7 +484,7 @@ int	dfputs(outfunc, s)
 	register int c;
 	register int l = 0;
 
-	while ((c = *s++) != 0) {
+	while ((c = *s++) != EOS) {
 	        (*outfunc)(c);
 		l++;
 	}
@@ -490,7 +500,7 @@ int	dfputsn(outfunc,s,n)
 {
 	register int c;
 	register int l = 0;
-	while ((c = *s++) != 0 && n-- != 0) {
+	while ((n-- != 0) && ((c = *s++) != EOS)) {
 		(*outfunc)(c);
 		l++;
 	}
@@ -978,7 +988,7 @@ vteeol()
 {
 	if (vtcol < term.t_ncol) {
 		(void)memset(&vscreen[vtrow]->v_text[vtcol],
-			' ', term.t_ncol-vtcol);
+			' ', (SIZE_T)(term.t_ncol-vtcol));
 		vtcol = term.t_ncol;
 	}
 }
@@ -1754,7 +1764,8 @@ int inserts;
 	struct	VIDEO *vpp ;	/* physical screen image */
 	int	i, j, k ;
 	int	rows, cols ;
-	int	first, match, count, ptarget = 0, vtarget = 0, end ;
+	int	first, match, count, ptarget = 0, vtarget = 0;
+	SIZE_T	end;
 	int	longmatch, longcount;
 	int	from, to;
 
@@ -1840,7 +1851,7 @@ int inserts;
 		for (i = 0; i < count; i++) {
 			vpp = PScreen(to+i) ;
 			vpv = vscreen[to+i];
-			(void)strncpy(vpp->v_text, vpv->v_text, cols) ;
+			(void)strncpy(vpp->v_text, vpv->v_text, (SIZE_T)cols) ;
 		}
 		if (inserts) {
 			from = ptarget;
@@ -1879,7 +1890,7 @@ int	vrow, prow ;		/* virtual, physical rows */
 	struct	VIDEO *vpv = vscreen[vrow] ;	/* virtual screen image */
 	struct	VIDEO *vpp = PScreen(prow)  ;	/* physical screen image */
 
-	return (!memcmp(vpv->v_text, vpp->v_text, term.t_ncol)) ;
+	return (!memcmp(vpv->v_text, vpp->v_text, (SIZE_T)term.t_ncol)) ;
 }
 
 /* return the index of the first blank of trailing whitespace */
@@ -2400,12 +2411,18 @@ BUFFER	*bp;
 
 	/* remember where we are, to reposition */
 	/* ...in case line is deleted from buffer-list */
-	if (curbp != bp) {
+	relisting_b_vals = 0;
+	relisting_w_vals = 0;
+	if (curbp == bp) {
+		relisting_b_vals = b_vals;
+ 	} else {
 		curbp = bp;
 		curwp = bp2any_wp(bp);
 	}
 	for_each_window(wp) {
 		if (wp->w_bufp == bp) {
+			if (wp == savewp)
+				relisting_w_vals = tbl[num].w_vals;
 			curwp = wp;	/* to make 'getccol()' work */
 			curbp = curwp->w_bufp;
 			tbl[num].wp   = wp;
@@ -2442,6 +2459,8 @@ BUFFER	*bp;
 	curbp = savebp;
 	curgoal = mygoal;
 	b_clr_flags(bp,BFUPBUFF);
+	relisting_b_vals = 0;
+	relisting_w_vals = 0;
 }
 #endif
 
@@ -2836,7 +2855,7 @@ va_dcl
  * is not valid.  This may be fixed (in the tcap.c case) by the TERM
  * variable.
  */
-#if defined( SIGWINCH) && ! X11
+#if ! X11
 void
 getscreensize (widthp, heightp)
 int *widthp, *heightp;
@@ -2873,7 +2892,9 @@ int *widthp, *heightp;
 		*heightp = atoi(e);
 #endif
 }
+#endif
 
+#if defined( SIGWINCH) && ! X11
 /* ARGSUSED */
 SIGT
 sizesignal (ACTUAL_SIG_ARGS)
@@ -2907,7 +2928,7 @@ int h, w;
 	if ((h - 1) <= term.t_mrow)
 		if (!newlength(TRUE,h))
 			return;
-	if (w < term.t_mcol)
+	if (w <= term.t_mcol)
 		if (!newwidth(TRUE,w))
 			return;
 
@@ -2924,6 +2945,10 @@ int h, w;
  * large files.
  */
 #if OPT_WORKING
+
+/* global disabler, to help debugging */
+int no_working = FALSE;
+
 /*ARGSUSED*/
 SIGT
 imworking (ACTUAL_SIG_ARGS)
@@ -2932,6 +2957,9 @@ ACTUAL_SIG_DECL
 	static	char	*msg[] = {"working", "..."};
 	static	int	flip;
 	static	int	skip;
+
+	if (no_working)
+		return;
 
 	if (displaying) {	/* look at the semaphore first! */
 		;
@@ -2977,8 +3005,11 @@ ACTUAL_SIG_DECL
 		if (mpresf < 0) {	/* erase leftover working-message */
 			int	save_row = ttrow;
 			int	save_col = ttcol;
-			movecursor(term.t_nrow, -(mpresf+1));
-			erase_remaining_msg(-(mpresf+1));
+			int	erase_at = -(mpresf+1);
+			if (erase_at < save_col)
+				erase_at = save_col;
+			movecursor(term.t_nrow, erase_at);
+			erase_remaining_msg(erase_at);
 			movecursor(save_row, save_col);
 			TTflush();
 			mpresf = 0;

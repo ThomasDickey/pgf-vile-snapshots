@@ -5,7 +5,13 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.78  1993/09/10 16:06:49  pgf
+ * Revision 1.80  1993/10/11 17:39:35  pgf
+ * added arg to fmatchindent, which is character to match
+ *
+ * Revision 1.79  1993/10/04  10:24:09  pgf
+ * see tom's 3.62 changes
+ *
+ * Revision 1.78  1993/09/10  16:06:49  pgf
  * tom's 3.61 changes
  *
  * Revision 1.77  1993/09/06  16:32:48  pgf
@@ -404,7 +410,7 @@ extern void kbd_puts P(( char * ));
 extern void kbd_erase P(( void ));
 extern void kbd_init P(( void ));
 extern void kbd_unquery P(( void ));
-extern int kbd_complete P(( int, char *, int *, char *, unsigned ));
+extern int kbd_complete P(( int, char *, int *, char *, SIZE_T ));
 extern int kbd_engl_stat P(( char *, char * ));
 
 /* buffer.c */
@@ -629,8 +635,8 @@ extern int quickreadf P(( BUFFER *, int * ));
 #endif
 extern int slowreadf P(( BUFFER *, int * ));
 extern int set_dosmode P(( int, int ));
-extern void makename P(( char [], char [] ));
-extern void unqname P((char *, int));
+extern void makename P(( char *, char * ));
+extern int unqname P((char *, int));
 extern int filewrite P(( int, int ));
 extern int filesave P(( int, int ));
 extern int writeout P(( char *, BUFFER *, int ));
@@ -648,7 +654,7 @@ extern int resetkey P(( BUFFER *, char * ));
 /* filec.c */
 #if COMPLETE_DIRS || COMPLETE_FILES
 extern BUFFER *bs_init P(( char *, int ));
-extern int bs_find P(( char *, int, BUFFER *, int, LINEPTR * ));
+extern int bs_find P(( char *, SIZE_T, BUFFER *, int, LINEPTR * ));
 #endif
 extern int mlreply_file P(( char *, TBUFF **, int, char * ));
 extern int mlreply_dir P(( char *, TBUFF **, char * ));
@@ -722,6 +728,7 @@ extern int kbd_delimiter P(( void ));
 extern int is_edit_char P(( int ));
 extern void kbd_kill_response P(( char *, int *, int ));
 extern int kbd_show_response P(( char *, char *, int, int, int ));
+extern void kbd_pushback P(( char *, int ));
 extern int kbd_string P(( char *, char *, int, int, int, int (*func)(int,char*,int*) ));
 extern int kbd_reply P(( char *, char *, int, int (*efunc)(char *,int,int,int), int, int, int (*cfunc)(int,char*,int*) ));
 extern int speckey P(( int, int ));
@@ -843,8 +850,9 @@ extern int copy_val P(( struct VAL *, struct VAL * ));
 extern void copy_mvals P(( int, struct VAL *, struct VAL * ));
 #if OPT_UPBUFF
 extern void save_vals P(( int, struct VAL *, struct VAL *, struct VAL * ));
+extern void relist_settings P(( void ));
 #endif
-extern void free_local_vals P(( struct VALNAMES *, struct VAL * ));
+extern void free_local_vals P(( struct VALNAMES *, struct VAL *, struct VAL * ));
 extern int listmodes P(( int, int ));
 extern int find_mode P(( char *, int, VALARGS * ));
 
@@ -955,7 +963,7 @@ extern int chgchar P(( int, int ));
 extern int matchfence P(( int, int ));
 extern int matchfenceback P(( int, int ));
 extern int clrmes P(( int, int ));
-extern int fmatchindent P(( void ));
+extern int fmatchindent P(( int ));
 #if !SMALLER
 extern int writemsg P(( int, int ));
 #endif
@@ -1024,7 +1032,7 @@ extern int eq P(( int, int ));
 #endif
 extern int scrsearchpat P(( int, int ));
 extern int readpattern P(( char *, char *, regexp **, int, int ));
-extern void savematch P(( MARK, int ));
+extern void savematch P(( MARK, SIZE_T ));
 extern void scanboundry P(( int, MARK, int ));
 extern void nextch P(( MARK *, int ));
 extern int findpat P(( int, int, regexp *, int ));
@@ -1148,6 +1156,7 @@ extern int toktyp P(( char * ));
 extern char * tokval P(( char * ));
 extern char * token P(( char *, char *, int ));
 extern int ffgetline P(( int * ));
+extern int macroize P(( TBUFF **, char *, char * ));
 extern int macarg P(( char * ));
 extern int echochar P(( int, int ));
 extern int scanmore P(( char *, int ));
@@ -1221,6 +1230,7 @@ extern	void ev_leaks P(( void ));
 extern	void x_set_rv P(( void ));
 extern	int x_setfont P(( char * ));
 extern	void x_setname P(( char * ));
+extern	void x_set_wm_title P(( char * ));
 extern	char *x_current_fontname P(( void ));
 extern	void x_setforeground P(( char * ));
 extern	void x_setbackground P(( char * ));
@@ -1262,13 +1272,13 @@ extern void update_dos_drv_dir P(( char * ));
 #if UNIX && !LINUX
 #if (SUNOS || NeXT) && defined(lint) || __GNUC__
 extern	int	_filbuf	P(( FILE * ));
-extern	int	_flsbuf	P(( UCHAR, FILE * ));
+extern	int	_flsbuf	P(( int, FILE * ));
 extern	int	printf	P(( char *, ... ));
 extern	int	fclose	P(( FILE * ));
 extern	int	fflush	P(( FILE * ));
 extern	int	fprintf	P(( FILE *, char *, ... ));
 extern	int	fgetc	P(( FILE * ));
-extern	int	fputc	P(( char, FILE * ));
+extern	int	fputc	P(( int, FILE * ));
 extern	int	fread	P(( char *, int, int, FILE * ));
 extern	int	fseek	P(( FILE *, long, int ));
 extern	int	fwrite	P(( char *, int, int, FILE * ));
@@ -1295,7 +1305,7 @@ extern int	atoi	P((char *));
 extern int	dup	P((int));
 extern int	close	P((int));
 extern void	free	P((void *ptr));
-extern void	memset	P((char*, int ch, int n));
+extern void	memset	P((char *, int ch, int n));
 extern int	access	P((char *, int));
 extern int	read	P((int, char *, int));
 extern int	write	P((int, char *, int));

@@ -3,7 +3,13 @@
  *		strings.
  *
  * $Log: path.c,v $
- * Revision 1.17  1993/09/06 16:31:57  pgf
+ * Revision 1.19  1993/10/04 10:24:09  pgf
+ * see tom's 3.62 changes
+ *
+ * Revision 1.18  1993/09/22  10:26:08  pgf
+ * minor vms path fix, from jim crigler
+ *
+ * Revision 1.17  1993/09/06  16:31:57  pgf
  * suppress doubled path separators in pathcat()
  *
  * Revision 1.16  1993/09/03  09:11:54  pgf
@@ -208,7 +214,9 @@ int	option;		/* true:directory, false:file, -true:don't care */
 		default:
 			if (!ispath(*path))
 				return FALSE;
-			next = this;
+			next = (this == VMSPATH_END_DIR)
+				? VMSPATH_BEGIN_FILE
+				: this;
 			break;
 		}
 		if (next < this)
@@ -324,7 +332,9 @@ char	*leaf;
 	s += strlen(s) - 1;
 
 #if VMS
-	if (!is_vms_pathname(dst, TRUE))	/* could be DecShell */
+	if (is_vms_pathname(dst, TRUE))	/* could be DecShell */
+		s++;
+	else
 #endif
 	 if (!slashc(*s++)) {
 		*s++ = slash;
@@ -435,6 +445,7 @@ char	*path;
 		for (s = path+1, d = temp; (*d = *s) != EOS; d++, s++) {
 			if (slashc(*d)) {
 				*d = EOS;
+				s++;
 				break;
 			}
 		}
@@ -943,8 +954,22 @@ char *	path;
 	struct	stat	sb;
 
 #if VMS
-	if (is_vms_pathname(path, TRUE))
+	register char *s;
+	if (is_vms_pathname(path, TRUE)) {
 		return TRUE;
+	}
+
+	/* If the name doesn't look like a directory, there's no point in
+	 * wasting time doing a 'stat()' call.
+	 */
+	s = vms_pathleaf(path);
+	if ((s = strchr(s, '.')) != 0) {
+		char	ftype[NFILEN];
+		(void)mkupper(strcpy(ftype, s));
+		if (strcmp(ftype, ".DIR")
+		 && strcmp(ftype, ".DIR;1"))
+			return FALSE;
+	}
 #endif
 	return ((*path != EOS)
 	  &&	(stat(path, &sb) >= 0)

@@ -2,7 +2,10 @@
  * version & usage-messages for vile
  *
  * $Log: version.c,v $
- * Revision 1.2  1993/09/06 16:35:36  pgf
+ * Revision 1.3  1993/10/04 10:24:09  pgf
+ * see tom's 3.62 changes
+ *
+ * Revision 1.2  1993/09/06  16:35:36  pgf
  * clarified wording in version message (i.e. what the date means)
  *
  * Revision 1.1  1993/09/03  09:11:54  pgf
@@ -45,6 +48,7 @@ print_usage P((void))
 	"-f fontname    to change font",
 	"-d displayname to change the default display",
 	"-r             for reverse video",
+	"-wm title      to set window title (default XVile)",
 	"=geometry      to set window size (like '=80x50')",
 #endif
 #if IBMPC

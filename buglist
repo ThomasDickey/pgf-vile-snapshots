@@ -498,6 +498,7 @@ of our users do use cmdtool.
 
 I found an ugly workaround. Turning off SCROLLCODE does the job.
 
+[ cannot duplicate this on SunOs 4.1.3 ]
 
 ----------------------------------
 
@@ -525,15 +526,13 @@ xvile from says
 and then after a couple seconds the xterm itself vanishes!  However,
 	xvile tmp
 works fine, except that the process is in the foreground.
+ > The bug on the Pyramid SVR4 machine with xvile & suspending itself,
+ > committing suicide, and then blowing away the xterm still exists.
+ > For the time being I just remember to run xvile on a different
+ > machine.
 
--------------------------------------------------------------------------
-
+-----------------------------
 apply Alistair's min/max regexp patch
-
--------------------------------------------------------------------------
-
-I guess, in the future, there will be an option for "xvile" which can
-change the title of its window, right?
 
 -------------------------------------------------------------------------
 
@@ -547,10 +546,107 @@ it doesn't get the right screen size or exits with incorrect colors).
 
 -------------------------------------------------------------------------
 
-When vile saves files before it dies, it puts them in /tmp on the
-machine where you are editing.  In a networked environment, a person
-may be editing files on several different machines and so it would be
-convenient if the e-mail message stated which machine's /tmp contains
-the saved files.
+
+In version 3.61 on SunOS 4.1.3 xterm:
+
+	If at end of file (ie: "bot" is displayed in the status line, and
+	a :previous-page is performed, "bot" is still displayed
+
+	If in middle of file (ie "mid" is displayed in the status line, and
+	a :previous-page is performed, "mid" is still displayed even if
+	the top of the file is reached.
+
+The inverse of this problem ("top" and "mid" with :next-page) is OK.
+
+--------------------------------------
+
+It would be nice if for a :ta search 
+	taglength = MIN(taglength, strlen(target_string));
+so that if in the .vilerc
+	set taglength=20
+is set, then doing
+	vile -t SomeString
+will be found, rather than needing to match against 20 characters.
+
+This will permit the former behavior of matching against as much of the tag
+as is given.
+
+I haven't found this in the code yet.
+
+
+
+-----------------------------------------------------
+
+
+Edit two existing files from the unix command line, using both vi 
+and vile.  E.g.:
+
+    % vile j k
+    % vi   j k
+
+
+While editing "j", type this colon command in both vi and vile:
+
+   :e#      <- no space after the 'e'
+
+In vi, this command switches editing to 'k'.  In vile, this command
+does nothing.
+
+If you instead type:
+
+   :e #
+
+in vile, it does what you expect (switch to 'k').
+
+[ the # is correctly terminating the command matching code, but it is not
+being tungetc'ed (or whatever the current mechanism is), so it doesn't get
+expanded for filefind() ]
+
 
 -----------------------------
+
+In vile version 3.61 (SunOS 4.2.3 xterm)
+
+The search pattern:
+	/:\>/
+does not find :
+
+[ should it? the \> looks for a "word" to "non-word" transition, and ':' is a
+"non-word" character ]
+
+---------------------------
+would be nice if "file newer" warning could come up on first change to buffer.
+
+---------------------------
+
+	xvile has been dumping core rather frequently today.  Not sure
+why, though I did change window managers today.  This is on a Sun4 running
+SunOS 4.1.1.  Here's what adb says.  This is the second time I tried adb
+on the core file, and both times the problem was in tb_get.
+	Eric Krohn
+
+_kill(?)
+__DYNAMIC(0x0,0x46000,0x45c20,0xf7fff585,0x1,0x0) + 8
+_imdying(0xb,0x3,0xf7ffdc48,0x1,0x1,0xf7fff585) + 174
+__sigtramp(?)
+_tb_get(0x89e20,0xdfdfdfdf,0x41000,0x1,0xf83e3000,0x1b) + ac
+_tb_next(0x89d88,0xdfdfdfdf,0x1,0x8000000,0xf83e3000,0x1) + 20
+_x_getc(0x0,0xf7ffe610,0x0,0x0,0xffffffff,0x48400) + 20
+_tgetc(0x0,0x1,0xd0,0x0,0x7a2c8,0xffffffff) + ac
+_kbd_key(0x4d238,0x1,0x79868,0x0,0xffffffff,0x1b) + a0
+_ins_anytime(0x0,0x0,0x1,0xf7ffe75c,0x1,0x1b) + 1bc
+_ins_n_times(0x0,0x1,0x1,0x0,0x0,0x1) + 48
+_insert(0x0,0x1,0x46400,0x1,0x1,0x0) + c
+_execute(0x42f60,0x0,0x1,0x0,0x0,0x3) + 158
+_loop(0x1,0x83bd0,0x80,0x1,0x0,0x42f60) + 164
+_main(0x1,0x4d238,0x1,0x0,0x41408,0x0) + 9f8
+
+0x89d88,8/X
+0x89d88:        89e20           1               1               dfdfdfe0
+                1b              dfdfdfdf        dfdfdfdf        20094120
+
+0x89e20,8/X		# fishy looking data
+0x89e20:        6adfdfdf        dfdfdfdf        18              dfdfdfdf
+                dfdfdfdf        dfdfdfdf        dfdfdfdf        6865206c
+
+

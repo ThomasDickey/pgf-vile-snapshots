@@ -2,7 +2,11 @@
  *		for MicroEMACS
  *
  * $Log: tcap.c,v $
- * Revision 1.29  1993/09/16 11:17:43  pgf
+ * Revision 1.30  1993/09/21 11:00:20  pgf
+ * don't call showcpos on mouse-clicks -- call mlerase.  if someone want to
+ * know position, they can use ruler mode.
+ *
+ * Revision 1.29  1993/09/16  11:17:43  pgf
  * added missing args to showcpos
  *
  * Revision 1.28  1993/09/16  10:58:20  pgf
@@ -607,7 +611,7 @@ int	c;
 			 && button == 1
 			 && ttrow != term.t_nrow
 			 && setcursor(y-1, x-1)) {
-				showcpos(FALSE,1);
+				mlerase();
 				(void)update(TRUE);
 			} else if (button <= 3) {
 #if OPT_XTERM >= 3

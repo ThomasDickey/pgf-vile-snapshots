@@ -14,7 +14,10 @@
  *
  *
  * $Log: mktbls.c,v $
- * Revision 1.37  1993/09/10 16:06:49  pgf
+ * Revision 1.38  1993/10/04 10:24:09  pgf
+ * see tom's 3.62 changes
+ *
+ * Revision 1.37  1993/09/10  16:06:49  pgf
  * tom's 3.61 changes
  *
  * Revision 1.36  1993/09/06  16:30:01  pgf
@@ -187,6 +190,8 @@ extern char *malloc();
 #define	TRUE	(1)
 #define	FALSE	(0)
 #endif
+
+#define EOS     '\0'
 
 #define	L_CURL	'{'
 #define	R_CURL	'}'
@@ -477,7 +482,7 @@ char *c1, *c2;
 	else if (c1[0] || c2[0])
 		Sprintf(cond, "(%s%s)", c1, c2);
 	else
-		cond[0] = '\0';
+		cond[0] = EOS;
 	return cond;
 }
 
@@ -518,7 +523,7 @@ char	*buffer;
 			with = ' ';
 
 		buffer[len++] = with;
-		buffer[len]   = '\0';
+		buffer[len]   = EOS;
 		any++;
 	}
 	return buffer;
@@ -545,41 +550,41 @@ Parse(input, vec)
 char	*input;
 char	**vec;
 {
-	char	*base = input;
 	register int	expecting = TRUE,
 			count = 0,
 			quote = 0,
+			n,
 			c;
 
 	for (c = 0; c < MAX_PARSE; c++)
 		vec[c] = "";
 	for (c = strlen(input); c > 0 && isspace(input[c-1]); c--)
-		input[c-1] = '\0';
+		input[c-1] = EOS;
 
-	while ((c = *input++) != 0) {
+	for (n = 0; (c = input[n++]) != EOS; ) {
 		if (quote) {
 			if (c == quote) {
 				quote = 0;
-				if (*input && !isspace(*input))
-					badfmt2("expected blank", input-base);
-				input[-1] = '\0';
+				if (input[n] && !isspace(input[n]))
+					badfmt2("expected blank", n);
+				input[n-1] = EOS;
 			}
 		} else {
 			if ((c == '"') || (c == '\'')) {
 				quote = c;
 			} else if (isspace(c)) {
-				input[-1] = '\0';
+				input[n-1] = EOS;
 				expecting = TRUE;
-			} else if ((c == '#')) {
-				while (isspace(*input))
-					input++;
-				vec[0] = input;
+			} else if (c == '#') {
+				while (isspace(input[n]))
+					n++;
+				vec[0] = input+n;
 				break;
 			}
 			if (expecting && !isspace(c)) {
 				if (count+1 >= MAX_PARSE)
 					break;
-				vec[++count] = input - (c != quote);
+				vec[++count] = input + n - (c != quote);
 				expecting = FALSE;
 			}
 		}
@@ -603,7 +608,7 @@ char	*cond;
 {
 	if (cond == 0)
 		cond = "";
-	if (cond[0] != '\0') {
+	if (cond[0] != EOS) {
 		if (lastIfdef != 0) {
 			if (!strcmp(lastIfdef, cond))
 				return;
@@ -638,7 +643,7 @@ char *src;
 			*d++ = tolower(*s);
 		s++;
 	}
-	*d = '\0';
+	*d = EOS;
 	return dst;
 }
 
@@ -731,7 +736,7 @@ char	*name;
 	}
 	*dst++ = '_';
 	*dst++ = '_';
-	*dst = '\0';
+	*dst = EOS;
 	return base;
 }
 
@@ -1007,7 +1012,7 @@ char *s, *func, *cond;
 		if (bindings[btype][c] != NULL && !two_conds(btype,c,cond))
 			badfmt("duplicate key binding");
 		bindings[btype][c] = StrAlloc(func);
-	} else if (*s == '^' && (c = *(s+1)) != '\0') { /* a control char? */
+	} else if (*s == '^' && (c = *(s+1)) != EOS) { /* a control char? */
 		if (c > 'a' &&  c < 'z')
 			c = toupper(c);
 		c = tocntrl(c);
@@ -1029,7 +1034,7 @@ char *s, *func, *cond;
 		conditions[btype][c] = NULL;
 	}
 
-	if (*s != '\0')
+	if (*s != EOS)
 		badfmt("got extra characters");
 }
 
@@ -1522,7 +1527,7 @@ char    *argv[];
 		exit(BAD(1));
 	}
 
-	*old_fcond = '\0';
+	*old_fcond = EOS;
 
 	/* process each input line */
 	while (fgets(line, sizeof(line), cmdtbl) != NULL) {

@@ -8,9 +8,12 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: fences.c,v $
- *	Revision 1.15  1993/09/16 11:06:43  pgf
- *	make parentheses act like braces in c-mode -- for indentation purposes, in
- *	languages like scheme (and lisp?)
+ *	Revision 1.16  1993/10/11 17:39:19  pgf
+ *	fmatchindent now looks for a specific match
+ *
+ * Revision 1.15  1993/09/16  11:06:43  pgf
+ * make parentheses act like braces in c-mode -- for indentation purposes, in
+ * languages like scheme (and lisp?)
  *
  * Revision 1.14  1993/06/28  14:27:25  pgf
  * new arg to catnap()
@@ -263,12 +266,12 @@ int sdir; /* direction to scan if we're not on a fence to begin with */
 
 	/* setup proper matching fence */
 	switch (ch) {
-		case '(':
-			ofence = ')';
+		case LPAREN:
+			ofence = RPAREN;
 			sdir = FORWARD;
 			break;
-		case ')':
-			ofence = '(';
+		case RPAREN:
+			ofence = LPAREN;
 			sdir = REVERSE;
 			break;
 		case LBRACE:
@@ -482,16 +485,16 @@ int sdir;
 	return FALSE;
 }
 
-/* get the indent of the line containing the matching brace. */
+/* get the indent of the line containing the matching brace/paren. */
 int
-fmatchindent()
+fmatchindent(c)
+int c;
 {
 	int ind;
 	    
 	MK = DOT;
 	    
-	if ((getfence(RPAREN,FORWARD) == FALSE) &&
-	    (getfence(RBRACE,FORWARD) == FALSE)) {
+	if (getfence(c,FORWARD) == FALSE) {
 		gomark(FALSE,1);
 		return previndent((int *)0);
 	}

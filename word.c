@@ -4,7 +4,11 @@
  * do any sentence mode commands, they are likely to be put in this file. 
  *
  * $Log: word.c,v $
- * Revision 1.32  1993/09/03 09:11:54  pgf
+ * Revision 1.33  1993/09/28 22:24:01  pgf
+ * don't allow tabs to be inserted during formatregion() if notabinsert
+ * is set
+ *
+ * Revision 1.32  1993/09/03  09:11:54  pgf
  * tom's 3.60 changes
  *
  * Revision 1.31  1993/08/18  20:37:17  pgf
@@ -530,13 +534,12 @@ formatregion()
 						++clength;
 					} 
 				} else {
-			                if (lnewline() == FALSE ||
-					((i=secondindent/curtabval)!=0 &&
-			                	   linsert(i, '\t')==FALSE) ||
-					((i=secondindent%curtabval)!=0 &&
-				                   linsert(i,  ' ')==FALSE)) {
-			                        return FALSE;
-			                }
+			                if (lnewline() == FALSE)
+						return FALSE;
+				        if (linsert(secondindent,' ') == FALSE)
+						return FALSE;
+					if (b_val(curbp,MDTABINSERT))
+						entabline(TRUE);
 					clength = secondindent;
 					firstflag = TRUE;
 				}

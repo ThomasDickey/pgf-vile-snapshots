@@ -6,7 +6,10 @@
  * framing, are hard.
  *
  * $Log: basic.c,v $
- * Revision 1.59  1993/09/10 16:06:49  pgf
+ * Revision 1.60  1993/10/04 10:24:09  pgf
+ * see tom's 3.62 changes
+ *
+ * Revision 1.59  1993/09/10  16:06:49  pgf
  * tom's 3.61 changes
  *
  * Revision 1.58  1993/09/06  16:19:31  pgf
@@ -221,6 +224,8 @@
 
 #include	"estruct.h"
 #include	"edef.h"
+
+#define	RegexpLen(exp) ((exp->mlen) ? (int)(exp->mlen) : 1)
 
 static	int	full_pages P((int, int));
 static	int	half_pages P((int, int));
@@ -940,7 +945,7 @@ int f,n;
 	if (findpat(f, n, exp, REVERSE) != TRUE) {
 		return gotobob(f,n);
 	}
-	s = forwchar(TRUE, exp->mlen?exp->mlen:1);
+	s = forwchar(TRUE, RegexpLen(exp));
 	while (s && (is_at_end_of_line(DOT) || isspace(char_at(DOT)))) {
 		s = forwchar(TRUE,1);
 		extra++;
@@ -948,7 +953,7 @@ int f,n;
 	if (n == 1 && samepoint(savepos,DOT)) { /* try again */
 		if (looped > 10)
 			return FALSE;
-		s = backchar(TRUE, (exp->mlen?exp->mlen:1) + extra + looped);
+		s = backchar(TRUE, RegexpLen(exp) + extra + looped);
 		while (s && is_at_end_of_line(DOT))
 			s = backchar(TRUE,1);
 		looped++;
@@ -978,7 +983,7 @@ int f,n;
 			return TRUE;
 		}
 	}
-	s = forwchar(TRUE, exp->mlen?exp->mlen:1);
+	s = forwchar(TRUE, RegexpLen(exp));
 	while (s && (is_at_end_of_line(DOT) || isspace(char_at(DOT)))) {
 		s = forwchar(TRUE,1);
 	}

@@ -10,7 +10,16 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.141  1993/09/16 11:07:32  pgf
+ * Revision 1.144  1993/10/11 18:50:37  pgf
+ * turn on DOS mouse code only for turbo-c
+ *
+ * Revision 1.143  1993/10/04  10:24:09  pgf
+ * see tom's 3.62 changes
+ *
+ * Revision 1.142  1993/09/28  22:26:27  pgf
+ * changes for djgpp
+ *
+ * Revision 1.141  1993/09/16  11:07:32  pgf
  * added LPAREN/RPAREN
  *
  * Revision 1.140  1993/09/10  16:06:49  pgf
@@ -587,7 +596,8 @@
 # define HAVE_POLL 0
 #endif
 
-#if ! LINUX	/* there are probably others that don't want const defined */
+#if ! LINUX && ! GO32
+    /* there are probably others that don't want const defined */
 # define const
 #endif
 
@@ -725,7 +735,7 @@
 # endif
 #endif
 
-#ifdef SIGALRM
+#if defined(SIGALRM) && !GO32
 # define HAS_ALARM 1
 #else
 # define HAS_ALARM 0
@@ -871,7 +881,7 @@
 #define OPT_EVAL        !SMALLER		/* expression-evaluation */
 #define OPT_FLASH       !SMALLER || IBMPC	/* visible-bell */
 #define OPT_HISTORY     !SMALLER		/* command-history */
-#define OPT_MS_MOUSE    !SMALLER && IBMPC	/* MsDos-mouse */
+#define OPT_MS_MOUSE    !SMALLER && IBMPC && TURBO 	/* MsDos-mouse */
 #define OPT_UPBUFF      !SMALLER		/* animated buffer-update */
 
 #if	(TERMCAP || X11) && !SMALLER
@@ -1229,14 +1239,15 @@ union REGS {
 #define	TESTC		test_cmpl /* char for testing name-completion */
 
 /* kbd_string options */
-#define KBD_EXPAND	0x1	/* do we want to expand %, #, : */
-#define KBD_QUOTES	0x2	/* do we add and delete '\' chars for the caller */
-#define KBD_LOWERC	0x4	/* do we force input to lowercase */
-#define KBD_UPPERC	0x8	/* do we force input to uppercase */
-#define KBD_NOEVAL	0x10	/* disable 'tokval()' (e.g., from buffer) */
-#define KBD_MAYBEC	0x20	/* may be completed -- or not */
-#define KBD_NULLOK	0x40	/* may be empty -- or not */
-#define KBD_EXPCMD	0x80	/* expand %, #, : only in shell-command */
+#define KBD_EXPAND	iBIT(0)	/* do we want to expand %, #, : */
+#define KBD_QUOTES	iBIT(1)	/* do we add and delete '\' chars for the caller */
+#define KBD_LOWERC	iBIT(2)	/* do we force input to lowercase */
+#define KBD_UPPERC	iBIT(3)	/* do we force input to uppercase */
+#define KBD_NOEVAL	iBIT(4)	/* disable 'tokval()' (e.g., from buffer) */
+#define KBD_MAYBEC	iBIT(5)	/* may be completed -- or not */
+#define KBD_NULLOK	iBIT(6)	/* may be empty -- or not */
+#define KBD_EXPCMD	iBIT(7)	/* expand %, #, : only in shell-command */
+#define KBD_SHPIPE	iBIT(8)	/* expand, assuming shell-command */
 
 /* default option for 'mlreply' (used in modes.c also) */
 #if !MSDOS
@@ -1438,12 +1449,12 @@ typedef short CMASK;
 typedef struct regexp {
 	char *startp[NSUBEXP];
 	char *endp[NSUBEXP];
-	short mlen;		/* convenience:  endp[0] - startp[0] */
+	SIZE_T mlen;		/* convenience:  endp[0] - startp[0] */
 	char regstart;		/* Internal use only. */
 	char reganch;		/* Internal use only. */
 	int regmust;		/* Internal use only. */
 	int regmlen;		/* Internal use only. */
-	unsigned size;		/* vile addition -- how big is this */
+	SIZE_T size;		/* vile addition -- how big is this */
 	char program[1];	/* Unwarranted chumminess with compiler. */
 } regexp;
 
@@ -2343,6 +2354,9 @@ typedef struct WHBLOCK {
 #  if ! VMALLOC
  extern char *malloc();
  extern char *realloc();
+#  endif
+#  if APOLLO
+extern void qsort P((char *, SIZE_T, SIZE_T, int (*func)(char **,char **)));
 #  endif
 extern long strtol P((char *, char **, int));
 extern char *getenv P((char *));

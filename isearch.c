@@ -5,19 +5,22 @@
  * is intended to emulate the same command from the original EMACS
  * implementation (ITS).  Contains references to routines internal to
  * SEARCH.C.
- * 
+ *
  * REVISION HISTORY:
- * 
+ *
  * D. R. Banks 9-May-86 - added ITS EMACSlike ISearch
- * 
+ *
  * John M. Gamble 5-Oct-86 - Made iterative search use search.c's scanner()
  * routine. This allowed the elimination of bakscan(). - Put isearch
  * constants into estruct.h - Eliminated the passing of 'status' to
  * scanmore() and checknext(), since there were no circumstances where it
  * ever equalled FALSE.
- * 
+ *
  * $Log: isearch.c,v $
- * Revision 1.24  1993/08/05 14:29:12  pgf
+ * Revision 1.25  1993/10/04 10:24:09  pgf
+ * see tom's 3.62 changes
+ *
+ * Revision 1.24  1993/08/05  14:29:12  pgf
  * tom's 3.57 changes
  *
  * Revision 1.23  1993/07/27  18:06:20  pgf
@@ -65,24 +68,24 @@
  * saber cleanup
  * Revision 1.9  1991/10/30  14:55:43  pgf renamed
  * thescanner to scanner and setboundry to scanboundry
- * 
+ *
  * Revision 1.8  1991/10/27  01:46:27  pgf switch to regexp from regex package,
  * and moved expandp to this file
- * 
+ *
  * Revision 1.7  1991/10/24  13:05:52  pgf conversion to new regex package --
  * much faster
- * 
+ *
  * Revision 1.6  1991/08/07  12:35:07  pgf added RCS log messages
- * 
+ *
  * revision 1.5 date: 1991/06/26 09:37:56; renamed an ifdef BEFORE
- * 
+ *
  * revision 1.4 date: 1991/06/25 19:52:50; massive data structure restructure
- * 
+ *
  * revision 1.3 date: 1991/06/03 10:23:22; cleanup, and made it work with newer
  * scanner (setboundry())
- * 
+ *
  * revision 1.2 date: 1990/10/03 16:00:54; make backspace work for everyone
- * 
+ *
  * revision 1.1 date: 1990/09/21 10:25:30; initial vile RCS revision
  */
 
@@ -106,7 +109,7 @@ int             cmd_reexecute = -1;	/* > 0 if re-executing command */
  * code as the normal incremental search, as both can go both ways.
  */
 
-int 
+int
 risearch(f, n)
 	int             f, n;
 {
@@ -169,7 +172,7 @@ fisearch(f, n)
  * to the older micro-emacs search function, except that the search happens
  * as each character is typed, with the screen and cursor updated with each
  * new search character.
- * 
+ *
  * While searching forward, each successive character will leave the cursor at
  * the end of the entire matched string.  Typing a Control-S or Control-X
  * will cause the next occurrence of the string to be searched for (where the
@@ -178,13 +181,13 @@ fisearch(f, n)
  * Control-G will abort the search.  Rubout will back up to the previous
  * match of the string, or if the starting point is reached first, it will
  * delete the last character from the search string.
- * 
+ *
  * While searching backward, each successive character will leave the cursor at
  * the beginning of the matched string.  Typing a Control-R will search
  * backward for the next occurrence of the string.  Control-S or Control-X
  * will revert the search to the forward direction.  In general, the reverse
  * incremental search is just like the forward incremental search inverted.
- * 
+ *
  * In all cases, if the search fails, the user will be feeped, and the search
  * will stall until the pattern string is edited back into something that
  * exists (or until the search is aborted).
@@ -207,7 +210,7 @@ int f,n;
 
 	cmd_reexecute = -1;	/* We're not re-executing (yet?) */
 	cmd_offset = 0;		/* Start at the beginning of the buff */
-	cmd_buff[0] = '\0';	/* Init the command buffer */
+	cmd_buff[0] = EOS;	/* Init the command buffer */
 	(void)strncpy(pat_save, pat, NPAT); /* Save the old pattern string */
 	curpos = DOT;		/* Save the current pointer */
 	init_direction = n;	/* Save the initial search direction */
@@ -247,7 +250,7 @@ start_over:
 			forwchar(TRUE, 1);
 		}
 		--cmd_offset;	/* Back up over the Rubout */
-		cmd_buff[--cmd_offset] = '\0';	/* Yes, delete last char */
+		cmd_buff[--cmd_offset] = EOS;	/* Yes, delete last char */
 		status = scanmore(pat, n);	/* Do the search */
 		if (status != TRUE)
 			DOT = curp;
@@ -285,7 +288,7 @@ start_over:
 				DOT = curp;
 			c = kcod2key(get_char());	/* Get the next char */
 			--cmd_offset;	/* Back up over the Rubout */
-			cmd_buff[--cmd_offset] = '\0';	/* Yes, del last char */
+			cmd_buff[--cmd_offset] = EOS;	/* Yes, del last char */
 			continue;	/* Go continue with the search */
 
 		case '\r':	/* Carriage return */
@@ -300,7 +303,7 @@ start_over:
 			if (cmd_offset <= 1)	/* Anything to delete? */
 				return (TRUE);	/* No, just exit */
 			--cmd_offset;	/* Back up over the Rubout */
-			cmd_buff[--cmd_offset] = '\0';	/* Yes, del last char */
+			cmd_buff[--cmd_offset] = EOS;	/* Yes, del last char */
 			DOT = curpos;	/* Reset the pointer */
 			n = init_direction;	/* Reset the search direction */
 			(void)strncpy(pat, pat_save, NPAT);
@@ -348,7 +351,7 @@ start_over:
  * reverse searches.
  */
 
-int 
+int
 scanmore(patrn, dir)		/* search forward or back for a pattern */
 	char           *patrn;	/* string to scan for */
 	int             dir;	/* direction to search */
@@ -376,14 +379,14 @@ scanmore(patrn, dir)		/* search forward or back for a pattern */
  * The following is a worker subroutine used by the reverse search.  It
  * compares the pattern string with the characters at "." for equality. If
  * any characters mismatch, it will return FALSE.
- * 
+ *
  * This isn't used for forward searches, because forward searches leave "." at
  * the end of the search string (instead of in front), so all that needs to
  * be done is match the last char input.
  */
 
 #ifdef	UNUSED
-int 
+int
 match_pat(patrn)		/* See if the pattern string matches string
 				 * at "." */
 	char           *patrn;	/* String to match to buffer */
@@ -419,7 +422,7 @@ match_pat(patrn)		/* See if the pattern string matches string
 
 /* Routine to prompt for I-Search string. */
 
-static int 
+static int
 promptpattern(prompt)
 	char           *prompt;
 {
@@ -474,13 +477,13 @@ expandp(deststr, srcstr, maxlength)
 			break;
 		}
 	}
-	*deststr = '\0';
+	*deststr = EOS;
 	return base;
 }
 
 /* routine to echo i-search characters */
 
-int 
+int
 echochar(c, col)
 	int             c;	/* character to be echoed */
 	int             col;	/* column to be echoed in */
@@ -504,7 +507,7 @@ echochar(c, col)
  * next character.
  */
 
-int 
+int
 get_char()
 {
 	int             c;	/* A place to get a character */
@@ -527,7 +530,7 @@ get_char()
 	}
 	c = kbd_key();		/* Get the next character */
 	cmd_buff[cmd_offset++] = c;	/* Save the char for next time */
-	cmd_buff[cmd_offset] = '\0';	/* And terminate the buffer */
+	cmd_buff[cmd_offset] = EOS;	/* And terminate the buffer */
 	return (c);		/* Return the character */
 }
 

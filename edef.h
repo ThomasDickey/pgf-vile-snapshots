@@ -9,7 +9,10 @@
 
 /*
  * $Log: edef.h,v $
- * Revision 1.115  1993/09/10 16:06:49  pgf
+ * Revision 1.116  1993/10/04 10:24:09  pgf
+ * see tom's 3.62 changes
+ *
+ * Revision 1.115  1993/09/10  16:06:49  pgf
  * tom's 3.61 changes
  *
  * Revision 1.114  1993/09/03  09:11:54  pgf
@@ -384,7 +387,7 @@
 decl_uninit( char *prog_arg );		/* argv[0] from main.c */
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version 3.61");
+decl_init( char version[], "version 3.62");
 
 decl_init( int slash, '/'); 		/* so DOS can use '\' as path separator */
 
@@ -416,6 +419,8 @@ decl_uninit( WINDOW *curwp );           /* Current window               */
 decl_uninit( BUFFER *curbp );           /* Current buffer               */
 decl_uninit( WINDOW *wheadp );          /* Head of list of windows      */
 decl_uninit( BUFFER *bheadp );          /* Head of list of buffers      */
+
+decl_uninit( TBUFF *save_shell[2] );	/* last ":!" or ^X-!  command	*/
 
 decl_uninit( char sres[NBUFN] );	/* current screen resolution	*/
 
@@ -529,6 +534,14 @@ decl_uninit( int macbug );		/* macro debugging flag		*/
 decl_uninit( B_COUNT max_working );	/* 100% value for slowreadf	*/
 decl_uninit( B_COUNT cur_working );	/* current-value for slowreadf	*/
 decl_uninit( B_COUNT old_working );	/* previous-value for slowreadf	*/
+#endif
+
+	/* These pointers are nonnull only while animating a given buffer or
+	 * window.  They are used to obtain local mode-values.
+	 */
+#if OPT_UPBUFF
+decl_uninit( struct VAL *relisting_b_vals );
+decl_uninit( struct VAL *relisting_w_vals );
 #endif
 
 decl_init( char out_of_mem[], "OUT OF MEMORY" );
