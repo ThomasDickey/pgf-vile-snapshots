@@ -2,7 +2,10 @@
  *		for MicroEMACS
  *
  * $Log: spawn.c,v $
- * Revision 1.51  1993/05/04 17:05:14  pgf
+ * Revision 1.52  1993/05/24 15:21:37  pgf
+ * tom's 3.47 changes, part a
+ *
+ * Revision 1.51  1993/05/04  17:05:14  pgf
  * see tom's CHANGES, 3.45
  *
  * Revision 1.50  1993/04/28  17:11:22  pgf
@@ -757,7 +760,7 @@ filterregion()
 #endif
 	}
 	fclose(fw);
-	DOT.l = lback(DOT.l);
+	DOT.l = lBACK(DOT.l);
 	s = ifile((char *)0,TRUE,fr);
 	npclose(fr);
 	firstnonwhite(FALSE,1);

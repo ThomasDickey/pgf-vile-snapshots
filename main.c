@@ -14,7 +14,10 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.117  1993/05/11 16:22:22  pgf
+ * Revision 1.118  1993/05/24 15:21:37  pgf
+ * tom's 3.47 changes, part a
+ *
+ * Revision 1.117  1993/05/11  16:22:22  pgf
  * see tom's CHANGES, 3.46
  *
  * Revision 1.116  1993/05/11  15:46:42  pgf
@@ -521,6 +524,13 @@ char	*argv[];
 	*ekey = EOS;
 #endif
 
+#if OPT_MAP_MEMORY
+	pre_op_dot.l = l_ptr((LINE *)0);
+	nullmark.l = l_ptr((LINE *)0);
+#if !WINMARK
+	Mark.l = l_ptr((LINE *)0);	/* ...so we don't confuse with blk 0 */
+#endif
+#endif
 	charinit();		/* character types -- we need these pretty
 					early  */
 
@@ -737,8 +747,8 @@ char	*argv[];
 			firstbp = bp;
 		ffp = fdopen(dup(fileno(stdin)), "r");
 		if ((in = fopen("/dev/tty", "r")) != 0) {
-			close(0);	/* not all systems have dup2() */
-			dup(fileno(in));	/* so 'ttopen()' will work */
+			(void)close(0);		/* not all systems have dup2() */
+			(void)dup(fileno(in));	/* so 'ttopen()' will work */
 			*stdin = *in;
 		}
 		(void)slowreadf(bp, &(bp->b_linecount));
@@ -1355,6 +1365,7 @@ int f,n;
 		bp_leaks();
 		vt_leaks();
 		ev_leaks();
+		tmp_leaks();
 
 		for (i = 0, v=g_valuenames; v[i].name != 0; i++)
 			free_val(v+i, &global_g_values.gv[i]);
@@ -1368,6 +1379,9 @@ int f,n;
 		if (gregexp != 0)	free((char *)gregexp);
 		if (patmatch != 0)	free(patmatch);
 
+#if UNIX
+		if (strcmp(pathname[2], ".")) free(pathname[2]);
+#endif
 		/* whatever is left over must be a leak */
 		show_alloc();
 	}

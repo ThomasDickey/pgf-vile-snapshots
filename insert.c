@@ -8,10 +8,13 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: insert.c,v $
- *	Revision 1.23  1993/05/05 10:31:30  pgf
- *	cleaned up handling of SPEC keys from withing insert mode.  now, any
- *	function bound to a SPECkey (i.e. any FN-? thing) can be executed
- *	either from inside or outside insert mode.
+ *	Revision 1.24  1993/05/24 15:21:37  pgf
+ *	tom's 3.47 changes, part a
+ *
+ * Revision 1.23  1993/05/05  10:31:30  pgf
+ * cleaned up handling of SPEC keys from withing insert mode.  now, any
+ * function bound to a SPECkey (i.e. any FN-? thing) can be executed
+ * either from inside or outside insert mode.
  *
  * Revision 1.22  1993/05/03  14:22:55  pgf
  * fixed botch of backspace limiting introduced when i created inschar()
@@ -300,7 +303,7 @@ int f,n;
 	register int	s;
 	register int	c;
 
-	if (!f && llength(DOT.l) == 0)
+	if (!f && lLength(DOT.l) == 0)
 		return FALSE;
 
 	insertmode = REPLACECHAR;  /* need to fool the SPEC prefix code */
@@ -509,7 +512,7 @@ int *backsp_limit_p;
 			} else {
 				while (DOT.o > *backsp_limit_p) {
 					if (c == wkillc) {
-						if (isspace( lgetc(DOT.l,
+						if (isspace( lGetc(DOT.l,
 								DOT.o-1))) {
 							if (saw_word)
 								break;
@@ -538,7 +541,7 @@ int *backsp_limit_p;
 	/* if we are in overwrite mode, not at eol,
 	   and next char is not a tab or we are at a tab stop,
 	   delete a char forword			*/
-	if (insertmode == OVERWRITE && DOT.o < llength(DOT.l) &&
+	if (insertmode == OVERWRITE && DOT.o < lLength(DOT.l) &&
 			(char_at(DOT) != '\t' ||
 				(DOT.o) % curtabval == curtabval-1)) {
 		autoindented = -1;
@@ -727,12 +730,12 @@ int *bracefp;
 		gomark(FALSE,1);
 		return 0;
 	}
-	ind = indentlen(DOT.l);
+	ind = indentlen(l_ref(DOT.l));
 	if (bracefp) {
-		int lc = lastchar(DOT.l);
+		int lc = lastchar(l_ref(DOT.l));
 		*bracefp = (lc >= 0 &&
-			(lgetc(DOT.l,lc) == LBRACE ||
-			 lgetc(DOT.l,lc) == ':') );
+			(lGetc(DOT.l,lc) == LBRACE ||
+			 lGetc(DOT.l,lc) == ':') );
 	}
 		    
 	gomark(FALSE,1);
@@ -753,15 +756,15 @@ int *bracefp;
 	    
 	/* we want the indent of this line if it's non-blank, or the indent
 		of the next non-blank line otherwise */
-	fc = firstchar(DOT.l);
+	fc = firstchar(l_ref(DOT.l));
 	if (fc < 0 && forwword(FALSE,1) == FALSE) {
 		if (bracefp) *bracefp = FALSE;
 		DOT = MK;
 		return 0;
 	}
-	ind = indentlen(DOT.l);
+	ind = indentlen(l_ref(DOT.l));
 	if (bracefp) {
-		*bracefp = (lgetc(DOT.l,fc) == RBRACE);
+		*bracefp = (lGetc(DOT.l,fc) == RBRACE);
 	}
 		    
 	DOT = MK;
@@ -779,7 +782,7 @@ int ind;
 		return TRUE;
 	autoindented = 0;
 	/* first clean up existing leading whitespace */
-	i = firstchar(DOT.l);
+	i = firstchar(l_ref(DOT.l));
 	if (i > 0)
 		ldelete((long)i,FALSE);
 	if ((i=ind/curtabval)!=0) {
@@ -891,7 +894,7 @@ int f,n;
 {
 	int s;
 	int fc;
-	fc = firstchar(DOT.l);
+	fc = firstchar(l_ref(DOT.l));
 	if (fc >= 0 && fc < DOT.o) {
 		s = linsert(curswval, ' ');
 		/* should entab mult ^T inserts */
@@ -904,11 +907,11 @@ int f,n;
 	if (b_val(curbp,MDTABINSERT))
                 entabline(TRUE);
 	if (autoindented >= 0) {
-		fc = firstchar(DOT.l);
+		fc = firstchar(l_ref(DOT.l));
 		if (fc >= 0)
 			autoindented = fc;
 		else /* all white */
-			autoindented = llength(DOT.l);
+			autoindented = lLength(DOT.l);
 	}
 	return TRUE;
 }

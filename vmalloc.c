@@ -10,7 +10,10 @@
  *	(pgf, 1989)
  *
  * $Log: vmalloc.c,v $
- * Revision 1.12  1993/05/11 16:22:22  pgf
+ * Revision 1.13  1993/05/24 15:21:37  pgf
+ * tom's 3.47 changes, part a
+ *
+ * Revision 1.12  1993/05/11  16:22:22  pgf
  * see tom's CHANGES, 3.46
  *
  * Revision 1.11  1993/04/28  14:34:11  pgf
@@ -353,8 +356,8 @@ int f,n;
 				found++;
 			found++;  /* for the buffer itself */
 			for (i = 0; i < 2; i++) {
-				for (lp = bp->b_udstks[i]; lp != NULL;
-							lp = lp->l_nxtundo)
+				for (lp = l_ref(bp->b_udstks[i]); lp != NULL;
+							lp = l_ref(lp->l_nxtundo))
 					found++;
 			}
 		}

@@ -4,7 +4,10 @@
  * do any sentence mode commands, they are likely to be put in this file. 
  *
  * $Log: word.c,v $
- * Revision 1.26  1993/04/28 14:34:11  pgf
+ * Revision 1.27  1993/05/24 15:21:37  pgf
+ * tom's 3.47 changes, part a
+ *
+ * Revision 1.26  1993/04/28  14:34:11  pgf
  * see CHANGES, 3.44 (tom)
  *
  * Revision 1.25  1993/04/01  12:53:33  pgf
@@ -321,19 +324,19 @@ joinregion()
 		return FALSE;
 
 	DOT = region.r_orig;
-	end = region.r_end.l;
+	end = l_ref(region.r_end.l);
 	fulllineregions = FALSE;
 
 	while (!done) {
 		c = EOS;
 		s = gotoeol(FALSE,1);
 		if (DOT.o > 0)
-			c = lgetc(DOT.l, DOT.o-1);
+			c = lGetc(DOT.l, DOT.o-1);
 		if (s == TRUE) s = setmark();
 		if (s == TRUE) s = forwline(FALSE,1);
 		if (s == TRUE) s = firstnonwhite(FALSE,1);
 
-		done = ((DOT.l == end) || (lforw(DOT.l) == end));
+		done = ((l_ref(DOT.l) == end) || (lForw(DOT.l) == end));
 		if (s == TRUE) s = killregion();
 		if (s != TRUE)
 			return s ;
@@ -341,10 +344,10 @@ joinregion()
 		doto = DOT.o;
 		if (doto == 0)
 			;	/* join at column 0 to empty line */
-		else if (doto < llength(DOT.l)) {
-			if (lgetc(DOT.l, doto) == ')')
+		else if (doto < lLength(DOT.l)) {
+			if (lGetc(DOT.l, doto) == ')')
 				;	/* join after parentheses */
-			else if (lgetc(DOT.l, doto-1) == '.')
+			else if (lGetc(DOT.l, doto-1) == '.')
 				s = linsert(2,' ');
 			else if (!isspace(c))
 				s = linsert(1,' ');
@@ -389,46 +392,46 @@ formatregion()
 		if (sameline(region.r_orig, MK))
 			swapmark();
 	}
-	pastline = MK.l;
-	if (pastline != curbp->b_line.l)
+	pastline = l_ref(MK.l);
+	if (pastline != l_ref(curbp->b_line.l))
 		pastline = lforw(pastline);
 
 	expP = b_val_rexp(curbp,VAL_PARAGRAPHS)->reg;
 	expC = b_val_rexp(curbp,VAL_COMMENTS)->reg;
  	finished = FALSE;
  	while (finished != TRUE) {  /* i.e. is FALSE or SORTOFTRUE */
-		while (lregexec(expP, DOT.l, 0, llength(DOT.l)) ||
-			lregexec(expC, DOT.l, 0, llength(DOT.l)) ) {
-			DOT.l = lforw(DOT.l);
-			if (DOT.l == pastline) {
+		while (lregexec(expP, l_ref(DOT.l), 0, lLength(DOT.l)) ||
+			lregexec(expC, l_ref(DOT.l), 0, lLength(DOT.l)) ) {
+			DOT.l = lFORW(DOT.l);
+			if (l_ref(DOT.l) == pastline) {
 				setmark();
 				return TRUE;
 			}
 		}
 
-		secondindent = indentlen(DOT.l);
+		secondindent = indentlen(l_ref(DOT.l));
 		
 		/* go forward to get the indent for the second
 			and following lines */
-		DOT.l = lforw(DOT.l);
+		DOT.l = lFORW(DOT.l);
 
-		if (DOT.l != pastline) {
-			secondindent = indentlen(DOT.l);
+		if (l_ref(DOT.l) != pastline) {
+			secondindent = indentlen(l_ref(DOT.l));
 		}
 			
 		/* and back where we should be */
-		DOT.l = lback(DOT.l);
+		DOT.l = lBACK(DOT.l);
 		firstnonwhite(FALSE,1);
 		
-		clength = indentlen(DOT.l);
+		clength = indentlen(l_ref(DOT.l));
 		wordlen = 0;
 		sentence = FALSE;
 
 		is_comment = ( ((c = char_at(DOT)) == '#') ||
 				(c == '*') ||
 				((c == '/') &&
-				DOT.o+1 < llength(DOT.l) &&
-				 lgetc(DOT.l,DOT.o+1) == '*'));
+				DOT.o+1 < lLength(DOT.l) &&
+				 lGetc(DOT.l,DOT.o+1) == '*'));
 
 		if (is_comment)
 			comment_char = (c == '#') ? '#':'*';
@@ -443,16 +446,16 @@ formatregion()
 			/* get the next character */
 			if (is_at_end_of_line(DOT)) {
 				c = ' ';
-				DOT.l = lforw(DOT.l);
-				if (DOT.l == pastline) {
+				DOT.l = lFORW(DOT.l);
+				if (l_ref(DOT.l) == pastline) {
 					finished = TRUE;
 				} else if (
-				lregexec(expP, DOT.l, 0, llength(DOT.l)) ||
-				lregexec(expC, DOT.l, 0, llength(DOT.l))) {
+				lregexec(expP, l_ref(DOT.l), 0, lLength(DOT.l)) ||
+				lregexec(expC, l_ref(DOT.l), 0, lLength(DOT.l))) {
 					/* we're at a section break */
 					finished = SORTOFTRUE;
 				}
-				DOT.l = lback(DOT.l);
+				DOT.l = lBACK(DOT.l);
 				at_nl = TRUE;
 			} else {
 				c = char_at(DOT);
@@ -522,7 +525,7 @@ formatregion()
 				wordlen = 0;
 			}
 		}
-		DOT.l = lforw(DOT.l);
+		DOT.l = lFORW(DOT.l);
 	}
 	setmark();
 	return(TRUE);

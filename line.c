@@ -11,7 +11,10 @@
  * which means that the dot and mark values in the buffer headers are nonsense.
  *
  * $Log: line.c,v $
- * Revision 1.42  1993/05/11 16:22:22  pgf
+ * Revision 1.43  1993/05/24 15:21:37  pgf
+ * tom's 3.47 changes, part a
+ *
+ * Revision 1.42  1993/05/11  16:22:22  pgf
  * see tom's CHANGES, 3.46
  *
  * Revision 1.41  1993/04/22  11:15:08  pgf
@@ -178,6 +181,7 @@
  * a pointer to the new block, or NULL if there isn't any memory left. Print a
  * message in the message line if no space.
  */
+/*ARGSUSED*/
 LINE *
 lalloc(used,bp)
 register int	used;
@@ -192,6 +196,9 @@ BUFFER *bp;
 	} else {
 		size = roundup(used);
 	}
+#if OPT_MAP_MEMORY
+	lp = l_ref(l_allocate(size));
+#else
 	/* see if the buffer LINE block has any */
 	if ((lp = bp->b_freeLINEs) != NULL) {
 		bp->b_freeLINEs = lp->l_nxtundo;
@@ -207,37 +214,45 @@ BUFFER *bp;
 		return NULL;
 	}
 	lp->l_size = size;
+#endif
 	lp->l_used = used;
 	lsetclear(lp);
-	lp->l_nxtundo = NULL;
+	lp->l_nxtundo = l_ptr((LINE *)0);
 	return (lp);
 }
 
+/*ARGSUSED*/
 void
 lfree(lp,bp)
 register LINE *lp;
 register BUFFER *bp;
 {
+#if OPT_MAP_MEMORY
+	l_deallocate(l_ptr(lp),bp);
+#else
 	ltextfree(lp,bp);
 
 	/* if the buffer doesn't have its own block of LINEs, or this
 		one isn't in that range, free it */
-	if (!bp->b_LINEs || lp < bp->b_LINEs || lp >= bp->b_LINEs_end) {
+	if (!l_ref(bp->b_LINEs) || lp < l_ref(bp->b_LINEs) || lp >= l_ref(bp->b_LINEs_end)) {
 		poison(lp, sizeof(*lp));
 		free((char *)lp);
 	} else {
 		/* keep track of freed buffer LINEs here */
 		lp->l_nxtundo = bp->b_freeLINEs;
-		bp->b_freeLINEs = lp;
+		bp->b_freeLINEs = l_ptr(lp);
 #ifdef POISON
 		/* catch references hard */
 		set_lback(lp, set_lback(lp, (LINE *)1)); /* patch: why twice? */
 		lp->l_text = (char *)1;
-		lp->l_size = lp->l_used = -1;
+		lp->l_size = lp->l_used = LINENOTREAL;
 #endif
 	}
+#endif
 }
 
+#if !OPT_MAP_MEMORY
+/*ARGSUSED*/
 void
 ltextfree(lp,bp)
 register LINE *lp;
@@ -261,6 +276,7 @@ register BUFFER *bp;
 		lp->l_text = NULL;
 	} /* else nothing to free */
 }
+#endif
 
 /*
  * Delete line "lp". Fix all of the links that might point at it (they are
@@ -277,16 +293,16 @@ register LINE	*lp;
 	register WINDOW *wp;
 
 #if !WINMARK
-	if (MK.l == lp) {
-		MK.l = lforw(lp);
+	if (l_ref(MK.l) == lp) {
+		MK.l = l_ptr(lforw(lp));
 		MK.o = 0;
 	}
 #endif
 	for_each_window(wp) {
-		if (wp->w_line.l == lp)
-			wp->w_line.l = lforw(lp);
-		if (wp->w_dot.l	== lp) {
-			wp->w_dot.l  = lforw(lp);
+		if (l_ref(wp->w_line.l) == lp)
+			wp->w_line.l = l_ptr(lforw(lp));
+		if (l_ref(wp->w_dot.l)	== lp) {
+			wp->w_dot.l  = l_ptr(lforw(lp));
 			wp->w_dot.o  = 0;
 		}
 #if WINMARK
@@ -303,8 +319,8 @@ register LINE	*lp;
 #endif
 	}
 	if (bp->b_nwnd == 0) {
-		if (bp->b_dot.l	== lp) {
-			bp->b_dot.l = lforw(lp);
+		if (l_ref(bp->b_dot.l) == lp) {
+			bp->b_dot.l = l_ptr(lforw(lp));
 			bp->b_dot.o = 0;
 		}
 #if WINMARK
@@ -366,12 +382,14 @@ int n, c;
 	register int	doto;
 	register int	i;
 	register WINDOW *wp;
+#if !OPT_MAP_MEMORY
 	register char	*ntext;
+#endif
 	unsigned nsize;
 
 	chg_buff(curbp, WFEDIT);
-	lp1 = curwp->w_dot.l;			/* Current line 	*/
-	if (lp1 == curbp->b_line.l) {		/* At the end: special	*/
+	lp1 = l_ref(curwp->w_dot.l);		/* Current line 	*/
+	if (lp1 == l_ref(curbp->b_line.l)) {	/* At the end: special	*/
 		if (curwp->w_dot.o != 0) {
 			mlforce("BUG: linsert");
 			return (FALSE);
@@ -388,7 +406,7 @@ int n, c;
 		set_lback(lp2, lp3);
 		for (i=0; i<n; ++i)
 			lp2->l_text[i] = c;
-		curwp->w_dot.l = lp2;
+		curwp->w_dot.l = l_ptr(lp2);
 		curwp->w_dot.o = n;
 		tag_for_undo(lp2);
 		return (TRUE);
@@ -398,6 +416,13 @@ int n, c;
 		copy_for_undo(lp1);
 		/* first, create the new image */
 		nsize = roundup(lp1->l_used+n);
+#if OPT_MAP_MEMORY
+		if ((lp1 = l_reallocate(curwp->w_dot.l, nsize, curbp)) == 0)
+			return (FALSE);
+		memmove(&lp1->l_text[doto+n], &lp1->l_text[doto], lp1->l_used - doto);
+		memset(&lp1->l_text[doto],   c, n);
+		lp1->l_used += n;
+#else
 		if ((ntext=castalloc(char,nsize)) == NULL)
 			return (FALSE);
 		if (lp1->l_text) /* possibly NULL if l_size == 0 */
@@ -411,6 +436,7 @@ int n, c;
 		lp1->l_text = ntext;
 		lp1->l_size = nsize;
 		lp1->l_used += n;
+#endif
 	} else {				/* Easy: in place	*/
 		copy_for_undo(lp1);
 		/* don't used memcpy:  overlapping regions.... */
@@ -423,13 +449,13 @@ int n, c;
 			lp1->l_text[doto+i] = c;
 	}
 #if ! WINMARK
-	if (MK.l == lp1) {
+	if (l_ref(MK.l) == lp1) {
 		if (MK.o > doto)
 			MK.o += n;
 	}
 #endif
 	for_each_window(wp) {			/* Update windows	*/
-		if (wp->w_dot.l == lp1) {
+		if (l_ref(wp->w_dot.l) == lp1) {
 			if (wp==curwp || wp->w_dot.o>doto)
 				wp->w_dot.o += n;
 		}
@@ -439,7 +465,7 @@ int n, c;
 				wp->w_mark.o += n;
 		}
 #endif
-		if (wp->w_lastdot.l == lp1) {
+		if (l_ref(wp->w_lastdot.l) == lp1) {
 			if (wp->w_lastdot.o > doto)
 				wp->w_lastdot.o += n;
 		}
@@ -448,7 +474,7 @@ int n, c;
 		struct MARK *mp;
 		for (i = 0; i < 26; i++) {
 			mp = &(curbp->b_nmmarks[i]);
-			if (mp->l == lp1) {
+			if (l_ref(mp->l) == lp1) {
 				if (mp->o > doto)
 					mp->o += n;
 			}
@@ -476,9 +502,9 @@ lnewline()
 	register WINDOW *wp;
 
 	chg_buff(curbp, WFHARD|WFINS);
-	lp1  = curwp->w_dot.l;			/* Get the address and	*/
+	lp1  = l_ref(curwp->w_dot.l);		/* Get the address and	*/
 	doto = curwp->w_dot.o;			/* offset of "."	*/
-	if (lp1 == curbp->b_line.l && lforw(lp1) == lp1) {
+	if (lp1 == l_ref(curbp->b_line.l) && lforw(lp1) == lp1) {
 		/* empty buffer -- just  create empty line */
 		if ((lp2=lalloc(doto,curbp)) == NULL)
 			return (FALSE);
@@ -489,10 +515,10 @@ lnewline()
 		set_lback(lp2, lp1);
 		tag_for_undo(lp2);
 		for_each_window(wp) {
-			if (wp->w_line.l == lp1)
-				wp->w_line.l = lp2;
-			if (wp->w_dot.l == lp1)
-				wp->w_dot.l = lp2;
+			if (l_ref(wp->w_line.l) == lp1)
+				wp->w_line.l = l_ptr(lp2);
+			if (l_ref(wp->w_dot.l) == lp1)
+				wp->w_dot.l = l_ptr(lp2);
 		}
 		return TRUE;
 	}
@@ -517,19 +543,19 @@ lnewline()
 	tag_for_undo(lp2);
 	dumpuline(lp1);
 #if ! WINMARK
-	if (MK.l == lp1) {
+	if (l_ref(MK.l) == lp1) {
 		if (MK.o < doto)
-			MK.l = lp2;
+			MK.l = l_ptr(lp2);
 		else
 			MK.o -= doto;
 	}
 #endif
 	for_each_window(wp) {
-		if (wp->w_line.l == lp1)
-			wp->w_line.l = lp2;
-		if (wp->w_dot.l == lp1) {
+		if (l_ref(wp->w_line.l) == lp1)
+			wp->w_line.l = l_ptr(lp2);
+		if (l_ref(wp->w_dot.l) == lp1) {
 			if (wp->w_dot.o < doto)
-				wp->w_dot.l = lp2;
+				wp->w_dot.l = l_ptr(lp2);
 			else
 				wp->w_dot.o -= doto;
 		}
@@ -541,9 +567,9 @@ lnewline()
 				wp->w_mark.o -= doto;
 		}
 #endif
-		if (wp->w_lastdot.l == lp1) {
+		if (l_ref(wp->w_lastdot.l) == lp1) {
 			if (wp->w_lastdot.o < doto)
-				wp->w_lastdot.l = lp2;
+				wp->w_lastdot.l = l_ptr(lp2);
 			else
 				wp->w_lastdot.o -= doto;
 		}
@@ -553,9 +579,9 @@ lnewline()
 		struct MARK *mp;
 		for (i = 0; i < 26; i++) {
 			mp = &(curbp->b_nmmarks[i]);
-			if (mp->l == lp1) {
+			if (l_ref(mp->l) == lp1) {
 				if (mp->o < doto)
-					mp->l = lp2;
+					mp->l = l_ptr(lp2);
 				else
 					mp->o -= doto;
 			}
@@ -585,9 +611,9 @@ int kflag;	/* put killed text in kill buffer flag */
 	register int i,s;
 
 	while (n != 0) {
-		dotp = DOT.l;
+		dotp = l_ref(DOT.l);
 		doto = DOT.o;
-		if (dotp == curbp->b_line.l)	/* Hit end of buffer.	*/
+		if (dotp == l_ref(curbp->b_line.l)) /* Hit end of buffer.*/
 			return (FALSE);
 		chunk = dotp->l_used-doto;	/* Size of chunk.	*/
 		if (chunk > (int)n)
@@ -596,7 +622,7 @@ int kflag;	/* put killed text in kill buffer flag */
 			chg_buff(curbp, WFHARD|WFKILLS);
 			/* first take out any whole lines below this one */
 			nlp = lforw(dotp);
-			while (nlp != curbp->b_line.l && llength(nlp)+1 < n) {
+			while (nlp != l_ref(curbp->b_line.l) && llength(nlp)+1 < n) {
 				if (kflag) {
 					s = kinsert('\n');
 					for (i = 0; i < llength(nlp) && 
@@ -633,14 +659,14 @@ int kflag;	/* put killed text in kill buffer flag */
 			*cp1++ = *cp2++;
 		dotp->l_used -= chunk;
 #if ! WINMARK
-		if (MK.l && MK.o > doto) {
+		if (l_ref(MK.l) && MK.o > doto) {
 			MK.o -= chunk;
 			if (MK.o < doto)
 				MK.o = doto;
 		}
 #endif
 		for_each_window(wp) {		/* Fix windows		*/
-			if (wp->w_dot.l==dotp && wp->w_dot.o > doto) {
+			if (l_ref(wp->w_dot.l) == dotp && wp->w_dot.o > doto) {
 				wp->w_dot.o -= chunk;
 				if (wp->w_dot.o < doto)
 					wp->w_dot.o = doto;
@@ -652,7 +678,7 @@ int kflag;	/* put killed text in kill buffer flag */
 					wp->w_mark.o = doto;
 			}
 #endif
-			if (wp->w_lastdot.l==dotp && wp->w_lastdot.o > doto) {
+			if (l_ref(wp->w_lastdot.l) == dotp && wp->w_lastdot.o > doto) {
 				wp->w_lastdot.o -= chunk;
 				if (wp->w_lastdot.o < doto)
 					wp->w_lastdot.o = doto;
@@ -662,7 +688,7 @@ int kflag;	/* put killed text in kill buffer flag */
 			struct MARK *mp;
 			for (i = 0; i < 26; i++) {
 				mp = &(curbp->b_nmmarks[i]);
-				if (mp->l==dotp && mp->o > doto) {
+				if (l_ref(mp->l)==dotp && mp->o > doto) {
 					mp->o -= chunk;
 					if (mp->o < doto)
 						mp->o = doto;
@@ -736,7 +762,7 @@ ldelnewline()
 	register LINE	*lp2;
 	register WINDOW *wp;
 
-	lp1 = curwp->w_dot.l;
+	lp1 = l_ref(curwp->w_dot.l);
 	/* if the current line is empty, remove it */
 	if (lp1->l_used == 0) {		/* Blank line.		*/
 		toss_to_undo(lp1);
@@ -747,7 +773,7 @@ ldelnewline()
 	/* if the next line is empty, that's "currline\n\n", so we
 		remove the second \n by deleting the next line */
 	/* but never delete the newline on the last non-empty line */
-	if (lp2 == curbp->b_line.l)
+	if (lp2 == l_ref(curbp->b_line.l))
 		return (TRUE);
 	else if (lp2->l_used == 0) {
 		/* next line blank? */
@@ -758,10 +784,16 @@ ldelnewline()
 	copy_for_undo(lp1);
 	/* no room in line above, make room */
 	if (lp2->l_used > lp1->l_size-lp1->l_used) {
+#if !OPT_MAP_MEMORY
 		char *ntext;
+#endif
 		unsigned nsize;
 		/* first, create the new image */
 		nsize = roundup(lp1->l_used + lp2->l_used);
+#if OPT_MAP_MEMORY
+		if ((lp1 = l_reallocate(l_ptr(lp1), nsize, curbp)) == 0)
+			return (FALSE);
+#else
 		if ((ntext=castalloc(char, nsize)) == NULL)
 			return (FALSE);
 		if (lp1->l_text) { /* possibly NULL if l_size == 0 */
@@ -770,23 +802,24 @@ ldelnewline()
 		}
 		lp1->l_text = ntext;
 		lp1->l_size = nsize;
+#endif
 	}
 	cp1 = &lp1->l_text[lp1->l_used];
 	cp2 = &lp2->l_text[0];
 	while (cp2 != &lp2->l_text[lp2->l_used])
 		*cp1++ = *cp2++;
 #if ! WINMARK
-	if (MK.l == lp2) {
-		MK.l  = lp1;
+	if (l_ref(MK.l) == lp2) {
+		MK.l  = l_ptr(lp1);
 		MK.o += lp1->l_used;
 	}
 #endif
 	/* check all windows for references to the deleted line */
 	for_each_window(wp) {
-		if (wp->w_line.l == lp2)
-			wp->w_line.l = lp1;
-		if (wp->w_dot.l == lp2) {
-			wp->w_dot.l  = lp1;
+		if (l_ref(wp->w_line.l) == lp2)
+			wp->w_line.l = l_ptr(lp1);
+		if (l_ref(wp->w_dot.l) == lp2) {
+			wp->w_dot.l  = l_ptr(lp1);
 			wp->w_dot.o += lp1->l_used;
 		}
 #if WINMARK
@@ -795,8 +828,8 @@ ldelnewline()
 			wp->w_mark.o += lp1->l_used;
 		}
 #endif
-		if (wp->w_lastdot.l == lp2) {
-			wp->w_lastdot.l  = lp1;
+		if (l_ref(wp->w_lastdot.l) == lp2) {
+			wp->w_lastdot.l  = l_ptr(lp1);
 			wp->w_lastdot.o += lp1->l_used;
 		}
 	}
@@ -805,8 +838,8 @@ ldelnewline()
 		struct MARK *mp;
 		for (i = 0; i < 26; i++) {
 			mp = &(curbp->b_nmmarks[i]);
-			if (mp->l == lp2) {
-				mp->l  = lp1;
+			if (l_ref(mp->l) == lp2) {
+				mp->l  = l_ptr(lp1);
 				mp->o += lp1->l_used;
 			}
 		}
@@ -1096,7 +1129,7 @@ int f,n,after,putlines;
 	lining = (putlines == TRUE || (kbs[ukb].kbflag & KLINES));
 	if (lining) {
 		if (after && !is_header_line(curwp->w_dot, curbp))
-			curwp->w_dot.l = lforw(curwp->w_dot.l);
+			curwp->w_dot.l = lFORW(curwp->w_dot.l);
 		curwp->w_dot.o = 0;
 	} else {
 		if (after && !is_at_end_of_line(curwp->w_dot))
@@ -1107,7 +1140,7 @@ int f,n,after,putlines;
 	if (s == TRUE)
 		swapmark();
 	if (is_header_line(curwp->w_dot, curbp))
-		curwp->w_dot.l = lback(curwp->w_dot.l);
+		curwp->w_dot.l = lBACK(curwp->w_dot.l);
 	if (lining)
 		firstnonwhite(FALSE,0);
 	ukb = 0;

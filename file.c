@@ -6,7 +6,10 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.87  1993/05/11 16:22:22  pgf
+ * Revision 1.88  1993/05/24 15:21:37  pgf
+ * tom's 3.47 changes, part a
+ *
+ * Revision 1.87  1993/05/11  16:22:22  pgf
  * see tom's CHANGES, 3.46
  *
  * Revision 1.86  1993/05/10  10:08:30  pgf
@@ -730,7 +733,7 @@ int	mflg;		/* print messages? */
 		odv = doverifys;
 		doverifys = 0;
 #endif
-#if ! MSDOS	/* DOS has too many 64K limits for this to work */
+#if ! MSDOS && !OPT_MAP_MEMORY
 		if (fileispipe || (s = quickreadf(bp, &nline)) == FIOMEM)
 #endif
 			s = slowreadf(bp, &nline);
@@ -777,8 +780,8 @@ int	mflg;		/* print messages? */
 
         for_each_window(wp) {
                 if (wp->w_bufp == bp) {
-                        wp->w_line.l = lforw(bp->b_line.l);
-                        wp->w_dot.l  = lforw(bp->b_line.l);
+                        wp->w_line.l = lFORW(bp->b_line.l);
+                        wp->w_dot.l  = lFORW(bp->b_line.l);
                         wp->w_dot.o  = 0;
 #ifdef WINMARK
                         wp->w_mark = nullmark;
@@ -795,7 +798,7 @@ int	mflg;		/* print messages? */
         return TRUE;
 }
 
-#if ! MSDOS
+#if ! MSDOS && !OPT_MAP_MEMORY
 int
 quickreadf(bp, nlinep)
 register BUFFER *bp;
@@ -910,7 +913,7 @@ int *nlinep;
 				set_lforw(lp, lp + 1);
 				set_lback(lp, lp - 1);
 				lsetclear(lp);
-				lp->l_nxtundo = NULL;
+				lp->l_nxtundo = l_ptr(NULL);
 				lp++;
 				textp += *textp + 1;
 			}
@@ -990,9 +993,9 @@ int *nlinep;
 			        for_each_window(wp) {
 			                if (wp->w_bufp == bp) {
 			                        wp->w_line.l=
-							lforw(bp->b_line.l);
+							lFORW(bp->b_line.l);
 			                        wp->w_dot.l =
-							lback(bp->b_line.l);
+							lBACK(bp->b_line.l);
 			                        wp->w_dot.o = 0;
 						wp->w_flag |= flag;
 						wp->w_force = -1;
@@ -1246,7 +1249,7 @@ int msgf;
 
 	bsizes(bp);	/* make sure we have current count */
 	/* starting at the beginning of the buffer */
-        region.r_orig.l = lforw(bp->b_line.l);
+        region.r_orig.l = lFORW(bp->b_line.l);
         region.r_orig.o = 0;
         region.r_size   = bp->b_bytecount;
         region.r_end    = bp->b_line;
@@ -1296,8 +1299,8 @@ BUFFER	*bp;
 	long nchar;
 
 	/* this is adequate as long as we cannot write parts of lines */
-	int	whole_file = (rp->r_orig.l == lforw(bp->b_line.l))
-	        	  && (rp->r_end.l  == bp->b_line.l);
+	int	whole_file = (l_ref(rp->r_orig.l) == lForw(bp->b_line.l))
+	        	  && (l_ref(rp->r_end.l)  == l_ref(bp->b_line.l));
 
 	fn = lengthen_path(strcpy(fname, fn));
 	if (same_fname(fn, bp, FALSE) && b_val(bp,MDVIEW)) {
@@ -1323,7 +1326,7 @@ BUFFER	*bp;
 
 	CleanToPipe();
 
-        lp = rp->r_orig.l;
+        lp = l_ref(rp->r_orig.l);
         nline = 0;                              /* Number of lines     */
         nchar = 0;                              /* Number of chars     */
 
@@ -1559,7 +1562,7 @@ FILE	*haveffp;
 	} else { /* we already have the file pointer */
 		ffp = haveffp;
 	}
-	lp0 = curwp->w_dot.l;
+	lp0 = l_ref(curwp->w_dot.l);
 	curwp->w_dot.o = 0;
 	MK = DOT;
 
@@ -1601,7 +1604,7 @@ FILE	*haveffp;
 	}
 out:
 	/* advance to the next line and mark the window for changes */
-	curwp->w_dot.l = lforw(curwp->w_dot.l);
+	curwp->w_dot.l = lFORW(curwp->w_dot.l);
 
 	/* copy window parameters back to the buffer structure */
 	curbp->b_wtraits = curwp->w_traits;

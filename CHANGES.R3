@@ -1,3 +1,33 @@
+Changes for vile 3.47:
+(tom)
+
+    (part a)
+	+ introduced 'l_ref()' and 'l_ptr()' functions, rippled-through changes
+	  to support mapped data (files basic.c buffer.c csrch.c display.c
+	  estruct.h eval.c exec.c fences.c file.c filec.c finderr.c globals.c
+	  history.c insert.c line.c oneliner.c path.c proto.h random.c region.c
+	  search.c spawn.c tags.c tmp.c undo.c window.c word.c)
+
+	+ added logic to file tmp.c to allocate LINE structs from a pool of
+	  pages (note that deallocation isn't done, nor is swapping to a
+	  tmp-file as yet).
+
+    (part b)
+	+ added code to test return-value of 'glob()' in file eval.c
+
+	+ corrected 'get_recorded_char()' (file input.c) to reset 'buffer'
+	  variable after 'finish_kbm()' makes it obsolete.
+
+	+ provided more useful defaults for TERMCAP, IBMPC and COLOR
+	  definitions in file estruct.h
+
+	+ corrected value of MK in 'FreeBuffer()' (file buffer.c), which caused
+	  multiple frees of the same LINE struct.
+
+	+ supplied initialization for wp->w_dot.l and wp->w_line.l in
+	  'reframe()' (file display.c) to handle the case when vile is invoked
+	  with no filename parameters. 
+
 Changes for vile 3.46:
 (pgf)
 	+ suppress attempts at reading a null file into the [vileinit]

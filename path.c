@@ -3,7 +3,10 @@
  *		strings.
  *
  * $Log: path.c,v $
- * Revision 1.10  1993/05/11 16:22:22  pgf
+ * Revision 1.11  1993/05/24 15:21:37  pgf
+ * tom's 3.47 changes, part a
+ *
+ * Revision 1.10  1993/05/11  16:22:22  pgf
  * see tom's CHANGES, 3.46
  *
  * Revision 1.9  1993/05/06  11:59:58  pgf
@@ -634,7 +637,7 @@ char *path;
 		if (!strchr(path, '*') && !strchr(path, '?')) {
 			if ((fd = open(path, O_RDONLY, 0)) >= 0) {
 				getname(fd, temp);
-				close(fd);
+				(void)close(fd);
 				return strcpy(path, temp);
 			}
 		}

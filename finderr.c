@@ -2,7 +2,10 @@
  * Written for vile by Paul Fox, (c)1990
  *
  * $Log: finderr.c,v $
- * Revision 1.22  1993/05/11 16:22:22  pgf
+ * Revision 1.23  1993/05/24 15:21:37  pgf
+ * tom's 3.47 changes, part a
+ *
+ * Revision 1.22  1993/05/11  16:22:22  pgf
  * see tom's CHANGES, 3.46
  *
  * Revision 1.21  1993/04/28  14:34:11  pgf
@@ -211,11 +214,11 @@ int f,n;
 			}
 		}
 			
-		if (lforw(dotp) == sbp->b_line.l) {
+		if (lforw(dotp) == l_ref(sbp->b_line.l)) {
 			mlforce("[No more errors in %s buffer]", febuff);
 			TTbeep();
 			/* start over at the top of file */
-			putdotback(sbp, lforw(sbp->b_line.l));
+			putdotback(sbp, lForw(sbp->b_line.l));
 			while (l)
 				free(dirs[l--]);
 			return FALSE;
@@ -273,11 +276,11 @@ struct BUFFER *bp;
 					pull dot from the first */
 	        for_each_window(wp) {
 	                if (wp->w_bufp == bp) {
-	                        return wp->w_dot.l;
+	                        return l_ref(wp->w_dot.l);
 			}
 	        }
 	}
-        return bp->b_dot.l;
+        return l_ref(bp->b_dot.l);
 }
 
 void
@@ -290,7 +293,7 @@ struct LINE *dotp;
 	if (bp->b_nwnd) {
 	        for_each_window(wp) {
 	                if (wp->w_bufp == bp) {
-		                wp->w_dot.l = dotp;
+		                wp->w_dot.l = l_ptr(dotp);
 		                wp->w_dot.o = 0;
 			        wp->w_flag |= WFMOVE;
 			}
@@ -298,7 +301,7 @@ struct LINE *dotp;
 		return;
 	}
 	/* then the buffer isn't displayed */
-        bp->b_dot.l = dotp;
+        bp->b_dot.l = l_ptr(dotp);
         bp->b_dot.o = 0;
 }
 

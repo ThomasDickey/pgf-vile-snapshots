@@ -8,8 +8,11 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: fences.c,v $
- *	Revision 1.11  1993/04/01 13:06:31  pgf
- *	turbo C support (mostly prototypes for static)
+ *	Revision 1.12  1993/05/24 15:21:37  pgf
+ *	tom's 3.47 changes, part a
+ *
+ * Revision 1.11  1993/04/01  13:06:31  pgf
+ * turbo C support (mostly prototypes for static)
  *
  * Revision 1.10  1993/03/31  19:28:50  pgf
  * fixed bug introduced in 3.38 -- getfence is sometimes called internally
@@ -115,15 +118,15 @@ int key;
 
 	/* set up for scan */
 	if (sdir == REVERSE)
-		DOT.l = lback(DOT.l);
+		DOT.l = lBACK(DOT.l);
 	else
-		DOT.l = lforw(DOT.l);
+		DOT.l = lFORW(DOT.l);
 
 	while (count > 0 && !is_header_line(DOT, curbp)) {
-		if ((i = firstchar(DOT.l)) >= 0
-		 && lgetc(DOT.l,i) == '#'
-		 && (j = nextchar(DOT.l,i+1)) >= 0
-		 && ((this = cpp_keyword(DOT.l,j)) != CPP_UNKNOWN)) {
+		if ((i = firstchar(l_ref(DOT.l))) >= 0
+		 && lGetc(DOT.l,i) == '#'
+		 && (j = nextchar(l_ref(DOT.l),i+1)) >= 0
+		 && ((this = cpp_keyword(l_ref(DOT.l),j)) != CPP_UNKNOWN)) {
 			int	done = FALSE;
 
 			switch (this) {
@@ -160,9 +163,9 @@ int key;
 		}
 
 		if (sdir == REVERSE)
-			DOT.l = lback(DOT.l);
+			DOT.l = lBACK(DOT.l);
 		else
-			DOT.l = lforw(DOT.l);
+			DOT.l = lFORW(DOT.l);
 
 		if (is_header_line(DOT,curbp) || interrupted)
 			return FALSE;
@@ -212,21 +215,21 @@ int sdir; /* direction to scan if we're not on a fence to begin with */
 
 	/* ch may have been passed, if being used internally */
 	if (!ch) {
-		if ((i = firstchar(DOT.l)) < 0)	/* offset of first nonblank */
+		if ((i = firstchar(l_ref(DOT.l))) < 0)	/* offset of first nonblank */
 			return FALSE;		/* line is entirely blank */
 
-		if (DOT.o <= i && (ch = lgetc(DOT.l,i)) == '#') {
-			if (llength(DOT.l) < i+3)
+		if (DOT.o <= i && (ch = lGetc(DOT.l,i)) == '#') {
+			if (lLength(DOT.l) < i+3)
 				return FALSE;
 		} else if ((ch = char_at(DOT)) == '/' || ch == '*') {
 			/* EMPTY */;
 		} else if (sdir == FORWARD) {
 			/* get the current character */
-			if (oldpos.o < llength(oldpos.l)) {
+			if (oldpos.o < lLength(oldpos.l)) {
 				do {
 					ch = char_at(oldpos);
 				} while(!isfence(ch) &&
-					++oldpos.o < llength(oldpos.l));
+					++oldpos.o < lLength(oldpos.l));
 			}
 			if (is_at_end_of_line(oldpos)) {
 				return FALSE;
@@ -275,21 +278,21 @@ int sdir; /* direction to scan if we're not on a fence to begin with */
 			sdir = REVERSE;
 			break;
 		case '#':
-			if ((i = firstchar(DOT.l)) < 0)
+			if ((i = firstchar(l_ref(DOT.l))) < 0)
 				return FALSE;	/* line is entirely blank */
-			if ((i = nextchar(DOT.l,i+1)) >= 0
-			 && ((key = cpp_keyword(DOT.l,i)) != CPP_UNKNOWN))
+			if ((i = nextchar(l_ref(DOT.l),i+1)) >= 0
+			 && ((key = cpp_keyword(l_ref(DOT.l),i)) != CPP_UNKNOWN))
 			 	break;
 			return FALSE;
 		case '*':
 			ch = '/';
-			if (DOT.o+1 < llength(DOT.l) &&
-				(lgetc(DOT.l, DOT.o+1) == '/')) {
+			if (DOT.o+1 < lLength(DOT.l) &&
+				(lGetc(DOT.l, DOT.o+1) == '/')) {
 				sdir = REVERSE;
 				forwchar(TRUE,1);
 				break;
 			} else if (DOT.o > 0 &&
-				(lgetc(DOT.l, DOT.o-1) == '/')) {
+				(lGetc(DOT.l, DOT.o-1) == '/')) {
 				sdir = FORWARD;
 				backchar(TRUE,1);
 				if (doingopcmd)
@@ -298,12 +301,12 @@ int sdir; /* direction to scan if we're not on a fence to begin with */
 			}
 			return FALSE;
 		case '/':
-			if (DOT.o+1 < llength(DOT.l) &&
-				(lgetc(DOT.l, DOT.o+1) == '*')) {
+			if (DOT.o+1 < lLength(DOT.l) &&
+				(lGetc(DOT.l, DOT.o+1) == '*')) {
 				sdir = FORWARD;
 				break;
 			} else if (DOT.o > 0 &&
-				(lgetc(DOT.l, DOT.o-1) == '*')) {
+				(lGetc(DOT.l, DOT.o-1) == '*')) {
 				sdir = REVERSE;
 				break;
 			}
@@ -403,7 +406,7 @@ int sdir;
 	else
 		forwchar(FALSE, 1);
 
-	comstartpos.l = NULL;
+	comstartpos.l = l_ptr((LINE *)0);
 
 	while (count > 0) {
 		if (is_at_end_of_line(DOT))
@@ -413,11 +416,11 @@ int sdir;
 
 		if (c == '/') {
 			/* is it a comment-end? */
-			if ( DOT.o > 0 && lgetc(DOT.l, DOT.o-1) == '*') {
+			if ( DOT.o > 0 && lGetc(DOT.l, DOT.o-1) == '*') {
 				if ( sdir == FORWARD) {
 					count = 0;
 				} else {
-					if (comstartpos.l) {
+					if (l_ref(comstartpos.l)) {
 						DOT = comstartpos;
 						count = 0;
 					} else {
@@ -427,8 +430,8 @@ int sdir;
 			}
 			/* is it a comment start? */
 			if ( sdir == REVERSE &&
-				DOT.o < llength(DOT.l)-1 &&
-				lgetc(DOT.l, DOT.o+1) == '*') {
+				DOT.o < lLength(DOT.l)-1 &&
+				lGetc(DOT.l, DOT.o+1) == '*') {
 				/* remember where we are */
 				comstartpos = DOT;
 			}
@@ -441,7 +444,7 @@ int sdir;
 			s = backchar(FALSE, 1);
 
 		if (s == FALSE) {
-			if (comstartpos.l) {
+			if (l_ref(comstartpos.l)) {
 				DOT = comstartpos;
 				count = 0;
 				break;
@@ -482,7 +485,7 @@ fmatchindent()
 		return previndent((int *)0);
 	}
 
-	ind = indentlen(DOT.l);
+	ind = indentlen(l_ref(DOT.l));
 
 	gomark(FALSE,1);
 	    
@@ -518,12 +521,12 @@ int ch;	/* fence type to match against */
 		opench = '[';
 
 	/* find the top line and set up for scan */
-	toplp = lback(curwp->w_line.l);
+	toplp = lBack(curwp->w_line.l);
 	count = 1;
 	backchar(TRUE, 2);
 
 	/* scan back until we find it, or reach past the top of the window */
-	while (count > 0 && DOT.l != toplp) {
+	while (count > 0 && l_ref(DOT.l) != toplp) {
 		if (is_at_end_of_line(DOT))
 			c = '\n';
 		else

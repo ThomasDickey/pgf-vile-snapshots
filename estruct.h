@@ -10,7 +10,13 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.114  1993/05/11 16:22:22  pgf
+ * Revision 1.116  1993/05/24 15:25:41  pgf
+ * tom's 3.47 changes, part b
+ *
+ * Revision 1.115  1993/05/24  15:21:37  pgf
+ * tom's 3.47 changes, part a
+ *
+ * Revision 1.114  1993/05/11  16:22:22  pgf
  * see tom's CHANGES, 3.46
  *
  * Revision 1.113  1993/05/05  11:41:05  pgf
@@ -653,7 +659,7 @@
 #ifndef scrn_chosen
 /*	Terminal Output definitions		*/
 /* choose ONLY one of the following */
-#define TERMCAP 1			/* Use TERMCAP			*/
+#define TERMCAP UNIX			/* Use TERMCAP			*/
 #define ANSI	0			/* ANSI escape sequences	*/
 #define AT386	0			/* AT style 386 unix console	*/
 #define	HP150	0			/* HP150 screen driver		*/
@@ -661,7 +667,7 @@
 #define	VMSVT	0			/* various VMS terminal entries	*/
 #define VT52	0			/* VT52 terminal (Zenith).	*/
 #define RAINBOW 0			/* Use Rainbow fast video.	*/
-#define	IBMPC	0			/* IBM-PC CGA/MONO/EGA driver	*/
+#define	IBMPC	MSDOS			/* IBM-PC CGA/MONO/EGA driver	*/
 #define	ZIBMPC	0			/* Zortech lib IBM-PC CGA/MONO/EGA driver	*/
 #define	DG10	0			/* Data General system/10	*/
 #define	TIPC	0			/* TI Professional PC driver	*/
@@ -684,7 +690,7 @@
 /* NOTE -- COLOR doesn't currently do anything if you're using X or TERMCAP */
 /* (But I think X11 may honor colors from the command line or .Xdefaults) */
 /* (and DOS definitely does do things with COLOR, but it may not work) */
-#define	COLOR	0	/* color commands and windows			*/
+#define	COLOR	(MSDOS|X11)	/* color commands and windows			*/
 
 /* Feature turnon/turnoff */
 #define ANSI_SPEC	1 /* ANSI function/arrow keys */
@@ -1243,17 +1249,30 @@ typedef	long		B_COUNT;	/* byte-count */
  *
  * Lines are additionally sometimes stacked in undo lists.
  */
+#if OPT_MAP_MEMORY
+typedef	long	BLK_T;
+typedef	int	OFF_T;
+typedef	struct	{ BLK_T blk; OFF_T off; } LINEPTR;
+#else
+typedef	struct	LINE*	LINEPTR;
+#endif
+
 typedef struct	LINE {
-	struct	LINE *l_fp;		/* Link to the next line	*/
-	struct	LINE *l_bp;		/* Link to the previous line	*/
+	LINEPTR l_fp;			/* Link to the next line	*/
+	LINEPTR l_bp;			/* Link to the previous line	*/
 	int	l_size;			/* Allocated size 		*/
 	int	l_used;			/* Used size			*/
 	char *	l_text;			/* The data for this line	*/
 #if !SMALLER
 	L_NUM	l_number;		/* line-# iff b_numlines > 0	*/
 #endif
-	union {
-	    struct  LINE *l_stklnk;	/* Link for undo stack		*/
+#if OPT_MAP_MEMORY
+	struct
+#else
+	union
+#endif
+	{
+	    LINEPTR	l_stklnk;	/* Link for undo stack		*/
 	    L_FLAG	l_flag;		/* flags for undo ops		*/
 	} l;
 }	LINE;
@@ -1263,17 +1282,24 @@ typedef struct	LINE {
 #define LGMARK 2	/* line matched a global scan */
 
 /* macros to ease the use of lines */
-#define	for_each_line(lp,bp) for (lp = lforw(bp->b_line.l); lp != bp->b_line.l; lp = lforw(lp))
+#define	for_each_line(lp,bp) for (lp = lForw(bp->b_line.l); lp != l_ref(bp->b_line.l); lp = lforw(lp))
+
+#define l_nxtundo		l.l_stklnk
+
+#define LINENOTREAL	((int)(-1))
+#define LINEUNDOPATCH	((int)(-2))
+#define MARKPATCH	((int)(-3))
 
 	/*
 	 * If we are configured with mapped-data, references to LINE pointers
 	 * are translated by functions.
 	 */
 #if OPT_MAP_MEMORY
-typedef	double		LINEPTR;
+#define	null_ptr	nullmark.l
 #else
-typedef	struct	LINE*	LINEPTR;
-#define	lsync(lp)	lp
+#define	null_ptr	(LINE *)0
+#define	l_ref(lp)	lp
+#define	l_ptr(lp)	lp
 #define set_lforw(a,b)	lforw(a) = b
 #define set_lback(a,b)	lback(a) = b
 #define lforw(lp)	(lp)->l_fp
@@ -1283,27 +1309,39 @@ typedef	struct	LINE*	LINEPTR;
 	/*
 	 * Macros for referencing fields in the LINE struct.
 	 */
-#define lgetc(lp, n)	char2int((lp)->l_text[(n)])
-#define lputc(lp, n, c) ((lp)->l_text[(n)]=(c))
-#define llength(lp)	((lp)->l_used)
-#define l_nxtundo	l.l_stklnk
-#define liscopied(lp)	(lp->l.l_flag & LCOPIED)
-#define lismarked(lp)	(lp->l.l_flag & LGMARK)
-#define lsetcopied(lp)		(lp->l.l_flag |= LCOPIED)
-#define lsetnotcopied(lp)	(lp->l.l_flag &= ~LCOPIED)
-#define lsetmarked(lp)		(lp->l.l_flag |= LGMARK)
-#define lsetnotmarked(lp)	(lp->l.l_flag &= ~LGMARK)
-#define lflipmark(lp)	(lp->l.l_flag ^= LGMARK)
-#define lsetclear(lp)	(lp->l.l_flag = 0)
-#define LINENOTREAL	((int)(-1))
-#define LINEUNDOPATCH	((int)(-2))
-#define MARKPATCH	((int)(-3))
-#define lisreal(lp)	((lp)->l_used >= 0)
-#define lisnotreal(lp)	   ((lp)->l_used == LINENOTREAL)
-#define lislinepatch(lp)     ((lp)->l_used == LINEUNDOPATCH)
-#define lismarkpatch(lp)     ((lp)->l_used == MARKPATCH)
-#define lispatch(lp)	 (lislinepatch(lp) || lismarkpatch(lp))
-#define lneedscopying(lp)     ((lp)->l_copied != TRUE)
+#define lgetc(lp, n)		char2int((lp)->l_text[(n)])
+#define lputc(lp, n, c) 	((lp)->l_text[(n)]=(c))
+#define llength(lp)		((lp)->l_used)
+
+#define liscopied(lp)		((lp)->l.l_flag & LCOPIED)
+#define lismarked(lp)		((lp)->l.l_flag & LGMARK)
+#define lsetcopied(lp)		((lp)->l.l_flag |= LCOPIED)
+#define lsetnotcopied(lp)	((lp)->l.l_flag &= ~LCOPIED)
+#define lsetmarked(lp)		((lp)->l.l_flag |= LGMARK)
+#define lsetnotmarked(lp)	((lp)->l.l_flag &= ~LGMARK)
+#define lflipmark(lp)		((lp)->l.l_flag ^= LGMARK)
+#if !OPT_MAP_MEMORY
+#define lsetclear(lp)		((lp)->l.l_flag = 0)
+#endif
+#define lisreal(lp)		((lp)->l_used >= 0)
+#define lisnotreal(lp)		((lp)->l_used == LINENOTREAL)
+#define lislinepatch(lp)	((lp)->l_used == LINEUNDOPATCH)
+#define lismarkpatch(lp)	((lp)->l_used == MARKPATCH)
+#define lispatch(lp)		(lislinepatch(lp) || lismarkpatch(lp))
+#define lneedscopying(lp)	((lp)->l_copied != TRUE)
+
+	/*
+	 * Corresponding (mixed-case : mixed-type) names for LINEPTR references
+	 */
+#define lGetc(lp, n)		lgetc(l_ref(lp), n)
+#define lPutc(lp, n, c)		lputc(l_ref(lp), n, c)
+#define lLength(lp)		llength(l_ref(lp))
+
+#define	lForw(lp)		lforw(l_ref(lp))
+#define	lBack(lp)		lback(l_ref(lp))
+
+#define	lFORW(lp)		l_ptr(lForw(lp))
+#define	lBACK(lp)		l_ptr(lBack(lp))
 
 /* marks are a line and an offset into that line */
 typedef struct MARK {
@@ -1312,15 +1350,15 @@ typedef struct MARK {
 } MARK;
 
 /* some macros that take marks as arguments */
-#define is_at_end_of_line(m)	(m.o == llength(m.l))
-#define is_empty_line(m)	(llength(m.l) == 0)
-#define sameline(m1,m2)		(m1.l == m2.l)
-#define samepoint(m1,m2)	((m1.l == m2.l) && (m1.o == m2.o))
-#define char_at(m)		(lgetc(m.l,m.o))
-#define put_char_at(m,c)	(lputc(m.l,m.o,c))
-#define is_header_line(m,bp)	( m.l == bp->b_line.l)
-#define is_last_line(m,bp)	( lforw(m.l) == bp->b_line.l)
-#define is_first_line(m,bp)	( lback(m.l) == bp->b_line.l)
+#define is_at_end_of_line(m)	(m.o == llength(l_ref(m.l)))
+#define is_empty_line(m)	(llength(l_ref(m.l)) == 0)
+#define sameline(m1,m2)		(l_ref(m1.l) == l_ref(m2.l))
+#define samepoint(m1,m2)	(sameline(m1,m2) && (m1.o == m2.o))
+#define char_at(m)		(lGetc(m.l,m.o))
+#define put_char_at(m,c)	(lPutc(m.l,m.o,c))
+#define is_header_line(m,bp)	(l_ref(m.l) == l_ref(bp->b_line.l))
+#define is_last_line(m,bp)	(lforw(l_ref(m.l)) == l_ref(bp->b_line.l))
+#define is_first_line(m,bp)	(lback(l_ref(m.l)) == l_ref(bp->b_line.l))
 
 /* settable values have their names stored here, along with a synonym, and
 	what type they are */
@@ -1438,11 +1476,13 @@ typedef struct	BUFFER {
 	LINEPTR b_udstks[2];		/* undo stack pointers		*/
 	MARK 	b_uddot[2];		/* Link to "." before undoable op*/
 	short	b_udstkindx;		/* which of above to use	*/
+#if !OPT_MAP_MEMORY
 	LINEPTR	b_LINEs;		/* block-malloced LINE structs */
 	LINEPTR	b_LINEs_end;		/* end of 	"	"	" */
 	LINEPTR	b_freeLINEs;		/* list of free " 	"	" */
 	unsigned char	*b_ltext;	/* block-malloced text */
 	unsigned char	*b_ltext_end;	/* end of block-malloced text */
+#endif
 	LINEPTR	b_ulinep;		/* pointer at 'Undo' line	*/
 	int	b_active;		/* window activated flag	*/
 	int	b_nwnd;		        /* Count of windows on buffer   */
@@ -1517,7 +1557,7 @@ typedef struct	BUFFER {
 #define is_local_b_val(bp,which)  \
 		(bp->b_values.bv[which].vp == &(bp->b_values.bv[which].v))
 
-#define is_empty_buf(bp) (lforw(bp->b_line.l) == bp->b_line.l)
+#define is_empty_buf(bp) (lforw(l_ref(bp->b_line.l)) == l_ref(bp->b_line.l))
 #define b_dot b_wtraits.w_dt
 #ifdef WINMARK
 #define b_mark b_wtraits.w_mk

@@ -5,7 +5,10 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.54  1993/05/11 16:22:22  pgf
+ * Revision 1.55  1993/05/24 15:21:37  pgf
+ * tom's 3.47 changes, part a
+ *
+ * Revision 1.54  1993/05/11  16:22:22  pgf
  * see tom's CHANGES, 3.46
  *
  * Revision 1.53  1993/05/04  17:05:14  pgf
@@ -490,7 +493,9 @@ extern int viewfile P(( int, int ));
 extern int insfile P(( int, int ));
 extern int getfile P(( char *, int ));
 extern int readin P((char *, int, BUFFER *, int ));
+#if !MSDOS && !OPT_MAP_MEMORY
 extern int quickreadf P(( BUFFER *, int * ));
+#endif
 extern int slowreadf P(( BUFFER *, int * ));
 extern int set_dosmode P(( int, int ));
 extern void readlinesmsg P(( int, int, char *, int ));
@@ -523,10 +528,12 @@ extern char *filec_expand P(( void ));
 extern int ffropen P(( char * ));
 extern int ffwopen P(( char * ));
 extern int ffronly P(( char * ));
+#if !MSDOS && !OPT_MAP_MEMORY
 extern long ffsize P(( void ));
 extern int ffread P(( char *, long ));
 extern void ffseek P(( long ));
 extern void ffrewind P(( void ));
+#endif
 extern int ffclose P(( void ));
 extern int ffputline P(( char [], int, int ));
 extern int ffputc P(( int ));
@@ -608,7 +615,9 @@ extern int get_char P(( void ));
 /* line.c */
 extern LINE * lalloc P(( int, BUFFER * ));
 extern void lfree P(( LINE *, BUFFER * ));
+#if !OPT_MAP_MEMORY
 extern void ltextfree P(( LINE *, BUFFER * ));
+#endif
 extern void lremove P(( BUFFER *, LINE * ));
 extern int insspace P(( int, int ));
 extern int linsert P(( int, int ));
@@ -887,8 +896,8 @@ extern void ttmiscinit P(( void ));
 extern void toss_to_undo P(( LINE * ));
 extern int copy_for_undo P(( LINE * ));
 extern int tag_for_undo P(( LINE * ));
-extern void pushline P(( LINE *, LINE ** ));
-extern LINE * popline P(( LINE ** ));
+extern void pushline P(( LINE *, LINEPTR * ));
+extern LINE * popline P(( LINEPTR * ));
 extern void make_undo_patch P(( LINE *, LINE *, int ));
 extern void applypatch P(( LINE *, LINE * ));
 extern LINE * copyline P(( LINE * ));
@@ -995,15 +1004,22 @@ unsigned tb_length P(( TBUFF * ));
 
 /* tmp.c */
 #if OPT_MAP_MEMORY
-extern	LINE *lsync P(( LINEPTR ));
-extern	LINE *set_lforw P(( LINE *, LINE * ));
-extern	LINE *set_lback P(( LINE *, LINE * ));
-extern	LINE *lforw P(( LINE * ));
-extern	LINE *lback P(( LINE * ));
+extern	LINEPTR	l_allocate	P(( SIZE_T ));
+extern	void	l_deallocate	P(( LINEPTR, BUFFER * ));
+extern	LINE *	l_reallocate	P(( LINEPTR, SIZE_T, BUFFER * ));
+extern	void	l_changed	P(( LINEPTR ));
+extern	LINE *	l_ref		P(( LINEPTR ));
+extern	LINEPTR	l_ptr		P(( LINE * ));
+extern	LINE *	set_lforw	P(( LINE *, LINE * ));
+extern	LINE *	set_lback	P(( LINE *, LINE * ));
+extern	LINE *	lforw		P(( LINE * ));
+extern	LINE *	lback		P(( LINE * ));
+extern	void	lsetclear	P(( LINE * ));
 #endif
 
 #if NO_LEAKS
 extern	void kbs_leaks P(( void ));
+extern	void tmp_leaks P(( void ));
 extern	void tb_leaks P(( void ));
 extern	void wp_leaks P(( void ));
 extern	void bp_leaks P(( void ));

@@ -3,7 +3,10 @@
  * commands. There is no functional grouping here, for sure.
  *
  * $Log: random.c,v $
- * Revision 1.93  1993/05/04 17:05:14  pgf
+ * Revision 1.94  1993/05/24 15:21:37  pgf
+ * tom's 3.47 changes, part a
+ *
+ * Revision 1.93  1993/05/04  17:05:14  pgf
  * see tom's CHANGES, 3.45
  *
  * Revision 1.92  1993/04/28  14:34:11  pgf
@@ -450,12 +453,12 @@ int f,n;
 	C_NUM ecol;			/* column pos/end of current line */
 
 	/* starting at the beginning of the buffer */
-	lp = lforw(curbp->b_line.l);
+	lp = lForw(curbp->b_line.l);
 
 	/* start counting chars and lines */
-	while (lp != curbp->b_line.l) {
+	while (lp != l_ref(curbp->b_line.l)) {
 		/* if we are on the current line, record it */
-		if (lp == DOT.l) {
+		if (lp == l_ref(DOT.l)) {
 			predlines = numlines;
 			predchars = numchars + DOT.o;
 			if (DOT.o == llength(lp))
@@ -478,7 +481,7 @@ int f,n;
 	/* Get real column and end-of-line column. */
 	col = getccol(FALSE);
 	savepos = DOT.o;
-	DOT.o = llength(DOT.l);
+	DOT.o = lLength(DOT.l);
 	ecol = getccol(FALSE);
 	DOT.o = savepos;
 
@@ -503,8 +506,8 @@ int f,n;
 	register int	numlines = 0;	/* # of lines in file */
 
 	/* starting at the beginning of the buffer */
-	lp = lforw(curbp->b_line.l);
-	while (lp != curbp->b_line.l) {
+	lp = lForw(curbp->b_line.l);
+	while (lp != l_ref(curbp->b_line.l)) {
 		++numlines;
 		lp = lforw(lp);
 	}
@@ -521,11 +524,11 @@ LINE *the_line;
 	register int	numlines;	/* # of lines before point */
 
 	/* starting at the beginning of the buffer */
-	lp = lforw(the_buffer->b_line.l);
+	lp = lForw(the_buffer->b_line.l);
 
 	/* start counting lines */
 	numlines = 0;
-	while (lp != the_buffer->b_line.l) {
+	while (lp != l_ref(the_buffer->b_line.l)) {
 		/* if we are on the specified line, record it */
 		if (lp == the_line)
 			break;
@@ -541,7 +544,7 @@ LINE *the_line;
 int
 getcline()	/* get the current line number */
 {
-	return line_no(curbp, DOT.l);
+	return line_no(curbp, l_ref(DOT.l));
 }
 #endif
 
@@ -555,7 +558,7 @@ int bflg;
 	register int c, i, col;
 	col = 0;
 	for (i=0; i < DOT.o; ++i) {
-		c = lgetc(DOT.l, i);
+		c = lGetc(DOT.l, i);
 		if (!isspace(c) && bflg)
 			break;
 		col = next_column(c,col);
@@ -587,7 +590,7 @@ int n;
 	register int llen;	/* length of line in bytes */
 
 	col = 0;
-	llen = llength(DOT.l);
+	llen = lLength(DOT.l);
 
 	/* scan the line until we are at or past the target column */
 	for (i = 0; i < llen; ++i) {
@@ -596,7 +599,7 @@ int n;
 			break;
 
 		/* advance one character */
-		c = lgetc(DOT.l, i);
+		c = lGetc(DOT.l, i);
 		col = next_column(c,col);
 	}
 
@@ -632,7 +635,7 @@ int f,n;
 	if (--dot.o < 0)
 		return (FALSE);
 	cl = char_at(dot);
-	copy_for_undo(dot.l);
+	copy_for_undo(l_ref(dot.l));
 	put_char_at(dot, cr);
 	++dot.o;
 	put_char_at(dot, cl);
@@ -659,7 +662,7 @@ int leadingonly;
 	DOT.o = 0;
 
 	/* detab the entire current line */
-	while (DOT.o < llength(DOT.l)) {
+	while (DOT.o < lLength(DOT.l)) {
 		c = char_at(DOT);
 		if (leadingonly && !isspace(c))
 			break;
@@ -720,7 +723,7 @@ int leadingonly;
 				fspace = -1;
 			}
 
-		if (DOT.o >= llength(DOT.l))
+		if (DOT.o >= lLength(DOT.l))
 			break;
 
 		/* get the current character */
@@ -757,7 +760,7 @@ trimline()
 	register int off, orig;
 	register LINE *lp;
 	    
-	lp = DOT.l;
+	lp = l_ref(DOT.l);
 		    
 	off = llength(lp)-1;
 	orig = off;
@@ -802,16 +805,16 @@ int f,n;
 	register LINE	*lp2;
 	long nld;
 
-	lp1 = DOT.l;
-	while (llength(lp1)==0 && (lp2=lback(lp1))!=curbp->b_line.l)
+	lp1 = l_ref(DOT.l);
+	while (llength(lp1)==0 && (lp2=lback(lp1))!=l_ref(curbp->b_line.l))
 		lp1 = lp2;
 	lp2 = lp1;
 	nld = 0;
-	while ((lp2=lforw(lp2))!=curbp->b_line.l && llength(lp2)==0)
+	while ((lp2=lforw(lp2))!=l_ref(curbp->b_line.l) && llength(lp2)==0)
 		++nld;
 	if (nld == 0)
 		return (TRUE);
-	DOT.l = lforw(lp1);
+	DOT.l = l_ptr(lforw(lp1));
 	DOT.o = 0;
 	return (ldelete(nld, FALSE));
 }
@@ -859,7 +862,7 @@ int f,n;
 {
 	extern CMDFUNC f_gotoeol;
 
-	if (llength(DOT.l) == 0)
+	if (lLength(DOT.l) == 0)
 		return TRUE;
 
 	havemotion = &f_gotoeol;
@@ -873,7 +876,7 @@ int f,n;
 {
 	extern CMDFUNC f_gotoeol;
 
-	if (llength(DOT.l) == 0) {
+	if (lLength(DOT.l) == 0) {
 		return ins(FALSE);
 	} else {
 		havemotion = &f_gotoeol;

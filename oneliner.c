@@ -4,7 +4,10 @@
  *	Written (except for delins()) for vile by Paul Fox, (c)1990
  *
  * $Log: oneliner.c,v $
- * Revision 1.41  1993/05/04 17:05:14  pgf
+ * Revision 1.42  1993/05/24 15:21:37  pgf
+ * tom's 3.47 changes, part a
+ *
+ * Revision 1.41  1993/05/04  17:05:14  pgf
  * see tom's CHANGES, 3.45
  *
  * Revision 1.40  1993/04/28  14:34:11  pgf
@@ -173,7 +176,7 @@ int flag;
 	if (s != TRUE)
 		return (s);
 
-	linep = region.r_orig.l;		 /* Current line.	 */
+	linep = l_ref(region.r_orig.l);		 /* Current line.	 */
 	        
 	/* first check if we are already here */
 	bp = bfind(bname, OK_CREAT, 0);
@@ -197,7 +200,7 @@ int flag;
 	do {
 		addline(bp,linep->l_text,llength(linep));
 		linep = lforw(linep);
-	} while (linep != region.r_end.l);
+	} while (linep != l_ref(region.r_end.l));
 
 	(void)strcpy(bp->b_bname,bname);
 	set_rdonly(bp, "");
@@ -253,7 +256,7 @@ int f,n;
 	/* the region spans just the line */
 	MK.l = DOT.l;
 	DOT.o = 0;
-	MK.o = llength(MK.l);
+	MK.o = lLength(MK.l);
 	s = substreg1(FALSE,FALSE);
 	if (s != TRUE) {
 		mlforce("[No match.]");
@@ -354,11 +357,11 @@ int needpats, use_opts;
 	DOT.l = region.r_orig.l;	    /* Current line.	    */
 
 	do {
-		oline = DOT.l;
+		oline = l_ref(DOT.l);
 		if ((s = substline( substexp, nth_occur, printit, globally))
 								!= TRUE)
 			return s;
-		DOT.l = lforw(oline);
+		DOT.l = l_ptr(lforw(oline));
 	} while (!sameline(DOT, region.r_end));
 	calledbefore = TRUE;
 	return TRUE;
@@ -387,7 +390,7 @@ int nth_occur, printit, globally;
 	scanboundpos.l = DOT.l;
 	DOT.o = 0;
 	do {
-		scanboundpos.o = llength(DOT.l);
+		scanboundpos.o = lLength(DOT.l);
 		s = scanner(exp, FORWARD, FALSE);
 		if (s != TRUE)
 			break;
@@ -399,7 +402,7 @@ int nth_occur, printit, globally;
 			setmark();
 			/* only allow one match at the end of line, to
 				prevent loop with s/$/x/g  */
-			if (MK.o == llength(DOT.l)) {
+			if (MK.o == lLength(DOT.l)) {
 				if (matched_at_eol)
 					break;
 				matched_at_eol = TRUE;

@@ -6,7 +6,10 @@
  * framing, are hard.
  *
  * $Log: basic.c,v $
- * Revision 1.51  1993/05/11 16:22:22  pgf
+ * Revision 1.52  1993/05/24 15:21:37  pgf
+ * tom's 3.47 changes, part a
+ *
+ * Revision 1.51  1993/05/11  16:22:22  pgf
  * see tom's CHANGES, 3.46
  *
  * Revision 1.50  1993/05/08  00:23:13  pgf
@@ -230,9 +233,9 @@ register int n;
                 return (forwchar(f, -n));
         while (n--) {
                 if (curwp->w_dot.o == 0) {
-                        if ((lp=lback(curwp->w_dot.l)) == curbp->b_line.l)
+                        if ((lp=lBack(curwp->w_dot.l)) == l_ref(curbp->b_line.l))
                                 return (FALSE);
-                        curwp->w_dot.l  = lp;
+                        curwp->w_dot.l  = l_ptr(lp);
                         curwp->w_dot.o  = llength(lp);
                         curwp->w_flag |= WFMOVE;
                 } else
@@ -276,7 +279,7 @@ int f,n;
 			 ++n;
 		forwline(f,n);
 	}
-        curwp->w_dot.o  = llength(curwp->w_dot.l);
+        curwp->w_dot.o  = lLength(curwp->w_dot.l);
 	curgoal = HUGE;
         return (TRUE);
 }
@@ -300,7 +303,7 @@ register int    n;
                         if (is_header_line(curwp->w_dot, curbp) ||
 					is_last_line(curwp->w_dot,curbp))
                                 return (FALSE);
-                        curwp->w_dot.l  = lforw(curwp->w_dot.l);
+                        curwp->w_dot.l  = lFORW(curwp->w_dot.l);
                         curwp->w_dot.o  = 0;
                         curwp->w_flag |= WFMOVE;
                 } else
@@ -347,10 +350,10 @@ int f,n;
 
 	curwp->w_dot.o  = 0;
 	if (n < 0) {
-		curwp->w_dot.l  = lback(curbp->b_line.l);
+		curwp->w_dot.l  = lBACK(curbp->b_line.l);
 		status = backline(f, -n - 1 );
 	} else {
-		curwp->w_dot.l  = lforw(curbp->b_line.l);
+		curwp->w_dot.l  = lFORW(curbp->b_line.l);
 		status = forwline(f, n-1);
 	}
 	if (status == TRUE)
@@ -368,7 +371,7 @@ int
 gotobob(f, n)
 int f,n;
 {
-        curwp->w_dot.l  = lforw(curbp->b_line.l);
+        curwp->w_dot.l  = lFORW(curbp->b_line.l);
         curwp->w_dot.o  = 0;
         curwp->w_flag |= WFMOVE;
         return (TRUE);
@@ -382,7 +385,7 @@ int
 gotoeob(f, n)
 int f,n;
 {
-        curwp->w_dot.l  = lback(curbp->b_line.l);
+        curwp->w_dot.l  = lBACK(curbp->b_line.l);
 	firstnonwhite(FALSE,1);
         curwp->w_flag |= WFMOVE;
         return TRUE;
@@ -400,7 +403,7 @@ int f,n;
 	while (--n) {
 		if (is_last_line(DOT,curbp))
 			break;
-		DOT.l = lforw(DOT.l);
+		DOT.l = lFORW(DOT.l);
 	}
 	firstnonwhite(f,n);
 	return TRUE;
@@ -416,23 +419,23 @@ int f,n;
 {
 	int midrow;
 	LINE *midln;
-	midln = DOT.l = curwp->w_line.l;
+	midln = l_ref(DOT.l = curwp->w_line.l);
 	midrow = curwp->w_ntrows/2;
 	n = 1;
 	while (n < curwp->w_ntrows) {
 		if (n == midrow)	/* remember the middle line */
-			midln = DOT.l;
+			midln = l_ref(DOT.l);
 		if (is_last_line(DOT,curbp))
 			break;
-		DOT.l = lforw(DOT.l);
+		DOT.l = lFORW(DOT.l);
 		n++;
 	}
 	if (n < curwp->w_ntrows) { /* then we hit eof before eos */
 		n /= 2;  /* go back up */
 		while (n--)
-			DOT.l = lback(DOT.l);
+			DOT.l = lBACK(DOT.l);
 	} else {
-		DOT.l = midln;
+		DOT.l = l_ptr(midln);
 	}
 	firstnonwhite(f,n);
 	return TRUE;
@@ -455,14 +458,14 @@ int f,n;
 	while (--nn) {
 		if (is_last_line(DOT,curbp))
 			break;
-		DOT.l = lforw(DOT.l);
+		DOT.l = lFORW(DOT.l);
 	}
 	/* and then go back up */
 	/* (we're either at eos or eof) */
 	while (--n) {
-		if (DOT.l == curwp->w_line.l)
+		if (l_ref(DOT.l) == l_ref(curwp->w_line.l))
 			break;
-		DOT.l = lback(DOT.l);
+		DOT.l = lBACK(DOT.l);
 	}
 	firstnonwhite(f,n);
 	return TRUE;
@@ -494,16 +497,16 @@ int f,n;
                 curgoal = getccol(FALSE);
 
 	/* and move the point down */
-        dlp = curwp->w_dot.l;
+        dlp = l_ref(curwp->w_dot.l);
 	while (n-- > 0) {
 		register LINE *nlp = lforw(dlp);
-		if (nlp == curbp->b_line.l)
+		if (nlp == l_ref(curbp->b_line.l))
 			break;
 		dlp = nlp;
 	}
 
 	/* resetting the current position */
-	curwp->w_dot.l  = dlp;
+	curwp->w_dot.l  = l_ptr(dlp);
         curwp->w_dot.o  = getgoal(dlp);
         curwp->w_flag |= WFMOVE;
         return (TRUE);
@@ -514,12 +517,12 @@ int
 firstnonwhite(f,n)
 int f,n;
 {
-        DOT.o  = firstchar(DOT.l);
+        DOT.o  = firstchar(l_ref(DOT.l));
 	if (DOT.o < 0) {
-		if (llength(DOT.l) == 0)
+		if (lLength(DOT.l) == 0)
 			DOT.o = 0;
 		else
-			DOT.o = llength(DOT.l) - 1;
+			DOT.o = lLength(DOT.l) - 1;
 	}
 	return TRUE;
 }
@@ -529,7 +532,7 @@ int
 lastnonwhite(f,n)
 int f,n;
 {
-        DOT.o  = lastchar(DOT.l);
+        DOT.o  = lastchar(l_ref(DOT.l));
 	if (DOT.o < 0)
 		DOT.o = 0;
 	return TRUE;
@@ -630,12 +633,12 @@ int f,n;
                 curgoal = getccol(FALSE);
 
 	/* and move the point up */
-        dlp = curwp->w_dot.l;
-	while (n-- && lback(dlp) != curbp->b_line.l)
+        dlp = l_ref(curwp->w_dot.l);
+	while (n-- && lback(dlp) != l_ref(curbp->b_line.l))
 		dlp = lback(dlp);
 
 	/* reseting the current position */
-        curwp->w_dot.l  = dlp;
+        curwp->w_dot.l  = l_ptr(dlp);
         curwp->w_dot.o  = getgoal(dlp);
         curwp->w_flag |= WFMOVE;
         return (TRUE);
@@ -654,10 +657,10 @@ int f,n;
 
 	if (!f) n = 1;
 
-	was_on_empty = (llength(DOT.l) == 0);
+	was_on_empty = (lLength(DOT.l) == 0);
 	odot = DOT;
 
-	fc = firstchar(DOT.l);
+	fc = firstchar(l_ref(DOT.l));
 	if (doingopcmd && 
 		((fc >= 0 && DOT.o <= fc) || fc < 0) && 
 		!is_first_line(DOT,curbp)) {
@@ -668,12 +671,12 @@ int f,n;
 		if (findpat(TRUE, 1, b_val_rexp(curbp,VAL_PARAGRAPHS)->reg,
 							REVERSE) != TRUE) {
 			gotobob(f,n);
-		} else if (llength(DOT.l) == 0) {
+		} else if (lLength(DOT.l) == 0) {
 			/* special case -- if we found an empty line,
 				and it's adjacent to where we started,
 				skip all adjacent empty lines, and try again */
-			if ( (was_on_empty && lforw(DOT.l) == odot.l) ||
-				(n > 0 && llength(lforw(DOT.l)) == 0) ) {
+			if ( (was_on_empty && lForw(DOT.l) == l_ref(odot.l)) ||
+				(n > 0 && llength(lForw(DOT.l)) == 0) ) {
 				/* then we haven't really found what we
 					wanted.  keep going */
 				skipblanksb();
@@ -683,9 +686,9 @@ int f,n;
 		n--;
 	}
 	if (doingopcmd) {
-		fc = firstchar(DOT.l);
+		fc = firstchar(l_ref(DOT.l));
 		if (!sameline(DOT,odot) && 
-			(pre_op_dot.o > lastchar(pre_op_dot.l)) &&
+			(pre_op_dot.o > lastchar(l_ref(pre_op_dot.l))) &&
 			((fc >= 0 && DOT.o <= fc) || fc < 0)) {
 			fulllineregions = TRUE;
 		}
@@ -704,8 +707,8 @@ int f,n;
 
 	if (!f) n = 1;
 
-	fc = firstchar(DOT.l);
-	was_on_empty = (llength(DOT.l) == 0);
+	fc = firstchar(l_ref(DOT.l));
+	was_on_empty = (lLength(DOT.l) == 0);
 	was_at_bol = ((fc >= 0 && DOT.o <= fc) || fc < 0);
 	odot = DOT;
 
@@ -713,12 +716,12 @@ int f,n;
 		if (findpat(TRUE, 1, b_val_rexp(curbp,VAL_PARAGRAPHS)->reg, 
 						FORWARD) != TRUE) {
 			DOT = curbp->b_line;
-		} else if (llength(DOT.l) == 0) {
+		} else if (lLength(DOT.l) == 0) {
 			/* special case -- if we found an empty line. */
 			/* either as the very next line, or at the end of
 				our search */
-			if ( (was_on_empty && lback(DOT.l) == odot.l) ||
-				(n > 0 && llength(lback(DOT.l)) == 0) ) {
+			if ( (was_on_empty && lBack(DOT.l) == l_ref(odot.l)) ||
+				(n > 0 && llength(lBack(DOT.l)) == 0) ) {
 				/* then we haven't really found what we
 					wanted.  keep going */
 				skipblanksf();
@@ -730,7 +733,7 @@ int f,n;
 	if (doingopcmd) {
 		/* if we're now at the beginning of a line and we can back up,
 		  do so to avoid eating the newline and leading whitespace */
-		fc = firstchar(DOT.l);
+		fc = firstchar(l_ref(DOT.l));
 		if (((fc >= 0 && DOT.o <= fc) || fc < 0) && 
 			!is_first_line(DOT,curbp) &&
 			!sameline(DOT,odot) ) {
@@ -746,15 +749,15 @@ int f,n;
 void
 skipblanksf()
 {
-	while (lforw(DOT.l) != curbp->b_line.l && llength(DOT.l) == 0)
-		DOT.l = lforw(DOT.l);
+	while (lForw(DOT.l) != l_ref(curbp->b_line.l) && lLength(DOT.l) == 0)
+		DOT.l = lFORW(DOT.l);
 }
 
 void
 skipblanksb()
 {
-	while (lback(DOT.l) != curbp->b_line.l && llength(DOT.l) == 0)
-		DOT.l = lback(DOT.l);
+	while (lBack(DOT.l) != l_ref(curbp->b_line.l) && lLength(DOT.l) == 0)
+		DOT.l = lBACK(DOT.l);
 }
 
 #if STUTTER_SEC_CMD
@@ -849,8 +852,8 @@ int f,n;
 	exp = b_val_rexp(curbp,VAL_SENTENCES)->reg;
 	/* if we're on the end of a sentence now, don't bother scanning
 		further, or we'll miss the immediately following sentence */
-	if (!(lregexec(exp, DOT.l, DOT.o, llength(DOT.l)) &&
-				exp->startp[0] - DOT.l->l_text == DOT.o)) {
+	if (!(lregexec(exp, l_ref(DOT.l), DOT.o, lLength(DOT.l)) &&
+				exp->startp[0] - l_ref(DOT.l)->l_text == DOT.o)) {
 		if (findpat(f, n, exp, FORWARD) != TRUE) {
 			DOT = curbp->b_line;
 			return TRUE;
@@ -928,11 +931,11 @@ register int    n;
         else                                    /* Convert from pages   */
                 n *= curwp->w_ntrows;           /* to lines.            */
 #endif
-        lp = curwp->w_line.l;
-        while (n-- && lp!=curbp->b_line.l)
+        lp = l_ref(curwp->w_line.l);
+        while (n-- && lp!=l_ref(curbp->b_line.l))
                 lp = lforw(lp);
-        curwp->w_line.l = lp;
-        curwp->w_dot.l  = lp;
+        curwp->w_line.l = l_ptr(lp);
+        curwp->w_dot.l  = l_ptr(lp);
         curwp->w_dot.o  = 0;
         curwp->w_flag |= WFHARD|WFMODE;
         return (TRUE);
@@ -961,11 +964,11 @@ register int    n;
         else                                    /* Convert from pages   */
                 n *= curwp->w_ntrows;           /* to lines.            */
 #endif
-        lp = curwp->w_line.l;
-        while (n-- && lback(lp)!=curbp->b_line.l)
+        lp = l_ref(curwp->w_line.l);
+        while (n-- && lback(lp)!=l_ref(curbp->b_line.l))
                 lp = lback(lp);
-        curwp->w_line.l = lp;
-        curwp->w_dot.l  = lp;
+        curwp->w_line.l = l_ptr(lp);
+        curwp->w_dot.l  = l_ptr(lp);
         curwp->w_dot.o  = 0;
         curwp->w_flag |= WFHARD;
         return (TRUE);
@@ -994,14 +997,14 @@ register int    n;
         else                                    /* Convert from pages   */
                 n *= curwp->w_ntrows/2;           /* to lines.            */
 #endif
-        llp = curwp->w_line.l;
-        dlp = curwp->w_dot.l;
-        while (n-- && lforw(dlp) != curbp->b_line.l) {
+        llp = l_ref(curwp->w_line.l);
+        dlp = l_ref(curwp->w_dot.l);
+        while (n-- && lforw(dlp) != l_ref(curbp->b_line.l)) {
                 llp = lforw(llp);
                 dlp = lforw(dlp);
 	}
-        curwp->w_line.l = llp;
-        curwp->w_dot.l  = dlp;
+        curwp->w_line.l = l_ptr(llp);
+        curwp->w_dot.l  = l_ptr(dlp);
 	firstnonwhite(f,n);
         curwp->w_flag |= WFHARD|WFKILLS;
         return (TRUE);
@@ -1030,14 +1033,14 @@ register int    n;
         else                                    /* Convert from pages   */
                 n *= curwp->w_ntrows/2;           /* to lines.            */
 #endif
-        llp = curwp->w_line.l;
-        dlp = curwp->w_dot.l;
-        while (n-- && lback(dlp)!=curbp->b_line.l) {
+        llp = l_ref(curwp->w_line.l);
+        dlp = l_ref(curwp->w_dot.l);
+        while (n-- && lback(dlp)!=l_ref(curbp->b_line.l)) {
                 llp = lback(llp);
                 dlp = lback(dlp);
 	}
-        curwp->w_line.l = llp;
-        curwp->w_dot.l  = dlp;
+        curwp->w_line.l = l_ptr(llp);
+        curwp->w_dot.l  = l_ptr(dlp);
 	firstnonwhite(f,n);
         curwp->w_flag |= WFHARD|WFINS;
         return (TRUE);
@@ -1176,9 +1179,9 @@ int c;
 	/* if we have any named marks, and the one we want isn't null */
 	if (markp != NULL && !samepoint((*markp), nullmark)) {
 		register LINE *lp;
-		for (lp = lforw(curbp->b_line.l);
-				lp != curbp->b_line.l; lp = lforw(lp)) {
-			if ((*markp).l == lp) {
+		for (lp = lForw(curbp->b_line.l);
+				lp != l_ref(curbp->b_line.l); lp = lforw(lp)) {
+			if (l_ref((*markp).l) == lp) {
 				found = TRUE;
 				break;
 			}

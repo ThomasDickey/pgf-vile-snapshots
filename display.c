@@ -6,7 +6,13 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.82  1993/05/05 12:25:41  pgf
+ * Revision 1.84  1993/05/24 15:25:41  pgf
+ * tom's 3.47 changes, part b
+ *
+ * Revision 1.83  1993/05/24  15:21:37  pgf
+ * tom's 3.47 changes, part a
+ *
+ * Revision 1.82  1993/05/05  12:25:41  pgf
  * osf1 and ultrix keep ioctl.h in sys
  *
  * Revision 1.81  1993/05/04  17:05:14  pgf
@@ -969,9 +975,18 @@ WINDOW *wp;
 
 	/* if not a requested reframe, check for a needed one */
 	if ((wp->w_flag & WFFORCE) == 0) {
+		/* initial update in main.c may not set these first... */
+		if (l_ref(wp->w_dot.l) == (LINE *)0) {
+			wp->w_dot.l = lFORW(wp->w_bufp->b_line.l);
+			wp->w_dot.o = 0;
+		}
+		if (l_ref(wp->w_line.l) == (LINE *)0) {
+			wp->w_line.l = wp->w_dot.l;
+			wp->w_line.o = 0;
+		}
 #if CAN_SCROLL
 		/* loop from one line above the window to one line after */
-		lp = lback(wp->w_line.l);
+		lp = lBack(wp->w_line.l);
 		for (i = -1; i <= wp->w_ntrows; i++)
 #else
 		/* loop through the window */
@@ -981,7 +996,7 @@ WINDOW *wp;
 		{
 
 			/* if the line is in the window, no reframe */
-			if (lp == wp->w_dot.l) {
+			if (lp == l_ref(wp->w_dot.l)) {
 #if CAN_SCROLL
 				/* if not _quite_ in, we'll reframe gently */
 				if ( i < 0 || i == wp->w_ntrows) {
@@ -996,7 +1011,7 @@ WINDOW *wp;
 			}
 
 			/* if we are at the end of the file, reframe */
-			if (i >= 0 && lp == wp->w_bufp->b_line.l)
+			if (i >= 0 && lp == l_ref(wp->w_bufp->b_line.l))
 				break;
 
 			/* on to the next line */
@@ -1034,17 +1049,17 @@ WINDOW *wp;
 		i = wp->w_ntrows / 2;
 
 	/* backup to new line at top of window */
-	lp = wp->w_dot.l;
-	while (i != 0 && lback(lp) != wp->w_bufp->b_line.l) {
+	lp = l_ref(wp->w_dot.l);
+	while (i != 0 && lback(lp) != l_ref(wp->w_bufp->b_line.l)) {
 		--i;
 		lp = lback(lp);
 	}
 
-	if (lp == wp->w_bufp->b_line.l)
+	if (lp == l_ref(wp->w_bufp->b_line.l))
 		lp = lback(lp);
 		
 	/* and reset the current line-at-top-of-window */
-	wp->w_line.l = lp;
+	wp->w_line.l = l_ptr(lp);
 	wp->w_flag |= WFHARD;
 	wp->w_flag &= ~WFFORCE;
 }
@@ -1059,9 +1074,9 @@ WINDOW *wp;	/* window to update current line in */
 	register int sline;	/* physical screen line to update */
 
 	/* search down the line we want */
-	lp = wp->w_line.l;
+	lp = l_ref(wp->w_line.l);
 	sline = wp->w_toprow;
-	while (lp != wp->w_dot.l) {
+	while (lp != l_ref(wp->w_dot.l)) {
 		++sline;
 		lp = lforw(lp);
 	}
@@ -1080,12 +1095,12 @@ WINDOW *wp;	/* window to update lines in */
 	register int sline;	/* physical screen line to update */
 
 	/* search down the lines, updating them */
-	lp = wp->w_line.l;
+	lp = l_ref(wp->w_line.l);
 	sline = wp->w_toprow;
 	while (sline < wp->w_toprow + wp->w_ntrows) {
 		l_to_vline(wp,lp,sline);
 		vteeol();
-		if (lp != wp->w_bufp->b_line.l)
+		if (lp != l_ref(wp->w_bufp->b_line.l))
 			lp = lforw(lp);
 		++sline;
 	}
@@ -1105,7 +1120,7 @@ int sline;
 	vscreen[sline]->v_flag &= ~VFREQ;
 	if (w_val(wp,WVAL_SIDEWAYS))
 		taboff = w_val(wp,WVAL_SIDEWAYS);
-	if (lp != wp->w_bufp->b_line.l) {
+	if (lp != l_ref(wp->w_bufp->b_line.l)) {
 		vtmove(sline, -w_val(wp,WVAL_SIDEWAYS));
 		vtset(lp, wp);
 		if (w_val(wp,WVAL_SIDEWAYS)) {
@@ -1140,14 +1155,14 @@ int *screencolp;
 	int moved = FALSE;
 
 	/* find the current row */
-	lp = curwp->w_line.l;
+	lp = l_ref(curwp->w_line.l);
 	currow = curwp->w_toprow;
-	while (lp != DOT.l) {
+	while (lp != l_ref(DOT.l)) {
 		++currow;
 		lp = lforw(lp);
-		if (lp == curwp->w_line.l || currow > term.t_nrow) {
+		if (lp == l_ref(curwp->w_line.l) || currow > term.t_nrow) {
 			mlforce("BUG:  lost dot updpos().  setting at top");
-			curwp->w_line.l = DOT.l  = lforw(curbp->b_line.l);
+			curwp->w_line.l = DOT.l  = lFORW(curbp->b_line.l);
 			currow = curwp->w_toprow;
 		}
 	}
@@ -1180,7 +1195,7 @@ int *screencolp;
 	collimit = col_limit(curwp);
 	excess = curcol - collimit;
 	if ((excess > 0) || (excess == 0 && 
-			(DOT.o < llength(DOT.l) - 1 ))) {
+			(DOT.o < lLength(DOT.l) - 1 ))) {
 		if (w_val(curwp,WMDHORSCROLL)) {
 			(void)mvrightwind(TRUE, excess + collimit/2 );
 			moved = TRUE;
@@ -1216,7 +1231,7 @@ upddex()
 	register int i;
 
 	for_each_window(wp) {
-		lp = wp->w_line.l;
+		lp = l_ref(wp->w_line.l);
 		i = wp->w_toprow;
 
 		curtabval = tabstop_val(wp->w_bufp);
@@ -1224,7 +1239,7 @@ upddex()
 		while (i < wp->w_toprow + wp->w_ntrows) {
 			if (vscreen[i]->v_flag & VFEXT) {
 				if ((wp != curwp)
-				 || (lp != wp->w_dot.l)
+				 || (lp != l_ref(wp->w_dot.l))
 				 || ((i != currow)
 				  && (curcol < col_limit(wp)))) {
 					l_to_vline(wp,lp,i);
@@ -1491,7 +1506,7 @@ int	excess;
 
 	/* start scanning offscreen */
 	vtmove(currow, -taboff);
-	vtset(DOT.l, curwp);
+	vtset(l_ref(DOT.l), curwp);
 
 	/* truncate the virtual line, restore tab offset */
 	vteeol();
@@ -1522,7 +1537,7 @@ int	col;
 	/* scan through the line outputing characters to the virtual screen */
 	/* once we reach the left edge					*/
 	vtmove(currow, -taboff);	/* start scanning offscreen */
-	vtset(DOT.l, curwp);
+	vtset(l_ref(DOT.l), curwp);
 
 	/* truncate the virtual line, restore tab offset */
 	vteeol();
@@ -1849,21 +1864,21 @@ WINDOW *wp;
 		vtputc(lchar);
 		
 	{ /* determine if top line, bottom line, or both are visible */
-		LINE *lp = wp->w_line.l;
+		LINE *lp = l_ref(wp->w_line.l);
 		int rows = wp->w_ntrows;
 		char *msg = NULL;
 		
 		vtcol = n - 7;  /* strlen(" top ") plus a couple */
 		while (rows--) {
 			lp = lforw(lp);
-			if (lp == wp->w_bufp->b_line.l) {
+			if (lp == l_ref(wp->w_bufp->b_line.l)) {
 				msg = " bot ";
 				break;
 			}
 		}
-		if (lback(wp->w_line.l) == wp->w_bufp->b_line.l) {
+		if (lBack(wp->w_line.l) == l_ref(wp->w_bufp->b_line.l)) {
 			if (msg) {
-				if (wp->w_line.l == wp->w_bufp->b_line.l)
+				if (l_ref(wp->w_line.l) == l_ref(wp->w_bufp->b_line.l))
 					msg = " emp ";
 				else
 					msg = " all ";

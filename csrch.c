@@ -2,7 +2,10 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: csrch.c,v $
- * Revision 1.7  1993/03/16 10:53:21  pgf
+ * Revision 1.8  1993/05/24 15:21:37  pgf
+ * tom's 3.47 changes, part a
+ *
+ * Revision 1.7  1993/03/16  10:53:21  pgf
  * see 3.36 section of CHANGES file
  *
  * Revision 1.6  1992/12/04  09:12:25  foxharp
@@ -56,8 +59,8 @@ int f,n,c;
 	doto = curwp->w_dot.o;
 
 	i = doto+1;
-	while(i < llength(curwp->w_dot.l)) {
-		if ( c == lgetc(curwp->w_dot.l,i)) {
+	while(i < lLength(curwp->w_dot.l)) {
+		if ( c == lGetc(curwp->w_dot.l,i)) {
 			doto = i;
 			n--;
 			if (!n) break;
@@ -65,7 +68,7 @@ int f,n,c;
 		i++;
 	}
 
-	if ( i == llength(curwp->w_dot.l)) {
+	if ( i == lLength(curwp->w_dot.l)) {
 		TTbeep();
 		return(FALSE);
 	}
@@ -95,7 +98,7 @@ int f,n,c;
 
 	i = doto-1;
 	while(i >= 0) {
-		if ( c == lgetc(curwp->w_dot.l,i)) {
+		if ( c == lGetc(curwp->w_dot.l,i)) {
 			doto = i;
 			n--;
 			if (!n) break;
