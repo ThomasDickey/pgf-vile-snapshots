@@ -4,7 +4,10 @@
  * All operating systems.
  *
  * $Log: termio.c,v $
- * Revision 1.88  1994/02/04 12:31:44  pgf
+ * Revision 1.89  1994/02/11 14:12:36  pgf
+ * test tungotc for positive or zero, so entering a 0 will work
+ *
+ * Revision 1.88  1994/02/04  12:31:44  pgf
  * preserve more of the iflags in the termio settings.
  *
  * Revision 1.87  1994/02/04  12:22:35  pgf
@@ -844,7 +847,7 @@ this seems to think there is something ready more often than there really is
 #endif
 #else
 
-	if (tungotc > 0)
+	if (tungotc >= 0)
 		return TRUE;
 
 # if	USE_FIONREAD
@@ -1267,7 +1270,7 @@ ttgetc()
 int
 typahead()
 {
-	if (tungotc > 0)
+	if (tungotc >= 0)
 		return TRUE;
 
 #if	X11

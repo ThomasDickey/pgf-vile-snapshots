@@ -14,7 +14,10 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.158  1994/02/07 12:31:30  pgf
+ * Revision 1.159  1994/02/11 14:12:08  pgf
+ * new dummy function, altspeckey
+ *
+ * Revision 1.158  1994/02/07  12:31:30  pgf
  * fix preprocessor syntax to suit older compilers
  *
  * Revision 1.157  1994/02/07  12:27:51  pgf
@@ -1811,6 +1814,14 @@ int f,n;
 /* ARGSUSED */
 int
 speckey(f,n) /* dummy function for binding to pseudo-function prefix, '#' */
+int f,n;
+{
+	return TRUE;
+}
+
+/* ARGSUSED */
+int
+altspeckey(f,n)
 int f,n;
 {
 	return TRUE;

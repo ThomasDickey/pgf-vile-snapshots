@@ -74,7 +74,12 @@
 #		here for completeness.
 #
 # $Log: cmdtbl,v $
-# Revision 1.79  1994/02/03 19:35:12  pgf
+# Revision 1.80  1994/02/11 14:05:29  pgf
+# added altspeckey/"alt-function-prefix".  it's not bound to a key, since
+# it's special, and is initialized in edef.h to have the same value as
+# poundc.  mktbls wouldn't like the double binding.
+#
+# Revision 1.79  1994/02/03  19:35:12  pgf
 # tom's changes for 3.65
 #
 # Revision 1.78  1994/02/02  18:07:38  pgf
@@ -1211,6 +1216,8 @@ spawn		NONE
 speckey		NONE
 	"function-prefix"
 	'#'
+altspeckey		NONE
+	"alt-function-prefix"
 splitwind	NONE
 	"split-current-window"		!FEWNAMES
 #	'^T'

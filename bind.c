@@ -4,7 +4,11 @@
  *	written 11-feb-86 by Daniel Lawrence
  *
  * $Log: bind.c,v $
- * Revision 1.63  1994/02/03 19:35:12  pgf
+ * Revision 1.64  1994/02/11 14:04:31  pgf
+ * added support for altpoundc special key, and
+ * for echoing 8bit chars on the command line in hex or octal
+ *
+ * Revision 1.63  1994/02/03  19:35:12  pgf
  * tom's changes for 3.65
  *
  * Revision 1.62  1994/01/31  18:11:03  pgf
@@ -222,7 +226,7 @@
 #define TERMCHRS_NAME ScratchName(Terminal)
 
 /* dummy prefix binding functions */
-extern CMDFUNC f_cntl_af, f_cntl_xf, f_unarg, f_esc, f_speckey;
+extern CMDFUNC f_cntl_af, f_cntl_xf, f_unarg, f_esc, f_speckey, f_altspeckey;
 
 #if REBIND
 #define	isSpecialCmd(k) \
@@ -230,7 +234,9 @@ extern CMDFUNC f_cntl_af, f_cntl_xf, f_unarg, f_esc, f_speckey;
 		||(k == &f_cntl_xf)\
 		||(k == &f_unarg)\
 		||(k == &f_esc)\
-		||(k == &f_speckey))
+		||(k == &f_speckey)\
+		||(k == &f_altspeckey)\
+		)
 # if OPT_TERMCHRS
 static	int	chr_complete P(( int, char *, int * ));
 static	int	chr_eol P(( char *, int, int, int ));
@@ -602,6 +608,8 @@ register CMDFUNC *kcmd;
 			abortc = c;
 		if (kcmd == &f_speckey)
 			poundc = c;
+		if (kcmd == &f_altspeckey)
+			altpoundc = c;
 	}
 }
 
@@ -1373,13 +1381,19 @@ kbd_putc(c)
 		kbd_putc(' ');
 	} else {
 		if (c & HIGHBIT) {
-		    kbd_putc('\\');
-		    kbd_putc(((c>>6)&3)+'0');
-		    kbd_putc(((c>>3)&7)+'0');
-		    kbd_putc(((c   )&7)+'0');
+			kbd_putc('\\');
+			if (global_w_val(WMDNONPRINTOCTAL)) {
+				kbd_putc(((c>>6)&3)+'0');
+				kbd_putc(((c>>3)&7)+'0');
+				kbd_putc(((c   )&7)+'0');
+			} else {
+				kbd_putc('x');
+				kbd_putc(hexdigits[(c>>4) & 0xf]);
+				kbd_putc(hexdigits[(c   ) & 0xf]);
+			}
 		} else {
-		    kbd_putc('^');
-		    kbd_putc(toalpha(c));
+			kbd_putc('^');
+			kbd_putc(toalpha(c));
 		}
 	}
 	endofDisplay;

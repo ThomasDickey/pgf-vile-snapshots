@@ -10,7 +10,10 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.154  1994/02/07 12:24:48  pgf
+ * Revision 1.155  1994/02/11 11:06:07  pgf
+ * add linux to gethostname(), and made strtol prototype match proto.h
+ *
+ * Revision 1.154  1994/02/07  12:24:48  pgf
  * added LBRACK/RBRACK defines for [ and ]
  *
  * Revision 1.153  1994/02/03  19:35:12  pgf
@@ -1046,7 +1049,7 @@ extern	char *	sys_errlist[];
 #define USE_BCOPY 1
 #endif
 
-#if BERK
+#if BERK || LINUX  /* who else?  can i include POSIX here? */
 #define HAVE_GETHOSTNAME 1
 #else
 #define HAVE_GETHOSTNAME 0
@@ -2440,7 +2443,7 @@ typedef struct WHBLOCK {
 #  if APOLLO_STDLIB
 extern void qsort P((char *, SIZE_T, SIZE_T, int (*func)(char **,char **)));
 #  endif
-extern long strtol P((char *, char **, int));
+extern	long	strtol	P(( const char *, char **, int ));
 extern char *getenv P((char *));
 extern void exit P((int));
 extern void _exit P((int));
