@@ -5,7 +5,7 @@
  * functions that adjust the top line in the window and invalidate the
  * framing, are hard.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/basic.c,v 1.75 1994/12/12 18:23:25 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/basic.c,v 1.76 1994/12/16 22:42:58 pgf Exp $
  *
  */
 
@@ -1252,7 +1252,7 @@ int	col;
 
 	if ((wp1 = row2window(row)) == 0)
 		return FALSE;
-	if (doingopcmd && curwp != wp1)
+	if ((doingopcmd || doingsweep) && curwp != wp1)
 		return FALSE;
 	saveMK = MK;
 	if (set_curwp(wp1)

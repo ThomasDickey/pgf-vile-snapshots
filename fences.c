@@ -7,7 +7,7 @@
  * Most code probably by Dan Lawrence or Dave Conroy for MicroEMACS
  * Extensions for vile by Paul Fox
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/fences.c,v 1.25 1994/11/29 04:02:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/fences.c,v 1.26 1994/12/16 22:54:21 pgf Exp $
  *
  */
 
@@ -339,8 +339,10 @@ int ofence;
 	if (count == 0) {
 		if (s == TRUE) {
 			if (sdir == FORWARD) {
-				if (!doingopcmd)
+				if (!doingopcmd || doingsweep) {
 					backchar(FALSE, 1);
+					sweephack = TRUE;
+				}
 			} else {
 				forwchar(FALSE, 1);
 			}
@@ -419,14 +421,16 @@ int sdir;
 	if (count == 0) {
 		if (s == TRUE) {
 			if (sdir == FORWARD) {
-				if (!doingopcmd && s)
+				if (!doingopcmd || doingsweep) {
 					backchar(FALSE, 1);
+					sweephack = TRUE;
+				}
 			} else {
 				forwchar(FALSE, 1);
 			}
 		}
 		curwp->w_flag |= WFMOVE;
-		return(TRUE);
+		return TRUE;
 	}
 	return FALSE;
 }

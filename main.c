@@ -13,7 +13,7 @@
  *	The same goes for vile.  -pgf
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/main.c,v 1.216 1994/12/15 15:01:52 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/main.c,v 1.217 1994/12/16 22:54:21 pgf Exp $
  *
  */
 
@@ -1277,6 +1277,8 @@ int f,n;
 	dotcmdmode = STOP;
 	regionshape = EXACT;
 	doingopcmd = FALSE;
+	doingsweep = FALSE;
+	sweephack = FALSE;
 	opcmd = 0;
 	mlwarn("[Aborted]");
 	return ABORT;

@@ -8,7 +8,7 @@
 */
 
 /*
- * $Header: /usr/build/VCS/pgf-vile/RCS/edef.h,v 1.164 1994/12/15 15:54:09 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/edef.h,v 1.166 1994/12/16 22:54:48 pgf Exp $
  */
 
 /* I know this declaration stuff is really ugly, and I probably won't ever
@@ -31,7 +31,7 @@ decl_init( char prognam[], "xvile");
 decl_init( char prognam[], "vile");
 #endif
 
-decl_init( char version[], "version 4.11");
+decl_init( char version[], "version 4.12");
 
 #if SYS_UNIX
 decl_init( char opersys[], "unix");
@@ -72,23 +72,25 @@ decl_uninit( VIDEO_ATTR videoattribute );
 					/* attribute to set in call to
 					   attributeregion()		*/
 #endif
-decl_uninit( short doingopcmd );        /* operator command in progress */
+decl_uninit( int doingopcmd );		/* operator command in progress */
+decl_uninit( int doingsweep );		/* operator command in progress */
+decl_uninit( int sweephack );		/* don't include dot when sweeping */
 decl_uninit( MARK pre_op_dot );		/* current pos. before operator cmd */
-decl_uninit( short opcmd );             /* what sort of operator?	*/
+decl_uninit( short opcmd );		/* what sort of operator?	*/
 decl_uninit( CMDFUNC *havemotion );	/* so we can use "oper" routines
 					   internally */
-decl_uninit( int currow );              /* Cursor row                   */
-decl_uninit( int curcol );              /* Cursor column                */
-decl_uninit( WINDOW *curwp );           /* Current window               */
-decl_uninit( BUFFER *curbp );           /* Current buffer               */
-decl_uninit( WINDOW *wheadp );          /* Head of list of windows      */
-decl_uninit( BUFFER *bheadp );          /* Head of list of buffers      */
+decl_uninit( int currow );		/* Cursor row                   */
+decl_uninit( int curcol );		/* Cursor column                */
+decl_uninit( WINDOW *curwp );		/* Current window               */
+decl_uninit( BUFFER *curbp );		/* Current buffer               */
+decl_uninit( WINDOW *wheadp );		/* Head of list of windows      */
+decl_uninit( BUFFER *bheadp );		/* Head of list of buffers      */
 
 decl_uninit( TBUFF *save_shell[2] );	/* last ":!" or ^X-!  command	*/
 
 decl_uninit( char sres[NBUFN] );	/* current screen resolution	*/
 
-decl_uninit( char pat[NPAT] );          /* Search pattern		*/
+decl_uninit( char pat[NPAT] );		/* Search pattern		*/
 decl_uninit( char rpat[NPAT] );		/* replacement pattern		*/
 
 #if OPT_PROCEDURES

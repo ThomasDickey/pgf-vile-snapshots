@@ -18,7 +18,7 @@
  * transfering the selection are not dealt with in this file.  Procedures
  * for dealing with the representation are maintained in this file.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/select.c,v 1.29 1994/12/13 15:39:06 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/select.c,v 1.30 1994/12/16 22:54:21 pgf Exp $
  *
  */
 
@@ -580,8 +580,6 @@ selectregion()
 	return status;
 }
 
-int sweeping;
-
 static int multimotionworker P(( int, int ));
 
 static int
@@ -595,17 +593,25 @@ int f,n;
 	MARK savemark;
 	MARK realdot;
 	char	temp[NLINE];
+	static int wassweephack = FALSE;
 	extern CMDFUNC f_multimotion;
 
 	savedot = DOT;
-	if (sweeping) { /* the same command terminates as starts the sweep */
-		sweeping = FALSE;
+	if (doingsweep) { /* the same command terminates as starts the sweep */
+		doingsweep = FALSE;
 		mlforce("[Sweeping: Completed]");
 		regionshape = shape;
+		/* since the terminating 'q' is executed as a motion, we have
+		   now lost the value of sweephack we were interested in, the
+		   one that tells us to include DOT.o in the selection.
+		   so we preserved it in wassweephack, and restore it here.
+		 */
+		if (wassweephack)
+			sweephack = wassweephack;
 		return TRUE;
 	} else {
 		kcod2pstr(fnc2kcod(&f_multimotion), temp);
-		sweeping = TRUE;
+		doingsweep = TRUE;
 		mlwrite("[Begin cursor sweep... (end with %*S)]",*temp,temp+1);
 		sel_begin();
 		(void)sel_setshape(shape);
@@ -613,7 +619,7 @@ int f,n;
 
 	waserr = TRUE; /* to force message "state-machine" */
 
-	while (sweeping) {
+	while (doingsweep) {
 
 		/* Fix up the screen	*/
 		s = update(FALSE);
@@ -622,7 +628,7 @@ int f,n;
 		c = kbd_seq();
 
 		if (ABORTED(c)) {
-			sweeping = FALSE;
+			doingsweep = FALSE;
 			mlforce("[Sweeping: Aborted]");
 			sel_release();
 			return FALSE;
@@ -637,6 +643,8 @@ int f,n;
 		cfp = kcod2fnc(c);
 		if ( (cfp != NULL)
 		 && ((cfp->c_flags & MOTION) != 0)) {
+			wassweephack = sweephack;
+			sweephack = FALSE;
 			s = execute(cfp, f, n);
 			if (s != TRUE) {
 				mlforce(
@@ -652,7 +660,12 @@ int f,n;
 				sel_begin();
 				DOT = realdot;
 				(void)sel_setshape(shape);
-				sel_extend(TRUE,FALSE);
+				/* we sometimes want to include DOT.o in the
+				   selection (unless it's a rectangle, in
+				   which case it's taken care of elsewhere)
+				 */
+				sel_extend(TRUE,(regionshape != RECTANGLE &&
+					sweephack));
 			}
 		 } else {
 			mlforce(
@@ -662,6 +675,10 @@ int f,n;
 
 	}
 	regionshape = shape;
+	/* if sweephack is set here, it's because the last motion had
+		it set */
+	if (doingopcmd && regionshape != RECTANGLE && sweephack)
+    		DOT.o += 1;
 	savedot = DOT;
 	savemark = MK;
 	s = yankregion();

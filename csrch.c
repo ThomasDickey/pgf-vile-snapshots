@@ -1,7 +1,7 @@
 /* These functions perform vi's on-this-line character scanning functions.
  *	written for vile by Paul Fox, (c)1990
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/csrch.c,v 1.19 1994/11/28 19:04:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/csrch.c,v 1.20 1994/12/16 22:54:21 pgf Exp $
  *
 */
 
@@ -47,8 +47,10 @@ int f,n,c;
 	if ( i == lLength(DOT.l)) {
 		return(FALSE);
 	}
-	if (doingopcmd)
+	if (doingopcmd && !doingsweep)
 		doto++;
+	else if (doingsweep)
+		sweephack = TRUE;
 
 	DOT.o = doto;
 	curwp->w_flag |= WFMOVE;

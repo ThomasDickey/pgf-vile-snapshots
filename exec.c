@@ -3,7 +3,7 @@
  *
  *	written 1986 by Daniel Lawrence
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/exec.c,v 1.105 1994/12/15 15:01:52 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/exec.c,v 1.106 1994/12/16 22:54:21 pgf Exp $
  *
  */
 
@@ -775,7 +775,7 @@ int f,n;
 	flags = execfunc->c_flags;
 
 	/* commands following operators can't be redone or undone */
-	if ( !doingopcmd) {
+	if ( !doingopcmd && !doingsweep) {
 		/* don't record non-redoable cmds, */
 		/* but if we're in insertmode, it's okay, since we must
 			be executing a function key, like an arrow key,
@@ -832,7 +832,7 @@ int f,n;
 
 	/* if motion was absolute, and it wasn't just on behalf of an
 		operator, and we moved, update the "last dot" mark */
-	if ((flags & ABSM) && !doingopcmd && 
+	if ((flags & ABSM) && !doingopcmd &&
 			!sameline(DOT, curwp->w_tentative_lastdot)) {
 		curwp->w_lastdot = curwp->w_tentative_lastdot;
 	}
