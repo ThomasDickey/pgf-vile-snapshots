@@ -3,7 +3,10 @@
  * code by Paul Fox, original algorithm mostly by Julia Harper May, 89
  *
  * $Log: undo.c,v $
- * Revision 1.17  1992/05/16 12:00:31  pgf
+ * Revision 1.18  1992/07/28 22:02:55  foxharp
+ * took out crufty ifdefs and commented-out code.  reworded some commentary.
+ *
+ * Revision 1.17  1992/05/16  12:00:31  pgf
  * prototypes/ansi/void-int stuff/microsoftC
  *
  * Revision 1.16  1992/01/05  00:06:13  pgf
@@ -99,12 +102,7 @@
 
 #define CURSTK(bp) (&(bp->b_udstks[bp->b_udstkindx]))
 #define ALTSTK(bp) (&(bp->b_udstks[1^(bp->b_udstkindx)]))
-/*
-#define CURDOTP(bp) (bp->b_uddot[bp->b_udstkindx].l)
-#define ALTDOTP(bp) (bp->b_uddot[1^(bp->b_udstkindx)].l)
-#define CURDOTO(bp) (bp->b_uddot[bp->b_udstkindx].o)
-#define ALTDOTO(bp) (bp->b_uddot[1^(bp->b_udstkindx)].o)
-*/
+
 #define CURDOT(bp) bp->b_uddot[bp->b_udstkindx]
 #define ALTDOT(bp) bp->b_uddot[1^(bp->b_udstkindx)]
 #define SWITCHSTKS(bp) (bp->b_udstkindx = 1 ^ bp->b_udstkindx)
@@ -137,13 +135,15 @@ LINE *lp;
 	dumpuline(lp);
 }
 
-/* push a copy of a line onto the right undo stack */
-/* push a patch so we can later fix up any references to this line that */
-/* might already be in the stack.  */
-/* This unforutunate breach of stak protocol is because we'd rather push the */
-/* _copy_ than the origianal. When the undo happens, the later pops will  */
-/* point at the _original_ (which will by then be on the other undo stack)  */
-/* unless we fix them now. */
+/* 
+ * Push a copy of a line onto the right undo stack.  Push a patch so we can
+ * later fix up any references to this line that might already be in the
+ * stack.  When the undo happens, the later pops (i.e. those lines still
+ * in the stack) will point at the _original_ (which will by then be on the
+ * other undo stack) instead of the copy, which will have just been popped. 
+ * unless we fix them by when popping the patch.
+ */
+
 int
 copy_for_undo(lp)
 LINE *lp;
@@ -246,7 +246,7 @@ int type;
 }
 
 void
-patchstk(newlp,oldlp)
+applypatch(newlp,oldlp)
 LINE *newlp, *oldlp;
 {
 	register LINE *tlp;
@@ -320,19 +320,8 @@ int f,n;
 
 	while ((lp = popline(CURSTK(curbp))) != NULL) {
 		nopops = FALSE;
-#if NEWUNDO
-		if (lismarkpatch(lp)) {
-			register LINE *tlp;
-			resetuline(lp->l_bp,lp->l_fp);
-			tlp = lp->l_fp;
-			lp->l_fp = lp->l_bp;
-			lp->l_bp = tlp;
-			pushline(lp,ALTSTK(curbp));
-			continue;
-		}
-#endif
 		if (lislinepatch(lp)) {
-			patchstk(lp->l_bp, lp->l_fp);
+			applypatch(lp->l_bp, lp->l_fp);
 			lfree(lp,curbp);
 			continue;
 		}
@@ -451,8 +440,6 @@ int f,n;
 	curwp->w_dot.l = lp;
 	preundocleanup();
 
-
-	
 	ntext = NULL;
 	if (ulp->l_size && (ntext = malloc(ulp->l_size)) == NULL)
 		return (FALSE);
@@ -463,6 +450,7 @@ int f,n;
 		memcpy(ntext, ulp->l_text, llength(ulp));
 		ltextfree(lp,curbp);
 	}
+
 	lp->l_text = ntext;
 	lp->l_used = ulp->l_used;
 	lp->l_size = ulp->l_size;
@@ -557,16 +545,6 @@ register LINE *nlp,*olp;
 		}
 		wp = wp->w_wndp;
 	}
-#if 0
-no code for ALTDOT, but this was ifdefed out before I put that in...  pgf
-	if (ALTDOT(curbp).l == olp) {
-		if (lisreal(nlp)) {
-			ALTDOT(curbp).l = nlp;
-		} else {
-		    mlforce("BUG: preundodot points at newly inserted line!");
-		}
-	}
-#endif
 	if (CURDOT(curbp).l == olp) {
 		if (lisreal(nlp)) {
 			CURDOT(curbp).l = nlp;
@@ -590,9 +568,7 @@ no code for ALTDOT, but this was ifdefed out before I put that in...  pgf
 			}
 		}
 	}
-#if !NEWUNDO
 	resetuline(olp,nlp);
-#endif
 }
 
 int

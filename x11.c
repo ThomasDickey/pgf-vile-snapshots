@@ -2,7 +2,10 @@
  * 	X11 support, Dave Lemke, 11/91
  *
  * $Log: x11.c,v $
- * Revision 1.7  1992/05/16 12:00:31  pgf
+ * Revision 1.8  1992/08/04 20:16:14  foxharp
+ * prototype fixups
+ *
+ * Revision 1.7  1992/05/16  12:00:31  pgf
  * prototypes/ansi/void-int stuff/microsoftC
  *
  * Revision 1.6  1992/05/13  09:17:23  pgf
@@ -126,9 +129,11 @@ static char *paste;
 static char *pp;
 static int  plen;
 
-static int  x_open(),
+static int  x_getc(),
+            x_cres();
+
+static void  x_open(),
             x_close(),
-            x_getc(),
             x_putc(),
             x_flush(),
             x_kopen(),
@@ -137,8 +142,7 @@ static int  x_open(),
             x_eeol(),
             x_eeop(),
             x_beep(),
-            x_rev(),
-            x_cres();
+            x_rev();
 
 #if COLOR
 static int  x_fcol(), x_bcol();
@@ -146,12 +150,14 @@ static int  x_fcol(), x_bcol();
 #endif
 
 #ifdef SCROLLCODE
-static int  x_scroll();
+static void  x_scroll();
 
 #endif
 
 static void change_selection();
 static void x_stash_selection();
+static int set_character_class();
+static void x_refresh();
 
 #define	FONTNAME	"9x15"
 static char *fontname;
@@ -257,10 +263,10 @@ x_set_geometry(g)
 }
 
 void
-x_set_dpy(dname)
-    char       *dname;
+x_set_dpy(dn)
+    char       *dn;
 {
-    displayname = dname;
+    displayname = dn;
 }
 
 int
@@ -329,6 +335,8 @@ x_quit()
 {
     x_close();
     exit(0);
+    /* NOTREACHED */
+    return 0;
 }
 
 static void
@@ -410,81 +418,81 @@ bool_name(t)
 }
 
 static int
-color_value(dpy, screen, t)
-    Display    *dpy;
+color_value(disp, screen, t)
+    Display    *disp;
     int         screen;
     char       *t;
 {
     XColor      xc;
     Colormap    cmap;
 
-    cmap = DefaultColormap(dpy, screen);
+    cmap = DefaultColormap(disp, screen);
 
-    XParseColor(dpy, cmap, t, &xc);
-    XAllocColor(dpy, cmap, &xc);
+    XParseColor(disp, cmap, t, &xc);
+    XAllocColor(disp, cmap, &xc);
     return xc.pixel;
 }
 
 static void
-x_get_defaults(dpy, screen)
-    Display    *dpy;
+x_get_defaults(disp, screen)
+    Display    *disp;
     int         screen;
 {
     char       *t;
 
     if (!fontname) {
-	t = XGetDefault(dpy, "XVile", "font");
+	t = XGetDefault(disp, "XVile", "font");
 	if (t)
 	    fontname = t;
-	t = XGetDefault(dpy, progname, "font");
+	t = XGetDefault(disp, progname, "font");
 	if (t)
 	    fontname = t;
     }
     if (!geometry) {
-	t = XGetDefault(dpy, "XVile", "geometry");
+	t = XGetDefault(disp, "XVile", "geometry");
 	if (t)
 	    geometry = t;
-	t = XGetDefault(dpy, progname, "geometry");
+	t = XGetDefault(disp, progname, "geometry");
 	if (t)
 	    geometry = t;
     }
-    t = XGetDefault(dpy, "XVile", "charClass");
+    t = XGetDefault(disp, "XVile", "charClass");
     if (t)
 	set_character_class(t);
-    t = XGetDefault(dpy, progname, "charClass");
+    t = XGetDefault(disp, progname, "charClass");
     if (t)
 	set_character_class(t);
 
-    t = XGetDefault(dpy, "XVile", "multiClickTime");
+    t = XGetDefault(disp, "XVile", "multiClickTime");
     if (t)
 	multi_click_time = atoi(t);
-    t = XGetDefault(dpy, progname, "multiClickTime");
+    t = XGetDefault(disp, progname, "multiClickTime");
     if (t)
 	multi_click_time = atoi(t);
 
-    t = XGetDefault(dpy, "XVile", "reverseVideo");
+    t = XGetDefault(disp, "XVile", "reverseVideo");
     if (t)
 	reverse_video = bool_name(t);
-    t = XGetDefault(dpy, progname, "reverseVideo");
+    t = XGetDefault(disp, progname, "reverseVideo");
     if (t)
 	reverse_video = bool_name(t);
 
-    t = XGetDefault(dpy, "XVile", "foreground");
+    t = XGetDefault(disp, "XVile", "foreground");
     if (t)
-	foreground = color_value(dpy, screen, t);
-    t = XGetDefault(dpy, progname, "foreground");
+	foreground = color_value(disp, screen, t);
+    t = XGetDefault(disp, progname, "foreground");
     if (t)
-	foreground = color_value(dpy, screen, t);
+	foreground = color_value(disp, screen, t);
 
-    t = XGetDefault(dpy, "XVile", "background");
+    t = XGetDefault(disp, "XVile", "background");
     if (t)
-	background = color_value(dpy, screen, t);
-    t = XGetDefault(dpy, progname, "background");
+	background = color_value(disp, screen, t);
+    t = XGetDefault(disp, progname, "background");
     if (t)
-	background = color_value(dpy, screen, t);
+	background = color_value(disp, screen, t);
 }
 
-static int
+static void
 x_open()
 {
     TextWindow  tw;
@@ -651,23 +659,23 @@ x_open()
     term.t_nrow = tw->rows - 1;
 }
 
-static int
+static void
 x_close()
 {
     XCloseDisplay(dpy);
 }
 
-static int
+static void
 x_kopen()
 {
 }
 
-static int
+static void
 x_kclose()
 {
 }
 
-static int
+static void
 x_refresh(tw, sc, sr, ec, er)
     TextWindow  tw;
     int         sc,
@@ -729,7 +737,7 @@ wait_for_scroll(tw)
  * XXX this may not be any faster than having the guts do the scrolling
  * instead
  */
-static int
+static void
 x_scroll(from, to, count)
     int         from,
                 to,
@@ -912,7 +920,7 @@ clear_line(row, start, count)
 #undef	clear_hack
 
 /* make sure the screen looks like we want it to */
-static int
+static void
 x_flush()
 {
     unsigned char *start;
@@ -1014,7 +1022,7 @@ x_flush()
     XFlush(dpy);
 }
 
-static int
+static void
 x_move(row, col)
     int         row,
                 col;
@@ -1032,10 +1040,11 @@ x_move(row, col)
 				 (r) <= (tw)->sel_end_row)
 
 /* ARGSUSED */
-int
+void
 x_putline(row, str, len)
     int         row;
     char       *str;
+    int		len;
 {
     int         c,
                 i;
@@ -1066,7 +1075,7 @@ x_putline(row, str, len)
     cur_win->line_attr[row] |= LINE_DIRTY;
 }
 
-static int
+static void
 x_putc(c)
     char        c;
 {
@@ -1099,7 +1108,7 @@ x_putc(c)
 /*
  * clear to end of line
  */
-static int
+static void
 x_eeol()
 {
     int         c;
@@ -1121,7 +1130,7 @@ x_eeol()
 /*
  * clear to end of page
  */
-static int
+static void
 x_eeop()
 {
     int         r,
@@ -1920,8 +1929,8 @@ x_getc()
 
 /* ARGSUSED */
 static Bool
-check_kbd_ev(dpy, ev, arg)
-    Display    *dpy;
+check_kbd_ev(disp, ev, arg)
+    Display    *disp;
     XEvent     *ev;
     char       *arg;
 {
@@ -1942,7 +1951,7 @@ x_key_events_ready()
 /*
  * change reverse video status
  */
-static int
+static void
 x_rev(state)
     int         state;
 {
@@ -1971,12 +1980,14 @@ x_bcol()
 
 /* change pallette string */
 /* ARGSUSED */
+void
 spal(dummy)
+char *dummy;
 {
 }
 
 /* beep */
-static int
+static void
 x_beep()
 {
     XBell(cur_win->dpy, 0);

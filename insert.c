@@ -8,8 +8,11 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: insert.c,v $
- *	Revision 1.4  1992/07/15 23:23:46  foxharp
- *	made '80i-ESC' work
+ *	Revision 1.5  1992/08/06 23:53:51  foxharp
+ *	autoindent now goes by shiftwidth, instead of tabstop
+ *
+ * Revision 1.4  1992/07/15  23:23:46  foxharp
+ * made '80i-ESC' work
  *
  * Revision 1.3  1992/07/04  14:34:52  foxharp
  * added ability to call SPEC-key bound functions (motion only) during
@@ -540,7 +543,7 @@ int cmode;
 	if (lnewline() == FALSE)
 		return FALSE;
 	if (cmode && bracef)
-		indentwas = nextab(indentwas);
+		indentwas = nextsw(indentwas);
 	if (doindent(indentwas) != TRUE)
 		return FALSE;
 	return TRUE;
@@ -560,7 +563,7 @@ int cmode;
 	if (backline(TRUE,1) == FALSE)
 		return FALSE;
 	if (cmode && bracef)
-		indentwas = nextab(indentwas);
+		indentwas = nextsw(indentwas);
 	if (doindent(indentwas) != TRUE)
 		return FALSE;
 	return TRUE;

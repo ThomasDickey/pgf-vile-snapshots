@@ -6,7 +6,25 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.53  1992/07/24 07:49:38  foxharp
+ * Revision 1.58  1992/08/06 23:55:07  foxharp
+ * changes to canonical pathnames and directory changing to support DOS and
+ * its drive designators
+ *
+ * Revision 1.57  1992/08/05  22:07:50  foxharp
+ * glob() on DOS now does something -- it makes sure the drive designator
+ * is uppercase
+ *
+ * Revision 1.56  1992/08/05  21:51:55  foxharp
+ * trim trailing slashes in DOS as well as UNIX
+ *
+ * Revision 1.55  1992/08/05  21:02:51  foxharp
+ * check return of mlyesno explicitly against TRUE, since it might return FALSE _or_ ABORT
+ *
+ * Revision 1.54  1992/07/30  07:29:55  foxharp
+ * if a requested name has no slashes, try for it as a buffer name, then
+ * canonicalize, and try for buffer and then file, like we used to
+ *
+ * Revision 1.53  1992/07/24  07:49:38  foxharp
  * shorten_name changes
  *
  * Revision 1.52  1992/07/22  09:16:49  foxharp
@@ -350,18 +368,30 @@ int lockfl;		/* check the file for locks? */
         char bname[NBUFN];	/* buffer name to put file */
 
 #if	MSDOS
-	mklower(fname);		/* msdos isn't case sensitive */
+	/* msdos isn't case sensitive */
+	if (isupper(fname[0]) && fname [1] == ':')
+		mklower(fname+2);
+	else
+		mklower(fname);
 #endif
+
+	/* if there are no path delimiters in the name, then the user
+		is likely asking for an existing buffer -- try for that
+		first */
+        if (strchr(fname,slash) == NULL &&
+			(bp=bfind(fname, NO_CREAT, 0)) != NULL) {
+		return swbuffer(bp);
+	}
+	/* oh well.  canonicalize the name, and try again */
+
 	if (!tbp) {
 		if ((tbp=(BUFFER *)malloc(sizeof(BUFFER))) == NULL)
-			return (NULL);
+			return FALSE;
 	}
 	tbp->b_fname = NULL;
 	ch_fname(tbp,fname);		/* fill it out */
 	fname = tbp->b_fname;
 
-
-		
         if ((bp=bfind(fname, NO_CREAT, 0)) == NULL) {
 		/* it's not already here by that buffer name */
 	        for (bp=bheadp; bp!=NULL; bp=bp->b_bufp) {
@@ -373,7 +403,7 @@ int lockfl;		/* check the file for locks? */
 		                        mlwrite("[Old buffer]");
 				} else {
 		                        if (mlyesno(
-		                         "Old command output -- rerun")) {
+				 "Old command output -- rerun") == TRUE) {
 					        return readin(fname, lockfl, 
 								curbp, TRUE);
 					}
@@ -800,8 +830,8 @@ char    fname[];
 	fcp = &fname[strlen(fname)];
 	/* trim trailing whitespace */
 	while (fcp != fname && (fcp[-1] == ' ' || fcp[-1] == '\t'
-#if UNIX  /* trim trailing slashes as well */
-					 || fcp[-1] == '/'
+#if UNIX || MSDOS /* trim trailing slashes as well */
+					 || slashc(fcp[-1])
 #endif
 							) )
                 *(--fcp) = '\0';
@@ -1575,6 +1605,11 @@ char *buf;
 		cp++;
 	}
 #endif
+#if MSDOS
+	/* this is a just a convenient place to put this little hack */
+	if (islower(buf[0]) && buf[1] == ':')
+		buf[0] = toupper(buf[0]);
+#endif
 	return TRUE;
 }
 
@@ -1729,8 +1764,12 @@ char *f;
 
 	/* if we reached the end of cwd, and we're at a path boundary,
 		then the file must be under '.' */
-	if (*cwd == '\0' && *ff == slash)
-		return ff+1;
+	if (*cwd == '\0') {
+		if (*ff == slash)
+			return ff+1;
+		if (slp == ff - 1)
+			return ff;
+	}
 	
 	/* if we mismatched during the first path component, we're done */
 	if (slp == f)

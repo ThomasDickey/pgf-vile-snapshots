@@ -6,7 +6,13 @@
  * for the display system.
  *
  * $Log: buffer.c,v $
- * Revision 1.37  1992/07/24 07:49:38  foxharp
+ * Revision 1.39  1992/08/05 21:52:33  foxharp
+ * print filenames with DOS drive designators correctly
+ *
+ * Revision 1.38  1992/07/30  07:28:53  foxharp
+ * don't prepend "./" to non-files in buffer list
+ *
+ * Revision 1.37  1992/07/24  07:49:38  foxharp
  * shorten_name changes
  *
  * Revision 1.36  1992/07/18  13:13:56  foxharp
@@ -717,7 +723,14 @@ char *dummy;
 			char *p;
 			p = shorten_path(bp->b_fname);
 			if (p) {
-				if (p[0] != slash && p[0] != '.')
+#if MSDOS
+				if (isupper(p[0]) && p[1] == ':') {
+					bprintf("%c:",p[0]);
+					p += 2;
+				}
+#endif
+				if (p[0] != slash && p[0] != '.' && 
+						p[0] != '!' && !isspace(p[0]))
 					bprintf(".%c",slash);
 				bprintf("%s",p);
 			}

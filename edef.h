@@ -9,7 +9,10 @@
 
 /*
  * $Log: edef.h,v $
- * Revision 1.61  1992/07/15 08:53:12  foxharp
+ * Revision 1.62  1992/07/24 18:20:08  foxharp
+ * v. 3.24
+ *
+ * Revision 1.61  1992/07/15  08:53:12  foxharp
  * added "slash", for UNIX vs. DOS path separators
  *
  * Revision 1.60  1992/07/13  20:08:17  foxharp
@@ -226,7 +229,7 @@
 #endif
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version three point twenty-three");
+decl_init( char version[], "version three point twenty-four");
 
 decl_init( char slash, '/'); 		/* so DOS can use '\' as path separator */
 

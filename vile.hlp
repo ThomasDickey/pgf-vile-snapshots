@@ -78,17 +78,34 @@ Buffer manipulation commands:
 			^^   (ctrl-^)  (but many keyboards can't produce this)
 
 	:e	Edit a file.  If the file is already in a buffer, that buffer
-		will be recalled into the current window.
+		will be recalled into the current window.  This occurs as
+		follows: If the name given contains no path delimiters
+		(i.e.  slashes), then it will be compared to the existing
+		vile buffer names.  Failing that comparison (or if there
+		are any slashes in the name), the name will be stretched
+		into an absolute path, and will be compared to the existing
+		buffers' filenames.  In either case, the matching buffer
+		will be chosen.  If there are no such matches, the file
+		will be fetched from the filesystem.  This matching
+		technique introduces an ambiguity, since buffer names are
+		created from the last path component of filenames.  To
+		force vile to edit a file from the current directory whose
+		basename matches that of one that was edited elsewhere,
+		simply preface the name with "./".  For example, if you
+		edit "../Makefile" and later attempt to edit "Makefile",
+		vile will assume you are referring to the _buffer_ named
+		"Makefile".  To get the file in the current directory,
+		specify "./Makefile".
 
 	:e!	Re-edit a file.  A different filename can be given, and the 
 		buffer name will change to match it.  This command is not as
 		necessary in vile as it is in vi, since multiple buffers may
 		have outstanding unwritten changes.
 
-	^X-e	Edit the file whose pathname appears under the cursor.  That
-		is, if you are editing a makefile, you could edit one of the
-		source files by placing the cursor at the start of its name
-		and using this command.
+	^X-e	Edit the file whose pathname appears under the cursor.  For
+		example, if you are editing a makefile, you could edit one
+		of the source files by placing the cursor at the start of
+		its name and using this command.
 
 	:n	Go to the next buffer.  "next" means least recently used.
 		(The ":n file ..." version of the command is not supported.)
@@ -919,7 +936,7 @@ Command files
 
 	Files can be executed at any time with the ":source" (or
 	":execute-file") command.  There are (mostly untested) control
-	structures available, such as !while, !if, etc.  Refer to the
+	structures available, such as ~while, ~if, etc.  Refer to the
 	source code for more information.
 
 	Nesting of source'd files is limited to a depth of ten, to prevent
@@ -1049,13 +1066,12 @@ Sample .vilerc
 
 Note on Scrolling
 -----------------
-	If scrolling is really ugly (the status line hops around a lot),
-	and you're using a vt102 or compatible terminal that you
-	think should be able to scroll okay, then the problem is
-	almost certainly your termcap entry, which probably doesn't
-	describe the scrolling regions adequately.  Most standard
-	termcap entries are insufficient.  Here's one that should
-	work:
+	If scrolling is really slow, or really ugly (the status line hops
+	around a lot), and you're using a vt102 or compatible terminal that
+	you think should be able to scroll okay, then the problem is almost
+	certainly your termcap entry, which probably doesn't describe the
+	scrolling regions adequately.  Most standard termcap entries are
+	insufficient.  Here's one that should work:
 
         dy|vt102|vt-102|dec vt102:\
             :do=^J:co#80:li#24:cl=50\E[;H\E[2J:\

@@ -4,7 +4,10 @@
 	written 1986 by Daniel Lawrence
  *
  * $Log: eval.c,v $
- * Revision 1.36  1992/07/13 20:09:57  foxharp
+ * Revision 1.37  1992/07/24 18:22:51  foxharp
+ * deleted local atoi() routine -- now we use the system's copy
+ *
+ * Revision 1.36  1992/07/13  20:09:57  foxharp
  * "terse" is no longer a variable
  *
  * Revision 1.35  1992/07/13  09:26:16  foxharp
@@ -585,43 +588,6 @@ char *value;	/* value to set to */
 }
 #endif
 
-/*	atoi:	ascii string to integer......This is too
-		inconsistant to use the system's	*/
-
-int
-atoi(st)
-char *st;
-{
-	int result;	/* resulting number */
-	int sign;	/* sign of resulting number */
-	char c;		/* current char being examined */
-
-	result = 0;
-	sign = 1;
-
-	/* skip preceding whitespace */
-	while (isspace(*st))
-		++st;
-
-	/* check for sign */
-	if (*st == '-') {
-		sign = -1;
-		++st;
-	}
-	if (*st == '+')
-		++st;
-
-	/* scan digits, build value */
-	while (*st) {
-		c = *st++;
-		if (isdigit(c))
-			result = result * 10 + c - '0';
-		else
-			return(0);
-	}
-
-	return(result * sign);
-}
 
 #if ! SMALLER
 
