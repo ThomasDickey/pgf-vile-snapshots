@@ -9,7 +9,10 @@
 
 /*
  * $Log: edef.h,v $
- * Revision 1.104  1993/06/23 21:28:57  pgf
+ * Revision 1.105  1993/07/01 16:15:54  pgf
+ * tom's 3.51 changes
+ *
+ * Revision 1.104  1993/06/23  21:28:57  pgf
  * 3.50
  *
  * Revision 1.103  1993/06/22  10:36:31  pgf
@@ -351,7 +354,7 @@
 decl_uninit( char *prog_arg );		/* argv[0] from main.c */
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version 3.50");
+decl_init( char version[], "version 3.51");
 
 decl_init( int slash, '/'); 		/* so DOS can use '\' as path separator */
 
@@ -479,7 +482,9 @@ decl_init( int dotcmdarg, FALSE);	/* was there an arg to '.'? */
 decl_uninit( int dotcmdkreg);		/* original dot command kill reg */
 decl_init( int	kbdmode, STOP );	/* current keyboard macro mode	*/
 decl_uninit( int seed );		/* random number seed		*/
+#if RAMSIZE
 decl_uninit( long envram );		/* # of bytes current used malloc */
+#endif
 decl_uninit( int macbug );		/* macro debugging flag		*/
 decl_init( char	errorm[], "ERROR" );	/* error literal		*/
 decl_init( char	truem[], "TRUE" );	/* true literal			*/

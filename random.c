@@ -3,7 +3,17 @@
  * commands. There is no functional grouping here, for sure.
  *
  * $Log: random.c,v $
- * Revision 1.96  1993/06/18 15:57:06  pgf
+ * Revision 1.99  1993/07/01 16:15:54  pgf
+ * tom's 3.51 changes
+ *
+ * Revision 1.98  1993/06/28  14:30:28  pgf
+ * added second arg to catnap(), to allow user input to interrupt the nap.
+ * this is only implemented for select() so far.
+ *
+ * Revision 1.97  1993/06/25  11:25:55  pgf
+ * patches for Watcom C/386, from Tuan DANG
+ *
+ * Revision 1.96  1993/06/18  15:57:06  pgf
  * tom's 3.49 changes
  *
  * Revision 1.95  1993/06/02  14:28:47  pgf
@@ -353,8 +363,12 @@
 # include <sys/select.h>
 #endif
 
+#if WATCOM
+#   include <direct.h>
+#endif
+
 #if TURBO
-#include <dir.h>
+#   include <dir.h>
 #endif
 
 extern CMDFUNC f_forwchar, f_backchar, f_forwchar_to_eol, f_backchar_to_bol;
@@ -385,7 +399,7 @@ char	*name;
 		bp->b_fnlen = strlen(bp->b_fname);
 	}
 
-	bp->b_flag &= ~BFCHG;		/* assumes text is loaded... */
+	b_clr_changed(bp);		/* assumes text is loaded... */
 	bp->b_active = TRUE;
 
 	make_local_b_val(bp,MDVIEW);
@@ -421,7 +435,7 @@ char *carg;
 	    
 	if ((s=bclear(bp)) != TRUE) /* clear old text (?) */
 		return (s);
-	bp->b_flag |= BFSCRTCH;
+	b_set_scratch(bp);
 	if (popupbuff(bp) == FALSE) {
 		zotbuf(bp);
 		return (FALSE);
@@ -457,11 +471,8 @@ int f,n;
 	C_NUM savepos;			/* temp save for current offset */
 	C_NUM ecol;			/* column pos/end of current line */
 
-	/* starting at the beginning of the buffer */
-	lp = lForw(curbp->b_line.l);
-
-	/* start counting chars and lines */
-	while (lp != l_ref(curbp->b_line.l)) {
+	/* count chars and lines */
+	for_each_line(lp, curbp) {
 		/* if we are on the current line, record it */
 		if (lp == l_ref(DOT.l)) {
 			predlines = numlines;
@@ -474,7 +485,6 @@ int f,n;
 		/* on to the next line */
 		++numlines;
 		numchars += llength(lp) + 1;
-		lp = lforw(lp);
 	}
 
 	/* if at end of file, record it */
@@ -510,12 +520,9 @@ int f,n;
 	register LINE	*lp;		/* current line */
 	register int	numlines = 0;	/* # of lines in file */
 
-	/* starting at the beginning of the buffer */
-	lp = lForw(curbp->b_line.l);
-	while (lp != l_ref(curbp->b_line.l)) {
+	for_each_line(lp, curbp)
 		++numlines;
-		lp = lforw(lp);
-	}
+
 	mlforce("%d",numlines);
 	return TRUE;
 }
@@ -525,24 +532,23 @@ line_no(the_buffer, the_line)	/* return the number of the given line */
 BUFFER *the_buffer;
 LINEPTR the_line;
 {
+#if !SMALLER
+	(void)bsizes(the_buffer);
+	return l_ref(the_line)->l_number;
+#else
 	register LINE	*lp;		/* current line */
-	register int	numlines;	/* # of lines before point */
+	register int	numlines = 0;	/* # of lines before point */
 
-	/* starting at the beginning of the buffer */
-	lp = lForw(the_buffer->b_line.l);
-
-	/* start counting lines */
-	numlines = 0;
-	while (lp != l_ref(the_buffer->b_line.l)) {
+	for_each_line(lp, the_buffer) {
 		/* if we are on the specified line, record it */
 		if (lp == l_ref(the_line))
 			break;
 		++numlines;
-		lp = lforw(lp);
 	}
 
 	/* and return the resulting count */
 	return(numlines + 1);
+#endif
 }
 
 #if ! SMALLER
@@ -958,9 +964,13 @@ int f, n;	/* arguments ignored */
 #endif
 
 
+/* delay for the given number of milliseconds.  if "watchinput" is true,
+	then user input will abort the delay 
+	FIXXXX -- the second arg is only implemented for UNIX with select() */
 void
-catnap(milli)
+catnap(milli,watchinput)
 int milli;
+int watchinput;
 {
 #if ! UNIX
 #if VMS
@@ -975,9 +985,15 @@ int milli;
 # if HAVE_SELECT
 
 	struct timeval tval;
+	fd_set read_bits;
+
+	FD_ZERO(&read_bits);
+	if (watchinput) {
+		FD_SET(0, &read_bits);
+	}
 	tval.tv_sec = 0;
 	tval.tv_usec = milli * 1000;	/* microseconds */
-	(void)select (0, (fd_set*)0, (fd_set*)0, (fd_set*)0, &tval);
+	(void)select (1, &read_bits, (fd_set*)0, (fd_set*)0, &tval);
 
 # else
 #  if HAVE_POLL
@@ -1025,7 +1041,7 @@ int force;
 	cwd = dirname;
 	}
 #else
-# if (MSDOS & (MSC || TURBO)) || POSIX || VMS
+# if (MSDOS & (MSC || TURBO || WATCOM)) || POSIX || VMS
 	cwd = getcwd(dirname, NFILEN);
 # else
 	cwd = getwd(dirname);
@@ -1037,7 +1053,7 @@ int force;
 	s = strchr(cwd, '\n');
 	if (s)
 		*s = EOS;
-#if MSDOS & (MSC || TURBO)
+#if MSDOS & (MSC || TURBO || WATCOM)
 	update_dos_drv_dir(cwd);
 #endif
 
@@ -1241,25 +1257,34 @@ char *fname;
 
 	len = strlen(np)+1;
 
-	if (bp->b_fname && bp->b_fnlen < len ) {
-		/* don't free it yet -- it _may_ have been passed in as name */
-		holdp = bp->b_fname;
-		bp->b_fname = NULL;
-	}
+	if (bp->b_fname == 0 || strcmp(bp->b_fname, np)) {
 
-	if (!bp->b_fname) {
-		bp->b_fname = strmalloc(np);
-		if (!bp->b_fname) {
-			bp->b_fname = "NO MEMORY";
-			bp->b_fnlen = 9;
-			return;
+		if (bp->b_fname && bp->b_fnlen < len ) {
+			/* don't free it yet -- it _may_ have been passed in as
+			 * the current file-name
+			 */
+			holdp = bp->b_fname;
+			bp->b_fname = NULL;
 		}
-		bp->b_fnlen = len;
-	}
 
-	/* it'll fit, leave len untouched */
-	(void)strcpy(bp->b_fname, np);
-	if (holdp)
-		free(holdp);
-	updatelistbuffers();
+		if (!bp->b_fname) {
+			bp->b_fname = strmalloc(np);
+			if (!bp->b_fname) {
+				bp->b_fname = "NO MEMORY";
+				bp->b_fnlen = 9;
+				return;
+			}
+			bp->b_fnlen = len;
+		}
+
+		/* it'll fit, leave len untouched */
+		(void)strcpy(bp->b_fname, np);
+
+		if (holdp)
+			free(holdp);
+		updatelistbuffers();
+	}
+#ifdef	MDCHK_MODTIME
+	(void)get_modtime(bp, &(bp->b_modtime));
+#endif
 }

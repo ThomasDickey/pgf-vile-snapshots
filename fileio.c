@@ -3,7 +3,13 @@
  * the knowledge about files are here.
  *
  * $Log: fileio.c,v $
- * Revision 1.49  1993/06/18 15:57:06  pgf
+ * Revision 1.51  1993/07/01 16:15:54  pgf
+ * tom's 3.51 changes
+ *
+ * Revision 1.50  1993/06/25  11:25:55  pgf
+ * patches for Watcom C/386, from Tuan DANG
+ *
+ * Revision 1.49  1993/06/18  15:57:06  pgf
  * tom's 3.49 changes
  *
  * Revision 1.48  1993/06/02  14:28:47  pgf
@@ -182,7 +188,7 @@
 
 #if MSDOS
 #include	<sys/stat.h>
-#if TURBO
+#if TURBO || WATCOM
 #include	<io.h>
 #endif
 #endif
@@ -252,7 +258,12 @@ char    *fn;
 		count_fline = 0;
 
 	} else if (is_directory(fn)) {
+#if WATCOM
+		set_errno(S_IFDIR);  /* not the same, but... */
+#endif
+#if TURBO
 		set_errno(EISDIR);
+#endif
 		return (FIOERR);
 
 	} else if ((ffp=fopen(fn, FOPEN_READ)) == NULL) {
@@ -292,7 +303,12 @@ char    *fn;
 			action = "append";
 		}
 		if (is_directory(fn)) {
-			set_errno(EISDIR);
+#if WATCOM
+		        set_errno(S_IFDIR);
+#endif
+#if TURBO
+		        set_errno(EISDIR);
+#endif
 			what = "directory";
 		}
 #if MSDOS	/* patch: should make this a mode */
@@ -436,17 +452,19 @@ ffclose()
 		mlforce("[Read %d lines%s]",
 			count_fline,
 			interrupted ? "- Interrupted" : "");
+#ifdef	MDCHK_MODTIME
+		(void)check_all_modtimes();
+#endif
 	} else
 		s = fclose(ffp);
         if (s != 0) {
                 mlforce("[Error on close]");
                 return(FIOERR);
         }
-        return(FIOSUC);
 #else
         fclose(ffp);
-        return (FIOSUC);
 #endif
+        return (FIOSUC);
 }
 
 /*
@@ -601,8 +619,9 @@ int *lenp;	/* to return the final length */
  * is _much_much_ faster, and I don't have to futz with non-blocking
  * reads...
  */
-
-/* #define no_isready_c 1 */
+#if WATCOM
+#define no_isready_c 1 
+#endif
 
 #ifndef no_isready_c
 # ifdef __sgetc
@@ -620,7 +639,7 @@ int *lenp;	/* to return the final length */
 #    if VMS
 #     define	isready_c(p)	( (*p)->_cnt > 0)
 #    endif
-#    if TURBO
+#    if TURBO 
 #     define    isready_c(p)	( (p)->bsize > ((p)->curp - (p)->buffer) )
 #    endif
 #    ifndef isready_c	/* most other stdio's (?) */

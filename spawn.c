@@ -2,7 +2,13 @@
  *		for MicroEMACS
  *
  * $Log: spawn.c,v $
- * Revision 1.55  1993/06/24 12:11:52  pgf
+ * Revision 1.57  1993/07/01 16:15:54  pgf
+ * tom's 3.51 changes
+ *
+ * Revision 1.56  1993/06/25  11:25:55  pgf
+ * patches for Watcom C/386, from Tuan DANG
+ *
+ * Revision 1.55  1993/06/24  12:11:52  pgf
  * added nounmodifiable() call to filter(), since this operation is not
  * undoable.
  *
@@ -216,8 +222,17 @@ extern  int     newmode[3];                     /* In "termio.c"        */
 extern  short   iochan;                         /* In "termio.c"        */
 #endif
 
-#if	MSDOS & (MSC | TURBO | ZTC)
+#if	MSDOS & (MSC | TURBO | ZTC | WATCOM)
 #include	<process.h>
+#endif
+
+/*
+ * Check all modification-times after executing a shell command
+ */
+#ifdef	MDCHK_MODTIME
+#define	AfterShell()	check_all_modtimes()
+#else
+#define	AfterShell()	TRUE
 #endif
 
 /*
@@ -243,7 +258,7 @@ int f,n;
         TTflush();
 	ttunclean();
         sgarbf = TRUE;
-        return(TRUE);
+        return AfterShell();
 # endif /* X11 */
 #endif /* UNIX */
 
@@ -252,7 +267,7 @@ int f,n;
         mlwrite("[Starting new CLI]");
         Execute("NEWCLI \"CON:0/0/640/200/MicroEMACS Subprocess\"", 0L, 0L);
         sgarbf = TRUE;
-        return(TRUE);
+        return AfterShell();
 #endif
 
 #if     VMS
@@ -270,14 +285,14 @@ int f,n;
 	mlforce("[Not in TOS]");
 	return FALSE;
 #endif
-#if     MSDOS & (AZTEC | MSC | TURBO | ZTC)
+#if     MSDOS & (AZTEC | MSC | TURBO | ZTC | WATCOM)
         movecursor(term.t_nrow, 0);             /* Seek to last line.   */
         TTflush();
 	TTkclose();
 	system("command.com");
 	TTkopen();
         sgarbf = TRUE;
-        return(TRUE);
+        return AfterShell();
 #endif
 #if     MSDOS & LATTICE
         movecursor(term.t_nrow, 0);             /* Seek to last line.   */
@@ -286,7 +301,7 @@ int f,n;
         sys("\\command.com", "");               /* Run CLI.             */
 	TTkopen();
         sgarbf = TRUE;
-        return(TRUE);
+        return AfterShell();
 #endif
 }
 
@@ -333,6 +348,9 @@ int signo;
 	update(TRUE);
 # endif
 # endif
+#endif
+#ifdef	MDCHK_MODTIME
+	(void)check_all_modtimes();
 #endif
 	SIGRET;
 }
@@ -466,7 +484,7 @@ int rerun;
 	TTflush();
         sgarbf = TRUE;
 #endif /* X11 */
-        return (TRUE);
+        return AfterShell();
 #endif /* UNIX */
 
 #if     AMIGA
@@ -486,7 +504,7 @@ int rerun;
         Close(newcli);
         tgetc(FALSE);	/* Pause.               */
         sgarbf = TRUE;
-        return(TRUE);
+        return AfterShell();
 #endif
 #if	ST520 & MEGAMAX
         register int    s;
@@ -560,7 +578,7 @@ int rerun;
         mlforce("\r\n\n[End]");                  /* Pause.               */
         TTgetc();			     /* Pause.               */
         sgarbf = TRUE;
-        return (TRUE);
+        return AfterShell();
 #endif
 #if     VMS
         register int    s;
@@ -604,7 +622,7 @@ int rerun;
         	tgetc(FALSE);
         }
         sgarbf = TRUE;
-        return (TRUE);
+        return AfterShell();
 #endif
 }
 
@@ -725,7 +743,7 @@ pipecmd(f, n)
 
 	/* and get rid of the temporary file */
 	unlink(filnam);
-	return(TRUE);
+	return AfterShell();
 }
 #endif /* UNIX */
 
@@ -870,13 +888,13 @@ int f,n;
 
 	ch_fname(bp, tnam); /* restore name */
 
-	bp->b_flag |= BFCHG;	/* flag it as changed */
+	b_set_changed(bp);	/* flag it as changed */
 	nounmodifiable(bp);	/* and it can never be "un-changed" */
 
 	/* and get rid of the temporary file */
 	unlink(filnam1);
 	unlink(filnam2);
-	return(TRUE);
+	return AfterShell();
 }
 
 #if     VMS
@@ -917,11 +935,11 @@ register char   *cmd;
                 return (FALSE);
         if ((substatus&STS$M_SUCCESS) == 0)     /* Command failed.      */
                 return (FALSE);
-        return (TRUE);
+        return AfterShell();
 }
 #endif
 
-#if	~AZTEC & ~MSC & ~TURBO & ~ZTC & MSDOS
+#if	~AZTEC & ~MSC & ~TURBO & ~WATCOM & ~ZTC & MSDOS
 
 /*
  * This routine, once again by Bob McNamara, is a C translation of the "system"

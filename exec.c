@@ -4,7 +4,19 @@
  *	written 1986 by Daniel Lawrence	
  *
  * $Log: exec.c,v $
- * Revision 1.57  1993/06/18 15:57:06  pgf
+ * Revision 1.61  1993/07/01 16:15:54  pgf
+ * tom's 3.51 changes
+ *
+ * Revision 1.60  1993/06/30  10:05:54  pgf
+ * change ABS to ABSM, since osf/1 defines ABS in a system header
+ *
+ * Revision 1.59  1993/06/28  17:26:44  pgf
+ * turn off discmd during most dobuf()s
+ *
+ * Revision 1.58  1993/06/28  17:00:51  pgf
+ * make dobuf switch to the most deeply nested buffer having an error
+ *
+ * Revision 1.57  1993/06/18  15:57:06  pgf
  * tom's 3.49 changes
  *
  * Revision 1.56  1993/06/02  14:28:47  pgf
@@ -896,7 +908,7 @@ int f,n;
 	}
 
 	/* if motion is absolute, remember where we are */
-	if (flags & ABS) {
+	if (flags & ABSM) {
 		odot = DOT;
 	}
 
@@ -911,7 +923,7 @@ int f,n;
 
 	/* if motion was absolute, and it wasn't just on behalf of an
 		operator, and we moved, update the "last dot" mark */
-	if ((flags & ABS) && !doingopcmd && !sameline(DOT, odot)) {
+	if ((flags & ABSM) && !doingopcmd && !sameline(DOT, odot)) {
 		curwp->w_lastdot = odot;
 	}
 
@@ -1089,6 +1101,7 @@ int f, n;	/* default flag and numeric arg */
         register int status;		/* status return */
         static char obufn[NBUFN+2];		/* name of buffer to execute */
         char bufn[NBUFN+2];		/* name of buffer to execute */
+	register int odiscmd;
 
 	/* find out what buffer the user wants to execute */
         if ((status = mlreply("Execute procedure: ", obufn, NBUFN)) != TRUE)
@@ -1107,12 +1120,16 @@ int f, n;	/* default flag and numeric arg */
 	if (!f)
 		n = 1;
 
+	odiscmd = discmd;
+	discmd = FALSE;
+	status = TRUE;
+
 	/* and now execute it as asked */
-	while (n-- > 0) {
-		if ((status = dobuf(bp)) != TRUE)
-			return status;
-	}
-	return TRUE;
+	while (n-- > 0 && status == TRUE)
+		status = dobuf(bp);
+
+	discmd = odiscmd;
+	return status;
 }
 #endif
 
@@ -1126,6 +1143,7 @@ int f, n;	/* default flag and numeric arg */
         register BUFFER *bp;		/* ptr to buffer to execute */
         register int status;		/* status return */
         static char bufn[NSTRING];		/* name of buffer to execute */
+	register int odiscmd;
 
 	if (!f)
 		n = 1;
@@ -1140,12 +1158,16 @@ int f, n;	/* default flag and numeric arg */
                 return FALSE;
         }
 
+	odiscmd = discmd;
+	discmd = FALSE;
+	status = TRUE;
 	/* and now execute it as asked */
-	while (n-- > 0) {
-		if ((status = dobuf(bp)) != TRUE)
-			return status;
-	}
-	return TRUE;
+	while (n-- > 0 && status == TRUE)
+		status = dobuf(bp);
+
+	discmd = odiscmd;
+
+	return status;
 }
 #endif
 
@@ -1208,7 +1230,12 @@ BUFFER *bp;	/* buffer to execute */
 	char tkn[NSTRING];	/* buffer to evaluate an expression in */
 #endif
 
-	static dobufnesting;
+	static int dobufnesting;
+	static BUFFER *dobuferrbp;
+
+	if (dobufnesting == 0) {
+		dobuferrbp = NULL;
+	}
 
 	if (++dobufnesting > 9) {
 		dobufnesting--;
@@ -1324,8 +1351,8 @@ nxtscan:	/* on to the next line */
 
 		/* pjr - must check for empty line before copy */
 		if (linlen)
-			strncpy(eline, l_ref(lp)->l_text, linlen);
-		eline[linlen] = 0;	/* make sure it ends */
+			(void)strncpy(eline, l_ref(lp)->l_text, linlen);
+		eline[linlen] = EOS;	/* make sure it ends */
 
 		/* trim leading whitespace */
 		while (*eline == ' ' || *eline == '\t')
@@ -1577,7 +1604,11 @@ nxtscan:	/* on to the next line */
 			mstore = FALSE;
 			freewhile(whlist);
 			dobufnesting--;
-			swbuffer(bp);
+			if (dobuferrbp == NULL) {
+				dobuferrbp = bp;
+				swbuffer(bp);
+				TTbeep();
+			}
 			return status;
 		}
 
@@ -1593,7 +1624,7 @@ eexec:	/* exit the current function */
 	execlevel = 0;
 	freewhile(whlist);
 	dobufnesting--;
-        return TRUE;
+	return TRUE;
 }
 
 
@@ -1647,9 +1678,11 @@ char *fname;	/* file name to execute */
 		return FALSE;
 	}
 
+#ifdef BEFORE  /* is there any real reason for it to be view-only? */
 	/* mark the buffer as read only */
 	make_local_b_val(bp,MDVIEW);
 	set_b_val(bp,MDVIEW,TRUE);
+#endif
 
 	/* and try to read in the file to execute */
 	if ((status = readin(fname, FALSE, bp, TRUE)) != TRUE) {
@@ -1681,6 +1714,7 @@ int bufnum;	/* number of buffer to execute */
         register BUFFER *bp;		/* ptr to buffer to execute */
         register int status;		/* status return */
 	static char bufname[NBUFN];
+	register int odiscmd;
 
 	if (!f) n = 1;
 
@@ -1693,11 +1727,16 @@ int bufnum;	/* number of buffer to execute */
                 return FALSE;
         }
 
+	odiscmd = discmd;
+	discmd = FALSE;
+	status = TRUE;
 	/* and now execute it as asked */
-	while (n-- > 0)
-		if ((status = dobuf(bp)) != TRUE)
-			return status;
-	return TRUE;
+	while (n-- > 0 && status == TRUE)
+		status = dobuf(bp);
+
+	discmd = odiscmd;
+	return status;
+
 }
 
 int cbuf1(f, n) int f,n; { return cbuf(f, n, 1); }

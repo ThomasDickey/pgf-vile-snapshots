@@ -10,7 +10,10 @@
  * display type.
  *
  * $Log: ibmpc.c,v $
- * Revision 1.16  1993/06/18 15:57:06  pgf
+ * Revision 1.17  1993/06/25 11:25:55  pgf
+ * patches for Watcom C/386, from Tuan DANG
+ *
+ * Revision 1.16  1993/06/18  15:57:06  pgf
  * tom's 3.49 changes
  *
  * Revision 1.15  1993/05/11  16:22:22  pgf
@@ -73,9 +76,25 @@
 #define	NPAUSE	200			/* # times thru update to pause */
 #define	SPACE	32			/* space character		*/
 
+#ifdef __WATCOMC__
+#define	SCADC	(0xb800 << 4)		/* CGA address of screen RAM	*/
+#define	SCADM	(0xb000 << 4)		/* MONO address of screen RAM	*/
+#define SCADE	(0xb800 << 4)		/* EGA address of screen RAM	*/
+#else
 #define	SCADC	0xb8000000L		/* CGA address of screen RAM	*/
 #define	SCADM	0xb0000000L		/* MONO address of screen RAM	*/
 #define SCADE	0xb8000000L		/* EGA address of screen RAM	*/
+#endif
+
+#ifdef __WATCOMC__
+#define	INTX86(a,b,c)	int386(a, b, c)
+#define	_AX_		eax
+#define	_CX_		cax
+#else
+#define	INTX86(a,b,c)	int86(a, b, c)
+#define	_AX_		ax
+#define	_CX_		cx
+#endif
 
 #define	ColorDisplay()	(dtype != CDMONO && !monochrome)
 #define	AttrColor(b,f)	(((ctrans[b] & 7) << 4) | (ctrans[f] & 15))
@@ -190,6 +209,8 @@ static	int	scinit    P((int));
 static	int	getboard  P((void));
 static	int	scblank   P((void));
 
+static	void	maxkbdrate   P((void));
+
 int ibmtype;		/* pjr - what to do about screen resolution */
 
 /*
@@ -229,8 +250,19 @@ TERM    term    = {
 static void
 set_display (int mode)
 {
-	rg.x.ax = mode;
-	int86(0x10, &rg, &rg);
+	rg.x._AX_ = mode;
+	INTX86(0x10, &rg, &rg);
+}
+
+/*  set the keyboard rate to max */
+static void
+maxkbdrate (void)
+{
+	rg.h.ah = 0x3;
+	rg.h.al = 0x5;
+        rg.h.bh = 0x0;
+        rg.h.bl = 0x0;
+	INTX86(0x16, &rg, &rg);
 }
 
 static void
@@ -245,15 +277,15 @@ set_8x8_chars(void)
 	rg.h.ah = 0x11;		/* set char. generator function code */
 	rg.h.al = 0x12;		/*  to 8 by 8 double dot ROM         */
 	rg.h.bl = 0;		/* block 0                           */
-	int86(0x10, &rg, &rg);	/* VIDEO - TEXT-MODE CHARACTER GENERATOR FUNCTIONS */
+	INTX86(0x10, &rg, &rg);	/* VIDEO - TEXT-MODE CHARACTER GENERATOR FUNCTIONS */
 }
 
 static void
 set_cursor(int start_stop)
 {
 	rg.h.ah = 1;		/* set cursor size function code */
-	rg.x.cx = start_stop;	/* turn cursor on code */
-	int86(0x10, &rg, &rg);	/* VIDEO - SET TEXT-MODE CURSOR SHAPE */
+	rg.x._CX_ = start_stop;	/* turn cursor on code */
+	INTX86(0x10, &rg, &rg);	/* VIDEO - SET TEXT-MODE CURSOR SHAPE */
 }
 
 static void
@@ -262,7 +294,7 @@ set_vertical_resolution(int code)
 	rg.h.ah = 0x12;
 	rg.h.al = code;
 	rg.h.bl = 30;
-	int86(0x10, &rg, &rg);	/* VIDEO - SELECT VERTICAL RESOLUTION */
+	INTX86(0x10, &rg, &rg);	/* VIDEO - SELECT VERTICAL RESOLUTION */
 
 }
 
@@ -291,7 +323,7 @@ ibmmove(row, col)
 	rg.h.dl = col;
 	rg.h.dh = row;
 	rg.h.bh = 0;		/* set screen page number */
-	int86(0x10, &rg, &rg);
+	INTX86(0x10, &rg, &rg);
 }
 
 /* erase to the end of the line */
@@ -303,7 +335,7 @@ ibmeeol()
 	/* find the current cursor position */
 	rg.h.ah = 3;		/* read cursor position function code */
 	rg.h.bh = 0;		/* current video page */
-	int86(0x10, &rg, &rg);
+	INTX86(0x10, &rg, &rg);
 
 	ccol = rg.h.dl;		/* record current column */
 	crow = rg.h.dh;		/* and row */
@@ -324,9 +356,9 @@ int ch;
 		rg.h.bl = cfcolor;
 	else
 #endif
-	 rg.h.bl = White(TRUE);
+	rg.h.bl = White(TRUE);
 	rg.h.bh = 0;		/* current video page */
-	int86(0x10, &rg, &rg);
+	INTX86(0x10, &rg, &rg);
 }
 
 void
@@ -334,11 +366,11 @@ ibmeeop()
 {
 	rg.h.ah = 6;		/* scroll page up function code */
 	rg.h.al = 0;		/* # lines to scroll (clear it) */
-	rg.x.cx = 0;		/* upper left corner of scroll */
+	rg.x._CX_ = 0;		/* upper left corner of scroll */
 	rg.h.dh = term.t_nrow;  /* lower right corner of scroll */
 	rg.h.dl = term.t_ncol - 1;
 	rg.h.bh = scblank();
-	int86(0x10, &rg, &rg);
+	INTX86(0x10, &rg, &rg);
 }
 
 void
@@ -402,8 +434,9 @@ ibmbeep()
 void
 ibmopen()
 {
+
 	rg.h.ah = 0xf;
-	int86(0x10,&rg, &rg);	/* VIDEO - GET DISPLAY MODE */
+	INTX86(0x10,&rg, &rg);	/* VIDEO - GET DISPLAY MODE */
 
 	original_cols = rg.h.ah;
 	original_mode = rg.h.al;
@@ -412,13 +445,28 @@ ibmopen()
 
 	rg.h.ah = 3;
 	rg.h.bh = 0;
-	int86(0x10, &rg, &rg);	/* VIDEO - GET CURSOR POSITION */
-	original_curs = rg.x.cx;
+	original_curs = rg.x._CX_;
+	INTX86(0x10, &rg, &rg);	/* VIDEO - GET CURSOR POSITION */
+
+#ifdef PVGA
+	rg.h.ah = 0;
+	rg.h.al = 10;		/* set graphic 640x350 mode */
+	INTX86(0x10,&rg, &rg);	
+	rg.x.ax = 0x007F;      
+	rg.h.bh = 0x01;		/* set non-VGA mode */
+	INTX86(0x10,&rg, &rg);
+	rg.h.ah = 0x00;
+	rg.h.al = 0x07;		/* set Hercule mode */
+	INTX86(0x10,&rg, &rg);	
+	ibmtype = CD_25LINE;
+#endif
 
 	if (!scinit(ibmtype))
 		(void)scinit(CDSENSE);
 	revexist = TRUE;
 	ttopen();
+
+        maxkbdrate();   /* set the keyboard rate to max */
 }
 
 void
@@ -444,12 +492,12 @@ scinit(n)	/* initialize the screen head pointers */
 int n;		/* type of adapter to init for */
 {
 	union {
-		long laddr;	/* long form of address */
+		long laddr;		/* long form of address */
 		unsigned short *paddr;	/* pointer form of address */
 	} addr;
 	register int i;
-	int	type;
-	static	int	last = -1;
+	int	     type;
+	static	int  last = -1;
 
 	/* if asked...find out what display is connected */
 	if (n == CDSENSE)
@@ -520,9 +568,9 @@ int getboard()
 	egaexist = FALSE;
 
 	/* check for VGA or MCGA */
-	rg.x.ax = 0x1a00;
+	rg.x._AX_ = 0x1a00;
 	rg.h.bl = 0x00;
-	int86(0x10,&rg, &rg);	/* VIDEO - GET DISPLAY COMBINATION CODE (PS,VGA,MCGA) */
+	INTX86(0x10,&rg, &rg);	/* VIDEO - GET DISPLAY COMBINATION CODE (PS,VGA,MCGA) */
 
 	if (rg.h.al == 0x1a) {	/* function succeeded */
 		switch (rg.h.bl) {
@@ -547,7 +595,7 @@ int getboard()
 	/*
 	 * Check for MONO board
 	 */
-	int86(0x11, &rg, &rg);	/* BIOS - GET EQUIPMENT LIST */
+	INTX86(0x11, &rg, &rg);	/* BIOS - GET EQUIPMENT LIST */
 
 	/* Bits 4-5 in ax are:
 	 *	00 EGA, VGA or PGA
@@ -555,7 +603,7 @@ int getboard()
 	 *	10 80x25 color
 	 *	11 80x25 monochrome
 	 */
-	if (((rg.x.ax & 0x30) == 0x30)) {
+	if (((rg.x._AX_ & 0x30) == 0x30)) {
 		monochrome = TRUE;
 		return(CDMONO);
 	}
@@ -565,7 +613,7 @@ int getboard()
 	 */
 	rg.h.ah = 0x12;
 	rg.h.bl = 0x10;
-	int86(0x10,&rg, &rg);	/* VIDEO - GET EGA INFO */
+	INTX86(0x10,&rg, &rg);	/* VIDEO - GET EGA INFO */
 
 	if (rg.h.bl != 0x10) {	/* function succeeded */
 		egaexist = TRUE;
@@ -587,7 +635,7 @@ egaopen()
 	rg.h.ah = 0x12;		/* alternate select function code    */
 	rg.h.al = 0;		/* clear AL for no good reason       */
 	rg.h.bl = 0x20;		/* alt. print screen routine         */
-	int86(0x10, &rg, &rg);	/* VIDEO - SELECT ALTERNATE PRTSCRN  */
+	INTX86(0x10, &rg, &rg);	/* VIDEO - SELECT ALTERNATE PRTSCRN  */
 
 	set_cursor(0x0607);
 	outp(0x3d4, 10);	/* video bios bug patch */
@@ -611,7 +659,7 @@ int bacg;	/* background color */
 		attr = AttrColor(bacg,forg);
 	else
 #endif
-	 attr = AttrMono(bacg<forg);
+	attr = AttrMono(bacg<forg);
 	attr <<= 8;
 
 	if (flickcode && (dtype == CDCGA))
@@ -705,7 +753,7 @@ int from, to, n;
 	rg.h.cl = 0;		/* left window column */
 	rg.h.dh = max(to,from);	/* lower window column */
 	rg.h.dl = 0;		/* lower window column */
-	int86(0x10, &rg, &rg);
+	INTX86(0x10, &rg, &rg);
 }
 #endif	/* SCROLLCODE */
 

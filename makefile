@@ -60,6 +60,8 @@ DESTDIR2 = $(HOME)/bin
 # if you want the help file (vile.hlp) to go somewhere other than your $PATH
 #  or one of the hard-code paths in epath.h  (it goes to the same place vile
 #  does by default)
+# note you may have to hardcode this if the CFLAGS definition below doesn't
+#  get through your make.
 #HELP_LOC=/my/local/help/lib
  HELP_LOC=
 
@@ -88,11 +90,13 @@ CFLAGS1 = $(OPTFLAGS) $(CFLAGS0)
 # this get changes to "obj" for DOS builds
 O = o
 
-# All of the makefiles which should be preserved
+# All of the makefiles which should be preserved and distributed
 UNIXMAK = makefile 				# on UNIX
 VMSMAK = descrip.mms vms_link.opt		# on VMS
-TURBOMAK = mktbls.mak vile.mak			# on DOS, using TURBO
-MAKFILES = $(UNIXMAK) $(VMSMAK) $(TURBOMAK)
+TURBOMAK = makmktbl.tbc makvile.tbc		# on DOS, using TURBO
+WATMAK = makefile.wat				# on DOS, using Watcom C/386
+MSCMAK =	# still waiting for this one	# on DOS, using Microsoft C
+MAKFILES = $(UNIXMAK) $(VMSMAK) $(TURBOMAK) $(WATMAK) $(MSCMAK)
 
 MKTBLS = ./mktbls
 
@@ -537,7 +541,10 @@ random.$O:	glob.h
 vmalloc$O:	nevars.h
 
 # $Log: makefile,v $
-# Revision 1.110  1993/06/18 15:57:06  pgf
+# Revision 1.111  1993/06/25 15:05:12  pgf
+# added watcom makefile, renamed the turbo makefiles
+#
+# Revision 1.110  1993/06/18  15:57:06  pgf
 # tom's 3.49 changes
 #
 # Revision 1.109  1993/06/10  14:57:25  pgf

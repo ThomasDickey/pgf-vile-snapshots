@@ -6,7 +6,10 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.92  1993/06/24 12:11:08  pgf
+ * Revision 1.93  1993/07/01 16:15:54  pgf
+ * tom's 3.51 changes
+ *
+ * Revision 1.92  1993/06/24  12:11:08  pgf
  * tag_for_undo() now returns void -- this was the _only_ place that
  * checked the return value anyway.
  *
@@ -214,7 +217,7 @@
  *
  * Revision 1.30  1992/01/03  23:31:49  pgf
  * use new ch_fname() to manipulate filenames, since b_fname is now
- * a malloc'ed sting, to avoid length limits
+ * a malloc'ed string, to avoid length limits
  *
  * Revision 1.29  1991/11/10  21:21:20  pgf
  * don't look for cr/nl pairs on empty lines
@@ -331,7 +334,7 @@
 #include	"estruct.h"
 #include        "edef.h"
 
-#if UNIX
+#if UNIX || defined(MDCHK_MODTIME)
 #include	<sys/stat.h>  /* for mkdir() declaration */
 #endif
 
@@ -344,6 +347,104 @@ static	void	guess_dosmode P(( BUFFER * ));
 static	int	writereg P(( REGION *, char *, int, int, BUFFER * ));
 
 /*--------------------------------------------------------------------------*/
+
+#ifdef	MDCHK_MODTIME
+static	int	PromptModtime P(( BUFFER *, char *, char * ));
+
+static int
+PromptModtime (bp, fname, question)
+BUFFER	*bp;
+char	*fname;
+char	*question;
+{
+	int status = SORTOFTRUE;
+	long current;
+	char prompt[NLINE];
+
+	if (!b_is_temporary(bp)
+	 && b_val(bp, MDCHK_MODTIME)
+	 && bp->b_active	/* only buffers that are loaded */
+	 && same_fname(fname, bp, FALSE)
+	 && get_modtime(bp, &current)
+	 && bp->b_modtime != current) {
+		(void)lsprintf(prompt,
+			"File for buffer %s has changed on disk.  %s",
+			bp->b_bname, question);
+		if ((status = mlyesno( prompt )) != TRUE) {
+			bp->b_modtime = current; /* avoid reprompts */
+   			mlerase();
+		}
+	}
+	return status;
+}
+
+int
+get_modtime (bp, the_time)
+BUFFER	*bp;
+long	*the_time;
+{
+	struct stat	statbuf;
+
+	*the_time = 0;
+	if (!isInternalName(bp->b_fname)) {
+		if (stat(bp->b_fname, &statbuf) >= 0) {
+			*the_time = statbuf.st_mtime;
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+void
+set_modtime( bp, fn )
+BUFFER *bp;
+char *fn;
+{
+	long	current;
+
+	if (same_fname(fn, bp, FALSE)
+	 && get_modtime(bp, &current))
+		bp->b_modtime = current;
+}
+
+int
+check_modtime( bp, fn )
+BUFFER *bp;
+char *fn;
+{
+	int status = TRUE;
+
+	if (PromptModtime(bp, fn, "Read from disk") == TRUE) {
+		b_clr_changed(bp);
+		status = readin(fn, TRUE, bp, TRUE);
+	}
+	return status;
+}
+
+int
+inquire_modtime( bp, fn )
+BUFFER *bp;
+char *fn;
+{
+	register int status;
+	if ((status = PromptModtime(bp, fn, "Continue write")) != TRUE
+	 && (status != SORTOFTRUE)) {
+		mlforce("[Write aborted]");
+		return FALSE;
+	}
+	return TRUE;
+}
+
+int
+check_all_modtimes ()
+{
+	register BUFFER *bp;
+
+	for_each_buffer(bp)
+		(void)check_modtime(bp, bp->b_fname);
+	return TRUE;
+}
+#endif	/* MDCHK_MODTIME */
 
 #if UNIX
 static	void	CleanAfterPipe P((int));
@@ -464,7 +565,7 @@ int f,n;
 		return s;
 
 	/* we want no errors or complaints, so mark it unchanged */
-	curbp->b_flag &= ~BFCHG;
+	b_clr_changed(curbp);
         s = readin(fname, TRUE, curbp, TRUE);
 	curbp->b_bname[0] = EOS;
 	makename(bname, fname);
@@ -595,10 +696,10 @@ int lockfl;		/* check the file for locks? */
 	        makename(bname, fname);            /* New buffer name.     */
 		/* make sure the buffer name doesn't exist */
 	        while ((bp=bfind(bname, NO_CREAT, 0)) != NULL) {
-			if ( !(bp->b_flag & BFCHG) && is_empty_buf(bp)) {
+			if ( !b_is_changed(bp) && is_empty_buf(bp)) {
 				/* empty and unmodified -- then it's okay 
 					to re-use this buffer */
-				bp->b_active = 0;
+				bp->b_active = FALSE;
 				return readin(fname, lockfl, bp, TRUE) &&
 						swbuffer(bp);
 			}
@@ -666,6 +767,7 @@ BUFFER *bp;
 			}
 		}
 		set_b_val(bp, MDDOS, doslines > unixlines);
+		bp->b_bytecount -= doslines;
 	}
 }
 
@@ -717,7 +819,7 @@ int	mflg;		/* print messages? */
 #endif
         if ((s=bclear(bp)) != TRUE)             /* Might be old.        */
                 return s;
-        bp->b_flag &= ~(BFINVS|BFCHG);
+	b_clr_flags(bp, BFINVS|BFCHG);
 	ch_fname(bp,fname);
 #if DOSFILES
 	make_local_b_val(bp,MDDOS);
@@ -760,7 +862,7 @@ int	mflg;		/* print messages? */
 			mlerror(fname);
 		} else {
 
-			bp->b_flag &= ~BFCHG;
+			b_clr_changed(bp);
 #if FINDERR
 			if (fileispipe == TRUE)
 				set_febuff(bp->b_bname);
@@ -768,8 +870,6 @@ int	mflg;		/* print messages? */
         		(void)ffclose();	/* Ignore errors.       */
 			if (mflg)
 				readlinesmsg(nline, s, fname, ffronly(fname));
-
-			bp->b_linecount = nline;
 
 			/* set read-only mode for read-only files */
 			if (isShellOrPipe(fname)
@@ -822,9 +922,9 @@ int *nlinep;
 {
         register unsigned char *textp;
         unsigned char *countp;
-        int nlines;
+	L_NUM nlines;
         int incomplete = FALSE;
-	long len;
+	B_COUNT len, nbytes;
 
 	if ((len = ffsize()) < 0)
 		return FIOERR;
@@ -865,12 +965,13 @@ int *nlinep;
 	bp->b_ltext_end = bp->b_ltext + len + 1;
 	countp = bp->b_ltext;
 	textp = countp + 1;
+	nbytes = len;
         nlines = 0;
 	while (len--) {
 		if (*textp == '\n') {
 			if (textp - countp >= 255) {
 				unsigned char *np;
-				len = (long)(countp - bp->b_ltext);
+				len = (B_COUNT)(countp - bp->b_ltext);
 				incomplete = TRUE;
 				/* we'll re-read the rest later */
 				if (len)  {
@@ -887,6 +988,7 @@ int *nlinep;
 				}
 				bp->b_ltext = np;
 				bp->b_ltext_end = np + len + 1;
+				nbytes -= len;
 				break;
 			}
 			*countp = textp - countp - 1;
@@ -896,7 +998,6 @@ int *nlinep;
 		++textp;
 	}
 
-	/* dbgwrite("lines %d, chars %d", nlines, textp - bp->b_ltext); */
 	if (nlines == 0) {
 		ffrewind();
 		FreeAndNull(bp->b_ltext);
@@ -910,14 +1011,22 @@ int *nlinep;
 			return FIOMEM;
 		}
 		bp->b_LINEs_end = bp->b_LINEs + nlines;
+		bp->b_bytecount = nbytes;
+		bp->b_linecount = nlines;
 
 		/* loop through the buffer again, creating
 			line data structure for each line */
 		{
 			register LINE *lp;
+#if !SMALLER
+			L_NUM lineno = 0;
+#endif
 			lp = bp->b_LINEs;
 			textp = bp->b_ltext;
 			while (lp != bp->b_LINEs_end) {
+#if !SMALLER
+				lp->l_number = ++lineno;
+#endif
 				lp->l_used = *textp;
 				lp->l_size = *textp + 1;
 				lp->l_text = (char *)textp + 1;
@@ -972,6 +1081,7 @@ int *nlinep;
 	int	flag = 0;
 	int	done_update = FALSE;
 #endif
+	b_set_counted(bp);	/* make 'addline()' do the counting */
         while ((s = ffgetline(&len)) == FIOSUC) {
 #if DOSFILES
 		/*
@@ -1327,7 +1437,10 @@ BUFFER	*bp;
         	mlforce("[No filename]");
         	return FALSE;
         }
-        
+ 
+	if ( ! inquire_modtime( bp, fn ) )
+		return FALSE;
+  
         if ((s=ffwopen(fn)) != FIOSUC)       /* Open writes message. */
                 return FALSE;
 
@@ -1425,6 +1538,7 @@ BUFFER	*bp;
         if (s != FIOSUC)                        /* Some sort of error.  */
                 return FALSE;
 
+	set_modtime(bp, fn);
 	imply_alt(fn, whole_file, FALSE);
         return TRUE;
 }
@@ -1548,16 +1662,16 @@ char    *fname;
 int	belowthisline;
 FILE	*haveffp;
 {
-	fast_ptr LINEPTR lp0;
-	fast_ptr LINEPTR lp1;
-	fast_ptr LINEPTR lp2;
+	fast_ptr LINEPTR prevp;
+	fast_ptr LINEPTR newlp;
+	fast_ptr LINEPTR nextp;
         register BUFFER *bp;
         register int    s;
         int    nbytes;
         register int    nline;
 
         bp = curbp;                             /* Cheap.               */
-	bp->b_flag &= ~BFINVS;			/* we are not temporary*/
+	b_clr_flags(bp, BFINVS);		/* we are not temporary*/
 	if (!haveffp) {
 	        if ((s=ffropen(fname)) == FIOERR) /* Hard file open.      */
 	                goto out;
@@ -1573,43 +1687,30 @@ FILE	*haveffp;
 	} else { /* we already have the file pointer */
 		ffp = haveffp;
 	}
-	lp0 = curwp->w_dot.l;
+	prevp = curwp->w_dot.l;
 	curwp->w_dot.o = 0;
 	MK = DOT;
 
 	nline = 0;
 	while ((s=ffgetline(&nbytes)) == FIOSUC) {
-		lp1 = lalloc(nbytes, curbp);
-		if (same_ptr(lp1, null_ptr)) {
+#if DOSFILES
+		if (b_val(curbp,MDDOS)
+		 && (nbytes > 0)
+		 && fline[nbytes-1] == '\r')
+			nbytes--;
+#endif
+		if (!belowthisline) {
+			nextp = prevp;
+			prevp = lBACK(prevp);
+		}
+
+		if (add_line_at(curbp, prevp, fline, nbytes) != TRUE) {
 			s = FIOMEM;		/* Keep message on the	*/
 			break;			/* display.		*/
 		}
-#if OPT_MAP_MEMORY
-		if (nbytes > l_ref(lp1)->l_size)
-			nbytes = l_ref(lp1)->l_size;
-#endif
-		if (belowthisline) {
-			lp2 = lFORW(lp0);	/* line after insert */
-		} else {
-			lp2 = lp0;
-			lp0 = lBACK(lp0);
-		}
-
-		/* re-link new line between lp0 and lp2 */
-		set_lBACK(lp2, lp1);
-		set_lFORW(lp0, lp1);
-		set_lBACK(lp1, lp0);
-		set_lFORW(lp1, lp2);
-
-		if (nbytes)  /* l_text may be NULL in this case */
-			(void)memcpy(l_ref(lp1)->l_text, fline, nbytes);
-
-		tag_for_undo(lp1);
-
-		if (belowthisline)
-			lp0 = lp1;
-		else
-			lp0 = lp2;
+		newlp = lFORW(prevp);
+		tag_for_undo(newlp);
+		prevp = belowthisline ? newlp : nextp;
 		++nline;
 	}
 	if (!haveffp) {
@@ -1716,9 +1817,9 @@ int signo;
 #endif
 
 	for_each_buffer(bp) {
-		if (((bp->b_flag & BFINVS) == 0) && 
+		if (!b_is_invisible(bp) && 
 			 bp->b_active == TRUE && 
-	                 (bp->b_flag&BFCHG) != 0) {
+	                 b_is_changed(bp)) {
 #if HAVE_MKDIR
 			if (!created) {
 				(void)mktemp(dirnam);

@@ -17,7 +17,10 @@
  * ever equalled FALSE.
  * 
  * $Log: isearch.c,v $
- * Revision 1.21  1993/06/18 15:57:06  pgf
+ * Revision 1.22  1993/07/01 16:15:54  pgf
+ * tom's 3.51 changes
+ *
+ * Revision 1.21  1993/06/18  15:57:06  pgf
  * tom's 3.49 changes
  *
  * Revision 1.20  1993/05/04  17:05:14  pgf
@@ -199,7 +202,7 @@ int f,n;
 	cmd_reexecute = -1;	/* We're not re-executing (yet?) */
 	cmd_offset = 0;		/* Start at the beginning of the buff */
 	cmd_buff[0] = '\0';	/* Init the command buffer */
-	strncpy(pat_save, pat, NPAT);	/* Save the old pattern string */
+	(void)strncpy(pat_save, pat, NPAT); /* Save the old pattern string */
 	curpos = DOT;		/* Save the current pointer */
 	init_direction = n;	/* Save the initial search direction */
 
@@ -294,8 +297,8 @@ start_over:
 			cmd_buff[--cmd_offset] = '\0';	/* Yes, del last char */
 			DOT = curpos;	/* Reset the pointer */
 			n = init_direction;	/* Reset the search direction */
-			strncpy(pat, pat_save, NPAT);	/* Restore the old
-							 * search str */
+			(void)strncpy(pat, pat_save, NPAT);
+						/* Restore the old search str */
 			cmd_reexecute = 0;	/* Start the whole mess over */
 			goto start_over;	/* Let it take care of itself */
 

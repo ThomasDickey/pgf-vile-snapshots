@@ -4,7 +4,7 @@
  *	copyright information down below) -- in particular:
  *	 - regexec no longer needs to scan a null terminated string
  *	 - regexec takes two extra arguments describing the first and
- *	 	just-past-last legal scan start offsets, so limit matches
+ *	 	just-past-last legal scan start offsets, to limit matches
  *		to beginning in that range
  *	 - inexact character matches are now handled, if the global ignorecase
  *	 	is set
@@ -13,7 +13,10 @@
  *		pgf, 11/91
  * 
  * $Log: regexp.c,v $
- * Revision 1.34  1993/06/18 15:57:06  pgf
+ * Revision 1.35  1993/06/30 11:27:24  pgf
+ * comment typo
+ *
+ * Revision 1.34  1993/06/18  15:57:06  pgf
  * tom's 3.49 changes
  *
  * Revision 1.33  1993/04/01  13:06:31  pgf

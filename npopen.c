@@ -2,7 +2,10 @@
  *		written by John Hutchinson, heavily modified by Paul Fox
  *
  * $Log: npopen.c,v $
- * Revision 1.25  1993/06/18 15:57:06  pgf
+ * Revision 1.26  1993/06/25 11:25:55  pgf
+ * patches for Watcom C/386, from Tuan DANG
+ *
+ * Revision 1.25  1993/06/18  15:57:06  pgf
  * tom's 3.49 changes
  *
  * Revision 1.24  1993/05/04  17:05:14  pgf
@@ -318,7 +321,11 @@ char	*type;
 	register int n = (*type == 'r');
 	register int fd;
 
+#if WATCOM
+	myName[n] = tmpnam((char *)0);
+#else
 	myName[n] = tempnam(TMPDIR, type);
+#endif
 	if (myName[n] == 0)
 		return -1;
 	(void)close(creat(myName[n], 0666));

@@ -17,7 +17,10 @@
  *	modify (ifdef-style) 'expand_leaf()' to allow ellipsis.
  *
  * $Log: glob.c,v $
- * Revision 1.10  1993/06/18 15:57:06  pgf
+ * Revision 1.11  1993/06/25 11:25:55  pgf
+ * patches for Watcom C/386, from Tuan DANG
+ *
+ * Revision 1.10  1993/06/18  15:57:06  pgf
  * tom's 3.49 changes
  *
  * Revision 1.9  1993/06/02  14:28:47  pgf
@@ -413,7 +416,7 @@ static	int	compar P(( char **, char ** ));
 #endif
 
 static int
-#if __STDC__ || defined(__TURBOC__)
+#if __STDC__ || defined(__TURBOC__) || WATCOM
 compar (const void *a, const void *b)
 #else
 compar (a, b)

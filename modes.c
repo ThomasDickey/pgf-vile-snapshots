@@ -8,8 +8,14 @@
  * Major extensions for vile by Paul Fox, 1991
  *
  *	$Log: modes.c,v $
- *	Revision 1.17  1993/06/18 15:57:06  pgf
- *	tom's 3.49 changes
+ *	Revision 1.19  1993/07/01 16:15:54  pgf
+ *	tom's 3.51 changes
+ *
+ * Revision 1.18  1993/06/28  16:58:34  pgf
+ * gave adjustmode() a real return value
+ *
+ * Revision 1.17  1993/06/18  15:57:06  pgf
+ * tom's 3.49 changes
  *
  * Revision 1.16  1993/04/28  17:11:22  pgf
  * got rid of NeWS ifdefs
@@ -590,6 +596,15 @@ register struct VAL *values;
 	if (no && (names->type != VALTYPE_BOOL))
 		return FALSE;		/* this shouldn't happen */
 
+	/* prevent major-mode changes for scratch-buffers */
+	if ((global != TRUE)
+	 && (names->winflags & WFMODE)
+	 && b_is_scratch(curbp)) {
+		mlforce("[Cannot change mode \"%s\" of scratch buffer]",
+			names->name);
+		return FALSE;
+	}
+
 	/* get a value if we need one */
 	if ((end_string() == '=')
 	 || (names->type != VALTYPE_BOOL)) {
@@ -679,7 +694,10 @@ register struct VAL *values;
 			if (global == TRUE) {
 				register WINDOW *wp;
 				for_each_window(wp) {
-					wp->w_flag |= names->winflags;
+	 				if ((wp->w_bufp == NULL)
+					 || !b_is_scratch(wp->w_bufp)
+					 || !(names->winflags & WFMODE))
+						wp->w_flag |= names->winflags;
 				}
 			} else {
 				curwp->w_flag |= names->winflags;
@@ -823,10 +841,11 @@ adjustmode(kind, global)	/* change the editor mode status */
 int kind;	/* true = set,		false = delete */
 int global; /* true = global flag,	false = current buffer flag */
 {
+	int s;
 	int autobuff = global_g_val(GMDABUFF);
 
-	while ((do_a_mode(kind, global) == TRUE)
-	    && (end_string() == ' '));
+	while ((s = (do_a_mode(kind, global) == TRUE)) && (end_string() == ' '))
+		;
 
 	/* if the settings are up, redisplay them */
 	if (bfind(MODES_LIST_NAME, NO_CREAT, BFSCRTCH))
@@ -834,7 +853,7 @@ int global; /* true = global flag,	false = current buffer flag */
 
 	if (autobuff != global_g_val(GMDABUFF)) sortlistbuffers();
 
-	return TRUE;
+	return s;
 }
 
 /* ARGSUSED */

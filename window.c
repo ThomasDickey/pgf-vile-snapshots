@@ -3,7 +3,10 @@
  * attached to keys that the user actually types.
  *
  * $Log: window.c,v $
- * Revision 1.27  1993/06/18 15:57:06  pgf
+ * Revision 1.28  1993/07/01 16:15:54  pgf
+ * tom's 3.51 changes
+ *
+ * Revision 1.27  1993/06/18  15:57:06  pgf
  * tom's 3.49 changes
  *
  * Revision 1.26  1993/06/02  14:28:47  pgf
@@ -103,6 +106,7 @@ overlay	"window"
 #endif
 
 static	void	unlink_window P(( WINDOW * ));
+static	int	SetCurrentWindow P(( WINDOW * ));
 
 /*--------------------------------------------------------------------------*/
 
@@ -123,6 +127,20 @@ void	unlink_window(thewp)
 				wheadp = p->w_wndp;
 			break;
 		}
+}
+
+/*
+ * Set the current window (and associated current buffer).
+ */
+static int
+SetCurrentWindow (wp)
+WINDOW	*wp;
+{
+	curwp = wp;
+	make_current(curwp->w_bufp);
+	upmode();
+	updatelistbuffers();
+	return (TRUE);
 }
 
 /*
@@ -202,11 +220,7 @@ int f, n;	/* default flag and numeric argument */
 		if ((wp = curwp->w_wndp) == NULL)
 			wp = wheadp;
 	}
-	curwp = wp;
-	make_current(curwp->w_bufp);
-	upmode();
-	updatelistbuffers();
-	return (TRUE);
+	return SetCurrentWindow(wp);
 }
 
 int
@@ -265,11 +279,7 @@ int f,n;
 	while (wp1->w_wndp != wp2)
 		wp1 = wp1->w_wndp;
 
-	curwp = wp1;
-	make_current(curwp->w_bufp);
-	upmode();
-	updatelistbuffers();
-	return (TRUE);
+	return SetCurrentWindow(wp1);
 }
 
 /*
@@ -818,12 +828,8 @@ int f,n;
 
 	/* find the window */
 	for_each_window(wp) {
-		if (wp == swindow) {
-			curwp = wp;
-			make_current(curwp->w_bufp);
-			upmode();
-			return (TRUE);
-		}
+		if (wp == swindow)
+			return SetCurrentWindow(wp);
 	}
 
 	mlforce("[No such window exists]");
@@ -881,9 +887,10 @@ int f,n;	/* numeric argument */
 				}
 	
 				/* update curwp and lastwp if needed */
-				if (wp == curwp)
+				if (wp == curwp) {
 					curwp = wheadp;
 					make_current(curwp->w_bufp);
+				}
 				if (lastwp != NULL)
 					lastwp->w_wndp = NULL;
 

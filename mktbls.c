@@ -9,7 +9,13 @@
  *	the output structures.
  *
  * $Log: mktbls.c,v $
- * Revision 1.24  1993/06/23 21:29:29  pgf
+ * Revision 1.26  1993/07/01 16:15:54  pgf
+ * tom's 3.51 changes
+ *
+ * Revision 1.25  1993/06/25  11:25:55  pgf
+ * patches for Watcom C/386, from Tuan DANG
+ *
+ * Revision 1.24  1993/06/23  21:29:29  pgf
  * ifdefs for linux -- our ifdefs are obviously not right yet
  *
  * Revision 1.23  1993/06/18  16:16:34  pgf
@@ -94,7 +100,8 @@
 #define	OPT_IFDEF_MODES	1	/* true iff we can ifdef modes */
 
 /* stuff borrowed/adapted from estruct.h */
-#if defined(__TURBOC__)
+#if defined(__TURBOC__) || defined(__WATCOMC__) || \
+		(defined(__GNUC__) && defined(sun))
 #include <stdlib.h>
 #define P(param) param
 #else

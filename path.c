@@ -3,7 +3,10 @@
  *		strings.
  *
  * $Log: path.c,v $
- * Revision 1.12  1993/06/02 14:28:47  pgf
+ * Revision 1.13  1993/06/25 11:25:55  pgf
+ * patches for Watcom C/386, from Tuan DANG
+ *
+ * Revision 1.12  1993/06/02  14:28:47  pgf
  * see tom's 3.48 CHANGES
  *
  * Revision 1.11  1993/05/24  15:21:37  pgf
@@ -237,6 +240,26 @@ char	*path;
 /*
  * Returns a pointer to the argument's last path-leaf (i.e., filename).
  */
+
+#ifdef __WATCOMC__
+
+char *
+pathleaf(path)
+char	*path;
+{
+	register char	*s = last_slash(path);
+	if (s == 0) {
+#if MSDOS
+		if (!(s = is_msdos_drive(path)))
+#endif
+		s = path;
+	} else
+		s++;
+	return s;
+}
+
+#else
+
 #if !VMS
 #define	unix_pathleaf	pathleaf
 #endif
@@ -255,6 +278,8 @@ char	*path;
 		s++;
 	return s;
 }
+#endif /* __WATCOMC__ */
+
 
 #if VMS
 char *pathleaf(path)

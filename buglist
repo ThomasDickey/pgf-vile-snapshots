@@ -38,13 +38,6 @@ E	the scrsearch functions could become region based -- as in "search for
 	the ^A/ version could become "a/ (search for the contents of buffer a),
 	if you know what I mean.
 
-E	need a "file newer than buffer" warning.  Should stat the file, and
-	store it's mod time, compare to current when going back to that window,
-	after performing some shell command, or just before modifying it.
-	e.g., if you're editing a file that is created by a script you're
-	testing, then you want to be warned that the file is out of date
-	after doing a test run of the script.
-
 E	g should become a region command.  Then it could take ranges, as
 	it should, and could also become an operator command.
 
@@ -282,6 +275,10 @@ In message <9212231610.AA27630@cuba.Cayman.COM> you write:
 The only remaining pieces of oddness I've seen are
 1) doing ?\w when already on a \w character -- it says Only one occurrence
 of pattern.
+
+1a) doing ?\W when already on a \W character -- it says Only one occurrence
+of pattern.
+
 2) doing /\s stops at the end of a line and won't go any further (because
 the cursor rests on the last character of the line which is before the eol).
 
@@ -367,7 +364,7 @@ be nice in vile.
 	Got a problem with the most recent version of vile. When I try to
 load a filename from a failed patch like "foo.c#", the pound-sign seems to
 be a special character that vile's input line wants to interpret instead
-of allowing me to use as a filename character. Please take a look at this.
+of allowing me to use as a filename character.
 
 [This is simply # expansion.  perhaps we can add a mode to turn if off?
 perhaps the mode should be a string, which is the list of chars to _not_
@@ -441,4 +438,14 @@ use archie/xarchie to file fue.tar.Z (fue - folding-micro-emacs).
 
 
 ------------------------------------------------------------
+
+
+
+I've accumulated a couple more vi-compatible bugs:
+
+	+ type "3ifoo<nl>bar<esc>".  Vi kills the repeat count after the <nl>.
+
+	+ type "s<nl><esc>" before some whitespace.  Vi trims the whitespace.
+
+-----------
 

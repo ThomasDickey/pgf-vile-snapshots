@@ -8,8 +8,22 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: insert.c,v $
- *	Revision 1.25  1993/06/02 14:28:47  pgf
- *	see tom's 3.48 CHANGES
+ *	Revision 1.29  1993/06/30 17:43:14  pgf
+ *	added call to map_check() when we're about to execute a SPEC binding,
+ *	to make sure :maps work
+ *
+ * Revision 1.28  1993/06/28  20:10:27  pgf
+ * new variable
+ *
+ * Revision 1.27  1993/06/28  15:07:35  pgf
+ * when killing chars, check for c == killc or wkillc _before_ checking it
+ * against backspace, in case DEL is someones killc or wkillc.
+ *
+ * Revision 1.26  1993/06/28  13:32:04  pgf
+ * fixed insstring() to INSERT instead of OVERWRITE (cut/paste error)
+ *
+ * Revision 1.25  1993/06/02  14:28:47  pgf
+ * see tom's 3.48 CHANGES
  *
  * Revision 1.24  1993/05/24  15:21:37  pgf
  * tom's 3.47 changes, part a
@@ -100,6 +114,8 @@
 static	int	wrap_at_col P(( void ));
 static	void	advance_one_char P(( void ));
 static	int	ins_n_times P(( int, int, int ));
+
+static savedmode;  /* value of insertmode maintained through subfuncs */
 
 /*--------------------------------------------------------------------------*/
 
@@ -352,6 +368,7 @@ int playback;
 	int    c;		/* command character */
 	int backsp_limit;
 	static TBUFF *insbuff;
+	int osavedmode;
 
 	if (playback && (insbuff != 0))
 		tb_first(insbuff);
@@ -363,6 +380,8 @@ int playback;
 		if (b_val(curbp, MDSHOWMODE))
 			curwp->w_flag |= WFMODE;
 	}
+	osavedmode = savedmode;
+	savedmode = insertmode;
 
 	if (b_val(curbp,MDBACKLIMIT))
 		backsp_limit = DOT.o;	/* starting offset */
@@ -376,8 +395,10 @@ int playback;
 			c = tb_next(insbuff);
 		} else {
 			(void)update(FALSE);
-			if (!tb_append(&insbuff, c = kbd_key()))
+			if (!tb_append(&insbuff, c = kbd_key())) {
+				savedmode = osavedmode;
 				return FALSE;
+			}
 		}
 
 		if (c == abortc ) {
@@ -393,20 +414,13 @@ int playback;
 			status = TRUE;
 			goto leaveinsert;
 		} 
-#ifdef BEFORE
-			else if (c == -abortc ) {
-			/* we use the negative to suppress that
-				junk, for the benefit of SPEC keys */
-			status = TRUE;
-			goto leaveinsert;
-		}
-#endif
 
 		if (c & SPEC) {
 			CMDFUNC *cfp;
 			int oins;
 			cfp = kcod2fnc(c);
 			if (cfp) {
+				map_check(c);
 				oins = insertmode;
 				insertmode = FALSE;
 				backsp_limit = 0;
@@ -434,6 +448,7 @@ int playback;
 			insertmode = FALSE;
 			if (b_val(curbp, MDSHOWMODE))
 				curwp->w_flag |= WFMODE;
+			savedmode = osavedmode;
 			return (status);
 		}
 
@@ -525,7 +540,7 @@ int *backsp_limit_p;
 					}
 					backspace();
 					autoindented--;
-					if (isbackspace(c) || c == tocntrl('D'))
+					if (c != wkillc && c != killc)
 						break;
 				}
 			}
@@ -568,7 +583,7 @@ int
 insstring(f, n)
 int f, n;
 {
-	return istring(f,n,OVERWRITE);
+	return istring(f,n,INSERT);
 }
 
 int
@@ -946,4 +961,19 @@ int f,n;
 		return s;
 	}
 	return linsert(n, c);
+}
+
+char *
+current_modename()
+{
+	switch (savedmode) {
+		default:
+			return "command";
+		case INSERT:
+			return "insert";
+		case OVERWRITE:
+			return "overwrite";
+		case REPLACECHAR:
+			return "replace";
+	}
 }

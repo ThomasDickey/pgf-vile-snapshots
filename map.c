@@ -3,7 +3,16 @@
  *		6/3/93
  *
  * $Log: map.c,v $
- * Revision 1.2  1993/06/10 16:13:52  pgf
+ * Revision 1.5  1993/07/01 16:15:54  pgf
+ * tom's 3.51 changes
+ *
+ * Revision 1.4  1993/06/30  17:42:50  pgf
+ * cleaned up, made SPEC bindings work
+ *
+ * Revision 1.3  1993/06/28  20:04:14  pgf
+ * string_to_key replaced with prc2kcod
+ *
+ * Revision 1.2  1993/06/10  16:13:52  pgf
  * moved the recursion check from map_proc to map_check.  this makes
  * nesting possible, but loops are not detected....
  *
@@ -34,59 +43,12 @@ static Mapping	*mhead;			/* ptr to head of linked list */
 static Mapping	*keymapped = NULL;	/* current mapped key seq used */
 static TBUFF	*MapMacro;
 
-static int string_to_key P(( char * ));
 static Mapping * search_map P(( int ));
 static int install_bind P(( int, CMDFUNC *, CMDFUNC ** ));
 static int install_map P(( int, char * ));
 static int remove_map P(( int ));
 
 
-/*
-** translate string to key (sort of like prc2kcod)
-*/
-static int
-string_to_key(k)
-char	*k;
-{
-	int	key;
-	char	*s;
-
-	/*
-	** Hack to allow ascii keyspecs in the form of 0xff. Need to add
-	** key entries for map_proc in cmdtbl to take advantage of this.
-	** (I use it for strange PC function key mappings)
-	*/
-	if (*k == '0' && (*(k + 1) == 'x' || *(k + 1) == 'X'))
-	{
-		key = (int)strtol(k, &s, 0);
-		key |= SPEC;
-	}
-	/* Accept cntl_a in both raw and printable form */
-	else if (*k == cntl_a)
-	{
-		key = (int)*(k+1) | CTLA;
-	}
-	else if (*k == '^' && *(k+1) == toalpha(cntl_a) && *(k+2) == '-')
-	{
-		key = (int)*(k+3) | CTLA;
-	}
-	/* Accept cntl_x in both raw and printable form */
-	else if (*k == cntl_x)
-	{
-		key = (int)*(k+1) | CTLX;
-	}
-	else if (*k == '^' && *(k+1) == toalpha(cntl_x) && *(k+2) == '-')
-	{
-		key = (int)*(k+3) | CTLX;
-	}
-	/* otherwise raw form */
-	else
-	{
-		key = (int)*k;
-	}
-
-	return key;
-}
 
 /*
 ** search for key in mapped linked list
@@ -133,7 +95,7 @@ CMDFUNC	**oldcmd;	/* ptr to the old bind entry */
 	{
 		if (kbp >= &kbindtbl[NBINDS-1])
 		{
-			mlwrite("Prefixed binding table full");
+			mlforce("[Prefixed binding table full]");
 			return(FALSE);
 		}
 		*oldcmd = NULL;
@@ -163,39 +125,32 @@ char	*v;
 	}
 	else
 	{
-		m = (Mapping *)malloc(sizeof (Mapping));
+		m = typealloc(Mapping);
 		if (m == NULL)
 			return FALSE;
 		m->next = mhead;
 		mhead = m;
 	}
 
-	m->kbdseq = malloc(strlen(v) + 1);
+	m->kbdseq = strmalloc(v);
 	if (m->kbdseq == NULL)
 		return FALSE;
 	m->key = key;
-	strcpy(m->kbdseq, v);
 	
-	if (!(key & SPEC))
+	/*
+	** if control, install map_proc in key bind table, else
+	** install into ascii table
+	*/
+	if (isspecial(key))
 	{
-		/*
-		** if control, install map_proc in key bind table, else
-		** install into ascii table
-		*/
-		if (key & (CTLA | CTLX))
-		{
-			return install_bind(key, &f_map_proc, &m->oldfunc);
-		}
-		else
-		{
-			m->oldfunc = asciitbl[key];
-			asciitbl[key] = &f_map_proc;
-		}
-        }
+		return install_bind(key, &f_map_proc, &m->oldfunc);
+	}
 	else
 	{
-		m->oldfunc = NULL;
+		m->oldfunc = asciitbl[key];
+		asciitbl[key] = &f_map_proc;
 	}
+	
 	return TRUE;
 }	
 
@@ -229,7 +184,7 @@ int	key;
 			** if control, restore olfunc into key bind table,
 			** else restore ascii table
 			*/
-			if (key & (CTLA | CTLX))
+			if (isspecial(key))
 			{
 				KBIND	*kbp;
 
@@ -247,7 +202,7 @@ int	key;
 				asciitbl[key] = m->oldfunc;
 			}
 			free(m->kbdseq);
-			free(m);
+			free((char *)m);
 			return TRUE;
 		}
 		pm = m;
@@ -295,9 +250,9 @@ int f,n;
 	if (status != TRUE)
 		return status;
 
-	if (install_map(string_to_key(kbuf), val) != TRUE)
+	if (install_map(prc2kcod(kbuf), val) != TRUE)
 	{
-		mlwrite("mapping failed");
+		mlforce("[Mapping failed]");
 		return FALSE;
 	}
 	return TRUE;
@@ -315,13 +270,13 @@ int f,n;
 	char 	kbuf[NSTRING];
 
 	kbuf[0] = '\0';
-	status = mlreply("map key: ", kbuf, NSTRING - 1);
+	status = mlreply("unmap key: ", kbuf, NSTRING - 1);
 	if (status != TRUE)
 		return status;
 
-	if (remove_map(string_to_key(kbuf)) != TRUE)
+	if (remove_map(prc2kcod(kbuf)) != TRUE)
 	{
-		mlwrite("key not mapped");
+		mlforce("[Key not mapped]");
 		return FALSE;
 	}
 	return TRUE;
@@ -330,6 +285,7 @@ int f,n;
 /*
 ** use the keyboard replay macro code to execute the mapped command
 */
+/*ARGSUSED*/
 int
 map_proc(f, n)
 int	f,n;
@@ -340,26 +296,24 @@ int	f,n;
 	/* Could be null if the user tries to execute map_proc directly */
 	if (keymapped == NULL)
 	{
-		mlwrite("[Key not mapped]");
+		mlforce("[Key not mapped]");
 		return FALSE;
 	}
 
-	tb_init(&MapMacro, abortc);
+	(void)tb_init(&MapMacro, abortc);
 	/*
 	** if there is a repeat count, install it to be played
 	*/
-	if (n != 1)
-	{
-		sprintf(num, "%d", n);
+	if (n != 1) {
+		(void)lsprintf(num, "%d", n);
 		for (c = num; *c; c++)
-		{
-			tb_append(&MapMacro, *c);
-		}
+			if (!tb_append(&MapMacro, *c))
+				return FALSE;
 	}
 	for (c = keymapped->kbdseq; *c; c++)
-	{
-		tb_append(&MapMacro, *c);
-	}
+		if (!tb_append(&MapMacro, *c))
+			return FALSE;
+
 	keymapped = NULL;
 
 	return start_kbm(1, DEFAULT_REG, MapMacro);

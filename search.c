@@ -4,7 +4,10 @@
  *  heavily modified by Paul Fox, 1990
  *
  * $Log: search.c,v $
- * Revision 1.50  1993/06/18 15:57:06  pgf
+ * Revision 1.51  1993/07/01 10:47:36  pgf
+ * rearranged limit setting in scanner(), so I can understand it
+ *
+ * Revision 1.50  1993/06/18  15:57:06  pgf
  * tom's 3.49 changes
  *
  * Revision 1.49  1993/05/24  15:21:37  pgf
@@ -578,23 +581,32 @@ int	wrapok;	/* ok to wrap around bottom of buffer? */
 		if (interrupted) return ABORT;
 
 		if (sameline(curpos, scanboundpos)) {
-			if (!wrapped) {
-				startoff = (direct == FORWARD) ?
-					curpos.o : 0;
-				srchlim = (direct == FORWARD) ?
-					((scanboundpos.o > curpos.o)?
-					scanboundpos.o:lLength(curpos.l))
-							: scanboundpos.o+1;
+			if (direct == FORWARD) {
+				if (wrapped) {
+					startoff = curpos.o;
+					srchlim = scanboundpos.o;
+				} else {
+					startoff = curpos.o;
+					srchlim = (scanboundpos.o > curpos.o) ?
+					  scanboundpos.o : lLength(curpos.l);
+				}
 			} else {
-				startoff = (direct == FORWARD) ?
-					curpos.o : scanboundpos.o;
-				srchlim = (direct == FORWARD) ?
-					scanboundpos.o : lLength(curpos.l);
+				if (wrapped) {
+					startoff = scanboundpos.o;
+					srchlim = lLength(curpos.l);
+				} else {
+					startoff = 0;
+					srchlim = scanboundpos.o + 1;
+				}
 			}
 		} else {
-			startoff = (direct == FORWARD) ? curpos.o : 0;
-			srchlim = (direct == FORWARD) ?
-					lLength(curpos.l) : curpos.o+1;
+			if (direct == FORWARD) {
+				startoff = curpos.o;
+				srchlim = lLength(curpos.l);
+			} else {
+				startoff = 0;
+				srchlim = curpos.o+1;
+			}
 		}
 		found = lregexec(exp, l_ref(curpos.l), startoff, srchlim);
 		if (found) {
@@ -608,7 +620,7 @@ int	wrapok;	/* ok to wrap around bottom of buffer? */
 				if (!lregexec(exp, l_ref(curpos.l),
 						got-l_ref(curpos.l)->l_text,
 						srchlim)) {
-					dbgwrite("BUG: prev. match no good");
+					mlforce("BUG: prev. match no good");
 					return FALSE;
 				}
 			}

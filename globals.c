@@ -3,7 +3,10 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: globals.c,v $
- * Revision 1.20  1993/05/24 15:21:37  pgf
+ * Revision 1.21  1993/07/01 16:15:54  pgf
+ * tom's 3.51 changes
+ *
+ * Revision 1.20  1993/05/24  15:21:37  pgf
  * tom's 3.47 changes, part a
  *
  * Revision 1.19  1993/05/04  17:05:14  pgf
@@ -139,11 +142,8 @@ int f, n, g_or_v;
 	calledbefore = FALSE;
 	
 	if (g_or_v == 'v') {  /* invert the sense of all the matches */
-		lp = lForw(curbp->b_line.l);
-		while (lp != l_ref(curbp->b_line.l)) {
+		for_each_line(lp, curbp)
 			lflipmark(lp);
-			lp = lforw(lp);
-		}
 	}
 	/* loop through the buffer -- we must clear the marks no matter what */
 	s = TRUE;

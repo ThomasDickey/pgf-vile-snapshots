@@ -4,7 +4,10 @@
  *	Written (except for delins()) for vile by Paul Fox, (c)1990
  *
  * $Log: oneliner.c,v $
- * Revision 1.44  1993/06/18 15:57:06  pgf
+ * Revision 1.45  1993/07/01 16:15:54  pgf
+ * tom's 3.51 changes
+ *
+ * Revision 1.44  1993/06/18  15:57:06  pgf
  * tom's 3.49 changes
  *
  * Revision 1.43  1993/06/02  14:28:47  pgf
@@ -135,20 +138,20 @@
  * revision 1.5
  * date: 1991/08/06 15:24:19;
  *  global/local values
- * 
+ *
  * revision 1.4
  * date: 1991/06/27 18:33:47;
  * made screen oriented substitutes always act globally across line
- * 
+ *
  * revision 1.3
  * date: 1991/06/25 19:53:07;
  * massive data structure restructure
- * 
+ *
  * revision 1.2
  * date: 1991/05/31 11:14:50;
  * turned these into region operators.
  * they're not one-liners anymore
- * 
+ *
  * revision 1.1
  * date: 1990/09/21 10:25:51;
  * initial vile RCS revision
@@ -179,7 +182,7 @@ int flag;
 	}
 
 	linep = region.r_orig.l;		 /* Current line.	 */
-	        
+
 	/* first check if we are already here */
 	bp = bfind(bname, OK_CREAT, 0);
 	if (bp == NULL) {
@@ -187,7 +190,9 @@ int flag;
 		return FALSE;
 	}
 
-	if (bp == curbp) {
+	if (bp == curbp
+	 || bfind(ScratchName(Buffer List), NO_CREAT, BFSCRTCH) != 0 /* patch */
+		) {
 		mlforce("[Can't do that from this buffer.]");
 		rls_region();
 		return FALSE;
@@ -199,11 +204,11 @@ int flag;
 			rls_region();
 			return FALSE;
 		}
-	        
+
 		bclear(bp);
 		calledbefore = TRUE;
 	}
-        
+
 	do {
 		addline(bp, l_ref(linep)->l_text, lLength(linep));
 		linep = lFORW(linep);
@@ -408,7 +413,7 @@ int nth_occur, printit, globally;
 		s = scanner(exp, FORWARD, FALSE);
 		if (s != TRUE)
 			break;
-		        
+
 		/* found the pattern */
 		foundit = TRUE;
 		which_occur++;
@@ -588,7 +593,7 @@ char *sourc;
 					    case_next = NO_CASE;
 					    c = *cp;
 					    /* Somewhat convoluted to handle
-					       \u\L correctly (upper case first 
+					       \u\L correctly (upper case first
 					       char, lower case remainder).
 					       This is the perl model, not the vi model. */
 					    if (isupper(c) && (direction == LOWER_CASE))
@@ -613,7 +618,7 @@ char *sourc;
 			    int direction = case_next != NO_CASE ? case_next : case_all;
 			    case_next = NO_CASE;
 			    /* Somewhat convoluted to handle
-			       \u\L correctly (upper case first 
+			       \u\L correctly (upper case first
 			       char, lower case remainder).
 			       This is the perl model, not the vi model. */
 			    if (isupper(c) && (direction == LOWER_CASE))

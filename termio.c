@@ -4,7 +4,13 @@
  * All operating systems.
  *
  * $Log: termio.c,v $
- * Revision 1.72  1993/06/18 15:57:06  pgf
+ * Revision 1.74  1993/06/25 11:25:55  pgf
+ * patches for Watcom C/386, from Tuan DANG
+ *
+ * Revision 1.73  1993/06/24  18:06:35  pgf
+ * au/x keeps ioctl.h in sys
+ *
+ * Revision 1.72  1993/06/18  15:57:06  pgf
  * tom's 3.49 changes
  *
  * Revision 1.71  1993/05/05  13:52:04  pgf
@@ -282,7 +288,7 @@
 # if SUNOS
 #  include "sys/filio.h"
 # else /* if you have trouble including ioctl.h, try "sys/ioctl.h" instead */
-#  if APOLLO || AIX || OSF1 || ULTRIX
+#  if APOLLO || AIX || OSF1 || ULTRIX || AUX2
 #   include <sys/ioctl.h>
 #  else
 #   include <ioctl.h>
@@ -816,7 +822,7 @@ ttmiscinit()
 
 #else /* not UNIX */
 
-#if   MSDOS && (TURBO || MSC)
+#if   MSDOS && (TURBO || MSC || WATCOM)
 #include <conio.h>
 #endif
 
@@ -859,7 +865,7 @@ short	iochan;				/* TTY I/O channel		*/
 #include        <bdos.h>
 #endif
 
-#if     MSDOS && (LATTICE || TURBO || AZTEC || MWC86 || ZTC)
+#if     MSDOS && (LATTICE || TURBO || WATCOM || AZTEC || MWC86 || ZTC)
 union REGS rg;		/* cpu register for use of DOS calls */
 int nxtchar = -1;	/* character held from type ahead    */
 #endif
@@ -1174,7 +1180,7 @@ ttgetc()
 	return getch();
 	}
 #endif
-#if	MSDOS && (LATTICE || TURBO || AZTEC || ZTC)
+#if	MSDOS && (LATTICE || TURBO || WATCOM || AZTEC || ZTC)
 	{
 	int c;
 
@@ -1225,7 +1231,7 @@ typahead()
 	return TRUE;
 #endif
 
-#if	MSDOS && (MSC || TURBO || ZTC)
+#if	MSDOS && (MSC || TURBO || WATCOM || ZTC)
 	if (tungotc > 0)
 		return TRUE;
 

@@ -64,7 +64,10 @@
  *	Allow left/right scrolling of input lines (when they get too long).
  *
  * $Log: history.c,v $
- * Revision 1.6  1993/05/24 15:21:37  pgf
+ * Revision 1.7  1993/07/01 16:15:54  pgf
+ * tom's 3.51 changes
+ *
+ * Revision 1.6  1993/05/24  15:21:37  pgf
  * tom's 3.47 changes, part a
  *
  * Revision 1.5  1993/04/20  12:18:32  pgf
@@ -133,8 +136,8 @@ makeMyBuff()
 	if (!global_g_val(GMDHISTORY)) {
 		bp = 0;
 	} else if ((bp = bfind(MyBuff, OK_CREAT, BFINVS)) != 0) { 
-		bp->b_flag |= BFINVS;
-		bp->b_flag &= ~BFSCRTCH;	/* make it nonvolatile */
+		b_set_invisible(bp);
+		b_clr_flags(bp, BFSCRTCH); /* make it nonvolatile */
 		bp->b_active = TRUE;
 	} else {
 		stopMyBuff();
