@@ -142,7 +142,7 @@ OBJ =	main.obj,\
 	insert.obj,\
 	isearch.obj,\
 	line.obj,\
-	map.obj \
+	map.obj, \
 	modes.obj,\
 	npopen.obj,\
 	oneliner.obj,\
@@ -247,7 +247,10 @@ vile.com :
 	@ write sys$output "** made $@"
 
 # $Log: descrip.mms,v $
-# Revision 1.7  1993/07/06 16:53:50  pgf
+# Revision 1.8  1993/07/15 10:37:58  pgf
+# see 3.55 CHANGES
+#
+# Revision 1.7  1993/07/06  16:53:50  pgf
 # added map.c/map.obj
 #
 # Revision 1.6  1993/06/18  15:57:06  pgf

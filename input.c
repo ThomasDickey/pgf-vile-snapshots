@@ -3,7 +3,10 @@
  *		5/9/86
  *
  * $Log: input.c,v $
- * Revision 1.81  1993/06/29 11:09:47  pgf
+ * Revision 1.82  1993/07/15 12:00:00  pgf
+ * added mlquickask(), which does "raw" single character response queries
+ *
+ * Revision 1.81  1993/06/29  11:09:47  pgf
  * changed 'naptime' to 'timeout-value'
  *
  * Revision 1.80  1993/06/28  20:05:49  pgf
@@ -371,7 +374,7 @@ int	*pos;
 /*
  * Ask a yes or no question in the message line. Return either TRUE, FALSE, or
  * ABORT. The ABORT status is returned if the user bumps out of the question
- * with a ^G. Used any time a confirmation is required.
+ * with an abortc. Used any time a confirmation is required.
  */
 
 int
@@ -392,6 +395,32 @@ char *prompt;
 
 		if (c=='n' || c=='N')
 			return(FALSE);
+	}
+}
+
+/*
+ * Ask a simple question in the message line. Return the single char response,
+ *  if it was one of the valid responses.
+ */
+
+int
+mlquickask(prompt,respchars,cp)
+char *prompt;
+char *respchars;
+int *cp;
+{
+
+	for (;;) {
+		mlprompt("%s ",prompt);
+		*cp = tgetc(FALSE);	/* get the response */
+
+		if (*cp == kcod2key(abortc))	/* Bail out! */
+			return(ABORT);
+
+		if (strchr(respchars,*cp))
+			return TRUE;
+
+		TTbeep();
 	}
 }
 

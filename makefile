@@ -93,7 +93,7 @@ O = o
 # All of the makefiles which should be preserved and distributed
 UNIXMAK = makefile 				# on UNIX
 VMSMAK = descrip.mms vms_link.opt		# on VMS
-TURBOMAK = makmktbl.tbc makvile.tbc		# on DOS, using TURBO
+TURBOMAK = makefile.tbc				# on DOS, using TURBO
 WATMAK = makefile.wat				# on DOS, using Watcom C/386
 MSCMAK =	# still waiting for this one	# on DOS, using Microsoft C
 DJGPPMAK = makefile.djg				# on DOS, DJGCC v1.09
@@ -186,7 +186,7 @@ all:
 	echo "	make sunos	(sunos 3 or 4)"				;\
 	echo "	make ultrix"						;\
 	echo "	make mach	(just pure bsd)"			;\
-	echo "	make svr4	(untested)"				;\
+	echo "	make svr4	(Solaris 2.1, 2.2)"			;\
 	echo "	make mips	(uses systemV stuff)"			;\
 	echo "	make odt	(SCO Open DeskTop -- variant of svr3)"	;\
 	echo "	make isc	(interactive -- another such variant)"	;\
@@ -542,7 +542,13 @@ random.$O:	glob.h
 vmalloc$O:	nevars.h
 
 # $Log: makefile,v $
-# Revision 1.113  1993/07/08 10:41:15  pgf
+# Revision 1.115  1993/07/19 10:39:26  pgf
+# svr4 now tested
+#
+# Revision 1.114  1993/07/15  10:37:58  pgf
+# see 3.55 CHANGES
+#
+# Revision 1.113  1993/07/08  10:41:15  pgf
 # turn off the strict gcc warnings by default -- we don't pass yet.
 #
 # Revision 1.112  1993/07/06  16:55:58  pgf

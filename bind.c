@@ -4,7 +4,13 @@
  *	written 11-feb-86 by Daniel Lawrence
  *
  * $Log: bind.c,v $
- * Revision 1.50  1993/07/01 16:15:54  pgf
+ * Revision 1.52  1993/07/19 15:28:23  pgf
+ * moved hex digit processing from prc2kcod to token()
+ *
+ * Revision 1.51  1993/07/15  10:37:58  pgf
+ * see 3.55 CHANGES
+ *
+ * Revision 1.50  1993/07/01  16:15:54  pgf
  * tom's 3.51 changes
  *
  * Revision 1.49  1993/07/01  10:56:21  pgf
@@ -192,15 +198,14 @@ extern CMDFUNC f_cntl_af, f_cntl_xf, f_unarg, f_esc, f_speckey;
 static	int	chr_complete P(( int, char *, int * ));
 static	int	chr_eol P(( char *, int, int, int ));
 static	void	makechrslist P(( int, char *));
+#endif
 static	void	ostring P(( char * ));
 static	char *	quoted P(( char *, char * ));
 static	void	convert_kcode P(( int, char * ));
-#endif
 static	int	key_to_bind P(( CMDFUNC * ));
-static	int	rebind_key P(( int, CMDFUNC * ));
+static	int	converted_len P(( char * ));
+static	char *	to_tabstop P(( char * ));
 #endif
-
-static	char *	string2prc P(( char *, char * ));
 
 static	char *	skip_partial P(( char *, int, char *, unsigned ));
 static	void	show_partial P(( char *, int, char *, unsigned ));
@@ -285,7 +290,7 @@ int dum1;
 char *ptr;
 {
 	register int i;
-	char	temp[80];
+	char	temp[NLINE];
 
 	bprintf("--- Terminal Settings %*P\n", term.t_ncol-1, '-');
 	for (i = 0; TermChrs[i].name != 0; i++) {
@@ -357,10 +362,7 @@ int f,n;
 #ifdef BEFORE
 		case 'b':
 			kcmd = engl2fnc(name);
-			c = key_to_bind(kcmd);
-			if (c < 0)
-				return(FALSE);
-			s = rebind_key(c);
+			s = rebind_key(key_to_bind(kcmd), kcmd);
 			break;
 #endif
 		case 's':
@@ -446,7 +448,6 @@ int f, n;	/* command arguments [IGNORED] */
 	register CMDFUNC *kcmd;	/* ptr to the requested function to bind to */
 	char cmd[NLINE];
 	char *fnp;
-	int c;
 
 	/* prompt the user to type in a key to bind */
 	/* and get the function name to bind it to */
@@ -457,10 +458,7 @@ int f, n;	/* command arguments [IGNORED] */
 		return(FALSE);
 	}
 
-	c = key_to_bind(kcmd);
-	if (c < 0)
-		return(FALSE);
-	return rebind_key(c, kcmd);
+	return rebind_key(key_to_bind(kcmd), kcmd);
 }
 
 /*
@@ -470,7 +468,7 @@ static int
 key_to_bind(kcmd)
 register CMDFUNC *kcmd;
 {
-	char outseq[80];	/* output buffer for keystroke sequence */
+	char outseq[NLINE];	/* output buffer for keystroke sequence */
 	register int c;
 
 	mlprompt("...to keyboard sequence (type it exactly): ");
@@ -492,6 +490,7 @@ register CMDFUNC *kcmd;
 	if (c >= 0) {
 		/* change it to something we can print as well */
 		ostring(kcod2prc(c, outseq));
+		hst_append(outseq, FALSE);
 	} else {
 		mlforce("[Not a proper key-sequence]");
 	}
@@ -502,12 +501,29 @@ register CMDFUNC *kcmd;
  * Given a key-code and a command-function pointer, rebind the key-code to
  * the command-function.
  */
-static int
+int
 rebind_key (c, kcmd)
 register int	c;
 register CMDFUNC *kcmd;
 {
+	CMDFUNC ignored, *old = &ignored;
+	return install_bind (c, kcmd, &old);
+}
+
+/*
+ * Bind a command-function pointer to a given key-code (saving the old
+ * value of the function-pointer via an pointer given by the caller).
+ */
+int
+install_bind (c, kcmd, oldfunc)
+register int	c;
+register CMDFUNC *kcmd;
+CMDFUNC **oldfunc;
+{
 	register KBIND *kbp;	/* pointer into a binding table */
+
+	if (c < 0)
+		return FALSE;	/* not a legal key-code */
 
 	/* if the function is a prefix key, i.e. we're changing the definition
 		of a prefix key, then they typed a dummy function name, which
@@ -515,7 +531,7 @@ register CMDFUNC *kcmd;
 	if (isSpecialCmd(kcmd)) {
 		register int j;
 		/* search for an existing binding for the prefix key */
-		for (j = 0; j < 128; j++) {
+		for (j = 0; j < N_chars; j++) {
 			if (asciitbl[j] == kcmd) {
 				(void)unbindchar(j);
 				break;
@@ -535,12 +551,12 @@ register CMDFUNC *kcmd;
 	}
 	
 	if (!isspecial(c)) {
+		*oldfunc = asciitbl[c];
 		asciitbl[c] = kcmd;
 	} else {
-		kbp = kbindtbl;
-		while (kbp->k_cmd && kbp->k_code != c)
-			kbp++;
+		kbp = kcode2kbind(c);
 		if (kbp->k_cmd) { /* found it, change it in place */
+			*oldfunc = kbp->k_cmd;
 			kbp->k_cmd = kcmd;
 		} else {
 			if (kbp >= &kbindtbl[NBINDS-1]) {
@@ -548,10 +564,11 @@ register CMDFUNC *kcmd;
 				return(FALSE);
 			}
 			kbp->k_code = c;	/* add keycode */
-			kbp->k_cmd = kcmd; /* and func pointer */
+			kbp->k_cmd = kcmd;	/* and func pointer */
 			++kbp;		/* and make sure the next is null */
 			kbp->k_code = 0;
 			kbp->k_cmd = NULL;
+			*oldfunc   = NULL;
 		}
 	}
 	return(TRUE);
@@ -565,7 +582,7 @@ unbindkey(f, n)
 int f, n;	/* command arguments [IGNORED] */
 {
 	register int c;		/* command key to unbind */
-	char outseq[80];	/* output buffer for keystroke sequence */
+	char outseq[NLINE];	/* output buffer for keystroke sequence */
 
 	/* prompt the user to type in a key to unbind */
 	mlprompt("Unbind this key sequence: ");
@@ -609,9 +626,7 @@ int c;		/* command key to unbind */
 		asciitbl[c] = NULL;
 	} else {
 		/* search the table to see if the key exists */
-		kbp = kbindtbl;
-		while (kbp->k_cmd && kbp->k_code != c)
-			kbp++;
+		kbp = kcode2kbind(c);
 
 		/* if it isn't bound, bitch */
 		if (kbp->k_cmd == NULL)
@@ -654,7 +669,7 @@ int f,n;
         register int    s;
 
 
-	s = mlreply("Apropos string: ", mstring, NSTRING - 1);
+	s = mlreply("Apropos string: ", mstring, sizeof(mstring));
 	if (s != TRUE)
 		return(s);
 
@@ -671,19 +686,38 @@ char	*src;
 	return strcat(strcat(strcpy(dst, "\""), src), "\"");
 }
 
+/* returns the number of columns used by the given string */
+static int
+converted_len(buffer)
+register char	*buffer;
+{
+	register int len = 0, c;
+	while ((c = *buffer++) != EOS) {
+		if (c == '\t')
+			len |= 7;
+		len++;
+	}
+	return len;
+}
+
+/* force the buffer to a tab-stop if needed */
+static char *
+to_tabstop(buffer)
+char	*buffer;
+{
+	register int	cpos = converted_len(buffer);
+	if (cpos & 7)
+		(void)strcat(buffer, "\t");
+	return buffer + strlen(buffer);
+}
+
 /* convert a key binding, padding to the next multiple of 8 columns */
 static void
 convert_kcode(c, buffer)
 int	c;
 char	*buffer;
 {
-	register int	cpos;
-
-	(void)kcod2prc(c, &buffer[strlen(buffer)]);
-	cpos = strlen(buffer);
-	while (cpos & 7)
-		buffer[cpos++] = ' ';
-	buffer[cpos] = EOS;
+	(void)kcod2prc(c, to_tabstop(buffer));
 }
 
 /* build a binding list (limited or full) */
@@ -697,10 +731,8 @@ char *mstring;		/* match string if partial list, NULL to list all */
 #define	register		
 #endif
 	register KBIND *kbp;	/* pointer into a key binding table */
-	register CMDFUNC **cfp;	/* pointer into the ascii table */
 	register NTAB *nptr,*nptr2;	/* pointer into the name table */
-	int cpos;		/* current position to use in outseq */
-	char outseq[81];	/* output buffer for keystroke sequence */
+	char outseq[NLINE];	/* output buffer for keystroke sequence */
 	int i,pass;
 	int ok = TRUE;		/* reset if out-of-memory, etc. */
 
@@ -720,10 +752,9 @@ char *mstring;		/* match string if partial list, NULL to list all */
 			continue;
 
 		/* add in the command name */
-		cpos = strlen(quoted(outseq, nptr->n_name));
-		while (cpos < 32)
-			outseq[cpos++] = ' ';
-		outseq[cpos] = 0;
+		(void)quoted(outseq, nptr->n_name);
+		while (converted_len(outseq) < 32)
+			(void)strcat(outseq, "\t");
 		
 #if	APROP
 		/* if we are executing an apropos command
@@ -732,26 +763,23 @@ char *mstring;		/* match string if partial list, NULL to list all */
 		    	continue;
 #endif
 		/* look in the simple ascii binding table first */
-		for(cfp = asciitbl, i = 0; cfp < &asciitbl[128]; cfp++, i++) {
-			if (*cfp == nptr->n_cmd) {
+		for (i = 0; i < N_chars; i++)
+			if (asciitbl[i] == nptr->n_cmd)
 				convert_kcode(i, outseq);
-			}
-		}
+
 		/* then look in the multi-key table */
-		for(kbp = kbindtbl; kbp->k_cmd; kbp++) {
-			if (kbp->k_cmd == nptr->n_cmd) {
+		for (kbp = kbindtbl; kbp->k_cmd; kbp++)
+			if (kbp->k_cmd == nptr->n_cmd)
 				convert_kcode(kbp->k_code, outseq);
-			}
-		}
+
 		/* dump the line */
 		if (!addline(curbp,outseq,-1)) {
 			ok = FALSE;
 			break;
 		}
 
-		cpos = 0;
-
 		/* then look for synonyms */
+		(void)strcpy(outseq, "\t");
 		for (nptr2 = nametbl; nptr2->n_name != NULL; ++nptr2) {
 			/* if it's the one we're on, skip */
 			if (nptr2 == nptr)
@@ -762,15 +790,11 @@ char *mstring;		/* match string if partial list, NULL to list all */
 			/* if it's not a synonym, skip */
 			if (nptr2->n_cmd != nptr->n_cmd)
 				continue;
-			while (cpos < 8)
-				outseq[cpos++] = ' ';
-			(void)quoted(outseq+cpos, nptr2->n_name);
+			(void)quoted(outseq+1, nptr2->n_name);
 			if (!addline(curbp,outseq,-1)) {
 				ok = FALSE;
 				break;
 			}
-			cpos = 0;	/* and clear the line */
-
 		}
 
 		nptr->n_cmd->c_flags |= LISTED; /* mark it as already listed */
@@ -809,7 +833,7 @@ char *sub;	/* substring to look for */
 		}
 
 		/* yes, return a success */
-		if (*tp == 0)
+		if (*tp == EOS)
 			return(TRUE);
 
 		/* no, onward */
@@ -975,7 +999,7 @@ char *seq;	/* destination string for sequence */
 }
 
 /* translates a binding string into printable form */
-static char *
+char *
 string2prc(dst, src)
 char	*dst;
 char	*src;
@@ -993,7 +1017,7 @@ char	*src;
 			tmp = "<tab>";
 		else if (iscntrl(c)) {
 			*dst++ = '^';
-			*dst = toalpha(c);
+			*dst = tocntrl(c);
 		} else if (c == poundc && src[1] != EOS)
 			tmp = "FN";
 		else
@@ -1031,6 +1055,18 @@ insertion_cmd()
 	return back_to_ins_char;
 }
 
+/* kcode2kbind: translate a 10-bit key-binding to the table-pointer
+ */
+KBIND *
+kcode2kbind(code)
+register int code;
+{
+	register KBIND	*kbp;	/* pointer into a binding table */
+
+	for (kbp = kbindtbl; kbp->k_cmd && kbp->k_code != code; kbp++)
+		;
+	return kbp;
+}
 
 /* kcod2fnc:  translate a 10-bit keycode to a function pointer */
 /*	(look a key binding up in the binding table)		*/
@@ -1038,15 +1074,10 @@ CMDFUNC *
 kcod2fnc(c)
 int c;	/* key to find what is bound to it */
 {
-	register KBIND *kbp;
-
 	if (!isspecial(c)) {
 		return asciitbl[c];
 	} else {
-		kbp = kbindtbl;
-		while (kbp->k_cmd && kbp->k_code != c)
-			kbp++;
-		return kbp->k_cmd;
+		return kcode2kbind(c)->k_cmd;
 	}
 }
 
@@ -1111,7 +1142,7 @@ CMDFUNC *cfp;	/* ptr to the requested function to bind to */
 {
 	register int i;
 
-	for(i = 0; i < 128; i++) {
+	for (i = 0; i < N_chars; i++) {
 		if (cfp == asciitbl[i])
 			return i;
 	}
@@ -1147,85 +1178,78 @@ engl2fnc(fname)
 char *fname;	/* name to attempt to match */
 {
 	register NTAB *nptr;	/* pointer to entry in name binding table */
+	register SIZE_T len = strlen(fname);
 
-	/* scan through the table, returning any match */
-	nptr = nametbl;
-	while (nptr->n_cmd != NULL) {
-		if (strcmp(fname, nptr->n_name) == 0) {
-			return nptr->n_cmd;
+	if (len != 0) {	/* scan through the table, returning any match */
+		nptr = nametbl;
+		while (nptr->n_cmd != NULL) {
+			if (strncmp(fname, nptr->n_name, len) == 0) {
+				NTAB *test = (nptr+1);
+				if (!strcmp(fname, nptr->n_name)
+				 || test->n_name == NULL
+				 || strncmp(fname, test->n_name, len) != 0)
+					return nptr->n_cmd;
+				else
+					break;
+			}
+			++nptr;
 		}
-		++nptr;
 	}
 	return NULL;
 }
 
 /* prc2kcod: translate printable code to 10 bit keycode */
-int 
-prc2kcod(k)
-char *k;		/* name of key to translate to Command key form */
+unsigned int 
+prc2kcod(kk)
+char *kk;		/* name of key to translate to Command key form */
 {
-	register int c = 0;	/* key sequence to return */
-	register int pref = 0;	/* key prefixes */
+	register unsigned int c;		/* key sequence to return */
+	register unsigned int pref = 0;	/* key prefixes */
+	register int len = strlen(kk);
+	register unsigned char *k = (unsigned char *)kk;
 
-	/* first, the CTLA prefix */
-	if (iscntrl(cntl_a) &&
-		(*k == '^' && *(k+1) == toalpha(cntl_a) && *(k+2) == '-')) {
-		pref = CTLA;	/* ^A- as 3 chars */
-		k += 3;
-	} else if (iscntrl(cntl_x) &&
-		(*k == '^' && *(k+1) == toalpha(cntl_x) && *(k+2) == '-')) {
-		pref |= CTLX;	/* ^X- as 3 chars */
-		k += 3;
-	} else if (*k == cntl_a) {
-		pref = CTLA;	/* ^A as one char */
-		k++;
-	} else if (*k == cntl_x) {
-		pref |= CTLX;	/* ^X as one char */
-		k++;
-	}
-
-	/* next possibly the "function" prefix */
-	if (strncmp(k, "FN-", 3) == 0) {
-		pref |= SPEC;		/* FN- as 3 chars */
-		k += 3;
-	} else if (strncmp(k, "M-", 2) == 0) {
-		pref |= SPEC;		/* M- as 2 chars */
+	if (len > 3 && *(k+2) == '-') {
+		if (*k == '^') {
+			if (*(k+1) == toalpha(cntl_a))
+				pref = CTLA;
+			if (*(k+1) == toalpha(cntl_x))
+				pref = CTLX;
+		} else if (!strncmp(k, "FN", 2)) {
+			pref = SPEC;
+		}
+		if (pref != 0)
+			k += 3;
+	} else if (len > 2 && !strncmp(k, "M-", 2)) {
+		pref = SPEC;
 		k += 2;
+	} else if (len > 1) {
+		if (*k == cntl_a)
+			pref = CTLA;
+		else if (*k == cntl_x)
+			pref = CTLX;
+		else if (*k == poundc)
+			pref = SPEC;
+		if (pref != 0)
+			k++;
 	}
 
 	/* a control char? */
-	if (*k == '^' && ('?' <= *(k+1) && *(k+1) <= '_')) {
-		c = tocntrl(*(k+1));
+	if (*k == '^' && *(k+1) != EOS) {
+		c = *(k+1);
+		if (islower(c)) c = toupper(c);
+		c = tocntrl(c);
 		k += 2;
 	} else if (!strcmp(k,"<sp>")) {
-		return pref | ' ';		/* the string <sp> */
+		c = ' ';		/* the string <sp> */
+		k += 4;
 	} else if (!strcmp(k,"<tab>")) {
-		return pref | '\t';		/* the string <tab> */
-	} else if (*k == '0' && (*(k+1) == 'x' || *(k+1) == 'X') &&
-		isalnum(*(k+2)) && isalnum(*(k+3))) {
-		k += 2;				/* 0xNN or 0XNN */
-		c = 0;
-		if (isdigit(*k))
-			c = *k - '0';
-		else if (isupper(*k))
-			c = *k - 'A' + 10;
-		else if (islower(*k))
-			c = *k - 'a' + 10;
-		k++;
-		c *= 16;
-		if (isdigit(*k))
-			c += *k - '0';
-		else if (isupper(*k))
-			c += *k - 'A' + 10;
-		else if (islower(*k))
-			c += *k - 'a' + 10;
-		k++;
-
+		c = '\t';		/* the string <tab> */
+		k += 5;
 	} else {		/* any single char, control or not */
 		c = *k++;
 	}
 
-	if (*k != '\0')		/* we should have eaten the whole thing */
+	if (*k != EOS)		/* we should have eaten the whole thing */
 		return -1;
 	
 	return pref|c;
@@ -1242,7 +1266,7 @@ char *skey;	/* name of key to get binding for */
 	int c;
 
 	c = prc2kcod(skey);
-	if (c >= 0)
+	if (c < 0)
 		return "ERROR";
 
 	bindname = fnc2engl(kcod2fnc(c));
@@ -1410,7 +1434,7 @@ unsigned size_entry;
 	register int	n = pos;
 	char	*this_name = THIS_NAME(first);
 
-	while (TRUE) {
+	for (;;) {
 		buf[n] = this_name[n];	/* add the next char in */
 		buf[n+1] = EOS;
 

@@ -4,7 +4,14 @@
  *	written 1986 by Daniel Lawrence	
  *
  * $Log: exec.c,v $
- * Revision 1.62  1993/07/06 17:23:33  pgf
+ * Revision 1.64  1993/07/19 15:27:06  pgf
+ * added \OOO and \xXXX input in token(), where OOO and XXX are octal and
+ * hex sequences.  also added \e for ESC
+ *
+ * Revision 1.63  1993/07/15  10:37:58  pgf
+ * see 3.55 CHANGES
+ *
+ * Revision 1.62  1993/07/06  17:23:33  pgf
  * take out dbgwrite if toline is null after call to linespec -- this can
  * happen, and the upper layers catch it correctly
  *
@@ -823,10 +830,17 @@ int f,n;
 		n = 1;
 	}
 
-	if ((status = macarg(tkn)) != TRUE) {	/* and grab the first token */
-		execstr = oldestr;
-		return status;
-	}
+	do {
+		if ((status = macarg(tkn)) != TRUE) {	/* and grab the first token */
+			execstr = oldestr;
+			return status;
+		}
+		if (*tkn == ':') {	/* allow leading ':' on line */
+			register int j;
+			for (j = 0; (tkn[j] = tkn[j+1]) != EOS; j++)
+				;
+		}
+	} while (!*tkn);
 
 	/* process leading argument */
 	if (toktyp(tkn) != TKCMD) {
@@ -963,6 +977,48 @@ int eolchar;
 				case 't':	*tok++ = '\t';  break;
 				case 'b':	*tok++ = '\b';  break;
 				case 'f':	*tok++ = '\f'; break;
+				case 'e':	*tok++ = ESC; break;
+
+				case 'x':
+					{
+					int i = 3; /* allow \xNNN 
+						      (we're on the 'x' now)*/
+					*tok = 0;
+					while(*src && isalnum(*src) && i--) {
+						if (isdigit(*src)) {
+							*tok = *tok * 16 + 
+								*src - '0';
+						} else if (isupper(*src)) {
+							if (*src > 'F')
+								break;
+							*tok = *tok * 16 +
+								*src - 'A' + 10;
+						} else if (islower(*src)) {
+							if (*src > 'f')
+								break;
+							*tok = *tok * 16 +
+								*src - 'a' + 10;
+						}
+						src++;
+					}
+					tok++;
+					}
+					break;
+
+				case '0': case '1': case '2': case '3':
+				case '4': case '5': case '6': case '7':
+					{
+					int i = 2; /* allow \NNN (we have
+						the first N as c, are
+						about to do the second */
+					*tok = c - '0';
+					while(*src && isdigit(*src) &&
+							*src < '8' && i--) {
+						*tok = *tok * 8 + *src++ - '0';
+					}
+					tok++;
+					}
+					break;
 				default:	*tok++ = c;
 			}
 		} else {
@@ -979,7 +1035,8 @@ int eolchar;
 					break;
 				} else if (c == '"') {
 					quotef = c;
-					/* note that leading quote is included */
+					/* note that leading quote
+						is included */
 				} else if (isspace(c)) {
 					break;
 				}
@@ -1102,7 +1159,7 @@ int f, n;	/* default flag and numeric arg */
 {
         register BUFFER *bp;		/* ptr to buffer to execute */
         register int status;		/* status return */
-        static char obufn[NBUFN+2];		/* name of buffer to execute */
+        static char obufn[NBUFN+2];	/* name of buffer to execute */
         char bufn[NBUFN+2];		/* name of buffer to execute */
 	register int odiscmd;
 
@@ -1145,7 +1202,7 @@ int f, n;	/* default flag and numeric arg */
 {
         register BUFFER *bp;		/* ptr to buffer to execute */
         register int status;		/* status return */
-        static char bufn[NSTRING];		/* name of buffer to execute */
+        static char bufn[NSTRING];	/* name of buffer to execute */
 	register int odiscmd;
 
 	if (!f)

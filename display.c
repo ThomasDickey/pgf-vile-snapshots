@@ -6,7 +6,10 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.91  1993/07/07 12:59:30  pgf
+ * Revision 1.92  1993/07/15 10:37:58  pgf
+ * see 3.55 CHANGES
+ *
+ * Revision 1.91  1993/07/07  12:59:30  pgf
  * don't put cursor at nu_width if the buffer is empty, since there won't be
  * a line number in that case.
  *
@@ -350,7 +353,10 @@
 #define	MRK_EXTEND_RIGHT '>'
 
 VIDEO   **vscreen;                      /* Virtual screen. */
-#if	! MEMMAP
+#if	MEMMAP
+#define PSCREEN vscreen
+#else
+#define PSCREEN pscreen
 VIDEO   **pscreen;                      /* Physical screen. */
 #endif
 
@@ -1329,7 +1335,6 @@ void
 updupd(force)
 int force;	/* forced update flag */
 {
-	register VIDEO *vp1;
 	register int i;
 
 #if CAN_SCROLL
@@ -1341,21 +1346,69 @@ int force;	/* forced update flag */
 #endif
 
 	for (i = 0; i < term.t_nrow; ++i) {
-		vp1 = vscreen[i];
-
 		/* for each line that needs to be updated*/
-		if ((vp1->v_flag & VFCHG) != 0) {
+		if ((vscreen[i]->v_flag & VFCHG) != 0) {
 #if	TYPEAH
 			if (force == FALSE && typahead())
 				return;
 #endif
-#if	MEMMAP
-			updateline(i, vp1, vp1);
-#else
-			updateline(i, vp1, pscreen[i]);
-#endif
+			updateline(i, 0, term.t_ncol);
 		}
 	}
+}
+
+/*
+ * Translate offset (into a line's text) into the display-column, taking into
+ * account the tabstop, sideways, number- and list-modes.
+ */
+int
+offs2col(wp, lp, offset)
+WINDOW	*wp;
+LINEPTR	lp;
+C_NUM	offset;
+{
+	int	column = 0;
+	int	tabs = tabstop_val(wp->w_bufp);
+	int	list = w_val(wp,WMDLIST);
+
+	register int	n, c;
+
+	for (n = 0; n < offset; n++) {
+		c = l_ref(lp)->l_text[n]; 
+		if (isprint(c)) {
+			column++;
+		} else if (list) {
+			column += 2;
+		} else if (c == '\t') {
+			column = ((column / tabs) + 1) * tabs;
+		}
+	}
+	return column - w_val(wp,WVAL_SIDEWAYS) + nu_width(wp);
+}
+
+/*
+ * Highlight the requested portion of the screen.  We're mucking with the video
+ * attributes on the line here, so this is NOT good code - it would be better
+ * if there was an individual colour attribute per character, rather than per
+ * row, but I didn't write the original code.  Anyway, hilite is called only
+ * once so far, so it's not that big a deal.
+ */
+void
+hilite(row, colfrom, colto, on)
+int	row;		/* row to start highlighting */
+int	colfrom;	/* column to start highlighting */
+int	colto;		/* column to end highlighting */
+int	on;		/* start highlighting */
+{
+	register VIDEO *vp1 = vscreen[row];
+	if (on) {
+		vp1->v_flag |= VFREQ;
+		vp1->v_flag &= ~VFREV;
+	} else {
+		vp1->v_flag &= ~VFREQ;
+		vp1->v_flag |= VFREV;
+	}
+	updateline(row, colfrom, colto);
 }
 
 #if CAN_SCROLL
@@ -1588,38 +1641,40 @@ int	col;
 /*	UPDATELINE specific code for the IBM-PC and other compatibles */
 
 void
-updateline(row, vp1, vpdummy)
+updateline(row, colfrom, colto)
 
-int row;		/* row of screen to update */
-struct VIDEO *vp1;	/* virtual screen image */
-struct VIDEO *vpdummy;	/* virtual screen image */
+int	row;		/* row of screen to update */
+int	colfrom;	/* first column on screen */
+int	colto;		/* last column on screen */
 
 {
+	register struct VIDEO *vp1 = vscreen[row];	/* virtual screen image */
 #if	COLOR
-	scwrite(row, 0, term.t_ncol,
+	scwrite(row, colfrom, colto,
 		vp1->v_text, vp1->v_rfcolor, vp1->v_rbcolor);
 	vp1->v_fcolor = vp1->v_rfcolor;
 	vp1->v_bcolor = vp1->v_rbcolor;
 #else
 	if (vp1->v_flag & VFREQ)
-		scwrite(row, 0, term.t_ncol, vp1->v_text, 0, 7);
+		scwrite(row, colfrom, colto, vp1->v_text, 0, 7);
 	else
-		scwrite(row, 0, term.t_ncol, vp1->v_text, 7, 0);
+		scwrite(row, colfrom, colto, vp1->v_text, 7, 0);
 #endif
 	vp1->v_flag &= ~(VFCHG | VFCOL);	/* flag this line as changed */
-
 }
 
 #else
 
 void
-updateline(row, vp1, vp2)
+updateline(row, colfrom, colto)
 
-int row;		/* row of screen to update */
-struct VIDEO *vp1;	/* virtual screen image */
-struct VIDEO *vp2;	/* physical screen image */
+int	row;		/* row of screen to update */
+int	colfrom;	/* first column on screen */
+int	colto;		/* first column on screen */
 
 {
+    struct VIDEO *vp1 = vscreen[row];	/* virtual screen image */
+    struct VIDEO *vp2 = PSCREEN[row];	/* physical screen image */
 #if RAINBOW
 /*	UPDATELINE specific code for the DEC rainbow 100 micro	*/
 
@@ -1657,8 +1712,8 @@ struct VIDEO *vp2;	/* physical screen image */
 
 
 	/* set up pointers to virtual and physical lines */
-	cp1 = &vp1->v_text[0];
-	cp2 = &vp2->v_text[0];
+	cp1 = &vp1->v_text[colfrom];
+	cp2 = &vp2->v_text[colfrom];
 
 #if	COLOR
 	TTforg(vp1->v_rfcolor);
@@ -1679,14 +1734,14 @@ struct VIDEO *vp2;	/* physical screen image */
 	    || req || rev
 #endif
 			) {
-		movecursor(row, 0);	/* Go to start of line. */
+		movecursor(row, colfrom);	/* Go to start of line. */
 		/* set rev video if needed */
 		if (rev != req)
 			TTrev(req);
 
 		/* scan through the line and dump it to the screen and
 		   the virtual screen array				*/
-		cp3 = &vp1->v_text[term.t_ncol];
+		cp3 = &vp1->v_text[colto];
 #if X11
 		x_putline(row, cp1, cp3 - cp1);
 #endif
@@ -1719,7 +1774,7 @@ struct VIDEO *vp2;	/* physical screen image */
 
 	/* advance past any common chars at the left */
 	if (!rev)
-		while (cp1 != &vp1->v_text[term.t_ncol] && *cp1 == *cp2) {
+		while (cp1 != &vp1->v_text[colto] && *cp1 == *cp2) {
 			++cp1;
 			++cp2;
 		}
@@ -1731,15 +1786,15 @@ struct VIDEO *vp2;	/* physical screen image */
  * be hard operations that do a lot of update, so I don't really care.
  */
 	/* if both lines are the same, no update needs to be done */
-	if (cp1 == &vp1->v_text[term.t_ncol]) {
+	if (cp1 == &vp1->v_text[colto]) {
  		vp1->v_flag &= ~VFCHG;		/* flag this line is changed */
 		return;
 	}
 
 	/* find out if there is a match on the right */
 	nbflag = FALSE;
-	cp3 = &vp1->v_text[term.t_ncol];
-	cp4 = &vp2->v_text[term.t_ncol];
+	cp3 = &vp1->v_text[colto];
+	cp4 = &vp2->v_text[colto];
 
 	if (!rev)
 		while (cp3[-1] == cp4[-1]) {
@@ -1760,7 +1815,7 @@ struct VIDEO *vp2;	/* physical screen image */
 			cp5 = cp3;		/* fewer characters. */
 	}
 
-	movecursor(row, cp1 - &vp1->v_text[0]);	/* Go to start of line. */
+	movecursor(row, cp1 - &vp1->v_text[colfrom]);	/* Go to start of line. */
 #if	REVSTA
 	TTrev(rev);
 #endif

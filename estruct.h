@@ -10,7 +10,10 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.129  1993/07/09 14:00:38  pgf
+ * Revision 1.130  1993/07/15 10:37:58  pgf
+ * see 3.55 CHANGES
+ *
+ * Revision 1.129  1993/07/09  14:00:38  pgf
  * fix for predefined GO32 in DJ GCC
  *
  * Revision 1.128  1993/07/06  16:55:12  pgf
@@ -764,7 +767,7 @@
 /* NOTE -- COLOR doesn't currently do anything if you're using X or TERMCAP */
 /* (But I think X11 may honor colors from the command line or .Xdefaults) */
 /* (and DOS definitely does do things with COLOR, but it may not work) */
-#define	COLOR	(MSDOS|X11)	/* color commands and windows			*/
+#define	COLOR	(ANSI|MSDOS|X11)	/* color commands and windows			*/
 
 /* Feature turnon/turnoff */
 #define ANSI_SPEC	1 /* ANSI function/arrow keys */
@@ -911,10 +914,6 @@ extern char *rindex();
 
 #if 	WATCOM || GO32
 #define	movmem(a, b, c)		memcpy(b, a, c)
-#endif
-
-#if	TURBO
-#include <mem.h>
 #endif
 
 #if	MSC || ZTC

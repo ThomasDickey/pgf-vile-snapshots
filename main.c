@@ -14,7 +14,10 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.130  1993/07/09 19:12:25  pgf
+ * Revision 1.131  1993/07/15 10:37:58  pgf
+ * see 3.55 CHANGES
+ *
+ * Revision 1.130  1993/07/09  19:12:25  pgf
  * make DOS mode be on by default for MSDOS versions of vile
  *
  * Revision 1.129  1993/07/06  16:39:04  pgf
@@ -824,13 +827,17 @@ char	*argv[];
 #else
 # if MSDOS
 	signal(SIGINT,catchintr);
-#if ! GO32
+#  if ! GO32
+#   if WATCOM
 	{
 	/* clean up Warning from Watcom C */
 	void *ptrfunc = dos_crit_handler;
 	_harderr(ptrfunc);
 	}
-#endif
+#   else	/* TURBO */
+	_harderr(dos_crit_handler);
+#   endif
+#  endif
 # endif
 #endif
 

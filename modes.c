@@ -8,8 +8,11 @@
  * Major extensions for vile by Paul Fox, 1991
  *
  *	$Log: modes.c,v $
- *	Revision 1.19  1993/07/01 16:15:54  pgf
- *	tom's 3.51 changes
+ *	Revision 1.20  1993/07/15 10:37:58  pgf
+ *	see 3.55 CHANGES
+ *
+ * Revision 1.19  1993/07/01  16:15:54  pgf
+ * tom's 3.51 changes
  *
  * Revision 1.18  1993/06/28  16:58:34  pgf
  * gave adjustmode() a real return value
@@ -805,13 +808,12 @@ int	global;
 	static char cbuf[NLINE]; 	/* buffer to receive mode name into */
 
 	/* prompt the user and get an answer */
-	if ((kbd_reply(
+	if ((s = kbd_reply(
 		global	? "Global value: "
 			: "Local value: ",
 		cbuf, sizeof(cbuf)-1,
-		mode_eol, '=', KBD_NORMAL|KBD_LOWERC, mode_complete) != TRUE)
-	|| (*cbuf == EOS))
-		return FALSE;
+		mode_eol, '=', KBD_NORMAL|KBD_LOWERC, mode_complete)) != TRUE)
+		return ((s == FALSE) ? SORTOFTRUE : s);
 
 	if (!strcmp(cbuf,"all")) {
 		hst_glue(' ');
@@ -839,13 +841,16 @@ int	global;
 static int
 adjustmode(kind, global)	/* change the editor mode status */
 int kind;	/* true = set,		false = delete */
-int global; /* true = global flag,	false = current buffer flag */
+int global;	/* true = global flag,	false = current buffer flag */
 {
 	int s;
 	int autobuff = global_g_val(GMDABUFF);
+	int anything = 0;
 
-	while ((s = (do_a_mode(kind, global) == TRUE)) && (end_string() == ' '))
-		;
+	while (((s = do_a_mode(kind, global)) == TRUE) && (end_string() == ' '))
+		anything++;
+	if ((s == SORTOFTRUE) && anything) /* fix for trailing whitespace */
+		return TRUE;
 
 	/* if the settings are up, redisplay them */
 	if (bfind(MODES_LIST_NAME, NO_CREAT, BFSCRTCH))

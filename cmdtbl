@@ -72,7 +72,10 @@
 #		here for completeness.
 #
 # $Log: cmdtbl,v $
-# Revision 1.66  1993/06/30 10:05:54  pgf
+# Revision 1.67  1993/07/15 10:37:58  pgf
+# see 3.55 CHANGES
+#
+# Revision 1.66  1993/06/30  10:05:54  pgf
 # change ABS to ABSM, since osf/1 defines ABS in a system header
 #
 # Revision 1.65  1993/06/25  11:25:55  pgf
@@ -1108,6 +1111,7 @@ setmode		NONE|(EXRCOK|EXTRA)
 	"setl"
 	"set-mode"			!FEWNAMES
 setgmode	NONE
+	"se"
 	"set"
 	"setg"
 	"set-global-mode"
