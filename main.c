@@ -14,7 +14,20 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.110  1993/04/28 14:34:11  pgf
+ * Revision 1.114  1993/05/05 11:27:48  pgf
+ * reordered initial message and initial update, to make sure the update
+ * happens for X11
+ *
+ * Revision 1.113  1993/05/04  17:05:14  pgf
+ * see tom's CHANGES, 3.45
+ *
+ * Revision 1.112  1993/04/28  17:15:56  pgf
+ * got rid of LOOKTAGS mode and ifdefs
+ *
+ * Revision 1.111  1993/04/28  17:11:22  pgf
+ * got rid of NeWS ifdefs
+ *
+ * Revision 1.110  1993/04/28  14:34:11  pgf
  * see CHANGES, 3.44 (tom)
  *
  * Revision 1.109  1993/04/22  15:14:39  pgf
@@ -424,6 +437,54 @@ int _STKLOW = 0;		/* default is stack above heap (small only) */
 unsigned _stklen = 32768U;
 #endif
 
+static	void	do_num_proc P(( int *, int *, int * ));
+static	void	do_rept_arg_proc P(( int *, int *, int * ));
+
+/*--------------------------------------------------------------------------*/
+
+static	void print_usage P((void))
+{
+	static	char	*options[] = {
+	"-h             to get help on startup",
+	"-gNNN          or simply +NNN to go to line NNN",
+	"-sstring       or +/string to search for \"string\"",
+#if TAGS
+	"-ttagname      to look up a tag",
+#endif
+	"-v             to view files as read-only",
+#if CRYPT
+	"-kcryptkey     for encrypted files",
+#endif
+#if X11
+	"-name name     to change program name for X resources",
+	"-fg color      to change foreground color",
+	"-bg color      to change background color",
+	"-f fontname    to change font",
+	"-d displayname to change the default display",
+	"-r             for reverse video",
+#endif
+#if MSDOS
+	"-2             25-line mode",
+	"-4             43-line mode",
+	"-5             50-line mode",
+#endif
+	"-V             for version info",
+	"use @filename to run filename as commands",
+	" (this will suppress .vilerc)" };
+	register int	j;
+
+	(void)fprintf(stderr, "usage: %s [-flags] [@cmdfile] files...\n", prog_arg);
+	for (j = 0; j < SIZEOF(options); j++)
+		(void)fprintf(stderr, "\t%s\n", options[j]);
+	exit(BAD(1));
+}
+
+/*--------------------------------------------------------------------------*/
+#define	GetArgVal(param)	if (!*(++param))\
+					param = argv[++carg];\
+				if (param == 0)\
+					goto usage
+
 int
 main(argc, argv)
 int	argc;
@@ -448,6 +509,7 @@ char	*argv[];
 #endif
 #if	CRYPT
 	char ekey[NPAT];		/* startup encryption key */
+	*ekey = EOS;
 #endif
 
 	charinit();		/* character types -- we need these pretty
@@ -483,27 +545,22 @@ char	*argv[];
 #endif
 	/* Parse the command line */
 	for (carg = 1; carg < argc; ++carg) {
+		register char *param = argv[carg];
 #if X11
-		if (argv[carg][0] == '=') {
-                	x_set_geometry(argv[carg]);
+		if (*param == '=') {
+			x_set_geometry(param);
                         continue;
                 }
 #endif
 
 
 		/* Process Switches */
-		if (argv[carg][0] == '-') {
-			switch (argv[carg][1]) {
-#if	NeWS
-			case 'l':	/* -l for screen lines */
-			case 'L':
-				term.t_nrow = atoi(&argv[carg][2]);
-				break;
-#endif
+		if (*param == '-') {
+			switch (*(++param)) {
 #if X11
 			case 'd':
-				if (argv[carg + 1])
-					x_set_dpy(argv[++carg]);
+				if ((param = argv[++carg]) != 0)
+					x_set_dpy(param);
 				else
 					goto usage;
 				break;
@@ -512,29 +569,27 @@ char	*argv[];
 				x_set_rv();
 				break;
 			case 'f':
-			case 'F':
-				if (strcmp(&argv[carg][1], "foreground") == 0)
-					x_setforeground(argv[++carg]);
-				else if (strcmp(&argv[carg][1], "fg") == 0)
-					x_setforeground(argv[++carg]);
-				else if (argv[carg + 1])
-					x_setfont(argv[++carg]);
-				else
+				if (argv[++carg] != 0) {
+					if (strcmp(param, "foreground") == 0
+					 || strcmp(param, "fg") == 0)
+						x_setforeground(argv[carg]);
+					else
+						x_setfont(argv[carg]);
+				} else
 					goto usage;
-
 				break;
 			case 'b':
-				if (strcmp(&argv[carg][1], "background") == 0)
-					x_setbackground(argv[++carg]);
-				else if (strcmp(&argv[carg][1], "bg") == 0)
-					x_setbackground(argv[++carg]);
-				else
+				if (argv[++carg] != 0) {
+					if (strcmp(param, "background") == 0
+					 || strcmp(param, "bg") == 0)
+						x_setbackground(argv[carg]);
+				} else
 					goto usage;
-
 				break;
 			case 'n':
-				if (strcmp(&argv[carg][1], "name") == 0)
-					x_setname(argv[++carg]);
+				if (strcmp(param, "name") == 0
+				 && argv[++carg] != 0)
+					x_setname(argv[carg]);
 				else
 					goto usage;
 
@@ -547,14 +602,8 @@ char	*argv[];
 			case 'g':	/* -g for initial goto */
 			case 'G':
 				gotoflag = TRUE;
-				if (argv[carg][2]) {
-					gline = atoi(&argv[carg][2]);
-				} else {
-					if (++carg < argc)
-						gline = atoi(&argv[carg][0]);
-					else
-						goto usage;
-				}
+				GetArgVal(param);
+				gline = atoi(param);
 				break;
 			case 'h':	/* -h for initial help */
 			case 'H':
@@ -563,154 +612,98 @@ char	*argv[];
 #if	CRYPT
 			case 'k':	/* -k<key> for code key */
 			case 'K':
-				cryptflag = TRUE;
-				if (argv[carg][2]) {
-					strcpy(ekey, &argv[carg][2]);
-				} else {
-					if (++carg < argc)
-						strcpy(ekey, &argv[carg][0]);
-					else
-						goto usage;
-				}
-				set_global_b_val(MDCRYPT,TRUE);
-				crypt((char *)NULL, 0);
-				crypt(ekey, strlen(ekey));
+				GetArgVal(param);
+				(void)strcpy(ekey, param);
+				(void)memset(param, '.', strlen(param));
+				ue_crypt((char *)NULL, 0);
+				ue_crypt(ekey, (int)strlen(ekey));
 				break;
 #endif
 			case 's':  /* -s for initial search string */
 			case 'S':
 		dosearch:
 				searchflag = TRUE;
-				if (argv[carg][2]) {
-					strncpy(pat,&argv[carg][2],NPAT);
-				} else {
-					if (++carg < argc)
-						strncpy(pat,&argv[carg][0],NPAT);
-					else
-						goto usage;
-				}
+				GetArgVal(param);
+				(void)strncpy(pat, param, NPAT);
 				gregexp = regcomp(pat, global_b_val(MDMAGIC));
 				break;
 #if TAGS
 			case 't':  /* -t for initial tag lookup */
 			case 'T':
-				if (argv[carg][2]) {
-					tname = &argv[carg][2];
-				} else {
-					if (++carg < argc)
-						tname = &argv[carg][0];
-					else
-						goto usage;
-				}
+				GetArgVal(param);
+				tname = param;
 				break;
 #endif
 			case 'V':
-#ifndef DOS
 				printf("vile %s\n", version);
 				exit(GOOD);
-#endif
+
 			case 'v':	/* -v for View File */
 				set_global_b_val(MDVIEW,TRUE);
 				break;
-#if IBMPC
-#if __ZTC__
+
 			/*
 			 * Note that ibmtype is now only used to detect
 			 * whether a command line option was given, ie if
 			 * it is not equal to CDSENSE then a command line
 			 * option was given
 			 */
-			case '2':	/* 25 line mode */
-				ibmtype = CDMONO;
-				set43 = FALSE;
-  				break;
+#if IBMPC
 
-			case '4':	/* 43 line mode */
-				ibmtype = CDEGA;
-				set43 = TRUE;
-				break;
-
-			case '5':	/* 50 line mode */
-				ibmtype = CDVGA;
-				set43 = TRUE;
-				break;
+#if __ZTC__
+#define	OptScreen(type)	ibmtype = type; set43 = (type != CD_25LINE)
 #else
-			case '2':	/* 25 line mode */
-#if COLOR
-				ibmtype = CDCGA;
-#else
-				ibmtype = CDMONO;
-#endif
-				break;
-			case '4':	/* 43 line mode */
-				ibmtype = CDEGA;
-				break;
-			case '5':	/* 50 line mode */
-				ibmtype = CDVGA;
-				break;
-
+#define	OptScreen(type)	ibmtype = type
 #endif	/* __ZTC__ */
+			case '2':	/* 25 line mode */
+				OptScreen(CD_25LINE);
+				break;
+			case '4':	/* 43 line mode */
+				OptScreen(CDEGA);
+				break;
+			case '5':	/* 50 line mode */
+				OptScreen(CDVGA);
+				break;
 #endif	/* IBMPC */
 
 			case '?':
 			default:	/* unknown switch */
 			usage:
-	fprintf(stderr, "usage: %s [-flags] [@cmdfile] files...\n",argv[0]);
-	fprintf(stderr, "	-h to get help on startup\n");
-	fprintf(stderr, "	-gNNN or simply +NNN to go to line NNN\n");
-	fprintf(stderr, "	-sstring or +/string to search for \"string\"\n");
-#if TAGS
-	fprintf(stderr, "	-ttagname to look up a tag\n");
-#endif
-	fprintf(stderr, "	-v to view files as read-only\n");
-	/* fprintf(stderr, "	-e to edit (as opposed to view) files\n"); */
-#if CRYPT
-	fprintf(stderr, "	-kcryptkey for encrypted files\n");
-#endif
-#if X11
-	fprintf(stderr, "	-name name to change program name for X resources\n");
-	fprintf(stderr, "	-fg color to change foreground color\n");
-	fprintf(stderr, "	-bg color to change background color\n");
-	fprintf(stderr, "	-f fontname to change font\n");
-	fprintf(stderr, "	-d displayname to change the default display\n");
-	fprintf(stderr, "	-r for reverse video\n");
-#endif
-#if ! DOS
-	fprintf(stderr, "	-V for version info\n");
-#endif
-	fprintf(stderr, "	use @filename to run filename as commands\n");
-	fprintf(stderr, "	 (this will suppress .vilerc)\n");
-	fprintf(stderr, "	This is vile %s\n",version);
-				exit(BAD(1));
+				print_usage();
 			}
 
-		} else if (argv[carg][0]== '+') { /* alternate form of -g */
-			if (argv[carg][1] == '/')
+		} else if (*param == '+') { /* alternate form of -g */
+			if (*(++param) == '/')
 				goto dosearch;
 			gotoflag = TRUE;
-			gline = atoi(&argv[carg][1]);
-		} else if (argv[carg][0]== '@') {
-			/* Process Startup macroes */
-			if ((startstat = startup(&argv[carg][1])) == TRUE)
+			gline = atoi(param);
+		} else if (*param == '@') {
+			/* Process Startup macros */
+			if ((startstat = startup(++param)) == TRUE)
 				ranstartup = TRUE; /* don't execute .vilerc */
 		} else {
 
 			/* Process an input file */
-
+#if CRYPT
+			cryptkey = (*ekey != EOS) ? ekey : 0;
+#endif
 			/* set up a buffer for this file */
-			makename(bname, argv[carg]);
+			makename(bname, param);
 			unqname(bname,FALSE);
 
 			bp = bfind(bname, OK_CREAT, BFARGS);
-			ch_fname(bp, argv[carg]);
+			ch_fname(bp, param);
 			make_current(bp); /* pull it to the front */
 			if (!gotafile) {
 				firstbp = bp;
 				gotafile = TRUE;
 			}
-
+#if CRYPT
+			cryptkey = 0;
+#endif
 		}
 	}
+
 
 	/* we made some calls to make_current() above, to shuffle the
 		list order.  this set curbp, which isn't actually kosher */
@@ -824,7 +817,6 @@ char	*argv[];
 					startstat = TRUE;
 			}
 		}
-		/* ranstartup = TRUE; (unneeded) */
 	}
 
 
@@ -870,13 +862,10 @@ char	*argv[];
 #endif
 	}
 
-#if X11
-	update(TRUE);
-#else
-	update(FALSE);
-#endif
 	if (startstat == TRUE)  /* else there's probably an error message */
 		mlforce(msg);
+
+	update(FALSE);
 
 	/* process commands */
 	loop();
@@ -987,9 +976,6 @@ global_val_init()
 	set_global_g_val(GMDABUFF,TRUE); 	/* auto-buffer */
 	set_global_g_val(GMDALTTABPOS,FALSE); 	/* emacs-style tab positioning */
 	set_global_g_val(GMDDIRC,FALSE); 	/* directory-completion */
-#ifdef GMDTAGSLOOK
-	set_global_g_val(GMDTAGSLOOK,FALSE); 	/* tags-look */
-#endif
 #ifdef GMDHISTORY
 	set_global_g_val(GMDHISTORY,TRUE);
 #endif
@@ -1103,8 +1089,6 @@ int *cp, *fp, *np;
 	register int oldn;
 
 	c = *cp;
-	f = *fp;
-	n = *np;
 
 	if (iscntrl(c) || (c & (CTLA|CTLX|SPEC)))
 		return;

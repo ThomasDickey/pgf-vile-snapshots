@@ -6,7 +6,13 @@
  * framing, are hard.
  *
  * $Log: basic.c,v $
- * Revision 1.47  1993/04/20 12:18:32  pgf
+ * Revision 1.49  1993/04/29 19:14:28  pgf
+ * allow goto-named-mark command to be used from command line
+ *
+ * Revision 1.48  1993/04/28  17:11:22  pgf
+ * got rid of NeWS ifdefs
+ *
+ * Revision 1.47  1993/04/20  12:18:32  pgf
  * see tom's 3.43 CHANGES
  *
  * Revision 1.46  1993/04/01  12:53:33  pgf
@@ -1016,16 +1022,23 @@ int f,n;
         return TRUE;
 }
 
+/* ARGSUSED */
 int
 golinenmmark(f,n)
 int f,n;
 {
-	int status;
-	status = goexactnmmark(f,n);
-	if (status != TRUE)
-		return(status);
-	firstnonwhite(f,n);
-	return(TRUE);
+	int c;
+	register int s;
+
+	s = getnmmarkname(&c);
+	if (s != TRUE)
+		return s;
+	s = gonmmark(c);
+	if (s != TRUE)
+		return s;
+
+	return firstnonwhite(FALSE,1);
+
 }
 
 /* ARGSUSED */
@@ -1034,18 +1047,45 @@ goexactnmmark(f,n)
 int f,n;
 {
 	int c;
+	register int s;
+
+	s = getnmmarkname(&c);
+	if (s != TRUE)
+		return s;
+
+	return gonmmark(c);
+}
+
+/* get the name of the mark to use.  interactively, "last dot" is
+	represented by stuttering the goto-mark command.  from
+	the command line, it's always named ' or `.  I suppose
+	this is questionable. */
+int
+getnmmarkname(cp)
+int *cp;
+{
+	int c;
 	int this1key;
 	int useldmark;
 
-	this1key = last1key;
-	c = kbd_seq();
-	useldmark = (last1key == this1key);  /* '' or `` */
-	c = kcod2key(c);
+	if (clexec || isnamedcmd) {
+		int stat;
+		static char cbuf[2];
+	        if ((stat=mlreply("Goto mark: ", cbuf, 2)) != TRUE)
+	                return stat;
+		c = cbuf[0];
+		useldmark = (c == '\'' || c == '`');
+        } else {
+		this1key = last1key;
+		c = kbd_key();
+		useldmark = (last1key == this1key);  /* usually '' or `` */
+        }
 
 	if (useldmark)
 		c = '\'';
 
-	return gonmmark(c);
+	*cp = c;
+	return TRUE;
 }
 
 int
@@ -1165,48 +1205,6 @@ swapmark()
         return;
 }
 
-
-
-#if	NeWS
-/* SETCURSOR
- *
- * Mouse support function.  Put the cursor to the requested location.
- * The cursor will be put just after the last character of the line if 
- * requested past the line.  The coordinates are expected in the command
- * stream.
- *   In the case of multiple windows, the window indicated by the mouse
- * is located and made the current window.
- */
-setcursor()
-{
-int	row, col, pasteol ;
-register LINE	*dlp;
-WINDOW *wp0 ;		/* current window on entry */
-
-	row = tgetc(FALSE) ;
-	col = tgetc(FALSE) ;
-
-/* find the window we are pointing to */
-	wp0 = curwp ;
-	while ( row < curwp->w_toprow ||
-		row > curwp->w_ntrows + curwp->w_toprow ) {
-		nextwind(FALSE,0) ;
-		if ( curwp == wp0 ) break ;	/* full circle */
-	}
-
-/* move to the right row */
-	row -= curwp->w_toprow ;
-	dlp = curwp->w_line.l ;			/* get pointer to 1st line */
-	while ( row-- && (dlp != curbp->b_line.l) ) dlp = lforw(dlp) ;
-	curwp->w_dot.l = dlp ;			/* set dot line pointer */
-
-	/* now move the dot over until near the requested column */
-    	curgoal = col + w_val(curwp, WVAL_SIDEWAYS);
-	curwp->w_dot.o = getgoal(dlp) ;
-	curwp->w_flag |= WFMOVE;
-	return;
-}
-#endif
 
 #if X11
 void

@@ -8,9 +8,20 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: insert.c,v $
- *	Revision 1.20  1993/04/28 09:49:29  pgf
- *	fixed indentation if openup used in cmode, with a single word on the
- *	current line -- indentation was coming from the _next_ line, instead.
+ *	Revision 1.23  1993/05/05 10:31:30  pgf
+ *	cleaned up handling of SPEC keys from withing insert mode.  now, any
+ *	function bound to a SPECkey (i.e. any FN-? thing) can be executed
+ *	either from inside or outside insert mode.
+ *
+ * Revision 1.22  1993/05/03  14:22:55  pgf
+ * fixed botch of backspace limiting introduced when i created inschar()
+ *
+ * Revision 1.21  1993/04/28  17:04:09  pgf
+ * cosmetics in inschar()
+ *
+ * Revision 1.20  1993/04/28  09:49:29  pgf
+ * fixed indentation if openup used in cmode, with a single word on the
+ * current line -- indentation was coming from the _next_ line, instead.
  *
  * Revision 1.19  1993/04/20  12:18:32  pgf
  * see tom's 3.43 CHANGES
@@ -333,7 +344,7 @@ int playback;
 {
 	register int status;
 	int    c;		/* command character */
-	int startoff = DOT.o;	/* starting offset on that line */
+	int backsp_limit;
 	static TBUFF *insbuff;
 
 	if (playback && (insbuff != 0))
@@ -346,6 +357,11 @@ int playback;
 		if (b_val(curbp, MDSHOWMODE))
 			curwp->w_flag |= WFMODE;
 	}
+
+	if (b_val(curbp,MDBACKLIMIT))
+		backsp_limit = DOT.o;	/* starting offset */
+	else
+		backsp_limit = 0;	/* no limit on backspaces */
 
 	/* get the next command from the keyboard */
 	while(1) {
@@ -370,21 +386,27 @@ int playback;
 			}
 			status = TRUE;
 			goto leaveinsert;
-		} else if (c == -abortc ) {
+		} 
+#ifdef BEFORE
+			else if (c == -abortc ) {
 			/* we use the negative to suppress that
 				junk, for the benefit of SPEC keys */
 			status = TRUE;
 			goto leaveinsert;
 		}
+#endif
 
 		if (c & SPEC) {
 			CMDFUNC *cfp;
+			int oins;
 			cfp = kcod2fnc(c);
-			if (!cfp || ((cfp->c_flags & (MOTION|REDO|UNDO))
-						!= MOTION)) {
-				startoff = 0;
+			if (cfp) {
+				oins = insertmode;
+				insertmode = FALSE;
+				backsp_limit = 0;
 				curgoal = getccol(FALSE);
-				execute(cfp,FALSE,1);
+				(void)execute(cfp,FALSE,1);
+				insertmode = oins;
 			}
 			continue;
 		}
@@ -397,8 +419,9 @@ int playback;
 			status = bktoshell(FALSE,1);
 		}
 #endif
-		else
-			status = inschar(c,startoff);
+		else {
+			status = inschar(c,&backsp_limit);
+		}
 
 		if (status != TRUE) {
  leaveinsert:
@@ -427,12 +450,11 @@ int playback;
 }
 
 int
-inschar(c,startoff)
+inschar(c,backsp_limit_p)
 int c;
-int startoff;
+int *backsp_limit_p;
 {
 	int (*execfunc) P((int, int));	/* ptr to function to execute */
-	int newlineyet = FALSE; /* are we on the line we started on? */
 
 	execfunc = NULL;
 	if (c == quotec) {
@@ -445,7 +467,7 @@ int startoff;
 		 */
 		if (isspace(c) && getccol(FALSE) > wrap_at_col()) {
 			wrapword(FALSE,1);
-			newlineyet = TRUE;
+			*backsp_limit_p = 0;
 		}
 
 		if ( c == '\t') { /* tab */
@@ -458,51 +480,48 @@ int startoff;
 				trimline();
 				autoindented = -1;
 			}
+			*backsp_limit_p = 0;
 		} else if ( isbackspace(c) ||
 				c == tocntrl('D') || 
 				c == killc ||
 				c == wkillc) { /* ^U and ^W */
-			/* how far can we back up? */
-			register int backlimit;
 			/* have we backed thru a "word" yet? */
 			int saw_word = FALSE;
-			if ((c == tocntrl('D') && autoindented >=0) ||
-				newlineyet || !b_val(curbp,MDBACKLIMIT))
-				backlimit = 0;
-			else
-				backlimit = startoff;
 			execfunc = nullproc;
 			if (c == tocntrl('D')) {
-				int goal;
-				int col;
-				int sw = curswval;
+				int goal, col, sw;
+
+				sw = curswval;
+				if (autoindented >=0)
+					*backsp_limit_p = 0;
 				col = getccol(FALSE);
 				if (col > 0)
 					goal = ((col-1)/sw)*sw;
 				else
 					goal = 0;
 				while (col > goal &&
-					DOT.o > backlimit) {
+					DOT.o > *backsp_limit_p) {
 					backspace();
 					col = getccol(FALSE);
 				}
 				if (col < goal)
 					linsert(goal - col,' ');
-			} else while (DOT.o > backlimit) {
-				if (c == wkillc) {
-					if (isspace(
-						lgetc(DOT.l,DOT.o-1))) {
-						if (saw_word)
-							break;
-					} else {
-						saw_word = TRUE;
+			} else {
+				while (DOT.o > *backsp_limit_p) {
+					if (c == wkillc) {
+						if (isspace( lgetc(DOT.l,
+								DOT.o-1))) {
+							if (saw_word)
+								break;
+						} else {
+							saw_word = TRUE;
+						}
 					}
+					backspace();
+					autoindented--;
+					if (isbackspace(c) || c == tocntrl('D'))
+						break;
 				}
-				backspace();
-				autoindented--;
-				if (isbackspace(c) ||
-					c == tocntrl('D'))
-					break;
 			}
 		} else if ( c ==  tocntrl('T')) { /* ^T */
 			execfunc = shiftwidth;
@@ -562,6 +581,7 @@ int mode;
 {
 	register char *tp;	/* pointer into string to add */
 	register int status;	/* status return code */
+	int backsp_limit;
 	static char tstring[NPAT+1];	/* string to add */
 
 	/* ask for string to insert */
@@ -578,11 +598,16 @@ int mode;
 
 	insertmode = mode;
 
+	if (b_val(curbp,MDBACKLIMIT))
+		backsp_limit = DOT.o;	/* starting offset */
+	else
+		backsp_limit = 0;	/* no limit on backspaces */
+
 	/* insert it */
 	while (n--) {
 		tp = &tstring[0];
 		while (*tp) {
-			status = inschar(*tp++,0);
+			status = inschar(*tp++,&backsp_limit);
 			if (status != TRUE) {
 				insertmode = FALSE;
 				return(status);

@@ -2,7 +2,13 @@
  * 	X11 support, Dave Lemke, 11/91
  *
  * $Log: x11.c,v $
- * Revision 1.15  1993/04/01 12:53:33  pgf
+ * Revision 1.17  1993/05/05 11:18:08  pgf
+ * fixed off by one in column accounting
+ *
+ * Revision 1.16  1993/04/28  15:37:54  pgf
+ * fixed type mismatch on color routines
+ *
+ * Revision 1.15  1993/04/01  12:53:33  pgf
  * removed redundant includes and declarations
  *
  * Revision 1.14  1993/03/05  17:50:54  pgf
@@ -162,7 +168,7 @@ static void  x_open(),
             x_rev();
 
 #if COLOR
-static int  x_fcol(), x_bcol();
+static void  x_fcol(), x_bcol();
 
 #endif
 
@@ -710,7 +716,7 @@ x_open()
     signal(SIGTERM, x_quit);
 
     /* main code assumes that it can access a cell at nrow x ncol */
-    term.t_ncol = tw->cols - 1;
+    term.t_ncol = tw->cols;
     term.t_nrow = tw->rows - 1;
 }
 
@@ -2074,12 +2080,12 @@ x_cres()
 }
 
 #if COLOR
-static int
+static void
 x_fcol()
 {
 }
 
-static int
+static void
 x_bcol()
 {
 }

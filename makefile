@@ -89,7 +89,11 @@ CFLAGS1 = $(OPTFLAGS) $(CFLAGS0)
 O = o
 
 # All of the makefiles which should be preserved
-MAKFILES = makefile make.ini descrip.mms vms_link.opt
+UNIXMAK = makefile 				# on UNIX
+VMSMAK = descrip.mms vms_link.opt		# on VMS
+TURBOMAK = mktbls.mak vile.mak			# on DOS, using TURBO
+MAKFILES = $(UNIXMAK) $(VMSMAK) $(TURBOMAK)
+
 MKTBLS = ./mktbls
 
 ALLTOOLS = $(MAKFILES)
@@ -122,7 +126,7 @@ CSRC = $(CSRCac) $(CSRCde) $(CSRCfh) $(CSRCim) $(CSRCnr) \
 OTHERSRC = z100bios.asm
 
 # text and data files
-TEXTFILES = README CHANGES cmdtbl modetbl vile.hlp buglist revlist \
+TEXTFILES = README CHANGES cmdtbl modetbl vile.hlp vile.1 buglist revlist \
 	README.X11
 
 ALLSRC = $(CSRC) $(OTHERSRC)
@@ -189,7 +193,7 @@ bsd sony mach:
 	    MAKE=/usr/bin/make $(TARGET) $(ENVIR)
 
 bsd_posix ultrix:
-	$(MAKE) CFLAGS="$(CFLAGS1) -DBERK -DPOSIX -Dos_chosen" \
+	$(MAKE) CFLAGS="$(CFLAGS1) -DBERK -DPOSIX -DULTRIX -Dos_chosen" \
 		$(TARGET) $(ENVIR)
 
 sunos:
@@ -213,7 +217,8 @@ svr3:
 		$(TARGET) $(ENVIR)
 
 mips:
-	$(MAKE) CFLAGS="$(CFLAGS1) -systype sysv $(INCS) -DSVR3 -Dos_chosen" \
+	$(MAKE) CFLAGS="$(CFLAGS1) -systype sysv $(INCS) -DSVR3 -DMIPS \
+		-Dos_chosen" \
 		$(TARGET) $(ENVIR)
 
 odt:
@@ -227,7 +232,7 @@ isc:
 		$(TARGET) $(ENVIR)
 
 hpux:
-	$(MAKE) CFLAGS="$(CFLAGS1) -DUSG -DHAVE_SELECT -Dos_chosen" \
+	$(MAKE) CFLAGS="$(CFLAGS1) -DUSG -DHAVE_SELECT -DHPUX -Dos_chosen" \
 		$(TARGET) $(ENVIR)
 
 next:
@@ -521,7 +526,13 @@ random.$O:	glob.h
 vmalloc$O:	nevars.h
 
 # $Log: makefile,v $
-# Revision 1.102  1993/04/28 14:34:11  pgf
+# Revision 1.104  1993/05/05 12:28:57  pgf
+# added some -DMACHINE defines to the compile lines (needed -DULTRIX)
+#
+# Revision 1.103  1993/04/29  19:19:16  pgf
+# added Turbo-C makefiles, and vile.1 man page
+#
+# Revision 1.102  1993/04/28  14:34:11  pgf
 # see CHANGES, 3.44 (tom)
 #
 # Revision 1.101  1993/04/28  09:42:25  pgf

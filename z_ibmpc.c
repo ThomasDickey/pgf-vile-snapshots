@@ -9,7 +9,10 @@
  *  is called whenever possible.
  *  Modifications by Pete Ruczynski (pjr).
  * $Log: z_ibmpc.c,v $
- * Revision 1.3  1993/04/01 12:53:33  pgf
+ * Revision 1.4  1993/05/04 17:05:14  pgf
+ * see tom's CHANGES, 3.45
+ *
+ * Revision 1.3  1993/04/01  12:53:33  pgf
  * removed redundant includes and declarations
  *
  * Revision 1.2  1992/08/20  23:40:48  foxharp
@@ -222,9 +225,11 @@ int set43 = TRUE;		/* pjr - try and force 43/50 line mode first */
  */
 /*****************************************************************************/
 int
-zibmcres(type)
+zibmcres(res)
+char	*res;
 /*****************************************************************************/
 {
+	int	type = atoi(res);
 	union {
 		long laddr;	/* long form of address */
 		short *paddr;	/* pointer form of address */

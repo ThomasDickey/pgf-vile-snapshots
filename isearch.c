@@ -17,7 +17,13 @@
  * ever equalled FALSE.
  * 
  * $Log: isearch.c,v $
- * Revision 1.18  1993/04/01 12:53:33  pgf
+ * Revision 1.20  1993/05/04 17:05:14  pgf
+ * see tom's CHANGES, 3.45
+ *
+ * Revision 1.19  1993/04/28  17:11:22  pgf
+ * got rid of NeWS ifdefs
+ *
+ * Revision 1.18  1993/04/01  12:53:33  pgf
  * removed redundant includes and declarations
  *
  * Revision 1.17  1992/12/23  09:20:10  foxharp
@@ -73,12 +79,6 @@
 
 #if	ISRCH
 
-#ifdef USE_REEAT
-/* A couple of "own" variables for re-eat */
-int             (*saved_get_char) ();	/* Get character routine */
-int             eaten_char = -1;/* Re-eaten char */
-#endif
-
 /* A couple "own" variables for the command string */
 
 int             cmd_buff[CMDBUFLEN];	/* Save the command args here */
@@ -105,9 +105,6 @@ risearch(f, n)
 
 	backchar(TRUE, 1);	/* Back up a character */
 
-#if	NeWS
-	newsimmediateon();
-#endif
 
 	if (!(isearch(f, -n))) {/* Call ISearch backwards */
 				/* If error in search: */
@@ -120,9 +117,6 @@ risearch(f, n)
 	} else
 		mlerase();	/* If happy, just erase the cmd line */
 
-#if	NeWS
-	newsimmediateoff();
-#endif
 	return TRUE;
 }
 
@@ -140,9 +134,6 @@ fisearch(f, n)
 
 	/* do the search */
 
-#if	NeWS
-	newsimmediateon();
-#endif
 
 	if (!(isearch(f, n))) {	/* Call ISearch forwards */
 				/* If error in search: */
@@ -155,9 +146,6 @@ fisearch(f, n)
 	} else
 		mlerase();	/* If happy, just erase the cmd line */
 
-#if	NeWS
-	newsimmediateoff();
-#endif
 	return TRUE;
 }
 
@@ -532,37 +520,6 @@ get_char()
 	return (c);		/* Return the character */
 }
 
-#ifdef USE_REEAT		/* tungetc replaces this */
-/*
- * Hacky routine to re-eat a character.  This will save the character to be
- * re-eaten by redirecting the input call to a routine here.  Hack, etc.
- */
-
-/* Come here on the next term.t_getchar call: */
-
-int 
-uneat()
-{
-	int             c;
-
-	term.t_getchar = saved_get_char;	/* restore the routine
-						 * address */
-	c = eaten_char;		/* Get the re-eaten char */
-	eaten_char = -1;	/* Clear the old char */
-	return (c);		/* and return the last char */
-}
-
-int 
-reeat(c)
-	int             c;
-{
-	if (eaten_char != -1)	/* If we've already been here */
-		return /* (NULL) */ ;	/* Don't do it again */
-	eaten_char = c;		/* Else, save the char for later */
-	saved_get_char = term.t_getchar;	/* Save the char get routine */
-	term.t_getchar = uneat;	/* Replace it with ours */
-}
-#endif
 #else
 isearch()
 {

@@ -3,7 +3,10 @@
  * the knowledge about files are here.
  *
  * $Log: fileio.c,v $
- * Revision 1.42  1993/04/28 14:34:11  pgf
+ * Revision 1.43  1993/05/04 17:05:14  pgf
+ * see tom's CHANGES, 3.45
+ *
+ * Revision 1.42  1993/04/28  14:34:11  pgf
  * see CHANGES, 3.44 (tom)
  *
  * Revision 1.41  1993/04/20  12:18:32  pgf
@@ -184,7 +187,9 @@ int eofflag;		/* end-of-file flag */
 /*--------------------------------------------------------------------------*/
 
 static	void	free_fline P(( void ));
-
+#if MSDOS
+static	int	make_backup P(( char * ));
+#endif
 static	int	count_fline;	/* # of lines read with 'ffgetline()' */
 
 /*--------------------------------------------------------------------------*/
@@ -197,6 +202,29 @@ free_fline()
 		flen = 0;
 	}
 }
+
+#if MSDOS
+/*
+ * Before overwriting a file, rename any existing version as a backup
+ */
+static int
+make_backup (fname)
+char	*fname;
+{
+	struct	stat	sb;
+	if (stat(fname, &sb) >= 0) {
+		char	tname[NFILEN];
+		char	*s = pathleaf(strcpy(tname, fname)),
+			*t = strrchr(s, '.');
+		if (t == 0)
+			t = s + strlen(s);
+		(void)strcpy(t, ".bak");
+		(void)unlink(tname);
+		return (rename(fname, tname) >= 0);
+	}
+	return TRUE;
+}
+#endif
 
 /*
  * Open a file for reading.
@@ -267,6 +295,10 @@ char    *fn;
 			set_errno(EISDIR);
 			what = "directory";
 		}
+#if MSDOS	/* patch: should make this a mode */
+		if (!make_backup(fn))
+			return (FIOERR);
+#endif
 		if (*what != 'f'
 		 || (ffp = fopen(fn, mode)) == NULL) {
 			mlforce("[Cannot open %s for %sing]", what, action);
@@ -422,22 +454,9 @@ int	nbuf;
 int	do_cr;
 {
         register int    i;
-#if	CRYPT
-	char c;		/* character to translate */
-
-	if (cryptflag) {
-	        for (i = 0; i < nbuf; ++i) {
-			c = char2int(buf[i]);
-			crypt(&c, 1);
-			fputc(c, ffp);
-		}
-	} else
-	        for (i = 0; i < nbuf; ++i)
-        	        fputc(char2int(buf[i]), ffp);
-#else
-        for (i = 0; i < nbuf; ++i)
-                fputc(char2int(buf[i]), ffp);
-#endif
+	for (i = 0; i < nbuf; ++i)
+		if (ffputc(char2int(buf[i])) != FIOSUC)
+			return FIOERR;
 
 #if	ST520
         fputc('\r', ffp);
@@ -470,7 +489,7 @@ int c;
 
 #if	CRYPT
 	if (cryptflag)
-		crypt(&d, 1);
+		ue_crypt(&d, 1);
 #endif
 	fputc(d, ffp);
 
@@ -541,9 +560,9 @@ int *lenp;	/* to return the final length */
 
 	/* test for any errors that may have occurred */
         if (c == EOF) {
-                if (ferror(ffp)) {
-                        mlforce("[File read error]");
-                        return(FIOERR);
+		if (ferror(ffp)) {
+			mlforce("[File read error]");
+			return(FIOERR);
                 }
 
                 if (i != 0)
@@ -555,7 +574,7 @@ int *lenp;	/* to return the final length */
 #if	CRYPT
 	/* decrypt the line */
 	if (cryptflag)
-		crypt(fline, i);
+		ue_crypt(fline, i);
 #endif
 	count_fline++;
         return(FIOSUC);

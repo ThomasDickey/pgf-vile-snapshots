@@ -4,7 +4,13 @@
  *	written 1986 by Daniel Lawrence	
  *
  * $Log: exec.c,v $
- * Revision 1.51  1993/04/28 14:34:11  pgf
+ * Revision 1.53  1993/05/04 17:05:14  pgf
+ * see tom's CHANGES, 3.45
+ *
+ * Revision 1.52  1993/04/28  17:11:22  pgf
+ * got rid of NeWS ifdefs
+ *
+ * Revision 1.51  1993/04/28  14:34:11  pgf
  * see CHANGES, 3.44 (tom)
  *
  * Revision 1.50  1993/04/22  12:18:08  pgf
@@ -264,9 +270,6 @@ int f, n;
 	mlprompt(": ");
 
 	/* and now get the function name to execute */
-#if	NeWS
-	newsimmediateon() ;
-#endif
 	while(1) {
 		if (cmode == 0) {	/* looking for range-spec, if any */
 			status = kbd_reply(
@@ -294,9 +297,12 @@ int f, n;
 			status = kbd_engl_stat((char *)0, cspec);
 			if (status == TRUE) {
 				fnp = cspec;
-				c = end_string();
-				if (c != NAMEC && c != ' ' && !isreturn(c))
-					tungetc(c);	/* e.g., !-command */
+				c = cspec[strlen(cspec)-1];
+				if (ispunct(c)) {
+					c = end_string();
+					if (c != NAMEC && c != ' ' && !isreturn(c))
+						tungetc(c);	/* e.g., !-command */
+				}
 				break;
 			} else if (status == SORTOFTRUE) {
 				if (lspec[0] == EOS)
@@ -311,9 +317,6 @@ int f, n;
 			}
 		}
 	}
-#if	NeWS
-	newsimmediateoff() ;
-#endif
 
 	/* parse the accumulated lspec */
 	if (rangespec(lspec,&fromline,&toline,&isdfl,&zero) != TRUE) {
@@ -718,15 +721,9 @@ int f, n;	/* command arguments [passed through to command executed] */
 	char cmd[NLINE];
 
 	/* get the function name to execute */
-#if	NeWS
-	newsimmediateon() ;
-#endif
 
 	fnp = kbd_engl(": ", cmd);
 
-#if	NeWS
-	newsimmediateoff() ;
-#endif
 
 	if (fnp == NULL) {
 		mlforce("[No such function]");

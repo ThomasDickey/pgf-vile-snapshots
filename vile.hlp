@@ -475,7 +475,7 @@ Miscellaneous commands
 		the same thing.  The status output indicates whether the
 		buffer is currently using the local or global copy of the
 		tabstop value.
-	^X-x	Set encryption key. (not well tested, but hopefully not broken)
+	^X-X	Set encryption key. (not well tested, but hopefully not broken)
 		CRYPT must have been on when vile was built for this to do
 		anything.
 	K	Count prefix.  The first time you type it, it is equivalent
@@ -534,6 +534,13 @@ Editor modes
 		256 characters of inserted text.  Other file changes are
 		not counted. (B)
 
+	backspacelimit (bl)  When in insert mode, this controls whether
+		one can backspace past the point at which the insert began. (B)
+
+	bcolor	On systems supporting this, will set the background color.
+		Currently only DOS can do color, although the X11 version
+		(xvile) can be given colors at startup or via .Xdefaults.
+
 	cmode	C-code mode..  Maintains current indentation level
 		automatically during insert, like autoindent, above.  If a
 		line ends with a '{' or a ':', then the next line indents
@@ -578,6 +585,10 @@ Editor modes
 		visible on the screen.  Setting this makes editing binary
 		files unreliable.  (B)
 
+	fcolor	On systems supporting this, will set the foreground color.
+		Currently only DOS can do color, although the X11 version
+		(xvile) can be given colors at startup or via .Xdefaults.
+
 	fillcol (fc) Will prompt for a new value for the fill column, where
 		auto-wrapping and region formatting will break lines. (B)
 
@@ -612,10 +623,6 @@ Editor modes
 
 	list	(li) The buffer will be displayed with tabs and newlines made
 		visible, instead of as whitespace. (W)
-
-	looktags (lt) In commands prompting to open a file, use tags to find
-		list of possibilities.  This overrides normal file name
-		completion.  (U)
 
 	magic	Allow meta-characters in search strings.  See the section 
 		"Regular Expressions" for more detail. (B)
@@ -736,18 +743,22 @@ Key Rebinding
 	command should be bound.  In a .vilerc file, keyseq should be the
 	printable representation of the sequence, e.g. ^A-a or ^X-S.
 
-	Commands can be bound to function keys, which are either ANSI
+	Commands can be bound to function keys, which are either regular
+	ASCII characters with the eighth bit (0x80) bit set, or else ANSI
 	escape sequences of the form "ESC [ c" or "ESC O c".  Thus the ANSI
 	up-arrow key, which produces "ESC [ A" is bindable as 'FN-A' (and
 	is bound to "previous-line" by default), and the 4 ANSI function
 	keys, which produce "ESC O P" through "ESC O S" (and sometimes
-	more) are bound to 'FN-P', 'FN-Q', 'FN-R', and 'FN-S'.
+	more) are bound to 'FN-P', 'FN-Q', 'FN-R', and 'FN-S'.  If your
+	terminal can generate characters with the eighth bit set (sometimes
+	called a "meta" key), then FN-c can be bound to "meta-c".
 
-	Any "function" key is available on any terminal using the '#'
-	prefix.  Entering the sequence "# A" is equivalent to hitting
-	the ANSI up-arrow in the above paragraph, and hitting "# 3" will
-	execute whatever is bound to 'FN-3' (which is "execute-macro-3"
-	by default.
+	Any "function" key is also available on using the '#' prefix. 
+	Entering the sequence "# A" is equivalent to hitting the ANSI
+	up-arrow in the above paragraph, and hitting "# 3" will execute
+	whatever is bound to 'FN-3' (which is "execute-macro-3" by default. 
+	(The '#' key itself can be rebound -- it is represented by the
+	command name "function-prefix".)
 
 	Examples:
 	 To cause the / and ? commands to perform incremental
@@ -766,12 +777,40 @@ Key Rebinding
 	"<tab>".)  The englishname "rebind-key" is synonymous with "bind-key".
 
 	Note that even the ^A and ^X prefix characters can be rebound, using
-	the dummy functions "cntl_a-prefix" and "cntl_x-prefix".  Even
-	if they are rebound, however, the binding list and bind-key
-	commands will refer to them as ^A and ^X.
+	the dummy functions "cntl_a-prefix" and "cntl_x-prefix".
 
-	Note that when interactive, ^A is typed using the control key.  In a
-	file, however, it should be a caret (^) followed by a letter.
+	Note that when interactive, ^A and ^X are typed using the control
+	key.  In a file, however, they should be a caret (^) followed by a
+	letter.
+
+	Function key bindings are available in insert mode, as well as
+	in command mode.  (But only via the "meta bit" or ANSI ESC sequence
+	form -- the '#' prefix will not work in insert mode.)
+
+Special "Terminal" Key Rebinding
+--------------------------------
+
+	In addition to the above binding mechanism for vile commands, other
+	keystrokes to the editor are rebindable using the "set-terminal"
+	command.  These keystrokes are mostly derived directly from the
+	user's tty settings on entering the editor, but there are a couple
+	of additions related to command and filename completion.
+
+	The values of these characters can be shown with the "show-terminal"
+	command, and can be changed with the "set-terminal" command.
+
+				Default value		Typical value
+	-------------------------------------------------------------
+	backspace		from tty settings	(DEL or ^H)
+	interrupt		from tty settings	(^C or DEL)
+	line-kill		from tty settings	(^U or @)
+	name-complete		<tab>
+	quote-next		from tty settings	(^V)
+	start-output		from tty settings	(^Q)
+	stop-output		from tty settings	(^S)
+	suspend			from tty settings	(^Z)
+	test-completions	?
+	word-kill		from tty settings	(^W)
 
 Macros
 ------
@@ -1361,14 +1400,14 @@ Credits
 	within comments in the micro-Emacs source code are: Dave
 	Conroy, Daniel Lawrence, John Gamble, Roger Ove, Dana Hoggatt,
 	Jon Reid, Steve Wilhite, George Jones, Adam Fritz, D.R.Banks,
-	Bob McNamara.  In addition, some of the "ex" code is by Steve
-	Kirkendall, author of the vi clone called "elvis".  The regular
-	expression code and documentation is by Henry Spencer.  The sample
-	.vilerc was created by Dave Lemke; he also contributed code for
-	new features and bug fixes.  Eric Krohn has done some excellent
-	testing and enhancement.  Tom Dickey has contributed a whole bunch
-	of changes and cleanup.  The initial changes to create vile from
-	micro-Emacs were all done by Paul Fox, who can be reached at
-	pgf@cayman.com.  (By the way, this is not the same Paul Fox that
-	did the Crisp editor.)
+	Bob McNamara.  Tom Dickey has contributed many code improvements
+	and features, and has stabilized vile on both VMS and DOS.  Some of
+	the "ex" code is by Steve Kirkendall, author of the vi clone called
+	"elvis".  The regular expression code and documentation is by Henry
+	Spencer.  The sample .vilerc was created by Dave Lemke; he also
+	contributed code for new features (native X support) and bug fixes. 
+	Eric Krohn has done some excellent testing and enhancement.  The
+	initial changes to create vile from micro-Emacs were all done by
+	Paul Fox, who can be reached at pgf@cayman.com.  (By the way, this
+	is not the same Paul Fox that did the Crisp editor.)
 

@@ -6,7 +6,13 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.82  1993/04/28 14:34:11  pgf
+ * Revision 1.84  1993/05/04 17:05:14  pgf
+ * see tom's CHANGES, 3.45
+ *
+ * Revision 1.83  1993/04/28  17:11:22  pgf
+ * got rid of NeWS ifdefs
+ *
+ * Revision 1.82  1993/04/28  14:34:11  pgf
  * see CHANGES, 3.44 (tom)
  *
  * Revision 1.81  1993/04/21  14:36:10  pgf
@@ -312,6 +318,27 @@ static	void	guess_dosmode P(( BUFFER * ));
 static	int	writereg P(( REGION *, char *, int, int, BUFFER * ));
 
 /*--------------------------------------------------------------------------*/
+
+#if UNIX
+static	void	CleanAfterPipe P((int));
+
+#define	CleanToPipe()	if (fileispipe) ttclean(TRUE)
+
+static void
+CleanAfterPipe (Wrote)
+int	Wrote;
+{
+	if (fileispipe == TRUE) {
+		ttunclean();	/* may clear the screen as a side-effect */
+	        TTflush();
+		if (Wrote) pressreturn();
+	        sgarbf = TRUE;
+	}
+}
+#else
+#define	CleanToPipe()		TTkclose()
+#define	CleanAfterPipe(f)	TTkopen()
+#endif
 
 int
 no_such_file(fname)
@@ -658,8 +685,7 @@ int	mflg;		/* print messages? */
 		return ABORT;
 #endif
 #if	CRYPT
-	s = resetkey(bp);
-	if (s != TRUE)
+	if ((s = resetkey(bp, fname)) != TRUE)
 		return s;
 #endif
         if ((s=bclear(bp)) != TRUE)             /* Might be old.        */
@@ -755,9 +781,6 @@ int	mflg;		/* print messages? */
 	if (s == FIOERR) {	/* False if error.      */
                 return FALSE;
 	}
-#if     NeWS
-        newsreportmodes() ;
-#endif
         return TRUE;
 }
 
@@ -772,7 +795,6 @@ int *nlinep;
         int nlines;
         int incomplete = FALSE;
 	long len;
-	long ffsize();
 
 	if ((len = ffsize()) < 0)
 		return FIOERR;
@@ -797,6 +819,17 @@ int *nlinep;
 		bp->b_ltext = NULL;
 		return FIOERR;
 	}
+
+#if CRYPT
+	if (b_val(bp, MDCRYPT)
+	 && bp->b_key[0]) {	/* decrypt the file */
+	 	char	temp[NPAT];
+		(void)strcpy(temp, bp->b_key);
+		ue_crypt((char *)NULL, 0);
+		ue_crypt(temp, (int)strlen(temp));
+		ue_crypt((char *)&bp->b_ltext[1], len);
+	}
+#endif
 
 	/* loop through the buffer, replacing all newlines with the
 		length of the _following_ line */
@@ -1259,8 +1292,7 @@ BUFFER	*bp;
 	}
 
 #if	CRYPT
-	s = resetkey(curbp);
-	if (s != TRUE)
+	if ((s = resetkey(curbp, fn)) != TRUE)
 		return s;
 #endif
         if (is_internalname(fn)) {
@@ -1275,12 +1307,7 @@ BUFFER	*bp;
 	if (msgf == TRUE)
 		mlwrite("[Writing...]");
 
-#if UNIX & ! NeWS
-	if (fileispipe)
-		ttclean(TRUE);
-#else
-	TTkclose();
-#endif
+	CleanToPipe();
 
         lp = rp->r_orig.l;
         nline = 0;                              /* Number of lines     */
@@ -1364,16 +1391,9 @@ BUFFER	*bp;
 	}
 	if (whole_file)
 		bp->b_linecount = nline;
-#if UNIX & ! NeWS
-	if (fileispipe == TRUE) {
-		ttunclean();
-	        TTflush();
-		pressreturn();
-		sgarbf = TRUE;
-	}
-#else
-	TTkopen();
-#endif
+
+	CleanAfterPipe(TRUE);
+
         if (s != FIOSUC)                        /* Some sort of error.  */
                 return FALSE;
 
@@ -1406,8 +1426,7 @@ int	msgf;
 	}
 
 #if	CRYPT
-	s = resetkey(curbp);
-	if (s != TRUE)
+	if ((s = resetkey(curbp, fn)) != TRUE)
 		return s;
 #endif
 	/* turn off ALL keyboard translation in case we get a dos error */
@@ -1517,17 +1536,13 @@ FILE	*haveffp;
 	                goto out;
 	        if (s == FIOFNF)		/* File not found.      */
 			return no_such_file(fname);
-	        mlwrite("[Inserting...]");
-#if UNIX
-		if (fileispipe)
-			ttclean(TRUE);
-#endif
-
 #if	CRYPT
-		s = resetkey(curbp);
-		if (s != TRUE)
+		if ((s = resetkey(curbp, fname)) != TRUE)
 			return s;
 #endif
+	        mlwrite("[Inserting...]");
+		CleanToPipe();
+
 	} else { /* we already have the file pointer */
 		ffp = haveffp;
 	}
@@ -1567,13 +1582,7 @@ FILE	*haveffp;
 		++nline;
 	}
 	if (!haveffp) {
-#if UNIX
-		if (fileispipe == TRUE) {
-			ttunclean();
-			TTflush();
-			sgarbf = TRUE;
-		}
-#endif
+		CleanAfterPipe(FALSE);
 		(void)ffclose();		/* Ignore errors.	*/
 		readlinesmsg(nline,s,fname,FALSE);
 	}
@@ -1610,18 +1619,14 @@ char    *fname;
                 goto out;
         if (s == FIOFNF)			/* File not found.      */
 		return no_such_file(fname);
-        mlwrite("[Reading...]");
-
-#if UNIX
-	if (fileispipe)
-		ttclean(TRUE);
-#endif
 
         nline = 0;
 #if	CRYPT
-	s = resetkey(curbp);
-	if (s == TRUE)
+	if ((s = resetkey(curbp, fname)) == TRUE)
 #endif
+	{
+        	mlwrite("[Reading...]");
+		CleanToPipe();
 		while ((s=ffgetline(&nbytes)) == FIOSUC) {
 			for (i=0; i<nbytes; ++i)
 				if (!kinsert(fline[i]))
@@ -1630,13 +1635,8 @@ char    *fname;
 				return FIOMEM;
 			++nline;
 		}
-#if UNIX
-	if (fileispipe == TRUE) {
-		ttunclean();
-	        TTflush();
-	        sgarbf = TRUE;
+		CleanAfterPipe(FALSE);
 	}
-#endif
 	kdone();
         (void)ffclose();                        /* Ignore errors.       */
 	readlinesmsg(nline,s,fname,FALSE);
@@ -1746,8 +1746,9 @@ BUFFER *bp;
 
 #if	CRYPT
 int
-resetkey(bp)	/* reset the encryption key if needed */
-BUFFER *bp;
+resetkey(bp, fname)	/* reset the encryption key if needed */
+BUFFER	*bp;
+char	*fname;
 {
 	register int s;	/* return status */
 
@@ -1756,10 +1757,24 @@ BUFFER *bp;
 
 	/* if we are in crypt mode */
 	if (b_val(bp, MDCRYPT)) {
-		if (bp->b_key[0] == EOS) {
-			s = setkey(FALSE, 0);
+		char	temp[NFILEN];
+
+		/* don't automatically inherit key from other buffers */
+		if (bp->b_key[0] != EOS
+		 && strcmp(lengthen_path(strcpy(temp, fname)), bp->b_fname)) {
+			char	prompt[80];
+			(void)lsprintf(prompt,
+				"Use crypt-key from %s", bp->b_bname);
+			s = mlyesno(prompt);
 			if (s != TRUE)
-				return s;
+				return (s == FALSE);
+		}
+
+		/* make a key if we don't have one */
+		if (bp->b_key[0] == EOS) {
+			s = ue_makekey(bp->b_key, sizeof(bp->b_key));
+			if (s != TRUE)
+				return (s == FALSE);
 		}
 
 		/* let others know... */
@@ -1767,12 +1782,12 @@ BUFFER *bp;
 
 		/* and set up the key to be used! */
 		/* de-encrypt it */
-		crypt((char *)NULL, 0);
-		crypt(bp->b_key, strlen(bp->b_key));
+		ue_crypt((char *)NULL, 0);
+		ue_crypt(bp->b_key, (int)strlen(bp->b_key));
 
 		/* re-encrypt it...seeding it to start */
-		crypt((char *)NULL, 0);
-		crypt(bp->b_key, strlen(bp->b_key));
+		ue_crypt((char *)NULL, 0);
+		ue_crypt(bp->b_key, (int)strlen(bp->b_key));
 	}
 
 	return TRUE;

@@ -4,7 +4,10 @@
  *	Written (except for delins()) for vile by Paul Fox, (c)1990
  *
  * $Log: oneliner.c,v $
- * Revision 1.40  1993/04/28 14:34:11  pgf
+ * Revision 1.41  1993/05/04 17:05:14  pgf
+ * see tom's CHANGES, 3.45
+ *
+ * Revision 1.40  1993/04/28  14:34:11  pgf
  * see CHANGES, 3.44 (tom)
  *
  * Revision 1.39  1993/04/01  12:53:33  pgf
@@ -280,20 +283,7 @@ int needpats, use_opts;
 		return (s);
 
 	if (calledbefore == FALSE && needpats) {
-		c = '\n';
-		if (isnamedcmd) {
-			c = tpeekc();
-			if (c < 0) {
-				c = '\n';
-			} else {
-				if (ispunct(c)) {
-					(void)kbd_key();
-				}
-			}
-		} else {
-			/* if it's a screen region, assume they want .../g */
-			globally = TRUE;
-		}
+		c = kbd_delimiter();
 		if ((s = readpattern("substitute pattern: ", &pat[0],
 					&gregexp, c, FALSE)) != TRUE) {
 			if (s != ABORT)

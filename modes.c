@@ -8,8 +8,11 @@
  * Major extensions for vile by Paul Fox, 1991
  *
  *	$Log: modes.c,v $
- *	Revision 1.15  1993/04/21 14:37:52  pgf
- *	special cases for validating glob strings
+ *	Revision 1.16  1993/04/28 17:11:22  pgf
+ *	got rid of NeWS ifdefs
+ *
+ * Revision 1.15  1993/04/21  14:37:52  pgf
+ * special cases for validating glob strings
  *
  * Revision 1.14  1993/04/20  12:18:32  pgf
  * see tom's 3.43 CHANGES
@@ -82,13 +85,8 @@ static	int	do_a_mode P(( int, int ));
 static	int	adjustmode P(( int, int ));
 
 static	char	*cname[] = {	/* names of colors */
-#if	NeWS
-	"white", "red",     "green", "yellow",
-	"blue",  "magenta", "cyan",  "black"
-#else
 	"black", "red",     "green", "yellow",
 	"blue",  "magenta", "cyan",  "white"
-#endif
 	};
 
 static	int	found_mode;	/* flag to suppress redundant error-message */

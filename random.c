@@ -3,7 +3,10 @@
  * commands. There is no functional grouping here, for sure.
  *
  * $Log: random.c,v $
- * Revision 1.92  1993/04/28 14:34:11  pgf
+ * Revision 1.93  1993/05/04 17:05:14  pgf
+ * see tom's CHANGES, 3.45
+ *
+ * Revision 1.92  1993/04/28  14:34:11  pgf
  * see CHANGES, 3.44 (tom)
  *
  * Revision 1.91  1993/04/20  12:18:32  pgf
@@ -436,15 +439,15 @@ showcpos(f, n)
 int f,n;
 {
 	register LINE	*lp;		/* current line */
-	register long	numchars = 0;	/* # of chars in file */
-	register int	numlines = 0;	/* # of lines in file */
-	register long	predchars = 0;	/* # chars preceding point */
-	register int	predlines = 0;	/* # lines preceding point */
+	register B_COUNT numchars = 0;	/* # of chars in file */
+	register L_NUM	 numlines = 0;	/* # of lines in file */
+	register B_COUNT predchars = 0;	/* # chars preceding point */
+	register L_NUM	 predlines = 0;	/* # lines preceding point */
 	register int	curchar = '\n';	/* character under cursor */
-	int ratio;
-	int col;
-	int savepos;			/* temp save for current offset */
-	int ecol;			/* column pos/end of current line */
+	long ratio;
+	C_NUM col;
+	C_NUM savepos;			/* temp save for current offset */
+	C_NUM ecol;			/* column pos/end of current line */
 
 	/* starting at the beginning of the buffer */
 	lp = lforw(curbp->b_line.l);
@@ -485,7 +488,7 @@ int f,n;
 
 	/* summarize and report the info */
 	mlforce(
-"Line %d of %d, Col %d of %d, Char %D of %D (%d%%) char is 0x%x",
+"Line %d of %d, Col %d of %d, Char %D of %D (%D%%) char is 0x%x",
 		predlines+1, numlines, col+1, ecol,
 		predchars+1, numchars, ratio, curchar);
 	return TRUE;

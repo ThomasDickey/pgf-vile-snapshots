@@ -7,7 +7,10 @@
  * display type.
  *
  * $Log: ibmpc.c,v $
- * Revision 1.13  1993/04/28 14:34:11  pgf
+ * Revision 1.14  1993/05/04 17:05:14  pgf
+ * see tom's CHANGES, 3.45
+ *
+ * Revision 1.13  1993/04/28  14:34:11  pgf
  * see CHANGES, 3.44 (tom)
  *
  * Revision 1.12  1993/04/20  12:18:32  pgf
@@ -89,7 +92,7 @@ extern  void	ibmeeop   P((void));
 extern  void	ibmbeep   P((void));
 extern  void    ibmopen   P((void));
 extern	void	ibmrev    P((int));
-extern	int	ibmcres   P((int));
+extern	int	ibmcres   P((char *));
 extern	void	ibmclose  P((void));
 extern	void	ibmputc   P((int));
 extern	void	ibmkopen  P((void));
@@ -244,12 +247,37 @@ int state;	/* TRUE = reverse, FALSE = normal */
 
 int
 ibmcres(res)	/* change screen resolution */
-int res;	/* resolution to change to */
+char *res;	/* resolution to change to */
 {
-	int i;		/* index */
+	char	*dst;
+	register int i;		/* index */
+
+	/* find the default configuration */
+	if (!strcmp(res, "?")) {
+		scinit(CDSENSE);
+		return(TRUE);
+	}
+
+	/* specify a number */
+	if ((i = (int)strtol(res, &dst, 0)) >= 0
+	 && !*dst) {
+		switch (i) {
+		case 25:
+		case 2:
+			res = drvname[CD_25LINE];
+			break;
+		case 43:
+		case 4:	/* 43 line mode */
+			res = drvname[CDEGA];
+			break;
+		case 50:
+		case 5:	/* 50 line mode */
+			res = drvname[CDVGA];
+		}
+	}
 
 	for (i = 0; i < NDRIVE; i++)
-		if (strcmp(drvname[res], drvname[i]) == 0) {
+		if (strcmp(res, drvname[i]) == 0) {
 			scinit(i);
 			return(TRUE);
 		}
@@ -312,7 +340,8 @@ int type;	/* type of adapter to init for */
 		long laddr;	/* long form of address */
 		unsigned short *paddr;	/* pointer form of address */
 	} addr;
-	int i;
+	register int i;
+	int	rows;
 
 	/* if asked...find out what display is connected */
 	if (type == CDSENSE)
@@ -338,26 +367,27 @@ int type;	/* type of adapter to init for */
 	switch (type) {
 		case CDMONO:	/* Monochrome adapter */
 				scadd = SCADM;
-				newscreensize(25, term.t_ncol);
+				rows = 25;
 				break;
 
 		case CDCGA:	/* Color graphics adapter */
 				scadd = SCADC;
-				newscreensize(25, term.t_ncol);
+				rows = 25;
 				break;
 
 		case CDEGA:	/* Enhanced graphics adapter */
 				scadd = SCADE;
 				egaopen();
-				newscreensize(43, term.t_ncol);
+				rows = 43;
 				break;
 
 		case CDVGA:	/* VGA adapter */
 				scadd = SCADE;
 				vgaopen();
-				newscreensize(50, term.t_ncol);
+				rows = 50;
 				break;
 	}
+	newscreensize(rows, term.t_ncol);
 
 	/* reset the $sres environment variable */
 	strcpy(sres, drvname[type]);
@@ -470,17 +500,17 @@ egaopen()	/* init the computer to work with the EGA */
 {
 	/* put the beast into EGA 43 row mode */
 	rg.x.ax = 3;
-	int86(16, &rg, &rg);
+	int86(0x10, &rg, &rg);
 
 	rg.h.ah = 17;		/* set char. generator function code */
 	rg.h.al = 18;		/*  to 8 by 8 double dot ROM         */
 	rg.h.bl = 0;		/* block 0                           */
-	int86(16, &rg, &rg);
+	int86(0x10, &rg, &rg);
 
 	rg.h.ah = 18;		/* alternate select function code    */
 	rg.h.al = 0;		/* clear AL for no good reason       */
 	rg.h.bl = 32;		/* alt. print screen routine         */
-	int86(16, &rg, &rg);
+	int86(0x10, &rg, &rg);
 
 	rg.h.ah = 1;		/* set cursor size function code */
 	rg.x.cx = 0x0607;	/* turn cursor on code */
@@ -495,7 +525,7 @@ egaclose()
 {
 	/* put the beast into 80 column mode */
 	rg.x.ax = 3;
-	int86(16, &rg, &rg);
+	int86(0x10, &rg, &rg);
 }
 
 static void
@@ -504,14 +534,14 @@ vgaopen()	/* init the computer to work with the VGA */
 	/* put the beast into VGA 50 row mode */
 	rg.x.ax = 0x1202;
 	rg.h.bl = 30;
-	int86(16, &rg, &rg);
+	int86(0x10, &rg, &rg);
 
 	rg.x.ax = 3;
-	int86(16, &rg, &rg);
+	int86(0x10, &rg, &rg);
 
 	rg.x.ax = 0x1112;	/*  to 8 by 8 double dot ROM         */
 	rg.h.bl = 0;		/* block 0                           */
-	int86(16, &rg, &rg);
+	int86(0x10, &rg, &rg);
 }
 
 static void
@@ -519,7 +549,7 @@ vgaclose()
 {
 	/* put the beast back into normal 80 column mode */
 	rg.x.ax = 3;
-	int86(16, &rg, &rg);
+	int86(0x10, &rg, &rg);
 }
 
 void

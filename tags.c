@@ -5,7 +5,13 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: tags.c,v $
- * Revision 1.32  1993/04/20 12:18:32  pgf
+ * Revision 1.34  1993/05/04 17:05:14  pgf
+ * see tom's CHANGES, 3.45
+ *
+ * Revision 1.33  1993/04/28  17:15:56  pgf
+ * got rid of LOOKTAGS mode and ifdefs
+ *
+ * Revision 1.32  1993/04/20  12:18:32  pgf
  * see tom's 3.43 CHANGES
  *
  * Revision 1.31  1993/04/01  09:46:37  pgf
@@ -204,12 +210,11 @@ int taglen;
 			break;
 
 	i = 0;
-	if (b_val(curbp,MDTAGSRELTIV) && *tfp != '/') {
-		char *lastsl;
-		if ((lastsl = strrchr(tagbp->b_fname,'/')) != NULL) {
-			i = lastsl - tagbp->b_fname + 1;
-			(void)strncpy(tfname, tagbp->b_fname, i);
-		}
+	if (b_val(curbp,MDTAGSRELTIV) && !slashc(*tfp)) {
+		register char *first = tagbp->b_fname;
+		char *lastsl = pathleaf(tagbp->b_fname);
+		while (lastsl != first)
+			tfname[i++] = *first++;
 	}
 	while (i < NFILEN && tfp < lplim && *tfp != '\t') {
 		tfname[i++] = *tfp++;
@@ -477,57 +482,6 @@ tossuntag()
 		free((char *)utp);
 	}
 }
-
-#ifdef GMDTAGSLOOK
-
-/* create a filelist from the contents of the tags file. */
-/* patch: when does the buffer get reset? */
-/* patch: only scans the first file in the tags path. */
-
-BUFFER *
-look_tags(sequence)
-int	sequence;
-{
-	register LINE *tlp;
-	register char *fnp;
-	register int i, n;
-	BUFFER *filesbp;
-	BUFFER *tagbp;
-
-	if (!global_g_val(GMDTAGSLOOK))
-		return 0;
-
-	if ((tagbp = gettagsfile(0,&i)) == NULL)
-		return 0;
-
-	/* create/lookup the file list buffer   */
-	if ((filesbp = bs_init(ScratchName(files), (sequence == 0))) != NULL
-	 && !filesbp->b_active) {
-
-		filesbp->b_active = TRUE;
-
-		/* loop through the tags file */
-		for_each_line(tlp, tagbp) {
-
-			/* skip the tagname */
-			i = 0;
-			while (i < llength(tlp) && lgetc(tlp,i) != '\t')
-				i++;
-			n = i++;	/* skip the tab */
-			fnp = tlp->l_text + i;
-			while (i < llength(tlp) && lgetc(tlp,i) != '\t')
-				i++;
-
-			/* patch: should test for tab-found */
-
-			/* insert into the file list */
-			if (bs_find(fnp, i-1-n, filesbp, TRUE, (LINE **)0) == NULL)
-				break;
-		}
-	}
-	return filesbp;
-}
-#endif
 
 #else
 void taghello() { }

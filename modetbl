@@ -12,7 +12,10 @@
 # The modes are table entries in the BUFFER and WINDOW structures.
 #
 # $Log: modetbl,v $
-# Revision 1.9  1993/04/21 14:36:56  pgf
+# Revision 1.10  1993/04/28 17:15:56  pgf
+# got rid of LOOKTAGS mode and ifdefs
+#
+# Revision 1.9  1993/04/21  14:36:56  pgf
 # added VAL_GLOB
 #
 # Revision 1.8  1993/04/20  12:18:32  pgf
@@ -51,7 +54,6 @@ bool						# GMD prefix
 	"Alt-TabPos"	ALTTABPOS	0	# emacs-style cursor positioning
 	"HIstory"	HISTORY		0	# command-history
 	"ImplyBuffer"	IMPLYBUFF 	0	# imply-buffer (vi-like)
-#?	"LookTags"	TAGSLOOK	0	# use tags to find files
 	"SameBangs"	SAMEBANGS	0	# use same "!!" data for ^X-!
 regex						# VAL_ prefix
 	"C-SUFfixes"	CSUFFIXES	0
