@@ -466,3 +466,11 @@ I have a couple of bug reports and suggestions for you, concerning vile
 	is repeated.
 
 
+----------------------------------
+
+xile:
+With Xwindows, when you hit the title bar twice to make the window expand,
+it becoms enourmous.  This can be seen when using openwindows.
+
+[i may have fixed this -- don't know, don't have openwindows to test on...
+	-pgf ]

@@ -2,7 +2,11 @@
  *		for MicroEMACS
  *
  * $Log: tcap.c,v $
- * Revision 1.21  1993/06/18 15:57:06  pgf
+ * Revision 1.22  1993/07/08 15:03:52  pgf
+ * reduce max rows from 200 to 100.  it would take an _awfully_ big screen
+ * to have 200 readable lines of text.
+ *
+ * Revision 1.21  1993/06/18  15:57:06  pgf
  * tom's 3.49 changes
  *
  * Revision 1.20  1993/06/02  14:28:47  pgf
@@ -177,8 +181,8 @@ tcapopen()
 	}
 
 #ifdef SIGWINCH
-	term.t_mrow =  200;
 	term.t_mcol = 200;
+	term.t_mrow = 100;
 #else
 	term.t_mrow =  term.t_nrow;
 	term.t_mcol =  term.t_ncol;

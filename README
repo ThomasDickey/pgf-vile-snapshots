@@ -2,6 +2,93 @@
 README for vile
 ----------------
 
+(more recent additions to this README appear down below)
+
+
+2/92
+
+VILE -- VI Like Emacs: a vi workalike put together from Micro-Emacs by Paul Fox
+-------------------------------------------------------------------------------
+
+	This editor grew out of a frustration that although lots of
+	eager programmers have tackled rewrites of Emacs, with new and
+	better features (not to mention free source), I've not seen
+	anything similar done with the Second True Editor.  (The
+	First, of course, being /bin/ed)
+
+	So I took a copy of MicroEmacs 3.9 (which I've since
+	discovered was out of date, unfortunately) and turned it
+	into a vi "feel-alike".  It retains the multiple
+	buffer/multiple window features of uemacs, but the
+	"finger-feel", if you will, is very much that of vi.  It is
+	definitely not a clone, in that some substantial stuff is
+	missing, and the screen doesn't look quite the same.  But what
+	matters most is that one's "muscle memory" does the right thing
+	to the text in front of you, and that is what vile tries to do
+	for vi users.   THIS IS NOT A "CLONE"!  But it feels good.
+	(Put another way, the things that you tend to type over and
+	over probably work -- things done less frequently, like configuring
+	a .exrc file, are quite different.)
+
+	This is the second really public release of vile.  Users of
+	previous versions will hopefully find many new features -- see the
+	CHANGES file for details.
+
+	The collective developers of Micro-Emacs should be
+	complimented that the changes were as easy as they were.  The
+	code was pretty clean and well designed before I started on
+	it.  I'm not sure that the same can be said anymore... 
+
+	The major benefits over standard vi include:
+		- multiple files open at once
+		- multiple windows on the screen
+		- a larger set of operator commands
+		- the possibility of porting to your favorite micro.
+		- "next error" cursor positioning after compilation
+	      [	- infinite undo  - 7/93 ]
+	Of course, it _may_ lack some of vi's reliability. :-)
+
+	Take a look at vile.hlp for more information about features
+	and differences. 
+
+	In general, I suspect that the quality of the code is roughly
+	on a par with MicroEmacs.  I've been using vile regularly under
+	both SunOS and 386 UNIX for almost two years, with no major problems
+	(that haven't been fixed).  Version three was built and used by
+	many others on the net, and their feedback was invaluable.
+	I think all of the reported bugs have been fixed, and hopefully
+	not too many new ones introduced.
+
+	I have not run this much on a small system, and not much at all on
+	DOS.  Pete Rusczinski has done an excellent job of porting
+	version three to DOS -- his changes are now incorporated here (as
+	of version 3.20), but since in general the DOS version has been
+	less well exercised than the UNIX version, it probably harbors
+	more bugs.
+
+	Hope you enjoy -- 
+
+	Paul G. Fox	June, 1991, and February, 1992
+	pgf@cayman.com
+
+p.s. By the way, I'm _not_ the same Paul Fox who wrote Crisp, the Brief
+	work-alike.
+
+
+9/92:
+
+I don't have much to add to the original README -- vile has gotten a lot
+better since I first released it, thanks to a lot of users and a lot of
+bug reports.  It compiles and runs without modification on most major UNIXes,
+and under DOS.  It offers vi finger feel, and most (not all) of its features.
+I hope it fills someone's need out there.  -pgf 9/92
+
+(Special thanks to Dave Lemke and Pete Rucszinski, for X and DOS support,
+and (in no particular order) to Eric Krohn, Willem Kasdorp, J.C.Webber,
+Warren Vik, Julia Harper, Chris Sherman, Thomas Woo, Yanek Martinson, Miura
+Masahiro, Tom Dickey for lots of bug reports and suggestions and patience.)
+
+------------------------------
 4/93:
 
 Well, here's the second net posting of vile.  The first was a long time
@@ -39,93 +126,27 @@ The latest version of vile is usually available for ftp at "ftp.cayman.com",
 in the pub/vile directory.  Sometimes there's a compiled DOS binary there
 too.  I don't maintain a mailing list, or anything like that to inform folks
 of new releases -- you just sort of have to check once in a while, or send
-me mail...
+me mail...  [ I've set up a mailing list -- contact me to be added -pgf 7/93]
 
 paul
 
 ------------------------------
 
-9/92:
+7/93:
 
-I don't have much to add to the original README -- vile has gotten a lot
-better since I first released it, thanks to a lot of users and a lot of
-bug reports.  It compiles and runs without modification on most major UNIXes,
-and under DOS.  It offers vi finger feel, and most (not all) of its features.
-I hope it fills someone's need out there.  -pgf 9/92
+More new features:  infinite undo, modification time checking, and, at
+long last, primitive support for the :map command.  I've also received
+patches that let vile compile for DOS with the DJ GCC compiler.
+Have I mentioned filename completion?  Tom Dickey provided that and
+variable/modename/command completion too.
 
-(Special thanks to Dave Lemke and Pete Rucszinski, for X and DOS support,
-and (in no particular order) to Eric Krohn, Willem Kasdorp, J.C.Webber,
-Warren Vik, Julia Harper, Chris Sherman, Thomas Woo, Yanek Martinson, Miura
-Masahiro, Tom Dickey for lots of bug reports and suggestions and patience.)
+If you would like to be informed, via email, of new vile releases (bearing
+in mind that the newest release may be _more_ likely to be buggy, rather
+than _less_), please send me mail, and I will add you to my list.  The email
+will probably contain a capsule summary of the most recent changes to the
+code.
 
-------------------------------
+Thanks to Tuan Dang for the Watcom and DJ GCC work.
 
+pgf
 
-
-VILE -- VI Like Emacs: a vi workalike put together from Micro-Emacs by Paul Fox
--------------------------------------------------------------------------------
-
-	This editor grew out of a frustration that although lots of
-	eager programmers have tackled rewrites of Emacs, with new and
-	better features (not to mention free source), I've not seen
-	anything similar done with the Second True Editor.  (The
-	First, of course, being /bin/ed)
-
-	So I took a copy of MicroEmacs 3.9 (which I've since
-	discovered was out of date, unfortunately) and turned it
-	into a vi "feel-alike".  It retains the multiple
-	buffer/multiple window features of uemacs, but the
-	"finger-feel", if you will, is very much that of vi.  It is
-	definitely not a clone, in that some substantial stuff is
-	missing, and the screen doesn't look quite the same.  But what
-	matters most is that one's "muscle memory" does the right thing
-	to the text in front of you, and that is what vile tries to do
-	for vi users.   THIS IS NOT A "CLONE"!  But it feels good.
-	(Put another way, the things that you tend to type over and
-	over probably work -- things done less frequently, like configuring
-	a .exrc file, are quite different.)
-
-	This is the second really public release of vile.  Users of
-	previous versions will hopefully find many new features -- see the
-	CHANGES file for details.
-
-	The collective developers of Micro-Emacs should be
-	complimented that the changes were as easy as they were.  The
-	code was pretty clean and well designed before I started on
-	it.  I'm not sure that the same can be said anymore... 
-
-	The benefits over standard vi include:
-		- multiple files open at once
-		- multiple windows on the screen
-		- a larger set of operator commands
-		- the possibility of porting to your favorite micro.
-		- more uniform undo/yank register treatment
-		- using tags doesn't lose your last search pattern
-		- "next error" cursor positioning after compilation
-	Of course, it _may_ lack some of vi's reliability. :-)
-
-	Take a look at vile.hlp for more information about features
-	and differences. 
-
-	In general, I suspect that the quality of the code is roughly
-	on a par with MicroEmacs.  I've been using vile regularly under
-	both SunOS and 386 UNIX for almost two years, with no major problems
-	(that haven't been fixed).  Version three was built and used by
-	many others on the net, and their feedback was invaluable.
-	I think all of the reported bugs have been fixed, and hopefully
-	not too many new ones introduced.
-
-	I have not run this much on a small system, and not much at all on
-	DOS.  Pete Rusczinski has done an excellent job of porting
-	version three to DOS -- his changes are now incorporated here (as
-	of version 3.20), but since in general the DOS version has been
-	less well exercised than the UNIX version, it probably harbors
-	more bugs.
-
-	Hope you enjoy -- 
-
-	Paul G. Fox	June, 1991, and February, 1992
-	pgf@cayman.com
-
-p.s. By the way, I'm _not_ the same Paul Fox who wrote Crisp, the Brief
-	work-alike.

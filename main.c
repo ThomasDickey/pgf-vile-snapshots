@@ -14,7 +14,10 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.129  1993/07/06 16:39:04  pgf
+ * Revision 1.130  1993/07/09 19:12:25  pgf
+ * make DOS mode be on by default for MSDOS versions of vile
+ *
+ * Revision 1.129  1993/07/06  16:39:04  pgf
  * integrated Tuan DANG's changes for the djgpp compiler under DOS
  *
  * Revision 1.128  1993/07/01  16:18:26  pgf
@@ -1101,7 +1104,11 @@ global_val_init()
 	set_global_b_val(MDCRYPT,	FALSE);	/* crypt */
 #endif
 	set_global_b_val(MDIGNCASE,	FALSE); /* exact matches */
+#if MSDOS
+	set_global_b_val(MDDOS,		TRUE);	/* dos mode */
+#else
 	set_global_b_val(MDDOS,		FALSE);	/* dos mode */
+#endif
 	set_global_b_val(MDMAGIC,	TRUE); 	/* magic searches */
 	set_global_b_val(MDSHOWMAT,	FALSE);	/* show-match */
 	set_global_b_val(MDSHOWMODE,	TRUE);	/* show-mode */

@@ -10,7 +10,10 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.128  1993/07/06 16:55:12  pgf
+ * Revision 1.129  1993/07/09 14:00:38  pgf
+ * fix for predefined GO32 in DJ GCC
+ *
+ * Revision 1.128  1993/07/06  16:55:12  pgf
  * corrected calloc macro definition
  *
  * Revision 1.127  1993/07/06  16:39:04  pgf
@@ -592,6 +595,7 @@
 #define	ZTC	0	/* Zortech C compiler */
 #define	TURBO	0	/* Turbo C/MSDOS */
 #define	WATCOM	0	/* WATCOM C/386 version 9.0 or above */
+#undef  GO32            /* Sorry, DJ has defined it already */
 #define	GO32	0	/* DJ's GCC version 1.09 */
 
 #ifdef __TURBOC__ 	/* Borland C/C++ 3.0 */
