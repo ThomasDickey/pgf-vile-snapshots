@@ -16,61 +16,9 @@
  *	modify (ifdef-style) 'expand_leaf()' to allow ellipsis.
  *
  * $Log: glob.c,v $
- * Revision 1.17  1994/02/03 19:35:12  pgf
- * tom's changes for 3.65
+ * Revision 1.18  1994/02/22 11:03:15  pgf
+ * truncated RCS log for 4.0
  *
- * Revision 1.16  1993/11/04  09:10:51  pgf
- * tom's 3.63 changes
- *
- * Revision 1.15  1993/10/04  10:24:09  pgf
- * see tom's 3.62 changes
- *
- * Revision 1.14  1993/09/06  16:36:47  pgf
- * changed glob() to doglob() to avoid symbol conflicts
- *
- * Revision 1.13  1993/09/03  09:11:54  pgf
- * tom's 3.60 changes
- *
- * Revision 1.12  1993/08/05  14:29:12  pgf
- * tom's 3.57 changes
- *
- * Revision 1.11  1993/06/25  11:25:55  pgf
- * patches for Watcom C/386, from Tuan DANG
- *
- * Revision 1.10  1993/06/18  15:57:06  pgf
- * tom's 3.49 changes
- *
- * Revision 1.9  1993/06/02  14:28:47  pgf
- * see tom's 3.48 CHANGES
- *
- * Revision 1.8  1993/05/11  16:22:22  pgf
- * see tom's CHANGES, 3.46
- *
- * Revision 1.7  1993/05/06  11:59:58  pgf
- * added ifdefs for USE_D_NAMLEN, for systems that don't have or don't
- * need it (d_name[] is null-terminated on most systems)
- *
- * Revision 1.6  1993/04/28  14:34:11  pgf
- * see CHANGES, 3.44 (tom)
- *
- * Revision 1.5  1993/04/22  11:08:03  pgf
- * suppress some "may be used before set" warnings
- *
- * Revision 1.4  1993/04/21  16:10:08  pgf
- * typo
- *
- * Revision 1.3  1993/04/21  15:56:49  pgf
- * allow nulls to separate filenames from the pipe
- *
- * Revision 1.2  1993/04/21  15:45:04  pgf
- * added iswild() check to catch more possible wild characters (UNIX_GLOBBING
- * only)
- *
- * Revision 1.1  1993/04/21  14:39:07  pgf
- * glob mode support, either string or boolean
- *
- * Revision 1.0  1993/04/20  12:14:31  pgf
- * Initial revision
  *
  */
 

@@ -5,35 +5,9 @@
  *	Include this after "estruct.h"
  *
  * $Log: dirstuff.h,v $
- * Revision 1.9  1994/02/06 00:24:06  pgf
- * added DJGPP to the good guys list
+ * Revision 1.10  1994/02/22 11:03:15  pgf
+ * truncated RCS log for 4.0
  *
- * Revision 1.8  1993/07/27  18:06:20  pgf
- * see tom's 3.56 CHANGES entry
- *
- * Revision 1.7  1993/06/25  11:25:55  pgf
- * patches for Watcom C/386, from Tuan DANG
- *
- * Revision 1.6  1993/05/06  12:18:06  pgf
- * oops. typo.
- *
- * Revision 1.5  1993/05/06  11:59:58  pgf
- * added ifdefs for USE_D_NAMLEN, for systems that don't have or don't
- * need it (d_name[] is null-terminated on most systems)
- *
- * Revision 1.4  1993/04/20  12:18:32  pgf
- * see tom's 3.43 CHANGES
- *
- * Revision 1.3  1993/04/02  10:57:41  pgf
- * cleanup of ls-based directory enumeration, and support (unused as yet?)
- * for old-style directories
- *
- * Revision 1.2  1993/04/01  15:50:34  pgf
- * for sysV machines, without POSIX or BSD dirent, we now have code
- * that enumerates directories using /bin/ls.
- *
- * Revision 1.1  1993/03/25  19:50:58  pgf
- * see 3.39 section of CHANGES
  *
  */
 

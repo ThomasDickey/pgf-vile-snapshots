@@ -5,166 +5,9 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: tags.c,v $
- * Revision 1.47  1994/02/14 15:46:31  pgf
- * tom's interim post-3.65 changes
+ * Revision 1.49  1994/02/22 11:03:15  pgf
+ * truncated RCS log for 4.0
  *
- * Revision 1.46  1994/02/03  19:35:12  pgf
- * tom's changes for 3.65
- *
- * Revision 1.45  1994/01/03  15:57:34  pgf
- * changed logic of tags lookup, so i can understand it, and to
- * correct logic surrounding "taglength" (again).  if taglength is
- * 0, matches must be exact (i.e.  all characters significant).  if
- * the user enters less than 'taglength' characters, this match must
- * also be exact.  if the user enters 'taglength' or more
- * characters, only that many characters will be significant in the
- * lookup.
- *
- * Revision 1.44  1993/12/21  12:40:26  pgf
- * included missing glob.h
- *
- * Revision 1.43  1993/12/13  18:02:12  pgf
- * the filename found in a tags file is now globbed, so environment
- * variables can be used.
- *
- * Revision 1.42  1993/11/04  09:10:51  pgf
- * tom's 3.63 changes
- *
- * Revision 1.41  1993/10/04  10:24:09  pgf
- * see tom's 3.62 changes
- *
- * Revision 1.40  1993/09/03  09:11:54  pgf
- * tom's 3.60 changes
- *
- * Revision 1.39  1993/08/05  14:29:12  pgf
- * tom's 3.57 changes
- *
- * Revision 1.38  1993/07/01  16:15:54  pgf
- * tom's 3.51 changes
- *
- * Revision 1.37  1993/06/18  15:57:06  pgf
- * tom's 3.49 changes
- *
- * Revision 1.36  1993/06/02  14:28:47  pgf
- * see tom's 3.48 CHANGES
- *
- * Revision 1.35  1993/05/24  15:21:37  pgf
- * tom's 3.47 changes, part a
- *
- * Revision 1.34  1993/05/04  17:05:14  pgf
- * see tom's CHANGES, 3.45
- *
- * Revision 1.33  1993/04/28  17:15:56  pgf
- * got rid of LOOKTAGS mode and ifdefs
- *
- * Revision 1.32  1993/04/20  12:18:32  pgf
- * see tom's 3.43 CHANGES
- *
- * Revision 1.31  1993/04/01  09:46:37  pgf
- * name the tag buffers with "internal" style names, i.e. [Tags nn]
- *
- * Revision 1.30  1993/03/31  19:56:08  pgf
- * partially fix GMDTAGSLOOK code for tags path.  not really "fixed" -- it
- * only looks in first tags file.  i'm thinking of dropping the TAGSLOOK
- * code anyway.
- *
- * Revision 1.29  1993/03/31  19:35:21  pgf
- * implemented tags path
- *
- * Revision 1.28  1993/03/05  17:50:54  pgf
- * see CHANGES, 3.35 section
- *
- * Revision 1.27  1993/01/16  10:42:25  foxharp
- * use new macros
- *
- * Revision 1.26  1992/12/14  09:02:46  foxharp
- * lint cleanup for malloc
- *
- * Revision 1.25  1992/11/19  22:24:25  foxharp
- * recheck tagsprefix on every fetch of file
- *
- * Revision 1.24  1992/11/19  08:49:25  foxharp
- * allow more dynamic killing/creating of the tags buffer, so if you get
- * the wrong tags file by mistake, you can ":kill tags" and retry
- *
- * Revision 1.23  1992/08/05  21:51:10  foxharp
- * use "slash" instead of '/'
- *
- * Revision 1.22  1992/07/30  07:29:19  foxharp
- * further fix off-by-one on tags that use line numbers
- *
- * Revision 1.21  1992/07/15  09:00:35  foxharp
- * fixed off-by-one in tags-buffer line scan, so single digit line
- * numbers now work, e.g. "file.c	src/file.c	1".
- * also, always set up "tagprefix", in case we switch to tagsrelative
- * mode later on
- *
- * Revision 1.20  1992/07/13  20:09:27  foxharp
- * path-relative tags are now controlled by a boolean mode "set tagsrelative"
- *
- * Revision 1.19  1992/07/13  19:45:51  foxharp
- * added "tags relative to where we found the tags file" code
- *
- * Revision 1.18  1992/05/16  12:00:31  pgf
- * prototypes/ansi/void-int stuff/microsoftC
- *
- * Revision 1.17  1992/03/19  23:26:23  pgf
- * removed extra string lib externs
- *
- * Revision 1.16  1992/01/05  00:06:13  pgf
- * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
- * often.  also normalized message appearance somewhat.
- *
- * Revision 1.15  1991/11/08  13:07:09  pgf
- * ifdefed out lazy filename matching
- *
- * Revision 1.14  1991/11/07  02:00:32  pgf
- * lint cleanup
- *
- * Revision 1.13  1991/11/01  14:38:00  pgf
- * saber cleanup
- *
- * Revision 1.12  1991/10/27  01:53:15  pgf
- * use global taglen value for command line tags -- there's no current
- * buffer yet
- *
- * Revision 1.11  1991/10/22  03:09:32  pgf
- * tags given on the command line now set the response for further tag commands
- *
- * Revision 1.10  1991/10/20  23:06:43  pgf
- * cleaned up taglen stuff
- *
- * Revision 1.9  1991/10/15  11:58:58  pgf
- * added taglength support
- *
- * Revision 1.8  1991/10/08  01:30:00  pgf
- * added new bp arg to lfree and lalloc
- *
- * Revision 1.7  1991/10/08  01:26:33  pgf
- * untagpop now sets "lastdot" correctly
- *
- * Revision 1.6  1991/09/19  13:44:13  pgf
- * tags file is looked up via VAL_TAGS setting (the global one -- local tags
- * paths and files don't make sense.  yet? )
- *
- * Revision 1.5  1991/08/07  12:35:07  pgf
- * added RCS log messages
- *
- * revision 1.4
- * date: 1991/06/25 19:53:33;
- * massive data structure restructure
- * 
- * revision 1.3
- * date: 1991/06/07 13:23:30;
- * don't move "last dot" mark if dot doesn't change
- * 
- * revision 1.2
- * date: 1991/04/08 15:47:17;
- * fixed readin() arg count
- * 
- * revision 1.1
- * date: 1990/09/21 10:26:07;
- * initial vile RCS revision
  */
 #include	"estruct.h"
 #include        "edef.h"
@@ -185,7 +28,7 @@
 
 
 static	LINE *	cheap_tag_scan P(( BUFFER *, char *, SIZE_T));
-static	LINE *	cheap_buffer_scan P(( BUFFER *, char *, SIZE_T));
+static	LINE *	cheap_buffer_scan P(( BUFFER *, char *, SIZE_T, int));
 static	void	free_untag P(( UNTAG * ));
 static	BUFFER *gettagsfile P(( int, int * ));
 static	void	nth_name P(( char *,  char *, int ));
@@ -337,16 +180,21 @@ int taglen;
 		if (s != TRUE && !changedfile)
 			tossuntag();
 	} else {
+		int exact = 1;
 		i = 0;
 		tfp += 2; /* skip the "/^" */
 		lplim -= 2; /* skip the "$/" */
+		if (*lplim != '$') {
+			exact = 0;
+			lplim++;
+		}
 		while (i < sizeof(srchpat) && tfp < lplim) {
 			if (*tfp == '\\' && tfp < lplim - 1)
 				tfp++;  /* the backslash escapes next char */
 			srchpat[i++] = *tfp++;
 		}
 		srchpat[i] = EOS;
-		lp = cheap_buffer_scan(curbp, srchpat, (SIZE_T)i);
+		lp = cheap_buffer_scan(curbp, srchpat, (SIZE_T)i, exact);
 		if (lp == NULL) {
 			mlforce("[Tag not present]");
 			TTbeep();
@@ -482,17 +330,18 @@ SIZE_T taglen;
 }
 
 static LINE *
-cheap_buffer_scan(bp, patrn, len)
+cheap_buffer_scan(bp, patrn, len, exact)
 BUFFER *bp;
 char *patrn;
 SIZE_T len;
+int exact;
 {
 	register LINE *lp;
 
 	len = strlen(patrn);
 
 	for_each_line(lp, bp) {
-		if (llength(lp) == len) {
+		if ((exact && llength(lp) == len) || (!exact && llength(lp) >= len)) {
 			if (!strncmp(lp->l_text, patrn, len)) {
 				return lp;
 			}

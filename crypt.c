@@ -2,33 +2,9 @@
  *		written by Dana Hoggatt and Daniel Lawrence
  *
  * $Log: crypt.c,v $
- * Revision 1.9  1993/05/04 17:05:14  pgf
- * see tom's CHANGES, 3.45
+ * Revision 1.10  1994/02/22 11:03:15  pgf
+ * truncated RCS log for 4.0
  *
- * Revision 1.8  1993/04/28  14:34:11  pgf
- * see CHANGES, 3.44 (tom)
- *
- * Revision 1.7  1993/04/01  12:53:33  pgf
- * removed redundant includes and declarations
- *
- * Revision 1.6  1992/12/23  09:16:54  foxharp
- * lint
- *
- * Revision 1.5  1992/08/20  23:40:48  foxharp
- * typo fixes -- thanks, eric
- *
- * Revision 1.4  1992/05/16  12:00:31  pgf
- * prototypes/ansi/void-int stuff/microsoftC
- *
- * Revision 1.3  1991/11/01  14:38:00  pgf
- * saber cleanup
- *
- * Revision 1.2  1991/08/07  12:35:07  pgf
- * added RCS log messages
- *
- * revision 1.1
- * date: 1990/09/21 10:24:54;
- * initial vile RCS revision
  */
 
 #include	"estruct.h"

@@ -4,24 +4,9 @@
 # T.DANG (dang@cogit.ign.fr)
 #
 # $Log: makefile.wat,v $
-# Revision 1.5  1994/02/03 19:35:12  pgf
-# tom's changes for 3.65
+# Revision 1.6  1994/02/22 11:03:15  pgf
+# truncated RCS log for 4.0
 #
-# Revision 1.4  1993/12/08  16:47:00  pgf
-# vile.lnk should depend on makefiles, not object files, and
-# increased stack size
-#
-# Revision 1.3  1993/09/03  09:11:54  pgf
-# tom's 3.60 changes
-#
-# Revision 1.2  1993/07/27  19:20:00  pgf
-# changed default flags to /ols, to optimize by default
-#
-# Revision 1.1  1993/07/09  14:01:14  pgf
-# new clean target, added map.c/map.obj, added /p to compile lines
-#
-# Revision 1.0  1993/06/25  14:41:16  pgf
-# Initial revision
 #
 #
 #define PVGA for Paradise VGA (because there are some problems with this card)

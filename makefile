@@ -6,6 +6,9 @@
 # one's provided will work, then edit estruct.h, and use "make default".
 # For a list of the pre-defined targets, just type "make".
 #
+# yes, there should be a Configure script.  no, i don't plan on writing one
+# tomorrow.
+#
 # The command/name/key/function bindings are defined in the file "cmdtbl".
 # The mktbls program parses this to produce nebind.h, nename.h, and
 # nefunc.h, which are used by the rest of the build.
@@ -15,64 +18,102 @@
 # 'estruct.h'.
 #
 # The version number is found near the top of edef.h, and is displayed with
-# the '*' and ":version" commands, or by invoking vile with "-V".
+# the ":version" command, or by invoking vile with "-V".
 #
 # Paul Fox
 #
 # original makefile for uemacs: Adam Fritz July 30,1987  (do you recognize it?)
 #
 
-# some old make's don't predefine this:
-#MAKE=/bin/make
-#MAKE=/usr/bin/make
-
-SHELL = /bin/sh
-
 # To change screen driver modules, change SCREEN and SCRDEF below, OR edit
 # estruct.h to make sure the correct one is #defined as "1", and the others
-# all as "0".  If you use tcap.c, you'll need libtermcap.a too.  If you use
-# x11.c, you'll need libX11.a too.
+# all as "0".  
+#  NOTE! if you switch from "vile" to "xvile" or back, you _must_ do
+#  a "make clean" in between.
 
-# for regular vile, use these:
+# Regular vile, use these four lines:
 SCREEN = tcap
 LIBS = -ltermcap
 TARGET = vile
 SCRDEF = -DTERMCAP -Dscrn_chosen
 
-# for building the X version, xvile, use these:
-#  note that if you switch from "vile" to "xvile" or back, you _must_ do
-#  a "make clean" in between.
+# Five xvile options:
+# These options build differently depending on whether you have the
+# Athena widget library, the Motif widget library, the OpenLook widget library,
+# just the X toolkit library, or none of these (just the X11 library).
+#
+# In each case the LIBS line is just a suggested starting point.  You may be
+# able to get by without -lXext on some platforms. Others will require the
+# use of the math library (-lm).  One platform (a Sun) required that the 
+# Xmu library be linked statically rather than dynamically.  If you use
+# GCC, this may be accomplished by substituting "-static -lXmu -dynamic" in
+# place of "-lXmu".  If you are using Sun's C compiler, this may be accomplished
+# with "-Bstatic -lXmu -Bdynamic" instead.
+#
+# Your platform may well have its own idiosyncracies which will require other
+# libraries.
+
+# 1) for building the X toolkit version of xvile with the Athena widget set,
+# use these definitions.
 #SCREEN = x11
+#LIBS = -lXaw -lXmu -lXext -lXt -lX11
+#TARGET = xvile
+#SCRDEF = -DX11 -Dscrn_chosen -DXTOOLKIT -DATHENA_WIDGETS
+
+# 2) for building the X toolkit version of xvile with the Motif widget set,
+# use these definitions.  Not all systems have nor require -lgen.  Take it
+# out if your platform can't find it. 
+#SCREEN = x11
+#LIBS = -lXm -lXmu -lXext -lXt -lX11 -lgen
+#TARGET = xvile
+#SCRDEF = -DX11 -Dscrn_chosen -DXTOOLKIT -DMOTIF_WIDGETS
+
+# 3) if you want to build with the OpenLook widget library, you should use
+# the following lines.  Note the use of the OPENWINHOME environment variable.
+# If you are running on a Sun, you may well have this set without even knowing
+# it.  If you don't, you will have to figure out where OPENWINHOME is and
+# set it appropriately.  It is often in /usr/openwin.
+#SCREEN = x11
+#LIBS = -L${OPENWINHOME}/lib -lXol -lXmu -lXt -lX11
+#TARGET = xvile
+#SCRDEF = -DX11 -Dscrn_chosen -DXTOOLKIT -DOL_WIDGETS -I${OPENWINHOME}/include
+
+# 4) if you don't have any of the above widget sets (not very probable), but
+# have the X toolkit (libXt.a), use these lines.  The biggest loss in this case
+# is the absence of scrollbars.
+#SCREEN = x11
+#LIBS = -lXt -lX11
+#TARGET = xvile
+#SCRDEF = -DX11 -Dscrn_chosen -DXTOOLKIT -DNO_WIDGETS
+
+# 5) for building the simple X version (if you don't have libXaw.a _or_
+# libXt.a) use these lines.  You won't get scrollbars, and some other
+# things.  Visually, this looks much the same as the one above.
+#SCREEN = x11simp
 #LIBS = -lX11
 #TARGET = xvile
 #SCRDEF = -DX11 -Dscrn_chosen
 
-CO=co
-#CO="@echo co"
-
-# for passing along the above settings to sub-makes
-ENVIR = SCREEN="$(SCREEN)" LIBS="$(LIBS)" TARGET="$(TARGET)" \
-	SCRDEF="$(SCRDEF)" \
-	CO="$(CO)" CC="$(CC)" LINK="$(LINK)" OPTFLAGS="$(OPTFLAGS)"
-
-
-
-# install to DESTDIR1 if it's writable, else DESTDIR2
+# "make install" will install to DESTDIR1 if it's writable, else to DESTDIR2
 DESTDIR1 = /usr/local/bin
 DESTDIR2 = $(HOME)/bin
 
-# if you want the help file (vile.hlp) to go somewhere other than your $PATH
-#  or one of the hard-code paths in epath.h  (it goes to the same place vile
-#  does by default)
-# note you may have to hardcode this if the CFLAGS definition below doesn't
-#  get through your make.
+# normally, the help file should go somewhere along your PATH, or in one
+#  of the predefined directories mentioned in epaths.h.
+# if you want the help file (vile.hlp) to go somewhere else, specify the
+#  location as "HELP_LOC".  (note that you may have to hardcode this in the
+#  code itself if the CFLAGS definition below doesn't get through your make.
+#  there are too many double quotes for some.
 #HELP_LOC=/my/local/help/lib
  HELP_LOC=
 
-REMOTE=gutso!foxharp
+# this is for my uucp convenience targets -- i wouldn't suggest anyone else
+#  try them...
+REMOTE=foxharp!pgf
 
+# choose a compiler you like.  anything should work.
 #CC = gcc
-#OPTFLAGS = -g -O -Wall -Wshadow # -Wconversion -Wstrict-prototypes -Wmissing-prototypes
+#OPTFLAGS = -g -O -Wall -Wshadow
 
 CC = cc
 #OPTFLAGS = -g
@@ -87,6 +128,20 @@ LINK = $(CC)
 LDFLAGS =
 
 INCS =
+
+CO=co
+#CO="@echo co"
+
+# some old make's don't predefine this:
+#MAKE=/bin/make
+#MAKE=/usr/bin/make
+
+SHELL = /bin/sh
+
+# for passing along the above settings to sub-makes
+ENVIR = SCREEN="$(SCREEN)" LIBS="$(LIBS)" TARGET="$(TARGET)" \
+	SCRDEF="$(SCRDEF)" \
+	CO="$(CO)" CC="$(CC)" LINK="$(LINK)" OPTFLAGS="$(OPTFLAGS)"
 
 # the backslashes around HELP_LOC don't make it through all makes.  if
 #  you have trouble, use the following line instead, and edit epath.h to
@@ -134,7 +189,7 @@ CSRCnr = npopen.c opers.c oneliner.c path.c random.c regexp.c region.c
 CSRCst = search.c spawn.c st520.c tags.c tbuff.c tcap.c termio.c tipc.c tmp.c
 CSRCuv = undo.c version.c vmalloc.c vms2unix.c vmspipe.c vmsvt.c vt52.c
 CSRCw = window.c word.c wordmov.c
-CSRCxz = x11.c z309.c z_ibmpc.c
+CSRCxz = x11.c x11simp.c z309.c z_ibmpc.c
 
 CSRC = $(CSRCac) $(CSRCde) $(CSRCf) $(CSRCgh) $(CSRCil) $(CSRCm) $(CSRCnr) \
 	$(CSRCst) $(CSRCuv) $(CSRCw) $(CSRCxz)
@@ -143,7 +198,7 @@ CSRC = $(CSRCac) $(CSRCde) $(CSRCf) $(CSRCgh) $(CSRCil) $(CSRCm) $(CSRCnr) \
 OTHERSRC = z100bios.asm
 
 # text and data files
-TEXTFILES = README CHANGES \
+TEXTFILES = README CHANGES CHANGES.R3 \
 	cmdtbl modetbl vile.hlp vile.1 buglist revlist \
 	README.X11 README.PC
 
@@ -189,7 +244,7 @@ all:
 	echo "	please use one of the following:"			;\
 	echo "	make bsd	(for pure, older BSD systems)"		;\
 	echo "	make bsd_posix	(for BSD with some POSIX support)"	;\
-	echo "	make bsd386"						;\
+	echo "	make netbsd	(NetBSD 0.9, FreeBSD 1.0 and 386BSD 0.1)";\
 	echo "	make att	(traditional USG systems)"		;\
 	echo "	make att_posix	(newer, with POSIX support)"		;\
 	echo "	make sgi	(Silicon Graphics)"			;\
@@ -198,7 +253,7 @@ all:
 	echo "	make ultrix"						;\
 	echo "	make mach	(just pure bsd)"			;\
 	echo "	make svr4	(Solaris 2.1, 2.2, 2.3)"		;\
-	echo "	make mips	(uses systemV stuff)"			;\
+	echo "	make mips	(old? (UMIPS 4.52?) uses systemV stuff)";\
 	echo "	make odt	(SCO Open DeskTop -- variant of svr3)"	;\
 	echo "	make isc	(interactive -- another such variant)"	;\
 	echo "	make hpux"						;\
@@ -229,8 +284,8 @@ sunos:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DBERK -DPOSIX -DSUNOS -Dos_chosen" \
 		$(TARGET) $(ENVIR)
 
-bsd386:
-	make CFLAGS="$(CFLAGS1) -DBERK -DBSD386 -Dos_chosen" \
+net386:
+	make CFLAGS="$(CFLAGS1) -DBERK -DNETBSD -Dos_chosen" \
 	    MAKE=/usr/bin/make $(TARGET) $(ENVIR)
 
 att:
@@ -283,7 +338,7 @@ next:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DBERK -DNeXT -D__STRICT_BSD__ -Dos_chosen \
 		-I/NextDeveloper/Headers -I/NextDeveloper/Headers/bsd \
 		-I/NextDeveloper/Headers/bsd/sys" \
-		$(TARGET) $(ENVIR)
+		$(TARGET) $(ENVIR) MKTBLS="./$(MKTBLS)"
 
 unixpc:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DUSG -DHAVE_SELECT \
@@ -440,21 +495,25 @@ shar: link.msc /tmp/vilevers
 
 bigshar: link.msc /tmp/vilevers
 	@echo 'Do you need to rebuild the revlist????'
+	@sleep 3
 	vilevers=`cat /tmp/vilevers`; \
 	shar -spgf@cayman.com -nvile$${vilevers} \
 	    -o vile$${vilevers}shar README `ls $(EVERYTHING) | \
 	    sed '/^README$$/d'` link.msc ; \
-	mv vile$${vilevers}shar.01 vile$${vilevers}shar
+	mv vile$${vilevers}shar.01 vile$${vilevers}shar	; \
+	echo Created vile$${vilevers}shar
 
 vanillashar: link.msc
 	shar -V \
 	    -o vileshar README `ls $(EVERYTHING) | \
 	    sed '/^README$$/d'` link.msc ; \
-	mv vileshar.01 vileshar
+	mv vileshar.01 vileshar		; \
+	echo Created vileshar
 
 zipfile: /tmp/vilevers
 	vilevers=`cat /tmp/vilevers | sed 's/\.//'`; \
-	zip -k vile$${vilevers}.zip $(EVERYTHING)
+	zip -k vile$${vilevers}.zip $(EVERYTHING) ;\
+	echo Created vile$${vilevers}.zip
 
 patch:	link.msc /tmp/vilevers
 	@orevlistrev=`rlog -h revlist | egrep head: | cut -f2 -d'.'`	;\
@@ -468,7 +527,8 @@ patch:	link.msc /tmp/vilevers
 	while read file filerev						;\
 	do								 \
 	  rcsdiff -c -r$$filerev $$file 2>/dev/null || true		;\
-	done  >patch$$ovilevers-$$vilevers 
+	done  >patch$$ovilevers-$$vilevers 				;\
+	echo Created patch$$ovilevers-$$vilevers 
 
 /tmp/vilevers: ALWAYS
 	@expr "`egrep 'version\[\].*' edef.h`" : \
@@ -593,417 +653,12 @@ path.$O:	dirstuff.h
 vmalloc$O:	nevars.h
 
 # $Log: makefile,v $
-# Revision 1.129  1994/02/07 12:52:00  pgf
-# added README.PC as a textfile
+# Revision 1.136  1994/02/22 17:46:08  pgf
+# added kev's motif and openlook support
 #
-# Revision 1.128  1994/02/04  18:22:15  pgf
-# added sgi hints
+# Revision 1.135  1994/02/22  11:10:04  pgf
+# truncated RCS log for 4.0
 #
-# Revision 1.127  1994/02/03  19:35:12  pgf
-# tom's changes for 3.65
-#
-# Revision 1.126  1994/01/31  21:54:11  pgf
-# added zipfile target
-#
-# Revision 1.125  1994/01/28  20:59:11  pgf
-# added new file, djhandl.c, and
-# added targets for Motorola Delta88 processors
-#
-# Revision 1.124  1994/01/21  14:00:04  pgf
-# added vanillashar target, so my DOS unshar can unpack
-#
-# Revision 1.123  1993/12/23  11:27:47  pgf
-# solaris 2.3 works
-#
-# Revision 1.122  1993/11/10  10:19:40  pgf
-# added SHELL=/bin/sh for broken makes
-#
-# Revision 1.121  1993/11/04  09:10:51  pgf
-# tom's 3.63 changes
-#
-# Revision 1.120  1993/09/03  09:11:54  pgf
-# tom's 3.60 changes
-#
-# Revision 1.119  1993/08/18  18:48:49  pgf
-# added patch: target, for creating release patches
-#
-# Revision 1.118  1993/08/16  14:04:39  pgf
-# fixed broken all: target -- missing double quote
-#
-# Revision 1.117  1993/08/13  16:24:47  pgf
-# added sgi target (sort of)
-#
-# Revision 1.116  1993/07/28  10:44:51  pgf
-# comment about "make clean" when doing xvile
-#
-# Revision 1.115  1993/07/19  10:39:26  pgf
-# svr4 now tested
-#
-# Revision 1.114  1993/07/15  10:37:58  pgf
-# see 3.55 CHANGES
-#
-# Revision 1.113  1993/07/08  10:41:15  pgf
-# turn off the strict gcc warnings by default -- we don't pass yet.
-#
-# Revision 1.112  1993/07/06  16:55:58  pgf
-# added makefile.djg for dj gcc
-#
-# Revision 1.111  1993/06/25  15:05:12  pgf
-# added watcom makefile, renamed the turbo makefiles
-#
-# Revision 1.110  1993/06/18  15:57:06  pgf
-# tom's 3.49 changes
-#
-# Revision 1.109  1993/06/10  14:57:25  pgf
-# added map.c
-#
-# Revision 1.108  1993/06/02  14:46:13  pgf
-# added more gcc warnings
-#
-# Revision 1.107  1993/05/11  16:22:22  pgf
-# see tom's CHANGES, 3.46
-#
-# Revision 1.106  1993/05/06  16:21:28  pgf
-# uts compile-line change
-#
-# Revision 1.105  1993/05/06  10:48:29  pgf
-# mention sco in the make help
-#
-# Revision 1.104  1993/05/05  12:28:57  pgf
-# added some -DMACHINE defines to the compile lines (needed -DULTRIX)
-#
-# Revision 1.103  1993/04/29  19:19:16  pgf
-# added Turbo-C makefiles, and vile.1 man page
-#
-# Revision 1.102  1993/04/28  14:34:11  pgf
-# see CHANGES, 3.44 (tom)
-#
-# Revision 1.101  1993/04/28  09:42:25  pgf
-# add -O back into gcc optflags, so gcc will warn of unused variables
-#
-# Revision 1.100  1993/04/20  12:18:32  pgf
-# see tom's 3.43 CHANGES
-#
-# Revision 1.99  1993/04/02  15:23:36  pgf
-# more permissible in naming bigshar file
-#
-# Revision 1.98  1993/04/02  11:01:50  pgf
-# dependency updates
-#
-# Revision 1.97  1993/04/01  14:44:30  pgf
-# added -DNeXT for NeXT machines
-#
-# Revision 1.96  1993/04/01  12:55:37  pgf
-# added vmspipe.c
-#
-# Revision 1.95  1993/04/01  12:12:13  pgf
-# took out GINCS stuff, and the -I for /usr/include and /usr/include/sys.  they
-# were interfering with the gcc fixincludes directories
-#
-# Revision 1.94  1993/03/31  19:41:08  pgf
-# added revlist reminder to bigshar, took -O out of gcc line -- it confuses
-# me too much in gdb
-#
-# Revision 1.93  1993/03/25  19:50:58  pgf
-# see 3.39 section of CHANGES
-#
-# Revision 1.92  1993/03/17  10:43:53  pgf
-# made building/naming shar files easier -- gets version automatically
-#
-# Revision 1.91  1993/03/17  10:00:29  pgf
-# initial changes to make VMS work again
-#
-# Revision 1.90  1993/03/16  10:53:21  pgf
-# see 3.36 section of CHANGES file
-#
-# Revision 1.89  1993/03/08  15:24:00  pgf
-# added install2 target, which typically installs to your home directory
-#
-# Revision 1.88  1993/03/05  17:50:54  pgf
-# see CHANGES, 3.35 section
-#
-# Revision 1.87  1993/02/24  10:59:02  pgf
-# see 3.34 changes, in CHANGES file
-#
-# Revision 1.86  1993/02/24  09:31:53  pgf
-# warning re: HELP_LOC backslashes, uts support, and better (?) NeXT support
-#
-# Revision 1.85  1993/02/15  10:50:47  pgf
-# added aix warnings
-#
-# Revision 1.84  1993/02/15  10:36:34  pgf
-# back to cc
-#
-# Revision 1.83  1993/02/12  10:46:18  pgf
-# changed name of ENV to ENVIR, due to name conflict with linux make
-#
-# Revision 1.82  1993/02/08  14:53:35  pgf
-# see CHANGES, 3.32 section
-#
-# Revision 1.81  1993/01/23  13:38:23  foxharp
-# nevars.h replaces evar.h
-#
-# Revision 1.80  1993/01/12  08:44:24  foxharp
-# fixup so README.X11 gets included in shars, and more lint rules from tom dickey
-#
-# Revision 1.79  1992/12/29  23:17:28  foxharp
-# commentary
-#
-# Revision 1.78  1992/12/28  23:51:57  foxharp
-# test for presence of vile in destdir before trying to move it to ovile
-#
-# Revision 1.77  1992/12/16  21:38:34  foxharp
-# rule for nchanges target
-#
-# Revision 1.76  1992/12/14  09:02:08  foxharp
-# svr3 lint command
-#
-# Revision 1.75  1992/12/13  13:27:04  foxharp
-# various changes, for easier command-line ENVIR setting, and for linting
-#
-# Revision 1.74  1992/12/04  09:50:24  foxharp
-# pass SCREEN etc. to lower makes via ENV variable
-#
-# Revision 1.73  1992/12/04  09:23:08  foxharp
-# added apollo
-#
-# Revision 1.72  1992/11/19  09:14:41  foxharp
-# added HELP_LOC support -- allows easy choice of new dest for vile.hlp
-#
-# Revision 1.71  1992/08/28  08:55:08  foxharp
-# switch from -g to -O for releaseh
-#
-# Revision 1.70  1992/08/20  23:40:48  foxharp
-# typo fixes -- thanks, eric
-#
-# Revision 1.69  1992/08/20  08:58:05  foxharp
-# final cleanup preparing to release version four
-#
-# Revision 1.68  1992/08/07  18:05:27  pgf
-# fixed mips systype botch
-#
-# Revision 1.67  1992/08/04  20:12:00  foxharp
-# split out sunos, so SUNOS gets defined, added comment about DOS command
-# line lengths, and consolidated some vars into CFLAGS1
-#
-# Revision 1.66  1992/08/03  09:10:29  foxharp
-# added eric krohn's changes for sx1100 -- introduced LDFLAGS
-#
-# Revision 1.65  1992/07/24  18:22:06  foxharp
-# change name of MAKEFILES -- that name is special to GNU make
-#
-# Revision 1.64  1992/07/22  00:50:32  foxharp
-# turn off shared libs
-#
-# Revision 1.63  1992/07/20  22:48:17  foxharp
-# profiling support (commented out)
-#
-# Revision 1.62  1992/07/17  19:21:53  foxharp
-# added gcc sys dir to find filio.h, and changed "sun" to "sunos" to make
-# way for solaris
-#
-# Revision 1.61  1992/07/16  22:05:01  foxharp
-# fixed linux rule -- missing -DLINUX
-#
-# Revision 1.60  1992/07/01  17:03:12  foxharp
-# added z_ibmpc.c
-#
-# Revision 1.59  1992/06/25  23:00:50  foxharp
-# changes for dos/ibmpc
-#
-# Revision 1.58  1992/06/22  08:40:02  foxharp
-# added INCS to all targets, especially aix, so it'll get ioctl.h in termio.c
-#
-# Revision 1.57  1992/06/14  11:33:17  foxharp
-# added -DAIX
-#
-# Revision 1.56  1992/06/12  20:21:28  foxharp
-# use shared libs in svr3 -- should this be done for others?  isc? odt?
-#
-# Revision 1.55  1992/06/04  19:44:40  foxharp
-# added mach and cflow targets
-#
-# Revision 1.54  1992/06/03  08:39:23  foxharp
-# look explicitly for gcc include files
-#
-# Revision 1.53  1992/06/01  20:41:07  foxharp
-# added dependency of externs.o on ne....h
-#
-# Revision 1.52  1992/05/29  09:40:53  foxharp
-# split out modes.c, fences.c, and insert.c from random.c
-#
-# Revision 1.51  1992/05/29  08:40:05  foxharp
-# minor ordering
-#
-# Revision 1.50  1992/05/27  19:16:22  foxharp
-# fixed odt and isc targets -- added -DODT and -DISC
-#
-# Revision 1.49  1992/05/27  08:32:57  foxharp
-# added rcsdiffrw target
-#
-# Revision 1.48  1992/05/20  18:58:11  foxharp
-# comments on target help, a/ux support, and uurw
-#
-# Revision 1.47  1992/05/19  09:15:45  foxharp
-# machine target fixups
-#
-# Revision 1.46  1992/05/16  12:00:31  pgf
-# prototypes/ansi/void-int stuff/microsoftC
-#
-# Revision 1.45  1992/05/13  09:14:12  pgf
-# comment changes
-#
-# Revision 1.44  1992/04/26  13:42:33  pgf
-# added bsd386 target
-#
-# Revision 1.43  1992/04/14  08:55:38  pgf
-# added support for OSF1 (affects termio only)
-#
-# Revision 1.42  1992/04/10  18:52:21  pgf
-# add config targets for various platforms
-#
-# Revision 1.41  1992/04/06  09:43:55  pgf
-# fixed nrevlist target
-#
-# Revision 1.40  1992/04/06  09:29:57  pgf
-# added nrevlist target
-#
-# Revision 1.39  1992/04/06  09:21:40  pgf
-# added revlist
-#
-# Revision 1.38  1992/04/02  23:01:10  pgf
-# re-alphabetized SRC and OBJ
-#
-# Revision 1.37  1992/03/26  09:16:16  pgf
-# added regexp.c dependencies
-#
-# Revision 1.36  1992/03/25  19:12:19  pgf
-# explicit rule for building mktbls, to satisfy broken BSD make
-#
-# Revision 1.35  1992/03/19  23:36:42  pgf
-# removed shorten stuff
-#
-# Revision 1.34  1992/03/07  10:25:58  pgf
-# AIX support (needs -lcurses)
-#
-# Revision 1.33  1992/03/01  18:41:31  pgf
-# moved target define
-#
-# Revision 1.32  1992/02/17  08:48:49  pgf
-# keep copy of current executable during install
-#
-# Revision 1.31  1991/12/30  23:15:04  pgf
-# rename the product of bigshar
-#
-# Revision 1.30  1991/11/27  10:17:21  pgf
-# changes to dos backup target
-#
-# Revision 1.29  1991/11/16  18:35:08  pgf
-# dropped the file locking files -- they didn't work, and were only
-# compatible with other's running vile
-#
-# Revision 1.28  1991/11/13  20:09:27  pgf
-# X11 changes, from dave lemke
-#
-# Revision 1.27  1991/11/07  02:00:32  pgf
-# lint cleanup
-#
-# Revision 1.26  1991/11/01  14:56:51  pgf
-# took tags file out of the distribution
-#
-# Revision 1.25  1991/11/01  14:20:24  pgf
-# a little bit more saber support
-#
-# Revision 1.24  1991/10/28  14:19:46  pgf
-# took out some old junk, moved the changelog down low
-#
-# Revision 1.23  1991/10/27  01:47:14  pgf
-# switched from regex to regexp
-#
-# Revision 1.22  1991/10/24  13:03:48  pgf
-# added regex.c
-#
-# Revision 1.21  1991/10/23  12:05:37  pgf
-# added bigshar, and put ./ in front of mktbls rule -- there seems
-# to be a bug in some makes that drops the ./ in the MKTBLS
-# variable
-#
-# Revision 1.20  1991/10/22  14:36:01  pgf
-# added the CHANGES file
-#
-# Revision 1.19  1991/10/10  12:20:26  pgf
-# added vmalloc.o dependencies
-#
-# Revision 1.18  1991/09/27  02:49:30  pgf
-# initial saber support
-#
-# Revision 1.17  1991/08/10  01:24:28  pgf
-# added update target, and
-# removed the BUILTHDRS list
-#
-# Revision 1.16  1991/08/07  11:56:58  pgf
-# added RCS log entries
-#
-# revision 1.15
-# date: 1991/08/07 02:10:53;
-# removed './' from files in dependencies
-#
-# revision 1.14
-# date: 1991/08/06 16:19:55;
-# added populate rule, and "revision" arg to co rule
-#
-# revision 1.13
-# date: 1991/08/06 16:09:42;
-# fixed "rw" rule
-#
-# revision 1.12
-# date: 1991/08/06 14:45:14;
-# commented out shortnames stuff, and
-# added "co" rule
-#
-# revision 1.11
-# date: 1991/06/28 10:52:36;
-# exclude built headers from come lists
-#
-# revision 1.10
-# date: 1991/06/16 17:29:07;
-# fixed install rules, so I don't have to change it at home
-#
-# revision 1.9
-# date: 1991/06/04 16:00:40;
-# switch to -L for shar'ing
-#
-# revision 1.8
-# date: 1991/06/04 13:12:25;
-# cleanup for release of version three
-#
-# revision 1.7
-# date: 1991/04/08 13:11:17;
-# added 'rw' target, and make some dos backup changes
-#
-# revision 1.6
-# date: 1991/04/04 09:38:12;
-# new REMOTE address
-#
-# revision 1.5
-# date: 1990/12/06 18:53:14;
-# fixed compr-shar entry, commented out remap.h target
-#
-# revision 1.4
-# date: 1990/12/03 12:01:37;
-# comment change
-#
-# revision 1.3
-# date: 1990/10/03 16:09:30;
-# shortened "shortnames" to "shorten" !
-#
-# revision 1.2
-# date: 1990/10/01 12:32:23;
-# added shortnames directory
-#
-# revision 1.1
-# date: 1990/09/21 10:25:38;
-# initial vile RCS revision
 #
 
 # (dickey's rules)

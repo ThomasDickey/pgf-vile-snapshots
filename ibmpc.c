@@ -10,128 +10,12 @@
  * display type.
  *
  * $Log: ibmpc.c,v $
- * Revision 1.40  1994/02/14 15:46:31  pgf
- * tom's interim post-3.65 changes
+ * Revision 1.42  1994/02/22 11:55:59  pgf
+ * CSENSE should map directly to the original display type/mode
  *
- * Revision 1.39  1994/02/14  15:14:26  pgf
- * free dos_memory in get_vga_bios_info
+ * Revision 1.41  1994/02/22  11:03:15  pgf
+ * truncated RCS log for 4.0
  *
- * Revision 1.38  1994/02/14  12:22:05  pgf
- * pack the int 10/1b structs under djgpp, and get the size passed
- * to dosmemget() right.
- *
- * Revision 1.37  1994/02/04  18:24:47  pgf
- * latest djgpp attempts at a successful get_vga_bios_info.  no luck yet.
- *
- * Revision 1.36  1994/02/03  19:35:12  pgf
- * tom's changes for 3.65
- *
- * Revision 1.35  1994/01/31  12:16:45  pgf
- * botched ifdef fix
- *
- * Revision 1.34  1994/01/28  21:02:38  pgf
- * better (?) support for DJGPP
- *
- * Revision 1.33  1994/01/11  17:27:42  pgf
- * changed GO32 to DJGPP
- *
- * Revision 1.32  1994/01/11  17:15:53  pgf
- * added testing driver table entries for omnibook -- 480-line-only displays
- * don't work yet
- *
- * Revision 1.31  1993/12/23  10:24:53  pgf
- * took out debugging ifdef
- *
- * Revision 1.30  1993/12/22  15:28:34  pgf
- * applying tom's 3.64 changes
- *
- * Revision 1.29  1993/12/08  17:04:45  pgf
- * save and restore cursor properly, even in the face of some display
- * changing traps that seem to want to reset it on us.
- *
- * Revision 1.28  1993/11/04  09:10:51  pgf
- * tom's 3.63 changes
- *
- * Revision 1.27  1993/10/11  18:50:10  pgf
- * mods for watcom.  still doesn't work
- *
- * Revision 1.26  1993/10/04  10:24:09  pgf
- * see tom's 3.62 changes
- *
- * Revision 1.25  1993/09/28  22:26:27  pgf
- * changes for djgpp
- *
- * Revision 1.24  1993/09/10  16:06:49  pgf
- * tom's 3.61 changes
- *
- * Revision 1.23  1993/09/06  16:28:01  pgf
- * don't change cursor shape or keyboard rate gratuitously
- * also, attempt to restore old page
- *
- * Revision 1.22  1993/09/03  09:11:54  pgf
- * tom's 3.60 changes
- *
- * Revision 1.21  1993/07/27  18:06:20  pgf
- * see tom's 3.56 CHANGES entry
- *
- * Revision 1.20  1993/07/09  19:11:48  pgf
- * fixed typo for watcom
- *
- * Revision 1.19  1993/07/09  14:03:30  pgf
- * oops.  inp() has only one arg
- *
- * Revision 1.18  1993/07/06  16:39:04  pgf
- * integrated Tuan DANG's changes for the djgpp compiler under DOS
- *
- * Revision 1.17  1993/06/25  11:25:55  pgf
- * patches for Watcom C/386, from Tuan DANG
- *
- * Revision 1.16  1993/06/18  15:57:06  pgf
- * tom's 3.49 changes
- *
- * Revision 1.15  1993/05/11  16:22:22  pgf
- * see tom's CHANGES, 3.46
- *
- * Revision 1.14  1993/05/04  17:05:14  pgf
- * see tom's CHANGES, 3.45
- *
- * Revision 1.13  1993/04/28  14:34:11  pgf
- * see CHANGES, 3.44 (tom)
- *
- * Revision 1.12  1993/04/20  12:18:32  pgf
- * see tom's 3.43 CHANGES
- *
- * Revision 1.11  1993/04/02  09:48:48  pgf
- * tom's changes for turbo
- *
- * Revision 1.10  1992/08/20  23:40:48  foxharp
- * typo fixes -- thanks, eric
- *
- * Revision 1.9  1992/07/08  08:23:57  foxharp
- * set screen attributes correctly in ibmeeop()
- *
- * Revision 1.8  1992/07/01  17:06:32  foxharp
- * pgf cleanup (in general I can't leave well enough alone...).  somewhere
- * along the way I made it work properly -- I think the problem was a missing
- * page number in ibmputc() -- but it might have been a badly calculated
- * attribute byte somewhere else...
- *
- * Revision 1.7  1992/06/25  23:00:50  foxharp
- * changes for dos/ibmpc
- *
- * Revision 1.4  1991/09/10  01:19:35  pgf
- * re-tabbed, and moved ESC and BEL to estruct.h
- *
- * Revision 1.3  1991/08/07  12:35:07  pgf
- * added RCS log messages
- *
- * revision 1.2
- * date: 1990/10/01 12:24:47;
- * changed newsize to newscreensize
- *
- * revision 1.1
- * date: 1990/09/21 10:25:27;
- * initial vile RCS revision
  */
 
 #define	termdef	1			/* don't define "term" external */
@@ -908,13 +792,11 @@ int n;		/* type of adapter to init for */
 	register int i;
 	int	     type, rows, cols;
 
-	/* If asked, find out what display is connected, and map into our
-	 * default for this driver-type.  That is, we map CDSENSE into one of
-	 * CDCGA, CDMONO, CDEGA, CDVGA so that we can automatically select the
-	 * default screen layout for the given display-type.
+	/* If asked, use the driver/mode combo we found when we started,
+	 * which is also what we will use when we quit.
 	 */
 	if (n == CDSENSE)
-		n = drivers[original_type].type;
+		n = original_type;
 
 	driver = &drivers[n];
 	type = driver->type;

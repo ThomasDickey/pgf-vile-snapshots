@@ -1,52 +1,7 @@
-Changes for vile ?.??: (released ???)
-(pgf)
-	+ fix core from one-too-many chars to strncpy(). (eval.c)
 
-	+ change #elif constructs in version.c to oldstyle #else/#if
-
-	+ applied contributed patch for implementing 0^D in insert mode,
-	  and expanded it to implement ^^D. (insert.c)
-
-	+ insert mode now parses function key #c pairs returned from
-	  kbd_key(), so arrow keys work.  (input.c insert.c)
-
-	+ no longer turn off dot recording for non-redoable commands if
-	  we're in insert mode. (exec.c)
-
-	+ display high-bit keyboard input on message line in either octal
-	  or hex, depending on global value of unprintable-as-octal. (bind.c)
-
-	+ implemented "alt-function-prefix" to make function-key parsing
-	  in insert mode less ambiguous.  (edef.h, insert.c, input.c, cmdtbl,
-	  main.c)
-
-	+ new help for arrow keys, and cd/pwd commands.  also some more
-	  pcvile differences.  (vile.hlp)
-
-	+ fixed djgpp implementation of get_vga_bios_info, by packing
-	  the structs int 10/1b deals with.  this makes 43 and 50 line modes
-	  work.  (still don't work with watcom, though) (ibmpc.c)
-
-	+ made :memory work under DJGPP	(main.c)
-	
-	+ made catnap() work under DJGPP, so flash mode works now. (random.c)
-
-	+ added more dependencies to makefile.djg
-
-
-(tom)
-	+ added new function 'parse_pathlist()' to encapsulate the logic used
-	  in lookup of vile.hlp (PATHLOOK) and the CDPATH environment variable
-	  (fixes buffer overflow in the latter).
-
-	+ corrected treatment of arrow-keys (in history.c) broken in 3.65
-	  (input.c, history.c).
-
-	+ modified ifdef's in 'interrupted()' to test type-ahead only
-	  for DJGPP configuration (main.c).
-
-	+ restored code that translated CDSENSE to driver type, because it did
-	  not set screen defaults to maximum size (ibmpc.c)
+NOTICE: This change log is officially (sez me) closed.
+	All further changes documented (hopefully) in "CHANGES".  This
+	file was renamed from "CHANGES" to "CHANGES.R3" on Tue Feb 22, 1994.
 
 Changes for vile 3.65: (released Mon Feb 7, 1994)
 (pgf)

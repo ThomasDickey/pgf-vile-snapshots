@@ -10,59 +10,9 @@
  *	(pgf, 1989)
  *
  * $Log: vmalloc.c,v $
- * Revision 1.17  1993/09/03 09:11:54  pgf
- * tom's 3.60 changes
+ * Revision 1.18  1994/02/22 11:03:15  pgf
+ * truncated RCS log for 4.0
  *
- * Revision 1.16  1993/08/13  16:32:50  pgf
- * tom's 3.58 changes
- *
- * Revision 1.15  1993/07/27  18:06:20  pgf
- * see tom's 3.56 CHANGES entry
- *
- * Revision 1.14  1993/07/01  16:15:54  pgf
- * tom's 3.51 changes
- *
- * Revision 1.13  1993/05/24  15:21:37  pgf
- * tom's 3.47 changes, part a
- *
- * Revision 1.12  1993/05/11  16:22:22  pgf
- * see tom's CHANGES, 3.46
- *
- * Revision 1.11  1993/04/28  14:34:11  pgf
- * see CHANGES, 3.44 (tom)
- *
- * Revision 1.10  1993/04/20  12:18:32  pgf
- * see tom's 3.43 CHANGES
- *
- * Revision 1.9  1993/01/23  13:38:23  foxharp
- * evar.h is now nevars.h
- *
- * Revision 1.8  1993/01/16  10:43:22  foxharp
- * use new macros
- *
- * Revision 1.7  1992/07/22  00:51:35  foxharp
- * took out the counters -- they no longer compile correctly
- *
- * Revision 1.6  1992/05/16  12:00:31  pgf
- * prototypes/ansi/void-int stuff/microsoftC
- *
- * Revision 1.5  1992/03/05  09:19:55  pgf
- * changed some mlwrite() to mlforce(), due to new terse support
- *
- * Revision 1.4  1991/11/01  14:38:00  pgf
- * saber cleanup
- *
- * Revision 1.3  1991/10/08  01:30:59  pgf
- * brought up to date, and ifdef LATER'd some stuff in
- * the accounting section -- doesn't work due to header inclusion
- * problems
- *
- * Revision 1.2  1991/08/07  12:35:07  pgf
- * added RCS log messages
- *
- * revision 1.1
- * date: 1990/09/21 10:26:17;
- * initial vile RCS revision
  */
 
 #if VMALLOC

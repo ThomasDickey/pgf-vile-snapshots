@@ -3,344 +3,9 @@
  *		5/9/86
  *
  * $Log: input.c,v $
- * Revision 1.97  1994/02/14 15:46:31  pgf
- * tom's interim post-3.65 changes
+ * Revision 1.99  1994/02/22 11:03:15  pgf
+ * truncated RCS log for 4.0
  *
- * Revision 1.96  1994/02/11  14:10:47  pgf
- * we now return altpoundc for function keys if we're in insertmode.  we
- * also trim the output of tgetc to ensure just 8 bits.
- *
- * Revision 1.95  1994/02/03  19:35:12  pgf
- * tom's changes for 3.65
- *
- * Revision 1.94  1994/01/31  18:19:09  pgf
- * calls to kbd_key() changed to tgetc(), and kbd_key() no longer sets
- * the SPEC bit -- instead, it translates system-dependent function codes
- * to a canonical representation: a 'poundc' followed by the character.
- * also, eliminated ifdefed code.
- *
- * Revision 1.93  1994/01/31  15:07:25  pgf
- * eraseChar now knows about 8-bit chars and their octal format
- *
- * Revision 1.92  1994/01/29  00:25:26  pgf
- * ifdef out all references to RECORDED_ESC.  it wasn't doing anything
- * anyway, not for a long time now.  really.
- *
- * Revision 1.91  1994/01/11  17:32:07  pgf
- * 'interrupted' is now a routine
- *
- * Revision 1.90  1993/11/04  09:10:51  pgf
- * tom's 3.63 changes
- *
- * Revision 1.89  1993/10/04  10:24:09  pgf
- * see tom's 3.62 changes
- *
- * Revision 1.88  1993/09/16  16:59:27  pgf
- * fixed typo
- *
- * Revision 1.87  1993/09/10  16:06:49  pgf
- * tom's 3.61 changes
- *
- * Revision 1.86  1993/09/03  09:11:54  pgf
- * tom's 3.60 changes
- *
- * Revision 1.85  1993/08/18  15:10:36  pgf
- * don't let the OPT_XTERM code do anything under X11
- *
- * Revision 1.84  1993/08/13  16:32:50  pgf
- * tom's 3.58 changes
- *
- * Revision 1.83  1993/07/27  18:06:20  pgf
- * see tom's 3.56 CHANGES entry
- *
- * Revision 1.82  1993/07/15  12:00:00  pgf
- * added mlquickask(), which does "raw" single character response queries
- *
- * Revision 1.81  1993/06/29  11:09:47  pgf
- * changed 'naptime' to 'timeout-value'
- *
- * Revision 1.80  1993/06/28  20:05:49  pgf
- * removed ifdef BEFORE stuff
- *
- * Revision 1.79  1993/06/28  15:07:35  pgf
- * when killing chars, check for c == killc or wkillc _before_ checking it
- * against backspace, in case DEL is someones killc or wkillc.
- *
- * Revision 1.78  1993/06/28  14:27:38  pgf
- * implemented GVAL_NAPTIME, as argument to catnap().  also added new arg
- * to catnap call, that terminates the nap when user input observed.
- *
- * Revision 1.77  1993/06/02  14:28:47  pgf
- * see tom's 3.48 CHANGES
- *
- * Revision 1.76  1993/05/24  15:25:41  pgf
- * tom's 3.47 changes, part b
- *
- * Revision 1.75  1993/05/05  10:31:30  pgf
- * cleaned up handling of SPEC keys from withing insert mode.  now, any
- * function bound to a SPECkey (i.e. any FN-? thing) can be executed
- * either from inside or outside insert mode.
- *
- * Revision 1.74  1993/05/04  17:05:14  pgf
- * see tom's CHANGES, 3.45
- *
- * Revision 1.73  1993/04/28  17:11:22  pgf
- * got rid of NeWS ifdefs
- *
- * Revision 1.72  1993/04/28  14:34:11  pgf
- * see CHANGES, 3.44 (tom)
- *
- * Revision 1.71  1993/04/22  11:17:00  pgf
- * support for dotcmdkreg
- *
- * Revision 1.70  1993/04/21  14:08:04  pgf
- * made dotcmdcnt static again
- *
- * Revision 1.69  1993/04/21  13:53:50  pgf
- * make repeat counts on '.' take precedence over original repeat counts
- *
- * Revision 1.68  1993/04/20  12:18:32  pgf
- * see tom's 3.43 CHANGES
- *
- * Revision 1.67  1993/04/07  13:54:23  pgf
- * fix bug in incr_dot_kregnum so "1P...  works correctly again.  this
- * was a mistranslation when the tbuffs were introduced
- *
- * Revision 1.66  1993/04/07  13:51:52  pgf
- * undo the recording glitch fix (1.61) which used to be reproducible with
- * ix<ESC>j.j.j.j.j.j.j typed very quickly.  this doesn't happen anymore,
- * and now i can do dd..."1P... and only have deletes happen when they're
- * supposed to.
- *
- * Revision 1.65  1993/04/01  13:07:50  pgf
- * see tom's 3.40 CHANGES
- *
- * Revision 1.64  1993/04/01  12:05:46  pgf
- * add setjmp/longjmp to tgetc() and catchintr(), so that ^C gets
- * through on BSD-style signals
- *
- * Revision 1.63  1993/03/25  19:50:58  pgf
- * see 3.39 section of CHANGES
- *
- * Revision 1.62  1993/03/19  12:33:18  pgf
- * fix for recording glitch
- *
- * Revision 1.61  1993/03/18  17:42:20  pgf
- * see 3.38 section of CHANGES
- *
- * Revision 1.60  1993/03/17  09:57:59  pgf
- * fix for calling shorten_path() correctly
- *
- * Revision 1.59  1993/03/16  10:53:21  pgf
- * see 3.36 section of CHANGES file
- *
- * Revision 1.58  1993/03/15  12:01:59  pgf
- * another fix to kbd_reply, so that search delimiters work correctly
- *
- * Revision 1.57  1993/03/11  17:55:36  pgf
- * don't return TRUE from kbd_reply if backspaced past start of buff
- *
- * Revision 1.56  1993/03/05  17:50:54  pgf
- * see CHANGES, 3.35 section
- *
- * Revision 1.55  1993/02/24  10:59:02  pgf
- * see 3.34 changes, in CHANGES file
- *
- * Revision 1.54  1993/02/15  10:37:31  pgf
- * cleanup for gcc-2.3's -Wall warnings
- *
- * Revision 1.53  1993/02/12  10:42:55  pgf
- * use insertion_cmd() routine to get the char that puts us in insert mode
- *
- * Revision 1.52  1993/02/08  14:53:35  pgf
- * see CHANGES, 3.32 section
- *
- * Revision 1.51  1993/01/16  10:35:40  foxharp
- * support for scrtch and shpipe chars in screen_string(), and use find_alt()
- * to pick up name of '#' buffer, rather than hist_lookup(1)
- *
- * Revision 1.50  1992/12/13  13:32:36  foxharp
- * got rid of extraneous assign
- *
- * Revision 1.49  1992/12/05  13:22:10  foxharp
- * make sure we escape eolchar with '\' if passed in in kbd_strings buffer,
- * since the user would have had to type the '\' to put it there themselves
- *
- * Revision 1.48  1992/12/04  09:25:34  foxharp
- * deleted unused assigns, no longer propagate pointer to block local
- * in kbd_string, and fix expansion arg to mlreply_no_bs()
- *
- * Revision 1.47  1992/12/03  00:32:59  foxharp
- * added new mlreply_no_bs, which doesn't do backslash processing
- *
- * Revision 1.46  1992/11/19  09:07:30  foxharp
- * added check on recursive replay in dotcmdplay() -- I think we should
- * never play or record a call to dotcmdplay, so we abort if we find ourselves
- * doing so.
- * also added kdone() call to finish up after ksetup()
- *
- * Revision 1.45  1992/08/20  23:40:48  foxharp
- * typo fixes -- thanks, eric
- *
- * Revision 1.44  1992/07/24  07:49:38  foxharp
- * shorten_name changes
- *
- * Revision 1.43  1992/07/18  13:13:56  foxharp
- * put all path-shortening in one place (shorten_path()), and took out some old code now
- * unnecessary
- *
- * Revision 1.42  1992/07/16  22:08:34  foxharp
- * make keyboard macros redoable -- when out of input on a dotcmd, be
- * sure to check for pending kbdmode input
- *
- * Revision 1.41  1992/07/15  23:23:12  foxharp
- * made '80i-ESC' work
- *
- * Revision 1.40  1992/07/04  14:32:08  foxharp
- * rearranged/improved the insertmode arrow key code
- *
- * Revision 1.39  1992/06/25  23:00:50  foxharp
- * changes for dos/ibmpc
- *
- * Revision 1.38  1992/05/19  08:55:44  foxharp
- * more prototype and shadowed decl fixups
- *
- * Revision 1.37  1992/05/16  12:00:31  pgf
- * prototypes/ansi/void-int stuff/microsoftC
- *
- * Revision 1.36  1992/03/19  23:21:33  pgf
- * linux portability (pathn)
- *
- * Revision 1.35  1992/03/07  10:28:52  pgf
- * don't write a null past the end of the input buffer in kbd_string
- *
- * Revision 1.34  1992/03/03  21:58:32  pgf
- * minor optimization in screen_string
- *
- * Revision 1.33  1992/03/03  09:35:52  pgf
- * added support for getting "words" out of the buffer via variables --
- * needed _nonspace character type
- *
- * Revision 1.32  1992/03/03  08:42:01  pgf
- * took out pre_colon_pos
- *
- * Revision 1.31  1992/02/17  09:05:12  pgf
- * make "RECORDED_ESC" work on machines whose natural chars are unsigned, and
- * add support for "pre_colon_pos", which is the value of DOT just before the
- * named command was run -- this lets ':' expand correctly in all cases
- *
- * Revision 1.30  1992/01/06  23:10:56  pgf
- * try no update() in get_recorded_char() -- don't know why it's
- * necessary
- *
- * Revision 1.29  1992/01/05  00:06:13  pgf
- * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
- * often.  also normalized message appearance somewhat.
- *
- * Revision 1.28  1991/12/11  06:30:58  pgf
- * fixed backslashing, yet again -- should now be able to search for a
- * slash in a buffer
- *
- * Revision 1.27  1991/11/08  13:24:05  pgf
- * ifdefed unused function
- *
- * Revision 1.26  1991/11/01  14:38:00  pgf
- * saber cleanup
- *
- * Revision 1.25  1991/10/29  03:00:53  pgf
- * added speckey function, for '#' prefixing, and allow ESC O x in addition
- * to ESC [ x as ANSI fkeys
- *
- * Revision 1.24  1991/10/23  14:20:53  pgf
- * changes to fix interactions between dotcmdmode and kbdmode and tungetc
- *
- * Revision 1.23  1991/10/22  14:36:21  pgf
- * bug in ANSI_SPEC -- local declaration of f_insert hid global
- *
- * Revision 1.22  1991/10/22  03:08:09  pgf
- * made wkillc work in kbd_string
- *
- * Revision 1.21  1991/09/26  13:15:03  pgf
- * make backslash processing optional in kbd_string, and
- * fix type mismatch in ANSI_SPEC code (f_insert)
- *
- * Revision 1.20  1991/09/17  00:51:17  pgf
- * fixed even more backslashing bugs
- *
- * Revision 1.19  1991/09/13  03:27:06  pgf
- * bugfix for backslash changes
- *
- * Revision 1.18  1991/09/13  03:06:39  pgf
- * backslashing now works -- expansion chars and backslashes can be
- * escaped properly
- *
- * Revision 1.17  1991/09/12  13:03:16  pgf
- * kbd_string now recognizes leading eolchar corectly, but there are still
- * problems with trying to quote it, as in :s/xxx/\//g to change xxx to / .
- *
- * Revision 1.16  1991/09/12  12:27:41	pgf
- * un-record characters pushed back with tungetc
- *
- * Revision 1.15  1991/09/10  00:46:57	pgf
- * cleanup of the dotcmd stuff, to prevent catnap() for escape sequences
- * during playback
- *
- * Revision 1.14  1991/08/16  11:01:39	pgf
- * added catnap() before typahead check on esc char in ANSI_SPEC, and
- * added REPLACECHAR special check on ANSI_SPEC, and
- * allow quoting of %, #, :, with \ in kbd_string, so they don't expand
- *
- * Revision 1.13  1991/08/12  15:06:21	pgf
- * added ANSI_SPEC capability -- can now use the arrow keys from
- * command or insert mode
- *
- * Revision 1.12  1991/08/12  10:24:16	pgf
- * interrupts can now interrupt keyboard recording
- *
- * Revision 1.11  1991/08/07  12:35:07	pgf
- * added RCS log messages
- *
- * revision 1.10
- * date: 1991/06/26 09:37:37;
- * removed ifdef BEFORE
- * 
- * revision 1.9
- * date: 1991/06/25 19:52:47;
- * massive data structure restructure
- * 
- * revision 1.8
- * date: 1991/06/04 09:20:31;
- * kcod2key is now a macro
- * 
- * revision 1.7
- * date: 1991/06/03 17:34:53;
- * switch from "meta" etc. to "ctla" etc.
- * 
- * revision 1.6
- * date: 1991/06/03 10:22:14;
- * took out some old ifdefs, and
- * fixed "can't escape a slash w/ a backslash" bug in searching
- * 
- * revision 1.5
- * date: 1991/02/19 18:05:36;
- * took out extraneous check
- * 
- * revision 1.4
- * date: 1990/12/03 12:02:16;
- * change 'word-under-cursor' expansion char to ':'
- * 
- * revision 1.3
- * date: 1990/11/07 14:28:41;
- * added '+' expansion character, to expand to the path-style string under the
- * cursor
- * 
- * revision 1.2
- * date: 1990/10/03 16:00:52;
- * make backspace work for everyone
- * 
- * revision 1.1
- * date: 1990/09/21 10:25:28;
- * initial vile RCS revision
  */
 
 #include	"estruct.h"
@@ -924,6 +589,20 @@ kbd_seq()
 }
 
 
+/* Read a character from the input, allowing an escape-sequence if we've got
+ * one stacked up.  Use this function when we want to get the 16-bit keycode
+ * for a single keystroke.
+ */
+int
+kbd_escape_seq ()
+{
+	register int	c = kbd_key();
+	if (c == poundc && did_tungetc()) {
+		c = SPEC | kbd_key();
+	}
+	return c;
+}
+
 /* get a string consisting of inclchartype characters from the current
 	position.  if inclchartype is 0, return everything to eol */
 #if ANSI_PROTOS
@@ -1389,8 +1068,11 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 	for (;;) {
 		int	EscOrQuo = ((quotef == TRUE) || ((backslashes & 1) != 0));
 
-		/* get a character from the user */
-		c = quotef ? tgetc(TRUE) : kbd_seq();
+		/*
+		 * Get a character from the user. If not quoted, treat escape
+		 * sequences as a single (16-bit) special character.
+		 */
+		c = quotef ? tgetc(TRUE) : kbd_escape_seq();
 
 		/* if we echoed ^V, erase it now */
 		if (quotef) {

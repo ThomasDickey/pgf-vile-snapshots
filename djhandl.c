@@ -6,14 +6,8 @@
  *	critical error handling from Bob Babcock.
  *
  *	$Log: djhandl.c,v $
- *	Revision 1.2  1994/02/07 12:24:28  pgf
- *	include stdlib.h rather than sys/types.h
- *
- * Revision 1.1  1994/01/31  12:16:05  pgf
- * fix compile errors
- *
- * Revision 1.0  1994/01/28  20:52:05  pgf
- * Initial revision
+ *	Revision 1.3  1994/02/22 11:03:15  pgf
+ *	truncated RCS log for 4.0
  *
  *
  */

@@ -7,37 +7,9 @@
 
 /*
  * $Log: epath.h,v $
- * Revision 1.10  1993/09/03 09:11:54  pgf
- * tom's 3.60 changes
+ * Revision 1.11  1994/02/22 11:03:15  pgf
+ * truncated RCS log for 4.0
  *
- * Revision 1.9  1993/08/10  10:54:28  pgf
- * added "sys$login:" to VMS search path
- *
- * Revision 1.8  1993/05/11  16:22:22  pgf
- * see tom's CHANGES, 3.46
- *
- * Revision 1.7  1992/12/14  09:03:25  foxharp
- * lint cleanup, mostly malloc
- *
- * Revision 1.6  1992/11/19  08:58:06  foxharp
- * added HELP_LOC support -- set in makefile, as alternate place to put vile.hlp
- *
- * Revision 1.5  1992/08/20  23:40:48  foxharp
- * typo fixes -- thanks, eric
- *
- * Revision 1.4  1992/03/19  23:16:33  pgf
- * ifdef fix
- *
- * Revision 1.3  1991/08/07  11:51:32  pgf
- * added RCS log entries
- *
- * revision 1.2
- * date: 1991/06/26 09:43:03;
- * added trailing slash on some file search paths
- * ----------------------------
- * revision 1.1
- * date: 1990/09/21 10:25:08;
- * initial vile RCS revision
  */
 
 /* first two entries are default startup and help files, the rest are

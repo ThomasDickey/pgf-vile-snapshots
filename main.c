@@ -14,547 +14,14 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.161  1994/02/14 15:46:31  pgf
- * tom's interim post-3.65 changes
+ * Revision 1.166  1994/02/22 18:09:24  pgf
+ * when choosing dos-mode for an ambiguous buffer, vote in favor of on
+ * if the global mode is set, and we're running on DOS.  otherwise, choose
+ * no-dos-mode.
  *
- * Revision 1.160  1994/02/14  15:15:21  pgf
- * make :memory work under djgpp
+ * Revision 1.165  1994/02/22  11:03:15  pgf
+ * truncated RCS log for 4.0
  *
- * Revision 1.159  1994/02/11  14:12:08  pgf
- * new dummy function, altspeckey
- *
- * Revision 1.158  1994/02/07  12:31:30  pgf
- * fix preprocessor syntax to suit older compilers
- *
- * Revision 1.157  1994/02/07  12:27:51  pgf
- * inherit local dos mode from the global mode when undecided, rather than
- * turning it off.
- *
- * Revision 1.156  1994/02/03  19:35:12  pgf
- * tom's changes for 3.65
- *
- * Revision 1.155  1994/02/03  10:16:53  pgf
- * if there might be a working message on the status line, clear it
- * before quitting
- *
- * Revision 1.154  1994/02/02  18:11:45  pgf
- * initialize meta-insert-bindings mode
- *
- * Revision 1.153  1994/02/01  18:45:17  pgf
- * changed printing-xxx defaults to 0
- *
- * Revision 1.152  1994/01/31  18:18:33  pgf
- * speckey() is now in main.c
- *
- * Revision 1.151  1994/01/31  12:17:28  pgf
- * make charinit() recallable, so we can change the printable set of
- * characters for 8-bit usage
- *
- * Revision 1.150  1994/01/28  20:55:32  pgf
- * ctrl-c/ctrl-break/crit-error handling for djgpp
- *
- * Revision 1.149  1994/01/11  17:31:29  pgf
- * added not_interrupted() routine
- *
- * Revision 1.148  1994/01/11  17:27:27  pgf
- * 'interrupted' is now a routine
- *
- * Revision 1.147  1993/12/22  15:28:34  pgf
- * applying tom's 3.64 changes
- *
- * Revision 1.146  1993/12/14  11:10:51  pgf
- * added '~' to ispath() character set
- *
- * Revision 1.145  1993/12/08  20:06:27  pgf
- * only beep on failed motions that return FALSE, since if they're ABORTed,
- * we've probably already been beeped. (like if you abort a search with ESC)
- *
- * Revision 1.144  1993/11/04  09:10:51  pgf
- * tom's 3.63 changes
- *
- * Revision 1.143  1993/10/04  10:24:09  pgf
- * see tom's 3.62 changes
- *
- * Revision 1.142  1993/09/20  21:37:07  pgf
- * flash is now off by default
- *
- * Revision 1.141  1993/09/16  11:07:58  pgf
- * added .scm to c-suffixes list.  for scheme.  this is getting a little
- * unwieldly.
- *
- * Revision 1.140  1993/09/10  16:06:49  pgf
- * tom's 3.61 changes
- *
- * Revision 1.139  1993/09/06  16:29:26  pgf
- * added multibeep mode
- *
- * Revision 1.138  1993/09/03  09:11:54  pgf
- * tom's 3.60 changes
- *
- * Revision 1.137  1993/08/18  11:51:56  pgf
- * turn off xterm-mouse mode by default
- *
- * Revision 1.136  1993/08/13  16:32:50  pgf
- * tom's 3.58 changes
- *
- * Revision 1.135  1993/08/05  14:29:12  pgf
- * tom's 3.57 changes
- *
- * Revision 1.134  1993/07/27  18:06:20  pgf
- * see tom's 3.56 CHANGES entry
- *
- * Revision 1.133  1993/07/22  14:02:38  pgf
- * change the para/section/sentence/comment REs to reflect new status of
- * \s and \S as strict atoms
- *
- * Revision 1.132  1993/07/21  11:34:12  pgf
- * make sure the BFSCRTCH bit is on while loading up vileinit, to suppress
- * undo actions
- *
- * Revision 1.131  1993/07/15  10:37:58  pgf
- * see 3.55 CHANGES
- *
- * Revision 1.130  1993/07/09  19:12:25  pgf
- * make DOS mode be on by default for MSDOS versions of vile
- *
- * Revision 1.129  1993/07/06  16:39:04  pgf
- * integrated Tuan DANG's changes for the djgpp compiler under DOS
- *
- * Revision 1.128  1993/07/01  16:18:26  pgf
- * oops -- mismerge
- *
- * Revision 1.127  1993/07/01  16:15:54  pgf
- * tom's 3.51 changes
- *
- * Revision 1.126  1993/06/29  11:09:47  pgf
- * changed 'naptime' to 'timeout-value'
- *
- * Revision 1.125  1993/06/28  16:59:53  pgf
- * if startup() fails, go straight to update() and loop()
- *
- * Revision 1.124  1993/06/28  14:31:40  pgf
- * implemented new mode, "naptime"
- *
- * Revision 1.123  1993/06/25  11:25:55  pgf
- * patches for Watcom C/386, from Tuan DANG
- *
- * Revision 1.122  1993/06/23  21:31:16  pgf
- * added "undolimit" mode
- *
- * Revision 1.121  1993/06/18  15:57:06  pgf
- * tom's 3.49 changes
- *
- * Revision 1.120  1993/06/10  14:58:10  pgf
- * initial :map support, from Otto Lind
- *
- * Revision 1.119  1993/06/02  14:28:47  pgf
- * see tom's 3.48 CHANGES
- *
- * Revision 1.118  1993/05/24  15:21:37  pgf
- * tom's 3.47 changes, part a
- *
- * Revision 1.117  1993/05/11  16:22:22  pgf
- * see tom's CHANGES, 3.46
- *
- * Revision 1.116  1993/05/11  15:46:42  pgf
- * commentary
- *
- * Revision 1.115  1993/05/06  11:56:59  pgf
- * mark the "vileinit" buffer active before switching to it, so swbuffer
- * doesn't try a readin()
- *
- * Revision 1.114  1993/05/05  11:27:48  pgf
- * reordered initial message and initial update, to make sure the update
- * happens for X11
- *
- * Revision 1.113  1993/05/04  17:05:14  pgf
- * see tom's CHANGES, 3.45
- *
- * Revision 1.112  1993/04/28  17:15:56  pgf
- * got rid of LOOKTAGS mode and ifdefs
- *
- * Revision 1.111  1993/04/28  17:11:22  pgf
- * got rid of NeWS ifdefs
- *
- * Revision 1.110  1993/04/28  14:34:11  pgf
- * see CHANGES, 3.44 (tom)
- *
- * Revision 1.109  1993/04/22  15:14:39  pgf
- * small fixups to do_num/rept_proc, and now they're static
- *
- * Revision 1.108  1993/04/21  14:38:16  pgf
- * support for glob mode
- *
- * Revision 1.107  1993/04/21  13:51:19  pgf
- * multiple repeat counts (as in 3d2l) now multiply correctly, and
- * repeat counts on '.' now take precedence over original counts
- *
- * Revision 1.106  1993/04/20  12:18:32  pgf
- * see tom's 3.43 CHANGES
- *
- * Revision 1.105  1993/04/09  13:36:47  pgf
- * made the dummy functions more real, so that prototypes work
- *
- * Revision 1.104  1993/04/08  11:09:27  pgf
- * implemented horizscroll mode
- *
- * Revision 1.103  1993/04/01  14:43:16  pgf
- * typo -- missing semicolon
- *
- * Revision 1.102  1993/04/01  13:07:50  pgf
- * see tom's 3.40 CHANGES
- *
- * Revision 1.101  1993/04/01  12:05:46  pgf
- * add setjmp/longjmp to tgetc() and catchintr(), so that ^C gets
- * through on BSD-style signals
- *
- * Revision 1.100  1993/03/25  19:50:58  pgf
- * see 3.39 section of CHANGES
- *
- * Revision 1.99  1993/03/17  11:35:04  pgf
- * cleaned up confusion in alt-tabstop mode
- *
- * Revision 1.98  1993/03/16  10:53:21  pgf
- * see 3.36 section of CHANGES file
- *
- * Revision 1.97  1993/03/05  18:46:39  pgf
- * fix for tab cursor positioning in insert mode, and mode to control
- * positioning style
- *
- * Revision 1.96  1993/03/05  17:50:54  pgf
- * see CHANGES, 3.35 section
- *
- * Revision 1.95  1993/02/24  10:59:02  pgf
- * see 3.34 changes, in CHANGES file
- *
- * Revision 1.94  1993/02/15  10:37:31  pgf
- * cleanup for gcc-2.3's -Wall warnings
- *
- * Revision 1.93  1993/02/08  14:53:35  pgf
- * see CHANGES, 3.32 section
- *
- * Revision 1.92  1993/01/23  13:38:23  foxharp
- * writeall is now in file.c,
- * use new exit code macros
- *
- * Revision 1.91  1993/01/16  10:37:36  foxharp
- * macro-ization of special filenames, and re-ordering of bval initializations
- *
- * Revision 1.90  1992/12/23  09:20:50  foxharp
- * added .C, .i to cmode suffixes, for C++ and cpp output files
- *
- * Revision 1.89  1992/12/14  09:03:25  foxharp
- * lint cleanup, mostly malloc
- *
- * Revision 1.88  1992/12/04  09:24:12  foxharp
- * deleted unused assigns
- *
- * Revision 1.87  1992/12/02  09:13:16  foxharp
- * changes for "c-shiftwidth"
- *
- * Revision 1.86  1992/11/19  09:11:45  foxharp
- * eric krohn's changes for xvile "foreground", "background", and "name"
- * arguments, and
- * the "_qident" class of characters, useful for C++ "qualified" identifiers
- *
- * Revision 1.85  1992/11/19  08:48:48  foxharp
- * comment fixup
- *
- * Revision 1.84  1992/08/20  23:40:48  foxharp
- * typo fixes -- thanks, eric
- *
- * Revision 1.83  1992/08/19  22:59:05  foxharp
- * catch SIGINT and critical errors under DOS, glob command line args,
- * and clean up debug log ifdefs
- *
- * Revision 1.82  1992/08/18  22:39:59  foxharp
- * prevent double zotting of VILEINIT buffer by delaying setting the
- * BFSCRTCH flag (which probably isn't necessary anyway)
- *
- * Revision 1.81  1992/08/11  23:29:53  foxharp
- * fixed core from vileinit buf getting killed too early -- no longer
- * a scratch buffer
- *
- * Revision 1.80  1992/08/07  21:41:09  foxharp
- * cosmetic ifdef cleanup
- *
- * Revision 1.79  1992/07/15  08:56:28  foxharp
- * find our basename, so we can come up in view mode if named "view".
- *
- * Revision 1.78  1992/07/13  22:14:37  foxharp
- * initialize TERSE and TAGSRELATIVE modes
- *
- * Revision 1.77  1992/07/13  09:26:56  foxharp
- * use canonpath() on args before creating their buffers
- *
- * Revision 1.76  1992/07/04  14:37:49  foxharp
- * allow the cursor to rest on the 'newline', in the case where we're in
- * the middle of insert mode, and are only out here due to using arrow
- * keys.  otherwise, there's no way to append to end of line with arrow
- * keys -- you're blocked at the last character.
- *
- * Revision 1.75  1992/07/01  17:01:42  foxharp
- * make sure startstat is always set properly, and
- * commented the usage of the FF logfile
- *
- * Revision 1.74  1992/06/26  22:22:23  foxharp
- * moved reset of curbp (after makecurrent()) up higher -- vtinit may
- * call update().
- * some small fixes to the dos arg. expander.
- * took out all the freshmem stuff -- it wasn't doing anything.
- *
- * Revision 1.73  1992/06/25  23:00:50  foxharp
- * changes for dos/ibmpc
- *
- * Revision 1.72  1992/06/22  08:36:14  foxharp
- * bug in section r.e.
- *
- * Revision 1.71  1992/06/12  22:23:42  foxharp
- * changes for separate 'comments' r.e. for formatregion
- *
- * Revision 1.70  1992/06/08  08:56:05  foxharp
- * added version no. to usage message
- *
- * Revision 1.69  1992/06/04  19:44:29  foxharp
- * added -V for version info
- *
- * Revision 1.68  1992/06/01  20:38:12  foxharp
- * writeall() no longer calls pressreturn() if successful, and
- * added initialization for "tabinsert" mode
- *
- * Revision 1.67  1992/05/31  22:11:11  foxharp
- * paragraph regexp augmented to support reformatting of comments
- *
- * Revision 1.66  1992/05/19  08:55:44  foxharp
- * more prototype and shadowed decl fixups
- *
- * Revision 1.65  1992/05/16  12:00:31  pgf
- * prototypes/ansi/void-int stuff/microsoftC
- *
- * Revision 1.64  1992/05/13  09:12:20  pgf
- * force initial update in X11 -- not sure why -- seems to wait for event
- * otherwise
- *
- * Revision 1.63  1992/04/30  17:53:37  pgf
- * use new \s atom in paragraph and section regexps
- *
- * Revision 1.62  1992/04/14  08:42:42  pgf
- * don't handle SIGWINCH in X11 case
- *
- * Revision 1.61  1992/04/10  18:49:23  pgf
- * mark VILEINIT buf as scratch, so it goes away quickly
- *
- * Revision 1.60  1992/04/09  08:32:35  pgf
- * new vilerc processing was happening too late, after the first buffer
- * was already in.  this kept some modes from "sticking"
- *
- * Revision 1.59  1992/04/02  23:00:28  pgf
- * fixed empty buffer bug, just introduced
- *
- * Revision 1.58  1992/03/24  07:44:05  pgf
- * added support for VILEINIT variable for initialization
- *
- * Revision 1.57  1992/03/19  23:22:46  pgf
- * SIGT for signals, linux port
- *
- * Revision 1.56  1992/03/19  23:09:22  pgf
- * usage cleanup
- *
- * Revision 1.55  1992/03/07  10:36:29  pgf
- * fix missing goto-line argument problem.  "vile + file.c" now goes to end of
- * file, as it should
- *
- * Revision 1.54  1992/03/05  09:19:55  pgf
- * changed some mlwrite() to mlforce(), due to new terse support
- *
- * Revision 1.53  1992/03/03  21:59:02  pgf
- * added '`' to the _wild character set
- *
- * Revision 1.52  1992/03/03  09:35:52  pgf
- * added support for getting "words" out of the buffer via variables --
- * needed _nonspace character type
- *
- * Revision 1.51  1992/02/17  08:58:12  pgf
- * added "showmode" support, and kill registers now hold unsigned chars
- *
- * Revision 1.50  1992/01/14  20:24:54  pgf
- * don't ask for pressreturn() confirmation in quickexit() (ZZ command)
- *
- * Revision 1.49  1992/01/10  08:08:28  pgf
- * added initialization of shiftwidth
- *
- * Revision 1.48  1992/01/05  00:06:13  pgf
- * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
- * often.  also normalized message appearance somewhat.
- *
- * Revision 1.47  1992/01/03  23:31:49  pgf
- * use new ch_fname() to manipulate filenames, since b_fname is now
- * a malloc'ed string, to avoid length limits
- *
- * Revision 1.46  1991/11/27  10:09:09  pgf
- * slight rearrangement of init code, to prevent null filenames in makecurrent
- *
- * Revision 1.45  1991/11/16  18:38:58  pgf
- * changes for better magic mode -- the regexps for sections, paras etc. had
- * to change
- *
- * Revision 1.44  1991/11/13  20:09:27  pgf
- * X11 changes, from dave lemke
- *
- * Revision 1.43  1991/11/07  02:00:32  pgf
- * lint cleanup
- *
- * Revision 1.42  1991/11/06  23:26:27  pgf
- * recomp the search pattern if set from command line, and
- * added _fence to chartypes
- *
- * Revision 1.41  1991/11/01  14:38:00  pgf
- * saber cleanup
- *
- * Revision 1.40  1991/10/29  14:35:29  pgf
- * implemented the & commands: substagain
- *
- * Revision 1.39  1991/10/29  03:02:55  pgf
- * rename ctlx? routines to be ...kbd_macro... names, and allowed
- * for replaying of named registers
- *
- * Revision 1.38  1991/10/28  14:25:44  pgf
- * VAL_ASAVE --> VAL_ASAVECNT
- *
- * Revision 1.37  1991/10/27  01:45:10  pgf
- * set new regex values in global_val_init
- *
- * Revision 1.36  1991/10/24  13:05:52  pgf
- * conversion to new regex package -- much faster
- *
- * Revision 1.35  1991/10/23  14:20:53  pgf
- * changes to fix interactions between dotcmdmode and kbdmode and tungetc
- *
- * Revision 1.34  1991/10/22  03:08:45  pgf
- * call cmdlinetag() for command-line tags
- *
- * Revision 1.33  1991/10/20  23:07:56  pgf
- * pass taglength value to tags()
- *
- * Revision 1.32  1991/10/18  10:56:54  pgf
- * modified VALUE structures and lists to make them more easily settable
- *
- * Revision 1.31  1991/10/15  03:10:49  pgf
- * added backspacelimit and taglength
- *
- * Revision 1.30  1991/09/26  13:13:54  pgf
- * initialize window values, and
- * make sure file writing errors in writeall() are made visible
- *
- * Revision 1.29  1991/09/19  13:39:17  pgf
- * MDEXACT is now MDIGNCASE, and initialize new VAL_TAGS value to "tags"
- *
- * Revision 1.28  1991/09/17  13:02:57  pgf
- * added write-all and brethren
- *
- * Revision 1.27  1991/09/10  00:46:07	pgf
- * cleanup of the dotcmd stuff
- *
- * Revision 1.26  1991/08/13  02:50:13	pgf
- * initialize showmatch b_val
- *
- * Revision 1.25  1991/08/12  11:22:52	pgf
- * added 'vi +/searchstring file.c' invocation
- *
- * Revision 1.24  1991/08/12  10:23:43	pgf
- * esc() no longer kills keyboard recording
- *
- * Revision 1.23  1991/08/08  23:28:49	pgf
- * moved init of VAL_FILL to after vtinit, since it depends on term.t_ncol
- *
- * Revision 1.22  1991/08/08  13:19:58	pgf
- * removed ifdef BEFORE
- *
- * Revision 1.21  1991/08/07  12:35:07	pgf
- * added RCS log messages
- *
- * revision 1.20
- * date: 1991/08/06 15:55:24;
- * fixed dos mode on empty buffer
- *
- * revision 1.19
- * date: 1991/08/06 15:23:42;
- *  global/local values
- *
- * revision 1.18
- * date: 1991/07/23 11:12:19;
- * don't reset lastdot if absolute motion is on behalf of an operator
- *
- * revision 1.17
- * date: 1991/07/19 17:16:03;
- * ignore SIG_QUIT unless DEBUG
- *
- * revision 1.16
- * date: 1991/06/28 10:53:42;
- * undo last change -- was breaking some ops
- *
- * revision 1.15
- * date: 1991/06/27 19:45:16;
- * moved back from eol and eob to execute()
- *
- * revision 1.14
- * date: 1991/06/26 09:38:15;
- * removed an ifdef BEFORE
- *
- * revision 1.13
- * date: 1991/06/25 19:52:59;
- * massive data structure restructure
- *
- * revision 1.12
- * date: 1991/06/16 17:36:17;
- * support for local vs. global fillcol value
- *
- * revision 1.11
- * date: 1991/06/07 22:00:18;
- * changed header
- *
- * revision 1.10
- * date: 1991/06/07 13:22:23;
- * don't move "last dot" mark if ABS command doesn't change dot
- *
- * revision 1.9
- * date: 1991/06/03 17:34:55;
- * switch from "meta" etc. to "ctla" etc.
- *
- * revision 1.8
- * date: 1991/06/03 10:25:16;
- * command loop is now a separate routine, and
- * if (doingopcmd) stuff is now in operators()
- *
- * revision 1.7
- * date: 1991/05/31 12:54:25;
- * put _wild chartypes back in -- dropped by mistake
- *
- * revision 1.6
- * date: 1991/05/31 11:12:19;
- * changed args to execute(), and
- * added linespec character class, and
- * added unimplemented ex functions
- *
- * revision 1.5
- * date: 1991/04/22 09:00:12;
- * added iswild type to chartypes
- *
- * revision 1.4
- * date: 1991/04/04 09:37:48;
- * new arg. to unqname
- *
- * revision 1.3
- * date: 1991/02/19 17:27:03;
- * set up the reverse pattern if -s is given
- *
- * revision 1.2
- * date: 1990/10/03 16:00:57;
- * make backspace work for everyone
- *
- * revision 1.1
- * date: 1990/09/21 10:25:35;
- * initial vile RCS revision
  */
 
 /* Make global definitions not external */
@@ -679,7 +146,7 @@ char	*argv[];
 	/* Parse the command line */
 	for (carg = 1; carg < argc; ++carg) {
 		register char *param = argv[carg];
-#if X11
+#if X11 && !XTOOLKIT
 		if (*param == '=') {
 			x_set_geometry(param);
 			continue;
@@ -690,7 +157,7 @@ char	*argv[];
 		/* Process Switches */
 		if (*param == '-') {
 			switch (*(++param)) {
-#if X11
+#if X11 && !XTOOLKIT
 			case 'd':
 				if ((param = argv[++carg]) != 0)
 					x_set_dpy(param);
@@ -911,7 +378,7 @@ char	*argv[];
 		bp->b_active = TRUE;
 #if DOSFILES
 		make_local_b_val(bp,MDDOS);
-		set_b_val(bp, MDDOS, global_b_val(MDDOS) );
+		set_b_val(bp, MDDOS, MSDOS && global_b_val(MDDOS) );
 #endif
 		swbuffer(bp);
 	}
@@ -1226,11 +693,7 @@ global_val_init()
 	set_global_b_val(MDCRYPT,	FALSE);	/* crypt */
 #endif
 	set_global_b_val(MDIGNCASE,	FALSE); /* exact matches */
-#if MSDOS
-	set_global_b_val(MDDOS, TRUE);	/* on by default */
-#else
-	set_global_b_val(MDDOS, FALSE);	/* off by default */
-#endif
+	set_global_b_val(MDDOS, MSDOS);	/* on by default on DOS, off others */
 	set_global_b_val(MDMAGIC,	TRUE); 	/* magic searches */
 	set_global_b_val( MDMETAINSBIND, TRUE); /* honor meta-bindings when
 							in insert mode */
@@ -1345,7 +808,6 @@ int
 interrupted()
 {
 #if MSDOS && DJGPP
-	int c;
 
 	if (_go32_was_ctrl_break_hit() != 0) {
 		while(typahead())
@@ -1362,6 +824,7 @@ interrupted()
 		return TRUE;
 #ifdef NEEDED
 	if (typahead()) {
+		int c;
 		c = tgetc(FALSE);
 		if (c == tocntrl('C'))
 			return TRUE;
@@ -1476,7 +939,7 @@ int *cp, *fp, *np;
 
 	c = *cp;
 
-	if (iscntrl(c) || (c & (CTLA|CTLX|SPEC)))
+	if (iscntrl(c) || isspecial(c))
 		return;
 
 	f = *fp;

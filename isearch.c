@@ -17,80 +17,9 @@
  * ever equalled FALSE.
  *
  * $Log: isearch.c,v $
- * Revision 1.26  1994/01/31 18:17:04  pgf
- * changed kbd_key() to tgetc(), and eliminated unnecessary calls on
- * kcod2key()
+ * Revision 1.27  1994/02/22 11:03:15  pgf
+ * truncated RCS log for 4.0
  *
- * Revision 1.25  1993/10/04  10:24:09  pgf
- * see tom's 3.62 changes
- *
- * Revision 1.24  1993/08/05  14:29:12  pgf
- * tom's 3.57 changes
- *
- * Revision 1.23  1993/07/27  18:06:20  pgf
- * see tom's 3.56 CHANGES entry
- *
- * Revision 1.22  1993/07/01  16:15:54  pgf
- * tom's 3.51 changes
- *
- * Revision 1.21  1993/06/18  15:57:06  pgf
- * tom's 3.49 changes
- *
- * Revision 1.20  1993/05/04  17:05:14  pgf
- * see tom's CHANGES, 3.45
- *
- * Revision 1.19  1993/04/28  17:11:22  pgf
- * got rid of NeWS ifdefs
- *
- * Revision 1.18  1993/04/01  12:53:33  pgf
- * removed redundant includes and declarations
- *
- * Revision 1.17  1992/12/23  09:20:10  foxharp
- * ifdef of unused code
- *
- * Revision 1.16  1992/05/25  21:07:48  foxharp
- * extern func declarations moved to header
- *
- * Revision 1.15  1992/05/19  08:55:44  foxharp
- * more prototype and shadowed decl fixups
- *
- * Revision 1.14  1992/05/16  12:00:31  pgf
- * prototypes/ansi/void-int stuff/microsoftC
- *
- * Revision 1.13  1992/03/01  18:41:31  pgf
- * took out the checknext optimization, since we no longer move along
- * the found string quite the way we used to
- *
- * Revision 1.12  1992/01/05  00:06:13  pgf
- * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
- * often.  also normalized message appearance somewhat.
- *
- * Revision 1.11  1991/11/16  18:34:31  pgf
- * pass magic mode as flag to regcomp()
- *
- * Revision 1.10  1991/11/01  14:38:00  pgf
- * saber cleanup
- * Revision 1.9  1991/10/30  14:55:43  pgf renamed
- * thescanner to scanner and setboundry to scanboundry
- *
- * Revision 1.8  1991/10/27  01:46:27  pgf switch to regexp from regex package,
- * and moved expandp to this file
- *
- * Revision 1.7  1991/10/24  13:05:52  pgf conversion to new regex package --
- * much faster
- *
- * Revision 1.6  1991/08/07  12:35:07  pgf added RCS log messages
- *
- * revision 1.5 date: 1991/06/26 09:37:56; renamed an ifdef BEFORE
- *
- * revision 1.4 date: 1991/06/25 19:52:50; massive data structure restructure
- *
- * revision 1.3 date: 1991/06/03 10:23:22; cleanup, and made it work with newer
- * scanner (setboundry())
- *
- * revision 1.2 date: 1990/10/03 16:00:54; make backspace work for everyone
- *
- * revision 1.1 date: 1990/09/21 10:25:30; initial vile RCS revision
  */
 
 #include	"estruct.h"

@@ -3,48 +3,9 @@
  *		6/3/93
  *
  * $Log: map.c,v $
- * Revision 1.12  1994/02/14 15:46:31  pgf
- * tom's interim post-3.65 changes
+ * Revision 1.13  1994/02/22 11:03:15  pgf
+ * truncated RCS log for 4.0
  *
- * Revision 1.11  1994/02/03  19:35:12  pgf
- * tom's changes for 3.65
- *
- * Revision 1.10  1993/12/22  15:28:34  pgf
- * applying tom's 3.64 changes
- *
- * Revision 1.9  1993/09/03  09:11:54  pgf
- * tom's 3.60 changes
- *
- * Revision 1.8  1993/08/13  16:32:50  pgf
- * tom's 3.58 changes
- *
- * Revision 1.7  1993/08/05  14:29:12  pgf
- * tom's 3.57 changes
- *
- * Revision 1.6  1993/07/15  10:37:58  pgf
- * see 3.55 CHANGES
- *
- * Revision 1.5  1993/07/01  16:15:54  pgf
- * tom's 3.51 changes
- *
- * Revision 1.4  1993/06/30  17:42:50  pgf
- * cleaned up, made SPEC bindings work
- *
- * Revision 1.3  1993/06/28  20:04:14  pgf
- * string_to_key replaced with prc2kcod
- *
- * Revision 1.2  1993/06/10  16:13:52  pgf
- * moved the recursion check from map_proc to map_check.  this makes
- * nesting possible, but loops are not detected....
- *
- * Revision 1.1  1993/06/10  14:58:47  pgf
- * ansification, and a little reformatting (sorry, otto...  :-)
- *
- * otto's Revision 1.2  93/06/06  21:27:33  otto
- * Added unmap, cleaned up.
- * 
- * otto's Revision 1.1  93/06/04  23:42:11  otto
- * Initial revision
  * 
  */
 

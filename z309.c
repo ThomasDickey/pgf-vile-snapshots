@@ -4,18 +4,9 @@
  * It compiles into nothing if not a Zenith driver.
  *
  * $Log: z309.c,v $
- * Revision 1.4  1993/04/01 12:53:33  pgf
- * removed redundant includes and declarations
+ * Revision 1.5  1994/02/22 11:03:15  pgf
+ * truncated RCS log for 4.0
  *
- * Revision 1.3  1992/07/01  17:00:31  foxharp
- * scwrite arg changes
- *
- * Revision 1.2  1991/08/07  12:35:07  pgf
- * added RCS log messages
- *
- * revision 1.1
- * date: 1990/09/21 10:26:29;
- * initial vile RCS revision
  */
 
 #define	termdef	1			/* don't define "term" external */

@@ -10,523 +10,12 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.156  1994/02/14 15:46:31  pgf
- * tom's interim post-3.65 changes
+ * Revision 1.163  1994/02/22 18:29:15  pgf
+ * make sure MSDOS is always defined, at least as 0 if we're not on DOS
  *
- * Revision 1.155  1994/02/11  11:06:07  pgf
- * add linux to gethostname(), and made strtol prototype match proto.h
+ * Revision 1.162  1994/02/22  11:03:15  pgf
+ * truncated RCS log for 4.0
  *
- * Revision 1.154  1994/02/07  12:24:48  pgf
- * added LBRACK/RBRACK defines for [ and ]
- *
- * Revision 1.153  1994/02/03  19:35:12  pgf
- * tom's changes for 3.65
- *
- * Revision 1.152  1994/02/01  19:44:49  pgf
- * added HAVE_GETHOSTNAME
- *
- * Revision 1.151  1994/01/31  12:28:59  pgf
- * added define for HIGHBIT (as 0x80)
- *
- * Revision 1.150  1994/01/29  00:24:56  pgf
- * allow 8-bit input: changed SPEC define, and bumped N_chars to 256
- *
- * Revision 1.149  1994/01/27  18:00:15  pgf
- * new define, for min no. of lines per screen
- *
- * Revision 1.148  1994/01/27  17:39:53  pgf
- * changed if_OPT_WORKING to simple ifdef
- *
- * Revision 1.147  1994/01/11  17:27:42  pgf
- * changed GO32 to DJGPP
- *
- * Revision 1.146  1993/12/22  15:28:34  pgf
- * applying tom's 3.64 changes
- *
- * Revision 1.145  1993/11/04  09:10:51  pgf
- * tom's 3.63 changes
- *
- * Revision 1.144  1993/10/11  18:50:37  pgf
- * turn on DOS mouse code only for turbo-c
- *
- * Revision 1.143  1993/10/04  10:24:09  pgf
- * see tom's 3.62 changes
- *
- * Revision 1.142  1993/09/28  22:26:27  pgf
- * changes for djgpp
- *
- * Revision 1.141  1993/09/16  11:07:32  pgf
- * added LPAREN/RPAREN
- *
- * Revision 1.140  1993/09/10  16:06:49  pgf
- * tom's 3.61 changes
- *
- * Revision 1.139  1993/09/03  09:11:54  pgf
- * tom's 3.60 changes
- *
- * Revision 1.138  1993/08/18  16:45:00  pgf
- * added VIEWOK flag for functions that execute macros.  it says it's okay
- * to execute them in view mode, even though they have the UNDO bit set
- *
- * Revision 1.137  1993/08/18  15:10:36  pgf
- * OPT_XTERM is now turned on for X11, as an ease-of-use feature for the
- * user.  it doesn't actually do anything
- *
- * Revision 1.136  1993/08/18  11:52:12  pgf
- * turn off OPT_WORKING for USG builds
- *
- * Revision 1.135  1993/08/13  16:32:50  pgf
- * tom's 3.58 changes
- *
- * Revision 1.134  1993/08/05  14:39:55  pgf
- * removed conflicting #define USG 0 from djgpp settings
- *
- * Revision 1.133  1993/08/05  14:29:12  pgf
- * tom's 3.57 changes
- *
- * Revision 1.132  1993/07/27  18:06:20  pgf
- * see tom's 3.56 CHANGES entry
- *
- * Revision 1.131  1993/07/20  18:07:24  pgf
- * change which ScratchName macro is used for STDC
- *
- * Revision 1.130  1993/07/15  10:37:58  pgf
- * see 3.55 CHANGES
- *
- * Revision 1.129  1993/07/09  14:00:38  pgf
- * fix for predefined GO32 in DJ GCC
- *
- * Revision 1.128  1993/07/06  16:55:12  pgf
- * corrected calloc macro definition
- *
- * Revision 1.127  1993/07/06  16:39:04  pgf
- * integrated Tuan DANG's changes for the djgpp compiler under DOS
- *
- * Revision 1.126  1993/07/06  12:32:50  pgf
- * added b_modtime_at_warn to BUFFER
- *
- * Revision 1.125  1993/07/01  16:15:54  pgf
- * tom's 3.51 changes
- *
- * Revision 1.124  1993/06/30  10:05:54  pgf
- * change ABS to ABSM, since osf/1 defines ABS in a system header
- *
- * Revision 1.123  1993/06/29  17:58:56  pgf
- * allow undo to preserve DOT's offset, by overloading two more fields in
- * the LINE struct to hold the forward and backward offsets
- *
- * Revision 1.122  1993/06/28  15:27:40  pgf
- * deleted vestigial #define TIMING
- *
- * Revision 1.121  1993/06/25  11:25:55  pgf
- * patches for Watcom C/386, from Tuan DANG
- *
- * Revision 1.120  1993/06/23  21:32:25  pgf
- * added "undolimit" mode, and made undo able to restore unmodified state
- * to buffer, based on a new type of stack separator
- *
- * Revision 1.119  1993/06/22  10:27:31  pgf
- * new macros for undo stack separators
- *
- * Revision 1.118  1993/06/18  15:57:06  pgf
- * tom's 3.49 changes
- *
- * Revision 1.117  1993/06/02  14:28:47  pgf
- * see tom's 3.48 CHANGES
- *
- * Revision 1.116  1993/05/24  15:25:41  pgf
- * tom's 3.47 changes, part b
- *
- * Revision 1.115  1993/05/24  15:21:37  pgf
- * tom's 3.47 changes, part a
- *
- * Revision 1.114  1993/05/11  16:22:22  pgf
- * see tom's CHANGES, 3.46
- *
- * Revision 1.113  1993/05/05  11:41:05  pgf
- * backspc is now handled separately from chartypes[backspc]
- *
- * Revision 1.112  1993/05/04  17:05:14  pgf
- * see tom's CHANGES, 3.45
- *
- * Revision 1.111  1993/04/28  17:11:22  pgf
- * got rid of NeWS ifdefs
- *
- * Revision 1.110  1993/04/28  14:34:11  pgf
- * see CHANGES, 3.44 (tom)
- *
- * Revision 1.109  1993/04/21  15:41:27  pgf
- * changed NAMEC from SPACE to TAB
- *
- * Revision 1.108  1993/04/20  12:18:32  pgf
- * see tom's 3.43 CHANGES
- *
- * Revision 1.107  1993/04/02  10:59:13  pgf
- * vms needs setjmp.h
- *
- * Revision 1.106  1993/04/01  14:43:39  pgf
- * fix for NeXT
- *
- * Revision 1.105  1993/04/01  13:07:50  pgf
- * see tom's 3.40 CHANGES
- *
- * Revision 1.104  1993/04/01  12:01:07  pgf
- * add setjmp.h
- *
- * Revision 1.103  1993/03/25  19:50:58  pgf
- * see 3.39 section of CHANGES
- *
- * Revision 1.102  1993/03/17  10:00:29  pgf
- * initial changes to make VMS work again
- *
- * Revision 1.101  1993/03/16  10:53:21  pgf
- * see 3.36 section of CHANGES file
- *
- * Revision 1.100  1993/03/05  17:50:54  pgf
- * see CHANGES, 3.35 section
- *
- * Revision 1.99  1993/02/24  10:59:02  pgf
- * see 3.34 changes, in CHANGES file
- *
- * Revision 1.98  1993/02/24  09:31:02  pgf
- * added macro for catching ">>filename", for appending
- *
- * Revision 1.97  1993/02/12  10:42:32  pgf
- * don't redefine "const" on linux
- *
- * Revision 1.96  1993/02/08  14:53:35  pgf
- * see CHANGES, 3.32 section
- *
- * Revision 1.95  1993/01/23  13:38:23  foxharp
- * macros for process exit codes for VMS,
- *
- * Revision 1.94  1993/01/16  10:28:35  foxharp
- * new chartypes (scrtch, shpipe), new mode (autobuffer), new macros
- * (isShellOrPipe, isScratchName, isInternalName, for_each_buffer,
- * for_each_window)
- *
- * Revision 1.93  1993/01/12  08:48:43  foxharp
- * tom dickey's changes to support "set number", i.e. line numbering
- *
- * Revision 1.92  1992/12/20  14:38:46  foxharp
- * added lflipmark macro, for 'v' command
- *
- * Revision 1.91  1992/12/14  08:29:18  foxharp
- * changes for lint support, from Tom Dickey.  Still not nearly 100% lint free,
- * and may not get much closer -- the code gets too ugly for me....
- *
- * Revision 1.90  1992/12/05  13:53:56  foxharp
- * fix APOLLO signal types
- *
- * Revision 1.89  1992/12/04  09:28:35  foxharp
- * added APOLLO
- *
- * Revision 1.88  1992/12/02  09:13:16  foxharp
- * changes for "c-shiftwidth"
- *
- * Revision 1.87  1992/11/19  08:59:00  foxharp
- * added "qident" bit definition, for "qualified" (a la c++) identifiers
- *
- * Revision 1.86  1992/08/19  22:55:55  foxharp
- * made NFILEN bigger -- much safer
- *
- * Revision 1.85  1992/08/07  17:32:47  pgf
- * don't use bcopy
- *
- * Revision 1.84  1992/08/06  23:51:47  foxharp
- * nextsw() now finds next "shiftwidth stop", like nextab() finds next tabstop
- *
- * Revision 1.83  1992/08/04  20:09:59  foxharp
- * bsd386 doesn't have bfill, but it does have mem{set,cpy}
- *
- * Revision 1.82  1992/07/24  18:22:51  foxharp
- * deleted local atoi() routine -- now we use the system's copy
- *
- * Revision 1.81  1992/07/20  22:45:53  foxharp
- * if using TERMCAP, define TTputc directly as putchar(),
- * for some performance gain
- *
- * Revision 1.80  1992/07/17  19:16:45  foxharp
- * change "sun" to "SUNOS" to make way for solaris
- *
- * Revision 1.79  1992/07/13  20:08:17  foxharp
- * "terse" is now a boolean mode rather than a variable, and
- * added "tagsrelative" mode
- *
- * Revision 1.78  1992/07/13  09:24:41  foxharp
- * added b_dispfname, which will allow printing shorter paths
- * for files by trimming leading 'pwd' matches
- *
- * Revision 1.77  1992/07/08  08:20:22  foxharp
- * made the _rest_ of the command flags long.  sigh.
- *
- * Revision 1.76  1992/07/07  08:36:07  foxharp
- * redefined the command flags as long constants, so the upper 16 bits don't
- * get lost on 16 bit machines.  (DOS)
- *
- * Revision 1.75  1992/07/01  17:00:59  foxharp
- * added ZIBMPC define, and comment re: COLOR support
- *
- * Revision 1.74  1992/06/25  23:00:50  foxharp
- * changes for dos/ibmpc
- *
- * Revision 1.73  1992/06/22  08:33:28  foxharp
- * another ifdef for UNIXPC
- *
- * Revision 1.72  1992/06/12  22:23:42  foxharp
- * changes for separate 'comments' r.e. for formatregion
- *
- * Revision 1.71  1992/06/04  19:42:37  foxharp
- * use #ifdef __STDC__ in favor of #if
- *
- * Revision 1.70  1992/06/01  20:35:59  foxharp
- * added "tabinsert" support
- *
- * Revision 1.69  1992/05/25  21:27:14  foxharp
- * some func declarations moved in here, from edef.h and other .c files
- *
- * Revision 1.68  1992/05/25  21:25:35  foxharp
- * bad control char in log comment
- *
- * Revision 1.67  1992/05/20  18:57:16  foxharp
- * added a/ux, fixed my stdarg ifdef
- *
- * Revision 1.66  1992/05/19  18:28:04  foxharp
- * more proto-isms
- *
- * Revision 1.65  1992/05/19  09:15:45  foxharp
- * more prototype fixups
- *
- * Revision 1.64  1992/05/16  12:00:31  pgf
- * prototypes/ansi/void-int stuff/microsoftC
- *
- * Revision 1.63  1992/04/30  17:53:09  pgf
- * fixed ifdef on HAVE_MKDIR
- *
- * Revision 1.62  1992/04/14  08:55:38  pgf
- * added support for OSF1 (affects termio only)
- *
- * Revision 1.61  1992/04/10  19:52:40  pgf
- * make sure svr3 implies usg
- *
- * Revision 1.60  1992/04/10  18:51:31  pgf
- * rearrange some config ifdefs, so makefile can do config with targets
- *
- * Revision 1.59  1992/03/26  09:15:23  pgf
- * system choice ifdef cleanup
- *
- * Revision 1.58  1992/03/25  19:13:17  pgf
- * BSD portability changes
- *
- * Revision 1.57  1992/03/24  22:45:55  pgf
- * corrected typos
- *
- * Revision 1.56  1992/03/19  23:33:35  pgf
- * added b_linecount to BUFFER, so finderr can count from bottom of buffer
- *
- * Revision 1.55  1992/03/19  23:17:52  pgf
- * SIGT for signals, and linux portability
- *
- * Revision 1.54  1992/03/07  10:21:29  pgf
- * added AIX support (also need to link against -lcurses)
- *
- * Revision 1.53  1992/03/03  09:35:52  pgf
- * added support for getting "words" out of the buffer via variables --
- * needed _nonspace character type
- *
- * Revision 1.52  1992/03/01  18:38:40  pgf
- * compilation error #if COLOR
- *
- * Revision 1.51  1992/02/17  09:18:55  pgf
- * turn off DEBUG and DEBUGM for release
- *
- * Revision 1.50  1992/02/17  09:00:28  pgf
- * added "showmode" support, and
- * kill registers now hold unsigned chars
- *
- * Revision 1.49  1992/01/22  20:30:08  pgf
- * added HPUX "support", and big warning for non-CRYPT support
- *
- * Revision 1.48  1992/01/10  07:10:46  pgf
- * added VAL_SWIDTH
- *
- * Revision 1.47  1992/01/03  23:29:37  pgf
- * added UNIXPC support (on hints from Eric Krohn), and
- * changed the b_fname element of a BUFFER to a pointer
- *
- * Revision 1.46  1992/01/01  16:16:52  pgf
- * fixed typo
- *
- * Revision 1.45  1991/11/18  08:35:32  pgf
- * ifdef botch
- *
- * Revision 1.44  1991/11/16  18:29:15  pgf
- * ifdef cleanup
- *
- * Revision 1.43  1991/11/13  20:09:27  pgf
- * X11 changes, from dave lemke
- *
- * Revision 1.42  1991/11/08  13:18:23  pgf
- * added FIOABRT error
- *
- * Revision 1.41  1991/11/06  23:28:08  pgf
- * added fence character type macros
- * getfence() will scan for a fence if not on one to begin with.  it'll
- * scan in either direction, depending on arg to matchfence or matchfenceback
- *
- * Revision 1.40  1991/11/01  14:24:11  pgf
- * added lsprintf decl
- *
- * Revision 1.39  1991/11/01  14:10:35  pgf
- * make matchlen part of the regexp struct:  mlen, and
- * changed regmust from pointer to offset into program, to make
- * regexps relocatable
- *
- * Revision 1.38  1991/10/28  14:24:04  pgf
- * eliminated some useless macros, made gacount part of the BUFFER struct
- *
- * Revision 1.37  1991/10/27  01:58:53  pgf
- * added declarations/definitions for the regexp stuff (courtesy Henry Spencer),
- * and added the new regex value definitions
- *
- * Revision 1.36  1991/10/24  13:05:52  pgf
- * conversion to new regex package -- much faster
- *
- * Revision 1.35  1991/10/23  12:05:37  pgf
- * support for the NeXT machine
- *
- * Revision 1.34  1991/10/18  10:56:54  pgf
- * modified VALUE structures and lists to make them more easily settable
- *
- * Revision 1.33  1991/10/15  03:10:00  pgf
- * added backspacelimit and taglength
- *
- * Revision 1.32  1991/10/10  12:33:33  pgf
- * changes to support "block malloc" of line text -- now for most files
- * there is are two mallocs and a single read, no copies.  previously there
- * were two mallocs per line, and two copies (stdio's and ours).  This change
- * implies that lines and line text should not move between buffers, without
- * checking that the text and line struct do not "belong" to the buffer.
- *
- * Revision 1.31  1991/09/26  13:08:55  pgf
- * created window values, moved list mode there
- *
- * Revision 1.30  1991/09/19  13:35:29  pgf
- * MDEXACT is now MDIGNCASE, and names are now more vi-compliant
- *
- * Revision 1.29  1991/09/10  12:29:57  pgf
- * added b_wline macro into b_wtraits
- *
- * Revision 1.28  1991/09/10  01:08:28  pgf
- * added BEL define
- *
- * Revision 1.27  1991/09/10  00:44:29  pgf
- * added ESC defines
- *
- * Revision 1.26  1991/08/16  10:58:54  pgf
- * added the third flavor of insertmode
- *
- * Revision 1.25  1991/08/13  02:48:59  pgf
- * added select and poll selectors, and alphabetized the VAL_XXX's
- *
- * Revision 1.24  1991/08/12  15:06:21  pgf
- * added ANSI_SPEC capability -- can now use the arrow keys from
- * command or insert mode
- *
- * Revision 1.23  1991/08/12  09:25:10  pgf
- * now store w_line in w_traits while buffer is offscreen, so reframe
- * isn't always necessary.  don't force reframe on redisplay.
- *
- * Revision 1.22  1991/08/07  11:51:32  pgf
- * added RCS log entries
- *
- * revision 1.21
- * date: 1991/08/06 15:07:43;
- * global/local values
- * ----------------------------
- * revision 1.20
- * date: 1991/06/28 10:52:53;
- * added config for ISC, and changed some "#if" to "#ifdef"
- * ----------------------------
- * revision 1.19
- * date: 1991/06/25 19:51:43;
- * massive data structure restructure
- * ----------------------------
- * revision 1.18
- * date: 1991/06/16 17:30:21;
- * fixed tabs to be modulo intead of mask, added ctabstop capability, added
- * LOCAL_VALUES #define to control local buffer values
- * ----------------------------
- * revision 1.17
- * date: 1991/06/06 13:57:52;
- * added auto-indent mode
- * ----------------------------
- * revision 1.16
- * date: 1991/06/04 09:20:53;
- * kcod2key is now a macro
- * ----------------------------
- * revision 1.15
- * date: 1991/06/03 17:34:35;
- * switch from "meta" etc. to "ctla" etc.
- * ----------------------------
- * revision 1.14
- * date: 1991/06/03 13:58:40;
- * made bind description list better
- * ----------------------------
- * revision 1.13
- * date: 1991/06/03 10:16:34;
- * cleanup, for release of 2.3
- * ----------------------------
- * revision 1.12
- * date: 1991/05/31 10:46:27;
- * added lspec character class for ex line specifiers
- * added end pointer and offset to the region struct
- * added #defines for the ex range allowances
- * ----------------------------
- * revision 1.11
- * date: 1991/04/22 09:00:46;
- * added ODT, POSIX defines.
- * also added iswild() support
- * ----------------------------
- * revision 1.10
- * date: 1991/04/05 13:04:55;
- * fixed "shorten" directory name
- * ----------------------------
- * revision 1.9
- * date: 1991/04/04 09:28:32;
- * line text is now separate from LINE struct
- * ----------------------------
- * revision 1.8
- * date: 1991/03/26 17:01:11;
- * new undo dot offset field
- * ----------------------------
- * revision 1.7
- * date: 1991/02/21 09:13:00;
- * added sideways offsets for horiz scrolling
- * ----------------------------
- * revision 1.6
- * date: 1990/12/16 22:23:19;
- * changed the default configuration
- * ----------------------------
- * revision 1.5
- * date: 1990/10/04 13:07:38;
- * added #define for ODT
- * ----------------------------
- * revision 1.4
- * date: 1990/10/03 16:00:49;
- * make backspace work for everyone
- * ----------------------------
- * revision 1.3
- * date: 1990/10/01 12:16:36;
- * make provisions for shortnames, and added HAVE_MKDIR define
- * ----------------------------
- * revision 1.2
- * date: 1990/09/28 14:36:22;
- * cleanup of ifdefs, response to porting problems
- * ----------------------------
- * revision 1.1
- * date: 1990/09/21 10:25:09;
- * initial vile RCS revision
  */
 
 #ifndef os_chosen
@@ -716,6 +205,12 @@
 #endif
 
 #endif /* os_chosen */
+
+/* some code uses this as a value in expressions,
+ * so we always want it defined */
+#ifndef MSDOS
+#define MSDOS 0
+#endif
 
 #if ! LINUX && ! DJGPP && !defined(__CLCC_) && !defined(__GNUC__) && !APOLLO
     /* there are probably others that don't want/need const defined */
@@ -921,7 +416,10 @@
 /* show "working..." message */
 /* we suppress this on USG machines in case system calls are not restartable
 	after signals */
-#define OPT_WORKING (!USG && HAS_ALARM && !SMALLER)
+#define OPT_WORKING ((!USG || defined(SA_RESTART)) && HAS_ALARM && !SMALLER)
+
+/* scrollbars */
+#define OPT_SCROLLBARS XTOOLKIT
 
 /* individual features that are (normally) controlled by SMALLER */
 #define OPT_B_LIMITS    !SMALLER		/* left-margin */
@@ -1047,9 +545,6 @@ extern	char *	sys_errlist[];
 
 #if BERK && ! POSIX && !APOLLO
 #define USE_INDEX 1
-#endif
-#if never && BERK && ! POSIX && ! BSD386
-#define USE_BCOPY 1
 #endif
 
 #if BERK || LINUX  /* who else?  can i include POSIX here? */
@@ -1282,6 +777,7 @@ union REGS {
 
 #define	char2int(c)	((int)(c & 0xff)) /* mask off sign-extension, etc. */
 
+#define did_tungetc()   (tungotc >= 0)	/* true iff we have a char saved */
 #define	PLURAL(n)	((n!=1)?"s":"")
 
 #define	EOS     '\0'
@@ -1830,6 +1326,7 @@ typedef	struct	{
 #define WFKILLS	0x40			/* something was deleted	*/
 #define WFINS	0x80			/* something was inserted	*/
 #define WFSTAT	0x100			/* Update mode line (info only).*/
+#define WFSBAR	0x200			/* Update scroll bar(s) */
 
 /* define indices for GLOBAL, BUFFER, WINDOW modes */
 #include "nemode.h"
@@ -2073,6 +1570,7 @@ typedef struct	WINDOW {
 	int	w_ntrows;	        /* # of rows of text in window  */
 	int	w_force; 	        /* If non-zero, forcing row.    */
 	int	w_flag;		        /* Flags.		        */
+	ULONG	w_split_hist;		/* how to recombine deleted windows */
 #ifdef WMDRULER
 	int	w_ruler_line;
 	int	w_ruler_col;
@@ -2433,8 +1931,8 @@ typedef struct WHBLOCK {
 #include <string.h>
 
 #if POSIX
-#include "unistd.h"
-#include "stdlib.h"
+#include <unistd.h>
+#include <stdlib.h>
 #else
 # if (APOLLO_STDLIB && !defined(lint)) || VMS || NEWDOSCC
 #include <stdlib.h>

@@ -5,94 +5,9 @@
  * Written by T.E.Dickey for vile (march 1993).
  *
  * $Log: filec.c,v $
- * Revision 1.27  1994/02/03 19:35:12  pgf
- * tom's changes for 3.65
+ * Revision 1.28  1994/02/22 11:03:15  pgf
+ * truncated RCS log for 4.0
  *
- * Revision 1.26  1993/11/04  09:10:51  pgf
- * tom's 3.63 changes
- *
- * Revision 1.25  1993/10/04  10:24:09  pgf
- * see tom's 3.62 changes
- *
- * Revision 1.24  1993/09/10  16:06:49  pgf
- * tom's 3.61 changes
- *
- * Revision 1.23  1993/09/06  16:36:47  pgf
- * changed glob() to doglob() to avoid symbol conflicts
- *
- * Revision 1.22  1993/09/03  09:11:54  pgf
- * tom's 3.60 changes
- *
- * Revision 1.21  1993/07/09  19:10:27  pgf
- * changed a couple of routine names -- it looked like watcom might
- * have been doing caseless symbol compares, making trailing_slash() and
- * trailing_SLASH() match, and also force_slash/force_SLASH.
- *
- * Revision 1.20  1993/07/07  10:15:04  pgf
- * fix coredump on filecompletion, by making sure BFSIZES bit is cleared
- * when building MyBuff
- *
- * Revision 1.19  1993/07/01  16:15:54  pgf
- * tom's 3.51 changes
- *
- * Revision 1.18  1993/06/18  15:57:06  pgf
- * tom's 3.49 changes
- *
- * Revision 1.17  1993/06/02  14:58:17  pgf
- * folded some long lines
- *
- * Revision 1.16  1993/06/02  14:28:47  pgf
- * see tom's 3.48 CHANGES
- *
- * Revision 1.15  1993/05/24  15:21:37  pgf
- * tom's 3.47 changes, part a
- *
- * Revision 1.14  1993/05/11  16:22:22  pgf
- * see tom's CHANGES, 3.46
- *
- * Revision 1.13  1993/05/06  11:59:58  pgf
- * added ifdefs for USE_D_NAMLEN, for systems that don't have or don't
- * need it (d_name[] is null-terminated on most systems)
- *
- * Revision 1.12  1993/04/28  17:15:56  pgf
- * got rid of LOOKTAGS mode and ifdefs
- *
- * Revision 1.11  1993/04/28  14:34:11  pgf
- * see CHANGES, 3.44 (tom)
- *
- * Revision 1.10  1993/04/20  12:18:32  pgf
- * see tom's 3.43 CHANGES
- *
- * Revision 1.9  1993/04/02  11:00:40  pgf
- * ls-style directory reading moved to path.c.  thanks -- much better, tom.
- *
- * Revision 1.8  1993/04/01  15:50:34  pgf
- * for sysV machines, without POSIX or BSD dirent, we now have code
- * that enumerates directories using /bin/ls.
- *
- * Revision 1.7  1993/04/01  13:07:50  pgf
- * see tom's 3.40 CHANGES
- *
- * Revision 1.6  1993/03/25  19:50:58  pgf
- * see 3.39 section of CHANGES
- *
- * Revision 1.5  1993/03/19  12:33:32  pgf
- * suppress completion chars if IsInternalName
- *
- * Revision 1.4  1993/03/17  10:00:29  pgf
- * initial changes to make VMS work again
- *
- * Revision 1.3  1993/03/16  16:04:01  pgf
- * fix 'parentheses suggested' warnings
- *
- * Revision 1.2  1993/03/16  10:53:21  pgf
- * see 3.36 section of CHANGES file
- *
- * Revision 1.1  1993/03/05  18:45:59  pgf
- * fixes for null pointers and filenames
- *
- * Revision 1.0  1993/03/04  15:06:38  pgf
- * Initial revision
  *
  */
 

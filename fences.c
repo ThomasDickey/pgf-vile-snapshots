@@ -8,65 +8,8 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: fences.c,v $
- *	Revision 1.18  1994/02/07 12:25:12  pgf
- *	use LBRACK/RBRACK/LPAREN/RPAREN in lieu of the real chars
- *
- * Revision 1.17  1994/01/11  17:27:27  pgf
- * 'interrupted' is now a routine
- *
- * Revision 1.16  1993/10/11  17:39:19  pgf
- * fmatchindent now looks for a specific match
- *
- * Revision 1.15  1993/09/16  11:06:43  pgf
- * make parentheses act like braces in c-mode -- for indentation purposes, in
- * languages like scheme (and lisp?)
- *
- * Revision 1.14  1993/06/28  14:27:25  pgf
- * new arg to catnap()
- *
- * Revision 1.13  1993/06/02  14:28:47  pgf
- * see tom's 3.48 CHANGES
- *
- * Revision 1.12  1993/05/24  15:21:37  pgf
- * tom's 3.47 changes, part a
- *
- * Revision 1.11  1993/04/01  13:06:31  pgf
- * turbo C support (mostly prototypes for static)
- *
- * Revision 1.10  1993/03/31  19:28:50  pgf
- * fixed bug introduced in 3.38 -- getfence is sometimes called internally
- * on empty lines, with ch preset, to find indents etc.
- *
- * Revision 1.9  1993/03/25  19:50:58  pgf
- * see 3.39 section of CHANGES
- *
- * Revision 1.8  1993/03/24  17:30:30  pgf
- * cleaned gcc warnings
- *
- * Revision 1.7  1993/03/18  17:42:20  pgf
- * see 3.38 section of CHANGES
- *
- * Revision 1.6  1993/01/23  14:26:54  foxharp
- * protect against trying to fence on empty lines
- *
- * Revision 1.5  1992/12/23  09:18:34  foxharp
- * allow match of fence that is first char. in buffer
- *
- * Revision 1.4  1992/08/20  23:40:48  foxharp
- * typo fixes -- thanks, eric
- *
- * Revision 1.3  1992/06/08  08:56:05  foxharp
- * fixed infinite loop if simple fence not found, and
- * suppressed beeping in input mode if fence not found
- * ,.
- * 
- *
- * Revision 1.2  1992/06/03  08:37:23  foxharp
- * removed nested comment
- *
- * Revision 1.1  1992/05/29  09:38:33  foxharp
- * Initial revision
- *
+ *	Revision 1.19  1994/02/22 11:03:15  pgf
+ *	truncated RCS log for 4.0
  *
  *
  */

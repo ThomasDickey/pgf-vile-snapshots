@@ -6,387 +6,12 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.116  1994/02/11 14:06:31  pgf
- * hexdigits moved to edef.h
+ * Revision 1.121  1994/02/22 18:02:19  pgf
+ * removed ifdefs from the killtilde code
  *
- * Revision 1.115  1994/02/03  19:35:12  pgf
- * tom's changes for 3.65
+ * Revision 1.120  1994/02/22  11:03:15  pgf
+ * truncated RCS log for 4.0
  *
- * Revision 1.114  1994/02/03  10:17:27  pgf
- * bunch of vt...() stuff is now static, and
- * unprintable-as-octal mode is now a window mode
- *
- * Revision 1.113  1994/02/02  18:11:30  pgf
- * added non-printing-octal mode
- *
- * Revision 1.112  1994/01/31  12:28:44  pgf
- * use define for HIGHBIT
- *
- * Revision 1.111  1994/01/29  00:24:17  pgf
- * fix display of high-bit-set characters:  display in octal for now
- *
- * Revision 1.110  1994/01/28  21:49:52  pgf
- * apply contributed fix for infinite loop on extended lines with certain
- * kinds of tab values
- *
- * Revision 1.109  1994/01/27  17:39:53  pgf
- * changed if_OPT_WORKING to simple ifdef
- *
- * Revision 1.108  1993/12/22  15:28:34  pgf
- * applying tom's 3.64 changes
- *
- * Revision 1.107  1993/12/08  19:58:43  pgf
- * added BSD386 to list of machines storing ioctl.h in sys
- *
- * Revision 1.106  1993/11/04  09:10:51  pgf
- * tom's 3.63 changes
- *
- * Revision 1.105  1993/10/11  17:22:40  pgf
- * re-ifdef getscreensize
- *
- * Revision 1.104  1993/10/04  10:24:09  pgf
- * see tom's 3.62 changes
- *
- * Revision 1.103  1993/09/20  21:16:58  pgf
- * added "no_working" global, which can be used to shut off the "working..."
- * message during debugging
- *
- * Revision 1.102  1993/09/10  16:06:49  pgf
- * tom's 3.61 changes
- *
- * Revision 1.101  1993/09/06  16:24:28  pgf
- * used-before-set warning cleanup
- *
- * Revision 1.100  1993/09/03  09:11:54  pgf
- * tom's 3.60 changes
- *
- * Revision 1.99  1993/08/21  18:20:06  pgf
- * protect against window sizes less than 1
- *
- * Revision 1.98  1993/08/20  21:22:12  pgf
- * added AIX to the machines that need sys/ioctl.h, to pick up TIOCGWINSIZE
- *
- * Revision 1.97  1993/08/16  14:06:06  pgf
- * took out reference to variable 'req' in updateline() when REVSTA not
- * defined.
- *
- * Revision 1.96  1993/08/13  16:32:50  pgf
- * tom's 3.58 changes
- *
- * Revision 1.95  1993/08/05  14:29:12  pgf
- * tom's 3.57 changes
- *
- * Revision 1.94  1993/07/27  18:28:06  pgf
- * one more change from tom -- missed inequality in reframe()
- *
- * Revision 1.93  1993/07/27  18:06:20  pgf
- * see tom's 3.56 CHANGES entry
- *
- * Revision 1.92  1993/07/15  10:37:58  pgf
- * see 3.55 CHANGES
- *
- * Revision 1.91  1993/07/07  12:59:30  pgf
- * don't put cursor at nu_width if the buffer is empty, since there won't be
- * a line number in that case.
- *
- * Revision 1.90  1993/07/06  16:39:04  pgf
- * integrated Tuan DANG's changes for the djgpp compiler under DOS
- *
- * Revision 1.89  1993/07/01  16:15:54  pgf
- * tom's 3.51 changes
- *
- * Revision 1.88  1993/06/25  11:25:55  pgf
- * patches for Watcom C/386, from Tuan DANG
- *
- * Revision 1.87  1993/06/22  10:26:53  pgf
- * dbgwrite now loops for a ^G to be typed -- safer when typing fast than
- * a simple getchar()
- *
- * Revision 1.86  1993/06/18  15:57:06  pgf
- * tom's 3.49 changes
- *
- * Revision 1.85  1993/06/02  14:28:47  pgf
- * see tom's 3.48 CHANGES
- *
- * Revision 1.84  1993/05/24  15:25:41  pgf
- * tom's 3.47 changes, part b
- *
- * Revision 1.83  1993/05/24  15:21:37  pgf
- * tom's 3.47 changes, part a
- *
- * Revision 1.82  1993/05/05  12:25:41  pgf
- * osf1 and ultrix keep ioctl.h in sys
- *
- * Revision 1.81  1993/05/04  17:05:14  pgf
- * see tom's CHANGES, 3.45
- *
- * Revision 1.80  1993/04/28  14:34:11  pgf
- * see CHANGES, 3.44 (tom)
- *
- * Revision 1.79  1993/04/20  12:18:32  pgf
- * see tom's 3.43 CHANGES
- *
- * Revision 1.78  1993/04/20  12:03:35  pgf
- * AIX needs sys/ioctl.h (actually it doesn't, since it's POSIX, but i'm
- * adding it here for completeness)
- *
- * Revision 1.77  1993/04/20  12:00:02  pgf
- * scroll sideways by half screens
- *
- * Revision 1.76  1993/04/09  16:50:17  pgf
- * fix off-by-one when doing auto-horizontal-scroll leftward, and
- * allow the cursor to sit on the last column if it's the last char on the
- * line
- *
- * Revision 1.75  1993/04/09  13:36:01  pgf
- * include ioctl.h if LINUX
- *
- * Revision 1.74  1993/04/08  11:16:21  pgf
- * changed offset for horiz scrolling from 1/3 to 1/4
- *
- * Revision 1.73  1993/04/08  11:09:27  pgf
- * implemented horizscroll mode
- *
- * Revision 1.72  1993/04/02  10:58:37  pgf
- * first of probably many ioctl.h fixups :-(
- *
- * Revision 1.71  1993/04/01  13:06:31  pgf
- * turbo C support (mostly prototypes for static)
- *
- * Revision 1.70  1993/03/29  11:18:59  pgf
- * now look at environment variables LINES and COLUMNS in getscreensize()
- * if the tty driver doesn't know the size
- *
- * Revision 1.69  1993/03/25  19:50:58  pgf
- * see 3.39 section of CHANGES
- *
- * Revision 1.68  1993/03/18  17:42:20  pgf
- * see 3.38 section of CHANGES
- *
- * Revision 1.67  1993/03/17  11:35:04  pgf
- * cleaned up confusion in alt-tabstop mode
- *
- * Revision 1.66  1993/03/17  10:07:21  pgf
- * extra includes/defs for correct operation on OSF (shouldn't termios.h
- * provide TIOCGWINSIZE, and shouldn't FION_READ work?)
- *
- * Revision 1.65  1993/03/17  09:57:59  pgf
- * fix for calling shorten_path() correctly
- *
- * Revision 1.64  1993/03/16  10:53:21  pgf
- * see 3.36 section of CHANGES file
- *
- * Revision 1.63  1993/03/05  18:46:39  pgf
- * fix for tab cursor positioning in insert mode, and mode to control
- * positioning style
- *
- * Revision 1.62  1993/03/05  17:50:54  pgf
- * see CHANGES, 3.35 section
- *
- * Revision 1.61  1993/02/24  10:59:02  pgf
- * see 3.34 changes, in CHANGES file
- *
- * Revision 1.60  1993/02/08  14:53:35  pgf
- * see CHANGES, 3.32 section
- *
- * Revision 1.59  1993/01/23  13:38:23  foxharp
- * tom's changes -- reverse video works better, fix for list mode,
- * dfoutfn now re-entrant, dfputli now does hex
- *
- * Revision 1.58  1993/01/16  10:26:13  foxharp
- * for_each_window and other new macros, and fixes for column 80 indicator
- *
- * Revision 1.57  1993/01/12  08:48:43  foxharp
- * tom dickey's changes to support "set number", i.e. line numbering
- *
- * Revision 1.56  1992/12/23  09:17:17  foxharp
- * ifdef of unused code
- *
- * Revision 1.55  1992/12/14  08:32:20  foxharp
- * fix for the sideways-shifted-but-deextended bug.  thanks to Tom Dickey.
- * also lint cleanup.
- *
- * Revision 1.54  1992/12/04  09:12:25  foxharp
- * deleted unused assigns
- *
- * Revision 1.53  1992/08/20  23:40:48  foxharp
- * typo fixes -- thanks, eric
- *
- * Revision 1.52  1992/08/05  21:55:16  foxharp
- * handle files with DOS drive designators properly on mode line
- *
- * Revision 1.51  1992/07/24  07:49:38  foxharp
- * shorten_name changes
- *
- * Revision 1.50  1992/07/22  19:25:57  foxharp
- * handle non-printables correctly -- how did I get involved in this, anyway!
- *
- * Revision 1.49  1992/07/22  09:18:16  foxharp
- * got it.  sheesh.
- *
- * Revision 1.48  1992/07/22  00:50:43  foxharp
- * interim -- still dumping core in vtset
- *
- * Revision 1.47  1992/07/21  09:08:30  foxharp
- * now pass lp to vtset()
- *
- * Revision 1.46  1992/07/21  08:57:53  foxharp
- * pushed list mode choice into vtset()
- *
- * Revision 1.45  1992/07/20  22:44:44  foxharp
- * performance improvements -- fewer vtputc's
- *
- * Revision 1.44  1992/07/18  13:13:56  foxharp
- * put all path-shortening in one place (shorten_path()), and took out
- * some old code now unnecessary
- *
- * Revision 1.43  1992/07/13  20:03:54  foxharp
- * the "terse" variable is now a boolean mode
- *
- * Revision 1.42  1992/07/13  19:37:00  foxharp
- * trim leading `pwd` from filenames in modeline, now that filenames are
- * usually absolute
- *
- * Revision 1.41  1992/07/01  16:59:46  foxharp
- * scwrite() arg changes, and some fore/background color cleanup
- *
- * Revision 1.40  1992/06/26  22:21:05  foxharp
- * small almost cosmetic changes to mlsav'ing
- *
- * Revision 1.39  1992/05/29  08:36:06  foxharp
- * moved the SVR3_PTEM ifdef so it works with POSIX too
- *
- * Revision 1.38  1992/05/19  08:55:44  foxharp
- * more prototype and shadowed decl fixups
- *
- * Revision 1.37  1992/05/16  12:00:31  pgf
- * prototypes/ansi/void-int stuff/microsoftC
- *
- * Revision 1.36  1992/04/27  19:50:43  pgf
- * fixed ifdefs on termio inclusion
- *
- * Revision 1.35  1992/04/14  08:50:01  pgf
- * fix SIGWINCH handling for X11 case
- *
- * Revision 1.34  1992/03/25  19:13:17  pgf
- * BSD portability changes
- *
- * Revision 1.33  1992/03/19  23:31:54  pgf
- * mlputc now converts tabs to single spaces, since we don't really
- * know how wide they should be anyway
- *
- * Revision 1.32  1992/03/19  23:13:04  pgf
- * SIGT for signals
- *
- * Revision 1.31  1992/03/07  10:21:29  pgf
- * suppress prompts (mlprompt()) if execing buff or file
- *
- * Revision 1.30  1992/03/05  09:17:21  pgf
- * added support for new "terse" variable, to control unnecessary messages
- *
- * Revision 1.29  1992/03/01  18:38:40  pgf
- * compilation error #if COLOR
- *
- * Revision 1.28  1992/02/17  08:57:36  pgf
- * added "showmode" support
- *
- * Revision 1.27  1992/01/22  20:26:00  pgf
- * fixed ifdef conflict: SVR3_PTEM
- *
- * Revision 1.26  1992/01/05  00:05:24  pgf
- * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
- * often.  also normalized message appearance somewhat.
- *
- * Revision 1.25  1991/11/13  20:09:27  pgf
- * X11 changes, from dave lemke
- *
- * Revision 1.24  1991/11/08  13:14:40  pgf
- * more lint
- *
- * Revision 1.23  1991/11/07  03:58:31  pgf
- * lint cleanup
- *
- * Revision 1.22  1991/11/03  17:35:06  pgf
- * don't access unset vt column 80 if screen isn't that wide
- *
- * Revision 1.21  1991/11/01  14:38:00  pgf
- * saber cleanup
- *
- * Revision 1.20  1991/10/28  14:22:46  pgf
- * no more TABVAL macro, curtabstopval renamed curtabval
- *
- * Revision 1.19  1991/10/26  00:14:56  pgf
- * put termio.h back in, and switch to SVR3 around ptem.h
- *
- * Revision 1.18  1991/10/23  12:05:37  pgf
- * we don't need termio.h
- *
- * Revision 1.17  1991/10/08  01:28:43  pgf
- * dbgwrite now uses raw'est i/o
- *
- * Revision 1.16  1991/09/26  13:16:19  pgf
- * LIST mode and w_sideways are now both window values
- *
- * Revision 1.15  1991/09/11  02:30:22  pgf
- * use get_recorded_char, now that we have it
- *
- * Revision 1.14  1991/08/16  11:10:46  pgf
- * added insert mode indicator to modeline: I for insert, O for overwrite, and
- * R for replace-char
- *
- * Revision 1.13  1991/08/07  12:35:07  pgf
- * added RCS log messages
- *
- * revision 1.12
- * date: 1991/08/06 15:12:29;
- * global/local values, and printf/list changes
- * 
- * revision 1.11
- * date: 1991/06/28 10:53:18;
- * make update quit early if !curbp
- * 
- * revision 1.10
- * date: 1991/06/25 19:52:13;
- * massive data structure restructure
- * 
- * revision 1.9
- * date: 1991/06/16 17:34:57;
- * switched to modulo tab calculations
- * 
- * revision 1.8
- * date: 1991/05/31 10:35:55;
- * added new "dbgwrite()" routine, for debugging
- * 
- * revision 1.7
- * date: 1991/04/22 09:04:14;
- * more ODT support
- * 
- * revision 1.6
- * date: 1991/03/19 12:15:08;
- * fix flag checking
- * 
- * revision 1.5
- * date: 1991/02/21 10:04:01;
- * horizontal scrolling is most of the way there.  only thing
- * left to do is to extend lines where the cursor is beyond the
- * left edge of a scrolled screen
- * 
- * revision 1.4
- * date: 1990/10/05 14:19:31;
- * fixed typo in ODT ifdef.
- * propagated mode line changes to all windows holding a given buffer
- * 
- * revision 1.3
- * date: 1990/10/01 11:04:42;
- * atatus return in newscreensize
- * 
- * revision 1.2
- * date: 1990/09/25 11:38:06;
- * took out old ifdef BEFORE code
- * 
- * revision 1.1
- * date: 1990/09/21 10:24:58;
- * initial vile RCS revision
  */
 
 #include	"estruct.h"
@@ -400,7 +25,7 @@
 #   include <termio.h>
 #  else
 #   if BERK
-#    if APOLLO || AIX || OSF1 || ULTRIX || BSD386
+#    if APOLLO || AIX || OSF1 || ULTRIX || NETBSD
 #     include <sys/ioctl.h>
 #   else
 #     include <ioctl.h>
@@ -1181,6 +806,17 @@ int force;	/* force update past type ahead? */
 				updone(wp);	/* update EDITed line */
 			else if (wp->w_flag & ~(WFMOVE))
 				updall(wp);	/* update all lines */
+#if OPT_SCROLLBARS
+			if (wp->w_flag & (WFHARD | WFSBAR)) {
+				/* FIXME: Find some way to set the ruler
+				 * line info for both ruler and scroll bar
+				 * at same time.
+				 */
+				wp->w_ruler_line = 
+					line_no(wp->w_bufp, wp->w_dot.l);
+				update_scrollbar(wp);
+			}
+#endif /* OPT_SCROLLBARS */
 			if (scrflags || (wp->w_flag & (WFMODE|WFCOLR)))
 				modeline(wp);	/* update modeline */
 			wp->w_flag = 0;
@@ -1227,6 +863,7 @@ WINDOW *wp;
 	register int i = 0;
 	register int rows;
 	int	founddot = FALSE;	/* set to true iff we find dot */
+	int	tildecount;
 
 	/* if not a requested reframe, check for a needed one */
 	if ((wp->w_flag & WFFORCE) == 0) {
@@ -1270,7 +907,8 @@ WINDOW *wp;
 					break;
 				}
 #endif
-				return;
+				lp = wp->w_line.l;
+				goto kill_tildes;
 			}
 
 			/* if we are at the end of the file, reframe */
@@ -1346,9 +984,29 @@ WINDOW *wp;
 					lp = dlp;
 			}
 	}
+kill_tildes:
+	/* Eliminate as many tildes as possible from bottom */
+	dlp = lp;
+	rows = wp->w_ntrows;
+	while (rows > 0 && !same_ptr(dlp, win_head(wp))) {
+		rows -= line_height(wp, dlp);
+		dlp = lFORW(dlp);
+	}
+	dlp = lBACK(lp);
+
+	tildecount = (wp->w_ntrows * ntildes)/100;
+	if (tildecount == wp->w_ntrows)
+		tildecount--;
+
+	while (!same_ptr(dlp, win_head(wp)) 
+	       && (rows -= line_height(wp, dlp)) >= tildecount) {
+		lp = dlp;
+		dlp = lBACK(lp);
+	}
 
 	/* and reset the current line-at-top-of-window */
-	if (!same_ptr(lp, win_head(wp))) { /* mouse-click could be past end */
+	if (!same_ptr(lp, win_head(wp)) /* mouse click could be past end */
+	 && lp != wp->w_line.l) {	/* no need to set it if already there */
 		wp->w_line.l = lp;
 		wp->w_flag |= WFHARD;
 		wp->w_flag &= ~WFFORCE;

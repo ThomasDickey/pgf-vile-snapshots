@@ -4,9 +4,8 @@
  * This is just a place holder -- a place in which to pull in edef.h alone
  *
  * $Log: externs.c,v $
- * Revision 1.1  1992/05/16 11:58:59  pgf
- * Initial revision
- *
+ * Revision 1.2  1994/02/22 11:03:15  pgf
+ * truncated RCS log for 4.0
  *
  */
 

@@ -4,290 +4,9 @@
  * All operating systems.
  *
  * $Log: termio.c,v $
- * Revision 1.89  1994/02/11 14:12:36  pgf
- * test tungotc for positive or zero, so entering a 0 will work
+ * Revision 1.93  1994/02/22 11:03:15  pgf
+ * truncated RCS log for 4.0
  *
- * Revision 1.88  1994/02/04  12:31:44  pgf
- * preserve more of the iflags in the termio settings.
- *
- * Revision 1.87  1994/02/04  12:22:35  pgf
- * tom's change for 3.65 -- don't turn off istrip gratuitously
- *
- * Revision 1.86  1994/01/11  17:27:42  pgf
- * changed GO32 to DJGPP
- *
- * Revision 1.85  1993/12/23  10:06:38  pgf
- * added fallback def'n of VDISABLE -- linux doesn't define it.
- *
- * Revision 1.84  1993/12/22  15:28:34  pgf
- * applying tom's 3.64 changes
- *
- * Revision 1.83  1993/12/08  19:58:43  pgf
- * added BSD386 to list of machines storing ioctl.h in sys
- *
- * Revision 1.82  1993/09/10  16:06:49  pgf
- * tom's 3.61 changes
- *
- * Revision 1.81  1993/09/03  09:11:54  pgf
- * tom's 3.60 changes
- *
- * Revision 1.80  1993/08/13  16:32:50  pgf
- * tom's 3.58 changes
- *
- * Revision 1.79  1993/08/05  14:29:12  pgf
- * tom's 3.57 changes
- *
- * Revision 1.78  1993/07/23  12:03:39  pgf
- * make ttclean a no-op under _all_ variants for X11 -- it was flushing
- * and closing in the USE_TERMIO case
- *
- * Revision 1.77  1993/07/15  10:37:58  pgf
- * see 3.55 CHANGES
- *
- * Revision 1.76  1993/07/08  11:51:39  pgf
- * use setvbuf if USG and POSIX_TERMIOS, since svr4 doesn't have setbuffer
- * unless you have the ucb extensions (Solaris, anyway)
- *
- * Revision 1.75  1993/07/06  16:39:04  pgf
- * integrated Tuan DANG's changes for the djgpp compiler under DOS
- *
- * Revision 1.74  1993/06/25  11:25:55  pgf
- * patches for Watcom C/386, from Tuan DANG
- *
- * Revision 1.73  1993/06/24  18:06:35  pgf
- * au/x keeps ioctl.h in sys
- *
- * Revision 1.72  1993/06/18  15:57:06  pgf
- * tom's 3.49 changes
- *
- * Revision 1.71  1993/05/05  13:52:04  pgf
- * don't strip 8th bit in ttgetc()
- *
- * Revision 1.70  1993/05/05  12:25:16  pgf
- * osf1 and ultrix keep ioctl.h in sys
- *
- * Revision 1.69  1993/05/05  11:41:05  pgf
- * backspc is now handled separately from chartypes[backspc]
- *
- * Revision 1.68  1993/05/05  11:19:52  pgf
- * turned off typahead detection for X11 -- it gives me false-positives
- *
- * Revision 1.67  1993/05/04  17:05:14  pgf
- * see tom's CHANGES, 3.45
- *
- * Revision 1.66  1993/04/28  17:11:22  pgf
- * got rid of NeWS ifdefs
- *
- * Revision 1.65  1993/04/28  14:34:11  pgf
- * see CHANGES, 3.44 (tom)
- *
- * Revision 1.64  1993/04/20  12:00:37  pgf
- * AIX needs sys/ioctl.h
- *
- * Revision 1.63  1993/04/02  11:02:50  pgf
- * ioctl.h --> sys/ioctl.h for APOLLO
- *
- * Revision 1.62  1993/04/01  12:53:33  pgf
- * removed redundant includes and declarations
- *
- * Revision 1.61  1993/04/01  12:03:26  pgf
- * filio.h is in sys on sunos.
- *
- * Revision 1.60  1993/03/25  19:50:58  pgf
- * see 3.39 section of CHANGES
- *
- * Revision 1.59  1993/03/17  10:07:21  pgf
- * extra includes/defs for correct operation on OSF (shouldn't termios.h
- * provide TIOCGWINSIZE, and shouldn't FION_READ work?)
- *
- * Revision 1.58  1993/03/17  10:00:29  pgf
- * initial changes to make VMS work again
- *
- * Revision 1.57  1993/03/16  10:53:21  pgf
- * see 3.36 section of CHANGES file
- *
- * Revision 1.56  1993/03/05  17:50:54  pgf
- * see CHANGES, 3.35 section
- *
- * Revision 1.55  1993/02/15  10:37:31  pgf
- * cleanup for gcc-2.3's -Wall warnings
- *
- * Revision 1.54  1993/02/08  14:53:35  pgf
- * see CHANGES, 3.32 section
- *
- * Revision 1.53  1993/01/16  10:42:47  foxharp
- * extra TTflush for apollo
- *
- * Revision 1.52  1992/12/23  09:27:52  foxharp
- * added missing fflush in ttclean
- *
- * Revision 1.51  1992/12/05  13:58:20  foxharp
- * added missing TTclose to ttclean, for Tom Dickey on his apollo -- I'm not
- * convinced this seems right, but I'll try it for now.
- *
- * Revision 1.50  1992/12/04  09:18:04  foxharp
- * added another flush
- *
- * Revision 1.49  1992/08/20  23:40:48  foxharp
- * typo fixes -- thanks, eric
- *
- * Revision 1.48  1992/08/19  23:02:47  foxharp
- * ignore errors in ttunclean
- *
- * Revision 1.47  1992/08/04  20:14:58  foxharp
- * invert sense of ifdef -- it seems filio.h isn't as common as I thought
- *
- * Revision 1.46  1992/07/24  07:49:27  foxharp
- * aix has no filio.h
- *
- * Revision 1.45  1992/07/20  22:50:40  foxharp
- * use putchar/getchar instead of fputc/fgetc
- *
- * Revision 1.44  1992/07/17  19:19:47  foxharp
- * took out commented cruft
- *
- * Revision 1.43  1992/07/01  17:04:33  foxharp
- * always use && and || in #if statements, and
- * MSC now uses getch() to get characters, and
- * use TTputc() to put out cr-nl pairs instead of ttputc()
- *
- * Revision 1.42  1992/06/26  22:19:32  foxharp
- * improved (i hope) the FIONREAD ifdefs.  needs testing.
- *
- * Revision 1.41  1992/06/25  23:00:50  foxharp
- * changes for dos/ibmpc
- *
- * Revision 1.40  1992/06/22  08:35:13  foxharp
- * AIX has the fcntl bug, but isn't BERK.  also added ifdef VSWTCH protection
- *
- * Revision 1.39  1992/06/14  11:33:54  foxharp
- * fcntl hack for AIX
- *
- * Revision 1.38  1992/06/11  09:44:10  foxharp
- * try to avoid the fcntl() bug with better ifdefing
- *
- * Revision 1.37  1992/05/27  19:16:22  foxharp
- * took out extra call to setbuffer()
- *
- * Revision 1.36  1992/05/25  21:34:29  foxharp
- * moved extern func declarations to header
- *
- * Revision 1.34  1992/05/20  18:55:42  foxharp
- * don't use fcntl on a/ux, either
- *
- * Revision 1.33  1992/05/16  12:00:31  pgf
- * prototypes/ansi/void-int stuff/microsoftC
- *
- * Revision 1.32  1992/05/13  09:13:41  pgf
- * make X11 do even less in ttclean/unclean routines
- *
- * Revision 1.31  1992/04/14  08:40:11  pgf
- * added osf hack, to use sgtty instead of posix, and fixed sun hack, to use
- * fionread instead of fcntl, to prevent output flush during typeahead check
- *
- * Revision 1.30  1992/04/10  18:50:22  pgf
- * always include termios.h, not sys/termios.h, and
- * don't call setbuffer on odt or isc
- *
- * Revision 1.29  1992/03/26  09:16:59  pgf
- * ifdef cleanup
- *
- * Revision 1.28  1992/03/25  19:13:17  pgf
- * BSD portability changes
- *
- * Revision 1.27  1992/03/20  08:59:28  pgf
- * kbd_is_polled was out of sync after ttclean/unclean
- *
- * Revision 1.26  1992/03/19  23:27:20  pgf
- * SIGT for signals, linux port
- *
- * Revision 1.25  1992/03/19  23:09:46  pgf
- * TIOCSETP is now TIOCSETN, in all cases
- *
- * Revision 1.24  1992/03/07  10:25:58  pgf
- * AIX support (where is termios.h supposed to be?)
- *
- * Revision 1.23  1992/01/22  20:28:28  pgf
- * call TTclose in ttunclean, to support tcapclose().  i hope this is safe
- * for other screen types
- *
- * Revision 1.22  1992/01/10  08:11:41  pgf
- * fixed signal handling, for sysV style handling.  also
- * fixed 2nd arg to tcsetattr()
- *
- * Revision 1.21  1992/01/02  22:42:40  pgf
- * oops -- dropped the termio restoral in ttclean
- *
- * Revision 1.20  1992/01/01  16:30:14  pgf
- * more ifdef'ing on V_SUSP (for pyramid?), and
- * now get tty chars under X11, though we still don't set new modes
- *
- * Revision 1.19  1991/12/20  08:12:00  pgf
- * check the error return from tcsetattr()
- *
- * Revision 1.18  1991/12/04  09:22:19  pgf
- * a little more massaging of ifdefs
- *
- * Revision 1.17  1991/11/27  10:13:10  pgf
- * code split/re-arranged, cleaner posix support
- *
- * Revision 1.16  1991/11/16  18:35:55  pgf
- * changed the ifdefing so termio or sgtty can be used independently of
- * other UNIX choices
- *
- * Revision 1.15  1991/11/14  08:58:17  pgf
- * switch to TCSETAW from TSSETAF in ttclean and unclean -- don't want to
- * flush input needlessly
- *
- * Revision 1.14  1991/11/13  20:09:27  pgf
- * X11 changes, from dave lemke
- *
- * Revision 1.13  1991/11/07  02:00:32  pgf
- * lint cleanup
- *
- * Revision 1.12  1991/11/01  14:38:00  pgf
- * saber cleanup
- *
- * Revision 1.11  1991/10/15  12:18:39  pgf
- * fetch more termio chars at startup, like wkillc, suspc, etc.
- *
- * Revision 1.10  1991/08/12  15:05:43  pgf
- * rearranged read-ahead in one of the tgetc options
- *
- * Revision 1.9  1991/08/07  12:35:07  pgf
- * added RCS log messages
- *
- * revision 1.8
- * date: 1991/07/19 17:17:49;
- * change backspace action to back_char_to_bol()
- * 
- * revision 1.7
- * date: 1991/06/28 10:54:00;
- * change a config ifdef
- * 
- * revision 1.6
- * date: 1991/04/22 09:06:57;
- * POSIX/ULTRIX changes
- * 
- * revision 1.5
- * date: 1991/02/14 15:50:41;
- * fixed size problem on olstate/nlstate
- * 
- * revision 1.4
- * date: 1990/12/06 18:54:48;
- * tried to get ttgetc to return -1 on interrupt -- doesn't work
- * 
- * revision 1.3
- * date: 1990/10/12 19:32:11;
- * do SETAF, not SETA in ttunclean
- * 
- * revision 1.2
- * date: 1990/10/03 16:01:04;
- * make backspace work for everyone
- * 
- * revision 1.1
- * date: 1990/09/21 10:26:10;
- * initial vile RCS revision
  */
 #include	"estruct.h"
 #include        "edef.h"
@@ -339,7 +58,7 @@
 # if SUNOS
 #  include "sys/filio.h"
 # else /* if you have trouble including ioctl.h, try "sys/ioctl.h" instead */
-#  if APOLLO || AIX || OSF1 || ULTRIX || AUX2 || BSD386
+#  if APOLLO || AIX || OSF1 || ULTRIX || AUX2 || NETBSD
 #   include <sys/ioctl.h>
 #  else
 #   include <ioctl.h>
@@ -847,7 +566,7 @@ this seems to think there is something ready more often than there really is
 #endif
 #else
 
-	if (tungotc >= 0)
+	if (did_tungetc())
 		return TRUE;
 
 # if	USE_FIONREAD
@@ -884,6 +603,33 @@ ttmiscinit()
 	/* no buffering on input */
 	setbuf(stdin, (char *)0);
 }
+
+#if defined(SA_RESTART)
+/*
+ * Redefine signal in terms of sigaction for systems which have the
+ * SA_RESTART flag defined through <signal.h>
+ *
+ * This definition of signal will cause system calls to get restarted for a
+ * more BSD-ish behavior.  This will allow us to use the OPT_WORKING feature
+ * for such systems.
+ */
+
+void (*signal(sig,disp))()
+    int sig;
+    void (*disp) P((int));
+{
+    struct sigaction act, oact;
+    int status;
+
+    act.sa_handler = disp;
+    sigemptyset(&act.sa_mask);
+    act.sa_flags = SA_RESTART;
+
+    status = sigaction(sig, &act, &oact);
+
+    return (status < 0) ? SIG_ERR : oact.sa_handler;
+}
+#endif
 
 #else /* not UNIX */
 
@@ -1270,7 +1016,7 @@ ttgetc()
 int
 typahead()
 {
-	if (tungotc >= 0)
+	if (did_tungetc())
 		return TRUE;
 
 #if	X11
