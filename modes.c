@@ -8,9 +8,12 @@
  * Major extensions for vile by Paul Fox, 1991
  *
  *	$Log: modes.c,v $
- *	Revision 1.21  1993/08/05 14:35:57  pgf
- *	changed name of setmode to avoid library conflict with djgpp compiler
- *	(also changed delmode, setgmode, and delgmode to be consistent)
+ *	Revision 1.22  1993/08/13 16:32:50  pgf
+ *	tom's 3.58 changes
+ *
+ * Revision 1.21  1993/08/05  14:35:57  pgf
+ * changed name of setmode to avoid library conflict with djgpp compiler
+ * (also changed delmode, setgmode, and delgmode to be consistent)
  *
  * Revision 1.20  1993/07/15  10:37:58  pgf
  * see 3.55 CHANGES
@@ -475,6 +478,46 @@ struct VAL *values;
 	}
 }
 
+/*
+ * These are special routines designed to save the values of local modes and to
+ * restore them.  The 'recompute_buffer()' procedure assumes that global modes
+ * do not change during the recomputation process (so there is no point in
+ * trying to convert any of those values to local ones).
+ */
+#if	OPT_UPBUFF
+void
+save_vals(maximum, gbl, dst, src)
+int maximum;
+struct VAL *gbl;
+struct VAL *dst;
+struct VAL *src;
+{
+	register int	n;
+	for (n = 0; n < maximum; n++) {
+		dst[n] = src[n];
+		if (src[n].vp == &src[n].v) {	/* local value? */
+			dst[n].vp = &dst[n].v;
+			copy_val(src, gbl, n);
+		}
+	}
+}
+
+void
+restore_vals(maximum, dst, src)
+int maximum;
+struct VAL *dst;
+struct VAL *src;
+{
+	register int	n;
+	for (n = 0; n < maximum; n++) {
+		if (dst[n].vp == &dst[n].v) {
+			src[n] = dst[n];
+			src[n].vp = &src[n].v;
+		}
+	}
+}
+#endif /* OPT_UPBUFF */
+
 #if NO_LEAKS
 /*
  * free storage used by local mode-values, called only when we are freeing
@@ -639,8 +682,11 @@ register struct VAL *values;
 		 && !legal_glob_mode(rp))
 		 	return FALSE;
 #endif
-	} else
+	}
+#if !SMALLER
+	else
 		hst_glue(' ');
+#endif
 
 	oldvalue = *values;	/* save, to simplify no-change testing */
 	if (oldvalue.vp == &(values->v))
@@ -825,7 +871,7 @@ int	global;
 	}
 
 	if ((s = find_mode(cbuf, global, &nn, &vv)) != TRUE) {
-#if !SMALLER
+#if OPT_EVAL
 		return set_variable(cbuf);
 #else
 		mlforce("[Not a legal set option: \"%s\"]", cbuf);
@@ -850,6 +896,9 @@ int global;	/* true = global flag,	false = current buffer flag */
 	int s;
 	int autobuff = global_g_val(GMDABUFF);
 	int anything = 0;
+#if	OPT_XTERM
+	int xterm_mouse = global_g_val(GMDXTERM_MOUSE);
+#endif
 
 	while (((s = do_a_mode(kind, global)) == TRUE) && (end_string() == ' '))
 		anything++;
@@ -861,6 +910,15 @@ int global;	/* true = global flag,	false = current buffer flag */
 		(void)listmodes(FALSE,1);
 
 	if (autobuff != global_g_val(GMDABUFF)) sortlistbuffers();
+
+#if	OPT_XTERM
+	if (xterm_mouse != global_g_val(GMDXTERM_MOUSE)) {
+		set_global_g_val(GMDXTERM_MOUSE,TRUE);
+		if (xterm_mouse)	TTkclose();
+		else			TTkopen();
+		set_global_g_val(GMDXTERM_MOUSE,!xterm_mouse);
+	}
+#endif
 
 	return s;
 }

@@ -3,7 +3,10 @@
  *		5/9/86
  *
  * $Log: input.c,v $
- * Revision 1.83  1993/07/27 18:06:20  pgf
+ * Revision 1.84  1993/08/13 16:32:50  pgf
+ * tom's 3.58 changes
+ *
+ * Revision 1.83  1993/07/27  18:06:20  pgf
  * see tom's 3.56 CHANGES entry
  *
  * Revision 1.82  1993/07/15  12:00:00  pgf
@@ -239,7 +242,7 @@
  * during playback
  *
  * Revision 1.14  1991/08/16  11:01:39	pgf
- * added catnap() before typahead check on esc char in ANS_SPEC, and
+ * added catnap() before typahead check on esc char in ANSI_SPEC, and
  * added REPLACECHAR special check on ANSI_SPEC, and
  * allow quoting of %, #, :, with \ in kbd_string, so they don't expand
  *
@@ -299,6 +302,8 @@
 #include	"estruct.h"
 #include	"edef.h"
 
+#define	SQUARE_LEFT	'['
+
 #define	DEFAULT_REG	-1
 
 #define RECORDED_ESC	-2
@@ -332,12 +337,8 @@ static	void	dot_replays_macro P(( int ));
 #endif
 
 static	KSTACK *KbdStack;	/* keyboard/@-macros that are replaying */
-static	TBUFF  *dotcmd;		/* dot commands, recorded	*/
 static	TBUFF  *KbdMacro;	/* keyboard macro, recorded	*/
 static	int	last_eolchar;	/* records last eolchar-match in 'kbd_string' */
-
-static	int	dotcmdrep;	/* number of repetitions	*/
-static	int	dotcmdcnt;	/* original dot command repeat count*/
 
 /*--------------------------------------------------------------------------*/
 
@@ -672,6 +673,9 @@ kbd_key()
 {
 	int    c;
 
+#if OPT_XTERM
+kbd_key_loop:
+#endif
 	/* get a keystroke */
 	c = tgetc(FALSE);
 
@@ -698,9 +702,20 @@ kbd_key()
 		/* and then, if there _was_ recorded input or new typahead... */
 		if (nextc != -1 || typahead()) {
 			c = tgetc(FALSE);
-			if (c == '[' || c == 'O') {
+			if (c == SQUARE_LEFT || c == 'O') {
+#if OPT_XTERM
+				int	d = c;
+#endif
 				/* eat ansi sequences */
 				c = tgetc(FALSE);
+#if OPT_XTERM
+				if (d == SQUARE_LEFT
+				 && (d = xterm_button(c)) != FALSE) {
+					if (insertmode || (d != TRUE))
+						return abortc;
+					goto kbd_key_loop;
+				}
+#endif
 				if (abortc != ESC || !insertmode)
 					return (last1key = SPEC | c);
 				if (insertmode == REPLACECHAR) {
@@ -964,40 +979,31 @@ int	c;
 	register BUFFER *bp;
 	char str[NFILEN];
 
-	switch(c) {
-	case '%':
-		if (!*(curbp->b_fname) ||
-			isspace(*(curbp->b_fname)))
-			cp = curbp->b_bname;
-		else {
-			cp = shorten_path(strcpy(str, curbp->b_fname), FALSE);
-			if (!cp) cp = curbp->b_bname;
+	/* Is this a character that we know about? */
+	if (strchr(global_g_val_ptr(GVAL_EXPAND_CHARS),c) == 0)
+		return FALSE;
+
+	if (c == '%' || c == '#') {
+		bp = (c == '%') ? curbp : find_alt();
+		if (bp == 0 || b_is_invisible(bp)) {
+			kbd_alarm();	/* complain a little */
+			return FALSE;	/* ...and let the user type it as-is */
 		}
-		break;
-	case '#':
-		if ((bp = find_alt()) != 0) {
-			cp = shorten_path(strcpy(str, bp->b_fname), FALSE);
-			if (!cp || !*cp || isspace(*cp)) {
-				/* oh well, use the buffer */
-				cp = bp->b_bname;
-			}
-		} else
-			cp = NULL;
-		break;
-#if ! MSDOS
-	/* drive letters get in the way */
-	case ':':
+		cp = bp->b_fname;
+		if (isInternalName(cp))
+			cp = bp->b_bname;
+		else if (!global_g_val(GMDEXPAND_PATH))
+			cp = shorten_path(strcpy(str, cp), FALSE);
+	} else if (c == ':') {
 		if (screen_string(str, sizeof(str), (CMASK)_pathn))
 			cp = str;
 		else
 			cp = NULL;
-		break;
-#endif
-	default:
+	} else {
 		return FALSE;
 	}
 
-	if (cp != 0) {
+	if (cp != NULL) {
 		while (cpos < bufn-1 && ((c = *cp++) != EOS)) {
 			buf[cpos++] = c;
 			showChar(c);
@@ -1189,7 +1195,7 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 					extbuf[cpos] = EOS;
 			}
 			if (!(options & KBD_NOEVAL)) {
-				(void)strcpy(extbuf, tokval(extbuf));
+				(void)strncpy(extbuf, tokval(extbuf), (SIZE_T)bufn);
 			}
 			last_eolchar = *execstr;
 		}
@@ -1200,7 +1206,7 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 
 	/* prompt the user for the input string */
 	if (prompt != 0)
-		mlprompt(prompt);
+		mlprompt("%s", prompt);
 
 	if (bufn > sizeof(buf)) bufn = sizeof(buf);
 	cpos = kbd_show_response(buf, extbuf, bufn, eolchar, options);
@@ -1267,7 +1273,7 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 
 			/* if buffer is empty, return FALSE */
 			hst_append(buf, eolchar);
-			return (*strcpy(extbuf, buf) == EOS) ? FALSE:TRUE;
+			return (*strncpy(extbuf, buf, (SIZE_T)bufn) != EOS);
 		}
 
 
@@ -1475,22 +1481,6 @@ int f,n;
 		ukb = dotcmdkreg;
 
 	return TRUE;
-}
-
-/*
- * Special function used in 'insert.c' to adjust cursor position between
- * iterations in command of the form "5."
- */
-int
-dotreplaying(f)
-int f;
-{
-	if (dotcmdmode == PLAY) {
-		if (f)
-			return (dotcmdrep != dotcmdcnt);
-		return (dotcmdrep > 1);
-	}
-	return FALSE;
 }
 
 /*

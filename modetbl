@@ -12,7 +12,10 @@
 # The modes are table entries in the BUFFER and WINDOW structures.
 #
 # $Log: modetbl,v $
-# Revision 1.19  1993/08/05 14:29:12  pgf
+# Revision 1.20  1993/08/13 16:32:50  pgf
+# tom's 3.58 changes
+#
+# Revision 1.19  1993/08/05  14:29:12  pgf
 # tom's 3.57 changes
 #
 # Revision 1.18  1993/07/27  18:06:20  pgf
@@ -80,22 +83,26 @@ bool								# GMD prefix
 	"AutoBuffer"	ABUFF 		0			# auto-buffer (lru)
 	"dirc"		DIRC		0			# directory-completion (slow!)
 	"Alt-TabPos"	ALTTABPOS	0			# emacs-style cursor positioning
+	"expand-path"	EXPAND_PATH	0			# true iff %/# don't substitute shortened-path
 	"HIstory"	HISTORY		0			# command-history
 	"ImplyBuffer"	IMPLYBUFF 	0			# imply-buffer (vi-like)
 	"Popup-Choices"	POPUP_FILEC	0		NOTYET	# popup buffer showing file-completion choices
 	"Popup-Msgs"	POPUP_MSGS	0		NOTYET	# popup buffer when multiple messages emitted
 	"ShowRam"	RAMSIZE		0		RAMSIZE	# show ram-usage
 	"SameBangs"	SAMEBANGS	0			# use same "!!" data for ^X-!
+	"xterm-mouse"	XTERM_MOUSE	0		OPT_XTERM # (patch) mode to control whether we allow mouse-clicking
 int								# VAL_ prefix
 	"report"	REPORT		0			# threshold for reporting changes
 	"timeoutlen"	TIMEOUTVAL	0			# how long to catnap for more input
 regex								# VAL_ prefix
 	"C-SUFfixes"	CSUFFIXES	0			# match against filenames to turn on c-mode
 string								# VAL_ prefix
+	"expand-chars"	EXPAND_CHARS	0			# list of chars we can expand (%,#,:)
 	"glob"		GLOB		0			# select filename globbing style
 
 .buffers
 bool								# MD prefix
+	"animated"	UPBUFF		0		OPT_UPBUFF # update scratch-buffers
 	"AutoIndent"	AIND		0			# auto-indent
 	"AutoSave"	ASAVE		0			# auto-save mode
 	"BackspaceLimit" BACKLIMIT	0			# backspace limited in insert mode

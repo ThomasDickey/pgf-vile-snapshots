@@ -11,7 +11,10 @@
  * which means that the dot and mark values in the buffer headers are nonsense.
  *
  * $Log: line.c,v $
- * Revision 1.51  1993/08/05 14:29:12  pgf
+ * Revision 1.52  1993/08/13 16:32:50  pgf
+ * tom's 3.58 changes
+ *
+ * Revision 1.51  1993/08/05  14:29:12  pgf
  * tom's 3.57 changes
  *
  * Revision 1.50  1993/07/27  18:06:20  pgf
@@ -313,7 +316,7 @@ BUFFER *bp;
 void
 lfree(lp,bp)
 fast_ptr LINEPTR lp;
-register BUFFER *bp;
+fast_ptr BUFFER *bp;
 {
 #if OPT_MAP_MEMORY
 	l_deallocate(lp);
@@ -856,7 +859,7 @@ int kflag;	/* put killed text in kill buffer flag */
 /* getctext:	grab and return a string with text from
 		the current line, consisting of chars of type "type"
 */
-
+#if OPT_EVAL
 char *getctext(type)
 int type;
 {
@@ -865,8 +868,9 @@ int type;
 	(void)screen_string(rline, NSTRING, (CMASK)type);
 	return rline;
 }
+#endif
 
-#if ! SMALLER
+#if OPT_EVAL
 /* putctext:	replace the current line with the passed in text	*/
 
 int
@@ -1289,7 +1293,7 @@ int f,n,after,putlines;
 		if (after && !is_at_end_of_line(curwp->w_dot))
 			forwchar(TRUE,1);
 	}
-	setmark();
+	(void)setmark();
 	s = put(n,lining);
 	if (s == TRUE)
 		swapmark();

@@ -4,7 +4,10 @@
  *	written 1986 by Daniel Lawrence	
  *
  * $Log: exec.c,v $
- * Revision 1.66  1993/08/05 14:29:12  pgf
+ * Revision 1.67  1993/08/13 16:32:50  pgf
+ * tom's 3.58 changes
+ *
+ * Revision 1.66  1993/08/05  14:29:12  pgf
  * tom's 3.57 changes
  *
  * Revision 1.65  1993/07/27  18:06:20  pgf
@@ -325,6 +328,7 @@ int f, n;
 
 	LINEPTR fromline;	/* first linespec */
 	LINEPTR toline;		/* second linespec */
+	MARK	save_DOT;
 	char lspec[NLINE];
 	char cspec[NLINE];
 	int cmode = 0;
@@ -503,9 +507,13 @@ seems like we need one more check here -- is it from a .exrc file?
 	/* some commands have special default ranges */
 	if (isdfl) {
 		if (flags & DFLALL) {
+			extern CMDFUNC f_showlength;
 			extern CMDFUNC f_operwrite, f_filewrite, f_operglobals,
 					f_globals, f_opervglobals, f_vglobals;
-			if (cfp == &f_operwrite) {
+			if (cfp == &f_showlength) {
+				fromline = lFORW(buf_head(curbp));
+				toline   = lBACK(buf_head(curbp));
+			} else if (cfp == &f_operwrite) {
 				cfp = &f_filewrite;
 #if GLOBALS
 			} else if (cfp == &f_operglobals) {
@@ -521,7 +529,7 @@ seems like we need one more check here -- is it from a .exrc file?
 			extern CMDFUNC f_operfilter, f_spawn;
 			if (cfp == &f_operfilter) {
 				cfp = &f_spawn;
-				setmark();  /* not that it matters */
+				(void)setmark();  /* not that it matters */
 			} else {
 				mlforce("[Configuration error: DFLNONE]");
 				return FALSE;
@@ -538,8 +546,9 @@ seems like we need one more check here -- is it from a .exrc file?
 	}
 #endif
 
-	if (!same_ptr(toline, null_ptr)
-	 || !same_ptr(fromline, null_ptr)) {
+	if (flags & NOMOVE)
+		save_DOT = DOT;
+	else if (!same_ptr(toline, null_ptr) || !same_ptr(fromline, null_ptr)) {
 		/* assume it's an absolute motion */
 		/* we could probably do better */
 		curwp->w_lastdot = DOT;
@@ -547,13 +556,13 @@ seems like we need one more check here -- is it from a .exrc file?
 	if (!same_ptr(toline, null_ptr) && (flags & TO)) {
 		DOT.l = toline;
 		(void)firstnonwhite(f,n);
-		setmark();
+		(void)setmark();
 	}
 	if (!same_ptr(fromline, null_ptr) && (flags & FROM)) {
 		DOT.l = fromline;
 		(void)firstnonwhite(f,n);
 		if (same_ptr(toline, null_ptr))
-			setmark();
+			(void)setmark();
 	}
 
 	/* and then execute the command */
@@ -566,6 +575,9 @@ seems like we need one more check here -- is it from a .exrc file?
 	havemotion = NULL;
 	isnamedcmd = FALSE;
 	fulllineregions = FALSE;
+
+	if (flags & NOMOVE)
+		DOT = save_DOT;
 
 	return status;
 }
@@ -599,7 +611,7 @@ LINEPTR		*markptr;	/* where to store the mark's value */
 	register char	*t;
 	int		status;
 
-	setmark();
+	(void)setmark();
 	lp = NULL;
 
 	/* parse each ;-delimited clause of this linespec */
@@ -1840,6 +1852,7 @@ int cbuf9(f, n) int f,n; { return cbuf(f, n, 9); }
 
 int cbuf10(f, n) int f,n; { return cbuf(f, n, 10); }
 
+#if !SMALLER
 int cbuf11(f, n) int f,n; { return cbuf(f, n, 11); }
 
 int cbuf12(f, n) int f,n; { return cbuf(f, n, 12); }
@@ -1900,4 +1913,4 @@ int cbuf39(f, n) int f,n; { return cbuf(f, n, 39); }
 
 int cbuf40(f, n) int f,n; { return cbuf(f, n, 40); }
 
-
+#endif /* !SMALLER */

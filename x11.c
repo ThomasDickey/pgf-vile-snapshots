@@ -2,7 +2,10 @@
  * 	X11 support, Dave Lemke, 11/91
  *
  * $Log: x11.c,v $
- * Revision 1.24  1993/08/05 14:29:12  pgf
+ * Revision 1.25  1993/08/13 16:32:50  pgf
+ * tom's 3.58 changes
+ *
+ * Revision 1.24  1993/08/05  14:29:12  pgf
  * tom's 3.57 changes
  *
  * Revision 1.23  1993/07/27  18:06:20  pgf
@@ -82,6 +85,7 @@
 
 #include	"estruct.h"
 #include	"edef.h"
+#include "trace.h"	/* patch */
 
 /* undef for the benefit of some X header files -- if you really _are_
 	both ISC and X11, well, you know what to do. */
@@ -114,11 +118,20 @@ extern	XClassHint *XAllocClassHint P((void)); /* usually in <X11/xutil.h> */
 #define	MARGIN	8
 #define	SCRSIZ	64
 #define	NPAUSE	10		/* # times thru update to pause */
-#define min(x,y)	((x) < (y) ? (x) : (y))
-#define max(x,y)	((x) > (y) ? (x) : (y))
 #define	absol(x)	((x) > 0 ? (x) : -(x))
+#define	CEIL(a,b)	((a + b - 1) / (b))
 
 #define onMsgRow(tw)	(ttrow == (tw->rows - 1))
+
+#define	turnOffCursor(tw)\
+	tw->line_attr[tw->cur_row] |= LINE_DIRTY;\
+	tw->attr[tw->cur_row][tw->cur_col] &= ~CELL_CURSOR;\
+	tw->attr[tw->cur_row][tw->cur_col] |= CELL_DIRTY
+
+#define	turnOnCursor(tw)\
+	tw->line_attr[tw->cur_row] |= LINE_DIRTY;\
+	tw->attr[tw->cur_row][tw->cur_col] |= (CELL_DIRTY|CELL_CURSOR)
+
 
 /* XXX -- use xcutsel instead */
 #undef	SABER_HACK		/* hack to support Saber since it doesn't do
@@ -221,7 +234,7 @@ static	void	clear_row_selection P(( TextWindow, int, int, int ));
 static	void	change_selection P(( TextWindow, Bool, Bool ));
 static	void	x_stash_selection P(( TextWindow ));
 static	int	set_character_class P(( char * ));
-static	void	x_refresh P(( TextWindow, int, int, unsigned, unsigned ));
+static	void	x_touch P(( TextWindow, int, int, UINT, UINT ));
 static	void	x_resize_screen P(( TextWindow, unsigned, unsigned ));
 static	void	x_paste_selection P(( TextWindow ));
 static	Bool	x_give_selection P(( TextWindow, XSelectionRequestEvent *, Atom, Atom ));
@@ -231,6 +244,7 @@ static	void	multi_click P(( TextWindow, int, int ));
 static	void	start_selection P(( TextWindow, XButtonPressedEvent *, int, int ));
 static	XMotionEvent * compress_motion P(( XMotionEvent * ));
 static	void	x_process_event P(( XEvent * ));
+static	int	decoded_key P(( XEvent * ));
 #if NEEDED
 static	Bool	check_kbd_ev P(( Display *, XEvent *, char * ));
 #endif
@@ -450,7 +464,8 @@ x_setfont(fname)
 		XResizeWindow(dpy, cur_win->win,
 			      x_width(cur_win), x_height(cur_win));
 	    } else {
-		x_refresh(cur_win, 0, 0, cur_win->cols, cur_win->rows);
+		x_touch(cur_win, 0, 0, cur_win->cols, cur_win->rows);
+		x_flush();
 	    }
 	    xsh.flags = PResizeInc | PMaxSize;
 	    xsh.width_inc = cur_win->char_width;
@@ -724,7 +739,7 @@ x_open()
     tw->sel_prop = XInternAtom(dpy, "VILE_SELECTION", False);
 
     (void)signal(SIGHUP, x_quit);
-    (void)signal(SIGINT, x_quit);
+    (void)signal(SIGINT, catchintr);
     (void)signal(SIGTERM, x_quit);
 
     /* main code assumes that it can access a cell at nrow x ncol */
@@ -749,23 +764,27 @@ x_kclose()
 }
 
 static void
-x_refresh(tw, sc, sr, ec, er)
-    TextWindow  tw;
-    int         sc,
-                sr;
-    unsigned    ec,
-                er;
+x_touch(tw, sc, sr, ec, er)
+	TextWindow tw;
+	int	sc;
+	int	sr;
+	UINT    ec;
+	UINT	er;
 {
-    unsigned    r,
-                c;
+	register UINT	r;
+	register UINT	c;
 
-    for (r = sr; r < er; r++) {
-	tw->line_attr[r] |= LINE_DIRTY;
-	for (c = sc; c < ec; c++) {
-	    tw->attr[r][c] |= CELL_DIRTY;
+	if (er > tw->rows)
+		er = tw->rows;
+	if (ec > tw->cols)
+		ec = tw->cols;
+
+	for (r = sr; r < er; r++) {
+		tw->line_attr[r] |= LINE_DIRTY;
+		for (c = sc; c < ec; c++) {
+			tw->attr[r][c] |= CELL_DIRTY;
+		}
 	}
-    }
-    x_flush();
 }
 
 /* XXX this mostly works, except for cursor dirt.  doesn't seem to be
@@ -795,9 +814,10 @@ wait_for_scroll(tw)
 	    gev = (XGraphicsExposeEvent *) & ev;
 	    sc = gev->x / tw->char_width;
 	    sr = gev->y / tw->char_height;
-	    ec = sc + gev->width / tw->char_width;
-	    er = sr + gev->height / tw->char_height;
-	    x_refresh(tw, sc, sr, ec, er);
+	    ec = CEIL(gev->x + gev->width,  tw->char_width);
+	    er = CEIL(gev->y + gev->height, tw->char_height);
+	    x_touch(tw, sc, sr, ec, er);
+	    x_flush();
 	    return;
 	}
 	XSync(tw->dpy, 0);
@@ -850,9 +870,7 @@ x_scroll(from, to, count)
     }
 
 #ifndef copy_area
-    cur_win->line_attr[cur_win->cur_row] |= LINE_DIRTY;
-    cur_win->attr[cur_win->cur_row][cur_win->cur_col] |= CELL_DIRTY;
-    cur_win->attr[cur_win->cur_row][cur_win->cur_col] &= ~CELL_CURSOR;
+    turnOffCursor(cur_win);
 #endif
 
     for (rf = fst, rt = tst, i = 0; i < count; i++, rf += finc, rt += tinc) {
@@ -873,8 +891,7 @@ x_scroll(from, to, count)
 #else
 	if (rf == cur_win->cur_row) {	/* erase scrolled cursor */
 	    cur_win->line_attr[rt] |= LINE_DIRTY;
-	    cur_win->attr[rt][cur_win->cur_col] |= CELL_DIRTY;
-	    cur_win->attr[rt][cur_win->cur_col] &= ~CELL_CURSOR;
+	    turnOffCursor(cur_win);
 	}
 #endif
 
@@ -1103,16 +1120,16 @@ x_flush()
 
 static void
 x_move(row, col)
-    int         row,
-                col;
+	int	row;
+	int	col;
 {
-    cur_win->attr[cur_win->cur_row][cur_win->cur_col] &= ~CELL_CURSOR;
-    cur_win->attr[cur_win->cur_row][cur_win->cur_col] |= CELL_DIRTY;
-    cur_win->line_attr[cur_win->cur_row] |= LINE_DIRTY;
-    cur_win->cur_col = col;
-    cur_win->cur_row = row;
-    cur_win->attr[row][col] |= (CELL_CURSOR | CELL_DIRTY);
-    cur_win->line_attr[row] |= LINE_DIRTY;
+	if ((row != cur_win->cur_row && row >= 0)
+	 || (col != cur_win->cur_col && col >= 0)) {
+		turnOffCursor(cur_win);
+		cur_win->cur_col = col;
+		cur_win->cur_row = row;
+		turnOnCursor(cur_win);
+	}
 }
 
 #define	in_selection(tw, r)	((r) >= (tw)->sel_start_row && \
@@ -1138,8 +1155,7 @@ x_putline(row, str, len)
     if (cur_win->show_selection && in_selection(cur_win, row))
 	change_selection(cur_win, False, True);
 
-    cur_win->attr[cur_win->cur_row][cur_win->cur_col] &= ~CELL_CURSOR;
-    cur_win->attr[cur_win->cur_row][cur_win->cur_col] |= CELL_DIRTY;
+    turnOffCursor(cur_win);
 
     (void)memcpy(
     	(char *) &(cur_win->sc[row][cur_win->cur_col]),
@@ -1156,8 +1172,7 @@ x_putline(row, str, len)
     cur_win->cur_row = row;
     cur_win->cur_col = c - 1;
 
-    cur_win->attr[row][cur_win->cur_col] |= (CELL_CURSOR | CELL_DIRTY);
-    cur_win->line_attr[row] |= LINE_DIRTY;
+    turnOnCursor(cur_win);
 }
 
 static void
@@ -1171,8 +1186,7 @@ x_putc(c)
     if (cur_win->show_selection && in_selection(cur_win, cur_win->cur_row))
 	change_selection(cur_win, False, True);
 
-    cur_win->attr[cur_win->cur_row][cur_win->cur_col] &= ~CELL_CURSOR;
-    cur_win->attr[cur_win->cur_row][cur_win->cur_col] |= CELL_DIRTY;
+    turnOffCursor(cur_win);
 
     /* minibuffer prompt spits out real backspaces for some silly reason... */
     if (isprint(c)) {
@@ -1185,9 +1199,7 @@ x_putc(c)
     } else if (c == '\b') {
 	cur_win->cur_col--;
     }
-    cur_win->attr[cur_win->cur_row][cur_win->cur_col] |=
-	(CELL_CURSOR | CELL_DIRTY);
-    cur_win->line_attr[cur_win->cur_row] |= LINE_DIRTY;
+    turnOnCursor(cur_win);
 }
 
 /*
@@ -1658,10 +1670,14 @@ x_stash_selection(tw)
 		MARK	save;
 		int	region_flag = fulllineregions;
 		int	report_flag = global_g_val(GVAL_REPORT);
-		int	saverow = ttrow;
-		int	savecol = ttcol;
+		int	saverow;
+		int	savecol;
 		int	extend_left = FALSE;
 		int	extend_right = FALSE;
+
+		beginDisplay;
+		saverow = ttrow;
+		savecol = ttcol;
 
 		/*
 		 * If the selection is in a non-linewrapped window, extend the
@@ -1707,6 +1723,7 @@ x_stash_selection(tw)
 		if (saverow != ttrow)	/* we showed a message */
 			movecursor(saverow, savecol);
 		set_global_g_val(GVAL_REPORT,report_flag);
+		endofDisplay;
 
 		if (!(length = kchars)
 		 || !(dp = data = castalloc(UCHAR, kchars))
@@ -1880,9 +1897,14 @@ extend_selection(tw, nr, nc, wipe)
 	(void)setwmark(nr,nc);
 #ifdef WMDRULER
 	if (wp1 != 0 && w_val(wp1,WMDRULER) && !x_on_msgline()) {
-		int savecol = ttcol;
-		int saverow = ttrow;
-		int saveflg = curwp->w_flag;
+		int savecol;
+		int saverow;
+		int saveflg;
+
+		beginDisplay;
+		saverow = ttrow;
+		savecol = ttcol;
+		saveflg = curwp->w_flag;
 
 		drawing_ruler = True;
 		swapmark();
@@ -1894,6 +1916,7 @@ extend_selection(tw, nr, nc, wipe)
 		drawing_ruler = False;
 
 		movecursor(saverow, savecol);
+		endofDisplay;
 	}
 #endif
 }
@@ -1985,7 +2008,6 @@ multi_click(tw, nr, nc)
 #endif
 }
 
-
 static void
 start_selection(tw, ev, nr, nc)
 	TextWindow  tw;
@@ -1998,9 +2020,13 @@ start_selection(tw, ev, nr, nc)
 	 && (nr == tw->sel_start_row)) { /* ignore extra clicks on other rows */
 		multi_click(tw, nr, nc);
 	} else {
-		int	my_row	= ttrow;
-		int	my_col	= ttcol;
+		int	my_row;
+		int	my_col;
 		int	saved_selection = tw->have_selection;
+
+		beginDisplay;
+		my_row = ttrow;
+		my_col = ttcol;
 
 		tw->lasttime = ev->time;
 		tw->numclicks = 1;
@@ -2032,13 +2058,14 @@ start_selection(tw, ev, nr, nc)
 				movecursor(my_row, my_col);
 				x_flush();
 			} else if (!saved_selection) {
-				int	row = ttrow;
-				int	col = ttcol;
+				my_row = ttrow;
+				my_col = ttcol;
 				mlerase();
-				movecursor(row,col);
+				movecursor(my_row,my_col);
 				x_flush();
 			}
 		}
+		endofDisplay;
 	}
 }
 
@@ -2067,11 +2094,17 @@ static void
 x_process_event(ev)
     XEvent     *ev;
 {
+    int         sc,
+                sr;
+    unsigned    ec,
+                er;
+
     int         nr,
                 nc;
     Bool        changed = False;
     XSelectionEvent event;
     XMotionEvent *mev;
+    XExposeEvent *gev;
 
     switch (ev->type) {
     case SelectionClear:
@@ -2119,44 +2152,43 @@ x_process_event(ev)
 	break;
 
     case Expose:
-	/* XXX this should be smarter about lots of resizes */
-	if (ev->xexpose.count == 0) {
-	    x_refresh(cur_win, 0, 0, cur_win->cols, cur_win->rows);
-	}
+	gev = (XExposeEvent *)ev;
+	sc = gev->x / cur_win->char_width;
+	sr = gev->y / cur_win->char_height;
+	ec = CEIL(gev->x + gev->width,  cur_win->char_width);
+	er = CEIL(gev->y + gev->height, cur_win->char_height);
+	x_touch(cur_win, sc, sr, ec, er);
+	if (ev->xexpose.count == 0)
+		x_flush();
 	break;
     case EnterNotify:
     case FocusIn:
 	cur_win->show_cursor = True;
-	cur_win->line_attr[cur_win->cur_row] |= LINE_DIRTY;
-	cur_win->attr[cur_win->cur_row][cur_win->cur_col] |=
-	    CELL_DIRTY | CELL_CURSOR;
+	turnOnCursor(cur_win);
 	x_flush();
 	break;
     case LeaveNotify:
     case FocusOut:
-	cur_win->line_attr[cur_win->cur_row] |= LINE_DIRTY;
 	cur_win->show_cursor = False;
-	cur_win->attr[cur_win->cur_row][cur_win->cur_col] |= CELL_DIRTY;
-	cur_win->attr[cur_win->cur_row][cur_win->cur_col] &= ~CELL_CURSOR;
+	turnOffCursor(cur_win);
 	x_flush();
 	break;
     case ConfigureNotify:
 	nr = ev->xconfigure.height / cur_win->char_height;
-	nc = ev->xconfigure.width / cur_win->char_width;
+	nc = ev->xconfigure.width  / cur_win->char_width;
 
 	if (nc != cur_win->cols) {
-	    changed = True;
-	    newwidth(True, nc);
+		changed = True;
+		newwidth(True, nc);
 	}
 	if (nr != cur_win->rows) {
-	    changed = True;
-	    newlength(True, nr);
+		changed = True;
+		newlength(True, nr);
 	}
 	if (changed) {
-	    x_resize_screen(cur_win, (unsigned)nr, (unsigned)nc);
-
-	    (void) refresh(True, 0);
-	    (void) update(False);
+		x_resize_screen(cur_win, (unsigned)nr, (unsigned)nc);
+		(void) refresh(True, 0);
+		(void) update(False);
 	}
 	break;
     case MotionNotify:
@@ -2220,6 +2252,42 @@ x_on_msgline()
 }
 
 /*
+ * Because we poll our input-characters in 'x_getc()', it is possible to have
+ * exposure-events pending while doing lengthy processes (e.g., reading from a
+ * pipe).  This procedure is invoked from a timer-handler and is designed to
+ * handle the exposure-events, and to get keypress-events (i.e., for stopping a
+ * lengthy process).
+ */
+#if OPT_WORKING
+void
+x_working()
+{
+	register TextWindow tw = cur_win;
+	XEvent	ev;
+
+	while (XPending(tw->dpy)) {
+		if (XCheckTypedEvent(tw->dpy, KeyPress, &ev)) {
+			int	num = decoded_key(&ev);
+			if (num >= 0) {
+				if (num == intrc) {
+					(void)tb_init(&PasteBuf, abortc);
+#if VMS
+					kbd_alarm(); /* signals? */
+#else
+					(void)signal_pg(SIGINT);
+#endif
+				} else
+					(void)tb_append(&PasteBuf, num);
+			}
+		} else {
+			XNextEvent(tw->dpy, &ev);
+			x_process_event(&ev);
+		}
+	}
+}
+#endif
+
+/*
  * main event loop.  this means we'll be stuck if an event that needs
  * instant processing comes in while its off doing other work, but
  * there's no (easy) way around that.
@@ -2227,77 +2295,84 @@ x_on_msgline()
 static int
 x_getc()
 {
-    XEvent      ev;
-    char        buffer[10];
-    KeySym      keysym;
-    int         num;
+	XEvent	ev;
+	int	num;
 
-    while (1) {
+	while (1) {
 
-	if (tb_more(PasteBuf))	/* handle any queued pasted text */
-		return tb_next(PasteBuf);
+		if (tb_more(PasteBuf))	/* handle any queued pasted text */
+			return tb_next(PasteBuf);
 
-	XNextEvent(dpy, &ev);
-	if (ev.type == KeyPress) {
-		x_lose_selection(cur_win);
-	        num = XLookupString((XKeyPressedEvent *) &ev, buffer, 10,
-				&keysym, (XComposeStatus *) 0);
-		switch (keysym) {
-		/* Arrow keys */
-		case XK_Up:	return SPEC|'A';
-		case XK_Down:	return SPEC|'B';
-		case XK_Right:	return SPEC|'C';
-		case XK_Left:	return SPEC|'D';
-		/* page scroll */
-		case XK_Next:	return SPEC|'n';
-		case XK_Prior:	return SPEC|'p';
-		/* editing */
-		case XK_Insert:	return SPEC|'i';
-#if (ULTRIX || ultrix)
-		case DXK_Remove: return SPEC|'r';
-#endif
-		case XK_Find:	return SPEC|'f';
-		case XK_Select:	return SPEC|'s';
-		/* command keys */
-		case XK_Menu:	return SPEC|'m';
-		case XK_Help:	return SPEC|'h';
-                /* function keys */
-		case XK_F1:	return SPEC|'1';
-		case XK_F2:	return SPEC|'2';
-		case XK_F3:	return SPEC|'3';
-		case XK_F4:	return SPEC|'4';
-		case XK_F5:	return SPEC|'5';
-		case XK_F6:	return SPEC|'6';
-		case XK_F7:	return SPEC|'7';
-		case XK_F8:	return SPEC|'8';
-		case XK_F9:	return SPEC|'9';
-		case XK_F10:	return SPEC|'0';
-		case XK_F11:	return ESC;
-		case XK_F12:	return SPEC|'@';
-		case XK_F13:	return SPEC|'#';
-		case XK_F14:	return SPEC|'$';
-		case XK_F15:	return SPEC|'%';
-		case XK_F16:	return SPEC|'^';
-		case XK_F17:	return SPEC|'&';
-		case XK_F18:	return SPEC|'*';
-		case XK_F19:	return SPEC|'(';
-		case XK_F20:	return SPEC|')';
-		/* keypad function keys */
-		case XK_KP_F1:	return SPEC|'P';
-		case XK_KP_F2:	return SPEC|'Q';
-		case XK_KP_F3:	return SPEC|'R';
-		case XK_KP_F4:	return SPEC|'S';
-		/* ordinary keys */
-		default:
-			if (num)
-				return buffer[0];
-			else
-				continue;
+		XNextEvent(dpy, &ev);
+		if (ev.type == KeyPress) {
+			x_lose_selection(cur_win);
+			if ((num = decoded_key(&ev)) >= 0)
+				return num;
+		} else {
+			x_process_event(&ev);
 		}
-	} else {
-	    x_process_event(&ev);
 	}
-    }
+}
+
+static int
+decoded_key(ev)
+	XEvent	*ev;
+{
+	char	buffer[10];
+	KeySym	keysym;
+	int	num;
+
+	num = XLookupString((XKeyPressedEvent *) ev, buffer, sizeof(buffer),
+		&keysym, (XComposeStatus *) 0);
+
+	switch (keysym) {
+	/* Arrow keys */
+	case XK_Up:		return SPEC|'A';
+	case XK_Down:		return SPEC|'B';
+	case XK_Right:		return SPEC|'C';
+	case XK_Left:		return SPEC|'D';
+	/* page scroll */
+	case XK_Next:		return SPEC|'n';
+	case XK_Prior:		return SPEC|'p';
+	/* editing */
+	case XK_Insert:		return SPEC|'i';
+#if (ULTRIX || ultrix)
+	case DXK_Remove:	return SPEC|'r';
+#endif
+	case XK_Find:		return SPEC|'f';
+	case XK_Select:		return SPEC|'s';
+	/* command keys */
+	case XK_Menu:		return SPEC|'m';
+	case XK_Help:		return SPEC|'h';
+	/* function keys */
+	case XK_F1:		return SPEC|'1';
+	case XK_F2:		return SPEC|'2';
+	case XK_F3:		return SPEC|'3';
+	case XK_F4:		return SPEC|'4';
+	case XK_F5:		return SPEC|'5';
+	case XK_F6:		return SPEC|'6';
+	case XK_F7:		return SPEC|'7';
+	case XK_F8:		return SPEC|'8';
+	case XK_F9:		return SPEC|'9';
+	case XK_F10:		return SPEC|'0';
+	case XK_F11:		return ESC;
+	case XK_F12:		return SPEC|'@';
+	case XK_F13:		return SPEC|'#';
+	case XK_F14:		return SPEC|'$';
+	case XK_F15:		return SPEC|'%';
+	case XK_F16:		return SPEC|'^';
+	case XK_F17:		return SPEC|'&';
+	case XK_F18:		return SPEC|'*';
+	case XK_F19:		return SPEC|'(';
+	case XK_F20:		return SPEC|')';
+	/* keypad function keys */
+	case XK_KP_F1:		return SPEC|'P';
+	case XK_KP_F2:		return SPEC|'Q';
+	case XK_KP_F3:		return SPEC|'R';
+	case XK_KP_F4:		return SPEC|'S';
+	/* ordinary keys */
+	default:		return num ? buffer[0] : -1;
+	}
 }
 
 #if NEEDED

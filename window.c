@@ -3,7 +3,10 @@
  * attached to keys that the user actually types.
  *
  * $Log: window.c,v $
- * Revision 1.30  1993/08/05 14:29:12  pgf
+ * Revision 1.31  1993/08/13 16:32:50  pgf
+ * tom's 3.58 changes
+ *
+ * Revision 1.30  1993/08/05  14:29:12  pgf
  * tom's 3.57 changes
  *
  * Revision 1.29  1993/07/27  18:06:20  pgf
@@ -743,7 +746,7 @@ int f,n;
         return (TRUE);
 }
 
-#if !SMALLER
+#if !SMALLER || OPT_EVAL
 
 /*	Resize the current window to the requested size	*/
 int
@@ -956,7 +959,7 @@ int f,n;	/* numeric argument */
 	return(TRUE);
 }
 
-#if ! SMALLER
+#if OPT_EVAL
 int
 getwpos()	/* get screen offset of current line in current window */
 {

@@ -1,4 +1,4 @@
-/* 
+/*
  *
  *	insert.c
  *
@@ -8,8 +8,11 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: insert.c,v $
- *	Revision 1.30  1993/08/05 14:29:12  pgf
- *	tom's 3.57 changes
+ *	Revision 1.31  1993/08/13 16:32:50  pgf
+ *	tom's 3.58 changes
+ *
+ * Revision 1.30  1993/08/05  14:29:12  pgf
+ * tom's 3.57 changes
  *
  * Revision 1.29  1993/06/30  17:43:14  pgf
  * added call to map_check() when we're about to execute a SPEC binding,
@@ -106,19 +109,19 @@
  *
  * Revision 1.1  1992/05/29  09:38:33  foxharp
  * Initial revision
- *
- *
- *
  */
 
 #include	"estruct.h"
 #include	"edef.h"
 
+#define	dot_argument	((dotcmdmode == PLAY) && dotcmdarg)
+
 static	int	wrap_at_col P(( void ));
 static	void	advance_one_char P(( void ));
 static	int	ins_n_times P(( int, int, int ));
+static	int	ins_anytime P(( int, int, int, int * ));
 
-static savedmode;  /* value of insertmode maintained through subfuncs */
+static	int	savedmode;  /* value of insertmode maintained through subfuncs */
 
 /*--------------------------------------------------------------------------*/
 
@@ -152,20 +155,20 @@ static int
 ins_n_times(f,n,advance)
 int f,n,advance;
 {
-	register int s;
+	register int status = TRUE;
+	register int i;
+	int	flag	= FALSE;
 
 	if (!f || n < 0)
 		n = 1;
 
-	s = ins(FALSE);
-
-	while ((s == TRUE) && --n) {
-		if (advance)
+	for (i = 0; i < n; i++) {
+		if ((status = ins_anytime((i != 0), i, n, &flag)) != TRUE)
+			break;
+		if (advance && !flag)
 			advance_one_char();
-		s = ins(TRUE);
 	}
-
-	return s;
+	return status;
 }
 
 /* open lines up before this one */
@@ -177,7 +180,7 @@ int f,n;
 
 	if (!f) n = 1;
 	if (n < 0) return (FALSE);
-	if (n == 0) return ins(FALSE);
+	if (n == 0) return ins();
 
 	gotobol(TRUE,1);
 
@@ -187,7 +190,7 @@ int f,n;
 		s = indented_newline_above(b_val(curbp, MDCMOD));
 		if (s != TRUE) return (s);
 
-		return(ins(FALSE));
+		return(ins());
 	}
 	s = lnewline();
 	if (s != TRUE) return s;
@@ -202,7 +205,7 @@ int f,n;
 		if (s != TRUE) return s;
 	}
 
-	return(ins(FALSE));
+	return(ins());
 }
 
 /* open lines up after this one */
@@ -214,18 +217,23 @@ int f,n;
 
 	if (!f) n = 1;
 	if (n < 0) return (FALSE);
-	if (n == 0) return ins(FALSE);
+	if (n == 0) return ins();
 
 	s = openlines(n);
 	if (s != TRUE)
 		return (s);
 
-	return(ins(FALSE));
+	return(ins());
 }
 
 /*
  * Open up some blank space. The basic plan is to insert a bunch of newlines,
  * and then back up over them.
+ *
+ * This interprets the repeat-count for the 'o' and 'O' commands.  Unlike vi
+ * (which does not use the repeat-count), this specifies the number of blank
+ * lines to create before proceeding with inserting the string-argument of the
+ * command.
  */
 int
 openlines(n)
@@ -234,11 +242,11 @@ int n;
 	register int i = n;			/* Insert newlines. */
 	register int s = TRUE;
 	while (i-- && s==TRUE) {
-		gotoeol(FALSE,1);
+		(void)gotoeol(FALSE,1);
 		s = newline(TRUE,1);
 	}
 	if (s == TRUE && n)			/* Then back up overtop */
-		backline(TRUE, n-1);	/* of them all.		 */
+		backline(TRUE, n-1);		/* of them all.		 */
 
 	curgoal = -1;
 
@@ -246,83 +254,89 @@ int n;
 }
 
 /*
- * Go into insert mode.  I guess this isn't emacs anymore...
+ * Implements the vi 'i' command.
  */
 int
 insert(f, n)
 int f,n;
 {
-	int	s,
-		t = dotreplaying(FALSE);
-
-	s = ins_n_times(f,n,n>0);
-	if (t)
-		advance_one_char();
-	(void)update(FALSE);
-
-	return s;
+	return ins_n_times(f,n,TRUE);
 }
 
+/*
+ * Implements the vi 'I' command.
+ */
 int
 insertbol(f, n)
 int f,n;
 {
-	int	s,
-		t = dotreplaying(FALSE);
-
-	if (dotreplaying(TRUE))
-		return insert(f,n);
-
-	(void)firstnonwhite(f,n);
-	s = ins_n_times(f,n,n>0);
-	if (t)
-		advance_one_char();
-
-	return s;
+	if (!dot_argument || (dotcmdrep == dotcmdcnt))
+		(void)firstnonwhite(FALSE,1);
+	return ins_n_times(f,n,TRUE);
 }
 
+/*
+ * Implements the vi 'a' command.
+ */
 int
 append(f, n)
 int f,n;
 {
 	advance_one_char();
 
-	return ins_n_times(f,n,TRUE);
+	return ins_n_times(f,n, !dot_argument);
 }
 
+/*
+ * Implements the vi 'A' command.
+ */
 int
 appendeol(f, n)
 int f,n;
 {
 	if (!is_header_line(DOT,curbp))
-		gotoeol(FALSE,0);
+		(void)gotoeol(FALSE,0);
 
-	return ins_n_times(f,n,FALSE);
+	return ins_n_times(f,n,TRUE);
 }
 
+/*
+ * Implements the vi 'R' command.
+ *
+ * This takes an optional repeat-count and a string-argument.  The repeat-count
+ * (default 1) specifies the number of times that the string argument is
+ * inserted.  The length of the string-argument itself determines the number of
+ * characters (beginning with the cursor position) to delete before beginning
+ * the insertion.
+ */
 int
 overwritechars(f, n)
 int f,n;
 {
-	int	s,
-		t = dotreplaying(FALSE);
-
 	insertmode = OVERWRITE;
 	if (b_val(curbp, MDSHOWMODE))
 		curwp->w_flag |= WFMODE;
 
-	s = ins_n_times(f,n,FALSE);
-	if (t)
-		advance_one_char();
-
-	return s;
+	return ins_n_times(f,n, TRUE);
 }
 
+/*
+ * Implements the vi 'r' command.
+ *
+ * This takes an optional repeat-count and a single-character argument.  The
+ * repeat-count (default 1) specifies the number of characters beginning with
+ * the cursor position that are replaced by the argument.  Newline is treated
+ * differently from the other characters (only one newline is inserted).
+ *
+ * Unlike vi, the number of characters replaced can be longer than a line.
+ * Also, vile allows quoted characters.
+ */
 int
 replacechar(f, n)
 int f,n;
 {
-	register int	s;
+	register int	s = TRUE;
+	register int	t = FALSE;
 	register int	c;
 
 	if (!f && lLength(DOT.l) == 0)
@@ -331,47 +345,76 @@ int f,n;
 	insertmode = REPLACECHAR;  /* need to fool the SPEC prefix code */
 	if (b_val(curbp, MDSHOWMODE))
 		curwp->w_flag |= WFMODE;
-	(void)update(FALSE);
+	if (dotcmdmode != PLAY)
+		(void)update(FALSE);
 	c = kbd_key();
 	insertmode = FALSE;
 	curwp->w_flag |= WFMODE;
 
-	if (n < 0)
-		return FALSE;
-	if (n == 0)
-		return TRUE;
-	if (c == abortc)
-		return FALSE;
+	if (!f || !n)
+		n = 1;
+	if (n < 0 || c == abortc)
+		s = FALSE;
+	else {
+		int	vi_fix = (!dot_argument || (dotcmdrep <= 1));
 
-	ldelete((long)n,FALSE);
-	if (c == quotec) {
-		return(quote(f,n));
+		(void)ldelete((long)n, FALSE);
+		if (c == quotec) {
+			t = s = quote(f,n);
+		} else {
+			c = kcod2key(c);
+			if (isreturn(c)) {
+				if (vi_fix)
+					s = lnewline();
+			} else {
+				if (isbackspace(c)) {	/* vi beeps here */
+					s = TRUE;	/* replaced with nothing */
+				} else {
+					t = s = linsert(n, c);
+				}
+			}
+		}
+		if ((t == TRUE) && DOT.o && vi_fix)
+			s = backchar(FALSE,1);
 	}
-	c = kcod2key(c);
-	if (isreturn(c)) {
-		do {
-			s = lnewline();
-		} while (s==TRUE && --n);
-		return s;
-	} else if (isbackspace(c))
-		s = TRUE;
-	else
-		s = linsert(n, c);
-	if (s == TRUE)
-		s = backchar(FALSE,1);
 	return s;
 }
 
-/* grunt routine for insert mode */
-int
-ins(playback)
+/*
+ * This routine performs the principal decoding for insert mode (i.e.., the
+ * i,I,a,A,R commands).  It is invoked via 'ins_n_times()', which loops over
+ * the repeat-count for direct commands.  One complicating factor is that
+ * 'ins_n_times()' (actually its callers) is called once for each repetition in
+ * a '.' command.  At this level we compute the effective loop counter (the '.'
+ * and the direct commands), because we have to handle the vi-compatibilty case
+ * of inserting a newline.
+ *
+ * We stop repeating insert after the first newline in the insertion-string
+ * (that's what vi does).  If a user types
+ *
+ *	3iABC<nl>foo<esc>
+ *
+ * then we want to insert
+ *
+ *	ABCABCABC<nl>foo
+ */
+static int
+ins_anytime(playback, cur_count, max_count, splice)
 int playback;
+int cur_count;
+int max_count;
+int *splice;
 {
 	register int status;
-	int    c;		/* command character */
+	int	c;		/* command character */
 	int backsp_limit;
 	static TBUFF *insbuff;
 	int osavedmode;
+
+	if (dot_argument) {
+		max_count = cur_count + dotcmdcnt;
+		cur_count += dotcmdcnt - dotcmdrep;
+	}
 
 	if (playback && (insbuff != 0))
 		tb_first(insbuff);
@@ -391,22 +434,46 @@ int playback;
 	else
 		backsp_limit = 0;	/* no limit on backspaces */
 
-	/* get the next command from the keyboard */
 	while(1) {
 
+		/*
+		 * Read another character from the insertion-string.
+		 */
 		if (playback) {
-			c = tb_next(insbuff);
-		} else {
-			(void)update(FALSE);
+			if (*splice && !tb_more(insbuff))
+				playback = FALSE;
+			else
+				c = tb_next(insbuff);
+		}
+		if (!playback) {
+			if (dotcmdmode != PLAY)
+				(void)update(FALSE);
 			if (!tb_append(&insbuff, c = kbd_key())) {
-				savedmode = osavedmode;
-				return FALSE;
+				status = FALSE;
+				break;
 			}
 		}
 
-		if (c == abortc ) {
-			 /* an unfortunate Vi-ism that ensures one 
-				can always type "ESC a" if you're not sure 
+		if (isreturn(c)) {
+			if ((cur_count+1) < max_count) {
+				if (dot_argument) {
+					while (tb_more(dotcmd))
+						(void)tgetc(FALSE);
+				}
+				*splice = TRUE;
+				status = TRUE;
+				break;
+			} else if (dot_argument) {
+				*splice = TRUE;
+			}
+		}
+
+		/*
+		 * Decode the character
+		 */
+		if (c == abortc) {
+			 /* an unfortunate Vi-ism that ensures one
+				can always type "ESC a" if you're not sure
 				you're in insert mode. */
 			if (DOT.o != 0)
 				backchar(TRUE,1);
@@ -414,11 +481,11 @@ int playback;
 				trimline(FALSE);
 				autoindented = -1;
 			}
+			if (cur_count+1 == max_count)
+				*splice = TRUE;
 			status = TRUE;
-			goto leaveinsert;
-		} 
-
-		if (c & SPEC) {
+			break;
+		} else if (c & SPEC) {
 			CMDFUNC *cfp;
 			int oins;
 			cfp = kcod2fnc(c);
@@ -446,31 +513,40 @@ int playback;
 			status = inschar(c,&backsp_limit);
 		}
 
-		if (status != TRUE) {
- leaveinsert:
-			insertmode = FALSE;
-			if (b_val(curbp, MDSHOWMODE))
-				curwp->w_flag |= WFMODE;
-			savedmode = osavedmode;
-			return (status);
-		}
+		if (status != TRUE)
+			break;
 
 #if CFENCE
 		/* check for CMODE fence matching */
-		if ((c == RBRACE || c == ')' || c == ']') && 
+		if ((c == RBRACE || c == ')' || c == ']') &&
 						b_val(curbp, MDSHOWMAT))
 			fmatch(c);
 #endif
 
 		/* check auto-save mode */
-		if (b_val(curbp, MDASAVE))
+		if (b_val(curbp, MDASAVE)) {
 			if (--curbp->b_acount <= 0) {
 				/* and save the file if needed */
 				(void)update(TRUE);
 				filesave(FALSE, 0);
 				curbp->b_acount = b_val(curbp,VAL_ASAVECNT);
 			}
+		}
 	}
+
+	insertmode = FALSE;
+	if (b_val(curbp, MDSHOWMODE))
+		curwp->w_flag |= WFMODE;
+	savedmode = osavedmode;
+	return (status);
+}
+
+/* grunt routine for insert mode */
+int
+ins()
+{
+	int	flag;
+	return ins_anytime(FALSE,1,1,&flag);
 }
 
 int
@@ -478,7 +554,7 @@ inschar(c,backsp_limit_p)
 int c;
 int *backsp_limit_p;
 {
-	int (*execfunc) P((int, int));	/* ptr to function to execute */
+	CmdFunc execfunc;	/* ptr to function to execute */
 
 	execfunc = NULL;
 	if (c == quotec) {
@@ -487,7 +563,7 @@ int *backsp_limit_p;
 		/*
 		 * If a space was typed, fill column is defined, the
 		 * argument is non- negative, wrap mode is enabled, and
-		 * we are now past fill column, perform word wrap. 
+		 * we are now past fill column, perform word wrap.
 		 */
 		if (isspace(c) && getccol(FALSE) > wrap_at_col()) {
 			wrapword(FALSE,1);
@@ -497,8 +573,7 @@ int *backsp_limit_p;
 		if ( c == '\t') { /* tab */
 			execfunc = tab;
 			autoindented = -1;
-		} else if (c ==  tocntrl('J') ||
-			c ==  tocntrl('M')) { /* CR and NL */
+		} else if (isreturn(c)) {
 			execfunc = newline;
 			if (autoindented >= 0) {
 				trimline(FALSE);
@@ -506,7 +581,7 @@ int *backsp_limit_p;
 			}
 			*backsp_limit_p = 0;
 		} else if ( isbackspace(c) ||
-				c == tocntrl('D') || 
+				c == tocntrl('D') ||
 				c == killc ||
 				c == wkillc) { /* ^U and ^W */
 			/* have we backed thru a "word" yet? */
@@ -555,18 +630,19 @@ int *backsp_limit_p;
 
 	if (execfunc != NULL)
 		return (*execfunc)(FALSE, 1);
-		
+
 	/* make it a real character again */
 	c = kcod2key(c);
 
 	/* if we are in overwrite mode, not at eol,
 	   and next char is not a tab or we are at a tab stop,
 	   delete a char forword			*/
-	if (insertmode == OVERWRITE && DOT.o < lLength(DOT.l) &&
-			(char_at(DOT) != '\t' ||
-				(DOT.o) % curtabval == curtabval-1)) {
+	if ((insertmode == OVERWRITE)
+	 && (!dot_argument || (dotcmdrep <= 1))
+	 && (DOT.o < lLength(DOT.l))
+	 && (char_at(DOT) != '\t' || DOT.o % curtabval == curtabval-1)) {
 		autoindented = -1;
-		ldelete(1L, FALSE);
+		(void)ldelete(1L, FALSE);
 	}
 
 	/* do the appropriate insertion */
@@ -673,7 +749,7 @@ int f,n;
 	if (b_val(curbp, MDTRIM))
 		trimline(FALSE);
 #endif
-	    
+
 	/* if we are in C or auto-indent modes and this is a default <NL> */
 	if (n == 1 && (b_val(curbp,MDCMOD) || b_val(curbp,MDAIND)) &&
 						!is_header_line(DOT,curbp))
@@ -703,7 +779,7 @@ int cmode;
 {
 	register int indentwas; /* indent to reproduce */
 	int bracef; /* was there a brace at the end of line? */
-	    
+
 	indentwas = previndent(&bracef);
 
 	if (lnewline() == FALSE)
@@ -722,7 +798,7 @@ int cmode;
 {
 	register int indentwas;	/* indent to reproduce */
 	int bracef; /* was there a brace at the beginning of line? */
-	
+
 	indentwas = nextindent(&bracef);
 	if (lnewline() == FALSE)
 		return FALSE;
@@ -734,6 +810,7 @@ int cmode;
 		return FALSE;
 	return TRUE;
 }
+
 /* get the indent of the last previous non-blank line.	also, if arg
 	is non-null, check if line ended in a brace */
 int
@@ -741,9 +818,9 @@ previndent(bracefp)
 int *bracefp;
 {
 	int ind;
-	    
+
 	MK = DOT;
-	    
+
 	/* backword() will leave us either on this line, if there's something
 		non-blank here, or on the nearest previous non-blank line. */
 	if (backword(FALSE,1) == FALSE) {
@@ -758,9 +835,9 @@ int *bracefp;
 			(lGetc(DOT.l,lc) == LBRACE ||
 			 lGetc(DOT.l,lc) == ':') );
 	}
-		    
+
 	gomark(FALSE,1);
-	    
+
 	return ind;
 }
 
@@ -772,9 +849,9 @@ int *bracefp;
 {
 	int ind;
 	int fc;
-	    
+
 	MK = DOT;
-	    
+
 	/* we want the indent of this line if it's non-blank, or the indent
 		of the next non-blank line otherwise */
 	fc = firstchar(l_ref(DOT.l));
@@ -787,9 +864,9 @@ int *bracefp;
 	if (bracefp) {
 		*bracefp = (lGetc(DOT.l,fc) == RBRACE);
 	}
-		    
+
 	DOT = MK;
-	    
+
 	return ind;
 }
 
@@ -797,28 +874,30 @@ int
 doindent(ind)
 int ind;
 {
-	int i;
-	/* if no indent was asked for, we're done */
-	if (ind <= 0)
-		return TRUE;
-	autoindented = 0;
+	register int i;
+
 	/* first clean up existing leading whitespace */
 	i = firstchar(l_ref(DOT.l));
 	if (i > 0)
-		ldelete((long)i,FALSE);
-	if ((i=ind/curtabval)!=0) {
-		autoindented += i;
-		if (tab(TRUE,i) == FALSE)
-			return FALSE;
-	}
-	if ((i=ind%curtabval) != 0) {
-		autoindented += i;
-		if (linsert(i,	' ') == FALSE)
-			return FALSE;
+		(void)ldelete((long)i,FALSE);
+
+	autoindented = 0;
+	/* if no indent was asked for, we're done */
+	if (ind > 0) {
+		if ((i=ind/curtabval)!=0) {
+			autoindented += i;
+			if (tab(TRUE,i) == FALSE)
+				return FALSE;
+		}
+		if ((i=ind%curtabval) != 0) {
+			autoindented += i;
+			if (linsert(i,	' ') == FALSE)
+				return FALSE;
+		}
 	}
 	if (!autoindented)
 		autoindented = -1;
-	    
+
 	return TRUE;
 }
 
@@ -849,7 +928,7 @@ int c;	/* brace to insert (always { for now) */
 {
 
 #if ! CFENCE
-	/* wouldn't want to back up from here, but fences might take us 
+	/* wouldn't want to back up from here, but fences might take us
 		forward */
 	/* if we are at the beginning of the line, no go */
 	if (DOT.o == 0)
@@ -883,7 +962,7 @@ inspound()	/* insert a # into the text here...we are in CMODE */
 
 	if (autoindented > 0) { /* must all be whitespace before us */
 		DOT.o = 0;
-		ldelete((long)autoindented,FALSE);
+		(void)ldelete((long)autoindented,FALSE);
 	}
 	autoindented = -1;
 
@@ -926,7 +1005,7 @@ int f,n;
 	if (s)
 		linsert(s, ' ');
 	if (b_val(curbp,MDTABINSERT))
-                entabline(TRUE);
+		entabline(TRUE);
 	if (autoindented >= 0) {
 		fc = firstchar(l_ref(DOT.l));
 		if (fc >= 0)
@@ -966,6 +1045,7 @@ int f,n;
 	return linsert(n, c);
 }
 
+#if OPT_EVAL
 char *
 current_modename()
 {
@@ -980,3 +1060,4 @@ current_modename()
 			return "replace";
 	}
 }
+#endif

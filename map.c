@@ -3,7 +3,10 @@
  *		6/3/93
  *
  * $Log: map.c,v $
- * Revision 1.7  1993/08/05 14:29:12  pgf
+ * Revision 1.8  1993/08/13 16:32:50  pgf
+ * tom's 3.58 changes
+ *
+ * Revision 1.7  1993/08/05  14:29:12  pgf
  * tom's 3.57 changes
  *
  * Revision 1.6  1993/07/15  10:37:58  pgf
@@ -57,8 +60,8 @@ static int install_map P(( int, char * ));
 static int remove_map P(( int ));
 #if OPT_MAP_DISPLAY
 static void makecharslist P(( int, char * ));
-static void show_mapped_chars P(( void ));
-static void update_mapped_list P(( void ));
+static int show_mapped_chars P(( void ));
+static int update_mapped_list P(( void ));
 #endif
 
 /*
@@ -161,26 +164,29 @@ char	*ptr;
 	}
 }
 
-static void
+static int
 show_mapped_chars()
 {
-	liststuff(MAPPED_LIST_NAME, makecharslist, 0, (char *)0);
+	return liststuff(MAPPED_LIST_NAME, makecharslist, 0, (char *)0);
 }
 
-static void
+static int
 update_mapped_list()
 {
+	int	status = TRUE;
+
 	if (bfind(MAPPED_LIST_NAME, NO_CREAT, BFSCRTCH) != 0) {
 		WINDOW	*savewp = curwp;
-		show_mapped_chars();
+		status = show_mapped_chars();
 		if (curwp != savewp) {
-			swbuffer(savewp->w_bufp);
+			(void)swbuffer(savewp->w_bufp);
 			curwp = savewp;
 		}
 	}
+	return status;
 }
 #else
-#define update_mapped_list()
+#define update_mapped_list() TRUE
 #endif
 
 /*
@@ -215,8 +221,7 @@ int f,n;
 
 #if OPT_MAP_DISPLAY
 	if (end_named_cmd()) {
-		show_mapped_chars();
-		return TRUE;
+		return show_mapped_chars();
 	}
 #endif
 	kbuf[0] = EOS;
@@ -234,8 +239,7 @@ int f,n;
 		mlforce("[Mapping failed]");
 		return FALSE;
 	}
-	update_mapped_list();
-	return TRUE;
+	return update_mapped_list();
 }
 
 /*
@@ -258,8 +262,7 @@ int f,n;
 		mlforce("[Key not mapped]");
 		return FALSE;
 	}
-	update_mapped_list();
-	return TRUE;
+	return update_mapped_list();
 }
 
 /*

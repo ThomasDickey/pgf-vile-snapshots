@@ -6,7 +6,10 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.99  1993/08/05 14:29:12  pgf
+ * Revision 1.100  1993/08/13 16:32:50  pgf
+ * tom's 3.58 changes
+ *
+ * Revision 1.99  1993/08/05  14:29:12  pgf
  * tom's 3.57 changes
  *
  * Revision 1.98  1993/07/27  18:06:20  pgf
@@ -894,7 +897,7 @@ int	mflg;		/* print messages? */
 		odv = doverifys;
 		doverifys = 0;
 #endif
-		if_OPT_WORKING(max_working = cur_working = 0)
+		if_OPT_WORKING(max_working = cur_working = old_working = 0)
 #if ! MSDOS && !OPT_MAP_MEMORY
 		if (fileispipe || (s = quickreadf(bp, &nline)) == FIOMEM)
 #endif
@@ -902,6 +905,7 @@ int	mflg;		/* print messages? */
 #if VMALLOC
 		doverifys = odv;
 #endif
+		if_OPT_WORKING(cur_working = 0)
 		if (s == FIOERR) {
 			mlerror(fname);
 		} else {
@@ -1851,20 +1855,26 @@ ACTUAL_SIG_DECL
 	BUFFER *bp;
 	char *np;
 	int wrote = 0;
-	int created = 0;
+	int created = FALSE;
 	extern char *mktemp P(( char * ));
 
 #if APOLLO
 	extern	char	*getlogin();
 	static	int	i_am_dead;
+#endif	/* APOLLO */
 
+#if OPT_WORKING && defined(SIGALRM)
+	(void)signal(SIGALRM, SIG_IGN);
+#endif
+
+#if APOLLO
 	if (i_am_dead++)	/* prevent recursive faults */
 		_exit(signo);
 	(void)lsprintf(cmd,
 		"(echo signal %d killed vile;/com/tb %d)| /bin/mail %s",
 		signo, getpid(), getlogin());
 	(void)system(cmd);
-#endif
+#endif	/* APOLLO */
 
 	for_each_buffer(bp) {
 		if (!b_is_invisible(bp) && 
@@ -1877,7 +1887,7 @@ ACTUAL_SIG_DECL
 					vttidy(FALSE);
 					ExitProgram(BAD(1));
 				}
-				created = 1;
+				created = TRUE;
 			}
 			(void)pathcat(filnam, dirnam, bp->b_bname);
 #else

@@ -6,7 +6,10 @@
  * framing, are hard.
  *
  * $Log: basic.c,v $
- * Revision 1.55  1993/08/05 14:29:12  pgf
+ * Revision 1.56  1993/08/13 16:32:50  pgf
+ * tom's 3.58 changes
+ *
+ * Revision 1.55  1993/08/05  14:29:12  pgf
  * tom's 3.57 changes
  *
  * Revision 1.54  1993/07/27  18:06:20  pgf
@@ -546,6 +549,7 @@ int f,n;
 }
 
 /* ARGSUSED */
+#if !SMALLER
 int
 lastnonwhite(f,n)
 int f,n;
@@ -555,6 +559,7 @@ int f,n;
 		DOT.o = 0;
 	return TRUE;
 }
+#endif
 
 /* return the offset of the first non-white character on the line,
 	or -1 if there are no non-white characters on the line */
@@ -1286,7 +1291,7 @@ swapmark()
 	return;
 }
 
-#if X11
+#if X11 || OPT_XTERM
 /*
  * Given row & column from the screen, set the MK value.
  * Note that the resulting position may be past the end-of-buffer.

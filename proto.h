@@ -5,7 +5,10 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.74  1993/08/05 14:35:57  pgf
+ * Revision 1.75  1993/08/13 16:32:50  pgf
+ * tom's 3.58 changes
+ *
+ * Revision 1.74  1993/08/05  14:35:57  pgf
  * changed name of setmode to avoid library conflict with djgpp compiler
  * (also changed delmode, setgmode, and delgmode to be consistent)
  *
@@ -274,6 +277,7 @@ extern void exit_program P(( int ));
 #endif
 
 /* tcap.c and other screen-drivers */
+#if TERMCAP
 extern void tcapopen P(( void ));
 extern void tcapclose P(( void ));
 extern void tcapkopen P(( void ));
@@ -283,13 +287,17 @@ extern int tcapcres P(( char * ));
 extern void tcapmove P(( int, int ));
 extern void tcapeeol P(( void ));
 extern void tcapeeop P(( void ));
+extern void tcapbeep P(( void ));
+extern void putpad P(( char * ));
+extern void putnpad P(( char *, int ));
+#endif
+#if OPT_XTERM
+extern int xterm_button P(( int ));
+#endif
 extern void tcapscroll_reg P(( int, int, int ));
 extern void tcapscroll_delins P(( int, int, int ));
 extern void tcapscrollregion P(( int, int ));
 extern void spal P(( char * ));
-extern void tcapbeep P(( void ));
-extern void putpad P(( char * ));
-extern void putnpad P(( char *, int ));
 
 /* basic.c */
 extern int gotobol P(( int, int ));
@@ -306,7 +314,9 @@ extern int gotomos P(( int, int ));
 extern int gotoeos P(( int, int ));
 extern int forwline P(( int, int ));
 extern int firstnonwhite P(( int, int ));
+#if !SMALLER
 extern int lastnonwhite P(( int, int ));
+#endif
 extern int firstchar P(( LINE * ));
 extern int nextchar P(( LINE *, int ));
 extern int lastchar P(( LINE * ));
@@ -336,6 +346,10 @@ extern int setmark P(( void ));
 extern int gomark P(( int, int ));
 extern int godotplus P(( int, int ));
 extern void swapmark P(( void ));
+#if X11 || OPT_XTERM
+extern	int setwmark P(( int, int ));
+extern	int setcursor P(( int, int ));
+#endif
 
 /* bind.c */
 #if !SMALLER
@@ -369,7 +383,9 @@ extern CMDFUNC * engl2fnc P(( char * ));
 extern KBIND * kcode2kbind P(( int ));
 extern CMDFUNC * kcod2fnc P(( int ));
 extern int prc2kcod P(( char * ));
+#if OPT_EVAL
 extern char * prc2engl P(( char * ));
+#endif
 #if X11
 extern int fnc2key P(( CMDFUNC * ));
 #endif
@@ -384,6 +400,7 @@ extern int kbd_complete P(( int, char *, int *, char *, unsigned ));
 extern int kbd_engl_stat P(( char *, char * ));
 
 /* buffer.c */
+extern WINDOW *bp2any_wp P(( BUFFER * ));
 extern int histbuff P(( int, int ));
 extern void imply_alt P(( char *, int, int ));
 extern BUFFER * find_alt P(( void ));
@@ -405,7 +422,11 @@ extern int popupbuff P(( BUFFER * ));
 extern void sortlistbuffers P(( void ));
 extern int togglelistbuffers P(( int, int ));
 extern int listbuffers P(( int, int ));
+#if OPT_UPBUFF
 void updatelistbuffers P((void));
+#else
+#define updatelistbuffers()
+#endif
 extern int addline P(( BUFFER *, char *, int ));
 extern int add_line_at P(( BUFFER *, LINEPTR, char *, int ));
 extern int anycb P(( void ));
@@ -447,12 +468,17 @@ extern void vtputsn P(( char *, int ));
 extern void vtset P(( LINEPTR, WINDOW * ));
 extern void vtprintf P(( char *, ... ));
 extern void vteeol P(( void ));
+#if !SMALLER
 extern int upscreen P(( int, int ));
+#endif
 extern void reframe P(( WINDOW * ));
 extern int update P(( int ));
 extern void upmode P(( void ));
+#if OPT_UPBUFF
+extern void upbuff P(( BUFFER * ));
+#endif
 extern int offs2col P(( WINDOW *, LINEPTR, C_NUM ));
-#if X11
+#if X11 || OPT_XTERM
 extern int col2offs P(( WINDOW *, LINEPTR, C_NUM ));
 #endif
 #ifdef WMDLINEWRAP
@@ -460,7 +486,7 @@ extern int line_height P(( WINDOW *, LINEPTR ));
 #else
 #define line_height(wp,lp) 1
 #endif
-#if defined(WMDLINEWRAP) || defined(X11)
+#if defined(WMDLINEWRAP) || X11
 extern WINDOW *row2window P(( int ));
 #endif
 extern void hilite P((int, int, int, int));
@@ -483,7 +509,7 @@ extern char * _lsprintf P(( char *, ... ));
 extern void bputc P(( int ));
 extern void bprintf P((char *, ... ));
 extern void getscreensize P(( int *, int * ));
-#if defined(SIGWINCH) && ! X11
+#if defined(SIGWINCH) && !X11
 extern SIGT sizesignal (DEFINE_SIG_ARGS);
 #endif
 extern void newscreensize P(( int, int ));
@@ -493,22 +519,28 @@ extern SIGT imworking (DEFINE_SIG_ARGS);
 
 /* eval.c */
 extern char * l_itoa P(( int ));
-extern char * ltos P(( int ));
 extern int absol P(( int ));
 extern int is_truem P(( char * ));
 extern int is_falsem P(( char * ));
+#if OPT_EVAL || X11
 extern int stol P(( char * ));
-extern int gtlbl P(( char * ));
+#endif
+#if OPT_EVAL
 extern char * gtenv P(( char * ));
 extern char * gtusr P(( char * ));
-extern char * mklower P(( char * ));
+#endif
+#if OPT_EVAL || !SMALLER
 extern char * mkupper P(( char * ));
-extern void varinit P(( void ));
+#endif
+extern char * mklower P(( char * ));
+#if OPT_EVAL
 extern int listvars P(( int, int ));
 extern int setvar P(( int, int ));
 extern int set_variable P(( char * ));
 extern int sindex P(( char *, char * ));
+extern char * ltos P(( int ));
 extern int ernd P(( void ));
+#endif
 
 /* exec.c */
 extern int end_named_cmd P(( void ));
@@ -518,8 +550,10 @@ extern int rangespec P(( char *, LINEPTR *, LINEPTR *, int *, int * ));
 extern int docmd P(( char *, int, int, int ));
 extern int dobuf P(( BUFFER * ));
 extern int dofile P(( char * ));
+#if !SMALLER
 extern int execbuf P(( int, int ));
 extern int execfile P(( int, int ));
+#endif
 extern int execute P(( CMDFUNC *, int, int ));
 extern int storemac P(( int, int ));
 #if PROC
@@ -536,6 +570,7 @@ extern int cbuf7 P(( int, int ));
 extern int cbuf8 P(( int, int ));
 extern int cbuf9 P(( int, int ));
 extern int cbuf10 P(( int, int ));
+#if !SMALLER
 extern int cbuf11 P(( int, int ));
 extern int cbuf12 P(( int, int ));
 extern int cbuf13 P(( int, int ));
@@ -566,6 +601,7 @@ extern int cbuf37 P(( int, int ));
 extern int cbuf38 P(( int, int ));
 extern int cbuf39 P(( int, int ));
 extern int cbuf40 P(( int, int ));
+#endif /* !SMALLER */
 
 /* file.c */
 #ifdef MDCHK_MODTIME
@@ -684,7 +720,6 @@ extern int dotcmdbegin P(( void ));
 extern int dotcmdfinish P(( void ));
 extern void dotcmdstop P(( void ));
 extern int dotcmdplay P(( int, int ));
-extern int dotreplaying P(( int ));
 extern int kbd_replaying P(( int ));
 extern int kbd_mac_begin P(( int, int ));
 extern int kbd_mac_end P(( int, int ));
@@ -707,10 +742,12 @@ extern int insertbol P(( int, int ));
 extern int append P(( int, int ));
 extern int appendeol P(( int, int ));
 extern int overwritechars P(( int, int ));
-extern int ins P(( int ));
+extern int ins P(( void ));
+#if !SMALLER
 extern int insstring P(( int, int ));
 extern int overwstring P(( int, int ));
 extern int istring P(( int, int, int ));
+#endif
 extern int inschar P(( int, int * ));
 extern int backspace P(( void ));
 extern int newline P(( int, int ));
@@ -720,7 +757,9 @@ extern int previndent P(( int * ));
 extern int nextindent P(( int * ));
 extern int doindent P(( int ));
 extern int indentlen P(( LINE * ));
+#if OPT_EVAL
 extern char *current_modename P(( void ));
+#endif
 
 /* isearch.c */
 #if ISRCH
@@ -742,8 +781,10 @@ extern int insspace P(( int, int ));
 extern int linsert P(( int, int ));
 extern int lnewline P(( void ));
 extern int ldelete P(( long, int ));
+#if OPT_EVAL
 extern char * getctext P(( int ));
 extern int putctext P(( char * ));
+#endif
 extern int ldelnewline P(( void ));
 extern void ksetup P(( void ));
 extern void kdone P(( void ));
@@ -760,7 +801,9 @@ extern int doput P(( int, int, int, int ));
 extern int put P(( int, int ));
 extern int execkreg P(( int, int ));
 extern int loadkreg P(( int, int ));
+#if !SMALLER
 extern int showkreg P(( int, int ));
+#endif
 
 /* map.c */
 extern int map P(( int, int ));
@@ -781,6 +824,10 @@ extern REGEXVAL *new_regexval P(( char *, int ));
 extern void copy_val P(( struct VAL *, struct VAL *, int ));
 extern void free_regexval P(( REGEXVAL * ));
 extern void free_val P(( struct VALNAMES *, struct VAL * ));
+#if OPT_UPBUFF
+extern void save_vals P(( int, struct VAL *, struct VAL *, struct VAL * ));
+extern void restore_vals P(( int, struct VAL *, struct VAL * ));
+#endif
 #if NO_LEAKS
 extern void free_local_vals P(( struct VALNAMES *, struct VAL *, struct VAL * ));
 #endif
@@ -861,7 +908,9 @@ extern int is_directory P(( char * ));
 extern void line_report P(( L_NUM ));
 extern L_NUM line_count P(( BUFFER * ));
 extern L_NUM line_no P(( BUFFER *, LINEPTR ));
+#if OPT_EVAL
 extern L_NUM getcline P(( void ));
+#endif
 extern void set_rdonly P(( BUFFER *, char * ));
 extern int liststuff P(( char *, void (*)(int, char *), int, char * ));
 extern int showcpos P(( int, int ));
@@ -869,7 +918,9 @@ extern int showlength P(( int, int ));
 extern int getccol P(( int ));
 extern int gotocol P(( int, int ));
 extern int gocol P(( int ));
+#if !SMALLER
 extern int twiddle P(( int, int ));
+#endif
 extern int detabline P(( int ));
 extern int detab_region P(( void ));
 extern int entabline P(( int ));
@@ -888,8 +939,10 @@ extern int chgchar P(( int, int ));
 extern int matchfence P(( int, int ));
 extern int matchfenceback P(( int, int ));
 extern int clrmes P(( int, int ));
-extern int writemsg P(( int, int ));
 extern int fmatchindent P(( void ));
+#if !SMALLER
+extern int writemsg P(( int, int ));
+#endif
 extern void catnap P(( int, int ));
 extern char * current_directory P(( int ));
 extern int cd P(( int, int ));
@@ -950,7 +1003,9 @@ extern int rsearch P(( int, int, int, int ));
 extern int consearch P(( int, int ));
 extern int revsearch P(( int, int ));
 extern void regerror P(( char * ));
+#if OPT_EVAL || UNUSED
 extern int eq P(( int, int ));
+#endif
 extern int scrsearchpat P(( int, int ));
 extern int readpattern P(( char *, char *, regexp **, int, int ));
 extern void savematch P(( MARK, int ));
@@ -1007,7 +1062,9 @@ extern void dumpuline P(( LINEPTR ));
 
 /* window.c */
 extern int set_curwp P(( WINDOW * ));
+#if OPT_EVAL
 extern int getwpos P(( void ));
+#endif
 extern int reposition P(( int, int ));
 extern int refresh P(( int, int ));
 extern int poswind P(( int, int ));
@@ -1031,9 +1088,13 @@ extern int shrinkwind P(( int, int ));
 extern WINDOW * wpopup P(( void ));
 extern int scrnextup P(( int, int ));
 extern int scrnextdw P(( int, int ));
+#if !SMALLER
 extern int savewnd P(( int, int ));
 extern int restwnd P(( int, int ));
+#endif
+#if !SMALLER || OPT_EVAL
 extern int resize P(( int, int ));
+#endif
 extern void winit P(( void ));
 
 /* word.c */
@@ -1144,8 +1205,9 @@ extern	void x_putline P(( int, char *, int ));
 extern	int x_key_events_ready P(( void ));
 extern	int x_is_pasting P((void));
 extern	int x_on_msgline P((void));
-extern	int setwmark P(( int, int ));
-extern	int setcursor P(( int, int ));
+#if OPT_WORKING
+extern	void x_working P(( void ));
+#endif
 #if NO_LEAKS
 extern	void x11_leaks P(( void ));
 #endif

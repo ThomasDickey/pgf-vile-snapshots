@@ -4,7 +4,10 @@
  *	Written (except for delins()) for vile by Paul Fox, (c)1990
  *
  * $Log: oneliner.c,v $
- * Revision 1.52  1993/08/05 14:29:12  pgf
+ * Revision 1.53  1993/08/13 16:32:50  pgf
+ * tom's 3.58 changes
+ *
+ * Revision 1.52  1993/08/05  14:29:12  pgf
  * tom's 3.57 changes
  *
  * Revision 1.51  1993/07/27  18:06:20  pgf
@@ -479,7 +482,7 @@ int nth_occur, printit, globally, *confirmp;
 		foundit = TRUE;
 		which_occur++;
 		if (nth_occur == -1 || which_occur == nth_occur) {
-			setmark();
+			(void)setmark();
 			/* only allow one match at the end of line, to
 				prevent loop with s/$/x/g  */
 			if (MK.o == lLength(DOT.l)) {
@@ -551,7 +554,7 @@ int nth_occur, printit, globally, *confirmp;
 	} while (globally && sameline(scanboundpos,DOT));
 	if (foundit && printit) {
 		register WINDOW *wp = curwp;
-		setmark();
+		(void)setmark();
 		s = plineregion();
 		if (s != TRUE) return s;
 		/* back to our buffer */

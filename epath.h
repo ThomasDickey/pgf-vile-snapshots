@@ -7,7 +7,10 @@
 
 /*
  * $Log: epath.h,v $
- * Revision 1.8  1993/05/11 16:22:22  pgf
+ * Revision 1.9  1993/08/10 10:54:28  pgf
+ * added "sys$login:" to VMS search path
+ *
+ * Revision 1.8  1993/05/11  16:22:22  pgf
  * see tom's CHANGES, 3.46
  *
  * Revision 1.7  1992/12/14  09:03:25  foxharp
@@ -108,6 +111,7 @@ char *pathname[] =
 {
 	"vile.rc",
 	"vile.hlp",
+	"sys$login:",
 	"",
 	"sys$sysdevice:[vmstools]"
 };

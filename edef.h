@@ -9,7 +9,10 @@
 
 /*
  * $Log: edef.h,v $
- * Revision 1.111  1993/08/05 14:29:12  pgf
+ * Revision 1.112  1993/08/13 16:32:50  pgf
+ * tom's 3.58 changes
+ *
+ * Revision 1.111  1993/08/05  14:29:12  pgf
  * tom's 3.57 changes
  *
  * Revision 1.110  1993/07/27  18:06:20  pgf
@@ -372,7 +375,7 @@
 decl_uninit( char *prog_arg );		/* argv[0] from main.c */
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version 3.57");
+decl_init( char version[], "version 3.58");
 
 decl_init( int slash, '/'); 		/* so DOS can use '\' as path separator */
 
@@ -422,7 +425,9 @@ decl_uninit( char golabel[NPAT] );	/* current line to go to	*/
 decl_uninit( int execlevel );		/* execution IF level		*/
 decl_init( int	eolexist, TRUE );	/* does clear to EOL exist	*/
 decl_uninit( int revexist );		/* does reverse video exist?	*/
+#if MSDOS || ZIBMPC || OPT_EVAL
 decl_uninit( int flickcode );		/* do flicker suppression?	*/
+#endif
 decl_uninit( int curtabval );		/* current tab width		*/
 decl_uninit( int curswval );		/* current shiftwidth		*/
 
@@ -443,9 +448,10 @@ decl_uninit( MARK Mark );		/* the worker mark */
 /* these get their initial values in main.c, in global_val_init() */
 decl_uninit( G_VALUES global_g_values );
 decl_uninit( B_VALUES global_b_values );
+decl_uninit( W_VALUES global_w_values );
 
 decl_init( int sgarbf, TRUE );          /* TRUE if screen is garbage	*/
-decl_uninit( int mpresf );              /* TRUE if message in last line */
+decl_uninit( int mpresf );              /* zero if message-line empty	*/
 decl_uninit( int clexec	);		/* command line execution flag	*/
 decl_uninit( int mstore	);		/* storing text to macro flag	*/
 decl_init( int discmd, TRUE );		/* display command flag		*/
@@ -475,39 +481,50 @@ decl_init( int backspc, '\b');		/* current backspace char	*/
 decl_init( int name_cmpl, '\t');	/* do name-completion		*/
 decl_init( int test_cmpl, '?');		/* show name-completion		*/
 
-/* these get their initial values in main.c, in global_val_init() */
-decl_uninit( W_VALUES global_w_values );
-
 decl_uninit( KILLREG kbs[NKREGS] );	/* all chars, 1 thru 9, and default */
 decl_uninit( short ukb );		/* index of current kbuffs */
 decl_uninit( int kregflag );		/* info for pending kill into reg */
 decl_uninit( int kchars );		/* how much did we kill? */
 decl_uninit( int klines );
 
+#if !SMALLER
 decl_uninit( WINDOW *swindow );		/* saved window pointer		*/
+#endif
+
 #if CRYPT
 decl_init( int cryptflag, FALSE );	/* currently encrypting?	*/
 decl_init( char * cryptkey, 0 );	/* top-level crypt-key, if any	*/
 #endif
+
 decl_init( int dotcmdmode, RECORD );	/* current dot command mode	*/
 decl_init( int dotcmdarg, FALSE);	/* was there an arg to '.'? */
 decl_uninit( int dotcmdkreg);		/* original dot command kill reg */
+decl_uninit( TBUFF *dotcmd );		/* recorded-text of dot-commands */
+decl_uninit( int dotcmdcnt );		/* down-counter for dot-commands */
+decl_uninit( int dotcmdrep );		/* original dot-command repeat-count */
+
 decl_init( int	kbdmode, STOP );	/* current keyboard macro mode	*/
 decl_uninit( int seed );		/* random number seed		*/
+
 #if RAMSIZE
 decl_uninit( long envram );		/* # of bytes current used malloc */
 #endif
+
+#if OPT_EVAL || DEBUGM
 decl_uninit( int macbug );		/* macro debugging flag		*/
+#endif
 
 #if OPT_WORKING
 decl_uninit( B_COUNT max_working );	/* 100% value for slowreadf	*/
 decl_uninit( B_COUNT cur_working );	/* current-value for slowreadf	*/
+decl_uninit( B_COUNT old_working );	/* previous-value for slowreadf	*/
 #endif
 
 decl_init( char out_of_mem[], "OUT OF MEMORY" );
 decl_init( char	errorm[], "ERROR" );	/* error literal		*/
 decl_init( char	truem[], "TRUE" );	/* true literal			*/
 decl_init( char	falsem[], "FALSE" );	/* false literal		*/
+
 decl_init( int	cmdstatus, TRUE );	/* last command status		*/
 decl_uninit( char palstr[49] );		/* palette string		*/
 decl_uninit( char *fline );		/* dynamic return line		*/

@@ -2,7 +2,10 @@
  *		for MicroEMACS
  *
  * $Log: tcap.c,v $
- * Revision 1.22  1993/07/08 15:03:52  pgf
+ * Revision 1.23  1993/08/13 16:32:50  pgf
+ * tom's 3.58 changes
+ *
+ * Revision 1.22  1993/07/08  15:03:52  pgf
  * reduce max rows from 200 to 100.  it would take an _awfully_ big screen
  * to have 200 readable lines of text.
  *
@@ -134,6 +137,23 @@ TERM term = {
 #endif
 };
 
+#define	XtermPos()	TTgetc() - 040
+
+#if OPT_XTERM >= 3
+# define XTERM_ENABLE_TRACKING   "\033[?1001h"	/* mouse hilite tracking */
+# define XTERM_DISABLE_TRACKING  "\033[?1001l"
+#else
+# if OPT_XTERM >= 2
+#  define XTERM_ENABLE_TRACKING   "\033[?1000h"	/* normal tracking mode */
+#  define XTERM_DISABLE_TRACKING  "\033[?1000l"
+# else
+#  define XTERM_ENABLE_TRACKING   "\033[?9h"	/* X10 compatibility mode */
+#  define XTERM_DISABLE_TRACKING  "\033[?9l"
+# endif
+#endif
+
+static	int	i_am_xterm;
+
 void
 tcapopen()
 {
@@ -180,6 +200,8 @@ tcapopen()
 		ExitProgram(BAD(1));
 	}
 
+	i_am_xterm = !strcmp(tv_stype, "xterm");
+
 #ifdef SIGWINCH
 	term.t_mcol = 200;
 	term.t_mrow = 100;
@@ -223,7 +245,7 @@ tcapopen()
 	AL = tgetstr("AL", &p);
         
 	if (!CS || !SR) { /* some xterm's termcap entry is missing entries */
-		if (!strcmp(tv_stype, "xterm")) {
+		if (i_am_xterm) {
 			if (!CS) CS = "\033[%i%d;%dr";
 			if (!SR) SR = "\033[M";
 		}
@@ -265,12 +287,20 @@ tcapclose()
 void
 tcapkopen()
 {
+#if OPT_XTERM
+	if (i_am_xterm && global_g_val(GMDXTERM_MOUSE))
+		putpad(XTERM_ENABLE_TRACKING);
+#endif
 	(void)strcpy(sres, "NORMAL");
 }
 
 void
 tcapkclose()
 {
+#if OPT_XTERM
+	if (i_am_xterm && global_g_val(GMDXTERM_MOUSE))
+		putpad(XTERM_DISABLE_TRACKING);
+#endif
 }
 
 void
@@ -454,11 +484,153 @@ int f,n;	/* default flag, numeric argument [unused] */
 	return(TRUE);
 }
 #endif
-#else
 
-void
-hello()
+#if OPT_XTERM
+/* Finish decoding a mouse-click in an xterm, after the ESC and '[' chars.
+ *
+ * There are 3 mutually-exclusive xterm mouse-modes (selected here by values of
+ * OPT_XTERM):
+ *	(1) X10-compatibility (not used here)
+ *		Button-press events are received.
+ *	(2) normal-tracking
+ *		Button-press and button-release events are received.
+ *		Button-events have modifiers (e.g., shift, control, meta).
+ *	(3) hilite-tracking
+ *		Button-press and text-location events are received.
+ *		Button-events have modifiers (e.g., shift, control, meta).
+ *		Dragging with the mouse produces highlighting.
+ *		The text-locations are checked by xterm to ensure validity.
+ *
+ * NOTE:
+ *	The hilite-tracking code is here for testing and (later) use.  Because
+ *	we cannot guarantee that we always are decoding escape-sequences when
+ *	reading from the terminal, there is the potential for the xterm hanging
+ *	when a mouse-dragging operation is begun: it waits for us to specify
+ *	the screen locations that limit the highlighting.
+ *
+ * 	While highlighting, the xterm accepts other characters, but the display
+ *	does not appear to be refreshed until highlighting is ended. So (even
+ *	if we always capture the beginning of highlighting) we cannot simply
+ *	loop here waiting for the end of highlighting.
+ *
+ *	1993/aug/6 dickey@software.org
+ */
+int
+xterm_button(c)
+int	c;
 {
-}
+	WINDOW	*wp;
+	int	event;
+	int	button;
+	int	x;
+	int	y;
+	int	status;
+#if OPT_XTERM >= 3
+	int	save_row = ttrow;
+	int	save_col = ttcol;
+	int	firstrow, lastrow;
+	int	startx, endx, mousex;
+	int	starty, endy, mousey;
+	MARK	save_dot;
+	char	temp[NSTRING];
+	static	char	*fmt = "\033[%d;%d;%d;%d;%dT";
+#endif	/* OPT_XTERM >= 3 */
 
-#endif
+	if ((status = (i_am_xterm && global_g_val(GMDXTERM_MOUSE))) != 0) {
+		beginDisplay;
+		switch(c) {
+		case 'M':	/* button-event */
+			event	= TTgetc();
+			x	= XtermPos();
+			y	= XtermPos();
+
+			button	= (event & 3) + 1;
+			wp = row2window(y-1);
+#if OPT_XTERM >= 3
+			/* Tell the xterm how to highlight the selection.
+			 * It won't do anything else until we do this.
+			 */
+			if (wp != 0) {
+				firstrow = wp->w_toprow + 1;
+				lastrow  = wp->w_toprow + wp->w_ntrows + 1;
+			} else {		/* from message-line */
+				firstrow = term.t_nrow + 1;
+				lastrow  = term.t_nrow + 2;
+			}
+			if (y >= lastrow)	/* don't select modeline */
+				y = lastrow - 1;
+			(void)lsprintf(temp, fmt, 1, x, y, firstrow, lastrow);
+			putpad(temp);
+			TTflush();
+#endif	/* OPT_XTERM >= 3 */
+			/* Set the dot-location if button 1 was pressed in a
+			 * window.
+			 */
+			if (wp != 0
+			 && button == 1
+			 && ttrow != term.t_nrow
+			 && setcursor(y-1, x-1)) {
+				(void)update(TRUE);
+			} else if (button <= 3) {
+#if OPT_XTERM >= 3
+				/* abort the selection */
+				(void)lsprintf(temp, fmt, 0, x, y, firstrow, lastrow);
+				putpad(temp);
+				TTflush();
+#endif	/* OPT_XTERM >= 3 */
+				status = ABORT;
+			}
+			break;
+#if OPT_XTERM >= 3
+		case 't':	/* reports valid text-location */
+			x = XtermPos();
+			y = XtermPos();
+
+			setwmark(y-1, x-1);
+			yankregion();
+
+			movecursor(save_row, save_col);
+			(void)update(TRUE);
+			break;
+		case 'T':	/* reports invalid text-location */
+			/*
+			 * The starting-location returned is not the location
+			 * at which the mouse was pressed.  Instead, it is the
+			 * top-most location of the selection.  In turn, the
+			 * ending-location is the bottom-most location of the
+			 * selection.  The mouse-up location is not necessarily
+			 * a pointer to valid text.
+			 *
+			 * This case handles multi-clicking events as well as
+			 * selections whose start or end location was not
+			 * pointing to text.
+			 */
+			save_dot = DOT;
+			startx = XtermPos();	/* starting-location */
+			starty = XtermPos();
+			endx   = XtermPos();	/* ending-location */
+			endy   = XtermPos();
+			mousex = XtermPos();	/* location at mouse-up */
+			mousey = XtermPos();
+
+			setcursor(starty - 1, startx - 1);
+			setwmark (endy   - 1, endx   - 1);
+			if (MK.o != 0 && !is_at_end_of_line(MK))
+				MK.o += 1;
+			yankregion();
+
+			DOT = save_dot;
+			movecursor(save_row, save_col);
+			(void)update(TRUE);
+			break;
+#endif /* OPT_XTERM >= 3 */
+		default:
+			status = FALSE;
+		}
+		endofDisplay;
+	}
+	return status;
+}
+#endif	/* OPT_XTERM */
+
+#endif	/* TERMCAP */

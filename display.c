@@ -6,7 +6,10 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.95  1993/08/05 14:29:12  pgf
+ * Revision 1.96  1993/08/13 16:32:50  pgf
+ * tom's 3.58 changes
+ *
+ * Revision 1.95  1993/08/05  14:29:12  pgf
  * tom's 3.57 changes
  *
  * Revision 1.94  1993/07/27  18:28:06  pgf
@@ -388,14 +391,16 @@ int chg_width, chg_height;
 
 /******************************************************************************/
 
-static	void	(*dfoutfn) P(( int ));
+typedef	void	(*OutFunc) P(( int ));
+
+static	OutFunc	dfoutfn;
 
 static	char *	right_num P(( char *, int, long ));
-static	int	dfputs P(( void (*f)(int), char * ));
-static	int	dfputsn P(( void (*f)(int), char *, int ));
-static	int	dfputi P(( void (*f)(int), int, int ));
-static	int	dfputli P(( void (*f)(int), long, int ));
-static	int	dfputf P(( void (*f)(int), int ));
+static	int	dfputs  P(( OutFunc, char * ));
+static	int	dfputsn P(( OutFunc, char *, int ));
+static	int	dfputi  P(( OutFunc, int,  int ));
+static	int	dfputli P(( OutFunc, long, int ));
+static	int	dfputf  P(( OutFunc, int ));
 static	void	dofmt P(( char *, va_list * ));
 static	void	erase_remaining_msg P(( int ));
 static	void	PutMode P(( char * ));
@@ -412,6 +417,9 @@ static	int	updext_before P(( int ));
 static	void	updateline P(( int, int, int ));
 static	int	endofline P(( char *, int ));
 static	void	modeline P(( WINDOW * ));
+#if	OPT_UPBUFF
+static	void	recompute_buffer P(( BUFFER * ));
+#endif
 static	int	texttest P(( int, int ));
 #if CAN_SCROLL
 static	int	scrolls P(( int ));
@@ -444,7 +452,7 @@ right_num (buffer, len, value)
  */
 static
 int	dfputs(outfunc, s)
-	void (*outfunc) P((int));
+	OutFunc outfunc;
 	char *s;
 {
 	register int c;
@@ -460,7 +468,7 @@ int	dfputs(outfunc, s)
 /* as above, but takes a count for s's length */
 static
 int	dfputsn(outfunc,s,n)
-	void (*outfunc) P((int));
+	OutFunc outfunc;
 	char *s;
 	int n;
 {
@@ -478,7 +486,7 @@ int	dfputsn(outfunc,s,n)
  */
 static
 int	dfputi(outfunc,i, r)
-	void (*outfunc) P((int));
+	OutFunc outfunc;
 	int i,r;
 {
 	register int q;
@@ -500,7 +508,7 @@ int	dfputi(outfunc,i, r)
  */
 static
 int	dfputli(outfunc,l, r)
-	void (*outfunc) P((int));
+	OutFunc outfunc;
 	long l;
 	int r;
 {
@@ -521,7 +529,7 @@ int	dfputli(outfunc,l, r)
  */
 static
 int	dfputf(outfunc,s)
-	void (*outfunc) P((int));
+	OutFunc outfunc;
 	int s;	/* scaled integer to output */
 {
 	register int i;	/* integer portion of number */
@@ -560,7 +568,7 @@ va_list *app;
 	register int n;
 	register int nchars = 0;
 	int islong;
-	void (*outfunc) P((int)) = dfoutfn;  /* local copy, for recursion */
+	OutFunc outfunc = dfoutfn;  /* local copy, for recursion */
 
 	while ((c = *fmt++) != 0 ) {
 		if (c != '%') {
@@ -966,6 +974,7 @@ vteeol()
 
 /* upscreen:	user routine to force a screen update
 		always finishes complete update		*/
+#if !SMALLER
 /* ARGSUSED */
 int
 upscreen(f, n)
@@ -973,6 +982,7 @@ int f,n;
 {
 	return update(TRUE);
 }
+#endif
 
 static	int	scrflags;
 
@@ -1017,14 +1027,35 @@ int force;	/* force update past type ahead? */
 		}
 	}
 
+	/* look for scratch-buffers that should be recomputed.  */
+#if	OPT_UPBUFF
+	for_each_window(wp)
+		if (b_is_obsolete(wp->w_bufp))
+			recompute_buffer(wp->w_bufp);
+#endif
+
 	/* look for windows that need the ruler updated */
 #ifdef WMDRULER
 	for_each_window(wp) {
-		if ((w_val(wp,WMDRULER) || wp->w_flag & WFSTAT)
-		 && !(wp->w_flag & WFMODE)) {
+		if (w_val(wp,WMDRULER)) {
+			WINDOW	*save = curwp;
+			int	line, col;
+
+			curwp = wp;
+			col   = getccol(FALSE) + 1;
+			curwp = save;
+			line  = line_no(wp->w_bufp, wp->w_dot.l);
+
+			if (line != wp->w_ruler_line
+			 || col  != wp->w_ruler_col) {
+				wp->w_ruler_line = line;
+				wp->w_ruler_col  = col;
+				wp->w_flag |= WFMODE;
+			}
+		} else if (wp->w_flag & WFSTAT) {
 			wp->w_flag |= WFMODE;
-			wp->w_flag &= ~WFSTAT;
 		}
+		wp->w_flag &= ~WFSTAT;
 	}
 #endif
 
@@ -1176,8 +1207,10 @@ WINDOW *wp;
 	 */
 	if (i == 0 && w_val(wp,WMDLINEWRAP)) {
 		rows = (wp->w_ntrows - line_height(wp,lp) + 2) / 2;
-		while ((rows > 0)
-		  &&   (!same_ptr(dlp = lBACK(lp), win_head(wp)))) {
+		while (rows > 0) {
+			dlp = lBACK(lp);
+			if (same_ptr(dlp, win_head(wp)))
+				break;
 			if ((rows -= line_height(wp, dlp)) < 0)
 				break;
 			lp = dlp;
@@ -1192,7 +1225,8 @@ WINDOW *wp;
 			if ((i > 0)
 			 && (--i <= 0))
 				break;
-			if (same_ptr(dlp = lBACK(lp), win_head(wp)))
+			dlp = lBACK(lp);
+			if (same_ptr(dlp, win_head(wp)))
 				break;
 			if ((rows -= line_height(wp, lp)) < 0)
 				break;
@@ -1201,7 +1235,8 @@ WINDOW *wp;
 		if (rows > 0)
 			i = 0;
 		while (i++ < 0) {
-			if (!same_ptr(dlp = lFORW(lp), win_head(wp)))
+			dlp = lFORW(lp);
+			if (!same_ptr(dlp, win_head(wp)))
 				lp = dlp;
 		}
 	}
@@ -1484,7 +1519,7 @@ updgar()
 	movecursor(0, 0);		 /* Erase the screen. */
 	TTeeop();
 	sgarbf = FALSE;			 /* Erase-page clears */
-	mpresf = FALSE;			 /* the message area. */
+	mpresf = 0;			 /* the message area. */
 	if (mlsave[0]) {
 		mlforce(mlsave);
 	}
@@ -1562,7 +1597,7 @@ C_NUM	offset;
  * line's offset, taking into account the tabstop, sideways, number and list
  * modes.
  */
-#if X11
+#if X11 || OPT_XTERM
 int
 col2offs(wp, lp, col)
 WINDOW	*wp;
@@ -1620,7 +1655,7 @@ LINEPTR	lp;
  * Given a row on the screen, determines which window it belongs to.  Returns
  * null only for the message line.
  */
-#if defined(WMDLINEWRAP) || defined(X11)
+#if defined(WMDLINEWRAP) || defined(X11) || OPT_XTERM
 WINDOW *
 row2window (row)
 int	row;
@@ -1804,8 +1839,10 @@ void
 scrscroll(from, to, count)
 int from, to, count;
 {
+	beginDisplay;
 	ttrow = ttcol = -1;
 	TTscroll(from,to,count);
+	endofDisplay;
 }
 
 static int
@@ -2207,15 +2244,8 @@ WINDOW *wp;
 
 #ifdef WMDRULER
 	if (w_val(wp,WMDRULER)) {
-		WINDOW	*save = curwp;
-
-		curwp = wp;
-		col = getccol(FALSE) + 1;
-		curwp = save;
-
 		(void)lsprintf(temp, "(%d,%d)",
-			line_no(wp->w_bufp, wp->w_dot.l),
-			col);
+			wp->w_ruler_line, wp->w_ruler_col);
 		vtcol = n - strlen(temp);
 		vtputsn(temp, sizeof(temp));
 	} else
@@ -2287,6 +2317,104 @@ upmode()	/* update all the mode lines */
 }
 
 /*
+ * Mark the given buffer for automatic update
+ */
+#if	OPT_UPBUFF
+void
+upbuff(bp)
+BUFFER *bp;
+{
+	if (bp != 0
+	 && b_val(bp,MDUPBUFF)
+	 && bp->b_upbuff != 0)
+		b_set_flags(bp,BFUPBUFF);
+}
+#endif
+
+/*
+ * Recompute the given buffer. Save/restore its modes and position information
+ * so that a redisplay will show as little change as possible.
+ */
+#if	OPT_UPBUFF
+typedef	struct	{
+	WINDOW	*wp;
+	struct VAL w_vals[MAX_W_VALUES];
+	int	top;
+	int	line;
+	int	col;
+	} SAVEWIN;
+
+static void
+recompute_buffer(bp)
+BUFFER	*bp;
+{
+	register WINDOW *wp;
+	static	SAVEWIN	*tbl;
+	static	UINT	lentbl;
+
+	struct VAL b_vals[MAX_B_VALUES];
+	int	num = 0;
+	BUFFER *savebp = curbp;
+	WINDOW *savewp = curwp;
+
+	if (lentbl < bp->b_nwnd) {
+		lentbl = bp->b_nwnd + 1;
+		tbl = (tbl != 0)
+			? typereallocn(SAVEWIN,tbl,lentbl)
+			: typeallocn(SAVEWIN,lentbl);
+		if (tbl == 0) {
+			lentbl = 0;
+			return;
+		}
+	}
+
+	/* remember where we are, to reposition */
+	/* ...in case line is deleted from buffer-list */
+	if (curbp != bp) {
+		curbp = bp;
+		curwp = bp2any_wp(bp);
+	}
+	for_each_window(wp) {
+		if (wp->w_bufp == bp) {
+			curwp = wp;	/* to make 'getccol()' work */
+			curbp = curwp->w_bufp;
+			tbl[num].wp   = wp;
+			tbl[num].top  = line_no(bp, wp->w_line.l);
+			tbl[num].line = line_no(bp, wp->w_dot.l);
+			tbl[num].col  = getccol(FALSE);
+			save_vals(NUM_W_VALUES, global_w_values.wv,
+				tbl[num].w_vals, wp->w_traits.w_vals.wv);
+			if (++num >= lentbl)
+				break;
+		}
+	}
+	curwp = savewp;
+	curbp = savebp;
+
+	save_vals(NUM_B_VALUES, global_b_values.bv, b_vals, bp->b_values.bv);
+	(bp->b_upbuff)(bp);
+	restore_vals(NUM_B_VALUES, b_vals, bp->b_values.bv);
+
+	/* reposition and restore */
+	while (num-- > 0) {
+		curwp = wp = tbl[num].wp;
+		curbp = curwp->w_bufp;
+		(void) gotoline(TRUE, tbl[num].top);
+		wp->w_line.l = wp->w_dot.l;
+		wp->w_line.o = 0;
+		if (tbl[num].line != tbl[num].top)
+			(void)gotoline(TRUE, tbl[num].line);
+		(void)gocol(tbl[num].col);
+        	wp->w_flag |= WFMOVE;
+		restore_vals(NUM_W_VALUES, tbl[num].w_vals, wp->w_traits.w_vals.wv);
+	}
+	curwp = savewp;
+	curbp = savebp;
+	b_clr_flags(bp,BFUPBUFF);
+}
+#endif
+
+/*
  * Send a command to the terminal to move the hardware cursor to row "row"
  * and column "col". The row and column arguments are origin 0. Optimize out
  * random calls. Update "ttrow" and "ttcol".
@@ -2295,12 +2423,14 @@ void
 movecursor(row, col)
 int row,col;
 {
+	beginDisplay;
 	if (row!=ttrow || col!=ttcol)
         {
 	        ttrow = row;
 	        ttcol = col;
 	        TTmove(row, col);
         }
+	endofDisplay;
 }
 
 /* Erase the message-line from the current position */
@@ -2308,6 +2438,7 @@ static void
 erase_remaining_msg (column)
 int	column;
 {
+	beginDisplay;
 #if !RAMSIZE
 	if (eolexist == TRUE)
 		TTeeol();
@@ -2328,6 +2459,7 @@ int	column;
 		movecursor(term.t_nrow, column);
 	}
 	TTflush();
+	endofDisplay;
 }
 
 
@@ -2339,7 +2471,7 @@ int	column;
 void
 mlerase()
 {
-	if (mpresf != FALSE) {
+	if (mpresf != 0) {
 		movecursor(term.t_nrow, 0);
 		if (discmd != FALSE) {
 #if	COLOR
@@ -2347,7 +2479,7 @@ mlerase()
 			TTbacg(gbcolor);
 #endif
 			erase_remaining_msg(0);
-			mpresf = FALSE;
+			mpresf = 0;
 		}
 	}
 }
@@ -2500,6 +2632,7 @@ va_list *app;	/* ptr to current data field */
 	TTbacg(gbcolor);
 #endif
 
+	beginDisplay;
 	movecursor(term.t_nrow, 0);
 
 	kbd_expand = -1;
@@ -2513,8 +2646,9 @@ va_list *app;	/* ptr to current data field */
 
 	/* if we can, erase to the end of screen */
 	erase_remaining_msg(ttcol);
-	mpresf = TRUE;
+	mpresf = ttcol;
 	mlsave[0] = EOS;
+	endofDisplay;
 }
 
 /*
@@ -2625,17 +2759,15 @@ va_dcl
 /*
  * Buffer printf -- like regular printf, but puts characters
  *	into the BUFFER.
- *
  */
-
 void
 bputc(c)
 int c;
 {
 	if (c == '\n')
-		lnewline();
+		(void)lnewline();
 	else
-		linsert(1,c);
+		(void)linsert(1,c);
 }
 
 /* printf into curbp, at DOT */
@@ -2766,9 +2898,8 @@ ACTUAL_SIG_DECL
 	static	char	*msg[] = {"working", "..."};
 	static	int	flip;
 	static	int	skip;
-	static	B_COUNT	cur_temp;
 
-	if (!displaying && !doing_kbd_read) {
+	if (!global_b_val(MDTERSE) && !displaying && !doing_kbd_read) {
 		if (skip) {
 			skip = FALSE;
 		} else if (displayed) {
@@ -2779,11 +2910,11 @@ ACTUAL_SIG_DECL
 				show_col = 0;
 			movecursor(term.t_nrow, show_col);
 			if (cur_working != 0
-			 && cur_working != cur_temp) {
+			 && cur_working != old_working) {
 				char	temp[20];
 				int	len = cur_working > 999999L ? 10 : 6;
 
-				cur_temp = cur_working;
+				old_working = cur_working;
 				kbd_puts(right_num(temp, len, cur_working));
 				if (len == 10)
 					;
@@ -2799,11 +2930,24 @@ ACTUAL_SIG_DECL
 				kbd_puts(msg[!flip]);
 			}
 			movecursor(save_row, save_col);
-			mpresf = TRUE;
+			if (mpresf >= 0)
+				mpresf = -(mpresf+1);
 			TTflush();
+#if X11
+			x_working();
+#endif
 		}
-	} else
+	} else {
+		if (mpresf < 0) {	/* erase leftover working-message */
+			int	save_row = ttrow;
+			int	save_col = ttcol;
+			movecursor(term.t_nrow, -(mpresf+1));
+			erase_remaining_msg(-(mpresf+1));
+			movecursor(save_row, save_col);
+			mpresf = 0;
+		}
 		skip = TRUE;
+	}
 	(void)signal(SIGALRM,imworking);
 	(void)alarm(1);
 	flip = !flip;

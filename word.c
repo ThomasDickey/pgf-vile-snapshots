@@ -4,7 +4,10 @@
  * do any sentence mode commands, they are likely to be put in this file. 
  *
  * $Log: word.c,v $
- * Revision 1.29  1993/08/05 14:29:12  pgf
+ * Revision 1.30  1993/08/13 16:32:50  pgf
+ * tom's 3.58 changes
+ *
+ * Revision 1.29  1993/08/05  14:29:12  pgf
  * tom's 3.57 changes
  *
  * Revision 1.28  1993/06/02  14:28:47  pgf
@@ -132,7 +135,7 @@ int f,n;
 			return(FALSE);
 		/* if we make it to the beginning, start a new line */
 		if (DOT.o == 0) {
-			gotoeol(FALSE, 0);
+			(void)gotoeol(FALSE, 0);
 			return(lnewline());
 		}
 	}
@@ -409,10 +412,8 @@ formatregion()
 		while (lregexec(expP, l_ref(DOT.l), 0, lLength(DOT.l)) ||
 			lregexec(expC, l_ref(DOT.l), 0, lLength(DOT.l)) ) {
 			DOT.l = lFORW(DOT.l);
-			if (same_ptr(DOT.l, pastline)) {
-				setmark();
-				return TRUE;
-			}
+			if (same_ptr(DOT.l, pastline))
+				return setmark();
 		}
 
 		secondindent = indentlen(l_ref(DOT.l));
@@ -533,8 +534,7 @@ formatregion()
 		}
 		DOT.l = lFORW(DOT.l);
 	}
-	setmark();
-	return(TRUE);
+	return setmark();
 }
 
 

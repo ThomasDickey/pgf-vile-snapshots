@@ -3,7 +3,10 @@
  * commands. There is no functional grouping here, for sure.
  *
  * $Log: random.c,v $
- * Revision 1.103  1993/08/05 14:29:12  pgf
+ * Revision 1.104  1993/08/13 16:32:50  pgf
+ * tom's 3.58 changes
+ *
+ * Revision 1.103  1993/08/05  14:29:12  pgf
  * tom's 3.57 changes
  *
  * Revision 1.102  1993/07/27  18:06:20  pgf
@@ -530,7 +533,8 @@ int
 showlength(f,n)
 int f,n;
 {
-	mlforce("%d", line_count(curbp));
+	/* actually, can be used to show any address-value */
+	mlforce("%d", line_no(curbp, MK.l));
 	return TRUE;
 }
 
@@ -559,7 +563,7 @@ BUFFER *the_buffer;
 	register LINE	*lp;		/* current line */
 	register L_NUM	numlines = 0;	/* # of lines in file */
 
-	for_each_line(lp, curbp)
+	for_each_line(lp, the_buffer)
 		++numlines;
 
 	return numlines;
@@ -593,7 +597,7 @@ LINEPTR the_line;
 #endif
 }
 
-#if ! SMALLER
+#if OPT_EVAL
 L_NUM
 getcline()	/* get the current line number */
 {
@@ -728,7 +732,7 @@ int leadingonly;
 		}
 		DOT.o++;
 	}
-	gocol(ocol);
+	(void)gocol(ocol);
 	return TRUE;
 }
 
@@ -771,7 +775,7 @@ int leadingonly;
 				fspace = -1;
 			else {
 				backchar(TRUE, ccol - fspace);
-				ldelete((long)(ccol - fspace), FALSE);
+				(void)ldelete((long)(ccol - fspace), FALSE);
 				linsert(1, '\t');	    
 				fspace = -1;
 			}
@@ -793,7 +797,7 @@ int leadingonly;
 		ccol++;
 		DOT.o++;
 	}
-	gocol(ocol);
+	(void)gocol(ocol);
 	return TRUE;
 }
 
@@ -932,7 +936,7 @@ int f,n;
 	extern CMDFUNC f_gotoeol;
 
 	if (lLength(DOT.l) == 0) {
-		return ins(FALSE);
+		return ins();
 	} else {
 		havemotion = &f_gotoeol;
 		return operchg(f,n);
