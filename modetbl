@@ -12,7 +12,10 @@
 # The modes are table entries in the BUFFER and WINDOW structures.
 #
 # $Log: modetbl,v $
-# Revision 1.38  1994/04/22 13:49:11  pgf
+# Revision 1.39  1994/04/27 11:22:50  pgf
+# changes for  and
+#
+# Revision 1.38  1994/04/22  13:49:11  pgf
 # new hooks
 #
 # Revision 1.37  1994/04/22  11:30:50  pgf
@@ -154,6 +157,7 @@ color
 "mode"		MODE			# are we inserting/overwriting/command
 "ntildes"	NTILDES			# number of tildes displayed at eob
 "ocwd"		OCWD			# previous directory
+"os"		OS			# what os are we on?
 "pagelen"	PAGELEN			# number of lines used by editor
 "pagewid"	CURWIDTH		# current screen width
 "palette"	PALETTE			# current palette string
@@ -175,8 +179,6 @@ color
 "wline"		WLINE			# # of lines in current window
 "word"		WORD			# current word
 "write-hook"	WRHOOK		PROC	# procedure to run when writing
-"xvile"		XVILE			# are we xvile?
-"pcvile"	PCVILE			# are we on a pc?
 
 .functions
 "abs"	ABS		MONAMIC		# absolute value of a number

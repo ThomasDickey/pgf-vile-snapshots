@@ -14,7 +14,10 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.182  1994/04/25 22:12:32  pgf
+ * Revision 1.183  1994/04/27 11:22:50  pgf
+ * changes for  and
+ *
+ * Revision 1.182  1994/04/25  22:12:32  pgf
  * change nextbuffer() to swbuffer(firstbp) to start things off, to fix
  * problem with noautobuffer skipping first buffer
  *
@@ -160,10 +163,6 @@ char	*argv[];
 #endif
 	prog_arg = argv[0];	/* this contains our only clue to exec-path */
 
-#if UNIX || VMS
-	makeversion();
-#endif
-
 	start_debug_log(argc,argv);
 
 	if (strcmp(pathleaf(prog_arg), "view") == 0)
@@ -279,7 +278,7 @@ char	*argv[];
 				break;
 #endif
 			case 'V':
-				(void)printf("vile %s\n", version);
+				(void)printf("%s\n", getversion());
 				ExitProgram(GOODEXIT);
 
 			case 'v':	/* -v for View File */

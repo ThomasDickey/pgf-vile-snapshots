@@ -8,8 +8,11 @@
  * Major extensions for vile by Paul Fox, 1991
  *
  *	$Log: modes.c,v $
- *	Revision 1.35  1994/04/25 23:24:32  pgf
- *	do switch to modes listing
+ *	Revision 1.36  1994/04/27 09:33:13  pgf
+ *	back out last change
+ *
+ * Revision 1.35  1994/04/25  23:24:32  pgf
+ * do switch to modes listing
  *
  * Revision 1.34  1994/03/22  16:26:53  pgf
  * used updatescratch() for buffer animation triggering
@@ -724,12 +727,9 @@ int f,n;
 	register int s;
 
 	s = liststuff(MODES_LIST_NAME, makemodelist,0,(char *)wp);
-#ifdef BEFORE  /* i think it's better if we switch, now that there are
-		so many modes */
 	/* back to the buffer whose modes we just listed */
 	if (swbuffer(wp->w_bufp))
 		curwp = wp;
-#endif
 	return s;
 }
 
