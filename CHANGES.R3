@@ -1,4 +1,22 @@
 
+Changes for vile 3.33:
+
+    	* many: cleanup for gcc-2.3's -Wall warnings
+
+    	* bind.c: added new function, insertion_cmd(), which returns char
+	that gives us simple insert mode.  used in x11.c and input.c, for
+	pasting and for insert-mode arrow keys
+
+    	* estruct.h: don't redefine "const" on linux
+
+    	* makefile: added aix warnings, changed name of ENV to ENVIR, due
+	to name conflict with linux make
+
+    	* random.c: add include of sys/select.h for AIX
+
+    	* x11.c: added code to support arrow keys and function keys from
+	Phil Rubini
+
 Changes for vile 3.32 (from Tom Dickey):
 
 	* modified estruct.h, proto.h and display.c to compile vile on HP/Apollo

@@ -4,7 +4,10 @@
  * All operating systems.
  *
  * $Log: termio.c,v $
- * Revision 1.54  1993/02/08 14:53:35  pgf
+ * Revision 1.55  1993/02/15 10:37:31  pgf
+ * cleanup for gcc-2.3's -Wall warnings
+ *
+ * Revision 1.54  1993/02/08  14:53:35  pgf
  * see CHANGES, 3.32 section
  *
  * Revision 1.53  1993/01/16  10:42:47  foxharp
@@ -326,7 +329,7 @@ ttopen()
 	ntermios = otermios;
 
 	/* setup new settings, preserve flow control, and allow BREAK */
-	ntermios.c_iflag = BRKINT|(otermios.c_iflag & IXON|IXANY|IXOFF);
+	ntermios.c_iflag = BRKINT|(otermios.c_iflag & (IXON|IXANY|IXOFF));
 	ntermios.c_oflag = 0;
 	ntermios.c_lflag = ISIG;
 	ntermios.c_cc[VMIN] = 1;

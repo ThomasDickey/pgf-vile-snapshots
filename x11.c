@@ -2,7 +2,14 @@
  * 	X11 support, Dave Lemke, 11/91
  *
  * $Log: x11.c,v $
- * Revision 1.10  1992/11/19 09:20:44  foxharp
+ * Revision 1.12  1993/02/15 10:13:41  pgf
+ * more changes from phil rubini -- some typos, and keypad func. keys
+ *
+ * Revision 1.11  1993/02/12  10:44:07  pgf
+ * added code to support arrow keys and function keys (from Phil Rubini?  I
+ * lost the mail)
+ *
+ * Revision 1.10  1992/11/19  09:20:44  foxharp
  * eric krohn's window resize fix, and his new name, foreground, and
  * background support
  *
@@ -36,6 +43,7 @@
  * Initial revision
  */
 
+#include	<stdio.h>
 #include	"estruct.h"
 #include	"edef.h"
 
@@ -135,6 +143,8 @@ static TextWindow cur_win;
 static char *paste;
 static char *pp;
 static int  plen;
+static int x_numbuffer = 0;
+static char x_kbdbuffer[10];
 
 static int  x_getc(),
             x_cres();
@@ -166,7 +176,7 @@ static void x_stash_selection();
 static int set_character_class();
 static void x_refresh();
 
-#define	FONTNAME	"9x15"
+#define	FONTNAME	"7x13"
 static char *fontname;
 
 static char *geometry = NULL;
@@ -428,15 +438,15 @@ struct {
     int         val;
 }           name_val[] = {
 
-    "yes", TRUE,
-    "on", TRUE,
-    "1", TRUE,
-    "true", TRUE,
-    "no", FALSE,
-    "off", FALSE,
-    "0", FALSE,
-    "false", FALSE,
-    (char *) 0, 0,
+    {"yes", TRUE},
+    {"on", TRUE},
+    {"1", TRUE},
+    {"true", TRUE},
+    {"no", FALSE},
+    {"off", FALSE},
+    {"0", FALSE},
+    {"false", FALSE},
+    {(char *) 0, 0}
 };
 
 static Bool
@@ -683,7 +693,7 @@ x_open()
       XSetClassHint(dpy,tw->win,class_hints);
       free(class_hints->res_name);
       free(class_hints->res_class);
-      XFree(class_hints);
+      XFree((char *)class_hints);
     }
     cur_win = tw;
     XMapWindow(dpy, tw->win);
@@ -1496,11 +1506,14 @@ x_get_selection(tw, selection, type, value, length, format)
 	/* should be impossible to hit this with existing paste */
 	/* XXX massive hack -- leave out 'i' if in prompt line */
 	if (!insertmode && (tw->cur_row < (tw->rows - 1))) {
+	    int c;
 	    length++;
 	    pp = paste = (char *) malloc(length);
 	    if (!paste)
 		goto bail;
-	    *pp = 'i';
+	    if ((c = insertion_cmd()) == -1)
+	    	goto bail;
+	    *pp = (char)c;
 	    plen = length;
 	    length--;
 	    bcopy((char *) value, pp + 1, length);
@@ -1938,7 +1951,14 @@ x_getc()
     int         num;
     int         c;
 
+   
     while (1) {
+
+	if (x_numbuffer) {		/* handle any queued chars */
+	    c = x_kbdbuffer[x_numbuffer--];
+	    return c;
+	}
+
 	if (plen) {		/* handle any queued pasted text */
 	    c = *pp++;
 	    if (--plen == 0)
@@ -1947,22 +1967,65 @@ x_getc()
 	}
 	XNextEvent(dpy, &ev);
 	if (ev.type == KeyPress) {
-	    num = XLookupString((XKeyPressedEvent *) & ev, buffer, 10, &keysym,
-				(XComposeStatus *) 0);
-	    /* fake arrow keys -- XXX breaks down when not in insert mode */
-	    switch (keysym) {
-	    case XK_Left:
-		return 'h';
-	    case XK_Right:
-		return 'l';
-	    case XK_Up:
-		return 'k';
-	    case XK_Down:
-		return 'j';
-	    default:
-		if (num)
-		    return buffer[0];
-	    }
+	        num = XLookupString((XKeyPressedEvent *) &ev, buffer, 10,
+				&keysym, (XComposeStatus *) 0);
+		x_numbuffer = 3;
+		x_kbdbuffer[3] = ESC;
+		x_kbdbuffer[2] = '[';
+		switch (keysym) {
+		/* Arrow keys */
+		case XK_Left:	x_kbdbuffer[1] = 'D'; break;
+		case XK_Right:	x_kbdbuffer[1] = 'C'; break;
+		case XK_Up:	x_kbdbuffer[1] = 'A'; break;
+		case XK_Down:	x_kbdbuffer[1] = 'B'; break;
+		/* page scroll */
+		case XK_Next:	x_kbdbuffer[1] = 'n'; break;
+		case XK_Prior:	x_kbdbuffer[1] = 'p'; break;
+		/* editing */
+		case XK_Insert:	x_kbdbuffer[1] = 'i'; break;
+#if (ULTRIX || ultrix)
+		case DXK_Remove: x_kbdbuffer[1] = 'r'; break;
+#endif
+		case XK_Find:	x_kbdbuffer[1] = 'f'; break;
+		case XK_Select:	x_kbdbuffer[1] = 's'; break;
+		/* command keys */
+		case XK_Menu:	x_kbdbuffer[1] = 'm'; break;
+		case XK_Help:	x_kbdbuffer[1] = 'h'; break;
+                /* function keys */
+		case XK_F1:	x_kbdbuffer[1] = '1'; break;
+		case XK_F2:	x_kbdbuffer[1] = '2'; break;
+		case XK_F3:	x_kbdbuffer[1] = '3'; break;
+		case XK_F4:	x_kbdbuffer[1] = '4'; break;
+		case XK_F5:	x_kbdbuffer[1] = '5'; break;
+		case XK_F6:	x_kbdbuffer[1] = '6'; break;
+		case XK_F7:	x_kbdbuffer[1] = '7'; break;
+		case XK_F8:	x_kbdbuffer[1] = '8'; break;
+		case XK_F9:	x_kbdbuffer[1] = '9'; break;
+		case XK_F10:	x_kbdbuffer[1] = '0'; break;
+		case XK_F11:	x_kbdbuffer[1] = ESC; x_numbuffer = 1; break;
+		case XK_F12:	x_kbdbuffer[1] = '@'; break;
+		case XK_F13:	x_kbdbuffer[1] = '#'; break;
+		case XK_F14:	x_kbdbuffer[1] = '$'; break;
+		case XK_F15:	x_kbdbuffer[1] = '%'; break;
+		case XK_F16:	x_kbdbuffer[1] = '^'; break;
+		case XK_F17:	x_kbdbuffer[1] = '&'; break;
+		case XK_F18:	x_kbdbuffer[1] = '*'; break;
+		case XK_F19:	x_kbdbuffer[1] = '('; break;
+		case XK_F20:	x_kbdbuffer[1] = ')'; break;
+		/* keypad function keys */
+		case XK_KP_F1:	x_kbdbuffer[1] = 'P'; break;
+		case XK_KP_F2:	x_kbdbuffer[1] = 'Q'; break;
+		case XK_KP_F3:	x_kbdbuffer[1] = 'R'; break;
+		case XK_KP_F4:	x_kbdbuffer[1] = 'S'; break;
+		/* ordinary keys */
+		default:
+			x_numbuffer = 0;
+			if (num)
+				return buffer[0];
+			else
+				continue;
+		}
+		return x_kbdbuffer[x_numbuffer--];
 	} else {
 	    x_process_event(&ev);
 	}
@@ -1983,6 +2046,9 @@ int
 x_key_events_ready()
 {
     XEvent      ev;
+
+
+    if (x_numbuffer) return TRUE;
 
     /* XXX may want to use another mode */
     if (XEventsQueued(dpy, QueuedAlready))

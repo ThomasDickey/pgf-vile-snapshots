@@ -4,7 +4,15 @@
  *	written 11-feb-86 by Daniel Lawrence
  *
  * $Log: bind.c,v $
- * Revision 1.27  1993/02/08 14:53:35  pgf
+ * Revision 1.29  1993/02/15 10:37:31  pgf
+ * cleanup for gcc-2.3's -Wall warnings
+ *
+ * Revision 1.28  1993/02/12  10:41:28  pgf
+ * added new function, insertion_cmd(), which returns char that gives
+ * us simple insert mode.  used in x11.c and input.c, for pasting and for
+ * insert-mode arrow keys
+ *
+ * Revision 1.27  1993/02/08  14:53:35  pgf
  * see CHANGES, 3.32 section
  *
  * Revision 1.26  1993/01/16  10:21:17  foxharp
@@ -727,6 +735,17 @@ char *seq;	/* destination string for sequence */
 	return ptr;
 }
 
+/* insertion_cmd -- what char puts us in insert mode? */
+int
+insertion_cmd()
+{
+	extern CMDFUNC f_insert;
+	static back_to_ins_char = -1;
+	if (back_to_ins_char == -1) /* try to initialize it.. */
+		back_to_ins_char = fnc2key(&f_insert);
+	return back_to_ins_char;
+}
+
 
 /* kcod2fnc:  translate a 10-bit keycode to a function pointer */
 /*	(look a key binding up in the binding table)		*/
@@ -971,7 +990,7 @@ unsigned size_entry;
 	register char *	next = NEXT_DATA(table);
 	register char *	sp;
 
-	while (sp = THIS_NAME(next)) {
+	while ((sp = THIS_NAME(next)) != 0) {
 		if (strncmp(buf, sp, len) != 0)
 			break;
 		next = NEXT_DATA(next);
@@ -998,7 +1017,7 @@ unsigned size_entry;
 
 	if (THIS_NAME(table)[len] == THIS_NAME(last)[len]) {
 		kbd_putc('{');
-		while (c = THIS_NAME(table)[len]) {
+		while ((c = THIS_NAME(table)[len]) != 0) {
 			if (c == THIS_NAME(last)[len]) {
 				kbd_putc(c);
 				len++;

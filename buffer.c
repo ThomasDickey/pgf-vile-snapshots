@@ -6,7 +6,10 @@
  * for the display system.
  *
  * $Log: buffer.c,v $
- * Revision 1.49  1993/02/08 14:53:35  pgf
+ * Revision 1.50  1993/02/15 10:37:31  pgf
+ * cleanup for gcc-2.3's -Wall warnings
+ *
+ * Revision 1.49  1993/02/08  14:53:35  pgf
  * see CHANGES, 3.32 section
  *
  * Revision 1.48  1993/01/23  14:25:14  foxharp
@@ -456,7 +459,7 @@ void	TrackAlternate(newbp)
 
 	if (!updating_list) {
 		MarkUnused(newbp);
-		if (bp = find_latest()) {
+		if ((bp = find_latest()) != 0) {
 			if (bp != newbp)
 				newbp->b_last_used = (bp->b_last_used + 1);
 		} else
@@ -1070,13 +1073,13 @@ sortlistbuffers()
 
 	if (global_b_val(MDABUFF)) {
 		c = 1;
-		while (bp = find_nth_used(c++)) {
+		while ((bp = find_nth_used(c++)) != 0) {
 			bp->b_relink = newhead;
 			newhead = bp;
 		}
 	} else {
 		c = countBuffers();
-		while (bp = find_nth_created(c--)) {
+		while ((bp = find_nth_created(c--)) != 0) {
 			bp->b_relink = newhead;
 			newhead = bp;
 		}
@@ -1126,11 +1129,11 @@ void	footnote(c)
 		char	*name;
 		int	flag;
 	} table[] = {
-		"automatic",	0,
-		"invisible",	0,
-		"modified",	0,
-		"scratch",	0,
-		"unread",	0,
+		{"automatic",	0},
+		{"invisible",	0},
+		{"modified",	0},
+		{"scratch",	0},
+		{"unread",	0},
 		};
 	register int	j, next;
 
@@ -1275,7 +1278,7 @@ updatelistbuffers()
 		register WINDOW *wp;
 		updating_list = TRUE;
 
-		if (bp = find_BufferList()) {
+		if ((bp = find_BufferList()) != 0) {
 			struct	{
 				WINDOW	*wp;
 				int	top, line, col;

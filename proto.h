@@ -5,7 +5,10 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.31  1993/02/08 14:53:35  pgf
+ * Revision 1.32  1993/02/12 10:43:33  pgf
+ * new function, insertion_cmd()
+ *
+ * Revision 1.31  1993/02/08  14:53:35  pgf
  * see CHANGES, 3.32 section
  *
  * Revision 1.30  1993/01/23  13:38:23  foxharp
@@ -220,6 +223,13 @@ extern int strinc P(( char *, char *));
 extern int unbindkey P(( int, int ));
 extern int unbindchar P(( int ));
 extern int apro P(( int, int ));
+extern int insertion_cmd P(( void ));
+extern char * fnc2engl P(( CMDFUNC * ));
+extern CMDFUNC * engl2fnc P(( char * ));
+extern CMDFUNC * kcod2fnc P(( int ));
+extern int prc2kcod P(( char * ));
+extern char * prc2engl P(( char * ));
+extern int fnc2key P(( CMDFUNC * ));
 extern char * kbd_engl P(( void ));
 extern void kbd_alarm P(( void ));
 extern void kbd_putc P(( int ));
@@ -736,12 +746,6 @@ extern char * tokval P(( char * ));
 extern char * token P(( char *, char *, int ));
 extern int ffgetline P(( int * ));
 extern int kinsert P(( int ));
-extern char * fnc2engl P(( CMDFUNC * ));
-extern CMDFUNC * engl2fnc P(( char * ));
-extern CMDFUNC * kcod2fnc P(( int ));
-extern int prc2kcod P(( char * ));
-extern char * prc2engl P(( char * ));
-extern int fnc2key P(( CMDFUNC * ));
 extern int macarg P(( char * ));
 extern int echochar P(( int, int ));
 extern int scanmore P(( char *, int ));

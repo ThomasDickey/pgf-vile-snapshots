@@ -9,7 +9,13 @@
  *	the output structures.
  *
  * $Log: mktbls.c,v $
- * Revision 1.13  1993/02/08 14:53:35  pgf
+ * Revision 1.15  1993/02/15 10:37:31  pgf
+ * cleanup for gcc-2.3's -Wall warnings
+ *
+ * Revision 1.14  1993/02/11  19:08:32  pgf
+ * fixups for shadowed variable warnings
+ *
+ * Revision 1.13  1993/02/08  14:53:35  pgf
  * see CHANGES, 3.32 section
  *
  * Revision 1.12  1993/01/26  22:46:20  foxharp
@@ -124,18 +130,20 @@ static	char *conditions[MAX_BIND][LEN_CHRSET];
 static	char *tblname   [MAX_BIND] = {"asciitbl", "ctlxtbl", "metatbl", "spectbl" };
 static	char *prefname  [MAX_BIND] = {"",         "CTLX|",   "CTLA|",   "SPEC|" };
 
-static	char *input;
+static	char *inputfile;
 static	int l = 0;
 static	FILE *nebind, *nefunc, *nename, *cmdtbl;
 static	FILE *nevars, *nemode;
 
 /******************************************************************************/
-static isspace(c)
+static int
+isspace(c)
 int c;
 {
 	return c == ' ' || c == '\t' || c == '\n';
 }
-static isprint(c)
+static int
+isprint(c)
 int c;
 {
 	return c >= ' ' && c < '\177';
@@ -160,7 +168,7 @@ static void
 badfmt(s)
 char *s;
 {
-	Fprintf(stderr,"\"%s\", line %d: bad format:", input, l);
+	Fprintf(stderr,"\"%s\", line %d: bad format:", inputfile, l);
 	Fprintf(stderr,"	%s\n",s);
 	exit(1);
 }
@@ -290,7 +298,7 @@ char	*buffer;
 {
 	register int	col = 0,
 			c;
-	while (c = *buffer++) {
+	while ((c = *buffer++) != 0) {
 		if (isprint(c))
 			col++;
 		else if (c == '\t')
@@ -359,7 +367,7 @@ char	**vec;
 	for (c = strlen(input); c > 0 && isspace(input[c-1]); c--)
 		input[c-1] = '\0';
 
-	while (c = *input++) {
+	while ((c = *input++) != 0) {
 		if (quote) {
 			if (c == quote) {
 				quote = 0;
@@ -505,7 +513,7 @@ char	*name;
 
 	*dst++ = 's';
 	*dst++ = '_';
-	while (c = *name++) {
+	while ((c = *name++) != 0) {
 		if (c == '-')
 			c = '_';
 		*dst++ = c;
@@ -745,7 +753,7 @@ char *s, *func, *cond;
 			badfmt("duplicate key binding");
 		bindings[btype][c] = StrAlloc(func);
 		s += 2;
-	} else if (c = *s) {
+	} else if ((c = *s) != 0) {
 		if (bindings[btype][c] != NULL && !two_conds(btype,c,cond))
 			badfmt("duplicate key binding");
 		bindings[btype][c] = StrAlloc(func);
@@ -1111,9 +1119,9 @@ dump_ufuncs()
 	for (p = all_ufuncs, count = 0; p != 0; p = p->nst) {
 		if (!count++)
 			init_ufuncs();
-		Sprintf(temp, "\t\"%s\",", p->s1);
+		Sprintf(temp, "\t{\"%s\",", p->s1);
 		(void)PadTo(15, temp);
-		Sprintf(temp+strlen(temp), "%s,", p->s3);
+		Sprintf(temp+strlen(temp), "%s},", p->s3);
 		if (p->s4[0]) {
 			(void)PadTo(32, temp);
 			Sprintf(temp+strlen(temp), "/* %s */", p->s4);
@@ -1193,7 +1201,7 @@ char    *argv[];
 		exit(1);
 	}
 
-	if ((cmdtbl = fopen(input = argv[1],"r")) == NULL ) {
+	if ((cmdtbl = fopen(inputfile = argv[1],"r")) == NULL ) {
 		Fprintf(stderr,"mktbls: couldn't open cmd-file\n");
 		exit(1);
 	}

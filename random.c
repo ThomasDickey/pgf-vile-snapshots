@@ -3,7 +3,10 @@
  * commands. There is no functional grouping here, for sure.
  *
  * $Log: random.c,v $
- * Revision 1.83  1993/01/23 13:38:23  foxharp
+ * Revision 1.84  1993/02/15 10:47:30  pgf
+ * add include of sys/select.h for AIX
+ *
+ * Revision 1.83  1993/01/23  13:38:23  foxharp
  * lchange is now chg_buff,
  * fix for repeat counts on 'C' command, and
  * update buffer list on chdir
@@ -308,6 +311,9 @@
 #include	"edef.h"
 #if HAVE_POLL
 # include <poll.h>
+#endif
+#if HAVE_SELECT && AIX
+# include <sys/select.h>
 #endif
 
 extern CMDFUNC f_forwchar, f_backchar, f_forwchar_to_eol, f_backchar_to_bol;

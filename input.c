@@ -3,7 +3,13 @@
  *		5/9/86
  *
  * $Log: input.c,v $
- * Revision 1.52  1993/02/08 14:53:35  pgf
+ * Revision 1.54  1993/02/15 10:37:31  pgf
+ * cleanup for gcc-2.3's -Wall warnings
+ *
+ * Revision 1.53  1993/02/12  10:42:55  pgf
+ * use insertion_cmd() routine to get the char that puts us in insert mode
+ *
+ * Revision 1.52  1993/02/08  14:53:35  pgf
  * see CHANGES, 3.32 section
  *
  * Revision 1.51  1993/01/16  10:35:40  foxharp
@@ -491,15 +497,12 @@ kbd_key()
 
 #if ANSI_SPEC
 	if (insert_mode_was && last1key == -abortc) {
+		int ic;
 		/* then we just read the command we pushed before */
-		extern CMDFUNC f_insert;
-		static back_to_ins_char = -1;
-		if (back_to_ins_char == -1) /* try to initialize it.. */
-			back_to_ins_char = fnc2key(&f_insert);
-		if (back_to_ins_char == -1) /* ... but couldn't */
+		if ((ic = insertion_cmd()) == -1) /* can we re-enter? */
 			mlforce("[Can't re-enter insert mode]");
 		else
-			tungetc(back_to_ins_char);
+			tungetc(ic);
 		insertmode = insert_mode_was;
 		insert_mode_was = FALSE;
 	}
@@ -729,7 +732,7 @@ int (*complete)P((int,char *,int *));/* handles completion */
 	if (clexec) {
 		int	s;
 		execstr = token(execstr, extbuf, eolchar);
-		if (s = (*extbuf != EOS)) {
+		if ((s = (*extbuf != EOS)) != FALSE) {
 			if ((options & KBD_LOWERC))
 				(void)mklower(extbuf);
 			if (complete != no_completion) {
@@ -930,7 +933,7 @@ int (*complete)P((int,char *,int *));/* handles completion */
 				}
 				break;
 			case '#':
-				if (bp = find_alt()) {
+				if ((bp = find_alt()) != 0) {
 					cp = shorten_path(bp->b_fname);
 					if (!cp || !*cp || isspace(*cp)) {
 						/* oh well, use the buffer */
