@@ -27,14 +27,14 @@ Getting along with vile
 	To get help (probably just this text), use any of:
 		:h
 		:help
-		^X-^H
-		^A-^H
+		^X-h
+		^A-h
 
 	To get a complete list of all commands, type ":describe-bindings".
 	To get a list of all commands that contain the strings "name",
 	type ":apropos name".  These lists will show all command synonyms
 	and key sequences that are bound to the same function.
-	
+
 	You needn't type full command names -- type a few characters and
 	hit TAB to perform command completion.  Type a question mark to
 	display a list of the characters that you would have to type to
@@ -136,7 +136,7 @@ Buffer manipulation commands:
 
 	:ki	Kill a buffer.  Remove the buffer and its contents from the
 		editor.  Will ask if changes to the buffer should be discarded.
-		
+
 	^X-e	Edit the file whose pathname appears under the cursor.  For
 		example, if you are editing a makefile, you could edit one
 		of the source files by placing the cursor at the start of
@@ -208,7 +208,7 @@ File manipulation commands:
 
 	The commands ":ww" and ":wwq" correspond roughly to ":w" and ":wq",
 	but they each write all modified buffers.
-	
+
 	As in vi, ranges of lines specified by line numbers (including '.',
 	'$', and '%' shorthands) or marks may precede these commands.  
 	Unlike vi, search patterns cannot be used as line specifiers.
@@ -242,7 +242,7 @@ Shell Access
 	The command ":!!" will rerun the previous such shell command.
 
 	The '!' operator works as a filter, as expected.
-	
+
 	In addition, the ^X-! command runs a shell command and captures
 	its output in a specific buffer, called "[Output]".  This is
 	almost identical to ":e !cmd", except that in that case the buffer
@@ -309,7 +309,7 @@ Text manipulation command:
 	a time).  The '^X-r' command will walk forward, redoing the
 	previously undone changes one by one.  A fresh change to the buffer
 	will cause previously undone changes to no longer be redoable.
-	
+
 	The number of changes stored in the undo "history" is controlled by
 	the numeric mode "undolimit".  The default history length is 10 --
 	that is, only 10 changes may be undone.  Set the undolimit to 0 for
@@ -369,9 +369,11 @@ Text manipulation command:
 		commands -- i.e.  blank lines, or lines beginning in .I .L
 		.P .Q or .b.  This make is possible to use "3^A-f}" or
 		"^A-fG" to reformat multiple paragraphs.  The reformatting
-		operation know about both C and shell comments, and will
-		do the "right" thing with lines that start with '#' or '*'
-		characters.
+		operation knows a little about both C and shell comments,
+		and will attempt to do the "right" thing with lines that
+		start with '#' or '*' characters.  (It also knows about the
+		'>' character, making it fairly easy to reformat mail and
+		news inclusions...  but is it ethical?  :-)
 
 	^X-s	For every occurrence of a search string, put in a replace-
 		ment string.  This is similar to "s/pattern/replacement/g"
@@ -542,8 +544,9 @@ Editor modes
 	animated Controls whether vile automatically updates the contents of
 		scratch buffers when their contents would change.  The animated
 		buffers include:
-		
+
 			[Buffer List]
+			[Registers]
 		(B)
 
 	autobuffer (ab) Controls whether vile uses "most-recently-used"
@@ -635,7 +638,7 @@ Editor modes
 
 	expand-chars Controls the set of characters that are expanded in command
 		lines.  These include
-		
+
 			'%' (the current buffer),
 			'#' (the alternate buffer) and
 			':' (the token at the cursor position).
@@ -682,6 +685,12 @@ Editor modes
 
 	magic	Allow meta-characters in search strings.  See the section 
 		"Regular Expressions" for more detail. (B)
+
+	multibeep   If a motion command fails then vile, like vi, will
+		sound the bell.  Turning this mode off prevents subsequent
+		identical motion failures from also sounding the bell. 
+		That is, if you repeat a failed motion many times (e.g. by
+		holding down the backspace key), you only get one beep. (U)
 
 	newline (nl) The buffer ends with a newline.  This is set when reading
 		a buffer.  (B)
@@ -1187,7 +1196,7 @@ Programmed macros
 	~while cond	Execute a loop if the condition is true
 	~break
 	~endwhile
-	
+
 	~endm		End a macro
 
 	Line Labels begin with a "*" as the first nonblank char, like:
@@ -1291,7 +1300,7 @@ Regular Expressions
    \c	string at the end of the input string), a `\' followed by a single
    c	character (matching that character), or a single character with no
 	other significance (matching that character)."
-	
+
  \< \>	In addition, vile atoms may be: \< and \>, which match the
  \s \S	beginning and end of a "word", \s and \S, which match characters of
  \w \W	whitespace and "darkspace", \w and \W, which match alphanumerics
@@ -1418,6 +1427,11 @@ X Window System specifics:
 		the text cursor position.
 	3 -	Extends the current selection.
 
+	Note: the selected area includes all highlighted characters except for
+	the special case in which the last highlighted character is the first
+	character on a line.  This exception is made to provide control over
+	whether the newline is selected as well.
+
 	Additional command line arguments:
 
 	-f fontname	Font to use.
@@ -1425,7 +1439,7 @@ X Window System specifics:
 	-d display	Use an alternate display.
 	-fg color	change foreground color (or -foreground)
 	-bg color	change background color (or -background)
-	-name name	change window name
+	-name name	change name used for resource lookups
 	=geometry	change window dimensions
 
 	X Resources:
@@ -1527,20 +1541,20 @@ Sample .vilerc
 	set fillcol 75
 	set cmode
 	set c-tabstop 4
-	
+
 	; sitting on a brace, run the C code block through indent
 	1 store-macro
 		write-file 
 		filter-til goto-matching-fence "indent -st"
 	~endm
 
-	
+
 	; format the current paragraph
 	2 store-macro
 		previous-paragraph 
 		filter-til next-paragraph "/usr/ucb/fmt"
 	~endm
-	
+
 	; put 'fprintf(stderr,"\n");" into the file, and
 	; position the cursor to add to the string
 	3 store-macro
@@ -1551,7 +1565,7 @@ Sample .vilerc
 		6 backward-character
 		insert-chars
 	~endm
-	
+
 	; insert '> ' in front of every line from here til the end
 	; (this works because without argument, the default action 
 	; for "goto-line" is to go to the end of file.
@@ -1563,7 +1577,7 @@ Sample .vilerc
 	bind-key next-window ^N
 	bind-key previous-window ^P
 	bind-key split-current-window ^T
-	
+
 	bind-key execute-macro-1 ^A-C
 	bind-key execute-macro-2 ^A-F
 	bind-key execute-macro-3 ^A-K

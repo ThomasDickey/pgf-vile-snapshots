@@ -3,7 +3,10 @@
  *		6/3/93
  *
  * $Log: map.c,v $
- * Revision 1.8  1993/08/13 16:32:50  pgf
+ * Revision 1.9  1993/09/03 09:11:54  pgf
+ * tom's 3.60 changes
+ *
+ * Revision 1.8  1993/08/13  16:32:50  pgf
  * tom's 3.58 changes
  *
  * Revision 1.7  1993/08/05  14:29:12  pgf
@@ -175,7 +178,7 @@ update_mapped_list()
 {
 	int	status = TRUE;
 
-	if (bfind(MAPPED_LIST_NAME, NO_CREAT, BFSCRTCH) != 0) {
+	if (find_b_name(MAPPED_LIST_NAME) != 0) {
 		WINDOW	*savewp = curwp;
 		status = show_mapped_chars();
 		if (curwp != savewp) {

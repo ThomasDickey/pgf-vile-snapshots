@@ -2,7 +2,13 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: csrch.c,v $
- * Revision 1.9  1993/06/14 12:15:02  pgf
+ * Revision 1.11  1993/09/06 16:23:08  pgf
+ * took out redundant beeps
+ *
+ * Revision 1.10  1993/09/03  09:11:54  pgf
+ * tom's 3.60 changes
+ *
+ * Revision 1.9  1993/06/14  12:15:02  pgf
  * fixed inverted test on 'f' in bscan()  (thanks alistair)
  *
  * Revision 1.8  1993/05/24  15:21:37  pgf
@@ -72,7 +78,6 @@ int f,n,c;
 	}
 
 	if ( i == lLength(curwp->w_dot.l)) {
-		TTbeep();
 		return(FALSE);
 	}
 	if (doingopcmd)
@@ -100,7 +105,7 @@ int f,n,c;
 	doto = curwp->w_dot.o;
 
 	i = doto-1;
-	while(i >= 0) {
+	while(i >= w_left_margin(curwp)) {
 		if ( c == lGetc(curwp->w_dot.l,i)) {
 			doto = i;
 			n--;
@@ -109,8 +114,7 @@ int f,n,c;
 		i--;
 	}
 
-	if ( i < 0 ) {
-		TTbeep();
+	if ( i < w_left_margin(curwp) ) {
 		return(FALSE);
 	}
 

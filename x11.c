@@ -2,7 +2,10 @@
  * 	X11 support, Dave Lemke, 11/91
  *
  * $Log: x11.c,v $
- * Revision 1.27  1993/08/18 16:50:10  pgf
+ * Revision 1.28  1993/09/03 09:11:54  pgf
+ * tom's 3.60 changes
+ *
+ * Revision 1.27  1993/08/18  16:50:10  pgf
  * bumped mrow from 100 to 200 -- some people have very good eyesight
  *
  * Revision 1.26  1993/08/17  19:08:28  pgf
@@ -128,16 +131,6 @@ extern	XClassHint *XAllocClassHint P((void)); /* usually in <X11/xutil.h> */
 
 #define onMsgRow(tw)	(ttrow == (tw->rows - 1))
 
-#define	turnOffCursor(tw)\
-	tw->line_attr[tw->cur_row] |= LINE_DIRTY;\
-	tw->attr[tw->cur_row][tw->cur_col] &= ~CELL_CURSOR;\
-	tw->attr[tw->cur_row][tw->cur_col] |= CELL_DIRTY
-
-#define	turnOnCursor(tw)\
-	tw->line_attr[tw->cur_row] |= LINE_DIRTY;\
-	tw->attr[tw->cur_row][tw->cur_col] |= (CELL_DIRTY|CELL_CURSOR)
-
-
 /* XXX -- use xcutsel instead */
 #undef	SABER_HACK		/* hack to support Saber since it doesn't do
 				 * selections right */
@@ -232,10 +225,13 @@ static	void	x_scroll P(( int, int, int ));
 
 static	SIGT	x_quit (DEFINE_SIG_ARGS);
 
+static	void	turnOffCursor P(( TextWindow ));
+static	void	turnOnCursor P(( TextWindow ));
 static	LINEPTR	row2line P(( WINDOW *, int, int * ));
 static	void	free_selection P(( TextWindow ));
 static	void	free_win_data P(( TextWindow ));
 static	void	clear_row_selection P(( TextWindow, int, int, int ));
+static	void	save_selection P(( TextWindow ));
 static	void	change_selection P(( TextWindow, Bool, Bool ));
 static	void	x_stash_selection P(( TextWindow ));
 static	int	set_character_class P(( char * ));
@@ -261,6 +257,8 @@ static	void	wait_for_scroll P(( TextWindow ));
 static	void	flush_line P(( UCHAR *, int, Bool, int, int ));
 static	int	set_character_class_range P(( int, int, int ));
 static	void	x_lose_selection P(( TextWindow ));
+static	int	add2paste P(( TBUFF **, int ));
+static	int	copy_paste P(( TBUFF **, char *, SIZE_T ));
 static	void	x_get_selection P(( TextWindow, Atom, Atom, char *, SIZE_T, int ));
 static	XFontStruct *query_font P(( TextWindow, char * ));
 
@@ -326,6 +324,23 @@ TERM        term = {
 #define	y_pos(tw, r)		((r) * (tw)->char_height)
 #define	text_y_pos(tw, r)	(y_pos((tw), (r)) + (tw)->char_ascent)
 
+static void
+turnOffCursor(tw)
+TextWindow tw;
+{
+	tw->line_attr[tw->cur_row] |= LINE_DIRTY;
+	tw->attr[tw->cur_row][tw->cur_col] &= ~CELL_CURSOR;
+	tw->attr[tw->cur_row][tw->cur_col] |= CELL_DIRTY;
+}
+
+static void
+turnOnCursor(tw)
+TextWindow tw;
+{
+	tw->line_attr[tw->cur_row] |= LINE_DIRTY;
+	tw->attr[tw->cur_row][tw->cur_col] |= (CELL_DIRTY|CELL_CURSOR);
+}
+
 /* why isn't this one standard? */
 static char *
 strndup(str, n)
@@ -371,9 +386,7 @@ x_preparse_args(pargc, pargv)
     int        *pargc;
     char     ***pargv;
 {
-    progname = *pargv[0];
-    if (*progname == '/')
-	progname = strrchr(progname, '/');
+    progname = pathleaf(*pargv[0]);
 }
 
 /* ARGSUSED */
@@ -381,7 +394,7 @@ void
 x_setname(name)
     char     *name;
 {
-    if (name && *name != '\0')
+    if (name && *name != EOS)
 	progname = name;
 }
 
@@ -855,8 +868,7 @@ x_scroll(from, to, count)
      * XXX since there aren't any hooks (yet) for scrolling, stop showing the
      * selection as soon as the text changes
      */
-    if (cur_win->show_selection)
-	change_selection(cur_win, False, True);
+    save_selection(cur_win);
 
     /*
      * figure out what lines to move first, to prevent being hosed if the
@@ -896,7 +908,7 @@ x_scroll(from, to, count)
 #else
 	if (rf == cur_win->cur_row) {	/* erase scrolled cursor */
 	    cur_win->line_attr[rt] |= LINE_DIRTY;
-	    turnOffCursor(cur_win);
+	    cur_win->attr[rt][cur_win->cur_col] |= CELL_DIRTY;
 	}
 #endif
 
@@ -1157,8 +1169,8 @@ x_putline(row, str, len)
      * XXX since there aren't any hooks (yet) for scrolling, stop showing the
      * selection as soon as the text changes
      */
-    if (cur_win->show_selection && in_selection(cur_win, row))
-	change_selection(cur_win, False, True);
+    if (in_selection(cur_win, row))
+	save_selection(cur_win);
 
     turnOffCursor(cur_win);
 
@@ -1188,8 +1200,8 @@ x_putc(c)
      * XXX since there aren't any hooks (yet) for scrolling, stop showing the
      * selection as soon as the text changes
      */
-    if (cur_win->show_selection && in_selection(cur_win, cur_win->cur_row))
-	change_selection(cur_win, False, True);
+    if (in_selection(cur_win, cur_win->cur_row))
+	save_selection(cur_win);
 
     turnOffCursor(cur_win);
 
@@ -1496,6 +1508,8 @@ set_character_class(s)
     return (0);
 }
 
+/*
+ */
 static void
 clear_row_selection(tw, row, left, right)
 	TextWindow  tw;
@@ -1516,6 +1530,22 @@ clear_row_selection(tw, row, left, right)
 	}
 }
 
+/*
+ * Save the selection and clear the highlighting.
+ */
+static void
+save_selection(tw)
+	TextWindow  tw;
+{
+	if (tw->show_selection)
+		change_selection(tw, False, True);
+}
+
+/*
+ * Change the highlighting that indicates a selection (using the 'set'
+ * parameter to turn highlighting on or off).  Optionally save the last
+ * highlighted selection before modifying the highlighting.
+ */
 static void
 change_selection(tw, set, save)
 	TextWindow  tw;
@@ -1543,18 +1573,24 @@ change_selection(tw, set, save)
 		left = 0;
 		if (wp != 0) {
 			fast_ptr LINEPTR lp;
-			int	row, next, right;
+			int	row, right, radj;
+#ifdef WMDLINEWRAP
+			int	next;
+#endif
 
 			lp = row2line(wp, r, &row);
 			if (!same_ptr(lp, win_head(wp))) {
-				left  = nu_width(wp);
+				radj  = 0;
+				left  = nu_width(wp) + w_left_margin(wp);
 				right = offs2col(wp, lp, lLength(lp)
 							+ w_val(wp,WMDLIST));
 #ifdef WMDLINEWRAP
 				next = line_height(wp,lp);
 				if (w_val(wp, WMDLINEWRAP) && (next > 1)) {
+					if (row != r)
+						left = 0;
 					if ((row + next - 1) == r)
-						right = right % tw->cols;
+						right -= (radj = tw->cols * (next-1));
 					else
 						right = tw->cols;
 					if (r != row
@@ -1568,6 +1604,25 @@ change_selection(tw, set, save)
 					end = right-1;
 					if (end < left)
 						end = left;
+				}
+
+				if (lLength(lp) > 0) {
+					/* test for control-char at start */
+					if (r == tw->sel_start_row) {
+						int	offs = col2offs(wp,lp,start+radj);
+						if (!isprint(lGetc(lp,offs))) {
+							start = offs2col(wp,lp,offs-1);
+							if (start != w_left_margin(wp))
+								start++;
+						}
+					}
+
+					/* test for control-char at end */
+					if (r == tw->sel_end_row) {
+						int	offs = col2offs(wp,lp,end+radj);
+						if (!isprint(lGetc(lp,offs)))
+							end = offs2col(wp,lp,offs+1)-1;
+					}
 				}
 			} else {
 				end = left-1;
@@ -1606,6 +1661,112 @@ x_lose_selection(tw)
 	x_flush();			/* show the changes */
 }
 
+/*
+ * Copy a single character into the paste-buffer, quoting it if necessary
+ */
+static int
+add2paste(p, c)
+TBUFF	**p;
+int	c;
+{
+	if (c == '\n' || isblank(c))
+		;
+	else if (isspecial(c) || (c == '\r') || !isprint(c))
+	 	(void)tb_append(p, quotec);
+	return (tb_append(p, c) != 0);
+}
+
+/*
+ * Copy the selection into the PasteBuf buffer.  If we are pasting into a
+ * window, check to see if:
+ *
+ *	+ the window's buffer is modifiable (if not, don't waste time copying
+ *	  text!)
+ *	+ the buffer uses 'autoindent' mode (if so, trim leading whitespace
+ *	  from each line).
+ */
+static int
+copy_paste(p, value, length)
+TBUFF	**p;
+char	*value;
+SIZE_T	length;
+{
+	WINDOW	*wp = row2window(ttrow);
+	BUFFER	*bp = (wp != NULL) ? wp->w_bufp : 0;
+	int	status;
+
+	if (bp != 0 && b_val(bp,MDVIEW)) {
+		status = FALSE;
+	} else {
+		status = TRUE;
+
+		if (bp != 0 && (b_val(bp,MDCMOD) || b_val(bp,MDAIND))) {
+			register int	trim = TRUE;
+			register int	c;
+
+			/*
+			 * If the cursor points before the first nonwhite on
+			 * the line, convert the insert into an 'O' command. 
+			 * If it points to the end of the line, convert it into
+			 * an 'o' command.  Otherwise (if it is within the
+			 * nonwhite portion of the line), assume the user knows
+			 * what (s)he is doing.
+			 */
+			if (setwmark(ttrow, ttcol)) {	/* MK gets cursor */
+				LINE	*lp	= l_ref(MK.l);
+				int	first	= -1;
+				int	last	= -1;
+				int	cmd	= 0;
+
+				for (c = 0; c < llength(lp); c++) {
+					if (!isblank(lp->l_text[c])) {
+						if (first < 0)
+							first = c;
+						last = c;
+					}
+				}
+				/* If the line contains only a single nonwhite,
+				 * we will insert before it.
+				 */
+				if (first >= MK.o)
+					cmd = -1;
+				else if (last <= MK.o)
+					cmd = 1;
+				if (insertmode) {
+					if ((*value != '\n')
+					 && (cmd > 1 || (MK.o == 0)))
+						(void)tb_append(p, '\n');
+				} else if (cmd != 0
+					&& (c = insertion_cmd(cmd)) >= 0) {
+					*tb_values(*p) = c;
+				}
+			}
+
+			while (length-- != 0) {
+				if ((c = *value++) == '\n')
+					trim = TRUE;
+				else if (trim && isblank(c))
+					continue;
+				else
+					trim = FALSE;
+
+				if (!add2paste(p, c)) {
+					status = FALSE;
+					break;
+				}
+			}
+		} else {
+			while (length-- > 0) {
+				if (!add2paste(p, *value++)) {
+					status = FALSE;
+					break;
+				}
+			}
+		}
+	}
+	return status;
+}
+
 /* ARGSUSED */
 static void
 x_get_selection(tw, selection, type, value, length, format)
@@ -1626,11 +1787,11 @@ x_get_selection(tw, selection, type, value, length, format)
 		/* XXX massive hack -- leave out 'i' if in prompt line */
 		do_ins = !insertmode
 			&& !onMsgRow(tw)
-			&& ((c = insertion_cmd()) != -1);
+			&& ((c = insertion_cmd(0)) != -1);
 
 		if (tb_init(&PasteBuf, abortc)) {
 			if ((do_ins && !tb_append(&PasteBuf, c))
-			 || !tb_bappend(&PasteBuf, value, (unsigned)length)
+			 || !copy_paste(&PasteBuf, value, length)
 			 || (do_ins && !tb_append(&PasteBuf, abortc)))
 				tb_free(&PasteBuf);
 		}
@@ -1642,19 +1803,19 @@ x_get_selection(tw, selection, type, value, length, format)
 
 static void
 x_paste_selection(tw)
-    TextWindow  tw;
+	TextWindow  tw;
 {
-    if (tw->have_selection) {
-	/* local transfer */
-	if (tw->selection_len == 0)	/* stash it if it hasn't been */
-	    x_stash_selection(tw);
-	x_get_selection(tw, XA_PRIMARY, XA_STRING,
-		     strndup((char *) tw->selection_data, tw->selection_len),
-			tw->selection_len, 8);
-    } else {
-	XConvertSelection(tw->dpy, XA_PRIMARY, XA_STRING, tw->sel_prop,
-			  tw->win, CurrentTime);
-    }
+	if (tw->have_selection) {
+		/* local transfer */
+		if (tw->selection_len == 0)	/* stash it if it hasn't been */
+			x_stash_selection(tw);
+			x_get_selection(tw, XA_PRIMARY, XA_STRING,
+				strndup((char *) tw->selection_data, tw->selection_len),
+				tw->selection_len, 8);
+		} else {
+			XConvertSelection(tw->dpy, XA_PRIMARY, XA_STRING,
+				tw->sel_prop, tw->win, CurrentTime);
+	}
 }
 
 static void
@@ -1711,10 +1872,11 @@ x_stash_selection(tw)
 		(void)setwmark(tw->sel_end_row,   tw->sel_end_col);
 
 		if (extend_left)
-			DOT.o = 0;
+			DOT.o = w_left_margin(curwp);
 		if (extend_right)
 			MK.o = lLength(MK.l);
-		else if (MK.o != 0 && !is_at_end_of_line(MK))
+		else if (!is_at_end_of_line(MK)
+		  && (MK.o != w_left_margin(curwp) || same_ptr(MK.l,DOT.l)))
 			MK.o += 1;
 
 		if (x_on_msgline())	/* disable messages? */
@@ -1769,16 +1931,16 @@ x_stash_selection(tw)
 /* ARGSUSED */
 static Bool
 x_give_selection(tw, ev, target, prop)
-    TextWindow  tw;
-    XSelectionRequestEvent *ev;
-    Atom        target;
-    Atom        prop;
+	TextWindow  tw;
+	XSelectionRequestEvent *ev;
+	Atom        target;
+	Atom        prop;
 {
-    if (tw->show_selection)
-	x_stash_selection(tw);
-    XChangeProperty(dpy, ev->requestor, prop, XA_STRING, 8,
-		    PropModeReplace, tw->selection_data, tw->selection_len);
-    return True;
+	if (tw->show_selection)
+		x_stash_selection(tw);
+	XChangeProperty(dpy, ev->requestor, prop, XA_STRING, 8,
+		PropModeReplace, tw->selection_data, tw->selection_len);
+	return True;
 }
 
 static void
@@ -1915,7 +2077,8 @@ extend_selection(tw, nr, nc, wipe)
 		swapmark();
 		mlforce("%s (%d,%d)\n",
 			wipe ? "select" : "extend",
-			line_no(curwp->w_bufp, DOT.l), DOT.o+1);
+			line_no(curwp->w_bufp, DOT.l),
+			getccol(FALSE)+1);
 		swapmark();
 		curwp->w_flag = saveflg;
 		drawing_ruler = False;
@@ -1996,7 +2159,10 @@ multi_click(tw, nr, nc)
 				tw->sel_end_row = row + line_height(wp,lp);
 			}
 		} else {
-			nc = tw->cols;
+			p = tw->sc[tw->rows-1];
+			for (nc = tw->cols - 1; nc > 0; nc--)
+				if (!isblank(p[nc]))
+					break;
 		}
 		break;
 	case 4:			/* screen */
@@ -2047,7 +2213,9 @@ start_selection(tw, ev, nr, nc)
 		 * on the screen.  Note that clicking on the modeline causes
 		 * the window to scroll up by one line.
 		 */
-		if (setcursor(nr, nc)) {
+		if (reading_msg_line) {
+			;	/* ignore */
+		} else if (setcursor(nr, nc)) {
 			/* Calling 'refresh()' forces the point to be centered,
 			 * but the ensuing 'update()' causes the message-line
 			 * to be cleared (including the yank-message from the
@@ -2247,13 +2415,13 @@ x_is_pasting()
 }
 
 /*
- * Return true if we want to disable updates of the cursor position because the
+ * Return true if we want to disable reports of the cursor position because the
  * cursor really should be on the message-line.
  */
 int
 x_on_msgline()
 {
-	return cur_win->was_on_msgline;
+	return reading_msg_line || cur_win->was_on_msgline;
 }
 
 /*
@@ -2310,9 +2478,11 @@ x_getc()
 
 		XNextEvent(dpy, &ev);
 		if (ev.type == KeyPress) {
-			x_lose_selection(cur_win);
-			if ((num = decoded_key(&ev)) >= 0)
+			if ((num = decoded_key(&ev)) >= 0) {
+				save_selection(cur_win);
 				return num;
+			}
+			/* else, could be shift-key, etc. */
 		} else {
 			x_process_event(&ev);
 		}

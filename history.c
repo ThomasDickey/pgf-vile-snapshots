@@ -4,7 +4,7 @@
  *	Manage command-history buffer
  *
  * Notes:
- *	This module manages an invisible, non-volatile buffer "[History]". 
+ *	This module manages an invisible, non-volatile buffer "[History]".
  *	Each keyboard command to vile is logged in this buffer.  The leading
  *	':' is not included, but all other characters are preserved so that the
  *	command can be replayed.
@@ -26,7 +26,7 @@
  *	were entered, then in response to ":set", the user would see the
  *	strings "ai", "ab" and "ts".
  *
- * 	Scrolling is accomplished by either arrow keys, or by an escaped set of
+ *	Scrolling is accomplished by either arrow keys, or by an escaped set of
  *	commands (a la 'ksh').
  *
  *	Note that this implementation is a compromise.  Ideally, the command
@@ -44,7 +44,7 @@
  *	Add logic to quote arguments that should be strings, to make them
  *	easier to parse back for scrolling, etc.
  *
- * 	Integrate this with the "!!" response to the ^X-! and !-commands.
+ *	Integrate this with the "!!" response to the ^X-! and !-commands.
  *
  *	Modify the matching logic so that file commands (i.e., ":e", ":w",
  *	etc.) are equivalent when matching for the argument.  Currently, the
@@ -64,7 +64,10 @@
  *	Allow left/right scrolling of input lines (when they get too long).
  *
  * $Log: history.c,v $
- * Revision 1.8  1993/07/27 18:06:20  pgf
+ * Revision 1.9  1993/09/03 09:11:54  pgf
+ * tom's 3.60 changes
+ *
+ * Revision 1.8  1993/07/27  18:06:20  pgf
  * see tom's 3.56 CHANGES entry
  *
  * Revision 1.7  1993/07/01  16:15:54  pgf
@@ -93,7 +96,7 @@
 #include "estruct.h"
 #include "edef.h"
 
-#if	!SMALLER
+#if	OPT_HISTORY
 
 #define	tb_args(p)	tb_values(p), (int)tb_length(p)
 #define	lp_args(p)	p->l_text, llength(p)
@@ -113,7 +116,7 @@ static	int	willGlue P(( void ));
 static	int	willExtend P(( char *, int ));
 static	int	sameLine P(( LINE *, char *, int ));
 static	int	parseArg P(( HST *, LINE * ));
-static	int	hst_macroize P(( char * ));
+static	int	hst_macroize P(( char *, char * ));
 static	LINE *	hst_find P(( HST *, BUFFER *, LINE *, int ));
 static	void	hst_display P(( HST *, char *, int ));
 static	void	display_LINE P(( HST *, LINE * ));
@@ -137,10 +140,10 @@ makeMyBuff()
 
 	if (!global_g_val(GMDHISTORY)) {
 		bp = 0;
-	} else if ((bp = bfind(MyBuff, OK_CREAT, BFINVS)) != 0) { 
+	} else if ((bp = bfind(MyBuff, BFINVS)) != 0) {
 		b_set_invisible(bp);
 		b_clr_flags(bp, BFSCRTCH); /* make it nonvolatile */
-		bp->b_active = TRUE;
+		set_rdonly(bp, MyBuff);
 	} else {
 		stopMyBuff();
 	}
@@ -152,8 +155,8 @@ stopMyBuff()
 {
 	register BUFFER *bp;
 
-	if ((bp = bfind(MyBuff, NO_CREAT, 0)) != 0)
-		zotbuf(bp);
+	if ((bp = find_b_name(MyBuff)) != 0)
+		(void)zotbuf(bp);
 
 	set_global_g_val(GMDABUFF,FALSE);
 
@@ -169,7 +172,8 @@ static int
 willGlue()
 {
 	if ((tb_length(MyText) != 0) && isprint(MyGlue)) {
-		if ((tb_values(MyText))[0] != SHPIPE_LEFT[0])
+		register int c = tb_values(MyText)[0];
+		if ((c != SHPIPE_LEFT[0]) || isRepeatable(c))
 			return 1;
 	}
 	return 0;
@@ -179,6 +183,8 @@ willGlue()
  * Returns true iff we display the complete, rather than the immediate portion
  * of the history line.  We do this for !-commands so that the user can see the
  * entire command when scrolling.
+ *
+ * The shift-commands also are a (similar) special case.
  */
 static int
 willExtend(src, srclen)
@@ -187,7 +193,7 @@ int	srclen;
 {
 	if ((tb_length(MyText) == 0)
 	 && (srclen > 0)) {
-		return (src[0] == SHPIPE_LEFT[0]);
+		return (src[0] == SHPIPE_LEFT[0]) || isRepeatable(src[0]);
 	}
 	return FALSE;
 }
@@ -205,9 +211,18 @@ int	srclen;
 {
 	if (srclen == 0)
 		return 0;
-	else if (llength(lp) >= srclen) {
-		if (!memcmp(lp->l_text, src, srclen))
-			return (llength(lp) - srclen);
+	else {
+		register int	dstlen = llength(lp);
+
+		if (dstlen >= srclen) {
+			if (!memcmp(lp->l_text, src, srclen)) {
+				if (isRepeatable(*src)
+				 && isRepeatable(lp->l_text[0])
+				 && dstlen != srclen)
+					return -1;
+				return (dstlen - srclen);
+			}
+		}
 	}
 	return -1;
 }
@@ -220,14 +235,16 @@ parseArg(parm, lp)
 HST *	parm;
 LINE *	lp;
 {
-	if (llength(lp) > 0) {
+	int	len = llength(lp);
+
+	if (len > 0) {
 		if (willExtend(lp_args(lp))) {
-			return llength(lp);
+			return len;
 		} else {
 			register char	*s = lp->l_text;
 			register int	n;
 
-			for (n = willGlue()+tb_length(MyText); n < llength(lp); n++)
+			for (n = willGlue()+tb_length(MyText); n < len; n++)
 				if ((*parm->endfunc)(s, n, s[n], parm->eolchar))
 					break;
 			return n;
@@ -237,18 +254,24 @@ LINE *	lp;
 }
 
 /*
- * Convert the string 'src' into a string that we can read back as a single
- * value with 'token()'.
+ * Convert the string 'src' into a string that we can read back with 'token()'. 
+ * If it is a shell-command, this will be a single-token.  Repeated shift
+ * commands are multiple tokens.
  */
 static int
-hst_macroize(src)
+hst_macroize(src, ref)
 char *	src;
+char *	ref;
 {
 	register int	c;
+	int	multi	= !isShellOrPipe(ref);	/* shift command? */
+	int	count	= 0;
 
 	if (tb_init(&MyArgs,abortc) != 0) {
 		(void)tb_append(&MyArgs, '"');
-		while ((c = *src++) != 0) {
+		while ((c = *src++) != EOS) {
+			if (multi && count++)
+				(void)tb_sappend(&MyArgs, "\" \"");
 			if (c == '\\' || c == '"')
 				(void)tb_append(&MyArgs, '\\');
 			(void)tb_append(&MyArgs, c);
@@ -290,14 +313,14 @@ int	glue;
 	static	int	skip = 1;		/* e.g., after "!" */
 
 	if (tb_length(MyArgs)			/* e.g., within "!!" command */
-	 && hst_macroize(cmd)) {
+	 && hst_macroize(cmd, cmd)) {
 		execstr = tb_values(MyArgs) + tb_length(MyArgs);
 		return;
 	}
 
 	if (willExtend(cmd, (int)strlen(cmd))
 	 && strlen(cmd) > skip
-	 && hst_macroize(cmd + skip) != 0) {
+	 && hst_macroize(cmd + skip, cmd) != 0) {
 
 		save_flg = clexec;
 		save_ptr = execstr;
@@ -309,7 +332,7 @@ int	glue;
 	}
 
 	if (willGlue())
- 		(void)tb_append(&MyText, MyGlue);
+		(void)tb_append(&MyText, MyGlue);
 	(void)tb_sappend(&MyText, cmd);
 	MyGlue = glue;
 }
@@ -344,11 +367,16 @@ hst_flush()
 		char	buffer[NLINE],
 			*base = tb_values(MyArgs);
 
-		(void)token(base, buffer, EOS); 
-		hst_append(tokval(buffer), EOS);
+		while (*base != EOS) {
+			base = token(base, buffer, EOS);
+			if (willGlue())
+				(void)tb_append(&MyText, MyGlue);
+			(void)tb_sappend(&MyText, tokval(buffer));
+		}
+		(void)tb_init(&MyArgs, abortc);
+
 		clexec = save_flg;
 		execstr = save_ptr;
-		(void)tb_init(&MyArgs, abortc);
 	}
 
 	if ((tb_length(MyText) != 0)
@@ -358,16 +386,16 @@ hst_flush()
 		if (((lp = lBack(bp->b_line.l)) != 0)
 		 && (lp != l_ref(bp->b_line.l))
 		 && (sameLine(lp, tb_args(MyText)) == 0)) {
-	 		(void)tb_init(&MyText, abortc);
+			(void)tb_init(&MyText, abortc);
 			return;
 		 }
 
 		if (!addline(bp, tb_args(MyText))) {
-	 		stopMyBuff();
+			stopMyBuff();
 			return;
 		}
 
-		/* patch: reuse logic from filterregion? */
+		/* patch: reuse logic from slowreadf()? */
 		for_each_window(wp) {
 			if (wp->w_bufp == bp) {
 				wp->w_flag |= WFFORCE;
@@ -376,14 +404,14 @@ hst_flush()
 				/* force dot to the beginning of last-line */
 				wp->w_force = -1;
 				if (l_ref(wp->w_dot.l) != lBack(bp->b_line.l)) {
-        				wp->w_dot.l = lBACK(bp->b_line.l);
-        				wp->w_dot.o = 0;
-        				wp->w_flag |= WFMOVE;
+					wp->w_dot.l = lBACK(bp->b_line.l);
+					wp->w_dot.o = 0;
+					wp->w_flag |= WFMOVE;
 				}
 			}
 		}
 		updatelistbuffers();	/* force it to show current sizes */
-	 	(void)tb_init(&MyText, abortc);
+		(void)tb_init(&MyText, abortc);
 	 }
 }
 
@@ -441,7 +469,7 @@ int	direction;
 			 && (len > 1 || !ispunct(tb_values(MyText)[0]))
 			 && llength(lp) > len
 			 && lp->l_text[len] != MyGlue)
-			 	continue;
+				continue;
 		}
 
 		/* avoid picking up lines with range-spec, since this is too
@@ -456,7 +484,7 @@ int	direction;
 		if (tb_length(MyText) == 0) {
 			if (lp->l_text[0] == '/'
 			 || lp->l_text[0] == '?')
-			 	continue;
+				continue;
 		}
 
 		/* compare the argument that will be shown for the original
@@ -469,7 +497,7 @@ int	direction;
 			 && n1 != 0
 			 && n0 == n1
 			 && sameLine(lp, lp0->l_text, n0) >= 0)
-			 	continue;
+				continue;
 		}
 
 		return lp;
@@ -589,9 +617,7 @@ int	eolchar;
 	register int	c = *given;
 
 #if	KSH_HISTORY
-	if (c == ESC)
-		escaped = TRUE;
-	else
+	if (c != ESC)				/* suppress immediate-return */
 #endif
 	if (!isspecial(c)) {
 		if (is_edit_char(c)
@@ -622,7 +648,7 @@ int	eolchar;
 	if (tb_copy(&original, MyText)) {
 		/* make 'original' look just like a complete command... */
 		if (willGlue())
- 			(void)tb_append(&original, MyGlue);
+			(void)tb_append(&original, MyGlue);
 		(void)tb_sappend(&original, buffer);
 	}
 
@@ -630,6 +656,16 @@ int	eolchar;
 	for (;;) {
 		register CMDFUNC *p;
 
+		/* If the character is bound to up/down scrolling, scroll the
+		 * history.
+		 */
+		direction = 0;	/* ...unless we find scrolling-command */
+		if ((p = kcod2fnc(c)) != 0) {
+			if (p->c_func == backline)
+				direction = -1;
+			else if (p->c_func == forwline)
+				direction = 1;
+		}
 #if	KSH_HISTORY
 		if (c == ESC) {
 			escaped = !escaped;
@@ -638,36 +674,26 @@ int	eolchar;
 		if (c == abortc) {
 			*given = c;
 			return FALSE;
-		} else if (is_edit_char(c)
-		 || (endfunc)(buffer, *position, c, eolchar)
-		 || (isgraph(c) && !escaped) ) {
+
+		} else if ((direction != 0) && (escaped || !isgraph(c))) {
+
+			if ((lp2 = hst_scroll(lp1, &param)) != 0)
+				lp1 = lp2;
+			else	/* cannot scroll */
+				kbd_alarm();
+#if	KSH_HISTORY
+		/* patch: inline-editing should be done at this point */
+#endif
+		} else if (!escaped) {
 			*given = c;
 			if (any_edit)
 				tungetc(c);
 			return any_edit;
-		}
 
-		/* If the character is bound to up/down scrolling, scroll the
-		 * history.
-		 */
-		if ((p = kcod2fnc(c)) != 0) {
-			if (p->c_func == backline)
-				direction = -1;
-			else if (p->c_func == forwline)
-				direction = 1;
-			else
-				direction = 0;
-
-			if ((direction != 0)
-			 && (lp2 = hst_scroll(lp1, &param)) != 0) {
-				lp1 = lp2;
-			} else	/* not a scrolling key */
-				kbd_alarm();
-
-		} else	/* not bound to anything */
+		} else
 			kbd_alarm();
 
 		c = kbd_key();
 	}
 }
-#endif	/* !SMALLER */
+#endif	/* OPT_HISTORY */

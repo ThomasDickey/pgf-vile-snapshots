@@ -4,7 +4,10 @@
  * written for vile by Paul Fox, (c)1990
  *
  * $Log: opers.c,v $
- * Revision 1.32  1993/08/13 16:32:50  pgf
+ * Revision 1.33  1993/09/03 09:11:54  pgf
+ * tom's 3.60 changes
+ *
+ * Revision 1.32  1993/08/13  16:32:50  pgf
  * tom's 3.58 changes
  *
  * Revision 1.31  1993/08/05  14:29:12  pgf
@@ -124,13 +127,19 @@
 
 extern CMDFUNC f_godotplus;
 
+typedef	int	(*OpsFunc) P((void));
+
+static	int	chgreg P(( void ));
+static	int	shift_n_times P(( int, int, OpsFunc, char * ));
+
+
 /* For the "operator" commands -- the following command is a motion, or
  *  the operator itself is repeated.  All operate on regions.
  */
 int
 operator(f,n,fn,str)
 int f,n;
-int (*fn) P(( void ));
+OpsFunc fn;
 char *str;
 {
 	int c;
@@ -194,7 +203,7 @@ char *str;
 		fulllineregions = TRUE;
 
 	/* and execute the motion */
-	status = execute(cfp, f, n);
+	status = execute(cfp, f,n);
 
 	if (status != TRUE) {
 		doingopcmd = FALSE;
@@ -220,7 +229,7 @@ char *str;
 
 	if (fulllineregions) {
 		fulllineregions = FALSE;
-		(void)firstnonwhite(f,n);
+		(void)firstnonwhite(FALSE,1);
 	}
 
 	doingopcmd = FALSE;
@@ -244,7 +253,7 @@ int f,n;
 	return operator(f,n,killregion,"Delete of full lines");
 }
 
-int
+static int
 chgreg()
 {
 	killregion();
@@ -331,23 +340,45 @@ int f,n;
 	return operator(f,n,lowerregion,"Lower case");
 }
 
+/*
+ * The shift commands are special, because vi allows an implicit repeat-count
+ * to be specified by repeating the '<' or '>' operators.
+ */
+static int
+shift_n_times(f,n, func, msg)
+int	f,n;
+OpsFunc	func;
+char	*msg;
+{
+	register int status = FALSE;
+
+	fulllineregions = TRUE;
+	opcmd = OPOTHER;
+
+	if (havemotion != NULL) {
+		CMDFUNC *cfp = havemotion;
+		while (n-- > 0) {
+			havemotion = cfp;
+			if ((status = operator(FALSE,1, func, msg)) != TRUE)
+				break;
+		}
+	} else
+		status = operator(f,n, func, msg);
+	return status;
+}
 
 int
 operlshift(f,n)
 int f,n;
 {
-	fulllineregions = TRUE;
-	opcmd = OPOTHER;
-	return operator(f,n,shiftlregion,"Left shift");
+	return shift_n_times(f,n,shiftlregion,"Left shift");
 }
 
 int
 operrshift(f,n)
 int f,n;
 {
-	fulllineregions = TRUE;
-	opcmd = OPOTHER;
-	return operator(f,n,shiftrregion,"Right shift");
+	return shift_n_times(f,n,shiftrregion,"Right shift");
 }
 
 int

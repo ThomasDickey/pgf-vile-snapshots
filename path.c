@@ -3,7 +3,13 @@
  *		strings.
  *
  * $Log: path.c,v $
- * Revision 1.15  1993/07/09 13:59:37  pgf
+ * Revision 1.17  1993/09/06 16:31:57  pgf
+ * suppress doubled path separators in pathcat()
+ *
+ * Revision 1.16  1993/09/03  09:11:54  pgf
+ * tom's 3.60 changes
+ *
+ * Revision 1.15  1993/07/09  13:59:37  pgf
  * comment on djgcc ifdef
  *
  * Revision 1.14  1993/07/06  16:39:04  pgf
@@ -58,7 +64,6 @@
 #if UNIX
 #include <sys/types.h>
 #include <pwd.h>
-static	void	home_path P(( char * ));
 #endif
 
 #if VMS
@@ -316,12 +321,14 @@ char	*leaf;
 
 	if (s != path)
 		(void)strcpy(s, path);
-	s += strlen(s);
+	s += strlen(s) - 1;
 
 #if VMS
 	if (!is_vms_pathname(dst, TRUE))	/* could be DecShell */
 #endif
+	 if (!slashc(*s++)) {
 		*s++ = slash;
+	 }
 
 	(void)strcpy(s, leaf);
 	return dst;
@@ -344,37 +351,98 @@ char *fn;
 }
 
 /*
- * If a pathname begins with "~", lookup the name in the password-file
+ * If a pathname begins with "~", lookup the name in the password-file.  Cache
+ * the names that we lookup, because searching the password-file can be slow,
+ * and users really don't move that often.
  */
 #if UNIX
-static void
+typedef	struct	_upath {
+	struct	_upath *next;
+	char	*name;
+	char	*path;
+	} UPATH;
+
+static	UPATH	*user_paths;
+
+static	char *	save_user P(( char *, char * ));
+static char *
+save_user(name, path)
+char	*name;
+char	*path;
+{
+	register UPATH *q;
+
+	if (name != NULL
+	 && path != NULL
+	 && (q = typealloc(UPATH)) != NULL) {
+		if ((q->name = strmalloc(name)) != NULL
+		 && (q->path = strmalloc(path)) != NULL) {
+			q->next = user_paths;
+			user_paths = q;
+			return q->path;
+		} else {
+			FreeIfNeeded(q->name);
+			FreeIfNeeded(q->path);
+			free((char *)q);
+		}
+	}
+	return NULL;
+}
+
+static	char *	find_user P(( char * ));
+static char *
+find_user(name)
+char	*name;
+{
+	register struct	passwd *p;
+	register UPATH	*q;
+
+	if (name != NULL) {
+		for (q = user_paths; q != NULL; q = q->next) {
+			if (!strcmp(q->name, name)) {
+				return q->path;
+			}
+		}
+
+		/* not-found, do a lookup */
+		if (*name != EOS)
+			p = getpwnam(name);
+		else
+			p = getpwuid((int)getuid());
+
+		if (p != NULL)
+			return save_user(name, p->pw_dir);
+#if NEEDED
+	} else {	/* lookup all users (for globbing) */
+		(void)setpwent();
+		while ((p = getpwent()) != NULL)
+			(void)save_user(p->pw_name, p->pw_dir);
+		(void)endpwent();
+#endif
+	}
+	return NULL;
+}
+
+char *
 home_path(path)
 char	*path;
 {
 	if (*path == '~') {
 		char	temp[NFILEN];
-		struct	passwd *p;
 		char	*s, *d;
-#if BEFORE
-		extern struct	passwd *getpwnam P((char *));
-		extern struct	passwd *getpwuid P((int));
-#endif
 
 		/* parse out the user-name portion */
-		for (s = path+1, d = temp; (*d = *s) != 0; d++, s++) {
+		for (s = path+1, d = temp; (*d = *s) != EOS; d++, s++) {
 			if (slashc(*d)) {
 				*d = EOS;
 				break;
 			}
 		}
-		if (*temp != EOS)
-			p = getpwnam(temp);
-		else
-			p = getpwuid((int)getuid());
 
-		if (p != 0)
-			(void)pathcat(path, p->pw_dir, s);
+		if ((d = find_user(temp)) != NULL)
+			(void)pathcat(path, d, s);
 	}
+	return path;
 }
 #endif
 
@@ -403,7 +471,7 @@ char *ss;
 #endif
 
 #if UNIX
-	home_path(s);
+	(void)home_path(s);
 #endif
 
 #if VMS
@@ -655,7 +723,7 @@ char *path;
 		return path;
 
 #if UNIX
-	home_path(f);
+	(void)home_path(f);
 #endif
 
 #if VMS
@@ -882,3 +950,19 @@ char *	path;
 	  &&	(stat(path, &sb) >= 0)
 	  &&	((sb.st_mode & S_IFMT) == S_IFDIR));
 }
+
+#if NO_LEAKS
+void
+path_leaks()
+{
+#if UNIX
+	while (user_paths != NULL) {
+		register UPATH *paths = user_paths;
+		user_paths = paths->next;
+		free(paths->name);
+		free(paths->path);
+		free((char *)paths);
+	}
+#endif
+}
+#endif	/* NO_LEAKS */

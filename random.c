@@ -3,8 +3,12 @@
  * commands. There is no functional grouping here, for sure.
  *
  * $Log: random.c,v $
- * Revision 1.104  1993/08/13 16:32:50  pgf
- * tom's 3.58 changes
+ * Revision 1.106  1993/09/06 16:33:24  pgf
+ * guard against null return from getcwd(), and
+ * changed glob() --> doglob()
+ *
+ * Revision 1.105  1993/09/03  09:11:54  pgf
+ * tom's 3.60 changes
  *
  * Revision 1.103  1993/08/05  14:29:12  pgf
  * tom's 3.57 changes
@@ -442,7 +446,7 @@ char *carg;
 	register int	s;
 
 	/* create the buffer list buffer   */
-	bp = bfind(name, OK_CREAT, BFSCRTCH);
+	bp = bfind(name, BFSCRTCH);
 	if (bp == NULL)
 		return FALSE;
 	    
@@ -450,13 +454,13 @@ char *carg;
 		return (s);
 	b_set_scratch(bp);
 	if (popupbuff(bp) == FALSE) {
-		zotbuf(bp);
+		(void)zotbuf(bp);
 		return (FALSE);
 	}
 	/* call the passed in function, giving it both the integer and 
 		character pointer arguments */
 	(*func)(iarg,carg);
-	gotobob(FALSE,1);
+	(void)gotobob(FALSE,1);
 
 	set_rdonly(bp, non_filename());
 	return TRUE;
@@ -575,26 +579,29 @@ line_no(the_buffer, the_line)	/* return the number of the given line */
 BUFFER *the_buffer;
 LINEPTR the_line;
 {
+	if (!same_ptr(the_line, null_ptr)) {
 #if !SMALLER
-	L_NUM	it;
-	(void)bsizes(the_buffer);
-	if ((it = l_ref(the_line)->l_number) == 0)
-		it = the_buffer->b_linecount + 1;
-	return it;
+		L_NUM	it;
+		(void)bsizes(the_buffer);
+		if ((it = l_ref(the_line)->l_number) == 0)
+			it = the_buffer->b_linecount + 1;
+		return it;
 #else
-	register LINE	*lp;		/* current line */
-	register L_NUM	numlines = 0;	/* # of lines before point */
+		register LINE	*lp;		/* current line */
+		register L_NUM	numlines = 0;	/* # of lines before point */
+	
+		for_each_line(lp, the_buffer) {
+			/* if we are on the specified line, record it */
+			if (lp == l_ref(the_line))
+				break;
+			++numlines;
+		}
 
-	for_each_line(lp, the_buffer) {
-		/* if we are on the specified line, record it */
-		if (lp == l_ref(the_line))
-			break;
-		++numlines;
-	}
-
-	/* and return the resulting count */
-	return(numlines + 1);
+		/* and return the resulting count */
+		return(numlines + 1);
 #endif
+	}
+	return 0;
 }
 
 #if OPT_EVAL
@@ -614,7 +621,7 @@ int bflg;
 {
 	register int c, i, col;
 	col = 0;
-	for (i=0; i < DOT.o; ++i) {
+	for (i = w_left_margin(curwp); i < DOT.o; ++i) {
 		c = lGetc(DOT.l, i);
 		if (!isspace(c) && bflg)
 			break;
@@ -650,7 +657,7 @@ int n;
 	llen = lLength(DOT.l);
 
 	/* scan the line until we are at or past the target column */
-	for (i = 0; i < llen; ++i) {
+	for (i = w_left_margin(curwp); i < llen; ++i) {
 		/* upon reaching the target, drop out */
 		if (col >= n)
 			break;
@@ -999,8 +1006,8 @@ int f, n;	/* arguments ignored */
 	register int status;
 	char buf[NPAT]; 	/* buffer to receive message into */
 
-	buf[0] = 0;
-	if ((status = mlreply("Message to write: ", buf, NPAT - 1)) != TRUE)
+	buf[0] = EOS;
+	if ((status = mlreply("Message to write: ", buf, sizeof(buf))) != TRUE)
 		return(status);
 
 	/* write the message out */
@@ -1096,10 +1103,17 @@ int force;
 #if MSDOS
 	(void)mklower(cwd);
 #endif
-	s = strchr(cwd, '\n');
-	if (s)
-		*s = EOS;
-#if MSDOS & NEWDOSCC
+	if (cwd == NULL) {
+		cwd = dirname;
+		dirname[0] = slash;
+		dirname[1] = EOS;
+	} else {
+		s = strchr(cwd, '\n');
+		if (s)
+			*s = EOS;
+	}
+
+#if MSDOS && NEWDOSCC
 	update_dos_drv_dir(cwd);
 #endif
 
@@ -1264,7 +1278,7 @@ char	*dir;
 
     exdp = strcpy(exdir, dir);
 
-    if (glob(exdp)) {
+    if (doglob(exdp)) {
 #if MSDOS
 	char	*s;
 	if ((s = is_msdos_drive(exdp)) != 0) {

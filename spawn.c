@@ -2,7 +2,10 @@
  *		for MicroEMACS
  *
  * $Log: spawn.c,v $
- * Revision 1.64  1993/08/13 16:32:50  pgf
+ * Revision 1.65  1993/09/03 09:11:54  pgf
+ * tom's 3.60 changes
+ *
+ * Revision 1.64  1993/08/13  16:32:50  pgf
  * tom's 3.58 changes
  *
  * Revision 1.63  1993/08/05  14:29:12  pgf
@@ -457,13 +460,13 @@ int	rerun;		/* TRUE/FALSE: spawn, -TRUE: pipecmd */
 	}
 
 	if (line[1] == bang[0]) {
-		hst_remove(line+1);
+		hst_remove(line);
 		if (line[2] == EOS) {	/* "!!" alone */
 			(void)strcpy(line, save);
 		} else {	/* append the current text to the last */
 			(void) strcpy(line, strcat(strcpy(temp, save), line+2));
 		}
-		hst_append(line+1, EOS);
+		hst_append(strcpy(temp, line), EOS);
 		mlwrite(": %s", line);
 	}
 	if (line[1] == EOS)
@@ -560,9 +563,10 @@ int rerun;
 		STcmd = castalloc(char, strlen(line) + 1);
 		for(i = 0,sptr = &line[0]; sptr != tptr; sptr++,i++)
 			STcmd[i] = *sptr;
-		STcmd[i] = '\0';
-		for(; *tptr == ' ' || *tptr == '\t'; tptr++);
-		if(*tptr == '\0')
+		STcmd[i] = EOS;
+		for (; isblank(*tptr); tptr++)
+			;
+		if (*tptr == EOS)
 			STargs = NULL;
 		else {
 			STargs = castalloc(char, strlen(tptr) + 2);
@@ -668,7 +672,7 @@ int f,n;
 
 	/* prompt ok? */
 	if (s == TRUE) {
-		if (((s = ((bp = bfind(bname, OK_CREAT, 0)) != NULL)) == TRUE)
+		if (((s = ((bp = bfind(bname, 0)) != NULL)) == TRUE)
 		 && ((s = popupbuff(bp)) == TRUE)
 		 && ((s = swbuffer(bp)) == TRUE)
 		 && ((s = readin(line, FALSE, bp, TRUE)) == TRUE))
@@ -711,7 +715,7 @@ pipecmd(f, n)
 	(void)strcpy(line,oline);
 
 	/* get rid of the command output buffer if it exists */
-        if ((bp=bfind(bname, NO_CREAT, 0)) != NULL) {
+	if ((bp=find_b_name(bname)) != NULL) {
 		/* try to make sure we are off screen */
 		ocurwp = NULL;
 		for_each_window(wp) {
@@ -751,7 +755,7 @@ pipecmd(f, n)
 		return(FALSE);
 
 	/* overwrite its buffer name for consistency */
-	(void)strcpy(curbp->b_bname, bname);
+	set_bname(curbp, bname);
 
 	/* make this window in VIEW mode, update buffer's mode lines */
 	make_local_b_val(curwp->w_bufp,MDVIEW);
@@ -800,8 +804,8 @@ filterregion()
 			kp = kp->d_next;
 		}
 #if UNIX
-		fflush(fw);
-		fclose(fw);
+		(void)fflush(fw);
+		(void)fclose(fw);
 		ExitProgram (GOOD);
 		/* NOTREACHED */
 #else

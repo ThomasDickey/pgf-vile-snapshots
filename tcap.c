@@ -2,7 +2,11 @@
  *		for MicroEMACS
  *
  * $Log: tcap.c,v $
- * Revision 1.25  1993/08/18 16:50:10  pgf
+ * Revision 1.26  1993/08/21 18:21:08  pgf
+ * protect against window sizes less than 2, and fix botch that always
+ * set i_am_xterm to TRUE
+ *
+ * Revision 1.25  1993/08/18  16:50:10  pgf
  * bumped mrow from 100 to 200 -- some people have very good eyesight
  *
  * Revision 1.24  1993/08/17  18:20:16  pgf
@@ -194,25 +198,23 @@ tcapopen()
 	/* Get screen size from system, or else from termcap.  */
 	getscreensize(&term.t_ncol, &term.t_nrow);
  
-	if ((term.t_nrow <= 0) && (term.t_nrow=(short)tgetnum("li")) == -1) {
-		puts("termcap entry incomplete (lines)");
+	if ((term.t_nrow <= 1) && (term.t_nrow=(short)tgetnum("li")) == -1) {
+		puts("Termcap entry incomplete (lines)");
 		ExitProgram(BAD(1));
 	}
 	term.t_nrow -= 1;
 
 
-	if ((term.t_ncol <= 0) &&(term.t_ncol=(short)tgetnum("co")) == -1){
+	if ((term.t_ncol <= 1) &&(term.t_ncol=(short)tgetnum("co")) == -1){
 		puts("Termcap entry incomplete (columns)");
 		ExitProgram(BAD(1));
 	}
 
-	{ 	/* are we probably an xterm?  (anything ending with...) */
+	{ 	/* are we probably an xterm? 
+			(anything starting or ending with...) */
 		int l = strlen(tv_stype);
-		/* 5 == strlen("xterm") */
-		if (l >= 5 && !strcmp(tv_stype + l - 5, "xterm"))
-			i_am_xterm = TRUE;
-		else
-			i_am_xterm = TRUE;
+		i_am_xterm = (strncmp(tv_stype, "xterm", 5) == 0 || 
+			(l >= 5 && strcmp(tv_stype + l - 5, "xterm") == 0));
 	}
 
 #ifdef SIGWINCH

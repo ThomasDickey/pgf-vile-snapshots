@@ -4,7 +4,10 @@
  *	written 11-feb-86 by Daniel Lawrence
  *
  * $Log: bind.c,v $
- * Revision 1.55  1993/08/13 16:32:50  pgf
+ * Revision 1.56  1993/09/03 09:11:54  pgf
+ * tom's 3.60 changes
+ *
+ * Revision 1.55  1993/08/13  16:32:50  pgf
  * tom's 3.58 changes
  *
  * Revision 1.54  1993/08/05  14:29:12  pgf
@@ -214,6 +217,7 @@ static	void	convert_kcode P(( int, char * ));
 static	int	key_to_bind P(( CMDFUNC * ));
 static	int	converted_len P(( char * ));
 static	char *	to_tabstop P(( char * ));
+static	int	is_shift_cmd P(( char *, int ));
 #endif
 
 static	char *	skip_partial P(( char *, int, char *, unsigned ));
@@ -234,7 +238,7 @@ int f,n;
 	char *fname;		/* ptr to file returned by flook() */
 
 	/* first check if we are already here */
-	bp = bfind(ScratchName(Help), OK_CREAT, BFSCRTCH);
+	bp = bfind(ScratchName(Help), BFSCRTCH);
 	if (bp == NULL)
 		return FALSE;
 
@@ -251,7 +255,7 @@ int f,n;
 			(void)zotbuf(bp);
 			return(FALSE);
 		}
-		(void)strcpy(bp->b_bname, ScratchName(Help));
+		set_bname(bp, ScratchName(Help));
 		set_rdonly(bp, non_filename());
 
 		make_local_b_val(bp,MDIGNCASE); /* easy to search, */
@@ -303,7 +307,7 @@ char *ptr;
 
 	bprintf("--- Terminal Settings %*P\n", term.t_ncol-1, '-');
 	for (i = 0; TermChrs[i].name != 0; i++) {
-		bprintf("%s = %s\n",
+		bprintf("\n%s = %s",
 			TermChrs[i].name,
 			kcod2prc(*(TermChrs[i].value), temp));
 	}
@@ -437,6 +441,7 @@ int f,n;
 
 	ostring(kcod2prc(c, outseq));
 	ostring(" ");
+	hst_append(outseq, EOS); /* cannot replay this, but can see it */
 
 	/* find the right ->function */
 	if ((ptr = fnc2engl(kcod2fnc(c))) == NULL)
@@ -1056,13 +1061,22 @@ char *seq;	/* destination string for sequence */
 /* insertion_cmd -- what char puts us in insert mode? */
 #if X11
 int
-insertion_cmd()
+insertion_cmd(direction)
+int direction;
 {
 	extern CMDFUNC f_insert;
-	static back_to_ins_char = -1;
-	if (back_to_ins_char == -1) /* try to initialize it.. */
-		back_to_ins_char = fnc2key(&f_insert);
-	return back_to_ins_char;
+	extern CMDFUNC f_opendown;
+	extern CMDFUNC f_openup;
+
+	register int	c;
+
+	switch (direction) {
+	case -1:	c = fnc2key(&f_openup);		break;
+	case 0:		c = fnc2key(&f_insert);		break;
+	case 1:		c = fnc2key(&f_opendown);	break;
+	default:	c = -1;
+	}
+	return c;
 }
 #endif /* X11 */
 
@@ -1470,14 +1484,6 @@ unsigned size_entry;
 	}
 }
 
-/* patch: account for
-	?-interaction with !-commands
-	^W and nonprinting chars,
-	buffer-overflow,
-	return-completion
-	null-command
-	*/
-
 static	int	testcol;	/* records the column when TESTC is decoded */
 
 /*
@@ -1565,6 +1571,25 @@ unsigned size_entry;
 }
 
 /*
+ * Test a buffer to see if it looks like a shift-command, which may have
+ * repeated characters (but they must all be the same).
+ */
+static int
+is_shift_cmd(buffer, cpos)
+char	*buffer;
+int	cpos;
+{
+	register int c = *buffer;
+	if (isRepeatable(c)) {
+		while (--cpos > 0)
+			if (*(++buffer) != c)
+				return FALSE;
+		return TRUE;
+	}
+	return FALSE;
+}
+
+/*
  * The following mess causes the command to terminate if:
  *
  *	we've got a space
@@ -1577,7 +1602,7 @@ unsigned size_entry;
  *		: !ls
  *		: q!
  *	to work properly.
- *	If we pass this "if" with c != ' ', then c is ungotten below,
+ *	If we pass this "if" with c != NAMEC, then c is ungotten below,
  *	so it can be picked up by the commands argument getter later.
  */
 static int
@@ -1587,6 +1612,20 @@ int	cpos;
 int	c;
 int	eolchar;
 {
+	/*
+	 * Handle special case of repeated-character implying repeat-count
+	 */
+	if (is_shift_cmd(buffer, cpos) && (c == *buffer))
+		return TRUE;
+
+	/*
+	 * Shell-commands aren't complete until the line is complete.
+	 */
+#if OPT_HISTORY
+	if ((cpos > 0) && isShellOrPipe(buffer))
+		return isreturn(c);
+#endif
+
 	return	(c == eolchar)
 	  ||	(
 		  cpos > 0
@@ -1612,7 +1651,27 @@ int	c;
 char	*buf;
 int	*pos;
 {
-	return kbd_complete(c, buf, pos, (char *)&nametbl[0], sizeof(nametbl[0]));
+	register int status;
+#if OPT_HISTORY
+	/*
+	 * If the user scrolled back in 'edithistory()', the text may be a
+	 * repeated-shift command, which won't match the command-table (e.g.,
+	 * ">>>").
+	 */
+	if ((*pos > 1) && is_shift_cmd(buf, *pos)) {
+		int	len = 1;
+		char	tmp[NLINE];
+		tmp[0] = *buf;
+		tmp[1] = EOS;
+		status = cmd_complete(c, tmp, &len);
+	} else if ((*pos > 0) && isShellOrPipe(buf)) {
+		status = isreturn(c);
+		if (c != NAMEC)
+			tungetc(c);
+	} else
+#endif
+	 status = kbd_complete(c, buf, pos, (char *)&nametbl[0], sizeof(nametbl[0]));
+	return status;
 }
 
 int
@@ -1620,7 +1679,7 @@ kbd_engl_stat(prompt, buffer)
 char	*prompt;
 char	*buffer;
 {
-	int	kbd_flags = KBD_NULLOK|((NAMEC != ' ') ? 0 : KBD_MAYBEC);
+	int	kbd_flags = KBD_EXPCMD|KBD_NULLOK|((NAMEC != ' ') ? 0 : KBD_MAYBEC);
 
 	*buffer = EOS;
 	return kbd_reply(
@@ -1628,7 +1687,7 @@ char	*buffer;
 		buffer,		/* in/out buffer */
 		NLINE,		/* sizeof(buffer) */
 		eol_command,
-		' ',
+		' ',		/* eolchar */
 		kbd_flags,	/* allow blank-return */
 		cmd_complete);
 }

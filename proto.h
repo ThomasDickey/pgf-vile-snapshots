@@ -5,7 +5,13 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.75  1993/08/13 16:32:50  pgf
+ * Revision 1.77  1993/09/06 16:32:48  pgf
+ * added entries for glob.c
+ *
+ * Revision 1.76  1993/09/03  09:11:54  pgf
+ * tom's 3.60 changes
+ *
+ * Revision 1.75  1993/08/13  16:32:50  pgf
  * tom's 3.58 changes
  *
  * Revision 1.74  1993/08/05  14:35:57  pgf
@@ -251,7 +257,6 @@ extern int quit P(( int, int ));
 extern int writequit P(( int, int ));
 extern int esc P(( int, int ));
 extern int rdonly P(( void ));
-extern int showversion P(( int, int ));
 extern int unimpl P(( int, int ));
 extern int opercopy P(( int, int ));
 extern int opermove P(( int, int ));
@@ -306,6 +311,7 @@ extern int backchar_to_bol P(( int, int ));
 extern int gotoeol P(( int, int ));
 extern int forwchar P(( int, int ));
 extern int forwchar_to_eol P(( int, int ));
+extern int forwchar_in_line P(( int, int ));
 extern int gotoline P(( int, int ));
 extern int gotobob P(( int, int ));
 extern int gotoeob P(( int, int ));
@@ -373,7 +379,7 @@ extern char * kcod2str P(( int, char * ));
 extern char * string2prc P(( char *, char * ));
 extern char * kcod2prc P(( int, char * ));
 #if X11
-extern int insertion_cmd P(( void ));
+extern int insertion_cmd P(( int ));
 #endif
 #ifdef GMDDOTMACRO
 extern int fnc2kcod P(( CMDFUNC * ));
@@ -430,7 +436,9 @@ void updatelistbuffers P((void));
 extern int addline P(( BUFFER *, char *, int ));
 extern int add_line_at P(( BUFFER *, LINEPTR, char *, int ));
 extern int anycb P(( void ));
-extern BUFFER * bfind P(( char *, int, int ));
+extern char * get_bname P(( BUFFER * ));
+extern BUFFER * find_b_name P(( char * ));
+extern BUFFER * bfind P(( char *, int ));
 extern int bclear P(( BUFFER * ));
 extern int bsizes P(( BUFFER * ));
 extern void chg_buff P(( BUFFER *, int ));
@@ -474,9 +482,6 @@ extern int upscreen P(( int, int ));
 extern void reframe P(( WINDOW * ));
 extern int update P(( int ));
 extern void upmode P(( void ));
-#if OPT_UPBUFF
-extern void upbuff P(( BUFFER * ));
-#endif
 extern int offs2col P(( WINDOW *, LINEPTR, C_NUM ));
 #if X11 || OPT_XTERM
 extern int col2offs P(( WINDOW *, LINEPTR, C_NUM ));
@@ -508,8 +513,8 @@ extern char * _lsprintf P(( char *, ... ));
 #endif	/* UNUSED */
 extern void bputc P(( int ));
 extern void bprintf P((char *, ... ));
-extern void getscreensize P(( int *, int * ));
 #if defined(SIGWINCH) && !X11
+extern void getscreensize P(( int *, int * ));
 extern SIGT sizesignal (DEFINE_SIG_ARGS);
 #endif
 extern void newscreensize P(( int, int ));
@@ -546,7 +551,6 @@ extern int ernd P(( void ));
 extern int end_named_cmd P(( void ));
 extern int more_named_cmd P(( void ));
 extern int namedcmd P(( int, int ));
-extern int rangespec P(( char *, LINEPTR *, LINEPTR *, int *, int * ));
 extern int docmd P(( char *, int, int, int ));
 extern int dobuf P(( BUFFER * ));
 extern int dofile P(( char * ));
@@ -673,12 +677,23 @@ extern void putdotback P(( BUFFER *, LINE * ));
 extern int finderrbuf P(( int, int ));
 #endif
 
+/* glob.c */
+extern char ** glob_expand P(( char ** ));
+extern char ** glob_string P(( char * ));
+extern int glob_length P(( char ** ));
+extern char ** glob_free P(( char ** ));
+extern int doglob P(( char * ));
+#if !UNIX
+extern void expand_wild_args P(( int *, char *** ));
+extern int glob_needed P(( char	** ));
+#endif
+
 /* globals.c */
 extern int globals P(( int, int ));
 extern int vglobals P(( int, int ));
 
 /* history.c */
-#if !SMALLER
+#if OPT_HISTORY
 extern void hst_init P(( int ));
 extern void hst_glue P(( int ));
 extern void hst_append P(( char *, int ));
@@ -699,6 +714,8 @@ extern int no_completion P(( int, char *, int * ));
 extern int mlyesno P(( char * ));
 extern int mlquickask P(( char *, char *, int * ));
 extern int mlreply P(( char *, char *, int ));
+extern int mlreply_reg P(( char *, char *, int *, int ));
+extern int mlreply_reg_count P(( int, int *, int * ));
 extern int mlreply_no_bs P(( char *, char *, int ));
 extern int mlreply_no_opts P(( char *, char *, int ));
 extern void incr_dot_kregnum P(( void ));
@@ -804,6 +821,11 @@ extern int loadkreg P(( int, int ));
 #if !SMALLER
 extern int showkreg P(( int, int ));
 #endif
+#if !SMALLER && OPT_UPBUFF
+extern void relist_registers P(( void ));
+#else
+#define relist_registers()
+#endif
 
 /* map.c */
 extern int map P(( int, int ));
@@ -812,27 +834,26 @@ extern void map_check P(( int ));
 extern int map_proc P((int, int));
 
 /* modes.c */
+extern int string_to_number P(( char *, int * ));
 extern int setlocmode P(( int, int ));
 extern int dellocmode P(( int, int ));
 extern int setglobmode P(( int, int ));
 extern int delglobmode P(( int, int ));
 extern int settab P(( int, int ));
-extern int adjvalueset P(( char *, int, struct VALNAMES *, int, struct VAL * ));
+extern int adjvalueset P(( char *, int, int, VALARGS * ));
 extern int setfillcol P(( int, int ));
-extern char *string_mode_val P(( struct VALNAMES *, struct VAL * ));
+extern char *string_mode_val P(( VALARGS * ));
 extern REGEXVAL *new_regexval P(( char *, int ));
-extern void copy_val P(( struct VAL *, struct VAL *, int ));
 extern void free_regexval P(( REGEXVAL * ));
 extern void free_val P(( struct VALNAMES *, struct VAL * ));
+extern int copy_val P(( struct VAL *, struct VAL * ));
+extern void copy_mvals P(( int, struct VAL *, struct VAL * ));
 #if OPT_UPBUFF
 extern void save_vals P(( int, struct VAL *, struct VAL *, struct VAL * ));
-extern void restore_vals P(( int, struct VAL *, struct VAL * ));
 #endif
-#if NO_LEAKS
-extern void free_local_vals P(( struct VALNAMES *, struct VAL *, struct VAL * ));
-#endif
+extern void free_local_vals P(( struct VALNAMES *, struct VAL * ));
 extern int listmodes P(( int, int ));
-extern int find_mode P(( char *, int, struct VALNAMES **, struct VAL ** ));
+extern int find_mode P(( char *, int, VALARGS * ));
 
 /* npopen.c */
 #if UNIX || MSDOS
@@ -861,7 +882,6 @@ extern int subst_again P(( int, int ));
 extern int operator P(( int, int, int (*)(void), char * ));
 extern int operdel P(( int, int ));
 extern int operlinedel P(( int, int ));
-extern int chgreg P(( void ));
 extern int operchg P(( int, int ));
 extern int operlinechg P(( int, int ));
 extern int operjoin P(( int, int ));
@@ -890,6 +910,9 @@ extern char * is_msdos_drive P(( char * ));
 #if VMS
 extern int is_vms_pathname P(( char *, int ));
 extern char * vms_pathleaf P(( char * ));
+#endif
+#if UNIX
+extern char * home_path P(( char * ));
 #endif
 extern char * pathleaf P(( char * ));
 extern char * pathcat P(( char *, char *, char * ));
@@ -1060,6 +1083,13 @@ extern int forwredo P(( int, int ));
 extern int lineundo P(( int, int ));
 extern void dumpuline P(( LINEPTR ));
 
+/* version.c */
+extern void print_usage P(( void ));
+#if UNIX
+extern void makeversion P(( void ));
+#endif
+extern int showversion P(( int, int ));
+
 /* window.c */
 extern int set_curwp P(( WINDOW * ));
 #if OPT_EVAL
@@ -1081,6 +1111,7 @@ extern int newlength P(( int, int ));
 extern int onlywind P(( int, int ));
 extern int delwind P(( int, int ));
 extern int delwp P(( WINDOW * ));
+extern void copy_traits P(( W_TRAITS *, W_TRAITS * ));
 extern WINDOW * splitw P(( int, int ));
 extern int splitwind P(( int, int ));
 extern int enlargewind P(( int, int ));
@@ -1182,6 +1213,8 @@ extern	void	set_lback_p2p	P(( LINEPTR, LINEPTR ));
 #endif
 
 #if NO_LEAKS
+extern	void onel_leaks P(( void ));
+extern	void path_leaks P(( void ));
 extern	void kbs_leaks P(( void ));
 extern	void tmp_leaks P(( void ));
 extern	void tb_leaks P(( void ));
@@ -1255,6 +1288,7 @@ extern	int	select	P(( int, fd_set*, fd_set*, fd_set*, struct timeval* ));
 extern	void	setbuf	P(( FILE *, char * ));
 extern	void	setbuffer P(( FILE *, char *, int ));
 extern	int	system	P(( char * ));
+extern	long	time	P(( long * ));
 extern	int	wait	P(( int * ));
 extern	long	strtol	P(( char *, char **, int ));
 #endif /* lint || __GNUC__ */

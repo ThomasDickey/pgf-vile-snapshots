@@ -56,7 +56,7 @@ CSRCfh = fences.c file.c filec.c fileio.c finderr.c glob.c globals.c history.c h
 CSRCim = ibmpc.c input.c insert.c isearch.c line.c main.c map.c modes.c mktbls.c
 CSRCnr = npopen.c opers.c oneliner.c path.c random.c regexp.c region.c
 CSRCst = search.c spawn.c st520.c tags.c tbuff.c tcap.c termio.c tipc.c tmp.c
-CSRCuw = undo.c vmalloc.c vms2unix.c vmspipe.c vmsvt.c vt52.c window.c word.c wordmov.c
+CSRCuw = undo.c version.c vmalloc.c vms2unix.c vmspipe.c vmsvt.c vt52.c window.c word.c wordmov.c
 CSRCxz = x11.c z309.c z_ibmpc.c
 
 CSRC = $(CSRCac) $(CSRCde) $(CSRCfh) $(CSRCim) $(CSRCnr) \
@@ -112,6 +112,7 @@ SRC =	main.c \
 	termio.c \
 	tmp.c \
 	undo.c \
+	version.c \
 	vmalloc.c \
 	vms2unix.c \
 	vmspipe.c \
@@ -158,6 +159,7 @@ OBJ =	main.obj,\
 	termio.obj,\
 	tmp.obj,\
 	undo.obj,\
+	version.obj, \
 	vmalloc.obj,\
 	vms2unix.obj,\
 	vmspipe.obj,\
@@ -260,7 +262,10 @@ xvile.com :
 	@ write sys$output "** made $@"
 
 # $Log: descrip.mms,v $
-# Revision 1.9  1993/08/05 14:29:12  pgf
+# Revision 1.10  1993/09/03 09:11:54  pgf
+# tom's 3.60 changes
+#
+# Revision 1.9  1993/08/05  14:29:12  pgf
 # tom's 3.57 changes
 #
 # Revision 1.8  1993/07/15  10:37:58  pgf

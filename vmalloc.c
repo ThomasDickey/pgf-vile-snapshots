@@ -10,7 +10,10 @@
  *	(pgf, 1989)
  *
  * $Log: vmalloc.c,v $
- * Revision 1.16  1993/08/13 16:32:50  pgf
+ * Revision 1.17  1993/09/03 09:11:54  pgf
+ * tom's 3.60 changes
+ *
+ * Revision 1.16  1993/08/13  16:32:50  pgf
  * tom's 3.58 changes
  *
  * Revision 1.15  1993/07/27  18:06:20  pgf
@@ -165,7 +168,7 @@ int	l;
 		rvverify("vmalloc",f,l);
 	if (( buffer = (UCHAR *)malloc(size + KPW + KPW)) == NULL) {
 		sp = "ERROR: real malloc returned NULL\n";
-		fprintf(stderr,sp);
+		(void)fprintf(stderr,sp);
 		trace(sp);
 		errout();
 	}
@@ -179,7 +182,7 @@ int	l;
 		;
 	if (mp == &m[MAXMALLOCS]) {
 		sp = "ERROR: too many mallocs\n";
-		fprintf(stderr,sp);
+		(void)fprintf(stderr,sp);
 		trace(sp);
 		errout();
 	}
@@ -223,7 +226,7 @@ int	l;
 	if (mp < m) {
 		sprintf(s,"ERROR: location to free is not in list. %s %d\n",
 					 f,l);
-		fprintf(stderr,s);
+		(void)fprintf(stderr,s);
 		trace(s);
 		errout();
 	}
@@ -235,7 +238,7 @@ int	l;
 		*(ULONG *)(mp->addr + sizeof (ULONG)) != KP)
 	{
 		sprintf(s,"ERROR: corrupted freed block. %s %d\n", f,l);
-		fprintf(stderr,s);
+		(void)fprintf(stderr,s);
 		trace(s);
 		errout();
 	}
@@ -265,7 +268,7 @@ int	l;
 	if (mp < m) {
 		sprintf(s,"ERROR: location to realloc is not in list. %s %d\n",
 					 f,l);
-		fprintf(stderr,s);
+		(void)fprintf(stderr,s);
 		trace(s);
 		errout();
 	}

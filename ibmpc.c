@@ -10,7 +10,14 @@
  * display type.
  *
  * $Log: ibmpc.c,v $
- * Revision 1.21  1993/07/27 18:06:20  pgf
+ * Revision 1.23  1993/09/06 16:28:01  pgf
+ * don't change cursor shape or keyboard rate gratuitously
+ * also, attempt to restore old page
+ *
+ * Revision 1.22  1993/09/03  09:11:54  pgf
+ * tom's 3.60 changes
+ *
+ * Revision 1.21  1993/07/27  18:06:20  pgf
  * see tom's 3.56 CHANGES entry
  *
  * Revision 1.20  1993/07/09  19:11:48  pgf
@@ -168,12 +175,12 @@ static	struct	{
 		{"40x25",  CDVGA,	1,	0,	25,  40},
 		{"80x25",  CDVGA,	3,	0,	25,  80},
 		{"80x50",  CDVGA,	3,	C8x8,	50,  80},
-		/* Paradise VGA (doesn't work yet...) */
-#ifdef TOP_2000_VGA
-#undef	NROW
-#define	NROW	75
-#undef	NCOL
-#define	NCOL	132
+
+#ifdef TOP_2000_VGA /* Paradise VGA (doesn't work yet...) */
+# undef	NROW
+# define	NROW	75
+# undef	NCOL
+# define	NCOL	132
 		{"80x30",  CDVGA,	0x12,	C8x16,	30,  80},
 		{"100x75", CDVGA,	0x58,	C8x8,	75,  100},
 		{"132x25", CDVGA,	0x55,	C7x16,	25,  132},
@@ -196,7 +203,9 @@ static	int	original_mode	= -1,
 		original_cols,		/* width of display		*/
 		original_page,		/* display-page (we use 0)	*/
 		original_type,		/* one of CDMONO, ... CDVGA	*/
+#ifdef MUCK_WITH_CURSOR
 		original_curs,		/* start/stop scan lines	*/
+#endif
 		monochrome	= FALSE;
 
 static	int	egaexist = FALSE;	/* is an EGA card available?	*/
@@ -241,9 +250,11 @@ static	int	scinit    P((int));
 static	int	getboard  P((void));
 static	int	scblank   P((void));
 
+#ifdef MUCK_WITH_KBD_RATE
 static	void	maxkbdrate   P((void));
+#endif
 
-int ibmtype;		/* pjr - what to do about screen resolution */
+int ibmtype;
 
 /*
  * Standard terminal interface dispatch table. Most of the fields point into
@@ -282,10 +293,20 @@ TERM    term    = {
 static void
 set_display (int mode)
 {
-	rg.x._AX_ = mode;
+	rg.h.ah = 0;
+	rg.h.al = mode;
 	INTX86(0x10, &rg, &rg);
 }
 
+static void
+set_page (int page)
+{
+	rg.h.ah = 5;
+	rg.h.al = page;
+	INTX86(0x10, &rg, &rg);
+}
+
+#ifdef MUCK_WITH_KBD_RATE
 /*  set the keyboard rate to max */
 static void
 maxkbdrate (void)
@@ -296,6 +317,7 @@ maxkbdrate (void)
         rg.h.bl = 0x0;
 	INTX86(0x16, &rg, &rg);
 }
+#endif
 
 static void
 set_80x25_display (void)
@@ -312,6 +334,7 @@ set_8x8_chars(void)
 	INTX86(0x10, &rg, &rg);	/* VIDEO - TEXT-MODE CHARACTER GENERATOR FUNCTIONS */
 }
 
+#ifdef MUCK_WITH_CURSOR
 static void
 set_cursor(int start_stop)
 {
@@ -319,6 +342,7 @@ set_cursor(int start_stop)
 	rg.x._CX_ = start_stop;	/* turn cursor on code */
 	INTX86(0x10, &rg, &rg);	/* VIDEO - SET TEXT-MODE CURSOR SHAPE */
 }
+#endif
 
 static void
 set_vertical_resolution(int code)
@@ -480,7 +504,9 @@ ibmopen()
 	rg.h.ah = 3;
 	rg.h.bh = 0;
 	INTX86(0x10, &rg, &rg);	/* VIDEO - GET CURSOR POSITION */
+#ifdef MUCK_WITH_CURSOR
 	original_curs = rg.x._CX_;
+#endif
 
 #ifdef PVGA
 	rg.h.ah = 0;
@@ -500,7 +526,9 @@ ibmopen()
 	revexist = TRUE;
 	ttopen();
 
+#ifdef MUCK_WITH_KBD_RATE
         maxkbdrate();   /* set the keyboard rate to max */
+#endif
 }
 
 void
@@ -508,7 +536,11 @@ ibmclose()
 
 {
 	set_display(original_mode);
+	if (original_page != 0)
+		set_page(original_page);
+#ifdef MUCK_WITH_CURSOR
 	set_cursor(original_mode <= 3 ? original_curs & 0x707 : original_curs);
+#endif
 }
 
 void
@@ -671,7 +703,9 @@ egaopen()
 	rg.h.bl = 0x20;		/* alt. print screen routine         */
 	INTX86(0x10, &rg, &rg);	/* VIDEO - SELECT ALTERNATE PRTSCRN  */
 
+#ifdef MUCK_WITH_CURSOR
 	set_cursor(0x0607);
+#endif
 	outp(0x3d4, 10);	/* video bios bug patch */
 	outp(0x3d5, 6);
 }
@@ -697,13 +731,13 @@ int bacg;	/* background color */
 	attr <<= 8;
 
 	if (flickcode && (dtype == CDCGA))
-		lnptr = &sline[0];
+		lnptr = sline;
 	else
 		lnptr = scptr[row]+col;
 
 	if (outstr) {
 		for (i = 0; i < nchar; i++) {
-			*lnptr++ = (outstr[i] & 255) | attr;
+			*lnptr++ = (outstr[i+col] & 255) | attr;
 		}
 	} else {
 		for (i = 0; i < nchar; i++) {
@@ -719,7 +753,7 @@ int bacg;	/* background color */
 		while ((inp(0x3da) & 8) == 0)
 			;
 		/* and send the string out */
-		movmem(&sline[0], scptr[row], nchar*sizeof(short));
+		movmem(sline, scptr[row]+col, nchar*sizeof(short));
 	}
 }
 

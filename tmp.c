@@ -34,7 +34,10 @@
  *	  are in-memory can have space allocated from them.
  *
  * $Log: tmp.c,v $
- * Revision 1.3  1993/06/18 15:57:06  pgf
+ * Revision 1.4  1993/09/03 09:11:54  pgf
+ * tom's 3.60 changes
+ *
+ * Revision 1.3  1993/06/18  15:57:06  pgf
  * tom's 3.49 changes
  *
  * Revision 1.2  1993/06/02  14:28:47  pgf
@@ -106,7 +109,7 @@ typedef	struct	free_t	{
 	 *	space[1] = offset to inuse-space
 	 */
 #define	PAGE_T	struct	buff_t
-typedef	PAGE_T	{
+	PAGE_T	{
 	PAGE_T	*next;		/* pointer to next in-memory page */
 	BLK_T	block;		/* identifies this page */
 	OFF_T	space[2];	/* offset of first freespace in page */
@@ -209,7 +212,7 @@ BUFFER	*bp;
 	int	n;
 
 	dumping = TRUE;
-	Trace("dumpBuffer(%s) %d windows\n", bp->b_bname, bp->b_nwnd);
+	Trace("dumpBuffer(%s) %d windows\n", get_bname(bp), bp->b_nwnd);
 	if (bp->b_nwnd != 0) {	/* only show if displayed */
 		(void)dumpMark(bp->b_dot);
 #ifdef WINMARK

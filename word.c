@@ -4,7 +4,15 @@
  * do any sentence mode commands, they are likely to be put in this file. 
  *
  * $Log: word.c,v $
- * Revision 1.30  1993/08/13 16:32:50  pgf
+ * Revision 1.32  1993/09/03 09:11:54  pgf
+ * tom's 3.60 changes
+ *
+ * Revision 1.31  1993/08/18  20:37:17  pgf
+ * as a stop-gap measure, added '>' to the characters that the formatregion
+ * code knows about.  there's a note in the buglist about how this should
+ * be regexp-able.
+ *
+ * Revision 1.30  1993/08/13  16:32:50  pgf
  * tom's 3.58 changes
  *
  * Revision 1.29  1993/08/05  14:29:12  pgf
@@ -123,7 +131,7 @@ int f,n;
 	register int c;		/* character temporary */
 
 	/* backup from the <NL> 1 char */
-	if (!backchar(0, 1))
+	if (!backchar(FALSE, 1))
 		return(FALSE);
 
 	/* back up until we aren't in a word,
@@ -131,7 +139,7 @@ int f,n;
 	cnt = 0;
 	while (c = char_at(DOT), !isspace(c)) {
 		cnt++;
-		if (!backchar(0, 1))
+		if (!backchar(FALSE, 1))
 			return(FALSE);
 		/* if we make it to the beginning, start a new line */
 		if (DOT.o == 0) {
@@ -158,6 +166,8 @@ int f,n;
 
 
 /*
+ * Implements the vi "w" command.
+ *
  * Move the cursor forward by the specified number of words. All of the motion
  * is done by "forwchar". Error if you try and move beyond the buffer's end.
  *
@@ -166,7 +176,6 @@ int f,n;
  * of course), but only on intermediate words for other operations, for
  * example.  The last word of non-delete ops does _not_ include its whitespace.
  */
-
 int
 forwviword(f, n)
 int f,n;
@@ -179,16 +188,20 @@ int f,n;
 	if (forwchar(FALSE, 1) == FALSE)
 		return (FALSE);
 	while (n--) {
+		int any = 0;
 		while (((s = isnewviwordf()) == FALSE) || 
 				(s == SORTOFTRUE && n != 0)) {
 			if (forwchar(FALSE, 1) == FALSE)
-				return (FALSE);
+				return (any != 0);
+			any++;
 		}
 	}
 	return TRUE;
 }
 
 /*
+ * Implements the vi "W" command.
+ *
  * Move the cursor forward by the specified number of words. All of the motion
  * is done by "forwchar". Error if you try and move beyond the buffer's end.
  */
@@ -204,16 +217,20 @@ int f,n;
 	if (forwchar(FALSE, 1) == FALSE)
 		return (FALSE);
 	while (n--) {
+		int any = 0;
 		while (((s = isnewwordf()) == FALSE) || 
 				(s == SORTOFTRUE && n != 0)) {
 			if (forwchar(FALSE, 1) == FALSE)
-				return (FALSE);
+				return (any != 0);
+			any++;
 		}
 	}
 	return(TRUE);
 }
 
 /*
+ * Implements the vi "e" command.
+ *
  * Move the cursor forward by the specified number of words. All of the motion
  * is done by "forwchar". Error if you try and move beyond the buffer's end.
  */
@@ -230,9 +247,11 @@ int f,n;
 		return (FALSE);
 	setchartype();
 	while (n--) {
+		int	any = 0;
 		while ((s = isendviwordf()) == FALSE) {
 			if (forwchar(FALSE, 1) == FALSE)
-				return (FALSE);
+				return (any != 0);
+			any++;
 		}
 
 	}
@@ -243,6 +262,8 @@ int f,n;
 }
 
 /*
+ * Implements the vi "E" command.
+ *
  * Move the cursor forward by the specified number of words. All of the motion
  * is done by "forwchar". Error if you try and move beyond the buffer's end.
  */
@@ -259,9 +280,11 @@ int f,n;
 		return (FALSE);
 	setchartype();
 	while (n--) {
+		int	any = 0;
 		while ((s = isendwordf()) == FALSE) {
 			if (forwchar(FALSE, 1) == FALSE)
-				return (FALSE);
+				return (any != 0);
+			any++;
 		}
 
 	}
@@ -272,6 +295,8 @@ int f,n;
 }
 
 /*
+ * Implements the vi "b" command.
+ *
  * Move the cursor backward by "n" words. All of the details of motion are
  * performed by the "backchar" and "forwchar" routines. Error if you try to
  * move beyond the buffers.
@@ -286,15 +311,19 @@ int f,n;
 		return (FALSE);
 	setchartype();
 	while (n--) {
+		int	any = 0;
 		while (isnewviwordb() == FALSE) {
+			any++;
 			if (backchar(FALSE, 1) == FALSE)
-				return (FALSE);
+				return (any != 0);
 		}
 	}
 	return (forwchar(FALSE, 1));
 }
 
 /*
+ * Implements the vi "B" command.
+ *
  * Move the cursor backward by "n" words. All of the details of motion are
  * performed by the "backchar" and "forwchar" routines. Error if you try to
  * move beyond the buffers.
@@ -309,9 +338,11 @@ int f,n;
 		return (FALSE);
 	setchartype();
 	while (n--) {
+		int	any = 0;
 		while (isnewwordb() == FALSE) {
+			any++;
 			if (backchar(FALSE, 1) == FALSE)
-				return (FALSE);
+				return (any != 0);
 		}
 	}
 	return (forwchar(FALSE, 1));
@@ -435,13 +466,14 @@ formatregion()
 		sentence = FALSE;
 
 		is_comment = ( ((c = char_at(DOT)) == '#') ||
+				(c == '>') ||
 				(c == '*') ||
 				((c == '/') &&
 				DOT.o+1 < lLength(DOT.l) &&
 				 lGetc(DOT.l,DOT.o+1) == '*'));
 
 		if (is_comment)
-			comment_char = (c == '#') ? '#':'*';
+			comment_char = (c == '#' || c == '>') ? c :'*';
 
 		/* scan through lines, filling words */
 		firstflag = TRUE;
@@ -479,7 +511,7 @@ formatregion()
 			}
 
 			/* if not a separator, just add it in */
-			if (c != ' ' && c != '\t') {
+			if (!isblank(c)) {
 				/* was it the end of a "sentence"? */
 				sentence = (c == '.' || c == '?' || c == '!');
 				if (wordlen < NSTRING - 1)

@@ -1,10 +1,19 @@
 /*	This file is for functions dealing with execution of
  *	commands, command lines, buffers, files and startup files
  *
- *	written 1986 by Daniel Lawrence	
+ *	written 1986 by Daniel Lawrence
  *
  * $Log: exec.c,v $
- * Revision 1.68  1993/08/18 16:45:00  pgf
+ * Revision 1.71  1993/09/06 16:25:18  pgf
+ * took out leftover dbgwrite() call
+ *
+ * Revision 1.70  1993/09/03  09:11:54  pgf
+ * tom's 3.60 changes
+ *
+ * Revision 1.69  1993/08/18  20:40:34  pgf
+ * reset "calledbefore" in docmd(), so that macros work correctly
+ *
+ * Revision 1.68  1993/08/18  16:45:00  pgf
  * added VIEWOK flag for functions that execute macros.  it says it's okay
  * to execute them in view mode, even though they have the UNDO bit set
  *
@@ -187,50 +196,50 @@
  * revision 1.12
  * date: 1991/08/06 15:20:45;
  * global/local values
- * 
+ *
  * revision 1.11
  * date: 1991/06/25 19:52:27;
  * massive data structure restructure
- * 
+ *
  * revision 1.10
  * date: 1991/06/20 17:22:02;
  * changed comments -- ! is now ~ ???
- * 
+ *
  * revision 1.9
  * date: 1991/06/13 15:17:46;
  * added globbing and uniq'ifying to execfile names
- * 
+ *
  * revision 1.8
  * date: 1991/06/07 13:39:06;
  * cleanup
- * 
+ *
  * revision 1.7
  * date: 1991/06/03 15:53:46;
  * initialize fulllineregions and havemotion in dobuf()
- * 
+ *
  * revision 1.6
  * date: 1991/06/03 12:17:32;
  * ifdef'ed GLOBALS for unresolved ref
- * 
+ *
  * revision 1.5
  * date: 1991/06/03 10:20:18;
  * cleanup, and
  * namedcmd now calls execute() directly, allowing
  * removal of cfp arg to docmd
- * 
+ *
  * revision 1.4
  * date: 1991/05/31 10:53:21;
  * new namedcmd(), linespec(), and rangespec() routines to support
  * line ranges on ex commands.  mostly borrowed from kirkendall's elvis
- * 
+ *
  * revision 1.3
  * date: 1991/04/08 15:46:08;
  * fixed readin() arg count
- * 
+ *
  * revision 1.2
  * date: 1990/12/06 19:49:44;
  * turn off command display during file exec
- * 
+ *
  * revision 1.1
  * date: 1990/09/21 10:25:14;
  * initial vile RCS revision
@@ -243,9 +252,11 @@
 extern CMDFUNC f_gomark;
 
 static	int	eol_range P(( char *, int, int, int ));
+static	int	end_of_cmd P(( void ));
 #if !SMALLER
 static	int	execute_named_command P(( int, int ));
 #endif
+static	int	rangespec P(( char *, LINEPTR *, LINEPTR *, CMDFLAGS * ));
 static	char *	linespec P(( char *, LINEPTR * ));
 static	void	freewhile P(( WHBLOCK * ));
 
@@ -289,6 +300,16 @@ int	eolchar;
 	return TRUE;
 }
 
+/*
+ * Returns true iff the user ended the last prompt with a carriage-return.
+ */
+static int
+end_of_cmd()
+{
+	register int c = end_string();
+	return isreturn(c);
+}
+
 /* returns true iff we are in a named-command and if the user ended the last
  * prompt with a carriage-return.
  */
@@ -296,8 +317,7 @@ int
 end_named_cmd()
 {
 	if (isnamedcmd) {
-		register int c = end_string();
-		return isreturn(c);
+		return end_of_cmd();
 	}
 	return FALSE;
 }
@@ -309,8 +329,7 @@ int
 more_named_cmd()
 {
 	if (isnamedcmd) {
-		register int c = end_string();
-		return !isreturn(c);
+		return !end_of_cmd();
 	}
 	return FALSE;
 }
@@ -333,11 +352,13 @@ int f, n;
 	LINEPTR fromline;	/* first linespec */
 	LINEPTR toline;		/* second linespec */
 	MARK	save_DOT;
-	char lspec[NLINE];
-	char cspec[NLINE];
+	char lspec[NLINE];	/* text of line spec */
+	char cspec[NLINE];	/* text of command spec */
 	int cmode = 0;
-	int c,isdfl,zero;
-	long flags;
+	int c;
+	int repeat_cmd = EOS;
+	int maybe_reg, maybe_num;
+	CMDFLAGS lflag, flags;
 
 	lspec[0] = EOS;
 
@@ -357,57 +378,105 @@ int f, n;
 				no_completion);
 			c = end_string();
 			if (status != TRUE && status != FALSE) {
+				if (status == SORTOFTRUE) {
+					(void)tgetc(FALSE); /* cancel the tungetc */
+					return FALSE;
+				}
 				return status;
 			} else if (isreturn(c) && (status == FALSE)) {
-				return FALSE;
-			} else if (isbackspace(c)) {
-				(void)tgetc(FALSE); /* cancel the tungetc */
 				return FALSE;
 			} else {
 				tungetc(c);	/* ...so we can splice */
 			}
 			cmode = 1;
-		} else {		/* looking for command-name */
+			repeat_cmd = EOS;
+		} else {			/* looking for command-name */
 			fnp = NULL;
 			status = kbd_engl_stat((char *)0, cspec);
 			if (status == TRUE) {
 				fnp = cspec;
-				c = cspec[strlen(cspec)-1];
-				if (ispunct(c)) {
-					c = end_string();
-					if (c != NAMEC && c != ' ' && !isreturn(c))
-						tungetc(c);	/* e.g., !-command */
+#if !SMALLER
+				if (isRepeatable(*fnp) && clexec) {
+					repeat_cmd = *fnp;
+					cmode++;
+					hst_glue(EOS);
+				} else
+#endif
+				 if (isRepeatable(*fnp) && (*fnp == end_string())) {
+					tungetc(*fnp);
+					repeat_cmd = *fnp;
+					cmode++;
+					hst_glue(EOS);
+				} else {
+					c = fnp[strlen(fnp)-1];
+					if (ispunct(c)) {
+						c = end_string();
+						if (c != NAMEC
+						 && c != ' '
+						 && !isreturn(c)) {
+							tungetc(c);
+							/* e.g., !-command */
+						 }
+					}
+					break;
 				}
-				break;
 			} else if (status == SORTOFTRUE) {
-				if (lspec[0] == EOS)
-					return FALSE;
-				cmode = 0;
-				hst_remove(lspec);
-				continue;
-			} else if (status != FALSE || lspec[0] == EOS) {
+				hst_remove("?");
+				(void)tgetc(FALSE); /* eat the delete */
+				if (--cmode <= 1) {
+					cmode = 0;
+					hst_remove(lspec);
+				}
+			} else if ((status == ABORT) || (lastkey == killc)) {
 				return status;
-			} else {
-				break;	/* range-only */
+			} else {	/* status == FALSE (killc/wkillc) */
+				if (cmode > 1) {
+					fnp = cspec;
+					cmode--;
+					break;
+				} else {
+					if (lspec[0] == EOS) {
+						return status;
+					} else {
+						break;	/* range-only */
+					}
+				}
 			}
 		}
 	}
 
+	/* reconstruct command if user edited it */
+	if (repeat_cmd != EOS && fnp != 0 && *fnp == EOS) {
+		fnp[0] = repeat_cmd;
+		fnp[1] = EOS;
+	}
+
+	/* infer repeat count from repeated-command */
+	if (cmode > 1) {
+		if (!f) {
+			f = TRUE;
+			n = cmode;
+		} else {
+			mlforce("[Redundant repeat-count]");
+			return FALSE;
+		}
+	}
+
 	/* parse the accumulated lspec */
-	if (rangespec(lspec,&fromline,&toline,&isdfl,&zero) != TRUE) {
+	if (rangespec(lspec, &fromline, &toline, &lflag) != TRUE) {
 		mlforce("[Improper line range]");
 		return FALSE;
 	}
 
 	/* if range given, and it wasn't "0" and the buffer's empty */
-	if (!isdfl && !zero && is_empty_buf(curbp)) {
+	if (!(lflag & (DFLALL|ZERO)) && is_empty_buf(curbp)) {
 		mlforce("[No range possible in empty buffer]", fnp);
 		return FALSE;
 	}
 
 	/* did we get a name? */
 	if (fnp == NULL) {
-		if (isdfl) { /* no range, no function */
+		if ((lflag & DFLALL)) { /* no range, no function */
 			mlforce("[No such function]");
 			return FALSE;
 		} else { /* range, no function */
@@ -419,20 +488,20 @@ int f, n;
 		return FALSE;
 	}
 	flags = cfp->c_flags;
-	
+
 	/* bad arguments? */
 #ifdef EXRC_FILES
 seems like we need one more check here -- is it from a .exrc file?
 	    cmd not ok in .exrc 		empty file
 	if (!(flags & EXRCOK) && is_empty_buf(curbp)) {
-		mlforce("[Can't use the \"%s\" command in a %s file.]", 
+		mlforce("[Can't use the \"%s\" command in a %s file.]",
 					cmdnames[cmdidx].name, EXRC);
 		return FALSE;
 	}
 #endif
 
 	/* was: if (!(flags & (ZERO | EXRCOK)) && fromline == NULL ) */
-	if (zero) {
+	if ((lflag & ZERO)) {
 		extern CMDFUNC f_lineputafter, f_opendown, f_insfile;
 		extern CMDFUNC f_lineputbefore, f_openup;
 		if (!(flags & ZERO)) {
@@ -468,7 +537,7 @@ seems like we need one more check here -- is it from a .exrc file?
 		mlforce("[Can't use address with \"%s\" command.]", fnp);
 		return FALSE;
 	}
-	/* if we're not supposed to have a second line no., and the line no. 
+	/* if we're not supposed to have a second line no., and the line no.
 		isn't the same as the first line no., and there's more than
 		one line */
 	if (!(flags & TO) && !same_ptr(toline, fromline) &&
@@ -477,9 +546,10 @@ seems like we need one more check here -- is it from a .exrc file?
 		mlforce("[Can't use a range with \"%s\" command.]", fnp);
 		return FALSE;
 	}
+
 #ifdef NEEDED
 	if (!(flags & EXTRA) && *scan) {
-		mlforce("[Extra characters after \"%s\" command.]", 
+		mlforce("[Extra characters after \"%s\" command.]",
 						cmdnames[cmdidx].name);
 		return FALSE;
 	}
@@ -509,7 +579,7 @@ seems like we need one more check here -- is it from a .exrc file?
 #endif /* NEEDED */
 
 	/* some commands have special default ranges */
-	if (isdfl) {
+	if (lflag & DFLALL) {
 		if (flags & DFLALL) {
 			extern CMDFUNC f_showlength;
 			extern CMDFUNC f_operwrite, f_filewrite, f_operglobals,
@@ -529,6 +599,7 @@ seems like we need one more check here -- is it from a .exrc file?
 				mlforce("[Configuration error: DFLALL]");
 				return FALSE;
 			}
+			lflag |= (FROM|TO); /* avoid prompt for line-count */
 		} else if (flags & DFLNONE) {
 			extern CMDFUNC f_operfilter, f_spawn;
 			if (cfp == &f_operfilter) {
@@ -539,7 +610,9 @@ seems like we need one more check here -- is it from a .exrc file?
 				return FALSE;
 			}
 			fromline = toline = null_ptr;
-		}
+			lflag |= (FROM|TO); /* avoid prompt for line-count */
+		} else
+			lflag &= ~DFLALL;
 	}
 
 #ifdef NEEDED
@@ -550,6 +623,45 @@ seems like we need one more check here -- is it from a .exrc file?
 	}
 #endif
 
+	/* Process argument(s) for named-buffer & line-count, if present.  The
+	 * line-count is expected only if no "to" address specification was
+	 * given.
+	 */
+	maybe_reg = (*fnp != EOS)
+		&&  ((flags & WORD1) == WORD1)
+		&& !((flags & FILES) == FILES);
+	maybe_num = (*fnp != EOS)
+		&&  ((flags & TO) == TO)
+		&& !((lflag & TO) == TO);
+
+	if (!end_of_cmd() && (maybe_reg || maybe_num)) {
+		int	num,
+			this = (maybe_num && maybe_reg)
+				? 0
+				: (maybe_num ? 1 : -1),
+			last = maybe_num ? 2 : 1;
+
+		while (!end_of_cmd() && (this < last)) {
+			status = mlreply_reg_count(this, &num, &this);
+			if (status == ABORT)
+				return status;
+			else if (status != TRUE)
+				break;
+			if (this == 2) {
+				swapmark();
+				DOT.l = fromline;
+				(void)forwline(TRUE, num-1);
+				toline = DOT.l;
+				swapmark();
+			} else {
+				ukb = num;
+				kregflag = (this == 1) ? KAPPEND : 0;
+				this = 1;
+				/* patch: need to handle recursion */
+			}
+		}
+	}
+
 	if (flags & NOMOVE)
 		save_DOT = DOT;
 	else if (!same_ptr(toline, null_ptr) || !same_ptr(fromline, null_ptr)) {
@@ -559,12 +671,12 @@ seems like we need one more check here -- is it from a .exrc file?
 	}
 	if (!same_ptr(toline, null_ptr) && (flags & TO)) {
 		DOT.l = toline;
-		(void)firstnonwhite(f,n);
+		(void)firstnonwhite(FALSE,1);
 		(void)setmark();
 	}
 	if (!same_ptr(fromline, null_ptr) && (flags & FROM)) {
 		DOT.l = fromline;
-		(void)firstnonwhite(f,n);
+		(void)firstnonwhite(FALSE,1);
 		if (same_ptr(toline, null_ptr))
 			(void)setmark();
 	}
@@ -619,8 +731,7 @@ LINEPTR		*markptr;	/* where to store the mark's value */
 	lp = NULL;
 
 	/* parse each ;-delimited clause of this linespec */
-	do
-	{
+	do {
 		/* skip an initial ';', if any */
 		if (*s == ';')
 			s++;
@@ -628,7 +739,7 @@ LINEPTR		*markptr;	/* where to store the mark's value */
 		/* skip leading spaces */
 		while (isspace(*s))
 			s++;
-	
+
 		/* dot means current position */
 		if (*s == '.') {
 			s++;
@@ -661,7 +772,7 @@ LINEPTR		*markptr;	/* where to store the mark's value */
 			status = forwline(TRUE,num);
 			if (status)
 				lp = l_ref(DOT.l);
-                } else if (*s == '-') {
+		} else if (*s == '-') {
 			s++;
 			for (num = 0; isdigit(*s); s++)
 					num = num * 10 + *s - '0';
@@ -672,12 +783,12 @@ LINEPTR		*markptr;	/* where to store the mark's value */
 			status = forwline(TRUE,-num);
 			if (status)
 				lp = l_ref(DOT.l);
-                }
+		}
 #if PATTERNS
 		else if (*s == '/' || *s == '?') { /* slash means do a search */
 			/* put a '\0' at the end of the search pattern */
 			t = parseptrn(s);
-	
+
 			/* search for the pattern */
 			lp &= ~(BLKSIZE - 1);
 			if (*s == '/') {
@@ -688,24 +799,24 @@ LINEPTR		*markptr;	/* where to store the mark's value */
 			} else {
 				lp = m_bsrch(lp, s);
 			}
-	
+
 			/* adjust command string pointer */
 			s = t;
 		}
 #endif
-	
+
 		/* if linespec was faulty, quit now */
 		if (!lp) {
 			*markptr = l_ptr(lp);
 			swapmark();
 			return s;
 		}
-	
+
 		/* maybe add an offset */
 		t = s;
 		if (*t == '-' || *t == '+') {
 			s++;
-			for (num = 0; *s >= '0' && *s <= '9'; s++) {
+			for (num = 0; isdigit(*s); s++) {
 				num = num * 10 + *s - '0';
 			}
 			if (num == 0)
@@ -723,19 +834,18 @@ LINEPTR		*markptr;	/* where to store the mark's value */
 /* parse an ex-style line range -- code culled from elvis, file ex.c, by
 	Steve Kirkendall
 */
-int
-rangespec(specp,fromlinep,tolinep,isdefaultp,zerop)
-char		*specp;	/* string containing a line range */
+static int
+rangespec(specp, fromlinep, tolinep, flagp)
+char		*specp;		/* string containing a line range */
 LINEPTR		*fromlinep;	/* first linespec */
 LINEPTR		*tolinep;	/* second linespec */
-int		*isdefaultp;
-int		*zerop;
+CMDFLAGS	*flagp;
 {
 	register char	*scan;		/* used to scan thru specp */
 	LINEPTR		fromline;	/* first linespec */
 	LINEPTR		toline;		/* second linespec */
 
-	*zerop = FALSE;
+	*flagp = 0;
 
 	/* ignore command lines that start with a double-quote */
 	if (*specp == '"') {
@@ -752,21 +862,24 @@ int		*zerop;
 	scan = specp;
 	if (*scan == '0') {
 		fromline = toline = curbp->b_line.l; /* _very_ top of buffer */
-		*zerop = TRUE;
+		*flagp |= (FROM|ZERO);
 		scan++;
 	} else if (*scan == '%') {
 		/* '%' means all lines */
 		fromline = lFORW(curbp->b_line.l);
 		toline = lBACK(curbp->b_line.l);
 		scan++;
+		*flagp |= (FROM|TO);
 	} else {
 		scan = linespec(scan, &fromline);
+		*flagp |= FROM;
 		if (same_ptr(fromline, null_ptr))
 			fromline = DOT.l;
 		toline = fromline;
 		if (*scan == ',') {
 			scan++;
 			scan = linespec(scan, &toline);
+			*flagp |= TO;
 		}
 		if (same_ptr(toline,null_ptr)) {
 			/* faulty line spec */
@@ -777,20 +890,21 @@ int		*zerop;
 	if (is_empty_buf(curbp))
 		fromline = toline = null_ptr;
 
-	*isdefaultp = (scan == specp);
+	if (scan == specp)
+		*flagp |= DFLALL;
 
 	/* skip whitespace */
 	while (isspace(*scan))
 		scan++;
 
 	if (*scan) {
-		dbgwrite("crud at end %s",specp);
+		/* dbgwrite("crud at end %s (%s)",specp, scan); */
 		return FALSE;
 	}
 
 	*fromlinep = fromline;
 	*tolinep = toline;
-	
+
 	return TRUE;
 }
 
@@ -864,7 +978,7 @@ int f,n;
 	char *oldestr;		/* original exec string */
 	char tkn[NSTRING];	/* next token off of command line */
 	CMDFUNC *cfp;
-		
+
 	/* if we are scanning and not executing..go back here */
 	if (execlevel)
 		return TRUE;
@@ -898,8 +1012,8 @@ int f,n;
 		/* and now get the command to execute */
 		if ((status = macarg(tkn)) != TRUE) {
 			execstr = oldestr;
-			return status;	
-		}	
+			return status;
+		}
 	}
 
 	/* and match the token to see if it exists */
@@ -908,10 +1022,15 @@ int f,n;
 		execstr = oldestr;
 		return FALSE;
 	}
-	
+
 	/* save the arguments and go execute the command */
 	oldcle = clexec;		/* save old clexec flag */
 	clexec = newcle;		/* in cline execution */
+	/* flag the first time through for some commands -- e.g. subst
+		must know to not prompt for strings again, and pregion
+		must only restart the p-lines buffer once for each
+		command. */
+	calledbefore = FALSE;
 	status = execute(cfp,f,n);
 	cmdstatus = status;		/* save the status */
 	clexec = oldcle;		/* restore clexec flag */
@@ -1129,7 +1248,7 @@ int n;		/* macro number to use */
 	(void)lsprintf(bname, ScratchName(Macro %d), n);
 
 	/* set up the new macro buffer */
-	if ((bp = bfind(bname, OK_CREAT, BFINVS)) == NULL) {
+	if ((bp = bfind(bname, BFINVS)) == NULL) {
 		mlforce("[Cannot create macro]");
 		return FALSE;
 	}
@@ -1157,23 +1276,23 @@ int n;		/* macro number to use */
 {
 	register struct BUFFER *bp;	/* pointer to macro buffer */
 	register int status;		/* return status */
-	char bname[NBUFN];		/* name of buffer to use */
+	char bname[NBUFN+1];		/* name of buffer to use */
 
 	/* a numeric argument means its a numbered macro */
 	if (f == TRUE)
 		return storemac(f, n);
 
 	/* get the name of the procedure */
-	bname[1] = 0;
-        if ((status = mlreply("Procedure name: ", &bname[1], NBUFN-2)) != TRUE)
-                return status;
+	bname[1] = EOS;
+	if ((status = mlreply("Procedure name: ", bname+1, sizeof(bname)-2)) != TRUE)
+		return status;
 
 	/* construct the macro buffer name */
 	bname[0] = SCRTCH_LEFT[0];
 	(void)strcat(bname, SCRTCH_RIGHT);
 
 	/* set up the new macro buffer */
-	if ((bp = bfind(bname, OK_CREAT, BFINVS)) == NULL) {
+	if ((bp = bfind(bname, BFINVS)) == NULL) {
 		mlforce("[Cannot create macro]");
 		return FALSE;
 	}
@@ -1193,25 +1312,25 @@ int
 execproc(f, n)
 int f, n;	/* default flag and numeric arg */
 {
-        register BUFFER *bp;		/* ptr to buffer to execute */
-        register int status;		/* status return */
-        static char obufn[NBUFN+2];	/* name of buffer to execute */
-        char bufn[NBUFN+2];		/* name of buffer to execute */
+	register BUFFER *bp;		/* ptr to buffer to execute */
+	register int status;		/* status return */
+	static char obufn[NBUFN-1];	/* name of buffer to execute */
+	char bufn[NBUFN+1];		/* name of buffer to execute */
 	register int odiscmd;
 
 	/* find out what buffer the user wants to execute */
-        if ((status = mlreply("Execute procedure: ", obufn, NBUFN)) != TRUE)
-                return status;
+	if ((status = mlreply("Execute procedure: ", obufn, sizeof(obufn))) != TRUE)
+		return status;
 
 	/* construct the buffer name */
 	bufn[0] = SCRTCH_LEFT[0];
 	(void)strcat(strcpy(&bufn[1], obufn), SCRTCH_RIGHT);
 
 	/* find the pointer to that buffer */
-        if ((bp=bfind(bufn, NO_CREAT, 0)) == NULL) {
+	if ((bp = find_b_name(bufn)) == NULL) {
 		mlforce("[No such procedure \"%s\"]",bufn);
-                return FALSE;
-        }
+		return FALSE;
+	}
 
 	if (!f)
 		n = 1;
@@ -1236,23 +1355,23 @@ int
 execbuf(f, n)
 int f, n;	/* default flag and numeric arg */
 {
-        register BUFFER *bp;		/* ptr to buffer to execute */
-        register int status;		/* status return */
-        static char bufn[NSTRING];	/* name of buffer to execute */
+	register BUFFER *bp;		/* ptr to buffer to execute */
+	register int status;		/* status return */
+	static char bufn[NBUFN+1];	/* name of buffer to execute */
 	register int odiscmd;
 
 	if (!f)
 		n = 1;
 
 	/* find out what buffer the user wants to execute */
-        if ((status = mlreply("Execute buffer: ", bufn, NBUFN)) != TRUE)
-                return status;
+	if ((status = mlreply("Execute buffer: ", bufn, sizeof(bufn))) != TRUE)
+		return status;
 
 	/* find the pointer to that buffer */
-        if ((bp=bfind(bufn, NO_CREAT, 0)) == NULL) {
+	if ((bp = find_b_name(bufn)) == NULL) {
 		mlforce("[No such buffer \"%s\"]",bufn);
-                return FALSE;
-        }
+		return FALSE;
+	}
 
 	odiscmd = discmd;
 	discmd = FALSE;
@@ -1284,7 +1403,7 @@ int f, n;	/* default flag and numeric arg */
 	~force		Force macro to continue...even if command fails
 	~while (cond)	Execute a loop if the condition is true
 	~endwhile
-	
+
 	Line Labels begin with a "*" as the first nonblank char, like:
 
 	*LBL01
@@ -1309,7 +1428,7 @@ int
 dobuf(bp)
 BUFFER *bp;	/* buffer to execute */
 {
-        register int status;	/* status return */
+	register int status;	/* status return */
 	fast_ptr LINEPTR lp;	/* pointer to line to execute */
 	fast_ptr LINEPTR hlp;	/* pointer to line header */
 	int dirnum;		/* directive index */
@@ -1337,13 +1456,13 @@ BUFFER *bp;	/* buffer to execute */
 		dobufnesting--;
 		return FALSE;
 	}
-		
+
 
 	/* clear IF level flags/while ptr */
 	execlevel = 0;
 	whlist = NULL;
 	fulllineregions = FALSE;
-	havemotion = FALSE;
+	havemotion = NULL;
 
 #if ! SMALLER
 	scanpt = NULL;
@@ -1360,7 +1479,7 @@ BUFFER *bp;	/* buffer to execute */
 		i = l_ref(lp)->l_used;
 
 		/* trim leading whitespace */
-		while (i-- > 0 && (*eline == ' ' || *eline == '\t'))
+		while (i-- > 0 && isblank(*eline))
 			++eline;
 
 		/* if theres nothing here, don't bother */
@@ -1403,7 +1522,7 @@ failexit:			freewhile(scanpt);
 		if (eline[0] == DIRECTIVE_CHAR && strncmp(&eline[1], "endw", 4) == 0) {
 			if (scanpt == NULL) {
 				mlforce("[ENDWHILE with no preceding WHILE in '%s']",
-					bp->b_bname);
+					get_bname(bp));
 				goto failexit;
 			}
 			/* move top records from the scanpt list to the
@@ -1425,7 +1544,7 @@ nxtscan:	/* on to the next line */
 	/* while and endwhile should match! */
 	if (scanpt != NULL) {
 		mlforce("[WHILE with no matching ENDWHILE in '%s']",
-			bp->b_bname);
+			get_bname(bp));
 		goto failexit;
 	}
 #endif
@@ -1451,7 +1570,7 @@ nxtscan:	/* on to the next line */
 		eline[linlen] = EOS;	/* make sure it ends */
 
 		/* trim leading whitespace */
-		while (*eline == ' ' || *eline == '\t')
+		while (isblank(*eline))
 			++eline;
 
 		/* dump comments and blank lines */
@@ -1462,15 +1581,15 @@ nxtscan:	/* on to the next line */
 		/* if $debug == TRUE, every line to execute
 		   gets echoed and a key needs to be pressed to continue
 		   ^G will abort the command */
-	
+
 		if (macbug) {
 			char	outline[NLINE];
 			(void)strcpy(outline, "<<<");
-	
+
 			/* debug macro name */
-			(void)strcat(outline, bp->b_bname);
+			(void)strcat(outline, get_bname(bp));
 			(void)strcat(outline, ":");
-	
+
 			/* debug if levels */
 			(void)strcat(outline, l_itoa(execlevel));
 			(void)strcat(outline, ":");
@@ -1478,11 +1597,11 @@ nxtscan:	/* on to the next line */
 			/* and lastly the line */
 			(void)strcat(outline, eline);
 			(void)strcat(outline, ">>>");
-	
+
 			/* write out the debug line */
 			mlforce("%s",outline);
 			(void)update(TRUE);
-	
+
 			/* and get the keystroke */
 			if (kbd_key() == abortc) {
 				mlforce("[Macro aborted]");
@@ -1501,7 +1620,7 @@ nxtscan:	/* on to the next line */
 			++eline;
 			for (dirnum = 0; dirnum < NUMDIRS; dirnum++)
 				if (strncmp(eline, dname[dirnum],
-				            strlen(dname[dirnum])) == 0)
+					    strlen(dname[dirnum])) == 0)
 					break;
 
 			/* and bitch if it's illegal */
@@ -1537,7 +1656,7 @@ nxtscan:	/* on to the next line */
 			}
 			goto onward;
 		}
-	
+
 
 		force = FALSE;
 
@@ -1549,7 +1668,7 @@ nxtscan:	/* on to the next line */
 		/* now, execute directives */
 		if (dirnum != -1) {
 			/* skip past the directive */
-			while (*eline && *eline != ' ' && *eline != '\t')
+			while (*eline && !isblank(*eline))
 				++eline;
 			execstr = eline;
 
@@ -1587,7 +1706,7 @@ nxtscan:	/* on to the next line */
 						break;
 					whtemp = whtemp->w_next;
 				}
-			
+
 				if (whtemp == NULL) {
 					mlforce("[WHILE loop error]");
 					freewhile(whlist);
@@ -1595,7 +1714,7 @@ nxtscan:	/* on to the next line */
 					dobufnesting--;
 					return FALSE;
 				}
-			
+
 				/* reset the line pointer back.. */
 				lp = whtemp->w_end;
 				goto onward;
@@ -1623,7 +1742,7 @@ nxtscan:	/* on to the next line */
 					while (glp != l_ref(hlp)) {
 						if (glp->l_text[0] == '*' &&
 						    (strncmp(&glp->l_text[1], golabel,
-						            linlen) == 0)) {
+							    linlen) == 0)) {
 							lp = l_ptr(glp);
 							goto onward;
 						}
@@ -1636,7 +1755,7 @@ nxtscan:	/* on to the next line */
 					return FALSE;
 				}
 				goto onward;
-	
+
 			case DRETURN:	/* RETURN directive */
 				if (execlevel == 0)
 					goto eexec;
@@ -1655,7 +1774,7 @@ nxtscan:	/* on to the next line */
 							break;
 						whtemp = whtemp->w_next;
 					}
-		
+
 					if (whtemp == NULL) {
 						mlforce("[Internal While loop error]");
 						freewhile(whlist);
@@ -1663,7 +1782,7 @@ nxtscan:	/* on to the next line */
 						dobufnesting--;
 						return FALSE;
 					}
-		
+
 					/* reset the line pointer back.. */
 					lp = lBACK(whtemp->w_begin);
 					goto onward;
@@ -1767,38 +1886,35 @@ char *fname;	/* file name to execute */
 	register int odiscmd;
 	char bname[NBUFN];	/* name of buffer */
 
-	makename(bname, fname);		/* derive the name of the buffer */
-	unqname(bname,FALSE);
+	makename(bname, fname);	/* derive the name of the buffer */
+	unqname(bname, FALSE);
 
 	/* okay, we've got a unique name -- create it */
-	if ((bp=bfind(bname, OK_CREAT, 0))==NULL) {
+	if ((bp=bfind(bname, 0))==NULL) {
 		return FALSE;
 	}
 
-#ifdef BEFORE  /* is there any real reason for it to be view-only? */
-	/* mark the buffer as read only */
-	make_local_b_val(bp,MDVIEW);
-	set_b_val(bp,MDVIEW,TRUE);
-#endif
-
 	/* and try to read in the file to execute */
-	if ((status = readin(fname, FALSE, bp, TRUE)) != TRUE) {
-		return status;
+	if ((status = readin(fname, FALSE, bp, TRUE)) == TRUE) {
+
+		/* go execute it! */
+		odiscmd = discmd;
+		discmd = FALSE;
+		status = dobuf(bp);
+		discmd = odiscmd;
+
+		/*
+		 * If no errors occurred, and if the buffer isn't displayed,
+		 * remove it.
+		 */
+		if (status != TRUE)
+			(void)swbuffer(bp);
+		else if (bp->b_nwnd == 0)
+			(void)zotbuf(bp);
 	}
-
-	/* go execute it! */
-	odiscmd = discmd;
-	discmd = FALSE;
-	status = dobuf(bp);
-	discmd = odiscmd;
-	if (status != TRUE)
-		return status;
-
-	/* if not displayed, remove the now unneeded buffer and exit */
-	if (bp->b_nwnd == 0)
-		zotbuf(bp);
-	return TRUE;
+	return status;
 }
+
 static	int	cbuf P(( int, int, int ));
 
 /*	cbuf:	Execute the contents of a numbered buffer	*/
@@ -1808,8 +1924,8 @@ cbuf(f, n, bufnum)
 int f, n;	/* default flag and numeric arg */
 int bufnum;	/* number of buffer to execute */
 {
-        register BUFFER *bp;		/* ptr to buffer to execute */
-        register int status;		/* status return */
+	register BUFFER *bp;		/* ptr to buffer to execute */
+	register int status;		/* status return */
 	static char bufname[NBUFN];
 	register int odiscmd;
 
@@ -1819,10 +1935,10 @@ int bufnum;	/* number of buffer to execute */
 	(void)lsprintf(bufname, ScratchName(Macro %d), bufnum);
 
 	/* find the pointer to that buffer */
-        if ((bp=bfind(bufname, NO_CREAT, 0)) == NULL) {
-        	mlforce("[Macro not defined]");
-                return FALSE;
-        }
+	if ((bp = find_b_name(bufname)) == NULL) {
+		mlforce("[Macro not defined]");
+		return FALSE;
+	}
 
 	odiscmd = discmd;
 	discmd = FALSE;

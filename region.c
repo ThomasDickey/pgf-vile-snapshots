@@ -6,7 +6,10 @@
  * internal use.
  *
  * $Log: region.c,v $
- * Revision 1.27  1993/08/05 14:29:12  pgf
+ * Revision 1.28  1993/09/03 09:11:54  pgf
+ * tom's 3.60 changes
+ *
+ * Revision 1.27  1993/08/05  14:29:12  pgf
  * tom's 3.57 changes
  *
  * Revision 1.26  1993/07/27  18:06:20  pgf
@@ -153,15 +156,21 @@ yankregion()
 		m = region.r_orig;
 		if (fulllineregions)
 			kregflag |= KLINES|KYANK;
-        	while (region.r_size--) {
-                	if (is_at_end_of_line(m)) { /* End of line.         */
+        	while (region.r_size-- > 0) {
+                	if (m.o >= lLength(m.l)) { /* On/past end of line. */
                         	if ((status = kinsert('\n')) != TRUE) {
 					ukb = 0;
 					rls_region();
                                 	return status;
 				}
                         	m.l = lFORW(m.l);
-                        	m.o = 0;
+                        	m.o = w_left_margin(curwp);
+#if OPT_B_LIMITS
+				if (!same_ptr(m.l, region.r_orig.l))
+					region.r_size -= w_left_margin(curwp);
+				if (same_ptr(m.l, buf_head(curbp)))
+					break;
+#endif
                 	} else {                    /* Middle of line.      */
                         	if ((status = kinsert(char_at(m))) != TRUE) {
 					ukb = 0;

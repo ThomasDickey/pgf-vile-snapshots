@@ -162,46 +162,7 @@ Firstly - UNISYS 80286, EGA screen, 4DOS command shell & NNANSI.SYS
 [ i don't know if any of these are still true -- this was with 3.25 ]
 
 
-===================================================
 
-PCVILE
-
-Sigh, well, I removed vile from my DOS box today.  Reason:  earlier
-today I had cut over to it as my editor of choice and I noticed that
-after using vile for a long period of time and then typing:
-
-    :w        (save file)
-
-I would get an error message from vile saying that it was unable to
-access [PRN] (the DOS printer port).  Vile then gave me an opportunity
-to Retry or Abort?, but ignored all responses from the keyboard,
-including ^C.  I had no choice but to reboot.  Oh well, I figured, just
-a fluke.  But then the same problem occurred an hour later.  At that
-point I saw no alternative but to remove the program from disk.  I sure
-can't debug this problem because I know for a fact that the PC version
-of Vile is not using your released base of source code (it can't be
-because it handles command line file globbing, which your source does
-not support for DOS).
-
-
-[ i don't know if this is still true -- this was with 3.25 ]
-
-===================================
-
-
-PCVILE
-
-
-
-2) If your screen starts out in 50-line mode when you enter PC-vile,
-   and then exit, PC-vile puts the screen in 25-line mode.  Not
-   nice.
-[ still true?  how do i test? ]
-
-3) If you start editing PC-vile with a full block cursor, PC-vile
-   switches you back to a small underscore cursor.  Veeeeerrrrrrry
-   unfriendly.
-[ still true?  how do i test? ]
 
 ===================================================
 486 PC under Dell Unix (svr4) - make:    unixpc
@@ -239,10 +200,6 @@ better mimicking vi's behavior).
 	bind-key execute-macro-7 ^A-g
  - pgf ]
 ----------------------------------------------------------------------
-
-xvile: When I am in cmode and I do a cut from a xterm and do a paste into
-xvile, the program messes up the format so it doesn't paste properly.  So
-it needs to gobble up the spaces when I am in cmode or something like that.
 
 Enhancement:  xvile would be nicer with scroll bars.
 
@@ -423,20 +380,11 @@ I have a couple of bug reports and suggestions for you, concerning vile
 3.52 on SunOS.
 
 
-4) even more minor
-	I suggest that you redraw the entire screen after an ^X-!
-	command.  It frequently leaves my screen with a lot of garbage
-        which I have to cure with an ^L.
-    [ unreproducible -- should only happen if the command writes directly
-    to /dev/tty, since we capture all stderr and stdout ]
-
-
 5) annoying
 	When I execute a keyboard macro using ^X-& I cannot repeat this
 	using the dot command. Instead, the last command in the macro
 	is repeated.
     [ this is because . doesn't do @ macros either...]
-
 
 ------------------------------
 I found a bug in vile3.54 with file completion. If I type:
@@ -465,54 +413,17 @@ Can you add the '>' character to the list of comment chars for paragraph
 reformatting?  I would live to be able to reformat mail quotes (like shown
 above).
 
-[ pgf notes: formatregion should use the comments regexp to match a comment
-  delimiter at the beginning of line, and should insert the comment
-  delimiter of the _second_ line (so that boxed C comments work right)in
-  subsequent reformatted lines, including leading but not trailing
-  whitespace.  indentlen should be counted _after_ the width of such a
-  comment delimiter.  this would make paragraphs that are indented way
-  after the delimiter keep their indent.  commented paragraphs should end
-  when exp->mlen for the comment regexp is equal to llength(DOT), i.e. 
-  it's the whole line.  (we'll need to take the $ off the end of the
-  comment regexp).  ]
+[ pgf notes: I did this, as chris suggested, but formatregion should use
+  the comments regexp to match a comment delimiter at the beginning of
+  line, and should insert the comment delimiter of the _second_ line (so
+  that boxed C comments work right)in subsequent reformatted lines,
+  including leading but not trailing whitespace.  indentlen should be
+  counted _after_ the width of such a comment delimiter.  this would make
+  paragraphs that are indented way after the delimiter keep their indent. 
+  commented paragraphs should end when exp->mlen for the comment regexp is
+  equal to llength(DOT), i.e.  it's the whole line.  (we'll need to take
+  the $ off the end of the comment regexp).  ]
 
----------------------
-
-I have the world's most hideous macro to do it now...
-
-11 store-macro
-        set-variable %fred $curline
-        %fred goto-line
-        substitute-til next-paragraph "^> " "# "
-        %fred goto-line
-        update-screen
-        ~force format-til next-paragraph
-        update-screen
-        %fred goto-line
-        use-register y load-register ":g/^\# /s//> /g^M"
-        execute-register y
-        clear-message-line
-        write-message "reformatting done... "
-~endm
-bind-key execute-macro-11 FN-n
-
-
-See the 'use-register y...', 'execute-register y' lines above?  I would
-have used:
-
-        substitute-til next-paragraph "^\# " "> "
-
-instead...
-
-But that doesn't work.  The 'sub..' line does absolutely nothing.  It's
-like it doesn't see the text.  In fact, just about any subsitute command
-after the first one results in absolutely nothing happening.
-
-I tried everything I could think of, like sticking in the update-screen
-stuff, and all kinds of other things.  
-
-In the end, I had to whip out a :g command.  But it isn't a good solution,
-because it will try to reformat everything, not just the paragraph.  
 
 --------------------
 	When I do a ^R or ^W would you be able to make it so that when
@@ -536,13 +447,8 @@ because it will try to reformat everything, not just the paragraph.
 
 We are running vile under NeXT and we have
 problems to set macros with the meta key.
-Also the editor mode showram does not work (is not so important).
 --------------------------------
 
-in a text (non-C) file, i couldn't get "set sw=2" to "take" until i did
-a "set csw=3", and then the '2' stuck..   ????
-
------------------------------
 I got to compile vile at home over the weekend.  The version of
 djgpp (gcc 2.4.2 - sorry, I don't know the djgpp version number)
 I have didn't like this bit from estruct.h, lines (561-563):
@@ -553,36 +459,15 @@ I have didn't like this bit from estruct.h, lines (561-563):
 
 ----------------------------------
 
-BTW, the error finder doesn't work under OSF1 on DEC Alphas.  I checked
-finderr.c and was a little surprised to see that it uses a bunch of OR'ed
-and #ifdef'ed sscanf's to do it instead of regexp calls.  I wish you could
-reimplement it in a more elegant way (I hope it would be a minor work,
-since all the regexp routines are there) and give us an extra user
-definible err in regexp just like you define sentence, paragraph, etc. 
-Examples of compiling errors using DEC Fortran and C/C++ are:
-
-fort: Severe: test.f, line 3: Missing constant
-        stop;
-------------^
-
-/usr/lib/cmplrs/cc/cfe: Error: test.c, line 8: Syntax Error
-    openfile("slr.model"):
- ------------------------^
-
-The regexp for file name and line # for above message might be \1 and \2 in
-': \(..*\), line \([0-9][0-9]*\)'
-
-Of course, using sscanf directly and #ifdef OSF1 might be a quicker fix 
-(But other OSF1 machines like iParagon don't use DEC compilers for sure).
-
+enhancement:  reimplement error finder using regexps.
 
 ------------------------------
 core dump on startup in xterm with too many rows.
 
 ------------------------------
 	Another enhacement.
-	How about a history file.  SO say like I have been using vile and
-	quit out and come back in later I can use the history file.
+	How about a history file.  say I have been using vile and
+	quit and come back in later I can use the history file.
 
 --------------------------
 
@@ -596,18 +481,128 @@ connect to a 690 server (lightly loaded) running 4.1.3 and running vile
 on the 690.
 
 I just ran vile locally and didn't see the problem.
-
-------------------
-
-	I did a cut and paste from one vile screen to another.
-	I was in cmode and what i did was copied a function across.
-	I started at the { and when down to the matching }
-	When I did the paste into the other vile it lost the }
-
-
 -------------------------------
 
+PC Vile --
 
-Here's another buglet with xvile.  Often when scrolling with ^D or ^U the
-old cursor position stays inverse video.
+   1) Open a 50-line DOS box under windows.
 
+   2) Invoke pc vile (dos box stays at 50 lines, as I would expect).
+
+   3) Exit pc vile and the dos box goes to 25 lines. I wish PC vile would
+     leave the dos box at 50 lines.
+
+[ is this still true?  i don't see why it's happening -- we restore the
+    screen mode... ]
+----------------------------------
+
+
+On the Sun 4, Sun os 4.1.1 vile doesn't seem to work in cmdtool or
+shelltool windows (and, of course, vi does). Can you provide any help
+on that? Personally, I don't use cmdtool (I prefer xterm) but a lot
+of our users do use cmdtool.
+
+I found an ugly workaround. Turning off SCROLLCODE does the job.
+
+
+----------------------------------
+
+I found a bug with vile 3.59, compiled on a SparcStation running SunOS
+4.1.2. Using an xterm inserting a formfeed character gives some very
+strange behaviour. When I type:
+        0i^V^L
+the visual line under the cursor is deleted, and the cursor moves to
+the next line, 3rd row. When I now type a space the ^L appears and
+everything goes seemingly back to normal. If I insert the ^L on any but
+the 1st row there is no problem. Weird eh! vile 3.55 did not have this
+problem.
+
+
+-------------------------------------------------------------------------
+
+
+I found a bug (new with 3.59) on our Pyramid SVR4 (but not Pyramid SVR3,
+SunOS 4.1.1, AIX 3.2) where
+	xvile tmp &
+pops up the xvile window briefly, the window dies, the xterm I started
+xvile from says
+	[1]  + suspended (tty input)  xvile3.59 tmp
+and then after a couple seconds the xterm itself vanishes!  However,
+	xvile tmp
+works fine, except that the process is in the foreground.
+
+-------------------------------------------------------------------------
+
+I just did a :.,+s/User/Sys/g in xvile and it said 3 changes
+on 2 lines, sat for a while, then dumped core.  Here's the stack trace for
+what it's worth (happened on Pyramid SVR3).  The death in malloc indicates
+heap corruption.
+
+_kill(2FF9,6,0,C00CD608,C00CD60C,C00CD610,C00CD614,C00CB107,C00CD61C,C00CD620,C00CD624,C00CD628) from 50898
+_abort(0,58DC4,58960,C00CB6EB,0,0,1,14F3D8,C00CD59C,C00CD5A0,C00CD5A4,C00CD5A8)from 48800
+_imdying(A,1,C00CD554,200341,1AFF4,C00CD500,79F08,1,0,C00CD520,C00CD524,C00CD528) from 1b1c0
+?(E,6961676E,B5644,C00CB038,2DF,9B49F,0,6961676E,C00CD49C,C00CD4A0,C00CD4A4,FF1962EC) from c00cc000
+_malloc(10,5E3C0,1,C00CB0D8,8,1,6DAB0,0,C00CD41C,C00CD420,C00CD424,FF1962EC) from 50920
+_lalloc(F,B5F80,FFFFFFF5,59DF0,73,20,C00CAFE0,0,0,21C,C00CD3A4,FF1962EC) from 23ad0
+_add_line_at(B5F80,1528D0,6C460,F,20,0,A794,55B40,C00CD31C,C00CD320,C00CD324,C00CD328) from cac8
+_addline(B5F80,6C460,F,C00CD2F8,C00CD2D4,B5644,968B4,0,C00CD29C,C00CD2A0,C00CD2A4,FF1962EC) from ca64
+_hst_flush(1,1,1,1F4,10,1,0,3A,69,C00CD220,C00CD224,FF1962EC) from 1eb84
+_namedcmd(1,1,1556C,14F3C0,0,9,0,48,C00CD19C,C00CD1A0,C00CD1A4,FF1962EC) from 15594
+_execute(55A90,0,1,C00CD108,C00CD10C,C00CD110,0,B5644,C00CD11C,C00CD120,C00CD124,C00CD128) from 15e14
+_loop(1,0,0,20,0,C00CD080,0,0,0,0,0,0) from cf0
+_main(5,C00CB44C,C00CB464) from ba0
+
+
+
+-----------------------------
+apply Alistair's min/max regexp patch
+
+-------------------------------------------------------------------------
+
+I guess, in the future, there will be an option for "xvile" which can
+change the title of its window, right?
+
+-------------------------------------------------------------------------
+
+	Is there any way to use termcap to define 
+all of the window parameters, but still use ANSI escapes for colors?  Elvis
+allows me to do this under Linux on the terminal screen and a couple of
+systems allow Elvis to change the foreground and background colors under an
+xterm.  If I tell Vile to compile using ANSI instead of termcap it works 
+but it doesn't seem to recognize any of my termcap variables (which means
+it doesn't get the right screen size or exits with incorrect colors).
+
+	Thanks for any help.
+-------------------------------------------------------------------------
+
+shell commands aren't redisplayed with ' ' anymore, only '\r'.
+(i think because the space doesn't do the command completion that it used
+to do?)
+
+-------------------------------------------------------------------------
+the :s/pat/repl/ command prompts for "Specify line-count"
+
+-------------------------------------------------------------------------
+c<sp> on last character of a line no longer works.  why did you need to
+introduce "forwchar_on_line()"?
+
+-------------------------------------------------------------------------
+register naming is broken for "1, "2 etc seem to reference "8, "9 instead.
+
+-------------------------------------------------------------------------
+buffer naming for piped commands is weird: for examle, a second "!co args"
+becomes "!co-1 args args"  (the -1, -2 etc. seem to get stuck in the wrong
+place?  or else the buffer name's too long to begin with.  this is no doubt
+a result of the non-null-termination.  can you tell me again (i've forgotten)
+why we couldn't just fix the couple of places where the bufn wasn't terminated?
+
+-------------------------------------------------------------------------
+if i filter a region, i get a "deleted" report for all the lines that were
+deleted.  it's a little unnerving, esp. since undo/redo then get it right
+
+-------------------------------------------------------------------------
+[from a user]
+Is there perhaps a bug in is_at_end_of_line? I noticed that,
+in forwchar_to_eol it never reports true, even when it should.
+Is it considering the newline to be at eol, when in fact the
+newline is at eol+1?

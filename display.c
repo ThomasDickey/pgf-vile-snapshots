@@ -6,7 +6,19 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.97  1993/08/16 14:06:06  pgf
+ * Revision 1.101  1993/09/06 16:24:28  pgf
+ * used-before-set warning cleanup
+ *
+ * Revision 1.100  1993/09/03  09:11:54  pgf
+ * tom's 3.60 changes
+ *
+ * Revision 1.99  1993/08/21  18:20:06  pgf
+ * protect against window sizes less than 1
+ *
+ * Revision 1.98  1993/08/20  21:22:12  pgf
+ * added AIX to the machines that need sys/ioctl.h, to pick up TIOCGWINSIZE
+ *
+ * Revision 1.97  1993/08/16  14:06:06  pgf
  * took out reference to variable 'req' in updateline() when REVSTA not
  * defined.
  *
@@ -355,10 +367,7 @@
 # endif
 #endif
 
-#if OSF1
-# include <sys/ioctl.h>
-#endif
-#if LINUX
+#if OSF1 || AIX || LINUX
 # include <sys/ioctl.h>
 #endif
 
@@ -909,6 +918,9 @@ WINDOW *wp;
 	} else
 		skip = 0;
 
+#if OPT_B_LIMITS
+	taboff -= w_left_margin(wp);
+#endif
 	from = l_ref(lp)->l_text + skip;
 	while ((vtcol <= term.t_ncol) && (n > 0)) {
 		if (list)
@@ -1015,7 +1027,7 @@ int force;	/* force update past type ahead? */
 		return SORTOFTRUE;
 #endif
 
-	displaying = TRUE;
+	beginDisplay;
 
 	/* first, propagate mode line changes to all instances of
 		a buffer displayed in more than one window */
@@ -1075,11 +1087,11 @@ int force;	/* force update past type ahead? */
 				scrflags |= (wp->w_flag & (WFINS|WFKILLS));
 				wp->w_flag &= ~(WFKILLS|WFINS);
 			}
-			if ((wp->w_flag & ~(/* WFMOVE| */WFMODE)) == WFEDIT)
+			if ((wp->w_flag & ~(WFMODE)) == WFEDIT)
 				updone(wp);	/* update EDITed line */
 			else if (wp->w_flag & ~(WFMOVE))
 				updall(wp);	/* update all lines */
-			if (scrflags || (wp->w_flag & WFMODE))
+			if (scrflags || (wp->w_flag & (WFMODE|WFCOLR)))
 				modeline(wp);	/* update modeline */
 			wp->w_flag = 0;
 			wp->w_force = 0;
@@ -1103,13 +1115,10 @@ int force;	/* force update past type ahead? */
 	updupd(force);
 
 	/* update the cursor and flush the buffers */
-#if X11
-	if (!x_on_msgline())
-#endif
 	movecursor(screenrow, screencol);
 
 	TTflush();
-	displaying = FALSE;
+	endofDisplay;
 	displayed  = TRUE;
 
 	while (chg_width || chg_height)
@@ -1127,6 +1136,7 @@ WINDOW *wp;
 	fast_ptr LINEPTR lp;
 	register int i = 0;
 	register int rows;
+	int	founddot = FALSE;	/* set to true iff we find dot */
 
 	/* if not a requested reframe, check for a needed one */
 	if ((wp->w_flag & WFFORCE) == 0) {
@@ -1151,6 +1161,7 @@ WINDOW *wp;
 		for (;;) {
 			/* if the line is in the window, no reframe */
 			if (same_ptr(lp, wp->w_dot.l)) {
+				founddot = TRUE;
 #if CAN_SCROLL
 				/* if not _quite_ in, we'll reframe gently */
 				if ( i < 0 || i >= wp->w_ntrows) {
@@ -1177,10 +1188,11 @@ WINDOW *wp;
 				break;
 
 			/* on to the next line */
-			if ((i += line_height(wp,lp)) > wp->w_ntrows) {
+			if (i >= wp->w_ntrows) {
 				i = 0;	/* dot-not-found */
 				break;
 			}
+			i += line_height(wp,lp);
 			lp = lFORW(lp);
 		}
 	}
@@ -1189,7 +1201,8 @@ WINDOW *wp;
 	if (i < 0) {	/* we're just above the window */
 		i = 1;	/* put dot at first line */
 		scrflags |= WFINS;
-	} else if (i >= wp->w_ntrows) { /* we're just below the window */
+	} else if (founddot && (i >= wp->w_ntrows)) {
+		/* we're just below the window */
 		i = -1;	/* put dot at last line */
 		scrflags |= WFKILLS;
 	} else /* put dot where requested */
@@ -1236,19 +1249,20 @@ WINDOW *wp;
 				break;
 			lp = dlp;
 		}
-		if (rows > 0)
-			i = 0;
-		while (i++ < 0) {
-			dlp = lFORW(lp);
-			if (!same_ptr(dlp, win_head(wp)))
-				lp = dlp;
-		}
+		if (rows < line_height(wp, lp))
+			while (i++ < 0) {
+				dlp = lFORW(lp);
+				if (!same_ptr(dlp, win_head(wp)))
+					lp = dlp;
+			}
 	}
 
 	/* and reset the current line-at-top-of-window */
-	wp->w_line.l = lp;
-	wp->w_flag |= WFHARD;
-	wp->w_flag &= ~WFFORCE;
+	if (!same_ptr(lp, win_head(wp))) { /* mouse-click could be past end */
+		wp->w_line.l = lp;
+		wp->w_flag |= WFHARD;
+		wp->w_flag &= ~WFFORCE;
+	}
 }
 
 /*	updone:	update the current line	to the virtual screen		*/
@@ -1378,7 +1392,7 @@ int *screencolp;
 
 	/* find the current column */
 	col = 0;
-	i = 0;
+	i = w_left_margin(curwp);
 	while (i < DOT.o || (!global_g_val(GMDALTTABPOS) && !insertmode &&
 				i <= DOT.o && i < lLength(lp))) {
 		c = lGetc(lp, i++);
@@ -1393,6 +1407,7 @@ int *screencolp;
 		}
 
 	}
+	col += w_left_margin(curwp);
 	if (!global_g_val(GMDALTTABPOS) && !insertmode &&
 			col != 0 && DOT.o < lLength(lp))
 		col--;
@@ -1452,7 +1467,8 @@ int *screencolp;
 		}
 		*screencolp = curcol;
 	}
-	*screencolp += nuadj;
+	if (!moved)
+		*screencolp += nuadj;
 	return moved;
 }
 
@@ -1551,7 +1567,7 @@ int force;	/* forced update flag */
 
 	for (i = 0; i < term.t_nrow; ++i) {
 		/* for each line that needs to be updated*/
-		if ((vscreen[i]->v_flag & VFCHG) != 0) {
+		if ((vscreen[i]->v_flag & (VFCHG|VFCOL)) != 0) {
 #if	TYPEAH
 			if (force == FALSE && typahead())
 				return;
@@ -1581,19 +1597,24 @@ C_NUM	offset;
 #endif
 			w_val(wp,WVAL_SIDEWAYS);
 
-	register int	n, c;
+	register C_NUM	n, c;
 
-	for (n = 0; (n < offset) && (n <= length); n++) {
-		c = (n == length) ? '\n' : l_ref(lp)->l_text[n];
-		if (isprint(c)) {
-			column++;
-		} else if (list) {
-			column += 2;
-		} else if (c == '\t') {
-			column = ((column / tabs) + 1) * tabs;
+	if (same_ptr(lp, win_head(wp))) {
+		column = 0;
+	} else {
+		for (n = w_left_margin(wp); (n < offset) && (n <= length); n++) {
+			c = (n == length) ? '\n' : l_ref(lp)->l_text[n];
+			if (isprint(c)) {
+				column++;
+			} else if (list || (c != '\t')) {
+				column += 2;
+			} else if (c == '\t') {
+				column = ((column / tabs) + 1) * tabs;
+			}
 		}
+		column = column - left + nu_width(wp) + w_left_margin(wp);
 	}
-	return column - left + nu_width(wp);
+	return column;
 }
 
 /*
@@ -1615,20 +1636,29 @@ C_NUM	col;
 			w_val(wp,WMDLINEWRAP) ? 0 :
 #endif
 			w_val(wp,WVAL_SIDEWAYS);
-	int	goal = col + left - nu_width(wp);
+	int	goal = col + left - nu_width(wp) - w_left_margin(wp);
 
+	register C_NUM	n;
 	register C_NUM	offset;
 	register C_NUM	len	= llength(l_ref(lp));
 	register char	*text	= l_ref(lp)->l_text;
 
-	for (offset = 0, col = 0; (offset < len) && (col < goal); offset++) {
-		register int c = text[offset];
-		if (isprint(c)) {
-			col++;
-		} else if (list) {
-			col += 2;
-		} else if (c == '\t') {
-			col = ((col / tabs) + 1) * tabs;
+	if (same_ptr(lp, win_head(wp))) {
+		offset = 0;
+	} else {
+		for (offset = w_left_margin(wp), n = 0;
+			(offset < len) && (n < goal);
+				offset++) {
+			register int c = text[offset];
+			if (isprint(c)) {
+				n++;
+			} else if (list || (c != '\t')) {
+				n += 2;
+			} else if (c == '\t') {
+				n = ((n / tabs) + 1) * tabs;
+			}
+			if (n > goal)
+				break;
 		}
 	}
 	return offset;
@@ -1707,10 +1737,8 @@ int	on;		/* start highlighting */
 	if (row < term.t_nrow && (colfrom >= 0 || colto <= term.t_ncol)) {
 		if (on) {
 			vp1->v_flag |= VFREQ;
-			vp1->v_flag &= ~VFREV;
 		} else {
 			vp1->v_flag &= ~VFREQ;
-			vp1->v_flag |= VFREV;
 		}
 		if (colfrom < 0)
 			colfrom = 0;
@@ -1959,21 +1987,28 @@ int	colto;		/* last column on screen */
 
 {
 	register struct VIDEO *vp1 = vscreen[row];	/* virtual screen image */
+	register int	req = (vp1->v_flag & VFREQ) == VFREQ;
 #if	COLOR
-	scwrite(row, colfrom, colto,
-		vp1->v_text, vp1->v_rfcolor, vp1->v_rbcolor);
 	vp1->v_fcolor = vp1->v_rfcolor;
 	vp1->v_bcolor = vp1->v_rbcolor;
+	scwrite(row, colfrom, colto - colfrom,
+		vp1->v_text,
+		req ? vp1->v_rbcolor : vp1->v_rfcolor,
+		req ? vp1->v_rfcolor : vp1->v_rbcolor);
 #else
-	if (vp1->v_flag & VFREQ)
-		scwrite(row, colfrom, colto, vp1->v_text, 0, 7);
-	else
-		scwrite(row, colfrom, colto, vp1->v_text, 7, 0);
+	scwrite(row, colfrom, colto - colfrom,
+		vp1->v_text,
+		req ? C_BLACK : C_WHITE,
+		req ? C_WHITE : C_BLACK);
 #endif
-	vp1->v_flag &= ~(VFCHG | VFCOL);	/* flag this line as changed */
+	vp1->v_flag &= ~(VFCHG | VFCOL); /* flag this line as updated */
+	if (req)
+		vp1->v_flag |= VFREV;
+	else
+		vp1->v_flag &= ~VFREV;
 }
 
-#else
+#else	/* !MEMMAP */
 
 static void
 updateline(row, colfrom, colto)
@@ -2013,7 +2048,8 @@ int	colto;		/* first column on screen */
 	req = (vp1->v_flag & VFREQ) == VFREQ;
 	if ((rev != req)
 #if	COLOR
-	    || (vp1->v_fcolor != vp1->v_rfcolor) || (vp1->v_bcolor != vp1->v_rbcolor)
+	    || (vp1->v_fcolor != vp1->v_rfcolor)
+	    || (vp1->v_bcolor != vp1->v_rbcolor)
 #endif
 #if	HP150
 	/* the HP150 has some reverse video problems */
@@ -2022,7 +2058,7 @@ int	colto;		/* first column on screen */
 			) {
 		movecursor(row, colfrom);	/* Go to start of line. */
 		/* set rev video if needed */
-		if (rev != req)
+		if (req)
 			TTrev(req);
 
 		/* scan through the line and dump it to the screen and
@@ -2039,11 +2075,11 @@ int	colto;		/* first column on screen */
 			*cp2++ = *cp1++;
 		}
 		/* turn rev video off */
-		if (rev != req)
+		if (req)
 			TTrev(FALSE);
 
 		/* update the needed flags */
-		vp1->v_flag &= ~VFCHG;
+		vp1->v_flag &= ~(VFCHG|VFCOL);
 		if (req)
 			vp1->v_flag |= VFREV;
 		else
@@ -2073,7 +2109,7 @@ int	colto;		/* first column on screen */
  */
 	/* if both lines are the same, no update needs to be done */
 	if (cp1 == &vp1->v_text[colto]) {
- 		vp1->v_flag &= ~VFCHG;		/* flag this line is changed */
+		vp1->v_flag &= ~VFCHG;	/* flag this line unchanged */
 		return;
 	}
 
@@ -2129,10 +2165,10 @@ int	colto;		/* first column on screen */
 #if	REVSTA
 	TTrev(FALSE);
 #endif
-	vp1->v_flag &= ~VFCHG;		/* flag this line as updated */
+	vp1->v_flag &= ~(VFCHG|VFCOL);	/* flag this line as updated */
 	return;
 }
-#endif
+#endif	/* MEMMAP(updateline) */
 
 static	char *	PutMode_gap;
 
@@ -2163,11 +2199,9 @@ WINDOW *wp;
 
 	n = wp->w_toprow+wp->w_ntrows;      	/* Location. */
 	vscreen[n]->v_flag |= VFCHG | VFREQ | VFCOL;/* Redraw next time. */
-
-
 #if	COLOR
-	vscreen[n]->v_rbcolor = w_val(wp,WVAL_FCOLOR);
-	vscreen[n]->v_rfcolor = w_val(wp,WVAL_BCOLOR);
+	vscreen[n]->v_rfcolor = w_val(wp,WVAL_FCOLOR);
+	vscreen[n]->v_rbcolor = w_val(wp,WVAL_BCOLOR);
 #endif
 	vtmove(n, 0);                       	/* Seek to right line. */
 	if (wp == curwp) {			/* mark the current buffer */
@@ -2196,7 +2230,7 @@ WINDOW *wp;
 		}
 		vtputc(ic);
 	}
-	vtprintf("%c %s",lchar,bp->b_bname);
+	vtprintf("%c %s",lchar, get_bname(bp));
 
 	/* show the major-modes of the buffer */
 	PutMode_gap = " [";
@@ -2218,7 +2252,7 @@ WINDOW *wp;
 	if (bp->b_fname != 0 && bp->b_fname[0] != EOS) {
 		char *p;
 		p = shorten_path(strcpy(temp,bp->b_fname), FALSE);
-		if (p != 0 && strcmp(p,bp->b_bname) != 0) {
+		if (p != 0 && !eql_bname(bp, p)) {
 			/* line-up the internal-names */
 #if !SMALLER
 			if (is_internalname(p)) {
@@ -2325,21 +2359,6 @@ upmode()	/* update all the mode lines */
 }
 
 /*
- * Mark the given buffer for automatic update
- */
-#if	OPT_UPBUFF
-void
-upbuff(bp)
-BUFFER *bp;
-{
-	if (bp != 0
-	 && b_val(bp,MDUPBUFF)
-	 && bp->b_upbuff != 0)
-		b_set_flags(bp,BFUPBUFF);
-}
-#endif
-
-/*
  * Recompute the given buffer. Save/restore its modes and position information
  * so that a redisplay will show as little change as possible.
  */
@@ -2352,29 +2371,37 @@ typedef	struct	{
 	int	col;
 	} SAVEWIN;
 
+static	SAVEWIN	*recomp_tbl;
+static	UINT	recomp_len;
+
 static void
 recompute_buffer(bp)
 BUFFER	*bp;
 {
 	register WINDOW *wp;
-	static	SAVEWIN	*tbl;
-	static	UINT	lentbl;
+	register SAVEWIN *tbl;
 
 	struct VAL b_vals[MAX_B_VALUES];
 	int	num = 0;
 	BUFFER *savebp = curbp;
 	WINDOW *savewp = curwp;
+	int	mygoal = curgoal;
 
-	if (lentbl < bp->b_nwnd) {
-		lentbl = bp->b_nwnd + 1;
-		tbl = (tbl != 0)
-			? typereallocn(SAVEWIN,tbl,lentbl)
-			: typeallocn(SAVEWIN,lentbl);
-		if (tbl == 0) {
-			lentbl = 0;
+	if (!b_val(bp,MDUPBUFF)) {
+		b_clr_flags(bp,BFUPBUFF);
+		return;
+	}
+	if (recomp_len < bp->b_nwnd) {
+		recomp_len = bp->b_nwnd + 1;
+		recomp_tbl = (recomp_tbl != 0)
+			? typereallocn(SAVEWIN,recomp_tbl,recomp_len)
+			: typeallocn(SAVEWIN,recomp_len);
+		if (recomp_tbl == 0) {
+			recomp_len = 0;
 			return;
 		}
 	}
+	tbl = recomp_tbl;
 
 	/* remember where we are, to reposition */
 	/* ...in case line is deleted from buffer-list */
@@ -2391,8 +2418,8 @@ BUFFER	*bp;
 			tbl[num].line = line_no(bp, wp->w_dot.l);
 			tbl[num].col  = getccol(FALSE);
 			save_vals(NUM_W_VALUES, global_w_values.wv,
-				tbl[num].w_vals, wp->w_traits.w_vals.wv);
-			if (++num >= lentbl)
+				tbl[num].w_vals, wp->w_values.wv);
+			if (++num >= recomp_len)
 				break;
 		}
 	}
@@ -2401,23 +2428,24 @@ BUFFER	*bp;
 
 	save_vals(NUM_B_VALUES, global_b_values.bv, b_vals, bp->b_values.bv);
 	(bp->b_upbuff)(bp);
-	restore_vals(NUM_B_VALUES, b_vals, bp->b_values.bv);
+	copy_mvals(NUM_B_VALUES, bp->b_values.bv, b_vals);
 
 	/* reposition and restore */
 	while (num-- > 0) {
 		curwp = wp = tbl[num].wp;
 		curbp = curwp->w_bufp;
-		(void) gotoline(TRUE, tbl[num].top);
+		(void)gotoline(TRUE, tbl[num].top);
 		wp->w_line.l = wp->w_dot.l;
 		wp->w_line.o = 0;
 		if (tbl[num].line != tbl[num].top)
 			(void)gotoline(TRUE, tbl[num].line);
 		(void)gocol(tbl[num].col);
         	wp->w_flag |= WFMOVE;
-		restore_vals(NUM_W_VALUES, tbl[num].w_vals, wp->w_traits.w_vals.wv);
+		copy_mvals(NUM_W_VALUES, wp->w_values.wv, tbl[num].w_vals);
 	}
 	curwp = savewp;
 	curbp = savebp;
+	curgoal = mygoal;
 	b_clr_flags(bp,BFUPBUFF);
 }
 #endif
@@ -2479,6 +2507,7 @@ int	column;
 void
 mlerase()
 {
+	beginDisplay;
 	if (mpresf != 0) {
 		movecursor(term.t_nrow, 0);
 		if (discmd != FALSE) {
@@ -2490,6 +2519,7 @@ mlerase()
 			mpresf = 0;
 		}
 	}
+	endofDisplay;
 }
 
 char *mlsavep;
@@ -2604,8 +2634,10 @@ va_dcl
 	mlmsg(&ap);
 #endif
 	va_end(ap);
+	beginDisplay;
 	while (TTgetc() != '\007')
 		;
+	endofDisplay;
 }
 
 /*
@@ -2809,7 +2841,7 @@ va_dcl
  * is not valid.  This may be fixed (in the tcap.c case) by the TERM
  * variable.
  */
-
+#if defined( SIGWINCH) && ! X11
 void
 getscreensize (widthp, heightp)
 int *widthp, *heightp;
@@ -2847,7 +2879,6 @@ int *widthp, *heightp;
 #endif
 }
 
-#if defined( SIGWINCH) && ! X11
 /* ARGSUSED */
 SIGT
 sizesignal (ACTUAL_SIG_ARGS)
@@ -2858,7 +2889,7 @@ ACTUAL_SIG_DECL
 
 	getscreensize (&w, &h);
 
-	if ((h && h-1 != term.t_nrow) || (w && w != term.t_ncol))
+	if ((h > 1 && h-1 != term.t_nrow) || (w > 1 && w != term.t_ncol))
 		newscreensize(h, w);
 
 	(void)signal(SIGWINCH, sizesignal);
@@ -2907,7 +2938,9 @@ ACTUAL_SIG_DECL
 	static	int	flip;
 	static	int	skip;
 
-	if (!global_b_val(MDTERSE) && !displaying && !doing_kbd_read) {
+	if (displaying) {	/* look at the semaphore first! */
+		;
+	} else if (!global_b_val(MDTERSE) && !doing_kbd_read) {
 		if (skip) {
 			skip = FALSE;
 		} else if (displayed) {
@@ -2952,6 +2985,7 @@ ACTUAL_SIG_DECL
 			movecursor(term.t_nrow, -(mpresf+1));
 			erase_remaining_msg(-(mpresf+1));
 			movecursor(save_row, save_col);
+			TTflush();
 			mpresf = 0;
 		}
 		skip = TRUE;
@@ -2977,6 +3011,9 @@ void	vt_leaks()
 	free ((char *)vscreen);
 #if	! MEMMAP
 	free ((char *)pscreen);
+#endif
+#if OPT_UPBUFF
+	FreeIfNeeded(recomp_tbl);
 #endif
 }
 #endif

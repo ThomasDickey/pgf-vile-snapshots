@@ -4,7 +4,12 @@
  *  heavily modified by Paul Fox, 1990
  *
  * $Log: search.c,v $
- * Revision 1.52  1993/08/13 16:32:50  pgf
+ * Revision 1.53  1993/09/06 16:34:38  pgf
+ * took out redundant TTbeep() calls, now that all failed motions cause
+ * a beep.  (left them in for the "only one occurence" cases, since those
+ * return TRUE)
+ *
+ * Revision 1.52  1993/08/13  16:32:50  pgf
  * tom's 3.58 changes
  *
  * Revision 1.51  1993/07/01  10:47:36  pgf
@@ -288,7 +293,6 @@ int marking, fromscreen;
 		nextch(&(DOT), FORWARD);
 		status = scanner(gregexp, FORWARD, wrapok);
 		if (status == ABORT) {
-			TTbeep();
 			mlforce("[Aborted]");
 			DOT = curpos;
 			return status;
@@ -325,7 +329,6 @@ int marking, fromscreen;
 	if ((marking && didmark == FALSE) ||
 				(!marking && status == FALSE)) {
 		not_found_msg(wrapok,FORWARD);
-		TTbeep();
 		return FALSE;
 	}
 	
@@ -383,9 +386,7 @@ int f, n;	/* default flag / numeric argument */
 	} else if (status == FALSE) {
 		nextch(&(DOT),REVERSE);
 		not_found_msg(wrapok,FORWARD);
-		TTbeep();
 	} else if (status == ABORT) {
-		TTbeep();
 		mlforce("[Aborted]");
 		DOT = curpos;
 		return status;
@@ -455,9 +456,7 @@ int dummy, fromscreen;
 		else if (status == FALSE) {
 			nextch(&(DOT),FORWARD);
 			not_found_msg(wrapok,REVERSE);
-			TTbeep();
 		} else if (status == ABORT) {
-			TTbeep();
 			mlforce("[Aborted]");
 			DOT = curpos;
 			return status;
@@ -519,9 +518,7 @@ int f, n;	/* default flag / numeric argument */
 	} else if (status == FALSE) {
 		nextch(&(DOT),FORWARD);
 		not_found_msg(wrapok,REVERSE);
-		TTbeep();
 	} else if (status == ABORT) {
-		TTbeep();
 		mlforce("[Aborted]");
 		DOT = curpos;
 		return status;

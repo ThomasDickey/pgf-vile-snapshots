@@ -12,7 +12,13 @@
 # The modes are table entries in the BUFFER and WINDOW structures.
 #
 # $Log: modetbl,v $
-# Revision 1.20  1993/08/13 16:32:50  pgf
+# Revision 1.22  1993/09/06 16:31:19  pgf
+# added multibeep mode
+#
+# Revision 1.21  1993/09/03  09:11:54  pgf
+# tom's 3.60 changes
+#
+# Revision 1.20  1993/08/13  16:32:50  pgf
 # tom's 3.58 changes
 #
 # Revision 1.19  1993/08/05  14:29:12  pgf
@@ -86,6 +92,7 @@ bool								# GMD prefix
 	"expand-path"	EXPAND_PATH	0			# true iff %/# don't substitute shortened-path
 	"HIstory"	HISTORY		0			# command-history
 	"ImplyBuffer"	IMPLYBUFF 	0			# imply-buffer (vi-like)
+	"multibeep"	MULTIBEEP	0			# multiple successive identical failed motions all beep
 	"Popup-Choices"	POPUP_FILEC	0		NOTYET	# popup buffer showing file-completion choices
 	"Popup-Msgs"	POPUP_MSGS	0		NOTYET	# popup buffer when multiple messages emitted
 	"ShowRam"	RAMSIZE		0		RAMSIZE	# show ram-usage
@@ -144,7 +151,7 @@ bool								# WMD prefix
 	"LIst"		LIST		WFHARD			# "list" mode -- show tabs and EOL
 	"NUmber"	NUMBER		WFMODE|WFHARD		# line-numbers shown
 	"HorizScroll"	HORSCROLL	0			# scroll whole screen
-	"LineWrap"	LINEWRAP	WFMODE|WFHARD	!SMALLER # wrap lines wider than screen
+	"LineWrap"	LINEWRAP	WFHARD		!SMALLER # wrap lines wider than screen
 	"ruler"		RULER		WFSTAT		!SMALLER # display line+col in modeline
 int								# VAL_ prefix
 	"SIDEways"	SIDEWAYS	WFMODE|WFHARD		# sideways offset for display

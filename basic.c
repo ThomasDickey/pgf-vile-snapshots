@@ -6,7 +6,13 @@
  * framing, are hard.
  *
  * $Log: basic.c,v $
- * Revision 1.56  1993/08/13 16:32:50  pgf
+ * Revision 1.58  1993/09/06 16:19:31  pgf
+ * eliminated infinite loop in gotobosent()
+ *
+ * Revision 1.57  1993/09/03  09:11:54  pgf
+ * tom's 3.60 changes
+ *
+ * Revision 1.56  1993/08/13  16:32:50  pgf
  * tom's 3.58 changes
  *
  * Revision 1.55  1993/08/05  14:29:12  pgf
@@ -213,18 +219,55 @@
 #include	"estruct.h"
 #include	"edef.h"
 
+static	int	full_pages P((int, int));
+static	int	half_pages P((int, int));
+
+/* utility routine for 'forwpage()' and 'backpage()' */
+static int
+full_pages(f,n)
+int	f, n;
+{
+	if (f == FALSE) {
+		n = curwp->w_ntrows - 2;	/* Default scroll.	*/
+		if (n <= 0)			/* Don't blow up if the */
+			n = 1;			/* window is tiny.	*/
+	}
+#if	CVMVAS
+	else if (n > 0)				/* Convert from pages	*/
+		n *= curwp->w_ntrows;		/* to lines.		*/
+#endif
+	return n;
+}
+
+/* utility routine for 'forwhpage()' and 'backhpage()' */
+static int
+half_pages(f,n)
+int	f, n;
+{
+	if (f == FALSE) {
+		n = curwp->w_ntrows / 2;	/* Default scroll.	*/
+		if (n <= 0)			/* Forget the overlap	*/
+			n = 1;			/* if tiny window.	*/
+	}
+#if	CVMVAS
+	else if (n > 0)				/* Convert from pages	*/
+		n *= curwp->w_ntrows/2;		/* to lines.		*/
+#endif
+	return n;
+}
+
 /*
- * Move the cursor to the
- * beginning of the current line.
- * Trivial.
+ * Implements the vi "0" command.
+ *
+ * Move the cursor to the beginning of the current line.
  */
 /* ARGSUSED */
 int
 gotobol(f, n)
 int f,n;
 {
-	curwp->w_dot.o  = 0;
-	return (TRUE);
+	DOT.o  = w_left_margin(curwp);
+	return mvleftwind(TRUE, -w_val(curwp,WVAL_SIDEWAYS));
 }
 
 /*
@@ -244,19 +287,21 @@ register int n;
 	if (n < 0)
 		return (forwchar(f, -n));
 	while (n--) {
-		if (curwp->w_dot.o == 0) {
-			if ((lp=lBack(curwp->w_dot.l)) == l_ref(curbp->b_line.l))
+		if (DOT.o == w_left_margin(curwp)) {
+			if ((lp=lBack(DOT.l)) == l_ref(curbp->b_line.l))
 				return (FALSE);
-			curwp->w_dot.l  = l_ptr(lp);
-			curwp->w_dot.o  = llength(lp);
+			DOT.l  = l_ptr(lp);
+			DOT.o  = llength(lp);
 			curwp->w_flag |= WFMOVE;
 		} else
-			curwp->w_dot.o--;
+			DOT.o--;
 	}
 	return (TRUE);
 }
 
 /*
+ * Implements the vi "h" command.
+ *
  * Move the cursor backwards by "n" characters. Stop at beginning of line.
  */
 int
@@ -269,15 +314,17 @@ register int	n;
 	if (n < 0)
 		return forwchar_to_eol(f, -n);
 	while (n--) {
-		if (curwp->w_dot.o == 0)
-			return TRUE;
+		if (DOT.o == w_left_margin(curwp))
+			return FALSE;
 		else
-			curwp->w_dot.o--;
+			DOT.o--;
 	}
 	return TRUE;
 }
 
 /*
+ * Implements the vi "$" command.
+ *
  * Move the cursor to the end of the current line. Trivial. No errors.
  */
 int
@@ -291,7 +338,7 @@ int f,n;
 			++n;
 		forwline(f,n);
 	}
-	curwp->w_dot.o  = lLength(curwp->w_dot.l);
+	DOT.o  = lLength(DOT.l);
 	curgoal = HUGE;
 	return (TRUE);
 }
@@ -311,21 +358,23 @@ register int	n;
 	if (n < 0)
 		return (backchar(f, -n));
 	while (n--) {
-		if (is_at_end_of_line(curwp->w_dot)) {
-			if (is_header_line(curwp->w_dot, curbp) ||
-					is_last_line(curwp->w_dot,curbp))
+		if (is_at_end_of_line(DOT)) {
+			if (is_header_line(DOT, curbp) ||
+					is_last_line(DOT,curbp))
 				return (FALSE);
-			curwp->w_dot.l  = lFORW(curwp->w_dot.l);
-			curwp->w_dot.o  = 0;
+			DOT.l  = lFORW(DOT.l);
+			DOT.o  = w_left_margin(curwp);
 			curwp->w_flag |= WFMOVE;
 		} else
-			curwp->w_dot.o++;
+			DOT.o++;
 	}
 	return (TRUE);
 }
 
 /*
- * Move the cursor forwards by "n" characters. Don't go past end-of-line
+ * Implements a vi "l"-like motion for internal use.  The end-of-line test is
+ * off-by-one from the true "l" command to allow for substitutions at the end
+ * of a line.
  */
 int
 forwchar_to_eol(f, n)
@@ -336,16 +385,43 @@ register int	n;
 	if (n < 0)
 		return backchar_to_bol(f, -n);
 	while (n--) {
-		if (is_at_end_of_line(curwp->w_dot))
-			return TRUE;
+		if (is_at_end_of_line(DOT))
+			return FALSE;
 		else
-			curwp->w_dot.o++;
+			DOT.o++;
 	}
 	return TRUE;
 }
 
-/* move to a particular line. */
-/* count from bottom of file if negative */
+/*
+ * Implements the vi "l" command.
+ *
+ * Move the cursor forwards by "n" characters. Don't go past end-of-line
+ */
+int
+forwchar_in_line(f, n)
+int f;
+register int	n;
+{
+	if (f == FALSE) n = 1;
+	if (n < 0)
+		return backchar_to_bol(f, -n);
+	while (n--) {
+		if (DOT.o+1 >= lLength(DOT.l))
+			return FALSE;
+		else
+			DOT.o++;
+	}
+	return TRUE;
+}
+
+
+/*
+ * Implements the vi "G" command.
+ *
+ * Move to a particular line (the argument).  Count from bottom of file if
+ * argument is negative.
+ */
 int
 gotoline(f, n)
 int f,n;
@@ -360,12 +436,12 @@ int f,n;
 	if (n == 0)		/* if a bogus argument...then leave */
 		return(FALSE);
 
-	curwp->w_dot.o  = 0;
+	DOT.o  = w_left_margin(curwp);
 	if (n < 0) {
-		curwp->w_dot.l  = lBACK(curbp->b_line.l);
+		DOT.l  = lBACK(curbp->b_line.l);
 		status = backline(f, -n - 1 );
 	} else {
-		curwp->w_dot.l  = lFORW(curbp->b_line.l);
+		DOT.l  = lFORW(curbp->b_line.l);
 		status = forwline(f, n-1);
 	}
 	if (status == TRUE)
@@ -383,8 +459,8 @@ int
 gotobob(f, n)
 int f,n;
 {
-	curwp->w_dot.l  = lFORW(curbp->b_line.l);
-	curwp->w_dot.o  = 0;
+	DOT.l  = lFORW(curbp->b_line.l);
+	DOT.o  = w_left_margin(curwp);
 	curwp->w_flag |= WFMOVE;
 	return (TRUE);
 }
@@ -397,12 +473,14 @@ int
 gotoeob(f, n)
 int f,n;
 {
-	curwp->w_dot.l  = lBACK(curbp->b_line.l);
+	DOT.l  = lBACK(curbp->b_line.l);
 	curwp->w_flag |= WFMOVE;
 	return firstnonwhite(FALSE,1);
 }
 
 /*
+ * Implements the vi "H" command.
+ *
  * Move to first (or nth) line in window
  */
 int
@@ -427,6 +505,8 @@ int f,n;
 }
 
 /*
+ * Implements the vi "M" command.
+ *
  * Move to the middle of lines displayed in window
  */
 /* ARGSUSED */
@@ -457,6 +537,8 @@ int f,n;
 }
 
 /*
+ * Implements the vi "L" command.
+ *
  * Move to the last (or nth last) line in window
  */
 int
@@ -493,6 +575,8 @@ int f,n;
 }
 
 /*
+ * Implements the vi "j" command.
+ *
  * Move forward by full lines. If the number of lines to move is less than
  * zero, call the backward line function to actually do it. The last command
  * controls how the goal column is set. No errors are
@@ -509,7 +593,7 @@ int f,n;
 		return (backline(f, -n));
 
 	/* if we are on the last line as we start....fail the command */
-	if (is_last_line(curwp->w_dot, curbp))
+	if (is_last_line(DOT, curbp))
 		return(FALSE);
 
 	/* if the last command was not a line move,
@@ -518,7 +602,7 @@ int f,n;
 		curgoal = getccol(FALSE);
 
 	/* and move the point down */
-	dlp = l_ref(curwp->w_dot.l);
+	dlp = l_ref(DOT.l);
 	while (n-- > 0) {
 		register LINE *nlp = lforw(dlp);
 		if (nlp == l_ref(curbp->b_line.l))
@@ -527,21 +611,27 @@ int f,n;
 	}
 
 	/* resetting the current position */
-	curwp->w_dot.l  = l_ptr(dlp);
-	curwp->w_dot.o  = getgoal(dlp);
+	DOT.l  = l_ptr(dlp);
+	DOT.o  = getgoal(dlp);
 	curwp->w_flag |= WFMOVE;
 	return (TRUE);
 }
 
+/*
+ * Implements the vi "^" command.
+ *
+ * Move to the first nonwhite character on the current line.  No errors are
+ * returned.
+ */
 /* ARGSUSED */
 int
 firstnonwhite(f,n)
 int f,n;
 {
 	DOT.o  = firstchar(l_ref(DOT.l));
-	if (DOT.o < 0) {
-		if (lLength(DOT.l) == 0)
-			DOT.o = 0;
+	if (DOT.o < w_left_margin(curwp)) {
+		if (lLength(DOT.l) <= w_left_margin(curwp))
+			DOT.o = w_left_margin(curwp);
 		else
 			DOT.o = lLength(DOT.l) - 1;
 	}
@@ -555,8 +645,8 @@ lastnonwhite(f,n)
 int f,n;
 {
 	DOT.o  = lastchar(l_ref(DOT.l));
-	if (DOT.o < 0)
-		DOT.o = 0;
+	if (DOT.o < w_left_margin(curwp))
+		DOT.o = w_left_margin(curwp);
 	return TRUE;
 }
 #endif
@@ -567,8 +657,8 @@ int
 firstchar(lp)
 LINE *lp;
 {
-	int off = 0;
-	while ( off != llength(lp) && isspace(lgetc(lp, off)) )
+	int off = w_left_margin(curwp);
+	while ( off < llength(lp) && isblank(lgetc(lp, off)) )
 		off++;
 	if (off == llength(lp))
 		return -1;
@@ -602,7 +692,11 @@ LINE *lp;
 	return off;
 }
 
-/* like forwline, but got to first non-white char position */
+/*
+ * Implements the vi "^M" command.
+ *
+ * Like 'forwline()', but goes to the first non-white character position.
+ */
 int
 forwbline(f,n)
 int f,n;
@@ -615,7 +709,11 @@ int f,n;
 	return firstnonwhite(FALSE,1);
 }
 
-/* like backline, but got to first non-white char position */
+/*
+ * Implements the vi "-" command.
+ *
+ * Like 'backline()', but goes to the first non-white character position.
+ */
 int
 backbline(f,n)
 int f,n;
@@ -629,10 +727,9 @@ int f,n;
 }
 
 /*
- * This function is like "forwline", but goes backwards. The scheme is exactly
- * the same. Check for arguments that are less than zero and call your
- * alternate. Figure out the new line and call "movedot" to perform the
- * motion. No errors are possible.
+ * Implements the vi "k" command.
+ *
+ * This function is like "forwline", but goes backwards.
  */
 int
 backline(f, n)
@@ -645,7 +742,7 @@ int f,n;
 		return (forwline(f, -n));
 
 	/* if we are on the first line as we start....fail the command */
-	if (is_first_line(curwp->w_dot, curbp))
+	if (is_first_line(DOT, curbp))
 		return(FALSE);
 
 	/* if the last command was not note a line move,
@@ -654,20 +751,21 @@ int f,n;
 		curgoal = getccol(FALSE);
 
 	/* and move the point up */
-	dlp = l_ref(curwp->w_dot.l);
+	dlp = l_ref(DOT.l);
 	while (n-- && lback(dlp) != l_ref(curbp->b_line.l))
 		dlp = lback(dlp);
 
 	/* reseting the current position */
-	curwp->w_dot.l  = l_ptr(dlp);
-	curwp->w_dot.o  = getgoal(dlp);
+	DOT.l  = l_ptr(dlp);
+	DOT.o  = getgoal(dlp);
 	curwp->w_flag |= WFMOVE;
 	return (TRUE);
 }
 
 #if	WORDPRO
-
-
+/*
+ * Go to the beginning of the current paragraph.
+ */
 int
 gotobop(f,n)
 int f,n;
@@ -691,7 +789,7 @@ int f,n;
 	while (n) {
 		if (findpat(TRUE, 1, b_val_rexp(curbp,VAL_PARAGRAPHS)->reg,
 							REVERSE) != TRUE) {
-			gotobob(f,n);
+			(void)gotobob(f,n);
 		} else if (lLength(DOT.l) == 0) {
 			/* special case -- if we found an empty line,
 				and it's adjacent to where we started,
@@ -717,6 +815,9 @@ int f,n;
 	return TRUE;
 }
 
+/*
+ * Go to the end of the current paragraph.
+ */
 int
 gotoeop(f,n)
 int f,n;
@@ -797,6 +898,10 @@ getstutter()
 }
 #endif
 
+/*
+ * Go to the beginning of the current section (or paragraph if no section
+ * marker found).
+ */
 int
 gotobosec(f,n)
 int f,n;
@@ -807,11 +912,15 @@ int f,n;
 #endif
 	if (findpat(f, n, b_val_rexp(curbp,VAL_SECTIONS)->reg,
 							REVERSE) != TRUE) {
-		gotobob(f,n);
+		(void)gotobob(f,n);
 	}
 	return TRUE;
 }
 
+/*
+ * Go to the end of the current section (or paragraph if no section marker
+ * found).
+ */
 int
 gotoeosec(f,n)
 int f,n;
@@ -827,6 +936,9 @@ int f,n;
 	return TRUE;
 }
 
+/*
+ * Go to the beginning of the current sentence.
+ */
 int
 gotobosent(f,n)
 int f,n;
@@ -842,12 +954,11 @@ int f,n;
  top:
 	extra = 0;
 	if (findpat(f, n, exp, REVERSE) != TRUE) {
-		gotobob(f,n);
-		return TRUE;
+		return gotobob(f,n);
 	}
-	forwchar(TRUE, exp->mlen?exp->mlen:1);
-	while (is_at_end_of_line(DOT) || isspace(char_at(DOT))) {
-		forwchar(TRUE,1);
+	s = forwchar(TRUE, exp->mlen?exp->mlen:1);
+	while (s && (is_at_end_of_line(DOT) || isspace(char_at(DOT)))) {
+		s = forwchar(TRUE,1);
 		extra++;
 	}
 	if (n == 1 && samepoint(savepos,DOT)) { /* try again */
@@ -863,6 +974,9 @@ int f,n;
 	return TRUE;
 }
 
+/*
+ * Go to the end of the current sentence.
+ */
 int
 gotoeosent(f,n)
 int f,n;
@@ -904,8 +1018,8 @@ register LINE	*dlp;
 	register int	dbo;
 
 	col = 0;
-	dbo = 0;
-	while (dbo != llength(dlp)) {
+	dbo = w_left_margin(curwp);
+	while (dbo < llength(dlp)) {
 		c = lgetc(dlp, dbo);
 		newcol = next_column(c,col);
 		if (newcol > curgoal)
@@ -930,10 +1044,10 @@ int c, col;
 }
 
 /*
+ * Implements the vi "^F" command.
+ *
  * Scroll forward by a specified number of lines, or by a full page if no
- * argument.  The "2" in the arithmetic on the window size is
- * the overlap; this value is the default overlap value in ITS EMACS. Because
- * this zaps the top line in the display window, we have to do a hard update.
+ * argument.
  */
 int
 forwpage(f, n)
@@ -941,33 +1055,29 @@ int f;
 register int	n;
 {
 	fast_ptr LINEPTR lp;
+	int	status;
 
-	if (f == FALSE) {
-		n = curwp->w_ntrows - 2;	/* Default scroll.	*/
-		if (n <= 0)			/* Forget the overlap	*/
-			n = 1;			/* if tiny window.	*/
-	} else if (n < 0)
-		return (backpage(f, -n));
-#if	CVMVAS
-	else					/* Convert from pages	*/
-		n *= curwp->w_ntrows;		/* to lines.		*/
-#endif
-	lp = curwp->w_line.l;
-	while ((n -= line_height(curwp,lp)) >= 0
-	  &&   !same_ptr(lp, curbp->b_line.l))
-		lp = lFORW(lp);
-	curwp->w_line.l = lp;
-	curwp->w_dot.l  = lp;
-	curwp->w_dot.o  = 0;
-	curwp->w_flag |= WFHARD|WFMODE;
-	return (TRUE);
+	if ((n = full_pages(f,n)) < 0)
+		return backpage(f, -n);
+
+	if ((status = !same_ptr(lFORW(DOT.l), buf_head(curbp))) == TRUE) {
+		lp = curwp->w_line.l;
+		while ((n -= line_height(curwp,lp)) >= 0
+		  &&   !same_ptr(lp, buf_head(curbp)))
+			lp = lFORW(lp);
+		if (n < 0)
+			curwp->w_line.l = lp;
+		DOT.l  = lp;
+		DOT.o  = w_left_margin(curwp);
+		curwp->w_flag |= WFHARD|WFMODE;
+	}
+	return status;
 }
 
 /*
- * This command is like "forwpage", but it goes backwards. The "2", like
- * above, is the overlap between the two windows. The value is from the ITS
- * EMACS manual. We do a hard update for exactly the same
- * reason.
+ * Implements the vi "^B" command.
+ *
+ * This command is like "forwpage", but it goes backwards.
  */
 int
 backpage(f, n)
@@ -975,33 +1085,32 @@ int f;
 register int	n;
 {
 	fast_ptr LINEPTR lp;
+	int	status;
 
-	if (f == FALSE) {
-		n = curwp->w_ntrows - 2;	/* Default scroll.	*/
-		if (n <= 0)			/* Don't blow up if the */
-			n = 1;			/* window is tiny.	*/
-	} else if (n < 0)
-		return (forwpage(f, -n));
-#if	CVMVAS
-	else					/* Convert from pages	*/
-		n *= curwp->w_ntrows;		/* to lines.		*/
-#endif
+	if ((n = full_pages(f,n)) < 0)
+		return forwpage(f, -n);
+
 	lp = curwp->w_line.l;
-	while ((n -= line_height(curwp,lp)) >= 0
-	  &&   !same_ptr(lBACK(lp), curbp->b_line.l))
-		lp = lBACK(lp);
-	curwp->w_line.l = lp;
-	curwp->w_dot.l  = lp;
-	curwp->w_dot.o  = 0;
-	curwp->w_flag |= WFHARD;
-	return (TRUE);
+	if ((status = !same_ptr(lBACK(lp), buf_head(curbp))) == TRUE) {
+		while ((n -= line_height(curwp,lp)) >= 0
+		  &&   !same_ptr(lBACK(lp), buf_head(curbp)))
+			lp = lBACK(lp);
+		curwp->w_line.l = lp;
+		DOT.l  = lp;
+		DOT.o  = w_left_margin(curwp);
+		curwp->w_flag |= WFHARD;
+	}
+	return status;
 }
 
 /*
- * Scroll forward by a specified number of lines, or by a full page if no
- * argument. The "2" in the arithmetic on the window size is
- * the overlap; this value is the default overlap value in ITS EMACS. Because
- * this zaps the top line in the display window, we have to do a hard update.
+ * Implements the vi "^D" command.
+ *
+ * Scroll forward by a half-page.  If a repeat count is given, interpret that
+ * as the number of half-pages to scroll.
+ *
+ * Unlike vi, the CVMVAS option causes the repeat-count to be interpreted as
+ * half-page, rather than lines.
  */
 int
 forwhpage(f, n)
@@ -1009,35 +1118,35 @@ int f;
 register int	n;
 {
 	fast_ptr LINEPTR  llp, dlp;
+	int	status;
 
-	if (f == FALSE) {
-		n = curwp->w_ntrows / 2;	/* Default scroll.	*/
-		if (n <= 0)			/* Forget the overlap	*/
-			n = 1;			/* if tiny window.	*/
-	} else if (n < 0)
-		return (backhpage(f, -n));
-#if	CVMVAS
-	else					/* Convert from pages	*/
-		n *= curwp->w_ntrows/2;		/* to lines.		*/
-#endif
+	if ((n = half_pages(f,n)) < 0)
+		return backhpage(f, -n);
+
 	llp = curwp->w_line.l;
-	dlp = curwp->w_dot.l;
-	while ((n -= line_height(curwp,dlp)) >= 0
-	  &&   !same_ptr(lFORW(dlp), curbp->b_line.l)) {
-		llp = lFORW(llp);
-		dlp = lFORW(dlp);
+	dlp = DOT.l;
+	if ((status = !same_ptr(lFORW(dlp), buf_head(curbp))) == TRUE) {
+		while ((n -= line_height(curwp,dlp)) >= 0
+		  &&   !same_ptr(lFORW(dlp), buf_head(curbp))) {
+			llp = lFORW(llp);
+			dlp = lFORW(dlp);
+		}
+		curwp->w_line.l = llp;
+		DOT.l  = dlp;
+		curwp->w_flag |= WFHARD|WFKILLS;
 	}
-	curwp->w_line.l = llp;
-	curwp->w_dot.l  = dlp;
-	curwp->w_flag |= WFHARD|WFKILLS;
-	return firstnonwhite(FALSE,1);
+	(void)firstnonwhite(FALSE,1);
+	return status;
 }
 
 /*
- * This command is like "forwpage", but it goes backwards. The "2", like
- * above, is the overlap between the two windows. The value is from the ITS
- * EMACS manual. We do a hard update for exactly the same
- * reason.
+ * Implements the vi "^U" command.
+ *
+ * This command is like "forwpage", but it goes backwards.  It returns false
+ * only if the cursor is on the first line of the buffer.
+ *
+ * Unlike vi, the CVMVAS option causes the repeat-count to be interpreted as
+ * half-pages, rather than lines.
  */
 int
 backhpage(f, n)
@@ -1045,33 +1154,30 @@ int f;
 register int	n;
 {
 	fast_ptr LINEPTR llp, dlp;
+	int	status;
 
-	if (f == FALSE) {
-		n = curwp->w_ntrows / 2;	/* Default scroll.	*/
-		if (n <= 0)			/* Don't blow up if the */
-			n = 1;			/* window is tiny.	*/
-	} else if (n < 0)
-		return (forwhpage(f, -n));
-#if	CVMVAS
-	else					/* Convert from pages	*/
-		n *= curwp->w_ntrows/2;		/* to lines.		*/
-#endif
+	if ((n = half_pages(f,n)) < 0)
+		return forwhpage(f, -n);
+
 	llp = curwp->w_line.l;
-	dlp = curwp->w_dot.l;
-	while ((n -= line_height(curwp,dlp)) >= 0
-	  &&   !same_ptr(lBACK(dlp), curbp->b_line.l)) {
-		llp = lBACK(llp);
-		dlp = lBACK(dlp);
+	dlp = DOT.l;
+	if ((status = !same_ptr(lBACK(dlp), buf_head(curbp))) == TRUE) {
+		while ((n -= line_height(curwp,dlp)) >= 0
+		  &&   !same_ptr(lBACK(dlp), buf_head(curbp))) {
+			llp = lBACK(llp);
+			dlp = lBACK(dlp);
+		}
+		curwp->w_line.l = llp;
+		DOT.l  = dlp;
+		curwp->w_flag |= WFHARD|WFINS;
 	}
-	curwp->w_line.l = llp;
-	curwp->w_dot.l  = dlp;
-	curwp->w_flag |= WFHARD|WFINS;
-	return firstnonwhite(FALSE,1);
+	(void)firstnonwhite(FALSE,1);
+	return status;
 }
 
-
-
 /*
+ * Implements the vi "m" command.
+ *
  * Set the named mark in the current window to the value of "." in the window.
  */
 /* ARGSUSED */
@@ -1307,7 +1413,7 @@ int row, col;
 	if (row == mode_row(curwp)) {
 		(void) gotoeos(FALSE,1);
 		DOT.l = lFORW(DOT.l);
-		DOT.o = 0;
+		DOT.o = w_left_margin(curwp);
 	} else {	/* move to the right row */
 		row -= curwp->w_toprow;
 		dlp = curwp->w_line.l;	/* get pointer to 1st line */
@@ -1326,7 +1432,7 @@ int row, col;
 		/* don't allow the cursor to be set past end of line unless we
 		 * are in insert mode
 		 */
-		if (DOT.o >= lLength(dlp) && DOT.o > 0 && !insertmode)
+		if (DOT.o >= lLength(dlp) && DOT.o > w_left_margin(curwp) && !insertmode)
 			DOT.o--;
 	}
 	MK  = DOT;

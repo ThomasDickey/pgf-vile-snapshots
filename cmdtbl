@@ -72,7 +72,13 @@
 #		here for completeness.
 #
 # $Log: cmdtbl,v $
-# Revision 1.71  1993/08/18 16:45:00  pgf
+# Revision 1.73  1993/09/06 16:22:28  pgf
+# added "stop" command
+#
+# Revision 1.72  1993/09/03  09:11:54  pgf
+# tom's 3.60 changes
+#
+# Revision 1.71  1993/08/18  16:45:00  pgf
 # added VIEWOK flag for functions that execute macros.  it says it's okay
 # to execute them in view mode, even though they have the UNDO bit set
 #
@@ -344,7 +350,7 @@ backdelchar	REDO|UNDO
 	'X'
 backhunt	ABSM|MOTION		!SMALLER
 	"hunt-backward"
-backhpage	NONE
+backhpage	MOTION
 	"previous-half-page"		!FEWNAMES
 	"back-half-page"		!FEWNAMES
 	"up-half-page"		!FEWNAMES
@@ -390,6 +396,7 @@ bindkey		NONE			REBIND
 	"rebind-key"
 bktoshell	NONE
 	"suspend-vile"			!FEWNAMES
+	"stop"
 	'^Z'
 cd		NONE
 	"cd"
@@ -634,7 +641,7 @@ forwdelchar	REDO|UNDO
 	"delete-next-character"		!FEWNAMES
 	'x'
 	'FN-\123'			MSDOS
-forwhpage	NONE
+forwhpage	MOTION
 	"forward-half-page"		!FEWNAMES
 	"next-half-page"		!FEWNAMES
 	"down-half-page"		!FEWNAMES
@@ -644,7 +651,10 @@ forwchar	MOTION
 	"next-character"		!FEWNAMES
 forwchar_to_eol	MOTION
 	"forward-character-to-eol"	!FEWNAMES
-	"next-character-to-eol"	!FEWNAMES
+	"next-character-to-eol"		!FEWNAMES
+forwchar_in_line MOTION
+	"forward-character-in-line"	!FEWNAMES
+	"next-character-in-line"	!FEWNAMES
 	' '
 	'l'
 	'FN-C'				ANSI_SPEC
@@ -772,7 +782,7 @@ gotoeosent	ABSM|MOTION		WORDPRO
 	"next-sentence"			!FEWNAMES
 	"down-sentence"			!FEWNAMES
 	')'
-gototag		NONE|(BANG|WORD1)		TAGS
+gototag		NONE			TAGS
 	"ta"
 	"tag"
 	"find-tag"			!FEWNAMES
@@ -835,7 +845,7 @@ listbuffers	NONE
 	"list-buffers"			!FEWNAMES
 	"args"
 	'^A-*'
-showhistory	NONE			!SMALLER
+showhistory	NONE			OPT_HISTORY
 	"show-history"
 lineputafter	REDO|UNDO|GLOBOK|(FROM|ZERO|WORD1)
 	"put-as-lines-after"		!FEWNAMES
@@ -937,7 +947,7 @@ operdel		OPER|REDO|UNDO
 operjoin	OPER|REDO|UNDO|GLOBOK|RANGE
 	"j"
 	"join-lines-til"		!FEWNAMES
-operlinedel	OPER|REDO|UNDO|GLOBOK|(RANGE+WORD1)
+operlinedel	OPER|REDO|UNDO|GLOBOK|(RANGE|WORD1)
 	"delete-lines-til"		!FEWNAMES
 	"d"
 	'^X-d'
@@ -993,7 +1003,7 @@ opertrim	REDO|UNDO|GLOBOK|UNDO|(RANGE)	AEDIT
 operyank	OPER
 	"yank-til"			!FEWNAMES
 	'y'
-operlineyank	OPER|(RANGE|WORD1)
+operlineyank	OPER|(RANGE|WORD1|NOMOVE)
 	"yank-lines-til"		!FEWNAMES
 	"y"
 	'^X-y'
@@ -1001,7 +1011,7 @@ opersubstagain	OPER|REDO|UNDO|GLOBOK|(RANGE|EXTRA)
 	"substitute-again-til"		!FEWNAMES
 	"&"
 	'^A-&'
-opertransf	OPER|(RANGE+EXTRA)
+opertransf	OPER|(RANGE|EXTRA)
 	"transfer-til"
 	"t"
 operwrite	OPER|(RANGE|BANG|FILE1|DFLALL|NOMOVE)
@@ -1129,7 +1139,7 @@ setglobmode	NONE
 	"set"
 	"setg"
 	"set-global-mode"
-setnmmark	NONE|(FROM+WORD1)
+setnmmark	NONE|(FROM|EXTRA|NOMOVE)
 	"set-named-mark"		!FEWNAMES
 	"k"
 	'm'

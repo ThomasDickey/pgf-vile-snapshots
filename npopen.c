@@ -2,7 +2,10 @@
  *		written by John Hutchinson, heavily modified by Paul Fox
  *
  * $Log: npopen.c,v $
- * Revision 1.28  1993/08/13 16:32:50  pgf
+ * Revision 1.29  1993/09/03 09:11:54  pgf
+ * tom's 3.60 changes
+ *
+ * Revision 1.28  1993/08/13  16:32:50  pgf
  * tom's 3.58 changes
  *
  * Revision 1.27  1993/08/05  14:29:12  pgf
@@ -157,7 +160,7 @@ char *cmd;
 		if (fr) {
 			*fr = fdopen (rp[0], "r");
 			if (*fr == NULL) {
-				fprintf(stderr,"fdopen r failed\n");
+				(void)fprintf(stderr,"fdopen r failed\n");
 				abort();
 			}
 		} else {
@@ -168,7 +171,7 @@ char *cmd;
 		if (fw) {
 			*fw = fdopen (wp[1], "w");
 			if (*fw == NULL) {
-				fprintf(stderr,"fdopen w failed\n");
+				(void)fprintf(stderr,"fdopen w failed\n");
 				abort();
 			}
 		} else {
@@ -213,8 +216,8 @@ npclose (fp)
 FILE *fp;
 {
 	int child;
-	fflush(fp);
-	fclose(fp);
+	(void)fflush(fp);
+	(void)fclose(fp);
 	while ((child = wait ((int *)0)) != pipe_pid) {
 		if (child < 0 && errno == EINTR) {
 			(void) kill (SIGKILL, pipe_pid);
@@ -458,7 +461,7 @@ npflush ()
 {
 	if (myCmds != 0) {
 		if (myWrtr != 0) {
-			fflush(*myWrtr);
+			(void)fflush(*myWrtr);
 #if UNUSED
 			fclose(*myWrtr);
 			*myWrtr = fopen(myName[0], "r");

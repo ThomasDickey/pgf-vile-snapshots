@@ -4,7 +4,10 @@
  *	Written (except for delins()) for vile by Paul Fox, (c)1990
  *
  * $Log: oneliner.c,v $
- * Revision 1.53  1993/08/13 16:32:50  pgf
+ * Revision 1.54  1993/09/03 09:11:54  pgf
+ * tom's 3.60 changes
+ *
+ * Revision 1.53  1993/08/13  16:32:50  pgf
  * tom's 3.58 changes
  *
  * Revision 1.52  1993/08/05  14:29:12  pgf
@@ -218,14 +221,14 @@ int flag;
 	linep = region.r_orig.l;		 /* Current line.	 */
 
 	/* first check if we are already here */
-	bp = bfind(bname, OK_CREAT, 0);
+	bp = bfind(bname, 0);
 	if (bp == NULL) {
 		rls_region();
 		return FALSE;
 	}
 
 	if (bp == curbp
-	 || bfind(ScratchName(Buffer List), NO_CREAT, BFSCRTCH) != 0 /* patch */
+	 || find_b_name(ScratchName(Buffer List)) != 0 /* patch */
 		) {
 		mlforce("[Can't do that from this buffer.]");
 		rls_region();
@@ -244,11 +247,12 @@ int flag;
 	}
 
 	do {
-		addline(bp, l_ref(linep)->l_text, lLength(linep));
+		if (!addline(bp, l_ref(linep)->l_text, lLength(linep)))
+			break;	/* out of memory */
 		linep = lFORW(linep);
 	} while (!same_ptr(linep, region.r_end.l));
 
-	(void)strcpy(bp->b_bname,bname);
+	set_bname(bp, bname);
 	set_rdonly(bp, "");
 	set_b_val(bp,VAL_TAB,tabstop_val(curbp));
 
@@ -586,6 +590,9 @@ int nth_occur, printit, globally, *confirmp;
  *		be misrepresented as being the original software.
  */
 
+static	char	*buf_delins;
+static	UINT	len_delins;
+
 /*
  - delins - perform substitutions after a regexp match
  */
@@ -598,8 +605,6 @@ char *sourc;
 	register unsigned dlength;
 	register char c;
 	register int no;
-	static char *buf = NULL;
-	static buflen = -1;
 	int s;
 #define NO_CASE	0
 #define UPPER_CASE 1
@@ -617,18 +622,18 @@ char *sourc;
 
 	dlength = exp->mlen;
 
-	if (buf == NULL || dlength + 1 > buflen) {
-		if (buf)
-			free(buf);
-		if ((buf = castalloc(char,dlength+1)) == NULL) {
+	if (buf_delins == NULL || dlength + 1 > len_delins) {
+		if (buf_delins)
+			free(buf_delins);
+		if ((buf_delins = castalloc(char,dlength+1)) == NULL) {
 			mlforce("[Out of memory in delins]");
 			return FALSE;
 		}
-		buflen = dlength + 1;
+		len_delins = dlength + 1;
 	}
 
-	(void)memcpy(buf, exp->startp[0], (SIZE_T)dlength);
-	buf[dlength] = EOS;
+	(void)memcpy(buf_delins, exp->startp[0], (SIZE_T)dlength);
+	buf_delins[dlength] = EOS;
 
 	if (ldelete((long) dlength, FALSE) != TRUE) {
 		mlforce("[Error while deleting]");
@@ -693,7 +698,7 @@ char *sourc;
 			    char *cp;
 			    int len;
 			    len = (exp->endp[no] - exp->startp[no]);
-			    cp = (exp->startp[no] - exp->startp[0]) + buf;
+			    cp = (exp->startp[no] - exp->startp[0]) + buf_delins;
 			    while (len--) {
 				    if (!*cp) {
 					    mlforce( "BUG: mangled replace");
@@ -752,3 +757,12 @@ char *sourc;
 	}
 	return TRUE;
 }
+
+#if NO_LEAKS
+void
+onel_leaks()
+{
+	FreeIfNeeded(substexp);
+	FreeIfNeeded(buf_delins);
+}
+#endif
