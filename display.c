@@ -6,7 +6,10 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.59  1993/01/23 13:38:23  foxharp
+ * Revision 1.60  1993/02/08 14:53:35  pgf
+ * see CHANGES, 3.32 section
+ *
+ * Revision 1.59  1993/01/23  13:38:23  foxharp
  * tom's changes -- reverse video works better, fix for list mode,
  * dfoutfn now re-entrant, dfputli now does hex
  *
@@ -378,14 +381,14 @@ int	dfputf(outfunc,s)
  */
 static
 void
-#ifdef __STDC__
+#if	ANSI_VARARGS
 dofmt( char *fmt, va_list *app)
 #else
 dofmt(app)
 va_list *app;
 #endif
 {
-#ifndef __STDC__
+#if	!ANSI_VARARGS
 	register char *fmt = va_arg(*app, char *);
 #endif
 	register int c;		/* current char in format string */
@@ -740,7 +743,7 @@ WINDOW *wp;
 
 /* VARARGS1 */
 void
-#ifdef __STDC__
+#if	ANSI_VARARGS
 vtprintf( char *fmt, ...)
 #else
 vtprintf(va_alist)
@@ -749,7 +752,7 @@ va_dcl
 {
 
 	va_list ap;
-#ifdef __STDC__
+#if	ANSI_VARARGS
 	va_start(ap,fmt);
 #else
 	va_start(ap);
@@ -757,7 +760,7 @@ va_dcl
 
 	dfoutfn = vtputc;
 
-#ifdef __STDC__
+#if	ANSI_VARARGS
 	dofmt(fmt,&ap);
 #else
 	dofmt(&ap);
@@ -1066,7 +1069,7 @@ updpos()
 	while (lp != DOT.l) {
 		++currow;
 		lp = lforw(lp);
-		if (lp == curwp->w_line.l) {
+		if (lp == curwp->w_line.l || currow > term.t_nrow) {
 			mlforce("BUG:  lost dot updpos().  setting at top");
 			curwp->w_line.l = DOT.l  = lforw(curbp->b_line.l);
 			currow = curwp->w_toprow;
@@ -1865,7 +1868,7 @@ int c;
  */
 /* VARARGS1 */
 void
-#ifdef __STDC__
+#if	ANSI_VARARGS
 mlwrite( char *fmt, ...)
 #else
 mlwrite(va_alist)
@@ -1878,7 +1881,7 @@ va_dcl
 		movecursor(term.t_nrow, 0);
 		return;
 	}
-#ifdef __STDC__
+#if	ANSI_VARARGS
 	va_start(ap,fmt);
 	mlmsg(fmt,&ap);
 #else
@@ -1895,7 +1898,7 @@ va_dcl
 */
 /* VARARGS1 */
 void
-#ifdef __STDC__
+#if	ANSI_VARARGS
 mlforce(char *fmt, ...)
 #else
 mlforce(va_alist)
@@ -1903,7 +1906,7 @@ va_dcl
 #endif
 {
 	va_list ap;
-#ifdef __STDC__
+#if	ANSI_VARARGS
 	va_start(ap,fmt);
 	mlmsg(fmt,&ap);
 #else
@@ -1915,7 +1918,7 @@ va_dcl
 
 /* VARARGS1 */
 void
-#ifdef __STDC__
+#if	ANSI_VARARGS
 mlprompt( char *fmt, ...)
 #else
 mlprompt(va_alist)
@@ -1929,7 +1932,7 @@ va_dcl
 		return;
 	}
 	sgarbf = FALSE;
-#ifdef __STDC__
+#if	ANSI_VARARGS
 	va_start(ap,fmt);
 	mlmsg(fmt,&ap);
 #else
@@ -1942,7 +1945,7 @@ va_dcl
 
 /* VARARGS */
 void
-#ifdef __STDC__
+#if	ANSI_VARARGS
 dbgwrite( char *fmt, ...)
 #else
 dbgwrite(va_alist)
@@ -1950,7 +1953,7 @@ va_dcl
 #endif
 {
 	va_list ap;	/* ptr to current data field */
-#ifdef __STDC__
+#if	ANSI_VARARGS
 	va_start(ap,fmt);
 	mlmsg(fmt,&ap);
 #else
@@ -1967,7 +1970,7 @@ va_dcl
  * Set the "message line" flag TRUE.
  */
 void
-#ifdef __STDC__
+#if	ANSI_VARARGS
 mlmsg( char *fmt, va_list *app)
 #else
 mlmsg(app)
@@ -1979,7 +1982,7 @@ va_list *app;	/* ptr to current data field */
 		/* then we'll lose the message on the next update(), so save it now */
 		mlsavep = mlsave;
 		dfoutfn = mlsavec;
-#ifdef __STDC__
+#if	ANSI_VARARGS
 		dofmt(fmt,app);
 #else
 		dofmt(app);
@@ -2002,8 +2005,8 @@ va_list *app;	/* ptr to current data field */
 
 	movecursor(term.t_nrow, 0);
 
-	dfoutfn = mlputc;
-#ifdef __STDC__
+	dfoutfn = kbd_putc;
+#if	ANSI_VARARGS
 	dofmt(fmt,app);
 #else
 	dofmt(app);
@@ -2015,23 +2018,6 @@ va_list *app;	/* ptr to current data field */
 	TTflush();
 	mpresf = TRUE;
 	mlsave[0] = '\0';
-}
-
-/*
- * Write out a character. Update the physical cursor position. This assumes that
- * the character has width "1"; if this is not the case
- * things will get screwed up a little.
- */
-void
-mlputc(c)
-int c;
-{
-	if (c == '\r') ttcol = 0;
-	if (c == '\t') c = ' ';
-	if (ttcol < term.t_ncol-1) {
-	        TTputc(c);
-	        ++ttcol;
-	}
 }
 
 /*
@@ -2053,7 +2039,7 @@ int c;
 
 /* VARARGS1 */
 char *
-#ifdef __STDC__
+#if	ANSI_VARARGS
 lsprintf( char *buf, char *fmt, ...)
 #else
 lsprintf(va_alist)
@@ -2062,7 +2048,7 @@ va_dcl
 {
 
 	va_list ap;
-#ifdef __STDC__
+#if	ANSI_VARARGS
 	va_start(ap,fmt);
 #else
 	char *buf;
@@ -2073,7 +2059,7 @@ va_dcl
 	lsp = buf;
 	dfoutfn = lspputc;
 
-#ifdef __STDC__
+#if	ANSI_VARARGS
 	dofmt(fmt,&ap);
 #else
 	dofmt(&ap);
@@ -2096,7 +2082,7 @@ char *buf;
 
 /* VARARGS1 */
 char *
-#ifdef __STDC__
+#if	ANSI_VARARGS
 _lsprintf( char *fmt, ...)
 #else
 _lsprintf(va_alist)
@@ -2105,7 +2091,7 @@ va_dcl
 {
 
 	va_list ap;
-#ifdef __STDC__
+#if	ANSI_VARARGS
 	va_start(ap,fmt);
 #else
 	va_start(ap);
@@ -2114,7 +2100,7 @@ va_dcl
 	lsp = lsbuf;
 	dfoutfn = lspputc;
 
-#ifdef __STDC__
+#if	ANSI_VARARGS
 	dofmt(fmt,&ap);
 #else
 	dofmt(&ap);
@@ -2145,7 +2131,7 @@ int c;
 /* printf into curbp, at DOT */
 /* VARARGS */
 void
-#ifdef __STDC__
+#if	ANSI_VARARGS
 bprintf( char *fmt, ...)
 #else
 bprintf(va_alist)
@@ -2156,7 +2142,7 @@ va_dcl
 
 	dfoutfn = bputc;
 
-#ifdef __STDC__
+#if	ANSI_VARARGS
 	va_start(ap,fmt);
 	dofmt(fmt,&ap);
 #else

@@ -1,3 +1,100 @@
+
+Changes for vile 3.32 (from Tom Dickey):
+
+	* modified estruct.h, proto.h and display.c to compile vile on HP/Apollo
+	  SR10.2 (CC 6.7).  Added new definitions ANSI_PROTOS and ANSI_VARARGS
+	  to simplify this.
+
+	* modified 'mktbls.c' to produce nemode.h; use these definitions
+	  to replace buffer/window mode definitions in estruct.h and edef.h
+	  (note that this obsoletes symbol MAX_STRING_W_VALUE, reordered
+	  window int-modes).  Further modified 'mktbls.c' to only create
+	  ".h" files for the cases where it has data (so that I can split
+	  modetbl off from cmdtbl, avoiding unnecessary recompiles).
+
+	* supplied an ifdef (at least for APOLLO!) in termio.c so that ^C
+	  and ^U work properly.
+
+	* added buffer-mode 'wrapmargin' to file insert.c (which overrides
+	  wrapwords iff it is set to nonzero).
+
+	* added new module 'tbuff.c' to manage dynamic buffers in places
+	  where local static buffers exist now.
+
+	* modified 'ins()' in insert.c so that it reallocates 'insbuff[]',
+	  allowing arbitrarily-large re-inserts.
+
+	* modified 'input.c' to dynamically allocate 'tmpcmd' and 'dotcmd'
+	  buffers.  This allows arbitrarily-large commands to be repeated
+	  with '.'.
+
+	* guard 'lengthen_path()' in file.c against shell/pipe/internal names.
+
+	* added variable "$shell" (files cmdtbl and eval.c) to override
+	  environment-variable "SHELL" in pipe-commands.
+
+	* made 'show-vars' (file eval.c) show leading '$' or '%' to be
+	  consistent with the way the user must type them.
+
+	* suppress 'show-vars' (file eval.c) ERROR values (these correspond to
+	  unimplemented variables)
+
+	* corrected error in nextbuffer/swbuffer (file buffer.c) that allowed
+	  vile to crash if "set noautobuffer" was specified in .vilerc
+
+	* corrected display in 'show-vars' (file eval.c) of "$kill" (reference
+	  to volatile data).
+
+	* made new function 'kbd_complete()' (file bind.c) to allow keyboard
+	  completion in tables other than NTAB.
+
+	* modified logic in new function 'kbd_complete()' to show permissible
+	  completions in response to '?'.
+
+	* consolidated logic in exec.c, display.c, bind.c, input.c with new
+	  procedures 'kbd_putc()', 'kbd_puts()', 'kbd_erase()', 'kbd_alarm()'
+	  These hide random use of 'ttcol'.
+
+	* make 'kbd_engl_stat()' (file bind.c) recognize word-delete character.
+
+	* eliminated redundant unget/get (files bind.c, exec.c) in the interface
+	  of 'kbd_engl_stat()'; this caused an infinite loop in the call from
+	  'namedcmd()'.
+
+	* modified bug-test in 'updpos()' (file display.c); I had a process hang
+	  in that loop for some reason.
+
+	* collapsed expand/dobackslashes args of 'kbd_string' (file input.c)
+	  into one mask.
+
+	* modified 'mktbls.c' further to produce table 'all_modes[]', to use
+	  this for name-completion of mode.
+
+	* modified 'mktbls.c' to recognize color-types so I could get rid of
+	  upper/lower case kludge in modes.c
+
+	* modified 'modes.c' to use color-types.  The interactive behavior now
+	  uses 'kbd_string()' to split the input at the '=' mark (if given).
+
+	* added option-flag KBD_LOWERC to 'kbd_string()' (file input.c) so that
+	  things that are forced to lowercase will be shown in that way on
+	  input.
+
+	* modified 'token()' (file exec.c) to handle the 'eolchar' for
+	  non-interactive calls on 'kbd_string()'.
+
+	- modified 'eval.c' to recognize '=' as a separator between
+	  variable-name and value, as in 'modes.c'.
+
+	- modified 'eval.c' to perform name-completion for environment
+	  variables (i.e., those beginning with '$').
+
+	- modified 'modes.c' to accept vi-style multiple assignments in a ":set"
+	  command (this works non-interactively).
+
+	- corrected 'imply_alt()' in buffer.c; ensure that the fname-argument is
+	  non-null.  If called via 'filterregion()', it will be null.
+
 Changes in 3.31:  (Tom Dickey)
 
 	* corrected test in 'find_alt()', which caused the %/# toggle to work

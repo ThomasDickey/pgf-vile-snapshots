@@ -11,7 +11,10 @@
  * which means that the dot and mark values in the buffer headers are nonsense.
  *
  * $Log: line.c,v $
- * Revision 1.31  1993/01/23 13:38:23  foxharp
+ * Revision 1.32  1993/02/08 14:53:35  pgf
+ * see CHANGES, 3.32 section
+ *
+ * Revision 1.31  1993/01/23  13:38:23  foxharp
  * lchange is now chg_buff
  *
  * Revision 1.30  1993/01/16  10:36:46  foxharp
@@ -1208,8 +1211,7 @@ int f,n;
 	char respbuf[NFILEN];
 
 	ksetup();
-	s = kbd_string("Load register with: ", respbuf,
-					NFILEN - 1, '\n', NO_EXPAND, FALSE);
+	s = mlreply_no_opts("Load register with: ", respbuf, sizeof(respbuf) - 1);
 	if (s != TRUE)
 		return FALSE;
 	for (s = 0; s < NFILEN; s++) {

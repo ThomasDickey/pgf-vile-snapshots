@@ -9,7 +9,10 @@
 
 /*
  * $Log: edef.h,v $
- * Revision 1.77  1993/01/23 15:08:35  foxharp
+ * Revision 1.78  1993/02/08 14:53:35  pgf
+ * see CHANGES, 3.32 section
+ *
+ * Revision 1.77  1993/01/23  15:08:35  foxharp
  * v. 3.31
  *
  * Revision 1.76  1993/01/23  13:38:23  foxharp
@@ -274,7 +277,7 @@
 #endif
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version 3.31");
+decl_init( char version[], "version 3.32");
 
 decl_init( char slash, '/'); 		/* so DOS can use '\' as path separator */
 
@@ -301,8 +304,6 @@ decl_uninit( short opcmd );             /* what sort of operator?	*/
 decl_uninit( CMDFUNC *havemotion );	/* so we can use "oper" routines
 					   internally */
 decl_uninit( unsigned char kbdm[KBLOCK] );	/* Macro                        */
-decl_uninit( unsigned char dotcmdm[KBLOCK] );	/* dot commands			*/
-decl_uninit( unsigned char tmpcmdm[KBLOCK] );	/* dot commands, 'til we're sure */
 decl_uninit( int currow );              /* Cursor row                   */
 decl_uninit( int curcol );              /* Cursor column                */
 decl_uninit( WINDOW *curwp );           /* Current window               */
@@ -367,64 +368,6 @@ decl_uninit( MARK Mark );		/* the worker mark */
 /* these get their initial values in main.c, in global_val_init() */
 decl_uninit( B_VALUES global_b_values );
 
-#ifndef realdef
-extern struct VALNAMES b_valuenames[];
-extern struct VALNAMES w_valuenames[];
-#else
-/* THE FOLLOWING MODE NAME TABLES MUST CORRESPOND EXACTLY WITH THE #DEFINES
-	IN ESTRUCT.H */
-struct VALNAMES b_valuenames[] = {
-	{ "autobuffer"	comma "ab" comma VALTYPE_BOOL } comma
-	{ "autoindent"	comma "ai" comma VALTYPE_BOOL } comma
-	{ "autosave"	comma "as" comma VALTYPE_BOOL } comma
-	{ "backspacelimit"	comma "bl" comma VALTYPE_BOOL } comma
-	{ "cmode"	comma "X"  comma VALTYPE_BOOL } comma
-	{ "crypt"	comma "X"  comma VALTYPE_BOOL } comma
-	{ "dos"		comma "X"  comma VALTYPE_BOOL } comma
-	{ "ignorecase"	comma "ic" comma VALTYPE_BOOL } comma
-	{ "magic"	comma "X"  comma VALTYPE_BOOL } comma
-	{ "showmatch"	comma "sm" comma VALTYPE_BOOL } comma
-	{ "showmode"	comma "smd" comma VALTYPE_BOOL } comma
-	{ "tabinsert"	comma "ti" comma VALTYPE_BOOL } comma
-	{ "tagrelative" comma "tr" comma VALTYPE_BOOL } comma
-	{ "terse"	comma "X"  comma VALTYPE_BOOL } comma
-	{ "view"	comma "X"  comma VALTYPE_BOOL } comma
-	{ "wrapscan"	comma "ws" comma VALTYPE_BOOL } comma
-	{ "wrapwords"	comma "ww" comma VALTYPE_BOOL } comma
-
-	{ "autosavecnt"	comma "ascnt" comma VALTYPE_INT } comma
-	{ "c-shiftwidth"comma "csw" comma VALTYPE_INT } comma
-	{ "c-tabstop"	comma "cts" comma VALTYPE_INT } comma
-	{ "fillcol"	comma "fc" comma VALTYPE_INT } comma
-	{ "shiftwidth"	comma "sw" comma VALTYPE_INT } comma
-	{ "tabstop"	comma "ts" comma VALTYPE_INT } comma
-	{ "taglength"	comma "tl" comma VALTYPE_INT } comma
-
-	{ "cwd"		comma "X"  comma VALTYPE_STRING } comma
-	{ "tags"	comma "X" comma VALTYPE_STRING } comma
-
-	{ "c-suffixes"	comma "csuf" comma VALTYPE_REGEX } comma
-	{ "comments"	comma "X" comma VALTYPE_REGEX } comma
-	{ "paragraphs"	comma "X" comma VALTYPE_REGEX } comma
-	{ "sections"	comma "X" comma VALTYPE_REGEX } comma
-	{ "sentences"	comma "X" comma VALTYPE_REGEX } comma
-
-	{ NULL		comma NULL comma VALTYPE_INT }
-};
-
-struct VALNAMES w_valuenames[] = {
-	{ "list"	comma "li" comma VALTYPE_BOOL } comma
-	{ "number"	comma "nu" comma VALTYPE_BOOL } comma
-
-
-	{ "sideways"	comma "side" comma VALTYPE_INT } comma
-	{ "fcolor"	comma "X"  comma VALTYPE_INT } comma
-	{ "bcolor"	comma "X"  comma VALTYPE_INT } comma
-	{ NULL		comma NULL comma VALTYPE_INT }
-};
-#endif
-
-
 decl_init( int sgarbf, TRUE );          /* TRUE if screen is garbage	*/
 decl_uninit( int mpresf );              /* TRUE if message in last line */
 decl_uninit( int clexec	);		/* command line execution flag	*/
@@ -474,10 +417,6 @@ decl_uninit( WINDOW *swindow );		/* saved window pointer		*/
 #if CRYPT
 decl_init( int cryptflag, FALSE );		/* currently encrypting?	*/
 #endif
-decl_uninit( unsigned char *tmpcmdptr );	/* current position in dot cmd buf */
-decl_init( unsigned char *tmpcmdend, &tmpcmdm[0] );/* ptr to end of the dot cmd */
-decl_uninit( unsigned char *dotcmdptr );	/* current position in dot cmd buf */
-decl_init( unsigned char *dotcmdend, &dotcmdm[0] );/* ptr to end of the dot command */
 decl_init( int dotcmdmode, RECORD );	/* current dot command mode	*/
 decl_uninit( int dotcmdrep );		/* number of repetitions	*/
 decl_uninit( unsigned char *kbdptr );		/* current position in keyboard buf */

@@ -10,7 +10,10 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.95  1993/01/23 13:38:23  foxharp
+ * Revision 1.96  1993/02/08 14:53:35  pgf
+ * see CHANGES, 3.32 section
+ *
+ * Revision 1.95  1993/01/23  13:38:23  foxharp
  * macros for process exit codes for VMS,
  *
  * Revision 1.94  1993/01/16  10:28:35  foxharp
@@ -780,6 +783,8 @@ union REGS {
 
 #define kcod2key(c) (c & 0x7f)		/* strip off the above prefixes */
 
+#define	EOS     '\0'
+
 #ifdef	FALSE
 #undef	FALSE
 #endif
@@ -807,9 +812,22 @@ union REGS {
 #define OK_CREAT TRUE
 #define NO_CREAT FALSE
 
+/* definitions for name-completion */
+#define	NAMEC		' '	/* char for forcing name-completion */
+#define	TESTC		'?'	/* char for testing name-completion */
+
 /* kbd_string options */
-#define EXPAND TRUE
-#define NO_EXPAND FALSE
+#define KBD_EXPAND	1	/* do we want to expand %, #, : */
+#define KBD_QUOTES	2	/* do we add and delete '\' chars for the caller */
+#define	KBD_LOWERC	4	/* do we force input to lowercase */
+#define KBD_NOEVAL	8	/* disable 'tokval()' (e.g., from buffer) */
+
+/* default option for 'mlreply' (used in modes.c also) */
+#if !MSDOS
+#define	KBD_NORMAL	KBD_EXPAND|KBD_QUOTES
+#else
+#define	KBD_NORMAL	KBD_EXPAND
+#endif
 
 /*	Directive definitions	*/
 
@@ -1036,6 +1054,17 @@ extern void regerror();
 /* end of regexp stuff */
 
 /*
+ * Definitions for 'tbuff.c' (temporary/dynamic char-buffers)
+ */
+typedef	struct	_tbuff	{
+	unsigned char *	tb_data;	/* the buffer-data */
+	unsigned	tb_size;	/* allocated size */
+	unsigned	tb_used;	/* total used in */
+	unsigned	tb_last;	/* last put/get index */
+	int		tb_endc;
+	} TBUFF;
+
+/*
  * All text is kept in circularly linked lists of "LINE" structures. These
  * begin at the header line. This line is pointed to by the "BUFFER".
  * Each line contains:
@@ -1117,6 +1146,7 @@ struct VALNAMES {
 #define VALTYPE_STRING 1
 #define VALTYPE_BOOL 2
 #define VALTYPE_REGEX 3
+#define VALTYPE_COLOR 4
 
 struct regexval {
 	char *pat;
@@ -1136,31 +1166,7 @@ struct VAL {
 	union V *vp;
 };
 
-/* these are the boolean, integer, and pointer value'd settings that are
-	associated with a window, and usually settable by a user.  There
-	is a global set that is inherited into a buffer, and its windows
-	in turn are inherit the buffer's set. */
-#define	WMDLIST		0		/* "list" mode -- show tabs and EOL */
-#define	WMDNUMBER	1		/* line-numbers shown		*/
-
-/* put more boolean-valued things here */
-#define	MAX_BOOL_W_VALUE	1	/* max of boolean values	*/
-
-#define WVAL_SIDEWAYS	(MAX_BOOL_W_VALUE+1)
-#define WVAL_FCOLOR	(MAX_BOOL_W_VALUE+2)
-#define WVAL_BCOLOR	(MAX_BOOL_W_VALUE+3)
-/* put more int-valued things here */
-#define	MAX_INT_W_VALUE	(MAX_BOOL_W_VALUE+3) /* max of integer-valued modes */
-
-/* put more string-valued things here */
-#define	MAX_STRING_W_VALUE (MAX_INT_W_VALUE+0) /* max of string-valued modes */
-#define	MAX_W_VALUES	(MAX_STRING_W_VALUE) /* max of buffer values */
-
-typedef struct W_VALUES {
-	/* each entry is a val, and a ptr to a val */
-	struct VAL wv[MAX_W_VALUES+1];
-} W_VALUES;
-
+#include "nemode.h"
 
 /* these are window properties affecting window appearance _only_ */
 typedef struct	W_TRAITS {
@@ -1197,56 +1203,6 @@ typedef struct	W_TRAITS {
 
 #define gfcolor global_w_val(WVAL_FCOLOR)
 #define gbcolor global_w_val(WVAL_BCOLOR)
-
-/* buffer mode flags	*/
-/* the indices of B_VALUES.v[] */
-/* the first set are boolean */
-#define MDABUFF 	0		/* auto-buffer (lru) */
-#define	MDAIND		1		/* auto-indent */
-#define	MDASAVE		2		/* auto-save mode		*/
-#define	MDBACKLIMIT	3		/* backspace limited in insert mode */
-#define	MDCMOD		4		/* C indentation and fence match*/
-#define	MDCRYPT		5		/* encrytion mode active	*/
-#define	MDDOS		6		/* "dos" mode -- lines end in crlf */
-#define	MDIGNCASE	7		/* Exact matching for searches	*/
-#define MDMAGIC		8		/* regular expressions in search */
-#define	MDSHOWMAT	9		/* auto-indent */
-#define	MDSHOWMODE	10		/* show insert/replace/command mode */
-#define	MDTABINSERT	11		/* okay to insert tab chars 	*/
-#define	MDTAGSRELTIV	12		/* tags are relative to tagsfile path */
-#define	MDTERSE		13		/* be terse -- suppress messages */
-#define	MDVIEW		14		/* read-only buffer		*/
-#define	MDSWRAP 	15		/* wrap-around search mode	*/
-#define	MDWRAP		16		/* word wrap			*/
-
-#define	MAX_BOOL_B_VALUE	16	/* max of boolean values	*/
-
-#define VAL_ASAVECNT	(MAX_BOOL_B_VALUE+1)
-#define VAL_C_SWIDTH	(MAX_BOOL_B_VALUE+2)
-#define VAL_C_TAB	(MAX_BOOL_B_VALUE+3)
-#define VAL_FILL	(MAX_BOOL_B_VALUE+4)
-#define VAL_SWIDTH	(MAX_BOOL_B_VALUE+5)
-#define VAL_TAB		(MAX_BOOL_B_VALUE+6)
-#define VAL_TAGLEN	(MAX_BOOL_B_VALUE+7)
-#define	MAX_INT_B_VALUE	(MAX_BOOL_B_VALUE+7) /* max of integer-valued modes */
-
-#define VAL_CWD		(MAX_INT_B_VALUE+1)
-#define VAL_TAGS	(MAX_INT_B_VALUE+2)
-#define	MAX_STRING_B_VALUE (MAX_INT_B_VALUE+2) /* max of string-valued modes */
-
-#define VAL_CSUFFIXES	(MAX_STRING_B_VALUE+1)
-#define VAL_COMMENTS	(MAX_STRING_B_VALUE+2)
-#define VAL_PARAGRAPHS	(MAX_STRING_B_VALUE+3)
-#define VAL_SECTIONS	(MAX_STRING_B_VALUE+4)
-#define VAL_SENTENCES	(MAX_STRING_B_VALUE+5)
-#define	MAX_REGEX_B_VALUE (MAX_STRING_B_VALUE+5) /* max of string-valued modes */
-
-#define	MAX_B_VALUES	(MAX_REGEX_B_VALUE) /* max of buffer values */
-
-typedef struct B_VALUES {
-	/* each entry is a val, and a ptr to a val */
-	struct VAL bv[MAX_B_VALUES+1];
-} B_VALUES;
 
 /*
  * Text is kept in buffers. A buffer header, described below, exists for every
@@ -1663,10 +1619,31 @@ typedef struct WHBLOCK {
  * General purpose includes
  */
 
-#ifdef __STDC__
+#if APOLLO && !defined(__STDCPP__)
+# define ANSI_VARARGS 0
+# define ANSI_PROTOS 0 /* SR10.2 does not like protos w/o variable names */
+#endif
+
+#ifndef ANSI_VARARGS
+# ifdef __STDC__
+#  define ANSI_VARARGS 1	/* look in <stdarg.h> */
+# else
+#  define ANSI_VARARGS 0	/* look in <varargs.h> */
+# endif
+#endif
+
+#if ANSI_VARARGS
 #include <stdarg.h>
 #else
 #include <varargs.h>
+#endif
+
+#ifndef ANSI_PROTOS
+#  ifdef __STDC__
+#    define ANSI_PROTOS 1
+#  else
+#    define ANSI_PROTOS 0
+#  endif
 #endif
 
 #include <sys/types.h>
@@ -1677,7 +1654,7 @@ typedef struct WHBLOCK {
 #include "unistd.h"
 #include "stdlib.h"
 #else
-# if APOLLO && defined(__STDC__)	/* e.g., while running lint */
+# if APOLLO && defined(__STDC__) && defined(__STDCPP__)	/* e.g., while running lint */
 #include <stdlib.h>
 # else
 #  if ! VMALLOC

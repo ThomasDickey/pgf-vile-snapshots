@@ -3,7 +3,10 @@
  *		5/9/86
  *
  * $Log: input.c,v $
- * Revision 1.51  1993/01/16 10:35:40  foxharp
+ * Revision 1.52  1993/02/08 14:53:35  pgf
+ * see CHANGES, 3.32 section
+ *
+ * Revision 1.51  1993/01/16  10:35:40  foxharp
  * support for scrtch and shpipe chars in screen_string(), and use find_alt()
  * to pick up name of '#' buffer, rather than hist_lookup(1)
  *
@@ -195,6 +198,23 @@
 #include	"estruct.h"
 #include	"edef.h"
 
+static	TBUFF	*tmpcmd;	/* dot commands, 'til we're sure */
+static	TBUFF	*dotcmd;	/* dot commands, recorded	*/
+static	int	last_eolchar;	/* records last eolchar-match in 'kbd_string' */
+
+/*
+ * Dummy function to use when 'kbd_string()' does not handle automatic completion
+ */
+/*ARGSUSED*/
+int
+no_completion(c, buf, pos)
+int	c;
+char	*buf;
+int	*pos;
+{
+	return FALSE;
+}
+
 /*
  * Ask a yes or no question in the message line. Return either TRUE, FALSE, or
  * ABORT. The ABORT status is returned if the user bumps out of the question
@@ -243,14 +263,7 @@ char *prompt;
 char *buf;
 int bufn;
 {
-	return kbd_string(prompt, buf, bufn, '\n', EXPAND,
-#if MSDOS
-		/* we certainly quote with a '\' */
-		FALSE
-#else
-		TRUE
-#endif
-	);
+	return kbd_string(prompt, buf, bufn, '\n', KBD_NORMAL, no_completion);
 }
 
 #ifdef NEEDED
@@ -261,7 +274,7 @@ char *prompt;
 char *buf;
 int bufn;
 {
-	return kbd_string(prompt, buf, bufn, '\n',NO_EXPAND,TRUE);
+	return kbd_string(prompt, buf, bufn, '\n', KBD_QUOTES, no_completion);
 }
 #endif
 
@@ -272,7 +285,17 @@ char *prompt;
 char *buf;
 int bufn;
 {
-	return kbd_string(prompt, buf, bufn, '\n',EXPAND,FALSE);
+	return kbd_string(prompt, buf, bufn, '\n', KBD_EXPAND, no_completion);
+}
+
+/* as above, but neither expand nor do anything to backslashes */
+int
+mlreply_no_opts(prompt, buf, bufn)
+char *prompt;
+char *buf;
+int bufn;
+{
+	return kbd_string(prompt, buf, bufn, '\n', 0, no_completion);
 }
 
 /*	kcod2key:	translate 10-bit keycode to single key value */
@@ -291,8 +314,9 @@ void
 incr_dot_kregnum()
 {
 	if (dotcmdmode == PLAY) {
-		if (isdigit(*dotcmdptr) && *dotcmdptr < '9')
-			(*dotcmdptr)++;
+		register int	c = tb_peek(dotcmd);
+		if (isdigit(c) && c < '9')
+			(void)tb_next(dotcmd);
 	}
 }
 
@@ -303,12 +327,9 @@ tungetc(c)
 int c;
 {
 	tungotc = c;
-	if (dotcmdmode == RECORD) {
-		if (tmpcmdend > tmpcmdm) {
-			tmpcmdend--;
-			tmpcmdptr--;
-		}
-	}
+	if (dotcmdmode == RECORD)
+		tb_unput(tmpcmd);
+
 	if (kbdmode == RECORD) {
 		if (kbdend > kbdm) {
 			kbdend--;
@@ -336,16 +357,16 @@ int eatit;  /* consume the character? */
 		}
 
 		/* if there is some left... */
-		if (dotcmdptr < dotcmdend) {
+		if (tb_more(dotcmd)) {
 			if (eatit)
-				return *dotcmdptr++;
+				return tb_next(dotcmd);
 			else
-				return *dotcmdptr;
+				return tb_peek(dotcmd);
 		}
 
 		if (!eatit) {
 			if (dotcmdrep > 1)
-				return dotcmdm[0];
+				return tb_get(dotcmd, 0);
 		} else {
 			/* at the end of last repetition? */
 			if (--dotcmdrep < 1) {
@@ -356,11 +377,11 @@ int eatit;  /* consume the character? */
 
 				/* reset the macro to the beginning
 					for the next rep */
-				dotcmdptr = &dotcmdm[0];
+				tb_first(dotcmd);
 				if (eatit)
-					return (int)*dotcmdptr++;
+					return tb_next(dotcmd);
 				else
-					return (int)*dotcmdptr;
+					return tb_peek(dotcmd);
 			}
 		}
 	} 
@@ -400,25 +421,17 @@ int eatit;  /* consume the character? */
 }
 
 /* if we should preserve this input, do so */
-void
-record_char(c)
-int c;
+static
+void	record_char(c)
+	int c;
 {
 	if (c == ESC)
 		c = RECORDED_ESC;
 
 	/* save it if we need to */
 	if (dotcmdmode == RECORD) {
-		/* don't overrun the buffer  */
-		if (tmpcmdptr > &tmpcmdm[NKBDM - 1])
+		if (!tb_append(&tmpcmd, c))
 			return;
-
-		/* force the last char to be abortc */
-		if (tmpcmdptr == &tmpcmdm[NKBDM - 1])
-			c = abortc; /* safest terminator */
-
-		*tmpcmdptr++ = c;
-		tmpcmdend = tmpcmdptr;
 	}
 
 	/* save it if we need to */
@@ -660,32 +673,78 @@ int bufn, inclchartype;
 	return buf[0] != '\0';
 }
 
+/*
+ * Returns the character that ended the last call on 'kbd_string()'
+ */
+int
+end_string()
+{
+	return last_eolchar;
+}
+
+/* turn \X into X */
+static void
+remove_backslashes(s)
+char *s;
+{
+	register char *cp;
+	while (*s) {
+		if (*s == '\\') {  /* shift left */
+			for (cp = s; *cp; cp++)
+				*cp = *(cp+1);
+		}
+		s++;
+	}
+}
+
 /*	A more generalized prompt/reply function allowing the caller
 	to specify a terminator other than '\n'.  Both are accepted.
 	Assumes the buffer already contains a valid (possibly
 	null) string to use as the default response.
 */
 int
-kbd_string(prompt, extbuf, bufn, eolchar, expand, dobackslashes)
+kbd_string(prompt, extbuf, bufn, eolchar, options, complete)
 char *prompt;		/* put this out first */
 char *extbuf;		/* the caller's (possibly full) buffer */
 int bufn;		/* the length of  " */
 int eolchar;		/* char we can terminate on, in addition to '\n' */
-int expand;		/* do we want to expand %, #, : */
-int dobackslashes;	/* do we add and delete '\' chars for the caller */
+int options;		/* KBD_EXPAND/KBD_QUOTES */
+int (*complete)P((int,char *,int *));/* handles completion */
 {
+	int	expand		= (options & KBD_EXPAND);
+	int	dobackslashes	= (options & KBD_QUOTES);
+	int	done;
+
 	register int cpos, extcpos;/* current character position in string */
 	register int c;
 	register int quotef;	/* are we quoting the next char? */
 	register int backslashes; /* are we quoting the next expandable char? */
 	int firstch = TRUE;
+	int newpos;
 	char buf[256];
 #if ! MSDOS
 	char str[80];
 #endif
 
-	if (clexec)
-		return nextarg(extbuf);
+	if (clexec) {
+		int	s;
+		execstr = token(execstr, extbuf, eolchar);
+		if (s = (*extbuf != EOS)) {
+			if ((options & KBD_LOWERC))
+				(void)mklower(extbuf);
+			if (complete != no_completion) {
+				cpos =
+				newpos = strlen(extbuf);
+				if (!(*complete)(NAMEC, extbuf, &newpos))
+					extbuf[cpos] = EOS;
+			}
+			if (!(options & KBD_NOEVAL)) {
+				(void)strcpy(extbuf, tokval(extbuf));
+			}
+			last_eolchar = *execstr;
+		}
+		return s;
+	}
 
 	lineinput = TRUE;
 
@@ -694,7 +753,7 @@ int dobackslashes;	/* do we add and delete '\' chars for the caller */
 	/* prompt the user for the input string */
 	mlprompt(prompt);
 
-	if (bufn > 256) bufn = 256;
+	if (bufn > sizeof(buf)) bufn = sizeof(buf);
 
 	cpos = extcpos = 0;
 	/* add backslash escapes in front of volatile characters */
@@ -707,7 +766,7 @@ int dobackslashes;	/* do we add and delete '\' chars for the caller */
 #if ! MSDOS
 		case ':':
 #endif
-			if (dobackslashes && expand == EXPAND)
+			if (dobackslashes && expand)
 				buf[cpos++] = '\\'; /* add extra */
 		default:
 			break;
@@ -723,19 +782,10 @@ int dobackslashes;	/* do we add and delete '\' chars for the caller */
 
 	/* put out the default response, which comes in already in the buffer */
 	cpos = 0;
+	kbd_init();
 	while((c = buf[cpos]) != '\0' && cpos < bufn-1) {
-		if (!isprint(c)) {
-			if (disinp)
-				TTputc('^');
-			++ttcol;
-			c = toalpha(c);
-		}
-
 		if (disinp)
-			TTputc(c);
-
-
-		++ttcol;
+			kbd_putc(c);
 		++cpos;
 	}
 	TTflush();
@@ -755,19 +805,46 @@ int dobackslashes;	/* do we add and delete '\' chars for the caller */
 			problems, especially when searching for patterns
 			containing them -pgf */
 		/* terminate with newline, or unescaped eolchar */
-		if ((c == '\n') || (c == eolchar && (quotef == FALSE && 
-				(backslashes & 1) == 0))) {
-			/* if (buf[cpos] != '\0')
-				buf[cpos++] = '\0'; */
+		done = ((c == '\n')
+			||   (c == eolchar
+			  && (quotef == FALSE
+			  && (backslashes & 1) == 0)));
+		if (done)
+			last_eolchar = c;
 
+		if (complete != no_completion) {
+			kbd_unquery();
+			if (done
+			 || c == TESTC
+			 || c == NAMEC) {
+				int	ok;
+
+				newpos = cpos;
+				ok = ((*complete)(c, buf, &newpos));
+				cpos = newpos;
+
+				if (ok) {
+					done = TRUE;
+					if (c != NAMEC)	/* cancel the unget */
+						(void)tgetc();
+				} else {
+					if (done) {	/* stay til matched! */
+						buf[cpos] = EOS;
+						kbd_unquery();
+						(void)((*complete)(TESTC, buf, &newpos));
+					}
+					continue;
+				}
+			}
+		}
+
+		if (done) {
 			lineinput = FALSE;
 			if (dobackslashes)
 				remove_backslashes(buf); /* take out quoters */
 
-			strcpy(extbuf,buf);
-
 			/* if buffer is empty, return FALSE */
-			return (extbuf[0] == 0) ? FALSE:TRUE;
+			return (*strcpy(extbuf, buf) == 0) ? FALSE:TRUE;
 		}
 
 #if	NeWS	/* make sure cursor is where we think it is before output */
@@ -775,10 +852,12 @@ int dobackslashes;	/* do we add and delete '\' chars for the caller */
 #endif
 		/* change from command form back to character form */
 		c = kcod2key(c);
+		if ((options & KBD_LOWERC) && isupper(c))
+			c = tolower(c);
 	        
 		if (c == kcod2key(abortc) && quotef == FALSE) {
 			buf[cpos] = 0;
-			esc(FALSE, 0);
+			(void)esc(FALSE, 0);
 			TTflush();
 			lineinput = FALSE;
 			return ABORT;
@@ -808,12 +887,12 @@ int dobackslashes;	/* do we add and delete '\' chars for the caller */
 						saw_word = TRUE;
 					}
 				}
-				outstring("\b \b");
-				--ttcol;
+				if (disinp)
+					kbd_erase();
 
 				if (!isprint(buf[--cpos])) {
-					outstring("\b \b");
-					--ttcol;
+					if (disinp)
+						kbd_erase();
 				}
 				if (cpos && buf[cpos-1] == '\\') {
 					backslashes = 1;
@@ -830,7 +909,7 @@ int dobackslashes;	/* do we add and delete '\' chars for the caller */
 			}
 			TTflush();
 
-		} else if (expand == EXPAND && ((backslashes & 1 ) == 0)) {
+		} else if (expand && ((backslashes & 1 ) == 0)) {
 			/* we prefer to expand to filenames, but a buffer name
 				will do */
 			char *cp;
@@ -874,20 +953,13 @@ int dobackslashes;	/* do we add and delete '\' chars for the caller */
 			}
 
 			if (!cp) {
-				TTbeep();
-				TTflush();
+				kbd_alarm();
 				continue;
 			}
 			while (cpos < bufn-1 && (c = *cp++)) {
 				buf[cpos++] = c;
-				if (!isprint(c)) {
-					outstring("^");
-					++ttcol;
-					c = toalpha(c);
-				}
 				if (disinp)
-					TTputc(c);
-				++ttcol;
+					kbd_putc(c);
 			}
 			buf[cpos] = '\0';
 			TTflush();
@@ -911,56 +983,14 @@ int dobackslashes;	/* do we add and delete '\' chars for the caller */
 				if (cpos < bufn-1) {
 					buf[cpos++] = c;
 					buf[cpos] = '\0';
-
-					if (!isprint(c)) {
-						outstring("^");
-						++ttcol;
-						c = toalpha(c);
-					}
-
 					if (disinp)
-						TTputc(c);
-
-					++ttcol;
+						kbd_putc(c);
 					TTflush();
 				}
 			}
 		}
 		firstch = FALSE;
 	}
-}
-
-/* turn \X into X */
-void
-remove_backslashes(s)
-char *s;
-{
-	char *cp;
-	while (*s) {
-		if (*s == '\\') {  /* shift left */
-			for (cp = s; *cp; cp++)
-				*cp = *(cp+1);
-		}
-		s++;
-	}
-}
-
-void
-outstring(s)	/* output a string of input characters */
-char *s;	/* string to output */
-{
-	if (disinp)
-		while (*s)
-			TTputc(*s++);
-}
-
-void
-ostring(s)	/* output a string of output characters */
-char *s;	/* string to output */
-{
-	if (discmd)
-		while (*s)
-			TTputc(*s++);
 }
 
 /* ARGSUSED */
@@ -991,8 +1021,7 @@ dotcmdbegin()
 	case PLAY:
 		return FALSE;
 	}
-	tmpcmdptr = &tmpcmdm[0];
-	tmpcmdend = tmpcmdptr;
+	(void)tb_init(&tmpcmd, abortc);
 	dotcmdmode = RECORD;
 	return TRUE;
 }
@@ -1003,7 +1032,6 @@ dotcmdbegin()
 int
 dotcmdfinish()
 {
-
 	switch (dotcmdmode) {
 	case STOP:
 	case PLAY:
@@ -1013,12 +1041,14 @@ dotcmdfinish()
 	case RECORD:
 		;
 	}
-	tmpcmdptr = &tmpcmdm[0];
-	dotcmdptr = &dotcmdm[0];
-	while (tmpcmdptr < tmpcmdend)
-		*dotcmdptr++ = *tmpcmdptr++;
-	dotcmdend = dotcmdptr;
-	dotcmdptr = &dotcmdm[0];
+
+	(void)tb_init(&dotcmd, abortc);
+	tb_first(tmpcmd);
+	while (tb_more(tmpcmd))
+		if (!tb_append(&dotcmd, tb_next(tmpcmd)))
+			return FALSE;
+
+	tb_first(dotcmd);
 	dotcmdmode = STOP;
 	return TRUE;
 }
@@ -1054,7 +1084,7 @@ int f,n;
 
 	dotcmdrep = n;		/* remember how many times to execute */
 	dotcmdmode = PLAY;		/* put us in play mode */
-	dotcmdptr = &dotcmdm[0];	/*    at the beginning */
+	tb_first(dotcmd);	/*    at the beginning */
 
 	return TRUE;
 }

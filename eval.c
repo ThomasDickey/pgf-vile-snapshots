@@ -4,7 +4,10 @@
 	written 1986 by Daniel Lawrence
  *
  * $Log: eval.c,v $
- * Revision 1.42  1993/01/23 13:38:23  foxharp
+ * Revision 1.43  1993/02/08 14:53:35  pgf
+ * see CHANGES, 3.32 section
+ *
+ * Revision 1.42  1993/01/23  13:38:23  foxharp
  * now include nevars.h, which is auto-created by mktbls
  *
  * Revision 1.41  1993/01/16  10:30:58  foxharp
@@ -143,6 +146,10 @@
 #include	"edef.h"
 #include	"nevars.h"
 
+#if	ENVFUNC
+extern	char *getenv();
+#endif
+
 void
 varinit()		/* initialize the user variable list */
 {
@@ -157,10 +164,10 @@ varinit()		/* initialize the user variable list */
 #if ! SMALLER
 /* list the current vars into the current buffer */
 /* ARGSUSED */
-static
-void	makevarslist(dum1,ptr)
-	int dum1;
-	char *ptr;
+static void
+makevarslist(dum1,ptr)
+int dum1;
+char *ptr;
 {
 	register int i, j;
 
@@ -170,7 +177,7 @@ void	makevarslist(dum1,ptr)
 		if (uv[i].u_name[0] != 0) {
 			if (!j++)
 				bprintf("--- User variables %*P\n", term.t_ncol-1, '-');
-			bprintf("%s = %s\n", uv[i].u_name, uv[i].u_value);
+			bprintf("%%%s = %s\n", uv[i].u_name, uv[i].u_value);
 		}
 	}
 }
@@ -184,19 +191,32 @@ int f,n;
 #if ! SMALLER
 	char *values;
 	register WINDOW *wp = curwp;
-	register int s, t;
-	register char *v;
-	static	char *fmt = "%s = %s\n";
+	register int s;
+	register unsigned t;
+	register char *v, *vv;
+	static	char *fmt = "$%s = %.*s\n";
 
 	/* collect data for environment-variables, since some depend on window */
-	for (s = t = 0; s < NEVARS; s++)
-		t += strlen(envars[s]) + strlen(fmt) + strlen(gtenv(envars[s]));
-	if (!(values = malloc((unsigned)t)))
+	for (s = t = 0; s < NEVARS; s++) {
+		vv = gtenv(envars[s]);
+		if (vv != errorm)
+			t += strlen(envars[s]) + strlen(fmt) + strlen(vv);
+	}
+	if (!(values = malloc(t)))
 		return FALSE;
 
 	for (s = 0, v = values; s < NEVARS; s++) {
-		(void)sprintf(v, fmt, envars[s], gtenv(envars[s]));
-		v += strlen(v);
+		vv = gtenv(envars[s]);
+		if (vv != errorm) {
+			t = strlen(vv);
+			if (t == 0) {
+				t = 1;
+				vv = "";
+			} else if (vv[t-1] == '\n')
+				t--;	/* suppress trailing newline */
+			(void)sprintf(v, fmt, envars[s], t, vv);
+			v += strlen(v);
+		}
 	}
 	s = liststuff(ScratchName(Variables), makevarslist, 0, (char *)values);
 	free(values);
@@ -216,9 +236,6 @@ char *fname;		/* name of function to evaluate */
 	char arg2[NSTRING];		/* value of second argument */
 	char arg3[NSTRING];		/* value of third argument */
 	static char result[2 * NSTRING];	/* string result */
-#if	ENVFUNC
-	char *getenv();
-#endif
 
 	if (!fname[0])
 		return(errorm);
@@ -392,6 +409,9 @@ char *vname;		/* name of environment variable to retrieve */
 #if X11
 		case EVFONT:	return(x_current_fontname());
 #endif
+#if ENVFUNC
+		case EVSHELL:	return(getenv("SHELL"));
+#endif
 	}
 	return errorm;
 }
@@ -399,7 +419,7 @@ char *vname;		/* name of environment variable to retrieve */
 char *getkill()		/* return some of the contents of the kill buffer */
 {
 	register int size;	/* max number of chars to return */
-	char value[NSTRING];	/* temp buffer for value */
+	static char value[NSTRING];	/* temp buffer for value */
 
 	if (kbs[0].kbufh == NULL)
 		/* no kill buffer....just a null string */
@@ -463,7 +483,7 @@ fvar:
 			var[4] = 0;
 			if (strcmp(&var[1], "ind") == 0) {
 				/* grab token, and eval it */
-				execstr = token(execstr, var);
+				execstr = token(execstr, var, EOS);
 				strcpy(var, tokval(var));
 				goto fvar;
 			}
@@ -474,6 +494,28 @@ fvar:
 	vd->v_type = vtype;
 }
 
+/*
+ * Handles name-completion for variables.
+ */
+static int
+vars_complete(c, buf, pos)
+int	c;
+char	*buf;
+int	*pos;
+{
+	if (buf[0] == '$') {
+		int	cpos = *pos;
+		*pos -= 1;	/* account for leading '$', not in tables */
+		if (kbd_complete(c, buf+1, pos, (char *)&envars[0], sizeof(envars[0])))
+			*pos += 1;
+		else {
+			*pos = cpos;
+			return FALSE;
+		}
+	}
+	return TRUE;
+}
+
 int 
 setvar(f, n)		/* set a variable */
 int f;		/* default flag */
@@ -481,18 +523,16 @@ int n;		/* numeric arg (can overide prompted value) */
 {
 	register int status;	/* status return */
 	VDESC vd;		/* variable num/type */
-	static char var[NVSIZE+1];	/* name of variable to fetch */
-	char value[NSTRING];	/* value to set variable to */
+	static char var[NLINE+3];	/* name of variable to fetch */
+	char prompt[NLINE];
+	char value[NLINE];	/* value to set variable to */
 
 	/* first get the variable to set.. */
-	if (clexec == FALSE) {
-		status = mlreply("Variable to set: ", &var[0], NVSIZE);
-		if (status != TRUE)
-			return(status);
-	} else {	/* macro line argument */
-		/* grab token and skip it */
-		execstr = token(execstr, var);
-	}
+	status = kbd_string("Variable to set: ",
+		var, NLINE,
+		'=', KBD_NOEVAL|KBD_LOWERC, vars_complete);
+	if (status != TRUE)
+		return(status);
 
 	/* check the legality and find the var */
 	findvar(var, &vd);
@@ -507,8 +547,9 @@ int n;		/* numeric arg (can overide prompted value) */
 	if (f == TRUE)
 		strcpy(value, l_itoa(n));
 	else {
-		value[0] = 0;
-		status = mlreply("Value: ", &value[0], NSTRING);
+		value[0] = EOS;
+		(void)lsprintf(prompt, "Value of %s: ", var);
+		status = mlreply(prompt, value, sizeof(value));
 		if (status != TRUE)
 			return(status);
 	}
@@ -561,6 +602,9 @@ char *value;	/* value to set to */
 	register int status;	/* status return */
 	register int c;		/* translated character */
 	register char * sp;	/* scratch string pointer */
+#if	ENVFUNC
+	char	temp[NFILEN];
+#endif
 
 	/* simplify the vd structure (we are gonna look at it a lot) */
 	vnum = var->v_num;
@@ -651,6 +695,11 @@ char *value;	/* value to set to */
 		case EVFONT:	status = x_setfont(value);
 				break;
 #endif
+#if ENVFUNC
+		case EVSHELL:	lsprintf(temp, "SHELL=%s", value);
+				status = (putenv(temp) == 0);
+				break;
+#endif
 		}
 		break;
 	}
@@ -736,8 +785,7 @@ char *tokn;		/* token to evaluate */
 				discmd = TRUE;
 				clexec = FALSE;
 				buf[0] = 0;
-				status = kbd_string(tokn,
-					   buf, NSTRING, '\n',EXPAND,TRUE);
+				status = kbd_string(tokn, buf, sizeof(buf), '\n', KBD_EXPAND|KBD_QUOTES,no_completion);
 				discmd = distmp;
 				clexec = oclexec;
 

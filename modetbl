@@ -1,0 +1,68 @@
+# This file contains all of the editor's buffer and window modes
+#
+# It should be processed by the "mktbls" program, which produces the
+#  headers #included by main.c
+#
+# All that is necessary to add a new mode to the editor is to add
+#  an entry to this file, write the supporting code, and rebuild.
+#
+# If you want to know which modes are already taken, look
+#  at nemode.h, after you build it.
+#
+# The modes are table entries in the BUFFER and WINDOW structures.
+#
+# $Log: modetbl,v $
+# Revision 1.1  1993/02/08 14:52:04  pgf
+# Initial revision
+#
+#
+# Mode-table entries.  Capitalized letters are used for abbreviations.
+# The second column is the root of the index-definition.
+# The third column is flags used to control updates after a mode is changed.
+.buffers
+bool						# MD prefix
+	"AutoBuffer"	ABUFF 		0	# auto-buffer (lru)
+	"AutoIndent"	AIND		0	# auto-indent
+	"AutoSave"	ASAVE		0	# auto-save mode
+	"BackspaceLimit" BACKLIMIT	0	# backspace limited in insert mode
+	"cmode"		CMOD		WFHARD	# C indentation and fence match
+	"crypt"		CRYPT		0	# encrytion mode active
+	"dos"		DOS		WFHARD	# "dos" mode -- lines end in crlf
+	"IgnoreCase"	IGNCASE		0	# Exact matching for searches
+	"magic"		MAGIC		0	# regular expressions in search
+	"ShowMatch"	SHOWMAT		0	# auto-indent
+	"ShowMoDe"	SHOWMODE	WFMODE	# show insert/replace/command mode
+	"TabInsert"	TABINSERT	0	# okay to insert tab chars
+	"TagRelative"	TAGSRELTIV	0	# tags are relative to tagsfile path
+	"terse"		TERSE		0	# be terse -- suppress messages
+	"view"		VIEW		WFMODE	# read-only buffer
+	"WrapScan"	SWRAP 		0	# wrap-around search mode
+	"WrapWords"	WRAP		0	# word wrap
+int						# VAL_ prefix
+	"AutoSaveCNT"	ASAVECNT	0
+	"C-ShiftWidth"	C_SWIDTH	0
+	"C-TabStop"	C_TAB		WFHARD
+	"FillCol"	FILL		0
+	"ShiftWidth"	SWIDTH		0
+	"TabStop"	TAB		WFHARD
+	"TagLength"	TAGLEN		0
+	"WrapMargin"	WRAPMARGIN	0
+string						# VAL_ prefix
+	"cwd"		CWD		0
+	"tags"		TAGS		0
+regex						# VAL_ prefix
+	"C-SUFfixes"	CSUFFIXES	0
+	"comments"	COMMENTS	0
+	"paragraphs"	PARAGRAPHS	0
+	"sections"	SECTIONS	0
+	"sentences"	SENTENCES	0
+
+.windows
+bool						# WMD prefix
+	"LIst"		LIST		WFHARD		# "list" mode -- show tabs and EOL
+	"NUmber"	NUMBER		WFMODE|WFHARD	# line-numbers shown
+int							# VAL_ prefix
+	"SIDEways"	SIDEWAYS	WFMODE|WFHARD
+color
+	"fcolor"	FCOLOR		WFHARD|WFCOLR
+	"bcolor"	BCOLOR		WFHARD|WFCOLR

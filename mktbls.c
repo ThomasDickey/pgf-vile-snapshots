@@ -9,7 +9,13 @@
  *	the output structures.
  *
  * $Log: mktbls.c,v $
- * Revision 1.11  1993/01/23 14:44:08  foxharp
+ * Revision 1.13  1993/02/08 14:53:35  pgf
+ * see CHANGES, 3.32 section
+ *
+ * Revision 1.12  1993/01/26  22:46:20  foxharp
+ * fixed bad octal character constant
+ *
+ * Revision 1.11  1993/01/23  14:44:08  foxharp
  * local copies of isspace and isprint, since not everyone has them
  * in a standard library.
  *
@@ -65,8 +71,15 @@
 #define tocntrl(c)	((c)^DIFCNTRL)
 #define toalpha(c)	((c)^DIFCNTRL)
 #define	DIFCASE		0x20
+#define	isupper(c)	((c) >= 'A' && (c) <= 'Z')
+#define	islower(c)	((c) >= 'a' && (c) <= 'z')
 #define toupper(c)	((c)^DIFCASE)
 #define tolower(c)	((c)^DIFCASE)
+
+#ifndef	TRUE
+#define	TRUE	(1)
+#define	FALSE	(0)
+#endif
 
 #define	Fprintf	(void)fprintf
 #define	Sprintf	(void)sprintf
@@ -85,10 +98,13 @@ typedef	struct stringl {
 } LIST;
 
 static	LIST	*all_names,
-		*all_funcs,
-		*all_FUNCs,
+		*all_funcs,	/* data for extern-lines in nefunc.h */
+		*all_FUNCs,	/* data for {}-lines in nefunc.h */
 		*all_envars,
-		*all_ufuncs;
+		*all_ufuncs,
+		*all_modes,	/* data for name-completion of modes */
+		*all_bmodes,	/* data for BUFFER modes */
+		*all_wmodes;	/* data for WINDOW modes */
 
 	/* definitions for sections of cmdtbl */
 #define	SECT_CMDS 0
@@ -108,11 +124,10 @@ static	char *conditions[MAX_BIND][LEN_CHRSET];
 static	char *tblname   [MAX_BIND] = {"asciitbl", "ctlxtbl", "metatbl", "spectbl" };
 static	char *prefname  [MAX_BIND] = {"",         "CTLX|",   "CTLA|",   "SPEC|" };
 
+static	char *input;
 static	int l = 0;
 static	FILE *nebind, *nefunc, *nename, *cmdtbl;
-static	FILE *nevars;
-
-
+static	FILE *nevars, *nemode;
 
 /******************************************************************************/
 static isspace(c)
@@ -123,36 +138,37 @@ int c;
 static isprint(c)
 int c;
 {
-	return c >= ' ' && c < '\0177';
+	return c >= ' ' && c < '\177';
 }
+
 /******************************************************************************/
-static
-char *	StrAlloc(s)
-	char	*s;
+static char *
+StrAlloc(s)
+char	*s;
 {
 	return strcpy(malloc((unsigned)strlen(s)+1), s);
 }
 
-static
-LIST *	ListAlloc()
+static LIST *
+ListAlloc()
 {
 	return (LIST *)malloc(sizeof(LIST));
 }
 
 /******************************************************************************/
-static
-void	badfmt(s)
-	char *s;
+static void	
+badfmt(s)
+char *s;
 {
-	Fprintf(stderr,"\"cmdtbl\", line %d: bad format:",l);
+	Fprintf(stderr,"\"%s\", line %d: bad format:", input, l);
 	Fprintf(stderr,"	%s\n",s);
 	exit(1);
 }
 
-static
-void	badfmt2(s,col)
-	char *s;
-	int col;
+static void
+badfmt2(s,col)
+char *s;
+int col;
 {
 	char	temp[BUFSIZ];
 	Sprintf(temp, "%s (column %d)", s, col);
@@ -160,11 +176,11 @@ void	badfmt2(s,col)
 }
 
 /******************************************************************************/
-static
-void	WriteLines(fp, list, count)
-	FILE	*fp;
-	char	**list;
-	int	count;
+static void
+WriteLines(fp, list, count)
+FILE	*fp;
+char	**list;
+int	count;
 {
 	while (count-- > 0)
 		Fprintf(fp, "%s\n", *list++);
@@ -172,10 +188,10 @@ void	WriteLines(fp, list, count)
 #define	write_lines(fp,list) WriteLines(fp, list, sizeof(list)/sizeof(list[0]))
 
 /******************************************************************************/
-static
-FILE *	OpenHeader(name, argv)
-	char	*name;
-	char	**argv;
+static FILE *
+OpenHeader(name, argv)
+char	*name;
+char	**argv;
 {
 	register FILE *fp;
 	static char *progcreat =
@@ -191,13 +207,13 @@ FILE *	OpenHeader(name, argv)
 }
 
 /******************************************************************************/
-static
-void	InsertSorted(headp, name, func, cond, note)
-	LIST	**headp;
-	char	*name;
-	char	*func;
-	char	*cond;
-	char	*note;
+static void
+InsertSorted(headp, name, func, cond, note)
+LIST	**headp;
+char	*name;
+char	*func;
+char	*cond;
+char	*note;
 {
 	register LIST *n, *p, *q;
 	register int  r;
@@ -221,10 +237,10 @@ void	InsertSorted(headp, name, func, cond, note)
 		q->nst = n;
 }
 
-static
-void	InsertOnEnd(headp, name)
-	LIST	**headp;
-	char	*name;
+static void
+InsertOnEnd(headp, name)
+LIST	**headp;
+char	*name;
 {
 	register LIST *n, *p, *q;
 
@@ -245,18 +261,18 @@ void	InsertOnEnd(headp, name)
 }
 
 /******************************************************************************/
-static
-char *	append(dst, src)
-	char	*dst;
-	char	*src;
+static char *
+append(dst, src)
+char	*dst;
+char	*src;
 {
 	(void)strcat(dst, src);
 	return (dst + strlen(dst));
 }
 
-static
-char *	formcond(c1,c2)
-	char *c1, *c2;
+static char *
+formcond(c1,c2)
+char *c1, *c2;
 {
 	static char cond[LEN_BUFFER];
 	if (c1[0] && c2[0])
@@ -268,9 +284,9 @@ char *	formcond(c1,c2)
 	return cond;
 }
 
-static
-int	LastCol(buffer)
-	char	*buffer;
+static int
+LastCol(buffer)
+char	*buffer;
 {
 	register int	col = 0,
 			c;
@@ -283,10 +299,10 @@ int	LastCol(buffer)
 	return col;
 }
 
-static
-char *	PadTo(col, buffer)
-	int col;
-	char	*buffer;
+static char *
+PadTo(col, buffer)
+int col;
+char	*buffer;
 {
 	int	any	= 0,
 		len	= strlen(buffer),
@@ -311,10 +327,10 @@ char *	PadTo(col, buffer)
 	return buffer;
 }
 
-static
-int	two_conds(btype,c,cond)
-	int btype,c;
-	char *cond;
+static int
+two_conds(btype,c,cond)
+int btype,c;
+char *cond;
 {
 	/* return true if both bindings have different
 	 conditions associated with them */
@@ -324,9 +340,378 @@ int	two_conds(btype,c,cond)
 }
 
 /******************************************************************************/
-static
-void	save_bindings(s,func,cond)
-	char *s, *func, *cond;
+	/* returns the number of non-comment tokens parsed, with a list of
+	 * tokens (0=comment) as a side-effect.  Note that quotes are removed
+	 * from the token, so we have to have them only in the first token! */
+static int
+Parse(input, vec)
+char	*input;
+char	**vec;
+{
+	char	*base = input;
+	register int	expecting = TRUE,
+			count = 0,
+			quote = 0,
+			c;
+
+	for (c = 0; c < MAX_BIND; c++)
+		vec[c] = "";
+	for (c = strlen(input); c > 0 && isspace(input[c-1]); c--)
+		input[c-1] = '\0';
+
+	while (c = *input++) {
+		if (quote) {
+			if (c == quote) {
+				quote = 0;
+				if (*input && !isspace(*input))
+					badfmt2("expected blank", input-base);
+				input[-1] = '\0';
+			}
+		} else {
+			if ((c == '"') || (c == '\'')) {
+				quote = c;
+			} else if (isspace(c)) {
+				input[-1] = '\0';
+				expecting = TRUE;
+			} else if ((c == '#')) {
+				while (isspace(*input))
+					input++;
+				vec[0] = input;
+				break;
+			}
+			if (expecting && !isspace(c)) {
+				if (count+1 >= MAX_PARSE)
+					break;
+				vec[++count] = input - (c != quote);
+				expecting = FALSE;
+			}
+		}
+	}
+	return count;
+}
+
+/******************************************************************************/
+/* get abbreviation by taking the uppercase chars only */
+static char *
+AbbrevMode(src)
+char *src;
+{
+	char *dst = StrAlloc(src);
+	register char	*s = src,
+			*d = dst;
+	while (*s) {
+		if (isupper(*s))
+			*d++ = tolower(*s);
+		s++;
+	}
+	*d = '\0';
+	return dst;
+}
+
+/* get name, converted to lowercase */
+static char *
+NormalMode(src)
+char *src;
+{
+	char *dst = StrAlloc(src);
+	register char *s = dst;
+	while (*s) {
+		if (isupper(*s))
+			*s = tolower(*s);
+		s++;
+	}
+	return dst;
+}
+
+/* given single-char type-key (cf: Mode2Key), return type-string */
+static char *
+c2type(c)
+int	c;
+{
+	char	*value;
+	switch (c) {
+	case 'b':	value	= "boolean";	break;
+	case 'c':	value	= "color";	break;
+	case 'i':	value	= "integer";	break;
+	case 's':	value	= "string";	break;
+	case 'x':	value	= "regex";	break;
+	default:	value	= "?";
+	}
+	return value;
+}
+
+/* given single-char type-key (cf: Mode2Key), return define-string */
+static char *
+c2TYPE(c)
+int	c;
+{
+	char	*value;
+	switch (c) {
+	case 'b':	value	= "BOOL";	break;
+	case 'c':	value	= "COLOR";	break;
+	case 'i':	value	= "INT";	break;
+	case 's':	value	= "STRING";	break;
+	case 'x':	value	= "REGEX";	break;
+	default:	value	= "?";
+	}
+	return value;
+}
+
+/* make a sort-key for mode-name */
+static char *
+Mode2Key(type, name)
+char	*type, *name;
+{
+	static	void	save_all_modes();
+	int	c;
+	char	*abbrev = AbbrevMode(name),
+		*normal = NormalMode(name),
+		*tmp = malloc((unsigned)(4 + strlen(normal) + strlen(abbrev)));
+
+	switch (c = *type) {
+	case 'b':
+	case 'c':
+	case 'i':
+	case 's':	break;
+	case 'r':	c = 'x';	/* make this sort after strings */
+	}
+
+	save_all_modes(type, normal, abbrev);
+
+	(void)sprintf(tmp, "%c\n%s\n%s", c, normal, abbrev);
+	return tmp;
+}
+
+/* generates a symbol used for delimiting ranges of bool/int/string */
+static char *
+ModeBase(c, ppref)
+int	c;
+char	*ppref;
+{
+	char	value[LEN_BUFFER];
+	Sprintf(value, "MAX_%s_%s_VALUE", c2TYPE(c), *ppref ? "W" : "B");
+	return StrAlloc(value);
+}
+
+/* converts a mode-name to a legal (hopefully unique!) symbol */
+static char *
+Name2Symbol(name)
+char	*name;
+{
+	char	*base, *dst;
+	register char c;
+
+	base = dst = malloc((unsigned)(strlen(name) + 3));
+
+	*dst++ = 's';
+	*dst++ = '_';
+	while (c = *name++) {
+		if (c == '-')
+			c = '_';
+		*dst++ = c;
+	}
+	*dst = '\0';
+	return base;
+}
+
+/* converts a mode-name & type to a reference to string-value */
+static char *
+Name2Address(name, type)
+char	*name;
+char	*type;
+{
+	char	*base = malloc((unsigned)(strlen(name) + 7));
+
+	name = Name2Symbol(name);
+	(void)strcpy(base, name);
+	if (*type == 'b')
+		(void)strcat(strcat(strcpy(base+2, "no"), name+2), "+2");
+	return base;
+}
+
+static void
+WriteTypeMax(base1, base0, code1, count)
+char	*base1;
+char	*base0;
+int	code1;
+int	count;
+{
+	if (*base1) {
+		char	temp[MAX_BUFFER], *s = temp;
+		Sprintf(s, "#define %s", base1);
+		(void)PadTo(24, temp);
+		s += strlen(s);
+		if (*base0)
+			Sprintf(s, "(%s+%d)", base0, count);
+		else
+			Sprintf(s, "%d", count-1);
+		(void)PadTo(32, temp);
+		s += strlen(s);
+		Sprintf(s, "/* max of %s-valued modes */\n\n", c2type(code1));
+		Fprintf(nemode, "%s\n", temp);
+	}
+}
+
+/* generate the index-definitions */
+static void
+WriteModeDefines(p, ppref)
+LIST	*p;
+char	*ppref;
+{
+	char	temp[MAX_BUFFER],
+		line[MAX_BUFFER];
+	char	*base0	= "",
+		*base1	= "",
+		code1	= '\0',
+		codex;
+	char	*vec[MAX_PARSE];
+	int	count	= 0;
+
+	while (p != 0) {
+		(void)Parse(strcpy(line, p->s1), vec);
+		codex	= *vec[1];
+		if (code1 != codex) {
+			WriteTypeMax(base1, base0, code1, count);
+			count = 0;
+			base0 = base1;
+			base1 = ModeBase(codex, ppref);
+			code1 = codex;
+		}
+		Sprintf(temp, "#define %s%s%s ",
+			ppref,
+			(codex == 'b') ? "MD" : "VAL_",
+			p->s2);
+		(void)PadTo(24, temp);
+		if (*base0)
+			Sprintf(temp+strlen(temp), "(%s+%d)", base0, count+1);
+		else
+			Sprintf(temp+strlen(temp), "%d", count);
+		count++;
+		if (p->s4[0]) {
+			(void)PadTo(32, temp);
+			Sprintf(temp+strlen(temp), "/* %s */", p->s4);
+		}
+		Fprintf(nemode, "%s\n", temp);
+		p = p->nst;
+	}
+	if (*base1) {
+		WriteTypeMax(base1, base0, code1, count);
+		Sprintf(temp, "#define MAX_%s_VALUES\t(%s)",
+			*ppref ? ppref : "B",
+			base1);
+		(void)PadTo(32, temp);
+		Sprintf(temp+strlen(temp), "/* max of %s values */\n",
+			*ppref ? "window" : "buffer");
+		Fprintf(nemode, "%s\n", temp);
+	}
+}
+
+static void
+WriteModeSymbols(p)
+LIST	*p;
+{
+	char	temp[MAX_BUFFER],
+		line[MAX_BUFFER];
+	char	*vec[MAX_PARSE];
+	int	code	= 0;
+
+	/* generate the symbol-table */
+	while (p != 0) {
+		(void)Parse(strcpy(line, p->s1), vec);
+		if (code != 0 && code != *vec[1])
+			Fprintf(nemode, "\n");
+		code = *vec[1];
+		Sprintf(temp, "\t{ %s,",
+			Name2Address(vec[2], vec[1]));
+		(void)PadTo(32, temp);
+		Sprintf(temp+strlen(temp), "%s,",
+			*vec[3] ? Name2Address(vec[3], vec[1]) : "\"X\"");
+		(void)PadTo(48, temp);
+		Sprintf(temp+strlen(temp), "VALTYPE_%s },", c2TYPE(code));
+		Fprintf(nemode, "%s\n", temp);
+		p = p->nst;
+	}
+
+}
+
+/******************************************************************************/
+static void
+save_all_modes(type, normal, abbrev)
+char	*type;
+char	*normal;
+char	*abbrev;
+{
+	if (*type == 'b') {
+		char	t_normal[LEN_BUFFER],
+			t_abbrev[LEN_BUFFER];
+		save_all_modes("Bool",
+			strcat(strcpy(t_normal, "no"), normal),
+			*abbrev
+				? strcat(strcpy(t_abbrev, "no"), abbrev)
+				: "");
+	}
+	InsertSorted(&all_modes, normal, type, "", "");
+	if (*abbrev)
+		InsertSorted(&all_modes, abbrev, type, "", "");
+}
+
+static void
+dump_all_modes()
+{
+	static	char	*top[] = {
+		"",
+		"#ifdef realdef",
+		"/*",
+		" * List of strings shared between all_modes, b_valnames and w_valnames",
+		" */",
+		"static char",
+		};
+	static	char	*middle[] = {
+		"#endif /* realdef */",
+		"",
+		"#if !SMALLER",
+		"#ifdef realdef",
+		"char *all_modes[] = {",
+		};
+	static	char	*bottom[] = {
+		"\tNULL\t/* ends table */",
+		"};",
+		"#else",
+		"extern char *all_modes[];",
+		"#endif /* realdef */",
+		"#endif /* !SMALLER */",
+		};
+	char	temp[MAX_BUFFER];
+	register LIST *p, *q;
+
+	InsertSorted(&all_modes, "all", "?", "", "");
+	write_lines(nemode, top);
+	for (p = all_modes; p; p = p->nst) {
+		if (p->s2[0] != 'b') {
+			for (q = p->nst; q != 0; q = q->nst)
+				if (q->s2[0] != 'b')
+					break;
+			Sprintf(temp, "\t%s[]", Name2Symbol(p->s1));
+			(void)PadTo(32, temp);
+			Sprintf(temp+strlen(temp), "= \"%s\"%c",
+				p->s1, (q != 0) ? ',' : ';');
+			(void)PadTo(64, temp);
+			Fprintf(nemode, "%s/* %s */\n", temp, p->s2);
+		}
+	}
+
+	write_lines(nemode, middle);
+	for (p = all_modes; p; p = p->nst) {
+		Fprintf(nemode, "\t%s,\n", Name2Address(p->s1, p->s2));
+	}
+
+	write_lines(nemode, bottom);
+}
+
+/******************************************************************************/
+static void
+save_bindings(s,func,cond)
+char *s, *func, *cond;
 {
 	int btype, c;
 
@@ -378,8 +763,8 @@ void	save_bindings(s,func,cond)
 		badfmt("got extra characters");
 }
 
-static
-void	dump_bindings()
+static void
+dump_bindings()
 {
 	char	temp[MAX_BUFFER];
 	char	old_cond[LEN_BUFFER], *new_cond;
@@ -453,9 +838,53 @@ void	dump_bindings()
 }
 
 /******************************************************************************/
-static
-void	start_evar_h(argv)
-	char	**argv;
+static void
+save_bmodes(type, vec)
+char	*type;
+char	**vec;
+{
+	InsertSorted(&all_bmodes, Mode2Key(type,vec[1]), vec[2], vec[3], vec[0]);
+}
+
+static void
+dump_bmodes()
+{
+	static	char	*top[] = {
+		"",
+		"/* buffer mode flags	*/",
+		"/* the indices of B_VALUES.v[] */",
+		"/* the first set are boolean */",
+		};
+	static	char	*middle[] = {
+		"",
+		"typedef struct B_VALUES {",
+		"\t/* each entry is a val, and a ptr to a val */",
+		"\tstruct VAL bv[MAX_B_VALUES+1];",
+		"} B_VALUES;",
+		"",
+		"#ifdef realdef",
+		"struct VALNAMES b_valuenames[] = {",
+		};
+	static	char	*bottom[] = {
+		"",
+		"\t{ NULL,\tNULL,\tVALTYPE_INT }",
+		"};",
+		"#else",
+		"extern struct VALNAMES b_valuenames[];",
+		"#endif",
+		};
+
+	write_lines(nemode, top);
+	WriteModeDefines(all_bmodes, "");
+	write_lines(nemode, middle);
+	WriteModeSymbols(all_bmodes);
+	write_lines(nemode, bottom);
+}
+
+/******************************************************************************/
+static void
+start_evar_h(argv)
+char	**argv;
 {
 	static	char	*head[] = {
 		"",
@@ -481,16 +910,16 @@ void	start_evar_h(argv)
 	}
 }
 
-static
-void	finish_evar_h()
+static void
+finish_evar_h()
 {
 	if (nevars)
 		Fprintf(nevars, "\n#endif\n");
 }
 
 /******************************************************************************/
-static
-void	init_envars()
+static void
+init_envars()
 {
 	static	char	*head[] = {
 		"",
@@ -504,20 +933,21 @@ void	init_envars()
 		write_lines(nevars, head);
 }
 
-static
-void	save_envars(vec)
-	char	**vec;
+static void
+save_envars(vec)
+char	**vec;
 {
 	InsertSorted(&all_envars, vec[1], vec[2], vec[3], vec[0]);
 }
 
-static
-void	dump_envars()
+static void
+dump_envars()
 {
 	static	char *middle[] = {
+		"\tNULL\t/* ends table for name-completion */",
 		"};",
 		"",
-		"#define\tNEVARS\tSIZEOF(envars)",
+		"#define\tNEVARS\t(SIZEOF(envars)-1)",
 		"",
 		"/* \tand its preprocesor definitions\t\t*/",
 		""
@@ -549,12 +979,12 @@ void	dump_envars()
 }
 
 /******************************************************************************/
-static
-void	save_funcs(func, flags, cond, old_cond)
-	char	*func;
-	char	*flags;
-	char	*cond;
-	char	*old_cond;
+static void
+save_funcs(func, flags, cond, old_cond)
+char	*func;
+char	*flags;
+char	*cond;
+char	*old_cond;
 {
 	char	temp[MAX_BUFFER];
 	register char	*s;
@@ -582,9 +1012,9 @@ void	save_funcs(func, flags, cond, old_cond)
 	InsertOnEnd(&all_FUNCs, temp);
 }
 
-static
-void	dump_funcs(head)
-	LIST	*head;
+static void
+dump_funcs(head)
+LIST	*head;
 {
 	register LIST *p;
 	for (p = head; p != 0; p = p->nst)
@@ -592,9 +1022,9 @@ void	dump_funcs(head)
 }
 
 /******************************************************************************/
-static
-void	save_names(name,func,cond)
-	char *name, *func, *cond;
+static void
+save_names(name,func,cond)
+char *name, *func, *cond;
 {
 	char tmpline[80];
 
@@ -602,8 +1032,8 @@ void	save_names(name,func,cond)
 	InsertSorted(&all_names, name, func, cond, "");
 }
 
-static
-void	dump_names()
+static void
+dump_names()
 {
 	register LIST *m;
 	char	temp[MAX_BUFFER];
@@ -631,8 +1061,8 @@ void	dump_names()
 }
 
 /******************************************************************************/
-static
-void	init_ufuncs()
+static void
+init_ufuncs()
 {
 	static	char	*head[] = {
 		"",
@@ -656,15 +1086,15 @@ void	init_ufuncs()
 		write_lines(nevars, head);
 }
 
-static
-void	save_ufuncs(vec)
-	char	**vec;
+static void
+save_ufuncs(vec)
+char	**vec;
 {
 	InsertSorted(&all_ufuncs, vec[1], vec[2], vec[3], vec[0]);
 }
 
-static
-void	dump_ufuncs()
+static void
+dump_ufuncs()
 {
 	static	char	*middle[] = {
 		"};",
@@ -699,54 +1129,48 @@ void	dump_ufuncs()
 }
 
 /******************************************************************************/
-	/* returns the number of non-comment tokens parsed, with a list of
-	 * tokens (0=comment) as a side-effect.  Note that quotes are removed
-	 * from the token, so we have to have them only in the first token! */
-static
-int	Parse(input, vec)
-	char	*input;
-	char	**vec;
+static void
+save_wmodes(type, vec)
+char	*type;
+char	**vec;
 {
-	char	*base = input;
-	register int	expecting = 1,
-			count = 0,
-			quote = 0,
-			c;
+	InsertSorted(&all_wmodes, Mode2Key(type,vec[1]), vec[2], vec[3], vec[0]);
+}
 
-	for (c = 0; c < MAX_BIND; c++)
-		vec[c] = "";
-	for (c = strlen(input); c > 0 && isspace(input[c-1]); c--)
-		input[c-1] = '\0';
+static void
+dump_wmodes()
+{
+	static	char	*top[] = {
+		"",
+		"/* these are the boolean, integer, and pointer value'd settings that are",
+		"\tassociated with a window, and usually settable by a user.  There",
+		"\tis a global set that is inherited into a buffer, and its windows",
+		"\tin turn are inherit the buffer's set. */",
+		};
+	static	char	*middle[] = {
+		"",
+		"typedef struct W_VALUES {",
+		"\t/* each entry is a val, and a ptr to a val */",
+		"\tstruct VAL wv[MAX_W_VALUES+1];",
+		"} W_VALUES;",
+		"",
+		"#ifdef realdef",
+		"struct VALNAMES w_valuenames[] = {",
+		};
+	static	char	*bottom[] = {
+		"",
+		"\t{ NULL,\tNULL,\tVALTYPE_INT}",
+		"};",
+		"#else",
+		"extern struct VALNAMES w_valuenames[];",
+		"#endif",
+		};
 
-	while (c = *input++) {
-		if (quote) {
-			if (c == quote) {
-				quote = 0;
-				if (*input && !isspace(*input))
-					badfmt2("expected blank", input-base);
-				input[-1] = '\0';
-			}
-		} else {
-			if ((c == '"') || (c == '\'')) {
-				quote = c;
-			} else if (isspace(c)) {
-				input[-1] = '\0';
-				expecting = 1;
-			} else if ((c == '#')) {
-				while (isspace(*input))
-					input++;
-				vec[0] = input;
-				break;
-			}
-			if (expecting && !isspace(c)) {
-				if (count+1 >= MAX_PARSE)
-					break;
-				vec[++count] = input - (c != quote);
-				expecting = 0;
-			}
-		}
-	}
-	return count;
+	write_lines(nemode, top);
+	WriteModeDefines(all_wmodes, "W");
+	write_lines(nemode, middle);
+	WriteModeSymbols(all_wmodes);
+	write_lines(nemode, bottom);
 }
 
 /******************************************************************************/
@@ -760,6 +1184,7 @@ char    *argv[];
 	char func[LEN_BUFFER];
 	char flags[LEN_BUFFER];
 	char old_fcond[LEN_BUFFER],	fcond[LEN_BUFFER];
+	char modetype[LEN_BUFFER];
 	int section = SECT_CMDS;
 	int r;
 
@@ -768,27 +1193,28 @@ char    *argv[];
 		exit(1);
 	}
 
-	if ((cmdtbl = fopen(argv[1],"r")) == NULL ) {
+	if ((cmdtbl = fopen(input = argv[1],"r")) == NULL ) {
 		Fprintf(stderr,"mktbls: couldn't open cmd-file\n");
 		exit(1);
 	}
-
-	nebind = OpenHeader("nebind.h", argv);
-	nefunc = OpenHeader("nefunc.h", argv);
-	nename = OpenHeader("nename.h", argv);
 
 	*old_fcond = '\0';
 
 	/* process each input line */
 	while (fgets(line, sizeof(line), cmdtbl) != NULL) {
+		char	col0	= line[0],
+			col1	= line[1];
+
 		l++;
-		switch (line[0]) {
+		r = Parse(line, vec);
+
+		switch (col0) {
 		case '#':		/* comment */
 		case '\n':		/* empty-list */
 			break;
 
 		case '.':		/* a new section */
-			switch (line[1]) {
+			switch (col1) {
 			case 'c':
 				section = SECT_CMDS;
 				break;
@@ -812,40 +1238,50 @@ char    *argv[];
 			break;
 
 		case '\t':		/* a new function */
-			if (section != SECT_CMDS)
-				badfmt("did not expect a tab");
+			switch (section) {
+			case SECT_CMDS:
+				switch (col1) {
+				case '"':	/* then it's an english name */
+					if (r < 1 || r > 2)
+						badfmt("looking for english name");
 
-			switch (line[1]) {
-			case '"':	/* then it's an english name */
+					save_names(vec[1], func, formcond(fcond,vec[2]));
+					break;
 
-				r = Parse(line, vec);
-				if (r < 1 || r > 2)
-					badfmt("looking for english name");
+				case '\'':	/* then it's a key */
+					if (r < 1 || r > 2)
+						badfmt("looking for key binding");
 
-				save_names(vec[1], func, formcond(fcond,vec[2]));
+					save_bindings(vec[1], func, formcond(fcond,vec[2]));
+					break;
+
+				default:
+					badfmt("bad line");
+				}
 				break;
 
-			case '\'':	/* then it's a key */
-				r = Parse(line, vec);
-				if (r < 1 || r > 2)
-					badfmt("looking for key binding");
+			case SECT_BUFF:
+				if (r < 2 || r > 3)
+					badfmt("looking for BUFFER modes");
+				save_bmodes(modetype, vec);
+				break;
 
-				save_bindings(vec[1], func, formcond(fcond,vec[2]));
+			case SECT_WIND:
+				if (r < 2 || r > 3)
+					badfmt("looking for WINDOW modes");
+				save_wmodes(modetype, vec);
 				break;
 
 			default:
-				badfmt("bad line");
+				badfmt("did not expect a tab");
 			}
 			break;
 
 		default:		/* cache information about funcs */
 			switch (section) {
 			case SECT_CMDS:
-				r = Parse(line, vec);
 				if (r < 2 || r > 3)
 					badfmt("looking for new function");
-				if (r != 3)
-					fcond[0] = '\0';
 
 				save_funcs(
 					strcpy(func,  vec[1]),
@@ -855,14 +1291,12 @@ char    *argv[];
 				break;
 
 			case SECT_VARS:
-				r = Parse(line, vec);
 				if (r < 2 || r > 3)
 					badfmt("looking for char *envars[]");
 				save_envars(vec);
 				break;
 
 			case SECT_FUNC:
-				r = Parse(line, vec);
 				if (r < 2 || r > 3)
 					badfmt("looking for UFUNC func[]");
 				save_ufuncs(vec);
@@ -870,7 +1304,18 @@ char    *argv[];
 
 			case SECT_BUFF:
 			case SECT_WIND:
-			default:	badfmt("section not implemented");
+				if (r != 1
+				 || (!strcmp(vec[1], "bool")
+				  && !strcmp(vec[1], "color")
+				  && !strcmp(vec[1], "int")
+				  && !strcmp(vec[1], "string")
+				  && !strcmp(vec[1], "regex")))
+					badfmt("looking for mode datatype");
+				(void)strcpy(modetype, vec[1]);
+				break;
+
+			default:
+				badfmt("section not implemented");
 			}
 		}
 	}
@@ -880,14 +1325,28 @@ char    *argv[];
 		SaveEndif(all_FUNCs);
 	}
 
-	dump_names();
-	dump_bindings();
-	dump_funcs(all_funcs);
-	dump_funcs(all_FUNCs);
+	if (all_names) {
+		nebind = OpenHeader("nebind.h", argv);
+		nefunc = OpenHeader("nefunc.h", argv);
+		nename = OpenHeader("nename.h", argv);
+		dump_names();
+		dump_bindings();
+		dump_funcs(all_funcs);
+		dump_funcs(all_FUNCs);
+	}
 
-	dump_envars();
-	dump_ufuncs();
-	finish_evar_h();
+	if (all_envars) {
+		dump_envars();
+		dump_ufuncs();
+		finish_evar_h();
+	}
+
+	if (all_wmodes || all_bmodes) {
+		nemode = OpenHeader("nemode.h", argv);
+		dump_all_modes();
+		dump_wmodes();
+		dump_bmodes();
+	}
 
 	return 0;
 }
