@@ -1,5 +1,5 @@
 
-/* 
+/*
  *	This code has been MODIFIED for use in vile (see the original
  *	copyright information down below) -- in particular:
  *	 - regexec no longer needs to scan a null terminated string
@@ -11,9 +11,12 @@
  *	 - regexps are now relocatable, rather than locked down
  *
  *		pgf, 11/91
- * 
+ *
  * $Log: regexp.c,v $
- * Revision 1.38  1993/09/10 16:06:49  pgf
+ * Revision 1.39  1993/10/04 10:24:09  pgf
+ * see tom's 3.62 changes
+ *
+ * Revision 1.38  1993/09/10  16:06:49  pgf
  * tom's 3.61 changes
  *
  * Revision 1.37  1993/07/27  18:06:20  pgf
@@ -182,7 +185,7 @@
  * compile to execute that permits the execute phase to run lots faster on
  * simple cases.  They are:
  *
- * regstart	char that must begin a match; '\0' if none obvious
+ * regstart	char that must begin a match; EOS if none obvious
  * reganch	is the match anchored (at beginning-of-line only)?
  * regmust	string (starting at program[offset]) that match must
  *				include, or NULL
@@ -307,7 +310,7 @@ static char regdummy;
 static char *regcode;		/* Code-emit pointer; &regdummy = don't. */
 static long regsize;		/* Code size. */
 
-/*		 	
+/*
  *				regexp		in magic	in nomagic
  *				char		enter as	enter as
  *				-------		--------	--------
@@ -347,7 +350,7 @@ int magic;
 	char *metas =  magic ? MAGICMETA : NOMAGICMETA;
 	while (*old) {
 		if (*old == '\\') { /* remove \ from these metas */
-			if (*(old+1) == '\0') {
+			if (*(old+1) == EOS) {
 				*new++ = '\\';
 				break;
 			}
@@ -359,7 +362,7 @@ int magic;
 		}
 		*new++ = *old++;  /* the char */
 	}
-	*new = '\0';
+	*new = EOS;
 }
 
 /*
@@ -436,7 +439,7 @@ int magic;
 		return(NULL);
 
 	/* Dig out information for optimizations. */
-	r->regstart = '\0';	/* Worst-case defaults. */
+	r->regstart = EOS;	/* Worst-case defaults. */
 	r->reganch = 0;
 	r->regmust = -1;
 	r->regmlen = 0;
@@ -538,7 +541,7 @@ int *flagp;
 	}
 
 	/* Make a closing node, and hook it on the end. */
-	ender = regnode((paren) ? CLOSE+parno : END);	
+	ender = regnode((paren) ? CLOSE+parno : END);
 	regtail(ret, ender);
 
 	/* Hook the tails of the branches to the closing node. */
@@ -548,7 +551,7 @@ int *flagp;
 	/* Check for proper termination. */
 	if (paren && *regparse++ != ')') {
 		FAIL("unmatched ()");
-	} else if (!paren && *regparse != '\0') {
+	} else if (!paren && *regparse != EOS) {
 		if (*regparse == ')') {
 			FAIL("unmatched ()");
 		} else
@@ -577,7 +580,7 @@ int *flagp;
 
 	ret = regnode(BRANCH);
 	chain = NULL;
-	while (*regparse != '\0' && *regparse != '|' && *regparse != ')') {
+	while (*regparse != EOS && *regparse != '|' && *regparse != ')') {
 		latest = regpiece(&flags, chain == NULL);
 		if (latest == NULL)
 			return(NULL);
@@ -585,7 +588,7 @@ int *flagp;
 			regninsert(2,latest);
 			OP(chain) = EXACTLY;
 			*latest++ = '$';
-			*latest++ = '\0';
+			*latest++ = EOS;
 			flags |= HASWIDTH|SIMPLE;
 		}
 		*flagp |= flags&HASWIDTH;
@@ -718,10 +721,10 @@ int at_bop;
 				ret = regnode(ANYOF);
 			if (*regparse == ']' || *regparse == '-')
 				regc(*regparse++);
-			while (*regparse != '\0' && *regparse != ']') {
+			while (*regparse != EOS && *regparse != ']') {
 				if (*regparse == '-') {
 					regparse++;
-					if (*regparse == ']' || *regparse == '\0')
+					if (*regparse == ']' || *regparse == EOS)
 						regc('-');
 					else {
 						class = UCHAR_AT(regparse-2)+1;
@@ -735,7 +738,7 @@ int at_bop;
 				} else
 					regc(*regparse++);
 			}
-			regc('\0');
+			regc(EOS);
 			if (*regparse != ']')
 				FAIL("unmatched []");
 			regparse++;
@@ -748,7 +751,7 @@ int at_bop;
 			return(NULL);
 		*flagp |= flags&(HASWIDTH|SPSTART);
 		break;
-	case '\0':
+	case EOS:
 	case '|':
 	case ')':
 		FAIL("internal urp");	/* Supposed to be caught earlier. */
@@ -760,7 +763,7 @@ int at_bop;
 
 	case '\\':
 		switch(*regparse) {
-		case '\0':	
+		case EOS:
 #ifdef BEFORE
 			FAIL("trailing \\");
 #else
@@ -806,7 +809,7 @@ int at_bop;
 		default:
 			ret = regnode(EXACTLY);
 			regc(*regparse);
-			regc('\0');
+			regc(EOS);
 			*flagp |= HASWIDTH|SIMPLE;
 			break;
 		}
@@ -831,7 +834,7 @@ int at_bop;
 				regc(*regparse++);
 				len--;
 			}
-			regc('\0');
+			regc(EOS);
 		}
 		break;
 	}
@@ -857,8 +860,8 @@ int op;
 
 	ptr = ret;
 	*ptr++ = op;
-	*ptr++ = '\0';		/* Null "next" pointer. */
-	*ptr++ = '\0';
+	*ptr++ = EOS;		/* Null "next" pointer. */
+	*ptr++ = EOS;
 	regcode = ptr;
 
 	return(ret);
@@ -904,7 +907,7 @@ char *opnd;
 
 	place = opnd;		/* Op node, where operand used to be. */
 	while (n--)
-		*place++ = '\0';
+		*place++ = EOS;
 }
 
 /*
@@ -1071,7 +1074,7 @@ register int endoff;
 		regerror("end less than start");
 		return(0);
 	}
-		
+
 
 	if (endoff < 0)
 		endoff = stringend - string;
@@ -1107,7 +1110,7 @@ register int endoff;
 
 	/* Messy cases:  unanchored match. */
 	s = &string[startoff];
-	if (prog->regstart != '\0') {
+	if (prog->regstart != EOS) {
 		/* We know what char it must start with. */
 		while ( (s = regstrchr(s, prog->regstart, stringend)) != NULL &&
 					s < endsrch) {
@@ -1204,7 +1207,7 @@ char *prog;
 			/* Match if current char isident
 			 * and previous char BOL or !ident */
 			if ((reginput == regnomore || !isident(*reginput))
-					|| (reginput != regbol 
+					|| (reginput != regbol
 					&& isident(reginput[-1])))
 				return(0);
 			break;
@@ -1404,7 +1407,7 @@ char *prog;
 				 * Lookahead to avoid useless match attempts
 				 * when we know what character comes next.
 				 */
-				nxtch = '\0';
+				nxtch = EOS;
 				if (OP(next) == EXACTLY)
 					nxtch = *OPERAND(next);
 				min = (OP(scan) == STAR) ? 0 : 1;
@@ -1413,7 +1416,7 @@ char *prog;
 				if (ignorecase)
 				    while (no >= min) {
 					/* If it could work, try it. */
-					if (nxtch == '\0' || 
+					if (nxtch == EOS ||
 						nocase_eq(*reginput,nxtch))
 						if (regmatch(next))
 							return(1);
@@ -1424,7 +1427,7 @@ char *prog;
 				else
 				    while (no >= min) {
 					/* If it could work, try it. */
-					if (nxtch == '\0' ||
+					if (nxtch == EOS ||
 						*reginput == nxtch)
 						if (regmatch(next))
 							return(1);
@@ -1603,12 +1606,12 @@ regexp *r;
 		next = regnext(s);
 		if (next == NULL)		/* Next ptr. */
 			printf("(0)");
-		else 
+		else
 			printf("(%d)", (s-r->program)+(next-s));
 		s += 3;
 		if (op == ANYOF || op == ANYBUT || op == EXACTLY) {
 			/* Literal string, where present. */
-			while (*s != '\0') {
+			while (*s != EOS) {
 				putchar(*s);
 				s++;
 			}
@@ -1618,7 +1621,7 @@ regexp *r;
 	}
 
 	/* Header fields of interest. */
-	if (r->regstart != '\0')
+	if (r->regstart != EOS)
 		printf("start `%c' ", r->regstart);
 	if (r->reganch)
 		printf("anchored ");
@@ -1762,8 +1765,8 @@ char *s2;
 	register int count;
 
 	count = 0;
-	for (scan1 = s1; *scan1 != '\0'; scan1++) {
-		for (scan2 = s2; *scan2 != '\0';)	/* ++ moved down. */
+	for (scan1 = s1; *scan1 != EOS; scan1++) {
+		for (scan2 = s2; *scan2 != EOS;)	/* ++ moved down. */
 			if (*scan1 == *scan2++)
 				return(count);
 		count++;
@@ -1784,7 +1787,7 @@ register int endoff;
 {
 	if (endoff < startoff)
 		return 0;
-	
+
 	if (lp->l_text) {
 		return regexec(prog, lp->l_text, &(lp->l_text[llength(lp)]),
 					startoff, endoff);
@@ -1804,7 +1807,7 @@ register int endoff;
 			}
 			prog->startp[0] = prog->endp[0] = NULL;
 		}
-		return s; 
+		return s;
 	}
 
 }

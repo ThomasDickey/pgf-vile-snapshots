@@ -8,7 +8,10 @@
  *  Last Updated: 07/14/87
  *
  * $Log: vmsvt.c,v $
- * Revision 1.9  1993/07/27 18:06:20  pgf
+ * Revision 1.10  1993/10/04 10:24:09  pgf
+ * see tom's 3.62 changes
+ *
+ * Revision 1.9  1993/07/27  18:06:20  pgf
  * see tom's 3.56 CHANGES entry
  *
  * Revision 1.8  1993/06/18  15:57:06  pgf
@@ -124,7 +127,7 @@ ttputs(string)
 char * string;				/* String to write		*/
 {
 	if (string)
-		while (*string != '\0')
+		while (*string != EOS)
 			ttputc(*string++);
 }
 

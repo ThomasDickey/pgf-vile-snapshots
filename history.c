@@ -64,7 +64,13 @@
  *	Allow left/right scrolling of input lines (when they get too long).
  *
  * $Log: history.c,v $
- * Revision 1.9  1993/09/03 09:11:54  pgf
+ * Revision 1.11  1993/10/04 10:24:09  pgf
+ * see tom's 3.62 changes
+ *
+ * Revision 1.10  1993/09/20  21:20:00  pgf
+ * don't let hst_append run if clexec is set
+ *
+ * Revision 1.9  1993/09/03  09:11:54  pgf
  * tom's 3.60 changes
  *
  * Revision 1.8  1993/07/27  18:06:20  pgf
@@ -116,7 +122,6 @@ static	int	willGlue P(( void ));
 static	int	willExtend P(( char *, int ));
 static	int	sameLine P(( LINE *, char *, int ));
 static	int	parseArg P(( HST *, LINE * ));
-static	int	hst_macroize P(( char *, char * ));
 static	LINE *	hst_find P(( HST *, BUFFER *, LINE *, int ));
 static	void	hst_display P(( HST *, char *, int ));
 static	void	display_LINE P(( HST *, LINE * ));
@@ -124,12 +129,9 @@ static	void	display_TBUFF P(( HST *, TBUFF * ));
 static	LINE *	hst_scroll P(( LINE *, HST * ));
 
 static	char	*MyBuff = ScratchName(History);
-static	TBUFF	*MyText,	/* current command to display */
-		*MyArgs;	/* ...buffer to hold extended-args */
+static	TBUFF	*MyText;	/* current command to display */
 static	int	MyGlue,		/* most recent eolchar */
-		MyLevel,	/* logging iff level is 1 */
-		save_flg;	/* saves 'clexec' */
-static	char *	save_ptr;	/* saves 'execstr' */
+		MyLevel;	/* logging iff level is 1 */
 
 /*--------------------------------------------------------------------------*/
 
@@ -161,7 +163,6 @@ stopMyBuff()
 	set_global_g_val(GMDABUFF,FALSE);
 
 	tb_free(&MyText);
-	tb_free(&MyArgs);
 }
 
 /*
@@ -209,13 +210,13 @@ LINE *	lp;
 char *	src;
 int	srclen;
 {
-	if (srclen == 0)
+	if (srclen <= 0)
 		return 0;
 	else {
 		register int	dstlen = llength(lp);
 
 		if (dstlen >= srclen) {
-			if (!memcmp(lp->l_text, src, srclen)) {
+			if (!memcmp(lp->l_text, src, (SIZE_T)srclen)) {
 				if (isRepeatable(*src)
 				 && isRepeatable(lp->l_text[0])
 				 && dstlen != srclen)
@@ -253,35 +254,6 @@ LINE *	lp;
 	return 0;
 }
 
-/*
- * Convert the string 'src' into a string that we can read back with 'token()'. 
- * If it is a shell-command, this will be a single-token.  Repeated shift
- * commands are multiple tokens.
- */
-static int
-hst_macroize(src, ref)
-char *	src;
-char *	ref;
-{
-	register int	c;
-	int	multi	= !isShellOrPipe(ref);	/* shift command? */
-	int	count	= 0;
-
-	if (tb_init(&MyArgs,abortc) != 0) {
-		(void)tb_append(&MyArgs, '"');
-		while ((c = *src++) != EOS) {
-			if (multi && count++)
-				(void)tb_sappend(&MyArgs, "\" \"");
-			if (c == '\\' || c == '"')
-				(void)tb_append(&MyArgs, '\\');
-			(void)tb_append(&MyArgs, c);
-		}
-		(void)tb_append(&MyArgs, '"');
-		return (tb_append(&MyArgs, EOS) != 0);
-	}
-	return FALSE;
-}
-
 /******************************************************************************/
 void
 hst_init(c)
@@ -312,23 +284,16 @@ int	glue;
 {
 	static	int	skip = 1;		/* e.g., after "!" */
 
-	if (tb_length(MyArgs)			/* e.g., within "!!" command */
-	 && hst_macroize(cmd, cmd)) {
-		execstr = tb_values(MyArgs) + tb_length(MyArgs);
+
+	if (clexec)
 		return;
-	}
+
+	if (clexec)				/* non-interactive? */
+		return;
 
 	if (willExtend(cmd, (int)strlen(cmd))
-	 && strlen(cmd) > skip
-	 && hst_macroize(cmd + skip, cmd) != 0) {
-
-		save_flg = clexec;
-		save_ptr = execstr;
-
-		clexec   = TRUE;		/* get the argument */
-		execstr  = tb_values(MyArgs);
-
-		cmd[skip] = EOS;
+	 && strlen(cmd) > skip) {
+		kbd_pushback(cmd, skip);
 	}
 
 	if (willGlue())
@@ -362,22 +327,6 @@ hst_flush()
 		return;
 	if (MyLevel-- != 1)
 		return;
-
-	if (tb_length(MyArgs)) {
-		char	buffer[NLINE],
-			*base = tb_values(MyArgs);
-
-		while (*base != EOS) {
-			base = token(base, buffer, EOS);
-			if (willGlue())
-				(void)tb_append(&MyText, MyGlue);
-			(void)tb_sappend(&MyText, tokval(buffer));
-		}
-		(void)tb_init(&MyArgs, abortc);
-
-		clexec = save_flg;
-		execstr = save_ptr;
-	}
 
 	if ((tb_length(MyText) != 0)
 	 && ((bp = makeMyBuff()) != 0)) {
@@ -513,23 +462,24 @@ HST *	parm;
 char *	src;
 int	srclen;
 {
-	int	keylen	= tb_length(MyText) + willGlue();
-	int	uselen	= srclen - keylen;
-	register char	*s = src + keylen, *t = s;
-
 	kbd_kill_response(parm->buffer, parm->position, killc);
 
-	if (s != 0) {
-		if (willExtend(src,srclen))
-			t += uselen;
-		else {
+	if (src != 0) {
+		int	keylen	= tb_length(MyText) + willGlue();
+		int	uselen	= srclen - keylen;
+		register char	*s = src + keylen;
+		register int    n  = 0;
+
+		if (willExtend(src,srclen)) {
+			n = uselen;
+		} else {
 			while (uselen-- > 0) {
-				if ((*parm->endfunc)(s, t-s, *t, parm->eolchar))
+				if ((*parm->endfunc)(s, n, s[n], parm->eolchar))
 					break;
-				t++;
+				n++;
 			}
 		}
-		*parm->position = kbd_show_response(parm->buffer, s, t+1-s, parm->eolchar, parm->options);
+		*parm->position = kbd_show_response(parm->buffer, s, n, parm->eolchar, parm->options);
 	}
 }
 

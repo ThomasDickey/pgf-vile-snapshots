@@ -5,7 +5,10 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: tags.c,v $
- * Revision 1.40  1993/09/03 09:11:54  pgf
+ * Revision 1.41  1993/10/04 10:24:09  pgf
+ * see tom's 3.62 changes
+ *
+ * Revision 1.40  1993/09/03  09:11:54  pgf
  * tom's 3.60 changes
  *
  * Revision 1.39  1993/08/05  14:29:12  pgf
@@ -362,7 +365,7 @@ int *endofpathflagp;
 {
 	char *tagsfile;
 	BUFFER *tagbp;
-	static char tagbufname[NBUFN];
+	static char tagbufname[NBUFN+1];
 	char tagfilename[NFILEN];
 
 	*endofpathflagp = FALSE;

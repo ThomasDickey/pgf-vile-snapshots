@@ -16,7 +16,10 @@
  *	modify (ifdef-style) 'expand_leaf()' to allow ellipsis.
  *
  * $Log: glob.c,v $
- * Revision 1.14  1993/09/06 16:36:47  pgf
+ * Revision 1.15  1993/10/04 10:24:09  pgf
+ * see tom's 3.62 changes
+ *
+ * Revision 1.14  1993/09/06  16:36:47  pgf
  * changed glob() to doglob() to avoid symbol conflicts
  *
  * Revision 1.13  1993/09/03  09:11:54  pgf
@@ -499,7 +502,7 @@ char	*pattern;
 
 			for (s = tmp; s-tmp < len; s++) {
 				if ((single && isspace(*s))
-				 || (!single && (*s == '\n' || *s == '\0'))) {
+				 || (!single && (*s == '\n' || *s == EOS))) {
 					*d = EOS;
 					result = record_a_match(d = old);
 					*d = EOS;

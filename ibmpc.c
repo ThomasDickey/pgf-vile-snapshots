@@ -10,7 +10,16 @@
  * display type.
  *
  * $Log: ibmpc.c,v $
- * Revision 1.24  1993/09/10 16:06:49  pgf
+ * Revision 1.27  1993/10/11 18:50:10  pgf
+ * mods for watcom.  still doesn't work
+ *
+ * Revision 1.26  1993/10/04  10:24:09  pgf
+ * see tom's 3.62 changes
+ *
+ * Revision 1.25  1993/09/28  22:26:27  pgf
+ * changes for djgpp
+ *
+ * Revision 1.24  1993/09/10  16:06:49  pgf
  * tom's 3.61 changes
  *
  * Revision 1.23  1993/09/06  16:28:01  pgf
@@ -97,6 +106,7 @@
 #define max(a,b) (((a) > (b)) ? (a) : (b))
 #define outp(p,v) outportb(p,v)
 #define inp(p) inportb(p)
+#define far
 #endif
 
 
@@ -131,13 +141,21 @@
 #endif
 
 #ifdef __WATCOMC__
-#define	INTX86(a,b,c)	int386(a, b, c)
+#define	INTX86(a,b,c)		int386(a, b, c)
+#define	INTX86X(a,b,c,d)	int386x(a, b, c, d)
 #define	_AX_		eax
+#define	_BX_		ebx
 #define	_CX_		ecx
+#define	_DX_		edx
+#define	_DI_		edi
 #else
 #define	INTX86(a,b,c)	int86(a, b, c)
+#define	INTX86X(a,b,c,d)	int86x(a, b, c, d)
 #define	_AX_		ax
+#define	_BX_		bx
 #define	_CX_		cx
+#define	_DX_		dx
+#define	_DI_		di
 #endif
 
 #define	ColorDisplay()	(dtype != CDMONO && !monochrome)
@@ -147,62 +165,103 @@
 #define	AttrMono(f)	(((Black(f) & 7) << 4) | (White(f) & 15))
 
 #if OPT_MS_MOUSE
+	static	int	ms_crsr2inx  P(( int, int ));
 	static	void	ms_deinstall P(( void ));
-	static	void	ms_install P(( void ));
-	static	void	ms_movecrsr  P(( int, int ));
+	static	void	ms_hidecrsr  P(( void ));
+	static	void	ms_install   P(( void ));
+	static	void	ms_setvrange P(( int, int ));
 	static	void	ms_showcrsr  P(( void ));
 #else
 # define ms_deinstall()
 # define ms_install()
 #endif
 
-static	int	dtype = -1;		/* current display type		*/
+static	int	dtype = -1;	/* current display type		*/
+
+	/* mode-independent VGA-BIOS status information */
+typedef	struct {
+	UCHAR	video_modes[3];	/* 00 Supported video-modes */
+	UCHAR	reserved[4];	/* 03 */
+	UCHAR	text_scanlines;	/* 07 Number of pixel rows in text mode */
+	UCHAR	num_charsets;	/* 08 Number of character sets that can be displayed */
+	UCHAR	num_loadable;	/* 09 Number of character sets loadable into video RAM */
+	UCHAR	capability;	/* 0A VGA-BIOS capability info */
+	UCHAR	more_info;	/* 0B More VGA-BIOS capability info */
+	UCHAR	reserved2[4];	/* 0C */
+	} static_VGA_info;
+
+	/* mode-dependent VGA-BIOS status information */
+typedef	struct {
+	static_VGA_info *static_info; /* 00 Address of table containing static info */
+	UCHAR	code_number;	/* 04 Code number of current video mode */
+	USHORT	num_columns;	/* 05 Number of displayed screen or pixel cols */
+	USHORT	page_length;	/* 07 Length of display page in video RAM */
+	USHORT	curr_page;	/* 09 Starting address of current display-page in video RAM */
+	UCHAR	crsr_pos[8][2];	/* 0B Cursor positions in display-pages in col/row order */
+	UCHAR	crsr_end;	/* 1B Ending row of cursor (pixel) row */
+	UCHAR	crsr_start;	/* 1C Starting row of cursor (pixel) row */
+	UCHAR	curr_page_num;	/* 1D Number of current display page */
+	USHORT	port_crt;	/* 1E Port address of the CRT controller address register */
+	UCHAR	curr_crtc;	/* 20 Current contents of CRTC control registers */
+	UCHAR	curr_color_sel;	/* 21 Current color selection register contents */
+	UCHAR	num_rows;	/* 22 Number of screen rows displayed */
+	USHORT	char_height;	/* 23 Height of characters in pixel rows */
+	UCHAR	code_active;	/* 25 Code number of active video adapter */
+	UCHAR	code_inactive;	/* 26 Code number of inactive video adapter */
+	USHORT	num_colors;	/* 27 Number of displayable colors (0=monochrome) */
+	UCHAR	num_pages;	/* 29 Number of screen pages */
+	UCHAR	num_pixel_rows;	/* 2A Number of displayed pixel rows (RES_200, etc.) */
+	UCHAR	num_cset0;	/* 2B Number of char-table used with chars whose 3rd attr bit is 0 */
+	UCHAR	num_cset1;	/* 2C Number of char-table used with chars whose 3rd attr bit is 1 */
+	UCHAR	misc_info;	/* 2D Miscellaneous information */
+	UCHAR	reserved[3];	/* 2E */
+	UCHAR	size_of_ram;	/* 31 Size of available video RAM (0=64k, 1=128k, 2=192k, 3=256k) */
+	UCHAR	reserved2[14];	/* 32 */
+	} dynamic_VGA_info;	/* length == 64 bytes */
 
 	/* scan-line resolution codes */
-#define	RES_250	0
+#define	RES_200	0
 #define	RES_350	1
 #define	RES_400	2
+#define RES_480 3
 
 	/* character-size codes */
-#define	C9x16	0	/* the default */
-#define	C8x8	1
-#define	C8x14  	2
-#define	C8x16	4
-#define	C7x9	8
-#define	C7x16	16
+#define	C8x8	0x12
+#define	C8x14	0x11
+#define	C8x16	0x14
 
 	/* character-size in pixels, for mouse-positioning */
-static	int	char_width  = 8;
-static	int	char_height = 8;
+static	int	chr_wide = 8;
+static	int	chr_high = 8;
 
-static	struct	{
+typedef	struct	{
 	char	*name;
 	UCHAR	type;
 	UCHAR	mode;
-	UCHAR	flags;
+	UCHAR	vchr;	/* code for setting character-height */
 	UCHAR	rows;
 	UCHAR	cols;
-	} drivers[] = {
-		/* the first 4 entries are reserved as synonyms for card-types */
-		{"CGA",    CDCGA,	3,	0,	25,  80},
-		{"MONO",   CDMONO,	3,	0,	25,  80},
-		{"EGA",    CDEGA,	3,	0,	43,  80},
-		{"VGA",    CDVGA,	3,	C8x8,	50,  80},
-		/* all VGA's */
-		{"40x25",  CDVGA,	1,	0,	25,  40},
-		{"80x25",  CDVGA,	3,	0,	25,  80},
-		{"80x50",  CDVGA,	3,	C8x8,	50,  80},
+	UCHAR	vres;	/* required scan-lines, RES_200, ... */
+	} DRIVERS;
 
-#ifdef TOP_2000_VGA /* Paradise VGA (doesn't work yet...) */
-# undef	NROW
-# define	NROW	75
-# undef	NCOL
-# define	NCOL	132
-		{"80x30",  CDVGA,	0x12,	C8x16,	30,  80},
-		{"100x75", CDVGA,	0x58,	C8x8,	75,  100},
-		{"132x25", CDVGA,	0x55,	C7x16,	25,  132},
-		{"132x43", CDVGA,	0x54,	C7x9,	43,  132},
-#endif
+static	DRIVERS drivers[] = {
+		/* the first 4 entries are reserved as synonyms for card-types */
+		{"CGA",    CDCGA,	3,	C8x8,	25,  80, RES_200},
+		{"MONO",   CDMONO,	3,	C8x8,	25,  80, RES_200},
+		{"EGA",    CDEGA,	3,	C8x14,	43,  80, RES_350},
+		{"VGA",    CDVGA,	3,	C8x8,	50,  80, RES_400},
+		/* store original info in this slot */
+		{"default",CDSENSE,     3,      C8x8,   25,  80, RES_200},
+		/* all VGA's */
+		{"40x12",  CDVGA,	1,	C8x16,	12,  40, RES_200},
+		{"40x21",  CDVGA,	1,	C8x16,	21,  40, RES_350},
+		{"40x25",  CDVGA,	1,	C8x16,	25,  40, RES_400},
+		{"40x28",  CDVGA,	1,	C8x14,  28,  40, RES_400},
+		{"80x14",  CDVGA,	3,	C8x14,  14,  80, RES_200},
+		{"80x25",  CDVGA,	3,	C8x16,	25,  80, RES_400},
+		{"80x28",  CDVGA,	3,	C8x14,  28,  80, RES_400},
+		{"80x43",  CDVGA,	3,	C8x8,   43,  80, RES_350},
+		{"80x50",  CDVGA,	3,	C8x8,	50,  80, RES_400},
 	};
 
 static	long	ScreenAddress[] = {
@@ -213,13 +272,13 @@ static	long	ScreenAddress[] = {
 	};
 
 USHORT *scptr[NROW];			/* pointer to screen lines	*/
+USHORT *s2ptr[NROW];			/* pointer to page-1 lines	*/
 USHORT sline[NCOL];			/* screen line image		*/
 extern union REGS rg;			/* cpu register for use of DOS calls */
 
-static	int	original_mode	= -1,
-		original_cols,		/* width of display		*/
-		original_page,		/* display-page (we use 0)	*/
-		original_type,		/* one of CDMONO, ... CDVGA	*/
+static	int	original_page,		/* display-page (we use 0)	*/
+		allowed_vres,		/* possible scan-lines, 1 bit per value */
+		original_type	= CDVGA+1, /* one past CDMONO ... CDVGA	*/
 #ifdef MUCK_WITH_CURSOR
 		original_curs,		/* start/stop scan lines	*/
 #endif
@@ -260,8 +319,6 @@ int	ctrans[] = {		/* ansi to ibm color translation table */
 #if	SCROLLCODE
 extern	void	ibmscroll P((int,int,int));
 #endif
-
-static	void	egaopen   P((void));
 
 static	int	scinit    P((int));
 static	int	getboard  P((void));
@@ -338,17 +395,17 @@ maxkbdrate (void)
 #endif
 
 static void
-set_80x25_display (void)
+set_char_size(int code)
 {
-	set_display(3);
-}
-
-static void
-set_8x8_chars(void)
-{
-	rg.h.ah = 0x11;		/* set char. generator function code */
-	rg.h.al = 0x12;		/*  to 8 by 8 double dot ROM         */
-	rg.h.bl = 0;		/* block 0                           */
+	switch (code) {
+	case C8x8:	chr_wide = 8;	chr_high = 8;	break;
+	case C8x14:	chr_wide = 8;	chr_high = 14;	break;
+	case C8x16:	chr_wide = 8;	chr_high = 16;	break;
+	default:	return;		/* cannot set this one! */
+	}
+	rg.h.ah = 0x11;		/* set char. generator function code	*/
+	rg.h.al = code;		/*  to specified ROM			*/
+	rg.h.bl = 0;		/* Character table 0			*/
 	INTX86(0x10, &rg, &rg);	/* VIDEO - TEXT-MODE CHARACTER GENERATOR FUNCTIONS */
 }
 
@@ -369,7 +426,8 @@ set_vertical_resolution(int code)
 	rg.h.al = code;
 	rg.h.bl = 0x30;
 	INTX86(0x10, &rg, &rg);	/* VIDEO - SELECT VERTICAL RESOLUTION */
-
+	if (code == RES_200)
+		delay(50);	/* patch: timing problem? */
 }
 
 /*--------------------------------------------------------------------------*/
@@ -461,33 +519,43 @@ char *res;	/* resolution to change to */
 {
 	char	*dst;
 	register int i;		/* index */
+	int	status;
 
 	/* find the default configuration */
-	if (!strcmp(res, "?"))
-		return scinit(CDSENSE);
+	if (!strcmp(res, "?")) {
+		status = scinit(CDSENSE);
+	} else {	/* specify a number */
+		if ((i = (int)strtol(res, &dst, 0)) >= 0
+		 && !*dst) {
+			switch (i) {
+			case 25:
+			case 2:
+				res = drivers[CD_25LINE].name;
+				break;
+			case 43:
+			case 4:	/* 43 line mode */
+				res = drivers[CDEGA].name;
+				break;
+			case 50:
+			case 5:	/* 50 line mode */
+				res = drivers[CDVGA].name;
+			}
+		}
 
-	/* specify a number */
-	if ((i = (int)strtol(res, &dst, 0)) >= 0
-	 && !*dst) {
-		switch (i) {
-		case 25:
-		case 2:
-			res = drivers[CD_25LINE].name;
-			break;
-		case 43:
-		case 4:	/* 43 line mode */
-			res = drivers[CDEGA].name;
-			break;
-		case 50:
-		case 5:	/* 50 line mode */
-			res = drivers[CDVGA].name;
+		for (i = 0; i < SIZEOF(drivers); i++) {
+			if (strcmp(res, drivers[i].name) == 0) {
+				status = scinit(i);
+				break;
+			}
 		}
 	}
-
-	for (i = 0; i < SIZEOF(drivers); i++)
-		if (strcmp(res, drivers[i].name) == 0)
-			return scinit(i);
-	return(FALSE);
+#if OPT_MS_MOUSE
+	if ((status == TRUE) && ms_exists()) {
+		ms_deinstall();
+		ms_install();
+	}
+#endif
+	return status;
 }
 
 void
@@ -497,40 +565,90 @@ char *dummy;
 	/* nothing here now..... */
 }
 
-#if OPT_FLASH
+#if OPT_MS_MOUSE || OPT_FLASH
+extern VIDEO **vscreen;	/* patch: edef.h */
+
+static	int	vp2attr P(( VIDEO *, int ));
+static	void	move2nd P(( int, int ));
+static	void	copy2nd P(( int ));
+
 static int
-index_ctrans(int c)
+vp2attr(vp, inverted)
+VIDEO	*vp;
+int	inverted;
 {
-	register int n;
-	for (n = 0; n < SIZEOF(ctrans); n++)
-	if (ctrans[n] == c)
-	return n;
-	return 0;
+	int	attr;
+#if	COLOR
+	if (ColorDisplay())
+		attr = AttrColor(
+			inverted ? vp->v_rfcolor : vp->v_rbcolor,
+			inverted ? vp->v_rbcolor : vp->v_rfcolor);
+	else
+#endif
+	 attr = AttrMono(!inverted);
+	return (attr << 8);
 }
 
-#define	fg_color(attr) index_ctrans((attr >>  8) & 7)
-#define bg_color(attr) index_ctrans((attr >> 12) & 7)
+static void
+move2nd(row, col)
+int	row;
+int	col;
+{
+	rg.h.ah = 0x02;
+	rg.h.bh = 1;
+	rg.h.dh = row;
+	rg.h.dl = col;
+	INTX86(0x10, &rg, &rg);
+}
 
 static void
-invert_display(void)
+copy2nd(inverted)
+int	inverted;
 {
-	static	VIDEO *mine;
+	WINDOW	*wp;
 	VIDEO	*vp;
-	USHORT	*lp;	/* pointer to the destination line */
-	int	row, col, nchar;
+	USHORT *lp;
+	char *tt;
+	register int	row, col, attr;
 
-	for (row = 0; row < term.t_nrow; row++) {
-		vp = scread(videoAlloc(&mine), row);
-		lp = scptr[row];
-		for (col = 0; col < term.t_ncol; col += nchar) {
-			for (nchar = 1; nchar + col < term.t_ncol; nchar++)
-			if ((0xff00 & lp[col])
-			!= (0xff00 & lp[col+nchar]))
-			break;
-			scwrite(row, col, nchar, &vp->v_text[col],
-			bg_color(lp[col]), fg_color(lp[col]));
+	for_each_window(wp) {
+		for (row = wp->w_toprow; row <= mode_row(wp); row++) {
+			vp = vscreen[row];
+			lp = s2ptr[row];
+			tt = vp->v_text;
+			attr = vp2attr(vp, inverted ^ (row == mode_row(wp)));
+			for (col = 0; col < term.t_ncol; col++) {
+				lp[col] = (attr | tt[col]);
+			}
 		}
 	}
+
+	/* fill in the message line */
+	lp = s2ptr[term.t_nrow];
+	attr = scblank() << 8;
+	for (col = 0; col < term.t_ncol; col++)
+		lp[col] = attr | SPACE;
+	move2nd(ttrow, ttcol);
+}
+#endif
+
+/*
+ * Reading back from display memory does not work properly when using a mouse,
+ * because the portion of the display line beginning with the mouse cursor is
+ * altered (by the mouse driver, apparently).  Flash the display by building an
+ * inverted copy of the screen in the second display-page and toggling
+ * momentarily to that copy.
+ *
+ * Note: there's no window from which to copy the message line.
+ */
+#if OPT_FLASH
+void
+flash_display P((void))
+{
+	copy2nd(TRUE);
+	set_page(1);
+	catnap(100,FALSE); /* if we don't wait, we cannot see the flash */
+	set_page(0);
 }
 #endif	/* OPT_FLASH */
 
@@ -539,8 +657,7 @@ ibmbeep()
 {
 #if	OPT_FLASH
 	if (global_g_val(GMDFLASH)) {
-		invert_display();
-		invert_display();
+		flash_display();
 		return;
 	}
 #endif
@@ -554,32 +671,57 @@ ibmbeep()
 void
 ibmopen()
 {
+	register DRIVERS *driver = &drivers[original_type];
 
 	rg.h.ah = 0xf;
 	INTX86(0x10,&rg, &rg);	/* VIDEO - GET DISPLAY MODE */
 
-	original_cols = rg.h.ah;
-	original_mode = rg.h.al;
+	driver->vchr  = C8x8;
+	driver->vres  = RES_200;
+	driver->rows  = 25;
+	driver->cols  = rg.h.ah;
+	driver->mode  = rg.h.al;
 	original_page = rg.h.bh;
-	original_type = getboard();
+	driver->type  = getboard();
+	allowed_vres  = (1<<RES_200);	/* assume only 200 scan-lines */
 
+	if (driver->type == CDVGA) {	/* we can determine original rows */
+		dynamic_VGA_info buffer;
+		struct SREGS segs;
+
+		rg.h.ah = 0x1b;
+		rg.x._BX_ = 0;
+		segs.es = FP_SEG(&buffer);
+		rg.x._DI_ = FP_OFF(&buffer);
+		INTX86X(0x10, &rg, &rg, &segs); /* Get VGA-BIOS status */
+
+		if (rg.h.al == 0x1b) {
+			switch (buffer.char_height) {
+			case 8:		driver->vchr = C8x8;	break;
+			case 14:	driver->vchr = C8x14;	break;
+			case 16:	driver->vchr = C8x16;	break;
+			}
+			driver->rows = buffer.num_rows;
+			driver->vres = buffer.num_pixel_rows;
+			allowed_vres = buffer.static_info->text_scanlines;
+		}
+	} else if (driver->type == CDEGA) {
+		allowed_vres |= (1<<RES_350);
+	}
+
+#ifdef MUCK_WITH_CURSOR
 	rg.h.ah = 3;
 	rg.h.bh = 0;
 	INTX86(0x10, &rg, &rg);	/* VIDEO - GET CURSOR POSITION */
-#ifdef MUCK_WITH_CURSOR
 	original_curs = rg.x._CX_;
 #endif
 
 #ifdef PVGA
-	rg.h.ah = 0;
-	rg.h.al = 10;		/* set graphic 640x350 mode */
-	INTX86(0x10,&rg, &rg);
-	rg.x.ax = 0x007F;
+	set_display(10);	/* set graphic 640x350 mode */
+	rg.x._AX_ = 0x007F;      
 	rg.h.bh = 0x01;		/* set non-VGA mode */
 	INTX86(0x10,&rg, &rg);
-	rg.h.ah = 0x00;
-	rg.h.al = 0x07;		/* set Hercule mode */
-	INTX86(0x10,&rg, &rg);
+	set_display(7);		/* set Hercule mode */
 	ibmtype = CD_25LINE;
 #endif
 
@@ -596,12 +738,21 @@ ibmopen()
 void
 ibmclose()
 {
-	set_display(original_mode);
+	int	current_type = ibmtype;
+
+	scinit(original_type);
 	if (original_page != 0)
 		set_page(original_page);
 #ifdef MUCK_WITH_CURSOR
-	set_cursor(original_mode <= 3 ? original_curs & 0x707 : original_curs);
+	set_cursor(drivers[original_type].mode <= 3
+		? original_curs & 0x707
+		: original_curs);
 #endif
+	ibmtype = current_type;	/* ...so subsequent TTopen restores us */
+
+	dtype = CDMONO;		/* ...force monochrome */
+	movecursor(0,0);	/* clear the screen */
+	TTeeop();
 }
 
 void
@@ -624,49 +775,56 @@ int n;		/* type of adapter to init for */
 		long laddr;		/* long form of address */
 		USHORT *paddr;		/* pointer form of address */
 	} addr;
+	long pagesize;
+	register DRIVERS *driver;
 	register int i;
-	int	     type;
-	static	int  last = -1;
+	int	     type, rows, cols;
 
-	/* if asked...find out what display is connected */
+	/* if asked...find out what display is connected, and
+	 * map into our default for this driver-type
+	 */
 	if (n == CDSENSE)
-		n = type = original_type;
-	else {
-		type = drivers[n].type;
-		if (type == CDEGA && !egaexist)
-			return(FALSE);
-	}
+		n = drivers[original_type].type;
 
-	/* if changing resolution, we need a reset */
-	if (last >= 0) {
-		if (drivers[last].rows != drivers[n].rows
-		 || drivers[last].cols != drivers[n].cols)
-			set_80x25_display();
-		else if (dtype == type) {
-			(void)strcpy(sres, drivers[n].name);
-			return(TRUE);
-		}
-	}
+	driver = &drivers[n];
+	type = driver->type;
+	rows = driver->rows;
+	cols = driver->cols;
+
+	/* check to see if we're allow this many scan-lines */
+	if ((allowed_vres & (1 << (driver->vres))) == 0)
+		return FALSE;
 
 	/* and set up the various parameters as needed */
-	if (type == CDEGA)
-		egaopen();
-	else if (type == CDVGA) {
-		set_display(drivers[n].mode);
-		set_vertical_resolution(RES_400);	/* if this needed? */
-		if (drivers[n].flags & C8x8)
-			set_8x8_chars();
+	set_vertical_resolution(driver->vres);
+
+	set_display(driver->mode);
+	set_vertical_resolution(driver->vres);
+	set_char_size(driver->vchr);
+
+	/*
+	 * Install an alternative hardcopy routine which prints as many lines
+	 * as are displayed on the screen. The normal BIOS routine always
+	 * prints 25 lines.
+	 */
+	if (rows > 25) {
+		rg.h.ah = 0x12;		/* alternate select function code    */
+		rg.h.bl = 0x20;		/* alt. print screen routine         */
+		INTX86(0x10, &rg, &rg);	/* VIDEO - SELECT ALTERNATE PRTSCRN  */
 	}
 
-	newscreensize(drivers[n].rows, drivers[n].cols);
+	if (driver->type == CDEGA) {
+		outp(0x3d4, 10);	/* video bios bug patch */
+		outp(0x3d5, 6);
+	}
 
 	/* reset the $sres environment variable */
-	(void)strcpy(sres, drivers[n].name);
+	(void)strcpy(sres, driver->name);
 
 	if ((type == CDMONO) != (dtype == CDMONO))
 		sgarbf = TRUE;
 	dtype = type;
-	last  = n;
+	ibmtype = n;
 
 	/* initialize the screen pointer array */
 	if (monochrome)
@@ -676,9 +834,28 @@ int n;		/* type of adapter to init for */
 	else
 		addr.laddr = FAR_POINTER(ScreenAddress[type],0x0000);
 
-	for (i = 0; i < NROW; i++) {
-		scptr[i] = addr.paddr + term.t_ncol * i;
+	for (i = 0; i < rows; i++)
+		scptr[i] = addr.paddr + (cols * i);
+
+#if OPT_FLASH || OPT_MS_MOUSE
+	/* Build row-indices for display page #1.  This has been tested for
+	 *	80x50, 80x25 and 40x25 (but isn't general...).
+	 */
+	pagesize = (rows * cols);
+	switch (cols) {
+	case 40:
+		pagesize += ((4*cols) - 32);
+		break;
+	case 80:
+		pagesize += ((2*cols) - 32);
+		break;
 	}
+	addr.laddr += (pagesize + pagesize);
+	for (i = 0; i < rows; i++)
+		s2ptr[i] = addr.paddr + (cols * i);
+#endif
+	/* changing the screen-size forces an update, so we do this last */
+	newscreensize(rows, cols);
 	return(TRUE);
 }
 
@@ -752,27 +929,6 @@ int getboard()
 	return (CDCGA);
 }
 
-/*
- * Init the computer to work with the EGA (use 43-line mode)
- */
-static void
-egaopen()
-{
-	set_80x25_display();
-	set_8x8_chars();
-
-	rg.h.ah = 0x12;		/* alternate select function code    */
-	rg.h.al = 0;		/* clear AL for no good reason       */
-	rg.h.bl = 0x20;		/* alt. print screen routine         */
-	INTX86(0x10, &rg, &rg);	/* VIDEO - SELECT ALTERNATE PRTSCRN  */
-
-#ifdef MUCK_WITH_CURSOR
-	set_cursor(0x0607);
-#endif
-	outp(0x3d4, 10);	/* video bios bug patch */
-	outp(0x3d5, 6);
-}
-
 void
 scwrite(row, col, nchar, outstr, forg, bacg)	/* write a line out*/
 int row, col, nchar;	/* row,col of screen to place outstr (len nchar) on */
@@ -783,6 +939,9 @@ int bacg;	/* background color */
 	register USHORT attr;	/* attribute byte mask to place in RAM */
 	register USHORT *lnptr;	/* pointer to the destination line */
 	register int i;
+
+	if (row > term.t_nrow)
+		return;
 
 	/* build the attribute byte and setup the screen pointer */
 #if	COLOR
@@ -839,6 +998,9 @@ VIDEO *vp;
 int row;
 {
 	register int	i;
+
+	if (row > term.t_nrow)
+		return 0;
 
 	if (vp == 0) {
 		static	VIDEO	*mine;
@@ -907,29 +1069,31 @@ int f,n;		/* default flag, numeric argument [unused] */
 /*--------------------------------------------------------------------------*/
 
 #if OPT_MS_MOUSE
+
+/* Define translations between mouse (pixels) and chars (row/col).
+ * patch: why does 8 by 8 work, not chr_high by chr_wide?
+ */
+#define MS_CHAR_WIDE	((term.t_ncol == 80) ? 8 : 16)
+#define MS_CHAR_HIGH    8
+
+#define	pixels2col(x)   ((x)/MS_CHAR_WIDE)
+#define pixels2row(y)   ((y)/MS_CHAR_HIGH)
+
+#define col2pixels(x)   ((x)*MS_CHAR_WIDE)
+#define row2pixels(y)   ((y)*MS_CHAR_HIGH)
+
 /* Define a macro for calling mouse services */
 #define MouseCall INTX86(0x33, &rg, &rg)
 
-#define MS_MOVEMENT     iBIT(0)	/* mouse cursor movement */
-#define MS_BTN1_PRESS   iBIT(1)	/* left button */
+#define MS_MOVEMENT	iBIT(0)	/* mouse cursor movement */
+#define	MS_BTN1_PRESS   iBIT(1)	/* left button */
 #define MS_BTN1_RELEASE iBIT(2)
 #define MS_BTN2_PRESS   iBIT(3)	/* right button */
 #define MS_BTN2_RELEASE iBIT(4)
 #define MS_BTN3_PRESS   iBIT(5)	/* center button */
 #define MS_BTN3_RELEASE iBIT(6)
 
-/* Define a structure to hold information that the mouse functions */
-/* return and use */
-struct mousedata {
-	int	exists;		/* Greater than 0 if mouse exists */
-	int	cursor_display;	/* 1 if cursor displayed, 0 if hidden */
-	int	btnstatus;	/* Current button status (up or down) */
-	int	btnclicks;	/* Times button has been clicked */
-	int	column;		/* Mouse cursor column position */
-	int	row;		/* Mouse cursor row position */
-	int	hmovement;	/* Horizontal mouse movement */
-	int	vmovement;	/* Vertical mouse movement */
-} rodent;
+#define BLINK 0x8000
 
 	/* These have to be "far", otherwise TurboC doesn't force the
 	 * segment register to be specified from 'ms_event_handler()'
@@ -940,47 +1104,132 @@ int	far	button_press_x;
 int	far	button_press_y;
 int	far	button_relsd_x;
 int	far	button_relsd_y;
+int		rodent_exists;
+int		rodent_cursor_display;
 
 int
-ms_exists()
+ms_exists ()
 {
-	return rodent.exists;
+	return rodent_exists;
 }
 
 void
-ms_processing()
+ms_processing ()
 {
-	if (button_pending == 2) {
-		button_pending = 0;
-		if (button_press_x != button_relsd_x
-		 || button_press_y != button_relsd_y) {
-			ms_movecrsr(ttrow,ttcol);
-			/* kbd_alarm();	-- selection not yet implemented */
-		} else
-		if (button_number == 1) {
-			int	x = button_press_x / char_width;
-			int	y = button_press_y / char_height;
-			WINDOW	*wp = row2window(y);
-			/* Set the dot-location if button 1 was pressed in a
-			 * window.
-			 */
-			if (wp != 0
-			 && ttrow != term.t_nrow
-			 && setcursor(y, x)) {
-				(void)update(TRUE);
-			} else {
-				ms_movecrsr(ttrow,ttcol);
-				/*kbd_alarm(); -- cannot reposition */
+	WINDOW	*wp;
+	int	copied = FALSE,
+		invert, normal,
+		first, first_x = ttcol, first_y = ttrow,
+		last,  last_x  = ttcol,  last_y = ttrow,
+		that,  that_x,  that_y,
+		attr, delta;
+	USHORT *s2page = s2ptr[0];
+
+	ms_showcrsr();
+	while (button_pending) {
+		if (button_pending == 2) {
+			button_pending = 0;
+			if (copied) {
+				set_page(0);
+				ms_setvrange(0, term.t_nrow);
+				mlerase();
+				setwmark(pixels2row(last_y),
+					 pixels2col(last_x));
+				if (!same_ptr(DOT.l,MK.l)
+				 || DOT.o != MK.o) {
+					fulllineregions = FALSE;
+					(void)yankregion();
+				}
+				movecursor(pixels2row(first_y),
+					 pixels2col(first_x));
+
 			}
+		} else {	/* selection */
+
+			disable();
+			that_x = button_relsd_x;
+			that_y = button_relsd_y;
+			enable();
+
+			if (!copied) {
+				int x = pixels2col(button_press_x);
+				int y = pixels2row(button_press_y);
+				wp = row2window(y);
+				/* Set the dot-location if button 1 was pressed in a
+				 * window.
+				 */
+				if (wp != 0
+				 && ttrow != term.t_nrow
+				 && setcursor(y, x)) {
+					(void)update(TRUE);
+					ms_setvrange(wp->w_toprow,
+						     mode_row(wp) - 1);
+				} else {	/* cannot reposition */
+					kbd_alarm();
+					while (button_pending != 2)
+						;
+					continue;
+				}
+				first_x = last_x = col2pixels(ttcol);
+				first_y = last_y = row2pixels(ttrow);
+				first = ms_crsr2inx(first_x, first_y);
+
+				copy2nd(FALSE);
+				set_page(1);
+				copied = TRUE;
+
+				invert = vp2attr(vscreen[ttrow],TRUE);
+				normal = vp2attr(vscreen[ttrow],FALSE);
+			}
+
+			that  = ms_crsr2inx(that_x, that_y);
+			last  = ms_crsr2inx(last_x, last_y);
+			delta = (last < that) ? 1 : -1;
+
+			if (that != last) {
+				register int j;
+				if (((last < that) && (last <= first))
+				 || ((last > that) && (last >= first))) {
+					attr = normal;
+				} else {
+					attr = invert;
+				}
+#define HiLite(n,attr) s2page[n] = attr | (s2page[n] & 0xff)
+
+				for (j = last; j != that; j += delta) {
+					if (j == first) {
+						if (attr == normal) {
+							attr = invert;
+						} else {
+							attr = normal;
+						}
+					}
+					HiLite(j,attr);
+				}
+				HiLite(that,invert|BLINK);
+			}
+			last_x = that_x;
+			last_y = that_y;
 		}
 	}
+}
+
+/* translate cursor position (pixels) to array-index of the text-position */
+static int
+ms_crsr2inx(x, y)
+int	x;
+int	y;
+{
+	return pixels2col(x) + (pixels2row(y) * term.t_ncol);
 }
 
 static void
 ms_deinstall(void)
 {
-	rg.x.ax = 0;	/* reset the mouse */
+	ms_hidecrsr();
+	rg.x._AX_ = 0;	/* reset the mouse */
 	MouseCall;
+	rodent_exists = FALSE;
 }
 
 	/* This event-handler cannot do I/O; tracing it can be tricky...
@@ -996,10 +1245,11 @@ ms_event_handler P((void))
 	if (ms_event & MS_BTN1_PRESS) {
 		button_pending = 1;
 		button_number  = 1;
-		button_press_x = ms_horz;
-		button_press_y = ms_vert;
-	} else if (ms_event & MS_BTN1_RELEASE) {
-		button_pending = 2;
+		button_press_x = button_relsd_x = ms_horz;
+		button_press_y = button_relsd_y = ms_vert;
+	} else {	/* movement or release */
+		if (ms_event & MS_BTN1_RELEASE)
+			button_pending = 2;
 		button_relsd_x = ms_horz;
 		button_relsd_y = ms_vert;
 	}
@@ -1007,41 +1257,54 @@ ms_event_handler P((void))
 }
 
 static void
-ms_install(void)
+ms_hidecrsr()
 {
+	/* Hides the mouse cursor if it is displayed */
+	if (rodent_cursor_display) {
+		rodent_cursor_display = FALSE;
+		rg.x._AX_ = 0x02;
+		MouseCall;
+	}
+} /* End of ms_hidecrsr() */
+
+static void
+ms_install()
+{
+	if (rodent_exists)
+		return;
+
 	/* If a mouse is installed, initializes the mouse and
-	 * sets rodent.exists to 1. If no mouse is installed,
-	 * sets rodent.exists to 0.
+	 * sets rodent_exists to 1. If no mouse is installed,
+	 * sets rodent_exists to 0.
 	 */
-	rg.x.ax = 0;
+	rg.x._AX_ = 0;
 	MouseCall;
-	rodent.exists = rg.x.ax;
+	rodent_exists = rg.x._AX_;
 	if (ms_exists()) {
-		struct SREGS segregs;
-		rg.x.ax = 0xc;
-		rg.x.cx = MS_BTN1_PRESS | MS_BTN1_RELEASE;
-		rg.x.dx = FP_OFF(ms_event_handler);
-		segregs.es = FP_SEG(ms_event_handler);
-		int86x(0x33, &rg, &rg, &segregs);
-		ms_movecrsr(0,0);	/* patch */
-		ms_showcrsr();
+		struct SREGS segs;
+		rg.x._AX_ = 0xc;
+		rg.x._CX_ = MS_MOVEMENT | MS_BTN1_PRESS | MS_BTN1_RELEASE;
+		rg.x._DX_ = FP_OFF(ms_event_handler);
+		segs.es = FP_SEG(ms_event_handler);
+		INTX86X(0x33, &rg, &rg, &segs);
 	}
 }
 
 static void
-ms_movecrsr(int row, int col)
+ms_setvrange(upperrow, lowerrow)
+int upperrow;
+int lowerrow;
 {
-	/* Moves the mouse cursor to the screen position specified
-	 * in characters by the parameters.
+	/* Restricts vertical cursor movement to the screen region
+	 * between upperrow and lowerrow.  If the cursor is outside the range,
+	 * it is moved inside.
 	 */
-#if 0
-	rg.x.ax = 0x04;
-	rg.x.cx = col * char_width;
-	rg.x.dx = row * char_height;
+	rg.x._AX_ = 0x08;
+	rg.x._CX_ = row2pixels(upperrow);
+	rg.x._DX_ = row2pixels(lowerrow);
 	MouseCall;
-#endif
-	ibmmove(row,col);
-} /* End of ms_movecrsr() */
+} /* End of ms_setvrange() */
+
 
 static void
 ms_showcrsr(void)
@@ -1050,19 +1313,18 @@ ms_showcrsr(void)
 	int i, counter;
 
 	/* Call Int 33H Function 2AH to get the value of the display counter */
-	rg.x.ax = 0x2A;
+	rg.x._AX_ = 0x2A;
 	MouseCall;
-	counter = rg.x.ax;
+	counter = rg.x._AX_;
 
 	/* Call Int 33H Function 01H as many times as needed to display */
 	/* the mouse cursor */
 	for (i = 1; i < counter; i++) {
-		rg.x.ax = 0x01;
+		rg.x._AX_ = 0x01;
 		MouseCall;
 	}
-
-	rodent.cursor_display = 1;
+	rodent_cursor_display = TRUE;
 } /* End of ms_showcrsr() */
-#endif OPT_MS_MOUSE
+#endif /* OPT_MS_MOUSE */
 
 #endif	/* IBMPC */

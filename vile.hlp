@@ -648,8 +648,8 @@ Editor modes
 	expand-path Controls whether %/# are expanded to the full pathname
 		of a buffer. (U)
 
-	flash	If your terminal can, flashes the screen rather than beeping on
-		errors.  (U)
+	flash   If your terminal can, will flash the screen rather than
+		beeping on errors.  (U)
 
 	glob	Controls how wildcard characters (e.g., '*' and '?') are
 		treated in prompts for filenames.  Set glob to 'off' to

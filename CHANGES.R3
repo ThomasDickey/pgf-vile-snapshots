@@ -1,3 +1,131 @@
+Changes for vile 3.62: (released  ???)
+(pgf)
+	+ enable DOS mouse processing for Turbo-C only, since some code
+	  uses Turbo-isms to get at registers (_AX, etc)  (estruct.h)
+
+	* change references to x.ax, x.bx, x.di, etc to be x._AX_, x._BX_, etc.
+	  to satisfy the Watcom 386 need for eax, ebx, edi, etc.
+
+	+ improper automatic indent on brace insertion fixed (insert.c,
+	  fmatch,c, proto.h)
+
+	+ the ls -a output in imdying() was producing a line with a lone '.'
+	  on it, which was terminating /bin/mail.  use sort -r to rearrange
+	  it. (file.c)
+
+	+ re-ifdefed getscreensize, for machines without SIGWINCH
+
+	+ guard against zero values for tabstop and shiftwidth 	(buffer.c)
+
+	+ added global control variable to make it easy to turn off the
+	  "working..." message. (display.c)
+
+	+ don't let hst_append() do anything if clexec is set (history.c)
+
+	+ click the mouse (with xterm-mouse set) no longer calls showcpos().
+	  if you want the mouse position, turn on "ruler-mode" (tcap.c)
+
+	+ flash mode is now off by default.  beeps should be beeps until
+	  requested otherwise. (main.c)
+
+	+ applied vms path fix in pathcat() (path.c)
+
+	+ don't insert tabs during reformat if notabinsert is set (word.c)
+
+	+ applied patches for djgpp from Jim Crigler. (estruct.h, ibmpc.c)
+
+(tom)
+	+ TurboC compiler warnings (history.c, mktbls.c, oneliner.c, search.c).
+
+	+ added TurboC compiler warning patterns (finderr.c).
+
+	+ implemented mouse highlighting for MSDOS (display.c, ibmpc.c).
+
+	+ made the table-driven combinations for $sres work properly (ibmpc.c).
+
+	+ corrected 'repointstuff()', so that undo works properly for multiple
+	  windows; other window's dot wasn't being updated (undo.c).
+
+	+ modified 'execute_named_command()' to set dot-moved flag if the
+	  range-computation moves it, fixes warning from 'updpos()' (exec.c).
+
+	+ linted remaining size_t usage (basic.c bind.c display.c estruct.h
+	  eval.c exec.c filec.c glob.c history.c isearch.c mktbls.c npopen.c
+	  oneliner.c proto.h regexp.c search.c spawn.c vmsvt.c).
+
+	+ guarded &left, &right, related functions against negative indices,
+	  etc., (eval.c).
+
+	+ changed sizes in regexp-struct to SIZE_T (from short, int) to support
+	  lint (estruct.h).
+
+	+ added command-line option "-wm" to set X11 window-manager title
+	  (main.c, version.c, x11.c).
+
+	+ modified prompts to make ^V echo until the character is followed by
+	  what we want to see a la vi (input.c).
+
+	+ modified treatment of '!' character (in shell prompts) to expand it
+	  immediately, more like vi (main.c, history.c, input.c, spawn.c).
+
+	+ corrected some ifdefs that broke !-commands when compiling small
+	  configuration for testing (cmdtbl, bind.c, eval.c).
+
+	+ whitespace spawn.c
+
+	+ corrected redisplay logic in 'execute_named_command()' when repeated
+	  backspace characters were received (exec.c).
+
+	+ modified logic in 'imworking()' to be a little more conservative when
+	  erasing leftover text in the message line, e.g., when it happens
+	  during filename-completion on large directories (display.c).
+
+	+ corrected a hole in 'hst_append()' that allowed non-interactive use
+	  of the bind-key function to erroneously set the 'clexec' flag
+	  breaking subsequent named-commands (history.c).
+
+	+ trailing blank, e.g., "int<sp><nl>tgetc(quotec)<nl>" breaks apollo
+	  ctags by making it generate a pattern only for the "int<sp>" (bind.c,
+	  input.c, isearch.c, search.c).
+
+	+ modified 'imply_buffer()' so that c-mode is set as in 'readin()'
+	  (buffer.c).
+
+	+ corrected 'getfile()' to treat names longer than NBUFN as filenames,
+	  and 'unqname()' to assume its 'bname' argument can have a trailing
+	  null (buffer.c, exec.c, file.c, main.c).  (This fixes a bug I
+	  introduced in 3.60 that prevented using ":e %+" properly, where "%"
+	  expands to a long buffer name, because the buffer names are compared
+	  with 'strncmp()').
+
+	+ modified 'getfile()' to suppress redundant prompt by using returned
+	  state of 'unqname()' (file.c).
+
+	+ modified 'mlreply_file()' to prompt if a wildcard expands to multiple
+	  files (e.g., when reading a file) (filec.c).
+
+	+ modified 'tokval()' to expand ~-paths so macros can refer to user's
+	  home paths (eval.c).
+
+	+ corrections to vms filename-completion (path.c).
+
+	With Purify demo
+
+	+ corrected memory leak in 'FreeBuffer()' (buffer.c).
+	
+	+ corrected uninit-memory reference in 'kbd_show_response()' (input.c,
+	  history.c), in 'dfputsn()' (display.c).
+
+	+ corrected reference to freed memory in 'listmodes()' and modified
+	  logic to use 'animated' logic, and variables 'relisting_b_vals' and
+	  'relisting_w_vals'.  As a side-effect, this allows local buffer and
+	  window modes to be set in [Settings] (buffer.c, display.c, edef.h,
+	  main.c, modes.c).
+
+	+ corrected a null-pointer reference to 'fromline' when a ":0" command
+	  was entered in an empty buffer (exec.c).
+
+
 Changes for vile 3.61: (released  Thu Sep 16, 1993)
 (pgf)
 	+ when files are saved in /tmp, and mail is sent, the list is now
@@ -18,7 +146,6 @@ Changes for vile 3.61: (released  Thu Sep 16, 1993)
 	  ends with a left one, the next line is indented, and if it starts
 	  with a right one, the line is aligned with the line containing the
 	  match.  this may be useful for parentheses-heavy languages like
-	  scheme and perhaps lisp.
 
 (tom)
 	+ nits from 3.60 integration (file.c, mktbls.c, proto.h, glob.h)
@@ -143,7 +270,7 @@ Changes for vile 3.60: (unreleased)
 
 	+ fixed documentation of the help commands.  it's been wrong
 	  for over three years now, and it's in the first screen of
-	  help! (^X-^H and ^A-^H shoul be ^X-h and ^A-h) (vile.hlp)
+	  help! (^X-^H and ^A-^H should be ^X-h and ^A-h) (vile.hlp)
 
 	+ added AIX to the machines that need sys/ioctl.h, to pick up
 	  TIOCGWINSIZE (display.c)
@@ -721,7 +848,7 @@ Changes for vile 3.52:
 	  modes.c path.c random.c spawn.c termio.c)
 
 	+ consolidated TURBO, WATCOM, MSC, ZTC, and GO32 under a new,
-	  presumptious #define, called NEWDOSCC. (mostly same files as djgpp
+	  presumptuous #define, called NEWDOSCC. (mostly same files as djgpp
 	  changes)
 
 	+ fixed calloc macro (estruct.h) in RAMSIZE ifdef
@@ -1474,7 +1601,7 @@ Changes for vile 3.42:
 	  dd..."1P... to continue deleting lines after the P operation.
 
 	+ added horizontal scrolling mode, to cause whole screen to shift
-	  instead of just one line when cursor goes "off screen".  this 
+	  instead of just one line when cursor goes "off screen".  this
 	  mode ("set hs", or "set horizscroll" is now the default. (display.c,
 	  vile.hlp, main.c, modetbl, proto.h)
 
@@ -1483,7 +1610,7 @@ Changes for vile 3.42:
 
 	+ split up the ins() function, to provide an inschar() function that
 	  istring could use.  istring() now called by insstring() and
-	  overwstring(), which are bound to "insert-string" and new 
+	  overwstring(), which are bound to "insert-string" and new
 	  "overwrite-string" commands.  all this to allow "insert-string"
 	  to take advantage of autoindent, cmode, wordwrap, etc.  will
 	  need tweaks later when tty chars are rebindable (^U, ^W, etc.)
@@ -1562,7 +1689,7 @@ Changes for vile 3.40:
 	  vmsvt.c vt52.c window.c word.c wordmov.c x11.c z309.c z_ibmpc.c
 
 	+ moved macro 'P' from file proto.h to estruct.h, adjusted definitions
-	  in file 'estruct.h' to allow use of 'P' macro in CMDFUNC definition. 
+	  in file 'estruct.h' to allow use of 'P' macro in CMDFUNC definition.
 	  Added definition of type 'CmdFunc' for the actual pointer-type.
 
 	+ use P-macro for TERM struct definitions (and added TTscroll),
@@ -1661,7 +1788,7 @@ Changes for vile 3.39 (from Tom Dickey):
 	  file, and in 'lengthen_path()' (files file.c and path.c).  This makes
 	  it know the current version number of each file.
 
-	+ modified 'makename()' (file file.c) to account for VMS pathnames. 
+	+ modified 'makename()' (file file.c) to account for VMS pathnames.
 	  Note that DecShell names (which the C runtime library accepts as
 	  arguments to fopen, etc.) look much like unix filenames.
 
@@ -1679,7 +1806,7 @@ Changes for vile 3.39 (from Tom Dickey):
 	  'non_filename()' in 'is_internalname()'.
 
 	+ corrected logic of 'screen_string()' (file input.c) to handle the
-	  distintion between "[" and "]" used to delimit pathnames on VMS, and
+	  distinction between "[" and "]" used to delimit pathnames on VMS, and
 	  to indicate scratch-buffer names.
 
 	+ corrected wildcard, path and scratch-buffer characters for VMS (file
@@ -1703,7 +1830,7 @@ Changes for vile 3.39 (from Tom Dickey):
 
 Changes for vile 3.38:
 (pgf)
-	+ cleaned up internal naming and help for alt-tabpos mode. 
+	+ cleaned up internal naming and help for alt-tabpos mode.
 	  alt-tabpos on implies emacs-style, and it's off by default
 
 (tom)
@@ -1900,7 +2027,7 @@ Changes for vile 3.35 (from Tom Dickey):
 	  bug that caused incorrect display after repeated name completion and
 	  query operations.
 
-	+ quarded 'kbd_complete()' against embedded nulls in its buf-argument,
+	+ guarded 'kbd_complete()' against embedded nulls in its buf-argument,
 	  by testing for nulls before completion logic in file input.c
 
 	+ added a flag 'kbd_expand' to make calls on 'kbd_putc()' via
@@ -2535,7 +2662,7 @@ MISCELLANEOUS
 	works
 
 - quite a bit of code cleanup, at least I think so -- it has ported pretty
-	easily to a R6000, linux, 386bsd, Sony NeWS, NeXT, and the UNIXPC. 
+	easily to a R6000, linux, 386bsd, Sony NeWS, NeXT, and the UNIXPC.
 	it's close to lint-free, and Saber has very few problems with the
 	code.  it'll now use prototypes if __STDC__ is defined, and it
 	passes gcc -Wall -Wshadow with no warnings, if you ignore implicit
@@ -2544,7 +2671,7 @@ MISCELLANEOUS
 	targets in the makefile to make building on various platforms
 	easier.  the makefile even supports microsoft C.
 
-- the code now builds and runs under DOS, using (at least) Microsoft C 6.0. 
+- the code now builds and runs under DOS, using (at least) Microsoft C 6.0.
 	Peter Ruczynski has done a great job porting vile to DOS -- he
 	calls that version "pcvile".  He has used the Zortech compiler in
 	the past -- I didn't try to break that, but you never know.
@@ -2626,7 +2753,7 @@ MISCELLANEOUS
 
 - two new functions: &rd and &wr, return whether a file is readable or writable
 
-- a new mode, "tabinsert", has been created to fill the needs of the 
+- a new mode, "tabinsert", has been created to fill the needs of the
 	"I hate tabs" camp.
 
 - filenames are now put into canonical form -- this keeps "junk", "./junk",

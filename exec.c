@@ -4,7 +4,10 @@
  *	written 1986 by Daniel Lawrence
  *
  * $Log: exec.c,v $
- * Revision 1.72  1993/09/10 16:06:49  pgf
+ * Revision 1.73  1993/10/04 10:24:09  pgf
+ * see tom's 3.62 changes
+ *
+ * Revision 1.72  1993/09/10  16:06:49  pgf
  * tom's 3.61 changes
  *
  * Revision 1.71  1993/09/06  16:25:18  pgf
@@ -355,6 +358,7 @@ int f, n;
 	LINEPTR fromline;	/* first linespec */
 	LINEPTR toline;		/* second linespec */
 	MARK	save_DOT;
+	MARK	last_DOT;
 	char lspec[NLINE];	/* text of line spec */
 	char cspec[NLINE];	/* text of command spec */
 	int cmode = 0;
@@ -364,6 +368,7 @@ int f, n;
 	CMDFLAGS lflag, flags;
 
 	lspec[0] = EOS;
+	last_DOT = DOT;
 
 	/* prompt the user to type a named command */
 	mlprompt(": ");
@@ -424,8 +429,9 @@ int f, n;
 					break;
 				}
 			} else if (status == SORTOFTRUE) {
-				hst_remove("?");
-				(void)tgetc(FALSE); /* eat the delete */
+				hst_remove((cmode > 1) ? "*" : "");
+				if (cmode > 1)
+					(void)tgetc(FALSE); /* eat the delete */
 				if (--cmode <= 1) {
 					cmode = 0;
 					hst_remove(lspec);
@@ -509,6 +515,10 @@ seems like we need one more check here -- is it from a .exrc file?
 		extern CMDFUNC f_lineputbefore, f_openup;
 		if (!(flags & ZERO)) {
 			mlforce("[Can't use address 0 with \"%s\" command]", fnp);
+			return FALSE;
+		}
+		if (same_ptr(fromline,null_ptr)) {
+			mlforce("[Buffer is empty]");
 			return FALSE;
 		}
 		/*  we're positioned at fromline == curbp->b_linep, so commands
@@ -685,6 +695,8 @@ seems like we need one more check here -- is it from a .exrc file?
 		if (same_ptr(toline, null_ptr))
 			(void)setmark();
 	}
+	if (!sameline(last_DOT, DOT))
+		curwp->w_flag |= WFMOVE;
 
 	/* and then execute the command */
 	isnamedcmd = TRUE;
@@ -697,8 +709,10 @@ seems like we need one more check here -- is it from a .exrc file?
 	isnamedcmd = FALSE;
 	fulllineregions = FALSE;
 
-	if (flags & NOMOVE)
+	if (flags & NOMOVE) {	/* don't use this if the command modifies! */
 		DOT = save_DOT;
+		curwp->w_flag &= ~WFMOVE;
+	}
 
 	return status;
 }
@@ -791,7 +805,7 @@ LINEPTR		*markptr;	/* where to store the mark's value */
 		}
 #if PATTERNS
 		else if (*s == '/' || *s == '?') { /* slash means do a search */
-			/* put a '\0' at the end of the search pattern */
+			/* put a null at the end of the search pattern */
 			t = parseptrn(s);
 
 			/* search for the pattern */
@@ -952,7 +966,7 @@ int f, n;	/* default Flag and Numeric argument */
 	char cmdbuf[NSTRING];		/* string holding command to execute */
 
 	/* get the line wanted */
-	cmdbuf[0] = 0;
+	cmdbuf[0] = EOS;
 	if ((status = mlreply("cmd: ", cmdbuf, NSTRING)) != TRUE)
 		return status;
 
@@ -1210,6 +1224,36 @@ int eolchar;
 	return src;
 }
 
+/*
+ * Convert the string 'src' into a string that we can read back with 'token()'. 
+ * If it is a shell-command, this will be a single-token.  Repeated shift
+ * commands are multiple tokens.
+ */
+int
+macroize(p, src, ref)
+TBUFF	**p;
+char *	src;
+char *	ref;
+{
+	register int	c;
+	int	multi	= !isShellOrPipe(ref);	/* shift command? */
+	int	count	= 0;
+
+	if (tb_init(p, abortc) != 0) {
+		(void)tb_append(p, '"');
+		while ((c = *src++) != EOS) {
+			if (multi && count++)
+				(void)tb_sappend(p, "\" \"");
+			if (c == '\\' || c == '"')
+				(void)tb_append(p, '\\');
+			(void)tb_append(p, c);
+		}
+		(void)tb_append(p, '"');
+		return (tb_append(p, EOS) != 0);
+	}
+	return FALSE;
+}
+
 int
 macarg(tok)	/* get a macro line argument */
 char *tok;	/* buffer to place argument */
@@ -1437,7 +1481,7 @@ BUFFER *bp;	/* buffer to execute */
 	fast_ptr LINEPTR lp;	/* pointer to line to execute */
 	fast_ptr LINEPTR hlp;	/* pointer to line header */
 	int dirnum;		/* directive index */
-	int linlen;		/* length of line to execute */
+	SIZE_T linlen;		/* length of line to execute */
 	int force;		/* force TRUE result? */
 	WINDOW *wp;		/* ptr to windows to scan */
 	WHBLOCK *whlist;	/* ptr to WHILE list */
@@ -1579,7 +1623,7 @@ nxtscan:	/* on to the next line */
 			++eline;
 
 		/* dump comments and blank lines */
-		if (*eline == ';' || *eline == 0)
+		if (*eline == ';' || *eline == EOS)
 			goto onward;
 
 #if	DEBUGM
@@ -1889,10 +1933,10 @@ char *fname;	/* file name to execute */
 	register BUFFER *bp;	/* buffer to place file to execute */
 	register int status;	/* results of various calls */
 	register int odiscmd;
-	char bname[NBUFN];	/* name of buffer */
+	char bname[NBUFN+1];	/* name of buffer */
 
 	makename(bname, fname);	/* derive the name of the buffer */
-	unqname(bname, FALSE);
+	(void)unqname(bname, FALSE);
 
 	/* okay, we've got a unique name -- create it */
 	if ((bp=bfind(bname, 0))==NULL) {

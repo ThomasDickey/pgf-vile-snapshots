@@ -4,7 +4,10 @@
 	written 1986 by Daniel Lawrence
  *
  * $Log: eval.c,v $
- * Revision 1.67  1993/09/10 16:06:49  pgf
+ * Revision 1.68  1993/10/04 10:24:09  pgf
+ * see tom's 3.62 changes
+ *
+ * Revision 1.67  1993/09/10  16:06:49  pgf
  * tom's 3.61 changes
  *
  * Revision 1.66  1993/09/06  16:36:47  pgf
@@ -261,6 +264,8 @@ static	void	makevarslist P(( int, char *));
 static	int	is_mode_name P(( char *, int, VALARGS * ));
 static	char *	get_listvalue P(( char *, int ));
 #endif
+static	SIZE_T	s2size P(( char * ));
+static	char *	s2offset P(( char *, char * ));
 static	int	gtlbl P(( char * ));
 static	char *	gtfun P(( char * ));
 static	void	FindVar P(( char *, VDESC * ));
@@ -461,10 +466,9 @@ char *fname;		/* name of function to evaluate */
 		case UFMOD:	return(l_itoa(atoi(arg1) % atoi(arg2)));
 		case UFNEG:	return(l_itoa(-atoi(arg1)));
 		case UFCAT:	return(strcat(strcpy(result, arg1), arg2));
-		case UFLEFT:	return(strncpy(result, arg1, atoi(arg2)));
-		case UFRIGHT:	return(strcpy(result, &arg1[atoi(arg2)-1]));
-		case UFMID:	return(strncpy(result, &arg1[atoi(arg2)-1],
-					atoi(arg3)));
+		case UFLEFT:	return(strncpy(result, arg1, s2size(arg2)));
+		case UFRIGHT:	return(strcpy(result, s2offset(arg1,arg2)));
+		case UFMID:	return(strncpy(result, s2offset(arg1,arg2), s2size(arg3)));
 		case UFNOT:	return(ltos(stol(arg1) == FALSE));
 		case UFEQUAL:	return(ltos(atoi(arg1) == atoi(arg2)));
 		case UFLESS:	return(ltos(atoi(arg1) < atoi(arg2)));
@@ -613,7 +617,7 @@ char *vname;		/* name of environment variable to retrieve */
 static char *
 getkill()		/* return some of the contents of the kill buffer */
 {
-	register int size;	/* max number of chars to return */
+	register SIZE_T size;	/* max number of chars to return */
 	static char value[NSTRING];	/* temp buffer for value */
 
 	if (kbs[0].kbufh == NULL)
@@ -830,7 +834,7 @@ char *value;	/* value to set to */
 	case TKENV: /* set an environment variable */
 		status = TRUE;	/* by default */
 		If( EVCURCOL )
-			status = gotocol(TRUE,atoi(value));
+			status = gotocol(TRUE, atoi(value));
 
 		ElseIf( EVCURLINE )
 			status = gotoline(TRUE, atoi(value));
@@ -842,7 +846,7 @@ char *value;	/* value to set to */
 			status = newwidth(TRUE, atoi(value));
 
 		ElseIf( EVPAGELEN )
-			status = newlength(TRUE,atoi(value));
+			status = newlength(TRUE, atoi(value));
 
 		ElseIf( EVCBUFNAME )
 			set_bname(curbp, value);
@@ -990,7 +994,7 @@ char *tokn;	/* token to analyze */
 {
 
 	/* no blanks!!! */
-	if (tokn[0] == '\0')
+	if (tokn[0] == EOS)
 		return(TKNUL);
 
 	/* a numeric literal? */
@@ -1001,7 +1005,7 @@ char *tokn;	/* token to analyze */
 		return(TKSTR);
 
 	/* if it's any other single char, it must be itself */
-	if (tokn[1] == '\0')
+	if (tokn[1] == EOS)
 		return(TKCMD);
 
 #if ! SMALLER
@@ -1030,7 +1034,7 @@ char *tokn;		/* token to evaluate */
 #if OPT_EVAL
 	register int status;	/* error return */
 	register BUFFER *bp;	/* temp buffer pointer */
-	register int blen;	/* length of buffer argument */
+	register SIZE_T blen;	/* length of buffer argument */
 	register int distmp;	/* temporary discmd flag */
 	int	oclexec;
 	static char buf[NSTRING];/* string buffer for some returns */
@@ -1075,7 +1079,11 @@ char *tokn;		/* token to evaluate */
 					return(errorm);
 
 				/* grab the line as an argument */
-				blen = lLength(bp->b_dot.l) - bp->b_dot.o;
+				blen = lLength(bp->b_dot.l);
+				if (blen > bp->b_dot.o)
+					blen -= bp->b_dot.o;
+				else
+					blen = 0;
 				if (blen > NSTRING)
 					blen = NSTRING;
 				(void)strncpy(buf,
@@ -1101,7 +1109,12 @@ char *tokn;		/* token to evaluate */
 		case TKVAR:	return(gtusr(tokn+1));
 		case TKENV:	return(gtenv(tokn+1));
 		case TKFUN:	return(gtfun(tokn+1));
-		case TKDIR:	return(errorm);
+		case TKDIR:
+#if UNIX
+				return(lengthen_path(strcpy(buf,tokn)));
+#else
+				return(errorm);
+#endif
 		case TKLBL:	return(l_itoa(gtlbl(tokn)));
 		case TKLIT:	return(tokn);
 		case TKSTR:	return(tokn+1);
@@ -1109,7 +1122,7 @@ char *tokn;		/* token to evaluate */
 	}
 	return errorm;
 #else
-	return tokn;
+	return (toktyp(tokn) == TKSTR) ? tokn+1 : tokn;
 #endif
 }
 
@@ -1163,6 +1176,33 @@ char *val;	/* value to check for stol */
 #endif
 
 #if OPT_EVAL
+/* use this as a wrapper when evaluating an array index, etc., that cannot
+ * be negative.
+ */
+static SIZE_T
+s2size(s)
+char *s;
+{
+	int	n = atoi(s);
+	if (n < 0)
+		n = 0;
+	return n;
+}
+
+/* use this to return a pointer to the string after the n-1 first characters */
+static char *
+s2offset(s, n)
+char	*s;
+char	*n;
+{
+	SIZE_T	len = strlen(s) + 1;
+	UINT	off = s2size(n);
+	if (off > len)
+		off = len;
+	if (off == 0)
+		off = 1;
+	return s + (off - 1);
+}
 
 /* ARGSUSED */
 static int

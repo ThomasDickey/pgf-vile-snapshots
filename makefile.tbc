@@ -10,6 +10,8 @@ TLINK = tlink
 LIBPATH = C:\TC\LIB
 INCLUDEPATH = C:\TC\INCLUDE
 
+LINKOPTS = /x/c/L$(LIBPATH) # use /v option to get debug-info
+
 THIS = makefile.tbc
 MKTBLS = .\mktbls.exe
 TARGET = vile.exe
@@ -23,6 +25,7 @@ clean:
 	-del *.cfg
 	-del *.bak
 	-del ne*.h
+	-del $(MKTBLS)
 
 clobber:	clean
 	-del $(TARGET)
@@ -42,7 +45,7 @@ MKTBLS_DEPS =  \
 
 #		*Explicit Rules*
 $(MKTBLS): vile.cfg $(MKTBLS_DEPS)
-  $(TLINK) /v/x/c/L$(LIBPATH) @&&|
+  $(TLINK) $(LINKOPTS) @&&|
 c0l.obj+
 mktbls.obj
 mktbls
@@ -104,9 +107,10 @@ VILE_DEPS =  \
  ibmpc.obj
 
 #		*Explicit Rules*
+# Use /v option of tlink to get debugging info
 $(TARGET): vile.cfg $(VILE_DEPS)
   $(CC) -c version.c
-  $(TLINK) /v/x/c/L$(LIBPATH) @&&|
+  $(TLINK) $(LINKOPTS) @&&|
 c0l.obj+
 basic.obj+
 bind.obj+
@@ -311,6 +315,9 @@ vile.cfg: $(THIS)
 | vile.cfg
 
 # $Log: makefile.tbc,v $
-# Revision 1.2  1993/09/10 16:06:49  pgf
+# Revision 1.3  1993/10/04 10:24:09  pgf
+# see tom's 3.62 changes
+#
+# Revision 1.2  1993/09/10  16:06:49  pgf
 # tom's 3.61 changes
 #

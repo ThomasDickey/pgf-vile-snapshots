@@ -6,7 +6,13 @@
  * for the display system.
  *
  * $Log: buffer.c,v $
- * Revision 1.75  1993/09/03 09:11:54  pgf
+ * Revision 1.77  1993/10/04 10:24:09  pgf
+ * see tom's 3.62 changes
+ *
+ * Revision 1.76  1993/09/20  21:16:18  pgf
+ * guard against tab and shiftwid values of 0
+ *
+ * Revision 1.75  1993/09/03  09:11:54  pgf
  * tom's 3.60 changes
  *
  * Revision 1.74  1993/08/13  16:32:50  pgf
@@ -734,7 +740,7 @@ int	lockfl;
 	register BUFFER *bp;
 	register LINE	*lp;
 	BUFFER *savebp;
-	char bname[NBUFN];
+	char bname[NBUFN+1];
 	char nfname[NFILEN];
 
 	if (interrupted || fname == 0)	/* didn't really have a filename */
@@ -751,7 +757,7 @@ int	lockfl;
 			L_NUM	top, now;
 
 			makename(bname, fname);
-			unqname(bname, TRUE);
+			(void)unqname(bname, TRUE);
 
 			if (!(bp=bfind(bname, 0))) {
 				mlforce("[Cannot create buffer]");
@@ -778,6 +784,8 @@ int	lockfl;
 					}
 				}
 				set_b_val(bp, MDNEWLINE, b_val(savebp,MDNEWLINE));
+				make_local_b_val(bp, MDCMOD); /* local, as in 'readin()' */
+				set_b_val(bp, MDCMOD, (global_b_val(MDCMOD) && has_C_suffix(bp)));
 			} else
 				readin(fname, lockfl, bp, FALSE);
 
@@ -1020,7 +1028,9 @@ int
 tabstop_val(bp)
 register BUFFER *bp;
 {
-	return b_val(bp, (cmode_active(bp) ? VAL_C_TAB : VAL_TAB));
+	int i = b_val(bp, (cmode_active(bp) ? VAL_C_TAB : VAL_TAB));
+	if (i == 0) return 1;
+	return i;
 }
 
 /* return the correct shiftwidth setting for this buffer */
@@ -1028,7 +1038,9 @@ int
 shiftwid_val(bp)
 register BUFFER *bp;
 {
-	return b_val(bp, (cmode_active(bp) ? VAL_C_SWIDTH : VAL_SWIDTH));
+	int i = b_val(bp, (cmode_active(bp) ? VAL_C_SWIDTH : VAL_SWIDTH));
+	if (i == 0) return 1;
+	return i;
 }
 
 int
@@ -1608,7 +1620,9 @@ BUFFER *bp;
 }
 
 /*
- * Look for a buffer-name in the buffer-list
+ * Look for a buffer-name in the buffer-list.  This assumes that the argument
+ * is null-terminated.  If the length is longer than will fit in a b_bname
+ * field, then it is probably a filename.
  */
 BUFFER *
 find_b_name(bname)
@@ -1744,6 +1758,8 @@ register BUFFER *bp;
 		lfree(lp,bp);
 	}
 
+	if (!same_ptr(bp->b_ulinep, null_ptr))
+		lfree(bp->b_ulinep, bp);
 #if !OPT_MAP_MEMORY
 	FreeAndNull(bp->b_ltext);
 	bp->b_ltext_end = NULL;
@@ -1765,7 +1781,7 @@ register BUFFER *bp;
 	bp->b_bytecount = 0;
 	bp->b_linecount = 0;
 
-	free_local_vals(b_valuenames, bp->b_values.bv);
+	free_local_vals(b_valuenames, global_b_values.bv, bp->b_values.bv);
 
 	return (TRUE);
 }

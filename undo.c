@@ -2,7 +2,10 @@
  * code by Paul Fox, original algorithm mostly by Julia Harper May, 89
  *
  * $Log: undo.c,v $
- * Revision 1.43  1993/09/10 16:06:49  pgf
+ * Revision 1.44  1993/10/04 10:24:09  pgf
+ * see tom's 3.62 changes
+ *
+ * Revision 1.43  1993/09/10  16:06:49  pgf
  * tom's 3.61 changes
  *
  * Revision 1.42  1993/09/03  09:11:54  pgf
@@ -331,7 +334,7 @@ LINEPTR lp;
 		FORWDOT(curbp).l = next;
 		fc =  firstchar(l_ref(next));
 		if (fc < 0) /* all white */
-			FORWDOT(curbp).o = 0;
+			FORWDOT(curbp).o = b_left_margin(curbp);
 		else
 			FORWDOT(curbp).o = fc;
 	}
@@ -377,7 +380,7 @@ LINEPTR lp;
 	setupuline(lp);
 
 	FORWDOT(curbp).l = lp;
-	FORWDOT(curbp).o = curwp->w_dot.o;
+	FORWDOT(curbp).o = DOT.o;
 }
 
 /* push an unreal line onto the undo stack
@@ -409,12 +412,12 @@ LINEPTR lp;
 
 	lsetcopied(l_ref(lp));
 	FORWDOT(curbp).l = lp;
-	FORWDOT(curbp).o = curwp->w_dot.o;
+	FORWDOT(curbp).o = DOT.o;
 }
 
-/* change and PURESTACKSEPS on the stacks to STACKSEPS, so that
-   undo won't reset the BFCHG bit.  this should be called anytime
-   a non-undable change is made to a buffer.
+/* Change all PURESTACKSEPS on the stacks to STACKSEPS, so that undo won't
+ * reset the BFCHG bit.  This should be called anytime a non-undable change is
+ * made to a buffer.
  */
 void
 nounmodifiable(bp)
@@ -915,7 +918,7 @@ int f,n;
 	if (linesmatch(ulp,lp) == TRUE) 
 		return TRUE;
 
-	curwp->w_dot.l = l_ptr(lp);
+	DOT.l = l_ptr(lp);
 
 	preundocleanup();
 
@@ -928,7 +931,7 @@ int f,n;
 	copy_for_undo(l_ptr(lp));
 
 #if OPT_MAP_MEMORY
-	if ((lp = l_reallocate(curwp->w_dot.l, ulp->l_size, curbp)) == 0)
+	if ((lp = l_reallocate(DOT.l, ulp->l_size, curbp)) == 0)
 		return (FALSE);
 	lp->l_used = ulp->l_used;
 	(void)memcpy(lp->l_text, ulp->l_text, (SIZE_T)llength(ulp));
@@ -945,18 +948,18 @@ int f,n;
 
 #if ! WINMARK
 	if (l_ref(MK.l) == lp)
-		MK.o = 0;
+		MK.o = b_left_margin(curbp);
 #endif
 	/* let's be defensive about this */
 	for_each_window(wp) {
 		if (l_ref(wp->w_dot.l) == lp)
-			wp->w_dot.o = 0;
+			wp->w_dot.o = b_left_margin(curbp);
 #if WINMARK
 		if (wp->w_mark.l == lp)
-			wp->w_mark.o = 0;
+			wp->w_mark.o = b_left_margin(curbp);
 #endif
 		if (l_ref(wp->w_lastdot.l) == lp)
-			wp->w_lastdot.o = 0;
+			wp->w_lastdot.o = b_left_margin(curbp);
 	}
 	if (curbp->b_nmmarks != NULL) {
 		/* fix the named marks */
@@ -965,7 +968,7 @@ int f,n;
 		for (i = 0; i < 26; i++) {
 			mp = &(curbp->b_nmmarks[i]);
 			if (l_ref(mp->l) == lp)
-				mp->o = 0;
+				mp->o = b_left_margin(curbp);
 		}
 	}
 
@@ -987,29 +990,29 @@ fast_ptr LINEPTR olp;
 	register LINE *  ulp;
 
 	point = usenew ? nlp : lFORW(olp);
-	if (same_ptr(DOT.l, olp)) {
-		DOT.l = point;
-		DOT.o = 0;
-	}
 #if ! WINMARK
 	if (same_ptr(MK.l, olp)) {
 		MK.l = point;
-		MK.o = 0;
+		MK.o = b_left_margin(curbp);
 	}
 #endif
 	/* fix anything important that points to it */
 	for_each_window(wp) {
+		if (same_ptr(wp->w_dot.l, olp)) {
+			wp->w_dot.l = point;
+			wp->w_dot.o = b_left_margin(curbp);
+		}
 		if (same_ptr(wp->w_line.l, olp))
 			wp->w_line.l = point;
 #if WINMARK
 		if (same_ptr(wp->w_mark.l, olp)) {
 			wp->w_mark.l = point;
-			wp->w_mark.o = 0;
+			wp->w_mark.o = b_left_margin(curbp);
 		}
 #endif
 		if (same_ptr(wp->w_lastdot.l, olp)) {
 			wp->w_lastdot.l = point;
-			wp->w_lastdot.o = 0;
+			wp->w_lastdot.o = b_left_margin(curbp);
 		}
 	}
 	if (curbp->b_nmmarks != NULL) {
@@ -1021,7 +1024,7 @@ fast_ptr LINEPTR olp;
 			if (same_ptr(mp->l, olp)) {
 				if (usenew) {
 					mp->l = point;
-					mp->o = 0;
+					mp->o = b_left_margin(curbp);
 				} else {
 					mlforce("[Lost mark]");
 				}

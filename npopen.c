@@ -2,7 +2,10 @@
  *		written by John Hutchinson, heavily modified by Paul Fox
  *
  * $Log: npopen.c,v $
- * Revision 1.29  1993/09/03 09:11:54  pgf
+ * Revision 1.30  1993/10/04 10:24:09  pgf
+ * see tom's 3.62 changes
+ *
+ * Revision 1.29  1993/09/03  09:11:54  pgf
  * tom's 3.60 changes
  *
  * Revision 1.28  1993/08/13  16:32:50  pgf
@@ -239,7 +242,7 @@ char *cmd;
 	for (i = 3; i < NOFILE; i++)
 		(void) close (i);
 
-	if ((sh = user_SHELL()) == NULL || *sh == '\0') {
+	if ((sh = user_SHELL()) == NULL || *sh == EOS) {
 		sh = "/bin/sh";
 		shname = "sh";
 	} else {
@@ -248,7 +251,7 @@ char *cmd;
 			shname = sh;
 		} else {
 			shname++;
-			if (*shname == '\0')
+			if (*shname == EOS)
 				shname = sh;
 		}
 	}

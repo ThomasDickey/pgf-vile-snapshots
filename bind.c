@@ -4,7 +4,10 @@
  *	written 11-feb-86 by Daniel Lawrence
  *
  * $Log: bind.c,v $
- * Revision 1.56  1993/09/03 09:11:54  pgf
+ * Revision 1.57  1993/10/04 10:24:09  pgf
+ * see tom's 3.62 changes
+ *
+ * Revision 1.56  1993/09/03  09:11:54  pgf
  * tom's 3.60 changes
  *
  * Revision 1.55  1993/08/13  16:32:50  pgf
@@ -153,40 +156,40 @@
  * date: 1991/08/06 15:10:56;
  * global/local values
  * and new printf/list stuff
- * 
+ *
  * revision 1.9
  * date: 1991/06/27 19:45:08;
  * fixed prompts
- * 
+ *
  * revision 1.8
  * date: 1991/06/03 17:34:51;
  * switch from "meta" etc. to "ctla" etc.
- * 
+ *
  * revision 1.7
  * date: 1991/06/03 13:58:22;
  * made bind description list better
- * 
+ *
  * revision 1.6
  * date: 1991/06/03 10:18:31;
  * fix apropos bug, and a bind nit
- * 
+ *
  * revision 1.5
  * date: 1991/05/31 10:31:34;
  * new kbd_engl_stat() routine, which returns more status, for use in the
  * new namedcmd() code
- * 
+ *
  * revision 1.4
  * date: 1990/12/06 19:49:07;
  * always rebuild Binding List buffer on request
- * 
+ *
  * revision 1.3
  * date: 1990/10/03 16:00:30;
  * make backspace work for everyone
- * 
+ *
  * revision 1.2
  * date: 1990/09/28 14:34:57;
  * changed prc2kcod decl to int
- * 
+ *
  * revision 1.1
  * date: 1990/09/21 10:24:44;
  * initial vile RCS revision
@@ -220,9 +223,9 @@ static	char *	to_tabstop P(( char * ));
 static	int	is_shift_cmd P(( char *, int ));
 #endif
 
-static	char *	skip_partial P(( char *, int, char *, unsigned ));
-static	void	show_partial P(( char *, int, char *, unsigned ));
-static	int	fill_partial P(( char *, int, char *, char *, unsigned ));
+static	char *	skip_partial P(( char *, SIZE_T, char *, SIZE_T ));
+static	void	show_partial P(( char *, SIZE_T, char *, SIZE_T ));
+static	int	fill_partial P(( char *, SIZE_T, char *, char *, SIZE_T ));
 static	int	cmd_complete P(( int, char *, int * ));
 static	int	eol_command  P(( char *, int, int, int ));
 
@@ -563,7 +566,7 @@ CMDFUNC **oldfunc;
 		if (kcmd == &f_speckey)
 			poundc = c;
 	}
-	
+
 	if (!isspecial(c)) {
 		*oldfunc = asciitbl[c];
 		asciitbl[c] = kcmd;
@@ -692,7 +695,7 @@ int f,n;
 #endif
 
 /* returns a name in double-quotes */
-static char *	
+static char *
 quoted(dst, src)
 char	*dst;
 char	*src;
@@ -742,7 +745,7 @@ int dummy;
 char *mstring;		/* match string if partial list, NULL to list all */
 {
 #if	ST520 & LATTICE
-#define	register		
+#define	register
 #endif
 	register KBIND *kbp;	/* pointer into a key binding table */
 	register NTAB *nptr,*nptr2;	/* pointer into the name table */
@@ -769,7 +772,7 @@ char *mstring;		/* match string if partial list, NULL to list all */
 		(void)quoted(outseq, nptr->n_name);
 		while (converted_len(outseq) < 32)
 			(void)strcat(outseq, "\t");
-		
+
 #if	APROP
 		/* if we are executing an apropos command
 		   and current string doesn't include the search string */
@@ -1006,7 +1009,7 @@ char *seq;	/* destination string for sequence */
 
 	if (c & SPEC)
 		*ptr++ = poundc;
-	
+
 	*ptr++ = kcod2key(c);
 	*ptr = EOS;
 	return base;
@@ -1128,7 +1131,7 @@ CMDFUNC *f;
 }
 #endif
 
-/* fnc2engl: translate a function pointer to the english name for 
+/* fnc2engl: translate a function pointer to the english name for
 		that function
 */
 
@@ -1226,7 +1229,7 @@ char *fname;	/* name to attempt to match */
 }
 
 /* prc2kcod: translate printable code to 10 bit keycode */
-int 
+int
 prc2kcod(kk)
 char *kk;		/* name of key to translate to Command key form */
 {
@@ -1278,7 +1281,7 @@ char *kk;		/* name of key to translate to Command key form */
 
 	if (*k != EOS)		/* we should have eaten the whole thing */
 		return -1;
-	
+
 	return (int)(pref|c);
 }
 
@@ -1391,9 +1394,9 @@ char *	THIS_NAME(p)	char *p; { return 0; }
 static char *
 skip_partial(buf, len, table, size_entry)
 char	*buf;
-int	len;
+SIZE_T	len;
 char	*table;
-unsigned size_entry;
+SIZE_T	size_entry;
 {
 	register char *	next = NEXT_DATA(table);
 	register char *	sp;
@@ -1415,9 +1418,9 @@ unsigned size_entry;
 static void
 show_partial(buf, len, table, size_entry)
 char	*buf;
-int	len;
+SIZE_T	len;
 char	*table;
-unsigned size_entry;
+SIZE_T	size_entry;
 {
 	register char	*next = skip_partial(buf, len, table, size_entry);
 	register char	*last = PREV_DATA(next);
@@ -1456,10 +1459,10 @@ unsigned size_entry;
 static int
 fill_partial(buf, pos, first, last, size_entry)
 char	*buf;
-int	pos;
+SIZE_T	pos;
 char	*first;
 char	*last;
-unsigned size_entry;
+SIZE_T	size_entry;
 {
 	register char	*p;
 	register int	n = pos;
@@ -1521,9 +1524,9 @@ int	c;		/* TESTC, NAMEC or isreturn() */
 char	*buf;
 int	*pos;
 char	*table;
-unsigned size_entry;
+SIZE_T	size_entry;
 {
-	register int   cpos = *pos;
+	register SIZE_T cpos = *pos;
 	register char *nbp;	/* first ptr to entry in name binding table */
 
 	kbd_init();		/* nothing to erase */
@@ -1621,10 +1624,8 @@ int	eolchar;
 	/*
 	 * Shell-commands aren't complete until the line is complete.
 	 */
-#if OPT_HISTORY
 	if ((cpos > 0) && isShellOrPipe(buffer))
 		return isreturn(c);
-#endif
 
 	return	(c == eolchar)
 	  ||	(
@@ -1664,12 +1665,14 @@ int	*pos;
 		tmp[0] = *buf;
 		tmp[1] = EOS;
 		status = cmd_complete(c, tmp, &len);
-	} else if ((*pos > 0) && isShellOrPipe(buf)) {
+	} else
+#endif
+	 if ((*pos > 0) && isShellOrPipe(buf)) {
 		status = isreturn(c);
 		if (c != NAMEC)
 			tungetc(c);
 	} else
-#endif
+
 	 status = kbd_complete(c, buf, pos, (char *)&nametbl[0], sizeof(nametbl[0]));
 	return status;
 }

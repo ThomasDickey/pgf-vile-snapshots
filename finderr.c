@@ -2,7 +2,10 @@
  * Written for vile by Paul Fox, (c)1990
  *
  * $Log: finderr.c,v $
- * Revision 1.28  1993/09/10 16:06:49  pgf
+ * Revision 1.29  1993/10/04 10:24:09  pgf
+ * see tom's 3.62 changes
+ *
+ * Revision 1.28  1993/09/10  16:06:49  pgf
  * tom's 3.61 changes
  *
  * Revision 1.27  1993/09/06  16:26:34  pgf
@@ -188,7 +191,7 @@ int f,n;
 			if ( (sscanf(text,
 				"\"%[^\" \t]\", line %d:",
 				errfile, &errline) == 2
-#if APOLLO 	/* C compiler */
+#if APOLLO		 	/* C compiler */
 			  ||  sscanf(text,
 				"%32[*] Line %d of \"%[^\" \t]\"",
 				verb, &errline, errfile) == 3
@@ -213,7 +216,7 @@ int f,n;
 			  ||  sscanf(text,
 				"%[^: \t]: %d:",
 				errfile, &errline) == 2
-#if SUNOS	/* lint-output */
+#if SUNOS			/* lint-output */
 			  ||  sscanf(text,
 			  	"%[^:( \t](%d):",
 				errfile, &errline) == 2
@@ -221,6 +224,14 @@ int f,n;
 			    && sscanf(t,
 			  	"  ::  %[^( \t](%d)",
 				errfile, &errline) == 2)
+#endif
+#if TURBO
+			  ||  sscanf(text,
+			  	"Error %[^ ] %d:",
+				errfile, &errline) == 2
+			  ||  sscanf(text,
+			  	"Warning %[^ ] %d:",
+				errfile, &errline) == 2
 #endif
 				) && (oerrline != errline ||
 					strcmp(errfile,oerrfile))) {

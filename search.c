@@ -4,7 +4,10 @@
  *  heavily modified by Paul Fox, 1990
  *
  * $Log: search.c,v $
- * Revision 1.53  1993/09/06 16:34:38  pgf
+ * Revision 1.54  1993/10/04 10:24:09  pgf
+ * see tom's 3.62 changes
+ *
+ * Revision 1.53  1993/09/06  16:34:38  pgf
  * took out redundant TTbeep() calls, now that all failed motions cause
  * a beep.  (left them in for the "only one occurence" cases, since those
  * return TRUE)
@@ -152,40 +155,40 @@
  * revision 1.10
  * date: 1991/08/06 15:55:24;
  * fixed null l_text dereference in nextch()
- * 
+ *
  * revision 1.9
  * date: 1991/08/06 15:25:24;
  *  global/local values
- * 
+ *
  * revision 1.8
  * date: 1991/06/25 19:53:21;
  * massive data structure restructure
- * 
+ *
  * revision 1.7
  * date: 1991/06/20 17:20:56;
  * added missing status return in forwsearch()
- * 
+ *
  * revision 1.6
  * date: 1991/06/03 12:18:46;
  * ifdef'ed MAGIC for unresolved ref
- * 
+ *
  * revision 1.5
  * date: 1991/05/31 11:23:11;
  * cleaned up so forwsearch no longer depends on 3rd or 4th arg.
- * 
+ *
  * revision 1.4
  * date: 1990/10/12 19:31:44;
  * added scrsearchpat function
- * 
+ *
  * revision 1.3
  * date: 1990/09/25 11:38:22;
  * took out old ifdef BEFORE code
- * 
+ *
  * revision 1.2
  * date: 1990/09/24 20:36:24;
  * fixed core dump resulting from not checking return code of thescanner()
  * for ABORT
- * 
+ *
  * revision 1.1
  * date: 1990/09/21 10:25:59;
  * initial vile RCS revision
@@ -284,9 +287,9 @@ int marking, fromscreen;
 				&gregexp, lastkey, fromscreen)) != TRUE) {
 		return status;
 	}
-		
+
 	ignorecase = b_val(curwp->w_bufp, MDIGNCASE);
-			
+
 	curpos = DOT;
 	scanboundry(wrapok,curpos,FORWARD);
 	do {
@@ -311,10 +314,10 @@ int marking, fromscreen;
 			didmark = TRUE;
 		}
 	} while ((marking || --n > 0) && status == TRUE);
-	
+
 	if (!marking && !status)
 		nextch(&(DOT),REVERSE);
-		
+
 	if (marking) {  /* restore dot and offset */
 		DOT = curpos;
 	} else if (status) {
@@ -331,7 +334,7 @@ int marking, fromscreen;
 		not_found_msg(wrapok,FORWARD);
 		return FALSE;
 	}
-	
+
 	return TRUE;
 }
 
@@ -348,7 +351,7 @@ int f, n;	/* default flag / numeric argument */
 	register int status;
 	int wrapok;
 	MARK curpos;
-	
+
 	wrapok = b_val(curwp->w_bufp, MDSWRAP);
 
 	if (n < 0)		/* search backwards */
@@ -357,14 +360,14 @@ int f, n;	/* default flag / numeric argument */
 	/* Make sure a pattern exists, or that we didn't switch
 	 * into MAGIC mode until after we entered the pattern.
 	 */
-	if (pat[0] == '\0')
+	if (pat[0] == EOS)
 	{
 		mlforce("[No pattern set]");
 		return FALSE;
 	}
 
 	ignorecase = b_val(curwp->w_bufp, MDIGNCASE);
-			
+
 	/* Search for the pattern for as long as
 	 * n is positive (n == 0 will go through once, which
 	 * is just fine).
@@ -421,7 +424,7 @@ int dummy, fromscreen;
 	register int status;
 	int wrapok;
 	MARK curpos;
-	
+
 	if (n < 0)
 		return fsearch(f, -n, FALSE, fromscreen);
 
@@ -438,7 +441,7 @@ int dummy, fromscreen;
 	if ((status = readpattern("Reverse search: ", &pat[0],
 				&gregexp, lastkey, fromscreen)) == TRUE) {
 		ignorecase = b_val(curwp->w_bufp, MDIGNCASE);
-			
+
 		curpos = DOT;
 		scanboundry(wrapok,DOT,REVERSE);
 		do {
@@ -478,7 +481,7 @@ int f, n;	/* default flag / numeric argument */
 	register int status;
 	int wrapok;
 	MARK curpos;
-	
+
 	wrapok = b_val(curwp->w_bufp, MDSWRAP);
 
 	if (n < 0)
@@ -487,7 +490,7 @@ int f, n;	/* default flag / numeric argument */
 	/* Make sure a pattern exists, or that we didn't switch
 	 * into MAGIC mode until after we entered the pattern.
 	 */
-	if (pat[0] == '\0') {
+	if (pat[0] == EOS) {
 		mlforce("[No pattern set]");
 		return FALSE;
 	}
@@ -498,7 +501,7 @@ int f, n;	/* default flag / numeric argument */
 	 */
 
 	ignorecase = b_val(curwp->w_bufp, MDIGNCASE);
-			
+
 	curpos = DOT;
 	scanboundry(wrapok,DOT,REVERSE);
 	do {
@@ -554,7 +557,7 @@ int f,n;
  * scanner -- Search for a pattern in either direction.  If found,
  *	reset the "." to be at the start or just after the match string
  */
-int	
+int
 scanner(exp, direct, wrapok)
 regexp	*exp;	/* the compiled expression */
 int	direct;	/* which way to go.*/
@@ -613,7 +616,7 @@ int	wrapok;	/* ok to wrap around bottom of buffer? */
 			if (direct == REVERSE) { /* find the last one */
 				char *got = exp->startp[0];
 				while (lregexec(exp, l_ref(curpos.l),
-						got+1-l_ref(curpos.l)->l_text, 
+						got+1-l_ref(curpos.l)->l_text,
 						srchlim)) {
 					got = exp->startp[0];
 				}
@@ -671,7 +674,7 @@ char *s;
  *	from the pattern.  If we are in IGNCASE mode, fold out the case.
  */
 #if OPT_EVAL || UNUSED
-int	
+int
 eq(bc, pc)
 register int	bc;
 register int	pc;
@@ -690,7 +693,7 @@ scrsearchpat(f,n)
 int f,n;
 {
 	int s;
-	s =  readpattern("", pat, &gregexp, 0, TRUE);
+	s =  readpattern("", pat, &gregexp, EOS, TRUE);
 	mlwrite("Search pattern is now %s", pat);
 	lastdirec = 0;
 	return s;
@@ -738,7 +741,7 @@ int	fromscreen;
 			if (!*srchexpp)
 				return FALSE;
 		}
-	} else if (status == FALSE && *apat != 0) { /* Old one */
+	} else if (status == FALSE && *apat != EOS) { /* Old one */
 		status = TRUE;
 	}
 
@@ -752,9 +755,9 @@ int	fromscreen;
 void
 savematch(curpos,matchlen)
 MARK curpos;		/* last match */
-int matchlen;
+SIZE_T matchlen;
 {
-	static	patlen = -1;	/* length of last malloc */
+	static	ALLOC_T	patlen = -1;	/* length of last malloc */
 
 	/* free any existing match string */
 	if (patmatch == NULL || patlen < matchlen) {
@@ -768,7 +771,7 @@ int matchlen;
 	(void)strncpy(patmatch, &(l_ref(curpos.l)->l_text[curpos.o]), matchlen);
 
 	/* null terminate the match string */
-	patmatch[matchlen] = '\0';
+	patmatch[matchlen] = EOS;
 }
 
 void
@@ -836,7 +839,7 @@ int direc;
 	if (!f) n = 1;
 
 	s = TRUE;
-	scanboundry(FALSE,savepos,0);
+	scanboundpos = curbp->b_line; /* was scanboundry(FALSE,savepos,0); */
 	while (s == TRUE && n--) {
 		savepos = DOT;
 		s = (direc == FORWARD) ? forwchar(TRUE,1) : backchar(TRUE,1);

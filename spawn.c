@@ -2,7 +2,10 @@
  *		for MicroEMACS
  *
  * $Log: spawn.c,v $
- * Revision 1.65  1993/09/03 09:11:54  pgf
+ * Revision 1.66  1993/10/04 10:24:09  pgf
+ * see tom's 3.62 changes
+ *
+ * Revision 1.65  1993/09/03  09:11:54  pgf
  * tom's 3.60 changes
  *
  * Revision 1.64  1993/08/13  16:32:50  pgf
@@ -187,66 +190,66 @@
  * date: 1991/08/06 15:25:58;
  *  global/local values
  * and sprintf changes
- * 
+ *
  * revision 1.7
  * date: 1991/06/25 19:53:29;
  * massive data structure restructure
- * 
+ *
  * revision 1.6
  * date: 1991/05/30 16:10:14;
  * added extern decl for getenv()
- * 
+ *
  * revision 1.5
  * date: 1991/04/22 09:03:37;
  * removed non-portable initialization
- * 
+ *
  * revision 1.4
  * date: 1991/04/08 15:46:56;
  * fixed readin() arg count
- * 
+ *
  * revision 1.3
  * date: 1991/04/04 09:43:21;
  * added filterregion
- * 
+ *
  * revision 1.2
  * date: 1990/12/06 18:53:59;
  * added abortc to list that will terminate pressreturn
- * 
+ *
  * revision 1.1
  * date: 1990/09/21 10:26:01;
  * initial vile RCS revision
  */
 
 #include	"estruct.h"
-#include        "edef.h"
+#include	"edef.h"
 #if UNIX
 #include	<sys/stat.h>
 #endif
 
-#if     AMIGA
-#define  NEW   1006L
+#if	AMIGA
+#define  NEW	1006L
 #endif
 
 #if		ST520 & MEGAMAX
 #include <osbind.h>
-#define LOAD_EXEC 0 	/* load and execute the program */
+#define LOAD_EXEC 0	/* load and execute the program */
 char	*STcmd,		/* the command filename & path  */
-	*STargs,	/* command args (if any)        */
-	*STenv,		/* environment                  */
+	*STargs,	/* command args (if any)	*/
+	*STenv,		/* environment			*/
 	*STwork;	/* work area			*/
 #endif
 
-#if     VMS
-#define EFN     0                               /* Event flag.          */
+#if	VMS
+#define EFN	0				/* Event flag.		*/
 
-#include        <ssdef.h>                       /* Random headers.      */
-#include        <stsdef.h>
-#include        <descrip.h>
-#include        <iodef.h>
+#include	<ssdef.h>			/* Random headers.	*/
+#include	<stsdef.h>
+#include	<descrip.h>
+#include	<iodef.h>
 
-extern  int     oldmode[3];                     /* In "termio.c"        */
-extern  int     newmode[3];                     /* In "termio.c"        */
-extern  short   iochan;                         /* In "termio.c"        */
+extern  int	oldmode[3];			/* In "termio.c"	*/
+extern  int	newmode[3];			/* In "termio.c"	*/
+extern  short	iochan;				/* In "termio.c"	*/
 #endif
 
 #if	MSDOS & (MSC | TURBO | ZTC | WATCOM)
@@ -273,62 +276,62 @@ int
 spawncli(f, n)
 int f,n;
 {
-#if     UNIX
-# if 	X11
+#if	UNIX
+# if	X11
 	mlforce("[Not available under X11]");
 	return(FALSE);
 # else
-        movecursor(term.t_nrow, 0);             /* Seek to last line.   */
+	movecursor(term.t_nrow, 0);		/* Seek to last line.	*/
 	ttclean(TRUE);
-        TTputc('\n');
+	TTputc('\n');
 	(void)system_SHELL((char *)0);
-        TTflush();
+	TTflush();
 	ttunclean();
-        sgarbf = TRUE;
-        return AfterShell();
+	sgarbf = TRUE;
+	return AfterShell();
 # endif /* X11 */
 #endif /* UNIX */
 
 #if	AMIGA
-        long newcli;
-        mlwrite("[Starting new CLI]");
-        Execute("NEWCLI \"CON:0/0/640/200/MicroEMACS Subprocess\"", 0L, 0L);
-        sgarbf = TRUE;
-        return AfterShell();
+	long newcli;
+	mlwrite("[Starting new CLI]");
+	Execute("NEWCLI \"CON:0/0/640/200/MicroEMACS Subprocess\"", 0L, 0L);
+	sgarbf = TRUE;
+	return AfterShell();
 #endif
 
-#if     VMS
-        movecursor(term.t_nrow, 0);             /* In last line.        */
-        mlforce("[Starting DCL]\r\n");
-        TTflush(); 	                     /* Ignore "ttcol".      */
-        sgarbf = TRUE;
-        return sys(NULL);                     /* NULL => DCL.         */
+#if	VMS
+	movecursor(term.t_nrow, 0);		/* In last line.	*/
+	mlforce("[Starting DCL]\r\n");
+	TTflush();				/* Ignore "ttcol".	*/
+	sgarbf = TRUE;
+	return sys(NULL);			/* NULL => DCL.		*/
 #endif
-#if     CPM
-        mlforce("[Not in CP/M-86]");
+#if	CPM
+	mlforce("[Not in CP/M-86]");
 	return FALSE;
 #endif
 #if	ST520
 	mlforce("[Not in TOS]");
 	return FALSE;
 #endif
-#if     MSDOS && (AZTEC || NEWDOSCC)
-        movecursor(term.t_nrow, 0);             /* Seek to last line.   */
-        TTflush();
+#if	MSDOS && (AZTEC || NEWDOSCC)
+	movecursor(term.t_nrow, 0);		/* Seek to last line.	*/
+	TTflush();
 	TTkclose();
 	system("command.com");
 	TTkopen();
-        sgarbf = TRUE;
-        return AfterShell();
+	sgarbf = TRUE;
+	return AfterShell();
 #endif
-#if     MSDOS && LATTICE
-        movecursor(term.t_nrow, 0);             /* Seek to last line.   */
-        TTflush();
+#if	MSDOS && LATTICE
+	movecursor(term.t_nrow, 0);		/* Seek to last line.	*/
+	TTflush();
 	TTkclose();
-        sys("\\command.com", "");               /* Run CLI.             */
+	sys("\\command.com", "");		/* Run CLI.		*/
 	TTkopen();
-        sgarbf = TRUE;
-        return AfterShell();
+	sgarbf = TRUE;
+	return AfterShell();
 #endif
 }
 
@@ -384,12 +387,12 @@ pressreturn()
 {
 	int s;
 
-        mlprompt("[Press return to continue]");
-        TTflush();
+	mlprompt("[Press return to continue]");
+	TTflush();
 	/* loop for a CR, a space, or a : to do another named command */
-        while ((s = kbd_key()) != '\r' && s != ' ' && s != kcod2key(abortc)) {
+	while ((s = kbd_key()) != '\r' && s != ' ' && s != kcod2key(abortc)) {
 		extern CMDFUNC f_namedcmd;
-                if (kcod2fnc(s) == &f_namedcmd) {
+		if (kcod2fnc(s) == &f_namedcmd) {
 			tungetc(kcod2key(s));
 			break;
 		}
@@ -414,9 +417,10 @@ int f,n;
 	return spawn1(FALSE);
 }
 
-#if UNIX || MSDOS || VMS
+#define COMMON_SH_PROMPT (UNIX || VMS || MSDOS || (ST520 & LATTICE))
+
+#if COMMON_SH_PROMPT
 static	int	ShellPrompt P(( TBUFF **, char *, int ));
-static	TBUFF	*save_shell[2];
 
 /*
  * Common function for prompting for shell/pipe command, and for recording the
@@ -431,6 +435,7 @@ char	*result;
 int	rerun;		/* TRUE/FALSE: spawn, -TRUE: pipecmd */
 {
 	register int	s;
+	register SIZE_T	len;
 	static	char	bang[] = SHPIPE_LEFT;
 	int	cb	= anycb(),
 		fix	= (rerun != -TRUE);
@@ -438,8 +443,8 @@ int	rerun;		/* TRUE/FALSE: spawn, -TRUE: pipecmd */
 		temp[NLINE],
 		line[NLINE+1];
 
-	if ((s = tb_length(*holds)) != 0)
-		strncpy(save, tb_values(*holds), s)[s] = EOS;
+	if ((len = tb_length(*holds)) != 0)
+		strncpy(save, tb_values(*holds), len)[len] = EOS;
 	else
 		save[0] = EOS;
 
@@ -457,17 +462,6 @@ int	rerun;		/* TRUE/FALSE: spawn, -TRUE: pipecmd */
 
 		if ((s = mlreply_no_bs(temp, line+1, NLINE)) != TRUE)
 			return s;
-	}
-
-	if (line[1] == bang[0]) {
-		hst_remove(line);
-		if (line[2] == EOS) {	/* "!!" alone */
-			(void)strcpy(line, save);
-		} else {	/* append the current text to the last */
-			(void) strcpy(line, strcat(strcpy(temp, save), line+2));
-		}
-		hst_append(strcpy(temp, line), EOS);
-		mlwrite(": %s", line);
 	}
 	if (line[1] == EOS)
 		return FALSE;
@@ -488,60 +482,64 @@ int
 spawn1(rerun)
 int rerun;
 {
-
-#if UNIX
-        register int    s;
-        char	line[NLINE];	/* command line send to shell */
+#if IBMPC
+	int	closed;
+#endif
+#if COMMON_SH_PROMPT
+	register int	s;
+	char	line[NLINE];	/* command line send to shell */
 
 	if ((s = ShellPrompt(&save_shell[0], line, rerun)) != TRUE)
 		return s;
+#endif	/* COMMON_SH_PROMPT */
 
+#if UNIX
 #if X11
 	(void)system_SHELL(line);
 #else
 	ttclean(TRUE);
 	(void)system_SHELL(line);
-        TTflush();
+	TTflush();
 	ttunclean();
 	pressreturn();
 	TTopen();
 	TTflush();
-        sgarbf = TRUE;
+	sgarbf = TRUE;
 #endif /* X11 */
-        return AfterShell();
+	return AfterShell();
 #endif /* UNIX */
 
-#if     AMIGA
-        register int    s;
-        static char oline[NLINE];	/* command line send to shell */
-        char	line[NLINE];	/* command line send to shell */
+#if	AMIGA
+	register int	s;
+	static char oline[NLINE];	/* command line send to shell */
+	char	line[NLINE];	/* command line send to shell */
 	register char	*cp;
 	char		line2[NLINE];
-        long newcli;
+	long newcli;
 
 
-        if ((s=mlreply("cmd: !", oline, NLINE)) != TRUE)
-                return (s);
+	if ((s=mlreply("cmd: !", oline, NLINE)) != TRUE)
+		return (s);
 	(void)strcpy(line,oline);
-        newcli = Open("CON:0/0/640/200/MicroEMACS Subprocess", NEW);
-        Execute(line, 0L, newcli);
-        Close(newcli);
-        tgetc(FALSE);	/* Pause.               */
-        sgarbf = TRUE;
-        return AfterShell();
+	newcli = Open("CON:0/0/640/200/MicroEMACS Subprocess", NEW);
+	Execute(line, 0L, newcli);
+	Close(newcli);
+	tgetc(FALSE);			/* Pause.		*/
+	sgarbf = TRUE;
+	return AfterShell();
 #endif
 #if	ST520 & MEGAMAX
-        register int    s;
-        static char oline[NLINE];	/* command line send to shell */
-        char	line[NLINE];	/* command line send to shell */
+	register int	s;
+	static char oline[NLINE];	/* command line send to shell */
+	char	line[NLINE];	/* command line send to shell */
 	register char	*cp;
 	char		line2[NLINE];
 
 	int i,j,k;
 	char *sptr,*tptr;
 
-        if ((s=mlreply("cmd: !", oline, NLINE)) != TRUE)
-                return(s);
+	if ((s=mlreply("cmd: !", oline, NLINE)) != TRUE)
+		return(s);
 	(void)strcpy(line,oline);
 	movecursor(term.t_nrow - 1, 0);
 	TTclose();
@@ -549,7 +547,7 @@ int rerun;
 	 * break the line into the command and its args
 	 * be cute about it, if there is no '.' in the filename, try
 	 * to find .prg, .tos or .ttp in that order
-	 * in any case check to see that the file exists before we run 
+	 * in any case check to see that the file exists before we run
 	 * amok
 	 */
 	STenv = NULL;
@@ -582,72 +580,75 @@ int rerun;
 	 * issue the command as is
 	 */
 	if((tptr = index(STcmd,'.')) == NULL) {
- 		STwork = castalloc(char,strlen(STcmd) + 4);
- 		(void)strcpy(STwork,STcmd);
- 		(void)strcat(STwork,".prg");
- 		tptr = index(STwork,'.');
- 		if(Fsfirst(1,STwork) != 0) { /* try .tos */
- 			(void)strcpy(tptr,".tos");
- 			if(Fsfirst(1,STwork) != 0) { /* try .ttp */
- 				(void)strcpy(tptr,".ttp");
- 				if(Fsfirst(1,STwork) != 0) /* never mind */
- 					*STwork = NULL;
- 				}
- 			}
- 	}
- 	if(*STwork != NULL)
-	        Pexec(LOAD_EXEC,STwork,STargs,STenv); 		
+		STwork = castalloc(char,strlen(STcmd) + 4);
+		(void)strcpy(STwork,STcmd);
+		(void)strcat(STwork,".prg");
+		tptr = index(STwork,'.');
+		if(Fsfirst(1,STwork) != 0) { /* try .tos */
+			(void)strcpy(tptr,".tos");
+			if(Fsfirst(1,STwork) != 0) { /* try .ttp */
+				(void)strcpy(tptr,".ttp");
+				if(Fsfirst(1,STwork) != 0) /* never mind */
+					*STwork = NULL;
+				}
+			}
+	}
+	if(*STwork != NULL)
+		Pexec(LOAD_EXEC,STwork,STargs,STenv);
 	else
-	        Pexec(LOAD_EXEC,STcmd,STargs,STenv);
+		Pexec(LOAD_EXEC,STcmd,STargs,STenv);
 	TTopen();
-        mlforce("\r\n\n[End]");                  /* Pause.               */
-        TTgetc();			     /* Pause.               */
-        sgarbf = TRUE;
-        return AfterShell();
-#endif
-#if     VMS
-        register int    s;
-        static char oline[NLINE];	/* command line send to shell */
-        char	line[NLINE];	/* command line send to shell */
-	register char	*cp;
-	char		line2[NLINE];
+	mlforce("\r\n\n[End]");		/* Pause.		*/
+	TTgetc();			/* Pause.		*/
+	sgarbf = TRUE;
+	return AfterShell();
+#endif	/* ST520 & MEGAMAX */
 
-
-        if ((s=mlreply("cmd: !", oline, NLINE)) != TRUE)
-                return (s);
-	(void)strcpy(line,oline);
-        TTputc('\n');                /* Already have '\r'    */
-        TTflush();
-        s = sys(line);                          /* Run the command.     */
-        mlforce("\r\n\n[End]");                  /* Pause.               */
-        TTflush();
-        tgetc(FALSE);
-        sgarbf = TRUE;
-        return (s);
+#if	VMS
+	TTputc('\n');			/* Already have '\r'	*/
+	TTflush();
+	s = sys(line);			/* Run the command.	*/
+	mlforce("\r\n\n[End]");		/* Pause.		*/
+	TTflush();
+	tgetc(FALSE);
+	sgarbf = TRUE;
+	return (s);
 #endif
-#if     CPM
-        mlforce("[Not in CP/M-86]");
-        return (FALSE);
+#if	CPM
+	mlforce("[Not in CP/M-86]");
+	return (FALSE);
 #endif
-#if     MSDOS || (ST520 & LATTICE)
-        register int    s;
-        static char oline[NLINE];	/* command line send to shell */
-	char	line[NLINE];	/* command line send to shell */
-
-        if ((s=mlreply("cmd: !", oline, NLINE)) != TRUE)
-                return(s);
-	(void)strcpy(line,oline);
-	movecursor(term.t_nrow - 1, 0);
+#if	MSDOS || (ST520 & LATTICE)
+	movecursor(term.t_nrow, 0);
+	TTputc('\n');
+	TTflush();
 	TTkclose();
-        system(line);
+#if	IBMPC
+	/* If we don't reset to 80x25, parts of the shell-output will go
+	 * astray.
+	 */
+	closed = term.t_ncol != 80 || term.t_nrow != 24;
+	if (closed)
+		TTclose();
+#endif
+	system(line);
 	TTkopen();
 	/* if we are interactive, pause here */
 	if (clexec == FALSE) {
-	        mlforce("\r\n\n[End]");
-        	tgetc(FALSE);
-        }
-        sgarbf = TRUE;
-        return AfterShell();
+		kbd_expand = -1;
+		kbd_puts("\r\n\n[End]");
+		kbd_expand = 0;
+		tgetc(FALSE);
+	}
+#if	IBMPC
+	/* Reopen the display _after_ the prompt, to keep the shell-output
+	 * in the same type of screen as the prompt.
+	 */
+	if (closed)
+		TTopen();
+#endif
+	sgarbf = TRUE;
+	return AfterShell();
 #endif
 }
 
@@ -661,13 +662,13 @@ pipecmd(f, n)
 int f,n;
 {
 	register BUFFER *bp;	/* pointer to buffer to zot */
-        register int    s;
-        char line[NLINE];	/* command line send to shell */
+	register int	s;
+	char line[NLINE];	/* command line send to shell */
 	static char bname[] = ScratchName(Output);
 
 	/* get the command to pipe in */
 	hst_init('!');
-        s = ShellPrompt(&save_shell[!global_g_val(GMDSAMEBANGS)], line, -TRUE);
+	s = ShellPrompt(&save_shell[!global_g_val(GMDSAMEBANGS)], line, -TRUE);
 	hst_flush();
 
 	/* prompt ok? */
@@ -689,28 +690,28 @@ int f,n;
 int
 pipecmd(f, n)
 {
-        register int    s;	/* return status from CLI */
+	register int	s;	/* return status from CLI */
 	register WINDOW *wp;	/* pointer to new window */
 	register BUFFER *bp;	/* pointer to buffer to zot */
-        static char oline[NLINE];	/* command line send to shell */
-        char	line[NLINE];	/* command line send to shell */
+	static char oline[NLINE];	/* command line send to shell */
+	char	line[NLINE];	/* command line send to shell */
 	static char bname[] = ScratchName(Output);
 	WINDOW *ocurwp;		/* save the current window during delete */
 
 #if	AMIGA
 	static char filnam[] = "ram:command";
-        long newcli;
+	long newcli;
 #else
 	static char filnam[NSTRING] = "command";
 #endif
 
-#if     CPM
-        mlforce("[Not available under CP/M-86]");
-        return(FALSE);
+#if	CPM
+	mlforce("[Not available under CP/M-86]");
+	return(FALSE);
 #endif
 	/* get the command to pipe in */
-        if ((s=mlreply("cmd: <", oline, NLINE)) != TRUE)
-                return(s);
+	if ((s=mlreply("cmd: <", oline, NLINE)) != TRUE)
+		return(s);
 
 	(void)strcpy(line,oline);
 
@@ -734,14 +735,14 @@ pipecmd(f, n)
 			return(FALSE);
 	}
 
-#if     AMIGA
-        newcli = Open("CON:0/0/640/200/MicroEMACS Subprocess", NEW);
+#if	AMIGA
+	newcli = Open("CON:0/0/640/200/MicroEMACS Subprocess", NEW);
 	(void)strcat(line, " >");
 	(void)strcat(line, filnam);
-        Execute(line, 0L, newcli);
+	Execute(line, 0L, newcli);
 	s = TRUE;
-        Close(newcli);
-        sgarbf = TRUE;
+	Close(newcli);
+	sgarbf = TRUE;
 #endif
 	if (s != TRUE)
 		return(s);
@@ -777,14 +778,14 @@ int
 filterregion()
 {
 #if UNIX||MSDOS
-        static char oline[NLINE];	/* command line send to shell */
-        char	line[NLINE];	/* command line send to shell */
+	static char oline[NLINE];	/* command line send to shell */
+	char	line[NLINE];	/* command line send to shell */
 	FILE *fr, *fw;
 	int s;
 
 	/* get the filter name and its args */
-        if ((s=mlreply_no_bs("!", oline, NLINE)) != TRUE)
-                return(s);
+	if ((s=mlreply_no_bs("!", oline, NLINE)) != TRUE)
+		return(s);
 	(void)strcpy(line,oline);
 	if ((s = inout_popen(&fr, &fw, line)) != TRUE) {
 		mlforce("[Couldn't open pipe or command]");
@@ -834,33 +835,33 @@ int
 filter(f, n)
 int f,n;
 {
-        register int    s;	/* return status from CLI */
+	register int	s;	/* return status from CLI */
 	register BUFFER *bp;	/* pointer to buffer to zot */
-        static char oline[NLINE];	/* command line send to shell */
-        char	line[NLINE];	/* command line send to shell */
+	static char oline[NLINE];	/* command line send to shell */
+	char	line[NLINE];	/* command line send to shell */
 	char tnam[NFILEN];	/* place to store real file name */
 	static char bname1[] = "fltinp";
 
 #if	AMIGA
 	static char filnam1[] = "ram:fltinp";
 	static char filnam2[] = "ram:fltout";
-        long newcli;
+	long newcli;
 #else
 	static char filnam1[] = "fltinp";
 	static char filnam2[] = "fltout";
 #endif
 
-#if     VMS
+#if	VMS
 	mlforce("[Not available under VMS]");
 	return(FALSE);
 #endif
-#if     CPM
-        mlforce("[Not available under CP/M-86]");
-        return(FALSE);
+#if	CPM
+	mlforce("[Not available under CP/M-86]");
+	return(FALSE);
 #endif
 	/* get the filter name and its args */
-        if ((s=mlreply("cmd: |", oline, NLINE)) != TRUE)
-                return(s);
+	if ((s=mlreply("cmd: |", oline, NLINE)) != TRUE)
+		return(s);
 	(void)strcpy(line,oline);
 
 	/* setup the proper file names */
@@ -875,31 +876,31 @@ int f,n;
 		return(FALSE);
 	}
 
-#if     AMIGA
-        newcli = Open("CON:0/0/640/200/MicroEMACS Subprocess", NEW);
+#if	AMIGA
+	newcli = Open("CON:0/0/640/200/MicroEMACS Subprocess", NEW);
 	(void)strcat(line, " <ram:fltinp >ram:fltout");
-        Execute(line,0L,newcli);
+	Execute(line,0L,newcli);
 	s = TRUE;
-        Close(newcli);
-        sgarbf = TRUE;
+	Close(newcli);
+	sgarbf = TRUE;
 #endif
-#if     MSDOS
+#if	MSDOS
 	(void)strcat(line," <fltinp >fltout");
 	movecursor(term.t_nrow - 1, 0);
 	TTkclose();
-        system(line);
+	system(line);
 	TTkopen();
-        sgarbf = TRUE;
+	sgarbf = TRUE;
 	s = TRUE;
 #endif
-#if     UNIX
-        ttclean(TRUE);
+#if	UNIX
+	ttclean(TRUE);
 	(void)strcat(line," <fltinp >fltout");
-        system(line);
-        ttunclean();
-        TTflush();
-        sgarbf = TRUE;
-       s = TRUE;
+	system(line);
+	ttunclean();
+	TTflush();
+	sgarbf = TRUE;
+	s = TRUE;
 #endif
 
 	/* on failure, escape gracefully */
@@ -922,7 +923,7 @@ int f,n;
 	return AfterShell();
 }
 
-#if     VMS
+#if	VMS
 /*
  * Run a command. The "cmd" is a pointer to a command string, or NULL if you
  * want to run a copy of DCL in the subjob (this is how the standard routine
@@ -931,36 +932,36 @@ int f,n;
  */
 int
 sys(cmd)
-register char   *cmd;
+register char	*cmd;
 {
-        struct  dsc$descriptor  cdsc;
-        struct  dsc$descriptor  *cdscp;
-        long    status;
-        long    substatus;
-        long    iosb[2];
+	struct  dsc$descriptor  cdsc;
+	struct  dsc$descriptor  *cdscp;
+	long	status;
+	long	substatus;
+	long	iosb[2];
 
-        status = SYS$QIOW(EFN, iochan, IO$_SETMODE, iosb, 0, 0,
-                          oldmode, sizeof(oldmode), 0, 0, 0, 0);
-        if (status!=SS$_NORMAL || (iosb[0]&0xFFFF)!=SS$_NORMAL)
-                return (FALSE);
-        cdscp = NULL;                           /* Assume DCL.          */
-        if (cmd != NULL) {                      /* Build descriptor.    */
-                cdsc.dsc$a_pointer = cmd;
-                cdsc.dsc$w_length  = strlen(cmd);
-                cdsc.dsc$b_dtype   = DSC$K_DTYPE_T;
-                cdsc.dsc$b_class   = DSC$K_CLASS_S;
-                cdscp = &cdsc;
-        }
-        status = LIB$SPAWN(cdscp, 0, 0, 0, 0, 0, &substatus, 0, 0, 0);
-        if (status != SS$_NORMAL)
-                substatus = status;
-        status = SYS$QIOW(EFN, iochan, IO$_SETMODE, iosb, 0, 0,
-                          newmode, sizeof(newmode), 0, 0, 0, 0);
-        if (status!=SS$_NORMAL || (iosb[0]&0xFFFF)!=SS$_NORMAL)
-                return (FALSE);
-        if ((substatus&STS$M_SUCCESS) == 0)     /* Command failed.      */
-                return (FALSE);
-        return AfterShell();
+	status = SYS$QIOW(EFN, iochan, IO$_SETMODE, iosb, 0, 0,
+			  oldmode, sizeof(oldmode), 0, 0, 0, 0);
+	if (status!=SS$_NORMAL || (iosb[0]&0xFFFF)!=SS$_NORMAL)
+		return (FALSE);
+	cdscp = NULL;				/* Assume DCL.		*/
+	if (cmd != NULL) {			/* Build descriptor.	*/
+		cdsc.dsc$a_pointer = cmd;
+		cdsc.dsc$w_length  = strlen(cmd);
+		cdsc.dsc$b_dtype   = DSC$K_DTYPE_T;
+		cdsc.dsc$b_class   = DSC$K_CLASS_S;
+		cdscp = &cdsc;
+	}
+	status = LIB$SPAWN(cdscp, 0, 0, 0, 0, 0, &substatus, 0, 0, 0);
+	if (status != SS$_NORMAL)
+		substatus = status;
+	status = SYS$QIOW(EFN, iochan, IO$_SETMODE, iosb, 0, 0,
+			  newmode, sizeof(newmode), 0, 0, 0, 0);
+	if (status!=SS$_NORMAL || (iosb[0]&0xFFFF)!=SS$_NORMAL)
+		return (FALSE);
+	if ((substatus&STS$M_SUCCESS) == 0)	/* Command failed.	*/
+		return (FALSE);
+	return AfterShell();
 }
 #endif
 
@@ -976,16 +977,16 @@ register char   *cmd;
  */
 int
 sys(cmd, tail)
-char    *cmd;
-char    *tail;
+char	*cmd;
+char	*tail;
 {
-        register unsigned n;
-        extern   char     *__end;
+	register unsigned n;
+	extern   char	*__end;
 
-        n = __end + 15;
-        n >>= 4;
-        n = ((n + dsreg() + 16) & 0xFFF0) + 16;
-        return(execall(cmd, tail, n));
+	n = __end + 15;
+	n >>= 4;
+	n = ((n + dsreg() + 16) & 0xFFF0) + 16;
+	return(execall(cmd, tail, n));
 
 }
 #endif
@@ -993,10 +994,10 @@ char    *tail;
 #if LATTICE
 int
 sys(cmd, tail)
-char    *cmd;
-char    *tail;
+char	*cmd;
+char	*tail;
 {
-        return(forklp(cmd, tail, (char *)NULL));
+	return(forklp(cmd, tail, (char *)NULL));
 }
 #endif
 

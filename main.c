@@ -14,7 +14,13 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.141  1993/09/16 11:07:58  pgf
+ * Revision 1.143  1993/10/04 10:24:09  pgf
+ * see tom's 3.62 changes
+ *
+ * Revision 1.142  1993/09/20  21:37:07  pgf
+ * flash is now off by default
+ *
+ * Revision 1.141  1993/09/16  11:07:58  pgf
  * added .scm to c-suffixes list.  for scheme.  this is getting a little
  * unwieldly.
  *
@@ -547,7 +553,7 @@ char	*argv[];
 	int gline = FALSE;		/* if so, what line? */
 	int helpflag = FALSE;		/* do we need help at start? */
 	int searchflag = FALSE; 	/* Do we need to search at start? */
-	char bname[NBUFN];		/* buffer name of file to read */
+	char bname[NBUFN+1];		/* buffer name of file to read */
 	char *msg;
 #if TAGS
 	int didtag = FALSE;		/* look up a tag to start? */
@@ -650,9 +656,15 @@ char	*argv[];
 					x_setname(argv[carg]);
 				else
 					goto usage;
-
 				break;
-#endif
+			case 'w':
+				if (strcmp(param, "wm") == 0
+				 && argv[++carg] != 0)
+					x_set_wm_title(argv[carg]);
+				else
+					goto usage;
+				break;
+#endif /* X11 */
 			case 'e':	/* -e for Edit file */
 			case 'E':
 				set_global_b_val(MDVIEW,FALSE);
@@ -747,7 +759,7 @@ char	*argv[];
 #endif
 			/* set up a buffer for this file */
 			makename(bname, param);
-			unqname(bname,FALSE);
+			(void)unqname(bname,FALSE);
 
 			bp = bfind(bname, BFARGS);
 			ch_fname(bp, param);
@@ -1103,7 +1115,7 @@ global_val_init()
 	set_global_g_val(GMDDIRC,	FALSE); /* directory-completion */
 #endif
 #if OPT_FLASH
-	set_global_g_val(GMDFLASH,  	TRUE);	/* use it if we've got it */
+	set_global_g_val(GMDFLASH,  	FALSE);	/* beeps beep by default */
 #endif
 #ifdef GMDHISTORY
 	set_global_g_val(GMDHISTORY,	TRUE);
@@ -1113,9 +1125,9 @@ global_val_init()
 	set_global_g_val(GVAL_TIMEOUTVAL, 500);	/* catnap time -- how long
 							to wait for ESC seq */
 #if VMS || MSDOS			/* ':' gets in the way of drives */
-	set_global_g_val_ptr(GVAL_EXPAND_CHARS,strmalloc("%#"));
+	set_global_g_val_ptr(GVAL_EXPAND_CHARS,strmalloc("!%#"));
 #else	/* UNIX */
-	set_global_g_val_ptr(GVAL_EXPAND_CHARS,strmalloc("%#:"));
+	set_global_g_val_ptr(GVAL_EXPAND_CHARS,strmalloc("!%#:"));
 #endif
 	set_global_g_val(GMDEXPAND_PATH,FALSE);
 #ifdef GMDGLOB
@@ -1517,9 +1529,9 @@ int f,n;
 		x11_leaks();
 #endif
 
-		free_local_vals(g_valuenames, global_g_values.gv);
-		free_local_vals(b_valuenames, global_b_values.bv);
-		free_local_vals(w_valuenames, global_w_values.wv);
+		free_local_vals(g_valuenames, global_g_values.gv, global_g_values.gv);
+		free_local_vals(b_valuenames, global_b_values.bv, global_b_values.bv);
+		free_local_vals(w_valuenames, global_w_values.wv, global_w_values.wv);
 
 		FreeAndNull(gregexp);
 		FreeAndNull(patmatch);

@@ -6,7 +6,14 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.104  1993/09/16 10:57:31  pgf
+ * Revision 1.106  1993/10/11 17:21:42  pgf
+ * in imdying, run "ls -a" output through "sort -r" to put "." last, since
+ * it terminates /bin/mail
+ *
+ * Revision 1.105  1993/10/04  10:24:09  pgf
+ * see tom's 3.62 changes
+ *
+ * Revision 1.104  1993/09/16  10:57:31  pgf
  * do an 'ls -a' when sending mail about saved files
  *
  * Revision 1.103  1993/09/10  16:06:49  pgf
@@ -640,7 +647,7 @@ fileread(f, n)
 int f,n;
 {
         register int    s;
-        char bname[NBUFN];
+        char bname[NBUFN+1];
 	char fname[NFILEN];
 
 	if ((s = mlreply_file("Replace with file: ", (TBUFF **)0, 
@@ -652,7 +659,7 @@ int f,n;
         s = readin(fname, TRUE, curbp, TRUE);
 	curbp->b_bname[0] = EOS;	/* ...so 'unqname()' doesn't find me */
 	makename(bname, fname);
-	unqname(bname, TRUE);
+	(void)unqname(bname, TRUE);
 	set_bname(curbp, bname);
 	updatelistbuffers();
 	return s;
@@ -748,7 +755,8 @@ int lockfl;		/* check the file for locks? */
 	char nfname[NFILEN];	/* canonical form of 'fname' */
 
 	/* user may have renamed buffer to look like filename */
-	if ((bp = find_b_name(fname)) == NULL) {
+	if ((bp = find_b_name(fname)) == NULL
+	 || (strlen(fname) > NBUFN)) {
 
 		/* It's not already here by that buffer name.
 		 * Try to find it assuming we're given the file name.
@@ -787,7 +795,8 @@ int lockfl;		/* check the file for locks? */
 						swbuffer(bp);
 			}
 			/* old buffer name conflict code */
-			unqname(bname,TRUE);
+			if (unqname(bname,TRUE))
+				continue;
 			hst_glue(' ');
 			s = mlreply("Will use buffer name: ", bname, sizeof(bname));
 	                if (s == ABORT)
@@ -816,7 +825,8 @@ int lockfl;		/* check the file for locks? */
 	/* if there are no path delimiters in the name, then the user
 		is likely asking for an existing buffer -- try for that
 		first */
-        if (!maybe_pathname(fname)
+        if (strlen(fname) < NBUFN
+	 && !maybe_pathname(fname)
 	 && (bp = find_b_name(fname)) != NULL) {
 		return swbuffer(bp);
 	}
@@ -1388,16 +1398,18 @@ char    fname[];
 #endif
 }
 
-void
+int
 unqname(name,ok_to_ask)	/* make sure a buffer name is unique */
 char *name;	/* name to check on */
 int ok_to_ask;  /* prompts allowed? */
 {
 	register char *sp;
 	register SIZE_T	j;
+	int	user_okayed = FALSE;
 
 	/* check to see if it is in the buffer list */
 	while (find_b_name(name) != NULL) {
+		user_okayed = FALSE;
 
 		/* "strnlen()", if there were such a thing */
 		for (j = 0; (j < NBUFN) && (name[j] != EOS); j++)
@@ -1424,8 +1436,9 @@ int ok_to_ask;  /* prompts allowed? */
 					hst_glue(' ');
 					(void)mlreply(
 					"Choose a unique buffer name: ",
-						 name, NBUFN);
+						 name, NBUFN+1);
 				} while (name[0] == EOS);
+				user_okayed = TRUE;
 			} else { /* can't ask, just overwrite end of name */
 				while (j >= NBUFN-1) {
 					j--;
@@ -1435,6 +1448,7 @@ int ok_to_ask;  /* prompts allowed? */
 			}
 		}
 	}
+	return user_okayed;
 }
 
 /*
@@ -1975,13 +1989,14 @@ ACTUAL_SIG_DECL
 	}
 	if (wrote) {
 		if ((np = getenv("LOGNAME")) || (np = getenv("USER"))) {
-			(void)lsprintf(cmd,
+			(void)lsprintf(cmd, "%s%s%s%s%s%s",
+			"(echo Subject: vile died; echo Files saved: ;",
 #if HAVE_MKDIR
-    "(echo Subject: vile died; echo Files saved: ; ls -a %s ) | /bin/mail %s",
+			"ls -a ", dirnam, " | sort -r)",
 #else
-    "(echo Subject: vile died; echo Files saved: ; ls %s/V* ) | /bin/mail %s",
+			"ls ", dirnam, "/V* )",
 #endif
-				dirnam, np);
+			" | /bin/mail ", np);
 			(void)system(cmd);
 		}
 	}

@@ -4,7 +4,10 @@
  *	Written (except for delins()) for vile by Paul Fox, (c)1990
  *
  * $Log: oneliner.c,v $
- * Revision 1.55  1993/09/10 16:06:49  pgf
+ * Revision 1.56  1993/10/04 10:24:09  pgf
+ * see tom's 3.62 changes
+ *
+ * Revision 1.55  1993/09/10  16:06:49  pgf
  * tom's 3.61 changes
  *
  * Revision 1.54  1993/09/03  09:11:54  pgf
@@ -452,7 +455,7 @@ int	on;
 
 	hilite(row,
 		offs2col(curwp, lp, DOT.o),
-		offs2col(curwp, lp, DOT.o + (rp->endp[0] - rp->startp[0])), on);
+		offs2col(curwp, lp, (C_NUM)(DOT.o + rp->mlen)), on);
 }
 
 static int
@@ -524,7 +527,7 @@ int nth_occur, printit, globally, *confirmp;
 					(void)update(TRUE);
 					skipped = TRUE;
 					/* so we don't match this again */
-					DOT.o += (exp->endp[0] - exp->startp[0]);
+					DOT.o += exp->mlen;
 					break;
 				case 'q' :
 					mlerase();
@@ -554,7 +557,7 @@ int nth_occur, printit, globally, *confirmp;
 			if (nth_occur > 0)
 				break;
 		} else { /* non-overlapping matches */
-			s = forwchar(TRUE, exp->mlen);
+			s = forwchar(TRUE, (int)(exp->mlen));
 			if (s != TRUE)
 				return s;
 		}
@@ -699,8 +702,7 @@ char *sourc;
 	    case '&':
 		    if (exp->startp[no] != NULL && exp->endp[no] != NULL) {
 			    char *cp;
-			    int len;
-			    len = (exp->endp[no] - exp->startp[no]);
+			    int len = exp->mlen;
 			    cp = (exp->startp[no] - exp->startp[0]) + buf_delins;
 			    while (len--) {
 				    if (!*cp) {

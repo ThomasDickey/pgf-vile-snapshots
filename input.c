@@ -3,7 +3,13 @@
  *		5/9/86
  *
  * $Log: input.c,v $
- * Revision 1.87  1993/09/10 16:06:49  pgf
+ * Revision 1.89  1993/10/04 10:24:09  pgf
+ * see tom's 3.62 changes
+ *
+ * Revision 1.88  1993/09/16  16:59:27  pgf
+ * fixed typo
+ *
+ * Revision 1.87  1993/09/10  16:06:49  pgf
  * tom's 3.61 changes
  *
  * Revision 1.86  1993/09/03  09:11:54  pgf
@@ -339,7 +345,9 @@ static	void	record_char P(( int ));
 static	void	remove_backslashes P(( char * ));
 static	int	countBackSlashes P(( char *, int ));
 static	void	showChar P(( int ));
-static	int	expandChar P(( char *, int, int *, int ));
+static	void	show1Char P(( int ));
+static	void	eraseChar P(( int ));
+static	int	expandChar P(( char *, int, int *, int, int ));
 static	int	eol_history P(( char *, int, int, int ));
 #ifdef GMDDOTMACRO
 static	void	dot_replays_macro P(( int ));
@@ -556,7 +564,7 @@ char *prompt;
 char *buf;
 int bufn;
 {
-	return kbd_string(prompt, buf, bufn, '\n', KBD_EXPAND, no_completion);
+	return kbd_string(prompt, buf, bufn, '\n', KBD_EXPAND|KBD_SHPIPE, no_completion);
 }
 
 /* as above, but neither expand nor do anything to backslashes */
@@ -718,7 +726,7 @@ int eatit;  /* consume the character? */
 
 /*	tgetc:	Get a key from the terminal driver, resolve any keyboard
 		macro action					*/
-int 
+int
 tgetc(quoted)
 int quoted;
 {
@@ -1002,7 +1010,7 @@ kbd_delimiter()
 {
 	register int	c = '\n';
 
-	if (namedcmd) {
+	if (isnamedcmd) {
 		register int	d = end_string();
 		if (ispunct(d))
 			c = d;
@@ -1058,18 +1066,46 @@ int	c;
 	}
 }
 
+static void
+show1Char(c)
+int	c;
+{
+	if (disinp) {
+		showChar(c);
+		TTflush();
+	}
+}
+
+static void
+eraseChar(c)
+int	c;
+{
+	if (disinp) {
+		kbd_erase();
+		if (!isprint(c))
+			kbd_erase();
+	}
+}
+
 /* expand a single character (only used on interactive input) */
 static int
-expandChar(buf, bufn, position, c)
+expandChar(buf, bufn, position, c, options)
 char *	buf;
 int	bufn;
 int *	position;
 int	c;
+int	options;
 {
 	register int	cpos = *position;
 	register char *	cp;
 	register BUFFER *bp;
 	char str[NFILEN];
+	int  shell = ((options & KBD_EXPCMD) && isShellOrPipe(buf))
+		   || (options & KBD_SHPIPE);
+
+	/* Are we allowed to expand anything? */
+	if (!((options & KBD_EXPAND) || shell))
+	 	return FALSE;
 
 	/* Is this a character that we know about? */
 	if (strchr(global_g_val_ptr(GVAL_EXPAND_CHARS),c) == 0)
@@ -1091,6 +1127,10 @@ int	c;
 			cp = str;
 		else
 			cp = NULL;
+	} else if ((c == '!') && shell) {
+		cp = tb_values(save_shell[!isShellOrPipe(buf)]);
+		if (cp != NULL && isShellOrPipe(cp))
+			cp++;	/* skip the '!' */
 	} else {
 		return FALSE;
 	}
@@ -1133,11 +1173,7 @@ int	c;
 
 	while (cpos > 0) {
 		cpos--;
-		if (disinp) {
-			kbd_erase();
-			if (!isprint(buf[cpos]))
-				kbd_erase();
-		}
+		eraseChar(buf[cpos]);
 		if (c == wkillc) {
 			if (!isspace(buf[cpos])) {
 				if (cpos > 0 && isspace(buf[cpos-1]))
@@ -1170,9 +1206,10 @@ int	options;
 {
 	register int c, j, k;
 
-	j = k = 0;
 	/* add backslash escapes in front of volatile characters */
-	while ((c = src[k++]) != EOS && k < bufn) {
+	for (j = k = 0; k < bufn; k++) {
+		if ((c = src[k]) == EOS)
+			break;
 		if ((c == '\\') || (c == eolchar && eolchar != '\n')) {
 			if (options & KBD_QUOTES)
 				dst[j++] = '\\'; /* add extra */
@@ -1211,6 +1248,30 @@ int	eolchar;
 			return TRUE;
 	}
 	return FALSE;
+}
+
+/*
+ * Store a one-level push-back of the shell command text. This allows simple
+ * prompt/substitution of shell commands, while keeping the "!" and text
+ * separate for the command decoder.
+ */
+static	int	pushed_back;
+static	int	pushback_flg;
+static	char *	pushback_ptr;
+
+void kbd_pushback(buffer, skip)
+char	*buffer;
+int	skip;
+{
+	static	TBUFF	*PushBack;
+	if (macroize(&PushBack, buffer+1, buffer)) {
+		pushed_back  = TRUE;
+		pushback_flg = clexec;
+		pushback_ptr = execstr;
+		clexec       = TRUE;
+		execstr      = tb_values(PushBack);
+		buffer[skip] = EOS;
+	}
 }
 
 /*	A more generalized prompt/reply function allowing the caller
@@ -1252,7 +1313,6 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 	int	c;
 	int	done;
 	int	cpos;		/* current character position in string */
-	int	expanded;
 	int	status;
 
 	register int quotef;	/* are we quoting the next char? */
@@ -1264,9 +1324,8 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 	last_eolchar = EOS;	/* ...in case we don't set it elsewhere */
 
 	if (clexec) {
-		int	s;
 		execstr = token(execstr, extbuf, eolchar);
-		if ((s = (*extbuf != EOS)) != FALSE) {
+		if ((status = (*extbuf != EOS)) != FALSE) {
 #if !SMALLER
 			if ((options & KBD_LOWERC))
 				(void)mklower(extbuf);
@@ -1285,7 +1344,16 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 			last_eolchar = *execstr;
 			extbuf[bufn-1] = EOS;
 		}
-		return s;
+		if (pushed_back && (*execstr == EOS)) {
+			pushed_back = FALSE;
+			clexec  = pushback_flg;
+			execstr = pushback_ptr;
+#if	OPT_HISTORY
+			if (!pushback_flg)
+				hst_append(extbuf,EOS);
+#endif
+		}
+		return status;
 	}
 
 	quotef = FALSE;
@@ -1304,6 +1372,13 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 
 		/* get a character from the user */
 		c = quotef ? tgetc(TRUE) : kbd_key();
+
+		/* if we echoed ^V, erase it now */
+		if (quotef) {
+			firstch = FALSE;
+			eraseChar(quotec);
+			TTflush();
+		}
 
 		/* If it is a <ret>, change it to a <NL> */
 		if (c == '\r' && quotef == FALSE)
@@ -1363,6 +1438,24 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 			/* if buffer is empty, return FALSE */
 			hst_append(buf, eolchar);
 			status = (*strncpy(extbuf, buf, (SIZE_T)bufn) != EOS);
+
+			/* If this is a shell command, push-back the actual
+			 * text to separate the "!" from the command.  Note
+			 * that the history command tries to do this already,
+			 * but cannot for some special cases, e.g., the user
+			 * types
+			 *	:execute-named-command !ls -l
+			 * which is equivalent to
+			 *	:!ls -l
+			 */
+			if (status == TRUE	/* ...we have some text */
+			 && (options & KBD_EXPCMD)
+#if	OPT_HISTORY
+			 && (strlen(buf) == cpos) /* history didn't split it */
+#endif
+			 && isShellOrPipe(buf)) {
+				kbd_pushback(extbuf, 1);
+			}
 			break;
 		}
 
@@ -1405,6 +1498,7 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 
 		} else if (c == quotec && quotef == FALSE) {
 			quotef = TRUE;
+			show1Char(c);
 			continue;	/* keep firstch==TRUE */
 
 		} else {
@@ -1415,17 +1509,8 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 				goto killit;
 			}
 
-			expanded = FALSE;
-			if (!EscOrQuo) {
-				if ((options & KBD_EXPAND)
-#if OPT_HISTORY
-				 || ((options & KBD_EXPCMD) && isShellOrPipe(buf))
-#endif
-				   )
-					expanded = expandChar(buf, bufn, &cpos, c);
-			}
-
-			if (!expanded) {
+			if (EscOrQuo
+			 || !expandChar(buf, bufn, &cpos, c, options)) {
 				if (c == '\\')
 					backslashes++;
 				else
@@ -1448,10 +1533,7 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 #endif
 					buf[cpos++] = c;
 					buf[cpos] = EOS;
-					if (disinp) {
-						showChar(c);
-						TTflush();
-					}
+					show1Char(c);
 				}
 			}
 		}

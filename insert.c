@@ -8,9 +8,12 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: insert.c,v $
- *	Revision 1.34  1993/09/16 11:06:43  pgf
- *	make parentheses act like braces in c-mode -- for indentation purposes, in
- *	languages like scheme (and lisp?)
+ *	Revision 1.35  1993/10/11 17:39:56  pgf
+ *	pass char to match to fmatchindent()
+ *
+ * Revision 1.34  1993/09/16  11:06:43  pgf
+ * make parentheses act like braces in c-mode -- for indentation purposes, in
+ * languages like scheme (and lisp?)
  *
  * Revision 1.33  1993/09/10  16:06:49  pgf
  * tom's 3.61 changes
@@ -948,10 +951,11 @@ LINE *lp;
 }
 
 
+/* insert a brace or paren into the text here... we are in CMODE */
 int
-insbrace(n, c)	/* insert a brace into the text here...we are in CMODE */
+insbrace(n, c)
 int n;	/* repeat count */
-int c;	/* brace to insert (always { for now) */
+int c;	/* brace/paren to insert (always '}' or ')' for now) */
 {
 
 #if ! CFENCE
@@ -964,14 +968,13 @@ int c;	/* brace to insert (always { for now) */
 
 	if (autoindented >= 0) {
 		trimline(FALSE);
-	}
-	else {
+	} else {
 		return linsert(n,c);
 	}
 #if ! CFENCE /* no fences?	then put brace one tab in from previous line */
 	doindent(((previndent(NULL)-1) / curtabval) * curtabval);
 #else /* line up brace with the line containing its match */
-	doindent(fmatchindent());
+	doindent(fmatchindent(c));
 #endif
 	autoindented = -1;
 
