@@ -1,5 +1,5 @@
 
-Getting along with vile						(version 5.2)
+Getting along with vile						(version 5.3)
 -----------------------						-------------
 
 	Use Ctrl-D and Ctrl-U to scroll through this help information.
@@ -709,6 +709,12 @@ Miscellaneous commands
 		rectangular regions) of text with a mouse, and then apply
 		any vi operator to that region.
 
+	=	If "visual-matches" is set, then vile will highlight all
+		occurrences of a pattern that is searched for with one of
+		the usual searching commands.  The '=' command will clear
+		this highlighting, until the next search for a different
+		pattern.
+
 
 	Vile can display more of its internal "state" than traditional vi. 
 	Portions of the internal "state" may be viewed using various
@@ -918,6 +924,16 @@ Editor modes
 	backspacelimit (bl)  When in insert mode, this controls whether
 		one can backspace past the point at which the insert began. (B)
 
+	backup-style  Specifies the style used for creating file backups
+		when a file is written.  Can have values of "off", ".bak",
+		and (under UNIX) "tilde", for no backups, DOS-style .BAK
+		files, and file.c~ style backups, respectively.  Files
+		are copied before being written, to protect links to
+		the original file.  Permissions, modification and access
+		times are all preserved.  If creation of the backup fails,
+		the write of the file will fail, unless it is forced
+		using the ":w!" form of the write command.  (U)
+
 	bcolor	On systems supporting this, will set the background color.
 		Currently only DOS can do color, although the X11 version
 		(xvile) can be given colors at startup or via .Xdefaults.
@@ -1020,15 +1036,13 @@ Editor modes
 		See notes about the color palette down below, under DOS
 		specifics.
 
-	backup-style  Specifies the style used for creating file backups
-		when a file is written.  Can have values of "off", ".bak",
-		and (under UNIX) "tilde", for no backups, DOS-style .BAK
-		files, and file.c~ style backups, respectively.  Files
-		are copied before being written, to protect links to
-		the original file.  Permissions, modification and access
-		times are all preserved.  If creation of the backup fails,
-		the write of the file will fail, unless it is forced
-		using the ":w!" form of the write command.  (U)
+	fence-pairs  Each pair of characters in this string is taken to be
+		a set of "fences", which should be matched with the '%'
+		command.  The default value is "{}()[]", which produces
+		normal vi behavior.  This can, for instance, be augmented
+		with the '<' and '>' characters ("{}()[]<>") to cause angle
+		brackets to be matched as well.  See "showmatch" mode for
+		another use of the "fence-pairs" mode.  (B)
 
 	fillcol (fc)  Sets the value for the fill column, which is the
 		column at which autowrapping and region formatting will
@@ -1167,9 +1181,11 @@ Editor modes
 		commands are used, and it chooses the next column stop for
 		the cursor if a '^T' or '^D' is typed during insert mode. (B)
 
-	showmatch (sm) During insert, if a closing '}', ']', or ')' character
-		is typed, the cursor will highlight the matching member
-		of the pair for about a quarter second. (B)
+	showmatch (sm) During insert, if a closing "fence" character
+		(usually '}', ']', or ')', but may be changed by setting
+		"fence-pairs") is typed, the cursor will highlight the
+		matching member of the pair for about a quarter second. 
+		(B)
 
 	showmode (smd) Causes an indicator on the modeline to indicate what
 		mode vile is currently in: insert (I), replace (R), or
@@ -1182,6 +1198,11 @@ Editor modes
 		which allow display of a section of code normally off the
 		screen to the right.  Also affected by the ^X-^R and ^X-^L
 		commands.  (W)
+
+	slash-char  Under DOS/NT/OS2, allows changing the path deliter from
+		the default '\' to the traditional '/'.  This is mainly
+		just a display change.  Either type of slash is accepted
+		on input. (U)
 
 	tabinsert (ti) Allow the physical insertion of tab characters into
 		the buffer.  If turned off ("notabinsert"), and an attempt
@@ -1264,22 +1285,39 @@ Editor modes
 
 	view-on-readonly  Causes "view" mode to be set for read-only files. (U)
 
+	visual-matches When a search command is executed, the cursor will
+		move as usual.  In addition, all matching occurrences of
+		the searched-for pattern (in the current buffer) will be
+		emphasized according to the value of this mode: "none",
+		"underline", "bold", "italic", or "reverse".  The '='
+		command can be used to clear this sort of highlighting,
+		until the next search is done for a different pattern. 
+		Note that setting this mode can significantly slow down the
+		editor's operation when complex or frequently occurring
+		patterns are used, since vile will need to scan the entire
+		buffer for matches on any change to the buffer.  (B)
+
+	warn-unread  When leaving the editor, if not all buffers have been
+		"visited", then normally vile will complain, and remind the
+		user to use ":q!".  Turning off "warn-unread" mode will
+		suppress this behavior.  (U)
+
 	working If turned off (noworking), will suppress the activity
 		indicator ("working..."/"...working") which appears during
 		long-running operations.  (U)
 
-	wrapmargin (wm) Implements vi's auto-wrap mode.  If nonzero, the wrap-
-		margin specifies the number of columns on the screen's
-		right margin to reserve before breaking the input lines on
-		a preceding space.  (B)
+	wrapmargin (wm)  Implements vi's auto-wrap mode.  If nonzero, the
+		wrapmargin specifies the number of columns on the
+		screen's right margin to reserve before breaking the input
+		lines on a preceding space.  (B)
 
 	wrapscan (ws) Text searches will continue from past the bottom of
 		the file to the top, and vice-versa.  (B)
 
-	wrapwords (ww) Similar to vi's auto-wrap mode.  While inserting,
-		words are moved to the next line if the current line gets
-		too long.  Unlike vi, wrapping is only attempted when a
-		space is typed. (B)
+	wrapwords (ww) Similar to vi's auto-wrap mode (i.e. "wrapmargin"). 
+		While inserting, words are moved to the next line if the
+		current line gets too long.  Unlike vi, wrapping is only
+		attempted when a space is typed.  (B)
 
 	xterm-mouse Enables mouse-clicking if you are running within an
 		xterm.  That is, it allows vile to receive mouse events. 
@@ -2507,6 +2545,14 @@ X Window System specifics
 		window open to the same buffer as which the selection was
 		started in.
 
+	[ As described below in the "Scrollbars" section, the buttons
+	are modified by the control key as follows, when used on a scrollbar:
+
+	Ctrl-Button-1 splits the clicked-on window into two windows.
+	Ctrl-Button-2 deletes the clicked-on window.
+	Ctrl-Button-3 makes the clicked-on window the only window. ]
+
+
 	Areas of selected text can be operated on with any vile operator
 	command, in conjunction with the special "motion" command '^S',
 	which applies the operator to the selected region.  For example,
@@ -3101,4 +3147,4 @@ Credits
 
 Copyright 1995 by Paul Fox, Tom Dickey, and Kevin Buettner
 -----------------------------------------------------------
- $Header: /usr/build/VCS/pgf-vile/RCS/vile.hlp,v 1.236 1995/02/24 00:49:19 pgf Exp $
+ $Header: /usr/build/VCS/pgf-vile/RCS/vile.hlp,v 1.245 1995/05/09 13:08:23 pgf Exp $

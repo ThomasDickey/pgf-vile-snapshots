@@ -2,7 +2,7 @@
  * Window management. Some of the functions are internal, and some are
  * attached to keys that the user actually types.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/window.c,v 1.55 1994/12/02 22:18:48 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/window.c,v 1.58 1995/04/26 04:35:17 pgf Exp $
  *
  */
 
@@ -13,6 +13,7 @@ static	void	unlink_window P(( WINDOW * ));
 static	LINEPTR	adjust_forw P(( WINDOW *, LINEPTR, int ));
 static	LINEPTR	adjust_back P(( WINDOW *, LINEPTR, int ));
 static	int	scroll_sideways P(( int, int ));
+static	WINDOW *splitw P(( int, int ));
 
 /*--------------------------------------------------------------------------*/
 
@@ -99,10 +100,11 @@ int
 reposition(f, n)
 int f,n;
 {
-	if (f == FALSE)		/* default to 0 to center screen */
-		n = 0;
-	curwp->w_force = n;
-	curwp->w_flag |= WFFORCE;
+	if (f) {
+		curwp->w_force = n;
+		curwp->w_flag |= WFFORCE;
+	}
+	update(TRUE);
 	return (TRUE);
 }
 
@@ -527,7 +529,7 @@ W_TRAITS *src;
 	error that is possible is a "malloc" failure allocating the structure
 	for the new window.
  */
-WINDOW *
+static WINDOW *
 splitw(f, n)
 int f,n;
 {

@@ -3,14 +3,14 @@
  *		adapted from elvis, in turn from
  *		Chris Janton's (chj) VMS Icon port.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/vmspipe.c,v 1.7 1995/01/27 13:52:56 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/vmspipe.c,v 1.9 1995/04/22 03:22:53 pgf Exp $
  *
  */
 
 #include "estruct.h"
 
-#include <iodef>
-#include <ssdef>
+#include <iodef.h>
+#include <ssdef.h>
 #include <dvidef.h>
 #include <file.h>
 
@@ -188,8 +188,8 @@ vms_rpipe (char *cmd, int fd, char *input_file)
 	if (fd > 0) {
 		char	pre_command[132+12];
 
-		strcpy (pre_command, "DEFINE/USER SYS$INPUT ");
-		strcat (pre_command, input_file);
+		(void)strcpy (pre_command, "DEFINE/USER SYS$INPUT ");
+		(void)strcat (pre_command, input_file);
 		if (!OK(
 			SYS$QIOW(0,
 				ichan,

@@ -15,13 +15,19 @@
  *
  *	modify (ifdef-style) 'expand_leaf()' to allow ellipsis.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/glob.c,v 1.37 1995/02/06 04:06:39 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/glob.c,v 1.41 1995/04/25 02:57:37 pgf Exp $
  *
  */
 
 #include "estruct.h"	/* global structures and defines */
 #include "edef.h"	/* defines 'slash' */
-#include "dirstuff.h"	/* directory-scanning interface & definitions */
+#if SYS_OS2
+# define INCL_DOSFILEMGR
+# define INCL_ERRORS
+# include <os2.h>
+#else
+# include "dirstuff.h"	/* directory-scanning interface & definitions */
+#endif
 
 #define BAKTIK '`'	/* used in UNIX shell for pipe */
 #define	isname(c)	(isalnum(c) || ((c) == '_'))
@@ -94,6 +100,7 @@
 
 /*--------------------------------------------------------------------------*/
 
+static	char **	glob_expand P((char **));
 static	int	string_has_wildcards P((char *));
 static	int	record_a_match P((char *));
 static	int	expand_pattern P((char *));
@@ -284,6 +291,7 @@ char	*pattern;
 	return (*leaf == EOS && *pattern == EOS);
 }
 
+#if !SYS_OS2
 /*
  * Recursive procedure that allows any leaf (or all!) leaves in a path to
  * have wildcards.  Except for an ellipsis, each wildcard is completed
@@ -352,7 +360,7 @@ char	*pattern;
 
 	/* Scan the directory, looking for leaves that match the pattern.
 	 */
-	if ((dp = opendir(path)) != 0) {
+	if ((dp = opendir(SL_TO_BSL(path))) != 0) {
 		leaf[-1] = SLASHC;	/* connect the path to the leaf */
 		while ((de = readdir(dp)) != 0) {
 #if OPT_MSDOS_PATH
@@ -409,6 +417,121 @@ char	*pattern;
 	return result;
 }
 
+#else /* SYS_OS2 */
+
+/*
+ * Recursive procedure that allows any leaf (or all!) leaves in a path to
+ * have wildcards.  Except for an ellipsis, each wildcard is completed
+ * within a single leaf.
+ *
+ * Returns false if we ran out of memory (a problem on ms-dos), and true
+ * if everything went well (e.g., matches).
+ */
+static int
+expand_leaf (path, pattern)
+char	*path;		/* built-up pathname, top-level */
+char	*pattern;
+{
+	FILEFINDBUF3 fb;
+	ULONG entries;
+	HDIR hdir;
+	APIRET rc;
+
+	int	result	= TRUE;
+	int	save = 0; /* warning suppression */
+	SIZE_T	len;
+	char	*leaf;
+	char	*wild	= wild_leaf(pattern);
+	char	*next	= next_leaf(wild);
+	register char	*s;
+
+	/* Fill-in 'path[]' with the non-wild leaves that we skipped to get
+	 * to 'wild'.
+	 */
+	if (wild == pattern) {	/* top-level, first leaf is wild */
+		if (*path == EOS)
+			(void)strcpy(path, ".");
+	} else {
+		len = wild - pattern - 1;
+		if (*(s = path) != EOS) {
+			s += strlen(s);
+			*s++ = SLASHC;
+		}
+		if (len != 0)
+			strncpy(s, pattern, len)[len] = EOS;
+	}
+	leaf = path + strlen(path) + 1;
+
+	if (next != 0) {
+		save = next[-1];
+		next[-1] = EOS;		/* restrict 'wild[]' to one leaf */
+	}
+
+	/* Scan the directory, looking for leaves that match the pattern.
+	 */
+	len = strlen(path);
+	if (path[len - 1] != SLASHC)
+		strcat(path, "\\*.*");
+	else
+		strcat(path, "*.*");
+
+	hdir = HDIR_CREATE;
+	entries = 1;
+	rc = DosFindFirst(path, &hdir, FILE_DIRECTORY | FILE_READONLY,
+			&fb, sizeof(fb), &entries, FIL_STANDARD);
+	if (rc == NO_ERROR)
+	{
+		leaf[-1] = SLASHC;
+
+		do
+		{
+			(void) mklower(strcpy(leaf, fb.achName));
+
+			if (strcmp(leaf, ".") == 0 || strcmp(leaf, "..") == 0)
+			 	continue;
+			if (!match_leaf(leaf, wild))
+				continue;
+
+			if (next != 0) {	/* there are more leaves */
+				if (!string_has_wildcards(next)) {
+					s = leaf + strlen(leaf);
+					*s++ = SLASHC;
+					(void)strcpy(s, next);
+					if (!record_a_match(path)) {
+						result = FALSE;
+						break;
+					}
+				} else if (is_directory(path)) {
+					s = strrchr(path, '.');
+					if (s[1] == EOS)
+						s[0] = EOS;
+					if (!expand_leaf(path, next)) {
+						result = FALSE;
+						break;
+					}
+				}
+			} else if (!record_a_match(path)) {
+				result = FALSE;
+				break;
+			}
+
+		} while (entries = 1, 
+		         DosFindNext(hdir, &fb, sizeof(fb), &entries) == NO_ERROR 
+				 && entries == 1);
+
+		DosFindClose(hdir);
+	}
+	else
+	{
+		result = SORTOFTRUE;	/* at least we didn't run out of memory */
+	}
+
+	if (next != 0)
+		next[-1] = save;
+
+	return result;
+}
+#endif /* SYS_OS2 */
 
 #if ! ANSI_QSORT
 static	int	compar P(( char **, char ** ));
@@ -420,7 +543,11 @@ char	**b;
 static int compar (const void *a, const void *b)
 #endif
 {
+#if SYS_OS2 && CC_CSETPP
+	return stricmp(*(char **)a, *(char **)b);
+#else
 	return strcmp(*(char **)a, *(char **)b);
+#endif
 }
 #endif
 
@@ -592,7 +719,7 @@ char	*item;
 	DIR	*dp;
 	DIRENT	*de;
 
-	if ((dp = opendir(item)) != 0) {
+	if ((dp = opendir(SL_TO_BSL(item))) != 0) {
 		result = TRUE;
 		while ((de = readdir(dp)) != 0) {
 			char	temp[NFILEN];
@@ -701,7 +828,7 @@ char	**list_of_items;
  * freed without knowing where it came from originally).  This should only
  * return 0 if we run out of memory.
  */
-char **
+static char **
 glob_expand (list_of_items)
 char	**list_of_items;
 {
@@ -797,6 +924,54 @@ expand_wild_args(argcp, argvp)
 int *argcp;
 char ***argvp;
 {
+#if SYS_VMS
+	int	j, k;
+	int	comma	= 0;
+	int	option	= 0;
+	/*
+	 * VMS command-line arguments may be a comma-separated list of
+	 * filenames, with an optional "/read_only" flag appended.
+	 */
+	for (j = 1; j < *argcp; j++) {
+		char	*s = (*argvp)[j];
+		int	c;
+		while ((c = *s++) != EOS) {
+			if (c == ',')
+				comma++;
+			if (c == '/')
+				option++;
+		}
+	}
+	if (comma || option) {
+		char	**newvec = typeallocn(char *, comma + *argcp + 1);
+		for (j = k = 0; j < *argcp; j++) {
+			char	*the_arg = strmalloc((*argvp)[j]);
+			char	*item;
+
+			/* strip off VMS options */
+			while ((item = strrchr(the_arg, '/')) != 0) {
+				mkupper(item);
+				if (!strncmp(item, "/READ_ONLY", strlen(item))) {
+					set_global_b_val(MDVIEW,TRUE);
+				}
+				*item = EOS;
+			}
+
+			while (*the_arg != EOS) {
+				item = strchr(the_arg, ',');
+				if (item == 0)
+					item = the_arg + strlen(the_arg);
+				else
+					*item++ = EOS;
+				newvec[k++] = the_arg;
+				the_arg = item;
+			}
+		}
+		newvec[k] = 0;
+		*argcp = k;
+		*argvp = newvec;
+	}
+#endif
 	if (glob_needed(*argvp)) {
 		char	**newargs = glob_expand(*argvp);
 		if (newargs != 0) {

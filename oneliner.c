@@ -4,7 +4,7 @@
  *	Copyright (c) 1990, 1995 by Paul Fox, except for delins(), which is
  *	Copyright (c) 1986 by University of Toronto, as noted below.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/oneliner.c,v 1.69 1995/02/08 03:29:23 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/oneliner.c,v 1.71 1995/04/22 03:22:53 pgf Exp $
  */
 
 #include	"estruct.h"
@@ -13,9 +13,10 @@
 #define PLIST	0x01
 
 static	int	delins P(( regexp *, char * ));
-static	void	showpat P(( regexp *, int ));
-static	int	substreg1 P(( int, int ));
+static	int	pregion P(( int ));
 static	int	substline P(( regexp *, int, int, int, int * ));
+static	int	substreg1 P(( int, int ));
+static	void	showpat P(( regexp *, int ));
 
 static	int	lines_changed,
 		total_changes;
@@ -23,7 +24,7 @@ static	int	lines_changed,
 /*
  * put lines in a popup window
  */
-int
+static int
 pregion(flag)
 int flag;
 {
@@ -285,7 +286,6 @@ int nth_occur, printit, globally, *confirmp;
 	register int which_occur = 0;
 	int matched_at_eol = FALSE;
 	int yes, c, skipped;
-	extern MARK scanboundpos;
 
 	/* if the "magic number" hasn't been set yet... */
 	if (!exp || UCHAR_AT(exp->program) != REGEXP_MAGIC) {
@@ -515,6 +515,7 @@ char *sourc;
 		    /* else it's a digit --
 		    	get pattern number, and fall through */
 		    no = c - '0';
+		    /* FALLTHROUGH */
 	    case '&':
 		    if (exp->startp[no] != NULL && exp->endp[no] != NULL) {
 			    char *cp;

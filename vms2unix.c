@@ -3,7 +3,7 @@
  *
  *	Miscellaneous routines for UNIX/VMS compatibility.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/vms2unix.c,v 1.9 1995/01/27 13:52:56 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/vms2unix.c,v 1.10 1995/03/25 02:53:53 pgf Exp $
  *
  */
 #include	"estruct.h"
@@ -274,7 +274,7 @@ char *	unix2vms_path(dst, src)
 	}
 	if (bracket) {
 		if (on_top && d[-1] == '[') {
-			strcpy(d, "000000");
+			(void)strcpy(d, "000000");
 			d += strlen(d);
 		}
 		*d++ = ']';

@@ -1,3 +1,304 @@
+Changes for vile 5.3 (released Tue May 09, 1995)
+(pgf)
+	+ implemented "watchinput" arg for the poll code in catnap().
+	  (random.c)
+
+	+ fixed the definition of VDISABLE to attempt to use _POSIX_VDISABLE
+	  before using our own value. (termio.c)
+
+	+ cleaned up path lookup (flook()) code, and the code that tries
+	  to find our executable.  previously, we didn't know where the
+	  executable was until someone used the ":version" command.  and,
+	  we assumed that argv[0] could always be used to find us.  but
+	  if argv[0] contains no slash chars, we can make no assumption
+	  about where we came from.  there are still some problems in here,
+	  because i think we sometimes try to run access() on things that
+	  aren't quite pathnames yet.  (bind.c epath.h estruct.h main.c
+	  path.c proto.h version.c)
+
+	+ correct behavior of forwline()/gotoline() so that we get an error
+	  if we try to go to a line beyond the end of the buffer.  (basic.c)
+
+	+ don't check for '\r' on empty lines when counting doslines. (file.c)
+
+	+ fix ".bak" style backups when the filename is of form ".foo".  now
+	  change this to ".foo.bak" rather than just ".bak".  (UNIX only)
+	  (fileio.c)
+
+	+ added TI/TE and KS/KE processing to tcapk{open,close}.  i don't
+	  know that this is always right, but it fixes an xterm arrow key
+	  bug in some cases.
+
+	+ removed TI/TE part of above change.  it's not always right.  the
+	  terminal open/close code needs serious examination.  sigh.
+
+	+ removed broken ULTRIX ifdef in x11.c, which tried to support
+	  KEY_Remove.  it was broken.  i _could_ make it work, but i
+	  don't know what i'd bind it to.  (x11.c)
+
+	+ fixed "arrow key during insert" bug introduced in 5.2, which
+	  prevented arrow from moving beyond EOL when inserting.  (basic.c)
+
+	+ vile will now warn and insist on ":q!" if not all edited buffers
+	  are visited during the edit session (i.e. some are still
+	  "unread").  this is for vi compatibility, since some people use
+	  "ZZ:n" when moving through their files, and vile was quitting
+	  after the ZZ.  (the routine anycb() has been renamed
+	  any_changed_buf() as well.)  (main.c, buffer.c)
+
+	+ a new mode, "warn-unread", which will suppress the above behavior
+	  if it is turned off.  (modetbl, main.c)
+
+	+ implemented "visual-matches" mode, which allows one to highlight
+	  all matching occurrences of a search string when doing a search. 
+	  that is, if i search for "foo", then all occurrences of "foo" in
+	  the buffer will be highlighted (as specified by the value of
+	  "visual-matches").  i did not allow for color -- only bold,
+	  italics, underline, and reverse are supported.  this can be
+	  added in the future, i suppose.  (modetbl, modes.c, main.c,
+	  search.c, undo.c, estruct.h, vile.hlp)
+
+	+ added command to clear visual-matches:  "clear-visual-matches",
+	  bound to '=' by default. (cmdtbl, search.c)
+
+	+ added concept of "ownership" to attributes, so that, for example,
+	  search-string attributes can be cleared independently of selection
+	  attributes or ctl-A sequence attributes.  (select.c, search.c,
+	  estruct.h, display.c)
+
+	+ added/changed text in README.CFG which describes what to do
+	  when configure or the make doesn't work.  (README.CFG)
+
+	+ reset the action of VDSUSP char under POSIX.  (termio.c)
+
+	+ applied patch from rick sladkey, for borland.c fixups and djgpp
+	  compilation:
+
+	    Part 1: borand.c enhancement and bug fixes
+	    + enhance borland.c so that scrolling regions are used
+	      efficiently
+
+	    + enhance borland.c so that individual characters are buffered
+	      which makes certain conio packages much faster (e.g the DJGPP
+	      one)
+
+	    + enhance borland.c to handle PC-style function keys (e.g.  F1,
+	      F2, PageUp)
+
+	    + make the cursor-toggling code in borland.c, generic, optional
+	      and turned off by default since a big blinking block is
+	      horribly ugly
+
+	    + fix the color handling in display.c so that the broken and
+	      unusable garbf kludge in bor?color in borland.c is no longer
+	      needed
+
+	    + fix erase to end of page in borland.c so it actually works
+
+	    + enhance the mode detection in borland.c so that the screen
+	      mode does not need to be changed in the default case (i.e. 
+	      when using the current mode)
+
+	    + prevent borland.c from clearing the screen on exit so it is
+	      like vile on every other display device (i.e it goes to the
+	      lower left instead)
+
+	    Part 2: misc bug fixes affecting the MS-DOS versions
+
+	    + change the default msdos slash character to '/' instead of
+	      '\\' because typing tab (for completion) after backslash
+	      inserts a ^I instead which makes completion under MS-DOS much
+	      less useful and fairly annoying
+
+	    + fixed a null pointer dererencing bug in main.c which occurs
+	      when the vile.rc file is being edited but it does not exist
+	      yet
+
+	    + enhanced makefile.djg so that either ibmpc.c or borland.c can
+	      be used and so that borland.c is used by default
+
+	    + fixed a bug in path.c that caused the first slash after a
+	      drive letter not to be canonicalized properly (e.g. 
+	      C:\FOO\BAR => c:\foo/bar)
+
+	    + fixed a bug in path.c affecting DJGPP that caused relative
+	      pathnames containing an explicit pathname to be corrupted
+	      (e.g.  C:FOO => ../:/foo) by deleting incorrect code whose
+	      intention is solved by the previous fix
+
+	    + omit a conflicting prototype for delay which I don't know who
+	      needs but it can't be used as is on all platforms
+
+	    + fixed a fairly serious bug in file.c that causes the file
+	      size to be computed incorrectly at startup on dos-mode files
+	      which caused an explicit write of an unmodified buffer to
+	      append garbage to the file because the size was overstated by
+	      the number of returns in the file which have already been
+	      deleted but not yet subtracted from the count
+
+	+ further changes to make rick's changes work okay under watcom.
+	  the DOS path-deliter is now selectable, with "set slash-char". 
+	  (edef.h, estruct.h, file.c, filec.c, fileio.c, glob.c, input.c,
+	  modes.c, modetbl, path.c, proto.h, random.c, vile.hlp)
+
+	+ added in patch from Russ Herman which fixes kbhit() problem with
+	  function keys in OS/2.  (borland.c)
+
+	+ eliminate FAIL macro in regexp.c, since it saves very little,
+	  and is hard to write correctly without _someone's_ compiler or
+	  lint complaining about it.  (regexp.c)
+
+	+ fix infinite loop caused by null search patterns (e.g. ".*" or
+	  "^".  (estruct.h, search.c)
+
+	+ got rid of vestigial "tungetc()" code.  (input.c, proto.h, edef.h)
+
+	+ fix (quickly) the broken @a-in-a-macro problem. (map.c)
+
+	+ added ifdef'ed code which allows logging all keystrokes to
+	  a tempfile, which can help when trying to recreate rare bugs.
+	  (map.c)
+
+	+ modify regstrncmp to take use system strncmp when possible.
+	  (regexp.c)
+
+	+ made "fence" characters (i.e {,}.(,),[,]) configurable by
+	  user (new mode, "fence-pairs"), so that < and > can be added
+	  easily (i hear this is useful for html editing).  (fences.c,
+	  insert.c, main.c, modes.c, modetbl, proto.h, vile.hlp)
+
+	+ added patch from anthony shipman, to keep X11 selections from
+	  starting unless at more than one char is swept.  (x11.c)
+
+	+ added a binary search to engl2fnc, but it's not quite right.  i
+	  was in a hurry.  it's ifdefed.  (bind.c, externs.c)
+
+	+ minor efficiencies in regstrncmp and regstrchr.  (regexp.c)
+
+	+ interrupted() is now a macro again, when appropriate.  this
+	  speeds up simple searches to run something like 10% faster.
+	  (main.c, edef.h, estruct.h, proto.h)
+
+	+ fix cosmetic message bug when 'q' command is ended immediately
+	  with another 'q'.  (select.c)
+
+	+ fix forwchar() to work as advertised.  from a user's point
+	  of view, it now skips the newline if no arg is given, so it
+	  can move across lines.  this meant some places where it was
+	  called with default args internally had to be changed. 
+	  (basic.c, word.c)
+
+	+ force an update() in reposition(), so that "redraw-display"
+	  can be used in a macro to force an incremental screen update.
+
+	+ fix typo in cmdtbl.
+
+	+ created pictmode.rc, a primitive "mode" which assists in
+	  drawing ascii "art".  not that i've used it much yet...
+
+	+ changed cbuf[2] in replacechar() to cbuf[NLINE].  apparently
+	  the length arg that is supposed to prevent overruns doesn't
+	  work, if you do a command like "replace-char %keywas", i.e.
+	  use a variable to provide the response. (insert.c)
+
+	+ added ISO-8859 characters and punctuation to ispunct() etc.
+	  classes in charinit().  i assume this is "right".  (main.c)
+
+	+ applied patches from Lee Johnson (71310.405@compuserve.com) for
+	  support of OS/2 from the IBM C Set ++ Compiler (2.x).  changes
+	  mostly to pipe support, directory access, and file completion.
+	  new makefile (makefile.icc), new screen (os2vio.c), and new pipe
+	  routines (os2pipe.c).  (borland.c, buffer.c, dirstuff.h,
+	  display.c, edef.h, estruct.h, file.c, filec.c, fileio.c, glob.c,
+	  makefile.in, mktbls.c, modes.c, npopen.c, path.c, proto.h,
+	  random.c, spawn.c, termio.c, version.c)
+
+	+ fixed --with-cflags option to configure script (configure.in,
+	  configure)
+
+	+ add another mention of ctrl-button functions, in the button
+	  section of help file.
+
+(tom)
+	+ modified configuration scripts to conform to autoconf 2.2
+	  (aclocal.m4, configure, configure.in, dirstuff.h).
+
+	+ modified select.c to recover from manfile error that produces
+	  empty attribute-region (select.c).
+
+	+ removed "#error" for SunOS's K+R compiler (line.c).
+
+	+ modified to make OPT_MAP_MEMORY and SMALLER configurations compile
+	  (cmdtbl, display.c, search.c
+
+	+ modified tmp.c to use calloc on page/chunks to appease Purify.
+
+	+ added auxiliary programs to lint-rules (makefile.in).
+
+	+ use void-casts for strcmp, lsprintf, etc., (lots of places), and
+	  FALLTHROUGH comments for SunOS and IRIX lint (display.c, main.c,
+	  oneliner.c, wordmov.c)
+
+	+ removed redundant ';' after FAIL() macros that causes IRIX lint
+	  warnings in (regexp.c).
+
+	+ mods for miscellaneous lint (csrch.c, exec.c, filec.c, insert.c,
+	  main.c, modes.c, proto.h, region.c, tcap.c).
+
+	+ added stdarg.h to configure.in test so ANSI_VARARGS will work.
+
+	+ modified lint ifdef's for ANSI_VARARGS <stdarg.h> case, tested
+	  with IRIX lint (estruct.h).
+
+	+ added configuration tests for 'errno', 'time_t', 'off_t'
+	  (configure.in, aclocal.m4).
+
+	+ split-out neproto.h (from nefunc.h); cleanup gcc's -Wnested-externs
+	  and -Wredundant-decls warnings (mktbls.c, estruct.h, proto.h, etc.)
+
+	+ use IRIX lint to find/modify functions that can be made static
+	  (proto.h and several modules...)
+
+	+ corrected logic in makefuncdesc() and fnc2kcod() that caused vile to
+	  ignore the user-defined key bindings (bind.c).
+
+	+ modified mlreply_file() to handle the ^R!shell-command case (filec.c)
+
+	+ corrected ifdef that broke 'slash-char' mode when compiling
+	  SMALLER (main.c, modes.c).
+
+	+ modified wildcard-expansion for VMS to handle comma-separated lists,
+	  and /readonly option.
+
+	+ corrected tab offset in 'vtputc()' so that linewrap displays properly
+	  with various tab sizes (display.c).
+
+	+ added ifdef to use MAXPATHLEN if it is defined in <sys/param.h>
+	  (estruct.h).
+
+	+ adapted code by kev to resolve directory names which may contain
+	  embedded symbolic links (path.c, configure.in).
+
+(kev)	
+	+ display.c (l_to_vcol): Make sure that we don't try to examine
+	  characters which are past the end of the line.  Also compute
+	  non-varying parts of the loop condition in advance for efficiency.
+
+	+ configure.in: Don't use grep to pick out -D lines since some
+	  versions of grep limit the number of characters which are output.
+
+	+ search.c (attrib_matches): Start DOT out at the head of the buffer
+	  to attribute matches for instead of at the first line.  This will
+	  cause the first character in the buffer to be highlighted if
+	  deserving.
+
+	+ search.c (attrib_matches): Added new code for attributing with
+	  color.
+
+	+ modes.c (fsm_mono_attributes): Added color to this list.  Hmm...
+	  "color" doesn't seem to be a "mono" attribute, does it?
+
+
 Changes for vile 5.2 (released Thu Feb 23, 1995)
 (pgf)
 	+ added vile-c-filt to the man page.  (vile.1)

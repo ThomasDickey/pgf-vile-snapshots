@@ -3,7 +3,7 @@
  * and backward directions.
  *  heavily modified by Paul Fox, 1990
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/search.c,v 1.70 1994/11/28 19:04:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/search.c,v 1.84 1995/05/08 03:06:17 pgf Exp $
  *
  * original written Aug. 1986 by John M. Gamble, but I (pgf) have since
  * replaced his regex stuff with Henry Spencer's regexp package.
@@ -13,15 +13,20 @@
 #include	"estruct.h"
 #include        "edef.h"
 
-int lastdirec;
+static	int	lastdirec;
 
-MARK scanboundpos;
+static int scanbound_is_header;
 
-char onlyonemsg[] = "Only one occurrence of pattern";
-char notfoundmsg[] = "Not found";
-char hitendmsg[] = "Search reached %s without matching pattern";
+static char onlyonemsg[] = "Only one occurrence of pattern";
+static char notfoundmsg[] = "Not found";
+static char hitendmsg[] = "Search reached %s without matching pattern";
 
-void
+static	int	rsearch P(( int, int, int, int ));
+static	void	nextch P(( MARK *, int ));
+static	void	not_found_msg P(( int, int ));
+static	void	savematch P(( MARK, SIZE_T ));
+
+static void
 not_found_msg(wrapok, dir)
 int wrapok, dir;
 {
@@ -81,7 +86,7 @@ int marking, fromscreen;
 
 	wrapok = marking || window_b_val(curwp, MDSWRAP);
 
-	lastdirec = 0;
+	lastdirec = FORWARD;
 
 	/* Ask the user for the text of a pattern.  If the
 	 * response is TRUE (responses other than FALSE are
@@ -148,6 +153,7 @@ int marking, fromscreen;
 		return FALSE;
 	}
 
+	attrib_matches();
 	return TRUE;
 }
 
@@ -211,6 +217,7 @@ int f, n;	/* default flag / numeric argument */
 		return status;
 	}
 
+	attrib_matches();
 	return status;
 }
 
@@ -232,7 +239,7 @@ int f, n;
 }
 
 /* ARGSUSED */
-int
+static int
 rsearch(f, n, dummy, fromscreen)
 int f, n;	/* default flag / numeric argument */
 int dummy, fromscreen;
@@ -247,7 +254,7 @@ int dummy, fromscreen;
 
 	wrapok = window_b_val(curwp, MDSWRAP);
 
-	lastdirec = 1;
+	lastdirec = REVERSE;
 
 	/* Ask the user for the text of a pattern.  If the
 	 * response is TRUE (responses other than FALSE are
@@ -287,7 +294,8 @@ int dummy, fromscreen;
 			return status;
 		}
 	}
-	return(status);
+	attrib_matches();
+	return status;
 }
 
 /*
@@ -352,7 +360,8 @@ int f, n;	/* default flag / numeric argument */
 		return status;
 	}
 
-	return(status);
+	attrib_matches();
+	return status;
 }
 
 /* continue searching in the same direction as previous */
@@ -360,18 +369,18 @@ int
 consearch(f,n)
 int f,n;
 {
-	if (lastdirec == 0)
+	if (lastdirec == FORWARD)
 		return(forwhunt(f,n));
 	else
 		return(backhunt(f,n));
 }
 
-/* continue searching in the opposite direction as previous */
+/* reverse the search direction */
 int
 revsearch(f,n)
 int f,n;
 {
-	if (lastdirec == 0)
+	if (lastdirec == FORWARD)
 		return(backhunt(f,n));
 	else
 		return(forwhunt(f,n));
@@ -413,23 +422,32 @@ int	*wrappedp;
 		}
 
 		if (sameline(curpos, scanboundpos)) {
-			if (direct == FORWARD) {
-				if (wrapped) {
-					startoff = curpos.o;
-					srchlim = scanboundpos.o;
-				} else {
-					startoff = curpos.o;
-					srchlim = (scanboundpos.o > curpos.o) ?
-					  scanboundpos.o : lLength(curpos.l);
-				}
+			if (scanbound_is_header) {
+				/* if we're on the header, nothing can match */
+				found = FALSE;
 			} else {
-				if (wrapped) {
-					startoff = scanboundpos.o;
-					srchlim = lLength(curpos.l);
+				if (direct == FORWARD) {
+					if (wrapped) {
+						startoff = curpos.o;
+						srchlim = scanboundpos.o;
+					} else {
+						startoff = curpos.o;
+						srchlim = 
+						 (scanboundpos.o > curpos.o) ?
+							scanboundpos.o : 
+							lLength(curpos.l);
+					}
 				} else {
-					startoff = 0;
-					srchlim = scanboundpos.o + 1;
+					if (wrapped) {
+						startoff = scanboundpos.o;
+						srchlim = lLength(curpos.l);
+					} else {
+						startoff = 0;
+						srchlim = scanboundpos.o + 1;
+					}
 				}
+				found = lregexec(exp, l_ref(curpos.l),
+							startoff, srchlim);
 			}
 		} else {
 			if (direct == FORWARD) {
@@ -439,25 +457,27 @@ int	*wrappedp;
 				startoff = 0;
 				srchlim = curpos.o+1;
 			}
+			found = lregexec(exp, l_ref(curpos.l),
+						startoff, srchlim);
 		}
-		found = lregexec(exp, l_ref(curpos.l), startoff, srchlim);
 		if (found) {
 			if (direct == REVERSE) { /* find the last one */
 				char *got = exp->startp[0];
 				while (lregexec(exp, l_ref(curpos.l),
-						(int)(got+1-l_ref(curpos.l)->l_text),
-						srchlim)) {
+					  (int)(got+1-l_ref(curpos.l)->l_text),
+					  srchlim)) {
 					got = exp->startp[0];
 				}
 				if (!lregexec(exp, l_ref(curpos.l),
-						(int)(got-l_ref(curpos.l)->l_text),
-						srchlim)) {
+					    (int)(got-l_ref(curpos.l)->l_text),
+					    srchlim)) {
 					mlforce("BUG: prev. match no good");
 					return FALSE;
 				}
 			}
 			DOT.l = curpos.l;
-			DOT.o = (C_NUM)(exp->startp[0] - l_ref(curpos.l)->l_text);
+			DOT.o = (C_NUM)(exp->startp[0] - 
+					l_ref(curpos.l)->l_text);
 			curwp->w_flag |= WFMOVE; /* flag that we have moved */
 			if (wrappedp)
 				*wrappedp = wrapped;
@@ -496,6 +516,151 @@ int	*wrappedp;
 	return FALSE;	/* We could not find a match.*/
 }
 
+#if OPT_HILITEMATCH
+static int hilite_suppressed;
+
+/* keep track of enough state to give us a hint as to whether
+	we need to redo the visual matches */
+static int need_to_rehilite P(( void ));
+static int
+need_to_rehilite()
+{
+	/* save static copies of state that affects the search */
+	static char savepat[NPAT];
+	static int save_igncase, save_magic;
+	static BUFFER *save_curbp;
+
+	if ((curbp->b_highlight & (HILITE_ON|HILITE_DIRTY)) == 
+				  (HILITE_ON|HILITE_DIRTY) ||
+			strcmp(pat, savepat) != 0 ||
+			save_igncase != ignorecase ||
+			save_magic != b_val(curbp, MDMAGIC) ||
+			(!hilite_suppressed && save_curbp != curbp)) {
+		(void)strcpy(savepat, pat);
+		save_igncase = ignorecase;
+		save_magic = b_val(curbp, MDMAGIC);
+		save_curbp = curbp;
+		return TRUE;
+	}
+	return FALSE;
+}
+#endif
+
+#if OPT_HILITEMATCH
+/* ARGSUSED */
+int
+clear_match_attrs(f,n)
+int f,n;
+{
+	MARK origdot, origmark;
+
+	if ((curbp->b_highlight & HILITE_ON) == 0)
+		return TRUE;
+
+	origdot = DOT;
+	origmark = MK;
+
+	DOT.l = lFORW(buf_head(curbp));
+	DOT.o = 0;
+	MK.l = lBACK(buf_head(curbp));
+	MK.o = lLength(MK.l) - 1;
+	videoattribute = VOWN_MATCHES;
+	attributeregion();
+	DOT = origdot;
+	MK = origmark;
+	curbp->b_highlight = 0;
+#if OPT_HILITEMATCH
+	hilite_suppressed = TRUE;
+#endif
+	return TRUE;
+}
+#endif
+
+void
+attrib_matches()
+{
+#if OPT_HILITEMATCH
+	MARK origdot;
+	int status = TRUE;
+	REGIONSHAPE oregionshape = regionshape;
+	char *attrname = b_val_ptr(curbp,VAL_HILITEMATCH);
+	VIDEO_ATTR vattr = 0;
+	int i;
+	static struct attrmap {
+		char *name;
+		int val;
+	} attrmap[] = {
+	    {"none",		0},
+	    {"underline",	VAUL},
+	    {"bold",		VABOLD},
+	    {"italic",		VAITAL},
+	    {"reverse",		VAREV},
+	    {"color",		VACOLOR},
+	    {NULL,		0},
+	};
+
+	if (!need_to_rehilite())
+		return;
+
+	if (pat[0] == EOS)
+		return;
+
+/* #define track_hilite 1 */
+#ifdef track_hilite
+	mlwrite("rehighlighting");
+#endif
+
+	for (i = 0; i < TABLESIZE(attrmap); i++) {
+		if (strcmp(attrname, attrmap[i].name) == 0) {
+			vattr =  attrmap[i].val;
+			break;
+		}
+	}
+
+	if (vattr == 0)
+		return;
+
+	ignorecase = window_b_val(curwp, MDIGNCASE);
+
+	(void)clear_match_attrs(TRUE,1);
+
+	origdot = DOT;
+	DOT.l = buf_head(curbp);
+	DOT.o = 0;
+
+	scanboundry(FALSE,DOT,FORWARD);
+	do {
+		nextch(&(DOT),FORWARD);
+		status = scanner(gregexp, FORWARD, FALSE, (int *)0);
+		if (status != TRUE) 
+			break;
+		if (vattr != VACOLOR)
+			videoattribute = vattr;
+		else {
+			int c;
+			for (c = NSUBEXP-1; c > 0; c--)
+				if ( gregexp->startp[c] == gregexp->startp[0]
+				  && gregexp->endp[c] == gregexp->endp[0] )
+					break;
+			if (c > NCOLORS-1)
+				videoattribute = VCOLORATTR(NCOLORS-1);
+			else
+				videoattribute = VCOLORATTR(c+1);
+		}
+		MK.l = DOT.l;
+		MK.o = DOT.o + gregexp->mlen;
+		regionshape = EXACT;
+		videoattribute |= VOWN_MATCHES;
+		status = attributeregion();
+	} while (status == TRUE);
+
+	DOT = origdot;
+	regionshape = oregionshape;
+	curbp->b_highlight = HILITE_ON;  /* & ~HILITE_DIRTY */
+	hilite_suppressed = FALSE;
+#endif /* OPT_HILITEMATCH */
+}
+
 void
 regerror(s)
 char *s;
@@ -530,7 +695,7 @@ int f,n;
 	int s;
 	s =  readpattern("", pat, &gregexp, EOS, TRUE);
 	mlwrite("Search pattern is now %s", pat);
-	lastdirec = 0;
+	lastdirec = FORWARD;
 	return s;
 }
 
@@ -587,7 +752,7 @@ int	fromscreen;
  * savematch -- We found the pattern?  Let's save it away.
  */
 
-void
+static void
 savematch(curpos,matchlen)
 MARK curpos;		/* last match */
 SIZE_T matchlen;
@@ -618,8 +783,10 @@ int dir;
 	if (wrapok) {
 		nextch(&dot,dir);
 		scanboundpos = dot;
+		scanbound_is_header = FALSE;
 	} else {
 		scanboundpos = curbp->b_line;
+		scanbound_is_header = TRUE;
 	}
 }
 
@@ -627,7 +794,7 @@ int dir;
  * nextch -- advance/retreat the given mark
  *  will wrap, and doesn't set motion flags
  */
-void
+static void
 nextch(pdot, dir)
 MARK	*pdot;
 int	dir;
@@ -675,6 +842,7 @@ int direc;
 
 	s = TRUE;
 	scanboundpos = curbp->b_line; /* was scanboundry(FALSE,savepos,0); */
+	scanbound_is_header = TRUE;
 	while (s == TRUE && n--) {
 		savepos = DOT;
 		s = (direc == FORWARD) ? forwchar(TRUE,1) : backchar(TRUE,1);

@@ -21,7 +21,7 @@
  *		buffer will be marked readonly.  the .lck file will be
  *		deleted at most of the appropriate times.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/lckfiles.c,v 1.3 1994/11/29 04:02:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/lckfiles.c,v 1.4 1995/03/25 02:53:53 pgf Exp $
  *
  */
 
@@ -49,13 +49,13 @@ int n;
 	if ( (fp = fopen(lockfile,FOPEN_READ)) != (FILE *)0 ) {
 		l = read(fileno(fp),who,(SIZE_T)(n-1));
 		if ( l < 0 ) {
-			strcpy(who,"'Can't read .lck'");
+			(void)strcpy(who,"'Can't read .lck'");
 		} else {
 			who[l-1] = EOS; /* Strip \n */
 		}
 		fclose(fp);
 	} else {
-		strcpy(who,"'Can't open .lck'");
+		(void)strcpy(who,"'Can't open .lck'");
 	}
 }
 
@@ -86,11 +86,11 @@ int n;
 		return FALSE;			/* Can't set lock */
 	} else {
 		if (( fp = fopen(lockfile,FOPEN_WRITE)) != (FILE *)0 ) {
-			lsprintf(who,"%s\n",ourname());
+			(void)lsprintf(who,"%s\n",ourname());
 			write(fileno(fp),who,strlen(who));
 			fclose(fp);
 		} else {
-			strcpy(who,"'Can't write .lck'");
+			(void)strcpy(who,"'Can't write .lck'");
 			mlwrite("[%s]",who);
 			return(FALSE);		/* Can't set lock */
 		}
@@ -105,7 +105,7 @@ char	*fname;
 	char	who[100];
 
 	if ( fname && *fname ) {
-		lsprintf(lockfile,"%s.lck",fname);
+		(void)lsprintf(lockfile,"%s.lck",fname);
 		get_lock_owner(lockfile,who,sizeof(who));
 		/* is it ours? */
 		if (strcmp(who, ourname()) == 0)

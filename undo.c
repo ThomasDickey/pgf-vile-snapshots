@@ -3,7 +3,7 @@
  *
  * written for vile: Copyright (c) 1990, 1995 by Paul Fox
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/undo.c,v 1.56 1995/02/08 03:29:23 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/undo.c,v 1.58 1995/03/15 13:39:33 pgf Exp $
  *
  */
 
@@ -631,7 +631,6 @@ int stkindx;
 	fast_ptr LINEPTR lp;
 	fast_ptr LINEPTR alp;
 	int nopops = TRUE;
-
 	
 	while ((l_ref(lp = l_ptr(popline(STACK(stkindx), FALSE)))) != 0) {
 		if (nopops)  /* first pop -- establish a new stack base */

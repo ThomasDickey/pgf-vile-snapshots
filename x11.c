@@ -2,7 +2,7 @@
  * 	X11 support, Dave Lemke, 11/91
  *	X Toolkit support, Kevin Buettner, 2/94
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/x11.c,v 1.111 1995/02/20 13:50:27 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/x11.c,v 1.115 1995/04/22 03:22:53 pgf Exp $
  *
  */
 
@@ -97,6 +97,10 @@
 #define MINCOLS	30
 #define MINROWS MINWLNS
 #define MAXSBS	((MAXROWS) / 2)
+
+extern CMDFUNC f_opendown_no_aindent;
+extern CMDFUNC f_openup_no_aindent;
+extern CMDFUNC f_insert_no_aindent;
 
 /* The following set of definitions comprise the interface to pscreen
  * in display.c.  They should perhaps be moved to a header file so
@@ -330,7 +334,7 @@ static	void	x_key_press P(( Widget, XtPointer, XEvent *, Boolean * ));
 static	void	x_wm_delwin P(( Widget, XtPointer, XEvent *, Boolean * ));
 static	char *	strndup P(( char *, int ));
 static	void	wait_for_scroll P(( TextWindow ));
-static	void	flush_line P(( UCHAR *, int, unsigned int, int, int ));
+static	void	flush_line P(( char *, int, unsigned int, int, int ));
 static	int	set_character_class_range P(( int, int, int ));
 static	void	x_lose_selection P(( TextWindow ));
 static	int	add2paste P(( TBUFF **, int ));
@@ -2936,7 +2940,7 @@ wait_for_scroll(tw)
                 er;
     XGraphicsExposeEvent *gev;
 
-    while (1) {			/* loop looking for a gfx expose or no expose */
+    for (;;) {			/* loop looking for a gfx expose or no expose */
 	if (XCheckTypedEvent(dpy, NoExpose, &ev))
 	    return;
 	if (XCheckTypedEvent(dpy, GraphicsExpose, &ev)) {
@@ -3007,7 +3011,7 @@ x_scroll(from, to, count)
 
 static void
 flush_line(text, len, attr, sr, sc)
-    UCHAR *text;
+    char  *text;
     int	   len;
     unsigned int attr;
     int	   sr;
@@ -3537,8 +3541,6 @@ SIZE_T	length;
 			int	first   = firstchar(lp);
 			int	last    = lastchar(lp);
 			CMDFUNC	*f = NULL;
-			extern CMDFUNC f_opendown_no_aindent;
-			extern CMDFUNC f_openup_no_aindent;
 
 			/* If the line contains only a single nonwhite,
 			 * we will insert before it.
@@ -3588,7 +3590,6 @@ x_get_selection(tw, selection, type, value, length, format)
 
 	if (length != 0) {
 		char *s = NULL;		/* stifle warning */
-		extern CMDFUNC f_insert_no_aindent;
 		/* should be impossible to hit this with existing paste */
 		/* XXX massive hack -- leave out 'i' if in prompt line */
 		do_ins = !insertmode
@@ -3972,6 +3973,8 @@ x_process_event(w, unused, ev, continue_to_dispatch)
 
     int         nr,
                 nc;
+    static int onr = -1, onc = -1;
+
     XSelectionEvent event;
     XMotionEvent *mev;
     XExposeEvent *gev;
@@ -4069,7 +4072,6 @@ x_process_event(w, unused, ev, continue_to_dispatch)
          && (absol(ev->xmotion.time - cur_win->lasttime) < cur_win->click_timeout))
 	    return;
 	if (do_sel) {
-	    static int onr = -1, onc = -1;
 	    if (ev->xbutton.state & ControlMask) {
 		(void)sel_setshape(RECTANGLE);
 	    }
@@ -4091,6 +4093,8 @@ x_process_event(w, unused, ev, continue_to_dispatch)
 	switch (ev->xbutton.button) {
 	case Button1:		/* move button and set selection point */
 	    start_selection(cur_win, (XButtonPressedEvent *) ev, nr, nc);
+	    onr = nr;
+	    onc = nc;
 	    break;
 	case Button2:		/* paste selection */
 	    if (ev->xbutton.state) {	/* if modifier, paste at mouse */
@@ -4788,7 +4792,7 @@ x_getc()
 #if OPT_WORKING
     x_set_watch_cursor(FALSE);
 #endif
-    while (1) {
+    for (;;) {
 
 	if (tb_more(PasteBuf)) {	/* handle any queued pasted text */
 	    c = tb_next(PasteBuf);
@@ -4926,9 +4930,6 @@ x_key_press(w, unused, ev, continue_to_dispatch)
 	{XK_End,     KEY_End},
 	/* editing */
 	{XK_Insert,  KEY_Insert},
-#if (ULTRIX || ultrix)
-	{DXK_Remove, KEY_Remove},
-#endif
 	{XK_Find,    KEY_Find},
 	{XK_Select,  KEY_Select},
 	/* command keys */

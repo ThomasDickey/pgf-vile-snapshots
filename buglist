@@ -1,7 +1,9 @@
+RCS/buglist,v  -->  stdout
+revision 1.234
 ------------------------
 vile bug/enhancement/wish list
 ------------------------
-$Header: /usr/build/VCS/pgf-vile/RCS/buglist,v 1.228 1995/02/24 00:48:33 pgf Exp $
+$Header: /usr/build/VCS/pgf-vile/RCS/buglist,v 1.244 1995/05/09 13:00:55 pgf Exp $
 ----------------------
 	(E means enhancement, L,M,H are low, medium, high priority)
 
@@ -335,17 +337,6 @@ you can't use ! as a regular expression delimiter, as in:
 	:s!pat!replace!g
 because the parser treats ":s!" as if it's ":q!" or ":w!".
 
----------------------
-
-the ^W and ^R commands don't work with shell-files, i.e.
-	^WG!lpr
-or 
-    	"a^R!cat foo
-
-this seems to be a result of ending up down in kbd_pushback() called
-from hst_append().  this causes the clexec flag to be set, and that
-breaks a bunch of other stuff.  
-
 -------------------------
 
 width of a region is kept in units of offset, not of columns.
@@ -627,11 +618,6 @@ solution:
 
 -----------------------------------------------------------------
 
-it sure looks like flush_line() in x11.c should take (char *) as arg 1
-rather than (uchar *).  i don't want to change it for 5.2 though.
-
------------------------------------------------------------------
-
 DOS:  wildcarding in the top directory:
    c:
    cd \
@@ -651,4 +637,141 @@ sigh.  i hate DOS.
  [ i thought i could provide fallback definitions of those, but
    the values are different on sunos and linux, and are probably
    different again on Mips RISCos5.0, bless it's broken little heart. ]
+
+-----------------------------------------------------------------
+on OSF/1 3.0, it seems configure fails to define HAVE_SELECT even if select
+exists.   it fails because we build up confdefs.h as we run configure.  at
+some point, we add HAVE_SELECT_H to confdefs.h.  then we try to compile
+conftest.c to check for select(), and it contains "extern char select();"
+which causes a compilation error, since select.h contains a correct
+decl for select().  the compilation error makes configure think that we
+don't have select() at all.
+-----------------------------------------------------------------
+we should consider adding user-customizable menu or button support to
+xvile:
+    "Right now, you have most of the major functions as strings that can be
+    called from the macro language.  Suppose you made icons or something
+    for those strings, and then let the user string the icons (or maybe
+    have icons trigger macros and have a set of macros for most of the
+    basic stuff as a default package) together to form new icons they could
+    put in some sort of icon bar.  The windows (boo!  Hiss!) users would go
+    nuts!  Also, put some of this into the pull down menus, and people
+    would stand to cheer and applaud. "
+-----------------------------------------------------------------
+
+using "setv $printing-high 255" does not take effect until the next
+_mode_ is set.  the solution (current) is to use "set printing-high 255"
+instead of the setv form.  the setv way of setting a mode doesn't do the
+special processing necessary..
+
+the same thing is a problem if slash-char is changed.
+
+-----------------------------------------------------------------
+
+I think I found a couple of very minor bugs in vile.
+
+Possible bug #1)
+I'm using xvile right now because ^S doesn't seem to work correctly in
+regular vile yet (must be an HP 9.05 thing, I'm not sure yet).  I had
+thought you turned flow control off in vile, but I want to do more testing
+before I call this a bug.
+
+Anyway, do this:
+
+On a page with several lines of text, do this operation on the first one:
+
+:s/^/> /
+
+Now, using the mouse (or 'q'), sweep the next couple of lines.  To make
+things interesting, sweep to the end of the second to last line, but
+not the last line itself, so the highlighted text looks like this:
+
+xxxxxxxx
+xxxxxxxx
+xxxxxxxx
+
+instead of
+
+xxxxxxxx
+xxxxxxxx
+xxxxxxxx
+x
+
+Now, do a
+
+^A-&-^S
+
+On my machine, the last line of the highlighted text isn't touched.  I'm
+thinking it should be...
+
+-----------------------------------------------------------------
+
+the command ":r !ls" should not require the space.
+
+-----------------------------------------------------------
+
+when using wrapmargin, it is impossible to break
+up long lines consisting of a single word.
+-----------------------------------------------------------
+	- the layering of the map code with respect to the record/replay
+	  code that implements '.', the keyboard macros, and the '@'
+	  command execution is severely broken.  if you have a :map
+	  that executes a '@a' command in the middle, the contents
+	  of register a are readied for replay, but input continues
+	  to come from the :map string until it is ended, and only then 
+	  so we dip down to the lower level and start getting the result
+	  of '@a'.  a similar thing happens with '.' used in a :map, only
+	  it seems even worse, since recording isn't started/stopped
+	  correctly.
+	[this has been fixed for the @a case, but in a sloppy fashion.
+	  it should be cleaned up.  -pgf  ]
+-----------------------------------------------------------
+	a) Turn visual-matches off.  Then search for "." (i.e, any char). 
+	   Now type "n".  Everything's cool; the cursor is moved to the
+	   next character each time "n" is pressed.  Now type "N".  Not so
+	   cool; the message "Only one occurrence of pattern" is displayed.
+
+-----------------------------
+
+it would be nice to preserve DOT in helpfile, so that you come back to
+the same place in the help the next time you bring it up, in case you
+need to keep referring back to it.
+-----------------------
+
+Using xvile, if I [oO]pen a
+new line or do insert at the beginning of a line, and then paste in
+some text using the mouse, xvile inserts an extra blank line. that is,
+if I have
+
+foo
+bar
+
+and I try to paste in 'hi' under the foo, I get
+
+foo
+
+hi
+bar
+
+this only seems to happen in autoindent mode at the very beginning of
+the line. it does *not* happen if the preceeding line is indented, or
+if I type a space before pasting.
+
+-------------
+Using the djgpp version of vile, edit an unnamed file
+and add this text:
+
+   c:\autoexec.bat
+
+Put the cursor on the 'c' in the drive specification and press ^X-e .
+Vile will open the file "c" .  Bug #1.
+
+Put the cursor on the '\' in this filename and press ^X-e again.
+Vile does nothing.  Bug #2.
+
+----------------
+
+should suppress the "working" message when reading or writing to
+a pipe.  the pipe might be interactive.  in any case, it's ugly. 
+try ":w !sleep 10"
 

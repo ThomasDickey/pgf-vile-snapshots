@@ -1,8 +1,9 @@
 /* This standalone utility program constructs the function, key and command
  *	binding tables for vile.  The input is a data file containing the
  *	desired default relationships among the three entities.  Output
- *	is nebind.h, nefunc.h, and nename.h, all of which are then included
- *	in main.c
+ *	is nebind.h, neproto.h, nefunc.h, and nename.h, all of which are then
+ *	included in main.c
+ *
  *	Copyright (c) 1990 by Paul Fox
  *	Copyright (c) 1990, 1995 by Paul Fox and Tom Dickey
  *
@@ -14,7 +15,7 @@
  * by Tom Dickey, 1993.    -pgf
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/mktbls.c,v 1.61 1995/02/08 03:29:23 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/mktbls.c,v 1.64 1995/04/25 02:31:21 pgf Exp $
  *
  */
 
@@ -163,7 +164,7 @@ static	char	*Blank = "";
 
 static	LIST	*all_names,
 		*all_kbind,	/* data for kbindtbl[] */
-		*all_funcs,	/* data for extern-lines in nefunc.h */
+		*all_funcs,	/* data for extern-lines in neproto.h */
 		*all__FUNCs,	/* data for {}-lines in nefunc.h */
 		*all_envars,
 		*all_ufuncs,
@@ -231,7 +232,7 @@ static	void	save_envars P((char **));
 static	void	dump_envars P((void));
 
 static	void	save_funcs P((char *, char *, char *, char *, char *));
-static	void	dump_funcs P((LIST *));
+static	void	dump_funcs P((FILE *, LIST *));
 
 static	void	save_gmodes P((char *, char **));
 static	void	dump_gmodes P((void));
@@ -267,7 +268,8 @@ static	char *prefname  [MAX_BIND] = {"",         "CTLX|",   "CTLA|",   "SPEC|" }
 
 static	char *inputfile;
 static	int l = 0;
-static	FILE *nebind, *nefunc, *nename, *cmdtbl;
+static	FILE *cmdtbl;
+static	FILE *nebind, *neprot, *nefunc, *nename;
 static	FILE *nevars, *nemode, *nefkeys;
 static	jmp_buf my_top;
 
@@ -764,15 +766,15 @@ char	*type;
 	return base;
 }
 
-/* define OFFSETOF macro, used in index-definitions */
+/* define Member_Offset macro, used in index-definitions */
 static void
 DefineOffset(fp)
 FILE	*fp;
 {
 #if	OPT_IFDEF_MODES
 	Fprintf(fp,
-"#ifndef\tOFFSETOF\n\
-#define\tOFFSETOF(T, M)\t(((int)&(((T*)0)->M))/\\\n\
+"#ifndef\tMember_Offset\n\
+#define\tMember_Offset(T, M)\t(((int)&(((T*)0)->M))/\\\n\
 \t\t\t\t ((int)&(((T*)0)->Q1) - (int)&(((T*)0)->s_MAX)))\n\
 #endif\n");
 #endif
@@ -837,7 +839,7 @@ char	*ppref;
 		(void)PadTo(24, temp);
 #if OPT_IFDEF_MODES
 		WriteIf(nemode, p->Cond);
-		Sprintf(temp+strlen(temp), "OFFSETOF(Index%s, %s)",
+		Sprintf(temp+strlen(temp), "Member_Offset(Index%s, %s)",
 			ppref, s = Name2Symbol(vec[1]));
 		free(s);
 #else
@@ -853,7 +855,7 @@ char	*ppref;
 	Fprintf(nemode, "\n");
 #if OPT_IFDEF_MODES
 	FlushIf(nemode);
-	Sprintf(temp, "#define NUM_%c_VALUES\tOFFSETOF(Index%s, s_MAX)",
+	Sprintf(temp, "#define NUM_%c_VALUES\tMember_Offset(Index%s, s_MAX)",
 		*ppref, ppref);
 #else
 	Sprintf(temp, "#define NUM_%c_VALUES\t%d", *ppref, count);
@@ -1250,7 +1252,7 @@ dump_envars()
 		WriteIf(nevars, p->Cond);
 		Sprintf(temp, "#define\tEV%s", p->Func);
 		(void)PadTo(24, temp);
-		Sprintf(temp + strlen(temp), "OFFSETOF(IndexVars, %s)",
+		Sprintf(temp + strlen(temp), "Member_Offset(IndexVars, %s)",
 			s = Name2Symbol(p->Name));
 		free(s);
 		Fprintf(nevars, "%s\n", temp);
@@ -1303,12 +1305,13 @@ char	*help;
 }
 
 static void
-dump_funcs(head)
+dump_funcs(fp, head)
+FILE	*fp;
 LIST	*head;
 {
 	register LIST *p;
 	for (p = head; p != 0; p = p->nst)
-		Fprintf(nefunc, "%s\n", p->Name);
+		Fprintf(fp, "%s\n", p->Name);
 }
 
 /******************************************************************************/
@@ -1671,7 +1674,7 @@ char    *argv[];
 
 				case '<':	/* then it's a help string */
 					/* put code here. */
-					strcpy(funchelp, vec[1]);
+					(void)strcpy(funchelp, vec[1]);
 					break;
 
 				default:
@@ -1716,9 +1719,9 @@ char    *argv[];
 						old_fcond, funchelp);
 					funchelp[0] = EOS;
 				}
-				strcpy(func,  vec[1]);
-				strcpy(flags, vec[2]);
-				strcpy(fcond, vec[3]);
+				(void)strcpy(func,  vec[1]);
+				(void)strcpy(flags, vec[2]);
+				(void)strcpy(fcond, vec[3]);
 				break;
 
 			case SECT_VARS:
@@ -1764,11 +1767,12 @@ char    *argv[];
 	if (all_names) {
 		nebind = OpenHeader("nebind.h", argv);
 		nefunc = OpenHeader("nefunc.h", argv);
+		neprot = OpenHeader("neproto.h", argv);
 		nename = OpenHeader("nename.h", argv);
 		dump_names();
 		dump_bindings();
-		dump_funcs(all_funcs);
-		dump_funcs(all__FUNCs);
+		dump_funcs(neprot, all_funcs);
+		dump_funcs(nefunc, all__FUNCs);
 	}
 
 	if (all_envars) {

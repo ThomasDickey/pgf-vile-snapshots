@@ -7,7 +7,7 @@
  *	To do:	add 'tb_ins()' and 'tb_del()' to support cursor-level command
  *		editing.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/tbuff.c,v 1.20 1994/11/29 17:04:43 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/tbuff.c,v 1.22 1995/05/08 03:06:17 pgf Exp $
  *
  */
 
@@ -15,6 +15,8 @@
 #include "edef.h"
 
 #define	NCHUNK	NLINE
+
+static	TBUFF *	tb_put P(( TBUFF **, ALLOC_T, int ));
 
 /*******(testing)************************************************************/
 #if NO_LEAKS
@@ -28,8 +30,8 @@ static	TB_LIST	*all_tbuffs;
 #define	AllocatedBuffer(q)	tb_remember(q);
 #define	FreedBuffer(q)		tb_forget(q);
 
-static	void	tb_remember P(( TBUFF * ));
 static	void	tb_forget P(( TBUFF * ));
+static	void	tb_remember P(( TBUFF * ));
 
 static
 void	tb_remember(p)
@@ -77,7 +79,7 @@ void	tb_leaks()
 /*
  * ensure that the given temp-buff has as much space as specified
  */
-TBUFF *	tb_alloc(p, n)
+TBUFF * tb_alloc(p, n)
 	TBUFF	**p;
 	ALLOC_T	n;
 {
@@ -132,6 +134,7 @@ void	tb_free(p)
 /*
  * put a character c at the nth position of the temp-buff
  */
+static
 TBUFF *	tb_put(p, n, c)
 	TBUFF	**p;
 	ALLOC_T	n;

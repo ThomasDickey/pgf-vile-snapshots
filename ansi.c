@@ -4,7 +4,7 @@
  * "termio.c". It compiles into nothing if not an ANSI device.
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/ansi.c,v 1.20 1994/11/29 04:02:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/ansi.c,v 1.21 1995/04/22 03:22:53 pgf Exp $
  */
 
 #if	SYS_AMIGA
@@ -76,30 +76,31 @@
 #define MARGIN	8			/* size of minimim margin and	*/
 #define SCRSIZ	64			/* scroll size for extended lines */
 
-extern	void	ansimove   P((int,int));
-extern	void	ansieeol   P((void));
-extern	void	ansieeop   P((void));
-extern	void	ansibeep   P((void));
-extern	void	ansiopen   P((void));
-extern	void	ansirev    P((int));
-extern	void	ansiclose  P((void));
-extern	void	ansikopen  P((void));
-extern	void	ansikclose P((void));
-extern	int	ansicres   P((char *));
-extern	void	ansiscroll P((int,int,int));
+static	void	ansimove   P((int,int));
+static	void	ansieeol   P((void));
+static	void	ansieeop   P((void));
+static	void	ansibeep   P((void));
+static	void	ansiopen   P((void));
+static	void	ansirev    P((int));
+static	void	ansiclose  P((void));
+static	void	ansikopen  P((void));
+static	void	ansikclose P((void));
+static	int	ansicres   P((char *));
+static	void	ansiscroll P((int,int,int));
 
 #if	OPT_COLOR
-extern	void	ansifcol P((int));
-extern	void	ansibcol P((int));
+static	void	ansifcol P((int));
+static	void	ansibcol P((int));
 
-int	cfcolor = -1;		/* current forground color */
-int	cbcolor = -1;		/* current background color */
+static	int	cfcolor = -1;		/* current forground color */
+static	int	cbcolor = -1;		/* current background color */
 
 #if	SYS_AMIGA
 /* apparently the AMIGA does not follow the ANSI standards as regards to
  * colors ...maybe because of the default palette settings?
  */
-int coltran[8] = {2, 3, 5, 7, 0, 4, 6, 1};	/* color translation table */
+static	int coltran[8] = {2, 3, 5, 7, 0, 4, 6, 1};
+			/* color translation table */
 #endif
 #endif
 
@@ -149,7 +150,7 @@ csi P((void))
 }
 
 #if	OPT_COLOR
-void
+static void
 ansifcol(color)		/* set the current output color */
 	int	color;	/* color to set */
 {
@@ -165,7 +166,7 @@ ansifcol(color)		/* set the current output color */
 	cfcolor = color;
 }
 
-void
+static void
 ansibcol(color)		/* set the current background color */
 	int	color;	/* color to set */
 {
@@ -182,7 +183,7 @@ ansibcol(color)		/* set the current background color */
 }
 #endif
 
-void
+static void
 ansimove(row, col)
 int	row;
 int	col;
@@ -194,14 +195,14 @@ int	col;
 	ttputc('H');
 }
 
-void
+static void
 ansieeol()
 {
 	csi();
 	ttputc('K');
 }
 
-void
+static void
 ansieeop()
 {
 #if	OPT_COLOR
@@ -219,7 +220,7 @@ ansieeop()
 		video, and it works under DOS for me....  but then, i
 		use an "after-market" ansi driver -- nnansi593.zip, from
 		oak.oakland.edu, or any simtel mirror. */
-void
+static void
 ansirev(state)		/* change reverse video state */
 int state;	/* TRUE = reverse, FALSE = normal */
 {
@@ -285,7 +286,7 @@ int state;	/* TRUE = reverse, FALSE = normal */
 
 #endif
 
-int
+static int
 ansicres(flag)	/* change screen resolution */
 char	*flag;
 {
@@ -299,7 +300,7 @@ char	*dummy;
 	/* none for now */
 }
 
-void
+static void
 ansibeep()
 {
 	ttputc(BEL);
@@ -314,7 +315,7 @@ ansibeep()
 */
 
 /* move howmany lines starting at from to to */
-void
+static void
 ansiscroll(from,to,n)
 int	from;
 int	to;
@@ -406,7 +407,7 @@ register int	n;
 	ttputc((n%10) + '0');
 }
 
-void
+static void
 ansiopen()
 {
 	strcpy(sres, "NORMAL");
@@ -414,7 +415,7 @@ ansiopen()
 	ttopen();
 }
 
-void
+static void
 ansiclose()
 {
 #if	OPT_COLOR
@@ -424,12 +425,12 @@ ansiclose()
 	/*ttclose();*/
 }
 
-void
+static void
 ansikopen()	/* open the keyboard (a noop here) */
 {
 }
 
-void
+static void
 ansikclose()	/* close the keyboard (a noop here) */
 {
 }

@@ -33,7 +33,7 @@
  *	  freespace (or have been entirely freed).  Currently, only pages that
  *	  are in-memory can have space allocated from them.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/tmp.c,v 1.12 1994/11/29 04:02:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/tmp.c,v 1.14 1995/04/22 03:22:53 pgf Exp $
  *
  */
 #include "estruct.h"
@@ -57,6 +57,8 @@
  *****************************************************************************/
 
 #if OPT_MAP_MEMORY
+
+extern	char *tempnam P((const char *, const char *));
 
 #define	BAD_PAGE	-1
 
@@ -99,6 +101,12 @@ typedef	struct	free_t	{
 	PAGE_T	*next;		/* pointer to next in-memory page */
 	BLK_T	block;		/* identifies this page */
 	OFF_T	space[2];	/* offset of first freespace in page */
+	};
+
+#define	CHUNK_T	struct	chunk_t
+	CHUNK_T	{
+	PAGE_T	page_data;
+	char	chunk[NCHUNK-sizeof(PAGE_T)];
 	};
 
 #define	REGIONPTR	struct	regionptr
@@ -825,8 +833,10 @@ SIZE_T	size;
 			FlushPages(this);
 			RecentPage(prev);
 		} else {
-			if ((this = castalloc(PAGE_T, NCHUNK)) == 0)
+			CHUNK_T	*p = typecalloc(CHUNK_T);
+			if (p == 0)
 				return ptr;
+			this = &(p->page_data);
 			this->next = recent_pages;
 			recent_pages = this;
 		}

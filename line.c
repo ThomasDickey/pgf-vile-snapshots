@@ -10,7 +10,7 @@
  * editing must be being displayed, which means that "b_nwnd" is non zero,
  * which means that the dot and mark values in the buffer headers are nonsense.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/line.c,v 1.83 1995/02/24 00:40:31 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/line.c,v 1.88 1995/04/22 03:22:53 pgf Exp $
  *
  */
 
@@ -25,6 +25,16 @@
 #include	"edef.h"
 
 #define roundlenup(n) ((n+NBLOCK-1) & ~(NBLOCK-1))
+
+static	int	doput P(( int, int, int, REGIONSHAPE ));
+static	int	ldelnewline P(( void ));
+static	int	PutChar P(( int, REGIONSHAPE ));
+
+#if OPT_SHOW_REGS && OPT_UPBUFF
+static	void	relist_registers P(( void ));
+#else
+#define relist_registers()
+#endif
 
 #if OPT_MAP_MEMORY	/* patch: should use this in other places */
 #if HAS_MEMMOVE
@@ -107,7 +117,7 @@ BUFFER *bp;
 	}
 #if OPT_MAP_MEMORY
 	lp = l_ref(l_allocate(size));
-	used = Truncate(used, lp->l_size);
+	size = Truncate(size, lp->l_size);
 #else
 	/* see if the buffer LINE block has any */
 	if ((lp = bp->b_freeLINEs) != NULL) {
@@ -777,7 +787,7 @@ char *iline;	/* contents of new line */
  * can be done by shuffling data around. Hard cases require that lines be moved
  * about in memory. Return FALSE on error and TRUE if all looks ok.
  */
-int
+static int
 ldelnewline()
 {
 	fast_ptr LINEPTR lp1;
@@ -1187,8 +1197,7 @@ int f,n;
 	return doput(f, n, TRUE, RECTANGLE);
 }
 
-
-int
+static int
 doput(f,n,after,shape)
 int f,n,after;
 REGIONSHAPE shape;
@@ -1225,7 +1234,7 @@ REGIONSHAPE shape;
 	}
 
 	(void)setmark();
-	s = put(n, shape);
+	s = PutChar(n, shape);
 	if (s == TRUE)
 		swapmark();
 	if (is_header_line(DOT, curbp))
@@ -1283,8 +1292,8 @@ C_NUM *reachedp;
 /*
  * Put text back from the kill register.
  */
-int
-put(n,shape)
+static int
+PutChar(n,shape)
 int n;
 REGIONSHAPE shape;
 {
@@ -1508,7 +1517,9 @@ int f,n;
 {
 	int c, j, jj, status;
 	KILL *kp;		/* pointer into kill register */
+#if BEFORE
 	static ITBUFF	*buffer;
+#endif
 	static	char	cbuf[2];
 
 	if (!f)
@@ -1532,6 +1543,8 @@ int f,n;
 	if (kp == NULL)
 		return TRUE;		/* not an error, just nothing */
 
+#if BEFORE
+
 	/* for simplicity, keyboard-string needs a single buffer */
 	if (itb_alloc(&buffer, KBLOCK)
 	 && itb_init(&buffer, abortc)) {
@@ -1550,6 +1563,35 @@ int f,n;
 	itb_free(&buffer);
 #endif
 	return status;
+#else
+	{
+	int kbcount, whichkb;
+	int i;
+	char *sp;
+	KILL *tkp;
+	/* count the kchunks */
+	kbcount = 0;
+	tkp = kp;
+	while (tkp != NULL) {
+		kbcount++;
+		tkp = tkp->d_next;
+	}
+	/* process them in reverse order */
+	while (kbcount) {
+		whichkb = kbcount;
+		tkp = kp;
+		while (--whichkb)
+			tkp = tkp->d_next;
+		i = KbSize(jj,tkp);
+		sp = (char *)tkp->d_chunk+i-1;
+		while (i--) {
+			mapungetc((*sp--)|YESREMAP);
+		}
+		kbcount--;
+	}
+	}
+	return TRUE;
+#endif
 }
 
 /* ARGSUSED */
@@ -1675,7 +1717,7 @@ BUFFER *bp;
 	return showkreg(show_all_chars, 1);
 }
 
-void
+static void
 relist_registers()
 {
 

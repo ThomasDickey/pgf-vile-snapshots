@@ -7,7 +7,7 @@
  *  Author:  Curtis Smith
  *  Last Updated: 07/14/87
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/vmsvt.c,v 1.20 1995/02/21 02:37:07 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/vmsvt.c,v 1.22 1995/04/22 03:22:53 pgf Exp $
  *
  */
 
@@ -16,30 +16,32 @@
 
 #if	DISP_VMSVT
 
-#include	 <descrip.h>		/* Descriptor definitions	*/
+#include	<descrip.h>		/* Descriptor definitions	*/
 #include	<iodef.h>		/* to get IO$_SENSEMODE		*/
 #include	<ttdef.h>		/* to get TT$_UNKNOWN		*/
 #include	<smgtrmptr.h>		/* to get SMG$K_??? definitions	*/
 
 /** Forward references **/
-extern	void	vmsopen	(void);
-extern	void	vmskopen(void);
-extern	void	vmskclose(void);
-extern	void	vmsmove	(int, int);
-extern	void	vmseeol	(void);
-extern	void	vmseeop	(void);
-extern	void	vmsbeep	(void);
-extern	void	vmsrev	(int);
-extern	int	vmscres	(void);
+static	void	vmsscrollregion P(( int, int ));
+static	void	vmsscroll_reg P(( int, int, int ));
+static	void	vmsscroll_delins(int from, int to, int n);
+static	void	vmsopen	(void);
+static	void	vmskopen(void);
+static	void	vmskclose(void);
+static	void	vmsmove	(int, int);
+static	void	vmseeol	(void);
+static	void	vmseeop	(void);
+static	void	vmsbeep	(void);
+static	void	vmsrev	(int);
+static	int	vmscres	(char *);
 
 extern	int	eolexist, revexist;
 extern	char	sres[];
 
 #if OPT_COLOR
-extern	int	vmsfcol(int);
-extern	int	vmsbcol(int);
+static	int	vmsfcol(int);
+static	int	vmsbcol(int);
 #endif
-extern	void	tcapscroll (int, int, int);
 
 /** SMG stuff (just like termcap) */
 static	int	termtype;
@@ -103,8 +105,8 @@ static	struct	{
  *
  *  Nothing returned
  ***/
-ttputs(string)
-char * string;				/* String to write		*/
+static void
+ttputs(char * string)			/* String to write		*/
 {
 	if (string)
 		while (*string != EOS)
@@ -116,7 +118,8 @@ char * string;				/* String to write		*/
  *
  *  Nothing returned
  ***/
-static void putpad_tgoto(request_code, parm1, parm2)
+static void
+putpad_tgoto(request_code, parm1, parm2)
 {
 	char buffer[32];
 	int ret_length;
@@ -158,7 +161,8 @@ static void putpad_tgoto(request_code, parm1, parm2)
  *
  *  Nothing returned
  ***/
-void vmsmove (int row, int col)
+static void
+vmsmove (int row, int col)
 {
 	putpad_tgoto(SMG$K_SET_CURSOR_ABS, row+1, col+1);
 }
@@ -168,7 +172,8 @@ void vmsmove (int row, int col)
  *
  *  Nothing returned
  ***/
-void vmsrev(int status)
+static void
+vmsrev(int status)
 {
 	if (status)
 		ttputs(begin_reverse);
@@ -181,10 +186,12 @@ void vmsrev(int status)
  *
  *  Nothing returned
  ***/
-vmscres()
+static int
+vmscres(char *res)
 {
 	/* But it could.  For vt100/vt200s, one could switch from
 	80 and 132 columns modes */
+	return 0;
 }
 
 
@@ -194,7 +201,8 @@ vmscres()
  *
  *  Nothing returned
  ***/
-vmsfcol()
+static void
+vmsfcol(int fc)
 {
 }
 
@@ -203,7 +211,8 @@ vmsfcol()
  *
  *  Nothing returned
  ***/
-vmsbcol()
+static void
+vmsbcol(int bc)
 {
 }
 #endif
@@ -213,7 +222,8 @@ vmsbcol()
  *
  *  Nothing returned
  ***/
-void vmseeol(void)
+static void
+vmseeol(void)
 {
 	ttputs(erase_to_end_line);
 }
@@ -224,7 +234,8 @@ void vmseeol(void)
  *
  *  Nothing returned
  ***/
-void vmseeop(void)
+static void
+vmseeop(void)
 {
 	ttputs(erase_whole_display);
 }
@@ -235,7 +246,8 @@ void vmseeop(void)
  *
  *  Nothing returned
  ***/
-void vmsbeep(void)
+static void
+vmsbeep(void)
 {
 	ttputc(BEL);
 }
@@ -247,8 +259,8 @@ void vmsbeep(void)
  *  Returns:	Escape sequence
  *		NULL	No escape sequence available
  ***/ 
-char * vmsgetstr(request_code)
-int request_code;			/* Request code			*/
+static char *
+vmsgetstr(int request_code)
 {
 	register char * result;
 	static char seq_storage[1024];
@@ -327,7 +339,8 @@ static struct termchar tc;	/* Terminal characteristics		*/
  *
  *  Nothing returned
  ***/
-vmsgtty()
+static void
+vmsgtty(void)
 {
 	short fd;
 	int status;
@@ -367,7 +380,8 @@ vmsgtty()
  *
  *  Nothing returned
  ***/
-void vmsopen(void)
+static void
+vmsopen(void)
 {
 	int	i;
 
@@ -422,9 +436,9 @@ void vmsopen(void)
 	if (scroll_regn && scroll_back) {
 		if (scroll_forw == NULL) /* assume '\n' scrolls forward */
 			scroll_forw = "\n";
-		term.t_scroll = tcapscroll_reg;
+		term.t_scroll = vmsscroll_reg;
 	} else if (delete_line && insert_line) {
-		term.t_scroll = tcapscroll_delins;
+		term.t_scroll = vmsscroll_delins;
 	} else {
 		term.t_scroll = NULL;
 	}
@@ -447,7 +461,8 @@ void vmsopen(void)
  *
  *  Nothing returned
  ***/
-void vmskopen(void)
+static void
+vmskopen(void)
 {
 }
 
@@ -457,7 +472,8 @@ void vmskopen(void)
  *
  *  Nothing returned
  ***/
-void vmskclose(void)
+static void
+vmskclose(void)
 {
 }
 
@@ -475,24 +491,23 @@ char	*dummy;
 /* copied/adapted from 'tcap.c' 19-apr-1993 dickey@software.org */
 
 /* move howmany lines starting at from to to */
-void
-tcapscroll_reg(from,to,n)
-int from, to, n;
+static void
+vmsscroll_reg(int from, int to, int n)
 {
 	int i;
 	if (to == from) return;
 	if (to < from) {
-		tcapscrollregion(to, from + n - 1);
+		vmsscrollregion(to, from + n - 1);
 		vmsmove(from + n - 1,0);
 		for (i = from - to; i > 0; i--)
 			ttputs(scroll_forw);
 	} else { /* from < to */
-		tcapscrollregion(from, to + n - 1);
+		vmsscrollregion(from, to + n - 1);
 		vmsmove(from,0);
 		for (i = to - from; i > 0; i--)
 			ttputs(scroll_back);
 	}
-	tcapscrollregion(0, term.t_nrow-1);
+	vmsscrollregion(0, term.t_nrow-1);
 }
 
 /* 
@@ -501,16 +516,15 @@ OPT_PRETTIER_SCROLL is prettier but slower -- it scrolls
 */
 
 /* move howmany lines starting at from to to */
-void
-tcapscroll_delins(from,to,n)
-int from, to, n;
+static void
+vmsscroll_delins(int from, int to, int n)
 {
 	int i;
 	if (to == from) return;
 	/* patch: should make this more like 'tcap.c', or merge logic somehow */
 #if OPT_PRETTIER_SCROLL
 	if (absol(from-to) > 1) {
-		tcapscroll_delins(from, (from<to) ? to-1:to+1, n);
+		vmsscroll_delins(from, (from<to) ? to-1:to+1, n);
 		if (from < to)
 			from = to-1;
 		else
@@ -535,9 +549,8 @@ int from, to, n;
 }
 
 /* cs is set up just like cm, so we use tgoto... */
-void
-tcapscrollregion(top,bot)
-int top,bot;
+static void
+vmsscrollregion(int top, int bot)
 {
 	putpad_tgoto(SMG$K_SET_SCROLL_REGION, top+1, bot+1);
 }

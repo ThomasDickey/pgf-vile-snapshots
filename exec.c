@@ -4,7 +4,7 @@
  *	written 1986 by Daniel Lawrence
  * 	much modified since then.  assign no blame to him.  -pgf
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/exec.c,v 1.108 1995/01/10 15:07:38 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/exec.c,v 1.110 1995/04/22 03:22:53 pgf Exp $
  *
  */
 
@@ -13,16 +13,33 @@
 
 #define isSPorTAB(c) ((c) == ' ' || (c) == '\t')
 
+extern CMDFUNC f_dotcmdplay;
+extern CMDFUNC f_filewrite;
+extern CMDFUNC f_globals;
 extern CMDFUNC f_gomark;
+extern CMDFUNC f_insfile;
+extern CMDFUNC f_lineputafter;
+extern CMDFUNC f_lineputbefore;
+extern CMDFUNC f_opendown;
+extern CMDFUNC f_openup;
+extern CMDFUNC f_operfilter;
+extern CMDFUNC f_operglobals;
+extern CMDFUNC f_opervglobals;
+extern CMDFUNC f_operwrite;
+extern CMDFUNC f_showlength;
+extern CMDFUNC f_spawn;
+extern CMDFUNC f_vglobals;
 
-static	int	eol_range P(( char *, int, int, int ));
+static	char *	linespec P(( char *, LINEPTR * ));
+static	int	docmd P(( char *, int, int, int ));
 static	int	end_of_cmd P(( void ));
+static	int	eol_range P(( char *, int, int, int ));
+static	int	rangespec P(( char *, LINEPTR *, LINEPTR *, CMDFLAGS * ));
+static	void	freewhile P(( WHBLOCK * ));
+
 #if !SMALLER
 static	int	execute_named_command P(( int, int ));
 #endif
-static	int	rangespec P(( char *, LINEPTR *, LINEPTR *, CMDFLAGS * ));
-static	char *	linespec P(( char *, LINEPTR * ));
-static	void	freewhile P(( WHBLOCK * ));
 
 /* directive name table:
 	This holds the names of all the directives....	*/
@@ -141,7 +158,7 @@ int f, n;
 	mlprompt(": ");
 
 	/* and now get the function name to execute */
-	while(1) {
+	for (;;) {
 		if (cmode == 0) {	/* looking for range-spec, if any */
 			status = kbd_reply(
 				(char *)0,	/* no-prompt => splice */
@@ -282,8 +299,6 @@ seems like we need one more check here -- is it from a .exrc file?
 
 	/* was: if (!(flags & (ZERO | EXRCOK)) && fromline == NULL ) */
 	if ((lflag & ZERO)) {
-		extern CMDFUNC f_lineputafter, f_opendown, f_insfile;
-		extern CMDFUNC f_lineputbefore, f_openup;
 		if (!(flags & ZERO)) {
 			mlforce("[Can't use address 0 with \"%s\" command]", fnp);
 			return FALSE;
@@ -333,9 +348,6 @@ seems like we need one more check here -- is it from a .exrc file?
 	/* some commands have special default ranges */
 	if (lflag & DFLALL) {
 		if (flags & DFLALL) {
-			extern CMDFUNC f_showlength;
-			extern CMDFUNC f_operwrite, f_filewrite, f_operglobals,
-					f_globals, f_opervglobals, f_vglobals;
 			if (cfp == &f_showlength) {
 				fromline = lFORW(buf_head(curbp));
 				toline   = lBACK(buf_head(curbp));
@@ -351,7 +363,6 @@ seems like we need one more check here -- is it from a .exrc file?
 			}
 			lflag |= (FROM|TO); /* avoid prompt for line-count */
 		} else if (flags & DFLNONE) {
-			extern CMDFUNC f_operfilter, f_spawn;
 			if (cfp == &f_operfilter) {
 				cfp = &f_spawn;
 				(void)setmark();  /* not that it matters */
@@ -679,7 +690,7 @@ CMDFLAGS	*flagp;
 
 */
 
-int
+static int
 docmd(cline,newcle,f,n)
 char *cline;	/* command line to execute */
 int newcle;
@@ -801,7 +812,6 @@ int f,n;
 	}
 
 	if (dotcmdmode != PLAY) {
-		extern CMDFUNC f_dotcmdplay;
 		if (execfunc != &f_dotcmdplay) {
 			/* reset dotcmdkreg on any command where ukb is
 			 * unspecified.  usekreg() does it on the one's
@@ -1505,6 +1515,7 @@ nxtscan:	/* on to the next line */
 				}
 				/* drop down and act just like BREAK */
 
+				/* FALLTHROUGH */
 			case DBREAK:	/* BREAK directive */
 				if (dirnum == DBREAK && execlevel)
 					goto onward;

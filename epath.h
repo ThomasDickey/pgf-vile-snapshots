@@ -6,7 +6,7 @@
 /*	possible names and paths of help files under different OSs	*/
 
 /*
- * $Header: /usr/build/VCS/pgf-vile/RCS/epath.h,v 1.17 1995/01/31 01:58:47 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/epath.h,v 1.18 1995/02/28 16:55:40 pgf Exp $
  */
 
 /* first two entries are default startup and help files, the rest are
@@ -18,7 +18,7 @@ char *pathname[] =
 {
 	".vilerc",
 	"vile.hlp",
-	"",
+	NULL,
 	"sys:c/",
 	"sys:t/",
 	"sys:s/",
@@ -32,10 +32,10 @@ char *pathname[] =
 {
 	"vile.rc",
 	"vile.hlp",
+	NULL,
 	"\\",
 	"\\bin\\",
-	"\\util\\",
-	""
+	"\\util\\"
 };
 #endif
 
@@ -43,11 +43,11 @@ char *pathname[] =
 {
 	"vile.rc",
 	"vile.hlp",
+	NULL,
 	"\\sys\\public\\",
 	"\\usr\\bin\\",
 	"\\bin\\",
-	"\\",
-	""
+	"\\"
 };
 #endif
 
@@ -63,8 +63,7 @@ char *pathname[] =
 #endif
 	"/usr/local/lib/",
 	"/usr/local/",
-	"/usr/lib/",
-	""
+	"/usr/lib/"
 };
 #endif
 
@@ -72,7 +71,7 @@ char *pathname[] =
 {
 	"vile.rc",
 	"vile.hlp",
-	".",		/* replaced at runtime with path-head of argv[0] */
+	NULL,		/* replaced at runtime with path-head of argv[0] */
 	"sys$login:",
 	"",
 	"sys$sysdevice:[vmstools]"

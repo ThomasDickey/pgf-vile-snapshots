@@ -2,13 +2,14 @@
  *	matching lines, then for each such line, an action is performed.
  *	written for vile: Copyright (c) 1990, 1995 by Paul Fox
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/globals.c,v 1.32 1995/02/08 03:29:23 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/globals.c,v 1.33 1995/04/22 03:22:53 pgf Exp $
  *
  */
 
 #include	"estruct.h"
 #include        "edef.h"
 
+extern	CMDFUNC f_godotplus; 	
 
 static	int	globber P(( int, int, int ));
 
@@ -41,8 +42,6 @@ int f, n, g_or_v;
 	L_NUM	before;
 	int	save_report;
 
-	extern CMDFUNC f_godotplus;
-	
 	c = kbd_delimiter();
 	if (readpattern("global pattern: ", &pat[0], &gregexp, c, FALSE) != TRUE) {
 		mlforce("[No pattern.]");

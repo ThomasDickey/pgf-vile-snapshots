@@ -2,7 +2,7 @@
  * This file contains the command processing functions for a number of random
  * commands. There is no functional grouping here, for sure.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/random.c,v 1.151 1995/02/20 00:28:28 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/random.c,v 1.159 1995/05/08 03:06:17 pgf Exp $
  *
  */
 
@@ -25,12 +25,21 @@
 #   include <dirent.h>
 #endif
 
-#if SYS_OS2
+#if SYS_OS2 && CC_TURBO
 #   include <dos.h>  /* for _dos_getdrive */
 #   include <dir.h>
 #endif
 
-extern CMDFUNC f_forwchar, f_backchar, f_forwchar_to_eol, f_backchar_to_bol;
+#if CC_CSETPP
+#   include <direct.h>
+#endif
+
+extern CMDFUNC f_backchar;
+extern CMDFUNC f_backchar_to_bol;
+extern CMDFUNC f_forwchar;
+extern CMDFUNC f_forwchar_to_eol;
+extern CMDFUNC f_godotplus;
+extern CMDFUNC f_gotoeol;
 
 /*--------------------------------------------------------------------------*/
 #if SYS_MSDOS || SYS_OS2 || SYS_WINNT
@@ -157,6 +166,11 @@ int f,n;
 		mlwrite("whew.  got interrupted");
 		return ABORT;
 	}
+#endif
+#if debug_undo_log
+	extern int do_undolog;
+	if (f && n == 11)
+		do_undolog = !do_undolog;
 #endif
 	/* count chars and lines */
 	for_each_line(lp, curbp) {
@@ -498,8 +512,6 @@ int
 deltoeol(f, n)
 int f,n;
 {
-	extern CMDFUNC f_gotoeol;
-
 	if (lLength(DOT.l) == 0)
 		return TRUE;
 
@@ -512,8 +524,6 @@ int
 chgtoeol(f, n)
 int f,n;
 {
-	extern CMDFUNC f_gotoeol;
-
 	if (lLength(DOT.l) == 0) {
 		return ins();
 	} else {
@@ -527,7 +537,6 @@ int
 yankline(f, n)
 int f,n;
 {
-	extern CMDFUNC f_godotplus;
 	havemotion = &f_godotplus;
 	return(operyank(f,n));
 }
@@ -537,7 +546,6 @@ int
 chgline(f, n)
 int f,n;
 {
-	extern CMDFUNC f_godotplus;
 	havemotion = &f_godotplus;
 	return(operchg(f,n));
 }
@@ -641,7 +649,15 @@ int watchinput;
 #  if HAVE_POLL && HAVE_POLL_H
 
 	struct pollfd pfd;
-	(void)poll(&pfd, 0, milli); /* milliseconds */
+	int fdcnt;
+	if (watchinput) {
+		pfd.fd = 0;
+		pfd.events = POLLIN;
+		fdcnt = 1;
+	} else {
+		fdcnt = 0;
+	}
+	(void)poll(&pfd, fdcnt, milli); /* milliseconds */
 
 #  else
 
@@ -701,9 +717,7 @@ int watchinput;
     }
 }
 
-#if SYS_UNIX
-#include	<sys/param.h>
-#endif
+static char	current_dirname[NFILEN];
 
 /* return a string naming the current directory */
 char *
@@ -711,16 +725,15 @@ current_directory(force)
 int force;
 {
 	char *s;
-	static char	dirname[NFILEN];
 	static char *cwd;
 
 	if (!force && cwd)
 		return cwd;
 #if HAVE_GETCWD
-	cwd = getcwd(dirname, NFILEN);
+	cwd = getcwd(current_dirname, NFILEN);
 #else
 # if HAVE_GETWD
-	cwd = getwd(dirname);
+	cwd = getwd(current_dirname);
 # else
 	{
 	FILE *f, *npopen();
@@ -730,26 +743,32 @@ int force;
 		npclose(f);
 		return NULL;
 	}
-	n = fread(dirname, 1, NFILEN, f);
+	n = fread(current_dirname, 1, NFILEN, f);
 
-	dirname[n] = EOS;
+	current_dirname[n] = EOS;
 	npclose(f);
-	cwd = dirname;
+	cwd = current_dirname;
 	}
 # endif
 #endif
-#if SYS_MSDOS || SYS_OS2 || SYS_WINNT
-	(void)mklower(cwd);
-#endif
 	if (cwd == NULL) {
-		cwd = dirname;
-		dirname[0] = SLASHC;
-		dirname[1] = EOS;
+		cwd = current_dirname;
+		current_dirname[0] = SLASHC;
+		current_dirname[1] = EOS;
 	} else {
 		s = strchr(cwd, '\n');
 		if (s)
 			*s = EOS;
 	}
+#if OPT_MSDOS_PATH
+	(void)mklower(cwd);
+	/* be sure the result matches what we expect it to look like,
+		for file completion, mainly */
+	if (SLASHC == '/')
+		bsl_to_sl_inplace(cwd);
+	else
+		sl_to_bsl_inplace(cwd);
+#endif
 
 #if SYS_MSDOS || SYS_OS2
 	update_dos_drv_dir(cwd);
@@ -793,7 +812,11 @@ curdrive()
 {
 #if SYS_OS2
 	int d;
+# if CC_CSETPP
+	d = _getdrive();
+# else
 	_dos_getdrive(&d);  	/* A=1 B=2 ... */
+# endif
 	return drive2char((d-1) & 0xff);
 #else
 	return drive2char(bdos(0x19, 0, 0) & 0xff);
@@ -807,8 +830,12 @@ int d;
 {
 	if (isalpha(d)) {
 #if SYS_OS2
+# if CC_CSETPP
+		_chdrive(char2drive(d) + 1);
+# else
 		int maxdrives;
 		_dos_setdrive(char2drive(d)+1, &maxdrives); /* 1 based */
+# endif
 #else
 		bdos(0x0e, char2drive(d), 0); /* 0 based */
 #endif
@@ -821,6 +848,24 @@ int d;
 
 static int curd;		/* current drive-letter */
 static char *cwds[26];		/* list of current dirs on each drive */
+
+void
+fix_cwd_slashes()
+{
+	int i;
+	for (i = 0; i < 26; i++) {
+		if (cwds[i]) {
+			if (slashc == '/')
+				bsl_to_sl_inplace(cwds[i]);
+			else
+				sl_to_bsl_inplace(cwds[i]);
+		}
+	}
+	if (slashc == '/')
+		bsl_to_sl_inplace(current_dirname);
+	else
+		sl_to_bsl_inplace(current_dirname);
+}
 
 char *
 curr_dir_on_drive(drive)
@@ -971,16 +1016,19 @@ char	*dir;
 	/* Save current directory for subsequent "cd -". */
 	(void) strcpy(prevdir, current_directory(FALSE));
 
-	if (chdir(exdp) == 0) {
+#if CC_CSETPP
+	if (_chdir(SL_TO_BSL(exdp)) == 0)
+#else
+	if (chdir(SL_TO_BSL(exdp)) == 0)
+#endif
+	{
 		(void)pwd(TRUE,1);
 #if OPT_PROCEDURES
-	{ 
-	    if (!cdhooking && *cdhook) {
-		    cdhooking = TRUE;
-		    run_procedure(cdhook);
-		    cdhooking = FALSE;
-	    }
-	}
+		if (!cdhooking && *cdhook) {
+			cdhooking = TRUE;
+			run_procedure(cdhook);
+			cdhooking = FALSE;
+		}
 #endif
 		updatelistbuffers();
 		return TRUE;
@@ -997,15 +1045,13 @@ char	*dir;
 	 && (cdpath = getenv("CDPATH")) != 0) {
 		/* For each colon-separated component in CDPATH */
 		while ((cdpath = parse_pathlist(cdpath, cdpathdir)) != 0) {
-			if (chdir(pathcat(cdpathdir, cdpathdir, exdp)) == 0) {
+			if (chdir(SL_TO_BSL(pathcat(cdpathdir, cdpathdir, exdp))) == 0) {
 				(void)pwd(TRUE,1);
 #if OPT_PROCEDURES
-				{ 
-				    if (!cdhooking && *cdhook) {
-					    cdhooking = TRUE;
-					    run_procedure(cdhook);
-					    cdhooking = FALSE;
-				    }
+				if (!cdhooking && *cdhook) {
+					cdhooking = TRUE;
+					run_procedure(cdhook);
+					cdhooking = FALSE;
 				}
 #endif
 				updatelistbuffers();

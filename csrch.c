@@ -1,7 +1,7 @@
 /* These functions perform vi's on-this-line character scanning functions.
  * written for vile: Copyright (c) 1990, 1995 by Paul Fox
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/csrch.c,v 1.21 1995/02/08 03:29:23 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/csrch.c,v 1.23 1995/04/22 03:22:53 pgf Exp $
  *
 */
 
@@ -9,7 +9,7 @@
 #include "edef.h"
 
 static short lstscan;
-static short lstchar;
+static int   lstchar;
 #define BACK 0
 #define FORW 1
 #define DIREC 1
@@ -18,8 +18,11 @@ static short lstchar;
 #define T 2
 #define TYPE 2
 
+static	int	fscan P(( int, int, int ));
+static	int	bscan P(( int, int, int ));
+static	int	get_csrch_char P(( int * ));
 
-int
+static int
 fscan(f,n,c)
 int f,n,c;
 {
@@ -58,7 +61,7 @@ int f,n,c;
 			
 }
 
-int
+static int
 bscan(f,n,c)
 int f,n,c;
 {
@@ -93,7 +96,7 @@ int f,n,c;
 
 }
 
-int
+static int
 get_csrch_char(cp)
 int *cp;
 {

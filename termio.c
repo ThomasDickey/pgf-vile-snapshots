@@ -3,7 +3,7 @@
  * characters, and write characters in a barely buffered fashion on the display.
  * All operating systems.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/termio.c,v 1.119 1995/01/28 18:55:21 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/termio.c,v 1.124 1995/05/08 03:06:17 pgf Exp $
  *
  */
 #include	"estruct.h"
@@ -113,7 +113,6 @@ extern CMDFUNC f_backchar_to_bol;
 
 #if USE_POSIX_TERMIOS
 
-#include <sys/param.h>		/* defines 'VDISABLE' */
 #include <termios.h>
 
 #if SYSTEM_LOOKS_LIKE_SCO
@@ -124,7 +123,11 @@ extern CMDFUNC f_backchar_to_bol;
 #endif
 
 #ifndef VDISABLE
-# define VDISABLE '\0'
+# ifdef	_POSIX_VDISABLE
+#  define VDISABLE _POSIX_VDISABLE
+# else
+#  define VDISABLE '\0'
+# endif
 #endif
 
 struct termios otermios, ntermios;
@@ -195,6 +198,9 @@ ttopen()
 	ntermios.c_cc[VSWTCH] = VDISABLE;
 #endif
 	ntermios.c_cc[VSUSP]  = VDISABLE;
+#if defined (VDSUSP) && defined(NCCS) && VDSUSP < NCCS
+	ntermios.c_cc[VDSUSP]  = VDISABLE;
+#endif
 	ntermios.c_cc[VSTART] = VDISABLE;
 	ntermios.c_cc[VSTOP]  = VDISABLE;
 #endif /* ! DISP_X11 */
@@ -305,20 +311,15 @@ ttopen()
 
 #if SIGTSTP
 /* be careful here -- VSUSP is sometimes out of the range of the c_cc array */
-# ifdef VSUSP /* ODT (all POSIX?) uses this... */
-	ntermio.c_cc[VSUSP] = -1;
-	suspc =   otermio.c_cc[VSUSP];
-# else /* use V_SUSP */
-#  ifdef V_SUSP
+#ifdef V_SUSP
 	ntermio.c_cc[V_SUSP] = -1;
 	suspc = otermio.c_cc[V_SUSP];
-#  else
+#else
 	suspc = -1;
-#  endif
-#  ifdef V_DSUSP
+#endif
+#ifdef V_DSUSP
 	ntermio.c_cc[V_DSUSP] = -1;
-#  endif
-# endif
+#endif
 
 	setup_handler(SIGTSTP,SIG_DFL); 	/* set signals so that we can */
 	setup_handler(SIGCONT,rtfrmshell);	/* suspend & restart */
@@ -751,11 +752,11 @@ ttopen()
 
 	Enable_Abort = 0;	/* for the Manx compiler */
 #endif
-	strcpy(oline, "RAW:0/0/640/200/");
-	strcat(oline, PROGNAME);
-	strcat(oline, " ");
-	strcat(oline, VERSION);
-	strcat(oline, "/Amiga");
+	(void)strcpy(oline, "RAW:0/0/640/200/");
+	(void)strcat(oline, PROGNAME);
+	(void)strcat(oline, " ");
+	(void)strcat(oline, VERSION);
+	(void)strcat(oline, "/Amiga");
 	terminal = Open(oline, NEW);
 #endif
 #if	SYS_VMS
@@ -896,7 +897,7 @@ int c;
 #if	SYS_CPM
 	bios(BCONOUT, c, 0);
 #endif
-#if	SYS_OS2
+#if	SYS_OS2 && !DISP_VIO
 	putch(c);
 #endif
 #if	SYS_MSDOS

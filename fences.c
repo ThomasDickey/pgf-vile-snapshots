@@ -7,7 +7,7 @@
  * Most code probably by Dan Lawrence or Dave Conroy for MicroEMACS
  * Extensions for vile by Paul Fox
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/fences.c,v 1.26 1994/12/16 22:54:21 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/fences.c,v 1.30 1995/05/09 12:12:26 pgf Exp $
  *
  */
 
@@ -22,8 +22,11 @@
 #define	CPP_ELSE     2
 #define	CPP_ENDIF    3
 
+static	int	comment_fence P(( int ));
 static	int	cpp_keyword P(( LINE *, int ));
 static	int	cpp_fence P(( int, int ));
+static	int	getfence P(( int, int ));
+static	int	simple_fence P(( int, int, int ));
 
 static int
 cpp_keyword(lp,off)
@@ -159,7 +162,35 @@ int f,n;
 	return s;
 }
 
+#define PAIRED_FENCE_CH -1
+
 int
+is_user_fence(ch, sdirp)
+int ch;
+int *sdirp;
+{
+	char *fences = b_val_ptr(curbp,VAL_FENCES);
+	char *chp, och;
+	if (!ch)
+		return 0;
+	chp = strchr(fences, ch);
+	if (!chp)
+		return 0;
+	if ((chp - fences) & 1) { 
+		/* look for the left fence */
+		och = chp[-1];
+		if (sdirp)
+			*sdirp = REVERSE;
+	} else { 
+		/* look for the right fence */
+		och = chp[1];
+		if (sdirp)
+			*sdirp = FORWARD;
+	}
+	return och;
+}
+
+static int
 getfence(ch,sdir)
 int ch; /* fence type to match against */
 int sdir; /* direction to scan if we're not on a fence to begin with */
@@ -168,6 +199,8 @@ int sdir; /* direction to scan if we're not on a fence to begin with */
 	register int ofence = 0;	/* open fence */
 	int s, i;
 	int key = CPP_UNKNOWN;
+	char *C_fences, *ptr;
+	int fch;
 
 	/* save the original cursor position */
 	oldpos = DOT;
@@ -187,7 +220,7 @@ int sdir; /* direction to scan if we're not on a fence to begin with */
 			if (oldpos.o < lLength(oldpos.l)) {
 				do {
 					ch = char_at(oldpos);
-				} while(!isfence(ch) &&
+				} while(!is_user_fence(ch, (int *)0) &&
 					++oldpos.o < lLength(oldpos.l));
 			}
 			if (is_at_end_of_line(oldpos)) {
@@ -198,7 +231,8 @@ int sdir; /* direction to scan if we're not on a fence to begin with */
 			if (oldpos.o >= 0) {
 				do {
 					ch = char_at(oldpos);
-				} while(!isfence(ch) && --oldpos.o >= 0);
+				} while(!is_user_fence(ch, (int *)0) &&
+					--oldpos.o >= 0);
 			}
 
 			if (oldpos.o < 0) {
@@ -210,31 +244,22 @@ int sdir; /* direction to scan if we're not on a fence to begin with */
 		DOT.o = oldpos.o;
 	}
 
+	fch = ch;
+
+	/* is it a "special" fence char? */
+	C_fences = "/*#";
+	ptr = strchr(C_fences, ch);
+	
+	if (!ptr) {
+		ofence = is_user_fence(ch, &sdir);
+		if (ofence)
+			fch = PAIRED_FENCE_CH;
+	}
+
 	/* setup proper matching fence */
-	switch (ch) {
-		case LPAREN:
-			ofence = RPAREN;
-			sdir = FORWARD;
-			break;
-		case RPAREN:
-			ofence = LPAREN;
-			sdir = REVERSE;
-			break;
-		case LBRACE:
-			ofence = RBRACE;
-			sdir = FORWARD;
-			break;
-		case RBRACE:
-			ofence = LBRACE;
-			sdir = REVERSE;
-			break;
-		case LBRACK:
-			ofence = RBRACK;
-			sdir = FORWARD;
-			break;
-		case RBRACK:
-			ofence = LBRACK;
-			sdir = REVERSE;
+	switch (fch) {
+		case PAIRED_FENCE_CH:
+			/* NOTHING */
 			break;
 		case '#':
 			if ((i = firstchar(l_ref(DOT.l))) < 0)
@@ -297,7 +322,7 @@ int sdir; /* direction to scan if we're not on a fence to begin with */
 	return(FALSE);
 }
 
-int
+static int
 simple_fence(sdir, ch, ofence)
 int sdir;
 int ch;
@@ -353,7 +378,7 @@ int ofence;
 	return FALSE;
 }
 
-int
+static int
 comment_fence(sdir)
 int sdir;
 {
@@ -461,28 +486,25 @@ int c;
 /*	Close fences are matched against their partners, and if
 	on screen the cursor briefly lights there		*/
 void
-fmatch(ch)
-int ch;	/* fence type to match against */
+fmatch(rch)
+int rch;
 {
 	MARK	oldpos; 		/* original position */
 	register LINE *toplp;	/* top line in current window */
 	register int count; /* current fence level count */
-	register char opench;	/* open fence */
 	register char c;	/* current character in scan */
+	int dir, lch;
+
+	/* get the matching left-fence char, if it exists */
+	lch = is_user_fence(rch, &dir);
+	if (lch == 0 || dir != REVERSE)
+		return;
 
 	/* first get the display update out there */
 	(void)update(FALSE);
 
 	/* save the original cursor position */
 	oldpos = DOT;
-
-	/* setup proper open fence for passed close fence */
-	if (ch == RPAREN)
-		opench = LPAREN;
-	else if (ch == RBRACE)
-		opench = LBRACE;
-	else
-		opench = LBRACK;
 
 	/* find the top line and set up for scan */
 	toplp = lBack(curwp->w_line.l);
@@ -495,23 +517,21 @@ int ch;	/* fence type to match against */
 			c = '\n';
 		else
 			c = char_at(DOT);
-		if (c == ch)
+		if (c == rch)
 			++count;
-		if (c == opench)
+		if (c == lch)
 			--count;
 		if (backchar(FALSE, 1) != TRUE)
 			break;
 	}
 
 	/* if count is zero, we have a match, display the sucker */
-	/* there is a real machine dependent timing problem here we have
-	   yet to solve......... */
 	if (count == 0) {
 		forwchar(FALSE, 1);
 		if (update(FALSE) == TRUE)
 		/* the idea is to leave the cursor there for about a
 			quarter of a second */
-			catnap(250, FALSE);
+			catnap(300, FALSE);
 	}
 
 	/* restore the current position */

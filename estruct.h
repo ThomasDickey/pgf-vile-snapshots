@@ -9,7 +9,7 @@
 */
 
 /*
- * $Header: /usr/build/VCS/pgf-vile/RCS/estruct.h,v 1.238 1995/02/24 00:33:45 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/estruct.h,v 1.253 1995/05/08 03:06:17 pgf Exp $
  */
 
 #ifdef HAVE_CONFIG_H
@@ -45,6 +45,7 @@
 #define CC_TURBO	0	/* Turbo C/MSDOS or Borland C++ */
 #define CC_WATCOM	0	/* WATCOM C/386 version 9.0 or above */
 #define CC_DJGPP	0	/* DJ's GCC version 1.09 */
+#define CC_CSETPP	0	/* IBM C Set ++ 2.x */
 
 #ifdef __TURBOC__	/* predefined in Turbo C, both DOS and Windows */
 # undef CC_TURBO
@@ -63,6 +64,13 @@
 #undef CC_WATCOM
 #define SYS_MSDOS  1
 #define CC_WATCOM 1
+#endif
+
+#ifdef __IBMC__
+# if __IBMC__ >= 200	/* IBM C Set ++ version 2.x */
+#  undef  CC_CSETPP
+#  define CC_CSETPP 1
+# endif
 #endif
 
 #ifdef __OS2__
@@ -90,11 +98,19 @@
  * probably correct for MSC (Microsoft C) and ZTC (Zortech), but I'm not
  * sure of those.  (It implies a lot of ANSI and POSIX behavior.)
  */
-#if CC_TURBO || CC_WATCOM || CC_MSC || CC_DJGPP || CC_ZTC || SYS_WINNT
+#if CC_TURBO || CC_WATCOM || CC_MSC || CC_DJGPP || CC_ZTC || SYS_WINNT || CC_CSETPP
 # define CC_NEWDOSCC 1
 # define HAVE_GETCWD 1
+# define off_t long		/* missing in TurboC 3.1 */
 #else
 # define CC_NEWDOSCC 0
+#endif
+
+#if CC_CSETPP
+# define HAVE_UTIME		1
+# define HAVE_SYS_UTIME_H	1
+# define CPP_SUBS_BEFORE_QUOTE	1
+# define HAVE_LOSING_SWITCH_WITH_STRUCTURE_OFFSET	1
 #endif
 
 #endif /* os_chosen */
@@ -180,6 +196,9 @@
 #endif 
 #include <stdio.h>
 #include <sys/types.h>
+#if SYS_VMS
+#include <sys/stat.h>	/* defines off_t */
+#endif
 #if HAVE_LIBC_H
 #include <libc.h>
 #endif
@@ -316,6 +335,7 @@
 #define	DISP_ATARI	0		/* Atari 520/1040ST screen	*/
 #define	DISP_X11	0		/* X Window System */
 #define DISP_NTCONS	0		/* Windows/NT console		*/
+#define DISP_VIO	SYS_OS2		/* OS/2 VIO (text mode)		*/
 
 /*   Special keyboard definitions	     */
 #define DISP_WANGPC	0		/* funny escape sequences -- see ibmpc.c */
@@ -364,6 +384,7 @@
 				   ']]' and '[[' be stuttered?  they must be
 				   stuttered in real vi, I prefer them not
 				   to be */
+#define OPT_ICURSOR	0	/* use an insertion cursor if possible */
 
 /* the "working..." message -- we must have the alarm() syscall, and
    system calls must be restartable after an interrupt by default or be
@@ -386,6 +407,7 @@
 #define OPT_FLASH       !SMALLER || DISP_IBMPC	/* visible-bell */
 #define OPT_HISTORY     !SMALLER		/* command-history */
 #define OPT_ISRCH       !SMALLER		/* Incremental searches */
+#define OPT_ISO_8859    !SMALLER		/* ISO 8859 characters */
 #define OPT_LINEWRAP    !SMALLER		/* line-wrap mode */
 #define OPT_MLFORMAT    !SMALLER		/* modeline-format */
 #define OPT_MS_MOUSE    !SMALLER && DISP_IBMPC && CC_TURBO 	/* MsDos-mouse */
@@ -397,6 +419,7 @@
 #define OPT_TERMCHRS    !SMALLER		/* set/show-terminal */
 #define OPT_UPBUFF      !SMALLER		/* animated buffer-update */
 #define OPT_WIDE_CTYPES !SMALLER		/* extra char-types tests */
+#define OPT_HILITEMATCH !SMALLER		/* highlight all matches of a search */
 
 /* "show" commands for the optional features */
 #define OPT_SHOW_EVAL   !SMALLER && OPT_EVAL	/* "show-variables" */
@@ -471,7 +494,9 @@
 #include <perror.h>	/* defines 'sys_errlist[]' */
 #endif
 #if SYS_UNIX
+# ifndef HAVE_EXTERN_ERRNO
 extern	int	errno;	/* some systems don't define this in <errno.h> */
+# endif
 extern	int	sys_nerr;
 # ifndef HAVE_EXTERN_SYS_ERRLIST
 extern	char *	sys_errlist[];
@@ -566,13 +591,17 @@ extern char *rindex P((const char *, int));
 # endif
 #endif /* not STDC_HEADERS and not HAVE_STRING_H */
 
+#if HAVE_SYS_PARAM_H
+#include <sys/param.h>
+#endif
+
 /*	System dependent library redefinitions, structures and includes	*/
 
-#if CC_NEWDOSCC
+#if CC_NEWDOSCC && ! CC_CSETPP
 #include <dos.h>
 #endif
 
-#if CC_NEWDOSCC && ! CC_DJGPP
+#if CC_NEWDOSCC && ! CC_DJGPP && ! CC_CSETPP
 #undef peek
 #undef poke
 #define	peek(a,b,c,d)	movedata(a,b,FP_SEG(c),FP_OFF(c),d)
@@ -608,9 +637,15 @@ extern char *rindex P((const char *, int));
 #endif
 
 
-#if OPT_MSDOS_PATH
-# define SLASHC '\\'
+#if ! OPT_MSDOS_PATH /* DOS path / to \ conversions */
+# define SL_TO_BSL(s)	(s)
+# define bsl_to_sl(s)	(s)
+# define sl_to_bsl_inplace(s)
+# define bsl_to_sl_inplace(s)
+#else
+# define SLASHC slashc
 # define is_slashc(c) (c == '\\' || c == '/')
+# define SL_TO_BSL(s)	sl_to_bsl(s)
 #endif
 
 #if SYS_ST520
@@ -622,6 +657,7 @@ extern char *rindex P((const char *, int));
 # define SLASHC '/'
 # define is_slashc(c) (c == '/')
 #endif
+
 
 #if SYS_VMS
 #define	unlink(a)	delete(a)
@@ -690,7 +726,11 @@ extern char *rindex P((const char *, int));
 #define	BITS_PER_INT	32
 #endif
 
+#ifdef  MAXPATHLEN			/* usually in <sys/param.h>	*/
+#define NFILEN	MAXPATHLEN		/* # of bytes, file name	*/
+#else
 #define NFILEN	256			/* # of bytes, file name	*/
+#endif
 #define NBUFN	20			/* # of bytes, buffer name	*/
 #define NLINE	256			/* # of bytes, input line	*/
 #define	NSTRING	128			/* # of bytes, string buffers	*/
@@ -726,6 +766,8 @@ extern char *rindex P((const char *, int));
 #define CTLX	0x0200		/* ^X flag, or'ed in		*/
 #define SPEC	0x0400		/* special key (function keys)	*/
 #define NOREMAP	0x0800		/* unremappable */
+#define YESREMAP 0x1000		/* override noremap */
+#define REMAPFLAGS (NOREMAP|YESREMAP)
 
 #define kcod2key(c)	(c & (N_chars-1)) /* strip off the above prefixes */
 #define	isspecial(c)	(c & ~(N_chars-1))
@@ -772,10 +814,17 @@ typedef enum {
 #define FL_READABLE  iBIT(2)	/* same as R_OK */
 #define FL_HERE      iBIT(3)	/* look in current directory */
 #define FL_HOME      iBIT(4)	/* look in home directory */
-#define FL_PATH      iBIT(5)	/* look along execution-path */
+#define FL_EXECDIR   iBIT(5)	/* look in execution directory */
+#define FL_TABLE     iBIT(6)	/* look in table */
+#define FL_PATH      iBIT(7)	/* look along execution-path */
 
-#define FL_HERE_HOME (FL_HERE|FL_HOME)
-#define FL_ANYWHERE  (FL_HERE|FL_HOME|FL_PATH)
+#define FL_ANYWHERE  (FL_HERE|FL_HOME|FL_EXECDIR|FL_TABLE|FL_PATH)
+
+/* indices into pathname[] array (epath.h) */
+#define PATH_STARTUP_NAME	0
+#define PATH_HELPFILE_NAME	1
+#define PATH_EXECDIR		2
+#define PATH_TABLEDIRS		3
 
 /* definitions for name-completion */
 #define	NAMEC		name_cmpl /* char for forcing name-completion */
@@ -832,11 +881,8 @@ typedef enum {
 #endif
 
 /*
- * PTBEG, PTEND, FORWARD, and REVERSE are all toggle-able values for
- * the scan routines.
+ * directions for the scan routines.
  */
-#define	PTBEG	0	/* Leave the point at the beginning on search	*/
-#define	PTEND	1	/* Leave the point at the end on search		*/
 #define	FORWARD	0			/* forward direction		*/
 #define REVERSE	1			/* backwards direction		*/
 
@@ -1000,8 +1046,16 @@ typedef short CHARTYPE;
 #define nocase_eq(bc,pc)	((bc) == (pc) || \
 			(isalpha(bc) && (((bc) ^ DIFCASE) == (pc))))
 
-#define ESC	tocntrl('[')
-#define BEL	tocntrl('G')	/* ascii bell character		*/
+#define ESC		tocntrl('[')
+#define BEL		tocntrl('G')	/* ascii bell character		*/
+#define CONTROL_A	tocntrl('A')	/* for cntl_a attribute sequences */
+
+#if !(SYS_MSDOS && CC_DJGPP)
+/* some systems need a routine to check for interrupts.  most don't, and
+ * the routine overhead can be expensive in some places
+ */
+# define interrupted() (am_interrupted != 0)
+#endif
 
 #define ABORTED(c) ((c) == abortc || (c) == intrc || interrupted())
 
@@ -1177,10 +1231,10 @@ typedef struct	LINE {
 #define fast_ptr	register
 #define	same_ptr(a,b)	((a) == (b))
 #define	null_ptr	(LINE *)0
-#define	l_ref(lp)	lp
-#define	l_ptr(lp)	lp
-#define set_lforw(a,b)	lforw(a) = b
-#define set_lback(a,b)	lback(a) = b
+#define	l_ref(lp)	(lp)
+#define	l_ptr(lp)	(lp)
+#define set_lforw(a,b)	lforw(a) = (b)
+#define set_lback(a,b)	lback(a) = (b)
 #define lforw(lp)	(lp)->l_fp
 #define lback(lp)	(lp)->l_bp
 #define	rls_region()	/* unused */
@@ -1293,7 +1347,7 @@ typedef struct	{
 #endif
 }	REGION;
 
-#if OPT_COLOR || DISP_X11
+#if OPT_COLOR || DISP_X11 || OPT_HILITEMATCH
 typedef unsigned short VIDEO_ATTR;	/* assumption: short is at least 16 bits */
 #else
 typedef unsigned char VIDEO_ATTR;
@@ -1312,9 +1366,17 @@ typedef unsigned char VIDEO_ATTR;
 #define	VAUL	0x20			/* underline			*/
 #define	VAITAL	0x40			/* italics			*/
 #define	VABOLD	0x80			/* bold				*/
+#define VAOWNER 0x0f00			/* owner mask			*/
 #define VACOLOR 0xf000			/* color mask			*/
 #define VCOLORNUM(attr) (((attr) & VACOLOR) >> 12)
 #define VCOLORATTR(num) ((num) << 12)
+
+/* who owns an attributed region -- so we can delete them independently */
+#define VOWNER(attr)	((attr) & VAOWNER)
+#define VOWN_MATCHES	0x0100
+#define VOWN_OPERS	0x0200
+#define VOWN_SELECT	0x0300
+#define VOWN_CTLA	0x0400
 
 /* The VATTRIB macro masks out those bits which should not be considered
  * for comparison purposes
@@ -1322,10 +1384,10 @@ typedef unsigned char VIDEO_ATTR;
 
 #if OPT_PSCREEN
 #define VADIRTY	0x01			/* cell needs to be written out */
-#define VATTRIB(attr) ((attr) & ~VADIRTY)
+#define VATTRIB(attr) ((attr) & ~(VAOWNER|VADIRTY))
 #else
 #define VADIRTY 0x0			/* nop for all others */
-#define VATTRIB(attr) (attr)
+#define VATTRIB(attr) ((attr) & ~(VAOWNER))
 #endif
 
 /* grow (or initially allocate) a vector of newsize types, pointed to by
@@ -1528,8 +1590,8 @@ typedef struct	BUFFER {
 	char	b_key[NPAT];		/* current encrypted key	*/
 #endif
 #ifdef	MDCHK_MODTIME
-	long	b_modtime;		/* file's last-modification time */
-	long	b_modtime_at_warn;	/* file's modtime when user warned */
+	time_t	b_modtime;		/* file's last-modification time */
+	time_t	b_modtime_at_warn;	/* file's modtime when user warned */
 #endif
 #if	OPT_UPBUFF
 	int	(*b_upbuff) P((struct BUFFER *)); /* call to recompute  */
@@ -1540,6 +1602,9 @@ typedef struct	BUFFER {
 	struct	BUFFER *b_relink; 	/* Link to next BUFFER (sorting) */
 	int	b_created;
 	int	b_last_used;
+#if OPT_HILITEMATCH
+	short	b_highlight;
+#endif
 }	BUFFER;
 
 /*
@@ -1634,12 +1699,23 @@ typedef struct	BUFFER {
 #define b_clr_counted(bp)       b_clr_flags(bp, BFSIZES)
 #define b_clr_obsolete(bp)      b_clr_flags(bp, BFUPBUFF)
 
+#if OPT_HILITEMATCH
+#define b_match_attrs_dirty(bp)	(bp)->b_highlight |= HILITE_DIRTY
+#else
+#define b_match_attrs_dirty(bp)
+#endif
+
 #if OPT_B_LIMITS
 #define b_left_margin(bp)       bp->b_lim_left
 #define b_set_left_margin(bp,n) b_left_margin(bp) = n
 #else
 #define b_left_margin(bp)       0
 #define b_set_left_margin(bp,n)
+#endif
+
+#if OPT_HILITEMATCH
+#define HILITE_ON	1
+#define HILITE_DIRTY	2
 #endif
 
 /* macro for iterating over the marks associated with the current buffer */
@@ -1775,6 +1851,9 @@ typedef struct	{
 #if 	OPT_PSCREEN
 	void	(*t_pflush) P((void));	/* really flush */
 #endif	/* OPT_PSCREEN */
+#if	OPT_ICURSOR
+	void	(*t_icursor) P((int));  /* set cursor shape for insertion */
+#endif
 }	TERM;
 
 /*	TEMPORARY macros for terminal I/O  (to be placed in a machine
@@ -1801,6 +1880,9 @@ typedef struct	{
 #define	TTscroll	(*term.t_scroll)
 #if	OPT_PSCREEN
 #define	TTpflush	(*term.t_pflush)
+#endif
+#if	OPT_ICURSOR
+#define	TTicursor	(*term.t_icursor)
 #endif
 
 typedef struct  VIDEO {
@@ -2055,9 +2137,20 @@ typedef struct WHBLOCK {
 
 #if ANSI_VARARGS
 # include <stdarg.h>
+# ifdef lint
+#  undef  va_arg
+#  define va_arg(ptr,cast) (cast)(ptr-(char *)0)
+# endif
 #else
 # include <varargs.h>
-# ifndef lint
+# ifdef lint
+#  undef  va_dcl
+#  define va_dcl char * va_alist;
+#  undef  va_start
+#  define va_start(list) list = (char *) &va_alist
+#  undef  va_arg
+#  define va_arg(ptr,cast) (cast)(ptr-(char *)0)
+# else
 #  ifndef va_dcl	 /* then try these out */
     typedef char *va_list;
 #   define va_dcl int va_alist;
@@ -2067,15 +2160,6 @@ typedef struct WHBLOCK {
 #  endif
 # endif
 #endif /* ANSI_VARARGS */
-
-#ifdef lint
-# undef  va_dcl
-# define va_dcl char * va_alist;
-# undef  va_start
-# define va_start(list) list = (char *) &va_alist
-# undef  va_arg
-# define va_arg(ptr,cast) (cast)(ptr-(char *)0)
-#endif
 
 #if DISP_X11 && SYS_APOLLO
 #define SYSV_STRINGS	/* <strings.h> conflicts with <string.h> */
@@ -2104,13 +2188,6 @@ extern void exit P((int));
 extern void _exit P((int));
 #endif	/* HAVE_STDLIB_H */
 
-#if HAVE_GETWD && MISSING_EXTERN_GETWD
-extern char *getwd P(( char * ));
-#endif
-#if HAVE_GETCWD && MISSING_EXTERN_GETCWD
-extern char *getcwd P(( char *, int ));
-#endif
-
 /* array/table size */
 #define	TABLESIZE(v)	(sizeof(v)/sizeof(v[0]))
 
@@ -2123,6 +2200,7 @@ extern char *getcwd P(( char *, int ));
 #define	castalloc(cast,nbytes)		((cast *)0)
 #define	castrealloc(cast,ptr,nbytes)	((ptr)+(nbytes))
 #define	typecalloc(cast)		((cast *)0)
+#define	typecallocn(cast,ntypes)	(((cast *)0)+(ntypes))
 #define	typealloc(cast)			((cast *)0)
 #define	typeallocn(cast,ntypes)		(((cast *)0)+(ntypes))
 #define	typereallocn(cast,ptr,ntypes)	((ptr)+(ntypes))
@@ -2131,6 +2209,7 @@ extern char *getcwd P(( char *, int ));
 #define	castalloc(cast,nbytes)		(cast *)malloc(nbytes)
 #define	castrealloc(cast,ptr,nbytes)	(cast *)realloc((char *)(ptr),(nbytes))
 #define	typecalloc(cast)		(cast *)calloc(sizeof(cast),1)
+#define	typecallocn(cast,ntypes)	(cast *)calloc(sizeof(cast),ntypes)
 #define	typealloc(cast)			(cast *)malloc(sizeof(cast))
 #define	typeallocn(cast,ntypes)		(cast *)malloc((ntypes)*sizeof(cast))
 #define	typereallocn(cast,ptr,ntypes)	(cast *)realloc((char *)(ptr),\
@@ -2161,6 +2240,10 @@ extern char *getcwd P(( char *, int ));
 # include <utime.h>
 #endif
 
+#if HAVE_SYS_UTIME_H
+# include <sys/utime.h>
+#endif
+
 /*
  * Comparison-function for 'qsort()'
  */
@@ -2178,6 +2261,7 @@ extern char *getcwd P(( char *, int ));
  * Local prototypes
  */
 
+#include "neproto.h"
 #include "proto.h" 
 
 /*
@@ -2209,7 +2293,9 @@ extern char *getcwd P(( char *, int ));
 #undef malloc
 #undef realloc
 #undef free
-#include "malloc.h"
+#include "dbmalloc.h"		/* renamed from dbmalloc's convention */
+#define show_alloc() malloc_dump(fileno(stderr))
+#define strmalloc strdup
 #else
 #if	NO_LEAKS || DOALLOC || OPT_TRACE
 #include "trace.h"

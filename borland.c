@@ -10,25 +10,23 @@
  * Note: Visual flashes are not yet supported.
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/borland.c,v 1.9 1994/11/29 04:02:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/borland.c,v 1.12 1995/04/25 02:31:21 pgf Exp $
  *
  */
 
-
-#if defined __OS2__    /* Catch-22: OS2 is not defined until estruct.h */
-#define INCL_VIO
-#define INCL_NOPMAPI
-#include <os2.h>
-
-#undef OFFSETOF
-#undef OPT_COLOR
-
-#endif /* OS2 */
 
 #define	termdef	1			/* don't define "term" external */
 
 #include        "estruct.h"
 #include        "edef.h"
+
+#if SYS_OS2
+#define INCL_VIO
+#define INCL_NOPMAPI
+#include <os2.h>
+#undef OPT_COLOR
+#endif /* SYS_OS2 */
+
 
 #if !DISP_BORLAND || DISP_IBMPC
 #error misconfigured:  DISP_BORLAND should be defined if using borland.c
@@ -42,8 +40,6 @@
 #define	NPAUSE	200			/* # times thru update to pause */
 #define	SPACE	32			/* space character		*/
 
-#define VIO 0				/* TESTING, not working yet	*/
-
 /* We assume that most users have a color display.  */
 
 #include <conio.h>
@@ -51,6 +47,7 @@
 
 #define	AttrColor(b,f)	(((ctrans[b] & 7) << 4) | (ctrans[f] & 15))
 
+extern  void	borflush  P((void));
 extern  void	bormove   P((int,int));
 extern  void	boreeol   P((void));
 extern  void	boreeop   P((void));
@@ -66,6 +63,10 @@ extern	void	borkclose P((void));
 extern	void	borfcol   P((int));
 extern	void	borbcol   P((int));
 
+#if OPT_ICURSOR
+extern	void	icursor   P((int));
+#endif
+
 int	cfcolor = -1;		/* current forground color */
 int	cbcolor = -1;		/* current background color */
 int	ctrans[NCOLORS];
@@ -76,10 +77,46 @@ char *initpalettestr = "0 4 2 14 1 5 3 7";  /* 15 is too bright */
 extern	void	borscroll P((int,int,int));
 
 static	int	scinit    P((int));
-static	int	scblank   P((void));
 
+
+static	char	linebuf[128];
+static	int	bufpos = 0;
+
+static struct {
+	char  *seq;
+	int   code;
+} keyseqs[] = {
+	/* Arrow keys */
+	{"\0\110",     KEY_Up},
+	{"\0\120",     KEY_Down},
+	{"\0\115",     KEY_Right},
+	{"\0\113",     KEY_Left},
+	/* page scroll */
+	{"\0\121",     KEY_Next},
+	{"\0\111",     KEY_Prior},
+	{"\0\107",     KEY_Home},
+	{"\0\117",     KEY_End},
+	/* editing */
+        {"\0R",        KEY_Insert},
+	{"\0\123",     KEY_Delete},
+	/* function keys */
+        {"\0;",        KEY_F1},
+	{"\0<",        KEY_F2},
+	{"\0=",        KEY_F3},
+	{"\0>",        KEY_F4},
+	{"\0?",        KEY_F5},
+	{"\0@",        KEY_F6},
+	{"\0A",        KEY_F7},
+	{"\0B",        KEY_F8},
+	{"\0C",        KEY_F9},
+        {"\0D",        KEY_F10},
+};
 
 int ibmtype;
+
+static int borlastchar = -1;
+static int bortttypahead(void);
+static int borttgetc(void);
 
 /*
  * Standard terminal interface dispatch table. Most of the fields point into
@@ -97,10 +134,10 @@ TERM    term    = {
 	borclose,
 	borkopen,
 	borkclose,
-	ttgetc,
+	borttgetc,
 	borputc,
-	tttypahead,
-	ttflush,
+	bortttypahead,
+	borflush,
 	bormove,
 	boreeol,
 	boreeop,
@@ -109,11 +146,15 @@ TERM    term    = {
 	borcres,
 	borfcol,
 	borbcol,
-	borscroll
+	borscroll,
+#if OPT_ICURSOR
+	icursor,
+#endif
 };
 
+#ifdef OPT_ICURSOR
 void
-set_cursor(int cmode)
+icursor(int cmode)
 {
 	switch (cmode) {
 	case -1: _setcursortype( _NOCURSOR);		break;
@@ -121,22 +162,14 @@ set_cursor(int cmode)
 	case  1: _setcursortype( _SOLIDCURSOR);		break;
 	} 
 }
+#endif
 
-
-/*--------------------------------------------------------------------------*/
-/* FIXX these: the borland textcolor sets attributes for text drawn after
- * the call, not whats already displayed.  sgarbf will work, by forcing a
- * redraw, but it's done twice in opening the screen (ugly).  If we don't
- * do it here, then setting background or foreground color later won't
- * update the screen (ugly).
- */
 void
 borfcol(color)		/* set the current output color */
 int color;	/* color to set */
 {
 	cfcolor = ctrans[color];
 	textcolor(cfcolor & 15);
-	sgarbf = TRUE;
 }
 
 void
@@ -145,24 +178,31 @@ int color;	/* color to set */
 {
 	cbcolor = ctrans[color];
 	textbackground(cbcolor & 7);
-	sgarbf = TRUE;
+}
+
+void
+borflush()
+{
+	if (bufpos) {
+		linebuf[bufpos] = '\0';
+		cputs(linebuf);
+		bufpos = 0;
+	}
 }
 
 void
 bormove(row, col)
 int row, col;
 {
-#if VIO
-	VioSetCurPos(row, col, 0);
-#else
+	borflush();
 	gotoxy(col+1, row+1);
-#endif
 }
 
 /* erase to the end of the line */
 void
 boreeol()
 {
+	borflush();
 	clreol();		/* pointer to the destination line */
 }
 
@@ -171,19 +211,33 @@ void
 borputc(ch)
 int ch;
 {
-	putch(ch);
+	linebuf[bufpos++] = ch;
 }
+
 
 void
 boreeop()
 {
-	clrscr();
+	int x, y, i;
+	struct text_info t;
+
+	borflush();
+	x = wherex();
+	y = wherey();
+	gettextinfo(&t);
+	clreol();
+	for (i = x + 1; i <= t.screenheight; i++) {
+		gotoxy(1, i);
+		clreol();
+	}
+	gotoxy(x, y);
 }
 
 void
 borrev(reverse)		/* change reverse video state */
 int reverse;	/* TRUE = reverse, FALSE = normal */
 {
+	borflush();
 	if (reverse) {
 	    textbackground(cfcolor & 7);
 	    textcolor(cbcolor & 15);
@@ -201,6 +255,7 @@ char *res;	/* resolution to change to */
 	register int i;		/* index */
 	int	status = FALSE;
 
+	borflush();
 	/* find the default configuration */
 	if (!strcmp(res, "?")) {
 		status = scinit(-1);
@@ -239,6 +294,7 @@ void
 spal(palstr)	/* reset the palette registers */
 char *palstr;
 {
+	borflush();
     	/* this is pretty simplistic.  big deal. */
 	(void)sscanf(palstr,"%i %i %i %i %i %i %i %i",
 	    	&ctrans[0], &ctrans[1], &ctrans[2], &ctrans[3],
@@ -256,12 +312,16 @@ borbeep()
 void
 boropen()
 {
+	int i;
+
 	spal(initpalettestr);
 	borfcol(gfcolor);
 	borbcol(gbcolor);
 	if (!borcres(current_res_name))
 		(void)scinit(-1);
 	ttopen();
+	for (i = TABLESIZE(keyseqs) - 1; i >= 0; i--)
+		addtosysmap(keyseqs[i].seq, 2, keyseqs[i].code);
 }
 
 
@@ -270,11 +330,14 @@ borclose()
 {
 	int	current_type = ibmtype;
 
+	borflush();
+#ifdef OPT_ICURSOR
 	_setcursortype(_NORMALCURSOR);
+#endif
 	ibmtype = current_type;	/* ...so subsequent TTopen restores us */
 
-	movecursor(0,0);	/* clear the screen */
-	TTeeop();
+	bottomleft();
+	TTeeol();
 }
 
 void
@@ -287,6 +350,26 @@ void
 borkclose()	/* close the keyboard */
 {
 	/* ms_deinstall(); */
+}
+
+static
+int borttgetc()
+{
+	return (borlastchar = ttgetc());
+}
+
+
+/* bortttypahead:  Check to see if any characters are already in the
+ * keyboard buffer.In Borland C OS/2 1.5, kbhit doesn't return non-zero for
+ * the 2nd part of an extended character, but 1st part is still 0 so use
+ * that as indicator as well (why it's saved in borttgetc).
+*/
+static
+int bortttypahead()
+{
+
+	return (kbhit() != 0 || borlastchar == 0);
+
 }
 
 #if SYS_OS2  		/* all modes are available under OS/2 */
@@ -361,33 +444,35 @@ int rows;		/* Number of rows. only do 80 col */
 
 	/* and set up the various parameters as needed */
 
+	struct text_info ti;
+	int oldrows;
+
+	gettextinfo(&ti);
+	oldrows = ti.screenheight;
 	if (rows == -1)
-	{
-		struct text_info ti;
-		gettextinfo(&ti);
-		rows = ti.screenheight;
-	}
+		rows = oldrows;
 
 	switch (rows) {
 
-/* DOS has only (?) BW40, C40, BW80, C80, MONO, and C4350 */
+/* DOS has only BW40, C40, BW80, C80, MONO, and C4350 */
 
 		default:
 		case 25:	/* Color graphics adapter */
-				textmode(C80);
+				if (oldrows != 25)
+					textmode(C80);
 				newscreensize(25, term.t_ncol);
 				(void)strcpy(sres, "C80");
 				break;
 
 		case 43:
 		case 50:
-				/* Enhanced graphics adapter */
-				/* FIXXX this needs to ask how big 
-					we get after C4350, and call
-					newscreensize appropriately */
-				textmode(C4350);
-				newscreensize(50, term.t_ncol);
-				(void)strcpy(sres, "C80X50");
+		case 60:
+				if (rows != oldrows)
+					textmode(C4350);
+				gettextinfo(&ti);
+				rows = ti.screenheight;
+				newscreensize(rows, term.t_ncol);
+				sprintf(sres, "C80X%d", rows);
 				break;
 
 	}
@@ -398,13 +483,6 @@ int rows;		/* Number of rows. only do 80 col */
 }
 
 #endif /* SYS_OS2 */
-
-/* returns attribute for blank/empty space */
-static int
-scblank()
-{
-	return AttrColor(gbcolor,gfcolor);
-}
 
 /*
  * Move 'n' lines starting at 'from' to 'to'
@@ -419,11 +497,10 @@ borscroll(from,to,n)
 int from, to, n;
 {
 	int i;
-	unsigned char a = (unsigned)scblank();
+	struct text_info t;
+
+	borflush();
 	if (to == from) return;
-#if VIO
-	VioScrollUp(min(to,from),0,max(to,from),term.t_ncol,n,&a,0);
-#else
 #if OPT_PRETTIER_SCROLL
 	if (absol(from-to) > 1) {
 		borscroll(from, (from<to) ? to-1:to+1, n);
@@ -433,24 +510,26 @@ int from, to, n;
 			from = to+1;    
 	}
 #endif
+	gettextinfo(&t);
 	if (to < from) {
-		bormove(to,0);
+		window(1, to + 1, t.screenwidth, from + n);
+		gotoxy(1, 1);
 		for (i = from - to; i > 0; i--)
 			delline();
-		bormove(to+n,0);
+		gotoxy(1, n + 1);
 		for (i = from - to; i > 0; i--)
 			insline();
 	} else {
-		bormove(from+n,0);
+		window(1, from + 1, t.screenwidth, to + n);
+		gotoxy(1, n + 1);
 		for (i = to - from; i > 0; i--)
 			delline();
-		bormove(from,0);
+		gotoxy(1, 1);
 		for (i = to - from; i > 0; i--)
 			insline();
 	}
-#endif	/* VIO */
+	window(1, 1, t.screenwidth, t.screenheight);
 }
-
 
 /*--------------------------------------------------------------------------*/
 

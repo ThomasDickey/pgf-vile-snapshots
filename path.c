@@ -2,7 +2,7 @@
  *		The routines in this file handle the conversion of pathname
  *		strings.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/path.c,v 1.37 1995/02/05 04:28:30 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/path.c,v 1.46 1995/05/09 12:12:26 pgf Exp $
  *
  *
  */
@@ -28,6 +28,8 @@
 # define curdrive() _getdrive()
 # define curr_dir_on_drive(d) _getdcwd(d, temp, sizeof(temp))
 #endif
+
+static	char * canonpath P(( char * ));
 
 /*
  * Fake directory-routines for system where we cannot otherwise figure out how
@@ -314,7 +316,7 @@ char	*leaf;
 
 /*
  * Tests to see if the string contains a slash-delimiter.  If so, return the
- * last one (so we can locate the path-leak).
+ * last one (so we can locate the path-leaf).
  */
 char *
 last_slash(fn)
@@ -435,13 +437,356 @@ char	*path;
 }
 #endif
 
+#if HAVE_SYMLINK
+/*
+ * Some of this code was "borrowed" from the GNU C library (getcwd.c).  It has
+ * been largely rewritten and bears little resemblance to what it started out
+ * as.
+ *
+ * The purpose of this code is to generalize getcwd.  The idea is to pass it as
+ * input some path name.  This pathname can be relative, absolute, whatever. 
+ * It may have elements which reference symbolic links.  The output from this
+ * function will be the absolute pathname representing the same file. 
+ * Actually, it only returns the directory.  If the thing you pass it is a
+ * directory, you'll get that directory back (canonicalized).  If you pass it a
+ * path to an ordinary file, you'll get back the canonicalized directory which
+ * contains that file.
+ *
+ * The way that this code works is similar to the classic implementation of
+ * getcwd (or getwd).  The difference is that once it finds a directory, it
+ * will cache it.  If that directory is referenced again, finding it will be
+ * very fast.  The callee of this function should not free up the pointer which
+ * is returned.  This will be done automatically by the caching code.  The
+ * value returned will exist at least up until the next call It should not be
+ * relied on any longer than this.  Care should be taken not to corrupt the
+ * value returned.
+ *
+ * FIXME: there should be some way to reset the cache in case directories are
+ * renamed.
+ */
+
+#define CPN_CACHE_SIZE 64
+#define CPN_CACHE_MASK (CPN_CACHE_SIZE-1)
+
+#if !defined(HAVE_SETITIMER) || !defined(HAVE_SIGACTION)
+#define TimedStat stat
+#else /* !defined(HAVE_SETITIMER) */
+
+#define TimedStat stat_with_timeout
+
+static	SIGT	StatHandler		P(( ACTUAL_SIG_ARGS ));
+static	int	stat_with_timeout	P(( const char *, struct stat * ));
+
+static	jmp_buf stat_jmp_buf;		/* for setjmp/longjmp on timeout */
+
+static SIGT
+StatHandler(ACTUAL_SIG_ARGS)
+{
+	longjmp(stat_jmp_buf, signo);
+	SIGRET;
+}
+
+static int
+stat_with_timeout(path, statbuf)
+	const char *path;
+	struct stat *statbuf;
+{
+	struct sigaction newact;
+	struct sigaction oldact;
+	sigset_t newset;
+	sigset_t oldset;
+	struct itimerval timeout;
+	struct itimerval oldtimerval;
+	int retval, stat_errno;
+
+	newact.sa_handler = StatHandler;
+	newact.sa_flags = 0;
+	if (sigemptyset(&newact.sa_mask) < 0
+	 || sigfillset(&newset) < 0
+	 || sigdelset(&newset, SIGPROF) < 0
+	 || sigprocmask(SIG_BLOCK, &newset, &oldset) < 0)
+		return -1;
+
+	if (sigaction(SIGPROF, &newact, &oldact) < 0) {
+		sigprocmask(SIG_SETMASK, &oldset, (sigset_t *)0);
+		return -1;
+	}
+
+	timeout.it_interval.tv_sec  = 0;
+	timeout.it_interval.tv_usec = 0;
+	timeout.it_value.tv_sec     = 0;
+	timeout.it_value.tv_usec    = 75000;
+
+	(void)setitimer(ITIMER_PROF, &timeout, &oldtimerval);
+
+	/*
+	 * POSIX says that 'stat()' won't return an error if it's interrupted,
+	 * so we force an error by making a longjmp from the timeout handler,
+	 * and forcing the error return status.
+	 */
+	if (setjmp(stat_jmp_buf)) {
+		retval = -1;
+		stat_errno = EINTR;
+	} else {
+		retval = stat(path, statbuf);
+		stat_errno = errno;
+	}
+
+	timeout.it_value.tv_usec = 0;
+	(void)setitimer(ITIMER_PROF, &timeout, (struct itimerval *)0);
+
+	(void)sigaction(SIGPROF, &oldact, (struct sigaction *)0);
+	(void)sigprocmask(SIG_SETMASK, &oldset, (sigset_t *)0);
+	(void)setitimer(ITIMER_PROF, &oldtimerval, (struct itimerval *)0);
+
+	errno = stat_errno;
+	return retval;
+}
+#endif /* !defined(HAVE_SETITIMER) */
+
+char *
+resolve_directory(path_name, file_namep)
+	char *path_name;
+	char **file_namep;
+{
+	dev_t rootdev, thisdev;
+	ino_t rootino, thisino;
+	struct stat  st;
+
+	static char   rootdir[] = { SLASHC, EOS };
+
+	static TBUFF *last_leaf;
+	static TBUFF *last_path;
+	static TBUFF *last_temp;
+
+	char         *temp_name;
+	char         *tnp;	/* temp name pointer */
+	char         *temp_path; /* the path that we've determined */
+
+	ALLOC_T       len;	/* temporary for length computations */
+
+	static struct cpn_cache {
+		dev_t ce_dev;
+		ino_t ce_ino;
+		TBUFF *ce_dirname;
+	} cache_entries[CPN_CACHE_SIZE];
+
+	struct cpn_cache *cachep;
+
+	tb_free(&last_leaf);
+	*file_namep = NULL;
+	len = strlen(path_name);
+
+	if (!tb_alloc(&last_temp, len))
+		return NULL;
+	tnp = (temp_name = tb_values(last_temp)) + len;
+
+	if (!tb_alloc(&last_path, len))
+		return NULL;
+	*(temp_path = tb_values(last_path)) = EOS;
+
+	(void)strcpy(temp_name, path_name);
+
+	/*
+	 * Test if the given pathname is an actual directory, or not.  If it's
+	 * a symbolic link, we'll have to determine if it points to a directory
+	 * before deciding how to split it.
+	 */
+	if (lstat(temp_name, &st) < 0)
+		st.st_mode = S_IFREG;	/* assume we're making a file... */
+
+	if (!S_ISDIR(st.st_mode)) {
+		int levels = 0;
+		char target[NFILEN];
+
+		/* loop until no more links */
+		while (S_ISLNK(st.st_mode)) {
+			int got;
+
+			if (levels++ > 4	/* FIXME */
+			 || (got = readlink(temp_name,
+			 		target, sizeof(target)-1)) < 0) {
+				return NULL;
+			}
+			target[got] = EOS;
+
+			if (tb_alloc(&last_temp, strlen(temp_name)+got+1) == 0)
+				return NULL;
+
+			temp_name = tb_values(last_temp);
+
+			if (!is_slashc(target[0])) {
+				tnp = pathleaf(temp_name);
+				if (tnp != temp_name && !is_slashc(tnp[-1]))
+					*tnp++ = SLASHC;
+				(void)strcpy(tnp, target);
+			} else {
+				(void)strcpy(temp_name, target);
+			}
+			if (lstat(temp_name, &st) < 0)
+				break;
+		}
+
+		/*
+		 * If we didn't resolve any symbolic links, we can find the
+		 * filename leaf in the original 'path_name' argument.
+		 */
+		tnp = last_slash(temp_name);
+		if (tnp == NULL) {
+			tnp = temp_name;
+			if (tb_scopy(&last_leaf, tnp) == 0)
+				return NULL;
+			*tnp++ = '.';
+			*tnp = EOS;
+		} else if (tb_scopy(&last_leaf, tnp + 1) == 0) {
+			return NULL;
+		}
+		if (tnp == temp_name && is_slashc(*tnp)) /* initial slash */
+			tnp++;
+		*tnp = EOS;
+
+		/*
+		 * If the parent of the given path_name isn't a directory, give
+		 * up...
+		 */
+		if (TimedStat(temp_name, &st) < 0 || !S_ISDIR(st.st_mode))
+			return NULL;
+	}
+
+	/*
+	 * Now, 'temp_name[]' contains a null-terminated directory-path, and
+	 * 'tnp' points to the null.  If we've set file_namep, we've allocated
+	 * a pointer since it may be pointing within the temp_name string --
+	 * which may be overwritten. 
+	 */
+	*file_namep = tb_values(last_leaf);
+
+	thisdev = st.st_dev;
+	thisino = st.st_ino;
+
+	cachep =  &cache_entries[(thisdev ^ thisino) & CPN_CACHE_MASK];
+	if (tb_values(cachep->ce_dirname) != 0
+	 && cachep->ce_ino == thisino
+	 && cachep->ce_dev == thisdev) {
+		return tb_values(cachep->ce_dirname);
+	} else {
+		cachep->ce_ino = thisino;
+		cachep->ce_dev = thisdev;
+		tb_free(&(cachep->ce_dirname));	/* will reset iff ok */
+	}
+
+	if (TimedStat(rootdir, &st) < 0)
+		return NULL;
+
+	rootdev = st.st_dev;
+	rootino = st.st_ino;
+
+	while ((thisdev != rootdev)
+	   ||  (thisino != rootino)) {
+		register DIR *dp;
+		register DIRENT *de;
+		dev_t dotdev;
+		ino_t dotino;
+		char  mount_point;
+		ALLOC_T namelen = 0;
+
+		len = tnp - temp_name;
+		if (tb_alloc(&last_temp, 4 + len) == 0)
+			return NULL;
+
+		tnp = (temp_name = tb_values(last_temp)) + len;
+		*tnp++ = SLASHC;
+		*tnp++ = '.';
+		*tnp++ = '.';
+		*tnp   = EOS;
+
+		/* Figure out if this directory is a mount point.  */
+		if (TimedStat(temp_name, &st) < 0)
+			return NULL;
+
+		dotdev = st.st_dev;
+		dotino = st.st_ino;
+		mount_point = (dotdev != thisdev);
+
+		/* Search for the last directory.  */
+		if ((dp = opendir(temp_name)) != 0) {
+			int	found = FALSE;
+
+			while ((de = readdir(dp)) != NULL) {
+#if USE_D_NAMLEN
+				namelen = de->d_namlen;
+#else
+				namelen = strlen(de->d_name);
+#endif
+				/* Ignore "." and ".." */
+				if (de->d_name[0] == '.'
+				 && (namelen == 1
+				  || (namelen == 2 && de->d_name[1] == '.')))
+					continue;
+
+				if (mount_point || de->d_ino == thisino) {
+					len = tnp - temp_name;
+					if (tb_alloc(&last_temp, len + namelen + 1) == 0)
+						break;
+
+					temp_name = tb_values(last_temp);
+					tnp = temp_name + len;
+
+					*tnp = SLASHC;
+					(void)strncpy(tnp+1, de->d_name, namelen);
+					tnp[namelen+1] = EOS;
+
+					if (TimedStat(temp_name, &st) == 0
+					 && st.st_dev == thisdev
+					 && st.st_ino == thisino) {
+						found = TRUE;
+						break;
+					}
+				}
+			}
+
+			if (found) {
+				/*
+				 * Push the latest directory-leaf before the
+				 * string already in 'temp_path[]'.
+				 */
+				len = strlen(temp_path) + 1;
+				if (tb_alloc(&last_path, len + namelen + 1) == 0) {
+					(void) closedir(dp);
+					return NULL;
+				}
+				temp_path = tb_values(last_path);
+				while (len-- != 0)
+					temp_path[namelen+1+len] = temp_path[len];
+				temp_path[0] = SLASHC;
+				memcpy(temp_path+1, de->d_name, namelen);
+			}
+			(void) closedir(dp);
+			if (!found)
+				return NULL;
+		}
+
+		thisdev = dotdev;
+		thisino = dotino;
+	}
+
+	if (tb_scopy(&(cachep->ce_dirname),
+		*temp_path ? temp_path : rootdir) == 0)
+		return NULL;
+
+	return tb_values(cachep->ce_dirname);
+}
+#endif	/* HAVE_SYMLINK */
+
 /* canonicalize a pathname, to eliminate extraneous /./, /../, and ////
 	sequences.  only guaranteed to work for absolute pathnames */
-char *
+static char *
 canonpath(ss)
 char *ss;
 {
+#if !HAVE_SYMLINK
 	char *p, *pp;
+#endif
 	char *s;
 
 	TRACE(("canonpath '%s'\n", ss))
@@ -477,11 +822,31 @@ char *ss;
 #endif
 
 #if SYS_UNIX || OPT_MSDOS_PATH || OPT_VMS_PATH
-	p = pp = s;
 	if (!is_slashc(*s)) {
 		mlforce("BUG: canonpath '%s'", s);
 		return ss;
 	}
+	*s = SLASHC;
+
+	/*
+	 * If the system supports symbolic links (most UNIX systems do), we
+	 * cannot do dead reckoning to resolve the pathname.
+	 */
+#if HAVE_SYMLINK
+	{
+		char temp[NFILEN];
+		char *leaf;
+		char *head = resolve_directory(s, &leaf);
+		if (head != 0) {
+			if (leaf != 0)
+				(void)strcpy(s, pathcat(temp, head, leaf));
+			else
+				(void)strcpy(s, head);
+		}
+	}
+
+#else	/* !HAVE_SYMLINK */
+	p = pp = s;
 
 #if SYS_APOLLO
 	if (!is_slashc(p[1])) {	/* could be something like "/usr" */
@@ -499,20 +864,13 @@ char *ss;
 
 	p++; pp++;	/* leave the leading slash */
 	while (*pp) {
-		switch (*pp) {
-		case '/':
-#if OPT_MSDOS_PATH
-		case '\\':
-#endif
+		if (is_slashc(*pp)) {
 			pp++;
 			continue;
-		case '.':
-			if (is_slashc(*(pp+1))) {
-				pp += 2;
-				continue;
-			}
-		default:
-			break;
+		}
+		if (*pp == '.' && is_slashc(*(pp+1))) {
+			pp += 2;
+			continue;
 		}
 		break;
 	}
@@ -554,6 +912,7 @@ char *ss;
 	if (p == s)
 		*p++ = SLASHC;
 	*p = EOS;
+#endif	/* HAVE_SYMLINK */
 #endif	/* SYS_UNIX || SYS_MSDOS */
 
 #if OPT_VMS_PATH
@@ -565,7 +924,7 @@ char *ss;
 #else
 		(void)mklower(ss);
 #endif
-		if ((stat(ss, &sb) >= 0)
+		if ((stat(SL_TO_BSL(ss), &sb) >= 0)
 		 && ((sb.st_mode & S_IFMT) == S_IFDIR))
 			(void)strcpy(tt, "/");
 		else
@@ -802,7 +1161,7 @@ char *path;
 		register char	*s;
 
 		if (!strchr(path, '*') && !strchr(path, '?')) {
-			if ((fd = open(path, O_RDONLY, 0)) >= 0) {
+			if ((fd = open(SL_TO_BSL(path), O_RDONLY, 0)) >= 0) {
 				getname(fd, temp);
 				(void)close(fd);
 				return strcpy(path, temp);
@@ -867,9 +1226,6 @@ char *path;
 #endif
 		len = strlen(temp);
 		temp[len++] = SLASHC;
-#if CC_DJGPP
-		temp[0] = SLASHC;  /* DJGCC returns '/', we may want '\' */
-#endif
 		(void)strcpy(temp + len, f);
 		(void)strcpy(path, temp);
 	}
@@ -1001,6 +1357,9 @@ char *	path;
 {
 	struct	stat	sb;
 
+	if (path == NULL || *path == EOS)
+		return FALSE;
+
 #if OPT_VMS_PATH
 	register char *s;
 	if (is_vms_pathname(path, TRUE)) {
@@ -1019,9 +1378,14 @@ char *	path;
 			return FALSE;
 	}
 #endif
-	return ((*path != EOS)
-	  &&	(stat(path, &sb) >= 0)
-	  &&	((sb.st_mode & S_IFMT) == S_IFDIR));
+	return ( (stat(SL_TO_BSL(path), &sb) >= 0)
+#if SYS_OS2 && CC_CSETPP
+		&& ((sb.st_mode & S_IFDIR) != 0)
+#else
+		&& ((sb.st_mode & S_IFMT) == S_IFDIR)
+#endif
+	  );
+
 }
 
 #if (SYS_UNIX||SYS_VMS||OPT_MSDOS_PATH) && OPT_PATHLOOKUP
@@ -1029,7 +1393,8 @@ char *	path;
  * Parse the next entry in a list of pathnames, returning null only when no
  * more entries can be parsed.
  */
-char *parse_pathlist(list, result)
+char *
+parse_pathlist(list, result)
 char *list;
 char *result;
 {
@@ -1054,7 +1419,6 @@ char *result;
 #endif	/* OPT_PATHLOOKUP */
 
 #if SYS_WINNT
-/********                                               \\  opendir  //
  *                                                        ===========
  * opendir
  *
@@ -1069,16 +1433,17 @@ char *result;
  *
  ********/
 
-DIR *opendir(fname)
+DIR *
+opendir(fname)
 char * fname;
 {
 	char buf[256];	/* FIXME: isn't there a MAXPATHLEN defined? */
 	DIR *od;
 
-	strcpy(buf, fname);
+	(void)strcpy(buf, fname);
 
 	if (!strcmp(buf, ".")) /* if its just a '.', replace with '*.*' */
-		strcpy(buf, "*.*");
+		(void)strcpy(buf, "*.*");
 	else
 		strcat(buf, "\\*.*");
 
@@ -1178,3 +1543,64 @@ path_leaks()
 #endif
 }
 #endif	/* NO_LEAKS */
+
+#if OPT_MSDOS_PATH
+static char *slconv P(( char * , char *, char, char ));
+static char slconvpath[NFILEN * 2];
+char * 
+sl_to_bsl(p)
+char *p;
+{
+	return slconv(p, slconvpath, '/', '\\');
+}
+
+char * 
+bsl_to_sl(p)
+char *p;
+{
+	return slconv(p, slconvpath, '\\', '/');
+}
+
+void
+sl_to_bsl_inplace(p)
+char *p;
+{
+	(void)slconv(p, p, '/', '\\');
+}
+
+void
+bsl_to_sl_inplace(p)
+char *p;
+{
+	(void)slconv(p, p, '\\', '/');
+}
+
+char *
+slconv(f, t, oc, nc)
+char *f, *t;
+char oc, nc;
+{
+	char *retp = t;
+	while (*f) {
+		if (*f == oc)
+			*t = nc;
+		else
+			*t = *f;
+		f++;
+		t++;
+	}
+	*t-- = '\0';
+
+	/* trim trailing slashes while we're at it */
+	while (t > retp && *t == nc && t[-1] != ':')
+		*t-- = '\0';
+
+	/* but don't allow a trailing ':' */
+	if (*t == ':') {
+		*++t = '.';
+		*++t = EOS;
+	}
+	return retp;
+}
+#endif
+

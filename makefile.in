@@ -6,7 +6,7 @@
 # and install vile/xvile.
 #
 # The command/name/key/function bindings are defined in the file "cmdtbl".
-# The mktbls program parses this to produce nebind.h, nename.h, and
+# The mktbls program parses this to produce nebind.h, nename.h, neproto.h and
 # nefunc.h, which are used by the rest of the build.
 #
 # Buffer/window modes are defined in the file "modetbl".
@@ -21,7 +21,7 @@
 # gnu autoconf support by kevin buettner, 5/94
 # original makefile for uemacs: Adam Fritz July 30,1987  (do you recognize it?)
 #
-# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.in,v 1.40 1995/02/20 00:09:34 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.in,v 1.46 1995/04/25 02:31:21 pgf Exp $
 #
 
 #### Start of system configuration section. ####
@@ -31,7 +31,7 @@ srcdir_sl = @srcdir@/
 VPATH  = @srcdir@
 
 CC		= @CC@
-LINK		= $(CC)
+LINK		= $(CC) $(CFLAGS)
 INSTALL		= @INSTALL@
 INSTALL_PROGRAM	= @INSTALL_PROGRAM@
 INSTALL_DATA	= @INSTALL_DATA@
@@ -77,8 +77,9 @@ WATMAK =   makefile.wat				# on DOS, using Watcom C/386
 MSCMAK =	# still waiting for this one	# on DOS, using Microsoft C
 DJGPPMAK = makefile.djg				# on DOS, DJGCC v1.09
 NTMAK = makefile.wnt				# on Windows/NT
+OS2MAK = makefile.icc				# OS/2, (IBM C Set ++ 2.x)
 MAKFILES = $(UNIXMAKIN) $(VMSMAK) $(TURBOMAK) $(WATMAK) \
-	$(DJGPPMAK) $(MSCMAK) $(BORMAK) $(NTMAK)
+	$(DJGPPMAK) $(MSCMAK) $(BORMAK) $(NTMAK) $(OS2MAK)
 
 ALLTOOLS = $(MAKFILES) mktbls.c cmdtbl modetbl \
 	configure config_h.in \
@@ -88,13 +89,14 @@ ALLTOOLS = $(MAKFILES) mktbls.c cmdtbl modetbl \
 # these are normal editable headers
 HDRS = estruct.h epath.h edef.h proto.h dirstuff.h
 
-SCREENS = tcap.c x11.c ibmpc.c borland.c ansi.c ntconio.c vmsvt.c \
+SCREENS = tcap.c x11.c ibmpc.c borland.c ansi.c ntconio.c os2vio.c vmsvt.c \
 	at386.c dg10.c hp110.c hp150.c st520.c \
 	tipc.c vt52.c x11simp.c z309.c z_ibmpc.c
 
-# other source code, some used in other makefiles, some possibly obsolete
-OTHERSRC = z100bios.asm vms2unix.c vmspipe.c djhandl.c \
-	manpage.rc manfilt.pl manfilt.c c-filt.c c-filt.flx
+# other source code, some used in other makefiles, some useful tools,
+#  some possibly obsolete
+OTHERSRC = z100bios.asm vms2unix.c vmspipe.c os2pipe.c djhandl.c \
+	manpage.rc manfilt.pl manfilt.c c-filt.c c-filt.flx pictmode.rc
 
 # documentation, such as it is
 DOCS = vile.hlp vile.1 macros.doc
@@ -135,7 +137,7 @@ MKTBLS = ./mktbls
 
 # these headers are built by the mktbls program from the information in cmdtbl
 # and in modetbl
-BUILTHDRS = nebind.h nefunc.h nemode.h nename.h nevars.h nefkeys.h
+BUILTHDRS = nebind.h neproto.h nefunc.h nemode.h nename.h nevars.h nefkeys.h
 
 OBJ = $(SCREEN).o \
 	main.o basic.o bind.o buffer.o crypt.o csrch.o \
@@ -162,6 +164,7 @@ vile-c-filt: c-filt.o
 nebind.h \
 nefkeys.h \
 nefunc.h \
+neproto.h \
 nename.h :	cmdtbl $(MKTBLS)
 	$(MKTBLS) $(srcdir)/cmdtbl
 
@@ -210,13 +213,16 @@ clean: mostlyclean
 	-$(RM) $(TARGET) vile-manfilt vile-c-filt
 
 distclean: clean
-	-$(RM) makefile config.status config.h
+	-$(RM) makefile config.status config.cache config.log config.h
 
 realclean: distclean
 	-$(RM) tags TAGS
 
-lint:
+lint: $(BUILTHDRS)
 	$(LINT) $(CPPFLAGS) $(SRC) $(LIBS)
+	$(LINT) $(CPPFLAGS) mktbls.c
+	$(LINT) $(CPPFLAGS) c-filt.c
+	$(LINT) $(CPPFLAGS) manfilt.c
 
 tags:
 	ctags $(SRC) $(HDRS)
@@ -347,7 +353,7 @@ rcsdiffrw:
 
 # dump a list of the important files
 list:
-	@ls $(DEV_DISTFILES) | more
+	@ls $(DEV_DISTFILES)
 
 # make a list of RCS revisions.  don't include the revlist itself
 nrevlist:
@@ -368,14 +374,14 @@ populate:
 	test -f $$file || co $$file ;\
 	done
 
-$(OBJ): estruct.h nemode.h edef.h proto.h config.h
+$(OBJ): estruct.h nemode.h edef.h neproto.h proto.h config.h
 
 main.o:	nevars.h
 bind.o:	epath.h
 filec.o:	dirstuff.h
 eval.o:	nevars.h
 glob.o:	dirstuff.h
-externs.o:	nebind.h nename.h nefunc.h
+externs.o:	nebind.h nename.h neproto.h nefunc.h
 path.o:	dirstuff.h
 version.o: patchlev.h
 vmalloc.o:	nevars.h

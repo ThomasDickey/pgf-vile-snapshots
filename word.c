@@ -3,12 +3,14 @@
  * paragraph at a time.  There are all sorts of word mode commands.  If I
  * do any sentence mode commands, they are likely to be put in this file. 
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/word.c,v 1.42 1994/11/29 04:02:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/word.c,v 1.44 1995/04/26 03:45:53 pgf Exp $
  *
  */
 
 #include	"estruct.h"
 #include	"edef.h"
+
+extern CMDFUNC f_godotplus;
 
 /* Word wrap on n-spaces. Back-over whatever precedes the point on the current
  * line and stop on the first word-break or the beginning of the line. If we
@@ -80,13 +82,13 @@ int f,n;
 	if (n < 0)
 		return (backword(f, -n));
 	setchartype();
-	if (forwchar(FALSE, 1) == FALSE)
+	if (forwchar(TRUE, 1) == FALSE)
 		return (FALSE);
 	while (n--) {
 		int any = 0;
 		while (((s = isnewviwordf()) == FALSE) || 
 				(s == SORTOFTRUE && n != 0)) {
-			if (forwchar(FALSE, 1) == FALSE)
+			if (forwchar(TRUE, 1) == FALSE)
 				return (any != 0);
 			any++;
 		}
@@ -109,13 +111,13 @@ int f,n;
 	if (n < 0)
 		return (backword(f, -n));
 	setchartype();
-	if (forwchar(FALSE, 1) == FALSE)
+	if (forwchar(TRUE, 1) == FALSE)
 		return (FALSE);
 	while (n--) {
 		int any = 0;
 		while (((s = isnewwordf()) == FALSE) || 
 				(s == SORTOFTRUE && n != 0)) {
-			if (forwchar(FALSE, 1) == FALSE)
+			if (forwchar(TRUE, 1) == FALSE)
 				return (any != 0);
 			any++;
 		}
@@ -138,13 +140,13 @@ int f,n;
 		n = 1;
 	else if (n <= 0)
 		return (FALSE);
-	if (forwchar(FALSE, 1) == FALSE)
+	if (forwchar(TRUE, 1) == FALSE)
 		return (FALSE);
 	setchartype();
 	while (n--) {
 		int	any = 0;
 		while ((s = isendviwordf()) == FALSE) {
-			if (forwchar(FALSE, 1) == FALSE)
+			if (forwchar(TRUE, 1) == FALSE)
 				return (any != 0);
 			any++;
 		}
@@ -171,13 +173,13 @@ int f,n;
 		n = 1;
 	else if (n <= 0)
 		return (FALSE);
-	if (forwchar(FALSE, 1) == FALSE)
+	if (forwchar(TRUE, 1) == FALSE)
 		return (FALSE);
 	setchartype();
 	while (n--) {
 		int	any = 0;
 		while ((s = isendwordf()) == FALSE) {
-			if (forwchar(FALSE, 1) == FALSE)
+			if (forwchar(TRUE, 1) == FALSE)
 				return (any != 0);
 			any++;
 		}
@@ -213,7 +215,7 @@ int f,n;
 				return (any != 0);
 		}
 	}
-	return (forwchar(FALSE, 1));
+	return (forwchar(TRUE, 1));
 }
 
 /*
@@ -240,7 +242,7 @@ int f,n;
 				return (any != 0);
 		}
 	}
-	return (forwchar(FALSE, 1));
+	return (forwchar(TRUE, 1));
 }
 
 int
@@ -294,7 +296,6 @@ int
 joinlines(f,n)
 int f,n;
 {
-	extern CMDFUNC f_godotplus;
 	havemotion = &f_godotplus;
 	return(operjoin(f,n));
 }
@@ -480,6 +481,7 @@ formatregion()
 			and report on them.			*/
 int
 wordcount(f, n)
+int f, n;
 {
 	register LINE *lp;	/* current line to scan */
 	register int offset;	/* current char to scan */

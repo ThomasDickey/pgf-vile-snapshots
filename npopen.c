@@ -1,7 +1,7 @@
 /*	npopen:  like popen, but grabs stderr, too
  *		written by John Hutchinson, heavily modified by Paul Fox
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/npopen.c,v 1.42 1995/02/10 03:42:18 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/npopen.c,v 1.45 1995/05/08 03:06:17 pgf Exp $
  *
  */
 
@@ -10,9 +10,12 @@
 
 #if SYS_UNIX || SYS_OS2 || SYS_WINNT
 
-#if SYS_UNIX
-#include <sys/param.h>
-#else
+/*
+ * For OS/2 implementations of inout_popen(), npflush(), and npclose(),
+ * see "os2pipe.c".
+ */
+
+#if SYS_OS2 || SYS_WINNT
 #include <process.h>
 #endif
 
@@ -27,6 +30,7 @@
 
 static int pipe_pid;
 
+static void exec_sh_c P(( char * ));
 
 FILE *
 npopen (cmd, type)
@@ -38,7 +42,7 @@ char *cmd, *type;
 		return NULL;
 
 	if (*type == 'r') {
-#if SYS_OS2 || SYS_WINNT
+#if SYS_WINNT
  		if ((ff = _popen(cmd,"r")) == NULL)
 #else
   		if (inout_popen(&ff, (FILE **)0, cmd) != TRUE)
@@ -46,7 +50,7 @@ char *cmd, *type;
 			return NULL;
 		return ff;
 	} else {
-#if SYS_OS2 || SYS_WINNT
+#if SYS_WINNT
 		if ((ff = _popen(cmd,"w")) == NULL)
 #else
 		if (inout_popen((FILE **)0, &ff, cmd) != TRUE)
@@ -55,7 +59,7 @@ char *cmd, *type;
 		return ff;
 	}
 }
-#endif /* SYS_UNIX || SYS_OS2 */
+#endif /* SYS_UNIX || SYS_OS2 || SYS_WINNT */
 
 #if SYS_UNIX
 
@@ -134,7 +138,7 @@ char *cmd;
 }
 #endif /* SYS_UNIX */
 
-#if SYS_OS2 || SYS_WINNT
+#if SYS_WINNT
 void
 npclose (fp)
 FILE *fp;
@@ -158,7 +162,7 @@ FILE *fp;
 	}
 }
 
-void
+static void
 exec_sh_c(cmd)
 char *cmd;
 {

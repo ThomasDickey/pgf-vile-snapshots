@@ -2,7 +2,7 @@
  * The routines in this file read and write ASCII files from the disk. All of
  * the knowledge about files are here.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/fileio.c,v 1.95 1995/02/15 16:06:43 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/fileio.c,v 1.100 1995/04/25 02:31:21 pgf Exp $
  *
  */
 
@@ -107,10 +107,10 @@ char *backup;
 
 	struct stat ostat, bstat;
 
-	if (stat(orig, &ostat) != 0)
+	if (stat(SL_TO_BSL(orig), &ostat) != 0)
 		return FALSE;
 
-	if (stat(backup, &bstat) == 0) {  /* the backup file exists */
+	if (stat(SL_TO_BSL(backup), &bstat) == 0) {  /* the backup file exists */
 		
 #if SYS_UNIX
 		/* same file, somehow? */
@@ -172,7 +172,11 @@ char *backup;
 #endif
 #endif
 
+#if SYS_OS2 && CC_CSETPP
+	s = chmod(backup, ostat.st_mode & (S_IREAD | S_IWRITE));
+#else
 	s = chmod(backup, ostat.st_mode & 0777);
+#endif
 	if (s != 0) {
 		(void)unlink(backup);
 		return FALSE;
@@ -194,8 +198,12 @@ char	*fname;
 		char *gvalfileback = global_g_val_ptr(GVAL_BACKUPSTYLE);
 
 		if (strcmp(gvalfileback,".bak") == 0) {
-			if (t == 0)
-				t = s + strlen(s);
+			if (t == 0	/* i.e. no '.' at all */
+#if SYS_UNIX
+				|| t == s	/* i.e. leading char is '.' */
+#endif
+			)
+				t = s + strlen(s); /* then just append */
 			(void)strcpy(t, ".bak");
 #if SYS_UNIX
 		} else if (strcmp(gvalfileback, "tilde") == 0) {
@@ -262,6 +270,9 @@ char    *fn;
 
 	} else if ((ffp=fopen(fn, FOPEN_READ)) == NULL) {
 		if (errno != ENOENT
+#if SYS_OS2 && CC_CSETPP
+                 && errno != ENOTEXIST
+#endif
 		 && errno != EINVAL) {	/* a problem with Linux to DOS-files */
 			mlerror("opening for read");
 			return (FIOERR);
@@ -357,7 +368,7 @@ char	*fn;
 int	mode;
 {
 #if HAVE_ACCESS
-	return (access(fn, mode) == 0);
+	return (access(SL_TO_BSL(fn), mode) == 0);
 #else
 	int	fd;
 	switch (mode) {
@@ -370,7 +381,7 @@ int	mode;
 		}
         	return FALSE;
 	case FL_WRITEABLE:
-	        if ((fd=open(fn, O_WRONLY|O_APPEND)) < 0) {
+	        if ((fd=open(SL_TO_BSL(fn), O_WRONLY|O_APPEND)) < 0) {
 	                return FALSE;
 		}
 		(void)close(fd);
@@ -395,7 +406,7 @@ char    *fn;
 
 #if !OPT_MAP_MEMORY
 #if SYS_UNIX || SYS_VMS || SYS_OS2 || SYS_WINNT
-long
+off_t
 ffsize()
 {
 	struct stat statbuf;
@@ -409,7 +420,7 @@ ffsize()
 #if SYS_MSDOS
 #if CC_DJGPP
 
-long
+off_t
 ffsize(void)
 {
 	int flen, prev;
@@ -423,7 +434,7 @@ ffsize(void)
 
 #else
 
-long
+off_t
 ffsize(void)
 {
 	int fd = fileno(ffp);
@@ -443,7 +454,7 @@ ffexists(p)
 char *p;
 {
 	struct stat statbuf;
-	if (stat(p, &statbuf) == 0) {
+	if (stat(SL_TO_BSL(p), &statbuf) == 0) {
 		return TRUE;
 	}
         return FALSE;
@@ -457,7 +468,7 @@ int
 ffexists(p)
 char *p;
 {
-	if (ffropen(p) == FIOSUC) {
+	if (ffropen(SL_TO_BSL(p)) == FIOSUC) {
 		ffclose();
 		return TRUE;
 	}
@@ -488,10 +499,15 @@ long len;
 	fseek (ffp, len, 1);	/* resynchronize stdio */
 	return total;
 #else
+# if CC_CSETPP
+	int got = fread(buf, len, 1, ffp);
+	return got == 1 ? len : -1;
+# else
 	int got = read(fileno(ffp), buf, (SIZE_T)len);
 	if (got >= 0)
 	    fseek (ffp, len, 1);	/* resynchronize stdio */
 	return got;
+# endif
 #endif
 }
 
@@ -639,7 +655,7 @@ int *lenp;	/* to return the final length */
 /* i think some older kernels may lose data if a signal is
 received after some data has been tranferred to the user's buffer, so
 i don't think this code is safe... */
-		while(1) {
+		for (;;) {
 			/* clear our signal memory.  this should
 			  become a bitmap if we need to notice more than
 			  just alarm signals */

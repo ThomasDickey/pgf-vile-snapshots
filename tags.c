@@ -4,7 +4,7 @@
  *	the cursor.
  *	written for vile: Copyright (c) 1990, 1995 by Paul Fox
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/tags.c,v 1.67 1995/02/08 03:29:23 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/tags.c,v 1.68 1995/04/22 03:22:53 pgf Exp $
  *
  */
 #include	"estruct.h"
@@ -30,6 +30,7 @@ static	BUFFER *gettagsfile P(( int, int * ));
 static	void	nth_name P(( char *,  char *, int ));
 static	int	popuntag P(( char *, int * ));
 static	void	pushuntag P(( char *, int, char * ));
+static	int	tags P(( char *, int ));
 static	void	tossuntag P(( void ));
 
 static	UNTAG *	untaghead = NULL;
@@ -70,7 +71,7 @@ char *t;
 }
 
 
-int
+static int
 tags(tag,taglen)
 char *tag;
 int taglen;
@@ -268,7 +269,7 @@ int n;
 int *endofpathflagp;
 {
 #ifdef	MDCHK_MODTIME
-	long current;
+	time_t current;
 #endif
 	char *tagsfile;
 	BUFFER *tagbp;

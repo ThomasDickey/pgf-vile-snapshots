@@ -5,7 +5,7 @@
  *	reading and writing of the disk are in "fileio.c".
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/file.c,v 1.152 1995/02/09 01:08:14 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/file.c,v 1.158 1995/04/25 02:31:21 pgf Exp $
  *
  */
 
@@ -16,9 +16,12 @@
 #include	<sys/stat.h>  /* for mkdir() declaration */
 #endif
 
-static	void	readlinesmsg P(( int, int, char *, int ));
 static	BUFFER *getfile2bp P(( char * ));
 static	int	bp2swbuffer P(( BUFFER *, int, int ));
+static	int	kifile P(( char * ));
+static	int	writereg P(( REGION *, char *, int, BUFFER *, int ));
+static	void	readlinesmsg P(( int, int, char *, int ));
+
 #if OPT_DOSFILES
 static	void	guess_dosmode P(( BUFFER * ));
 /* give DOS the benefit of the doubt on ambiguous files */
@@ -28,9 +31,17 @@ static	void	guess_dosmode P(( BUFFER * ));
 #  define MORETHAN >
 # endif
 #endif
-static	int	writereg P(( REGION *, char *, int, BUFFER *, int ));
+
 #if SYS_UNIX
-static	int	slowtime P(( long * ));
+static	int	slowtime P(( time_t * ));
+#endif
+
+#if	defined(MDCHK_MODTIME)
+static	int	inquire_modtime P(( BUFFER *, char * ));
+#endif
+
+#if !(SYS_MSDOS || SYS_WIN31) && !OPT_MAP_MEMORY
+static	int	quickreadf P(( BUFFER *, int * ));
 #endif
 
 /*--------------------------------------------------------------------------*/
@@ -39,15 +50,20 @@ static	int	slowtime P(( long * ));
  * otherwise it returns zero.
  */
 #if	defined(MDCHK_MODTIME) || SYS_VMS || SYS_UNIX
-long
+time_t
 file_modified(path)
 char *path;
 {
 	struct stat	statbuf;
-	long		the_time = 0;
+	time_t		the_time = 0;
 
-	if (stat(path, &statbuf) >= 0
-	 && (statbuf.st_mode & S_IFMT) == S_IFREG) {
+	if (stat(SL_TO_BSL(path), &statbuf) >= 0
+#if CC_CSETPP
+	 && (statbuf.st_mode & S_IFREG) == S_IFREG)
+#else
+	 && (statbuf.st_mode & S_IFMT) == S_IFREG)
+#endif
+	{
 #if SYS_VMS
 		the_time = statbuf.st_ctime; /* e.g., creation-time */
 #else
@@ -69,7 +85,7 @@ char	*question;
 int	iswrite;
 {
 	int status = SORTOFTRUE;
-	long current;
+	time_t current;
 	char prompt[NLINE];
 
 	if (!b_is_temporary(bp)
@@ -77,7 +93,7 @@ int	iswrite;
 	 && bp->b_active	/* only buffers that are loaded */
 	 && same_fname(fname, bp, FALSE)
 	 && get_modtime(bp, &current)) {
-		long check_against;
+		time_t check_against;
 		char *remind, *again;
 		if (iswrite) {
 			check_against = bp->b_modtime;
@@ -119,7 +135,7 @@ BUFFER *bp;
 int
 get_modtime (bp, the_time)
 BUFFER	*bp;
-long	*the_time;
+time_t	*the_time;
 {
 	if (isInternalName(bp->b_fname))
 		*the_time = 0;
@@ -134,7 +150,7 @@ set_modtime( bp, fn )
 BUFFER *bp;
 char *fn;
 {
-	long	current;
+	time_t	current;
 
 	if (same_fname(fn, bp, FALSE) && get_modtime(bp, &current)) {
 		bp->b_modtime = current;
@@ -162,7 +178,7 @@ char *fn;
 	return status;
 }
 
-int
+static int
 inquire_modtime( bp, fn )
 BUFFER *bp;
 char *fn;
@@ -216,12 +232,12 @@ int	Wrote;
 #if SYS_UNIX
 static int
 slowtime (refp)
-long	*refp;
+time_t	*refp;
 {
 	int	status = FALSE;
 
 	if (fileispipe) {
-		long	temp = time((long *)0);
+		time_t	temp = time((time_t *)0);
 
 		status = (!ffhasdata() || (temp != *refp));
 		if (status)
@@ -794,7 +810,7 @@ int	mflg;		/* print messages? */
 		grab_lck_file(bp,fname);
 #endif
 #if OPT_PROCEDURES
-	if (s == TRUE) {
+	if (s == FIOSUC) {
 	    static int readhooking;
 	    if (!readhooking && *readhook) {
 		    readhooking = TRUE;
@@ -803,6 +819,7 @@ int	mflg;		/* print messages? */
 	    }
 	}
 #endif
+	b_match_attrs_dirty(bp);
 	return (s != FIOERR);
 }
 
@@ -822,7 +839,7 @@ int lockfl;
 }
 
 #if ! (SYS_MSDOS || SYS_WIN31) && !OPT_MAP_MEMORY
-int
+static int
 quickreadf(bp, nlinep)
 register BUFFER *bp;
 int *nlinep;
@@ -1000,7 +1017,7 @@ int *nlinep;
 	int	done_update = FALSE;
 #endif
 #if SYS_UNIX
-	long	last_updated = time((long *)0);
+	time_t	last_updated = time((time_t *)0);
 #endif
 	b_set_counted(bp);	/* make 'addline()' do the counting */
         while ((s = ffgetline(&len)) <= FIOSUC) {
@@ -1010,7 +1027,7 @@ int *nlinep;
 		 * keep any CR's that we read.
 		 */
 		if (global_b_val(MDDOS)) {
-			if (fline[len-1] == '\r') {
+			if (len > 0 && fline[len-1] == '\r') {
 				doslines++;
 			} else {
 				unixlines++;
@@ -1083,6 +1100,7 @@ int *nlinep;
 					llength(lp)--;
 				}
 			}
+			bp->b_bytecount -= doslines;
 		}
 	}
 #endif
@@ -1387,7 +1405,7 @@ int	forced;
         register int    nline;
 	register int i;
 	char	fname[NFILEN];
-	long	nchar;
+	B_COUNT	nchar;
 	char *	ending =
 #if OPT_DOSFILES
 			b_val(bp, MDDOS) ? "\r\n" : "\n"
@@ -1730,7 +1748,7 @@ out:
  * Called by insert file command. Return the final
  * status of the read.
  */
-int
+static int
 kifile(fname)
 char    *fname;
 {
@@ -1795,7 +1813,6 @@ ACTUAL_SIG_DECL
 	char *np;
 	int wrote = 0;
 	int created = FALSE;
-	extern char *mktemp P(( char * ));
 
 #if SYS_APOLLO
 	extern	char	*getlogin(void);
