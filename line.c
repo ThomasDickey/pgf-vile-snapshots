@@ -10,7 +10,7 @@
  * editing must be being displayed, which means that "b_nwnd" is non zero,
  * which means that the dot and mark values in the buffer headers are nonsense.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/line.c,v 1.82 1994/12/21 13:45:26 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/line.c,v 1.83 1995/02/24 00:40:31 pgf Exp $
  *
  */
 
@@ -438,10 +438,12 @@ int n, c;
 		tmp = l_ref(lp1);
 		/* don't use memcpy:  overlapping regions.... */
 		llength(tmp) += n;
-		cp2 = &tmp->l_text[tmp->l_used];
-		cp1 = cp2-n;
-		while (cp1 != &tmp->l_text[doto])
-			*--cp2 = *--cp1;
+		if (tmp->l_used - n > doto) {
+			cp2 = &tmp->l_text[tmp->l_used];
+			cp1 = cp2-n;
+			while (cp1 != &tmp->l_text[doto])
+				*--cp2 = *--cp1;
+		}
 		for (i=0; i<n; ++i)		/* Add the characters	*/
 			tmp->l_text[doto+i] = c;
 	}

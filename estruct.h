@@ -9,7 +9,7 @@
 */
 
 /*
- * $Header: /usr/build/VCS/pgf-vile/RCS/estruct.h,v 1.237 1995/02/21 13:16:59 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/estruct.h,v 1.238 1995/02/24 00:33:45 pgf Exp $
  */
 
 #ifdef HAVE_CONFIG_H
@@ -332,7 +332,7 @@
 /* various color stuff */
 /* termcap color stuff conditional on linux for now, 
 	since it's only been tested there. */
-#define	OPT_COLOR (DISP_ANSI || IBM_VIDEO || DISP_X11 || \
+#define	OPT_COLOR (DISP_ANSI || IBM_VIDEO || \
 			(DISP_TERMCAP && defined(linux)))
 
 /* Feature turnon/turnoff */
@@ -1293,7 +1293,7 @@ typedef struct	{
 #endif
 }	REGION;
 
-#if OPT_COLOR
+#if OPT_COLOR || DISP_X11
 typedef unsigned short VIDEO_ATTR;	/* assumption: short is at least 16 bits */
 #else
 typedef unsigned char VIDEO_ATTR;

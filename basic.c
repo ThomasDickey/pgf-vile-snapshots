@@ -5,7 +5,7 @@
  * functions that adjust the top line in the window and invalidate the
  * framing, are hard.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/basic.c,v 1.76 1994/12/16 22:42:58 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/basic.c,v 1.77 1995/02/24 00:44:57 pgf Exp $
  *
  */
 
@@ -166,6 +166,7 @@ register int	n;
 	return (TRUE);
 }
 
+
 /*
  * Implements the vi "l" command.
  *
@@ -180,18 +181,27 @@ forwchar_to_eol(f, n)
 int f;
 register int	n;
 {
+	int nwas = n;
+	int lim;
 	if (f == FALSE) n = 1;
-	if (n < 0)
-		return backchar_to_bol(f, -n);
-	while (n--) {
-		if ((DOT.o + !doingopcmd) >= lLength(DOT.l) + (insertmode != 0))
-			return doingopcmd;
+	if (n < 0) return backchar_to_bol(f, -n);
+	if (n == 0) return TRUE;
+
+	/* normally, we're confined to the text on the line itself.  if
+	  we're doing an opcmd, then we're allowed to move to the newline
+	  as well, to take care of the internal cases:  's', 'x', and '~'. */
+	if (doingopcmd)
+		lim = lLength(DOT.l);
+	else
+		lim = lLength(DOT.l) - 1;
+	do {
+		if (DOT.o >= lim)
+			return n != nwas; /* return ok if we moved at all */
 		else
 			DOT.o++;
-	}
+	} while (--n);
 	return TRUE;
 }
-
 /*
  * Implements the vi "G" command.
  *
