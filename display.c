@@ -6,7 +6,11 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.96  1993/08/13 16:32:50  pgf
+ * Revision 1.97  1993/08/16 14:06:06  pgf
+ * took out reference to variable 'req' in updateline() when REVSTA not
+ * defined.
+ *
+ * Revision 1.96  1993/08/13  16:32:50  pgf
  * tom's 3.58 changes
  *
  * Revision 1.95  1993/08/05  14:29:12  pgf
@@ -2089,7 +2093,11 @@ int	colto;		/* first column on screen */
 	cp5 = cp3;
 
 	/* Erase to EOL ? */
-	if (nbflag == FALSE && eolexist == TRUE && (req != TRUE)) {
+	if (nbflag == FALSE && eolexist == TRUE 
+#if	REVSTA
+		&& (req != TRUE)
+#endif
+			) {
 		while (cp5!=cp1 && cp5[-1]==' ')
 			--cp5;
 

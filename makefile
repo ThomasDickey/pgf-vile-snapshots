@@ -177,14 +177,14 @@ OBJ = main.$O $(SCREEN).$O basic.$O bind.$O buffer.$O crypt.$O \
 # please report bugs with these config options
 
 all:
-	@echo "	there is no longer a default unnamed target"		;\
+	@echo "	there is no default unnamed target."			;\
 	echo "	please use one of the following:"			;\
 	echo "	make bsd	(for pure, older BSD systems)"		;\
 	echo "	make bsd_posix	(for BSD with some POSIX support)"	;\
 	echo "	make bsd386"						;\
 	echo "	make att	(traditional USG systems)"		;\
 	echo "	make att_posix	(newer, with POSIX support)"		;\
-	echo "	make sgi	(Silicon Graphics)			;\
+	echo "	make sgi	(Silicon Graphics)"			;\
 	echo "	make svr3	(early 386 UNIX, for instance)"		;\
 	echo "	make sunos	(sunos 3 or 4)"				;\
 	echo "	make ultrix"						;\
@@ -548,7 +548,10 @@ random.$O:	glob.h
 vmalloc$O:	nevars.h
 
 # $Log: makefile,v $
-# Revision 1.117  1993/08/13 16:24:47  pgf
+# Revision 1.118  1993/08/16 14:04:39  pgf
+# fixed broken all: target -- missing double quote
+#
+# Revision 1.117  1993/08/13  16:24:47  pgf
 # added sgi target (sort of)
 #
 # Revision 1.116  1993/07/28  10:44:51  pgf

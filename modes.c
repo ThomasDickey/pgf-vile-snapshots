@@ -8,8 +8,11 @@
  * Major extensions for vile by Paul Fox, 1991
  *
  *	$Log: modes.c,v $
- *	Revision 1.22  1993/08/13 16:32:50  pgf
- *	tom's 3.58 changes
+ *	Revision 1.23  1993/08/18 15:10:36  pgf
+ *	don't let the OPT_XTERM code do anything under X11
+ *
+ * Revision 1.22  1993/08/13  16:32:50  pgf
+ * tom's 3.58 changes
  *
  * Revision 1.21  1993/08/05  14:35:57  pgf
  * changed name of setmode to avoid library conflict with djgpp compiler
@@ -896,7 +899,7 @@ int global;	/* true = global flag,	false = current buffer flag */
 	int s;
 	int autobuff = global_g_val(GMDABUFF);
 	int anything = 0;
-#if	OPT_XTERM
+#if	OPT_XTERM && !X11
 	int xterm_mouse = global_g_val(GMDXTERM_MOUSE);
 #endif
 
@@ -911,7 +914,7 @@ int global;	/* true = global flag,	false = current buffer flag */
 
 	if (autobuff != global_g_val(GMDABUFF)) sortlistbuffers();
 
-#if	OPT_XTERM
+#if	OPT_XTERM && !X11
 	if (xterm_mouse != global_g_val(GMDXTERM_MOUSE)) {
 		set_global_g_val(GMDXTERM_MOUSE,TRUE);
 		if (xterm_mouse)	TTkclose();

@@ -2,7 +2,13 @@
  * 	X11 support, Dave Lemke, 11/91
  *
  * $Log: x11.c,v $
- * Revision 1.25  1993/08/13 16:32:50  pgf
+ * Revision 1.27  1993/08/18 16:50:10  pgf
+ * bumped mrow from 100 to 200 -- some people have very good eyesight
+ *
+ * Revision 1.26  1993/08/17  19:08:28  pgf
+ * took out trace.h include
+ *
+ * Revision 1.25  1993/08/13  16:32:50  pgf
  * tom's 3.58 changes
  *
  * Revision 1.24  1993/08/05  14:29:12  pgf
@@ -85,7 +91,6 @@
 
 #include	"estruct.h"
 #include	"edef.h"
-#include "trace.h"	/* patch */
 
 /* undef for the benefit of some X header files -- if you really _are_
 	both ISC and X11, well, you know what to do. */
@@ -695,7 +700,7 @@ x_open()
 
     /* these can go bigger, but they suck up lots of VM if they do */
     term.t_mcol = 200;		/* XXX */
-    term.t_mrow = 100;		/* XXX */
+    term.t_mrow = 200;		/* XXX */
 
     xsh.flags = PPosition | PResizeInc | PSize | PMaxSize;
     if (flags & (XValue | YValue))
