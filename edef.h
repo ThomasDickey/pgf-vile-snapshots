@@ -9,7 +9,13 @@
 
 /*
  * $Log: edef.h,v $
- * Revision 1.122  1994/02/03 19:35:12  pgf
+ * Revision 1.124  1994/02/11 14:19:45  pgf
+ * 3.65+
+ *
+ * Revision 1.123  1994/02/11  14:06:50  pgf
+ * new altpoundc, and hexdigits[] is now global
+ *
+ * Revision 1.122  1994/02/03  19:35:12  pgf
  * tom's changes for 3.65
  *
  * Revision 1.121  1994/02/03  10:18:59  pgf
@@ -403,7 +409,7 @@
 decl_uninit( char *prog_arg );		/* argv[0] from main.c */
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version 3.65");
+decl_init( char version[], "version 3.65+");
 
 decl_init( int slash, '/'); 		/* so DOS can use '\' as path separator */
 
@@ -500,6 +506,7 @@ decl_init( int cntl_x, tocntrl('X') );	/* current control X prefix char */
 decl_init( int reptc, 'K' );		/* current universal repeat char */
 decl_init( int abortc, tocntrl('[') );	/* ESC: current abort command char */
 decl_init( int poundc, '#' );		/* pseudo function key prefix */
+decl_init( int altpoundc, '#' );	/* pseudo function key prefix */
 decl_init( int quotec, tocntrl('V') );	/* quote char during mlreply()	*/
 decl_init( int killc, tocntrl('U') );	/* current line kill char	*/
 decl_init( int wkillc, tocntrl('W') );	/* current word kill char	*/
@@ -577,6 +584,8 @@ decl_uninit( int kbd_expand );		/* -1 kbd_putc shows tab as space */
 decl_uninit( FILE *ffp );		/* File pointer, all functions. */
 decl_uninit( int fileispipe );
 decl_uninit( int eofflag );		/* end-of-file flag */
+
+decl_init( char hexdigits[], "0123456789ABCDEF");
 
 /* defined in nebind.h and nename.h */
 extern NTAB nametbl[];

@@ -67,8 +67,6 @@ E	marks should perhaps be linked onto lines.  this would make a lot
 
 L	vile really ought to use unix-crypt if it is available.
 
-E	in autoindent mode: 0^D and ^^D don't work
-
 E	can't search for a NUL in a buffer.
 
 E	":e" and ":e!" should share the same prompt data, which should be

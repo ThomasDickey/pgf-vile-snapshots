@@ -4,7 +4,10 @@
 	written 1986 by Daniel Lawrence
  *
  * $Log: eval.c,v $
- * Revision 1.71  1994/02/03 19:35:12  pgf
+ * Revision 1.72  1994/02/08 13:23:10  pgf
+ * fix off-the-end problems related to strncpy
+ *
+ * Revision 1.71  1994/02/03  19:35:12  pgf
  * tom's changes for 3.65
  *
  * Revision 1.70  1994/01/31  18:11:03  pgf
@@ -640,6 +643,7 @@ getkill()		/* return some of the contents of the kill buffer */
 		else
 			size = NSTRING - 1;
 		(void)strncpy(value, (char *)(kbs[0].kbufh->d_chunk), size);
+		value[size] = EOS;
 	}
 
 	/* and return the constructed value */
@@ -1145,7 +1149,8 @@ is_truem(val)
 char *val;
 {
 	char	temp[8];
-	(void)mklower(strncpy(temp, val, sizeof(temp)));
+	temp[sizeof(temp)-1] = '\0';
+	(void)mklower(strncpy(temp, val, sizeof(temp)-1));
 	return (!strcmp(temp, "yes")
 	   ||   !strcmp(temp, "true")
 	   ||   !strcmp(temp, "t")
@@ -1162,7 +1167,8 @@ is_falsem(val)
 char *val;
 {
 	char	temp[8];
-	(void)mklower(strncpy(temp, val, sizeof(temp)));
+	temp[sizeof(temp)-1] = '\0';
+	(void)mklower(strncpy(temp, val, sizeof(temp)-1));
 	return (!strcmp(temp, "no")
 	   ||   !strcmp(temp, "false")
 	   ||   !strcmp(temp, "f")

@@ -2,7 +2,10 @@
  * version & usage-messages for vile
  *
  * $Log: version.c,v $
- * Revision 1.4  1994/01/31 12:19:47  pgf
+ * Revision 1.5  1994/02/11 11:13:52  pgf
+ * revert ifdefs to old-style
+ *
+ * Revision 1.4  1994/01/31  12:19:47  pgf
  * added compiler type to version output for DOS
  *
  * Revision 1.3  1993/10/04  10:24:09  pgf
@@ -120,10 +123,16 @@ int f,n;
 	mlforce("%s, built %s %s with %s", version, __DATE__, __TIME__,
 #  if WATCOM
 	"Watcom C/386"
-#  elif DJGPP
+#  else
+#   if DJGPP
 	"DJGPP"
-#  elif TURBO
+#   else
+#    if TURBO
 	"Turbo C"
+#    else
+	"???"
+#    endif
+#   endif
 #  endif
 	);
 # else

@@ -4,7 +4,10 @@
  *	written 1986 by Daniel Lawrence
  *
  * $Log: exec.c,v $
- * Revision 1.80  1994/02/03 19:35:12  pgf
+ * Revision 1.81  1994/02/11 14:08:20  pgf
+ * don't turn off dot recording in execute if we're in insert mode
+ *
+ * Revision 1.80  1994/02/03  19:35:12  pgf
  * tom's changes for 3.65
  *
  * Revision 1.79  1994/01/31  19:52:59  pgf
@@ -1112,8 +1115,11 @@ int f,n;
 
 	/* commands following operators can't be redone or undone */
 	if ( !doingopcmd) {
-		/* don't record non-redoable cmds */
-		if ((flags & REDO) == 0)
+		/* don't record non-redoable cmds, */
+		/* but if we're in insertmode, it's okay, since we must
+			be executing a function key, like an arrow key,
+			that the user will want to have replayed later */
+		if (!insertmode && (flags & REDO) == 0)
 			dotcmdstop();
 		if (flags & UNDO) {
 			/* undoable command can't be permitted when read-only */

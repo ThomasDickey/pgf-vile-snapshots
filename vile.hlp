@@ -261,6 +261,13 @@ Shell Access
 
 	On systems supporting job control, ^Z (or ":stop") will suspend vile.
 
+	The :cd and :pwd commands are of course supported.  Unlike vi,
+	filenames will track their directory of origin, so you can't simply
+	edit a file in one directory, cd to another, and write it.  You
+	must explicitly write to ./filename in the new directory to
+	accomplish this.  ":cd -" will return to the previous directory, as
+	it does in some shells.
+
 Text manipulation command:
 --------------------------
 
@@ -526,6 +533,32 @@ Miscellaneous commands
 		"#endif" it will go back up to the "#if".  If the cursor is
 		on any part of a "/*" or "*/" sequence, it will find the
 		appropriate corresponding C comment endpoint.
+
+Arrow keys
+----------
+
+	Vile understands ANSI-style arrow keys, which are produced by
+	the keypad on VT100-style terminals and terminal emulators,
+	including xterm.  The keys are interpreted as function keys, and
+	are by default bound to the up, down, left, and right screen
+	motions.  These bindings are honored in insert mode as well as
+	command mode.  
+	
+	Note:  Because all function keys are translated internally
+	to the "function-prefix" notation for execution, there is a
+	case in which a repeated insert of text that includes function
+	key motions will fail.  If you type "i<text><up-arrow><more-text>ESC"
+	all the text will insert correctly, and if you then type "3." it
+	will be inserted correctly 3 more times.  However, if you type
+	"4i<text><up-arrow><more-text>ESC" the first insertion will work
+	correctly, but in the next three the <up-arrow> sequence will
+	be replaced with '#A' characters, since the up-arrow is bound to
+	FN-A, which gets translated to "#A".  If this is a problem, you can
+		":bind-key alt-function-prefix \x80"
+	where \x80 can be any character that you rarely if ever want to
+	insert into your text.  (This is not the default since it makes
+	full 8-bit operation difficult to implement.)
+
 
 Editor modes
 ------------
@@ -977,11 +1010,11 @@ Key Rebinding
 	to setting the high bit of the following character, so 'M-e' is
 	has the value of (0x80|0x65), or 0xe5.
 
-	Function key bindings are available in insert mode, as well as
-	in command mode.  (But only via the "meta bit" or ANSI ESC sequence
-	form -- the '#' prefix will not work in insert mode.)  So the
-	following macro will work corrently in both command and insert
-	modes:
+	Function and meta key bindings are available in insert mode, as
+	well as in command mode.  (But only via either the "meta bit" or
+	ANSI ESC sequence form -- the '#' prefix will not work in insert
+	mode.) So the following macro will work corrently in both command
+	and insert modes:
 
 		15 store-macro
 			insert-string "fprintf(stderr, \""
@@ -993,8 +1026,10 @@ Key Rebinding
 				insert-chars
 			~endif
 		~endm
-		; bind to Meta-f
+		; bind to function key f
 		bind-key execute-macro-15 FN-f
+		; also bind to meta-A
+		bind-key execute-macro-15 M-A
 
 
 	:map 
@@ -1571,6 +1606,10 @@ DOS specifics
 
 	All file globbing, including from the command line, is done using
 	UNIX shell-style wild-carding conventions.
+
+	The expansion of the ':' character in user input, which normally
+	expands to the "word under the cursor", is suppressed for DOS, due
+	to the conflict with the drive-specifier syntax (e.g. "c:\foo").
 
 	In any version of vile there is a command, "set-dos-mode", which
 	will set the "dos" mode, and strip all carriage-return ('^M')

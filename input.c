@@ -3,7 +3,11 @@
  *		5/9/86
  *
  * $Log: input.c,v $
- * Revision 1.95  1994/02/03 19:35:12  pgf
+ * Revision 1.96  1994/02/11 14:10:47  pgf
+ * we now return altpoundc for function keys if we're in insertmode.  we
+ * also trim the output of tgetc to ensure just 8 bits.
+ *
+ * Revision 1.95  1994/02/03  19:35:12  pgf
  * tom's changes for 3.65
  *
  * Revision 1.94  1994/01/31  18:19:09  pgf
@@ -609,20 +613,6 @@ incr_dot_kregnum()
 	}
 }
 
-void
-tungetc(c)
-int c;
-{
-
-	tungotc = c;
-	if (dotcmdmode == RECORD) {
-		tb_unput(TempDot(FALSE));
-		if (kbdmode == RECORD)
-			tb_unput(KbdMacro);
-	} else if (dotcmdmode != PLAY && kbdmode == RECORD)
-		tb_unput(KbdMacro);
-}
-
 /*
  * Record a character for "." commands
  */
@@ -730,6 +720,20 @@ int eatit;  /* consume the character? */
 	return c;
 }
 
+void
+tungetc(c)
+int c;
+{
+
+	tungotc = c;
+	if (dotcmdmode == RECORD) {
+		tb_unput(TempDot(FALSE));
+		if (kbdmode == RECORD)
+			tb_unput(KbdMacro);
+	} else if (dotcmdmode != PLAY && kbdmode == RECORD)
+		tb_unput(KbdMacro);
+}
+
 /*	tgetc:	Get a key from the terminal driver, resolve any keyboard
 		macro action					*/
 int
@@ -766,15 +770,20 @@ int quoted;
 	}
 
 	/* and finally give the char back */
-	return(lastkey = c);
+	return lastkey = char2int(c);
 }
 
-/*	KBD_KEY:	Get one keystroke. The only prefix legal here
-			is the SPEC prefix.  */
+/*	KBD_KEY:	Get one keystroke.  system function keys are
+	translated to the internal representation of '#' followed by a
+	single character.  be careful here.  insert mode function key/arrow
+	key processing depends on the behavior that the only way to get a
+	poundc from kbd_key with a tungotc having been pushed back is for a
+	real function key to have been pressed */
 int
 kbd_key()
 {
 	int    c;
+	int pound = insertmode ? altpoundc : poundc;
 
 #if OPT_XTERM && !X11
 kbd_key_loop:
@@ -813,14 +822,14 @@ kbd_key_loop:
 #endif
 				if (abortc != ESC || !insertmode) {
 				    	tungetc(c);
-					return poundc;
+					return pound;
 				}
 				if (insertmode == REPLACECHAR) {
 					/* eat the sequence, but return abort */
 					return abortc;
 				}
 				tungetc(c);
-				return poundc;
+				return pound;
 			} else {
 				if (abortc != ESC)
 					return (c);
@@ -834,7 +843,7 @@ kbd_key_loop:
 	if (c == 0) {			/* Apply SPEC prefix	*/
 		c = tgetc(FALSE);
 		tungetc(c);
-		return poundc;
+		return pound;
 	}
 #endif
 
@@ -846,19 +855,15 @@ kbd_key_loop:
 
 		/* first try to see if it is a cursor key */
 		if ((c >= 'A' && c <= 'D') || c == 'S' || c == 'T') {
-			if (!insertmode) {
-				tungetc(c);
-				return poundc;
-			}
+			tungetc(c);
+			return pound;
 		}
 
 		/* next, a 2 char sequence */
 		d = tgetc(FALSE);
 		if (d == '~') {
-			if (!insertmode) {
-				tungetc(c);
-				return poundc;
-			}
+			tungetc(c);
+			return pound;
 		}
 
 		/* decode a 3 char sequence */
@@ -866,31 +871,16 @@ kbd_key_loop:
 		/* if a shifted function key, eat the tilde */
 		if (d >= '0' && d <= '9')
 			d = tgetc(FALSE);
-		if (!insertmode) {
-			tungetc(c);
-			return poundc;
-		}
+		tungetc(c);
+		return pound;
 	}
 #endif
 
 #if  WANGPC
 	if (c == 0x1F) {	/* Apply SPEC prefix	*/
 		c = tgetc(FALSE);
-		if (!insertmode) {
-			tungetc(c);
-			return poundc;
-		}
-	}
-#endif
-
-#ifdef DOCUMENTATION
-	/* this code clearly isn't needed, but be careful to preserve
-		this behavior, since user-typed # keys must become
-		function keys at the outer layer. */
-	if (c == poundc) {	/* Apply pseudo function-key prefix	*/
-		c = tgetc(FALSE);
 		tungetc(c);
-		return poundc;
+		return pound;
 	}
 #endif
 
@@ -907,22 +897,6 @@ kbd_seq()
 {
 	int c;		/* fetched keystroke */
 
-#ifdef BEFORE
-	/* get initial character */
-	c = kbd_key();
-
-	/* process CTLA prefix */
-	if (c == cntl_a) {
-		c = kbd_key();
-		return (lastcmd = CTLA | c);
-	}
-
-	/* process CTLX prefix */
-	if (c == cntl_x) {
-		c = kbd_key();
-		return (lastcmd = CTLX | c);
-	}
-#else
 	int prefix = 0;	/* accumulate prefix */
 
 	c = kbd_key();
@@ -935,13 +909,12 @@ kbd_seq()
 		c = kbd_key();
 	}
 
-	if (c == poundc) {
+	if (c == poundc || c == altpoundc) {
 		prefix |= SPEC;
 		c = kbd_key();
 	}
 
 	c |= prefix;
-#endif
 
 	/* otherwise, just return it */
 	return (lastcmd = c);
@@ -1585,19 +1558,6 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 	reading_msg_line = FALSE;
 	return status;
 }
-
-#ifdef BEFORE
-/* ARGSUSED */
-int
-speckey(f,n)
-int f,n;
-{
-
-	tungetc( SPEC | kbd_key() );
-
-	return TRUE;
-}
-#endif
 
 /*
  * Make the "." replay the keyboard macro

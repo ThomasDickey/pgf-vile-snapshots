@@ -8,9 +8,16 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: insert.c,v $
- *	Revision 1.44  1994/02/07 12:46:41  pgf
- *	allow backspacing over autoindent, whether the backspacelimit mode
- *	is set or not
+ *	Revision 1.46  1994/02/11 15:20:08  pgf
+ *	implemented 0^D (patch from kev) and ^^D
+ *
+ * Revision 1.45  1994/02/11  14:11:25  pgf
+ * call kbd_key when doing insertions, so we can interpret function keys.
+ * preserve goal when doing function keys.
+ *
+ * Revision 1.44  1994/02/07  12:46:41  pgf
+ * allow backspacing over autoindent, whether the backspacelimit mode
+ * is set or not
  *
  * Revision 1.43  1994/02/07  12:27:16  pgf
  * treat brackets like braces and parentheses in cmode
@@ -175,6 +182,7 @@ static	int	ins_anytime P(( int, int, int, int * ));
 static	int	savedmode;  /* value of insertmode maintained through subfuncs */
 
 static int allow_aindent = TRUE;
+static int skipindent;
 
 /*--------------------------------------------------------------------------*/
 
@@ -496,6 +504,8 @@ int f,n;
  *
  *	ABCABCABC<nl>foo
  */
+static last_insert_char;
+
 static int
 ins_anytime(playback, cur_count, max_count, splice)
 int playback;
@@ -511,6 +521,7 @@ int *splice;
 	int backsp_limit;
 	static TBUFF *insbuff;
 	int osavedmode;
+	int is_func_prefix = FALSE;
 
 	if (DOT_ARGUMENT) {
 		max_count = cur_count + dotcmdcnt;
@@ -532,6 +543,8 @@ int *splice;
 
 	backsp_limit = BackspaceLimit();
 
+	last_insert_char = '\0';
+
 	while(1) {
 
 		/*
@@ -547,17 +560,32 @@ int *splice;
 		if (!playback) {
 			if (dotcmdmode != PLAY)
 				(void)update(FALSE);
-			if (!tb_append(&insbuff, c = tgetc(FALSE))) {
+			if (!tb_append(&insbuff, c = kbd_key())) {
 				status = FALSE;
 				break;
 			}
 		}
 
+		if (is_func_prefix) {
+		    	/* if we're allowed to honor meta-character bindings,
+				then see if it's bound to something, and
+				insert it if not */
+			CMDFUNC *cfp = kcod2fnc(SPEC|c);
+			if (cfp) {
+				map_check(c);
+				backsp_limit = w_left_margin(curwp);
+				if (curgoal < 0)
+					curgoal = getccol(FALSE);
+				(void)execute(cfp,FALSE,1);
+			}
+			is_func_prefix = FALSE;
+			continue;
+		}
 		if (isreturn(c)) {
 			if ((cur_count+1) < max_count) {
 				if (DOT_ARGUMENT) {
 					while (tb_more(dotcmd))
-						(void)tgetc(FALSE);
+						(void)kbd_key();
 				}
 				*splice = TRUE;
 				status = TRUE;
@@ -601,6 +629,20 @@ int *splice;
 				*splice = TRUE;
 			status = TRUE;
 			break;
+		} else /* the only way to get through kbd_key() and
+			* tgetc() and end up with c == poundc and a pushed-
+			* back character (tungotc) is if this was the
+			* result of a function-key press.
+			* since this breaks on repeated inserts (we end up
+			* inserting the #c instead of executing the
+			* function), we allow for 'altpoundc', which is
+			* presumably something the user will never want to
+			* actually insert -- we never try to insert it, we
+			* always execute instead.  */
+			if ((c == poundc && tungotc >= 0) ||
+		    		(c == altpoundc && altpoundc != poundc)) {
+		    	is_func_prefix = TRUE;
+			continue;
 		} else if ((c & HIGHBIT) && b_val(curbp, MDMETAINSBIND)) {
 		    	/* if we're allowed to honor meta-character bindings,
 				then see if it's bound to something, and
@@ -609,7 +651,8 @@ int *splice;
 			if (cfp) {
 				map_check(c);
 				backsp_limit = w_left_margin(curwp);
-				curgoal = getccol(FALSE);
+				if (curgoal < 0)
+					curgoal = getccol(FALSE);
 				(void)execute(cfp,FALSE,1);
 				continue;
 			}
@@ -625,6 +668,7 @@ int *splice;
 #endif
 		else {
 			status = inschar(c,&backsp_limit);
+			curgoal = -1;
 		}
 
 		if (status != TRUE)
@@ -663,6 +707,20 @@ ins()
 	return ins_anytime(FALSE,1,1,&flag);
 }
 
+static int
+isallspace(ln,lb,ub)
+LINEPTR ln;
+int lb;
+int ub;
+{
+	while (lb <= ub) {
+	    if (!isspace(lGetc(ln,ub)))
+		return 0;
+	    ub--;
+	}
+	return 1;
+}
+
 int
 inschar(c,backsp_limit_p)
 int c;
@@ -698,10 +756,18 @@ int *backsp_limit_p;
 				c == tocntrl('D') ||
 				c == killc ||
 				c == wkillc) { /* ^U and ^W */
-			/* have we backed thru a "word" yet? */
-			int saw_word = FALSE;
 			execfunc = nullproc;
-			if (c == tocntrl('D')) {
+			/* all this says -- "is this a regular ^D for
+				backing up a shiftwidth?".  otherwise,
+				we treat it as ^U, below */
+			if (c == tocntrl('D')
+			 && !(DOT.o > *backsp_limit_p
+			      && ((lGetc(DOT.l,DOT.o-1) == '0'
+				  && last_insert_char == '0')
+				  || (lGetc(DOT.l,DOT.o-1) == '^'
+				  && last_insert_char == '^'))
+			      && isallspace(DOT.l,w_left_margin(curwp),
+			                          DOT.o-2))) {
 				int goal, col, sw;
 
 				sw = curswval;
@@ -720,6 +786,17 @@ int *backsp_limit_p;
 				if (col < goal)
 					linsert(goal - col,' ');
 			} else {
+				/* have we backed thru a "word" yet? */
+				int saw_word = FALSE;
+
+				/* was it '^^D'?  then set the flag
+					that tells us to skip a line
+					when calculating the autoindent
+					on the next newline */
+				if (c == tocntrl('D') && 
+					last_insert_char == '^')
+					skipindent = 1;
+
 				while (DOT.o > *backsp_limit_p) {
 					if (c == wkillc) {
 						if (isspace( lGetc(DOT.l,
@@ -732,13 +809,16 @@ int *backsp_limit_p;
 					}
 					backspace();
 					autoindented--;
-					if (c != wkillc && c != killc)
+					if (c != wkillc && c != killc
+					    && c != tocntrl('D'))
 						break;
 				}
 			}
 		} else if ( c ==  tocntrl('T')) { /* ^T */
 			execfunc = shiftwidth;
 		}
+
+		last_insert_char = c;
 
 	}
 
@@ -891,6 +971,7 @@ indented_newline()
 	int bracef; /* was there a brace at the end of line? */
 
 	indentwas = previndent(&bracef);
+	skipindent = 0;
 
 	if (lnewline() == FALSE)
 		return FALSE;
@@ -937,19 +1018,15 @@ int *bracefp;
 	/* backword() will leave us either on this line, if there's something
 		non-blank here, or on the nearest previous non-blank line. */
 	/* (at start of buffer, may leave us on empty line) */
-	if (backword(FALSE,1) == FALSE || llength(DOT.l) == 0) {
-		gomark(FALSE,1);
-		return 0;
-	}
-
+	do {
+	    if (backword(FALSE,1) == FALSE || llength(DOT.l) == 0) {
+		    gomark(FALSE,1);
+		    return 0;
+	    }
+	    DOT.o = 0;
 	/* if the line starts with a #, then don't copy its indent */
-	if (cmode && lGetc(DOT.l, 0) == '#') {
-		DOT.o = 0;
-		if (backword(FALSE,1) == FALSE) {
-			gomark(FALSE,1);
-			return 0;
-		}
-	}
+	} while ((skipindent-- > 0) || (cmode && lGetc(DOT.l, 0) == '#'));
+
 	ind = indentlen(l_ref(DOT.l));
 	if (bracefp) {
 		int lc = lastchar(l_ref(DOT.l));
@@ -1068,6 +1145,7 @@ int c;	/* brace/paren to insert (always '}' or ')' for now) */
 	} else {
 		return linsert(n,c);
 	}
+	skipindent = 0;
 #if ! CFENCE /* no fences?	then put brace one tab in from previous line */
 	doindent(((previndent(NULL)-1) / curtabval) * curtabval);
 #else /* line up brace with the line containing its match */

@@ -6,7 +6,10 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.115  1994/02/03 19:35:12  pgf
+ * Revision 1.116  1994/02/11 14:06:31  pgf
+ * hexdigits moved to edef.h
+ *
+ * Revision 1.115  1994/02/03  19:35:12  pgf
  * tom's changes for 3.65
  *
  * Revision 1.114  1994/02/03  10:17:27  pgf
@@ -450,8 +453,6 @@ static	int	allow_wrap;
 
 /* for window size changes */
 int chg_width, chg_height;
-
-static char hexdigits[] = "0123456789ABCDEF";
 
 /******************************************************************************/
 

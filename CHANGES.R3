@@ -1,3 +1,28 @@
+Changes for vile ?.??: (released ???)
+(pgf)
+	+ fix core from one-too-many chars to strncpy(). (eval.c)
+
+	+ change #elif constructs in version.c to oldstyle #else/#if
+
+	+ applied contributed patch for implementing 0^D in insert mode,
+	  and expanded it to implement ^^D. (insert.c)
+
+	+ insert mode now parses function key #c pairs returned from
+	  kbd_key(), so arrow keys work.  (input.c insert.c)
+
+	+ no longer turn off dot recording for non-redoable commands if
+	  we're in insert mode. (exec.c)
+
+	+ display high-bit keyboard input on message line in either octal
+	  or hex, depending on global value of unprintable-as-octal. (bind.c)
+
+	+ implemented "alt-function-prefix" to make function-key parsing
+	  in insert mode less ambiguous.  (edef.h, insert.c, input.c, cmdtbl,
+	  main.c)
+
+	+ new help for arrow keys, and cd/pwd commands.  also some more
+	  pcvile differences.  (vile.hlp)
+
 Changes for vile 3.65: (released Mon Feb 7, 1994)
 (pgf)
     Big change this release is 8-bit cleanliness.  See the help file
