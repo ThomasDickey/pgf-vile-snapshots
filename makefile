@@ -21,12 +21,13 @@
 
 SCREEN = tcap
 LIBS = -ltermcap
+#LIBS=-lcurses		# for AIX
+TARGET = vile
 
 #SCREEN = x11
 #LIBS = -lX11
 #TARGET = xvile
 
-TARGET = vile
 
 
 # install to DESTDIR1 if it's writable, else DESTDIR2
@@ -35,9 +36,11 @@ DESTDIR2 = $(HOME)/bin
 
 REMOTE=towno!pgf
 
+# for the mips
+#CFLAGS = -g -systype sysv
+
 #CFLAGS = -O
 CFLAGS = -g
-#CFLAGS = -g -systype sysv	# for the mips machine
 CC=cc
 
 
@@ -47,15 +50,6 @@ HEADER_BUILDER = ./mktbls
 
 ALLTOOLS = $(MAKEFILES)
 
-# this stuff lives in the shorten subdirectory.  It was lifted from the
-#	GNU emacs distribution.  See the file COPYING for more info.
-#SHORTSTUFF = shorten/COPYING \
-#	shorten/names.c \
-#	shorten/dups.c \
-#	shorten/defines.c \
-#	shorten/header.h \
-#	shorten/reserved \
-#	shorten/special
 
 # these are normal editable headers
 HDRS = estruct.h epath.h evar.h edef.h
@@ -82,25 +76,27 @@ CSRC = $(CSRCac) $(CSRCde) $(CSRCfh) $(CSRCim) $(CSRCnr) \
 OTHERSRC = z100bios.asm news.cps
 
 # text and data files
-TEXTFILES = README CHANGES cmdtbl vile.hlp buglist readme.news
+TEXTFILES = README CHANGES cmdtbl vile.hlp buglist revlist readme.news
 
 ALLSRC = $(CSRC) $(OTHERSRC)
 
 EVERYTHING = $(ALLTOOLS) $(ALLHDRS) $(ALLSRC) $(TEXTFILES) $(SHORTSTUFF)
 
-SRC = npopen.c finderr.c main.c buffer.c $(SCREEN).c termio.c display.c \
-	word.c wordmov.c window.c spawn.c \
-	region.c search.c random.c isearch.c line.c \
-	input.c fileio.c exec.c file.c eval.c \
-	crypt.c bind.c basic.c opers.c undo.c csrch.c tags.c \
-	vmalloc.c globals.c oneliner.c regexp.c
 
-OBJ = npopen.o finderr.o main.o buffer.o $(SCREEN).o termio.o display.o \
-	word.o wordmov.o window.o spawn.o \
-	region.o search.o random.o isearch.o line.o \
-	input.o fileio.o exec.o file.o eval.o \
-	crypt.o bind.o basic.o opers.o undo.o csrch.o tags.o \
-	vmalloc.o globals.o oneliner.o regexp.o
+SRC = main.c $(SCREEN).c basic.c bind.c buffer.c \
+	crypt.c csrch.c display.c eval.c exec.c file.c \
+	fileio.c finderr.c globals.c input.c isearch.c \
+	line.c npopen.c oneliner.c opers.c random.c regexp.c \
+	region.c search.c spawn.c tags.c termio.c undo.c \
+	vmalloc.c window.c word.c wordmov.c
+
+
+OBJ = main.o $(SCREEN).o basic.o bind.o buffer.o \
+	crypt.o csrch.o display.o eval.o exec.o file.o \
+	fileio.o finderr.o globals.o input.o isearch.o \
+	line.o npopen.o oneliner.o opers.o random.o regexp.o \
+	region.o search.o spawn.o tags.o termio.o undo.o \
+	vmalloc.o window.o word.o wordmov.o
 
 all: $(TARGET)
 
@@ -125,6 +121,9 @@ saber_obj: $(OBJ)
 
 $(BUILTHDRS): cmdtbl $(HEADER_BUILDER)
 	./$(HEADER_BUILDER) cmdtbl
+
+$(HEADER_BUILDER):  $(HEADER_BUILDER).c
+	$(CC) $(CFLAGS) -o $(HEADER_BUILDER)  $(HEADER_BUILDER).c
 
 # install to DESTDIR1 if it's writable, else DESTDIR2
 install:
@@ -182,6 +181,14 @@ newdosfloppy:
 list:
 	@ls $(EVERYTHING) | more
 
+# make a list of RCS revisions.  don't include the revlist itself
+nrevlist:
+	$(MAKE) list  | egrep -v revlist >/tmp/vile__files
+	rlog -Ntrunk `cat /tmp/vile__files` >/tmp/vile__revs
+	-paste /tmp/vile__files /tmp/vile__revs >/tmp/vile_revlist
+	rm /tmp/vile__files /tmp/vile__revs
+	mv /tmp/vile_revlist nrevlist
+
 # dump a list of files that may have changed since last backup
 rw list-writeable:
 	@ls -l $(EVERYTHING) | \
@@ -224,14 +231,35 @@ populate: $(EVERYTHING)
 $(EVERYTHING):
 	co -r$(revision) $@
 
-# you need this if SHORTNAMES is 0 in estruct.h
-# estruct.h: shorten/remap.h
-
-shorten/remap.h:
-	cd shorten; $(MAKE) remap.h
-
 # $Log: makefile,v $
-# Revision 1.32  1992/02/17 08:48:49  pgf
+# Revision 1.41  1992/04/06 09:43:55  pgf
+# fixed nrevlist target
+#
+# Revision 1.40  1992/04/06  09:29:57  pgf
+# added nrevlist target
+#
+# Revision 1.39  1992/04/06  09:21:40  pgf
+# added revlist
+#
+# Revision 1.38  1992/04/02  23:01:10  pgf
+# re-alphabetized SRC and OBJ
+#
+# Revision 1.37  1992/03/26  09:16:16  pgf
+# added regexp.c dependencies
+#
+# Revision 1.36  1992/03/25  19:12:19  pgf
+# explicit rule for building mktbls, to satisfy broken BSD make
+#
+# Revision 1.35  1992/03/19  23:36:42  pgf
+# removed shorten stuff
+#
+# Revision 1.34  1992/03/07  10:25:58  pgf
+# AIX support (needs -lcurses)
+#
+# Revision 1.33  1992/03/01  18:41:31  pgf
+# moved target define
+#
+# Revision 1.32  1992/02/17  08:48:49  pgf
 # keep copy of current executable during install
 #
 # Revision 1.31  1991/12/30  23:15:04  pgf
@@ -400,6 +428,10 @@ region.o: region.c
 region.o: /usr/include/stdio.h
 region.o: estruct.h
 region.o: edef.h
+regexp.o: regexp.c
+regexp.o: /usr/include/stdio.h
+regexp.o: estruct.h
+regexp.o: edef.h
 search.o: search.c
 search.o: /usr/include/stdio.h
 search.o: estruct.h

@@ -4,7 +4,10 @@
  * do any sentence mode commands, they are likely to be put in this file. 
  *
  * $Log: word.c,v $
- * Revision 1.14  1991/11/08 13:02:46  pgf
+ * Revision 1.15  1992/03/05 09:19:55  pgf
+ * changed some mlwrite() to mlforce(), due to new terse support
+ *
+ * Revision 1.14  1991/11/08  13:02:46  pgf
  * ifdefed unneeded funcs
  *
  * Revision 1.13  1991/11/03  17:33:20  pgf
@@ -518,7 +521,7 @@ wordcount(f, n)
 	else
 		avgch = 0;
 
-	mlwrite("lines %d, words, %D chars %D  avg chars/word %f",
+	mlforce("lines %d, words, %D chars %D  avg chars/word %f",
 		nlines + 1, nwords, nchars, avgch);
 	return(TRUE);
 }

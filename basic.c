@@ -6,7 +6,23 @@
  * framing, are hard.
  *
  * $Log: basic.c,v $
- * Revision 1.30  1992/02/17 08:49:47  pgf
+ * Revision 1.35  1992/03/22 10:54:41  pgf
+ * fixed bad bug in gotoline
+ *
+ * Revision 1.34  1992/03/19  23:30:35  pgf
+ * gotoline can now take neg. argument, to count from bottom of
+ * buffer. (for finderr)
+ *
+ * Revision 1.33  1992/03/19  23:05:50  pgf
+ * forwpage now sets WFMODE
+ *
+ * Revision 1.32  1992/03/13  08:12:53  pgf
+ * new paragraph behavior wrt blank lines, once again
+ *
+ * Revision 1.31  1992/03/03  21:57:01  pgf
+ * fixed loop at buffer top/bottom in gotoeosent
+ *
+ * Revision 1.30  1992/02/17  08:49:47  pgf
  * took out unused var for saber
  *
  * Revision 1.29  1992/01/22  17:15:25  pgf
@@ -257,9 +273,8 @@ register int    n;
         return TRUE;
 }
 
-/* move to a particular line.
-   argument (n) must be a positive integer for
-   this to actually do anything		*/
+/* move to a particular line. */
+/* count from bottom of file if negative */
 gotoline(f, n)
 int f,n;
 {
@@ -270,13 +285,17 @@ int f,n;
 		return(gotoeob(f,n));
 	}
 
-	if (n < 1)		/* if a bogus argument...then leave */
+	if (n == 0)		/* if a bogus argument...then leave */
 		return(FALSE);
 
-	/* first, we go to the start of the buffer */
-        curwp->w_dot.l  = lforw(curbp->b_line.l);
-        curwp->w_dot.o  = 0;
-	status = forwline(f, n-1);
+	curwp->w_dot.o  = 0;
+	if (n < 0) {
+		curwp->w_dot.l  = lback(curbp->b_line.l);
+		status = backline(f, -n - 1 );
+	} else {
+		curwp->w_dot.l  = lforw(curbp->b_line.l);
+		status = forwline(f, n-1);
+	}
 	if (status == TRUE)
 		firstnonwhite(f,n);
 	return(status);
@@ -460,7 +479,7 @@ int f,n;
 
 	/* and move the point up */
         dlp = curwp->w_dot.l;
-        while (n-- && lback(dlp)!=curbp->b_line.l)
+        while (n-- && lback(dlp) != curbp->b_line.l)
                 dlp = lback(dlp);
 
 	/* reseting the current position */
@@ -477,27 +496,32 @@ gotobop(f,n)
 int f,n;
 {
 	MARK odot;
+	int was_on_empty = (llength(DOT.l) == 0);
 	odot = DOT;
+	if (!f) n = 1;
 	if (doingopcmd && 
 		(DOT.o <= firstchar(DOT.l)) && 
 		!is_first_line(DOT,curbp)) {
 		backchar(TRUE,DOT.o+1);
 		pre_op_dot = DOT;
 	}
-    retry:
-	if (findpat(f, n, b_val_rexp(curbp,VAL_PARAGRAPHS)->reg,
+    	while (n) {
+		if (findpat(TRUE, 1, b_val_rexp(curbp,VAL_PARAGRAPHS)->reg,
 							REVERSE) != TRUE) {
-		gotobob(f,n);
-	} else if (llength(DOT.l) == 0) {
-		/* special case -- if we found an empty line,
-			and it's adjacent to where we started,
-			skip all adjacent empty lines, and try again */
-		if (llength(DOT.l) == 0 && lforw(DOT.l) == odot.l) {
-			while (lback(DOT.l) != curbp->b_line.l &&
-					llength(lback(DOT.l)) == 0)
-				DOT.l = lback(DOT.l);
-			goto retry;
+			gotobob(f,n);
+		} else if (llength(DOT.l) == 0) {
+			/* special case -- if we found an empty line,
+				and it's adjacent to where we started,
+				skip all adjacent empty lines, and try again */
+			if ( (was_on_empty && lforw(DOT.l) == odot.l) ||
+				(n > 0 && llength(lforw(DOT.l)) == 0) ) {
+				/* then we haven't really found what we
+					wanted.  keep going */
+				skipblanksb();
+				continue;
+			}
 		}
+		n--;
 	}
 	if (doingopcmd) {
 		if (!sameline(DOT,odot) && 
@@ -513,18 +537,27 @@ gotoeop(f,n)
 int f,n;
 {
 	MARK odot;
-	int was_at_bol;
+	int was_at_bol = (DOT.o <= firstchar(DOT.l));
+	int was_on_empty = (llength(DOT.l) == 0);
 	odot = DOT;
-	was_at_bol = (DOT.o <= firstchar(DOT.l));
-	if (findpat(f, n, b_val_rexp(curbp,VAL_PARAGRAPHS)->reg, 
-					FORWARD) != TRUE) {
-		DOT = curbp->b_line;
-	} else if (llength(DOT.l) == 0) {
-		/* special case -- if we found an empty line, skip all
-			adjacent empty lines */
-		while (lforw(DOT.l) != curbp->b_line.l &&
-				llength(lforw(DOT.l)) == 0)
-			DOT.l = lforw(DOT.l);
+	if (!f) n = 1;
+	while (n) {
+		if (findpat(TRUE, 1, b_val_rexp(curbp,VAL_PARAGRAPHS)->reg, 
+						FORWARD) != TRUE) {
+			DOT = curbp->b_line;
+		} else if (llength(DOT.l) == 0) {
+			/* special case -- if we found an empty line. */
+			/* either as the very next line, or at the end of
+				our search */
+			if ( (was_on_empty && lback(DOT.l) == odot.l) ||
+				(n > 0 && llength(lback(DOT.l)) == 0) ) {
+				/* then we haven't really found what we
+					wanted.  keep going */
+				skipblanksf();
+				continue;
+			}
+		}
+		n--;
 	}
 	if (doingopcmd) {
 		/* if we're now at the beginning of a line and we can back up,
@@ -539,6 +572,16 @@ int f,n;
 			fulllineregions = TRUE;
 	}
 	return TRUE;
+}
+
+skipblanksf() {
+	while (lforw(DOT.l) != curbp->b_line.l && llength(DOT.l) == 0)
+		DOT.l = lforw(DOT.l);
+}
+
+skipblanksb() {
+	while (lback(DOT.l) != curbp->b_line.l && llength(DOT.l) == 0)
+		DOT.l = lback(DOT.l);
 }
 
 #if STUTTER_SEC_CMD
@@ -591,6 +634,7 @@ int f,n;
 	int looped = 0;
 	int extra;
 	register regexp *exp;
+	register int s;
 
 	savepos = DOT;
 	exp = b_val_rexp(curbp,VAL_SENTENCES)->reg;
@@ -608,9 +652,9 @@ int f,n;
 	if (n == 1 && samepoint(savepos,DOT)) { /* try again */
 		if (looped > 10)
 			return FALSE;
-		backchar(TRUE, (exp->mlen?exp->mlen:1) + extra + looped);
-		while (is_at_end_of_line(DOT))
-			backchar(TRUE,1);
+		s = backchar(TRUE, (exp->mlen?exp->mlen:1) + extra + looped);
+		while (s && is_at_end_of_line(DOT))
+			s = backchar(TRUE,1);
 		looped++;
 		goto top;
 
@@ -622,6 +666,7 @@ gotoeosent(f,n)
 int f,n;
 {
 	register regexp *exp;
+	register int s;
 
 	exp = b_val_rexp(curbp,VAL_SENTENCES)->reg;
 	/* if we're on the end of a sentence now, don't bother scanning
@@ -633,9 +678,9 @@ int f,n;
 			return TRUE;
 		}
 	}
-	forwchar(TRUE, exp->mlen?exp->mlen:1);
-	while (is_at_end_of_line(DOT) || isspace(char_at(DOT))) {
-		forwchar(TRUE,1);
+	s = forwchar(TRUE, exp->mlen?exp->mlen:1);
+	while (s && (is_at_end_of_line(DOT) || isspace(char_at(DOT)))) {
+		s = forwchar(TRUE,1);
 	}
 	return TRUE;
 }
@@ -708,7 +753,7 @@ register int    n;
         curwp->w_line.l = lp;
         curwp->w_dot.l  = lp;
         curwp->w_dot.o  = 0;
-        curwp->w_flag |= WFHARD;
+        curwp->w_flag |= WFHARD|WFMODE;
         return (TRUE);
 }
 

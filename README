@@ -11,8 +11,8 @@ VILE -- VI Like Emacs: a vi workalike put together from Micro-Emacs by Paul Fox
 	First, of course, being /bin/ed)
 
 	So I took a copy of MicroEmacs 3.9 (which I've since
-	discovered was out of date, unfortunately) and bashed and
-	badgered it into a vi "feel-alike".  It retains the multiple
+	discovered was out of date, unfortunately) and turned it
+	into a vi "feel-alike".  It retains the multiple
 	buffer/multiple window features of uemacs, but the
 	"finger-feel", if you will, is very much that of vi.  It is
 	definitely not a clone, in that some substantial stuff is
@@ -20,8 +20,11 @@ VILE -- VI Like Emacs: a vi workalike put together from Micro-Emacs by Paul Fox
 	matters most is that one's "muscle memory" does the right thing
 	to the text in front of you, and that is what vile tries to do
 	for vi users.   THIS IS NOT A "CLONE"!  But it feels good.
+	(Put another way, the things that you tend to type over and
+	over probably work -- things done less frequently, like configuring
+	a .exrc file, are quite different.)
 
-	This is the second really public version of vile.  Users of
+	This is the second really public release of vile.  Users of
 	previous versions will hopefully find many new features -- see the
 	CHANGES file for details.
 
@@ -35,8 +38,6 @@ VILE -- VI Like Emacs: a vi workalike put together from Micro-Emacs by Paul Fox
 		- multiple windows on the screen
 		- a larger set of operator commands
 		- the possibility of porting to your favorite micro.
-			(mind you, I haven't even tried this on a small
-				UNIX machine, let alone DOS etc...)
 		- more uniform undo/yank register treatment
 		- using tags doesn't lose your last search pattern
 		- "next error" cursor positioning after compilation
@@ -47,25 +48,21 @@ VILE -- VI Like Emacs: a vi workalike put together from Micro-Emacs by Paul Fox
 
 	In general, I suspect that the quality of the code is roughly
 	on a par with MicroEmacs.  I've been using vile regularly under
-	both SunOS and 386 UNIX for about a year, with no major problems
+	both SunOS and 386 UNIX for almost two years, with no major problems
 	(that havn't been fixed).  Version three was built and used by
 	many others on the net, and their feedback was invaluable.
 	I think all of the reported bugs have been fixed, and hopefully
 	not too many new ones introduced.
 
-	I have not tried this on a small system, or even _any_
-	non-UNIX system.  I'm sure work will be required to make
-	it work on DOS again, for instance -- especially for spawning
-	sub-shells, etc. 
+	I have not tried this on a small system, or even _any_ non-UNIX 
+	system.  Pete Rusczinski has done an excellent job of porting
+	version three to DOS -- unfortunately his changes are not
+	incorporated here as yet.
 
 	Hope you enjoy -- 
 
-	Paul G. Fox	June, 1991, and October, 1992
+	Paul G. Fox	June, 1991, and February, 1992
 	pgf@cayman.com
 
-p.s.  The code distributed with vile in the "shortnames" subdirectory
-	is covered by GNU Public License.  The vile code itself in the
-	upper level directory is _not_ covered by the GNU public license. 
-
-p.p.s. By the way, I'm _not_ the same Paul Fox who wrote Crisp, the Brief
+p.s. By the way, I'm _not_ the same Paul Fox who wrote Crisp, the Brief
 	work-alike.

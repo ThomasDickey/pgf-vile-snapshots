@@ -4,7 +4,13 @@
  *	written 11-feb-86 by Daniel Lawrence
  *
  * $Log: bind.c,v $
- * Revision 1.18  1992/01/05 00:06:13  pgf
+ * Revision 1.20  1992/03/13 08:44:53  pgf
+ * honor \n like \r in kbd_engl_stat
+ *
+ * Revision 1.19  1992/03/05  09:19:55  pgf
+ * changed some mlwrite() to mlforce(), due to new terse support
+ *
+ * Revision 1.18  1992/01/05  00:06:13  pgf
  * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
  * often.  also normalized message appearance somewhat.
  *
@@ -136,7 +142,7 @@ int f,n;
 	char *kcod2prc();
 
 	/* prompt the user to type us a key to describe */
-	mlwrite("Describe the function bound to this key sequence: ");
+	mlprompt("Describe the function bound to this key sequence: ");
 
 	/* get the command sequence to describe
 	   change it to something we can print as well */
@@ -178,7 +184,7 @@ int f, n;	/* command arguments [IGNORED] */
 	char *kcod2prc();
 
 	/* prompt the user to type in a key to bind */
-	mlwrite("Bind function with english name: ");
+	mlprompt("Bind function with english name: ");
 
 	/* get the function name to bind it to */
 #if	NeWS
@@ -193,7 +199,7 @@ int f, n;	/* command arguments [IGNORED] */
 		mlforce("[No such function]");
 		return(FALSE);
 	}
-	mlwrite("...to keyboard sequence (type it exactly): ");
+	mlprompt("...to keyboard sequence (type it exactly): ");
 
 	/* get the command sequence to bind */
 	if (clexec) {
@@ -277,7 +283,7 @@ int f, n;	/* command arguments [IGNORED] */
 	char *kcod2prc();
 
 	/* prompt the user to type in a key to unbind */
-	mlwrite("Unbind this key sequence: ");
+	mlprompt("Unbind this key sequence: ");
 
 	/* get the command sequence to unbind */
 	if (clexec) {
@@ -900,13 +906,14 @@ char **bufp;
 			    c == kcod2key(abortc) ||
 			    c == kcod2key(killc) ||
 			    c == '\r' ||
+			    c == '\n' ||
 			    islinespecchar(c) ) {
 				tungetc(c);
 				return SORTOFTRUE;
 			}
 		}
 
-		if (c == '\r') {
+		if (c == '\r' || c == '\n') {
 			buf[cpos] = 0;
 			lineinput = FALSE;
 			*bufp = buf;

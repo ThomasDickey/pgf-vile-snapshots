@@ -6,7 +6,20 @@
 
 /*
  * $Log: evar.h,v $
- * Revision 1.7  1991/12/24 09:18:47  pgf
+ * Revision 1.11  1992/03/24 07:37:12  pgf
+ * added &rd and &wr functions, for file access
+ *
+ * Revision 1.10  1992/03/19  23:08:42  pgf
+ * variable rename/cleanup
+ *
+ * Revision 1.9  1992/03/05  09:17:21  pgf
+ * added support for new "terse" variable, to control unnecessary messages
+ *
+ * Revision 1.8  1992/03/03  09:35:52  pgf
+ * added support for getting "words" out of the buffer via variables --
+ * needed _nonspace character type
+ *
+ * Revision 1.7  1991/12/24  09:18:47  pgf
  * added current/change directory support  (Dave Lemke's changes)
  *
  * Revision 1.6  1991/11/13  20:09:27  pgf
@@ -54,15 +67,15 @@ char *envars[] = {
 	"curline",		/* current line in file */
 	"ram",			/* ram in use by malloc */
 	"flicker",		/* flicker supression */
-	"curwidth",		/* current screen width */
+	"pagewid",		/* current screen width */
 	"cbufname",		/* current buffer name */
-	"cfname",		/* current file name */
+	"cfilname",		/* current file name */
 	"sres",			/* current screen resolution */
 	"debug",		/* macro debugging */
 	"status",		/* returns the status of the last command */
 	"palette",		/* current palette string */
 	"lastkey",		/* last keyboard char struck */
-	"curchar",		/* current character under the cursor */
+	"char",			/* current character under the cursor */
 	"discmd",		/* display commands on command line */
 	"version",		/* current version number */
 	"progname",		/* returns current prog name - "vile" */
@@ -78,9 +91,13 @@ char *envars[] = {
 	"cmode",		/* mode of current buffer */
 	"tpause",		/* length to pause for paren matching */
 	"pending",		/* type ahead pending flag */
-	"lwidth",		/* width of current line */
+	"llength",		/* length of current line */
 	"line",			/* text of current line */
+	"word",			/* current word */
+	"identifier",		/* current punctuated */
+	"pathname",		/* current path-like word */
 	"directory",		/* current directory */
+	"terse",		/* be terse -- suppress messages */
 #if X11
 	"font",
 #endif
@@ -119,10 +136,14 @@ char *envars[] = {
 #define	EVCMODE		26
 #define	EVTPAUSE	27
 #define	EVPENDING	28
-#define	EVLWIDTH	29
+#define	EVLLENGTH	29
 #define	EVLINE		30
-#define	EVDIR		31
-#define	EVFONT		32
+#define	EVWORD		31
+#define	EVIDENTIF	32
+#define	EVPATHNAME	33
+#define	EVDIR		34
+#define	EVTERSE		35
+#define	EVFONT		36
 
 /*	list of recognized user functions	*/
 
@@ -169,6 +190,8 @@ UFUNC funcs[] = {
 	"sin", DYNAMIC,		/* find the index of one string in another */
 	"env", MONAMIC,		/* retrieve a system environment var */
 	"bin", MONAMIC,		/* loopup what function name is bound to a key */
+	"rd",  MONAMIC,		/* is a file readable? */
+	"wr",  MONAMIC,		/* is a file writeable? */
 };
 
 #define	NFUNCS	sizeof(funcs) / sizeof(UFUNC)
@@ -207,5 +230,7 @@ UFUNC funcs[] = {
 #define	UFSINDEX	29
 #define	UFENV		30
 #define	UFBIND		31
+#define	UFREADABLE	32
+#define	UFWRITABLE	33
 
 #endif

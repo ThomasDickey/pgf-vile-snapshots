@@ -6,7 +6,26 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.28  1992/02/17 08:57:36  pgf
+ * Revision 1.34  1992/03/25 19:13:17  pgf
+ * BSD portability changes
+ *
+ * Revision 1.33  1992/03/19  23:31:54  pgf
+ * mlputc now converts tabs to single spaces, since we don't really
+ * know how wide they should be anyway
+ *
+ * Revision 1.32  1992/03/19  23:13:04  pgf
+ * SIGT for signals
+ *
+ * Revision 1.31  1992/03/07  10:21:29  pgf
+ * suppress prompts (mlprompt()) if execing buff or file
+ *
+ * Revision 1.30  1992/03/05  09:17:21  pgf
+ * added support for new "terse" variable, to control unnecessary messages
+ *
+ * Revision 1.29  1992/03/01  18:38:40  pgf
+ * compilation error #if COLOR
+ *
+ * Revision 1.28  1992/02/17  08:57:36  pgf
  * added "showmode" support
  *
  * Revision 1.27  1992/01/22  20:26:00  pgf
@@ -115,11 +134,13 @@
 #include        "edef.h"
 #if UNIX
 #include <signal.h>
+#if USG
 #include <termio.h>
 #if SVR3_PTEM
 #include <sys/types.h>
 #include <sys/stream.h>
 #include <sys/ptem.h>
+#endif
 #endif
 #endif
 
@@ -570,8 +591,8 @@ int sline;
 	}
 	taboff = 0;
 #if	COLOR
-	vscreen[sline]->v_rfcolor = wp->w_fcolor;
-	vscreen[sline]->v_rbcolor = wp->w_bcolor;
+	vscreen[sline]->v_rfcolor = w_val(wp,WVAL_FCOLOR);
+	vscreen[sline]->v_rbcolor = w_val(wp,WVAL_BCOLOR);
 #endif
 }
 
@@ -691,7 +712,7 @@ updgar()
 	sgarbf = FALSE;			 /* Erase-page clears */
 	mpresf = FALSE;			 /* the message area. */
 	if (mlsave[0])
-		mlwrite(mlsave);
+		mlforce(mlsave);
 #if	COLOR
 	mlerase();			/* needs to be cleared if colored */
 #endif
@@ -1705,7 +1726,7 @@ va_dcl
 {
 	va_list ap;
 	/* if we are not currently echoing on the command line, abort this */
-	if (dotcmdmode == PLAY || discmd == FALSE) {
+	if (terse || dotcmdmode == PLAY || discmd == FALSE) {
 		movecursor(term.t_nrow, 0);
 		return;
 	}
@@ -1735,6 +1756,10 @@ va_dcl
 {
 	va_list ap;
 	int osgarbf = sgarbf;
+	if (discmd == FALSE) {
+		movecursor(term.t_nrow, 0);
+		return;
+	}
 	sgarbf = FALSE;
 	va_start(ap);
 	mlmsg(&ap);
@@ -1807,6 +1832,7 @@ mlputc(c)
 char c;
 {
 	if (c == '\r') ttcol = 0;
+	if (c == '\t') c = ' ';
 	if (ttcol < term.t_ncol-1) {
 	        TTputc(c);
 	        ++ttcol;
@@ -2123,6 +2149,7 @@ int *widthp, *heightp;
 }
 
 #ifdef SIGWINCH
+SIGT
 sizesignal ()
 {
 	int w, h;

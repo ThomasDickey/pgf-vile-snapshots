@@ -108,8 +108,8 @@ VI COMPLIANCE:
 
 - the "cd" and "pwd" commands now work
 
-- shiftwidth has been partially implemented -- ^T works, ^D doesn't, and
-	the '>' and '<' operators use the tab setting instead of shiftwidth.
+- shiftwidth has been implemented
+
 
 MISCELLANEOUS
 ===============
@@ -145,7 +145,8 @@ MISCELLANEOUS
 - there's less use of variant arguments to internal routines, to help
 	portability
 
-- quite a bit of code cleanup, at least I think so
+- quite a bit of code cleanup, at least I think so -- it has ported pretty
+	easily to an R6000, linux, 386bsd, Sony NeWS, NeXT, UNIXPC
 
 - quite a few bug fixes, including all (I think) of those reported by users
 
@@ -212,6 +213,19 @@ MISCELLANEOUS
 
 - it is now legal to "kill-buffer" a displayed buffer
 
+- there is a new variable, settable as "setv $terse true", which will
+	suppress some of the extra messages that vile prints, reducing
+	traffic for slow terminals.
+
+- there are new variables, $word, $pathname, and $identifier, which return
+	the appropriate type of string from the cursor's location
+
+- all of the variables, and the functions and directives of the extension
+	language have been documented, and most have been tried, if not
+	tested
+
+- two new functions: &rd and &wr, return whether a file is readable or writable
+
 IMPLEMENTORS NOTES:
 ===================
 
@@ -253,3 +267,7 @@ IMPLEMENTORS NOTES:
 
 - a lot of cleanup was done -- it's close to lint-free, and Saber has very
 	few problems with the code.
+
+- use mlwrite() for informative messages that $terse will suppress, mlforce()
+	for messages that _must_ be seen, and mlprompt() for messages that
+	need a response from the user unless they're in a command file.

@@ -3,7 +3,30 @@
  * commands. There is no functional grouping here, for sure.
  *
  * $Log: random.c,v $
- * Revision 1.48  1992/02/17 08:55:57  pgf
+ * Revision 1.55  1992/03/24 22:45:09  pgf
+ * allow ^D to back up past autoindented whitespace
+ *
+ * Revision 1.54  1992/03/24  07:45:08  pgf
+ * made separate internal and external entry points for go[to]col, so that
+ * users see columns starting at 1, and vile sees them starting from 0
+ *
+ * Revision 1.53  1992/03/19  23:23:31  pgf
+ * removed extra string lib externs and include
+ *
+ * Revision 1.52  1992/03/05  09:19:55  pgf
+ * changed some mlwrite() to mlforce(), due to new terse support
+ *
+ * Revision 1.51  1992/03/03  08:43:47  pgf
+ * fixed off-by-one error in gotocol()
+ *
+ * Revision 1.50  1992/03/01  18:38:40  pgf
+ * added fence matching on #if, #el, and #en, and
+ * fixed compilation error #if COLOR
+ *
+ * Revision 1.49  1992/02/26  21:58:17  pgf
+ * changes to entab/detabline, to better support shift operations
+ *
+ * Revision 1.48  1992/02/17  08:55:57  pgf
  * added showmode support, and
  * fixed backspace-after-wrapword bug, and
  * fixed '=' parsing in set commands, and
@@ -191,7 +214,6 @@
 #include	<stdio.h>
 #include	"estruct.h"
 #include	"edef.h"
-#include	<string.h>
 #if UNIX
 #include	<signal.h>
 #endif
@@ -372,8 +394,9 @@ int f,n;
 		TTbeep();
 		return FALSE;
 	}
-	mlwrite("[Fill column is %d, and is %s]", b_val(curbp,VAL_FILL),
-		is_global_b_val(curbp,VAL_FILL) ? "global" : "local" );
+	if (!terse || !f)
+		mlwrite("[Fill column is %d, and is %s]", b_val(curbp,VAL_FILL),
+			is_global_b_val(curbp,VAL_FILL) ? "global" : "local" );
 	return(TRUE);
 }
 
@@ -438,7 +461,7 @@ int f,n;
 		ratio = (100L*predchars) / numchars;
 
 	/* summarize and report the info */
-	mlwrite(
+	mlforce(
 "Line %d of %d, Col %d of %d, Char %D of %D (%d%%) char is 0x%x",
 		predlines+1, numlines, col+1, ecol,
 		predchars+1, numchars, ratio, curchar);
@@ -458,7 +481,7 @@ int f,n;
 		++numlines;
 		lp = lforw(lp);
 	}
-	mlwrite("%d",numlines);
+	mlforce("%d",numlines);
 	return TRUE;
 }
 
@@ -505,10 +528,19 @@ int bflg;
 
 
 /*
- * Set current column.
+ * Set current column, based on counting from 1
  */
 gotocol(f,n)
 int f,n;
+{
+	if (!f || n <= 0)
+		n = 1;
+	return gocol(n - 1);
+}
+
+/* really set column, based on counting from 0, for internal use */
+gocol(n)
+int n;
 {
 	register int c; 	/* character being scanned */
 	register int i; 	/* index into current line */
@@ -517,8 +549,6 @@ int f,n;
 
 	col = 0;
 	llen = llength(DOT.l);
-	if (!f || n <= 0)
-		n = 1;
 
 	/* scan the line until we are at or past the target column */
 	for (i = 0; i < llen; ++i) {
@@ -669,8 +699,9 @@ int f,n;
 		TTbeep();
 		return FALSE;
 	}
-	mlwrite("[%sabs are %d columns apart, using %s value.]", whichtabs,
-		curtabval, is_global_b_val(curbp,val)?"global":"local" );
+	if (!terse || !f)
+		mlwrite("[%sabs are %d columns apart, using %s value.]", whichtabs,
+			curtabval, is_global_b_val(curbp,val)?"global":"local" );
 	return TRUE;
 }
 
@@ -692,12 +723,12 @@ shiftwidth()
 		/* should entab mult ^T inserts */
 		return s;
 	}
-	detabline(fc);
+	detabline(TRUE);
 	s = b_val(curbp, VAL_SWIDTH) - 
 		(getccol(FALSE) % b_val(curbp,VAL_SWIDTH));
 	if (s)
 		s = linsert(s, ' ');
-	entabline(firstchar(DOT.l));
+	entabline(TRUE);
 	if (autoindented >= 0) {
 		autoindented = firstchar(DOT.l);
 	}
@@ -706,11 +737,11 @@ shiftwidth()
 
 
 /*
- * change all tabs in the line to the right number of spaces
- * upto says do upto that column
+ * change all tabs in the line to the right number of spaces.
+ * leadingonly says only do leading whitespace
  */
-detabline(upto)
-int upto;
+detabline(leadingonly)
+int leadingonly;
 {
 	register int	s;
 	register int	c;
@@ -720,15 +751,11 @@ int upto;
 
 	DOT.o = 0;
 
-	if (upto < 0)
-		upto = llength(DOT.l);
-
-	MK.l = DOT.l;
-	MK.o = upto;
-
 	/* detab the entire current line */
-	while (DOT.o < MK.o) {
+	while (DOT.o < llength(DOT.l)) {
 		c = char_at(DOT);
+		if (leadingonly && !isspace(c))
+			break;
 		/* if we have a tab */
 		if (c == '\t') {
 			if ((s = ldelete(1L, FALSE)) != TRUE) {
@@ -738,7 +765,7 @@ int upto;
 		}
 		DOT.o++;
 	}
-	gotocol(TRUE,ocol);
+	gocol(ocol);
 	return TRUE;
 }
 
@@ -747,14 +774,15 @@ int upto;
  */
 detab_region()
 {
-	return do_fl_region(detabline,-1);
+	return do_fl_region(detabline,FALSE);
 }
 
 /*
- * convert all appropriate spaces in the line to tab characters
+ * convert all appropriate spaces in the line to tab characters.
+ * leadingonly says only do leading whitespace
  */
-entabline(upto)
-int upto;
+entabline(leadingonly)
+int leadingonly;
 {
 	register int fspace;	/* pointer to first space if in a run */
 	register int ccol;	/* current cursor column */
@@ -763,20 +791,14 @@ int upto;
 
 	ocol = getccol(FALSE);
 
-	detabline(upto);	/* get rid of possible existing tabs */
-	DOT.o = 0;
-
 	/* entab the current line */
 	/* would this have been easier if it had started at
 		the _end_ of the line, rather than the beginning?  -pgf */
 	fspace = -1;
 	ccol = 0;
-	if (upto < 0)
-		upto = llength(DOT.l);
 
-	MK.l = DOT.l;
-	MK.o = upto;
-
+	detabline(leadingonly);	/* get rid of possible existing tabs */
+	DOT.o = 0;
 	while (1) {
 		/* see if it is time to compress */
 		if ((fspace >= 0) && (nextab(fspace) <= ccol))
@@ -789,7 +811,7 @@ int upto;
 				fspace = -1;
 			}
 
-		if (DOT.o >= MK.o)
+		if (DOT.o >= llength(DOT.l))
 			break;
 
 		/* get the current character */
@@ -799,12 +821,14 @@ int upto;
 			if (fspace == -1)
 				fspace = ccol;
 		} else {
+			if (leadingonly)
+				break;
 			fspace = -1;
 		}
 		ccol++;
 		DOT.o++;
 	}
-	gotocol(TRUE,ocol);
+	gocol(ocol);
 	return TRUE;
 }
 
@@ -813,7 +837,7 @@ int upto;
  */
 entab_region()
 {
-	return do_fl_region(entabline,-1);
+	return do_fl_region(entabline,FALSE);
 }
 
 /* trim trailing whitespace from a line.  leave dot at end of line */
@@ -1058,7 +1082,8 @@ ins()
 				register int backlimit;
 				/* have we backed thru a "word" yet? */
 				int saw_word = FALSE;
-				if (newlineyet || !b_val(curbp,MDBACKLIMIT))
+				if ((c == tocntrl('D') && autoindented >=0) ||
+					newlineyet || !b_val(curbp,MDBACKLIMIT))
 					backlimit = 0;
 				else
 					backlimit = startoff;
@@ -1608,12 +1633,12 @@ int global; /* true = global flag,	false = current buffer flag */
 				if (global)
 					gfcolor = i;
 				else if (curwp)
-					curwp->w_fcolor = i;
+					set_w_val(curwp, WVAL_FCOLOR, i);
 			else
 				if (global)
 					gbcolor = i;
 				else if (curwp)
-					curwp->w_bcolor = i;
+					set_w_val(curwp, WVAL_BCOLOR, i);
 
 			if (curwp)
 				curwp->w_flag |= WFCOLR;
@@ -1668,7 +1693,6 @@ register struct VAL *values;
 	int rplen = 0;
 	int no;
 	int nval, s;
-	extern char *strchr();
 	extern char *strmalloc();
 
 	no = 0;
@@ -1913,13 +1937,19 @@ int scandir; /* direction to scan if we're not on a fence to begin with */
 	register int ofence;	/* open fence */
 	register int c; /* current character in scan */
 	int s;
+	char *otherkey = NULL;
+	char *key;
 
 	/* save the original cursor position */
 	oldpos = DOT;
 
 	/* ch may have been passed, if being used internally */
 	if (!ch) {
-		if (scandir == FORWARD) {
+		if (b_val(curbp, MDCMOD) && DOT.o == 0
+					&& (ch = char_at(DOT)) == '#') {
+			if (llength(DOT.l) < 3)
+				return FALSE;
+		} else if (scandir == FORWARD) {
 			/* get the current character */
 			do {
 				ch = char_at(oldpos);
@@ -1953,7 +1983,29 @@ int scandir; /* direction to scan if we're not on a fence to begin with */
 		case ')': ofence = '('; sdir = REVERSE; break;
 		case RBRACE: ofence = LBRACE; sdir = REVERSE; break;
 		case ']': ofence = '['; sdir = REVERSE; break;
-		default: TTbeep(); return(FALSE);
+		case '#':
+			if (!strncmp("#if",DOT.l->l_text, 3)) {
+				sdir = FORWARD;
+				key = "#if";
+				otherkey = "#en";
+			} else if (!strncmp("#el",DOT.l->l_text, 3)) {
+				if (scandir == FORWARD) {
+					sdir = FORWARD;
+					key = "#if";
+					otherkey = "#en";
+				} else {
+					sdir = REVERSE;
+					key = "#en";
+					otherkey = "#if";
+				}
+			} else if (!strncmp("#en",DOT.l->l_text, 3)) {
+				sdir = REVERSE;
+				key = "#en";
+				otherkey = "#if";
+			} else 
+		default: {
+				TTbeep(); return(FALSE);
+			}
 	}
 
 	/* ops are inclusive of the endpoint */
@@ -1963,48 +2015,86 @@ int scandir; /* direction to scan if we're not on a fence to begin with */
 		backchar(TRUE,1);
 	}
 
-	/* set up for scan */
-	if (sdir == REVERSE)
-		backchar(FALSE, 1);
-	else
-		forwchar(FALSE, 1);
-
 	count = 1;
-	while (count > 0) {
-		if (is_at_end_of_line(DOT))
-			c = '\n';
+
+	if (otherkey != NULL) {  /* we're searching for a cpp keyword */
+		/* set up for scan */
+		if (sdir == REVERSE)
+			DOT.l = lback(DOT.l);
 		else
-			c = char_at(DOT);
+			DOT.l = lforw(DOT.l);
+		while (count > 0 && !is_header_line(DOT, curbp)) {
+			if (llength(DOT.l) >= 3 && char_at(DOT) == '#') {
+				if (!strncmp(key, DOT.l->l_text, 3))
+					++count;
+				else if (!strncmp(otherkey,DOT.l->l_text, 3))
+					--count;
+			}
 
-		if (c == ch)
-			++count;
-		else if (c == ofence)
-			--count;
+			if (count == 0)
+				break;
 
-		if (sdir == FORWARD)
-			s = forwchar(FALSE, 1);
-		else
-			s = backchar(FALSE, 1);
+			if (sdir == REVERSE)
+				DOT.l = lback(DOT.l);
+			else
+				DOT.l = lforw(DOT.l);
 
-		if (s == FALSE)
-			break;
-
-		if (interrupted) {
-			count = 1;
-			break;
+			if (interrupted) {
+				count = 1;
+				break;
+			}
 		}
-	}
+		if (count == 0) {
+			curwp->w_flag |= WFMOVE;
+			if (doingopcmd)
+				fulllineregions = TRUE;
+			return TRUE;
+		}
 
-	/* if count is zero, we have a match, move the sucker */
-	if (count == 0) {
-		if (sdir == FORWARD) {
-			if (!doingopcmd)
-				backchar(FALSE, 1);
-		} else {
+	} else {
+
+		/* set up for scan */
+		if (sdir == REVERSE)
+			backchar(FALSE, 1);
+		else
 			forwchar(FALSE, 1);
+
+		while (count > 0) {
+			if (is_at_end_of_line(DOT))
+				c = '\n';
+			else
+				c = char_at(DOT);
+
+			if (c == ch)
+				++count;
+			else if (c == ofence)
+				--count;
+
+			if (sdir == FORWARD)
+				s = forwchar(FALSE, 1);
+			else
+				s = backchar(FALSE, 1);
+
+			if (s == FALSE)
+				break;
+
+			if (interrupted) {
+				count = 1;
+				break;
+			}
 		}
-		curwp->w_flag |= WFMOVE;
-		return(TRUE);
+
+		/* if count is zero, we have a match, move the sucker */
+		if (count == 0) {
+			if (sdir == FORWARD) {
+				if (!doingopcmd)
+					backchar(FALSE, 1);
+			} else {
+				forwchar(FALSE, 1);
+			}
+			curwp->w_flag |= WFMOVE;
+			return(TRUE);
+		}
 	}
 
 	/* restore the current position */
@@ -2218,7 +2308,7 @@ cd(f,n)
 /* ARGSUSED */
 pwd(f,n)
 {
-	mlwrite("%s",current_directory());
+	mlforce("%s",current_directory());
 	return TRUE;
 }
 

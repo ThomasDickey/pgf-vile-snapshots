@@ -10,7 +10,32 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.51  1992/02/17 09:18:55  pgf
+ * Revision 1.59  1992/03/26 09:15:23  pgf
+ * system choice ifdef cleanup
+ *
+ * Revision 1.58  1992/03/25  19:13:17  pgf
+ * BSD portability changes
+ *
+ * Revision 1.57  1992/03/24  22:45:55  pgf
+ * corrected typos
+ *
+ * Revision 1.56  1992/03/19  23:33:35  pgf
+ * added b_linecount to BUFFER, so finderr can count from bottom of buffer
+ *
+ * Revision 1.55  1992/03/19  23:17:52  pgf
+ * SIGT for signals, and linux portability
+ *
+ * Revision 1.54  1992/03/07  10:21:29  pgf
+ * added AIX support (also need to link against -lcurses)
+ *
+ * Revision 1.53  1992/03/03  09:35:52  pgf
+ * added support for getting "words" out of the buffer via variables --
+ * needed _nonspace character type
+ *
+ * Revision 1.52  1992/03/01  18:38:40  pgf
+ * compilation error #if COLOR
+ *
+ * Revision 1.51  1992/02/17  09:18:55  pgf
  * turn off DEBUG and DEBUGM for release
  *
  * Revision 1.50  1992/02/17  09:00:28  pgf
@@ -207,6 +232,30 @@
 #endif
 
 
+/*	Machine/OS definitions			*/
+/* unix flavors */
+/* If you're UNIX, choose one of these... */
+#define BERK	0	/* Berkeley derived */
+#define USG	0	/* AT&T derived */
+#define SVR3	1	/* AT&T derived, more recently */
+#define V7	0	/* the good old days */
+
+/* ...and turn this on if you can... */
+#define POSIX	0	/* the good new days */
+
+/* unix sub-flavors */
+/* ...and turn on one of these if appropriate... */
+#define ODT	0			/* UNIX OPEN DESK TOP		*/
+#define ULTRIX	0			/* UNIX ULTRIX			*/
+#define ISC	0			/* Interactive Systems */
+#define NeXT	0
+#define UNIXPC	0
+#define HPUX	0
+#define AIX	0
+#define LINUX	0
+#define BSD386	0
+
+/* non-unix flavors */
 #ifdef	LATTICE
 #undef	LATTICE		/* don't use their definitions...use ours	*/
 #endif
@@ -223,84 +272,67 @@
 #undef	EGA
 #endif
 
-/*	Machine/OS definitions			*/
-/* sun, mips, generic 386, ODT, and Ultrix, see below... */
-/* unix flavors */
-#define BSD	1			/* UNIX BSD 4.2	and ULTRIX	*/
-#define USG	0			/* UNIX system V		*/
-#define V7	0			/* V7 UNIX or Coherent or BSD4.2*/
-					/*     presumably also Minix?	*/
-/* unix sub-flavors */
-/* define POSIX if you can -- then you'll get termio tty handling... */
-#define ODT	0			/* UNIX OPEN DESK TOP		*/
-#define ULTRIX	0			/* UNIX ULTRIX			*/
-#define ISC	0			/* Interactive Systems */
-#define POSIX	0			/* maybe someday the only??? */
-#define NeXT	0
-#define UNIXPC	0
-#define HPUX	0
-
-/* non-unix flavors */
 #define AMIGA	0			/* AmigaDOS			*/
 #define ST520	0			/* ST520, TOS		       */
 #define MSDOS	0			/* MS-DOS		       */
 #define CPM	0			/* CP/M-86		       */
 #define VMS	0			/* VAX/VMS		       */
 
-/* the following overrides are for convenience only */
-#if defined(sun)
-# undef BSD
-# undef USG
-# define BSD	1
-# define USG	0
+/* choose between void and int signal handler return type.
+  "typedefs?  we don't need no steenking typedefs..." */
+#if POSIX || (BERK && BSD386)
+# define SIGT void
+#else
+# define SIGT int
 #endif
 
-#if defined(i386) || defined(mips)
-# undef BSD
+/* the following overrides are mostly for convenience only */
+#if ULTRIX || defined(sun)
+# undef BERK
 # undef USG
-# define BSD	0
+# undef POSIX
+# define BERK	1
+# define USG	0
+# define POSIX	1
+#endif
+
+#if SVR3 || defined(mips)
+# undef BERK
+# undef USG
+# define BERK	0
 # define USG	1
 #endif
 
 #if ODT || ISC 
-# undef POSIX
-# undef BSD
+# undef BERK
 # undef USG
-# define POSIX	1
-# define BSD	0
+# undef POSIX
+# define BERK	0
 # define USG	1
-# define SVR3_PTEM	1	/* for ptem.h in display.c */
-#endif
-
-#if ULTRIX 
-# undef POSIX
-# undef BSD
-# undef USG
 # define POSIX	1
-# define BSD	1
-# define USG	0
+# define SVR3_PTEM	1	/* for ptem.h in display.c */
 #endif
 
 #if HPUX	/* reported to work with 7.05.  Could someone confirm these? */
 # define setbuffer setbuf
 # define HAVE_SELECT
 # undef POSIX
-# undef BSD
+# undef BERK
 # undef USG
 # define POSIX	0
-# define BSD	0
+# define BERK	0
 # define USG	1
 #endif
 
 #if NeXT
-#define __STRICT_BSD__
+# define __STRICT_BSD__
 #endif
 
 /* if anyone can verify that these are right, and work, let me know... -pgf */
 #if UNIXPC
-# undef BSD
+# undef BERK
 # undef USG
-# define BSD	0
+# define BERK	0
 # define USG	1
 # define abs xxabs
 # define atoi xxatoi
@@ -311,7 +343,24 @@
 # define HAVE_SELECT 1
 #endif
 
-#define UNIX	(V7 | BSD | USG)	/* any unix		*/
+#if AIX
+# undef POSIX
+# undef BERK
+# undef USG
+# define POSIX	1
+# define BERK	0
+# define USG	1
+# define HAVE_SELECT 1
+# define NOT_SYS_TERMIOS 1	/* termios.h is in /usr/include */
+# undef __STR__
+#endif
+
+#if LINUX
+# define HAVE_SELECT 1
+# define HAVE_POLL 0
+#endif
+
+#define UNIX	(V7 | BERK | USG)	/* any unix		*/
 
 /*	Porting constraints			*/
 #ifndef HAVE_MKDIR
@@ -320,11 +369,10 @@
 # define HAVE_MKDIR	0
 #endif
 
-#define SHORTNAMES	0	/* if your compiler insists on 7 char names */
 
 /* has the select() or poll() call, only used for short sleeps in fmatch() */
 #ifndef HAVE_SELECT
-# if BSD
+# if BERK
 #  define HAVE_SELECT 1
 # else
 #  define HAVE_SELECT 0
@@ -332,16 +380,17 @@
 #endif
 
 #ifndef HAVE_POLL
-# if POSIX || i386
+# if POSIX || SVR3 || ( USG && defined(pyr) )
 #  define HAVE_POLL 1
 # else
 #  define HAVE_POLL 0
 # endif
 #endif
 
+
 /*	Compiler definitions			*/
 #define MWC86	0	/* marc williams compiler */
-#define	LATTICE	0	/* Lattice 2.14 thruough 3.0 compilers */
+#define	LATTICE	0	/* Lattice 2.14 through 3.0 compilers */
 #define	AZTEC	0	/* Aztec C 3.20e */
 #define	MSC	0	/* MicroSoft C compile version 3 & 4 */
 #define	TURBO	0	/* Turbo C/MSDOS */
@@ -358,7 +407,7 @@
 #define RAINBOW 0			/* Use Rainbow fast video.	*/
 #define	IBMPC	0			/* IBM-PC CGA/MONO/EGA driver	*/
 #define	DG10	0			/* Data General system/10	*/
-#define	TIPC	0			/* TI Profesional PC driver	*/
+#define	TIPC	0			/* TI Professional PC driver	*/
 #define	Z309	0			/* Zenith 100 PC family	driver	*/
 #define	MAC	0			/* Macintosh			*/
 #define	ATARI	0			/* Atari 520/1040ST screen	*/
@@ -374,6 +423,9 @@
 /* Appearance */
 #define	TYPEAH	1	/* type ahead causes screen refresh to be delayed */
 #define	REVSTA	1	/* Status line appears in reverse video		*/
+
+/* NOTE -- COLOR doesn't currently do anything if you're using X or TERMCAP */
+/* (But I think X11 may honor colors from the command line or .Xdefaults) */
 #define	COLOR	0	/* color commands and windows			*/
 #define	CLRMSG	0	/* space clears the message line with no insert	*/
 
@@ -383,7 +435,7 @@
 #define	DOSFILES 1	/* turn on code for DOS mode (lines that end in crlf) */
 			/* use DOSFILES, for instance, if you edit DOS- */
 			/*	created files under UNIX		*/
-#define	CFENCE	1	/* do fench matching in CMODE			*/
+#define	CFENCE	1	/* do fence matching in CMODE			*/
 #define	REBIND	1	/* permit rebinding of keys at run-time		*/
 #define	APROP	1	/* Add code for Apropos command	(needs REBIND)	*/
 #define	FILOCK	0	/* file locking under unix BSD 4.2 (uses scanf) */
@@ -440,7 +492,7 @@
 /* (i.e. you shouldn't need to touch anything below here */
 /* ====================================================================== */
 
-#if BSD
+#if BERK
 #define USE_INDEX 1
 #endif
 
@@ -449,11 +501,7 @@
 #define strrchr rindex
 #endif
 
-#if SHORTNAMES
-#include "shorten/remap.h"
-#endif
-
-/*	System dependant library redefinitions, structures and includes	*/
+/*	System dependent library redefinitions, structures and includes	*/
 
 #if	TURBO
 #include      <dos.h>
@@ -709,14 +757,15 @@ union REGS {
 #define _digit	0x4		/* digits */
 #define _space	0x8		/* whitespace */
 #define _bspace 0x10		/* backspace character (^H, DEL, and user's) */
-#define _cntrl	0x20		/* control characterts, including DEL */
+#define _cntrl	0x20		/* control characters, including DEL */
 #define _print	0x40		/* printable */
 #define _punct	0x80		/* punctuation */
 #define _ident	0x100		/* is typically legal in "normal" identifier */
-#define _path	0x200		/* is typically legal in a file's pathname */
+#define _pathn	0x200		/* is typically legal in a file's pathname */
 #define _wild	0x400		/* is typically a shell wildcard char */
 #define _linespec 0x800		/* ex-style line range: 1,$ or 13,15 or % etc.*/
 #define _fence	0x1000		/* a fence, i.e. (, ), [, ], {, } */
+#define _nonspace	0x2000	/* non-whitespace */
 
 /* these intentionally match the ctypes.h definitions, except that
 	they force the char to 7-bit ascii first */
@@ -732,7 +781,7 @@ union REGS {
 #define isalpha(c)	istype(_lower|_upper, c)
 #define isalnum(c)	istype(_lower|_upper|_digit, c)
 #define isident(c)	istype(_ident, c)
-#define ispath(c)	istype(_path, c)
+#define ispath(c)	istype(_pathn, c)
 #define isbackspace(c)	istype(_bspace, c)
 #define islinespecchar(c)	istype(_linespec, c)
 #define isfence(c)	istype(_fence, c)
@@ -988,7 +1037,7 @@ typedef struct	W_TRAITS {
 #define	MDCRYPT		4		/* encrytion mode active	*/
 #define	MDDOS		5		/* "dos" mode -- lines end in crlf */
 #define	MDIGNCASE	6		/* Exact matching for searches	*/
-#define MDMAGIC		7		/* regular expresions in search */
+#define MDMAGIC		7		/* regular expressions in search */
 #define	MDSHOWMAT	8		/* auto-indent */
 #define	MDSHOWMODE	9		/* show insert/replace/command mode */
 #define	MDVIEW		10		/* read-only buffer		*/
@@ -1040,6 +1089,7 @@ typedef struct	BUFFER {
 					/*  global values		*/
 	struct	W_TRAITS b_wtraits;	/* saved window traits, while we're */
 					/*  not displayed		*/
+	long	b_linecount;		/* no. lines as of last read/write */
 	LINE 	*b_udstks[2];		/* undo stack pointers		*/
 	MARK 	b_uddot[2];		/* Link to "." before undoable op*/
 	short	b_udstkindx;		/* which of above to use	*/
@@ -1127,8 +1177,6 @@ typedef struct	WINDOW {
 #define w_line w_traits.w_ln
 #define w_values w_traits.w_vals
 #define w_mode w_traits.w_vals.w_mod
-#define w_fcolor w_traits.w_vals.w_fcol
-#define w_bcolor w_traits.w_vals.w_bcol
 
 #define DOT curwp->w_traits.w_dt
 #ifdef WINMARK
@@ -1194,7 +1242,7 @@ typedef struct	{
 	int	(*t_rev)();		/* set reverse video state	*/
 	int	(*t_rez)();		/* change screen resolution	*/
 #if	COLOR
-	int	(*t_setfor)();		/* set forground color		*/
+	int	(*t_setfor)();		/* set foreground color		*/
 	int	(*t_setback)();		/* set background color		*/
 #endif
 #if	SCROLLCODE
@@ -1203,7 +1251,7 @@ typedef struct	{
 }	TERM;
 
 /*	TEMPORARY macros for terminal I/O  (to be placed in a machine
-					    dependant place later)	*/
+					    dependent place later)	*/
 
 #define	TTopen		(*term.t_open)
 #define	TTclose		(*term.t_close)

@@ -2,7 +2,13 @@
  *		for MicroEMACS
  *
  * $Log: spawn.c,v $
- * Revision 1.16  1992/01/05 00:06:13  pgf
+ * Revision 1.18  1992/03/19 23:26:04  pgf
+ * SIGT for signals
+ *
+ * Revision 1.17  1992/03/05  09:19:55  pgf
+ * changed some mlwrite() to mlforce(), due to new terse support
+ *
+ * Revision 1.16  1992/01/05  00:06:13  pgf
  * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
  * often.  also normalized message appearance somewhat.
  *
@@ -64,9 +70,9 @@
  * initial vile RCS revision
  */
 
-#include        <stdio.h>
 #include	"estruct.h"
 #include        "edef.h"
+#include        <stdio.h>
 #if UNIX
 #include	<sys/types.h>
 #include	<sys/stat.h>
@@ -155,7 +161,7 @@ int f,n;
 
 #if     VMS
         movecursor(term.t_nrow, 0);             /* In last line.        */
-        mlwrite("[Starting DCL]\r\n");
+        mlforce("[Starting DCL]\r\n");
         TTflush(); 	                     /* Ignore "ttcol".      */
 	s = sys(NULL);                     /* NULL => DCL.         */
         sgarbf = TRUE;
@@ -210,6 +216,7 @@ bktoshell()		/* suspend and wait to wake up */
 #endif
 }
 
+SIGT
 rtfrmshell()
 {
 #if     NeWS
@@ -404,7 +411,7 @@ int rerun;
 	else
 	        Pexec(LOAD_EXEC,STcmd,STargs,STenv);
 	TTopen();
-        mlwrite("\r\n\n[End]");                  /* Pause.               */
+        mlforce("\r\n\n[End]");                  /* Pause.               */
         TTgetc();			     /* Pause.               */
         sgarbf = TRUE;
         return (TRUE);
@@ -423,7 +430,7 @@ int rerun;
         TTputc('\n');                /* Already have '\r'    */
         TTflush();
         s = sys(line);                          /* Run the command.     */
-        mlwrite("\r\n\n[End]");                  /* Pause.               */
+        mlforce("\r\n\n[End]");                  /* Pause.               */
         TTflush();
         tgetc();
         sgarbf = TRUE;
@@ -450,7 +457,7 @@ int rerun;
 	TTkopen();
 	/* if we are interactive, pause here */
 	if (clexec == FALSE) {
-	        mlwrite("\r\n\n[End]");
+	        mlforce("\r\n\n[End]");
         	tgetc();
         }
         sgarbf = TRUE;

@@ -8,8 +8,33 @@
 
 /*
  * $Log: edef.h,v $
- * Revision 1.35  1992/02/17 09:18:32  pgf
- * v 3.9
+ * Revision 1.43  1992/04/03 07:23:08  pgf
+ * v. 3.14
+ *
+ * Revision 1.42  1992/03/24  07:35:39  pgf
+ * since we include string.h, we also put the extern decls for index and rindex
+ * here if we need them
+ *
+ * Revision 1.41  1992/03/23  08:40:19  pgf
+ * v 3.13
+ *
+ * Revision 1.40  1992/03/19  23:42:34  pgf
+ * version 3.12
+ *
+ * Revision 1.39  1992/03/19  23:16:11  pgf
+ * vers. 3.11
+ *
+ * Revision 1.38  1992/03/13  19:49:30  pgf
+ * version three point ten
+ *
+ * Revision 1.37  1992/03/05  09:17:21  pgf
+ * added support for new "terse" variable, to control unnecessary messages
+ *
+ * Revision 1.36  1992/03/03  08:38:20  pgf
+ * use string.h instead of our own decl's
+ *
+ * Revision 1.35  1992/02/17  09:18:32  pgf
+ * version 3.9
  *
  * Revision 1.34  1992/02/17  08:59:33  pgf
  * added "showmode", and
@@ -150,9 +175,11 @@ char *mkupper();
 char *malloc();
 char *realloc();
 #endif
-char *strcat();
-char *strcpy();
-char *strncpy();
+#include <string.h>
+#if USE_INDEX
+char *index();
+char *rindex();
+#endif
 char *token();
 char *prc2engl();
 CMDFUNC *engl2fnc();
@@ -176,7 +203,7 @@ LINE    *lalloc();              /* Allocate a line              */
 #endif
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version three point nine");
+decl_init( char version[], "version three point fourteen");
 
 decl_init( int autoindented , -1);	/* how many chars (not cols) indented */
 decl_uninit( int isnamedcmd );		/* are we typing a command name */
@@ -250,6 +277,7 @@ decl_uninit( int execlevel );		/* execution IF level		*/
 decl_init( int	eolexist, TRUE );	/* does clear to EOL exist	*/
 decl_uninit( int revexist );		/* does reverse video exist?	*/
 decl_uninit( int flickcode );		/* do flicker supression?	*/
+decl_uninit( int terse );		/* be terse with messages? 	*/
 decl_uninit( int curtabval );		/* current tab width		*/
 
 decl_init( MARK nullmark, { NULL comma 0 } );

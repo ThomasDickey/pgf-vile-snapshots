@@ -7,7 +7,10 @@
 
 /*
  * $Log: epath.h,v $
- * Revision 1.3  1991/08/07 11:51:32  pgf
+ * Revision 1.4  1992/03/19 23:16:33  pgf
+ * ifdef fix
+ *
+ * Revision 1.3  1991/08/07  11:51:32  pgf
  * added RCS log entries
  *
  * revision 1.2
@@ -71,7 +74,7 @@ char *pathname[] =
 };
 #endif
 
-#if	V7 | BSD | USG
+#if	UNIX
 {
 	".vilerc",
 	"vile.hlp",

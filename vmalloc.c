@@ -10,7 +10,10 @@
  *	(pgf, 1989)
  *
  * $Log: vmalloc.c,v $
- * Revision 1.4  1991/11/01 14:38:00  pgf
+ * Revision 1.5  1992/03/05 09:19:55  pgf
+ * changed some mlwrite() to mlforce(), due to new terse support
+ *
+ * Revision 1.4  1991/11/01  14:38:00  pgf
  * saber cleanup
  *
  * Revision 1.3  1991/10/08  01:30:59  pgf
@@ -370,7 +373,7 @@ int f,n;
 			}
 		}
 	}
-	mlwrite("doverifys %s %d, outstanding mallocs: %d, %d accounted for.",
+	mlforce("doverifys %s %d, outstanding mallocs: %d, %d accounted for.",
 		f ? "set to":"is still", doverifys, num, found);
 	return TRUE;
 }

@@ -13,7 +13,17 @@
  *		pgf, 11/91
  * 
  * $Log: regexp.c,v $
- * Revision 1.15  1992/01/05 00:06:13  pgf
+ * Revision 1.18  1992/03/26 09:15:48  pgf
+ * took out include of string.h
+ *
+ * Revision 1.17  1992/03/07  10:23:31  pgf
+ * added eric krohn's diffs for \< and \> support, and removed some old ifdefs
+ * for backslashed-paren code, which isn't needed with regmassage
+ *
+ * Revision 1.16  1992/03/01  18:41:31  pgf
+ * be more restrictive setting regmust
+ *
+ * Revision 1.15  1992/01/05  00:06:13  pgf
  * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
  * often.  also normalized message appearance somewhat.
  *
@@ -99,7 +109,6 @@
  * regular-expression syntax might require a total rethink.
  */
 #include <stdio.h>
-#include <string.h>
 #include "estruct.h"
 #include "edef.h"
 
@@ -155,6 +164,8 @@
 #define	NOTHING	9	/* no	Match empty string. */
 #define	STAR	10	/* node	Match this (simple) thing 0 or more times. */
 #define	PLUS	11	/* node	Match this (simple) thing 1 or more times. */
+#define	BEGWORD	12	/* node	Match "" between nonword and word. */
+#define	ENDWORD 13	/* node	Match "" between word and nonword. */
 #define	OPEN	20	/* no	Mark this point in input as start of #n. */
 			/*	OPEN+1 is number 1, etc. */
 #define	CLOSE	30	/* no	Analogous to OPEN. */
@@ -206,11 +217,7 @@
 
 #define	FAIL(m)	{ regerror(m); return(NULL); }
 #define	ISMULT(c)	((c) == '*' || (c) == '+' || (c) == '?')
-#ifdef NO_BACK_PAREN
-#define	META	"^$.[()|?+*\\"
-#else
-#define	META	"^$.[|?+*\\"
-#endif
+#define	META	"^$.[()|?+*\\<>"
 
 /*
  * Flags to be passed up and down.
@@ -313,8 +320,6 @@ int magic;
  * of the structure of the compiled regexp.
  */
 
-#define NO_BACK_PAREN 1  /* let ( and ) act alone, no backslash needed */
-
 regexp *
 regcomp(origexp,magic)
 char *origexp;
@@ -404,8 +409,10 @@ int magic;
 					longest = OPERAND(scan);
 					len = strlen(OPERAND(scan));
 				}
-			r->regmust = longest - r->program;
-			r->regmlen = len;
+			if (longest) {
+				r->regmust = longest - r->program;
+				r->regmlen = len;
+			}
 		}
 	}
 
@@ -475,7 +482,6 @@ int *flagp;
 		regoptail(br, ender);
 
 	/* Check for proper termination. */
-#ifdef NO_BACK_PAREN
 	if (paren && *regparse++ != ')') {
 		FAIL("unmatched ()");
 	} else if (!paren && *regparse != '\0') {
@@ -485,19 +491,6 @@ int *flagp;
 			FAIL("junk on end");	/* "Can't happen". */
 		/* NOTREACHED */
 	}
-#else
-	if (paren) {
-		if (!(*regparse == '\\' && *(regparse+1) == ')')) {
-			FAIL("unmatched ()");
-			/* NOTREACHED */
-		}
-		regparse++;
-	} else if (!paren && *regparse != '\0') {
-		FAIL("junk on end");	/* "Can't happen". */
-		/* NOTREACHED */
-	}
-	regparse++;
-#endif
 
 	return(ret);
 }
@@ -520,13 +513,7 @@ int *flagp;
 
 	ret = regnode(BRANCH);
 	chain = NULL;
-	while (*regparse != '\0' && *regparse != '|' && 
-#ifdef NO_BACK_PAREN
-		*regparse != ')'
-#else
-		!(*regparse == '\\' && *(regparse+1) == ')')
-#endif
-			) {
+	while (*regparse != '\0' && *regparse != '|' && *regparse != ')') {
 		latest = regpiece(&flags);
 		if (latest == NULL)
 			return(NULL);
@@ -632,6 +619,12 @@ int *flagp;
 	case '$':
 		ret = regnode(EOL);
 		break;
+	case '<':
+		ret = regnode(BEGWORD);
+		break;
+	case '>':
+		ret = regnode(ENDWORD);
+		break;
 	case '.':
 		ret = regnode(ANY);
 		*flagp |= HASWIDTH|SIMPLE;
@@ -671,19 +664,15 @@ int *flagp;
 			*flagp |= HASWIDTH|SIMPLE;
 		}
 		break;
-#ifdef NO_BACK_PAREN
 	case '(':
 		ret = reg(1, &flags);
 		if (ret == NULL)
 			return(NULL);
 		*flagp |= flags&(HASWIDTH|SPSTART);
 		break;
-#endif
 	case '\0':
 	case '|':
-#ifdef NO_BACK_PAREN
 	case ')':
-#endif
 		FAIL("internal urp");	/* Supposed to be caught earlier. */
 		/* NOTREACHED */
 		break;
@@ -694,18 +683,6 @@ int *flagp;
 		/* NOTREACHED */
 		break;
 	case '\\':
-#ifndef NO_BACK_PAREN
-		if (*regparse == ')')
-			FAIL("internal urp");	/* Supposed to be caught earlier. */
-		if (*regparse == '(') {
-			regparse++;
-			ret = reg(1, &flags);
-			if (ret == NULL)
-				return(NULL);
-			*flagp |= flags&(HASWIDTH|SPSTART);
-			break;
-		}
-#endif
 		if (*regparse == '\0')
 			FAIL("trailing \\");
 		ret = regnode(EXACTLY);
@@ -1090,6 +1067,22 @@ char *prog;
 			if (reginput != regnomore)
 				return(0);
 			break;
+		case BEGWORD:
+			/* Match if current char isident
+			 * and previous char BOL or !ident */
+			if ((reginput == regnomore || !isident(*reginput))
+					|| (reginput != regbol 
+					&& isident(reginput[-1])))
+				return(0);
+			break;
+		case ENDWORD:
+			/* Match if previous char isident
+			 * and current char EOL or !ident */
+			if ((reginput != regnomore && isident(*reginput))
+					|| reginput == regbol
+					|| !isident(reginput[-1]))
+ 				return(0);
+ 			break;
 		case ANY:
 			if (reginput == regnomore)
 				return(0);

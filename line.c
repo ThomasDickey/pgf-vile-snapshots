@@ -11,7 +11,19 @@
  * which means that the dot and mark values in the buffer headers are nonsense.
  *
  * $Log: line.c,v $
- * Revision 1.19  1992/02/17 09:03:22  pgf
+ * Revision 1.22  1992/03/24 07:37:35  pgf
+ * usekreg now works better as a namedcmd
+ *
+ * Revision 1.21  1992/03/07  10:28:52  pgf
+ * don't bother copying and marking lines that aren't really being split,
+ * in lnewline -- fixes problem "p"utting and undoing a blank line at the
+ * end of file
+ *
+ * Revision 1.20  1992/03/03  09:35:52  pgf
+ * added support for getting "words" out of the buffer via variables --
+ * needed _nonspace character type
+ *
+ * Revision 1.19  1992/02/17  09:03:22  pgf
  * kill registers now hold unsigned chars
  *
  * Revision 1.18  1992/01/22  18:38:34  pgf
@@ -454,17 +466,19 @@ lnewline()
 		}
 		return TRUE;
 	}
-	copy_for_undo(lp1);
 	if ((lp2=lalloc(doto,curbp)) == NULL) 	/* New first half line	*/
 		return (FALSE);
-	cp1 = &lp1->l_text[0];			/* Shuffle text around	*/
-	cp2 = &lp2->l_text[0];
-	while (cp1 != &lp1->l_text[doto])
-		*cp2++ = *cp1++;
-	cp2 = &lp1->l_text[0];
-	while (cp1 != &lp1->l_text[lp1->l_used])
-		*cp2++ = *cp1++;
-	lp1->l_used -= doto;
+	if (doto > 0) {
+		copy_for_undo(lp1);
+		cp1 = &lp1->l_text[0];		/* Shuffle text around	*/
+		cp2 = &lp2->l_text[0];
+		while (cp1 != &lp1->l_text[doto])
+			*cp2++ = *cp1++;
+		cp2 = &lp1->l_text[0];
+		while (cp1 != &lp1->l_text[lp1->l_used])
+			*cp2++ = *cp1++;
+		lp1->l_used -= doto;
+	}
 	/* put lp2 in above lp1 */
 	lp2->l_bp = lp1->l_bp;
 	lp1->l_bp = lp2;
@@ -633,32 +647,17 @@ int kflag;	/* put killed text in kill buffer flag */
 	return (TRUE);
 }
 
-/* getctext:	grab and return a string with the text of
-		the current line
+/* getctext:	grab and return a string with text from
+		the current line, consisting of chars of type "type"
 */
 
-char *getctext()
-
+char *getctext(type)
+int type;
 {
-	register LINE *lp;	/* line to copy */
-	register int size;	/* length of line to return */
-	register char *sp;	/* string pointer into line */
-	register char *dp;	/* string pointer into returned line */
 	static char rline[NSTRING];	/* line to return */
 
-	/* find the contents of the current line and its length */
-	lp = curwp->w_dot.l;
-	sp = lp->l_text;
-	size = lp->l_used;
-	if (size >= NSTRING)
-		size = NSTRING - 1;
-
-	/* copy it across */
-	dp = rline;
-	while (size--)
-		*dp++ = *sp++;
-	*dp = 0;
-	return(rline);
+	screen_string(rline, NSTRING, type);
+	return rline;
 }
 
 #if ! SMALLER
@@ -913,6 +912,8 @@ int f,n;
 	if (clexec) {
 		macarg(tok);	/* get the next token */
 		cfp = engl2fnc(tok);
+	} else if (isnamedcmd) {
+		return namedcmd(f,n);
 	} else {
 		/* get the next command from the keyboard */
 		c = kbd_seq();

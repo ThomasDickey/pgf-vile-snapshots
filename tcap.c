@@ -2,7 +2,15 @@
  *		for MicroEMACS
  *
  * $Log: tcap.c,v $
- * Revision 1.10  1992/01/22 20:27:47  pgf
+ * Revision 1.12  1992/03/24 08:46:02  pgf
+ * fixed support for AL,DL -- I hope it's really safe to use tgoto as
+ * a generic parm capability expander.  I
+ *
+ * Revision 1.11  1992/03/24  07:46:34  pgf
+ * added support for DL and AL capabilities, which are multi-line insert
+ * and delete -- much better in an xterm
+ *
+ * Revision 1.10  1992/01/22  20:27:47  pgf
  * added TI, TE, KS, KE support, per user suggestion (sorry, forgot who)
  *
  * Revision 1.9  1991/11/01  14:38:00  pgf
@@ -84,7 +92,7 @@ char *UP, PC, *CM, *CE, *CL, *SO, *SE;
 char *TI, *TE, *KS, *KE;
 
 #if	SCROLLCODE
-char *CS, *DL, *AL, *SF, *SR;
+char *CS, *dl, *al, *DL, *AL, *SF, *SR;
 #endif
 
 TERM term = {
@@ -190,14 +198,16 @@ tcapopen()
 	CS = tgetstr("cs", &p);
 	SF = tgetstr("sf", &p);
 	SR = tgetstr("sr", &p);
-	DL = tgetstr("dl", &p);
-	AL = tgetstr("al", &p);
+	dl = tgetstr("dl", &p);
+	al = tgetstr("al", &p);
+	DL = tgetstr("DL", &p);
+	AL = tgetstr("AL", &p);
         
 	if (CS && SR) {
 		if (SF == NULL) /* assume '\n' scrolls forward */
 			SF = "\n";
 		term.t_scroll = tcapscroll_reg;
-	} else if (DL && AL) {
+	} else if ((DL && AL) || (dl && al)) {
 		term.t_scroll = tcapscroll_delins;
 	} else {
 		term.t_scroll = NULL;
@@ -303,29 +313,43 @@ int from, to, n;
 {
 	int i;
 	if (to == from) return;
+	if (DL && AL) {
+		if (to < from) {
+			tcapmove(to,0);
+			putpad(tgoto(DL,0,from-to));
+			tcapmove(to+n,0);
+			putpad(tgoto(AL,0,from-to));
+		} else {
+			tcapmove(from+n,0);
+			putpad(tgoto(DL,0,to-from));
+			tcapmove(from,0);
+			putpad(tgoto(AL,0,to-from));
+		}
+	} else { /* must be dl and al */
 #if PRETTIER_SCROLL
-	if (abs(from-to) > 1) {
-		tcapscroll_delins(from, (from<to) ? to-1:to+1, n);
-		if (from < to)
-			from = to-1;
-		else
-			from = to+1;    
-	}
+		if (abs(from-to) > 1) {
+			tcapscroll_delins(from, (from<to) ? to-1:to+1, n);
+			if (from < to)
+				from = to-1;
+			else
+				from = to+1;    
+		}
 #endif
-	if (to < from) {
-		tcapmove(to,0);
-		for (i = from - to; i > 0; i--)
-			putpad(DL);
-		tcapmove(to+n,0);
-		for (i = from - to; i > 0; i--)
-			putpad(AL);
-	} else {
-		tcapmove(from+n,0);
-		for (i = to - from; i > 0; i--)
-			putpad(DL);
-		tcapmove(from,0);
-		for (i = to - from; i > 0; i--)
-			putpad(AL);
+		if (to < from) {
+			tcapmove(to,0);
+			for (i = from - to; i > 0; i--)
+				putpad(dl);
+			tcapmove(to+n,0);
+			for (i = from - to; i > 0; i--)
+				putpad(al);
+		} else {
+			tcapmove(from+n,0);
+			for (i = to - from; i > 0; i--)
+				putpad(dl);
+			tcapmove(from,0);
+			for (i = to - from; i > 0; i--)
+				putpad(al);
+		}
 	}
 }
 

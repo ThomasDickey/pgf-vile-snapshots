@@ -5,7 +5,10 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: tags.c,v $
- * Revision 1.16  1992/01/05 00:06:13  pgf
+ * Revision 1.17  1992/03/19 23:26:23  pgf
+ * removed extra string lib externs
+ *
+ * Revision 1.16  1992/01/05  00:06:13  pgf
  * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
  * often.  also normalized message appearance somewhat.
  *
@@ -223,7 +226,6 @@ gettagsfile()
 {
 	int s;
 	char *tagsfile;
-	char *strrchr();
 
 	/* is there a "tags" buffer around? */
         if ((tagbp=bfind("tags", NO_CREAT, 0)) == NULL) {
@@ -394,7 +396,6 @@ makeflist()
 	register char *fnp;
 	register int i;
 	char fname[NFILEN];
-	char *strchr();
 
 	if (!(othmode & OTH_LAZY))
 		return TRUE;

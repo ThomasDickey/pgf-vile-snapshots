@@ -4,7 +4,26 @@
 	written 1986 by Daniel Lawrence
  *
  * $Log: eval.c,v $
- * Revision 1.23  1992/02/17 09:01:16  pgf
+ * Revision 1.29  1992/03/24 09:02:18  pgf
+ * need to glob() filenames for &rd and &wr
+ *
+ * Revision 1.28  1992/03/24  07:36:23  pgf
+ * added &rd and &wr functions, for file access, and fixed off-by-one in $curcol
+ *
+ * Revision 1.27  1992/03/19  23:19:55  pgf
+ * linux prototyped portability
+ *
+ * Revision 1.26  1992/03/19  23:07:47  pgf
+ * variable access cleanup/rearrangement
+ *
+ * Revision 1.25  1992/03/05  09:17:21  pgf
+ * added support for new "terse" variable, to control unnecessary messages
+ *
+ * Revision 1.24  1992/03/03  09:35:52  pgf
+ * added support for getting "words" out of the buffer via variables --
+ * needed _nonspace character type
+ *
+ * Revision 1.23  1992/02/17  09:01:16  pgf
  * took out unused vars for saber
  *
  * Revision 1.22  1992/01/05  00:06:13  pgf
@@ -188,6 +207,8 @@ char *fname;		/* name of function to evaluate */
 				return("");
 #endif
 		case UFBIND:	return(prc2engl(arg1));
+		case UFREADABLE:return(ltos(glob(arg1), flook(arg1, FL_HERE)));
+		case UFWRITABLE:return(ltos(glob(arg1), !ffronly(arg1)));
 	}
 	return errorm;
 }
@@ -238,10 +259,11 @@ char *vname;		/* name of environment variable to retrieve */
 	/* otherwise, fetch the appropriate value */
 	switch (vnum) {
 		case EVPAGELEN:	return(itoa(term.t_nrow + 1));
-		case EVCURCOL:	return(itoa(getccol(FALSE)));
+		case EVCURCOL:	return(itoa(getccol(FALSE) + 1));
 		case EVCURLINE: return(itoa(getcline()));
 		case EVRAM:	return(itoa((int)(envram / 1024l)));
 		case EVFLICKER:	return(ltos(flickcode));
+		case EVTERSE:	return(ltos(terse));
 		case EVCURWIDTH:return(itoa(term.t_nrow));
 		case EVCBUFNAME:return(curbp->b_bname);
 		case EVCFNAME:	return(curbp->b_fname);
@@ -271,8 +293,11 @@ char *vname;		/* name of environment variable to retrieve */
 #else
 				return(falsem);
 #endif
-		case EVLWIDTH:	return(itoa(llength(DOT.l)));
-		case EVLINE:	return(getctext());
+		case EVLLENGTH:	return(itoa(llength(DOT.l)));
+		case EVLINE:	return(getctext(0));
+		case EVWORD:	return(getctext(_nonspace));
+		case EVIDENTIF:	return(getctext(_ident));
+		case EVPATHNAME:return(getctext(_pathn));
 		case EVDIR:	return(current_directory());
 #if X11
 		case EVFONT:	return(x_current_fontname());
@@ -296,7 +321,7 @@ char *getkill()		/* return some of the contents of the kill buffer */
 			size = kbs[0].kused;
 		else
 			size = NSTRING - 1;
-		strncpy(value, kbs[0].kbufh->d_chunk, size);
+		strncpy(value, (char *)(kbs[0].kbufh->d_chunk), size);
 	}
 
 	/* and return the constructed value */
@@ -475,7 +500,8 @@ char *value;	/* value to set to */
 				break;
 		case EVCURLINE:	status = gotoline(TRUE, atoi(value));
 				break;
-		case EVRAM:	break;
+		case EVTERSE:	terse = stol(value);
+				break;
 		case EVFLICKER:	flickcode = stol(value);
 				break;
 		case EVCURWIDTH:status = newwidth(TRUE, atoi(value));
@@ -509,8 +535,6 @@ char *value;	/* value to set to */
 				break;
 		case EVDISCMD:	discmd = stol(value);
 				break;
-		case EVVERSION:	break;
-		case EVPROGNAME:break;
 		case EVSEED:	seed = atoi(value);
 				break;
 		case EVDISINP:	disinp = stol(value);
@@ -521,17 +545,24 @@ char *value;	/* value to set to */
 						atoi(value) - getwpos());
 				break;
 		case EVSEARCH:	strcpy(pat, value);
+				if (gregexp) free(gregexp);
+				gregexp = regcomp(pat, b_val(curbp, MDMAGIC));
 				break;
 		case EVREPLACE:	strcpy(rpat, value);
 				break;
-		case EVMATCH:	break;
-		case EVKILL:	break;
 		case EVTPAUSE:	term.t_pause = atoi(value);
 				break;
-		case EVPENDING:	break;
-		case EVLWIDTH:	break;
+		case EVPROGNAME:
+		case EVVERSION:
+		case EVMATCH:
+		case EVKILL:
+		case EVPENDING:
+		case EVLLENGTH:
+		case EVRAM:	break;
 		case EVLINE:	putctext(value);
+				break;
 		case EVDIR:	set_directory(value);
+				break;
 #if X11
 		case EVFONT:	status = x_setfont(value);
 				break;
@@ -727,9 +758,9 @@ int stol(val)	/* convert a string to a numeric logical */
 char *val;	/* value to check for stol */
 {
 	/* check for logical values */
-	if (val[0] == 'F')
+	if (val[0] == 'F' || val[0] == 'f')
 		return(FALSE);
-	if (val[0] == 'T')
+	if (val[0] == 'T' || val[0] == 't')
 		return(TRUE);
 
 	/* check for numeric truth (!= 0) */

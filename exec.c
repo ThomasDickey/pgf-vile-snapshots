@@ -4,7 +4,14 @@
  *	written 1986 by Daniel Lawrence	
  *
  * $Log: exec.c,v $
- * Revision 1.23  1992/02/17 09:01:50  pgf
+ * Revision 1.25  1992/03/13 08:11:04  pgf
+ * allow ":0" to work by honoring ZERO flag for gomark
+ *
+ * Revision 1.24  1992/03/03  08:41:15  pgf
+ * took out pre_colon_pos -- now we don't move dot unless the command _wants_
+ * a line no. or range
+ *
+ * Revision 1.23  1992/02/17  09:01:50  pgf
  * save "dot before the named colon command" so that ':' can be expanded to
  * a filename correctly, as in ":e:".
  * also, fixed bug in buffer exec code, and
@@ -97,11 +104,6 @@
 #include	<stdio.h>
 #include	"estruct.h"
 #include	"edef.h"
-
-MARK 	pre_colon_pos = {
-	NULL,
-	0
-};
 
 /* namedcmd:	execute a named command even if it is not bound */
 
@@ -228,7 +230,7 @@ seems like we need one more check here -- is it from a .exrc file?
 	/* was: if (!(flags & (ZERO | EXRCOK)) && fromline == NULL ) { */
 	if (zero) {
 		extern CMDFUNC f_lineputafter, f_opendown, f_insfile;
-		extern CMDFUNC f_lineputbefore, f_openup;
+		extern CMDFUNC f_lineputbefore, f_openup, f_gomark;
 		if (!(flags & ZERO)) {
 			mlforce("[Can't use address 0 with \"%s\" command]", fnp);
 			return FALSE;
@@ -237,12 +239,14 @@ seems like we need one more check here -- is it from a .exrc file?
 			must be willing to go _down_ from there.  Seems easiest
 			to special case the commands that prefer going up */
 		if (cfp == &f_insfile) {
-			/* EMPTY */ /* works okay -- acts down normally */ ;
+			/* EMPTY */ /* works okay, or acts down normally */ ;
 		} else if (cfp == &f_lineputafter) {
 			cfp = &f_lineputbefore;
 			fromline = lforw(fromline);
 		} else if (cfp == &f_opendown) {
 			cfp = &f_openup;
+			fromline = lforw(fromline);
+		} else if (cfp == &f_gomark) {
 			fromline = lforw(fromline);
 		} else {
 			mlforce("[Configuration error: ZERO]");
@@ -338,18 +342,16 @@ seems like we need one more check here -- is it from a .exrc file?
 	}
 #endif
 
-	pre_colon_pos = DOT;
-
 	if (toline || fromline) {  /* assume it's an absolute motion */
 				   /* we could probably do better */
 		curwp->w_lastdot = DOT;
 	}
-	if (toline) {
+	if (toline && (flags & TO)) {
 		DOT.l = toline;
 		firstnonwhite(f,n);
 		setmark();
 	}
-	if (fromline) {
+	if (fromline && (flags & FROM)) {
 		DOT.l = fromline;
 		firstnonwhite(f,n);
 		if (!toline)
@@ -366,8 +368,6 @@ seems like we need one more check here -- is it from a .exrc file?
 	havemotion = NULL;
 	isnamedcmd = FALSE;
 	fulllineregions = FALSE;
-
-	pre_colon_pos.l = NULL;
 
 	return s;
 }

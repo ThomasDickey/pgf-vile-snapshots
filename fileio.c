@@ -3,7 +3,13 @@
  * the knowledge about files are here.
  *
  * $Log: fileio.c,v $
- * Revision 1.20  1992/01/05 00:06:13  pgf
+ * Revision 1.22  1992/03/25 19:13:17  pgf
+ * BSD portability changes
+ *
+ * Revision 1.21  1992/03/19  23:21:12  pgf
+ * moved includes to top
+ *
+ * Revision 1.20  1992/01/05  00:06:13  pgf
  * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
  * often.  also normalized message appearance somewhat.
  *
@@ -79,10 +85,12 @@
 #include	"estruct.h"
 #include        "edef.h"
 #if UNIX
+#include	<sys/types.h>
+#include	<sys/stat.h>
 #include        <errno.h>
 #include        <fcntl.h>
 #endif
-#if	BSD
+#if	BERK
 #include "sys/ioctl.h"
 #endif
 
@@ -109,6 +117,7 @@ char    *fn;
 		fileispipe = TRUE;
 	} else {
 	        if ((ffp=fopen(fn, "r")) == NULL) {
+			extern int errno;
 			if (errno == ENOENT)
 		                return (FIOFNF);
 	                return (FIOERR);
@@ -186,10 +195,6 @@ char    *fn;
 #endif
 
 #ifdef UNIX
-
-#include "sys/types.h"
-#include "sys/stat.h"
-
 long
 ffsize()
 {
@@ -412,7 +417,11 @@ int *lenp;	/* to return the final length */
 	is used to see if stdio has data for us, without actually
 	reading it and possibly blocking.  if you have trouble building
 	this, just force ffhasdata() to always return FALSE */
-#define	isready_c(p)	( (p)->_cnt > 0)
+#ifdef __sgetc  /* 386bsd */
+# define	isready_c(p)	( (p)->_r > 0)
+#else
+# define	isready_c(p)	( (p)->_cnt > 0)
+#endif
 
 ffhasdata()
 {
