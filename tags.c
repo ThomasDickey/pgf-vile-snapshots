@@ -5,7 +5,10 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: tags.c,v $
- * Revision 1.34  1993/05/04 17:05:14  pgf
+ * Revision 1.35  1993/05/24 15:21:37  pgf
+ * tom's 3.47 changes, part a
+ *
+ * Revision 1.34  1993/05/04  17:05:14  pgf
  * see tom's CHANGES, 3.45
  *
  * Revision 1.33  1993/04/28  17:15:56  pgf
@@ -228,8 +231,8 @@ int taglen;
 
 	if (curbp && curwp) {
 		lineno = 1;
-	        for(clp = lforw(curbp->b_line.l); 
-				clp != curwp->w_dot.l; clp = lforw(clp))
+	        for(clp = lForw(curbp->b_line.l); 
+				clp != l_ref(curwp->w_dot.l); clp = lforw(clp))
 			lineno++;
 		pushuntag(curbp->b_fname, lineno);
 	}
@@ -284,7 +287,7 @@ int taglen;
 				tossuntag();
 			return FALSE;
 		}
-		curwp->w_dot.l = lp;
+		curwp->w_dot.l = l_ptr(lp);
 		curwp->w_flag |= WFMOVE;
 		(void)firstnonwhite(FALSE,1);
 		s = TRUE;
@@ -374,8 +377,8 @@ char *name;
 int len;
 {
 	LINE *lp;
-	lp = lforw(bp->b_line.l);
-	while (lp != bp->b_line.l) {
+	lp = lForw(bp->b_line.l);
+	while (lp != l_ref(bp->b_line.l)) {
 		if (llength(lp) >= len) {
 			if (llength(lp) >= len &&
 				 !strncmp(lp->l_text, name, len))

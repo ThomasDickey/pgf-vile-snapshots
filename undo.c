@@ -1,9 +1,11 @@
-
 /* these routines take care of undo operations
  * code by Paul Fox, original algorithm mostly by Julia Harper May, 89
  *
  * $Log: undo.c,v $
- * Revision 1.24  1993/05/11 16:22:22  pgf
+ * Revision 1.25  1993/05/24 15:21:37  pgf
+ * tom's 3.47 changes, part a
+ *
+ * Revision 1.24  1993/05/11  16:22:22  pgf
  * see tom's CHANGES, 3.46
  *
  * Revision 1.23  1993/04/20  12:18:32  pgf
@@ -139,19 +141,19 @@ LINE *lp;
 	if (needundocleanup)
 		preundocleanup();
 	pushline(lp,CURSTK(curbp));
-	if ((ALTDOT(curbp).l == NULL) || (ALTDOT(curbp).l == lp)) {
+	if ((l_ref(ALTDOT(curbp).l) == NULL) || (l_ref(ALTDOT(curbp).l) == lp)) {
 		int fc;
 		/* need to save a dot -- either the next line or 
 			the previous one */
-		if (lforw(lp) == curbp->b_line.l) {
-			ALTDOT(curbp).l = lback(lp);
+		if (lforw(lp) == l_ref(curbp->b_line.l)) {
+			ALTDOT(curbp).l = l_ptr(lback(lp));
 			fc =  firstchar(lback(lp));
 			if (fc < 0) /* all white */
 				ALTDOT(curbp).o = llength(lback(lp)) - 1;
 			else
 				ALTDOT(curbp).o = fc;
 		} else {
-			ALTDOT(curbp).l = lforw(lp);
+			ALTDOT(curbp).l = l_ptr(lforw(lp));
 			fc =  firstchar(lforw(lp));
 			if (fc < 0) /* all white */
 				ALTDOT(curbp).o = 0;
@@ -197,8 +199,8 @@ LINE *lp;
 
 	setupuline(lp);
 
-	if (ALTDOT(curbp).l == NULL) {
-		ALTDOT(curbp).l = lp;
+	if (l_ref(ALTDOT(curbp).l) == NULL) {
+		ALTDOT(curbp).l = l_ptr(lp);
 		ALTDOT(curbp).o = curwp->w_dot.o;
 	}
 	return (TRUE);
@@ -228,8 +230,8 @@ LINE *lp;
 	set_lback(nlp, lback(lp));
 	pushline(nlp,CURSTK(curbp));
 	lsetcopied(lp);
-	if (ALTDOT(curbp).l == NULL) {
-		    ALTDOT(curbp).l = lp;
+	if (l_ref(ALTDOT(curbp).l) == NULL) {
+		    ALTDOT(curbp).l = l_ptr(lp);
 		    ALTDOT(curbp).o = curwp->w_dot.o;
 	}
 	return (TRUE);
@@ -237,21 +239,22 @@ LINE *lp;
 
 void
 pushline(lp,stk)
-LINE *lp,**stk;
+LINE *lp;
+LINEPTR *stk;
 {
 	lp->l_nxtundo = *stk;
-	*stk = lp;
+	*stk = l_ptr(lp);
 }
 
 LINE *
 popline(stk)
-LINE **stk;
+LINEPTR *stk;
 {
 	LINE *lp;
-	lp = *stk;
+	lp = l_ref(*stk);
 	if (lp != NULL) {
 		*stk = lp->l_nxtundo;
-		lp->l_nxtundo = NULL;
+		lp->l_nxtundo = l_ptr((LINE *)0);
 	}
 	return (lp);
 }
@@ -277,7 +280,7 @@ applypatch(newlp,oldlp)
 LINE *newlp, *oldlp;
 {
 	register LINE *tlp;
-	for (tlp = *CURSTK(curbp); tlp != NULL ; tlp = tlp->l_nxtundo) {
+	for (tlp = l_ref(*CURSTK(curbp)); tlp != NULL ; tlp = l_ref(tlp->l_nxtundo)) {
 		if (!lispatch(tlp)) {
 			if (lforw(tlp) == oldlp)
 				set_lforw(tlp, newlp);
@@ -326,8 +329,8 @@ register BUFFER *bp;
 	/* there may be a way to clean these less drastically, by
 		using the information on the stacks above, but I
 		couldn't figure it out.  -pgf  */
-	lp = lforw(bp->b_line.l);
-	while (lp != bp->b_line.l) {
+	lp = lForw(bp->b_line.l);
+	while (lp != l_ref(bp->b_line.l)) {
 		lsetnotcopied(lp);
 		lp = lforw(lp);
 	}
@@ -402,9 +405,9 @@ int f,n;
 		odot = DOT;
 
 		DOT = CURDOT(curbp);
-		DOT.o = firstchar(DOT.l);
+		DOT.o = firstchar(l_ref(DOT.l));
 		if (DOT.o < 0) {
-			DOT.o = llength(DOT.l) - 1;
+			DOT.o = lLength(DOT.l) - 1;
 			if (DOT.o < 0)
 				DOT.o = 0;
 		}
@@ -445,15 +448,17 @@ int f,n;
 	register LINE *ulp;	/* the Undo line */
 	register LINE *lp;	/* the line we may replace */
 	register WINDOW *wp;
+#if !OPT_MAP_MEMORY
 	register char *ntext;
+#endif
 
-	ulp = curbp->b_ulinep;
+	ulp = l_ref(curbp->b_ulinep);
 	if (ulp == NULL) {
 		TTbeep();
 		return FALSE;
 	}
 
-	lp = ulp->l_nxtundo;
+	lp = l_ref(ulp->l_nxtundo);
 
 	if (lforw(ulp) != lforw(lp) ||
 	    lback(ulp) != lback(lp)) {
@@ -466,15 +471,23 @@ int f,n;
 	if (linesmatch(ulp,lp) == TRUE) 
 		return TRUE;
 
-	curwp->w_dot.l = lp;
+	curwp->w_dot.l = l_ptr(lp);
 	preundocleanup();
 
+#if !OPT_MAP_MEMORY
 	ntext = NULL;
 	if (ulp->l_size && (ntext = malloc(ulp->l_size)) == NULL)
 		return (FALSE);
+#endif
 
 	copy_for_undo(lp);
 
+#if OPT_MAP_MEMORY
+	if ((lp = l_reallocate(curwp->w_dot.l, ulp->l_size, curbp)) == 0)
+		return (FALSE);
+	lp->l_used = ulp->l_used;
+	memcpy(lp->l_text, ulp->l_text, llength(ulp));
+#else
 	if (ntext && lp->l_text) {
 		memcpy(ntext, ulp->l_text, llength(ulp));
 		ltextfree(lp,curbp);
@@ -483,23 +496,24 @@ int f,n;
 	lp->l_text = ntext;
 	lp->l_used = ulp->l_used;
 	lp->l_size = ulp->l_size;
+#endif
 
 #if ! WINMARK
-	if (MK.l == lp)
+	if (l_ref(MK.l) == lp)
 		MK.o = 0;
 #endif
 	/* let's be defensive about this */
 	for_each_window(wp) {
-		if (wp->w_dot.l == lp)
+		if (l_ref(wp->w_dot.l) == lp)
 			wp->w_dot.o = 0;
 #if WINMARK
 		if (wp->w_mark.l == lp)
 			wp->w_mark.o = 0;
 #endif
-		if (wp->w_lastdot.l == lp)
+		if (l_ref(wp->w_lastdot.l) == lp)
 			wp->w_lastdot.o = 0;
 	}
-	if (CURDOT(curbp).l == lp)
+	if (l_ref(CURDOT(curbp).l) == lp)
 		CURDOT(curbp).o = 0;
 	if (curbp->b_nmmarks != NULL) {
 		/* fix the named marks */
@@ -507,7 +521,7 @@ int f,n;
 		struct MARK *mp;
 		for (i = 0; i < 26; i++) {
 			mp = &(curbp->b_nmmarks[i]);
-			if (mp->l == lp)
+			if (l_ref(mp->l) == lp)
 				mp->o = 0;
 		}
 	}
@@ -525,31 +539,31 @@ register LINE *nlp,*olp;
 {
 	register WINDOW *wp;
 
-	if (DOT.l == olp) {
+	if (l_ref(DOT.l) == olp) {
 		if (lisreal(nlp)) {
-			DOT.l = nlp;
+			DOT.l = l_ptr(nlp);
 		} else {
-			DOT.l = lforw(olp);
+			DOT.l = l_ptr(lforw(olp));
 		}
 		DOT.o = 0;
 	}
 #if ! WINMARK
-	if (MK.l == olp) {
+	if (l_ref(MK.l) == olp) {
 		if (lisreal(nlp)) {
-			MK.l = nlp;
+			MK.l = l_ptr(nlp);
 		} else {
-			MK.l = lforw(olp);
+			MK.l = l_ptr(lforw(olp));
 		}
 		MK.o = 0;
 	}
 #endif
 	/* fix anything important that points to it */
 	for_each_window(wp) {
-		if (wp->w_line.l == olp)
+		if (l_ref(wp->w_line.l) == olp)
 			if (lisreal(nlp)) {
-				wp->w_line.l = nlp;
+				wp->w_line.l = l_ptr(nlp);
 			} else {
-				wp->w_line.l = lforw(olp);
+				wp->w_line.l = l_ptr(lforw(olp));
 			}
 #if WINMARK
 		if (wp->w_mark.l == olp) {
@@ -561,18 +575,18 @@ register LINE *nlp,*olp;
 			wp->w_mark.o = 0;
 		}
 #endif
-		if (wp->w_lastdot.l == olp) {
+		if (l_ref(wp->w_lastdot.l) == olp) {
 			if (lisreal(nlp)) {
-				wp->w_lastdot.l = nlp;
+				wp->w_lastdot.l = l_ptr(nlp);
 			} else {
-				wp->w_lastdot.l = lforw(olp);
+				wp->w_lastdot.l = l_ptr(lforw(olp));
 			}
 			wp->w_lastdot.o = 0;
 		}
 	}
-	if (CURDOT(curbp).l == olp) {
+	if (l_ref(CURDOT(curbp).l) == olp) {
 		if (lisreal(nlp)) {
-			CURDOT(curbp).l = nlp;
+			CURDOT(curbp).l = l_ptr(nlp);
 		} else {
 		    mlforce("BUG: preundodot points at newly inserted line!");
 		}
@@ -583,9 +597,9 @@ register LINE *nlp,*olp;
 		struct MARK *mp;
 		for (i = 0; i < 26; i++) {
 			mp = &(curbp->b_nmmarks[i]);
-			if (mp->l == olp) {
+			if (l_ref(mp->l) == olp) {
 				if (lisreal(nlp)) {
-					mp->l = nlp;
+					mp->l = l_ptr(nlp);
 					mp->o = 0;
 				} else {
 					mlforce("[Lost mark]");
@@ -611,10 +625,10 @@ void
 dumpuline(lp)
 LINE *lp;
 {
-	if ((curbp->b_ulinep != NULL) &&
-		    (curbp->b_ulinep->l_nxtundo == lp)) {
-		lfree(curbp->b_ulinep,curbp);
-		curbp->b_ulinep = NULL;
+	if ((l_ref(curbp->b_ulinep) != NULL) &&
+		    (l_ref(l_ref(curbp->b_ulinep)->l_nxtundo) == lp)) {
+		lfree(l_ref(curbp->b_ulinep), curbp);
+		curbp->b_ulinep = l_ptr((LINE *)0);
 	}
 }
 
@@ -623,12 +637,12 @@ setupuline(lp)
 LINE *lp;
 {
 	/* take care of the U line */
-	if ((curbp->b_ulinep == NULL) || (curbp->b_ulinep->l_nxtundo != lp)) {
-		if (curbp->b_ulinep != NULL)
-			lfree(curbp->b_ulinep,curbp);
-		curbp->b_ulinep = copyline(lp);
-		if (curbp->b_ulinep != NULL)
-			curbp->b_ulinep->l_nxtundo = lp;
+	if ((l_ref(curbp->b_ulinep) == NULL) || (l_ref(l_ref(curbp->b_ulinep)->l_nxtundo) != lp)) {
+		if (l_ref(curbp->b_ulinep) != NULL)
+			lfree(l_ref(curbp->b_ulinep), curbp);
+		curbp->b_ulinep = l_ptr(copyline(lp));
+		if (l_ref(curbp->b_ulinep) != NULL)
+			l_ref(curbp->b_ulinep)->l_nxtundo = l_ptr(lp);
 	}
 }
 
@@ -636,9 +650,9 @@ void
 resetuline(olp,nlp)
 register LINE *olp,*nlp;
 {
-	if (curbp->b_ulinep != NULL && curbp->b_ulinep->l_nxtundo == olp) {
+	if (l_ref(curbp->b_ulinep) != NULL && l_ref(l_ref(curbp->b_ulinep)->l_nxtundo) == olp) {
 		if (lisreal(nlp)) {
-			curbp->b_ulinep->l_nxtundo = nlp;
+			l_ref(curbp->b_ulinep)->l_nxtundo = l_ptr(nlp);
 		} else {
 			mlforce("BUG: b_ulinep pointed at inserted line!");
 		}

@@ -3,7 +3,10 @@
  * the knowledge about files are here.
  *
  * $Log: fileio.c,v $
- * Revision 1.46  1993/05/11 16:22:22  pgf
+ * Revision 1.47  1993/05/24 15:21:37  pgf
+ * tom's 3.47 changes, part a
+ *
+ * Revision 1.46  1993/05/11  16:22:22  pgf
  * see tom's CHANGES, 3.46
  *
  * Revision 1.45  1993/05/06  16:34:27  pgf
@@ -360,6 +363,7 @@ char    *fn;
 	}
 }
 
+#if !OPT_MAP_MEMORY
 #if UNIX || VMS
 long
 ffsize()
@@ -381,7 +385,9 @@ ffsize(void)
 	return  filelength(fd);
 }
 #endif
+#endif	/* !OPT_MAP_MEMORY */
 
+#if !MSDOS && !OPT_MAP_MEMORY
 int
 ffread(buf,len)
 char *buf;
@@ -421,6 +427,7 @@ ffrewind()
 {
 	fseek (ffp,0L,0);
 }
+#endif
 
 /*
  * Close a file. Should look at the status in all systems.

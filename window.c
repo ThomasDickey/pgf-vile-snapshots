@@ -3,7 +3,10 @@
  * attached to keys that the user actually types.
  *
  * $Log: window.c,v $
- * Revision 1.24  1993/04/20 12:18:32  pgf
+ * Revision 1.25  1993/05/24 15:21:37  pgf
+ * tom's 3.47 changes, part a
+ *
+ * Revision 1.24  1993/04/20  12:18:32  pgf
  * see tom's 3.43 CHANGES
  *
  * Revision 1.23  1993/04/20  12:00:59  pgf
@@ -294,7 +297,7 @@ int f,n;
 	register int    i;
 	int             was_n = n;
 
-	lp = curwp->w_line.l;
+	lp = l_ref(curwp->w_line.l);
 
 	if (!f)
 		n = 1;
@@ -305,21 +308,21 @@ int f,n;
 		curwp->w_flag |= WFINS;
 
 	if (n < 0) {
-		while (n++ && lforw(lp) != curbp->b_line.l)
+		while (n++ && lforw(lp) != l_ref(curbp->b_line.l))
 			lp = lforw(lp);
 	} else {
-		while (n-- && lback(lp) != curbp->b_line.l)
+		while (n-- && lback(lp) != l_ref(curbp->b_line.l))
 			lp = lback(lp);
 	}
 
-	curwp->w_line.l = lp;
+	curwp->w_line.l = l_ptr(lp);
 	curwp->w_flag |= WFHARD | WFMODE;
 
 	/* is it still in the window */
 	for (i = 0; i < curwp->w_ntrows; ++i) {
-		if (lp == curwp->w_dot.l)
+		if (lp == l_ref(curwp->w_dot.l))
 			return (TRUE);
-		if (lforw(lp) == curbp->b_line.l)
+		if (lforw(lp) == l_ref(curbp->b_line.l))
 			break;
 		lp = lforw(lp);
 	}
@@ -335,8 +338,8 @@ int f,n;
 	if (was_n < 0)
 		curwp->w_dot.l = curwp->w_line.l;
 	else
-		curwp->w_dot.l = lback(lp);
-	curwp->w_dot.o = getgoal(curwp->w_dot.l);
+		curwp->w_dot.l = l_ptr(lback(lp));
+	curwp->w_dot.o = getgoal(l_ref(curwp->w_dot.l));
 	return (TRUE);
 }
 
@@ -433,15 +436,15 @@ int f,n;
         }
         wheadp = curwp;
         wheadp->w_wndp = NULL;
-        lp = curwp->w_line.l;
+        lp = l_ref(curwp->w_line.l);
         i  = curwp->w_toprow;
-        while (i!=0 && lback(lp)!=curbp->b_line.l) {
+        while (i!=0 && lback(lp) != l_ref(curbp->b_line.l)) {
                 --i;
                 lp = lback(lp);
         }
         curwp->w_toprow = 0;
         curwp->w_ntrows = term.t_nrow-1;
-        curwp->w_line.l  = lp;
+        curwp->w_line.l = l_ptr(lp);
         curwp->w_flag  |= WFMODE|WFHARD;
         return (TRUE);
 }
@@ -477,12 +480,12 @@ WINDOW *thewp;
 	if (thewp == wheadp) { /* there's nothing before */
 		/* find the next window down */
 		wp = thewp->w_wndp;
-                lp = wp->w_line.l;
+                lp = l_ref(wp->w_line.l);
                 /* the prev. window (thewp) has wp->w_toprow rows in it */
                 for (i = wp->w_toprow;
-        		 i > 0 && lback(lp) != wp->w_bufp->b_line.l; --i)
+        		 i > 0 && lback(lp) != l_ref(wp->w_bufp->b_line.l); --i)
                         lp = lback(lp);
-                wp->w_line.l  = lp;
+                wp->w_line.l = l_ptr(lp);
 		wp->w_ntrows += wp->w_toprow;  /* add in the new rows */
 		wp->w_toprow = 0;	/* and we're at the top of the screen */
 		wheadp = wp;	/* and at the top of the list as well */
@@ -546,9 +549,9 @@ int f,n;
         wp->w_force = 0;
         ntru = (curwp->w_ntrows-1) / 2;         /* Upper size           */
         ntrl = (curwp->w_ntrows-1) - ntru;      /* Lower size           */
-        lp = curwp->w_line.l;
+        lp = l_ref(curwp->w_line.l);
         ntrd = 0;
-        while (lp != curwp->w_dot.l) {
+        while (lp != l_ref(curwp->w_dot.l)) {
                 ++ntrd;
                 lp = lforw(lp);
         }
@@ -561,7 +564,7 @@ int f,n;
 				ntru++;
 				ntrl--;
 			} else {
-	                        curwp->w_line.l = lforw(curwp->w_line.l);
+	                        curwp->w_line.l = lFORW(curwp->w_line.l);
 			}
 		}
                 curwp->w_ntrows = ntru; /* new size */
@@ -573,8 +576,8 @@ int f,n;
                 wp->w_ntrows = ntrl;
 		/* try to keep lower from reframing */
 		for (i = ntru+1; i > 0 &&
-				 wp->w_line.l != wp->w_bufp->b_line.l; i--) {
-			wp->w_line.l = lforw(wp->w_line.l);
+				 l_ref(wp->w_line.l) != l_ref(wp->w_bufp->b_line.l); i--) {
+			wp->w_line.l = lFORW(wp->w_line.l);
 		}
 		wp->w_dot.l = wp->w_line.l;
 		wp->w_dot.o = 0;
@@ -599,12 +602,12 @@ int f,n;
 		wp->w_dot.l = wp->w_line.l;
 		/* move upper window dot to bottom line of upper */
 		for (i = ntru-2; 
-			i > 0 && wp->w_dot.l!=wp->w_bufp->b_line.l; i--)
-			wp->w_dot.l = lforw(wp->w_dot.l);
+			i > 0 && l_ref(wp->w_dot.l) != l_ref(wp->w_bufp->b_line.l); i--)
+			wp->w_dot.l = lFORW(wp->w_dot.l);
 		wp->w_dot.o = 0;
 		/* adjust lower window topline */
                 while (ntru--)
-                        curwp->w_line.l = lforw(curwp->w_line.l);
+                        curwp->w_line.l = lFORW(curwp->w_line.l);
         }
         curwp->w_flag |= WFMODE|WFHARD;
         wp->w_flag |= WFMODE|WFHARD;
@@ -650,16 +653,16 @@ int f,n;
                 return (FALSE);
         }
         if (curwp->w_wndp == adjwp) {           /* Shrink below.        */
-                lp = adjwp->w_line.l;
-                for (i=0; i<n && lp!=adjwp->w_bufp->b_line.l; ++i)
+                lp = l_ref(adjwp->w_line.l);
+                for (i=0; i<n && lp != l_ref(adjwp->w_bufp->b_line.l); ++i)
                         lp = lforw(lp);
-                adjwp->w_line.l  = lp;
+                adjwp->w_line.l  = l_ptr(lp);
                 adjwp->w_toprow += n;
         } else {                                /* Shrink above.        */
-                lp = curwp->w_line.l;
-                for (i=0; i<n && lback(lp)!=curbp->b_line.l; ++i)
+                lp = l_ref(curwp->w_line.l);
+                for (i=0; i<n && lback(lp) != l_ref(curbp->b_line.l); ++i)
                         lp = lback(lp);
-                curwp->w_line.l  = lp;
+                curwp->w_line.l  = l_ptr(lp);
                 curwp->w_toprow -= n;
         }
         curwp->w_ntrows += n;
@@ -697,16 +700,16 @@ int f,n;
                 return (FALSE);
         }
         if (curwp->w_wndp == adjwp) {           /* Grow below.          */
-                lp = adjwp->w_line.l;
-                for (i=0; i<n && lback(lp)!=adjwp->w_bufp->b_line.l; ++i)
+                lp = l_ref(adjwp->w_line.l);
+                for (i=0; i<n && lback(lp) != l_ref(adjwp->w_bufp->b_line.l); ++i)
                         lp = lback(lp);
-                adjwp->w_line.l  = lp;
+                adjwp->w_line.l  = l_ptr(lp);
                 adjwp->w_toprow -= n;
         } else {                                /* Grow above.          */
-                lp = curwp->w_line.l;
-                for (i=0; i<n && lp!=curbp->b_line.l; ++i)
+                lp = l_ref(curwp->w_line.l);
+                for (i=0; i<n && lp != l_ref(curbp->b_line.l); ++i)
                         lp = lforw(lp);
-                curwp->w_line.l  = lp;
+                curwp->w_line.l  = l_ptr(lp);
                 curwp->w_toprow += n;
         }
         curwp->w_ntrows -= n;
@@ -940,9 +943,9 @@ getwpos()	/* get screen offset of current line in current window */
 	register LINE *lp;	/* scannile line pointer */
 
 	/* search down the line we want */
-	lp = curwp->w_line.l;
+	lp = l_ref(curwp->w_line.l);
 	sline = 1;
-	while (lp != curwp->w_dot.l) {
+	while (lp != l_ref(curwp->w_dot.l)) {
 		++sline;
 		lp = lforw(lp);
 	}

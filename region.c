@@ -6,7 +6,10 @@
  * internal use.
  *
  * $Log: region.c,v $
- * Revision 1.22  1993/04/01 12:53:33  pgf
+ * Revision 1.23  1993/05/24 15:21:37  pgf
+ * tom's 3.47 changes, part a
+ *
+ * Revision 1.22  1993/04/01  12:53:33  pgf
  * removed redundant includes and declarations
  *
  * Revision 1.21  1993/01/23  13:38:23  foxharp
@@ -142,7 +145,7 @@ yankregion()
 				ukb = 0;
                                 return s;
 			}
-                        m.l = lforw(m.l);
+                        m.l = lFORW(m.l);
                         m.o = 0;
                 } else {                        /* Middle of line.      */
                         if ((s=kinsert(char_at(m))) != TRUE) {
@@ -172,7 +175,7 @@ shift_right_line()
 {
 	int s, t;
 	if (b_val(curbp, MDCMOD) &&
-		llength(DOT.l) > 0 && char_at(DOT) == '#')
+		lLength(DOT.l) > 0 && char_at(DOT) == '#')
 		return TRUE;
 	s = curswval;
 	t = curtabval;
@@ -210,7 +213,7 @@ shift_left_line()
 	register int	i;
 	register int	lim;
 	register int	s;
-	register LINE *linep = DOT.l;
+	register LINE *linep = l_ref(DOT.l);
 
 	s = curswval;
 
@@ -307,13 +310,13 @@ int (*func) P((int));
 	m = region.r_orig;
         while (region.r_size--) {
                 if (is_at_end_of_line(m)) {
-                        m.l = lforw(m.l);
+                        m.l = lFORW(m.l);
                         m.o = 0;
                 } else {
                         c = char_at(m);
 			nc = (func)(c);
 			if (nc != -1) {
-				copy_for_undo(m.l);
+				copy_for_undo(l_ref(m.l));
                                 put_char_at(m, nc);
 			}
                         ++m.o;
@@ -339,7 +342,7 @@ register REGION *rp;
         long fsize;
         long bsize;
 
-        if (MK.l == NULL) {
+        if (l_ref(MK.l) == NULL) {
                 mlforce("BUG: getregion: no mark set in this window");
                 return FALSE;
         }
@@ -347,9 +350,9 @@ register REGION *rp;
 		if (fulllineregions) {
 	                rp->r_orig.l = DOT.l;
                         rp->r_orig.o = 0;
-	                rp->r_end.l = lforw(DOT.l);
+	                rp->r_end.l = lFORW(DOT.l);
                         rp->r_end.o = 0;
-                        rp->r_size = (long)llength(DOT.l)+1;
+                        rp->r_size = (long)lLength(DOT.l)+1;
 			return TRUE;
 		}
                 rp->r_orig.l = rp->r_end.l = DOT.l;
@@ -364,8 +367,8 @@ register REGION *rp;
                 }
                 return TRUE;
         }
-        blp = DOT.l;
-        flp = DOT.l;
+        blp = l_ref(DOT.l);
+        flp = l_ref(DOT.l);
 	if (fulllineregions) {
 		bsize = (long)(llength(blp)+1);
 		fsize = (long)(llength(flp)+1);
@@ -373,15 +376,15 @@ register REGION *rp;
 		bsize = (long)DOT.o;
 		fsize = (long)(llength(flp) - DOT.o + 1);
 	}
-        while ((flp!=curbp->b_line.l) || (lback(blp) != curbp->b_line.l)) {
-                if (flp != curbp->b_line.l) {
+        while ((flp!=l_ref(curbp->b_line.l)) || (lback(blp) != l_ref(curbp->b_line.l))) {
+                if (flp != l_ref(curbp->b_line.l)) {
                         flp = lforw(flp);
-                        if (flp == MK.l) {
+                        if (flp == l_ref(MK.l)) {
                                 rp->r_orig = DOT;
 				if (fulllineregions) {
 					rp->r_orig.o = 0;
-					rp->r_size = fsize + llength(MK.l)+1;
-	                                rp->r_end.l = lforw(flp);
+					rp->r_size = fsize + lLength(MK.l)+1;
+	                                rp->r_end.l = l_ptr(lforw(flp));
 					rp->r_end.o = 0;
 	                                return TRUE;
 				}
@@ -391,15 +394,15 @@ register REGION *rp;
                         }
                         fsize += llength(flp)+1;
                 }
-                if (lback(blp) != curbp->b_line.l) {
+                if (lback(blp) != l_ref(curbp->b_line.l)) {
                         blp = lback(blp);
                         bsize += llength(blp)+1;
-                        if (blp == MK.l) {
+                        if (blp == l_ref(MK.l)) {
                                 rp->r_orig = MK;
 				if (fulllineregions) {
 					rp->r_orig.o = 0;
 					rp->r_size = bsize;
-	                                rp->r_end.l = lforw(DOT.l);
+	                                rp->r_end.l = lFORW(DOT.l);
 					rp->r_end.o = 0;
 	                                return TRUE;
 				}
@@ -427,15 +430,15 @@ int arg;
                 return s;
 
 	/* for each line in the region, ... */
-	for ( linep = region.r_orig.l;
-			linep != region.r_end.l; linep = lforw(linep) ) {
+	for ( linep = l_ref(region.r_orig.l);
+			linep != l_ref(region.r_end.l); linep = lforw(linep) ) {
 
 		/* nothing on the line? */
 		if (llength(linep) == 0)
 			continue;
 
 		/* move through the region... */
-		DOT.l = linep;
+		DOT.l = l_ptr(linep);
 		DOT.o = 0;
 
 		/* ...and process each line */

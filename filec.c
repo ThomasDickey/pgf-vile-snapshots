@@ -4,7 +4,10 @@
  *	Filename prompting and completion routines
  *
  * $Log: filec.c,v $
- * Revision 1.14  1993/05/11 16:22:22  pgf
+ * Revision 1.15  1993/05/24 15:21:37  pgf
+ * tom's 3.47 changes, part a
+ *
+ * Revision 1.14  1993/05/11  16:22:22  pgf
  * see tom's CHANGES, 3.46
  *
  * Revision 1.13  1993/05/06  11:59:58  pgf
@@ -363,7 +366,7 @@ LINE **	lpp;	/* in/out line pointer, for iteration */
 #endif
 
 	if (lpp == NULL || (lp = *lpp) == NULL)
-		lp = bp->b_line.l;
+		lp = l_ref(bp->b_line.l);
 	lp = lforw(lp);
 
 	for (;;) {
@@ -384,7 +387,7 @@ LINE **	lpp;	/* in/out line pointer, for iteration */
 		}
 
 		lp = lforw(lp);
-		if (lp == bp->b_line.l) {
+		if (lp == l_ref(bp->b_line.l)) {
 		 	if (!iflag)
 				return FALSE;
 			doit = TRUE;

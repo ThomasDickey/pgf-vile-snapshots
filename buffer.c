@@ -6,7 +6,13 @@
  * for the display system.
  *
  * $Log: buffer.c,v $
- * Revision 1.60  1993/05/11 16:22:22  pgf
+ * Revision 1.62  1993/05/24 15:25:41  pgf
+ * tom's 3.47 changes, part b
+ *
+ * Revision 1.61  1993/05/24  15:21:37  pgf
+ * tom's 3.47 changes, part a
+ *
+ * Revision 1.60  1993/05/11  16:22:22  pgf
  * see tom's CHANGES, 3.46
  *
  * Revision 1.59  1993/05/04  17:05:14  pgf
@@ -521,7 +527,13 @@ void	FreeBuffer(bp)
 	if (bp->b_fname)
 		free(bp->b_fname);
 
-	lfree(bp->b_line.l,bp);	 /* Release header line. */
+#if !WINMARK
+	if (l_ref(MK.l) == l_ref(bp->b_line.l)) {
+		MK.l = l_ptr((LINE *)0);
+		MK.o = 0;
+	}
+#endif
+	lfree(l_ref(bp->b_line.l), bp);	 /* Release header line. */
 	bp1 = NULL;				/* Find the header.	*/
 	bp2 = bheadp;
 	while (bp2 != bp) {
@@ -879,7 +891,7 @@ register BUFFER *bp;
 
 	if (curbp == bp
 	 && curwp != 0
-	 && curwp->w_traits.w_dt.l != 0
+	 && l_ref(DOT.l) != 0
 	 && curwp->w_bufp == bp)  /* no switching to be done */
 		return TRUE;
 
@@ -912,7 +924,7 @@ register BUFFER *bp;
 	if (bp->b_active != TRUE) {		/* buffer not active yet*/
 		/* read it in and activate it */
 		(void)readin(bp->b_fname, TRUE, bp, TRUE);
-		curwp->w_dot.l = lforw(bp->b_line.l);
+		curwp->w_dot.l = lFORW(bp->b_line.l);
 		curwp->w_dot.o = 0;
 		bp->b_active = TRUE;
 	}
@@ -1119,8 +1131,8 @@ BUFFER *bp;
 
 	for_each_window(wp) {
 		if (wp->w_bufp == bp) {
-			wp->w_line.l = lforw(bp->b_line.l);
-			wp->w_dot.l  = lforw(bp->b_line.l);
+			wp->w_line.l = lFORW(bp->b_line.l);
+			wp->w_dot.l  = lFORW(bp->b_line.l);
 			wp->w_dot.o  = 0;
 #ifdef WINMARK
 			wp->w_mark = nullmark;
@@ -1354,8 +1366,8 @@ updatelistbuffers()
 			for_each_window(wp) {
 				if (wp->w_bufp == bp) {
 					tbl[num].wp   = wp;
-					tbl[num].top  = line_no(bp, wp->w_line.l);
-					tbl[num].line = line_no(bp, wp->w_dot.l);
+					tbl[num].top  = line_no(bp, l_ref(wp->w_line.l));
+					tbl[num].line = line_no(bp, l_ref(wp->w_dot.l));
 					tbl[num].col  = wp->w_dot.o;
 					if (++num >= SIZEOF(tbl))
 						break;
@@ -1408,12 +1420,12 @@ int len;
 		return (FALSE);
 	for (i=0; i<ntext; ++i)
 		lputc(lp, i, text[i]);
-	set_lforw(lback(bp->b_line.l), lp);	/* Hook onto the end    */
-	set_lback(lp, lback(bp->b_line.l));
-	set_lback(bp->b_line.l, lp);
-	set_lforw(lp, bp->b_line.l);
+	set_lforw(lBack(bp->b_line.l), lp);	/* Hook onto the end    */
+	set_lback(lp, lBack(bp->b_line.l));
+	set_lback(l_ref(bp->b_line.l), lp);
+	set_lforw(lp, l_ref(bp->b_line.l));
 	if (sameline(bp->b_dot, bp->b_line))  /* If "." is at the end */
-		bp->b_dot.l = lp;	     /* move it to new line  */
+		bp->b_dot.l = l_ptr(lp);	/* move it to new line  */
 	return (TRUE);
 }
 
@@ -1470,11 +1482,13 @@ char   *bname;
 	}
 
 	/* these affect lalloc(), below */
+#if !OPT_MAP_MEMORY
 	bp->b_LINEs = NULL;
 	bp->b_LINEs_end = NULL;
 	bp->b_freeLINEs = NULL;
 	bp->b_ltext = NULL;
 	bp->b_ltext_end = NULL;
+#endif
 
 	if ((lp=lalloc(0,bp)) == NULL) {
 		free((char *) bp);
@@ -1484,7 +1498,7 @@ char   *bname;
 
 	/* and set up the other buffer fields */
 	bp->b_active = FALSE;
-	bp->b_dot.l  = lp;
+	bp->b_dot.l  = l_ptr(lp);
 	bp->b_dot.o  = 0;
 #if WINMARK
 	bp->b_mark = nullmark;
@@ -1495,9 +1509,9 @@ char   *bname;
 	bp->b_values = global_b_values;
 	bp->b_wtraits.w_vals = global_w_values;
 	bp->b_nwnd  = 0;
-	bp->b_wline.l = lp;
+	bp->b_wline.l = l_ptr(lp);
 	bp->b_wline.o = 0;  /* unused */
-	bp->b_line.l = lp;
+	bp->b_line.l = l_ptr(lp);
 	bp->b_line.o = 0;
 	bp->b_acount = b_val(bp, VAL_ASAVECNT);
 	bp->b_fname = NULL;
@@ -1511,9 +1525,18 @@ char   *bname;
 	} else
 		bp->b_key[0] = EOS;
 #endif
-	bp->b_udstks[0] = bp->b_udstks[1] = NULL;
+	bp->b_udstks[0] = bp->b_udstks[1] = l_ptr((LINE *)0);
+#if OPT_MAP_MEMORY	/* _all_ pointers must be clean */
+	bp->b_wtraits.w_dt =
+#ifdef WINMARK
+	bp->b_wtraits.w_mk =
+#endif
+	bp->b_wtraits.w_ld =
+	bp->b_wtraits.w_ln =
+	bp->b_uddot[0] = bp->b_uddot[1] = nullmark;
+#endif
 	bp->b_udstkindx = 0;
-	bp->b_ulinep = NULL;
+	bp->b_ulinep = l_ptr((LINE *)0);
 	bp->b_last_used = 0;
 	set_lforw(lp, lp);
 	set_lback(lp, lp);
@@ -1554,21 +1577,25 @@ register BUFFER *bp;
 	}
 	bp->b_flag  &= ~BFCHG;			/* Not changed		*/
 	freeundostacks(bp);	/* do this before removing lines */
-	while ((lp=lforw(bp->b_line.l)) != bp->b_line.l) {
+	while ((lp=lForw(bp->b_line.l)) != l_ref(bp->b_line.l)) {
 		lremove(bp,lp);
 		lfree(lp,bp);
 	}
+
+#if !OPT_MAP_MEMORY
 	if (bp->b_ltext) {
 		free((char *)(bp->b_ltext));
 		bp->b_ltext = NULL;
 		bp->b_ltext_end = NULL;
 	}
 	if (bp->b_LINEs) {
-		free((char *)(bp->b_LINEs));
+		free((char *)bp->b_LINEs);
 		bp->b_LINEs = NULL;
 		bp->b_LINEs_end = NULL;
 	}
 	bp->b_freeLINEs = NULL;
+#endif
+
 	bp->b_dot  = bp->b_line;		/* Fix "."		*/
 #if WINMARK
 	bp->b_mark = nullmark;			/* Invalidate "mark"	*/
@@ -1604,10 +1631,10 @@ BUFFER *bp;
 		return FALSE;
 
 	/* starting at the beginning of the buffer */
-	lp = lforw(bp->b_line.l);
+	lp = lForw(bp->b_line.l);
 
 	/* start counting chars and lines */
-	while (lp != bp->b_line.l) {
+	while (lp != l_ref(bp->b_line.l)) {
 		++numlines;
 		numchars += llength(lp) + 1;
 #if !SMALLER	/* tradeoff between codesize & data */

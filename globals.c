@@ -3,7 +3,10 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: globals.c,v $
- * Revision 1.19  1993/05/04 17:05:14  pgf
+ * Revision 1.20  1993/05/24 15:21:37  pgf
+ * tom's 3.47 changes, part a
+ *
+ * Revision 1.19  1993/05/04  17:05:14  pgf
  * see tom's CHANGES, 3.45
  *
  * Revision 1.18  1993/04/01  12:53:33  pgf
@@ -136,20 +139,20 @@ int f, n, g_or_v;
 	calledbefore = FALSE;
 	
 	if (g_or_v == 'v') {  /* invert the sense of all the matches */
-		lp = lforw(curbp->b_line.l);
-		while (lp != curbp->b_line.l) {
+		lp = lForw(curbp->b_line.l);
+		while (lp != l_ref(curbp->b_line.l)) {
 			lflipmark(lp);
 			lp = lforw(lp);
 		}
 	}
 	/* loop through the buffer -- we must clear the marks no matter what */
 	s = TRUE;
-	lp = lforw(curbp->b_line.l);
+	lp = lForw(curbp->b_line.l);
 	wp = curwp;
 	/* loop until there are no marked lines in the buffer */
 	foundone = FALSE;
 	for(;;) {
-		if (lp == wp->w_bufp->b_line.l) {
+		if (lp == l_ref(wp->w_bufp->b_line.l)) {
 			/* at the end -- only quit if we found no 
 				marks on the last pass through. otherwise,
 				go through again */
@@ -171,12 +174,12 @@ int f, n, g_or_v;
 					mayneedundo();
 				}
 				havemotion = &f_godotplus;
-				wp->w_dot.l = lp;
+				wp->w_dot.l = l_ptr(lp);
 				wp->w_dot.o = 0;
 				s = (cfp->c_func)(FALSE, 1);
 				/* function may have switched on us */
 				swbuffer(wp->w_bufp);
-				lp = wp->w_dot.l;
+				lp = l_ref(wp->w_dot.l);
 				havemotion = NULL;
 				calledbefore = TRUE;
 			}

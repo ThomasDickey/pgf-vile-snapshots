@@ -9,7 +9,10 @@
 
 /*
  * $Log: edef.h,v $
- * Revision 1.99  1993/05/11 16:22:22  pgf
+ * Revision 1.100  1993/05/24 15:21:37  pgf
+ * tom's 3.47 changes, part a
+ *
+ * Revision 1.99  1993/05/11  16:22:22  pgf
  * see tom's CHANGES, 3.46
  *
  * Revision 1.98  1993/05/11  15:48:03  pgf
@@ -333,7 +336,7 @@
 decl_uninit( char *prog_arg );		/* argv[0] from main.c */
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version 3.46");
+decl_init( char version[], "version 3.47");
 
 decl_init( int slash, '/'); 		/* so DOS can use '\' as path separator */
 
@@ -394,7 +397,11 @@ decl_uninit( int curtabval );		/* current tab width		*/
 decl_uninit( int curswval );		/* current shiftwidth		*/
 
 #ifdef realdef
+#if OPT_MAP_MEMORY
+	MARK	nullmark = { {0,0}, 0 };
+#else
 	MARK	nullmark = { NULL, 0 };
+#endif
 #else
 extern	MARK	nullmark;
 #endif

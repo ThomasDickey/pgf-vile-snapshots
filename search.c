@@ -4,7 +4,10 @@
  *  heavily modified by Paul Fox, 1990
  *
  * $Log: search.c,v $
- * Revision 1.48  1993/04/20 12:18:32  pgf
+ * Revision 1.49  1993/05/24 15:21:37  pgf
+ * tom's 3.47 changes, part a
+ *
+ * Revision 1.48  1993/04/20  12:18:32  pgf
  * see tom's 3.43 CHANGES
  *
  * Revision 1.47  1993/04/01  12:53:33  pgf
@@ -287,11 +290,11 @@ int marking, fromscreen;
 				scanner returns TRUE, even though it's
 				on a boundary. quit if we find ourselves
 				marking a line twice */
-			if (lismarked(DOT.l))
+			if (lismarked(l_ref(DOT.l)))
 				break;
-			lsetmarked(DOT.l);
+			lsetmarked(l_ref(DOT.l));
 			/* and, so the next nextch gets to next line */
-			DOT.o = llength(DOT.l);
+			DOT.o = lLength(DOT.l);
 			didmark = TRUE;
 		}
 	} while ((marking || --n > 0) && status == TRUE);
@@ -577,37 +580,37 @@ int	wrapok;	/* ok to wrap around bottom of buffer? */
 					curpos.o : 0;
 				srchlim = (direct == FORWARD) ?
 					((scanboundpos.o > curpos.o)?
-					scanboundpos.o:llength(curpos.l))
+					scanboundpos.o:lLength(curpos.l))
 							: scanboundpos.o+1;
 			} else {
 				startoff = (direct == FORWARD) ?
 					curpos.o : scanboundpos.o;
 				srchlim = (direct == FORWARD) ?
-					scanboundpos.o : llength(curpos.l);
+					scanboundpos.o : lLength(curpos.l);
 			}
 		} else {
 			startoff = (direct == FORWARD) ? curpos.o : 0;
 			srchlim = (direct == FORWARD) ?
-					llength(curpos.l) : curpos.o+1;
+					lLength(curpos.l) : curpos.o+1;
 		}
-		found = lregexec(exp, curpos.l, startoff, srchlim);
+		found = lregexec(exp, l_ref(curpos.l), startoff, srchlim);
 		if (found) {
 			if (direct == REVERSE) { /* find the last one */
 				char *got = exp->startp[0];
-				while (lregexec(exp, curpos.l, 
-						got+1-curpos.l->l_text, 
+				while (lregexec(exp, l_ref(curpos.l),
+						got+1-l_ref(curpos.l)->l_text, 
 						srchlim)) {
 					got = exp->startp[0];
 				}
-				if (!lregexec(exp, curpos.l,
-						got-curpos.l->l_text,
+				if (!lregexec(exp, l_ref(curpos.l),
+						got-l_ref(curpos.l)->l_text,
 						srchlim)) {
 					dbgwrite("BUG: prev. match no good");
 					return FALSE;
 				}
 			}
 			DOT.l = curpos.l;
-			DOT.o = exp->startp[0] - curpos.l->l_text;
+			DOT.o = exp->startp[0] - l_ref(curpos.l)->l_text;
 			curwp->w_flag |= WFMOVE; /* flag that we have moved */
 			return TRUE;
 		} else {
@@ -616,11 +619,11 @@ int	wrapok;	/* ok to wrap around bottom of buffer? */
 				break;
 		}
 		if (direct == FORWARD) {
-			curpos.l = lforw(curpos.l);
+			curpos.l = lFORW(curpos.l);
 			curpos.o = 0;
 		} else {
-			curpos.l = lback(curpos.l);
-			if ((curpos.o = llength(curpos.l)-1) < 0)
+			curpos.l = lBACK(curpos.l);
+			if ((curpos.o = lLength(curpos.l)-1) < 0)
 				curpos.o = 0;
 		}
 		if (is_header_line(curpos, curbp)) {
@@ -629,9 +632,9 @@ int	wrapok;	/* ok to wrap around bottom of buffer? */
 						(!wrapok || wrapped) )
 				break;
 			if (direct == FORWARD) {
-				curpos.l = lforw(curpos.l);
+				curpos.l = lFORW(curpos.l);
 			} else {
-				curpos.l = lback(curpos.l);
+				curpos.l = lBACK(curpos.l);
 			}
 		}
 
@@ -747,7 +750,7 @@ int matchlen;
 			return;
 	}
 
-	(void)strncpy(patmatch, &curpos.l->l_text[curpos.o], matchlen);
+	(void)strncpy(patmatch, &(l_ref(curpos.l)->l_text[curpos.o]), matchlen);
 
 	/* null terminate the match string */
 	patmatch[matchlen] = '\0';
@@ -779,7 +782,7 @@ int	dir;
 	register LINE	*curline;
 	register int	curoff;
 
-	curline = pdot->l;
+	curline = l_ref(pdot->l);
 	curoff = pdot->o;
 	if (dir == FORWARD) {
 		if (curoff == llength(curline)) {
@@ -796,7 +799,7 @@ int	dir;
 			curoff--;
 		}
 	}
-	pdot->l = curline;
+	pdot->l = l_ptr(curline);
 	pdot->o = curoff;
 }
 

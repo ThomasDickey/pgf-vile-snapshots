@@ -4,7 +4,13 @@
 	written 1986 by Daniel Lawrence
  *
  * $Log: eval.c,v $
- * Revision 1.52  1993/05/04 17:05:14  pgf
+ * Revision 1.54  1993/05/24 15:25:41  pgf
+ * tom's 3.47 changes, part b
+ *
+ * Revision 1.53  1993/05/24  15:21:37  pgf
+ * tom's 3.47 changes, part a
+ *
+ * Revision 1.52  1993/05/04  17:05:14  pgf
  * see tom's CHANGES, 3.45
  *
  * Revision 1.51  1993/04/21  15:43:05  pgf
@@ -363,10 +369,10 @@ char *fname;		/* name of function to evaluate */
 		case UFSINDEX:	return(l_itoa(sindex(arg1, arg2)));
 		case UFENV:	return(GetEnv(arg1));
 		case UFBIND:	return(prc2engl(arg1));
-		case UFREADABLE:glob(arg1);
-				return(ltos(flook(arg1, FL_HERE) != NULL));
-		case UFWRITABLE:glob(arg1);
-				return(ltos(!ffronly(arg1)));
+		case UFREADABLE:return(ltos(glob(arg1)
+				  &&   flook(arg1, FL_HERE) != NULL));
+		case UFWRITABLE:return(ltos(glob(arg1)
+				  &&   !ffronly(arg1)));
 	}
 	return errorm;
 }
@@ -448,7 +454,7 @@ char *vname;		/* name of environment variable to retrieve */
 #else
 				return(falsem);
 #endif
-		case EVLLENGTH:	return(l_itoa(llength(DOT.l)));
+		case EVLLENGTH:	return(l_itoa(lLength(DOT.l)));
 		case EVLINE:	return(getctext(0));
 		case EVWORD:	return(getctext(_nonspace));
 		case EVIDENTIF:	return(getctext(_ident));
@@ -867,16 +873,16 @@ char *tokn;		/* token to evaluate */
 					return(errorm);
 		
 				/* grab the line as an argument */
-				blen = llength(bp->b_dot.l) - bp->b_dot.o;
+				blen = lLength(bp->b_dot.l) - bp->b_dot.o;
 				if (blen > NSTRING)
 					blen = NSTRING;
-				strncpy(buf, bp->b_dot.l->l_text + bp->b_dot.o,
+				strncpy(buf, l_ref(bp->b_dot.l)->l_text + bp->b_dot.o,
 					blen);
 				buf[blen] = 0;
 		
 				/* and step the buffer's line ptr
 					ahead a line */
-				bp->b_dot.l = lforw(bp->b_dot.l);
+				bp->b_dot.l = lFORW(bp->b_dot.l);
 				bp->b_dot.o = 0;
 
 				/* if displayed buffer, reset window ptr vars*/

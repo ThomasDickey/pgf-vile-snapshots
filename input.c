@@ -3,7 +3,10 @@
  *		5/9/86
  *
  * $Log: input.c,v $
- * Revision 1.75  1993/05/05 10:31:30  pgf
+ * Revision 1.76  1993/05/24 15:25:41  pgf
+ * tom's 3.47 changes, part b
+ *
+ * Revision 1.75  1993/05/05  10:31:30  pgf
  * cleaned up handling of SPEC keys from withing insert mode.  now, any
  * function bound to a SPECkey (i.e. any FN-? thing) can be executed
  * either from inside or outside insert mode.
@@ -558,6 +561,7 @@ int eatit;  /* consume the character? */
 			}
 
 			if (kbdmode == PLAY) {
+				buffer = KbdStack->m_kbdm;
 				if (eatit)
 					record_dot_char(c = tb_next(buffer));
 				else
