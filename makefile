@@ -40,13 +40,14 @@ DESTDIR2 = $(HOME)/bin
 
 REMOTE=gutso!foxharp
 
-#OPTFLAGS = -Wall -Wshadow -O -Dpgf_and_no_fixincludes
 #CC = gcc
 #LINK = gcc
+#OPTFLAGS = -g -Wall -Wshadow -O -Dpgf_and_no_fixincludes
 
-OPTFLAGS = -O
 CC = cc
 LINK = cc
+OPTFLAGS = -O
+#OPTFLAGS = -g
 
 # some older bsd systems keep ioctl in sys only -- easier to
 # search both places than to ifdef the code.  color me lazy.
@@ -75,8 +76,8 @@ ALLHDRS = $(HDRS)
 #  (including tools, like mktbls.c, unused screen drivers, etc.)
 CSRCac = ansi.c at386.c basic.c bind.c buffer.c crypt.c csrch.c
 CSRCde = dg10.c display.c eval.c exec.c externs.c
-CSRCfh = file.c fileio.c finderr.c globals.c hp110.c hp150.c
-CSRCim = ibmpc.c input.c isearch.c line.c main.c mktbls.c
+CSRCfh = fences.c file.c fileio.c finderr.c globals.c hp110.c hp150.c
+CSRCim = ibmpc.c input.c insert.c isearch.c line.c main.c modes.c mktbls.c
 CSRCnr = npopen.c opers.c oneliner.c random.c regexp.c region.c
 CSRCst = search.c spawn.c st520.c tags.c tcap.c termio.c tipc.c
 CSRCuz = undo.c vmalloc.c vmsvt.c vt52.c window.c word.c wordmov.c x11.c z309.c
@@ -96,17 +97,17 @@ ALLSRC = $(CSRC) $(OTHERSRC)
 EVERYTHING = $(ALLTOOLS) $(ALLHDRS) $(ALLSRC) $(TEXTFILES) $(SHORTSTUFF)
 
 
-SRC = main.c $(SCREEN).c basic.c bind.c buffer.c \
-	crypt.c csrch.c display.c eval.c exec.c externs.c file.c \
-	fileio.c finderr.c globals.c input.c isearch.c \
-	line.c npopen.c oneliner.c opers.c random.c regexp.c \
+SRC = main.c $(SCREEN).c basic.c bind.c buffer.c crypt.c \
+	csrch.c display.c eval.c exec.c externs.c fences.c file.c \
+	fileio.c finderr.c globals.c input.c insert.c isearch.c \
+	line.c modes.c npopen.c oneliner.c opers.c random.c regexp.c \
 	region.c search.c spawn.c tags.c termio.c undo.c \
 	vmalloc.c window.c word.c wordmov.c
 
-OBJ = main.$O $(SCREEN).$O basic.$O bind.$O buffer.$O \
-	crypt.$O csrch.$O display.$O eval.$O exec.$O externs.$O file.$O \
-	fileio.$O finderr.$O globals.$O input.$O isearch.$O \
-	line.$O npopen.$O oneliner.$O opers.$O random.$O regexp.$O \
+OBJ = main.$O $(SCREEN).$O basic.$O bind.$O buffer.$O crypt.$O \
+	csrch.$O display.$O eval.$O exec.$O externs.$O fences.$O file.$O \
+	fileio.$O finderr.$O globals.$O input.$O insert.$O isearch.$O \
+	line.$O modes.$O npopen.$O oneliner.$O opers.$O random.$O regexp.$O \
 	region.$O search.$O spawn.$O tags.$O termio.$O undo.$O \
 	vmalloc.$O window.$O word.$O wordmov.$O
 
@@ -150,32 +151,38 @@ bsd sony:
 	make CFLAGS="$(OPTFLAGS) $(INCS) -DBERK -Dos_chosen" \
 	    MAKE=/usr/bin/make $(TARGET)
 
-bsd_posix ultrix sun :
+bsd_posix ultrix sun:
 	$(MAKE) CFLAGS="$(OPTFLAGS) $(INCS) -DBERK -DPOSIX -Dos_chosen" \
 		$(TARGET)
 
-bsd386 :
+bsd386:
 	make CFLAGS="$(OPTFLAGS) -DBERK -DBSD386 -Dos_chosen" \
 	    MAKE=/usr/bin/make $(TARGET)
 
-att :
+att:
 	$(MAKE) CFLAGS="$(OPTFLAGS) -DUSG -Dos_chosen" \
 		$(TARGET)
 
-att_posix svr4 :
+att_posix svr4:
 	$(MAKE) CFLAGS="$(OPTFLAGS) -DUSG -DPOSIX -Dos_chosen" \
 		$(TARGET)
 
-svr3 :
+svr3:
 	$(MAKE) CFLAGS="$(OPTFLAGS) -DSVR3 -Dos_chosen" \
 		$(TARGET)
 
-mips :
+mips:
 	$(MAKE) CFLAGS="$(OPTFLAGS) -systype sysv -DSVR3 -Dos_chosen" \
 		$(TARGET)
 
-odt isc :
-	$(MAKE) CFLAGS="$(OPTFLAGS) -DUSG -DPOSIX -DSVR3_PTEM -Dos_chosen" \
+odt:
+	$(MAKE) \
+	CFLAGS="$(OPTFLAGS) -DODT -DUSG -DPOSIX -DSVR3_PTEM -Dos_chosen" \
+		$(TARGET)
+
+isc:
+	$(MAKE) \
+	CFLAGS="$(OPTFLAGS) -DISC -DUSG -DPOSIX -DSVR3_PTEM -Dos_chosen" \
 		$(TARGET)
 
 hpux:
@@ -220,13 +227,13 @@ default:
 	$(MAKE) CFLAGS="$(OPTFLAGS) -Uos_chosen" \
 		$(TARGET)
 
-$(TARGET) : $(BUILTHDRS) $(OBJ) makefile
+$(TARGET): $(BUILTHDRS) $(OBJ) makefile
 	-mv $(TARGET) o$(TARGET)
 	$(LINK) -o $(TARGET) $(OBJ) $(LIBS)
 #	$(LINK) -Bstatic -o $(TARGET) $(OBJ) $(LIBS)
 
 # this target is more convenient for the nonstandard environments, like DOS
-$(TARGET)2 : $(BUILTHDRS) $(OBJ) makefile
+$(TARGET)2: $(BUILTHDRS) $(OBJ) makefile
 	-mv $(TARGET) o$(TARGET)
 	$(LINK)
 
@@ -283,6 +290,17 @@ uuto:
 
 uurw:
 	uuto `make rw` $(REMOTE)
+
+rcsdiffrw:
+	@-for x in `$(MAKE) rw`	;\
+	do	\
+		echo 		;\
+		echo $$x	;\
+		echo =========	;\
+		rcsdiff $$x	;\
+	done 2>&1		;\
+	echo			;\
+	echo all done
 
 floppy:
 	ls $(EVERYTHING) | oo
@@ -360,7 +378,19 @@ $(EVERYTHING):
 	co -r$(revision) $@
 
 # $Log: makefile,v $
-# Revision 1.48  1992/05/20 18:58:11  foxharp
+# Revision 1.52  1992/05/29 09:40:53  foxharp
+# split out modes.c, fences.c, and insert.c from random.c
+#
+# Revision 1.51  1992/05/29  08:40:05  foxharp
+# minor ordering
+#
+# Revision 1.50  1992/05/27  19:16:22  foxharp
+# fixed odt and isc targets -- added -DODT and -DISC
+#
+# Revision 1.49  1992/05/27  08:32:57  foxharp
+# added rcsdiffrw target
+#
+# Revision 1.48  1992/05/20  18:58:11  foxharp
 # comments on target help, a/ux support, and uurw
 #
 # Revision 1.47  1992/05/19  09:15:45  foxharp

@@ -1,6 +1,8 @@
 	(E means enhancement, L,M,H are low, medium, high priority)
 ----------------------
 
+H	failed forward searches starting on last line loop forever
+
 H	output sometimes doesn't flush properly after a shell escape -- seems
 	to be related to turning on the USE_FCNTL code in termio.c.  If anyone
 	finds this -- let me know!  I'd love to know the answer.

@@ -5,7 +5,10 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.5  1992/05/25 21:28:37  foxharp
+ * Revision 1.6  1992/05/29 08:36:53  foxharp
+ * added new ..._fence routines
+ *
+ * Revision 1.5  1992/05/25  21:28:37  foxharp
  * took out extern decls of system and library calls, since they conflict
  * more often than not, and added some more routine declarations that
  * cextract (an old version) missed
@@ -620,6 +623,9 @@ extern int insbrace P(( int, int ));
 extern int inspound P(( void ));
 extern int fmatch P(( int ));
 extern int getfence P(( int, int ));
+extern int cpp_fence P((int, char *, char *, char * ));
+extern int comment_fence P(( int ));
+extern int simple_fence P(( int, int, int ));
 extern int adjustmode P(( int, int ));
 extern void putdotback P(( BUFFER *, LINE * ));
 

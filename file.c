@@ -6,7 +6,11 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.40  1992/05/19 08:55:44  foxharp
+ * Revision 1.41  1992/05/27 08:32:57  foxharp
+ * force screen updates while reading from pipes, otherwise bumping the
+ * keyboard freezes the screen until the spawned process is done
+ *
+ * Revision 1.40  1992/05/19  08:55:44  foxharp
  * more prototype and shadowed decl fixups
  *
  * Revision 1.39  1992/05/16  12:00:31  pgf
@@ -697,7 +701,7 @@ int *nlinep;
 				set_b_val(bp, MDDOS, 
 				 doslines > unixlines && global_b_val(MDDOS) );
 				curwp->w_flag |= WFMODE|WFKILLS;
-				update(FALSE);
+				update(TRUE);
 				done_update = TRUE;
 				flag = 0;
 			} else {

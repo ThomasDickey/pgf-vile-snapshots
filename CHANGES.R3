@@ -137,6 +137,11 @@ MISCELLANEOUS
 - Dave Lemke contributed code to support vile under X windows -- including
 	support for cutting/pasting, etc.  Thanks Dave!
 
+- the '%' command will now find matching #if/#else/#endif sets.
+
+- the '%' command will now find matching C comment sets.  Yes, it does
+	the (non-)nesting correctly.
+
 - tabstops can now be set to any value, and there is a separate value for
 	tabstops in C mode.  (c-tabstop)
 
@@ -204,7 +209,9 @@ MISCELLANEOUS
 
 - the format region command (^A-f) now restarts with each fresh paragraph,
 	so you can format an entire file at once, without collapsing it all
-	into a single paragraph
+	into a single paragraph.  It also knows a little bit about C and
+	shell comments, so you can now reformat blocks of commentary text.
+	(There can't be any non-commentary stuff in front of the comments.)
 
 - the position of the cursor within a window (the framing) is now preserved
 	while the window if "off-screen" -- it no longer reframes when made

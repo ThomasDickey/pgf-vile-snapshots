@@ -6,7 +6,10 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.38  1992/05/19 08:55:44  foxharp
+ * Revision 1.39  1992/05/29 08:36:06  foxharp
+ * moved the SVR3_PTEM ifdef so it works with POSIX too
+ *
+ * Revision 1.38  1992/05/19  08:55:44  foxharp
  * more prototype and shadowed decl fixups
  *
  * Revision 1.37  1992/05/16  12:00:31  pgf
@@ -149,16 +152,16 @@
 # else
 #  if USG
 #   include <termio.h>
-#   if SVR3_PTEM
-#    include <sys/types.h>
-#    include <sys/stream.h>
-#    include <sys/ptem.h>
-#   endif
 #  else
 #   if BERK
 #    include "ioctl.h"
 #   endif
 #  endif
+# endif
+# if SVR3_PTEM
+#  include <sys/types.h>
+#  include <sys/stream.h>
+#  include <sys/ptem.h>
 # endif
 #endif
 
