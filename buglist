@@ -410,12 +410,6 @@ xvile: I can't "cut and paste" between two different windows...
 
 --------------------------
 
-pcvile, compiled with watcom:
-	screen limited to 25 line mode -- i can't figure out how to
-	get the vga bios info successfully from a 32-bit application.
-
---------------------------
-
 the defeat-autoindent heuristics used by X pasting and by the ^A-i/o/O
 commands are different.  X trims all whitespace and lets autoindent
 do the formatting, the commands leave whitespace and turn off autoindenting.
@@ -451,4 +445,93 @@ you can't use ! as a regular expression delimiter, as in:
 because the parser treats ":s!" as if it's ":q!" or ":w!".
 
 ---------------------
+
+linux: attempting to resize the vile windows by grabbing the scroll grip (?)
+causes dump:
+#0  0x30d96 in MoveGripAdjustment ()
+#1  0x30fa9 in HandleGrip ()
+#2  0x37cac in XtCallCallbacks ()
+#3  0x33165 in GripAction ()
+#4  0x574e4 in HandleActions ()
+#5  0x57909 in HandleSimpleState ()
+#6  0x57d8f in _XtTranslateEvent ()
+#7  0x3f594 in DispatchEvent ()
+#8  0x3fbc2 in DecideToDispatch ()
+#9  0x3fcea in XtDispatchEvent ()
+#10 0x5c84 in x_getc () at x11.c:3408
+#11 0x1c9eb in tgetc (quoted=0) at input.c:429
+#12 0x1ca65 in kbd_key () at input.c:460
+#13 0x1cb43 in kbd_seq () at input.c:570
+#14 0xa1f in loop () at main.c:544
+#15 0x987 in main (argc=1, argv=0xbffff8fc) at main.c:507
+
+-----------
+
+pcvile: there's no cursor visible in some of the less-used video modes,
+like 40x12 or 40x25.
+
+----------
+
+the 25 line mode should be the vga-ish 25-line mode on vga-capable machines.
+right now if you use "-2" or "set sres 25" you get the 200 scanline CGA style
+mode.  there may be a similar problem with ega cards.
+
+-------------
+
+the ^W and ^R commands don't work with shell-files, i.e.
+	^WG!lpr
+or 
+    	"a^R!cat foo
+
+this seems to be a result of ending up down in kbd_pushback() called
+from hst_append().  this causes the clexec flag to be set, and that
+breaks a bunch of other stuff.  
+
+----------------
+
+1.	try typing:
+		bind-key up-line ^X^P
+                           ^ you can't get past this '-'...
+
+2.      only single char commands (eg ^P) will scroll thru the ':'
+	command line history; something like ^X^P (with suitable
+	binding like "up-line" :-)) will move thru a buffer but not
+	thru the history.
+
+---------------------------------
+
+
+i broke the show-registers animation, intentionally.  it relied
+on a call to relist_registers() on _every_ call kdone.  i think tom
+didn't realize that kdone is called on _every_ kinsert, meaning we
+do the whole buffer find and possible (i assume we don't do it if
+it's not displayed?) recalc on every deleted or yanked character.
+
+-------------------------
+
+width of a region is kept in units of offset, not of columns.
+i think this will break rectangular inserts of non-rectangular regions,
+where the longest line may not extend to the furthest column, due to
+tabs in other lines.
+
+
+-------------------------
+
+In vile 3.65 on SunOS 4.1.3, when I do execute-keyboard-macro while
+defining a keyboard macro, vile seems to go to an infinite loop (but can
+be stopped by Ctrl-C).  I guess this bug/feature come from the original
+MicroEmacs source code, but anyway, it would be nice if
+execute-keyboard-macro is disabled while defining the macro.
+
+-------------------------
+
+I needed to edit a file containing a list of path-names and replace the
+prefix.
+
+So I did
+	% vile file
+	:g%
+using the % as a delimeter rather than /.
+
+This operation was not permitted until I had searched for something already.
 

@@ -8,8 +8,11 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: fences.c,v $
- *	Revision 1.19  1994/02/22 11:03:15  pgf
- *	truncated RCS log for 4.0
+ *	Revision 1.20  1994/03/08 12:09:24  pgf
+ *	changed 'fulllineregions' to 'regionshape'.
+ *
+ * Revision 1.19  1994/02/22  11:03:15  pgf
+ * truncated RCS log for 4.0
  *
  *
  */
@@ -135,7 +138,7 @@ int key;
 	if (count == 0) {
 		curwp->w_flag |= WFMOVE;
 		if (doingopcmd)
-			fulllineregions = TRUE;
+			regionshape = FULLLINE;
 		return TRUE;
 	}
 	return FALSE;

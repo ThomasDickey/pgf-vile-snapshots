@@ -4,9 +4,15 @@
 # T.DANG (dang@cogit.ign.fr)
 #
 # $Log: makefile.wat,v $
-# Revision 1.6  1994/02/22 11:03:15  pgf
+# Revision 1.7  1994/02/23 05:10:18  pgf
+# added comment about suppressing the dos4gw banner
+#
+# Revision 1.6  1994/02/22  11:03:15  pgf
 # truncated RCS log for 4.0
 #
+# if you use the watcom version of vile, you may want to "set DOS4G=quiet"
+# to suppress the DOS 4G/W banner that comes up from the Rational Systems
+# DOS extender otherwise.
 #
 #
 #define PVGA for Paradise VGA (because there are some problems with this card)

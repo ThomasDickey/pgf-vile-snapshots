@@ -9,7 +9,10 @@
  *  is called whenever possible.
  *  Modifications by Pete Ruczynski (pjr).
  * $Log: z_ibmpc.c,v $
- * Revision 1.7  1994/02/22 11:03:15  pgf
+ * Revision 1.8  1994/03/11 11:57:01  pgf
+ * *** empty log message ***
+ *
+ * Revision 1.7  1994/02/22  11:03:15  pgf
  * truncated RCS log for 4.0
  *
  *
@@ -22,6 +25,12 @@
 #include	"edef.h"
 
 #if ZIBMPC
+
+ this code has not been built or run in a while.
+ in particular, the globlal set43 is no longer referenced outside
+ of this file, so some mode changes probably no longer work.
+ it should not be hard to fix, though.  
+ of course, the first thing you will need to do is ifdef out this text. :-)
 
 #include	<disp.h>
 

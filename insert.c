@@ -8,8 +8,17 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: insert.c,v $
- *	Revision 1.49  1994/02/22 11:03:15  pgf
- *	truncated RCS log for 4.0
+ *	Revision 1.51  1994/03/11 13:57:31  pgf
+ *	make backspace non-destructive in overwrite mode
+ *
+ * Revision 1.50  1994/03/08  12:10:13  pgf
+ * changed 'fulllineregions' to 'regionshape'.
+ * fixed inconsistency in autoindent, where breaking a line which ends
+ * in a brace in two would cause the second half to be indented, when
+ * it shouldn't be.
+ *
+ * Revision 1.49  1994/02/22  11:03:15  pgf
+ * truncated RCS log for 4.0
  *
  */
 
@@ -471,7 +480,7 @@ int *splice;
 			if (DOT.o > w_left_margin(curwp))
 				backchar(TRUE,1);
 			if (autoindented >= 0) {
-				trimline(FALSE);
+				trimline(FALSE,0,0);
 				autoindented = -1;
 			}
 			if (cur_count+1 == max_count)
@@ -597,7 +606,7 @@ int *backsp_limit_p;
 		} else if (isreturn(c)) {
 			execfunc = newline;
 			if (autoindented >= 0) {
-				trimline(FALSE);
+				trimline(FALSE,0,0);
 				autoindented = -1;
 			}
 			*backsp_limit_p = w_left_margin(curwp);
@@ -767,7 +776,7 @@ backspace()
 {
 	register int	s;
 
-	if ((s=backchar(TRUE, 1)) == TRUE)
+	if ((s=backchar(TRUE, 1)) == TRUE && insertmode != OVERWRITE)
 		s = ldelete(1L, FALSE);
 	return (s);
 }
@@ -819,11 +828,12 @@ indented_newline()
 	register int indentwas; /* indent to reproduce */
 	int bracef; /* was there a brace at the end of line? */
 
+	if (lnewline() == FALSE)
+		return FALSE;
+
 	indentwas = previndent(&bracef);
 	skipindent = 0;
 
-	if (lnewline() == FALSE)
-		return FALSE;
 	if (cmode && bracef)
 		indentwas = nextsw(indentwas);
 	if (doindent(indentwas) != TRUE)
@@ -990,7 +1000,7 @@ int c;	/* brace/paren to insert (always '}' or ')' for now) */
 #endif
 
 	if (autoindented >= 0) {
-		trimline(FALSE);
+		trimline(NULL,0,0);
 	} else {
 		return linsert(n,c);
 	}
@@ -1054,12 +1064,12 @@ int f,n;
 		/* should entab mult ^T inserts */
 		return s;
 	}
-	detabline(TRUE);
+	detabline((void *)TRUE,0,0);
 	s = curswval - (getccol(FALSE) % curswval);
 	if (s)
 		linsert(s, ' ');
 	if (b_val(curbp,MDTABINSERT))
-		entabline(TRUE);
+		entabline((void *)TRUE,0,0);
 	if (autoindented >= 0) {
 		fc = firstchar(l_ref(DOT.l));
 		if (fc >= 0)

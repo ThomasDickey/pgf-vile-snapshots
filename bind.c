@@ -4,7 +4,13 @@
  *	written 11-feb-86 by Daniel Lawrence
  *
  * $Log: bind.c,v $
- * Revision 1.67  1994/02/22 11:03:15  pgf
+ * Revision 1.69  1994/03/02 09:47:48  pgf
+ * new routine fnc2str() to replace insertion_cmd()
+ *
+ * Revision 1.68  1994/02/23  05:07:49  pgf
+ * made mstring static local again -- it slipped outside by mistake
+ *
+ * Revision 1.67  1994/02/22  11:03:15  pgf
  * truncated RCS log for 4.0
  *
  */
@@ -199,9 +205,6 @@ int f,n;
 	register int s, j;
 	char	name[NLINE];
 	int c;
-#ifdef BEFORE
-	CMDFUNC	*kcmd;
-#endif
 
 	/* get the table-entry */
 	*name = EOS;
@@ -210,12 +213,6 @@ int f,n;
 
 		j = chr_lookup(name);
 		switch (TermChrs[j].how_to) {
-#ifdef BEFORE
-		case 'b':
-			kcmd = engl2fnc(name);
-			s = rebind_key(key_to_bind(kcmd), kcmd);
-			break;
-#endif
 		case 's':
 		default:
 			c = key_to_bind((CMDFUNC *)0);
@@ -540,7 +537,6 @@ int f,n;
 
 #if	APROP
 
-static char mstring[NSTRING];	/* string to match cmd names to */
 
 /* ARGSUSED */
 int
@@ -548,6 +544,7 @@ apro(f, n)	/* Apropos (List functions that match a substring) */
 int f,n;
 {
 	register int    s;
+	static char mstring[NSTRING];	/* string to match cmd names to */
 
 
 	s = mlreply("Apropos string: ", mstring, sizeof(mstring));
@@ -853,8 +850,8 @@ kcod2str(c, seq)
 int c;		/* sequence to translate */
 char *seq;	/* destination string for sequence */
 {
-	register char *ptr = seq; /* pointer into current position in sequence */
-	char	*base = ptr;
+	/* pointer into current position in sequence */
+	register char *ptr = seq; 
 
 	if (c & CTLA)
 		*ptr++ = cntl_a;
@@ -867,7 +864,7 @@ char *seq;	/* destination string for sequence */
 
 	*ptr++ = kcod2key(c);
 	*ptr = EOS;
-	return base;
+	return seq;
 }
 
 /* translates a binding string into printable form */
@@ -924,29 +921,6 @@ char *seq;	/* destination string for sequence */
 	return string2prc(seq, kcod2str(c,temp));
 }
 
-/* insertion_cmd -- what char puts us in insert mode? */
-#if X11
-int
-insertion_cmd(direction)
-int direction;
-{
-	extern CMDFUNC f_insert;
-	extern CMDFUNC f_opendown;
-	extern CMDFUNC f_openup;
-
-	register int	c;
-
-	switch (direction) {
-	case -1:	c = fnc2kcod(&f_openup);	break;
-	case 0:		c = fnc2kcod(&f_insert);	break;
-	case 1:		c = fnc2kcod(&f_opendown);	break;
-	default:	c = -1;
-	}
-	if (isspecial(c))	/* sorry, we really need a character! */
-		c = -1;
-	return c;
-}
-#endif /* X11 */
 
 /* kcode2kbind: translate a 10-bit key-binding to the table-pointer
  */
@@ -994,6 +968,22 @@ CMDFUNC *f;
 	return -1;	/* none found */
 }
 
+/* fnc2str: translate a function pointer to a string that a user
+	could enter.  returns a pointer to a static array */
+char *
+fnc2str(f)
+CMDFUNC *f;
+{
+	register int	c;
+	static char seq[10];
+
+	c = fnc2kcod(f);
+
+	if (c == -1)
+		return NULL;
+
+	return kcod2str(c, seq);
+}
 /* fnc2engl: translate a function pointer to the english name for
 		that function
 */

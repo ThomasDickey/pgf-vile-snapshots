@@ -10,7 +10,14 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.163  1994/02/22 18:29:15  pgf
+ * Revision 1.165  1994/03/08 12:01:09  pgf
+ * augmented region structure, kill-register struct, and some flag
+ * sets to describe rectangles.
+ *
+ * Revision 1.164  1994/02/23  05:08:35  pgf
+ * include stddef.h when we include stdlib.h (to pick up offsetof)
+ *
+ * Revision 1.163  1994/02/22  18:29:15  pgf
  * make sure MSDOS is always defined, at least as 0 if we're not on DOS
  *
  * Revision 1.162  1994/02/22  11:03:15  pgf
@@ -799,6 +806,11 @@ union REGS {
 #define	PLAY	1			/*	"     "	  playing	*/
 #define	RECORD	2			/*	"     "   recording	*/
 
+/* values for regionshape */
+#define EXACT		0
+#define FULLLINE	1
+#define RECTANGLE	2
+
 /* flook options */
 #define FL_HERE 1
 #define FL_HERE_HOME 2
@@ -881,11 +893,12 @@ union REGS {
 #define OVERWRITE 2
 #define REPLACECHAR 3
 
-/* kill register control */
-#define KNEEDCLEAN   0x01		/* Kill register needs cleaning */
-#define KYANK        0x02		/* Kill register resulted from yank */
-#define KLINES       0x04		/* Kill register contains full lines */
-#define KAPPEND      0x08		/* Kill register should be appended */
+/* kill register control -- values for kbflag */
+#define KNEEDCLEAN   iBIT(0)		/* Kill register needs cleaning */
+#define KYANK        iBIT(1)		/* Kill register resulted from yank */
+#define KLINES       iBIT(2)		/* Kill register contains full lines */
+#define KRECT        iBIT(3)		/* Kill register contains rectangle */
+#define KAPPEND      iBIT(4)		/* Kill register should be appended */
 
 /* operator types.  Needed mainly because word movement changes depending on
 	whether operator is "delete" or not.  Aargh.  */
@@ -1610,6 +1623,8 @@ typedef struct	WINDOW {
 typedef struct	{
 	MARK 	r_orig;			/* Origin LINE address. 	*/
 	MARK	r_end;			/* Ending LINE address. 	*/
+	C_NUM	r_leftcol;		/* Leftmost column. 		*/
+	C_NUM	r_rightcol;		/* Rightmost column. 		*/
 	B_COUNT	r_size; 		/* Length in characters.	*/
 }	REGION;
 
@@ -1789,11 +1804,12 @@ typedef struct {
 #define NOMOVE  cmdBIT(9)	/* dot doesn't move (although address may be used) */
 #define VIEWOK  cmdBIT(10)	/* command is okay in view mode, even though it
 				 * _may_ be undoable (macros and maps) */
+#define RECT  cmdBIT(11)	/* motion causes rectangular operation */
 
 /* These flags are 'ex' argument descriptors, adapted from elvis.  Not all are
  * used or honored or implemented.
  */
-#define argBIT(n) cmdBIT(n+10)	/* ...to simplify adding bits */
+#define argBIT(n) cmdBIT(n+11)	/* ...to simplify adding bits */
 #define FROM    argBIT(1)	/* allow a linespec */
 #define TO      argBIT(2)	/* allow a second linespec */
 #define BANG    argBIT(3)	/* allow a ! after the command name */
@@ -1860,6 +1876,7 @@ typedef struct KILLREG {
 	struct KILL *kbufp;	/* current kill register chunk pointer */
 	struct KILL *kbufh;	/* kill register header pointer	*/
 	unsigned kused;		/* # of bytes used in kill last chunk	*/
+	C_NUM kbwidth;		/* width of chunk, if rectangle */
 	short kbflag;		/* flags describing kill register	*/
 } KILLREG;
 
@@ -1933,6 +1950,7 @@ typedef struct WHBLOCK {
 #if POSIX
 #include <unistd.h>
 #include <stdlib.h>
+#include <stddef.h>
 #else
 # if (APOLLO_STDLIB && !defined(lint)) || VMS || NEWDOSCC
 #include <stdlib.h>

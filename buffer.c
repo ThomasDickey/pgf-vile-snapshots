@@ -6,7 +6,13 @@
  * for the display system.
  *
  * $Log: buffer.c,v $
- * Revision 1.83  1994/02/22 11:03:15  pgf
+ * Revision 1.84  1994/03/10 20:02:15  pgf
+ * the histbuffer command now stutters with a call to tgetc instead of
+ * kbd_seq, so that the pushback of an unused command works okay.
+ * also, anycb() now returns a pointer to the first modified buffer
+ * it encounters, so callers can treat the single buffer case specially
+ *
+ * Revision 1.83  1994/02/22  11:03:15  pgf
  * truncated RCS log for 4.0
  *
  */
@@ -397,17 +403,17 @@ int
 histbuff(f,n)
 int f,n;
 {
-	register int thiscmd, c;
+	register int thiskey, c;
 	register BUFFER *bp = 0;
 	char *bufn;
 
 	if (f == FALSE) {
 		if (!hist_show())
 			return FALSE;
-		thiscmd = lastcmd;
-		c = kbd_seq();
+		thiskey = lastkey;
+		c = tgetc(FALSE);
 		mlerase();
-		if (c == thiscmd) {
+		if (c == thiskey) {
 			c = lookup_hist(bp = find_alt());
 		} else if (isdigit(c)) {
 			c = c - '0';
@@ -1354,16 +1360,24 @@ int	len;
  * list of buffer names is hacked.
  * Return FALSE if no buffers
  * have been changed.
+ * Return a pointer to the first changed buffer,
+ * in case there's only one -- it's useful info
+ * then.
  */
 int
-anycb()
+anycb(bpp)
+BUFFER **bpp;
 {
 	register BUFFER *bp;
 	register int cnt = 0;
+	if (bpp) *bpp = NULL;
 
 	for_each_buffer(bp) {
-		if (!b_is_invisible(bp) && b_is_changed(bp))
+		if (!b_is_invisible(bp) && b_is_changed(bp)) {
+		    	if (bpp && !*bpp)
+				*bpp = bp;
 			cnt++;
+		}
 	}
 	return (cnt);
 }

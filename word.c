@@ -4,7 +4,14 @@
  * do any sentence mode commands, they are likely to be put in this file. 
  *
  * $Log: word.c,v $
- * Revision 1.37  1994/02/22 11:03:15  pgf
+ * Revision 1.39  1994/03/08 12:30:42  pgf
+ * changed 'fulllineregions' to 'regionshape'.
+ * added column args to entabline.
+ *
+ * Revision 1.38  1994/02/28  15:11:30  pgf
+ * don't let joinregion() do yanking -- it shouldn't disrupt the kill registers
+ *
+ * Revision 1.37  1994/02/22  11:03:15  pgf
  * truncated RCS log for 4.0
  *
  */
@@ -259,20 +266,20 @@ joinregion()
 
 		DOT = region.r_orig;
 		end = l_ref(region.r_end.l);
-		fulllineregions = FALSE;
+		regionshape = EXACT;
 
-		while (!done) {
+		while (!done && status == TRUE) {
 			c = EOS;
-			status = gotoeol(FALSE,1);
+			(void)gotoeol(FALSE,1);
 			if (DOT.o > 0)
 				c = lGetc(DOT.l, DOT.o-1);
-			if (status == TRUE) status = setmark();
-			if (status == TRUE) status = forwline(FALSE,1);
-			if (status == TRUE) status = firstnonwhite(FALSE,1);
+			(void)setmark();
+			if (forwline(FALSE,1) != TRUE)
+				break;
+			(void)firstnonwhite(FALSE,1);
 
 			done = ((l_ref(DOT.l) == end) || (lForw(DOT.l) == end));
-			if (status == TRUE) status = killregion();
-			if (status != TRUE)
+			if (killregionmaybesave(FALSE) != TRUE)
 				break;
 
 			doto = DOT.o;
@@ -430,7 +437,7 @@ formatregion()
 					/* fix the leading indent now, if
 						some spaces should be tabs */
 					if (b_val(curbp,MDTABINSERT))
-						entabline(TRUE);
+						entabline((void *)TRUE, 0, 0);
 			                if (lnewline() == FALSE)
 						return FALSE;
 				        if (linsert(secondindent,' ') == FALSE)
@@ -466,7 +473,7 @@ formatregion()
 		  there's no more room, but because we're done processing a
 		  section or the region */
 		if (b_val(curbp,MDTABINSERT))
-			entabline(TRUE);
+			entabline((void *)TRUE, 0, 0);
 		DOT.l = lFORW(DOT.l);
 	}
 	return setmark();

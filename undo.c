@@ -2,7 +2,11 @@
  * code by Paul Fox, original algorithm mostly by Julia Harper May, 89
  *
  * $Log: undo.c,v $
- * Revision 1.46  1994/02/22 11:03:15  pgf
+ * Revision 1.47  1994/03/08 12:28:21  pgf
+ * trial version of repointstuff() which attempts to preserve offsets of
+ * marks attached to lines being replaced.
+ *
+ * Revision 1.46  1994/02/22  11:03:15  pgf
  * truncated RCS log for 4.0
  *
  */
@@ -836,6 +840,7 @@ int f,n;
 
 }
 
+#ifdef BEFORE
 static void
 repointstuff(nlp,olp)
 fast_ptr LINEPTR nlp;
@@ -902,6 +907,78 @@ fast_ptr LINEPTR olp;
 	}
 
 }
+#else
+
+
+#define _min(a,b) ((a) < (b)) ? (a) : (b)
+
+static void
+repointstuff(nlp,olp)
+fast_ptr LINEPTR nlp;
+fast_ptr LINEPTR olp;
+{
+	register WINDOW *wp;
+	int	usenew = lisreal(l_ref(nlp));
+	fast_ptr LINEPTR point;
+	register LINE *  ulp;
+
+	point = usenew ? nlp : lFORW(olp);
+#if ! WINMARK
+	if (same_ptr(MK.l, olp)) {
+		MK.l = point;
+		MK.o = _min(MK.o, llength(point));
+	}
+#endif
+	/* fix anything important that points to it */
+	for_each_window(wp) {
+		if (same_ptr(wp->w_dot.l, olp)) {
+			wp->w_dot.l = point;
+			wp->w_dot.o = _min(wp->w_dot.o, llength(point));
+		}
+		if (same_ptr(wp->w_line.l, olp))
+			wp->w_line.l = point;
+#if WINMARK
+		if (same_ptr(wp->w_mark.l, olp)) {
+			wp->w_mark.l = point;
+			wp->w_mark.o = _min(wp->w_mark.o, llength(point));
+		}
+#endif
+		if (same_ptr(wp->w_lastdot.l, olp)) {
+			wp->w_lastdot.l = point;
+			wp->w_lastdot.o = _min(wp->w_lastdot.o, llength(point));
+		}
+	}
+	if (curbp->b_nmmarks != NULL) {
+		/* fix the named marks */
+		int i;
+		struct MARK *mp;
+		for (i = 0; i < 26; i++) {
+			mp = &(curbp->b_nmmarks[i]);
+			if (same_ptr(mp->l, olp)) {
+				if (usenew) {
+					mp->l = point;
+					mp->o = _min(mp->o, llength(point));
+				} else {
+					mlforce("[Lost mark]");
+				}
+			}
+		}
+	}
+
+	/* reset the uline */
+	if ((ulp = l_ref(curbp->b_ulinep)) != NULL
+	 && same_ptr(ulp->l_nxtundo, olp)) {
+		if (usenew) {
+			ulp->l_nxtundo = point;
+		} else {
+			/* we lose the ability to undo all changes
+				to this line, since it's going away */
+			curbp->b_ulinep = null_ptr;
+		}
+	}
+
+}
+#endif
 
 static int
 linesmatch(lp1,lp2)

@@ -5,7 +5,22 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.97  1994/02/22 11:03:15  pgf
+ * Revision 1.102  1994/03/10 20:11:11  pgf
+ * kinsertlater() is new, anycb() now has arg
+ *
+ * Revision 1.101  1994/03/08  14:07:11  pgf
+ * added missing...
+ *
+ * Revision 1.100  1994/03/08  12:22:12  pgf
+ * changes for rectangles, and some movement from random.c to region.c
+ *
+ * Revision 1.99  1994/03/02  09:47:18  pgf
+ * new routine fnc2str
+ *
+ * Revision 1.98  1994/02/28  15:08:43  pgf
+ * added killregionmaybesave, which allows deleting without yanking
+ *
+ * Revision 1.97  1994/02/22  11:03:15  pgf
  * truncated RCS log for 4.0
  *
  *
@@ -120,6 +135,7 @@ extern int backhpage P(( int, int ));
 extern int setnmmark P(( int, int ));
 extern int golinenmmark P(( int, int ));
 extern int goexactnmmark P(( int, int ));
+extern int gorectnmmark P(( int, int ));
 extern int getnmmarkname P(( int * ));
 extern int gonmmark P(( int ));
 extern int setmark P(( void ));
@@ -156,6 +172,7 @@ extern char * kcod2prc P(( int, char * ));
 extern int insertion_cmd P(( int ));
 #endif
 extern int fnc2kcod P(( CMDFUNC * ));
+extern char * fnc2str P(( CMDFUNC * ));
 extern char * fnc2engl P(( CMDFUNC * ));
 extern CMDFUNC * engl2fnc P(( char * ));
 extern KBIND * kcode2kbind P(( int ));
@@ -206,7 +223,7 @@ void update_scratch P(( char *, int (*func)(BUFFER *) ));
 #endif
 extern int addline P(( BUFFER *, char *, int ));
 extern int add_line_at P(( BUFFER *, LINEPTR, char *, int ));
-extern int anycb P(( void ));
+extern int anycb P(( BUFFER ** ));
 extern void set_bname P(( BUFFER *, char * ));
 extern char * get_bname P(( BUFFER * ));
 extern BUFFER * find_b_name P(( char * ));
@@ -566,6 +583,7 @@ extern void ltextfree P(( LINE *, BUFFER * ));
 #endif
 extern void lremove P(( BUFFER *, LINEPTR ));
 extern int insspace P(( int, int ));
+extern int lstrinsert P(( char *, int ));
 extern int linsert P(( int, int ));
 extern int lnewline P(( void ));
 extern int ldelete P(( long, int ));
@@ -576,6 +594,7 @@ extern int putctext P(( char * ));
 extern int ldelnewline P(( void ));
 extern void ksetup P(( void ));
 extern void kdone P(( void ));
+extern int kinsertlater P(( int ));
 extern int kinsert P(( int ));
 extern int index2reg P(( int ));
 extern int reg2index P(( int ));
@@ -586,7 +605,10 @@ extern int putbefore P(( int, int ));
 extern int putafter P(( int, int ));
 extern int lineputbefore P(( int, int ));
 extern int lineputafter P(( int, int ));
+extern int rectputbefore P(( int, int ));
+extern int rectputafter P(( int, int ));
 extern int doput P(( int, int, int, int ));
+extern int force_text_to_col P(( int ));
 extern int put P(( int, int ));
 extern int execkreg P(( int, int ));
 extern int loadkreg P(( int, int ));
@@ -688,6 +710,8 @@ extern int opersubstagain P(( int, int ));
 extern int operentab P(( int, int ));
 extern int operdetab P(( int, int ));
 extern int opertrim P(( int, int ));
+extern int operblank P(( int, int ));
+extern int operopenrect P(( int, int ));
 
 /* path.c */
 #if MSDOS
@@ -728,17 +752,13 @@ extern int liststuff P(( char *, void (*)(int, char *), int, char * ));
 extern int showcpos P(( int, int ));
 extern int showlength P(( int, int ));
 extern int getccol P(( int ));
+extern int getcol P(( LINEPTR, C_NUM, int ));
 extern int gotocol P(( int, int ));
+extern int getoff P(( C_NUM, C_NUM * ));
 extern int gocol P(( int ));
 #if !SMALLER
 extern int twiddle P(( int, int ));
 #endif
-extern int detabline P(( int ));
-extern int detab_region P(( void ));
-extern int entabline P(( int ));
-extern int entab_region P(( void ));
-extern int trimline P(( int ));
-extern int trim_region P(( void ));
 extern int deblank P(( int, int ));
 extern int flipchar P(( int, int ));
 extern int forwdelchar P(( int, int ));
@@ -761,6 +781,16 @@ extern int cd P(( int, int ));
 extern int pwd P(( int, int ));
 extern int set_directory P(( char * ));
 extern void ch_fname P(( BUFFER *, char * ));
+
+/* rectangl.c */
+extern int yankrect P(( void ));
+extern int stropenrect P(( void ));
+extern int deleterect P(( void ));
+extern int killrect P(( void ));
+extern int openrect P(( int, int ));
+extern int copyrect P(( int, int ));
+extern int clearrect P(( void ));
+extern void CleanupRect P(( void ));
 
 /* regexp.c */
 extern void regmassage P(( char *, char *, int ));
@@ -786,11 +816,27 @@ extern int lregexec P(( regexp *, LINE *, int, int ));
 
 /* region.c */
 extern int killregion P(( void ));
-extern int yankregion P(( void ));
-extern int shift_right_line P(( int ));
+extern int killregionmaybesave P(( int ));
+extern int kill_line P((void *, int, int ));
+extern int killrectmaybesave P(( int ));
+extern int open_hole_in_line P((void *, int, int ));
+extern int openregion P(( void ));
+extern int stringrect P(( void ));
+extern int shift_right_line P(( void *, int, int ));
 extern int shiftrregion P(( void ));
-extern int shift_left_line P(( int ));
+extern int shift_left_line P(( void *, int, int ));
 extern int shiftlregion P(( void ));
+extern int detabline P(( void *, int, int ));
+extern int detab_region P(( void ));
+extern int entabline P(( void *, int, int ));
+extern int entab_region P(( void ));
+extern int trimline P(( void *, int, int ));
+extern int trim_region P(( void ));
+extern int blankline P(( void *, int, int ));
+extern int blank_region P(( void ));
+extern int yank_line P((void *, int, int ));
+extern int yankregion P(( void ));
+extern int _yankchar P(( int ));
 extern int _to_lower P(( int ));
 extern int _to_upper P(( int ));
 extern int _to_caseflip P(( int ));
@@ -800,7 +846,8 @@ extern int upperregion P(( void ));
 extern int charprocreg P(( int (*)(int) ));
 extern int getregion P(( REGION * ));
 extern int get_fl_region P(( REGION * ));
-extern int do_fl_region P(( int (*)(int), int ));
+extern int do_lines_in_region P(( int (*)(void *,int,int), void *, int ));
+extern int do_chars_in_line P(( void *, int, int ));
 
 /* search.c */
 extern void not_found_msg P(( int, int ));

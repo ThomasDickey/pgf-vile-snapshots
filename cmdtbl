@@ -74,7 +74,10 @@
 #		here for completeness.
 #
 # $Log: cmdtbl,v $
-# Revision 1.83  1994/02/22 11:03:15  pgf
+# Revision 1.84  1994/03/08 11:55:28  pgf
+# new rectangle-oriented commands
+#
+# Revision 1.83  1994/02/22  11:03:15  pgf
 # truncated RCS log for 4.0
 #
 #
@@ -555,6 +558,9 @@ golinenmmark	MOTION|FL
 goexactnmmark	MOTION
 	"goto-named-mark-exact"		!FEWNAMES
 	'`'
+gorectnmmark	MOTION|RECT
+	"goto-named-mark-rectangular"	!FEWNAMES
+	'\0134'
 help		NONE
 	"h"
 	"help"
@@ -610,6 +616,14 @@ lineputbefore	REDO|UNDO|GLOBOK|(FROM|OPTREG)
 	"put-as-lines-before"		!FEWNAMES
 	"Put"
 	'^X-P'
+rectputafter	REDO|UNDO|GLOBOK|(FROM|ZERO|OPTREG)
+	"put-as-rectangle-after"	!FEWNAMES
+	"rput"
+	'^A-p'
+rectputbefore	REDO|UNDO|GLOBOK|(FROM|OPTREG)
+	"put-as-rectangle-before"	!FEWNAMES
+	"rPut"
+	'^A-P'
 lineundo	NONE
 	"undo-line-changes"		!FEWNAMES
 	'U'
@@ -686,6 +700,9 @@ opendown	REDO|UNDO|(FROM|ZERO)
 opendown_no_aindent	REDO|UNDO|(FROM|ZERO)
 	"open-line-below-no-autoindent"	!FEWNAMES
 	'^A-o'
+operopenrect	REDO|UNDO|GLOBOK|UNDO|(RANGE)
+	"open-rectangle"
+	'^A-r'
 operchg		OPER|REDO|UNDO
 	"change-til"			!FEWNAMES
 	"delete-and-insert-chars-til"			!FEWNAMES
@@ -763,6 +780,10 @@ opertrim	REDO|UNDO|GLOBOK|UNDO|(RANGE)	AEDIT
 	"trim-lines-til"		!FEWNAMES
 	"trim"
 	'^A-t'
+operblank	REDO|UNDO|GLOBOK|UNDO|(RANGE)	AEDIT
+	"blank-region"
+	"blank"
+	'^A-b'
 operyank	OPER
 	"yank-til"			!FEWNAMES
 	'y'

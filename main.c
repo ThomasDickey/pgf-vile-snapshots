@@ -14,7 +14,21 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.166  1994/02/22 18:09:24  pgf
+ * Revision 1.169  1994/03/11 11:58:52  pgf
+ * we now pass the name of the desired screen resolution directly to
+ * the ibm screen driver via the current_res_name global.  any option
+ * starting with a digit is considered a screen resolution, preserving
+ * backwards compatability with -2, -25, -4, -43, -5, -50.  in addition,
+ * -80x25 or -40x12 will also now work from the command line
+ *
+ * Revision 1.168  1994/03/10  20:10:31  pgf
+ * quit and zzquit now prompt with name of buffer if only one buffer
+ * is modified.
+ *
+ * Revision 1.167  1994/03/08  12:19:53  pgf
+ * changed 'fulllineregions' to 'regionshape'.
+ *
+ * Revision 1.166  1994/02/22  18:09:24  pgf
  * when choosing dos-mode for an ambiguous buffer, vote in favor of on
  * if the global mode is set, and we're running on DOS.  otherwise, choose
  * no-dos-mode.
@@ -136,10 +150,6 @@ char	*argv[];
 	if (strcmp(pathleaf(prog_arg), "view") == 0)
 		set_global_b_val(MDVIEW,TRUE);
 
-#if IBMPC
-	ibmtype = CDSENSE;
-#endif
-
 #if X11
 	x_preparse_args(&argc, &argv);
 #endif
@@ -156,7 +166,16 @@ char	*argv[];
 
 		/* Process Switches */
 		if (*param == '-') {
-			switch (*(++param)) {
+			++param;
+#if IBMPC
+		    	/* if it's a digit, it's probably a screen
+				resolution */
+			if (isdigit(*param)) {
+				current_res_name = param;
+				continue;
+			} else
+#endif	/* IBMPC */
+			switch (*param) {
 #if X11 && !XTOOLKIT
 			case 'd':
 				if ((param = argv[++carg]) != 0)
@@ -248,29 +267,6 @@ char	*argv[];
 				set_global_b_val(MDVIEW,TRUE);
 				break;
 
-			/*
-			 * Note that ibmtype is now only used to detect
-			 * whether a command line option was given, i.e., if
-			 * it is not equal to CDSENSE then a command line
-			 * option was given
-			 */
-#if IBMPC
-
-#if __ZTC__
-#define	OptScreen(type)	ibmtype = type; set43 = (type != CD_25LINE)
-#else
-#define	OptScreen(type)	ibmtype = type
-#endif	/* __ZTC__ */
-			case '2':	/* 25 line mode */
-				OptScreen(CD_25LINE);
-				break;
-			case '4':	/* 43 line mode */
-				OptScreen(CDEGA);
-				break;
-			case '5':	/* 50 line mode */
-				OptScreen(CDVGA);
-				break;
-#endif	/* IBMPC */
 
 			case '?':
 			default:	/* unknown switch */
@@ -1071,13 +1067,19 @@ int f,n;
 {
 	int thiscmd;
 	int cnt;
+	BUFFER *bp;
 
 	thiscmd = lastcmd;
-	cnt = anycb();
+	cnt = anycb(&bp);
 	if (cnt) {
-		mlprompt("Will write %d buffer%c  %s ",
-			cnt, cnt > 1 ? 's':'.',
-			clexec ? "" : "Repeat command to continue.");
+	    	if (cnt > 1) {
+		    mlprompt("Will write %d buffers.  %s ", cnt,
+			    clexec ? "" : "Repeat command to continue.");
+		} else {
+		    mlprompt("Will write buffer \"%s\".  %s ",
+			    get_bname(bp),
+			    clexec ? "" : "Repeat command to continue.");
+		}
 		if (!clexec && !isnamedcmd) {
 			if (thiscmd != kbd_seq())
 				return FALSE;
@@ -1127,11 +1129,13 @@ quit(f, n)
 int f,n;
 {
 	int cnt;
+	BUFFER *bp;
 
-	if (f == FALSE && (cnt = anycb()) != 0) {
+	if (f == FALSE && (cnt = anycb(&bp)) != 0) {
 		if (cnt == 1)
 			mlforce(
-			"There is an unwritten modified buffer.  Write it, or use :q!");
+			"Buffer \"%s\" is modified.  Write it, or use :q!",
+				get_bname(bp));
 		else
 			mlforce(
 			"There are %d unwritten modified buffers.  Write them, or use :q!",
@@ -1212,7 +1216,7 @@ int f,n;
 {
 	TTbeep();
 	dotcmdmode = STOP;
-	fulllineregions = FALSE;
+	regionshape = EXACT;
 	doingopcmd = FALSE;
 	opcmd = 0;
 	mlforce("[Aborted]");

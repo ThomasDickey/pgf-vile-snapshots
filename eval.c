@@ -4,7 +4,10 @@
 	written 1986 by Daniel Lawrence
  *
  * $Log: eval.c,v $
- * Revision 1.75  1994/02/22 11:03:15  pgf
+ * Revision 1.76  1994/02/23 05:09:21  pgf
+ * fix is_falsem/is_truem again.
+ *
+ * Revision 1.75  1994/02/22  11:03:15  pgf
  * truncated RCS log for 4.0
  *
  */
@@ -933,7 +936,8 @@ is_truem(val)
 char *val;
 {
 	char	temp[8];
-	mklower(strncpy(temp, val, sizeof(temp)-1))[sizeof(temp)-1] = EOS;
+	strncpy(temp, val, sizeof(temp)-1)[sizeof(temp)-1] = EOS;
+	mklower(temp);
 	return (!strcmp(temp, "yes")
 	   ||   !strcmp(temp, "true")
 	   ||   !strcmp(temp, "t")
@@ -950,7 +954,8 @@ is_falsem(val)
 char *val;
 {
 	char	temp[8];
-	mklower(strncpy(temp, val, sizeof(temp)-1))[sizeof(temp)-1] = EOS;
+	strncpy(temp, val, sizeof(temp)-1)[sizeof(temp)-1] = EOS;
+	mklower(temp);
 	return (!strcmp(temp, "no")
 	   ||   !strcmp(temp, "false")
 	   ||   !strcmp(temp, "f")

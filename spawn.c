@@ -2,7 +2,16 @@
  *		for MicroEMACS
  *
  * $Log: spawn.c,v $
- * Revision 1.70  1994/02/22 11:03:15  pgf
+ * Revision 1.73  1994/03/10 20:15:32  pgf
+ * prompt with name of modified buffer when there's only one of them
+ *
+ * Revision 1.72  1994/03/08  14:17:45  pgf
+ * warning cleanup
+ *
+ * Revision 1.71  1994/02/28  15:14:24  pgf
+ * make DOS use pressreturn after a shell escape
+ *
+ * Revision 1.70  1994/02/22  11:03:15  pgf
  * truncated RCS log for 4.0
  *
  */
@@ -230,7 +239,8 @@ int	rerun;		/* TRUE/FALSE: spawn, -TRUE: pipecmd */
 	register int	s;
 	register SIZE_T	len;
 	static	char	bang[] = SHPIPE_LEFT;
-	int	cb	= anycb(),
+	BUFFER *bp;
+	int	cb	= anycb(&bp),
 		fix	= (rerun != -TRUE);
 	char	save[NLINE],
 		temp[NLINE],
@@ -247,11 +257,17 @@ int	rerun;		/* TRUE/FALSE: spawn, -TRUE: pipecmd */
 
 	(void)strcpy(line, save);
 	if (rerun != TRUE) {
-		if (cb != 0)
-			(void)lsprintf(temp, "Warning: %d modified buffer%s: %s",
-				cb, PLURAL(cb), bang);
-		else
+		if (cb != 0) {
+		    if (cb > 1) {
+			(void)lsprintf(temp, "Warning: %d modified buffers: %s",
+				cb, bang);
+		    } else {
+			(void)lsprintf(temp, "Warning: buffer \"%s\" is modified: %s",
+				get_bname(bp), bang);
+		    }
+		} else {
 			(void)lsprintf(temp, "%s%s", rerun == -TRUE ? "" : ": ", bang);
+		}
 
 		if ((s = mlreply_no_bs(temp, line+1, NLINE)) != TRUE)
 			return s;
@@ -428,10 +444,14 @@ int rerun;
 	TTkopen();
 	/* if we are interactive, pause here */
 	if (clexec == FALSE) {
+#if BEFORE
 		kbd_expand = -1;
 		kbd_puts("\r\n\n[End]");
 		kbd_expand = 0;
 		tgetc(FALSE);
+#else
+		pressreturn();
+#endif
 	}
 #if	IBMPC
 	/* Reopen the display _after_ the prompt, to keep the shell-output
@@ -591,7 +611,7 @@ filterregion()
 		kregcirculate(FALSE);
 		kp = kbs[ukb].kbufh;
 		while (kp != NULL) {
-			fwrite((char *)kp->d_chunk, 1, KbSize(ukb,kp), fw);
+			fwrite((char *)kp->d_chunk, 1, (int)KbSize(ukb,kp), fw);
 			kp = kp->d_next;
 		}
 #if UNIX
