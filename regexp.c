@@ -13,7 +13,22 @@
  *		pgf, 11/91
  * 
  * $Log: regexp.c,v $
- * Revision 1.20  1992/04/16 18:56:10  pgf
+ * Revision 1.25  1992/05/19 23:46:09  pgf
+ * took newline out of the \W, \D, and \p matches
+ *
+ * Revision 1.24  1992/05/19  23:24:27  foxharp
+ * fixed * and + behavior for \w, \S, \d, added \p and \P for "printable"
+ *
+ * Revision 1.23  1992/05/19  08:55:44  foxharp
+ * more prototype and shadowed decl fixups
+ *
+ * Revision 1.22  1992/05/16  12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.21  1992/04/30  17:54:28  pgf
+ * added \s, \S, \w, \W, \d, \D atoms
+ *
+ * Revision 1.20  1992/04/16  18:56:10  pgf
  * better fix for non-leading ^ and non-trailing $
  *
  * Revision 1.19  1992/04/14  08:34:25  pgf
@@ -53,7 +68,7 @@
  * better commentary
  *
  * Revision 1.9  1991/11/12  23:44:21  pgf
- * regexec no longer needs null terminated strings -- it takes an
+ * regexec no longer needs null terminated strings -- it takes an
  * end pointer instead
  *
  * Revision 1.8  1991/11/08  13:09:15  pgf
@@ -173,9 +188,17 @@
 #define	PLUS	11	/* node	Match this (simple) thing 1 or more times. */
 #define	BEGWORD	12	/* node	Match "" between nonword and word. */
 #define	ENDWORD 13	/* node	Match "" between word and nonword. */
-#define	OPEN	20	/* no	Mark this point in input as start of #n. */
+#define	WHITESP 14	/* node	Match any whitespace, including BOL and EOL */
+#define	NWHITESP 15	/* node	Match nonwhitespace, including BOL and EOL */
+#define	ALNUM	16	/* node	Match any alphanumeric, include _ */
+#define	NALNUM	17	/* node	inverse above, including BOL and EOL */
+#define	DIGIT	18	/* node	Match any digit */
+#define	NDIGIT	19	/* node	Match any non-digit */
+#define	PRINT	20	/* node	Match any printable char (including whitesp) */
+#define	NPRINT	21	/* node	Match any non-printable char */
+#define	OPEN	30	/* no	Mark this point in input as start of #n. */
 			/*	OPEN+1 is number 1, etc. */
-#define	CLOSE	30	/* no	Analogous to OPEN. */
+#define	CLOSE	40	/* no	Analogous to OPEN. */
 
 /*
  * Opcode notes:
@@ -243,53 +266,39 @@ static char regdummy;
 static char *regcode;		/* Code-emit pointer; &regdummy = don't. */
 static long regsize;		/* Code size. */
 
-/*
- * Forward declarations for regcomp()'s friends.
+/*		 	
+ *				regexp		in magic	in nomagic
+ *				char		enter as	enter as
+ *				-------		--------	--------
+ *	0 or 1			?		\?		\?
+ *	1 or more		+		\+		\+
+ *	0 or more		*		*		\*
+ *	beg. nest		(		\(		\(
+ *	end nest		)		\(		\)
+ *	beg chr class		[		[		\[
+ *	beg "word"		<		\<		\<
+ *	end "word"		>		\>		\>
+ *	beginning		^		^		^
+ *	end			$		$		$
+ *	any char		.		.		\.
+ *	alternation		|		\|		\|
+ *	flip or literal		\		\\		\\
+ *	last replace		~		~		\~
+ *	words			\w		\w		\w
+ *	spaces			\s		\s		\s
+ *	digits			\d		\d		\d
+ *	printable		\p		\p		\p
+ *
+ *	So:  in magic mode, we remove \ from ? + ( ) < > |
+ *			   and add \ to bare ? + ( ) < > |
+ *	   in nomagic mode, we remove \ from ? + ( ) < > | * [ ] . ~
+ *			   and add \ to bare ? + ( ) < > | * [ ] . ~
  */
-#ifndef STATIC
-#define	STATIC	static
-#endif
-STATIC char *reg();
-STATIC char *regbranch();
-STATIC char *regpiece();
-STATIC char *regatom();
-STATIC char *regnode();
-STATIC char *regnext();
-STATIC void regc();
-STATIC void regopinsert();
-STATIC void regninsert();
-STATIC void regtail();
-STATIC void regoptail();
-#ifdef STRCSPN
-STATIC int strcspn();
-#endif
 
-/*		 	regexp		in magic	in nomagic
-			char		enter as	enter as
-			-------		--------	--------
-0 or 1			?		\?		\?
-1 or more		+		\+		\+
-0 or more		*		*		\*
-beg. nest		(		\(		\(
-end nest		)		\(		\)
-beg chr class		[		[		\[
-beg "word"		<		\<		\<
-end "word"		>		\>		\>
-beginning		^		^		^
-end			$		$		$
-any char		.		.		\.
-alternation		|		\|		\|
-flip or literal		\		\\		\\
-last replace		~		~		\~
-
-So:  in magic mode, we remove \ from ? + ( ) < > |
-		   and add \ to bare ? + ( ) < > |
-   in nomagic mode, we remove \ from ? + ( ) < > | * [ ] . ~
-		   and add \ to bare ? + ( ) < > | * [ ] . ~
-*/
 #define MAGICMETA   "?+()<>|"
 #define NOMAGICMETA "?+()<>|*[] .~"
 
+void
 regmassage(old,new,magic)
 char *old, *new;
 int magic;
@@ -360,14 +369,14 @@ int magic;
 	/* First pass: determine size, legality. */
 	regparse = exp;
 	regnpar = 1;
-	regsize = 0L;
+	regsize = 0;
 	regcode = &regdummy;
 	regc(REGEXP_MAGIC);
 	if (reg(0, &flags) == NULL)
 		return(NULL);
 
 	/* Small enough for pointer-storage convention? */
-	if (regsize >= 32767L)		/* Probably could be 65535L. */
+	if (regsize >= 32767)		/* Probably could be 65535. */
 		FAIL("regexp too big");
 
 	/* Allocate space. */
@@ -436,7 +445,7 @@ int magic;
  * is a trifle forced, but the need to tie the tails of the branches to what
  * follows makes it hard to avoid.
  */
-static char *
+char *
 reg(paren, flagp)
 int paren;			/* Parenthesized? */
 int *flagp;
@@ -456,8 +465,10 @@ int *flagp;
 		parno = regnpar;
 		regnpar++;
 		ret = regnode(OPEN+parno);
-	} else
+	} else {
 		ret = NULL;
+		parno = 0;
+	}
 
 	/* Pick up the branches, linking them together. */
 	br = regbranch(&flags);
@@ -508,7 +519,7 @@ int *flagp;
  *
  * Implements the concatenation operator.
  */
-static char *
+char *
 regbranch(flagp)
 int *flagp;
 {
@@ -554,7 +565,7 @@ int *flagp;
  * It might seem that this node could be dispensed with entirely, but the
  * endmarker role is not redundant.
  */
-static char *
+char *
 regpiece(flagp, at_bop)
 int *flagp;
 int at_bop;
@@ -619,7 +630,7 @@ int at_bop;
  * faster to run.  Backslashed characters are exceptions, each becoming a
  * separate node; the code is simpler that way and it's not worth fixing.
  */
-static char *
+char *
 regatom(flagp, at_bop)
 int *flagp;
 int at_bop;
@@ -707,10 +718,46 @@ int at_bop;
 	case '\\':
 		if (*regparse == '\0')
 			FAIL("trailing \\");
-		ret = regnode(EXACTLY);
-		regc(*regparse++);
-		regc('\0');
-		*flagp |= HASWIDTH|SIMPLE;
+		switch(*regparse) {
+		case 's':
+			ret = regnode(WHITESP);
+			break;
+		case 'S':
+			ret = regnode(NWHITESP);
+			*flagp |= HASWIDTH|SIMPLE;
+			break;
+		case 'w':
+			ret = regnode(ALNUM);
+			*flagp |= HASWIDTH|SIMPLE;
+			break;
+		case 'W':
+			ret = regnode(NALNUM);
+			*flagp |= HASWIDTH|SIMPLE;
+			break;
+		case 'd':
+			ret = regnode(DIGIT);
+			*flagp |= HASWIDTH|SIMPLE;
+			break;
+		case 'D':
+			ret = regnode(NDIGIT);
+			*flagp |= HASWIDTH|SIMPLE;
+			break;
+		case 'p':
+			ret = regnode(PRINT);
+			*flagp |= HASWIDTH|SIMPLE;
+			break;
+		case 'P':
+			ret = regnode(NPRINT);
+			*flagp |= HASWIDTH|SIMPLE;
+			break;
+		default:
+			ret = regnode(EXACTLY);
+			regc(*regparse);
+			regc('\0');
+			*flagp |= HASWIDTH|SIMPLE;
+			break;
+		}
+		regparse++;
 		break;
 	default: {
 			register char ender;
@@ -742,9 +789,9 @@ int at_bop;
 /*
  - regnode - emit a node
  */
-static char *			/* Location. */
+char *			/* Location. */
 regnode(op)
-char op;
+int op;
 {
 	register char *ret;
 	register char *ptr;
@@ -767,7 +814,7 @@ char op;
 /*
  - regc - emit (if appropriate) a byte of code
  */
-static void
+void
 regc(b)
 int b;
 {
@@ -782,7 +829,7 @@ int b;
  *
  * Means relocating the operand.
  */
-static void
+void
 regninsert(n, opnd)
 register int n;
 char *opnd;
@@ -812,9 +859,9 @@ char *opnd;
  *
  * Means relocating the operand.
  */
-static void
+void
 regopinsert(op, opnd)
-char op;
+int op;
 char *opnd;
 {
 	regninsert(3, opnd);
@@ -827,7 +874,7 @@ char *opnd;
 /*
  - regtail - set the next-pointer at the end of a node chain
  */
-static void
+void
 regtail(p, val)
 char *p;
 char *val;
@@ -859,7 +906,7 @@ char *val;
 /*
  - regoptail - regtail on operand of first argument; nop if operandless
  */
-static void
+void
 regoptail(p, val)
 char *p;
 char *val;
@@ -883,13 +930,6 @@ static char *regbol;		/* Beginning of input, for ^ check. */
 static char **regstartp;	/* Pointer to startp array. */
 static char **regendp;		/* Ditto for endp. */
 
-/*
- * Forwards.
- */
-STATIC int regtry();
-STATIC int regmatch();
-STATIC int regrepeat();
-
 #ifdef REGDEBUG
 int regnarrate = 0;
 void regdump();
@@ -901,6 +941,7 @@ STATIC char *regprop();
  * E, which can be NULL if A really is null terminated.  B must be null-
  * terminated.  At most n characters are compared.
  */
+int
 regstrncmp(a,b,n,e)
 char *a,*b,*e;
 int n;
@@ -922,7 +963,9 @@ int n;
 
 char *
 regstrchr(s, c, e)
-register char *s, c, *e;
+register char *s;
+register int c;
+register char *e;
 {
 	if (e == NULL)
 		e = &s[strlen(s)];
@@ -1034,7 +1077,7 @@ register int endoff;
 /*
  - regtry - try match at specific point
  */
-static int			/* 0 failure, 1 success */
+int			/* 0 failure, 1 success */
 regtry(prog, string, stringend)
 regexp *prog;
 char *string;
@@ -1076,7 +1119,7 @@ char *stringend;
  * need to know whether the rest of the match failed) by a loop instead of
  * by recursion.
  */
-static int			/* 0 failure, 1 success */
+int			/* 0 failure, 1 success */
 regmatch(prog)
 char *prog;
 {
@@ -1121,6 +1164,67 @@ char *prog;
 					|| !isident(reginput[-1]))
  				return(0);
  			break;
+		case WHITESP:
+			/* match bol, eol, or multiple whitespace */
+			if (reginput == regbol || reginput == regnomore
+				|| isspace(*reginput)) {
+				while ( reginput != regnomore &&
+					isspace(*reginput)) {
+					reginput++;
+				}
+				break;
+			}
+			return 0;
+		case NWHITESP:
+			/* don't match bol, eol, or space or tab */
+			if (reginput == regbol || reginput == regnomore ||
+					isspace(*reginput))
+				return 0;
+			while (reginput != regnomore && !isspace(*reginput))
+				reginput++;
+			break;
+		case ALNUM: /* includes _ */
+			if (reginput == regbol || reginput == regnomore)
+				return 0;
+			if (!isident(*reginput))
+				return 0;
+			reginput++;
+			break;
+		case NALNUM:
+			if (reginput == regbol || reginput == regnomore)
+				return 0;
+			if (isident(*reginput))
+				return 0;
+			reginput++;
+			break;
+		case DIGIT:
+			if (reginput == regbol || reginput == regnomore)
+				return 0;
+			if (!isdigit(*reginput))
+				return 0;
+			reginput++;
+			break;
+		case NDIGIT:
+			if (reginput == regbol || reginput == regnomore)
+				return 0;
+			if (isdigit(*reginput))
+				return 0;
+			reginput++;
+			break;
+		case PRINT:
+			if (reginput == regbol || reginput == regnomore)
+				return 0;
+			if (!(isprint(*reginput) || isspace(*reginput)))
+				return 0;
+			reginput++;
+			break;
+		case NPRINT:
+			if (reginput == regbol || reginput == regnomore)
+				return 0;
+			if (isprint(*reginput) || isspace(*reginput))
+				return 0;
+			reginput++;
+			break;
 		case ANY:
 			if (reginput == regnomore)
 				return(0);
@@ -1243,7 +1347,7 @@ char *prog;
 			break;
 		case STAR:
 		case PLUS: {
-				register char nextch;
+				register char nxtch;
 				register int no;
 				register char *save;
 				register int min;
@@ -1252,17 +1356,17 @@ char *prog;
 				 * Lookahead to avoid useless match attempts
 				 * when we know what character comes next.
 				 */
-				nextch = '\0';
+				nxtch = '\0';
 				if (OP(next) == EXACTLY)
-					nextch = *OPERAND(next);
+					nxtch = *OPERAND(next);
 				min = (OP(scan) == STAR) ? 0 : 1;
 				save = reginput;
 				no = regrepeat(OPERAND(scan));
 				if (ignorecase)
 				    while (no >= min) {
 					/* If it could work, try it. */
-					if (nextch == '\0' || 
-						nocase_eq(*reginput,nextch))
+					if (nxtch == '\0' || 
+						nocase_eq(*reginput,nxtch))
 						if (regmatch(next))
 							return(1);
 					/* Couldn't or didn't -- back up. */
@@ -1272,8 +1376,8 @@ char *prog;
 				else
 				    while (no >= min) {
 					/* If it could work, try it. */
-					if (nextch == '\0' ||
-						*reginput == nextch)
+					if (nxtch == '\0' ||
+						*reginput == nxtch)
 						if (regmatch(next))
 							return(1);
 					/* Couldn't or didn't -- back up. */
@@ -1305,7 +1409,7 @@ char *prog;
 /*
  - regrepeat - repeatedly match something simple, report how many
  */
-static int
+int
 regrepeat(p)
 char *p;
 {
@@ -1346,6 +1450,50 @@ char *p;
 			scan++;
 		}
 		break;
+	case NWHITESP:
+		while (scan != regnomore && !isspace(*scan)) {
+			count++;
+			scan++;
+		}
+		break;
+	case ALNUM:
+		while (scan != regnomore && isident(*scan)) {
+			count++;
+			scan++;
+		}
+		break;
+	case NALNUM:
+		while (scan != regnomore && !isident(*scan)) {
+			count++;
+			scan++;
+		}
+		break;
+	case DIGIT:
+		while (scan != regnomore && isdigit(*scan)) {
+			count++;
+			scan++;
+		}
+		break;
+	case NDIGIT:
+		while (scan != regnomore && !isdigit(*scan)) {
+			count++;
+			scan++;
+		}
+		break;
+	case PRINT:
+		while (scan != regnomore &&
+				(isprint(*scan) || isspace(*scan))) {
+			count++;
+			scan++;
+		}
+		break;
+	case NPRINT:
+		while (scan != regnomore &&
+				!(isprint(*scan) || isspace(*scan))) {
+			count++;
+			scan++;
+		}
+		break;
 	default:		/* Oh dear.  Called inappropriately. */
 		regerror("internal foulup");
 		count = 0;	/* Best compromise. */
@@ -1359,7 +1507,7 @@ char *p;
 /*
  - regnext - dig the "next" pointer out of a node
  */
-static char *
+char *
 regnext(p)
 register char *p;
 {
@@ -1428,7 +1576,7 @@ regexp *r;
 /*
  - regprop - printable representation of opcode
  */
-static char *
+char *
 regprop(op)
 char *op;
 {
@@ -1467,6 +1615,36 @@ char *op;
 		break;
 	case END:
 		p = "END";
+		break;
+	case BEGWORD:
+		p = "BEGWORD";
+		break;
+	case ENDWORD:
+		p = "ENDWORD";
+		break;
+	case WHITESP:
+		p = "WHITESP";
+		break;
+	case NWHITESP:
+		p = "NWHITESP";
+		break;
+	case ALNUM:
+		p = "ALNUM";
+		break;
+	case NALNUM:
+		p = "NALNUM";
+		break;
+	case DIGIT:
+		p = "DIGIT";
+		break;
+	case NDIGIT:
+		p = "NDIGIT";
+		break;
+	case PRINT:
+		p = "PRINT";
+		break;
+	case NPRINT:
+		p = "NPRINT";
 		break;
 	case OPEN+1:
 	case OPEN+2:
@@ -1520,7 +1698,7 @@ char *op;
  * of characters not from s2
  */
 
-static int
+int
 strcspn(s1, s2)
 char *s1;
 char *s2;

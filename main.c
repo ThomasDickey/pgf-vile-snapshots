@@ -14,7 +14,20 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.62  1992/04/14 08:42:42  pgf
+ * Revision 1.66  1992/05/19 08:55:44  foxharp
+ * more prototype and shadowed decl fixups
+ *
+ * Revision 1.65  1992/05/16  12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.64  1992/05/13  09:12:20  pgf
+ * force initial update in X11 -- not sure why -- seems to wait for event
+ * otherwise
+ *
+ * Revision 1.63  1992/04/30  17:53:37  pgf
+ * use new \s atom in paragraph and section regexps
+ *
+ * Revision 1.62  1992/04/14  08:42:42  pgf
  * don't handle SIGWINCH in X11 case
  *
  * Revision 1.61  1992/04/10  18:49:23  pgf
@@ -235,6 +248,10 @@
 
 #include	<stdio.h>
 
+#include	"estruct.h"	/* global structures and defines */
+
+extern char *pathname[];	/* startup file path/name array */
+
 /* for MSDOS, increase the default stack space */
 
 #if	MSDOS & LATTICE
@@ -256,20 +273,13 @@ int _STKLOW = 0;		/* default is stack above heap (small only) */
 unsigned _stklen = 32768;
 #endif
 
-/* make global definitions not external */
-#define maindef
-
-#include	"estruct.h"	/* global structures and defines */
-
 #if UNIX
 #include	<signal.h>
 #endif
 
-#include	"nefunc.h"	/* function declarations */
-#include	"nebind.h"	/* default key bindings */
-#include	"nename.h"	/* name table */
+/* Make global definitions not external */
+#define realdef
 #include	"edef.h"	/* global definitions */
-
 
 #if	VMS
 #include	<ssdef.h>
@@ -280,54 +290,35 @@ unsigned _stklen = 32768;
 #define GOOD	0
 #endif
 
+int
 main(argc, argv)
 int	argc;
 char	*argv[];
 {
-	int    c;		/* command character */
+	int    c;			/* command character */
 	register BUFFER *bp;		/* temp buffer pointer */
-	register int	gotafile;	/* filename arg present? */
+	register int	gotafile = FALSE;/* filename arg present? */
 	register int	carg;		/* current arg to scan */
-	register int	ranstartup;	/* startup executed flag */
+	register int	ranstartup = FALSE;/* startup executed flag */
 	int startstat = TRUE;		/* result of running startup */
 	BUFFER *firstbp = NULL; 	/* ptr to first buffer in cmd line */
-	int gotoflag;			/* do we need to goto a line at start? */
-	int helpflag;			/* do we need to goto a line at start? */
-	int gline;			/* if so, what line? */
-	int searchflag; 		/* Do we need to search at start? */
-#if TAGS
-	int tagflag, didtag;			/* look up a tag to start? */
-	char *tname;
-#endif
+	int gotoflag = FALSE;		/* do we need to goto line at start? */
+	int gline = FALSE;		/* if so, what line? */
+	int helpflag = FALSE;		/* do we need help at start? */
+	int searchflag = FALSE; 	/* Do we need to search at start? */
 	char bname[NBUFN];		/* buffer name of file to read */
 	char *msg;
+#if TAGS
+	int didtag = FALSE;		/* look up a tag to start? */
+	char *tname = NULL;
+#endif
 #if	CRYPT
-	/* int cryptflag;			/* encrypting on the way in? */
 	char ekey[NPAT];		/* startup encryption key */
 #endif
-	char *strncpy();
-#if UNIX
-	extern SIGT catchintr();
-	extern SIGT imdying();
-	extern SIGT sizesignal();
-#endif
-	extern char *pathname[];	/* startup file path/name array */
 
 	charinit();		/* character types -- we need these pretty
 					early  */
 	global_val_init();	/* global buffer values */
-
-	gotoflag = FALSE;	/* set to off to begin with */
-	helpflag = FALSE;	/* set to off to begin with */
-	searchflag = FALSE;	/* set to off to begin with */
-#if TAGS
-	tagflag = FALSE;	/* set to off to begin with */
-#endif
-	gotafile = FALSE;	/* no file to edit yet */
-	ranstartup = FALSE;	/* startup file not executed yet */
-#if	CRYPT
-	cryptflag = FALSE;	/* no encryption by default */
-#endif
 
 #if X11
 	x_preparse_args(&argc, &argv);
@@ -424,7 +415,6 @@ char	*argv[];
 #if TAGS
 			case 't':  /* -t for initial tag lookup */
 			case 'T':
-				tagflag = TRUE;
 				if (argv[carg][2]) {
 					tname = &argv[carg][2];
 				} else {
@@ -553,7 +543,7 @@ char	*argv[];
 		if (vileinit != NULL) {
 			int odiscmd;
 			BUFFER *vbp, *obp;
-			int oflags;
+			int oflags = 0;
 
 			/* mark as modified, to prevent undispbuff() from
 				 clobbering */
@@ -564,7 +554,7 @@ char	*argv[];
 			}
 
 			if ((vbp=bfind("[vileinit]", OK_CREAT, BFSCRTCH))==NULL)
-				return FALSE;
+				exit(1);
 			/* mark the buffer as read only */
 			make_local_b_val(vbp,MDVIEW);
 			set_b_val(vbp,MDVIEW,TRUE);
@@ -611,7 +601,7 @@ char	*argv[];
 		nextbuffer(FALSE,0);
 	}
 #if TAGS
-	else if (tagflag) {
+	else if (tname) {
 		cmdlinetag(tname);
 		didtag = TRUE;
 	}
@@ -629,7 +619,7 @@ char	*argv[];
 	/* Deal with startup gotos and searches */
 	if (gotoflag + searchflag
 #if TAGS
-		 + tagflag 
+		 + (tname?1:0) 
 #endif
 		> 1) {
 #if TAGS
@@ -643,12 +633,16 @@ char	*argv[];
 	} else if (searchflag) {
 		forwhunt(FALSE, 0);
 #if TAGS
-	} else if (tagflag && !didtag) {
+	} else if (tname && !didtag) {
 		cmdlinetag(tname);
 #endif
 	}
 
+#if X11
+	update(TRUE);
+#else
 	update(FALSE);
+#endif
 	if (startstat == TRUE)  /* else there's probably an error message */
 		mlforce(msg);
 
@@ -657,10 +651,16 @@ char	*argv[];
 	loop();
 
 	/* NOTREACHED */
-	return 0;
+
+	return 1;
+
 }
 
+void do_num_proc();
+void do_rept_arg_proc();
+
 /* this is nothing but the main command loop */
+void
 loop()
 {
 	int s,c,f,n;
@@ -730,6 +730,7 @@ char *s;
 }
 
 
+void
 global_val_init()
 {
 	register int i;
@@ -777,21 +778,21 @@ global_val_init()
 	rp = (struct regexval *)malloc(sizeof (struct regexval));
 	set_global_b_val_rexp(VAL_PARAGRAPHS, rp);
 	rp->pat = 
-		strmalloc("^\\.[ILPQ]P\\|^\\.P[ 	]\\|^\\.LI\\|^\\.[plinb]p\\|^\\.\\?$");
+		strmalloc("^\\.[ILPQ]P\\s\\|^\\.P\\s\\|^\\.LI\\s\\|^\\.[plinb]p\\s\\|^\\.\\?\\s$");
 	rp->reg = regcomp(rp->pat, TRUE);
 
 	/* where do sections start? */
 	rp = (struct regexval *)malloc(sizeof (struct regexval));
 	set_global_b_val_rexp(VAL_SECTIONS, rp);
-	rp->pat = strmalloc("^[{\014]\\|^\\.[NS]H\\|^\\.H[ 	U]\\|^\\.[us]h\\|^+c");
+	rp->pat = strmalloc("^[{\014]\\|^\\.[NS]H\\s\\|^\\.H[ 	U]\\s\\|^\\.[us]h\\s\\|^+c\\s");
 	rp->reg = regcomp(rp->pat, TRUE);
 
 	/* where do sentences start? */
 	rp = (struct regexval *)malloc(sizeof (struct regexval));
 	set_global_b_val_rexp(VAL_SENTENCES, rp);
 	rp->pat = strmalloc(
-	"[.!?][])\"']* \\?$\\|[.!?][])\"']*  \\|^\\.[ILPQ]P\\|\
-^\\.P[ 	]\\|^\\.LI\\|^\\.[plinb]p\\|^\\.\\?$");
+	"[.!?][])\"']* \\?$\\|[.!?][])\"']*  \\|^\\.[ILPQ]P\\s\\|\
+^\\.P\\s\\|^\\.LI\\s\\|^\\.[plinb]p\\s\\|^\\.\\?\\s$");
 	rp->reg = regcomp(rp->pat, TRUE);
 
 	set_global_w_val(WMDLIST,FALSE); /* list-mode */
@@ -803,16 +804,19 @@ global_val_init()
 
 #if UNIX
 SIGT
-catchintr()
+catchintr(signo)
+int signo;
 {
 	interrupted = TRUE;
 #if USG
 	signal(SIGINT,catchintr);
 #endif
+	SIGRET;
 }
 #endif
 
 /* do number processing if needed */
+void
 do_num_proc(cp,fp,np)
 int *cp, *fp, *np;
 {
@@ -853,6 +857,7 @@ int *cp, *fp, *np;
 }
 
 /* do ^U-style repeat argument processing -- vile binds this to 'K' */
+void
 do_rept_arg_proc(cp,fp,np)
 int *cp, *fp, *np;
 {
@@ -914,70 +919,8 @@ int *cp, *fp, *np;
 }
 
 
-/*
- * This is the general command execution routine. It takes care of checking
- * flags, globals, etc, to be sure we're not doing something dumb.
- * Return the status of command.
- */
-
-int
-execute(execfunc, f, n)
-CMDFUNC *execfunc;		/* ptr to function to execute */
-int f,n;
-{
-	register int status, flags;
-	MARK odot;
-
-	if (execfunc == NULL) {
-		TTbeep();
-#if REBIND
-		mlforce("[Key not bound]");	/* complain		*/
-#else
-		mlforce("[Not a command]");	/* complain		*/
-#endif
-		return FALSE;
-	}
-
-	flags = execfunc->c_flags;
-
-	/* commands following operators can't be redone or undone */
-	if ( !doingopcmd) {
-		/* don't record non-redoable cmds */
-		if ((flags & REDO) == 0)
-			dotcmdstop();
-		if (flags & UNDO) {
-			/* undoable command can't be permitted when read-only */
-			if (b_val(curbp,MDVIEW))
-				return rdonly();
-			mayneedundo();
-		}
-	}
-
-	/* if motion is absolute, remember where we are */
-	if (flags & ABS) {
-		odot = DOT;
-	}
-
-	status = (execfunc->c_func)(f, n);
-	if ((flags & GOAL) == 0) { /* goal should not be retained */
-		curgoal = -1;
-	}
-#if VMALLOC
-	if (flags & UNDO)	/* verify malloc arena after line changers */
-		vverify("main");
-#endif
-
-	/* if motion was absolute, and it wasn't just on behalf of an
-		operator, and we moved, update the "last dot" mark */
-	if ((flags & ABS) && !doingopcmd && !sameline(DOT, odot)) {
-		curwp->w_lastdot = odot;
-	}
-
-
-	return status;
-}
-
 /* write all _changed_ buffers */
+int
 writeall(f,n)
 int f,n;
 {
@@ -1008,6 +951,7 @@ int f,n;
 }
 
 /* the vi ZZ command -- write all, then quit */
+int
 zzquit(f,n)
 int f,n;
 {
@@ -1041,6 +985,7 @@ int f,n;
  * Fancy quit command, as implemented by Norm. If the any buffer has
  * changed do a write on that buffer and exit, otherwise simply exit.
  */
+int
 quickexit(f, n)
 int f,n;
 {
@@ -1051,10 +996,11 @@ int f,n;
 
 /* Force quit by giving argument */
 /* ARGSUSED */
+int
 quithard(f,n)
 int f,n;
 {
-    quit(TRUE,1);
+    return quit(TRUE,1);
 }
 
 /*
@@ -1062,31 +1008,36 @@ int f,n;
  * has been changed and not written out.
  */
 /* ARGSUSED */
+int
 quit(f, n)
 int f,n;
 {
 	int cnt;
         
-	if (f != FALSE || (cnt = anycb()) == 0) {
-		vttidy(TRUE);
-#if	FILOCK
-		if (lockrel() != TRUE) {
-			exit(1);
-		}
-#endif
-		exit(GOOD);
+	if (f == FALSE && (cnt = anycb()) != 0) {
+		if (cnt == 1)
+			mlforce(
+			"There is an unwritten modified buffer.  Write it, or use :q!");
+		else
+			mlforce(
+			"There are %d unwritten modified buffers.  Write them, or use :q!",
+				cnt);
+		return FALSE;
 	}
-	if (cnt == 1)
-		mlforce(
-		"There is an unwritten modified buffer.  Write it, or use :q!");
-	else
-		mlforce(
-		"There are %d unwritten modified buffers.  Write them, or use :q!",
-			cnt);
+	vttidy(TRUE);
+#if	FILOCK
+	if (lockrel() != TRUE) {
+		exit(1);
+		/* NOTREACHED */
+	}
+#endif
+	exit(GOOD);
+	/* NOTREACHED */
 	return FALSE;
 }
 
 /* ARGSUSED */
+int
 writequit(f,n)
 int f,n;
 {
@@ -1098,165 +1049,12 @@ int f,n;
 }
 
 /*
- * Begin recording the dot command macro.
- * Set up variables and return.
- * we use a temporary accumulator, in case this gets stopped prematurely
- */
-dotcmdbegin()
-{
-	/* never record a playback */
-	if (kbdmode == PLAY)
-		return FALSE;
-
-	switch (dotcmdmode) {
-	case TMPSTOP:
-	case PLAY:
-		return FALSE;
-	}
-	tmpcmdptr = &tmpcmdm[0];
-	tmpcmdend = tmpcmdptr;
-	dotcmdmode = RECORD;
-	return TRUE;
-}
-
-/*
- * Finish dot command, and copy it to the real holding area
- */
-dotcmdfinish()
-{
-
-	switch (dotcmdmode) {
-	case STOP:
-	case PLAY:
-	case TMPSTOP:
-		return FALSE;
-
-	case RECORD:
-		;
-	}
-	tmpcmdptr = &tmpcmdm[0];
-	dotcmdptr = &dotcmdm[0];
-	while (tmpcmdptr < tmpcmdend)
-		*dotcmdptr++ = *tmpcmdptr++;
-	dotcmdend = dotcmdptr;
-	dotcmdptr = &dotcmdm[0];
-	dotcmdmode = STOP;
-	return TRUE;
-}
-
-/* stop recording a dot command, 
-	probably because the command is not re-doable */ 
-dotcmdstop()
-{
-	if (dotcmdmode == RECORD)
-		dotcmdmode = STOP;
-}
-
-/*
- * Execute a the '.' command, by putting us in PLAY mode.
- * The command argument is the number of times to loop. Quit as soon as a
- * command gets an error. Return TRUE if all ok, else FALSE.
- */
-dotcmdplay(f, n)
-int f,n;
-{
-	if (!f)
-		n = 1;
-	else if (n <= 0)
-		return TRUE;
-	dotcmdrep = n;		/* remember how many times to execute */
-	dotcmdmode = PLAY;		/* put us in play mode */
-	dotcmdptr = &dotcmdm[0];	/*    at the beginning */
-
-	return TRUE;
-}
-/*
- * Begin a keyboard macro.
- * Error if not at the top level in keyboard processing. Set up variables and
- * return.
- */
-/* ARGSUSED */
-kbd_mac_begin(f, n)
-int f,n;
-{
-	if (kbdmode != STOP) {
-		mlforce("[Macro already active]");
-		return FALSE;
-	}
-	mlwrite("[Start macro]");
-	kbdptr = &kbdm[0];
-	kbdend = kbdptr;
-	kbdmode = RECORD;
-	kbdplayreg = -1;  /* default buffer */
-	return TRUE;
-}
-
-/*
- * End keyboard macro. Check for the same limit conditions as the above
- * routine. Set up the variables and return to the caller.
- */
-/* ARGSUSED */
-kbd_mac_end(f, n)
-int f,n;
-{
-	if (kbdmode == STOP) {
-		mlforce("[Macro not active]");
-		return FALSE;
-	}
-	if (kbdmode == RECORD) {
-		mlwrite("[End macro]");
-		kbdmode = STOP;
-		kbdplayreg = -1;  /* default buffer */
-		kbdlim = kbdend;
-	}
-	/* note that if kbd_mode == PLAY, we do nothing -- that makes
-		the '^X-)' at the of the recorded buffer a no-op during
-		playback */
-	return TRUE;
-}
-
-/*
- * Execute a macro.
- * The command argument is the number of times to loop. Quit as soon as a
- * command gets an error. Return TRUE if all ok, else FALSE.
- */
-/* ARGSUSED */
-kbd_mac_exec(f, n)
-int f,n;
-{
-	if (kbdmode != STOP) {
-		mlforce("[Macro already active]");
-		return FALSE;
-	}
-	if (n <= 0)
-		return TRUE;
-	kbdrep = n;		/* remember how many times to execute */
-	kbdmode = PLAY; 	/* start us in play mode */
-	kbdplayreg = -1;	/* default playback register */
-	kbdptr = &kbdm[0];	/*    at the beginning */
-	kbdend = kbdlim;
-	dotcmdmode = STOP;
-	return TRUE;
-}
-
-/* ARGSUSED */
-kbd_mac_save(f,n)
-int f,n;
-{
-	register unsigned char *kp;
-	kdelete();
-	for (kp = kbdm; kp < kbdlim; kp++)
-		kinsert(*kp);
-	mlwrite("[Keyboard macro saved.]");
-	return TRUE;
-}
-
-/*
  * Abort.
  * Beep the beeper. Kill off any keyboard macro, etc., that is in progress.
  * Sometimes called as a routine, to do general aborting of stuff.
  */
 /* ARGSUSED */
+int
 esc(f, n)
 int f,n;
 {
@@ -1272,6 +1070,7 @@ int f,n;
 /* tell the user that this command is illegal while we are in
    VIEW (read-only) mode				*/
 
+int
 rdonly()
 {
 	TTbeep();
@@ -1280,6 +1079,7 @@ rdonly()
 }
 
 /* ARGSUSED */
+int
 showversion(f,n)
 int f,n;
 {
@@ -1288,6 +1088,7 @@ int f,n;
 }
 
 /* ARGSUSED */
+int
 unimpl(f,n)
 int f,n;
 {
@@ -1296,41 +1097,46 @@ int f,n;
 	return FALSE;
 }
 
-opercopy(f,n) int f,n; { return unimpl(f,n); }
-opermove(f,n) int f,n; { return unimpl(f,n); }
-opertransf(f,n) int f,n; { return unimpl(f,n); }
+int opercopy(f,n) int f,n; { return unimpl(f,n); }
+int opermove(f,n) int f,n; { return unimpl(f,n); }
+int opertransf(f,n) int f,n; { return unimpl(f,n); }
 
-operglobals(f,n) int f,n; { return unimpl(f,n); }
-opervglobals(f,n) int f,n; { return unimpl(f,n); }
+int operglobals(f,n) int f,n; { return unimpl(f,n); }
+int opervglobals(f,n) int f,n; { return unimpl(f,n); }
 
-map(f,n) int f,n; { return unimpl(f,n); }
-unmap(f,n) int f,n; { return unimpl(f,n); }
+int map(f,n) int f,n; { return unimpl(f,n); }
+int unmap(f,n) int f,n; { return unimpl(f,n); }
 
-source(f,n) int f,n; { return unimpl(f,n); }
+int source(f,n) int f,n; { return unimpl(f,n); }
 
-visual(f,n) int f,n; { return unimpl(f,n); }
-ex(f,n) int f,n; { return unimpl(f,n); }
+int visual(f,n) int f,n; { return unimpl(f,n); }
+int ex(f,n) int f,n; { return unimpl(f,n); }
 
 /* ARGSUSED */
+int
 nullproc(f,n)	/* user function that does (almost) NOTHING */
 int f,n;
 {
 	return TRUE;
 }
 
+void
 cntl_af()	/* dummy function for binding to control-a prefix */
 {
 }
 
+void
 cntl_xf()	/* dummy function for binding to control-x prefix */
 {
 }
 
+void
 unarg() /* dummy function for binding to universal-argument */
 {
 }
 
 /* initialize our version of the "chartypes" stuff normally in ctypes.h */
+void
 charinit()
 {
 	register int c;
@@ -1438,7 +1244,7 @@ int size;	/* number of bytes to move */
 }
 #endif
 
-#if	(AZTEC | MSC | TURBO | LATTICE) & MSDOS
+#if	(AZTEC | TURBO | LATTICE) & MSDOS
 /*	strncpy:	copy a string...with length restrictions
 			ALWAYS null terminate
 Hmmmm...

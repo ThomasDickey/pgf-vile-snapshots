@@ -3,7 +3,13 @@
  *		5/9/86
  *
  * $Log: input.c,v $
- * Revision 1.36  1992/03/19 23:21:33  pgf
+ * Revision 1.38  1992/05/19 08:55:44  foxharp
+ * more prototype and shadowed decl fixups
+ *
+ * Revision 1.37  1992/05/16  12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.36  1992/03/19  23:21:33  pgf
  * linux portability (pathn)
  *
  * Revision 1.35  1992/03/07  10:28:52  pgf
@@ -148,6 +154,7 @@
  * with a ^G. Used any time a confirmation is required.
  */
 
+int
 mlyesno(prompt)
 char *prompt;
 {
@@ -183,6 +190,7 @@ char *prompt;
  * return. Handle erase, kill, and abort keys.
  */
 
+int
 mlreply(prompt, buf, bufn)
 char *prompt;
 char *buf;
@@ -193,6 +201,7 @@ int bufn;
 
 #ifdef NEEDED
 /* as above, but don't expand special punctuation, like #, %, ~, etc. */
+int
 mlreply_no_exp(prompt, buf, bufn)
 char *prompt;
 char *buf;
@@ -214,6 +223,7 @@ int c;
 
 
 /* the numbered buffer names increment each time they are referenced */
+void
 incr_dot_kregnum()
 {
 	if (dotcmdmode == PLAY) {
@@ -224,6 +234,7 @@ incr_dot_kregnum()
 
 int tungotc = -1;
 
+void
 tungetc(c)
 int c;
 {
@@ -241,12 +252,14 @@ int c;
 	}
 }
 
+int
 tpeekc()
 {
 	return tungotc;
 }
 
 /* get the next character of a replayed '.' or macro */
+int
 get_recorded_char(eatit)
 int eatit;  /* consume the character? */
 {
@@ -322,6 +335,7 @@ int eatit;  /* consume the character? */
 }
 
 /* if we should preserve this input, do so */
+void
 record_char(c)
 int c;
 {
@@ -385,6 +399,7 @@ tgetc()
 
 /*	KBD_KEY:	Get one keystroke. The only prefix legal here
 			is the SPEC prefix.  */
+int
 kbd_key()
 {
 	int    c;
@@ -517,6 +532,7 @@ kbd_key()
 		Process all applicable prefix keys.
 		Set lastcmd for commands which want stuttering.
 */
+int
 kbd_seq()
 {
 	int c;		/* fetched keystroke */
@@ -543,6 +559,7 @@ kbd_seq()
 
 /* get a string consisting of inclchartype characters from the current
 	position.  if inclchartype is 0, return everything to eol */
+int
 screen_string(buf,bufn,inclchartype)
 char *buf;
 int bufn, inclchartype;
@@ -572,6 +589,7 @@ int bufn, inclchartype;
 	Assumes the buffer already contains a valid (possibly
 	null) string to use as the default response.
 */
+int
 kbd_string(prompt, extbuf, bufn, eolchar, expand, dobackslashes)
 char *prompt;		/* put this out first */
 char *extbuf;		/* the caller's (possibly full) buffer */
@@ -584,7 +602,7 @@ int dobackslashes;	/* do we add and delete '\' chars for the caller */
 	register int c;
 	register int quotef;	/* are we quoting the next char? */
 	register int backslashes; /* are we quoting the next expandable char? */
-	int firstchar = TRUE;
+	int firstch = TRUE;
 	char buf[256];
 
 	if (clexec)
@@ -688,7 +706,7 @@ int dobackslashes;	/* do we add and delete '\' chars for the caller */
 			c == kcod2key(killc)) && quotef==FALSE) {
 
 			/* have we backed thru a "word" yet? */
-			int saw_word = FALSE;
+			int saw_word;
 
 			/* rubout/erase */
 			if (cpos == 0) {
@@ -699,6 +717,7 @@ int dobackslashes;	/* do we add and delete '\' chars for the caller */
 			}
 
 		killit:
+			saw_word = FALSE;
 			while (cpos > 0) {
 				if (c == kcod2key(wkillc)) {
 					if (isspace(buf[cpos-1])) {
@@ -735,7 +754,7 @@ int dobackslashes;	/* do we add and delete '\' chars for the caller */
 				will do */
 			char *cp = NULL;
 			char *hist_lookup();
-			if (firstchar == TRUE) {
+			if (firstch == TRUE) {
 				tungetc(c);
 				c = killc;
 				goto killit;
@@ -792,7 +811,7 @@ int dobackslashes;	/* do we add and delete '\' chars for the caller */
 			if (c == kcod2key(quotec) && quotef == FALSE) {
 				quotef = TRUE;
 			} else	{
-				if (firstchar == TRUE) {
+				if (firstch == TRUE) {
 					/* we always clean the buf on the
 						first char typed */
 					tungetc(c);
@@ -822,11 +841,12 @@ int dobackslashes;	/* do we add and delete '\' chars for the caller */
 				}
 			}
 		}
-		firstchar = FALSE;
+		firstch = FALSE;
 	}
 }
 
 /* turn \X into X */
+void
 remove_backslashes(s)
 char *s;
 {
@@ -840,6 +860,7 @@ char *s;
 	}
 }
 
+void
 outstring(s)	/* output a string of input characters */
 char *s;	/* string to output */
 {
@@ -848,6 +869,7 @@ char *s;	/* string to output */
 			TTputc(*s++);
 }
 
+void
 ostring(s)	/* output a string of output characters */
 char *s;	/* string to output */
 {
@@ -857,6 +879,7 @@ char *s;	/* string to output */
 }
 
 /* ARGSUSED */
+int
 speckey(f,n)
 int f,n;
 {
@@ -865,3 +888,167 @@ int f,n;
 
 	return TRUE;
 }
+
+/*
+ * Begin recording the dot command macro.
+ * Set up variables and return.
+ * we use a temporary accumulator, in case this gets stopped prematurely
+ */
+int
+dotcmdbegin()
+{
+	/* never record a playback */
+	if (kbdmode == PLAY)
+		return FALSE;
+
+	switch (dotcmdmode) {
+	case TMPSTOP:
+	case PLAY:
+		return FALSE;
+	}
+	tmpcmdptr = &tmpcmdm[0];
+	tmpcmdend = tmpcmdptr;
+	dotcmdmode = RECORD;
+	return TRUE;
+}
+
+/*
+ * Finish dot command, and copy it to the real holding area
+ */
+int
+dotcmdfinish()
+{
+
+	switch (dotcmdmode) {
+	case STOP:
+	case PLAY:
+	case TMPSTOP:
+		return FALSE;
+
+	case RECORD:
+		;
+	}
+	tmpcmdptr = &tmpcmdm[0];
+	dotcmdptr = &dotcmdm[0];
+	while (tmpcmdptr < tmpcmdend)
+		*dotcmdptr++ = *tmpcmdptr++;
+	dotcmdend = dotcmdptr;
+	dotcmdptr = &dotcmdm[0];
+	dotcmdmode = STOP;
+	return TRUE;
+}
+
+/* stop recording a dot command, 
+	probably because the command is not re-doable */ 
+void
+dotcmdstop()
+{
+	if (dotcmdmode == RECORD)
+		dotcmdmode = STOP;
+}
+
+/*
+ * Execute a the '.' command, by putting us in PLAY mode.
+ * The command argument is the number of times to loop. Quit as soon as a
+ * command gets an error. Return TRUE if all ok, else FALSE.
+ */
+int
+dotcmdplay(f, n)
+int f,n;
+{
+	if (!f)
+		n = 1;
+	else if (n <= 0)
+		return TRUE;
+	dotcmdrep = n;		/* remember how many times to execute */
+	dotcmdmode = PLAY;		/* put us in play mode */
+	dotcmdptr = &dotcmdm[0];	/*    at the beginning */
+
+	return TRUE;
+}
+
+/*
+ * Begin a keyboard macro.
+ * Error if not at the top level in keyboard processing. Set up variables and
+ * return.
+ */
+/* ARGSUSED */
+int
+kbd_mac_begin(f, n)
+int f,n;
+{
+	if (kbdmode != STOP) {
+		mlforce("[Macro already active]");
+		return FALSE;
+	}
+	mlwrite("[Start macro]");
+	kbdptr = &kbdm[0];
+	kbdend = kbdptr;
+	kbdmode = RECORD;
+	kbdplayreg = -1;  /* default buffer */
+	return TRUE;
+}
+
+/*
+ * End keyboard macro. Check for the same limit conditions as the above
+ * routine. Set up the variables and return to the caller.
+ */
+/* ARGSUSED */
+int
+kbd_mac_end(f, n)
+int f,n;
+{
+	if (kbdmode == STOP) {
+		mlforce("[Macro not active]");
+		return FALSE;
+	}
+	if (kbdmode == RECORD) {
+		mlwrite("[End macro]");
+		kbdmode = STOP;
+		kbdplayreg = -1;  /* default buffer */
+		kbdlim = kbdend;
+	}
+	/* note that if kbd_mode == PLAY, we do nothing -- that makes
+		the '^X-)' at the of the recorded buffer a no-op during
+		playback */
+	return TRUE;
+}
+
+/*
+ * Execute a macro.
+ * The command argument is the number of times to loop. Quit as soon as a
+ * command gets an error. Return TRUE if all ok, else FALSE.
+ */
+/* ARGSUSED */
+int
+kbd_mac_exec(f, n)
+int f,n;
+{
+	if (kbdmode != STOP) {
+		mlforce("[Macro already active]");
+		return FALSE;
+	}
+	if (n <= 0)
+		return TRUE;
+	kbdrep = n;		/* remember how many times to execute */
+	kbdmode = PLAY; 	/* start us in play mode */
+	kbdplayreg = -1;	/* default playback register */
+	kbdptr = &kbdm[0];	/*    at the beginning */
+	kbdend = kbdlim;
+	dotcmdmode = STOP;
+	return TRUE;
+}
+
+/* ARGSUSED */
+int
+kbd_mac_save(f,n)
+int f,n;
+{
+	register unsigned char *kp;
+	kdelete();
+	for (kp = kbdm; kp < kbdlim; kp++)
+		kinsert(*kp);
+	mlwrite("[Keyboard macro saved.]");
+	return TRUE;
+}
+

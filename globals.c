@@ -7,7 +7,10 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: globals.c,v $
- * Revision 1.11  1992/03/07 10:21:29  pgf
+ * Revision 1.12  1992/05/16 12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.11  1992/03/07  10:21:29  pgf
  * arg mismatch on fsearch()
  *
  * Revision 1.10  1992/01/05  00:06:13  pgf
@@ -50,12 +53,14 @@
 */
 #if GLOBALS
 
+int
 globals(f,n)
 int f,n;
 {
 	return globber(f,n,'g');
 }
 
+int
 vglobals(f,n)
 int f,n;
 {
@@ -67,6 +72,7 @@ int f,n;
 }
 
 /* ARGSUSED */
+int
 globber(f, n, g_or_v)
 int f, n, g_or_v;
 {

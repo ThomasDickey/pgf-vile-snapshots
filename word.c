@@ -4,7 +4,13 @@
  * do any sentence mode commands, they are likely to be put in this file. 
  *
  * $Log: word.c,v $
- * Revision 1.15  1992/03/05 09:19:55  pgf
+ * Revision 1.17  1992/05/19 08:55:44  foxharp
+ * more prototype and shadowed decl fixups
+ *
+ * Revision 1.16  1992/05/16  12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.15  1992/03/05  09:19:55  pgf
  * changed some mlwrite() to mlforce(), due to new terse support
  *
  * Revision 1.14  1991/11/08  13:02:46  pgf
@@ -71,6 +77,7 @@
  * Returns TRUE on success, FALSE on errors.
  */
 /* ARGSUSED */
+int
 wrapword(f,n)
 int f,n;
 {
@@ -122,6 +129,7 @@ int f,n;
  * example.  The last word of non-delete ops does _not_ include its whitespace.
  */
 
+int
 forwviword(f, n)
 int f,n;
 {
@@ -146,6 +154,7 @@ int f,n;
  * Move the cursor forward by the specified number of words. All of the motion
  * is done by "forwchar". Error if you try and move beyond the buffer's end.
  */
+int
 forwword(f, n)
 int f,n;
 {
@@ -170,13 +179,14 @@ int f,n;
  * Move the cursor forward by the specified number of words. All of the motion
  * is done by "forwchar". Error if you try and move beyond the buffer's end.
  */
+int
 forwviendw(f, n)
 int f,n;
 {
-	int s;
+	int s = FALSE;
 	if (!f)
 		n = 1;
-	else if (n < 0)
+	else if (n <= 0)
 		return (FALSE);
 	if (forwchar(FALSE, 1) == FALSE)
 		return (FALSE);
@@ -198,13 +208,14 @@ int f,n;
  * Move the cursor forward by the specified number of words. All of the motion
  * is done by "forwchar". Error if you try and move beyond the buffer's end.
  */
+int
 forwendw(f, n)
 int f,n;
 {
-	int s;
+	int s = FALSE;
 	if (!f)
 		n = 1;
-	else if (n < 0)
+	else if (n <= 0)
 		return (FALSE);
 	if (forwchar(FALSE, 1) == FALSE)
 		return (FALSE);
@@ -227,6 +238,7 @@ int f,n;
  * performed by the "backchar" and "forwchar" routines. Error if you try to
  * move beyond the buffers.
  */
+int
 backviword(f, n)
 int f,n;
 {
@@ -249,6 +261,7 @@ int f,n;
  * performed by the "backchar" and "forwchar" routines. Error if you try to
  * move beyond the buffers.
  */
+int
 backword(f, n)
 int f,n;
 {
@@ -271,6 +284,7 @@ int f,n;
  * Return TRUE if the character at dot is a character that is considered to be
  * part of a word. The word character list is hard coded. Should be setable.
  */
+int
 inword()
 {
 	register int	c;
@@ -288,10 +302,11 @@ inword()
 }
 #endif
 
+int
 join(f,n)
 int f,n;
 {
-	register int s;
+	register int s = TRUE;
 	register int doto;
 
 	if (!f) {
@@ -326,13 +341,14 @@ int f,n;
 	return s;
 }
 
+int
 formatregion()
 {
 	register int c;			/* current char durring scan	*/
 	register int wordlen;		/* length of current word	*/
 	register int clength;		/* position on line during fill	*/
 	register int i;			/* index during word copy	*/
-	register int newlength;		/* tentative new line length	*/
+	register int newlen;		/* tentative new line length	*/
 	register int finished;		/* Are we at the End-Of-Paragraph? */
 	register int firstflag;		/* first word? (needs no space)	*/
 	register LINE *pastline;		/* pointer to line just past EOP */
@@ -419,8 +435,8 @@ formatregion()
 				/* at a word break with a word waiting */
 				/* calculate tentative new length
 							with word added */
-				newlength = clength + 1 + wordlen;
-				if (newlength <= b_val(curbp,VAL_FILL)) {
+				newlen = clength + 1 + wordlen;
+				if (newlen <= b_val(curbp,VAL_FILL)) {
 					/* add word to current line */
 					if (!firstflag) {
 						/* the space */
@@ -465,6 +481,7 @@ formatregion()
 /*	wordcount:	count the # of words in the marked region,
 			along with average word sizes, # of chars, etc,
 			and report on them.			*/
+int
 wordcount(f, n)
 {
 	register LINE *lp;	/* current line to scan */

@@ -1,0 +1,11 @@
+main.obj+ibmpc.obj+basic.obj+bind.obj+buffer.obj+
+crypt.obj+csrch.obj+display.obj+eval.obj+exec.obj+externs.obj+file.obj+
+fileio.obj+finderr.obj+globals.obj+input.obj+isearch.obj+
+line.obj+npopen.obj+oneliner.obj+opers.obj+random.obj+regexp.obj+
+region.obj+search.obj+spawn.obj+tags.obj+termio.obj+undo.obj+
+vmalloc.obj+window.obj+word.obj+wordmov.obj
+vile.exe
+vile.map
+
+
+

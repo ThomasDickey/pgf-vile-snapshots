@@ -3,7 +3,10 @@
  * code by Paul Fox, original algorithm mostly by Julia Harper May, 89
  *
  * $Log: undo.c,v $
- * Revision 1.16  1992/01/05 00:06:13  pgf
+ * Revision 1.17  1992/05/16 12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.16  1992/01/05  00:06:13  pgf
  * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
  * often.  also normalized message appearance somewhat.
  *
@@ -108,8 +111,10 @@
 
 short needundocleanup;
 LINE *copyline();
+void make_undo_patch();
 
 /* push the line onto the right undo stack. */
+void
 toss_to_undo(lp)
 LINE *lp;
 {
@@ -139,6 +144,7 @@ LINE *lp;
 /* _copy_ than the origianal. When the undo happens, the later pops will  */
 /* point at the _original_ (which will by then be on the other undo stack)  */
 /* unless we fix them now. */
+int
 copy_for_undo(lp)
 LINE *lp;
 {
@@ -173,6 +179,7 @@ LINE *lp;
 
 /* push an unreal line onto the right undo stack */
 /* lp should be the new line, _after_ insertion, so l_fp and l_bp are right */
+int
 tag_for_undo(lp)
 LINE *lp;
 {
@@ -201,6 +208,7 @@ LINE *lp;
 	return (TRUE);
 }
 
+void
 pushline(lp,stk)
 LINE *lp,**stk;
 {
@@ -221,6 +229,7 @@ LINE **stk;
 	return (lp);
 }
 
+void
 make_undo_patch(olp,nlp,type)
 LINE *olp,*nlp;
 int type;
@@ -236,6 +245,7 @@ int type;
 	pushline(plp,CURSTK(curbp));
 }
 
+void
 patchstk(newlp,oldlp)
 LINE *newlp, *oldlp;
 {
@@ -272,6 +282,7 @@ register LINE *lp;
 
 /* before any undoable command (except undo itself), clean the undo list */
 /* clean the copied flag on the line we're the copy of */
+void
 freeundostacks(bp)
 register BUFFER *bp;
 {
@@ -297,6 +308,7 @@ register BUFFER *bp;
 }
 
 /* ARGSUSED */
+int
 undo(f,n)
 int f,n;
 {
@@ -392,11 +404,13 @@ int f,n;
 	return TRUE;
 }
 
+void
 mayneedundo()
 {
 	needundocleanup = TRUE;
 }
 
+void
 preundocleanup()
 {
 	freeundostacks(curbp);
@@ -406,6 +420,7 @@ preundocleanup()
 }
 
 /* ARGSUSED */
+int
 lineundo(f,n)
 int f,n;
 {
@@ -489,6 +504,7 @@ int f,n;
 
 }
 
+void
 repointstuff(nlp,olp)
 register LINE *nlp,*olp;
 {
@@ -579,6 +595,7 @@ no code for ALTDOT, but this was ifdefed out before I put that in...  pgf
 #endif
 }
 
+int
 linesmatch(lp1,lp2)
 register LINE *lp1,*lp2;
 {
@@ -589,6 +606,7 @@ register LINE *lp1,*lp2;
 	return !memcmp(lp1->l_text, lp2->l_text, llength(lp1));
 }
 
+void
 dumpuline(lp)
 LINE *lp;
 {
@@ -599,6 +617,7 @@ LINE *lp;
 	}
 }
 
+void
 setupuline(lp)
 LINE *lp;
 {
@@ -612,6 +631,7 @@ LINE *lp;
 	}
 }
 
+void
 resetuline(olp,nlp)
 register LINE *olp,*nlp;
 {

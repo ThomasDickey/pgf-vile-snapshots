@@ -4,7 +4,19 @@
  *	Written (except for delins()) for vile by Paul Fox, (c)1990
  *
  * $Log: oneliner.c,v $
- * Revision 1.28  1992/03/13 08:12:11  pgf
+ * Revision 1.32  1992/05/19 09:14:27  foxharp
+ * drop cntrl char in comment
+ *
+ * Revision 1.31  1992/05/19  08:55:44  foxharp
+ * more prototype and shadowed decl fixups
+ *
+ * Revision 1.30  1992/05/16  12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.29  1992/05/05  17:47:10  pgf
+ * clear fulllineregions after using it, in substregion1, and pregion
+ *
+ * Revision 1.28  1992/03/13  08:12:11  pgf
  * attempt to use args passed after :& command, as in ":&g"
  *
  * Revision 1.27  1992/03/03  08:42:59  pgf
@@ -113,6 +125,7 @@
 /*
  * put lines in a popup window
  */
+int
 pregion(flag)
 int flag;
 {
@@ -125,7 +138,11 @@ int flag;
 
 	fulllineregions = TRUE;
 	        
-	if ((s=getregion(&region)) != TRUE)
+	s = getregion(&region);
+
+	fulllineregions = FALSE;
+
+	if (s != TRUE)
 		return (s);
 
 	linep = region.r_orig.l;		 /* Current line.	 */
@@ -172,11 +189,13 @@ int flag;
 	return TRUE;
 }
 
+int
 llineregion()
 {
 	return pregion(PLIST);
 }
 
+int
 plineregion()
 {
 	return pregion(0);
@@ -184,11 +203,13 @@ plineregion()
 
 static regexp *substexp;
 
+int
 substregion()
 {
 	return substreg1(TRUE,TRUE);
 }
 
+int
 subst_again_region()
 {
 	return substreg1(FALSE,TRUE);
@@ -196,6 +217,7 @@ subst_again_region()
 
 /* traditional vi & command */
 /* ARGSUSED */
+int
 subst_again(f,n)
 int f,n;
 {
@@ -218,6 +240,7 @@ int f,n;
 	return TRUE;
 }
 
+int
 substreg1(needpats, use_opts)
 int needpats, use_opts;
 {
@@ -228,7 +251,11 @@ int needpats, use_opts;
 
 	fulllineregions = TRUE;
 	        
-	if ((s=getregion(&region)) != TRUE)
+	s = getregion(&region);
+
+	fulllineregions = FALSE;
+
+	if (s != TRUE)
 		return (s);
 
 	if (calledbefore == FALSE && needpats) {
@@ -255,9 +282,9 @@ int needpats, use_opts;
 
 		if (gregexp) {
 			if (substexp)
-				free(substexp);
+				free((char *)substexp);
 			substexp = (regexp *)malloc(gregexp->size);
-			memcpy(substexp, gregexp, gregexp->size);
+			memcpy((char *)substexp, (char *)gregexp, gregexp->size);
 		}
 
 		if ((s = readpattern("replacement string: ", &rpat[0], NULL, c,
@@ -326,6 +353,7 @@ int needpats, use_opts;
 	return TRUE;
 }
 
+int
 substline(exp, nth_occur, printit, globally)
 regexp *exp;
 int nth_occur, printit, globally;
@@ -416,9 +444,10 @@ int nth_occur, printit, globally;
 /*
  - delins - perform substitutions after a regexp match
  */
-delins(exp, source)
+int
+delins(exp, sourc)
 regexp *exp;
-char *source;
+char *sourc;
 {
 	register char *src;
 	register int dlength;
@@ -427,7 +456,7 @@ char *source;
 	static char *buf = NULL;
 	static buflen = -1;
 
-	if (exp == NULL || source == NULL) {
+	if (exp == NULL || sourc == NULL) {
 		mlforce("BUG: NULL parm to delins");
 		return FALSE;
 	}
@@ -455,7 +484,7 @@ char *source;
 		mlforce("[Error while deleting]");
 		return FALSE;
 	}
-	src = source;
+	src = sourc;
 	while ((c = *src++) != '\0') {
 		if (c == '&')
 			no = 0;

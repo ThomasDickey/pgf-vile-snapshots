@@ -14,17 +14,20 @@
 # original makefile for uemacs:	Adam Fritz	July 30,1987
 #
 
-MAKE=/bin/make
+#MAKE=/bin/make
+#MAKE=/usr/bin/make
 
 # To change screen driver modules, change SCREEN below, and edit estruct.h to
 #  make sure the correct one is #defined as "1", and the others all as "0"
 # If you use tcap.c, you'll need libtermcap.a too.
 # If you use x11.c,  you'll need libX11.a too.
 
+# for regular use
 SCREEN = tcap
 LIBS = -ltermcap
 TARGET = vile
 
+# for building the X version (also edit estruct.h, turn TERMCAP off and X11 on)
 #SCREEN = x11
 #LIBS = -lX11
 #TARGET = xvile
@@ -35,22 +38,33 @@ TARGET = vile
 DESTDIR1 = /usr/local/bin
 DESTDIR2 = $(HOME)/bin
 
-REMOTE=towno!pgf
+REMOTE=gutso!foxharp
 
-#OPTFLAGS = -O
-OPTFLAGS = -g
-CC=cc
+#OPTFLAGS = -Wall -Wshadow -O -Dpgf_and_no_fixincludes
+#CC = gcc
+#LINK = gcc
 
+OPTFLAGS = -O
+CC = cc
+LINK = cc
+
+# some older bsd systems keep ioctl in sys only -- easier to
+# search both places than to ifdef the code.  color me lazy.
+INCS = -I. -I/usr/include -I/usr/include/sys
+
+# suffix for object files.
+# this get changes to "obj" for DOS builds
+O = o
 
 # All of the makefiles which should be preserved
 MAKEFILES = makefile make.ini
-HEADER_BUILDER = ./mktbls
+MKTBLS = ./mktbls
 
 ALLTOOLS = $(MAKEFILES)
 
 
 # these are normal editable headers
-HDRS = estruct.h epath.h evar.h edef.h
+HDRS = estruct.h epath.h evar.h edef.h proto.h
 
 # these headers are built by the mktbls program from the information in cmdtbl
 BUILTHDRS = nebind.h nefunc.h nename.h 
@@ -60,10 +74,10 @@ ALLHDRS = $(HDRS)
 # All the C files which should be saved
 #  (including tools, like mktbls.c, unused screen drivers, etc.)
 CSRCac = ansi.c at386.c basic.c bind.c buffer.c crypt.c csrch.c
-CSRCde = dg10.c display.c eval.c exec.c
+CSRCde = dg10.c display.c eval.c exec.c externs.c
 CSRCfh = file.c fileio.c finderr.c globals.c hp110.c hp150.c
 CSRCim = ibmpc.c input.c isearch.c line.c main.c mktbls.c
-CSRCnr = news.c npopen.c opers.c oneliner.c random.c regexp.c region.c
+CSRCnr = npopen.c opers.c oneliner.c random.c regexp.c region.c
 CSRCst = search.c spawn.c st520.c tags.c tcap.c termio.c tipc.c
 CSRCuz = undo.c vmalloc.c vmsvt.c vt52.c window.c word.c wordmov.c x11.c z309.c
 
@@ -71,10 +85,11 @@ CSRC = $(CSRCac) $(CSRCde) $(CSRCfh) $(CSRCim) $(CSRCnr) \
 	$(CSRCst) $(CSRCuz)
 
 # non-C source code
-OTHERSRC = z100bios.asm news.cps
+OTHERSRC = z100bios.asm
 
 # text and data files
-TEXTFILES = README CHANGES cmdtbl vile.hlp buglist revlist readme.news
+TEXTFILES = README CHANGES cmdtbl vile.hlp buglist revlist \
+	README.X11 link.msc
 
 ALLSRC = $(CSRC) $(OTHERSRC)
 
@@ -82,19 +97,18 @@ EVERYTHING = $(ALLTOOLS) $(ALLHDRS) $(ALLSRC) $(TEXTFILES) $(SHORTSTUFF)
 
 
 SRC = main.c $(SCREEN).c basic.c bind.c buffer.c \
-	crypt.c csrch.c display.c eval.c exec.c file.c \
+	crypt.c csrch.c display.c eval.c exec.c externs.c file.c \
 	fileio.c finderr.c globals.c input.c isearch.c \
 	line.c npopen.c oneliner.c opers.c random.c regexp.c \
 	region.c search.c spawn.c tags.c termio.c undo.c \
 	vmalloc.c window.c word.c wordmov.c
 
-
-OBJ = main.o $(SCREEN).o basic.o bind.o buffer.o \
-	crypt.o csrch.o display.o eval.o exec.o file.o \
-	fileio.o finderr.o globals.o input.o isearch.o \
-	line.o npopen.o oneliner.o opers.o random.o regexp.o \
-	region.o search.o spawn.o tags.o termio.o undo.o \
-	vmalloc.o window.o word.o wordmov.o
+OBJ = main.$O $(SCREEN).$O basic.$O bind.$O buffer.$O \
+	crypt.$O csrch.$O display.$O eval.$O exec.$O externs.$O file.$O \
+	fileio.$O finderr.$O globals.$O input.$O isearch.$O \
+	line.$O npopen.$O oneliner.$O opers.$O random.$O regexp.$O \
+	region.$O search.$O spawn.$O tags.$O termio.$O undo.$O \
+	vmalloc.$O window.$O word.$O wordmov.$O
 
 
 # if your pre-processor won't treat undefined macros as having value 0, or
@@ -107,34 +121,42 @@ OBJ = main.o $(SCREEN).o basic.o bind.o buffer.o \
 # please report bugs with these config options
 
 all:
-	@echo "	there is no longer an unnamed target"	;\
-	echo "	please use one of the following:"	;\
-	echo "	make bsd"		;\
-	echo "	make bsd_posix"		;\
-	echo "	make att"		;\
-	echo "	make att_posix"		;\
-	echo "	make svr3"		;\
-	echo "	make sun"		;\
-	echo "	make ultrix"		;\
-	echo "	make svr4"		;\
-	echo "	make mips"		;\
-	echo "	make odt"		;\
-	echo "	make isc"		;\
-	echo "	make hpux"		;\
-	echo "	make next"		;\
-	echo "	make unixpc"		;\
-	echo "	make aix"		;\
-	echo "	make osf1"		;\
-	echo "	make linux"		;\
-	echo "	make default (to use config internal to estruct.h)"
+	@echo "	there is no longer an unnamed target"			;\
+	echo "	please use one of the following:"			;\
+	echo "	make bsd	(for pure, older BSD systems)"		;\
+	echo "	make bsd_posix	(for BSD with some POSIX support"	;\
+	echo "	make bsd386"						;\
+	echo "	make att	(traditional USG sytems)"		;\
+	echo "	make att_posix	(newer, with POSIX support"		;\
+	echo "	make svr3	(early 386 UNIX, for instance"		;\
+	echo "	make sun	(sunos 3 or 4)"				;\
+	echo "	make ultrix"						;\
+	echo "	make svr4	(untested)"				;\
+	echo "	make mips	(uses systemV stuff)"			;\
+	echo "	make odt	(open desktop -- variant of svr3)"	;\
+	echo "	make isc	(interactive -- another such variant"	;\
+	echo "	make hpux"						;\
+	echo "	make next	(NeXT)"					;\
+	echo "	make sony	(Sony News -- very BSD)"		;\
+	echo "	make unixpc	(AT&T 3B1)"				;\
+	echo "	make aix	(r6000)"				;\
+	echo "	make osf1	(OSF/1)"				;\
+	echo "	make linux	(ported to 0.95)"			;\
+	echo "	make aux2	(A/UX 2.0) (3.0 is probably svr3)"	;\
+	echo "	nmake msc	(MicroSoft C 6.0) (buggy)"		;\
+	echo "	make default	(to use config internal to estruct.h)"
 
-bsd :
-	$(MAKE) CFLAGS="$(OPTFLAGS) -DBERK -Dos_chosen" \
-		$(TARGET)
+bsd sony:
+	make CFLAGS="$(OPTFLAGS) $(INCS) -DBERK -Dos_chosen" \
+	    MAKE=/usr/bin/make $(TARGET)
 
 bsd_posix ultrix sun :
-	$(MAKE) CFLAGS="$(OPTFLAGS) -DBERK -DPOSIX -Dos_chosen" \
+	$(MAKE) CFLAGS="$(OPTFLAGS) $(INCS) -DBERK -DPOSIX -Dos_chosen" \
 		$(TARGET)
+
+bsd386 :
+	make CFLAGS="$(OPTFLAGS) -DBERK -DBSD386 -Dos_chosen" \
+	    MAKE=/usr/bin/make $(TARGET)
 
 att :
 	$(MAKE) CFLAGS="$(OPTFLAGS) -DUSG -Dos_chosen" \
@@ -161,7 +183,7 @@ hpux:
 		$(TARGET)
 
 next:
-	$(MAKE) CFLAGS="$(OPTFLAGS) -DBERK -D__STRICT_BSD__ -Dos_chosen" \
+	$(MAKE) CFLAGS="$(OPTFLAGS) $(INCS) -DBERK -D__STRICT_BSD__ -Dos_chosen" \
 		$(TARGET)
 
 unixpc:
@@ -184,14 +206,29 @@ linux:
 		-DPOSIX -DHAVE_SELECT -DHAVE_POLL=0 -Dos_chosen" \
 		$(TARGET)
 
+msc:
+	$(MAKE) MKTBLS=mktbls.exe CFLAGS="/qc /AL /nologo \
+		-DMSDOS -DMSC -Dos_chosen -DIBMPC -Dscrn_chosen" \
+		O=obj CC=cl SCREEN=ibmpc \
+		LINK="link /ST:8192 @link.msc" $(TARGET)2
+
+aux2:
+	$(MAKE) CFLAGS="$(OPTFLAGS) -DUSG -DAUX2 -Dos_chosen" \
+		$(TARGET)
+
 default:
 	$(MAKE) CFLAGS="$(OPTFLAGS) -Uos_chosen" \
 		$(TARGET)
 
 $(TARGET) : $(BUILTHDRS) $(OBJ) makefile
 	-mv $(TARGET) o$(TARGET)
-	$(CC) $(CFLAGS) -o $(TARGET) $(OBJ) $(LIBS)
-#	$(CC) -Bstatic $(CFLAGS) -o $(TARGET) $(OBJ) $(LIBS)
+	$(LINK) -o $(TARGET) $(OBJ) $(LIBS)
+#	$(LINK) -Bstatic -o $(TARGET) $(OBJ) $(LIBS)
+
+# this target is more convenient for the nonstandard environments, like DOS
+$(TARGET)2 : $(BUILTHDRS) $(OBJ) makefile
+	-mv $(TARGET) o$(TARGET)
+	$(LINK)
 
 saber_src:
 	#load $(CFLAGS) $(SRC) $(LIBS)
@@ -207,11 +244,11 @@ saber_obj: $(OBJ)
 #SUFFIXES: .c .h .o .src .obj
 
 
-$(BUILTHDRS): cmdtbl $(HEADER_BUILDER)
-	./$(HEADER_BUILDER) cmdtbl
+$(BUILTHDRS): cmdtbl $(MKTBLS)
+	$(MKTBLS) cmdtbl
 
-$(HEADER_BUILDER):  $(HEADER_BUILDER).c
-	$(CC) $(CFLAGS) -o $(HEADER_BUILDER)  $(HEADER_BUILDER).c
+$(MKTBLS):  mktbls.c
+	$(CC) $(CFLAGS) -o $(MKTBLS)  mktbls.c
 
 # install to DESTDIR1 if it's writable, else DESTDIR2
 install:
@@ -243,6 +280,9 @@ bigshar:
 uuto:
 	uuto `ls -t $(EVERYTHING) uutodone | sed '/uutodone/q'` $(REMOTE)
 	date >uutodone
+
+uurw:
+	uuto `make rw` $(REMOTE)
 
 floppy:
 	ls $(EVERYTHING) | oo
@@ -289,6 +329,9 @@ no-write:
 update:
 	nupdatefile.pl -r $(EVERYTHING)
 
+protos:
+	cextract -D__STDC__ +E +P +s +r -o nproto.h $(SRC)
+
 tagfile:
 	dotags $(SRC) $(HDRS)
 
@@ -297,13 +340,10 @@ lint:	$(SRC)
 	lint  $(SRC) >lint.out 
 
 clean:
-	rm -f *.o o$(TARGET) $(BUILTHDRS) $(HEADER_BUILDER) news.h core *~ *.BAK
+	rm -f *.$O o$(TARGET) $(BUILTHDRS) $(MKTBLS) core *~ *.BAK
 
 clobber: clean
 	rm -f $(TARGET)
-
-news.h: news.cps
-	cps news.cps
 
 print:
 	pr makefile $(HDRS) $(SRC) | lpr
@@ -320,7 +360,22 @@ $(EVERYTHING):
 	co -r$(revision) $@
 
 # $Log: makefile,v $
-# Revision 1.43  1992/04/14 08:55:38  pgf
+# Revision 1.48  1992/05/20 18:58:11  foxharp
+# comments on target help, a/ux support, and uurw
+#
+# Revision 1.47  1992/05/19  09:15:45  foxharp
+# machine target fixups
+#
+# Revision 1.46  1992/05/16  12:00:31  pgf
+# prototypes/ansi/void-int stuff/microsoftC
+#
+# Revision 1.45  1992/05/13  09:14:12  pgf
+# comment changes
+#
+# Revision 1.44  1992/04/26  13:42:33  pgf
+# added bsd386 target
+#
+# Revision 1.43  1992/04/14  08:55:38  pgf
 # added support for OSF1 (affects termio only)
 #
 # Revision 1.42  1992/04/10  18:52:21  pgf
@@ -389,7 +444,7 @@ $(EVERYTHING):
 #
 # Revision 1.21  1991/10/23  12:05:37  pgf
 # added bigshar, and put ./ in front of mktbls rule -- there seems
-# to be a bug in some makes that drops the ./ in the HEADER_BUILDER
+# to be a bug in some makes that drops the ./ in the MKTBLS
 # variable
 #
 # Revision 1.20  1991/10/22  14:36:01  pgf
@@ -469,178 +524,4 @@ $(EVERYTHING):
 # date: 1990/09/21 10:25:38;
 # initial vile RCS revision
 #
-#DEPENDS
-news.o: news.c
-news.o: /usr/include/stdio.h
-news.o: estruct.h
-news.o: edef.h
-news.o: news.h
-word.o: word.c
-word.o: /usr/include/stdio.h
-word.o: estruct.h
-word.o: edef.h
-vmsvt.o: vmsvt.c
-vmsvt.o: /usr/include/stdio.h
-vmsvt.o: estruct.h
-vmsvt.o: edef.h
-window.o: window.c
-window.o: /usr/include/stdio.h
-window.o: estruct.h
-window.o: edef.h
-vt52.o: vt52.c
-vt52.o: /usr/include/stdio.h
-vt52.o: estruct.h
-vt52.o: edef.h
-tipc.o: tipc.c
-tipc.o: /usr/include/stdio.h
-tipc.o: estruct.h
-tipc.o: edef.h
-tcap.o: tcap.c
-tcap.o: /usr/include/stdio.h
-tcap.o: estruct.h
-tcap.o: edef.h
-termio.o: termio.c
-termio.o: /usr/include/stdio.h
-termio.o: estruct.h
-termio.o: edef.h
-termio.o: /usr/include/sgtty.h
-termio.o: /usr/include/sys/ioctl.h
-#termio.o: /usr/include/sys/ttychars.h
-#termio.o: /usr/include/sys/ttydev.h
-termio.o: /usr/include/signal.h
-termio.o: /usr/include/sys/ioctl.h
-spawn.o: spawn.c
-spawn.o: /usr/include/stdio.h
-spawn.o: estruct.h
-spawn.o: edef.h
-spawn.o: /usr/include/signal.h
-st520.o: st520.c
-st520.o: /usr/include/stdio.h
-st520.o: estruct.h
-st520.o: edef.h
-region.o: region.c
-region.o: /usr/include/stdio.h
-region.o: estruct.h
-region.o: edef.h
-regexp.o: regexp.c
-regexp.o: /usr/include/stdio.h
-regexp.o: estruct.h
-regexp.o: edef.h
-search.o: search.c
-search.o: /usr/include/stdio.h
-search.o: estruct.h
-search.o: edef.h
-main.o: main.c
-main.o: /usr/include/stdio.h
-main.o: estruct.h
-main.o: nefunc.h
-main.o: edef.h
-main.o: nebind.h
-main.o: nename.h
-random.o: random.c
-random.o: /usr/include/stdio.h
-random.o: estruct.h
-random.o: edef.h
-isearch.o: isearch.c
-isearch.o: /usr/include/stdio.h
-isearch.o: estruct.h
-isearch.o: edef.h
-line.o: line.c
-line.o: /usr/include/stdio.h
-line.o: estruct.h
-line.o: edef.h
-ibmpc.o: ibmpc.c
-ibmpc.o: /usr/include/stdio.h
-ibmpc.o: estruct.h
-ibmpc.o: edef.h
-input.o: input.c
-input.o: /usr/include/stdio.h
-input.o: estruct.h
-input.o: edef.h
-hp110.o: hp110.c
-hp110.o: /usr/include/stdio.h
-hp110.o: estruct.h
-hp110.o: edef.h
-hp150.o: hp150.c
-hp150.o: /usr/include/stdio.h
-hp150.o: estruct.h
-hp150.o: edef.h
-fileio.o: fileio.c
-fileio.o: /usr/include/stdio.h
-fileio.o: estruct.h
-fileio.o: edef.h
-exec.o: exec.c
-exec.o: /usr/include/stdio.h
-exec.o: estruct.h
-exec.o: edef.h
-file.o: file.c
-file.o: /usr/include/stdio.h
-file.o: estruct.h
-file.o: edef.h
-eval.o: eval.c
-eval.o: /usr/include/stdio.h
-eval.o: estruct.h
-eval.o: edef.h
-eval.o: evar.h
-display.o: display.c
-display.o: /usr/include/stdio.h
-display.o: estruct.h
-display.o: edef.h
-buffer.o: buffer.c
-buffer.o: /usr/include/stdio.h
-buffer.o: estruct.h
-buffer.o: edef.h
-crypt.o: crypt.c
-crypt.o: /usr/include/stdio.h
-crypt.o: estruct.h
-crypt.o: edef.h
-dg10.o: dg10.c
-dg10.o: /usr/include/stdio.h
-dg10.o: estruct.h
-dg10.o: edef.h
-bind.o: bind.c
-bind.o: /usr/include/stdio.h
-bind.o: estruct.h
-bind.o: edef.h
-bind.o: epath.h
-basic.o: basic.c
-basic.o: /usr/include/stdio.h
-basic.o: estruct.h
-basic.o: edef.h
-ansi.o: ansi.c
-ansi.o: /usr/include/stdio.h
-ansi.o: estruct.h
-ansi.o: edef.h
-opers.o: opers.c
-opers.o: estruct.h
-opers.o: edef.h
-wordmov.o: wordmov.c
-wordmov.o: estruct.h
-wordmov.o: edef.h
-csrch.o: csrch.c
-csrch.o: estruct.h
-csrch.o: edef.h
-undo.o: undo.c
-undo.o: estruct.h
-undo.o: edef.h
-tags.o: tags.c
-tags.o: estruct.h
-tags.o: edef.h
-finderr.o: finderr.c
-finderr.o: estruct.h
-finderr.o: edef.h
-at386.o: at386.c
-at386.o: /usr/include/stdio.h
-at386.o: estruct.h
-at386.o: edef.h
-npopen.o: npopen.c
-npopen.o: estruct.h
-npopen.o: edef.h
-oneliner.o: oneliner.c
-oneliner.o: estruct.h
-oneliner.o: edef.h
-globals.o: globals.c
-globals.o: estruct.h
-globals.o: edef.h
-vmalloc.o: estruct.h
-vmalloc.o: edef.h
+$(OBJ): estruct.h edef.h

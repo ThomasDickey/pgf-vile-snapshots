@@ -3,7 +3,10 @@
  * attached to keys that the user actually types.
  *
  * $Log: window.c,v $
- * Revision 1.13  1992/01/05 00:06:13  pgf
+ * Revision 1.14  1992/05/16 12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.13  1992/01/05  00:06:13  pgf
  * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
  * often.  also normalized message appearance somewhat.
  *
@@ -65,6 +68,7 @@ overlay	"window"
  * bottom. If it is 0 the window is centered around dot (this is what 
  * the standard redisplay code does). Defaults to 0.
  */
+int
 reposition(f, n)
 int f,n;
 {
@@ -80,12 +84,10 @@ int f,n;
  * argument it recenters "." in the current window.
  */
 /* ARGSUSED */
+int
 refresh(f, n)
 int f,n;
 {
-#if	NeWS	/* see if the window has changed size */
-    newsrefresh() ;
-#endif	
 
 	if (f == FALSE) {
 		sgarbf = TRUE;
@@ -94,9 +96,6 @@ int f,n;
 	        curwp->w_flag |= WFFORCE;
 	}
 
-#if     NeWS
-	newsreportmodes() ;
-#endif
 	return (TRUE);
 }
 
@@ -108,6 +107,7 @@ int f,n;
  * with an argument this command finds the <n>th window from the top
  *
  */
+int
 nextwind(f, n)
 int f, n;	/* default flag and numeric argument */
 {
@@ -148,6 +148,7 @@ int f, n;	/* default flag and numeric argument */
 	return (TRUE);
 }
 
+int
 poswind(f,n)
 int f,n;
 {
@@ -183,6 +184,7 @@ int f,n;
  * current window. There arn't any errors, although the command does not do a
  * lot if there is 1 window.
  */
+int
 prevwind(f, n)
 int f,n;
 {
@@ -215,6 +217,7 @@ int f,n;
  * a new dot. We share the code by having "move down" just be an interface to
  * "move up". Magic.
  */
+int
 mvdnwind(f, n)
 int f,n;
 {
@@ -230,6 +233,7 @@ int f,n;
  * (this command does not really move "." (except as above); it moves the 
  * frame).
  */
+int
 mvupwind(f, n)
 int f,n;
 {
@@ -283,22 +287,27 @@ int f,n;
 	return (TRUE);
 }
 
+int
 mvdnnxtwind(f, n)
 int f,n;
 {
 	nextwind(FALSE, 1);
 	mvdnwind(f, n);
 	prevwind(FALSE, 1);
+	return TRUE;
 }
 
+int
 mvupnxtwind(f, n)
 int f,n;
 {
 	nextwind(FALSE, 1);
 	mvupwind(f, n);
 	prevwind(FALSE, 1);
+	return TRUE;
 }
 
+int
 mvrightwind(f,n)
 int f,n;
 {
@@ -323,6 +332,7 @@ int f,n;
 	return TRUE;
 }
 
+int
 mvleftwind(f,n)
 int f,n;
 {
@@ -348,6 +358,7 @@ int f,n;
  * become undisplayed.
  */
 /* ARGSUSED */
+int
 onlywind(f, n)
 int f,n;
 {
@@ -387,12 +398,14 @@ int f,n;
  */
 
 /* ARGSUSED */
+int
 delwind(f,n)
 int f, n;	/* arguments are ignored for this command */
 {
 	return delwp(curwp);
 }
 
+int
 delwp(thewp)
 WINDOW *thewp;
 {
@@ -545,6 +558,7 @@ int f,n;
 }
 
 /* externall callable version -- return int instead of (WINDOW *) */
+int
 splitwind(f,n)
 int f,n;
 {
@@ -558,6 +572,7 @@ int f,n;
  * move.
  */
 /* ARGSUSED */
+int
 enlargewind(f, n)
 int f,n;
 {
@@ -604,6 +619,7 @@ int f,n;
  * Shrink the current window. Find the window that gains space. Hack at the
  * window descriptions. Ask the redisplay to do all the hard work.
  */
+int
 shrinkwind(f, n)
 int f,n;
 {
@@ -649,6 +665,7 @@ int f,n;
 #if !SMALLER
 
 /*	Resize the current window to the requested size	*/
+int
 resize(f, n)
 int f, n;	/* default flag and numeric argument */
 {
@@ -699,24 +716,29 @@ wpopup()
         return wp;
 }
 
+int
 scrnextup(f, n)		/* scroll the next window up (back) a page */
 int f,n;
 {
 	nextwind(FALSE, 1);
 	backhpage(f, n);
 	prevwind(FALSE, 1);
+	return TRUE;
 }
 
+int
 scrnextdw(f, n)		/* scroll the next window down (forward) a page */
 int f,n;
 {
 	nextwind(FALSE, 1);
 	forwhpage(f, n);
 	prevwind(FALSE, 1);
+	return TRUE;
 }
 
 #if ! SMALLER
 /* ARGSUSED */
+int
 savewnd(f, n)		/* save ptr to current window */
 int f,n;
 {
@@ -725,6 +747,7 @@ int f,n;
 }
 
 /* ARGSUSED */
+int
 restwnd(f, n)		/* restore the saved screen */
 int f,n;
 {
@@ -747,6 +770,7 @@ int f,n;
 }
 #endif
 
+int
 newlength(f,n)	/* resize the screen, re-writing the screen */
 int f,n;	/* numeric argument */
 {
@@ -826,6 +850,7 @@ int f,n;	/* numeric argument */
 	return(TRUE);
 }
 
+int
 newwidth(f,n)	/* resize the screen, re-writing the screen */
 int f,n;	/* numeric argument */
 {
@@ -838,14 +863,8 @@ int f,n;	/* numeric argument */
 
 	/* make sure it's in range */
 	if (n < 10 || n > term.t_mcol) {
-#if	NeWS		/* serious error for NeWS, halt */
-		fprintf(stderr, "Screen width out of range\n") ;
-		newsclose() ;
-		exit(1) ;
-#else
 		mlforce("[Screen width out of range]");
 		return(FALSE);
-#endif
 	}
 
 	/* otherwise, just re-width it (no big deal) */
@@ -865,7 +884,8 @@ int f,n;	/* numeric argument */
 }
 
 #if ! SMALLER
-int getwpos()	/* get screen offset of current line in current window */
+int
+getwpos()	/* get screen offset of current line in current window */
 {
 	register int sline;	/* screen line from top of window */
 	register LINE *lp;	/* scannile line pointer */
@@ -886,6 +906,7 @@ int getwpos()	/* get screen offset of current line in current window */
 /*
  * Initialize all of the windows.
  */
+void
 winit()
 {
         register WINDOW *wp;

@@ -5,7 +5,10 @@
  * added by Daniel Lawrence
  *
  * $Log: hp150.c,v $
- * Revision 1.4  1992/01/05 00:06:13  pgf
+ * Revision 1.5  1992/05/16 12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.4  1992/01/05  00:06:13  pgf
  * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
  * often.  also normalized message appearance somewhat.
  *
@@ -358,6 +361,7 @@ ckeyon()	/* turn control-C trapping on */
 #undef	unsigned
 #endif
 
+int
 agios(buf, len) /* perform an AGIOS call */
 
 char *buf;	/* sequence of bytes in command */
@@ -412,6 +416,7 @@ dsplbls()	/* display the application softkey labels on the screen */
 }
 
 #if	FLABEL
+int
 fnclabel(f, n)		/* label a function key */
 
 int f,n;	/* default flag, numeric argument */

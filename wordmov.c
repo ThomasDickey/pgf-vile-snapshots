@@ -5,7 +5,10 @@
  *	Written for vile by Paul Fox, (c)1990
  *
  * $Log: wordmov.c,v $
- * Revision 1.4  1991/11/08 13:02:46  pgf
+ * Revision 1.5  1992/05/16 12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.4  1991/11/08  13:02:46  pgf
  * ifdefed unneeded funcs
  *
  * Revision 1.3  1991/08/07  12:35:07  pgf
@@ -36,11 +39,13 @@
 
 static int ochartype;
 
+void
 setchartype()
 {
 	ochartype = getchartype();
 }
 
+int
 getchartype()
 {
 	register int	c;
@@ -54,9 +59,10 @@ getchartype()
 }
 
 
+int
 isnewwordf()
 {
-	register int	ret;
+	register int	ret = FALSE;
 	register int	type;
 
 	type = getchartype();
@@ -86,9 +92,10 @@ isnewwordf()
 	return (ret);
 }
 
+int
 isnewwordb()
 {
-	register int	ret;
+	register int	ret = FALSE;
 	register int	type;
 
 	type = getchartype();
@@ -118,9 +125,10 @@ isnewwordb()
 	return (ret);
 }
 
+int
 isnewviwordf()
 {
-	register int	ret;
+	register int	ret = FALSE;
 	register int	type;
 
 	type = getchartype();
@@ -158,9 +166,10 @@ isnewviwordf()
 	return (ret);
 }
 
+int
 isnewviwordb()
 {
-	register int	ret;
+	register int	ret = FALSE;
 	register int	type;
 
 	type = getchartype();
@@ -192,9 +201,10 @@ isnewviwordb()
 
 
 #ifdef NEEDED
+int
 isendwordb()
 {
-	register int	ret;
+	register int	ret = FALSE;
 	register int	type;
 
 	type = getchartype();
@@ -217,9 +227,10 @@ isendwordb()
 	return (ret);
 }
 
+int
 isendviwordb()
 {
-	register int	ret;
+	register int	ret = FALSE;
 	register int	type;
 
 	type = getchartype();
@@ -256,9 +267,10 @@ isendviwordb()
 }
 #endif /* NEEDED */
 
+int
 isendwordf()
 {
-	register int	ret;
+	register int	ret = FALSE;
 	register int	type;
 
 	type = getchartype();
@@ -294,9 +306,10 @@ isendwordf()
 	return (ret);
 }
 
+int
 isendviwordf()
 {
-	register int	ret;
+	register int	ret = FALSE;
 	register int	type;
 
 	type = getchartype();
@@ -333,9 +346,10 @@ isendviwordf()
 }
 
 #ifdef template
+int
 isANYTHING()
 {
-	register int	ret;
+	register int	ret = FALSE;
 	register int	type;
 
 	type = getchartype();

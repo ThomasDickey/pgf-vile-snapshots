@@ -797,9 +797,7 @@ Regular Expressions
 	Searches use regular expressions, which, as in vi, may be magic
 	by default or not.
 
-	Major differences from vi:
-
-	The metacharacters \+ and \| are new magic.
+	There are new magic metacharacters.
 
 	The code that implements the expressions is based directly on
 	Henry Spencer's regexp code.  Quoting from the original man page:
@@ -820,11 +818,18 @@ Regular Expressions
 	(matching a match for the regular expression), a range (see below),
 	`.' (matching any single character), `^' (matching the null string
 	at the beginning of the input string), `$' (matching the null
-	string at the end of the input string), a `\' followed by a
-	single character (matching that character), or a single character
-	with no other significance (matching that character)." [ In
-	addition, vile atoms may be \< and \>, which match the beginning
-	and end of a "word". ]
+	string at the end of the input string), a `\' followed by a single
+	character (matching that character), or a single character with no
+	other significance (matching that character)." [ In addition, vile
+	atoms may be: \< and \>, which match the beginning and end of a
+	"word", \s and \S, which match sequences of whitespace and
+	"darkspace", \w and \W, which match alphanumerics (including '_')
+	and non-alphanumerics, \d and \D, which match digits and
+	non-digits, and \p and \P, which match printable and non-printable
+	characters (whitespace is printable).  (Note: only \s will match the
+	start or end of a line (since newlines count as whitespace), but
+	since no vile regular expression will span more than one line, it
+	will not _cross_ the newline.) ]
 
 	"A range is a sequence of characters enclosed in `[]'.  It normally
 	matches any single character from the sequence.  If the sequence
@@ -844,7 +849,7 @@ Regular Expressions
 	must be preceded by '\' to hide their special meaning:
 		* [ . ^ $
 	These characters are special if they _are_ preceded with a '\':
-		? + ( ) |		( '<' and '>' will be here someday)
+		? + ( ) | < >
 
 	If magic mode is _not_ on, only ^ and $ are special if not escaped. 
 	All of the following must be preceded with a '\' to be special,

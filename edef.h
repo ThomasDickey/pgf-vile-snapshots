@@ -8,7 +8,13 @@
 
 /*
  * $Log: edef.h,v $
- * Revision 1.44  1992/04/10 19:54:00  pgf
+ * Revision 1.46  1992/05/16 12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.45  1992/04/29  07:31:56  pgf
+ * v 3.16
+ *
+ * Revision 1.44  1992/04/10  19:54:00  pgf
  * v 3.15
  *
  * Revision 1.43  1992/04/03  07:23:08  pgf
@@ -169,7 +175,7 @@ char *tokval();
 char *gtenv();
 char *gtfun();
 char *gtusr();
-char *itoa();
+char *l_itoa();
 char *ltos();
 char *mklower();
 char *mkupper();
@@ -196,7 +202,7 @@ LINE    *lalloc();              /* Allocate a line              */
  *	do it again.  promise.  but it _does_ make it easy to add/change
  *	globals.  Too bad about "comma".    -pgf
  */
-#ifdef maindef
+#ifdef realdef
 # define comma ,
 # define decl_init(thing,value) thing = value
 # define decl_uninit(thing) thing
@@ -206,7 +212,7 @@ LINE    *lalloc();              /* Allocate a line              */
 #endif
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version three point fifteen");
+decl_init( char version[], "version three point sixteen");
 
 decl_init( int autoindented , -1);	/* how many chars (not cols) indented */
 decl_uninit( int isnamedcmd );		/* are we typing a command name */
@@ -291,7 +297,7 @@ decl_uninit( MARK Mark );		/* the worker mark */
 /* these get their initial values in main.c, in global_val_init() */
 decl_uninit( B_VALUES global_b_values );
 
-#ifndef maindef
+#ifndef realdef
 extern struct VALNAMES b_valuenames[];
 extern struct VALNAMES w_valuenames[];
 #else
@@ -388,7 +394,7 @@ decl_uninit( int klines );
 
 decl_uninit( WINDOW *swindow );		/* saved window pointer		*/
 #if CRYPT
-decl_uninit( int cryptflag );		/* currently encrypting?	*/
+decl_init( int cryptflag, FALSE );		/* currently encrypting?	*/
 #endif
 decl_uninit( unsigned char *tmpcmdptr );	/* current position in dot cmd buf */
 decl_init( unsigned char *tmpcmdend, &tmpcmdm[0] );/* ptr to end of the dot cmd */
@@ -430,6 +436,6 @@ extern  TERM    term;                   /* Terminal information.        */
 #endif
 
 /* per-character output function called by dofmt() */
-decl_uninit( int (*dfoutfn)() );
+decl_uninit( void (*dfoutfn)() );
 
 

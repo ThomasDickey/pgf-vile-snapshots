@@ -4,7 +4,16 @@
  * All operating systems.
  *
  * $Log: termio.c,v $
- * Revision 1.31  1992/04/14 08:40:11  pgf
+ * Revision 1.34  1992/05/20 18:55:42  foxharp
+ * don't use fcntl on a/ux, either
+ *
+ * Revision 1.33  1992/05/16  12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.32  1992/05/13  09:13:41  pgf
+ * make X11 do even less in ttclean/unclean routines
+ *
+ * Revision 1.31  1992/04/14  08:40:11  pgf
  * added osf hack, to use sgtty instead of posix, and fixed sun hack, to use
  * fionread instead of fcntl, to prevent output flush during typeahead check
  *
@@ -166,6 +175,12 @@ extern int errno;
 #include <sys/filio.h>		/* to get at FIONREAD */
 #endif
 
+#if AUX2	/* same problem as above */
+#undef USE_FCNTL
+#define USE_FIONREAD 	1
+#include <sys/ioctl.h>		/* to get at FIONREAD */
+#endif
+
 #if X11
 # undef USE_FCNTL
 # undef USE_FIONREAD
@@ -202,6 +217,7 @@ struct termios otermios, ntermios;
 
 char tobuf[TBUFSIZ];		/* terminal output buffer */
 
+void
 ttopen()
 {
 	int s;
@@ -265,14 +281,17 @@ ttopen()
 
 }
 
+void
 ttclose()
 {
 	ttclean(TRUE);
 }
 
+void
 ttclean(f)
 int f;
 {
+#if !X11
 	if (f) {
 		movecursor(term.t_nrow, ttcol); /* don't care about column */
 		ttputc('\n');
@@ -282,22 +301,22 @@ int f;
 #if ! LINUX
 	tcdrain(1);
 #endif
-#if ! X11
 	tcsetattr(0, TCSADRAIN, &otermios);
-#endif
 	TTclose();
 #if USE_FCNTL
 	fcntl(0, F_SETFL, kbd_flags);
 	kbd_is_polled = FALSE;
 #endif
+#endif
 }
 
+void
 ttunclean()
 {
+#if ! X11
 #if ! LINUX
 	tcdrain(1);
 #endif
-#if ! X11
 	if (tcsetattr(0, TCSADRAIN, &ntermios) < 0) {
 		perror("ttunclean: tcsetattr");
 		exit(1);
@@ -319,6 +338,7 @@ struct	termio	otermio, ntermio;
 char tobuf[TBUFSIZ];		/* terminal output buffer */
 #endif
 
+void
 ttopen()
 {
 
@@ -384,11 +404,13 @@ ttopen()
 
 }
 
+void
 ttclose()
 {
 	ttclean(TRUE);
 }
 
+void
 ttclean(f)
 int f;
 {
@@ -411,6 +433,7 @@ int f;
 #endif	/* X11 */
 }
 
+void
 ttunclean()
 {
 #if ! X11
@@ -438,6 +461,7 @@ struct ltchars	nltchars = { -1, -1, -1, -1, -1, -1 }; /* a lot of nothing */
 struct tchars	otchars;	/* Saved terminal special character set */
 struct tchars	ntchars; /*  = { -1, -1, -1, -1, -1, -1 }; */
 
+void
 ttopen()
 {
 	ioctl(0,TIOCGETP,&ostate); /* save old state */
@@ -498,11 +522,13 @@ ttopen()
 
 }
 
+void
 ttclose()
 {
 	ttclean(TRUE);
 }
 
+void
 ttclean(f)
 int f;
 {
@@ -522,6 +548,7 @@ int f;
 #endif
 }
 
+void
 ttunclean()
 {
 #if ! X11
@@ -536,12 +563,14 @@ ttunclean()
 
 #endif /* USE_SGTTY */
 
+void
 ttputc(c)
 int c;
 {
         fputc(c, stdout);
 }
 
+void
 ttflush()
 {
         fflush(stdout);
@@ -553,6 +582,7 @@ extern int tungotc;
  * Read a character from the terminal, performing no editing and doing no echo
  * at all.
  */
+int
 ttgetc()
 {
 #if	USE_FCNTL
@@ -589,6 +619,7 @@ ttgetc()
 /* typahead:	Check to see if any characters are already in the
 		keyboard buffer
 */
+int
 typahead()
 {
 #if	NeWS
@@ -627,6 +658,7 @@ typahead()
 
 /* this takes care of some stuff that's common across all ttopen's.  Some of
 	it should arguably be somewhere else, but... */
+void
 ttmiscinit()
 {
 	/* make sure backspace is bound to backspace */
@@ -696,6 +728,7 @@ int nxtchar = -1;	/* character held from type ahead    */
 extern CMDFUNC f_backchar;
 extern CMDFUNC f_backchar_to_bol;
 
+void
 ttopen()
 {
 #if     AMIGA
@@ -775,6 +808,7 @@ ttopen()
 	_chartypes_[backspc] |= _bspace;
 }
 
+void
 ttclose()
 {
 #if     AMIGA
@@ -813,6 +847,7 @@ ttclose()
 	ttclean(TRUE);
 }
 
+void
 ttclean(f)
 int f;
 {
@@ -826,6 +861,7 @@ int f;
 	TTkclose();
 }
 
+void
 ttunclean()
 {
 }
@@ -836,9 +872,10 @@ ttunclean()
  * On CPM terminal I/O unbuffered, so we just write the byte out. Ditto on
  * MS-DOS (use the very very raw console output routine).
  */
+void
 ttputc(c)
 #if     AMIGA | (ST520 & MEGAMAX)
-        char c;
+        int c;
 #else
 	int c;
 #endif
@@ -888,6 +925,7 @@ amg_flush()
  * Flush terminal buffer. Does real work where the terminal output is buffered
  * up. A no-operation on systems where byte at a time terminal I/O is done.
  */
+void
 ttflush()
 {
 #if     AMIGA
@@ -922,6 +960,7 @@ extern int tungotc;
  * at all. More complex in VMS that almost anyplace else, which figures. Very
  * simple on CPM, because the system can do exactly what you want.
  */
+int
 ttgetc()
 {
 #if     AMIGA
@@ -1033,6 +1072,7 @@ ttgetc()
 /* typahead:	Check to see if any characters are already in the
 		keyboard buffer
 */
+int
 typahead()
 {
 

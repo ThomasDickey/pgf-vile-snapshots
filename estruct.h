@@ -10,7 +10,23 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.62  1992/04/14 08:55:38  pgf
+ * Revision 1.67  1992/05/20 18:57:16  foxharp
+ * added a/ux, fixed my stdarg ifdef
+ * 
+ *
+ * Revision 1.66  1992/05/19  18:28:04  foxharp
+ * more proto-isms
+ *
+ * Revision 1.65  1992/05/19  09:15:45  foxharp
+ * more prototype fixups
+ *
+ * Revision 1.64  1992/05/16  12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.63  1992/04/30  17:53:09  pgf
+ * fixed ifdef on HAVE_MKDIR
+ *
+ * Revision 1.62  1992/04/14  08:55:38  pgf
  * added support for OSF1 (affects termio only)
  *
  * Revision 1.61  1992/04/10  19:52:40  pgf
@@ -236,6 +252,8 @@
  * initial vile RCS revision
  */
 
+#define const
+
 #ifndef os_chosen
 
 /* Note that as of vile 3.15, most of these choices can be made
@@ -265,6 +283,7 @@
 #define OSF1	0
 #define LINUX	0
 #define BSD386	0
+#define AUX2	0			/* Apple A/UX 2.0 */
 
 /* the following overrides are mostly for convenience only */
 #if ULTRIX || defined(sun)
@@ -338,17 +357,6 @@
 #endif
 
 
-#endif /* os_chosen */
-
-#if SVR3
-# undef BERK
-# undef USG
-# define BERK	0
-# define USG	1
-#endif
-
-#define UNIX	(V7 | BERK | USG)	/* any unix		*/
-
 
 /* non-unix flavors */
 #undef	LATTICE		/* don't use their definitions...use ours	*/
@@ -370,20 +378,31 @@
 #define	MSC	0	/* MicroSoft C compile version 3 & 4 */
 #define	TURBO	0	/* Turbo C/MSDOS */
 
+#endif /* os_chosen */
+
+#if SVR3
+# undef BERK
+# undef USG
+# define BERK	0
+# define USG	1
+#endif
+
+#define UNIX	(V7 | BERK | USG)	/* any unix		*/
+
 /* choose between void and int signal handler return type.
   "typedefs?  we don't need no steenking typedefs..." */
-#if POSIX || (BERK && BSD386)
+#if POSIX || (BERK && BSD386) || SVR3
 # define SIGT void
+# define SIGRET
 #else
 # define SIGT int
+# define SIGRET return 0
 #endif
 
 
 /*	Porting constraints			*/
 #ifndef HAVE_MKDIR
 # define HAVE_MKDIR	1	/* if your system has the mkdir() system call */
-#else
-# define HAVE_MKDIR	0
 #endif
 
 
@@ -405,6 +424,7 @@
 #endif
 
 
+#ifndef scrn_chosen
 /*	Terminal Output definitions		*/
 /* choose ONLY one of the following */
 #define TERMCAP 1			/* Use TERMCAP			*/
@@ -427,6 +447,7 @@
 /*   Special keyboard definitions	     */
 #define WANGPC	0		/* WangPC - mostly escape sequences	*/
 /* the WANGPC stuff isn't in the cmdtbl keyboard definitions: sorry -- pgf */
+#endif
 
 /*	Configuration options... pick and choose as you wish */
 
@@ -853,7 +874,7 @@ typedef struct regexp {
 	char reganch;		/* Internal use only. */
 	int regmust;		/* Internal use only. */
 	int regmlen;		/* Internal use only. */
-	long size;		/* vile addition -- how big is this */
+	unsigned size;		/* vile addition -- how big is this */
 	char program[1];	/* Unwarranted chumminess with compiler. */
 } regexp;
 
@@ -1237,25 +1258,25 @@ typedef struct	{
 	int	t_margin;		/* min margin for extended lines*/
 	int	t_scrsiz;		/* size of scroll region "	*/
 	int	t_pause;		/* # times thru update to pause */
-	int	(*t_open)();		/* Open terminal at the start.	*/
-	int	(*t_close)();		/* Close terminal at end.	*/
-	int	(*t_kopen)();		/* Open keyboard		*/
-	int	(*t_kclose)();		/* close keyboard		*/
+	void	(*t_open)();		/* Open terminal at the start.	*/
+	void	(*t_close)();		/* Close terminal at end.	*/
+	void	(*t_kopen)();		/* Open keyboard		*/
+	void	(*t_kclose)();		/* close keyboard		*/
 	int	(*t_getchar)(); 	/* Get character from keyboard. */
-	int	(*t_putchar)(); 	/* Put character to display.	*/
-	int	(*t_flush)();		/* Flush output buffers.	*/
-	int	(*t_move)();		/* Move the cursor, origin 0.	*/
-	int	(*t_eeol)();		/* Erase to end of line.	*/
-	int	(*t_eeop)();		/* Erase to end of page.	*/
-	int	(*t_beep)();		/* Beep.			*/
-	int	(*t_rev)();		/* set reverse video state	*/
+	void	(*t_putchar)(); 	/* Put character to display.	*/
+	void	(*t_flush)();		/* Flush output buffers.	*/
+	void	(*t_move)();		/* Move the cursor, origin 0.	*/
+	void	(*t_eeol)();		/* Erase to end of line.	*/
+	void	(*t_eeop)();		/* Erase to end of page.	*/
+	void	(*t_beep)();		/* Beep.			*/
+	void	(*t_rev)();		/* set reverse video state	*/
 	int	(*t_rez)();		/* change screen resolution	*/
 #if	COLOR
-	int	(*t_setfor)();		/* set foreground color		*/
-	int	(*t_setback)();		/* set background color		*/
+	void	(*t_setfor)();		/* set foreground color		*/
+	void	(*t_setback)();		/* set background color		*/
 #endif
 #if	SCROLLCODE
-	int	(*t_scroll)();		/* scroll a region of the screen */
+	void	(*t_scroll)();		/* scroll a region of the screen */
 #endif
 }	TERM;
 
@@ -1280,6 +1301,24 @@ typedef struct	{
 #define	TTbacg		(*term.t_setback)
 #endif
 
+typedef struct  VIDEO {
+        int	v_flag;                 /* Flags */
+#if	COLOR
+	int	v_fcolor;		/* current forground color */
+	int	v_bcolor;		/* current background color */
+	int	v_rfcolor;		/* requested forground color */
+	int	v_rbcolor;		/* requested background color */
+#endif
+	/* allocate 4 bytes here, and malloc 4 bytes less than we need,
+		to keep malloc from rounding up. */
+        char    v_text[4];              /* Screen data. */
+}       VIDEO;
+
+#define VFCHG   0x0001                  /* Changed flag			*/
+#define	VFEXT	0x0002			/* extended (beyond column 80)	*/
+#define	VFREV	0x0004			/* reverse video status		*/
+#define	VFREQ	0x0008			/* reverse video request	*/
+#define	VFCOL	0x0010			/* color change requested	*/
 
 /* Commands are represented as CMDFUNC structures, which contain a
  *	pointer to the actual function, and flags which help to classify it.
@@ -1418,4 +1457,23 @@ typedef struct WHBLOCK {
 
 #endif
 
-extern char *lsprintf();
+#ifndef NULL
+# define NULL 0
+#endif
+
+#if __STDC__
+# define P(a) a
+#if pgf_and_no_fixincludes
+#include "/jukebox/gnu-sources/gcc/gcc-1.40/gstdarg.h"
+#else
+#include <stdarg.h>
+#endif
+#else
+# define P(a) ()
+#include <varargs.h>
+#endif
+
+#include <stdio.h>
+
+#include "proto.h"
+

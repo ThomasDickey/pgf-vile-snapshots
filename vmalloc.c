@@ -10,7 +10,10 @@
  *	(pgf, 1989)
  *
  * $Log: vmalloc.c,v $
- * Revision 1.5  1992/03/05 09:19:55  pgf
+ * Revision 1.6  1992/05/16 12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.5  1992/03/05  09:19:55  pgf
  * changed some mlwrite() to mlforce(), due to new terse support
  *
  * Revision 1.4  1991/11/01  14:38:00  pgf
@@ -292,6 +295,7 @@ errout()
 	pause();
 }
 
+int
 setvmalloc(f,n)
 int f,n;
 {

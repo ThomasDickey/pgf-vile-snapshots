@@ -4,7 +4,13 @@
  *	written 11-feb-86 by Daniel Lawrence
  *
  * $Log: bind.c,v $
- * Revision 1.20  1992/03/13 08:44:53  pgf
+ * Revision 1.22  1992/05/19 08:55:44  foxharp
+ * more prototype and shadowed decl fixups
+ *
+ * Revision 1.21  1992/05/16  12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.20  1992/03/13  08:44:53  pgf
  * honor \n like \r in kbd_engl_stat
  *
  * Revision 1.19  1992/03/05  09:19:55  pgf
@@ -89,6 +95,7 @@ extern CMDFUNC f_cntl_af, f_cntl_xf, f_unarg, f_esc;
 
 /* give me some help!!!! bring up a buffer and read the help file into it */
 /* ARGSUSED */
+int
 help(f, n)
 int f,n;
 {
@@ -133,6 +140,7 @@ int f,n;
 #if REBIND
 
 /* ARGSUSED */
+int
 deskey(f, n)	/* describe the command for a certain key */
 int f,n;
 {
@@ -167,11 +175,13 @@ int f,n;
 
 	/* output the command sequence */
 	ostring(ptr);
+	return TRUE;
 }
 
 /* bindkey:	add a new key to the key binding table		*/
 
 /* ARGSUSED */
+int
 bindkey(f, n)
 int f, n;	/* command arguments [IGNORED] */
 {
@@ -232,7 +242,7 @@ int f, n;	/* command arguments [IGNORED] */
 		cfp = asciitbl;
 		for (cfp = asciitbl; cfp < &asciitbl[128]; cfp++) {
 			if (*cfp == kcmd) {
-				unbindchar(cfp - asciitbl);
+				(void)unbindchar(cfp - asciitbl);
 				break;
 			}
 		}
@@ -275,6 +285,7 @@ int f, n;	/* command arguments [IGNORED] */
 /* unbindkey:	delete a key from the key binding table	*/
 
 /* ARGSUSED */
+int
 unbindkey(f, n)
 int f, n;	/* command arguments [IGNORED] */
 {
@@ -308,6 +319,7 @@ int f, n;	/* command arguments [IGNORED] */
 	return(TRUE);
 }
 
+int
 unbindchar(c)
 int c;		/* command key to unbind */
 {
@@ -346,20 +358,20 @@ int c;		/* command key to unbind */
 /* describe bindings bring up a fake buffer and list the key bindings
 		   into it with view mode			*/
 /* ARGSUSED */
+int
 desbind(f, n)
 int f,n;
 {
-	int makebindlist();
         return liststuff("[Binding List]",makebindlist,1,NULL);
 }
 
 #if	APROP
 /* ARGSUSED */
+int
 apro(f, n)	/* Apropos (List functions that match a substring) */
 int f,n;
 {
 	static char mstring[NSTRING];	/* string to match cmd names to */
-	int makebindlist();
         register int    s;
 
 
@@ -373,6 +385,7 @@ int f,n;
 
 /* build a binding list (limited or full) */
 /* ARGSUSED */
+void
 makebindlist(dummy, mstring)
 int dummy;
 char *mstring;		/* match string if partial list, NULL to list all */
@@ -475,12 +488,12 @@ char *mstring;		/* match string if partial list, NULL to list all */
 		nptr->n_cmd->c_flags &= ~LISTED; /* mark it as unlisted */
 
 	mlwrite("");	/* clear the message line */
-	return(TRUE);
 }
 
 #if	APROP
-strinc(source, sub)	/* does source include sub? */
-char *source;	/* string to search in */
+int
+strinc(sourc, sub)	/* does source include sub? */
+char *sourc;	/* string to search in */
 char *sub;	/* substring to look for */
 {
 	char *sp;	/* ptr into source */
@@ -488,7 +501,7 @@ char *sub;	/* substring to look for */
 	char *tp;	/* ptr into substring */
 
 	/* for each character in the source string */
-	sp = source;
+	sp = sourc;
 	while (*sp) {
 		tp = sub;
 		nxtsp = sp;
@@ -517,6 +530,7 @@ char *sub;	/* substring to look for */
 
 /* execute the startup file */
 
+int
 startup(sfname)
 char *sfname;	/* name of startup file  */
 {
@@ -868,6 +882,7 @@ kbd_engl()
 }
 
 /* *bufp only valid if return is TRUE */
+int
 kbd_engl_stat(bufp)
 char **bufp;
 {

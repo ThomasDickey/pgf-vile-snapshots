@@ -4,7 +4,13 @@
 	written 1986 by Daniel Lawrence
  *
  * $Log: eval.c,v $
- * Revision 1.30  1992/04/10 18:48:17  pgf
+ * Revision 1.33  1992/05/19 08:55:44  foxharp
+ * more prototype and shadowed decl fixups
+ *
+ * Revision 1.32  1992/05/16  12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.30  1992/04/10  18:48:17  pgf
  * change abs to absol to get rid of name conflicts
  *
  * Revision 1.29  1992/03/24  09:02:18  pgf
@@ -109,8 +115,8 @@
 #include	"edef.h"
 #include	"evar.h"
 
+void
 varinit()		/* initialize the user variable list */
-
 {
 #if ! SMALLER
 	register int i;
@@ -167,12 +173,12 @@ char *fname;		/* name of function to evaluate */
 
 	/* and now evaluate it! */
 	switch (fnum) {
-		case UFADD:	return(itoa(atoi(arg1) + atoi(arg2)));
-		case UFSUB:	return(itoa(atoi(arg1) - atoi(arg2)));
-		case UFTIMES:	return(itoa(atoi(arg1) * atoi(arg2)));
-		case UFDIV:	return(itoa(atoi(arg1) / atoi(arg2)));
-		case UFMOD:	return(itoa(atoi(arg1) % atoi(arg2)));
-		case UFNEG:	return(itoa(-atoi(arg1)));
+		case UFADD:	return(l_itoa(atoi(arg1) + atoi(arg2)));
+		case UFSUB:	return(l_itoa(atoi(arg1) - atoi(arg2)));
+		case UFTIMES:	return(l_itoa(atoi(arg1) * atoi(arg2)));
+		case UFDIV:	return(l_itoa(atoi(arg1) / atoi(arg2)));
+		case UFMOD:	return(l_itoa(atoi(arg1) % atoi(arg2)));
+		case UFNEG:	return(l_itoa(-atoi(arg1)));
 		case UFCAT:	strcpy(result, arg1);
 				return(strcat(result, arg2));
 		case UFLEFT:	return(strncpy(result, arg1, atoi(arg2)));
@@ -189,20 +195,20 @@ char *fname;		/* name of function to evaluate */
 		case UFIND:	return(tokval(arg1));
 		case UFAND:	return(ltos(stol(arg1) && stol(arg2)));
 		case UFOR:	return(ltos(stol(arg1) || stol(arg2)));
-		case UFLENGTH:	return(itoa(strlen(arg1)));
+		case UFLENGTH:	return(l_itoa(strlen(arg1)));
 		case UFUPPER:	return(mkupper(arg1));
 		case UFLOWER:	return(mklower(arg1));
 		case UFTRUTH:	return(ltos(atoi(arg1) == 42));
-		case UFASCII:	return(itoa((int)arg1[0]));
+		case UFASCII:	return(l_itoa((int)arg1[0]));
 		case UFCHR:	result[0] = atoi(arg1);
 				result[1] = 0;
 				return(result);
 		case UFGTKEY:	result[0] = tgetc();
 				result[1] = 0;
 				return(result);
-		case UFRND:	return(itoa((ernd() % absol(atoi(arg1))) + 1));
-		case UFABS:	return(itoa(absol(atoi(arg1))));
-		case UFSINDEX:	return(itoa(sindex(arg1, arg2)));
+		case UFRND:	return(l_itoa((ernd() % absol(atoi(arg1))) + 1));
+		case UFABS:	return(l_itoa(absol(atoi(arg1))));
+		case UFSINDEX:	return(l_itoa(sindex(arg1, arg2)));
 		case UFENV:
 #if	ENVFUNC
 				return(getenv(arg1) == NULL ? "" : getenv(arg1));
@@ -210,8 +216,10 @@ char *fname;		/* name of function to evaluate */
 				return("");
 #endif
 		case UFBIND:	return(prc2engl(arg1));
-		case UFREADABLE:return(ltos(glob(arg1), flook(arg1, FL_HERE)));
-		case UFWRITABLE:return(ltos(glob(arg1), !ffronly(arg1)));
+		case UFREADABLE:glob(arg1);
+				return(ltos(flook(arg1, FL_HERE) != NULL));
+		case UFWRITABLE:glob(arg1);
+				return(ltos(!ffronly(arg1)));
 	}
 	return errorm;
 }
@@ -261,42 +269,42 @@ char *vname;		/* name of environment variable to retrieve */
 
 	/* otherwise, fetch the appropriate value */
 	switch (vnum) {
-		case EVPAGELEN:	return(itoa(term.t_nrow + 1));
-		case EVCURCOL:	return(itoa(getccol(FALSE) + 1));
-		case EVCURLINE: return(itoa(getcline()));
-		case EVRAM:	return(itoa((int)(envram / 1024l)));
+		case EVPAGELEN:	return(l_itoa(term.t_nrow + 1));
+		case EVCURCOL:	return(l_itoa(getccol(FALSE) + 1));
+		case EVCURLINE: return(l_itoa(getcline()));
+		case EVRAM:	return(l_itoa((int)(envram / 1024l)));
 		case EVFLICKER:	return(ltos(flickcode));
 		case EVTERSE:	return(ltos(terse));
-		case EVCURWIDTH:return(itoa(term.t_nrow));
+		case EVCURWIDTH:return(l_itoa(term.t_nrow));
 		case EVCBUFNAME:return(curbp->b_bname);
 		case EVCFNAME:	return(curbp->b_fname);
 		case EVSRES:	return(sres);
 		case EVDEBUG:	return(ltos(macbug));
 		case EVSTATUS:	return(ltos(cmdstatus));
 		case EVPALETTE:	return(palstr);
-		case EVLASTKEY: return(itoa(lastkey));
+		case EVLASTKEY: return(l_itoa(lastkey));
 		case EVCURCHAR:
-			return(is_at_end_of_line(DOT) ? itoa('\n') :
-				itoa(char_at(DOT)));
+			return(is_at_end_of_line(DOT) ? l_itoa('\n') :
+				l_itoa(char_at(DOT)));
 		case EVDISCMD:	return(ltos(discmd));
 		case EVVERSION:	return(version);
 		case EVPROGNAME:return(prognam);
-		case EVSEED:	return(itoa(seed));
+		case EVSEED:	return(l_itoa(seed));
 		case EVDISINP:	return(ltos(disinp));
-		case EVWLINE:	return(itoa(curwp->w_ntrows));
-		case EVCWLINE:	return(itoa(getwpos()));
+		case EVWLINE:	return(l_itoa(curwp->w_ntrows));
+		case EVCWLINE:	return(l_itoa(getwpos()));
 		case EVSEARCH:	return(pat);
 		case EVREPLACE:	return(rpat);
 		case EVMATCH:	return((patmatch == NULL)? "": patmatch);
 		case EVKILL:	return(getkill());
-		case EVTPAUSE:	return(itoa(term.t_pause));
+		case EVTPAUSE:	return(l_itoa(term.t_pause));
 		case EVPENDING:
 #if	TYPEAH
 				return(ltos(typahead()));
 #else
 				return(falsem);
 #endif
-		case EVLLENGTH:	return(itoa(llength(DOT.l)));
+		case EVLLENGTH:	return(l_itoa(llength(DOT.l)));
 		case EVLINE:	return(getctext(0));
 		case EVWORD:	return(getctext(_nonspace));
 		case EVIDENTIF:	return(getctext(_ident));
@@ -331,7 +339,65 @@ char *getkill()		/* return some of the contents of the kill buffer */
 	return(value);
 }
 
-int setvar(f, n)		/* set a variable */
+void
+findvar(var, vd)	/* find a variables type and name */
+char *var;	/* name of var to get */
+VDESC *vd;	/* structure to hold type and ptr */
+{
+	register int vnum;	/* subscript in varable arrays */
+	register int vtype;	/* type to return */
+
+fvar:
+	vtype = vnum = -1;
+	if (!var[1]) {
+		vd->v_type = vtype;
+		return;
+	}
+	switch (var[0]) {
+
+		case '$': /* check for legal enviromnent var */
+			for (vnum = 0; vnum < NEVARS; vnum++)
+				if (strcmp(&var[1], envars[vnum]) == 0) {
+					vtype = TKENV;
+					break;
+				}
+			break;
+
+		case '%': /* check for existing legal user variable */
+			for (vnum = 0; vnum < MAXVARS; vnum++)
+				if (strcmp(&var[1], uv[vnum].u_name) == 0) {
+					vtype = TKVAR;
+					break;
+				}
+			if (vnum < MAXVARS)
+				break;
+
+			/* create a new one??? */
+			for (vnum = 0; vnum < MAXVARS; vnum++)
+				if (uv[vnum].u_name[0] == 0) {
+					vtype = TKVAR;
+					strcpy(uv[vnum].u_name, &var[1]);
+					break;
+				}
+			break;
+
+		case '&':	/* indirect operator? */
+			var[4] = 0;
+			if (strcmp(&var[1], "ind") == 0) {
+				/* grab token, and eval it */
+				execstr = token(execstr, var);
+				strcpy(var, tokval(var));
+				goto fvar;
+			}
+	}
+
+	/* return the results */
+	vd->v_num = vnum;
+	vd->v_type = vtype;
+}
+
+int 
+setvar(f, n)		/* set a variable */
 int f;		/* default flag */
 int n;		/* numeric arg (can overide prompted value) */
 {
@@ -361,7 +427,7 @@ int n;		/* numeric arg (can overide prompted value) */
 
 	/* get the value for that variable */
 	if (f == TRUE)
-		strcpy(value, itoa(n));
+		strcpy(value, l_itoa(n));
 	else {
 		value[0] = 0;
 		status = mlreply("Value: ", &value[0], NSTRING);
@@ -408,70 +474,9 @@ int n;		/* numeric arg (can overide prompted value) */
 	return(status);
 }
 
-findvar(var, vd)	/* find a variables type and name */
-
-char *var;	/* name of var to get */
-VDESC *vd;	/* structure to hold type and ptr */
-
-{
-	register int vnum;	/* subscript in varable arrays */
-	register int vtype;	/* type to return */
-
-fvar:
-	vtype = -1;
-	if (!var[1]) {
-		vd->v_type = vtype;
-		return;
-	}
-	switch (var[0]) {
-
-		case '$': /* check for legal enviromnent var */
-			for (vnum = 0; vnum < NEVARS; vnum++)
-				if (strcmp(&var[1], envars[vnum]) == 0) {
-					vtype = TKENV;
-					break;
-				}
-			break;
-
-		case '%': /* check for existing legal user variable */
-			for (vnum = 0; vnum < MAXVARS; vnum++)
-				if (strcmp(&var[1], uv[vnum].u_name) == 0) {
-					vtype = TKVAR;
-					break;
-				}
-			if (vnum < MAXVARS)
-				break;
-
-			/* create a new one??? */
-			for (vnum = 0; vnum < MAXVARS; vnum++)
-				if (uv[vnum].u_name[0] == 0) {
-					vtype = TKVAR;
-					strcpy(uv[vnum].u_name, &var[1]);
-					break;
-				}
-			break;
-
-		case '&':	/* indirect operator? */
-			var[4] = 0;
-			if (strcmp(&var[1], "ind") == 0) {
-				/* grab token, and eval it */
-				execstr = token(execstr, var);
-				strcpy(var, tokval(var));
-				goto fvar;
-			}
-	}
-
-	/* return the results */
-	vd->v_num = vnum;
-	vd->v_type = vtype;
-	return;
-}
-
 int svar(var, value)		/* set a variable */
-
 VDESC *var;	/* variable to set */
 char *value;	/* value to set to */
-
 {
 	register int vnum;	/* ordinal number of var refrenced */
 	register int vtype;	/* type of variable to set */
@@ -548,7 +553,7 @@ char *value;	/* value to set to */
 						atoi(value) - getwpos());
 				break;
 		case EVSEARCH:	strcpy(pat, value);
-				if (gregexp) free(gregexp);
+				if (gregexp) free((char *)gregexp);
 				gregexp = regcomp(pat, b_val(curbp, MDMAGIC));
 				break;
 		case EVREPLACE:	strcpy(rpat, value);
@@ -562,7 +567,7 @@ char *value;	/* value to set to */
 		case EVPENDING:
 		case EVLLENGTH:
 		case EVRAM:	break;
-		case EVLINE:	putctext(value);
+		case EVLINE:	(void)putctext(value);
 				break;
 		case EVDIR:	set_directory(value);
 				break;
@@ -580,6 +585,7 @@ char *value;	/* value to set to */
 /*	atoi:	ascii string to integer......This is too
 		inconsistant to use the system's	*/
 
+int
 atoi(st)
 char *st;
 {
@@ -616,10 +622,10 @@ char *st;
 
 #if ! SMALLER
 
-/*	itoa:	integer to ascii string.......... This is too
+/*	l_itoa:	integer to ascii string.......... This is too
 		inconsistant to use the system's	*/
 
-char *itoa(i)
+char *l_itoa(i)
 int i;	/* integer to translate to a string */
 {
 	static char result[INTWIDTH+1];	/* resulting string */
@@ -737,7 +743,7 @@ char *tokn;		/* token to evaluate */
 		case TKENV:	return(gtenv(tokn+1));
 		case TKFUN:	return(gtfun(tokn+1));
 		case TKDIR:	return(errorm);
-		case TKLBL:	return(itoa(gtlbl(tokn)));
+		case TKLBL:	return(l_itoa(gtlbl(tokn)));
 		case TKLIT:	return(tokn);
 		case TKSTR:	return(tokn+1);
 		case TKCMD:	return(tokn);
@@ -751,6 +757,7 @@ char *tokn;		/* token to evaluate */
 #if ! SMALLER
 
 /* ARGSUSED */
+int
 gtlbl(tokn)	/* find the line number of the given label */
 char *tokn;	/* label name to find */
 {
@@ -825,8 +832,8 @@ int ernd()	/* returns a random integer */
 	return(seed);
 }
 
-int sindex(source, pattern)	/* find pattern within source */
-char *source;	/* source string to search */
+int sindex(sourc, pattern)	/* find pattern within source */
+char *sourc;	/* source string to search */
 char *pattern;	/* string to look for */
 {
 	char *sp;	/* ptr to current position to scan */
@@ -834,7 +841,7 @@ char *pattern;	/* string to look for */
 	char *cp;	/* ptr to place to check for equality */
 
 	/* scanning through the source string */
-	sp = source;
+	sp = sourc;
 	while (*sp) {
 		/* scan through the pattern */
 		cp = pattern;
@@ -848,7 +855,7 @@ char *pattern;	/* string to look for */
 
 		/* was it a match? */
 		if (*cp == 0)
-			return((int)(sp - source) + 1);
+			return((int)(sp - sourc) + 1);
 		++sp;
 	}
 

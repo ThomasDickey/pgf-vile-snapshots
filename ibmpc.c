@@ -5,7 +5,13 @@
  * Supported monitor cards include CGA, MONO and EGA.
  *
  * $Log: ibmpc.c,v $
- * Revision 1.4  1991/09/10 01:19:35  pgf
+ * Revision 1.6  1992/05/20 18:54:33  foxharp
+ * prototype changes
+ *
+ * Revision 1.5  1992/05/16  12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.4  1991/09/10  01:19:35  pgf
  * re-tabbed, and moved ESC and BEL to estruct.h
  *
  * Revision 1.3  1991/08/07  12:35:07  pgf
@@ -58,26 +64,21 @@ unsigned int sline[NCOL];		/* screen line image		*/
 int egaexist = FALSE;			/* is an EGA card available?	*/
 extern union REGS rg;			/* cpu register for use of DOS calls */
 
-extern	int	ttopen();		/* Forward references.		*/
-extern	int	ttgetc();
-extern	int	ttputc();
-extern	int	ttflush();
-extern	int	ttclose();
-extern	int	ibmmove();
-extern	int	ibmeeol();
-extern	int	ibmeeop();
-extern	int	ibmbeep();
-extern	int	ibmopen();
-extern	int	ibmrev();
+extern	void	ibmmove();
+extern	void	ibmeeol();
+extern	void	ibmeeop();
+extern	void	ibmbeep();
+extern	void	ibmopen();
+extern	void	ibmrev();
 extern	int	ibmcres();
-extern	int	ibmclose();
-extern	int	ibmputc();
-extern	int	ibmkopen();
-extern	int	ibmkclose();
+extern	void	ibmclose();
+extern	void	ibmputc();
+extern	void	ibmkopen();
+extern	void	ibmkclose();
 
 #if	COLOR
-extern	int	ibmfcol();
-extern	int	ibmbcol();
+extern	void	ibmfcol();
+extern	void	ibmbcol();
 
 int	cfcolor = -1;		/* current forground color */
 int	cbcolor = -1;		/* current background color */
@@ -134,6 +135,7 @@ int color;	/* color to set */
 }
 #endif
 
+void
 ibmmove(row, col)
 {
 	rg.h.ah = 2;		/* set cursor position function code */
@@ -143,6 +145,7 @@ ibmmove(row, col)
 	int86(0x10, &rg, &rg);
 }
 
+void
 ibmeeol()	/* erase to the end of the line */
 
 {
@@ -187,11 +190,10 @@ ibmeeol()	/* erase to the end of the line */
 
 }
 
+void
 ibmputc(ch)	/* put a character at the current position in the
 		   current colors */
-
 int ch;
-
 {
 	rg.h.ah = 14;		/* write char to screen with current attrs */
 	rg.h.al = ch;
@@ -206,6 +208,7 @@ int ch;
 	int86(0x10, &rg, &rg);
 }
 
+void
 ibmeeop()
 {
 	int attr;		/* attribute to fill screen with */
@@ -227,18 +230,15 @@ ibmeeop()
 	int86(0x10, &rg, &rg);
 }
 
+void
 ibmrev(state)		/* change reverse video state */
-
 int state;	/* TRUE = reverse, FALSE = normal */
-
 {
 	/* This never gets used under the IBM-PC driver */
 }
 
 ibmcres(res)	/* change screen resolution */
-
 char *res;	/* resolution to change to */
-
 {
 	int i;		/* index */
 
@@ -250,12 +250,16 @@ char *res;	/* resolution to change to */
 	return(FALSE);
 }
 
-spal()	/* reset the pallette registers */
-
+/* ARGSUSED */
+void
+spal(dummy)	/* change palette string */
+char *dummy;
 {
-	/* nothin here now..... */
+	/*	Does nothing here	*/
 }
 
+
+void
 ibmbeep()
 {
 #if	MWC86
@@ -265,6 +269,7 @@ ibmbeep()
 #endif
 }
 
+void
 ibmopen()
 {
 	scinit(CDSENSE);
@@ -272,8 +277,8 @@ ibmopen()
 	ttopen();
 }
 
+void
 ibmclose()
-
 {
 #if	COLOR
 	ibmfcol(7);
@@ -286,20 +291,18 @@ ibmclose()
 	ttclose();
 }
 
+void
 ibmkopen()	/* open the keyboard */
-
 {
 }
 
+void
 ibmkclose()	/* close the keyboard */
-
 {
 }
 
 scinit(type)	/* initialize the screen head pointers */
-
 int type;	/* type of adapter to init for */
-
 {
 	union {
 		long laddr;	/* long form of address */
@@ -369,7 +372,6 @@ int type;	/* type of adapter to init for */
 */
 
 int getboard()
-
 {
 	int type;	/* board type to return */
 
@@ -387,7 +389,6 @@ int getboard()
 }
 
 egaopen()	/* init the computer to work with the EGA */
-
 {
 	/* put the beast into EGA 43 row mode */
 	rg.x.ax = 3;
@@ -412,7 +413,6 @@ egaopen()	/* init the computer to work with the EGA */
 }
 
 egaclose()
-
 {
 	/* put the beast into 80 column mode */
 	rg.x.ax = 3;
@@ -420,12 +420,10 @@ egaclose()
 }
 
 scwrite(row, outstr, forg, bacg)	/* write a line out*/
-
 int row;	/* row of screen to place outstr on */
 char *outstr;	/* string to write out (must be term.t_ncol long) */
 int forg;	/* forground color of string to write */
 int bacg;	/* background color */
-
 {
 	unsigned int attr;	/* attribute byte mask to place in RAM */
 	unsigned int *lnptr;	/* pointer to the destination line */
@@ -459,10 +457,9 @@ int bacg;	/* background color */
 }
 
 #if	FLABEL
+int
 fnclabel(f, n)		/* label a function key */
-
 int f,n;	/* default flag, numeric argument [unused] */
-
 {
 	/* on machines with no function keys...don't bother */
 	return(TRUE);
