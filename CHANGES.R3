@@ -23,6 +23,31 @@ Changes for vile ?.??: (released ???)
 	+ new help for arrow keys, and cd/pwd commands.  also some more
 	  pcvile differences.  (vile.hlp)
 
+	+ fixed djgpp implementation of get_vga_bios_info, by packing
+	  the structs int 10/1b deals with.  this makes 43 and 50 line modes
+	  work.  (still don't work with watcom, though) (ibmpc.c)
+
+	+ made :memory work under DJGPP	(main.c)
+	
+	+ made catnap() work under DJGPP, so flash mode works now. (random.c)
+
+	+ added more dependencies to makefile.djg
+
+
+(tom)
+	+ added new function 'parse_pathlist()' to encapsulate the logic used
+	  in lookup of vile.hlp (PATHLOOK) and the CDPATH environment variable
+	  (fixes buffer overflow in the latter).
+
+	+ corrected treatment of arrow-keys (in history.c) broken in 3.65
+	  (input.c, history.c).
+
+	+ modified ifdef's in 'interrupted()' to test type-ahead only
+	  for DJGPP configuration (main.c).
+
+	+ restored code that translated CDSENSE to driver type, because it did
+	  not set screen defaults to maximum size (ibmpc.c)
+
 Changes for vile 3.65: (released Mon Feb 7, 1994)
 (pgf)
     Big change this release is 8-bit cleanliness.  See the help file

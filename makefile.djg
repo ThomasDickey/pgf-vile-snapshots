@@ -3,10 +3,13 @@
 #
 # T.DANG (dang@cogit.ign.fr)
 #
-# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.djg,v 1.5 1994/02/07 12:28:24 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.djg,v 1.6 1994/02/14 15:16:12 pgf Exp $
 #
 # $Log: makefile.djg,v $
-# Revision 1.5  1994/02/07 12:28:24  pgf
+# Revision 1.6  1994/02/14 15:16:12  pgf
+# added more complete dependencies
+#
+# Revision 1.5  1994/02/07  12:28:24  pgf
 # use ld in favor of gcc for linking, since real-mode gcc (gcc-rm) can't
 # deal with long argument lists.  also, added my incremental link targets
 # (rvile.o and ivile)
@@ -62,8 +65,9 @@ vile: 	$(BUILTHDRS) $(OBJ)
 	stubedit vile.exe globbing=no
 
 dist:	vile
-#	coff2exe -s /djgpp/bin/go32.exe vile
-#	stubedit vile.exe globbing=no
+	strip vile
+	coff2exe vile
+	stubedit vile.exe globbing=no
 	pkzip pcvile.zip readme.pc readme vile.exe vile.hlp \\djgpp\\bin\\go32.exe
 
 
@@ -101,3 +105,13 @@ clean:
 	rm mktbls.exe
 	rm *.o
 	rm $(BUILTHDRS)
+
+main.o:	nevars.h
+bind.o:	epath.h
+filec.o:	dirstuff.h
+eval.o:	nevars.h
+glob.o:	dirstuff.h
+externs.o:	nebind.h nename.h nefunc.h
+path.o:	dirstuff.h
+vmalloc.o:	nevars.h
+

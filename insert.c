@@ -8,8 +8,11 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: insert.c,v $
- *	Revision 1.46  1994/02/11 15:20:08  pgf
- *	implemented 0^D (patch from kev) and ^^D
+ *	Revision 1.47  1994/02/14 15:46:31  pgf
+ *	tom's interim post-3.65 changes
+ *
+ * Revision 1.46  1994/02/11  15:20:08  pgf
+ * implemented 0^D (patch from kev) and ^^D
  *
  * Revision 1.45  1994/02/11  14:11:25  pgf
  * call kbd_key when doing insertions, so we can interpret function keys.
@@ -543,7 +546,7 @@ int *splice;
 
 	backsp_limit = BackspaceLimit();
 
-	last_insert_char = '\0';
+	last_insert_char = EOS;
 
 	while(1) {
 
@@ -714,11 +717,11 @@ int lb;
 int ub;
 {
 	while (lb <= ub) {
-	    if (!isspace(lGetc(ln,ub)))
-		return 0;
-	    ub--;
+		if (!isspace(lGetc(ln,ub)))
+			return FALSE;
+		ub--;
 	}
-	return 1;
+	return TRUE;
 }
 
 int

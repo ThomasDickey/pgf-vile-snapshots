@@ -74,7 +74,13 @@
 #		here for completeness.
 #
 # $Log: cmdtbl,v $
-# Revision 1.80  1994/02/11 14:05:29  pgf
+# Revision 1.82  1994/02/14 15:46:31  pgf
+# tom's interim post-3.65 changes
+#
+# Revision 1.81  1994/02/14  15:19:17  pgf
+# added showmemory for DJGPP
+#
+# Revision 1.80  1994/02/11  14:05:29  pgf
 # added altspeckey/"alt-function-prefix".  it's not bound to a key, since
 # it's special, and is initialized in edef.h to have the same value as
 # poundc.  mktbls wouldn't like the double binding.
@@ -893,6 +899,8 @@ map		NONE|(EXRCOK|BANG|EXTRA)
 	"map"
 map_proc		REDO|UNDO|VIEWOK
 	"map_proc"
+map_set		NONE|(EXRCOK|BANG|EXTRA) NEW_VI_MAP
+	"MAP"
 cntl_af		NONE
 	"cntl_a-prefix"
 	'^A'
@@ -1200,7 +1208,7 @@ listvars	NONE			OPT_SHOW_EVAL
 	"showvars"			!FEWNAMES
 showversion	NONE|(EXRCOK)
 	"version"
-showmemory	NONE			TURBO|WATCOM
+showmemory	NONE			TURBO|WATCOM|DJGPP
 	"memory"
 showtagstack	NONE			OPT_SHOW_TAGS
 	"tags"				!FEWNAMES

@@ -4,7 +4,10 @@
  *	written 11-feb-86 by Daniel Lawrence
  *
  * $Log: bind.c,v $
- * Revision 1.64  1994/02/11 14:04:31  pgf
+ * Revision 1.65  1994/02/14 15:46:31  pgf
+ * tom's interim post-3.65 changes
+ *
+ * Revision 1.64  1994/02/11  14:04:31  pgf
  * added support for altpoundc special key, and
  * for echoing 8bit chars on the command line in hex or octal
  *
@@ -962,11 +965,13 @@ char *fname;	/* base file name to search for */
 int hflag;	/* Look in the HOME environment variable first? */
 {
 	register char *home;	/* path to home directory */
+#if ENVFUNC && PATHLOOK
 	register char *path;	/* environmental PATH variable */
-	register char *sp;	/* pointer into path spec */
+#endif
 	register int i;		/* index */
 	static char fspec[NSTRING];	/* full path spec to search */
 #if VMS
+	register char *sp;	/* pointer into path spec */
 	static TBUFF *myfiles;
 #endif
 
@@ -1026,24 +1031,12 @@ int hflag;	/* Look in the HOME environment variable first? */
 	path = getenv("PATH");	/* get the PATH variable */
 #endif
 
-	if (path != NULL)
-		while (*path) {
-
-			/* build next possible file spec */
-			sp = fspec;
-			while (*path && (*path != PATHCHR))
-				*sp++ = *path++;
-			*sp = EOS;
-
-			/* and try it out */
-			if (ffropen(pathcat(fspec, fspec, fname)) == FIOSUC) {
-				ffclose();
-				return(fspec);
-			}
-
-			if (*path == PATHCHR)
-				++path;
+	while ((path = parse_pathlist(path, fspec)) != 0) {
+		if (ffropen(pathcat(fspec, fspec, fname)) == FIOSUC) {
+			ffclose();
+			return(fspec);
 		}
+	}
 #endif	/* PATHLOOK */
 #endif	/* ENVFUNC */
 

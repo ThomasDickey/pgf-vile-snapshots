@@ -10,7 +10,17 @@
  * display type.
  *
  * $Log: ibmpc.c,v $
- * Revision 1.37  1994/02/04 18:24:47  pgf
+ * Revision 1.40  1994/02/14 15:46:31  pgf
+ * tom's interim post-3.65 changes
+ *
+ * Revision 1.39  1994/02/14  15:14:26  pgf
+ * free dos_memory in get_vga_bios_info
+ *
+ * Revision 1.38  1994/02/14  12:22:05  pgf
+ * pack the int 10/1b structs under djgpp, and get the size passed
+ * to dosmemget() right.
+ *
+ * Revision 1.37  1994/02/04  18:24:47  pgf
  * latest djgpp attempts at a successful get_vga_bios_info.  no luck yet.
  *
  * Revision 1.36  1994/02/03  19:35:12  pgf
@@ -215,47 +225,51 @@
 #endif
 
 static	int	dtype = -1;	/* current display type		*/
-
+#if DJGPP
+#define PACKED __attribute__ ((packed))
+#else
+#define PACKED
+#endif
 	/* mode-independent VGA-BIOS status information */
 typedef	struct {
-	UCHAR	video_modes[3];	/* 00 Supported video-modes */
-	UCHAR	reserved[4];	/* 03 */
-	UCHAR	text_scanlines;	/* 07 Number of pixel rows in text mode */
-	UCHAR	num_charsets;	/* 08 Number of character sets that can be displayed */
-	UCHAR	num_loadable;	/* 09 Number of character sets loadable into video RAM */
-	UCHAR	capability;	/* 0A VGA-BIOS capability info */
-	UCHAR	more_info;	/* 0B More VGA-BIOS capability info */
-	UCHAR	reserved2[4];	/* 0C */
-	} static_VGA_info;
+	UCHAR	video_modes[3] PACKED;	/* 00 Supported video-modes */
+	UCHAR	reserved[4] PACKED;	/* 03 */
+	UCHAR	text_scanlines PACKED;	/* 07 Number of pixel rows in text mode */
+	UCHAR	num_charsets PACKED;	/* 08 Number of character sets that can be displayed */
+	UCHAR	num_loadable PACKED;	/* 09 Number of character sets loadable into video RAM */
+	UCHAR	capability PACKED;	/* 0A VGA-BIOS capability info */
+	UCHAR	more_info PACKED;	/* 0B More VGA-BIOS capability info */
+	UCHAR	reserved2[4] PACKED;	/* 0C */
+	} static_VGA_info PACKED;
 
 	/* mode-dependent VGA-BIOS status information */
 typedef	struct {
-	static_VGA_info *static_info; /* 00 Address of table containing static info */
-	UCHAR	code_number;	/* 04 Code number of current video mode */
-	USHORT	num_columns;	/* 05 Number of displayed screen or pixel cols */
-	USHORT	page_length;	/* 07 Length of display page in video RAM */
-	USHORT	curr_page;	/* 09 Starting address of current display-page in video RAM */
-	UCHAR	crsr_pos[8][2];	/* 0B Cursor positions in display-pages in col/row order */
-	UCHAR	crsr_end;	/* 1B Ending row of cursor (pixel) row */
-	UCHAR	crsr_start;	/* 1C Starting row of cursor (pixel) row */
-	UCHAR	curr_page_num;	/* 1D Number of current display page */
-	USHORT	port_crt;	/* 1E Port address of the CRT controller address register */
-	UCHAR	curr_crtc;	/* 20 Current contents of CRTC control registers */
-	UCHAR	curr_color_sel;	/* 21 Current color selection register contents */
-	UCHAR	num_rows;	/* 22 Number of screen rows displayed */
-	USHORT	char_height;	/* 23 Height of characters in pixel rows */
-	UCHAR	code_active;	/* 25 Code number of active video adapter */
-	UCHAR	code_inactive;	/* 26 Code number of inactive video adapter */
-	USHORT	num_colors;	/* 27 Number of displayable colors (0=monochrome) */
-	UCHAR	num_pages;	/* 29 Number of screen pages */
-	UCHAR	num_pixel_rows;	/* 2A Number of displayed pixel rows (RES_200, etc.) */
-	UCHAR	num_cset0;	/* 2B Number of char-table used with chars whose 3rd attr bit is 0 */
-	UCHAR	num_cset1;	/* 2C Number of char-table used with chars whose 3rd attr bit is 1 */
-	UCHAR	misc_info;	/* 2D Miscellaneous information */
-	UCHAR	reserved[3];	/* 2E */
-	UCHAR	size_of_ram;	/* 31 Size of available video RAM (0=64k, 1=128k, 2=192k, 3=256k) */
-	UCHAR	reserved2[14];	/* 32 */
-	} dynamic_VGA_info;	/* length == 64 bytes */
+	static_VGA_info *static_info PACKED; /* 00 Address of table containing static info */
+	UCHAR	code_number PACKED;	/* 04 Code number of current video mode */
+	USHORT	num_columns PACKED;	/* 05 Number of displayed screen or pixel cols */
+	USHORT	page_length PACKED;	/* 07 Length of display page in video RAM */
+	USHORT	curr_page PACKED;	/* 09 Starting address of current display-page in video RAM */
+	UCHAR	crsr_pos[8][2] PACKED;	/* 0B Cursor positions in display-pages in col/row order */
+	UCHAR	crsr_end PACKED;	/* 1B Ending row of cursor (pixel) row */
+	UCHAR	crsr_start PACKED;	/* 1C Starting row of cursor (pixel) row */
+	UCHAR	curr_page_num PACKED;	/* 1D Number of current display page */
+	USHORT	port_crt PACKED;	/* 1E Port address of the CRT controller address register */
+	UCHAR	curr_crtc PACKED;	/* 20 Current contents of CRTC control registers */
+	UCHAR	curr_color_sel PACKED;	/* 21 Current color selection register contents */
+	UCHAR	num_rows PACKED;	/* 22 Number of screen rows displayed */
+	USHORT	char_height PACKED;	/* 23 Height of characters in pixel rows */
+	UCHAR	code_active PACKED;	/* 25 Code number of active video adapter */
+	UCHAR	code_inactive PACKED;	/* 26 Code number of inactive video adapter */
+	USHORT	num_colors PACKED;	/* 27 Number of displayable colors (0=monochrome) */
+	UCHAR	num_pages PACKED;	/* 29 Number of screen pages */
+	UCHAR	num_pixel_rows PACKED;	/* 2A Number of displayed pixel rows (RES_200, etc.) */
+	UCHAR	num_cset0 PACKED;	/* 2B Number of char-table used with chars whose 3rd attr bit is 0 */
+	UCHAR	num_cset1 PACKED;	/* 2C Number of char-table used with chars whose 3rd attr bit is 1 */
+	UCHAR	misc_info PACKED;	/* 2D Miscellaneous information */
+	UCHAR	reserved[3] PACKED;	/* 2E */
+	UCHAR	size_of_ram PACKED;	/* 31 Size of available video RAM (0=64k, 1=128k, 2=192k, 3=256k) */
+	UCHAR	reserved2[14] PACKED;	/* 32 */
+	} dynamic_VGA_info PACKED;	/* length == 64 bytes */
 
 	/* scan-line resolution codes */
 #define	RES_200	0
@@ -288,8 +302,11 @@ static	DRIVERS drivers[] = {
 		{"MONO",   CDMONO,	3,	C8x8,	25,  80, RES_200},
 		{"EGA",    CDEGA,	3,	C8x8,	43,  80, RES_350},
 		{"VGA",    CDVGA,	3,	C8x8,	50,  80, RES_400},
+
 		/* store original info in this slot */
+#define original_type  CDVGA+1		/* one past CDMONO ... CDVGA	*/
 		{"default",CDSENSE,     3,      C8x8,   25,  80, RES_200},
+
 		/* all VGA's */
 		{"40x12",  CDVGA,	1,	C8x16,	12,  40, RES_200},
 		{"40x21",  CDVGA,	1,	C8x16,	21,  40, RES_350},
@@ -301,6 +318,7 @@ static	DRIVERS drivers[] = {
 		{"80x28",  CDVGA,	3,	C8x14,  28,  80, RES_400},
 		{"80x43",  CDVGA,	3,	C8x8,   43,  80, RES_350},
 		{"80x50",  CDVGA,	3,	C8x8,	50,  80, RES_400},
+
 		{"omni",  CDVGA,	3,	C8x16,	25,  80, RES_480},
 	/* none of the rest work */
 		{"omni2",  CDVGA,	3,	C8x8,	60,  80, RES_480},
@@ -323,7 +341,6 @@ extern union REGS rg;			/* cpu register for use of DOS calls */
 static	int	ibm_opened,
 		original_page,		/* display-page (we use 0)	*/
 		allowed_vres,		/* possible scan-lines, 1 bit per value */
-		original_type	= CDVGA+1, /* one past CDMONO ... CDVGA	*/
 		original_curs,		/* start/stop scan lines	*/
 		monochrome	= FALSE;
 
@@ -416,14 +433,13 @@ static int
 get_vga_bios_info(dynamic_VGA_info *buffer)
 {
 #if WATCOM || DJGPP
-# if XXXXDJGPP 	/* this should work, but doesn't seem to */
+# if DJGPP 	/* this should work, but doesn't seem to */
 	_go32_dpmi_registers regs;
 	vgainfo.size = (sizeof (dynamic_VGA_info)+15) / 16;
 	if (_go32_dpmi_allocate_dos_memory(&vgainfo) != 0) {
 		fprintf(stderr,"Couldn't allocate vgainfo memory\n");
 		exit(1);
 	}
-	/* _go32_dpmi_free_dos_memory(&vgainfo); */
 
 	regs.x.ax = 0x1b00;
 	regs.x.bx = 0;
@@ -432,10 +448,13 @@ get_vga_bios_info(dynamic_VGA_info *buffer)
 	regs.x.di = 0;
 	_go32_dpmi_simulate_int(0x10, &regs);
 
-	dosmemget( vgainfo.rm_segment*16, vgainfo.size, buffer);
+	dosmemget( vgainfo.rm_segment*16, sizeof (dynamic_VGA_info), buffer);
+
+	_go32_dpmi_free_dos_memory(&vgainfo);
+
 	return (regs.h.al == 0x1b);
 # else
-/* FIXXXXX */
+	/* if someone figures this out for watcom, let me know... */
 	return FALSE;
 # endif
 #else
@@ -889,15 +908,13 @@ int n;		/* type of adapter to init for */
 	register int i;
 	int	     type, rows, cols;
 
-	/* if asked...find out what display is connected, and
-	 * map into our default for this driver-type
+	/* If asked, find out what display is connected, and map into our
+	 * default for this driver-type.  That is, we map CDSENSE into one of
+	 * CDCGA, CDMONO, CDEGA, CDVGA so that we can automatically select the
+	 * default screen layout for the given display-type.
 	 */
 	if (n == CDSENSE)
-#ifdef BEFORE
 		n = drivers[original_type].type;
-#else
-		n = original_type;
-#endif
 
 	driver = &drivers[n];
 	type = driver->type;

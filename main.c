@@ -14,7 +14,13 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.159  1994/02/11 14:12:08  pgf
+ * Revision 1.161  1994/02/14 15:46:31  pgf
+ * tom's interim post-3.65 changes
+ *
+ * Revision 1.160  1994/02/14  15:15:21  pgf
+ * make :memory work under djgpp
+ *
+ * Revision 1.159  1994/02/11  14:12:08  pgf
  * new dummy function, altspeckey
  *
  * Revision 1.158  1994/02/07  12:31:30  pgf
@@ -637,7 +643,9 @@ char	*argv[];
 #endif
 	global_val_init();	/* global buffer values */
 	charinit();	/* character types -- we need these pretty early  */
-
+#if NEW_VI_MAP
+	map_init();
+#endif
 #if MSDOS
 	slash = '\\';
 #else
@@ -1336,9 +1344,9 @@ catchintr (ACTUAL_SIG_ARGS)
 int
 interrupted()
 {
-#if MSDOS
+#if MSDOS && DJGPP
 	int c;
-#if DJGPP
+
 	if (_go32_was_ctrl_break_hit() != 0) {
 		while(typahead())
 			(void)tgetc(FALSE);
@@ -1349,15 +1357,17 @@ interrupted()
 			(void)tgetc(FALSE);
 		return TRUE;
 	}
-#endif
+
 	if (am_interrupted)
 		return TRUE;
+#ifdef NEEDED
 	if (typahead()) {
 		c = tgetc(FALSE);
 		if (c == tocntrl('C'))
 			return TRUE;
 		tungetc(c);
 	}
+#endif
 	return FALSE;
 #else
 	return am_interrupted;
@@ -1834,7 +1844,7 @@ charinit()
 {
 	register int c;
 
-	(void)memset(_chartypes_, 0, sizeof(_chartypes_));
+	(void)memset((char *)_chartypes_, 0, sizeof(_chartypes_));
 
 	/* legal in pathnames */
 	_chartypes_['.'] =
@@ -2121,6 +2131,18 @@ int	f,n;
 {
 	extern	long	_memavl(void);
 	mlforce("Memory left: %D bytes", _memavl());
+	return TRUE;
+}
+#endif
+
+#if DJGPP
+int
+showmemory(f,n)
+int	f,n;
+{
+	mlforce("Memory left: %D Kb virtual, %D Kb physical",
+			_go32_dpmi_remaining_virtual_memory()/1024,
+			_go32_dpmi_remaining_physical_memory()/1024);
 	return TRUE;
 }
 #endif

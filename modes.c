@@ -8,8 +8,11 @@
  * Major extensions for vile by Paul Fox, 1991
  *
  *	$Log: modes.c,v $
- *	Revision 1.31  1994/02/03 19:35:12  pgf
- *	tom's changes for 3.65
+ *	Revision 1.32  1994/02/14 15:46:31  pgf
+ *	tom's interim post-3.65 changes
+ *
+ * Revision 1.31  1994/02/03  19:35:12  pgf
+ * tom's changes for 3.65
  *
  * Revision 1.30  1994/01/31  13:24:59  pgf
  * use strtol() in string_to_number(), so we can easily accept any (mormal)
@@ -605,7 +608,6 @@ int	*np;
 {
 	long n;
 	char *p;
-	extern long strtol();
 
 	/* accept decimal, octal, or hex */
 	n = strtol(from, &p, 0);

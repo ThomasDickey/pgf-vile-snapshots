@@ -5,7 +5,10 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.93  1994/02/03 19:35:12  pgf
+ * Revision 1.94  1994/02/14 15:46:31  pgf
+ * tom's interim post-3.65 changes
+ *
+ * Revision 1.93  1994/02/03  19:35:12  pgf
  * tom's changes for 3.65
  *
  * Revision 1.92  1994/02/03  10:18:01  pgf
@@ -798,9 +801,12 @@ extern int replacechar P(( int, int ));
 extern int tab P(( int, int ));
 extern int shiftwidth P(( int, int ));
 extern int openup P(( int, int ));
+extern int openup_no_aindent P(( int, int ));
 extern int opendown P(( int, int ));
+extern int opendown_no_aindent P(( int, int ));
 extern int openlines P(( int ));
 extern int insert P(( int, int ));
+extern int insert_no_aindent P(( int, int ));
 extern int insertbol P(( int, int ));
 extern int append P(( int, int ));
 extern int appendeol P(( int, int ));
@@ -883,6 +889,14 @@ extern int map_proc P((int, int));
 extern void relist_mappings P(( void ));
 #else
 #define relist_mappings()
+#endif
+
+/* mapchars.c */
+#if NEW_VI_MAP
+extern void map_init P(( void ));
+extern int map_set P(( int, int ));
+extern int map_unset P(( int, int ));
+extern int map_read P(( void ));
 #endif
 
 /* modes.c */
@@ -979,6 +993,9 @@ extern char * is_appendname P(( char * ));
 extern char * non_filename P(( void ));
 extern int is_internalname P(( char * ));
 extern int is_directory P(( char * ));
+#if (UNIX||MSDOS) && PATHLOOK
+extern char *parse_pathlist P(( char *, char * ));
+#endif
 
 /* random.c */
 extern void line_report P(( L_NUM ));

@@ -64,7 +64,10 @@
  *	Allow left/right scrolling of input lines (when they get too long).
  *
  * $Log: history.c,v $
- * Revision 1.14  1994/02/03 19:35:12  pgf
+ * Revision 1.15  1994/02/14 15:46:31  pgf
+ * tom's interim post-3.65 changes
+ *
+ * Revision 1.14  1994/02/03  19:35:12  pgf
  * tom's changes for 3.65
  *
  * Revision 1.13  1994/01/31  18:11:03  pgf
@@ -648,7 +651,7 @@ int	eolchar;
 		} else
 			kbd_alarm();
 
-		c = tgetc(FALSE);
+		c = kbd_seq();
 	}
 }
 #endif	/* OPT_HISTORY */
