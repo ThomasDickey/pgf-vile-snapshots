@@ -1,16 +1,13 @@
 	(E means enhancement, L,M,H are low, medium, high priority)
 ----------------------
 
-E	should add a "show-vars" command
-
 E	everybody and their sibling wants "map", "map!", and "abb".
 	the first step to supporting this is making macro/dotcmd replay be
 	properly fully nested, and generalized.  I think, for instance that
 	if an @a macro invoked a @b macro, or a ^X-& macro, there'd be
 	reentrancy problems.
 
-E	add "set autowrite", ":n file" (what does that do?), "set nu", "set
-	noredraw"
+E	add "set autowrite", ":n file" (what does that do?), "set noredraw"
 
 E	now that paragraphs, sections, and sentences are all selectable
 	with regexps, they (and the tabstop value) are prime candidates for
@@ -125,19 +122,20 @@ E	in autoindent mode: 0^D and ^^D don't work
 
 E	can't search for a NUL in a buffer.
 
-E	undo does not apply to windows of a buffer?  I opened two windows
-	onto a buffer and made changes in one window.  The changes tracked in
-	the other window, until I did an undo.
-
 E	if a file has zero-length, it is treated as not-modified
 
 E	":e" and ":e!" should share the same prompt data, which should be
 	editable / history.  They both should default (like vi!) to the
 	current buffer.
 
-E	should add a mode that causes vile to automatically create buffers
-	that correspond to files _written_ as well as read (this is what
-	'vi' does), and makes the %/# toggling behavior more like vi.  
+E	the "ww" command (e.g., 'writeall()') emits multiple messages via
+	'mlforce()'; these go by too quickly to follow.
+
+E	for consistency, 'execute-macro-nn' should be 'execute-macro nn';
+	doing this would allow modification to eliminate a fixed number of
+	macro-buffers.
+
+E	vile's 'view' mode is vi's 'readonly' mode.
 
 ===================================================
 
@@ -322,4 +320,117 @@ to offset by the horizontally scrolling.
 ----------------------------------------------------------------------
 
 Enhancement:  xvile would be nicer with scroll bars.
+
+----------------------------------------------------------------------
+
+In message <9212231610.AA27630@cuba.Cayman.COM> you write:
+>
+> > The rest (regexp.c) fix problems with
+> > \S \w \W \d \D \p \P never matching the first character on a line.
+>
+>Actually, I could have sworn I put in the check against BOL to prevent some
+>infinite loop or other oddness -- but I'll put certainly apply your change
+>until proven otherwise...
+
+The only remaining pieces of oddness I've seen are
+1) doing ?\w when already on a \w character -- it says Only one occurrence
+of pattern.
+2) doing /\s stops at the end of a line and won't go any further (because
+the cursor rests on the last character of the line which is before the eol).
+
+----------------------------------------------------------------------
+Also, I encountered the following problem: I am editing foo.tex and
+call latex using ^X!latex foo.tex. There is an error, so latex waits for
+input -> vile sits waiting and nothing helps. I think this should
+be interruptable. I will agree with you that the ^X! command was not
+intended for this, but still...
+
+But ok, the real problem is that after I kill latex and
+vile comes back to life I can no longer filter parts of text using
+!fmt. The text just gets deleted.
+
+----------------------------------------------------------------------
+Some of the bugs that I have noticed (and may swat) include
+
+	* the handling of control characters in the prompts. Sometimes I have
+	  ended up with a ^U in the buffer response...
+	* '\' does not escape backspace in a prompt (sometimes I want to
+	  edit out backspace sequences from nroff-output).
+	* I think that abbreviation-resolution should apply to 'set' keywords
+	  also.
+
+----------------------------------------------------------------------
+
+I just grabbed a copy of xvi.  I noted some interesting tidbits while
+reading the "differences between vi and xvi" document.  Some of these would
+be nice in vile.
+
+
+     As well as the normal named (conjugate) buffers, and the  default
+     one  named @, several extra buffers named :, /, ?  and ! contain
+     the last command lines entered for each of the command types.  So
+     for  instance,  @: will re-execute the last colon command, or you
+     can insert it into your buffer, edit it and  then re-execute  it
+     (e.g. with dd@@).
+
+
+     +    In insert and replace modes, ^A has the same meaning  as  ^@
+          in  vi,  except  that it works at any time, not just for the
+          first character.  Also, typing ^Bx, where x is the name of a
+          conjugate  buffer,  inserts the contents of that buffer into
+          the input stream at that point.  The buffer named  <  always
+          contains the last thing inserted, so that ^B< is the same as
+          ^A.
+
+
+     2.8.  Preserve
+
+     Rather than use vi's UNIX-specific method for  preservation,  xvi
+     does  periodic  preservation  of all files currently being edited
+     into a temporary file in the same directory.   Xvi  tries  to  do
+     this  when you are not typing, so that you won't notice the short
+     delay when the temporary file is written  out.   Obviously,  only
+     changed  files  are preserved in this way, and the temporary file
+     is normally removed once the  real  file  has  been  successfully
+     written.   As  an  additional  safety  measure,  when  a  file is
+     explicitly saved and  it  appears  not  to  have  been  preserved
+     recently,  it  is  normally  preserved first.  This ensures that,
+     even if the operating system crashes while the real file is being
+     created, there should always be at least one recent copy of it in
+     the filesystem.  The :preserve command is available as in  vi  to
+     preserve a specific buffer manually.
+
+     The level of safety provided by the preservation facility may  be
+     configured   by   changing   the   values  of  the  preserve  and
+     preservetime parameters.  The following values are available  for
+     preserve:
+
+     unsafe    Never preserve any  buffer  before  an  explicit  save.
+               This  can  be useful on old, slow, floppy-only systems,
+               but is not generally recommended.
+
+     standard  The default value.  Only preserve a  buffer  before  an
+               explicit  save if it appears not to have been preserved
+               recently.
+
+     safe      Always preserve buffers before they are written.
+
+     paranoid  As for safe, but the preserve file  is  never  removed,
+               even after the file has been successfully written.
+
+     In all cases, all modified buffers  are  preserved  automatically
+     after no user events have been received for preservetime seconds,
+     if a minimum number of events (currently 60) have  been  received
+     since  the  last  automatic  preservation.  This behaviour can be
+     more or less disabled by setting  preservetime  to  a  very  high
+     value.
+
+-----------------
+
+Another problem is w/ a Convex C220 running ConvexOS 10.1. It (3.30)
+compiles silently (though I had to change getpgrp (0) to getpgrp () to get
+it compile) w/ make bsd or bsd_posix. But then vile behaves strangely:
+you can start it by type vile and then load file within vile, it works
+properly. If you try to load a file using vile filename, it dies:  IOT
+trap (core dumped). vile 3.25 works ok though.
 

@@ -469,8 +469,11 @@ Editor modes
 	display modes, use ":setall", ":modes", ":set all".  Local values
 	are only shown if they differ from the global values, whether they
 	have been independently set or not.  The possible modes (with
-	synonyms in parentheses, and a trailing B or W indicating whether
-	the mode belongs to buffers or windows) are:
+	synonyms in parentheses, and a trailing G, B or W indicating whether
+	the mode belongs to globals, buffers or windows) are:
+
+	autobuffer (ab) Controls whether vile uses LRU-style buffering,
+		or vi-style (command-line order) buffers. (G)
 
 	autoindent (ai) During insert, newly created lines inherit their
 		leading indent from the previous line in the buffer. (B)
@@ -526,6 +529,9 @@ Editor modes
 
 	magic	Allow meta-characters in search strings.  See the section 
 		"Regular Expressions" for more detail. (B)
+
+	number	(nu) All lines in the buffer will be prefixed by their line
+		number. (W) 
 
 	paragraphs A regular expression defining where the "next-paragraph"
 		('}') and "previous-paragraph" ('{') commands will go. (B)

@@ -5,7 +5,10 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: tags.c,v $
- * Revision 1.26  1992/12/14 09:02:46  foxharp
+ * Revision 1.27  1993/01/16 10:42:25  foxharp
+ * use new macros
+ *
+ * Revision 1.26  1992/12/14  09:02:46  foxharp
  * lint cleanup for malloc
  *
  * Revision 1.25  1992/11/19  22:24:25  foxharp
@@ -446,7 +449,7 @@ makeflist()
 		return TRUE;
 
 	/* create the file list buffer   */
-	filesbp = bfind("[files]", OK_CREAT, BFINVS);
+	filesbp = bfind(ScratchName(files), OK_CREAT, BFINVS);
 	if (filesbp == NULL)
 		return FALSE;
 	filesbp->b_active = TRUE;

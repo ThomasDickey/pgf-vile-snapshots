@@ -10,7 +10,18 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.92  1992/12/20 14:38:46  foxharp
+ * Revision 1.95  1993/01/23 13:38:23  foxharp
+ * macros for process exit codes for VMS,
+ *
+ * Revision 1.94  1993/01/16  10:28:35  foxharp
+ * new chartypes (scrtch, shpipe), new mode (autobuffer), new macros
+ * (isShellOrPipe, isScratchName, isInternalName, for_each_buffer,
+ * for_each_window)
+ *
+ * Revision 1.93  1993/01/12  08:48:43  foxharp
+ * tom dickey's changes to support "set number", i.e. line numbering
+ *
+ * Revision 1.92  1992/12/20  14:38:46  foxharp
  * added lflipmark macro, for 'v' command
  *
  * Revision 1.91  1992/12/14  08:29:18  foxharp
@@ -489,6 +500,17 @@
 # define SIGRET return 0
 #endif
 
+/* argument for 'exit()' or '_exit()' */
+#if	VMS
+#include	<stsdef.h>
+#define GOOD	(STS$M_INHIB_MSG | STS$K_SUCCESS)
+#define BAD(c)	(STS$M_INHIB_MSG | STS$K_ERROR)
+#endif
+
+#ifndef GOOD
+#define GOOD	0
+#define BAD(c)	(c)
+#endif
 
 /*	Porting constraints			*/
 #ifndef HAVE_MKDIR
@@ -900,6 +922,17 @@ union REGS {
 #define _nonspace	0x2000	/* non-whitespace */
 #define _qident	0x4000		/* is typically legal in "qualified" identifier */
 
+#if !SMALLER
+#define	_scrtch 0x8000		/* legal in scratch-buffer names */
+#define	_shpipe 0x10000		/* legal in shell/pipe-buffer names */
+
+#define	screen_to_bname(buf)\
+        screen_string(buf,sizeof(buf),_pathn|_scrtch|_shpipe) 
+#else
+#define	screen_to_bname(buf)\
+        screen_string(buf,sizeof(buf),_pathn)
+#endif
+
 /* these intentionally match the ctypes.h definitions, except that
 	they force the char to 7-bit ascii first */
 #define istype(sometype,c)	(_chartypes_[(c)&(N_chars-1)] & (sometype))
@@ -918,6 +951,9 @@ union REGS {
 #define isbackspace(c)	istype(_bspace, c)
 #define islinespecchar(c)	istype(_linespec, c)
 #define isfence(c)	istype(_fence, c)
+
+/* macro for cases where return & newline are equivalent */
+#define	isreturn(c)	((c == '\r') || (c == '\n'))
 
 /* DIFCASE represents the difference between upper
    and lower case letters, DIFCNTRL the difference between upper case and
@@ -1105,8 +1141,10 @@ struct VAL {
 	is a global set that is inherited into a buffer, and its windows
 	in turn are inherit the buffer's set. */
 #define	WMDLIST		0		/* "list" mode -- show tabs and EOL */
+#define	WMDNUMBER	1		/* line-numbers shown		*/
+
 /* put more boolean-valued things here */
-#define	MAX_BOOL_W_VALUE	0	/* max of boolean values	*/
+#define	MAX_BOOL_W_VALUE	1	/* max of boolean values	*/
 
 #define WVAL_SIDEWAYS	(MAX_BOOL_W_VALUE+1)
 #define WVAL_FCOLOR	(MAX_BOOL_W_VALUE+2)
@@ -1163,23 +1201,25 @@ typedef struct	W_TRAITS {
 /* buffer mode flags	*/
 /* the indices of B_VALUES.v[] */
 /* the first set are boolean */
-#define	MDAIND		0		/* auto-indent */
-#define	MDASAVE		1		/* auto-save mode		*/
-#define	MDBACKLIMIT	2		/* backspace limited in insert mode */
-#define	MDCMOD		3		/* C indentation and fence match*/
-#define	MDCRYPT		4		/* encrytion mode active	*/
-#define	MDDOS		5		/* "dos" mode -- lines end in crlf */
-#define	MDIGNCASE	6		/* Exact matching for searches	*/
-#define MDMAGIC		7		/* regular expressions in search */
-#define	MDSHOWMAT	8		/* auto-indent */
-#define	MDSHOWMODE	9		/* show insert/replace/command mode */
-#define	MDTABINSERT	10		/* okay to insert tab chars 	*/
-#define	MDTAGSRELTIV	11		/* tags are relative to tagsfile path */
-#define	MDTERSE		12		/* be terse -- suppress messages */
-#define	MDVIEW		13		/* read-only buffer		*/
-#define	MDSWRAP 	14		/* wrap-around search mode	*/
-#define	MDWRAP		15		/* word wrap			*/
-#define	MAX_BOOL_B_VALUE	15	/* max of boolean values	*/
+#define MDABUFF 	0		/* auto-buffer (lru) */
+#define	MDAIND		1		/* auto-indent */
+#define	MDASAVE		2		/* auto-save mode		*/
+#define	MDBACKLIMIT	3		/* backspace limited in insert mode */
+#define	MDCMOD		4		/* C indentation and fence match*/
+#define	MDCRYPT		5		/* encrytion mode active	*/
+#define	MDDOS		6		/* "dos" mode -- lines end in crlf */
+#define	MDIGNCASE	7		/* Exact matching for searches	*/
+#define MDMAGIC		8		/* regular expressions in search */
+#define	MDSHOWMAT	9		/* auto-indent */
+#define	MDSHOWMODE	10		/* show insert/replace/command mode */
+#define	MDTABINSERT	11		/* okay to insert tab chars 	*/
+#define	MDTAGSRELTIV	12		/* tags are relative to tagsfile path */
+#define	MDTERSE		13		/* be terse -- suppress messages */
+#define	MDVIEW		14		/* read-only buffer		*/
+#define	MDSWRAP 	15		/* wrap-around search mode	*/
+#define	MDWRAP		16		/* word wrap			*/
+
+#define	MAX_BOOL_B_VALUE	16	/* max of boolean values	*/
 
 #define VAL_ASAVECNT	(MAX_BOOL_B_VALUE+1)
 #define VAL_C_SWIDTH	(MAX_BOOL_B_VALUE+2)
@@ -1247,7 +1287,36 @@ typedef struct	BUFFER {
 #if	CRYPT
 	char	b_key[NPAT];		/* current encrypted key	*/
 #endif
+	struct	BUFFER *b_relink; 	/* Link to next BUFFER (sorting) */
+	int	b_created;
+	int	b_last_used;
 }	BUFFER;
+
+/*
+ * Special symbols for scratch-buffer names.
+ */
+#define	SCRTCH_LEFT  "["
+#define	SCRTCH_RIGHT "]"
+#define	SHPIPE_LEFT  "!"
+
+#define	isShellOrPipe(s)  (s[0] == SHPIPE_LEFT[0])
+#define	isScratchName(s)  (s[0] == SCRTCH_LEFT[0])
+#define	isInternalName(s) (isShellOrPipe(s) || isScratchName(s))
+
+#ifdef	__STDC__
+#if	!defined(apollo) || defined(__STDCPP__)
+#define	ScratchName(s) SCRTCH_LEFT ## #s ## SCRTCH_RIGHT
+#endif
+#endif
+
+#ifndef	ScratchName	/* K&R-style macro */
+#define	ScratchName(s)	"[s]"
+#endif
+
+/*
+ * Macros for manipulating buffer-struct members.
+ */
+#define	for_each_buffer(bp) for (bp = bheadp; bp; bp = bp->b_bufp)
 
 #define global_b_val(which) global_b_values.bv[which].v.i
 #define set_global_b_val(which,val) global_b_val(which) = val
@@ -1285,6 +1354,8 @@ typedef struct	BUFFER {
 #define BFINVS	0x01			/* Internal invisible buffer	*/
 #define BFCHG	0x02			/* Changed since last write	*/
 #define BFSCRTCH   0x04 		/* scratch -- gone on last close */
+#define BFARGS	0x08			/* set for ":args" buffers */
+#define BFIMPLY	0x010			/* set for implied-# buffers */
 
 /*
  * There is a window structure allocated for every active display window. The
@@ -1306,6 +1377,8 @@ typedef struct	WINDOW {
 	int	w_force; 	        /* If non-zero, forcing row.    */
 	int	w_flag;		        /* Flags.		        */
 }	WINDOW;
+
+#define	for_each_window(wp) for (wp = wheadp; wp; wp = wp->w_wndp)
 
 #define w_dot w_traits.w_dt
 #ifdef WINMARK
@@ -1399,7 +1472,7 @@ typedef struct	{
 #if ! TERMCAP
 #define	TTputc		(*term.t_putchar)
 #else
-#define	TTputc		putchar
+#define	TTputc		(void)putchar
 #endif
 #define	TTflush		(*term.t_flush)
 #define	TTmove		(*term.t_move)
@@ -1625,6 +1698,9 @@ extern char *getcwd();
  extern void free (/*char *s*/);
 #endif
 #endif	/* free */
+
+/* array/table size */
+#define	SIZEOF(v)	(sizeof(v)/sizeof(v[0]))
 
 /* structure-allocate, for linting */
 #ifdef	lint

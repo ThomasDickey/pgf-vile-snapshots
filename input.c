@@ -3,7 +3,11 @@
  *		5/9/86
  *
  * $Log: input.c,v $
- * Revision 1.50  1992/12/13 13:32:36  foxharp
+ * Revision 1.51  1993/01/16 10:35:40  foxharp
+ * support for scrtch and shpipe chars in screen_string(), and use find_alt()
+ * to pick up name of '#' buffer, rather than hist_lookup(1)
+ *
+ * Revision 1.50  1992/12/13  13:32:36  foxharp
  * got rid of extraneous assign
  *
  * Revision 1.49  1992/12/05  13:22:10  foxharp
@@ -616,17 +620,38 @@ char *buf;
 int bufn, inclchartype;
 {
 	register int i = 0;
-	/* register int s = TRUE; */
 	MARK mk;
 
 	mk = DOT;
 	while ( i < bufn && !is_at_end_of_line(DOT)) {
 		buf[i] = char_at(DOT);
+#if !SMALLER
+		if (i == 0) {
+			if (inclchartype & _scrtch) {
+				if (buf[0] != SCRTCH_LEFT[0])
+					inclchartype &= ~_scrtch;
+			}
+			if (inclchartype & _shpipe) {
+				if (buf[0] != SHPIPE_LEFT[0])
+					inclchartype &= ~_shpipe;
+			}
+		}
+#endif
 		if (inclchartype && !istype(inclchartype, buf[i]))
 			break;
 		DOT.o++;
 		i++;
+		if (inclchartype & _scrtch)
+			if (buf[i-1] == SCRTCH_RIGHT[0])
+				break;
 	}
+
+#if !SMALLER
+	if (inclchartype & _scrtch)
+		if (buf[i-1] != SCRTCH_RIGHT[0])
+			i = 0;
+#endif
+
 	buf[bufn-1] = '\0';
 	if (i < bufn)
 		buf[i] = '\0';
@@ -809,7 +834,7 @@ int dobackslashes;	/* do we add and delete '\' chars for the caller */
 			/* we prefer to expand to filenames, but a buffer name
 				will do */
 			char *cp;
-			char *hist_lookup();
+			BUFFER *bp;
 			if (firstch == TRUE) {
 				tungetc(c);
 				c = killc;
@@ -826,17 +851,14 @@ int dobackslashes;	/* do we add and delete '\' chars for the caller */
 				}
 				break;
 			case '#':
-				cp = hist_lookup(1);  /* returns buffer name */
-				if (cp) {
-					/* but we want a file */
-					BUFFER *bp;
-					bp = bfind(cp,NO_CREAT,0);
+				if (bp = find_alt()) {
 					cp = shorten_path(bp->b_fname);
 					if (!cp || !*cp || isspace(*cp)) {
 						/* oh well, use the buffer */
 						cp = bp->b_bname;
 					}
-				}
+				} else
+					cp = NULL;
 				break;
 #if ! MSDOS
 /* drive letters get in the way */
@@ -850,9 +872,10 @@ int dobackslashes;	/* do we add and delete '\' chars for the caller */
 			default:
 				goto trymore;
 			}
-		        
+
 			if (!cp) {
 				TTbeep();
+				TTflush();
 				continue;
 			}
 			while (cpos < bufn-1 && (c = *cp++)) {

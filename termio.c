@@ -4,7 +4,10 @@
  * All operating systems.
  *
  * $Log: termio.c,v $
- * Revision 1.52  1992/12/23 09:27:52  foxharp
+ * Revision 1.53  1993/01/16 10:42:47  foxharp
+ * extra TTflush for apollo
+ *
+ * Revision 1.52  1992/12/23  09:27:52  foxharp
  * added missing fflush in ttclean
  *
  * Revision 1.51  1992/12/05  13:58:20  foxharp
@@ -596,7 +599,6 @@ int f;
 		TTputc('\n');
 		TTputc('\r');
 	}
-	fflush(stdout);
 	TTflush();
 	TTclose();
 	ioctl(0, TIOCSETN, &ostate);
@@ -604,6 +606,9 @@ int f;
 	ioctl(0, TIOCSLTC, &oltchars);
 #ifdef	TIOCLSET
 	ioctl(0, TIOCLSET, &olstate);
+#endif
+#if APOLLO
+	TTflush();
 #endif
 #endif
 }

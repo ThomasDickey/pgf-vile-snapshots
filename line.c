@@ -11,7 +11,13 @@
  * which means that the dot and mark values in the buffer headers are nonsense.
  *
  * $Log: line.c,v $
- * Revision 1.29  1992/12/23 09:20:31  foxharp
+ * Revision 1.31  1993/01/23 13:38:23  foxharp
+ * lchange is now chg_buff
+ *
+ * Revision 1.30  1993/01/16  10:36:46  foxharp
+ * use for_each_window macro
+ *
+ * Revision 1.29  1992/12/23  09:20:31  foxharp
  * ifdef of unused code
  *
  * Revision 1.28  1992/12/14  09:03:25  foxharp
@@ -268,8 +274,7 @@ register LINE	*lp;
 		MK.o = 0;
 	}
 #endif
-	wp = wheadp;
-	while (wp != NULL) {
+	for_each_window(wp) {
 		if (wp->w_line.l == lp)
 			wp->w_line.l = lp->l_fp;
 		if (wp->w_dot.l	== lp) {
@@ -288,7 +293,6 @@ register LINE	*lp;
 			wp->w_lastdot.o = 0;
 		}
 #endif
-		wp = wp->w_wndp;
 	}
 	if (bp->b_nwnd == 0) {
 		if (bp->b_dot.l	== lp) {
@@ -325,34 +329,6 @@ register LINE	*lp;
 	lp->l_fp->l_bp = lp->l_bp;
 }
 
-/*
- * This routine gets called when a character is changed in place in the current
- * buffer. It updates all of the required flags in the buffer and window
- * system. The flag used is passed as an argument; if the buffer is being
- * displayed in more than 1 window we change EDIT to HARD. Set MODE if the
- * mode line needs to be updated (the "*" has to be set).
- */
-void
-lchange(flag)
-register int	flag;
-{
-	register WINDOW *wp;
-
-	if (curbp->b_nwnd != 1) { 		/* Ensure hard. 	*/
-		flag |= WFHARD;
-	}
-	if ((curbp->b_flag&BFCHG) == 0) {	/* First change, so	*/
-		flag |= WFMODE; 		/* update mode lines.	*/
-		curbp->b_flag |= BFCHG;
-	}
-	wp = wheadp;
-	while (wp != NULL) {
-		if (wp->w_bufp == curbp)
-			wp->w_flag |= flag;
-		wp = wp->w_wndp;
-	}
-}
-
 int
 insspace(f, n)	/* insert spaces forward into text */
 int f, n;	/* default flag and numeric argument */
@@ -385,7 +361,7 @@ int n, c;
 	register char	*ntext;
 	unsigned nsize;
 
-	lchange(WFEDIT);
+	chg_buff(curbp, WFEDIT);
 	lp1 = curwp->w_dot.l;			/* Current line 	*/
 	if (lp1 == curbp->b_line.l) {		/* At the end: special	*/
 		if (curwp->w_dot.o != 0) {
@@ -444,8 +420,7 @@ int n, c;
 			MK.o += n;
 	}
 #endif
-	wp = wheadp;				/* Update windows	*/
-	while (wp != NULL) {
+	for_each_window(wp) {			/* Update windows	*/
 		if (wp->w_dot.l == lp1) {
 			if (wp==curwp || wp->w_dot.o>doto)
 				wp->w_dot.o += n;
@@ -460,7 +435,6 @@ int n, c;
 			if (wp->w_lastdot.o > doto)
 				wp->w_lastdot.o += n;
 		}
-		wp = wp->w_wndp;
 	}
 	if (curbp->b_nmmarks != NULL) { /* fix the named marks */
 		struct MARK *mp;
@@ -493,7 +467,7 @@ lnewline()
 	register int	doto;
 	register WINDOW *wp;
 
-	lchange(WFHARD|WFINS);
+	chg_buff(curbp, WFHARD|WFINS);
 	lp1  = curwp->w_dot.l;			/* Get the address and	*/
 	doto = curwp->w_dot.o;			/* offset of "."	*/
 	if (lp1 == curbp->b_line.l && lforw(lp1) == lp1) {
@@ -506,13 +480,11 @@ lnewline()
 		lp2->l_fp->l_bp = lp2;
 		lp2->l_bp = lp1;
 		tag_for_undo(lp2);
-		wp = wheadp;
-		while (wp != NULL) {
+		for_each_window(wp) {
 			if (wp->w_line.l == lp1)
 				wp->w_line.l = lp2;
 			if (wp->w_dot.l == lp1)
 				wp->w_dot.l = lp2;
-			wp = wp->w_wndp;
 		}
 		return TRUE;
 	}
@@ -544,8 +516,7 @@ lnewline()
 			MK.o -= doto;
 	}
 #endif
-	wp = wheadp;				/* Windows		*/
-	while (wp != NULL) {
+	for_each_window(wp) {
 		if (wp->w_line.l == lp1)
 			wp->w_line.l = lp2;
 		if (wp->w_dot.l == lp1) {
@@ -568,7 +539,6 @@ lnewline()
 			else
 				wp->w_lastdot.o -= doto;
 		}
-		wp = wp->w_wndp;
 	}
 	if (curbp->b_nmmarks != NULL) { /* fix the named marks */
 		int i;
@@ -615,7 +585,7 @@ int kflag;	/* put killed text in kill buffer flag */
 		if (chunk > (int)n)
 			chunk = (int)n;
 		if (chunk == 0) {		/* End of line, merge.	*/
-			lchange(WFHARD|WFKILLS);
+			chg_buff(curbp, WFHARD|WFKILLS);
 			/* first take out any whole lines below this one */
 			nlp = lforw(dotp);
 			while (nlp != curbp->b_line.l && llength(nlp)+1 < n) {
@@ -639,7 +609,7 @@ int kflag;	/* put killed text in kill buffer flag */
 			--n;
 			continue;
 		}
-		lchange(WFEDIT);
+		chg_buff(curbp, WFEDIT);
 		copy_for_undo(dotp);
 		cp1 = &dotp->l_text[doto];	/* Scrunch text.	*/
 		cp2 = cp1 + chunk;
@@ -661,8 +631,7 @@ int kflag;	/* put killed text in kill buffer flag */
 				MK.o = doto;
 		}
 #endif
-		wp = wheadp;			/* Fix windows		*/
-		while (wp != NULL) {
+		for_each_window(wp) {		/* Fix windows		*/
 			if (wp->w_dot.l==dotp && wp->w_dot.o > doto) {
 				wp->w_dot.o -= chunk;
 				if (wp->w_dot.o < doto)
@@ -680,7 +649,6 @@ int kflag;	/* put killed text in kill buffer flag */
 				if (wp->w_lastdot.o < doto)
 					wp->w_lastdot.o = doto;
 			}
-			wp = wp->w_wndp;
 		}
 		if (curbp->b_nmmarks != NULL) { /* fix the named marks */
 			struct MARK *mp;
@@ -806,8 +774,7 @@ ldelnewline()
 	}
 #endif
 	/* check all windows for references to the deleted line */
-	wp = wheadp;
-	while (wp != NULL) {
+	for_each_window(wp) {
 		if (wp->w_line.l == lp2)
 			wp->w_line.l = lp1;
 		if (wp->w_dot.l == lp2) {
@@ -824,7 +791,6 @@ ldelnewline()
 			wp->w_lastdot.l  = lp1;
 			wp->w_lastdot.o += lp1->l_used;
 		}
-		wp = wp->w_wndp;
 	}
 	if (curbp->b_nmmarks != NULL) { /* fix the named marks */
 		int i;

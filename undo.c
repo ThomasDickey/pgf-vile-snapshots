@@ -3,7 +3,13 @@
  * code by Paul Fox, original algorithm mostly by Julia Harper May, 89
  *
  * $Log: undo.c,v $
- * Revision 1.20  1992/12/04 09:14:36  foxharp
+ * Revision 1.22  1993/01/23 13:38:23  foxharp
+ * lchange is now chg_buff
+ *
+ * Revision 1.21  1993/01/16  10:43:22  foxharp
+ * use new macros
+ *
+ * Revision 1.20  1992/12/04  09:14:36  foxharp
  * deleted unused assigns
  *
  * Revision 1.19  1992/11/30  23:07:03  foxharp
@@ -340,7 +346,7 @@ int f,n;
 			lfree(lp,curbp);
 			continue;
 		}
-		lchange(WFHARD|WFINS|WFKILLS);
+		chg_buff(curbp, WFHARD|WFINS|WFKILLS);
 		if (lp->l_bp->l_fp != lp->l_fp) { /* theres something there */
 			if (lp->l_bp->l_fp->l_fp == lp->l_fp) {
 				/* then there is exactly one line there */
@@ -477,8 +483,7 @@ int f,n;
 		MK.o = 0;
 #endif
 	/* let's be defensive about this */
-	wp = wheadp;
-	while (wp != NULL) {
+	for_each_window(wp) {
 		if (wp->w_dot.l == lp)
 			wp->w_dot.o = 0;
 #if WINMARK
@@ -487,7 +492,6 @@ int f,n;
 #endif
 		if (wp->w_lastdot.l == lp)
 			wp->w_lastdot.o = 0;
-		wp = wp->w_wndp;
 	}
 	if (CURDOT(curbp).l == lp)
 		CURDOT(curbp).o = 0;
@@ -502,7 +506,7 @@ int f,n;
 		}
 	}
 
-	curwp->w_flag |= WFEDIT;
+	chg_buff(curbp, WFEDIT|WFKILLS|WFINS);
 	
 	vverify("lineundo");
 	return TRUE;
@@ -534,8 +538,7 @@ register LINE *nlp,*olp;
 	}
 #endif
 	/* fix anything important that points to it */
-	wp = wheadp;
-	while (wp != NULL) {
+	for_each_window(wp) {
 		if (wp->w_line.l == olp)
 			if (lisreal(nlp)) {
 				wp->w_line.l = nlp;
@@ -560,7 +563,6 @@ register LINE *nlp,*olp;
 			}
 			wp->w_lastdot.o = 0;
 		}
-		wp = wp->w_wndp;
 	}
 	if (CURDOT(curbp).l == olp) {
 		if (lisreal(nlp)) {

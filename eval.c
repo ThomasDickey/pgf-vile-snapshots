@@ -4,7 +4,13 @@
 	written 1986 by Daniel Lawrence
  *
  * $Log: eval.c,v $
- * Revision 1.40  1992/12/14 09:03:25  foxharp
+ * Revision 1.42  1993/01/23 13:38:23  foxharp
+ * now include nevars.h, which is auto-created by mktbls
+ *
+ * Revision 1.41  1993/01/16  10:30:58  foxharp
+ * makevarslist() and listvars()
+ *
+ * Revision 1.40  1992/12/14  09:03:25  foxharp
  * lint cleanup, mostly malloc
  *
  * Revision 1.39  1992/11/19  09:03:56  foxharp
@@ -135,7 +141,7 @@
 #include	<stdio.h>
 #include	"estruct.h"
 #include	"edef.h"
-#include	"evar.h"
+#include	"nevars.h"
 
 void
 varinit()		/* initialize the user variable list */
@@ -145,6 +151,59 @@ varinit()		/* initialize the user variable list */
 
 	for (i=0; i < MAXVARS; i++)
 		uv[i].u_name[0] = 0;
+#endif
+}
+
+#if ! SMALLER
+/* list the current vars into the current buffer */
+/* ARGSUSED */
+static
+void	makevarslist(dum1,ptr)
+	int dum1;
+	char *ptr;
+{
+	register int i, j;
+
+	bprintf("--- Environment variables %*P\n", term.t_ncol-1, '-');
+	bprintf("%s", ptr);
+	for (i = j = 0; i < MAXVARS; i++) {
+		if (uv[i].u_name[0] != 0) {
+			if (!j++)
+				bprintf("--- User variables %*P\n", term.t_ncol-1, '-');
+			bprintf("%s = %s\n", uv[i].u_name, uv[i].u_value);
+		}
+	}
+}
+#endif
+
+/* ARGSUSED */
+int
+listvars(f, n)
+int f,n;
+{
+#if ! SMALLER
+	char *values;
+	register WINDOW *wp = curwp;
+	register int s, t;
+	register char *v;
+	static	char *fmt = "%s = %s\n";
+
+	/* collect data for environment-variables, since some depend on window */
+	for (s = t = 0; s < NEVARS; s++)
+		t += strlen(envars[s]) + strlen(fmt) + strlen(gtenv(envars[s]));
+	if (!(values = malloc((unsigned)t)))
+		return FALSE;
+
+	for (s = 0, v = values; s < NEVARS; s++) {
+		(void)sprintf(v, fmt, envars[s], gtenv(envars[s]));
+		v += strlen(v);
+	}
+	s = liststuff(ScratchName(Variables), makevarslist, 0, (char *)values);
+	free(values);
+
+	/* back to the buffer whose modes we just listed */
+	swbuffer(wp->w_bufp);
+	return s;
 #endif
 }
 

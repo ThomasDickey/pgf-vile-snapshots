@@ -9,7 +9,22 @@
 
 /*
  * $Log: edef.h,v $
- * Revision 1.72  1992/12/30 20:30:35  foxharp
+ * Revision 1.77  1993/01/23 15:08:35  foxharp
+ * v. 3.31
+ *
+ * Revision 1.76  1993/01/23  13:38:23  foxharp
+ * dfoutfn is no longer a global
+ *
+ * Revision 1.75  1993/01/16  10:47:39  foxharp
+ * v 3.30
+ *
+ * Revision 1.74  1993/01/16  10:28:04  foxharp
+ * chartypes is now array of longs, and autobuffer mode is new.
+ *
+ * Revision 1.73  1993/01/12  08:48:43  foxharp
+ * tom dickey's changes to support "set number", i.e. line numbering
+ *
+ * Revision 1.72  1992/12/30  20:30:35  foxharp
  * v. 3.29
  *
  * Revision 1.71  1992/12/14  09:04:55  foxharp
@@ -259,14 +274,18 @@
 #endif
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version 3.29");
+decl_init( char version[], "version 3.31");
 
 decl_init( char slash, '/'); 		/* so DOS can use '\' as path separator */
 
 decl_init( int autoindented , -1);	/* how many chars (not cols) indented */
 decl_uninit( int isnamedcmd );		/* are we typing a command name */
 decl_uninit( int calledbefore );	/* called before during this command? */
+#if !SMALLER
+decl_uninit( long _chartypes_[N_chars] );	/* character types	*/
+#else
 decl_uninit( short _chartypes_[N_chars] );	/* character types	*/
+#endif
 decl_uninit( int interrupted );		/* interrupt signal?		*/
 decl_uninit( int insertmode );		/* are we inserting or overwriting? */
 decl_uninit( int insert_mode_was );	/* were we (and will we be?)	*/
@@ -355,6 +374,7 @@ extern struct VALNAMES w_valuenames[];
 /* THE FOLLOWING MODE NAME TABLES MUST CORRESPOND EXACTLY WITH THE #DEFINES
 	IN ESTRUCT.H */
 struct VALNAMES b_valuenames[] = {
+	{ "autobuffer"	comma "ab" comma VALTYPE_BOOL } comma
 	{ "autoindent"	comma "ai" comma VALTYPE_BOOL } comma
 	{ "autosave"	comma "as" comma VALTYPE_BOOL } comma
 	{ "backspacelimit"	comma "bl" comma VALTYPE_BOOL } comma
@@ -394,6 +414,8 @@ struct VALNAMES b_valuenames[] = {
 
 struct VALNAMES w_valuenames[] = {
 	{ "list"	comma "li" comma VALTYPE_BOOL } comma
+	{ "number"	comma "nu" comma VALTYPE_BOOL } comma
+
 
 	{ "sideways"	comma "side" comma VALTYPE_INT } comma
 	{ "fcolor"	comma "X"  comma VALTYPE_INT } comma
@@ -490,9 +512,6 @@ extern KBIND kbindtbl[];
 #ifndef	termdef
 extern  TERM    term;                   /* Terminal information.        */
 #endif
-
-/* per-character output function called by dofmt() */
-decl_uninit( void (*dfoutfn)() );
 
 #if IBMPC
 #if __ZTC__

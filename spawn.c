@@ -2,7 +2,10 @@
  *		for MicroEMACS
  *
  * $Log: spawn.c,v $
- * Revision 1.37  1992/12/23 09:26:08  foxharp
+ * Revision 1.38  1993/01/16 10:42:16  foxharp
+ * use new macros
+ *
+ * Revision 1.37  1992/12/23  09:26:08  foxharp
  * lint cleanup -- mostly casting strcXX() to void.  ugh.
  *
  * Revision 1.36  1992/12/14  09:03:25  foxharp
@@ -533,14 +536,14 @@ int f,n;
 	register BUFFER *bp;	/* pointer to buffer to zot */
         static char oline[NLINE];	/* command line send to shell */
         register int    s;
-	static char bname[] = "[Output]";
+	static char bname[] = ScratchName(Output);
 	int cb;
 	char prompt[50];
 
 
 	/* if it doesn't start with '!', or if that's all it is */
-	if (oline[0] != '!' || oline[1] == '\0') {
-		oline[0] = '!';
+	if (!isShellOrPipe(oline) || oline[1] == '\0') {
+		oline[0] = SHPIPE_LEFT[0];
 		oline[1] = '\0';
 	}
 
@@ -594,7 +597,7 @@ pipecmd(f, n)
 	register BUFFER *bp;	/* pointer to buffer to zot */
         static char oline[NLINE];	/* command line send to shell */
         char	line[NLINE];	/* command line send to shell */
-	static char bname[] = "[output]";
+	static char bname[] = ScratchName(output);
 	WINDOW *ocurwp;		/* save the current window during delete */
 
 #if	AMIGA
@@ -636,9 +639,8 @@ pipecmd(f, n)
 	/* get rid of the command output buffer if it exists */
         if ((bp=bfind(bname, NO_CREAT, 0)) != FALSE) {
 		/* try to make sure we are off screen */
-		wp = wheadp;
 		ocurwp = NULL;
-		while (wp != NULL) {
+		for_each_window(wp) {
 			if (wp->w_bufp == bp) {
 				if (curwp != wp) {
 					ocurwp = curwp;
@@ -649,7 +651,6 @@ pipecmd(f, n)
 					curwp = ocurwp;
 				break;
 			}
-			wp = wp->w_wndp;
 		}
 		if (zotbuf(bp) != TRUE)
 
@@ -695,14 +696,11 @@ pipecmd(f, n)
 	/* make this window in VIEW mode, update all mode lines */
 	make_local_b_val(curwp->w_bufp,MDVIEW);
 	set_b_val(curwp->w_bufp,MDVIEW,TRUE);
-	wp = wheadp;
-	while (wp != NULL) {
+	for_each_window(wp)
 		wp->w_flag |= WFMODE;
-		wp = wp->w_wndp;
-	}
 
 #if FINDERR
-	(void)strcpy(febuff,"[Cmd Output]");
+	(void)strcpy(febuff,ScratchName(Cmd Output));
 	newfebuff = TRUE;
 #endif
 

@@ -1,5 +1,6 @@
-
 # This file contains all of the editor's command and key linkages.
+# It also contains data for tables which are automatically generated in the
+# editor.
 #
 # It should be processed by the "mktbls" program, which produces the
 #  headers #included by main.c
@@ -71,7 +72,16 @@
 #		here for completeness.
 #
 # $Log: cmdtbl,v $
-# Revision 1.44  1992/12/20 14:37:35  foxharp
+# Revision 1.47  1993/01/23 14:26:19  foxharp
+# make '@' command undo/redoable
+#
+# Revision 1.46  1993/01/23  13:38:23  foxharp
+# tom's changes -- added variables and functions
+#
+# Revision 1.45  1993/01/16  10:25:33  foxharp
+# added tom's rewind, list-vars, and show-vars commands
+#
+# Revision 1.44  1992/12/20  14:37:35  foxharp
 # took RANGE out of opervglobals flags
 #
 # Revision 1.43  1992/11/19  08:56:35  foxharp
@@ -482,7 +492,7 @@ execcmd		NONE			NEVER
 execfile	NONE			!SMALLER
 	"execute-file"			!FEWNAMES
 	"source"
-execkreg	NONE
+execkreg	REDO|UNDO
 	"execute-register"
 	'@'
 execproc	REDO			PROC
@@ -526,6 +536,8 @@ filter		REDO|UNDO
 finderr		NONE			FINDERR
 	"find-next-error"		!FEWNAMES
 	'^X-^X'
+firstbuffer	NONE
+	"rewind"
 firstnonwhite	MOTION
 	"first-nonwhite"		!FEWNAMES
 	'^'
@@ -729,6 +741,7 @@ killbuffer	NONE
 	"delete-buffer"			!FEWNAMES
 	"kill-buffer"			!FEWNAMES
 	"ki"
+	'^X-k'
 showlength	NONE
 	"buffer-length"			!FEWNAMES
 	"="
@@ -1036,6 +1049,9 @@ listmodes	NONE
 	"show-global-modes"
 	"showmodes"
 	"showgmodes"
+listvars	NONE
+	"list-vars"
+	"show-vars"
 showversion	NONE|(EXRCOK)
 	"version"
 shrinkwind	NONE
@@ -1117,3 +1133,76 @@ yankline	NONE
 zzquit		NONE|(BANG|NL)
 	'Z'
 	"stuttered-write-all-and-quit"
+.environment
+"pagelen"	PAGELEN			# number of lines used by editor
+"curcol"	CURCOL			# current column pos of cursor
+"curline"	CURLINE			# current line in file
+"ram"		RAM			# ram in use by malloc
+"flicker"	FLICKER			# flicker suppression
+"pagewid"	CURWIDTH		# current screen width
+"cbufname"	CBUFNAME		# current buffer name
+"cfilname"	CFNAME			# current file name
+"sres"		SRES			# current screen resolution
+"debug"		DEBUG			# macro debugging
+"status"	STATUS			# returns the status of the last command
+"palette"	PALETTE			# current palette string
+"lastkey"	LASTKEY			# last keyboard char struck
+"char"		CURCHAR			# current character under the cursor
+"discmd"	DISCMD			# display commands on command line
+"version"	VERSION			# current version number
+"progname"	PROGNAME		# returns current prog name - "vile"
+"seed"		SEED			# current random number seed
+"disinp"	DISINP			# display command line input characters
+"wline"		WLINE			# # of lines in current window
+"cwline"	CWLINE			# current screen line in window
+"target"	TARGET			# target for line moves
+"search"	SEARCH			# search pattern
+"replace"	REPLACE			# replacement pattern
+"match"		MATCH			# last matched magic pattern
+"kill"		KILL			# kill buffer (read only)
+"cmode"		CMODE			# mode of current buffer
+"tpause"	TPAUSE			# length to pause for paren matching
+"pending"	PENDING			# type ahead pending flag
+"llength"	LLENGTH			# length of current line
+"line"		LINE			# text of current line
+"word"		WORD			# current word
+"identifier"	IDENTIF			# current identifier
+"qidentifier"	QIDENTIF		# current qualified identifier
+"pathname"	PATHNAME		# current path-like word
+"directory"	DIR			# current directory
+"font"		FONT		X11
+.functions
+"add"	ADD		DYNAMIC		# add two numbers together
+"sub"	SUB		DYNAMIC		# subtraction
+"tim"	TIMES		DYNAMIC		# multiplication
+"div"	DIV		DYNAMIC		# division
+"mod"	MOD		DYNAMIC		# mod
+"neg"	NEG		MONAMIC		# negate
+"cat"	CAT		DYNAMIC		# concatenate string
+"lef"	LEFT		DYNAMIC		# left string(string, len)
+"rig"	RIGHT		DYNAMIC		# right string(string, pos)
+"mid"	MID		TRINAMIC	# mid string(string, pos, len)
+"not"	NOT		MONAMIC		# logical not
+"equ"	EQUAL		DYNAMIC		# logical equality check
+"les"	LESS		DYNAMIC		# logical less than
+"gre"	GREATER		DYNAMIC		# logical greater than
+"seq"	SEQUAL		DYNAMIC		# string logical equality check
+"sle"	SLESS		DYNAMIC		# string logical less than
+"sgr"	SGREAT		DYNAMIC		# string logical greater than
+"ind"	IND		MONAMIC		# evaluate indirect value
+"and"	AND		DYNAMIC		# logical and
+"or"	OR		DYNAMIC		# logical or
+"len"	LENGTH		MONAMIC		# string length
+"upp"	UPPER		MONAMIC		# uppercase string
+"low"	LOWER		MONAMIC		# lower case string
+"tru"	TRUTH		MONAMIC		# Truth of the universe logical test
+"asc"	ASCII		MONAMIC		# char to integer conversion
+"chr"	CHR		MONAMIC		# integer to char conversion
+"gtk"	GTKEY		NILNAMIC	# get 1 character
+"rnd"	RND		MONAMIC		# get a random number
+"abs"	ABS		MONAMIC		# absolute value of a number
+"sin"	SINDEX		DYNAMIC		# find the index of one string in another
+"env"	ENV		MONAMIC		# retrieve a system environment var
+"bin"	BIND		MONAMIC		# loopup what function name is bound to a key
+"rd"	READABLE	MONAMIC		# is a file readable?
+"wr"	WRITABLE	MONAMIC		# is a file writeable?

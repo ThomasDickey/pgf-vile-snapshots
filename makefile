@@ -91,10 +91,10 @@ ALLTOOLS = $(MAKFILES)
 
 
 # these are normal editable headers
-HDRS = estruct.h epath.h evar.h edef.h proto.h
+HDRS = estruct.h epath.h edef.h proto.h
 
 # these headers are built by the mktbls program from the information in cmdtbl
-BUILTHDRS = nebind.h nefunc.h nename.h 
+BUILTHDRS = nebind.h nefunc.h nename.h nevars.h
 
 ALLHDRS = $(HDRS)
 
@@ -340,7 +340,7 @@ compr-shar: link.msc
 	[ -d cshardir ] || mkdir cshardir
 #	add -a for archive headers, add -s pgf@cayman.com for submitted-by
 	shar -p -nvile -L55 -o cshardir/vileshar \
-		-T README -C `ls $(EVERYTHING) | sed /README/d` link.msc
+		-T README -C `ls $(EVERYTHING) | sed '/^README$$/d'` link.msc
 
 shar: link.msc
 	[ -d shardir ] || mkdir shardir
@@ -350,7 +350,7 @@ shar: link.msc
 
 bigshar: link.msc
 	shar -spgf@cayman.com -nVile \
-	-o vileBIGshar README `ls $(EVERYTHING) | sed /README/d` link.msc
+	-o vileBIGshar README `ls $(EVERYTHING) | sed '/^README$$/d'` link.msc
 
 # only uucp things changed since last time
 uuto:
@@ -456,12 +456,21 @@ $(EVERYTHING):
 	$(CO) -r$(revision) $@
 
 
-$(OBJ): estruct.h edef.h
+$(OBJ): estruct.h edef.h proto.h
 
-externs.$O: nebind.h nename.h nefunc.h
+bind.$O:	epath.h
+eval.$O:	nevars.h
+externs.$O:	nebind.h nename.h nefunc.h
+vmalloc$O:	nevars.h
 
 # $Log: makefile,v $
-# Revision 1.79  1992/12/29 23:17:28  foxharp
+# Revision 1.81  1993/01/23 13:38:23  foxharp
+# nevars.h replaces evar.h
+#
+# Revision 1.80  1993/01/12  08:44:24  foxharp
+# fixup so README.X11 gets included in shars, and more lint rules from tom dickey
+#
+# Revision 1.79  1992/12/29  23:17:28  foxharp
 # commentary
 #
 # Revision 1.78  1992/12/28  23:51:57  foxharp
@@ -720,9 +729,14 @@ externs.$O: nebind.h nename.h nefunc.h
 # date: 1990/09/21 10:25:38;
 # initial vile RCS revision
 #
+
+# (dickey's rules)
 CPP_OPTS= $(CFLAGS0) -DBERK -DAPOLLO -Dos_chosen
 .SUFFIXES: .i .i2 .lint
+lintlib:	llib-lvile.ln
+llib-lvile.ln:	llib-lvile ; makellib $(CPP_OPTS) llib-lvile vile
+llib-lvile:	$(SRC) ; cproto -l $(CPP_OPTS) $(SRC) >$@
 lint.out:	;tdlint $(CPP_OPTS) $(SRC) >$@
 .c.i:		;$(CC)  $(CPP_OPTS) -C -E $< >$@
 .c.i2:		;/usr/lib/cpp  $(CPP_OPTS) -C -E $< >$@
-.c.lint:	;tdlint $(CPP_OPTS) $< >$@
+.c.lint:	;tdlint -lvile $(CPP_OPTS) $< >$@

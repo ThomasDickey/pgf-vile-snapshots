@@ -4,12 +4,19 @@
  *	is nebind.h, nefunc.h, and nename.h, all of which are then included
  *	in main.c
  *	This code written by Paul Fox, (c)1990
- *	
+ *
  *	See the file "cmdtbls" for input data formats, and "estruct.h" for
  *	the output structures.
  *
  * $Log: mktbls.c,v $
- * Revision 1.9  1992/07/17 19:12:44  foxharp
+ * Revision 1.11  1993/01/23 14:44:08  foxharp
+ * local copies of isspace and isprint, since not everyone has them
+ * in a standard library.
+ *
+ * Revision 1.10  1993/01/23  13:38:23  foxharp
+ * tom's changes, for lint, cleanup, variables, and functions
+ *
+ * Revision 1.9  1992/07/17  19:12:44  foxharp
  * explicit int return on func
  *
  * Revision 1.8  1992/07/08  08:35:09  foxharp
@@ -48,8 +55,11 @@
 #include <stdio.h>
 #include <string.h>
 
-char *progcreat = "/* %s: this header file was produced automatically by\n\
- * the %s program, based on input from the file %s\n */\n";
+#define	MAX_BIND	4	/* total # of binding-types */
+#define	MAX_PARSE	5	/* maximum # of tokens on line */
+#define	LEN_BUFFER	50	/* nominal buffer-length */
+#define	MAX_BUFFER	(LEN_BUFFER*10)
+#define	LEN_CHRSET	128	/* total # of chars in set (ascii) */
 
 #define	DIFCNTRL	0x40
 #define tocntrl(c)	((c)^DIFCNTRL)
@@ -58,174 +68,270 @@ char *progcreat = "/* %s: this header file was produced automatically by\n\
 #define toupper(c)	((c)^DIFCASE)
 #define tolower(c)	((c)^DIFCASE)
 
-int l = 0;
-FILE *nebind, *nefunc, *nename, *cmdtbl;
+#define	Fprintf	(void)fprintf
+#define	Sprintf	(void)sprintf
 
-#if __STDC__
-# define P(a) a
-#else
-# define P(a) ()
-#endif
+#define	SaveEndif(head)	InsertOnEnd(&head, "#endif")
 
-int main P(( int, char *[]));
-void badfmt P(( char * ));
-void savenames P(( char *, char *, char * ));
-void savebindings P(( char *, char *, char * ));
-void dumpnames P((void));
-void dumpbindings P((void));
-char *formcond P(( char *, char * ));
 extern char *malloc();
 
 
-struct stringl {
-	char *s1;
-	char *s2;
-	char *s3;
+typedef	struct stringl {
+	char *s1;	/* stores primary-data */
+	char *s2;	/* stores secondary-data */
+	char *s3;	/* stores ifdef-flags */
+	char *s4;	/* stores comment, if any */
 	struct stringl *nst;
-};
-	
-int
-main(argc, argv)
-int	argc;
-char    *argv[];
+} LIST;
+
+static	LIST	*all_names,
+		*all_funcs,
+		*all_FUNCs,
+		*all_envars,
+		*all_ufuncs;
+
+	/* definitions for sections of cmdtbl */
+#define	SECT_CMDS 0
+#define	SECT_FUNC 1
+#define	SECT_VARS 2
+#define	SECT_BUFF 3
+#define	SECT_WIND 4
+
+	/* definitions for [MAX_BIND] indices */
+#define ASCIIBIND 0
+#define CTLXBIND 1
+#define CTLABIND 2
+#define SPECBIND 3
+
+static	char *bindings  [MAX_BIND][LEN_CHRSET];
+static	char *conditions[MAX_BIND][LEN_CHRSET];
+static	char *tblname   [MAX_BIND] = {"asciitbl", "ctlxtbl", "metatbl", "spectbl" };
+static	char *prefname  [MAX_BIND] = {"",         "CTLX|",   "CTLA|",   "SPEC|" };
+
+static	int l = 0;
+static	FILE *nebind, *nefunc, *nename, *cmdtbl;
+static	FILE *nevars;
+
+
+
+/******************************************************************************/
+static isspace(c)
+int c;
 {
-	char line[100];
-	char func[50];
-	char flags[50];
-	char english[50];
-	char fcond[50];
-	char ncond[50];
-	char key[50];
-	int r;
-	
-	if (argc != 2) {
-		fprintf(stderr, "usage: mktbls cmd-file\n");
-		exit(1);
-	}
-	
-	if ((cmdtbl = fopen(argv[1],"r")) == NULL ) {
-		fprintf(stderr,"mktbls: couldn't open cmd-file\n");
-		exit(1);
-	}
-	
-	if ( (nebind = fopen("nebind.h","w")) == NULL ||
-		(nefunc = fopen("nefunc.h","w")) == NULL ||
-		(nename = fopen("nename.h","w")) == NULL ) {
-		fprintf(stderr,"mktbls: couldn't open header files\n");
-		exit(1);
-	}
-	
-	fprintf(nebind,progcreat,"nebind.h",argv[0],argv[1]);
-	fprintf(nefunc,progcreat,"nefunc.h",argv[0],argv[1]);
-	fprintf(nename,progcreat,"nename.h",argv[0],argv[1]);
-	
-	
-	/* process each input line */
-	while (fgets(line,100,cmdtbl) != NULL) {
-		l++;
-		if (line[0] == '#') {  /* comment */
-			continue;
-		} else if (line[0] == '\n') { /* empty line */
-			continue;
-		} else if (line[0] != '\t') { /* then it's a new func */
-			/* we can spill information about funcs right away */
-			r = sscanf(line,"%s %s %s",func,flags,fcond);
-			if (r < 2 || r > 3)
-				badfmt("looking for new function");
-			if (r != 3)
-				fcond[0] = '\0';
-				
-			if (fcond[0])
-				fprintf(nefunc,"#if %s\n",fcond);
-			fprintf(nefunc,"extern int %s();\n", func);
-			fprintf(nefunc,"\tCMDFUNC f_%s = { %s,\t%s };\n",
-				func, func, flags);
-			if (fcond[0])
-				fprintf(nefunc,"#endif\n");
-				
-		} else if (line[1] == '"') { /* then it's an english name */
-		
-			r = sscanf(line, " \"%[^\"]\"	%s", english,ncond);
-			if (r < 1 || r > 2)
-				badfmt("looking for english name");
-			if (r != 2)
-				ncond[0] = '\0';
-				
-			savenames(english, func, formcond(fcond,ncond));
-				
-		} else if (line[1] == '\'') { /* then it's a key */
-			r = sscanf(&line[2], "%[^']' %s", key, ncond);
-			if (r < 1 || r > 2)
-				badfmt("looking for key binding");
-			if (r != 2)
-				ncond[0] = '\0';
-				
-			savebindings(key, func, formcond(fcond,ncond));
-			
-		} else {
-			badfmt("bad line");
-		}
-	}
-	
-	dumpnames();
-	dumpbindings();
-	
-	return 0;
+	return c == ' ' || c == '\t' || c == '\n';
+}
+static isprint(c)
+int c;
+{
+	return c >= ' ' && c < '\0177';
+}
+/******************************************************************************/
+static
+char *	StrAlloc(s)
+	char	*s;
+{
+	return strcpy(malloc((unsigned)strlen(s)+1), s);
 }
 
-char *
-formcond(c1,c2)
-char *c1, *c2;
+static
+LIST *	ListAlloc()
 {
-	static char cond[50];
+	return (LIST *)malloc(sizeof(LIST));
+}
+
+/******************************************************************************/
+static
+void	badfmt(s)
+	char *s;
+{
+	Fprintf(stderr,"\"cmdtbl\", line %d: bad format:",l);
+	Fprintf(stderr,"	%s\n",s);
+	exit(1);
+}
+
+static
+void	badfmt2(s,col)
+	char *s;
+	int col;
+{
+	char	temp[BUFSIZ];
+	Sprintf(temp, "%s (column %d)", s, col);
+	badfmt(temp);
+}
+
+/******************************************************************************/
+static
+void	WriteLines(fp, list, count)
+	FILE	*fp;
+	char	**list;
+	int	count;
+{
+	while (count-- > 0)
+		Fprintf(fp, "%s\n", *list++);
+}
+#define	write_lines(fp,list) WriteLines(fp, list, sizeof(list)/sizeof(list[0]))
+
+/******************************************************************************/
+static
+FILE *	OpenHeader(name, argv)
+	char	*name;
+	char	**argv;
+{
+	register FILE *fp;
+	static char *progcreat =
+"/* %s: this header file was produced automatically by\n\
+ * the %s program, based on input from the file %s\n */\n";
+
+	if (!(fp = fopen(name, "w"))) {
+		Fprintf(stderr,"mktbls: couldn't open header file %s\n", name);
+		exit(1);
+	}
+	Fprintf(fp, progcreat, name, argv[0], argv[1]);
+	return fp;
+}
+
+/******************************************************************************/
+static
+void	InsertSorted(headp, name, func, cond, note)
+	LIST	**headp;
+	char	*name;
+	char	*func;
+	char	*cond;
+	char	*note;
+{
+	register LIST *n, *p, *q;
+	register int  r;
+
+	n = ListAlloc();
+	n->s1 = StrAlloc(name);
+	n->s2 = StrAlloc(func);
+	n->s3 = StrAlloc(cond);
+	n->s4 = StrAlloc(note);
+
+	for (p = *headp, q = 0; p != 0; q = p, p = p->nst) {
+		if ((r = strcmp(n->s1, p->s1)) < 0)
+			break;
+		else if (r == 0)
+			badfmt("duplicate name");
+	}
+	n->nst = p;
+	if (q == 0)
+		*headp = n;
+	else
+		q->nst = n;
+}
+
+static
+void	InsertOnEnd(headp, name)
+	LIST	**headp;
+	char	*name;
+{
+	register LIST *n, *p, *q;
+
+	n = ListAlloc();
+	n->s1 = StrAlloc(name);
+	n->s2 = "";
+	n->s3 = "";
+	n->s4 = "";
+
+	for (p = *headp, q = 0; p != 0; q = p, p = p->nst)
+		;
+
+	n->nst = 0;
+	if (q == 0)
+		*headp = n;
+	else
+		q->nst = n;
+}
+
+/******************************************************************************/
+static
+char *	append(dst, src)
+	char	*dst;
+	char	*src;
+{
+	(void)strcat(dst, src);
+	return (dst + strlen(dst));
+}
+
+static
+char *	formcond(c1,c2)
+	char *c1, *c2;
+{
+	static char cond[LEN_BUFFER];
 	if (c1[0] && c2[0])
-		sprintf(cond,"#if (%s) & (%s)\n",c1,c2);
+		Sprintf(cond,"#if (%s) & (%s)\n",c1,c2);
 	else if (c1[0] || c2[0])
-		sprintf(cond,"#if (%s%s)\n",c1,c2);
+		Sprintf(cond,"#if (%s%s)\n",c1,c2);
 	else
 		cond[0] = '\0';
 	return cond;
 }
 
-void
-badfmt(s)
-char *s;
+static
+int	LastCol(buffer)
+	char	*buffer;
 {
-	fprintf(stderr,"\"cmdtbl\", line %d: bad format:",l);
-	fprintf(stderr,"	%s\n",s);
-	exit(1);
+	register int	col = 0,
+			c;
+	while (c = *buffer++) {
+		if (isprint(c))
+			col++;
+		else if (c == '\t')
+			col = (col | 7) + 1;
+	}
+	return col;
 }
 
-#define ASCIIBIND 0
-#define CTLXBIND 1
-#define CTLABIND 2
-#define SPECBIND 3
-char *bindings[4][128];
-char *conditions[4][128];
-char *tblname[] = {"asciitbl", "ctlxtbl", "metatbl", "spectbl" };
-char *prefname[] = {"", "CTLX|", "CTLA|", "SPEC|" };
+static
+char *	PadTo(col, buffer)
+	int col;
+	char	*buffer;
+{
+	int	any	= 0,
+		len	= strlen(buffer),
+		now,
+		with;
 
-int
-two_conds(btype,c,cond)
-int btype,c;
-char *cond;
+	for (;;) {
+		if ((now = LastCol(buffer)) >= col) {
+			if (any)
+				break;
+			else
+				with = ' ';
+		} else if (col-now > 1)
+			with = '\t';
+		else
+			with = ' ';
+
+		buffer[len++] = with;
+		buffer[len]   = '\0';
+		any++;
+	}
+	return buffer;
+}
+
+static
+int	two_conds(btype,c,cond)
+	int btype,c;
+	char *cond;
 {
 	/* return true if both bindings have different
 	 conditions associated with them */
-	return (cond[0] != 0 && 
-		conditions[btype][c] != NULL && 
+	return (cond[0] != 0 &&
+		conditions[btype][c] != NULL &&
 		strcmp(cond, conditions[btype][c]) != 0);
 }
 
-/* prc2kcod: translate printable code to C-language keycode */
-void
-savebindings(s,func,cond)
-char *s, *func, *cond;
+/******************************************************************************/
+static
+void	save_bindings(s,func,cond)
+	char *s, *func, *cond;
 {
 	int btype, c;
-	
+
 	btype = ASCIIBIND;
-	
+
 	if (*s == '^' && *(s+1) == 'A'&& *(s+2) == '-') {
 		btype = CTLABIND;
 		s += 3;
@@ -236,59 +342,56 @@ char *s, *func, *cond;
 		btype = CTLXBIND;
 		s += 3;
 	}
-	
+
 	if (*s == '\\') { /* try for an octal value */
 		c = 0;
 		while (*++s < '8' && *s >= '0')
 			c = (c*8) + *s - '0';
-		if (c > 127)
+		if (c >= LEN_CHRSET)
 			badfmt("octal character too big");
 		if (bindings[btype][c] != NULL && !two_conds(btype,c,cond))
 			badfmt("duplicate key binding");
-		bindings[btype][c] = malloc(strlen(func)+1);
-		strcpy(bindings[btype][c], func);
+		bindings[btype][c] = StrAlloc(func);
 	} else if (*s == '^' && (c = *(s+1)) != '\0') { /* a control char? */
 		if (c > 'a' &&  c < 'z')
 			c = toupper(c);
 		c = tocntrl(c);
 		if (bindings[btype][c] != NULL && !two_conds(btype,c,cond))
 			badfmt("duplicate key binding");
-		bindings[btype][c] = malloc(strlen(func)+1);
-		strcpy(bindings[btype][c], func);
+		bindings[btype][c] = StrAlloc(func);
 		s += 2;
 	} else if (c = *s) {
 		if (bindings[btype][c] != NULL && !two_conds(btype,c,cond))
 			badfmt("duplicate key binding");
-		bindings[btype][c] = malloc(strlen(func)+1);
-		strcpy(bindings[btype][c], func);
+		bindings[btype][c] = StrAlloc(func);
 		s++;
 	} else {
 		badfmt("getting binding");
 	}
 	if (cond[0]) {
-		conditions[btype][c] = malloc(strlen(cond)+1);
-		strcpy(conditions[btype][c], cond);
+		conditions[btype][c] = StrAlloc(cond);
 	} else {
 		conditions[btype][c] = NULL;
 	}
-	
+
 	if (*s != '\0')
 		badfmt("got extra characters");
-	
 }
 
-void
-dumpbindings()
+static
+void	dump_bindings()
 {
+	char	temp[MAX_BUFFER];
+	char	old_cond[LEN_BUFFER], *new_cond;
 	char *sctl;
 	int i, c, btype;
-	
+
 	btype = ASCIIBIND;
-	
-	fprintf(nebind,"\nCMDFUNC *%s[128] = {\n",tblname[btype]);
-	for (i = 0; i < 128; i++) {
+
+	Fprintf(nebind,"\nCMDFUNC *%s[%d] = {\n",tblname[btype], LEN_CHRSET);
+	for (i = 0; i < LEN_CHRSET; i++) {
 		if (conditions[btype][i]) {
-			fprintf(nebind,"%s", conditions[btype][i]);
+			Fprintf(nebind,"%s", conditions[btype][i]);
 		}
 		if (i < ' ' || i > '~' ) {
 			sctl = "ctrl-";
@@ -297,112 +400,494 @@ dumpbindings()
 			sctl = "";
 			c = i;
 		}
-			
+
 		if (bindings[btype][i])
-			fprintf(nebind,"	&f_%s,	/* %s%c */\n",
-				bindings[btype][i], sctl, c);
+			Sprintf(temp, "\t&f_%s,", bindings[btype][i]);
 		else
-			fprintf(nebind,"	NULL,	/* %s%c */\n", sctl, c);
+			Sprintf(temp, "\tNULL,");
+
+		Fprintf(nebind, "%s/* %s%c */\n", PadTo(32, temp), sctl, c);
+
 		if (conditions[btype][i]) {
-			fprintf(nebind,"#else\n	NULL,\n#endif\n");
+			Fprintf(nebind,"#else\n\tNULL,\n#endif\n");
 		}
-			
+
 	}
-	fprintf(nebind,"};\n");
-	
-	
-	fprintf(nebind,"\nKBIND kbindtbl[NBINDS] = {\n");
+	Fprintf(nebind,"};\n");
+
+	Fprintf(nebind,"\nKBIND kbindtbl[NBINDS] = {\n");
 	for (btype = 1; btype <= 3; btype++) {
-		for (i = 0; i < 128; i++) {
+		*old_cond = '\0';
+		for (i = 0; i < LEN_CHRSET; i++) {
 			if (bindings[btype][i]) {
-				if (conditions[btype][i]) {
-					fprintf(nebind,"%s",
-						conditions[btype][i]);
+				if (!(new_cond = conditions[btype][i]))
+					new_cond = "";
+				if (strcmp(old_cond, new_cond)) {
+					if (*old_cond)
+						Fprintf(nebind,"#endif\n");
+					Fprintf(nebind,"%s",new_cond);
+					(void)strcpy(old_cond,new_cond);
 				}
 				if (i < ' ') {
-					fprintf(nebind,
-					"	{ %stocntrl('%c'), &f_%s },\n",
+					Sprintf(temp,
+					"\t{ %stocntrl('%c'),",
 						prefname[btype],
-						toalpha(i),bindings[btype][i]);
+						toalpha(i));
 				} else {
-					fprintf(nebind,
-					"	{ %s'%s%c', &f_%s },\n",
+					Sprintf(temp,
+					"\t{ %s'%s%c',",
 						prefname[btype],
 						(i == '\'' || i == '\\') ?
 							"\\":"",
-						i, bindings[btype][i]);
+						i);
 				}
-				if (conditions[btype][i]) {
-					fprintf(nebind,"#endif\n");
-				}
+				Fprintf(nebind, "%s&f_%s },\n",
+					PadTo(32, temp), bindings[btype][i]);
+			}
+		}
+		if (*old_cond)
+			Fprintf(nebind,"#endif\n");
+	}
+	Fprintf(nebind,"	{ 0, NULL }\n");
+	Fprintf(nebind,"};\n");
+}
+
+/******************************************************************************/
+static
+void	start_evar_h(argv)
+	char	**argv;
+{
+	static	char	*head[] = {
+		"",
+		"#if !SMALLER",
+		"",
+		"/*\tstructure to hold user variables and their definitions\t*/",
+		"",
+		"typedef struct UVAR {",
+		"\tchar u_name[NVSIZE + 1];\t\t/* name of user variable */",
+		"\tchar *u_value;\t\t\t\t/* value (string) */",
+		"} UVAR;",
+		"",
+		"/*\tcurrent user variables (This structure will probably change)\t*/",
+		"",
+		"#define\tMAXVARS\t\t10 \t/* was 255 */",
+		"",
+		"UVAR uv[MAXVARS];\t/* user variables */",
+		};
+
+	if (!nevars) {
+		nevars = OpenHeader("nevars.h", argv);
+		write_lines(nevars, head);
+	}
+}
+
+static
+void	finish_evar_h()
+{
+	if (nevars)
+		Fprintf(nevars, "\n#endif\n");
+}
+
+/******************************************************************************/
+static
+void	init_envars()
+{
+	static	char	*head[] = {
+		"",
+		"/*\tlist of recognized environment variables\t*/",
+		"",
+		"char *envars[] = {"
+		};
+	static	int	done;
+
+	if (!done++)
+		write_lines(nevars, head);
+}
+
+static
+void	save_envars(vec)
+	char	**vec;
+{
+	InsertSorted(&all_envars, vec[1], vec[2], vec[3], vec[0]);
+}
+
+static
+void	dump_envars()
+{
+	static	char *middle[] = {
+		"};",
+		"",
+		"#define\tNEVARS\tSIZEOF(envars)",
+		"",
+		"/* \tand its preprocesor definitions\t\t*/",
+		""
+		};
+	char	temp[MAX_BUFFER];
+	register LIST *p;
+	register int count;
+
+	for (p = all_envars, count = 0; p != 0; p = p->nst) {
+		if (!count++)
+			init_envars();
+		if (p->s3[0])
+			Fprintf(nevars, "#if %s\n", p->s3);
+		Sprintf(temp, "\t\"%s\",", p->s1);
+		if (p->s4[0]) {
+			(void)PadTo(24, temp);
+			Sprintf(temp+strlen(temp), "/* %s */", p->s4);
+		}
+		Fprintf(nevars, "%s\n", temp);
+		if (p->s3[0])
+			Fprintf(nevars, "#endif\n");
+	}
+	for (p = all_envars, count = 0; p != 0; p = p->nst) {
+		if (!count)
+			write_lines(nevars, middle);
+		Sprintf(temp, "#define\tEV%s", p->s2);
+		Fprintf(nevars, "%s%d\n", PadTo(24, temp), count++);
+	}
+}
+
+/******************************************************************************/
+static
+void	save_funcs(func, flags, cond, old_cond)
+	char	*func;
+	char	*flags;
+	char	*cond;
+	char	*old_cond;
+{
+	char	temp[MAX_BUFFER];
+	register char	*s;
+
+	if (strcmp(cond, old_cond)) {
+		if (*old_cond) {
+			SaveEndif(all_funcs);
+			SaveEndif(all_FUNCs);
+		}
+		if (*cond) {
+			Sprintf(temp, "#if %s", cond);
+			InsertOnEnd(&all_funcs, temp);
+			InsertOnEnd(&all_FUNCs, temp);
+		}
+		(void)strcpy(old_cond, cond);
+	}
+	Sprintf(temp, "extern int %s P(( int, int ));", func);
+	InsertOnEnd(&all_funcs, temp);
+
+	s = append(strcpy(temp, "\tCMDFUNC f_"), func);
+	(void)PadTo(32, temp);
+	s = append(append(append(s, "= { "), func), ",");
+	(void)PadTo(56, temp);
+	(void)append(append(s, flags), " };");
+	InsertOnEnd(&all_FUNCs, temp);
+}
+
+static
+void	dump_funcs(head)
+	LIST	*head;
+{
+	register LIST *p;
+	for (p = head; p != 0; p = p->nst)
+		Fprintf(nefunc, "%s\n", p->s1);
+}
+
+/******************************************************************************/
+static
+void	save_names(name,func,cond)
+	char *name, *func, *cond;
+{
+	char tmpline[80];
+
+	Sprintf(tmpline,"\t{ \"%s\",\t&f_%s },\n", name, func);
+	InsertSorted(&all_names, name, func, cond, "");
+}
+
+static
+void	dump_names()
+{
+	register LIST *m;
+	char	temp[MAX_BUFFER];
+	char	old_s3[LEN_BUFFER];
+
+	Fprintf(nename,"\n/* if you maintain this by hand, keep it in */\n");
+	Fprintf(nename,"/* alphabetical order!!!! */\n\n");
+	Fprintf(nename,"NTAB nametbl[] = {\n");
+	*old_s3 = '\0';
+
+	for (m = all_names; m != NULL; m = m->nst) {
+		if (strcmp(old_s3, m->s3)) {
+			if (*old_s3)
+				Fprintf(nename,"#endif\n");
+			if (m->s3[0])
+				Fprintf(nename,"%s",m->s3);
+			(void)strcpy(old_s3, m->s3);
+		}
+		Sprintf(temp, "\t{ \"%s\",", m->s1);
+		Fprintf(nename, "%s&f_%s },\n", PadTo(40, temp), m->s2);
+	}
+	if (*old_s3)
+		Fprintf(nename,"#endif\n");
+	Fprintf(nename,"	{ NULL, NULL }\n};\n");
+}
+
+/******************************************************************************/
+static
+void	init_ufuncs()
+{
+	static	char	*head[] = {
+		"",
+		"/*\tlist of recognized user functions\t*/",
+		"",
+		"typedef struct UFUNC {",
+		"\tchar *f_name;\t/* name of function */",
+		"\tint f_type;\t/* 1 = monamic, 2 = dynamic */",
+		"} UFUNC;",
+		"",
+		"#define\tNILNAMIC\t0",
+		"#define\tMONAMIC\t\t1",
+		"#define\tDYNAMIC\t\t2",
+		"#define\tTRINAMIC\t3",
+		"",
+		"UFUNC funcs[] = {",
+		};
+	static	int	done;
+
+	if (!done++)
+		write_lines(nevars, head);
+}
+
+static
+void	save_ufuncs(vec)
+	char	**vec;
+{
+	InsertSorted(&all_ufuncs, vec[1], vec[2], vec[3], vec[0]);
+}
+
+static
+void	dump_ufuncs()
+{
+	static	char	*middle[] = {
+		"};",
+		"",
+		"#define\tNFUNCS\tSIZEOF(funcs)",
+		"",
+		"/* \tand its preprocesor definitions\t\t*/",
+		"",
+		};
+	char	temp[MAX_BUFFER];
+	register LIST *p;
+	register int	count;
+
+	for (p = all_ufuncs, count = 0; p != 0; p = p->nst) {
+		if (!count++)
+			init_ufuncs();
+		Sprintf(temp, "\t\"%s\",", p->s1);
+		(void)PadTo(15, temp);
+		Sprintf(temp+strlen(temp), "%s,", p->s3);
+		if (p->s4[0]) {
+			(void)PadTo(32, temp);
+			Sprintf(temp+strlen(temp), "/* %s */", p->s4);
+		}
+		Fprintf(nevars, "%s\n", temp);
+	}
+	for (p = all_ufuncs, count = 0; p != 0; p = p->nst) {
+		if (!count)
+			write_lines(nevars, middle);
+		Sprintf(temp, "#define\tUF%s", p->s2);
+		Fprintf(nevars, "%s%d\n", PadTo(24, temp), count++);
+	}
+}
+
+/******************************************************************************/
+	/* returns the number of non-comment tokens parsed, with a list of
+	 * tokens (0=comment) as a side-effect.  Note that quotes are removed
+	 * from the token, so we have to have them only in the first token! */
+static
+int	Parse(input, vec)
+	char	*input;
+	char	**vec;
+{
+	char	*base = input;
+	register int	expecting = 1,
+			count = 0,
+			quote = 0,
+			c;
+
+	for (c = 0; c < MAX_BIND; c++)
+		vec[c] = "";
+	for (c = strlen(input); c > 0 && isspace(input[c-1]); c--)
+		input[c-1] = '\0';
+
+	while (c = *input++) {
+		if (quote) {
+			if (c == quote) {
+				quote = 0;
+				if (*input && !isspace(*input))
+					badfmt2("expected blank", input-base);
+				input[-1] = '\0';
+			}
+		} else {
+			if ((c == '"') || (c == '\'')) {
+				quote = c;
+			} else if (isspace(c)) {
+				input[-1] = '\0';
+				expecting = 1;
+			} else if ((c == '#')) {
+				while (isspace(*input))
+					input++;
+				vec[0] = input;
+				break;
+			}
+			if (expecting && !isspace(c)) {
+				if (count+1 >= MAX_PARSE)
+					break;
+				vec[++count] = input - (c != quote);
+				expecting = 0;
 			}
 		}
 	}
-	fprintf(nebind,"	{ 0, NULL }\n");
-	fprintf(nebind,"};\n");
+	return count;
 }
 
-struct stringl lastname = {"\177\177\177\177\177\177", "", "", NULL};
-struct stringl firstname = {"", "", "", &lastname};
-
-void
-savenames(name,func,cond)
-char *name, *func, *cond;
+/******************************************************************************/
+int
+main(argc, argv)
+int	argc;
+char    *argv[];
 {
-	char tmpline[80];
-	struct stringl *n, *m;
+	char *vec[MAX_PARSE];
+	char line[MAX_BUFFER];
+	char func[LEN_BUFFER];
+	char flags[LEN_BUFFER];
+	char old_fcond[LEN_BUFFER],	fcond[LEN_BUFFER];
+	int section = SECT_CMDS;
 	int r;
-	
-	n = (struct stringl *)malloc(sizeof (struct stringl));
-	
-	n->s1 = (char *)malloc(strlen(name)+1);
-	strcpy(n->s1, name);
-	
-	sprintf(tmpline,"\t{ \"%s\",\t&f_%s },\n",
-		name, func);
-	n->s2 = (char *)malloc(strlen(func)+1);
-	strcpy(n->s2, func);
-	
-	n->s3 = (char *)malloc(strlen(cond)+1);
-	strcpy(n->s3, cond);
-	
-	for (m = &firstname; m->nst != NULL; m = m->nst) {
-		if ((r = strcmp(n->s1, m->nst->s1)) < 0) { /* insert it here */
-			n->nst = m->nst;
-			m->nst = n;
+
+	if (argc != 2) {
+		Fprintf(stderr, "usage: mktbls cmd-file\n");
+		exit(1);
+	}
+
+	if ((cmdtbl = fopen(argv[1],"r")) == NULL ) {
+		Fprintf(stderr,"mktbls: couldn't open cmd-file\n");
+		exit(1);
+	}
+
+	nebind = OpenHeader("nebind.h", argv);
+	nefunc = OpenHeader("nefunc.h", argv);
+	nename = OpenHeader("nename.h", argv);
+
+	*old_fcond = '\0';
+
+	/* process each input line */
+	while (fgets(line, sizeof(line), cmdtbl) != NULL) {
+		l++;
+		switch (line[0]) {
+		case '#':		/* comment */
+		case '\n':		/* empty-list */
 			break;
-		} else if (r == 0) {
-			badfmt("duplicate english name");
+
+		case '.':		/* a new section */
+			switch (line[1]) {
+			case 'c':
+				section = SECT_CMDS;
+				break;
+			case 'e':
+				section = SECT_VARS;
+				start_evar_h(argv);
+				break;
+			case 'f':
+				section = SECT_FUNC;
+				start_evar_h(argv);
+				break;
+			case 'b':
+				section = SECT_BUFF;
+				break;
+			case 'w':
+				section = SECT_WIND;
+				break;
+			default:
+				badfmt("unknown section");
+			}
+			break;
+
+		case '\t':		/* a new function */
+			if (section != SECT_CMDS)
+				badfmt("did not expect a tab");
+
+			switch (line[1]) {
+			case '"':	/* then it's an english name */
+
+				r = Parse(line, vec);
+				if (r < 1 || r > 2)
+					badfmt("looking for english name");
+
+				save_names(vec[1], func, formcond(fcond,vec[2]));
+				break;
+
+			case '\'':	/* then it's a key */
+				r = Parse(line, vec);
+				if (r < 1 || r > 2)
+					badfmt("looking for key binding");
+
+				save_bindings(vec[1], func, formcond(fcond,vec[2]));
+				break;
+
+			default:
+				badfmt("bad line");
+			}
+			break;
+
+		default:		/* cache information about funcs */
+			switch (section) {
+			case SECT_CMDS:
+				r = Parse(line, vec);
+				if (r < 2 || r > 3)
+					badfmt("looking for new function");
+				if (r != 3)
+					fcond[0] = '\0';
+
+				save_funcs(
+					strcpy(func,  vec[1]),
+					strcpy(flags, vec[2]),
+					strcpy(fcond, vec[3]),
+					old_fcond);
+				break;
+
+			case SECT_VARS:
+				r = Parse(line, vec);
+				if (r < 2 || r > 3)
+					badfmt("looking for char *envars[]");
+				save_envars(vec);
+				break;
+
+			case SECT_FUNC:
+				r = Parse(line, vec);
+				if (r < 2 || r > 3)
+					badfmt("looking for UFUNC func[]");
+				save_ufuncs(vec);
+				break;
+
+			case SECT_BUFF:
+			case SECT_WIND:
+			default:	badfmt("section not implemented");
+			}
 		}
 	}
-}
 
-void
-dumpnames()
-{
-	struct stringl *m;
-	
-	fprintf(nename,"\n/* if you maintain this by hand, keep it in */\n");
-	fprintf(nename,"/* alphabetical order!!!! */\n\n");
-	fprintf(nename,"NTAB nametbl[] = {\n");
-	for (m = firstname.nst; m->nst != NULL; m = m->nst) {
-		if (m->s3[0])
-			fprintf(nename,"%s",m->s3);
-		fprintf(nename,"\t{ \"%s\",\t&f_%s },\n", m->s1, m->s2);
-		if (m->s3[0])
-			fprintf(nename,"#endif\n");
+	if (*old_fcond) {
+		SaveEndif(all_funcs);
+		SaveEndif(all_FUNCs);
 	}
-	fprintf(nename,"	{ NULL, NULL }\n};\n");
-}
 
-#ifdef NEEDED
-strtolower(s)
-char *s;
-{
-	while (*s) {
-		if (*s >= 'A' && *s <= 'Z')
-			*s = tolower(*s);
-		s++;
-	}
+	dump_names();
+	dump_bindings();
+	dump_funcs(all_funcs);
+	dump_funcs(all_FUNCs);
+
+	dump_envars();
+	dump_ufuncs();
+	finish_evar_h();
+
+	return 0;
 }
-#endif

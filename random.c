@@ -3,7 +3,18 @@
  * commands. There is no functional grouping here, for sure.
  *
  * $Log: random.c,v $
- * Revision 1.80  1992/12/14 09:03:25  foxharp
+ * Revision 1.83  1993/01/23 13:38:23  foxharp
+ * lchange is now chg_buff,
+ * fix for repeat counts on 'C' command, and
+ * update buffer list on chdir
+ *
+ * Revision 1.82  1993/01/16  10:41:43  foxharp
+ * use new macros, and add call to updatelistbuffers()
+ *
+ * Revision 1.81  1993/01/12  08:48:43  foxharp
+ * tom dickey's changes to support "set number", i.e. line numbering
+ *
+ * Revision 1.80  1992/12/14  09:03:25  foxharp
  * lint cleanup, mostly malloc
  *
  * Revision 1.79  1992/12/04  09:51:00  foxharp
@@ -440,19 +451,21 @@ int f,n;
 
 #if ! SMALLER
 int
-getcline()	/* get the current line number */
+line_no(the_buffer, the_line)	/* return the number of the given line */
+BUFFER *the_buffer;
+LINE *the_line;
 {
 	register LINE	*lp;		/* current line */
 	register int	numlines;	/* # of lines before point */
 
 	/* starting at the beginning of the buffer */
-	lp = lforw(curbp->b_line.l);
+	lp = lforw(the_buffer->b_line.l);
 
 	/* start counting lines */
 	numlines = 0;
-	while (lp != curbp->b_line.l) {
-		/* if we are on the current line, record it */
-		if (lp == DOT.l)
+	while (lp != the_buffer->b_line.l) {
+		/* if we are on the specified line, record it */
+		if (lp == the_line)
 			break;
 		++numlines;
 		lp = lforw(lp);
@@ -460,6 +473,12 @@ getcline()	/* get the current line number */
 
 	/* and return the resulting count */
 	return(numlines + 1);
+}
+
+int
+getcline()	/* get the current line number */
+{
+	return line_no(curbp, DOT.l);
 }
 #endif
 
@@ -554,7 +573,7 @@ int f,n;
 	put_char_at(dot, cr);
 	++dot.o;
 	put_char_at(dot, cl);
-	lchange(WFEDIT);
+	chg_buff(curbp, WFEDIT);
 	return (TRUE);
 }
 #endif
@@ -785,7 +804,6 @@ int f,n;
 }
 
 /* 'C' is synonymous with 'c$' */
-/* ARGSUSED */
 int
 chgtoeol(f, n)
 int f,n;
@@ -796,7 +814,7 @@ int f,n;
 		return ins(FALSE);
 	} else {
 		havemotion = &f_gotoeol;
-		return operchg(FALSE,1);
+		return operchg(f,n);
 	}
 }
 
@@ -1100,7 +1118,7 @@ char	*dir;
 #endif
     WINDOW *wp;
 
-    for (wp = wheadp; wp != NULL; wp = wp->w_wndp)
+    for_each_window(wp)
 	wp->w_flag |= WFMODE;
 
     strcpy(exdir, dir);
@@ -1123,6 +1141,7 @@ char	*dir;
 #endif
 	if (chdir(exdp) == 0) {
 		pwd(TRUE,1);
+		updatelistbuffers();
 		return TRUE;
 	}
     }
@@ -1150,7 +1169,7 @@ char *fname;
 
 	/* produce a full pathname, unless already absolute or "internal" */
 	np = name;
-	if (name[0] != '\0' && name[0] != '[' && name[0] != '!') {
+	if (name[0] != '\0' && !isScratchName(name) && !isShellOrPipe(name)) {
 #if MSDOS
 		char drive = 0;
 		if (isupper(np[0]) && np[1] == ':') {
@@ -1191,4 +1210,5 @@ char *fname;
 	strcpy(bp->b_fname, np);
 	if (holdp)
 		free(holdp);
+	updatelistbuffers();
 }

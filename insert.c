@@ -8,8 +8,14 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: insert.c,v $
- *	Revision 1.9  1992/12/04 09:25:03  foxharp
- *	deleted unused assigns
+ *	Revision 1.11  1993/01/23 14:27:23  foxharp
+ *	protect against backline() failing in openup(), if we're at top of buf
+ *
+ * Revision 1.10  1993/01/16  10:36:33  foxharp
+ * use isreturn() macro
+ *
+ * Revision 1.9  1992/12/04  09:25:03  foxharp
+ * deleted unused assigns
  *
  * Revision 1.8  1992/12/02  09:13:16  foxharp
  * changes for "c-shiftwidth"
@@ -74,8 +80,8 @@ int f,n;
 	s = lnewline();
 	if (s != TRUE) return s;
 
-	s = backline(TRUE,1);		/* back to the blank line */
-	if (s != TRUE) return s;
+	if (!is_first_line(DOT,curbp))
+		backline(TRUE,1);		/* back to the blank line */
 
 	if ( n > 1) {
 		s = openlines(n-1);
@@ -255,7 +261,7 @@ int f,n;
 		return(quote(f,n));
 	}
 	c = kcod2key(c);
-	if (c == '\n' || c == '\r') {
+	if (isreturn(c)) {
 		do {
 			s = lnewline();
 		} while (s==TRUE && --n);

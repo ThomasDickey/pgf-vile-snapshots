@@ -8,8 +8,11 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: fences.c,v $
- *	Revision 1.5  1992/12/23 09:18:34  foxharp
- *	allow match of fence that is first char. in buffer
+ *	Revision 1.6  1993/01/23 14:26:54  foxharp
+ *	protect against trying to fence on empty lines
+ *
+ * Revision 1.5  1992/12/23  09:18:34  foxharp
+ * allow match of fence that is first char. in buffer
  *
  * Revision 1.4  1992/08/20  23:40:48  foxharp
  * typo fixes -- thanks, eric
@@ -73,6 +76,8 @@ int sdir; /* direction to scan if we're not on a fence to begin with */
 
 	/* ch may have been passed, if being used internally */
 	if (!ch) {
+		if (llength(DOT.l) == 0)
+			return FALSE;
 		if (DOT.o == 0 && (ch = char_at(DOT)) == '#') {
 			if (llength(DOT.l) < 3)
 				return FALSE;

@@ -1,7 +1,7 @@
 #include "estruct.h"
 #include "edef.h"
 #if ! SMALLER && LATER
-# include "evar.h"
+# include "nevars.h"
 #endif
 
 /* these routines copied without permission from "The C User's Journal",
@@ -10,7 +10,13 @@
  *	(pgf, 1989)
  *
  * $Log: vmalloc.c,v $
- * Revision 1.7  1992/07/22 00:51:35  foxharp
+ * Revision 1.9  1993/01/23 13:38:23  foxharp
+ * evar.h is now nevars.h
+ *
+ * Revision 1.8  1993/01/16  10:43:22  foxharp
+ * use new macros
+ *
+ * Revision 1.7  1992/07/22  00:51:35  foxharp
  * took out the counters -- they no longer compile correctly
  *
  * Revision 1.6  1992/05/16  12:00:31  pgf
@@ -315,12 +321,12 @@ int f,n;
 	found = 0;
 	{ /* windows */
 		register WINDOW *wp;
-		for (wp=wheadp; wp != NULL; wp = wp->w_wndp)
+		for_each_window(wp)
 			found++;
 	}
 	{ /* buffers */
 		register BUFFER *bp;
-		for (bp=bheadp; bp != NULL; bp = bp->b_bufp) {
+		for_each_buffer(bp) {
 			LINE *lp;
 			found++; /* for b_linep */
 			for(lp = bp->b_line.l; lp->l_fp != bp->b_line.l;
