@@ -2,7 +2,10 @@
  *		for MicroEMACS
  *
  * $Log: spawn.c,v $
- * Revision 1.36  1992/12/14 09:03:25  foxharp
+ * Revision 1.37  1992/12/23 09:26:08  foxharp
+ * lint cleanup -- mostly casting strcXX() to void.  ugh.
+ *
+ * Revision 1.36  1992/12/14  09:03:25  foxharp
  * lint cleanup, mostly malloc
  *
  * Revision 1.35  1992/12/04  09:51:54  foxharp
@@ -194,7 +197,7 @@ int f,n;
         movecursor(term.t_nrow, 0);             /* Seek to last line.   */
 	ttclean(TRUE);
         TTputc('\n');
-	system_SHELL(NULL);
+	(void)system_SHELL(NULL);
         TTflush();
 	ttunclean();
         sgarbf = TRUE;
@@ -359,13 +362,13 @@ int rerun;
 			return FALSE;
 		mlwrite(": !%s",oline);
 	}
-	strcpy(line,oline);
+	(void)strcpy(line,oline);
 
 #if	NeWS || X11
-	system_SHELL(line);
+	(void)system_SHELL(line);
 #else
 	ttclean(TRUE);
-	system_SHELL(line);
+	(void)system_SHELL(line);
         TTflush();
 	ttunclean();
 	pressreturn();
@@ -387,7 +390,7 @@ int rerun;
 
         if ((s=mlreply("cmd: !", oline, NLINE)) != TRUE)
                 return (s);
-	strcpy(line,oline);
+	(void)strcpy(line,oline);
         newcli = Open("CON:0/0/640/200/MicroEMACS Subprocess", NEW);
         Execute(line, 0L, newcli);
         Close(newcli);
@@ -407,7 +410,7 @@ int rerun;
 
         if ((s=mlreply("cmd: !", oline, NLINE)) != TRUE)
                 return(s);
-	strcpy(line,oline);
+	(void)strcpy(line,oline);
 	movecursor(term.t_nrow - 1, 0);
 	TTclose();
 	/*
@@ -420,7 +423,7 @@ int rerun;
 	STenv = NULL;
 	if((tptr = index(&line[0],' ')) == NULL) { /* no args */
 		STcmd = castalloc(char, strlen(line) + 1);
-		strcpy(STcmd,line);
+		(void)strcpy(STcmd,line);
 		STargs = NULL;
 	}
 	else {  /* separate out the args from the command */
@@ -437,7 +440,7 @@ int rerun;
 /* first byte of STargs is the length of the string */
 			STargs[0] = strlen(tptr);
 			STargs[1] = NULL; /* fake it for strcat */
-			strcat(STargs,tptr);
+			(void)strcat(STargs,tptr);
 		}
 	}
 	/*
@@ -447,13 +450,13 @@ int rerun;
 	 */
 	if((tptr = index(STcmd,'.')) == NULL) {
  		STwork = castalloc(char,strlen(STcmd) + 4);
- 		strcpy(STwork,STcmd);
- 		strcat(STwork,".prg");
+ 		(void)strcpy(STwork,STcmd);
+ 		(void)strcat(STwork,".prg");
  		tptr = index(STwork,'.');
  		if(Fsfirst(1,STwork) != 0) { /* try .tos */
- 			strcpy(tptr,".tos");
+ 			(void)strcpy(tptr,".tos");
  			if(Fsfirst(1,STwork) != 0) { /* try .ttp */
- 				strcpy(tptr,".ttp");
+ 				(void)strcpy(tptr,".ttp");
  				if(Fsfirst(1,STwork) != 0) /* never mind */
  					*STwork = NULL;
  				}
@@ -479,7 +482,7 @@ int rerun;
 
         if ((s=mlreply("cmd: !", oline, NLINE)) != TRUE)
                 return (s);
-	strcpy(line,oline);
+	(void)strcpy(line,oline);
         TTputc('\n');                /* Already have '\r'    */
         TTflush();
         s = sys(line);                          /* Run the command.     */
@@ -503,7 +506,7 @@ int rerun;
 
         if ((s=mlreply("cmd: !", oline, NLINE)) != TRUE)
                 return(s);
-	strcpy(line,oline);
+	(void)strcpy(line,oline);
 	movecursor(term.t_nrow - 1, 0);
 	TTkclose();
         system(line);
@@ -572,7 +575,7 @@ int f,n;
 		readin(oline, FALSE, bp, TRUE) != TRUE) {
 		return(FALSE);
 	}
-	strcpy(bp->b_bname,bname);
+	(void)strcpy(bp->b_bname,bname);
 	ch_fname(bp, oline);
 
 	return TRUE;
@@ -610,10 +613,10 @@ pipecmd(f, n)
 
 #if	MSDOS
 	if ((tmp = getenv("TMP")) == NULL)
-		strcpy(filnam, "command");
+		(void)strcpy(filnam, "command");
 	else {
-		strcpy(filnam, tmp);
-                strcat(filnam,"\\command");
+		(void)strcpy(filnam, tmp);
+                (void)strcat(filnam,"\\command");
         }
 #endif
 #if     VMS
@@ -628,7 +631,7 @@ pipecmd(f, n)
         if ((s=mlreply("cmd: <", oline, NLINE)) != TRUE)
                 return(s);
 
-	strcpy(line,oline);
+	(void)strcpy(line,oline);
 
 	/* get rid of the command output buffer if it exists */
         if ((bp=bfind(bname, NO_CREAT, 0)) != FALSE) {
@@ -655,16 +658,16 @@ pipecmd(f, n)
 
 #if     AMIGA
         newcli = Open("CON:0/0/640/200/MicroEMACS Subprocess", NEW);
-	strcat(line, " >");
-	strcat(line, filnam);
+	(void)strcat(line, " >");
+	(void)strcat(line, filnam);
         Execute(line, 0L, newcli);
 	s = TRUE;
         Close(newcli);
         sgarbf = TRUE;
 #endif
 #if     MSDOS
-	strcat(line," >>");
-	strcat(line,filnam);
+	(void)strcat(line," >>");
+	(void)strcat(line,filnam);
 	movecursor(term.t_nrow - 1, 0);
 	TTkclose();
         system(line);
@@ -699,7 +702,7 @@ pipecmd(f, n)
 	}
 
 #if FINDERR
-	strcpy(febuff,"[Cmd Output]");
+	(void)strcpy(febuff,"[Cmd Output]");
 	newfebuff = TRUE;
 #endif
 
@@ -722,7 +725,7 @@ filterregion()
 	/* get the filter name and its args */
         if ((s=mlreply_no_bs("!", oline, NLINE)) != TRUE)
                 return(s);
-	strcpy(line,oline);
+	(void)strcpy(line,oline);
 	if ((s = inout_popen(&fr, &fw, line)) != TRUE) {
 		mlforce("[Couldn't open pipe or command]");
 		return s;
@@ -793,11 +796,11 @@ int f,n;
 	/* get the filter name and its args */
         if ((s=mlreply("cmd: |", oline, NLINE)) != TRUE)
                 return(s);
-	strcpy(line,oline);
+	(void)strcpy(line,oline);
 
 	/* setup the proper file names */
 	bp = curbp;
-	strcpy(tnam, bp->b_fname);	/* save the original name */
+	(void)strcpy(tnam, bp->b_fname);/* save the original name */
 	ch_fname(bp, bname1);		/* set it to our new one */
 
 	/* write it out, checking for errors */
@@ -809,14 +812,14 @@ int f,n;
 
 #if     AMIGA
         newcli = Open("CON:0/0/640/200/MicroEMACS Subprocess", NEW);
-	strcat(line, " <ram:fltinp >ram:fltout");
+	(void)strcat(line, " <ram:fltinp >ram:fltout");
         Execute(line,0L,newcli);
 	s = TRUE;
         Close(newcli);
         sgarbf = TRUE;
 #endif
 #if     MSDOS
-	strcat(line," <fltinp >fltout");
+	(void)strcat(line," <fltinp >fltout");
 	movecursor(term.t_nrow - 1, 0);
 	TTkclose();
         system(line);
@@ -828,7 +831,7 @@ int f,n;
 #if	! NeWS
         ttclean(TRUE);
 #endif
-	strcat(line," <fltinp >fltout");
+	(void)strcat(line," <fltinp >fltout");
         system(line);
 #if	! NeWS
         ttunclean();

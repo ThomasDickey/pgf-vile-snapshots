@@ -7,7 +7,11 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: globals.c,v $
- * Revision 1.13  1992/12/04 09:12:25  foxharp
+ * Revision 1.14  1992/12/20 14:39:48  foxharp
+ * implemented 'v' command -- easy -- just do same as 'g', but invert marks
+ * before runnning the command
+ *
+ * Revision 1.13  1992/12/04  09:12:25  foxharp
  * deleted unused assigns
  *
  * Revision 1.12  1992/05/16  12:00:31  pgf
@@ -67,11 +71,7 @@ int
 vglobals(f,n)
 int f,n;
 {
-#ifdef SOMEDAY
 	return globber(f,n,'v');
-#else
-	return unimpl(f,n);
-#endif
 }
 
 /* ARGSUSED */
@@ -132,6 +132,13 @@ int f, n, g_or_v;
 	
 	calledbefore = FALSE;
 	
+	if (g_or_v == 'v') {  /* invert the sense of all the matches */
+		lp = lforw(curbp->b_line.l);
+		while (lp != curbp->b_line.l) {
+			lflipmark(lp);
+			lp = lforw(lp);
+		}
+	}
 	/* loop through the buffer -- we must clear the marks no matter what */
 	s = TRUE;
 	lp = lforw(curbp->b_line.l);

@@ -8,8 +8,11 @@
  * Major extensions for vile by Paul Fox, 1991
  *
  *	$Log: modes.c,v $
- *	Revision 1.5  1992/12/14 09:03:25  foxharp
- *	lint cleanup, mostly malloc
+ *	Revision 1.6  1992/12/23 09:21:56  foxharp
+ *	macro-ized the "[Settings]" name
+ *
+ * Revision 1.5  1992/12/14  09:03:25  foxharp
+ * lint cleanup, mostly malloc
  *
  * Revision 1.4  1992/12/04  09:14:36  foxharp
  * deleted unused assigns
@@ -31,6 +34,8 @@
 #include	"estruct.h"
 #include	"edef.h"
  
+#define MODES_LIST_NAME "[Settings]"
+
 /* ARGSUSED */
 int
 listmodes(f, n)
@@ -39,7 +44,7 @@ int f,n;
 	register WINDOW *wp = curwp;
 	register int s;
 
-	s = liststuff("[Settings]",makemodelist,0,(char *)wp);
+	s = liststuff(MODES_LIST_NAME, makemodelist,0,(char *)wp);
 	/* back to the buffer whose modes we just listed */
 	swbuffer(wp->w_bufp);
 	return s;
@@ -324,7 +329,7 @@ success:
 	}
 
 	/* if the settings are up, redisplay them */
-	if (bfind("[Settings]", NO_CREAT, BFSCRTCH))
+	if (bfind(MODES_LIST_NAME, NO_CREAT, BFSCRTCH))
 		listmodes(FALSE,1);
 
 	refresh(FALSE,1);

@@ -11,7 +11,10 @@
  * which means that the dot and mark values in the buffer headers are nonsense.
  *
  * $Log: line.c,v $
- * Revision 1.28  1992/12/14 09:03:25  foxharp
+ * Revision 1.29  1992/12/23 09:20:31  foxharp
+ * ifdef of unused code
+ *
+ * Revision 1.28  1992/12/14  09:03:25  foxharp
  * lint cleanup, mostly malloc
  *
  * Revision 1.27  1992/11/19  09:10:16  foxharp
@@ -170,6 +173,7 @@ BUFFER *bp;
 	return (lp);
 }
 
+#ifdef	UNUSED
 int
 lgrow(lp,howmuch,bp)
 register LINE	*lp;
@@ -191,6 +195,7 @@ BUFFER *bp;
 	lp->l_size = size;
 	return TRUE;
 }
+#endif	/* UNUSED */
 
 
 

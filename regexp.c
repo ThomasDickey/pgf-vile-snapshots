@@ -13,7 +13,10 @@
  *		pgf, 11/91
  * 
  * $Log: regexp.c,v $
- * Revision 1.29  1992/12/14 09:03:25  foxharp
+ * Revision 1.30  1992/12/28 23:50:45  foxharp
+ * fixes for BOL and \s etc., from eric krohn
+ *
+ * Revision 1.29  1992/12/14  09:03:25  foxharp
  * lint cleanup, mostly malloc
  *
  * Revision 1.28  1992/12/13  13:20:21  foxharp
@@ -1197,50 +1200,49 @@ char *prog;
 			}
 			return 0;
 		case NWHITESP:
-			/* don't match bol, eol, or space or tab */
-			if (reginput == regbol || reginput == regnomore ||
-					isspace(*reginput))
+			/* don't match eol, or space or tab */
+			if (reginput == regnomore || isspace(*reginput))
 				return 0;
 			while (reginput != regnomore && !isspace(*reginput))
 				reginput++;
 			break;
 		case ALNUM: /* includes _ */
-			if (reginput == regbol || reginput == regnomore)
+			if (reginput == regnomore)
 				return 0;
 			if (!isident(*reginput))
 				return 0;
 			reginput++;
 			break;
 		case NALNUM:
-			if (reginput == regbol || reginput == regnomore)
+			if (reginput == regnomore)
 				return 0;
 			if (isident(*reginput))
 				return 0;
 			reginput++;
 			break;
 		case DIGIT:
-			if (reginput == regbol || reginput == regnomore)
+			if (reginput == regnomore)
 				return 0;
 			if (!isdigit(*reginput))
 				return 0;
 			reginput++;
 			break;
 		case NDIGIT:
-			if (reginput == regbol || reginput == regnomore)
+			if (reginput == regnomore)
 				return 0;
 			if (isdigit(*reginput))
 				return 0;
 			reginput++;
 			break;
 		case PRINT:
-			if (reginput == regbol || reginput == regnomore)
+			if (reginput == regnomore)
 				return 0;
 			if (!(isprint(*reginput) || isspace(*reginput)))
 				return 0;
 			reginput++;
 			break;
 		case NPRINT:
-			if (reginput == regbol || reginput == regnomore)
+			if (reginput == regnomore)
 				return 0;
 			if (isprint(*reginput) || isspace(*reginput))
 				return 0;

@@ -6,7 +6,15 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.64  1992/12/14 09:03:25  foxharp
+ * Revision 1.66  1992/12/30 19:54:56  foxharp
+ * avoid inf. loop when choosing unique name for buffers that have names
+ * containing "-x" in the NBUFN-1 position
+ *
+ * Revision 1.65  1992/12/23  09:19:26  foxharp
+ * allow ":e!" with no file to default to current file, and
+ * lint cleanup
+ *
+ * Revision 1.64  1992/12/14  09:03:25  foxharp
  * lint cleanup, mostly malloc
  *
  * Revision 1.63  1992/12/05  13:55:06  foxharp
@@ -251,6 +259,8 @@ int doslines, unixlines;
 # define slashc(c) (c == '/')
 #endif
 
+#define	InternalName(s)	((s[0] == '!') || (s[0] == '['))
+
 /*
  * Read a file into the current
  * buffer. This is really easy; all you do it
@@ -266,8 +276,12 @@ int f,n;
         static char fname[NFILEN];
         char bname[NBUFN];
 
-        if ((s=mlreply("Replace with file: ", fname, NFILEN)) != TRUE)
-                return s;
+        if ((s=mlreply("Replace with file: ", fname, NFILEN)) != TRUE) {
+		if (mlyesno("Reread current buffer"))
+			(void)strcpy(fname, curbp->b_fname);
+		else
+                	return s;
+	}
 	if ((s = glob(fname)) != TRUE)
 		return FALSE;
 	/* we want no errors or complaints, so mark it unchanged */
@@ -276,7 +290,7 @@ int f,n;
 	curbp->b_bname[0] = 0;
 	makename(bname, fname);
 	unqname(bname, TRUE);
-	strcpy(curbp->b_bname, bname);
+	(void)strcpy(curbp->b_bname, bname);
 	return s;
 }
 
@@ -306,7 +320,7 @@ int f,n;
         }
 	if ((s = glob(fname)) != TRUE)
 		return FALSE;
-	strcpy (nfname, fname);
+	(void)strcpy (nfname, fname);
 #ifdef LAZINESS
 	if (othmode & OTH_LAZY) {
 		char rnfname[NFILEN];
@@ -318,7 +332,7 @@ int f,n;
 			if (makeflist() == FALSE || !sortsearch(rnfname, 
 					strlen(rnfname), filesbp, FALSE, &lp)) {
 				/* give up, and try what they asked for */
-				strcpy (nfname, fname);
+				(void)strcpy (nfname, fname);
 				break;
 			}
 			rvstrncpy(nfname, lp->l_text, llength(lp));
@@ -577,7 +591,7 @@ int	mflg;		/* print messages? */
 	bp->b_flag &= ~BFCHG;
 #if FINDERR
 	if (fileispipe == TRUE) {
-		strncpy(febuff,bp->b_bname,NBUFN);
+		(void)strncpy(febuff,bp->b_bname,NBUFN);
 		newfebuff = TRUE;
 	}
 #endif
@@ -932,10 +946,10 @@ char    fname[];
 	}
 	lastsl = strrchr(fcp,'/');
 	if (lastsl) {
-		strncpy(bcp,lastsl+1,NBUFN);
+		(void)strncpy(bcp,lastsl+1,NBUFN);
 		bcp[NBUFN-1] = '\0';
 	} else {  /* no slashes, use the filename as is */
-		strncpy(bcp,fcp,NBUFN);
+		(void)strncpy(bcp,fcp,NBUFN);
 		bcp[NBUFN-1] = '\0';
 	}
 	return;
@@ -965,12 +979,13 @@ int ok_to_ask;  /* prompts allowed? */
 		if (sp - name >= 2 && sp[-1] == '-') {
 			if (sp[0] == '9')
 				sp[0] = 'A';
-			else if (sp[0] == 'Z')
+			else if ((sp[0] == 'Z') || 
+					 (!isdigit(sp[0]) && !isupper(sp[0])))
 				goto choosename;
-			else if (isdigit(sp[0]) || isupper(sp[0]))
+			else
 				sp[0] += 1;
 		} else if (sp + 2 < &name[NBUFN-1])  {
-			strcat(sp, "-1");
+			(void)strcat(sp, "-1");
 		} else {
 		choosename:
 			if (ok_to_ask) {
@@ -998,7 +1013,7 @@ int f,n;
         register int    s;
         static char            fname[NFILEN];
 
-	strncpy(fname, curbp->b_fname, NFILEN);
+	(void)strncpy(fname, curbp->b_fname, NFILEN);
 	
 	/* HACK -- this implies knowledge of how kbd_engl works! */
 	if (isnamedcmd && lastkey != '\r') {
@@ -1092,7 +1107,7 @@ writeregion()
         static char fname[NFILEN];
 
 	if (isnamedcmd && lastkey == '\r') {
-		strncpy(fname, curbp->b_fname, NFILEN);
+		(void)strncpy(fname, curbp->b_fname, NFILEN);
 
 		if (mlyesno("Okay to write [possible] partial range") != TRUE) {
 			mlwrite("Range not written");
@@ -1117,7 +1132,7 @@ writeregion()
         }
         if ((s=getregion(&region)) != TRUE)
                 return s;
-	s = writereg(&region,fname,TRUE,b_val(curbp, MDDOS), NULL);
+	s = writereg(&region,fname,TRUE,b_val(curbp, MDDOS), (BUFFER **)0);
         return s;
 }
 
@@ -1422,7 +1437,7 @@ FILE	*haveffp;
 		lp1->l_fp = lp2;
 
 		if (nbytes)  /* l_text may be NULL in this case */
-			memcpy(lp1->l_text, fline, nbytes);
+			(void)memcpy(lp1->l_text, fline, nbytes);
 		tag_for_undo(lp1);
 		if (belowthisline)
 			lp0 = lp1;
@@ -1551,12 +1566,11 @@ int signo;
 				created = 1;
 			}
 #endif
-			strcpy(filnam,dirnam);
-			strcat(filnam,"/");
+			(void)strcat(strcpy(filnam,dirnam), "/");
 #if ! HAVE_MKDIR
-			strcat(filnam,"V");
+			(void)strcat(filnam,"V");
 #endif
-			strcat(filnam,bp->b_bname);
+			(void)strcat(filnam,bp->b_bname);
 			if (writeout(filnam,bp,FALSE) != TRUE) {
 				vttidy(FALSE);
 				exit(1);
@@ -1574,7 +1588,7 @@ int signo;
     "(echo Subject: vile died; echo Files saved: ; ls %s/V* ) | /bin/mail %s",
 #endif
 				dirnam, np);
-			system(cmd);
+			(void)system(cmd);
 		}
 	}
 	vttidy(FALSE);
@@ -1623,7 +1637,7 @@ char *buf;
 	}
 
 	cp = buf;
-	if (*cp == '!' || *cp == '[')	/* it's a shell command, or an */
+	if (InternalName(cp))		/* it's a shell command, or an */
 		return TRUE;		/* internal name, don't bother */
 
 	while (*cp) {
@@ -1812,7 +1826,7 @@ char *f;
 	if (!f || *f == '\0')
 		return NULL;
 
-	if (*f == '!' || *f == '[')
+	if (InternalName(f))
 		return f;
 
 	cwd = current_directory(FALSE);
@@ -1841,8 +1855,7 @@ char *f;
 		is under '..' */
 	if (strchr(cwd,slash) == NULL) {
 		static char path[NFILEN];
-		strcpy(path,"..");
-		strcat(path,slp);
+		(void)strcat(strcpy(path,".."), slp);
 		return path;
 	}
 

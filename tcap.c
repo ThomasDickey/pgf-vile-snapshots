@@ -2,7 +2,10 @@
  *		for MicroEMACS
  *
  * $Log: tcap.c,v $
- * Revision 1.16  1992/12/04 09:18:31  foxharp
+ * Revision 1.17  1992/12/23 09:27:14  foxharp
+ * hack in missing CS or SR for xterms
+ *
+ * Revision 1.16  1992/12/04  09:18:31  foxharp
  * allow the open routine to be called again, to emit TI, KS
  *
  * Revision 1.15  1992/05/19  08:55:44  foxharp
@@ -206,6 +209,13 @@ tcapopen()
 	DL = tgetstr("DL", &p);
 	AL = tgetstr("AL", &p);
         
+	if (!CS || !SR) { /* some xterm's termcap entry is missing entries */
+		if (!strcmp(tv_stype, "xterm")) {
+			if (!CS) CS = "\033[%i%d;%dr";
+			if (!SR) SR = "\033[M";
+		}
+	}
+
 	if (CS && SR) {
 		if (SF == NULL) /* assume '\n' scrolls forward */
 			SF = "\n";

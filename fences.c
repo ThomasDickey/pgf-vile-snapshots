@@ -8,14 +8,17 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: fences.c,v $
- *	Revision 1.4  1992/08/20 23:40:48  foxharp
- *	typo fixes -- thanks, eric
+ *	Revision 1.5  1992/12/23 09:18:34  foxharp
+ *	allow match of fence that is first char. in buffer
+ *
+ * Revision 1.4  1992/08/20  23:40:48  foxharp
+ * typo fixes -- thanks, eric
  *
  * Revision 1.3  1992/06/08  08:56:05  foxharp
  * fixed infinite loop if simple fence not found, and
  * suppressed beeping in input mode if fence not found
  * ,.
- * 
+ * 
  *
  * Revision 1.2  1992/06/03  08:37:23  foxharp
  * removed nested comment
@@ -244,7 +247,10 @@ int ofence;
 
 		if (sdir == FORWARD)
 			s = forwchar(FALSE, 1);
-		else
+		else if (count == 0) {
+			s = FALSE;
+			break;		/* prevent backup past buffer top */
+		} else
 			s = backchar(FALSE, 1);
 
 		if (s == FALSE || interrupted)

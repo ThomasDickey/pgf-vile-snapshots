@@ -4,7 +4,10 @@
  * do any sentence mode commands, they are likely to be put in this file. 
  *
  * $Log: word.c,v $
- * Revision 1.22  1992/12/16 21:19:07  foxharp
+ * Revision 1.23  1992/12/23 09:28:15  foxharp
+ * fix counts on 'J' command
+ *
+ * Revision 1.22  1992/12/16  21:19:07  foxharp
  * fixups (from tom dickey) for 'J' command, wrt blank lines and counts
  *
  * Revision 1.21  1992/08/20  23:40:48  foxharp
@@ -330,6 +333,8 @@ int f,n;
 		if (n < 0) return FALSE;
 		if (n == 0) return TRUE;
 	}
+	if (n > 1)		/* in 'vi', "1J" and "2J" are the same */
+		n--;
 	if (is_last_line(DOT, curbp))
 		return FALSE;
 	while(n-- > 0) {

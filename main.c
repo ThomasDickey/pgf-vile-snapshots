@@ -14,7 +14,10 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.89  1992/12/14 09:03:25  foxharp
+ * Revision 1.90  1992/12/23 09:20:50  foxharp
+ * added .C, .i to cmode suffixes, for C++ and cpp output files
+ *
+ * Revision 1.89  1992/12/14  09:03:25  foxharp
  * lint cleanup, mostly malloc
  *
  * Revision 1.88  1992/12/04  09:24:12  foxharp
@@ -1115,7 +1118,7 @@ global_val_init()
 	/* suffixes for C mode */
 	rp = typealloc(struct regexval);
 	set_global_b_val_rexp(VAL_CSUFFIXES, rp);
-	rp->pat = strmalloc("\\.[chs]$");
+	rp->pat = strmalloc("\\.[Cchis]$");
 	rp->reg = regcomp(rp->pat, TRUE);
 
 	/* where do paragraphs start? */

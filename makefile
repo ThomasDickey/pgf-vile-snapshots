@@ -33,7 +33,7 @@ LIBS = -ltermcap
 TARGET = vile
 SCRDEF = -DTERMCAP -Dscrn_chosen
 
-# for building the X version (also edit estruct.h, turn TERMCAP off and X11 on)
+# for building the X version
 #SCREEN = x11
 #LIBS = -lX11
 #TARGET = xvile
@@ -326,7 +326,7 @@ $(MKTBLS):  mktbls.c
 install:
 	@[ -x $(TARGET) ] || (echo must make $(TARGET) first && exit 1)
 	@[ -w $(DESTDIR1) ] && dest=$(DESTDIR1) || dest=$(DESTDIR2) ;\
-	mv $$dest/$(TARGET) $$dest/o$(TARGET) ;\
+	[ -f $$dest/$(TARGET) ] && mv $$dest/$(TARGET) $$dest/o$(TARGET) ;\
 	echo Installing $(TARGET) to $$dest ; \
 	cp $(TARGET) $$dest ;\
 	test -f vile.hlp && /bin/rm -f $$dest/vile.hlp ;\
@@ -461,7 +461,13 @@ $(OBJ): estruct.h edef.h
 externs.$O: nebind.h nename.h nefunc.h
 
 # $Log: makefile,v $
-# Revision 1.77  1992/12/16 21:38:34  foxharp
+# Revision 1.79  1992/12/29 23:17:28  foxharp
+# commentary
+#
+# Revision 1.78  1992/12/28  23:51:57  foxharp
+# test for presence of vile in destdir before trying to move it to ovile
+#
+# Revision 1.77  1992/12/16  21:38:34  foxharp
 # rule for nchanges target
 #
 # Revision 1.76  1992/12/14  09:02:08  foxharp
