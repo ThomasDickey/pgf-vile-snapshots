@@ -4,7 +4,10 @@
  * written for vile by Paul Fox, (c)1990
  *
  * $Log: opers.c,v $
- * Revision 1.12  1991/08/13 02:50:52  pgf
+ * Revision 1.13  1991/09/10 00:51:05  pgf
+ * only restore dot with swapmark if the buffer hasn't switched on us
+ *
+ * Revision 1.12  1991/08/13  02:50:52  pgf
  * fixed chgreg case of butting against top of buffer
  *
  * Revision 1.11  1991/08/07  12:35:07  pgf
@@ -75,10 +78,12 @@ char *str;
 	CMDFUNC *cfp;			/* function to execute */
 	char tok[NSTRING];		/* command incoming */
 	MARK ourmark;
+	BUFFER *ourbp;
 
 	doingopcmd = TRUE;
 
 	ourmark = DOT;
+	ourbp = curbp;
 
 	if (havemotion != NULL) {
 		cfp = havemotion;
@@ -147,7 +152,8 @@ char *str;
 		status = (fn)(f,n,NULL,NULL);
 	}
 
-	swapmark();
+	if (ourbp == curbp) /* in case the func switched buffers on us */
+		swapmark();
 
 	if (fulllineregions) {
 		fulllineregions = FALSE;

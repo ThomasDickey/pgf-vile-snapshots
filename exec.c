@@ -4,7 +4,10 @@
  *	written 1986 by Daniel Lawrence	
  *
  * $Log: exec.c,v $
- * Revision 1.13  1991/08/07 12:35:07  pgf
+ * Revision 1.14  1991/10/08 01:30:00  pgf
+ * added new bp arg to lfree and lalloc
+ *
+ * Revision 1.13  1991/08/07  12:35:07  pgf
  * added RCS log messages
  *
  * revision 1.12
@@ -88,7 +91,7 @@ int f, n;
 
 	while(1) {
 		c = tgetc();
-		if (c == '\r') {
+		if (c == '\r' || c == '\n') {
 			lspec[cpos] = 0;
 			fnp = NULL;
 			break;
@@ -1108,7 +1111,7 @@ nxtscan:	/* on to the next line */
 		if (mstore) {
 			/* allocate the space for the line */
 			linlen = strlen(eline);
-			if ((mp=lalloc(linlen)) == NULL) {
+			if ((mp=lalloc(linlen,bstore)) == NULL) {
 				mlwrite("%%Out of memory while storing macro");
 				mstore = FALSE;
 				dobufnesting--;

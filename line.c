@@ -11,7 +11,17 @@
  * which means that the dot and mark values in the buffer headers are nonsense.
  *
  * $Log: line.c,v $
- * Revision 1.9  1991/08/07 12:35:07  pgf
+ * Revision 1.11  1991/10/10 12:33:33  pgf
+ * changes to support "block malloc" of line text -- now for most files
+ * there is are two mallocs and a single read, no copies.  previously there
+ * were two mallocs per line, and two copies (stdio's and ours).  This change
+ * implies that lines and line text should not move between buffers, without
+ * checking that the text and line struct do not "belong" to the buffer.
+ *
+ * Revision 1.10  1991/09/24  01:04:10  pgf
+ * do lnewline() correctly in empty buffer
+ *
+ * Revision 1.9  1991/08/07  12:35:07  pgf
  * added RCS log messages
  *
  * revision 1.8
@@ -61,8 +71,9 @@
  * message in the message line if no space.
  */
 LINE *
-lalloc(used)
+lalloc(used,bp)
 register int	used;
+BUFFER *bp;
 {
 	register LINE	*lp;
 	register int	size;
@@ -73,7 +84,9 @@ register int	used;
 	} else {
 		size = roundup(used);
 	}
-	if ((lp = (LINE *) malloc(sizeof(LINE))) == NULL) {
+	if (lp = bp->b_freeLINEs) { /* see if the buffer LINE block has any */
+		bp->b_freeLINEs = lp->l_fp;
+	} else if ((lp = (LINE *) malloc(sizeof(LINE))) == NULL) {
 		mlwrite("[OUT OF MEMORY]");
 		return NULL;
 	}
@@ -90,12 +103,44 @@ register int	used;
 	return (lp);
 }
 
-lfree(lp)
+
+
+lfree(lp,bp)
 register LINE *lp;
+register BUFFER *bp;
 {
-	if (lp->l_text)
-		free(lp->l_text);
-	free((char *)lp);
+	ltextfree(lp,bp);
+
+	/* if the buffer doesn't have its own block of LINEs, or this
+		one isn't in that range, free it */
+	if (!bp->b_LINEs || lp < bp->b_LINEs || lp >= bp->b_LINEs_end) {
+		free((char *)lp);
+	} else {
+		/* keep track of freed buffer LINEs here */
+		lp->l_fp = bp->b_freeLINEs;
+		bp->b_freeLINEs = lp;
+	}
+}
+
+ltextfree(lp,bp)
+register LINE *lp;
+register BUFFER *bp;
+{
+	register unsigned char *ltextp;
+
+	ltextp = (unsigned char *)lp->l_text;
+	if (ltextp) {
+		if (bp->b_ltext) { /* could it be in the big range? */
+			if (ltextp < bp->b_ltext || ltextp >= bp->b_ltext_end) {
+				free(ltextp);
+			} else {
+			/* could keep track of freed big range text here */
+			}
+		} else {
+			free(ltextp);
+		}
+		lp->l_text = NULL;
+	} /* else nothing to free */
 }
 
 /*
@@ -237,7 +282,7 @@ linsert(n, c)
 			mlwrite("bug: linsert");
 			return (FALSE);
 		}
-		if ((lp2=lalloc(n)) == NULL)	/* Allocate new line	*/
+		if ((lp2=lalloc(n,curbp)) == NULL) /* Allocate new line	*/
 			return (FALSE);
 		copy_for_undo(lp1->l_bp); /* don't want preundodot to point
 					   *	at a new line if this is the
@@ -266,7 +311,7 @@ linsert(n, c)
 		if (lp1->l_text) {
 			memcpy(&ntext[doto+n], &lp1->l_text[doto],
 							lp1->l_used-doto );
-			free((char *)lp1->l_text);
+			ltextfree(lp1,curbp);
 		}
 		lp1->l_text = ntext;
 		lp1->l_size = nsize;
@@ -339,9 +384,20 @@ lnewline()
 	lchange(WFHARD|WFINS);
 	lp1  = curwp->w_dot.l;			/* Get the address and	*/
 	doto = curwp->w_dot.o;			/* offset of "."	*/
-	if (lp1 != curbp->b_line.l)
-		copy_for_undo(lp1);
-	if ((lp2=lalloc(doto)) == NULL) 	/* New first half line	*/
+	if (lp1 == curbp->b_line.l) { /* first line special -- just */
+					/* create empty line */
+		if ((lp2=lalloc(doto,curbp)) == NULL)
+			return (FALSE);
+		/* put lp2 in below lp1 */
+		lp2->l_fp = lp1->l_fp;
+		lp1->l_fp = lp2;
+		lp2->l_fp->l_bp = lp2;
+		lp2->l_bp = lp1;
+		tag_for_undo(lp2);
+		return TRUE;
+	}
+	copy_for_undo(lp1);
+	if ((lp2=lalloc(doto,curbp)) == NULL) 	/* New first half line	*/
 		return (FALSE);
 	cp1 = &lp1->l_text[0];			/* Shuffle text around	*/
 	cp2 = &lp2->l_text[0];
@@ -625,7 +681,7 @@ ldelnewline()
 			return (FALSE);
 		if (lp1->l_text) { /* possibly NULL if l_size == 0 */
 			memcpy(&ntext[0], &lp1->l_text[0], lp1->l_used);
-			free((char *)lp1->l_text);
+			ltextfree(lp1,curbp);
 		}
 		lp1->l_text = ntext;
 		lp1->l_size = nsize;

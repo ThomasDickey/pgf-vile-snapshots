@@ -1,8 +1,11 @@
-/*	AT386:   hacked tcap.c for the 386 console, when you don't
+/*	AT386:	 hacked tcap.c for the 386 console, when you don't
  *		have libtermcap.   grrr.
  *
  * $Log: at386.c,v $
- * Revision 1.5  1991/08/07 12:34:39  pgf
+ * Revision 1.6  1991/09/10 01:19:35  pgf
+ * re-tabbed, and moved ESC and BEL to estruct.h
+ *
+ * Revision 1.5  1991/08/07  12:34:39  pgf
  * added RCS log messages
  *
  * revision 1.4
@@ -23,39 +26,37 @@
  * initial vile RCS revision
 */
 
-#define	termdef	1			/* don't define "term" external */
+#define termdef 1			/* don't define "term" external */
 
 #include <stdio.h>
 #include	"estruct.h"
-#include        "edef.h"
+#include	"edef.h"
 
 #if AT386
 
-#define NROW    25                      /* Screen size.                 */
-#define NCOL    80                      /* Edit if you want to.         */
-#define	MARGIN	8
-#define	SCRSIZ	64
-#define	NPAUSE	10			/* # times thru update to pause */
-#define BEL     0x07
-#define ESC     0x1B
+#define NROW	25			/* Screen size. 		*/
+#define NCOL	80			/* Edit if you want to. 	*/
+#define MARGIN	8
+#define SCRSIZ	64
+#define NPAUSE	10			/* # times thru update to pause */
 
-extern int      ttopen();
-extern int      ttgetc();
-extern int      ttputc();
+extern int	ttopen();
+extern int	ttgetc();
+extern int	ttputc();
 extern int	tgetnum();
-extern int      ttflush();
-extern int      ttclose();
+extern int	ttflush();
+extern int	ttclose();
 extern int	at386kopen();
 extern int	at386kclose();
-extern int      at386move();
-extern int      at386eeol();
-extern int      at386eeop();
-extern int      at386beep();
+extern int	at386move();
+extern int	at386eeol();
+extern int	at386eeop();
+extern int	at386beep();
 extern int	at386rev();
 extern int	at386cres();
-extern int      at386open();
-extern int      tput();
-extern char     *tgoto();
+extern int	at386open();
+extern int	tput();
+extern char	*tgoto();
 #if	COLOR
 extern	int	at386fcol();
 extern	int	at386bcol();
@@ -80,19 +81,19 @@ TERM term = {
 	MARGIN,
 	SCRSIZ,
 	NPAUSE,
-        at386open,
-        ttclose,
-        at386kopen,
-        at386kclose,
-        ttgetc,
-        ttputc,
-        ttflush,
-        at386move,
-        at386eeol,
-        at386eeop,
-        at386beep,
-        at386rev,
-        at386cres
+	at386open,
+	ttclose,
+	at386kopen,
+	at386kclose,
+	ttgetc,
+	ttputc,
+	ttflush,
+	at386move,
+	at386eeol,
+	at386eeop,
+	at386beep,
+	at386rev,
+	at386cres
 #if	COLOR
 	, at386fcol,
 	at386bcol
@@ -104,15 +105,15 @@ TERM term = {
 
 at386open()
 {
-        char *getenv();
-        char *t, *p, *tgetstr();
-        char tcbuf[1024];
-        char *tv_stype;
-        char err_str[72];
+	char *getenv();
+	char *t, *p, *tgetstr();
+	char tcbuf[1024];
+	char *tv_stype;
+	char err_str[72];
 
-        CL = "\033[2J\033[H";
-        CE = "\033[K";
-        UP = "\033[A";
+	CL = "\033[2J\033[H";
+	CE = "\033[K";
+	UP = "\033[A";
 	SE = "\033[m";
 	SO = "\033[7m";
 	revexist = TRUE;
@@ -123,7 +124,7 @@ at386open()
 	AL = "\033[1L";
 	term.t_scroll = at386scroll_delins;
 #endif
-        ttopen();
+	ttopen();
 }
 
 at386kopen()
@@ -142,42 +143,42 @@ csi()
 }
 
 ansiparm(n)
-register int    n;
+register int	n;
 {
-        register int q,r;
+	register int q,r;
 
-        q = n/10;
-        if (q != 0) {
+	q = n/10;
+	if (q != 0) {
 		r = q/10;
 		if (r != 0) {
 			ttputc((r%10)+'0');
 		}
 		ttputc((q%10) + '0');
-        }
-        ttputc((n%10) + '0');
+	}
+	ttputc((n%10) + '0');
 }
 
 at386move(row, col)
 register int row, col;
 {
 	csi();
-        if (row) ansiparm(row+1);
-        ttputc(';');
-        if (col) ansiparm(col+1);
-        ttputc('H');
+	if (row) ansiparm(row+1);
+	ttputc(';');
+	if (col) ansiparm(col+1);
+	ttputc('H');
 }
 
 at386eeol()
 {
-        fputs(CE,stdout);
+	fputs(CE,stdout);
 }
 
 at386eeop()
 {
-        fputs(CL,stdout);
+	fputs(CL,stdout);
 }
 
-at386rev(state)		/* change reverse video status */
+at386rev(state) 	/* change reverse video status */
 int state;		/* FALSE = normal video, TRUE = reverse video */
 {
 	static int revstate = -1;
@@ -216,7 +217,7 @@ at386scroll_delins(from,to,n)
 		if (from < to)
 			from = to-1;
 		else
-			from = to+1;	
+			from = to+1;    
 	}
 #endif
 	if (to < from) {

@@ -3,7 +3,10 @@
  * Microcomputer.
  *
  * $Log: dg10.c,v $
- * Revision 1.2  1991/08/07 12:35:07  pgf
+ * Revision 1.3  1991/09/10 01:19:35  pgf
+ * re-tabbed, and moved ESC and BEL to estruct.h
+ *
+ * Revision 1.2  1991/08/07  12:35:07  pgf
  * added RCS log messages
  *
  * revision 1.1
@@ -11,34 +14,33 @@
  * initial vile RCS revision
  */
 
-#define	termdef	1			/* don't define "term" external */
+#define termdef 1			/* don't define "term" external */
 
-#include        <stdio.h>
+#include	<stdio.h>
 #include	"estruct.h"
-#include        "edef.h"
+#include	"edef.h"
 
-#if     DG10
+#if	DG10
 
-#define NROW    24                      /* Screen size.                 */
-#define NCOL    80                      /* Edit if you want to.         */
-#define	NPAUSE	100			/* # times thru update to pause */
-#define	MARGIN	8			/* size of minimim margin and	*/
-#define	SCRSIZ	64			/* scroll size for extended lines */
-#define BEL     0x07                    /* BEL character.               */
-#define ESC     30                      /* DG10 ESC character.          */
+#define NROW	24			/* Screen size. 		*/
+#define NCOL	80			/* Edit if you want to. 	*/
+#define NPAUSE	100			/* # times thru update to pause */
+#define MARGIN	8			/* size of minimim margin and	*/
+#define SCRSIZ	64			/* scroll size for extended lines */
+#define DG_ESC	   30			/* DG10 ESC character.		*/
 
-extern  int     ttopen();               /* Forward references.          */
-extern  int     ttgetc();
-extern  int     ttputc();
-extern  int     ttflush();
-extern  int     ttclose();
+extern	int	ttopen();		/* Forward references.		*/
+extern	int	ttgetc();
+extern	int	ttputc();
+extern	int	ttflush();
+extern	int	ttclose();
 extern	int	dg10kopen();
 extern	int	dg10kclose();
-extern  int     dg10move();
-extern  int     dg10eeol();
-extern  int     dg10eeop();
-extern  int     dg10beep();
-extern  int     dg10open();
+extern	int	dg10move();
+extern	int	dg10eeol();
+extern	int	dg10eeop();
+extern	int	dg10beep();
+extern	int	dg10open();
 extern	int	dg10rev();
 extern	int	dg10close();
 extern	int	dg10cres();
@@ -57,25 +59,25 @@ int	ctrans[] = {		/* emacs -> DG10 color translation table */
  * Standard terminal interface dispatch table. Most of the fields point into
  * "termio" code.
  */
-TERM    term    = {
+TERM	term	= {
 	NROW-1,
-        NROW-1,
-        NCOL,
-        NCOL,
+	NROW-1,
+	NCOL,
+	NCOL,
 	MARGIN,
 	SCRSIZ,
 	NPAUSE,
-        dg10open,
-        dg10close,
+	dg10open,
+	dg10close,
 	dg10kopen,
 	dg10kclose,
-        ttgetc,
-        ttputc,
-        ttflush,
-        dg10move,
-        dg10eeol,
-        dg10eeop,
-        dg10beep,
+	ttgetc,
+	ttputc,
+	ttflush,
+	dg10move,
+	dg10eeol,
+	dg10eeop,
+	dg10beep,
 	dg10rev,
 	dg10cres
 #if	COLOR
@@ -85,43 +87,43 @@ TERM    term    = {
 };
 
 #if	COLOR
-dg10fcol(color)		/* set the current output color */
+dg10fcol(color) 	/* set the current output color */
 
 int color;	/* color to set */
 
 {
 	if (color == cfcolor)
 		return;
-	ttputc(ESC);
+	ttputc(DG_ESC);
 	ttputc(0101);
 	ttputc(ctrans[color]);
 	cfcolor = color;
 }
 
-dg10bcol(color)		/* set the current background color */
+dg10bcol(color) 	/* set the current background color */
 
 int color;	/* color to set */
 
 {
 	if (color == cbcolor)
 		return;
-	ttputc(ESC);
+	ttputc(DG_ESC);
 	ttputc(0102);
 	ttputc(ctrans[color]);
-        cbcolor = color;
+	cbcolor = color;
 }
 #endif
 
 dg10move(row, col)
 {
 	ttputc(16);
-        ttputc(col);
+	ttputc(col);
 	ttputc(row);
 }
 
 dg10eeol()
 {
-        ttputc(11);
+	ttputc(11);
 }
 
 dg10eeop()
@@ -130,9 +132,9 @@ dg10eeop()
 	dg10fcol(gfcolor);
 	dg10bcol(gbcolor);
 #endif
-        ttputc(ESC);
-        ttputc(0106);
-        ttputc(0106);
+	ttputc(DG_ESC);
+	ttputc(0106);
+	ttputc(0106);
 }
 
 dg10rev(state)		/* change reverse video state */
@@ -146,7 +148,7 @@ int state;	/* TRUE = reverse, FALSE = normal */
 		dg10bcol(7);
 	}
 #else
-	ttputc(ESC);
+	ttputc(DG_ESC);
 	ttputc(state ? 0104: 0105);
 #endif
 }
@@ -165,15 +167,15 @@ spal()		/* change palette string */
 
 dg10beep()
 {
-        ttputc(BEL);
-        ttflush();
+	ttputc(BEL);
+	ttflush();
 }
 
 dg10open()
 {
 	strcpy(sres, "NORMAL");
 	revexist = TRUE;
-        ttopen();
+	ttopen();
 }
 
 dg10close()

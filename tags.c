@@ -5,7 +5,26 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: tags.c,v $
- * Revision 1.5  1991/08/07 12:35:07  pgf
+ * Revision 1.11  1991/10/22 03:09:32  pgf
+ * tags given on the command line now set the response for further tag commands
+ *
+ * Revision 1.10  1991/10/20  23:06:43  pgf
+ * cleaned up taglen stuff
+ *
+ * Revision 1.9  1991/10/15  11:58:58  pgf
+ * added taglength support
+ *
+ * Revision 1.8  1991/10/08  01:30:00  pgf
+ * added new bp arg to lfree and lalloc
+ *
+ * Revision 1.7  1991/10/08  01:26:33  pgf
+ * untagpop now sets "lastdot" correctly
+ *
+ * Revision 1.6  1991/09/19  13:44:13  pgf
+ * tags file is looked up via VAL_TAGS setting (the global one -- local tags
+ * paths and files don't make sense.  yet? )
+ *
+ * Revision 1.5  1991/08/07  12:35:07  pgf
  * added RCS log messages
  *
  * revision 1.4
@@ -33,27 +52,39 @@
 #define NULL 0
 #endif
 
+static char tagname[NFILEN];
+
 gototag(f,n)
 {
 	register int i = 0;
 	register int s = TRUE;
-	static char tname[NFILEN];
+	int taglen;
 
 	if (clexec || isnamedcmd) {
-	        if ((s=mlreply("Tag name: ", tname, NFILEN)) != TRUE)
+	        if ((s=mlreply("Tag name: ", tagname, NFILEN)) != TRUE)
 	                return (s);
+		taglen = b_val(curbp,VAL_TAGLEN);
 	} else {
-		screen_string(tname,NFILEN,_ident);
+		screen_string(tagname,NFILEN,_ident);
+		taglen = 0;
 	}
 	if (s == TRUE)
-		s = tags(tname);
+		s = tags(tagname,taglen);
 	return s;
+}
+
+cmdlinetag(t)
+char *t;
+{
+	strcpy(tagname,t);
+	return tags(tagname, b_val(curbp,VAL_TAGLEN));
 }
 
 static BUFFER *tagbp;
 
-tags(tag)
+tags(tag,taglen)
 char *tag;
+int taglen;
 {
 	BUFFER *ocurbp;
 	register LINE *lp, *clp;
@@ -74,17 +105,19 @@ char *tag;
 			return FALSE;
 	}
 
-	strcat(tname,"\t");
-
-	lp = cheap_scan(tagbp,tname);
+	lp = cheap_scan(tagbp, tname, taglen ? taglen : strlen(tname));
 	if (lp == NULL) {
 		TTbeep();
 		mlwrite("No such tag: %s",tname);
 		return FALSE;
 	}
 	
-	tfp = lp->l_text + strlen(tname);
 	lplim = &lp->l_text[lp->l_used];
+	tfp = lp->l_text;
+	while (tfp < lplim)
+		if (*tfp++ == '\t')
+			break;
+
 	i = 0;
 	while (i < NFILEN && tfp < lplim && *tfp != '\t') {
 		tfname[i++] = *tfp++;
@@ -111,7 +144,8 @@ char *tag;
 		}
 		changedfile = TRUE;
 	} else {
-		tname[strlen(tname)-1] = '\0'; /* get rid of tab we added */
+		if (tname[strlen(tname)-1] == '\t')
+			tname[strlen(tname)-1] = '\0'; /* get rid of tab we added */
 		mlwrite("[Tag \"%s\" in current buffer]", tname);
 		changedfile = FALSE;
 	}
@@ -139,7 +173,7 @@ char *tag;
 			tagpat[i++] = *tfp++;
 		}
 		tagpat[i] = 0;
-		lp = cheap_scan(curbp,tagpat);
+		lp = cheap_scan(curbp,tagpat,i);
 		if (lp == NULL) {
 			mlwrite("Tag not present");
 			if (!changedfile)
@@ -166,8 +200,9 @@ gettagsfile()
 
 	/* is there a "tags" buffer around? */
         if ((tagbp=bfind("tags", NO_CREAT, 0)) == NULL) {
+		char *tagf = global_b_val_ptr(VAL_TAGS);
 		/* look up the tags file */
-		tagsfile = flook("tags", FL_HERE);
+		tagsfile = flook(tagf, FL_HERE);
 
 		/* if it isn't around, don't sweat it */
 		if (tagsfile == NULL)
@@ -177,27 +212,29 @@ gettagsfile()
 		}
 
 		/* find the pointer to that buffer */
-	        if ((tagbp=bfind("tags", OK_CREAT, BFINVS)) == NULL) {
-	        	mlwrite("No tags buffer");
-	                return(FALSE);
+	        if ((tagbp=bfind("tags", NO_CREAT, BFINVS)) == NULL) {
+		        if ((tagbp=bfind(tagf, OK_CREAT, BFINVS)) == NULL) {
+		        	mlwrite("No tags buffer");
+		                return(FALSE);
+			}
 	        }
 
 		if ((s = readin(tagsfile, FALSE, tagbp, FALSE)) != TRUE) {
 			return(s);
 		}
+		strcpy(tagbp->b_bname, "tags");  /* be sure it's named tags */
 		tagbp->b_flag |= BFINVS;
         }
 	return TRUE;
 }
 
 LINE *
-cheap_scan(bp,name)
+cheap_scan(bp,name,len)
 BUFFER *bp;
 char *name;
+int len;
 {
 	LINE *lp;
-	register int len;
-	len = strlen(name);
 	lp = lforw(bp->b_line.l);
 	while (lp != bp->b_line.l) {
 		if (llength(lp) >= len) {
@@ -215,6 +252,8 @@ int f,n;
 {
 	int lineno;
 	char fname[NFILEN];
+	MARK odot;
+
 	if (!f) n = 1;
 	while (n-- && popuntag(fname,&lineno))
 		;
@@ -223,7 +262,15 @@ int f,n;
 		s = getfile(fname,FALSE);
 		if (s != TRUE)
 			return s;
-		return gotoline(TRUE,lineno);
+
+		/* it's an absolute move -- remember where we are */
+		odot = DOT;
+		s = gotoline(TRUE,lineno);
+		/* if we moved, update the "last dot" mark */
+		if (s == TRUE && !sameline(DOT, odot)) {
+			curwp->w_lastdot = odot;
+		}
+		return s;
 	}
 	TTbeep();
 	mlwrite("No stacked un-tags");
@@ -392,7 +439,7 @@ LINE **lpp;
 		     lp == bp->b_line.l) { /* stick line into buffer */
 		     	if (!insert)
 				return FALSE;
-		        if ((nlp=lalloc(len)) == NULL)
+		        if ((nlp=lalloc(len,bp)) == NULL)
 		                return FALSE;
 			memcpy(nlp->l_text, text, len);
 		        lp->l_bp->l_fp = nlp;

@@ -4,7 +4,19 @@
 	written 1986 by Daniel Lawrence
  *
  * $Log: eval.c,v $
- * Revision 1.7  1991/08/07 12:35:07  pgf
+ * Revision 1.11  1991/10/22 14:10:07  pgf
+ * more portable #if --> #ifdef
+ *
+ * Revision 1.10  1991/09/26  13:12:04  pgf
+ * new arg. to kbd_string to enable backslash processing
+ *
+ * Revision 1.9  1991/09/16  23:46:55  pgf
+ * more hardening
+ *
+ * Revision 1.8  1991/09/13  03:27:06  pgf
+ * attempt to harden against bad variable names (like lone %)
+ *
+ * Revision 1.7  1991/08/07  12:35:07  pgf
  * added RCS log messages
  *
  * revision 1.6
@@ -61,6 +73,9 @@ char *fname;		/* name of function to evaluate */
 #if	ENVFUNC
 	char *getenv();
 #endif
+
+	if (!fname[0])
+		return(errorm);
 
 	/* look the function up in the function table */
 	fname[3] = 0;	/* only first 3 chars significant */
@@ -147,6 +162,9 @@ char *vname;		/* name of user variable to fetch */
 
 	register int vnum;	/* ordinal number of user var */
 
+	if (!vname[0])
+		return (errorm);
+
 	/* scan the list looking for the user var name */
 	for (vnum = 0; vnum < MAXVARS; vnum++)
 		if (strcmp(vname, uv[vnum].u_name) == 0)
@@ -165,6 +183,9 @@ char *vname;		/* name of environment variable to retrieve */
 	register int vnum;	/* ordinal number of var refrenced */
 	char *getkill();
 
+	if (!vname[0])
+		return (errorm);
+
 	/* scan the list, looking for the referenced name */
 	for (vnum = 0; vnum < NEVARS; vnum++)
 		if (strcmp(vname, envars[vnum]) == 0)
@@ -176,7 +197,7 @@ char *vname;		/* name of environment variable to retrieve */
 
 	/* otherwise, fetch the appropriate value */
 	switch (vnum) {
-#if BEFORE
+#ifdef BEFORE
 		case EVFILLCOL:	return(itoa(fillcol));
 #endif
 		case EVPAGELEN:	return(itoa(term.t_nrow + 1));
@@ -352,7 +373,12 @@ VDESC *vd;	/* structure to hold type and ptr */
 	register int vnum;	/* subscript in varable arrays */
 	register int vtype;	/* type to return */
 
-fvar:	vtype = -1;
+fvar:
+	vtype = -1;
+	if (!var[1]) {
+		vd->v_type = vtype;
+		return;
+	}
 	switch (var[0]) {
 
 		case '$': /* check for legal enviromnent var */
@@ -429,7 +455,7 @@ char *value;	/* value to set to */
 	case TKENV: /* set an environment variable */
 		status = TRUE;	/* by default */
 		switch (vnum) {
-#if BEFORE
+#ifdef BEFORE
 		case EVFILLCOL: fillcol = atoi(value);
 				break;
 #endif
@@ -634,7 +660,7 @@ char *tokn;		/* token to evaluate */
 				distmp = discmd;	/* echo it always! */
 				discmd = TRUE;
 				status = kbd_string(tokn,
-					   buf, NSTRING, '\n',EXPAND);
+					   buf, NSTRING, '\n',EXPAND,TRUE);
 				discmd = distmp;
 				if (status == ABORT)
 					return(errorm);

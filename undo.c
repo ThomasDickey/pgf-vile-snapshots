@@ -3,7 +3,16 @@
  * code by Paul Fox, original algorithm mostly by Julia Harper May, 89
  *
  * $Log: undo.c,v $
- * Revision 1.9  1991/08/07 12:35:07  pgf
+ * Revision 1.12  1991/10/08 01:30:00  pgf
+ * added new bp arg to lfree and lalloc
+ *
+ * Revision 1.11  1991/09/30  01:47:24  pgf
+ * satisfy gcc's objection to ' in ifdefs
+ *
+ * Revision 1.10  1991/09/10  13:04:34  pgf
+ * don't let DOT.o go negative after an undo
+ *
+ * Revision 1.9  1991/08/07  12:35:07  pgf
  * added RCS log messages
  *
  * revision 1.8
@@ -164,7 +173,7 @@ LINE *lp;
 	if (liscopied(lp))
 		return(TRUE);
 
-	nlp = lalloc(-1);
+	nlp = lalloc(-1,curbp);
 	if (nlp == NULL)
 		return(FALSE);
 	llength(nlp) = LINENOTREAL;
@@ -204,7 +213,7 @@ LINE *olp,*nlp;
 {
 	register LINE *plp;
 	/* push on a tag that matches up the copy with the original */
-	plp = lalloc(-1);
+	plp = lalloc(-1,curbp);
 	if (plp == NULL)
 		return(FALSE);
 	llength(plp) = type;
@@ -234,7 +243,7 @@ register LINE *lp;
 	int i;
 	register LINE *nlp;
 	
-	nlp = lalloc(lp->l_used);
+	nlp = lalloc(lp->l_used,curbp);
 	if (nlp == NULL)
 		return(NULL);
 	/* copy the text and forward and back pointers.  everything else 
@@ -258,7 +267,7 @@ register BUFFER *bp;
 
 	for (i = 0; i <= 1; i++, SWITCHSTKS(bp)) {
 		while ((lp = popline(CURSTK(bp))) != NULL) {
-			lfree(lp);
+			lfree(lp,bp);
 		}
 	}
 
@@ -297,7 +306,7 @@ undo(f,n)
 #endif
 		if (lislinepatch(lp)) {
 			patchstk(lp->l_bp, lp->l_fp);
-			lfree(lp);
+			lfree(lp,curbp);
 			continue;
 		}
 		lchange(WFHARD|WFINS|WFKILLS);
@@ -318,7 +327,7 @@ undo(f,n)
 			}
 		} else { /* there is no line where we're going */
 			/* create an "unreal" tag line to push */
-			alp = lalloc(-1);
+			alp = lalloc(-1,curbp);
 			if (alp == NULL)
 				return(FALSE);
 			llength(alp) = LINENOTREAL;
@@ -332,7 +341,7 @@ undo(f,n)
 			lp->l_bp->l_fp = lp;
 			lp->l_fp->l_bp = lp;
 		} else {
-			lfree(lp);
+			lfree(lp,curbp);
 		}
 
 		pushline(alp,ALTSTK(curbp));
@@ -351,7 +360,7 @@ undo(f,n)
 
 		DOT = CURDOT(curbp);
 		if (DOT.o >= llength(DOT.l))
-			DOT.o = llength(DOT.l) - 1;
+			DOT.o = llength(DOT.l);
 		else if (DOT.o < firstchar(DOT.l))
 			DOT.o = firstchar(DOT.l);
 
@@ -516,7 +525,7 @@ register LINE *nlp,*olp;
 		wp = wp->w_wndp;
 	}
 #if 0
-no code for ALTDOT, but this was ifdef'ed out before I put that in...  pgf
+no code for ALTDOT, but this was ifdefed out before I put that in...  pgf
 	if (ALTDOT(curbp).l == olp) {
 		if (lisreal(nlp)) {
 			ALTDOT(curbp).l = nlp;
@@ -569,7 +578,7 @@ LINE *lp;
 {
 	if ((curbp->b_ulinep != NULL) &&
 		    (curbp->b_ulinep->l_nxtundo == lp)) {
-		lfree(curbp->b_ulinep);
+		lfree(curbp->b_ulinep,curbp);
 		curbp->b_ulinep = NULL;
 	}
 }
@@ -580,7 +589,7 @@ LINE *lp;
 	/* take care of the U line */
 	if ((curbp->b_ulinep == NULL) || (curbp->b_ulinep->l_nxtundo != lp)) {
 		if (curbp->b_ulinep != NULL)
-			lfree(curbp->b_ulinep);
+			lfree(curbp->b_ulinep,curbp);
 		curbp->b_ulinep = copyline(lp);
 		if (curbp->b_ulinep != NULL)
 			curbp->b_ulinep->l_nxtundo = lp;

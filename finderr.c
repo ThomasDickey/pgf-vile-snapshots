@@ -2,7 +2,10 @@
  * Written for vile by Paul Fox, (c)1990
  *
  * $Log: finderr.c,v $
- * Revision 1.4  1991/08/07 12:35:07  pgf
+ * Revision 1.5  1991/09/20 13:11:53  pgf
+ * protect against passing null l_text pointer to sscanf
+ *
+ * Revision 1.4  1991/08/07  12:35:07  pgf
  * added RCS log messages
  *
  * revision 1.3
@@ -72,7 +75,8 @@ finderr(f,n)
 			or
 			file.c: 223: error....
 		*/
-		if ((sscanf(dotp->l_text,
+		if ( dotp->l_text &&
+		    (sscanf(dotp->l_text,
 			"\"%[^\" 	]\", line %d:",errfile,&errline) == 2 ||
 		     sscanf(dotp->l_text,
 			"%[^: 	]: %d:",errfile,&errline) == 2 

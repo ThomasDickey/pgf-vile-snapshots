@@ -1,10 +1,8 @@
 	(E means enhancement, L,M,H are low, medium, high priority)
 ----------------------
-H	:e! (fileread()) should rename the buffer to match the file 
+H	do a 'd/.PP' at the start of a line containing ".PP"
 
 H	sys/filio.h and FIONREAD aren't there under ULTRIX  (POSIX?)
-
-H	empty buffer, "ijjjjESCuij" gives "bug: linsert"
 
 H	try building on the NeXt and the Sony.
 
@@ -12,34 +10,25 @@ H	the gotoeop motion and regions interract wrongly.  For instance,
 	using ^W} to write the rest of the paragraph to a file writes
 	the wrong number of characters.
 
-H	when reading the output of a shell command, it's far too slow -- should
-	read as much as possible, put it into the buffer, and _then_ update
-	[ This has been fixed for BSD -- other implementations not yet ]
+M	make ^W work in kbd_string
 
-M	the section chars and suffixes for c mode should be in variables, and
-	should perhaps be regexps
+M	the section chars should be in variables and should perhaps be regexps
 
-M	add "set autowrite", "write-all-buffers", ":n file" (what does that do?)
+M	the file accepted for c-mode should be expressable as regexps
+
+M	add "set autowrite", ":n file" (what does that do?)
 
 M	output doesn't flush properly after a shell escape
 
 M	longnames cause severe portability constraint -- does the shortnames
 	stuff take care of this?  I can't test it...
 
-M	:k, to set a mark, won't work as ":ka" or ":kb".  Must use ":k a"
-
-M	:set all should be made to work (fix help)
-
 L	should I make the "value'd" modes be variables?  should I add 
 	some syntax checks to "set" to call set-variable if it has an '='?
 
-L	dos-style is set even when file is majority unix-lines?
+L	searching is slow
 
-L	why does file reading seem so slow?
-
-L	why is searching so slow?
-
-E	add support for ansi arrow keys 
+E	:k, to set a mark, won't work as ":ka" or ":kb".  Must use ":k a"
 
 E	patterns as addresses do not work, e.g. ":/str1/,/str2/d".  They're
 	hard to parse the way things are set up right now.  We could accumulate
@@ -68,25 +57,18 @@ E	need a "file newer than buffer" warning.  Should stat the file, and
 
 E	should be able to refer to remote tags file, and have paths
 	contained there be relative to _its_ location, rather than the current
-	directory.
+	directory.  possibly a tagspath, and/or multiple tags files as well.
 
 E	add a command-line expansion character to be the list of files
 	mentioned in "tags"
 
-E	should there be a "significant-length" for tags?
-
 E	another mode, which will "!get -p" an SCCS or RCS file if 
 	the clear-text file isn't found
-
-E	add _another_ mode, similar to the above, which will do a caseless 
-	match against filenames mentioned in tags
 
 E	it would be nice if ^X!! reran the last command into [Output]
 
 E	add support for sh or C comments to formatregion() code
 
-E	why can't I kill a displayed buffer?  simply bring up the previous.
-	
 E	g should become a region command.  Then it could take ranges, as
 	it should, and could also become an operator command.
 
@@ -98,7 +80,7 @@ E	adjust window size of popups based on length of buffer.  currently
 	popups get half the window they're splitting, no matter what
 
 E	collapse command execution code to as few places as possible.
-	Its currently spread through main(), execute(), operator(),
+	Its currently spread through execute(), operator(),
 	docmd(), and usekreg().
 	
 E	mlreply line should ideally be a one line buffer, so editing
@@ -109,20 +91,10 @@ E	BSD interrupt processing is botched during a read() of the keyboard.
 	So you can bang on ^C all day and nothing will happen.
 	[I'm not sure this is true anymore  -pgf]
 	
-E	This editor does not virtualize buffers out to disk.  It is quite 
-	a memory hog.  But isn't that what /dev/swap is for?  But
-	seriously, I haven't even come close to testing it for
+E	I haven't even come close to testing vile for
 	memory-full conditions.  Some malloc() packages give 95%
 	warnings -- perhaps something like that should be done for
 	safety.
-
-E	to make the code shrink, could probably try to eliminate
-	sprintf and its brethren.  mlwrite already does format
-	expansion, it could probably be turned into a doprnt-like
-	beast, and that used as a basis for our own sprintf,fprintf
-	How does one write [sfp]printf and doprnt using varargs?
-
-E	likewise for scanf
 
 E	marks should perhaps be linked onto lines.  this would make a lot
         of things a lot easier, since a mark would travel with the
@@ -146,70 +118,8 @@ E	:e and :n should be able to deal with multiple filenames resulting
 	vile lets you choose to choose the first such name.  if should show
 	you the first name, so you know whether to accept it or not.
 
-E	^W should erase word in input mode, and killc should erase line 
-	in input mode.  (but only back to where the input started, if it
-	started on this line.  right now we have no record of that, hence
-	you can backspace past the insert point)
-
 E	All code should pass lint.  This won't be easy... :-)
 	
---------
-new 
 
-------------
-from pcsherma@eos.ncsu.edu
-  1) :f doesn't give ^G info.
-
-
-
-from David Giddy, d.giddy@trl.oz.au
-
-		wants to map the arrow keys, as in:
-                up      ^[[A    k
-                down    ^[[B    j
-                left    ^[[D    h
-                right   ^[[C    l
-
-From Dave Lemke
- > i also managed to crash it with one of my earlier tests with this macro:
- >
- > 5 store-macro
- >  write-file
- >  replace-with-file %
- > ~endm
- >
- > its apparently looking at the '%' as the start of an argument, and derefs
- > the NULL on the end.
-
-
-
-
-
-from Todd Ogasawar, todd@pinhead.pegasus.com
-	config changes for ISC2.2
-        estruct.h       /* really system configuration changes */
-        display.c
-        termio.c
-	<estruct.h>
-	30,31c30,31
-	< #define BSD   1                       /* UNIX BSD 4.2 and ULTRIX      */
-	< #define USG   0                       /* UNIX system V                */
-	---
-	> #define BSD   0                       /* UNIX BSD 4.2 and ULTRIX      */
-	> #define USG   1                       /* UNIX system V                */
-	37c37
-	< #define POSIX 0
-	---
-	> #define POSIX 1
-	=====================================
-	display.c
-	16a17,19
-	> #include      <sys/types.h>   /* t.o. */
-	> #include      <sys/stream.h>  /* t.o. */
-	> #include      <sys/ptem.h>    /* t.o. */
-	=====================================
-	termio.c
-	6a7
-	> #include      <termios.h>     /* t.o. */
 
 

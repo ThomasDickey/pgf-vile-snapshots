@@ -1,36 +1,60 @@
 /*
  *	This used to be MicroEMACS 3.9
- * 			written by Dave G. Conroy.
- *			substatially modified by Daniel M. Lawrence
+ *			written by Dave G. Conroy.
+ *			substantially modified by Daniel M. Lawrence
+ *
+ *	Turned into "VI Like Emacs", a.k.a. vile, by Paul Fox
  *
  *	(C)opyright 1987 by Daniel M. Lawrence
  *	MicroEMACS 3.9 can be copied and distributed freely for any
  *	non-commercial purposes. MicroEMACS 3.9 can only be incorporated
  *	into commercial software with the permission of the current author.
  *
- *	Turned into "VI Like Emacs", a.k.a. vile, by Paul Fox
- *
- * This file contains the main driving routine, and some keyboard processing
- * code, for the screen editor.
+ *	The same goes for vile.  -pgf
  *
  *
  * $Log: main.c,v $
- * Revision 1.26  1991/08/13 02:50:13  pgf
+ * Revision 1.34  1991/10/22 03:08:45  pgf
+ * call cmdlinetag() for command-line tags
+ *
+ * Revision 1.33  1991/10/20  23:07:56  pgf
+ * pass taglength value to tags()
+ *
+ * Revision 1.32  1991/10/18  10:56:54  pgf
+ * modified VALUE structures and lists to make them more easily settable
+ *
+ * Revision 1.31  1991/10/15  03:10:49  pgf
+ * added backspacelimit and taglength
+ *
+ * Revision 1.30  1991/09/26  13:13:54  pgf
+ * initialize window values, and
+ * make sure file writing errors in writeall() are made visible
+ *
+ * Revision 1.29  1991/09/19  13:39:17  pgf
+ * MDEXACT is now MDIGNCASE, and initialize new VAL_TAGS value to "tags"
+ *
+ * Revision 1.28  1991/09/17  13:02:57  pgf
+ * added write-all and brethren
+ *
+ * Revision 1.27  1991/09/10  00:46:07	pgf
+ * cleanup of the dotcmd stuff
+ *
+ * Revision 1.26  1991/08/13  02:50:13	pgf
  * initialize showmatch b_val
  *
- * Revision 1.25  1991/08/12  11:22:52  pgf
+ * Revision 1.25  1991/08/12  11:22:52	pgf
  * added 'vi +/searchstring file.c' invocation
  *
- * Revision 1.24  1991/08/12  10:23:43  pgf
+ * Revision 1.24  1991/08/12  10:23:43	pgf
  * esc() no longer kills keyboard recording
  *
- * Revision 1.23  1991/08/08  23:28:49  pgf
+ * Revision 1.23  1991/08/08  23:28:49	pgf
  * moved init of VAL_FILL to after vtinit, since it depends on term.t_ncol
  *
- * Revision 1.22  1991/08/08  13:19:58  pgf
+ * Revision 1.22  1991/08/08  13:19:58	pgf
  * removed ifdef BEFORE
  *
- * Revision 1.21  1991/08/07  12:35:07  pgf
+ * Revision 1.21  1991/08/07  12:35:07	pgf
  * added RCS log messages
  *
  * revision 1.20
@@ -117,7 +141,7 @@
  * initial vile RCS revision
  */
 
-#include        <stdio.h>
+#include	<stdio.h>
 
 /* for MSDOS, increase the default stack space */
 
@@ -130,9 +154,9 @@ int _mneed = 256000;		/* reset memory pool size */
 #endif
 
 #if	MSDOS & AZTEC
-int _STKSIZ = 32767/16;		/* stack size in paragraphs */
+int _STKSIZ = 32767/16; 	/* stack size in paragraphs */
 int _STKRED = 1024;		/* stack checking limit */
-int _HEAPSIZ = 4096/16;		/* (in paragraphs) */
+int _HEAPSIZ = 4096/16; 	/* (in paragraphs) */
 int _STKLOW = 0;		/* default is stack above heap (small only) */
 #endif
 
@@ -141,9 +165,9 @@ unsigned _stklen = 32768;
 #endif
 
 /* make global definitions not external */
-#define	maindef
+#define maindef
 
-#include        "estruct.h"	/* global structures and defines */
+#include	"estruct.h"	/* global structures and defines */
 
 #if UNIX
 #include	<signal.h>
@@ -155,36 +179,36 @@ unsigned _stklen = 32768;
 #include	"edef.h"	/* global definitions */
 
 
-#if     VMS
-#include        <ssdef.h>
-#define GOOD    (SS$_NORMAL)
+#if	VMS
+#include	<ssdef.h>
+#define GOOD	(SS$_NORMAL)
 #endif
 
 #ifndef GOOD
-#define GOOD    0
+#define GOOD	0
 #endif
 
 main(argc, argv)
-char    *argv[];
+char	*argv[];
 {
-        int    c;		/* command character */
-        int    f;		/* default flag */
-        int    n;		/* numeric repeat count */
+	int    c;		/* command character */
+	int    f;		/* default flag */
+	int    n;		/* numeric repeat count */
 	int	s;
 	register BUFFER *bp;		/* temp buffer pointer */
 	register int	gotafile;	/* filename arg present? */
 	register int	carg;		/* current arg to scan */
 	register int	ranstartup;	/* startup executed flag */
-	BUFFER *firstbp = NULL;		/* ptr to first buffer in cmd line */
-        int gotoflag;                   /* do we need to goto a line at start? */
-        int helpflag;                   /* do we need to goto a line at start? */
-        int gline;                      /* if so, what line? */
-        int searchflag;                 /* Do we need to search at start? */
+	BUFFER *firstbp = NULL; 	/* ptr to first buffer in cmd line */
+	int gotoflag;			/* do we need to goto a line at start? */
+	int helpflag;			/* do we need to goto a line at start? */
+	int gline;			/* if so, what line? */
+	int searchflag; 		/* Do we need to search at start? */
 #if TAGS
-        int tagflag, didtag;                    /* look up a tag to start? */
+	int tagflag, didtag;			/* look up a tag to start? */
 	char *tname;
 #endif
-        char bname[NBUFN];		/* buffer name of file to read */
+	char bname[NBUFN];		/* buffer name of file to read */
 	char *msg;
 #if	CRYPT
 	/* int cryptflag;			/* encrypting on the way in? */
@@ -299,26 +323,26 @@ char    *argv[];
 			usage:
 				fprintf(stderr,
 			"usage: %s -flags files...\n%s%s%s%s%s%s",argv[0],
-				"	-h to get help on startup\n",
-			      "	-gNNN or simply +NNN to go to line NNN\n",
-				"	-sstring to search for string\n",
+			"	-h to get help on startup\n",
+			"	-gNNN or simply +NNN to go to line NNN\n",
+			"	-sstring to search for string\n",
 #if TAGS
-				"	-ttagname to look up a tag\n",
+			"	-ttagname to look up a tag\n",
 #else
-				"",
+			"",
 #endif
-				"	-v to view files as read-only\n",
+			"	-v to view files as read-only\n",
 #if CRYPT
-				"	-kcryptkey for encrypted files\n"
+			"	-kcryptkey for encrypted files\n"
 #else
-				""
+			""
 #endif
 				);
 				exit(1);
 			}
 
 		} else if (argv[carg][0]== '+') { /* alternate form of -g */
- 			if (argv[carg][1] == '/')
+			if (argv[carg][1] == '/')
 				goto dosearch;
 			gotoflag = TRUE;
 			gline = atoi(&argv[carg][1]);
@@ -331,7 +355,7 @@ char    *argv[];
 			/* Process an input file */
 
 			/* set up a buffer for this file */
-	                makename(bname, argv[carg]);
+			makename(bname, argv[carg]);
 			unqname(bname,FALSE);
 
 			bp = bfind(bname, OK_CREAT, 0);
@@ -366,9 +390,9 @@ char    *argv[];
 	vtinit();		/* Display */
 	winit();		/* windows */
 	varinit();		/* user variables */
-	
+        
 	/* this comes out to 70 on an 80 (or greater) column display */
-	{    	register int fill;
+	{	register int fill;
 		fill = (7 * term.t_ncol) / 8;  /* must be done after vtinit() */
 		if (fill > 70) fill = 70;
 		set_global_b_val(VAL_FILL, fill);
@@ -400,8 +424,8 @@ char    *argv[];
 	}
 #if TAGS
 	else if (tagflag) {
-	     	tags(tname);
-	     	didtag = TRUE;
+		cmdlinetag(tname);
+		didtag = TRUE;
 	}
 #endif
 	if (!curbp) {
@@ -424,8 +448,8 @@ char    *argv[];
 		msg = "[Use ^A-h, ^X-h, or :help to get help]";
 	}
 
-        /* Deal with startup gotos and searches */
-        if (gotoflag + searchflag
+	/* Deal with startup gotos and searches */
+	if (gotoflag + searchflag
 #if TAGS
 		 + tagflag 
 #endif
@@ -436,15 +460,15 @@ char    *argv[];
 		msg = "[Cannot search and goto at the same time]";
 #endif
 	} else if (gotoflag) {
-                if (gotoline(TRUE,gline) == FALSE)
+		if (gotoline(TRUE,gline) == FALSE)
 			msg = "[Invalid goto argument]";
-        } else if (searchflag) {
-                forwhunt(FALSE, 0);
+	} else if (searchflag) {
+		forwhunt(FALSE, 0);
 #if TAGS
-        } else if (tagflag && !didtag) {
-                tags(tname);
+	} else if (tagflag && !didtag) {
+		cmdlinetag(tname);
 #endif
-        }
+	}
 
 	update(FALSE);
 	mlwrite(msg);
@@ -455,6 +479,7 @@ char    *argv[];
 
 }
 
+/* this is nothing but the main command loop */
 loop()
 {
 	int s,c,f,n;
@@ -472,7 +497,7 @@ loop()
 		/* start recording for '.' command */
 		dotcmdbegin();
 
-		/* Fix up the screen    */
+		/* Fix up the screen	*/
 		s = update(FALSE);
 
 		/* get the next command from the keyboard */
@@ -492,7 +517,7 @@ loop()
 		do_rept_arg_proc(&c,&f,&n);
 
 		kregflag = 0;
-		
+	        
 		/* flag the first time through for some commands -- e.g. subst
 			must know to not prompt for strings again, and pregion
 			must only restart the p-lines buffer once for each
@@ -501,7 +526,7 @@ loop()
 
 		/* and execute the command */
 		execute(kcod2fnc(c), f, n);
-		
+	        
 		if (bheadp != curbp)
 			mlwrite("BUG: main: bheadp != curbp, bhead name is %s",
 					 bheadp->b_bname);
@@ -510,6 +535,19 @@ loop()
 		dotcmdfinish();
 	}
 }
+
+char *
+strmalloc(s)
+char *s;
+{
+	char *ns = malloc(strlen(s)+1);
+	if (ns)
+		strcpy(ns,s);
+	else
+		return NULL;
+
+}
+
 
 global_val_init()
 {
@@ -520,25 +558,36 @@ global_val_init()
 		global_b_values structure, the pointers will still point
 		back at the global values, which is what we want */
 	for (i = 0; i <= MAX_B_VALUES; i++)
-		global_b_values.vp[i] = &(global_b_values.v[i]);
+		global_b_values.bv[i].vp = &(global_b_values.bv[i].v);
 
-	set_global_b_val(MDWRAP,FALSE);	/* wrap */
-	set_global_b_val(MDCMOD,FALSE);	/* C mode */
-	set_global_b_val(MDSWRAP,TRUE);	/* scan wrap */
-	set_global_b_val(MDEXACT,TRUE);	/* exact matches */
-	set_global_b_val(MDVIEW,FALSE);	/* view-only */
-	set_global_b_val(MDMAGIC,TRUE);	/* magic searches */
+	for (i = 0; i <= MAX_W_VALUES; i++)
+		global_w_values.wv[i].vp = &(global_w_values.wv[i].v);
+
+
+	set_global_b_val(MDWRAP,FALSE); /* wrap */
+	set_global_b_val(MDCMOD,FALSE); /* C mode */
+	set_global_b_val(MDBACKLIMIT,TRUE); /* limit backspacing to insert point */
+	set_global_b_val(MDSWRAP,TRUE); /* scan wrap */
+	set_global_b_val(MDIGNCASE,FALSE); /* exact matches */
+	set_global_b_val(MDVIEW,FALSE); /* view-only */
+	set_global_b_val(MDMAGIC,TRUE); /* magic searches */
 	set_global_b_val(MDCRYPT,FALSE);	/* crypt */
 	set_global_b_val(MDASAVE,FALSE);	/* auto-save */
-	set_global_b_val(MDLIST,FALSE);	/* list-mode */
 	set_global_b_val(MDDOS,FALSE);	/* dos mode */
-	set_global_b_val(MDAIND,FALSE);	/* auto-indent */
+	set_global_b_val(MDAIND,FALSE); /* auto-indent */
 	set_global_b_val(MDSHOWMAT,FALSE);	/* show-match */
 	set_global_b_val(VAL_TAB, 8);	/* tab stop */
-	set_global_b_val(VAL_C_TAB, 8);	/* C file tab stop */
+	set_global_b_val(VAL_TAGLEN, 0);	/* significant tag length */
+	set_global_b_val(VAL_C_TAB, 8); /* C file tab stop */
 	set_global_b_val(VAL_ASAVE, 256);	/* autosave count */
 	set_global_b_val_ptr(VAL_CWD, NULL);	/* current directory */
-	set_global_b_val_ptr(VAL_CSUFFIXES, "chsCHS"); /* suffixes for C mode */
+	set_global_b_val_ptr(VAL_CSUFFIXES, strmalloc("chsCHS")); /* suffixes for C mode */
+	set_global_b_val_ptr(VAL_TAGS, strmalloc("tags")); /* suffixes for C mode */
+
+	set_global_w_val(WMDLIST,FALSE); /* list-mode */
+	set_global_w_val(WVAL_SIDEWAYS,0); /* list-mode */
+	set_global_w_val(WVAL_FCOLOR,7); /* foreground color */
+	set_global_w_val(WVAL_BCOLOR,0); /* background color */
 
 }
 
@@ -557,7 +606,7 @@ do_num_proc(cp,fp,np)
 int *cp, *fp, *np;
 {
 	register int c, f, n;
-        register int    mflag;
+	register int	mflag;
 
 	c = *cp;
 	f = *fp;
@@ -597,56 +646,56 @@ do_rept_arg_proc(cp,fp,np)
 int *cp, *fp, *np;
 {
 	register int c, f, n;
-        register int    mflag;
+	register int	mflag;
 	c = *cp;
 	f = *fp;
 	n = *np;
 
-        if (c != reptc) 
+	if (c != reptc) 
 		return;
 
-        f = TRUE;
-        n = 4;                          /* with argument of 4 */
-        mflag = 0;                      /* that can be discarded. */
-        mlwrite("arg: 4");
-        while (isdigit(c=kbd_seq()) || c==reptc || c=='-'){
-                if (c == reptc)
+	f = TRUE;
+	n = 4;				/* with argument of 4 */
+	mflag = 0;			/* that can be discarded. */
+	mlwrite("arg: 4");
+	while (isdigit(c=kbd_seq()) || c==reptc || c=='-'){
+		if (c == reptc)
 			if ((n > 0) == ((n*4) > 0))
-                                n = n*4;
-                        else
-                        	n = 1;
-                /*
-                 * If dash, and start of argument string, set arg.
-                 * to -1.  Otherwise, insert it.
-                 */
-                else if (c == '-') {
-                        if (mflag)
-                                break;
-                        n = 0;
-                        mflag = -1;
-                }
-                /*
-                 * If first digit entered, replace previous argument
-                 * with digit and set sign.  Otherwise, append to arg.
-                 */
-                else {
-                        if (!mflag) {
-                                n = 0;
-                                mflag = 1;
-                        }
-                        n = 10*n + c - '0';
-                }
-                mlwrite("arg: %d", (mflag >=0) ? n : (n ? -n : -1));
-        }
-        /*
-         * Make arguments preceded by a minus sign negative and change
-         * the special argument "^U -" to an effective "^U -1".
-         */
-        if (mflag == -1) {
-                if (n == 0)
-                        n++;
-                n = -n;
-        }
+				n = n*4;
+			else
+				n = 1;
+		/*
+		 * If dash, and start of argument string, set arg.
+		 * to -1.  Otherwise, insert it.
+		 */
+		else if (c == '-') {
+			if (mflag)
+				break;
+			n = 0;
+			mflag = -1;
+		}
+		/*
+		 * If first digit entered, replace previous argument
+		 * with digit and set sign.  Otherwise, append to arg.
+		 */
+		else {
+			if (!mflag) {
+				n = 0;
+				mflag = 1;
+			}
+			n = 10*n + c - '0';
+		}
+		mlwrite("arg: %d", (mflag >=0) ? n : (n ? -n : -1));
+	}
+	/*
+	 * Make arguments preceded by a minus sign negative and change
+	 * the special argument "^U -" to an effective "^U -1".
+	 */
+	if (mflag == -1) {
+		if (n == 0)
+			n++;
+		n = -n;
+	}
 
 	*cp = c;
 	*fp = f;
@@ -664,7 +713,7 @@ int
 execute(execfunc, f, n)
 CMDFUNC *execfunc;		/* ptr to function to execute */
 {
-        register int status, flags;
+	register int status, flags;
 	MARK odot;
 
 	if (execfunc == NULL) {
@@ -674,7 +723,7 @@ CMDFUNC *execfunc;		/* ptr to function to execute */
 #else
 		mlwrite("[Not a command]");	/* complain		*/
 #endif
-		return (FALSE);
+		return FALSE;
 	}
 
 	flags = execfunc->c_flags;
@@ -687,7 +736,7 @@ CMDFUNC *execfunc;		/* ptr to function to execute */
 		if (flags & UNDO) {
 			/* undoable command can't be permitted when read-only */
 			if (b_val(curbp,MDVIEW))
-				return(rdonly());
+				return rdonly();
 			mayneedundo();
 		}
 	}
@@ -711,22 +760,43 @@ CMDFUNC *execfunc;		/* ptr to function to execute */
 	}
 
 
-	return (status);
+	return status;
 }
 
-/*
- * Fancy quit command, as implemented by Norm. If the any buffer has
- * changed do a write on that buffer and exit, otherwise simply exit.
- */
-quickexit(f, n)
+/* write all _changed_ buffers */
+writeall(f,n)
 {
 	register BUFFER *bp;	/* scanning pointer to buffers */
-        register BUFFER *oldcb; /* original current buffer */
-	register int status;
-	int thiscmd;
+	register BUFFER *oldbp; /* original current buffer */
+	register int status = TRUE;
 	int cnt;
 
-        oldcb = curbp;                          /* save in case we fail */
+	oldbp = curbp;				/* save in case we fail */
+
+	bp = bheadp;
+	while (bp != NULL) {
+		if ((bp->b_flag&BFCHG) != 0 && (bp->b_flag&BFINVS) == 0) {
+			make_current(bp);
+			mlwrite("[Saving %s]",bp->b_fname);
+			mlwrite("\n");
+			if ((status = filesave(f, n)) != TRUE)
+				break;
+			mlwrite("\n");
+		}
+		bp = bp->b_bufp;	/* on to the next buffer */
+	}
+	make_current(oldbp);
+	sgarbf = TRUE;
+	mlwrite("\n");
+	pressreturn();
+	return status;
+}
+
+/* the vi ZZ command -- write all, then quit */
+zzquit(f,n)
+{
+	int thiscmd;
+	int cnt;
 
 	thiscmd = lastcmd;
 	if (cnt = anycb()) {
@@ -735,30 +805,30 @@ quickexit(f, n)
 			clexec ? "" : "Repeat command to continue.");
 		if (!clexec && !isnamedcmd) {
 			if (thiscmd != kbd_seq())
-				return(FALSE);
+				return FALSE;
 		}
 
-		bp = bheadp;
-		while (bp != NULL) {
-			if ((bp->b_flag&BFCHG) != 0 &&
-			    (bp->b_flag&BFINVS) == 0) {
-			    	make_current(bp);
-				mlwrite("[Saving %s]",bp->b_fname);
-				mlwrite("\n");
-				if ((status = filesave(f, n)) != TRUE) {
-				    	make_current(oldcb);
-					return(status);
-				}
-				mlwrite("\n");
-			}
-			bp = bp->b_bufp;	/* on to the next buffer */
-		}
+		if (writeall(TRUE,1) != TRUE)
+			return FALSE;
+
 	} else if (!clexec && !isnamedcmd) {
+		/* consume the next char. anyway */
 		if (thiscmd != kbd_seq())
-			return(FALSE);
+			return FALSE;
 	}
-        quithard(f, n);                             /* conditionally quit   */
-	return(TRUE);
+	quithard(f, n);
+	return TRUE;
+}
+
+/*
+ * Fancy quit command, as implemented by Norm. If the any buffer has
+ * changed do a write on that buffer and exit, otherwise simply exit.
+ */
+quickexit(f, n)
+{
+	if (writeall(TRUE,1) == TRUE)
+		quithard(f, n); 	/* conditionally quit	*/
+	return TRUE;
 }
 
 /* Force quit by giving argument */
@@ -774,16 +844,16 @@ quithard(f,n)
 quit(f, n)
 {
 	int cnt;
-	
-        if (f != FALSE || (cnt = anycb()) == 0) {
-                vttidy(TRUE);
+        
+	if (f != FALSE || (cnt = anycb()) == 0) {
+		vttidy(TRUE);
 #if	FILOCK
 		if (lockrel() != TRUE) {
 			exit(1);
 		}
 #endif
-                exit(GOOD);
-        }
+		exit(GOOD);
+	}
 	if (cnt == 1)
 		mlwrite(
 		"There is an unwritten modified buffer.  Write it, or use :q!");
@@ -791,7 +861,7 @@ quit(f, n)
 		mlwrite(
 		"There are %d unwritten modified buffers.  Write them, or use :q!",
 			cnt);
-        return (FALSE);
+	return FALSE;
 }
 
 writequit(f,n)
@@ -800,37 +870,38 @@ writequit(f,n)
 	s = filesave(FALSE,n);
 	if (s != TRUE)
 		return s;
-	return(quit(FALSE,n));
+	return quit(FALSE,n);
 }
 
 /*
- * Begin recording a dot command macro.
+ * Begin recording the dot command macro.
  * Set up variables and return.
+ * we use a temporary accumulator, in case this gets stopped prematurely
  */
 dotcmdbegin()
 {
 	switch (dotcmdmode) {
-        case TMPSTOP:
+	case TMPSTOP:
 	case PLAY:
-                return(FALSE);
+		return FALSE;
 	}
 	tmpcmdptr = &tmpcmdm[0];
 	tmpcmdend = tmpcmdptr;
-        dotcmdmode = RECORD;
-        return (TRUE);
+	dotcmdmode = RECORD;
+	return TRUE;
 }
 
 /*
- * End dot command
+ * Finish dot command, and copy it to the real holding area
  */
 dotcmdfinish()
 {
 
 	switch (dotcmdmode) {
-        case STOP:
+	case STOP:
 	case PLAY:
 	case TMPSTOP:
-                return(FALSE);
+		return FALSE;
 
 	case RECORD:
 		;
@@ -841,32 +912,32 @@ dotcmdfinish()
 		*dotcmdptr++ = *tmpcmdptr++;
 	dotcmdend = dotcmdptr;
 	dotcmdptr = &dotcmdm[0];
-	tmpcmdptr = tmpcmdptr = &tmpcmdm[0];
-	/* leave us in RECORD mode */
-        return(TRUE);
+	dotcmdmode = STOP;
+	return TRUE;
 }
 
+/* stop recording a dot command, 
+	probably because the command is not re-doable */ 
 dotcmdstop()
 {
-	if (dotcmdmode == RECORD) {
+	if (dotcmdmode == RECORD)
 		dotcmdmode = STOP;
-	}
 }
 
 /*
- * Execute a macro.
+ * Execute a the '.' command, by putting us in PLAY mode.
  * The command argument is the number of times to loop. Quit as soon as a
  * command gets an error. Return TRUE if all ok, else FALSE.
  */
 dotcmdplay(f, n)
 {
-        if (n <= 0)
-                return (TRUE);
+	if (n <= 0)
+		return TRUE;
 	dotcmdrep = n;		/* remember how many times to execute */
 	dotcmdmode = PLAY;		/* put us in play mode */
 	dotcmdptr = &dotcmdm[0];	/*    at the beginning */
 
-	return(TRUE);
+	return TRUE;
 }
 /*
  * Begin a keyboard macro.
@@ -875,15 +946,15 @@ dotcmdplay(f, n)
  */
 ctlxlp(f, n)
 {
-        if (kbdmode != STOP) {
-                mlwrite("%%Macro already active");
-                return(FALSE);
-        }
-        mlwrite("[Start macro]");
+	if (kbdmode != STOP) {
+		mlwrite("%%Macro already active");
+		return FALSE;
+	}
+	mlwrite("[Start macro]");
 	kbdptr = &kbdm[0];
 	kbdend = kbdptr;
-        kbdmode = RECORD;
-        return (TRUE);
+	kbdmode = RECORD;
+	return TRUE;
 }
 
 /*
@@ -892,15 +963,15 @@ ctlxlp(f, n)
  */
 ctlxrp(f, n)
 {
-        if (kbdmode == STOP) {
-                mlwrite("%%Macro not active");
-                return(FALSE);
-        }
-	if (kbdmode == RECORD) {
-	        mlwrite("[End macro]");
-	        kbdmode = STOP;
+	if (kbdmode == STOP) {
+		mlwrite("%%Macro not active");
+		return FALSE;
 	}
-        return(TRUE);
+	if (kbdmode == RECORD) {
+		mlwrite("[End macro]");
+		kbdmode = STOP;
+	}
+	return TRUE;
 }
 
 /*
@@ -910,16 +981,16 @@ ctlxrp(f, n)
  */
 ctlxe(f, n)
 {
-        if (kbdmode != STOP) {
-                mlwrite("%%Macro already active");
-                return(FALSE);
-        }
-        if (n <= 0)
-                return (TRUE);
+	if (kbdmode != STOP) {
+		mlwrite("%%Macro already active");
+		return FALSE;
+	}
+	if (n <= 0)
+		return TRUE;
 	kbdrep = n;		/* remember how many times to execute */
-	kbdmode = PLAY;		/* start us in play mode */
+	kbdmode = PLAY; 	/* start us in play mode */
 	kbdptr = &kbdm[0];	/*    at the beginning */
-	return(TRUE);
+	return TRUE;
 }
 
 /*
@@ -929,13 +1000,13 @@ ctlxe(f, n)
  */
 esc(f, n)
 {
-        TTbeep();
+	TTbeep();
 	dotcmdmode = STOP;
 	fulllineregions = FALSE;
 	doingopcmd = FALSE;
 	opcmd = 0;
 	mlwrite("[Aborted]");
-        return(ABORT);
+	return ABORT;
 }
 
 /* tell the user that this command is illegal while we are in
@@ -991,7 +1062,7 @@ cntl_xf()	/* dummy function for binding to control-x prefix */
 {
 }
 
-unarg()	/* dummy function for binding to universal-argument */
+unarg() /* dummy function for binding to universal-argument */
 {
 }
 
@@ -1109,7 +1180,7 @@ int maxlen;	/* maximum length */
 	while (*src && (maxlen-- > 0))
 		*dptr++ = *src++;
 	*dptr = 0;
-	return(dst);
+	return dst;
 }
 #endif
 
@@ -1139,7 +1210,7 @@ unsigned nbytes;	/* # of bytes to allocate */
 #endif
 	}
 
-	return(mp);
+	return mp;
 }
 
 release(mp)	/* release malloced memory and track */

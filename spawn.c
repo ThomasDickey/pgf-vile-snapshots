@@ -2,7 +2,11 @@
  *		for MicroEMACS
  *
  * $Log: spawn.c,v $
- * Revision 1.9  1991/08/07 12:35:07  pgf
+ * Revision 1.10  1991/09/13 01:47:59  pgf
+ * child now runs and exits correctly if there is no input for it in
+ * filterregion
+ *
+ * Revision 1.9  1991/08/07  12:35:07  pgf
  * added RCS log messages
  *
  * revision 1.8
@@ -620,10 +624,6 @@ filterregion(f,n)
 	} else {
 		KILL *kp;		/* pointer into kill register */
 		kregcirculate(FALSE);
-		/* make sure there is something to put */
-		if (kbs[ukb].kbufh == NULL)
-			return TRUE;		/* not an error, just nothing */
-
 		kp = kbs[ukb].kbufh;
 		while (kp != NULL) {
 			if (kp->d_next == NULL)

@@ -8,7 +8,25 @@
 
 /*
  * $Log: edef.h,v $
- * Revision 1.14  1991/08/13 02:47:23  pgf
+ * Revision 1.20  1991/10/22 03:07:34  pgf
+ * bumped to version three 5ive
+ *
+ * Revision 1.19  1991/10/20  23:05:44  pgf
+ * declared realloc()
+ *
+ * Revision 1.18  1991/10/18  10:56:54  pgf
+ * modified VALUE structures and lists to make them more easily settable
+ *
+ * Revision 1.17  1991/10/15  03:08:57  pgf
+ * added backspacelimit and taglength
+ *
+ * Revision 1.16  1991/09/26  13:07:45  pgf
+ * moved LIST mode to window vals, and created window vals
+ *
+ * Revision 1.15  1991/09/19  13:34:30  pgf
+ * added short synonyms for mode and value names, and made names more vi-compliant
+ *
+ * Revision 1.14  1991/08/13  02:47:23  pgf
  * alphabetized VAL_XXX's, and added "showmatch"
  *
  * Revision 1.13  1991/08/07  11:51:32  pgf
@@ -83,6 +101,7 @@ char *mkupper();
 #endif
 #if ! VMALLOC
 char *malloc();
+char *realloc();
 #endif
 char *strcat();
 char *strcpy();
@@ -110,7 +129,7 @@ LINE    *lalloc();              /* Allocate a line              */
 #endif
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version three X");
+decl_init( char version[], "version three point five");
 
 decl_init( int autoindented , -1);	/* how many chars (not cols) indented */
 decl_uninit( int isnamedcmd );		/* are we typing a command name */
@@ -210,62 +229,54 @@ decl_uninit( MARK Mark );		/* the worker mark */
 
 /* THE FOLLOWING MODE NAME TABLES MUST CORRESPOND EXACTLY WITH THE #DEFINES
 	IN ESTRUCT.H */
+
 decl_init( char	*othermodes[] , {
 	"lazy" comma
 	"versionctrl" } );
-
 decl_init( int othmode, 0);   /* "other" global modes	*/
 
-#if TRIED
-decl_init( B_VALUES global_b_values , {
-	{
-		FALSE	comma	/* wrap */
-		FALSE	comma	/* C mode */
-		TRUE	comma	/* scan wrap */
-		TRUE	comma	/* exact matches */
-		FALSE	comma	/* view-only */
-		TRUE	comma	/* magic searches */
-		FALSE	comma	/* crypt */
-		FALSE	comma	/* auto-save */
-		FALSE	comma	/* list-mode */
-		FALSE	comma	/* dos mode */
-		FALSE	comma	/* auto-indent */
-		8	comma	/* tabstop */
-		8	comma	/* C code tabstop */
-		70	comma	/* fill column */
-		256	comma	/* autosave count */
-		NULL	comma	/* current directory */
-		NULL	comma	/* C code suffixes */
-	} comma { NULL }	/* leave all the pointers unset */
-	);
-#else
+/* these get their initial values in main.c, in global_val_init() */
 decl_uninit( B_VALUES global_b_values );
+
+#ifndef maindef
+extern struct VALNAMES b_valuenames[];
+extern struct VALNAMES w_valuenames[];
+#else
+struct VALNAMES b_valuenames[] = {
+	{ "autoindent"	comma "ai" comma VALTYPE_BOOL } comma
+	{ "autosave"	comma "as" comma VALTYPE_BOOL } comma
+	{ "backspacelimit"	comma "bl" comma VALTYPE_BOOL } comma
+	{ "cmode"	comma "X"  comma VALTYPE_BOOL } comma
+	{ "crypt"	comma "X"  comma VALTYPE_BOOL } comma
+	{ "dos"		comma "X"  comma VALTYPE_BOOL } comma
+	{ "ignorecase"	comma "ic" comma VALTYPE_BOOL } comma
+	{ "magic"	comma "X"  comma VALTYPE_BOOL } comma
+	{ "showmatch"	comma "sm" comma VALTYPE_BOOL } comma
+	{ "view"	comma "X"  comma VALTYPE_BOOL } comma
+	{ "wrapscan"	comma "ws" comma VALTYPE_BOOL } comma
+	{ "wrapwords"	comma "ww" comma VALTYPE_BOOL } comma
+
+	{ "autosavecnt"	comma "ascnt" comma VALTYPE_INT } comma
+	{ "c-tabstop"	comma "cts" comma VALTYPE_INT } comma
+	{ "fillcol"	comma "fc" comma VALTYPE_INT } comma
+	{ "tabstop"	comma "ts" comma VALTYPE_INT } comma
+	{ "taglength"	comma "tl" comma VALTYPE_INT } comma
+
+	{ "c-suffixes"	comma "csuf" comma VALTYPE_STRING } comma
+	{ "cwd"		comma "X"  comma VALTYPE_STRING } comma
+	{ "tags"	comma "tag" comma VALTYPE_STRING } comma
+	{ NULL		comma NULL comma VALTYPE_INT }
+};
+
+struct VALNAMES w_valuenames[] = {
+	{ "list"	comma "li" comma VALTYPE_BOOL } comma
+
+	{ "sideways"	comma "side" comma VALTYPE_INT } comma
+	{ "fcolor"	comma "X"  comma VALTYPE_INT } comma
+	{ "bcolor"	comma "X"  comma VALTYPE_INT } comma
+	{ NULL		comma NULL comma VALTYPE_INT }
+};
 #endif
-decl_init( struct {
-		char *name;
-		short type;
-} valuenames[] , {
-	{ "aindent"	comma VALTYPE_BOOL } comma
-	{ "asave"	comma VALTYPE_BOOL } comma
-	{ "cmode"	comma VALTYPE_BOOL } comma
-	{ "crypt"	comma VALTYPE_BOOL } comma
-	{ "dos"		comma VALTYPE_BOOL } comma
-	{ "exact"	comma VALTYPE_BOOL } comma
-	{ "list"	comma VALTYPE_BOOL } comma
-	{ "magic"	comma VALTYPE_BOOL } comma
-	{ "showmatch"	comma VALTYPE_BOOL } comma
-	{ "swrap"	comma VALTYPE_BOOL } comma
-	{ "view"	comma VALTYPE_BOOL } comma
-	{ "wrap"	comma VALTYPE_BOOL } comma
-
-	{ "autosave"	comma VALTYPE_INT } comma
-	{ "c-tabstop"	comma VALTYPE_INT } comma
-	{ "fillcol"	comma VALTYPE_INT } comma
-	{ "tabstop"	comma VALTYPE_INT } comma
-
-	{ "c-suffixes"	comma VALTYPE_STRING } comma
-	{ "cwd"		comma VALTYPE_STRING } comma
-}  );
 
 decl_init( char	modecode[], "wcsevmyaldi" );/* letters to represent modes */
 
@@ -289,7 +300,11 @@ decl_init( int reptc, 'K' );		/* current universal repeat char */
 decl_init( int abortc, tocntrl('[') );	/* ESC: current abort command char */
 decl_init( int quotec, tocntrl('V') );	/* quote char during mlreply()	*/
 decl_init( int killc, tocntrl('U') );	/* current line kill char	*/
+decl_init( int wkillc, tocntrl('W') );	/* current word kill char	*/
 decl_init( int intrc, tocntrl('C') );	/* current interrupt char	*/
+decl_init( int suspc, tocntrl('Z') );	/* current suspend char	*/
+decl_init( int startc, tocntrl('Q') );	/* current output start char	*/
+decl_init( int stopc, tocntrl('S') );	/* current output stop char	*/
 decl_init( int backspc, '\b');		/* current backspace char	*/
 
 #if	NeWS
@@ -306,19 +321,8 @@ decl_init( char	*cname[], {		/* names of colors		*/
 /*  sideways offset */
 /* foregound color (white) */
 /* background color (black) */
-#if ! COLOR
-decl_init( W_VALS global_w_values, {
-	0 comma
-	0 comma
-} );
-#else
-decl_init( W_VALS global_w_values, {
-	0 comma
-	0 comma
-	7 comma
-	0 comma
-} );
-#endif
+/* these get their initial values in main.c, in global_val_init() */
+decl_uninit( W_VALUES global_w_values );
 
 decl_uninit( int exmode );
 
