@@ -1,0 +1,74 @@
+#
+# makefile for vile on WIN32 using Microsoft Visual C++
+#
+# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.wnt,v 1.7 1995/09/10 20:48:35 pgf Exp $
+#
+#
+!include <ntwin32.mak>
+
+CFLAGS= $(cvars) $(cdebug) -nologo -DWIN32_LEAN_AND_MEAN -G4 -Dscrn_chosen 
+
+# these are normal editable headers
+HDRS = estruct.h epath.h edef.h proto.h dirstuff.h
+
+# these headers are built by the mktbls program from the information in cmdtbl
+# and in modetbl
+BUILTHDRS = nebind.h nefunc.h nemode.h nename.h nevars.h
+
+SRC = 	main.c ntconio.c basic.c bind.c buffer.c crypt.c \
+	csrch.c display.c eval.c exec.c externs.c \
+	fences.c file.c filec.c \
+	fileio.c finderr.c glob.c globals.c history.c \
+	input.c insert.c itbuff.c isearch.c \
+	line.c modes.c msgs.c npopen.c oneliner.c opers.c \
+	path.c random.c regexp.c \
+	region.c search.c select.c spawn.c \
+	tags.c tbuff.c termio.c tmp.c undo.c \
+	version.c vmalloc.c window.c word.c wordmov.c map.c 
+
+OBJ = 	main.obj ntconio.obj basic.obj bind.obj buffer.obj crypt.obj \
+      	csrch.obj display.obj eval.obj exec.obj externs.obj \
+	fences.obj file.obj filec.obj \
+	fileio.obj finderr.obj glob.obj globals.obj history.obj \
+	input.obj insert.obj itbuff.obj isearch.obj \
+	line.obj modes.obj msgs.obj npopen.obj oneliner.obj opers.obj \
+	path.obj random.obj regexp.obj \
+	region.obj search.obj select.obj spawn.obj \
+	tags.obj tbuff.obj termio.obj tmp.obj undo.obj \
+	version.obj vmalloc.obj window.obj word.obj wordmov.obj map.obj 
+
+.c.obj:	
+	cl $(CFLAGS) -c $< -Fo$@ 
+
+vile.exe: 	$(BUILTHDRS) $(OBJ)
+	link $(OBJ) $(ldebug) $(conlflags) $(conlibs) /OUT:vile.exe user32.lib
+
+$(OBJ):	estruct.h
+
+nebind.h \
+nefunc.h \
+nename.h \
+nevars.h :	cmdtbl mktbls.exe
+	mktbls.exe cmdtbl
+
+nemode.h:	modetbl mktbls.exe
+	mktbls.exe modetbl
+
+mktbls.exe:  mktbls.c
+	cl $(CFLAGS) mktbls.c /Fomktbls
+
+clean:
+	del mktbls.exe
+	del *.obj
+	del ne*.h
+
+main.obj:	nevars.h
+bind.obj:	epath.h
+filec.obj:	dirstuff.h
+eval.obj:	nevars.h
+glob.obj:	dirstuff.h
+externs.obj:	nebind.h nename.h nefunc.h
+path.obj:	dirstuff.h
+vmalloc.obj:	nevars.h
+version.obj:	patchlev.h
+

@@ -7,7 +7,7 @@
  * bell on the VT52 is terrible, so the "beep"
  * routine is conditionalized on defining BEL.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/vt52.c,v 1.13 1995/11/17 04:03:42 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/vt52.c,v 1.12 1994/11/29 04:02:03 pgf Exp $
  *
  */
 #error This module is not actively maintained as part of vile.
@@ -77,9 +77,8 @@ TERM	term	= {
 	&vt52rev,
 	&vt52cres
 #if	OPT_COLOR
-	, &vt52fcol
-	, &vt52bcol
-	, 0			/* no palette */
+	, &vt52fcol,
+	&vt52bcol
 #endif
 };
 
@@ -115,6 +114,12 @@ vt52cres()	/* change screen resolution - (not here though) */
 
 {
 	return(TRUE);
+}
+
+spal()		/* change palette string */
+
+{
+	/*	Does nothing here	*/
 }
 
 #if	OPT_COLOR

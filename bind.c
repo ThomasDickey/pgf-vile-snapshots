@@ -3,173 +3,322 @@
  *
  *	written 11-feb-86 by Daniel Lawrence
  *
- * $Log: bind.c,v $
- * Revision 1.13  1991/09/19 13:33:48  pgf
- * MDEXACT changed to MDIGNCASE
+ * $Header: /usr/build/VCS/pgf-vile/RCS/bind.c,v 1.126 1995/09/20 13:06:17 pgf Exp $
  *
- * Revision 1.12  1991/08/12  15:05:14  pgf
- * added fnc2key function, for getting back into insert mode
- *
- * Revision 1.11  1991/08/07  12:35:07  pgf
- * added RCS log messages
- *
- * revision 1.10
- * date: 1991/08/06 15:10:56;
- * global/local values
- * and new printf/list stuff
- * 
- * revision 1.9
- * date: 1991/06/27 19:45:08;
- * fixed prompts
- * 
- * revision 1.8
- * date: 1991/06/03 17:34:51;
- * switch from "meta" etc. to "ctla" etc.
- * 
- * revision 1.7
- * date: 1991/06/03 13:58:22;
- * made bind description list better
- * 
- * revision 1.6
- * date: 1991/06/03 10:18:31;
- * fix apropos bug, and a bind nit
- * 
- * revision 1.5
- * date: 1991/05/31 10:31:34;
- * new kbd_engl_stat() routine, which returns more status, for use in the
- * new namedcmd() code
- * 
- * revision 1.4
- * date: 1990/12/06 19:49:07;
- * always rebuild Binding List buffer on request
- * 
- * revision 1.3
- * date: 1990/10/03 16:00:30;
- * make backspace work for everyone
- * 
- * revision 1.2
- * date: 1990/09/28 14:34:57;
- * changed prc2kcod decl to int
- * 
- * revision 1.1
- * date: 1990/09/21 10:24:44;
- * initial vile RCS revision
-*/
+ */
 
-#include	<stdio.h>
 #include	"estruct.h"
 #include	"edef.h"
 #include	"epath.h"
 
+#define SHORT_CMD_LEN 4	/* command names longer than this are preferred
+				over those shorter.  e.g. display "quit"
+				instead of "q" if possible */
+
 /* dummy prefix binding functions */
-extern CMDFUNC f_cntl_af, f_cntl_xf, f_unarg, f_esc;
+extern CMDFUNC f_cntl_a_func, f_cntl_x_func, f_unarg_func, f_esc_func, f_poundc_func;
+
+static	KBIND *	kcode2kbind P(( int ));
+
+#if OPT_CASELESS
+static	int	cs_strcmp P(( int, char *, char * ));
+static	int	cs_strncmp P(( int, char *, char *, SIZE_T ));
+#define Strcmp(s,d)      cs_strcmp(case_insensitive, s, d)
+#define StrNcmp(s,d,len) cs_strncmp(case_insensitive, s, d, len)
+#else
+#define Strcmp(s,d)      strcmp(s, d)
+#define StrNcmp(s,d,len) strncmp(s, d, len)
+#endif
+
+#if OPT_REBIND
+#define	isSpecialCmd(k) \
+		( (k == &f_cntl_a_func)\
+		||(k == &f_cntl_x_func)\
+		||(k == &f_poundc_func)\
+		||(k == &f_unarg_func)\
+		||(k == &f_esc_func)\
+		)
+# if OPT_TERMCHRS
+static	int	chr_complete P(( int, char *, int * ));
+static	int	chr_eol P(( char *, int, int, int ));
+static	void	makechrslist P(( int, void *));
+#  if OPT_UPBUFF
+static	int	update_termchrs P(( BUFFER * ));
+#  endif
+# endif
+
+static	char *	bytes2prc P(( char *, char *, int ));
+static	char *	kcod2prc P(( int, char * ));
+static	char *	quoted P(( char *, char * ));
+static	char *	to_tabstop P(( char * ));
+static	int	converted_len P(( char * ));
+static	int	install_bind P(( int, CMDFUNC *, CMDFUNC ** ));
+static	int	key_to_bind P(( CMDFUNC * ));
+static	int	makefuncdesc P(( NTAB * ));
+static	int	rebind_key P(( int, CMDFUNC * ));
+static	int	strinc P(( char *, char *));
+static	int	unbindchar P(( int ));
+static	int	update_binding_list P(( BUFFER * ));
+static	void	convert_kcode P(( int, char * ));
+static	void	makebindlist P(( int, void *));
+static	void	ostring P(( char * ));
+static	void	reset_prefix P(( int, CMDFUNC * ));
+
+#endif	/* OPT_REBIND */
+
+static	int	is_shift_cmd P(( char *, int ));
+static	char *	skip_partial P(( int, char *, SIZE_T, char *, SIZE_T ));
+static	void	show_partial P(( int, char *, SIZE_T, char *, SIZE_T ));
+#if OPT_POPUPCHOICE
+static	void	makecmpllist P(( int, void * ));
+static	void	show_completions P(( int, char *, SIZE_T, char *, SIZE_T ));
+static	void	scroll_completions P(( int, char *, SIZE_T, char *, SIZE_T ));
+#endif
+static	int	fill_partial P(( int, char *, SIZE_T, char *, char *, SIZE_T ));
+static	int	cmd_complete P(( int, char *, int * ));
+static	int	eol_command  P(( char *, int, int, int ));
+
+#if OPT_EVAL || OPT_REBIND
+static	NTAB *	fnc2ntab P(( CMDFUNC * ));
+static	char *	fnc2engl P(( CMDFUNC * ));
+static	int	prc2kcod P(( char * ));
+#endif
+
+#if OPT_REBIND
+static	KBIND	*KeyBindings = kbindtbl;
+#endif
+
+/*----------------------------------------------------------------------------*/
 
 /* give me some help!!!! bring up a buffer and read the help file into it */
+/* ARGSUSED */
+int
 help(f, n)
+int f,n;
 {
-	register WINDOW *wp;	/* scaning pointer to windows */
 	register BUFFER *bp;	/* buffer pointer to help */
 	char *fname;		/* ptr to file returned by flook() */
+	int alreadypopped;
 
 	/* first check if we are already here */
-	bp = bfind("[Help]", OK_CREAT, BFSCRTCH);
+	bp = bfind(HELP_BufName, BFSCRTCH);
 	if (bp == NULL)
 		return FALSE;
 
 	if (bp->b_active == FALSE) { /* never been used */
-		fname = flook(pathname[1], FL_ANYWHERE);
+		fname = flook(pathname[PATH_HELPFILE_NAME], 
+					FL_ANYWHERE|FL_READABLE);
 		if (fname == NULL) {
-			mlwrite("[Sorry, can't find the help information]");
-			zotbuf(bp);
+			mlforce("[Sorry, can't find the help information]");
+			(void)zotbuf(bp);
 			return(FALSE);
 		}
+		alreadypopped = (bp->b_nwnd != 0);
 		/* and read the stuff in */
 		if (readin(fname, 0, bp, TRUE) == FALSE ||
 				popupbuff(bp) == FALSE) {
-			zotbuf(bp);
+			(void)zotbuf(bp);
 			return(FALSE);
 		}
-		strcpy(bp->b_bname,"[Help]");
-	        lsprintf(bp->b_fname, "       %s   %s",prognam,version);
-		make_local_b_val(bp,MDVIEW);	/* make it readonly, */
-		set_b_val(bp,MDVIEW,TRUE);
+		set_bname(bp, HELP_BufName);
+		set_rdonly(bp, fname);
+
 		make_local_b_val(bp,MDIGNCASE); /* easy to search, */
 		set_b_val(bp,MDIGNCASE,TRUE);
-		make_local_b_val(bp,VAL_TAB);	/* and tabbed by 8 */
-		set_b_val(bp,VAL_TAB,8);
-		bp->b_flag |= BFSCRTCH;
+		b_set_scratch(bp);
+		if (!alreadypopped)
+			shrinkwrap();
 	}
-	return swbuffer(bp);
+
+	if (!swbuffer(bp))
+		return FALSE;
+
+	if (help_at >= 0) {
+		if (!gotoline(TRUE, help_at))
+			return FALSE;
+		mlwrite("[Type '1G' to return to start of help information]");
+		help_at = -1;  /* until zotbuf is called, we let normal
+				DOT tracking keep our position */
+	}
+	return TRUE;
 }
 
-#if REBIND
+#if OPT_REBIND
 
-deskey(f, n)	/* describe the command for a certain key */
+#if OPT_TERMCHRS
+
+	/* patch: this table and the corresponding initializations should be
+	 * generated by 'mktbls'.  In any case, the table must be sorted to use
+	 * name-completion on it.
+	 */
+static struct {
+		char	*name;
+		int	*value;
+		char	how_to;
+	} TermChrs[] = {
+		{"backspace",		&backspc,	's'},
+		{"interrupt",		&intrc,		's'},
+		{"line-kill",		&killc,		's'},
+		{"name-complete",	&name_cmpl,	0},
+		{"quote-next",		&quotec,	0},
+		{"start-output",	&startc,	's'},
+		{"stop-output",		&stopc,		's'},
+		{"suspend",		&suspc,		's'},
+		{"test-completions",	&test_cmpl,	0},
+		{"word-kill",		&wkillc,	's'},
+		{0}
+	};
+
+/*----------------------------------------------------------------------------*/
+
+/* list the current chrs into the current buffer */
+/* ARGSUSED */
+static void
+makechrslist(dum1,ptr)
+int dum1;
+void *ptr;
 {
-	register int c;		/* key to describe */
-	register char *ptr;	/* string pointer to scan output strings */
-	char outseq[NSTRING];	/* output buffer for command sequence */
-	char *kcod2prc();
+	register int i;
+	char	temp[NLINE];
 
-	/* prompt the user to type us a key to describe */
-	mlwrite("Describe the function bound to this key sequence: ");
-
-	/* get the command sequence to describe
-	   change it to something we can print as well */
-
-	/* check to see if we are executing a command line */
-	if (clexec) {
-		char tok[NSTRING];
-		macarg(tok);	/* get the next token */
-		c = prc2kcod(tok);
-	} else {
-		c = kbd_seq();
+	bprintf("--- Terminal Character Settings %*P\n", term.t_ncol-1, '-');
+	for (i = 0; TermChrs[i].name != 0; i++) {
+		bprintf("\n%s = %s",
+			TermChrs[i].name,
+			kcod2prc(*(TermChrs[i].value), temp));
 	}
-	kcod2prc(c, &outseq[0]);
+}
 
-	/* and dump it out */
-	ostring(outseq);
-	ostring(" ");
+/*
+ * Find a special-character definition, given the name
+ */
+static	int	chr_lookup P(( char * ));
+static int
+chr_lookup(name)
+char	*name;
+{
+	register int	j;
+	for (j = 0; TermChrs[j].name != 0; j++)
+		if (!strcmp(name, TermChrs[j].name))
+			return j;
+	return -1;
+}
 
-	/* find the right ->function */
-	if ((ptr = fnc2engl(kcod2fnc(c))) == NULL)
-		ptr = "Not Bound";
+/*
+ * The 'chr_complete()' and 'chr_eol()' functions are invoked from
+ * 'kbd_reply()' to setup the mode-name completion and query displays.
+ */
+static int
+chr_complete(c, buf, pos)
+int	c;
+char	*buf;
+int	*pos;
+{
+	return kbd_complete(FALSE, c, buf, pos, (char *)&TermChrs[0],
+		sizeof(TermChrs[0]));
+}
 
-	/* output the command sequence */
-	ostring(ptr);
+static int
+/*ARGSUSED*/
+chr_eol(buffer, cpos, c, eolchar)
+char *	buffer;
+int	cpos;
+int	c;
+int	eolchar;
+{
+	return isspace(c);
+}
+
+#if OPT_UPBUFF
+/* ARGSUSED */
+static int
+update_termchrs(bp)
+BUFFER *bp;
+{
+	return show_termchrs(FALSE,1);
+}
+#endif
+
+/* ARGSUSED */
+int
+set_termchrs(f,n)
+int f,n;
+{
+	register int s, j;
+	char	name[NLINE];
+	int c;
+
+	/* get the table-entry */
+	*name = EOS;
+	if ((s = kbd_reply("Terminal setting: ", name, sizeof(name), chr_eol,
+		' ', 0, chr_complete)) == TRUE) {
+
+		j = chr_lookup(name);
+		switch (TermChrs[j].how_to) {
+		case 's':
+		default:
+			c = key_to_bind((CMDFUNC *)0);
+			if (c < 0)
+				return(FALSE);
+			*(TermChrs[j].value) = c;
+			break;
+		}
+		update_scratch(TERMINALCHARS_BufName, update_termchrs);
+	}
+	return s;
+}
+
+/* ARGSUSED */
+int
+show_termchrs(f,n)
+int f,n;
+{
+	return liststuff(TERMINALCHARS_BufName, FALSE, makechrslist, 0, (void *)0);
+}
+#endif /* OPT_TERMCHRS */
+
+static void
+ostring(s)	/* output a string of output characters */
+char *s;	/* string to output */
+{
+	if (discmd)
+		kbd_puts(s);
 }
 
 /* bindkey:	add a new key to the key binding table		*/
 
+/* ARGSUSED */
+int
 bindkey(f, n)
 int f, n;	/* command arguments [IGNORED] */
 {
-	register int c;		/* command key to bind */
 	register CMDFUNC *kcmd;	/* ptr to the requested function to bind to */
-	register KBIND *kbp;	/* pointer into a binding table */
-	register int found;	/* matched command flag */
-	char outseq[80];	/* output buffer for keystroke sequence */
+	char cmd[NLINE];
 	char *fnp;
-	char *kbd_engl();
-	char *kcod2prc();
 
 	/* prompt the user to type in a key to bind */
-	mlwrite("Bind function with english name: ");
-
-	/* get the function name to bind it to */
-#if	NeWS
-	newsimmediateon() ;
-#endif
-	fnp = kbd_engl();
-#if	NeWS
-	newsimmediateoff() ;
-#endif
+	/* and get the function name to bind it to */
+	fnp = kbd_engl("Bind function whose full name is: ", cmd);
 
 	if (fnp == NULL || (kcmd = engl2fnc(fnp)) == NULL) {
-		mlwrite("[No such function]");
+		mlforce("[No such function]");
 		return(FALSE);
 	}
-	mlwrite("...to keyboard sequence (type it exactly): ");
+
+	return rebind_key(key_to_bind(kcmd), kcmd);
+}
+
+/*
+ * Prompt-for and return the key-code to bind.
+ */
+static int
+key_to_bind(kcmd)
+register CMDFUNC *kcmd;
+{
+	char outseq[NLINE];	/* output buffer for keystroke sequence */
+	register int c;
+
+	mlprompt("...to keyboard sequence (type it exactly): ");
 
 	/* get the command sequence to bind */
 	if (clexec) {
@@ -179,120 +328,160 @@ int f, n;	/* command arguments [IGNORED] */
 	} else {
 		/* perhaps we only want a single key, not a sequence */
 		/* 	(see more comments below) */
-		if ((kcmd == &f_cntl_af) || (kcmd == &f_cntl_xf) ||
-	            (kcmd == &f_unarg) || (kcmd == &f_esc))
-			c = kbd_key();
+		if (isSpecialCmd(kcmd))
+			c = keystroke();
 		else
 			c = kbd_seq();
 	}
 
-	/* change it to something we can print as well */
-	kcod2prc(c, &outseq[0]);
+	if (c >= 0) {
+		/* change it to something we can print as well */
+		ostring(kcod2prc(c, outseq));
+		hst_append(outseq, FALSE);
+	} else {
+		mlforce("[Not a proper key-sequence]");
+	}
+	return c;
+}
 
-	/* and dump it out */
-	ostring(outseq);
+/*
+ * Given a key-code and a command-function pointer, rebind the key-code to
+ * the command-function.
+ */
+static int
+rebind_key (c, kcmd)
+register int	c;
+register CMDFUNC *kcmd;
+{
+	CMDFUNC ignored, *old = &ignored;
+	return install_bind (c, kcmd, &old);
+}
+
+/*
+ * Prefix-keys can be only bound to one value. This procedure tests the
+ * argument 'kcmd' to see if it is a prefix key, and if so, unbinds the
+ * key, and sets the corresponding global variable to the new value.
+ * The calling procedure will then do the binding per se.
+ */
+static void
+reset_prefix (c, kcmd)
+register int	c;
+register CMDFUNC *kcmd;
+{
+	if (isSpecialCmd(kcmd)) {
+		register int j;
+		/* search for an existing binding for the prefix key */
+		if ((j = fnc2kcod(kcmd)) >= 0)
+			(void)unbindchar(j);
+		/* reset the appropriate global prefix variable */
+		if (kcmd == &f_cntl_a_func)
+			cntl_a = c;
+		if (kcmd == &f_cntl_x_func)
+			cntl_x = c;
+		if (kcmd == &f_poundc_func)
+			poundc = c;
+		if (kcmd == &f_unarg_func)
+			reptc = c;
+		if (kcmd == &f_esc_func)
+			abortc = c;
+	}
+}
+
+/*
+ * Bind a command-function pointer to a given key-code (saving the old
+ * value of the function-pointer via an pointer given by the caller).
+ */
+static int
+install_bind (c, kcmd, oldfunc)
+register int	c;
+register CMDFUNC *kcmd;
+CMDFUNC **oldfunc;
+{
+	register KBIND *kbp;	/* pointer into a binding table */
+
+	if (c < 0)
+		return FALSE;	/* not a legal key-code */
 
 	/* if the function is a prefix key, i.e. we're changing the definition
 		of a prefix key, then they typed a dummy function name, which
 		has been translated into a dummy function pointer */
-	if (kcmd == &f_cntl_af || kcmd == &f_cntl_xf ||
-	    kcmd == &f_unarg || kcmd == &f_esc) {
-	    	register CMDFUNC **cfp;
-		/* search for an existing binding for the prefix key */
-		cfp = asciitbl;
-		found = FALSE;
-		for (cfp = asciitbl; cfp < &asciitbl[128]; cfp++) {
-			if (*cfp == kcmd) {
-				unbindchar(cfp - asciitbl);
-				break;
-			}
-		}
+	*oldfunc = kcod2fnc(c);
+	reset_prefix(-1, *oldfunc);
+	reset_prefix(c, kcmd);
 
-		/* reset the appropriate global prefix variable */
-		if (kcmd == &f_cntl_af)
-			cntl_a = c;
-		if (kcmd == &f_cntl_xf)
-			cntl_x = c;
-		if (kcmd == &f_unarg)
-			reptc = c;
-		if (kcmd == &f_esc)
-			abortc = c;
-	}
-	
-	if ((c & (CTLA|SPEC|CTLX)) == 0) {
+	if (!isspecial(c)) {
 		asciitbl[c] = kcmd;
 	} else {
-		for(kbp = kbindtbl; kbp->k_cmd && kbp->k_code != c; kbp++)
-			;
-		if (kbp->k_cmd) { /* found it, change it in place */
+		if ((kbp = kcode2kbind(c)) != 0) { /* change it in place */
 			kbp->k_cmd = kcmd;
 		} else {
-			if (kbp >= &kbindtbl[NBINDS-1]) {
-				mlwrite("Prefixed binding table full");
-				return(FALSE);
+			if ((kbp = typealloc(KBIND)) == 0) {
+				return no_memory("Key-Binding");
 			}
-			kbp->k_code = c;	/* add keycode */
-			kbp->k_cmd = kcmd; /* and func pointer */
-			++kbp;		/* and make sure the next is null */
-			kbp->k_code = 0;
-			kbp->k_cmd = NULL;
+			kbp->k_link = KeyBindings;
+			kbp->k_code = (short)c;	/* add keycode */
+			kbp->k_cmd  = kcmd;	/* and func pointer */
+			KeyBindings = kbp;
 		}
 	}
-
-	return TRUE;
+	update_scratch(BINDINGLIST_BufName, update_binding_list);
+	return(TRUE);
 }
 
 /* unbindkey:	delete a key from the key binding table	*/
 
+/* ARGSUSED */
+int
 unbindkey(f, n)
 int f, n;	/* command arguments [IGNORED] */
 {
 	register int c;		/* command key to unbind */
-	char outseq[80];	/* output buffer for keystroke sequence */
-	char *kcod2prc();
+	char outseq[NLINE];	/* output buffer for keystroke sequence */
 
 	/* prompt the user to type in a key to unbind */
-	mlwrite("Unbind this key sequence: ");
+	mlprompt("Unbind this key sequence: ");
 
 	/* get the command sequence to unbind */
 	if (clexec) {
 		char tok[NSTRING];
 		macarg(tok);	/* get the next token */
 		c = prc2kcod(tok);
+		if (c < 0) {
+			mlforce("[Illegal key-sequence \"%s\"]",tok);
+			return FALSE;
+		}
 	} else {
 		c = kbd_seq();
+		if (c < 0) {
+			mlforce("[Not a bindable key-sequence]");
+			return(FALSE);
+		}
 	}
 
 	/* change it to something we can print as well */
-	kcod2prc(c, &outseq[0]);
-
-	/* and dump it out */
-	ostring(outseq);
+	ostring(kcod2prc(c, outseq));
 
 	/* if it isn't bound, bitch */
 	if (unbindchar(c) == FALSE) {
-		mlwrite("[Key not bound]");
+		mlforce("[Key not bound]");
 		return(FALSE);
 	}
+	update_scratch(BINDINGLIST_BufName, update_binding_list);
 	return(TRUE);
 }
 
+static int
 unbindchar(c)
 int c;		/* command key to unbind */
 {
 	register KBIND *kbp;	/* pointer into the command table */
 	register KBIND *skbp;	/* saved pointer into the command table */
-	register int found;	/* matched command flag */
 
-	if ((c & (CTLA|SPEC|CTLX)) == 0) {
+	if (!isspecial(c)) {
 		asciitbl[c] = NULL;
 	} else {
 		/* search the table to see if the key exists */
-		for (kbp = kbindtbl; kbp->k_cmd && kbp->k_code != c; kbp++)
-			;
-
-		/* if it isn't bound, bitch */
-		if (kbp->k_cmd == NULL)
+		if ((kbp = kcode2kbind(c)) == 0)
 			return(FALSE);
 
 		/* save the pointer and scan to the end of the table */
@@ -314,88 +503,284 @@ int c;		/* command key to unbind */
 
 /* describe bindings bring up a fake buffer and list the key bindings
 		   into it with view mode			*/
-desbind(f, n)
+
+/* remember whether we last did "apropos" or "describe-bindings" */
+static char *last_apropos_string;
+static CMDFLAGS last_whichcmds;
+static append_to_binding_list;
+
+/* ARGSUSED */
+static int
+update_binding_list(bp)
+BUFFER *bp;
 {
-#if ! BEFORE
-	int makebindlist();
-        return liststuff("[Binding List]",makebindlist,1,NULL);
-#else
-	return mkblist(1,NULL);
-#endif
+	return liststuff(BINDINGLIST_BufName, append_to_binding_list,
+		makebindlist, (int)last_whichcmds, (void *)last_apropos_string);
 }
 
-#if	APROP
-apro(f, n)	/* Apropos (List functions that match a substring) */
+/* ARGSUSED */
+int
+desbind(f, n)
+int f,n;
 {
-	static char mstring[NSTRING] = 0;	/* string to match cmd names to */
-	int makebindlist();
-        register int    s;
+	last_apropos_string = (char *)0;
+	last_whichcmds = 0;
 
+	return update_binding_list((BUFFER *)0);
+}
 
-	s = mlreply("Apropos string: ", mstring, NSTRING - 1);
+/* ARGSUSED */
+int
+desmotions(f, n)
+int f,n;
+{
+	last_apropos_string = (char *)0;
+	last_whichcmds = MOTION;
+	return update_binding_list((BUFFER *)0);
+}
+
+/* ARGSUSED */
+int
+desopers(f, n)
+int f,n;
+{
+	last_apropos_string = (char *)0;
+	last_whichcmds = OPER;
+	return update_binding_list((BUFFER *)0);
+}
+
+/* ARGSUSED */
+int
+desapro(f, n)	/* Apropos (List functions that match a substring) */
+int f,n;
+{
+	register int    s;
+	static char mstring[NSTRING];	/* string to match cmd names to */
+
+	s = mlreply("Apropos string: ", mstring, sizeof(mstring));
 	if (s != TRUE)
 		return(s);
 
-#if ! BEFORE
-        return liststuff("[Binding List]",makebindlist,1,mstring);
-#else
-	return mkblist(1,mstring);
-#endif
+	last_apropos_string = mstring;
+	last_whichcmds = 0;
+	return update_binding_list((BUFFER *)0);
 }
-#endif
 
-#if BEFORE
-mkblist(mstring)
-char *mstring;
+static char described_cmd[NLINE+1];	/* string to match cmd names to */
+
+/* ARGSUSED */
+int
+desfunc(f, n)	/* describe-function */
+int f,n;
 {
-        register BUFFER *bp;
-        register int    s;
+	register int    s;
+	char *fnp;
 
-	/* create the binding list buffer   */
-	bp = bfind("[Binding List]", OK_CREAT, BFSCRTCH);
-	if (bp == NULL)
-		return FALSE;
-	
-        if ((s=bclear(bp)) != TRUE) /* clear old text (?) */
-                return (s);
-        s = makebindlist(1,mstring,bp);
-	if (s != TRUE || popupbuff(bp) == FALSE) {
-		mlwrite("[Sorry, can't list.]");
-		zotbuf(bp);
-                return (s);
-        }
-        strcpy(bp->b_fname, "");
-	make_local_b_val(bp,MDVIEW);
-	set_b_val(bp,MDVIEW,TRUE);
-	make_local_b_val(bp,VAL_TAB);
-	set_b_val(bp,VAL_TAB,8);
-	bp->b_flag |= BFSCRTCH;
-        bp->b_flag &= ~BFCHG;        /* Don't complain!      */
-        bp->b_active = TRUE;
+	/* force an exact match by strinc() later on from makefuncdesc() */
+	described_cmd[0] = '^';
 
-        return TRUE;
+	fnp = kbd_engl("Describe function whose full name is: ", 
+							described_cmd+1);
+	if (fnp == NULL || engl2fnc(fnp) == NULL) {
+		mlforce("[No such function]");
+		return(FALSE);
+	}
+
+	last_apropos_string = described_cmd;
+	last_whichcmds = 0;
+	append_to_binding_list = TRUE;
+	s = update_binding_list((BUFFER *)0);
+	append_to_binding_list = FALSE;
+	return s;
 }
-#endif
 
+/* ARGSUSED */
+int
+deskey(f, n)	/* describe the command for a certain key */
+int f,n;
+{
+	register int c;		/* key to describe */
+	char outseq[NSTRING];	/* output buffer for command sequence */
+	NTAB *nptr;		/* name table pointer */
+	int s;
+
+	/* prompt the user to type us a key to describe */
+	mlprompt("Describe the function bound to this key sequence: ");
+
+	/* get the command sequence to describe
+	   change it to something we can print as well */
+
+	/* check to see if we are executing a command line */
+	if (clexec) {
+		char tok[NSTRING];
+		macarg(tok);	/* get the next token */
+		c = prc2kcod(tok);
+		if (c < 0) {
+			mlforce("[Illegal key-sequence \"%s\"]",tok);
+			return(FALSE);
+		}
+	} else {
+		c = kbd_seq();
+		if (c < 0) {
+			mlforce("[Not a bindable key-sequence]");
+			return(FALSE);
+		}
+	}
+
+	(void)kcod2prc(c, outseq);
+	hst_append(outseq, EOS); /* cannot replay this, but can see it */
+
+	/* find the right ->function */
+	if ((nptr = fnc2ntab(kcod2fnc(c))) == NULL) {
+		mlwrite("Key sequence '%s' is not bound to anything.",
+					outseq);
+		return TRUE;
+	}
+
+	/* describe it */
+	described_cmd[0] = '^';
+	(void)strcpy(described_cmd + 1, nptr->n_name);
+	last_apropos_string = described_cmd;
+	last_whichcmds = 0;
+	append_to_binding_list = TRUE;
+	s = update_binding_list((BUFFER *)0);
+	append_to_binding_list = FALSE;
+
+	mlwrite("Key sequence '%s' is bound to function \"%s\"",
+				outseq, nptr->n_name);
+
+	return s;
+}
+
+/* returns a name in double-quotes */
+static char *
+quoted(dst, src)
+char	*dst;
+char	*src;
+{
+	return strcat(strcat(strcpy(dst, "\""), src), "\"");
+}
+
+/* returns the number of columns used by the given string */
+static int
+converted_len(buffer)
+register char	*buffer;
+{
+	register int len = 0, c;
+	while ((c = *buffer++) != EOS) {
+		if (c == '\t')
+			len |= 7;
+		len++;
+	}
+	return len;
+}
+
+/* force the buffer to a tab-stop if needed */
+static char *
+to_tabstop(buffer)
+char	*buffer;
+{
+	register int	cpos = converted_len(buffer);
+	if (cpos & 7)
+		(void)strcat(buffer, "\t");
+	return buffer + strlen(buffer);
+}
+
+/* convert a key binding, padding to the next multiple of 8 columns */
+static void
+convert_kcode(c, buffer)
+int	c;
+char	*buffer;
+{
+	(void)kcod2prc(c, to_tabstop(buffer));
+}
+
+/* fully describe a function into the current buffer, given a pointer to
+ * its name table entry */
+static int
+makefuncdesc(nptr)
+NTAB *nptr;
+{
+	register KBIND *kbp;	/* pointer into a key binding table */
+	register NTAB *nptr2;	/* pointer into the name table */
+	int i;
+	CMDFUNC *cmd = nptr->n_cmd;
+	char outseq[NLINE];	/* output buffer for keystroke sequence */
+
+	/* add in the command name */
+	(void)quoted(outseq, nptr->n_name);
+	while (converted_len(outseq) < 32)
+		(void)strcat(outseq, "\t");
+
+	/* look in the simple ascii binding table first */
+	for (i = 0; i < N_chars; i++)
+		if (asciitbl[i] == cmd)
+			convert_kcode(i, outseq);
+
+	/* then look in the multi-key table */
+#if OPT_REBIND
+	for (kbp = KeyBindings; kbp != kbindtbl; kbp = kbp->k_link) {
+		if (kbp->k_cmd == cmd)
+			convert_kcode(kbp->k_code, outseq);
+	}
+#endif
+	for (kbp = kbindtbl; kbp->k_cmd; kbp++)
+		if (kbp->k_cmd == cmd)
+			convert_kcode(kbp->k_code, outseq);
+
+	/* dump the line */
+	if (!addline(curbp,outseq,-1))
+		return FALSE;
+
+	/* then look for synonyms */
+	(void)strcpy(outseq, "  or\t");
+	for (nptr2 = nametbl; nptr2->n_name != NULL; ++nptr2) {
+		/* if it's the one we're on, skip */
+		if (nptr2 == nptr)
+			continue;
+		/* if it's already been listed, skip */
+		if (nptr2->n_cmd->c_flags & LISTED)
+			continue;
+		/* if it's not a synonym, skip */
+		if (nptr2->n_cmd != cmd)
+			continue;
+		(void)quoted(outseq+5, nptr2->n_name);
+		if (!addline(curbp,outseq,-1))
+			return FALSE;
+	}
+
+#if OPT_ONLINEHELP
+	if (cmd->c_help && cmd->c_help[0])
+		(void)lsprintf(outseq,"  (%s %s )",
+		(cmd->c_flags & MOTION) ? "motion: " :
+			(cmd->c_flags & OPER) ? "operator: " : "",
+		cmd->c_help);
+	else
+		(void)lsprintf(outseq,"  ( no help for this command )");
+	if (!addline(curbp,outseq,-1))
+		return FALSE;
+	if (cmd->c_flags & GLOBOK) {
+		if (!addline(curbp,"  (may follow global command)",-1))
+			return FALSE;
+	}
+#endif
+	/* blank separator */
+	if (!addline(curbp,"",-1))
+		return FALSE;
+
+	return TRUE;
+}
 
 /* build a binding list (limited or full) */
-makebindlist(dummy, mstring)
-int dummy;
-char *mstring;		/* match string if partial list, NULL to list all */
+/* ARGSUSED */
+static void
+makebindlist(whichmask, mstring)
+int whichmask;
+void *mstring;		/* match string if partial list, NULL to list all */
 {
-#if	ST520 & LATTICE
-#define	register		
-#endif
-	register WINDOW *wp;	/* scanning pointer to windows */
-	register KBIND *kbp;	/* pointer into a key binding table */
-	register CMDFUNC **cfp;	/* pointer into the ascii table */
-	register NTAB *nptr,*nptr2;	/* pointer into the name table */
-	char *strp;		/* pointer int string to send */
-	int cpos;		/* current position to use in outseq */
-	char outseq[81];	/* output buffer for keystroke sequence */
-	int i,pass;
-	char *kcod2prc();
-
+	register NTAB *nptr;	/* pointer into the name table */
+	int pass;
+	int ok = TRUE;		/* reset if out-of-memory, etc. */
 
 	/* let us know this is in progress */
 	mlwrite("[Building binding list]");
@@ -408,72 +793,22 @@ char *mstring;		/* match string if partial list, NULL to list all */
 		if (nptr->n_cmd->c_flags & LISTED)
 			continue;
 
-		/* try to avoid alphabetizing by the real short names */
-		if (pass == 0 && strlen(nptr->n_name) <= 2)
+		/* are we interested in this type of command? */
+		if (whichmask && !(nptr->n_cmd->c_flags & whichmask))
 			continue;
 
-		/* add in the command name */
-		strcpy(outseq,"\"");
-		strcat(outseq, nptr->n_name);
-		strcat(outseq,"\"");
-		cpos = strlen(outseq);
-		while (cpos < 32)
-			outseq[cpos++] = ' ';
-		outseq[cpos] = 0;
-		
-#if	APROP
+		/* try to avoid alphabetizing by the real short names */
+		if (pass == 0 && (int)strlen(nptr->n_name) <= SHORT_CMD_LEN)
+			continue;
+
 		/* if we are executing an apropos command
 		   and current string doesn't include the search string */
-		if (mstring && (strinc(outseq, mstring) == FALSE))
-		    	continue;
-#endif
-		/* look in the simple ascii binding table first */
-		for(cfp = asciitbl, i = 0; cfp < &asciitbl[128]; cfp++, i++) {
-			if (*cfp == nptr->n_cmd) {
-				cpos = kcod2prc(i, &outseq[strlen(outseq)]) -
-					outseq;
-				while(cpos & 7)
-					outseq[cpos++] = ' ';
-				outseq[cpos] = '\0';
-			}
-		}
-		/* then look in the multi-key table */
-		for(kbp = kbindtbl; kbp->k_cmd; kbp++) {
-			if (kbp->k_cmd == nptr->n_cmd) {
-				cpos = 
-				kcod2prc(kbp->k_code, &outseq[strlen(outseq)]) -
-					outseq;
-				while(cpos & 7)
-					outseq[cpos++] = ' ';
-				outseq[cpos] = '\0';
-			}
-		}
-		/* dump the line */
-		addline(curbp,outseq,-1);
+		if (mstring && (strinc(nptr->n_name, (char *)mstring) == FALSE))
+			continue;
 
-		cpos = 0;
-
-		/* then look for synonyms */
-		for (nptr2 = nametbl; nptr2->n_name != NULL; ++nptr2) {
-			/* if it's the one we're on, skip */
-			if (nptr2 == nptr)
-				continue;
-			/* if it's already been listed, skip */
-			if (nptr2->n_cmd->c_flags & LISTED)
-				continue;
-			/* if it's not a synonym, skip */
-			if (nptr2->n_cmd != nptr->n_cmd)
-				continue;
-			while (cpos < 8)
-				outseq[cpos++] = ' ';
-			outseq[cpos] = '\0';
-			strcat(outseq,"\"");
-			strcat(outseq,nptr2->n_name);
-			strcat(outseq,"\"");
-			addline(curbp,outseq,-1);
-			cpos = 0;	/* and clear the line */
-
-		}
+		ok = makefuncdesc(nptr);
+		if (!ok)
+			break;
 
 		nptr->n_cmd->c_flags |= LISTED; /* mark it as already listed */
 	    }
@@ -482,21 +817,27 @@ char *mstring;		/* match string if partial list, NULL to list all */
 	for (nptr = nametbl; nptr->n_name != NULL; ++nptr)
 		nptr->n_cmd->c_flags &= ~LISTED; /* mark it as unlisted */
 
-	mlwrite("");	/* clear the mode line */
-	return(TRUE);
+	if (ok)
+		mlerase();	/* clear the message line */
 }
 
-#if	APROP
-strinc(source, sub)	/* does source include sub? */
-char *source;	/* string to search in */
+/* much like the "standard" strstr, but if the substring starts
+	with a '^', we discard it and force an exact match.  */
+static int
+strinc(sourc, sub)	/* does source include sub? */
+char *sourc;	/* string to search in */
 char *sub;	/* substring to look for */
 {
 	char *sp;	/* ptr into source */
 	char *nxtsp;	/* next ptr into source */
 	char *tp;	/* ptr into substring */
+	int exact = (*sub == '^');
+
+	if (exact)
+		sub++;
 
 	/* for each character in the source string */
-	sp = source;
+	sp = sourc;
 	while (*sp) {
 		tp = sub;
 		nxtsp = sp;
@@ -505,37 +846,38 @@ char *sub;	/* substring to look for */
 		while (*tp) {
 			if (*nxtsp++ != *tp)
 				break;
-			else
-				tp++;
+			tp++;
 		}
 
-		/* yes, return a success */
-		if (*tp == 0)
+		if ((*tp == EOS) && (!exact || *nxtsp == EOS))
 			return(TRUE);
+
+		if (exact) /* we only get one chance */
+			break;
 
 		/* no, onward */
 		sp++;
 	}
 	return(FALSE);
 }
-#endif
 
-#endif /* REBIND */
+#endif /* OPT_REBIND */
 
 
 /* execute the startup file */
 
+int
 startup(sfname)
 char *sfname;	/* name of startup file  */
 {
 	char *fname;	/* resulting file name to execute */
 
 	/* look up the startup file */
-	fname = flook(sfname, FL_HERE_HOME);
+	fname = flook(sfname, (FL_HERE|FL_HOME)|FL_READABLE);
 
 	/* if it isn't around, don't sweat it */
 	if (fname == NULL) {
-		mlwrite("[Can't find startup file %s]",sfname);
+		mlforce("[Can't find startup file %s]",sfname);
 		return(TRUE);
 	}
 
@@ -554,149 +896,210 @@ char *fname;	/* base file name to search for */
 int hflag;	/* Look in the HOME environment variable first? */
 {
 	register char *home;	/* path to home directory */
+#if ENVFUNC && OPT_PATHLOOKUP
 	register char *path;	/* environmental PATH variable */
-	register char *sp;	/* pointer into path spec */
+#endif
 	register int i;		/* index */
 	static char fspec[NSTRING];	/* full path spec to search */
-	char *getenv();
+#if SYS_VMS
+	register char *sp;	/* pointer into path spec */
+	static TBUFF *myfiles;
+#endif
+	int	mode = (hflag & (FL_EXECABLE|FL_WRITEABLE|FL_READABLE));
 
-	/* tak care of special cases */
+	/* take care of special cases */
 	if (!fname || !fname[0] || isspace(fname[0]))
 		return NULL;
-	else if (fname[0] == '!')
+	else if (isShellOrPipe(fname))
 		return fname;
-		
-	/* always try the current directory first */
-	if (ffropen(fname) == FIOSUC) {
-		ffclose();
-		return(fname);
+
+	if (hflag & FL_HERE) {
+		if (ffaccess(fname, mode)) {
+			return(fname);
+		}
 	}
 
-	if (hflag == FL_HERE)
-		return NULL;
+#if ENVFUNC
 
-#if	ENVFUNC
-
-	if (hflag) {
+	if (hflag & FL_HOME) {
 		home = getenv("HOME");
 		if (home != NULL) {
-			/* build home dir file spec */
-			strcpy(fspec, home);
-			strcat(fspec, "/");
-			strcat(fspec, fname);
-
-			/* and try it out */
-			if (ffropen(fspec) == FIOSUC) {
-				ffclose();
+			/* try home dir file spec */
+			if (ffaccess(pathcat(fspec,home,fname), mode)) {
 				return(fspec);
 			}
 		}
 	}
 
-	if (hflag == FL_HERE_HOME)
-		return NULL;
+#endif	/* ENVFUNC */
 
-#if PATHLOOK
-	/* get the PATH variable */
-	path = getenv("PATH");
-	if (path != NULL)
-		while (*path) {
-
-			/* build next possible file spec */
-			sp = fspec;
-			while (*path && (*path != PATHCHR))
-				*sp++ = *path++;
-			*sp++ = '/';
-			*sp = 0;
-			strcat(fspec, fname);
-
-			/* and try it out */
-			if (ffropen(fspec) == FIOSUC) {
-				ffclose();
-				return(fspec);
-			}
-
-			if (*path == PATHCHR)
-				++path;
-		}
-#endif
-#endif
-
-	/* look it up via the old table method */
-	for (i=2; i < NPNAMES; i++) {
-		strcpy(fspec, pathname[i]);
-		strcat(fspec, fname);
-
-		/* and try it out */
-		if (ffropen(fspec) == FIOSUC) {
-			ffclose();
+	if (hflag & FL_EXECDIR) { /* is it where we found the executable? */
+		if (pathname[PATH_EXECDIR] && 
+				pathname[PATH_EXECDIR][0] != EOS &&
+			ffaccess(pathcat(fspec,pathname[PATH_EXECDIR],
+						fname),mode))
 			return(fspec);
+	}
+
+	if (hflag & FL_TABLE) {
+		/* then look it up via the table method */
+		for (i = PATH_TABLEDIRS; i < NPNAMES; i++) {
+			if (ffaccess(pathcat(fspec, pathname[i], fname),mode))
+				return(fspec);
 		}
 	}
 
+	if (hflag & FL_PATH) {
+
+#if ENVFUNC
+#if OPT_PATHLOOKUP
+		/* then look along $PATH */
+#if SYS_VMS
+		/* On VAX/VMS, the PATH environment variable is only the
+		 * current-dir.  Fake up an acceptable alternative.
+		 */
+		if (!tb_length(myfiles)) {
+			char	mypath[NFILEN];
+
+			(void)strcpy(mypath, prog_arg);
+			if ((sp = vms_pathleaf(mypath)) == mypath)
+				(void)strcpy(mypath, current_directory(FALSE));
+			else
+				*sp = EOS;
+
+			if (!tb_init(&myfiles, EOS)
+			 || !tb_sappend(&myfiles, mypath)
+			 || !tb_sappend(&myfiles, ",SYS$SYSTEM:,SYS$LIBRARY:")
+			 || !tb_append(&myfiles, EOS))
+			return NULL;
+		}
+		path = tb_values(myfiles);
+#else	/* UNIX or MSDOS */
+		path = getenv("PATH");	/* get the PATH variable */
+#endif
+		while ((path = parse_pathlist(path, fspec)) != 0) {
+			if (ffaccess(pathcat(fspec, fspec, fname), mode)) {
+				return(fspec);
+			}
+		}
+#endif	/* OPT_PATHLOOKUP */
+#endif	/* ENVFUNC */
+
+	}
 
 	return NULL;	/* no such luck */
 }
 
-/* translate a 10-bit keycode to its printable name (like "M-j")  */
+/* translate a keycode to its binding-string */
 char *
+kcod2pstr(c, seq)
+int c;		/* sequence to translate */
+char *seq;	/* destination string for sequence */
+{
+	seq[0] = (char)kcod2escape_seq(c, &seq[1]);
+	return seq;
+}
+
+/* Translate a 16-bit keycode to a string that will replay into the same
+ * code.
+ */
+int
+kcod2escape_seq (c, ptr)
+int	c;
+char *	ptr;
+{
+	char	*base = ptr;
+
+	/* ...just for completeness */
+	if (c & CTLA)		*ptr++ = (char)cntl_a;
+	else if (c & CTLX)	*ptr++ = (char)cntl_x;
+	else if (c & SPEC)	*ptr++ = (char)poundc;
+
+	*ptr++ = (char)c;
+	*ptr = EOS;
+	return (int)(ptr - base);
+}
+
+
+/* translates a binding string into printable form */
+#if OPT_REBIND
+static char *
+bytes2prc(dst, src, n)
+char	*dst;
+char	*src;
+int	n;
+{
+	char	*base = dst;
+	register int	c;
+	register char	*tmp;
+
+	for ( ; n != 0; dst++, src++, n--) {
+
+		c = *src;
+
+		tmp = NULL;
+
+		if (c & HIGHBIT) {
+			*dst++ = 'M';
+			*dst++ = '-';
+			c &= ~HIGHBIT;
+		}
+		if (c == ' ') {
+			tmp = "<space>";
+		} else if (iscntrl(c)) {
+			*dst++ = '^';
+			*dst = tocntrl(c);
+		} else {
+			*dst = (char)c;
+		}
+
+		if (tmp != NULL) {
+			while ((*dst++ = *tmp++) != EOS)
+				;
+			dst -= 2;	/* point back to last nonnull */
+		}
+
+		if (n > 1) {
+			*++dst = '-';
+		}
+	}
+	*dst = EOS;
+	return base;
+}
+
+/* translate a 10-bit keycode to its printable name (like "M-j")  */
+static char *
 kcod2prc(c, seq)
 int c;		/* sequence to translate */
 char *seq;	/* destination string for sequence */
 {
-	char *ptr;	/* pointer into current position in sequence */
-
-	ptr = seq;
-
-	/* apply cntl_a sequence if needed */
-	if (c & CTLA) {
-		*ptr++ = '^';
-		*ptr++ = 'A';
-		*ptr++ = '-';
-	}
-
-	/* apply ^X sequence if needed */
-	if (c & CTLX) {
-		*ptr++ = '^';
-		*ptr++ = 'X';
-		*ptr++ = '-';
-	}
-
-	/* apply SPEC sequence if needed */
-	if (c & SPEC) {
-		*ptr++ = 'F';
-		*ptr++ = 'N';
-		*ptr++ = '-';
-	}
-	
-	c = kcod2key(c);
-
-	/* apply control sequence if needed */
-	if (iscntrl(c)) {
-		*ptr++ = '^';
-		c = toalpha(c);
-	}
-
-	/* and output the final sequence */
-
-	if (c == ' ') {
-		*ptr++ = '<';
-		*ptr++ = 's';
-		*ptr++ = 'p';
-		*ptr++ = '>';
-	} else if (c == '\t') {
-		*ptr++ = '<';
-		*ptr++ = 't';
-		*ptr++ = 'a';
-		*ptr++ = 'b';
-		*ptr++ = '>';
-	} else {
-		*ptr++ = c;
-	}
-	*ptr = 0;	/* terminate the string */
-	return ptr;
+	char	temp[NSTRING];
+	(void)kcod2pstr(c,temp);
+	return bytes2prc(seq, temp + 1, *temp);
 }
+#endif
 
+
+/* kcode2kbind: translate a 10-bit key-binding to the table-pointer
+ */
+static KBIND *
+kcode2kbind(code)
+register int code;
+{
+	register KBIND	*kbp;	/* pointer into a binding table */
+
+#if OPT_REBIND
+	for (kbp = KeyBindings; kbp != kbindtbl; kbp = kbp->k_link) {
+		if (kbp->k_code == code)
+			return kbp;
+	}
+#endif
+	for (kbp = kbindtbl; kbp->k_cmd; kbp++) {
+		if (kbp->k_code == code)
+			return kbp;
+	}
+	return 0;
+}
 
 /* kcod2fnc:  translate a 10-bit keycode to a function pointer */
 /*	(look a key binding up in the binding table)		*/
@@ -704,150 +1107,232 @@ CMDFUNC *
 kcod2fnc(c)
 int c;	/* key to find what is bound to it */
 {
-	register KBIND *kbp;
-
-	if ((c & (CTLA|SPEC|CTLX)) == 0) {
-		return asciitbl[c];
-	} else {
-		for (kbp = kbindtbl; kbp->k_cmd && kbp->k_code != c; kbp++)
-			;
-		return kbp->k_cmd;
+	if (isspecial(c)) {
+		register KBIND *kp = kcode2kbind(c);
+		return (kp != 0) ? kp->k_cmd : 0;
 	}
+	return asciitbl[c];
 }
 
+#if !SMALLER
+/* fnc2kcod: translate a function pointer to a keycode */
+int
+fnc2kcod(f)
+CMDFUNC *f;
+{
+	register KBIND *kbp;
+	register int	c;
 
-/* fnc2engl: translate a function pointer to the english name for 
+	for (c = 0; c < N_chars; c++)
+		if (f == asciitbl[c])
+			return c;
+
+#if OPT_REBIND
+	for (kbp = KeyBindings; kbp != kbindtbl; kbp = kbp->k_link) {
+		if (kbp->k_cmd == f)
+			return kbp->k_code;
+	}
+#endif
+	for (kbp = kbindtbl; kbp->k_cmd != 0; kbp++) {
+		if (kbp->k_cmd == f)
+			return kbp->k_code;
+	}
+
+	return -1;	/* none found */
+}
+#endif
+
+/* fnc2pstr: translate a function pointer to a pascal-string that a user
+	could enter.  returns a pointer to a static array */
+#if DISP_X11
+char *
+fnc2pstr(f)
+CMDFUNC *f;
+{
+	register int	c;
+	static char seq[10];
+
+	c = fnc2kcod(f);
+
+	if (c == -1)
+		return NULL;
+
+	return kcod2pstr(c, seq);
+}
+#endif
+
+/* fnc2engl: translate a function pointer to the english name for
 		that function
 */
-
-char *
-fnc2engl(cfp)
-CMDFUNC *cfp;	/* ptr to the requested function to bind to */
+#if OPT_EVAL || OPT_REBIND
+static NTAB *
+fnc2ntab(cfp)
+CMDFUNC *cfp;
 {
 	register NTAB *nptr;	/* pointer into the name table */
+	register NTAB *shortnptr = NULL; /* pointer into the name table */
 
 	/* skim through the table, looking for a match */
 	for (nptr = nametbl; nptr->n_cmd; nptr++) {
 		if (nptr->n_cmd == cfp) {
-			return(nptr->n_name);
+			/* if it's a long name, return it */
+			if ((int)strlen(nptr->n_name) > SHORT_CMD_LEN)
+				return nptr;
+			/* remember the first short name, in case there's
+				no long name */
+			if (!shortnptr)
+				shortnptr = nptr;
 		}
 	}
+	if (shortnptr)
+		return shortnptr;
+
 	return NULL;
 }
 
-/* fnc2key: translate a function pointer to a simple key that is bound
-		to that function
-*/
-
-int
-fnc2key(cfp)
-CMDFUNC *cfp;	/* ptr to the requested function to bind to */
+static char *
+fnc2engl(cfp)
+CMDFUNC *cfp;
 {
-	register int i;
-
-	for(i = 0; i < 128; i++) {
-		if (cfp == asciitbl[i])
-			return i;
-	}
-	return -1;
+	register NTAB *nptr = fnc2ntab(cfp);
+	return nptr ? nptr->n_name : NULL;
 }
 
-#if NEEDED
-/* translate a function pointer to its associated flags */
-fnc2flags(func)
-CMDFUNC *cfp;	/* ptr to the requested function to bind to */
-{
-	register NTAB *nptr;	/* pointer into the name binding table */
-
-	/* skim through the table, looking for a match */
-	nptr = nametbl;
-	while (nptr->n_cmd != NULL) {
-		if (nptr->n_cmd == cfp) {
-			return nptr->n_flags;
-		}
-		++nptr;
-	}
-	return NONE;
-}
 #endif
-
 
 /* engl2fnc: match name to a function in the names table
 	translate english name to function pointer
  		 return any match or NULL if none
  */
+#define BINARY_SEARCH_IS_BROKEN 0
+#if BINARY_SEARCH_IS_BROKEN  /* then use the old linear look-up */
 CMDFUNC *
 engl2fnc(fname)
 char *fname;	/* name to attempt to match */
 {
 	register NTAB *nptr;	/* pointer to entry in name binding table */
+	register SIZE_T len = strlen(fname);
 
-	/* scan through the table, returning any match */
-	nptr = nametbl;
-	while (nptr->n_cmd != NULL) {
-		if (strcmp(fname, nptr->n_name) == 0) {
-			return nptr->n_cmd;
+	if (len != 0) {	/* scan through the table, returning any match */
+		nptr = nametbl;
+		while (nptr->n_cmd != NULL) {
+			if (strncmp(fname, nptr->n_name, len) == 0)
+				return nptr->n_cmd;
+			++nptr;
 		}
-		++nptr;
 	}
 	return NULL;
 }
+#else
+/* this runs 10 times faster for 'nametbl[]' */
+CMDFUNC *
+engl2fnc(fname)
+char *fname;	/* name to attempt to match */
+{
+	int lo, hi, cur;
+	int r;
+	register SIZE_T len = strlen(fname);
+	extern int nametblsize;
+
+	if (len == 0)
+		return NULL;
+
+	/* scan through the table, returning any match */
+	lo = 0;
+	hi = nametblsize - 2;	/* don't want last entry -- it's NULL */
+
+	while (lo <= hi) {
+		cur = (lo + hi) >> 1;
+		if ((r = strncmp(fname, nametbl[cur].n_name, len)) == 0) {
+			/* Now find earliest matching entry */
+			while (cur > lo 
+			    && strncmp(fname, nametbl[cur-1].n_name, len) == 0)
+				cur--;
+			return nametbl[cur].n_cmd;
+
+		} else if (r > 0) {
+			lo = cur+1;
+		} else {
+			hi = cur-1;
+		}
+	}
+	return NULL;
+}
+#endif	/* binary vs linear */
 
 /* prc2kcod: translate printable code to 10 bit keycode */
-int 
-prc2kcod(k)
-char *k;		/* name of key to translate to Command key form */
+#if OPT_EVAL || OPT_REBIND
+static int
+prc2kcod(kk)
+char *kk;		/* name of key to translate to Command key form */
 {
-	register int c;	/* key sequence to return */
+	register UINT c;	/* key sequence to return */
+	register UINT pref = 0;	/* key prefixes */
+	register int len = strlen(kk);
+	register UCHAR *k = (UCHAR *)kk;
 
-	/* parse it up */
-	c = 0;
-
-	/* first, the CTLA prefix */
-	if (*k == '^' && *(k+1) == toalpha(cntl_a) && *(k+2) == '-') {
-		c = CTLA;
-		k += 3;
-	}
-
-	/* next the function prefix */
-	if (*k == 'F' && *(k+1) == 'N' && *(k+2) == '-') {
-		c |= SPEC;
-		k += 3;
-	}
-
-	/* control-x as well... (but not with FN) */
-	if (*k == '^' && *(k+1) == toalpha(cntl_x) && 
-				*(k+2) == '-' && !(c & SPEC)) {
-		c |= CTLX;
-		k += 3;
+	if (len > 3 && *(k+2) == '-') {
+		if (*k == '^') {
+			if (iscntrl(cntl_a) && *(k+1) == toalpha(cntl_a))
+				pref = CTLA;
+			if (iscntrl(cntl_x) && *(k+1) == toalpha(cntl_x))
+				pref = CTLX;
+			if (iscntrl(poundc) && *(k+1) == toalpha(poundc))
+				pref = SPEC;
+		} else if (!strncmp((char *)k, "FN", (SIZE_T)2)) {
+			pref = SPEC;
+		}
+		if (pref != 0)
+			k += 3;
+	} else if (len > 2 && !strncmp((char *)k, "M-", (SIZE_T)2)) {
+		pref = HIGHBIT;
+		k += 2;
+	} else if (len > 1) {
+		if (*k == cntl_a)
+			pref = CTLA;
+		else if (*k == cntl_x)
+			pref = CTLX;
+		else if (*k == poundc)
+			pref = SPEC;
+		if (pref != 0) {
+			k++;
+			if (len > 2 && *k == '-')
+				k++;
+		}
 	}
 
 	/* a control char? */
-	if (*k == '^' && *(k+1) != 0) {
-		++k;
-		c |= *k;
+	if (*k == '^' && *(k+1) != EOS) {
+		c = *(k+1);
 		if (islower(c)) c = toupper(c);
 		c = tocntrl(c);
-	} else if (!strcmp(k,"<sp>")) {
-		c |= ' ';
-	} else if (!strcmp(k,"<tab>")) {
-		c |= '\t';
-	} else {
-		c |= *k;
+		k += 2;
+	} else {		/* any single char, control or not */
+		c = *k++;
 	}
-	return c;
+
+	if (*k != EOS)		/* we should have eaten the whole thing */
+		return -1;
+
+	return (int)(pref|c);
 }
+#endif
 
-#if ! SMALLER
 
+#if OPT_EVAL
 /* translate printable code (like "M-r") to english command name */
 char *
 prc2engl(skey)	/* string key name to binding name.... */
-char *skey;	/* name of keey to get binding for */
+char *skey;	/* name of key to get binding for */
 {
 	char *bindname;
+	int c;
 
-	bindname = fnc2engl(kcod2fnc(prc2kcod(skey)));
+	c = prc2kcod(skey);
+	if (c < 0)
+		return "ERROR";
+
+	bindname = fnc2engl(kcod2fnc(c));
 	if (bindname == NULL)
 		bindname = "ERROR";
 
@@ -855,193 +1340,715 @@ char *skey;	/* name of keey to get binding for */
 }
 #endif
 
-/* get an english command name from the user. Command completion means
- * that pressing a <SPACE> will attempt to complete an unfinished command
- * name if it is unique.
+/*
+ * Get an english command name from the user
  */
 char *
-kbd_engl()
+kbd_engl(prompt, buffer)
+char *prompt;		/* null pointer to splice calls */
+char *buffer;
 {
-	int status;
-	char *buf;
-
-
-	status = kbd_engl_stat(&buf);
-	if (status == SORTOFTRUE) /* something was tungetc'ed */
-		(void)tgetc();
-	if (status == TRUE)
-		return buf;
+	if (kbd_engl_stat(prompt, buffer) == TRUE)
+		return buffer;
 	return NULL;
 }
 
-/* *bufp only valid if return is TRUE */
-kbd_engl_stat(bufp)
-char **bufp;
+/* sound the alarm! */
+void
+kbd_alarm()
 {
-#if	ST520 & LATTICE
-#define register		
-#endif
-	register int c;
-	register int cpos;	/* current column on screen output */
-	register char *sp;	/* pointer to string for output */
-	register NTAB *nbp;	/* first ptr to entry in name binding table */
-	register NTAB *cnbp;	/* current ptr to entry in name binding table */
-	register NTAB *lnbp;	/* last ptr to entry in name binding table */
-	static char buf[NLINE]; /* buffer to hold tentative command name */
-
-	cpos = 0;
-
-	*bufp = NULL;
-
-	/* if we are executing a command line just get the next arg and return */
-	if (clexec) {
-		if (macarg(buf) != TRUE) {
-			return FALSE;
-		}
-		*bufp = buf;
-		return TRUE;
+	if (global_g_val(GMDERRORBELLS)) {
+		TTbeep();
+		TTflush();
 	}
+	warnings++;
+}
 
-	lineinput = TRUE;
-
-	/* build a name string from the keyboard */
-	while (TRUE) {
-		c = tgetc();
-
-		if (cpos == 0) {
-			if (isbackspace(c) ||
-			    c == kcod2key(abortc) ||
-			    c == kcod2key(killc) ||
-			    c == '\r' ||
-			    islinespecchar(c) ) {
-				tungetc(c);
-				return SORTOFTRUE;
+/* put a character to the keyboard-prompt, updating 'ttcol' */
+void
+kbd_putc(c)
+	int	c;
+{
+	beginDisplay;
+	if ((kbd_expand <= 0) && isreturn(c)) {
+		TTputc(c);
+		ttcol = 0;
+	} else if (isprint(c)) {
+		if (ttcol < term.t_ncol-1) /* -1 to avoid auto-wrap problems */
+			TTputc(c);
+		ttcol++;
+	} else if ((kbd_expand < 0) && (c == '\t')) {
+		kbd_putc(' ');
+	} else {
+		if (c & HIGHBIT) {
+			kbd_putc('\\');
+			if (global_w_val(WMDNONPRINTOCTAL)) {
+				kbd_putc(((c>>6)&3)+'0');
+				kbd_putc(((c>>3)&7)+'0');
+				kbd_putc(((c   )&7)+'0');
+			} else {
+				kbd_putc('x');
+				kbd_putc(hexdigits[(c>>4) & 0xf]);
+				kbd_putc(hexdigits[(c   ) & 0xf]);
 			}
+		} else {
+			kbd_putc('^');
+			kbd_putc(toalpha(c));
 		}
+	}
+	endofDisplay;
+}
 
-		if (c == '\r') {
-			buf[cpos] = 0;
-			lineinput = FALSE;
-			*bufp = buf;
-			return TRUE;
+/* put a string to the keyboard-prompt */
+void
+kbd_puts(s)
+	char	*s;
+{
+	while (*s)
+		kbd_putc(*s++);
+}
 
-		} else if (c == kcod2key(abortc)) {	/* Bell, abort */
-			buf[0] = '\0';
-			lineinput = FALSE;
-			return FALSE;
-
-		} else if (isbackspace(c)) {
+/* erase a character from the display by wiping it out */
+void
+kbd_erase()
+{
+	beginDisplay;
+	if (ttcol > 0) {
+		if (--ttcol < term.t_ncol) {
 			TTputc('\b');
 			TTputc(' ');
 			TTputc('\b');
-			--ttcol;
-			--cpos;
-			TTflush();
+		}
+	} else
+		ttcol = 0;
+	endofDisplay;
+}
 
-		} else if (c == kcod2key(killc)) {	/* ^U, kill */
-			while (cpos != 0) {
-				TTputc('\b');
-				TTputc(' ');
-				TTputc('\b');
-				--cpos;
-				--ttcol;
-			}
-			TTflush();
-			tungetc(c);
-			return SORTOFTRUE;
+/* definitions for name-completion */
+#define	NEXT_DATA(p)	((p)+size_entry)
+#define	PREV_DATA(p)	((p)-size_entry)
 
-		} /* else... */
-/* the following mess causes the command to terminate if:
-	we've got a space
-		-or-
-	we're in the first few chars and we're switching from punctuation
-	to alphanumerics, or vice-versa.  oh yeah -- '!' is considered
-	alphanumeric today.
-	All this allows things like:
-		: e#
-		: !ls
-		: q!
-	to work properly.
-	If we pass this "if" with c != ' ', then c is ungotten below,
-	so it can be picked up by the commands argument getter later.
-*/
-		else if (c == ' ' || (cpos > 0 && cpos < 3 &&
-			     ((!ispunct(c) &&  ispunct(buf[cpos-1])) ||
-	   ((c != '!' && ispunct(c)) &&
-	   	 (buf[cpos-1] == '!' || !ispunct(buf[cpos-1]))) )
-			      		)
-			) {
-/* <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< */
-	/* attempt a completion */
-	buf[cpos] = 0;		/* terminate it for us */
-	nbp = nametbl;	/* scan for matches */
-	while (nbp->n_cmd != NULL) {
-		if (strncmp(buf, nbp->n_name, strlen(buf)) == 0) {
-			/* a possible match! exact? no more than one? */
-			if (strcmp(buf, nbp->n_name) == 0 || /* exact? */
-				(nbp + 1)->n_cmd == NULL ||
-				strncmp(buf, (nbp+1)->n_name, strlen(buf)) != 0)
-			{
-				/* exact or only one like it.  print it */
-				sp = nbp->n_name + cpos;
-				while (*sp)
-					TTputc(*sp++);
-				TTflush();
-				if (c != ' ')  /* put it back */
-					tungetc(c);
-				lineinput = FALSE;
-				/* return nbp->n_name; */
-				strncpy(buf,nbp->n_name,NLINE);
-				*bufp = buf;
-				return TRUE;
-			} else {
-/* << << << << << << << << << << << << << << << << << */
-	/* try for a partial match against the list */
+#ifdef	lint
+static	/*ARGSUSED*/
+char *	THIS_NAME(p)	char *p; { return 0; }
+#else
+#define	THIS_NAME(p)	(*(char **)(p))
+#endif
+#define	NEXT_NAME(p)	THIS_NAME(NEXT_DATA(p))
 
-	/* first scan down until we no longer match the current input */
-	lnbp = (nbp + 1);
-	while ((lnbp+1)->n_cmd != NULL) {
-		if (strncmp(buf, (lnbp+1)->n_name, strlen(buf)) != 0)
+/*
+ * Scan down until we no longer match the current input, or reach the end of
+ * the symbol table.
+ */
+/*ARGSUSED*/
+static char *
+skip_partial(case_insensitive, buf, len, table, size_entry)
+int	case_insensitive;
+char	*buf;
+SIZE_T	len;
+char	*table;
+SIZE_T	size_entry;
+{
+	register char *	next = NEXT_DATA(table);
+	register char *	sp;
+
+	while ((sp = THIS_NAME(next)) != 0) {
+		if (StrNcmp(buf, sp, len) != 0)
 			break;
-		++lnbp;
+		next = NEXT_DATA(next);
 	}
+	return next;
+}
 
-	/* and now, attempt to partial complete the string, char at a time */
-	while (TRUE) {
-		/* add the next char in */
-		buf[cpos] = nbp->n_name[cpos];
+/*
+ * Shows a partial-match.  This is invoked in the symbol table at a partial
+ * match, and the user wants to know what characters could be typed next.
+ * If there is more than one possibility, they are shown in square-brackets.
+ * If there is only one possibility, it is shown in curly-braces.
+ */
+static void
+show_partial(case_insensitive, buf, len, table, size_entry)
+int	case_insensitive;
+char	*buf;
+SIZE_T	len;
+char	*table;
+SIZE_T	size_entry;
+{
+	register char	*next = skip_partial(case_insensitive, buf, len, table, size_entry);
+	register char	*last = PREV_DATA(next);
+	register int	c;
+
+	if (THIS_NAME(table)[len] == THIS_NAME(last)[len]) {
+		kbd_putc('{');
+		while ((c = THIS_NAME(table)[len]) != 0) {
+			if (c == THIS_NAME(last)[len]) {
+				kbd_putc(c);
+				len++;
+			} else
+				break;
+		}
+		kbd_putc('}');
+	}
+	if (next != NEXT_DATA(table)) {
+		c = TESTC;	/* shouldn't be in the table! */
+		kbd_putc('[');
+		while (table != next) {
+			register char *sp = THIS_NAME(table);
+			if (c != sp[len]) {
+				c = sp[len];
+				kbd_putc(c ? c : '$');
+			}
+			table = NEXT_DATA(table);
+		}
+		kbd_putc(']');
+	}
+	TTflush();
+}
+
+#if OPT_POPUPCHOICE
+/*
+ * makecmpllist is called from liststuff to display the possible completions.
+ */
+struct compl_rec {
+    char *buf;
+    SIZE_T len;
+    char *table;
+    SIZE_T size_entry;
+};
+
+#ifdef lint
+#define c2ComplRec(c) ((struct compl_rec *)0)
+#else
+#define c2ComplRec(c) ((struct compl_rec *)c)
+#endif
+
+/*ARGSUSED*/
+static void
+makecmpllist(case_insensitive, cinfop)
+    int case_insensitive;
+    void *cinfop;
+{
+    char * buf		= c2ComplRec(cinfop)->buf;
+    SIZE_T len		= c2ComplRec(cinfop)->len;
+    char * first	= c2ComplRec(cinfop)->table;
+    SIZE_T size_entry	= c2ComplRec(cinfop)->size_entry;
+    register char *last = skip_partial(case_insensitive, buf, len, first, size_entry);
+    register char *p;
+    SIZE_T maxlen;
+    int slashcol;
+    int cmpllen;
+    int cmplcols;
+    int cmplrows;
+    int nentries;
+    int i, j;
+
+    for (p = NEXT_DATA(first), maxlen = strlen(THIS_NAME(first));
+         p != last;
+	 p = NEXT_DATA(p)) {
+	int l = strlen(THIS_NAME(p));
+	if (l > maxlen)
+	    maxlen = l;
+    }
+
+    slashcol = (int)(pathleaf(buf) - buf);
+    if (slashcol != 0) {
+        char b[NLINE];
+        (void)strncpy(b, buf, (SIZE_T)slashcol);
+        (void)strncpy(&b[slashcol], &(THIS_NAME(first))[slashcol],
+			(len-slashcol));
+        b[slashcol+(len-slashcol)] = EOS;
+        bprintf("Completions prefixed by %s:\n", b);
+    }
+
+    cmplcols = term.t_ncol / (maxlen - slashcol + 1);
+
+    if (cmplcols == 0)
+	cmplcols = 1;
+
+    nentries = (int)(last - first) / size_entry;
+    cmplrows = nentries / cmplcols;
+    cmpllen  = term.t_ncol / cmplcols;
+    if (cmplrows * cmplcols < nentries)
+	cmplrows++;
+
+    for (i = 0; i < cmplrows; i++) {
+	for (j = 0; j < cmplcols; j++) {
+	    int idx = cmplrows * j + i;
+	    if (idx < nentries) {
+		char *s = THIS_NAME(first+(idx*size_entry))+slashcol;
+		if (j == cmplcols-1)
+		    bprintf("%s\n", s);
+		else
+		    bprintf("%*s", cmpllen, s);
+	    }
+	    else {
+		bprintf("\n");
+		break;
+	    }
+	}
+    }
+}
+
+/*
+ * Pop up a window and show the possible completions.
+ */
+static void
+show_completions(case_insensitive, buf, len, table, size_entry)
+int	case_insensitive;
+char	*buf;
+SIZE_T	len;
+char	*table;
+SIZE_T	size_entry;
+{
+    struct compl_rec cinfo;
+    BUFFER *bp;
+    int alreadypopped = 0;
+
+    /*
+     * Find out if completions buffer exists; so we can take the time to
+     * shrink/grow the window to the latest size.
+     */
+    if ((bp = find_b_name(COMPLETIONS_BufName)) != NULL) {
+	alreadypopped = (bp->b_nwnd != 0);
+    }
+
+    cinfo.buf = buf;
+    cinfo.len = len;
+    cinfo.table = table;
+    cinfo.size_entry = size_entry;
+    liststuff(COMPLETIONS_BufName, FALSE, makecmpllist, case_insensitive, (void *) &cinfo);
+
+    if (alreadypopped)
+	shrinkwrap();
+
+    (void)update(TRUE);
+}
+
+/*
+ * Scroll the completions window wrapping around back to the beginning
+ * of the buffer once it has been completely scrolled.  If the completions
+ * buffer is missing for some reason, we will call show_completions to pop
+ * it (back) up.
+ */
+static void
+scroll_completions(case_insensitive, buf, len, table, size_entry)
+    int		case_insensitive;
+    char	*buf;
+    SIZE_T	len;
+    char	*table;
+    SIZE_T	size_entry;
+{
+    BUFFER *bp = find_b_name(COMPLETIONS_BufName);
+    if (bp == NULL)
+	show_completions(case_insensitive, buf, len, table, size_entry);
+    else {
+	LINEPTR lp;
+	swbuffer(bp);
+	gotoeos(FALSE, 1);
+	lp = DOT.l;
+	(void)forwhpage(FALSE, 1);
+	if (same_ptr(lp, DOT.l))
+	    gotobob(FALSE, 0);
+	(void)update(TRUE);
+    }
+}
+
+void
+popdown_completions()
+{
+    BUFFER *bp;
+    if ((bp = find_b_name(COMPLETIONS_BufName)) != NULL)
+	zotwp(bp);
+}
+#endif /* OPT_POPUPCHOICE */
+
+/*
+ * Attempt to partial-complete the string, char at a time
+ */
+static int
+fill_partial(case_insensitive, buf, pos, first, last, size_entry)
+int	case_insensitive;
+char	*buf;
+SIZE_T	pos;
+char	*first;
+char	*last;
+SIZE_T	size_entry;
+{
+	register char	*p;
+	register int	n = pos;
+	char	*this_name = THIS_NAME(first);
+
+#if 0 /* case insensitive reply correction doesn't work reliably yet */
+	if (!clexec && case_insensitive) {
+		int spos = pos;
+
+		while (spos > 0 && buf[spos - 1] != SLASHC) {
+			kbd_erase();
+			spos--;
+		}
+		while (spos < pos) {
+			kbd_putc(this_name[spos]);
+			spos++;
+		}
+	}
+#endif
+
+	for_ever {
+		buf[n] = this_name[n];	/* add the next char in */
+		buf[n+1] = EOS;
 
 		/* scan through the candidates */
-		cnbp = nbp + 1;
-		while (cnbp <= lnbp) {
-			if (cnbp->n_name[cpos] != buf[cpos])
-				goto onward;
-			++cnbp;
-		}
-
-		/* add the character */
-		TTputc(buf[cpos++]);
-	}
-/* << << << << << << << << << << << << << << << << << */
+		for (p = NEXT_DATA(first); p != last; p = NEXT_DATA(p)) {
+			if (THIS_NAME(p)[n] != buf[n]) {
+				buf[n] = EOS;
+				if (n == pos
+#if OPT_POPUPCHOICE
+# if OPT_ENUM_MODES
+				 && !global_g_val(GVAL_POPUP_CHOICES)
+# else
+				 && !global_g_val(GMDPOPUP_CHOICES)
+# endif
+#endif
+				)
+					kbd_alarm();
+				TTflush(); /* force out alarm or partial completion */
+				return n;
 			}
 		}
-		++nbp;
-	}
 
-	/* no match.....beep and onward */
-	TTbeep();
-onward:;
-	TTflush();
-/* <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< */
-		} else {
-			if (cpos < NLINE-1 && isprint(c)) {
-				buf[cpos++] = c;
-				TTputc(c);
-			}
-
-			++ttcol;
-			TTflush();
-		}
+		if (!clexec)
+			kbd_putc(buf[n]); /* add the character */
+		n++;
 	}
 }
 
+static	int	testcol;	/* records the column when TESTC is decoded */
+#if OPT_POPUPCHOICE
+/*
+ * cmplcol is used to record the column number (on the message line) after
+ * name completion.  Its value is used to decide whether or not to display
+ * a completion list if the name completion character (tab) is pressed
+ * twice in succession.  Once the completion list has been displayed, its
+ * value will be changed to the additive inverse of the column number in
+ * order to determine whether to scroll if tab is pressed yet again.  We
+ * assume that 0 will never be a valid column number.  So long as we always
+ * display some sort of prompt prior to reading from the message line, this
+ * is a good assumption.
+ */
+static	int	cmplcol = 0;
+#endif
+
+/*
+ * Initializes the name-completion logic
+ */
+void
+kbd_init()
+{
+	testcol = -1;
+}
+
+/*
+ * Erases the display that was shown in response to TESTC
+ */
+void
+kbd_unquery()
+{
+	beginDisplay;
+#if OPT_POPUPCHOICE
+	if (cmplcol != ttcol && -cmplcol != ttcol)
+		cmplcol = 0;
+#endif
+	if (testcol >= 0) {
+		while (ttcol > testcol)
+			kbd_erase();
+		TTflush();
+		testcol = -1;
+	}
+	endofDisplay;
+}
+
+/*
+ * This is invoked to find the closest name to complete from the current buffer
+ * contents.
+ */
+int
+kbd_complete(case_insensitive, c, buf, pos, table, size_entry)
+int	case_insensitive;
+int	c;		/* TESTC, NAMEC or isreturn() */
+char	*buf;
+int	*pos;
+char	*table;
+SIZE_T	size_entry;
+{
+	register SIZE_T cpos = *pos;
+	register char *nbp;	/* first ptr to entry in name binding table */
+	int status = FALSE;
+#if OPT_POPUPCHOICE
+# if OPT_ENUM_MODES
+	int gvalpopup_choices = *global_g_val_ptr(GVAL_POPUP_CHOICES);
+# else
+	int gvalpopup_choices = global_g_val(GMDPOPUP_CHOICES);
+# endif
+#endif
+
+	kbd_init();		/* nothing to erase */
+	buf[cpos] = EOS;	/* terminate it for us */
+	nbp = table;		/* scan for matches */
+
+	while (THIS_NAME(nbp) != NULL) {
+		if (StrNcmp(buf,  THIS_NAME(nbp), strlen(buf)) == 0) {
+			testcol = ttcol;
+			/* a possible match! exact? no more than one? */
+#if OPT_POPUPCHOICE
+			if (!clexec && c == NAMEC && cmplcol == -ttcol) {
+				scroll_completions(case_insensitive, buf, cpos, nbp, size_entry);
+				return FALSE;
+			}
+#endif
+			if (c == TESTC) {
+				show_partial(case_insensitive, buf, cpos, nbp, size_entry);
+			}
+			else if (Strcmp(buf,  THIS_NAME(nbp)) == 0 || /* exact? */
+				NEXT_NAME(nbp) == NULL ||
+				StrNcmp(buf, NEXT_NAME(nbp), strlen(buf)) != 0)
+			{
+				/* exact or only one like it.  print it */
+				if (!clexec) {
+#if 0 /* case insensitive reply correction doesn't work reliably yet */
+					if (case_insensitive) {
+						int spos = cpos;
+
+						while (spos > 0 && buf[spos - 1] != SLASHC) {
+							kbd_erase();
+							spos--;
+						}
+						kbd_puts(THIS_NAME(nbp) + spos);
+					}
+					else
+#endif
+						kbd_puts(THIS_NAME(nbp) + cpos);
+					TTflush();
+					testcol = ttcol;
+				}
+				if (c != NAMEC)  /* put it back */
+					unkeystroke(c);
+				/* return complete name */
+				(void)strncpy0(buf, THIS_NAME(nbp),
+						(SIZE_T)(NLINE - 1));
+				*pos = strlen(buf);
+#if OPT_POPUPCHOICE
+				if (gvalpopup_choices != 'o' && !clexec && (c == NAMEC))
+					status = FALSE;
+				else
+#endif
+					status = TRUE;
+			}
+			else {
+				/* try for a partial match against the list */
+				*pos = fill_partial(case_insensitive, buf, cpos, nbp,
+					skip_partial(case_insensitive, buf, cpos, nbp, size_entry),
+					size_entry);
+				testcol = ttcol;
+			}
+#if OPT_POPUPCHOICE
+# if OPT_ENUM_MODES
+			if (!clexec && gvalpopup_choices != 'o' && c == NAMEC && *pos == cpos) {
+				if (gvalpopup_choices == 'i' || cmplcol == ttcol) {
+					show_completions(case_insensitive, buf, cpos, nbp, size_entry);
+					cmplcol = -ttcol;
+				}
+				else
+					cmplcol = ttcol;
+			}
+			else
+				cmplcol = 0;
+# else
+			if (!clexec && gvalpopup_choices 
+			 && c == NAMEC && *pos == cpos) {
++				show_completions(case_insensitive, buf, cpos, nbp, size_entry);
+				cmplcol = -ttcol;
+			}
+			else
+				cmplcol = 0;
+# endif
+#endif
+			return status;
+		}
+		nbp = NEXT_DATA(nbp);
+	}
+
+#if OPT_POPUPCHOICE
+	cmplcol = 0;
+#endif
+	kbd_alarm();	/* no match */
+	buf[*pos = cpos] = EOS;
+	return FALSE;
+}
+
+/*
+ * Test a buffer to see if it looks like a shift-command, which may have
+ * repeated characters (but they must all be the same).
+ */
+static int
+is_shift_cmd(buffer, cpos)
+char	*buffer;
+int	cpos;
+{
+	register int c = *buffer;
+	if (isRepeatable(c)) {
+		while (--cpos > 0)
+			if (*(++buffer) != c)
+				return FALSE;
+		return TRUE;
+	}
+	return FALSE;
+}
+
+/*
+ * The following mess causes the command to terminate if:
+ *
+ *	we've got the eolchar
+ *		-or-
+ *	we're in the first few chars and we're switching from punctuation
+ *	(i.e., delimiters) to non-punctuation (i.e., characters that are part
+ *	of command-names), or vice-versa.  oh yeah -- '-' isn't punctuation
+ *	today, and '!' isn't either, in one direction, at any rate.
+ *	All this allows things like:
+ *		: e#
+ *		: e!%
+ *		: !ls
+ *		: q!
+ *		: up-line
+ *	to work properly.
+ *
+ *	If we pass this "if" with c != NAMEC, then c is ungotten below,
+ *	so it can be picked up by the commands argument getter later.
+ */
+
+#define ismostpunct(c) (ispunct(c) && (c) != '-')
+
+static int
+eol_command(buffer, cpos, c, eolchar)
+char *	buffer;
+int	cpos;
+int	c;
+int	eolchar;
+{
+	/*
+	 * Handle special case of repeated-character implying repeat-count
+	 */
+	if (is_shift_cmd(buffer, cpos) && (c == *buffer))
+		return TRUE;
+
+	/*
+	 * Shell-commands aren't complete until the line is complete.
+	 */
+	if ((cpos > 0) && isShellOrPipe(buffer))
+		return isreturn(c);
+
+	return	(c == eolchar)
+	  ||	(
+		  cpos > 0 &&  cpos < 3
+	      &&(
+		  (!ismostpunct(c)
+		&&  ismostpunct(buffer[cpos-1])
+		  )
+		|| ((c != '!' && ismostpunct(c))
+		  && (buffer[cpos-1] == '!' || !ismostpunct(buffer[cpos-1]))
+		  )
+		)
+	      );
+}
+
+/*
+ * This procedure is invoked from 'kbd_string()' to setup the command-name
+ * completion and query displays.
+ */
+static int
+cmd_complete(c, buf, pos)
+int	c;
+char	*buf;
+int	*pos;
+{
+	register int status;
+#if OPT_HISTORY
+	/*
+	 * If the user scrolled back in 'edithistory()', the text may be a
+	 * repeated-shift command, which won't match the command-table (e.g.,
+	 * ">>>").
+	 */
+	if ((*pos > 1) && is_shift_cmd(buf, *pos)) {
+		int	len = 1;
+		char	tmp[NLINE];
+		tmp[0] = *buf;
+		tmp[1] = EOS;
+		status = cmd_complete(c, tmp, &len);
+	} else
+#endif
+	 if ((*pos > 0) && isShellOrPipe(buf)) {
+		status = isreturn(c);
+		if (c != NAMEC)
+			unkeystroke(c);
+	} else
+
+	status = kbd_complete(FALSE, c, buf, pos,
+			(char *)&nametbl[0], sizeof(nametbl[0]));
+	return status;
+}
+
+int
+kbd_engl_stat(prompt, buffer)
+char	*prompt;
+char	*buffer;
+{
+	int	kbd_flags = KBD_EXPCMD|KBD_NULLOK|((NAMEC != ' ') ? 0 : KBD_MAYBEC);
+
+	*buffer = EOS;
+	return kbd_reply(
+		prompt,		/* no-prompt => splice */
+		buffer,		/* in/out buffer */
+		NLINE,		/* sizeof(buffer) */
+		eol_command,
+		' ',		/* eolchar */
+		kbd_flags,	/* allow blank-return */
+		cmd_complete);
+}
+
+#if NO_LEAKS
+void
+bind_leaks()
+{
+#if OPT_REBIND
+	while (KeyBindings != kbindtbl) {
+		KBIND *kbp = KeyBindings;
+		KeyBindings = kbp->k_link;
+		free((char *)kbp);
+	}
+#endif
+}
+#endif	/* NO_LEAKS */
+
+#if OPT_CASELESS
+static int
+cs_strcmp(case_insensitive, s1, s2)
+int case_insensitive;
+char *s1;
+char *s2;
+{
+	if (case_insensitive)
+		return stricmp(s1, s2);
+	return strcmp(s1, s2);
+}
+
+static int
+cs_strncmp(case_insensitive, s1, s2, n)
+int case_insensitive;
+char *s1;
+char *s2;
+SIZE_T n;
+{
+	if (case_insensitive)
+		return strnicmp(s1, s2, n);
+	return strncmp(s1, s2, n);
+}
+#endif	/* OPT_CASELESS */
