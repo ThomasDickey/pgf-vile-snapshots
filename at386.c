@@ -217,12 +217,12 @@ at386scroll_delins(from,to,howmany)
 }
 
 #endif
-#if 0
+
 spal(dummy)	/* change palette string */
 {
 	/*	Does nothing here	*/
 }
-#endif
+
 
 #if	COLOR
 at386fcol()	/* no colors here, ignore this */

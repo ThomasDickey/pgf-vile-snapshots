@@ -169,15 +169,11 @@ char *vname;		/* name of environment variable to retrieve */
 				itoa(lgetc(curwp->w_dotp, curwp->w_doto)));
 		case EVDISCMD:	return(ltos(discmd));
 		case EVVERSION:	return(version);
-		case EVPROGNAME:return(progname);
+		case EVPROGNAME:return(prognam);
 		case EVSEED:	return(itoa(seed));
 		case EVDISINP:	return(ltos(disinp));
 		case EVWLINE:	return(itoa(curwp->w_ntrows));
 		case EVCWLINE:	return(itoa(getwpos()));
-#ifdef BEFORE
-		case EVTARGET:	saveflag = lastflag;
-				return(itoa(curgoal));
-#endif
 		case EVSEARCH:	return(pat);
 		case EVREPLACE:	return(rpat);
 		case EVMATCH:	return((patmatch == NULL)? "": patmatch);
@@ -407,7 +403,7 @@ char *value;	/* value to set to */
 		switch (vnum) {
 		case EVFILLCOL:	fillcol = atoi(value);
 				break;
-		case EVPAGELEN:	status = newsize(TRUE, atoi(value));
+		case EVPAGELEN:	status = newscreensize(atoi(value),term.t_ncol);
 				break;
 		case EVCURCOL:	status = gotocol(TRUE,atoi(value));
 				break;
@@ -460,11 +456,6 @@ char *value;	/* value to set to */
 		case EVCWLINE:	status = forwline(TRUE,
 						atoi(value) - getwpos());
 				break;
-#ifdef BEFORE
-		case EVTARGET:	curgoal = atoi(value);
-				thisflag = saveflag;
-				break;
-#endif
 		case EVSEARCH:	strcpy(pat, value);
 				rvstrcpy(tap, pat);
 				mcclear();

@@ -32,7 +32,7 @@
 
 int    mcmatch();
 int    readpattern();
-#if BEFORE
+#if SEARCH_AND_REPLACE
 int    replaces();
 #endif
 int    nextch();
@@ -105,6 +105,13 @@ int f, n;	/* default flag / numeric argument */
 	do {
 		nextch(&(curwp->w_dotp),&(curwp->w_doto), FORWARD,wrapok);
 		status = thescanner(&pat[0], FORWARD, PTBEG, wrapok);
+		if (status == ABORT) {
+			TTbeep();
+			mlwrite("[Aborted]");
+			curwp->w_dotp = curdotp;
+			curwp->w_doto = curoff;
+			return status;
+		}
 		/* if found, mark the line */
 		if (status && marking) {
 			/* if we were on a match when we started, then
@@ -204,6 +211,12 @@ int f, n;	/* default flag / numeric argument */
 		nextch(&(curwp->w_dotp),&(curwp->w_doto),REVERSE,wrapok);
 		mlwrite(notfoundmsg);
 		TTbeep();
+	} else if (status == ABORT) {
+		TTbeep();
+		mlwrite("[Aborted]");
+		curwp->w_dotp = curdotp;
+		curwp->w_doto = curoff;
+		return status;
 	}
 
 	return(status);
@@ -262,6 +275,12 @@ int f, n;	/* default flag / numeric argument */
 									wrapok);
 			mlwrite(notfoundmsg);
 			TTbeep();
+		} else if (status == ABORT) {
+			TTbeep();
+			mlwrite("[Aborted]");
+			curwp->w_dotp = curdotp;
+			curwp->w_doto = curoff;
+			return status;
 		}
 	}
 	return(status);
@@ -329,6 +348,12 @@ int f, n;	/* default flag / numeric argument */
 		nextch(&(curwp->w_dotp),&(curwp->w_doto), FORWARD,wrapok);
 		mlwrite(notfoundmsg);
 		TTbeep();
+	} else if (status == ABORT) {
+		TTbeep();
+		mlwrite("[Aborted]");
+		curwp->w_dotp = curdotp;
+		curwp->w_doto = curoff;
+		return status;
 	}
 
 	return(status);
@@ -777,7 +802,7 @@ register char	*rvstr, *str;
 	*rvstr = '\0';
 }
 
-#if BEFORE
+#if SEARCH_AND_REPLACE
 /*
  * sreplace -- Search and replace.
  */

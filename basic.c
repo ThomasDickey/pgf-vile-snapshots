@@ -379,10 +379,6 @@ char *s1, *s2;
 				break;
 			curwp->w_dotp = lforw(curwp->w_dotp);
 		}
-#if BEFORE
-		if (curwp->w_dotp == curbp->b_linep)
-			curwp->w_dotp = lback(curwp->w_dotp);
-#endif
 	}
 	/* if doing an operation and we moved */
 	if (doingopcmd && odotp != curwp->w_dotp) {

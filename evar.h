@@ -1,5 +1,5 @@
 /*	EVAR.H:	Environment and user variable definitions
-		for MicroEMACS
+		for MicroEMACS (and now vile)
 
 		written 1986 by Daniel Lawrence
 */
@@ -41,7 +41,7 @@ char *envars[] = {
 	"curchar",		/* current character under the cursor */
 	"discmd",		/* display commands on command line */
 	"version",		/* current version number */
-	"progname",		/* returns current prog name - "MicroEMACS" */
+	"progname",		/* returns current prog name - "vile" */
 	"seed",			/* current random number seed */
 	"disinp",		/* display command line input characters */
 	"wline",		/* # of lines in current window */

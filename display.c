@@ -14,8 +14,8 @@
 #if UNIX
 #include <signal.h>
 #include <termio.h>
-#ifdef ODT
-#include <sys/ptem.h">
+#if ODT
+#include <sys/ptem.h>
 #endif
 #endif
 
@@ -214,6 +214,25 @@ int force;	/* force update past type ahead? */
 #endif
 
 	displaying = TRUE;
+
+	/* first, propagate mode line changes to all instances of
+		a buffer displayed in more than one window */
+	wp = wheadp;
+	while (wp != NULL) {
+		if (wp->w_flag & WFMODE) {
+			if (wp->w_bufp->b_nwnd > 1) {
+				/* make sure all previous windows have this */
+				register WINDOW *owp;
+				owp = wheadp;
+				while (owp != NULL) {
+					if (owp->w_bufp == wp->w_bufp)
+						owp->w_flag |= WFMODE;
+					owp = owp->w_wndp;
+				}
+			}
+		}
+		wp = wp->w_wndp;
+	}
 
 	/* update any windows that need refreshing */
 	wp = wheadp;
@@ -415,25 +434,9 @@ LINE *lp;
 	vscreen[sline]->v_flag &= ~VFREQ;
 	vtmove(sline, 0);
 	if (lp != wp->w_bufp->b_linep) {
-#if BEFORE
-		for (i=0; i < llength(lp); ++i) {
-			c = lgetc(lp, i);
-			if (c == '\t' && wp->w_bufp->b_mode&MDLIST) {
-				vtputc('^');
-				vtputc(toalpha('\t'));
-			} else {
-				vtputc(c);
-			}
-		}
-		if (wp->w_bufp->b_mode&MDLIST) {
-			vtputc('^');
-			vtputc(toalpha('\n'));
-		}
-#else
 		for (i = 0; i < llength(lp); ++i)
 			vtputc(lgetc(lp, i), wp->w_bufp->b_mode & MDLIST);
 		vtputc('\n', wp->w_bufp->b_mode & MDLIST);
-#endif
 	} else {
 		vtputc('~');
 	}
@@ -506,15 +509,10 @@ upddex()
 				if ((wp != curwp) || (lp != wp->w_dotp) ||
 				   (curcol < term.t_ncol - 1)) {
 					vtmove(i, 0);
-#if BEFORE
-					for (j = 0; j < llength(lp); ++j)
-						vtputc(lgetc(lp, j));
-#else
 					for (j = 0; j < llength(lp); ++j)
 						vtputc(lgetc(lp, j),
 						wp->w_bufp->b_mode&MDLIST);
 					vtputc('\n', wp->w_bufp->b_mode&MDLIST);
-#endif
 					vteeol();
 
 					/* this line no longer is extended */
@@ -766,14 +764,9 @@ WINDOW *wp;	/* window to update lines in */
 	/* once we reach the left edge					*/
 	vtmove(currow, -lbound);	/* start scanning offscreen */
 	lp = curwp->w_dotp;		/* line to output */
-#if BEFORE
-	for (j=0; j<llength(lp); ++j)	/* until the end-of-line */
-		vtputc(lgetc(lp, j));
-#else
 	for (j = 0; j < llength(lp); ++j)
 		vtputc(lgetc(lp, j), wp->w_bufp->b_mode&MDLIST);
 	vtputc('\n', wp->w_bufp->b_mode&MDLIST);
-#endif
 
 	/* truncate the virtual line, restore tab offset */
 	vteeol();
@@ -1758,6 +1751,7 @@ int h, w;
 		newwidth(w);
 
 	update(TRUE);
+	return TRUE;
 }
 
 #endif

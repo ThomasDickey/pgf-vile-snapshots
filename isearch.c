@@ -202,6 +202,7 @@ start_over:
 	if (expc == abortc)			/* Want to quit searching?    */
 	    return (TRUE);			/* Quit searching now	      */
 
+	if (c == backspc) c = IS_RUBOUT;
 	switch (c)				/* dispatch on the input char */
 	{
 	  case IS_ABORT:			/* If abort search request    */
@@ -423,12 +424,12 @@ int	c;	/* character to be echoed */
 int	col;	/* column to be echoed in */
 {
     movecursor(term.t_nrow,col);		/* Position the cursor	      */
-    if ((c < ' ') || (c == 0x7F))		/* Control character?	      */
+    if (iscntrl(c))				/* Control character?	      */
     {
 	switch (c)				/* Yes, dispatch special cases*/
 	{
 
-	  case 0x7F:				/* Rubout:		      */
+	  case IS_RUBOUT:				/* Rubout:		      */
 	    TTputc('^');		/* Output a funny looking     */
 	    TTputc('?');		/*  indication of Rubout      */
 	    col++;				/* Count the extra char       */

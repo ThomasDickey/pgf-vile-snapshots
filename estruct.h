@@ -23,24 +23,42 @@
 #endif
 
 /*	Machine/OS definitions			*/
-#define AMIGA  0                       /* AmigaDOS			*/
-#define ST520  0                       /* ST520, TOS                   */
-#define MSDOS  0                       /* MS-DOS                       */
-#define VMS    0                       /* VAX/VMS                      */
-#define CPM    0                       /* CP/M-86                      */
-#define V7     0                       /* V7 UNIX or Coherent or BSD4.2*/
-
-#if sun
 #define BSD	1			/* UNIX BSD 4.2	and ULTRIX	*/
 #define USG	0			/* UNIX system V		*/
+#define V7	0			/* V7 UNIX or Coherent or BSD4.2*/
+					/*     presumably also Minix?	*/
+#define ODT	0			/* Open Desktop	(and others?)	*/
+#define AMIGA	0			/* AmigaDOS			*/
+#define ST520	0			/* ST520, TOS		       */
+#define MSDOS	0			/* MS-DOS		       */
+#define CPM	0			/* CP/M-86		       */
+#define VMS	0			/* VAX/VMS		       */
+
+/* the following overrides for sun, i386, and mips are for convenience only */
+#if sun
+# undef BSD
+# undef USG
+# define BSD	1			/* UNIX BSD 4.2	and ULTRIX	*/
+# define USG	0			/* UNIX system V		*/
 #endif
 
 #if i386 || mips
-#define BSD	0			/* UNIX BSD 4.2	and ULTRIX	*/
-#define USG	1			/* UNIX system V		*/
+# undef BSD
+# undef USG
+# define BSD	0			/* UNIX BSD 4.2	and ULTRIX	*/
+# define USG	1			/* UNIX system V		*/
 #endif
 
-#define UNIX	(V7 | BSD | USG)	/* any of the above		*/
+#define UNIX	(V7 | BSD | USG)	/* any unix		*/
+
+#define OS	(UNIX | AMIGA | ST520 | MSDOS | CPM | VMS)
+#if ! OS
+  you need to choose a system #define...
+#endif
+
+#define HAVE_MKDIR	1	/* if your system has the mkdir() system call */
+
+#define SHORTNAMES	0	/* if your compiler insists on 7 char names */
 
 /*	Compiler definitions			*/
 #define MWC86   0	/* marc williams compiler */
@@ -58,19 +76,16 @@
 			/* TIMING doesn't work yet... sorry  -pgf */ 
 
 
-/*   Special keyboard definitions            */
-
-#define WANGPC	0		/* WangPC - mostly escape sequences     */
-
 /*	Terminal Output definitions		*/
-
+/* choose one of the following */
+#define TERMCAP 1                       /* Use TERMCAP                  */
 #define ANSI    0			/* ANSI escape sequences	*/
+#define AT386   0			/* AT style 386 unix console	*/
 #define	HP150	0			/* HP150 screen driver		*/
 #define	HP110	0			/* HP110 screen driver		*/
 #define	VMSVT	0			/* various VMS terminal entries	*/
 #define VT52    0                       /* VT52 terminal (Zenith).      */
 #define RAINBOW 0                       /* Use Rainbow fast video.      */
-#define TERMCAP 1                       /* Use TERMCAP                  */
 #define	IBMPC	0			/* IBM-PC CGA/MONO/EGA driver	*/
 #define	DG10	0			/* Data General system/10	*/
 #define	TIPC	0			/* TI Profesional PC driver	*/
@@ -78,17 +93,20 @@
 #define	MAC	0			/* Macintosh			*/
 #define	ATARI	0			/* Atari 520/1040ST screen	*/
 #define NeWS	0			/* distributed */
-#define AT386   0			/* AT style 386 unix console	*/
+
+/*   Special keyboard definitions            */
+#define WANGPC	0		/* WangPC - mostly escape sequences     */
+/* the WANGPC stuff isn't in the cmdtbl keyboard definitions: sorry -- pgf */
 
 /*	Configuration options	*/
-
-#define CVMVAS  1	/* arguments to page forward/back in pages	*/
+/* pick and choose as you wish */
 #define	CLRMSG	0	/* space clears the message line with no insert	*/
-#define	CFENCE	1	/* fench matching in CMODE			*/
-#define	TYPEAH	1	/* type ahead causes update to be skipped	*/
+#define	CFENCE	1	/* do fench matching in CMODE			*/
+#define	TYPEAH	1	/* type ahead causes screen refresh to be delayed */
 #define DEBUGM	0	/* $debug triggers macro debugging		*/
 #define	VISMAC	0	/* update display during keyboard macros	*/
 #define	CTRLZ	0	/* add a ^Z at end of files under MSDOS only	*/
+#define CVMVAS  1	/* arguments to forward/back page are in pages	*/
 
 #define	REVSTA	1	/* Status line appears in reverse video		*/
 #define	COLOR	0	/* color commands and windows			*/
@@ -98,28 +116,35 @@
 #define	WORDPRO	1	/* Advanced word processing features		*/
 #define	FLABEL	0	/* function key label code [HP150]		*/
 #define	APROP	0	/* Add code for Apropos command			*/
-#define	CRYPT	0	/* file encryption enabled?			*/
+#define	CRYPT	0	/* file encryption? (not crypt(1) compatible!	*/
 #define MAGIC	1	/* include regular expression matching?		*/
-#define	AEDIT	1	/* advanced editing options: en/detabbing	*/
-#define	PROC	0	/* named procedures				*/
 #define	TAGS	1	/* tags support.  requires MAGIC		*/
+#define	AEDIT	1	/* advanced editing options: e.g. en/detabbing	*/
+#define	PROC	0	/* named procedures				*/
 #define	FINDERR	1	/* finderr support. uses scanf()		*/
-#define	GLOBALS	1	/* global support.				*/
+#define	GLOBALS	1	/* "global" command support.			*/
 #define	REBIND	0	/* permit rebinding of keys			*/
-#define	PATHLOOK 1	/* look along $PATH for startup and help files */
-#define	SCROLLCODE 1	/* code for scrolling the screen.  only useful if
-				your display can scroll regions, or at
-				least insert/delete lines.  ansi and tcap
-				can */
+#define	PATHLOOK 1	/* look along $PATH for startup and help files  */
+#define	SCROLLCODE 1	/* code for scrolling the screen.  Only useful
+			   if your display can scroll regions, or at
+			   least insert/delete lines.  ANSI and TERMCAP
+			   can do this */
 #define STUTTER_SEC_CMD 0 /* must the next/prev section commands (i.e.
-				']]' and '[[' be stuttered? */
+				']]' and '[[' be stuttered?  they must be
+				stuttered in real vi, I prefer them not
+				to be */
 				
 #define	FEWNAMES 1	/* strip some names - will no longer be bindable */
-#define	SMALLER	1	/* strip out a bunch of fluff */
-#define	DOSFILES 1	/* turn on code for DOS mode (lines end in crlf) */
+#define	DOSFILES 1	/* turn on code for DOS mode (lines that end in crlf) */
+#define	SMALLER	1	/* strip out a bunch of fluff (well, _I_ don't always
+				want it! -- pgf */
 
-#define ASCII	1	/* always using ASCII char sequences for now	*/
-#define EBCDIC	0	/* later IBM mainfraim versions will use EBCDIC	*/
+/* That's the end of the user selections -- the rest is static definition */
+/* ====================================================================== */
+
+#if SHORTNAMES
+#include "shortnames/remap.h"
+#endif
 
 /*	System dependant library redefinitions, structures and includes	*/
 
@@ -349,9 +374,10 @@ union REGS {
 
 #define	BELL	0x07			/* a bell character		*/
 #define	TAB	0x09			/* a tab character		*/
-/* so C-fence matching doesn't get confused when editing */
-#define LBRACE 0x7b
-#define RBRACE 0x7d
+/* defind these so C-fence matching doesn't get confused when we're editing
+	the cfence code itself */
+#define LBRACE '{'
+#define RBRACE '}'
 
 
 #if	V7 | USG | BSD
@@ -383,11 +409,6 @@ union REGS {
 #undef	abs
 #endif
 
-/* DIFCASE represents the integer difference between upper
-   and lower case letters.  It is an xor-able value, which is
-   fortunate, since the relative positions of upper to lower
-   case letters is the opposite of ascii in ebcdic.
-*/
 
 #define N_chars 128
 #define _upper 1
@@ -400,13 +421,15 @@ union REGS {
 #define _punct 128
 #define _ident 256
 #define _path 512
+#define _bspace 1024
 
-#if	ASCII
+/* DIFCASE represents the difference between upper
+   and lower case letters, DIFCNTRL the difference between upper case and
+   control characters.  They are xor-able values.  */
 #define	DIFCASE		0x20
 #define	DIFCNTRL	0x40
 /* these intentionally match the ctypes.h definitions, except that
 	they force the char to ascii first */
-
 #define istype(sometype,c)	(_chartypes_[(c)&(N_chars-1)] & (sometype))
 #define islower(c)	istype(_lower, c)
 #define isupper(c)	istype(_upper, c)
@@ -419,22 +442,12 @@ union REGS {
 #define isalnum(c)	istype(_lower|_upper|_digit, c)
 #define isident(c)	istype(_ident, c)
 #define ispath(c)	istype(_path, c)
+#define isbackspace(c)	istype(_bspace, c)
 
 #define toupper(c)	((c)^DIFCASE)
 #define tolower(c)	((c)^DIFCASE)
 #define tocntrl(c)	((c)^DIFCNTRL)
 #define toalpha(c)	((c)^DIFCNTRL)
-
-#else
-
-#if	EBCDIC
-#define	DIFCASE		0x40
-
-you're on your own...
-
-#endif
-
-#endif
 
 /*	Dynamic RAM tracking and reporting redefinitions	*/
 

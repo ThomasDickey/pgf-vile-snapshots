@@ -71,14 +71,9 @@ filefind(f, n)
 			rvstrcpy(rnfname, fname);
 			if (makeflist() == FALSE || !sortsearch(rnfname, 
 					strlen(rnfname), filesbp, FALSE, &lp)) {
-#if BEFORE
-				mlwrite("No such file: %s", fname);
-				return FALSE;
-#else
 				/* give up, and try what they asked for */
 				strcpy (nfname, fname);
 				break;
-#endif
 			}
 			rvstrncpy(nfname, lp->l_text, llength(lp));
 		}
@@ -970,7 +965,11 @@ out:
 	myself while debugging...		pgf */
 imdying(signo)
 {
+#if HAVE_MKDIR
 	static char dirnam[NSTRING] = "/tmp/vileDXXXXXX";
+#else
+	static char dirnam[NSTRING] = "/tmp";
+#endif
 	char filnam[50];
 	char cmd[80];
 	BUFFER *bp;
@@ -986,18 +985,22 @@ imdying(signo)
 		if (((bp->b_flag & BFINVS) == 0) && 
 			 bp->b_active == TRUE && 
 	                 (bp->b_flag&BFCHG) != 0) {
+#if HAVE_MKDIR
 			if (!created) {
 				(void)mktemp(dirnam);
 				if(mkdir(dirnam,0700) != 0) {
-				    /* mlwrite("Could not create savedir"); */
 					vttidy(FALSE);
 					exit(1);
 				}
 				created = 1;
 			}
+#endif
 			strcpy(filnam,dirnam);
 			strcat(filnam,"/");
-			strcat(filnam,bp->b_fname);
+#if ! HAVE_MKDIR
+			strcat(filnam,"V");
+#endif
+			strcat(filnam,bp->b_bname);
 			if (writeout(filnam,bp,FALSE) != TRUE) {
 				vttidy(FALSE);
 				exit(1);
@@ -1009,7 +1012,11 @@ imdying(signo)
 	if (wrote) {
 		if ((np = getenv("LOGNAME")) || (np = getenv("USER"))) {
 			sprintf(cmd,
+#if HAVE_MKDIR
     "(echo Subject: vile died; echo Files saved: ; ls %s/* ) | /bin/mail %s",
+#else
+    "(echo Subject: vile died; echo Files saved: ; ls %s/V* ) | /bin/mail %s",
+#endif
 				dirnam, np);
 			system(cmd);
 		}

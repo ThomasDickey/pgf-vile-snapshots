@@ -727,7 +727,6 @@ prc2engl(skey)	/* string key name to binding name.... */
 char *skey;	/* name of keey to get binding for */
 {
 	char *bindname;
-	unsigned int prc2kcod();
 
 	bindname = fnc2engl(kcod2fnc(prc2kcod(skey)));
 	if (bindname == NULL)
@@ -784,7 +783,7 @@ kbd_engl()
 			lineinput = FALSE;
 			return buf;
 
-		} else if (c == 0x7F || c == '\b') {	/* rubout/erase */
+		} else if (isbackspace(c)) {
 			if (cpos != 0) {
 				TTputc('\b');
 				TTputc(' ');

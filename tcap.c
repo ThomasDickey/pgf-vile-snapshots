@@ -283,12 +283,11 @@ tcapscrollregion(top,bot)
 }
 
 #endif
-#if 0
+
 spal(dummy)	/* change palette string */
 {
 	/*	Does nothing here	*/
 }
-#endif
 
 #if	COLOR
 tcapfcol()	/* no colors here, ignore this */

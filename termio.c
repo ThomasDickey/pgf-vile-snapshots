@@ -91,6 +91,8 @@ char tobuf[TBUFSIZ];		/* terminal output buffer */
 #endif
 #endif
 
+extern CMDFUNC f_backchar;
+
 /*
  * This function is called once to set up the terminal device streams.
  * On VMS, it translates TT until it finds the terminal, then assigns
@@ -184,6 +186,7 @@ ttopen()
 #endif
 	intrc = ntermio.c_cc[VINTR];
 	killc = ntermio.c_cc[VKILL];
+	backspc = ntermio.c_cc[VERASE];
 	ioctl(0, TCSETA, &ntermio);	/* and activate them */
 	kbdflgs = fcntl( 0, F_GETFL, 0 );
 	kbdpoll = FALSE;
@@ -192,6 +195,7 @@ ttopen()
 #if     V7 | BSD
 	ioctl(0,TIOCGETP,&ostate); /* save old state */
 	killc = ostate.sg_kill;
+	backspc = ostate.sg_erase;
 
 	nstate = ostate;
         nstate.sg_flags |= CBREAK;
@@ -233,8 +237,14 @@ ttopen()
 	signal(SIGTTOU,SIG_IGN);	/* ignore output prevention */
 	}
 #endif
-	/* on all screens we are not sure of the initial position
-	   of the cursor					*/
+	/* make sure backspace is bound to backspace */
+	asciitbl[backspc] = &f_backchar;
+
+	/* make sure backspace is considered a backspace by the code */
+	_chartypes_[backspc] |= _bspace;
+
+	/* on all screens we are not sure of the initial position */
+	/*  of the cursor					*/
 	ttrow = 999;
 	ttcol = 999;
 }

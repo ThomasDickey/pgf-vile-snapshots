@@ -243,7 +243,7 @@ kbd_key()
 	}
 #endif
 
-#if  TERMCAP
+#if  TERMCAP & are_you_sure
 	/* Apply SPEC prefix    */
 	if (c == '#' && !lineinput && !insertmode && !isnamedcmd) {
 	        c = tgetc();
@@ -392,7 +392,7 @@ int eolchar;
 			TTflush();
 			lineinput = FALSE;
 			return ABORT;
-		} else if (c=='\b' && quotef==FALSE) {
+		} else if (isbackspace(c) && quotef==FALSE) {
 			/* rubout/erase */
 			if (cpos != 0) {
 				outstring("\b \b");

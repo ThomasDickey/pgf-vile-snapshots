@@ -257,7 +257,7 @@ dotcmdplay	NONE
 	'.'
 execbuf		NONE			!SMALLER
 	"execute-buffer"		!FEWNAMES
-execcmd		NONE			!SMALLER
+execcmd		NONE			NEVER
 	"execute-command-line"		!FEWNAMES
 execfile	NONE			!SMALLER
 	"execute-file"			!FEWNAMES
