@@ -3,7 +3,7 @@
  * compatible terminals. It goes directly to the graphics RAM to do
  * screen output. It compiles into nothing if not a TI-PC driver
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/tipc.c,v 1.10 1995/03/25 02:53:53 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/tipc.c,v 1.11 1995/11/17 04:03:42 pgf Exp $
  */
 
 #define termdef 1			/* don't define "term" external */
@@ -81,8 +81,9 @@ TERM	term	= {
 	tirev,
 	ticres
 #if	OPT_COLOR
-	, tifcol,
-	tibcol
+	, tifcol
+	, tibcol
+	, 0		/* no palette */
 #endif
 };
 
@@ -173,12 +174,6 @@ ticres()	/* change screen resolution */
 
 {
 	return(TRUE);
-}
-
-spal()		/* change palette string */
-
-{
-	/*	Does nothing here	*/
 }
 
 tibeep()

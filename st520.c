@@ -4,7 +4,7 @@
  * using VT52 emulation.  The I/O services are provided here as well.  It
  * compiles into nothing if not a 520ST style device.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/st520.c,v 1.16 1994/11/29 04:02:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/st520.c,v 1.13 1994/09/13 17:15:48 pgf Exp $
  *
  */
 #error This module is not actively maintained as part of vile.
@@ -12,25 +12,12 @@
 #error  I know someone is using it, i have little incentive to fix it.
 #error  If you use it when you build vile, please let me know.  -pgf
 
-/* 
- * this fragment used to appear in the input stream.  function keys should
- *	be mapped these days, and this looks a lot like the ibmpc code
- *	used to, so you should be able to clone that.
- *	#if	SYS_ST520
- *		if (c == 0) {
- *			c = TTgetc();
- *			return c | SPEC;
- *		}
- *	#endif
-*/
-
-
 #define termdef 1			/* don't define "term" external */
 
 #include	"estruct.h"
 #include	"edef.h"
 
-#if	DISP_ATARI & SYS_ST520 & MEGAMAX
+#if	ATARI & ST520 & MEGAMAX
 #include	<osbind.h>
 
 #define LINEA_INIT 0xA000
@@ -65,7 +52,7 @@ extern	int st520kopen();
 extern	int st520kclose();
 extern	int st520chgrez();
 
-#if	OPT_COLOR
+#if	COLOR
 extern	int	st520fcol();
 extern	int	st520bcol();
 
@@ -99,7 +86,6 @@ TERM	term	= {
 	&st520kclose,
 	&ttgetc,
 	&ttputc,
-	&sttypahead,
 	&ttflush,
 	&st520move,
 	&st520eeol,
@@ -109,7 +95,7 @@ TERM	term	= {
 #if	MULTREZ
 	, &st520chgrez
 #endif
-#if	OPT_COLOR
+#if	COLOR
 	, &st520fcol,
 	&st520bcol
 #endif
@@ -154,7 +140,7 @@ st520eeol()
 st520eeop()
 {
 
-#if	OPT_COLOR
+#if	COLOR
 		st520fcol(gfcolor);
 		st520bcol(gbcolor);
 #endif
@@ -178,7 +164,7 @@ int status;	/* TRUE = reverse video, FALSE = normal video */
 	}
 }
 
-#if	OPT_COLOR
+#if	COLOR
 st520fcol(color)
 int color;      
 {
@@ -238,7 +224,7 @@ st520open()
 			term.t_nrow = 25;
 			term.t_ncol  = 80;
 			grez = 1;
-#if	OPT_COLOR
+#if	COLOR
 			STncolors = 4;
 			for(i=0;i<8;i++) {
 				oldpal[i] = Setcolor(i,newpal[i]);
@@ -251,7 +237,7 @@ st520open()
 			grez = 2;
 			make_8x10(); /* create a smaller font */
 			set_40();    /* and go to 40 line mode */
-#if	OPT_COLOR
+#if	COLOR
 			STncolors = 0;
 #endif
 			break;
@@ -294,7 +280,7 @@ st520close()
 	if(grez == 2 && STrez == 2) /* b/w monitor in 40 row mode */
 		restore();
 
-#if		OPT_COLOR
+#if		COLOR
 	for(i=0;i<STncolors;i++)
 		Setcolor(i,oldpal[i]);
 #endif
@@ -524,8 +510,8 @@ int	onoff;
 	}	   
 }
 #else
+#if	ATARI & ST520 & LATTICE
 
-#if	DISP_ATARI & SYS_ST520 & CC_LATTICE
 /*
 	These routines provide support for the ATARI 1040ST using
 the LATTICE compiler using the virtual VT52 Emulator
@@ -631,7 +617,7 @@ extern	int	strez();
 extern	int	stkopen();
 extern	int	stkclose();
 
-#if	OPT_COLOR
+#if	COLOR
 extern	int	stfcol();
 extern	int	stbcol();
 #endif
@@ -662,7 +648,7 @@ TERM	term	= {
 	&stbeep,
 	&strev,
 	&strez
-#if	OPT_COLOR
+#if	COLOR
 	, &stfcol,
 	&stbcol
 #endif
@@ -684,7 +670,7 @@ steeol()
 
 steeop()
 {
-#if	OPT_COLOR
+#if	COLOR
 	stfcol(gfcolor);
 	stbcol(gbcolor);
 #endif
@@ -703,7 +689,7 @@ int status;	/* TRUE = reverse video, FALSE = normal video */
 	}
 }
 
-#if	OPT_COLOR
+#if	COLOR
 mapcol(clr)	/* medium rez color translation */
 
 int clr;	/* emacs color number to translate */
@@ -1012,7 +998,8 @@ char *cmd;	/* command to execute */
 				(char *)NULL));
 }
 
-sttypahead()
+#if	TYPEAH
+typahead()
 
 {
 	int rval;	/* return value from BIOS call */
@@ -1026,7 +1013,19 @@ sttypahead()
 	else
 		return(TRUE);
 }
+#endif
 
+#if	FLABEL
+int
+fnclabel(f, n)		/* label a function key */
+
+int f,n;	/* default flag, numeric argument [unused] */
+
+{
+	/* on machines with no function keys...don't bother */
+	return(TRUE);
+}
+#endif
 #else
 sthello()
 {

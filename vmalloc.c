@@ -9,11 +9,51 @@
  *	They and the accompanying article were written by Eric White.
  *	(pgf, 1989)
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/vmalloc.c,v 1.21 1994/11/29 04:02:03 pgf Exp $
+ * $Log: vmalloc.c,v $
+ * Revision 1.13  1993/05/24 15:21:37  pgf
+ * tom's 3.47 changes, part a
  *
+ * Revision 1.12  1993/05/11  16:22:22  pgf
+ * see tom's CHANGES, 3.46
+ *
+ * Revision 1.11  1993/04/28  14:34:11  pgf
+ * see CHANGES, 3.44 (tom)
+ *
+ * Revision 1.10  1993/04/20  12:18:32  pgf
+ * see tom's 3.43 CHANGES
+ *
+ * Revision 1.9  1993/01/23  13:38:23  foxharp
+ * evar.h is now nevars.h
+ *
+ * Revision 1.8  1993/01/16  10:43:22  foxharp
+ * use new macros
+ *
+ * Revision 1.7  1992/07/22  00:51:35  foxharp
+ * took out the counters -- they no longer compile correctly
+ *
+ * Revision 1.6  1992/05/16  12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.5  1992/03/05  09:19:55  pgf
+ * changed some mlwrite() to mlforce(), due to new terse support
+ *
+ * Revision 1.4  1991/11/01  14:38:00  pgf
+ * saber cleanup
+ *
+ * Revision 1.3  1991/10/08  01:30:59  pgf
+ * brought up to date, and ifdef LATER'd some stuff in
+ * the accounting section -- doesn't work due to header inclusion
+ * problems
+ *
+ * Revision 1.2  1991/08/07  12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.1
+ * date: 1990/09/21 10:26:17;
+ * initial vile RCS revision
  */
 
-#if OPT_VRFY_MALLOC
+#if VMALLOC
 
 #undef malloc
 #undef free
@@ -22,24 +62,26 @@
 #undef vverify
 
 /* max buffers alloc'ed but not yet free'd */
-#if CC_TURBO
+#if TURBO
 #define MAXMALLOCS 1000	/* sorry, not very big ! */
 #else
 #define MAXMALLOCS 20000
 #endif
 
+#define	uchar	unsigned char
+#define	ulong	unsigned long
+
 /* known pattern, and how many of them */
 #define KP 0xaaaaaaaaL
-#define KPW (2*sizeof(ULONG))
+#define KPW (2*sizeof(ulong))
 
 static void dumpbuf P(( int ));
 static void trace P(( char * ));
 static void errout P(( void ));
-int setvmalloc P((int, int));
 
 static int nummallocs = 0;
 struct mtype {
-	UCHAR *addr;
+	uchar *addr;
 	int size;
 };
 
@@ -54,12 +96,12 @@ static void
 dumpbuf(x)
 int x;
 {
-	UCHAR *c;
+	uchar *c;
 	char s [80];
-	c = (UCHAR *)m[x].addr - 2;
+	c = (uchar *)m[x].addr - 2;
 	/* dump malloc buffer to the vmalloc file */
 	while (c <= m[x].addr + m[x].size + KPW + KPW + 1) {
-		sprintf(s, "%04lx : %02x ", (long)c, *c);
+		sprintf(s, "%04.4lx : %02x ", (long)c, *c);
 		if (c == m[x].addr)
 			strcat(s," <= leading known pattern");
 		if (c == m[x].addr + KPW)
@@ -85,8 +127,8 @@ int l;
 	/* verify entire malloc heap */
 	for (mp = &m[nummallocs-1]; mp >= m; mp--) {
 		if (mp->addr != NULL) {
-			if (*(ULONG *)mp->addr != KP ||
-				*(ULONG *)(mp->addr + sizeof (ULONG)) != KP)
+			if (*(ulong *)mp->addr != KP ||
+				*(ulong *)(mp->addr + sizeof (ulong)) != KP)
 			{
 				sprintf(s, 
 		"ERROR: Malloc area corrupted (%s). %s %d\n",
@@ -109,15 +151,15 @@ int	l;
 #ifdef VERBOSE
 	char s[80];
 #endif
-	UCHAR *buffer;
+	uchar *buffer;
 	char *sp;
 	register struct mtype *mp;
 
 	if (doverifys & VMAL)
 		rvverify("vmalloc",f,l);
-	if (( buffer = (UCHAR *)malloc(size + KPW + KPW)) == NULL) {
+	if (( buffer = (uchar *)malloc(size + KPW + KPW)) == NULL) {
 		sp = "ERROR: real malloc returned NULL\n";
-		(void)fprintf(stderr,sp);
+		fprintf(stderr,sp);
 		trace(sp);
 		errout();
 	}
@@ -131,7 +173,7 @@ int	l;
 		;
 	if (mp == &m[MAXMALLOCS]) {
 		sp = "ERROR: too many mallocs\n";
-		(void)fprintf(stderr,sp);
+		fprintf(stderr,sp);
 		trace(sp);
 		errout();
 	}
@@ -139,8 +181,8 @@ int	l;
 	mp->size = size;
 	if (mp == &m[nummallocs])
 		++nummallocs;
-	*(ULONG *)(mp->addr) = KP;
-	*(ULONG *)(mp->addr + sizeof(ULONG)) = KP;
+	*(ulong *)(mp->addr) = KP;
+	*(ulong *)(mp->addr + sizeof(ulong)) = KP;
 	return (char *)(buffer + KPW);
 }
 
@@ -164,10 +206,10 @@ int	l;
 	char *sp;
 #endif
 	char s[80];
-	UCHAR *b;
+	uchar *b;
 	register struct mtype *mp;
 
-	b = (UCHAR *)(buffer - KPW);
+	b = (uchar *)(buffer - KPW);
 	if (doverifys & VFRE)
 		rvverify("vfree",f,l);
 	for (mp = &m[nummallocs-1]; mp >= m && mp->addr != b; mp--)
@@ -175,7 +217,7 @@ int	l;
 	if (mp < m) {
 		sprintf(s,"ERROR: location to free is not in list. %s %d\n",
 					 f,l);
-		(void)fprintf(stderr,s);
+		fprintf(stderr,s);
 		trace(s);
 		errout();
 	}
@@ -183,11 +225,11 @@ int	l;
 	sprintf(s,"%04.4lx:vfree %s %d\n",(long)b,f,l);
 	trace(s);
 #endif
-	if (*(ULONG *)mp->addr != KP || 
-		*(ULONG *)(mp->addr + sizeof (ULONG)) != KP)
+	if (*(ulong *)mp->addr != KP || 
+		*(ulong *)(mp->addr + sizeof (ulong)) != KP)
 	{
 		sprintf(s,"ERROR: corrupted freed block. %s %d\n", f,l);
-		(void)fprintf(stderr,s);
+		fprintf(stderr,s);
 		trace(s);
 		errout();
 	}
@@ -204,11 +246,11 @@ SIZE_T	size;
 char	*f;
 int	l;
 {
-	UCHAR *b, *b2;
+	uchar *b, *b2;
 	char s[80];
 	register struct mtype *mp;
 
-	b = (UCHAR *)(buffer - KPW);
+	b = (uchar *)(buffer - KPW);
 	if (doverifys & VREA)
 		rvverify("vrealloc",f,l);
 
@@ -217,7 +259,7 @@ int	l;
 	if (mp < m) {
 		sprintf(s,"ERROR: location to realloc is not in list. %s %d\n",
 					 f,l);
-		(void)fprintf(stderr,s);
+		fprintf(stderr,s);
 		trace(s);
 		errout();
 	}
@@ -227,11 +269,11 @@ int	l;
 			(long)b,(long)size,f,l);
 	trace(s);
 #endif
-	*(ULONG *)(mp->addr) = KP;
-	*(ULONG *)(mp->addr + sizeof (ULONG)) = KP;
-	b2 = (UCHAR *)realloc(b,size+KPW+KPW);
-	*(ULONG *)(mp->addr + mp->size + KPW) = KP;
-	*(ULONG *)(mp->addr + mp->size + KPW + sizeof (ULONG)) = KP;
+	*(ulong *)(mp->addr) = KP;
+	*(ulong *)(mp->addr + sizeof (ulong)) = KP;
+	b2 = (uchar *)realloc(b,size+KPW+KPW);
+	*(ulong *)(mp->addr + mp->size + KPW) = KP;
+	*(ulong *)(mp->addr + mp->size + KPW + sizeof (ulong)) = KP;
 	return (char *)(b2 + KPW);
 }
 
@@ -245,7 +287,7 @@ char *id;
 	trace(s);
 	for (x = 0; x < nummallocs; ++x) {
 		if (m[x].addr != NULL) {
-			sprintf(s,"=========malloc buffer addr: %04lx\n",
+			sprintf(s,"=========malloc buffer addr: %04.4lx\n",
 				(long)m[x].addr);
 			trace(s);
 			sprintf(s,"=========malloc buffer size: %04x\n",
@@ -273,7 +315,7 @@ static void
 errout()
 {
 	sleep(1);
-#if SYS_UNIX
+#if UNIX
 	kill(getpid(),3);
 	pause();
 #endif
@@ -283,10 +325,8 @@ int
 setvmalloc(f,n)
 int f,n;
 {
-#if COUNT_THEM
 	register struct mtype *mp;
 	int i,num,found;
-#endif
 	
 	if (f)
 		doverifys = n;
@@ -307,7 +347,8 @@ int f,n;
 		for_each_buffer(bp) {
 			LINE *lp;
 			found++; /* for b_linep */
-			for_each_line(lp, bp)
+			for(lp = bp->b_line.l; lforw(lp) != bp->b_line.l;
+								lp = lforw(lp))
 				found++;
 			if (bp->b_nmmarks)
 				found++;
@@ -329,12 +370,12 @@ int f,n;
 		found++;
 #if ! SMALLER && LATER
 	{ /* user vars */
-		register UVAR *p;
-		for (p = user_vars; p != 0; p = p->next)
-			found += 3;
+		extern UVAR uv[MAXVARS];
+		for (i=0; i < MAXVARS; i++)
+			if (uv[i].u_value) found++;
 	}
 #endif
-#if	OPT_BSD_FILOCK
+#if	FILOCK
 	need to count lock mallocs...
 #endif
 	{ /* searching */

@@ -1,28 +1,62 @@
 /* Find the next error in mentioned in the shell output window.
- * written for vile: Copyright (c) 1990, 1995 by Paul Fox
+ * Written for vile by Paul Fox, (c)1990
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/finderr.c,v 1.45 1995/04/22 03:22:53 pgf Exp $
+ * $Log: finderr.c,v $
+ * Revision 1.13  1992/12/04 09:12:25  foxharp
+ * deleted unused assigns
  *
- */
+ * Revision 1.12  1992/08/19  22:57:45  foxharp
+ * no longer need to multiply NFILEN -- it's bigger
+ *
+ * Revision 1.11  1992/07/16  22:06:58  foxharp
+ * honor the "Entering/Leaving directory" messages that GNU make puts out
+ *
+ * Revision 1.10  1992/05/16  12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.9  1992/03/19  23:35:27  pgf
+ * use b_linecount to index from end of file instead of top, to be
+ * less affected by insertions deletions up above
+ *
+ * Revision 1.8  1992/03/05  09:01:12  pgf
+ * shortened "found error" msg, and force it
+ *
+ * Revision 1.7  1992/01/05  00:06:13  pgf
+ * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
+ * often.  also normalized message appearance somewhat.
+ *
+ * Revision 1.6  1991/11/01  14:38:00  pgf
+ * saber cleanup
+ *
+ * Revision 1.5  1991/09/20  13:11:53  pgf
+ * protect against passing null l_text pointer to sscanf
+ *
+ * Revision 1.4  1991/08/07  12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.3
+ * date: 1991/08/06 15:21:44;
+ * sprintf changes
+ * 
+ * revision 1.2
+ * date: 1991/06/25 19:52:42;
+ * massive data structure restructure
+ * 
+ * revision 1.1
+ * date: 1990/09/21 10:25:19;
+ * initial vile RCS revision
+*/
 
-#include "estruct.h"
-#include "edef.h"
+#include	"estruct.h"
+#include        "edef.h"
 
-#if OPT_FINDERR
+#if FINDERR
 
-static LINE * getdot P(( BUFFER * ));
-static void putdotback P(( BUFFER *, LINE * ));
+#ifndef NULL
+#define NULL 0
+#endif
 
-static	char febuff[NBUFN+1];	/* name of buffer to find errors in */
-static	unsigned newfebuff;	/* is the name new since last time? */
-
-void
-set_febuff(name)
-char	*name;
-{
-	(void)strncpy0(febuff, name, (SIZE_T)(NBUFN+1));
-	newfebuff = TRUE;
-}
+struct LINE *getdot();
 
 /* edits the file and goes to the line pointed at by the next compiler
         error in the "[output]" window.  It unfortunately doesn't mark
@@ -38,40 +72,30 @@ int f,n;
 	register int s;
 	struct LINE *dotp;
 	int moveddot = FALSE;
-	char	*text;
-
+	
 	int errline;
 	char errfile[NFILEN];
 	char ferrfile[NFILEN];
-	char verb[32];
-
+	
 	static int oerrline = -1;
 	static char oerrfile[256];
-
-#if SYS_APOLLO
-	static	char	lint_fmt1[] = "%32[^( \t] \t%[^(](%d)";
-	static	char	lint_fmt2[] = "%32[^(]( arg %d ) \t%32[^( \t](%d) :: %[^(](%d))";
-	int	num1, num2;
-	char	nofile[NFILEN];
-#endif
-
-#define DIRLEVELS 20
 	static int l = 0;
+#define DIRLEVELS 20
 	static char *dirs[DIRLEVELS];
 
 	/* look up the right buffer */
-	if ((sbp = find_b_name(febuff)) == NULL) {
-		mlforce("[No buffer to search for errors.]");
-		return(FALSE);
-	}
- 
-	if (newfebuff) {
-		oerrline = -1;
-		oerrfile[0] = EOS;
-		while (l)
-			free(dirs[l--]);
-	}
-	newfebuff = FALSE;
+        if ((sbp=bfind(febuff, NO_CREAT, 0)) == NULL) {
+        	mlforce("[No buffer to search for errors.]");
+                return(FALSE);
+        }
+        
+        if (newfebuff) {
+        	oerrline = -1;
+        	oerrfile[0] = '\0';
+		l = 0;
+		dirs[0] = NULL;
+        }
+        newfebuff = FALSE;
 
 	dotp = getdot(sbp);
 
@@ -79,123 +103,40 @@ int f,n;
 		/* to use this line, we need both the filename and the line
 			number in the expected places, and a different line
 			than last time */
-		/* accepts error forms */
-		/*  (could probably be reduced/simplified -- maybe even 
-			regexps could be used. */
-		/*
+		/* accept lines of the form:
 			"file.c", line 223: error....
 			or
 			file.c: 223: error....
-			or
-			******** Line 187 of "filec.c"
 		*/
-		if (lisreal(dotp)) {
-			static	TBUFF	*tmp;
-#if SYS_SUNOS
-			char *t;
-#endif
-
-			if (tb_init(&tmp, EOS) != 0
-			 && tb_bappend(&tmp, dotp->l_text,
-			 	(ALLOC_T)llength(dotp)) != 0
-			 && tb_append(&tmp, EOS) != 0)
-			 	text = tb_values(tmp);
-			else
-				break;	/* out of memory */
-
-			if ( (
-			/* "file.c", line 223: error.... */
-			      sscanf(text,
-				"\"%[^\" \t]\", line %d:",
-				errfile, &errline) == 2
-
-			/* file.c: 223: error....	*/
-			  ||  sscanf(text,
-				"%[^: \t]: %d:",
-				errfile, &errline) == 2
-
-#if SYS_APOLLO		 	/* C compiler */
-			  ||  sscanf(text,
-				"%32[*] Line %d of \"%[^\" \t]\"",
-				verb, &errline, errfile) == 3
-				/* sys5 lint */
-			  ||  (!strncmp(text, "    ", 4)
-			    && ((sscanf(text+4, lint_fmt1,
-			    	verb, errfile, &errline) == 3)
-			     || sscanf(text+4, lint_fmt2,
-			     	verb, &num1, nofile, &num2,
-						errfile, &errline) == 6))
-			  	/* C++ compiler */
-			  ||  sscanf(text,
-			  	"CC: \"%[^\"]\", line %d",
-						errfile, &errline) == 2
-#endif
-
-#if defined(__hpux)			/* HP/UX C compiler */
-/* 	compiler-name: "filename", line line-number ...	*/
-			  ||  sscanf(text,
-			  	"%*s: \"%[^\"]\", line %d",
-						errfile, &errline) == 2
-#endif
-/* 	ultrix, sgi, osf1 (alpha only?)  use:			*/
-/* 	compiler-name: Error: filename, line line-number ...	*/
-			  ||  sscanf(text,
-			  	"%*s %*s %[^, \t], line %d",
-						errfile, &errline) == 2
-#if SYS_SUNOS
-			  ||  sscanf(text,
-			  	"%[^:( \t](%d):",  /* ) */
-				errfile, &errline) == 2
-			  ||  ((t = strstr(text, "  ::  ")) != 0
-			    && sscanf(t,
-			  	"  ::  %[^( \t](%d)", /* ) */
-				errfile, &errline) == 2)
-#endif
-#if CC_TURBO
-			  ||  sscanf(text,
-			  	"Error %[^ ] %d:",
-				errfile, &errline) == 2
-			  ||  sscanf(text,
-			  	"Warning %[^ ] %d:",
-				errfile, &errline) == 2
-#endif
-				) && (oerrline != errline ||
+		if ( dotp->l_text) {
+			char verb[20];
+			if ( (sscanf(dotp->l_text,
+			"\"%[^\" 	]\", line %d:",errfile,&errline) == 2 ||
+			     sscanf(dotp->l_text,
+			"%[^: 	]: %d:",errfile,&errline) == 2 
+				) && (oerrline != errline || 
 					strcmp(errfile,oerrfile))) {
 				break;
-			} else if (sscanf(text,
-			"%*[^ \t:`]: %32[^ \t`] directory `", verb) == 1 ) {
-				if (!strcmp(verb, "Entering")) {
-					if (l < DIRLEVELS) {
-						char *e,*d;
-						/* find the start of path */
-						d = strchr(text, '`');
-						if (!d)
-							continue;
-						d += 1;
-						/* find the term. quote */
-						e = strchr(d, '\'');
-						if (!e)
-							continue;
-						/* put a null in its place */
-						*e = EOS;
-						/* make a copy */
-						dirs[++l] = strmalloc(d);
-						/* put the quote back */
-						*e = '\'';
-					}
-				} else if (!strcmp(verb, "Leaving")) {
+			} else if (sscanf(dotp->l_text,
+			"%*[^ 	:`]: %20[^ 	`] directory `",verb) == 1 ) {
+				char *d = strchr(dotp->l_text,'`') + 1;
+				if (verb[0] == 'E') { /* Entering */
+					if (l < DIRLEVELS)
+						dirs[++l] = d;
+				} else if (verb[0] == 'L'){ /* Leaving */
 					if (l > 0)
-						free(dirs[l--]);
+						--l;
 				}
 			}
 		}
-
-		if (lforw(dotp) == l_ref(buf_head(sbp))) {
-			mlwarn("[No more errors in %s buffer]", febuff);
+			
+		if (lforw(dotp) == sbp->b_line.l) {
+			mlforce("[No more errors in %s buffer]", febuff);
+			TTbeep();
 			/* start over at the top of file */
-			putdotback(sbp, lForw(buf_head(sbp)));
-			while (l)
-				free(dirs[l--]);
+			putdotback(sbp, lforw(sbp->b_line.l));
+			l = 0;
+			dirs[0] = NULL;
 			return FALSE;
 		}
 		dotp = lforw(dotp);
@@ -206,16 +147,28 @@ int f,n;
 	if (moveddot)
 		putdotback(sbp,dotp);
 
-	(void)pathcat(ferrfile, dirs[l], errfile);
-
-	if (!eql_bname(curbp, ferrfile) &&
+	if (dirs[l]) {
+		int i = 0;
+		while(dirs[l][i] != '\'') {
+			ferrfile[i] = dirs[l][i];
+			i++;
+		}
+		ferrfile[i++] = '/';
+		strcpy(&ferrfile[i],errfile);
+	} else {
+		/* lsprintf(ferrfile,"%s/%s",current_directory(FALSE),errfile); */
+		strcpy(ferrfile,errfile);
+	}
+	if (strcmp(ferrfile,curbp->b_bname) &&
 		strcmp(ferrfile,curbp->b_fname)) {
 		/* if we must change windows */
 		struct WINDOW *wp;
-		for_each_window(wp) {
-			if (eql_bname(wp->w_bufp, ferrfile)
-			 || !strcmp(wp->w_bufp->b_fname,ferrfile))
+		wp = wheadp;
+		while (wp != NULL) {
+			if (!strcmp(wp->w_bufp->b_bname,ferrfile) ||
+				!strcmp(wp->w_bufp->b_fname,ferrfile))
 				break;
+			wp = wp->w_wndp;
 		}
 		if (wp) {
 			curwp = wp;
@@ -231,33 +184,36 @@ int f,n;
 	mlforce("Error: %*S", dotp->l_used, dotp->l_text);
 
 	/* it's an absolute move */
-	curwp->w_lastdot = DOT;
-	s = gotoline(TRUE, -(curbp->b_linecount - errline + 1));
+	curwp->w_lastdot = curwp->w_dot;
+	gotoline(TRUE, -(curbp->b_linecount - errline + 1));
 
 	oerrline = errline;
-	(void)strcpy(oerrfile,errfile);
+	strcpy(oerrfile,errfile);
 
-	return s;
+	return TRUE;
+
 }
 
-static struct LINE *
+struct LINE *
 getdot(bp)
 struct BUFFER *bp;
 {
 	register WINDOW *wp;
 	if (bp->b_nwnd) {
-		/* scan for windows holding that buffer,
+		/* scan for windows holding that buffer, 
 					pull dot from the first */
-		for_each_window(wp) {
-			if (wp->w_bufp == bp) {
-				return l_ref(wp->w_dot.l);
+	        wp = wheadp;
+	        while (wp != NULL) {
+	                if (wp->w_bufp == bp) {
+	                        return wp->w_dot.l;
 			}
-		}
+	                wp = wp->w_wndp;
+	        }
 	}
-	return l_ref(bp->b_dot.l);
+        return bp->b_dot.l;
 }
 
-static void
+void
 putdotback(bp,dotp)
 struct BUFFER *bp;
 struct LINE *dotp;
@@ -265,42 +221,22 @@ struct LINE *dotp;
 	register WINDOW *wp;
 
 	if (bp->b_nwnd) {
-		for_each_window(wp) {
-			if (wp->w_bufp == bp) {
-				wp->w_dot.l = l_ptr(dotp);
-				wp->w_dot.o = 0;
-				wp->w_flag |= WFMOVE;
+	        wp = wheadp;
+	        while (wp != NULL) {
+	                if (wp->w_bufp == bp) {
+		                wp->w_dot.l = dotp;
+		                wp->w_dot.o = 0;
+			        wp->w_flag |= WFMOVE;
 			}
-		}
+	                wp = wp->w_wndp;
+	        }
 		return;
 	}
 	/* then the buffer isn't displayed */
-	bp->b_dot.l = l_ptr(dotp);
-	bp->b_dot.o = 0;
+        bp->b_dot.l = dotp;
+        bp->b_dot.o = 0;
 }
 
-/*
- * Ask for a new finderr buffer name
- */
-/* ARGSUSED */
-int
-finderrbuf(f, n)
-int f,n;
-{
-	register int    s;
-	char name[NFILEN+1];
-	BUFFER *bp;
-
-	(void)strcpy(name, febuff);
-	if ((s = mlreply("Buffer to scan for \"errors\": ", name, sizeof(name))) == ABORT)
-		return s;
-	if (s == FALSE) {
-		set_febuff(OUTPUT_BufName);
-	} else {
-		if ((bp = find_any_buffer(name)) == 0)
-			return FALSE;
-		set_febuff(get_bname(bp));
-	}
-	return TRUE;
-}
+#else
+finderrhello() { }
 #endif

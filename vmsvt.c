@@ -7,40 +7,40 @@
  *  Author:  Curtis Smith
  *  Last Updated: 07/14/87
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/vmsvt.c,v 1.22 1995/04/22 03:22:53 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/vmsvt.c,v 1.13 1994/07/11 22:56:20 pgf Exp $
  *
  */
 
 #include	"estruct.h"		/* Emacs' structures		*/
 #include	"edef.h"		/* Emacs' definitions		*/
 
-#if	DISP_VMSVT
+#if	VMSVT
 
-#include	<descrip.h>		/* Descriptor definitions	*/
+#include	 <descrip.h>		/* Descriptor definitions	*/
 #include	<iodef.h>		/* to get IO$_SENSEMODE		*/
 #include	<ttdef.h>		/* to get TT$_UNKNOWN		*/
 #include	<smgtrmptr.h>		/* to get SMG$K_??? definitions	*/
 
 /** Forward references **/
-static	void	vmsscrollregion P(( int, int ));
-static	void	vmsscroll_reg P(( int, int, int ));
-static	void	vmsscroll_delins(int from, int to, int n);
-static	void	vmsopen	(void);
-static	void	vmskopen(void);
-static	void	vmskclose(void);
-static	void	vmsmove	(int, int);
-static	void	vmseeol	(void);
-static	void	vmseeop	(void);
-static	void	vmsbeep	(void);
-static	void	vmsrev	(int);
-static	int	vmscres	(char *);
+extern	void	vmsopen	(void);
+extern	void	vmskopen(void);
+extern	void	vmskclose(void);
+extern	void	vmsmove	(int, int);
+extern	void	vmseeol	(void);
+extern	void	vmseeop	(void);
+extern	void	vmsbeep	(void);
+extern	void	vmsrev	(int);
+extern	int	vmscres	(void);
 
 extern	int	eolexist, revexist;
 extern	char	sres[];
 
-#if OPT_COLOR
-static	int	vmsfcol(int);
-static	int	vmsbcol(int);
+#if COLOR
+extern	int	vmsfcol(int);
+extern	int	vmsbcol(int);
+#endif
+#if SCROLLCODE
+extern	void	tcapscroll (int, int, int);
 #endif
 
 /** SMG stuff (just like termcap) */
@@ -50,16 +50,18 @@ static	char *	end_reverse;
 static	char *	erase_to_end_line;
 static	char *	erase_whole_display;
 
+#if SCROLLCODE
 static	char *	delete_line;
 static	char *	insert_line;
 static	char *	scroll_forw;
 static	char *	scroll_back;
 static	char *	scroll_regn;
+#endif
 
 /* Dispatch table. All hard fields just point into the terminal I/O code. */
 TERM	term	= {
-	24,				/* Max number of rows allowable */
-	/* Filled in */ 0,		/* Current number of rows used	*/
+	24 - 1,				/* Max number of rows allowable */
+	/* Filled in */ - 1,		/* Current number of rows used	*/
 	132,				/* Max number of columns	*/
 	/* Filled in */ 0,		/* Current number of columns	*/
 	64,				/* Min margin for extended lines*/
@@ -71,7 +73,6 @@ TERM	term	= {
 	vmskclose,			/* Close keyboard		*/
 	ttgetc,				/* Get character from keyboard	*/
 	ttputc,				/* Put character to display	*/
-	tttypahead,			/* char ready for reading	*/
 	ttflush,			/* Flush output buffers		*/
 	vmsmove,			/* Move cursor, origin 0	*/
 	vmseeol,			/* Erase to end of line		*/
@@ -79,25 +80,13 @@ TERM	term	= {
 	vmsbeep,			/* Beep				*/
 	vmsrev,				/* Set reverse video state	*/
 	vmscres				/* Change screen resolution	*/
-#if	OPT_COLOR
+#if	COLOR
 	, vmsfcol,			/* Set forground color		*/
 	vmsbcol				/* Set background color		*/
 #endif
+#if	SCROLLCODE
 	, NULL				/* set at init-time		*/
-};
-
-static	struct	{
-	char	*seq;
-	int	code;
-} keyseqs[] = {
-	{ "\33[A",  KEY_Up },    { "\33A", KEY_Up },
-	{ "\33[B",  KEY_Down },  { "\33B", KEY_Down },
-	{ "\33[C",  KEY_Right }, { "\33C", KEY_Right },
-	{ "\33[D",  KEY_Left },  { "\33D", KEY_Left },
-	{ "\33OP",  KEY_KP_F1 }, { "\33P", KEY_KP_F1 },
-	{ "\33OQ",  KEY_KP_F2 }, { "\33Q", KEY_KP_F2 },
-	{ "\33OR",  KEY_KP_F3 }, { "\33R", KEY_KP_F3 },
-	{ "\33OS",  KEY_KP_F4 }, { "\33S", KEY_KP_F4 },
+#endif
 };
 
 /***
@@ -105,8 +94,8 @@ static	struct	{
  *
  *  Nothing returned
  ***/
-static void
-ttputs(char * string)			/* String to write		*/
+ttputs(string)
+char * string;				/* String to write		*/
 {
 	if (string)
 		while (*string != EOS)
@@ -118,8 +107,7 @@ ttputs(char * string)			/* String to write		*/
  *
  *  Nothing returned
  ***/
-static void
-putpad_tgoto(request_code, parm1, parm2)
+static void putpad_tgoto(request_code, parm1, parm2)
 {
 	char buffer[32];
 	int ret_length;
@@ -161,8 +149,7 @@ putpad_tgoto(request_code, parm1, parm2)
  *
  *  Nothing returned
  ***/
-static void
-vmsmove (int row, int col)
+void vmsmove (int row, int col)
 {
 	putpad_tgoto(SMG$K_SET_CURSOR_ABS, row+1, col+1);
 }
@@ -172,8 +159,7 @@ vmsmove (int row, int col)
  *
  *  Nothing returned
  ***/
-static void
-vmsrev(int status)
+void vmsrev(int status)
 {
 	if (status)
 		ttputs(begin_reverse);
@@ -186,23 +172,20 @@ vmsrev(int status)
  *
  *  Nothing returned
  ***/
-static int
-vmscres(char *res)
+vmscres()
 {
 	/* But it could.  For vt100/vt200s, one could switch from
 	80 and 132 columns modes */
-	return 0;
 }
 
 
-#if	OPT_COLOR
+#if	COLOR
 /***
  *  vmsfcol  -  Set the foreground color (not implemented)
  *
  *  Nothing returned
  ***/
-static void
-vmsfcol(int fc)
+vmsfcol()
 {
 }
 
@@ -211,8 +194,7 @@ vmsfcol(int fc)
  *
  *  Nothing returned
  ***/
-static void
-vmsbcol(int bc)
+vmsbcol()
 {
 }
 #endif
@@ -222,8 +204,7 @@ vmsbcol(int bc)
  *
  *  Nothing returned
  ***/
-static void
-vmseeol(void)
+void vmseeol(void)
 {
 	ttputs(erase_to_end_line);
 }
@@ -234,8 +215,7 @@ vmseeol(void)
  *
  *  Nothing returned
  ***/
-static void
-vmseeop(void)
+void vmseeop(void)
 {
 	ttputs(erase_whole_display);
 }
@@ -246,8 +226,7 @@ vmseeop(void)
  *
  *  Nothing returned
  ***/
-static void
-vmsbeep(void)
+void vmsbeep(void)
 {
 	ttputc(BEL);
 }
@@ -259,8 +238,8 @@ vmsbeep(void)
  *  Returns:	Escape sequence
  *		NULL	No escape sequence available
  ***/ 
-static char *
-vmsgetstr(int request_code)
+char * vmsgetstr(request_code)
+int request_code;			/* Request code			*/
 {
 	register char * result;
 	static char seq_storage[1024];
@@ -339,8 +318,7 @@ static struct termchar tc;	/* Terminal characteristics		*/
  *
  *  Nothing returned
  ***/
-static void
-vmsgtty(void)
+vmsgtty()
 {
 	short fd;
 	int status;
@@ -348,12 +326,12 @@ vmsgtty(void)
 	$DESCRIPTOR(devnam, "SYS$INPUT");
 
 	/* Assign input to a channel */
-	status = SYS$ASSIGN(&devnam, &fd, 0, 0);
+	status = sys$assign(&devnam, &fd, 0, 0);
 	if ((status & 1) == 0)
 		ExitProgram(status);
 
 	/* Get terminal characteristics */
-	status = SYS$QIOW(		/* Queue and wait		*/
+	status = sys$qiow(		/* Queue and wait		*/
 		0,			/* Wait on event flag zero	*/
 		fd,			/* Channel to input terminal	*/
 		IO$_SENSEMODE,		/* Get current characteristic	*/
@@ -364,7 +342,7 @@ vmsgtty(void)
 		0, 0, 0, 0);		/* P3-P6 unused			*/
 
 	/* De-assign the input device */
-	if ((SYS$DASSGN(fd) & 1) == 0)
+	if ((sys$dassgn(fd) & 1) == 0)
 		ExitProgram(status);
 
 	/* Jump out if bad status */
@@ -380,11 +358,8 @@ vmsgtty(void)
  *
  *  Nothing returned
  ***/
-static void
-vmsopen(void)
+void vmsopen(void)
 {
-	int	i;
-
 	/* Get terminal type */
 	vmsgtty();
 	if (tc.t_type == TT$_UNKNOWN) {
@@ -401,7 +376,7 @@ vmsopen(void)
 	}
 		
 	/* Set sizes */
-	term.t_nrow = ((UINT) tc.t_mandl >> 24);
+	term.t_nrow = ((UINT) tc.t_mandl >> 24) - 1;
 	term.t_ncol = tc.t_width;
 
 	if (term.t_mrow < term.t_nrow)
@@ -421,6 +396,7 @@ vmsopen(void)
 
 	erase_whole_display = vmsgetstr(SMG$K_ERASE_WHOLE_DISPLAY);
 
+#if SCROLLCODE
 	insert_line	= vmsgetstr(SMG$K_INSERT_LINE);		/* al */
 	delete_line	= vmsgetstr(SMG$K_DELETE_LINE);		/* dl */
 	scroll_forw	= vmsgetstr(SMG$K_SCROLL_FORWARD);	/* SF */
@@ -436,23 +412,19 @@ vmsopen(void)
 	if (scroll_regn && scroll_back) {
 		if (scroll_forw == NULL) /* assume '\n' scrolls forward */
 			scroll_forw = "\n";
-		term.t_scroll = vmsscroll_reg;
+		term.t_scroll = tcapscroll_reg;
 	} else if (delete_line && insert_line) {
-		term.t_scroll = vmsscroll_delins;
+		term.t_scroll = tcapscroll_delins;
 	} else {
 		term.t_scroll = NULL;
 	}
+#endif
 
 	/* Set resolution */
 	(void)strcpy(sres, "NORMAL");
 
 	/* Open terminal I/O drivers */
 	ttopen();
-
-	/* Set predefined keys */
-	for (i = TABLESIZE(keyseqs); i--; ) {
-		addtosysmap(keyseqs[i].seq, strlen(keyseqs[i].seq), keyseqs[i].code);
-	}
 }
 
 
@@ -461,8 +433,7 @@ vmsopen(void)
  *
  *  Nothing returned
  ***/
-static void
-vmskopen(void)
+void vmskopen(void)
 {
 }
 
@@ -472,10 +443,25 @@ vmskopen(void)
  *
  *  Nothing returned
  ***/
-static void
-vmskclose(void)
+void vmskclose(void)
 {
 }
+
+
+/***
+ *  fnclabel  -  Label function keys (not used)
+ *
+ *  Nothing returned
+ ***/
+#if	FLABEL
+fnclabel(f, n)		/* label a function key */
+int f,n;	/* default flag, numeric argument [unused] */
+{
+	/* on machines with no function keys...don't bother */
+	return(TRUE);
+}
+#endif
+
 
 /***
  *  spal  -  Set palette type  (Are you kidding?)
@@ -488,43 +474,46 @@ char	*dummy;
 {
 }
 
+#if SCROLLCODE
 /* copied/adapted from 'tcap.c' 19-apr-1993 dickey@software.org */
 
 /* move howmany lines starting at from to to */
-static void
-vmsscroll_reg(int from, int to, int n)
+void
+tcapscroll_reg(from,to,n)
+int from, to, n;
 {
 	int i;
 	if (to == from) return;
 	if (to < from) {
-		vmsscrollregion(to, from + n - 1);
+		tcapscrollregion(to, from + n - 1);
 		vmsmove(from + n - 1,0);
 		for (i = from - to; i > 0; i--)
 			ttputs(scroll_forw);
 	} else { /* from < to */
-		vmsscrollregion(from, to + n - 1);
+		tcapscrollregion(from, to + n - 1);
 		vmsmove(from,0);
 		for (i = to - from; i > 0; i--)
 			ttputs(scroll_back);
 	}
-	vmsscrollregion(0, term.t_nrow-1);
+	tcapscrollregion(0, term.t_nrow);
 }
 
 /* 
-OPT_PRETTIER_SCROLL is prettier but slower -- it scrolls 
+PRETTIER_SCROLL is prettier but slower -- it scrolls 
 		a line at a time instead of all at once.
 */
 
 /* move howmany lines starting at from to to */
-static void
-vmsscroll_delins(int from, int to, int n)
+void
+tcapscroll_delins(from,to,n)
+int from, to, n;
 {
 	int i;
 	if (to == from) return;
 	/* patch: should make this more like 'tcap.c', or merge logic somehow */
-#if OPT_PRETTIER_SCROLL
+#if PRETTIER_SCROLL
 	if (absol(from-to) > 1) {
-		vmsscroll_delins(from, (from<to) ? to-1:to+1, n);
+		tcapscroll_delins(from, (from<to) ? to-1:to+1, n);
 		if (from < to)
 			from = to-1;
 		else
@@ -549,12 +538,14 @@ vmsscroll_delins(int from, int to, int n)
 }
 
 /* cs is set up just like cm, so we use tgoto... */
-static void
-vmsscrollregion(int top, int bot)
+void
+tcapscrollregion(top,bot)
+int top,bot;
 {
 	putpad_tgoto(SMG$K_SET_SCROLL_REGION, top+1, bot+1);
 }
 
+#endif	/* SCROLLCODE */
 
 #else
 

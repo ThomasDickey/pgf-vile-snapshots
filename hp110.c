@@ -1,7 +1,7 @@
 /*
  *	HP110:	Hewlett Packard 110 Screen Driver
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/hp110.c,v 1.12 1994/11/29 04:02:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/hp110.c,v 1.13 1995/11/17 04:03:42 pgf Exp $
  *
  */
 #error This module is not actively maintained as part of vile.
@@ -73,8 +73,9 @@ TERM	term	= {
 	h110rev,
 	h110cres
 #if	OPT_COLOR
-	, h110fcol,
-	h110bcol
+	, h110fcol
+	, h110bcol
+	, 0
 #endif
 };
 
@@ -167,12 +168,6 @@ h110cres()	/* change screen resolution */
 
 {
 	return(TRUE);
-}
-
-spal()		/* change palette register */
-
-{
-	/*   not here */
 }
 
 h110beep()

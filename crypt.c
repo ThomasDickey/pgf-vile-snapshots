@@ -1,7 +1,7 @@
 /*	Crypt:	Encryption routines for MicroEMACS
  *		written by Dana Hoggatt and Daniel Lawrence
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/crypt.c,v 1.12 1994/11/29 04:02:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/crypt.c,v 1.13 1995/07/16 16:08:03 pgf Exp $
  *
  */
 
@@ -54,7 +54,7 @@ int n;		/* numeric argument */
 				curbp->b_key[0] = EOS;
 				make_local_b_val(curbp, MDCRYPT);
 				set_b_val(curbp, MDCRYPT, FALSE);
-				markWFMODE(curbp);
+				curwp->w_flag |= WFMODE;
 			}
 		}
 	}
