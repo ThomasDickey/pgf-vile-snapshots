@@ -5,7 +5,10 @@
  * Written by T.E.Dickey for vile (march 1993).
  *
  * $Log: filec.c,v $
- * Revision 1.25  1993/10/04 10:24:09  pgf
+ * Revision 1.26  1993/11/04 09:10:51  pgf
+ * tom's 3.63 changes
+ *
+ * Revision 1.25  1993/10/04  10:24:09  pgf
  * see tom's 3.62 changes
  *
  * Revision 1.24  1993/09/10  16:06:49  pgf
@@ -692,7 +695,7 @@ int	*pos;
 		}
 #endif
 
-		if (!(s = is_appendname(buf)))
+		if ((s = is_appendname(buf)) == 0)
 			s = buf;
 		if ((*s == EOS) || trailing_slash(s))
 			(void)force_slash(path);

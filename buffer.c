@@ -6,7 +6,10 @@
  * for the display system.
  *
  * $Log: buffer.c,v $
- * Revision 1.77  1993/10/04 10:24:09  pgf
+ * Revision 1.78  1993/11/04 09:10:51  pgf
+ * tom's 3.63 changes
+ *
+ * Revision 1.77  1993/10/04  10:24:09  pgf
  * see tom's 3.62 changes
  *
  * Revision 1.76  1993/09/20  21:16:18  pgf
@@ -448,9 +451,9 @@ BUFFER *find_any_buffer(name)
 {
 	register BUFFER *bp;
 
-	if (!(bp=find_b_name(name))		/* Try buffer */
-	 && !(bp=find_b_file(name))		/* ...then filename */
-	 && !(bp=find_b_number(name))) {	/* ...then number */
+	if ((bp=find_b_name(name)) == 0		/* Try buffer */
+	 && (bp=find_b_file(name)) == 0		/* ...then filename */
+	 && (bp=find_b_number(name)) == 0) {	/* ...then number */
 		mlforce("[No such buffer] %s", name);
 		return 0;
 	}
@@ -753,13 +756,13 @@ int	lockfl;
 	 && !same_fname(nfname, curbp, FALSE)
 	 && !isInternalName(fname)) {
 		savebp = curbp;
-		if (!(bp = find_b_file(nfname))) {
+		if ((bp = find_b_file(nfname)) == 0) {
 			L_NUM	top, now;
 
 			makename(bname, fname);
 			(void)unqname(bname, TRUE);
 
-			if (!(bp=bfind(bname, 0))) {
+			if ((bp=bfind(bname, 0)) == 0) {
 				mlforce("[Cannot create buffer]");
 				return;
 			}
@@ -849,7 +852,7 @@ int f,n;
 	bufn[0] = EOS;
 	if ((s=mlreply("Use buffer: ", bufn, sizeof(bufn))) != TRUE)
 		return s;
-	if (!(bp=find_any_buffer(bufn)))	/* Try buffer */
+	if ((bp=find_any_buffer(bufn)) == 0)	/* Try buffer */
 		return FALSE;
 	return swbuffer(bp);
 }
@@ -888,7 +891,7 @@ int f, n;	/* default flag, numeric argument */
 				return swbuffer(bp);
 		}
 	} else {			/* go forward thru args-list */
-		if (!(stopatbp = curbp))
+		if ((stopatbp = curbp) == 0)
 			stopatbp = find_nth_created(1);
 		if (last_bp == 0)
 			last_bp = find_b_hist(0);
@@ -1108,7 +1111,7 @@ int f,n;
 			break;
 		}
 
-		if (!(bp=find_any_buffer(bufn))) {	/* Try buffer */
+		if ((bp=find_any_buffer(bufn)) == 0) {	/* Try buffer */
 			s = FALSE;
 			break;
 		}
@@ -1504,6 +1507,7 @@ int f,n;
 	b_clr_flags(curbp, BFUPBUFF);
 	return status;
 #else
+	show_all = f;
 	this_bp = 0;
 	that_bp = curbp;
 	return liststuff(BUFFER_LIST_NAME, makebufflist, 0, (char *)0);

@@ -16,7 +16,10 @@
  *	modify (ifdef-style) 'expand_leaf()' to allow ellipsis.
  *
  * $Log: glob.c,v $
- * Revision 1.15  1993/10/04 10:24:09  pgf
+ * Revision 1.16  1993/11/04 09:10:51  pgf
+ * tom's 3.63 changes
+ *
+ * Revision 1.15  1993/10/04  10:24:09  pgf
  * see tom's 3.62 changes
  *
  * Revision 1.14  1993/09/06  16:36:47  pgf
@@ -179,7 +182,7 @@ record_a_match(item)
 char	*item;
 {
 	if (item != 0 && *item != EOS) {
-		if (!(item = strmalloc(item)))
+		if ((item = strmalloc(item)) == 0)
 			return no_memory("glob-match");
 
 		if (myLen + 2 >= myMax) {
@@ -422,8 +425,8 @@ char	*pattern;
 /*
  * Comparison-function for 'qsort()'
  */
-#if __STDC__ || defined(__TURBOC__) || WATCOM
-#if defined(apollo) && !defined(__STDCPP__)
+#if __STDC__ || defined(__TURBOC__) || WATCOM || defined(__CLCC__)
+#if defined(apollo) && !(defined(__STDCPP__) || defined(__GNUC__))
 #define	ANSI_QSORT 0	/* cc 6.7 */
 #else
 #define	ANSI_QSORT 1

@@ -2,7 +2,10 @@
  * 	X11 support, Dave Lemke, 11/91
  *
  * $Log: x11.c,v $
- * Revision 1.30  1993/10/04 10:24:09  pgf
+ * Revision 1.31  1993/11/04 09:10:51  pgf
+ * tom's 3.63 changes
+ *
+ * Revision 1.30  1993/10/04  10:24:09  pgf
  * see tom's 3.62 changes
  *
  * Revision 1.29  1993/09/10  16:06:49  pgf
@@ -255,7 +258,7 @@ static	int	decoded_key P(( XEvent * ));
 #if NEEDED
 static	Bool	check_kbd_ev P(( Display *, XEvent *, char * ));
 #endif
-static	char *	strndup P(( char *, SIZE_T ));
+static	char *	strndup P(( char *, int ));
 static	X_PIXEL	color_value P(( Display *, int, char * ));
 static	char *	any_resource P(( Display *, char * ));
 static	void	x_get_defaults P(( Display *, int ));
@@ -292,11 +295,11 @@ static unsigned  start_rows = 36,
 
 
 TERM        term = {
-    NULL,			/* these four values are set dynamically at
+    0,				/* these four values are set dynamically at
 				 * open time */
-    NULL,
-    NULL,
-    NULL,
+    0,
+    0,
+    0,
     MARGIN,
     SCRSIZ,
     NPAUSE,
@@ -352,12 +355,14 @@ TextWindow tw;
 static char *
 strndup(str, n)
     char       *str;
-    SIZE_T      n;
+    int        n;
 {
     register char *t;
 
+    if (n < 0)
+    	n = 0;
     if ((t = malloc((ALLOC_T)n)) != 0)
-    	(void)memcpy(t, str, n);
+    	(void)memcpy(t, str, (SIZE_T)n);
     return t;
 }
 
@@ -1193,7 +1198,7 @@ x_putline(row, str, len)
     (void)memcpy(
     	(char *) &(cur_win->sc[row][cur_win->cur_col]),
     	(char *) str,
-	len);
+	(SIZE_T) len);
     for (i = 0, c = cur_win->cur_col; i < len; c++, i++) {
 	if (cur_win->reverse)
 	    cur_win->attr[row][c] |= CELL_REVERSE;
@@ -1799,6 +1804,8 @@ x_get_selection(tw, selection, type, value, length, format)
 		return;			/* can't handle incoming data */
 
 	if (length != 0) {
+		c = EOS;		/* stifle compiler warning */
+
 		/* should be impossible to hit this with existing paste */
 		/* XXX massive hack -- leave out 'i' if in prompt line */
 		do_ins = !insertmode
@@ -1827,7 +1834,7 @@ x_paste_selection(tw)
 			x_stash_selection(tw);
 			x_get_selection(tw, XA_PRIMARY, XA_STRING,
 				strndup((char *) tw->selection_data, tw->selection_len),
-				tw->selection_len, 8);
+				(SIZE_T)tw->selection_len, 8);
 		} else {
 			XConvertSelection(tw->dpy, XA_PRIMARY, XA_STRING,
 				tw->sel_prop, tw->win, CurrentTime);
@@ -1908,9 +1915,9 @@ x_stash_selection(tw)
 		set_global_g_val(GVAL_REPORT,report_flag);
 		endofDisplay;
 
-		if (!(length = kchars)
-		 || !(dp = data = castalloc(UCHAR, kchars))
-		 || !(kp = kbs[0].kbufh))
+		if ((length = kchars) == 0
+		 || (dp = data = castalloc(UCHAR, kchars)) == 0
+		 || (kp = kbs[0].kbufh) == 0)
 			return;
 
 		while (kp->d_next != 0) {

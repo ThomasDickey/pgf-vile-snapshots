@@ -4,7 +4,10 @@
  *	written 11-feb-86 by Daniel Lawrence
  *
  * $Log: bind.c,v $
- * Revision 1.57  1993/10/04 10:24:09  pgf
+ * Revision 1.58  1993/11/04 09:10:51  pgf
+ * tom's 3.63 changes
+ *
+ * Revision 1.57  1993/10/04  10:24:09  pgf
  * see tom's 3.62 changes
  *
  * Revision 1.56  1993/09/03  09:11:54  pgf
@@ -1244,12 +1247,12 @@ char *kk;		/* name of key to translate to Command key form */
 				pref = CTLA;
 			if (*(k+1) == toalpha(cntl_x))
 				pref = CTLX;
-		} else if (!strncmp((char *)k, "FN", 2)) {
+		} else if (!strncmp((char *)k, "FN", (SIZE_T)2)) {
 			pref = SPEC;
 		}
 		if (pref != 0)
 			k += 3;
-	} else if (len > 2 && !strncmp((char *)k, "M-", 2)) {
+	} else if (len > 2 && !strncmp((char *)k, "M-", (SIZE_T)2)) {
 		pref = SPEC;
 		k += 2;
 	} else if (len > 1) {

@@ -10,7 +10,10 @@
  * display type.
  *
  * $Log: ibmpc.c,v $
- * Revision 1.27  1993/10/11 18:50:10  pgf
+ * Revision 1.28  1993/11/04 09:10:51  pgf
+ * tom's 3.63 changes
+ *
+ * Revision 1.27  1993/10/11  18:50:10  pgf
  * mods for watcom.  still doesn't work
  *
  * Revision 1.26  1993/10/04  10:24:09  pgf
@@ -365,6 +368,20 @@ TERM    term    = {
 #endif
 };
 
+static int
+get_vga_bios_info(dynamic_VGA_info *buffer)
+{
+	struct SREGS segs;
+
+	rg.h.ah   = 0x1b;
+	rg.x._BX_ = 0;
+	segs.es   = FP_SEG(buffer);
+	rg.x._DI_ = FP_OFF(buffer);
+	INTX86X(0x10, &rg, &rg, &segs); /* Get VGA-BIOS status */
+
+	return (rg.h.al == 0x1b);
+}
+
 static void
 set_display (int mode)
 {
@@ -687,15 +704,8 @@ ibmopen()
 
 	if (driver->type == CDVGA) {	/* we can determine original rows */
 		dynamic_VGA_info buffer;
-		struct SREGS segs;
 
-		rg.h.ah = 0x1b;
-		rg.x._BX_ = 0;
-		segs.es = FP_SEG(&buffer);
-		rg.x._DI_ = FP_OFF(&buffer);
-		INTX86X(0x10, &rg, &rg, &segs); /* Get VGA-BIOS status */
-
-		if (rg.h.al == 0x1b) {
+		if (get_vga_bios_info(&buffer)) {
 			switch (buffer.char_height) {
 			case 8:		driver->vchr = C8x8;	break;
 			case 14:	driver->vchr = C8x14;	break;
@@ -771,6 +781,7 @@ static int
 scinit(n)	/* initialize the screen head pointers */
 int n;		/* type of adapter to init for */
 {
+	dynamic_VGA_info buffer;
 	union {
 		long laddr;		/* long form of address */
 		USHORT *paddr;		/* pointer form of address */
@@ -838,19 +849,32 @@ int n;		/* type of adapter to init for */
 		scptr[i] = addr.paddr + (cols * i);
 
 #if OPT_FLASH || OPT_MS_MOUSE
-	/* Build row-indices for display page #1.  This has been tested for
-	 *	80x50, 80x25 and 40x25 (but isn't general...).
+	/* Build row-indices for display page #1, to use it in screen flashing
+	 * or for mouse highlighting.
 	 */
-	pagesize = (rows * cols);
-	switch (cols) {
-	case 40:
-		pagesize += ((4*cols) - 32);
-		break;
-	case 80:
-		pagesize += ((2*cols) - 32);
-		break;
+	if ((type == CDVGA) && get_vga_bios_info(&buffer)) {
+		/*
+		 * Setting page-1 seems to make Window 3.1 "aware" that we're
+		 * going to write to that page.  Otherwise, the "flash" mode
+		 * doesn't write to the correct address.
+		 */
+		set_page(1);
+		get_vga_bios_info(&buffer);
+		pagesize = (long)buffer.page_length; /* also, page-1 offset */
+		set_page(0);
+	} else {
+		/*
+		 * This was tested for all of the VGA combinations running
+		 * with MSDOS, but isn't general -- dickey@software.org
+		 */
+		pagesize = (rows * cols);
+		switch (cols) {
+		case 40:	pagesize += ((4*cols) - 32);	break;
+		case 80:	pagesize += ((2*cols) - 32);	break;
+		}
+		pagesize <<= 1;
 	}
-	addr.laddr += (pagesize + pagesize);
+	addr.laddr += pagesize;
 	for (i = 0; i < rows; i++)
 		s2ptr[i] = addr.paddr + (cols * i);
 #endif
@@ -1280,6 +1304,7 @@ ms_install()
 	rg.x._AX_ = 0;
 	MouseCall;
 	rodent_exists = rg.x._AX_;
+	rodent_cursor_display = FALSE; /* safest assumption */
 	if (ms_exists()) {
 		struct SREGS segs;
 		rg.x._AX_ = 0xc;
@@ -1310,7 +1335,7 @@ static void
 ms_showcrsr(void)
 {
 	/* Displays the mouse cursor */
-	int i, counter;
+	int counter;
 
 	/* Call Int 33H Function 2AH to get the value of the display counter */
 	rg.x._AX_ = 0x2A;
@@ -1319,7 +1344,7 @@ ms_showcrsr(void)
 
 	/* Call Int 33H Function 01H as many times as needed to display */
 	/* the mouse cursor */
-	for (i = 1; i < counter; i++) {
+	while (counter-- > 0) {
 		rg.x._AX_ = 0x01;
 		MouseCall;
 	}

@@ -6,7 +6,10 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.105  1993/10/11 17:22:40  pgf
+ * Revision 1.106  1993/11/04 09:10:51  pgf
+ * tom's 3.63 changes
+ *
+ * Revision 1.105  1993/10/11  17:22:40  pgf
  * re-ifdef getscreensize
  *
  * Revision 1.104  1993/10/04  10:24:09  pgf
@@ -428,6 +431,7 @@ static	int	dfputi  P(( OutFunc, int,  int ));
 static	int	dfputli P(( OutFunc, long, int ));
 static	int	dfputf  P(( OutFunc, int ));
 static	void	dofmt P(( char *, va_list * ));
+static	void	mlmsg P(( char *, va_list * ));
 static	void	erase_remaining_msg P(( int ));
 static	void	PutMode P(( char * ));
 
@@ -2659,7 +2663,7 @@ va_dcl
  * position. A small class of printf like format items is handled.
  * Set the "message line" flag TRUE.
  */
-void
+static void
 #if	ANSI_VARARGS
 mlmsg( char *fmt, va_list *app)
 #else

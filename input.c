@@ -3,7 +3,10 @@
  *		5/9/86
  *
  * $Log: input.c,v $
- * Revision 1.89  1993/10/04 10:24:09  pgf
+ * Revision 1.90  1993/11/04 09:10:51  pgf
+ * tom's 3.63 changes
+ *
+ * Revision 1.89  1993/10/04  10:24:09  pgf
  * see tom's 3.62 changes
  *
  * Revision 1.88  1993/09/16  16:59:27  pgf
@@ -1333,7 +1336,9 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 				(void)mkupper(extbuf);
 #endif
 			if (!(options & KBD_NOEVAL)) {
-				(void)strncpy(extbuf, tokval(extbuf), (SIZE_T)bufn);
+				(void)strncpy(extbuf,
+					tokval(strcpy(buf, extbuf)),
+					(SIZE_T)bufn);
 			}
 			if (complete != no_completion) {
 				cpos =

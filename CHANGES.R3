@@ -1,9 +1,49 @@
-Changes for vile 3.62: (released  ???)
+Changes for vile 3.63: (released  Wed Nov 10, 1993)
+(tom)
+	+ corrected 'pathcat()', to avoid using autoincrement in 'slashc()'
+	  macro (path.c).
+
+    	+ cleanup for gcc-2.4.5's -Wall warnings (estruct.h, display.c, exec.c,
+	  finderr.c, glob.c, mktbls.c, modes.c, npopen.c, proto.h).
+
+	+ compiled with CenterLine 'clcc' compiler (bind.c, buffer.c,
+	  display.c, eval.c, file.c, filec.c, glob.c, globals.c, line.c,
+	  tags.c).
+
+	+ corrected 'backpage()' to update mode-line after "previous-page".
+
+	+ modified ibmpc.c to make flash/mouse code more portable.
+
+	+ corrected call on 'strncpy()' in 'kbd_reply()' where 'extbuf' may be
+	  copied onto itself.  On HP/UX, this causes the destination to be
+	  cleared (input.c).
+
+	+ modified initialization of IBMPC to make "flash" mode work better on
+	  MSDOS (ibmpc.c).
+
+	+ modified so that on MSDOS and VMS vile properly handles files that
+	  are redirected to it via the standard input (main.c).
+
+	+ corrected bug that caused ":e#" command to ignore the '#' character
+	  (exec.c).
+
+	+ corrected handling of ":tag" command so that if a tag's length is
+	  shorter than the taglength setting, the shorter value is used
+	  (tags.c).
+
+	+ modified 'writereg()' to prevent inadvertant file-write using a
+	  read-pipe expression (file.c).
+(pgf)
+	+ fixed indenting bug in formatregion().  (word.c)
+
+	+ added SHELL=/bin/sh to makefile
+
+Changes for vile 3.62: (released  Mon Oct 11, 1993)
 (pgf)
 	+ enable DOS mouse processing for Turbo-C only, since some code
 	  uses Turbo-isms to get at registers (_AX, etc)  (estruct.h)
 
-	* change references to x.ax, x.bx, x.di, etc to be x._AX_, x._BX_, etc.
+	+ change references to x.ax, x.bx, x.di, etc to be x._AX_, x._BX_, etc.
 	  to satisfy the Watcom 386 need for eax, ebx, edi, etc.
 
 	+ improper automatic indent on brace insertion fixed (insert.c,
@@ -124,7 +164,6 @@ Changes for vile 3.62: (released  ???)
 
 	+ corrected a null-pointer reference to 'fromline' when a ":0" command
 	  was entered in an empty buffer (exec.c).
-
 
 Changes for vile 3.61: (released  Thu Sep 16, 1993)
 (pgf)

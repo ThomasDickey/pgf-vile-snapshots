@@ -26,6 +26,8 @@
 #MAKE=/bin/make
 #MAKE=/usr/bin/make
 
+SHELL = /bin/sh
+
 # To change screen driver modules, change SCREEN and SCRDEF below, OR edit
 # estruct.h to make sure the correct one is #defined as "1", and the others
 # all as "0".  If you use tcap.c, you'll need libtermcap.a too.  If you use
@@ -68,6 +70,11 @@ DESTDIR2 = $(HOME)/bin
  HELP_LOC=
 
 REMOTE=gutso!foxharp
+
+# CenterLine:
+# Use -Xt option to compile quasi-K&R code with some ANSI semantics
+#CC = clcc 
+#OPTFLAGS = -O -Xt
 
 #CC = gcc
 #OPTFLAGS = -g -O -Wall -Wshadow # -Wconversion -Wstrict-prototypes -Wmissing-prototypes
@@ -254,7 +261,7 @@ isc:
 		$(TARGET) $(ENVIR)
 
 hpux:
-	$(MAKE) CFLAGS="$(CFLAGS1) -DUSG -DHAVE_SELECT -DHPUX -Dos_chosen" \
+	$(MAKE) CFLAGS="$(CFLAGS1) -DUSG -DPOSIX -DHAVE_SELECT -DHPUX -Dos_chosen" \
 		$(TARGET) $(ENVIR)
 
 next:
@@ -563,7 +570,13 @@ random.$O:	glob.h
 vmalloc$O:	nevars.h
 
 # $Log: makefile,v $
-# Revision 1.120  1993/09/03 09:11:54  pgf
+# Revision 1.122  1993/11/10 10:19:40  pgf
+# added SHELL=/bin/sh for broken makes
+#
+# Revision 1.121  1993/11/04  09:10:51  pgf
+# tom's 3.63 changes
+#
+# Revision 1.120  1993/09/03  09:11:54  pgf
 # tom's 3.60 changes
 #
 # Revision 1.119  1993/08/18  18:48:49  pgf

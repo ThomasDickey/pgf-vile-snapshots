@@ -5,7 +5,10 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.80  1993/10/11 17:39:35  pgf
+ * Revision 1.81  1993/11/04 09:10:51  pgf
+ * tom's 3.63 changes
+ *
+ * Revision 1.80  1993/10/11  17:39:35  pgf
  * added arg to fmatchindent, which is character to match
  *
  * Revision 1.79  1993/10/04  10:24:09  pgf
@@ -509,7 +512,6 @@ extern void mlsavec P(( int ));
 extern void mlwrite P((char *, ... ));
 extern void mlforce P((char *, ... ));
 extern void mlprompt P((char *, ... ));
-extern void mlmsg P((char *, va_list * ));
 extern void mlerror P(( char * ));
 extern void dbgwrite P((char *, ... ));
 extern void lspputc P(( int ));
@@ -1270,34 +1272,69 @@ extern void update_dos_drv_dir P(( char * ));
 #endif
 
 #if UNIX && !LINUX
-#if (SUNOS || NeXT) && defined(lint) || __GNUC__
+#if APOLLO && __GNUC__
+extern	int	access	P(( char *, int ));
+extern	UINT	alarm	P(( UINT ));
+extern	void	bzero	P(( char *, int ));
+extern	int	chdir	P(( char * ));
+extern	int	close	P(( int ));
+extern	int	dup	P(( int ));
+extern	int	execlp	P(( char *, ... ));
+extern	int	fork	P(( void ));
+extern	int	getpgrp	P(( int ));
+extern	int	getpid	P(( void ));
+extern	int	getuid	P(( void ));
+extern	int	ioctl	P(( int, ULONG, caddr_t ));
+extern	int	isatty	P(( int ));
+extern	int	killpg	P(( int, int ));
+extern	int	mkdir	P(( char *, int ));
+extern	int	open	P(( char *, int ));
+extern	int	pipe	P(( int * ));
+extern	int	read	P(( int, char *, int ));
+extern	int	select	P(( int, fd_set*, fd_set*, fd_set*, struct timeval* ));
+extern	int	sleep	P(( UINT ));
+extern	int	unlink	P(( char * ));
+extern	int	write	P(( int, char *, int ));
+#endif
+#if HPUX && __GNUC__
+#include <fcntl.h>	/* 'open()' */
+#include <sys/wait.h>	/* 'wait()' */
+#endif
+#if (SUNOS || NeXT) && (defined(lint) || __GNUC__ || defined(__CLCC__))
 extern	int	_filbuf	P(( FILE * ));
 extern	int	_flsbuf	P(( int, FILE * ));
-extern	int	printf	P(( char *, ... ));
+extern	void	bzero	P(( char *, int ));
+#ifdef __CLCC__
+extern	int	execlp	P(( char *, ... ));
+#endif
 extern	int	fclose	P(( FILE * ));
 extern	int	fflush	P(( FILE * ));
-extern	int	fprintf	P(( FILE *, char *, ... ));
+extern	int	fprintf	P(( FILE *, const char *, ... ));
 extern	int	fgetc	P(( FILE * ));
+#ifndef	fileno
+extern	int	fileno	P(( FILE * ));
+#endif
 extern	int	fputc	P(( int, FILE * ));
 extern	int	fread	P(( char *, int, int, FILE * ));
 extern	int	fseek	P(( FILE *, long, int ));
-extern	int	fwrite	P(( char *, int, int, FILE * ));
-extern	int	ioctl	P(( int, int, caddr_t ));
+extern	int	fwrite	P(( const char *, SIZE_T, SIZE_T, FILE * ));
+extern	int	ioctl	P(( int, ULONG, caddr_t ));
 extern	int	killpg	P(( int, int ));
 extern	int	mkdir	P(( char *, int ));
-extern	void	bzero	P(( char *, int ));
+extern	int	open	P(( char *, int ));
 #ifndef NeXT
-extern	void	perror	P(( char * ));
+extern	void	perror	P(( const char * ));
 #endif /* !NeXT */
-extern	int	puts	P(( char * ));
-extern	int	sscanf	P(( char *, char *, ... ));
+extern	int	printf	P(( const char *, ... ));
+extern	int	puts	P(( const char * ));
+extern	int	sscanf	P(( const char *, const char *, ... ));
 extern	int	select	P(( int, fd_set*, fd_set*, fd_set*, struct timeval* ));
 extern	void	setbuf	P(( FILE *, char * ));
 extern	void	setbuffer P(( FILE *, char *, int ));
-extern	int	system	P(( char * ));
+extern	int	system	P(( const char * ));
 extern	long	time	P(( long * ));
 extern	int	wait	P(( int * ));
-extern	long	strtol	P(( char *, char **, int ));
+extern	long	strtol	P(( const char *, char **, int ));
 #endif /* lint || __GNUC__ */
 #ifdef NeXT
 extern int	isatty	P((int));
@@ -1309,7 +1346,7 @@ extern void	memset	P((char *, int ch, int n));
 extern int	access	P((char *, int));
 extern int	read	P((int, char *, int));
 extern int	write	P((int, char *, int));
-extern void	*qsort	P((void *, size_t, size_t , int (*compar)(void *, void *)));
+extern void	qsort	P((void *, size_t, size_t , int (*compar)(void *, void *)));
 extern int	pipe	P((int *));
 extern int	kill	P((int, int));
 extern int	execlp	P((char *, char *, ...));

@@ -8,8 +8,11 @@
  * Major extensions for vile by Paul Fox, 1991
  *
  *	$Log: modes.c,v $
- *	Revision 1.27  1993/10/04 10:24:09  pgf
- *	see tom's 3.62 changes
+ *	Revision 1.28  1993/11/04 09:10:51  pgf
+ *	tom's 3.63 changes
+ *
+ * Revision 1.27  1993/10/04  10:24:09  pgf
+ * see tom's 3.62 changes
  *
  * Revision 1.26  1993/09/10  16:06:49  pgf
  * tom's 3.61 changes
@@ -896,7 +899,7 @@ int	global;
 	if ((s = kbd_reply(
 		global	? "Global value: "
 			: "Local value: ",
-		cbuf, sizeof(cbuf)-1,
+		cbuf, (int)sizeof(cbuf)-1,
 		mode_eol, '=', KBD_NORMAL|KBD_LOWERC, mode_complete)) != TRUE)
 		return ((s == FALSE) ? SORTOFTRUE : s);
 
