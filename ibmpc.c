@@ -9,7 +9,30 @@
  * display type.
  *
  * $Log: ibmpc.c,v $
- * Revision 1.48  1994/03/16 19:20:15  pgf
+ * Revision 1.54  1994/04/22 14:34:15  pgf
+ * changed BAD and GOOD to BADEXIT and GOODEXIT
+ *
+ * Revision 1.53  1994/04/22  11:47:50  pgf
+ * specify max col to scroll operation, since not all video BIOSes treat
+ * '0' as max col. (richard hussong)
+ *
+ * Revision 1.52  1994/04/20  19:54:50  pgf
+ * changes to support 'BORLAND' console i/o screen driver
+ *
+ * Revision 1.51  1994/04/18  14:26:27  pgf
+ * merge of OS2 port patches, and changes to tungetc operation
+ *
+ * Revision 1.50  1994/04/06  10:03:46  pgf
+ * warning fixup
+ *
+ * Revision 1.49  1994/04/04  11:33:46  pgf
+ * added and implemented new attribute string argument to scwrite(), to
+ * allow support of OPT_VIDEO_ATTR.  this is brute force right now, and
+ * i don't quite understand what the relationship and layering should
+ * be regarding color and reverse video.  right now fore and back-ground
+ * colors are still passed in independently of the attribute string.
+ *
+ * Revision 1.48  1994/03/16  19:20:15  pgf
  * don't OR in the upper bit to the ctrans value.
  *
  * Revision 1.47  1994/03/16  19:01:44  pgf
@@ -44,6 +67,10 @@
 #include        "estruct.h"
 #include        "edef.h"
 
+#if BORLAND || !IBMPC
+#error misconfigured:  IBMPC should be defined if using ibmpc.c
+#error (and BORLAND should not be defined)
+#endif
 
 #if DJGPP
 #include <pc.h>
@@ -488,7 +515,7 @@ ibmeeol()
 	ccol = rg.h.dl;		/* record current column */
 	crow = rg.h.dh;		/* and row */
 
-	scwrite(crow, ccol, term.t_ncol-ccol, NULL, gfcolor, gbcolor);
+	scwrite(crow, ccol, term.t_ncol-ccol, NULL, NULL, gfcolor, gbcolor);
 
 }
 
@@ -659,11 +686,7 @@ ibmbeep()
 		return;
 	}
 #endif
-#if	MWC86
-	putcnb(BEL);
-#else
 	bdos(6, BEL, 0);	/* annoying!! */
-#endif
 }
 
 void
@@ -978,42 +1001,71 @@ int getboard()
 }
 
 void
-scwrite(row, col, nchar, outstr, forg, bacg)	/* write a line out*/
+scwrite(row, col, nchar, outstr, attrstr, forg, bacg)	/* write a line out*/
 int row, col, nchar;	/* row,col of screen to place outstr (len nchar) on */
 char *outstr;	/* string to write out (must be term.t_ncol long) */
+VIDEO_ATTR *attrstr; /* attributes to write out (must be term.t_ncol long) */
 int forg;	/* foreground color of string to write */
 int bacg;	/* background color */
 {
-	register USHORT attr;	/* attribute byte mask to place in RAM */
 	register USHORT *lnptr;	/* pointer to the destination line */
 	register int i;
 
 	if (row > term.t_nrow)
 		return;
 
-	/* build the attribute byte and setup the screen pointer */
-#if	COLOR
-	if (ColorDisplay())
-		attr = AttrColor(bacg,forg);
-	else
-#endif
-	attr = AttrMono(bacg<forg);
-	attr <<= 8;
-
 	if (flickcode && (dtype == CDCGA))
 		lnptr = sline;
 	else
 		lnptr = scptr[row]+col;
 
-	if (outstr) {
-		for (i = 0; i < nchar; i++) {
-			*lnptr++ = (outstr[i+col] & 255) | attr;
+	if (attrstr) {
+		register USHORT attrnorm;
+		register USHORT attrrev;
+#if	COLOR
+		if (ColorDisplay()) {
+			attrnorm = AttrColor(bacg,forg) << 8;
+			attrrev = AttrColor(forg,bacg) << 8;
+		} else 
+#endif
+		{
+		attrnorm = AttrMono(bacg<forg) << 8;
+		attrrev = AttrMono(forg<bacg) << 8;
+		}
+		if (outstr) {
+			for (i = 0; i < nchar; i++) {
+				*lnptr++ = (outstr[i+col] & 255) | 
+					((attrstr[i+col] & VAREV) ? 
+						attrrev : attrnorm);
+			}
+		} else {
+			for (i = 0; i < nchar; i++) {
+				*lnptr++ = (SPACE & 255) | 
+					((attrstr[i+col] & VAREV) ? 
+						attrrev : attrnorm);
+			}
 		}
 	} else {
-		for (i = 0; i < nchar; i++) {
-			*lnptr++ = (SPACE & 255) | attr;
+		register USHORT attr; /* attribute byte mask to place in RAM */
+		/* build the attribute byte and setup the screen pointer */
+#if	COLOR
+		if (ColorDisplay())
+			attr = AttrColor(bacg,forg);
+		else
+#endif
+		attr = AttrMono(bacg<forg);
+		attr <<= 8;
+		if (outstr) {
+			for (i = 0; i < nchar; i++) {
+				*lnptr++ = (outstr[i+col] & 255) | attr;
+			}
+		} else {
+			for (i = 0; i < nchar; i++) {
+				*lnptr++ = (SPACE & 255) | attr;
+			}
 		}
 	}
+
 
 	if (flickcode && (dtype == CDCGA)) {
 		/* wait for vertical retrace to be off */
@@ -1034,7 +1086,7 @@ VIDEO **vpp;
 	if (*vpp == 0) {
 		*vpp = typeallocplus(VIDEO, term.t_mcol - 4);
 		if (*vpp == NULL)
-		ExitProgram(BAD(1));
+		ExitProgram(BADEXIT);
 	}
 	return *vpp;
 }
@@ -1099,8 +1151,8 @@ int from, to, n;
 	rg.h.bh = scblank();	/* attribute to use for line-fill */
 	rg.h.ch = min(to,from);	/* upper window row */
 	rg.h.cl = 0;		/* left window column */
-	rg.h.dh = max(to,from);	/* lower window column */
-	rg.h.dl = 0;		/* lower window column */
+	rg.h.dh = max(to,from);	/* lower window row */
+	rg.h.dl = term.t_ncol - 1; /* lower window column */
 	INTX86(0x10, &rg, &rg);
 }
 #endif	/* SCROLLCODE */

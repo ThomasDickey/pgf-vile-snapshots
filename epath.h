@@ -7,7 +7,10 @@
 
 /*
  * $Log: epath.h,v $
- * Revision 1.11  1994/02/22 11:03:15  pgf
+ * Revision 1.12  1994/04/18 14:26:27  pgf
+ * merge of OS2 port patches, and changes to tungetc operation
+ *
+ * Revision 1.11  1994/02/22  11:03:15  pgf
  * truncated RCS log for 4.0
  *
  */
@@ -52,7 +55,7 @@ char *pathname[] =
 };
 #endif
 
-#if	MSDOS
+#if	MSDOS || OS2
 {
 	"vile.rc",
 	"vile.hlp",

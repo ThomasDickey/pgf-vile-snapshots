@@ -9,7 +9,43 @@
 
 /*
  * $Log: edef.h,v $
- * Revision 1.134  1994/03/28 16:40:41  pgf
+ * Revision 1.147  1994/04/25 21:49:49  pgf
+ * v. 4.4
+ *
+ * Revision 1.146  1994/04/22  16:21:05  pgf
+ * v. 4.3e
+ *
+ * Revision 1.145  1994/04/22  11:27:57  pgf
+ * added hook holders
+ *
+ * Revision 1.144  1994/04/20  19:54:50  pgf
+ * changes to support 'BORLAND' console i/o screen driver
+ *
+ * Revision 1.143  1994/04/18  14:26:27  pgf
+ * merge of OS2 port patches, and changes to tungetc operation
+ *
+ * Revision 1.141  1994/04/11  16:51:52  pgf
+ * v. 4.3c
+ *
+ * Revision 1.140  1994/04/11  15:50:06  pgf
+ * kev's attribute changes
+ *
+ * Revision 1.139  1994/04/04  16:15:59  pgf
+ * v. 4.3b
+ *
+ * Revision 1.138  1994/04/04  16:14:58  pgf
+ * kev's 4.4 changes
+ *
+ * Revision 1.137  1994/04/01  14:30:02  pgf
+ * tom's warning/lint patch
+ *
+ * Revision 1.136  1994/03/29  16:30:35  pgf
+ * v. 4.3a
+ *
+ * Revision 1.135  1994/03/29  16:24:20  pgf
+ * kev's changes: selection and attributes
+ *
+ * Revision 1.134  1994/03/28  16:40:41  pgf
  * v. 4.3
  *
  * Revision 1.133  1994/03/23  13:06:58  pgf
@@ -48,7 +84,7 @@
 decl_uninit( char *prog_arg );		/* argv[0] from main.c */
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version 4.3");
+decl_init( char version[], "version 4.4");
 
 decl_init( int slash, '/'); 		/* so DOS can use '\' as path separator */
 
@@ -60,13 +96,18 @@ decl_uninit( int displaying );		/* flag set during screen updates */
 decl_uninit( int doing_kbd_read );	/* flag set during keyboard reading */
 decl_uninit( int reading_msg_line );	/* flag set during msgline reading */
 decl_uninit( jmp_buf read_jmp_buf );	/* for setjmp/longjmp on SIGINT */
+#ifndef insertmode
 decl_uninit( int insertmode );		/* are we inserting or overwriting? */
-decl_uninit( int insert_mode_was );	/* were we (and will we be?)	*/
-					/*	inserting or overwriting? */
+#endif
 decl_uninit( int lastkey );		/* last keystoke (tgetc)	*/
-decl_init( int tungotc , -1);		/* last un-gotten key (tungetc) */
+decl_init( int tungotcnt, 0);		/* how many ungotten chars (tungetc) */
 decl_uninit( int lastcmd );		/* last command	(kbd_seq)	*/
-decl_uninit( short regionshape );	/* regions should be full lines */
+decl_uninit( REGIONSHAPE regionshape );	/* shape of region		*/
+#if OPT_VIDEO_ATTRS
+decl_uninit( VIDEO_ATTR videoattribute );
+					/* attribute to set in call to
+					   attributeregion()		*/
+#endif
 decl_uninit( short doingopcmd );        /* operator command in progress */
 decl_uninit( MARK pre_op_dot );		/* current pos. before operator cmd */
 decl_uninit( short opcmd );             /* what sort of operator?	*/
@@ -86,6 +127,14 @@ decl_uninit( char sres[NBUFN] );	/* current screen resolution	*/
 decl_uninit( char pat[NPAT] );          /* Search pattern		*/
 decl_uninit( char rpat[NPAT] );		/* replacement pattern		*/
 
+#if PROC
+decl_uninit( char cdhook[NBUFN+1] );	/* proc to run when change dir */
+decl_uninit( char readhook[NBUFN+1] );	/* proc to run when read file  */
+decl_uninit( char writehook[NBUFN+1] );	/* proc to run when write file */
+decl_uninit( char bufhook[NBUFN+1] );	/* proc to run when change buf */
+decl_uninit( char exithook[NBUFN+1] );	/* proc to run when exiting */
+#endif
+
 decl_uninit( regexp *gregexp );		/* compiled version of pat */
 
 /* patmatch holds the string that satisfied the search command.  */
@@ -95,7 +144,9 @@ decl_uninit( int ignorecase );
 
 decl_init( int curgoal, -1 );           /* column goal			*/
 decl_uninit( char *execstr );		/* pointer to string to execute	*/
+#if OPT_EVAL
 decl_uninit( char golabel[NPAT] );	/* current line to go to	*/
+#endif
 decl_uninit( int execlevel );		/* execution IF level		*/
 decl_init( int	eolexist, TRUE );	/* does clear to EOL exist	*/
 decl_uninit( int revexist );		/* does reverse video exist?	*/
@@ -147,7 +198,6 @@ decl_init( int cntl_x, tocntrl('X') );	/* current control X prefix char */
 decl_init( int reptc, 'K' );		/* current universal repeat char */
 decl_init( int abortc, tocntrl('[') );	/* ESC: current abort command char */
 decl_init( int poundc, '#' );		/* pseudo function key prefix */
-decl_init( int altpoundc, '#' );	/* pseudo function key prefix */
 decl_init( int quotec, tocntrl('V') );	/* quote char during mlreply()	*/
 decl_init( int killc, tocntrl('U') );	/* current line kill char	*/
 decl_init( int wkillc, tocntrl('W') );	/* current word kill char	*/
@@ -184,7 +234,9 @@ decl_uninit( int dotcmdcnt );		/* down-counter for dot-commands */
 decl_uninit( int dotcmdrep );		/* original dot-command repeat-count */
 
 decl_init( int	kbdmode, STOP );	/* current keyboard macro mode	*/
+#if OPT_EVAL
 decl_uninit( int seed );		/* random number seed		*/
+#endif
 
 #if RAMSIZE
 decl_uninit( long envram );		/* # of bytes current used malloc */
@@ -215,7 +267,9 @@ decl_init( char	truem[], "TRUE" );	/* true literal			*/
 decl_init( char	falsem[], "FALSE" );	/* false literal		*/
 
 decl_init( int	cmdstatus, TRUE );	/* last command status		*/
+#if OPT_EVAL || (ATARI & ST520 & MEGAMAX)
 decl_uninit( char palstr[NSTRING] );	/* palette string		*/
+#endif
 decl_uninit( char *fline );		/* dynamic return line		*/
 decl_uninit( ALLOC_T flen );		/* current length of fline	*/
 
@@ -240,6 +294,6 @@ extern KBIND kbindtbl[];
 extern  TERM    term;                   /* Terminal information.        */
 #endif
 
-#if IBMPC
+#if IBMPC || BORLAND
 decl_init( char *current_res_name, "default");
 #endif	/* IBMPC */

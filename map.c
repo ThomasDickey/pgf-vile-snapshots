@@ -3,7 +3,21 @@
  *		6/3/93
  *
  * $Log: map.c,v $
- * Revision 1.14  1994/03/22 16:26:53  pgf
+ * Revision 1.18  1994/04/26 13:48:38  pgf
+ * warning cleanup
+ *
+ * Revision 1.17  1994/04/22  15:57:39  pgf
+ * typos
+ *
+ * Revision 1.16  1994/04/22  14:15:37  pgf
+ * be sure and pass any arg through to a mapped string (fixes 1g where
+ * g is mapped to G) (lee johnson)
+ *
+ * Revision 1.15  1994/04/13  20:40:21  pgf
+ * change kcod2str, fnc2str, string2prc to all deal in "p-strings", so
+ * we can store null chars in binding strings.
+ *
+ * Revision 1.14  1994/03/22  16:26:53  pgf
  * used updatescratch() for buffer animation triggering
  *
  * Revision 1.13  1994/02/22  11:03:15  pgf
@@ -79,8 +93,9 @@ char	*v;
 
 	/* check for attempted recursion
 	 * patch: prc2kcod assumes only a single key-sequence
+	 * patch: assumes no null chars in v -- should be pstring.
 	 */
-	test = prc2kcod(string2prc(temp, v));
+	test = prc2kcod(bytes2prc(temp, v, (int)strlen(v)));
 	if (test == key || search_map(test) != NULL) {
 		mlforce("[Attempted recursion]");
 		return FALSE;
@@ -159,11 +174,14 @@ char	*ptr;
 			lsettrimmed(lBack(DOT.l));
 		}
 		bprintf("%*S", MAPS_PREFIX, show_all
-			? kcod2str(m->key, temp)
+			? kcod2pstr(m->key, temp) + 1	/* FIXXX: nulls */
 			: kcod2prc(m->key, temp));
+
+
+		/* patch -- m->kbdseq cannot have nulls in it.  need length */
 		bprintf("%s", show_all
 			? m->kbdseq
-			: string2prc(temp, m->kbdseq));
+			: bytes2prc(temp, m->kbdseq, (int)strlen(m->kbdseq)));
 		lsettrimmed(l_ref(DOT.l));
 	}
 }
@@ -286,7 +304,7 @@ int	f,n;
 	}
 
 	(void)tb_init(&MapMacro, abortc);
-	if (n != 1) {
+	if (f) { /* then an arg was given */
 		char	num[10];
 		(void)lsprintf(num, "%d", n);
 		if (!tb_sappend(&MapMacro, num))

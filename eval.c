@@ -4,7 +4,36 @@
 	written 1986 by Daniel Lawrence
  *
  * $Log: eval.c,v $
- * Revision 1.78  1994/03/29 14:50:30  pgf
+ * Revision 1.87  1994/04/25 21:31:39  pgf
+ * cfix strncpy0() calls
+ *
+ * Revision 1.86  1994/04/25  20:24:12  pgf
+ * response variables (@foo) now remember last response
+ *
+ * Revision 1.85  1994/04/22  16:54:08  pgf
+ * remove spurious arg
+ *
+ * Revision 1.84  1994/04/22  13:48:25  pgf
+ * new hook variables, and $abufname
+ *
+ * Revision 1.83  1994/04/22  11:28:22  pgf
+ * added $title and $iconname variables (X11 only), added $xvile and $pcvile
+ * variables which are true on their respective builds, and added $cdhook
+ * variable, as a trial hook.
+ *
+ * Revision 1.82  1994/04/19  15:13:06  pgf
+ * use strncpy0() in likely places
+ *
+ * Revision 1.81  1994/04/08  19:52:30  pgf
+ * look up functions via first match, rather than exact
+ *
+ * Revision 1.80  1994/04/04  16:14:58  pgf
+ * kev's 4.4 changes
+ *
+ * Revision 1.79  1994/04/01  14:30:02  pgf
+ * tom's warning/lint patch
+ *
+ * Revision 1.78  1994/03/29  14:50:30  pgf
  * warning cleanup
  *
  * Revision 1.77  1994/03/16  19:00:09  pgf
@@ -233,7 +262,8 @@ char *fname;		/* name of function to evaluate */
 	/* look the function up in the function table */
 	mklower(fname)[FUNC_NAMELEN-1] = EOS; /* case-independent */
 	for (fnum = 0; fnum < NFUNCS; fnum++)
-		if (strcmp(fname, funcs[fnum].f_name) == 0)
+		if (strncmp(fname, funcs[fnum].f_name, 
+				strlen(funcs[fnum].f_name)) == 0)
 			break;
 
 	/* return errorm on a bad reference */
@@ -266,9 +296,10 @@ char *fname;		/* name of function to evaluate */
 		case UFMOD:	return(l_itoa(atoi(arg1) % atoi(arg2)));
 		case UFNEG:	return(l_itoa(-atoi(arg1)));
 		case UFCAT:	return(strcat(strcpy(result, arg1), arg2));
-		case UFLEFT:	return(strncpy(result, arg1, s2size(arg2)));
+		case UFLEFT:	return(strncpy0(result, arg1, s2size(arg2)+1));
 		case UFRIGHT:	return(strcpy(result, s2offset(arg1,arg2)));
-		case UFMID:	return(strncpy(result, s2offset(arg1,arg2), s2size(arg3)));
+		case UFMID:	return(strncpy0(result, s2offset(arg1,arg2),
+							s2size(arg3)+1));
 		case UFNOT:	return(ltos(stol(arg1) == FALSE));
 		case UFEQUAL:	return(ltos(atoi(arg1) == atoi(arg2)));
 		case UFLESS:	return(ltos(atoi(arg1) < atoi(arg2)));
@@ -358,6 +389,7 @@ char *vname;		/* name of environment variable to retrieve */
 		ElseIf( EVFLICKER )	value = ltos(flickcode);
 		ElseIf( EVCURWIDTH )	value = l_itoa(term.t_ncol);
 		ElseIf( EVCBUFNAME )	value = get_bname(curbp);
+		ElseIf( EVABUFNAME )	value = get_bname(find_alt());
 		ElseIf( EVCFNAME )	value = curbp->b_fname;
 		ElseIf( EVSRES )	value = sres;
 		ElseIf( EVDEBUG )	value = ltos(macbug);
@@ -398,8 +430,18 @@ char *vname;		/* name of environment variable to retrieve */
 		ElseIf( EVQIDENTIF )	value = getctext(_qident);
 		ElseIf( EVPATHNAME )	value = getctext(_pathn);
 		ElseIf( EVCWD )		value = current_directory(FALSE);
+		ElseIf( EVOCWD )	value = previous_directory();
+#if PROC
+		ElseIf( EVCDHOOK )	value = cdhook;
+		ElseIf( EVRDHOOK )	value = readhook;
+		ElseIf( EVWRHOOK )	value = writehook;
+		ElseIf( EVBUFHOOK )	value = bufhook;
+		ElseIf( EVEXITHOOK )	value = exithook;
+#endif
 #if X11
 		ElseIf( EVFONT )	value = x_current_fontname();
+		ElseIf( EVTITLE )	value = x_get_window_name();
+		ElseIf( EVICONNAM )	value = x_get_icon_name();
 #endif
 		ElseIf( EVSHELL )
 			if (shell == 0)
@@ -412,6 +454,10 @@ char *vname;		/* name of environment variable to retrieve */
 			value = directory;
 
 		ElseIf( EVNTILDES )	value = l_itoa(ntildes);
+
+		ElseIf( EVXVILE )	value = ltos( X11 );
+
+		ElseIf( EVPCVILE )	value = ltos( MSDOS );
 
 		EndIf
 	}
@@ -433,7 +479,8 @@ getkill()		/* return some of the contents of the kill buffer */
 			size = kbs[0].kused;
 		else
 			size = NSTRING - 1;
-		strncpy(value, (char *)(kbs[0].kbufh->d_chunk), size)[size] = EOS;
+		strncpy(value, (char *)(kbs[0].kbufh->d_chunk),
+			size)[size] = EOS;
 	}
 
 	/* and return the constructed value */
@@ -531,7 +578,7 @@ int	*pos;
 			return FALSE;
 		}
 	} else if (c != NAMEC) /* cancel the unget */
-		(void)tungetc(c);
+		tungetc(c);
 	return TRUE;
 }
 
@@ -670,7 +717,7 @@ char *value;	/* value to set to */
 			cmdstatus = stol(value);
 
 		ElseIf( EVPALETTE )
-			spal(strncpy(palstr, value, (SIZE_T)(NSTRING-1)));
+			spal(strncpy0(palstr, value, (SIZE_T)(NSTRING)));
 
 		ElseIf( EVLASTKEY )
 			lastkey = atoi(value);
@@ -723,8 +770,9 @@ char *value;	/* value to set to */
 		ElseIf( EVCWD )
 			status = set_directory(value);
 #if X11
-		ElseIf( EVFONT )
-			status = x_setfont(value);
+		ElseIf( EVFONT ) status = x_setfont(value);
+		ElseIf( EVTITLE ) x_set_window_name(value); status = TRUE;
+		ElseIf( EVICONNAM ) x_set_icon_name(value); status = TRUE;
 #endif
 		ElseIf( EVSHELL )
 			SetEnv(&shell, value);
@@ -732,12 +780,21 @@ char *value;	/* value to set to */
 		ElseIf( EVDIRECTORY )
 			SetEnv(&directory, value);
 
+#if PROC
+		ElseIf( EVCDHOOK )     (void)strcpy(cdhook, value);
+		ElseIf( EVRDHOOK )     (void)strcpy(readhook, value);
+		ElseIf( EVWRHOOK )     (void)strcpy(writehook, value);
+		ElseIf( EVBUFHOOK )    (void)strcpy(bufhook, value);
+		ElseIf( EVEXITHOOK )   (void)strcpy(exithook, value);
+#endif
+
 		ElseIf( EVNTILDES )
 			ntildes = atoi(value);
 			if (ntildes > 100)
 				ntildes = 100;
 
 		Otherwise
+			/* EVABUFNAME */
 			/* EVPROGNAME */
 			/* EVVERSION */
 			/* EVMATCH */
@@ -746,6 +803,8 @@ char *value;	/* value to set to */
 			/* EVLLENGTH */
 			/* EVRAM */
 			/* EVMODE */
+			/* EVXVILE */
+			/* EVPCVILE */
 			status = ABORT;	/* must be readonly */
 		EndIf
 		break;
@@ -851,14 +910,16 @@ char *tokn;		/* token to evaluate */
 		case TKNUL:	return("");
 
 		case TKARG:	/* interactive argument */
+				{
+				static char tkargbuf[NSTRING];
+			
 				oclexec = clexec;
 
 				(void)strcpy(tokn, tokval(&tokn[1]));
 				distmp = discmd;	/* echo it always! */
 				discmd = TRUE;
 				clexec = FALSE;
-				buf[0] = EOS;
-				status = kbd_string(tokn, buf,
+				status = kbd_string(tokn, tkargbuf,
 						sizeof(buf), '\n',
 						KBD_EXPAND|KBD_QUOTES,
 						no_completion);
@@ -867,7 +928,8 @@ char *tokn;		/* token to evaluate */
 
 				if (status == ABORT)
 					return(errorm);
-				return(buf);
+				return(tkargbuf);
+				}
 
 		case TKBUF:	/* buffer contents fetch */
 
@@ -895,7 +957,7 @@ char *tokn;		/* token to evaluate */
 				if (blen > NSTRING)
 					blen = NSTRING;
 				strncpy(buf,
-					l_ref(bp->b_dot.l)->l_text + bp->b_dot.o,
+				    l_ref(bp->b_dot.l)->l_text + bp->b_dot.o,
 					blen)[blen] = EOS;
 
 				/* and step the buffer's line ptr
@@ -942,8 +1004,8 @@ is_truem(val)
 char *val;
 {
 	char	temp[8];
-	strncpy(temp, val, sizeof(temp)-1)[sizeof(temp)-1] = EOS;
-	mklower(temp);
+	strncpy0(temp, val, sizeof(temp));
+	(void)mklower(temp);
 	return (!strcmp(temp, "yes")
 	   ||   !strcmp(temp, "true")
 	   ||   !strcmp(temp, "t")
@@ -960,8 +1022,8 @@ is_falsem(val)
 char *val;
 {
 	char	temp[8];
-	strncpy(temp, val, sizeof(temp)-1)[sizeof(temp)-1] = EOS;
-	mklower(temp);
+	strncpy0(temp, val, sizeof(temp));
+	(void)mklower(temp);
 	return (!strcmp(temp, "no")
 	   ||   !strcmp(temp, "false")
 	   ||   !strcmp(temp, "f")

@@ -4,7 +4,10 @@
  * "termio.c". It compiles into nothing if not an ANSI device.
  *
  * $Log: ansi.c,v $
- * Revision 1.13  1994/02/22 11:03:15  pgf
+ * Revision 1.14  1994/04/25 21:07:13  pgf
+ * changes for ANSI screen under MSDOS
+ *
+ * Revision 1.13  1994/02/22  11:03:15  pgf
  * truncated RCS log for 4.0
  *
  */
@@ -16,6 +19,8 @@
 
 #if	ANSI
 
+#define SCROLL_REG 1
+
 #if	AMIGA
 #define NROW	23			/* Screen size.			*/
 #define NCOL	77			/* Edit if you want to.		*/
@@ -24,13 +29,19 @@
 #if	MSDOS
 #define NROW    25
 #define NCOL    80
-#undef SCROLLCODE
-#define SCROLLCODE 0			/* ANSI.SYS doesn't do scrolling */
+#define MAXNROW	60
+#define MAXNCOL	132
+#undef SCROLL_REG			/* ANSI.SYS can't do scrolling */
+#define SCROLL_REG 0
 #endif
 
 #ifndef NROW
 #define NROW	24			/* Screen size.			*/
 #define NCOL	80			/* Edit if you want to.		*/
+#endif
+#ifndef MAXNROW
+#define MAXNROW	NROW
+#define MAXNCOL	NCOL
 #endif
 
 #define NPAUSE	100			/* # times thru update to pause */
@@ -71,10 +82,10 @@ int coltran[8] = {2, 3, 5, 7, 0, 4, 6, 1};	/* color translation table */
  * "termio" code.
  */
 TERM	term	= {
-	NROW-1,
-	NROW-1,
-	NCOL,
-	NCOL,
+	MAXNROW-1,	/* max */
+	NROW-1,		/* current */
+	MAXNCOL,	/* max */
+	NCOL,		/* current */
 	MARGIN,
 	SCRSIZ,
 	NPAUSE,
@@ -96,7 +107,6 @@ TERM	term	= {
 	ansibcol
 #endif
 #if SCROLLCODE
-#define SCROLL_REG 1
 	, ansiscroll
 #endif
 };
@@ -153,9 +163,9 @@ int	row;
 int	col;
 {
 	csi();
-	if (row) ansiparm(row+1);
+	ansiparm(row+1);
 	ttputc(';');
-	if (col) ansiparm(col+1);
+	ansiparm(col+1);
 	ttputc('H');
 }
 
@@ -174,9 +184,16 @@ ansieeop()
 	ansibcol(gbcolor);
 #endif
 	csi();
+	ttputc('2');
 	ttputc('J');
 }
 
+#if BROKEN_REVERSE_VIDEO
+/* there was something wrong with this "fix".  the "else" of
+		the ifdef just uses "ESC [ 7 m" to set reverse
+		video, and it works under DOS for me....  but then, i
+		use an "after-market" ansi driver -- nnansi593.zip, from
+		oak.oakland.edu, or any simtel mirror. */
 void
 ansirev(state)		/* change reverse video state */
 int state;	/* TRUE = reverse, FALSE = normal */
@@ -223,6 +240,25 @@ int state;	/* TRUE = reverse, FALSE = normal */
 #endif	/* MSDOS vs ANSI-reverse */
 #endif	/* COLOR */
 }
+
+#else
+
+void
+ansirev(state)		/* change reverse video state */
+int state;	/* TRUE = reverse, FALSE = normal */
+{
+	static int revstate = -1;
+	if (state == revstate)
+		return;
+	revstate = state;
+
+	csi();
+	if (state) ttputc('7');	/* reverse-video on */
+	ttputc('m');
+
+}
+
+#endif
 
 int
 ansicres(flag)	/* change screen resolution */
@@ -291,20 +327,20 @@ int	n;
 	if (to < from) {
 		ansimove(to,0);
 		csi();
-		if (from - to > 1) ansiparm(from - to);
+		ansiparm(from - to);
 		ttputc('M'); /* delete */
 		ansimove(to+n,0);
 		csi();
-		if (from - to > 1) ansiparm(from - to);
+		ansiparm(from - to);
 		ttputc('L'); /* insert */
 	} else {
 		ansimove(from+n,0);
 		csi();
-		if (to - from > 1) ansiparm(to - from);
+		ansiparm(to - from);
 		ttputc('M'); /* delete */
 		ansimove(from,0);
 		csi();
-		if (to - from > 1) ansiparm(to - from);
+		ansiparm(to - from);
 		ttputc('L'); /* insert */
 	}
 #endif
@@ -317,7 +353,7 @@ int	top;
 int	bot;
 {
 	csi();
-	if (top) ansiparm(top + 1);
+	ansiparm(top + 1);
 	ttputc(';');
 	if (bot != term.t_nrow) ansiparm(bot + 1);
 	ttputc('r');
@@ -331,6 +367,10 @@ ansiparm(n)
 register int	n;
 {
 	register int q,r;
+
+#if optimize_works /* i don't think it does, although it should, to be ANSI */
+	if (n == 1) return;
+#endif
 
 	q = n/10;
 	if (q != 0) {

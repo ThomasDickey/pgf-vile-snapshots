@@ -11,7 +11,28 @@
  * which means that the dot and mark values in the buffer headers are nonsense.
  *
  * $Log: line.c,v $
- * Revision 1.64  1994/03/24 12:42:48  pgf
+ * Revision 1.70  1994/04/20 19:53:07  pgf
+ * changed an llength to lLength
+ *
+ * Revision 1.69  1994/04/12  17:11:53  pgf
+ * move kdone() in kinsert() until after we check for kcharpending,
+ * so that kdone doesn't reset it on us.
+ *
+ * Revision 1.68  1994/04/04  18:51:19  pgf
+ * widen a region in kinsertlater() since we will always call this when
+ * done to clean up, and if the last line is the longest of the region,
+ * we have not yet updated the region width.
+ *
+ * Revision 1.67  1994/04/04  16:14:58  pgf
+ * kev's 4.4 changes
+ *
+ * Revision 1.66  1994/03/29  17:53:18  pgf
+ * warning cleanup
+ *
+ * Revision 1.65  1994/03/29  16:24:20  pgf
+ * kev's changes: selection and attributes
+ *
+ * Revision 1.64  1994/03/24  12:42:48  pgf
  * warning cleanup
  *
  * Revision 1.63  1994/03/22  16:30:17  pgf
@@ -292,6 +313,32 @@ fast_ptr LINEPTR lp;
 		}
 	}
 #endif
+#if OPT_VIDEO_ATTRS
+	{
+	    AREGION *ap = bp->b_attribs;
+	    while (ap != NULL) {
+		int samestart = same_ptr(ap->ar_region.r_orig.l, lp);
+		int sameend   = same_ptr(ap->ar_region.r_end.l, lp);
+		if (samestart && sameend) {
+		    AREGION *tofree = ap;
+		    ap = ap->ar_next;
+		    free_attrib(bp, tofree);
+		}
+		else if (samestart) {
+		    ap->ar_region.r_orig.l = point;
+		    ap->ar_region.r_orig.o = 0;
+		    ap = ap->ar_next;
+		}
+		else if (sameend) {
+		    ap->ar_region.r_end.l = lBACK(lp);
+		    ap->ar_region.r_end.o = lLength(ap->ar_region.r_end.l);
+		    ap = ap->ar_next;
+		}
+		else
+		    ap = ap->ar_next;
+	    }
+	}
+#endif /* OPT_VIDEO_ATTRS */
 	set_lForw(lBack(lp), lFORW(lp));
 	set_lBack(lForw(lp), lBACK(lp));
 }
@@ -467,16 +514,12 @@ int n, c;
 				wp->w_lastdot.o += n;
 		}
 	}
-	if (curbp->b_nmmarks != NULL) { /* fix the named marks */
-		struct MARK *mp;
-		for (i = 0; i < 26; i++) {
-			mp = &(curbp->b_nmmarks[i]);
+	do_mark_iterate(mp,
 			if (same_ptr(mp->l, lp1)) {
 				if (mp->o > doto)
 					mp->o += n;
 			}
-		}
-	}
+	);
 	return (TRUE);
 }
 
@@ -586,19 +629,14 @@ lnewline()
 				wp->w_lastdot.o -= doto;
 		}
 	}
-	if (curbp->b_nmmarks != NULL) { /* fix the named marks */
-		int i;
-		struct MARK *mp;
-		for (i = 0; i < 26; i++) {
-			mp = &(curbp->b_nmmarks[i]);
+	do_mark_iterate(mp,
 			if (same_ptr(mp->l, lp1)) {
 				if (mp->o < doto)
 					mp->l = lp2;
 				else
 					mp->o -= doto;
 			}
-		}
-	}
+	);
 	chg_buff(curbp, WFHARD|WFINS);
 	return (TRUE);
 }
@@ -611,7 +649,7 @@ lnewline()
  */
 int
 ldelete(n, kflag)
-long n; 	/* # of chars to delete */
+B_COUNT n; 	/* # of chars to delete */
 int kflag;	/* put killed text in kill buffer flag */
 {
 	register char	*cp1;
@@ -713,18 +751,14 @@ int kflag;	/* put killed text in kill buffer flag */
 					wp->w_lastdot.o = doto;
 			}
 		}
-		if (curbp->b_nmmarks != NULL) { /* fix the named marks */
-			struct MARK *mp;
-			for (i = 0; i < 26; i++) {
-				mp = &(curbp->b_nmmarks[i]);
+		do_mark_iterate(mp,
 				if (same_ptr(mp->l, dotp)
 				 && mp->o > doto) {
 					mp->o -= chunk;
 					if (mp->o < doto)
 						mp->o = doto;
 				}
-			}
-		}
+		);
 		n -= chunk;
 	}
 	return (s);
@@ -869,17 +903,12 @@ ldelnewline()
 			wp->w_lastdot.o += len;
 		}
 	}
-	if (curbp->b_nmmarks != NULL) { /* fix the named marks */
-		int i;
-		struct MARK *mp;
-		for (i = 0; i < 26; i++) {
-			mp = &(curbp->b_nmmarks[i]);
+	do_mark_iterate(mp,
 			if (same_ptr(mp->l, lp2)) {
 				mp->l  = lp1;
 				mp->o += len;
 			}
-		}
-	}
+	);
 	lLength(lp1) += add;
 	set_lFORW(lp1, lFORW(lp2));
 	set_lBACK(lFORW(lp2), lp1);
@@ -948,6 +977,9 @@ int c;
 		kcharpending = -1;
 		s = kinsert(oc);
 	}
+	/* try to widen the rectangle, just in case */
+	if (kregwidth > kbs[ukb].kbwidth)
+		kbs[ukb].kbwidth = kregwidth;
 	kcharpending = c;
 	return s;
 }
@@ -963,14 +995,13 @@ int c;		/* character to insert in the kill buffer */
 	KILL *nchunk;	/* ptr to newly malloced chunk */
 	KILLREG *kbp = &kbs[ukb];
 
-	kdone(); /* clean up the (possible) old contents */
-
 	if (kcharpending >= 0) {
 		int oc = kcharpending;
 		kcharpending = -1;
 		kinsert(oc);
 	}
 
+	kdone(); /* clean up the (possible) old contents */
 
 	/* check to see if we need a new chunk */
 	if (kbp->kused >= KBLOCK || kbp->kbufh == NULL) {
@@ -1034,6 +1065,10 @@ int	c;
 		n = c - 'a' + 10;  /* named buffs are in 10 through 36 */
 	else if (isupper(c))
 		n = c - 'A' + 10;
+#if OPT_SELECTIONS
+	else if (c == '.')
+		n = SEL_KREG;
+#endif
 	else
 		n = -1;
 
@@ -1156,50 +1191,51 @@ int
 putbefore(f,n)
 int f,n;
 {
-	return doput(f,n,FALSE,EXACT);
+	return doput(f, n, FALSE, EXACT);
 }
 
 int
 putafter(f,n)
 int f,n;
 {
-	return doput(f,n,TRUE,EXACT);
+	return doput(f, n, TRUE, EXACT);
 }
 
 int
 lineputbefore(f,n)
 int f,n;
 {
-	return doput(f,n,FALSE,FULLLINE);
+	return doput(f, n, FALSE, FULLLINE);
 }
 
 int
 lineputafter(f,n)
 int f,n;
 {
-	return doput(f,n,TRUE,FULLLINE);
+	return doput(f, n, TRUE, FULLLINE);
 }
 
 int
 rectputbefore(f,n)
 int f,n;
 {
-	return doput(f,n,FALSE,RECTANGLE);
+	return doput(f, n, FALSE, RECTANGLE);
 }
 
 int
 rectputafter(f,n)
 int f,n;
 {
-	return doput(f,n,TRUE,RECTANGLE);
+	return doput(f, n, TRUE, RECTANGLE);
 }
 
 
 int
-doput(f,n,after,shaparg)
-int f,n,after,shaparg;
+doput(f,n,after,shape)
+int f,n,after;
+REGIONSHAPE shape;
 {
-	int s, oukb, shape;
+	int s, oukb;
 
 	if (!f)
 		n = 1;
@@ -1213,9 +1249,7 @@ int f,n,after,shaparg;
 		return(FALSE);
 	}
 
-	if (shaparg != EXACT) {
-		shape = shaparg;
-	} else {
+	if (shape == EXACT) {
 		if ((kbs[ukb].kbflag & (KLINES|KAPPEND)))
 			shape = FULLLINE;
 		else if (kbs[ukb].kbflag & KRECT)
@@ -1234,7 +1268,7 @@ int f,n,after,shaparg;
 	}
 
 	(void)setmark();
-	s = put(n,shape);
+	s = put(n, shape);
 	if (s == TRUE)
 		swapmark();
 	if (is_header_line(DOT, curbp))
@@ -1294,7 +1328,8 @@ C_NUM *reachedp;
  */
 int
 put(n,shape)
-int n,shape;
+int n;
+REGIONSHAPE shape;
 {
 	register int	c;
 	register int	i;
@@ -1331,58 +1366,6 @@ int n,shape;
 			sp = (char *)kp->d_chunk;
 			while (i--) {
 				c = *sp++;
-#if BEFORE
-				if (shape == RECTANGLE &&
-						(width == 0 || c == '\n')) {
-					if (checkpad) {
-						status = force_text_at_col(
-								col, reached);
-						if (status != TRUE)
-							break;
-						checkpad = FALSE;
-					}
-					if (width && 
-						 linsert(width, ' ') != TRUE) {
-						status = FALSE;
-						break;
-					}
-					if (next_line_at_col(col,&reached)
-							!= TRUE) {
-						status = FALSE;
-						break;
-					}
-					checkpad = TRUE;
-					width = kbs[ukb].kbwidth;
-				}
-				if (c == '\n') {
-					if (shape == RECTANGLE) {
-						continue; /* did it already */
-					}
-					if (lnewline() != TRUE) {
-						status = FALSE;
-						break;
-					}
-					wasnl = TRUE;
-				} else {
-					if (shape == RECTANGLE) {
-					    if (checkpad) {
-						status = force_text_at_col(
-								col, reached);
-						if (status != TRUE)
-							break;
-						checkpad = FALSE;
-					    }
-					    width--;
-					}
-					if (is_header_line(DOT,curbp))
-						suppressnl = TRUE;
-					if (linsert(1, c) != TRUE) {
-						status = FALSE;
-						break;
-					}
-					wasnl = FALSE;
-				}
-#else
 				if (shape == RECTANGLE) {
 				    if (width == 0 || c == '\n') {
 					    if (checkpad) {
@@ -1442,7 +1425,6 @@ int n,shape;
 					    wasnl = FALSE;
 				    }
 				}
-#endif
 			}
 			if (status != TRUE)
 				break;

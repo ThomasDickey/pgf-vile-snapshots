@@ -3,7 +3,27 @@
  *		5/9/86
  *
  * $Log: input.c,v $
- * Revision 1.100  1994/03/24 12:04:37  pgf
+ * Revision 1.107  1994/04/25 20:34:11  pgf
+ * use strncpy0
+ *
+ * Revision 1.106  1994/04/25  09:52:54  pgf
+ * fix off-by-one in kbd_reply
+ *
+ * Revision 1.105  1994/04/19  15:13:06  pgf
+ * use strncpy0() in likely places
+ *
+ * Revision 1.104  1994/04/18  16:57:40  pgf
+ * "poundc" is now handled as a command again -- this prevents mixups
+ * when doing insertmode or history
+ *
+ * Revision 1.103  1994/04/18  14:26:27  pgf
+ * merge of OS2 port patches, and changes to tungetc operation
+ *
+ * Revision 1.101  1994/04/12  11:21:08  pgf
+ * call update() in mlyesno and mlquickask, in case called after a
+ * shell escape in a macro
+ *
+ * Revision 1.100  1994/03/24  12:04:37  pgf
  * arrow key fix from tom
  *
  * Revision 1.99  1994/02/22  11:03:15  pgf
@@ -99,6 +119,10 @@ char *prompt;
 {
 	char c; 		/* input character */
 
+	/* in case this is right after a shell escape */
+	if (sgarbf)
+		update(TRUE);
+
 	for (;;) {
 		mlprompt("%s [y/n]? ",prompt);
 		c = tgetc(FALSE);	/* get the response */
@@ -125,6 +149,9 @@ char *prompt;
 char *respchars;
 int *cp;
 {
+
+	if (sgarbf)
+		update(TRUE);
 
 	for (;;) {
 		mlprompt("%s ",prompt);
@@ -391,18 +418,30 @@ int eatit;  /* consume the character? */
 	return c;
 }
 
+char tungottenchars[10];
+
 void
 tungetc(c)
 int c;
 {
+	int i, n;
+	char esc_seq[10];
+	n = kcod2escape_seq(c, esc_seq);
+	tungotcnt = n;
+	n--;
+	for (i = 0; i < tungotcnt; i++, n--)
+		tungottenchars[i] = esc_seq[n];
+	
+	i = tungotcnt;
+	while (i--) {
+	    if (dotcmdmode == RECORD) {
+		    tb_unput(TempDot(FALSE));
+		    if (kbdmode == RECORD)
+			    tb_unput(KbdMacro);
+	    } else if (dotcmdmode != PLAY && kbdmode == RECORD)
+		    tb_unput(KbdMacro);
+	}
 
-	tungotc = c;
-	if (dotcmdmode == RECORD) {
-		tb_unput(TempDot(FALSE));
-		if (kbdmode == RECORD)
-			tb_unput(KbdMacro);
-	} else if (dotcmdmode != PLAY && kbdmode == RECORD)
-		tb_unput(KbdMacro);
 }
 
 /*	tgetc:	Get a key from the terminal driver, resolve any keyboard
@@ -413,9 +452,8 @@ int quoted;
 {
 	register int c;	/* fetched character */
 
-	if (tungotc >= 0) {
-		c = tungotc;
-		tungotc = -1;
+	if (tungotcnt > 0) {
+		c = tungottenchars[--tungotcnt];
 		record_char(c);
 	} else {
 		if ((c = get_recorded_char(TRUE)) == -1) {
@@ -446,16 +484,11 @@ int quoted;
 }
 
 /*	KBD_KEY:	Get one keystroke.  system function keys are
-	translated to the internal representation of '#' followed by a
-	single character.  be careful here.  insert mode function key/arrow
-	key processing depends on the behavior that the only way to get a
-	poundc from kbd_key with a tungotc having been pushed back is for a
-	real function key to have been pressed */
+	translated to the internal representation SPEC|c */
 int
 kbd_key()
 {
 	int    c;
-	int pound = insertmode ? altpoundc : poundc;
 
 #if OPT_XTERM && !X11
 kbd_key_loop:
@@ -491,16 +524,11 @@ kbd_key_loop:
 					goto kbd_key_loop;
 				}
 #endif
-				if (abortc != ESC || !insertmode) {
-				    	tungetc(c);
-					return pound;
-				}
 				if (insertmode == REPLACECHAR) {
 					/* eat the sequence, but return abort */
 					return abortc;
 				}
-				tungetc(c);
-				return pound;
+				return c|SPEC;
 			} else {
 				if (abortc != ESC)
 					return (c);
@@ -510,11 +538,11 @@ kbd_key_loop:
 		}
 	}
 #endif
-#if	MSDOS | ST520
+
+#if	IBM_KBD || ST520
 	if (c == 0) {			/* Apply SPEC prefix	*/
 		c = tgetc(FALSE);
-		tungetc(c);
-		return pound;
+		return c | SPEC;
 	}
 #endif
 
@@ -526,15 +554,13 @@ kbd_key_loop:
 
 		/* first try to see if it is a cursor key */
 		if ((c >= 'A' && c <= 'D') || c == 'S' || c == 'T') {
-			tungetc(c);
-			return pound;
+			return c | SPEC;
 		}
 
 		/* next, a 2 char sequence */
 		d = tgetc(FALSE);
 		if (d == '~') {
-			tungetc(c);
-			return pound;
+			return c | SPEC;
 		}
 
 		/* decode a 3 char sequence */
@@ -542,16 +568,14 @@ kbd_key_loop:
 		/* if a shifted function key, eat the tilde */
 		if (d >= '0' && d <= '9')
 			d = tgetc(FALSE);
-		tungetc(c);
-		return pound;
+		return c | SPEC;
 	}
 #endif
 
 #if  WANGPC
 	if (c == 0x1F) {	/* Apply SPEC prefix	*/
 		c = tgetc(FALSE);
-		tungetc(c);
-		return pound;
+		return c | SPEC;
 	}
 #endif
 
@@ -580,35 +604,28 @@ kbd_seq()
 		c = kbd_key();
 	}
 
-	if (c == poundc || c == altpoundc) {
-		prefix |= SPEC;
-		c = kbd_key();
-	}
-
 	c |= prefix;
 
 	/* otherwise, just return it */
 	return (lastcmd = c);
 }
 
-
-/* Read a character from the input, allowing an escape-sequence if we've got
- * one stacked up.  Use this function when we want to get the 16-bit keycode
- * for a single keystroke.
- */
+/* this is a _command_, which implements the poundsign vi command, which
+	allows any keyboard to produce function keys */
+/* ARGSUSED */
 int
-kbd_escape_seq ()
+speckey(f,n)
+int f,n;
 {
-	register int	c = kbd_key();
-	if (c == poundc && did_tungetc()) {
-		c = SPEC | kbd_key();
-	}
-	return c;
+
+	tungetc( SPEC | kbd_key() );
+
+	return TRUE;
 }
 
-/* Translate a 16-bit keycode to a string that will replay into the same code,
- * i.e., when routed via 'kbd_escape_seq()'.  This differs from 'kcod2str()',
- * which produces results that could be routed via 'kbd_seq()'.
+/* Translate a 16-bit keycode to a string that will replay into the same
+ * code, This differs from 'kcod2str()', which produces results that could
+ * be routed via 'kbd_seq()'.
  */
 int
 kcod2escape_seq (c, ptr)
@@ -627,9 +644,9 @@ char *	ptr;
 #if ANSI_SPEC
 		*ptr++ = ESC;
 		*ptr++ = SQUARE_LEFT;
-
 #endif
-#if	MSDOS | ST520
+
+#if	IBM_KBD || ST520
 		*ptr++ = 0;
 #endif
 
@@ -1130,7 +1147,7 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 		 * Get a character from the user. If not quoted, treat escape
 		 * sequences as a single (16-bit) special character.
 		 */
-		c = quotef ? tgetc(TRUE) : kbd_escape_seq();
+		c = quotef ? tgetc(TRUE) : kbd_key();
 
 		/* if we echoed ^V, erase it now */
 		if (quotef) {
@@ -1196,7 +1213,8 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 
 			/* if buffer is empty, return FALSE */
 			hst_append(buf, eolchar);
-			status = (*strncpy(extbuf, buf, (SIZE_T)bufn) != EOS);
+			strncpy0(extbuf, buf, (SIZE_T)bufn);
+			status = (*extbuf != EOS);
 
 			/* If this is a shell command, push-back the actual
 			 * text to separate the "!" from the command.  Note

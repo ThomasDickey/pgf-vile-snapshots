@@ -1,6 +1,7 @@
 
 [ This readme accompanies binary-only PC distributions -- if that's not
-what you got, consider it informative.]
+what you got, consider it informative -- there's also some information
+on build options for the PC down below. ]
 
 This is a binary-only distribution of vile version 3.65, for 386 PC
 machines.  This version of vile will _not_ run on anything less than a 386. 
@@ -21,16 +22,83 @@ the directory pub/vile.
     vile.
     
     (Other versions of vile for the PC have been built using the DJGPP
-    compiler, and needed the go32.exe extender to run.  This extender is
-    not needed with this version.  I would continue to use the DJGPP
-    compiler, because it is free software, and because the paging behavior
-    is better than with Watcom/DOS4gw, but vile won't run under windows
-    when i build that version.)
+    compiler (and those needed the go32.exe extender to run).  I would
+    continue to use the DJGPP compiler, because it is free software, and
+    because the paging behavior is better than with Watcom/DOS4gw, but vile
+    won't run under windows when i build that version.)
 
 
 Let me know about bugs/oddities when you use vile on a PC -- i probably don't
 use it as much as you do.
 
+Oh -- there are three possible screen drivers in the source distribution
+that should work, with varying degrees of success:
+	ibmpc.c (need #define IBMPC in estruct.h or makefile): goes
+		straight to the video controller and the screen, should
+		support most popular video modes on CGA/EGA/VGA cards. 
+		this is the one i usually build with, and the one that has
+		the most complete support for color, modes, and
+		documentation.  oh yeah -- the mouse is supported, but
+		unfortunately not currently under the dos-extended
+		compilers (Watcom or DJGPP), which are of course the most
+		interesting, since they let you edit huge files.
+
+	ansi.c (need #define ANSI in estruct.h or makefile):  uses ANSI.SYS.
+		this may be more portable than ibmpc.c, since it relies on
+		the ansi driver for it's cursor/scrolling/color services. 
+		if you can change the resolution of your screen (to 43 or
+		50 line mode) with your ansi driver, just use the
+		"screen-rows" and/or "screen-columns" vile commands to make
+		it's idea of the size match your physical screen, and
+		you'll be all set.  (i've only tested it with a free/public
+		replacement program called NNANSI.  i got my copy from a
+		simtel mirror.  i can probably find you a copy if you need
+		it.)
+
+	borland.c (need #define BORLAND in estruct.h or makefile):  this
+		uses the "conio" routines that come with Turbo C or Borland
+		C++.  This stuff is reported to work under OS/2.  The
+		trouble with this under DOS is the Borland compilers don't
+		produce a dos-extender 32 bit app, so you're _severely_
+		limited as to filesize.
+
 paul fox, pgf@cayman.com (work) or pgf@foxharp.boston.ma.us (home)
-Feb 6, 1994
+
+--------------------------------------------------------
+
+OS/2 information:
+-----------------
+
+Charles Moschel (ccm@cais.com) ported vile 4.3 to OS/2 in March '93.  I've
+incorporated his changes, though not verbatim.
+
+The current port of vile to OS/2 uses the Borland console i/o routines,
+in borland.c.  You'll need to be sure OS2 and BORLAND get defined somehow.
+The ansi.c driver may work too, but you may have to turn on some OS2 support
+in there, since right now it only knows about MSDOS.
+
+The Watcom OS/2 compiler should work as well, but would need some work
+to get the display working.  The ANSI display would be a good choice
+for Watcom.
+
+borland.c	contains Borland-specific display stuff.
+
+You'll have to modify makefile.tbc slightly to build on OS/2.
+
+Other information:
+
++ filterregion is not available.
+
++ The mouse is not supported
+
++ 25, 43, 50, or 60 line displays are supported, either full screen or
+  in an OS/2 window under Presentation Manager.  vile is NOT a PM
+  program.
+
++ Correct #defines should be made automatically if you use Borland or
+  Watcom compilers, as both define __OS2__.  __OS2__ is used only as a
+  check, and if it is found then OS2 is defined.  If you use something
+  else, you'll have to define this youself.  In any case, OS2 is the
+  correct define, for the program and display code.  DO NOT define
+  MSDOS, IBMPC, TURBO etc.
 

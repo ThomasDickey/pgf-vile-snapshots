@@ -8,8 +8,20 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: insert.c,v $
- *	Revision 1.52  1994/03/18 18:30:38  pgf
- *	fixes for OPT_MAP_MEMORY compilation
+ *	Revision 1.57  1994/04/18 16:59:09  pgf
+ *	don't use poundc as flag when inserting -- just use hardcoded '#'
+ *
+ * Revision 1.56  1994/04/18  14:26:27  pgf
+ * merge of OS2 port patches, and changes to tungetc operation
+ *
+ * Revision 1.54  1994/04/13  21:39:13  pgf
+ * readability
+ *
+ * Revision 1.53  1994/04/01  14:30:02  pgf
+ * tom's warning/lint patch
+ *
+ * Revision 1.52  1994/03/18  18:30:38  pgf
+ * fixes for OPT_MAP_MEMORY compilation
  *
  * Revision 1.51  1994/03/11  13:57:31  pgf
  * make backspace non-destructive in overwrite mode
@@ -40,7 +52,8 @@ static	int	ins_n_times P(( int, int, int ));
 static	int	ins_anytime P(( int, int, int, int * ));
 static	int	isallspace P(( LINEPTR, int, int ));
 
-static	int	savedmode;  /* value of insertmode maintained through subfuncs */
+/* value of insertmode maintained through subfuncs */
+static	int	savedmode;  
 
 static int allow_aindent = TRUE;
 static int skipindent;
@@ -374,9 +387,7 @@ int cur_count;
 int max_count;
 int *splice;
 {
-#if OPT_MOUSE
 	WINDOW	*wp0 = curwp;
-#endif
 	register int status;
 	int	c;		/* command character */
 	int backsp_limit;
@@ -417,21 +428,80 @@ int *splice;
 				playback = FALSE;
 			else
 				c = tb_next(insbuff);
+			if (c == '#') {
+				/* if the user entered this character, it's
+				    been doubled up.  if we entered it, it's
+				    followed by it's value+1. */
+			    	int nc;
+				nc = tb_next(insbuff);
+				if (nc == '#'+1) {
+					c = tb_next(insbuff);
+					c |= SPEC;
+				} else if (nc == '#') {
+				    /* nothing */ ;
+				} else {
+				    mlwrite("BUG: bad stored '#' seq.");
+				}
+			}
 		}
 		if (!playback) {
 			if (dotcmdmode != PLAY)
 				(void)update(FALSE);
-			if (!tb_append(&insbuff, c = kbd_key())) {
-				status = FALSE;
-				break;
+
+			c = kbd_key();
+
+#if OPT_MOUSE
+			/*
+			 * Prevent user from starting insertion into a
+			 * modifiable buffer, then clicking on another
+			 * buffer to continue inserting.  This assumes that
+			 * 'setcursor()' handles entry into the other
+			 * buffer.
+			 */
+			if (curwp != wp0) {
+			    	/* end insert mode for window we started in */
+			    	wp0->w_traits.insmode = FALSE;
+				if (b_val(wp0->w_bufp, MDSHOWMODE))
+				    wp0->w_flag |= WFMODE;
+				tungetc(c);
+				goto leave;
+			}
+#endif
+			/* if this isn't a plain character, escape it */
+			if (isspecial(c)) {
+			    if (!tb_append(&insbuff, '#')) {
+				    status = FALSE;
+				    break;
+			    }
+			    if (!tb_append(&insbuff, '#'+1)) {
+				    status = FALSE;
+				    break;
+			    }
+			    if (!tb_append(&insbuff, kcod2key(c))) {
+				    status = FALSE;
+				    break;
+			    }
+			} else {
+			    if (c == '#') {
+				/* save it twice */
+				if (!tb_append(&insbuff, c)) {
+					status = FALSE;
+					break;
+				}
+			    }
+			    if (!tb_append(&insbuff, c)) {
+				    status = FALSE;
+				    break;
+			    }
 			}
 		}
 
-		if (is_func_prefix) {
+
+		if (isspecial(c) /* is_func_prefix */ ) {
 		    	/* if we're allowed to honor meta-character bindings,
 				then see if it's bound to something, and
 				insert it if not */
-			CMDFUNC *cfp = kcod2fnc(SPEC|c);
+			CMDFUNC *cfp = kcod2fnc( /* SPEC| */ c);
 			if (cfp) {
 				map_check(c);
 				backsp_limit = w_left_margin(curwp);
@@ -455,32 +525,15 @@ int *splice;
 				*splice = TRUE;
 			}
 		}
-#if OPT_MOUSE
-		/*
-		 * Prevent user from starting insertion into a modifiable
-		 * buffer, then clicking on a readonly buffer to continue
-		 * inserting.  This assumes that 'setcursor()' handles entry
-		 * into the readonly buffer.
-		 */
-		if (curwp != wp0) {
-			if (b_val(curbp, MDVIEW) || !insertmode) {
-				tungetc(c);
-				status = FALSE;
-				break;
-			}
-			wp0 = curwp;
-			backsp_limit = BackspaceLimit();
-		}
-#endif
-
 		/*
 		 * Decode the character
 		 */
 		if (c == abortc) {
+	leave:
 			 /* an unfortunate Vi-ism that ensures one
 				can always type "ESC a" if you're not sure
 				you're in insert mode. */
-			if (DOT.o > w_left_margin(curwp))
+			if (DOT.o > w_left_margin(wp0))
 				backchar(TRUE,1);
 			if (autoindented >= 0) {
 				trimline(FALSE,0,0);
@@ -490,20 +543,6 @@ int *splice;
 				*splice = TRUE;
 			status = TRUE;
 			break;
-		} else /* the only way to get through kbd_key() and
-			* tgetc() and end up with c == poundc and a pushed-
-			* back character (tungotc) is if this was the
-			* result of a function-key press.
-			* since this breaks on repeated inserts (we end up
-			* inserting the #c instead of executing the
-			* function), we allow for 'altpoundc', which is
-			* presumably something the user will never want to
-			* actually insert -- we never try to insert it, we
-			* always execute instead.  */
-			if ((c == poundc && did_tungetc()) ||
-		    		(c == altpoundc && altpoundc != poundc)) {
-		    	is_func_prefix = TRUE;
-			continue;
 		} else if ((c & HIGHBIT) && b_val(curbp, MDMETAINSBIND)) {
 		    	/* if we're allowed to honor meta-character bindings,
 				then see if it's bound to something, and
@@ -882,7 +921,7 @@ int *bracefp;
 	/* (at start of buffer, may leave us on empty line) */
 	do {
 	    if (backword(FALSE,1) == FALSE || lLength(DOT.l) == 0) {
-		    gomark(FALSE,1);
+		    (void)gomark(FALSE,1);
 		    return 0;
 	    }
 	    DOT.o = 0;
@@ -899,7 +938,7 @@ int *bracefp;
 			 lGetc(DOT.l,lc) == ':') );
 	}
 
-	gomark(FALSE,1);
+	(void)gomark(FALSE,1);
 
 	return ind;
 }

@@ -5,7 +5,75 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.103  1994/03/24 12:10:28  pgf
+ * Revision 1.125  1994/04/25 20:28:14  pgf
+ * fixes from kev
+ *
+ * Revision 1.124  1994/04/22  16:18:29  pgf
+ * fixe bad prototype
+ *
+ * Revision 1.123  1994/04/22  16:06:18  pgf
+ * kev's font changes, mostly
+ *
+ * Revision 1.122  1994/04/22  15:57:46  pgf
+ * new get_csrch_char
+ *
+ * Revision 1.121  1994/04/22  11:32:09  pgf
+ * added run_procedure(), changed the X title/icon maintenance routines,
+ * added previous_directory() to support $ocwd
+ *
+ * Revision 1.120  1994/04/19  15:13:06  pgf
+ * use strncpy0() in likely places
+ *
+ * Revision 1.119  1994/04/18  17:35:51  pgf
+ * kev's changes for attribution, man page macros
+ *
+ * Revision 1.118  1994/04/18  16:57:15  pgf
+ * moved speckey back to input.c
+ *
+ * Revision 1.117  1994/04/18  14:26:27  pgf
+ * merge of OS2 port patches, and changes to tungetc operation
+ *
+ * Revision 1.116  1994/04/14  09:52:58  pgf
+ * new x_set_window_and_icon_names()
+ *
+ * Revision 1.115  1994/04/13  20:46:38  pgf
+ * various fixes (towards 4.4) from kev
+ *
+ * Revision 1.114  1994/04/13  20:40:21  pgf
+ * change kcod2str, fnc2str, string2prc to all deal in "p-strings", so
+ * we can store null chars in binding strings.
+ *
+ * Revision 1.113  1994/04/11  15:50:06  pgf
+ * kev's attribute changes
+ *
+ * Revision 1.112  1994/04/11  11:39:17  pgf
+ * added second arg to spawn1()
+ *
+ * Revision 1.111  1994/04/07  19:02:20  pgf
+ * kev's changes for direct pscreen access
+ *
+ * Revision 1.110  1994/04/07  18:17:13  pgf
+ * added sel_motion()
+ *
+ * Revision 1.109  1994/04/05  12:17:18  pgf
+ * added operselect()
+ *
+ * Revision 1.108  1994/04/04  16:14:58  pgf
+ * kev's 4.4 changes
+ *
+ * Revision 1.107  1994/04/04  11:36:25  pgf
+ * added attribute argument to scwrite()
+ *
+ * Revision 1.106  1994/04/01  14:30:02  pgf
+ * tom's warning/lint patch
+ *
+ * Revision 1.105  1994/03/29  17:53:18  pgf
+ * warning cleanup
+ *
+ * Revision 1.104  1994/03/29  16:24:20  pgf
+ * kev's changes: selection and attributes
+ *
+ * Revision 1.103  1994/03/24  12:10:28  pgf
  * new function, kcod2escape_seq()
  *
  * Revision 1.102  1994/03/10  20:11:11  pgf
@@ -60,8 +128,6 @@ extern int ex P(( int, int ));
 extern int cntl_af P(( int, int ));
 extern int cntl_xf P(( int, int ));
 extern int unarg P(( int, int ));
-extern int speckey P(( int, int ));
-extern int altspeckey P(( int, int ));
 extern int nullproc P(( int, int ));
 extern void charinit P(( void ));
 #if RAMSIZE
@@ -73,6 +139,7 @@ extern void start_debug_log P(( int , char ** ));
 #if OPT_MAP_MEMORY
 extern void exit_program P(( int ));
 #endif
+extern char *strncpy0 P(( char *, char *, SIZE_T ));
 
 /* tcap.c and other screen-drivers */
 #if TERMCAP
@@ -168,14 +235,14 @@ extern int unbindchar P(( int ));
 extern int apro P(( int, int ));
 extern int startup P(( char *));
 extern char * flook P(( char *, int ));
-extern char * kcod2str P(( int, char * ));
-extern char * string2prc P(( char *, char * ));
+extern char * kcod2pstr P(( int, char * ));
+extern char * bytes2prc P(( char *, char *, int ));
 extern char * kcod2prc P(( int, char * ));
 #if X11
 extern int insertion_cmd P(( int ));
 #endif
 extern int fnc2kcod P(( CMDFUNC * ));
-extern char * fnc2str P(( CMDFUNC * ));
+extern char * fnc2pstr P(( CMDFUNC * ));
 extern char * fnc2engl P(( CMDFUNC * ));
 extern CMDFUNC * engl2fnc P(( char * ));
 extern KBIND * kcode2kbind P(( int ));
@@ -247,6 +314,7 @@ extern	void	ue_crypt P((char *, int));
 /* csrch.c */
 extern int fscan P(( int, int, int ));
 extern int bscan P(( int, int, int ));
+extern int get_csrch_char P(( int * ));
 extern int fcsrch P(( int, int ));
 extern int bcsrch P(( int, int ));
 extern int fcsrch_to P(( int, int ));
@@ -302,6 +370,14 @@ extern void newscreensize P(( int, int ));
 #if OPT_WORKING
 extern SIGT imworking (DEFINE_SIG_ARGS);
 #endif
+#if OPT_PSCREEN
+extern	void	psc_putchar	P(( int ));
+extern	void	psc_flush	P(( void ));
+extern	void	psc_move	P(( int, int ));
+extern	void	psc_eeol	P(( void ));
+extern	void	psc_eeop	P(( void ));
+extern	void	psc_rev		P(( int ));
+#endif	/* OPT_PSCREEN */
 
 /* eval.c */
 extern char * l_itoa P(( int ));
@@ -344,6 +420,7 @@ extern int storemac P(( int, int ));
 #if PROC
 extern int storeproc P(( int, int ));
 extern int execproc P(( int, int ));
+extern int run_procedure P(( char * ));
 #endif
 extern int cbuf1 P(( int, int ));
 extern int cbuf2 P(( int, int ));
@@ -511,7 +588,7 @@ extern int get_recorded_char P(( int ));
 extern int tgetc P(( int ));
 extern int kbd_key P(( void ));
 extern int kbd_seq P(( void ));
-extern int kbd_escape_seq P(( void ));
+extern int speckey P(( int, int ));
 extern int kcod2escape_seq P(( int, char * ));
 extern int screen_string P(( char *, int, CMASK ));
 extern int end_string P(( void ));
@@ -611,9 +688,9 @@ extern int lineputbefore P(( int, int ));
 extern int lineputafter P(( int, int ));
 extern int rectputbefore P(( int, int ));
 extern int rectputafter P(( int, int ));
-extern int doput P(( int, int, int, int ));
+extern int doput P(( int, int, int, REGIONSHAPE ));
 extern int force_text_to_col P(( int ));
-extern int put P(( int, int ));
+extern int put P(( int, REGIONSHAPE ));
 extern int execkreg P(( int, int ));
 extern int loadkreg P(( int, int ));
 #if OPT_SHOW_REGS
@@ -668,13 +745,13 @@ extern int listmodes P(( int, int ));
 extern int find_mode P(( char *, int, VALARGS * ));
 
 /* npopen.c */
-#if UNIX || MSDOS
+#if UNIX || MSDOS || OS2
 extern FILE * npopen P(( char *, char * ));
 extern void npclose P(( FILE * ));
 extern int inout_popen P(( FILE **, FILE **, char * ));
 extern int softfork P(( void ));
 #endif
-#if UNIX
+#if UNIX || OS2
 extern void exec_sh_c P(( char * ));
 extern int system_SHELL P(( char * ));
 #endif
@@ -718,7 +795,7 @@ extern int operblank P(( int, int ));
 extern int operopenrect P(( int, int ));
 
 /* path.c */
-#if MSDOS
+#if MSDOS || OS2
 extern char * is_msdos_drive P(( char * ));
 #endif
 #if VMS
@@ -740,7 +817,7 @@ extern char * is_appendname P(( char * ));
 extern char * non_filename P(( void ));
 extern int is_internalname P(( char * ));
 extern int is_directory P(( char * ));
-#if (UNIX||MSDOS) && PATHLOOK
+#if (UNIX||MSDOS||OS2) && PATHLOOK
 extern char *parse_pathlist P(( char *, char * ));
 #endif
 
@@ -783,6 +860,7 @@ extern void catnap P(( int, int ));
 extern char * current_directory P(( int ));
 extern int cd P(( int, int ));
 extern int pwd P(( int, int ));
+extern char * previous_directory P(( void ));
 extern int set_directory P(( char * ));
 extern void ch_fname P(( BUFFER *, char * ));
 
@@ -883,7 +961,7 @@ extern int bktoshell P(( int, int ));
 extern void pressreturn P(( void ));
 extern int respawn P(( int, int ));
 extern int spawn P(( int, int ));
-extern int spawn1 P(( int ));
+extern int spawn1 P(( int, int ));
 extern int pipecmd P(( int, int ));
 extern int filterregion P(( void ));
 extern int filter P(( int, int ));
@@ -1002,7 +1080,7 @@ extern int scanmore P(( char *, int ));
 extern int scanner P((regexp *, int, int ));
 extern int insbrace P(( int, int ));
 extern int inspound P(( void ));
-extern int fmatch P(( int ));
+extern void fmatch P(( int ));
 extern int getfence P(( int, int ));
 extern int comment_fence P(( int ));
 extern int simple_fence P(( int, int, int ));
@@ -1066,32 +1144,40 @@ extern	void ev_leaks P(( void ));
 #endif
 
 #if X11
-extern void update_scrollbar P(( WINDOW *uwp ));
-extern	void x_set_rv P(( void ));
-extern	int x_setfont P(( char * ));
-extern	void x_setname P(( char * ));
-extern	void x_set_wm_title P(( char * ));
-extern	char *x_current_fontname P(( void ));
-extern	void x_setforeground P(( char * ));
-extern	void x_setbackground P(( char * ));
-extern	void x_preparse_args P(( int *, char *** ));
-extern  void x_set_geometry P(( char * ));
-extern	void x_set_dpy P(( char * ));
-extern	void x_putline P(( int, char *, int ));
-extern	int x_key_events_ready P(( void ));
-extern	int x_is_pasting P((void));
-extern	int x_on_msgline P((void));
+#if XTOOLKIT
+extern	void	own_selection		P(( void ));
+extern	void	update_scrollbar	P(( WINDOW *uwp ));
+#else	/* !XTOOLKIT */
+extern	void	x_set_rv		P(( void ));
+extern	void	x_setname		P(( char * ));
+extern	void	x_set_wm_title		P(( char * ));
+extern	void	x_setforeground		P(( char * ));
+extern	void	x_setbackground		P(( char * ));
+extern  void	x_set_geometry		P(( char * ));
+extern	void	x_set_dpy		P(( char * ));
+extern	int	x_key_events_ready	P(( void ));
+#endif	/* !XTOOKIT */
+extern	int	x_setfont		P(( char * ));
+extern	char *	x_current_fontname	P(( void ));
+extern	void	x_preparse_args		P(( int *, char *** ));
+extern	void	x_putline		P(( int, char *, int ));
+extern	int	x_is_pasting		P((void));
+extern	int	x_on_msgline		P((void));
 #if OPT_WORKING
-extern	void x_working P(( void ));
+extern	void	x_working		P(( void ));
 #endif
 #if NO_LEAKS
-extern	void x11_leaks P(( void ));
+extern	void	x11_leaks		P(( void ));
 #endif
+extern void x_set_icon_name P(( char * ));
+extern char * x_get_icon_name P(( void ));
+extern void x_set_window_name P(( char * ));
+extern char * x_get_window_name P(( void ));
 #endif	/* X11 */
 
-#if MSDOS
+#if MSDOS || OS2
 /* ibmpc.c */
-extern	void scwrite P(( int, int, int, char *, int, int ));
+extern	void scwrite P(( int, int, int, char *, VIDEO_ATTR *, int, int ));
 extern VIDEO *scread P(( VIDEO *, int ));
 /* random.c */
 extern char * curr_dir_on_drive P(( int ));
@@ -1215,3 +1301,27 @@ extern void hard_error_teardown P(( void ));
 extern int did_hard_error_occur P(( void ));
 extern void delay P(( int ));
 #endif
+
+#if OPT_SELECTIONS
+/* select.c */
+extern	void	free_attribs	P(( BUFFER * ));
+extern	void	free_attrib	P(( BUFFER *, AREGION * ));
+extern	int	sel_begin	P(( void ));
+extern	int	sel_extend	P(( int ));
+extern	void	sel_release	P(( void ));
+extern	void	sel_reassert_ownership P(( BUFFER * ));
+extern	int	sel_yank	P(( void ));
+extern	int	sel_attached	P(( void ));
+extern	BUFFER *sel_buffer	P(( void ));
+extern	int	sel_setshape	P(( REGIONSHAPE ));
+extern	int	sel_motion	P(( int, int ));
+extern	int	selectregion	P(( void ));
+extern	int	attributeregion P(( void ));
+extern	int	attribute_cntl_a_sequences	P(( void ));
+extern	int	operselect	P(( int, int ));
+extern	int	operattrbold	P(( int, int ));
+extern	int	operattrital	P(( int, int ));
+extern	int	operattrul	P(( int, int ));
+extern	int	operattrcaseq	P(( int, int ));
+#endif /* OPT_SELECTIONS */
+

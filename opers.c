@@ -4,7 +4,25 @@
  * written for vile by Paul Fox, (c)1990
  *
  * $Log: opers.c,v $
- * Revision 1.38  1994/03/08 14:06:43  pgf
+ * Revision 1.45  1994/04/18 14:26:27  pgf
+ * merge of OS2 port patches, and changes to tungetc operation
+ *
+ * Revision 1.43  1994/04/11  15:50:06  pgf
+ * kev's attribute changes
+ *
+ * Revision 1.42  1994/04/08  21:12:05  pgf
+ * defensively reset haveregion
+ *
+ * Revision 1.41  1994/04/08  19:58:21  pgf
+ * moved operselect() to select.c
+ *
+ * Revision 1.40  1994/04/07  18:15:00  pgf
+ * preserve DOT across operyank and operlineyank
+ *
+ * Revision 1.39  1994/04/04  11:36:08  pgf
+ * added operselect()
+ *
+ * Revision 1.38  1994/03/08  14:06:43  pgf
  * renamed routine, and gcc warning cleanup
  *
  * Revision 1.37  1994/03/08  12:20:50  pgf
@@ -28,6 +46,7 @@ typedef	int	(*OpsFunc) P((void));
 static	int	chgreg P(( void ));
 static	int	shift_n_times P(( int, int, OpsFunc, char * ));
 
+extern REGION *haveregion;
 
 /* For the "operator" commands -- the following command is a motion, or
  *  the operator itself is repeated.  All operate on regions.
@@ -44,6 +63,9 @@ char *str;
 	CMDFUNC *cfp;			/* function to execute */
 	char tok[NSTRING];		/* command incoming */
 	BUFFER *ourbp;
+#if OPT_MOUSE
+	WINDOW	*wp0 = curwp;
+#endif
 
 	doingopcmd = TRUE;
 
@@ -69,6 +91,13 @@ char *str;
 			thiskey = lastkey;
 			c = kbd_seq();
 
+#if OPT_MOUSE
+			if (curwp != wp0) {
+				tungetc(c);
+			    	doingopcmd = FALSE;
+				return FALSE;
+			}
+#endif
 			/* allow second chance for entering counts */
 			do_repeats(&c,&f,&n);
 
@@ -133,6 +162,9 @@ char *str;
 	regionshape = EXACT;
 
 	doingopcmd = FALSE;
+
+	haveregion = FALSE;
+
 	return status;
 }
 
@@ -216,17 +248,27 @@ int
 operyank(f,n)
 int f,n;
 {
+	MARK savedot;
+	int s;
+	savedot = DOT;
 	opcmd = OPOTHER;
-	return operator(f,n,yankregion,"Yank");
+	s = operator(f,n,yankregion,"Yank");
+	DOT = savedot;
+	return s;
 }
 
 int
 operlineyank(f,n)
 int f,n;
 {
+	MARK savedot;
+	int s;
+	savedot = DOT;
 	regionshape = FULLLINE;
 	opcmd = OPOTHER;
-	return operator(f,n,yankregion,"Yank of full lines");
+	s = operator(f,n,yankregion,"Yank of full lines");
+	DOT = savedot;
+	return s;
 }
 
 int
@@ -410,3 +452,4 @@ int f,n;
 	regionshape = RECTANGLE;
 	return operator(f,n,openregion,"Opening");
 }
+

@@ -6,7 +6,25 @@
  * for the display system.
  *
  * $Log: buffer.c,v $
- * Revision 1.84  1994/03/10 20:02:15  pgf
+ * Revision 1.90  1994/04/22 15:55:16  pgf
+ * missed a bufhook
+ *
+ * Revision 1.89  1994/04/22  13:47:32  pgf
+ * buffer-hook
+ *
+ * Revision 1.88  1994/04/01  14:30:02  pgf
+ * tom's warning/lint patch
+ *
+ * Revision 1.87  1994/04/01  10:46:02  pgf
+ * return readin()'s return value from swbuffer()
+ *
+ * Revision 1.86  1994/04/01  10:40:33  pgf
+ * rearrange new buffer init so that b_dot values aren't clobbered
+ *
+ * Revision 1.85  1994/03/29  16:24:20  pgf
+ * kev's changes: selection and attributes
+ *
+ * Revision 1.84  1994/03/10  20:02:15  pgf
  * the histbuffer command now stutters with a call to tgetc instead of
  * kbd_seq, so that the pushback of an unused command works okay.
  * also, anycb() now returns a pointer to the first modified buffer
@@ -658,12 +676,20 @@ int f, n;	/* default flag, numeric argument */
 	return swbuffer(stopatbp);
 }
 
+#if PROC
+static int bufhooking;
+#endif
 /* bring nbp to the top of the list, where curbp usually lives */
 void
 make_current(nbp)
 BUFFER *nbp;
 {
 	register BUFFER *bp;
+#if PROC
+	register BUFFER *ocurbp;
+
+	ocurbp = curbp;
+#endif
 
 	TrackAlternate(nbp);
 
@@ -683,6 +709,15 @@ BUFFER *nbp;
 	} else
 		curbp = nbp;
 
+#if PROC
+	if (curbp != ocurbp) { 
+	    if (!bufhooking && *bufhook) {
+		    bufhooking = TRUE;
+		    run_procedure(bufhook);
+		    bufhooking = FALSE;
+	    }
+	}
+#endif
 	curtabval = tabstop_val(curbp);
 	curswval = shiftwid_val(curbp);
 }
@@ -692,6 +727,7 @@ int
 swbuffer(bp)	/* make buffer BP current */
 register BUFFER *bp;
 {
+	int s = TRUE;
 
 	if (!bp) {
 		mlforce("BUG:  swbuffer passed null bp");
@@ -726,6 +762,15 @@ register BUFFER *bp;
 		if (bp != find_BufferList())
 			updatelistbuffers();
 #endif
+#if PROC
+	{ 
+	    if (!bufhooking && *bufhook) {
+		    bufhooking = TRUE;
+		    run_procedure(bufhook);
+		    bufhooking = FALSE;
+	    }
+	}
+#endif
 		return TRUE;
 	} else if (curwp == 0) {
 		return FALSE;	/* we haven't started displaying yet */
@@ -740,7 +785,7 @@ register BUFFER *bp;
 
 	if (bp->b_active != TRUE) {		/* buffer not active yet*/
 		/* read it in and activate it */
-		(void)readin(bp->b_fname, TRUE, bp, TRUE);
+		s = readin(bp->b_fname, TRUE, bp, TRUE);
 		DOT.l = lFORW(buf_head(bp));
 		DOT.o = 0;
 		bp->b_active = TRUE;
@@ -750,7 +795,16 @@ register BUFFER *bp;
 		(void)check_modtime( bp, bp->b_fname );
 #endif
 	updatelistbuffers();
-	return TRUE;
+#if PROC
+	{ 
+	    if (!bufhooking && *bufhook) {
+		    bufhooking = TRUE;
+		    run_procedure(bufhook);
+		    bufhooking = FALSE;
+	    }
+	}
+#endif
+	return s;
 }
 
 
@@ -1411,7 +1465,10 @@ get_bname(bp)
 BUFFER *bp;
 {
 	static	char	bname[NBUFN+1];
-	strncpy(bname, bp->b_bname, NBUFN)[NBUFN] = EOS;
+	if (bp)
+	    strncpy(bname, bp->b_bname, NBUFN)[NBUFN] = EOS;
+	else
+	    *bname = EOS;
 	return bname;
 }
 
@@ -1473,6 +1530,8 @@ char *bname;
 	}
 
 	/* and set up the other buffer fields */
+	bp->b_values = global_b_values;
+	bp->b_wtraits.w_vals = global_w_values;
 	bp->b_active = FALSE;
 	bp->b_dot.l  = lp;
 	bp->b_dot.o  = 0;
@@ -1483,9 +1542,10 @@ char *bname;
 #endif
 	bp->b_lastdot = nullmark;
 	bp->b_nmmarks = NULL;
+#if OPT_VIDEO_ATTRS
+	bp->b_attribs = NULL;
+#endif
 	bp->b_flag  = bflag;
-	bp->b_values = global_b_values;
-	bp->b_wtraits.w_vals = global_w_values;
 	bp->b_nwnd  = 0;
 	bp->b_acount = b_val(bp, VAL_ASAVECNT);
 	bp->b_fname = NULL;
@@ -1576,6 +1636,9 @@ register BUFFER *bp;
 #endif
 	bp->b_lastdot = nullmark;	/* Invalidate "mark"	*/
 	FreeAndNull(bp->b_nmmarks);	/* free the named marks */
+#if OPT_SELECTIONS
+	free_attribs(bp);
+#endif
 
 	b_set_counted(bp);
 	bp->b_bytecount = 0;

@@ -4,7 +4,29 @@
  *	written 11-feb-86 by Daniel Lawrence
  *
  * $Log: bind.c,v $
- * Revision 1.70  1994/03/29 14:30:04  pgf
+ * Revision 1.77  1994/04/19 15:13:06  pgf
+ * use strncpy0() in likely places
+ *
+ * Revision 1.76  1994/04/18  17:29:10  pgf
+ * oops -- too many poundcs went away.  some come back.
+ *
+ * Revision 1.75  1994/04/18  17:17:51  pgf
+ * eliminate poundc usage
+ *
+ * Revision 1.74  1994/04/18  16:56:45  pgf
+ * speckey() is back to being a regular command, rather than a special char
+ *
+ * Revision 1.73  1994/04/18  14:26:27  pgf
+ * merge of OS2 port patches, and changes to tungetc operation
+ *
+ * Revision 1.72  1994/04/13  20:40:21  pgf
+ * change kcod2str, fnc2str, string2prc to all deal in "p-strings", so
+ * we can store null chars in binding strings.
+ *
+ * Revision 1.71  1994/04/01  14:30:02  pgf
+ * tom's warning/lint patch
+ *
+ * Revision 1.70  1994/03/29  14:30:04  pgf
  * allow for '-' in command names (i.e. it's not punctuation in that case)
  *
  * Revision 1.69  1994/03/02  09:47:48  pgf
@@ -27,7 +49,7 @@
 #define TERMCHRS_NAME ScratchName(Terminal)
 
 /* dummy prefix binding functions */
-extern CMDFUNC f_cntl_af, f_cntl_xf, f_unarg, f_esc, f_speckey, f_altspeckey;
+extern CMDFUNC f_cntl_af, f_cntl_xf, f_unarg, f_esc, f_speckey;
 
 #if REBIND
 #define	isSpecialCmd(k) \
@@ -36,7 +58,6 @@ extern CMDFUNC f_cntl_af, f_cntl_xf, f_unarg, f_esc, f_speckey, f_altspeckey;
 		||(k == &f_unarg)\
 		||(k == &f_esc)\
 		||(k == &f_speckey)\
-		||(k == &f_altspeckey)\
 		)
 # if OPT_TERMCHRS
 static	int	chr_complete P(( int, char *, int * ));
@@ -46,9 +67,7 @@ static	void	makechrslist P(( int, char *));
 static	int	update_termchrs P(( BUFFER * ));
 #  endif
 # endif
-# if OPT_UPBUFF
 static	int	update_binding_list P(( BUFFER * ));
-# endif
 static	void	ostring P(( char * ));
 static	char *	quoted P(( char *, char * ));
 static	void	convert_kcode P(( int, char * ));
@@ -390,8 +409,6 @@ register CMDFUNC *kcmd;
 			abortc = c;
 		if (kcmd == &f_speckey)
 			poundc = c;
-		if (kcmd == &f_altspeckey)
-			altpoundc = c;
 	}
 }
 
@@ -609,9 +626,6 @@ makebindlist(dummy, mstring)
 int dummy;
 char *mstring;		/* match string if partial list, NULL to list all */
 {
-#if	ST520 & LATTICE
-#define	register
-#endif
 	register KBIND *kbp;	/* pointer into a key binding table */
 	register NTAB *nptr,*nptr2;	/* pointer into the name table */
 	char outseq[NLINE];	/* output buffer for keystroke sequence */
@@ -849,12 +863,12 @@ int hflag;	/* Look in the HOME environment variable first? */
 
 /* translate a keycode to its binding-string */
 char *
-kcod2str(c, seq)
+kcod2pstr(c, seq)
 int c;		/* sequence to translate */
 char *seq;	/* destination string for sequence */
 {
 	/* pointer into current position in sequence */
-	register char *ptr = seq; 
+	register char *ptr = seq + 1; 
 
 	if (c & CTLA)
 		*ptr++ = cntl_a;
@@ -862,25 +876,32 @@ char *seq;	/* destination string for sequence */
 	if (c & CTLX)
 		*ptr++ = cntl_x;
 
-	if (c & SPEC)
-		*ptr++ = poundc;
+	if (c & SPEC) {
+		*ptr++ = ESC;
+		*ptr++ = '[';
+	}
 
 	*ptr++ = kcod2key(c);
 	*ptr = EOS;
+	*seq = ptr - seq - 1;
 	return seq;
 }
 
 /* translates a binding string into printable form */
 char *
-string2prc(dst, src)
+bytes2prc(dst, src, n)
 char	*dst;
 char	*src;
+int	n;
 {
-	char	*base;
+	char	*base = dst;
 	register int	c;
 	register char	*tmp;
 
-	for (base = dst; (c = (*dst = *src)) != EOS; dst++, src++) {
+	for ( ; n != 0; dst++, src++, n--) {
+
+		c = *src;
+
 		tmp = NULL;
 
 		if (c & HIGHBIT) {
@@ -892,11 +913,13 @@ char	*src;
 			tmp = "<sp>";
 		} else if (c == '\t') {
 			tmp = "<tab>";
+		} else if (c == ESC && n > 2 && *(src+1) == '[') {
+			tmp = "FN";
+			src++;
+			n--;
 		} else if (iscntrl(c)) {
 			*dst++ = '^';
 			*dst = tocntrl(c);
-		} else if (c == poundc && src[1] != EOS) {
-			tmp = "FN";
 		} else {
 			*dst = c;
 		}
@@ -907,10 +930,11 @@ char	*src;
 			dst -= 2;	/* point back to last nonnull */
 		}
 
-		if (src[1] != EOS) {
+		if (n > 1) {
 			*++dst = '-';
 		}
 	}
+	*dst = EOS;
 	return base;
 }
 
@@ -921,7 +945,8 @@ int c;		/* sequence to translate */
 char *seq;	/* destination string for sequence */
 {
 	char	temp[NSTRING];
-	return string2prc(seq, kcod2str(c,temp));
+	(void)kcod2pstr(c,temp);
+	return bytes2prc(seq, temp + 1, *temp);
 }
 
 
@@ -971,10 +996,10 @@ CMDFUNC *f;
 	return -1;	/* none found */
 }
 
-/* fnc2str: translate a function pointer to a string that a user
+/* fnc2pstr: translate a function pointer to a pascal-string that a user
 	could enter.  returns a pointer to a static array */
 char *
-fnc2str(f)
+fnc2pstr(f)
 CMDFUNC *f;
 {
 	register int	c;
@@ -985,7 +1010,7 @@ CMDFUNC *f;
 	if (c == -1)
 		return NULL;
 
-	return kcod2str(c, seq);
+	return kcod2pstr(c, seq);
 }
 /* fnc2engl: translate a function pointer to the english name for
 		that function
@@ -1384,7 +1409,7 @@ SIZE_T	size_entry;
 				if (c != NAMEC)  /* put it back */
 					tungetc(c);
 				/* return complete name */
-				(void)strncpy(buf, THIS_NAME(nbp), NLINE);
+				(void)strncpy0(buf, THIS_NAME(nbp), NLINE);
 				*pos = cpos;
 				return TRUE;
 			}

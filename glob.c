@@ -16,7 +16,10 @@
  *	modify (ifdef-style) 'expand_leaf()' to allow ellipsis.
  *
  * $Log: glob.c,v $
- * Revision 1.18  1994/02/22 11:03:15  pgf
+ * Revision 1.19  1994/04/18 14:26:27  pgf
+ * merge of OS2 port patches, and changes to tungetc operation
+ *
+ * Revision 1.18  1994/02/22  11:03:15  pgf
  * truncated RCS log for 4.0
  *
  *
@@ -29,7 +32,7 @@
 #define	isname(c)	(isalnum(c) || ((c) == '_'))
 #define	isdelim(c)	((c) == '(' || ((c) == '{'))
 
-#if MSDOS
+#if MSDOS || OS2
 # define UNIX_GLOBBING !SMALLER
 # if UNIX_GLOBBING
 #  define DirEntryStr(p)		p->d_name
@@ -98,7 +101,7 @@ static int
 string_has_wildcards (item)
 char	*item;
 {
-#if VMS || UNIX || MSDOS
+#if VMS || UNIX || MSDOS || OS2
 	while (*item != EOS) {
 #if UNIX_GLOBBING
 		if (iswild(*item))
@@ -320,7 +323,7 @@ char	*pattern;
 	if ((dp = opendir(path)) != 0) {
 		leaf[-1] = slash;
 		while ((de = readdir(dp)) != 0) {
-#if MSDOS
+#if MSDOS || OS2
 			(void)mklower(strcpy(leaf, de->d_name));
 			if (strchr(pattern, '.') && !strchr(leaf, '.'))
 				(void)strcat(leaf, ".");
@@ -600,7 +603,7 @@ char	*item;
 
 	(void)strcpy(pattern, item);
 	*builtup = EOS;
-#if MSDOS
+#if MSDOS || OS2
 	(void)mklower(pattern);
 #endif
 	expand_environ(pattern);
@@ -613,7 +616,7 @@ char	*item;
 		result = record_a_match(pattern);
 	}
 #endif				/* UNIX-style globbing */
-#if MSDOS && !UNIX_GLOBBING
+#if (MSDOS || OS2) && !UNIX_GLOBBING
 	/* native DOS-wildcards */
 	DeclareFind(p);
 	char	temp[FILENAME_MAX + 1];

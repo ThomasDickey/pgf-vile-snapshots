@@ -3,7 +3,22 @@
  * the knowledge about files are here.
  *
  * $Log: fileio.c,v $
- * Revision 1.67  1994/03/24 12:29:20  pgf
+ * Revision 1.72  1994/04/26 13:47:43  pgf
+ * warning cleanup
+ *
+ * Revision 1.71  1994/04/19  16:03:06  pgf
+ * isready_c for new GNU stdio lib
+ *
+ * Revision 1.70  1994/04/18  14:26:27  pgf
+ * merge of OS2 port patches, and changes to tungetc operation
+ *
+ * Revision 1.69  1994/04/07  18:14:17  pgf
+ * beep management
+ *
+ * Revision 1.68  1994/04/05  12:17:00  pgf
+ * warning cleanup
+ *
+ * Revision 1.67  1994/03/24  12:29:20  pgf
  * eliminate #elif for broken HP/UX compiler
  *
  * Revision 1.66  1994/03/23  12:57:57  pgf
@@ -21,7 +36,7 @@
 
 #include	"estruct.h"
 #include        "edef.h"
-#if UNIX || VMS || MSDOS
+#if UNIX || VMS || MSDOS || OS2
 #include	<sys/stat.h>
 #endif
 
@@ -31,11 +46,11 @@
 #include        <fcntl.h>
 #endif
 
-#if	BERK
+#if BERK
 #include	<sys/ioctl.h>
 #endif
 
-#if MSDOS && NEWDOSCC
+#if NEWDOSCC
 #include	<io.h>
 #endif
 
@@ -47,7 +62,7 @@
 /*--------------------------------------------------------------------------*/
 
 static	void	free_fline P(( void ));
-#if MSDOS
+#if MSDOS || OS2
 static	int	copy_file P(( char *, char * ));
 static	int	make_backup P(( char *, int ));
 #endif
@@ -62,7 +77,7 @@ free_fline()
 	flen = 0;
 }
 
-#if MSDOS
+#if MSDOS || OS2
 /*
  * Copy file when making a backup, when we are appending.
  */
@@ -145,7 +160,7 @@ char    *fn;
 
 	if (isShellOrPipe(fn)) {
 		ffp = 0;
-#if UNIX || MSDOS
+#if UNIX || MSDOS || OS2
 	        ffp = npopen(fn+1, FOPEN_READ);
 #endif
 #if VMS
@@ -184,21 +199,25 @@ int
 ffwopen(fn)
 char    *fn;
 {
-#if UNIX || MSDOS
+#if UNIX || MSDOS || OS2
 	char	*name;
 	char	*mode = FOPEN_WRITE;
 
 	if (isShellOrPipe(fn)) {
 		if ((ffp=npopen(fn+1, mode)) == NULL) {
 	                mlerror("opening pipe for write");
-			TTbeep();
+			/* TTbeep(); */
 	                return (FIOERR);
 		}
 		fileispipe = TRUE;
 	} else {
+#if MSDOS || OS2
 		int	appending = FALSE;
+#endif
 		if ((name = is_appendname(fn)) != NULL) {
+#if MSDOS || OS2
 			appending = TRUE;
+#endif
 			fn = name;
 			mode = FOPEN_APPEND;
 		}
@@ -215,7 +234,7 @@ char    *fn;
 #endif
 		if ((ffp = fopen(fn, mode)) == NULL) {
 			mlerror("opening for write");
-			TTbeep();
+			/* TTbeep(); */
 			return (FIOERR);
 		}
 		fileispipe = FALSE;
@@ -254,7 +273,7 @@ char    *fn;
 	if (isShellOrPipe(fn)) {
 		return TRUE;
 	} else {
-#if UNIX || VMS
+#if UNIX || VMS || OS2
 		return (access(fn, 2) != 0);	/* W_OK==2 */
 #else
 		int fd;
@@ -268,7 +287,7 @@ char    *fn;
 }
 
 #if !OPT_MAP_MEMORY
-#if UNIX || VMS
+#if UNIX || VMS || OS2
 long
 ffsize()
 {
@@ -310,7 +329,7 @@ ffsize(void)
 #endif
 #endif	/* !OPT_MAP_MEMORY */
 
-#if UNIX || VMS
+#if UNIX || VMS || OS2
 
 int
 ffexists(p)
@@ -362,7 +381,7 @@ long len;
 	fseek (ffp, len, 1);	/* resynchronize stdio */
 	return total;
 #else
-	int got = read(fileno(ffp), buf, len);
+	int got = read(fileno(ffp), buf, (SIZE_T)len);
 	if (got >= 0)
 	    fseek (ffp, len, 1);	/* resynchronize stdio */
 	return got;
@@ -408,7 +427,7 @@ ffclose()
 
 	free_fline();	/* free this since we do not need it anymore */
 
-#if UNIX || MSDOS
+#if UNIX || MSDOS || OS2
 	if (fileispipe) {
 		npclose(ffp);
 		mlforce("[Read %d lines%s]",
@@ -582,7 +601,7 @@ int *lenp;	/* to return the final length */
  * is _much_much_ faster, and I don't have to futz with non-blocking
  * reads...
  */
-#if WATCOM
+#if WATCOM || OS2
 #define no_isready_c 1 
 #endif
 
@@ -596,8 +615,12 @@ int *lenp;	/* to return the final length */
 #   define 	isready_c(p)	( (p)->__rptr < (p)->__rend)
 #  else
 #   ifdef _G_FOPEN_MAX
-	/* GNU iostream/stdio library */
-#    define 	isready_c(p)	( (p)->_gptr < (p)->_egptr)
+	/* two versions of GNU iostream/stdio library */
+#     if _IO_STDIO
+#      define   isready_c(p)    ( (p)->_IO_read_ptr < (p)->_IO_read_end)
+#     else
+#      define 	isready_c(p)	( (p)->_gptr < (p)->_egptr)
+#     endif
 #   else
 #    if VMS
 #     define	isready_c(p)	( (*p)->_cnt > 0)
@@ -631,33 +654,3 @@ ffhasdata()
 #endif
 }
 
-#if	AZTEC & MSDOS
-#undef	fgetc
-/*	a1getc:		Get an ascii char from the file input stream
-			but DO NOT strip the high bit
-*/
-
-int a1getc(fp)
-
-FILE *fp;
-
-{
-	int c;		/* translated character */
-
-	c = getc(fp);	/* get the character */
-
-	/* if its a <LF> char, throw it out  */
-	while (c == '\n')
-		c = getc(fp);
-
-	/* if its a <RETURN> char, change it to a LF */
-	if (c == '\r')
-		c = '\n';
-
-	/* if its a ^Z, its an EOF */
-	if (c == 26)
-		c = EOF;
-
-	return(c);
-}
-#endif

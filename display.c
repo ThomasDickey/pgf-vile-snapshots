@@ -6,7 +6,49 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.124  1994/03/29 14:50:18  pgf
+ * Revision 1.138  1994/04/25 20:28:14  pgf
+ * fixes from kev
+ *
+ * Revision 1.137  1994/04/22  14:34:15  pgf
+ * changed BAD and GOOD to BADEXIT and GOODEXIT
+ *
+ * Revision 1.136  1994/04/22  11:25:54  pgf
+ * took out x_set_window_and_icon_names() call
+ *
+ * Revision 1.135  1994/04/19  15:13:06  pgf
+ * use strncpy0() in likely places
+ *
+ * Revision 1.134  1994/04/14  09:51:41  pgf
+ * added hook for maintaining buffer name in X window name
+ *
+ * Revision 1.133  1994/04/13  20:46:38  pgf
+ * various fixes (towards 4.4) from kev
+ *
+ * Revision 1.132  1994/04/11  15:50:06  pgf
+ * kev's attribute changes
+ *
+ * Revision 1.131  1994/04/07  19:02:20  pgf
+ * kev's changes for direct pscreen access
+ *
+ * Revision 1.130  1994/04/07  18:13:16  pgf
+ * fix column calculation for rectangles for selections
+ *
+ * Revision 1.129  1994/04/04  16:14:58  pgf
+ * kev's 4.4 changes
+ *
+ * Revision 1.128  1994/04/04  11:30:48  pgf
+ * changed args to scwrite(), to allow passing attribute string.
+ *
+ * Revision 1.127  1994/04/01  14:30:02  pgf
+ * tom's warning/lint patch
+ *
+ * Revision 1.126  1994/04/01  10:47:52  pgf
+ * beep on calls to mlerror()
+ *
+ * Revision 1.125  1994/03/29  16:24:20  pgf
+ * kev's changes: selection and attributes
+ *
+ * Revision 1.124  1994/03/29  14:50:18  pgf
  * fix to mlerror
  *
  * Revision 1.123  1994/03/23  12:56:02  pgf
@@ -112,6 +154,9 @@ static	void	updgar P(( void ));
 static	void	updone P(( WINDOW * ));
 static	void	updall P(( WINDOW * ));
 static	void	updupd P(( int ));
+#if OPT_VIDEO_ATTRS
+static	void	updattrs P(( WINDOW * ));
+#endif
 static	int	updext_past P(( int, int ));
 static	int	updext_before P(( int ));
 static	void	updateline P(( int, int, int ));
@@ -415,15 +460,15 @@ vtinit()
     TTkopen();		/* open the keyboard */
     TTrev(FALSE);
     vscreen = typeallocn(VIDEO *,term.t_mrow);
-
     if (vscreen == NULL)
-	ExitProgram(BAD(1));
+	ExitProgram(BADEXIT);
+
 
 #if	! MEMMAP
     pscreen = typeallocn(VIDEO *,term.t_mrow);
 
     if (pscreen == NULL)
-	ExitProgram(BAD(1));
+	ExitProgram(BADEXIT);
 #endif
 
     for (i = 0; i < term.t_mrow; ++i) {
@@ -431,30 +476,33 @@ vtinit()
         vp = typeallocplus(VIDEO, term.t_mcol - 4);
 
         if (vp == NULL)
-	    ExitProgram(BAD(1));
+	    ExitProgram(BADEXIT);
 
 
-	/* unnecessary */
-	/* (void)memset(vp, ' ', sizeof(struct VIDEO) + term.t_mcol - 4); */
 	vp->v_flag = 0;
 #if	COLOR
 	vp->v_rfcolor = gfcolor;
 	vp->v_rbcolor = gbcolor;
 #endif
         vscreen[i] = vp;
+#if OPT_VIDEO_ATTRS
+	if ((vscreen[i]->v_attrs = typeallocn(VIDEO_ATTR, term.t_mcol)) == NULL)
+	    ExitProgram(BADEXIT);
+#endif
 #if	! MEMMAP
     	/* struct VIDEO already has 4 of the bytes */
         vp = typeallocplus(VIDEO, term.t_mcol - 4);
 
         if (vp == NULL)
-	    ExitProgram(BAD(1));
-
-	/* unnecessary */
-	/* (void)memset(vp, 0, sizeof(struct VIDEO) + term.t_mcol - 4); */
+	    ExitProgram(BADEXIT);
 
 	vp->v_flag = 0;
         pscreen[i] = vp;
+#if OPT_VIDEO_ATTRS
+	if ((pscreen[i]->v_attrs = typeallocn(VIDEO_ATTR, term.t_mcol)) == NULL)
+	    ExitProgram(BADEXIT);
 #endif
+#endif	/* !MEMMAP */
         }
 #if OPT_WORKING
 	imworking(0);
@@ -738,7 +786,14 @@ update(force)
 int force;	/* force update past type ahead? */
 {
 	register WINDOW *wp;
+	int origrow, origcol;
 	int screenrow, screencol;
+
+	/* Get row and column prior to doing the update in case we are
+	 * reading the message line.
+	 */
+	origrow = ttrow;
+	origcol = ttcol;
 
 	if (!curbp) /* not initialized */
 		return FALSE;
@@ -816,16 +871,14 @@ int force;	/* force update past type ahead? */
 			else if (wp->w_flag & ~(WFMOVE))
 				updall(wp);	/* update all lines */
 #if OPT_SCROLLBARS
-			if (wp->w_flag & (WFHARD | WFSBAR)) {
-				/* FIXME: Find some way to set the ruler
-				 * line info for both ruler and scroll bar
-				 * at same time.
-				 */
-				wp->w_ruler_line = 
-					line_no(wp->w_bufp, wp->w_dot.l);
+			if (wp->w_flag & (WFHARD | WFSBAR))
 				update_scrollbar(wp);
-			}
 #endif /* OPT_SCROLLBARS */
+
+#if OPT_VIDEO_ATTRS
+			if (wp->w_flag & (WFHARD | WFEDIT))
+				updattrs(wp);
+#endif
 			if (scrflags || (wp->w_flag & (WFMODE|WFCOLR)))
 				modeline(wp);	/* update modeline */
 			wp->w_flag = 0;
@@ -850,7 +903,10 @@ int force;	/* force update past type ahead? */
 	updupd(force);
 
 	/* update the cursor and flush the buffers */
-	movecursor(screenrow, screencol);
+	if (reading_msg_line)
+	    movecursor(origrow, origcol);
+	else
+	    movecursor(screenrow, screencol);
 
 	TTflush();
 	endofDisplay;
@@ -974,7 +1030,7 @@ WINDOW *wp;
 	{
 		rows = (i != 0)
 			? wp->w_ntrows
-			: (wp->w_ntrows+1) / 2;
+			: wp->w_ntrows / 2;
 		while (rows > 0) {
 			if ((i > 0)
 			 && (--i <= 0))
@@ -1272,7 +1328,7 @@ extern char mlsave[];
 static void
 updgar()
 {
-#if !MEMMAP
+#if !MEMMAP && !OPT_PSCREEN
 	register char *txt;
 	register int j;
 #endif
@@ -1287,15 +1343,24 @@ updgar()
 		vscreen[i]->v_fcolor = gfcolor;
 		vscreen[i]->v_bcolor = gbcolor;
 #endif
-#if	! MEMMAP
+#if	! MEMMAP && ! OPT_PSCREEN
 		txt = pscreen[i]->v_text;
-		for (j = 0; j < term.t_ncol; ++j)
+		for (j = 0; j < term.t_ncol; ++j) {
 			txt[j] = ' ';
+#if OPT_VIDEO_ATTRS
+			/* FIXME: Color? */
+			pscreen[i]->v_attrs[j] = 0;
+#endif /* OPT_VIDEO_ATTRS */
+		}
 #endif
 	}
-
+#if !OPT_PSCREEN
 	movecursor(0, 0);		 /* Erase the screen. */
 	TTeeop();
+#else
+	movecursor(term.t_nrow, 0);
+	TTeeol();
+#endif
 	sgarbf = FALSE;			 /* Erase-page clears */
 	mpresf = 0;			 /* the message area. */
 	if (mlsave[0]) {
@@ -1335,6 +1400,123 @@ int force;	/* forced update flag */
 	}
 }
 
+#if OPT_VIDEO_ATTRS
+static void
+updattrs(wp)
+    WINDOW *wp;
+{
+    int lmap[MAXROWS];
+    AREGION *ap;
+    int i, j;
+    
+    L_NUM start_wlnum, end_wlnum;
+    LINEPTR lp;
+    int rows;
+
+    /*
+     * Clear portion of virtual screen associated with window pointer
+     * of all attributes.
+     */
+    /* FIXME: color; need to set to value indicating fg and bg for window */
+    for (i = wp->w_toprow + wp->w_ntrows - 1; i >= wp->w_toprow; i--)
+	for (j = 0; j < term.t_ncol; j++)
+	    vscreen[i]->v_attrs[j] = 0;
+
+    /*
+     * No need to do any more work on this window if there are no
+     * attributes.
+     */
+    if (wp->w_bufp->b_attribs == NULL)
+	return;
+
+    /*
+     * Compute starting and ending line numbers for the window.  We
+     * also fill in lmap which is used for mapping line numbers to
+     * screen row numbers.
+     */
+    lp = wp->w_line.l;
+    start_wlnum = 
+    end_wlnum = line_no(wp->w_bufp, lp);
+    rows = wp->w_ntrows;
+    lmap[end_wlnum - start_wlnum] = wp->w_toprow;
+    while ( (rows -= line_height(wp,lp)) > 0) {
+	lp = lFORW(lp);
+	end_wlnum++;
+	lmap[end_wlnum - start_wlnum] = wp->w_toprow + wp->w_ntrows - rows;
+    }
+
+    /*
+     * Set current attributes in virtual screen associated with window
+     * pointer.
+     */
+    for (ap = wp->w_bufp->b_attribs; ap != NULL;) {
+	VIDEO_ATTR attr;
+	C_NUM start_col, end_col;
+	L_NUM start_rlnum, end_rlnum, lnum, start_lnum, end_lnum;
+	start_rlnum = line_no(wp->w_bufp, ap->ar_region.r_orig.l);
+	end_rlnum = line_no(wp->w_bufp, ap->ar_region.r_end.l);
+
+	/* Garbage collect empty visible regions */
+	if (start_rlnum == end_rlnum
+	 && ap->ar_vattr != 0
+	 && ap->ar_region.r_orig.o >= ap->ar_region.r_end.o) {
+	    AREGION *nap = ap->ar_next;
+	    free_attrib(wp->w_bufp, ap);
+	    ap = nap;
+	    continue;
+	}
+
+	if (start_rlnum > start_wlnum) {
+	    start_lnum = start_rlnum;
+	    lp = ap->ar_region.r_orig.l;
+	}
+	else {
+	    start_lnum = start_wlnum;
+	    lp = wp->w_line.l;
+	}
+	end_lnum = (end_rlnum < end_wlnum) ? end_rlnum : end_wlnum;
+	attr = ap->ar_vattr;
+	for (lnum = start_lnum; lnum <= end_lnum; lnum++, lp = lFORW(lp)) {
+	    int row, col;
+	    if (lnum == start_rlnum || ap->ar_shape == RECTANGLE)
+		start_col = offs2col(wp, ap->ar_region.r_orig.l,
+				     ap->ar_region.r_orig.o);
+	    else
+		start_col = 0;
+	    if (start_col < 0)
+		start_col = 0;
+	    if (ap->ar_shape == RECTANGLE)
+		end_col = offs2col(wp, ap->ar_region.r_end.l,
+				   ap->ar_region.r_end.o);
+	    else if (lnum == end_rlnum)
+		end_col = offs2col(wp, ap->ar_region.r_end.l,
+				   ap->ar_region.r_end.o - 1);
+	    else
+		end_col = offs2col(wp, lp, lLength(lp));
+	    row = lmap[lnum - start_wlnum];
+#ifdef WMDLINEWRAP
+	    if (w_val(wp,WMDLINEWRAP))
+		for (col = start_col; col <= end_col; col++)
+		    vscreen[row + col / term.t_ncol]->v_attrs[col % term.t_ncol] =
+			(vscreen[row + col / term.t_ncol]->v_attrs[col % term.t_ncol]
+			 | (attr & ~VAREV))
+			^ (attr & VAREV);
+	    else
+#endif
+	    {
+		if (end_col >= term.t_ncol)
+		    end_col = term.t_ncol-1;
+		for (col = start_col; col <= end_col; col++)
+		    vscreen[row]->v_attrs[col] = 
+			(vscreen[row]->v_attrs[col] | (attr & ~VAREV))
+			^ (attr & VAREV);
+	    }
+	}
+	ap = ap->ar_next;
+    }
+}
+#endif /* OPT_VIDEO_ATTRS */
+
 /*
  * Translate offset (into a line's text) into the display-column, taking into
  * account the tabstop, sideways, number- and list-modes.
@@ -1356,6 +1538,10 @@ C_NUM	offset;
 			w_val(wp,WVAL_SIDEWAYS);
 
 	register C_NUM	n, c;
+
+	/* this makes the how-much-to-select calculation easier above */
+	if (offset < 0)
+		return offset;
 
 	if (same_ptr(lp, win_head(wp))) {
 		column = 0;
@@ -1475,7 +1661,9 @@ int	colfrom;	/* column to start highlighting */
 int	colto;		/* column to end highlighting */
 int	on;		/* start highlighting */
 {
+#if !OPT_VIDEO_ATTRS
 	register VIDEO *vp1 = vscreen[row];
+#endif
 #ifdef WMDLINEWRAP
 	WINDOW	*wp = row2window(row);
 	if (w_val(wp,WMDLINEWRAP)) {
@@ -1493,16 +1681,30 @@ int	on;		/* start highlighting */
 	}
 #endif
 	if (row < term.t_nrow && (colfrom >= 0 || colto <= term.t_ncol)) {
+		if (colfrom < 0)
+			colfrom = 0;
+		if (colto > term.t_ncol)
+			colto = term.t_ncol;
+#if OPT_VIDEO_ATTRS
+		if (on) {
+		    int col;
+		    for (col=colfrom; col<colto; col++)
+			vscreen[row]->v_attrs[col] |= VAREV;
+		}
+		else {
+		    int col;
+		    for (col=colfrom; col<colto; col++)
+			vscreen[row]->v_attrs[col] &= ~VAREV;
+		}
+		updateline(row, 0, term.t_ncol);
+#else /* OPT_VIDEO_ATTRS */
 		if (on) {
 			vp1->v_flag |= VFREQ;
 		} else {
 			vp1->v_flag &= ~VFREQ;
 		}
-		if (colfrom < 0)
-			colfrom = 0;
-		if (colto > term.t_ncol)
-			colto = term.t_ncol;
 		updateline(row, colfrom, colto);
+#endif /* OPT_VIDEO_ATTRS */
 	}
 }
 
@@ -1520,6 +1722,8 @@ int inserts;
 	int	first, match, count, ptarget = 0, vtarget = 0;
 	SIZE_T	end;
 	int	longmatch, longcount;
+	int	longinplace, inplace;	/* count of lines which are already
+					   in the right place */
 	int	from, to;
 
 	if (!term.t_scroll) /* no way to scroll */
@@ -1547,7 +1751,7 @@ int inserts;
 		end = endofline(vpv->v_text,cols) ;
 		if ( end == 0 )
 			ptarget = first ;		/* newlines */
-		else if ( strncmp(vpp->v_text, vpv->v_text, end) == 0 )
+		else if ( memcmp(vpp->v_text, vpv->v_text, end) == 0 )
 			ptarget = first + 1 ;	/* broken line newlines */
 		else
 			ptarget = first ;
@@ -1559,19 +1763,25 @@ int inserts;
 	/* find the matching shifted area */
 	longmatch = -1;
 	longcount = 0;
+	longinplace = 0;
 	for (i = from+1; i < rows; i++) {
 		if (inserts ? texttest(i,from) : texttest(from,i) ) {
 			match = i ;
 			count = 1 ;
+			inplace = texttest(match, match) ? 1 : 0;
 			for (j=match+1, k=from+1; j<rows && k<rows; j++, k++) {
-				if (inserts ? texttest(j,k) : texttest(k,j))
+				if (inserts ? texttest(j,k) : texttest(k,j)) {
 					count++ ;
+					if (texttest(j,j))
+						inplace++;
+				}
 				else
 					break ;
 			}
-			if (longcount < count) {
+			if (longcount - longinplace < count - inplace) {
 				longcount = count;
 				longmatch = match;
+				longinplace = inplace;
 			}
 		}
 	}
@@ -1600,12 +1810,71 @@ int inserts;
 			from = match;
 			to = vtarget;
 		}
+#if OPT_PSCREEN
+		/*
+		 * Update lines _before_ the scroll so that they will
+		 * be available for any updates which need to be done
+		 * (due to a GraphicsExpose event in X11...these occur
+		 * when scrolling a partially obscured window).  Note
+		 * that in the typical case of scrolling a line or two
+		 * that very few memory accesses are performed.  We
+		 * mostly shuffle pointers around.
+		 */
+#define SWAP_PLINE(a, b) do { VIDEO *temp = pscreen[a];	\
+			      pscreen[a] = pscreen[b];	\
+			      pscreen[b] = temp; } while (0)
+#define CLEAR_PLINE(a)  do {						\
+			    pscreen[a]->v_flag |= VFCHG;		\
+			    for (j = 0; j < term.t_ncol; j++) {		\
+				pscreen[a]->v_attrs[j] = VADIRTY;	\
+				pscreen[a]->v_text[j] = ' ';		\
+			    }						\
+			  } while (0)
+		if (from < to) {
+		    /* FIXME: color */
+		    for (i = from; i < to; i++)
+			CLEAR_PLINE(i+count);
+		    for (i = count-1; i >= 0; i--)
+			SWAP_PLINE(from+i, to+i);
+		}
+		else {
+		    /* FIXME: color */
+		    for (i = to; i < from; i++)
+			CLEAR_PLINE(i);
+		    for (i = 0; i < count; i++)
+			SWAP_PLINE(from+i, to+i);
+		}
+#endif /* OPT_PSCREEN */
 		scrscroll(from, to, count) ;
+#if !OPT_PSCREEN
 		for (i = 0; i < count; i++) {
 			vpp = PScreen(to+i) ;
 			vpv = vscreen[to+i];
-			(void)strncpy(vpp->v_text, vpv->v_text, (SIZE_T)cols) ;
+			(void)memcpy(vpp->v_text, vpv->v_text, (SIZE_T)cols) ;
 		}
+#if OPT_VIDEO_ATTRS && !MEMMAP
+#define SWAP_ATTR_PTR(a, b) do { VIDEO_ATTR *temp = pscreen[a]->v_attrs;  \
+			         pscreen[a]->v_attrs = pscreen[b]->v_attrs; \
+			         pscreen[b]->v_attrs = temp; } while (0)
+		if (from < to) {
+		    /* FIXME: color */
+		    for (i = from; i < to; i++)
+			for (j = 0; j < term.t_ncol; j++)
+			    pscreen[i+count]->v_attrs[j] = 0;
+		    for (i = count-1; i >= 0; i--)
+			SWAP_ATTR_PTR(from+i, to+i);
+
+		}
+		else {
+		    /* FIXME: color */
+		    for (i = to; i < from; i++)
+			for (j = 0; j < term.t_ncol; j++)
+			    pscreen[i]->v_attrs[j] = 0;
+		    for (i = 0; i < count; i++)
+			SWAP_ATTR_PTR(from+i, to+i);
+		}
+#undef SWAP_ATTR_PTR
+#endif /* OPT_VIDEO_ATTRS */
 		if (inserts) {
 			from = ptarget;
 			to = match;
@@ -1620,6 +1889,7 @@ int inserts;
 				txt[j] = ' ';
 			vscreen[i]->v_flag |= VFCHG;
 		}
+#endif /* !OPT_PSCREEN */
 		return(TRUE) ;
 	}
 	return(FALSE) ;
@@ -1752,13 +2022,27 @@ int	colto;		/* last column on screen */
 	vp1->v_bcolor = vp1->v_rbcolor;
 	scwrite(row, colfrom, colto - colfrom,
 		vp1->v_text,
+#if OPT_VIDEO_ATTRS
+		vscreen[row]->v_attrs,
+		vp1->v_rfcolor,
+		vp1->v_rbcolor);
+#else
+		NULL,
 		req ? vp1->v_rbcolor : vp1->v_rfcolor,
 		req ? vp1->v_rfcolor : vp1->v_rbcolor);
+#endif
 #else
 	scwrite(row, colfrom, colto - colfrom,
 		vp1->v_text,
+#if OPT_VIDEO_ATTRS
+		vscreen[row]->v_attrs,
+		C_WHITE,
+		C_BLACK);
+#else
+		NULL,
 		req ? C_BLACK : C_WHITE,
 		req ? C_WHITE : C_BLACK);
+#endif
 #endif
 	vp1->v_flag &= ~(VFCHG | VFCOL); /* flag this line as updated */
 	if (req)
@@ -1768,6 +2052,40 @@ int	colto;		/* last column on screen */
 }
 
 #else	/* !MEMMAP */
+#if	OPT_PSCREEN
+static void
+updateline(row, colfrom, colto)
+    int	row;		/* row of screen to update */
+    int	colfrom;	/* col to start updating from */
+    int	colto;		/* col to go to */
+{
+    register char *vc, *pc, *evc;
+    register VIDEO_ATTR *va, *pa;
+    int nchanges = 0;
+    vc  = &vscreen[row]->v_text[colfrom];
+    evc = &vscreen[row]->v_text[colto];
+    pc  = &pscreen[row]->v_text[colfrom];
+    va  = &vscreen[row]->v_attrs[colfrom];
+    pa  = &pscreen[row]->v_attrs[colfrom];
+
+    while (vc < evc) {
+	if (*vc != *pc || VATTRIB(*va) != VATTRIB(*pa)) {
+	    *pc = *vc;
+	    *pa = *va | VADIRTY;
+	    nchanges++;
+	}
+	vc++;
+	pc++;
+	va++;
+	pa++;
+    }
+
+    if (nchanges > 0)
+	pscreen[row]->v_flag |= VFCHG;
+    vscreen[row]->v_flag &= ~(VFCHG | VFCOL); /* mark virtual line updated */
+}
+
+#else  /* !OPT_PSCREEN */
 
 static void
 updateline(row, colfrom, colto)
@@ -1787,20 +2105,29 @@ int	colto;		/* first column on screen */
 	register char *cp4;
 	register char *cp5;
 	register int nbflag;	/* non-blanks to the right flag? */
+#if OPT_VIDEO_ATTRS
+	VIDEO_ATTR *ap1, *ap2, *ap3, *ap4, *ap5;
+#else
 	int rev;		/* reverse video flag */
 	int req;		/* reverse video request flag */
-
+#endif
 
 	/* set up pointers to virtual and physical lines */
 	cp1 = &vp1->v_text[colfrom];
 	cp2 = &vp2->v_text[colfrom];
+
+#if OPT_VIDEO_ATTRS
+	/* set up pointers to attributes in virtual and physical lines */
+	ap1 = &vp1->v_attrs[colfrom];
+	ap2 = &vp2->v_attrs[colfrom];
+#else /* OPT_VIDEO_ATTRS */
 
 #if	COLOR
 	TTforg(vp1->v_rfcolor);
 	TTbacg(vp1->v_rbcolor);
 #endif
 
-#if	REVSTA | COLOR
+#if	REVSTA || COLOR
 	/* if we need to change the reverse video status of the
 	   current line, we need to re-write the entire line     */
 	rev = (vp1->v_flag & VFREV) == VFREV;
@@ -1851,13 +2178,24 @@ int	colto;		/* first column on screen */
 	}
 #else
 	rev = FALSE;
-#endif
+#endif	/* REVSTA || COLOR */
+#endif	/* OPT_VIDEO_ATTRS */
 
 	/* advance past any common chars at the left */
+#if !OPT_VIDEO_ATTRS
 	if (!rev)
-		while (cp1 != &vp1->v_text[colto] && *cp1 == *cp2) {
+#endif	/* !OPT_VIDEO_ATTRS */
+		while (cp1 != &vp1->v_text[colto] && *cp1 == *cp2
+#if OPT_VIDEO_ATTRS
+		    && VATTRIB(*ap1) == VATTRIB(*ap2)
+#endif	/* OPT_VIDEO_ATTRS */
+		      						 ) {
 			++cp1;
 			++cp2;
+#if OPT_VIDEO_ATTRS
+			++ap1;
+			++ap2;
+#endif	/* OPT_VIDEO_ATTRS */
 		}
 
 /* This can still happen, even though we only call this routine on changed
@@ -1876,31 +2214,98 @@ int	colto;		/* first column on screen */
 	nbflag = FALSE;
 	cp3 = &vp1->v_text[colto];
 	cp4 = &vp2->v_text[colto];
+#if OPT_VIDEO_ATTRS
+	ap3 = &vp1->v_attrs[colto];
+	ap4 = &vp2->v_attrs[colto];
+#endif
 
+#if !OPT_VIDEO_ATTRS
 	if (!rev)
-		while (cp3[-1] == cp4[-1]) {
+#endif
+		while (cp3[-1] == cp4[-1]
+#if OPT_VIDEO_ATTRS
+		    && VATTRIB(ap3[-1]) == VATTRIB(ap4[-1])
+#endif
+		                         ) {
 			--cp3;
 			--cp4;
-			if (cp3[0] != ' ')		/* Note if any nonblank */
-				nbflag = TRUE;		/* in right match. */
+#if OPT_VIDEO_ATTRS
+			--ap3;
+			--ap4;
+#endif
+			/* Note if any nonblank in right match */
+			if (cp3[0] != ' ' 
+#if OPT_VIDEO_ATTRS
+			 /* FIXME: Color */
+			 || VATTRIB(*ap3)
+#endif
+					 )
+				nbflag = TRUE;
 		}
 
 	cp5 = cp3;
+#if OPT_VIDEO_ATTRS
+	ap5 = ap3;
+#endif
 
 	/* Erase to EOL ? */
 	if (nbflag == FALSE && eolexist == TRUE 
-#if	REVSTA
+#if	REVSTA && !OPT_VIDEO_ATTRS
 		&& (req != TRUE)
 #endif
 			) {
-		while (cp5!=cp1 && cp5[-1]==' ')
+		while (cp5!=cp1 && cp5[-1]==' '
+#if OPT_VIDEO_ATTRS
+		    /* FIXME: Color */
+		    && VATTRIB(ap5[-1]) == 0
+#endif
+					        ) {
 			--cp5;
+#if OPT_VIDEO_ATTRS
+			--ap5;
+#endif
+		}
 
 		if (cp3-cp5 <= 3)		/* Use only if erase is */
 			cp5 = cp3;		/* fewer characters. */
 	}
 
 	movecursor(row, cp1 - &vp1->v_text[colfrom]);	/* Go to start of line. */
+#if OPT_VIDEO_ATTRS
+	while (cp1 < cp5) {
+	    VIDEO_ATTR *api = ap1;
+	    VIDEO_ATTR attr = VATTRIB(*api);
+	    while (attr == VATTRIB(*api) && api < ap1 + (cp5 - cp1))
+		api++;
+#if	REVSTA
+	    TTrev((attr & VAREV));
+#endif
+#if X11
+	    x_putline(row, cp1, api - ap1);
+#endif
+	    while (ap1 != api) {
+#if !X11
+		TTputc(*cp1);
+#endif
+		++ttcol;
+		*cp2++ = *cp1++;
+		*ap2++ = *ap1++;
+	    }
+	}
+#if	REVSTA
+	TTrev(FALSE);
+#endif
+	if (cp5 != cp3) {		/* Erase. */
+		TTeeol();
+		while (cp1 != cp3) {
+			if (*cp2 != *cp1 || VATTRIB(*ap2) != VATTRIB(*ap1))
+				*ap2 = *ap1;
+			ap1++;
+			ap2++;
+			*cp2++ = *cp1++;
+		}
+	}
+#else /* OPT_VIDEO_ATTRS */
 #if	REVSTA
 	TTrev(rev);
 #endif
@@ -1924,9 +2329,11 @@ int	colto;		/* first column on screen */
 #if	REVSTA
 	TTrev(FALSE);
 #endif
+#endif /* OPT_VIDEO_ATTRS */
 	vp1->v_flag &= ~(VFCHG|VFCOL);	/* flag this line as updated */
 	return;
 }
+#endif  /* OPT_PSCREEN(updateline) */
 #endif	/* MEMMAP(updateline) */
 
 static	char *	PutMode_gap;
@@ -1957,11 +2364,18 @@ WINDOW *wp;
 	char	temp[NFILEN];
 
 	n = mode_row(wp);      	/* Location. */
+#if OPT_VIDEO_ATTRS
+	vscreen[n]->v_flag |= VFCHG;
+	for (col=0; col < term.t_ncol; col++)
+	    vscreen[n]->v_attrs[col] = VAREV;
+#else
 	vscreen[n]->v_flag |= VFCHG | VFREQ | VFCOL;/* Redraw next time. */
+#endif
 #if	COLOR
 	vscreen[n]->v_rfcolor = w_val(wp,WVAL_FCOLOR);
 	vscreen[n]->v_rbcolor = w_val(wp,WVAL_BCOLOR);
 #endif
+	bp = wp->w_bufp;
 	vtmove(n, 0);                       	/* Seek to right line. */
 	if (wp == curwp) {			/* mark the current buffer */
 		lchar = '=';
@@ -1973,12 +2387,19 @@ WINDOW *wp;
 #endif
 			lchar = '-';
 	}
-	bp = wp->w_bufp;
 
 	vtputc(lchar);
 	if (b_val(bp, MDSHOWMODE)) {
 		register int ic;
 		ic = lchar;
+#ifdef insertmode	/* insert mode is a trait for each window */
+		if (wp->w_traits.insmode == INSERT)
+			ic = 'I';
+		else if (wp->w_traits.insmode == REPLACECHAR)
+			ic = 'R';
+		else if (wp->w_traits.insmode == OVERWRITE)
+			ic = 'O';
+#else 			/* insertmode is a variable global to all windows */
 		if (wp == curwp) {
 			if (insertmode == INSERT)
 				ic = 'I';
@@ -1987,6 +2408,7 @@ WINDOW *wp;
 			else if (insertmode == OVERWRITE)
 				ic = 'O';
 		}
+#endif /* !defined(insertmode) */
 		vtputc(ic);
 	}
 	vtprintf("%c %s",lchar, get_bname(bp));
@@ -2474,6 +2896,7 @@ char	*s;
 		es = "unknown system error";
 
 	mlforce("[Error %s: %s]", s, es);
+	TTbeep();
 #endif
 }
 
@@ -2735,7 +3158,86 @@ ACTUAL_SIG_DECL
 	(void)alarm(1);
 	flip = !flip;
 }
-#endif
+#endif	/* OPT_WORKING */
+
+#if	OPT_PSCREEN
+/* Most of the code in this section is for making the message line work
+ * right...it shouldn't be called to display the rest of the screen.
+ */
+static int psc_row;
+static int psc_col;
+
+#define SWAP_INT(x,y) \
+	do { (x) = (x)+(y); (y) = (x)-(y); (x) = (x)-(y); } while (0)
+#define SWAP_VT_PSC \
+	do { SWAP_INT(vtcol, psc_col); SWAP_INT(vtrow, psc_row); } while (0)
+
+void
+psc_putchar(c)
+    int c;
+{
+    if (c == '\b') {
+	if (psc_col > 0)
+	    psc_col--;
+    }
+    else {
+	SWAP_VT_PSC;
+	vtputc(c);
+	SWAP_VT_PSC;
+    }
+}
+
+void
+psc_flush()
+{
+    updateline(term.t_nrow, 0, term.t_ncol);
+    TTpflush();
+}
+
+void
+psc_move(row,col)
+    int row,col;
+{
+    psc_row = row;
+    psc_col = col;
+}
+
+void
+psc_eeol()
+{
+    if (ttrow >= 0 && ttrow <= term.t_nrow && ttcol >= 0) {
+	VIDEO_ATTR *vp = &vscreen[ttrow]->v_attrs[ttcol];
+	char *cp = &vscreen[ttrow]->v_text[ttcol];
+	char *cplim = &vscreen[ttrow]->v_text[term.t_ncol];
+	while (cp < cplim) {
+	    *vp++ = 0;
+	    *cp++ = ' ';
+	}
+    }
+}
+
+void
+psc_eeop()
+{
+    int saverow = ttrow;
+    int savecol = ttcol;
+    while (ttrow <= term.t_nrow) {
+	psc_eeol();
+	ttrow++;
+	ttcol = 0;
+    }
+    ttrow = saverow;
+    ttcol = savecol;
+}
+
+void
+psc_rev(huh)
+    int huh;
+{
+    /* do nothing */
+}
+
+#endif	/* OPT_PSCREEN */
 
 /* For memory-leak testing (only!), releases all display storage. */
 #if NO_LEAKS
@@ -2744,8 +3246,14 @@ void	vt_leaks()
 	register int i;
 
 	for (i = 0; i < term.t_mrow; ++i) {
+#if 	OPT_VIDEO_ATTRS
+		free ((char *)vscreen[i]->v_attrs);
+#endif
 		free ((char *)vscreen[i]);
 #if	! MEMMAP
+#if 	OPT_VIDEO_ATTRS
+		free ((char *)pscreen[i]->v_attrs);
+#endif
 		free ((char *)pscreen[i]);
 #endif
 	}

@@ -64,7 +64,10 @@
  *	Allow left/right scrolling of input lines (when they get too long).
  *
  * $Log: history.c,v $
- * Revision 1.17  1994/02/22 11:03:15  pgf
+ * Revision 1.18  1994/04/18 14:26:27  pgf
+ * merge of OS2 port patches, and changes to tungetc operation
+ *
+ * Revision 1.17  1994/02/22  11:03:15  pgf
  * truncated RCS log for 4.0
  *
  *
@@ -610,7 +613,7 @@ int	eolchar;
 		} else
 			kbd_alarm();
 
-		c = kbd_escape_seq();
+		c = kbd_key();
 	}
 }
 #endif	/* OPT_HISTORY */

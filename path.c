@@ -3,7 +3,10 @@
  *		strings.
  *
  * $Log: path.c,v $
- * Revision 1.24  1994/03/24 12:10:07  pgf
+ * Revision 1.25  1994/04/18 14:26:27  pgf
+ * merge of OS2 port patches, and changes to tungetc operation
+ *
+ * Revision 1.24  1994/03/24  12:10:07  pgf
  * vms fix
  *
  * Revision 1.23  1994/02/22  11:03:15  pgf
@@ -82,7 +85,7 @@ DIR	*dp;
 }
 #endif
 
-#if MSDOS
+#if MSDOS || OS2
 /*
  * If the pathname begins with an MSDOS-drive, return the pointer past it.
  * Otherwise, return null.
@@ -216,7 +219,7 @@ char	*path;
 {
 	register char	*s = last_slash(path);
 	if (s == 0) {
-#if MSDOS
+#if MSDOS || OS2
 		if (!(s = is_msdos_drive(path)))
 #endif
 		s = path;
@@ -237,7 +240,7 @@ char	*path;
 {
 	register char	*s = last_slash(path);
 	if (s == 0) {
-#if MSDOS
+#if MSDOS || OS2
 		if (!(s = is_msdos_drive(path)))
 #endif
 		s = path;
@@ -420,7 +423,7 @@ char *ss;
 	if (!*s)
 		return s;
 
-#if MSDOS
+#if MSDOS || OS2
 	(void)mklower(ss);	/* MS-DOS is case-independent */
 	/* pretend the drive designator isn't there */
 	if ((s = is_msdos_drive(ss)) == 0)
@@ -443,7 +446,7 @@ char *ss;
 	}
 #endif
 
-#if UNIX || MSDOS
+#if UNIX || MSDOS || OS2
 	p = pp = s;
 	if (!slashc(*s)) {
 		mlforce("BUG: canonpath '%s'", s);
@@ -468,7 +471,7 @@ char *ss;
 	while (*pp) {
 		switch (*pp) {
 		case '/':
-#if MSDOS
+#if MSDOS || OS2
 		case '\\':
 #endif
 			pp++;
@@ -609,7 +612,7 @@ int keep_cwd;
 	}
 #endif
 
-#if UNIX || MSDOS
+#if UNIX || MSDOS || OS2
 	cwd = current_directory(FALSE);
 	slp = ff = path;
 	while (*cwd && *ff && *cwd == *ff) {
@@ -666,7 +669,7 @@ char *path;
 	char	*cwd;
 	char	*f;
 	char	temp[NFILEN];
-#if MSDOS
+#if MSDOS || OS2
 	char	drive;
 #endif
 
@@ -731,8 +734,8 @@ char *path;
 	}
 #endif
 
-#if UNIX || MSDOS
-#if MSDOS
+#if UNIX || MSDOS || OS2
+#if MSDOS || OS2
 	if ((f = is_msdos_drive(path)) != 0)
 		drive = *path;
 	else {
@@ -741,7 +744,7 @@ char *path;
 	}
 #endif
 	if (!slashc(f[0])) {
-#if MSDOS
+#if MSDOS || OS2
 		cwd = curr_dir_on_drive(drive!=EOS?drive:curdrive());
 #else
 		cwd = current_directory(FALSE);
@@ -754,7 +757,7 @@ char *path;
 		(void)strcpy(temp + len, f);
 		(void)strcpy(path, temp);
 	}
-#if MSDOS
+#if MSDOS || OS2
 	if (is_msdos_drive(path) == 0) { /* ensure that we have drive too */
 		temp[0] = curdrive();
 		temp[1] = ':';
@@ -788,7 +791,7 @@ char *path;
 		return TRUE;
 #endif
 
-#if UNIX || MSDOS || VMS
+#if UNIX || MSDOS || VMS || OS2
 	if ((f = path) != 0) {
 #if UNIX
 		if (f[0] == '~')
@@ -818,7 +821,7 @@ char *fn;
 {
 	if (is_pathname(fn))	/* test the obvious stuff */
 		return TRUE;
-#if MSDOS
+#if MSDOS || OS2
 	if (is_msdos_drive(fn))
 		return TRUE;
 #endif
@@ -922,7 +925,7 @@ char *	path;
 	  &&	((sb.st_mode & S_IFMT) == S_IFDIR));
 }
 
-#if (UNIX||VMS||MSDOS) && PATHLOOK
+#if (UNIX||VMS||MSDOS||OS2) && PATHLOOK
 /*
  * Parse the next entry in a list of pathnames, returning null only when no
  * more entries can be parsed.

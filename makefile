@@ -1,6 +1,8 @@
 #
 # makefile for vile.
 #
+# type "make help" for buildable target list
+#
 # Not much user-configuration is usually needed.  Various targets in the
 # makefile support various systems -- if yours isn't here, and none of the
 # one's provided will work, then edit estruct.h, and use "make default".
@@ -83,6 +85,8 @@ SCRDEF = -DTERMCAP -Dscrn_chosen
 
 # 4) for building the simple X version (if you don't even have libXt.a) use
 # these lines.  You won't get scrollbars, and some other things.
+# (PLEASE -- if you need this version, please send me mail -- i'd like to
+#	drop support for it if no one uses it...  pgf@cayman.com)
 #SCREEN = x11simp
 #LIBS = $(XLIBS) -lX11
 #TARGET = xvile
@@ -144,85 +148,67 @@ ENVIR = SCREEN="$(SCREEN)" LIBS="$(LIBS)" TARGET="$(TARGET)" \
 CFLAGS0 = $(INCS) $(SCRDEF) -DHELP_LOC=\\\"$(HELP_LOC)\\\"
 CFLAGS1 = $(OPTFLAGS) $(CFLAGS0)
 
-# suffix for object files.
-# this get changes to "obj" for DOS builds
-O = o
-
 # All of the makefiles which should be preserved and distributed
-UNIXMAK = makefile 				# on UNIX
-VMSMAK = descrip.mms vms_link.opt		# on VMS
-TURBOMAK = makefile.tbc				# on DOS, using TURBO
-WATMAK = makefile.wat				# on DOS, using Watcom C/386
+UNIXMAK =  makefile 				# on UNIX
+VMSMAK =   descrip.mms vms_link.opt		# on VMS
+TURBOMAK = makefile.tbc			# on DOS or OS/2, TURBO C or Borland C
+WATMAK =   makefile.wat				# on DOS, using Watcom C/386
 MSCMAK =	# still waiting for this one	# on DOS, using Microsoft C
 DJGPPMAK = makefile.djg				# on DOS, DJGCC v1.09
-MAKFILES = $(UNIXMAK) $(VMSMAK) $(TURBOMAK) $(WATMAK) $(DJGPPMAK) $(MSCMAK)
 
-MKTBLS = ./mktbls
+MAKFILES = $(UNIXMAK) $(VMSMAK) $(TURBOMAK) $(WATMAK) \
+	$(DJGPPMAK) $(MSCMAK) $(BORMAK)
 
-ALLTOOLS = $(MAKFILES)
-
+ALLTOOLS = $(MAKFILES) mktbls.c cmdtbl modetbl
 
 # these are normal editable headers
 HDRS = estruct.h epath.h edef.h proto.h dirstuff.h
+
+SCREENS = ansi.c at386.c borland.c dg10.c hp110.c hp150.c ibmpc.c st520.c \
+	tcap.c tipc.c vmsvt.c vt52.c x11.c x11simp.c z309.c z_ibmpc.c
+
+# other source code, some used in other makefiles, some possibly obsolete
+OTHERSRC = z100bios.asm vms2unix.c vmspipe.c djhandl.c \
+	man-bindings manfilt.pl manfilt.c
+
+# documentation, such as it is
+DOCS = vile.hlp vile.1 macros.doc
+
+# miscellaneous text files
+TEXTFILES = README CHANGES README.X11 README.PC \
+	CHANGES.R3 buglist revlist
+
+
+VILESRC = main.c basic.c bind.c buffer.c crypt.c csrch.c \
+	display.c eval.c exec.c externs.c fences.c file.c \
+	filec.c fileio.c finderr.c glob.c globals.c \
+	history.c input.c insert.c isearch.c line.c map.c \
+	modes.c npopen.c oneliner.c opers.c path.c random.c \
+	regexp.c region.c search.c select.c spawn.c tags.c \
+	tbuff.c termio.c tmp.c undo.c version.c vmalloc.c \
+	window.c word.c wordmov.c
+
+ALLSRC = $(VILESRC) $(SCREENS) $(OTHERSRC) $(HDRS)
+
+EVERYTHING = $(ALLTOOLS) $(ALLSRC) $(DOCS) $(TEXTFILES)
+
+SRC = $(SCREEN).c $(VILESRC)
+
+MKTBLS = ./mktbls
 
 # these headers are built by the mktbls program from the information in cmdtbl
 # and in modetbl
 BUILTHDRS = nebind.h nefunc.h nemode.h nename.h nevars.h
 
-ALLHDRS = $(HDRS)
-
-# All the C files which should be saved
-#  (including tools, like mktbls.c, unused screen drivers, etc.)
-CSRCac = ansi.c at386.c basic.c bind.c buffer.c crypt.c csrch.c
-CSRCde = dg10.c display.c djhandl.c eval.c exec.c externs.c
-CSRCf = fences.c file.c filec.c fileio.c finderr.c
-CSRCgh = glob.c globals.c history.c hp110.c hp150.c
-CSRCil = ibmpc.c input.c insert.c isearch.c line.c
-CSRCm = main.c map.c modes.c mktbls.c
-CSRCnq = npopen.c opers.c oneliner.c path.c
-CSRCr = random.c regexp.c region.c
-CSRCst = search.c spawn.c st520.c tags.c tbuff.c tcap.c termio.c tipc.c tmp.c
-CSRCuv = undo.c version.c vmalloc.c vms2unix.c vmspipe.c vmsvt.c vt52.c
-CSRCw = window.c word.c wordmov.c
-CSRCxz = x11.c x11simp.c z309.c z_ibmpc.c
-
-CSRC = $(CSRCac) $(CSRCde) $(CSRCf) $(CSRCgh) $(CSRCil) $(CSRCm) $(CSRCnq) \
-	$(CSRCr) $(CSRCst) $(CSRCuv) $(CSRCw) $(CSRCxz)
-
-# non-C source code
-OTHERSRC = z100bios.asm
-
-# text and data files
-TEXTFILES = README CHANGES CHANGES.R3 \
-	cmdtbl modetbl vile.hlp vile.1 buglist revlist \
-	README.X11 README.PC
-
-ALLSRC = $(CSRC) $(OTHERSRC)
-
-EVERYTHING = $(ALLTOOLS) $(ALLHDRS) $(ALLSRC) $(TEXTFILES) $(SHORTSTUFF)
-
-
-SRC = main.c $(SCREEN).c basic.c bind.c buffer.c crypt.c \
-	csrch.c display.c eval.c exec.c externs.c \
-	fences.c file.c filec.c \
-	fileio.c finderr.c glob.c globals.c history.c \
-	input.c insert.c isearch.c \
-	line.c map.c modes.c npopen.c oneliner.c \
-	opers.c path.c random.c regexp.c \
-	region.c search.c spawn.c tags.c tbuff.c \
-	termio.c tmp.c undo.c \
-	version.c vmalloc.c window.c word.c wordmov.c
-
-OBJ = main.o $(SCREEN).o basic.o bind.o buffer.o crypt.o \
-	csrch.o display.o eval.o exec.o externs.o \
-	fences.o file.o filec.o \
-	fileio.o finderr.o glob.o globals.o history.o \
-	input.o insert.o isearch.o \
-	line.o map.o modes.o npopen.o oneliner.o \
-	opers.o path.o random.o regexp.o \
-	region.o search.o spawn.o tags.o tbuff.o \
-	termio.o tmp.o undo.o \
-	version.o vmalloc.o window.o word.o wordmov.o
+OBJ = $(SCREEN).o \
+	main.o basic.o bind.o buffer.o crypt.o csrch.o \
+	display.o eval.o exec.o externs.o fences.o file.o \
+	filec.o fileio.o finderr.o glob.o globals.o \
+	history.o input.o insert.o isearch.o line.o map.o \
+	modes.o npopen.o oneliner.o opers.o path.o random.o \
+	regexp.o region.o search.o select.o spawn.o tags.o \
+	tbuff.o termio.o tmp.o undo.o version.o vmalloc.o \
+	window.o word.o wordmov.o
 
 
 # if your pre-processor won't treat undefined macros as having value 0, or
@@ -266,12 +252,16 @@ all:
 	echo "	make delta88r4	(Motorola Delta 88, SVR4)"		;\
 	echo "	make default	(to use config internal to estruct.h)"
 
-bsd sony mach:
+bsd mach:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DBERK -Dos_chosen" \
 	    MAKE=/usr/bin/make $(TARGET) $(ENVIR)
 
 bsd_posix ultrix:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DBERK -DPOSIX -DULTRIX -Dos_chosen" \
+		$(TARGET) $(ENVIR)
+
+sony:
+	$(MAKE) CFLAGS="$(CFLAGS1) -DBERK -DPOSIX -DSONY -Dos_chosen" \
 		$(TARGET) $(ENVIR)
 
 sunos:
@@ -350,6 +340,9 @@ uts:		# use -eft to allow editing terabyte files.  :-)
 # in addition, since I didn't know that aix varies so much from platform to
 #  platform, i used "AIX" as the ifdef in the code.  it may not work for
 #  all the other platforms.  sorry.
+# one more thing -- i've been told that xvile core dumps with some recent
+#  XL (??) compilers, but that if you get the latest compiler patches, it
+#  should work.  i know nothing more about this.
 aix:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DUSG \
 		-DPOSIX -DAIX -DHAVE_SELECT -U__STR__ -Dos_chosen -qpgmsize=l" \
@@ -634,7 +627,31 @@ path.o:	dirstuff.h
 vmalloco:	nevars.h
 
 # $Log: makefile,v $
-# Revision 1.140  1994/03/29 12:34:32  pgf
+# Revision 1.148  1994/04/25 21:49:13  pgf
+# aix compiler bug warning
+#
+# Revision 1.147  1994/04/19  15:12:01  pgf
+# typo
+#
+# Revision 1.146  1994/04/19  14:23:29  pgf
+# added kev's man page filters to "OTHERSRC"
+#
+# Revision 1.145  1994/04/18  14:26:27  pgf
+# merge of OS2 port patches, and changes to tungetc operation
+#
+# Revision 1.144  1994/04/13  20:51:44  pgf
+# Sony support
+#
+# Revision 1.143  1994/04/08  19:59:49  pgf
+# added x11simp() user query
+#
+# Revision 1.142  1994/04/08  12:18:03  pgf
+# added macros doc
+#
+# Revision 1.141  1994/03/29  16:24:20  pgf
+# kev's changes: selection and attributes
+#
+# Revision 1.140  1994/03/29  12:34:32  pgf
 # added "tags" target
 #
 # Revision 1.139  1994/03/11  14:00:52  pgf
