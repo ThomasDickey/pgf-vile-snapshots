@@ -1,7 +1,7 @@
 /*
  * version & usage-messages for vile
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/version.c,v 1.14 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/version.c,v 1.15 1994/07/22 01:45:44 pgf Exp $
  *
  */
 
@@ -100,8 +100,8 @@ getversion()
 		if ((s = flook(prog_arg, FL_ANYWHERE)) != NULL) {
 			struct	stat	sb;
 			if (stat(s, &sb) >= 0) {
-				strcat(version_string, ", installed ");
-				strcat(version_string, ctime(&sb.st_mtime));
+				(void)strcat(version_string, ", installed ");
+				(void)strcat(version_string, ctime(&sb.st_mtime));
 				/* trim the newline */
 				version_string[strlen(version_string)-1] = EOS;
 			}

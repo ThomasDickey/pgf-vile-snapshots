@@ -1,7 +1,7 @@
 /*	AT386:	 hacked tcap.c for the 386 console, when you don't
  *		have libtermcap.   grrr.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/at386.c,v 1.12 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/at386.c,v 1.13 1994/09/13 17:15:48 pgf Exp $
  *
  */
 #error This module is not actively maintained as part of vile.
@@ -56,8 +56,8 @@ char *DL, *AL, *SF, *SR;
 #endif
 
 TERM term = {
-	NROW-1,
-	NROW-1,
+	NROW,
+	NROW,
 	NCOL,
 	NCOL,
 	MARGIN,

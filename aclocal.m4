@@ -1,7 +1,7 @@
 dnl
 dnl Local definitions for autoconf.
 dnl ------------------------
-dnl $Header: /usr/build/VCS/pgf-vile/RCS/aclocal.m4,v 1.3 1994/07/11 22:56:20 pgf Exp $
+dnl $Header: /usr/build/VCS/pgf-vile/RCS/aclocal.m4,v 1.4 1994/07/22 01:45:44 pgf Exp $
 dnl ------------------------
 dnl
 dnl VC_HAVE_LIBRARY is a slightly modifid version of AC_HAVE_LIBRARY from 
@@ -291,3 +291,13 @@ int main() { char *y = quote(a b); exit (strcmp(y, "/a b/"));}
   ])
  ])
 ])dnl
+dnl ---------------------------------------------------------------------------
+dnl	On both Ultrix and CLIX, I find size_t defined in <stdio.h>
+define([VC_SIZE_T],
+[AC_CHECKING(for size_t in <sys/types.h> or <stdio.h>)
+ AC_TEST_PROGRAM([
+#include <sys/types.h>
+#include <stdio.h>
+int main() { size_t x; exit (0);}
+], ,
+[AC_DEFINE(size_t, unsigned)])])dnl

@@ -11,7 +11,7 @@
 #
 # The modes are table entries in the BUFFER and WINDOW structures.
 #
-# $Header: /usr/build/VCS/pgf-vile/RCS/modetbl,v 1.40 1994/07/11 22:56:20 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/modetbl,v 1.43 1994/09/07 22:00:47 pgf Exp $
 #
 #
 # Mode-table entries.  Capitalized letters are used for abbreviations.
@@ -24,15 +24,16 @@ bool								# GMD prefix
 	"dirc"		DIRC		0		COMPLETE_DIRS # directory-completion (slow!)
 	"Alt-TabPos"	ALTTABPOS	0			# emacs-style cursor positioning
 	"expand-path"	EXPAND_PATH	0			# true iff %/# don't substitute shortened-path
+	"ErrorBells"	ERRORBELLS	0			# audible/visible-bells
 	"flash"		FLASH		0		OPT_FLASH # visible-bell (flash)
 	"glob"		GLOB		0		!OPT_GLOB_PIPE # enable/disable filename globbing
 	"HIstory"	HISTORY		0		OPT_HISTORY # command-history
 	"ImplyBuffer"	IMPLYBUFF 	0			# imply-buffer (vi-like)
 	"multibeep"	MULTIBEEP	0			# multiple successive identical failed motions all beep
-	"Popup-Choices"	POPUP_FILEC	0		NOTYET	# popup buffer showing file-completion choices
-	"Popup-Msgs"	POPUP_MSGS	0		NOTYET	# popup buffer when multiple messages emitted
+	"Popup-Msgs"	POPUP_MSGS	0		OPT_POPUP_MSGS	# popup buffer when multiple messages emitted
 	"ShowRam"	RAMSIZE		0		RAMSIZE	# show ram-usage
 	"SameBangs"	SAMEBANGS	0			# use same "!!" data for ^X-!
+	"working"	WORKING		0		OPT_WORKING # "working" message
 	"view-on-readonly" RONLYVIEW	0		# set view mode for readonly files
 	"xterm-mouse"	XTERM_MOUSE	0		OPT_XTERM # (patch) mode to control whether we allow mouse-clicking
 int								# VAL_ prefix
@@ -45,6 +46,7 @@ regex								# VAL_ prefix
 string								# VAL_ prefix
 	"expand-chars"	EXPAND_CHARS	0			# list of chars we can expand (%,#,:)
 	"glob"		GLOB		0		OPT_GLOB_PIPE # select filename globbing style
+	"Popup-Choices"	POPUP_CHOICES	0		OPT_POPUPCHOICE	# popup buffer showing file-completion choices
 
 .buffers
 bool								# MD prefix

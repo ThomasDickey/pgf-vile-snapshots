@@ -4,7 +4,7 @@
  *	the cursor.
  *	written for vile by Paul Fox, (c)1990
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/tags.c,v 1.54 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/tags.c,v 1.58 1994/08/08 16:12:29 pgf Exp $
  *
  */
 #include	"estruct.h"
@@ -62,8 +62,7 @@ int
 cmdlinetag(t)
 char *t;
 {
-	strncpy0(tagname,t,NFILEN);
-	return tags(tagname, global_b_val(VAL_TAGLEN));
+	return tags(strncpy0(tagname, t, NFILEN), global_b_val(VAL_TAGLEN));
 }
 
 
@@ -89,8 +88,7 @@ int taglen;
 		tagbp = gettagsfile(i, &nomore);
 		if (nomore) {
 			if (gotafile) {
-				TTbeep();
-				mlforce("[No such tag: \"%s\"]",tag);
+				mlwarn("[No such tag: \"%s\"]",tag);
 			} else {
 				mlforce("[No tags file available.]");
 			}
@@ -113,6 +111,9 @@ int taglen;
 	while (tfp < lplim)
 		if (*tfp++ == '\t')
 			break;
+	if (*tfp == '\t') { /* then it's a new-fangled NeXT tags file */
+		tfp++;  /* skip the tab */
+	}
 
 	i = 0;
 	if (b_val(curbp,MDTAGSRELTIV) && !is_slashc(*tfp)) {
@@ -177,14 +178,37 @@ int taglen;
 		if (s != TRUE && !changedfile)
 			tossuntag();
 	} else {
-		int exact = 1;
-		i = 0;
+		int exact;
+		int delim = *tfp;
+		int quoted = FALSE;
+		char *p;
+
 		tfp += 2; /* skip the "/^" */
-		lplim -= 2; /* skip the "$/" */
-		if (*lplim != '$') {
-			exact = 0;
-			lplim++;
+		p = tfp+1;
+
+		/* we're on the '/', so look for the matching one */
+		while (p < lplim) {
+			if (quoted) {
+				quoted = FALSE;
+			} else if (*p == '\\') {
+				quoted = TRUE;
+			} else if (*p == delim) {
+				break;
+			}
+			p++;
 		}
+		if (p >= lplim) {
+			mlforce("[Bad pattern in tags file.]");
+			return FALSE;
+		}
+		if (p[-1] == '$') {
+			exact = TRUE;
+			p--;
+		} else {
+			exact = FALSE;
+		}
+		lplim = p;
+		i = 0;
 		while (i < sizeof(srchpat) && tfp < lplim) {
 			if (*tfp == '\\' && tfp < lplim - 1)
 				tfp++;  /* the backslash escapes next char */
@@ -193,8 +217,7 @@ int taglen;
 		srchpat[i] = EOS;
 		lp = cheap_buffer_scan(curbp, srchpat, (SIZE_T)i, exact);
 		if (lp == NULL) {
-			mlforce("[Tag not present]");
-			TTbeep();
+			mlwarn("[Tag not present]");
 			if (!changedfile)
 				tossuntag();
 			return FALSE;
@@ -373,8 +396,7 @@ int f,n;
 		}
 		return s;
 	}
-	TTbeep();
-	mlforce("[No stacked un-tags]");
+	mlwarn("[No stacked un-tags]");
 	return FALSE;
 }
 

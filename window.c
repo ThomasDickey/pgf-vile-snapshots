@@ -2,7 +2,7 @@
  * Window management. Some of the functions are internal, and some are
  * attached to keys that the user actually types.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/window.c,v 1.42 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/window.c,v 1.47 1994/09/05 19:30:21 pgf Exp $
  *
  */
 
@@ -46,6 +46,8 @@ int
 set_curwp (wp)
 WINDOW	*wp;
 {
+	if (wp == curwp)
+		return (TRUE);
 	curwp = wp;
 	make_current(curwp->w_bufp);
 	upmode();
@@ -146,7 +148,7 @@ int f, n;	/* default flag and numeric argument */
 	if (f) {
 
 		/* first count the # of windows */
-		nwindows = 1;
+		nwindows = 0;
 		for_each_window(wp)
 			nwindows++;
 
@@ -190,7 +192,7 @@ int f,n;
 	} else if (c == '-' || c == 'L') {
 		rows = -1;
 	} else {
-		TTbeep();
+		kbd_alarm();
 		return FALSE;
 	}
 
@@ -348,7 +350,7 @@ int	f,n;
 
 	if (w_val(curwp, WVAL_SIDEWAYS) < 0) {
 		if (original == 0)
-			TTbeep();
+			kbd_alarm();
 		w_val(curwp, WVAL_SIDEWAYS) = 0;
 	}
 
@@ -402,7 +404,7 @@ int f,n;
         wheadp->w_wndp = NULL;
 
         curwp->w_line.l = adjust_back(curwp, curwp->w_line.l, curwp->w_toprow);
-        curwp->w_ntrows = term.t_nrow-1;
+        curwp->w_ntrows = term.t_nrow-2;
         curwp->w_toprow = 0;
         curwp->w_flag  |= WFMODE|WFHARD|WFSBAR;
 	curwp->w_split_hist = 0;
@@ -755,15 +757,67 @@ wpopup()
 		if(wp->w_ntrows > biggest_wp->w_ntrows)
 			biggest_wp = wp;
 	}
-	curwp = biggest_wp;
-	wp = splitw(FALSE,0); /* yes -- choose the unoccupied half */
-	curwp = owp;
-	if (wp == NULL ) { /* maybe biggest_wp was too small  */
+	if (biggest_wp->w_ntrows >= MINWLNS) {
+	    curwp = biggest_wp;
+	    wp = splitw(FALSE,0); /* yes -- choose the unoccupied half */
+	    curwp = owp;
+	}
+	else {
+		/*  biggest_wp was too small  */
 		wp = wheadp;		/* Find window to use	*/
 	        while (wp!=NULL && wp==curwp) /* uppermost non-current window */
 	                wp = wp->w_wndp;
+		if (wp == NULL)
+		    wp = wheadp;
 	}
         return wp;
+}
+
+/*
+ * Shrink or expand current window to the number of lines in the buffer.
+ * If the buffer is too large, make the window as large as possible using
+ * space from window closest in the split history.
+ */
+
+void
+shrinkwrap()
+{
+    L_NUM nlines;
+
+    if (wheadp->w_wndp == NULL)
+	return;			/* only one window */
+
+    nlines = line_count(curwp->w_bufp);
+    if (nlines <= 0)
+	nlines = 1;
+
+    if (nlines == curwp->w_ntrows)
+	return;
+
+    if ((curwp->w_split_hist & 1) == 0 || wheadp == curwp) {
+	int nrows;
+	/* give/steal from lower window */
+	nrows = curwp->w_ntrows + curwp->w_wndp->w_ntrows - 1;
+	if (nlines > nrows)
+	    nlines = nrows;
+	resize(TRUE, nlines);
+    }
+    else {
+	/* give/steal from upper window; need to find upper window */
+	register WINDOW *wp;
+	WINDOW *savewp = curwp;
+	int nrows;
+	for (wp = wheadp; 
+	     wp->w_wndp != curwp && wp->w_wndp != NULL; 
+	     wp = wp->w_wndp)
+	    ;
+	curwp = wp;
+	nrows = curwp->w_ntrows + curwp->w_wndp->w_ntrows - 1;
+	if (nlines > nrows)
+	    nlines = nrows;
+	resize(TRUE, nrows - nlines + 1);
+	curwp = savewp;
+    }
 }
 
 int
@@ -825,7 +879,6 @@ int f,n;	/* numeric argument */
 	WINDOW *wp;	/* current window being examined */
 	WINDOW *nextwp;	/* next window to scan */
 	WINDOW *lastwp;	/* last window scanned */
-	int lastline;	/* screen line of last line of current window */
 
 	if (!f) {
 		mlforce("[No length given]");
@@ -833,14 +886,14 @@ int f,n;	/* numeric argument */
 	}
 
 	/* make sure it's in range */
-	if (n < MINWLNS || n > term.t_mrow + 1) {
+	if (n < MINWLNS || n > term.t_mrow) {
 		mlforce("[Screen length out of range]");
 		return(FALSE);
 	}
 
-	if (term.t_nrow == n - 1)
+	if (term.t_nrow == n)
 		return(TRUE);
-	else if (term.t_nrow < n - 1) {
+	else if (term.t_nrow < n) {
 
 		/* go to the last window */
 		wp = wheadp;
@@ -861,7 +914,7 @@ int f,n;	/* numeric argument */
 			nextwp = wp->w_wndp;
 	
 			/* get rid of it if it is too low */
-			if (wp->w_toprow > n - 2) {
+			if (wp->w_toprow >= n - 2) {
 
 				if (--wp->w_bufp->b_nwnd == 0) {
 					undispbuff(wp->w_bufp,wp);
@@ -881,8 +934,7 @@ int f,n;	/* numeric argument */
 
 			} else {
 				/* need to change this window size? */
-				lastline = mode_row(wp) - 1;
-				if (lastline >= n - 2) {
+				if (mode_row(wp) >= n - 3) {
 					wp->w_ntrows = n - wp->w_toprow - 2;
 					wp->w_flag |= WFHARD|WFMODE;
 				}
@@ -893,7 +945,7 @@ int f,n;	/* numeric argument */
 	}
 
 	/* screen is garbage */
-	term.t_nrow = n - 1;
+	term.t_nrow = n;
 	sgarbf = TRUE;
 	return(TRUE);
 }
@@ -971,7 +1023,7 @@ winit()
         wp->w_lastdot = nullmark;
         wp->w_toprow = 0;
         wp->w_values = global_w_values;
-        wp->w_ntrows = term.t_nrow-1;           /* "-1" for mode line.  */
+        wp->w_ntrows = term.t_nrow-2;           /* "-1" for mode line.  */
         wp->w_force = 0;
         wp->w_flag  = WFMODE|WFHARD;            /* Full.                */
 	wp->w_bufp = NULL;

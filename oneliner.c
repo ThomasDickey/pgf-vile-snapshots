@@ -3,7 +3,7 @@
  *	here to support the globals() function.  They now work on regions.
  *	Written (except for delins()) for vile by Paul Fox, (c)1990
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/oneliner.c,v 1.61 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/oneliner.c,v 1.64 1994/09/23 04:30:41 pgf Exp $
  */
 
 #include	"estruct.h"
@@ -245,10 +245,9 @@ int needpats, use_opts;
 
 	rls_region();
 	if (do_report(total_changes)) {
-		if (globally)
-			mlforce("[%d changes on %d lines]", total_changes, lines_changed);
-		else
-			mlforce("[%d changes]", total_changes);
+		mlforce("[%d change%s on %d line%s]",
+			total_changes, PLURAL(total_changes),
+			lines_changed, PLURAL(lines_changed));
 	}
 	return TRUE;
 }
@@ -298,7 +297,7 @@ int nth_occur, printit, globally, *confirmp;
 	DOT.o = 0;
 	do {
 		scanboundpos.o = lLength(DOT.l);
-		s = scanner(exp, FORWARD, FALSE);
+		s = scanner(exp, FORWARD, FALSE, NULL);
 		if (s != TRUE)
 			break;
 
@@ -546,6 +545,7 @@ char *sourc;
 		    break;
 
 	    case '\n':
+	    case '\r':
 		    s = lnewline();
 		    break;
 

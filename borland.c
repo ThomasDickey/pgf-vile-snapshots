@@ -10,7 +10,7 @@
  * Note: Visual flashes are not yet supported.
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/borland.c,v 1.5 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/borland.c,v 1.6 1994/09/13 17:15:48 pgf Exp $
  *
  */
 
@@ -89,8 +89,8 @@ int ibmtype;
  * "termio" code.
  */
 TERM    term    = {
-	NROW-1,
-	NROW-1,
+	NROW,
+	NROW,
 	NCOL,
 	NCOL,
 	MARGIN,

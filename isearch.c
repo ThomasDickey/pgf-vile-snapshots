@@ -7,7 +7,7 @@
  *
  * original author: D. R. Banks 9-May-86
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/isearch.c,v 1.30 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/isearch.c,v 1.33 1994/09/05 19:30:21 pgf Exp $
  *
  */
 
@@ -51,8 +51,7 @@ risearch(f, n)
 		DOT = curpos;	/* Reset the pointer */
 		curwp->w_flag |= WFMOVE;	/* Say we've moved */
 		(void)update(FALSE);		/* And force an update */
-		mlforce("[I-Search failed]");	/* Say we died */
-		TTbeep();
+		mlwarn("[I-Search failed]");	/* Say we died */
 		return FALSE;
 	} else
 		mlerase();	/* If happy, just erase the cmd line */
@@ -80,8 +79,7 @@ fisearch(f, n)
 		DOT = curpos;	/* reset */
 		curwp->w_flag |= WFMOVE;	/* Say we've moved */
 		(void)update(FALSE);		/* And force an update */
-		mlforce("[I-Search failed]");	/* Say we died */
-		TTbeep();
+		mlwarn("[I-Search failed]");	/* Say we died */
 		return FALSE;
 	} else
 		mlerase();	/* If happy, just erase the cmd line */
@@ -254,8 +252,7 @@ start_over:
 		pat[cpos] = 0;	/* null terminate the buffer */
 		col = echochar(c, col);	/* Echo the character */
 		if (!status) {	/* If we lost last time */
-			TTbeep();	/* Feep again */
-			TTflush();	/* see that the feep feeps */
+			kbd_alarm();	/* Feep again */
 		} else /* Otherwise, we must have won */
 			status = scanmore(pat, n);   /* or find the next
 							      * match */
@@ -288,12 +285,10 @@ scanmore(patrn, dir)		/* search forward or back for a pattern */
 
 	ignorecase = window_b_val(curwp, MDIGNCASE);
 
-	sts = scanner(gregexp, (dir < 0) ? REVERSE : FORWARD, FALSE);
+	sts = scanner(gregexp, (dir < 0) ? REVERSE : FORWARD, FALSE, NULL);
 
-	if (!sts) {
-		TTbeep();	/* Feep if search fails */
-		TTflush();	/* see that the feep feeps */
-	}
+	if (!sts)
+		kbd_alarm();	/* Feep if search fails */
 	return (sts);		/* else, don't even try */
 }
 
@@ -410,7 +405,7 @@ echochar(c, col)
 	int             c;	/* character to be echoed */
 	int             col;	/* column to be echoed in */
 {
-	movecursor(term.t_nrow, col);	/* Position the cursor */
+	movecursor(term.t_nrow-1, col);	/* Position the cursor */
 	if (!isprint(c)) {	/* control char */
 		TTputc('^');	/* Yes, output prefix */
 		TTputc(toalpha(c));	/* Make it "^X" */

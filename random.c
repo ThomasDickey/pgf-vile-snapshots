@@ -2,7 +2,7 @@
  * This file contains the command processing functions for a number of random
  * commands. There is no functional grouping here, for sure.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/random.c,v 1.133 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/random.c,v 1.139 1994/09/23 04:21:19 pgf Exp $
  *
  */
 
@@ -62,7 +62,7 @@ char	*name;
 	set_b_val(bp,VAL_TAB,8);
 
 	make_local_b_val(bp,MDDOS);
-	set_b_val(bp, MDDOS, CRLF_LINES && global_b_val(MDDOS) );
+	set_b_val(bp, MDDOS, CRLF_LINES);
 
 	make_local_b_val(bp,MDCMOD);
 	set_b_val(bp,MDCMOD,FALSE);
@@ -81,6 +81,8 @@ char *carg;
 	register BUFFER *bp;
 	register int	s;
 	WINDOW  *wp;
+	int alreadypopped;
+	BUFFER *ocurbp = curbp;
 
 	/* create the buffer list buffer   */
 	bp = bfind(name, BFSCRTCH);
@@ -90,6 +92,7 @@ char *carg;
 	if ((s=bclear(bp)) != TRUE) /* clear old text (?) */
 		return (s);
 	b_set_scratch(bp);
+	alreadypopped = (bp->b_nwnd != 0);
 	if (popupbuff(bp) == FALSE) {
 		(void)zotbuf(bp);
 		return (FALSE);
@@ -103,8 +106,13 @@ char *carg;
 		character pointer arguments */
 	(*func)(iarg,carg);
 	(void)gotobob(FALSE,1);
-
 	set_rdonly(bp, non_filename());
+
+	if (alreadypopped) /* don't switch to the popup if it wasn't there */
+		swbuffer(ocurbp);
+	else
+		shrinkwrap(); /* only resize if it's fresh */
+
 	return TRUE;
 }
 
@@ -566,6 +574,14 @@ int f, n;	/* arguments ignored */
 	mlforce("%s",buf);
 	return(TRUE);
 }
+
+int
+userbeep(f, n)
+int f, n;
+{
+	TTbeep();
+	return TRUE;
+}
 #endif
 
 
@@ -577,29 +593,45 @@ catnap(milli,watchinput)
 int milli;
 int watchinput;
 {
+#if X11
+    if (watchinput)
+	x_typahead(milli);
+    else
+#endif
+    {
 #if UNIX
 # if HAVE_SELECT
 
 	struct timeval tval;
 	fd_set read_bits;
+#  if HAVE_SIGPROCMASK
+	sigset_t newset, oldset;
+	sigemptyset(&newset);
+	sigaddset(&newset, SIGALRM);
+	sigprocmask(SIG_BLOCK, &newset, &oldset);
+#  endif
 
 	FD_ZERO(&read_bits);
 	if (watchinput) {
 		FD_SET(0, &read_bits);
 	}
-	tval.tv_sec = 0;
-	tval.tv_usec = milli * 1000;	/* microseconds */
+	tval.tv_sec = milli / 1000;
+	tval.tv_usec = (milli % 1000) * 1000;	/* microseconds */
 	(void)select (1, &read_bits, (fd_set*)0, (fd_set*)0, &tval);
 
+#  if HAVE_SIGPROCMASK
+	sigprocmask(SIG_SETMASK, &oldset, NULL);
+#  endif
+
 # else
-#  if HAVE_POLL
+#  if HAVE_POLL && HAVE_POLL_H
 
 	struct pollfd pfd;
 	(void)poll(&pfd, 0, milli); /* milliseconds */
 
 #  else
 
-	sleep(1); /* 1 second.	ugh. */
+	sleep((milli + 999) / 1000); /* 1 second granularity. ugh. */
 
 #  endif
 # endif
@@ -627,6 +659,7 @@ int watchinput;
 	for (i = 0; i < term.t_pause; i++)
 		;
 #endif
+    }
 }
 
 #if UNIX

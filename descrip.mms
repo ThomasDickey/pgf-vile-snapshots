@@ -11,7 +11,7 @@
 # all as "0".  If you use tcap.c, you'll need libtermcap.a too.  If you use
 # x11.c, you'll need libX11.a too.
 #
-# $Header: /usr/build/VCS/pgf-vile/RCS/descrip.mms,v 1.15 1994/07/11 22:56:20 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/descrip.mms,v 1.16 1994/07/22 01:45:44 pgf Exp $
 
 # for regular vile, use these:
 SCREEN = vmsvt
@@ -236,9 +236,9 @@ vms2unix.obj :	dirstuff.h
 	@- if f$search("*.log") .nes. "" then purge *.log
 
 # used /G_FLOAT with vaxcrtlg/share in vms_link.opt
-# can also use /Listing, /Show=All
+# can also use /Debug /Listing, /Show=All
 CFLAGS =-
-	/Diagnostics /Debug /Define=("os_chosen",$(SCRDEF)) -
+	/Diagnostics /Define=("os_chosen",$(SCRDEF)) -
 	/Object=$@ /Include=($(INCS))
 
 .C.OBJ :

@@ -2,7 +2,7 @@
  *		The routines in this file handle the conversion of pathname
  *		strings.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/path.c,v 1.28 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/path.c,v 1.30 1994/09/05 19:38:34 pgf Exp $
  *
  *
  */
@@ -136,7 +136,12 @@ int	option;		/* true:directory, false:file, -true:don't care */
 		case ']':
 			if (this < VMSPATH_BEGIN_DIR)
 				return FALSE;
-			next = VMSPATH_END_DIR;
+			if (path != base	/* rooted logical? */
+			 && path[1] == '['
+			 && path[-1] == '.')
+				path++;
+			else
+				next = VMSPATH_END_DIR;
 			break;
 		case '.':
 			next = (this >= VMSPATH_END_DIR)
@@ -182,6 +187,7 @@ int	option;		/* true:directory, false:file, -true:don't care */
 		this = VMSPATH_BEGIN_FILE;
 
 	return (option == TRUE  && (this == VMSPATH_END_DIR))	/* dir? */
+	  ||   (option == TRUE  && (this == VMSPATH_END_DEV))	/* dev? */
 	  ||   (option == FALSE && (this >= VMSPATH_BEGIN_FILE))/* file? */
 	  ||   (option == -TRUE && (this >= VMSPATH_END_DIR	/* anything? */
 				 || this <  VMSPATH_BEGIN_DIR));
@@ -485,7 +491,7 @@ char *ss;
 		break;
 	}
 	while (*pp) {
-#if DEBUG
+#if PDEBUG
 		if (pp != p)
 			*p = EOS;
 		printf(" s is %s\n",s);
@@ -634,7 +640,7 @@ int keep_cwd;
 		if (slp == ff - 1)
 			return strcpy(path, strcat(temp, ff));
 	}
-	
+
 	/* if we mismatched during the first path component, we're done */
 	if (slp == path)
 		return path;
@@ -952,22 +958,6 @@ char *result;
 }
 #endif	/* PATHLOOK */
 
-#if NO_LEAKS
-void
-path_leaks()
-{
-#if UNIX
-	while (user_paths != NULL) {
-		register UPATH *paths = user_paths;
-		user_paths = paths->next;
-		free(paths->name);
-		free(paths->path);
-		free((char *)paths);
-	}
-#endif
-}
-#endif	/* NO_LEAKS */
-
 #if NT
 /********                                               \\  opendir  //
  *                                                        ===========
@@ -987,7 +977,7 @@ path_leaks()
 DIR *opendir(fname)
 char * fname;
 {
-	char buf[256];
+	char buf[256];	/* FIXME: isn't there a MAXPATHLEN defined? */
 	DIR *od;
 
 	strcpy(buf, fname);
@@ -998,7 +988,7 @@ char * fname;
 		strcat(buf, "\\*.*");
 
 	/* allocate the structure to maintain currency */
-	if ((od = (DIR *)malloc(sizeof(DIR))) == NULL)
+	if ((od = typealloc(DIR)) == NULL)
 		return NULL;
 
 	/* Let's try to find a file matching the given name */
@@ -1010,6 +1000,7 @@ char * fname;
 	od->first = 1;
 	return od;
 }
+
 /********                                               \\  readdir  //
  *                                                        ===========
  * readdir
@@ -1027,7 +1018,7 @@ char * fname;
 DIRENT *readdir(dirp)
 DIR *dirp;
 {
-	DIRENT *dep;
+	static	DIRENT *dep;
 
 	if (!dirp->first) {
 		if (!FindNextFile(dirp->hFindFile, &dirp->ffd))
@@ -1035,16 +1026,24 @@ DIR *dirp;
 	}
 	dirp->first = 0;
 
-	if ((dep = (DIRENT *)malloc(sizeof(DIRENT))) == NULL)
+#if NO_LEAKS
+	if (dep != 0) {
+		free(dep->d_name);
+	} else
+#endif
+	if ((dep = typealloc(DIRENT)) == NULL)
 		return NULL;
 
-	if ((dep->d_name = strdup(dirp->ffd.cFileName)) == NULL) {
+	if ((dep->d_name = strmalloc(dirp->ffd.cFileName)) == NULL) {
 		free(dep);
+#if NO_LEAKS
+		dep = 0;
+#endif
 		return NULL;
 	}
 	return dep;
 }
-																				     
+
 /********                                               \\  closedir  //
  *                                                        ===========
  * closedir
@@ -1068,3 +1067,19 @@ DIR *dirp;
 }
 
 #endif /* NT */
+
+#if NO_LEAKS
+void
+path_leaks()
+{
+#if UNIX
+	while (user_paths != NULL) {
+		register UPATH *paths = user_paths;
+		user_paths = paths->next;
+		free(paths->name);
+		free(paths->path);
+		free((char *)paths);
+	}
+#endif
+}
+#endif	/* NO_LEAKS */

@@ -36,9 +36,12 @@ Getting along with vile
 	and key sequences that are bound to the same function.
 
 	You needn't type full command names -- type a few characters and
-	hit TAB to perform command completion.  Type a question mark to
-	display a list of the characters that you would have to type to
-	complete the command.  For example, to complete
+	hit TAB to perform command completion.  Hitting a second TAB will
+	pop up a window containing the list of possible completions.
+	
+	You can also type a question mark to display a list of the
+	characters that you would have to type to complete the command. 
+	For example, to complete
 
 		:unm?			-- you type
 		:unm{a}[pr]		-- you see
@@ -78,7 +81,7 @@ General Remarks
 	you can undo it in the other.
 
 	vile is 8-bit clean, allowing it to be used more easily at non-
-	English speaking sites.  The section on "8-Bit Operation" for
+	English speaking sites.  See the section on "8-Bit Operation" for
 	more information.
 
 Buffer manipulation commands:  
@@ -777,24 +780,30 @@ Editor modes
 		information allowing you to distinguish between directory and
 		file names in the prompt.  (U)
 
-	dos	When writing the buffer, terminate lines with CR/LF pairs,
-                rather than the usual single LF.  On input, if the global
-		DOS mode is set, then incoming CR/LF pairs are taken as
-		line terminators, and the local DOS mode is set on the
-		buffer if the majority of lines ended that way.  If global
-		DOS mode is _not_ set, then incoming CR characters will be
-		visible on the screen.  Setting this makes editing binary
-		files unreliable.  (This mode is set _on_ in DOS versions
-		of vile, and should be turned off if doing binary editing.) (B)
+	dos	On input, if the global copy of this mode is set, then
+		incoming CR/LF pairs are taken as line terminators, the CR
+		characters are stripped out, and the local dos mode is set
+		for the buffer, if the majority of lines had CR characters
+		at the end.  If global dos mode is _not_ set, then incoming
+		CR characters will be left visible on the screen (as '^M'),
+		and the local mode will not be set.
 
-	fcolor	On systems supporting this, will set the foreground color.
-		Currently only DOS can do color, although the X11 version
-		(xvile) can be given colors at startup or via .Xdefaults.
-		See notes about the color palette down below, under DOS
-		specifics.
+		On output, when writing a buffer with local dos mode set,
+		all lines will be terminated with CR/LF pairs, rather than
+		the usual single LF.
+		
+		When buffers representing non-existent files are created
+		they will inherit the line-style of the operating system
+		(LF-only on UNIX and VMS, CRLF-style on DOS derivatives)
+		regardless of the global setting of dos mode. 
+		
+		Setting dos mode makes editing binary files unreliable.
+		The global value for this mode is set on by default in DOS
+		versions of vile, and should therefore be turned off if
+		doing binary editing.  (B)
 
-	fillcol (fc) Will prompt for a new value for the fill column, where
-		auto-wrapping and region formatting will break lines. (B)
+	errorbells (eb) Controls whether a bell sounds (or whether the
+		screen flashes, if "flash" mode is on") when an error occurs (U)
 
 	expand-chars Controls the set of characters that are expanded in command
 		lines.  These include
@@ -807,8 +816,18 @@ Editor modes
 	expand-path Controls whether %/# are expanded to the full pathname
 		of a buffer. (U)
 
+	fcolor	On systems supporting this, will set the foreground color.
+		Currently only DOS can do color, although the X11 version
+		(xvile) can be given colors at startup or via .Xdefaults.
+		See notes about the color palette down below, under DOS
+		specifics.
+
+	fillcol (fc) Will prompt for a new value for the fill column, where
+		auto-wrapping and region formatting will break lines. (B)
+
 	flash   If your terminal can, will flash the screen rather than
-		beeping on errors.  (U)
+		beeping on errors.  No audible or visible indication will
+		occur at all if "errorbells" mode is not on.  (U)
 
 	glob	Controls how wildcard characters (e.g., '*' and '?') are
 		treated in prompts for filenames.  Set glob to 'off' to
@@ -874,6 +893,23 @@ Editor modes
 	paragraphs A regular expression defining where the "next-paragraph"
 		('}') and "previous-paragraph" ('{') commands will go. (B)
 
+	popup-choices (pc) Must be set to one of the following three
+		values: "off", "immediate", or "delayed".  When enabled
+		with either "immediate" or "delayed", vile pops up the
+		[Completions] buffer showing choices for filename and
+		command completion in response to a TAB.  "immediate" will
+		force the buffer to be popped up immediately if no progress
+		is made in forming a completion.  "delayed" will cause vile
+		to wait until TAB is pressed a second time before popping
+		up the completion choices.  (U)
+
+	popup-msgs (pm) When enabled, vile pops up the [Messages] buffer
+		showing the text that was written to the message line. 
+		Closing the window clears its content until the next
+		message is written.  This is most useful during the
+		debugging of macros, since many messages may appear, each
+		overwriting a previous one.  (U)
+
 	printing-low The integer value representing the first of the
 		printable set of "high bit" characters.  Defaults to 0.
 		Most foreign (relative to me!) users would set this to 160,
@@ -887,7 +923,9 @@ Editor modes
 	report A threshold value that is used to control messages that report
 		the number of lines deleted, changed, etc.  (U)
 
-	ruler Shows the current line and column in the status line.  (B)
+	ruler Shows the current line and column in the status line, as
+		well as what percentage of the current buffer's lines lie
+		in front of the cursor.  (B)
 
 	samebangs (sb) Controls whether the "!!" and "^X-!" commands use the
 		same command string.  (U)
@@ -983,6 +1021,9 @@ Editor modes
 
 	view-on-readonly  Causes "view" mode to be set for read-only files. (U)
 
+	working  If turned off (noworking), will suppress the long-running
+		activity indicator ("working..."/"...working").  (U)
+
 	wrapmargin (wm) Implements vi's auto-wrap mode.  If nonzero, the wrap-
 		margin specifies the number of columns on the screen's right
 		margin to reserve before breaking the input lines on a space.
@@ -1018,7 +1059,7 @@ Editor modes
 	Input: If the user's input device can generate all characters, and
 	if the terminal settings are such that these characters pass through
 	unmolested (Using "stty cs8 -parenb -istrip" works for me, on an
-	xterm.  Real serial lines make take more convincing, at both
+	xterm.  Real serial lines may take more convincing, at both
 	ends.), vile will happily incorporate them into the user's text, or
 	act on them if they are bound to functions.  Users who have no need
 	to enter 8-bit text may want access to the meta-bound functions
@@ -1143,30 +1184,9 @@ Key Rebinding
 		bind-key execute-macro-15 M-A
 
 
-	:map 
-	----
-	The vi "map" command is available in a restricted form.  The sequence
-	being mapped can only be a single valid bindable vile key-sequence,
-	like any single character, or ^A or ^X or "FN-" followed by a
-	single character.  The other limitation is that although mappings
-	can be nested, there is currently NO way for vile to detect infinite
-	recursion, and serious consequences (including data loss) may
-	result if mapping are set up in an infinite loop.  The key being
-	bound to may be specified in any of the literal or printable ways
-	mentioned above.  The sequence that map should generate must be
-	entered literally -- as in real vi, there is no translation of ^
-	to control characters.  To enter control characters into a .vilerc
-	file, use the ^V escaping mechanism.
-
-	The :map! and :abbr commands have not yet been implemented, but
-	as mentioned above, function key ("FN-") bindings work in input
-	mode as well as command mode.
-
-
 	Syntax for key-sequences:
 	-------------------------
-	To summarize, a key-sequence being bound to or mapped is specified
-	with:
+	To summarize, a key-sequence being bound to is specified with:
 		1) an optional prefix, like this:
 			^A-	(three chars)
 			^X-	(three chars)
@@ -1196,6 +1216,41 @@ Key Rebinding
 	(The "one char" control character entries in the above table are
 	represented in this help file as two printable characters, to
 	ensure they are not deleted by mailers or file transfer programs.)
+
+
+	:map 
+	----
+	The vi "map" and "map!" commands are implemented in vile.  As in vi,
+	mapping works best if the character sequence being bound corresponds
+	to pressing a single key.  Multiple key sequences will work however
+	so long as the next key in the sequence is pressed within the number
+	of milliseconds specified by timeoutlen.  Though not recommended,
+	this mechanism even permits the following type of mappings:
+
+		:map z j
+		:map zz k
+
+	What this says is that 'z' pressed by itself will cause vile to move
+	down one line (assuming j has not been rebound or remapped).  But
+	if 'z' is pressed twice rapidly enough in succession, vile will
+	move to the previous line.
+
+	Because "map" and "map!" may be used to remap arbitrary sequences,
+	these sequences must be entered literally, i.e, the syntax for
+	key sequences as listed below will not work for "map" and "map!".
+	To enter control characters into a .vilerc file, use the ^V escaping
+	mechanism.  A map command entered from the command line will require
+	few characters to be escaped with ^V.
+
+	Vile duplicates real vi's behavior (but not vim's) in that the first
+	character of the sequence being mapped to is not subject to
+	recursive (map) evaluation.  Thus, pressing 'j' when ":map j jh" is
+	in effect will not cause an infinite loop.  Assuming the motion is
+	possible, pressing 'j' with this map in effect will cause vile to
+	move down one line and then left one character.  But pressing 'j'
+	when ":map j hj" is in effect will cause an infinite loop.  Long
+	running loops are detected and assumed to be infinite.  When an
+	(assumed) infinite loop is detected, execution is aborted.
 
 
 Special "Terminal" Key Rebinding
@@ -1894,7 +1949,7 @@ Filtering "man" pages
 		XVile*font: -*-courier-medium-r-*-*-*-*-*-*-*-70-*-*
 
 	You may also set the font from your .vilerc file.  This is not
-	recommended, however, as you loose the ability to choose a different
+	recommended, however, as you lose the ability to choose a different
 	font from the command line or resource file.  It may also cause the
 	xvile window to be unnecessarily resized during initialization.
 
@@ -2179,7 +2234,7 @@ Differences from vi
 		set sections=^[{^L]
 
 
-	The vi ":map!", and ":abbr" are not supported.
+	The vi command ":abbr" is not supported.
 
 	There is no special lisp support.  But then, when was the last time
 	you heard of a lisp programmer that used vi?
@@ -2333,7 +2388,9 @@ Credits
 -------
 
 	This code has been written by a _lot_ of people, with help from a
-	lot more sending in bug reports, fixes, and suggestions.
+	lot more sending in bug reports, fixes, and suggestions.  But bug
+	reports should be sent to Paul Fox, pgf@foxharp.boston.ma.us, who
+	is (still) (principally) responsible for this thing.
 	
 	Names appearing within comments in the micro-Emacs source code are:
 	Dave Conroy, Daniel Lawrence, John Gamble, Roger Ove, Dana Hoggatt,
@@ -2343,20 +2400,20 @@ Credits
 	Tom Dickey has contributed many code improvements and features, and
 	has stabilized vile on both VMS and DOS.  Kevin Buettner has
 	contributed lots of changes for X11 Toolkit support, as well as the
-	bulk of the selection and video attribute mechanisms.  Some of the
-	"ex" code is by Steve Kirkendall, author of the vi work-alike
-	"elvis".  The regular expression code and documentation is by Henry
-	Spencer.  The sample .vilerc was created by Dave Lemke; he also
-	contributed code for new features, including the original native X
-	support.  Eric Krohn has done some excellent testing and
-	enhancement.  The implementation of rectangles and their operations
-	was inspired by code from the 'notgnu' editor, by Julie Melbin.
-	Patches to support OS/2 and Windows/NT came from Charles Moschel
-	and Joe Greer, respectively.
+	bulk of the selection and video attribute mechanisms, and the bulk
+	of the :map command.  Some of the "ex" code is by Steve Kirkendall,
+	author of the vi work-alike "elvis".  The regular expression code
+	and documentation is by Henry Spencer.  The sample .vilerc was
+	created by Dave Lemke; he also contributed code for new features,
+	including the original native X support.  Eric Krohn has done some
+	excellent testing and enhancement.  The implementation of
+	rectangles and their operations was inspired by code from the
+	'notgnu' editor, by Julie Melbin.  Patches to support OS/2 and
+	Windows/NT came from Charles Moschel and Joe Greer, respectively.
 	
 	The initial changes to create vile from micro-Emacs were all done
 	by Paul Fox, who can be reached at home at pgf@foxharp.boston.ma.us.
 	(By the way, he is not the Paul D. Fox that wrote the Crisp editor.)
 
 ------------------------------------
- $Header: /usr/build/VCS/pgf-vile/RCS/vile.hlp,v 1.172 1994/07/11 22:56:20 pgf Exp $
+ $Header: /usr/build/VCS/pgf-vile/RCS/vile.hlp,v 1.181 1994/09/27 01:49:15 pgf Exp $

@@ -8,7 +8,7 @@
  * Modified by Pete Ruczynski (pjr) for auto-sensing and selection of
  * display type.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/ibmpc.c,v 1.56 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/ibmpc.c,v 1.58 1994/09/13 17:15:48 pgf Exp $
  *
  */
 
@@ -36,7 +36,7 @@
 #endif
 
 
-#define NROW	60			/* Max Screen size.		*/
+#define NROW	50			/* Max Screen size.		*/
 #define NCOL    80			/* Edit if you want to.         */
 #define	MARGIN	8			/* size of minimum margin and	*/
 #define	SCRSIZ	64			/* scroll size for extended lines */
@@ -219,6 +219,9 @@ static	long	ScreenAddress[] = {
 		SCADE	/* CDVGA: VGA adapter */
 	};
 
+/*  the following should be sized dynamically, but it may not be worth it,
+	if we come up in the biggest size anyway, since we never shrink
+	but only grow */
 USHORT *scptr[NROW];			/* pointer to screen lines	*/
 USHORT *s2ptr[NROW];			/* pointer to page-1 lines	*/
 USHORT sline[NCOL];			/* screen line image		*/
@@ -276,8 +279,8 @@ static int current_ibmtype;
  * "termio" code.
  */
 TERM    term    = {
-	NROW-1,
-	NROW-1,
+	NROW,
+	NROW,
 	NCOL,
 	NCOL,
 	MARGIN,
@@ -492,7 +495,7 @@ ibmeeop()
 	rg.h.ah = 6;		/* scroll page up function code */
 	rg.h.al = 0;		/* # lines to scroll (clear it) */
 	rg.x._CX_ = 0;		/* upper left corner of scroll */
-	rg.h.dh = term.t_nrow;  /* lower right corner of scroll */
+	rg.h.dh = term.t_nrow - 1; /* lower right corner of scroll */
 	rg.h.dl = term.t_ncol - 1;
 	rg.h.bh = scblank();
 	INTX86(0x10, &rg, &rg);
@@ -599,7 +602,7 @@ int	inverted;
 	}
 
 	/* fill in the message line */
-	lp = s2ptr[term.t_nrow];
+	lp = s2ptr[term.t_nrow-1];
 	attr = scblank() << 8;
 	for (col = 0; col < term.t_ncol; col++)
 		lp[col] = attr | SPACE;
@@ -749,7 +752,7 @@ ibmclose()
 	current_ibmtype = ctype; /* ...so subsequent TTopen restores us */
 
 	dtype = CDMONO;		/* ...force monochrome */
-	movecursor(term.t_nrow, 0);
+	bottomleft();
 }
 
 void
@@ -961,7 +964,7 @@ int bacg;	/* background color */
 	register USHORT *lnptr;	/* pointer to the destination line */
 	register int i;
 
-	if (row > term.t_nrow)
+	if (row > term.t_nrow-1)
 		return;
 
 	if (flickcode && (dtype == CDCGA))
@@ -1048,7 +1051,7 @@ int row;
 {
 	register int	i;
 
-	if (row > term.t_nrow)
+	if (row > term.t_nrow-1)
 		return 0;
 
 	if (vp == 0) {
@@ -1187,7 +1190,7 @@ ms_processing ()
 			button_pending = 0;
 			if (copied) {
 				set_page(0);
-				ms_setvrange(0, term.t_nrow);
+				ms_setvrange(0, term.t_nrow-1);
 				mlerase();
 				setwmark(pixels2row(last_y),
 					 pixels2col(last_x));
@@ -1216,7 +1219,7 @@ ms_processing ()
 				 * window.
 				 */
 				if (wp != 0
-				 && ttrow != term.t_nrow
+				 && ttrow != term.t_nrow - 1
 				 && setcursor(y, x)) {
 					(void)update(TRUE);
 					ms_setvrange(wp->w_toprow,

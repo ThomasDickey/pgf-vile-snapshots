@@ -3,7 +3,7 @@
  * and backward directions.
  *  heavily modified by Paul Fox, 1990
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/search.c,v 1.63 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/search.c,v 1.67 1994/09/01 15:59:32 pgf Exp $
  *
  * original written Aug. 1986 by John M. Gamble, but I (pgf) have since
  * replaced his regex stuff with Henry Spencer's regexp package.
@@ -28,7 +28,7 @@ int wrapok, dir;
 	if (wrapok || global_b_val(MDTERSE))
 		mlforce (notfoundmsg);
 	else
-		mlforce (hitendmsg, dir == FORWARD ? "BOTTOM":"TOP");
+		mlforce (hitendmsg, dir == FORWARD ? "bottom":"top");
 }
 
 int
@@ -74,6 +74,7 @@ int marking, fromscreen;
 	int wrapok;
 	MARK curpos;
 	int didmark = FALSE;
+	int didwrap;
 
 	if (f && n < 0)
 		return rsearch(f, -n, FALSE, FALSE);
@@ -100,9 +101,10 @@ int marking, fromscreen;
 
 	curpos = DOT;
 	scanboundry(wrapok,curpos,FORWARD);
+	didwrap = FALSE;
 	do {
 		nextch(&(DOT), FORWARD);
-		status = scanner(gregexp, FORWARD, wrapok);
+		status = scanner(gregexp, FORWARD, wrapok, &didwrap);
 		if (status == ABORT) {
 			mlforce("[Aborted]");
 			DOT = curpos;
@@ -121,6 +123,10 @@ int marking, fromscreen;
 			DOT.o = lLength(DOT.l);
 			didmark = TRUE;
 		}
+		if (!marking && didwrap) {
+			mlwrite("[Search wrapped past end of buffer]");
+			didwrap = FALSE;
+		}
 	} while ((marking || --n > 0) && status == TRUE);
 
 	if (!marking && !status)
@@ -131,8 +137,7 @@ int marking, fromscreen;
 	} else if (status) {
 		savematch(DOT,gregexp->mlen);
 		if (samepoint(DOT,curpos)) {
-			mlwrite(onlyonemsg);
-			TTbeep();
+			mlwarn(onlyonemsg);
 		}
 	}
 
@@ -159,6 +164,7 @@ int f, n;	/* default flag / numeric argument */
 	register int status;
 	int wrapok;
 	MARK curpos;
+	int didwrap;
 
 	wrapok = window_b_val(curwp, MDSWRAP);
 
@@ -180,17 +186,21 @@ int f, n;	/* default flag / numeric argument */
 	 */
 	curpos = DOT;
 	scanboundry(wrapok,DOT,FORWARD);
+	didwrap = FALSE;
 	do {
 		nextch(&(DOT),FORWARD);
-		status = scanner(gregexp, FORWARD, wrapok);
+		status = scanner(gregexp, FORWARD, wrapok, &didwrap);
+		if (didwrap) {
+			mlwrite("[Search wrapped past end of buffer]");
+			didwrap = FALSE;
+		}
 	} while ((--n > 0) && status == TRUE);
 
 	/* Save away the match, or complain if not there.  */
 	if (status == TRUE) {
 		savematch(DOT,gregexp->mlen);
 		if (samepoint(DOT,curpos)) {
-			mlwrite(onlyonemsg);
-			TTbeep();
+			mlwarn(onlyonemsg);
 		}
 	} else if (status == FALSE) {
 		nextch(&(DOT),REVERSE);
@@ -230,6 +240,7 @@ int dummy, fromscreen;
 	register int status;
 	int wrapok;
 	MARK curpos;
+	int didwrap;
 
 	if (n < 0)
 		return fsearch(f, -n, FALSE, fromscreen);
@@ -250,17 +261,22 @@ int dummy, fromscreen;
 
 		curpos = DOT;
 		scanboundry(wrapok,DOT,REVERSE);
+		didwrap = FALSE;
 		do {
 			nextch(&(DOT),REVERSE);
-			status = scanner(gregexp, REVERSE, wrapok);
+			status = scanner(gregexp, REVERSE, wrapok, &didwrap);
+			if (didwrap) {
+				mlwrite(
+				  "[Search wrapped past start of buffer]");
+				didwrap = FALSE;
+			}
 		} while ((--n > 0) && status == TRUE);
 
 		/* Save away the match, or complain if not there.  */
 		if (status == TRUE)
 			savematch(DOT,gregexp->mlen);
 			if (samepoint(DOT,curpos)) {
-				mlwrite(onlyonemsg);
-				TTbeep();
+				mlwarn(onlyonemsg);
 			}
 		else if (status == FALSE) {
 			nextch(&(DOT),FORWARD);
@@ -287,6 +303,7 @@ int f, n;	/* default flag / numeric argument */
 	register int status;
 	int wrapok;
 	MARK curpos;
+	int didwrap;
 
 	wrapok = window_b_val(curwp, MDSWRAP);
 
@@ -308,9 +325,14 @@ int f, n;	/* default flag / numeric argument */
 
 	curpos = DOT;
 	scanboundry(wrapok,DOT,REVERSE);
+	didwrap = FALSE;
 	do {
 		nextch(&(DOT),REVERSE);
-		status = scanner(gregexp, REVERSE, wrapok);
+		status = scanner(gregexp, REVERSE, wrapok, &didwrap);
+		if (didwrap) {
+			mlwrite("[Search wrapped past start of buffer]");
+			didwrap = FALSE;
+		}
 	} while ((--n > 0) && status == TRUE);
 
 	/* Save away the match, or complain
@@ -319,8 +341,7 @@ int f, n;	/* default flag / numeric argument */
 	if (status == TRUE) {
 		savematch(DOT,gregexp->mlen);
 		if (samepoint(DOT, curpos)) {
-			mlwrite(onlyonemsg);
-			TTbeep();
+			mlwarn(onlyonemsg);
 		}
 	} else if (status == FALSE) {
 		nextch(&(DOT),FORWARD);
@@ -362,13 +383,15 @@ int f,n;
  *	reset the "." to be at the start or just after the match string
  */
 int
-scanner(exp, direct, wrapok)
+scanner(exp, direct, wrapok, wrappedp)
 regexp	*exp;	/* the compiled expression */
 int	direct;	/* which way to go.*/
 int	wrapok;	/* ok to wrap around bottom of buffer? */
+int	*wrappedp;
 {
 	MARK curpos;
-	int found, wrapped;
+	int found;
+	int wrapped = FALSE;
 
 	if (!exp) {
 		mlforce("BUG: null exp");
@@ -379,13 +402,15 @@ int	wrapok;	/* ok to wrap around bottom of buffer? */
 	 */
 	curpos = DOT;
 
-	wrapped = 0;
-
 	/* Scan each character until we hit the scan boundary */
 	for(;;) {
 		register int startoff, srchlim;
 
-		if (interrupted()) return ABORT;
+		if (interrupted()) {
+			if (wrappedp)
+				*wrappedp = wrapped;
+			return ABORT;
+		}
 
 		if (sameline(curpos, scanboundpos)) {
 			if (direct == FORWARD) {
@@ -434,6 +459,8 @@ int	wrapok;	/* ok to wrap around bottom of buffer? */
 			DOT.l = curpos.l;
 			DOT.o = (C_NUM)(exp->startp[0] - l_ref(curpos.l)->l_text);
 			curwp->w_flag |= WFMOVE; /* flag that we have moved */
+			if (wrappedp)
+				*wrappedp = wrapped;
 			return TRUE;
 		} else {
 			if (sameline(curpos,scanboundpos) &&
@@ -446,15 +473,14 @@ int	wrapok;	/* ok to wrap around bottom of buffer? */
 			curpos.l = lBACK(curpos.l);
 		}
 		if (is_header_line(curpos, curbp)) {
-			wrapped++;
+			wrapped = TRUE;
 			if (sameline(curpos,scanboundpos) &&
 						(!wrapok || wrapped) )
 				break;
-			if (direct == FORWARD) {
+			if (direct == FORWARD)
 				curpos.l = lFORW(curpos.l);
-			} else {
+			else
 				curpos.l = lBACK(curpos.l);
-			}
 		}
 		if (direct == FORWARD) {
 			curpos.o = 0;
@@ -465,6 +491,8 @@ int	wrapok;	/* ok to wrap around bottom of buffer? */
 
 	}
 
+	if (wrappedp)
+		*wrappedp = wrapped;
 	return FALSE;	/* We could not find a match.*/
 }
 
@@ -654,7 +682,7 @@ int direc;
 		savepos = DOT;
 		s = (direc == FORWARD) ? forwchar(TRUE,1) : backchar(TRUE,1);
 		if (s == TRUE)
-			s = scanner(exp, direc, FALSE);
+			s = scanner(exp, direc, FALSE, NULL);
 	}
 	if (s != TRUE)
 		DOT = savepos;

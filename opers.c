@@ -3,7 +3,7 @@
  * that take motion operators.
  * written for vile by Paul Fox, (c)1990
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/opers.c,v 1.46 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/opers.c,v 1.47 1994/08/08 16:12:29 pgf Exp $
  *
  */
 
@@ -89,7 +89,7 @@ char *str;
 	}
 
 	if ((cfp->c_flags & MOTION) == 0) {
-		TTbeep();
+		kbd_alarm();
 		doingopcmd = FALSE;
 		return(ABORT);
 	}
@@ -222,7 +222,7 @@ int f,n;
 	MARK savedot;
 	int s;
 	savedot = DOT;
-	opcmd = OPOTHER;
+	opcmd = OPDEL;
 	s = operator(f,n,yankregion,"Yank");
 	DOT = savedot;
 	return s;

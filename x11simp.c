@@ -1,7 +1,7 @@
 /*
  * 	older, simpler X11 support, Dave Lemke, 11/91
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/x11simp.c,v 1.47 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/x11simp.c,v 1.48 1994/09/05 19:30:21 pgf Exp $
  *
  */
 #error This module is not actively maintained as part of vile.
@@ -693,7 +693,7 @@ x_open()
 
     /* main code assumes that it can access a cell at nrow x ncol */
     term.t_ncol = tw->cols;
-    term.t_nrow = tw->rows - 1;
+    term.t_nrow = tw->rows;
     if (wm_title)
     	XStoreName(dpy, tw->win, wm_title);
 }
@@ -1943,7 +1943,7 @@ extend_selection(tw, nr, nc, wipe)
 						nc = tw->cols;
 					}
 				} else {
-					nr = term.t_nrow - 1;
+					nr = term.t_nrow - 2;
 					nc = 0;
 				}
 			} else {

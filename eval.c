@@ -3,7 +3,7 @@
 
 	written 1986 by Daniel Lawrence
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/eval.c,v 1.91 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/eval.c,v 1.96 1994/09/05 19:31:41 pgf Exp $
  *
  */
 
@@ -252,22 +252,22 @@ char *fname;		/* name of function to evaluate */
 	/* and now evaluate it! */
 	switch (fnum) {
 	case UFADD:
-		it = l_itoa(atoi(arg1) + atoi(arg2));
+		it = l_itoa(l_strtol(arg1) + l_strtol(arg2));
 		break;
 	case UFSUB:
-		it = l_itoa(atoi(arg1) - atoi(arg2));
+		it = l_itoa(l_strtol(arg1) - l_strtol(arg2));
 		break;
 	case UFTIMES:
-		it = l_itoa(atoi(arg1) * atoi(arg2));
+		it = l_itoa(l_strtol(arg1) * l_strtol(arg2));
 		break;
 	case UFDIV:
-		it = l_itoa(atoi(arg1) / atoi(arg2));
+		it = l_itoa(l_strtol(arg1) / l_strtol(arg2));
 		break;
 	case UFMOD:
-		it = l_itoa(atoi(arg1) % atoi(arg2));
+		it = l_itoa(l_strtol(arg1) % l_strtol(arg2));
 		break;
 	case UFNEG:
-		it = l_itoa(-atoi(arg1));
+		it = l_itoa(-l_strtol(arg1));
 		break;
 	case UFCAT:
 		it = strcat(strcpy(result, arg1), arg2);
@@ -285,13 +285,13 @@ char *fname;		/* name of function to evaluate */
 		it = ltos(stol(arg1) == FALSE);
 		break;
 	case UFEQUAL:
-		it = ltos(atoi(arg1) == atoi(arg2));
+		it = ltos(l_strtol(arg1) == l_strtol(arg2));
 		break;
 	case UFLESS:
-		it = ltos(atoi(arg1) < atoi(arg2));
+		it = ltos(l_strtol(arg1) < l_strtol(arg2));
 		break;
 	case UFGREATER:
-		it = ltos(atoi(arg1) > atoi(arg2));
+		it = ltos(l_strtol(arg1) > l_strtol(arg2));
 		break;
 	case UFSEQUAL:
 		it = ltos(strcmp(arg1, arg2) == 0);
@@ -322,13 +322,13 @@ char *fname;		/* name of function to evaluate */
 		break;
 	case UFTRUTH:
 		/* is it the answer to everything? */
-		it = ltos(atoi(arg1) == 42);
+		it = ltos(l_strtol(arg1) == 42);
 		break;
 	case UFASCII:
 		it = l_itoa((int)arg1[0]);
 		break;
 	case UFCHR:
-		result[0] = atoi(arg1);
+		result[0] = l_strtol(arg1);
 		result[1] = EOS;
 		it = result;
 		break;
@@ -338,10 +338,10 @@ char *fname;		/* name of function to evaluate */
 		it = result;
 		break;
 	case UFRND:
-		it = l_itoa((ernd() % absol(atoi(arg1))) + 1);
+		it = l_itoa((ernd() % absol(l_strtol(arg1))) + 1);
 		break;
 	case UFABS:
-		it = l_itoa(absol(atoi(arg1)));
+		it = l_itoa(absol(l_strtol(arg1)));
 		break;
 	case UFSINDEX:
 		it = l_itoa(sindex(arg1, arg2));
@@ -410,7 +410,7 @@ char *vname;		/* name of environment variable to retrieve */
 			system to the set of those with broken compilers that need
 			to use ifs instead of a switch statement */
 
-		If( EVPAGELEN )		value = l_itoa(term.t_nrow + 1);
+		If( EVPAGELEN )		value = l_itoa(term.t_nrow);
 		ElseIf( EVCURCOL )	value = l_itoa(getccol(FALSE) + 1);
 		ElseIf( EVCURLINE )	value = l_itoa(getcline());
 #if RAMSIZE
@@ -455,7 +455,7 @@ char *vname;		/* name of environment variable to retrieve */
 					value = falsem;
 #endif
 		ElseIf( EVLLENGTH )	value = l_itoa(lLength(DOT.l));
-		ElseIf( EVLINE )	value = getctext((CMASK)0);
+		ElseIf( EVLINE )	value = getctext((CHARTYPE)0);
 		ElseIf( EVWORD )	value = getctext(_nonspace);
 		ElseIf( EVIDENTIF )	value = getctext(_ident);
 		ElseIf( EVQIDENTIF )	value = getctext(_qident);
@@ -748,14 +748,14 @@ char *value;	/* value to set to */
 			spal(strncpy0(palstr, value, (SIZE_T)(NSTRING)));
 
 		ElseIf( EVLASTKEY )
-			lastkey = atoi(value);
+			lastkey = l_strtol(value);
 
 		ElseIf( EVCURCHAR )
 			if (b_val(curbp,MDVIEW))
 				status = rdonly();
 			else {
 				(void)ldelete(1L, FALSE); /* delete 1 char */
-				c = atoi(value);
+				c = l_strtol(value);
 				if (c == '\n')
 					status = lnewline();
 				else
@@ -849,7 +849,13 @@ char *value;	/* value to set to */
 		(void)strcat(outline, ":");
 
 		/* variable name */
-		(void)strcat(outline, var);
+		if (var->v_type == TKENV) {
+			(void)strcat(outline, "&");
+			(void)strcat(outline, envars[var->v_num]);
+		} else if (var->v_type == TKENV) {
+			(void)strcat(outline, "%");
+			(void)strcat(outline, var->v_ptr->u_name);
+		}
 		(void)strcat(outline, ":");
 
 		/* and lastly the value we tried to assign */
@@ -881,6 +887,18 @@ int i;	/* integer to translate to a string */
 	static char result[INTWIDTH+1];	/* resulting string */
 	(void)lsprintf(result,"%d",i);
 	return result;
+}
+
+
+/* like strtol, but also allow character constants */
+long l_strtol(s)
+char *s;
+{
+	if (s[0] == '\'' && 
+	    s[2] == '\'' && 
+	    s[3] == EOS)
+	    return (long)s[1];
+	return strtol(s,NULL,0);
 }
 
 int toktyp(tokn)	/* find the type of a passed token */
@@ -1031,8 +1049,7 @@ is_truem(val)
 char *val;
 {
 	char	temp[8];
-	strncpy0(temp, val, sizeof(temp));
-	(void)mklower(temp);
+	(void)mklower(strncpy0(temp, val, sizeof(temp)));
 	return (!strcmp(temp, "yes")
 	   ||   !strcmp(temp, "true")
 	   ||   !strcmp(temp, "t")
@@ -1049,8 +1066,7 @@ is_falsem(val)
 char *val;
 {
 	char	temp[8];
-	strncpy0(temp, val, sizeof(temp));
-	(void)mklower(temp);
+	(void)mklower(strncpy0(temp, val, sizeof(temp)));
 	return (!strcmp(temp, "no")
 	   ||   !strcmp(temp, "false")
 	   ||   !strcmp(temp, "f")

@@ -1,26 +1,18 @@
 ------------------------
 vile bug/enhancement/wish list
 ------------------------
-$Header: /usr/build/VCS/pgf-vile/RCS/buglist,v 1.179 1994/07/11 22:56:20 pgf Exp $
+$Header: /usr/build/VCS/pgf-vile/RCS/buglist,v 1.194 1994/09/27 01:49:15 pgf Exp $
 ----------------------
 	(E means enhancement, L,M,H are low, medium, high priority)
-----------------------
 
-E	everybody and their sibling wants "map", "map!", and "abb".
-	there is now fledgling support for this, courtesy Otto Lind.
-	Still no map! or abb, and nested maps are broken in a couple
-	of ways, but it's a start...  oh yes, one other thing -- :map
-	currently only supports single key mappings (i.e.  you can map one
-	vile key-sequnce to a string, but there is no string to string
-	mapping).
+E	add "set autowrite"
 
-	    [ a user writes: vi's map/map!  has problems in treating
-	    numbers of ^V in different platforms.  And mail/newsreaders
-	    don't like those control characters.  I suggest you consider
-	    the bindkey style in tcsh that uses \e as ESC, \r as return
-	    etc.  vile is not just a vi emulator anyway. ]
+E	add ":n file" 
+	    (:n means go to the next file in a series of files.
+	    :n file means go to that specific file - one can specify a
+	    +<cmd> before file to indicate the vi command which should be
+	    executed when entering the command.)
 
-E	add "set autowrite", ":n file" (what does that do?), "set noredraw"
 
 E	now that paragraphs, sections, and sentences are all selectable
 	with regexps, they (and the tabstop value) are prime candidates for
@@ -375,9 +367,6 @@ in this situation.
 
 ---------------------------
 
-I was wondering if it was possible to delete/cut the highlighted region
-(from the selection with mouse button one)? 
----------------------------
 
 How can I read the status of a shell command when I execute a
 shell-command? Although the shell command has a $STATUS=1 the
@@ -391,22 +380,6 @@ buffers at other times as well).
 This would be most useful for the edit, make, execute cycle.
 ---------------------------
 
- > 
- > 2) In xvile :set cmode does not work. :set all keeps giving nocmode.
- >    (Linux)
-are you sure you're setting the right cmode?  the local vs. global setting
-can be a little confusing...
-
- > 
- > 3) I cannot give xvile a filename at startup. (Linux)
-it ignores the argument?
-
- > 
- > 4) I cannot run xvile in the background. (Linux)
-what are the symptoms?
-
------------------------
-
 Is it possible to bind keys which give a sequence like ^[[5~, that is other
 than ^[O<char.>, longer than 3 chars?
 [ not currently  -pgf ]
@@ -419,11 +392,6 @@ you can't use ! as a regular expression delimiter, as in:
 because the parser treats ":s!" as if it's ":q!" or ":w!".
 
 ---------------------
-
-pcvile: there's no cursor visible in some of the less-used video modes,
-like 40x12 or 40x25.
-
-----------
 
 the ^W and ^R commands don't work with shell-files, i.e.
 	^WG!lpr
@@ -546,17 +514,266 @@ mode -- i think they should be available with :n, and they are not.
 
 running a SunOS4.1.3 binary of vile on Solaris2.3 causes the "interrupted
 system call" problem, no doubt due to the differing BSD/SysV signal()
-semantics.  we should add a "working" mode, to allow the "working..."
-message to be turned off in cases like this.
+semantics.  [ probable workaround:  ":set noworking" ]
 
 ----------------------
 
 the DOS versions of vile (Watcom, with ibmpc.c or ansi.c) don't work on
 any machine in the whole wide world _except_ the HP OmniBook.  :-)
 
+[TurboC works fine, but there's no memory extender -- tom ]
+
 ----------------------------
 
 it might be nice to have an easy way to deselect text, since it is
 sometimes visually annoying
 
+----------------------------
 
+I was wondering if there was a list anywhere of which commands take what
+arguments.  I have the definitive list of commands, but I wasn't able to
+find anywhere in the source code that there is a list of the commands AND
+their arguments.  This would really help in macro programming.
+
+------------------------------------
+
+Another thing that would be really helpful would be a description of the
+$debug variable, and what it does, how it works.
+
+------------------------------------
+
+the "yW" command doesn't eat whitespace.  it should, just as "dW" does.
+
+-------------------------------
+
+the docs for the &right function disagree, in vile.hlp and macros.doc.  the
+code seems to do what vile.hlp says.  the macros.doc behavior seems more
+rational, since the current behavior can i think be duplicated more easily
+with &mid than the macros.doc-style behavior.  (vile.hlp says that we take
+the substring starting at the given position.  macros.doc says we take the
+substring starting the given number of chars from the end.)
+
+---------------------------------
+
+there should be better support in vile for reading bits of shell output
+into a buffer -- ":r !foo" is a little primitive when trying to insert a
+single word into a line.
+
+---------------------------------
+
+the vile_bulletin script should use a list, or a special from address, to
+make it possible for users to filter it.
+
+-----------------
+
+the .bak backups under DOS should be optional and/or they should be available
+under UNIX as well.
+
+----------
+
+autoindent skips blank lines when looking for the
+indent value.  apparently real vi doesn't?
+
+----------------------
+
+[really?  why is this?]
+currently can't pop/untag from within macro
+
+------------------
+
+are there still reentrancy problems in xvile when mousing around during
+long-running operations.
+
+----------------------
+
+should switch to distributing with a tar archive instead of shar.   much
+faster, and probably portable, these days.
+
+-------------------------
+
+[ need to verify this: ]
+
+    I played around with the new selection feature and noticed that
+    "backward" selection extension does not work the same as
+    "forward" selection extension.  Briefly, "forward" selection
+    extension does what is documented in vile.hlp.  "Backward"
+    selection extension, however, does not always extend the
+    selection, but sometimes starts it from a new point of reference
+    in the buffer.
+
+    A concrete example...
+
+    Mappings:
+
+    ; rebind Select functionality
+    bind-key selection  ^O
+    bind-key select-til S
+
+    Buffer contents (4 lines and only these 4 lines):
+
+    1
+    22
+    333
+    4444
+
+    Place the cursor on line #1 (text == 1) and enter these keystrokes:
+
+	Sj     ; select top 2 lines of buffer
+
+    Place the cursor on line #4 (text == 4444) and enter these keystrokes:
+
+	S^O    ; extend selection to end of buffer
+
+    At this point, all text in the buffer is highlighted (as expected).
+    No problems so far.  Now, here's the behavior I would classify as a
+    possible bug:
+
+    Place the cursor on line #3 (text == 333) and enter these keystrokes:
+
+	SG     ; select bottom two lines of buffer.
+
+    Place the cursor on line #1 (text == 1) and enter these keystrokes:
+
+	S^O    ; extend selection to top of buffer.
+
+    At this point, only the first three lines of the buffer are selected.
+    I would have expected all lines in the buffer to be selected.
+
+    I also dropped core once while fooling around with backward 
+    selection, but was unable to duplicate the problem.
+
+
+-------------------------
+
+could the attribute selection logic be used to emulate vi's behavior
+of replacing the last char of a change operation to '$'?  (but only for
+text which does not span a line)
+
+---------------------------
+
+ Another problem with '1 shell-command '
+ With the option '1' vile don't prompt for [Return] but the
+ screen always 'hops'.  (scrolls 1 line forward and backward)
+
+-------------------------
+
+the local copy of signal() in termio.c should get a new name e.g. 
+vilesignal().  we should call it in all cases.  we should ifdef things so
+on systems where we don't need our routine, we simply act as a wrapper for
+the real signal().  (someone reported getting a multiply-defined error
+on signal, on a Sequent machine.  probably from a bad shared-lib
+implementation.
+
+--------------------
+
+there should be a way to reference both the global and local values
+of modes from within macros, so that values can be saved and restored.
+
+-------------------------
+
+from tom, a while ago.  still true?
+        + I ran into a bug in line-wrap: I don't think it takes tabs into
+          account (I saved the test case at work).
+
+-------------------------
+
+regarding the ^X^X find-error code (from tom)
+Rather than have the long if-then-else-if sequence, we could have a table
+of structs something like
+
+        struct  {
+                int     file;
+                int     line;
+                int     msg;
+                REGEX   *pattern;
+        } ERR_PATTERN;
+
+where the int-members correspond to the \1 through \9 special symbols.
+If we use a meta character such as '%', we can define something like
+
+        "\"\([a-z]%f\)\" Line \([0-9][0-9]*%l\)"
+
+to substitute as a regular expression
+
+        "\"\([a-z]\1\)\" Line \([0-9][0-9]*\2\)"
+
+I believe that I suggested a few months ago that the expressions be put
+into a special buffer as well, rather than trying to make a mode out
+of them.
+
+-------------------------
+
+[ how do i test this? ]
+In xvile, when the load is high and the machine stalls for a while
+and I key in several keystrokes ahead, it takes the first of those keystrokes
+and replaces the later keys by it i.e. when several events simultaneously
+arrive, it doesn't do the right thing (process them in order).
+Otherwise, great work!
+
+	Tjl
+-----------------
+
+when motion keys or pasting is used during an insertion, perhaps we should
+break the insertion into multiple undoable chunks.
+-----------------
+
+pasting to a view-only buffer does not generate an error message.
+----------------------------
+
+there's no way to get buffer status from within a macro, like "modified"
+
+----------------------------
+
+Carriage returns in the replacement pattern should become newlines:
+
+example:
+    darkstar brad kgillesp zerrenner amylia
+
+    vile: after :%s/ /^M/g
+
+    darkstar^Mbrad^Mkgillesp^Mzerrenner^Mamylia
+
+    vi: after :%s/ /^M/g
+
+    darkstar
+    brad
+    kgillesp
+    zerrenner
+    amylia
+
+---------------
+
+some folks would like to see smooth-scrolling enforced.  it seems they
+have keyboards that repeat just a little faster than their screen can keep up,
+and they'd like vile to scroll rather than jump with the typahead.
+
+
+-----------
+
+   XVILE BUG:
+
+      - If I click on the "maximize" gadget, it gets _really_ big.
+        Like, many times bigger than the screen big; I suspect that
+        it is maximizing to a number of *characters* equal to the number
+        of *pixels* available or something.  If I click on the same 
+        gadget (after dragging that part of the window onto the screen),
+        which does a normalize, it crashes.
+	I am use vile 4.5 and xvile on HP/UX 9.01.
+	I use vuewm as my window manager (a motif variant).
+
+
+------------------
+      - I would like an option whereby if I have more than one file on
+        the command line, the display opens with one window per buffer,
+        so I can visibly see all the files available.
+----------------------
+
+still no abbr command
+
+----------------------
+vi's map/map!  has problems in treating numbers of ^V in different
+platforms.  And mail/newstreaders don't like those control
+characters.  consider the bindkey style in tcsh
+that uses \e as ESC, \r as consider return etc.  vile is not
+just a vi emulator anyway.  ]
+----------------------

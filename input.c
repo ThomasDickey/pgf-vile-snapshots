@@ -2,7 +2,7 @@
  *		written by Daniel Lawrence
  *		5/9/86
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/input.c,v 1.108 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/input.c,v 1.113 1994/09/23 04:21:19 pgf Exp $
  *
  */
 
@@ -12,6 +12,8 @@
 #define	SQUARE_LEFT	'['
 
 #define	DEFAULT_REG	-1
+
+#define INFINITE_LOOP_COUNT 1200
 
 typedef	struct	_kstack	{
 	struct	_kstack	*m_link;
@@ -138,7 +140,7 @@ int *cp;
 		if (strchr(respchars,*cp))
 			return TRUE;
 
-		TTbeep();
+		kbd_alarm();
 	}
 }
 
@@ -166,8 +168,7 @@ int	at_dft;		/* default-value (e.g., for "@@" command) */
 	if (c == '@' && at_dft != -1) {
 		c = at_dft;
 	} else if (reg2index(c) < 0) {
-		TTbeep();
-		mlforce("[Invalid register name]");
+		mlwarn("[Invalid register name]");
 		return FALSE;
 	}
 
@@ -393,7 +394,7 @@ int eatit;  /* consume the character? */
 	return c;
 }
 
-char tungottenchars[10];
+static TBUFF *tungottenchars = NULL;
 
 void
 tungetc(c)
@@ -401,14 +402,13 @@ int c;
 {
 	int i, n;
 	char esc_seq[10];
+
 	n = kcod2escape_seq(c, esc_seq);
-	tungotcnt = n;
-	n--;
-	for (i = 0; i < tungotcnt; i++, n--)
-		tungottenchars[i] = esc_seq[n];
-	
-	i = tungotcnt;
-	while (i--) {
+
+	for (i = n-1; i >= 0; i--)
+		tb_put(&tungottenchars, (ALLOC_T) tungotcnt++, esc_seq[i]);
+
+	for (i = n; i--; ) {
 	    if (dotcmdmode == RECORD) {
 		    tb_unput(TempDot(FALSE));
 		    if (kbdmode == RECORD)
@@ -416,7 +416,28 @@ int c;
 	    } else if (dotcmdmode != PLAY && kbdmode == RECORD)
 		    tb_unput(KbdMacro);
 	}
+}
 
+void
+tungetstr(s, n)
+char *s;		/* string to unget */
+int n;			/* number of recorded characters to elide */
+{
+	if (s) {
+	    register char *t;
+	    for (t = s; *t; t++);
+	    while (t > s)
+		    tb_put(&tungottenchars, (ALLOC_T) tungotcnt++, *--t);
+	}
+
+	while (n-- > 0) {
+	    if (dotcmdmode == RECORD) {
+		    tb_unput(TempDot(FALSE));
+		    if (kbdmode == RECORD)
+			    tb_unput(KbdMacro);
+	    } else if (dotcmdmode != PLAY && kbdmode == RECORD)
+		    tb_unput(KbdMacro);
+	}
 }
 
 /*	tgetc:	Get a key from the terminal driver, resolve any keyboard
@@ -425,12 +446,20 @@ int
 tgetc(quoted)
 int quoted;
 {
+	static int infloopcnt = 0;
 	register int c;	/* fetched character */
 
 	if (tungotcnt > 0) {
-		c = tungottenchars[--tungotcnt];
+		if (++infloopcnt >= INFINITE_LOOP_COUNT) {
+			mlforce("[Infinite loop due to map detected]");
+			tungotcnt = 0;
+			c = abortc;
+		}	
+		else
+			c = tb_get(tungottenchars, (ALLOC_T) --tungotcnt);
 		record_char(c);
 	} else {
+		infloopcnt = 0;
 		if ((c = get_recorded_char(TRUE)) == -1) {
 			/* fetch a character from the terminal driver */ 
 			not_interrupted();
@@ -464,12 +493,14 @@ int
 kbd_key()
 {
 	int    c;
+	int    delayed = 0;
 
 #if OPT_XTERM && !X11
 kbd_key_loop:
 #endif
+
 	/* get a keystroke */
-	c = tgetc(FALSE);
+	c = maplookup(tgetc(FALSE), &delayed);
 
 #if ANSI_SPEC
 
@@ -477,7 +508,8 @@ kbd_key_loop:
 		int nextc;
 
 		/* if there's no recorded input, and no user typeahead */
-		if ((nextc = get_recorded_char(FALSE)) == -1 && !typahead()) {
+		if ( (nextc = get_recorded_char(FALSE)) == -1 
+		  && !typahead() && !delayed) {
 			/* give it a little extra time... */
 			catnap(global_g_val(GVAL_TIMEOUTVAL),TRUE);
 		}
@@ -656,13 +688,13 @@ char *	ptr;
 /* get a string consisting of inclchartype characters from the current
 	position.  if inclchartype is 0, return everything to eol */
 #if ANSI_PROTOS
-int screen_string (char *buf, int bufn, CMASK inclchartype )
+int screen_string (char *buf, int bufn, CHARTYPE inclchartype )
 #else
 int
 screen_string(buf,bufn,inclchartype)
 char *buf;
 int bufn;
-CMASK inclchartype;
+CHARTYPE inclchartype;
 #endif
 {
 	register int i = 0;
@@ -1063,6 +1095,7 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 
 	register int quotef;	/* are we quoting the next char? */
 	register int backslashes; /* are we quoting the next expandable char? */
+	int dontmap = (options & KBD_NOMAP);
 	int firstch = TRUE;
 	int newpos;
 	char buf[NLINE];
@@ -1122,7 +1155,7 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 		 * Get a character from the user. If not quoted, treat escape
 		 * sequences as a single (16-bit) special character.
 		 */
-		c = quotef ? tgetc(TRUE) : kbd_key();
+		c = (quotef || dontmap) ? tgetc(TRUE) : kbd_key();
 
 		/* if we echoed ^V, erase it now */
 		if (quotef) {
@@ -1188,7 +1221,7 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 
 			/* if buffer is empty, return FALSE */
 			hst_append(buf, eolchar);
-			strncpy0(extbuf, buf, (SIZE_T)bufn);
+			(void)strncpy0(extbuf, buf, (SIZE_T)bufn);
 			status = (*extbuf != EOS);
 
 			/* If this is a shell command, push-back the actual
@@ -1220,7 +1253,7 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 			continue;
 		} else
 #endif
-		if (c == abortc && quotef == FALSE) {
+		if (c == abortc && quotef == FALSE && !dontmap) {
 			buf[cpos] = EOS;
 			status = esc(FALSE, 1);
 			break;
@@ -1292,6 +1325,9 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 		firstch = FALSE;
 	}
 	reading_msg_line = FALSE;
+#if OPT_POPUPCHOICE
+	popdown_completions();
+#endif
 	return status;
 }
 
@@ -1518,10 +1554,9 @@ int	force;
 		register KSTACK *sp;
 		for (sp = KbdStack; sp != 0; sp = sp->m_link) {
 			if (sp->m_indx == macnum) {
-				TTbeep();
 				while (kbdmode == PLAY)
 					finish_kbm();
-				mlforce("[Error: currently executing %s%c]",
+				mlwarn("[Error: currently executing %s%c]",
 					macnum == DEFAULT_REG
 						? "macro" : "register ",
 					index2reg(macnum));

@@ -8,7 +8,7 @@
 */
 
 /*
- * $Header: /usr/build/VCS/pgf-vile/RCS/edef.h,v 1.152 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/edef.h,v 1.155 1994/09/27 01:50:00 pgf Exp $
  */
 
 /* I know this declaration stuff is really ugly, and I probably won't ever
@@ -31,7 +31,7 @@ decl_init( char prognam[], "xvile");
 decl_init( char prognam[], "vile");
 #endif
 
-decl_init( char version[], "version 4.6");
+decl_init( char version[], "version 4.7");
 
 #if UNIX
 decl_init( char opersys[], "unix");
@@ -55,7 +55,7 @@ decl_init( char opersys[], "windows/nt");
 decl_init( int autoindented , -1);	/* how many chars (not cols) indented */
 decl_uninit( int isnamedcmd );		/* are we typing a command name */
 decl_uninit( int calledbefore );	/* called before during this command? */
-decl_uninit( CMASK _chartypes_[N_chars] );	/* character types	*/
+decl_uninit( CHARTYPE _chartypes_[N_chars] );	/* character types	*/
 decl_uninit( int displaying );		/* flag set during screen updates */
 decl_uninit( int doing_kbd_read );	/* flag set during keyboard reading */
 decl_uninit( int reading_msg_line );	/* flag set during msgline reading */
@@ -180,6 +180,7 @@ decl_uninit( C_NUM kregwidth );		/* max width of current kill */
 decl_uninit( int kchars );		/* how much did we kill? */
 decl_uninit( int klines );
 decl_uninit( int lines_deleted );	/* from 'ldelete()', for reporting */
+decl_uninit( int warnings );		/* from 'mlwarn()', for reporting */
 
 #if !SMALLER
 decl_uninit( WINDOW *swindow );		/* saved window pointer		*/

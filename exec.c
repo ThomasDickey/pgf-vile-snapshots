@@ -3,7 +3,7 @@
  *
  *	written 1986 by Daniel Lawrence
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/exec.c,v 1.90 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/exec.c,v 1.94 1994/09/05 19:31:19 pgf Exp $
  *
  */
 
@@ -838,11 +838,10 @@ int f,n;
 	MARK odot;
 
 	if (execfunc == NULL) {
-		TTbeep();
 #if REBIND
-		mlforce("[Key not bound]");	/* complain		*/
+		mlwarn("[Key not bound]");	/* complain		*/
 #else
-		mlforce("[Not a command]");	/* complain		*/
+		mlwarn("[Not a command]");	/* complain		*/
 #endif
 		return FALSE;
 	}
@@ -1341,7 +1340,8 @@ BUFFER *bp;	/* buffer to execute */
 			goto nxtscan;
 
 		/* if is a while directive, make a block... */
-		if (eline[0] == DIRECTIVE_CHAR && eline[1] == 'w' && eline[2] == 'h') {
+		if (eline[0] == DIRECTIVE_CHAR && eline[1] == 'w' && 
+						  eline[2] == 'h') {
 			whtemp = typealloc(WHBLOCK);
 			if (whtemp == NULL) {
 noram:				mlforce("[Out of memory during while scan]");
@@ -1358,7 +1358,8 @@ failexit:			freewhile(scanpt);
 		}
 
 		/* if is a BREAK directive, make a block... */
-		if (eline[0] == DIRECTIVE_CHAR && eline[1] == 'b' && eline[2] == 'r') {
+		if (eline[0] == DIRECTIVE_CHAR && eline[1] == 'b' && 
+						  eline[2] == 'r') {
 			if (scanpt == NULL) {
 				mlforce("[BREAK outside of any WHILE loop]");
 				goto failexit;
@@ -1373,9 +1374,11 @@ failexit:			freewhile(scanpt);
 		}
 
 		/* if it is an endwhile directive, record the spot... */
-		if (eline[0] == DIRECTIVE_CHAR && strncmp(&eline[1], "endw", 4) == 0) {
+		if (eline[0] == DIRECTIVE_CHAR &&
+					strncmp(&eline[1], "endw", 4) == 0) {
 			if (scanpt == NULL) {
-				mlforce("[ENDWHILE with no preceding WHILE in '%s']",
+				mlforce(
+				  "[ENDWHILE with no preceding WHILE in '%s']",
 					get_bname(bp));
 				goto failexit;
 			}
@@ -1457,7 +1460,7 @@ nxtscan:	/* on to the next line */
 			(void)update(TRUE);
 
 			/* and get the keystroke */
-			if (tgetc() == abortc) {
+			if (tgetc(FALSE) == abortc) {
 				mlforce("[Macro aborted]");
 				freewhile(whlist);
 				mstore = FALSE;
@@ -1487,11 +1490,16 @@ nxtscan:	/* on to the next line */
 			}
 
 			/* service only the ENDM macro here */
-			if (dirnum == DENDM) {
-				mstore = FALSE;
+			if (dirnum == DENDM && execlevel == 0) {
+				if (!mstore) {
+					mlforce(
+					"[No macro definition in progress]");
+					return FALSE;
+				}
 				bstore->b_dot.l = lFORW(buf_head(bstore));
 				bstore->b_dot.o = 0;
 				bstore = NULL;
+				mstore = FALSE;
 				goto onward;
 			}
 
@@ -1631,7 +1639,8 @@ nxtscan:	/* on to the next line */
 					}
 
 					if (whtemp == NULL) {
-						mlforce("[Internal While loop error]");
+						mlforce(
+						 "[Internal While loop error]");
 						freewhile(whlist);
 						mstore = FALSE;
 						dobufnesting--;
@@ -1678,7 +1687,7 @@ nxtscan:	/* on to the next line */
 			if (dobuferrbp == NULL) {
 				dobuferrbp = bp;
 				(void)swbuffer(bp);
-				TTbeep();
+				kbd_alarm();
 			}
 			return status;
 		}

@@ -13,7 +13,7 @@
  * by Tom Dickey, 1993.    -pgf
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/mktbls.c,v 1.51 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/mktbls.c,v 1.53 1994/07/22 01:45:44 pgf Exp $
  *
  */
 
@@ -1572,7 +1572,7 @@ char    *argv[];
 	char flags[LEN_BUFFER];
 	char old_fcond[LEN_BUFFER],	fcond[LEN_BUFFER];
 	char modetype[LEN_BUFFER];
-	int section = SECT_CMDS;
+	int section;
 	int r;
 
 	if (setjmp(my_top))
@@ -1589,6 +1589,7 @@ char    *argv[];
 	}
 
 	*old_fcond = EOS;
+	section = SECT_CMDS;
 
 	/* process each input line */
 	while (fgets(line, sizeof(line), cmdtbl) != NULL) {

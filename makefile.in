@@ -21,7 +21,7 @@
 # gnu autoconf support by kevin buettner, 5/94
 # original makefile for uemacs: Adam Fritz July 30,1987  (do you recognize it?)
 #
-# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.in,v 1.8 1994/07/11 22:56:20 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.in,v 1.13 1994/09/27 01:58:03 pgf Exp $
 #
 
 #### Start of system configuration section. ####
@@ -107,7 +107,7 @@ VILESRC = main.c basic.c bind.c buffer.c crypt.c csrch.c \
 	display.c eval.c exec.c externs.c fences.c file.c \
 	filec.c fileio.c finderr.c glob.c globals.c \
 	history.c input.c insert.c isearch.c line.c map.c \
-	modes.c npopen.c oneliner.c opers.c path.c random.c \
+	modes.c msgs.c npopen.c oneliner.c opers.c path.c random.c \
 	regexp.c region.c search.c select.c spawn.c tags.c \
 	tbuff.c termio.c tmp.c undo.c version.c vmalloc.c \
 	window.c word.c wordmov.c
@@ -141,7 +141,7 @@ OBJ = $(SCREEN).o \
 	display.o eval.o exec.o externs.o fences.o file.o \
 	filec.o fileio.o finderr.o glob.o globals.o \
 	history.o input.o insert.o isearch.o line.o map.o \
-	modes.o npopen.o oneliner.o opers.o path.o random.o \
+	modes.o msgs.o npopen.o oneliner.o opers.o path.o random.o \
 	regexp.o region.o search.o select.o spawn.o tags.o \
 	tbuff.o termio.o tmp.o undo.o version.o vmalloc.o \
 	window.o word.o wordmov.o
@@ -150,7 +150,7 @@ all:	$(TARGET) manfilt
 
 $(TARGET): $(BUILTHDRS) $(OBJ)
 	-mv $(TARGET) o$(TARGET)
-	$(LINK) $(LDFLAGS) -o $(TARGET) $(OBJ) $(X_LIBS) $(X_EXTRA_LIBS) $(LIBS)
+	$(LINK) $(LDFLAGS) -o $(TARGET) $(OBJ) $(X_LIBS) $(LIBS) $(X_EXTRA_LIBS)
 
 nebind.h \
 nefunc.h \
@@ -169,7 +169,7 @@ install: $(INSTALL_DIRS) \
 	$(bindir)/vile-manfilt \
 	$(mandir)/vile.$(manext) \
 	$(libdir)/vile.hlp
-	@echo '** completed installation'
+	@echo 'Completed installation.'
 
 installdirs: $(INSTALL_DIRS)
 
@@ -201,7 +201,7 @@ realclean: distclean
 	-$(RM) tags TAGS
 
 lint:
-	$(LINT) $(SRC) $(LIBS)
+	$(LINT) $(CPPFLAGS) $(SRC) $(LIBS)
 
 tags:
 	ctags $(SRC) $(HDRS)
@@ -267,13 +267,13 @@ patch:	/tmp/vilevers
 	done  >patch$$ovilevers-$$vilevers 				;\
 	echo Created patch$$ovilevers-$$vilevers 
 
-/tmp/vilevers:
+/tmp/vilevers: ALWAYS
 	@expr "`egrep 'version\[\].*' edef.h`" : \
 		'.* \([0-9][0-9]*\.[0-9].*\)".*' >/tmp/vilevers
 	@echo Current version is `cat /tmp/vilevers`
 
 rcsdiffrw:
-	@-for x in `$(MAKE) rw`	;\
+	@-for x in `$(MAKE) -f makefile.in rw`	;\
 	do	\
 		echo 		;\
 		echo $$x	;\
@@ -289,7 +289,7 @@ list:
 
 # make a list of RCS revisions.  don't include the revlist itself
 nrevlist:
-	$(MAKE) list  | egrep -v revlist >/tmp/vile__files
+	$(MAKE) -f makefile.in list  | egrep -v revlist >/tmp/vile__files
 	rlog -Ntrunk `cat /tmp/vile__files` >/tmp/vile__revs
 	-paste /tmp/vile__files /tmp/vile__revs >/tmp/vile_revlist
 	rm /tmp/vile__files /tmp/vile__revs
@@ -323,4 +323,6 @@ $(libdir)/vile.hlp:        $(srcdir)/vile.hlp
 	$(INSTALL_DATA)    $(srcdir)/vile.hlp $@
 $(INSTALL_DIRS):
 	$(SHELL) ${srcdir}/mkdirs.sh $@
+
+ALWAYS:
 

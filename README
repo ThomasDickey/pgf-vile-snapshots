@@ -11,11 +11,13 @@ the authors of vile are Paul Fox, Tom Dickey, and Kevin Buettner.
 
 many patches have been contributed by a lot of users.  we thank them.
 
-more recent additions to this README appear near the bottom.
+more recent additions to this README appear near the bottom.  that is, most
+of the newest stuff is at the end, not up here where you are.
 
 impatient?  just type "./configure; make", and get a cup of coffee.
 
-want X11 support?  you'd better look at README.CFG.
+want X11 support?  you'd better look at README.CFG, although 
+"./configure --with-screen=x11"; make" may well do what you want
 
 
 2/92
@@ -177,6 +179,53 @@ We should have keyboard selections and highlighted regions soon...
 
 pgf, pgf@foxharp.boston.ma.us
 
+
 -------------------------------
-$Header: /usr/build/VCS/pgf-vile/RCS/README,v 1.30 1994/07/11 22:56:20 pgf Exp $
+9/94
+
+hmmmm -- lets see.  new stuff.  see the CHANGES file for details.
+
+	- vile is now completely autoconf'ed -- you should be able to type
+	either "./configure; make" or "./configure --with-screen=x11" to build
+	it on any (unix-like) platform. 
+
+	- :map and :map! are now much more complete, but by no means still
+	not done.  expect to have to edit your favorite macros to make
+	them work.
+
+	- along with proper :map support comes proper function key support.
+	function keys defined for your terminal in the termcap/info database
+	are now premapped and can be bound to as FN-1 etc.  so those of
+	you with ESC [ 10 ~ style function keys should be happy now.
+
+	- new modes to better control beeping and the "working..." message.
+
+	- popup windows now adjust their size to their contents -- less screen
+	space is wasted for small window, and more is used for big windows.
+
+	- file and command completion is now more emacs/bash/tcsh-like, in
+	that possible choices are shown when you hit a second TAB key.  this
+	can be tuned via a new mode, "popup-choices"
+
+	- various fixes to the macro language, for core dumps and usability.
+
+	- infinite (? :-) screen sizes should now be supported under X.
+
+	- it's now possible to break lines by putting ^M in the replacement
+	pattern.
+
+	- selections under xvile can be made in a different color.
+
+	- put'ing from registers (i.e. 'p' and 'P' commands) should be much
+	faster.
+
+	- multiple (error) messages arising from running a macro or a startup
+	file will now accumulate in a new popup window.
+
+	- Windows NT support -- console mode only.
+
+	- lots of bug fixes
+
+-------------------------------
+$Header: /usr/build/VCS/pgf-vile/RCS/README,v 1.31 1994/09/27 01:49:15 pgf Exp $
 -------------------------------

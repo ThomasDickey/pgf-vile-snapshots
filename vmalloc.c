@@ -9,7 +9,7 @@
  *	They and the accompanying article were written by Eric White.
  *	(pgf, 1989)
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/vmalloc.c,v 1.19 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/vmalloc.c,v 1.20 1994/09/05 19:33:50 pgf Exp $
  *
  */
 
@@ -35,6 +35,7 @@
 static void dumpbuf P(( int ));
 static void trace P(( char * ));
 static void errout P(( void ));
+int setvmalloc P((int, int));
 
 static int nummallocs = 0;
 struct mtype {
@@ -58,7 +59,7 @@ int x;
 	c = (UCHAR *)m[x].addr - 2;
 	/* dump malloc buffer to the vmalloc file */
 	while (c <= m[x].addr + m[x].size + KPW + KPW + 1) {
-		sprintf(s, "%04.4lx : %02x ", (long)c, *c);
+		sprintf(s, "%04lx : %02x ", (long)c, *c);
 		if (c == m[x].addr)
 			strcat(s," <= leading known pattern");
 		if (c == m[x].addr + KPW)
@@ -244,7 +245,7 @@ char *id;
 	trace(s);
 	for (x = 0; x < nummallocs; ++x) {
 		if (m[x].addr != NULL) {
-			sprintf(s,"=========malloc buffer addr: %04.4lx\n",
+			sprintf(s,"=========malloc buffer addr: %04lx\n",
 				(long)m[x].addr);
 			trace(s);
 			sprintf(s,"=========malloc buffer size: %04x\n",
@@ -282,8 +283,10 @@ int
 setvmalloc(f,n)
 int f,n;
 {
+#if COUNT_THEM
 	register struct mtype *mp;
 	int i,num,found;
+#endif
 	
 	if (f)
 		doverifys = n;
