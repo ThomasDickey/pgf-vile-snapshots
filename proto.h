@@ -5,7 +5,16 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.32  1993/02/12 10:43:33  pgf
+ * Revision 1.35  1993/03/16 10:53:21  pgf
+ * see 3.36 section of CHANGES file
+ *
+ * Revision 1.34  1993/03/05  17:50:54  pgf
+ * see CHANGES, 3.35 section
+ *
+ * Revision 1.33  1993/02/24  10:59:02  pgf
+ * see 3.34 changes, in CHANGES file
+ *
+ * Revision 1.32  1993/02/12  10:43:33  pgf
  * new function, insertion_cmd()
  *
  * Revision 1.31  1993/02/08  14:53:35  pgf
@@ -112,14 +121,6 @@
 # define P(a) ()
 #endif
 
-#if APOLLO && defined(__STDC__) && defined(__STDCPP__)	/* SR10.3 */
-# define DEFINE_SIGNAL(func)	SIGT func(int signo, ...)
-# define ACTUAL_SIGNAL(func)	SIGT func(int signo, ...)
-#else
-# define DEFINE_SIGNAL(func)	SIGT func P(( int ))
-# define ACTUAL_SIGNAL(func)	SIGT func(signo) int signo;
-#endif
-
 extern int main P(( int, char *[] ));
 #if MSDOS
 extern void expand_wild_args P(( int * , char ***));
@@ -223,6 +224,8 @@ extern int strinc P(( char *, char *));
 extern int unbindkey P(( int, int ));
 extern int unbindchar P(( int ));
 extern int apro P(( int, int ));
+extern int startup P(( char *));
+extern char * flook P(( char *, int ));
 extern int insertion_cmd P(( void ));
 extern char * fnc2engl P(( CMDFUNC * ));
 extern CMDFUNC * engl2fnc P(( char * ));
@@ -230,7 +233,7 @@ extern CMDFUNC * kcod2fnc P(( int ));
 extern int prc2kcod P(( char * ));
 extern char * prc2engl P(( char * ));
 extern int fnc2key P(( CMDFUNC * ));
-extern char * kbd_engl P(( void ));
+extern char * kbd_engl P(( char *, char * ));
 extern void kbd_alarm P(( void ));
 extern void kbd_putc P(( int ));
 extern void kbd_puts P(( char * ));
@@ -238,11 +241,11 @@ extern void kbd_erase P(( void ));
 extern void kbd_init P(( void ));
 extern void kbd_unquery P(( void ));
 extern int kbd_complete P(( int, char *, int *, char *, unsigned ));
-extern int kbd_engl_stat P(( char ** ));
+extern int kbd_engl_stat P(( char *, char * ));
 
 /* buffer.c */
 extern int histbuff P(( int, int ));
-extern void imply_alt P(( char * ));
+extern void imply_alt P(( char *, int, int ));
 extern BUFFER * find_alt P(( void ));
 extern int altbuff P(( int, int ));
 extern int usebuffer P(( int, int ));
@@ -257,20 +260,20 @@ extern int has_C_suffix P(( BUFFER * ));
 extern int killbuffer P(( int, int ));
 extern int zotbuf P(( BUFFER * ));
 extern int popupbuff P(( BUFFER * ));
-extern int readin P((char *, int, BUFFER *, int ));
 extern void sortlistbuffers P(( void ));
 extern int togglelistbuffers P(( int, int ));
 extern int listbuffers P(( int, int ));
 void updatelistbuffers P((void));
-
-extern int startup P(( char *));
 extern int addline P(( BUFFER *, char *, int ));
 extern int anycb P(( void ));
 extern BUFFER * bfind P(( char *, int, int ));
 extern int bclear P(( BUFFER * ));
+extern int bsizes P(( BUFFER * ));
 extern void chg_buff P(( BUFFER *, int ));
 extern void unchg_buff P(( BUFFER *, int ));
 extern int unmark P(( int, int ));
+
+/* crypt.c */
 #if	CRYPT
 extern	int	setkey P((int, int));
 extern	void	crypt P((char *, int));
@@ -285,6 +288,8 @@ extern int fcsrch_to P(( int, int ));
 extern int bcsrch_to P(( int, int ));
 extern int rep_csrch P(( int, int ));
 extern int rev_csrch P(( int, int ));
+
+/* display.c */
 extern int nu_mode P(( WINDOW * ));
 extern int nu_width P(( WINDOW * ));
 extern int col_limit P(( WINDOW * ));
@@ -355,6 +360,8 @@ extern int getcline P(( void ));
 extern int getwpos P(( void ));
 extern int svar P(( VDESC *, char * ));
 extern int resize P(( int, int ));
+
+/* exec.c */
 extern int namedcmd P(( int, int ));
 extern int rangespec P(( char *, LINE **, LINE **, int *, int * ));
 extern int docmd P(( char *, int, int, int ));
@@ -401,12 +408,15 @@ extern int cbuf37 P(( int, int ));
 extern int cbuf38 P(( int, int ));
 extern int cbuf39 P(( int, int ));
 extern int cbuf40 P(( int, int ));
-extern void ch_fname P(( BUFFER *, char * ));
+
+/* file.c */
+extern int no_such_file P(( char * ));
 extern int fileread P(( int, int ));
-extern int getfile P(( char *, int ));
 extern int filefind P(( int, int ));
 extern int viewfile P(( int, int ));
 extern int insfile P(( int, int ));
+extern int getfile P(( char *, int ));
+extern int readin P((char *, int, BUFFER *, int ));
 extern int quickreadf P(( BUFFER *, int * ));
 extern int slowreadf P(( BUFFER *, int * ));
 extern void readlinesmsg P(( int, int, char *, int ));
@@ -423,12 +433,16 @@ extern int ifile P(( char *, int, FILE * ));
 extern int kifile P(( char * ));
 extern DEFINE_SIGNAL(imdying);
 extern void markWFMODE P(( BUFFER * ));
-extern int glob P(( char * ));
-extern char * canonpath P(( char * ));
-extern char * shorten_path P(( char * ));
-extern char * lengthen_path P(( char * ));
-extern int is_pathname P(( char * ));
-extern char * flook P(( char *, int ));
+
+/* filec.c */
+#if UNIX || defined(MDTAGSLOOK)
+extern BUFFER *bs_init P(( char *, int ));
+extern int bs_find P(( char *, int, BUFFER *, int, LINE ** ));
+#endif
+extern int mlreply_file P(( char *, TBUFF **, int, char * ));
+extern int mlreply_dir P(( char *, TBUFF **, char * ));
+
+/* fileio.c */
 extern int ffropen P(( char * ));
 extern int ffwopen P(( char * ));
 extern int ffronly P(( char * ));
@@ -447,6 +461,23 @@ extern int globals P(( int, int ));
 extern int vglobals P(( int, int ));
 extern int globber P(( int, int, int ));
 
+/* history.c */
+#if !SMALLER
+extern void hst_init P(( int ));
+extern void hst_glue P(( int ));
+extern void hst_append P(( char *, int ));
+extern void hst_remove P(( char * ));
+extern void hst_flush P(( void ));
+extern int showhistory P(( int, int ));
+extern int edithistory P(( char *, int *, int *, int, int (*func)( char *, int, int, int ), int ));
+#else
+#define hst_init(c)
+#define hst_glue(c)
+#define hst_append(p,c)
+#define hst_remove(p)
+#define hst_flush()
+#endif
+
 /* input.c */
 extern int no_completion P(( int, char *, int * ));
 extern int mlyesno P(( char * ));
@@ -457,42 +488,54 @@ extern void incr_dot_kregnum P(( void ));
 extern void tungetc P(( int ));
 extern int tpeekc P(( void ));
 extern int get_recorded_char P(( int ));
-extern int tgetc P(( void ));
+extern int tgetc P(( int ));
 extern int kbd_key P(( void ));
 extern int kbd_seq P(( void ));
 extern int screen_string P(( char *, int, int ));
 extern int end_string P(( void ));
+extern int is_edit_char P(( int ));
+extern void kbd_kill_response P(( char *, int *, int ));
+extern int kbd_show_response P(( char *, char *, int, int, int ));
 extern int kbd_string P(( char *, char *, int, int, int, int (*func)(int,char*,int*) ));
+extern int kbd_reply P(( char *, char *, int, int (*efunc)(char *,int,int,int), int, int, int (*cfunc)(int,char*,int*) ));
 extern int speckey P(( int, int ));
 extern int dotcmdbegin P(( void ));
 extern int dotcmdfinish P(( void ));
 extern void dotcmdstop P(( void ));
 extern int dotcmdplay P(( int, int ));
+extern int dotreplaying P(( int ));
+extern int kbd_replaying P(( void ));
 extern int kbd_mac_begin P(( int, int ));
 extern int kbd_mac_end P(( int, int ));
 extern int kbd_mac_exec P(( int, int ));
 extern int kbd_mac_save P(( int, int ));
+extern int start_kbm P(( int, int, TBUFF * ));
+extern void finish_kbm P(( void ));
 
+/* isearch.c */
 extern int risearch P(( int, int ));
 extern int fisearch P(( int, int ));
 extern int isearch P(( int, int ));
 extern int promptpattern P(( char * ));
 extern int get_char P(( void ));
+
+/* line.c */
 extern LINE * lalloc P(( int, BUFFER * ));
-#ifdef	UNUSED
-extern int lgrow P(( LINE *, int, BUFFER * ));
-#endif	/* UNUSED */
 extern void lfree P(( LINE *, BUFFER * ));
 extern void ltextfree P(( LINE *, BUFFER * ));
 extern void lremove P(( BUFFER *, LINE * ));
+extern int insspace P(( int, int ));
 extern int linsert P(( int, int ));
-extern int ldelete P(( long, int ));
 extern int lnewline P(( void ));
+extern int ldelete P(( long, int ));
 extern char * getctext P(( int ));
 extern int putctext P(( char * ));
 extern int ldelnewline P(( void ));
 extern void ksetup P(( void ));
 extern void kdone P(( void ));
+extern int kinsert P(( int ));
+extern int index2reg P(( int ));
+extern int reg2index P(( int ));
 extern int usekreg P(( int, int ));
 extern void kregcirculate P(( int ));
 extern int putbefore P(( int, int ));
@@ -503,13 +546,30 @@ extern int doput P(( int, int, int, int ));
 extern int put P(( int, int ));
 extern int execkreg P(( int, int ));
 extern int loadkreg P(( int, int ));
+extern int showkreg P(( int, int ));
+
+/* modes.c */
+extern int settab P(( int, int ));
+extern int setfillcol P(( int, int ));
+extern REGEXVAL *new_regexval P(( char *, int ));
+extern void copy_val P(( struct VAL *, struct VAL *, int ));
+extern void free_regexval P(( REGEXVAL * ));
+extern void free_val P(( struct VALNAMES *, struct VAL * ));
+#if NO_LEAKS
+extern void free_local_vals P(( struct VALNAMES *, struct VAL *, struct VAL * ));
+#endif
+extern int listmodes P(( int, int ));
+
+/* npopen.c */
 extern FILE * npopen P(( char *, char * ));
 extern int inout_popen P(( FILE **, FILE **, char * ));
 extern void npclose P(( FILE * ));
-extern int pregion P(( int ));
 extern void exec_sh_c P(( char * ));
 extern int system_SHELL P(( char * ));
 extern int softfork P(( void ));
+
+/* oneliner.c */
+extern int pregion P(( int ));
 extern int llineregion P(( void ));
 extern int plineregion P(( void ));
 extern int substregion P(( void ));
@@ -518,12 +578,15 @@ extern int subst_again P(( int, int ));
 extern int substreg1 P(( int, int ));
 extern int substline P(( regexp *, int, int, int ));
 extern int delins P(( regexp *, char * ));
+
+/* opers.c */
 extern int operator P(( int, int, int (*)(), char * ));
 extern int operdel P(( int, int ));
 extern int operlinedel P(( int, int ));
 extern int chgreg P(( void ));
 extern int operchg P(( int, int ));
 extern int operlinechg P(( int, int ));
+extern int operjoin P(( int, int ));
 extern int operyank P(( int, int ));
 extern int operlineyank P(( int, int ));
 extern int operflip P(( int, int ));
@@ -541,9 +604,17 @@ extern int opersubstagain P(( int, int ));
 extern int operentab P(( int, int ));
 extern int operdetab P(( int, int ));
 extern int opertrim P(( int, int ));
+
+/* path.c */
+extern int glob P(( char * ));
+extern char * canonpath P(( char * ));
+extern char * shorten_path P(( char * ));
+extern char * lengthen_path P(( char * ));
+extern int is_pathname P(( char * ));
+extern char * is_appendname P(( char * ));
+
+/* random.c */
 extern int liststuff P(( char *, void (*)(), int, char * ));
-extern int listmodes P(( int, int ));
-extern int setfillcol P(( int, int ));
 extern int showcpos P(( int, int ));
 extern int showlength P(( int, int ));
 extern int getccol P(( int ));
@@ -552,9 +623,8 @@ extern int gocol P(( int ));
 extern int twiddle P(( int, int ));
 extern int quote P(( int, int ));
 extern int replacechar P(( int, int ));
-extern int settab P(( int, int ));
 extern int tab P(( int, int ));
-extern int shiftwidth P(( void ));
+extern int shiftwidth P(( int, int ));
 extern int detabline P(( int ));
 extern int detab_region P(( void ));
 extern int entabline P(( int ));
@@ -596,6 +666,9 @@ extern char * current_directory P(( int ));
 extern int cd P(( int, int ));
 extern int pwd P(( int, int ));
 extern int set_directory P(( char * ));
+extern void ch_fname P(( BUFFER *, char * ));
+
+/* regexp.c */
 extern void regmassage P(( char *, char *, int ));
 extern regexp * regcomp P(( char *, int ));
 extern char * reg P(( int, int * ));
@@ -616,6 +689,8 @@ extern int regmatch P(( char * ));
 extern int regrepeat P(( char * ));
 extern char * regnext P(( char * ));
 extern int lregexec P(( regexp *, LINE *, int, int ));
+
+/* region.c */
 extern int killregion P(( void ));
 extern int yankregion P(( void ));
 extern int shift_right_line P(( void ));
@@ -631,6 +706,8 @@ extern int upperregion P(( void ));
 extern int charprocreg P(( int (*)() ));
 extern int getregion P(( REGION * ));
 extern int do_fl_region P(( int (*)(), int ));
+
+/* search.c */
 extern void not_found_msg P(( int, int ));
 extern int scrforwsearch P(( int, int ));
 extern int scrbacksearch P(( int, int ));
@@ -647,13 +724,11 @@ extern int eq P(( int, int ));
 extern int scrsearchpat P(( int, int ));
 extern int readpattern P(( char *, char *, regexp **, int, int ));
 extern void savematch P(( MARK, int ));
-#ifdef	LAZINESS
-extern void rvstrcpy P(( char *, char * ));
-extern void rvstrncpy P(( char *, char *, int ));
-#endif
 extern void scanboundry P(( int, MARK, int ));
 extern void nextch P(( MARK *, int ));
 extern int findpat P(( int, int, regexp *, int ));
+
+/* spawn.c */
 extern int spawncli P(( int, int ));
 extern DEFINE_SIGNAL(rtfrmshell);
 extern int bktoshell P(( int, int ));
@@ -664,6 +739,9 @@ extern int spawn1 P(( int ));
 extern int pipecmd P(( int, int ));
 extern int filterregion P(( void ));
 extern int filter P(( int, int ));
+
+/* tags.c */
+#if TAGS
 extern int gototag P(( int, int ));
 extern int cmdlinetag P(( char * ));
 extern int tags P(( char *, int ));
@@ -673,6 +751,12 @@ extern int untagpop P(( int, int ));
 extern void pushuntag P(( char *, int ));
 extern int popuntag P(( char *, int * ));
 extern void tossuntag P(( void ));
+#ifdef GMDTAGSLOOK
+extern BUFFER * look_tags P(( int ));
+#endif
+#endif /* TAGS */
+
+/* termio.c */
 extern void ttopen P(( void ));
 extern void ttclose P(( void ));
 extern void ttclean P(( int ));
@@ -682,6 +766,8 @@ extern void ttflush P(( void ));
 extern int ttgetc P(( void ));
 extern int typahead P(( void ));
 extern void ttmiscinit P(( void ));
+
+/* undo.c */
 extern void toss_to_undo P(( LINE * ));
 extern int copy_for_undo P(( LINE * ));
 extern int tag_for_undo P(( LINE * ));
@@ -724,6 +810,8 @@ extern int savewnd P(( int, int ));
 extern int restwnd P(( int, int ));
 extern void winit P(( void ));
 extern void varinit P(( void ));
+
+/* word.c */
 extern int wrapword P(( int, int ));
 extern int forwviword P(( int, int ));
 extern int forwword P(( int, int ));
@@ -731,8 +819,13 @@ extern int forwviendw P(( int, int ));
 extern int forwendw P(( int, int ));
 extern int backviword P(( int, int ));
 extern int backword P(( int, int ));
-extern int join P(( int, int ));
+extern int joinregion P(( void ));
+extern int joinlines P(( int, int ));
 extern int formatregion P(( void ));
+#if	WORDCOUNT
+extern int wordcount P(( int, int ));
+#endif
+
 extern void setchartype P(( void ));
 extern int getchartype P(( void ));
 extern int isnewwordf P(( void ));
@@ -745,13 +838,11 @@ extern int toktyp P(( char * ));
 extern char * tokval P(( char * ));
 extern char * token P(( char *, char *, int ));
 extern int ffgetline P(( int * ));
-extern int kinsert P(( int ));
 extern int macarg P(( char * ));
 extern int echochar P(( int, int ));
 extern int scanmore P(( char *, int ));
 extern int expandp P(( char *, char *, int ));
 extern int scanner P((regexp *, int, int ));
-extern int insspace P(( int, int ));
 extern int insbrace P(( int, int ));
 extern int inspound P(( void ));
 extern int fmatch P(( int ));
@@ -761,7 +852,6 @@ extern int comment_fence P(( int ));
 extern int simple_fence P(( int, int, int ));
 extern void putdotback P(( BUFFER *, LINE * ));
 
-#ifndef	TBUFF
 /* tbuff.c */
 TBUFF *	tb_alloc P(( TBUFF **, unsigned ));
 TBUFF *	tb_init P(( TBUFF **, int ));
@@ -770,10 +860,24 @@ TBUFF *	tb_put P(( TBUFF **, unsigned, int ));
 int	tb_get P(( TBUFF *, unsigned ));
 void	tb_unput P(( TBUFF * ));
 TBUFF *	tb_append P(( TBUFF **, int ));
+TBUFF *	tb_copy P(( TBUFF **, TBUFF * ));
+TBUFF *	tb_bappend P(( TBUFF **, char *, unsigned ));
+TBUFF *	tb_sappend P(( TBUFF **, char * ));
+TBUFF *	tb_scopy P(( TBUFF **, char * ));
 void	tb_first P(( TBUFF * ));
 int	tb_more P(( TBUFF * ));
 int	tb_next P(( TBUFF * ));
 int	tb_peek P(( TBUFF * ));
+char *	tb_values P(( TBUFF * ));
+unsigned tb_length P(( TBUFF * ));
+
+#if NO_LEAKS
+extern	void kbs_leaks P(( void ));
+extern	void tb_leaks P(( void ));
+extern	void wp_leaks P(( void ));
+extern	void bp_leaks P(( void ));
+extern	void vt_leaks P(( void ));
+extern	void ev_leaks P(( void ));
 #endif
 
 #if X11
@@ -785,7 +889,9 @@ extern	void x_setbackground P(( char * ));
 extern	void x_preparse_args P(( int *, char *** ));
 extern  void x_set_geometry P(( char * ));
 extern	void x_set_dpy P(( char * ));
-extern void setcursor P(( int, int ));
+extern	void setcursor P(( int, int ));
+extern	void x_putline P(( int, char *, int ));
+extern	int x_key_events_ready P(( void ));
 #endif
 
 #if MSDOS
@@ -795,3 +901,30 @@ extern int setdrive P(( int ));
 extern void update_dos_drv_dir P(( char * ));
 extern void dos_crit_handler P(( void ));
 #endif
+
+#if UNIX
+#if SUNOS && (defined(lint) || __GNUC__)
+extern	int	_filbuf	P(( FILE * ));
+extern	int	_flsbuf	P(( unsigned char, FILE * ));
+extern	int	printf	P(( char *, ... ));
+extern	int	fclose	P(( FILE * ));
+extern	int	fflush	P(( FILE * ));
+extern	int	fprintf	P(( FILE *, char *, ... ));
+extern	int	fgetc	P(( FILE * ));
+extern	int	fputc	P(( char, FILE * ));
+extern	int	fread	P(( char *, int, int, FILE * ));
+extern	int	fseek	P(( FILE *, long, int ));
+extern	int	fwrite	P(( char *, int, int, FILE * ));
+extern	int	ioctl	P(( int, int, caddr_t ));
+extern	int	killpg	P(( int, int ));
+extern	int	mkdir	P(( char *, int ));
+extern	void	perror	P(( char * ));
+extern	int	puts	P(( char * ));
+extern	int	sscanf	P(( char *, char *, ... ));
+extern	int	select	P(( int, fd_set*, fd_set*, fd_set*, struct timeval* ));
+extern	void	setbuf	P(( FILE *, char * ));
+extern	void	setbuffer P(( FILE *, char *, int ));
+extern	int	system	P(( char * ));
+extern	int	wait	P(( int * ));
+#endif
+#endif /* UNIX */

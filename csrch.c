@@ -2,7 +2,10 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: csrch.c,v $
- * Revision 1.6  1992/12/04 09:12:25  foxharp
+ * Revision 1.7  1993/03/16 10:53:21  pgf
+ * see 3.36 section of CHANGES file
+ *
+ * Revision 1.6  1992/12/04  09:12:25  foxharp
  * deleted unused assigns
  *
  * Revision 1.5  1992/05/16  12:00:31  pgf
@@ -120,7 +123,7 @@ int f,n;
 
         c = kbd_key();
 	if (c == quotec)
-		c = tgetc();
+		c = tgetc(TRUE);
 	else if (c == abortc)
 		return FALSE;
 	else
@@ -138,7 +141,7 @@ int f,n;
 
         c = kbd_key();
 	if (c == quotec)
-		c = tgetc();
+		c = tgetc(TRUE);
 	else if (c == abortc)
 		return FALSE;
 	else

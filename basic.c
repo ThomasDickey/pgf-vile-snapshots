@@ -6,7 +6,10 @@
  * framing, are hard.
  *
  * $Log: basic.c,v $
- * Revision 1.42  1992/12/14 09:03:25  foxharp
+ * Revision 1.43  1993/03/16 10:53:21  pgf
+ * see 3.36 section of CHANGES file
+ *
+ * Revision 1.42  1992/12/14  09:03:25  foxharp
  * lint cleanup, mostly malloc
  *
  * Revision 1.41  1992/12/05  13:12:16  foxharp
@@ -1150,8 +1153,8 @@ int	row, col, pasteol ;
 register LINE	*dlp;
 WINDOW *wp0 ;		/* current window on entry */
 
-	row = tgetc() ;
-	col = tgetc() ;
+	row = tgetc(FALSE) ;
+	col = tgetc(FALSE) ;
 
 /* find the window we are pointing to */
 	wp0 = curwp ;

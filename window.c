@@ -3,7 +3,10 @@
  * attached to keys that the user actually types.
  *
  * $Log: window.c,v $
- * Revision 1.20  1993/01/23 13:38:23  foxharp
+ * Revision 1.21  1993/02/24 10:59:02  pgf
+ * see 3.34 changes, in CHANGES file
+ *
+ * Revision 1.20  1993/01/23  13:38:23  foxharp
  * new unlink_window() function
  *
  * Revision 1.19  1993/01/16  10:43:38  foxharp
@@ -965,4 +968,16 @@ winit()
 	wp->w_bufp = NULL;
 }
 
+/* For memory-leak testing (only!), releases all display storage. */
+#if NO_LEAKS
+void	wp_leaks()
+{
+	register WINDOW *wp;
 
+	while (wp = wheadp) {
+        	wp = wp->w_wndp;
+		free((char *)wheadp);
+		wheadp = wp;
+	}
+}
+#endif

@@ -2,7 +2,19 @@
  *		for MicroEMACS
  *
  * $Log: spawn.c,v $
- * Revision 1.38  1993/01/16 10:42:16  foxharp
+ * Revision 1.42  1993/03/16 16:04:01  pgf
+ * fix 'parentheses suggested' warnings
+ *
+ * Revision 1.41  1993/03/16  10:53:21  pgf
+ * see 3.36 section of CHANGES file
+ *
+ * Revision 1.40  1993/03/05  17:50:54  pgf
+ * see CHANGES, 3.35 section
+ *
+ * Revision 1.39  1993/02/24  10:59:02  pgf
+ * see 3.34 changes, in CHANGES file
+ *
+ * Revision 1.38  1993/01/16  10:42:16  foxharp
  * use new macros
  *
  * Revision 1.37  1992/12/23  09:26:08  foxharp
@@ -195,8 +207,6 @@ int f,n;
 	mlforce("[Not available under X11]");
 	return(FALSE);
 #  else
-        char    *getenv();
-        
         movecursor(term.t_nrow, 0);             /* Seek to last line.   */
 	ttclean(TRUE);
         TTputc('\n');
@@ -287,6 +297,10 @@ int signo;
 	ttunclean();
 	curwp->w_flag = WFHARD;  /* is this needed, with sgarbf == TRUE? */
 	sgarbf = TRUE;
+# if APOLLO
+	(void)TTgetc();		/* have to skip a character */
+	ttunclean();		/* ...so that I can finally suppress echo */
+# endif
 # if USG
 	signal(SIGCONT,rtfrmshell);	/* suspend & restart */
 	update(TRUE);
@@ -331,6 +345,69 @@ int f,n;
 	return spawn1(FALSE);
 }
 
+#if UNIX
+static	TBUFF	*save_shell[2];
+
+/*
+ * Common function for prompting for shell/pipe command, and for recording the
+ * last shell/pipe command so that we can support "!!" convention.
+ *
+ * Note that for 'pipecmd()', we must retain a leading "!".
+ */
+static int
+ShellPrompt(holds, result, rerun)
+TBUFF	**holds;
+char	*result;
+int	rerun;		/* TRUE/FALSE: spawn, -TRUE: pipecmd */
+{
+	register int	s;
+	static	char	bang[] = SHPIPE_LEFT;
+	int	cb	= anycb(),
+		fix	= (rerun != -TRUE);
+	char	save[NLINE],
+		temp[NLINE],
+		line[NLINE+1];
+
+	if ((s = tb_length(*holds)) != 0)
+		strncpy(save, tb_values(*holds), s)[s] = EOS;
+	else
+		save[0] = EOS;
+
+	/* if it doesn't start with '!', or if that's all it is */
+	if (!isShellOrPipe(save) || save[1] == EOS)
+		(void)strcpy(save, bang);
+
+	(void)strcpy(line, save);
+	if (rerun != TRUE) {
+		if (cb != 0)
+			lsprintf(temp, "Warning: %d modified buffer%s: %s",
+				cb, cb>1 ? "s":"", bang);
+		else
+			lsprintf(temp, ": %s", bang);
+
+		if ((s = mlreply_no_bs(temp, line+1, NLINE)) != TRUE)
+			return s;
+	}
+
+	if (line[1] == bang[0]) {
+		hst_remove(line+1);
+		if (line[2] == EOS) {	/* "!!" alone */
+			(void)strcpy(line, save);
+		} else {	/* append the current text to the last */
+			(void) strcpy(line, strcat(strcpy(temp, save), line+2));
+		}
+		hst_append(line+1, EOS);
+		mlwrite(": %s", line);
+	}
+	if (line[1] == EOS)
+		return FALSE;
+
+	*holds = tb_scopy(holds, line);
+	(void)strcpy(result, line+fix);
+	return TRUE;
+}
+#endif
+
 /*
  * Run a one-liner in a subjob. When the command returns, wait for a single
  * character to be typed, then mark the screen as garbage so a full repaint is
@@ -344,28 +421,10 @@ int rerun;
 
 #if  UNIX
         register int    s;
-        static char oline[NLINE];	/* command line send to shell */
         char	line[NLINE];	/* command line send to shell */
-	int cb;
-	char prompt[50];
-	char *getenv();
 
-	if (!rerun) {
-		cb = anycb();
-		if (cb)
-			lsprintf(prompt,"Warning: %d modified buffer%s: !",
-				cb, cb>1 ? "s":"");
-		else
-			lsprintf(prompt,": !");
-
-	        if ((s=mlreply_no_bs(prompt, oline, NLINE)) != TRUE)
-	                return (s);
-	} else {
-		if (!oline[0])
-			return FALSE;
-		mlwrite(": !%s",oline);
-	}
-	(void)strcpy(line,oline);
+	if ((s = ShellPrompt(&save_shell[0], line, rerun)) != TRUE)
+		return s;
 
 #if	NeWS || X11
 	(void)system_SHELL(line);
@@ -397,7 +456,7 @@ int rerun;
         newcli = Open("CON:0/0/640/200/MicroEMACS Subprocess", NEW);
         Execute(line, 0L, newcli);
         Close(newcli);
-        tgetc();     /* Pause.               */
+        tgetc(FALSE);	/* Pause.               */
         sgarbf = TRUE;
         return(TRUE);
 #endif
@@ -491,7 +550,7 @@ int rerun;
         s = sys(line);                          /* Run the command.     */
         mlforce("\r\n\n[End]");                  /* Pause.               */
         TTflush();
-        tgetc();
+        tgetc(FALSE);
         sgarbf = TRUE;
         return (s);
 #endif
@@ -517,7 +576,7 @@ int rerun;
 	/* if we are interactive, pause here */
 	if (clexec == FALSE) {
 	        mlforce("\r\n\n[End]");
-        	tgetc();
+        	tgetc(FALSE);
         }
         sgarbf = TRUE;
         return (TRUE);
@@ -534,28 +593,16 @@ pipecmd(f, n)
 int f,n;
 {
 	register BUFFER *bp;	/* pointer to buffer to zot */
-        static char oline[NLINE];	/* command line send to shell */
         register int    s;
+        char line[NLINE];	/* command line send to shell */
 	static char bname[] = ScratchName(Output);
-	int cb;
-	char prompt[50];
 
-
-	/* if it doesn't start with '!', or if that's all it is */
-	if (!isShellOrPipe(oline) || oline[1] == '\0') {
-		oline[0] = SHPIPE_LEFT[0];
-		oline[1] = '\0';
-	}
-
-	cb = anycb();
-	if (cb)
-		lsprintf(prompt,"Warning: %d modified buffer%s. !",
-			cb, cb>1 ? "s":"");
-	else
-		lsprintf(prompt,"!");
-		
 	/* get the command to pipe in */
-        if ((s=mlreply_no_bs(prompt, &oline[1], NLINE)) != TRUE)
+	hst_init('!');
+        s = ShellPrompt(&save_shell[!global_g_val(GMDSAMEBANGS)], line, -TRUE);
+	hst_flush();
+
+	if (s != TRUE)
                 return(s);
 
 	/* first check if we are already here */
@@ -575,11 +622,10 @@ int f,n;
 	/* and read the stuff in */
 	if (popupbuff(bp) != TRUE || 
 		swbuffer(bp) != TRUE ||
-		readin(oline, FALSE, bp, TRUE) != TRUE) {
+		readin(line, FALSE, bp, TRUE) != TRUE) {
 		return(FALSE);
 	}
-	(void)strcpy(bp->b_bname,bname);
-	ch_fname(bp, oline);
+	ch_fname(bp, line);
 
 	return TRUE;
 }

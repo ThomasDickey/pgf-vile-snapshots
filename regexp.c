@@ -13,7 +13,10 @@
  *		pgf, 11/91
  * 
  * $Log: regexp.c,v $
- * Revision 1.30  1992/12/28 23:50:45  foxharp
+ * Revision 1.31  1993/02/24 10:59:02  pgf
+ * see 3.34 changes, in CHANGES file
+ *
+ * Revision 1.30  1992/12/28  23:50:45  foxharp
  * fixes for BOL and \s etc., from eric krohn
  *
  * Revision 1.29  1992/12/14  09:03:25  foxharp
@@ -449,6 +452,9 @@ int magic;
 		}
 	}
 
+#if NO_LEAKS
+	if (exp != 0) { free(exp); exp = 0; explen = 0; }
+#endif
 	return(r);
 }
 

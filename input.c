@@ -3,7 +3,22 @@
  *		5/9/86
  *
  * $Log: input.c,v $
- * Revision 1.54  1993/02/15 10:37:31  pgf
+ * Revision 1.59  1993/03/16 10:53:21  pgf
+ * see 3.36 section of CHANGES file
+ *
+ * Revision 1.58  1993/03/15  12:01:59  pgf
+ * another fix to kbd_reply, so that search delimiters work correctly
+ *
+ * Revision 1.57  1993/03/11  17:55:36  pgf
+ * don't return TRUE from kbd_reply if backspaced past start of buff
+ *
+ * Revision 1.56  1993/03/05  17:50:54  pgf
+ * see CHANGES, 3.35 section
+ *
+ * Revision 1.55  1993/02/24  10:59:02  pgf
+ * see 3.34 changes, in CHANGES file
+ *
+ * Revision 1.54  1993/02/15  10:37:31  pgf
  * cleanup for gcc-2.3's -Wall warnings
  *
  * Revision 1.53  1993/02/12  10:42:55  pgf
@@ -198,15 +213,52 @@
  * revision 1.1
  * date: 1990/09/21 10:25:28;
  * initial vile RCS revision
-*/
+ */
 
 #include	<stdio.h>
 #include	"estruct.h"
 #include	"edef.h"
 
-static	TBUFF	*tmpcmd;	/* dot commands, 'til we're sure */
-static	TBUFF	*dotcmd;	/* dot commands, recorded	*/
+#define	DEFAULT_REG	-1
+
+#define RECORDED_ESC	-2
+
+typedef	struct	_kstack	{
+	struct	_kstack	*m_link;
+	int	m_save;		/* old value of 'kbdmode'		*/
+	int	m_indx;		/* index identifying this macro		*/
+	int	m_rept;		/* the number of times to execute the macro */
+	TBUFF  *m_kbdm;		/* the macro-text to execute		*/
+	TBUFF  *m_dots;		/* workspace for "." command		*/
+	TBUFF  *m_DOTS;		/* save-location for 'dotcmd'		*/
+	} KSTACK;
+
+static	KSTACK *KbdStack;	/* keyboard/@-macros that are replaying */
+static	TBUFF  *dotcmd;		/* dot commands, recorded	*/
+static	TBUFF  *KbdMacro;	/* keyboard macro, recorded	*/
 static	int	last_eolchar;	/* records last eolchar-match in 'kbd_string' */
+
+static	int	dotcmdcnt;	/* original # of repetitions	*/
+static	int	dotcmdrep;	/* number of repetitions	*/
+
+/*
+ * Returns a pointer to the buffer that we use for saving text to replay with
+ * the "." command.
+ */
+static TBUFF *
+TempDot(init)
+int	init;
+{
+	static	TBUFF  *tmpcmd;		/* dot commands, 'til we're sure */
+	if (kbdmode == PLAY) {
+		if (init)
+			(void)tb_init(&(KbdStack->m_dots), abortc);
+		return KbdStack->m_dots;
+	}
+	if (init || (tmpcmd == 0))
+		(void)tb_init(&tmpcmd, abortc);
+	return tmpcmd;
+}
 
 /*
  * Dummy function to use when 'kbd_string()' does not handle automatic completion
@@ -237,11 +289,11 @@ char *prompt;
 #if	NeWS
 		newsimmediateon() ;
 		mlprompt(,"%s [y/n]? ",prompt);
-		c = tgetc();		/* get the response */
+		c = tgetc(FALSE);	/* get the response */
 		newsimmediateoff() ;
 #else
 		mlprompt("%s [y/n]? ",prompt);
-		c = tgetc();		/* get the response */
+		c = tgetc(FALSE);	/* get the response */
 #endif
 
 		if (c == kcod2key(abortc))		/* Bail out! */
@@ -310,7 +362,7 @@ int bufn;
 kcod2key(c)
 int c;
 {
-	return c & 0x7f;
+	return c & (N_chars-1);
 }
 #endif
 
@@ -334,14 +386,10 @@ int c;
 {
 	tungotc = c;
 	if (dotcmdmode == RECORD)
-		tb_unput(tmpcmd);
+		tb_unput(TempDot(FALSE));
 
-	if (kbdmode == RECORD) {
-		if (kbdend > kbdm) {
-			kbdend--;
-			kbdptr--;
-		}
-	}
+	if (kbdmode == RECORD)
+		tb_unput(KbdMacro);
 }
 
 int
@@ -350,136 +398,142 @@ tpeekc()
 	return tungotc;
 }
 
+/*
+ * Record a character for "." commands
+ */
+static void
+record_dot_char(c)
+int c;
+{
+	if (dotcmdmode == RECORD) {
+		TBUFF	*tmp = TempDot(FALSE);
+		(void)tb_append(&tmp, c);
+	}
+}
+
+/*
+ * Record a character for kbd-macros
+ */
+static void
+record_kbd_char(c)
+int c;
+{
+	if (kbdmode == RECORD)
+		(void)tb_append(&KbdMacro, c);
+}
+
+/* if we should preserve this input, do so */
+static void
+record_char(c)
+int c;
+{
+	if (c == ESC)
+		c = RECORDED_ESC;
+
+	record_dot_char(c);
+	record_kbd_char(c);
+}
+
 /* get the next character of a replayed '.' or macro */
 int
 get_recorded_char(eatit)
 int eatit;  /* consume the character? */
 {
+	register int	c = -1;
+	register TBUFF	*buffer;
+
 	if (dotcmdmode == PLAY) {
-	        
+
 		if (interrupted) {
 			dotcmdmode = STOP;
-			return (kcod2key(abortc));
-		}
-
-		/* if there is some left... */
-		if (tb_more(dotcmd)) {
-			if (eatit)
-				return tb_next(dotcmd);
-			else
-				return tb_peek(dotcmd);
-		}
-
-		if (!eatit) {
-			if (dotcmdrep > 1)
-				return tb_get(dotcmd, 0);
+			c = kcod2key(abortc);
+			return c;
 		} else {
-			/* at the end of last repetition? */
-			if (--dotcmdrep < 1) {
-				dotcmdmode = STOP;
-				dotcmdbegin(); /* immediately start recording
-						   again, just in case */
-			} else {
 
-				/* reset the macro to the beginning
-					for the next rep */
-				tb_first(dotcmd);
+			if (!tb_more(buffer = dotcmd)) {
+				if (!eatit) {
+					if (dotcmdrep > 1)
+						return tb_get(buffer, 0);
+				} else { /* at the end of last repetition?  */
+					if (--dotcmdrep < 1) {
+						dotcmdmode = STOP;
+						(void)dotcmdbegin();
+						/* immediately start recording
+						 * again, just in case.
+						 */
+					} else {
+						/* reset the macro to the
+						 * beginning for the next rep.
+						 */
+						tb_first(buffer);
+					}
+				}
+			}
+
+			/* if there is some left... */
+			if (tb_more(buffer)) {
 				if (eatit)
-					return tb_next(dotcmd);
+					c = tb_next(buffer);
 				else
-					return tb_peek(dotcmd);
+					c = tb_peek(buffer);
+				return c;
 			}
 		}
-	} 
+	}
 
-	if (kbdmode == PLAY) {
-	/* if we are playing a keyboard macro back, */
+	if (kbdmode == PLAY) { /* if we are playing a keyboard macro back, */
 
 		if (interrupted) {
-			kbdmode = STOP;
-			return (kcod2key(abortc));
-		}
-
-		/* if there is some left... */
-		if (kbdptr < kbdend) {
-			if (eatit)
-				return (int)*kbdptr++;
-			else
-				return (int)*kbdptr;
-		}
-
-		/* at the end of last repetition? */
-		if (--kbdrep < 1) {
-			kbdmode = STOP;
+			finish_kbm();
+			c = kcod2key(abortc);
 		} else {
 
-			/* reset the macro to the beginning for the next rep */
-			kbdptr = &kbdm[0];
-			if (eatit)
-				return (int)*kbdptr++;
-			else
-				return (int)*kbdptr;
+			if (!tb_more(buffer = KbdStack->m_kbdm)) {
+				if (--(KbdStack->m_rept) >= 1)
+					tb_first(buffer);
+				else
+					finish_kbm();
+			}
+
+			if (kbdmode == PLAY) {
+				if (eatit)
+					record_dot_char(c = tb_next(buffer));
+				else
+					c = tb_peek(buffer);
+			}
 		}
 	}
 
-
-	return -1;  /* no stored chars */
-}
-
-/* if we should preserve this input, do so */
-static
-void	record_char(c)
-	int c;
-{
-	if (c == ESC)
-		c = RECORDED_ESC;
-
-	/* save it if we need to */
-	if (dotcmdmode == RECORD) {
-		if (!tb_append(&tmpcmd, c))
-			return;
-	}
-
-	/* save it if we need to */
-	if (kbdmode == RECORD) {
-		/* don't overrun the buffer */
-		if (kbdptr > &kbdm[NKBDM - 1])
-			return;
-
-		/* force the last char to be abortc */
-		if (kbdptr == &kbdm[NKBDM - 1]) {
-			c = abortc; /* safest terminator */
-			kbdmode = STOP;
-		}
-		*kbdptr++ = c;
-		kbdend = kbdptr;
-	}
+	return c;
 }
 
 /*	tgetc:	Get a key from the terminal driver, resolve any keyboard
 		macro action					*/
 int 
-tgetc()
+tgetc(quoted)
+int quoted;
 {
-	int c;	/* fetched character */
+	register int c;	/* fetched character */
 
 	if (tungotc >= 0) {
 		c = tungotc;
 		tungotc = -1;
+		record_char(c);
 	} else {
-		c = get_recorded_char(TRUE);
-		if (c != -1)
-			return lastkey = c;
-		/* fetch a character from the terminal driver */
-		interrupted = 0;
-		c = TTgetc();
-		if (c == -1 || c == kcod2key(intrc)) {
-			c = kcod2key(abortc);
-			return lastkey = c;
+		if ((c = get_recorded_char(TRUE)) == -1) {
+			/* fetch a character from the terminal driver */ 
+			interrupted = 0;
+			if ((c = TTgetc()) == -1)
+				c = kcod2key(intrc);
+			if (!quoted && (c == kcod2key(intrc)))
+				c = kcod2key(abortc);
+			else
+				record_char(c);
 		}
 	}
 
-	record_char(c);
+	if (!quoted && (c == RECORDED_ESC))
+		c = ESC;
 
 	/* and finally give the char back */
 	return(lastkey = c);
@@ -493,7 +547,7 @@ kbd_key()
 	int    c;
 
 	/* get a keystroke */
-	c = tgetc();
+	c = tgetc(FALSE);
 
 #if ANSI_SPEC
 	if (insert_mode_was && last1key == -abortc) {
@@ -525,10 +579,10 @@ kbd_key()
 
 		/* and then, if there _was_ recorded input or new typahead... */
 		if (nextc != -1 || typahead()) {
-			c = tgetc();
+			c = tgetc(FALSE);
 			if (c == '[' || c == 'O') {
 				/* eat ansi sequences */
-				c = tgetc();
+				c = tgetc(FALSE);
 				if (abortc != ESC || !insertmode)
 					return (last1key = SPEC | c);
 				if (insertmode == REPLACECHAR) {
@@ -553,7 +607,7 @@ kbd_key()
 
 #if	MSDOS | ST520
 	if (c == 0) {			/* Apply SPEC prefix	*/
-		c = tgetc();
+		c = tgetc(FALSE);
 		return(last1key = SPEC | c);
 	}
 #endif
@@ -562,7 +616,7 @@ kbd_key()
 	/* apply SPEC prefix */
 	if ((unsigned)c == 155) {
 		int	d;
-		c = tgetc();
+		c = tgetc(FALSE);
 
 		/* first try to see if it is a cursor key */
 		if ((c >= 'A' && c <= 'D') || c == 'S' || c == 'T') {
@@ -571,7 +625,7 @@ kbd_key()
 		}
 
 		/* next, a 2 char sequence */
-		d = tgetc();
+		d = tgetc(FALSE);
 		if (d == '~') {
 			if (!insertmode)
 				return(last1key = SPEC | c);
@@ -581,7 +635,7 @@ kbd_key()
 		c = d + ' ';
 		/* if a shifted function key, eat the tilde */
 		if (d >= '0' && d <= '9')
-			d = tgetc();
+			d = tgetc(FALSE);
 		if (!insertmode)
 			return(last1key = SPEC | c);
 	}
@@ -589,7 +643,7 @@ kbd_key()
 
 #if  WANGPC
 	if (c == 0x1F) {	/* Apply SPEC prefix	*/
-		c = tgetc();
+		c = tgetc(FALSE);
 		if (!insertmode)
 			return(last1key = SPEC | c);
 	}
@@ -657,9 +711,11 @@ int bufn, inclchartype;
 			break;
 		DOT.o++;
 		i++;
+#if !SMALLER
 		if (inclchartype & _scrtch)
 			if (buf[i-1] == SCRTCH_RIGHT[0])
 				break;
+#endif
 	}
 
 #if !SMALLER
@@ -668,12 +724,12 @@ int bufn, inclchartype;
 			i = 0;
 #endif
 
-	buf[bufn-1] = '\0';
+	buf[bufn-1] = EOS;
 	if (i < bufn)
-		buf[i] = '\0';
+		buf[i] = EOS;
 	DOT = mk;
 
-	return buf[0] != '\0';
+	return buf[0] != EOS;
 }
 
 /*
@@ -700,6 +756,219 @@ char *s;
 	}
 }
 
+/* count backslashes so we can tell at any point whether we have the current
+ * position escaped by one.
+ */
+static int
+countBackSlashes(buffer, len)
+char *	buffer;
+int	len;
+{
+	register int	count;
+
+	if (len && buffer[len-1] == '\\') {
+		count = 1;
+		while (count+1 <= len &&
+			buffer[len-1-count] == '\\')
+			count++;
+	} else {
+		count = 0;
+	}
+	return count;
+}
+
+static void
+showChar(c)
+int	c;
+{
+	if (disinp) {
+		int	save_expand = kbd_expand;
+		kbd_expand = 1;	/* show all controls */
+		kbd_putc(c);
+		kbd_expand = save_expand;
+	}
+}
+
+/* expand a single character (only used on interactive input) */
+static int
+expandChar(buf, bufn, position, c)
+char *	buf;
+int	bufn;
+int *	position;
+int	c;
+{
+	register int	cpos = *position;
+	register char *	cp;
+	register BUFFER *bp;
+#if ! MSDOS
+	char str[NFILEN];
+#endif
+
+	switch(c) {
+	case '%':
+		if (!*(curbp->b_fname) ||
+			isspace(*(curbp->b_fname)))
+			cp = curbp->b_bname;
+		else {
+			cp = shorten_path(curbp->b_fname);
+			if (!cp) cp = curbp->b_bname;
+		}
+		break;
+	case '#':
+		if ((bp = find_alt()) != 0) {
+			cp = shorten_path(bp->b_fname);
+			if (!cp || !*cp || isspace(*cp)) {
+				/* oh well, use the buffer */
+				cp = bp->b_bname;
+			}
+		} else
+			cp = NULL;
+		break;
+#if ! MSDOS
+	/* drive letters get in the way */
+	case ':':
+		if (screen_string(str, sizeof(str), _pathn))
+			cp = str;
+		else
+			cp = NULL;
+		break;
+#endif
+	default:
+		return FALSE;
+	}
+
+	if (cp != 0) {
+		while (cpos < bufn-1 && (c = *cp++)) {
+			buf[cpos++] = c;
+			showChar(c);
+		}
+		buf[cpos] = EOS;
+		TTflush();
+	}
+	*position = cpos;
+	return TRUE;
+}
+
+/*
+ * Returns true for the (presumably control-chars) that we use for line edits
+ */
+int
+is_edit_char(c)
+int c;
+{
+	return (isreturn(c)
+	  ||	isbackspace(c)
+	  ||	(c == wkillc)
+	  ||	(c == killc));
+}
+
+/*
+ * Erases the response from the screen for 'kbd_string()'
+ */
+void
+kbd_kill_response(buf, position, c)
+char *	buf;
+int *	position;
+int	c;
+{
+	int	saw_word = FALSE;
+	register int	cpos = *position;
+
+	while (cpos > 0) {
+		cpos--;
+		if (disinp) {
+			kbd_erase();
+			if (!isprint(buf[cpos]))
+				kbd_erase();
+		}
+		if (c == wkillc) {
+			if (isspace(buf[cpos])) {
+				if (saw_word)
+					break;
+			} else {
+				saw_word = TRUE;
+			}
+		}
+
+		if (isbackspace(c))
+			break;
+	}
+	if (disinp)
+		TTflush();
+
+	buf[*position = cpos] = EOS;
+}
+
+/*
+ * Display the default response for 'kbd_string()', escaping backslashes if
+ * necessary.
+ *
+ * patch: make 'dst[]' a TBUFF so we don't have to worry about overflow.
+ */
+int
+kbd_show_response(dst, src, bufn, eolchar, options)
+char	*dst;		/* string with escapes */
+char	*src;		/* string w/o escapes */
+int	bufn;		/* maximum # of chars we read from 'src[]' */
+int	eolchar;
+int	options;
+{
+	register int c, j, k;
+
+	j = k = 0;
+	/* add backslash escapes in front of volatile characters */
+	while ((c = src[k++]) != EOS && k < bufn) {
+		if (c == eolchar && eolchar != '\n')
+			goto is_eolchar;
+		switch(c) {
+		case '%':
+		case '#':
+#if ! MSDOS
+		case ':':
+#endif
+			if ((options & KBD_QUOTES)
+			 && (options & KBD_EXPAND))
+				dst[j++] = '\\'; /* add extra */
+		default:
+			break;
+		case '\\':
+		is_eolchar:
+			if (options & KBD_QUOTES)
+				dst[j++] = '\\'; /* add extra */
+			break;
+		}
+		dst[j++] = c;
+	}
+	dst[j] = EOS;
+
+	/* put out the default response, which is in the buffer */
+	j = 0;
+	kbd_init();
+	while ((c = dst[j]) != EOS && j < NLINE-1) {
+		showChar(c);
+		++j;
+	}
+	if (disinp)
+		TTflush();
+	return j;
+}
+
+/* default function for 'edithistory()' */
+static int
+/*ARGSUSED*/
+eol_history(buffer, cpos, c, eolchar)
+char *	buffer;
+int	cpos;
+int	c;
+int	eolchar;
+{
+	if (isprint(eolchar)) {
+		if (c == eolchar)
+			return TRUE;
+	}
+	return FALSE;
+}
+
 /*	A more generalized prompt/reply function allowing the caller
 	to specify a terminator other than '\n'.  Both are accepted.
 	Assumes the buffer already contains a valid (possibly
@@ -711,30 +980,49 @@ char *prompt;		/* put this out first */
 char *extbuf;		/* the caller's (possibly full) buffer */
 int bufn;		/* the length of  " */
 int eolchar;		/* char we can terminate on, in addition to '\n' */
-int options;		/* KBD_EXPAND/KBD_QUOTES */
+int options;		/* KBD_EXPAND/KBD_QUOTES, etc. */
 int (*complete)P((int,char *,int *));/* handles completion */
 {
-	int	expand		= (options & KBD_EXPAND);
-	int	dobackslashes	= (options & KBD_QUOTES);
-	int	done;
+	return kbd_reply(prompt, extbuf, bufn, eol_history, eolchar, options, complete);
+}
 
-	register int cpos, extcpos;/* current character position in string */
-	register int c;
+/*
+ * Same as 'kbd_string()', except for adding the 'endfunc' parameter.
+ *
+ * Returns:
+ *	ABORT - abort character given (usually ESC)
+ *	SORTOFTRUE - backspace from empty-buffer
+ *	TRUE - buffer is not empty
+ *	FALSE - buffer is empty
+ */
+int
+kbd_reply(prompt, extbuf, bufn, endfunc, eolchar, options, complete)
+char *prompt;		/* put this out first */
+char *extbuf;		/* the caller's (possibly full) buffer */
+int bufn;		/* the length of  " */
+int (*endfunc)P((char *,int,int,int));	/* parsing with 'eolchar' delimiter */
+int eolchar;		/* char we can terminate on, in addition to '\n' */
+int options;		/* KBD_EXPAND/KBD_QUOTES */
+int (*complete)P((int,char *,int *));	/* handles completion */
+{
+	int	c;
+	int	done;
+	int	cpos;		/* current character position in string */
+
 	register int quotef;	/* are we quoting the next char? */
 	register int backslashes; /* are we quoting the next expandable char? */
 	int firstch = TRUE;
 	int newpos;
-	char buf[256];
-#if ! MSDOS
-	char str[80];
-#endif
+	char buf[NLINE];
 
 	if (clexec) {
 		int	s;
 		execstr = token(execstr, extbuf, eolchar);
 		if ((s = (*extbuf != EOS)) != FALSE) {
+#if !SMALLER
 			if ((options & KBD_LOWERC))
 				(void)mklower(extbuf);
+#endif
 			if (complete != no_completion) {
 				cpos =
 				newpos = strlen(extbuf);
@@ -749,53 +1037,19 @@ int (*complete)P((int,char *,int *));/* handles completion */
 		return s;
 	}
 
-	lineinput = TRUE;
-
 	quotef = FALSE;
 
 	/* prompt the user for the input string */
-	mlprompt(prompt);
+	if (prompt != 0)
+		mlprompt(prompt);
 
 	if (bufn > sizeof(buf)) bufn = sizeof(buf);
-
-	cpos = extcpos = 0;
-	/* add backslash escapes in front of volatile characters */
-	while((c = extbuf[extcpos++]) != '\0' && extcpos < bufn) {
-		if (c == eolchar && eolchar != '\n')
-			goto is_eolchar;
-		switch(c) {
-		case '%':
-		case '#':
-#if ! MSDOS
-		case ':':
-#endif
-			if (dobackslashes && expand)
-				buf[cpos++] = '\\'; /* add extra */
-		default:
-			break;
-		case '\\':
-		is_eolchar:
-			if (dobackslashes)
-				buf[cpos++] = '\\'; /* add extra */
-			break;
-		}
-		buf[cpos++] = c;
-	}
-	buf[cpos] = '\0';
-
-	/* put out the default response, which comes in already in the buffer */
-	cpos = 0;
-	kbd_init();
-	while((c = buf[cpos]) != '\0' && cpos < bufn-1) {
-		if (disinp)
-			kbd_putc(c);
-		++cpos;
-	}
-	TTflush();
-
+	cpos = kbd_show_response(buf, extbuf, bufn, eolchar, options);
 	backslashes = 0; /* by definition, there is an even 
 					number of backslashes */
 	for (;;) {
+		int	EscOrQuo = ((quotef == TRUE) || ((backslashes & 1) != 0));
+
 		/* get a character from the user */
 		c = kbd_key();
 
@@ -808,33 +1062,47 @@ int (*complete)P((int,char *,int *));/* handles completion */
 			problems, especially when searching for patterns
 			containing them -pgf */
 		/* terminate with newline, or unescaped eolchar */
-		done = ((c == '\n')
-			||   (c == eolchar
-			  && (quotef == FALSE
-			  && (backslashes & 1) == 0)));
+		done = FALSE;
+		if (c == '\n') {
+			done = TRUE;
+		} else if (!EscOrQuo && !is_edit_char(c)) {
+			if ((*endfunc)(buf,cpos,c,eolchar)) {
+				/*
+				 * If this is not an exact match for 'eolchar',
+				 * then the end-function was probably something
+				 * like 'eol_command()', e.g., an "s" that is
+				 * followed by a pattern delimiter.
+				 */
+				if (c != eolchar
+				 && c != TESTC
+				 && c != NAMEC
+				 && ispunct(c))
+					tungetc(c);
+				done = TRUE;
+			}
+		}
 		if (done)
 			last_eolchar = c;
 
 		if (complete != no_completion) {
+			if (c == EOS) {	/* conflicts with null-terminated strings */
+				kbd_alarm();
+				continue;
+			}
 			kbd_unquery();
-			if (done
-			 || c == TESTC
-			 || c == NAMEC) {
-				int	ok;
-
-				newpos = cpos;
-				ok = ((*complete)(c, buf, &newpos));
-				cpos = newpos;
+			if ((done && !(options & KBD_MAYBEC))
+			 || (!EscOrQuo && (c == TESTC || c == NAMEC))) {
+				int	ok = ((*complete)(c, buf, &cpos));
 
 				if (ok) {
 					done = TRUE;
 					if (c != NAMEC)	/* cancel the unget */
-						(void)tgetc();
+						(void)tgetc(FALSE);
 				} else {
 					if (done) {	/* stay til matched! */
 						buf[cpos] = EOS;
 						kbd_unquery();
-						(void)((*complete)(TESTC, buf, &newpos));
+						(void)((*complete)(TESTC, buf, &cpos));
 					}
 					continue;
 				}
@@ -842,134 +1110,62 @@ int (*complete)P((int,char *,int *));/* handles completion */
 		}
 
 		if (done) {
-			lineinput = FALSE;
-			if (dobackslashes)
+			if (options & KBD_QUOTES)
 				remove_backslashes(buf); /* take out quoters */
 
 			/* if buffer is empty, return FALSE */
-			return (*strcpy(extbuf, buf) == 0) ? FALSE:TRUE;
+			hst_append(buf, eolchar);
+			return (*strcpy(extbuf, buf) == EOS) ? FALSE:TRUE;
 		}
 
 #if	NeWS	/* make sure cursor is where we think it is before output */
 		TTmove(ttrow,ttcol) ;
 #endif
-		/* change from command form back to character form */
-		c = kcod2key(c);
-		if ((options & KBD_LOWERC) && isupper(c))
-			c = tolower(c);
-	        
-		if (c == kcod2key(abortc) && quotef == FALSE) {
-			buf[cpos] = 0;
+
+#if	!SMALLER
+		if (!EscOrQuo
+		 && edithistory(buf, &cpos, &c, options, endfunc, eolchar)) {
+			backslashes = countBackSlashes(buf, cpos);
+			firstch = TRUE;
+			continue;
+		} else
+#endif
+		if (c == abortc && quotef == FALSE) {
+			buf[cpos] = EOS;
 			(void)esc(FALSE, 0);
-			TTflush();
-			lineinput = FALSE;
 			return ABORT;
 		} else if ((isbackspace(c) ||
-			c == kcod2key(wkillc) ||
-			c == kcod2key(killc)) && quotef==FALSE) {
+			c == wkillc ||
+			c == killc) && quotef==FALSE) {
 
-			/* have we backed thru a "word" yet? */
-			int saw_word;
-
-			/* rubout/erase */
 			if (cpos == 0) {
-				buf[0] = '\0';
-				mlerase();
-				lineinput = FALSE;
+				buf[0] = EOS;
+				if (prompt)
+					mlerase();
+				if (isbackspace(c)) {	/* splice calls */
+					tungetc(c);
+					return SORTOFTRUE;
+				}
 				return FALSE;
 			}
 
 		killit:
-			saw_word = FALSE;
-			while (cpos > 0) {
-				if (c == kcod2key(wkillc)) {
-					if (isspace(buf[cpos-1])) {
-						if (saw_word)
-							break;
-					} else {
-						saw_word = TRUE;
-					}
-				}
-				if (disinp)
-					kbd_erase();
+			kbd_kill_response(buf, &cpos, c);
+			backslashes = countBackSlashes(buf, cpos);
 
-				if (!isprint(buf[--cpos])) {
-					if (disinp)
-						kbd_erase();
-				}
-				if (cpos && buf[cpos-1] == '\\') {
-					backslashes = 1;
-					while (backslashes+1 <= cpos &&
-						buf[cpos-1-backslashes] == '\\')
-						backslashes++;
-				} else {
-					backslashes = 0;
-				}
-
-				buf[cpos] = '\0';
-				if (isbackspace(c))
-					break;
-			}
-			TTflush();
-
-		} else if (expand && ((backslashes & 1 ) == 0)) {
-			/* we prefer to expand to filenames, but a buffer name
-				will do */
-			char *cp;
-			BUFFER *bp;
+		} else if ((options & KBD_EXPAND) && ((backslashes & 1 ) == 0)) {
 			if (firstch == TRUE) {
 				tungetc(c);
 				c = killc;
 				goto killit;
 			}
-			switch(c) {
-			case '%':
-				if (!*(curbp->b_fname) ||
-					isspace(*(curbp->b_fname)))
-					cp = curbp->b_bname;
-				else {
-					cp = shorten_path(curbp->b_fname);
-					if (!cp) cp = curbp->b_bname;
-				}
-				break;
-			case '#':
-				if ((bp = find_alt()) != 0) {
-					cp = shorten_path(bp->b_fname);
-					if (!cp || !*cp || isspace(*cp)) {
-						/* oh well, use the buffer */
-						cp = bp->b_bname;
-					}
-				} else
-					cp = NULL;
-				break;
-#if ! MSDOS
-/* drive letters get in the way */
-			case ':':
-				if (screen_string(str, 80, _pathn))
-					cp = str;
-				else
-					cp = NULL;
-				break;
-#endif
-			default:
+			if (!expandChar(buf, bufn, &cpos, c))
 				goto trymore;
-			}
-
-			if (!cp) {
-				kbd_alarm();
-				continue;
-			}
-			while (cpos < bufn-1 && (c = *cp++)) {
-				buf[cpos++] = c;
-				if (disinp)
-					kbd_putc(c);
-			}
-			buf[cpos] = '\0';
-			TTflush();
 		} else {
 		trymore:
-			if (c == kcod2key(quotec) && quotef == FALSE) {
+			if (c == quotec && quotef == FALSE) {
 				quotef = TRUE;
+				continue;	/* keep firstch==TRUE */
 			} else	{
 				if (firstch == TRUE) {
 					/* we always clean the buf on the
@@ -983,12 +1179,20 @@ int (*complete)P((int,char *,int *));/* handles completion */
 				else
 					backslashes = 0;
 				quotef = FALSE;
-				if (cpos < bufn-1) {
+
+				if (isspecial(c)) {
+					kbd_alarm();
+					continue; /* keep firstch==TRUE */
+				} else {
+					if ((options & KBD_LOWERC)
+					 && isupper(c))
+						c = tolower(c);
 					buf[cpos++] = c;
-					buf[cpos] = '\0';
-					if (disinp)
-						kbd_putc(c);
-					TTflush();
+					buf[cpos] = EOS;
+					if (disinp) {
+						showChar(c);
+						TTflush();
+					}
 				}
 			}
 		}
@@ -1016,17 +1220,12 @@ int
 dotcmdbegin()
 {
 	/* never record a playback */
-	if (kbdmode == PLAY)
-		return FALSE;
-
-	switch (dotcmdmode) {
-	case TMPSTOP:
-	case PLAY:
-		return FALSE;
+	if (dotcmdmode != PLAY) {
+		(void)TempDot(TRUE);
+		dotcmdmode = RECORD;
+		return TRUE;
 	}
-	(void)tb_init(&tmpcmd, abortc);
-	dotcmdmode = RECORD;
-	return TRUE;
+	return FALSE;
 }
 
 /*
@@ -1035,25 +1234,14 @@ dotcmdbegin()
 int
 dotcmdfinish()
 {
-	switch (dotcmdmode) {
-	case STOP:
-	case PLAY:
-	case TMPSTOP:
-		return FALSE;
-
-	case RECORD:
-		;
+	if (dotcmdmode == RECORD) {
+		if (tb_copy(&dotcmd, TempDot(FALSE)) != 0) {
+			tb_first(dotcmd);
+			dotcmdmode = STOP;
+			return TRUE;
+		}
 	}
-
-	(void)tb_init(&dotcmd, abortc);
-	tb_first(tmpcmd);
-	while (tb_more(tmpcmd))
-		if (!tb_append(&dotcmd, tb_next(tmpcmd)))
-			return FALSE;
-
-	tb_first(dotcmd);
-	dotcmdmode = STOP;
-	return TRUE;
+	return FALSE;
 }
 
 
@@ -1080,11 +1268,12 @@ int f,n;
 	else if (n <= 0)
 		return TRUE;
 
-	if (dotcmdmode != STOP) {
+	if (dotcmdmode != STOP || tb_length(dotcmd) == 0) {
 		dotcmdmode = STOP;
 		return FALSE;
 	}
 
+	dotcmdcnt =
 	dotcmdrep = n;		/* remember how many times to execute */
 	dotcmdmode = PLAY;		/* put us in play mode */
 	tb_first(dotcmd);	/*    at the beginning */
@@ -1093,9 +1282,32 @@ int f,n;
 }
 
 /*
- * Begin a keyboard macro.
- * Error if not at the top level in keyboard processing. Set up variables and
- * return.
+ * Special function used in 'insert.c' to adjust cursor position between
+ * iterations in command of the form "5."
+ */
+int
+dotreplaying(f)
+int f;
+{
+	if (dotcmdmode == PLAY) {
+		if (f)
+			return (dotcmdrep != dotcmdcnt);
+		return (dotcmdrep > 1);
+	}
+	return FALSE;
+}
+
+/*
+ *
+ */
+int
+kbd_replaying()
+{
+	return (dotcmdmode == PLAY) || (kbdmode == PLAY);
+}
+
+/*
+ * Begin recording a keyboard macro.
  */
 /* ARGSUSED */
 int
@@ -1107,11 +1319,10 @@ int f,n;
 		return FALSE;
 	}
 	mlwrite("[Start macro]");
-	kbdptr = &kbdm[0];
-	kbdend = kbdptr;
+
 	kbdmode = RECORD;
-	kbdplayreg = -1;  /* default buffer */
-	return TRUE;
+	kbdplayreg = DEFAULT_REG;
+	return (tb_init(&KbdMacro, abortc) != 0);
 }
 
 /*
@@ -1130,8 +1341,7 @@ int f,n;
 	if (kbdmode == RECORD) {
 		mlwrite("[End macro]");
 		kbdmode = STOP;
-		kbdplayreg = -1;  /* default buffer */
-		kbdlim = kbdend;
+		kbdplayreg = DEFAULT_REG;
 	}
 	/* note that if kbd_mode == PLAY, we do nothing -- that makes
 		the '^X-)' at the of the recorded buffer a no-op during
@@ -1149,18 +1359,10 @@ int
 kbd_mac_exec(f, n)
 int f,n;
 {
-	if (kbdmode != STOP) {
-		mlforce("[Macro already active]");
-		return FALSE;
-	}
 	if (n <= 0)
 		return TRUE;
-	kbdrep = n;		/* remember how many times to execute */
-	kbdmode = PLAY; 	/* start us in play mode */
-	kbdplayreg = -1;	/* default playback register */
-	kbdptr = &kbdm[0];	/*    at the beginning */
-	kbdend = kbdlim;
-	return TRUE;
+
+	return start_kbm(n, DEFAULT_REG, KbdMacro);
 }
 
 /* ARGSUSED */
@@ -1168,12 +1370,82 @@ int
 kbd_mac_save(f,n)
 int f,n;
 {
-	register unsigned char *kp;
 	ksetup();
-	for (kp = kbdm; kp < kbdlim; kp++)
-		kinsert(*kp);
+	tb_first(KbdMacro);
+	while (tb_more(KbdMacro))
+		kinsert(tb_next(KbdMacro));
 	kdone();
-	mlwrite("[Keyboard macro saved.]");
+	mlwrite("[Keyboard macro saved in register %c.]", index2reg(ukb));
 	return TRUE;
 }
 
+/*
+ * Start playback of the given keyboard command-string
+ */
+int
+start_kbm(n, macnum, ptr)
+int	n;			/* # of times to repeat */
+int	macnum;			/* register to execute */
+TBUFF *	ptr;			/* data to interpret */
+{
+	register KSTACK *sp;
+	TBUFF  *tp = 0;
+
+	if (interrupted)
+		return FALSE;
+
+	if (kbdmode == RECORD && KbdStack != 0)
+		return TRUE;
+
+	if (tb_length(ptr)
+	 && (sp = typealloc(KSTACK)) != 0
+	 && tb_copy(&tp, ptr) != 0) {
+
+		/* make a copy of the macro in case recursion alters it */
+		tb_first(tp);
+
+		sp->m_save = kbdmode;
+		sp->m_indx = /* patch */kbdplayreg = macnum;
+		sp->m_rept = n;
+		sp->m_kbdm = tp;
+		sp->m_link = KbdStack;
+
+		KbdStack   = sp;
+		kbdmode    = PLAY; 	/* start us in play mode */
+
+		/* save data for "." on the same stack */
+		sp->m_dots = 0;
+		sp->m_DOTS = dotcmd;
+		dotcmd     = 0;
+		return (tb_init(&dotcmd, abortc) != 0
+		  &&    tb_init(&(sp->m_dots), abortc) != 0);
+	}
+	return FALSE;
+}
+
+/*
+ * Finish a macro begun via 'start_kbm()'
+ */
+void
+finish_kbm()
+{
+	if (kbdmode == PLAY) {
+		register KSTACK *sp = KbdStack;
+
+		kbdmode = STOP;
+		kbdplayreg = DEFAULT_REG;
+		if (sp != 0) {
+			kbdmode  = sp->m_save;
+			KbdStack = sp->m_link;
+
+			tb_free(&(sp->m_kbdm));
+			tb_free(&dotcmd);
+			dotcmd = sp->m_DOTS;
+			tb_free(&(sp->m_dots));
+			free((char *)sp);
+
+			if (KbdStack != 0)
+				kbdplayreg = KbdStack->m_indx;
+		}
+	}
+}

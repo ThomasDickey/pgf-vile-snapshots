@@ -8,8 +8,11 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: insert.c,v $
- *	Revision 1.13  1993/02/15 10:37:31  pgf
- *	cleanup for gcc-2.3's -Wall warnings
+ *	Revision 1.14  1993/03/16 10:53:21  pgf
+ *	see 3.36 section of CHANGES file
+ *
+ * Revision 1.13  1993/02/15  10:37:31  pgf
+ * cleanup for gcc-2.3's -Wall warnings
  *
  * Revision 1.12  1993/02/08  14:53:35  pgf
  * see CHANGES, 3.32 section
@@ -99,7 +102,7 @@ int f,n,advance;
 
 	s = ins(FALSE);
 
-	while (s && --n) {
+	while ((s == TRUE) && --n) {
 		if (advance)
 			advance_one_char();
 		s = ins(TRUE);
@@ -193,9 +196,14 @@ int
 insert(f, n)
 int f,n;
 {
-	int s = ins_n_times(f,n,FALSE);
+	int	s,
+		t = dotreplaying(FALSE);
 
+	s = ins_n_times(f,n,FALSE);
+	if (t)
+		advance_one_char();
 	update(FALSE);
+
 	return s;
 }
 
@@ -204,8 +212,18 @@ int
 insertbol(f, n)
 int f,n;
 {
+	int	s,
+		t = dotreplaying(FALSE);
+
+	if (dotreplaying(TRUE))
+		return insert(f,n);
+
 	firstnonwhite(f,n);
-	return ins_n_times(f,n,FALSE);
+	s = ins_n_times(f,n,FALSE);
+	if (t)
+		advance_one_char();
+
+	return s;
 }
 
 /* ARGSUSED */
@@ -234,11 +252,18 @@ int
 overwrite(f, n)
 int f,n;
 {
+	int	s,
+		t = dotreplaying(FALSE);
+
 	insertmode = OVERWRITE;
 	if (b_val(curbp, MDSHOWMODE))
 		curwp->w_flag |= WFMODE;
 
-	return ins_n_times(f,n,FALSE);
+	s = ins_n_times(f,n,FALSE);
+	if (t)
+		advance_one_char();
+
+	return s;
 }
 
 int
@@ -292,7 +317,7 @@ int playback;
 {
 	register int status;
 	int f,n;
-	int (*execfunc)();		/* ptr to function to execute */
+	int (*execfunc) P((int, int));	/* ptr to function to execute */
 	int    c;		/* command character */
 	int newlineyet = FALSE; /* are we on the line we started on? */
 	int startoff = DOT.o;	/* starting offset on that line */
@@ -765,8 +790,10 @@ int f,n;
 	return linsert((nextab(ccol) - ccol) + (n-1)*curtabval,' ');
 }
 
+/*ARGSUSED*/
 int
-shiftwidth()
+shiftwidth(f, n)
+int f,n;
 {
 	int s;
 	int fc;
@@ -805,7 +832,7 @@ int f,n;
 	register int	s;
 	register int	c;
 
-	c = tgetc();
+	c = tgetc(TRUE);
 	if (!f)
 		n = 1;
 	if (n < 0)

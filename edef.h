@@ -9,7 +9,19 @@
 
 /*
  * $Log: edef.h,v $
- * Revision 1.79  1993/02/12 10:47:20  pgf
+ * Revision 1.83  1993/03/16 16:01:26  pgf
+ * vers. 3.36
+ *
+ * Revision 1.82  1993/03/16  10:53:21  pgf
+ * see 3.36 section of CHANGES file
+ *
+ * Revision 1.81  1993/03/05  17:50:54  pgf
+ * see CHANGES, 3.35 section
+ *
+ * Revision 1.80  1993/02/24  10:59:02  pgf
+ * see 3.34 changes, in CHANGES file
+ *
+ * Revision 1.79  1993/02/12  10:47:20  pgf
  * v. 3.33
  *
  * Revision 1.78  1993/02/08  14:53:35  pgf
@@ -280,7 +292,7 @@
 #endif
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version 3.33");
+decl_init( char version[], "version 3.36");
 
 decl_init( char slash, '/'); 		/* so DOS can use '\' as path separator */
 
@@ -296,7 +308,6 @@ decl_uninit( int interrupted );		/* interrupt signal?		*/
 decl_uninit( int insertmode );		/* are we inserting or overwriting? */
 decl_uninit( int insert_mode_was );	/* were we (and will we be?)	*/
 					/*	inserting or overwriting? */
-decl_uninit( int lineinput );		/* are we inserting linestyle? */
 decl_uninit( int lastkey );		/* last keystoke (tgetc)	*/
 decl_uninit( int last1key );		/* last keystoke (kbd_key)	*/
 decl_uninit( int lastcmd );		/* last command	(kbd_seq)	*/
@@ -306,7 +317,6 @@ decl_uninit( MARK pre_op_dot );		/* current pos. before operator cmd */
 decl_uninit( short opcmd );             /* what sort of operator?	*/
 decl_uninit( CMDFUNC *havemotion );	/* so we can use "oper" routines
 					   internally */
-decl_uninit( unsigned char kbdm[KBLOCK] );	/* Macro                        */
 decl_uninit( int currow );              /* Cursor row                   */
 decl_uninit( int curcol );              /* Cursor column                */
 decl_uninit( WINDOW *curwp );           /* Current window               */
@@ -369,6 +379,7 @@ decl_uninit( MARK Mark );		/* the worker mark */
 #endif
 
 /* these get their initial values in main.c, in global_val_init() */
+decl_uninit( G_VALUES global_g_values );
 decl_uninit( B_VALUES global_b_values );
 
 decl_init( int sgarbf, TRUE );          /* TRUE if screen is garbage	*/
@@ -421,19 +432,14 @@ decl_uninit( WINDOW *swindow );		/* saved window pointer		*/
 decl_init( int cryptflag, FALSE );		/* currently encrypting?	*/
 #endif
 decl_init( int dotcmdmode, RECORD );	/* current dot command mode	*/
-decl_uninit( int dotcmdrep );		/* number of repetitions	*/
-decl_uninit( unsigned char *kbdptr );		/* current position in keyboard buf */
-decl_init( unsigned char *kbdend, &kbdm[0] );	/* volatile to end of the keyboard */
-decl_uninit( unsigned char *kbdlim);		/* perm. ptr to end of the keyboard */
 decl_init( int	kbdmode, STOP );	/* current keyboard macro mode	*/
 decl_init( int	kbdplayreg, -1 );	/* register currently playing back */
-decl_uninit( int kbdrep );		/* number of repetitions	*/
 decl_uninit( int seed );		/* random number seed		*/
 decl_uninit( long envram );		/* # of bytes current used malloc */
 decl_uninit( int macbug );		/* macro debugging flag		*/
 decl_init( char	errorm[], "ERROR" );	/* error literal		*/
 decl_init( char	truem[], "TRUE" );	/* true literal			*/
-decl_init( char	falsem[], "FALSE" );	/* false litereal		*/
+decl_init( char	falsem[], "FALSE" );	/* false literal		*/
 decl_init( int	cmdstatus, TRUE );	/* last command status		*/
 decl_uninit( char palstr[49] );		/* palette string		*/
 decl_uninit( char *fline );		/* dynamic return line		*/
@@ -443,6 +449,8 @@ decl_uninit( unsigned flen );		/* current length of fline	*/
 decl_init( char febuff[NBUFN], "" );	/* name of buffer to find errors in */
 decl_uninit( unsigned newfebuff );	/* is the name new since last time? */
 #endif
+decl_uninit( int kbd_expand );		/* -1 kbd_putc shows tab as space */
+					/* +1 kbd_putc shows cr at ^M */
 
 /* defined in nebind.h and nename.h */
 extern NTAB nametbl[];

@@ -2,7 +2,10 @@
  * Written for vile by Paul Fox, (c)1990
  *
  * $Log: finderr.c,v $
- * Revision 1.14  1993/01/16 10:34:20  foxharp
+ * Revision 1.15  1993/03/05 17:50:54  pgf
+ * see CHANGES, 3.35 section
+ *
+ * Revision 1.14  1993/01/16  10:34:20  foxharp
  * use for_each_window macro
  *
  * Revision 1.13  1992/12/04  09:12:25  foxharp
@@ -110,18 +113,27 @@ int f,n;
 			"file.c", line 223: error....
 			or
 			file.c: 223: error....
+			or
+			******** Line 187 of "filec.c"
 		*/
 		if ( dotp->l_text) {
 			char verb[20];
 			if ( (sscanf(dotp->l_text,
-			"\"%[^\" 	]\", line %d:",errfile,&errline) == 2 ||
-			     sscanf(dotp->l_text,
-			"%[^: 	]: %d:",errfile,&errline) == 2 
+				"\"%[^\" \t]\", line %d:",
+				errfile, &errline) == 2
+			  ||  sscanf(dotp->l_text,
+				"%[^: \t]: %d:",
+				errfile, &errline) == 2 
+#if APOLLO
+			  ||  sscanf(dotp->l_text,
+				"%20[*] Line %d of \"%[^\" \t]\"",
+				verb, &errline, errfile) == 3 
+#endif
 				) && (oerrline != errline || 
 					strcmp(errfile,oerrfile))) {
 				break;
 			} else if (sscanf(dotp->l_text,
-			"%*[^ 	:`]: %20[^ 	`] directory `",verb) == 1 ) {
+			"%*[^ \t:`]: %20[^ \t`] directory `",verb) == 1 ) {
 				char *d = strchr(dotp->l_text,'`') + 1;
 				if (verb[0] == 'E') { /* Entering */
 					if (l < DIRLEVELS)
@@ -157,10 +169,10 @@ int f,n;
 			i++;
 		}
 		ferrfile[i++] = '/';
-		strcpy(&ferrfile[i],errfile);
+		(void)strcpy(&ferrfile[i],errfile);
 	} else {
 		/* lsprintf(ferrfile,"%s/%s",current_directory(FALSE),errfile); */
-		strcpy(ferrfile,errfile);
+		(void)strcpy(ferrfile,errfile);
 	}
 	if (strcmp(ferrfile,curbp->b_bname) &&
 		strcmp(ferrfile,curbp->b_fname)) {
@@ -189,7 +201,7 @@ int f,n;
 	gotoline(TRUE, -(curbp->b_linecount - errline + 1));
 
 	oerrline = errline;
-	strcpy(oerrfile,errfile);
+	(void)strcpy(oerrfile,errfile);
 
 	return TRUE;
 

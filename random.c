@@ -3,7 +3,13 @@
  * commands. There is no functional grouping here, for sure.
  *
  * $Log: random.c,v $
- * Revision 1.84  1993/02/15 10:47:30  pgf
+ * Revision 1.86  1993/03/16 10:53:21  pgf
+ * see 3.36 section of CHANGES file
+ *
+ * Revision 1.85  1993/03/05  17:50:54  pgf
+ * see CHANGES, 3.35 section
+ *
+ * Revision 1.84  1993/02/15  10:47:30  pgf
  * add include of sys/select.h for AIX
  *
  * Revision 1.83  1993/01/23  13:38:23  foxharp
@@ -306,7 +312,6 @@
  * initial vile RCS revision
  */
 
-#include	<stdio.h>
 #include	"estruct.h"
 #include	"edef.h"
 #if HAVE_POLL
@@ -455,7 +460,6 @@ int f,n;
 	return TRUE;
 }
 
-#if ! SMALLER
 int
 line_no(the_buffer, the_line)	/* return the number of the given line */
 BUFFER *the_buffer;
@@ -481,6 +485,7 @@ LINE *the_line;
 	return(numlines + 1);
 }
 
+#if ! SMALLER
 int
 getcline()	/* get the current line number */
 {
@@ -989,7 +994,7 @@ int force;
 	}
 	n = fread(dirname, 1, NFILEN, f);
 
-	dirname[n] = '\0';
+	dirname[n] = EOS;
 	npclose(f);
 	cwd = dirname;
 	}
@@ -1003,7 +1008,7 @@ int force;
 #endif
 	s = strchr(cwd, '\n');
 	if (s)
-		*s = '\0';
+		*s = EOS;
 #if MSDOS & MSC
 	update_dos_drv_dir(cwd);
 #endif
@@ -1056,7 +1061,7 @@ int drive;
 		return current_directory(FALSE);
 
 	if (setdrive(drive) == TRUE) {
-		strcpy(cwds[drive-'A'], current_directory(TRUE));
+		(void)strcpy(cwds[drive-'A'], current_directory(TRUE));
 		setdrive(curd);
 		(void)current_directory(TRUE);
 		return cwds[drive-'A'];
@@ -1082,7 +1087,7 @@ char *cwd;
 	if (!cwds[drive-'A'])
 		return;
 
-	strcpy(cwds[drive-'A'],cwd);
+	(void)strcpy(cwds[drive-'A'],cwd);
 	
 }
 #endif
@@ -1093,9 +1098,11 @@ int
 cd(f,n)
 int f, n;
 {
-	int status;
-	static char cdirname[NFILEN];
-	status = mlreply("Change to directory: ", cdirname, NFILEN);
+	register int status;
+	static	TBUFF	*last;
+	char cdirname[NFILEN];
+
+	status = mlreply_dir("Change to directory: ", &last, cdirname);
 	if (status != TRUE) {
 		/* should go HOME here */
 		return status;
@@ -1127,9 +1134,7 @@ char	*dir;
     for_each_window(wp)
 	wp->w_flag |= WFMODE;
 
-    strcpy(exdir, dir);
-
-    exdp = exdir;
+    exdp = strcpy(exdir, dir);
 
     if (glob(exdp)) {
 #if MSDOS
@@ -1165,34 +1170,15 @@ BUFFER *bp;
 char *fname;
 {
 	int len;
-	char nfilen[512];
+	char nfilen[NFILEN];
 	char *np;
 	char *holdp = NULL;
-	char *cwd;
-	char *name;
 
-	name = fname;
+	np = fname;
 
 	/* produce a full pathname, unless already absolute or "internal" */
-	np = name;
-	if (name[0] != '\0' && !isScratchName(name) && !isShellOrPipe(name)) {
-#if MSDOS
-		char drive = 0;
-		if (isupper(np[0]) && np[1] == ':') {
-			drive = *np;
-			np += 2;
-		}
-		cwd = curr_dir_on_drive(drive);
-#else
-		cwd = current_directory(FALSE);
-#endif
-		if (np[0] != slash && cwd != NULL) {
-			lsprintf(nfilen, "%s%c%s", cwd, slash, np );
-			np = canonpath(nfilen);
-		} else {
-			np = canonpath(name);
-		}
-	}
+	if (np[0] != EOS && !isScratchName(np) && !isShellOrPipe(np))
+		np = lengthen_path(strcpy(nfilen, np));
 
 	len = strlen(np)+1;
 
@@ -1213,7 +1199,7 @@ char *fname;
 	}
 
 	/* it'll fit, leave len untouched */
-	strcpy(bp->b_fname, np);
+	(void)strcpy(bp->b_fname, np);
 	if (holdp)
 		free(holdp);
 	updatelistbuffers();

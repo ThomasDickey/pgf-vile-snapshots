@@ -29,11 +29,6 @@ E	patterns as addresses do not work, e.g. ":/str1/,/str2/d".  They're
 	the whole commandline, and then parse it, the way real vi does, but we'd
 	lose the "prompt and display last response" behavior.
 
-E	In vi, the join command is supposed to act either on a region (from
-	the command line, as in ":13,15j"), or it should take a simple
-	count, from vi mode, as in "3j".  Right now vile _only_ does the
-	simple count form of the command.
-
 E	should add an option to support file locking, rather than the current
 	ifdef stuff.  (this is only useful if we match the GNU locking
 	protocol.) And it's not clear that in an NFS'ed environment that
@@ -41,7 +36,7 @@ E	should add an option to support file locking, rather than the current
 
 E	the scrsearch functions could become region based -- as in "search for
 	the next occurrence of the region", which would usually be a word.  And
-	the ^A/ version could become "a/ (search for teh contents of buffer a),
+	the ^A/ version could become "a/ (search for the contents of buffer a),
 	if you know what I mean.
 
 E	need a "file newer than buffer" warning.  Should stat the file, and
@@ -53,8 +48,6 @@ E	need a "file newer than buffer" warning.  Should stat the file, and
 
 E	should implement tagpath, and/or multiple tags files as well.
 
-E	it would be nice if ^X!! reran the last command into [Output]
-
 E	g should become a region command.  Then it could take ranges, as
 	it should, and could also become an operator command.
 
@@ -65,8 +58,8 @@ E	collapse command execution code to as few places as possible.
 	Its currently spread through execute(), operator(),
 	docmd(), and usekreg().
 
-E	mlreply line should ideally be a one line buffer, so editing
-	and history can be done on it.
+E	mlreply line should ideally be a one line buffer, so inline editing
+	can be done on it.
 
 E	BSD interrupt processing is botched during a read() of the keyboard.
 	The read doesn't return -1 as it does under sysV (USG).
@@ -94,9 +87,6 @@ E	:e and :n should be able to deal with multiple filenames resulting
 E	When a line is too long to fit on the screen, you have to move
 	over it to see the rest, and when you get to the edge of the screen,
 	it jumps. I would prefer a smooth(er) scroll.
-
-E	File completion would be nice for commands asking for filenames.
-	This saves a lot of typing.
 
 L	"I found a problem when using vile with encrypted files.  During a file
 	edit if I set the mode to crypt and save the file, I am prompted
@@ -131,8 +121,6 @@ E	the "ww" command (e.g., 'writeall()') emits multiple messages via
 E	for consistency, 'execute-macro-nn' should be 'execute-macro nn';
 	doing this would allow modification to eliminate a fixed number of
 	macro-buffers.
-
-E	vile's 'view' mode is vi's 'readonly' mode.
 
 E	'updatelistbuffers()' should be revisited to make it happen at the
 	beginning of keyboard commands when the buffer list is out of date.
@@ -353,13 +341,6 @@ intended for this, but still...
 But ok, the real problem is that after I kill latex and
 vile comes back to life I can no longer filter parts of text using
 !fmt. The text just gets deleted.
-
-----------------------------------------------------------------------
-Some of the bugs that I have noticed (and may swat) include
-
-	* '\' does not escape backspace in a prompt (sometimes I want to
-	  edit out backspace sequences from nroff-output).
-	* variables set but never used: Enable_Abort, lineinput
 
 ----------------------------------------------------------------------
 

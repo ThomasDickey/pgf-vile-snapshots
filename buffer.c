@@ -6,7 +6,19 @@
  * for the display system.
  *
  * $Log: buffer.c,v $
- * Revision 1.50  1993/02/15 10:37:31  pgf
+ * Revision 1.54  1993/03/16 16:04:01  pgf
+ * fix 'parentheses suggested' warnings
+ *
+ * Revision 1.53  1993/03/16  10:53:21  pgf
+ * see 3.36 section of CHANGES file
+ *
+ * Revision 1.52  1993/03/05  17:50:54  pgf
+ * see CHANGES, 3.35 section
+ *
+ * Revision 1.51  1993/02/24  10:59:02  pgf
+ * see 3.34 changes, in CHANGES file
+ *
+ * Revision 1.50  1993/02/15  10:37:31  pgf
  * cleanup for gcc-2.3's -Wall warnings
  *
  * Revision 1.49  1993/02/08  14:53:35  pgf
@@ -449,6 +461,37 @@ void	MarkUnused(bp)
 }
 
 /*
+ * After 'bclear()', frees remaining storage for a buffer.
+ */
+static
+void	FreeBuffer(bp)
+	BUFFER *bp;
+{
+	register BUFFER *bp1, *bp2;
+
+	if (bp->b_fname)
+		free(bp->b_fname);
+
+	lfree(bp->b_line.l,bp);	 /* Release header line. */
+	bp1 = NULL;				/* Find the header.	*/
+	bp2 = bheadp;
+	while (bp2 != bp) {
+		bp1 = bp2;
+		bp2 = bp2->b_bufp;
+	}
+	bp2 = bp2->b_bufp;			/* Next one in chain.	*/
+	if (bp1 == NULL)			/* Unlink it.		*/
+		bheadp = bp2;
+	else
+		bp1->b_bufp = bp2;
+	MarkUnused(bp);
+	MarkDeleted(bp);
+	if (bp == last_bp)
+		last_bp = 0;
+	free((char *) bp);			/* Release buffer block */
+}
+
+/*
  * Adjust buffer-list's last-used member to account for a new buffer.
  */
 static
@@ -569,7 +612,7 @@ BUFFER *find_alt()
 {
 	register BUFFER *bp;
 
-	if (global_b_val(MDABUFF)) {
+	if (global_g_val(GMDABUFF)) {
 		BUFFER *any_bp = 0;
 		for (bp = curbp; bp; bp = bp->b_bufp) {
 			if (bp != curbp) {
@@ -601,8 +644,10 @@ BUFFER *find_alt()
 
 /* make '#' buffer in noautobuffer-mode, given filename */
 void
-imply_alt(fname)
-char *fname;
+imply_alt(fname, copy, lockfl)
+char *	fname;
+int	copy;
+int	lockfl;
 {
 	register BUFFER *bp;
 	register LINE	*lp;
@@ -610,17 +655,19 @@ char *fname;
         char bname[NBUFN*10];
         char nfname[NFILEN];
 
-	if (fname == 0)	/* didn't really have a filename */
+	if (interrupted || fname == 0)	/* didn't really have a filename */
 		return;
 
 	fname = lengthen_path(strcpy(nfname, fname));
-	if (!global_b_val(MDABUFF)
+	if (global_g_val(GMDIMPLYBUFF)
+	 && curbp != 0
+	 && curbp->b_fname != 0
 	 && strcmp(fname, curbp->b_fname)
 	 && !isInternalName(fname)) {
 		savebp = curbp;
 		if (!(bp = find_b_file(fname))) {
 			makename(bname, fname);
-			/* patch: worry about unique bname! */
+			unqname(bname, TRUE);
 
 	        	if (!(bp=bfind(bname, OK_CREAT, 0))) {
 	                	mlforce("[Cannot create buffer]");
@@ -631,22 +678,21 @@ char *fname;
         		bp->b_flag &= ~(BFINVS|BFCHG);
 			bp->b_flag |= BFIMPLY;
 			bp->b_active = TRUE;
+			ch_fname(bp, fname);
 
-			lp = lforw(savebp->b_line.l);
-			while (lp != savebp->b_line.l) {
-				if (addline(bp,lp->l_text,lp->l_used) != TRUE) {
-					mlforce("[Copy-buffer failed]");
-					return;
+			if (copy) {
+				for_each_line(lp, savebp) {
+					if (addline(bp,lp->l_text,lp->l_used) != TRUE) {
+						mlforce("[Copy-buffer failed]");
+						return;
+					}
 				}
-				lp = lforw(lp);
-			}
+			} else
+				readin(fname, lockfl, bp, FALSE);
 
 			/* set last-used */
 			make_current(bp);
 			make_current(savebp);
-
-			/* finally, set the filename & update buffer-list */
-			ch_fname(bp, fname);
 		} else {	/* buffer already exists */
 			make_current(bp);
 			make_current(savebp);
@@ -700,7 +746,7 @@ firstbuffer(f,n)
 int f, n;
 {
 	int s = histbuff(TRUE,0);
-	if (!global_b_val(MDABUFF))
+	if (!global_g_val(GMDABUFF))
 		last_bp = s ? curbp : 0;
 	return s;
 }
@@ -713,7 +759,7 @@ int f, n;	/* default flag, numeric argument */
 	register BUFFER *bp;	/* eligible buffer to switch to*/
 	register BUFFER *stopatbp;	/* eligible buffer to switch to*/
 
-	if (global_b_val(MDABUFF)) {	/* go backward thru buffer-list */
+	if (global_g_val(GMDABUFF)) {	/* go backward thru buffer-list */
 		stopatbp = NULL;
 		while (stopatbp != bheadp) {
 			/* get the last buffer in the list */
@@ -752,7 +798,7 @@ BUFFER *nbp;
 
 	TrackAlternate(nbp);
 
-	if (!updating_list && global_b_val(MDABUFF)) {
+	if (!updating_list && global_g_val(GMDABUFF)) {
 		if (nbp != bheadp) {	/* remove nbp from the list */
 			bp = bheadp; while(bp->b_bufp != nbp)
 				bp = bp->b_bufp;
@@ -837,7 +883,7 @@ register WINDOW *wp;
 	/* get rid of it completely if it's a scratch buffer,
 		or it's empty and unmodified */
 	if (Scratch(bp)
-	 || ( global_b_val(MDABUFF) && !Changed(bp) && is_empty_buf(bp)) ) {
+	 || ( global_g_val(GMDABUFF) && !Changed(bp) && is_empty_buf(bp)) ) {
 		(void)zotbuf(bp);
 	} else {  /* otherwise just adjust it off the screen */
 		bp->b_wtraits  = wp->w_traits;
@@ -879,7 +925,7 @@ register BUFFER *bp;
 	int s;
 	int save = ignorecase;
 	ignorecase = FALSE;
-	s =  regexec(b_val_rexp(bp,VAL_CSUFFIXES)->reg,
+	s =  regexec(global_g_val_rexp(GVAL_CSUFFIXES)->reg,
 			bp->b_fname, NULL, 0, -1);
 	ignorecase = save;
 	return s;
@@ -940,8 +986,6 @@ int
 zotbuf(bp)	/* kill the buffer pointed to by bp */
 register BUFFER *bp;
 {
-	register BUFFER *bp1;
-	register BUFFER *bp2;
 	register int	s;
 	register int	didswitch = FALSE;
 
@@ -974,23 +1018,7 @@ register BUFFER *bp;
 		return (s);
 	}
 
-	lfree(bp->b_line.l,bp);	 /* Release header line. */
-	bp1 = NULL;				/* Find the header.	*/
-	bp2 = bheadp;
-	while (bp2 != bp) {
-		bp1 = bp2;
-		bp2 = bp2->b_bufp;
-	}
-	bp2 = bp2->b_bufp;			/* Next one in chain.	*/
-	if (bp1 == NULL)			/* Unlink it.		*/
-		bheadp = bp2;
-	else
-		bp1->b_bufp = bp2;
-	MarkUnused(bp);
-	MarkDeleted(bp);
-	if (bp == last_bp)
-		last_bp = 0;
-	free((char *) bp);			/* Release buffer block */
+	FreeBuffer(bp);
 	updatelistbuffers();
 	return (TRUE);
 }
@@ -1071,7 +1099,7 @@ sortlistbuffers()
 	register BUFFER *bp, *newhead = 0;
 	register int	c;
 
-	if (global_b_val(MDABUFF)) {
+	if (global_g_val(GMDABUFF)) {
 		c = 1;
 		while ((bp = find_nth_used(c++)) != 0) {
 			bp->b_relink = newhead;
@@ -1179,7 +1207,6 @@ void	makebufflist(iflag,dummy)
 {
 	register BUFFER *bp;
 	int nbuf = 0;		/* no. of buffers */
-	long nbytes;		/* # of bytes in current buffer */
 	int this_or_that;
 
 	show_all = iflag;	/* save this to use in 'updatelistbuffers()' */
@@ -1222,20 +1249,20 @@ void	makebufflist(iflag,dummy)
 		else
 			bprintf(" %2d%c ", nbuf++, this_or_that);
 
-		{	/* Count bytes in buf.	*/
-			register LINE	*lp;
-			nbytes = 0L;
-			lp = lforw(bp->b_line.l);
-			while (lp != bp->b_line.l) {
-				nbytes += (long)llength(lp)+1L;
-				lp = lforw(lp);
-			}
-		}
-		bprintf("%7ld %*s ",nbytes, NBUFN, bp->b_bname );
+		bsizes(bp);
+		bprintf("%7ld %*s ", bp->b_bytecount, NBUFN, bp->b_bname );
 		{
-			char *p;
-			p = shorten_path(bp->b_fname);
+			char	temp[NFILEN];
+			char	*p;
+
+			if ((p = bp->b_fname) != 0)
+				p = shorten_path(strcpy(temp, p));
+
 			if (p) {
+				if (isAppendToName(p)) {
+					bprintf("%c%c", p[0], p[1]);
+					p += 2;
+				}
 #if MSDOS
 				if (isupper(p[0]) && p[1] == ':') {
 					bprintf("%c:",p[0]);
@@ -1512,7 +1539,46 @@ register BUFFER *bp;
 		free((char *)(bp->b_nmmarks));
 		bp->b_nmmarks = NULL;
 	}
+
+#if NO_LEAKS
+	free_local_vals(b_valuenames, bp->b_values.bv, global_b_values.bv);
+#endif
+
 	return (TRUE);
+}
+
+/*
+ * Update the counts for the # of bytes and lines, to use in various display
+ * commands.
+ */
+int
+bsizes(bp)
+BUFFER *bp;
+{
+	register LINE	*lp;		/* current line */
+	register long	numchars = 0;	/* # of chars in file */
+	register int	numlines = 0;	/* # of lines in file */
+
+	static int cache_up_to_date = FALSE;
+
+	if (cache_up_to_date)		/* patch */
+		return FALSE;
+
+	/* starting at the beginning of the buffer */
+	lp = lforw(bp->b_line.l);
+
+	/* start counting chars and lines */
+	while (lp != bp->b_line.l) {
+		++numlines;
+		numchars += llength(lp) + 1;
+#if !SMALLER	/* tradeoff between codesize & data */
+		lp->l_number = numlines;
+#endif
+		lp = lforw(lp);
+	}
+	bp->b_bytecount = numchars;
+	bp->b_linecount = numlines;
+	return TRUE;
 }
 
 /*
@@ -1607,3 +1673,17 @@ int f,n;
 	}
 	return status;
 }
+
+/* For memory-leak testing (only!), releases all buffer storage. */
+#if	NO_LEAKS
+void	bp_leaks()
+{
+	register BUFFER *bp;
+
+	while (bp = bheadp) {
+		bp->b_flag &= ~BFCHG;	/* discard any changes */
+		bclear(bheadp);
+		FreeBuffer(bheadp);
+	}
+}
+#endif

@@ -72,7 +72,16 @@
 #		here for completeness.
 #
 # $Log: cmdtbl,v $
-# Revision 1.49  1993/02/08 14:53:35  pgf
+# Revision 1.52  1993/03/16 10:53:21  pgf
+# see 3.36 section of CHANGES file
+#
+# Revision 1.51  1993/03/05  17:50:54  pgf
+# see CHANGES, 3.35 section
+#
+# Revision 1.50  1993/02/24  10:59:02  pgf
+# see 3.34 changes, in CHANGES file
+#
+# Revision 1.49  1993/02/08  14:53:35  pgf
 # see CHANGES, 3.32 section
 #
 # Revision 1.48  1993/01/26  22:44:07  foxharp
@@ -345,6 +354,8 @@ clrmes		NONE
 consearch	ABS|MOTION
 	"continue-search"		!FEWNAMES
 	'n'
+wordcount	RANGE			WORDCOUNT
+	"count-words"
 opercopy		OPER|(RANGE|EXTRA)
 	"copy-til"
 	"c"
@@ -740,7 +751,7 @@ insspace	REDO|UNDO		!SMALLER
 	"insert-space"			!FEWNAMES
 istring		REDO|UNDO		!SMALLER
 	"insert-string"
-join		REDO|UNDO
+joinlines	REDO|UNDO
 	"join-lines"			!FEWNAMES
 	'J'
 killbuffer	NONE
@@ -757,6 +768,8 @@ listbuffers	NONE
 	"list-buffers"			!FEWNAMES
 	"args"
 	'^A-*'
+showhistory	NONE			!SMALLER
+	"show-history"
 lineputafter	REDO|UNDO|GLOBOK|(FROM|ZERO|WORD1)
 	"put-as-lines-after"		!FEWNAMES
 	"put"
@@ -770,6 +783,10 @@ lineundo	NONE
 	'U'
 loadkreg	NONE
 	"load-register"
+showkreg	NONE			!SMALLER
+	"show-registers"
+	"showregisters"			!FEWNAMES
+	"list-registers"		!FEWNAMES
 map		NONE|(EXRCOK|BANG|EXTRA)
 	"map"
 cntl_af		NONE
@@ -848,6 +865,9 @@ operlinechg	OPER|REDO|UNDO|(RANGE)
 operdel		OPER|REDO|UNDO
 	"delete-til"			!FEWNAMES
 	'd'
+operjoin	OPER|REDO|UNDO|GLOBOK|RANGE
+	"j"
+	"join-lines-til"		!FEWNAMES
 operlinedel	OPER|REDO|UNDO|GLOBOK|(RANGE+WORD1)
 	"delete-lines-til"		!FEWNAMES
 	"d"
@@ -1002,6 +1022,8 @@ scrbacksearch	ABS|MOTION
 scrsearchpat	NONE
 	"screen-search-pattern-grab"	!FEWNAMES
 	'^A-/'
+set_dosmode	NONE			DOSFILES
+	"set-dos-mode"
 settab		NONE
 	"handle-tab"			!FEWNAMES
 	"set-tab"
@@ -1058,6 +1080,7 @@ listmodes	NONE
 listvars	NONE
 	"list-vars"
 	"show-vars"
+	"showvars"
 showversion	NONE|(EXRCOK)
 	"version"
 shrinkwind	NONE
@@ -1178,6 +1201,7 @@ zzquit		NONE|(BANG|NL)
 "directory"	DIR			# current directory
 "font"		FONT			# current font patch: "#if X11"
 "shell"		SHELL			# shell-environment variable 
+
 .functions
 "add"	ADD		DYNAMIC		# add two numbers together
 "sub"	SUB		DYNAMIC		# subtraction

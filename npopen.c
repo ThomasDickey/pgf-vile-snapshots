@@ -2,7 +2,16 @@
  *		written by John Hutchinson, heavily modified by Paul Fox
  *
  * $Log: npopen.c,v $
- * Revision 1.16  1993/02/08 14:53:35  pgf
+ * Revision 1.19  1993/03/16 10:53:21  pgf
+ * see 3.36 section of CHANGES file
+ *
+ * Revision 1.18  1993/03/05  17:50:54  pgf
+ * see CHANGES, 3.35 section
+ *
+ * Revision 1.17  1993/02/16  20:53:45  pgf
+ * look up "shell" variable every time, since it can change
+ *
+ * Revision 1.16  1993/02/08  14:53:35  pgf
  * see CHANGES, 3.32 section
  *
  * Revision 1.15  1992/12/04  09:21:52  foxharp
@@ -55,7 +64,6 @@
  * initial vile RCS revision
  */
 
-#include <stdio.h>
 #include "estruct.h"
 #include "edef.h"
 
@@ -64,6 +72,12 @@
 #include <signal.h>
 #include <errno.h>
 #include <sys/param.h>
+
+#if !SMALLER
+#define	user_SHELL()	gtenv("shell")
+#else
+#define	user_SHELL()	getenv("SHELL")
+#endif
 
 #define R 0
 #define W 1
@@ -81,11 +95,11 @@ char *cmd, *type;
 		return NULL;
 
 	if (*type == 'r') {
-		if (inout_popen(&ff, NULL, cmd) != TRUE)
+		if (inout_popen(&ff, (FILE **)0, cmd) != TRUE)
 			return NULL;
 		return ff;
 	} else {
-		if (inout_popen(NULL, &ff, cmd) != TRUE)
+		if (inout_popen((FILE **)0, &ff, cmd) != TRUE)
 			return NULL;
 		return ff;
 	}
@@ -184,7 +198,7 @@ void
 exec_sh_c(cmd)
 char *cmd;
 {
-	static char *sh, *shname;
+	char *sh, *shname;
 	int i;
 
 #ifndef NOFILE
@@ -194,19 +208,17 @@ char *cmd;
 	for (i = 3; i < NOFILE; i++)
 		(void) close (i);
 
-	if (sh == NULL) {
-		if ((sh = gtenv("shell")) == NULL || *sh == '\0') {
-			sh = "/bin/sh";
-			shname = "sh";
+	if ((sh = user_SHELL()) == NULL || *sh == '\0') {
+		sh = "/bin/sh";
+		shname = "sh";
+	} else {
+		shname = strrchr(sh,'/');
+		if (shname == NULL) {
+			shname = sh;
 		} else {
-			shname = strrchr(sh,'/');
-			if (shname == NULL) {
+			shname++;
+			if (*shname == '\0')
 				shname = sh;
-			} else {
-				shname++;
-				if (*shname == '\0')
-					shname = sh;
-			}
 		}
 	}
 

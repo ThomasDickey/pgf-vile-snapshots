@@ -10,7 +10,19 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.97  1993/02/12 10:42:32  pgf
+ * Revision 1.101  1993/03/16 10:53:21  pgf
+ * see 3.36 section of CHANGES file
+ *
+ * Revision 1.100  1993/03/05  17:50:54  pgf
+ * see CHANGES, 3.35 section
+ *
+ * Revision 1.99  1993/02/24  10:59:02  pgf
+ * see 3.34 changes, in CHANGES file
+ *
+ * Revision 1.98  1993/02/24  09:31:02  pgf
+ * added macro for catching ">>filename", for appending
+ *
+ * Revision 1.97  1993/02/12  10:42:32  pgf
  * don't redefine "const" on linux
  *
  * Revision 1.96  1993/02/08  14:53:35  pgf
@@ -464,8 +476,6 @@
 # define USG 0
 #endif
 
-
-
 /* non-unix flavors */
 #undef	LATTICE		/* don't use their definitions...use ours	*/
 #undef	MSDOS
@@ -498,6 +508,18 @@
 
 #define UNIX	(V7 | BERK | USG)	/* any unix		*/
 
+/* definitions for testing apollo version with gcc warnings */
+#if APOLLO
+# ifdef __GNUC__		/* only tested for SR10.3 with gcc 1.36 */
+#  define _APOLLO_SOURCE	/* appease gcc by forcing extern-defs */
+#  define __attribute(s)
+#  define APOLLO_STDLIB 1
+# endif
+# if defined(__STDC__) && defined(__STDCPP__)	/* SR10.3 */
+#  define APOLLO_STDLIB 1
+# endif
+#endif
+
 /* choose between void and int signal handler return type.
   "typedefs?  we don't need no steenking typedefs..." */
 #if POSIX || (BERK && BSD386) || SVR3 || APOLLO
@@ -506,6 +528,27 @@
 #else
 # define SIGT int
 # define SIGRET return 0
+#endif
+
+#if UNIX || MSDOS
+#include	<signal.h>
+# if APOLLO
+#  if APOLLO_STDLIB	/* SR10.3, CC 6.8 */
+#   define DEFINE_SIGNAL(func)	SIGT func(int signo, ...)
+#   define ACTUAL_SIGNAL(func)	SIGT func(int signo, ...)
+#   if defined(__GNUC__)
+#    undef  SIG_DFL
+#    undef  SIG_IGN
+#    define SIG_DFL	(void (*)(int,...))0
+#    define SIG_IGN	(void (*)(int,...))1
+#   endif
+#  endif
+# endif
+#endif
+
+#ifndef DEFINE_SIGNAL
+# define DEFINE_SIGNAL(func)	SIGT func P(( int ))
+# define ACTUAL_SIGNAL(func)	SIGT func(signo) int signo;
 #endif
 
 /* argument for 'exit()' or '_exit()' */
@@ -607,10 +650,12 @@
 
 #define	TAGS	1	/* tags support  				*/
 #define	WORDPRO	1	/* "Advanced" word processing features		*/
+#define	WORDCOUNT 0	/* "count-words" command"			*/
 #define	AEDIT	1	/* advanced editing options: e.g. en/detabbing	*/
 #define	PROC	1	/* named procedures				*/
 #define	FINDERR	1	/* finderr support. uses scanf()		*/
 #define	GLOBALS	1	/* "global" command support.			*/
+#define	KSH_HISTORY 0	/* ksh-style history commands			*/
 #define	PATHLOOK 1	/* look along $PATH for startup and help files	*/
 #define	SCROLLCODE 1	/* code in display.c for scrolling the screen.
 			   Only useful if your display can scroll
@@ -644,7 +689,7 @@
 /* (i.e. you shouldn't need to touch anything below here */
 /* ====================================================================== */
 
-#if BERK && ! POSIX
+#if BERK && ! POSIX && !APOLLO
 #define USE_INDEX 1
 #endif
 #if never && BERK && ! POSIX && ! BSD386
@@ -662,6 +707,10 @@ extern char *rindex();
 #define memcmp		bcmp
 #define memcpy(a,b,c)	bcopy(b,a,c)
 #define memset(a,c,b)	bfill(a,b,c)
+#else
+# if POSIX
+#  include <memory.h>
+# endif
 #endif
 
 /*	System dependent library redefinitions, structures and includes	*/
@@ -709,6 +758,12 @@ union REGS {
 	struct XREG x;
 	struct HREG h;
 };
+#endif
+
+#if MSDOS
+# define slashc(c) (c == '\\' || c == '/')
+#else
+# define slashc(c) (c == '/')
 #endif
 
 #if	MSDOS && MWC86
@@ -771,7 +826,6 @@ union REGS {
 #define NBUFN	20			/* # of bytes, buffer name	*/
 #define NLINE	256			/* # of bytes, input line	*/
 #define	NSTRING	128			/* # of bytes, string buffers	*/
-#define NKBDM	256			/* # of strokes, keyboard macro */
 #define NPAT	128			/* # of bytes, pattern		*/
 #define HUGE	60000			/* Huge number			*/
 #define	NLOCKS	100			/* max # of file locks active	*/
@@ -782,11 +836,15 @@ union REGS {
 #define	NVSIZE	10			/* max #chars in a var name	*/
 
 /* SPEC is just 8th bit set, for convenience in some systems (like NeWS?) */
+#define N_chars 128			/* must be a power-of-2		*/
 #define SPEC	0x0080			/* special key (function keys)	*/
 #define CTLA	0x0100			/* ^A flag, or'ed in		*/
 #define CTLX	0x0200			/* ^X flag, or'ed in		*/
 
-#define kcod2key(c) (c & 0x7f)		/* strip off the above prefixes */
+#define kcod2key(c)	(c & (N_chars-1)) /* strip off the above prefixes */
+#define	isspecial(c)	(c & ~(N_chars-1))
+
+#define	char2int(c)	((int)(c & 0xff)) /* mask off sign-extension, etc. */
 
 #define	EOS     '\0'
 
@@ -806,7 +864,6 @@ union REGS {
 #define	STOP	0			/* keyboard macro not in use	*/
 #define	PLAY	1			/*	"     "	  playing	*/
 #define	RECORD	2			/*	"     "   recording	*/
-#define	TMPSTOP	3			/* temporary stop, record can resume */
 
 /* flook options */
 #define FL_HERE 1
@@ -826,6 +883,7 @@ union REGS {
 #define KBD_QUOTES	2	/* do we add and delete '\' chars for the caller */
 #define	KBD_LOWERC	4	/* do we force input to lowercase */
 #define KBD_NOEVAL	8	/* disable 'tokval()' (e.g., from buffer) */
+#define KBD_MAYBEC	0x10	/* may be completed -- or not */
 
 /* default option for 'mlreply' (used in modes.c also) */
 #if !MSDOS
@@ -928,7 +986,6 @@ union REGS {
 
 /* these are the bits that go into the _chartypes_ array */
 /* the macros below test for them */
-#define N_chars 128
 #define _upper	0x1		/* upper case */
 #define _lower	0x2		/* lower case */
 #define _digit	0x4		/* digits */
@@ -992,8 +1049,6 @@ union REGS {
 			(isalpha(bc) && (((bc) ^ DIFCASE) == (pc))))
 
 #define ESC	tocntrl('[')
-#define RECORDED_ESC	-2
-
 #define BEL	tocntrl('G')	/* ascii bell character		*/
 
 /*	Dynamic RAM tracking and reporting redefinitions	*/
@@ -1062,7 +1117,7 @@ extern void regerror();
  * Definitions for 'tbuff.c' (temporary/dynamic char-buffers)
  */
 typedef	struct	_tbuff	{
-	unsigned char *	tb_data;	/* the buffer-data */
+	char *		tb_data;	/* the buffer-data */
 	unsigned	tb_size;	/* allocated size */
 	unsigned	tb_used;	/* total used in */
 	unsigned	tb_last;	/* last put/get index */
@@ -1084,9 +1139,12 @@ typedef	struct	_tbuff	{
 typedef struct	LINE {
 	struct	LINE *l_fp;		/* Link to the next line	*/
 	struct	LINE *l_bp;		/* Link to the previous line	*/
-	int   l_size;		      /* Allocated size 	      */
-	int   l_used;		      /* Used size		      */
-	char *l_text;
+	int	l_size;			/* Allocated size 		*/
+	int	l_used;			/* Used size			*/
+	char *	l_text;			/* The data for this line	*/
+#if !SMALLER
+	int	l_number;		/* line-# iff b_numlines > 0	*/
+#endif
 	union {
 	    struct  LINE *l_stklnk;	/* Link for undo stack		*/
 	    long	l_flag;		/* flags for undo ops		*/
@@ -1098,9 +1156,10 @@ typedef struct	LINE {
 #define LGMARK 2	/* line matched a global scan */
 
 /* macros to ease the use of lines */
+#define	for_each_line(lp,bp) for (lp = lforw(bp->b_line.l); lp != bp->b_line.l; lp = lforw(lp))
 #define lforw(lp)	((lp)->l_fp)
 #define lback(lp)	((lp)->l_bp)
-#define lgetc(lp, n)	((lp)->l_text[(n)]&0xFF)
+#define lgetc(lp, n)	char2int((lp)->l_text[(n)])
 #define lputc(lp, n, c) ((lp)->l_text[(n)]=(c))
 #define llength(lp)	((lp)->l_used)
 #define l_nxtundo	l.l_stklnk
@@ -1145,6 +1204,7 @@ struct VALNAMES {
 		char *name;
 		char *shortname;
 		short type;
+		short winflags;
 };
 /* the values of VALNAMES->type */
 #define VALTYPE_INT 0
@@ -1153,25 +1213,46 @@ struct VALNAMES {
 #define VALTYPE_REGEX 3
 #define VALTYPE_COLOR 4
 
-struct regexval {
+typedef	struct {
 	char *pat;
 	regexp *reg;
-};
+} REGEXVAL;
 
 /* this is to ensure values can be of any type we wish.
    more can be added if needed.  */
 union V {
 	int i;
 	char *p;
-	struct regexval *r;
+	REGEXVAL *r;
 };
 
 struct VAL {
+	int	refs;	/* reference-count, for copying */
 	union V v;
 	union V *vp;
 };
 
+/* these are masks for the WINDOW.w_flag hint */
+#define WFFORCE 0x01			/* Window needs forced reframe	*/
+#define WFMOVE	0x02			/* Movement from line to line	*/
+#define WFEDIT	0x04			/* Editing within a line	*/
+#define WFHARD	0x08			/* Better do a full display	*/
+#define WFMODE	0x10			/* Update mode line.		*/
+#define WFCOLR	0x20			/* Needs a color change		*/
+#define WFKILLS	0x40			/* something was deleted	*/
+#define WFINS	0x80			/* something was inserted	*/
+
+/* define indices for GLOBAL, BUFFER, WINDOW modes */
 #include "nemode.h"
+
+/* macros for setting GLOBAL modes */
+
+#define global_g_val(which) global_g_values.gv[which].v.i
+#define set_global_g_val(which,val) global_g_val(which) = val
+#define global_g_val_ptr(which) global_g_values.gv[which].v.p
+#define set_global_g_val_ptr(which,val) global_g_val_ptr(which) = val
+#define global_g_val_rexp(which) global_g_values.gv[which].v.r
+#define set_global_g_val_rexp(which,val) global_g_val_rexp(which) = val
 
 /* these are window properties affecting window appearance _only_ */
 typedef struct	W_TRAITS {
@@ -1197,9 +1278,9 @@ typedef struct	W_TRAITS {
 #define set_w_val_ptr(wp,which,val) w_val_ptr(wp,which) = val
 
 #define make_local_w_val(wp,which)  \
-	wp->w_traits.w_vals.wv[which].vp = &(wp->w_traits.w_vals.wv[which].v)
+	copy_val(wp->w_traits.w_vals.wv, wp->w_traits.w_vals.wv, which)
 #define make_global_w_val(wp,which)  \
-	wp->w_traits.w_vals.wv[which].vp = &(global_wvalues.wv[which].v)
+	copy_val(wp->w_traits.w_vals.wv, global_wvalues.wv, which)
 
 #define is_global_w_val(wp,which)  \
 	(wp->w_traits.w_vals.wv[which].vp == &(global_w_values.wv[which].v))
@@ -1228,6 +1309,7 @@ typedef struct	BUFFER {
 					/*  global values		*/
 	struct	W_TRAITS b_wtraits;	/* saved window traits, while we're */
 					/*  not displayed		*/
+	long	b_bytecount;		/* # of chars			*/
 	long	b_linecount;		/* no. lines as of last read/write */
 	LINE 	*b_udstks[2];		/* undo stack pointers		*/
 	MARK 	b_uddot[2];		/* Link to "." before undoable op*/
@@ -1260,9 +1342,12 @@ typedef struct	BUFFER {
 #define	SCRTCH_RIGHT "]"
 #define	SHPIPE_LEFT  "!"
 
+/* warning:  code in file.c and fileio.c knows how long the shell, pipe, and 
+	append prefixes are (e.g. fn += 2 when appending) */
 #define	isShellOrPipe(s)  (s[0] == SHPIPE_LEFT[0])
 #define	isScratchName(s)  (s[0] == SCRTCH_LEFT[0])
 #define	isInternalName(s) (isShellOrPipe(s) || isScratchName(s))
+#define	isAppendToName(s) (s[0] == '>' && s[1] == '>')
 
 #ifdef	__STDC__
 #if	!defined(apollo) || defined(__STDCPP__)
@@ -1294,9 +1379,9 @@ typedef struct	BUFFER {
 #define set_b_val_rexp(bp,which,val) b_val_rexp(bp,which) = val
 
 #define make_local_b_val(bp,which)  \
-		bp->b_values.bv[which].vp = &(bp->b_values.bv[which].v)
+		copy_val(bp->b_values.bv, bp->b_values.bv, which)
 #define make_global_b_val(bp,which)  \
-		bp->b_values.bv[which].vp = &(global_b_values.bv[which].v)
+		copy_val(bp->b_values.bv, global_b_values.bv, which)
 
 #define is_global_b_val(bp,which)  \
 		(bp->b_values.bv[which].vp == &(global_b_values.bv[which].v))
@@ -1312,11 +1397,11 @@ typedef struct	BUFFER {
 #define b_wline b_wtraits.w_ln
 
 /* values for b_flag */
-#define BFINVS	0x01			/* Internal invisible buffer	*/
-#define BFCHG	0x02			/* Changed since last write	*/
-#define BFSCRTCH   0x04 		/* scratch -- gone on last close */
-#define BFARGS	0x08			/* set for ":args" buffers */
-#define BFIMPLY	0x010			/* set for implied-# buffers */
+#define BFINVS     0x01			/* Internal invisible buffer	*/
+#define BFCHG      0x02			/* Changed since last write	*/
+#define BFSCRTCH   0x04			/* scratch -- gone on last close */
+#define BFARGS     0x08			/* set for ":args" buffers */
+#define BFIMPLY    0x010		/* set for implied-# buffers */
 
 /*
  * There is a window structure allocated for every active display window. The
@@ -1356,22 +1441,6 @@ typedef struct	WINDOW {
 #else
 #define MK Mark
 #endif
-
-#define WFFORCE 0x01			/* Window needs forced reframe	*/
-#define WFMOVE	0x02			/* Movement from line to line	*/
-#define WFEDIT	0x04			/* Editing within a line	*/
-#define WFHARD	0x08			/* Better do a full display	*/
-#define WFMODE	0x10			/* Update mode line.		*/
-#define	WFCOLR	0x20			/* Needs a color change		*/
-#define	WFKILLS	0x40			/* something was deleted	*/
-#define	WFINS	0x80			/* something was inserted	*/
-
-
-/* the next set are global, bit-mapped, but are meaningless per-buffer */
-#define	NUMOTHERMODES	2 /* # of defined modes		*/
-#define OTH_LAZY 0x01
-#define OTH_VERS 0x02
-
 
 /*
  * The starting position of a region, and the size of the region in
@@ -1558,9 +1627,17 @@ typedef struct {
 #define NAMEDFS	(FILES + NODFL)	/* multiple files allowed, default is "" */
 #define RANGE	(FROM + TO)	/* range of linespecs allowed */
 
+/* definitions for 'mlreply_file()' and other filename-completion */
+#define	FILEC_REREAD   4
+#define	FILEC_READ     3
+#define	FILEC_UNKNOWN  2
+#define	FILEC_WRITE    1
+
+#define	FILEC_PROMPT   8	/* always prompt (never from screen) */
+
 /*	The editor holds deleted text chunks in the KILL registers. The
 	kill registers are logically a stream of ascii characters, however
-	due to unpredicatable size, get implemented as a linked
+	due to unpredictable size, are implemented as a linked
 	list of chunks. (The d_ prefix is for "deleted" text, as k_
 	was taken up by the keycode structure)
 */
@@ -1573,7 +1650,7 @@ typedef	struct KILL {
 typedef struct KILLREG {
 	struct KILL *kbufp;	/* current kill register chunk pointer */
 	struct KILL *kbufh;	/* kill register header pointer	*/
-	int kused;		/* # of bytes used in kill last chunk	*/
+	unsigned kused;		/* # of bytes used in kill last chunk	*/
 	short kbflag;		/* flags describing kill register	*/
 } KILLREG;
 
@@ -1624,9 +1701,11 @@ typedef struct WHBLOCK {
  * General purpose includes
  */
 
-#if APOLLO && !defined(__STDCPP__)
-# define ANSI_VARARGS 0
-# define ANSI_PROTOS 0 /* SR10.2 does not like protos w/o variable names */
+#if APOLLO
+# ifndef __STDCPP__
+#  define ANSI_VARARGS 0
+#  define ANSI_PROTOS 0 /* SR10.2 does not like protos w/o variable names */
+# endif
 #endif
 
 #ifndef ANSI_VARARGS
@@ -1653,13 +1732,17 @@ typedef struct WHBLOCK {
 
 #include <sys/types.h>
 #include <stdio.h>
+
+#if X11 && APOLLO
+#define SYSV_STRINGS
+#endif
 #include <string.h>
 
 #if POSIX
 #include "unistd.h"
 #include "stdlib.h"
 #else
-# if APOLLO && defined(__STDC__) && defined(__STDCPP__)	/* e.g., while running lint */
+# if APOLLO_STDLIB
 #include <stdlib.h>
 # else
 #  if ! VMALLOC
@@ -1676,7 +1759,7 @@ extern char *getcwd();
 #endif
 
 #ifndef	free
-#if	APOLLO && !defined(__STDC__)
+#if	APOLLO && !APOLLO_STDLIB
  extern void free (/*char *s*/);
 #endif
 #endif	/* free */
@@ -1710,9 +1793,44 @@ extern char *getcwd();
 #endif
 #endif
 
+
 /*
  * Local prototypes
  */
 
-#include "proto.h"
+#include "proto.h" 
 
+/*
+ * Debugging/memory-leak testing
+ */
+
+#ifndef	DOALLOC		/* record info for 'show_alloc()' */
+#define	DOALLOC		0
+#endif
+#ifndef	DBMALLOC	/* test malloc/free/strcpy/memcpy, etc. */
+#define	DBMALLOC	0
+#endif
+#ifndef	NO_LEAKS	/* free permanent memory, analyze leaks */
+#define	NO_LEAKS	0
+#endif
+
+#if	DBMALLOC
+#undef strchr
+#undef strrchr
+#undef malloc
+#undef realloc
+#undef free
+#include "malloc.h"
+#else
+#if	DOALLOC
+extern	char *	doalloc P((char *,unsigned));
+extern	void	dofree P((char *));
+#undef	malloc
+#define	malloc(n)	doalloc((char *)0,n)
+#undef	realloc
+#define	realloc(p,n)	doalloc(p,n)
+#undef	free
+#define	free(p)		dofree(p)
+#else
+#endif	/* DOALLOC */
+#endif	/* DBMALLOC */

@@ -2,7 +2,13 @@
  * 	X11 support, Dave Lemke, 11/91
  *
  * $Log: x11.c,v $
- * Revision 1.12  1993/02/15 10:13:41  pgf
+ * Revision 1.14  1993/03/05 17:50:54  pgf
+ * see CHANGES, 3.35 section
+ *
+ * Revision 1.13  1993/02/24  10:59:02  pgf
+ * see 3.34 changes, in CHANGES file
+ *
+ * Revision 1.12  1993/02/15  10:13:41  pgf
  * more changes from phil rubini -- some typos, and keypad func. keys
  *
  * Revision 1.11  1993/02/12  10:44:07  pgf
@@ -63,12 +69,6 @@
 #include	<X11/Xos.h>
 #include	<X11/Xatom.h>
 
-#include	<signal.h>
-#include	<stdio.h>
-#include	<string.h>
-
-char *strmalloc();
-
 #define	MARGIN	8
 #define	SCRSIZ	64
 #define	NPAUSE	10		/* # times thru update to pause */
@@ -98,7 +98,7 @@ typedef struct _text_win {
     Display    *dpy;
     int         screen;
     Window      win;
-    int         bw;
+    unsigned    bw;
     XFontStruct *pfont;
     GC          textgc;
     GC          reversegc;
@@ -111,7 +111,7 @@ typedef struct _text_win {
 
     /* text stuff */
     Bool        reverse;
-    int         rows,
+    unsigned    rows,
                 cols;
     int         last_col,
                 last_row;
@@ -143,8 +143,6 @@ static TextWindow cur_win;
 static char *paste;
 static char *pp;
 static int  plen;
-static int x_numbuffer = 0;
-static char x_kbdbuffer[10];
 
 static int  x_getc(),
             x_cres();
@@ -194,8 +192,8 @@ static int  multi_click_time = 500;
 static int  startx = 100,
             starty = 100;
 
-static int  start_rows = 36,
-            start_cols = 80;
+static unsigned  start_rows = 36,
+                 start_cols = 80;
 
 
 TERM        term = {
@@ -244,10 +242,10 @@ strndup(str, n)
     char       *str;
     int         n;
 {
-    char       *t;
+    register char *t;
 
-    t = malloc(n);
-    bcopy(str, t, n);
+    if ((t = malloc(n)) != 0)
+    	memcpy(t, str, n);
     return t;
 }
 
@@ -372,40 +370,42 @@ x_setfont(fname)
     return 1;
 }
 
-static int
-x_quit()
+static
+/* ARGSUSED */
+SIGT
+x_quit(signo)
+int signo;
 {
     x_close();
-    exit(0);
+    exit(GOOD);
     /* NOTREACHED */
-    return 0;
+    SIGRET;
 }
 
 static void
 x_resize_screen(tw, rows, cols)
     TextWindow  tw;
-    int         rows;
-    int         cols;
+    unsigned    rows;
+    unsigned    cols;
 {
-    int         r,
+    unsigned    r,
                 c;
 
     if (rows != tw->rows) {
 	if (tw->sc) {
 	    for (r = 0; r < tw->rows; r++) {
-		free(tw->sc[r]);
-		free(tw->attr[r]);
+		free((char *)(tw->sc[r]));
+		free((char *)(tw->attr[r]));
 	    }
-	    free(tw->sc);
-	    free(tw->attr);
-	    free(tw->line_attr);
+	    free((char *)(tw->sc));
+	    free((char *)(tw->attr));
+	    free((char *)(tw->line_attr));
 	}
 	tw->rows = rows;
 	/* allocate screen */
-	tw->sc = (unsigned char **) malloc(sizeof(unsigned char *) * tw->rows);
-	tw->attr = (unsigned char **) malloc(sizeof(unsigned char *) * tw->rows);
-	tw->line_attr = (unsigned char *)
-	    malloc(sizeof(unsigned char) * tw->rows);
+	tw->sc   = typeallocn(unsigned char *, tw->rows);
+	tw->attr = typeallocn(unsigned char *, tw->rows);
+	tw->line_attr = typeallocn(unsigned char, tw->rows);
     }
     tw->cols = cols;
     if (tw->cur_col >= tw->cols)
@@ -413,7 +413,7 @@ x_resize_screen(tw, rows, cols)
 
     if (!tw->sc || !tw->attr || !tw->line_attr) {
 	fprintf(stderr, "couldn't allocate memory for screen\n");
-	exit(-1);
+	exit(BAD(-1));
     }
     /* init it */
     for (r = 0; r < tw->rows; r++) {
@@ -421,7 +421,7 @@ x_resize_screen(tw, rows, cols)
 	tw->attr[r] = (unsigned char *) malloc(sizeof(unsigned char) * tw->cols);
 	if (!tw->sc[r] || !tw->attr[r]) {
 	    fprintf(stderr, "couldn't allocate memory for screen\n");
-	    exit(-1);
+	    exit(BAD(-1));
 	}
 	tw->line_attr[r] = LINE_DIRTY;
 	memset((char *) tw->sc[r], ' ', tw->cols);
@@ -561,7 +561,7 @@ x_open()
     tw = (TextWindow) calloc(1, sizeof(TextWindowRec));
     if (!tw) {
 	fprintf(stderr, "insufficient memory, exiting\n");
-	exit(-1);
+	exit(BAD(-1));
     }
     dpy = XOpenDisplay(displayname);
 
@@ -571,7 +571,7 @@ x_open()
 
     if (!dpy) {
 	fprintf(stderr, "couldn't open X display\n");
-	exit(0);
+	exit(GOOD);
     }
     tw->dpy = dpy;
     tw->screen = screen = DefaultScreen(dpy);
@@ -584,7 +584,7 @@ x_open()
 	if (!pfont) {
 	    fprintf(stderr, "couldn't get font \"%s\" or \"%s\", exiting\n",
 		    fontname, FONTNAME);
-	    exit(-1);
+	    exit(BAD(-1));
 	}
 	fontname = FONTNAME;
     }
@@ -687,6 +687,7 @@ x_open()
 
     {
       XClassHint *class_hints;
+      extern XClassHint *XAllocClassHint();	/* usually in <X11/xutil.h> */
       class_hints = XAllocClassHint();
       class_hints->res_name = strmalloc("xvile");
       class_hints->res_class = strmalloc("XVile");
@@ -731,11 +732,11 @@ static void
 x_refresh(tw, sc, sr, ec, er)
     TextWindow  tw;
     int         sc,
-                ec;
-    int         sr,
+                sr;
+    unsigned    ec,
                 er;
 {
-    int         r,
+    unsigned    r,
                 c;
 
     for (r = sr; r < er; r++) {
@@ -762,8 +763,8 @@ wait_for_scroll(tw)
 {
     XEvent      ev;
     int         sc,
-                sr,
-                ec,
+                sr;
+    unsigned    ec,
                 er;
     XGraphicsExposeEvent *gev;
 
@@ -835,7 +836,8 @@ x_scroll(from, to, count)
 #endif
 
     for (rf = fst, rt = tst, i = 0; i < count; i++, rf += finc, rt += tinc) {
-	bcopy((char *) cur_win->sc[rf], (char *) cur_win->sc[rt], cur_win->cols);
+	memcpy((char *) cur_win->sc[rt],
+	       (char *) cur_win->sc[rf], cur_win->cols);
 	memset((char *) cur_win->sc[rf], ' ', cur_win->cols);
 
         /* only mark row if it isn't going to be overwritten during 
@@ -907,7 +909,7 @@ flush_line(text, len, rev, sr, sc)
     unsigned char *p;
     int         cc,
                 tlen,
-                i = 0;
+                i;
 
     /* break line into TextStrings and FillRects */
     p = text;
@@ -922,14 +924,16 @@ flush_line(text, len, rev, sr, sc)
 		tlen -= cc;
 		XDrawImageString(dpy, cur_win->win,
 				 (rev ? cur_win->reversegc : cur_win->textgc),
-				 x_pos(cur_win, sc), text_y_pos(cur_win, sr),
+				 (int)x_pos(cur_win, sc),
+				 (int)text_y_pos(cur_win, sr),
 				 (char *) p, tlen);
 		p += tlen + cc;
 		sc += tlen;
 		XFillRectangle(dpy, cur_win->win,
 			       (!rev ? cur_win->reversegc : cur_win->textgc),
 			       x_pos(cur_win, sc), y_pos(cur_win, sr),
-			   (cc * cur_win->char_width), cur_win->char_height);
+			       (unsigned)(cc * cur_win->char_width),
+			       (unsigned)(cur_win->char_height));
 		sc += cc;
 		tlen = 1;	/* starting new run */
 	    } else
@@ -947,7 +951,8 @@ flush_line(text, len, rev, sr, sc)
 	XFillRectangle(dpy, cur_win->win,
 		       (!rev ? cur_win->reversegc : cur_win->textgc),
 		       x_pos(cur_win, sc), y_pos(cur_win, sr),
-		       (cc * cur_win->char_width), cur_win->char_height);
+		       (unsigned)(cc * cur_win->char_width),
+		       (unsigned)(cur_win->char_height));
     } else if (tlen > 0) {
 	XDrawImageString(dpy, cur_win->win,
 			 (rev ? cur_win->reversegc : cur_win->textgc),
@@ -1070,7 +1075,8 @@ x_flush()
     if (!cur_win->show_cursor)
 	XDrawRectangle(dpy, cur_win->win, cur_win->textgc,
 	  x_pos(cur_win, cur_win->cur_col), y_pos(cur_win, cur_win->cur_row),
-		       cur_win->char_width - 1, cur_win->char_height - 1);
+		       (unsigned)(cur_win->char_width - 1),
+		       (unsigned)(cur_win->char_height - 1));
     XFlush(dpy);
 }
 
@@ -1111,7 +1117,10 @@ x_putline(row, str, len)
     cur_win->attr[cur_win->cur_row][cur_win->cur_col] &= ~CELL_CURSOR;
     cur_win->attr[cur_win->cur_row][cur_win->cur_col] |= CELL_DIRTY;
 
-    bcopy((char *) str, (char *) &(cur_win->sc[row][cur_win->cur_col]), len);
+    memcpy(
+    	(char *) &(cur_win->sc[row][cur_win->cur_col]),
+    	(char *) str,
+	len);
     for (i = 0, c = cur_win->cur_col; i < len; c++, i++) {
 	if (cur_win->reverse)
 	    cur_win->attr[row][c] |= CELL_REVERSE;
@@ -1495,8 +1504,8 @@ x_get_selection(tw, selection, type, value, length, format)
     TextWindow  tw;
     Atom        selection;
     Atom        type;
-    long        length;
     char       *value;
+    long        length;
     int         format;
 {
     if (format != 8 || type != XA_STRING)
@@ -1516,12 +1525,12 @@ x_get_selection(tw, selection, type, value, length, format)
 	    *pp = (char)c;
 	    plen = length;
 	    length--;
-	    bcopy((char *) value, pp + 1, length);
+	    memcpy(pp + 1, (char *) value, length);
 	} else {
 	    pp = paste = (char *) malloc(length);
 	    if (!paste)
 		goto bail;
-	    bcopy((char *) value, pp, length);
+	    memcpy(pp, (char *) value, length);
 	    plen = length;
 	}
     }
@@ -1560,7 +1569,7 @@ x_stash_selection(tw)
     if (!tw->have_selection)
 	return;
     if (tw->selection_len) {
-	free(tw->selection_data);
+	free((char *)(tw->selection_data));
 	tw->selection_len = 0;
     }
     if (tw->sel_start_row == tw->sel_end_row) {
@@ -1568,8 +1577,9 @@ x_stash_selection(tw)
 	data = (unsigned char *) malloc(length);
 	if (!data)
 	    return;
-	bcopy((char *) &(tw->sc[tw->sel_start_row][tw->sel_start_col]),
-	      data, length);
+	memcpy(data,
+		(char *) &(tw->sc[tw->sel_start_row][tw->sel_start_col]),
+		length);
 	tw->selection_len = length;
     } else {
 	start = tw->sel_start_col;
@@ -1586,7 +1596,7 @@ x_stash_selection(tw)
 	for (r = tw->sel_start_row; r <= tw->sel_end_row; r++) {
 	    end = (r == tw->sel_end_row) ? tw->sel_end_col : (tw->cols - 1);
 	    length = end - start + 1;
-	    bcopy((char *) &(tw->sc[r][start]), dp, length);
+	    memcpy(dp, (char *) &(tw->sc[r][start]), length);
 	    dp += length;
 	    *dp++ = '\n';	/* add CR */
 	    start = 0;
@@ -1622,7 +1632,7 @@ x_own_selection(tw)
 {
     if (tw->selection_len) {	/* get rid of old one */
 	tw->selection_len = 0;
-	free(tw->selection_data);
+	free((char *)(tw->selection_data));
     }
     if (!tw->have_selection) {
 	XSetSelectionOwner(tw->dpy, XA_PRIMARY, tw->win, CurrentTime);
@@ -1835,7 +1845,7 @@ x_process_event(ev)
 	} else {
 	    event.property = None;
 	}
-	(void) XSendEvent(dpy, event.requestor, False, (unsigned long) 0,
+	(void) XSendEvent(dpy, event.requestor, False, (long) 0,
 			  (XEvent *) & event);
 	break;
     case SelectionNotify:
@@ -1954,10 +1964,6 @@ x_getc()
    
     while (1) {
 
-	if (x_numbuffer) {		/* handle any queued chars */
-	    c = x_kbdbuffer[x_numbuffer--];
-	    return c;
-	}
 
 	if (plen) {		/* handle any queued pasted text */
 	    c = *pp++;
@@ -1969,63 +1975,58 @@ x_getc()
 	if (ev.type == KeyPress) {
 	        num = XLookupString((XKeyPressedEvent *) &ev, buffer, 10,
 				&keysym, (XComposeStatus *) 0);
-		x_numbuffer = 3;
-		x_kbdbuffer[3] = ESC;
-		x_kbdbuffer[2] = '[';
 		switch (keysym) {
 		/* Arrow keys */
-		case XK_Left:	x_kbdbuffer[1] = 'D'; break;
-		case XK_Right:	x_kbdbuffer[1] = 'C'; break;
-		case XK_Up:	x_kbdbuffer[1] = 'A'; break;
-		case XK_Down:	x_kbdbuffer[1] = 'B'; break;
+		case XK_Up:	return SPEC|'A';
+		case XK_Down:	return SPEC|'B';
+		case XK_Right:	return SPEC|'C';
+		case XK_Left:	return SPEC|'D';
 		/* page scroll */
-		case XK_Next:	x_kbdbuffer[1] = 'n'; break;
-		case XK_Prior:	x_kbdbuffer[1] = 'p'; break;
+		case XK_Next:	return SPEC|'n';
+		case XK_Prior:	return SPEC|'p';
 		/* editing */
-		case XK_Insert:	x_kbdbuffer[1] = 'i'; break;
+		case XK_Insert:	return SPEC|'i';
 #if (ULTRIX || ultrix)
-		case DXK_Remove: x_kbdbuffer[1] = 'r'; break;
+		case DXK_Remove: return SPEC|'r';
 #endif
-		case XK_Find:	x_kbdbuffer[1] = 'f'; break;
-		case XK_Select:	x_kbdbuffer[1] = 's'; break;
+		case XK_Find:	return SPEC|'f';
+		case XK_Select:	return SPEC|'s';
 		/* command keys */
-		case XK_Menu:	x_kbdbuffer[1] = 'm'; break;
-		case XK_Help:	x_kbdbuffer[1] = 'h'; break;
+		case XK_Menu:	return SPEC|'m';
+		case XK_Help:	return SPEC|'h';
                 /* function keys */
-		case XK_F1:	x_kbdbuffer[1] = '1'; break;
-		case XK_F2:	x_kbdbuffer[1] = '2'; break;
-		case XK_F3:	x_kbdbuffer[1] = '3'; break;
-		case XK_F4:	x_kbdbuffer[1] = '4'; break;
-		case XK_F5:	x_kbdbuffer[1] = '5'; break;
-		case XK_F6:	x_kbdbuffer[1] = '6'; break;
-		case XK_F7:	x_kbdbuffer[1] = '7'; break;
-		case XK_F8:	x_kbdbuffer[1] = '8'; break;
-		case XK_F9:	x_kbdbuffer[1] = '9'; break;
-		case XK_F10:	x_kbdbuffer[1] = '0'; break;
-		case XK_F11:	x_kbdbuffer[1] = ESC; x_numbuffer = 1; break;
-		case XK_F12:	x_kbdbuffer[1] = '@'; break;
-		case XK_F13:	x_kbdbuffer[1] = '#'; break;
-		case XK_F14:	x_kbdbuffer[1] = '$'; break;
-		case XK_F15:	x_kbdbuffer[1] = '%'; break;
-		case XK_F16:	x_kbdbuffer[1] = '^'; break;
-		case XK_F17:	x_kbdbuffer[1] = '&'; break;
-		case XK_F18:	x_kbdbuffer[1] = '*'; break;
-		case XK_F19:	x_kbdbuffer[1] = '('; break;
-		case XK_F20:	x_kbdbuffer[1] = ')'; break;
+		case XK_F1:	return SPEC|'1';
+		case XK_F2:	return SPEC|'2';
+		case XK_F3:	return SPEC|'3';
+		case XK_F4:	return SPEC|'4';
+		case XK_F5:	return SPEC|'5';
+		case XK_F6:	return SPEC|'6';
+		case XK_F7:	return SPEC|'7';
+		case XK_F8:	return SPEC|'8';
+		case XK_F9:	return SPEC|'9';
+		case XK_F10:	return SPEC|'0';
+		case XK_F11:	return ESC;
+		case XK_F12:	return SPEC|'@';
+		case XK_F13:	return SPEC|'#';
+		case XK_F14:	return SPEC|'$';
+		case XK_F15:	return SPEC|'%';
+		case XK_F16:	return SPEC|'^';
+		case XK_F17:	return SPEC|'&';
+		case XK_F18:	return SPEC|'*';
+		case XK_F19:	return SPEC|'(';
+		case XK_F20:	return SPEC|')';
 		/* keypad function keys */
-		case XK_KP_F1:	x_kbdbuffer[1] = 'P'; break;
-		case XK_KP_F2:	x_kbdbuffer[1] = 'Q'; break;
-		case XK_KP_F3:	x_kbdbuffer[1] = 'R'; break;
-		case XK_KP_F4:	x_kbdbuffer[1] = 'S'; break;
+		case XK_KP_F1:	return SPEC|'P';
+		case XK_KP_F2:	return SPEC|'Q';
+		case XK_KP_F3:	return SPEC|'R';
+		case XK_KP_F4:	return SPEC|'S';
 		/* ordinary keys */
 		default:
-			x_numbuffer = 0;
 			if (num)
 				return buffer[0];
 			else
 				continue;
 		}
-		return x_kbdbuffer[x_numbuffer--];
 	} else {
 	    x_process_event(&ev);
 	}
@@ -2046,9 +2047,6 @@ int
 x_key_events_ready()
 {
     XEvent      ev;
-
-
-    if (x_numbuffer) return TRUE;
 
     /* XXX may want to use another mode */
     if (XEventsQueued(dpy, QueuedAlready))

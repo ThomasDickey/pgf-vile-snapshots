@@ -14,7 +14,20 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.94  1993/02/15 10:37:31  pgf
+ * Revision 1.98  1993/03/16 10:53:21  pgf
+ * see 3.36 section of CHANGES file
+ *
+ * Revision 1.97  1993/03/05  18:46:39  pgf
+ * fix for tab cursor positioning in insert mode, and mode to control
+ * positioning style
+ *
+ * Revision 1.96  1993/03/05  17:50:54  pgf
+ * see CHANGES, 3.35 section
+ *
+ * Revision 1.95  1993/02/24  10:59:02  pgf
+ * see 3.34 changes, in CHANGES file
+ *
+ * Revision 1.94  1993/02/15  10:37:31  pgf
  * cleanup for gcc-2.3's -Wall warnings
  *
  * Revision 1.93  1993/02/08  14:53:35  pgf
@@ -372,10 +385,6 @@ int _STKLOW = 0;		/* default is stack above heap (small only) */
 
 #if	MSDOS & TURBO
 unsigned _stklen = 32768;
-#endif
-
-#if UNIX || MSDOS
-#include	<signal.h>
 #endif
 
 int
@@ -1076,20 +1085,29 @@ void
 global_val_init()
 {
 	register int i;
-	struct regexval *rp;
 	/* set up so the global value pointers point at the global
 		values.  we never actually use the global pointers
-		directly, but but when buffers get a copy of the
+		directly, but when buffers get a copy of the
 		global_b_values structure, the pointers will still point
 		back at the global values, which is what we want */
+	for (i = 0; i <= MAX_G_VALUES; i++)
+		copy_val(global_g_values.gv, global_g_values.gv, i);
+
 	for (i = 0; i <= MAX_B_VALUES; i++)
-		global_b_values.bv[i].vp = &(global_b_values.bv[i].v);
+		copy_val(global_b_values.bv, global_b_values.bv, i);
 
 	for (i = 0; i <= MAX_W_VALUES; i++)
-		global_w_values.wv[i].vp = &(global_w_values.wv[i].v);
+		copy_val(global_w_values.wv, global_w_values.wv, i);
 
 
-	set_global_b_val(MDABUFF,TRUE); 	/* auto-buffer */
+	set_global_g_val(GMDABUFF,TRUE); 	/* auto-buffer */
+	set_global_g_val(GMDVITABPOS,TRUE); 	/* vi-style tab positioning */
+	set_global_g_val(GMDDIRC,FALSE); 	/* directory-completion */
+#ifdef GMDTAGSLOOK
+	set_global_g_val(GMDTAGSLOOK,FALSE); 	/* tags-look */
+#endif
+	set_global_g_val(GMDIMPLYBUFF,FALSE); 	/* imply-buffer */
+
 	set_global_b_val(MDAIND,FALSE); 	/* auto-indent */
 	set_global_b_val(MDASAVE,FALSE);	/* auto-save */
 	set_global_b_val(MDBACKLIMIT,TRUE); 	/* limit backspacing to insert point */
@@ -1115,44 +1133,40 @@ global_val_init()
 	set_global_b_val(VAL_TAB, 8);		/* tab stop */
 	set_global_b_val(VAL_TAGLEN, 0);	/* significant tag length */
 
-	set_global_b_val_ptr(VAL_CWD, NULL);	/* current directory */
 	set_global_b_val_ptr(VAL_TAGS, strmalloc("tags")); /* tags filename */
 
 	/* suffixes for C mode */
-	rp = typealloc(struct regexval);
-	set_global_b_val_rexp(VAL_CSUFFIXES, rp);
-	rp->pat = strmalloc("\\.[Cchis]$");
-	rp->reg = regcomp(rp->pat, TRUE);
+	set_global_g_val_rexp(GVAL_CSUFFIXES,
+		new_regexval(
+			"\\.[Cchis]$",
+			TRUE));
 
 	/* where do paragraphs start? */
-	rp = typealloc(struct regexval);
-	set_global_b_val_rexp(VAL_PARAGRAPHS, rp);
-	rp->pat = 
-		strmalloc("^\\.[ILPQ]P\\s\\|^\\.P\\s\\|^\\.LI\\s\\|\
-^\\.[plinb]p\\s\\|^\\.\\?\\s$");
-	rp->reg = regcomp(rp->pat, TRUE);
+	set_global_b_val_rexp(VAL_PARAGRAPHS,
+		new_regexval(
+			"^\\.[ILPQ]P\\s\\|^\\.P\\s\\|^\\.LI\\s\\|\
+^\\.[plinb]p\\s\\|^\\.\\?\\s$",
+			TRUE));
 
 	/* where do comments start and end, for formatting them */
-	rp = typealloc(struct regexval);
-	set_global_b_val_rexp(VAL_COMMENTS, rp);
-	rp->pat = 
-		strmalloc("^\\s/\\?[#*>]\\+/\\?\\s$");
-	rp->reg = regcomp(rp->pat, TRUE);
+	set_global_b_val_rexp(VAL_COMMENTS,
+		new_regexval(
+			"^\\s/\\?[#*>]\\+/\\?\\s$",
+			TRUE));
 
 	/* where do sections start? */
-	rp = typealloc(struct regexval);
-	set_global_b_val_rexp(VAL_SECTIONS, rp);
-	rp->pat = strmalloc("^[{\014]\\|^\\.[NS]H\\s\\|^\\.HU\\?\\s\\|\
-^\\.[us]h\\s\\|^+c\\s");
-	rp->reg = regcomp(rp->pat, TRUE);
+	set_global_b_val_rexp(VAL_SECTIONS,
+		new_regexval(
+			"^[{\014]\\|^\\.[NS]H\\s\\|^\\.HU\\?\\s\\|\
+^\\.[us]h\\s\\|^+c\\s",
+			TRUE));
 
 	/* where do sentences start? */
-	rp = typealloc(struct regexval);
-	set_global_b_val_rexp(VAL_SENTENCES, rp);
-	rp->pat = strmalloc(
+	set_global_b_val_rexp(VAL_SENTENCES,
+		new_regexval(
 	"[.!?][])\"']* \\?$\\|[.!?][])\"']*  \\|^\\.[ILPQ]P\\s\\|\
-^\\.P\\s\\|^\\.LI\\s\\|^\\.[plinb]p\\s\\|^\\.\\?\\s$");
-	rp->reg = regcomp(rp->pat, TRUE);
+^\\.P\\s\\|^\\.LI\\s\\|^\\.[plinb]p\\s\\|^\\.\\?\\s$",
+			TRUE));
 
 	set_global_w_val(WMDLIST,FALSE); /* list-mode */
 	set_global_w_val(WVAL_SIDEWAYS,0); /* list-mode */
@@ -1163,9 +1177,7 @@ global_val_init()
 
 #if UNIX || MSDOS
 /* ARGSUSED */
-SIGT
-catchintr(signo)
-int signo;
+ACTUAL_SIGNAL(catchintr)
 {
 	interrupted = TRUE;
 #if USG || MSDOS
@@ -1367,6 +1379,35 @@ int f,n;
 #endif
 #if UNIX
 	signal(SIGHUP,SIG_DFL);	/* I don't care anymore */
+#endif
+#if NO_LEAKS
+	{
+		register int i;
+		register struct VALNAMES *v;
+
+		/* free all of the global data structures */
+		kbs_leaks();
+		tb_leaks();
+		wp_leaks();
+		bp_leaks();
+		vt_leaks();
+		ev_leaks();
+
+		for (i = 0, v=g_valuenames; v[i].name != 0; i++)
+			free_val(v+i, &global_g_values.gv[i]);
+
+		for (i = 0, v=b_valuenames; v[i].name != 0; i++)
+			free_val(v+i, &global_b_values.bv[i]);
+
+		for (i = 0, v=w_valuenames; v[i].name != 0; i++)
+			free_val(v+i, &global_w_values.wv[i]);
+
+		if (gregexp != 0)	free((char *)gregexp);
+		if (patmatch != 0)	free(patmatch);
+
+		/* whatever is left over must be a leak */
+		show_alloc();
+	}
 #endif
 	exit(GOOD);
 	/* NOTREACHED */

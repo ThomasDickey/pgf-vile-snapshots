@@ -11,7 +11,16 @@
  * which means that the dot and mark values in the buffer headers are nonsense.
  *
  * $Log: line.c,v $
- * Revision 1.32  1993/02/08 14:53:35  pgf
+ * Revision 1.35  1993/03/16 10:53:21  pgf
+ * see 3.36 section of CHANGES file
+ *
+ * Revision 1.34  1993/03/05  17:50:54  pgf
+ * see CHANGES, 3.35 section
+ *
+ * Revision 1.33  1993/02/24  10:59:02  pgf
+ * see 3.34 changes, in CHANGES file
+ *
+ * Revision 1.32  1993/02/08  14:53:35  pgf
  * see CHANGES, 3.32 section
  *
  * Revision 1.31  1993/01/23  13:38:23  foxharp
@@ -141,6 +150,7 @@
 #include	"edef.h"
 
 #define roundup(n) ((n+NBLOCK-1) & ~(NBLOCK-1))
+
 /*
  * This routine allocates a block of memory large enough to hold a LINE
  * containing "used" characters. The block is always rounded up a bit. Return
@@ -181,32 +191,6 @@ BUFFER *bp;
 	lp->l_nxtundo = NULL;
 	return (lp);
 }
-
-#ifdef	UNUSED
-int
-lgrow(lp,howmuch,bp)
-register LINE	*lp;
-register int	howmuch;
-BUFFER *bp;
-{
-	register unsigned size;
-	char *ntext;
-
-	size = roundup(lp->l_size + howmuch);
-	ntext = castalloc(char,size);
-	if (ntext == NULL) {
-		mlforce("[OUT OF MEMORY]");
-		return FALSE;
-	}
-	memcpy(ntext, lp->l_text, lp->l_used);
-	ltextfree(lp,bp);
-	lp->l_text = ntext;
-	lp->l_size = size;
-	return TRUE;
-}
-#endif	/* UNUSED */
-
-
 
 void
 lfree(lp,bp)
@@ -734,8 +718,8 @@ ldelnewline()
 	lp1 = curwp->w_dot.l;
 	/* if the current line is empty, remove it */
 	if (lp1->l_used == 0) {		/* Blank line.		*/
-		lremove(curbp,lp1);
 		toss_to_undo(lp1);
+		lremove(curbp,lp1);
 		return (TRUE);
 	}
 	lp2 = lp1->l_fp;
@@ -746,8 +730,8 @@ ldelnewline()
 		return (TRUE);
 	else if (lp2->l_used == 0) {
 		/* next line blank? */
-		lremove(curbp,lp2);
 		toss_to_undo(lp2);
+		lremove(curbp,lp2);
 		return (TRUE);
 	}
 	copy_for_undo(lp1);
@@ -893,6 +877,46 @@ int c;		/* character to insert in the kill buffer */
 	return(TRUE);
 }
 
+/*
+ * Translates the index of a register in kill-buffer list to its name.
+ */
+int
+index2reg(c)
+int	c;
+{
+	register int n;
+
+	if (c >= 0 && c < 10)
+		n = (c + '0');
+	else if (c >= 10 && c < SIZEOF(kbs))
+		n = (c - 10 + 'a');
+	else
+		n = '?';
+
+	return n;
+}
+
+/*
+ * Translates the name of a register into the index in kill-buffer list.
+ */
+int
+reg2index(c)
+int	c;
+{
+	register int n;
+
+	if (isdigit(c))
+		n = c - '0';
+	else if (islower(c))
+		n = c - 'a' + 10;  /* named buffs are in 10 through 36 */
+	else if (isupper(c))
+		n = c - 'A' + 10;
+	else
+		n = -1;
+
+	return n;
+}
+
 /* select one of the named registers for use with the following command */
 /*  this could actually be handled as a command prefix, in kbdseq(), much
 	the way ^X-cmd and META-cmd are done, except that we need to be
@@ -906,7 +930,7 @@ int
 usekreg(f,n)
 int f,n;
 {
-	int c, status;
+	int c, i, status;
 	CMDFUNC *cfp;			/* function to execute */
 	char tok[NSTRING];		/* command incoming */
 
@@ -924,16 +948,11 @@ int f,n;
 		c = kbd_key();
         }
 
-	if (isdigit(c))
-		ukb = c - '0';
-	else if (islower(c))
-		ukb = c - 'a' + 10;  /* named buffs are in 10 through 36 */
-	else if (isupper(c)) {
-		ukb = c - 'A' + 10;
-	} else {
+	if ((i = reg2index(c)) < 0) {
 		TTbeep();
 		return (FALSE);
 	}
+	ukb = i;
 
 	if (kbdmode == PLAY && kbdplayreg == ukb) {
 		mlforce("[Error: currently executing register %c]",c);
@@ -1050,8 +1069,7 @@ int f,n,after,putlines;
 	kregcirculate(FALSE);
 	if (kbs[ukb].kbufh == NULL) {
 		if (ukb != 0)
-			mlforce("[Nothing in register %c]", 
-				(oukb<10)? oukb+'0' : oukb-10+'a');
+			mlforce("[Nothing in register %c]", index2reg(oukb));
 		TTbeep();
 		return(FALSE);
 	}
@@ -1144,15 +1162,10 @@ int
 execkreg(f,n)
 int f,n;
 {
-	int c, i;
+	int c, j, status;
 	KILL *kp;		/* pointer into kill register */
-	static lastreg = -1;
-
-	if (kbdmode != STOP) {
-		mlforce("[Error: already executing macro]");
-		kbdmode = STOP;
-		return FALSE;
-	}
+	static int	lastreg = -1;
+	static TBUFF	*buffer;
 
 	if (!f)
 		n = 1;
@@ -1171,35 +1184,38 @@ int f,n;
 
 	if (c == '@' && lastreg != -1) {
 		c = lastreg;
-	} else if (c < 'a' || c > 'z') {
+	} else if (reg2index(c) < 0) {
 		TTbeep();
 		mlforce("[Invalid register name]");
 		return FALSE;
 	}
 
-	lastreg = c;
-
-	c = c - 'a' + 10;
+	j = reg2index(lastreg = c);
 
 	/* make sure there is something to execute */
-	kp = kbs[c].kbufh;
+	kp = kbs[j].kbufh;
 	if (kp == NULL)
 		return TRUE;		/* not an error, just nothing */
 
-	if (kp->d_next == NULL) {
-		i = kbs[c].kused;
-	} else {
-		mlforce("Warning:  only first %d characters will execute",
-								KBLOCK);
-		i = KBLOCK;
+	/* for simplicity, keyboard-string needs a single buffer */
+	if (tb_alloc(&buffer, KBLOCK)
+	 && tb_init(&buffer, abortc)) {
+		while (kp->d_next != 0) {
+			if (!tb_bappend(&buffer, (char *)(kp->d_chunk), KBLOCK))
+				return FALSE;
+			kp = kp->d_next;
+		}
+		if (!tb_bappend(&buffer, (char *)(kp->d_chunk), kbs[j].kused))
+			return FALSE;
 	}
-	kbdrep = n;		/* remember how many times to execute */
-	kbdmode = PLAY; 	/* start us in play mode */
-	kbdplayreg = c;  	/* which buffer is playing */
-	kbdptr = kp->d_chunk;	/*    at the beginning */
-	kbdend = &kp->d_chunk[i];
-	dotcmdmode = STOP;
-	return TRUE;
+
+	if ((status = start_kbm(n, j, buffer)) == TRUE) {
+		dotcmdmode = STOP;
+	}
+#if NO_LEAKS2
+	tb_free(&buffer);
+#endif
+	return status;
 }
 
 /* ARGSUSED */
@@ -1222,3 +1238,68 @@ int f,n;
 	kdone();
 	return TRUE;
 }
+
+/* Show the contents of the kill-buffers */
+#if !SMALLER
+/*ARGSUSED*/
+static void
+listregisters(iflag,dummy)
+int iflag;	/* list nonprinting chars flag */
+char *dummy;
+{
+	register KILL	*kp;
+	register int	i, j, c;
+	register unsigned char	*p;
+	int	any = 0;
+
+	for (i = 10; i < SIZEOF(kbs); i++) {
+		if ((kp = kbs[i].kbufh) != 0) {
+			int first = TRUE;
+			if (any++)
+				bputc('\n');
+			bprintf("%c:", index2reg(i));
+			do {
+				j = (kp->d_next != 0) ? KBLOCK : kbs[i].kused;
+				p = kp->d_chunk;
+
+				while (j-- > 0) {
+					if (first) {
+						first = FALSE;
+						bputc('\t');
+					}
+					c = *p++;
+					if (isprint(c) || !iflag) {
+						bputc(c);
+					} else {
+						bputc('^');
+						bputc(toalpha(c));
+						if (c == '\n')
+							bputc('\n');
+					}
+					if (c == '\n')
+						first = TRUE;
+				}
+			} while ((kp = kp->d_next) != 0);
+		}
+	}
+}
+
+/*ARGSUSED*/
+int
+showkreg(f,n)
+int f,n;
+{
+	return liststuff(ScratchName(Registers), listregisters, f, NULL);
+}
+#endif
+
+/* For memory-leak testing (only!), releases all kill-buffer storage. */
+#if NO_LEAKS
+void	kbs_leaks()
+{
+	for (ukb = 0; ukb < SIZEOF(kbs); ukb++) {
+		ksetup();
+		kdone();
+	}
+}
+#endif
