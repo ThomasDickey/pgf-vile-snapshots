@@ -11,7 +11,7 @@
 #
 # The modes are table entries in the BUFFER and WINDOW structures.
 #
-# $Header: /usr/build/VCS/pgf-vile/RCS/modetbl,v 1.53 1994/11/29 04:02:03 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/modetbl,v 1.56 1994/12/14 20:26:57 pgf Exp $
 #
 #
 # Mode-table entries.  Capitalized letters are used for abbreviations.
@@ -53,7 +53,6 @@ string							# VAL_ prefix
 	"expand-chars"	EXPAND_CHARS	0		# list of chars we can expand (%,#,:)
 	"glob"		GLOB		0		OPT_GLOB_PIPE # select filename globbing style
 	"Popup-Choices"	POPUP_CHOICES	0		OPT_POPUPCHOICE&&OPT_ENUM_MODES # popup buffer showing file-completion choices
-	"ModeLine-ForMaT" MLFORMAT	0		OPT_MLFORMAT # modeline format string
 	"backup-style"  BACKUPSTYLE	0		OPT_FILEBACK # file backup style
 
 .buffers
@@ -61,6 +60,7 @@ bool							# MD prefix
 	"animated"	UPBUFF		0		OPT_UPBUFF # update scratch-buffers
 	"AutoIndent"	AIND		0		# auto-indent
 	"AutoSave"	ASAVE		0		# auto-save mode
+	"AutoWrite"	AUTOWRITE	0		# auto-write when shelling out
 	"BackspaceLimit" BACKLIMIT	0		# backspace limited in insert mode
 	"check-modtime" CHK_MODTIME	0		!SMALLER # check buffer-modtime
 	"cmode"		CMOD		WFHARD|WFMODE	# C indentation and fence match
@@ -141,6 +141,7 @@ color
 "llength"	LLENGTH			# length of current line
 "match"		MATCH			# last matched magic pattern
 "mode"		MODE			# are we inserting/overwriting/command
+"modeline-format" MLFORMAT	OPT_MLFORMAT # modeline format string
 "modified"	MODIFIED		# is current buffer modified?
 "ntildes"	NTILDES			# number of tildes displayed at eob
 "ocwd"		OCWD			# previous directory

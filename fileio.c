@@ -2,7 +2,7 @@
  * The routines in this file read and write ASCII files from the disk. All of
  * the knowledge about files are here.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/fileio.c,v 1.87 1994/11/29 17:04:43 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/fileio.c,v 1.92 1994/12/15 16:53:08 pgf Exp $
  *
  */
 
@@ -138,19 +138,13 @@ char *backup;
 		return s;
 
 	/* change date and permissions to match original */
-#if HAVE_UTIME
-	{
-	    struct utimbuf buf;
-	    buf.actime = ostat.st_atime;
-	    buf.modtime = ostat.st_mtime;
-	    s = utime(backup, &buf);
-	    if (s != 0) {
-		    (void)unlink(backup);
-		    return FALSE;
-	    }
-	}
-#else
 #if HAVE_UTIMES
+	/* we favor utimes over utime, since not all implementations (i.e.
+		older ones) declare the utimbuf argument.  NeXT, for example,
+		declares it as an array of two timevals instead.  we think
+		utimes will be more standard, where it exists.  what we
+		really think is that it's probably BSD systems that got
+		utime wrong, and those will have utimes to cover for it.  :-) */
 	{
 	    struct timeval buf[2];
 	    buf[0].tv_sec = ostat.st_atime;
@@ -158,6 +152,18 @@ char *backup;
 	    buf[1].tv_sec = ostat.st_mtime;
 	    buf[1].tv_usec = 0;
 	    s = utimes(backup, buf);
+	    if (s != 0) {
+		    (void)unlink(backup);
+		    return FALSE;
+	    }
+	}
+#else
+# if HAVE_UTIME
+	{
+	    struct utimbuf buf;
+	    buf.actime = ostat.st_atime;
+	    buf.modtime = ostat.st_mtime;
+	    s = utime(backup, &buf);
 	    if (s != 0) {
 		    (void)unlink(backup);
 		    return FALSE;
@@ -181,7 +187,7 @@ char	*fname;
 {
 	int	ok	= TRUE;
 
-	if (ffexists(fname) >= 0) { /* if the file exists, attempt a backup */
+	if (ffexists(fname)) { /* if the file exists, attempt a backup */
 		char	tname[NFILEN];
 		char	*s = pathleaf(strcpy(tname, fname)),
 			*t = strrchr(s, '.');
@@ -344,6 +350,37 @@ int	forced;
         return (FIOSUC);
 }
 
+/* wrapper for 'access()' */
+int
+ffaccess(fn, mode)
+char	*fn;
+int	mode;
+{
+#if HAVE_ACCESS
+	return (access(fn, mode) == 0);
+#else
+	int	fd;
+	switch (mode) {
+	case FL_EXECABLE:
+		/* FALL-THRU */
+	case FL_READABLE:
+		if (ffropen(fn) == FIOSUC) {
+			ffclose();
+			return TRUE;
+		}
+        	return FALSE;
+	case FL_WRITEABLE:
+	        if ((fd=open(fn, O_WRONLY|O_APPEND)) < 0) {
+	                return FALSE;
+		}
+		(void)close(fd);
+		return TRUE;
+	default:
+		return ffexists(fn);
+	}
+#endif
+}
+
 /* is the file read-only?  true or false */
 int
 ffronly(fn)
@@ -352,16 +389,7 @@ char    *fn;
 	if (isShellOrPipe(fn)) {
 		return TRUE;
 	} else {
-#if HAVE_ACCESS
-		return (access(fn, 2) != 0);	/* W_OK==2 */
-#else
-		int fd;
-	        if ((fd=open(fn, O_WRONLY|O_APPEND)) < 0) {
-	                return TRUE;
-		}
-		(void)close(fd);
-		return FALSE;
-#endif
+		return !ffaccess(fn, FL_WRITEABLE);
 	}
 }
 
@@ -437,17 +465,6 @@ char *p;
 }
 
 #endif
-
-int
-ffreadable(p)
-char *p;
-{
-	if (ffropen(p) == FIOSUC) {
-		ffclose();
-		return TRUE;
-	}
-        return FALSE;
-}
 
 #if !SYS_MSDOS && !OPT_MAP_MEMORY
 int

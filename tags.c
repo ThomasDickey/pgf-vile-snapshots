@@ -4,15 +4,13 @@
  *	the cursor.
  *	written for vile by Paul Fox, (c)1990
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/tags.c,v 1.63 1994/12/03 13:22:56 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/tags.c,v 1.66 1994/12/15 15:01:52 pgf Exp $
  *
  */
 #include	"estruct.h"
 #include        "edef.h"
 
 #if OPT_TAGS
-
-#define	TAGS_LIST_NAME	ScratchName(Tag Stack)
 
 #define	UNTAG	struct	untag
 	UNTAG {
@@ -149,7 +147,10 @@ int taglen;
 		bsizes(curbp);
 		lineno = l_ref(DOT.l)->l_number;
 #endif
-		pushuntag(curbp->b_fname, lineno, tag);
+		if (!isInternalName(curbp->b_fname))
+			pushuntag(curbp->b_fname, lineno, tag);
+		else
+			pushuntag(curbp->b_bname, lineno, tag);
 	}
 
 	if (curbp == NULL
@@ -276,7 +277,7 @@ int *endofpathflagp;
 
 	*endofpathflagp = FALSE;
 	
-	(void)lsprintf(tagbufname, ScratchName(Tags %d), n+1);
+	(void)lsprintf(tagbufname, TAGFILE_BufName, n+1);
 
 	/* is the buffer around? */
 	if ((tagbp=find_b_name(tagbufname)) == NULL) {
@@ -289,7 +290,7 @@ int *endofpathflagp;
 		}
 
 		/* look up the tags file */
-		tagsfile = flook(tagfilename, FL_HERE);
+		tagsfile = flook(tagfilename, FL_HERE|FL_READABLE);
 
 		/* if it isn't around, don't sweat it */
 		if (tagsfile == NULL)
@@ -459,7 +460,7 @@ char *tag;
 	utp->u_lineno = lineno;
 	utp->u_stklink = untaghead;
 	untaghead = utp;
-	update_scratch(TAGS_LIST_NAME, update_tagstack);
+	update_scratch(TAGSTACK_BufName, update_tagstack);
 }
 
 
@@ -476,7 +477,7 @@ int *linenop;
 		(void)strcpy(fname, utp->u_fname);
 		*linenop = utp->u_lineno;
 		free_untag(utp);
-		update_scratch(TAGS_LIST_NAME, update_tagstack);
+		update_scratch(TAGSTACK_BufName, update_tagstack);
 		return TRUE;
 	}
 	fname[0] = EOS;
@@ -495,7 +496,7 @@ tossuntag()
 		utp = untaghead;
 		untaghead = utp->u_stklink;
 		free_untag(utp);
-		update_scratch(TAGS_LIST_NAME, update_tagstack);
+		update_scratch(TAGSTACK_BufName, update_tagstack);
 	}
 }
 
@@ -553,7 +554,7 @@ int
 showtagstack(f,n)
 int	f,n;
 {
-	return liststuff(TAGS_LIST_NAME, FALSE, maketagslist, f, (void *)0);
+	return liststuff(TAGSTACK_BufName, FALSE, maketagslist, f, (void *)0);
 }
 #endif	/* OPT_SHOW_TAGS */
 

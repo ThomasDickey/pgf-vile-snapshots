@@ -4,7 +4,7 @@
  *
  *   Created: Thu May 14 15:44:40 1992
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/proto.h,v 1.162 1994/12/04 14:47:14 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/proto.h,v 1.170 1994/12/15 16:53:08 pgf Exp $
  *
  */
 
@@ -19,7 +19,8 @@ extern SIGT catchintr (DEFINE_SIG_ARGS);
 extern int interrupted P(( void ));
 extern void not_interrupted P(( void ));
 extern void do_repeats P(( int *, int *, int * ));
-extern int writeall P(( int, int ));
+extern int writeallchanged P(( int, int ));
+extern int writeall P(( int, int, int, int, int ));
 extern int zzquit P(( int, int ));
 extern int quickexit P(( int, int ));
 extern int quithard P(( int, int ));
@@ -69,7 +70,7 @@ extern void putpad P(( char * ));
 extern void putnpad P(( char *, int ));
 #endif
 #if OPT_XTERM
-extern int xterm_mouse_M P(( int, int ));
+extern int mouse_motion P(( int, int ));
 extern int xterm_mouse_t P(( int, int ));
 extern int xterm_mouse_T P(( int, int ));
 extern int xterm_button P(( int ));
@@ -80,6 +81,7 @@ extern void tcapscrollregion P(( int, int ));
 #if OPT_EVAL || OPT_COLOR
 extern void spal P(( char * ));
 #endif
+
 
 /* basic.c */
 extern int gotobol P(( int, int ));
@@ -456,10 +458,10 @@ extern char *filec_expand P(( void ));
 /* fileio.c */
 extern int ffropen P(( char * ));
 extern int ffwopen P(( char *, int ));
+extern int ffaccess P(( char *, int ));
 extern int ffronly P(( char * ));
 extern long ffsize P(( void ));
 extern int ffexists P(( char * ));
-extern int ffreadable P(( char * ));
 #if !(SYS_MSDOS || SYS_WIN31) && !OPT_MAP_MEMORY
 extern int ffread P(( char *, long ));
 extern void ffseek P(( long ));
@@ -662,16 +664,17 @@ extern int map P(( int, int ));
 extern int map_bang P(( int, int ));
 extern int noremap P(( int, int ));
 extern int noremap_bang P(( int, int ));
+extern int abbrev P(( int, int ));
+extern int sysmap P(( int, int ));
 extern int unmap P(( int, int ));
 extern int unmap_bang P(( int, int ));
 extern void addtosysmap P(( char *, int, int ));
 extern int sysmapped_c P(( void ));
 extern int sysmapped_c_avail P(( void ));
 extern void mapungetc P(( int ));
-extern int mapgetc P(( int ));
-extern int mapgetc_avail P(( void ));
 extern int mapped_c P(( int, int ));
 extern int mapped_c_avail P(( void ));
+extern void abbr_check P(( int * ));
 
 /* msgs.c */
 #if OPT_POPUP_MSGS
@@ -1165,6 +1168,8 @@ extern void x_set_icon_name P(( char * ));
 extern char * x_get_icon_name P(( void ));
 extern void x_set_window_name P(( char * ));
 extern char * x_get_window_name P(( void ));
+extern	void	x_resize		P(( int cols, int rows ));
+extern int mouse_motion P(( int, int ));
 #endif	/* DISP_X11 */
 
 #if SYS_MSDOS || SYS_OS2 || SYS_WINNT
@@ -1396,6 +1401,7 @@ extern void delay P(( int ));
 /* select.c */
 extern	void	free_attribs	P(( BUFFER * ));
 extern	void	free_attrib	P(( BUFFER *, AREGION * ));
+extern	int	assign_attr_id	P(( void ));
 extern	void	find_release_attr P(( BUFFER *, REGION * ));
 extern	int	sel_begin	P(( void ));
 extern	int	sel_extend	P(( int, int ));

@@ -3,20 +3,13 @@
  *
  *	written 11-feb-86 by Daniel Lawrence
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/bind.c,v 1.101 1994/12/04 15:47:10 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/bind.c,v 1.105 1994/12/15 15:01:52 pgf Exp $
  *
  */
 
 #include	"estruct.h"
 #include	"edef.h"
 #include	"epath.h"
-
-#define HELP_BUF_NAME ScratchName(Help)
-#define BINDINGS_NAME ScratchName(Binding List)
-#define TERMCHRS_NAME ScratchName(Terminal)
-#if OPT_POPUPCHOICE
-static char COMPLETIONS_NAME[] = ScratchName(Completions);
-#endif
 
 #define SHORT_CMD_LEN 4	/* command names longer than this are preferred
 				over those shorter.  e.g. display "quit"
@@ -81,12 +74,12 @@ int f,n;
 	int alreadypopped;
 
 	/* first check if we are already here */
-	bp = bfind(HELP_BUF_NAME, BFSCRTCH);
+	bp = bfind(HELP_BufName, BFSCRTCH);
 	if (bp == NULL)
 		return FALSE;
 
 	if (bp->b_active == FALSE) { /* never been used */
-		fname = flook(pathname[1], FL_ANYWHERE);
+		fname = flook(pathname[1], FL_ANYWHERE|FL_READABLE);
 		if (fname == NULL) {
 			mlforce("[Sorry, can't find the help information]");
 			(void)zotbuf(bp);
@@ -99,7 +92,7 @@ int f,n;
 			(void)zotbuf(bp);
 			return(FALSE);
 		}
-		set_bname(bp, HELP_BUF_NAME);
+		set_bname(bp, HELP_BufName);
 		set_rdonly(bp, non_filename());
 
 		make_local_b_val(bp,MDIGNCASE); /* easy to search, */
@@ -149,7 +142,7 @@ void *ptr;
 	register int i;
 	char	temp[NLINE];
 
-	bprintf("--- Terminal Settings %*P\n", term.t_ncol-1, '-');
+	bprintf("--- Terminal Character Settings %*P\n", term.t_ncol-1, '-');
 	for (i = 0; TermChrs[i].name != 0; i++) {
 		bprintf("\n%s = %s",
 			TermChrs[i].name,
@@ -231,7 +224,7 @@ int f,n;
 			*(TermChrs[j].value) = c;
 			break;
 		}
-		update_scratch(TERMCHRS_NAME, update_termchrs);
+		update_scratch(TERMINALCHARS_BufName, update_termchrs);
 	}
 	return s;
 }
@@ -241,7 +234,7 @@ int
 show_termchrs(f,n)
 int f,n;
 {
-	return liststuff(TERMCHRS_NAME, FALSE, makechrslist, 0, (void *)0);
+	return liststuff(TERMINALCHARS_BufName, FALSE, makechrslist, 0, (void *)0);
 }
 #endif /* OPT_TERMCHRS */
 
@@ -392,7 +385,7 @@ CMDFUNC **oldfunc;
 			KeyBindings = kbp;
 		}
 	}
-	update_scratch(BINDINGS_NAME, update_binding_list);
+	update_scratch(BINDINGLIST_BufName, update_binding_list);
 	return(TRUE);
 }
 
@@ -434,7 +427,7 @@ int f, n;	/* command arguments [IGNORED] */
 		mlforce("[Key not bound]");
 		return(FALSE);
 	}
-	update_scratch(BINDINGS_NAME, update_binding_list);
+	update_scratch(BINDINGLIST_BufName, update_binding_list);
 	return(TRUE);
 }
 
@@ -482,7 +475,7 @@ static int
 update_binding_list(bp)
 BUFFER *bp;
 {
-	return liststuff(BINDINGS_NAME, append_to_binding_list,
+	return liststuff(BINDINGLIST_BufName, append_to_binding_list,
 		makebindlist, (int)last_whichcmds, (void *)last_apropos_string);
 }
 
@@ -835,7 +828,7 @@ char *sfname;	/* name of startup file  */
 	char *fname;	/* resulting file name to execute */
 
 	/* look up the startup file */
-	fname = flook(sfname, FL_HERE_HOME);
+	fname = flook(sfname, FL_HERE_HOME|FL_READABLE);
 
 	/* if it isn't around, don't sweat it */
 	if (fname == NULL) {
@@ -867,6 +860,7 @@ int hflag;	/* Look in the HOME environment variable first? */
 	register char *sp;	/* pointer into path spec */
 	static TBUFF *myfiles;
 #endif
+	int	mode = (hflag & (FL_EXECABLE|FL_WRITEABLE|FL_READABLE));
 
 	/* take care of special cases */
 	if (!fname || !fname[0] || isspace(fname[0]))
@@ -874,9 +868,10 @@ int hflag;	/* Look in the HOME environment variable first? */
 	else if (isShellOrPipe(fname))
 		return fname;
 
-	if (hflag & FL_HERE) {
+	if ((hflag & FL_HERE)
+	 || ((hflag & FL_PATH) && is_pathname(fname))) {
 		/* always try the current directory first */
-		if (ffreadable(fname)) {
+		if (ffaccess(fname, mode)) {
 			return(fname);
 		}
 	}
@@ -887,7 +882,7 @@ int hflag;	/* Look in the HOME environment variable first? */
 		home = getenv("HOME");
 		if (home != NULL) {
 			/* try home dir file spec */
-			if (ffreadable(pathcat(fspec,home,fname))) {
+			if (ffaccess(pathcat(fspec,home,fname), mode)) {
 				return(fspec);
 			}
 		}
@@ -921,7 +916,7 @@ int hflag;	/* Look in the HOME environment variable first? */
 #endif
 
 		while ((path = parse_pathlist(path, fspec)) != 0) {
-			if (ffreadable(pathcat(fspec, fspec, fname))) {
+			if (ffaccess(pathcat(fspec, fspec, fname), mode)) {
 				return(fspec);
 			}
 		}
@@ -930,7 +925,7 @@ int hflag;	/* Look in the HOME environment variable first? */
 
 		/* look it up via the old table method */
 		for (i=2; i < NPNAMES; i++) {
-			if (ffreadable(pathcat(fspec, pathname[i], fname))) {
+			if (ffaccess(pathcat(fspec, pathname[i], fname),mode)) {
 				return(fspec);
 			}
 		}
@@ -1017,6 +1012,7 @@ int	n;
 	return base;
 }
 
+#if !SMALLER
 /* translate a 10-bit keycode to its printable name (like "M-j")  */
 char *
 kcod2prc(c, seq)
@@ -1027,6 +1023,7 @@ char *seq;	/* destination string for sequence */
 	(void)kcod2pstr(c,temp);
 	return bytes2prc(seq, temp + 1, *temp);
 }
+#endif
 
 
 /* kcode2kbind: translate a 10-bit key-binding to the table-pointer
@@ -1063,6 +1060,7 @@ int c;	/* key to find what is bound to it */
 	return asciitbl[c];
 }
 
+#if !SMALLER
 /* fnc2kcod: translate a function pointer to a keycode */
 int
 fnc2kcod(f)
@@ -1082,6 +1080,7 @@ CMDFUNC *f;
 
 	return -1;	/* none found */
 }
+#endif
 
 /* fnc2pstr: translate a function pointer to a pascal-string that a user
 	could enter.  returns a pointer to a static array */
@@ -1467,7 +1466,8 @@ makecmpllist(dummy, cinfop)
     slashcol = (int)(pathleaf(buf) - buf);
     if (slashcol != 0) {
 	char b[NLINE];
-	strncpy(b, buf, (SIZE_T)slashcol)[slashcol] = EOS;
+	(void)strncpy(b, buf, (SIZE_T)slashcol);
+	buf[slashcol] = EOS;
 	bprintf("Completions prefixed by %s:\n", b);
     }
 
@@ -1518,7 +1518,7 @@ SIZE_T	size_entry;
      * Find out if completions buffer exists; so we can take the time to
      * shrink/grow the window to the latest size.
      */
-    if ((bp = find_b_name(COMPLETIONS_NAME)) != NULL) {
+    if ((bp = find_b_name(COMPLETIONS_BufName)) != NULL) {
 	alreadypopped = (bp->b_nwnd != 0);
     }
 
@@ -1526,7 +1526,7 @@ SIZE_T	size_entry;
     cinfo.len = len;
     cinfo.table = table;
     cinfo.size_entry = size_entry;
-    liststuff(COMPLETIONS_NAME, FALSE, makecmpllist, 0, (void *) &cinfo);
+    liststuff(COMPLETIONS_BufName, FALSE, makecmpllist, 0, (void *) &cinfo);
 
     if (alreadypopped)
 	shrinkwrap();
@@ -1547,7 +1547,7 @@ scroll_completions(buf, len, table, size_entry)
     char	*table;
     SIZE_T	size_entry;
 {
-    BUFFER *bp = find_b_name(COMPLETIONS_NAME);
+    BUFFER *bp = find_b_name(COMPLETIONS_BufName);
     if (bp == NULL)
 	show_completions(buf, len, table, size_entry);
     else {
@@ -1566,7 +1566,7 @@ void
 popdown_completions()
 {
     BUFFER *bp;
-    if ((bp = find_b_name(COMPLETIONS_NAME)) != NULL)
+    if ((bp = find_b_name(COMPLETIONS_BufName)) != NULL)
 	zotwp(bp);
 }
 #endif /* OPT_POPUPCHOICE */

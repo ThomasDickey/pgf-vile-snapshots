@@ -5,7 +5,7 @@
  * functions that adjust the top line in the window and invalidate the
  * framing, are hard.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/basic.c,v 1.74 1994/11/29 04:02:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/basic.c,v 1.75 1994/12/12 18:23:25 pgf Exp $
  *
  */
 
@@ -1248,9 +1248,14 @@ int	col;
 {
 	register WINDOW *wp0 = curwp;
 	register WINDOW *wp1;
+	MARK saveMK;
 
-	if ((wp1 = row2window(row)) != 0
-	 && set_curwp(wp1)
+	if ((wp1 = row2window(row)) == 0)
+		return FALSE;
+	if (doingopcmd && curwp != wp1)
+		return FALSE;
+	saveMK = MK;
+	if (set_curwp(wp1)
 	 && setwmark(row, col)) {
 		if (insertmode != FALSE
 		 && b_val(wp1->w_bufp, MDVIEW)
@@ -1261,7 +1266,10 @@ int	col;
 				wp1->w_flag |= WFMODE;
 			insertmode = FALSE;
 		}
-		return gomark(FALSE,1);
+		DOT = MK;
+		MK = saveMK;
+		curwp->w_flag |= WFMOVE;
+		return TRUE;
 	}
 
 	return FALSE;

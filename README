@@ -194,15 +194,27 @@ hmmmm -- lets see.  new stuff.  see the CHANGES and help files for details.
 	done.  expect to have to edit your favorite macros to make
 	them work.
 
+	- :abbr now works.
+
 	- along with proper :map support comes proper function key support.
 	function keys defined for your terminal in the termcap/info database
 	are now premapped and can be bound to as #-1 etc.  so those of
 	you with ESC [ 10 ~ style function keys should be happy now.
 
+	- mouse clicks which move the cursor now count as proper motion
+	commands in both xvile and vile-in-an-xterm.  this means, for
+	instance, that '' or `` will get you back to where you were before
+	you clicked the mouse, and you can apply operators to mouse
+	movements.  for example -- click the mouse somewhere, hit 'd' to
+	start a delete operation, and click the mouse somewhere else.  the
+	text between the two mouse-click locations will be deleted.
+
 	- on-line help (just a single line) for every function, available
 	with describe-{bindings,function,key} commands.
 
 	- new modes to better control beeping and the "working..." message.
+
+	- autowrite mode now supported.
 
 	- popup windows now adjust their size to their contents -- less screen
 	space is wasted for small window, and more is used for big windows.
@@ -223,7 +235,8 @@ hmmmm -- lets see.  new stuff.  see the CHANGES and help files for details.
 	- it's now possible to break lines by putting ^M in the replacement
 	pattern.
 
-	- selections under xvile can be made in a different color.
+	- selections, the modelines, and the cursor, under xvile, can be all
+	have different colors.
 
 	- color support for termcap, at least on the linux console.
 
@@ -243,5 +256,5 @@ hmmmm -- lets see.  new stuff.  see the CHANGES and help files for details.
 	- lots of bug fixes
 
 -------------------------------
-$Header: /usr/build/VCS/pgf-vile/RCS/README,v 1.38 1994/12/05 14:19:17 pgf Exp $
+$Header: /usr/build/VCS/pgf-vile/RCS/README,v 1.42 1994/12/15 15:56:35 pgf Exp $
 -------------------------------

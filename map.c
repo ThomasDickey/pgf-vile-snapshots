@@ -3,15 +3,12 @@
  *	Original interface by Otto Lind, 6/3/93
  *	Additional map and map! support by Kevin Buettner, 9/17/94
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/map.c,v 1.38 1994/12/04 14:44:48 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/map.c,v 1.44 1994/12/10 00:15:04 pgf Exp $
  * 
  */
 
 #include "estruct.h"
 #include "edef.h"
-
-static char MAPPED_LIST_NAME_CM[] = ScratchName(Mapped Characters);
-static char MAPPED_LIST_NAME_IM[] = ScratchName(Map! Characters);
 
 #define MAXLHS	NSTRING
 
@@ -76,12 +73,22 @@ struct maprec {
 static struct maprec *map_command = NULL;
 static struct maprec *map_insert = NULL;
 static struct maprec *map_syskey = NULL;
+static struct maprec *abbr_map = NULL;
 
-static	int	map_common P(( int f, struct maprec **, char *, int ));
+static	int	map_common P(( struct maprec **, char *, int ));
 static	int	unmap_common P(( struct maprec **, char * ));
 static	void	addtomap P(( struct maprec **, char *, int, int, int, char * ));
 static	int	delfrommap P(( struct maprec **, char * ));
 
+static	int	abbr_getc P(( void ));
+static	int	abbr_c_avail P(( void ));
+
+static int	mapgetc P(( void ));
+
+typedef	int (*AvailFunc) P(( void ));
+typedef	int (*GetFunc) P(( void ));
+
+static int maplookup P(( int, ITBUFF **, struct maprec *, GetFunc, AvailFunc ));
 
 #if OPT_SHOW_MAPS
 static void makemaplist P(( int, void * ));
@@ -101,12 +108,10 @@ static void relist_mappings P(( char * ));
 #if OPT_SHOW_MAPS
 #define MAPS_PREFIX 12
 
-static	int	show_all;	/* show system mappings as well as user */
-
 /*ARGSUSED*/
 static void
-makemaplist(all, mapp)
-    int   all;
+makemaplist(dummy, mapp)
+    int   dummy;
     void *mapp;
 {
     char lhsstr[MAXLHS];
@@ -115,6 +120,8 @@ makemaplist(all, mapp)
     int depth = 0;
     int footnote = 0;
     int i;
+    
+    
 
     for (;;) {
 	if (mp) {
@@ -128,20 +135,26 @@ makemaplist(all, mapp)
 	    mapstr = (char *)0;
 	    if (mp->srv) {
 		mapstr = mp->srv;
-	    } else if (all && mp->irv != -1) {
+	    } else if (mp->irv != -1) {
 		(void)kcod2escape_seq(mp->irv, esc_seq);
 		mapstr = esc_seq;
 	    }
 	    if (mapstr) {
-		    if (mp->flags & MAPF_NOREMAP) {
-			remapnote = "(n)";
-			footnote++;
+		    if (mp == abbr_map) {
+			    /* the abbr map is stored inverted */
+			    for (i = depth; i > 0; )
+				bputc(lhsstr[--i]);	/* may contain nulls */
 		    } else {
-			remapnote = "   ";
+			    if (mp->flags & MAPF_NOREMAP) {
+				remapnote = "(n)";
+				footnote++;
+			    } else {
+				remapnote = "   ";
+			    }
+			    bprintf("%s ", remapnote);
+			    for (i = 0; i < depth; i++)
+				bputc(lhsstr[i]);	/* may contain nulls */
 		    }
-		    bprintf("%s ", remapnote);
-		    for (i = 0; i < depth; i++)
-		    	bputc(lhsstr[i]);	/* may contain nulls */
 		    bprintf("\t%s\n", mapstr);
 	    }
 	    mp = mp->dlink;
@@ -160,11 +173,18 @@ static int
 show_mapped_chars(bname)
     char *bname;
 {
-	struct maprec *mp = (strcmp(bname, MAPPED_LIST_NAME_CM) == 0)
-	                  ? map_command : map_insert;
-	if (show_all)
+	struct maprec *mp;
+	if (strcmp(bname, MAP_BufName) == 0)
+		mp = map_command;
+	else if (strcmp(bname, MAPBANG_BufName) == 0)
+		mp = map_insert;
+	else if (strcmp(bname, ABBR_BufName) == 0)
+		mp = abbr_map;
+	else if (strcmp(bname, SYSMAP_BufName) == 0)
 		mp = map_syskey;
-	return liststuff(bname, FALSE, makemaplist, show_all, (void *)mp);
+	else
+		return FALSE;
+	return liststuff(bname, FALSE, makemaplist, 0, (void *)mp);
 }
 
 #if OPT_UPBUFF
@@ -196,7 +216,7 @@ int
 map(f, n)
     int f, n;
 {
-    return map_common(f, &map_command, MAPPED_LIST_NAME_CM, 0);
+    return map_common(&map_command, MAP_BufName, 0);
 }
 
 /* ARGSUSED */
@@ -204,7 +224,7 @@ int
 map_bang(f, n)
     int f, n;
 {
-    return map_common(f, &map_insert, MAPPED_LIST_NAME_IM, 0);
+    return map_common(&map_insert, MAPBANG_BufName, 0);
 }
 
 /* ARGSUSED */
@@ -212,7 +232,7 @@ int
 noremap(f, n)
     int f, n;
 {
-    return map_common(f, &map_command, MAPPED_LIST_NAME_CM, MAPF_NOREMAP);
+    return map_common(&map_command, MAP_BufName, MAPF_NOREMAP);
 }
 
 /* ARGSUSED */
@@ -220,12 +240,29 @@ int
 noremap_bang(f, n)
     int f, n;
 {
-    return map_common(f, &map_insert, MAPPED_LIST_NAME_IM, MAPF_NOREMAP);
+    return map_common(&map_insert, MAPBANG_BufName, MAPF_NOREMAP);
 }
 
+/* ARGSUSED */
+int
+abbrev(f, n)
+    int f, n;
+{
+    return map_common(&abbr_map, ABBR_BufName, MAPF_NOREMAP);
+}
+
+#if OPT_SHOW_MAPS
+/* ARGSUSED */
+int
+sysmap(f, n)
+int f, n;
+{
+	return show_mapped_chars(SYSMAP_BufName);
+}
+#endif
+
 static int
-map_common(f, mpp, bufname, remapflag)
-    int f;
+map_common(mpp, bufname, remapflag)
     struct maprec **mpp;
     char *bufname;
     int remapflag;
@@ -233,15 +270,15 @@ map_common(f, mpp, bufname, remapflag)
     int	 status;
     char kbuf[NSTRING];
     char val[NSTRING];
+    int len;
 
 #if OPT_SHOW_MAPS
     if (end_named_cmd()) {
-	show_all = f;
 	return show_mapped_chars(bufname);
     }
 #endif
     kbuf[0] = EOS;
-    status = kbd_string("map this string: ", kbuf, sizeof(kbuf),
+    status = kbd_string("change this string: ", kbuf, sizeof(kbuf),
 			' ', KBD_NOMAP|KBD_NOEVAL, no_completion);
     if (status != TRUE)
 	return status;
@@ -258,7 +295,18 @@ map_common(f, mpp, bufname, remapflag)
     if (status != TRUE)
 	return status;
 
-    addtomap(mpp, kbuf, (int)strlen(kbuf), MAPF_USERTIMER|remapflag, -1, val);
+
+    len = strlen(kbuf);
+    if (*mpp == abbr_map) { /* reverse the lhs */
+	int i, t;
+	for (i = 0; i < len/2; i++) {
+	    t = kbuf[len-i-1];
+	    kbuf[len-i-1] = kbuf[i];
+	    kbuf[i] = t;
+	}
+    }
+
+    addtomap(mpp, kbuf, len, MAPF_USERTIMER|remapflag, -1, val);
     relist_mappings(bufname);
     return TRUE;
 }
@@ -271,7 +319,7 @@ int
 unmap(f, n)
     int f,n;
 {
-    return unmap_common(&map_command, MAPPED_LIST_NAME_CM);
+    return unmap_common(&map_command, MAP_BufName);
 }
 
 /* ARGSUSED */
@@ -279,7 +327,7 @@ int
 unmap_bang(f, n)
     int f, n;
 {
-    return unmap_common(&map_insert, MAPPED_LIST_NAME_IM);
+    return unmap_common(&map_insert, MAPBANG_BufName);
 }
 
 static int
@@ -435,7 +483,6 @@ delfrommap(mpp, ks)
     return TRUE;
 }
 
-static int maplookup P(( int, ITBUFF **, struct maprec *, int, int ));
 
 #define INPUT_FROM_TTGET 1
 #define INPUT_FROM_MAPGETC 2
@@ -455,7 +502,7 @@ sysmapped_c()
 
 
     /* will push back on sysmappedchars successful, or not */
-    (void)maplookup(c, &sysmappedchars, map_syskey, INPUT_FROM_TTGET, 0);
+    (void)maplookup(c, &sysmappedchars, map_syskey, TTgetc, TTtypahead);
 
     return itb_last(sysmappedchars);
 }
@@ -480,10 +527,10 @@ int c;
 
 #define TOOMANY 1200
 static int infloopcount;
+static int mapgetc_raw_flag;
 
-int
-mapgetc(raw)
-int raw;
+static int
+mapgetc()
 {
     int remapflag;
     if (global_g_val(GMDREMAP))
@@ -504,7 +551,7 @@ int raw;
 	    return itb_last(mapgetc_ungottenchars) | remapflag;
     }
     infloopcount = 0;
-    return tgetc(raw);
+    return tgetc(mapgetc_raw_flag);
 }
 
 int
@@ -512,7 +559,6 @@ mapped_c_avail()
 {
     return mapgetc_ungotcnt > 0 || tgetc_avail();
 }
-
 
 int
 mapped_c(remap, raw)
@@ -526,7 +572,8 @@ int raw;
     static ITBUFF *mappedchars = NULL;
     
     /* still some pushback left? */
-    c = mapgetc(raw);
+    mapgetc_raw_flag = raw;
+    c = mapgetc();
 
     if (!remap || (c & NOREMAP))
 	return (c & ~NOREMAP);
@@ -549,7 +596,7 @@ int raw;
     do {
 	itb_init(&mappedchars, abortc);
 
-	matched = maplookup(c, &mappedchars, mp, INPUT_FROM_MAPGETC, raw);
+	matched = maplookup(c, &mappedchars, mp, mapgetc, mapped_c_avail);
 
 
 	while(itb_more(mappedchars))
@@ -559,13 +606,13 @@ int raw;
 	    in the first place.  unless they wanted it quoted.  then we
 	    leave it as is */
 	if (!raw && speckey && !matched) {
-	    c = mapgetc(raw);
+	    c = mapgetc() & ~NOREMAP;
 	    if (c != poundc)
 		    dbgwrite("BUG: # problem in mapped_c");
-	    return (mapgetc(raw) & ~NOREMAP) | SPEC;
+	    return (mapgetc() & ~NOREMAP) | SPEC;
 	}
 
-	c = mapgetc(raw);
+	c = mapgetc();
 
 	if (!global_g_val(GMDREMAPFIRST))
 		matched = FALSE;
@@ -578,22 +625,86 @@ int raw;
 
 }
 
+static int abbr_curr_off;
+static int abbr_search_lim;
+
 static int
-maplookup(c, outp, mp, where, raw)
+abbr_getc()
+{
+    if (abbr_curr_off <= abbr_search_lim)
+    	return -1; /* won't match anything in the tree */
+    return lgetc(DOT.l, --abbr_curr_off);
+}
+
+static int
+abbr_c_avail()
+{
+    return TRUE;
+}
+
+void
+abbr_check(backsp_limit_p)
+int *backsp_limit_p;
+{
+    int matched;
+    ITBUFF *abbr_chars = NULL;
+    int status = TRUE;
+
+    if (llength(DOT.l) < 1)
+    	return;
+    abbr_curr_off = DOT.o;
+    abbr_search_lim = *backsp_limit_p;
+    itb_init(&abbr_chars, abortc);
+    matched = maplookup(abbr_getc(), &abbr_chars, abbr_map,
+    	abbr_getc, abbr_c_avail);
+
+
+    if (matched) {
+	    /* there are still some conditions that have to be met by
+	       the preceding chars, if any */
+	    if (abbr_curr_off > abbr_search_lim) {
+		/* we need to check the char in front of the match.
+		   if it's a similar type to the first char of the match, 
+		   i.e. both idents, or both non-idents, we do nothing.
+		   if whitespace precedes either ident or non-ident, the
+		   match is good.
+		 */
+		char first, prev;
+		first = lgetc(DOT.l,abbr_curr_off);
+		prev = lgetc(DOT.l,abbr_curr_off-1);
+		if ((isident(first) && isident(prev)) ||
+		    (!isident(first) && !(isident(prev) || isspace(prev))))
+		    	return;
+	    }
+	    DOT.o -= matched;
+	    ldelete(matched, FALSE);
+	    while(status && itb_more(abbr_chars))
+		status = inschar(itb_last(abbr_chars), backsp_limit_p);
+    }
+    return;
+}
+
+/* do map tranlations.
+	C is first char to begin mapping on
+	OUTP is an ITBUFF in which to put the result
+	MP is the map in which to look
+	GET is a routine to use to get the next character
+	AVAIL is the routine that tells if GET can return something now
+  returns number of characters matched
+*/
+static int
+maplookup(c, outp, mp, get, avail)
     int c;
     ITBUFF **outp;
     struct maprec *mp;
-    int where;
-    int raw;
+    GetFunc get;
+    AvailFunc avail;
 {
     struct maprec *rmp = NULL;
     int unmatched[MAXLHS];
     register int *s = unmatched;
-    int cnt;
+    int matchedcnt;
     int use_sys_timing;
-
-#define KEY_AVAIL ((where == INPUT_FROM_MAPGETC) ?  \
-	    		mapped_c_avail() : TTtypahead())
 
     /* 
      * we don't want to delay for a user-specified :map!  starting with
@@ -607,12 +718,12 @@ maplookup(c, outp, mp, where, raw)
     				(isprint(poundc) || isspace(poundc)));
 
     *s++ = c;
-    cnt = 0;
+    matchedcnt = 0;
     while (mp) {
 	if (c == mp->ch) {
 	    if (mp->irv != -1 || mp->srv != NULL) {
 		rmp = mp;
-		cnt += (s - unmatched);
+		matchedcnt += (s - unmatched);
 		s = unmatched;
 
 		/* our code supports matching the longer of two maps one of
@@ -629,7 +740,7 @@ maplookup(c, outp, mp, where, raw)
 		break;
 
 	    /* if there's no recorded input, and no user typeahead */
-	    if (!KEY_AVAIL) {
+	    if (!(*avail)()) {
 
 		/* give it a little extra time... */
 		int timer = 0;
@@ -649,14 +760,11 @@ maplookup(c, outp, mp, where, raw)
 
 		catnap(timer,TRUE);
 
-		if (!KEY_AVAIL)
+		if (!(*avail)())
 		    break;
 	    }
 
-	    if (where == INPUT_FROM_MAPGETC)
-		*s++ = c = mapgetc(raw) & ~NOREMAP;
-	    else
-		*s++ = c = TTgetc();
+	    *s++ = c = (*get)() & ~NOREMAP;
 
 	}
 	else
@@ -671,7 +779,7 @@ maplookup(c, outp, mp, where, raw)
 	if (rmp->srv) {
 	    int remapflag;
 	    char *cp;
-	    cp = rmp->srv + cnt;
+	    /* cp = rmp->srv + cnt; */
 	    for (cp = rmp->srv; *cp; cp++)
 	    	;
 	    if (rmp->flags & MAPF_NOREMAP)
@@ -684,11 +792,11 @@ maplookup(c, outp, mp, where, raw)
 	else {
 	    itb_append(outp, rmp->irv);
 	}
-	return TRUE;
+	return matchedcnt;
     }
     else {	/* didn't find a match */
 	while (s > unmatched)
 	    itb_append(outp, *--s);
-	return FALSE;
+	return 0;
     }
 }

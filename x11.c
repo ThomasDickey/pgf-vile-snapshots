@@ -2,7 +2,7 @@
  * 	X11 support, Dave Lemke, 11/91
  *	X Toolkit support, Kevin Buettner, 2/94
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/x11.c,v 1.97 1994/12/05 14:08:22 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/x11.c,v 1.101 1994/12/13 13:49:21 pgf Exp $
  *
  */
 /*
@@ -15,6 +15,9 @@
  *    OL_WIDGETS	-- Use Xlib, Xt, and Openlook widget set
  */
 
+#include	"estruct.h"
+#include	"edef.h"
+
 #include	<X11/Intrinsic.h>
 #include	<X11/StringDefs.h>
 #include	<X11/cursorfont.h>
@@ -26,13 +29,6 @@
 #if XtSpecificationRelease < 4
 #define XtPointer caddr_t
 #endif
-
-/*
- * Put our include files _after_ X-windows, to avoid conflicts that arise
- * on various systems, including Apollo and Linux.
- */
-#include	"estruct.h"
-#include	"edef.h"
 
 #if DISP_X11 && XTOOLKIT
 
@@ -197,6 +193,11 @@ typedef struct _text_win {
     GC          reversegc;
     GC		selgc;
     GC		revselgc;
+    int		is_color_cursor;
+    GC		cursgc;
+    GC		revcursgc;
+    GC		modeline_focus_gc;	/* GC for modeline w/ focus */
+    GC		modeline_gc;		/* GC for other modelines  */
     Pixel	fg;
     Pixel	bg;
     Pixel	modeline_fg;
@@ -205,6 +206,8 @@ typedef struct _text_win {
     Pixel	modeline_focus_bg;
     Pixel	selection_fg;
     Pixel	selection_bg;
+    Pixel	cursor_fg;
+    Pixel	cursor_bg;
     int         char_width,
                 char_ascent,
 		char_descent,
@@ -853,7 +856,7 @@ update_scrollbar_sizes()
 		    "resizeGrip",
 		    coreWidgetClass,
 		    cur_win->pane,
-		    XtNbackground,	cur_win->fg,
+		    XtNbackground,	cur_win->modeline_bg,
 		    XtNborderWidth,	0,
 		    XtNheight,		1,
 		    XtNwidth,		1,
@@ -1464,7 +1467,7 @@ static XtResource scrollbar_resources[] = {
 static XtResource modeline_resources[] = {
     {
 	XtNforeground,
-	XtCBackground,				/* weird, huh? */
+	XtCForeground,
 	XtRPixel,
 	sizeof(Pixel),
 	XtOffset(TextWindow, modeline_fg),
@@ -1473,7 +1476,7 @@ static XtResource modeline_resources[] = {
     },
     {
 	XtNbackground,
-	XtCForeground,
+	XtCBackground,
 	XtRPixel,
 	sizeof(Pixel),
 	XtOffset(TextWindow, modeline_bg),
@@ -1482,7 +1485,7 @@ static XtResource modeline_resources[] = {
     },
     {
 	XtNfocusForeground,
-	XtCBackground,
+	XtCForeground,
 	XtRPixel,
 	sizeof(Pixel),
 	XtOffset(TextWindow, modeline_focus_fg),
@@ -1491,7 +1494,7 @@ static XtResource modeline_resources[] = {
     },
     {
 	XtNfocusBackground,
-	XtCForeground,
+	XtCBackground,
 	XtRPixel,
 	sizeof(Pixel),
 	XtOffset(TextWindow, modeline_focus_bg),
@@ -1518,6 +1521,37 @@ static XtResource selection_resources[] = {
 	XtOffset(TextWindow, selection_bg),
 	XtRPixel,
 	(XtPointer) &cur_win_rec.fg
+    },
+};
+
+/*
+ * We resort to a bit of trickery for the cursor resources.  Note that the
+ * default foreground and background for the cursor is the same as that for
+ * the rest of the window.  This would render the cursor invisible!  This
+ * condition actually indicates that usual technique of inverting the
+ * foreground and background colors should be used, the rationale being
+ * that no (sane) user would want to set the cursor foreground and
+ * background to be the same as the rest of the window.
+ */
+
+static XtResource cursor_resources[] = {
+    {
+	XtNforeground,
+	XtCForeground,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, cursor_fg),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.fg
+    },
+    {
+	XtNbackground,
+	XtCBackground,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, cursor_bg),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.bg
     },
 };
 
@@ -1654,7 +1688,17 @@ x_preparse_args(pargc, pargv)
 	    (ArgList)0,
 	    0);
 
-    /* Initialize atoms which may be needed to get the fully specified name */
+    XtGetSubresources(
+	    cur_win->top_widget,
+	    (XtPointer)cur_win,
+	    "cursor",
+	    "Cursor",
+	    cursor_resources,
+	    XtNumber(cursor_resources),
+	    (ArgList)0,
+	    0);
+
+    /* Initialize atoms needed for getting a fully specified font name */
     atom_FONT 		= XInternAtom(dpy, "FONT", False);
     atom_FOUNDRY	= XInternAtom(dpy, "FOUNDRY", False);
     atom_WEIGHT_NAME	= XInternAtom(dpy, "WEIGHT_NAME", False);
@@ -1779,6 +1823,7 @@ x_preparse_args(pargc, pargv)
 #endif	/* MOTIF_WIDGETS */
 	    NULL);
 
+    /* Initialize graphics context for display of normal and reverse text */
     gcmask = GCForeground | GCBackground | GCFont | GCGraphicsExposures;
     gcvals.foreground = cur_win->fg;
     gcvals.background = cur_win->bg;
@@ -1820,6 +1865,76 @@ x_preparse_args(pargc, pargv)
 	gcvals.foreground = cur_win->selection_bg;
 	gcvals.background = cur_win->selection_fg;
 	cur_win->revselgc = XCreateGC(dpy,
+		DefaultRootWindow(dpy),
+		gcmask, &gcvals);
+    }
+
+    /*
+     * Initialize graphics context for display of normal modelines. 
+     * Portions of the modeline are never displayed in reverse video (wrt
+     * the modeline) so there is no corresponding reverse video gc.
+     */
+    if (screen_depth == 1
+     || cur_win->modeline_bg == cur_win->modeline_fg
+     ||  (cur_win->fg == cur_win->modeline_fg
+       && cur_win->bg == cur_win->modeline_bg)
+     ||  (cur_win->fg == cur_win->modeline_bg
+       && cur_win->bg == cur_win->modeline_fg)) {
+	cur_win->modeline_gc = cur_win->reversegc;
+    }
+    else {
+	gcvals.foreground = cur_win->modeline_fg;
+	gcvals.background = cur_win->modeline_bg;
+	cur_win->modeline_gc = XCreateGC(dpy,
+		                         DefaultRootWindow(dpy),
+		                         gcmask, &gcvals);
+    }
+
+    /*
+     * Initialize graphics context for display of modelines which indicate
+     * that the corresponding window has focus.
+     */
+    if (screen_depth == 1
+     || cur_win->modeline_focus_bg == cur_win->modeline_focus_fg
+     ||  (cur_win->fg == cur_win->modeline_focus_fg
+       && cur_win->bg == cur_win->modeline_focus_bg)
+     ||  (cur_win->fg == cur_win->modeline_focus_bg
+       && cur_win->bg == cur_win->modeline_focus_fg)) {
+	cur_win->modeline_focus_gc = cur_win->reversegc;
+    }
+    else {
+	gcvals.foreground = cur_win->modeline_focus_fg;
+	gcvals.background = cur_win->modeline_focus_bg;
+	cur_win->modeline_focus_gc = XCreateGC(dpy,
+		                               DefaultRootWindow(dpy),
+		                               gcmask, &gcvals);
+    }
+
+    /* Initialize cursor graphics context and flag which indicates how to
+     * display cursor.
+     */
+    if (screen_depth == 1
+     || cur_win->cursor_bg == cur_win->cursor_fg
+     ||  (cur_win->fg == cur_win->cursor_fg
+       && cur_win->bg == cur_win->cursor_bg)
+     ||  (cur_win->fg == cur_win->cursor_bg
+       && cur_win->bg == cur_win->cursor_fg)) {
+	cur_win->is_color_cursor = FALSE;
+	cur_win->cursor_fg = cur_win->bg;		/* undo our trickery */
+	cur_win->cursor_bg = cur_win->fg;
+	cur_win->cursgc = cur_win->reversegc;
+	cur_win->revcursgc = cur_win->textgc;
+    }
+    else {
+	cur_win->is_color_cursor = TRUE;
+	gcvals.foreground = cur_win->cursor_fg;
+	gcvals.background = cur_win->cursor_bg;
+	cur_win->cursgc = XCreateGC(dpy,
+		DefaultRootWindow(dpy),
+		gcmask, &gcvals);
+	gcvals.foreground = cur_win->cursor_bg;
+	gcvals.background = cur_win->cursor_fg;
+	cur_win->revcursgc = XCreateGC(dpy,
 		DefaultRootWindow(dpy),
 		gcmask, &gcvals);
     }
@@ -1899,7 +2014,7 @@ x_preparse_args(pargc, pargv)
 					    : x_width(cur_win),
 	    XtNy,			0,
 	    XtNborderWidth,		0,
-	    XtNbackground,		cur_win->fg,
+	    XtNbackground,		cur_win->modeline_bg,
 	    NULL);
     cur_win->curs_sb_v_double_arrow = 
     		XCreateFontCursor(dpy, XC_sb_v_double_arrow);
@@ -2283,6 +2398,12 @@ x_setfont(fname)
 
 	    XSetFont(dpy, cur_win->textgc, pfont->fid);
 	    XSetFont(dpy, cur_win->reversegc, pfont->fid);
+	    XSetFont(dpy, cur_win->selgc, pfont->fid);
+	    XSetFont(dpy, cur_win->revselgc, pfont->fid);
+	    XSetFont(dpy, cur_win->cursgc, pfont->fid);
+	    XSetFont(dpy, cur_win->revcursgc, pfont->fid);
+	    XSetFont(dpy, cur_win->modeline_focus_gc, pfont->fid);
+	    XSetFont(dpy, cur_win->modeline_gc, pfont->fid);
 	    if (cur_win->textgc != cur_win->revselgc) {
 		XSetFont(dpy, cur_win->selgc, pfont->fid);
 		XSetFont(dpy, cur_win->revselgc, pfont->fid);
@@ -2500,15 +2621,33 @@ flush_line(text, len, attr, sr, sc)
     int	   sr;
     int	   sc;
 {
-    GC	fore_gc = ((attr & VASEL) ? cur_win->selgc : cur_win->textgc);
-    GC	back_gc = ((attr & VASEL) ? cur_win->revselgc : cur_win->reversegc);
+    GC	fore_gc;
+    GC	back_gc;
     int	fore_yy = text_y_pos(cur_win, sr);
     int	back_yy = y_pos(cur_win, sr);
     char *p;
     int   cc, tlen, i, startcol;
     int   fontchanged = FALSE;
 
-    if (attr & VAREV) {
+    if ((attr & VACURS) && cur_win->is_color_cursor) {
+	fore_gc = cur_win->cursgc;
+	back_gc = cur_win->revcursgc;
+	attr &= ~VACURS;
+    }
+    else if (attr & VASEL) {
+	fore_gc = cur_win->selgc;
+	back_gc = cur_win->revselgc;
+    }
+    else if (attr & VAMLFOC)
+	fore_gc = back_gc = cur_win->modeline_focus_gc;
+    else if (attr & VAML)
+	fore_gc = back_gc = cur_win->modeline_gc;
+    else {
+	fore_gc = cur_win->textgc;
+	back_gc = cur_win->reversegc;
+    }
+
+    if (attr & (VAREV | VACURS)) {
 	GC tmp_gc = fore_gc;
 	fore_gc = back_gc;
 	back_gc = tmp_gc;
@@ -3371,9 +3510,22 @@ start_selection(tw, ev, nr, nc)
 	    (void) sel_begin();
 	    (void)update(TRUE);
 	    tw->wipe_permitted = TRUE;
+	    /* force the editor to notice the changed DOT, if it cares */
+	    kqadd(cur_win, KEY_Mouse);
 	}
 	endofDisplay;
     }
+}
+
+/* this doesn't need to do anything.  it's invoked when we do
+	shove KEY_Mouse back on the input stream, to force the
+	main editor code to notice that DOT has moved. */
+/*ARGSUSED*/
+int
+mouse_motion(f,n)
+int f,n;
+{
+	return TRUE;
 }
 
 static XMotionEvent *
@@ -3688,16 +3840,7 @@ x_configure_window(w, unused, ev, continue_to_dispatch)
     nc = new_width / cur_win->char_width;
 
     if (nr < MINROWS || nc < MINCOLS) {
-	if (nr < MINROWS)
-	    nr = MINROWS;
-	if (nc < MINCOLS)
-	    nc = MINCOLS;
-	XResizeWindow(ev->xconfigure.display,
-		      ev->xconfigure.window,
-		      (unsigned)nc * cur_win->char_width 
-			    + cur_win->base_width,
-		      (unsigned)nr * cur_win->char_height
-			    + cur_win->base_height);
+	x_resize(nc, nr);
 	/* Calling XResizeWindow will cause another ConfigureNotify
 	 * event, so we should return early and let this event occur.
 	 */
@@ -3714,6 +3857,22 @@ x_configure_window(w, unused, ev, continue_to_dispatch)
 #if MOTIF_WIDGETS
     lookfor_sb_resize = FALSE;
 #endif
+}
+
+void
+x_resize(cols, rows)
+    int cols;
+    int rows;
+{
+    if (cols < MINCOLS)
+	cols = MINCOLS;
+    if (rows < MINROWS)
+	rows = MINROWS;
+
+    XResizeWindow(dpy, XtWindow(cur_win->top_widget),
+		  (unsigned)cols * cur_win->char_width + cur_win->base_width,
+		  (unsigned)rows * cur_win->char_height + cur_win->base_height);
+    /* This should cause a ConfigureNotify event */
 }
 
 static
@@ -4181,7 +4340,7 @@ display_cursor(client_data, idp)
 	flush_line(&CELL_TEXT(ttrow,ttcol), 1,
 	           (unsigned int) (VATTRIB(CELL_ATTR(ttrow,ttcol))
 		                ^ ((cur_win->blink_status & BLINK_TOGGLE)
-				  ? 0 : VAREV)),
+				  ? 0 : VACURS)),
 		   ttrow, ttcol);
     }
     else {
@@ -4196,8 +4355,8 @@ display_cursor(client_data, idp)
 	flush_line(&CELL_TEXT(ttrow,ttcol), 1,
 	    (unsigned int) VATTRIB(CELL_ATTR(ttrow,ttcol)), ttrow, ttcol);
 	XDrawRectangle(dpy, cur_win->win,
-	               IS_REVERSED(ttrow,ttcol) ? cur_win->reversegc 
-		                                : cur_win->textgc,
+	               IS_REVERSED(ttrow,ttcol) ? cur_win->cursgc 
+		                                : cur_win->revcursgc,
 	               x_pos(cur_win, ttcol), y_pos(cur_win, ttrow),
 		       (unsigned)(cur_win->char_width - 1),
 		       (unsigned)(cur_win->char_height - 1));

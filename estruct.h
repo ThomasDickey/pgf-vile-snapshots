@@ -9,7 +9,7 @@
 */
 
 /*
- * $Header: /usr/build/VCS/pgf-vile/RCS/estruct.h,v 1.218 1994/12/05 14:08:22 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/estruct.h,v 1.223 1994/12/15 14:39:48 pgf Exp $
  */
 
 #ifdef HAVE_CONFIG_H
@@ -93,7 +93,6 @@
 #if CC_TURBO || CC_WATCOM || CC_MSC || CC_DJGPP || CC_ZTC || SYS_WINNT
 # define CC_NEWDOSCC 1
 # define HAVE_GETCWD 1
-# define CPP_SUBS_BEFORE_QUOTE 1
 #else
 # define CC_NEWDOSCC 0
 #endif
@@ -159,7 +158,6 @@
 #ifdef VMS		/* predefined by VAX/VMS compiler (VAX C V3.2-044) */
 # define SYS_VMS    1
 # define HAVE_GETCWD 1
-# define CPP_SUBS_OLDSTYLE 1
 #else
 # define SYS_VMS    0
 #endif
@@ -317,7 +315,7 @@
 #define DISP_AT386	0		/* AT style 386 unix console	*/
 #define	DISP_HP150	0		/* HP150 screen driver		*/
 #define	DISP_HP110	0		/* HP110 screen driver		*/
-#define	DISP_VMSVT	0		/* various VMS terminal entries	*/
+#define	DISP_VMSVT	SYS_VMS		/* various VMS terminal entries	*/
 #define DISP_VT52	0		/* VT52 terminal (Zenith).	*/
 #define	DISP_BORLAND	0		/* Borland console I/O routines */
 #define	DISP_IBMPC	(SYS_MSDOS && !DISP_BORLAND && !DISP_ANSI) /* IBM-PC CGA/MONO/EGA driver */
@@ -390,6 +388,7 @@
 #define OPT_ENUM_MODES  !SMALLER		/* fixed-string modes */
 #define OPT_EVAL        !SMALLER		/* expression-evaluation */
 #define OPT_FINDERR     !SMALLER		/* finderr support. */
+#define OPT_FORMAT      !SMALLER		/* region formatting support. */
 #define OPT_FLASH       !SMALLER || DISP_IBMPC	/* visible-bell */
 #define OPT_HISTORY     !SMALLER		/* command-history */
 #define OPT_ISRCH       !SMALLER		/* Incremental searches */
@@ -767,9 +766,12 @@ typedef enum {
 } REGIONSHAPE;
 
 /* flook options */
-#define FL_HERE      iBIT(0)	/* look in current directory */
-#define FL_HOME      iBIT(1)	/* look in home directory */
-#define FL_PATH      iBIT(2)	/* look along execution-path */
+#define FL_EXECABLE  iBIT(0)	/* same as X_OK */
+#define FL_WRITEABLE iBIT(1)	/* same as W_OK */
+#define FL_READABLE  iBIT(2)	/* same as R_OK */
+#define FL_HERE      iBIT(3)	/* look in current directory */
+#define FL_HOME      iBIT(4)	/* look in home directory */
+#define FL_PATH      iBIT(5)	/* look along execution-path */
 
 #define FL_HERE_HOME (FL_HERE|FL_HOME)
 #define FL_ANYWHERE  (FL_HERE|FL_HOME|FL_PATH)
@@ -1294,7 +1296,15 @@ typedef unsigned short VIDEO_ATTR;	/* assumption: short is at least 16 bits */
 typedef unsigned char VIDEO_ATTR;
 #endif
 
-#define VASEL	0x08			/* selection */
+#define VACURS	0x01			/* cursor -- this is intentionally
+					 * the same as VADIRTY. It should
+					 * not be used anywhere other than
+					 * in specific places in the low
+					 * level drivers (e.g, x11.c).
+					 */
+#define VAMLFOC	0x02			/* modeline w/ focus		*/
+#define VAML	0x04			/* standard mode line (no focus)*/
+#define VASEL	0x08			/* selection			*/
 #define	VAREV	0x10			/* reverse video		*/
 #define	VAUL	0x20			/* underline			*/
 #define	VAITAL	0x40			/* italics			*/
@@ -1424,13 +1434,14 @@ typedef	struct	{
 
 /* these are window properties affecting window appearance _only_ */
 typedef struct	{
-	MARK 	w_dt;			/* Line containing "."	       */
+	MARK 	w_dt;		/* Line containing "."	       */
 		/* i don't think "mark" needs to be here -- I think it 
 			could safely live only in the buffer -pgf */
 #ifdef WINMARK
-	MARK 	w_mk;	        	/* Line containing "mark"      */
+	MARK 	w_mk;	        /* Line containing "mark"      */
 #endif
-	MARK 	w_ld;	        	/* Line containing "lastdotmark"*/
+	MARK 	w_ld;	        /* Line containing "lastdotmark"*/
+	MARK 	w_tld;	        /* Line which may become "lastdotmark"*/
 	MARK 	w_ln;		/* Top line in the window (offset unused) */
 #if OPT_MOUSE
 	int	insmode;	
@@ -1543,20 +1554,6 @@ typedef struct	BUFFER {
 /* shift-commands can be repeated when typed on :-command */
 #define isRepeatable(c)   ((c) == '<' || (c) == '>')
 
-#if CPP_SUBS_AFTER_QUOTE
-# define	ScratchName(s) SCRTCH_LEFT ## #s ## SCRTCH_RIGHT
-#else
-# if CPP_SUBS_BEFORE_QUOTE
-#  define	ScratchName(s) SCRTCH_LEFT    #s    SCRTCH_RIGHT
-# else
-#  if CPP_SUBS_OLDSTYLE
-#   define	ScratchName(s)	"[s]"	/* K&R-style macro */
-#  else
-    error "Cannot construct ScratchName macro"
-#  endif
-# endif
-#endif
-
 /*
  * Macros for manipulating buffer-struct members.
  */
@@ -1596,6 +1593,7 @@ typedef struct	BUFFER {
 #define b_mark    b_wtraits.w_mk
 #endif
 #define b_lastdot b_wtraits.w_ld
+#define b_tentative_lastdot b_wtraits.w_tld
 #define b_wline   b_wtraits.w_ln
 
 /* buffer-name may not necessarily have trailing null */
@@ -1711,6 +1709,7 @@ typedef struct	WINDOW {
 #define w_mark    w_traits.w_mk
 #endif
 #define w_lastdot w_traits.w_ld
+#define w_tentative_lastdot w_traits.w_tld
 #define w_line    w_traits.w_ln
 #define w_values  w_traits.w_vals
 

@@ -5,7 +5,7 @@
  * commands. Some functions are just for
  * internal use.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/region.c,v 1.64 1994/12/05 14:08:22 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/region.c,v 1.67 1994/12/13 15:39:06 pgf Exp $
  *
  */
 
@@ -438,36 +438,37 @@ entab_region()
 }
 #endif
 
-/* trim trailing whitespace from a line.  leave dot at end of line */
+/* trim trailing whitespace from a line.  dot is preserved if possible. */
 /*ARGSUSED*/
 int
 trimline(flag, l, r)
 void 	*flag;
 int	l, r;
 {
-	register int off, orig;
+	register int off;
 	register LINE *lp;
+	int odoto, s;
 
 	lp = l_ref(DOT.l);
 
 	if (llength(lp) == 0)
 		return TRUE;
 
+	/* may return -1 if no non-white on line.  but
+		that's okay, since the math still works. */
+	off = lastchar(DOT.l);
 
-	off = llength(lp)-1;
-	orig = off;
-	while (off >= 0) {
-		if (!isspace(lgetc(lp,off)))
-			break;
-		off--;
-	}
-
-	if (off == orig)
-		return TRUE;
-
+	odoto = DOT.o;
 	DOT.o = off+1;
+	s = ldelete((B_COUNT)(llength(DOT.l) - off - 1),FALSE);
 
-	return ldelete((B_COUNT)(orig - off),FALSE);
+	/* but now we need to ensure DOT.o doesn't become -1 */
+	if (off < 0)
+		off = 0;
+	DOT.o = odoto;
+	if (DOT.o > off)
+		DOT.o = off;
+	return s;
 }
 
 /*
@@ -491,17 +492,23 @@ int	l, r;
 {
     	char *string = (char *)flagp;
 	int len;
-	int s;
+	int s = TRUE;
 	int saveo;
 	LINE *lp = l_ref(DOT.l);
 
 	saveo = l;
 
-	s = detabline((void *)FALSE, 0, 0);
+	/* if the shape is rectangular, then l and r are columns, not
+		offsets */
+	if (regionshape == RECTANGLE) {
+		s = detabline((void *)FALSE, 0, 0);
+		if (s != TRUE)
+			return s;
+	}
 
 	if (llength(lp) <= l) {	/* nothing to do if no string */
 		if (!string) {
-		    if (b_val(curbp,MDTABINSERT))
+		    if (regionshape == RECTANGLE && b_val(curbp,MDTABINSERT))
 			    s = entabline((void *)TRUE, 0, 0);
 		    DOT.o = saveo;
 		    return s;
@@ -533,11 +540,10 @@ int	l, r;
 	    	len = r - l;
 	}
 
-	s =  lstrinsert(string, len);
+	s = lstrinsert(string, len);
 	if (s != TRUE) return s;
 
-	/* DOT.o = saveo; */
-	if (b_val(curbp,MDTABINSERT))
+        if (regionshape == RECTANGLE && b_val(curbp,MDTABINSERT))
 		s = entabline((void *)TRUE, 0, 0);
 
 	return s;
@@ -769,7 +775,7 @@ register REGION *rp;
 		return TRUE;
 	}
 
-	rp->r_attr_id = 0;
+	rp->r_attr_id = assign_attr_id();
 
 #if OPT_MAP_MEMORY
 	rp->r_orig.l = null_ptr;

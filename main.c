@@ -13,7 +13,7 @@
  *	The same goes for vile.  -pgf
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/main.c,v 1.208 1994/12/05 14:08:22 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/main.c,v 1.216 1994/12/15 15:01:52 pgf Exp $
  *
  */
 
@@ -250,6 +250,7 @@ char	*argv[];
 	 */
 #if SYS_UNIX || SYS_VMS || SYS_MSDOS || SYS_WIN31 || SYS_OS2 || SYS_WINNT
 	if (!isatty(fileno(stdin))) {
+#if !DISP_X11
 #if SYS_UNIX
 # if HAS_TTYNAME
 		char	*tty = ttyname(fileno(stderr));
@@ -259,15 +260,17 @@ char	*argv[];
 #else
   		FILE	*in;
   		int	fd;
-#endif
+#endif /* SYS_UNIX */
+#endif /* DISP_X11 */
 		BUFFER	*lastbp = firstbp;
 		int	nline = 0;
 
-		bp = bfind(ScratchName(Standard Input), BFARGS);
+		bp = bfind(STDIN_BufName, BFARGS);
 		make_current(bp); /* pull it to the front */
 		if (firstbp == 0)
 			firstbp = bp;
 		ffp = fdopen(dup(fileno(stdin)), "r");
+#if !DISP_X11
 #if SYS_UNIX
 		/*
 		 * Note: On Linux, the low-level close/dup operation
@@ -292,6 +295,7 @@ char	*argv[];
   		 && (in = fdopen(fd, "r")) != 0)
   			*stdin = *in;
 #endif	/* SYS_UNIX */
+#endif /* DISP_X11 */
 
   		(void)slowreadf(bp, &nline);
   		set_rdonly(bp, bp->b_fname);
@@ -333,7 +337,7 @@ char	*argv[];
 
 	/* pull in an unnamed buffer, if we were given none to work with */
 	if (firstbp == 0) {
-		bp = bfind(ScratchName(unnamed), 0);
+		bp = bfind(UNNAMED_BufName, 0);
 		bp->b_active = TRUE;
 #if OPT_DOSFILES
 		/* an empty non-existent buffer defaults to line-style
@@ -363,7 +367,7 @@ char	*argv[];
 				b_set_changed(obp);
 			}
 
-			if ((vbp=bfind(ScratchName(vileinit), 0))==NULL)
+			if ((vbp=bfind(VILEINIT_BufName, 0))==NULL)
 				ExitProgram(BADEXIT);
 
 			/* don't want swbuffer to try to read it */
@@ -396,7 +400,7 @@ char	*argv[];
 					don't clobber it */
 #if SYS_MSDOS || SYS_WIN31 || SYS_OS2 || SYS_WINNT
 			/* search PATH for vilerc under dos */
-	 		fname = flook(pathname[0], FL_ANYWHERE);
+	 		fname = flook(pathname[0], FL_ANYWHERE|FL_READABLE);
 #else
 			fname = pathname[0];
 #endif
@@ -681,10 +685,6 @@ global_val_init()
 #endif
 #if	OPT_POPUP_MSGS
 	set_global_g_val(GMDPOPUP_MSGS,-TRUE);	/* popup-msgs */
-#endif
-#if	OPT_MLFORMAT
-	set_global_g_val_ptr(GVAL_MLFORMAT, strmalloc(
-	    "%-%i%- %b %m:: :%f:is : :%=%F: : :%l:(:,:%c::) :%p::% :%S%-%-%|"));
 #endif
 #ifdef GMDRAMSIZE
 	set_global_g_val(GMDRAMSIZE,	TRUE);	/* show ram-usage */
@@ -1081,6 +1081,8 @@ int *cp,*fp,*np;
 	}
 }
 
+int quitting;
+
 /* the vi ZZ command -- write all, then quit */
 int
 zzquit(f,n)
@@ -1106,8 +1108,11 @@ int f,n;
 				return FALSE;
 		}
 
-		if (writeall(TRUE,1) != TRUE)
+		quitting = TRUE;
+		if (writeall(f,n,FALSE,TRUE,FALSE) != TRUE) {
+			quitting = FALSE;
 			return FALSE;
+		}
 
 	} else if (!clexec && !isnamedcmd) {
 		/* consume the next char. anyway */
@@ -1126,8 +1131,10 @@ quickexit(f, n)
 int f,n;
 {
 	register int status;
-	if ((status = writeall(TRUE,1)) == TRUE)
+	quitting = TRUE;
+	if ((status = writeall(f,n,FALSE,TRUE,FALSE)) == TRUE)
 		status = quithard(f, n);  /* conditionally quit	*/
+	quitting = FALSE;
 	return status;
 }
 
@@ -1185,7 +1192,9 @@ int f,n;
 	if ( global_g_val(GMDUSEFILELOCK) ) {
 		for_each_buffer(bp) {
 			if ( bp->b_active ) {
-				release_lock(bp->b_fname);
+				if (!b_val(curbp,MDLOCKED) &&
+						!b_val(curbp,MDVIEW))
+					release_lock(bp->b_fname);
 			}
 		}
 	}
@@ -1195,9 +1204,15 @@ int f,n;
 # if defined(SIGALRM)
 	(void)signal(SIGALRM, SIG_IGN);
 # endif
+#if NEEDED	/* i'm not sure when we'd end up with a "working..."
+			left on the line, and if we _do_ need to
+			clear it, i'd like to figure out how to
+			clear just that, so the last message written
+			by the editor doesn't get tromped */
 	/* force the message line clear */
 	mpresf = 1;
 	mlerase();
+#endif
 #endif
 	vttidy(TRUE);
 #if NO_LEAKS

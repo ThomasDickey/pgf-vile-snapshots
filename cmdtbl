@@ -95,10 +95,14 @@
 #		in '!' listed, then the flag does nothing, and should be
 #		viewed simply as documentation.
 #
-# $Header: /usr/build/VCS/pgf-vile/RCS/cmdtbl,v 1.111 1994/12/01 18:02:53 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/cmdtbl,v 1.118 1994/12/14 18:27:28 pgf Exp $
 #
 #
 
+abbrev		NONE|(EXRCOK|EXTRA)
+	"abbreviate"
+	"show-abbreviations"
+	<establish shorthand for another string, or show all abbreviations>
 altbuff		NONE
 	"alternate-buffer"		!FEWNAMES
 	'^^'
@@ -183,9 +187,11 @@ bindkey		NONE			OPT_REBIND
 	"bind-key"
 	"rebind-key"
 	<bind a keystroke to a function>
-bktoshell	NONE
-	"suspend-vile"			!FEWNAMES
+bktoshell	NONE|(BANG)
+	"suspend"
+	"suspend!"
 	"stop"
+	"stop!"
 	'^Z'
 	<suspend the editor>
 cd		NONE
@@ -250,140 +256,140 @@ cbuf2		REDO
 	"execute-macro-2"		!FEWNAMES
 	'FN-2'				KEY_F2
 	'FN-Q'				KEY_KP_F2
-	<execute [Macro 1]>
+	<execute [Macro 2]>
 cbuf3		REDO
 	"execute-macro-3"		!FEWNAMES
 	'FN-3'				KEY_F3
 	'FN-R'				KEY_KP_F3
-	<execute [Macro 1]>
+	<execute [Macro 3]>
 cbuf4		REDO
 	"execute-macro-4"		!FEWNAMES
 	'FN-4'				KEY_F4
 	'FN-S'				KEY_KP_F4
-	<execute [Macro 1]>
+	<execute [Macro 4]>
 cbuf5		REDO
 	"execute-macro-5"		!FEWNAMES
 	'FN-5'				KEY_F5
-	<execute [Macro 1]>
+	<execute [Macro 5]>
 cbuf6		REDO
 	"execute-macro-6"		!FEWNAMES
 	'FN-6'				KEY_F6
-	<execute [Macro 1]>
+	<execute [Macro 6]>
 cbuf7		REDO
 	"execute-macro-7"		!FEWNAMES
 	'FN-7'				KEY_F7
-	<execute [Macro 1]>
+	<execute [Macro 7]>
 cbuf8		REDO
 	"execute-macro-8"		!FEWNAMES
 	'FN-8'				KEY_F8
-	<execute [Macro 1]>
+	<execute [Macro 8]>
 cbuf9		REDO
 	"execute-macro-9"		!FEWNAMES
 	'FN-9'				KEY_F9
-	<execute [Macro 1]>
+	<execute [Macro 9]>
 cbuf10		REDO
 	'FN-0'				KEY_F10
 	"execute-macro-10"		!FEWNAMES
-	<execute [Macro 1]>
+	<execute [Macro 10]>
 cbuf11		REDO			!SMALLER
 	"execute-macro-11"		!FEWNAMES
-	<execute [Macro 1]>
+	<execute [Macro 11]>
 cbuf12		REDO			!SMALLER
 	'FN-@'				KEY_F12
 	"execute-macro-12"		!FEWNAMES
-	<execute [Macro 1]>
+	<execute [Macro 12]>
 cbuf13		REDO			!SMALLER
 	'FN-#'				KEY_F13
 	"execute-macro-13"		!FEWNAMES
-	<execute [Macro 1]>
+	<execute [Macro 13]>
 cbuf14		REDO			!SMALLER
 	'FN-$'				KEY_F14
 	"execute-macro-14"		!FEWNAMES
-	<execute [Macro 1]>
+	<execute [Macro 14]>
 cbuf15		REDO			!SMALLER
 	'FN-%'				KEY_F15
 	"execute-macro-15"		!FEWNAMES
-	<execute [Macro 1]>
+	<execute [Macro 15]>
 cbuf16		REDO			!SMALLER
 	'FN-^'				KEY_F16
 	"execute-macro-16"		!FEWNAMES
-	<execute [Macro 1]>
+	<execute [Macro 16]>
 cbuf17		REDO			!SMALLER
 	'FN-&'				KEY_F17
 	"execute-macro-17"		!FEWNAMES
-	<execute [Macro 1]>
+	<execute [Macro 17]>
 cbuf18		REDO			!SMALLER
 	'FN-*'				KEY_F18
 	"execute-macro-18"		!FEWNAMES
-	<execute [Macro 1]>
+	<execute [Macro 18]>
 cbuf19		REDO			!SMALLER
 	'FN-('				KEY_F19
 	"execute-macro-19"		!FEWNAMES
-	<execute [Macro 1]>
+	<execute [Macro 19]>
 cbuf20		REDO			!SMALLER
 	'FN-)'				KEY_F20
 	"execute-macro-20"		!FEWNAMES
-	<execute [Macro 1]>
+	<execute [Macro 20]>
 cbuf21		REDO			!SMALLER
 	"execute-macro-21"		!FEWNAMES
-	<execute [Macro 1]>
+	<execute [Macro 21]>
 cbuf22		REDO			!SMALLER
 	"execute-macro-22"		!FEWNAMES
-	<execute [Macro 1]>
+	<execute [Macro 22]>
 cbuf23		REDO			!SMALLER
 	"execute-macro-23"		!FEWNAMES
-	<execute [Macro 1]>
+	<execute [Macro 23]>
 cbuf24		REDO			!SMALLER
 	"execute-macro-24"		!FEWNAMES
-	<execute [Macro 1]>
+	<execute [Macro 24]>
 cbuf25		REDO			!SMALLER
 	"execute-macro-25"		!FEWNAMES
-	<execute [Macro 1]>
+	<execute [Macro 25]>
 cbuf26		REDO			!SMALLER
 	"execute-macro-26"		!FEWNAMES
-	<execute [Macro 1]>
+	<execute [Macro 26]>
 cbuf27		REDO			!SMALLER
 	"execute-macro-27"		!FEWNAMES
-	<execute [Macro 1]>
+	<execute [Macro 27]>
 cbuf28		REDO			!SMALLER
 	"execute-macro-28"		!FEWNAMES
-	<execute [Macro 1]>
+	<execute [Macro 28]>
 cbuf29		REDO			!SMALLER
 	"execute-macro-29"		!FEWNAMES
-	<execute [Macro 1]>
+	<execute [Macro 29]>
 cbuf30		REDO			!SMALLER
 	"execute-macro-30"		!FEWNAMES
-	<execute [Macro 1]>
+	<execute [Macro 30]>
 cbuf31		REDO			!SMALLER
 	"execute-macro-31"		!FEWNAMES
-	<execute [Macro 1]>
+	<execute [Macro 31]>
 cbuf32		REDO			!SMALLER
 	"execute-macro-32"		!FEWNAMES
-	<execute [Macro 1]>
+	<execute [Macro 32]>
 cbuf33		REDO			!SMALLER
 	"execute-macro-33"		!FEWNAMES
-	<execute [Macro 1]>
+	<execute [Macro 33]>
 cbuf34		REDO			!SMALLER
 	"execute-macro-34"		!FEWNAMES
-	<execute [Macro 1]>
+	<execute [Macro 34]>
 cbuf35		REDO			!SMALLER
 	"execute-macro-35"		!FEWNAMES
-	<execute [Macro 1]>
+	<execute [Macro 35]>
 cbuf36		REDO			!SMALLER
 	"execute-macro-36"		!FEWNAMES
-	<execute [Macro 1]>
+	<execute [Macro 36]>
 cbuf37		REDO			!SMALLER
 	"execute-macro-37"		!FEWNAMES
-	<execute [Macro 1]>
+	<execute [Macro 37]>
 cbuf38		REDO			!SMALLER
 	"execute-macro-38"		!FEWNAMES
-	<execute [Macro 1]>
+	<execute [Macro 38]>
 cbuf39		REDO			!SMALLER
 	"execute-macro-39"		!FEWNAMES
-	<execute [Macro 1]>
+	<execute [Macro 39]>
 cbuf40		REDO			!SMALLER
 	"execute-macro-40"		!FEWNAMES
-	<execute [Macro 1]>
+	<execute [Macro 40]>
 delwind		NONE
 	"delete-window"			!FEWNAMES
 	'^K'
@@ -413,6 +419,7 @@ desbind		NONE			OPT_REBIND
 	"list-commands"
 	"describe-bindings"
 	"show-commands"
+	"show-bindings"
 	<show a list of all commands>
 desmotions	NONE			OPT_REBIND
 	"list-motions"
@@ -829,6 +836,9 @@ showkreg	NONE			OPT_SHOW_REGS
 	"showregisters"			!FEWNAMES
 	"list-registers"		!FEWNAMES
 	<show the contents of all of the named and unnamed registers>
+sysmap		NONE|(EXRCOK|EXTRA)	OPT_SHOW_MAPS
+	"show-system-mapped-chars"
+	<list the system function-key maps>
 map		NONE|(EXRCOK|EXTRA)
 	"map"
 	"show-mapped-chars"
@@ -1390,7 +1400,7 @@ vglobals	NONE
 viewfile	NONE
 	"view-file"
 	<bring given file or existing buffer into window, mark it \"view-only\">
-writeall	NONE|(NL)
+writeallchanged	NONE|(NL)
 	"ww"
 	"write-changed-buffers"		!FEWNAMES
 	<attempt to write any buffers which are marked \"modified\">
@@ -1410,9 +1420,9 @@ yankline	NONE
 	"yank-line"			!FEWNAMES
 	'Y'
 	<get the current line into the given named or unnamed register>
-xterm_mouse_M	NONE			OPT_XTERM
+mouse_motion	ABSM|MOTION		OPT_XTERM||DISP_X11
 	'FN-M'				KEY_Mouse
-	<dummy command to support xterm mouse operation>
+	<dummy command to support mouse movements internally>
 xterm_mouse_t	NONE			(OPT_XTERM>=3)
 	'FN-t'				KEY_text
 	<dummy command to support xterm mouse operation>

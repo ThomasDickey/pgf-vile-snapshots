@@ -5,14 +5,12 @@
  * keys. Like everyone else, they set hints
  * for the display system.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/buffer.c,v 1.109 1994/12/03 13:22:56 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/buffer.c,v 1.115 1994/12/14 20:26:57 pgf Exp $
  *
  */
 
 #include	"estruct.h"
 #include	"edef.h"
-
-#define BUFFER_LIST_NAME ScratchName(Buffer List)
 
 /*--------------------------------------------------------------------------*/
 static	BUFFER *find_BufferList P(( void ));
@@ -56,7 +54,7 @@ static	int	show_all,	/* true iff we show all buffers */
 static
 BUFFER *find_BufferList()
 {
-	return find_b_name(BUFFER_LIST_NAME);
+	return find_b_name(BUFFERLIST_BufName);
 }
 
 /*
@@ -1000,7 +998,8 @@ register BUFFER *bp;
 	/* If Buffer is killed and not locked by other then release own lock */
 	if ( global_g_val(GMDUSEFILELOCK) ) {
 		if ( bp->b_active )
-			release_lock(bp->b_fname);
+			 if (!b_val (curbp, MDLOCKED) && !b_val (curbp, MDVIEW))
+				release_lock(bp->b_fname);
 	}
 #endif
 	/* Blow text away.	*/
@@ -1295,7 +1294,7 @@ BUFFER	*bp;
 	if ((status = (!updating_list++ != 0)) != FALSE) {
 		this_bp = curbp;
 		that_bp = find_alt();
-		status = liststuff(BUFFER_LIST_NAME, FALSE, 
+		status = liststuff(BUFFERLIST_BufName, FALSE, 
 				makebufflist, 0, (void *)0);
 	}
 	updating_list--;
@@ -1309,7 +1308,7 @@ BUFFER	*bp;
 void
 updatelistbuffers()
 {
-	update_scratch(BUFFER_LIST_NAME, show_BufferList);
+	update_scratch(BUFFERLIST_BufName, show_BufferList);
 }
 
 /* mark a scratch/temporary buffer for update */
@@ -1342,7 +1341,7 @@ int f,n;
 	}
 	this_bp = 0;
 	that_bp = curbp;
-	status  = liststuff(BUFFER_LIST_NAME, FALSE, 
+	status  = liststuff(BUFFERLIST_BufName, FALSE, 
 				makebufflist, 0, (void *)0);
 	b_clr_flags(curbp, BFUPBUFF);
 	return status;
@@ -1350,7 +1349,7 @@ int f,n;
 	show_all = f;
 	this_bp = 0;
 	that_bp = curbp;
-	return liststuff(BUFFER_LIST_NAME, FALSE, 
+	return liststuff(BUFFERLIST_BufName, FALSE, 
 				makebufflist, 0, (void *)0);
 #endif
 }
@@ -1468,7 +1467,8 @@ BUFFER *bp;
 char *name;
 {
 	register int j, k;
-	register char *d = strncpy(bp->b_bname, name, NBUFN);
+	register char *d = bp->b_bname;
+	(void)strncpy(bp->b_bname, name, NBUFN);
 	for (j = 0, k = -1; j < NBUFN && d[j] != EOS; j++) {
 		if (!isspace(d[j]))
 			k = -1;
@@ -1488,10 +1488,12 @@ get_bname(bp)
 BUFFER *bp;
 {
 	static	char	bname[NBUFN+1];
-	if (bp)
-	    strncpy(bname, bp->b_bname, NBUFN)[NBUFN] = EOS;
-	else
+	if (bp) {
+	    (void)strncpy(bname, bp->b_bname, NBUFN);
+	    bname[NBUFN] = EOS;
+	} else {
 	    *bname = EOS;
+	}
 	return bname;
 }
 
@@ -1793,42 +1795,101 @@ int f, n;	/* unused command arguments */
 }
 
 /* write all _changed_ buffers */
+/* if you get the urge to tinker in here, bear in mind that you need
+   to test:  :ww, 1:ww, :wwq, 1:wwq, all with 1 buffer, both modified and
+   unmodified, with 2 buffers (0, 1, or both modified), and with errors,
+   like either buffer not writeable.  oh yes -- you also need to turn
+   on "autowrite", and try ^Z and :!cmd.
+
+   by default, we should have scrolling messages, a pressreturn call, and
+   a screen update.
+
+   any numeric argument will suppress the pressreturn call, and therefore
+   also the scrolling of the messages and screen update.
+
+   if you're leaving (quitting, or suspending to the shell, you want the
+   scrolling messages, but no press-return, and no update.
+
+   if there's a failure, you want a pressreturn, and an update, and you
+   need to return non-TRUE so you won't try to quit.  we also switch to
+   the buffer that failed in that case.
+*/
 int
-writeall(f,n)
+writeallchanged(f,n)
 int f,n;
+{
+	return writeall(f,n,!f,FALSE,FALSE);
+}
+
+int
+writeall(f,n,promptuser,leaving, autowriting)
+int f, n, promptuser, leaving, autowriting;
 {
 	register BUFFER *bp;	/* scanning pointer to buffers */
 	register BUFFER *oldbp; /* original current buffer */
 	register int status = TRUE;
 	int count = 0;
+	int failure = FALSE;
+	int dirtymsgline = FALSE;
 
 	oldbp = curbp;				/* save in case we fail */
 
 	for_each_buffer(bp) {
+		if (autowriting && !b_val(bp,MDAUTOWRITE))
+			continue;
 		if (b_is_changed(bp) && !b_is_invisible(bp)) {
 			make_current(bp);
-			mlforce("[Saving %s]",bp->b_fname);
-			mlforce("\n");
-			if ((status = filesave(f, n)) != TRUE)
+			if (dirtymsgline && (promptuser || leaving)) {
+				mlforce("\n");
+				dirtymsgline = FALSE;
+			}
+			status = filesave(f, n);
+			dirtymsgline = TRUE;
+			failure = (status != TRUE);
+			if (failure) {
+				mlforce("\n");
+				mlforce("[Save of %s failed]",bp->b_fname);
+				/* dirtymsgline still TRUE */
 				break;
+			}
 			count++;
-			mlforce("\n");
 		}
 	}
-	if (count > 0 || status != TRUE) {
-		make_current(oldbp);
+
+	/* shortcut out */
+	if (autowriting && !failure && !count)
+		return TRUE;
+	
+	/* do we want a press-return message?  */
+	if (failure || ((promptuser && !leaving) && count)) {
+		if (dirtymsgline)
+			mlforce("\n");
+		dirtymsgline = FALSE;
+		pressreturn();
+	}
+
+	/* get our old buffer back */
+	make_current(oldbp);
+
+	/* and then switch to the failed buffer */
+	if (failure && !insertmode /* can happen from ^Z and autowrite */ )
+		swbuffer(bp);
+
+	/* if we asked "press-return", then we certainly need an update */
+	if (failure || ((promptuser && !leaving) && count)) {
+		sgarbf = TRUE;
+		(void)update(TRUE);
+	} else if (dirtymsgline && (promptuser || leaving)) {
 		mlforce("\n");
 	}
-	if (status != TRUE) {
-		pressreturn();
-		sgarbf = TRUE;
-	} else {
-		if (count > 0) {
-			sgarbf = TRUE;
-			(void)update(TRUE);
-		}
-		mlforce("[Wrote %d buffer%s]",count, PLURAL(count));
-	}
+
+	/* final message -- appears on the message line after the update,
+	  or as the last line before the post-quit prompt */
+	if (count)
+		mlforce("[Wrote %d buffer%s]", count, PLURAL(count));
+	else
+		mlforce("[No buffers written]");
+
 	return status;
 }
 

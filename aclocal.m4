@@ -1,7 +1,7 @@
 dnl
 dnl Local definitions for autoconf.
 dnl ------------------------
-dnl $Header: /usr/build/VCS/pgf-vile/RCS/aclocal.m4,v 1.8 1994/12/05 14:08:22 pgf Exp $
+dnl $Header: /usr/build/VCS/pgf-vile/RCS/aclocal.m4,v 1.9 1994/12/09 18:05:28 pgf Exp $
 dnl ------------------------
 dnl
 dnl VC_HAVE_LIBRARY is a slightly modifid version of AC_HAVE_LIBRARY from 
@@ -267,32 +267,6 @@ ac_tr_func=`echo $ac_func | tr '[a-z]' '[A-Z]'`
 changequote([,])dnl
 VC_MISSING_CHECK(${ac_func}, ${ac_tr_func})dnl
 done
-])dnl
-dnl
-dnl----------------------------
-dnl Test the C-preprocessor to determine how to substitute the ScratchName
-dnl macro.
-define(VC_CPP_SUBS,
-[AC_CHECKING(for ANSI CPP token-splicing/quoting)
- AC_TEST_PROGRAM([
-#define quote(name) "name"
-int main() { char *y = quote(a b); exit (strcmp(y, "a b"));}
- ],
- [AC_DEFINE(CPP_SUBS_OLDSTYLE)],
- [AC_TEST_PROGRAM([
-#define mark "/"
-#define quote(name) mark ## #name ## mark
- int main() { char *y = quote(a b); exit (strcmp(y, "/a b/"));}
- ],
- [AC_DEFINE(CPP_SUBS_AFTER_QUOTE)],
-  [AC_TEST_PROGRAM([
-#define mark "/"
-#define	quote(s) mark #s mark
-int main() { char *y = quote(a b); exit (strcmp(y, "/a b/"));}
-   ],
-   [AC_DEFINE(CPP_SUBS_BEFORE_QUOTE)])
-  ])
- ])
 ])dnl
 dnl ---------------------------------------------------------------------------
 dnl	On both Ultrix and CLIX, I find size_t defined in <stdio.h>

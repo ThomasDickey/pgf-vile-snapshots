@@ -1,7 +1,7 @@
 /*	tcap:	Unix V5, V7 and BS4.2 Termcap video driver
  *		for MicroEMACS
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/tcap.c,v 1.54 1994/11/29 04:02:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/tcap.c,v 1.57 1994/12/12 19:25:50 pgf Exp $
  *
  */
 
@@ -146,7 +146,7 @@ TERM term = {
 	, NULL		/* set dynamically at open time */
 };
 
-#define	XtermPos()	TTgetc() - 040
+#define	XtermPos()	keystroke() - 040
 
 #if OPT_XTERM >= 3
 # define XTERM_ENABLE_TRACKING   "\033[?1001h"	/* mouse hilite tracking */
@@ -587,6 +587,8 @@ int attr;
 
 	attr = VATTRIB(attr);	/* FIXME: color? */
 
+	attr &= ~(VAML|VAMLFOC);
+
 	if (attr != last) {
 		register int n;
 		register char *s;
@@ -710,7 +712,7 @@ int n;
 
 /*ARGSUSED*/
 int
-xterm_mouse_M(f,n)
+mouse_motion(f,n)
 int f,n;
 {
 	return xterm_button('M');
@@ -762,11 +764,13 @@ int	c;
 		beginDisplay;
 		switch(c) {
 		case 'M':	/* button-event */
-			event	= TTgetc();
+			event	= keystroke();
 			x	= XtermPos();
 			y	= XtermPos();
 
 			button	= (event & 3) + 1;
+			if (button > 3)
+				return TRUE; /* button up */
 			wp = row2window(y-1);
 #if OPT_XTERM >= 3
 			/* Tell the xterm how to highlight the selection.
@@ -790,10 +794,11 @@ int	c;
 			 */
 			if (wp != 0
 			 && button == 1
-			 && ttrow != term.t_nrow-1
+			 && !reading_msg_line
 			 && setcursor(y-1, x-1)) {
 				mlerase();
 				(void)update(TRUE);
+				status = TRUE;
 			} else if (button <= 3) {
 #if OPT_XTERM >= 3
 				/* abort the selection */
@@ -802,6 +807,8 @@ int	c;
 				TTflush();
 #endif	/* OPT_XTERM >= 3 */
 				status = ABORT;
+			} else {
+				status = FALSE;
 			}
 			break;
 #if OPT_XTERM >= 3

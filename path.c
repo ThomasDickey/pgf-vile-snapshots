@@ -2,7 +2,7 @@
  *		The routines in this file handle the conversion of pathname
  *		strings.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/path.c,v 1.33 1994/11/29 04:02:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/path.c,v 1.35 1994/12/15 15:01:52 pgf Exp $
  *
  *
  */
@@ -134,6 +134,8 @@ int	option;		/* true:directory, false:file, -true:don't care */
 	while (ispath(*path)) {
 		switch (*path) {
 		case '[':
+			if (this >= VMSPATH_BEGIN_FILE)
+				return FALSE;
 			next = VMSPATH_BEGIN_DIR;
 			break;
 		case ']':
@@ -279,16 +281,17 @@ char	*dst;
 char	*path;
 char	*leaf;
 {
-	char	temp[NFILEN];
+	char	save_path[NFILEN];
+	char	save_leaf[NFILEN];
 	register char	*s = dst;
 
 	if (path == 0 || *path == EOS)
 		return strcpy(dst, leaf);
 
-	leaf = strcpy(temp, leaf);		/* in case leaf is in dst */
+	path = strcpy(save_path, path);		/* in case path is in dst */
+	leaf = strcpy(save_leaf, leaf);		/* in case leaf is in dst */
 
-	if (s != path)
-		(void)strcpy(s, path);
+	(void)strcpy(s, path);
 	s += strlen(s) - 1;
 
 #if OPT_VMS_PATH
@@ -299,6 +302,13 @@ char	*leaf;
 	 }
 
 	(void)strcpy(s+1, leaf);
+
+#if OPT_VMS_PATH
+	if (is_vms_pathname(path, -TRUE)
+	 && is_vms_pathname(leaf, -TRUE)
+	 && !is_vms_pathname(dst, -TRUE))
+		(void)strcpy(dst, leaf);
+#endif
 	return dst;
 }
 
@@ -597,7 +607,7 @@ int keep_cwd;
 #endif
 
 	if (!path || *path == EOS)
-		return NULL;
+		return path;
 
 	if (isInternalName(path))
 		return path;

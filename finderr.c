@@ -1,7 +1,7 @@
 /* Find the next error in mentioned in the shell output window.
  * Written for vile by Paul Fox, (c)1990
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/finderr.c,v 1.41 1994/11/29 04:02:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/finderr.c,v 1.42 1994/12/09 18:06:35 pgf Exp $
  *
  */
 
@@ -292,7 +292,7 @@ int f,n;
 	if ((s = mlreply("Buffer to scan for \"errors\": ", name, sizeof(name))) == ABORT)
 		return s;
 	if (s == FALSE) {
-		set_febuff(ScratchName(Output));
+		set_febuff(OUTPUT_BufName);
 	} else {
 		if ((bp = find_any_buffer(name)) == 0)
 			return FALSE;
