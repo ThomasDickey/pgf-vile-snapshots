@@ -5,7 +5,18 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: tags.c,v $
- * Revision 1.28  1993/03/05 17:50:54  pgf
+ * Revision 1.31  1993/04/01 09:46:37  pgf
+ * name the tag buffers with "internal" style names, i.e. [Tags nn]
+ *
+ * Revision 1.30  1993/03/31  19:56:08  pgf
+ * partially fix GMDTAGSLOOK code for tags path.  not really "fixed" -- it
+ * only looks in first tags file.  i'm thinking of dropping the TAGSLOOK
+ * code anyway.
+ *
+ * Revision 1.29  1993/03/31  19:35:21  pgf
+ * implemented tags path
+ *
+ * Revision 1.28  1993/03/05  17:50:54  pgf
  * see CHANGES, 3.35 section
  *
  * Revision 1.27  1993/01/16  10:42:25  foxharp
@@ -106,7 +117,6 @@
 #if TAGS
 
 static char tagname[NFILEN];
-static char tagprefix[NFILEN];
 
 /* ARGSUSED */
 int
@@ -154,18 +164,35 @@ int taglen;
 	MARK odot;
 	LINE *cheap_scan();
 	BUFFER *tagbp;
+	int nomore;
+	int gotafile = FALSE;
 
 	(void)strcpy(tname,tag);
 
-	if ((tagbp = gettagsfile()) == NULL )
-		return FALSE;
+	i = 0;
+	do {
+		tagbp = gettagsfile(i, &nomore);
+		if (nomore) {
+			if (gotafile) {
+				TTbeep();
+				mlforce("[No such tag: \"%s\"]",tname);
+			} else {
+				mlforce("[No tags file available.]");
+			}
+			return FALSE;
+		}
 
-	lp = cheap_scan(tagbp, tname, taglen ? taglen : strlen(tname));
-	if (lp == NULL) {
-		TTbeep();
-		mlforce("[No such tag: \"%s\"]",tname);
-		return FALSE;
-	}
+		if (tagbp) {
+			lp = cheap_scan(tagbp, tname, taglen ? 
+					taglen : strlen(tname));
+			gotafile = TRUE;
+		} else {
+			lp = NULL;
+		}
+
+		i++;
+
+	} while (lp == NULL);
 	
 	lplim = &lp->l_text[lp->l_used];
 	tfp = lp->l_text;
@@ -175,13 +202,16 @@ int taglen;
 
 	i = 0;
 	if (b_val(curbp,MDTAGSRELTIV) && *tfp != '/') {
-		(void)strcpy(tfname, tagprefix);
-		i += strlen(tagprefix);
+		char *lastsl;
+		if ((lastsl = strrchr(tagbp->b_fname,'/')) != NULL) {
+			i = lastsl - tagbp->b_fname + 1;
+			(void)strncpy(tfname, tagbp->b_fname, i);
+		}
 	}
 	while (i < NFILEN && tfp < lplim && *tfp != '\t') {
 		tfname[i++] = *tfp++;
 	}
-	tfname[i] = 0;
+	tfname[i] = '\0';
 
 	if (tfp >= lplim) {
 		mlforce("[Bad line in tags file.]");
@@ -258,23 +288,56 @@ int taglen;
 	
 }
 
-#define TAGBUF "tags"
+/* 
+ * return (in buf) the Nth whitespace 
+ *	separated word in "path", counting from 0
+ */
+void
+nth_name(buf, path, n)
+char *buf;
+char *path;
+int n;
+{
+	while (n-- > 0) {
+		while (*path &&  isspace(*path)) path++;
+		while (*path && !isspace(*path)) path++;
+	}
+	while (*path &&  isspace(*path)) path++;
+	while (*path && !isspace(*path)) *buf++ = *path++;
+	*buf = '\0';
+}
+
+
 BUFFER *
-gettagsfile()
+gettagsfile(n, endofpathflagp)
+int n;
+int *endofpathflagp;
 {
 	char *tagsfile;
 	BUFFER *tagbp;
+	static char tagbufname[NBUFN];
+	char tagfilename[NFILEN];
 
-	/* is there a TAGBUF buffer around? */
-        if ((tagbp=bfind(TAGBUF, NO_CREAT, 0)) == NULL) {
+	*endofpathflagp = FALSE;
+	
+	lsprintf(tagbufname, ScratchName(Tags %d), n+1);
+
+	/* is the buffer around? */
+        if ((tagbp=bfind(tagbufname, NO_CREAT, 0)) == NULL) {
 		char *tagf = global_b_val_ptr(VAL_TAGS);
+
+		nth_name(tagfilename, tagf, n);
+		if (tagfilename[0] == '\0') {
+			*endofpathflagp = TRUE;
+			return NULL;
+		}
+
 		/* look up the tags file */
-		tagsfile = flook(tagf, FL_HERE);
+		tagsfile = flook(tagfilename, FL_HERE);
 
 		/* if it isn't around, don't sweat it */
 		if (tagsfile == NULL)
 		{
-	        	mlforce("[No tags file available.]");
 			return NULL;
 		}
 
@@ -287,17 +350,11 @@ gettagsfile()
 		if (readin(tagsfile, FALSE, tagbp, FALSE) != TRUE) {
 			return NULL;
 		}
-		/* be sure it's named TAGBUF */
-		(void)strcpy(tagbp->b_bname, TAGBUF);
+		/* be sure it has the right name */
+		(void)strcpy(tagbp->b_bname, tagbufname);
 		tagbp->b_flag |= BFINVS;
 			
         }
-	if (strrchr(tagbp->b_fname,'/')) {
-		(void)strcpy(tagprefix, tagbp->b_fname);
-		*(strrchr(tagprefix,'/')+1) = '\0';
-	} else {
-		tagprefix[0] = '\0';
-	}
 	return tagbp;
 }
 
@@ -421,6 +478,8 @@ tossuntag()
 
 /* create a filelist from the contents of the tags file. */
 /* patch: when does the buffer get reset? */
+/* patch: only scans the first file in the tags path. */
+
 BUFFER *
 look_tags(sequence)
 int	sequence;
@@ -434,7 +493,7 @@ int	sequence;
 	if (!global_g_val(GMDTAGSLOOK))
 		return 0;
 
-	if ((tagbp = gettagsfile()) == NULL)
+	if ((tagbp = gettagsfile(0,&i)) == NULL)
 		return 0;
 
 	/* create/lookup the file list buffer   */

@@ -1,12 +1,12 @@
 #
-# makefile for vile.  
+# makefile for vile.
 #
 # Not much user-configuration is usually needed.  Various targets in the
 # makefile support various systems -- if yours isn't here, and none of the
 # one's provided will work, then edit estruct.h, and use "make default".
 # For a list of the pre-defined targets, just type "make".
 #
-# The command/name/key/function bindings are defined in the file "cmdtbl". 
+# The command/name/key/function bindings are defined in the file "cmdtbl".
 # The mktbls program parses this to produce nebind.h, nename.h, and
 # nefunc.h, which are used by the rest of the build.
 #
@@ -49,8 +49,8 @@ CO=co
 # for passing along the above settings to sub-makes
 ENVIR = SCREEN="$(SCREEN)" LIBS="$(LIBS)" TARGET="$(TARGET)" \
 	SCRDEF="$(SCRDEF)" \
-	CO="$(CO)" CC="$(CC)" LINK="$(LINK)" OPTFLAGS="$(OPTFLAGS)" \
-	GINCS="$(GINCS)"
+	CO="$(CO)" CC="$(CC)" LINK="$(LINK)" OPTFLAGS="$(OPTFLAGS)"
+
 
 
 # install to DESTDIR1 if it's writable, else DESTDIR2
@@ -66,20 +66,16 @@ DESTDIR2 = $(HOME)/bin
 REMOTE=gutso!foxharp
 
 #CC = gcc
-#OPTFLAGS = -g -Wall -Wshadow -O # -pg
-#gincdir = /usr/local/lib/gcc-include
-#GINCS = -I$(gincdir) -I$(gincdir)/sys
+#OPTFLAGS = -g -Wall -Wshadow # -pg
 
 CC = cc
 #OPTFLAGS = -g
 OPTFLAGS = -O
 
 LINK = $(CC)
-LDFLAGS = 
+LDFLAGS =
 
-# some older bsd systems keep ioctl in sys only -- easier to
-# search both places than to ifdef the code.  color me lazy.
-INCS = -I. $(GINCS) -I/usr/include -I/usr/include/sys
+INCS =
 
 # the backslashes around HELP_LOC don't make it through all makes.  if
 #  you have trouble, use the following line instead, and edit epath.h to
@@ -100,7 +96,7 @@ ALLTOOLS = $(MAKFILES)
 
 
 # these are normal editable headers
-HDRS = estruct.h epath.h edef.h proto.h
+HDRS = estruct.h epath.h edef.h proto.h dirstuff.h
 
 # these headers are built by the mktbls program from the information in cmdtbl
 # and in modetbl
@@ -116,7 +112,7 @@ CSRCfh = fences.c file.c filec.c fileio.c finderr.c globals.c history.c hp110.c 
 CSRCim = ibmpc.c input.c insert.c isearch.c line.c main.c modes.c mktbls.c
 CSRCnr = npopen.c opers.c oneliner.c path.c random.c regexp.c region.c
 CSRCst = search.c spawn.c st520.c tags.c tbuff.c tcap.c termio.c tipc.c
-CSRCuw = undo.c vmalloc.c vmsvt.c vt52.c window.c word.c wordmov.c
+CSRCuw = undo.c vmalloc.c vms2unix.c vmspipe.c vmsvt.c vt52.c window.c word.c wordmov.c
 CSRCxz = x11.c z309.c z_ibmpc.c
 
 CSRC = $(CSRCac) $(CSRCde) $(CSRCfh) $(CSRCim) $(CSRCnr) \
@@ -127,7 +123,7 @@ OTHERSRC = z100bios.asm
 
 # text and data files
 TEXTFILES = README CHANGES cmdtbl modetbl vile.hlp buglist revlist \
-	README.X11
+	README.X11 vile.com
 
 ALLSRC = $(CSRC) $(OTHERSRC)
 
@@ -235,7 +231,7 @@ hpux:
 		$(TARGET) $(ENVIR)
 
 next:
-	$(MAKE) CFLAGS="$(CFLAGS1) -DBERK -D__STRICT_BSD__ -Dos_chosen	\
+	$(MAKE) CFLAGS="$(CFLAGS1) -DBERK -DNeXT -D__STRICT_BSD__ -Dos_chosen \
 		-I/NextDeveloper/Headers -I/NextDeveloper/Headers/bsd \
 		-I/NextDeveloper/Headers/bsd/sys" \
 		$(TARGET) $(ENVIR)
@@ -377,7 +373,7 @@ install2:
 	echo Installing vile.hlp to $$dest ; \
 	cp vile.hlp $$dest; \
 	chmod 0644 $$dest/vile.hlp
-	
+
 
 compr-shar: link.msc /tmp/vilevers
 	[ -d cshardir ] || mkdir cshardir
@@ -394,6 +390,7 @@ shar: link.msc /tmp/vilevers
 			-o shardir/vileshar `ls $(EVERYTHING)` link.msc
 
 bigshar: link.msc /tmp/vilevers
+	@echo Do you need to rebuild the revlist????
 	vilevers=`cat /tmp/vilevers`; \
 	shar -spgf@cayman.com -nvile$${vilevers} \
 	    -o vile$${vilevers}shar README `ls $(EVERYTHING) | \
@@ -440,7 +437,7 @@ dosscript:
 	/bin/rm -f tmp.bat
 	#-dos
 	#>dosback.bat
-	
+
 newdosfloppy:
 	touch 0101010170 dosback.bat
 
@@ -479,13 +476,13 @@ tagfile:
 	dotags $(SRC) $(HDRS)
 
 lint:	$(SRC)
-	#lint -hbvxac $(SRC) >lint.out 
-	#lint $(CFLAGS0) $(ENVIR) $(SRC) >lint.out 
-	#lint $(CFLAGS0) -DBERK -DPOSIX -DSUNOS -Dos_chosen  $(SRC) >lint.out 
-	lint $(CFLAGS0) -DSVR3 -Dos_chosen  $(SRC) >lint.out 
+	#lint -hbvxac $(SRC) >lint.out
+	#lint $(CFLAGS0) $(ENVIR) $(SRC) >lint.out
+	#lint $(CFLAGS0) -DBERK -DPOSIX -DSUNOS -Dos_chosen  $(SRC) >lint.out
+	lint $(CFLAGS0) -DSVR3 -Dos_chosen  $(SRC) >lint.out
 
 cflow:	$(SRC)
-	cflow  $(SRC) >cflow.out 
+	cflow  $(SRC) >cflow.out
 
 clean:
 	rm -f *.$O o$(TARGET) $(BUILTHDRS) $(MKTBLS) core *~ *.BAK
@@ -508,7 +505,7 @@ $(EVERYTHING):
 	$(CO) -r$(revision) $@
 
 
-$(OBJ): estruct.h nemode.h edef.h proto.h
+$(OBJ): estruct.h nemode.h edef.h # proto.h
 
 ALWAYS:
 
@@ -518,7 +515,24 @@ externs.$O:	nebind.h nename.h nefunc.h
 vmalloc$O:	nevars.h
 
 # $Log: makefile,v $
-# Revision 1.92  1993/03/17 10:43:53  pgf
+# Revision 1.97  1993/04/01 14:44:30  pgf
+# added -DNeXT for NeXT machines
+#
+# Revision 1.96  1993/04/01  12:55:37  pgf
+# added vmspipe.c
+#
+# Revision 1.95  1993/04/01  12:12:13  pgf
+# took out GINCS stuff, and the -I for /usr/include and /usr/include/sys.  they
+# were interfering with the gcc fixincludes directories
+#
+# Revision 1.94  1993/03/31  19:41:08  pgf
+# added revlist reminder to bigshar, took -O out of gcc line -- it confuses
+# me too much in gdb
+#
+# Revision 1.93  1993/03/25  19:50:58  pgf
+# see 3.39 section of CHANGES
+#
+# Revision 1.92  1993/03/17  10:43:53  pgf
 # made building/naming shar files easier -- gets version automatically
 #
 # Revision 1.91  1993/03/17  10:00:29  pgf
@@ -758,60 +772,60 @@ vmalloc$O:	nevars.h
 # revision 1.15
 # date: 1991/08/07 02:10:53;
 # removed './' from files in dependencies
-# 
+#
 # revision 1.14
 # date: 1991/08/06 16:19:55;
 # added populate rule, and "revision" arg to co rule
-# 
+#
 # revision 1.13
 # date: 1991/08/06 16:09:42;
 # fixed "rw" rule
-# 
+#
 # revision 1.12
 # date: 1991/08/06 14:45:14;
 # commented out shortnames stuff, and
 # added "co" rule
-# 
+#
 # revision 1.11
 # date: 1991/06/28 10:52:36;
 # exclude built headers from come lists
-# 
+#
 # revision 1.10
 # date: 1991/06/16 17:29:07;
 # fixed install rules, so I don't have to change it at home
-# 
+#
 # revision 1.9
 # date: 1991/06/04 16:00:40;
 # switch to -L for shar'ing
-# 
+#
 # revision 1.8
 # date: 1991/06/04 13:12:25;
 # cleanup for release of version three
-# 
+#
 # revision 1.7
 # date: 1991/04/08 13:11:17;
 # added 'rw' target, and make some dos backup changes
-# 
+#
 # revision 1.6
 # date: 1991/04/04 09:38:12;
 # new REMOTE address
-# 
+#
 # revision 1.5
 # date: 1990/12/06 18:53:14;
 # fixed compr-shar entry, commented out remap.h target
-# 
+#
 # revision 1.4
 # date: 1990/12/03 12:01:37;
 # comment change
-# 
+#
 # revision 1.3
 # date: 1990/10/03 16:09:30;
 # shortened "shortnames" to "shorten" !
-# 
+#
 # revision 1.2
 # date: 1990/10/01 12:32:23;
 # added shortnames directory
-# 
+#
 # revision 1.1
 # date: 1990/09/21 10:25:38;
 # initial vile RCS revision

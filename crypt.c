@@ -2,7 +2,10 @@
  *		written by Dana Hoggatt and Daniel Lawrence
  *
  * $Log: crypt.c,v $
- * Revision 1.6  1992/12/23 09:16:54  foxharp
+ * Revision 1.7  1993/04/01 12:53:33  pgf
+ * removed redundant includes and declarations
+ *
+ * Revision 1.6  1992/12/23  09:16:54  foxharp
  * lint
  *
  * Revision 1.5  1992/08/20  23:40:48  foxharp
@@ -20,9 +23,8 @@
  * revision 1.1
  * date: 1990/09/21 10:24:54;
  * initial vile RCS revision
-*/
+ */
 
-#include	<stdio.h>
 #include	"estruct.h"
 #include	"edef.h"
 

@@ -2,7 +2,10 @@
  * Written for vile by Paul Fox, (c)1990
  *
  * $Log: finderr.c,v $
- * Revision 1.15  1993/03/05 17:50:54  pgf
+ * Revision 1.16  1993/04/01 13:07:50  pgf
+ * see tom's 3.40 CHANGES
+ *
+ * Revision 1.15  1993/03/05  17:50:54  pgf
  * see CHANGES, 3.35 section
  *
  * Revision 1.14  1993/01/16  10:34:20  foxharp
@@ -78,6 +81,7 @@ int f,n;
 	register int s;
 	struct LINE *dotp;
 	int moveddot = FALSE;
+	char	*text;
 	
 	int errline;
 	char errfile[NFILEN];
@@ -116,25 +120,46 @@ int f,n;
 			or
 			******** Line 187 of "filec.c"
 		*/
-		if ( dotp->l_text) {
+		if (lisreal(dotp)) {
+			static	TBUFF	*tmp;
 			char verb[20];
-			if ( (sscanf(dotp->l_text,
+#if SUNOS
+			char *t;
+#endif
+
+			if (tb_init(&tmp, EOS) != 0
+			 && tb_bappend(&tmp, dotp->l_text, (unsigned)llength(dotp)) != 0
+			 && tb_append(&tmp, EOS) != 0)
+			 	text = tb_values(tmp);
+			else
+				break;	/* out of memory */
+
+			if ( (sscanf(text,
 				"\"%[^\" \t]\", line %d:",
 				errfile, &errline) == 2
-			  ||  sscanf(dotp->l_text,
+			  ||  sscanf(text,
 				"%[^: \t]: %d:",
 				errfile, &errline) == 2 
+#if SUNOS			/* lint-output */
+			  ||  sscanf(text,
+			  	"%[^:( \t](%d):",
+				errfile, &errline) == 2
+			  ||  ((t = strstr(text, "  ::  ")) != 0
+			    && sscanf(t,
+			  	"  ::  %[^( \t](%d)",
+				errfile, &errline) == 2)
+#endif
 #if APOLLO
-			  ||  sscanf(dotp->l_text,
+			  ||  sscanf(text,
 				"%20[*] Line %d of \"%[^\" \t]\"",
 				verb, &errline, errfile) == 3 
 #endif
 				) && (oerrline != errline || 
 					strcmp(errfile,oerrfile))) {
 				break;
-			} else if (sscanf(dotp->l_text,
+			} else if (sscanf(text,
 			"%*[^ \t:`]: %20[^ \t`] directory `",verb) == 1 ) {
-				char *d = strchr(dotp->l_text,'`') + 1;
+				char *d = strchr(text, '`') + 1;
 				if (verb[0] == 'E') { /* Entering */
 					if (l < DIRLEVELS)
 						dirs[++l] = d;

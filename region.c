@@ -6,7 +6,10 @@
  * internal use.
  *
  * $Log: region.c,v $
- * Revision 1.21  1993/01/23 13:38:23  foxharp
+ * Revision 1.22  1993/04/01 12:53:33  pgf
+ * removed redundant includes and declarations
+ *
+ * Revision 1.21  1993/01/23  13:38:23  foxharp
  * lchange is now chg_buff
  *
  * Revision 1.20  1992/12/13  13:34:25  foxharp
@@ -81,7 +84,7 @@
  * date: 1990/09/21 10:25:58;
  * initial vile RCS revision
  */
-#include        <stdio.h>
+
 #include	"estruct.h"
 #include        "edef.h"
 
@@ -291,7 +294,7 @@ upperregion()
 
 int
 charprocreg(func)
-int (*func)();
+int (*func) P((int));
 {
 	MARK		m;
         register int    c,nc;
@@ -412,7 +415,7 @@ register REGION *rp;
 
 int
 do_fl_region(lineprocfunc,arg)
-int (*lineprocfunc)();
+int (*lineprocfunc) P((int));
 int arg;
 {
         register LINE   *linep;

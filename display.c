@@ -6,7 +6,23 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.66  1993/03/17 10:07:21  pgf
+ * Revision 1.71  1993/04/01 13:06:31  pgf
+ * turbo C support (mostly prototypes for static)
+ *
+ * Revision 1.70  1993/03/29  11:18:59  pgf
+ * now look at environment variables LINES and COLUMNS in getscreensize()
+ * if the tty driver doesn't know the size
+ *
+ * Revision 1.69  1993/03/25  19:50:58  pgf
+ * see 3.39 section of CHANGES
+ *
+ * Revision 1.68  1993/03/18  17:42:20  pgf
+ * see 3.38 section of CHANGES
+ *
+ * Revision 1.67  1993/03/17  11:35:04  pgf
+ * cleaned up confusion in alt-tabstop mode
+ *
+ * Revision 1.66  1993/03/17  10:07:21  pgf
  * extra includes/defs for correct operation on OSF (shouldn't termios.h
  * provide TIOCGWINSIZE, and shouldn't FION_READ work?)
  *
@@ -233,7 +249,6 @@
 #include        "edef.h"
 
 #if UNIX
-# include <signal.h>
 # if POSIX
 #  include <termios.h>
 # else
@@ -262,29 +277,6 @@
 #define	MRK_EXTEND_LEFT  '<'
 #define	MRK_EXTEND_RIGHT '>'
 
-#ifndef __STDC__
-
-#ifndef va_dcl	 /* then try these out */
-
-typedef char *va_list;
-#define va_dcl int va_alist;
-#define va_start(list) list = (char *) &va_alist
-#define va_end(list)
-#define va_arg(list, mode) ((mode *)(list += sizeof(mode)))[-1]
-
-#endif
-
-#endif /* __STDC__ */
-
-#ifdef	lint
-# undef  va_dcl
-# define va_dcl char * va_alist;
-# undef  va_start
-# define va_start(list) list = (char *) &va_alist
-# undef  va_arg
-# define va_arg(ptr,cast) (cast)(ptr-(char *)0)
-#endif
-
 VIDEO   **vscreen;                      /* Virtual screen. */
 #if	! MEMMAP
 VIDEO   **pscreen;                      /* Physical screen. */
@@ -298,13 +290,19 @@ int chg_width, chg_height;
 /******************************************************************************/
 
 static	void	(*dfoutfn) P(( int ));
-
+static	int	dfputs P(( void (*f)(int), char * ));
+static	int	dfputsn P(( void (*f)(int), char *, int ));
+static	int	dfputi P(( void (*f)(int), int, int ));
+static	int	dfputli P(( void (*f)(int), long, int ));
+static	int	dfputf P(( void (*f)(int), int ));
+static	void	dofmt P(( char *, va_list * ));
+/*--------------------------------------------------------------------------*/
 /*
  * Do format a string.
  */
 static
 int	dfputs(outfunc, s)
-	void (*outfunc)();
+	void (*outfunc) P((int));
 	char *s;
 {
 	register int c;
@@ -320,14 +318,14 @@ int	dfputs(outfunc, s)
 /* as above, but takes a count for s's length */
 static
 int	dfputsn(outfunc,s,n)
-	void (*outfunc)();
+	void (*outfunc) P((int));
 	char *s;
 	int n;
 {
 	register int c;
 	register int l = 0;
 	while ((c = *s++) != 0 && n-- != 0) {
-	        (*outfunc)(c);
+		(*outfunc)(c);
 		l++;
 	}
 	return l;
@@ -338,7 +336,7 @@ int	dfputsn(outfunc,s,n)
  */
 static
 int	dfputi(outfunc,i, r)
-	void (*outfunc)();
+	void (*outfunc) P((int));
 	int i,r;
 {
 	register int q;
@@ -360,7 +358,7 @@ int	dfputi(outfunc,i, r)
  */
 static
 int	dfputli(outfunc,l, r)
-	void (*outfunc)();
+	void (*outfunc) P((int));
 	long l;
 	int r;
 {
@@ -381,7 +379,7 @@ int	dfputli(outfunc,l, r)
  */
 static
 int	dfputf(outfunc,s)
-	void (*outfunc)();
+	void (*outfunc) P((int));
 	int s;	/* scaled integer to output */
 {
 	register int i;	/* integer portion of number */
@@ -420,7 +418,7 @@ va_list *app;
 	register int n;
 	register int nchars = 0;
 	int islong;
-	void (*outfunc)() = dfoutfn;  /* local copy, for recursion */
+	void (*outfunc) P((int)) = dfoutfn;  /* local copy, for recursion */
 
 	while ((c = *fmt++) != 0 ) {
 		if (c != '%') {
@@ -813,8 +811,7 @@ int
 upscreen(f, n)
 int f,n;
 {
-	update(TRUE);
-	return(TRUE);
+	return update(TRUE);
 }
 
 int scrflags;
@@ -839,7 +836,7 @@ int force;	/* force update past type ahead? */
 		return SORTOFTRUE;
 #endif
 #if	VISMAC == 0
-	if (force == FALSE && (get_recorded_char(FALSE) != -1))
+	if (force == FALSE && (dotcmdmode != PLAY) && (get_recorded_char(FALSE) != -1))
 		return SORTOFTRUE;
 #endif
 
@@ -1102,7 +1099,7 @@ updpos()
 	/* find the current column */
 	col = 0;
 	i = 0;
-	while (i < DOT.o || (global_g_val(GMDVITABPOS) && !insertmode &&
+	while (i < DOT.o || (!global_g_val(GMDALTTABPOS) && !insertmode &&
 				i <= DOT.o && i < llength(lp))) {
 		c = lgetc(lp, i++);
 		if (c == '\t' && !w_val(curwp,WMDLIST)) {
@@ -1116,7 +1113,7 @@ updpos()
 		}
 
 	}
-	if (global_g_val(GMDVITABPOS) && !insertmode &&
+	if (!global_g_val(GMDALTTABPOS) && !insertmode &&
 			col != 0 && DOT.o < llength(lp))
 		col--;
 
@@ -1221,6 +1218,7 @@ int force;	/* forced update flag */
 {
 	register VIDEO *vp1;
 	register int i;
+
 #if SCROLLCODE && ! MEMMAP
 	if (scrflags & WFKILLS)
 		scrolls(FALSE);
@@ -1371,7 +1369,7 @@ scrscroll(from, to, count)
 int from, to, count;
 {
 	ttrow = ttcol = -1;
-	(*term.t_scroll)(from,to,count);
+	TTscroll(from,to,count);
 }
 
 int
@@ -1740,22 +1738,9 @@ WINDOW *wp;
 		vtputsn(" [modified]", 20);
 	if (bp->b_fname && bp->b_fname[0]) {
 		char *p;
-		p = shorten_path(strcpy(temp,bp->b_fname));
-		if (p && strcmp(p,bp->b_bname) != 0) {
-			if (!isspace(p[0])) {
-				vtprintf(" is ");
-#if MSDOS
-				if (isupper(p[0]) && p[1] == ':') {
-					vtprintf("%c:",p[0]);
-					p += 2;
-				}
-#endif
-				if (!is_pathname(p)
-				 && !isShellOrPipe(p))
-					vtprintf(".%c",slash);
-			}
-			vtprintf("%s",p);
-		}
+		p = shorten_path(strcpy(temp,bp->b_fname), FALSE);
+		if (p != 0 && strcmp(p,bp->b_bname) != 0)
+			vtprintf(" is %s",p);
 	}
 	vtputc(' ');
 
@@ -2199,25 +2184,48 @@ char buf[];
 }
 #endif
 
-/* Get terminal size from system.
-   Store number of lines into *heightp and width into *widthp.
-   If zero or a negative number is stored, the value is not valid.  */
+
+/* Get terminal size from system, first trying the driver, and then
+ * the environment.  Store number of lines into *heightp and width
+ * into *widthp.  If zero or a negative number is stored, the value
+ * is not valid.  This may be fixed (in the tcap.c case) by the TERM
+ * variable.
+ */
 
 void
 getscreensize (widthp, heightp)
 int *widthp, *heightp;
 {
+	char *e;
 #ifdef TIOCGWINSZ
 	struct winsize size;
+#endif
 	*widthp = 0;
 	*heightp = 0;
-	if (ioctl (0, TIOCGWINSZ, (caddr_t)&size) < 0)
-		return;
-	*widthp = size.ws_col;
-	*heightp = size.ws_row;
+#ifdef TIOCGWINSZ
+	if (ioctl (0, TIOCGWINSZ, (caddr_t)&size) == 0) {
+		if (size.ws_row > 0)
+			*heightp = size.ws_row;
+		if (size.ws_col > 0)
+			*widthp = size.ws_col;
+	}
+	if (*widthp <= 0) {
+		e = getenv("COLUMNS");
+		if (e)
+			*widthp = atoi(e);
+	}
+	if (*heightp <= 0) {
+		e = getenv("LINES");
+		if (e)
+			*heightp = atoi(e);
+	}
 #else
-	*widthp = 0;
-	*heightp = 0;
+	e = getenv("COLUMNS");
+	if (e)
+		*widthp = atoi(e);
+	e = getenv("LINES");
+	if (e)
+		*heightp = atoi(e);
 #endif
 }
 
@@ -2260,7 +2268,7 @@ int h, w;
 		if (!newwidth(TRUE,w))
 			return;
 
-	update(TRUE);
+	(void)update(TRUE);
 }
 
 

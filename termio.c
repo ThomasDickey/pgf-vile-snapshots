@@ -4,7 +4,16 @@
  * All operating systems.
  *
  * $Log: termio.c,v $
- * Revision 1.59  1993/03/17 10:07:21  pgf
+ * Revision 1.62  1993/04/01 12:53:33  pgf
+ * removed redundant includes and declarations
+ *
+ * Revision 1.61  1993/04/01  12:03:26  pgf
+ * filio.h is in sys on sunos.
+ *
+ * Revision 1.60  1993/03/25  19:50:58  pgf
+ * see 3.39 section of CHANGES
+ *
+ * Revision 1.59  1993/03/17  10:07:21  pgf
  * extra includes/defs for correct operation on OSF (shouldn't termios.h
  * provide TIOCGWINSIZE, and shouldn't FION_READ work?)
  *
@@ -214,11 +223,7 @@ extern int errno;
    	us back into vile's mode
 */
 
-#include	<signal.h>
-
 /* I suppose this config stuff should move to estruct.h */
-
-
 
 #if POSIX
 # define USE_POSIX_TERMIOS 1
@@ -247,8 +252,9 @@ extern int errno;
 #if (BERK || AIX || AUX2) && !defined(FIONREAD)
 /* try harder to get it */
 # if SUNOS
-#  include "filio.h"
+#  include "sys/filio.h"
 # else
+	/* if you have trouble including ioctl.h, try "sys/ioctl.h" instead */
 #  include "ioctl.h"
 # endif
 #endif
@@ -308,7 +314,7 @@ ttopen()
 	s = tcgetattr(0, &otermios);
 	if (s < 0) {
 		perror("ttopen tcgetattr");
-		exit(1);
+		exit(BAD(1));
 	}
 #if ODT || ISC
 	setvbuf(stdout, tobuf, _IOLBF, TBUFSIZ);
@@ -780,7 +786,7 @@ ttmiscinit()
 	_chartypes_[backspc] |= _bspace;
 
 	/* no buffering on input */
-	setbuf(stdin, NULL);
+	setbuf(stdin, (char *)0);
 }
 
 #else /* not UNIX */
@@ -811,17 +817,17 @@ static long     scrn_tmp_p = 0;
 #include	<tt2def.h>
 
 #define NIBUF   128                     /* Input buffer size            */
-#define NOBUF   1024                    /* MM says bug buffers win!     */
-#define EFN     0                       /* Event flag                   */
+#define NOBUF   1024			/* MM says big buffers win!	*/
+#define EFN     0			/* Event flag			*/
 
-char    obuf[NOBUF];                    /* Output buffer                */
-int     nobuf;                  /* # of bytes in above    */
-char    ibuf[NIBUF];                    /* Input buffer          */
-int     nibuf;                  /* # of bytes in above  */
-int     ibufi;                  /* Read index                   */
-int     oldmode[3];                     /* Old TTY mode bits            */
-int     newmode[3];                     /* New TTY mode bits            */
-short   iochan;                  /* TTY I/O channel             */
+char	obuf[NOBUF];			/* Output buffer		*/
+int	nobuf;				/* # of bytes in above		*/
+char	ibuf[NIBUF];			/* Input buffer			*/
+int	nibuf;				/* # of bytes in above		*/
+int	ibufi;				/* Read index			*/
+int	oldmode[3];			/* Old TTY mode bits		*/
+int	newmode[3];			/* New TTY mode bits		*/
+short	iochan;				/* TTY I/O channel		*/
 #endif
 
 #if     CPM
@@ -937,11 +943,13 @@ ttclose()
 
 #if     VMS
         int     status;
-        int     iosb[1];
+        int     iosb[2];
 
         ttflush();
         status = SYS$QIOW(EFN, iochan, IO$_SETMODE, iosb, 0, 0,
                  oldmode, sizeof(oldmode), 0, 0, 0, 0);
+	if (status == SS$_IVCHAN)
+		return;	/* already closed it */
         if (status!=SS$_NORMAL || (iosb[0]&0xFFFF)!=SS$_NORMAL)
                 exit(status);
         status = SYS$DASSGN(iochan);
@@ -955,8 +963,9 @@ ttclose()
 	rg.h.dl = 1;		/* set it ON */
 	intdos(&rg, &rg);	/* go for it! */
 #endif
-
+#if	!VMS
 	ttclean(TRUE);
+#endif
 }
 
 void
@@ -1099,18 +1108,9 @@ ttgetc()
         int     term[2];
 
         while (ibufi >= nibuf) {
-                ibufi = 0;
-                term[0] = 0;
-                term[1] = 0;
-                status = SYS$QIOW(EFN, iochan, IO$_READLBLK|IO$M_TIMED,
-                         iosb, 0, 0, ibuf, NIBUF, 0, term, 0, 0);
-                if (status != SS$_NORMAL)
-                        exit(status);
-                status = iosb[0] & 0xFFFF;
-                if (status!=SS$_NORMAL && status!=SS$_TIMEOUT)
-                        exit(status);
-                nibuf = (iosb[0]>>16) + (iosb[1]>>16);
-                if (nibuf == 0) {
+		term[0] =
+		term[1] = 0;
+		if (!typahead()) {
                         status = SYS$QIOW(EFN, iochan, IO$_READLBLK,
                                  iosb, 0, 0, ibuf, 1, 0, term, 0, 0);
                         if (status != SS$_NORMAL
@@ -1181,6 +1181,28 @@ ttgetc()
 int
 typahead()
 {
+#if	VMS
+	if (ibufi >= nibuf) {
+		int	status,
+			iosb[2],
+			term[2];
+
+                ibufi = 0;
+                term[0] = 0;
+                term[1] = 0;
+
+                status = SYS$QIOW(EFN, iochan, IO$_READLBLK|IO$M_TIMED,
+                         iosb, 0, 0, ibuf, NIBUF, 0, term, 0, 0);
+                if (status != SS$_NORMAL)
+                        exit(status);
+                status = iosb[0] & 0xFFFF;
+                if (status!=SS$_NORMAL && status!=SS$_TIMEOUT)
+                        exit(status);
+                nibuf = (iosb[0]>>16) + (iosb[1]>>16);
+                return (nibuf > 0);
+	}
+	return TRUE;
+#endif
 
 #if	MSDOS && (MSC || TURBO || ZTC)
 	if (tungotc > 0)
@@ -1223,5 +1245,3 @@ typahead()
 }
 
 #endif /* not UNIX */
-
-

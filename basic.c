@@ -6,7 +6,17 @@
  * framing, are hard.
  *
  * $Log: basic.c,v $
- * Revision 1.43  1993/03/16 10:53:21  pgf
+ * Revision 1.46  1993/04/01 12:53:33  pgf
+ * removed redundant includes and declarations
+ *
+ * Revision 1.45  1993/03/31  19:30:50  pgf
+ * added firstnonwhite() calls to godotplus, so we can publish it as "whole-
+ * lines"
+ *
+ * Revision 1.44  1993/03/18  17:42:20  pgf
+ * see 3.38 section of CHANGES
+ *
+ * Revision 1.43  1993/03/16  10:53:21  pgf
  * see 3.36 section of CHANGES file
  *
  * Revision 1.42  1992/12/14  09:03:25  foxharp
@@ -168,7 +178,7 @@
  * date: 1990/09/21 10:24:42;
  * initial vile RCS revision
  */
-#include        <stdio.h>
+
 #include	"estruct.h"
 #include        "edef.h"
 
@@ -466,6 +476,21 @@ LINE *lp;
 	if (off == llength(lp))
 		return -1;
 	return off;
+}
+
+/* return the offset of the next non-white character on the line,
+	or -1 if there are no more non-white characters on the line */
+int
+nextchar(lp,off)
+LINE *lp;
+int off;
+{
+	while (off < llength(lp)) {
+		if (!isspace(lgetc(lp,off)))
+			return off;
+		off++;
+	}
+	return -1;
 }
 
 /* return the offset of the last non-white character on the line
@@ -1104,13 +1129,17 @@ godotplus(f,n)
 int f,n;
 {
 	int s;
-	if (!f || n == 1)
+	if (!f || n == 1) {
+		firstnonwhite(f,n);
 	        return (TRUE);
+	}
 	if (n < 1)
 	        return (FALSE);
 	s = forwline(TRUE,n-1);
 	if (s && is_header_line(DOT, curbp))
 		s = backline(FALSE,1);
+	if (s == TRUE)
+		firstnonwhite(f,n);
 	return s;
 }
 

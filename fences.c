@@ -8,8 +8,24 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: fences.c,v $
- *	Revision 1.6  1993/01/23 14:26:54  foxharp
- *	protect against trying to fence on empty lines
+ *	Revision 1.11  1993/04/01 13:06:31  pgf
+ *	turbo C support (mostly prototypes for static)
+ *
+ * Revision 1.10  1993/03/31  19:28:50  pgf
+ * fixed bug introduced in 3.38 -- getfence is sometimes called internally
+ * on empty lines, with ch preset, to find indents etc.
+ *
+ * Revision 1.9  1993/03/25  19:50:58  pgf
+ * see 3.39 section of CHANGES
+ *
+ * Revision 1.8  1993/03/24  17:30:30  pgf
+ * cleaned gcc warnings
+ *
+ * Revision 1.7  1993/03/18  17:42:20  pgf
+ * see 3.38 section of CHANGES
+ *
+ * Revision 1.6  1993/01/23  14:26:54  foxharp
+ * protect against trying to fence on empty lines
  *
  * Revision 1.5  1992/12/23  09:18:34  foxharp
  * allow match of fence that is first char. in buffer
@@ -33,12 +49,133 @@
  *
  */
 
-
-#include	<stdio.h>
 #include	"estruct.h"
 #include	"edef.h"
 
 #if CFENCE
+
+#define	CPP_UNKNOWN -1
+#define	CPP_IF       0
+#define	CPP_ELIF     1
+#define	CPP_ELSE     2
+#define	CPP_ENDIF    3
+
+static	int	cpp_keyword P(( LINE *, int ));
+static	int	cpp_fence P(( int, int ));
+
+static int
+cpp_keyword(lp,off)
+LINE	*lp;
+int	off;
+{
+	char	temp[NSTRING];
+	register char *d = temp;
+	register int  n;
+
+	static	struct	{
+		char	*name;
+		int	code;
+	} keyword_table[] = {
+		{ "if",     CPP_IF },
+		{ "ifdef",  CPP_IF },
+		{ "ifndef", CPP_IF },
+		{ "elif",   CPP_ELIF },
+		{ "else",   CPP_ELSE },
+		{ "endif",  CPP_ENDIF }
+	};
+
+	while (off < llength(lp)) {
+		n = lgetc(lp,off++);
+		if ((d - temp < sizeof(temp)-2) && isident(n))
+			*d++ = n;
+		else
+			break;
+	}
+	*d = EOS;
+
+	for (n = 0; n < SIZEOF(keyword_table); n++)
+		if (!strcmp(temp, keyword_table[n].name))
+			return keyword_table[n].code;
+	return CPP_UNKNOWN;
+}
+
+static int
+cpp_fence(sdir,key)
+int sdir;
+int key;
+{
+	int count = 1;
+	int i, j, this;
+
+	/* patch: this should come from arguments */
+	if (key == CPP_ENDIF)
+		sdir = REVERSE;
+	else
+		sdir = FORWARD;
+
+	/* set up for scan */
+	if (sdir == REVERSE)
+		DOT.l = lback(DOT.l);
+	else
+		DOT.l = lforw(DOT.l);
+
+	while (count > 0 && !is_header_line(DOT, curbp)) {
+		if ((i = firstchar(DOT.l)) >= 0
+		 && lgetc(DOT.l,i) == '#'
+		 && (j = nextchar(DOT.l,i+1)) >= 0
+		 && ((this = cpp_keyword(DOT.l,j)) != CPP_UNKNOWN)) {
+			int	done = FALSE;
+
+			switch (this) {
+			case CPP_IF:
+				if (sdir == FORWARD) {
+					count++;
+				} else {
+					done = ((count-- == 1) && 
+						(key != this));
+					if (done)
+						count = 0;
+				}
+				break;
+
+			case CPP_ELIF:
+			case CPP_ELSE:
+				done = ((sdir == FORWARD) && (count == 1));
+				if (done)
+					count = 0;
+				break;
+
+			case CPP_ENDIF:
+				if (sdir == FORWARD) {
+					done = (--count == 0);
+				} else {
+					count++;
+				}
+			}
+
+			if ((count <= 0) || done) {
+				DOT.o = i;
+				break;
+			}
+		}
+
+		if (sdir == REVERSE)
+			DOT.l = lback(DOT.l);
+		else
+			DOT.l = lforw(DOT.l);
+
+		if (is_header_line(DOT,curbp) || interrupted)
+			return FALSE;
+	}
+	if (count == 0) {
+		curwp->w_flag |= WFMOVE;
+		if (doingopcmd)
+			fulllineregions = TRUE;
+		return TRUE;
+	}
+	return FALSE;
+}
+
 /*	the cursor is moved to a matching fence */
 int
 matchfence(f,n)
@@ -68,18 +205,18 @@ int sdir; /* direction to scan if we're not on a fence to begin with */
 	MARK	oldpos; 	/* original pointer */
 	register int ofence = 0;	/* open fence */
 	int s, i;
-	char *otherkey = NULL, *key = NULL;
-	char *lookingforkey = NULL;
+	int key = CPP_UNKNOWN;
 
 	/* save the original cursor position */
 	oldpos = DOT;
 
 	/* ch may have been passed, if being used internally */
 	if (!ch) {
-		if (llength(DOT.l) == 0)
-			return FALSE;
-		if (DOT.o == 0 && (ch = char_at(DOT)) == '#') {
-			if (llength(DOT.l) < 3)
+		if ((i = firstchar(DOT.l)) < 0)	/* offset of first nonblank */
+			return FALSE;		/* line is entirely blank */
+
+		if (DOT.o <= i && (ch = lgetc(DOT.l,i)) == '#') {
+			if (llength(DOT.l) < i+3)
 				return FALSE;
 		} else if ((ch = char_at(DOT)) == '/' || ch == '*') {
 			/* EMPTY */;
@@ -138,37 +275,11 @@ int sdir; /* direction to scan if we're not on a fence to begin with */
 			sdir = REVERSE;
 			break;
 		case '#':
-			for (i = 1; i < llength(DOT.l) &&
-				isspace(lgetc(DOT.l,i)); i++)
-				;
-			if (i + 2 <= llength(DOT.l)) {
-				if (!strncmp("if",
-						&DOT.l->l_text[i], 2)) {
-					sdir = FORWARD;
-					key = "if";
-					otherkey = "en";
-					lookingforkey = "el";
-					break;
-				} else if (!strncmp("el",
-						&DOT.l->l_text[i], 2)) {
-					if (sdir == FORWARD) {
-						key = "if";
-						lookingforkey =
-							otherkey = "en";
-					} else {
-						key = "en";
-						lookingforkey = 
-							otherkey = "if";
-					}
-					break;
-				} else if (!strncmp("en",
-						&DOT.l->l_text[i], 2)) {
-					sdir = REVERSE;
-					key = "en";
-					lookingforkey = otherkey = "if";
-					break;
-				}
-			}
+			if ((i = firstchar(DOT.l)) < 0)
+				return FALSE;	/* line is entirely blank */
+			if ((i = nextchar(DOT.l,i+1)) >= 0
+			 && ((key = cpp_keyword(DOT.l,i)) != CPP_UNKNOWN))
+			 	break;
 			return FALSE;
 		case '*':
 			ch = '/';
@@ -208,8 +319,8 @@ int sdir; /* direction to scan if we're not on a fence to begin with */
 		backchar(TRUE,1);
 	}
 
-	if (lookingforkey != NULL) {  /* we're searching for a cpp keyword */
-		s = cpp_fence(sdir,key,otherkey,lookingforkey);
+	if (key != CPP_UNKNOWN) {  /* we're searching for a cpp keyword */
+		s = cpp_fence(sdir, key);
 	} else if (ch == '/') {
 		s = comment_fence(sdir);
 	} else {
@@ -358,60 +469,6 @@ int sdir;
 	return FALSE;
 }
 
-int
-cpp_fence(sdir,key,otherkey,lookingforkey)
-int sdir;
-char *key, *otherkey, *lookingforkey;
-{
-	int count = 1;
-	int i;
-
-	/* set up for scan */
-	if (sdir == REVERSE)
-		DOT.l = lback(DOT.l);
-	else
-		DOT.l = lforw(DOT.l);
-	while (count > 0 && !is_header_line(DOT, curbp)) {
-		for (i = 1; i < llength(DOT.l) && 
-			isspace(lgetc(DOT.l,i)); i++)
-			;
-		if (llength(DOT.l) >= i + 2 && char_at(DOT) == '#') {
-
-			if (!strncmp(key, &DOT.l->l_text[i], 2))
-				++count;
-			else if (!strncmp(otherkey,
-						&DOT.l->l_text[i], 2))
-				--count;
-			if (count == 1 && 
-				strcmp(otherkey, lookingforkey) && 
-				!strncmp(lookingforkey,
-						&DOT.l->l_text[i], 2)) {
-				
-				count = 0;
-				break;
-			}
-		}
-
-		if (count == 0)
-			break;
-
-		if (sdir == REVERSE)
-			DOT.l = lback(DOT.l);
-		else
-			DOT.l = lforw(DOT.l);
-
-		if (is_header_line(DOT,curbp) || interrupted)
-			return FALSE;
-	}
-	if (count == 0) {
-		curwp->w_flag |= WFMOVE;
-		if (doingopcmd)
-			fulllineregions = TRUE;
-		return TRUE;
-	}
-	return FALSE;
-}
-
 /* get the indent of the line containing the matching brace. */
 int
 fmatchindent()
@@ -422,7 +479,7 @@ fmatchindent()
 	    
 	if (getfence(RBRACE,FORWARD) == FALSE) {
 		gomark(FALSE,1);
-		return previndent(NULL);
+		return previndent((int *)0);
 	}
 
 	ind = indentlen(DOT.l);
@@ -447,7 +504,7 @@ int ch;	/* fence type to match against */
 	register char c;	/* current character in scan */
 
 	/* first get the display update out there */
-	update(FALSE);
+	(void)update(FALSE);
 
 	/* save the original cursor position */
 	oldpos = DOT;
@@ -484,10 +541,10 @@ int ch;	/* fence type to match against */
 	   yet to solve......... */
 	if (count == 0) {
 		forwchar(FALSE, 1);
-		update(FALSE);
+		if (update(FALSE) == TRUE)
 		/* the idea is to leave the cursor there for about a
 			quarter of a second */
-		catnap(250);
+			catnap(250);
 	}
 
 	/* restore the current position */

@@ -6,7 +6,13 @@
  * for the display system.
  *
  * $Log: buffer.c,v $
- * Revision 1.54  1993/03/16 16:04:01  pgf
+ * Revision 1.56  1993/04/01 13:06:31  pgf
+ * turbo C support (mostly prototypes for static)
+ *
+ * Revision 1.55  1993/03/25  19:50:58  pgf
+ * see 3.39 section of CHANGES
+ *
+ * Revision 1.54  1993/03/16  16:04:01  pgf
  * fix 'parentheses suggested' warnings
  *
  * Revision 1.53  1993/03/16  10:53:21  pgf
@@ -193,7 +199,7 @@
  * date: 1990/09/21 10:24:46;
  * initial vile RCS revision
  */
-#include	<stdio.h>
+
 #include	"estruct.h"
 #include	"edef.h"
 
@@ -206,11 +212,42 @@
 #define	Scratch(bp)		(bp->b_flag & (BFSCRTCH))
 #define	InvisibleOrScratch(bp)	(bp->b_flag & (BFINVS|BFSCRTCH))
 
+/*--------------------------------------------------------------------------*/
+static	BUFFER *find_BufferList P(( void ));
+static	int	update_on_chg P(( BUFFER * ));
+static	BUFFER *find_bp P(( BUFFER * ));
+static	int	countBuffers P(( void ));
+static	BUFFER *find_nth_created P(( int ));
+static	BUFFER *find_nth_used P(( int ));
+static	BUFFER *find_latest P(( void ));
+static	BUFFER *find_b_name P(( char * ));
+static	BUFFER *find_b_file P(( char * ));
+static	BUFFER *find_b_hist P(( int ));
+static	BUFFER *find_b_number P(( char * ));
+static	BUFFER *find_any_buffer P(( char * ));
+static	WINDOW *bp2wp P(( BUFFER * ));
+static	int	zotwp P(( BUFFER * ));
+static	void	MarkDeleted P(( BUFFER * ));
+static	void	MarkUnused P(( BUFFER * ));
+static	void	FreeBuffer P(( BUFFER * ));
+static	void	TrackAlternate P(( BUFFER * ));
+static	char *	hist_lookup P(( int ));
+static	int	lookup_hist P(( BUFFER * ));
+static	int	hist_show P(( void ));
+#if !SMALLER
+static	void	footnote P(( int ));
+#endif
+static	void	makebufflist P(( int, char * ));
+
+/*--------------------------------------------------------------------------*/
+
 static	BUFFER	*last_bp,	/* noautobuffer value */
 		*this_bp,	/* '%' buffer */
 		*that_bp;	/* '#' buffer */
 static	int	show_all,	/* true iff we show all buffers */
 		updating_list;
+
+/*--------------------------------------------------------------------------*/
 
 /*
  * Returns the buffer-list pointer, if it exists.
@@ -652,20 +689,20 @@ int	lockfl;
 	register BUFFER *bp;
 	register LINE	*lp;
 	BUFFER *savebp;
-        char bname[NBUFN*10];
+        char bname[NBUFN];
         char nfname[NFILEN];
 
 	if (interrupted || fname == 0)	/* didn't really have a filename */
 		return;
 
-	fname = lengthen_path(strcpy(nfname, fname));
+	(void)lengthen_path(strcpy(nfname, fname));
 	if (global_g_val(GMDIMPLYBUFF)
 	 && curbp != 0
 	 && curbp->b_fname != 0
-	 && strcmp(fname, curbp->b_fname)
+	 && strcmp(nfname, curbp->b_fname)
 	 && !isInternalName(fname)) {
 		savebp = curbp;
-		if (!(bp = find_b_file(fname))) {
+		if (!(bp = find_b_file(nfname))) {
 			makename(bname, fname);
 			unqname(bname, TRUE);
 
@@ -678,7 +715,7 @@ int	lockfl;
         		bp->b_flag &= ~(BFINVS|BFCHG);
 			bp->b_flag |= BFIMPLY;
 			bp->b_active = TRUE;
-			ch_fname(bp, fname);
+			ch_fname(bp, nfname);
 
 			if (copy) {
 				for_each_line(lp, savebp) {
@@ -926,7 +963,7 @@ register BUFFER *bp;
 	int save = ignorecase;
 	ignorecase = FALSE;
 	s =  regexec(global_g_val_rexp(GVAL_CSUFFIXES)->reg,
-			bp->b_fname, NULL, 0, -1);
+			bp->b_fname, (char *)0, 0, -1);
 	ignorecase = save;
 	return s;
 }
@@ -1256,25 +1293,10 @@ void	makebufflist(iflag,dummy)
 			char	*p;
 
 			if ((p = bp->b_fname) != 0)
-				p = shorten_path(strcpy(temp, p));
+				p = shorten_path(strcpy(temp, p), TRUE);
 
-			if (p) {
-				if (isAppendToName(p)) {
-					bprintf("%c%c", p[0], p[1]);
-					p += 2;
-				}
-#if MSDOS
-				if (isupper(p[0]) && p[1] == ':') {
-					bprintf("%c:",p[0]);
-					p += 2;
-				}
-#endif
-				if (!is_pathname(p)
-				 && !isShellOrPipe(p)
-				 && !isspace(p[0]))
-					bprintf(".%c",slash);
+			if (p != 0)
 				bprintf("%s",p);
-			}
 		}
 		bprintf("\n");
 	}
@@ -1290,7 +1312,7 @@ int f,n;
 {
 	this_bp = curbp;
 	that_bp = find_alt();
-	return liststuff(BUFFER_LIST_NAME, makebufflist, f, NULL);
+	return liststuff(BUFFER_LIST_NAME, makebufflist, f, (char *)0);
 }
 
 /*
@@ -1335,7 +1357,7 @@ updatelistbuffers()
 
 			this_bp = curbp;
 			that_bp = find_alt();
-			(void)liststuff(BUFFER_LIST_NAME, makebufflist, show_all, NULL);
+			(void)liststuff(BUFFER_LIST_NAME, makebufflist, show_all, (char *)0);
 
 			/* reposition and restore */
 			while (num-- > 0) {
@@ -1680,7 +1702,7 @@ void	bp_leaks()
 {
 	register BUFFER *bp;
 
-	while (bp = bheadp) {
+	while ((bp = bheadp) != 0) {
 		bp->b_flag &= ~BFCHG;	/* discard any changes */
 		bclear(bheadp);
 		FreeBuffer(bheadp);

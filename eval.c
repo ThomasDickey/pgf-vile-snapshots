@@ -4,7 +4,13 @@
 	written 1986 by Daniel Lawrence
  *
  * $Log: eval.c,v $
- * Revision 1.47  1993/03/16 10:53:21  pgf
+ * Revision 1.49  1993/04/01 13:06:31  pgf
+ * turbo C support (mostly prototypes for static)
+ *
+ * Revision 1.48  1993/03/29  11:18:15  pgf
+ * $pagewid was returning length instead of width
+ *
+ * Revision 1.47  1993/03/16  10:53:21  pgf
  * see 3.36 section of CHANGES file
  *
  * Revision 1.46  1993/03/05  17:50:54  pgf
@@ -152,19 +158,29 @@
  * revision 1.1
  * date: 1990/09/21 10:25:11;
  * initial vile RCS revision
-*/
+ */
 
-#include	<stdio.h>
 #include	"estruct.h"
 #include	"edef.h"
 #include	"nevars.h"
+
+#if ! SMALLER
+#if ENVFUNC
+static	char	*GetEnv P(( char * ));
+#endif
+static	void	makevarslist P(( int, char *));
+static	char *	gtfun P(( char * ));
+static	void	findvar P(( char *, VDESC * ));
+#endif
+static	int	vars_complete P(( int, char *, int * ));
+
+/*--------------------------------------------------------------------------*/
 
 #if	ENVFUNC && !SMALLER
 static
 char	*GetEnv(s)
 	char	*s;
 {
-	extern	char *getenv();
 	register char *v = getenv(s);
 	return v ? v : "";
 }
@@ -254,6 +270,7 @@ int f,n;
 }
 
 #if ! SMALLER
+static
 char *gtfun(fname)	/* evaluate a function */
 char *fname;		/* name of function to evaluate */
 {
@@ -392,7 +409,7 @@ char *vname;		/* name of environment variable to retrieve */
 		case EVCURLINE: return(l_itoa(getcline()));
 		case EVRAM:	return(l_itoa((int)(envram / 1024l)));
 		case EVFLICKER:	return(ltos(flickcode));
-		case EVCURWIDTH:return(l_itoa(term.t_nrow));
+		case EVCURWIDTH:return(l_itoa(term.t_ncol));
 		case EVCBUFNAME:return(curbp->b_bname);
 		case EVCFNAME:	return(curbp->b_fname);
 		case EVSRES:	return(sres);
@@ -463,7 +480,7 @@ char *getkill()		/* return some of the contents of the kill buffer */
 	return(value);
 }
 
-void
+static void
 findvar(var, vd)	/* find a variables type and name */
 char *var;	/* name of var to get */
 VDESC *vd;	/* structure to hold type and ptr */
@@ -665,7 +682,7 @@ char *value;	/* value to set to */
 		case EVCFNAME:	ch_fname(curbp, value);
 				curwp->w_flag |= WFMODE;
 				break;
-		case EVSRES:	status = TTrez(value);
+		case EVSRES:	status = TTrez(atoi(value));
 				break;
 		case EVDEBUG:	macbug = stol(value);
 				break;
@@ -841,7 +858,7 @@ char *tokn;		/* token to evaluate */
 					blen);
 				buf[blen] = 0;
 		
-				/* and step the buffer's line ptr 
+				/* and step the buffer's line ptr
 					ahead a line */
 				bp->b_dot.l = lforw(bp->b_dot.l);
 				bp->b_dot.o = 0;

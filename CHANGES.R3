@@ -1,8 +1,239 @@
-Changes for vile 3.37:
 
+Changes for vile 3.40:
+(pgf)
+
+	+ the makefile no longer supplies any -I options.  this will cause some
+	  machines to not find "ioctl.h" where it's in the sys subdirectory, but
+	  I just spent a day tracking a bug caused by picking up the wrong system
+	  headers (i needed the gcc "fixincludes", and they had moved).
+
+	+ now honor LINES and COLUMNS in getscreensize (display.c)
+
+	+ now handle searching multiple tags files specified in "set tags"
+
+	+ bugfix to fences.c, which fixes indentation when inserting '}'
+(tom)
+	+ corrected 'ffwopen()' in fileio.c so that write of current buffer on
+	  VMS works properly (forgot to strip version number).
+
+	+ made 'flook()' work properly for vms (file bind.c)
+
+	+ moved 'dname[]' table into file exec.c and 'cname[]' table into file
+	  modes.c; did this to get rid of 'comma' macro, which does not work as
+	  intended on Turbo-C (the comma got evaluated too soon).
+
+	+ to prevent redefinition error in Turbo-C, removed redundant includes
+	  for <stdio.h>, <string.h> and <signal.h> (already in file estruct.h)
+	  from the ".c" files: ansi.c at386.c basic.c bind.c buffer.c crypt.c
+	  dg10.c display.c eval.c exec.c file.c globals.c hp110.c hp150.c
+	  ibmpc.c input.c isearch.c line.c main.c modes.c npopen.c oneliner.c
+	  regexp.c region.c search.c spawn.c st520.c tcap.c termio.c tipc.c
+	  vmsvt.c vt52.c window.c word.c wordmov.c x11.c z309.c z_ibmpc.c
+
+	+ moved macro 'P' from file proto.h to estruct.h, adjusted definitions
+	  in file 'estruct.h' to allow use of 'P' macro in CMDFUNC definition.
+	  Added definition of type 'CmdFunc' for the actual pointer-type.
+
+	+ use P-macro for TERM struct definitions (and added TTscroll),
+	  modified files estruct.h and display.c
+
+	+ corrected logic of 'dot_replays_macro()' in file input.c (for the
+	  special case of macro "@w" followed by "dd" command, I noticed that
+	  '.' replayed both commands).
+
+	+ compiled with Turbo-C, turned on warning if function was called w/o a
+	  prototype.  Added prototypes (including those for static procedures)
+	  to get rid of these and other compiler warnings.  Doing this found an
+	  error in eval.c and one in history.c (files modified: bind.c buffer.c
+	  display.c eval.c exec.c fences.c file.c fileio.c history.c ibmpc.c
+	  input.c insert.c main.c mktbls.c modes.c npopen.c opers.c path.c
+	  random.c regexp.c region.c spawn.c tbuff.c window.c).
+
+	+ corrected MSDOS-specific pathname translation in files path.c and
+	  random.c
+
+	+ corrected d_namlen value supplied in readdir function for VMS (file
+	  vms2unix.c)
+
+	+ implemented first version of filename completion for VMS.  (Directory
+	  names are not completed; there are still some ambiguities between
+	  scratch buffer names and VMS directory paths).
+
+	+ added option KBD_UPPERC to input.c; use this to force prompts for VMS
+	  filenames to uppercase.
+
+	+ removed redundant declarations for 'getenv()'; it is already in file
+	  estruct.h
+
+	+ added new file 'vmspipe.c' which provides a piped-read facility
+	  'vms_rpipe()'.
+
+	+ modified file finderr.c to recognize lint output on SUNOS; also
+	  corrected it to ensure that sscanf doesn't scan past the string
+	  limits (no EOS was formerly on each line).
+
+	+ added/used new functions 'pathleaf()' and 'pathcat()' to file path.c
+	  to hide vms/unix pathname differences.
+
+Changes for vile 3.39 (from Tom Dickey):
+
+	+ corrected error in 'get_recorded_char()' (file input.c) that caused
+	  command "ix^[j.j.j.j." to not repeat properly.
+
+	+ corrected prompt-string in 'ShellPrompt()' (file spawn.c)
+
+	+ corrected behavior of filename completion (file filec.c) so that
+	  internal names and shell names can have blanks in them.
+
+	+ provided a last-replay value for 'execfile()' in file exec.c (it was
+	  defaulting to the current buffer, which is wrong).
+
+	+ corrected pointer test in 'tb_sappend()', which was null in the
+	  special case of a ":w" command before any ":e" or other read.
+
+	+ simplified MSDOS-drive translation (untested) in file random.c to
+	  accommodate changes made for VMS in other files.
+
+	+ modified 'cd()' procedure in file random.c to chdir to home directory
+	  on systems that have one.
+
+	The following are changes to support VMS:
+
+	+ added new files (shown in makefile and descrip.mms): dirstuff.h,
+	  vms2unix.c, vile.com
+
+	+ use new file 'dirstuff.h' for definitions in filec.c and path.c
+
+	+ corrected some dependencies in descrip.mms
+
+	+ corrected logic in 'imply_alt()' (file buffer.c) that lost the
+	  original filename argument (replaced it with the lengthen-path).
+
+	+ corrected logic in 'getfile()2' (file file.c) to account for the
+	  distinction between buffer-names and file-names.  Simplified
+	  'getfile()' and 'getfile2()' because of modifications to
+	  'shorten_path()' and 'lengthen_path()'.
+
+	+ corrected logic of 'ffread()' (file fileio.c); on VMS a single read
+	  does not necessarily read an entire file.
+
+	+ corrected definition of macro 'isready_c()' for VMS.
+
+	+ modified 'shorten_path()' (file path.c) to provide the "./" prefix
+	  that was added in files buffer.c and display.c; also absorbed the
+	  test for MSDOS device prefix (e.g., "c:") there.  This was needed to
+	  allow VMS port to show native pathnames.  The equivalent of "./" on
+	  VMS is "[]".
+
+	+ use VMS function 'fgetname()' and 'getname()' to determine the
+	  fully-resolved path in 3 cases: after writing a file, after reading a
+	  file, and in 'lengthen_path()' (files file.c and path.c).  This makes
+	  it know the current version number of each file.
+
+	+ modified 'makename()' (file file.c) to account for VMS pathnames. 
+	  Note that DecShell names (which the C runtime library accepts as
+	  arguments to fopen, etc.) look much like unix filenames.
+
+	+ added new function 'is_internalname()' to file path.c; this serves
+	  the same purpose as the (now obsolete) macro isScratchName.  This
+	  makes a better check (to keep VMS paths distinct from scratch buffer
+	  names) than the macro.
+
+	+ deleted macro isScratchName from file estruct.h; changed macro
+	  isInternalName to use function 'is_internalname()'.  Adjusted other
+	  macros in estruct.h and display.c to make VMS port work properly.
+
+	+ added new function 'non_filename()' to file path.c; use this in files
+	  bind.c and random.c to encapsulate the program+version string.  Use
+	  'non_filename()' in 'is_internalname()'.
+
+	+ corrected logic of 'screen_string()' (file input.c) to handle the
+	  distintion between "[" and "]" used to delimit pathnames on VMS, and
+	  to indicate scratch-buffer names.
+
+	+ corrected wildcard, path and scratch-buffer characters for VMS (file
+	  main.c).
+
+	+ corrected/modified file path.c so that the functions therein support
+	  VMS filenames.  Added several new functions to do this.
+
+	+ corrected code for 'catnap()' (file random.c) for VMS.
+
+	+ corrected several 'exit()' arguments (file termio.c)
+
+	+ corrected VMS's ttgetc function (its interaction with 'typahead()'
+	  was wrong; also 'typahead()' was not really implemented (file
+	  termio.c).
+
+	+ ifdef'd out a redundant 'ttclean()' call (which caused the output on
+	  VMS to be closed more than once, which is really an error).
+
+	+ guard 'vtinit()' (file vmsvt.c) against t_mcol or t_mrow too small
+
+Changes for vile 3.38:
+(pgf)
+	+ cleaned up internal naming and help for alt-tabpos mode. 
+	  alt-tabpos on implies emacs-style, and it's off by default
+
+(tom)
+	+ corrected status-check in 'ffclose()' (in fileio.c) that generated
+	  spurious 'Error on close' message, visible when nothing was read from
+	  a pipe.  (Also eliminated redundant defs for 'npopen.c' in fileio.c
+	  and proto.h).
+
+	+ corrected place in 'globals.c' where (if the buffer was readonly),
+	  the '/' delimiter after an s-command was not eaten.
+
+	+ modified loop-limit in "show-registers" command to display the
+	  numbered registers.
+
+	+ corrected file fences.c, allowing C preprocessor lines to have
+	  leading whitespace before '#'.  The cursor may be on any character
+	  from the first column through the '#'.
+
+	+ rewrote procedure 'cpp_fence()' in file fences.c, allowing it to
+	  recognize "elif" keyword.  Added 'nextchar()' to file basic.c to
+	  support this.
+
+	+ modified procedure 'ShellPrompt()' in file spawn.c to eliminate the
+	  ": " before prompts for ^X-!.
+
+	+ corrected 'kbd_reply()' in file input.c to invoke 'tgetc()' directly
+	  when ^V is used to escape a character.
+
+	+ corrected 'kbd_kill_response()' in file input.c; ^W is not supposed
+	  to trim blanks before a word.
+
+	+ corrected 'update()' in file display.c; the VISMAC define does not
+	  apply to "." command.  This fix allows showmatch to work with "."
+	  command.  Also, in 'fmatch()' in file fences.c; test return-value of
+	  'update()' to avoid catnap when update fails.
+
+	+ corrected 'insert()' and 'insertbol()' in file insert.c; the cursor
+	  was not being advanced after repeated insertions like vi.
+
+	+ corrected file input.c so that it can handle a "." command within a
+	  keyboard macro.  The macro was "iA^[l2." (for testing).
+
+	+ modified file input.c (new procedure 'dot_replays_macro()' so that
+	  the "." command after defining or executing a keyboard macro causes
+	  the macro to be (re)invoked.
+
+	+ split 'kcod2prc()' in file bind.c into 2 parts; the new one (i.e.,
+	  'kcod2str()') is used to support 'dot_replays_macro()'.  Also use new
+	  function 'fnc2kcod()'.
+
+	+ added new function 'kbm_started()' to file input.c to get rid of then
+	  non-recursive variable 'kbdplayreg'.
+
+	+ save/restore "." repeat counts in 'start_kbm()' and 'finish_kbm()' so
+	  that repeat works properly for keyboard macros.
+
+Changes for vile 3.37:
+(pgf)
 	+ works on osf/1 alpha now, with hacks applied to termio.c and
 	  display.c
-
+(tom)
 	+ added files 'descrip.mms' and 'vms_link.opt'; compiled on VAX/VMS
 	  (but did not make it run) (tom dickey)
 

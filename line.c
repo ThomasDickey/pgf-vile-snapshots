@@ -11,7 +11,16 @@
  * which means that the dot and mark values in the buffer headers are nonsense.
  *
  * $Log: line.c,v $
- * Revision 1.35  1993/03/16 10:53:21  pgf
+ * Revision 1.38  1993/04/01 13:06:31  pgf
+ * turbo C support (mostly prototypes for static)
+ *
+ * Revision 1.37  1993/03/25  19:50:58  pgf
+ * see 3.39 section of CHANGES
+ *
+ * Revision 1.36  1993/03/18  17:42:20  pgf
+ * see 3.38 section of CHANGES
+ *
+ * Revision 1.35  1993/03/16  10:53:21  pgf
  * see 3.36 section of CHANGES file
  *
  * Revision 1.34  1993/03/05  17:50:54  pgf
@@ -140,12 +149,11 @@
 
 #define POISON
 #ifdef POISON
-#define poison(p,s) memset(p, 0xdf, s)
+#define poison(p,s) memset((char *)p, 0xdf, s)
 #else
 #define poison(p,s)
 #endif
 
-#include	<stdio.h>
 #include	"estruct.h"
 #include	"edef.h"
 
@@ -544,7 +552,7 @@ lnewline()
 }
 
 /*
- * This function deletes "n" bytes, starting at dot. It understands how do deal
+ * This function deletes "n" bytes, starting at dot. It understands how to deal
  * with end of lines, etc. It returns TRUE if all of the characters were
  * deleted, and FALSE if they were not (because dot ran into the end of the
  * buffer. The "kflag" is TRUE if the text should be put in the kill buffer.
@@ -662,7 +670,7 @@ int type;
 {
 	static char rline[NSTRING];	/* line to return */
 
-	screen_string(rline, NSTRING, type);
+	(void)screen_string(rline, NSTRING, type);
 	return rline;
 }
 
@@ -952,14 +960,10 @@ int f,n;
 		TTbeep();
 		return (FALSE);
 	}
+	if (kbm_started(i,FALSE))
+		return FALSE;
 	ukb = i;
 
-	if (kbdmode == PLAY && kbdplayreg == ukb) {
-		mlforce("[Error: currently executing register %c]",c);
-		kbdmode = STOP;
-		return FALSE;
-	}
-	
 	if (isupper(c))
 		kregflag |= KAPPEND;
 
@@ -1191,6 +1195,8 @@ int f,n;
 	}
 
 	j = reg2index(lastreg = c);
+	if (kbm_started(j,TRUE))
+		return FALSE;
 
 	/* make sure there is something to execute */
 	kp = kbs[j].kbufh;
@@ -1233,7 +1239,8 @@ int f,n;
 	for (s = 0; s < NFILEN; s++) {
 		if (!respbuf[s])
 			break;
-		kinsert(respbuf[s]);
+		if (!kinsert(respbuf[s]))
+			break;
 	}
 	kdone();
 	return TRUE;
@@ -1252,7 +1259,7 @@ char *dummy;
 	register unsigned char	*p;
 	int	any = 0;
 
-	for (i = 10; i < SIZEOF(kbs); i++) {
+	for (i = 0; i < SIZEOF(kbs); i++) {
 		if ((kp = kbs[i].kbufh) != 0) {
 			int first = TRUE;
 			if (any++)
@@ -1289,7 +1296,7 @@ int
 showkreg(f,n)
 int f,n;
 {
-	return liststuff(ScratchName(Registers), listregisters, f, NULL);
+	return liststuff(ScratchName(Registers), listregisters, f, (char *)0);
 }
 #endif
 

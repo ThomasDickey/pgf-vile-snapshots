@@ -8,8 +8,11 @@
  * Major extensions for vile by Paul Fox, 1991
  *
  *	$Log: modes.c,v $
- *	Revision 1.12  1993/03/16 10:53:21  pgf
- *	see 3.36 section of CHANGES file
+ *	Revision 1.13  1993/04/01 13:06:31  pgf
+ *	turbo C support (mostly prototypes for static)
+ *
+ * Revision 1.12  1993/03/16  10:53:21  pgf
+ * see 3.36 section of CHANGES file
  *
  * Revision 1.11  1993/03/05  18:49:39  pgf
  * change "global" modes to "universal", to be less ambigous about what
@@ -45,11 +48,8 @@
  * Revision 1.1  1992/05/29  09:38:33  foxharp
  * Initial revision
  *
- *
- *
  */
 
-#include	<stdio.h>
 #include	"estruct.h"
 #include	"edef.h"
  
@@ -58,7 +58,33 @@
 #define	ONE_COL	26
 #define	NCOLS	3
 
+/*--------------------------------------------------------------------------*/
+
+static	int	same_val P(( struct VALNAMES *, struct VAL *, struct VAL * ));
+static	int	size_val P(( struct VALNAMES *, struct VAL * ));
+static	int	listvalueset P(( char *, int, struct VALNAMES *, struct VAL *, struct VAL * ));
+static	void	makemodelist P(( int, char * ));
+static	int	string_to_bool P(( char *, int * ));
+static	int	string_to_number P(( char *, int * ));
+static	int	adjvalueset P(( char *, int, struct VALNAMES *, int, struct VAL * ));
+static	int	mode_complete P(( int, char *, int * ));
+static	int	mode_eol P(( char *, int, int, int ));
+static	int	do_a_mode P(( int, int ));
+static	int	adjustmode P(( int, int ));
+
+static	char	*cname[] = {	/* names of colors */
+#if	NeWS
+	"WHITE", "RED",     "GREEN", "YELLOW",
+	"BLUE",  "MAGENTA", "CYAN",  "BLACK"
+#else
+	"BLACK", "RED",     "GREEN", "YELLOW",
+	"BLUE",  "MAGENTA", "CYAN",  "WHITE"
+#endif
+	};
+
 static	int	found_mode;	/* flag to suppress redundant error-message */
+
+/*--------------------------------------------------------------------------*/
 
 static int
 same_val(names, tst, ref)
@@ -646,6 +672,7 @@ int	eolchar;
 {
 	return (c == ' ' || c == eolchar);
 }
+
 /*
  * Process a single mode-setting
  */
@@ -672,12 +699,12 @@ int	global;
 	}
 
 	found_mode = FALSE;
-	if ((s = adjvalueset(cbuf, kind, g_valuenames,
-		global, global ? global_g_values.gv : (struct VAL *)0 ))
-	 || (s = adjvalueset(cbuf, kind, b_valuenames,
-		global, global ? global_b_values.bv : curbp->b_values.bv ))
-	 || (s = adjvalueset(cbuf, kind, w_valuenames,
-		global, global ? global_w_values.wv : curwp->w_values.wv ))) {
+	if (((s = adjvalueset(cbuf, kind, g_valuenames,
+		global, global ? global_g_values.gv : (struct VAL *)0 )) != 0)
+	 || ((s = adjvalueset(cbuf, kind, b_valuenames,
+		global, global ? global_b_values.bv : curbp->b_values.bv )) != 0)
+	 || ((s = adjvalueset(cbuf, kind, w_valuenames,
+		global, global ? global_w_values.wv : curwp->w_values.wv )) != 0)) {
 		if (s == TRUE)
 			mlerase();	/* erase the junk */
 		return s;

@@ -8,7 +8,13 @@
  *		editing.
  *
  * $Log: tbuff.c,v $
- * Revision 1.5  1993/03/16 10:53:21  pgf
+ * Revision 1.7  1993/04/01 13:06:31  pgf
+ * turbo C support (mostly prototypes for static)
+ *
+ * Revision 1.6  1993/03/25  19:50:58  pgf
+ * see 3.39 section of CHANGES
+ *
+ * Revision 1.5  1993/03/16  10:53:21  pgf
  * see 3.36 section of CHANGES file
  *
  * Revision 1.4  1993/03/05  17:50:54  pgf
@@ -42,6 +48,9 @@ static	TB_LIST	*all_tbuffs;
 
 #define	AllocatedBuffer(q)	tb_remember(q);
 #define	FreedBuffer(q)		tb_forget(q);
+
+static	void	tb_remember P(( TBUFF * ));
+static	void	tb_forget P(( TBUFF * ));
 
 static
 void	tb_remember(p)
@@ -205,6 +214,8 @@ TBUFF *	tb_sappend(p, s)
 	TBUFF	**p;
 	char	*s;
 {
+	if (!s)
+		s = "";
 	return tb_bappend(p, s, (unsigned)strlen(s));
 }
 

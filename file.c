@@ -6,7 +6,13 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.74  1993/03/16 16:04:01  pgf
+ * Revision 1.76  1993/04/01 13:07:50  pgf
+ * see tom's 3.40 CHANGES
+ *
+ * Revision 1.75  1993/03/25  19:50:58  pgf
+ * see 3.39 section of CHANGES
+ *
+ * Revision 1.74  1993/03/16  16:04:01  pgf
  * fix 'parentheses suggested' warnings
  *
  * Revision 1.73  1993/03/16  10:53:21  pgf
@@ -269,15 +275,20 @@
  * revision 1.1
  * date: 1990/09/21 10:25:16;
  * initial vile RCS revision
-*/
+ */
 
-#include        <stdio.h>
-#include        <string.h>
 #include	"estruct.h"
 #include        "edef.h"
 
-
 extern int fileispipe;
+
+static	int	writable P(( char *, BUFFER * ));
+static	int	getfile2 P(( char *, int ));
+#if DOSFILES
+static	void	guess_dosmode P(( BUFFER * ));
+#endif
+
+/*--------------------------------------------------------------------------*/
 
 static int
 writable(fname, bp)
@@ -315,7 +326,7 @@ int f,n;
 	char fname[NFILEN];
 
 	if ((s = mlreply_file("Replace with file: ", (TBUFF **)0, FILEC_REREAD, fname)) != TRUE)
-                return s;
+		return s;
 
 	/* we want no errors or complaints, so mark it unchanged */
 	curbp->b_flag &= ~BFCHG;
@@ -356,7 +367,7 @@ int
 viewfile(f, n)	/* visit a file in VIEW mode */
 int f,n;
 {
-        char fname[NFILEN];	/* file user wishes to find */
+	char fname[NFILEN];	/* file user wishes to find */
         register int s;		/* status return */
 	static	TBUFF	*last;
 
@@ -404,12 +415,22 @@ int lockfl;		/* check the file for locks? */
 	register BUFFER *bp;
         register int    s;
         char bname[NBUFN];	/* buffer name to put file */
+	char nfname[NFILEN];	/* canonical form of 'fname' */
 
+	/* user may have renamed buffer to look like filename */
         if ((bp=bfind(fname, NO_CREAT, 0)) == NULL) {
-		/* it's not already here by that buffer name */
+
+		/* It's not already here by that buffer name.
+		 * Try to find it assuming we're given the file name.
+		 */
+		(void)lengthen_path(strcpy(nfname, fname));
+		if (is_internalname(nfname)) {
+			mlforce("[Buffer not found]");
+			return FALSE;
+		}
 	        for_each_buffer(bp) {
 			/* is it here by that filename? */
-	                if (strcmp(bp->b_fname, fname)==0) {
+	                if (strcmp(bp->b_fname, nfname)==0) {
 				(void)swbuffer(bp);
 	                        curwp->w_flag |= WFMODE|WFHARD;
 				if (!isShellOrPipe(fname)) {
@@ -420,8 +441,7 @@ int lockfl;		/* check the file for locks? */
 					        return readin(fname, lockfl, 
 								curbp, TRUE);
 					}
-				}
-					
+				}					
 	                        return TRUE;
 	                }
 	        }
@@ -447,11 +467,11 @@ int lockfl;		/* check the file for locks? */
 	        }
 		/* okay, we've got a unique name -- create it */
 	        if (bp==NULL && (bp=bfind(bname, OK_CREAT, 0))==NULL) {
-	                mlforce("[Cannot create buffer]");
+			mlforce("[Cannot create buffer]");
 	                return FALSE;
 	        }
 		/* switch and read it in. */
-		ch_fname(bp,fname);
+		ch_fname(bp, nfname);
 	}
 	return swbuffer(bp);
 }
@@ -462,35 +482,17 @@ char *fname;		/* file name to find */
 int lockfl;		/* check the file for locks? */
 {
         register BUFFER *bp;
-        register int    s;
-	static BUFFER tbp;
-
-#if	MSDOS
-	/* msdos isn't case sensitive */
-	if (isupper(fname[0]) && fname [1] == ':')
-		(void)mklower(fname+2);
-	else
-		(void)mklower(fname);
-#endif
 
 	/* if there are no path delimiters in the name, then the user
 		is likely asking for an existing buffer -- try for that
 		first */
-        if (strchr(fname,slash) == NULL &&
-			(bp=bfind(fname, NO_CREAT, 0)) != NULL) {
+        if (!maybe_pathname(fname)
+	 && (bp=bfind(fname, NO_CREAT, 0)) != NULL) {
 		return swbuffer(bp);
 	}
 
 	/* oh well.  canonicalize the name, and try again */
-	ch_fname(&tbp, fname);		/* fill it out */
-	fname = tbp.b_fname;
-	s = getfile2(fname, lockfl);
-
-#if NO_LEAKS
-	free(tbp.b_fname);
-	tbp.b_fname = 0;
-#endif
-	return s;
+	return getfile2(fname, lockfl);
 }
 
 /*
@@ -552,7 +554,7 @@ register BUFFER *bp;	/* read into this buffer */
 int	mflg;		/* print messages? */
 {
         register WINDOW *wp;
-        register int    s;
+	register int    s;
         int    nline;
 #if VMALLOC
 	extern int doverifys;
@@ -591,6 +593,15 @@ int	mflg;		/* print messages? */
         if (mflg) {
 		 mlforce("[Reading %s ]", fname);
 	}
+
+#if VMS
+	{	/* fully-resolve the filename */
+		extern FILE *ffp;
+		char temp[NFILEN];
+		ch_fname(bp, fgetname(ffp, temp));
+		fname = bp->b_fname;
+	}
+#endif
 
 #if UNIX & before
 	if (fileispipe)
@@ -663,7 +674,7 @@ out:
         }
 	imply_alt(fname, FALSE, lockfl);
 	updatelistbuffers();
-        if (s == FIOERR || s == FIOFNF) {	/* False if error.      */
+	if (s == FIOERR || s == FIOFNF) {	/* False if error.      */
 #if UNIX
 		extern int sys_nerr, errno;
 		extern char *sys_errlist[];
@@ -714,7 +725,6 @@ int *nlinep;
 		bp->b_ltext = NULL;
 		return FIOERR;
 	}
-
 
 	/* loop through the buffer, replacing all newlines with the
 		length of the _following_ line */
@@ -898,7 +908,7 @@ int rdo;
 	}
 	if (!global_b_val(MDTERSE))
 		mlwrite("[%sRead %d line%s from \"%s\"%s]", m,
-			n, n != 1 ? "s":"", f, rdo ? "  (read-only)":"" );
+			n, PLURAL(n), f, rdo ? "  (read-only)":"" );
 	else
 		mlforce("[%s%d lines]",m,n);
 }
@@ -921,6 +931,23 @@ char    fname[];
         register char *fcp;
         register char *bcp;
 
+#if VMS
+	if (is_vms_pathname(fname, TRUE)) {
+		(void)strcpy(bname, "NoName");
+		return;
+	}
+	if (is_vms_pathname(fname, FALSE)) {
+		for (fcp = fname + strlen(fname);
+			fcp > fname && !strchr(":]", fcp[-1]);
+				fcp--)
+				;
+		(void)strncpy(bname, fcp, NBUFN-1);
+		if (bcp = strchr(bname, ';'))	/* strip version */
+			*bcp = EOS;
+		(void)mklower(bname);
+		return;
+	}
+#endif
 	fcp = &fname[strlen(fname)];
 	/* trim trailing whitespace */
 	while (fcp != fname && (fcp[-1] == ' ' || fcp[-1] == '\t'
@@ -941,23 +968,19 @@ char    fname[];
         while (bcp!=fcp && bcp[-1]!=':' && bcp[-1]!='/')
                 --bcp;
 #endif
-#if     VMS
-        while (bcp!=fcp && bcp[-1]!=':' && bcp[-1]!=']')
-                --bcp;
-#endif
 #if     CPM
         while (bcp!=fcp && bcp[-1]!=':')
                 --bcp;
 #endif
 #if     MSDOS
         while (bcp!=fcp && bcp[-1]!=':' && bcp[-1]!='\\'&&bcp[-1]!='/')
-                --bcp;
+		--bcp;
 #endif
 #if     ST520
         while (bcp!=fcp && bcp[-1]!=':' && bcp[-1]!='\\')
                 --bcp;
 #endif
-#if     UNIX
+#if     UNIX || VMS
 	bcp = bname;
 	if (isShellOrPipe(fcp)) { /* ...it's a shell command; bname is first word */
 		*bcp++ = SHPIPE_LEFT[0];
@@ -969,8 +992,8 @@ char    fname[];
 		*bcp = EOS;
 		return;
 	}
-	lastsl = strrchr(fcp,'/');
-	if (lastsl) {
+
+	if ((lastsl = last_slash(fcp)) != 0) {
 		(void)strncpy(bcp,lastsl+1,NBUFN);
 		bcp[NBUFN-1] = EOS;
 	} else {  /* no slashes, use the filename as is */
@@ -1091,7 +1114,7 @@ int msgf;
         REGION region;
 
 	/* starting at the beginning of the buffer */
-        lp = lforw(bp->b_line.l);
+	lp = lforw(bp->b_line.l);
         region.r_orig.l = lp;
         region.r_orig.o = 0;
 
@@ -1158,7 +1181,7 @@ BUFFER	**bpp;
 	if (s != TRUE)
 		return s;
 #endif
-        if (*fn == SCRTCH_LEFT[0] || *fn == ' ') {
+        if (is_internalname(fn)) {
         	mlforce("[No filename]");
         	return FALSE;
         }
@@ -1169,8 +1192,6 @@ BUFFER	**bpp;
 	/* tell us we're writing */
 	if (msgf == TRUE)
 		mlwrite("[Writing...]");
-
-	imply_alt(fn, TRUE, FALSE);
 
 #if UNIX & ! NeWS
 	if (fileispipe)
@@ -1213,7 +1234,7 @@ BUFFER	**bpp;
         while (rp->r_size >= llength(lp)+1) {
                 if ((s=ffputline(&lp->l_text[0], llength(lp), do_cr))
 						!= FIOSUC)
-                        goto out;
+			goto out;
                 ++nline;
 		nchar += llength(lp) + 1;
 		rp->r_size -= llength(lp) + 1;
@@ -1235,6 +1256,15 @@ BUFFER	**bpp;
 
  out:
         if (s == FIOSUC) {                      /* No write error.      */
+#if VMS
+		if ((*bpp != NULL) && !strcmp(fn, (*bpp)->b_fname)) {
+			/* fully-resolve the filename */
+			extern FILE *ffp;
+			char temp[NFILEN];
+			ch_fname(*bpp, fgetname(ffp, temp));
+			fn = (*bpp)->b_fname;
+		}
+#endif
                 s = ffclose();
                 if (s == FIOSUC && msgf) {      /* No close error.      */
 			if (!global_b_val(MDTERSE)) {
@@ -1245,9 +1275,9 @@ BUFFER	**bpp;
 				} else {
 					action = "Wrote";
 				}
-				mlwrite("[%s %d line%s %ld char%s to %s]", 
-					action, nline, (nline>1)?"s":"",
-					nchar, (nchar>1)?"s":"", fn);
+				mlwrite("[%s %d line%s %ld char%s to \"%s\"]", 
+					action, nline, PLURAL(nline),
+					nchar, PLURAL(nchar), fn);
 			} else {
 				mlforce("[%d lines]", nline);
 			}
@@ -1269,6 +1299,8 @@ BUFFER	**bpp;
 #endif
         if (s != FIOSUC)                        /* Some sort of error.  */
                 return FALSE;
+
+	imply_alt(fn, TRUE, FALSE);
         return TRUE;
 }
 
@@ -1333,7 +1365,7 @@ int	msgf;
 		if (s == FIOSUC && msgf) {	/* No close error.	*/
 			if (!global_b_val(MDTERSE))
 				mlwrite("[Wrote %d line%s to %s ]",
-					nline,nline!=1?"s":"", fn);
+					nline, PLURAL(nline), fn);
 			else
 				mlforce("[%d lines]", nline);
 		}
@@ -1552,15 +1584,15 @@ int signo;
 	static char dirnam[NSTRING] = "/tmp/vileDXXXXXX";
 #else
 	static char dirnam[NSTRING] = "/tmp";
+	char temp[NFILEN];
 #endif
-	char filnam[50];
+	char filnam[NFILEN];
 	char cmd[80];
 	BUFFER *bp;
 	char *np;
 	int wrote = 0;
 	int created = 0;
-	char *getenv();
-	char *mktemp();
+	extern char *mktemp();
 
 #if APOLLO
 	extern	char	*getlogin();
@@ -1587,13 +1619,11 @@ int signo;
 				}
 				created = 1;
 			}
+			(void)pathcat(filnam, dirnam, bp->b_bname);
+#else
+			(void)pathcat(filnam, dirnam,
+				strcat(strcpy(temp, "V"), bp->b_bname));
 #endif
-			(void)strcat(strcpy(filnam,dirnam), "/");
-#if ! HAVE_MKDIR
-			(void)strcat(filnam,"V");
-#endif
-			(void)strcat(filnam,bp->b_bname);
-
 			set_b_val(bp,MDVIEW,FALSE);
 			if (writeout(filnam,bp,FALSE) != TRUE) {
 				vttidy(FALSE);

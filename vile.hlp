@@ -92,6 +92,9 @@ Buffer manipulation commands:
 			:e#
 			^^   (ctrl-^)  (but many keyboards can't produce this)
 
+		[ See the note under "Differences", below, for comments
+		on vi's use of '_'.]
+
 	:e	Edit a file.  If the file is already in a buffer, that buffer
 		will be recalled into the current window.  This occurs as
 		follows: If the name given contains no path delimiters
@@ -418,17 +421,25 @@ Text manipulation command:
 		tagname.
 	^T or ^X-^] or ":pop" - pops to the file and location just previous
 		to the last tag command.
-	When one of these commands is used, vile will look for a file named
-	"tags" in the current directory, and load it into a hidden buffer
-	for use during tag searches.  This buffer is editable if you wish
-	(":e tags"), but will not appear in the buffer lists.  If a buffer
-	named "tags" is already available when a tag is first requested, it
-	will be used instead of a file called "tags", and of course will
-	remain visible.  If the ":ta" form of the command is used, tag
-	matches must be exact, unless "taglength" is set non-zero, in which
-	case the first tag matching that many characters will be used.
-	If your tags file is not named "tags", simply edit it and name the
-	buffer "tags" with the ":rename-buffer" command.
+
+	When one of these commands is used, vile will (by default) look for
+	a file named "tags" in the current directory, and load it into a
+	hidden buffer for use during tag searches.  This buffer is editable
+	if you wish (":e tags"), but will not appear in the buffer lists. 
+	If a buffer named "[Tags 1]" is already available when a tag is
+	first requested, it will be used instead of a file found by
+	searching the tags setting, and of course will remain visible.
+
+	The name of the default tags file may be changed with "set tags"
+	(see "tags" under "Editor modes", below).  If multiple filenames
+	are given in the "tags" setting (separated by whitespace), they are
+	searched in order, and placed in buffers named "[Tags 1]", "[Tags 2]",
+	"[Tags 3]", etc.
+
+	If the ":ta" form of the command is used, tag matches must be
+	exact, unless the mode "taglength" is set non-zero, in which case
+	the first tag matching that many characters will be used.
+
 
 Miscellaneous commands
 ----------------------
@@ -498,12 +509,14 @@ Editor modes
 	B or W indicating whether the mode is universal, or belongs to
 	buffers or windows, are:
 
-	alt-tabpos (atp) Position the cursor over tab and control characters
-		the way vi would, that is, at the end of the tab or control
-		character display sequence.  If turned off, the cursor is
-		positioned over tabs and control characters the way it would be
-		in emacs, i.e.  at the start of the tab or control character
-		display sequence.  (U)
+	alt-tabpos (atp) If set, vile will position the cursor over tab and
+		control characters the way emacs would, that is, at the
+		start of a tab or control character display sequence.  If
+		turned off (the default), the cursor is positioned over
+		tabs and control characters the way it would be in vi, i.e. 
+		at the end of the tab or control character display
+		sequence.  (To match the behavior of earlier versions of
+		vile, should be set.) (U)
 
 	autobuffer (ab) Controls whether vile uses "most-recently-used"
 		style buffering, or vi-style (command-line order) buffers. 
@@ -620,7 +633,7 @@ Editor modes
 		shiftwidth or the line shifting commands, then the
 		appropriate number of space characters will be inserted
 		instead.  Use '^V^I' to insert a real tab, and remember
-                that pre-existing tabs will not be affected.  Use '^A-SP'
+                that pre-existing tabs will not be affected.  Use '^A-<SP>'
                 to eliminate pre-existing tabs from a region of text. (B)
 
 	tabstop (ts) Will prompt for a new value for spacing of normal
@@ -634,7 +647,18 @@ Editor modes
 
 	tagrelative (tr) Causes files looked up via the tags mechanism to
 		be found relative to the location of the tags file, rather
-		than relative to the current directory. (B)
+		than relative to the current directory. This allows the
+		same tags file to be useful from different locations, while
+		not requiring absolute filenames.  For example, using 
+		`set tags "tags ../tags"' would allow a single tags file
+		to be used in a small source hierarchy from either the
+		parent or a child directory. (B)
+
+	tags	This gives the names of the file(s) in which to look up
+		tag references.  It is a whitespace-separated list of
+		filenames.  Relative pathnames are evaluated with respect
+		to the current directory of vile at the time of the tags
+		lookup.
 
 	terse   vile produces more "status" messages than vi, which may
 		become annoying at low baud rates.  Setting terse mode will
@@ -1181,9 +1205,17 @@ Differences from vi
 	on the last word of a line ending in whitespace deletes the
 	trailing whitespace.  Vi does not delete the whitespace. 
 
-	If you use "cd" to change directories, all buffers whose filenames
-	do not already begin with '/' will be made absolute, by prepending
-	the current directory name to the filename.
+	In the real vi, the '_' command is a little-used motion command,
+	which moves the cursor to the start of the Nth next line, where N
+	is the argument given, less 1.  So '2_' takes you to the start of
+	the next line.  Primarily intended for use in an operator context,
+	as in "2d_", it is always exactly equivalent in those cases to
+	"stuttering" the operator, as in "2dd".  Most people know about and
+	use the stuttered form, so in vile, the '_' command is used by
+	default for buffer history.  If the regular vi behavior is desired,
+	put the following in the .vilerc file:
+
+		bind-key whole-lines _
 
 Sample .vilerc
 --------------
@@ -1237,8 +1269,16 @@ Sample .vilerc
 	bind-key execute-macro-3 ^A-K
 	bind-key execute-macro-4 ^A-M
 
-Note on Scrolling
------------------
+Notes on TERM types and Scrolling
+---------------------------------
+
+	vile will determine the window size in one of three ways: first it
+	will ask the tty driver (using a TIOCGWINSZ ioctl call under UNIX),
+	then it will use the LINES and COLUMNS environment variables, and
+	as a last resort will use the size specified in the TERMCAP entry
+	corresponding to the TERM variable.  In addition, vile will attempt
+	to support the SIGWINCH signal, which allows it to track changes to
+	the size of the window in which it is running.
 
 	If scrolling is really slow, or really ugly (the status line hops
 	around a lot), and you're using a vt102 or compatible terminal that
@@ -1250,7 +1290,7 @@ Note on Scrolling
 	will augment an "xterm" entry with the codes needed for scrolling
 	regions.
 
-	In any case, here's one that should work:
+	In any case, here's a termcap entry that should work:
 
         dy|vt102|vt-102|dec vt102:\
             :do=^J:co#80:li#24:cl=50\E[;H\E[2J:\

@@ -4,7 +4,10 @@
  * screen output. It compiles into nothing if not a TI-PC driver
  *
  * $Log: tipc.c,v $
- * Revision 1.3  1991/09/10 01:19:35  pgf
+ * Revision 1.4  1993/04/01 12:53:33  pgf
+ * removed redundant includes and declarations
+ *
+ * Revision 1.3  1991/09/10  01:19:35  pgf
  * re-tabbed, and moved ESC and BEL to estruct.h
  *
  * Revision 1.2  1991/08/07  12:35:07  pgf
@@ -17,7 +20,6 @@
 
 #define termdef 1			/* don't define "term" external */
 
-#include	<stdio.h>
 #include	"estruct.h"
 #include	"edef.h"
 

@@ -5,7 +5,19 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.36  1993/03/17 10:01:18  pgf
+ * Revision 1.40  1993/04/01 13:07:50  pgf
+ * see tom's 3.40 CHANGES
+ *
+ * Revision 1.39  1993/03/31  19:36:08  pgf
+ * changes for tags.c (tags path implementation)
+ *
+ * Revision 1.38  1993/03/25  19:50:58  pgf
+ * see 3.39 section of CHANGES
+ *
+ * Revision 1.37  1993/03/18  17:42:20  pgf
+ * see 3.38 section of CHANGES
+ *
+ * Revision 1.36  1993/03/17  10:01:18  pgf
  * overwrite() renamed to overwritechars()
  *
  * Revision 1.35  1993/03/16  10:53:21  pgf
@@ -118,12 +130,6 @@
  *
  */
 
-#if ANSI_PROTOS
-# define P(a) a
-#else
-# define P(a) ()
-#endif
-
 extern int main P(( int, char *[] ));
 #if MSDOS
 extern void expand_wild_args P(( int * , char ***));
@@ -162,7 +168,7 @@ extern void tcapclose P(( void ));
 extern void tcapkopen P(( void ));
 extern void tcapkclose P(( void ));
 extern void tcaprev P(( int ));
-extern int tcapcres P(( void ));
+extern int tcapcres P(( int ));
 extern void tcapmove P(( int, int ));
 extern void tcapeeol P(( void ));
 extern void tcapeeop P(( void ));
@@ -191,6 +197,7 @@ extern int forwline P(( int, int ));
 extern int firstnonwhite P(( int, int ));
 extern int lastnonwhite P(( int, int ));
 extern int firstchar P(( LINE * ));
+extern int nextchar P(( LINE *, int ));
 extern int lastchar P(( LINE * ));
 extern int forwbline P(( int, int ));
 extern int backbline P(( int, int ));
@@ -229,7 +236,10 @@ extern int unbindchar P(( int ));
 extern int apro P(( int, int ));
 extern int startup P(( char *));
 extern char * flook P(( char *, int ));
+extern char * kcod2str P(( int, char * ));
+extern char * kcod2prc P(( int, char * ));
 extern int insertion_cmd P(( void ));
+extern int fnc2kcod P(( CMDFUNC * ));
 extern char * fnc2engl P(( CMDFUNC * ));
 extern CMDFUNC * engl2fnc P(( char * ));
 extern CMDFUNC * kcod2fnc P(( int ));
@@ -371,6 +381,11 @@ extern int docmd P(( char *, int, int, int ));
 extern int dobuf P(( BUFFER * ));
 extern int dofile P(( char * ));
 extern int execute P(( CMDFUNC *, int, int ));
+extern int storemac P(( int, int ));
+#if PROC
+extern int storeproc P(( int, int ));
+extern int execproc P(( int, int ));
+#endif
 extern int cbuf1 P(( int, int ));
 extern int cbuf2 P(( int, int ));
 extern int cbuf3 P(( int, int ));
@@ -512,6 +527,7 @@ extern int kbd_mac_begin P(( int, int ));
 extern int kbd_mac_end P(( int, int ));
 extern int kbd_mac_exec P(( int, int ));
 extern int kbd_mac_save P(( int, int ));
+extern int kbm_started P(( int, int ));
 extern int start_kbm P(( int, int, TBUFF * ));
 extern void finish_kbm P(( void ));
 
@@ -564,12 +580,14 @@ extern void free_local_vals P(( struct VALNAMES *, struct VAL *, struct VAL * ))
 extern int listmodes P(( int, int ));
 
 /* npopen.c */
+#if UNIX
 extern FILE * npopen P(( char *, char * ));
 extern int inout_popen P(( FILE **, FILE **, char * ));
 extern void npclose P(( FILE * ));
 extern void exec_sh_c P(( char * ));
 extern int system_SHELL P(( char * ));
 extern int softfork P(( void ));
+#endif
 
 /* oneliner.c */
 extern int pregion P(( int ));
@@ -609,12 +627,25 @@ extern int operdetab P(( int, int ));
 extern int opertrim P(( int, int ));
 
 /* path.c */
+#if MSDOS
+extern char * is_msdos_drive P(( char * ));
+#endif
+#if VMS
+extern int is_vms_pathname P(( char *, int ));
+extern char * vms_pathleaf P(( char * ));
+#endif
+extern char * pathleaf P(( char * ));
+extern char * pathcat P(( char *, char *, char * ));
+extern char * last_slash P(( char * ));
 extern int glob P(( char * ));
 extern char * canonpath P(( char * ));
-extern char * shorten_path P(( char * ));
+extern char * shorten_path P(( char *, int ));
 extern char * lengthen_path P(( char * ));
 extern int is_pathname P(( char * ));
+extern int maybe_pathname P(( char * ));
 extern char * is_appendname P(( char * ));
+extern char * non_filename P(( void ));
+extern int is_internalname P(( char * ));
 
 /* random.c */
 extern int liststuff P(( char *, void (*)(), int, char * ));
@@ -748,7 +779,8 @@ extern int filter P(( int, int ));
 extern int gototag P(( int, int ));
 extern int cmdlinetag P(( char * ));
 extern int tags P(( char *, int ));
-extern BUFFER * gettagsfile P(( void ));
+extern void nth_name P(( char *,  char *, int ));
+extern BUFFER * gettagsfile P(( int, int * ));
 extern LINE * cheap_scan P(( BUFFER *, char *, int ));
 extern int untagpop P(( int, int ));
 extern void pushuntag P(( char *, int ));
@@ -789,6 +821,8 @@ extern int linesmatch P(( LINE *, LINE * ));
 extern void dumpuline P(( LINE * ));
 extern void setupuline P(( LINE * ));
 extern void resetuline P(( LINE *, LINE * ));
+
+/* window.c */
 extern int reposition P(( int, int ));
 extern int refresh P(( int, int ));
 extern int poswind P(( int, int ));
@@ -801,6 +835,7 @@ extern int mvupnxtwind P(( int, int ));
 extern int mvrightwind P(( int, int ));
 extern int mvleftwind P(( int, int ));
 extern int onlywind P(( int, int ));
+extern int delwind P(( int, int ));
 extern int delwp P(( WINDOW * ));
 extern WINDOW * splitw P(( int, int ));
 extern int splitwind P(( int, int ));
@@ -850,7 +885,6 @@ extern int insbrace P(( int, int ));
 extern int inspound P(( void ));
 extern int fmatch P(( int ));
 extern int getfence P(( int, int ));
-extern int cpp_fence P((int, char *, char *, char * ));
 extern int comment_fence P(( int ));
 extern int simple_fence P(( int, int, int ));
 extern void putdotback P(( BUFFER *, LINE * ));
@@ -898,6 +932,9 @@ extern	int x_key_events_ready P(( void ));
 #endif
 
 #if MSDOS
+/* ibmpc.c */
+extern	void scwrite P(( int, int, int, char *, int, int ));
+/* random.c */
 extern char * curr_dir_on_drive P(( int ));
 extern int curdrive P(( void ));
 extern int setdrive P(( int ));

@@ -8,7 +8,13 @@
  *  Last Updated: 07/14/87
  *
  * $Log: vmsvt.c,v $
- * Revision 1.4  1993/03/17 10:00:29  pgf
+ * Revision 1.6  1993/04/01 12:57:22  pgf
+ * removed redundant includes and declarations
+ *
+ * Revision 1.5  1993/03/25  19:50:58  pgf
+ * see 3.39 section of CHANGES
+ *
+ * Revision 1.4  1993/03/17  10:00:29  pgf
  * initial changes to make VMS work again
  *
  * Revision 1.3  1992/08/20  23:40:48  foxharp
@@ -22,20 +28,17 @@
  * initial vile RCS revision
  */
 
-#include	<stdio.h>		/* Standard I/O package		*/
 #include	"estruct.h"		/* Emacs' structures		*/
 #include	"edef.h"		/* Emacs' definitions		*/
 
 #if	VMSVT
 
 #include	 <descrip.h>		/* Descriptor definitions	*/
-
-/*  These would normally come from iodef.h and ttdef.h  */
-#define IO$_SENSEMODE	0x27		/* Sense mode of terminal	*/
-#define TT$_UNKNOWN	0x00		/* Unknown terminal		*/
+#include	<iodef.h>		/* to get IO$_SENSEMODE		*/
+#include	<ttdef.h>		/* to get TT$_UNKNOWN		*/
 
 /** Forward references **/
-int vmsopen(), vmskopen(), vmskclose(), ttgetc();
+int vmsopen(), vmskopen(), vmskclose();
 int vmsmove(), vmseeol(), vmseeop(), vmsbeep(), vmsrev();
 int vmscres();
 extern int eolexist, revexist;
@@ -50,7 +53,7 @@ static char * begin_reverse, * end_reverse, * erase_to_end_line;
 static char * erase_whole_display;
 static int termtype;
 
-#define SMG$K_BEGIN_REVERSE		0x1bf
+#define SMG$K_BEGIN_REVERSE		0x1bf	/* <smgtrmptr.h> */
 #define SMG$K_END_REVERSE		0x1d6
 #define SMG$K_SET_CURSOR_ABS		0x23a
 #define SMG$K_ERASE_WHOLE_DISPLAY	0x1da
@@ -82,6 +85,9 @@ TERM	term	= {
 #if	COLOR
 	, vmsfcol,			/* Set forground color		*/
 	vmsbcol				/* Set background color		*/
+#endif
+#if	SCROLLCODE
+	, NULL				/* not yet			*/
 #endif
 };
 
@@ -220,7 +226,7 @@ vmseeop()
  ***/
 vmsbeep()
 {
-	ttputc('\007');
+	ttputc(BEL);
 }
 
 
@@ -363,12 +369,19 @@ vmsopen()
 
 	/* Access the system terminal definition table for the		*/
 	/* information of the terminal type returned by IO$_SENSEMODE	*/
-	if ((smg$init_term_table_by_type(&tc.t_type, &termtype) & 1) == 0)
+	if ((smg$init_term_table_by_type(&tc.t_type, &termtype) & 1) == 0) {
 		return -1;
+	}
 		
 	/* Set sizes */
 	term.t_nrow = ((unsigned int) tc.t_mandl >> 24) - 1;
 	term.t_ncol = tc.t_width;
+
+	if (term.t_mrow < term.t_nrow)
+		term.t_mrow = term.t_nrow;
+
+	if (term.t_mcol < term.t_ncol)
+		term.t_mcol = term.t_ncol;
 
 	/* Get some capabilities */
 	begin_reverse = vmsgetstr(SMG$K_BEGIN_REVERSE);

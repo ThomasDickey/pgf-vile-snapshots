@@ -3,7 +3,16 @@
  * the knowledge about files are here.
  *
  * $Log: fileio.c,v $
- * Revision 1.36  1993/03/17 10:00:29  pgf
+ * Revision 1.39  1993/04/01 13:07:50  pgf
+ * see tom's 3.40 CHANGES
+ *
+ * Revision 1.38  1993/03/25  19:50:58  pgf
+ * see 3.39 section of CHANGES
+ *
+ * Revision 1.37  1993/03/18  17:42:20  pgf
+ * see 3.38 section of CHANGES
+ *
+ * Revision 1.36  1993/03/17  10:00:29  pgf
  * initial changes to make VMS work again
  *
  * Revision 1.35  1993/03/16  10:53:21  pgf
@@ -130,21 +139,44 @@
 #include	<sys/stat.h>
 #include        <errno.h>
 #endif
+
 #if VMS
 #include	<file.h>
 #else
 #include        <fcntl.h>
 #endif
+
 #if	BERK
 #include "sys/ioctl.h"
 #endif
+
 #if MSDOS
 #include	<sys/stat.h>
+#if TURBO
+#include	<io.h>
+#endif
 #endif
 
 FILE	*ffp;		/* File pointer, all functions. */
 int fileispipe;
 int eofflag;		/* end-of-file flag */
+
+/*--------------------------------------------------------------------------*/
+
+static	void	free_fline P(( void ));
+
+static	int	count_fline;	/* # of lines read with 'ffgetline()' */
+
+/*--------------------------------------------------------------------------*/
+static void
+free_fline()
+{
+	if (fline != NULL) {
+		free(fline);
+		fline = NULL;
+		flen = 0;
+	}
+}
 
 /*
  * Open a file for reading.
@@ -153,31 +185,33 @@ int
 ffropen(fn)
 char    *fn;
 {
-#if UNIX
-	FILE *npopen();
-#endif
-
-
-#if UNIX
-	
-	if (isShellOrPipe(fn)) {
-	        if ((ffp=npopen(fn+1, "r")) == NULL)
-	                return (FIOERR);
-		fileispipe = TRUE;
-	} else {
-	        if ((ffp=fopen(fn, "r")) == NULL) {
-			extern int errno;
-			if (errno == ENOENT)
-		                return (FIOFNF);
-	                return (FIOERR);
-		}
-		fileispipe = FALSE;
-	}
-#else
-        if ((ffp=fopen(fn, "r")) == NULL)
-                return (FIOFNF);
-#endif
+	fileispipe = FALSE;
 	eofflag = FALSE;
+
+	if (isShellOrPipe(fn)) {
+		ffp = 0;
+#if UNIX
+	        ffp = npopen(fn+1, "r");
+#endif
+#if VMS
+	        ffp = vms_rpipe(fn+1, 0, (char *)0);
+		/* really a temp-file, but we cannot fstat it to get size */
+#endif
+		if (ffp == 0)
+			return (FIOERR);
+
+		fileispipe = TRUE;
+		count_fline = 0;
+
+	} else if ((ffp=fopen(fn, "r")) == NULL) {
+#if UNIX
+		extern	int	errno;
+		if (errno != ENOENT)
+			return (FIOERR);
+#endif
+                return (FIOFNF);
+	}
+
         return (FIOSUC);
 }
 
@@ -190,7 +224,6 @@ ffwopen(fn)
 char    *fn;
 {
 #if UNIX
-	FILE *npopen();
 	char *name;
 
 	if (isShellOrPipe(fn)) {
@@ -217,7 +250,12 @@ char    *fn;
 	}
 #else
 #if     VMS
+	char	temp[NFILEN];
         register int    fd;
+	register char	*s;
+
+	if ((s = strchr(fn = strcpy(temp, fn), ';')))	/* strip version */
+		*s = EOS;
 
         if ((fd=creat(fn, 0666, "rfm=var", "rat=cr")) < 0
         || (ffp=fdopen(fd, "w")) == NULL) {
@@ -248,7 +286,7 @@ char    *fn;
 	        if ((fd=open(fn, O_WRONLY)) < 0) {
 	                return TRUE;
 		}
-		close(fd);
+		(void)close(fd);
 		return FALSE;
 	}
 }
@@ -281,7 +319,23 @@ ffread(buf,len)
 char *buf;
 long len;
 {
+#if VMS
+	/*
+	 * If the input file is record-formatted (as opposed to stream-lf, a
+	 * single read won't get the whole file.
+	 */
+	int	total = 0;
+
+	while (len > 0) {
+		int	this = read(fileno(ffp), buf+total, len-total);
+		if (this <= 0)
+			break;
+		total += this;
+	}
+	return total;
+#else
 	return read(fileno(ffp), buf, (int)len);
+#endif
 }
 
 void
@@ -303,21 +357,19 @@ ffrewind()
 int
 ffclose()
 {
-	int s = TRUE;
+	int s = 0;
 
-	/* free this since we do not need it anymore */
-	if (fline) {
-		free(fline);
-		fline = NULL;
-		flen = 0;
-	}
+	free_fline();	/* free this since we do not need it anymore */
 
 #if UNIX | (MSDOS & (LATTICE | MSC | TURBO | ZTC))
+
 #if UNIX
-	
-	if (fileispipe)
+	if (fileispipe) {
 		npclose(ffp);
-	else
+		mlforce("[Read %d lines%s]",
+			count_fline,
+			interrupted ? "- Interrupted" : "");
+	} else
 #endif
 		s = fclose(ffp);
         if (s != 0) {
@@ -428,8 +480,7 @@ int *lenp;	/* to return the final length */
         i = 0;
         while ((c = fgetc(ffp)) != EOF && c != '\n') {
 		if (interrupted) {
-			free(fline);
-			fline = NULL;
+			free_fline();
 			*lenp = 0;
 			return FIOABRT;
 		}
@@ -458,7 +509,7 @@ int *lenp;	/* to return the final length */
 #endif
 
 	*lenp = i;	/* return the length, not including final null */
-        fline[i] = 0;
+        fline[i] = EOS;
 
 	/* test for any errors that may have occurred */
         if (c == EOF) {
@@ -478,6 +529,7 @@ int *lenp;	/* to return the final length */
 	if (cryptflag)
 		crypt(fline, i);
 #endif
+	count_fline++;
         return(FIOSUC);
 }
 
@@ -511,8 +563,15 @@ int *lenp;	/* to return the final length */
 	/* GNU iostream/stdio library */
 #    define 	isready_c(p)	( (p)->_gptr < (p)->_egptr)
 #   else
-	/* most other stdio's (?) */
-#    define	isready_c(p)	( (p)->_cnt > 0)
+#    if VMS
+#     define	isready_c(p)	( (*p)->_cnt > 0)
+#    endif
+#    if TURBO
+#     define    isready_c(p)	( (p)->bsize > ((p)->curp - (p)->buffer) )
+#    endif
+#    ifndef isready_c	/* most other stdio's (?) */
+#     define	isready_c(p)	( (p)->_cnt > 0)
+#    endif
 #   endif
 #  endif
 # endif

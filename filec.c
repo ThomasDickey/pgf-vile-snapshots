@@ -4,7 +4,20 @@
  *	Filename prompting and completion routines
  *
  * $Log: filec.c,v $
- * Revision 1.4  1993/03/17 10:00:29  pgf
+ * Revision 1.8  1993/04/01 15:50:34  pgf
+ * for sysV machines, without POSIX or BSD dirent, we now have code
+ * that enumerates directories using /bin/ls.
+ *
+ * Revision 1.7  1993/04/01  13:07:50  pgf
+ * see tom's 3.40 CHANGES
+ *
+ * Revision 1.6  1993/03/25  19:50:58  pgf
+ * see 3.39 section of CHANGES
+ *
+ * Revision 1.5  1993/03/19  12:33:32  pgf
+ * suppress completion chars if IsInternalName
+ *
+ * Revision 1.4  1993/03/17  10:00:29  pgf
  * initial changes to make VMS work again
  *
  * Revision 1.3  1993/03/16  16:04:01  pgf
@@ -26,19 +39,24 @@
 
 #define	SLASH (EOS+1) /* less than everything but EOS */
 
+#if VMS
+#define	KBD_OPTIONS	KBD_NORMAL|KBD_UPPERC
+#endif
+
+#if MSDOS
+#define	KBD_OPTIONS	KBD_NORMAL|KBD_LOWERC
+#endif
+
+#ifndef	KBD_OPTIONS
+#define	KBD_OPTIONS	KBD_NORMAL
+#endif
+
 static	int	only_dir;	/* can only match real directories */
 
-#if UNIX || defined(MDTAGSLOOK)
+#if VMS|| UNIX || defined(MDTAGSLOOK)
 
 #include <sys/stat.h>
-
-#if POSIX
-#include <dirent.h>
-#define	DIRENT	struct dirent
-#else	/* apollo & other old bsd's */
-#include <sys/dir.h>
-#define	DIRENT	struct direct
-#endif
+#include "dirstuff.h"
 
 /*
  * Test if the given path is a directory
@@ -49,21 +67,32 @@ char *	path;
 {
 	struct	stat	sb;
 
+#if VMS
+	if (is_vms_pathname(path, TRUE))
+		return TRUE;
+#endif
 	return ((*path != EOS)
 	  &&	(stat(path, &sb) >= 0)
 	  &&	((sb.st_mode & S_IFMT) == S_IFDIR));
 }
 
 /*
- * Test if the path has a trailing slash-delimiter
+ * Test if the path has a trailing slash-delimiter (i.e., can be syntactically
+ * distinguished from non-directory paths).
  */
 static int
 trailing_slash(path)
 char *	path;
 {
 	register int	len = strlen(path);
-	return (len > 1
-	  &&	slashc(path[len-1]));
+	if (len > 1) {
+#if VMS
+		if (is_vms_pathname(path, TRUE))
+			return TRUE;
+#endif
+		return (slashc(path[len-1]));
+	}
+	return FALSE;
 }
 
 /*
@@ -76,6 +105,9 @@ char *	path;
 {
 	register int	len = strlen(path);
 
+#if VMS
+	if (!is_vms_pathname(path, -TRUE))	/* must be unix-style name */
+#endif
 	if (!trailing_slash(path)) {
 		path[len++] = slash;
 		path[len] = EOS;
@@ -126,6 +158,10 @@ int	len;
 	register int	c;
 
 	while ((len-- > 0) && (c = *src++)) {
+#if VMS
+		if (strchr(":[]!", c))
+			c = SLASH;
+#endif
 		if (slashc(c))
 			c = SLASH;
 		*dst++ = c;
@@ -298,12 +334,16 @@ LINE **	lpp;	/* in/out line pointer, for iteration */
 	 * completion.
 	 */
 	strncpy(fname, text, len)[len] = EOS;
+#if VMS
+	/* name should already be in canonical form */
+#else
 	if (iflag) {
 		/* always store full paths */
 		(void)lengthen_path(fname);
 		if (iflag == -TRUE)
 			(void)force_slash(fname);
 	}
+#endif
 
 	if (lpp == NULL || (lp = *lpp) == NULL)
 		lp = bp->b_line.l;
@@ -344,7 +384,7 @@ LINE **	lpp;	/* in/out line pointer, for iteration */
 }
 #endif /* UNIX || defined(MDTAGSLOOK) */
 
-#if UNIX
+#if UNIX || VMS
 static	BUFFER	*MyBuff;	/* the buffer containing pathnames */
 static	char	*MyName;	/* name of buffer for name-completion */
 static	char	**MyList;	/* list, for name-completion code */
@@ -395,22 +435,17 @@ char *	name;
 {
 	register char	*s;
 
+#if ! USE_LS_FOR_DIRS
 	DIR	*dp;
 	DIRENT	*de;
 
-	char	path[NFILEN],
-		leaf[NFILEN];
+	char	path[NFILEN];
 
 	int	iflag;
 
 	(void)strcpy(path, name);
-	if (is_directory(path)) {
-		*leaf = EOS;
-	} else {
-		if (((s = strrchr(path, slash)) != 0) && (*++s != EOS)) {
-			(void)strcpy(leaf, s);
-			*--s = EOS;
-		}
+	if (!is_directory(path)) {
+		*pathleaf(path) = EOS;
 		if (!is_directory(path))
 			return;
 	}
@@ -419,13 +454,33 @@ char *	name;
 		return;
 
 	if ((dp = opendir(path)) != 0) {
-		s = path + force_slash(path);
+		s = path;
+#if VMS
+		if (!is_vms_pathname(path, -TRUE))
+#endif
+		s += force_slash(path);
 
 		while ((de = readdir(dp)) != 0) {
 			strncpy(s, de->d_name, (int)(de->d_namlen))[de->d_namlen] = EOS;
+#if UNIX
 			if (!strcmp(s, ".")
 			 || !strcmp(s, ".."))
 			 	continue;
+#endif
+#if VMS
+			/* convert ".dir" files to "]" form */
+			if ((s = strchr(path, ']')) != 0
+			 && (s[1] != EOS)) {
+				register char *t;
+				if ((t = strchr(s, '.')) != 0
+				 && !strcmp(t, ".DIR;1")) {
+					*s = '.';
+					*t++ = ']';
+					*t = EOS;
+				}
+			}
+			s = path;
+#endif
 			if (only_dir) {
 				if (!is_directory(path))
 					continue;
@@ -439,6 +494,52 @@ char *	name;
 		}
 		(void)closedir(dp);
 	}
+#else
+	char	path[NFILEN];
+	char	filen[NFILEN];
+	char	lscmd[NFILEN + 4];
+	FILE *dp;
+
+	int	iflag;
+
+	(void)strcpy(path, name);
+	if (!is_directory(path)) {
+		*pathleaf(path) = EOS;
+		if (!is_directory(path))
+			return;
+	}
+
+	if (already_scanned(path))
+		return;
+
+	lsprintf(lscmd,"/bin/ls %s", path);
+
+	if ((dp = npopen(lscmd, "r")) != NULL) {
+
+		s = path;
+		s += force_slash(path);
+
+		while ((fgets(s, NFILEN, dp)) != NULL) {
+			s[strlen(s)-1] = EOS; /* tromp the newline */
+#if UNIX
+			if (!strcmp(s, ".")
+			 || !strcmp(s, ".."))
+			 	continue;
+#endif
+			if (only_dir) {
+				if (!is_directory(path))
+					continue;
+				iflag = -TRUE;
+			} else {
+				iflag = (global_g_val(GMDDIRC) && is_directory(path))
+					? -TRUE
+					: TRUE;
+			}
+			(void)bs_find(path, (int)strlen(path), MyBuff, iflag, (LINE **)0);
+		}
+		(void)npclose(dp);
+	}
+#endif
 }
 
 /*
@@ -496,9 +597,25 @@ int	c;
 char	*buf;
 int	*pos;
 {
-	int	code	= FALSE;
+	int	code	= FALSE,
+		action	= (c == NAMEC || c == TESTC),
+		ignore	= (*buf != EOS && isInternalName(buf));
 
-	if ((c == NAMEC || c == TESTC) && !isInternalName(buf)) {
+#if VMS
+	if (ignore && action) {		/* resolve scratch-name conflict */
+		if (is_vms_pathname(buf, -TRUE))
+			ignore = FALSE;
+	}
+#endif
+	if (ignore) {
+		if (action) {
+			kbd_putc(c);	/* completion-chars have no meaning */
+			TTflush();
+			buf[*pos] = c;
+			*pos += 1;
+			buf[*pos] = EOS;
+		}
+	} else if (action) {
 		char	*s;
 		char	path[NFILEN];
 		int	oldlen,
@@ -511,20 +628,45 @@ int	*pos;
 			 	return FALSE;
 		}
 
+		/*
+		 * Copy 'buf' into 'path', making it canonical-form.
+		 */
+#if UNIX || MSDOS
 		/* trim trailing "." if it is a "/." */
-		if ((s = strrchr(buf, slash)) != 0
+		if ((s = last_slash(buf)) != 0
 		 && !strcmp(s+1, "."))
 			kbd_kill_response(buf, pos, '\b');
 
 		(void)lengthen_path(strcpy(path, buf));
+#endif
+
+#if VMS
+		if (*strcpy(path, buf) == EOS) {
+			(void)strcpy(path, current_directory(FALSE));
+		} else {
+			char	frac[NFILEN];
+			*frac = EOS;
+			if (is_vms_pathname(path, -TRUE)) {
+				s = vms_pathleaf(path);
+				(void)strcpy(frac, s);
+				*s = EOS;
+			}
+			if (*path == EOS)
+				(void)strcpy(path, current_directory(FALSE));
+			else
+				(void)lengthen_path(path);
+			(void)strcat(path, frac);
+		}
+#endif
+
 		if (!(s = is_appendname(buf)))
 			s = buf;
 		if ((*s == EOS) || trailing_slash(s))
 			(void)force_slash(path);
 
-		if ((s = is_appendname(path)) != 0) {
+		if ((s = is_appendname(path)) != NULL) {
 			register char *d;
-			for (d = path; (*d++ = *s++) != 0; )
+			for (d = path; (*d++ = *s++) != EOS; )
 				;
 		}
 
@@ -556,7 +698,7 @@ int	*pos;
 	}
 	return code;
 }
-#else	/* VMS */
+#else	/* no filename-completion */
 #define	freeMyList()
 #endif	/* UNIX */
 
@@ -582,7 +724,7 @@ char *	result;
 		;
 	else
 #endif
-#if UNIX
+#if UNIX || VMS
 	if (isnamedcmd && !clexec) {
 		complete = path_completion;
 		MyBuff = 0;
@@ -595,7 +737,7 @@ char *	result;
 		(void)tb_scopy(
 			buf = &last,
 			had_fname && is_pathname(curbp->b_fname)
-				? shorten_path(strcpy(Reply, curbp->b_fname))
+				? shorten_path(strcpy(Reply, curbp->b_fname), FALSE)
 				: "");
 	}
 
@@ -609,7 +751,7 @@ char *	result;
 			*Reply = EOS;
 
 	        s = kbd_string(prompt, Reply, NFILEN,
-			'\n', KBD_NORMAL|KBD_MAYBEC, complete);
+			'\n', KBD_OPTIONS|KBD_MAYBEC, complete);
 		freeMyList();
 
 		if (s != TRUE) {
@@ -673,6 +815,7 @@ char *	result;
 	register int	s;
 	char	Reply[NFILEN];
 	int	(*complete) P(( int, char *, int *)) = no_completion;
+
 #if UNIX
 	if (isnamedcmd && !clexec) {
 		complete = path_completion;
@@ -688,7 +831,7 @@ char *	result;
 
 		only_dir = TRUE;
 	        s = kbd_string(prompt, Reply, NFILEN, '\n',
-			KBD_NORMAL|KBD_MAYBEC, complete);
+			KBD_OPTIONS|KBD_MAYBEC, complete);
 		freeMyList();
 		only_dir = FALSE;
 		if (s != TRUE)

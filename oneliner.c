@@ -4,7 +4,10 @@
  *	Written (except for delins()) for vile by Paul Fox, (c)1990
  *
  * $Log: oneliner.c,v $
- * Revision 1.38  1993/03/08 10:53:17  pgf
+ * Revision 1.39  1993/04/01 12:53:33  pgf
+ * removed redundant includes and declarations
+ *
+ * Revision 1.38  1993/03/08  10:53:17  pgf
  * fix for lengthy multiple substitutions:  need to track the growing line
  * length so we don't stop scanning too early
  *
@@ -138,7 +141,6 @@
 
 #include	"estruct.h"
 #include	"edef.h"
-#include	<stdio.h>
 
 #define PLIST	0x01
 

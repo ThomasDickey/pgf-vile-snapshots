@@ -4,7 +4,16 @@
  *	written 11-feb-86 by Daniel Lawrence
  *
  * $Log: bind.c,v $
- * Revision 1.32  1993/03/16 10:53:21  pgf
+ * Revision 1.35  1993/04/01 13:07:50  pgf
+ * see tom's 3.40 CHANGES
+ *
+ * Revision 1.34  1993/03/25  19:50:58  pgf
+ * see 3.39 section of CHANGES
+ *
+ * Revision 1.33  1993/03/18  17:42:20  pgf
+ * see 3.38 section of CHANGES
+ *
+ * Revision 1.32  1993/03/16  10:53:21  pgf
  * see 3.36 section of CHANGES file
  *
  * Revision 1.31  1993/03/05  17:50:54  pgf
@@ -115,9 +124,8 @@
  * revision 1.1
  * date: 1990/09/21 10:24:44;
  * initial vile RCS revision
-*/
+ */
 
-#include	<stdio.h>
 #include	"estruct.h"
 #include	"edef.h"
 #include	"epath.h"
@@ -125,7 +133,17 @@
 /* dummy prefix binding functions */
 extern CMDFUNC f_cntl_af, f_cntl_xf, f_unarg, f_esc;
 
-static void	
+static	void	ostring P(( char * ));
+static	char *	quoted P(( char *, char * ));
+static	char *	string2prc P(( char *, char * ));
+static	void	convert_kcode P(( int, char * ));
+
+static	char *	skip_partial P(( char *, int, char *, unsigned ));
+static	void	show_partial P(( char *, int, char *, unsigned ));
+static	int	fill_partial P(( char *, int, char *, char *, unsigned ));
+
+/*--------------------------------------------------------------------------*/
+static void
 ostring(s)	/* output a string of output characters */
 char *s;	/* string to output */
 {
@@ -161,11 +179,8 @@ int f,n;
 			return(FALSE);
 		}
 		(void)strcpy(bp->b_bname, ScratchName(Help));
-		{
-			char buf[80];
-	        	lsprintf(buf, "       %s   %s",prognam,version);
-			ch_fname(bp, buf);
-		}
+		ch_fname(bp, non_filename());
+
 		make_local_b_val(bp,MDVIEW);	/* make it readonly, */
 		set_b_val(bp,MDVIEW,TRUE);
 		make_local_b_val(bp,MDIGNCASE); /* easy to search, */
@@ -187,7 +202,6 @@ int f,n;
 	register int c;		/* key to describe */
 	register char *ptr;	/* string pointer to scan output strings */
 	char outseq[NSTRING];	/* output buffer for command sequence */
-	char *kcod2prc();
 
 	/* prompt the user to type us a key to describe */
 	mlprompt("Describe the function bound to this key sequence: ");
@@ -203,10 +217,7 @@ int f,n;
 	} else {
 		c = kbd_seq();
 	}
-	kcod2prc(c, &outseq[0]);
-
-	/* and dump it out */
-	ostring(outseq);
+	ostring(kcod2prc(c, outseq));
 	ostring(" ");
 
 	/* find the right ->function */
@@ -231,7 +242,6 @@ int f, n;	/* command arguments [IGNORED] */
 	char outseq[80];	/* output buffer for keystroke sequence */
 	char cmd[NLINE];
 	char *fnp;
-	char *kcod2prc();
 
 	/* prompt the user to type in a key to bind */
 	/* and get the function name to bind it to */
@@ -265,10 +275,7 @@ int f, n;	/* command arguments [IGNORED] */
 	}
 
 	/* change it to something we can print as well */
-	kcod2prc(c, &outseq[0]);
-
-	/* and dump it out */
-	ostring(outseq);
+	ostring(kcod2prc(c, outseq));
 
 	/* if the function is a prefix key, i.e. we're changing the definition
 		of a prefix key, then they typed a dummy function name, which
@@ -328,7 +335,6 @@ int f, n;	/* command arguments [IGNORED] */
 {
 	register int c;		/* command key to unbind */
 	char outseq[80];	/* output buffer for keystroke sequence */
-	char *kcod2prc();
 
 	/* prompt the user to type in a key to unbind */
 	mlprompt("Unbind this key sequence: ");
@@ -343,10 +349,7 @@ int f, n;	/* command arguments [IGNORED] */
 	}
 
 	/* change it to something we can print as well */
-	kcod2prc(c, &outseq[0]);
-
-	/* and dump it out */
-	ostring(outseq);
+	ostring(kcod2prc(c, outseq));
 
 	/* if it isn't bound, bitch */
 	if (unbindchar(c) == FALSE) {
@@ -399,7 +402,7 @@ int
 desbind(f, n)
 int f,n;
 {
-        return liststuff(ScratchName(Binding List),makebindlist,1,NULL);
+        return liststuff(ScratchName(Binding List),makebindlist,1,(char *)0);
 }
 
 #if	APROP
@@ -429,6 +432,21 @@ char	*src;
 	return strcat(strcat(strcpy(dst, "\""), src), "\"");
 }
 
+/* convert a key binding, padding to the next multiple of 8 columns */
+static void
+convert_kcode(c, buffer)
+int	c;
+char	*buffer;
+{
+	register int	cpos;
+
+	(void)kcod2prc(c, &buffer[strlen(buffer)]);
+	cpos = strlen(buffer);
+	while (cpos & 7)
+		buffer[cpos++] = ' ';
+	buffer[cpos] = EOS;
+}
+
 /* build a binding list (limited or full) */
 /* ARGSUSED */
 void
@@ -445,8 +463,6 @@ char *mstring;		/* match string if partial list, NULL to list all */
 	int cpos;		/* current position to use in outseq */
 	char outseq[81];	/* output buffer for keystroke sequence */
 	int i,pass;
-	char *kcod2prc();
-
 
 	/* let us know this is in progress */
 	mlwrite("[Building binding list]");
@@ -478,26 +494,18 @@ char *mstring;		/* match string if partial list, NULL to list all */
 		/* look in the simple ascii binding table first */
 		for(cfp = asciitbl, i = 0; cfp < &asciitbl[128]; cfp++, i++) {
 			if (*cfp == nptr->n_cmd) {
-				cpos = kcod2prc(i, &outseq[strlen(outseq)]) -
-					outseq;
-				while(cpos & 7)
-					outseq[cpos++] = ' ';
-				outseq[cpos] = EOS;
+				convert_kcode(i, outseq);
 			}
 		}
 		/* then look in the multi-key table */
 		for(kbp = kbindtbl; kbp->k_cmd; kbp++) {
 			if (kbp->k_cmd == nptr->n_cmd) {
-				cpos = 
-				kcod2prc(kbp->k_code, &outseq[strlen(outseq)]) -
-					outseq;
-				while(cpos & 7)
-					outseq[cpos++] = ' ';
-				outseq[cpos] = EOS;
+				convert_kcode(kbp->k_code, outseq);
 			}
 		}
 		/* dump the line */
-		addline(curbp,outseq,-1);
+		if (!addline(curbp,outseq,-1))
+			break;
 
 		cpos = 0;
 
@@ -515,7 +523,8 @@ char *mstring;		/* match string if partial list, NULL to list all */
 			while (cpos < 8)
 				outseq[cpos++] = ' ';
 			(void)quoted(outseq+cpos, nptr2->n_name);
-			addline(curbp,outseq,-1);
+			if (!addline(curbp,outseq,-1))
+				break;
 			cpos = 0;	/* and clear the line */
 
 		}
@@ -604,14 +613,16 @@ int hflag;	/* Look in the HOME environment variable first? */
 	register char *sp;	/* pointer into path spec */
 	register int i;		/* index */
 	static char fspec[NSTRING];	/* full path spec to search */
-	char *getenv();
+#if VMS
+	static TBUFF *myfiles;
+#endif
 
-	/* tak care of special cases */
+	/* take care of special cases */
 	if (!fname || !fname[0] || isspace(fname[0]))
 		return NULL;
 	else if (isShellOrPipe(fname))
 		return fname;
-		
+
 	/* always try the current directory first */
 	if (ffropen(fname) == FIOSUC) {
 		ffclose();
@@ -626,15 +637,8 @@ int hflag;	/* Look in the HOME environment variable first? */
 	if (hflag) {
 		home = getenv("HOME");
 		if (home != NULL) {
-			/* build home dir file spec */
-			(void)strcat(
-				strcat(
-					strcpy(fspec, home),
-					"/"),
-				fname);
-
-			/* and try it out */
-			if (ffropen(fspec) == FIOSUC) {
+			/* try home dir file spec */
+			if (ffropen(pathcat(fspec,home,fname)) == FIOSUC) {
 				ffclose();
 				return(fspec);
 			}
@@ -645,8 +649,30 @@ int hflag;	/* Look in the HOME environment variable first? */
 		return NULL;
 
 #if PATHLOOK
-	/* get the PATH variable */
-	path = getenv("PATH");
+#if VMS
+	/* On VAX/VMS, the PATH environment variable is only the current-dir.
+	 * Fake up an acceptable alternative.
+	 */
+	if (!tb_length(myfiles)) {
+		char	mypath[NFILEN];
+
+		(void)strcpy(mypath, prog_arg);
+		if ((sp = vms_pathleaf(mypath)) == mypath)
+			(void)strcpy(mypath, current_directory(FALSE));
+		else
+			*sp = EOS;
+
+		if (!tb_init(&myfiles, EOS)
+		 || !tb_sappend(&myfiles, mypath)
+		 || !tb_sappend(&myfiles, ",SYS$SYSTEM:,SYS$LIBRARY:")
+		 || !tb_append(&myfiles, EOS))
+		return NULL;
+	}
+	path = tb_values(myfiles);
+#else	/* UNIX or MSDOS */
+	path = getenv("PATH");	/* get the PATH variable */
+#endif
+
 	if (path != NULL)
 		while (*path) {
 
@@ -654,12 +680,10 @@ int hflag;	/* Look in the HOME environment variable first? */
 			sp = fspec;
 			while (*path && (*path != PATHCHR))
 				*sp++ = *path++;
-			*sp++ = '/';
-			*sp = 0;
-			(void)strcat(fspec, fname);
+			*sp = EOS;
 
 			/* and try it out */
-			if (ffropen(fspec) == FIOSUC) {
+			if (ffropen(pathcat(fspec, fspec, fname)) == FIOSUC) {
 				ffclose();
 				return(fspec);
 			}
@@ -667,15 +691,12 @@ int hflag;	/* Look in the HOME environment variable first? */
 			if (*path == PATHCHR)
 				++path;
 		}
-#endif
-#endif
+#endif	/* PATHLOOK */
+#endif	/* ENVFUNC */
 
 	/* look it up via the old table method */
 	for (i=2; i < NPNAMES; i++) {
-		(void)strcat(strcpy(fspec, pathname[i]), fname);
-
-		/* and try it out */
-		if (ffropen(fspec) == FIOSUC) {
+		if (ffropen(pathcat(fspec, pathname[i], fname)) == FIOSUC) {
 			ffclose();
 			return(fspec);
 		}
@@ -685,61 +706,73 @@ int hflag;	/* Look in the HOME environment variable first? */
 	return NULL;	/* no such luck */
 }
 
+/* translate a keycode to its binding-string */
+char *
+kcod2str(c, seq)
+int c;		/* sequence to translate */
+char *seq;	/* destination string for sequence */
+{
+	register char *ptr = seq; /* pointer into current position in sequence */
+	char	*base = ptr;
+
+	if (c & CTLA)
+		*ptr++ = tocntrl('A');
+
+	if (c & CTLX)
+		*ptr++ = tocntrl('X');
+
+	if (c & SPEC)
+		*ptr++ = '#';
+	
+	*ptr++ = kcod2key(c);
+	*ptr = EOS;
+	return base;
+}
+
+/* translates a binding string into printable form */
+static char *
+string2prc(dst, src)
+char	*dst;
+char	*src;
+{
+	char	*base;
+	register int	c;
+	register char	*tmp;
+
+	for (base = dst; (c = (*dst = *src)) != EOS; dst++, src++) {
+		tmp = NULL;
+
+		if (c == ' ')
+			tmp = "<sp>";
+		else if (c == '\t')
+			tmp = "<tab>";
+		else if (iscntrl(c)) {
+			*dst++ = '^';
+			*dst = toalpha(c);
+		} else if (c == '#' && src[1] != EOS)
+			tmp = "FN";
+		else
+			*dst = c;
+
+		if (tmp != NULL) {
+			while ((*dst++ = *tmp++) != EOS)
+				;
+			dst -= 2;	/* point back to last nonnull */
+		}
+		if (src[1] != EOS)
+			*++dst = '-';
+	}
+	return base;
+}
+
 /* translate a 10-bit keycode to its printable name (like "M-j")  */
 char *
 kcod2prc(c, seq)
 int c;		/* sequence to translate */
 char *seq;	/* destination string for sequence */
 {
-	register char *ptr = seq; /* pointer into current position in sequence */
-
-	/* apply cntl_a sequence if needed */
-	if (c & CTLA) {
-		*ptr++ = '^';
-		*ptr++ = 'A';
-		*ptr++ = '-';
-	}
-
-	/* apply ^X sequence if needed */
-	if (c & CTLX) {
-		*ptr++ = '^';
-		*ptr++ = 'X';
-		*ptr++ = '-';
-	}
-
-	/* apply SPEC sequence if needed */
-	if (c & SPEC) {
-		*ptr++ = 'F';
-		*ptr++ = 'N';
-		*ptr++ = '-';
-	}
-	
-	c = kcod2key(c);
-
-	/* apply control sequence if needed */
-	if (iscntrl(c)) {
-		*ptr++ = '^';
-		c = toalpha(c);
-	}
-
-	/* and output the final sequence */
-
-	if (c == ' ') {
-		*ptr++ = '<';
-		*ptr++ = 's';
-		*ptr++ = 'p';
-		*ptr++ = '>';
-	} else if (c == '\t') {
-		*ptr++ = '<';
-		*ptr++ = 't';
-		*ptr++ = 'a';
-		*ptr++ = 'b';
-		*ptr++ = '>';
-	} else {
-		*ptr++ = c;
-	}
-	*ptr = 0;	/* terminate the string */
-	return ptr;
+	char	temp[NSTRING];
+	return string2prc(seq, kcod2str(c,temp));
 }
 
 /* insertion_cmd -- what char puts us in insert mode? */
@@ -772,6 +805,25 @@ int c;	/* key to find what is bound to it */
 	}
 }
 
+/* fnc2kcod: translate a function pointer to a keycode */
+int
+fnc2kcod(f)
+CMDFUNC *f;
+{
+	register KBIND *kbp;
+	register int	c;
+
+	for (c = 0; c < N_chars; c++)
+		if (f == asciitbl[c])
+			return c;
+
+	for (kbp = kbindtbl; kbp->k_cmd != 0; kbp++) {
+		if (kbp->k_cmd == f)
+			return kbp->k_code;
+	}
+
+	return -1;	/* none found */
+}
 
 /* fnc2engl: translate a function pointer to the english name for 
 		that function
@@ -990,7 +1042,7 @@ char *	THIS_NAME(p)	char *p; { return 0; }
  * Scan down until we no longer match the current input, or reach the end of
  * the symbol table.
  */
-static char *	
+static char *
 skip_partial(buf, len, table, size_entry)
 char	*buf;
 int	len;

@@ -9,7 +9,20 @@
 
 /*
  * $Log: edef.h,v $
- * Revision 1.84  1993/03/17 10:14:32  pgf
+ * Revision 1.88  1993/04/01 13:07:50  pgf
+ * see tom's 3.40 CHANGES
+ *
+ * Revision 1.87  1993/04/01  12:04:43  pgf
+ * added keyboard read flag, and jmp_buf, for handling ^C with BSD-style
+ * signals
+ *
+ * Revision 1.86  1993/03/25  19:50:58  pgf
+ * see 3.39 section of CHANGES
+ *
+ * Revision 1.85  1993/03/18  17:41:15  pgf
+ * v. 3.38
+ *
+ * Revision 1.84  1993/03/17  10:14:32  pgf
  * bumped to vers 3.37.  that was fast.
  *
  * Revision 1.83  1993/03/16  16:01:26  pgf
@@ -283,10 +296,9 @@
 
 /* I know this declaration stuff is really ugly, and I probably won't ever
  *	do it again.  promise.  but it _does_ make it easy to add/change
- *	globals.  Too bad about "comma".    -pgf
+ *	globals. -pgf
  */
 #ifdef realdef
-# define comma ,
 # define decl_init(thing,value) thing = value
 # define decl_uninit(thing) thing
 #else
@@ -294,8 +306,10 @@
 # define decl_uninit(thing) extern thing
 #endif
 
+decl_uninit( char *prog_arg );		/* argv[0] from main.c */
+
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version 3.37");
+decl_init( char version[], "version 3.40");
 
 decl_init( char slash, '/'); 		/* so DOS can use '\' as path separator */
 
@@ -308,6 +322,8 @@ decl_uninit( long _chartypes_[N_chars] );	/* character types	*/
 decl_uninit( short _chartypes_[N_chars] );	/* character types	*/
 #endif
 decl_uninit( int interrupted );		/* interrupt signal?		*/
+decl_uninit( int doing_kbd_read );	/* flag set during keyboard reading */
+decl_uninit( jmp_buf read_jmp_buf );	/* for setjmp/longjmp on SIGINT */
 decl_uninit( int insertmode );		/* are we inserting or overwriting? */
 decl_uninit( int insert_mode_was );	/* were we (and will we be?)	*/
 					/*	inserting or overwriting? */
@@ -339,23 +355,6 @@ decl_uninit( char *patmatch );
 
 decl_uninit( int ignorecase );
 
-/* directive name table:
-	This holds the names of all the directives....	*/
-
-#if ! SMALLER
-decl_init(char *dname[],
-	 { "if" comma "else" comma "endif" comma
-	"goto" comma "return" comma "endm" comma
-	"while" comma "endwhile" comma "break" comma
-	"force" }
-	 );
-#else
-decl_init(char *dname[],
-	 { "endm" }
-	);
-#endif
-
-
 #if	DEBUGM
 /*	vars needed for macro debugging output	*/
 /* global string to hold debug line text */
@@ -376,7 +375,12 @@ decl_uninit( int flickcode );		/* do flicker suppression?	*/
 decl_uninit( int curtabval );		/* current tab width		*/
 decl_uninit( int curswval );		/* current shiftwidth		*/
 
-decl_init( MARK nullmark, { NULL comma 0 } );
+#ifdef realdef
+	MARK	nullmark = { NULL, 0 };
+#else
+extern	MARK	nullmark;
+#endif
+
 #if ! WINMARK
 decl_uninit( MARK Mark );		/* the worker mark */
 #endif
@@ -411,16 +415,6 @@ decl_init( int startc, tocntrl('Q') );	/* current output start char	*/
 decl_init( int stopc, tocntrl('S') );	/* current output stop char	*/
 decl_init( int backspc, '\b');		/* current backspace char	*/
 
-#if	NeWS
-decl_init( char	*cname[], {		/* names of colors		*/
-	"WHITE" comma "RED" comma "GREEN" comma "YELLOW" comma "BLUE" comma
-	"MAGENTA" comma "CYAN" comma "BLACK"} );
-#else
-decl_init( char	*cname[], {		/* names of colors		*/
-	"BLACK" comma "RED" comma "GREEN" comma "YELLOW" comma "BLUE" comma
-	"MAGENTA" comma "CYAN" comma "WHITE"} );
-#endif
-
 /* these get their initial values in main.c, in global_val_init() */
 decl_uninit( W_VALUES global_w_values );
 
@@ -436,7 +430,6 @@ decl_init( int cryptflag, FALSE );		/* currently encrypting?	*/
 #endif
 decl_init( int dotcmdmode, RECORD );	/* current dot command mode	*/
 decl_init( int	kbdmode, STOP );	/* current keyboard macro mode	*/
-decl_init( int	kbdplayreg, -1 );	/* register currently playing back */
 decl_uninit( int seed );		/* random number seed		*/
 decl_uninit( long envram );		/* # of bytes current used malloc */
 decl_uninit( int macbug );		/* macro debugging flag		*/

@@ -5,7 +5,10 @@
  * compiles into nothing if not a 520ST style device.
  *
  * $Log: st520.c,v $
- * Revision 1.7  1992/08/20 23:40:48  foxharp
+ * Revision 1.8  1993/04/01 12:53:33  pgf
+ * removed redundant includes and declarations
+ *
+ * Revision 1.7  1992/08/20  23:40:48  foxharp
  * typo fixes -- thanks, eric
  *
  * Revision 1.6  1992/05/16  12:00:31  pgf
@@ -32,7 +35,6 @@
 
 #define termdef 1			/* don't define "term" external */
 
-#include	<stdio.h>
 #include	"estruct.h"
 #include	"edef.h"
 

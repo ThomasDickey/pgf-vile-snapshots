@@ -1,6 +1,12 @@
 #
 # VMS makefile for vile.  Requires "MMS"
 #
+# Tested with:
+#	VMS system version 5.4-2
+#	MMS version 2.6
+#	VAX-C version 3.2
+#
+# Note: 'remove' is a unix-like utility that can delete files silently.
 
 # To change screen driver modules, change SCREEN and SCRDEF below, OR edit
 # estruct.h to make sure the correct one is #defined as "1", and the others
@@ -36,7 +42,7 @@ ALLTOOLS = $(MAKFILES)
 
 
 # these are normal editable headers
-HDRS = estruct.h epath.h edef.h proto.h
+HDRS = estruct.h epath.h edef.h proto.h dirstuff.h
 
 # these headers are built by the mktbls program from the information in cmdtbl
 # and in modetbl
@@ -52,7 +58,7 @@ CSRCfh = fences.c file.c filec.c fileio.c finderr.c globals.c history.c hp110.c 
 CSRCim = ibmpc.c input.c insert.c isearch.c line.c main.c modes.c mktbls.c
 CSRCnr = npopen.c opers.c oneliner.c path.c random.c regexp.c region.c
 CSRCst = search.c spawn.c st520.c tags.c tbuff.c tcap.c termio.c tipc.c
-CSRCuw = undo.c vmalloc.c vmsvt.c vt52.c window.c word.c wordmov.c
+CSRCuw = undo.c vmalloc.c vms2unix.c vmspipe.c vmsvt.c vt52.c window.c word.c wordmov.c
 CSRCxz = x11.c z309.c z_ibmpc.c
 
 CSRC = $(CSRCac) $(CSRCde) $(CSRCfh) $(CSRCim) $(CSRCnr) \
@@ -63,7 +69,7 @@ OTHERSRC = z100bios.asm
 
 # text and data files
 TEXTFILES = README CHANGES cmdtbl modetbl vile.hlp buglist revlist \
-	README.X11
+	README.X11 vile.com
 
 ALLSRC = $(CSRC) $(OTHERSRC)
 
@@ -106,6 +112,8 @@ SRC =	main.c \
 	termio.c \
 	undo.c \
 	vmalloc.c \
+	vms2unix.c \
+	vmspipe.c \
 	window.c \
 	word.c \
 	wordmov.c
@@ -147,6 +155,8 @@ OBJ =	main.obj,\
 	termio.obj,\
 	undo.obj,\
 	vmalloc.obj,\
+	vms2unix.obj,\
+	vmspipe.obj,\
 	window.obj,\
 	word.obj,\
 	wordmov.obj
@@ -173,19 +183,22 @@ clean :
 clobber : clean
 	@- remove -f $(TARGET);*
 
-$(OBJ) :: estruct.h nemode.h edef.h proto.h
+$(OBJ) : estruct.h nemode.h edef.h proto.h
 
-bind.obj ::	epath.h
-eval.obj ::	nevars.h
-externs.obj ::	nebind.h nename.h nefunc.h
-vmalloc.obj ::	nevars.h
+bind.obj :	epath.h
+filec.obj :	dirstuff.h
+eval.obj :	nevars.h
+externs.obj :	nebind.h nename.h nefunc.h
+vmalloc.obj :	nevars.h
+vms2unix.obj :	dirstuff.h
 
 .first :
 	@ define/nolog SYS SYS$LIBRARY		! fix includes to <sys/...>
 	@ MKTBLS :== $SYS$DISK:'F$DIRECTORY()$(MKTBLS)	! make a foreign command
 
 .last :
-	@- purge *.dia,*.lis,*.obj,*.map,*.exe,*.log
+	@- remove -f *.dia;*
+	@- purge *.lis,*.obj,*.map,*.exe,*.log
 
 CFLAGS =-
 	/Diagnostics /Listing /Debug /Define=("os_chosen",$(SCRDEF)) -
@@ -202,7 +215,13 @@ $(TARGET) : $(OBJ)
 	$(LINK) $(LINKFLAGS) $(OBJ),$(LIB_ARGS)
 
 # $Log: descrip.mms,v $
-# Revision 1.1  1993/03/17 09:50:19  pgf
+# Revision 1.3  1993/04/01 13:07:50  pgf
+# see tom's 3.40 CHANGES
+#
+# Revision 1.2  1993/03/25  19:50:58  pgf
+# see 3.39 section of CHANGES
+#
+# Revision 1.1  1993/03/17  09:50:19  pgf
 # Initial revision
 #
 #

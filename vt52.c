@@ -8,7 +8,10 @@
  * routine is conditionalized on defining BEL.
  *
  * $Log: vt52.c,v $
- * Revision 1.4  1991/11/16 18:25:37  pgf
+ * Revision 1.5  1993/04/01 12:57:22  pgf
+ * removed redundant includes and declarations
+ *
+ * Revision 1.4  1991/11/16  18:25:37  pgf
  * ifdef change for UNIX
  *
  * Revision 1.3  1991/09/10  01:19:35  pgf
@@ -21,9 +24,9 @@
  * date: 1990/09/21 10:26:20;
  * initial vile RCS revision
  */
+
 #define termdef 1			/* don't define "term" external */
 
-#include	<stdio.h>
 #include	"estruct.h"
 #include	"edef.h"
 
@@ -150,7 +153,6 @@ vt52open()
 {
 #if	UNIX
 	register char *cp;
-	char *getenv();
 
 	if ((cp = getenv("TERM")) == NULL) {
 		puts("Shell variable TERM not defined!");

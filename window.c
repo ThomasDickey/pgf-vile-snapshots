@@ -3,7 +3,10 @@
  * attached to keys that the user actually types.
  *
  * $Log: window.c,v $
- * Revision 1.21  1993/02/24 10:59:02  pgf
+ * Revision 1.22  1993/04/01 12:57:22  pgf
+ * removed redundant includes and declarations
+ *
+ * Revision 1.21  1993/02/24  10:59:02  pgf
  * see 3.34 changes, in CHANGES file
  *
  * Revision 1.20  1993/01/23  13:38:23  foxharp
@@ -77,13 +80,16 @@
  * initial vile RCS revision
  */
 
-#include        <stdio.h>
 #include        "estruct.h"
 #include	"edef.h"
 
 #if	MEGAMAX & ST520
 overlay	"window"
 #endif
+
+static	void	unlink_window P(( WINDOW * ));
+
+/*--------------------------------------------------------------------------*/
 
 /*
  * Unlink the given window-pointer from the list
@@ -974,7 +980,7 @@ void	wp_leaks()
 {
 	register WINDOW *wp;
 
-	while (wp = wheadp) {
+	while ((wp = wheadp) != 0) {
         	wp = wp->w_wndp;
 		free((char *)wheadp);
 		wheadp = wp;

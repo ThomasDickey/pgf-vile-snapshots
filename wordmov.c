@@ -5,7 +5,10 @@
  *	Written for vile by Paul Fox, (c)1990
  *
  * $Log: wordmov.c,v $
- * Revision 1.5  1992/05/16 12:00:31  pgf
+ * Revision 1.6  1993/04/01 12:53:33  pgf
+ * removed redundant includes and declarations
+ *
+ * Revision 1.5  1992/05/16  12:00:31  pgf
  * prototypes/ansi/void-int stuff/microsoftC
  *
  * Revision 1.4  1991/11/08  13:02:46  pgf
@@ -23,7 +26,6 @@
  * initial vile RCS revision
  */
 
-#include	<stdio.h>
 #include "estruct.h"
 #include "edef.h"
 

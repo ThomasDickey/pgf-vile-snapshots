@@ -4,7 +4,10 @@
  * written for vile by Paul Fox, (c)1990
  *
  * $Log: opers.c,v $
- * Revision 1.26  1993/03/16 10:53:21  pgf
+ * Revision 1.27  1993/04/01 13:07:50  pgf
+ * see tom's 3.40 CHANGES
+ *
+ * Revision 1.26  1993/03/16  10:53:21  pgf
  * see 3.36 section of CHANGES file
  *
  * Revision 1.25  1993/03/05  17:50:54  pgf
@@ -102,12 +105,8 @@
 
 #include	"estruct.h"
 #include        "edef.h"
-#ifndef NULL
-#define NULL 0
-#endif
 
 extern CMDFUNC f_godotplus;
-MARK pre_op_dot;
 
 /* For the "operator" commands -- the following command is a motion, or
  *  the operator itself is repeated.  All operate on regions.
@@ -115,7 +114,7 @@ MARK pre_op_dot;
 int
 operator(f,n,fn,str)
 int f,n;
-int (*fn)();
+int (*fn) P(( void ));
 char *str;
 {
 	int c;
