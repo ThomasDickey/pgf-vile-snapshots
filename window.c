@@ -3,7 +3,10 @@
  * attached to keys that the user actually types.
  *
  * $Log: window.c,v $
- * Revision 1.14  1992/05/16 12:00:31  pgf
+ * Revision 1.15  1992/08/20 23:40:48  foxharp
+ * typo fixes -- thanks, eric
+ *
+ * Revision 1.14  1992/05/16  12:00:31  pgf
  * prototypes/ansi/void-int stuff/microsoftC
  *
  * Revision 1.13  1992/01/05  00:06:13  pgf
@@ -181,7 +184,7 @@ int f,n;
 
 /*
  * This command makes the previous window (previous => up the screen) the
- * current window. There arn't any errors, although the command does not do a
+ * current window. There aren't any errors, although the command does not do a
  * lot if there is 1 window.
  */
 int
@@ -409,7 +412,7 @@ int
 delwp(thewp)
 WINDOW *thewp;
 {
-	register WINDOW *wp;	/* window to recieve deleted space */
+	register WINDOW *wp;	/* window to receive deleted space */
 	register LINE *lp;	/* line pointer */
 	register int i;
 
@@ -419,7 +422,7 @@ WINDOW *thewp;
 		return(FALSE);
 	}
 
-	/* find recieving window and give up our space */
+	/* find receiving window and give up our space */
 	if (thewp == wheadp) { /* there's nothing before */
 		/* find the next window down */
 		wp = thewp->w_wndp;
@@ -557,7 +560,7 @@ int f,n;
         return wp;
 }
 
-/* externall callable version -- return int instead of (WINDOW *) */
+/* external callable version -- return int instead of (WINDOW *) */
 int
 splitwind(f,n)
 int f,n;

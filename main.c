@@ -14,7 +14,10 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.83  1992/08/19 22:59:05  foxharp
+ * Revision 1.84  1992/08/20 23:40:48  foxharp
+ * typo fixes -- thanks, eric
+ *
+ * Revision 1.83  1992/08/19  22:59:05  foxharp
  * catch SIGINT and critical errors under DOS, glob command line args,
  * and clean up debug log ifdefs
  *
@@ -525,7 +528,7 @@ char	*argv[];
 #if __ZTC__
 			/*
 			 * Note that ibmtype is now only used to detect
-			 * whether a comamnd line option was given, ie if
+			 * whether a command line option was given, ie if
 			 * it is not equal to CDSENSE then a command line
 			 * option was given
 			 */

@@ -3,7 +3,10 @@
  * the knowledge about files are here.
  *
  * $Log: fileio.c,v $
- * Revision 1.29  1992/07/28 21:42:36  foxharp
+ * Revision 1.30  1992/08/20 23:40:48  foxharp
+ * typo fixes -- thanks, eric
+ *
+ * Revision 1.29  1992/07/28  21:42:36  foxharp
  * linux switched to GNU stdio... okay, so maybe isready_c() _wasn't_
  * such a good idea...
  *
@@ -427,7 +430,7 @@ int *lenp;	/* to return the final length */
 	*lenp = i;	/* return the length, not including final null */
         fline[i] = 0;
 
-	/* test for any errors that may have occured */
+	/* test for any errors that may have occurred */
         if (c == EOF) {
                 if (ferror(ffp)) {
                         mlforce("[File read error]");

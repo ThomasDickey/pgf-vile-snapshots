@@ -6,7 +6,10 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.52  1992/08/05 21:55:16  foxharp
+ * Revision 1.53  1992/08/20 23:40:48  foxharp
+ * typo fixes -- thanks, eric
+ *
+ * Revision 1.52  1992/08/05  21:55:16  foxharp
  * handle files with DOS drive designators properly on mode line
  *
  * Revision 1.51  1992/07/24  07:49:38  foxharp
@@ -1104,7 +1107,7 @@ updext_before()
  * RAINBOW version of this routine uses fast video.
  */
 #if	MEMMAP
-/*	UPDATELINE specific code for the IBM-PC and other compatables */
+/*	UPDATELINE specific code for the IBM-PC and other compatibles */
 
 void
 updateline(row, vp1, vpdummy)

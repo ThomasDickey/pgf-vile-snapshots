@@ -9,7 +9,10 @@
  *  is called whenever possible.
  *  Modifications by Pete Ruczynski (pjr).
  * $Log: z_ibmpc.c,v $
- * Revision 1.1  1992/07/01 16:57:45  foxharp
+ * Revision 1.2  1992/08/20 23:40:48  foxharp
+ * typo fixes -- thanks, eric
+ *
+ * Revision 1.1  1992/07/01  16:57:45  foxharp
  * Initial revision
  *
  *
@@ -167,7 +170,7 @@ zibmeeol(void)
 /*
  * zibmputc
  *
- * put a character at the current cursor position in the current colours
+ * put a character at the current cursor position in the current colors
  */
 /*****************************************************************************/
 int
@@ -262,14 +265,14 @@ zibmcres(type)
 /*
  * spal
  *
- * reset the pallette registers
+ * reset the palette registers
  */
 /*****************************************************************************/
 int
 spal()
 /*****************************************************************************/
 {
-	/* nothin here now..... */
+	/* nothing here now..... */
 } /* end of spal */
 
 

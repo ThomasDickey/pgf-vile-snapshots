@@ -6,7 +6,10 @@
  * framing, are hard.
  *
  * $Log: basic.c,v $
- * Revision 1.37  1992/08/04 20:09:03  foxharp
+ * Revision 1.38  1992/08/20 23:40:48  foxharp
+ * typo fixes -- thanks, eric
+ *
+ * Revision 1.37  1992/08/04  20:09:03  foxharp
  * prototype fixups, for xvile
  *
  * Revision 1.36  1992/05/16  12:00:31  pgf
@@ -1072,7 +1075,7 @@ int f,n;
 
 /*
  * Swap the values of "." and "mark" in the current window. This is pretty
- * easy, bacause all of the hard work gets done by the standard routine
+ * easy, because all of the hard work gets done by the standard routine
  * that moves the mark about. The only possible error is "no mark".
  */
 void

@@ -47,18 +47,18 @@
 #	UNDO means the undo stacks should be cleared, in preparation for
 #		an undoable command.
 #	OPER means the command is an "operator", that is, it acts on a region
-#		demarcated by the current cursor postion and the cursor position
+#		demarcated by the current cursor position and the cursor position
 #		following a subsequent motion command.
 #	MOTION means this command moves dot, and specifically is compatible
 #		with the operator commands.
 #	FL only occurs with MOTION, means that if the motion is an argument
 #		to an operator, the operation should affect Full Lines
 #	ABS only occurs with MOTION, means that the motion is absolute,
-#		i.e. not relative to the current postion or screen.  It causes
+#		i.e. not relative to the current position or screen.  It causes
 #		the "lastdotmark", ldmark to be set to dot before the move
 #		takes place.
 #	GOAL signifies a motion that will attempt to retain the 
-#		current column postition after the motion.
+#		current column position after the motion.
 #	GLOBOK says the function can follow a global command
 #		(e.g. the 'd' in "g/pattern/d")
 #
@@ -71,7 +71,10 @@
 #		here for completeness.
 #
 # $Log: cmdtbl,v $
-# Revision 1.41  1992/07/16 22:03:35  foxharp
+# Revision 1.42  1992/08/20 23:40:48  foxharp
+# typo fixes -- thanks, eric
+#
+# Revision 1.41  1992/07/16  22:03:35  foxharp
 # made kbd_mac_exec undoable
 #
 # Revision 1.40  1992/07/15  19:26:18  foxharp

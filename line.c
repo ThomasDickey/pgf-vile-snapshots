@@ -11,7 +11,10 @@
  * which means that the dot and mark values in the buffer headers are nonsense.
  *
  * $Log: line.c,v $
- * Revision 1.25  1992/07/10 22:01:14  foxharp
+ * Revision 1.26  1992/08/20 23:40:48  foxharp
+ * typo fixes -- thanks, eric
+ *
+ * Revision 1.25  1992/07/10  22:01:14  foxharp
  * make poison more poisonous
  *
  * Revision 1.24  1992/07/04  14:36:17  foxharp
@@ -1186,7 +1189,7 @@ int f,n;
 
 	c = c - 'a' + 10;
 
-	/* make sure there is something to execure */
+	/* make sure there is something to execute */
 	kp = kbs[c].kbufh;
 	if (kp == NULL)
 		return TRUE;		/* not an error, just nothing */

@@ -4,7 +4,10 @@
  *  heavily modified by Paul Fox, 1990
  *
  * $Log: search.c,v $
- * Revision 1.37  1992/07/13 20:03:54  foxharp
+ * Revision 1.38  1992/08/20 23:40:48  foxharp
+ * typo fixes -- thanks, eric
+ *
+ * Revision 1.37  1992/07/13  20:03:54  foxharp
  * the "terse" variable is now a boolean mode
  *
  * Revision 1.36  1992/07/08  09:08:08  foxharp
@@ -176,7 +179,7 @@ int lastdirec;
 
 MARK scanboundpos;
 
-char onlyonemsg[] = "Only one occurence of pattern";
+char onlyonemsg[] = "Only one occurrence of pattern";
 char notfoundmsg[] = "Not found";
 char hitendmsg[] = "Search reached %s without matching pattern";
 

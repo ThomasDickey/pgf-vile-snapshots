@@ -1,10 +1,13 @@
-/*	EVAL.C:	Expresion evaluation functions for
+/*	EVAL.C:	Expression evaluation functions for
 		MicroEMACS
 
 	written 1986 by Daniel Lawrence
  *
  * $Log: eval.c,v $
- * Revision 1.37  1992/07/24 18:22:51  foxharp
+ * Revision 1.38  1992/08/20 23:40:48  foxharp
+ * typo fixes -- thanks, eric
+ *
+ * Revision 1.37  1992/07/24  18:22:51  foxharp
  * deleted local atoi() routine -- now we use the system's copy
  *
  * Revision 1.36  1992/07/13  20:09:57  foxharp
@@ -260,7 +263,7 @@ char *vname;		/* name of user variable to fetch */
 char *gtenv(vname)
 char *vname;		/* name of environment variable to retrieve */
 {
-	register int vnum;	/* ordinal number of var refrenced */
+	register int vnum;	/* ordinal number of var referenced */
 #if X11
 	char	*x_current_fontname(); 
 #endif
@@ -352,7 +355,7 @@ findvar(var, vd)	/* find a variables type and name */
 char *var;	/* name of var to get */
 VDESC *vd;	/* structure to hold type and ptr */
 {
-	register int vnum;	/* subscript in varable arrays */
+	register int vnum;	/* subscript in variable arrays */
 	register int vtype;	/* type to return */
 
 fvar:
@@ -486,7 +489,7 @@ int svar(var, value)		/* set a variable */
 VDESC *var;	/* variable to set */
 char *value;	/* value to set to */
 {
-	register int vnum;	/* ordinal number of var refrenced */
+	register int vnum;	/* ordinal number of var referenced */
 	register int vtype;	/* type of variable to set */
 	register int status;	/* status return */
 	register int c;		/* translated character */
@@ -592,7 +595,7 @@ char *value;	/* value to set to */
 #if ! SMALLER
 
 /*	l_itoa:	integer to ascii string.......... This is too
-		inconsistant to use the system's	*/
+		inconsistent to use the system's	*/
 
 char *l_itoa(i)
 int i;	/* integer to translate to a string */

@@ -7,7 +7,10 @@
  * display type.
  *
  * $Log: ibmpc.c,v $
- * Revision 1.9  1992/07/08 08:23:57  foxharp
+ * Revision 1.10  1992/08/20 23:40:48  foxharp
+ * typo fixes -- thanks, eric
+ *
+ * Revision 1.9  1992/07/08  08:23:57  foxharp
  * set screen attributes correctly in ibmeeop()
  *
  * Revision 1.8  1992/07/01  17:06:32  foxharp
@@ -231,9 +234,9 @@ int res;	/* resolution to change to */
 }
 
 void
-spal()	/* reset the pallette registers */
+spal()	/* reset the palette registers */
 {
-	/* nothin here now..... */
+	/* nothing here now..... */
 }
 
 ibmbeep()
@@ -348,7 +351,7 @@ int type;	/* type of adapter to init for */
 		CDVGA	VGA graphics Adapter
 */
 
-/* getbaord:	Detect the current display adapter
+/* getboard:	Detect the current display adapter
 		if MONO		set to MONO
 		   CGA		set to CGA	EGAexist = FALSE
 		   EGA		set to CGA	EGAexist = TRUE
@@ -399,7 +402,7 @@ int getboard()
  * setboard() - added by pjr
  *
  * This allows the user to set the monitor type by hand by using a set
- * variable in the rc file rathher than trying to figure out automatically
+ * variable in the rc file rather than trying to figure out automatically
  * which board is present, anyhow people may prefer 25 lines!
  */
 int setboard(type)

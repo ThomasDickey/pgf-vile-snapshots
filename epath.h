@@ -1,5 +1,5 @@
 /*	EPATH:	This file contains certain info needed to locate the
-		MicroEMACS files on a system dependant basis.
+		MicroEMACS files on a system dependent basis.
 
 									*/
 
@@ -7,7 +7,10 @@
 
 /*
  * $Log: epath.h,v $
- * Revision 1.4  1992/03/19 23:16:33  pgf
+ * Revision 1.5  1992/08/20 23:40:48  foxharp
+ * typo fixes -- thanks, eric
+ *
+ * Revision 1.4  1992/03/19  23:16:33  pgf
  * ifdef fix
  *
  * Revision 1.3  1991/08/07  11:51:32  pgf

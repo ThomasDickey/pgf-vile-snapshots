@@ -8,8 +8,11 @@
  * Major extensions for vile by Paul Fox, 1991
  *
  *	$Log: modes.c,v $
- *	Revision 1.2  1992/07/13 20:03:54  foxharp
- *	the "terse" variable is now a boolean mode
+ *	Revision 1.3  1992/08/20 23:40:48  foxharp
+ *	typo fixes -- thanks, eric
+ *
+ * Revision 1.2  1992/07/13  20:03:54  foxharp
+ * the "terse" variable is now a boolean mode
  *
  * Revision 1.1  1992/05/29  09:38:33  foxharp
  * Initial revision
@@ -229,7 +232,7 @@ int global; /* true = global flag,	false = current buffer flag */
 	register int uflag; 	/* was modename uppercase?	*/
 #endif
 	char prompt[50];	/* string to prompt user with */
-	static char cbuf[NPAT]; 	/* buffer to recieve mode name into */
+	static char cbuf[NPAT]; 	/* buffer to receive mode name into */
 
 	/* build the proper prompt string */
 	if (global)

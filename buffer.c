@@ -6,7 +6,10 @@
  * for the display system.
  *
  * $Log: buffer.c,v $
- * Revision 1.39  1992/08/05 21:52:33  foxharp
+ * Revision 1.40  1992/08/20 23:40:48  foxharp
+ * typo fixes -- thanks, eric
+ *
+ * Revision 1.39  1992/08/05  21:52:33  foxharp
  * print filenames with DOS drive designators correctly
  *
  * Revision 1.38  1992/07/30  07:28:53  foxharp
@@ -285,8 +288,8 @@ int
 nextbuffer(f, n)	/* switch to the next buffer in the buffer list */
 int f, n;	/* default flag, numeric argument */
 {
-	register BUFFER *bp;	/* eligable buffer to switch to*/
-	register BUFFER *stopatbp;	/* eligable buffer to switch to*/
+	register BUFFER *bp;	/* eligible buffer to switch to*/
+	register BUFFER *stopatbp;	/* eligible buffer to switch to*/
         
 	stopatbp = NULL;
 	while (stopatbp != bheadp) {
@@ -622,7 +625,7 @@ BUFFER *bp;
 	window is displaying the buffer list, splitting the screen
 	if this is what it takes.  Lastly, repaint all of the
 	windows that are displaying the list.
-	A numeric argument forces it to list invisable buffers as
+	A numeric argument forces it to list invisible buffers as
 	well.
 */
 

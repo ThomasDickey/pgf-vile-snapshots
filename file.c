@@ -6,7 +6,10 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.59  1992/08/19 22:56:50  foxharp
+ * Revision 1.60  1992/08/20 23:40:48  foxharp
+ * typo fixes -- thanks, eric
+ *
+ * Revision 1.59  1992/08/19  22:56:50  foxharp
  * no longer need to multiply or add to NFILEN
  *
  * Revision 1.58  1992/08/06  23:55:07  foxharp
@@ -1652,7 +1655,7 @@ BUFFER *bp;
 
 
 /* canonicalize a pathname, to eliminate extraneous /./, /../, and ////
-	sequnces.  only guaranteed to work for absolute pathnames */
+	sequences.  only guaranteed to work for absolute pathnames */
 char *
 canonpath(ss)
 char *ss;

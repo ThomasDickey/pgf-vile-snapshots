@@ -5,7 +5,10 @@
  * added by Daniel Lawrence
  *
  * $Log: hp150.c,v $
- * Revision 1.5  1992/05/16 12:00:31  pgf
+ * Revision 1.6  1992/08/20 23:40:48  foxharp
+ * typo fixes -- thanks, eric
+ *
+ * Revision 1.5  1992/05/16  12:00:31  pgf
  * prototypes/ansi/void-int stuff/microsoftC
  *
  * Revision 1.4  1992/01/05  00:06:13  pgf
@@ -169,7 +172,7 @@ hp15cres()	/* change screen resolution */
 	return(TRUE);
 }
 
-spal()		/* change pallette register */
+spal()		/* change palette register */
 
 {
 	/*   not here */
@@ -268,7 +271,7 @@ closehp()		/* close the HP150 screen for input */
 hp15kopen()		/* open the HP150 keyboard for input */
 
 {
-	/* define key charectoristics with AGIOS call (0, 40) */
+	/* define key characteristics with AGIOS call (0, 40) */
 	defkey();
 
 	/* Turn on RAW mode with MSDOS call 44h */
@@ -287,7 +290,7 @@ hp15kopen()		/* open the HP150 keyboard for input */
 hp15kclose()		/* close the HP150 keyboard for input */
 
 {
-	/* define key charectoristics with AGIOS call (0, 40) */
+	/* define key characteristics with AGIOS call (0, 40) */
 	undefkey();
         
 	/* Turn off RAW mode with MSDOS call 44h */

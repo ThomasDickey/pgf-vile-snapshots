@@ -4,7 +4,10 @@
  * All operating systems.
  *
  * $Log: termio.c,v $
- * Revision 1.48  1992/08/19 23:02:47  foxharp
+ * Revision 1.49  1992/08/20 23:40:48  foxharp
+ * typo fixes -- thanks, eric
+ *
+ * Revision 1.48  1992/08/19  23:02:47  foxharp
  * ignore errors in ttunclean
  *
  * Revision 1.47  1992/08/04  20:14:58  foxharp
@@ -374,7 +377,7 @@ ttunclean()
 
 #include	<termio.h>
 
-/* original terminal characteristics and charactoristics to use inside */
+/* original terminal characteristics and characteristics to use inside */
 struct	termio	otermio, ntermio;
 
 #ifdef AVAILABLE  /* setbuffer() isn't on most termio systems */
@@ -837,7 +840,7 @@ ttopen()
 #endif
 
 #if     MSDOS && (HP150 == 0) && LATTICE
-	/* kill the ctrl-break interupt */
+	/* kill the ctrl-break interrupt */
 	rg.h.ah = 0x33;		/* control-break check dos call */
 	rg.h.al = 1;		/* set the current state */
 	rg.h.dl = 0;		/* set it OFF */
@@ -880,7 +883,7 @@ ttclose()
                 exit(status);
 #endif
 #if     MSDOS && (HP150 == 0) && LATTICE
-	/* restore the ctrl-break interupt */
+	/* restore the ctrl-break interrupt */
 	rg.h.ah = 0x33;		/* control-break check dos call */
 	rg.h.al = 1;		/* set the current state */
 	rg.h.dl = 1;		/* set it ON */

@@ -15,7 +15,7 @@ VI COMPLIANCE:
 	key -- the binding is FN-c
 
 - the '#' key may now be used to force the following character to be treated
-	as a function key.  Thus #1 is now euivalent to FN-1.
+	as a function key.  Thus #1 is now equivalent to FN-1.
 
 - some modes/values have changed names: aindent is now autoindent, swrap is
 	now wrapscan, exact is now noignorecase, and they all have the vi
