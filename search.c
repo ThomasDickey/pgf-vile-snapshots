@@ -4,7 +4,11 @@
  *  heavily modified by Paul Fox, 1990
  *
  * $Log: search.c,v $
- * Revision 1.34  1992/06/03 08:37:48  foxharp
+ * Revision 1.35  1992/07/07 08:34:50  foxharp
+ * added not_found_msg(), to that non-wrapping searches give appropriate
+ * message.  thanks leora!
+ *
+ * Revision 1.34  1992/06/03  08:37:48  foxharp
  * stop searching if we've wrapped when we hit the boundary
  *
  * Revision 1.33  1992/05/16  12:00:31  pgf
@@ -166,6 +170,20 @@ int lastdirec;
 
 MARK scanboundpos;
 
+char onlyonemsg[] = "Only one occurence of pattern";
+char notfoundmsg[] = "Not found";
+char hitendmsg[] = "Search reached %s without matching pattern";
+
+void
+not_found_msg(wrapok, dir)
+int wrapok, dir;
+{
+	if (wrapok)
+		mlforce (notfoundmsg);
+	else
+		mlforce (hitendmsg, dir == FORWARD ? "BOTTOM":"TOP");
+}
+
 int
 scrforwsearch(f,n)
 int f,n;
@@ -179,9 +197,6 @@ int f,n;
 {
 	return rsearch(f,n,FALSE,TRUE);
 }
-
-char onlyonemsg[] = "Only one occurence of pattern";
-char notfoundmsg[] = "Not found";
 
 /*
  * forwsearch -- Search forward.  Get a search string from the user, and
@@ -266,7 +281,7 @@ int marking, fromscreen;
 	} else if (status) {
 		savematch(DOT,gregexp->mlen);
 		if (samepoint(DOT,curpos)) {
-			mlwrite(onlyonemsg);
+			mlforce(onlyonemsg);
 			TTbeep();
 		}
 	}
@@ -274,7 +289,7 @@ int marking, fromscreen;
 	/* Complain if not there.  */
 	if ((marking && didmark == FALSE) ||
 				(!marking && status == FALSE)) {
-		mlforce(notfoundmsg);
+		not_found_msg(wrapok,FORWARD);
 		TTbeep();
 		return FALSE;
 	}
@@ -327,12 +342,12 @@ int f, n;	/* default flag / numeric argument */
 	if (status == TRUE) {
 		savematch(DOT,gregexp->mlen);
 		if (samepoint(DOT,curpos)) {
-			mlwrite(onlyonemsg);
+			mlforce(onlyonemsg);
 			TTbeep();
 		}
 	} else if (status == FALSE) {
 		nextch(&(DOT),REVERSE);
-		mlforce(notfoundmsg);
+		not_found_msg(wrapok,FORWARD);
 		TTbeep();
 	} else if (status == ABORT) {
 		TTbeep();
@@ -395,12 +410,12 @@ int dummy, fromscreen;
 		if (status == TRUE)
 			savematch(DOT,gregexp->mlen);
 			if (samepoint(DOT,curpos)) {
-				mlwrite(onlyonemsg);
+				mlforce(onlyonemsg);
 				TTbeep();
 			}
 		else if (status == FALSE) {
 			nextch(&(DOT),FORWARD);
-			mlforce(notfoundmsg);
+			not_found_msg(wrapok,REVERSE);
 			TTbeep();
 		} else if (status == ABORT) {
 			TTbeep();
@@ -434,12 +449,10 @@ int f, n;	/* default flag / numeric argument */
 	/* Make sure a pattern exists, or that we didn't switch
 	 * into MAGIC mode until after we entered the pattern.
 	 */
-	if (pat[0] == '\0')
-	{
+	if (pat[0] == '\0') {
 		mlforce("[No pattern set]");
 		return FALSE;
 	}
-	/* mlwrite("Searching back..."); */
 
 	/* Go search for it for as long as
 	 * n is positive (n == 0 will go through once, which
@@ -461,12 +474,12 @@ int f, n;	/* default flag / numeric argument */
 	if (status == TRUE) {
 		savematch(DOT,gregexp->mlen);
 		if (samepoint(DOT, curpos)) {
-			mlwrite(onlyonemsg);
+			mlforce(onlyonemsg);
 			TTbeep();
 		}
 	} else if (status == FALSE) {
 		nextch(&(DOT),FORWARD);
-		mlforce(notfoundmsg);
+		not_found_msg(wrapok,REVERSE);
 		TTbeep();
 	} else if (status == ABORT) {
 		TTbeep();

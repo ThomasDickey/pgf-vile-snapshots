@@ -2,7 +2,10 @@
  *		for MicroEMACS
  *
  * $Log: spawn.c,v $
- * Revision 1.28  1992/06/25 23:00:50  foxharp
+ * Revision 1.29  1992/07/07 08:37:13  foxharp
+ * wait() for child in filterregion()
+ *
+ * Revision 1.28  1992/06/25  23:00:50  foxharp
  * changes for dos/ibmpc
  *
  * Revision 1.27  1992/06/01  21:23:40  foxharp
@@ -697,7 +700,7 @@ filterregion()
         static char oline[NLINE];	/* command line send to shell */
         char	line[NLINE];	/* command line send to shell */
 	FILE *fr, *fw;
-	int s;
+	int s, status;
 
 	/* get the filter name and its args */
         if ((s=mlreply("!", oline, NLINE)) != TRUE)
@@ -726,10 +729,10 @@ filterregion()
 		/* NOTREACHED */
 	}
 	fclose(fw);
-	/* backline(FALSE,1); */
 	DOT.l = lback(DOT.l);
 	s = ifile(NULL,TRUE,fr);
 	npclose(fr);
+	(void)wait(&status);
 	firstnonwhite(FALSE,1);
 	setmark();
 	return s;
