@@ -1,5 +1,34 @@
-The following changes are grouped only roughly, and represent the delta
-of the current release from vile version three.  -pgf   10/22/91
+
+Changes in 3.29:
+-----------------
+
+(fixes supplied by tom dickey, eric krohn, and willem kasdorp)
+
+buffer.c: changes for keeping the buffer list more up to date when
+	on screen
+fences.c: allow match of fence that is first char. in buffer
+file.c: avoid inf. loop when choosing unique name for buffers that have names
+	containing "x" in the NBUFN-1 position and allow ":e!" with no file
+	to default to current file
+globals.c: implemented 'v' command
+isearch.c, line.c, display.c: ifdef of some unused code
+main.c: added .C, .i to cmode suffixes, for C++ and cpp output files
+makefile, install target: test for presence of vile in destdir before
+	trying to move it to ovile
+oneliner.c: don't allow pregion to be used if the plines buffer is current,
+	and set the WINDOW list mode, not the BUFFER list mode, so :l works
+	again, and fix for s/.//g bug
+regexp.c: fixes for interaction of BOL and \s etc.
+spawn.c: lint cleanup  mostly casting strcXX() to void.
+tcap.c: hack to supply CS or SR for scrolling region control, missing
+	from some xterms
+termio.c: added missing fflush in two of the ttclean() routines
+word.c: fix for counts on 'J' command
+
+------------------------------------------
+
+The rest of the changes lister here are grouped only roughly, and represent
+the delta of version 3.28 from vile version three.  -pgf Dec 30 1992
 
 ------------------------------------------------------
 

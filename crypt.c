@@ -2,7 +2,10 @@
  *		written by Dana Hoggatt and Daniel Lawrence
  *
  * $Log: crypt.c,v $
- * Revision 1.5  1992/08/20 23:40:48  foxharp
+ * Revision 1.6  1992/12/23 09:16:54  foxharp
+ * lint
+ *
+ * Revision 1.5  1992/08/20  23:40:48  foxharp
  * typo fixes -- thanks, eric
  *
  * Revision 1.4  1992/05/16  12:00:31  pgf
@@ -49,7 +52,7 @@ int n;		/* numeric argument */
 	crypt(key, strlen(key));
 
 	/* and save it off */
-	strcpy(curbp->b_key, key);
+	(void)strcpy(curbp->b_key, key);
 	mlwrite(" ");		/* clear it off the bottom line */
 	return(TRUE);
 }

@@ -4,7 +4,10 @@
  * All operating systems.
  *
  * $Log: termio.c,v $
- * Revision 1.51  1992/12/05 13:58:20  foxharp
+ * Revision 1.52  1992/12/23 09:27:52  foxharp
+ * added missing fflush in ttclean
+ *
+ * Revision 1.51  1992/12/05  13:58:20  foxharp
  * added missing TTclose to ttclean, for Tom Dickey on his apollo -- I'm not
  * convinced this seems right, but I'll try it for now.
  *
@@ -240,7 +243,7 @@ extern int errno;
    * refresh correctly, as if the fcntl is interfering with the output drain
    */
 #  undef USE_FCNTL
-#  define USE_FIONREAD 	1
+#  define USE_FIONREAD 1
 # endif
 #endif
 
@@ -478,6 +481,7 @@ int f;
 		TTputc('\n');
 		TTputc('\r');
 	}
+	fflush(stdout);
 	TTflush();
 	TTclose();
 	ioctl(0, TCSETAF, &otermio);
@@ -592,6 +596,7 @@ int f;
 		TTputc('\n');
 		TTputc('\r');
 	}
+	fflush(stdout);
 	TTflush();
 	TTclose();
 	ioctl(0, TIOCSETN, &ostate);

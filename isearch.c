@@ -17,7 +17,10 @@
  * ever equalled FALSE.
  * 
  * $Log: isearch.c,v $
- * Revision 1.16  1992/05/25 21:07:48  foxharp
+ * Revision 1.17  1992/12/23 09:20:10  foxharp
+ * ifdef of unused code
+ *
+ * Revision 1.16  1992/05/25  21:07:48  foxharp
  * extern func declarations moved to header
  *
  * Revision 1.15  1992/05/19  08:55:44  foxharp
@@ -375,6 +378,7 @@ scanmore(patrn, dir)		/* search forward or back for a pattern */
  * be done is match the last char input.
  */
 
+#ifdef	UNUSED
 int 
 match_pat(patrn)		/* See if the pattern string matches string
 				 * at "." */
@@ -407,6 +411,7 @@ match_pat(patrn)		/* See if the pattern string matches string
 	}
 	return (TRUE);		/* Everything matched? Let's celebrate */
 }
+#endif	/* UNUSED */
 
 /* Routine to prompt for I-Search string. */
 

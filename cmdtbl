@@ -71,7 +71,10 @@
 #		here for completeness.
 #
 # $Log: cmdtbl,v $
-# Revision 1.43  1992/11/19 08:56:35  foxharp
+# Revision 1.44  1992/12/20 14:37:35  foxharp
+# took RANGE out of opervglobals flags
+#
+# Revision 1.43  1992/11/19  08:56:35  foxharp
 # add "args" as a synonym for "list-buffers".  i know it's not much
 # like the vi "args" command, but it's about as close as i can get easily
 #
@@ -846,7 +849,7 @@ operflip	OPER|REDO|UNDO|GLOBOK|(RANGE)
 operglobals	(/*RANGE|*/BANG|EXTRA|DFLALL)	GLOBALS
 	"global"
 	"g"
-opervglobals	(RANGE|BANG|EXTRA|DFLALL)	GLOBALS
+opervglobals	(/*RANGE|*/BANG|EXTRA|DFLALL)	GLOBALS
 	"vglobal"
 	"v"
 operlower	OPER|REDO|UNDO|GLOBOK|(RANGE)

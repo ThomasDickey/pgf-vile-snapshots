@@ -1,10 +1,6 @@
 	(E means enhancement, L,M,H are low, medium, high priority)
 ----------------------
 
-H	The mvrightwind and mvleftwind functions are broken -- visiting lines
-	that are too short to be visible when the screen is shifted will
-	cause junk on the screen.
-
 E	should add a "show-vars" command
 
 E	everybody and their sibling wants "map", "map!", and "abb".
@@ -53,7 +49,7 @@ E	the scrsearch functions could become region based -- as in "search for
 
 E	need a "file newer than buffer" warning.  Should stat the file, and
 	store it's mod time, compare to current when going back to that window,
-	after performing some shell command, or just before modifying it. 
+	after performing some shell command, or just before modifying it.
 	e.g., if you're editing a file that is created by a script you're
 	testing, then you want to be warned that the file is out of date
 	after doing a test run of the script.
@@ -71,7 +67,7 @@ E	adjust window size of popups based on length of buffer.  currently
 E	collapse command execution code to as few places as possible.
 	Its currently spread through execute(), operator(),
 	docmd(), and usekreg().
-	
+
 E	mlreply line should ideally be a one line buffer, so editing
 	and history can be done on it.
 
@@ -79,7 +75,7 @@ E	BSD interrupt processing is botched during a read() of the keyboard.
 	The read doesn't return -1 as it does under sysV (USG).
 	So you can bang on ^C all day and nothing will happen.  It does work
 	if you're not in a read(), of course.
-	
+
 E	I haven't even come close to testing vile for
 	memory-full conditions.  Some malloc() packages give 95%
 	warnings -- perhaps something like that should be done for
@@ -120,7 +116,6 @@ E	The vi '_' command isn't supported -- it's similar to stuttering
 	when used as an operator controller, and similar to '^' when used
 	as a simple motion.
 
-
 E	Do autoindent after labels and case statements (lines ending in ':')
 	Alternately, _back_up_ if you type either of `case ' or `default:'.
 	and shift back all the way to the left for `label:'
@@ -129,6 +124,20 @@ E	Do autoindent after labels and case statements (lines ending in ':')
 E	in autoindent mode: 0^D and ^^D don't work
 
 E	can't search for a NUL in a buffer.
+
+E	undo does not apply to windows of a buffer?  I opened two windows
+	onto a buffer and made changes in one window.  The changes tracked in
+	the other window, until I did an undo.
+
+E	if a file has zero-length, it is treated as not-modified
+
+E	":e" and ":e!" should share the same prompt data, which should be
+	editable / history.  They both should default (like vi!) to the
+	current buffer.
+
+E	should add a mode that causes vile to automatically create buffers
+	that correspond to files _written_ as well as read (this is what
+	'vi' does), and makes the %/# toggling behavior more like vi.  
 
 ===================================================
 
@@ -146,31 +155,11 @@ E	can't search for a NUL in a buffer.
 
 ===================================================
 
-    There is a bug in the regular expression code.  The expression
-	's/./=/g' should change all the characters on the lines to an equal
-	sign.  Yet, here is what happens:
-
-	This line should turn into all equals:
-
-	but, :s/./=/g yields:
-        =h=s=l=n= =h=u=d=t=r= =n=o=a=l=e=u=l=:
-
-    Every other character is skipped.  (A pointer incrementing problem?)
-
-    The ed 'transfer' and 'move' commands don't work. 
+    The ed 'transfer' and 'move' commands don't work.
     (to copy and move text around.  e.g., :'a,'bt$.)
 
 ===================================================
 
-    vile running in an xterm terminal has the
-annoying habit of moving the status bar line when scrolling up with
-^U or ^E.  This leads to the impression of 'flicker' that is very
-hard to get used to.  Is there any easy fix for this, or is this a
-consequence of the way the termcap entry is set up?
-
-(add "use scroll regions" setting to force there use, termcap notwithstanding)
-
-===================================================
 
 PCVILE
 
@@ -180,7 +169,7 @@ PCVILE
 	- filter-region -- this would be easier if I had used named pipes
 	as the conduit between child and parent, instead of regular pipes,
 	'cause then I could just replace the named pipe with a tmp file
-	under DOS.	
+	under DOS.
 
 	- some function keys return 8 bit characters on the PC.  This means
 	the input path, through tgetc, has to be 8-bit clean, we need to
@@ -201,7 +190,7 @@ Firstly - UNISYS 80286, EGA screen, 4DOS command shell & NNANSI.SYS
 1) Attempting to shell out to 4dos results in running COMMAND.COM.  Is
    this because COMSPEC is not checked ?
 
-2) Attempting to redirect the output of a 4DOS internal command into a 
+2) Attempting to redirect the output of a 4DOS internal command into a
    buffer works erratically.
 
 	a) :e !dir		- never works
@@ -221,7 +210,7 @@ Firstly - UNISYS 80286, EGA screen, 4DOS command shell & NNANSI.SYS
    appears to print out just fine.
 
 4) Points 1) & 3) I have previuosly raised with Peter Ruczynski on his
-   version. 
+   version.
 
 
 ===================================================
@@ -252,7 +241,7 @@ not support for DOS).
 PCVILE
 
 
-1) PC-vile wants all of its filenames to be specified with back 
+1) PC-vile wants all of its filenames to be specified with back
    slashes.  Blech.  Everybody's DOS products (except Microsoft) accept
    both backward and forward slashes in filenames.
 
@@ -295,7 +284,7 @@ Tektronix XD88/10 under UTekV - changes: removed LIBS definition from svr3 rule
 ----------------------------------------------------------------------
 
 Though I use it, I'm still not quite satisfied with the qident stuff.  It
-needs to be more flexible.  That is, I'd like to make it user defined. 
+needs to be more flexible.  That is, I'd like to make it user defined.
 For example
 	find-tag $qidentifier
 should be expressable as a character class like
@@ -316,9 +305,6 @@ better mimicking vi's behavior).
 
 	bind-key execute-macro-7 ^A-g
  - pgf ]
-----------------------------------------------------------------------
-What about the possibility of adding vi's (and perl's) \u \U \l \L \E.
-
 ----------------------------------------------------------------------
 
 Xvile works nicely with the middle mouse button to paste text.  It mangles

@@ -4,7 +4,14 @@
  *	Written (except for delins()) for vile by Paul Fox, (c)1990
  *
  * $Log: oneliner.c,v $
- * Revision 1.34  1992/12/14 08:31:06  foxharp
+ * Revision 1.36  1992/12/29 23:18:00  foxharp
+ * don't allow pregion to be used if the p-lines buffer is current, and
+ * set the WINDOW list mode, not the BUFFER list mode, so :l works again
+ *
+ * Revision 1.35  1992/12/28  23:50:00  foxharp
+ * fix for s/./=/g bug, from eric krohn
+ *
+ * Revision 1.34  1992/12/14  08:31:06  foxharp
  * now handle \U \L \u \l \e in the replacement pattern.  thanks to eric krohn.
  *
  * Revision 1.33  1992/12/07  23:32:29  foxharp
@@ -158,14 +165,17 @@ int flag;
 	if (bp == NULL)
 		return FALSE;
 
+	if (bp == curbp) {
+		mlforce("[Can't do that from this buffer.]");
+		return FALSE;
+	}
+
 	if (!calledbefore) {		/* fresh start */
 		/* bring p-lines up */
 		if (popupbuff(bp) != TRUE)
 			return FALSE;
 	        
 		bclear(bp);
-		make_local_b_val(bp,WMDLIST);
-		set_b_val(bp, WMDLIST, ((flag & PLIST) != 0) );
 		calledbefore = TRUE;
 	}
         
@@ -188,8 +198,9 @@ int flag;
 	bp->b_active = TRUE;
 	for (wp=wheadp; wp!=NULL; wp=wp->w_wndp) {
 		if (wp->w_bufp == bp) {
+			make_local_w_val(wp,WMDLIST);
+			set_w_val(wp, WMDLIST, ((flag & PLIST) != 0) );
 			wp->w_flag |= WFMODE|WFFORCE;
-			wp->w_traits.w_vals = bp->b_wtraits.w_vals;
 		}
 	}
 	return TRUE;
@@ -404,8 +415,7 @@ int nth_occur, printit, globally;
 			s = delins(exp, &rpat[0]);
 			if (s != TRUE)
 				return s;
-			if ((exp->mlen == 0 || exp->regmlen == 0) &&
-					forwchar(TRUE,1) == FALSE)
+			if (exp->mlen == 0 && forwchar(TRUE,1) == FALSE)
 				break;
 			if (nth_occur > 0)
 				break;

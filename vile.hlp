@@ -256,8 +256,6 @@ Text manipulation command:
 	see any of the '/' characters.  Try it-- you'll get the idea.
 	Line ranges are not possible on ":g", but they are on ":s".
 
-	The ":v" counterpart to ":g" is not implemented.
-
 	The ":g" command can be followed by any of l (list), p (print),
 	< (left shift), > (right shift), r (read file), d (delete),
 	L (lower case), U (upper case), ~ (flip case), put (append
@@ -267,6 +265,9 @@ Text manipulation command:
 	above every line containing "pattern".   The ":g" command can
 	only be used over the entire file -- smaller regions are not
 	permitted.
+
+	The ":v" counterpart to ":g" is also implemented -- it performs the
+	given command on all lines that don't match the given pattern.
 
 	The substitute command can be followed by any of 'g', a digit, or
 	'p', to do the substitution for all occurrences, the n'th

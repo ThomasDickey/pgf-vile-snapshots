@@ -6,7 +6,10 @@
  * for the display system.
  *
  * $Log: buffer.c,v $
- * Revision 1.43  1992/12/14 09:03:25  foxharp
+ * Revision 1.44  1992/12/23 09:15:49  foxharp
+ * tom dickey's changes for keeping the buffer list up to date when on screen
+ *
+ * Revision 1.43  1992/12/14  09:03:25  foxharp
  * lint cleanup, mostly malloc
  *
  * Revision 1.42  1992/12/02  09:13:16  foxharp
@@ -161,6 +164,97 @@
 #include	"estruct.h"
 #include	"edef.h"
 
+#define BUFFER_LIST_NAME "[Buffer List]"
+
+#define	Changed(bp)		(bp->b_flag & (BFCHG))
+#define	Invisible(bp)		(bp->b_flag & (BFINVS))
+#define	Scratch(bp)		(bp->b_flag & (BFSCRTCH))
+#define	InvisibleOrScratch(bp)	(bp->b_flag & (BFINVS|BFSCRTCH))
+
+static	int	show_all;
+
+/*
+ * Returns the buffer-list pointer, if it exists.
+ */
+BUFFER *
+find_listbuffers()
+{
+	return bfind(BUFFER_LIST_NAME, NO_CREAT, BFSCRTCH);
+}
+
+/*
+ * Look for a buffer-pointer in the list, to see if it has been delinked yet.
+ */
+BUFFER *
+find_bp(bp)
+BUFFER *bp;
+{
+	register BUFFER *bp1;
+	for (bp1 = bheadp; bp1; bp1 = bp1->b_bufp) {
+		if (bp1 == bp)
+			return bp1;
+	}
+	return 0;
+}
+
+/*
+ * Given a buffer, returns the corresponding WINDOW pointer
+ */
+WINDOW *
+bp2wp(bp)
+BUFFER *bp;
+{
+	register WINDOW *wp;
+	wp = wheadp;
+	while (wp->w_bufp != bp && wp->w_wndp != NULL)
+		wp = wp->w_wndp;
+	return wp;
+}
+
+/*
+ * Delete all instances of window pointer for a given buffer pointer
+ */
+int
+zotwp(bp)
+BUFFER *bp;
+{
+	register WINDOW *wp;
+	int s = FALSE;
+	for (wp = wheadp; wp != NULL; wp = wp->w_wndp) {
+		if (wp->w_bufp == bp) {
+			s = delwp(wp);
+		}
+	}
+	return s;
+}
+
+/*
+ * If the list-buffers window is visible, update it after operations that
+ * would modify the list.
+ */
+void
+updatelistbuffers()
+{
+	static	int	updating_list;
+
+	if (!updating_list++) {
+		BUFFER *savebp = curbp, *bp;
+		WINDOW *savewp = curwp;
+
+		if ((bp = find_listbuffers()) != 0) {
+			liststuff(BUFFER_LIST_NAME, makebufflist, show_all, NULL);
+			if ((savebp != bp) && (find_bp(savebp) != 0)) {
+				make_current(savebp);	/* sets curbp */
+				curwp = bp2wp(savebp);
+			}
+			else {
+				curwp = savewp;
+				curbp = savebp;
+			}
+		}
+	}
+	updating_list--;
+}
 
 /* c is either first character of a filename, or an index into buffer list */
 char *
@@ -176,7 +270,7 @@ int c;
 	        
 	bp = curbp->b_bufp; /* always skip the current */
 	while (bp != NULL) {
-		if (!(bp->b_flag & (BFINVS|BFSCRTCH)) && (--c == 0))
+		if (!InvisibleOrScratch(bp) && (--c == 0))
 			break;
 		bp = bp->b_bufp;
 	}
@@ -197,9 +291,9 @@ hist_show()
         
 	strcpy(line,"");
 	for (i = 0, bp = curbp->b_bufp; i < 10 && bp != NULL; bp = bp->b_bufp) {
-		if (!(bp->b_flag & (BFINVS|BFSCRTCH))) {
+		if (!InvisibleOrScratch(bp)) {
 			strcat(line, "  %d");
-			if (bp->b_flag & BFCHG)
+			if (Changed(bp))
 				strcat(line, "* ");
 			else
 				strcat(line, " ");
@@ -307,14 +401,13 @@ int f, n;	/* default flag, numeric argument */
 		while(bp->b_bufp != stopatbp)
 			bp = bp->b_bufp;
 		/* if that one's invisible, back up and try again */
-		if (bp->b_flag & BFINVS)
+		if (Invisible(bp))
 			stopatbp = bp;
 		else
 			return swbuffer(bp);
 	}
 	/* we're back to the top -- they were all invisible */
 	return swbuffer(stopatbp);
-        
 }
 
 /* bring nbp to the top of the list, where curbp _always_ lives */
@@ -323,25 +416,18 @@ make_current(nbp)
 BUFFER *nbp;
 {
 	register BUFFER *bp;
-        
-	if (nbp == bheadp) {	/* already at the head */
-		curbp = bheadp;
-		curtabval = tabstop_val(curbp);
-		curswval = shiftwid_val(curbp);
-		return;
-	}
-	        
-	/* remove nbp from the list */
-	bp = bheadp; while(bp->b_bufp != nbp)
-		bp = bp->b_bufp;
-	bp->b_bufp = nbp->b_bufp;
-        
-	/* put it at the head */
-	nbp->b_bufp = bheadp;
-        
-	bheadp = nbp;
-	curbp = nbp;
 
+	if (nbp != bheadp) { /* remove nbp from the list */
+		bp = bheadp; while(bp->b_bufp != nbp)
+			bp = bp->b_bufp;
+		bp->b_bufp = nbp->b_bufp;
+
+		/* put it at the head */
+		nbp->b_bufp = bheadp;
+
+		bheadp = nbp;
+	}
+	curbp = bheadp; 
 	curtabval = tabstop_val(curbp);
 	curswval = shiftwid_val(curbp);
 }
@@ -362,7 +448,7 @@ register BUFFER *bp;
 
 	if (curbp) {
 		/* if we'll have to take over this window, and it's the last */
-		if (bp->b_nwnd == 0 && --curbp->b_nwnd == 0) {
+		if (bp->b_nwnd == 0 && --(curbp->b_nwnd) == 0) {
 			undispbuff(curbp,curwp);
 		}
 	}
@@ -370,14 +456,12 @@ register BUFFER *bp;
 
 	/* get it already on the screen if possible */
 	if (bp->b_nwnd > 0)  { /* then it's on the screen somewhere */
-		register WINDOW *wp;
-		wp = wheadp;
-		while (wp->w_bufp != bp && wp->w_wndp != NULL)
-			wp = wp->w_wndp;
+		register WINDOW *wp = bp2wp(bp);
 		if (!wp)
 			mlforce("BUG: swbuffer: wp still NULL");
 		curwp = wp;
 		upmode();
+		updatelistbuffers();
 		return TRUE;
 	}
         
@@ -397,6 +481,7 @@ register BUFFER *bp;
 #if	NeWS
 	newsreportmodes() ;
 #endif
+	updatelistbuffers();
 	return TRUE;
 }
 
@@ -408,8 +493,8 @@ register WINDOW *wp;
 {
 	/* get rid of it completely if it's a scratch buffer,
 		or it's empty and unmodified */
-	if ( (bp->b_flag & BFSCRTCH) || 
-		( !(bp->b_flag & BFCHG) && is_empty_buf(bp)) ) {
+	if ( Scratch(bp)
+	 || ( !Changed(bp) && is_empty_buf(bp)) ) {
 		(void)zotbuf(bp);
 	} else {  /* otherwise just adjust it off the screen */
 		bp->b_wtraits  = wp->w_traits;
@@ -449,9 +534,11 @@ has_C_suffix(bp)
 register BUFFER *bp;
 {
 	int s;
+	int save = ignorecase;
 	ignorecase = FALSE;
 	s =  regexec(b_val_rexp(bp,VAL_CSUFFIXES)->reg,
 			bp->b_fname, NULL, 0, -1);
+	ignorecase = save;
 	return s;
 }
 
@@ -471,7 +558,6 @@ int f,n;
 	register BUFFER *bp;
 	register int	s;
 	char bufn[NBUFN];
-	register BUFFER *bp1;
 
 	bufn[0] = 0;
 	if ((s=mlreply("Kill buffer: ", bufn, NBUFN)) != TRUE)
@@ -481,8 +567,8 @@ int f,n;
 		return FALSE;
 	}
 #ifdef BEFORE /* now allow killing the specials, like "tags" */
-	if(bp->b_flag & BFINVS) 	/* Deal with special buffers	*/
-			return (TRUE);		/* by doing nothing.	*/
+	if (Invisible(bp)) 		/* Deal with special buffers	*/
+		return (TRUE);		/* by doing nothing.	*/
 #endif
 	if (curbp == bp) {
 		if (histbuff(TRUE,1) != TRUE) {
@@ -491,17 +577,8 @@ int f,n;
 		}
 	}
 	if (bp->b_nwnd > 0)  { /* then it's on the screen somewhere */
-		register WINDOW *wp;
-		for (wp = wheadp; wp != NULL; wp = wp->w_wndp) {
-			if (wp->w_bufp == bp) {
-				delwp(wp);
-			}
-		}
-		for (bp1 = bheadp; bp1; bp1 = bp1->b_bufp) {
-			if (bp1 == bp)
-				break;
-		}
-		if (bp1 == NULL)  /* delwp must have zotted us */
+		(void)zotwp(bp);
+		if (find_bp(bp) == 0) /* delwp must have zotted us */
 			return TRUE;
 	}
 	s = zotbuf(bp);
@@ -534,21 +611,11 @@ register BUFFER *bp;
 		}
 	}
 	if (bp->b_nwnd > 0)  { /* then it's on the screen somewhere */
-		register WINDOW *wp;
-		for (wp = wheadp; wp != NULL; wp = wp->w_wndp) {
-			if (wp->w_bufp == bp) {
-				delwp(wp);
-			}
-		}
-		for (bp1 = bheadp; bp1; bp1 = bp1->b_bufp) {
-			if (bp1 == bp)
-				break;
-		}
-		if (bp1 == NULL)  /* delwp must have zotted us */
+		(void)zotwp(bp);
+		if (find_bp(bp) == 0) /* delwp must have zotted us */
 			return TRUE;
 	}
 
-		
 #endif
 	/* Blow text away.	*/
 	if ((s=bclear(bp)) != TRUE) {
@@ -571,6 +638,7 @@ register BUFFER *bp;
 	else
 		bp1->b_bufp = bp2;
 	free((char *) bp);			/* Release buffer block */
+	updatelistbuffers();
 	return (TRUE);
 }
 
@@ -603,6 +671,7 @@ ask:	if (mlreply(prompt, bufn, NBUFN) != TRUE)
 	strcpy(curbp->b_bname, bufn);	/* copy buffer name to structure */
 	curwp->w_flag |= WFMODE;	/* make mode line replot */
 	mlerase();
+	updatelistbuffers();
 	return(TRUE);
 }
 
@@ -657,32 +726,19 @@ BUFFER *bp;
 	well.
 */
 
-#define BUFFER_LIST_NAME "[Buffer List]"
-
 int
 togglelistbuffers(f, n)
 int f,n;
 {
-	register WINDOW *wp;
 	register BUFFER *bp;
-	int s;
 
 	/* if it doesn't exist, create it */
-	if ((bp = bfind(BUFFER_LIST_NAME, NO_CREAT, BFSCRTCH)) == NULL)
+	if ((bp = find_listbuffers()) == NULL)
 		return listbuffers(f,n);
 
 	/* if it does exist, delete the window, which in turn 
 		will kill the BFSCRTCH buffer */
-	wp = wheadp;
-	s = TRUE;
-	while (wp != NULL && s) {
-		if (wp->w_bufp == bp) {
-			s = delwp(wp);
-			break;
-		}
-		wp = wp->w_wndp;
-	}
-	return s;
+	return zotwp(bp);
 }
 
 /* ARGSUSED */
@@ -713,32 +769,43 @@ char *dummy;
 	long nbytes;		/* # of bytes in current buffer */
 	int footnote = FALSE;
 
+	show_all = iflag;	/* save this to use in 'updatebufflist()' */
+
+	bclear(curbp);
 	bprintf("     %7s %*s %s\n", "Size",NBUFN,"Buffer name","Contents");
 	bprintf("     %7p %*p %30p\n", '-',NBUFN,'-','-');
-	        
+
 	bp = bheadp;				/* For all buffers	*/
 
 	/* output the list of buffers */
 	while (bp != NULL) {
 		/* skip invisible buffers and ourself if iflag is false */
-		if (((bp->b_flag&(BFINVS|BFSCRTCH)) != 0) && (iflag != TRUE)) {
+		if ((InvisibleOrScratch(bp)) && !show_all) {
 			bp = bp->b_bufp;
 			continue;
 		}
 		/* output status of ACTIVE flag (has the file been read in? */
 		if (bp->b_active == TRUE) {   /* if activated	    */
-			if ((bp->b_flag&BFCHG) != 0) {	  /* if changed     */
+			if (Changed(bp)) {	/* if changed     */
 				bputc('m');
 				footnote = TRUE;
 			} else {
 				bputc(' ');
 			}
 		} else {
-			bputc('u');
+			if (Invisible(bp))
+				bputc('i');
+			else if (Scratch(bp))
+				bputc('s');
+			else
+				bputc('u');
 			footnote = TRUE;
 		}
 
-		bprintf(" %2d ",nbuf++);
+		if (InvisibleOrScratch(bp))
+			bprintf("    ");
+		else
+			bprintf(" %2d ",nbuf++);
 
 		{	/* Count bytes in buf.	*/
 			register LINE	*lp;
@@ -771,7 +838,7 @@ char *dummy;
 	}
 
 	if (footnote == TRUE)
-		bprintf("('m' means modified, 'u' means unread)\n");
+		bprintf("notes: 'm' is modified, 'u' unread, 's' scratch, 'i' invisible\n");
 
 	bprintf("             %*s %s\n", NBUFN, "Current dir:",
 		current_directory(FALSE));
@@ -843,7 +910,7 @@ anycb()
 
 	bp = bheadp;
 	while (bp != NULL) {
-		if ((bp->b_flag&BFINVS)==0 && (bp->b_flag&BFCHG)!=0)
+		if (!Invisible(bp) && Changed(bp))
 			cnt++;
 		bp = bp->b_bufp;
 	}
@@ -947,8 +1014,8 @@ register BUFFER *bp;
 {
 	register LINE	*lp;
 
-	if ((bp->b_flag&(BFINVS|BFSCRTCH)) == 0 /* Not invisible or scratch */
-			&& (bp->b_flag&BFCHG) != 0 ) {	    /* Something changed    */
+	if (!InvisibleOrScratch(bp) /* Not invisible or scratch */
+	 &&  Changed(bp)) {	    /* Something changed    */
 		char ques[50];
 		strcpy(ques,"Discard changes to ");
 		strcat(ques,bp->b_bname);

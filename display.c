@@ -6,7 +6,10 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.55  1992/12/14 08:32:20  foxharp
+ * Revision 1.56  1992/12/23 09:17:17  foxharp
+ * ifdef of unused code
+ *
+ * Revision 1.55  1992/12/14  08:32:20  foxharp
  * fix for the sideways-shifted-but-deextended bug.  thanks to Tom Dickey.
  * also lint cleanup.
  *
@@ -2003,6 +2006,7 @@ va_dcl
 	return lsp;
 } 
 
+#ifdef	UNUSED
 static char *lsbuf;
 
 void
@@ -2042,6 +2046,7 @@ va_dcl
 	*lsp = '\0';
 	return lsp;
 } 
+#endif	/* UNUSED */
 
 /*
  * Buffer printf -- like regular printf, but puts characters

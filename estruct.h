@@ -10,7 +10,10 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.91  1992/12/14 08:29:18  foxharp
+ * Revision 1.92  1992/12/20 14:38:46  foxharp
+ * added lflipmark macro, for 'v' command
+ *
+ * Revision 1.91  1992/12/14  08:29:18  foxharp
  * changes for lint support, from Tom Dickey.  Still not nearly 100% lint free,
  * and may not get much closer -- the code gets too ugly for me....
  *
@@ -1037,6 +1040,7 @@ typedef struct	LINE {
 #define lsetnotcopied(lp)	(lp->l.l_flag &= ~LCOPIED)
 #define lsetmarked(lp)		(lp->l.l_flag |= LGMARK)
 #define lsetnotmarked(lp)	(lp->l.l_flag &= ~LGMARK)
+#define lflipmark(lp)	(lp->l.l_flag ^= LGMARK)
 #define lsetclear(lp)	(lp->l.l_flag = 0)
 #define LINENOTREAL	((int)(-1))
 #define LINEUNDOPATCH	((int)(-2))

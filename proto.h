@@ -5,7 +5,10 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.26  1992/12/14 09:03:25  foxharp
+ * Revision 1.27  1992/12/23 09:22:40  foxharp
+ * some new, some ifdefed UNUSED
+ *
+ * Revision 1.26  1992/12/14  09:03:25  foxharp
  * lint cleanup, mostly malloc
  *
  * Revision 1.25  1992/12/05  13:52:20  foxharp
@@ -202,6 +205,10 @@ extern int unbindchar P(( int ));
 extern int apro P(( int, int ));
 extern char * kbd_engl P(( void ));
 extern int kbd_engl_stat P(( char ** ));
+BUFFER * find_listbuffers P((void));
+WINDOW * bp2wp P((BUFFER *));
+int zotwp P((BUFFER *));
+void updatelistbuffers P((void));
 extern char * hist_lookup P(( int ));
 extern int hist_show P(( void ));
 extern int histbuff P(( int, int ));
@@ -226,7 +233,12 @@ extern int addline P(( BUFFER *, char *, int ));
 extern int anycb P(( void ));
 extern BUFFER * bfind P(( char *, int, int ));
 extern int bclear P(( BUFFER * ));
+#if	CRYPT
+extern	int	setkey P((int, int));
+extern	void	crypt P((char *, int));
+#else
 extern void nocrypt P(( void ));
+#endif	/* CRYPT */
 extern int fscan P(( int, int, int ));
 extern int bscan P(( int, int, int ));
 extern int fcsrch P(( int, int ));
@@ -281,8 +293,10 @@ extern int dfputi P(( int, int ));
 extern int dfputli P(( long, int ));
 extern void lspputc P(( int ));
 extern char * lsprintf P((char *, char *, ... ));
+#ifdef	UNUSED
 extern void lssetbuf P(( char * ));
 extern char * _lsprintf P(( char *, ... ));
+#endif	/* UNUSED */
 extern void bputc P(( int ));
 extern void bprintf P((char *, ... ));
 extern void getscreensize P(( int *, int * ));
@@ -427,7 +441,9 @@ extern int isearch P(( int, int ));
 extern int promptpattern P(( char * ));
 extern int get_char P(( void ));
 extern LINE * lalloc P(( int, BUFFER * ));
+#ifdef	UNUSED
 extern int lgrow P(( LINE *, int, BUFFER * ));
+#endif	/* UNUSED */
 extern void lfree P(( LINE *, BUFFER * ));
 extern void ltextfree P(( LINE *, BUFFER * ));
 extern void lremove P(( BUFFER *, LINE * ));
