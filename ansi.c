@@ -3,36 +3,33 @@
  * over a serial line. The serial I/O services are provided by routines in
  * "termio.c". It compiles into nothing if not an ANSI device.
  *
- * $Log: ansi.c,v $
- * Revision 1.14  1994/04/25 21:07:13  pgf
- * changes for ANSI screen under MSDOS
  *
- * Revision 1.13  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
- *
+ * $Header: /usr/build/VCS/pgf-vile/RCS/ansi.c,v 1.28 1996/04/14 23:37:50 pgf Exp $
  */
+
 
 #define termdef 1			/* don't define "term" external */
 
 #include	"estruct.h"
 #include	"edef.h"
 
-#if	ANSI
+#if	DISP_ANSI
 
 #define SCROLL_REG 1
 
-#if	AMIGA
-#define NROW	23			/* Screen size.			*/
-#define NCOL	77			/* Edit if you want to.		*/
-#endif
 
-#if	MSDOS
+#if	SYS_MSDOS
 #define NROW    25
 #define NCOL    80
 #define MAXNROW	60
 #define MAXNCOL	132
 #undef SCROLL_REG			/* ANSI.SYS can't do scrolling */
 #define SCROLL_REG 0
+#endif
+
+#if	defined(linux)
+#define NROW	25			/* Screen size.			*/
+#define NCOL	80			/* Edit if you want to.		*/
 #endif
 
 #ifndef NROW
@@ -48,33 +45,25 @@
 #define MARGIN	8			/* size of minimim margin and	*/
 #define SCRSIZ	64			/* scroll size for extended lines */
 
-extern	void	ansimove   P((int,int));
-extern	void	ansieeol   P((void));
-extern	void	ansieeop   P((void));
-extern	void	ansibeep   P((void));
-extern	void	ansiopen   P((void));
-extern	void	ansirev    P((int));
-extern	void	ansiclose  P((void));
-extern	void	ansikopen  P((void));
-extern	void	ansikclose P((void));
-extern	int	ansicres   P((char *));
-#if SCROLLCODE
-extern	void	ansiscroll P((int,int,int));
-#endif
+static	void	ansimove   (int row, int col);
+static	void	ansieeol   (void);
+static	void	ansieeop   (void);
+static	void	ansibeep   (void);
+static	void	ansiopen   (void);
+static	void	ansirev    (int state);
+static	void	ansiclose  (void);
+static	void	ansikopen  (void);
+static	void	ansikclose (void);
+static	int	ansicres   (char *flag);
+static	void	ansiscroll (int from, int to, int n);
 
-#if	COLOR
-extern	void	ansifcol P((int));
-extern	void	ansibcol P((int));
+#if	OPT_COLOR
+static	void	ansifcol (int color);
+static	void	ansibcol (int color);
 
-int	cfcolor = -1;		/* current forground color */
-int	cbcolor = -1;		/* current background color */
+static	int	cfcolor = -1;		/* current forground color */
+static	int	cbcolor = -1;		/* current background color */
 
-#if	AMIGA
-/* apparently the AMIGA does not follow the ANSI standards as regards to
- * colors ...maybe because of the default palette settings?
- */
-int coltran[8] = {2, 3, 5, 7, 0, 4, 6, 1};	/* color translation table */
-#endif
 #endif
 
 /*
@@ -82,8 +71,8 @@ int coltran[8] = {2, 3, 5, 7, 0, 4, 6, 1};	/* color translation table */
  * "termio" code.
  */
 TERM	term	= {
-	MAXNROW-1,	/* max */
-	NROW-1,		/* current */
+	MAXNROW,	/* max */
+	NROW,		/* current */
 	MAXNCOL,	/* max */
 	NCOL,		/* current */
 	MARGIN,
@@ -95,72 +84,66 @@ TERM	term	= {
 	ansikclose,
 	ttgetc,
 	ttputc,
+	tttypahead,
 	ttflush,
 	ansimove,
 	ansieeol,
 	ansieeop,
 	ansibeep,
 	ansirev,
-	ansicres
-#if	COLOR
-	, ansifcol,
-	ansibcol
+	ansicres,
+#if	OPT_COLOR
+	ansifcol,
+	ansibcol,
+#else
+	null_t_setfor,
+	null_t_setback,
 #endif
-#if SCROLLCODE
-	, ansiscroll
-#endif
+	null_t_setpal,			/* no palette */
+	ansiscroll,
+	null_t_pflush,
+	null_t_icursor,
+	null_t_title,
 };
 
-static	void	ansiparm P((int));
+static	void	ansiparm (int n);
 #if SCROLL_REG
-static	void	ansiscrollregion P((int,int));
+static	void	ansiscrollregion (int top, int bot);
 #endif
 
 static void
-csi P((void))
+csi (void)
 {
 	ttputc(ESC);
 	ttputc('[');
 }
 
-#if	COLOR
-void
-ansifcol(color)		/* set the current output color */
-	int	color;	/* color to set */
+#if	OPT_COLOR
+static void
+ansifcol(int color)	/* set the current output color */
 {
 	if (color == cfcolor)
 		return;
 	csi();
-#if	AMIGA
-	ansiparm(coltran[color]+30);
-#else
 	ansiparm(color+30);
-#endif
 	ttputc('m');
 	cfcolor = color;
 }
 
-void
-ansibcol(color)		/* set the current background color */
-	int	color;	/* color to set */
+static void
+ansibcol(int color)	/* set the current background color */
 {
 	if (color == cbcolor)
 		return;
 	csi();
-#if	AMIGA
-	ansiparm(coltran[color]+40);
-#else
 	ansiparm(color+40);
-#endif
 	ttputc('m');
 	cbcolor = color;
 }
 #endif
 
-void
-ansimove(row, col)
-int	row;
-int	col;
+static void
+ansimove(int row, int col)
 {
 	csi();
 	ansiparm(row+1);
@@ -169,17 +152,17 @@ int	col;
 	ttputc('H');
 }
 
-void
-ansieeol()
+static void
+ansieeol(void)
 {
 	csi();
 	ttputc('K');
 }
 
-void
-ansieeop()
+static void
+ansieeop(void)
 {
-#if	COLOR
+#if	OPT_COLOR
 	ansifcol(gfcolor);
 	ansibcol(gbcolor);
 #endif
@@ -188,19 +171,28 @@ ansieeop()
 	ttputc('J');
 }
 
+#if OPT_COLOR
+static void
+force_colors(int fc, int bc)
+{
+	cfcolor =
+	cbcolor = -1;
+	ansifcol(fc);
+	ansibcol(bc);
+}
+#endif
+
 #if BROKEN_REVERSE_VIDEO
 /* there was something wrong with this "fix".  the "else" of
 		the ifdef just uses "ESC [ 7 m" to set reverse
 		video, and it works under DOS for me....  but then, i
 		use an "after-market" ansi driver -- nnansi593.zip, from
 		oak.oakland.edu, or any simtel mirror. */
-void
-ansirev(state)		/* change reverse video state */
-int state;	/* TRUE = reverse, FALSE = normal */
+static void
+ansirev(	/* change reverse video state */
+int state)	/* TRUE = reverse, FALSE = normal */
 {
-#if	COLOR
-	int ftmp, btmp;	/* temporaries for colors */
-#else
+#if	!OPT_COLOR
 	static int revstate = -1;
 	if (state == revstate)
 		return;
@@ -208,44 +200,37 @@ int state;	/* TRUE = reverse, FALSE = normal */
 #endif
 
 	csi();
-#if COLOR && MSDOS
+#if OPT_COLOR && SYS_MSDOS
 	ttputc('1');	/* bold-on */
 #else
 	if (state) ttputc('7');	/* reverse-video on */
 #endif
 	ttputc('m');
 
-#if	COLOR
-#if	MSDOS
+#if	OPT_COLOR
+#if	SYS_MSDOS
 	/*
 	 * Setting reverse-video with ANSI.SYS seems to reset the colors to
 	 * monochrome.  Using the colors directly to simulate reverse video
 	 * works better. Bold-face makes the foreground colors "look" right.
 	 */
-	ftmp = cfcolor;
-	btmp = cbcolor;
-	cfcolor = -1;
-	cbcolor = -1;
-	ansifcol(state ? btmp : ftmp);
-	ansibcol(state ? ftmp : btmp);
+	if (state)
+		force_colors(cbcolor, cfcolor);
+	else
+		force_colors(cfcolor, cbcolor);
 #else	/* normal ANSI-reverse */
 	if (state == FALSE) {
-		ftmp = cfcolor;
-		btmp = cbcolor;
-		cfcolor = -1;
-		cbcolor = -1;
-		ansifcol(ftmp);
-		ansibcol(btmp);
+		force_colors(cfcolor, cbcolor);
 	}
 #endif	/* MSDOS vs ANSI-reverse */
-#endif	/* COLOR */
+#endif	/* OPT_COLOR */
 }
 
 #else
 
-void
-ansirev(state)		/* change reverse video state */
-int state;	/* TRUE = reverse, FALSE = normal */
+static void
+ansirev(	/* change reverse video state */
+int state)	/* TRUE = reverse, FALSE = normal */
 {
 	static int revstate = -1;
 	if (state == revstate)
@@ -255,33 +240,26 @@ int state;	/* TRUE = reverse, FALSE = normal */
 	csi();
 	if (state) ttputc('7');	/* reverse-video on */
 	ttputc('m');
-
+#if OPT_COLOR
+	force_colors(cfcolor, cbcolor);
+#endif
 }
 
 #endif
 
-int
-ansicres(flag)	/* change screen resolution */
-char	*flag;
+static int
+ansicres(char *flag)	/* change screen resolution */
 {
 	return(TRUE);
 }
 
-void
-spal(dummy)		/* change palette settings */
-char	*dummy;
-{
-	/* none for now */
-}
-
-void
-ansibeep()
+static void
+ansibeep(void)
 {
 	ttputc(BEL);
 	ttflush();
 }
 
-#if SCROLLCODE
 
 /* if your ansi terminal can scroll regions, like the vt100, then define
 	SCROLL_REG.  If not, you can use delete/insert line code, which
@@ -290,11 +268,8 @@ ansibeep()
 */
 
 /* move howmany lines starting at from to to */
-void
-ansiscroll(from,to,n)
-int	from;
-int	to;
-int	n;
+static void
+ansiscroll(int from, int to, int n)
 {
 	int i;
 	if (to == from) return;
@@ -315,7 +290,7 @@ int	n;
 	ansiscrollregion(0, term.t_mrow);
 
 #else /* use insert and delete line */
-#if PRETTIER_SCROLL
+#if OPT_PRETTIER_SCROLL
 	if (absol(from-to) > 1) {
 		ansiscroll(from, (from<to) ? to-1:to+1, n);
 		if (from < to)
@@ -348,23 +323,19 @@ int	n;
 
 #if SCROLL_REG
 static void
-ansiscrollregion(top,bot)
-int	top;
-int	bot;
+ansiscrollregion(int top, int bot)
 {
 	csi();
 	ansiparm(top + 1);
 	ttputc(';');
-	if (bot != term.t_nrow) ansiparm(bot + 1);
+	if (bot != term.t_nrow-1) ansiparm(bot + 1);
 	ttputc('r');
 }
 #endif
 
-#endif
 
-void
-ansiparm(n)
-register int	n;
+static void
+ansiparm(register int n)
 {
 	register int q,r;
 
@@ -383,42 +354,33 @@ register int	n;
 	ttputc((n%10) + '0');
 }
 
-void
-ansiopen()
+static void
+ansiopen(void)
 {
 	strcpy(sres, "NORMAL");
 	revexist = TRUE;
 	ttopen();
 }
 
-void
-ansiclose()
+static void
+ansiclose(void)
 {
-#if	COLOR
-	ansifcol(7);
-	ansibcol(0);
+	TTmove(term.t_nrow-1, 0);	/* cf: dumbterm.c */
+	ansieeol();
+#if	OPT_COLOR
+	ansifcol(C_WHITE);
+	ansibcol(C_BLACK);
 #endif
-	/*ttclose();*/
 }
 
-void
-ansikopen()	/* open the keyboard (a noop here) */
+static void
+ansikopen(void)		/* open the keyboard (a noop here) */
 {
 }
 
-void
-ansikclose()	/* close the keyboard (a noop here) */
+static void
+ansikclose(void)	/* close the keyboard (a noop here) */
 {
 }
 
-#if	FLABEL
-int
-fnclabel(f, n)		/* label a function key */
-int f,n;	/* default flag, numeric argument [unused] */
-{
-	/* on machines with no function keys...don't bother */
-	return(TRUE);
-}
-#endif
-
-#endif	/* ANSI */
+#endif	/* DISP_ANSI */

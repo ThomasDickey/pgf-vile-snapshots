@@ -1,9 +1,7 @@
 /* These functions perform vi's on-this-line character scanning functions.
- *	written for vile by Paul Fox, (c)1990
+ * written for vile: Copyright (c) 1990, 1995 by Paul Fox
  *
- * $Log: csrch.c,v $
- * Revision 1.14  1994/02/22 11:03:15  pgf
- * truncated RCS log for 4.0
+ * $Header: /usr/build/VCS/pgf-vile/RCS/csrch.c,v 1.26 1996/03/24 13:38:16 pgf Exp $
  *
 */
 
@@ -11,7 +9,7 @@
 #include "edef.h"
 
 static short lstscan;
-static short lstchar;
+static int   lstchar;
 #define BACK 0
 #define FORW 1
 #define DIREC 1
@@ -20,10 +18,8 @@ static short lstchar;
 #define T 2
 #define TYPE 2
 
-
-int
-fscan(f,n,c)
-int f,n,c;
+static int
+fscan(int f, int n, int c)
 {
 	int i;
 	int doto;
@@ -37,8 +33,8 @@ int f,n,c;
 	doto = DOT.o;
 
 	i = doto+1;
-	while(i < lLength(DOT.l)) {
-		if ( c == lGetc(DOT.l,i)) {
+	while(i < llength(DOT.l)) {
+		if ( c == lgetc(DOT.l,i)) {
 			doto = i;
 			n--;
 			if (!n) break;
@@ -46,11 +42,13 @@ int f,n,c;
 		i++;
 	}
 
-	if ( i == lLength(DOT.l)) {
+	if ( i == llength(DOT.l)) {
 		return(FALSE);
 	}
-	if (doingopcmd)
+	if (doingopcmd && !doingsweep)
 		doto++;
+	else if (doingsweep)
+		sweephack = TRUE;
 
 	DOT.o = doto;
 	curwp->w_flag |= WFMOVE;
@@ -58,9 +56,8 @@ int f,n,c;
 			
 }
 
-int
-bscan(f,n,c)
-int f,n,c;
+static int
+bscan(int f, int n, int c)
 {
 	int i;
 	int doto;
@@ -75,7 +72,7 @@ int f,n,c;
 
 	i = doto-1;
 	while(i >= w_left_margin(curwp)) {
-		if ( c == lGetc(DOT.l,i)) {
+		if ( c == lgetc(DOT.l,i)) {
 			doto = i;
 			n--;
 			if (!n) break;
@@ -93,42 +90,58 @@ int f,n,c;
 
 }
 
+static int
+get_csrch_char(int *cp)
+{
+	int c;
+
+	if (clexec || isnamedcmd) {
+		int status;
+		static char cbuf[2];
+		if ((status=mlreply("Scan for: ", cbuf, 2)) != TRUE)
+			return status;
+		c = cbuf[0];
+	} else {
+		c = keystroke();
+		if (c == quotec)
+			c = keystroke_raw8();
+		else if (ABORTED(c))
+			return FALSE;
+	}
+
+	*cp = c;
+	return TRUE;
+}
+
 /* f */
 int
-fcsrch(f,n)
-int f,n;
+fcsrch(int f, int n)
 {
-	register int c;
+	int c, s;
 
-        c = tgetc(FALSE);
-	if (c == quotec)
-		c = tgetc(TRUE);
-	else if (c == abortc)
-		return FALSE;
+	s = get_csrch_char(&c);
+	if (s != TRUE)
+		return s;
 
 	return(fscan(f,n,c));
 }
 
 /* F */
 int
-bcsrch(f,n)
-int f,n;
+bcsrch(int f, int n)
 {
-	register int c;
+	int c, s;
 
-        c = tgetc(FALSE);
-	if (c == quotec)
-		c = tgetc(TRUE);
-	else if (c == abortc)
-		return FALSE;
+	s = get_csrch_char(&c);
+	if (s != TRUE)
+		return s;
 
 	return(bscan(f,n,c));
 }
 
 /* t */
 int
-fcsrch_to(f,n)
-int f,n;
+fcsrch_to(int f, int n)
 {
 	int s;
 	s = fcsrch(f,n);
@@ -140,8 +153,7 @@ int f,n;
 
 /* T */
 int
-bcsrch_to(f,n)
-int f,n;
+bcsrch_to(int f, int n)
 {
 	int s;
 	s = bcsrch(f,n);
@@ -153,8 +165,7 @@ int f,n;
 
 /* ; */
 int
-rep_csrch(f,n)
-int f,n;
+rep_csrch(int f, int n)
 {
 	int s;
 	int ls = lstscan;
@@ -180,8 +191,7 @@ int f,n;
 
 /* , */
 int
-rev_csrch(f,n)
-int f,n;
+rev_csrch(int f, int n)
 {
 	int s;
 
