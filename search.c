@@ -3,16 +3,7 @@
  * and backward directions.
  *  heavily modified by Paul Fox, 1990
  *
- * $Log: search.c,v $
- * Revision 1.61  1994/04/18 14:26:27  pgf
- * merge of OS2 port patches, and changes to tungetc operation
- *
- * Revision 1.60  1994/03/29  14:51:27  pgf
- * fix for alternate search delimiters
- *
- * Revision 1.59  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
- *
+ * $Header: /usr/build/VCS/pgf-vile/RCS/search.c,v 1.63 1994/07/11 22:56:20 pgf Exp $
  *
  * original written Aug. 1986 by John M. Gamble, but I (pgf) have since
  * replaced his regex stuff with Henry Spencer's regexp package.
@@ -87,7 +78,7 @@ int marking, fromscreen;
 	if (f && n < 0)
 		return rsearch(f, -n, FALSE, FALSE);
 
-	wrapok = marking || b_val(curwp->w_bufp, MDSWRAP);
+	wrapok = marking || window_b_val(curwp, MDSWRAP);
 
 	lastdirec = 0;
 
@@ -105,7 +96,7 @@ int marking, fromscreen;
 		return status;
 	}
 
-	ignorecase = b_val(curwp->w_bufp, MDIGNCASE);
+	ignorecase = window_b_val(curwp, MDIGNCASE);
 
 	curpos = DOT;
 	scanboundry(wrapok,curpos,FORWARD);
@@ -169,7 +160,7 @@ int f, n;	/* default flag / numeric argument */
 	int wrapok;
 	MARK curpos;
 
-	wrapok = b_val(curwp->w_bufp, MDSWRAP);
+	wrapok = window_b_val(curwp, MDSWRAP);
 
 	if (n < 0)		/* search backwards */
 		return(backhunt(f, -n));
@@ -181,7 +172,7 @@ int f, n;	/* default flag / numeric argument */
 		return FALSE;
 	}
 
-	ignorecase = b_val(curwp->w_bufp, MDIGNCASE);
+	ignorecase = window_b_val(curwp, MDIGNCASE);
 
 	/* Search for the pattern for as long as
 	 * n is positive (n == 0 will go through once, which
@@ -243,7 +234,7 @@ int dummy, fromscreen;
 	if (n < 0)
 		return fsearch(f, -n, FALSE, fromscreen);
 
-	wrapok = b_val(curwp->w_bufp, MDSWRAP);
+	wrapok = window_b_val(curwp, MDSWRAP);
 
 	lastdirec = 1;
 
@@ -255,7 +246,7 @@ int dummy, fromscreen;
 	 */
 	if ((status = readpattern("Reverse search: ", &pat[0],
 				&gregexp, lastkey, fromscreen)) == TRUE) {
-		ignorecase = b_val(curwp->w_bufp, MDIGNCASE);
+		ignorecase = window_b_val(curwp, MDIGNCASE);
 
 		curpos = DOT;
 		scanboundry(wrapok,DOT,REVERSE);
@@ -297,7 +288,7 @@ int f, n;	/* default flag / numeric argument */
 	int wrapok;
 	MARK curpos;
 
-	wrapok = b_val(curwp->w_bufp, MDSWRAP);
+	wrapok = window_b_val(curwp, MDSWRAP);
 
 	if (n < 0)		/* search forwards */
 		return(forwhunt(f, -n));
@@ -313,7 +304,7 @@ int f, n;	/* default flag / numeric argument */
 	 * is just fine).
 	 */
 
-	ignorecase = b_val(curwp->w_bufp, MDIGNCASE);
+	ignorecase = window_b_val(curwp, MDIGNCASE);
 
 	curpos = DOT;
 	scanboundry(wrapok,DOT,REVERSE);
@@ -497,7 +488,7 @@ register int	pc;
 {
 	if (bc == pc)
 		return TRUE;
-	if (!b_val(curwp->w_bufp, MDIGNCASE))
+	if (!window_b_val(curwp, MDIGNCASE))
 		return FALSE;
 	return nocase_eq(bc,pc);
 }

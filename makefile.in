@@ -1,0 +1,326 @@
+# makefile.in is the makefile template for vile on unix systems.
+# makefile is generated from makefile.in by running configure.
+#
+# If you edit makefile, your changes will be lost when you run configure
+# again.  See the file INSTALL from instructions on how to configure, make,
+# and install vile/xvile.
+#
+# The command/name/key/function bindings are defined in the file "cmdtbl".
+# The mktbls program parses this to produce nebind.h, nename.h, and
+# nefunc.h, which are used by the rest of the build.
+#
+# Buffer/window modes are defined in the file "modetbl".
+# The mktbls program parses this to produce nemode.h, which is included in
+# 'estruct.h'.
+#
+# The version number is found near the top of edef.h, and is displayed with
+# the ":version" command, or by invoking vile with "-V".
+#
+# Paul Fox
+#
+# gnu autoconf support by kevin buettner, 5/94
+# original makefile for uemacs: Adam Fritz July 30,1987  (do you recognize it?)
+#
+# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.in,v 1.8 1994/07/11 22:56:20 pgf Exp $
+#
+
+#### Start of system configuration section. ####
+
+srcdir = @srcdir@
+srcdir_sl = @srcdir@/
+VPATH  = @srcdir@
+
+CC		= @CC@
+LINK		= $(CC)
+INSTALL		= @INSTALL@
+INSTALL_PROGRAM	= @INSTALL_PROGRAM@
+INSTALL_DATA	= @INSTALL_DATA@
+
+CFLAGS		= @CFLAGS@
+LIBS		= @LIBS@
+LINT		= lint
+
+X_CFLAGS	= @X_CFLAGS@
+X_LIBS		= @X_LIBS@
+X_EXTRA_LIBS	= @X_EXTRA_LIBS@
+
+SCREEN		= @SCREEN@
+TARGET		= @TARGET@
+
+prefix		= @prefix@
+exec_prefix	= $(prefix)
+
+manext		= 1
+bindir		= $(exec_prefix)/bin
+libdir		= $(exec_prefix)/lib
+mandir		= $(prefix)/man/man$(manext)
+
+#### End of system configuration section. ####
+
+SHELL		= /bin/sh
+RM              = rm -f
+
+CPPFLAGS	= -I. -I$(srcdir) -DHAVE_CONFIG_H
+
+LDFLAGS		= 
+
+INSTALL_DIRS    = $(bindir) $(libdir) $(mandir)
+
+.c.o:
+	$(CC) -c $(CPPFLAGS) $(CFLAGS) $(X_CFLAGS) -DHELP_LOC=\"$(libdir)\" $<
+
+# All of the makefiles which should be preserved and distributed
+UNIXMAKIN = makefile.in				# for use with configure
+VMSMAK =   descrip.mms vms_link.opt		# on VMS
+TURBOMAK = makefile.tbc				# on DOS or OS/2, TURBO C or Borland C
+WATMAK =   makefile.wat				# on DOS, using Watcom C/386
+MSCMAK =	# still waiting for this one	# on DOS, using Microsoft C
+DJGPPMAK = makefile.djg				# on DOS, DJGCC v1.09
+NTMAK = makefile.wnt				# on Windows/NT
+MAKFILES = $(UNIXMAKIN) $(VMSMAK) $(TURBOMAK) $(WATMAK) \
+	$(DJGPPMAK) $(MSCMAK) $(BORMAK) $(NTMAK)
+
+ALLTOOLS = $(MAKFILES) mktbls.c cmdtbl modetbl \
+	configure config_h.in \
+	install.sh mkdirs.sh \
+	configure.in aclocal.m4
+
+# these are normal editable headers
+HDRS = estruct.h epath.h edef.h proto.h dirstuff.h
+
+SCREENS = tcap.c x11.c ibmpc.c borland.c ansi.c ntconio.c vmsvt.c \
+	at386.c dg10.c hp110.c hp150.c st520.c \
+	tipc.c vt52.c x11simp.c z309.c z_ibmpc.c
+
+# other source code, some used in other makefiles, some possibly obsolete
+OTHERSRC = z100bios.asm vms2unix.c vmspipe.c djhandl.c \
+	manpage.rc manfilt.pl manfilt.c
+
+# documentation, such as it is
+DOCS = vile.hlp vile.1 macros.doc
+
+# miscellaneous text files
+TEXTFILES = README README.CFG README.X11 README.PC \
+	INSTALL CHANGES CHANGES.R3 buglist revlist
+
+VILESRC = main.c basic.c bind.c buffer.c crypt.c csrch.c \
+	display.c eval.c exec.c externs.c fences.c file.c \
+	filec.c fileio.c finderr.c glob.c globals.c \
+	history.c input.c insert.c isearch.c line.c map.c \
+	modes.c npopen.c oneliner.c opers.c path.c random.c \
+	regexp.c region.c search.c select.c spawn.c tags.c \
+	tbuff.c termio.c tmp.c undo.c version.c vmalloc.c \
+	window.c word.c wordmov.c
+
+ALLSRC = $(VILESRC) $(SCREENS) $(OTHERSRC) $(HDRS)
+
+# this is for work-in-progress files being shared among developers
+#  which don't need to go into general releases yet.
+DEVELOPER_ONLY = empty.rc mktbls.bat \
+	win31drv.c win31drv.def win31tbl.c win31tbl.def \
+	win31tbl.h win31tbl.rc  commdlg.msg \
+	trace.c trace.h \
+	mapchars.c mapchars.h
+
+# these are the files that go to everyone
+DISTFILES = $(ALLTOOLS) $(ALLSRC) $(DOCS) $(TEXTFILES)
+
+# these are the files that go to coders
+DEV_DISTFILES = $(DISTFILES) $(DEVELOPER_ONLY)
+
+SRC = $(SCREEN).c $(VILESRC)
+
+MKTBLS = ./mktbls
+
+# these headers are built by the mktbls program from the information in cmdtbl
+# and in modetbl
+BUILTHDRS = nebind.h nefunc.h nemode.h nename.h nevars.h
+
+OBJ = $(SCREEN).o \
+	main.o basic.o bind.o buffer.o crypt.o csrch.o \
+	display.o eval.o exec.o externs.o fences.o file.o \
+	filec.o fileio.o finderr.o glob.o globals.o \
+	history.o input.o insert.o isearch.o line.o map.o \
+	modes.o npopen.o oneliner.o opers.o path.o random.o \
+	regexp.o region.o search.o select.o spawn.o tags.o \
+	tbuff.o termio.o tmp.o undo.o version.o vmalloc.o \
+	window.o word.o wordmov.o
+
+all:	$(TARGET) manfilt
+
+$(TARGET): $(BUILTHDRS) $(OBJ)
+	-mv $(TARGET) o$(TARGET)
+	$(LINK) $(LDFLAGS) -o $(TARGET) $(OBJ) $(X_LIBS) $(X_EXTRA_LIBS) $(LIBS)
+
+nebind.h \
+nefunc.h \
+nename.h :	cmdtbl $(MKTBLS)
+	$(MKTBLS) $(srcdir)/cmdtbl
+
+nevars.h \
+nemode.h:	modetbl $(MKTBLS)
+	$(MKTBLS) $(srcdir)/modetbl
+
+$(MKTBLS):  $(srcdir)/mktbls.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o $(MKTBLS)  $(srcdir)/mktbls.c
+
+install: $(INSTALL_DIRS) \
+	$(bindir)/$(TARGET) \
+	$(bindir)/vile-manfilt \
+	$(mandir)/vile.$(manext) \
+	$(libdir)/vile.hlp
+	@echo '** completed installation'
+
+installdirs: $(INSTALL_DIRS)
+
+uninstall:
+	-$(RM) $(bindir)/$(TARGET) $(bindir)/vile-manfilt \
+	      $(mandir)/vile.$(manext) $(libdir)/vile.hlp
+
+makefile: makefile.in config.status
+	$(SHELL) ./config.status
+
+# defining this target, though technically (i think) correct, causes
+#  the make to fail on machines which don't have autoconf, i.e. most of them.
+#configure: configure.in aclocal.m4
+#	autoconf
+
+config.status: configure
+	$(SHELL) ./config.status --recheck
+
+mostlyclean:
+	-$(RM) *.o o$(TARGET) $(BUILTHDRS) $(MKTBLS) core *~ *.BAK
+
+clean: mostlyclean
+	-$(RM) $(TARGET) manfilt
+
+distclean: clean
+	-$(RM) makefile config.status config.h
+
+realclean: distclean
+	-$(RM) tags TAGS
+
+lint:
+	$(LINT) $(SRC) $(LIBS)
+
+tags:
+	ctags $(SRC) $(HDRS)
+
+TAGS:
+	etags $(SRC) $(HDRS)
+
+dist:	$(DEV_DISTFILES) /tmp/vilevers
+	@echo 'Do you need to rebuild the revlist????'
+	@sleep 3
+	echo vile-`cat /tmp/vilevers` > .fname
+	rm -rf `cat .fname`
+	mkdir `cat .fname`
+	SRCDIR=. ;\
+	test $(srcdir) = "\@srcdir\@" && SRCDIR=$(srcdir) ;\
+	for file in $(DEV_DISTFILES); do \
+	  ln $$SRCDIR/$$file `cat .fname` \
+	    || { echo copying $$file instead; cp -p $$file `cat .fname`; }; \
+	done
+	tar -cf - `cat .fname` | gzip >`cat .fname`.tar.gz
+	rm -rf `cat .fname` .fname
+
+# shar args: add -a for archive headers, add -s pgf@site.net for "submitted-by"
+shar: /tmp/vilevers
+	[ -d shardir ] || mkdir shardir
+	vilevers=`cat /tmp/vilevers`; \
+	shar -x -a -spgf@foxharp.boston.ma.us -nvile$${vilevers} -L60 \
+			-o shardir/vileshar `ls $(DEV_DISTFILES)`
+
+compr-shar: /tmp/vilevers
+	[ -d cshardir ] || mkdir cshardir
+	vilevers=`cat /tmp/vilevers`; \
+	shar -p -nvile$${vilevers} -L60 -o cshardir/vileshar \
+		-C `ls $(DEV_DISTFILES)`
+
+bigshar: /tmp/vilevers
+	@echo 'Do you need to rebuild the revlist????'
+	@sleep 3
+	vilevers=`cat /tmp/vilevers`; \
+	shar -spgf@foxharp.boston.ma.us -nvile$${vilevers} \
+	    -o vile$${vilevers}shar README `ls $(DISTFILES) | \
+	    sed '/^README$$/d'` ; \
+	mv vile$${vilevers}shar.01 vile$${vilevers}shar	; \
+	echo Created vile$${vilevers}shar
+
+zipfile: /tmp/vilevers
+	vilevers=`cat /tmp/vilevers | sed 's/\.//'`; \
+	zip -k vile$${vilevers}.zip $(DISTFILES) ;\
+	echo Created vile$${vilevers}.zip
+
+patch:	/tmp/vilevers
+	@orevlistrev=`rlog -h revlist | egrep head: | cut -f2 -d'.'`	;\
+	orevlistrev=1.`expr $$orevlistrev - 1`				;\
+	ovilevers=`cat /tmp/vilevers | cut -f2 -d'.'`			;\
+	ovilemajor=`cat /tmp/vilevers | cut -f1 -d'.'`			;\
+	ovilevers=$$ovilemajor.`expr $$ovilevers - 1`			;\
+	echo Previous version is $$ovilevers				;\
+	vilevers=`cat /tmp/vilevers`					;\
+	co -p$$orevlistrev revlist |					 \
+	while read file filerev						;\
+	do								 \
+	  rcsdiff -c -r$$filerev $$file 2>/dev/null || true		;\
+	done  >patch$$ovilevers-$$vilevers 				;\
+	echo Created patch$$ovilevers-$$vilevers 
+
+/tmp/vilevers:
+	@expr "`egrep 'version\[\].*' edef.h`" : \
+		'.* \([0-9][0-9]*\.[0-9].*\)".*' >/tmp/vilevers
+	@echo Current version is `cat /tmp/vilevers`
+
+rcsdiffrw:
+	@-for x in `$(MAKE) rw`	;\
+	do	\
+		echo 		;\
+		echo $$x	;\
+		echo =========	;\
+		rcsdiff $$x	;\
+	done 2>&1		;\
+	echo			;\
+	echo all done
+
+# dump a list of the important files
+list:
+	@ls $(DEV_DISTFILES) | more
+
+# make a list of RCS revisions.  don't include the revlist itself
+nrevlist:
+	$(MAKE) list  | egrep -v revlist >/tmp/vile__files
+	rlog -Ntrunk `cat /tmp/vile__files` >/tmp/vile__revs
+	-paste /tmp/vile__files /tmp/vile__revs >/tmp/vile_revlist
+	rm /tmp/vile__files /tmp/vile__revs
+	mv /tmp/vile_revlist nrevlist
+
+# dump a list of files that may have changed since last backup
+rw:
+	@ls -l $(DEV_DISTFILES) |\
+		egrep '^[^l].w' | \
+		sed 's;.* ;;'   # strip to last space
+
+$(OBJ): estruct.h nemode.h edef.h proto.h config.h
+
+main.o:	nevars.h
+bind.o:	epath.h
+filec.o:	dirstuff.h
+eval.o:	nevars.h
+glob.o:	dirstuff.h
+externs.o:	nebind.h nename.h nefunc.h
+path.o:	dirstuff.h
+vmalloc.o:	nevars.h
+
+# dependency-rules for install/installdirs
+$(bindir)/$(TARGET):       $(TARGET) 
+	$(INSTALL_PROGRAM) $(TARGET) $@
+$(bindir)/vile-manfilt:    manfilt 
+	$(INSTALL_PROGRAM) manfilt $@
+$(mandir)/vile.$(manext):  $(srcdir)/vile.1 
+	$(INSTALL_DATA)    $(srcdir)/vile.1 $@
+$(libdir)/vile.hlp:        $(srcdir)/vile.hlp 
+	$(INSTALL_DATA)    $(srcdir)/vile.hlp $@
+$(INSTALL_DIRS):
+	$(SHELL) ${srcdir}/mkdirs.sh $@
+

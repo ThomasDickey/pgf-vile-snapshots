@@ -5,77 +5,7 @@
  * commands. Some functions are just for
  * internal use.
  *
- * $Log: region.c,v $
- * Revision 1.50  1994/04/08 20:00:25  pgf
- * don't let getregion loop forever if we hit the end, and null out
- * haveregion after using it
- *
- * Revision 1.49  1994/04/07  18:17:39  pgf
- * moved selectregion to select.c, and added "haveregion" backdoor, to
- * shorten getregions work sometimes
- *
- * Revision 1.48  1994/04/04  18:52:33  pgf
- * account (in selectregion()) for the off-by-one nature of r_end vs.
- * the right column of rectangular regions.
- *
- * Revision 1.47  1994/04/04  12:36:36  pgf
- * make selectregion do a yankregion by default.  this may change.
- *
- * Revision 1.46  1994/04/04  11:37:11  pgf
- * added selectregion() to support operselect()
- *
- * Revision 1.45  1994/03/29  17:53:18  pgf
- * warning cleanup
- *
- * Revision 1.44  1994/03/29  14:51:00  pgf
- * fix buffer size passed to mlreply
- *
- * Revision 1.43  1994/03/28  17:16:51  pgf
- * typo
- *
- * Revision 1.42  1994/03/28  16:21:01  pgf
- * make sure all functions called by do_lines_in_region() are prepared
- * to handle empty lines, since they may now get them
- *
- * Revision 1.41  1994/03/18  18:30:38  pgf
- * fixes for OPT_MAP_MEMORY compilation
- *
- * Revision 1.40  1994/03/15  18:33:09  pgf
- * protect against kill_line going off the end of the line, and
- * make sure region_corner does the right thing when swapping left
- * and right.
- *
- * Revision 1.39  1994/03/11  18:27:57  pgf
- * pass correct column-to-offset converter argument to yankline.
- * add comment, so we remember to do this right the next time.
- *
- * Revision 1.38  1994/03/11  13:57:10  pgf
- * fix compiler problem
- *
- * Revision 1.37  1994/03/10  20:14:09  pgf
- * took out ifdef BEFORE code
- * changed yankline to delay the "yanking" of a newline until we're
- * sure something follows it.
- *
- * Revision 1.36  1994/03/08  18:24:05  pgf
- * oops.  bugfix for last change
- *
- * Revision 1.35  1994/03/08  14:48:38  pgf
- * fixed getregion() loops, and use line numbers if available to help
- * scan the region faster.
- * fixed bug in offset calcs for do_lines_in_region()
- *
- * Revision 1.34  1994/03/08  14:06:43  pgf
- * renamed routine, and gcc warning cleanup
- *
- * Revision 1.33  1994/03/08  12:27:24  pgf
- * new routines and much churn to accomodate rectangles.
- *
- * Revision 1.32  1994/02/28  15:08:43  pgf
- * added killregionmaybesave, which allows deleting without yanking
- *
- * Revision 1.31  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
+ * $Header: /usr/build/VCS/pgf-vile/RCS/region.c,v 1.51 1994/07/11 22:56:20 pgf Exp $
  *
  */
 

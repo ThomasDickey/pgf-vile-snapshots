@@ -13,70 +13,7 @@
  *	The same goes for vile.  -pgf
  *
  *
- * $Log: main.c,v $
- * Revision 1.183  1994/04/27 11:22:50  pgf
- * changes for  and
- *
- * Revision 1.182  1994/04/25  22:12:32  pgf
- * change nextbuffer() to swbuffer(firstbp) to start things off, to fix
- * problem with noautobuffer skipping first buffer
- *
- * Revision 1.181  1994/04/22  14:34:15  pgf
- * changed BAD and GOOD to BADEXIT and GOODEXIT
- *
- * Revision 1.180  1994/04/22  13:49:43  pgf
- * exit hook support
- *
- * Revision 1.179  1994/04/20  19:54:50  pgf
- * changes to support 'BORLAND' console i/o screen driver
- *
- * Revision 1.178  1994/04/19  15:13:06  pgf
- * use strncpy0() in likely places
- *
- * Revision 1.177  1994/04/18  16:58:28  pgf
- * removed dummy speckey command, in lieu of going back to using a real
- * speckey command, in input.c
- *
- * Revision 1.176  1994/04/18  14:26:27  pgf
- * merge of OS2 port patches, and changes to tungetc operation
- *
- * Revision 1.174  1994/04/04  16:14:58  pgf
- * kev's 4.4 changes
- *
- * Revision 1.173  1994/04/01  10:46:31  pgf
- * set startstat to result of nextbuffer(), so any file-open errors
- * aren't clobbered by the help message.
- *
- * Revision 1.172  1994/03/29  16:24:20  pgf
- * kev's changes: selection and attributes
- *
- * Revision 1.171  1994/03/24  12:59:47  pgf
- * replace lost bug
- *
- * Revision 1.170  1994/03/15  18:45:06  pgf
- * disabled Watcom's showmemory() call
- *
- * Revision 1.169  1994/03/11  11:58:52  pgf
- * we now pass the name of the desired screen resolution directly to
- * the ibm screen driver via the current_res_name global.  any option
- * starting with a digit is considered a screen resolution, preserving
- * backwards compatability with -2, -25, -4, -43, -5, -50.  in addition,
- * -80x25 or -40x12 will also now work from the command line
- *
- * Revision 1.168  1994/03/10  20:10:31  pgf
- * quit and zzquit now prompt with name of buffer if only one buffer
- * is modified.
- *
- * Revision 1.167  1994/03/08  12:19:53  pgf
- * changed 'fulllineregions' to 'regionshape'.
- *
- * Revision 1.166  1994/02/22  18:09:24  pgf
- * when choosing dos-mode for an ambiguous buffer, vote in favor of on
- * if the global mode is set, and we're running on DOS.  otherwise, choose
- * no-dos-mode.
- *
- * Revision 1.165  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
+ * $Header: /usr/build/VCS/pgf-vile/RCS/main.c,v 1.188 1994/07/11 22:56:20 pgf Exp $
  *
  */
 
@@ -85,10 +22,6 @@
 #include	"estruct.h"	/* global structures and defines */
 #include	"edef.h"	/* global definitions */
 #include	"nevars.h"
-
-#if UNIX
-#include        <fcntl.h>	/* defines 'open()' on SunOS */
-#endif
 
 #if NEWDOSCC
 #include <io.h>
@@ -152,11 +85,6 @@ char	*argv[];
 	charinit();	/* character types -- we need these pretty early  */
 #if NEW_VI_MAP
 	map_init();
-#endif
-#if MSDOS || OS2 || ST520
-	slash = '\\';
-#else
-	slash = '/';
 #endif
 #if !UNIX
 	expand_wild_args(&argc, &argv);
@@ -328,11 +256,19 @@ char	*argv[];
 	/* if stdin isn't a terminal, assume the user is trying to pipe a
 	 * file into a buffer.
 	 */
-#if UNIX || VMS || MSDOS || OS2
+#if UNIX || VMS || MSDOS || WIN31 || OS2 || NT
 	if (!isatty(fileno(stdin))) {
+#if UNIX
+# if HAS_TTYNAME
+		char	*tty = ttyname(fileno(stderr));
+# else
+		char	*tty = "/dev/tty";
+# endif
+#else
+  		FILE	*in;
+  		int	fd;
+#endif
 		BUFFER	*lastbp = firstbp;
-		FILE	*in;
-		int	fd;
 		int	nline = 0;
 
 		bp = bfind(ScratchName(Standard Input), BFARGS);
@@ -341,22 +277,32 @@ char	*argv[];
 			firstbp = bp;
 		ffp = fdopen(dup(fileno(stdin)), "r");
 #if UNIX
-		fd = open("/dev/tty", 0);
-#endif
-#if VMS
-		fd = open("tt:", 0);	/* or sys$command */
-#endif
-#if MSDOS || OS2
-		fd = fileno(stderr);	/* this normally cannot be redirected */
-#endif
-		if ((fd >= 0)
-		 && (close(0) >= 0)
-		 && (fd = dup(fd)) == 0
-		 && (in = fdopen(fd, "r")) != 0)
-			*stdin = *in;
-
-		(void)slowreadf(bp, &nline);
-		set_rdonly(bp, bp->b_fname);
+		/*
+		 * Note: On Linux, the low-level close/dup operation
+		 * doesn't work, since something hangs, apparently
+		 * because substituting the file descriptor doesn't communicate
+		 * properly up to the stdio routines.
+		 */
+		if ((freopen(tty, "r", stdin)) == 0
+		 || !isatty(fileno(stdin))) {
+			fputs("cannot open a terminal\n", stderr);
+			ExitProgram(BADEXIT);
+		}
+#else
+# if VMS
+  		fd = open("tt:", 0);	/* or sys$command */
+# else					/* e.g., DOS-based systems */
+  		fd = fileno(stderr);	/* this normally cannot be redirected */
+# endif
+  		if ((fd >= 0)
+  		 && (close(0) >= 0)
+  		 && (fd = dup(fd)) == 0
+  		 && (in = fdopen(fd, "r")) != 0)
+  			*stdin = *in;
+#endif	/* UNIX */
+  
+  		(void)slowreadf(bp, &nline);
+  		set_rdonly(bp, bp->b_fname);
 		(void)ffclose();
 
 		if (is_empty_buf(bp)) {
@@ -445,7 +391,7 @@ char	*argv[];
 			char *fname;
 			/* if .vilerc is one of the input files....
 					don't clobber it */
-#if MSDOS || OS2
+#if MSDOS || WIN31 || OS2 || NT
 			/* search PATH for vilerc under dos */
 	 		fname = flook(pathname[0], FL_ANYWHERE);
 #else
@@ -479,7 +425,7 @@ char	*argv[];
 		didtag = TRUE;
 	}
 #endif
-	msg = "";
+	msg = s_NULL;
 	if (helpflag) {
 		if (help(TRUE,1) != TRUE) {
 			msg =
@@ -680,7 +626,7 @@ global_val_init()
 
 	set_global_g_val(GVAL_TIMEOUTVAL, 500);	/* catnap time -- how long
 							to wait for ESC seq */
-#if VMS || MSDOS || OS2			/* ':' gets in the way of drives */
+#if VMS || MSDOS || WIN31 || OS2 || NT	/* ':' gets in the way of drives */
 	set_global_g_val_ptr(GVAL_EXPAND_CHARS,strmalloc("!%#"));
 #else	/* UNIX */
 	set_global_g_val_ptr(GVAL_EXPAND_CHARS,strmalloc("!%#:"));
@@ -753,7 +699,7 @@ global_val_init()
 #if VMS
 #define	DEFAULT_CSUFFIX	"\\.\\(\\([CHIS]\\)\\|CC\\|CXX\\|HXX\\)\\(;[0-9]*\\)\\?$"
 #endif
-#if MSDOS
+#if MSDOS || WIN31
 #define	DEFAULT_CSUFFIX	"\\.\\(\\([chis]\\)\\|cpp\\|cxx\\|hxx\\)$"
 #endif
 #ifndef DEFAULT_CSUFFIX	/* UNIX or OS2/HPFS (mixed-case names) */
@@ -814,7 +760,7 @@ global_val_init()
 
 }
 
-#if UNIX || MSDOS || OS2 || VMS
+#if UNIX || MSDOS || WIN31 || OS2 || NT || VMS
 
 /* have we been interrupted/ */
 static int am_interrupted = FALSE;
@@ -824,12 +770,10 @@ SIGT
 catchintr (ACTUAL_SIG_ARGS)
 {
 	am_interrupted = TRUE;
-#if MSDOS || OS2
+#if MSDOS || OS2 || NT
 	sgarbf = TRUE;	/* there's probably a ^C on the screen. */
 #endif
-#if USG || MSDOS || OS2
 	(void)signal(SIGINT,catchintr);
-#endif
 	if (doing_kbd_read)
 		longjmp(read_jmp_buf, signo);
 	SIGRET;
@@ -934,7 +878,7 @@ siginit()
 #   endif
 #  endif
 # endif
-# if OS2
+# if OS2 || NT
 	(void)signal(SIGINT,catchintr);
 #endif
 #endif
@@ -1104,11 +1048,11 @@ int f,n;
 	if (cnt) {
 	    	if (cnt > 1) {
 		    mlprompt("Will write %d buffers.  %s ", cnt,
-			    clexec ? "" : "Repeat command to continue.");
+			    clexec ? s_NULL : "Repeat command to continue.");
 		} else {
 		    mlprompt("Will write buffer \"%s\".  %s ",
 			    get_bname(bp),
-			    clexec ? "" : "Repeat command to continue.");
+			    clexec ? s_NULL : "Repeat command to continue.");
 		}
 		if (!clexec && !isnamedcmd) {
 			if (thiscmd != kbd_seq())
@@ -1192,6 +1136,9 @@ int f,n;
 #endif
 	siguninit();
 #if OPT_WORKING
+# if defined(SIGALRM)
+	(void)signal(SIGALRM, SIG_IGN);
+# endif
 	/* force the message line clear */
 	mpresf = 1;
 	mlerase();
@@ -1594,6 +1541,8 @@ char **av;
 #endif
 }
 
+#if MSDOS
+
 #if TURBO
 int
 showmemory(f,n)
@@ -1626,6 +1575,7 @@ int	f,n;
 	return TRUE;
 }
 #endif
+#endif /* MSDOS */
 
 /*
  * Try to invoke 'exit()' from only one point so we can cleanup temporary

@@ -3,24 +3,7 @@
  * characters, and write characters in a barely buffered fashion on the display.
  * All operating systems.
  *
- * $Log: termio.c,v $
- * Revision 1.99  1994/04/25 21:07:13  pgf
- * changes for ANSI screen under MSDOS
- *
- * Revision 1.98  1994/04/22  14:34:15  pgf
- * changed BAD and GOOD to BADEXIT and GOODEXIT
- *
- * Revision 1.97  1994/04/20  19:54:50  pgf
- * changes to support 'BORLAND' console i/o screen driver
- *
- * Revision 1.96  1994/04/18  14:26:27  pgf
- * merge of OS2 port patches, and changes to tungetc operation
- *
- * Revision 1.94  1994/04/13  20:56:25  pgf
- * added SONY to sys/ioctl list
- *
- * Revision 1.93  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
+ * $Header: /usr/build/VCS/pgf-vile/RCS/termio.c,v 1.105 1994/07/11 22:56:20 pgf Exp $
  *
  */
 #include	"estruct.h"
@@ -44,15 +27,22 @@
 
 /* I suppose this config stuff should move to estruct.h */
 
-#if POSIX
+#if HAVE_TERMIOS_H && HAVE_TCGETATTR
+/* Note: <termios.h> is available on some systems, but in order to use it
+ * a special library needs to be linked in.  This is the case on the NeXT
+ * where libposix.a needs to be linked in.  Unfortunately libposix.a is buggy.
+ * So we have the configuration script test to make sure that tcgetattr is
+ * available through the standard set of libraries in order to help us
+ * determine whether or not to use <termios.h>.
+ */
 # define USE_POSIX_TERMIOS 1
 # define USE_FCNTL 1
 #else
-# if USG
+# if HAVE_TERMIO_H
 #  define USE_TERMIO 1
 #  define USE_FCNTL 1
 # else
-#  if BERK || V7
+#  if HAVE_SGTTY_H
 #   define USE_SGTTY 1
 #   define USE_FIONREAD 1
 #  else
@@ -61,22 +51,22 @@
 # endif
 #endif
 
-#if OSF1		/* don't know why termios doesn't work in osf */
-# undef POSIX
-# undef BERK
-# define BERK 1
-# undef USE_FIONREAD	/* because of osf screen refresh problems */
-#endif
+/* FIXME: There used to be code here which dealt with OSF1 not working right
+ * with termios.  We will have to determine if this is still the case and
+ * add code here to deal with it if so.
+ */
 
-#if (BERK || AIX || AUX2) && !defined(FIONREAD)
+#if !defined(FIONREAD)
 /* try harder to get it */
-# if SUNOS
+# if HAVE_SYS_FILIO_H
 #  include "sys/filio.h"
 # else /* if you have trouble including ioctl.h, try "sys/ioctl.h" instead */
-#  if APOLLO || AIX || OSF1 || ULTRIX || AUX2 || NETBSD || SONY
-#   include <sys/ioctl.h>
-#  else
+#  if HAVE_IOCTL_H
 #   include <ioctl.h>
+#  else
+#   if HAVE_SYS_IOCTL_H
+#    include <sys/ioctl.h>
+#   endif
 #  endif
 # endif
 #endif
@@ -143,13 +133,17 @@ ttopen()
 		perror("ttopen tcgetattr");
 		ExitProgram(BADEXIT);
 	}
- /* the "|| USG" below is to support SVR4 -- let me know if
- 	it conflicts on other systems */
-#if ODT || ISC || USG
+#if !X11
+#if HAVE_SETVBUF
+# if SETVBUF_REVERSED
+	setvbuf(stdout, _IOLBF, tobuf, TBUFSIZ);
+# else
 	setvbuf(stdout, tobuf, _IOLBF, TBUFSIZ);
-#else
+# endif
+#else /* !HAVE_SETVBUF */
   	setbuffer(stdout, tobuf, TBUFSIZ);
-#endif
+#endif /* !HAVE_SETVBUF */
+#endif /* !X11 */
 
 	suspc =   otermios.c_cc[VSUSP];
 	intrc =   otermios.c_cc[VINTR];
@@ -197,8 +191,6 @@ ttopen()
 	ttmiscinit();
 
 	ttunclean();
-
-
 }
 
 void
@@ -219,9 +211,7 @@ int f;
 		TTputc('\r');
 	}
 	(void)fflush(stdout);
-#if ! LINUX
 	tcdrain(1);
-#endif
 	tcsetattr(0, TCSADRAIN, &otermios);
 	TTkclose();	/* xterm */
 	TTclose();
@@ -237,9 +227,7 @@ void
 ttunclean()
 {
 #if ! X11
-#if ! LINUX
 	tcdrain(1);
-#endif
 	tcsetattr(0, TCSADRAIN, &ntermios);
 #endif
 	TTkopen();	/* xterm */
@@ -264,7 +252,7 @@ ttopen()
 {
 
 	ioctl(0, TCGETA, (char *)&otermio);	/* save old settings */
-#ifdef AVAILABLE
+#if defined(AVAILABLE) && !X11
 	setbuffer(stdout, tobuf, TBUFSIZ);
 #endif
 
@@ -504,6 +492,7 @@ ttunclean()
 
 #endif /* USE_SGTTY */
 
+#if !X11
 void
 ttputc(c)
 int c;
@@ -564,7 +553,7 @@ ttgetc()
 	return c;
 #endif
 }
-
+#endif /* !X11 */
 
 /* typahead:	Check to see if any characters are already in the
 		keyboard buffer
@@ -615,8 +604,10 @@ ttmiscinit()
 	/* make sure backspace is bound to backspace */
 	asciitbl[backspc] = &f_backchar_to_bol;
 
+#if !X11
 	/* no buffering on input */
 	setbuf(stdin, (char *)0);
+#endif
 }
 
 #if defined(SA_RESTART)
@@ -629,9 +620,9 @@ ttmiscinit()
  * for such systems.
  */
 
-void (*signal(sig,disp))()
+void (*signal(sig,disp))(DEFINE_SIG_ARGS)
     int sig;
-    void (*disp) P((int));
+    void (*disp) (DEFINE_SIG_ARGS);
 {
     struct sigaction act, oact;
     int status;
@@ -648,7 +639,7 @@ void (*signal(sig,disp))()
 
 #else /* not UNIX */
 
-#if MSDOS || OS2
+#if MSDOS || OS2 || NT
 # if DJGPP
 #  include <gppconio.h>
 # else
@@ -973,6 +964,9 @@ ttgetc()
 	}
 #endif
 
+#if NT
+	return ntgetch();
+#endif /* NT */
 #if MSDOS || OS2
 	/*
 	 * If we've got a mouse, poll waiting for mouse movement and mouse
@@ -987,10 +981,10 @@ ttgetc()
 		}
 	}
 # endif /* OPT_MS_MOUSE */
-#if	MSC || TURBO || OS2
+#if	MSC || TURBO || OS2 || NT
 	return getch();
 #endif
-#if	NEWDOSCC && !(MSC||TURBO)
+#if	NEWDOSCC && !(MSC||TURBO||OS2||NT)
 	{
 	int c;
 
@@ -1049,10 +1043,56 @@ typahead()
 	return TRUE;
 #endif
 
-#if	MSDOS || OS2
+#if	MSDOS || OS2 || NT
 	return (kbhit() != 0);
 #endif
 
 }
 
 #endif /* not UNIX */
+
+
+/* Get terminal size from system, first trying the driver, and then
+ * the environment.  Store number of lines into *heightp and width
+ * into *widthp.  If zero or a negative number is stored, the value
+ * is not valid.  This may be fixed (in the tcap.c case) by the TERM
+ * variable.
+ */
+#if ! X11
+void
+getscreensize (widthp, heightp)
+int *widthp, *heightp;
+{
+	char *e;
+#ifdef TIOCGWINSZ
+	struct winsize size;
+#endif
+	*widthp = 0;
+	*heightp = 0;
+#ifdef TIOCGWINSZ
+	if (ioctl (0, TIOCGWINSZ, (caddr_t)&size) == 0) {
+		if ((int)(size.ws_row) > 0)
+			*heightp = size.ws_row;
+		if ((int)(size.ws_col) > 0)
+			*widthp = size.ws_col;
+	}
+	if (*widthp <= 0) {
+		e = getenv("COLUMNS");
+		if (e)
+			*widthp = atoi(e);
+	}
+	if (*heightp <= 0) {
+		e = getenv("LINES");
+		if (e)
+			*heightp = atoi(e);
+	}
+#else
+	e = getenv("COLUMNS");
+	if (e)
+		*widthp = atoi(e);
+	e = getenv("LINES");
+	if (e)
+		*heightp = atoi(e);
+#endif
+}
+#endif

@@ -4,99 +4,7 @@
  *
  *   Created: Thu May 14 15:44:40 1992
  *
- * $Log: proto.h,v $
- * Revision 1.126  1994/04/27 11:22:50  pgf
- * changes for  and
- *
- * Revision 1.125  1994/04/25  20:28:14  pgf
- * fixes from kev
- *
- * Revision 1.124  1994/04/22  16:18:29  pgf
- * fixe bad prototype
- *
- * Revision 1.123  1994/04/22  16:06:18  pgf
- * kev's font changes, mostly
- *
- * Revision 1.122  1994/04/22  15:57:46  pgf
- * new get_csrch_char
- *
- * Revision 1.121  1994/04/22  11:32:09  pgf
- * added run_procedure(), changed the X title/icon maintenance routines,
- * added previous_directory() to support $ocwd
- *
- * Revision 1.120  1994/04/19  15:13:06  pgf
- * use strncpy0() in likely places
- *
- * Revision 1.119  1994/04/18  17:35:51  pgf
- * kev's changes for attribution, man page macros
- *
- * Revision 1.118  1994/04/18  16:57:15  pgf
- * moved speckey back to input.c
- *
- * Revision 1.117  1994/04/18  14:26:27  pgf
- * merge of OS2 port patches, and changes to tungetc operation
- *
- * Revision 1.116  1994/04/14  09:52:58  pgf
- * new x_set_window_and_icon_names()
- *
- * Revision 1.115  1994/04/13  20:46:38  pgf
- * various fixes (towards 4.4) from kev
- *
- * Revision 1.114  1994/04/13  20:40:21  pgf
- * change kcod2str, fnc2str, string2prc to all deal in "p-strings", so
- * we can store null chars in binding strings.
- *
- * Revision 1.113  1994/04/11  15:50:06  pgf
- * kev's attribute changes
- *
- * Revision 1.112  1994/04/11  11:39:17  pgf
- * added second arg to spawn1()
- *
- * Revision 1.111  1994/04/07  19:02:20  pgf
- * kev's changes for direct pscreen access
- *
- * Revision 1.110  1994/04/07  18:17:13  pgf
- * added sel_motion()
- *
- * Revision 1.109  1994/04/05  12:17:18  pgf
- * added operselect()
- *
- * Revision 1.108  1994/04/04  16:14:58  pgf
- * kev's 4.4 changes
- *
- * Revision 1.107  1994/04/04  11:36:25  pgf
- * added attribute argument to scwrite()
- *
- * Revision 1.106  1994/04/01  14:30:02  pgf
- * tom's warning/lint patch
- *
- * Revision 1.105  1994/03/29  17:53:18  pgf
- * warning cleanup
- *
- * Revision 1.104  1994/03/29  16:24:20  pgf
- * kev's changes: selection and attributes
- *
- * Revision 1.103  1994/03/24  12:10:28  pgf
- * new function, kcod2escape_seq()
- *
- * Revision 1.102  1994/03/10  20:11:11  pgf
- * kinsertlater() is new, anycb() now has arg
- *
- * Revision 1.101  1994/03/08  14:07:11  pgf
- * added missing...
- *
- * Revision 1.100  1994/03/08  12:22:12  pgf
- * changes for rectangles, and some movement from random.c to region.c
- *
- * Revision 1.99  1994/03/02  09:47:18  pgf
- * new routine fnc2str
- *
- * Revision 1.98  1994/02/28  15:08:43  pgf
- * added killregionmaybesave, which allows deleting without yanking
- *
- * Revision 1.97  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
- *
+ * $Header: /usr/build/VCS/pgf-vile/RCS/proto.h,v 1.130 1994/07/11 22:56:20 pgf Exp $
  *
  */
 
@@ -231,8 +139,10 @@ extern int bindkey P(( int, int ));
 extern int desbind P(( int, int ));
 extern void makebindlist P(( int, char *));
 extern int strinc P(( char *, char *));
+#if REBIND
 extern int rebind_key P(( int, CMDFUNC * ));
 extern int install_bind P(( int, CMDFUNC *, CMDFUNC ** ));
+#endif
 extern int unbindkey P(( int, int ));
 extern int unbindchar P(( int ));
 extern int apro P(( int, int ));
@@ -365,9 +275,11 @@ extern char * _lsprintf P(( char *, ... ));
 #endif	/* UNUSED */
 extern void bputc P(( int ));
 extern void bprintf P((char *, ... ));
-#if defined(SIGWINCH) && !X11
+#if !X11
 extern void getscreensize P(( int *, int * ));
+#if defined(SIGWINCH)
 extern SIGT sizesignal (DEFINE_SIG_ARGS);
+#endif
 #endif
 extern void newscreensize P(( int, int ));
 #if OPT_WORKING
@@ -485,7 +397,7 @@ extern int viewfile P(( int, int ));
 extern int insfile P(( int, int ));
 extern int getfile P(( char *, int ));
 extern int readin P((char *, int, BUFFER *, int ));
-#if !MSDOS && !OPT_MAP_MEMORY
+#if !(MSDOS || WIN31) && !OPT_MAP_MEMORY
 extern int quickreadf P(( BUFFER *, int * ));
 #endif
 extern int slowreadf P(( BUFFER *, int * ));
@@ -521,7 +433,7 @@ extern int ffwopen P(( char * ));
 extern int ffronly P(( char * ));
 extern long ffsize P(( void ));
 extern int ffexists P(( char * ));
-#if !MSDOS && !OPT_MAP_MEMORY
+#if !(MSDOS || WIN31) && !OPT_MAP_MEMORY
 extern int ffread P(( char *, long ));
 extern void ffseek P(( long ));
 extern void ffrewind P(( void ));
@@ -748,17 +660,17 @@ extern int listmodes P(( int, int ));
 extern int find_mode P(( char *, int, VALARGS * ));
 
 /* npopen.c */
-#if UNIX || MSDOS || OS2
+#if UNIX || MSDOS || WIN31 || OS2 || NT
 extern FILE * npopen P(( char *, char * ));
 extern void npclose P(( FILE * ));
 extern int inout_popen P(( FILE **, FILE **, char * ));
 extern int softfork P(( void ));
 #endif
-#if UNIX || OS2
+#if UNIX || OS2 || NT
 extern void exec_sh_c P(( char * ));
 extern int system_SHELL P(( char * ));
 #endif
-#if MSDOS
+#if MSDOS || WIN31
 extern void npflush P(( void ));
 #endif
 
@@ -798,7 +710,7 @@ extern int operblank P(( int, int ));
 extern int operopenrect P(( int, int ));
 
 /* path.c */
-#if MSDOS || OS2
+#if MSDOS || WIN31 || OS2 || NT
 extern char * is_msdos_drive P(( char * ));
 #endif
 #if VMS
@@ -820,7 +732,7 @@ extern char * is_appendname P(( char * ));
 extern char * non_filename P(( void ));
 extern int is_internalname P(( char * ));
 extern int is_directory P(( char * ));
-#if (UNIX||MSDOS||OS2) && PATHLOOK
+#if (UNIX||MSDOS||WIN31||OS2||NT) && PATHLOOK
 extern char *parse_pathlist P(( char *, char * ));
 #endif
 
@@ -1176,7 +1088,7 @@ extern void x_set_window_name P(( char * ));
 extern char * x_get_window_name P(( void ));
 #endif	/* X11 */
 
-#if MSDOS || OS2
+#if MSDOS || OS2 || NT
 /* ibmpc.c */
 extern	void scwrite P(( int, int, int, char *, VIDEO_ATTR *, int, int ));
 extern VIDEO *scread P(( VIDEO *, int ));
@@ -1196,101 +1108,174 @@ extern void update_dos_drv_dir P(( char * ));
 # endif
 #endif
 
-#if UNIX && !LINUX
-#if APOLLO && __GNUC__
-extern	int	access	P(( char *, int ));
-extern	UINT	alarm	P(( UINT ));
-extern	void	bzero	P(( char *, int ));
-extern	int	chdir	P(( char * ));
-extern	int	close	P(( int ));
-extern	int	dup	P(( int ));
-extern	int	execlp	P(( char *, ... ));
-extern	int	fork	P(( void ));
-extern	int	getpgrp	P(( int ));
-extern	int	getpid	P(( void ));
-extern	int	getuid	P(( void ));
-extern	char *	getwd	P(( char * ));
-extern	int	ioctl	P(( int, ULONG, caddr_t ));
-extern	int	isatty	P(( int ));
-extern	int	killpg	P(( int, int ));
-extern	int	mkdir	P(( char *, int ));
-extern	int	open	P(( char *, int ));
-extern	int	pipe	P(( int * ));
-extern	int	read	P(( int, char *, int ));
-extern	int	select	P(( int, fd_set*, fd_set*, fd_set*, struct timeval* ));
-extern	int	sleep	P(( UINT ));
-extern	int	unlink	P(( char * ));
-extern	int	write	P(( int, char *, int ));
-#endif
-#if HPUX && __GNUC__
-#include <fcntl.h>	/* 'open()' */
-#include <sys/wait.h>	/* 'wait()' */
-#endif
-#if (SUNOS || NeXT) && (defined(lint) || __GNUC__ || defined(__CLCC__))
+#if UNIX
+#if MISSING_EXTERN__FILBUF
 extern	int	_filbuf	P(( FILE * ));
+#endif
+#if MISSING_EXTERN__FLSBUF
 extern	int	_flsbuf	P(( int, FILE * ));
+#endif
+#if MISSING_EXTERN_ACCESS
+extern	int	access	P(( char *, int ));
+#endif
+#if MISSING_EXTERN_ALARM
+extern	UINT	alarm	P(( UINT ));
+#endif
+#if MISSING_EXTERN_ATOI
+extern int	atoi	P((char *));
+#endif
+#if MISSING_EXTERN_BZERO
 extern	void	bzero	P(( char *, int ));
-#ifdef __CLCC__
+#endif
+#if MISSING_EXTERN_CHDIR
+extern	int	chdir	P(( char * ));
+#endif
+#if MISSING_EXTERN_CLOSE
+extern	int	close	P(( int ));
+#endif
+#if MISSING_EXTERN_DUP
+extern	int	dup	P(( int ));
+#endif
+#if MISSING_EXTERN_EXECLP
 extern	int	execlp	P(( char *, ... ));
 #endif
+#if MISSING_EXTERN_FCLOSE
 extern	int	fclose	P(( FILE * ));
+#endif
+#if MISSING_EXTERN_FCLOSE
 extern	int	fflush	P(( FILE * ));
-extern	int	fprintf	P(( FILE *, const char *, ... ));
+#endif
+#if MISSING_EXTERN_FGETC
 extern	int	fgetc	P(( FILE * ));
-#ifndef	fileno
+#endif
+#if !defined(fileno) && MISSING_EXTERN_FILENO
 extern	int	fileno	P(( FILE * ));
 #endif
+#if MISSING_EXTERN_FORK
+extern	int	fork	P(( void ));
+#endif
+#if MISSING_EXTERN_FPRINTF
+extern	int	fprintf	P(( FILE *, const char *, ... ));
+#endif
+#if MISSING_EXTERN_FPUTC
 extern	int	fputc	P(( int, FILE * ));
+#endif
+#if MISSING_EXTERN_FREAD
 extern	int	fread	P(( char *, int, int, FILE * ));
+#endif
+#if MISSING_EXTERN_FREE
+extern void	free	P((void *ptr));
+#endif
+#if MISSING_EXTERN_FSEEK
 extern	int	fseek	P(( FILE *, long, int ));
+#endif
+#if MISSING_EXTERN_FWRITE
 extern	int	fwrite	P(( const char *, SIZE_T, SIZE_T, FILE * ));
+#endif
+#if MISSING_EXTERN_GETENV
+extern	char *	getenv	P(( const char * ));
+#endif
+#if HAVE_GETHOSTNAME && MISSING_EXTERN_GETHOSTNAME
+extern	int	gethostname P((char *, int));
+#endif
+#if MISSING_EXTERN_GETPGRP
+extern	int	getpgrp	P(( int ));
+#endif
+#if MISSING_EXTERN_GETPID
+extern	int	getpid	P(( void ));
+#endif
+#if MISSING_EXTERN_GETUID
+extern	int	getuid	P(( void ));
+#endif
+#if HAVE_GETWD && MISSING_EXTERN_GETWD
+extern	char *	getwd	P(( char * ));
+#endif
+#if MISSING_EXTERN_IOCTL
 extern	int	ioctl	P(( int, ULONG, caddr_t ));
+#endif
+#if MISSING_EXTERN_ISATTY
+extern	int	isatty	P(( int ));
+#endif
+#if MISSING_EXTERN_KILL
+extern	int	kill	P((int, int));
+#endif
+#if HAVE_KILLPG && MISSING_EXTERN_KILLPG
 extern	int	killpg	P(( int, int ));
-#ifndef	__GNUC__
+#endif
+#if MISSING_EXTERN_LONGJMP
+extern	void	longjmp	P((jmp_buf env, int val));
+#endif
+#if MISSING_EXTERN_MEMSET
+extern	void	memset	P((char *, int ch, int n));
+#endif
+#if HAVE_MKDIR && MISSING_EXTERN_MKDIR
 extern	int	mkdir	P(( char *, int ));
+#endif
+#if MISSING_EXTERN_OPEN
 extern	int	open	P(( char *, int ));
 #endif
-#ifndef NeXT
+#if MISSING_EXTERN_PERROR
 extern	void	perror	P(( const char * ));
-#endif /* !NeXT */
-extern	int	printf	P(( const char *, ... ));
-extern	int	puts	P(( const char * ));
-extern	int	sscanf	P(( const char *, const char *, ... ));
-extern	int	select	P(( int, fd_set*, fd_set*, fd_set*, struct timeval* ));
-extern	void	setbuf	P(( FILE *, char * ));
-extern	void	setbuffer P(( FILE *, char *, int ));
-extern	int	system	P(( const char * ));
-extern	long	time	P(( long * ));
-extern	int	wait	P(( int * ));
-extern	long	strtol	P(( const char *, char **, int ));
-#endif /* lint || __GNUC__ */
-#ifdef NeXT
-extern int	isatty	P((int));
-extern int	atoi	P((char *));
-extern int	dup	P((int));
-extern int	close	P((int));
-extern void	free	P((void *ptr));
-extern void	memset	P((char *, int ch, int n));
-extern int	access	P((char *, int));
-extern int	read	P((int, char *, int));
-extern int	write	P((int, char *, int));
-extern void	qsort	P((void *, size_t, size_t , int (*compar)(void *, void *)));
-extern int	pipe	P((int *));
-extern int	kill	P((int, int));
-extern int	execlp	P((char *, char *, ...));
-extern int	fork	P((void));
-extern int	sleep	P((int));
-extern int	getuid	P((void));
-extern int	chdir	P((char *));
-extern int	getpgrp	P((int));
-extern int	unlink	P((char *));
-extern int	setjmp	P((jmp_buf env));
-extern void	longjmp	P((jmp_buf env, int val));
-#endif /* NeXT */
-#if HAVE_GETHOSTNAME
-extern int	gethostname P((char *, int));
 #endif
-#endif /* UNIX */
+#if MISSING_EXTERN_PIPE
+extern	int	pipe	P(( int * ));
+#endif
+#if MISSING_EXTERN_PRINTF
+extern	int	printf	P(( const char *, ... ));
+#endif
+#if MISSING_EXTERN_PUTS
+extern	int	puts	P(( const char * ));
+#endif
+#if MISSING_EXTERN_QSORT
+extern void	qsort	P((void *, size_t, size_t , int (*compar)(void *, void *)));
+#endif
+#if MISSING_EXTERN_READ
+extern	int	read	P(( int, char *, SIZE_T ));
+#endif
+#if HAVE_SELECT && MISSING_EXTERN_SELECT
+extern	int	select	P(( int, fd_set*, fd_set*, fd_set*, struct timeval* ));
+#endif
+#if MISSING_EXTERN_SETBUF
+extern	void	setbuf	P(( FILE *, char * ));
+#endif
+#if MISSING_EXTERN_SETBUFFER
+extern	void	setbuffer P(( FILE *, char *, int ));
+#endif
+#if MISSING_EXTERN_SETJMP
+extern	int	setjmp	P((jmp_buf env));
+#endif
+#if MISSING_EXTERN_SETVBUF
+#if SETVBUF_REVERSED
+extern	int	setvbuf P(( FILE *, int, char *, size_t ));
+#else
+extern	int	setvbuf P(( FILE *, char *, int, size_t ));
+#endif
+#endif
+#if MISSING_EXTERN_SLEEP
+extern	int	sleep	P(( UINT ));
+#endif
+#if MISSING_EXTERN_SSCANF
+extern	int	sscanf	P(( const char *, const char *, ... ));
+#endif
+#if MISSING_EXTERN_STRTOL
+extern	long	strtol	P(( const char *, char **, int ));
+#endif
+#if MISSING_EXTERN_SYSTEM
+extern	int	system	P(( const char * ));
+#endif
+#if MISSING_EXTERN_TIME
+extern	long	time	P(( long * ));
+#endif
+#if MISSING_EXTERN_UNLINK
+extern	int	unlink	P(( char * ));
+#endif
+#if MISSING_EXTERN_WAIT
+extern	int	wait	P(( int * ));
+#endif
+#if MISSING_EXTERN_WRITE
+extern	int	write	P(( int, char *, int ));
+#endif
+#endif
 
 #if DJGPP
 /* djhandl.c */

@@ -3,36 +3,7 @@
  * that take motion operators.
  * written for vile by Paul Fox, (c)1990
  *
- * $Log: opers.c,v $
- * Revision 1.45  1994/04/18 14:26:27  pgf
- * merge of OS2 port patches, and changes to tungetc operation
- *
- * Revision 1.43  1994/04/11  15:50:06  pgf
- * kev's attribute changes
- *
- * Revision 1.42  1994/04/08  21:12:05  pgf
- * defensively reset haveregion
- *
- * Revision 1.41  1994/04/08  19:58:21  pgf
- * moved operselect() to select.c
- *
- * Revision 1.40  1994/04/07  18:15:00  pgf
- * preserve DOT across operyank and operlineyank
- *
- * Revision 1.39  1994/04/04  11:36:08  pgf
- * added operselect()
- *
- * Revision 1.38  1994/03/08  14:06:43  pgf
- * renamed routine, and gcc warning cleanup
- *
- * Revision 1.37  1994/03/08  12:20:50  pgf
- * changed 'fulllineregions' to 'regionshape'.
- * added operblank() and operopenrect() functions.
- * made some operator functions rectangle aware, in the cases where a
- * different region routine is needed.
- *
- * Revision 1.36  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
+ * $Header: /usr/build/VCS/pgf-vile/RCS/opers.c,v 1.46 1994/07/11 22:56:20 pgf Exp $
  *
  */
 

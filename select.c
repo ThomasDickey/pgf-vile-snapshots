@@ -18,52 +18,7 @@
  * transfering the selection are not dealt with in this file.  Procedures
  * dealing with the representation are maintained in this file.
  *
- * $Log: select.c,v $
- * Revision 1.14  1994/04/25 20:28:14  pgf
- * fixes from kev
- *
- * Revision 1.13  1994/04/22  16:06:18  pgf
- * kev's font changes, mostly
- *
- * Revision 1.12  1994/04/18  17:35:51  pgf
- * kev's changes for attribution, man page macros
- *
- * Revision 1.11  1994/04/13  20:46:38  pgf
- * various fixes (towards 4.4) from kev
- *
- * Revision 1.10  1994/04/11  15:50:06  pgf
- * kev's attribute changes
- *
- * Revision 1.9  1994/04/11  11:41:37  pgf
- * kev's patches to selection mechanism, my fixes for keyboard extending
- *
- * Revision 1.8  1994/04/08  20:01:52  pgf
- * check all returns from getregion(), simplify sel_motion, make it capable
- * of extending a selection if operselect has sel_motion as its motion.
- *
- * Revision 1.7  1994/04/08  09:23:17  pgf
- * forgot to initialized selregion.ar_shape in select_region()
- *
- * Revision 1.6  1994/04/07  18:40:16  pgf
- * use the new "haveregion" backdoor to getregion, fixed some off-by-ones
- * on selections, implemented sel_motion(), moved select_region() here,
- * from region.c
- *
- * Revision 1.5  1994/04/04  16:14:58  pgf
- * kev's 4.4 changes
- *
- * Revision 1.4  1994/04/04  12:35:51  pgf
- * decrement MK.o after doing yankregion in the yanksel case
- *
- * Revision 1.3  1994/04/01  14:30:02  pgf
- * tom's warning/lint patch
- *
- * Revision 1.2  1994/03/29  17:53:18  pgf
- * warning cleanup
- *
- * Revision 1.1  1994/03/29  16:24:20  pgf
- * kev's changes: selection and attributes
- *
+ * $Header: /usr/build/VCS/pgf-vile/RCS/select.c,v 1.15 1994/07/11 22:56:20 pgf Exp $
  *
  */
 

@@ -1,8 +1,9 @@
 ;History:46,1
+; $Header: /usr/build/VCS/pgf-vile/RCS/z100bios.asm,v 1.4 1994/07/11 22:56:20 pgf Exp $
 #error This module is not actively maintained as part of vile.
 #error It can likely be made to work without much difficulty, but unless
 #error  I know someone is using it, i have little incentive to fix it.
-#error  If you use it when you build vile, please let me know.  pgf@cayman.com
+#error  If you use it when you build vile, please let me know.  -pgf
 
 _TEXT	SEGMENT  BYTE PUBLIC 'CODE'
 _TEXT	ENDS

@@ -67,7 +67,7 @@ that should work, with varying degrees of success:
 		produce a dos-extender 32 bit app, so you're _severely_
 		limited as to filesize.
 
-paul fox, pgf@cayman.com (work) or pgf@foxharp.boston.ma.us (home)
+paul fox, pgf@foxharp.boston.ma.us (home)
 
 --------------------------------------------------------
 
@@ -107,3 +107,6 @@ Other information:
   correct define, for the program and display code.  DO NOT define
   MSDOS, IBMPC, TURBO etc.
 
+------------------------
+$Header: /usr/build/VCS/pgf-vile/RCS/README.PC,v 1.5 1994/07/11 22:56:20 pgf Exp $
+------------------------

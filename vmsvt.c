@@ -7,9 +7,7 @@
  *  Author:  Curtis Smith
  *  Last Updated: 07/14/87
  *
- * $Log: vmsvt.c,v $
- * Revision 1.11  1994/02/22 11:03:15  pgf
- * truncated RCS log for 4.0
+ * $Header: /usr/build/VCS/pgf-vile/RCS/vmsvt.c,v 1.13 1994/07/11 22:56:20 pgf Exp $
  *
  */
 
@@ -471,7 +469,8 @@ int f,n;	/* default flag, numeric argument [unused] */
  *  Nothing returned
  ***/
 void
-spal()
+spal(dummy)
+char	*dummy;
 {
 }
 

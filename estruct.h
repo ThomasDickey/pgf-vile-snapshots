@@ -9,191 +9,28 @@
 */
 
 /*
- * $Log: estruct.h,v $
- * Revision 1.179  1994/04/25 21:07:13  pgf
- * changes for ANSI screen under MSDOS
- *
- * Revision 1.178  1994/04/25  20:28:14  pgf
- * fixes from kev
- *
- * Revision 1.177  1994/04/22  14:34:15  pgf
- * changed BAD and GOOD to BADEXIT and GOODEXIT
- *
- * Revision 1.176  1994/04/22  13:47:56  pgf
- * make sure X11 is always defined
- *
- * Revision 1.175  1994/04/20  19:54:50  pgf
- * changes to support 'BORLAND' console i/o screen driver
- *
- * Revision 1.174  1994/04/18  14:26:27  pgf
- * merge of OS2 port patches, and changes to tungetc operation
- *
- * Revision 1.173  1994/04/13  20:46:38  pgf
- * various fixes (towards 4.4) from kev
- *
- * Revision 1.172  1994/04/11  15:50:06  pgf
- * kev's attribute changes
- *
- * Revision 1.171  1994/04/07  19:02:20  pgf
- * kev's changes for direct pscreen access
- *
- * Revision 1.170  1994/04/04  16:14:58  pgf
- * kev's 4.4 changes
- *
- * Revision 1.169  1994/04/01  14:30:02  pgf
- * tom's warning/lint patch
- *
- * Revision 1.168  1994/03/29  16:24:20  pgf
- * kev's changes: selection and attributes
- *
- * Revision 1.167  1994/03/18  18:31:26  pgf
- * cleanup of OPT_WORKING ifdefs
- *
- * Revision 1.166  1994/03/16  10:54:56  pgf
- * switch over to cookie method of marking copied lines for undo
- *
- * Revision 1.165  1994/03/08  12:01:09  pgf
- * augmented region structure, kill-register struct, and some flag
- * sets to describe rectangles.
- *
- * Revision 1.164  1994/02/23  05:08:35  pgf
- * include stddef.h when we include stdlib.h (to pick up offsetof)
- *
- * Revision 1.163  1994/02/22  18:29:15  pgf
- * make sure MSDOS is always defined, at least as 0 if we're not on DOS
- *
- * Revision 1.162  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
- *
+ * $Header: /usr/build/VCS/pgf-vile/RCS/estruct.h,v 1.186 1994/07/11 22:56:20 pgf Exp $
  */
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 
 #ifndef os_chosen
 
-/* Note that as of vile 3.15, most of these choices can be made
-	from the makefile, using separate make targets, so you may
-	not need to edit this... */
-
-/*	Machine/OS definitions			*/
-/* unix flavors */
-/* If you're UNIX, choose one of these... */
-#define BERK	0	/* Berkeley derived */
-#define USG	0	/* AT&T derived */
-#define SVR3	1	/* AT&T derived, more recently */
-#define V7	0	/* the good old days */
-
-/* ...and turn this on if you can... */
-#define POSIX	0	/* the good new days */
-
-/* unix sub-flavors */
-/* ...and turn on one of these if appropriate... */
-#define ODT	0			/* UNIX OPEN DESK TOP		*/
-#define ULTRIX	0			/* UNIX ULTRIX			*/
-#define ISC	0			/* Interactive Systems */
-#define SUNOS	0			/* SunOS 3 or 4 */
-#define NeXT	0
-#define UNIXPC	0
-#define HPUX	0
-#define AIX	0
-#define OSF1	0
-#define LINUX	0
-#define BSD386	0
-#define APOLLO	0
-#define AUX2	0			/* Apple A/UX 2.0 */
-
-/* the following overrides are mostly for convenience only */
-#if ULTRIX || SUNOS
-# undef BERK
-# undef USG
-# undef POSIX
-# define BERK	1
-# define USG	0
-# define POSIX	1
-#endif
-
-#if defined(mips)
-# undef BERK
-# undef USG
-# define BERK	0
-# define USG	1
-#endif
-
-#if ODT || ISC 
-# undef BERK
-# undef USG
-# undef POSIX
-# define BERK	0
-# define USG	1
-# define POSIX	1
-# define SVR3_PTEM	1	/* for ptem.h in display.c */
-#endif
-
-#if HPUX			/* tested with HP/UX 9.01 */
-# define HAVE_SELECT
-# undef POSIX
-# undef BERK
-# undef USG
-# define POSIX	1
-# define BERK	0
-# define USG	1
-#endif
-
-#if NeXT
-# define __STRICT_BSD__
-#endif
-
-/* if anyone can verify that these are right, and work, let me know... -pgf */
-#if UNIXPC
-# undef BERK
-# undef USG
-# define BERK	0
-# define USG	1
-# define winit xxwinit
-# undef HAVE_MKDIR
-# undef HAVE_SELECT
-# define HAVE_MKDIR 0
-# define HAVE_SELECT 1
-#endif
-
-#if AIX
-# undef POSIX
-# undef BERK
-# undef USG
-# define POSIX	1
-# define BERK	0
-# define USG	1
-# define HAVE_SELECT 1
-# undef __STR__
-#endif
-
-#if LINUX
-# define HAVE_SELECT 1
-# define HAVE_POLL 0
-#endif
-
-#if APOLLO
-# undef POSIX
-# undef BERK
-# undef USG
-# define POSIX 0
-# define BERK 1
-# define USG 0
-#endif
+/* All variants of UNIX should now be handled by the configure script */
 
 #ifdef VMS		/* predefined by VAX/VMS compiler */
-# undef BERK
-# undef SVR3
-# undef USG
-# define BERK   0
-# define SVR3   0
-# define USG    0
 # define scrn_chosen
 # define VMSVT  1
+# define HAVE_GETCWD 1
 #else
 # define VMS    0
 #endif
 
 /* non-unix flavors */
 #undef	MSDOS
+#undef  WIN31
 #undef	CPM
 #undef	AMIGA
 #undef	EGA
@@ -201,8 +38,10 @@
 #define AMIGA	0			/* AmigaDOS			*/
 #define ST520	0			/* ST520, TOS			*/
 #define MSDOS	0			/* MS-DOS			*/
+#define WIN31   0			/* Windows 3.1			*/
 #define OS2	0			/* son of DOS			*/
 #define CPM	0			/* CP/M-86			*/
+#define NT	0			/* Windows/NT			*/
 
 /*	Compiler definitions			*/
 #define	MSC	0	/* MicroSoft C compile version 3 & 4 & 5 & 6 */
@@ -211,20 +50,21 @@
 #define	WATCOM	0	/* WATCOM C/386 version 9.0 or above */
 #define	DJGPP	0	/* DJ's GCC version 1.09 */
 
-#ifdef __TURBOC__
-#undef TURBO
-#undef SVR3
-#undef MSDOS
-#define SVR3   0
-#define MSDOS  1
-#define TURBO  1
+#ifdef __TURBOC__	/* predefined in Turbo C, both DOS and Windows */
+# undef TURBO
+# undef MSDOS
+# undef WIN31
+# ifdef _Windows	/* predefined in TurboC for Windows */
+#  define WIN31  1
+# else
+#  define MSDOS  1
+# endif
+# define TURBO  1
 #endif
 
 #ifdef __WATCOMC__
-#undef SVR3
 #undef MSDOS
 #undef WATCOM
-#define SVR3   0
 #define MSDOS  1
 #define WATCOM 1
 #endif
@@ -233,18 +73,22 @@
 /* assume compiler already chosen */
 #undef MSDOS
 #undef OS2
-#define OS2
+#define OS2    1
 #endif
 
 #ifdef __GO32__  	/* DJ's GCC version 1.09 */
 #undef DJGPP
-#undef SVR3
 #undef BSD
-#undef USG
 #undef MSDOS
-#define SVR3   0
 #define MSDOS  1
 #define DJGPP   1
+#endif
+
+#if NT
+#undef MSDOS
+#undef NT
+#define SVR3   0
+#define NT	1
 #endif
 
 /* As of version 3.51 of vile, NEWDOSCC should be correct for Turbo,
@@ -252,47 +96,99 @@
  * probably correct for MSC (Microsoft C) and ZTC (Zortech), but I'm not
  * sure of those.  (It implies a lot of ANSI and POSIX behavior.)
  */
-#if TURBO || WATCOM || MSC || DJGPP || ZTC
+#if TURBO || WATCOM || MSC || DJGPP || ZTC || NT
 # define NEWDOSCC 1
+# define HAVE_GETCWD 1
+# define CPP_SUBS_BEFORE_QUOTE 1
 #else
 # define NEWDOSCC 0
 #endif
 
-
 #endif /* os_chosen */
 
-/* some code uses these as values in expressions,
- * so we always want them defined */
+/*
+ * Porting constraints: supply the normally assumed values that we get from
+ * the "configure" script, for systems on which we cannot run "configure"
+ * (e.g., VMS, OS2, MSDOS).
+ */
+#ifndef HAVE_ACCESS
+# define HAVE_ACCESS    1	/* if your system has the access() system call */
+#endif
+
+#ifndef HAVE_MKDIR
+# define HAVE_MKDIR	1	/* if your system has the mkdir() system call */
+#endif
+
+#ifndef HAVE_SETJMP_H
+# define HAVE_SETJMP_H  1	/* if your system has <setjmp.h> */
+#endif
+
+#ifndef HAVE_SIGNAL_H
+# define HAVE_SIGNAL_H  1	/* if your system has <signal.h> */
+#endif
+
+#if !(defined(HAVE_STRCHR) || defined(HAVE_STRRCHR))
+# define HAVE_STRCHR    1
+# define HAVE_STRRCHR   1
+#endif
+
+#ifndef HAVE_STDLIB_H
+# define HAVE_STDLIB_H  1	/* if your system has <stdlib.h> */
+#endif
+
+#ifndef HAVE_STRING_H
+# define HAVE_STRING_H  1	/* if your system has <string.h> */
+#endif
+
+/* Some code uses these as values in expressions, so we always want them
+ * defined, just in case we run into a substandard preprocessor.
+ */
+#ifndef X11
+# define X11 0
+#endif
 #ifndef MSDOS
 # define MSDOS 0
 #endif
 #ifndef OS2
 # define OS2 0
 #endif
-#ifndef X11
-# define X11 0
+#ifndef NT
+# define NT 	0
+#endif
+#ifndef VMS
+# define VMS 0
+#endif
+#ifdef apollo
+# define APOLLO 1	/* FIXME: still more ifdefs to autoconf */
+#endif
+#ifdef sun
+# define SUNOS 1	/* FIXME: need to tweak lint ifdefs */
 #endif
 
-#define IBM_KBD (MSDOS || OS2)
-#define CRLF_LINES (MSDOS || OS2)
+
+#define IBM_KBD 	(MSDOS || OS2 || NT)
+#define CRLF_LINES 	(MSDOS || OS2 || NT)
 
 
-#if ! LINUX && ! DJGPP && !defined(__CLCC_) && !defined(__GNUC__) && !APOLLO
+#if 0	/* FIXME: Need to figure out what this should now be */
     /* there are probably others that don't want/need const defined */
 # define const
 #endif
 
-#if SVR3
-# undef BERK
-# undef USG
-# define BERK	0
-# define USG	1
-#endif
-
-#define UNIX	(V7 | BERK | USG)	/* any unix		*/
-
+#if NT
+#include <windows.h>
+#endif 
 #include <stdio.h>
 #include <sys/types.h>
+#if HAVE_LIBC_H
+#include <libc.h>
+#endif
+#if HAVE_FCNTL_H
+#include <fcntl.h>	/* 'open()' */
+#endif
+#if HAVE_SYS_WAIT_H
+#include <sys/wait.h>	/* 'wait()' */
+#endif
 
 /* definitions for testing apollo version with gcc warnings */
 #if APOLLO
@@ -312,17 +208,19 @@
 # define APOLLO_STDLIB 0
 #endif
 
+#ifndef SIGT
 /* choose between void and int signal handler return type.
   "typedefs?  we don't need no steenking typedefs..." */
-#if POSIX || (BERK && BSD386) || SVR3 || APOLLO_STDLIB || NEWDOSCC
-# define SIGT void
-# define SIGRET
-#else
-# define SIGT int
-# define SIGRET return 0
-#endif
+# if NEWDOSCC
+#  define SIGT void
+#  define SIGRET
+# else
+#  define SIGT int
+#  define SIGRET return 0
+# endif
+#endif /* SIGT */
 
-#if UNIX || MSDOS || VMS || OS2
+#if HAVE_SIGNAL_H
 #include	<signal.h>
 # if APOLLO
 #  if APOLLO_STDLIB && !defined(lint)	/* SR10.3, CC 6.8 */
@@ -342,7 +240,7 @@
 
 /* We suppress this on USG machines in case system calls are not restartable
 	after signals */
-#if USG && !defined(SA_RESTART)
+#if !HAVE_RESTARTABLE_SYSCALLS && !defined(SA_RESTART)
 # undef HAS_ALARM
 # define HAS_ALARM 0
 #endif
@@ -366,7 +264,7 @@
 # define SIG_IGN	(SIGT (*)(DEFINE_SIG_ARGS))1
 #endif
 
-#if UNIX || MSDOS || VMS || OS2
+#if HAVE_SETJMP_H
 #include	<setjmp.h>
 #endif
 
@@ -380,30 +278,12 @@
 #define BADEXIT		1
 #endif
 
-/*	Porting constraints			*/
-#ifndef HAVE_MKDIR
-# define HAVE_MKDIR	1	/* if your system has the mkdir() system call */
-#endif
-
-
 /* has the select() or poll() call, only used for short sleeps in fmatch() */
-#ifndef HAVE_SELECT
-# if BERK
-#  define HAVE_SELECT 1
-# else
-#  define HAVE_SELECT 0
-# endif
+#if HAVE_SELECT
+#undef HAVE_POLL
 #endif
 
-#ifndef HAVE_POLL
-# if !HAVE_SELECT && (POSIX || SVR3 || ( USG && defined(pyr) ))
-#  define HAVE_POLL 1
-# else
-#  define HAVE_POLL 0
-# endif
-#endif
-
-#if UNIX || MSDOS || VMS || OS2
+#if UNIX || MSDOS || WIN31 || VMS || OS2 || NT
 #define	ENVFUNC	1
 #else
 #define	ENVFUNC	0
@@ -420,7 +300,7 @@
 #define	HP110	0			/* HP110 screen driver		*/
 #define	VMSVT	0			/* various VMS terminal entries	*/
 #define VT52	0			/* VT52 terminal (Zenith).	*/
-#define	BORLAND	0			/* Borland console I/O routines */
+#define	BORLAND	1			/* Borland console I/O routines */
 #define	IBMPC	(MSDOS && !BORLAND && !ANSI) /* IBM-PC CGA/MONO/EGA driver */
 #define	ZIBMPC	0			/* Zortech lib IBM-PC CGA/MONO/EGA driver	*/
 #define	DG10	0			/* Data General system/10	*/
@@ -429,6 +309,7 @@
 #define	MAC	0			/* Macintosh			*/
 #define	ATARI	0			/* Atari 520/1040ST screen	*/
 #define	X11	0			/* X Window System */
+#define NTCONS	0			/* Windows/NT console		*/
 
 /*   Special keyboard definitions	     */
 #define WANGPC	0		/* WangPC - mostly escape sequences	*/
@@ -445,7 +326,7 @@
 /* NOTE -- COLOR doesn't currently do anything if you're using X or TERMCAP */
 /* (But I think X11 may honor colors from the command line or .Xdefaults) */
 /* (and DOS definitely does do things with COLOR, but it may not work) */
-#define	COLOR	(ANSI|MSDOS|OS2|X11)	/* color commands and windows			*/
+#define	COLOR	(ANSI|MSDOS|OS2|X11|NT)	/* color commands and windows			*/
 
 /* Feature turnon/turnoff */
 #define ANSI_SPEC	1 /* ANSI function/arrow keys */
@@ -474,7 +355,7 @@
 			   ANSI, TERMCAP, IBMPC, VMSVT and AT386 can do this */
 #define CVMVAS	1	/* arguments to forward/back page and half page */
 			/* are in pages	instead of rows */
-#define PRETTIER_SCROLL 1 /* can improve the appearance of a scrolling screen */
+#define PRETTIER_SCROLL 0 /* can improve the appearance of a scrolling screen */
 #define STUTTER_SEC_CMD 0 /* must the next/prev section commands (i.e.
 				']]' and '[[' be stuttered?  they must be
 				stuttered in real vi, I prefer them not
@@ -531,14 +412,14 @@
 #endif
 
 	/* any mouse capability */
-#define OPT_MOUSE       (X11 || OPT_XTERM || OPT_MS_MOUSE)
+#define OPT_MOUSE       (X11 || OPT_XTERM || OPT_MS_MOUSE || NT)
 
 /*
  * If selections will be used to communicate between vile and other
  * applications, OWN_SELECTION must be defined to call the procedure
  * for establishing ownership of the selection.
  */
-#if OPT_SELECTIONS && (XTOOLKIT /* || ... */)
+#if OPT_SELECTIONS && XTOOLKIT /* or others? */
 #define OWN_SELECTION() own_selection()
 #else
 #define OWN_SELECTION()
@@ -556,9 +437,9 @@
  * Configuration options for globbing
  */
 #define	OPT_GLOB_ENVIRON	ENVFUNC && !SMALLER
-#define	OPT_GLOB_ELLIPSIS	VMS || UNIX || (MSDOS && !SMALLER)
+#define	OPT_GLOB_ELLIPSIS	VMS || UNIX || OS2 || (MSDOS && !SMALLER)
 #define	OPT_GLOB_PIPE		UNIX
-#define	OPT_GLOB_RANGE		UNIX || (MSDOS && !SMALLER)
+#define	OPT_GLOB_RANGE		UNIX || OS2 || (MSDOS && !SMALLER)
 
 /*	Debugging options	*/
 #define	RAMSIZE	0	/* dynamic RAM memory usage tracking */
@@ -587,8 +468,9 @@ extern	char *	sys_errlist[];
 #define	lBIT(n)	(1L<<(n))
 #define	iBIT(n) (1 <<(n))
 
-/* use 'size_t' if we have it */
-#if POSIX || APOLLO || VMS || NEWDOSCC
+/* use 'size_t' if we have it ... for unix systems, the configuration script
+   will define size_t if it wasn't available in sys/types.h. */
+#if UNIX || VMS || NEWDOSCC
 # if defined(lint) && (SUNOS||APOLLO)
 #  define SIZE_T  size_t	/* note: SunOs 4.1.3 defines 'size_t' as 'int'*/
 #  define ALLOC_T unsigned
@@ -607,7 +489,6 @@ extern	char *	sys_errlist[];
 
 #if APOLLO
 # if !defined(__STDCPP__) && !defined(__GNUC__)
-#  define ANSI_VARARGS 0
 #  define ANSI_PROTOS 0 /* SR10.2 does not like protos w/o variable names */
 # endif
 #endif
@@ -618,6 +499,10 @@ extern	char *	sys_errlist[];
 #  else
 #    define ANSI_PROTOS 0
 #  endif
+#endif
+
+#if HAVE_STDARG_H
+# define ANSI_VARARGS  1
 #endif
 
 #ifndef ANSI_VARARGS
@@ -634,40 +519,37 @@ extern	char *	sys_errlist[];
 # define P(a) ()
 #endif
 
-#if BERK && ! POSIX && !APOLLO
+#if !(HAVE_STRCHR && HAVE_STRRCHR)
 #define USE_INDEX 1
 #endif
 
-#if BERK || LINUX  /* who else?  can i include POSIX here? */
-#define HAVE_GETHOSTNAME 1
-#else
+#ifndef HAVE_GETHOSTNAME
 #define HAVE_GETHOSTNAME 0
 #endif
 
 #ifdef USE_INDEX
 #define strchr index
 #define strrchr rindex
-extern char *index();
-extern char *rindex();
+#if MISSING_EXTERN_RINDEX
+extern char *index P((const char *, int));
+extern char *rindex P((const char *, int));
 #endif
+#endif /* USE_INDEX */
 
-#ifdef USE_BCOPY
-#define memcmp		bcmp
-#define memcpy(a,b,c)	bcopy(b,a,c)
-#define memset(a,c,b)	bfill(a,b,c)
-#else
-# if POSIX
+#if STDC_HEADERS || HAVE_STRING_H
+# include <string.h>
+  /* An ANSI string.h and pre-ANSI memory.h might conflict.  */
+# if !STDC_HEADERS && HAVE_MEMORY_H
 #  include <memory.h>
+# endif /* not STDC_HEADERS and HAVE_MEMORY_H */
+#else /* not STDC_HEADERS and not HAVE_STRING_H */
+# if HAVE_STRINGS_H
+#  include <strings.h>
+  /* memory.h and strings.h conflict on some systems */
+  /* FIXME: should probably define memcpy and company in terms of bcopy,
+     et al here */
 # endif
-#endif
-
-#if APOLLO
-# ifndef L_tmpnam		/* CC 6.8 <stdio.h> defines, CC 6.7 doesn't */
-#  include <memory.h>
-   extern time_t time P((time_t *));
-   extern uid_t  getuid P((void));
-# endif
-#endif
+#endif /* not STDC_HEADERS and not HAVE_STRING_H */
 
 /*	System dependent library redefinitions, structures and includes	*/
 
@@ -698,7 +580,7 @@ extern char *rindex();
 
 /* on MS-DOS we have to open files in binary mode to see the ^Z characters. */
 
-#if MSDOS || OS2
+#if MSDOS || WIN31 || OS2 || NT
 #define FOPEN_READ	"rb"
 #define FOPEN_WRITE	"wb"
 #define FOPEN_APPEND	"ab"
@@ -711,16 +593,19 @@ extern char *rindex();
 #endif
 
 
-#if MSDOS || OS2
-# define slashc(c) (c == '\\' || c == '/')
+#if MSDOS || WIN31 || OS2 || NT
+# define SLASHC '\\'
+# define is_slashc(c) (c == '\\' || c == '/')
 #endif
 
 #if ST520
-# define slashc(c) (c == '\\')
+# define SLASHC '\\'
+# define is_slashc(c) (c == '\\')
 #endif
 
-#ifndef slashc
-# define slashc(c) (c == '/')
+#ifndef SLASHC
+# define SLASHC '/'
+# define is_slashc(c) (c == '/')
 #endif
 
 #if	VMS
@@ -731,8 +616,8 @@ extern char *rindex();
 
 	/* intermediate config-controls for filec.c (needed in nemode.h) */
 #if !SMALLER && !OPT_MAP_MEMORY
-#define COMPLETE_FILES  (UNIX || MSDOS || VMS || OS2)
-#define	COMPLETE_DIRS   (UNIX || MSDOS || OS2)
+#define COMPLETE_FILES  (UNIX || MSDOS || VMS || OS2 || NT)
+#define	COMPLETE_DIRS   (UNIX || MSDOS || OS2 || NT)
 #else
 #define COMPLETE_FILES  0
 #define COMPLETE_DIRS   0
@@ -748,13 +633,13 @@ extern char *rindex();
 #endif
 
 	/* how to signal this process group */
-#if BERK
+#if HAVE_KILLPG
 # define signal_pg(sig) killpg(getpgrp(0), sig)
 #else
 /* pass the 0 if we can, since it's safer --- the machines where we can't are
  * probably POSIX machines with ANSI C.
  */
-# if AIX || (defined(__STDC__) && POSIX)
+# if STDC_HEADERS || __STDC__		/* FIXME: Design specific test */
 #  define signal_pg(sig) kill(-getpgrp(), sig)
 # else
 #  define signal_pg(sig) kill(-getpgrp(0), sig)
@@ -774,7 +659,7 @@ extern char *rindex();
 
 /*	internal constants	*/
 
-#if MSDOS
+#if MSDOS || WIN31
 #define	BITS_PER_INT	16
 #endif
 
@@ -870,7 +755,7 @@ typedef enum {
 #define KBD_SHPIPE	iBIT(8)	/* expand, assuming shell-command */
 
 /* default option for 'mlreply' (used in modes.c also) */
-#if !(MSDOS || OS2)
+#if !(MSDOS || WIN31 || OS2 || NT)
 #define	KBD_NORMAL	KBD_EXPAND|KBD_QUOTES
 #else
 #define	KBD_NORMAL	KBD_EXPAND
@@ -958,7 +843,7 @@ typedef enum {
 #define	PATHCHR	','
 #endif
 
-#if MSDOS || OS2
+#if MSDOS || WIN31 || OS2 || NT
 #define	PATHCHR	';'
 #endif
 
@@ -1025,6 +910,19 @@ typedef	long CMASK;
 	screen_string(buf,sizeof(buf),(CMASK)(_pathn))
 typedef short CMASK;
 #endif
+
+#if NT
+/* I dont like the warnings, so... */
+#undef islower
+#undef isupper
+#undef isdigit
+#undef isspace
+#undef iscntrl
+#undef isprint
+#undef ispunct
+#undef isalpha
+#undef isalnum
+#endif /* NT */
 
 /* these intentionally match the ctypes.h definitions, except that
 	they force the char to valid range first */
@@ -1571,23 +1469,19 @@ typedef struct	BUFFER {
 /* shift-commands can be repeated when typed on :-command */
 #define isRepeatable(c)   ((c) == '<' || (c) == '>')
 
-#if	defined(apollo)
-#if	defined(__STDCPP__) || defined(__GNUC__) /* cc 6.8 or gcc */
-#define	ScratchName(s) SCRTCH_LEFT ## #s ## SCRTCH_RIGHT
-#else				/* cc 6.7 */
-#define	ScratchName(s)	"[s]"	/* K&R-style macro */
+#if CPP_SUBS_OLDSTYLE
+# define	ScratchName(s)	"[s]"	/* K&R-style macro */
+#else
+# if CPP_SUBS_AFTER_QUOTE
+#  define	ScratchName(s) SCRTCH_LEFT ## #s ## SCRTCH_RIGHT
+# else
+#  if CPP_SUBS_BEFORE_QUOTE
+#   define	ScratchName(s) SCRTCH_LEFT    #s    SCRTCH_RIGHT
+#  else
+#   error "Cannot construct ScratchName macro"
+#  endif
+# endif
 #endif
-#endif	/* apollo */
-
-#ifndef	ScratchName
-#if defined(__STDC__) || NEWDOSCC || NeXT
-#define	ScratchName(s) SCRTCH_LEFT    #s    SCRTCH_RIGHT
-#endif
-#endif
-
-#ifndef	ScratchName
-#define	ScratchName(s)	"[s]"	/* K&R-style macro */
-#endif	/* ScratchName */
 
 /*
  * Macros for manipulating buffer-struct members.
@@ -1607,6 +1501,11 @@ typedef struct	BUFFER {
 #define set_b_val_ptr(bp,which,val) b_val_ptr(bp,which) = val
 #define b_val_rexp(bp,val) (bp->b_values.bv[val].vp->r)
 #define set_b_val_rexp(bp,which,val) b_val_rexp(bp,which) = val
+
+#define window_b_val(wp,val) \
+ 	((wp != 0 && wp->w_bufp != 0) \
+ 		? b_val(wp->w_bufp,val) \
+		: global_b_val(val))
 
 #define make_local_b_val(bp,which)  \
 		make_local_val(bp->b_values.bv, which)
@@ -1891,7 +1790,7 @@ typedef struct  VIDEO {
 
 typedef	int	(*CmdFunc) P(( int, int ));
 
-typedef  struct {
+typedef	struct {
 	CmdFunc  c_func;	/* function name is bound to */
 	CMDFLAGS c_flags;	/* what sort of command is it? */
 }	CMDFUNC;
@@ -1982,7 +1881,7 @@ typedef struct {
 #define	FILEC_EXPAND   16	/* allow glob-expansion to multiple files */
 
 #ifndef P_tmpdir		/* not all systems define this */
-#if MSDOS || OS2
+#if MSDOS || OS2 || NT
 #define P_tmpdir ""
 #endif
 #if UNIX
@@ -2084,42 +1983,40 @@ typedef struct WHBLOCK {
 #endif
 
 #if X11 && APOLLO
-#define SYSV_STRINGS
+#define SYSV_STRINGS	/* <strings.h> conflicts with <string.h> */
 #endif
-#include <string.h>
 
-#if POSIX
+#if HAVE_UNISTD_H
 #include <unistd.h>
-#include <stdlib.h>
+#endif
+
+#if HAVE_STDDEF_H
 #include <stddef.h>
-#else
-# if (APOLLO_STDLIB && !defined(lint)) || VMS || NEWDOSCC
+#endif
+
+#if (HAVE_STDLIB_H || VMS || NEWDOSCC)
 #include <stdlib.h>
-# else
-#  if ! VMALLOC
- extern char *malloc();
- extern char *realloc();
-#  endif
-#  if APOLLO_STDLIB
-extern void qsort P((char *, SIZE_T, SIZE_T, int (*func)(char **,char **)));
-#  endif
-extern	long	strtol	P(( const char *, char **, int ));
-extern char *getenv P((char *));
+#else
+# if ! VMALLOC
+#if MISSING_EXTERN_MALLOC
+extern	char *	malloc	P(( unsigned int ));
+#endif
+#if MISSING_EXTERN_REALLOC
+extern	char *	realloc	P(( char *, unsigned int ));
+#endif
+# endif
 extern void exit P((int));
 extern void _exit P((int));
-# endif	/* APOLLO (special handling of lint vs __STDC__) */
-#endif	/* POSIX */
+#endif	/* HAVE_STDLIB_H */
 
-#if ! USG && !defined(__GNUC__)
+#if !defined(__GNUC__)
+# if HAVE_GETWD
 extern char *getwd P(( char * ));
+# endif
+# if HAVE_GETCWD
 extern char *getcwd P(( char *, int ));
+# endif
 #endif
-
-#ifndef	free
-#if	APOLLO && (!APOLLO_STDLIB || defined(lint))
- extern void free (/*char *s*/);
-#endif
-#endif	/* free */
 
 /* array/table size */
 #define	SIZEOF(v)	(sizeof(v)/sizeof(v[0]))
@@ -2157,10 +2054,22 @@ extern char *getcwd P(( char *, int ));
 #endif
 
 #if HAVE_SELECT
-#if UNIXPC
-#include <select.h>
-#else
+# if HAVE_SELECT_H
+# include <select.h>
+# endif
+# if HAVE_SYS_SELECT_H
+# include <sys/select.h>
+# endif
+#endif
+
+#ifdef TIME_WITH_SYS_TIME
 #include <sys/time.h>
+#include <time.h>
+#else
+#ifdef HAVE_SYS_TIME_H
+#include <sys/time.h>
+#else
+#include <time.h>
 #endif
 #endif
 
@@ -2193,19 +2102,6 @@ extern char *getcwd P(( char *, int ));
 #undef free
 #include "malloc.h"
 #else
-#if	NO_LEAKS
-extern	void	show_alloc P((void));
-#endif
-#if	DOALLOC
-extern	char *	doalloc P((char *,unsigned));
-extern	void	dofree P((char *));
-#undef	malloc
-#define	malloc(n)	doalloc((char *)0,n)
-#undef	realloc
-#define	realloc(p,n)	doalloc(p,n)
-#undef	free
-#define	free(p)		dofree(p)
-#endif	/* DOALLOC */
 #if	NO_LEAKS || DOALLOC
 #include "trace.h"
 #endif

@@ -7,19 +7,7 @@
  * Original code probably by Dan Lawrence or Dave Conroy for MicroEMACS.
  * Major extensions for vile by Paul Fox, 1991
  *
- *	$Log: modes.c,v $
- *	Revision 1.36  1994/04/27 09:33:13  pgf
- *	back out last change
- *
- * Revision 1.35  1994/04/25  23:24:32  pgf
- * do switch to modes listing
- *
- * Revision 1.34  1994/03/22  16:26:53  pgf
- * used updatescratch() for buffer animation triggering
- *
- * Revision 1.33  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
- *
+ * $Header: /usr/build/VCS/pgf-vile/RCS/modes.c,v 1.38 1994/07/11 22:56:20 pgf Exp $
  *
  */
 
@@ -674,6 +662,7 @@ VALARGS *args;			/* symbol-table entry for the mode */
 				return FALSE;
 			}
 			values->vp->i = nval;
+			refresh(FALSE, 0);
 			break;
 #endif /* COLOR */
 

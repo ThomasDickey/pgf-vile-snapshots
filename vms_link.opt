@@ -1,11 +1,5 @@
 ! Link with sharable C-runtime library
-! $Log: vms_link.opt,v $
-! Revision 1.8  1994/03/24 12:11:19  pgf
-! added X libs
-!
-! Revision 1.7  1994/02/22  11:03:15  pgf
-! truncated RCS log for 4.0
-!
+! $Header: /usr/build/VCS/pgf-vile/RCS/vms_link.opt,v 1.10 1994/07/11 22:56:20 pgf Exp $
 !
 ! There are too many object-files to list on the command-line.
 basic.obj
@@ -39,6 +33,7 @@ random.obj
 regexp.obj
 region.obj
 search.obj
+select.obj
 spawn.obj
 tags.obj
 tbuff.obj

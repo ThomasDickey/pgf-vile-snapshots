@@ -4,9 +4,7 @@
  *	need to back up to get to the char. before the transition.
  *	Written for vile by Paul Fox, (c)1990
  *
- * $Log: wordmov.c,v $
- * Revision 1.7  1994/02/22 11:03:15  pgf
- * truncated RCS log for 4.0
+ * $Header: /usr/build/VCS/pgf-vile/RCS/wordmov.c,v 1.8 1994/07/11 22:56:20 pgf Exp $
  *
  */
 

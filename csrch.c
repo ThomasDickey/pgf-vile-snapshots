@@ -1,12 +1,7 @@
 /* These functions perform vi's on-this-line character scanning functions.
  *	written for vile by Paul Fox, (c)1990
  *
- * $Log: csrch.c,v $
- * Revision 1.15  1994/04/22 15:55:46  pgf
- * forward-char-scan et al now usable from macros
- *
- * Revision 1.14  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
+ * $Header: /usr/build/VCS/pgf-vile/RCS/csrch.c,v 1.17 1994/07/11 22:56:20 pgf Exp $
  *
 */
 
@@ -103,10 +98,10 @@ int *cp;
 	int c;
 
 	if (clexec || isnamedcmd) {
-		int stat;
+		int status;
 		static char cbuf[2];
-		if ((stat=mlreply("Scan for: ", cbuf, 2)) != TRUE)
-			return stat;
+		if ((status=mlreply("Scan for: ", cbuf, 2)) != TRUE)
+			return status;
 		c = cbuf[0];
 	} else {
 		c = tgetc(FALSE);

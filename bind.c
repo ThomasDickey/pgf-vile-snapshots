@@ -3,40 +3,7 @@
  *
  *	written 11-feb-86 by Daniel Lawrence
  *
- * $Log: bind.c,v $
- * Revision 1.77  1994/04/19 15:13:06  pgf
- * use strncpy0() in likely places
- *
- * Revision 1.76  1994/04/18  17:29:10  pgf
- * oops -- too many poundcs went away.  some come back.
- *
- * Revision 1.75  1994/04/18  17:17:51  pgf
- * eliminate poundc usage
- *
- * Revision 1.74  1994/04/18  16:56:45  pgf
- * speckey() is back to being a regular command, rather than a special char
- *
- * Revision 1.73  1994/04/18  14:26:27  pgf
- * merge of OS2 port patches, and changes to tungetc operation
- *
- * Revision 1.72  1994/04/13  20:40:21  pgf
- * change kcod2str, fnc2str, string2prc to all deal in "p-strings", so
- * we can store null chars in binding strings.
- *
- * Revision 1.71  1994/04/01  14:30:02  pgf
- * tom's warning/lint patch
- *
- * Revision 1.70  1994/03/29  14:30:04  pgf
- * allow for '-' in command names (i.e. it's not punctuation in that case)
- *
- * Revision 1.69  1994/03/02  09:47:48  pgf
- * new routine fnc2str() to replace insertion_cmd()
- *
- * Revision 1.68  1994/02/23  05:07:49  pgf
- * made mstring static local again -- it slipped outside by mistake
- *
- * Revision 1.67  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
+ * $Header: /usr/build/VCS/pgf-vile/RCS/bind.c,v 1.79 1994/07/11 22:56:20 pgf Exp $
  *
  */
 
@@ -75,9 +42,9 @@ static	int	key_to_bind P(( CMDFUNC * ));
 static	void	reset_prefix P(( int, CMDFUNC * ));
 static	int	converted_len P(( char * ));
 static	char *	to_tabstop P(( char * ));
-static	int	is_shift_cmd P(( char *, int ));
 #endif	/* REBIND */
 
+static	int	is_shift_cmd P(( char *, int ));
 static	char *	skip_partial P(( char *, SIZE_T, char *, SIZE_T ));
 static	void	show_partial P(( char *, SIZE_T, char *, SIZE_T ));
 static	int	fill_partial P(( char *, SIZE_T, char *, char *, SIZE_T ));

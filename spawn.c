@@ -1,43 +1,13 @@
 /*	Spawn:	various DOS access commands
  *		for MicroEMACS
  *
- * $Log: spawn.c,v $
- * Revision 1.79  1994/04/22 14:34:15  pgf
- * changed BAD and GOOD to BADEXIT and GOODEXIT
- *
- * Revision 1.78  1994/04/20  19:54:50  pgf
- * changes to support 'BORLAND' console i/o screen driver
- *
- * Revision 1.77  1994/04/18  14:26:27  pgf
- * merge of OS2 port patches, and changes to tungetc operation
- *
- * Revision 1.76  1994/04/11  11:39:36  pgf
- * giving an arg to :! or :!! or "shell-command" now suppresses the
- * "press return to continue" prompt
- *
- * Revision 1.75  1994/03/24  12:10:58  pgf
- * warning cleanup
- *
- * Revision 1.74  1994/03/23  16:04:05  pgf
- * removed ifdef BEFORE code
- *
- * Revision 1.73  1994/03/10  20:15:32  pgf
- * prompt with name of modified buffer when there's only one of them
- *
- * Revision 1.72  1994/03/08  14:17:45  pgf
- * warning cleanup
- *
- * Revision 1.71  1994/02/28  15:14:24  pgf
- * make DOS use pressreturn after a shell escape
- *
- * Revision 1.70  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
+ * $Header: /usr/build/VCS/pgf-vile/RCS/spawn.c,v 1.84 1994/07/11 22:56:20 pgf Exp $
  *
  */
 
 #include	"estruct.h"
 #include	"edef.h"
-#if UNIX || OS2
+#if UNIX || OS2 || NT
 #include	<sys/stat.h>
 #endif
 
@@ -67,7 +37,7 @@ extern  int	newmode[3];			/* In "termio.c"	*/
 extern  short	iochan;				/* In "termio.c"	*/
 #endif
 
-#if NEWSDOSCC && !DJGPP
+#if NEWDOSCC && !DJGPP			/* Typo, was NEWSDOSCC 	*/
 #include	<process.h>
 #endif
 
@@ -91,11 +61,12 @@ int
 spawncli(f, n)
 int f,n;
 {
+/* i never thought i'd see an ifdef like this one... strange bedfellows */
+#if X11 || CPM || ST520 || WIN31
+	mlforce("[This version of vile cannot spawn an interactive shell]");
+	return FALSE;
+#else
 #if	UNIX
-# if	X11
-	mlforce("[Not available under X11]");
-	return(FALSE);
-# else
 	movecursor(term.t_nrow, 0);		/* Seek to last line.	*/
 	ttclean(TRUE);
 	TTputc('\n');
@@ -104,7 +75,6 @@ int f,n;
 	ttunclean();
 	sgarbf = TRUE;
 	return AfterShell();
-# endif /* X11 */
 #endif /* UNIX */
 
 #if	AMIGA
@@ -122,22 +92,14 @@ int f,n;
 	sgarbf = TRUE;
 	return sys(NULL);			/* NULL => DCL.		*/
 #endif
-#if	CPM
-	mlforce("[Not in CP/M-86]");
-	return FALSE;
-#endif
-#if	ST520
-	mlforce("[Not in TOS]");
-	return FALSE;
-#endif
-#if	MSDOS || OS2
+#if	MSDOS || OS2 || NT
 	movecursor(term.t_nrow, 0);		/* Seek to last line.	*/
 	TTflush();
 	TTkclose();
 	{ 
 		char *shell;
 		if ((shell = getenv("COMSPEC")) == NULL) {
-#if OS2
+#if OS2 || NT
 			shell = "cmd.exe";
 #else
 			shell = "command.com";
@@ -158,6 +120,7 @@ int f,n;
 	TTkopen();
 	sgarbf = TRUE;
 	return AfterShell();
+#endif
 #endif
 }
 
@@ -196,10 +159,8 @@ ACTUAL_SIG_DECL
 	(void)TTgetc();		/* have to skip a character */
 	ttunclean();		/* ...so that I can finally suppress echo */
 #  endif
-#  if USG
 	(void)signal(SIGCONT,rtfrmshell); /* suspend & restart */
 	(void)update(TRUE);
-#  endif
 # endif
 #endif
 #ifdef	MDCHK_MODTIME
@@ -248,7 +209,7 @@ int f,n;
 	return spawn1(FALSE, !f);
 }
 
-#define COMMON_SH_PROMPT (UNIX || VMS || MSDOS || OS2 || (ST520 & LATTICE))
+#define COMMON_SH_PROMPT (UNIX || VMS || MSDOS || OS2 || NT || (ST520 & LATTICE))
 
 #if COMMON_SH_PROMPT
 static	int	ShellPrompt P(( TBUFF **, char *, int ));
@@ -458,7 +419,11 @@ int pressret;
 	mlforce("[Not in CP/M-86]");
 	return (FALSE);
 #endif
-#if	MSDOS || OS2 || (ST520 & LATTICE)
+#if	WIN31
+	mlforce("[Not in Windows 3.1]");
+	return FALSE;
+#endif
+#if	MSDOS || OS2 || NT || (ST520 & LATTICE)
 	movecursor(term.t_nrow, 0);
 	TTputc('\n');
 	TTflush();
@@ -489,7 +454,7 @@ int pressret;
 #endif
 }
 
-#if UNIX || MSDOS || VMS || OS2
+#if UNIX || MSDOS || VMS || OS2 || NT
 /*
  * Pipe a one line command into a window
  */
@@ -719,7 +684,7 @@ int f,n;
 	Close(newcli);
 	sgarbf = TRUE;
 #endif
-#if	MSDOS || OS2
+#if	MSDOS || OS2 || NT
 	(void)strcat(line," <fltinp >fltout");
 	movecursor(term.t_nrow - 1, 0);
 	TTkclose();

@@ -3,50 +3,7 @@
 
 	written 1986 by Daniel Lawrence
  *
- * $Log: eval.c,v $
- * Revision 1.88  1994/04/27 11:22:50  pgf
- * changes for  and
- *
- * Revision 1.87  1994/04/25  21:31:39  pgf
- * cfix strncpy0() calls
- *
- * Revision 1.86  1994/04/25  20:24:12  pgf
- * response variables (@foo) now remember last response
- *
- * Revision 1.85  1994/04/22  16:54:08  pgf
- * remove spurious arg
- *
- * Revision 1.84  1994/04/22  13:48:25  pgf
- * new hook variables, and $abufname
- *
- * Revision 1.83  1994/04/22  11:28:22  pgf
- * added $title and $iconname variables (X11 only), added $xvile and $pcvile
- * variables which are true on their respective builds, and added $cdhook
- * variable, as a trial hook.
- *
- * Revision 1.82  1994/04/19  15:13:06  pgf
- * use strncpy0() in likely places
- *
- * Revision 1.81  1994/04/08  19:52:30  pgf
- * look up functions via first match, rather than exact
- *
- * Revision 1.80  1994/04/04  16:14:58  pgf
- * kev's 4.4 changes
- *
- * Revision 1.79  1994/04/01  14:30:02  pgf
- * tom's warning/lint patch
- *
- * Revision 1.78  1994/03/29  14:50:30  pgf
- * warning cleanup
- *
- * Revision 1.77  1994/03/16  19:00:09  pgf
- * use #define for palette string length
- *
- * Revision 1.76  1994/02/23  05:09:21  pgf
- * fix is_falsem/is_truem again.
- *
- * Revision 1.75  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
+ * $Header: /usr/build/VCS/pgf-vile/RCS/eval.c,v 1.91 1994/07/11 22:56:20 pgf Exp $
  *
  */
 
@@ -67,7 +24,7 @@
 
 	/* macros for environment-variable switch */
 	/*  (if your compiler balks with "non-constant case expression" */
-#if VMS || AUX2 || pyr || AIX
+#if VMS || HAVE_LOSING_SWITCH_WITH_STRUCTURE_OFFSET
 #define	If(N)		if (vnum == N) {
 #define	ElseIf(N)	} else If(N)
 #define	Otherwise	} else {
@@ -254,13 +211,15 @@ char *gtfun(fname)	/* evaluate a function */
 char *fname;		/* name of function to evaluate */
 {
 	register int fnum;		/* index to function to eval */
+	char *it = errorm;
 	char arg1[NSTRING];		/* value of first argument */
 	char arg2[NSTRING];		/* value of second argument */
 	char arg3[NSTRING];		/* value of third argument */
 	static char result[2 * NSTRING];	/* string result */
 
+	*arg1 = *arg2 = *arg3 = EOS;
 	if (!fname[0])
-		return(errorm);
+		return(it);
 
 	/* look the function up in the function table */
 	mklower(fname)[FUNC_NAMELEN-1] = EOS; /* case-independent */
@@ -292,50 +251,118 @@ char *fname;		/* name of function to evaluate */
 
 	/* and now evaluate it! */
 	switch (fnum) {
-		case UFADD:	return(l_itoa(atoi(arg1) + atoi(arg2)));
-		case UFSUB:	return(l_itoa(atoi(arg1) - atoi(arg2)));
-		case UFTIMES:	return(l_itoa(atoi(arg1) * atoi(arg2)));
-		case UFDIV:	return(l_itoa(atoi(arg1) / atoi(arg2)));
-		case UFMOD:	return(l_itoa(atoi(arg1) % atoi(arg2)));
-		case UFNEG:	return(l_itoa(-atoi(arg1)));
-		case UFCAT:	return(strcat(strcpy(result, arg1), arg2));
-		case UFLEFT:	return(strncpy0(result, arg1, s2size(arg2)+1));
-		case UFRIGHT:	return(strcpy(result, s2offset(arg1,arg2)));
-		case UFMID:	return(strncpy0(result, s2offset(arg1,arg2),
-							s2size(arg3)+1));
-		case UFNOT:	return(ltos(stol(arg1) == FALSE));
-		case UFEQUAL:	return(ltos(atoi(arg1) == atoi(arg2)));
-		case UFLESS:	return(ltos(atoi(arg1) < atoi(arg2)));
-		case UFGREATER:	return(ltos(atoi(arg1) > atoi(arg2)));
-		case UFSEQUAL:	return(ltos(strcmp(arg1, arg2) == 0));
-		case UFSLESS:	return(ltos(strcmp(arg1, arg2) < 0));
-		case UFSGREAT:	return(ltos(strcmp(arg1, arg2) > 0));
-		case UFIND:	return(tokval(arg1));
-		case UFAND:	return(ltos(stol(arg1) && stol(arg2)));
-		case UFOR:	return(ltos(stol(arg1) || stol(arg2)));
-		case UFLENGTH:	return(l_itoa((int)strlen(arg1)));
-		case UFUPPER:	return(mkupper(arg1));
-		case UFLOWER:	return(mklower(arg1));
-				/* patch: why 42? (that's an '*') */
-		case UFTRUTH:	return(ltos(atoi(arg1) == 42));
-		case UFASCII:	return(l_itoa((int)arg1[0]));
-		case UFCHR:	result[0] = atoi(arg1);
-				result[1] = EOS;
-				return(result);
-		case UFGTKEY:	result[0] = tgetc(TRUE);
-				result[1] = EOS;
-				return(result);
-		case UFRND:	return(l_itoa((ernd() % absol(atoi(arg1))) + 1));
-		case UFABS:	return(l_itoa(absol(atoi(arg1))));
-		case UFSINDEX:	return(l_itoa(sindex(arg1, arg2)));
-		case UFENV:	return(GetEnv(arg1));
-		case UFBIND:	return(prc2engl(arg1));
-		case UFREADABLE:return(ltos(doglob(arg1)
-				  &&   flook(arg1, FL_HERE) != NULL));
-		case UFWRITABLE:return(ltos(doglob(arg1)
-				  &&   !ffronly(arg1)));
+	case UFADD:
+		it = l_itoa(atoi(arg1) + atoi(arg2));
+		break;
+	case UFSUB:
+		it = l_itoa(atoi(arg1) - atoi(arg2));
+		break;
+	case UFTIMES:
+		it = l_itoa(atoi(arg1) * atoi(arg2));
+		break;
+	case UFDIV:
+		it = l_itoa(atoi(arg1) / atoi(arg2));
+		break;
+	case UFMOD:
+		it = l_itoa(atoi(arg1) % atoi(arg2));
+		break;
+	case UFNEG:
+		it = l_itoa(-atoi(arg1));
+		break;
+	case UFCAT:
+		it = strcat(strcpy(result, arg1), arg2);
+		break;
+	case UFLEFT:
+		it = strncpy0(result, arg1, s2size(arg2)+1);
+		break;
+	case UFRIGHT:
+		it = strcpy(result, s2offset(arg1,arg2));
+		break;
+	case UFMID:
+		it = strncpy0(result, s2offset(arg1,arg2), s2size(arg3)+1);
+		break;
+	case UFNOT:
+		it = ltos(stol(arg1) == FALSE);
+		break;
+	case UFEQUAL:
+		it = ltos(atoi(arg1) == atoi(arg2));
+		break;
+	case UFLESS:
+		it = ltos(atoi(arg1) < atoi(arg2));
+		break;
+	case UFGREATER:
+		it = ltos(atoi(arg1) > atoi(arg2));
+		break;
+	case UFSEQUAL:
+		it = ltos(strcmp(arg1, arg2) == 0);
+		break;
+	case UFSLESS:
+		it = ltos(strcmp(arg1, arg2) < 0);
+		break;
+	case UFSGREAT:
+		it = ltos(strcmp(arg1, arg2) > 0);
+		break;
+	case UFIND:
+		it = tokval(arg1);
+		break;
+	case UFAND:
+		it = ltos(stol(arg1) && stol(arg2));
+		break;
+	case UFOR:
+		it = ltos(stol(arg1) || stol(arg2));
+		break;
+	case UFLENGTH:
+		it = l_itoa((int)strlen(arg1));
+		break;
+	case UFUPPER:
+		it = mkupper(arg1);
+		break;
+	case UFLOWER:
+		it = mklower(arg1);
+		break;
+	case UFTRUTH:
+		/* is it the answer to everything? */
+		it = ltos(atoi(arg1) == 42);
+		break;
+	case UFASCII:
+		it = l_itoa((int)arg1[0]);
+		break;
+	case UFCHR:
+		result[0] = atoi(arg1);
+		result[1] = EOS;
+		it = result;
+		break;
+	case UFGTKEY:
+		result[0] = tgetc(TRUE);
+		result[1] = EOS;
+		it = result;
+		break;
+	case UFRND:
+		it = l_itoa((ernd() % absol(atoi(arg1))) + 1);
+		break;
+	case UFABS:
+		it = l_itoa(absol(atoi(arg1)));
+		break;
+	case UFSINDEX:
+		it = l_itoa(sindex(arg1, arg2));
+		break;
+	case UFENV:
+		it = GetEnv(arg1);
+		break;
+	case UFBIND:
+		it = prc2engl(arg1);
+		break;
+	case UFREADABLE:
+		it = ltos(doglob(arg1) && flook(arg1, FL_HERE) != NULL);
+		break;
+	case UFWRITABLE:
+		it = ltos(doglob(arg1) && !ffronly(arg1));
+		break;
+	default:
+		it = errorm;
+		break;
 	}
-	return errorm;
+	return it;
 }
 
 char *gtusr(vname)	/* look up a user var's value */
@@ -1140,6 +1167,7 @@ int sindex(sourc, pattern)	/* find pattern within source */
 char *sourc;	/* source string to search */
 char *pattern;	/* string to look for */
 {
+	int it = 0;	/* assume no match at all.. */
 	char *sp;	/* ptr to current position to scan */
 	char *csp;	/* ptr to source string during comparison */
 	char *cp;	/* ptr to place to check for equality */
@@ -1158,13 +1186,14 @@ char *pattern;	/* string to look for */
 		}
 
 		/* was it a match? */
-		if (*cp == 0)
-			return((int)(sp - sourc) + 1);
+		if (*cp == 0) {
+			it = (int)(sp - sourc) + 1;
+			break;
+		}
 		++sp;
 	}
 
-	/* no match at all.. */
-	return(0);
+	return(it);
 }
 
 #endif /* OPT_EVAL */

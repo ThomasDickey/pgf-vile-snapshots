@@ -2,32 +2,7 @@
  *		written by Daniel Lawrence
  *		5/9/86
  *
- * $Log: input.c,v $
- * Revision 1.107  1994/04/25 20:34:11  pgf
- * use strncpy0
- *
- * Revision 1.106  1994/04/25  09:52:54  pgf
- * fix off-by-one in kbd_reply
- *
- * Revision 1.105  1994/04/19  15:13:06  pgf
- * use strncpy0() in likely places
- *
- * Revision 1.104  1994/04/18  16:57:40  pgf
- * "poundc" is now handled as a command again -- this prevents mixups
- * when doing insertmode or history
- *
- * Revision 1.103  1994/04/18  14:26:27  pgf
- * merge of OS2 port patches, and changes to tungetc operation
- *
- * Revision 1.101  1994/04/12  11:21:08  pgf
- * call update() in mlyesno and mlquickask, in case called after a
- * shell escape in a macro
- *
- * Revision 1.100  1994/03/24  12:04:37  pgf
- * arrow key fix from tom
- *
- * Revision 1.99  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
+ * $Header: /usr/build/VCS/pgf-vile/RCS/input.c,v 1.108 1994/07/11 22:56:20 pgf Exp $
  *
  */
 

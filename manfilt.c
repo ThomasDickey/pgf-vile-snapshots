@@ -45,9 +45,63 @@
  * vile will choose some appropriate fallback (such as underlining) if
  * italics are not available.
  *
+ * $Header: /usr/build/VCS/pgf-vile/RCS/manfilt.c,v 1.4 1994/07/11 22:56:20 pgf Exp $
+ *
  */
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+# if defined(__STDC__)
+#   define ANSI_PROTOS 1
+# else
+#   define ANSI_PROTOS 0
+# endif
+#endif
+
+#ifndef HAVE_STDLIB_H
+# define HAVE_STDLIB_H 0
+#endif
+
+#ifndef ANSI_PROTOS
+# define ANSI_PROTOS 0
+#endif
+
+#if ANSI_PROTOS
+#define P(param) param
+#else
+#define P(param) ()
+#endif
+
+#include <sys/types.h>		/* sometimes needed to get size_t */
+
+#if HAVE_STDLIB_H
+#include <stdlib.h>
+#else
+# if !defined(HAVE_CONFIG_H) || MISSING_EXTERN_MALLOC
+extern	char *	malloc	P(( size_t ));
+# endif
+# if !defined(HAVE_CONFIG_H) || MISSING_EXTERN_REALLOC
+extern	char *	realloc	P(( char *, size_t ));
+# endif
+#endif
+
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+
 #include <stdio.h>
+
+#if MISSING_EXTERN__FILBUF
+extern	int	_filbuf	P(( FILE * ));
+#endif
+
+#if MISSING_EXTERN_FPRINTF
+extern	int	fprintf	P(( FILE *, const char *, ... ));
+#endif
+
+#if MISSING_EXTERN_FPUTS
+extern	int	fputs	P(( const char *, FILE * ));
+#endif
 
 /* Initial amount of space to allocate for the input line. */
 #define INITIALSIZE 1024
@@ -72,27 +126,32 @@ static char *progname;
 #define LINE_IN (line_in+1)
 
 /* Prototypes */
-static void filter(FILE *);
-static int  getline(FILE *);
-static void putline(void);
-static void fatal_error(const char *);
+
+static	void	filter		P(( FILE * ));
+static	int 	getline		P(( FILE * ));
+static	void	putline		P(( void ));
+static	void	fatal_error	P(( const char * ));
+extern	void	main		P(( int, char ** ));
 
 
 /* Print an error message and exit */
 static void
-fatal_error(const char *message)
+fatal_error(message)
+    const char *message;
 {
     fprintf(stderr, "%s: Fatal error: %s\n", progname, message);
     exit(1);	/* unsuccessful exit */
 }
 
 void
-main(int argc, char **argv)
+main(argc, argv)
+    int argc;
+    char **argv;
 {
     progname = argv[0];
     
-    line_in = (char *) malloc(line_in_size);
-    line_out = (char *) malloc(line_out_size);
+    line_in = (char *) malloc((size_t)line_in_size);
+    line_out = (char *) malloc((size_t)line_out_size);
 
     if (line_in == NULL || line_out == NULL)
 	fatal_error("Insufficient memory");
@@ -114,7 +173,8 @@ main(int argc, char **argv)
 }
 
 static void
-filter(FILE *fp)
+filter(fp)
+    FILE *fp;
 {
     char *inp, *outp;
     int c;
@@ -250,7 +310,8 @@ filter(FILE *fp)
 }
 
 static int
-getline(FILE *fp)
+getline(fp)
+    FILE *fp;
 {
     register char *lim = line_in + line_in_size;
     register char *p = LINE_IN;
@@ -265,13 +326,13 @@ getline(FILE *fp)
 	if (p >= lim) {
 	    int offset = p - line_in;
 	    line_in_size *= 2;
-	    line_in = (char *) realloc(line_in, line_in_size);
+	    line_in = (char *) realloc(line_in, (size_t)line_in_size);
 	    if (line_in == NULL)
 		fatal_error("Insufficient memory");
 	    p = line_in + offset;
 	    lim = line_in + line_in_size;
 	    line_out_size *= 2;
-	    line_out = (char *) realloc(line_out, line_out_size);
+	    line_out = (char *) realloc(line_out, (size_t)line_out_size);
 	    if (line_out == NULL)
 		fatal_error("Insufficient memory");
 	}

@@ -3,9 +3,7 @@
  *
  *	Miscellaneous routines for UNIX/VMS compatibility.
  *
- * $Log: vms2unix.c,v $
- * Revision 1.3  1994/02/22 11:03:15  pgf
- * truncated RCS log for 4.0
+ * $Header: /usr/build/VCS/pgf-vile/RCS/vms2unix.c,v 1.5 1994/07/11 22:56:20 pgf Exp $
  *
  */
 #include	"estruct.h"
@@ -44,7 +42,7 @@ opendir(char *filename)
 	znam.nam$l_rsa = zrsa;
 
 	if (sys$parse(&zfab) != RMS$_NORMAL) {
-		closedir(dirp);
+		(void)closedir(dirp);
 		dirp = 0;
 	}
 	return (dirp);
@@ -65,6 +63,7 @@ int
 closedir(DIR *dirp)
 {
 	cfree(dirp);
+	return 0;
 }
 
 char *

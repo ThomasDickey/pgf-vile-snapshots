@@ -5,94 +5,15 @@
  * functions use hints that are left in the windows by the commands.
  *
  *
- * $Log: display.c,v $
- * Revision 1.138  1994/04/25 20:28:14  pgf
- * fixes from kev
- *
- * Revision 1.137  1994/04/22  14:34:15  pgf
- * changed BAD and GOOD to BADEXIT and GOODEXIT
- *
- * Revision 1.136  1994/04/22  11:25:54  pgf
- * took out x_set_window_and_icon_names() call
- *
- * Revision 1.135  1994/04/19  15:13:06  pgf
- * use strncpy0() in likely places
- *
- * Revision 1.134  1994/04/14  09:51:41  pgf
- * added hook for maintaining buffer name in X window name
- *
- * Revision 1.133  1994/04/13  20:46:38  pgf
- * various fixes (towards 4.4) from kev
- *
- * Revision 1.132  1994/04/11  15:50:06  pgf
- * kev's attribute changes
- *
- * Revision 1.131  1994/04/07  19:02:20  pgf
- * kev's changes for direct pscreen access
- *
- * Revision 1.130  1994/04/07  18:13:16  pgf
- * fix column calculation for rectangles for selections
- *
- * Revision 1.129  1994/04/04  16:14:58  pgf
- * kev's 4.4 changes
- *
- * Revision 1.128  1994/04/04  11:30:48  pgf
- * changed args to scwrite(), to allow passing attribute string.
- *
- * Revision 1.127  1994/04/01  14:30:02  pgf
- * tom's warning/lint patch
- *
- * Revision 1.126  1994/04/01  10:47:52  pgf
- * beep on calls to mlerror()
- *
- * Revision 1.125  1994/03/29  16:24:20  pgf
- * kev's changes: selection and attributes
- *
- * Revision 1.124  1994/03/29  14:50:18  pgf
- * fix to mlerror
- *
- * Revision 1.123  1994/03/23  12:56:02  pgf
- * gave mlerror a default message
- *
- * Revision 1.122  1994/03/18  18:30:38  pgf
- * fixes for OPT_MAP_MEMORY compilation
- *
- * Revision 1.121  1994/02/22  18:02:19  pgf
- * removed ifdefs from the killtilde code
- *
- * Revision 1.120  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
+ * $Header: /usr/build/VCS/pgf-vile/RCS/display.c,v 1.142 1994/07/11 22:56:20 pgf Exp $
  *
  */
 
 #include	"estruct.h"
 #include        "edef.h"
 
-#if UNIX
-# if POSIX
-#  include <termios.h>
-# else
-#  if USG
-#   include <termio.h>
-#  else
-#   if BERK
-#    if APOLLO || AIX || OSF1 || ULTRIX || NETBSD
-#     include <sys/ioctl.h>
-#   else
-#     include <ioctl.h>
-#    endif
-#   endif
-#  endif
-# endif
-# if SVR3_PTEM
-#  include <sys/types.h>
-#  include <sys/stream.h>
-#  include <sys/ptem.h>
-# endif
-#endif
-
-#if OSF1 || AIX || LINUX
-# include <sys/ioctl.h>
+#if BORLAND
+#include 	<conio.h>
 #endif
 
 #define	NU_WIDTH 8
@@ -496,7 +417,9 @@ vtinit()
         if (vp == NULL)
 	    ExitProgram(BADEXIT);
 
-	vp->v_flag = 0;
+	/* set everything to 0's unless we want nonzero */
+	(void)memset((char *)vp, 0, sizeof(VIDEO) + term.t_mcol - 4);
+
         pscreen[i] = vp;
 #if OPT_VIDEO_ATTRS
 	if ((pscreen[i]->v_attrs = typeallocn(VIDEO_ATTR, term.t_mcol)) == NULL)
@@ -2062,6 +1985,8 @@ updateline(row, colfrom, colto)
     register char *vc, *pc, *evc;
     register VIDEO_ATTR *va, *pa;
     int nchanges = 0;
+    if ((vscreen[row]->v_flag & VFCHG) == 0)
+	return;
     vc  = &vscreen[row]->v_text[colfrom];
     evc = &vscreen[row]->v_text[colto];
     pc  = &pscreen[row]->v_text[colfrom];
@@ -2399,6 +2324,12 @@ WINDOW *wp;
 			ic = 'R';
 		else if (wp->w_traits.insmode == OVERWRITE)
 			ic = 'O';
+#if BORLAND
+		if (ic == 'I' || ic=='R' || ic == 'O')
+			_setcursortype(_SOLIDCURSOR);
+		else
+			_setcursortype(_NORMALCURSOR);
+#endif
 #else 			/* insertmode is a variable global to all windows */
 		if (wp == curwp) {
 			if (insertmode == INSERT)
@@ -2407,6 +2338,12 @@ WINDOW *wp;
 				ic = 'R';
 			else if (insertmode == OVERWRITE)
 				ic = 'O';
+#if BORLAND
+			if (ic == 'I' || ic=='R' || ic == 'O')
+				_setcursortype(_SOLIDCURSOR);
+			else
+				_setcursortype(_NORMALCURSOR);
+#endif
 		}
 #endif /* !defined(insertmode) */
 		vtputc(ic);
@@ -2990,51 +2927,6 @@ va_dcl
 
 }
 
-/* Get terminal size from system, first trying the driver, and then
- * the environment.  Store number of lines into *heightp and width
- * into *widthp.  If zero or a negative number is stored, the value
- * is not valid.  This may be fixed (in the tcap.c case) by the TERM
- * variable.
- */
-#if ! X11
-void
-getscreensize (widthp, heightp)
-int *widthp, *heightp;
-{
-	char *e;
-#ifdef TIOCGWINSZ
-	struct winsize size;
-#endif
-	*widthp = 0;
-	*heightp = 0;
-#ifdef TIOCGWINSZ
-	if (ioctl (0, TIOCGWINSZ, (caddr_t)&size) == 0) {
-		if ((int)(size.ws_row) > 0)
-			*heightp = size.ws_row;
-		if ((int)(size.ws_col) > 0)
-			*widthp = size.ws_col;
-	}
-	if (*widthp <= 0) {
-		e = getenv("COLUMNS");
-		if (e)
-			*widthp = atoi(e);
-	}
-	if (*heightp <= 0) {
-		e = getenv("LINES");
-		if (e)
-			*heightp = atoi(e);
-	}
-#else
-	e = getenv("COLUMNS");
-	if (e)
-		*widthp = atoi(e);
-	e = getenv("LINES");
-	if (e)
-		*heightp = atoi(e);
-#endif
-}
-#endif
-
 #if defined( SIGWINCH) && ! X11
 /* ARGSUSED */
 SIGT
@@ -3183,6 +3075,7 @@ psc_putchar(c)
     else {
 	SWAP_VT_PSC;
 	vtputc(c);
+	vscreen[vtrow]->v_flag |= VFCHG;
 	SWAP_VT_PSC;
     }
 }
@@ -3209,6 +3102,7 @@ psc_eeol()
 	VIDEO_ATTR *vp = &vscreen[ttrow]->v_attrs[ttcol];
 	char *cp = &vscreen[ttrow]->v_text[ttcol];
 	char *cplim = &vscreen[ttrow]->v_text[term.t_ncol];
+	vscreen[ttrow]->v_flag |= VFCHG;
 	while (cp < cplim) {
 	    *vp++ = 0;
 	    *cp++ = ' ';

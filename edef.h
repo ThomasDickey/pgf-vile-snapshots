@@ -8,68 +8,7 @@
 */
 
 /*
- * $Log: edef.h,v $
- * Revision 1.148  1994/04/27 11:22:50  pgf
- * changes for  and
- *
- * Revision 1.147  1994/04/25  21:49:49  pgf
- * v. 4.4
- *
- * Revision 1.146  1994/04/22  16:21:05  pgf
- * v. 4.3e
- *
- * Revision 1.145  1994/04/22  11:27:57  pgf
- * added hook holders
- *
- * Revision 1.144  1994/04/20  19:54:50  pgf
- * changes to support 'BORLAND' console i/o screen driver
- *
- * Revision 1.143  1994/04/18  14:26:27  pgf
- * merge of OS2 port patches, and changes to tungetc operation
- *
- * Revision 1.141  1994/04/11  16:51:52  pgf
- * v. 4.3c
- *
- * Revision 1.140  1994/04/11  15:50:06  pgf
- * kev's attribute changes
- *
- * Revision 1.139  1994/04/04  16:15:59  pgf
- * v. 4.3b
- *
- * Revision 1.138  1994/04/04  16:14:58  pgf
- * kev's 4.4 changes
- *
- * Revision 1.137  1994/04/01  14:30:02  pgf
- * tom's warning/lint patch
- *
- * Revision 1.136  1994/03/29  16:30:35  pgf
- * v. 4.3a
- *
- * Revision 1.135  1994/03/29  16:24:20  pgf
- * kev's changes: selection and attributes
- *
- * Revision 1.134  1994/03/28  16:40:41  pgf
- * v. 4.3
- *
- * Revision 1.133  1994/03/23  13:06:58  pgf
- * v. 4.2
- *
- * Revision 1.132  1994/03/16  19:00:41  pgf
- * use #define for palette string length
- *
- * Revision 1.131  1994/03/11  14:08:06  pgf
- * v. 4.1
- *
- * Revision 1.130  1994/03/11  11:57:40  pgf
- * replaced the ibmtype integer with the current_res_name string
- *
- * Revision 1.129  1994/03/08  11:57:26  pgf
- * changed 'fulllineregions' to 'regionshape'.
- * added kregwidth for keeping width of a register
- *
- * Revision 1.128  1994/02/22  11:10:04  pgf
- * truncated RCS log for 4.0
- *
+ * $Header: /usr/build/VCS/pgf-vile/RCS/edef.h,v 1.152 1994/07/11 22:56:20 pgf Exp $
  */
 
 /* I know this declaration stuff is really ugly, and I probably won't ever
@@ -92,7 +31,7 @@ decl_init( char prognam[], "xvile");
 decl_init( char prognam[], "vile");
 #endif
 
-decl_init( char version[], "version 4.5");
+decl_init( char version[], "version 4.6");
 
 #if UNIX
 decl_init( char opersys[], "unix");
@@ -103,11 +42,15 @@ decl_init( char opersys[], "vms");
 #if MSDOS
 decl_init( char opersys[], "dos");
 #endif
+#if WIN31
+decl_init (char opersys[], "windows 3.1");
+#endif
 #if OS2
 decl_init( char opersys[], "os/2");
 #endif
-
-decl_init( int slash, '/'); 		/* so DOS can use '\' as path separator */
+#if NT
+decl_init( char opersys[], "windows/nt");
+#endif
 
 decl_init( int autoindented , -1);	/* how many chars (not cols) indented */
 decl_uninit( int isnamedcmd );		/* are we typing a command name */

@@ -3,27 +3,7 @@
  *
  *	written 1986 by Daniel Lawrence
  *
- * $Log: exec.c,v $
- * Revision 1.88  1994/04/22 15:56:58  pgf
- * fixups to storeproc()
- *
- * Revision 1.87  1994/04/22  11:29:59  pgf
- * split execproc() in two, so run_procedure() can now be called internally
- *
- * Revision 1.86  1994/04/11  15:50:06  pgf
- * kev's attribute changes
- *
- * Revision 1.85  1994/04/08  19:53:49  pgf
- * fix core dump on macro goto lookup
- *
- * Revision 1.84  1994/04/01  10:37:45  pgf
- * fix core from line-count ops on empty buffers
- *
- * Revision 1.83  1994/03/08  12:09:11  pgf
- * changed 'fulllineregions' to 'regionshape'.
- *
- * Revision 1.82  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
+ * $Header: /usr/build/VCS/pgf-vile/RCS/exec.c,v 1.90 1994/07/11 22:56:20 pgf Exp $
  *
  */
 
@@ -74,6 +54,7 @@ int	eolchar;
 		return TRUE;
 
 	if (islinespecchar(c)
+	 || (c == ':' && (cpos == 0 || buffer[cpos-1] == c))
 	 || /* special test for 'a style mark references */
 		(cpos > 0
 		&& buffer[cpos-1] == '\''
@@ -267,7 +248,6 @@ int f, n;
 	/* did we get a name? */
 	if (fnp == NULL) {
 		if ((lflag & DFLALL)) { /* no range, no function */
-			mlforce("[No such function]");
 			return FALSE;
 		} else { /* range, no function */
 			cfp = &f_gomark;

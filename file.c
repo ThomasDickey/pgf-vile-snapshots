@@ -5,41 +5,7 @@
  *	reading and writing of the disk are in "fileio.c".
  *
  *
- * $Log: file.c,v $
- * Revision 1.128  1994/04/22 14:34:15  pgf
- * changed BAD and GOOD to BADEXIT and GOODEXIT
- *
- * Revision 1.127  1994/04/22  13:49:00  pgf
- * read and write hooks
- *
- * Revision 1.126  1994/04/18  14:26:27  pgf
- * merge of OS2 port patches, and changes to tungetc operation
- *
- * Revision 1.125  1994/04/13  20:46:38  pgf
- * various fixes (towards 4.4) from kev
- *
- * Revision 1.124  1994/04/07  18:13:56  pgf
- * beep management
- *
- * Revision 1.123  1994/04/05  14:04:02  pgf
- * added "view-on-readonly" mode
- *
- * Revision 1.122  1994/04/01  10:47:10  pgf
- * don't just return on FIOERR in readin -- the rest of the routine needs
- * to run, to set cmode correctly, for example
- *
- * Revision 1.121  1994/03/23  12:57:57  pgf
- * rationalized use of mlerror() and FIOERR.  now, the function that
- * first generates FIOERR is guaranteed to have put out a message, probably
- * via mlerror.
- *
- * Revision 1.120  1994/02/22  18:09:24  pgf
- * when choosing dos-mode for an ambiguous buffer, vote in favor of on
- * if the global mode is set, and we're running on DOS.  otherwise, choose
- * no-dos-mode.
- *
- * Revision 1.119  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
+ * $Header: /usr/build/VCS/pgf-vile/RCS/file.c,v 1.131 1994/07/11 22:56:20 pgf Exp $
  *
  */
 
@@ -55,7 +21,7 @@ static	int	getfile2 P(( char *, int ));
 #if DOSFILES
 static	void	guess_dosmode P(( BUFFER * ));
 /* give DOS the benefit of the doubt on ambiguous files */
-# if MSDOS
+# if MSDOS || WIN31
 #  define MORETHAN >=
 # else
 #  define MORETHAN >
@@ -642,7 +608,7 @@ int	mflg;		/* print messages? */
 #if OPT_WORKING
 		max_working = cur_working = old_working = 0;
 #endif
-#if ! MSDOS && !OPT_MAP_MEMORY
+#if ! (MSDOS||WIN31) && !OPT_MAP_MEMORY
 		if (fileispipe || (s = quickreadf(bp, &nline)) == FIOMEM)
 #endif
 			s = slowreadf(bp, &nline);
@@ -715,7 +681,7 @@ int	mflg;		/* print messages? */
 	return (s != FIOERR);
 }
 
-#if ! MSDOS && !OPT_MAP_MEMORY
+#if ! (MSDOS || WIN31) && !OPT_MAP_MEMORY
 int
 quickreadf(bp, nlinep)
 register BUFFER *bp;
@@ -889,7 +855,7 @@ int *nlinep;
 	int	doslines = 0,
 		unixlines = 0;
 #endif
-#if UNIX || MSDOS || OS2	/* i.e., we can read from a pipe */
+#if UNIX || MSDOS || WIN31 || OS2 || NT	/* i.e., we can read from a pipe */
 	int	flag = 0;
 	int	done_update = FALSE;
 #endif
@@ -916,7 +882,7 @@ int *nlinep;
                         s = FIOMEM;             /* Keep message on the  */
                         break;                  /* display.             */
                 } 
-#if UNIX || MSDOS || OS2
+#if UNIX || MSDOS || WIN31 || OS2 || NT
 		else {
                 	/* reading from a pipe, and internal? */
 			if (slowtime(&last_updated)) {
@@ -1032,8 +998,8 @@ char    fname[];
 	fcp = &fname[strlen(fname)];
 	/* trim trailing whitespace */
 	while (fcp != fname && (isblank(fcp[-1])
-#if UNIX || MSDOS || OS2 /* trim trailing slashes as well */
-					 || slashc(fcp[-1])
+#if UNIX || MSDOS || WIN31 || OS2 || NT /* trim trailing slashes as well */
+					 || is_slashc(fcp[-1])
 #endif
 							) )
                 *(--fcp) = EOS;
@@ -1042,7 +1008,7 @@ char    fname[];
 	while (isblank(*fcp))
 		fcp++;
 
-#if     UNIX || MSDOS || VMS || OS2
+#if     UNIX || MSDOS || WIN31 || VMS || OS2 || NT
 	bcp = bname;
 	if (isShellOrPipe(fcp)) { 
 		/* ...it's a shell command; bname is first word */
@@ -1082,7 +1048,7 @@ char    fname[];
 
 	bcp = fcp + strlen(fcp);
 #if     AMIGA || ST520
-	while (bcp!=fcp && bcp[-1]!=':' && !slashc(bcp[-1]))
+	while (bcp!=fcp && bcp[-1]!=':' && !is_slashc(bcp[-1]))
                 --bcp;
 #endif
 #if     CPM

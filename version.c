@@ -1,28 +1,7 @@
 /*
  * version & usage-messages for vile
  *
- * $Log: version.c,v $
- * Revision 1.12  1994/04/27 11:22:50  pgf
- * changes for  and
- *
- * Revision 1.11  1994/04/22  14:34:15  pgf
- * changed BAD and GOOD to BADEXIT and GOODEXIT
- *
- * Revision 1.10  1994/04/20  19:54:50  pgf
- * changes to support 'BORLAND' console i/o screen driver
- *
- * Revision 1.9  1994/04/18  14:26:27  pgf
- * merge of OS2 port patches, and changes to tungetc operation
- *
- * Revision 1.8  1994/02/25  12:08:54  pgf
- * removed rows/columns options
- *
- * Revision 1.7  1994/02/23  05:31:03  pgf
- * x options up to date
- *
- * Revision 1.6  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
- *
+ * $Header: /usr/build/VCS/pgf-vile/RCS/version.c,v 1.14 1994/07/11 22:56:20 pgf Exp $
  *
  */
 
@@ -31,7 +10,6 @@
 
 #if UNIX || VMS
 #include <sys/stat.h>		/* ...for 'struct stat' */
-#include <time.h>		/* ...for 'ctime()' */
 #endif
 
 extern char *pathname[];	/* startup file path/name array */

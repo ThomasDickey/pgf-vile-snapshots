@@ -13,12 +13,7 @@
  * by Tom Dickey, 1993.    -pgf
  *
  *
- * $Log: mktbls.c,v $
- * Revision 1.48  1994/04/22 14:34:15  pgf
- * changed BAD and GOOD to BADEXIT and GOODEXIT
- *
- * Revision 1.47  1994/02/22  11:03:15  pgf
- * truncated RCS log for 4.0
+ * $Header: /usr/build/VCS/pgf-vile/RCS/mktbls.c,v 1.51 1994/07/11 22:56:20 pgf Exp $
  *
  */
 
@@ -26,36 +21,40 @@
 
 /* stuff borrowed/adapted from estruct.h */
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+# if defined(__STDC__)
+#   define ANSI_PROTOS 1
+# else
+#   define ANSI_PROTOS 0
+# endif
+#else	/* !defined(HAVE_CONFIG_H) */
+
 /* Note: VAX-C doesn't recognize continuation-line in ifdef lines */
-#ifdef vms
-# define HAS_STDLIB_H 1
-# define ANSI_PROTOS  1
-#endif
+# ifdef vms
+#  define HAVE_STDLIB_H 1
+#  define ANSI_PROTOS  1
+# endif
 
 	/* pc-stuff */
-#if defined(__TURBOC__) || defined(__WATCOMC__) || defined(__GO32__)
-# define HAS_STDLIB_H 1
-# define ANSI_PROTOS  1
-#endif
+# if defined(__TURBOC__) || defined(__WATCOMC__) || defined(__GO32__)
+#  define HAVE_STDLIB_H 1
+#  define ANSI_PROTOS  1
+# endif
 
 	/* unix-stuff */
-#if (defined(__GNUC__) && (defined(apollo) || defined(sun) || defined(__hpux) || defined(linux)))
-# define HAS_STDLIB_H 1
-# define ANSI_PROTOS  1
-#endif
+# if (defined(__GNUC__) && (defined(apollo) || defined(sun) || defined(__hpux) || defined(linux)))
+#  define HAVE_STDLIB_H 1
+#  define ANSI_PROTOS  1
+# endif
+#endif	/* !defined(HAVE_CONFIG_H) */
 
-#ifndef HAS_STDLIB_H
-# define HAS_STDLIB_H 0
+#ifndef HAVE_STDLIB_H
+# define HAVE_STDLIB_H 0
 #endif
 
 #ifndef ANSI_PROTOS
 # define ANSI_PROTOS 0
-#endif
-
-#if HAS_STDLIB_H
-#include <stdlib.h>
-#else
-extern char *malloc();
 #endif
 
 #if ANSI_PROTOS
@@ -64,9 +63,38 @@ extern char *malloc();
 #define P(param) ()
 #endif
 
+#if HAVE_STDLIB_H
+#include <stdlib.h>
+#else
+# if !defined(HAVE_CONFIG_H) || MISSING_EXTERN_MALLOC
+extern	char *	malloc	P(( unsigned int ));
+# endif
+# if !defined(HAVE_CONFIG_H) || MISSING_EXTERN_FREE
+extern	void	free	P(( char * ));
+# endif
+#endif
+
 /*----------------------------------------------------------------------------*/
+#ifdef	main	/* we're trying to intercept it, e.g., for Windows wrapper */
+#define	ReturnFromMain return
+#endif
+
+#ifndef	ReturnFromMain
+#define ReturnFromMain exit
+#endif
+
+/*----------------------------------------------------------------------------*/
+#ifndef DOALLOC
+#define DOALLOC 0
+#endif
+
+#if DOALLOC
+#include "trace.h"
+#endif
+
 #include <stdio.h>
 #include <string.h>
+#include <setjmp.h>
 
 /* argument for 'exit()' or '_exit()' */
 #if	VMS
@@ -111,15 +139,13 @@ extern char *malloc();
 #define	Fprintf	(void)fprintf
 #define	Sprintf	(void)sprintf
 
-#if defined(lint) || (defined(__GNUC__) && !defined(__GO32__))
-#if !LINUX && defined(__STDC__)		/* this ifdef needs work, clearly */
-extern       int     fprintf(FILE *, const char *, ... );
-#else
-extern       int     fprintf();
+#if MISSING_EXTERN_FPRINTF
+extern	int	fprintf	P(( FILE *, const char *, ... ));
 #endif
-#endif /* lint || __GNUC__ */
 
 #define	SaveEndif(head)	InsertOnEnd(&head, "#endif")
+
+#define	FreeIfNeeded(p) if (p != 0) { free(p); p = 0; }
 
 /*--------------------------------------------------------------------------*/
 
@@ -131,6 +157,8 @@ typedef	struct stringl {
 	char *Note;	/* stores comment, if any */
 	struct stringl *nst;
 } LIST;
+
+static	char	*Blank = "";
 
 static	LIST	*all_names,
 		*all_funcs,	/* data for extern-lines in nefunc.h */
@@ -147,6 +175,7 @@ static	LIST	*all_names,
 static	int	isspace P((int));
 static	int	isprint P((int));
 
+static	char *	Alloc P((unsigned));
 static	char *	StrAlloc P((char *));
 static	LIST *	ListAlloc P((void));
 
@@ -164,6 +193,7 @@ static	char *	formcond P((char *, char *));
 static	int	LastCol P((char *));
 static	char *	PadTo P((int, char *));
 static	int	two_conds P((int, int, char *));
+static	void	set_binding P((int, int, char *, char *));
 static	int	Parse P((char *, char **));
 
 static	void	BeginIf P((void));
@@ -237,6 +267,7 @@ static	char *inputfile;
 static	int l = 0;
 static	FILE *nebind, *nefunc, *nename, *cmdtbl;
 static	FILE *nevars, *nemode;
+static	jmp_buf my_top;
 
 /******************************************************************************/
 static int
@@ -255,16 +286,26 @@ int c;
 
 /******************************************************************************/
 static char *
+Alloc(len)
+unsigned len;
+{
+	char	*pointer = malloc(len);
+	if (pointer == 0)
+		badfmt("bug: not enough memory");
+        return pointer;
+}
+
+static char *
 StrAlloc(s)
 char	*s;
 {
-	return strcpy(malloc((unsigned)strlen(s)+1), s);
+	return strcpy(Alloc((unsigned)strlen(s)+1), s);
 }
 
 static LIST *
 ListAlloc()
 {
-	return (LIST *)malloc(sizeof(LIST));
+	return (LIST *)Alloc(sizeof(LIST));
 }
 
 /******************************************************************************/
@@ -274,7 +315,7 @@ char *s;
 {
 	Fprintf(stderr,"\"%s\", line %d: bad format:", inputfile, l);
 	Fprintf(stderr,"\t%s\n",s);
-	exit(BADEXIT);
+	longjmp(my_top,1);
 }
 
 static void
@@ -312,7 +353,7 @@ char	**argv;
 
 	if ((fp = fopen(name, "w")) == 0) {
 		Fprintf(stderr,"mktbls: couldn't open header file %s\n", name);
-		exit(BADEXIT);
+		longjmp(my_top,1);
 	}
 	Fprintf(fp, progcreat, name, argv[0], argv[1]);
 	return fp;
@@ -360,9 +401,10 @@ char	*name;
 
 	n = ListAlloc();
 	n->Name = StrAlloc(name);
-	n->Func = "";
-	n->Cond = "";
-	n->Note = "";
+	n->Func = Blank;
+	n->Data = Blank;
+	n->Cond = Blank;
+	n->Note = Blank;
 
 	for (p = *headp, q = 0; p != 0; q = p, p = p->nst)
 		;
@@ -451,6 +493,21 @@ char *cond;
 	return (cond[0] != 0 &&
 		conditions[btype][c] != NULL &&
 		strcmp(cond, conditions[btype][c]) != 0);
+}
+
+static void
+set_binding (btype, c, cond, func)
+int	btype;
+int	c;
+char *	cond;
+char *	func;
+{
+	if (bindings[btype][c] != NULL) {
+		free(bindings[btype][c]);
+		if (!two_conds(btype,c,cond))
+			badfmt("duplicate key binding");
+	}
+	bindings[btype][c] = StrAlloc(func);
 }
 
 /******************************************************************************/
@@ -608,7 +665,7 @@ char	*type, *name, *cond;
 	int	c;
 	char	*abbrev = AbbrevMode(name),
 		*normal = NormalMode(name),
-		*tmp = malloc((unsigned)(4 + strlen(normal) + strlen(abbrev)));
+		*tmp = Alloc((unsigned)(4 + strlen(normal) + strlen(abbrev)));
 
 	CheckModes(normal);
 	CheckModes(abbrev);
@@ -624,6 +681,10 @@ char	*type, *name, *cond;
 	save_all_modes(type, normal, abbrev, cond);
 
 	(void)sprintf(tmp, "%s\n%c\n%s", normal, c, abbrev);
+#if NO_LEAKS
+	free(normal);
+	free(abbrev);
+#endif
 	return tmp;
 }
 
@@ -637,11 +698,11 @@ char	*name;
 
 	/* allocate enough for adjustment in 'Name2Address()' */
 	/*   "+ 10" for comfort */
-	base = dst = malloc((unsigned)(strlen(name) + 10));
+	base = dst = Alloc((unsigned)(strlen(name) + 10));
 
 	*dst++ = 's';
 	*dst++ = '_';
-	while ((c = *name++) != 0) {
+	while ((c = *name++) != EOS) {
 		if (c == '-')
 			c = '_';
 		*dst++ = c;
@@ -659,10 +720,14 @@ char	*name;
 char	*type;
 {
 	/*  "+ 10" for comfort */
-	char	*base = malloc((unsigned)(strlen(name) + 10));
+        unsigned len = strlen(name) + 10;
+	char	*base = Alloc(len);
 	char	*temp;
 
 	temp = Name2Symbol(name);
+	if (strlen(temp) + 1 + ((*type == 'b') ? 4 : 0) > len)
+        	badfmt("bug: buffer overflow in Name2Address");
+
 	(void)strcpy(base, temp);
 	if (*type == 'b')
 		(void)strcat(strcat(strcpy(base+2, "no"), temp+2), "+2");
@@ -845,6 +910,7 @@ dump_all_modes()
 		"static char",
 		};
 	static	char	*middle[] = {
+		"\ts_NULL[] = \"\";",
 		"#endif /* realdef */",
 		"",
 		"#ifdef realdef",
@@ -871,11 +937,10 @@ dump_all_modes()
 #if OPT_IFDEF_MODES
 			WriteIf(nemode, p->Cond);
 #endif
-			Sprintf(temp, "\t%s[]", s = Name2Symbol(p->Name));
+			Sprintf(temp, "\t%s[]",	s = Name2Symbol(p->Name));
 			(void)PadTo(32, temp);
 			free(s);
-			Sprintf(temp+strlen(temp), "= \"%s\"%c",
-				p->Name, (q != 0) ? ',' : ';');
+			Sprintf(temp+strlen(temp), "= \"%s\",", p->Name);
 			(void)PadTo(64, temp);
 			Fprintf(nemode, "%s/* %s */\n", temp, p->Func);
 		}
@@ -928,28 +993,23 @@ char *s, *func, *cond;
 		if (c >= LEN_CHRSET)
 			badfmt("octal character too big");
 		c |= highbit;
-		if (bindings[btype][c] != NULL && !two_conds(btype,c,cond))
-			badfmt("duplicate key binding");
-		bindings[btype][c] = StrAlloc(func);
+		set_binding(btype, c, cond, func);
 	} else if (*s == '^' && (c = *(s+1)) != EOS) { /* a control char? */
 		if (c > 'a' &&  c < 'z')
 			c = toupper(c);
 		c = tocntrl(c);
 		c |= highbit;
-		if (bindings[btype][c] != NULL && !two_conds(btype,c,cond))
-			badfmt("duplicate key binding");
-		bindings[btype][c] = StrAlloc(func);
+		set_binding(btype, c, cond, func);
 		s += 2;
 	} else if ((c = *s) != 0) {
 		c |= highbit;
-		if (bindings[btype][c] != NULL && !two_conds(btype,c,cond))
-			badfmt("duplicate key binding");
-		bindings[btype][c] = StrAlloc(func);
+		set_binding(btype, c, cond, func);
 		s++;
 	} else {
 		badfmt("getting binding");
 	}
 	if (cond[0]) {
+		FreeIfNeeded(conditions[btype][c]);
 		conditions[btype][c] = StrAlloc(cond);
 	} else {
 		conditions[btype][c] = NULL;
@@ -1043,7 +1103,11 @@ save_bmodes(type, vec)
 char	*type;
 char	**vec;
 {
-	InsertSorted(&all_bmodes, Mode2Key(type,vec[1],vec[4]), vec[2], vec[3], vec[4], vec[0]);
+	char *key = Mode2Key(type, vec[1], vec[4]);
+	InsertSorted(&all_bmodes, key, vec[2], vec[3], vec[4], vec[0]);
+#if NO_LEAKS
+	free(key);
+#endif
 }
 
 static void
@@ -1246,7 +1310,11 @@ save_gmodes(type, vec)
 char	*type;
 char	**vec;
 {
-	InsertSorted(&all_gmodes, Mode2Key(type,vec[1],vec[4]), vec[2], vec[3], vec[4], vec[0]);
+	char *key = Mode2Key(type, vec[1], vec[4]);
+	InsertSorted(&all_gmodes, key, vec[2], vec[3], vec[4], vec[0]);
+#if NO_LEAKS
+	free(key);
+#endif
 }
 
 static void
@@ -1392,7 +1460,11 @@ save_wmodes(type, vec)
 char	*type;
 char	**vec;
 {
-	InsertSorted(&all_wmodes, Mode2Key(type,vec[1],vec[4]), vec[2], vec[3], vec[4], vec[0]);
+	char *key = Mode2Key(type,vec[1],vec[4]);
+	InsertSorted(&all_wmodes, key, vec[2], vec[3], vec[4], vec[0]);
+#if NO_LEAKS
+	free(key);
+#endif
 }
 
 static void
@@ -1433,6 +1505,62 @@ dump_wmodes()
 }
 
 /******************************************************************************/
+#if NO_LEAKS
+static	void	free_LIST P((LIST **));
+static	void	free_mktbls P((void));
+
+static void
+free_LIST (p)
+LIST **p;
+{
+	LIST	*q;
+
+	while ((q = *p) != 0) {
+		*p = q->nst;
+		if (q->Name != Blank) FreeIfNeeded(q->Name);
+		if (q->Func != Blank) FreeIfNeeded(q->Func);
+		if (q->Data != Blank) FreeIfNeeded(q->Data);
+		if (q->Cond != Blank) FreeIfNeeded(q->Cond);
+		if (q->Note != Blank) FreeIfNeeded(q->Note);
+		free((char *)q);
+	}
+}
+
+/*
+ * Free all memory allocated within 'mktbls'. This is used both for debugging
+ * as well as for allowing 'mktbls' to be an application procedure that is
+ * repeatedly invoked from a GUI.
+ */
+static void
+free_mktbls ()
+{
+	register int j, k;
+
+	free_LIST(&all_names);
+	free_LIST(&all_funcs);
+	free_LIST(&all__FUNCs);
+	free_LIST(&all_envars);
+	free_LIST(&all_ufuncs);
+	free_LIST(&all_modes);
+	free_LIST(&all_gmodes);
+	free_LIST(&all_bmodes);
+	free_LIST(&all_wmodes);
+
+	for (j = 0; j < MAX_BIND; j++) {
+		for (k = 0; k < LEN_CHRSET; k++) {
+			FreeIfNeeded(bindings[j][k]);
+			FreeIfNeeded(conditions[j][k]);
+		}
+	}
+#if DOALLOC
+	show_alloc();
+#endif
+}
+#else
+#define free_mktbls()
+#endif	/* NO_LEAKS */
+
+/******************************************************************************/
 int
 main(argc, argv)
 int	argc;
@@ -1447,14 +1575,17 @@ char    *argv[];
 	int section = SECT_CMDS;
 	int r;
 
+	if (setjmp(my_top))
+		ReturnFromMain(BADEXIT);
+
 	if (argc != 2) {
 		Fprintf(stderr, "usage: mktbls cmd-file\n");
-		exit(BADEXIT);
+		longjmp(my_top,1);
 	}
 
 	if ((cmdtbl = fopen(inputfile = argv[1],"r")) == NULL ) {
 		Fprintf(stderr,"mktbls: couldn't open cmd-file\n");
-		exit(BADEXIT);
+		longjmp(my_top,1);
 	}
 
 	*old_fcond = EOS;
@@ -1619,6 +1750,7 @@ char    *argv[];
 		dump_bmodes();
 	}
 
-	return(GOODEXIT);
+	free_mktbls();
+	ReturnFromMain(GOODEXIT);
 	/*NOTREACHED*/
 }

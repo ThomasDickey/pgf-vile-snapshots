@@ -3,10 +3,7 @@
  *	here to support the globals() function.  They now work on regions.
  *	Written (except for delins()) for vile by Paul Fox, (c)1990
  *
- * $Log: oneliner.c,v $
- * Revision 1.59  1994/02/22 11:03:15  pgf
- * truncated RCS log for 4.0
- *
+ * $Header: /usr/build/VCS/pgf-vile/RCS/oneliner.c,v 1.61 1994/07/11 22:56:20 pgf Exp $
  */
 
 #include	"estruct.h"
@@ -294,7 +291,7 @@ int nth_occur, printit, globally, *confirmp;
 		return FALSE;
 	}
 
-	ignorecase = b_val(curwp->w_bufp, MDIGNCASE);
+	ignorecase = window_b_val(curwp, MDIGNCASE);
 
 	foundit = FALSE;
 	scanboundpos.l = DOT.l;
