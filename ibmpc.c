@@ -10,7 +10,10 @@
  * display type.
  *
  * $Log: ibmpc.c,v $
- * Revision 1.20  1993/07/09 19:11:48  pgf
+ * Revision 1.21  1993/07/27 18:06:20  pgf
+ * see tom's 3.56 CHANGES entry
+ *
+ * Revision 1.20  1993/07/09  19:11:48  pgf
  * fixed typo for watcom
  *
  * Revision 1.19  1993/07/09  14:03:30  pgf
@@ -133,8 +136,6 @@
 #define	White(n)	((n) ? 7 : 0)
 #define	AttrMono(f)	(((Black(f) & 7) << 4) | (White(f) & 15))
 
-#define	uchar	unsigned char
-
 static	int	dtype = -1;		/* current display type		*/
 
 	/* scan-line resolution codes */
@@ -152,11 +153,11 @@ static	int	dtype = -1;		/* current display type		*/
 
 static	struct	{
 	char	*name;
-	uchar	type;
-	uchar	mode;
-	uchar	flags;
-	uchar	rows;
-	uchar	cols;
+	UCHAR	type;
+	UCHAR	mode;
+	UCHAR	flags;
+	UCHAR	rows;
+	UCHAR	cols;
 	} drivers[] = {
 		/* the first 4 entries are reserved as synonyms for card-types */
 		{"CGA",    CDCGA,	3,	0,	25,  80},
@@ -187,8 +188,8 @@ static	long	ScreenAddress[] = {
 		SCADE	/* CDVGA: VGA adapter */
 	};
 
-unsigned short *scptr[NROW];		/* pointer to screen lines	*/
-unsigned short sline[NCOL];		/* screen line image		*/
+USHORT *scptr[NROW];			/* pointer to screen lines	*/
+USHORT sline[NCOL];			/* screen line image		*/
 extern union REGS rg;			/* cpu register for use of DOS calls */
 
 static	int	original_mode	= -1,
@@ -526,7 +527,7 @@ int n;		/* type of adapter to init for */
 {
 	union {
 		long laddr;		/* long form of address */
-		unsigned short *paddr;	/* pointer form of address */
+		USHORT *paddr;		/* pointer form of address */
 	} addr;
 	register int i;
 	int	     type;
@@ -682,8 +683,8 @@ char *outstr;	/* string to write out (must be term.t_ncol long) */
 int forg;	/* foreground color of string to write */
 int bacg;	/* background color */
 {
-	register unsigned short attr;	/* attribute byte mask to place in RAM */
-	register unsigned short *lnptr;	/* pointer to the destination line */
+	register USHORT attr;	/* attribute byte mask to place in RAM */
+	register USHORT *lnptr;	/* pointer to the destination line */
 	register int i;
 
 	/* build the attribute byte and setup the screen pointer */

@@ -5,7 +5,10 @@
  *	Include this after "estruct.h"
  *
  * $Log: dirstuff.h,v $
- * Revision 1.7  1993/06/25 11:25:55  pgf
+ * Revision 1.8  1993/07/27 18:06:20  pgf
+ * see tom's 3.56 CHANGES entry
+ *
+ * Revision 1.7  1993/06/25  11:25:55  pgf
  * patches for Watcom C/386, from Tuan DANG
  *
  * Revision 1.6  1993/05/06  12:18:06  pgf
@@ -70,7 +73,7 @@
 #define USE_D_NAMLEN 1
 
 typedef struct	{
-	unsigned long d_ino;
+	ULONG	d_ino;
 	short	d_reclen;
 	short	d_namlen;
 	char	d_name[NAM$C_MAXRSS];		/* result: SYS$SEARCH */

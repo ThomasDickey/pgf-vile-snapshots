@@ -2,7 +2,10 @@
  * code by Paul Fox, original algorithm mostly by Julia Harper May, 89
  *
  * $Log: undo.c,v $
- * Revision 1.38  1993/07/15 10:37:58  pgf
+ * Revision 1.39  1993/07/27 18:06:20  pgf
+ * see tom's 3.56 CHANGES entry
+ *
+ * Revision 1.38  1993/07/15  10:37:58  pgf
  * see 3.55 CHANGES
  *
  * Revision 1.37  1993/07/09  19:26:30  pgf
@@ -445,18 +448,17 @@ undo(f,n)
 int f,n;
 {
 	int s;
+	L_NUM	before;
 
 	if (b_val(curbp, MDVIEW))
 		return(rdonly());
 
-	s = undoworker(curbp->b_udstkindx);
-	if (!s)
-		return s;
-
-	curbp->b_udstkindx ^= 1;  /* flip to other stack */
-
-	vverify("undo");
-	
+	before = line_count(curbp);
+	if ((s = undoworker(curbp->b_udstkindx)) == TRUE) {
+		line_report(before);
+		curbp->b_udstkindx ^= 1;  /* flip to other stack */
+		vverify("undo");
+	} 	
 	return s;
 }
 

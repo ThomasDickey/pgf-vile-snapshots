@@ -6,7 +6,10 @@
  * for the display system.
  *
  * $Log: buffer.c,v $
- * Revision 1.71  1993/07/15 10:37:58  pgf
+ * Revision 1.72  1993/07/27 18:06:20  pgf
+ * see tom's 3.56 CHANGES entry
+ *
+ * Revision 1.71  1993/07/15  10:37:58  pgf
  * see 3.55 CHANGES
  *
  * Revision 1.70  1993/07/07  12:31:09  pgf
@@ -764,6 +767,7 @@ int	lockfl;
 			b_set_flags(bp, BFIMPLY);
 			bp->b_active = TRUE;
 			ch_fname(bp, nfname);
+			make_local_b_val(bp,MDNEWLINE);
 			if (curwp != 0 && curwp->w_bufp == curbp) {
 				top = line_no(curbp, curwp->w_line.l);
 				now = line_no(curbp, curwp->w_dot.l);
@@ -777,6 +781,7 @@ int	lockfl;
 						return;
 					}
 				}
+				set_b_val(bp, MDNEWLINE, b_val(savebp,MDNEWLINE));
 			} else
 				readin(fname, lockfl, bp, FALSE);
 
@@ -1339,14 +1344,14 @@ void	makebufflist(iflag,dummy)
 		}
 
 		/* output status flag (e.g., has the file been read in?) */
-		if (!(bp->b_active))
+		if (b_is_scratch(bp))
+			MakeNote('s');
+		else if (!(bp->b_active))
 			MakeNote('u');
 		else if (b_is_implied(bp))
 			MakeNote('a');
 		else if (b_is_invisible(bp))
 			MakeNote('i');
-		else if (b_is_scratch(bp))
-			MakeNote('s');
 		else if (b_is_changed(bp))
 			MakeNote('m');
 		else
@@ -1497,10 +1502,11 @@ char	*text;
 int	len;
 {
 	fast_ptr LINEPTR newlp;
-	fast_ptr LINEPTR nextp = lFORW(prevp);
+	fast_ptr LINEPTR nextp;
 	register LINE *	lp;
 	register int	ntext;
 
+	nextp = lFORW(prevp);
 	ntext = (len < 0) ? strlen(text) : len;
 	newlp = lalloc(ntext, bp);
 	if (same_ptr(newlp, null_ptr))
@@ -1517,6 +1523,8 @@ int	len;
 	/* try to maintain byte/line counts? */
 	if (b_is_counted(bp)) {
 		if (same_ptr(nextp, bp->b_line.l)) {
+			make_local_b_val(bp,MDNEWLINE);
+			set_b_val(bp, MDNEWLINE, TRUE);
 			bp->b_bytecount += (ntext+1);
 			bp->b_linecount += 1;
 #if !SMALLER		/* tradeoff between codesize & data */
@@ -1745,6 +1753,9 @@ BUFFER *bp;
 		lp->l_number = numlines;
 #endif
 	}
+	if (!b_val(bp,MDNEWLINE))
+		numchars--;
+
 	bp->b_bytecount = numchars;
 	bp->b_linecount = numlines;
 	b_set_counted(bp);
@@ -1772,8 +1783,16 @@ register int	flag;
 			updatelistbuffers();
 	}
 	for_each_window(wp)
-		if (wp->w_bufp == bp)
+		if (wp->w_bufp == bp) {
 			wp->w_flag |= flag;
+#ifdef WMDLINEWRAP
+			/* The change may affect the line-height displayed
+			 * on the screen.  Assume the worst-case.
+			 */
+			if ((flag & WFEDIT) && w_val(wp,WMDLINEWRAP))
+				wp->w_flag |= WFHARD;
+#endif
+		}
 }
 
 /*
@@ -1834,14 +1853,20 @@ int f,n;
 			mlforce("\n");
 		}
 	}
-	make_current(oldbp);
-	mlforce("\n");
+	if (count > 0 || status != TRUE) {
+		make_current(oldbp);
+		mlforce("\n");
+	}
 	if (status != TRUE) {
 		pressreturn();
+		sgarbf = TRUE;
 	} else {
+		if (count > 0) {
+			sgarbf = TRUE;
+			(void)update(TRUE);
+		}
 		mlforce("[Wrote %d buffer%s]",count, PLURAL(count));
 	}
-	sgarbf = TRUE;
 	return status;
 }
 

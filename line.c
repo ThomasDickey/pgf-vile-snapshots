@@ -11,7 +11,13 @@
  * which means that the dot and mark values in the buffer headers are nonsense.
  *
  * $Log: line.c,v $
- * Revision 1.48  1993/07/07 16:09:45  pgf
+ * Revision 1.50  1993/07/27 18:06:20  pgf
+ * see tom's 3.56 CHANGES entry
+ *
+ * Revision 1.49  1993/07/21  11:35:21  pgf
+ * make sure chg_buff is called after ldelnewline
+ *
+ * Revision 1.48  1993/07/07  16:09:45  pgf
  * don't move dot until after tagging for undo in linsert/at-end case
  *
  * Revision 1.47  1993/06/24  12:10:52  pgf
@@ -238,6 +244,19 @@ WouldTruncate()
 #endif
 
 /*
+ * Test the 'report' threshold, returning true if the argument is above it.
+ */
+int
+do_report (value)
+L_NUM	value;
+{
+	if (value < 0)
+		value = -value;
+	return (global_g_val(GVAL_REPORT) > 0
+	   &&   global_g_val(GVAL_REPORT) <= value);
+}
+
+/*
  * This routine allocates a block of memory large enough to hold a LINE
  * containing "used" characters. The block is always rounded up a bit. Return
  * a pointer to the new block, or NULL if there isn't any memory left. Print a
@@ -277,6 +296,9 @@ BUFFER *bp;
 		return NULL;
 	}
 	lp->l_size = size;
+#endif
+#if !SMALLER
+	lp->l_number = 0;
 #endif
 	lp->l_used = used;
 	lsetclear(lp);
@@ -323,9 +345,9 @@ ltextfree(lp,bp)
 register LINE *lp;
 register BUFFER *bp;
 {
-	register unsigned char *ltextp;
+	register UCHAR *ltextp;
 
-	ltextp = (unsigned char *)lp->l_text;
+	ltextp = (UCHAR *)lp->l_text;
 	if (ltextp) {
 		if (bp->b_ltext) { /* could it be in the big range? */
 			if (ltextp < bp->b_ltext || ltextp >= bp->b_ltext_end) {
@@ -717,13 +739,17 @@ int kflag;	/* put killed text in kill buffer flag */
 	register int	doto;
 	register int	chunk;
 	register WINDOW *wp;
-	register int i,s;
+	register int i;
+	register int s = TRUE;
+	L_NUM	deleted = 0;
 
-	while (n != 0) {
+	while (n > 0) {
 		dotp = DOT.l;
 		doto = DOT.o;
-		if (same_ptr(dotp, curbp->b_line.l)) /* Hit end of buffer.*/
-			return (FALSE);
+		if (same_ptr(dotp, curbp->b_line.l)) { /* Hit end of buffer.*/
+			s = FALSE;
+			break;
+		}
 		chunk = l_ref(dotp)->l_used-doto; /* Size of chunk.	*/
 		if (chunk > (int)n)
 			chunk = (int)n;
@@ -737,20 +763,25 @@ int kflag;	/* put killed text in kill buffer flag */
 					for (i = 0; i < lLength(nlp) &&
 								s == TRUE; i++)
 						s = kinsert(lGetc(nlp,i));
-					if (s != TRUE)
-						return(FALSE);
 				}
+				if (s != TRUE)
+					break;
 				lremove(curbp, nlp);
+				deleted++;
 				toss_to_undo(nlp);
 				n -= lLength(nlp)+1;
 				nlp = lFORW(dotp);
 			}
+			if (s != TRUE)
+				break;
+			s = ldelnewline();
 			chg_buff(curbp, WFHARD|WFKILLS);
-			if ((s = ldelnewline()) != TRUE)
-				return (s);
+			if (s != TRUE)
+				break;
 			if (kflag && (s = kinsert('\n')) != TRUE)
-				return (s);
+				break;
 			--n;
+			deleted++;
 			continue;
 		}
 		copy_for_undo(DOT.l);
@@ -761,9 +792,11 @@ int kflag;	/* put killed text in kill buffer flag */
 		if (kflag) {		/* Kill?		*/
 			while (cp1 != cp2) {
 				if ((s = kinsert(*cp1)) != TRUE)
-					return (s);
+					break;
 				++cp1;
 			}
+			if (s != TRUE)
+				break;
 			cp1 = l_ref(dotp)->l_text + doto;
 		}
 		while (cp2 != l_ref(dotp)->l_text + l_ref(dotp)->l_used)
@@ -812,7 +845,9 @@ int kflag;	/* put killed text in kill buffer flag */
 		}
 		n -= chunk;
 	}
-	return (TRUE);
+	if (do_report(deleted))
+		mlforce("[%d lines deleted]", deleted);
+	return (s);
 }
 
 /* getctext:	grab and return a string with text from
@@ -865,8 +900,7 @@ char *iline;	/* contents of new line */
  * header line can be thought of as always being a successful operation, even
  * if nothing is done, and this makes the kill buffer work "right". Easy cases
  * can be done by shuffling data around. Hard cases require that lines be moved
- * about in memory. Return FALSE on error and TRUE if all looks ok. Called by
- * "ldelete" only.
+ * about in memory. Return FALSE on error and TRUE if all looks ok.
  */
 int
 ldelnewline()
@@ -1424,7 +1458,7 @@ char *dummy;
 {
 	register KILL	*kp;
 	register int	i, j, c;
-	register unsigned char	*p;
+	register UCHAR	*p;
 	int	any = 0;
 
 	for (i = 0; i < SIZEOF(kbs); i++) {

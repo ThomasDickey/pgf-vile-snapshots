@@ -3,7 +3,10 @@
  *		5/9/86
  *
  * $Log: input.c,v $
- * Revision 1.82  1993/07/15 12:00:00  pgf
+ * Revision 1.83  1993/07/27 18:06:20  pgf
+ * see tom's 3.56 CHANGES entry
+ *
+ * Revision 1.82  1993/07/15  12:00:00  pgf
  * added mlquickask(), which does "raw" single character response queries
  *
  * Revision 1.81  1993/06/29  11:09:47  pgf
@@ -674,7 +677,7 @@ kbd_key()
 
 #if ANSI_SPEC
 
-	if ((unsigned char)c == (unsigned char)RECORDED_ESC) {
+	if ((UCHAR)c == (UCHAR)RECORDED_ESC) {
 		/* if this is being replayed... */
 		/* ...then only look for esc sequences if there's input left */
 		if (get_recorded_char(FALSE) != -1)
@@ -794,11 +797,15 @@ kbd_seq()
 
 /* get a string consisting of inclchartype characters from the current
 	position.  if inclchartype is 0, return everything to eol */
+#if ANSI_PROTOS
+int screen_string (char *buf, int bufn, CMASK inclchartype )
+#else
 int
 screen_string(buf,bufn,inclchartype)
 char *buf;
 int bufn;
 CMASK inclchartype;
+#endif
 {
 	register int i = 0;
 	MARK mk;

@@ -17,7 +17,10 @@
  * ever equalled FALSE.
  * 
  * $Log: isearch.c,v $
- * Revision 1.22  1993/07/01 16:15:54  pgf
+ * Revision 1.23  1993/07/27 18:06:20  pgf
+ * see tom's 3.56 CHANGES entry
+ *
+ * Revision 1.22  1993/07/01  16:15:54  pgf
  * tom's 3.51 changes
  *
  * Revision 1.21  1993/06/18  15:57:06  pgf
@@ -119,7 +122,7 @@ risearch(f, n)
 				/* If error in search: */
 		DOT = curpos;	/* Reset the pointer */
 		curwp->w_flag |= WFMOVE;	/* Say we've moved */
-		update(FALSE);	/* And force an update */
+		(void)update(FALSE);		/* And force an update */
 		mlforce("[I-Search failed]");	/* Say we died */
 		TTbeep();
 		return FALSE;
@@ -148,7 +151,7 @@ fisearch(f, n)
 				/* If error in search: */
 		DOT = curpos;	/* reset */
 		curwp->w_flag |= WFMOVE;	/* Say we've moved */
-		update(FALSE);	/* And force an update */
+		(void)update(FALSE);		/* And force an update */
 		mlforce("[I-Search failed]");	/* Say we died */
 		TTbeep();
 		return FALSE;
@@ -441,7 +444,7 @@ expandp(deststr, srcstr, maxlength)
 	int             maxlength;	/* maximum chars in destination */
 {
 	char	*base = deststr;
-	unsigned char   c;	/* current char to translate */
+	UCHAR   c;	/* current char to translate */
 
 	/*
 	 * Scan through the string.
@@ -512,7 +515,7 @@ get_char()
 	/* We're not re-executing (or aren't any more).  Try for a real char */
 
 	cmd_reexecute = -1;	/* Say we're in real mode again */
-	update(FALSE);		/* Pretty up the screen */
+	(void)update(FALSE);	/* Pretty up the screen */
 	if (cmd_offset >= CMDBUFLEN - 1) {	/* If we're getting too big
 						 * ... */
 		mlforce("[Command too long]");	/* Complain loudly and

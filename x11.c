@@ -2,7 +2,13 @@
  * 	X11 support, Dave Lemke, 11/91
  *
  * $Log: x11.c,v $
- * Revision 1.21  1993/07/15 10:37:58  pgf
+ * Revision 1.23  1993/07/27 18:06:20  pgf
+ * see tom's 3.56 CHANGES entry
+ *
+ * Revision 1.22  1993/07/20  18:09:46  pgf
+ * change order of class and progname lookups for defaults
+ *
+ * Revision 1.21  1993/07/15  10:37:58  pgf
  * see 3.55 CHANGES
  *
  * Revision 1.20  1993/07/08  15:13:21  pgf
@@ -102,7 +108,7 @@
 				 * selections right */
 
 
-#define X_PIXEL unsigned long
+#define X_PIXEL ULONG
 
 /* local screen rep flags */
 #define	CELL_DIRTY	0x1
@@ -141,9 +147,9 @@ typedef struct _text_win {
     Bool        show_cursor;
     int         cur_row,
                 cur_col;
-    unsigned char **sc;		/* what the screen looks like */
-    unsigned char **attr;	/* per-char cell flags */
-    unsigned char *line_attr;	/* pre-line attributes */
+    UCHAR **sc;		/* what the screen looks like */
+    UCHAR **attr;	/* per-char cell flags */
+    UCHAR *line_attr;	/* pre-line attributes */
 
     /* selection stuff */
     Time        lasttime;	/* for multi-click */
@@ -158,7 +164,7 @@ typedef struct _text_win {
     Bool        have_selection;
     Bool        show_selection;
     Atom        sel_prop;
-    unsigned char *selection_data;
+    UCHAR *	selection_data;
     int         selection_len;
 }           TextWindowRec, *TextWindow;
 
@@ -196,7 +202,7 @@ static	DEFINE_SIGNAL(x_quit);
 static	void	change_selection P(( TextWindow, Bool, Bool ));
 static	void	x_stash_selection P(( TextWindow ));
 static	int	set_character_class P(( char * ));
-static	void	x_refresh P(( TextWindow, int, int, unsigned,  unsigned ));
+static	void	x_refresh P(( TextWindow, int, int, unsigned, unsigned ));
 static	void	x_resize_screen P(( TextWindow, unsigned, unsigned ));
 static	void	x_paste_selection P(( TextWindow ));
 static	Bool	x_give_selection P(( TextWindow, XSelectionRequestEvent *, Atom, Atom ));
@@ -214,7 +220,7 @@ static	X_PIXEL	color_value P(( Display *, int, char * ));
 static	char *	any_resource P(( Display *, char * ));
 static	void	x_get_defaults P(( Display *, int ));
 static	void	wait_for_scroll P(( TextWindow ));
-static	void	flush_line P(( unsigned char *, int, Bool, int, int ));
+static	void	flush_line P(( UCHAR *, int, Bool, int, int ));
 static	int	set_character_class_range P(( int, int, int ));
 static	void	x_lose_selection P(( TextWindow ));
 static	void	x_get_selection P(( TextWindow, Atom, Atom, char *, SIZE_T, int ));
@@ -448,9 +454,9 @@ x_resize_screen(tw, rows, cols)
 	}
 	tw->rows = rows;
 	/* allocate screen */
-	tw->sc   = typeallocn(unsigned char *, tw->rows);
-	tw->attr = typeallocn(unsigned char *, tw->rows);
-	tw->line_attr = typeallocn(unsigned char, tw->rows);
+	tw->sc   = typeallocn(UCHAR *, tw->rows);
+	tw->attr = typeallocn(UCHAR *, tw->rows);
+	tw->line_attr = typeallocn(UCHAR, tw->rows);
     }
     tw->cols = cols;
     if (tw->cur_col >= tw->cols)
@@ -462,8 +468,8 @@ x_resize_screen(tw, rows, cols)
     }
     /* init it */
     for (r = 0; r < tw->rows; r++) {
-	tw->sc[r] = typeallocn(unsigned char, tw->cols);
-	tw->attr[r] = typeallocn(unsigned char, tw->cols);
+	tw->sc[r] = typeallocn(UCHAR, tw->cols);
+	tw->attr[r] = typeallocn(UCHAR, tw->cols);
 	if (!tw->sc[r] || !tw->attr[r]) {
 	    (void)fprintf(stderr, "couldn't allocate memory for screen\n");
 	    ExitProgram(BAD(-1));
@@ -501,8 +507,8 @@ any_resource(disp, name)
 {
 	register char *it;
 
-	if ((it = XGetDefault(disp, MY_CLASS, name)) == 0)
-		it = XGetDefault(disp, progname, name);
+	if ((it = XGetDefault(disp, progname, name)) == 0)
+		it = XGetDefault(disp, MY_CLASS, name);
 	return it;
 }
 
@@ -549,9 +555,9 @@ x_open()
     int         screen;
     XFontStruct *pfont;
     XGCValues   gcvals;
-    unsigned long gcmask;
+    ULONG	gcmask;
     XSetWindowAttributes swat;
-    unsigned long winmask;
+    ULONG	winmask;
     XSizeHints  xsh;
     XWMHints    xwmh;
     int         flags;
@@ -880,11 +886,11 @@ x_scroll(from, to, count)
 
 static void
 flush_line(text, len, rev, sr, sc)
-    unsigned char *text;
-    int         len;
-    Bool        rev;
-    int         sr,
-                sc;
+UCHAR	*text;
+int	len;
+Bool	rev;
+int	sr;
+int	sc;
 {
 	GC	fore_gc = ( rev ? cur_win->reversegc : cur_win->textgc);
 	GC	back_gc = (!rev ? cur_win->reversegc : cur_win->textgc);
@@ -958,7 +964,7 @@ clear_line(row, start, count)
 static void
 x_flush()
 {
-    unsigned char *start;
+    UCHAR *	start;
     int         len;
     int         r,
                 c;
@@ -1537,8 +1543,8 @@ static void
 x_stash_selection(tw)
     TextWindow  tw;
 {
-    unsigned char *data,
-               *dp;
+    UCHAR	*data;
+    UCHAR	*dp;
     int         r;
     int         length = 0;
     int         start,
@@ -1552,7 +1558,7 @@ x_stash_selection(tw)
     }
     if (tw->sel_start_row == tw->sel_end_row) {
 	length = tw->sel_end_col - tw->sel_start_col + 1;
-	data = castalloc(unsigned char, length);
+	data = castalloc(UCHAR, length);
 	if (!data)
 	    return;
 	(void)memcpy(
@@ -1567,7 +1573,7 @@ x_stash_selection(tw)
 	    length += end - start + 2;	/* add CR */
 	    start = 0;
 	}
-	dp = data = castalloc(unsigned char, length);
+	dp = data = castalloc(UCHAR, length);
 	if (!data)
 	    return;
 	tw->selection_len = length;
@@ -1688,7 +1694,7 @@ multi_click(tw, nr, nc)
     int         nr,
                 nc;
 {
-    unsigned char *p;
+    UCHAR	*p;
     int         sc;
     int         cclass;
 
@@ -1835,11 +1841,11 @@ x_process_event(ev)
 	    x_get_selection(cur_win, ev->xselection.selection,
 			    None, (char *) 0, 0, 8);
 	} else {
-	    unsigned long bytesafter;
-	    unsigned long length;
+	    ULONG	bytesafter;
+	    ULONG	length;
 	    int         format;
 	    Atom        type;
-	    unsigned char *value;
+	    UCHAR	*value;
 
 	    (void) XGetWindowProperty(dpy, cur_win->win,
 				      ev->xselection.property,

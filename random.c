@@ -3,7 +3,10 @@
  * commands. There is no functional grouping here, for sure.
  *
  * $Log: random.c,v $
- * Revision 1.101  1993/07/06 16:39:04  pgf
+ * Revision 1.102  1993/07/27 18:06:20  pgf
+ * see tom's 3.56 CHANGES entry
+ *
+ * Revision 1.101  1993/07/06  16:39:04  pgf
  * integrated Tuan DANG's changes for the djgpp compiler under DOS
  *
  * Revision 1.100  1993/07/06  12:33:47  pgf
@@ -497,6 +500,9 @@ int f,n;
 		numchars += llength(lp) + 1;
 	}
 
+	if (!b_val(curbp,MDNEWLINE))
+		numchars--;
+
 	/* if at end of file, record it */
 	if (is_header_line(DOT,curbp)) {
 		predlines = numlines;
@@ -527,17 +533,43 @@ int
 showlength(f,n)
 int f,n;
 {
+	mlforce("%d", line_count(curbp));
+	return TRUE;
+}
+
+void
+line_report(before)
+L_NUM	before;
+{
+	L_NUM	after = line_count(curbp);
+
+	if (do_report(before-after)) {
+		if (before > after)
+			mlforce("[%d fewer lines]", before - after);
+		else
+			mlforce("[%d more lines]", after - before);
+	}
+}
+
+L_NUM
+line_count(the_buffer)
+BUFFER *the_buffer;
+{
+#if !SMALLER
+	(void)bsizes(the_buffer);
+	return the_buffer->b_linecount;
+#else
 	register LINE	*lp;		/* current line */
-	register int	numlines = 0;	/* # of lines in file */
+	register L_NUM	numlines = 0;	/* # of lines in file */
 
 	for_each_line(lp, curbp)
 		++numlines;
 
-	mlforce("%d",numlines);
-	return TRUE;
+	return numlines;
+#endif
 }
 
-int
+L_NUM
 line_no(the_buffer, the_line)	/* return the number of the given line */
 BUFFER *the_buffer;
 LINEPTR the_line;
@@ -547,7 +579,7 @@ LINEPTR the_line;
 	return l_ref(the_line)->l_number;
 #else
 	register LINE	*lp;		/* current line */
-	register int	numlines = 0;	/* # of lines before point */
+	register L_NUM	numlines = 0;	/* # of lines before point */
 
 	for_each_line(lp, the_buffer) {
 		/* if we are on the specified line, record it */
@@ -562,7 +594,7 @@ LINEPTR the_line;
 }
 
 #if ! SMALLER
-int
+L_NUM
 getcline()	/* get the current line number */
 {
 	return line_no(curbp, DOT.l);
@@ -946,7 +978,7 @@ int
 clrmes(f, n)
 int f, n;	/* arguments ignored */
 {
-	mlforce("");
+	mlerase();
 	return(TRUE);
 }
 

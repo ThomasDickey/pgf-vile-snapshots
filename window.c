@@ -3,7 +3,10 @@
  * attached to keys that the user actually types.
  *
  * $Log: window.c,v $
- * Revision 1.28  1993/07/01 16:15:54  pgf
+ * Revision 1.29  1993/07/27 18:06:20  pgf
+ * see tom's 3.56 CHANGES entry
+ *
+ * Revision 1.28  1993/07/01  16:15:54  pgf
  * tom's 3.51 changes
  *
  * Revision 1.27  1993/06/18  15:57:06  pgf
@@ -107,6 +110,8 @@ overlay	"window"
 
 static	void	unlink_window P(( WINDOW * ));
 static	int	SetCurrentWindow P(( WINDOW * ));
+static	LINEPTR	adjust_forw P(( WINDOW *, LINEPTR, int ));
+static	LINEPTR	adjust_back P(( WINDOW *, LINEPTR, int ));
 
 /*--------------------------------------------------------------------------*/
 
@@ -141,6 +146,44 @@ WINDOW	*wp;
 	upmode();
 	updatelistbuffers();
 	return (TRUE);
+}
+
+/*
+ * Adjust a LINEPTR forward by the given number of screen-rows, limited by
+ * the end of the buffer.
+ */
+static LINEPTR
+adjust_forw(wp, lp, n)
+WINDOW	*wp;
+LINEPTR	lp;
+int	n;
+{
+	register int i;
+	for (i = n; i > 0 && !same_ptr(lp, wp->w_bufp->b_line.l); ) {
+		if ((i -= line_height(wp, lp)) < 0)
+			break;
+		lp = lFORW(lp);
+	}
+	return lp;
+}
+
+/*
+ * Adjust a LINEPTR backward by the given number of screen-rows, limited by
+ * the end of the buffer.
+ */
+static LINEPTR
+adjust_back(wp, lp, n)
+WINDOW	*wp;
+LINEPTR	lp;
+int	n;
+{
+	register int i;
+	for (i = n; i > 0 && !same_ptr(lp, wp->w_bufp->b_line.l); ) {
+		if ((i -= line_height(wp, lp)) < 0)
+			break;
+		lp = lBACK(lp);
+	}
+	return lp;
 }
 
 /*
@@ -335,12 +378,13 @@ int f,n;
 	curwp->w_flag |= WFHARD | WFMODE;
 
 	/* is it still in the window */
-	for (i = 0; i < curwp->w_ntrows; ++i) {
-		if (lp == l_ref(curwp->w_dot.l))
+	for (i = 0; i < curwp->w_ntrows; lp = lforw(lp)) {
+		if ((i += line_height(curwp,l_ptr(lp))) > curwp->w_ntrows)
+			break;
+		if (lp == l_ref(DOT.l))
 			return (TRUE);
 		if (lforw(lp) == l_ref(curbp->b_line.l))
 			break;
-		lp = lforw(lp);
 	}
 	/*
 	 * now lp is either just past the window bottom, or it's the last
@@ -352,10 +396,10 @@ int f,n;
 		curgoal = getccol(FALSE);
 
 	if (was_n < 0)
-		curwp->w_dot.l = curwp->w_line.l;
+		DOT.l = curwp->w_line.l;
 	else
-		curwp->w_dot.l = l_ptr(lback(lp));
-	curwp->w_dot.o = getgoal(l_ref(curwp->w_dot.l));
+		DOT.l = l_ptr(lback(lp));
+	DOT.o = getgoal(l_ref(DOT.l));
 	return (TRUE);
 }
 
@@ -383,16 +427,12 @@ int
 mvrightwind(f,n)
 int f,n;
 {
-	int move;
-
-	if (f)
-		move = n;
-	else
-		move = term.t_ncol/2;
+	if (!f)
+		n = term.t_ncol/2;
 
 	make_local_w_val(curwp,WVAL_SIDEWAYS);
 
-	w_val(curwp, WVAL_SIDEWAYS) += move;
+	w_val(curwp, WVAL_SIDEWAYS) += n;
 
         curwp->w_flag  |= WFHARD|WFMOVE|WFMODE;
 
@@ -403,13 +443,14 @@ int
 mvleftwind(f,n)
 int f,n;
 {
-	int	original;
+	int	original = w_val(curwp,WVAL_SIDEWAYS);
+
 	make_local_w_val(curwp,WVAL_SIDEWAYS);
-	original = w_val(curwp,WVAL_SIDEWAYS);
-	if (f)
-		w_val(curwp, WVAL_SIDEWAYS) -= n;
-	else
-		w_val(curwp, WVAL_SIDEWAYS) -= term.t_ncol/2;
+
+	if (!f)
+		n = term.t_ncol/2;
+
+	w_val(curwp, WVAL_SIDEWAYS) -= n;
 
 	if (w_val(curwp, WVAL_SIDEWAYS) < 0) {
 		if (original == 0)
@@ -435,8 +476,6 @@ onlywind(f, n)
 int f,n;
 {
         register WINDOW *wp;
-        register LINE   *lp;
-        register int    i;
 
         wp = wheadp;
         while (wp != NULL) {
@@ -452,15 +491,10 @@ int f,n;
         }
         wheadp = curwp;
         wheadp->w_wndp = NULL;
-        lp = l_ref(curwp->w_line.l);
-        i  = curwp->w_toprow;
-        while (i!=0 && lback(lp) != l_ref(curbp->b_line.l)) {
-                --i;
-                lp = lback(lp);
-        }
-        curwp->w_toprow = 0;
+
+        curwp->w_line.l = adjust_back(curwp, curwp->w_line.l, curwp->w_toprow);
         curwp->w_ntrows = term.t_nrow-1;
-        curwp->w_line.l = l_ptr(lp);
+        curwp->w_toprow = 0;
         curwp->w_flag  |= WFMODE|WFHARD;
         return (TRUE);
 }
@@ -483,8 +517,6 @@ delwp(thewp)
 WINDOW *thewp;
 {
 	register WINDOW *wp;	/* window to receive deleted space */
-	register LINE *lp;	/* line pointer */
-	register int i;
 
 	/* if there is only one window, don't delete it */
 	if (wheadp->w_wndp == NULL) {
@@ -496,12 +528,7 @@ WINDOW *thewp;
 	if (thewp == wheadp) { /* there's nothing before */
 		/* find the next window down */
 		wp = thewp->w_wndp;
-                lp = l_ref(wp->w_line.l);
-                /* the prev. window (thewp) has wp->w_toprow rows in it */
-                for (i = wp->w_toprow;
-        		 i > 0 && lback(lp) != l_ref(wp->w_bufp->b_line.l); --i)
-                        lp = lback(lp);
-                wp->w_line.l = l_ptr(lp);
+                wp->w_line.l = adjust_back(wp, wp->w_line.l, wp->w_toprow);
 		wp->w_ntrows += wp->w_toprow;  /* add in the new rows */
 		wp->w_toprow = 0;	/* and we're at the top of the screen */
 		wheadp = wp;	/* and at the top of the list as well */
@@ -547,7 +574,6 @@ int f,n;
         register int    ntrd;
         register WINDOW *wp1;
         register WINDOW *wp2;
-	register int i;
 
         if (curwp->w_ntrows < 3) {
                 mlforce("[Cannot split a %d line window]", curwp->w_ntrows);
@@ -565,12 +591,14 @@ int f,n;
         wp->w_force = 0;
         ntru = (curwp->w_ntrows-1) / 2;         /* Upper size           */
         ntrl = (curwp->w_ntrows-1) - ntru;      /* Lower size           */
+
         lp = l_ref(curwp->w_line.l);
         ntrd = 0;
-        while (lp != l_ref(curwp->w_dot.l)) {
-                ++ntrd;
+        while (lp != l_ref(DOT.l)) {
+                ntrd += line_height(wp,l_ptr(lp));
                 lp = lforw(lp);
         }
+
 	/* ntrd is now the row containing dot */
         if (((f == FALSE) && (ntrd <= ntru)) || ((f == TRUE) && (n == 1))) {
                 /* Old is upper window. */
@@ -591,10 +619,7 @@ int f,n;
                 wp->w_toprow = curwp->w_toprow+ntru+1;
                 wp->w_ntrows = ntrl;
 		/* try to keep lower from reframing */
-		for (i = ntru+1; i > 0 &&
-				 !same_ptr(wp->w_line.l, wp->w_bufp->b_line.l); i--) {
-			wp->w_line.l = lFORW(wp->w_line.l);
-		}
+		wp->w_line.l = adjust_forw(wp, wp->w_line.l, ntru+1);
 		wp->w_dot.l = wp->w_line.l;
 		wp->w_dot.o = 0;
         } else {
@@ -617,13 +642,10 @@ int f,n;
                 curwp->w_ntrows  = ntrl;
 		wp->w_dot.l = wp->w_line.l;
 		/* move upper window dot to bottom line of upper */
-		for (i = ntru-2; 
-			i > 0 && !same_ptr(wp->w_dot.l, wp->w_bufp->b_line.l); i--)
-			wp->w_dot.l = lFORW(wp->w_dot.l);
+		wp->w_dot.l = adjust_forw(wp, wp->w_dot.l, ntru-2);
 		wp->w_dot.o = 0;
 		/* adjust lower window topline */
-                while (ntru--)
-                        curwp->w_line.l = lFORW(curwp->w_line.l);
+		curwp->w_line.l = adjust_forw(curwp, curwp->w_line.l, ntru);
         }
         curwp->w_flag |= WFMODE|WFHARD;
         wp->w_flag |= WFMODE|WFHARD;
@@ -650,8 +672,6 @@ enlargewind(f, n)
 int f,n;
 {
         register WINDOW *adjwp;
-        register LINE   *lp;
-        register int    i;
 
         if (n < 0)
                 return (shrinkwind(f, -n));
@@ -669,16 +689,10 @@ int f,n;
                 return (FALSE);
         }
         if (curwp->w_wndp == adjwp) {           /* Shrink below.        */
-                lp = l_ref(adjwp->w_line.l);
-                for (i=0; i<n && lp != l_ref(adjwp->w_bufp->b_line.l); ++i)
-                        lp = lforw(lp);
-                adjwp->w_line.l  = l_ptr(lp);
+                adjwp->w_line.l  = adjust_forw(adjwp, adjwp->w_line.l, n);
                 adjwp->w_toprow += n;
         } else {                                /* Shrink above.        */
-                lp = l_ref(curwp->w_line.l);
-                for (i=0; i<n && lback(lp) != l_ref(curbp->b_line.l); ++i)
-                        lp = lback(lp);
-                curwp->w_line.l  = l_ptr(lp);
+                curwp->w_line.l  = adjust_back(curwp, curwp->w_line.l, n);
                 curwp->w_toprow -= n;
         }
         curwp->w_ntrows += n;
@@ -697,8 +711,6 @@ shrinkwind(f, n)
 int f,n;
 {
         register WINDOW *adjwp;
-        register LINE   *lp;
-        register int    i;
 
         if (n < 0)
                 return (enlargewind(f, -n));
@@ -716,16 +728,10 @@ int f,n;
                 return (FALSE);
         }
         if (curwp->w_wndp == adjwp) {           /* Grow below.          */
-                lp = l_ref(adjwp->w_line.l);
-                for (i=0; i<n && lback(lp) != l_ref(adjwp->w_bufp->b_line.l); ++i)
-                        lp = lback(lp);
-                adjwp->w_line.l  = l_ptr(lp);
+                adjwp->w_line.l  = adjust_back(adjwp, adjwp->w_line.l, n);
                 adjwp->w_toprow -= n;
         } else {                                /* Grow above.          */
-                lp = l_ref(curwp->w_line.l);
-                for (i=0; i<n && lp != l_ref(curbp->b_line.l); ++i)
-                        lp = lforw(lp);
-                curwp->w_line.l  = l_ptr(lp);
+                curwp->w_line.l  = adjust_forw(curwp, curwp->w_line.l, n);
                 curwp->w_toprow += n;
         }
         curwp->w_ntrows -= n;
@@ -958,8 +964,8 @@ getwpos()	/* get screen offset of current line in current window */
 	/* search down the line we want */
 	lp = l_ref(curwp->w_line.l);
 	sline = 1;
-	while (lp != l_ref(curwp->w_dot.l)) {
-		++sline;
+	while (lp != l_ref(DOT.l)) {
+		sline += line_height(curwp,l_ptr(lp));
 		lp = lforw(lp);
 	}
 

@@ -3,7 +3,10 @@
  * the knowledge about files are here.
  *
  * $Log: fileio.c,v $
- * Revision 1.53  1993/07/06 16:39:04  pgf
+ * Revision 1.54  1993/07/27 18:06:20  pgf
+ * see tom's 3.56 CHANGES entry
+ *
+ * Revision 1.53  1993/07/06  16:39:04  pgf
  * integrated Tuan DANG's changes for the djgpp compiler under DOS
  *
  * Revision 1.52  1993/07/06  12:32:00  pgf
@@ -499,29 +502,23 @@ ffclose()
 /*
  * Write a line to the already opened file. The "buf" points to the buffer,
  * and the "nbuf" is its length, less the free newline. Return the status.
- * Check only at the newline.
  */
 int
-ffputline(buf, nbuf, do_cr)
+ffputline(buf, nbuf, ending)
 char    buf[];
 int	nbuf;
-int	do_cr;
+char *	ending;
 {
         register int    i;
 	for (i = 0; i < nbuf; ++i)
 		if (ffputc(char2int(buf[i])) != FIOSUC)
 			return FIOERR;
 
-#if	ST520
-        fputc('\r', ffp);
-#endif        
-#if DOSFILES
-	if (do_cr) { /* put out CR, unless we just did */
-		if (i == 0 || buf[i-1] != '\r')
-		        fputc('\r', ffp);
+	while (*ending != EOS) {
+		if (*ending != '\r' || i == 0 || buf[i-1] != '\r')
+			fputc(*ending, ffp);
+		ending++;
 	}
-#endif
-        fputc('\n', ffp);
 
         if (ferror(ffp)) {
                 mlforce("[Write I/O error]");
@@ -631,10 +628,10 @@ int *lenp;	/* to return the final length */
 		ue_crypt(fline, i);
 #endif
 	count_fline++;
-        return(FIOSUC);
+        return (eofflag ? FIOFUN : FIOSUC);
 }
 
-/* 
+/*
  * isready_c()
  *
  * This fairly non-portable addition to the stdio set of macros is used to

@@ -6,7 +6,10 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.97  1993/07/15 10:37:58  pgf
+ * Revision 1.98  1993/07/27 18:06:20  pgf
+ * see tom's 3.56 CHANGES entry
+ *
+ * Revision 1.97  1993/07/15  10:37:58  pgf
  * see 3.55 CHANGES
  *
  * Revision 1.96  1993/07/07  11:32:28  pgf
@@ -354,11 +357,12 @@
 
 extern int fileispipe;
 
+static	void	readlinesmsg P(( int, int, char *, int ));
 static	int	getfile2 P(( char *, int ));
 #if DOSFILES
 static	void	guess_dosmode P(( BUFFER * ));
 #endif
-static	int	writereg P(( REGION *, char *, int, int, BUFFER * ));
+static	int	writereg P(( REGION *, char *, int, BUFFER * ));
 
 /*--------------------------------------------------------------------------*/
 
@@ -871,6 +875,8 @@ int	mflg;		/* print messages? */
 	make_local_b_val(bp,MDDOS);
 	set_b_val(bp, MDDOS, global_b_val(MDDOS) );
 #endif
+	make_local_b_val(bp,MDNEWLINE);
+	set_b_val(bp, MDNEWLINE, TRUE);		/* assume we've got it */
 
 	/* turn off ALL keyboard translation in case we get a dos error */
 	TTkclose();
@@ -954,10 +960,8 @@ int	mflg;		/* print messages? */
         }
 	imply_alt(fname, FALSE, lockfl);
 	updatelistbuffers();
-	if (s == FIOERR) {	/* False if error.      */
-                return FALSE;
-	}
-        return TRUE;
+
+	return (s != FIOERR);
 }
 
 #if ! MSDOS && !OPT_MAP_MEMORY
@@ -966,8 +970,8 @@ quickreadf(bp, nlinep)
 register BUFFER *bp;
 int *nlinep;
 {
-        register unsigned char *textp;
-        unsigned char *countp;
+        register UCHAR *textp;
+        UCHAR *countp;
 	L_NUM nlines;
         int incomplete = FALSE;
 	B_COUNT len, nbytes;
@@ -986,7 +990,7 @@ int *nlinep;
 	/* leave an extra byte at the front, for the length of the first
 		line.  after that, lengths go in place of the newline at
 		the end of the previous line */
-	bp->b_ltext = castalloc(unsigned char, len + 1);
+	bp->b_ltext = castalloc(UCHAR, len + 2);
 	if (bp->b_ltext == NULL)
 		return FIOMEM;
 
@@ -1013,17 +1017,22 @@ int *nlinep;
 	textp = countp + 1;
 	nbytes = len;
         nlines = 0;
+
+	if (textp[len-1] != '\n') {
+		textp[len++] = '\n';
+		set_b_val(bp, MDNEWLINE, FALSE);
+	}
+
 	while (len--) {
 		if (*textp == '\n') {
 			if (textp - countp >= 255) {
-				unsigned char *np;
+				UCHAR *np;
 				len = (B_COUNT)(countp - bp->b_ltext);
 				incomplete = TRUE;
 				/* we'll re-read the rest later */
 				if (len)  {
 					ffseek(len);
-					np = castrealloc(unsigned char,
-							bp->b_ltext, len);
+					np = castrealloc(UCHAR, bp->b_ltext, len);
 				} else {
 					np = NULL;
 				}
@@ -1034,7 +1043,7 @@ int *nlinep;
 				}
 				bp->b_ltext = np;
 				bp->b_ltext_end = np + len + 1;
-				nbytes -= len;
+				nbytes = len;
 				break;
 			}
 			*countp = textp - countp - 1;
@@ -1059,6 +1068,7 @@ int *nlinep;
 		bp->b_LINEs_end = bp->b_LINEs + nlines;
 		bp->b_bytecount = nbytes;
 		bp->b_linecount = nlines;
+		b_set_counted(bp);
 
 		/* loop through the buffer again, creating
 			line data structure for each line */
@@ -1107,7 +1117,7 @@ int *nlinep;
 #if DOSFILES
 	guess_dosmode(bp);
 #endif
-	return FIOSUC;
+	return b_val(bp, MDNEWLINE) ? FIOSUC : FIOFUN;
 }
 
 #endif /* ! MSDOS */
@@ -1128,7 +1138,7 @@ int *nlinep;
 	int	done_update = FALSE;
 #endif
 	b_set_counted(bp);	/* make 'addline()' do the counting */
-        while ((s = ffgetline(&len)) == FIOSUC) {
+        while ((s = ffgetline(&len)) <= FIOSUC) {
 #if DOSFILES
 		/*
 		 * Strip CR's if we are reading in DOS-mode.  Otherwise,
@@ -1189,6 +1199,10 @@ int *nlinep;
 		}
 #endif
                 ++(*nlinep);
+		if (s == FIOFUN) {
+			set_b_val(bp, MDNEWLINE, FALSE);
+			break;
+		}
         }
 #if DOSFILES
 	if (global_b_val(MDDOS))
@@ -1198,15 +1212,18 @@ int *nlinep;
 }
 
 /* utility routine for no. of lines read */
-void
+static void
 readlinesmsg(n,s,f,rdo)
 int n;
 int s;
 char *f;
 int rdo;
 {
+	char fname[NFILEN];
 	char *m;
+	f = shorten_path(strcpy(fname,f),TRUE);
 	switch(s) {
+		case FIOFUN:	m = "INCOMPLETE LINE, ";break;
 		case FIOERR:	m = "I/O ERROR, ";	break;
 		case FIOMEM:	m = "OUT OF MEMORY, ";	break;
 		case FIOABRT:	m = "ABORTED, ";	break;
@@ -1421,7 +1438,7 @@ int msgf;
         region.r_size   = bp->b_bytecount;
         region.r_end    = bp->b_line;
  
-	return writereg(&region, fn, msgf, b_val(bp, MDDOS), bp);
+	return writereg(&region, fn, msgf, bp);
 }
 
 int
@@ -1443,18 +1460,16 @@ writeregion()
 	                return status;
         }
         if ((status=getregion(&region)) == TRUE)
-		status = writereg(&region, fname, TRUE, b_val(curbp, MDDOS),
-			curbp);
+		status = writereg(&region, fname, TRUE, curbp);
 	return status;
 }
 
 
 static int
-writereg(rp,fn,msgf, do_cr, bp)
+writereg(rp, fn, msgf, bp)
 REGION	*rp;
 char    *fn;
 int 	msgf;
-int	do_cr;
 BUFFER	*bp;
 {
         register int    s;
@@ -1462,8 +1477,19 @@ BUFFER	*bp;
         register int    nline;
 	register int i;
 	char	fname[NFILEN];
-	long lim;
-	long nchar;
+	long	nchar;
+	char *	ending =
+#if DOSFILES
+			b_val(bp, MDDOS) ? "\r\n" : "\n"
+#else
+#if ST520
+			"\r\n"
+#else	/* UNIX */
+			"\n"
+#endif
+#endif	/* DOSFILES */
+		;
+	C_NUM	offset = rp->r_orig.o;
 
 	/* this is adequate as long as we cannot write parts of lines */
 	int	whole_file = (l_ref(rp->r_orig.l) == lForw(bp->b_line.l))
@@ -1501,55 +1527,35 @@ BUFFER	*bp;
         nline = 0;                              /* Number of lines     */
         nchar = 0;                              /* Number of chars     */
 
-	/* First and maybe only line. */
-	if (rp->r_orig.o <= llength(lp)) {
-		if ((lim = rp->r_orig.o+rp->r_size) > llength(lp))
-			lim = (long)llength(lp);
-		for (i = rp->r_orig.o; i < lim; i++) {
-		        if ((s=ffputc(lgetc(lp,i))) != FIOSUC)
-		                goto out;
-			nchar++;
-		}
-		rp->r_size -= nchar;
+	/* first (maybe partial) line and succeeding whole lines */
+        while ((rp->r_size+offset) >= llength(lp)+1) {
+		register C_NUM	len = llength(lp) - offset;
+		register char	*text = lp->l_text + offset;
 
-		if (rp->r_size <= 0)
+		/* If this is the last line (and no fragment will be written
+		 * after the line), allow 'newline' mode to suppress the
+		 * trailing newline.
+		 */
+		if ((rp->r_size -= (len + 1)) <= 0
+		 && !b_val(bp,MDNEWLINE))
+			ending = "";
+                if ((s = ffputline(text, len, ending)) != FIOSUC)
 			goto out;
 
-		if (do_cr && (s=ffputc('\r')) != FIOSUC)
-	                goto out;
-	        if ((s=ffputc('\n')) != FIOSUC)
-	                goto out;
-
-		nchar++;
-		nline++;
-		rp->r_size--;
-                lp = lforw(lp);
-
-	}
-
-	/* whole lines */
-        while (rp->r_size >= llength(lp)+1) {
-                if ((s=ffputline(&lp->l_text[0], llength(lp), do_cr))
-						!= FIOSUC)
-			goto out;
                 ++nline;
-		nchar += llength(lp) + 1;
-		rp->r_size -= llength(lp) + 1;
+		nchar += len + 1;
+		offset = 0;
                 lp = lforw(lp);
         }
 
-	/* last line */
+	/* last line (fragment) */
 	if (rp->r_size > 0) {
-		lim = rp->r_size;
-		for (i = 0; i < lim; i++) {
-		        if ((s=ffputc(lgetc(lp,i))) != FIOSUC)
+		for (i = 0; i < rp->r_size; i++)
+		        if ((s = ffputc(lgetc(lp,i))) != FIOSUC)
 		                goto out;
-			nchar++;
-			rp->r_size--;
-		}
+		nchar += rp->r_size;
+		++nline;	/* it _looks_ like a line */
 	}
-	if (rp->r_size != 0)
-		mlforce("BUG: writereg, rsize == %d",rp->r_size);
 
  out:
         if (s == FIOSUC) {                      /* No write error.      */
@@ -1577,7 +1583,7 @@ BUFFER	*bp;
         } else {                                /* Ignore close error   */
                 (void)ffclose();                /* if a write error.    */
 	}
-	if (whole_file)
+	if (whole_file)				/* patch: do I need this? */
 		bp->b_linecount = nline;
 
 	CleanAfterPipe(TRUE);
@@ -1741,7 +1747,7 @@ FILE	*haveffp;
 	MK = DOT;
 
 	nline = 0;
-	while ((s=ffgetline(&nbytes)) == FIOSUC) {
+	while ((s=ffgetline(&nbytes)) <= FIOSUC) {
 #if DOSFILES
 		if (b_val(curbp,MDDOS)
 		 && (nbytes > 0)
@@ -1761,6 +1767,8 @@ FILE	*haveffp;
 		tag_for_undo(newlp);
 		prevp = belowthisline ? newlp : nextp;
 		++nline;
+		if (s < FIOSUC)
+			break;
 	}
 	if (!haveffp) {
 		CleanAfterPipe(FALSE);
@@ -1776,9 +1784,8 @@ out:
 
 	imply_alt(fname, FALSE, FALSE);
 	chg_buff (curbp, WFHARD);
-        if (s == FIOERR)                        /* False if error.      */
-                return FALSE;
-        return TRUE;
+
+	return (s != FIOERR);
 }
 
 /*
@@ -1808,13 +1815,15 @@ char    *fname;
 	{
         	mlwrite("[Reading...]");
 		CleanToPipe();
-		while ((s=ffgetline(&nbytes)) == FIOSUC) {
+		while ((s=ffgetline(&nbytes)) <= FIOSUC) {
 			for (i=0; i<nbytes; ++i)
 				if (!kinsert(fline[i]))
 					return FIOMEM;
-			if (!kinsert('\n'))
+			if ((s == FIOSUC) && !kinsert('\n'))
 				return FIOMEM;
 			++nline;
+			if (s < FIOSUC)
+				break;
 		}
 		CleanAfterPipe(FALSE);
 	}
@@ -1823,9 +1832,7 @@ char    *fname;
 	readlinesmsg(nline,s,fname,FALSE);
 
 out:
-        if (s == FIOERR)                        /* False if error.      */
-                return FALSE;
-        return TRUE;
+	return (s != FIOERR);
 }
 
 #if UNIX

@@ -10,7 +10,10 @@
  *	(pgf, 1989)
  *
  * $Log: vmalloc.c,v $
- * Revision 1.14  1993/07/01 16:15:54  pgf
+ * Revision 1.15  1993/07/27 18:06:20  pgf
+ * see tom's 3.56 CHANGES entry
+ *
+ * Revision 1.14  1993/07/01  16:15:54  pgf
  * tom's 3.51 changes
  *
  * Revision 1.13  1993/05/24  15:21:37  pgf
@@ -71,12 +74,9 @@
 #define MAXMALLOCS 20000
 #endif
 
-#define	uchar	unsigned char
-#define	ulong	unsigned long
-
 /* known pattern, and how many of them */
 #define KP 0xaaaaaaaaL
-#define KPW (2*sizeof(ulong))
+#define KPW (2*sizeof(ULONG))
 
 static void dumpbuf P(( int ));
 static void trace P(( char * ));
@@ -84,7 +84,7 @@ static void errout P(( void ));
 
 static int nummallocs = 0;
 struct mtype {
-	uchar *addr;
+	UCHAR *addr;
 	int size;
 };
 
@@ -99,9 +99,9 @@ static void
 dumpbuf(x)
 int x;
 {
-	uchar *c;
+	UCHAR *c;
 	char s [80];
-	c = (uchar *)m[x].addr - 2;
+	c = (UCHAR *)m[x].addr - 2;
 	/* dump malloc buffer to the vmalloc file */
 	while (c <= m[x].addr + m[x].size + KPW + KPW + 1) {
 		sprintf(s, "%04.4lx : %02x ", (long)c, *c);
@@ -130,8 +130,8 @@ int l;
 	/* verify entire malloc heap */
 	for (mp = &m[nummallocs-1]; mp >= m; mp--) {
 		if (mp->addr != NULL) {
-			if (*(ulong *)mp->addr != KP ||
-				*(ulong *)(mp->addr + sizeof (ulong)) != KP)
+			if (*(ULONG *)mp->addr != KP ||
+				*(ULONG *)(mp->addr + sizeof (ULONG)) != KP)
 			{
 				sprintf(s, 
 		"ERROR: Malloc area corrupted (%s). %s %d\n",
@@ -154,13 +154,13 @@ int	l;
 #ifdef VERBOSE
 	char s[80];
 #endif
-	uchar *buffer;
+	UCHAR *buffer;
 	char *sp;
 	register struct mtype *mp;
 
 	if (doverifys & VMAL)
 		rvverify("vmalloc",f,l);
-	if (( buffer = (uchar *)malloc(size + KPW + KPW)) == NULL) {
+	if (( buffer = (UCHAR *)malloc(size + KPW + KPW)) == NULL) {
 		sp = "ERROR: real malloc returned NULL\n";
 		fprintf(stderr,sp);
 		trace(sp);
@@ -184,8 +184,8 @@ int	l;
 	mp->size = size;
 	if (mp == &m[nummallocs])
 		++nummallocs;
-	*(ulong *)(mp->addr) = KP;
-	*(ulong *)(mp->addr + sizeof(ulong)) = KP;
+	*(ULONG *)(mp->addr) = KP;
+	*(ULONG *)(mp->addr + sizeof(ULONG)) = KP;
 	return (char *)(buffer + KPW);
 }
 
@@ -209,10 +209,10 @@ int	l;
 	char *sp;
 #endif
 	char s[80];
-	uchar *b;
+	UCHAR *b;
 	register struct mtype *mp;
 
-	b = (uchar *)(buffer - KPW);
+	b = (UCHAR *)(buffer - KPW);
 	if (doverifys & VFRE)
 		rvverify("vfree",f,l);
 	for (mp = &m[nummallocs-1]; mp >= m && mp->addr != b; mp--)
@@ -228,8 +228,8 @@ int	l;
 	sprintf(s,"%04.4lx:vfree %s %d\n",(long)b,f,l);
 	trace(s);
 #endif
-	if (*(ulong *)mp->addr != KP || 
-		*(ulong *)(mp->addr + sizeof (ulong)) != KP)
+	if (*(ULONG *)mp->addr != KP || 
+		*(ULONG *)(mp->addr + sizeof (ULONG)) != KP)
 	{
 		sprintf(s,"ERROR: corrupted freed block. %s %d\n", f,l);
 		fprintf(stderr,s);
@@ -249,11 +249,11 @@ SIZE_T	size;
 char	*f;
 int	l;
 {
-	uchar *b, *b2;
+	UCHAR *b, *b2;
 	char s[80];
 	register struct mtype *mp;
 
-	b = (uchar *)(buffer - KPW);
+	b = (UCHAR *)(buffer - KPW);
 	if (doverifys & VREA)
 		rvverify("vrealloc",f,l);
 
@@ -272,11 +272,11 @@ int	l;
 			(long)b,(long)size,f,l);
 	trace(s);
 #endif
-	*(ulong *)(mp->addr) = KP;
-	*(ulong *)(mp->addr + sizeof (ulong)) = KP;
-	b2 = (uchar *)realloc(b,size+KPW+KPW);
-	*(ulong *)(mp->addr + mp->size + KPW) = KP;
-	*(ulong *)(mp->addr + mp->size + KPW + sizeof (ulong)) = KP;
+	*(ULONG *)(mp->addr) = KP;
+	*(ULONG *)(mp->addr + sizeof (ULONG)) = KP;
+	b2 = (UCHAR *)realloc(b,size+KPW+KPW);
+	*(ULONG *)(mp->addr + mp->size + KPW) = KP;
+	*(ULONG *)(mp->addr + mp->size + KPW + sizeof (ULONG)) = KP;
 	return (char *)(b2 + KPW);
 }
 

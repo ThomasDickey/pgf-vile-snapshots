@@ -8,7 +8,10 @@
  *  Last Updated: 07/14/87
  *
  * $Log: vmsvt.c,v $
- * Revision 1.8  1993/06/18 15:57:06  pgf
+ * Revision 1.9  1993/07/27 18:06:20  pgf
+ * see tom's 3.56 CHANGES entry
+ *
+ * Revision 1.8  1993/06/18  15:57:06  pgf
  * tom's 3.49 changes
  *
  * Revision 1.7  1993/04/20  12:18:32  pgf
@@ -399,7 +402,7 @@ void vmsopen(void)
 	}
 		
 	/* Set sizes */
-	term.t_nrow = ((unsigned int) tc.t_mandl >> 24) - 1;
+	term.t_nrow = ((UINT) tc.t_mandl >> 24) - 1;
 	term.t_ncol = tc.t_width;
 
 	if (term.t_mrow < term.t_nrow)

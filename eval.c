@@ -4,7 +4,13 @@
 	written 1986 by Daniel Lawrence
  *
  * $Log: eval.c,v $
- * Revision 1.60  1993/07/15 10:37:58  pgf
+ * Revision 1.62  1993/07/27 18:06:20  pgf
+ * see tom's 3.56 CHANGES entry
+ *
+ * Revision 1.61  1993/07/20  18:08:18  pgf
+ * add pyr and AIX to the list of non-constant case identifer machines
+ *
+ * Revision 1.60  1993/07/15  10:37:58  pgf
  * see 3.55 CHANGES
  *
  * Revision 1.59  1993/07/01  16:15:54  pgf
@@ -204,7 +210,7 @@
 
 	/* macros for environment-variable switch */
 	/*  (if your compiler balks with "non-constant case expression" */
-#if VMS || AUX2
+#if VMS || AUX2 || pyr || AIX
 #define	If(N)		if (vnum == N) {
 #define	ElseIf(N)	} else If(N)
 #define	Otherwise	} else {
@@ -937,7 +943,7 @@ char *value;	/* value to set to */
 
 		/* write out the debug line */
 		mlforce("%s",outline);
-		update(TRUE);
+		(void)update(TRUE);
 
 		/* and get the keystroke to hold the output */
 		if (kbd_key() == abortc) {
@@ -1171,8 +1177,6 @@ char *str;		/* string to upper case */
 }
 #endif
 
-#if ! SMALLER || MSDOS
-
 char *mklower(str)	/* make a string lower case */
 char *str;		/* string to lower case */
 {
@@ -1186,7 +1190,6 @@ char *str;		/* string to lower case */
 	}
 	return(str);
 }
-#endif
 
 int absol(x)	/* take the absolute value of an integer */
 int x;

@@ -4,7 +4,10 @@
  * written for vile by Paul Fox, (c)1990
  *
  * $Log: opers.c,v $
- * Revision 1.29  1993/06/02 14:58:17  pgf
+ * Revision 1.30  1993/07/27 18:06:20  pgf
+ * see tom's 3.56 CHANGES entry
+ *
+ * Revision 1.29  1993/06/02  14:58:17  pgf
  * folded some long lines
  *
  * Revision 1.28  1993/04/21  13:55:27  pgf
@@ -141,7 +144,7 @@ char *str;
 		havemotion = NULL;
 	} else {
 		mlwrite("%s operation pending...",str);
-		update(FALSE);
+		(void)update(FALSE);
 
 		/* get the next command from the keyboard */
 		/* or a command line, as approp. */

@@ -3,7 +3,10 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: globals.c,v $
- * Revision 1.21  1993/07/01 16:15:54  pgf
+ * Revision 1.22  1993/07/27 18:06:20  pgf
+ * see tom's 3.56 CHANGES entry
+ *
+ * Revision 1.21  1993/07/01  16:15:54  pgf
  * tom's 3.51 changes
  *
  * Revision 1.20  1993/05/24  15:21:37  pgf
@@ -81,6 +84,8 @@
 
 #if GLOBALS
 
+static	int	globber P(( int, int, int ));
+
 int
 globals(f,n)
 int f,n;
@@ -96,7 +101,7 @@ int f,n;
 }
 
 /* ARGSUSED */
-int
+static int
 globber(f, n, g_or_v)
 int f, n, g_or_v;
 {
@@ -107,6 +112,9 @@ int f, n, g_or_v;
 	CMDFUNC *cfp;
 	int foundone;
 	WINDOW *wp;
+	L_NUM	before;
+	int	save_report;
+
 	extern CMDFUNC f_godotplus;
 	
 	c = kbd_delimiter();
@@ -151,6 +159,8 @@ int f, n, g_or_v;
 	wp = curwp;
 	/* loop until there are no marked lines in the buffer */
 	foundone = FALSE;
+	before = line_count(curbp);
+	save_report = global_g_val(GVAL_REPORT);
 	for(;;) {
 		if (lp == l_ref(wp->w_bufp->b_line.l)) {
 			/* at the end -- only quit if we found no 
@@ -172,6 +182,7 @@ int f, n, g_or_v;
 					if (b_val(wp->w_bufp,MDVIEW))
 						return(rdonly());
 					mayneedundo();
+					set_global_g_val(GVAL_REPORT,0);
 				}
 				havemotion = &f_godotplus;
 				wp->w_dot.l = l_ptr(lp);
@@ -186,7 +197,8 @@ int f, n, g_or_v;
 		}
 		lp = lforw(lp);
 	}
-
+	set_global_g_val(GVAL_REPORT,save_report);
+	line_report(before);
 
 	return s;
 }

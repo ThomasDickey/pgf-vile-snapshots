@@ -12,7 +12,10 @@
 # The modes are table entries in the BUFFER and WINDOW structures.
 #
 # $Log: modetbl,v $
-# Revision 1.17  1993/07/06 16:54:27  pgf
+# Revision 1.18  1993/07/27 18:06:20  pgf
+# see tom's 3.56 CHANGES entry
+#
+# Revision 1.17  1993/07/06  16:54:27  pgf
 # changed "timeout-value" to "timeoutlen"
 #
 # Revision 1.16  1993/07/01  16:15:54  pgf
@@ -76,9 +79,12 @@ bool								# GMD prefix
 	"Alt-TabPos"	ALTTABPOS	0			# emacs-style cursor positioning
 	"HIstory"	HISTORY		0			# command-history
 	"ImplyBuffer"	IMPLYBUFF 	0			# imply-buffer (vi-like)
+	"Popup-Choices"	POPUP_FILEC	0		NOTYET	# popup buffer showing file-completion choices
+	"Popup-Msgs"	POPUP_MSGS	0		NOTYET	# popup buffer when multiple messages emitted
 	"ShowRam"	RAMSIZE		0		RAMSIZE	# show ram-usage
 	"SameBangs"	SAMEBANGS	0			# use same "!!" data for ^X-!
 int								# VAL_ prefix
+	"report"	REPORT		0			# threshold for reporting changes
 	"timeoutlen"	TIMEOUTVAL	0			# how long to catnap for more input
 regex								# VAL_ prefix
 	"C-SUFfixes"	CSUFFIXES	0			# match against filenames to turn on c-mode
@@ -96,6 +102,7 @@ bool								# MD prefix
 	"dos"		DOS		WFHARD|WFMODE		# "dos" mode -- lines end in crlf
 	"IgnoreCase"	IGNCASE		0			# Exact matching for searches
 	"magic"		MAGIC		0			# regular expressions in search
+	"NewLine"	NEWLINE		0			# trailing newline (vi-style)
 	"ShowMatch"	SHOWMAT		0			# auto-indent
 	"ShowMoDe"	SHOWMODE	WFMODE			# show insert/replace/command mode
 	"TabInsert"	TABINSERT	0			# okay to insert tab chars
@@ -127,6 +134,7 @@ bool								# WMD prefix
 	"LIst"		LIST		WFHARD			# "list" mode -- show tabs and EOL
 	"NUmber"	NUMBER		WFMODE|WFHARD		# line-numbers shown
 	"HorizScroll"	HORSCROLL	0			# scroll whole screen
+	"LineWrap"	LINEWRAP	WFMODE|WFHARD	!SMALLER # wrap lines wider than screen
 int								# VAL_ prefix
 	"SIDEways"	SIDEWAYS	WFMODE|WFHARD		# sideways offset for display
 color

@@ -9,7 +9,10 @@
  *  is called whenever possible.
  *  Modifications by Pete Ruczynski (pjr).
  * $Log: z_ibmpc.c,v $
- * Revision 1.4  1993/05/04 17:05:14  pgf
+ * Revision 1.5  1993/07/27 18:06:20  pgf
+ * see tom's 3.56 CHANGES entry
+ *
+ * Revision 1.4  1993/05/04  17:05:14  pgf
  * see tom's CHANGES, 3.45
  *
  * Revision 1.3  1993/04/01  12:53:33  pgf
@@ -59,10 +62,10 @@
 extern int zibmtype;		/* pjr - what to do about screen resolution */
 
 
-int dtype = -1;				/* current display type		*/
-long scadd;					/* address of screen ram	*/
-int *scptr[NROW];			/* pointer to screen lines	*/
-unsigned int sline[NCOL];	/* screen line image		*/
+int dtype = -1;			/* current display type		*/
+long scadd;			/* address of screen ram	*/
+int *scptr[NROW];		/* pointer to screen lines	*/
+UINT sline[NCOL];		/* screen line image		*/
 extern union REGS rg;		/* cpu register for use of DOS calls */
 
 extern  void	ttopen();       /* Forward references.          */
@@ -351,12 +354,12 @@ void
 scwrite(row, col, nchar, outstr, forg, bacg)
 /*****************************************************************************/
 int row, col, nchar;		/* row,col of screen to place nchars of outstr on */
-char *outstr;	/* string to write out (must be term.t_ncol long) */
+char *outstr;		/* string to write out (must be term.t_ncol long) */
 int forg;		/* forground color of string to write */
 int bacg;		/* background color */
 {
-	unsigned int attr;	/* attribute byte mask to place in RAM */
-	unsigned int *lnptr;	/* pointer to the destination line */
+	UINT attr;	/* attribute byte mask to place in RAM */
+	UINT *lnptr;	/* pointer to the destination line */
 	int i;
 
 	/* build the attribute byte and setup the screen pointer */
