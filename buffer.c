@@ -6,7 +6,10 @@
  * for the display system.
  *
  * $Log: buffer.c,v $
- * Revision 1.70  1993/07/07 12:31:09  pgf
+ * Revision 1.71  1993/07/15 10:37:58  pgf
+ * see 3.55 CHANGES
+ *
+ * Revision 1.70  1993/07/07  12:31:09  pgf
  * small reformats
  *
  * Revision 1.69  1993/07/07  11:33:06  pgf
@@ -953,7 +956,9 @@ register BUFFER *bp;
 			mlforce("BUG: swbuffer: wp still NULL");
 		curwp = wp;
 		upmode();
+#ifdef MDCHK_MODTIME
 		(void)check_modtime( bp, bp->b_fname );
+#endif
 		if (bp != find_BufferList())
 			updatelistbuffers();
 		return TRUE;
@@ -972,9 +977,11 @@ register BUFFER *bp;
 		curwp->w_dot.l = lFORW(bp->b_line.l);
 		curwp->w_dot.o = 0;
 		bp->b_active = TRUE;
-	} else
+	}
+#ifdef MDCHK_MODTIME
+	else
 		(void)check_modtime( bp, bp->b_fname );
-
+#endif
 	updatelistbuffers();
 	return TRUE;
 }
@@ -1082,8 +1089,11 @@ int f,n;
 			return TRUE;
 	}
 	s = zotbuf(bp);
-	if (s == TRUE)
+	if (s == TRUE) {
 		mlwrite("Buffer %s gone", bufn);
+		if (f && n > 1)
+			s = killbuffer(f, n-1);
+	}
 	return s;
 }
 
@@ -1829,7 +1839,7 @@ int f,n;
 	if (status != TRUE) {
 		pressreturn();
 	} else {
-		mlforce("[Wrote %d buffer%c]",count,(count==1)?' ':'s');
+		mlforce("[Wrote %d buffer%s]",count, PLURAL(count));
 	}
 	sgarbf = TRUE;
 	return status;

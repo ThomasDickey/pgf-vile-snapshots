@@ -1,0 +1,302 @@
+# This is a makefile for mktbls and vile under Turbo-C
+
+.AUTODEPEND
+
+#		*Translator Definitions*
+CC = tcc +MKTBLS.CFG
+TASM = TASM
+TLIB = tlib
+TLINK = tlink
+LIBPATH = C:\TC\LIB
+INCLUDEPATH = C:\TC\INCLUDE
+
+THIS = makefile.tbc
+
+BUILTHDRS = nebind.h nefunc.h nemode.h nename.h nevars.h
+
+all:	vile.exe
+
+clean:
+	del *.obj
+	del *.cfg
+	del *.bak
+	del ne*.h
+
+clobber:	clean
+	del vile.exe
+
+#		*Implicit Rules*
+.c.obj:
+  $(CC) -c {$< }
+
+.cpp.obj:
+  $(CC) -c {$< }
+
+#		*List Macros*
+
+
+MKTBLS_DEPS =  \
+ mktbls.obj
+
+#		*Explicit Rules*
+mktbls.exe: mktbls.cfg $(MKTBLS_DEPS)
+  $(TLINK) /v/x/c/L$(LIBPATH) @&&|
+c0c.obj+
+mktbls.obj
+mktbls
+		# no map file
+emu.lib+
+mathc.lib+
+cc.lib
+|
+
+
+#		*Individual File Dependencies*
+mktbls.obj: mktbls.cfg mktbls.c 
+
+#		*Compiler Configuration File*
+mktbls.cfg: $(THIS)
+  copy &&|
+-mc
+-v
+-vi-
+-w-ret
+-w-nci
+-w-inl
+-wpin
+-w-par
+-wasm
+-wcln
+-w-cpt
+-wdef
+-w-dup
+-w-pia
+-wsig
+-wnod
+-w-ill
+-w-sus
+-wstv
+-wucp
+-wuse
+-w-ext
+-w-ias
+-w-ibc
+-w-pre
+-w-nst
+-I$(INCLUDEPATH)
+-L$(LIBPATH)
+| mktbls.cfg
+
+
+
+VILE_DEPS =  \
+ basic.obj \
+ bind.obj \
+ buffer.obj \
+ crypt.obj \
+ csrch.obj \
+ display.obj \
+ eval.obj \
+ exec.obj \
+ externs.obj \
+ fences.obj \
+ file.obj \
+ filec.obj \
+ fileio.obj \
+ finderr.obj \
+ glob.obj \
+ globals.obj \
+ history.obj \
+ input.obj \
+ insert.obj \
+ isearch.obj \
+ line.obj \
+ modes.obj \
+ npopen.obj \
+ oneliner.obj \
+ opers.obj \
+ path.obj \
+ random.obj \
+ regexp.obj \
+ region.obj \
+ search.obj \
+ spawn.obj \
+ tags.obj \
+ tbuff.obj \
+ termio.obj \
+ tmp.obj \
+ undo.obj \
+ vmalloc.obj \
+ window.obj \
+ word.obj \
+ wordmov.obj \
+ main.obj \
+ ibmpc.obj
+
+#		*Explicit Rules*
+vile.exe: vile.cfg $(VILE_DEPS)
+  $(TLINK) /v/x/c/L$(LIBPATH) @&&|
+c0l.obj+
+basic.obj+
+bind.obj+
+buffer.obj+
+crypt.obj+
+csrch.obj+
+display.obj+
+eval.obj+
+exec.obj+
+externs.obj+
+fences.obj+
+file.obj+
+filec.obj+
+fileio.obj+
+finderr.obj+
+glob.obj+
+globals.obj+
+history.obj+
+input.obj+
+insert.obj+
+isearch.obj+
+line.obj+
+modes.obj+
+npopen.obj+
+oneliner.obj+
+opers.obj+
+path.obj+
+random.obj+
+regexp.obj+
+region.obj+
+search.obj+
+spawn.obj+
+tags.obj+
+tbuff.obj+
+termio.obj+
+tmp.obj+
+undo.obj+
+vmalloc.obj+
+window.obj+
+word.obj+
+wordmov.obj+
+main.obj+
+ibmpc.obj
+vile
+		# no map file
+emu.lib+
+mathl.lib+
+cl.lib
+|
+
+
+#		*Individual File Dependencies*
+basic.obj: vile.cfg basic.c 
+
+bind.obj: vile.cfg bind.c 
+
+buffer.obj: vile.cfg buffer.c 
+
+crypt.obj: vile.cfg crypt.c 
+
+csrch.obj: vile.cfg csrch.c 
+
+display.obj: vile.cfg display.c 
+
+eval.obj: vile.cfg eval.c 
+
+exec.obj: vile.cfg exec.c 
+
+externs.obj: vile.cfg externs.c 
+
+fences.obj: vile.cfg fences.c 
+
+file.obj: vile.cfg file.c 
+
+filec.obj: vile.cfg filec.c 
+
+fileio.obj: vile.cfg fileio.c 
+
+finderr.obj: vile.cfg finderr.c 
+
+glob.obj: vile.cfg glob.c 
+
+globals.obj: vile.cfg globals.c 
+
+history.obj: vile.cfg history.c 
+
+input.obj: vile.cfg input.c 
+
+insert.obj: vile.cfg insert.c 
+
+isearch.obj: vile.cfg isearch.c 
+
+line.obj: vile.cfg line.c 
+
+modes.obj: vile.cfg modes.c 
+
+npopen.obj: vile.cfg npopen.c 
+
+oneliner.obj: vile.cfg oneliner.c 
+
+opers.obj: vile.cfg opers.c 
+
+path.obj: vile.cfg path.c 
+
+random.obj: vile.cfg random.c 
+
+regexp.obj: vile.cfg regexp.c 
+
+region.obj: vile.cfg region.c 
+
+search.obj: vile.cfg search.c 
+
+spawn.obj: vile.cfg spawn.c 
+
+tags.obj: vile.cfg tags.c 
+
+tbuff.obj: vile.cfg tbuff.c 
+
+termio.obj: vile.cfg termio.c 
+
+tmp.obj: vile.cfg tmp.c 
+
+undo.obj: vile.cfg undo.c 
+
+vmalloc.obj: vile.cfg vmalloc.c 
+
+window.obj: vile.cfg window.c 
+
+word.obj: vile.cfg word.c 
+
+wordmov.obj: vile.cfg wordmov.c 
+
+main.obj: vile.cfg main.c 
+
+ibmpc.obj: vile.cfg ibmpc.c 
+
+#		*Compiler Configuration File*
+vile.cfg: mktbls.exe cmdtbl modetbl $(THIS)
+  ./mktbls cmdtbl
+  ./mktbls modetbl
+  copy &&|
+-ml
+-v
+-vi-
+-w-ret
+-w-nci
+-w-inl
+-wasm
+-w-cpt
+-w-dup
+-w-pia
+-w-ill
+-w-sus
+-wstv
+-w-ext
+-w-ias
+-w-ibc
+-w-pre
+-w-nst
+-I$(INCLUDEPATH)
+-L$(LIBPATH)
+| vile.cfg
+
+

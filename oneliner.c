@@ -4,7 +4,14 @@
  *	Written (except for delins()) for vile by Paul Fox, (c)1990
  *
  * $Log: oneliner.c,v $
- * Revision 1.45  1993/07/01 16:15:54  pgf
+ * Revision 1.47  1993/07/15 12:00:36  pgf
+ * use mlquickask instead of mlreply when confirming substitutions, so that
+ * user needn't hit return for each answer.
+ *
+ * Revision 1.46  1993/07/15  10:37:58  pgf
+ * see 3.55 CHANGES
+ *
+ * Revision 1.45  1993/07/01  16:15:54  pgf
  * tom's 3.51 changes
  *
  * Revision 1.44  1993/06/18  15:57:06  pgf
@@ -285,7 +292,7 @@ substreg1(needpats, use_opts)
 int needpats, use_opts;
 {
 	int c, status;
-	static int printit, globally, nth_occur;
+	static int printit, globally, nth_occur, confirm;
 	REGION region;
 	LINEPTR oline;
 	int	getopts = FALSE;
@@ -318,7 +325,7 @@ int needpats, use_opts;
 			/* if false, the pattern is null, which is okay... */
 		}
 		nth_occur = -1;
-		printit = globally = FALSE;
+		confirm = printit = globally = FALSE;
 		getopts = (lastkey == c); /* the user may have something to add */
 
 	} else {
@@ -336,12 +343,12 @@ int needpats, use_opts;
 	}
 
 	if (getopts) {
-		char buf[3];
+		char buf[4];
 		char *bp = buf;
 
 		buf[0] = EOS;
 		status = mlreply(
-	"(g)lobally or ([1-9])th occurrence on line and/or (p)rint result: ",
+"(g)lobally, ([1-9])th occurrence on line, (c)onfirm, and/or (p)rint result: ",
 			buf, sizeof buf);
 		if (status == ABORT) {
 			rls_region();
@@ -358,6 +365,8 @@ int needpats, use_opts;
 					!nth_occur && !globally) {
 				nth_occur = *bp - '0';
 				globally = TRUE;
+			} else if (*bp == 'c' && !confirm) {
+				confirm = TRUE;
 			} else if (!isspace(*bp)) {
 				mlforce("[Unknown action %s]",buf);
 				rls_region();
@@ -370,11 +379,10 @@ int needpats, use_opts;
 	}
 
 	DOT.l = region.r_orig.l;	    /* Current line.	    */
-
 	do {
 		oline = DOT.l;
-		if ((status = substline( substexp, nth_occur, printit, globally))
-								!= TRUE) {
+		if ((status = substline(substexp, nth_occur, printit,
+						globally, &confirm)) != TRUE) {
 			rls_region();
 			return status;
 		}
@@ -386,15 +394,35 @@ int needpats, use_opts;
 	return TRUE;
 }
 
+/* show the pattern we've matched */
+void
+showpat(rp, on)
+regexp	*rp;
+int	on;
+{
+	fast_ptr LINEPTR	lp;
+	int	row;
+
+	for (lp = DOT.l, row = curwp->w_toprow ;
+			!same_ptr(lp, curwp->w_line.l) ; ) {
+		row++;
+		lp = lBACK(lp);
+	}
+	hilite(row,
+		offs2col(curwp, DOT.l, DOT.o),
+		offs2col(curwp, DOT.l, DOT.o + (rp->endp[0] - rp->startp[0])), on);
+}
+
 int
-substline(exp, nth_occur, printit, globally)
+substline(exp, nth_occur, printit, globally, confirm)
 regexp *exp;
-int nth_occur, printit, globally;
+int nth_occur, printit, globally, *confirm;
 {
 	int foundit;
 	register int s;
 	register int which_occur = 0;
 	int matched_at_eol = FALSE;
+	int yes, c;
 	extern MARK scanboundpos;
 
 	/* if the "magic number" hasn't been set yet... */
@@ -426,9 +454,50 @@ int nth_occur, printit, globally;
 					break;
 				matched_at_eol = TRUE;
 			}
-			s = delins(exp, &rpat[0]);
-			if (s != TRUE)
-				return s;
+			/* if we need confirmation, get it */
+			if (*confirm) {
+
+				/* force the pattern onto the screen */
+				(void)gomark(FALSE, 0);
+				if (update(TRUE) == TRUE)
+					showpat(exp, TRUE);
+				s = mlquickask("Make change [y/n/q/a]?",
+					"ynqa\r",&c);
+
+				showpat(exp, FALSE);
+
+				if (s != TRUE)
+					c = 'q';
+
+				switch(c) {
+				case 'y' :
+					yes = TRUE;
+					break;
+				default:
+				case 'n' :
+					yes = FALSE;
+					/* so we don't match this again */
+					DOT.o += (exp->endp[0] - exp->startp[0]);
+					break;
+				case 'q' :
+					mlerase();
+					return(FALSE);
+				case 'a' :
+					yes = TRUE;
+					*confirm = FALSE;
+					break;
+				}
+			} else {
+				yes = TRUE;
+			}
+			if (yes) {
+				s = delins(exp, &rpat[0]);
+				if (s != TRUE)
+					return s;
+			}
+			if (confirm)	/* force a screen update */
+				(void)update(TRUE);
+
 			if (exp->mlen == 0 && forwchar(TRUE,1) == FALSE)
 				break;
 			if (nth_occur > 0)

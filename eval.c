@@ -4,7 +4,10 @@
 	written 1986 by Daniel Lawrence
  *
  * $Log: eval.c,v $
- * Revision 1.59  1993/07/01 16:15:54  pgf
+ * Revision 1.60  1993/07/15 10:37:58  pgf
+ * see 3.55 CHANGES
+ *
+ * Revision 1.59  1993/07/01  16:15:54  pgf
  * tom's 3.51 changes
  *
  * Revision 1.58  1993/06/28  20:10:27  pgf
@@ -1100,7 +1103,8 @@ char *val;
 	return (!strcmp(temp, "yes")
 	   ||   !strcmp(temp, "true")
 	   ||   !strcmp(temp, "t")
-	   ||   !strcmp(temp, "y"));
+	   ||   !strcmp(temp, "y")
+	   ||   !strcmp(temp, "on"));
 }
 
 /*
@@ -1116,7 +1120,8 @@ char *val;
 	return (!strcmp(temp, "no")
 	   ||   !strcmp(temp, "false")
 	   ||   !strcmp(temp, "f")
-	   ||   !strcmp(temp, "n"));
+	   ||   !strcmp(temp, "n")
+	   ||   !strcmp(temp, "off"));
 }
 
 #if ! SMALLER

@@ -2,7 +2,10 @@
  * code by Paul Fox, original algorithm mostly by Julia Harper May, 89
  *
  * $Log: undo.c,v $
- * Revision 1.37  1993/07/09 19:26:30  pgf
+ * Revision 1.38  1993/07/15 10:37:58  pgf
+ * see 3.55 CHANGES
+ *
+ * Revision 1.37  1993/07/09  19:26:30  pgf
  * add static decl to setupuline()
  *
  * Revision 1.36  1993/07/07  16:31:59  pgf
@@ -599,9 +602,9 @@ int stkindx;
 	if (same_ptr(plp, null_ptr))
 		return;
 	set_lBACK(plp, BACKDOT(curbp).l);
-	plp->l_back_offs = BACKDOT(curbp).o;
+	l_ref(plp)->l_back_offs = BACKDOT(curbp).o;
 	set_lFORW(plp, FORWDOT(curbp).l);
-	plp->l_forw_offs = FORWDOT(curbp).o;
+	l_ref(plp)->l_forw_offs = FORWDOT(curbp).o;
 	pushline(plp, STACK(stkindx));
 	if (stkindx == BACK) {
 		l_ref(plp)->l_nextsep = null_ptr;
@@ -797,9 +800,9 @@ int stkindx;
 	
 	lp = l_ptr(popline(STACK(stkindx),TRUE));
 	FORWDOT(curbp).l = lFORW(lp);
-	FORWDOT(curbp).o = lp->l_forw_offs;
+	FORWDOT(curbp).o = l_ref(lp)->l_forw_offs;
 	BACKDOT(curbp).l = lBACK(lp);
-	BACKDOT(curbp).o = lp->l_back_offs;
+	BACKDOT(curbp).o = l_ref(lp)->l_back_offs;
 	if (stkindx == FORW) {
 		/* if we moved, update the "last dot" mark */
 		if (!sameline(DOT, FORWDOT(curbp)))

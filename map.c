@@ -3,7 +3,10 @@
  *		6/3/93
  *
  * $Log: map.c,v $
- * Revision 1.5  1993/07/01 16:15:54  pgf
+ * Revision 1.6  1993/07/15 10:37:58  pgf
+ * see 3.55 CHANGES
+ *
+ * Revision 1.5  1993/07/01  16:15:54  pgf
  * tom's 3.51 changes
  *
  * Revision 1.4  1993/06/30  17:42:50  pgf
@@ -32,6 +35,9 @@
 
 #define DEFAULT_REG     -1
 
+#define OPT_MAP_DISPLAY	!SMALLER
+#define	MAPPED_LIST_NAME	ScratchName(Mapped Characters)
+
 typedef struct _mapping {
     int			key;		/* key that is mapped */
     char		*kbdseq;	/* keyboard sequnce to replace */
@@ -44,11 +50,13 @@ static Mapping	*keymapped = NULL;	/* current mapped key seq used */
 static TBUFF	*MapMacro;
 
 static Mapping * search_map P(( int ));
-static int install_bind P(( int, CMDFUNC *, CMDFUNC ** ));
 static int install_map P(( int, char * ));
 static int remove_map P(( int ));
-
-
+#if OPT_MAP_DISPLAY
+static void makecharslist P(( int, char * ));
+static void show_mapped_chars P(( void ));
+static void update_mapped_list P(( void ));
+#endif
 
 /*
 ** search for key in mapped linked list
@@ -60,52 +68,9 @@ int	key;
 	register Mapping	*m;
 
 	for (m = mhead; m; m = m->next)
-	{
 		if (m->key == key)
-		{
 			return m;
-		}
-	}
 	return NULL;
-}
-
-/*
-** install key and command into kbindtbl
-*/
-static int
-install_bind(key, kcmd, oldcmd)
-int	key;
-CMDFUNC	*kcmd;		/* ptr to the requested function to bind to */
-CMDFUNC	**oldcmd;	/* ptr to the old bind entry */
-{
-	register KBIND	*kbp;	/* pointer into a binding table */
-
-	for (kbp = kbindtbl; kbp->k_cmd && kbp->k_code != key; kbp++)
-		;
-
-	/*
-	** if found, change it in place, else add entry
-	*/
-	if (kbp->k_cmd)
-	{
-		*oldcmd = kbp->k_cmd;
-		kbp->k_cmd = kcmd;
-	}
-	else
-	{
-		if (kbp >= &kbindtbl[NBINDS-1])
-		{
-			mlforce("[Prefixed binding table full]");
-			return(FALSE);
-		}
-		*oldcmd = NULL;
-		kbp->k_code = key;	/* add keycode */
-		kbp->k_cmd = kcmd; 	/* and func pointer */
-		++kbp;			/* and make sure the next is null */
-		kbp->k_code = 0;
-		kbp->k_cmd = NULL;
-	}
-	return TRUE;
 }
 
 /*
@@ -118,13 +83,21 @@ char	*v;
 {
 	extern	CMDFUNC	f_map_proc;
 	register Mapping	*m;
+	char	temp[NSTRING];
+	int	test;
 
-	if ((m = search_map(key)) != NULL)
-	{
-		free(m->kbdseq);
+	/* check for attempted recursion
+	 * patch: prc2kcod assumes only a single key-sequence
+	 */
+	test = prc2kcod(string2prc(temp, v));
+	if (test == key || search_map(test) != NULL) {
+		mlforce("[Attempted recursion]");
+		return FALSE;
 	}
-	else
-	{
+
+	if ((m = search_map(key)) != NULL) {
+		free(m->kbdseq);
+	} else {
 		m = typealloc(Mapping);
 		if (m == NULL)
 			return FALSE;
@@ -137,25 +110,11 @@ char	*v;
 		return FALSE;
 	m->key = key;
 	
-	/*
-	** if control, install map_proc in key bind table, else
-	** install into ascii table
-	*/
-	if (isspecial(key))
-	{
-		return install_bind(key, &f_map_proc, &m->oldfunc);
-	}
-	else
-	{
-		m->oldfunc = asciitbl[key];
-		asciitbl[key] = &f_map_proc;
-	}
-	
-	return TRUE;
+	return install_bind(key, &f_map_proc, &m->oldfunc);
 }	
 
 /*
-** install key sequence into appropriate table
+** Remove entry from list and restore the old function pointer.
 */
 static int
 remove_map(key)
@@ -163,52 +122,63 @@ int	key;
 {
 	register Mapping	*m;
 	register Mapping	*pm;
+	int	status = FALSE;
 
-	/*
-	** Remove entry from list
-	*/
-	pm = NULL;
-	for (m = mhead; m; m = m->next)
-	{
-		if (m->key == key)
-		{
+	for (m = mhead, pm = NULL; m; m = m->next) {
+		if (m->key == key) {
 			if (pm == NULL)
-			{
 				mhead = m->next;
-			}
 			else
-			{
 				pm->next = m->next;
-			}
-			/*
-			** if control, restore olfunc into key bind table,
-			** else restore ascii table
-			*/
-			if (isspecial(key))
-			{
-				KBIND	*kbp;
 
-				for (kbp = kbindtbl;
-				     kbp->k_cmd && kbp->k_code != key;
-				     kbp++)
-					;
-				if (kbp->k_cmd)
-				{
-					kbp->k_cmd = m->oldfunc;
-				}
-			}
-			else
-			{
-				asciitbl[key] = m->oldfunc;
-			}
+			status = rebind_key(key, m->oldfunc);
 			free(m->kbdseq);
 			free((char *)m);
-			return TRUE;
+			break;
 		}
 		pm = m;
 	}
-	return FALSE;
+	return status;
 }
+
+#if OPT_MAP_DISPLAY
+/*ARGSUSED*/
+static void
+makecharslist(flag, ptr)
+int	flag;
+char	*ptr;
+{
+	register Mapping *m;
+	char	temp[NSTRING];
+
+	bprintf("--- Mapped Characters %*P", term.t_ncol-1, '-');
+	for (m = mhead; m != 0; m = m->next) {
+		bprintf("\n%s ", kcod2prc(m->key, temp));
+		bprintf("%s", string2prc(temp, m->kbdseq));
+	}
+}
+
+static void
+show_mapped_chars()
+{
+	liststuff(MAPPED_LIST_NAME, makecharslist, 0, (char *)0);
+}
+
+static void
+update_mapped_list()
+{
+	if (bfind(MAPPED_LIST_NAME, NO_CREAT, BFSCRTCH) != 0) {
+		WINDOW	*savewp = curwp;
+		show_mapped_chars();
+		if (curwp != savewp) {
+			swbuffer(savewp->w_bufp);
+			curwp = savewp;
+		}
+	}
+}
+#else
+#define update_mapped_list()
+#endif
 
 /*
 ** if a mapped char, save for subsequent processing
@@ -240,21 +210,27 @@ int f,n;
 	char 	kbuf[NSTRING];
 	char 	val[NSTRING];
 
-	kbuf[0] = '\0';
-	status = mlreply("map key: ", kbuf, NSTRING - 1);
+	kbuf[0] = EOS;
+	status = mlreply("map key: ", kbuf, sizeof(kbuf));
+	if (status != TRUE) {
+#if OPT_MAP_DISPLAY
+		if (status == FALSE)
+			show_mapped_chars();
+#endif
+		return status;
+	}
+
+	hst_glue(' ');
+	val[0] = EOS;
+	status = mlreply("map value: ", val, sizeof(val));
 	if (status != TRUE)
 		return status;
 
-	val[0] = '\0';
-	status = mlreply("map value: ", val, NSTRING - 1);
-	if (status != TRUE)
-		return status;
-
-	if (install_map(prc2kcod(kbuf), val) != TRUE)
-	{
+	if (install_map(prc2kcod(kbuf), val) != TRUE) {
 		mlforce("[Mapping failed]");
 		return FALSE;
 	}
+	update_mapped_list();
 	return TRUE;
 }
 
@@ -269,16 +245,16 @@ int f,n;
 	int	status;
 	char 	kbuf[NSTRING];
 
-	kbuf[0] = '\0';
-	status = mlreply("unmap key: ", kbuf, NSTRING - 1);
+	kbuf[0] = EOS;
+	status = mlreply("unmap key: ", kbuf, sizeof(kbuf));
 	if (status != TRUE)
 		return status;
 
-	if (remove_map(prc2kcod(kbuf)) != TRUE)
-	{
+	if (remove_map(prc2kcod(kbuf)) != TRUE) {
 		mlforce("[Key not mapped]");
 		return FALSE;
 	}
+	update_mapped_list();
 	return TRUE;
 }
 
@@ -290,31 +266,17 @@ int
 map_proc(f, n)
 int	f,n;
 {
-	register char		*c;
-	char			num[11];
-
 	/* Could be null if the user tries to execute map_proc directly */
-	if (keymapped == NULL)
-	{
+	if (keymapped == NULL || keymapped->kbdseq == NULL) {
 		mlforce("[Key not mapped]");
 		return FALSE;
 	}
 
 	(void)tb_init(&MapMacro, abortc);
-	/*
-	** if there is a repeat count, install it to be played
-	*/
-	if (n != 1) {
-		(void)lsprintf(num, "%d", n);
-		for (c = num; *c; c++)
-			if (!tb_append(&MapMacro, *c))
-				return FALSE;
-	}
-	for (c = keymapped->kbdseq; *c; c++)
-		if (!tb_append(&MapMacro, *c))
-			return FALSE;
+	if (!tb_sappend(&MapMacro, keymapped->kbdseq))
+		return FALSE;
 
 	keymapped = NULL;
 
-	return start_kbm(1, DEFAULT_REG, MapMacro);
+	return start_kbm(n, DEFAULT_REG, MapMacro);
 }

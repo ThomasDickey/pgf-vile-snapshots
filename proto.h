@@ -5,7 +5,16 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.68  1993/07/06 12:31:30  pgf
+ * Revision 1.71  1993/07/19 15:28:59  pgf
+ * prc2kcod now returns unsigned
+ *
+ * Revision 1.70  1993/07/15  12:00:00  pgf
+ * added mlquickask(), which does "raw" single character response queries
+ *
+ * Revision 1.69  1993/07/15  10:37:58  pgf
+ * see 3.55 CHANGES
+ *
+ * Revision 1.68  1993/07/06  12:31:30  pgf
  * new check_visible_modtimes() routine
  *
  * Revision 1.67  1993/07/01  16:15:54  pgf
@@ -329,12 +338,15 @@ extern int bindkey P(( int, int ));
 extern int desbind P(( int, int ));
 extern void makebindlist P(( int, char *));
 extern int strinc P(( char *, char *));
+extern int rebind_key P(( int, CMDFUNC * ));
+extern int install_bind P(( int, CMDFUNC *, CMDFUNC ** ));
 extern int unbindkey P(( int, int ));
 extern int unbindchar P(( int ));
 extern int apro P(( int, int ));
 extern int startup P(( char *));
 extern char * flook P(( char *, int ));
 extern char * kcod2str P(( int, char * ));
+extern char * string2prc P(( char *, char * ));
 extern char * kcod2prc P(( int, char * ));
 extern int insertion_cmd P(( void ));
 #ifdef GMDDOTMACRO
@@ -342,8 +354,9 @@ extern int fnc2kcod P(( CMDFUNC * ));
 #endif
 extern char * fnc2engl P(( CMDFUNC * ));
 extern CMDFUNC * engl2fnc P(( char * ));
+extern KBIND * kcode2kbind P(( int ));
 extern CMDFUNC * kcod2fnc P(( int ));
-extern int prc2kcod P(( char * ));
+extern unsigned int prc2kcod P(( char * ));
 extern char * prc2engl P(( char * ));
 extern int fnc2key P(( CMDFUNC * ));
 extern char * kbd_engl P(( char *, char * ));
@@ -428,7 +441,9 @@ extern void upddex P(( void ));
 extern void updgar P(( void ));
 extern int update P(( int ));
 extern void upmode P(( void ));
-extern void updateline P(( int, struct VIDEO *, struct VIDEO * ));
+extern void updateline P(( int, int, int ));
+extern int offs2col P(( WINDOW *, LINEPTR, C_NUM));
+extern void hilite P((int, int, int, int));
 extern void updone P(( WINDOW * ));
 extern void updall P(( WINDOW * ));
 extern void updupd P(( int ));
@@ -633,6 +648,7 @@ extern int edithistory P(( char *, int *, int *, int, int (*func)( char *, int, 
 /* input.c */
 extern int no_completion P(( int, char *, int * ));
 extern int mlyesno P(( char * ));
+extern int mlquickask P(( char *, char *, int * ));
 extern int mlreply P(( char *, char *, int ));
 extern int mlreply_no_bs P(( char *, char *, int ));
 extern int mlreply_no_opts P(( char *, char *, int ));
@@ -778,7 +794,8 @@ extern int substregion P(( void ));
 extern int subst_again_region P(( void ));
 extern int subst_again P(( int, int ));
 extern int substreg1 P(( int, int ));
-extern int substline P(( regexp *, int, int, int ));
+extern void showpat P(( regexp *, int ));
+extern int substline P(( regexp *, int, int, int, int *));
 extern int delins P(( regexp *, char * ));
 
 /* opers.c */

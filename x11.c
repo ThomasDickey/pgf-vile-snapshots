@@ -2,7 +2,10 @@
  * 	X11 support, Dave Lemke, 11/91
  *
  * $Log: x11.c,v $
- * Revision 1.20  1993/07/08 15:13:21  pgf
+ * Revision 1.21  1993/07/15 10:37:58  pgf
+ * see 3.55 CHANGES
+ *
+ * Revision 1.20  1993/07/08  15:13:21  pgf
  * removed inadvertent debug code
  *
  * Revision 1.19  1993/07/08  15:04:58  pgf
@@ -99,6 +102,8 @@
 				 * selections right */
 
 
+#define X_PIXEL unsigned long
+
 /* local screen rep flags */
 #define	CELL_DIRTY	0x1
 #define	CELL_REVERSE	0x2
@@ -120,8 +125,8 @@ typedef struct _text_win {
     XFontStruct *pfont;
     GC          textgc;
     GC          reversegc;
-    unsigned long fg,
-                bg;
+    X_PIXEL	fg;
+    X_PIXEL	bg;
     int         char_width,
                 char_ascent,
                 char_height;
@@ -162,48 +167,71 @@ static char *paste;
 static char *pp;
 static int  plen;
 
-static int  x_getc(),
-            x_cres();
+static	int	x_getc   P(( void )),
+		x_cres   P(( char * ));
 
-static void  x_open(),
-            x_close(),
-            x_putc(),
-            x_flush(),
-            x_kopen(),
-            x_kclose(),
-            x_move(),
-            x_eeol(),
-            x_eeop(),
-            x_beep(),
-            x_rev();
+static	void	x_open   P(( void )),
+		x_close  P(( void )),
+		x_putc   P(( int )),
+		x_flush  P(( void )),
+		x_kopen  P(( void )),
+		x_kclose P(( void )),
+		x_move   P(( int, int )),
+		x_eeol   P(( void )),
+		x_eeop   P(( void )),
+		x_beep   P(( void )),
+		x_rev    P(( int ));
 
 #if COLOR
-static void  x_fcol(), x_bcol();
-
+static	void	x_fcol   P(( int )),
+		x_bcol   P(( int ));
 #endif
 
 #ifdef SCROLLCODE
-static void  x_scroll();
-
+static	void	x_scroll P(( int, int, int ));
 #endif
 
-static void change_selection();
-static void x_stash_selection();
-static int set_character_class();
-static void x_refresh();
+static	DEFINE_SIGNAL(x_quit);
 
+static	void	change_selection P(( TextWindow, Bool, Bool ));
+static	void	x_stash_selection P(( TextWindow ));
+static	int	set_character_class P(( char * ));
+static	void	x_refresh P(( TextWindow, int, int, unsigned,  unsigned ));
+static	void	x_resize_screen P(( TextWindow, unsigned, unsigned ));
+static	void	x_paste_selection P(( TextWindow ));
+static	Bool	x_give_selection P(( TextWindow, XSelectionRequestEvent *, Atom, Atom ));
+static	void	x_own_selection P(( TextWindow ));
+static	void	extend_selection P(( TextWindow, int, int, Bool ));
+static	void	multi_click P(( TextWindow, int, int ));
+static	void	start_selection P(( TextWindow, XButtonPressedEvent *, int, int ));
+static	XMotionEvent * compress_motion P(( XMotionEvent * ));
+static	void	x_process_event P(( XEvent * ));
+#if NEEDED
+static	Bool	check_kbd_ev P(( Display *, XEvent *, char * ));
+#endif
+static	char *	strndup P(( char *, SIZE_T ));
+static	X_PIXEL	color_value P(( Display *, int, char * ));
+static	char *	any_resource P(( Display *, char * ));
+static	void	x_get_defaults P(( Display *, int ));
+static	void	wait_for_scroll P(( TextWindow ));
+static	void	flush_line P(( unsigned char *, int, Bool, int, int ));
+static	int	set_character_class_range P(( int, int, int ));
+static	void	x_lose_selection P(( TextWindow ));
+static	void	x_get_selection P(( TextWindow, Atom, Atom, char *, SIZE_T, int ));
+static	XFontStruct *query_font P(( TextWindow, char * ));
+
+#define MY_NAME         "xvile"
+#define MY_CLASS	"XVile"
 #define	FONTNAME	"7x13"
-static char *fontname;
 
-static char *geometry = NULL;
-
-static char *progname;
-
-static Bool reverse_video;
-static char *foreground_name = 0,
-            *background_name = 0;
-static int  foreground = -1,
-            background = -1;
+static	char *	fontname;
+static	char *	geometry;
+static	char *	progname;
+static	Bool	reverse_video;
+static	char *	foreground_name;
+static	char *	background_name;
+static	X_PIXEL	foreground;
+static	X_PIXEL	background;
 
 static int  multi_click_time = 500;
 
@@ -258,12 +286,12 @@ TERM        term = {
 static char *
 strndup(str, n)
     char       *str;
-    int         n;
+    SIZE_T      n;
 {
     register char *t;
 
-    if ((t = malloc(n)) != 0)
-    	memcpy(t, str, n);
+    if ((t = malloc((unsigned)n)) != 0)
+    	(void)memcpy(t, str, n);
     return t;
 }
 
@@ -327,6 +355,27 @@ x_setbackground(colorname)
     background_name = colorname;
 }
 
+static XFontStruct *
+query_font(tw, fname)
+	TextWindow tw;
+	char	*fname;
+{
+	XFontStruct *pf;
+
+	if ((pf = XLoadQueryFont(dpy, fname)) != 0) {
+		if (pf->max_bounds.width != pf->min_bounds.width) {
+			(void)fprintf(stderr,
+				"proportional font, things will be miserable\n");
+		}
+		tw->pfont = pf;
+		tw->char_width  = pf->max_bounds.width;
+		tw->char_height = pf->ascent + pf->descent;
+		tw->char_ascent = pf->ascent;
+		tw->fontname = strmalloc(fname);
+	}
+	return pf;
+}
+
 int
 x_setfont(fname)
     char       *fname;
@@ -338,28 +387,9 @@ x_setfont(fname)
 
     fontname = fname;
     if (cur_win) {
-	pfont = XLoadQueryFont(dpy, fontname);
-	if (pfont) {
-	    oldw = x_width(cur_win);
-	    oldh = x_height(cur_win);
-
-	    if (pfont->max_bounds.width != pfont->min_bounds.width) {
-		fprintf(stderr, "proportional font, things will be miserable\n");
-	    }
-	    cur_win->pfont = pfont;
-	    cur_win->char_width = pfont->max_bounds.width;
-	    /*
-	     * using maxbounds instead of font ascent/descent, so it may be
-	     * widely spaced, but won't screw up accented chars
-	     */
-
-#ifdef undef
-	    cur_win->char_height = pfont->max_bounds.ascent + pfont->max_bounds.descent;
-#else
-	    cur_win->char_height = pfont->ascent + pfont->descent;
-#endif
-
-	    cur_win->char_ascent = pfont->max_bounds.ascent;
+	oldw = x_width(cur_win);
+	oldh = x_height(cur_win);
+	if ((pfont = query_font(cur_win, fontname)) != 0) {
 
 	    XSetFont(dpy, cur_win->textgc, pfont->fid);
 	    XSetFont(dpy, cur_win->reversegc, pfont->fid);
@@ -389,9 +419,7 @@ x_setfont(fname)
 
 static
 /* ARGSUSED */
-SIGT
-x_quit(signo)
-int signo;
+ACTUAL_SIGNAL(x_quit)
 {
     x_close();
     ExitProgram(GOOD);
@@ -429,19 +457,19 @@ x_resize_screen(tw, rows, cols)
         tw->cur_col = tw->cols - 1;
 
     if (!tw->sc || !tw->attr || !tw->line_attr) {
-	fprintf(stderr, "couldn't allocate memory for screen\n");
+	(void)fprintf(stderr, "couldn't allocate memory for screen\n");
 	ExitProgram(BAD(-1));
     }
     /* init it */
     for (r = 0; r < tw->rows; r++) {
-	tw->sc[r] = (unsigned char *) malloc(sizeof(unsigned char) * tw->cols);
-	tw->attr[r] = (unsigned char *) malloc(sizeof(unsigned char) * tw->cols);
+	tw->sc[r] = typeallocn(unsigned char, tw->cols);
+	tw->attr[r] = typeallocn(unsigned char, tw->cols);
 	if (!tw->sc[r] || !tw->attr[r]) {
-	    fprintf(stderr, "couldn't allocate memory for screen\n");
+	    (void)fprintf(stderr, "couldn't allocate memory for screen\n");
 	    ExitProgram(BAD(-1));
 	}
 	tw->line_attr[r] = LINE_DIRTY;
-	memset((char *) tw->sc[r], ' ', tw->cols);
+	(void)memset((char *) tw->sc[r], ' ', (SIZE_T)tw->cols);
 	for (c = 0; c < tw->cols; c++) {
 	    tw->attr[r][c] = CELL_DIRTY;
 	}
@@ -450,37 +478,7 @@ x_resize_screen(tw, rows, cols)
         tw->cur_row = tw->rows - 1;
 }
 
-struct {
-    char       *name;
-    int         val;
-}           name_val[] = {
-
-    {"yes", TRUE},
-    {"on", TRUE},
-    {"1", TRUE},
-    {"true", TRUE},
-    {"no", FALSE},
-    {"off", FALSE},
-    {"0", FALSE},
-    {"false", FALSE},
-    {(char *) 0, 0}
-};
-
-static Bool
-bool_name(t)
-    char       *t;
-{
-    int         len = strlen(t);
-    int         i;
-
-    for (i = 0; name_val[i].name; i++) {
-	if (!strncmp(t, name_val[i].name, len))
-	    return name_val[i].val;
-    }
-    return False;
-}
-
-static int
+static X_PIXEL
 color_value(disp, screen, t)
     Display    *disp;
     int         screen;
@@ -496,69 +494,52 @@ color_value(disp, screen, t)
     return xc.pixel;
 }
 
+static char *
+any_resource(disp, name)
+	Display *disp;
+	char	*name;
+{
+	register char *it;
+
+	if ((it = XGetDefault(disp, MY_CLASS, name)) == 0)
+		it = XGetDefault(disp, progname, name);
+	return it;
+}
+
 static void
 x_get_defaults(disp, screen)
-    Display    *disp;
-    int         screen;
+	Display    *disp;
+	int         screen;
 {
-    char       *t;
+	char       *t;
 
-    if (!fontname) {
-	t = XGetDefault(disp, "XVile", "font");
+	if (!fontname)
+		fontname = any_resource(disp, "font");
+
+	if (!geometry)
+		geometry = any_resource(disp, "geometry");
+
+	(void) set_character_class( any_resource(disp, "charClass") );
+
+	if ((t = any_resource(disp, "multiClickTime")) != 0)
+		multi_click_time = atoi(t);
+
+	if ((t = any_resource(disp, "reverseVideo")) != 0)
+		reverse_video = stol(t);
+
+	foreground = BlackPixel(dpy, 0);
+	t = any_resource(disp, "foreground");
+	if (foreground_name)
+		t = foreground_name;
 	if (t)
-	    fontname = t;
-	t = XGetDefault(disp, progname, "font");
+		foreground = color_value(disp, screen, t);
+
+	background = WhitePixel(dpy, 0);
+	t = any_resource(disp, "background");
+	if (background_name)
+		t = background_name;
 	if (t)
-	    fontname = t;
-    }
-    if (!geometry) {
-	t = XGetDefault(disp, "XVile", "geometry");
-	if (t)
-	    geometry = t;
-	t = XGetDefault(disp, progname, "geometry");
-	if (t)
-	    geometry = t;
-    }
-    t = XGetDefault(disp, "XVile", "charClass");
-    if (t)
-	set_character_class(t);
-    t = XGetDefault(disp, progname, "charClass");
-    if (t)
-	set_character_class(t);
-
-    t = XGetDefault(disp, "XVile", "multiClickTime");
-    if (t)
-	multi_click_time = atoi(t);
-    t = XGetDefault(disp, progname, "multiClickTime");
-    if (t)
-	multi_click_time = atoi(t);
-
-    t = XGetDefault(disp, "XVile", "reverseVideo");
-    if (t)
-	reverse_video = bool_name(t);
-    t = XGetDefault(disp, progname, "reverseVideo");
-    if (t)
-	reverse_video = bool_name(t);
-
-    t = XGetDefault(disp, "XVile", "foreground");
-    if (t)
-	foreground = color_value(disp, screen, t);
-    t = XGetDefault(disp, progname, "foreground");
-    if (t)
-	foreground = color_value(disp, screen, t);
-    t = foreground_name;
-    if (t)
-	foreground = color_value(disp, screen, t);
-
-    t = XGetDefault(disp, "XVile", "background");
-    if (t)
-	background = color_value(disp, screen, t);
-    t = XGetDefault(disp, progname, "background");
-    if (t)
-	background = color_value(disp, screen, t);
-    t = background_name;
-    if (t)
-	background = color_value(disp, screen, t);
+		background = color_value(disp, screen, t);
 }
 
 static void
@@ -577,7 +558,7 @@ x_open()
 
     tw = (TextWindow) calloc(1, sizeof(TextWindowRec));
     if (!tw) {
-	fprintf(stderr, "insufficient memory, exiting\n");
+	(void)fprintf(stderr, "insufficient memory, exiting\n");
 	ExitProgram(BAD(-1));
     }
     dpy = XOpenDisplay(displayname);
@@ -587,7 +568,7 @@ x_open()
 #endif
 
     if (!dpy) {
-	fprintf(stderr, "couldn't open X display\n");
+	(void)fprintf(stderr, "couldn't open X display\n");
 	ExitProgram(GOOD);
     }
     tw->dpy = dpy;
@@ -595,40 +576,16 @@ x_open()
 
     x_get_defaults(dpy, screen);
 
-    pfont = XLoadQueryFont(dpy, fontname);
+    pfont = query_font(tw, fontname);
     if (!pfont) {
-	pfont = XLoadQueryFont(dpy, FONTNAME);
+	pfont = query_font(tw, FONTNAME);
 	if (!pfont) {
-	    fprintf(stderr, "couldn't get font \"%s\" or \"%s\", exiting\n",
+	    (void)fprintf(stderr, "couldn't get font \"%s\" or \"%s\", exiting\n",
 		    fontname, FONTNAME);
 	    ExitProgram(BAD(-1));
 	}
-	fontname = FONTNAME;
     }
-    tw->fontname = strmalloc(fontname);
 
-    if (pfont->max_bounds.width != pfont->min_bounds.width) {
-	fprintf(stderr, "proportional font, things will be miserable\n");
-    }
-    tw->pfont = pfont;
-    tw->char_width = pfont->max_bounds.width;
-    /*
-     * using maxbounds instead of font ascent/descent, so it may be widely
-     * spaced, but won't screw up accented chars
-     */
-
-#ifdef undef
-    tw->char_height = pfont->max_bounds.ascent + pfont->max_bounds.descent;
-#else
-    tw->char_height = pfont->ascent + pfont->descent;
-#endif
-
-    tw->char_ascent = pfont->max_bounds.ascent;
-
-    if (foreground == -1)
-	foreground = BlackPixel(dpy, 0);
-    if (background == -1)
-	background = WhitePixel(dpy, 0);
     if (reverse_video) {
 	tw->bg = foreground;
 	tw->fg = background;
@@ -640,12 +597,12 @@ x_open()
     gcmask = GCForeground | GCBackground | GCFont;
     gcvals.foreground = tw->fg;
     gcvals.background = tw->bg;
-    gcvals.font = pfont->fid;
+    gcvals.font = tw->pfont->fid;
     tw->textgc = XCreateGC(dpy, RootWindow(dpy, screen), gcmask, &gcvals);
 
     gcvals.foreground = tw->bg;
     gcvals.background = tw->fg;
-    gcvals.font = pfont->fid;
+    gcvals.font = tw->pfont->fid;
     tw->reversegc = XCreateGC(dpy, RootWindow(dpy, screen), gcmask, &gcvals);
 
     if (geometry) {
@@ -673,8 +630,9 @@ x_open()
 	FocusChangeMask | EnterWindowMask | LeaveWindowMask;
     winmask = CWBackPixel | CWBorderPixel | CWEventMask;
     tw->win = XCreateWindow(dpy, RootWindow(dpy, screen), startx, starty,
-	      x_width(tw), x_height(tw), tw->bw, CopyFromParent, InputOutput,
-			    CopyFromParent, winmask, &swat);
+		x_width(tw), x_height(tw), tw->bw,
+		(int)CopyFromParent, InputOutput,
+		(Visual *)CopyFromParent, winmask, &swat);
 
 
     /* these can go bigger, but they suck up lots of VM if they do */
@@ -695,8 +653,11 @@ x_open()
     xsh.height = x_height(tw);
     xsh.max_width = term.t_mrow * tw->char_height;
     xsh.max_height = term.t_mcol * tw->char_width;
-    XSetStandardProperties(dpy, tw->win, "XVile", "XVile", (Pixmap) 0,
-			   NULL, 0, &xsh);
+    XSetStandardProperties(dpy, tw->win,
+    		MY_CLASS,	/* application name */
+		MY_CLASS,	/* icon name */
+		(Pixmap) 0,	/* icon pixmap */
+		(char **)0, 0, &xsh);
 
     xwmh.flags = InputHint;
     xwmh.input = True;
@@ -704,10 +665,10 @@ x_open()
 
     {
       XClassHint *class_hints;
-      extern XClassHint *XAllocClassHint();	/* usually in <X11/xutil.h> */
+      extern XClassHint *XAllocClassHint P((void)); /* usually in <X11/xutil.h> */
       class_hints = XAllocClassHint();
-      class_hints->res_name = strmalloc("xvile");
-      class_hints->res_class = strmalloc("XVile");
+      class_hints->res_name = strmalloc(MY_NAME);
+      class_hints->res_class = strmalloc(MY_CLASS);
       XSetClassHint(dpy,tw->win,class_hints);
       free(class_hints->res_name);
       free(class_hints->res_class);
@@ -720,9 +681,9 @@ x_open()
 
     tw->sel_prop = XInternAtom(dpy, "VILE_SELECTION", False);
 
-    signal(SIGHUP, x_quit);
-    signal(SIGINT, x_quit);
-    signal(SIGTERM, x_quit);
+    (void)signal(SIGHUP, x_quit);
+    (void)signal(SIGINT, x_quit);
+    (void)signal(SIGTERM, x_quit);
 
     /* main code assumes that it can access a cell at nrow x ncol */
     term.t_ncol = tw->cols;
@@ -853,9 +814,11 @@ x_scroll(from, to, count)
 #endif
 
     for (rf = fst, rt = tst, i = 0; i < count; i++, rf += finc, rt += tinc) {
-	memcpy((char *) cur_win->sc[rt],
-	       (char *) cur_win->sc[rf], cur_win->cols);
-	memset((char *) cur_win->sc[rf], ' ', cur_win->cols);
+	(void)memcpy(
+		(char *) cur_win->sc[rt],
+		(char *) cur_win->sc[rf],
+		(SIZE_T)cur_win->cols);
+	(void)memset((char *) cur_win->sc[rf], ' ', (SIZE_T)cur_win->cols);
 
         /* only mark row if it isn't going to be overwritten during 
          * this scroll
@@ -888,7 +851,7 @@ x_scroll(from, to, count)
 #ifdef copy_area
     XCopyArea(cur_win->dpy, cur_win->win, cur_win->win, cur_win->textgc,
 	      x_pos(cur_win, 0), y_pos(cur_win, from),
-	      x_width(cur_win), count * cur_win->char_height,
+	      x_width(cur_win), (unsigned)(count * cur_win->char_height),
 	      x_pos(cur_win, 0), y_pos(cur_win, to));
     XFlush(dpy);
     wait_for_scroll(cur_win);
@@ -903,7 +866,7 @@ x_scroll(from, to, count)
     if (absol(from - to) != count) {
 	diff = absol(from - to) - count;
 	for (i = 0, rf = fst; i <= diff; i++, rf -= finc) {
-	    memset((char *) cur_win->sc[rf], ' ', cur_win->cols);
+	    (void)memset((char *) cur_win->sc[rf], ' ', (SIZE_T)cur_win->cols);
 	    cur_win->line_attr[rf] |= LINE_DIRTY;
 	    for (c = 0; c < cur_win->cols; c++) {
 		/* memor() would be useful here... */
@@ -923,13 +886,17 @@ flush_line(text, len, rev, sr, sc)
     int         sr,
                 sc;
 {
-    unsigned char *p;
+	GC	fore_gc = ( rev ? cur_win->reversegc : cur_win->textgc);
+	GC	back_gc = (!rev ? cur_win->reversegc : cur_win->textgc);
+	int	fore_yy = text_y_pos(cur_win, sr);
+	int	back_yy = y_pos(cur_win, sr);
+    char *p;
     int         cc,
                 tlen,
                 i;
 
     /* break line into TextStrings and FillRects */
-    p = text;
+    p = (char *)text;
     cc = 0;
     tlen = 0;
     for (i = 0; i < len; i++) {
@@ -939,16 +906,13 @@ flush_line(text, len, rev, sr, sc)
 	} else {
 	    if (cc >= CLEAR_THRESH) {
 		tlen -= cc;
-		XDrawImageString(dpy, cur_win->win,
-				 (rev ? cur_win->reversegc : cur_win->textgc),
-				 (int)x_pos(cur_win, sc),
-				 (int)text_y_pos(cur_win, sr),
-				 (char *) p, tlen);
+		XDrawImageString(dpy, cur_win->win, fore_gc,
+				 (int)x_pos(cur_win, sc), fore_yy,
+				 p, tlen);
 		p += tlen + cc;
 		sc += tlen;
-		XFillRectangle(dpy, cur_win->win,
-			       (!rev ? cur_win->reversegc : cur_win->textgc),
-			       x_pos(cur_win, sc), y_pos(cur_win, sr),
+		XFillRectangle(dpy, cur_win->win, back_gc,
+			       x_pos(cur_win, sc), back_yy,
 			       (unsigned)(cc * cur_win->char_width),
 			       (unsigned)(cur_win->char_height));
 		sc += cc;
@@ -960,21 +924,18 @@ flush_line(text, len, rev, sr, sc)
     }
     if (cc >= CLEAR_THRESH) {
 	tlen -= cc;
-	XDrawImageString(dpy, cur_win->win,
-			 (rev ? cur_win->reversegc : cur_win->textgc),
-			 x_pos(cur_win, sc), text_y_pos(cur_win, sr),
-			 (char *) p, tlen);
+	XDrawImageString(dpy, cur_win->win, fore_gc,
+			 x_pos(cur_win, sc), fore_yy,
+			 p, tlen);
 	sc += tlen;
-	XFillRectangle(dpy, cur_win->win,
-		       (!rev ? cur_win->reversegc : cur_win->textgc),
-		       x_pos(cur_win, sc), y_pos(cur_win, sr),
+	XFillRectangle(dpy, cur_win->win, back_gc,
+		       x_pos(cur_win, sc), back_yy,
 		       (unsigned)(cc * cur_win->char_width),
 		       (unsigned)(cur_win->char_height));
     } else if (tlen > 0) {
-	XDrawImageString(dpy, cur_win->win,
-			 (rev ? cur_win->reversegc : cur_win->textgc),
-			 x_pos(cur_win, sc), text_y_pos(cur_win, sr),
-			 (char *) p, tlen);
+	XDrawImageString(dpy, cur_win->win, fore_gc,
+			 x_pos(cur_win, sc), fore_yy,
+			 p, tlen);
     }
 }
 
@@ -1134,7 +1095,7 @@ x_putline(row, str, len)
     cur_win->attr[cur_win->cur_row][cur_win->cur_col] &= ~CELL_CURSOR;
     cur_win->attr[cur_win->cur_row][cur_win->cur_col] |= CELL_DIRTY;
 
-    memcpy(
+    (void)memcpy(
     	(char *) &(cur_win->sc[row][cur_win->cur_col]),
     	(char *) str,
 	len);
@@ -1193,8 +1154,8 @@ x_eeol()
 
     c = cur_win->cur_col;
 
-    memset((char *) &(cur_win->sc[cur_win->cur_row][c]), ' ',
-	   cur_win->cols - c);
+    (void)memset((char *) &(cur_win->sc[cur_win->cur_row][c]), ' ',
+	   (SIZE_T)(cur_win->cols - c));
 
 #ifdef old			/* XXX this might be faster, but it looks
 				 * worse */
@@ -1225,7 +1186,7 @@ x_eeop()
     x_eeol();
     while (r < cur_win->rows) {
 	clear_line(r, 0, cur_win->cols);
-	memset((char *) &(cur_win->sc[r][0]), ' ', cur_win->cols);
+	(void)memset((char *) &(cur_win->sc[r][0]), ' ', cur_win->cols);
 	r++;
     }
 #else
@@ -1234,7 +1195,7 @@ x_eeop()
 	cur_win->line_attr[r] |= LINE_DIRTY;
 	for (c = sc; c < cur_win->cols; c++)
 	    cur_win->attr[r][c] |= CELL_DIRTY;
-	memset((char *) &(cur_win->sc[r][0]), ' ', cur_win->cols);
+	(void)memset((char *) &(cur_win->sc[r][0]), ' ', (SIZE_T)cur_win->cols);
 	r++;
 	sc = 0;
     }
@@ -1408,7 +1369,7 @@ set_character_class(s)
 	    low = acc;
 	    acc = 0;
 	    if (digits == 0) {
-		fprintf(stderr, errfmt, progname, "missing number", s, i);
+		(void)fprintf(stderr, errfmt, progname, "missing number", s, i);
 		return (-1);
 	    }
 	    digits = 0;
@@ -1420,7 +1381,7 @@ set_character_class(s)
 	    else if (numbers == 1)
 		high = acc;
 	    else {
-		fprintf(stderr, errfmt, progname, "too many numbers",
+		(void)fprintf(stderr, errfmt, progname, "too many numbers",
 			s, i);
 		return (-1);
 	    }
@@ -1438,10 +1399,10 @@ set_character_class(s)
 		numbers++;
 	    }
 	    if (numbers != 2) {
-		fprintf(stderr, errfmt, progname, "bad value number",
+		(void)fprintf(stderr, errfmt, progname, "bad value number",
 			s, i);
 	    } else if (set_character_class_range(low, high, acc) != 0) {
-		fprintf(stderr, errfmt, progname, "bad range", s, i);
+		(void)fprintf(stderr, errfmt, progname, "bad range", s, i);
 	    }
 	    low = high = -1;
 	    acc = 0;
@@ -1449,7 +1410,7 @@ set_character_class(s)
 	    numbers = 0;
 	    continue;
 	} else {
-	    fprintf(stderr, errfmt, progname, "bad character", s, i);
+	    (void)fprintf(stderr, errfmt, progname, "bad character", s, i);
 	    return (-1);
 	}			/* end if else if ... else */
 
@@ -1465,9 +1426,9 @@ set_character_class(s)
     if (high < 0)
 	high = low;
     if (numbers < 1 || numbers > 2) {
-	fprintf(stderr, errfmt, progname, "bad value number", s, i);
+	(void)fprintf(stderr, errfmt, progname, "bad value number", s, i);
     } else if (set_character_class_range(low, high, acc) != 0) {
-	fprintf(stderr, errfmt, progname, "bad range", s, i);
+	(void)fprintf(stderr, errfmt, progname, "bad range", s, i);
     }
     return (0);
 }
@@ -1522,7 +1483,7 @@ x_get_selection(tw, selection, type, value, length, format)
     Atom        selection;
     Atom        type;
     char       *value;
-    long        length;
+    SIZE_T      length;
     int         format;
 {
     if (format != 8 || type != XA_STRING)
@@ -1534,7 +1495,7 @@ x_get_selection(tw, selection, type, value, length, format)
 	if (!insertmode && (tw->cur_row < (tw->rows - 1))) {
 	    int c;
 	    length++;
-	    pp = paste = (char *) malloc(length);
+	    pp = paste = malloc((unsigned)length);
 	    if (!paste)
 		goto bail;
 	    if ((c = insertion_cmd()) == -1)
@@ -1542,12 +1503,12 @@ x_get_selection(tw, selection, type, value, length, format)
 	    *pp = (char)c;
 	    plen = length;
 	    length--;
-	    memcpy(pp + 1, (char *) value, length);
+	    (void)memcpy(pp + 1, (char *) value, length);
 	} else {
-	    pp = paste = (char *) malloc(length);
+	    pp = paste = malloc((unsigned)length);
 	    if (!paste)
 		goto bail;
-	    memcpy(pp, (char *) value, length);
+	    (void)memcpy(pp, (char *) value, length);
 	    plen = length;
 	}
     }
@@ -1591,12 +1552,13 @@ x_stash_selection(tw)
     }
     if (tw->sel_start_row == tw->sel_end_row) {
 	length = tw->sel_end_col - tw->sel_start_col + 1;
-	data = (unsigned char *) malloc(length);
+	data = castalloc(unsigned char, length);
 	if (!data)
 	    return;
-	memcpy(data,
+	(void)memcpy(
+		(char *)data,
 		(char *) &(tw->sc[tw->sel_start_row][tw->sel_start_col]),
-		length);
+		(SIZE_T)length);
 	tw->selection_len = length;
     } else {
 	start = tw->sel_start_col;
@@ -1605,7 +1567,7 @@ x_stash_selection(tw)
 	    length += end - start + 2;	/* add CR */
 	    start = 0;
 	}
-	dp = data = (unsigned char *) malloc(length);
+	dp = data = castalloc(unsigned char, length);
 	if (!data)
 	    return;
 	tw->selection_len = length;
@@ -1613,7 +1575,10 @@ x_stash_selection(tw)
 	for (r = tw->sel_start_row; r <= tw->sel_end_row; r++) {
 	    end = (r == tw->sel_end_row) ? tw->sel_end_col : (tw->cols - 1);
 	    length = end - start + 1;
-	    memcpy(dp, (char *) &(tw->sc[r][start]), length);
+	    (void)memcpy(
+	    	(char *)dp,
+		(char *) &(tw->sc[r][start]),
+		(SIZE_T)length);
 	    dp += length;
 	    *dp++ = '\n';	/* add CR */
 	    start = 0;
@@ -1806,7 +1771,7 @@ start_selection(tw, ev, nr, nc)
     }
     setcursor(nr, nc);
     /* 'True' forces the point to be centered */
-    refresh((ev->state ? True : False), 0);
+    (void) refresh((ev->state ? True : False), 0);
     (void) update(False);
 }
 
@@ -1878,11 +1843,11 @@ x_process_event(ev)
 
 	    (void) XGetWindowProperty(dpy, cur_win->win,
 				      ev->xselection.property,
-			  0L, 100000, False, AnyPropertyType, &type, &format,
+			  0L, 100000L, False, AnyPropertyType, &type, &format,
 				      &length, &bytesafter, &value);
 	    XDeleteProperty(dpy, cur_win->win, ev->xselection.property);
 	    x_get_selection(cur_win, ev->xselection.selection,
-			    type, (char *) value, length, format);
+			    type, (char *) value, (int)length, format);
 	}
 	break;
 
@@ -1921,10 +1886,9 @@ x_process_event(ev)
 	    newlength(True, nr);
 	}
 	if (changed) {
-	    x_resize_screen(cur_win, nr, nc);
+	    x_resize_screen(cur_win, (unsigned)nr, (unsigned)nc);
 
-	    refresh(True, 0);
-
+	    (void) refresh(True, 0);
 	    (void) update(False);
 	}
 	break;
@@ -2050,6 +2014,7 @@ x_getc()
     }
 }
 
+#if NEEDED
 /* ARGSUSED */
 static Bool
 check_kbd_ev(disp, ev, arg)
@@ -2067,9 +2032,10 @@ x_key_events_ready()
 
     /* XXX may want to use another mode */
     if (XEventsQueued(dpy, QueuedAlready))
-	return XPeekIfEvent(dpy, &ev, check_kbd_ev, NULL);
+	return XPeekIfEvent(dpy, &ev, check_kbd_ev, (char *)0);
     return FALSE;
 }
+#endif
 
 /*
  * change reverse video status
@@ -2082,20 +2048,24 @@ x_rev(state)
 }
 
 /* change screen resolution */
+/*ARGSUSED*/
 static int
-x_cres()
+x_cres(flag)
+char *flag;
 {
     return TRUE;
 }
 
 #if COLOR
 static void
-x_fcol()
+x_fcol(color)
+int color;
 {
 }
 
 static void
-x_bcol()
+x_bcol(color)
+int color;
 {
 }
 

@@ -4,7 +4,10 @@
  * "termio.c". It compiles into nothing if not an ANSI device.
  *
  * $Log: ansi.c,v $
- * Revision 1.10  1993/04/01 12:53:33  pgf
+ * Revision 1.11  1993/07/15 10:37:58  pgf
+ * see 3.55 CHANGES
+ *
+ * Revision 1.10  1993/04/01  12:53:33  pgf
  * removed redundant includes and declarations
  *
  * Revision 1.9  1992/08/20  23:40:48  foxharp
@@ -57,28 +60,23 @@
 #define MARGIN	8			/* size of minimim margin and	*/
 #define SCRSIZ	64			/* scroll size for extended lines */
 
-extern	int	ttopen();		/* Forward references.		*/
-extern	int	ttgetc();
-extern	int	ttputc();
-extern	int	ttflush();
-extern	int	ttclose();
-extern	int	ansimove();
-extern	int	ansieeol();
-extern	int	ansieeop();
-extern	int	ansibeep();
-extern	int	ansiopen();
-extern	int	ansirev();
-extern	int	ansiclose();
-extern	int	ansikopen();
-extern	int	ansikclose();
-extern	int	ansicres();
+extern	void	ansimove   P((int,int));
+extern	void	ansieeol   P((void));
+extern	void	ansieeop   P((void));
+extern	void	ansibeep   P((void));
+extern	void	ansiopen   P((void));
+extern	void	ansirev    P((int));
+extern	void	ansiclose  P((void));
+extern	void	ansikopen  P((void));
+extern	void	ansikclose P((void));
+extern	int	ansicres   P((char *));
 #if SCROLLCODE
-extern	int	ansiscroll();
+extern	void	ansiscroll P((int,int,int));
 #endif
 
 #if	COLOR
-extern	int	ansifcol();
-extern	int	ansibcol();
+extern	void	ansifcol P((int));
+extern	void	ansibcol P((int));
 
 int	cfcolor = -1;		/* current forground color */
 int	cbcolor = -1;		/* current background color */
@@ -123,17 +121,25 @@ TERM	term	= {
 	ansibcol
 #endif
 #if SCROLLCODE
+#define SCROLL_REG 1
 	, ansiscroll
 #endif
 };
 
-csi()
+static	void	ansiparm P((int));
+#if SCROLL_REG
+static	void	ansiscrollregion P((int,int));
+#endif
+
+static void
+csi P((void))
 {
 	ttputc(ESC);
 	ttputc('[');
 }
 
 #if	COLOR
+void
 ansifcol(color) 	/* set the current output color */
 
 int color;	/* color to set */
@@ -151,6 +157,7 @@ int color;	/* color to set */
 	cfcolor = color;
 }
 
+void
 ansibcol(color) 	/* set the current background color */
 
 int color;	/* color to set */
@@ -169,7 +176,10 @@ int color;	/* color to set */
 }
 #endif
 
+void
 ansimove(row, col)
+int	row;
+int	col;
 {
 	csi();
 	if (row) ansiparm(row+1);
@@ -178,12 +188,14 @@ ansimove(row, col)
 	ttputc('H');
 }
 
+void
 ansieeol()
 {
 	csi();
 	ttputc('K');
 }
 
+void
 ansieeop()
 {
 #if	COLOR
@@ -194,11 +206,9 @@ ansieeop()
 	ttputc('J');
 }
 
-
+void
 ansirev(state)		/* change reverse video state */
-
 int state;	/* TRUE = reverse, FALSE = normal */
-
 {
 #if	COLOR
 	int ftmp, btmp; 	/* temporaries for colors */
@@ -224,16 +234,21 @@ int state;	/* TRUE = reverse, FALSE = normal */
 #endif
 }
 
-ansicres()	/* change screen resolution */
+int
+ansicres(flag)	/* change screen resolution */
+char	*flag;
 {
 	return(TRUE);
 }
 
+void
 spal(dummy)		/* change palette settings */
+char	*dummy;
 {
 	/* none for now */
 }
 
+void
 ansibeep()
 {
 	ttputc(BEL);
@@ -248,10 +263,12 @@ ansibeep()
 	all at once.
 */
 
-#define SCROLL_REG 1
-
 /* move howmany lines starting at from to to */
+void
 ansiscroll(from,to,n)
+int	from;
+int	to;
+int	n;
 {
 	int i;
 	if (to == from) return;
@@ -263,7 +280,7 @@ ansiscroll(from,to,n)
 			ttputc('\n');
 	} else { /* from < to */
 		ansiscrollregion(from, to + n - 1);
-		ansimove(from);
+		ansimove(from,0);
 		for (i = to - from; i > 0; i--) {
 			ttputc(ESC);
 			ttputc('M');
@@ -304,7 +321,10 @@ ansiscroll(from,to,n)
 }
 
 #if SCROLL_REG
+static void
 ansiscrollregion(top,bot)
+int	top;
+int	bot;
 {
 	csi();
 	if (top) ansiparm(top + 1);
@@ -316,6 +336,7 @@ ansiscrollregion(top,bot)
 
 #endif
 
+void
 ansiparm(n)
 register int	n;
 {
@@ -332,6 +353,7 @@ register int	n;
 	ttputc((n%10) + '0');
 }
 
+void
 ansiopen()
 {
 	strcpy(sres, "NORMAL");
@@ -339,19 +361,22 @@ ansiopen()
 	ttopen();
 }
 
+void
 ansiclose()
 {
 #if	COLOR
 	ansifcol(7);
 	ansibcol(0);
 #endif
-	ttclose();
+	/*ttclose();*/
 }
 
+void
 ansikopen()	/* open the keyboard (a noop here) */
 {
 }
 
+void
 ansikclose()	/* close the keyboard (a noop here) */
 {
 }

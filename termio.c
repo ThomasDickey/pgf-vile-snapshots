@@ -4,7 +4,10 @@
  * All operating systems.
  *
  * $Log: termio.c,v $
- * Revision 1.76  1993/07/08 11:51:39  pgf
+ * Revision 1.77  1993/07/15 10:37:58  pgf
+ * see 3.55 CHANGES
+ *
+ * Revision 1.76  1993/07/08  11:51:39  pgf
  * use setvbuf if USG and POSIX_TERMIOS, since svr4 doesn't have setbuffer
  * unless you have the ucb extensions (Solaris, anyway)
  *
@@ -425,6 +428,7 @@ ttclose()
 	ttclean(TRUE);
 }
 
+/*ARGSUSED*/
 void
 ttclean(f)
 int f;

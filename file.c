@@ -6,7 +6,10 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.96  1993/07/07 11:32:28  pgf
+ * Revision 1.97  1993/07/15 10:37:58  pgf
+ * see 3.55 CHANGES
+ *
+ * Revision 1.96  1993/07/07  11:32:28  pgf
  * use mlforce instead of mlwrite for write-status message
  *
  * Revision 1.95  1993/07/07  09:01:30  pgf
@@ -1481,9 +1484,10 @@ BUFFER	*bp;
         	return FALSE;
         }
  
+#ifdef MDCHK_MODTIME
 	if ( ! inquire_modtime( bp, fn ) )
 		return FALSE;
-  
+#endif  
         if ((s=ffwopen(fn)) != FIOSUC)       /* Open writes message. */
                 return FALSE;
 
@@ -1581,7 +1585,9 @@ BUFFER	*bp;
         if (s != FIOSUC)                        /* Some sort of error.  */
                 return FALSE;
 
+#ifdef MDCHK_MODTIME
 	set_modtime(bp, fn);
+#endif
 	imply_alt(fn, whole_file, FALSE);
         return TRUE;
 }

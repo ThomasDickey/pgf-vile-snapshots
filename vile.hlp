@@ -284,7 +284,11 @@ Text manipulation command:
 
 	The substitute command can be followed by any of 'g', a digit, or
 	'p', to do the substitution for all occurrences, the n'th
-	occurrence, or to print the resulting line respectively.
+	occurrence, or to print the resulting line respectively.  You can
+	also add a 'c', and you will be asked to confirm each replacement
+	before it occurs.  The text being replaced will be highlighted,
+	and you can answer with 'y', 'n', 'q', or 'a'.  'a' will suppress
+	further prompting, and will do the rest of the replacements.
 
 	The ":&" and '&' commands work much as they do in vi, and repeat
 	the last substitution.  The '^A-&' command is a new operator (see
@@ -900,12 +904,13 @@ Key Rebinding
 			C	(one char)
 			^C	(one char)
 			^C	(two chars)
-			0xNN	(four chars)
-			0XNN	(four chars)
+			\NNN	(max of four chars, where NNN are octal digits)
+			\xNNN	(max of five chars, where NNN are hex digits)
+			\n,\r,\t,\b,\f (two chars each, usual meanings)
+			\e	(two chars, means ESC)
 			<tab>	(five chars)
 			<sp>	(four chars)
 
-	Currently, the caret ('^') character must be specified in hex.
 
 	(The "one char" control character entries in the above table are
 	represented in this help file as two printable characters, to

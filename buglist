@@ -88,6 +88,8 @@ E	":e" and ":e!" should share the same prompt data, which should be
 
 E	the "ww" command (e.g., 'writeall()') emits multiple messages via
 	'mlforce()'; these go by too quickly to follow.
+	[ the alternative currently is to require a press-return, which some
+	  folks don't like. ]
 
 E	for consistency, 'execute-macro-nn' should be 'execute-macro nn';
 	doing this would allow modification to eliminate a fixed number of
@@ -162,6 +164,8 @@ Firstly - UNISYS 80286, EGA screen, 4DOS command shell & NNANSI.SYS
 4) Points 1) & 3) I have previuosly raised with Peter Ruczynski on his
    version.
 
+[ i don't know if any of these are still true -- this was with 3.25 ]
+
 
 ===================================================
 
@@ -185,29 +189,24 @@ because it handles command line file globbing, which your source does
 not support for DOS).
 
 
+[ i don't know if this is still true -- this was with 3.25 ]
+
 ===================================
 
 
 PCVILE
 
 
-1) PC-vile quickly exhausts DOS memory when it opens a large file
-   or a large tags file.  This can easily be fixed with a compiler
-   that supplies a DOS extender (ala Intel's CodeBuilder).  The
-   problems I was experiencing with attempts to "write to PRN" may
-   also be related to out-of-memory conditions that aren't being
-   trapped by DOS or the editor.
 
 2) If your screen starts out in 50-line mode when you enter PC-vile,
    and then exit, PC-vile puts the screen in 25-line mode.  Not
    nice.
+[ still true?  how do i test? ]
 
 3) If you start editing PC-vile with a full block cursor, PC-vile
    switches you back to a small underscore cursor.  Veeeeerrrrrrry
    unfriendly.
-
-4) The supplied makefile does not work under DOS due to command
-   line overflow (but you knew that).
+[ still true?  how do i test? ]
 
 ===================================================
 486 PC under Dell Unix (svr4) - make:    unixpc
@@ -258,6 +257,12 @@ Xvile has problems with mouse selections if the line has been sideways
 scrolled.  It moves to an earlier part of the line.  This is obviously a
 problem of convert mouse coordinates to a column position but neglecting
 to offset by the horizontally scrolling.
+----------------------------------
+related:
+xvile: When I am in cmode and I do a cut from a xterm and do a paste into
+xvile, the program messes up the format so it doesn't paste properly.  So
+it needs to gobble up the spaces when I am in cmode or something like that.
+
 ----------------------------------------------------------------------
 
 Enhancement:  xvile would be nicer with scroll bars.
@@ -282,6 +287,9 @@ of pattern.
 
 2) doing /\s stops at the end of a line and won't go any further (because
 the cursor rests on the last character of the line which is before the eol).
+
+[ these are both tricky to fix... i tried, and started introducing problems
+elsewhere. -pgf]
 
 ----------------------------------------------------------------------
 Also, I encountered the following problem: I am editing foo.tex and
@@ -458,19 +466,34 @@ I have a couple of bug reports and suggestions for you, concerning vile
 	I suggest that you redraw the entire screen after an ^X-!
 	command.  It frequently leaves my screen with a lot of garbage
         which I have to cure with an ^L.
+    [ unreproducible -- should only happen if the command writes directly
+    to /dev/tty, since we capture all stderr and stdout ]
 
 
 5) annoying
 	When I execute a keyboard macro using ^X-& I cannot repeat this
 	using the dot command. Instead, the last command in the macro
 	is repeated.
+    [ this is because . doesn't do @ macros either...]
 
 
-----------------------------------
+------------------------------
+I found a bug in vile3.54 with file completion. If I type:
+        :r ~/c/headed/aut<TAB>
+It correctly expands it to
+        ~/c/headed/author
+But says [No such file "~/c/headed/author"] while this file definitely
+exists.
 
-xile:
-With Xwindows, when you hit the title bar twice to make the window expand,
-it becoms enourmous.  This can be seen when using openwindows.
+[ can't reproduce this ]
 
-[i may have fixed this -- don't know, don't have openwindows to test on...
-	-pgf ]
+------------------------------
+
+I also found a hard-to-reproduce-bug where I would type some input very
+fast, usually involving ^X-!, :w, etc. after which vile would no longer
+accept any input. It is not completely stuck, because it still reacts
+to window resizes, but it can not be backgrounded. Neither does it
+react to a SIGSEGV. I tried to get it to coredump and have it save the
+file and send me a mail.... Sorry I can't be anymore specific.
+
+

@@ -1,3 +1,72 @@
+Changes for vile 3.55:
+(pgf)
+	+ new routine, mlquickask(), which prompts for and returns a single
+	  key answer from a user.  use this when getting a confirm from a
+	  user for a substitute command. (input.c, oneliner.c, proto.h)
+
+	+ documented the 'c' for confirm (vile.hlp)
+
+	+ the token() routine now expands numeric escape codes, like \nnn and
+	  \xNNN where nnn are octal and NNN are hex digits.  this may affect
+	  vilerc files that have \ sequences in them.  support for mapping
+	  to key-sequences like 0xNN is gone -- use \xNN instead.  this will
+	  make it easier to do multi-char maps in the future.
+
+	  note that \000 will cause internal problems, since things are null-
+	  terminated, and the sequences "<sp>", "<tab>", and "^C" are all
+	  problematic when multi-char sequences come around.
+
+(alistair)
+	+ added highlighted confirm to ":s" command.  (oneliner.c, display.c)
+
+(tom)
+	+ modified 'makebindlist()' (in bind.c) to format using tabs rather
+	  than spaces.
+
+	+ many mods to map.c (and bind.c) to eliminate redundancy between it
+	  and bind.c
+
+	+ modified 'prc2kcod()' to look for only one prefix, but allow
+	  hexadecimal code in form 0xff.
+
+	+ corrected a recursion bug in 'install_map()' (file map.c)
+
+	+ modified ":map" (file map.c) to show show mappings if no values are
+	  given.
+
+	+ fix strict gcc warnings in x11.c, consolidated some initialization
+	  code and corrected font-ascent value (so 9x15 works properly).
+
+	+ added "on" and "off" to literals in 'stol()' (file eval.c) to use
+	  this in x11.c
+
+	+ modified 'killbuffer()' in buffer.c to recognize a repeat-count
+	  (e.g., allows ^X-k within the buffer list to remove a succession of
+	  buffers).
+
+	+ fix strict gcc warnings in ansi.c
+
+	+ make command-history record properly for bind-key and map commands
+	  (files bind.c and map.c).
+
+	+ modified 'engl2fnc()' (in bind.c) to allow unique abbreviation (so
+	  that scripts don't have to be spelled out), added "se" symbol to
+	  cmdtbl for vi-compatibility.
+
+	+ modified 'docmd()' (file exec.c) to allow leading ':' in scripts
+	  for vi-compatibility.
+
+	+ corrected logic in modes.c to (re)allow trailing whitespace on
+	  the end of set-commands.
+
+	+ merged files makmktbl.tbc and makvile.tbc into makefile.tbc
+
+	+ eliminated 'VIDEO *' arguments from 'updateline()' in file display.c
+	  because the 'row' argument already provides this information.
+
+	+ added 'offs2col()' to correct position of highlighting when
+	  confirming substitutions.
+
 Changes for vile 3.54: (released Fri Jul 09, 1993)
 (pgf)
 	+ will now call setvbuf instead of setbuffer if USG defined in the
