@@ -4,7 +4,10 @@
  * All operating systems.
  *
  * $Log: termio.c,v $
- * Revision 1.74  1993/06/25 11:25:55  pgf
+ * Revision 1.75  1993/07/06 16:39:04  pgf
+ * integrated Tuan DANG's changes for the djgpp compiler under DOS
+ *
+ * Revision 1.74  1993/06/25  11:25:55  pgf
  * patches for Watcom C/386, from Tuan DANG
  *
  * Revision 1.73  1993/06/24  18:06:35  pgf
@@ -244,6 +247,10 @@
  */
 #include	"estruct.h"
 #include        "edef.h"
+
+#if GO32
+# include <pc.h>   /* for kbhit() */
+#endif
 
 #if UNIX
 
@@ -826,6 +833,10 @@ ttmiscinit()
 #include <conio.h>
 #endif
 
+#if GO32
+#include <gppconio.h>
+#endif
+
 #if     AMIGA
 #define NEW 1006L
 #define AMG_MAXBUF      1024L
@@ -865,7 +876,7 @@ short	iochan;				/* TTY I/O channel		*/
 #include        <bdos.h>
 #endif
 
-#if     MSDOS && (LATTICE || TURBO || WATCOM || AZTEC || MWC86 || ZTC)
+#if     MSDOS && ((!MSC && NEWDOSCC) || LATTICE || AZTEC)
 union REGS rg;		/* cpu register for use of DOS calls */
 int nxtchar = -1;	/* character held from type ahead    */
 #endif
@@ -1180,7 +1191,7 @@ ttgetc()
 	return getch();
 	}
 #endif
-#if	MSDOS && (LATTICE || TURBO || WATCOM || AZTEC || ZTC)
+#if	MSDOS && ((!MSC && NEWDOSCC) || LATTICE || AZTEC)
 	{
 	int c;
 
@@ -1231,7 +1242,7 @@ typahead()
 	return TRUE;
 #endif
 
-#if	MSDOS && (MSC || TURBO || WATCOM || ZTC)
+#if	MSDOS && NEWDOSCC
 	if (tungotc > 0)
 		return TRUE;
 

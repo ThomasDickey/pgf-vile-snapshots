@@ -6,7 +6,10 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.89  1993/07/01 16:15:54  pgf
+ * Revision 1.90  1993/07/06 16:39:04  pgf
+ * integrated Tuan DANG's changes for the djgpp compiler under DOS
+ *
+ * Revision 1.89  1993/07/01  16:15:54  pgf
  * tom's 3.51 changes
  *
  * Revision 1.88  1993/06/25  11:25:55  pgf
@@ -2198,7 +2201,7 @@ void
 mlerror(s)
 char	*s;
 {
-#if UNIX || TURBO || VMS || WATCOM
+#if UNIX || VMS || NEWDOSCC
 	if (errno > 0 && errno < sys_nerr)
 		mlforce("[%s: %s]", s, sys_errlist[errno]);
 #endif

@@ -6,7 +6,12 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.93  1993/07/01 16:15:54  pgf
+ * Revision 1.94  1993/07/06 12:34:53  pgf
+ * tweaks to the check-modtime behavior -- always prompt, whether prompted
+ * previously or not, when writing.  also, new routine to only check visible
+ * buffers' modtimes, for use after shell escapes.
+ *
+ * Revision 1.93  1993/07/01  16:15:54  pgf
  * tom's 3.51 changes
  *
  * Revision 1.92  1993/06/24  12:11:08  pgf
@@ -349,13 +354,14 @@ static	int	writereg P(( REGION *, char *, int, int, BUFFER * ));
 /*--------------------------------------------------------------------------*/
 
 #ifdef	MDCHK_MODTIME
-static	int	PromptModtime P(( BUFFER *, char *, char * ));
+static	int	PromptModtime P(( BUFFER *, char *, char *, int));
 
 static int
-PromptModtime (bp, fname, question)
+PromptModtime (bp, fname, question, iswrite)
 BUFFER	*bp;
 char	*fname;
 char	*question;
+int	iswrite;
 {
 	int status = SORTOFTRUE;
 	long current;
@@ -365,14 +371,33 @@ char	*question;
 	 && b_val(bp, MDCHK_MODTIME)
 	 && bp->b_active	/* only buffers that are loaded */
 	 && same_fname(fname, bp, FALSE)
-	 && get_modtime(bp, &current)
-	 && bp->b_modtime != current) {
-		(void)lsprintf(prompt,
-			"File for buffer %s has changed on disk.  %s",
-			bp->b_bname, question);
-		if ((status = mlyesno( prompt )) != TRUE) {
-			bp->b_modtime = current; /* avoid reprompts */
-   			mlerase();
+	 && get_modtime(bp, &current)) {
+		long check_against;
+		char *remind, *again;
+		if (iswrite) {
+			check_against = bp->b_modtime;
+			remind = "Reminder: ";
+			again = "";
+		} else {
+			remind = "";
+			if (bp->b_modtime_at_warn) {
+				check_against = bp->b_modtime_at_warn;
+				again = "again ";
+			} else {
+				check_against = bp->b_modtime;
+				again = "";
+			}
+		}
+
+		if (check_against != current) {
+			(void)lsprintf(prompt,
+			"%sFile for buffer \"%s\" has changed %son disk.  %s",
+				remind, bp->b_bname, again, question);
+			if ((status = mlyesno( prompt )) != TRUE) {
+				/* avoid reprompts */
+				bp->b_modtime_at_warn = current;
+				mlerase();
+			}
 		}
 	}
 	return status;
@@ -402,9 +427,10 @@ char *fn;
 {
 	long	current;
 
-	if (same_fname(fn, bp, FALSE)
-	 && get_modtime(bp, &current))
+	if (same_fname(fn, bp, FALSE) && get_modtime(bp, &current)) {
 		bp->b_modtime = current;
+		bp->b_modtime_at_warn = 0;
+	}
 }
 
 int
@@ -414,8 +440,7 @@ char *fn;
 {
 	int status = TRUE;
 
-	if (PromptModtime(bp, fn, "Read from disk") == TRUE) {
-		b_clr_changed(bp);
+	if (PromptModtime(bp, fn, "Read from disk", FALSE) == TRUE) {
 		status = readin(fn, TRUE, bp, TRUE);
 	}
 	return status;
@@ -427,7 +452,7 @@ BUFFER *bp;
 char *fn;
 {
 	register int status;
-	if ((status = PromptModtime(bp, fn, "Continue write")) != TRUE
+	if ((status = PromptModtime(bp, fn, "Continue write", TRUE)) != TRUE
 	 && (status != SORTOFTRUE)) {
 		mlforce("[Write aborted]");
 		return FALSE;
@@ -435,6 +460,7 @@ char *fn;
 	return TRUE;
 }
 
+#ifdef not_needed
 int
 check_all_modtimes ()
 {
@@ -442,6 +468,30 @@ check_all_modtimes ()
 
 	for_each_buffer(bp)
 		(void)check_modtime(bp, bp->b_fname);
+	return TRUE;
+}
+#endif
+
+int
+check_visible_modtimes ()
+{
+	register BUFFER *bp;
+	register WINDOW *wp;
+
+	for_each_window(wp) {
+		if (wp->w_bufp->b_nwnd > 1) {
+			/* don't prompt twice for a doubly-visible buffer */
+			register WINDOW *wp2;
+			for_each_window(wp2) {
+				if (wp->w_bufp == wp2->w_bufp)
+					break;
+			}
+			if (wp != wp2)  /* we've seen it before */
+				continue;
+		}
+		bp = wp->w_bufp;
+		(void)check_modtime(bp, bp->b_fname);
+	}
 	return TRUE;
 }
 #endif	/* MDCHK_MODTIME */

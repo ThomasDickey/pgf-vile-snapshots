@@ -2,7 +2,13 @@
  *		for MicroEMACS
  *
  * $Log: spawn.c,v $
- * Revision 1.57  1993/07/01 16:15:54  pgf
+ * Revision 1.59  1993/07/06 16:39:04  pgf
+ * integrated Tuan DANG's changes for the djgpp compiler under DOS
+ *
+ * Revision 1.58  1993/07/06  12:32:00  pgf
+ * only check visible buffers' modtimes after shell escape or pipe
+ *
+ * Revision 1.57  1993/07/01  16:15:54  pgf
  * tom's 3.51 changes
  *
  * Revision 1.56  1993/06/25  11:25:55  pgf
@@ -230,7 +236,7 @@ extern  short   iochan;                         /* In "termio.c"        */
  * Check all modification-times after executing a shell command
  */
 #ifdef	MDCHK_MODTIME
-#define	AfterShell()	check_all_modtimes()
+#define	AfterShell()	check_visible_modtimes()
 #else
 #define	AfterShell()	TRUE
 #endif
@@ -285,7 +291,7 @@ int f,n;
 	mlforce("[Not in TOS]");
 	return FALSE;
 #endif
-#if     MSDOS & (AZTEC | MSC | TURBO | ZTC | WATCOM)
+#if     MSDOS && (AZTEC || NEWDOSCC)
         movecursor(term.t_nrow, 0);             /* Seek to last line.   */
         TTflush();
 	TTkclose();
@@ -294,7 +300,7 @@ int f,n;
         sgarbf = TRUE;
         return AfterShell();
 #endif
-#if     MSDOS & LATTICE
+#if     MSDOS && LATTICE
         movecursor(term.t_nrow, 0);             /* Seek to last line.   */
         TTflush();
 	TTkclose();
@@ -350,7 +356,7 @@ int signo;
 # endif
 #endif
 #ifdef	MDCHK_MODTIME
-	(void)check_all_modtimes();
+	(void)check_visible_modtimes();
 #endif
 	SIGRET;
 }
@@ -939,7 +945,7 @@ register char   *cmd;
 }
 #endif
 
-#if	~AZTEC & ~MSC & ~TURBO & ~WATCOM & ~ZTC & MSDOS
+#if	MSDOS && MWC86
 
 /*
  * This routine, once again by Bob McNamara, is a C translation of the "system"
@@ -954,7 +960,6 @@ sys(cmd, tail)
 char    *cmd;
 char    *tail;
 {
-#if MWC86
         register unsigned n;
         extern   char     *__end;
 
@@ -962,15 +967,21 @@ char    *tail;
         n >>= 4;
         n = ((n + dsreg() + 16) & 0xFFF0) + 16;
         return(execall(cmd, tail, n));
-#endif
 
-#if LATTICE
-        return(forklp(cmd, tail, (char *)NULL));
-#endif
 }
 #endif
 
-#if	MSDOS & LATTICE
+#if LATTICE
+int
+sys(cmd, tail)
+char    *cmd;
+char    *tail;
+{
+        return(forklp(cmd, tail, (char *)NULL));
+}
+#endif
+
+#if	MSDOS && LATTICE
 /*	System: a modified version of lattice's system() function
 		that detects the proper switchar and uses it
 		written by Dana Hogget				*/

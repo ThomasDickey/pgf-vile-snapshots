@@ -14,7 +14,10 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.128  1993/07/01 16:18:26  pgf
+ * Revision 1.129  1993/07/06 16:39:04  pgf
+ * integrated Tuan DANG's changes for the djgpp compiler under DOS
+ *
+ * Revision 1.128  1993/07/01  16:18:26  pgf
  * oops -- mismerge
  *
  * Revision 1.127  1993/07/01  16:15:54  pgf
@@ -818,11 +821,13 @@ char	*argv[];
 #else
 # if MSDOS
 	signal(SIGINT,catchintr);
+#if ! GO32
 	{
 	/* clean up Warning from Watcom C */
 	void *ptrfunc = dos_crit_handler;
 	_harderr(ptrfunc);
 	}
+#endif
 # endif
 #endif
 
@@ -1195,7 +1200,9 @@ ACTUAL_SIGNAL(catchintr)
 	_hardresume((int)_HARDERR_FAIL);
 	return (int)_HARDERR_FAIL;
 # else
+#  if ! GO32
 	_hardresume(_HARDERR_FAIL);
+#  endif
 # endif
 }
 #endif

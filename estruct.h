@@ -10,7 +10,16 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.125  1993/07/01 16:15:54  pgf
+ * Revision 1.128  1993/07/06 16:55:12  pgf
+ * corrected calloc macro definition
+ *
+ * Revision 1.127  1993/07/06  16:39:04  pgf
+ * integrated Tuan DANG's changes for the djgpp compiler under DOS
+ *
+ * Revision 1.126  1993/07/06  12:32:50  pgf
+ * added b_modtime_at_warn to BUFFER
+ *
+ * Revision 1.125  1993/07/01  16:15:54  pgf
  * tom's 3.51 changes
  *
  * Revision 1.124  1993/06/30  10:05:54  pgf
@@ -583,6 +592,7 @@
 #define	ZTC	0	/* Zortech C compiler */
 #define	TURBO	0	/* Turbo C/MSDOS */
 #define	WATCOM	0	/* WATCOM C/386 version 9.0 or above */
+#define	GO32	0	/* DJ's GCC version 1.09 */
 
 #ifdef __TURBOC__ 	/* Borland C/C++ 3.0 */
 #undef TURBO
@@ -600,6 +610,27 @@
 #define SVR3   0
 #define MSDOS  1
 #define WATCOM 1
+#endif
+
+#ifdef __GO32__  	/* DJ's GCC version 1.09 */
+#undef GO32
+#undef SVR3
+#undef USG
+#undef MSDOS
+#define SVR3   0
+#define USG    0
+#define MSDOS  1
+#define GO32   1
+#endif
+
+/* As of version 3.51 of vile, NEWDOSCC should be correct for Turbo, Watcom,
+ *  and the DJ gcc (GO32) compilers.  I'm betting that it's also probably
+ *  correct for MSC (Microsoft C) and ZTC (Zortech), but I'm not sure of those.
+ */
+#if TURBO || WATCOM || MSC || GO32 || ZTC
+# define NEWDOSCC 1
+#else
+# define NEWDOSCC 0
 #endif
 
 #endif /* os_chosen */
@@ -627,7 +658,7 @@
 
 /* choose between void and int signal handler return type.
   "typedefs?  we don't need no steenking typedefs..." */
-#if POSIX || (BERK && BSD386) || SVR3 || APOLLO || TURBO || WATCOM
+#if POSIX || (BERK && BSD386) || SVR3 || APOLLO || NEWDOSCC
 # define SIGT void
 # define SIGRET
 #else
@@ -797,7 +828,7 @@ extern	char *	sys_errlist[];
 #define	set_errno(code)	errno = code
 
 /* use 'size_t' if we have it */
-#if POSIX || APOLLO || TURBO || VMS || WATCOM
+#if POSIX || APOLLO || VMS || NEWDOSCC
 #define	SIZE_T	size_t
 #else
 #define	SIZE_T	int
@@ -811,7 +842,7 @@ extern	char *	sys_errlist[];
 #endif
 
 #ifndef ANSI_PROTOS
-#  if defined(__STDC__) || VMS || TURBO || WATCOM
+#  if defined(__STDC__) || VMS || NEWDOSCC
 #    define ANSI_PROTOS 1
 #  else
 #    define ANSI_PROTOS 0
@@ -819,7 +850,7 @@ extern	char *	sys_errlist[];
 #endif
 
 #ifndef ANSI_VARARGS
-# if defined(__STDC__) || VMS || TURBO || WATCOM
+# if defined(__STDC__) || VMS || NEWDOSCC
 #  define ANSI_VARARGS 1	/* look in <stdarg.h> */
 # else
 #  define ANSI_VARARGS 0	/* look in <varargs.h> */
@@ -858,22 +889,32 @@ extern char *rindex();
 
 /*	System dependent library redefinitions, structures and includes	*/
 
-#if 	WATCOM
-#include      <dos.h>
-#include      <string.h>
+#if	NEWDOSCC
+#include <dos.h>
+#endif
+
+#if	NEWDOSCC && ! GO32
 #undef peek
 #undef poke
-#define       peek(a,b,c,d)   movedata(a,b,FP_SEG(c),FP_OFF(c),d)
-#define       poke(a,b,c,d)   movedata(FP_SEG(c),FP_OFF(c),a,b,d)
+#define	peek(a,b,c,d)	movedata(a,b,FP_SEG(c),FP_OFF(c),d)
+#define	poke(a,b,c,d)	movedata(FP_SEG(c),FP_OFF(c),a,b,d)
+#define	movmem(a, b, c)		memcpy(b, a, c)
+#endif
+
+#if 	WATCOM
+#include      <string.h>
+#endif
+
+#if 	WATCOM || GO32
+#define	movmem(a, b, c)		memcpy(b, a, c)
 #endif
 
 #if	TURBO
-#include      <dos.h>
-#include      <mem.h>
-#undef peek
-#undef poke
-#define       peek(a,b,c,d)   movedata(a,b,FP_SEG(c),FP_OFF(c),d)
-#define       poke(a,b,c,d)   movedata(FP_SEG(c),FP_OFF(c),a,b,d)
+#include <mem.h>
+#endif
+
+#if	MSC || ZTC
+#include <memory.h>
 #endif
 
 #if	LATTICE
@@ -955,19 +996,6 @@ union REGS {
 };
 #endif
 
-#if	MSDOS && ( MSC || ZTC )
-#include	<dos.h>
-#include	<memory.h>
-#define	peek(a,b,c,d)	movedata(a,b,FP_SEG(c),FP_OFF(c),d)
-#define	poke(a,b,c,d)	movedata(FP_SEG(c),FP_OFF(c),a,b,d)
-#define	movmem(a, b, c)		memcpy(b, a, c)
-#endif
-
-#if WATCOM
-#include <string.h>
-#define	movmem(a, b, c)		memcpy(b, a, c)
-#endif
-
 #if	MSDOS && LATTICE
 #undef	CPM
 #undef	LATTICE
@@ -987,7 +1015,7 @@ union REGS {
 #define	MEMMAP	0
 #endif
 
-#if	((MSDOS) && (LATTICE || AZTEC || MSC || TURBO || ZTC || WATCOM)) || UNIX || VMS
+#if	((MSDOS) && (LATTICE || AZTEC || NEWDOSCC)) || UNIX || VMS
 #define	ENVFUNC	1
 #else
 #define	ENVFUNC	0
@@ -1641,6 +1669,7 @@ typedef struct	BUFFER {
 #endif
 #ifdef	MDCHK_MODTIME
 	long	b_modtime;		/* file's last-modification time */
+	long	b_modtime_at_warn;	/* file's modtime when user warned */
 #endif
 	struct	BUFFER *b_relink; 	/* Link to next BUFFER (sorting) */
 	int	b_created;
@@ -1660,7 +1689,7 @@ typedef struct	BUFFER {
 #define	isInternalName(s) (isShellOrPipe(s) || is_internalname(s))
 #define	isAppendToName(s) (s[0] == '>' && s[1] == '>')
 
-#if TURBO || WATCOM || NeXT	/* tokens are replaced differently than apollo */
+#if NEWDOSCC || NeXT	/* tokens are replaced differently than apollo */
 #define	ScratchName(s) SCRTCH_LEFT    #s    SCRTCH_RIGHT
 #endif
 
@@ -2113,7 +2142,7 @@ typedef struct WHBLOCK {
 #include "unistd.h"
 #include "stdlib.h"
 #else
-# if APOLLO_STDLIB || VMS || TURBO || WATCOM
+# if APOLLO_STDLIB || VMS || NEWDOSCC
 #include <stdlib.h>
 # else
 #  if ! VMALLOC
@@ -2230,7 +2259,7 @@ extern	void	dofree P((char *));
 #undef	realloc
 #define	realloc	reallocate
 #undef	calloc
-#define	calloc	allocate
+#define	calloc(n,m)	allocate((n)*(m))
 #undef	malloc
 #define	malloc	allocate
 #undef	free

@@ -5,7 +5,10 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.67  1993/07/01 16:15:54  pgf
+ * Revision 1.68  1993/07/06 12:31:30  pgf
+ * new check_visible_modtimes() routine
+ *
+ * Revision 1.67  1993/07/01  16:15:54  pgf
  * tom's 3.51 changes
  *
  * Revision 1.66  1993/06/30  10:25:34  pgf
@@ -537,7 +540,10 @@ extern int get_modtime P(( BUFFER *, long * ));
 extern void set_modtime P(( BUFFER *, char * ));
 extern int check_modtime P(( BUFFER *, char * ));
 extern int inquire_modtime P(( BUFFER *, char * ));
+#ifdef not_needed
 extern int check_all_modtimes P(( void ));
+#endif
+extern int check_visible_modtimes P(( void ));
 #endif
 extern int no_such_file P(( char * ));
 extern int same_fname P(( char *, BUFFER *, int ));

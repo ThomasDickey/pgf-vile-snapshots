@@ -3,7 +3,10 @@
  *		strings.
  *
  * $Log: path.c,v $
- * Revision 1.13  1993/06/25 11:25:55  pgf
+ * Revision 1.14  1993/07/06 16:39:04  pgf
+ * integrated Tuan DANG's changes for the djgpp compiler under DOS
+ *
+ * Revision 1.13  1993/06/25  11:25:55  pgf
  * patches for Watcom C/386, from Tuan DANG
  *
  * Revision 1.12  1993/06/02  14:28:47  pgf
@@ -717,6 +720,9 @@ char *path;
 #endif
 		len = strlen(strcpy(temp, cwd));
 		temp[len++] = slash;
+#if GO32
+		temp[0] = slash;
+#endif
 		(void)strcpy(temp + len, f);
 		(void)strcpy(path, temp);
 	}
