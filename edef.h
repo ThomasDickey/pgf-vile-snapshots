@@ -8,7 +8,13 @@
 
 /*
  * $Log: edef.h,v $
- * Revision 1.46  1992/05/16 12:00:31  pgf
+ * Revision 1.48  1992/05/25 22:07:45  foxharp
+ * v 3.17
+ *
+ * Revision 1.47  1992/05/25  21:09:01  foxharp
+ * func. decls moved to proto.h
+ *
+ * Revision 1.46  1992/05/16  12:00:31  pgf
  * prototypes/ansi/void-int stuff/microsoftC
  *
  * Revision 1.45  1992/04/29  07:31:56  pgf
@@ -165,39 +171,6 @@
  * initial vile RCS revision
  */
 
-/* some global function declarations */
-
-char *flook();
-char *getctext();
-char *fnc2engl();
-char *tokval();
-#if ! SMALLER
-char *gtenv();
-char *gtfun();
-char *gtusr();
-char *l_itoa();
-char *ltos();
-char *mklower();
-char *mkupper();
-#endif
-#if ! VMALLOC
-char *malloc();
-char *realloc();
-#endif
-#include <string.h>
-#if USE_INDEX
-char *index();
-char *rindex();
-#endif
-char *token();
-char *prc2engl();
-CMDFUNC *engl2fnc();
-CMDFUNC *kcod2fnc();
-int prc2kcod();
-BUFFER  *bfind();               /* Lookup a buffer by name      */
-WINDOW  *wpopup();              /* Pop up window creation       */
-LINE    *lalloc();              /* Allocate a line              */
-
 /* I know this declaration stuff is really ugly, and I probably won't ever
  *	do it again.  promise.  but it _does_ make it easy to add/change
  *	globals.  Too bad about "comma".    -pgf
@@ -212,7 +185,7 @@ LINE    *lalloc();              /* Allocate a line              */
 #endif
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version three point sixteen");
+decl_init( char version[], "version three point seventeen");
 
 decl_init( int autoindented , -1);	/* how many chars (not cols) indented */
 decl_uninit( int isnamedcmd );		/* are we typing a command name */

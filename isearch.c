@@ -17,7 +17,10 @@
  * ever equalled FALSE.
  * 
  * $Log: isearch.c,v $
- * Revision 1.15  1992/05/19 08:55:44  foxharp
+ * Revision 1.16  1992/05/25 21:07:48  foxharp
+ * extern func declarations moved to header
+ *
+ * Revision 1.15  1992/05/19  08:55:44  foxharp
  * more prototype and shadowed decl fixups
  *
  * Revision 1.14  1992/05/16  12:00:31  pgf
@@ -65,8 +68,6 @@
 #include        "edef.h"
 
 #if	ISRCH
-
-extern int      scanner();	/* Handy search routine */
 
 #ifdef USE_REEAT
 /* A couple of "own" variables for re-eat */

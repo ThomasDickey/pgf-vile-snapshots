@@ -5,7 +5,12 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.4  1992/05/19 18:28:04  foxharp
+ * Revision 1.5  1992/05/25 21:28:37  foxharp
+ * took out extern decls of system and library calls, since they conflict
+ * more often than not, and added some more routine declarations that
+ * cextract (an old version) missed
+ *
+ * Revision 1.4  1992/05/19  18:28:04  foxharp
  * more proto-isms
  *
  * Revision 1.3  1992/05/19  09:15:45  foxharp
@@ -25,8 +30,7 @@
 # define P(a) ()
 #endif
 
-
-extern int main P(( int, char *a[] ));
+extern int main P(( int, char *[] ));
 extern void loop P(( void ));
 extern char * strmalloc P(( char * ));
 extern void global_val_init P(( void ));
@@ -206,9 +210,15 @@ extern void newscreensize P(( int, int ));
 extern int newwidth P(( int, int ));
 extern int newlength P(( int, int ));
 extern int atoi P(( char * ));
+extern char * l_itoa P(( int ));
+extern char * ltos P(( int ));
 extern int absol P(( int ));
 extern int stol P(( char * ));
 extern int gtlbl P(( char * ));
+extern char * gtenv P(( char * ));
+extern char * gtusr P(( char * ));
+extern char * mklower P(( char * ));
+extern char * mkupper P(( char * ));
 extern int sindex P(( char *, char * ));
 extern int ernd P(( void ));
 extern int getcline P(( void ));
@@ -284,6 +294,7 @@ extern int kifile P(( char * ));
 extern SIGT imdying P(( int ));
 extern void markWFMODE P(( BUFFER * ));
 extern int glob P(( char * ));
+extern char * flook P(( char *, int ));
 extern int ffropen P(( char * ));
 extern int ffwopen P(( char * ));
 extern int ffronly P(( char * ));
@@ -340,7 +351,7 @@ extern void lchange P(( int ));
 extern int linsert P(( int, int ));
 extern int ldelete P(( long, int ));
 extern int lnewline P(( void ));
-extern char *getctext P(( int ));
+extern char * getctext P(( int ));
 extern int putctext P(( char * ));
 extern int ldelnewline P(( void ));
 extern void kdelete P(( void ));
@@ -504,6 +515,7 @@ extern void nextch P(( MARK *, int ));
 extern int findpat P(( int, int, regexp *, int ));
 extern int spawncli P(( int, int ));
 extern SIGT rtfrmshell P(( int ));
+extern int bktoshell P(( int, int ));
 extern void pressreturn P(( void ));
 extern int respawn P(( int, int ));
 extern int spawn P(( int, int ));
@@ -588,8 +600,15 @@ extern int isnewviwordb P(( void ));
 extern int isendwordf P(( void ));
 extern int isendviwordf P(( void ));
 extern int toktyp P(( char * ));
+extern char * tokval P(( char * ));
+extern char * token P(( char *, char * ));
 extern int ffgetline P(( int * ));
 extern int kinsert P(( int ));
+extern char * fnc2engl P(( CMDFUNC * ));
+extern CMDFUNC * engl2fnc P(( char * ));
+extern CMDFUNC * kcod2fnc P(( int ));
+extern int prc2kcod P(( char * ));
+extern char * prc2engl P(( char * ));
 extern int fnc2key P(( CMDFUNC * ));
 extern int nextarg P(( char * ));
 extern int echochar P(( int, int ));
@@ -603,112 +622,4 @@ extern int fmatch P(( int ));
 extern int getfence P(( int, int ));
 extern int adjustmode P(( int, int ));
 extern void putdotback P(( BUFFER *, LINE * ));
-
-#include <sys/types.h>
-
-#if ( BERK && !POSIX ) || SVR3 || (MSDOS && MSC)
-typedef int pid_t;
-#endif
-
-#if (SVR3 && ! mips) || (MSDOS && MSC)
-typedef int gid_t;
-typedef int uid_t;
-#endif
-
-#if ! (MSDOS && MSC)
-extern void	_exit P(( int ));
-extern void exit P((int ));
-extern int	access P(( char *, int ));
-extern unsigned	alarm P(( unsigned ));
-extern int	chdir P(( char *));
-extern int	chown P(( char *, uid_t , gid_t ));
-extern int	close P(( int ));
-/* these all conflict with sunos 4.0.X decls, so live with warnings... */
-/* extern int	chmod P(( char *, mode_t )); */
-/* extern int	open P(( char *, int, ... )); */
-/* extern int mkdir P(( char *, mode_t )); */
-extern char	*ctermid P(( char * ));
-extern char	*cuserid P(( char * ));
-extern int	dup P(( int ));
-extern int	dup2 P(( int , int ));
-extern int	execl P(( char *, ... ));
-extern int	execle P(( char *, ... ));
-extern int	execlp P(( char *, ... ));
-extern int	execv P(( char *, char *a[] ));
-extern int	execve P(( char *, char *a[], char *e[] ));
-extern int	execvp P(( char *, char *a[] ));
-extern pid_t	fork P(( void ));
-extern long	fpathconf P(( int, int ));
-extern char	*getcwd P(( char *, int ));
-extern gid_t	getegid P(( void ));
-extern uid_t	geteuid P(( void ));
-extern gid_t	getgid P(( void ));
-extern int	getgroups P(( int , gid_t g[] ));
-extern char	*getlogin P(( void ));
-extern pid_t	getpgrp P(( void ));
-extern pid_t	getpid P(( void ));
-extern pid_t	getppid P(( void ));
-extern uid_t	getuid P(( void ));
-extern int	isatty P(( int ));
-extern int	link P(( char *, char *));
-extern off_t	lseek P(( int , off_t , int ));
-extern long	pathconf P(( char *, int ));
-extern int	pause P(( void ));
-extern int	pipe P(( int f[2] ));
-extern int	read P(( int f, char *, unsigned int ));
-extern int	rmdir P(( char *));
-extern int	setgid P(( gid_t ));
-extern int	setpgid P(( pid_t , pid_t ));
-extern pid_t	setsid P(( void ));
-extern int	setuid P(( uid_t uid ));
-extern int sleep P(( unsigned ));
-extern long	sysconf P(( int ));
-extern pid_t	tcgetpgrp P(( int ));
-extern int	tcsetpgrp P(( int , pid_t ));
-extern char	*ttyname P(( int ));
-extern int	unlink P(( char *));
-extern int	write P(( int , char *, unsigned int ));
-extern char *memcpy P(( char *, char *, int ));
-extern char *memset P(( char *, int, int ));
-extern int memcmp P((char *, char *, int ));
-extern int system P(( char * ));
-extern void abort P(( void ));
-extern int fread P(( char *, int, int, FILE * ));
-extern int fwrite P(( char *, int, int, FILE * ));
-extern int fseek P(( FILE *, long , ...));
-extern int fclose P(( FILE * ));
-extern int fflush P(( FILE * ));
-extern int fgetc P(( FILE * ));
-extern int fputc P(( int, FILE * ));
-extern void setbuf P(( FILE *, char * ));
-extern void setbuffer P(( FILE *, char *, int ));
-extern int ioctl P(( int, int , ...));
-extern int wait P(( int * ));
-extern void perror P(( char * ));
-extern int sscanf P(( char *, char *, ... ));
-extern int fprintf P((FILE *, char *, ...));
-extern int puts P((char *));
-extern void free P((char * ));
-extern int	kill P(( int, int ));
-#if HAVE_SELECT
-#include <sys/time.h>
-extern int select P((int, fd_set *, fd_set *, fd_set *, struct timeval *));
-#else
-# if HAVE_POLL
-extern int poll P(( struct pollfd *, long, int ));
-# endif
-#endif
-
-#if !defined(__STDC__)
-extern SIGT	(*signal())();
-#else
-# ifdef __STRICT_BSD__
-extern SIGT (*signal(int, SIGT (*)()))();
-# else
-extern SIGT (*signal(int, SIGT (*)(int)))(int);
-# endif
-#endif
-
-#endif /* MSDOS && MSC */
-
 

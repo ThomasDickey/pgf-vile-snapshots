@@ -10,9 +10,14 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.67  1992/05/20 18:57:16  foxharp
+ * Revision 1.69  1992/05/25 21:27:14  foxharp
+ * some func declarations moved in here, from edef.h and other .c files
+ *
+ * Revision 1.68  1992/05/25  21:25:35  foxharp
+ * bad control char in log comment
+ *
+ * Revision 1.67  1992/05/20  18:57:16  foxharp
  * added a/ux, fixed my stdarg ifdef
- * 
  *
  * Revision 1.66  1992/05/19  18:28:04  foxharp
  * more proto-isms
@@ -416,7 +421,7 @@
 #endif
 
 #ifndef HAVE_POLL
-# if POSIX || SVR3 || ( USG && defined(pyr) )
+# if !HAVE_SELECT && (POSIX || SVR3 || ( USG && defined(pyr) ))
 #  define HAVE_POLL 1
 # else
 #  define HAVE_POLL 0
@@ -523,13 +528,15 @@
 /* (i.e. you shouldn't need to touch anything below here */
 /* ====================================================================== */
 
-#if BERK
+#if BERK && ! POSIX
 #define USE_INDEX 1
 #endif
 
 #ifdef USE_INDEX
 #define strchr index
 #define strrchr rindex
+extern char *index();
+extern char *rindex();
 #endif
 
 /*	System dependent library redefinitions, structures and includes	*/
@@ -1473,7 +1480,30 @@ typedef struct WHBLOCK {
 #include <varargs.h>
 #endif
 
+#include <sys/types.h>
 #include <stdio.h>
+#include <string.h>
+
+#if POSIX
+#include "unistd.h"
+#include "stdlib.h"
+#else
+# if ! VMALLOC
+ extern char *malloc();
+ extern char *realloc();
+# endif
+extern char *getenv();
+#endif
+#if ! USG
+extern char *getwd();
+extern char *getcwd();
+#endif
+
+#if HAVE_SELECT
+#include <sys/time.h>
+#endif
+
+
 
 #include "proto.h"
 
