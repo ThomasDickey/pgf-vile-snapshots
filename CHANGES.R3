@@ -259,6 +259,8 @@ MISCELLANEOUS
 - the find-next-error code now honors the "Entering/Leaving directory"
 	messages that GNU make (and others?) puts out.
 
+- job control now works right
+
 IMPLEMENTORS NOTES:
 ===================
 
@@ -293,6 +295,9 @@ IMPLEMENTORS NOTES:
 	chunks attached to the buffer structure, and not from the malloc
 	pool directly.  So lfree() and lalloc() now take a buffer pointer
 	argument.
+
+- there is "line poisoning" code, in line.c, which trashes the contents of
+	freed lines and LINE structs, to make it easier to find bad usage.
 
 - do_fl_region() is a convenient wrapper for writing operator commands that
 	work on full lines -- there isn't yet a similar wrapper for partial

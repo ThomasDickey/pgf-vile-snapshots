@@ -3,7 +3,12 @@
  * commands. There is no functional grouping here, for sure.
  *
  * $Log: random.c,v $
- * Revision 1.75  1992/08/06 23:55:07  foxharp
+ * Revision 1.76  1992/08/19 23:06:06  foxharp
+ * handle DOS's multiple current directories better (i.e. one per drive), and
+ * allow npopen to follow PATH to find "pwd", since it isn't always in /bin.
+ * sheesh.
+ *
+ * Revision 1.75  1992/08/06  23:55:07  foxharp
  * changes to canonical pathnames and directory changing to support DOS and
  * its drive designators
  *
@@ -932,21 +937,16 @@ current_directory(force)
 int force;
 {
 	char *s;
-	static char	dirname[NFILEN*2];
+	static char	dirname[NFILEN];
 	static char *cwd;
-
-#if MSDOS	/* drive switching makes the caching not work right */
-	force = TRUE;
-#endif
 
 	if (!force && cwd)
 		return cwd;
-
 #if USG
 	{
 	FILE *f, *npopen();
 	int n;
-	f = npopen("/bin/pwd", "r");
+	f = npopen("pwd", "r");
 	if (f == NULL) {
 		npclose(f);
 		return NULL;
@@ -960,7 +960,7 @@ int force;
 #else
 # if MSDOS & MSC
 
-	cwd = getcwd(dirname, NFILEN*2);
+	cwd = getcwd(dirname, NFILEN);
 # else
 	cwd = getwd(dirname);
 # endif
@@ -968,17 +968,23 @@ int force;
 	s = strchr(cwd, '\n');
 	if (s)
 		*s = '\0';
+#if MSDOS & MSC
+	update_dos_drv_dir(cwd);
+#endif
+
 	return cwd;
 }
 
 #if MSDOS
 
+/* returns drive _letter_ */
 int
 curdrive()
 {
 	return (bdos(0x19, 0, 0) & 0xff) + 'A';
 }
 
+/* take drive _letter_ as arg. */
 int
 setdrive(d)
 int d;
@@ -991,27 +997,57 @@ int d;
 #endif
 }
 
+
+static int curd;
+static char *cwds[26];
+
 char *
 curr_dir_on_drive(drive)
 int drive;
 {
-	int curd;
-	static char cwd[512];
-
 	if (drive == 0)
 		return current_directory(FALSE);
 
-	curd = curdrive();
-	if (curd == drive)
+	if (curd == 0)
+		curd = curdrive();
+
+	if (cwds[drive-'A'])
+		return cwds[drive-'A'];
+	else
+		cwds[drive-'A'] = (char *)malloc(NFILEN);
+
+	if (!cwds[drive-'A'])
 		return current_directory(FALSE);
 
 	if (setdrive(drive) == TRUE) {
-		strcpy(cwd, current_directory(TRUE));
+		strcpy(cwds[drive-'A'], current_directory(TRUE));
 		setdrive(curd);
-		return cwd;
-	} else {
-		return current_directory(FALSE);
+		(void)current_directory(TRUE);
+		return cwds[drive-'A'];
 	}
+	return current_directory(FALSE);
+}
+
+void
+update_dos_drv_dir(cwd)
+char *cwd;
+{
+	char drive = 0;
+	if (isupper(cwd[0]) && cwd[1] == ':') {
+		drive = *cwd;
+		cwd += 2;
+	}
+	if (!drive)
+		return;
+
+	if (!cwds[drive-'A'])
+		cwds[drive-'A'] = (char *)malloc(NFILEN);
+
+	if (!cwds[drive-'A'])
+		return;
+
+	strcpy(cwds[drive-'A'],cwd);
+	
 }
 #endif
 
@@ -1064,8 +1100,10 @@ char	*dir;
 	if (isupper(exdp[0]) && exdp[1] == ':') {
 		if (setdrive(exdp[0]) == TRUE) {
 			exdp += 2;
-			if (!*exdp)
+			if (!*exdp) {
+				pwd(TRUE,1);
 				return TRUE;
+			}
 		} else {
 			return FALSE;
 		}
@@ -1078,6 +1116,7 @@ char	*dir;
     }
 #if MSDOS
     setdrive(curd);
+    current_directory(TRUE);
 #endif
     mlforce("[Couldn't change to \"%s\"]", exdir);
     return FALSE;

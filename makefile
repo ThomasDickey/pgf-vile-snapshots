@@ -1,26 +1,31 @@
 #
 # makefile for vile.  
-# Various targets in the makefile support various systems -- if yours isn't
-#  here, and none of the one's provided will work, then edit estruct.h, and
-#  use "make default"
-# The command/name/key/function bindings are defined in the file "cmdtbl". The
-#  mktbls program parses this to produce nebind.h, nename.h, and nefunc.h,
-#  which are used by the rest of the build.
 #
-#  The version number (currently three something) is found near the top of
-#  edef.h, and is displayed with the '*' and ":version" commands.
-# 		Paul Fox
+# Not much user-configuration is usually needed.  Various targets in the
+# makefile support various systems -- if yours isn't here, and none of the
+# one's provided will work, then edit estruct.h, and use "make default".
+# For a list of the pre-defined targets, just type "make".
 #
-# original makefile for uemacs:	Adam Fritz	July 30,1987
+# The command/name/key/function bindings are defined in the file "cmdtbl". 
+# The mktbls program parses this to produce nebind.h, nename.h, and
+# nefunc.h, which are used by the rest of the build.
+#
+# The version number is found near the top of edef.h, and is displayed with
+# the '*' and ":version" commands, or by invoking vile with "-V".
+#
+# Paul Fox
+#
+# original makefile for uemacs: Adam Fritz July 30,1987  (do you recognize it?)
 #
 
+# some old make's don't predefine this:
 #MAKE=/bin/make
 #MAKE=/usr/bin/make
 
-# To change screen driver modules, change SCREEN below, and edit estruct.h to
-#  make sure the correct one is #defined as "1", and the others all as "0"
-# If you use tcap.c, you'll need libtermcap.a too.
-# If you use x11.c,  you'll need libX11.a too.
+# To change screen driver modules, change SCREEN and SCRDEF below, OR edit
+# estruct.h to make sure the correct one is #defined as "1", and the others
+# all as "0".  If you use tcap.c, you'll need libtermcap.a too.  If you use
+# x11.c, you'll need libX11.a too.
 
 # for regular use
 SCREEN = tcap
@@ -131,21 +136,21 @@ OBJ = main.$O $(SCREEN).$O basic.$O bind.$O buffer.$O crypt.$O \
 # please report bugs with these config options
 
 all:
-	@echo "	there is no longer an unnamed target"			;\
+	@echo "	there is no longer a default unnamed target"		;\
 	echo "	please use one of the following:"			;\
 	echo "	make bsd	(for pure, older BSD systems)"		;\
-	echo "	make bsd_posix	(for BSD with some POSIX support"	;\
+	echo "	make bsd_posix	(for BSD with some POSIX support)"	;\
 	echo "	make bsd386"						;\
 	echo "	make att	(traditional USG sytems)"		;\
-	echo "	make att_posix	(newer, with POSIX support"		;\
-	echo "	make svr3	(early 386 UNIX, for instance"		;\
+	echo "	make att_posix	(newer, with POSIX support)"		;\
+	echo "	make svr3	(early 386 UNIX, for instance)"		;\
 	echo "	make sunos	(sunos 3 or 4)"				;\
 	echo "	make ultrix"						;\
 	echo "	make mach	(just pure bsd)"			;\
 	echo "	make svr4	(untested)"				;\
 	echo "	make mips	(uses systemV stuff)"			;\
 	echo "	make odt	(open desktop -- variant of svr3)"	;\
-	echo "	make isc	(interactive -- another such variant"	;\
+	echo "	make isc	(interactive -- another such variant)"	;\
 	echo "	make hpux"						;\
 	echo "	make next	(NeXT)"					;\
 	echo "	make sony	(Sony News -- very BSD)"		;\
@@ -431,7 +436,10 @@ $(OBJ): estruct.h edef.h
 externs.$O: nebind.h nename.h nefunc.h
 
 # $Log: makefile,v $
-# Revision 1.68  1992/08/07 18:05:27  pgf
+# Revision 1.69  1992/08/20 08:58:05  foxharp
+# final cleanup preparing to release version four
+#
+# Revision 1.68  1992/08/07  18:05:27  pgf
 # fixed mips systype botch
 #
 # Revision 1.67  1992/08/04  20:12:00  foxharp

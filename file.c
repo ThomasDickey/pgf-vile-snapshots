@@ -6,7 +6,10 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.58  1992/08/06 23:55:07  foxharp
+ * Revision 1.59  1992/08/19 22:56:50  foxharp
+ * no longer need to multiply or add to NFILEN
+ *
+ * Revision 1.58  1992/08/06  23:55:07  foxharp
  * changes to canonical pathnames and directory changing to support DOS and
  * its drive designators
  *
@@ -1551,7 +1554,7 @@ char *buf;
 {
 #if UNIX
 	char *cp;
-	char cmd[NFILEN+50];
+	char cmd[NFILEN];
 	FILE *cf;
 	FILE *npopen();
 
@@ -1778,7 +1781,7 @@ char *f;
 	/* if we mismatched in the last component of cwd, then the file
 		is under '..' */
 	if (strchr(cwd,slash) == NULL) {
-		static char path[NFILEN*4];
+		static char path[NFILEN];
 		strcpy(path,"..");
 		strcat(path,slp);
 		return path;

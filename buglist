@@ -26,7 +26,8 @@ E	everybody and their sibling wants "map", "map!", and "abb".
 	if an @a macro invoked a @b macro, or a ^X-& macro, there'd be
 	reentrancy problems.
 
-E	add "set autowrite", ":n file" (what does that do?)
+E	add "set autowrite", ":n file" (what does that do?), "set nu", "set
+	noredraw"
 
 E	now that paragraphs, sections, and sentences are all selectable
 	with regexps, they (and the tabstop value) are prime candidates for
@@ -71,9 +72,7 @@ E	need a "file newer than buffer" warning.  Should stat the file, and
 	testing, then you want to be warned that the file is out of date
 	after doing a test run of the script.
 
-E	should be able to refer to remote tags file, and have paths
-	contained there be relative to _its_ location, rather than the current
-	directory.  possibly a tagspath, and/or multiple tags files as well.
+E	should implement tagpath, and/or multiple tags files as well.
 
 E	it would be nice if ^X!! reran the last command into [Output]
 
@@ -81,8 +80,6 @@ E	add support for sh or C comments to formatregion() code
 
 E	g should become a region command.  Then it could take ranges, as
 	it should, and could also become an operator command.
-
-E	add C comments to CFENCE matching code
 
 E	adjust window size of popups based on length of buffer.  currently
 	popups get half the window they're splitting, no matter what
@@ -96,7 +93,8 @@ E	mlreply line should ideally be a one line buffer, so editing
 
 E	BSD interrupt processing is botched during a read() of the keyboard.
 	The read doesn't return -1 as it does under sysV (USG).
-	So you can bang on ^C all day and nothing will happen.
+	So you can bang on ^C all day and nothing will happen.  It does work
+	if you're not in a read(), of course.
 	
 E	I haven't even come close to testing vile for
 	memory-full conditions.  Some malloc() packages give 95%
@@ -120,94 +118,18 @@ E	vi lets you say: "set ai nows ic".  These must be separate commands
 	in vile.
 
 
-User contributed:
--------------------------
+E	When a line is too long to fit on the screen, you have to move
+	over it to see the rest, and when you get to the edge of the screen,
+	it jumps. I would prefer a smooth(er) scroll.
 
-  Any way of adding :ab???  :ab is too useful.   
+E	File completion would be nice for commands asking for filenames.
+	This saves a lot of typing.
 
--------------------------
- - I miss some :set commands
-
-H)    :set nu     ( I use when I manipulate lines, deleting, writing etc.)
-HH)   :set aw     ( useful for shell escape; should write all buffers 
-                    for which it is set in case of a shell escape )
-L)    :set noredraw ( When I am logged in over a modem (several hours/week)
-                      I could use such a mode. )
-
-M) - In vi you can do :n file. Should be trivial.
-
-M) - As you said, :map is one of vi's better features.
- 
-M) - When a line is too long to fit on the screen, you have to move
-     over it to see the rest, and when you get to the edge of the screen,
-     it jumps. I would prefer a smooth(er) scroll.
-
-L) - Your helpfile could do with a command summary at the beginning,
-     so I don't have to hunt through the file to find what I need.
-
-L) - There is a very useful command summary for vi, called vi.ref.
-     Its available with anonymous ftp from star.cs.vu.nl, directory /maarten.
-     It would be great if this could be edited for vile.
-
---------------------------------------------
-
-This code will not compile because of confusion about how #if works.
-`#if VAR' is correct only if VAR has been previously #defined.
-There are many places in vile where #if VAR was used, but #ifdef or
-#if defined() would have been more correct. Use of the #if construct
-in vile causes compilation to abort.
-
-[ I think his compiler is broken -- pgf ]
-
----------------------------------
-
-
-2. File completion would be nice for commands asking for filenames.
-This saves a lot of typing.
-
-----------------------------------------------
-In vi, you can put a number infront of just about every command, and that
-command will be done <number> of times.  
-
-Why doesn't this work for insert?  
-
-Suppose I want to insert 80 dashes on a line.  80i-<ESC>  But this
-doesn't work in vile.  (Yes, I know there is other ways of doing it,
-but this seemed the easiest way to remember).
-
-
-I found a problem when using vile with encrypted files.  During a file edit if I
-set the mode to crypt and save the file, I am prompted for a encryption key.
-
-When I try to read in this encrypted file in another session using
-	
-	vile -kcryptkey file
-
-I am prompted for the encrypt key and when I type it in, I get the message
-
-	Encryption String: IOT trap
-
--------------------------------------------------- 
-
-I tried porting the shell macro package which came with uemacs but the
-main problem arises because you cannot trap a carriage return once you
-are in insert mode.  I managed to sort of get it to work by inserting,
-escaping and then hitting another key to execute the command.  It works
-but feels like a dog when you do it.  Any ideas on neat way to trap the
-carriage return?  I'd really like a shell in a window (even if it is
-only simple stdout collection).  Its really useful if you do lots of
-greps etc.  The only solution I can come up with is to use the escape
-as the carriage return, i.e. once the user escapes execute.  It would
-be nicer to use proper carriage return though.
-
-
--------------------------------------------------- 
-
-I get lots of scribbles on my screen
-when I use the horizontal scrolling ^X^R and ^X^L.  It appears that the
-last byte or two from the cursor position sequence (cup in terminfo, cm in
-termcap).  Specifics: in an xterm with cup=\E[%i%p1%d;%p2%dH and moving
-around on the line (especially moving left off the screen, or doing __
-back into a window that was ^X^R) gives me a bunch of HH5H8H2H8H scribbled
-in some part of the screen.
+L	"I found a problem when using vile with encrypted files.  During a file
+	edit if I set the mode to crypt and save the file, I am prompted
+	for a encryption key.  When I try to read in this encrypted file in
+	another session using "vile -kcryptkey file".  I am prompted for
+	the encrypt key and when I type it in, I get the message
+	"Encryption String: IOT trap".  "  [ Anyone wanting to work on this,
+	I can send you more info -- pgf ]
 

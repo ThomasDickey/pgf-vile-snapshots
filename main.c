@@ -14,7 +14,22 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.79  1992/07/15 08:56:28  foxharp
+ * Revision 1.83  1992/08/19 22:59:05  foxharp
+ * catch SIGINT and critical errors under DOS, glob command line args,
+ * and clean up debug log ifdefs
+ *
+ * Revision 1.82  1992/08/18  22:39:59  foxharp
+ * prevent double zotting of VILEINIT buffer by delaying setting the
+ * BFSCRTCH flag (which probably isn't necessary anyway)
+ *
+ * Revision 1.81  1992/08/11  23:29:53  foxharp
+ * fixed core from vileinit buf getting killed too early -- no longer
+ * a scratch buffer
+ *
+ * Revision 1.80  1992/08/07  21:41:09  foxharp
+ * cosmetic ifdef cleanup
+ *
+ * Revision 1.79  1992/07/15  08:56:28  foxharp
  * find our basename, so we can come up in view mode if named "view".
  *
  * Revision 1.78  1992/07/13  22:14:37  foxharp
@@ -320,7 +335,7 @@ int _STKLOW = 0;		/* default is stack above heap (small only) */
 unsigned _stklen = 32768;
 #endif
 
-#if UNIX
+#if UNIX || MSDOS
 #include	<signal.h>
 #endif
 
@@ -335,10 +350,6 @@ unsigned _stklen = 32768;
 
 #ifndef GOOD
 #define GOOD	0
-#endif
-
-#ifdef DEBUGLOG
-extern FILE *FF;
 #endif
 
 int
@@ -382,9 +393,7 @@ char	*argv[];
 	else
 		us++;
 
-#ifdef DEBUGLOG
 	start_debug_log(argc,argv);
-#endif
 
 	charinit();		/* character types -- we need these pretty
 					early  */
@@ -595,6 +604,9 @@ char	*argv[];
 			/* Process an input file */
 
 			/* set up a buffer for this file */
+#if MSDOS
+			(void)glob(argv[carg]);
+#endif
 			makename(bname, argv[carg]);
 			unqname(bname,FALSE);
 
@@ -615,8 +627,8 @@ char	*argv[];
 
 	/* initialize the editor */
 #if UNIX
-	signal(SIGHUP,imdying);
 	signal(SIGINT,catchintr);
+	signal(SIGHUP,imdying);
 #ifdef SIGBUS
 	signal(SIGBUS,imdying);
 #endif
@@ -634,6 +646,11 @@ char	*argv[];
 #if defined(SIGWINCH) && ! X11
 	signal(SIGWINCH,sizesignal);
 #endif
+#else
+# if MSDOS
+	signal(SIGINT,catchintr);
+	_harderr(dos_crit_handler);
+# endif
 #endif
 	vtinit();		/* Display */
 	winit();		/* windows */
@@ -676,7 +693,7 @@ char	*argv[];
 				obp->b_flag |= BFCHG;
 			}
 
-			if ((vbp=bfind("[vileinit]", OK_CREAT, BFSCRTCH))==NULL)
+			if ((vbp=bfind("[vileinit]", OK_CREAT, 0))==NULL)
 				exit(1);
 			/* mark the buffer as read only */
 			make_local_b_val(vbp,MDVIEW);
@@ -697,11 +714,9 @@ char	*argv[];
 				swbuffer(obp);
 				obp->b_flag = oflags;
 			}
-#ifdef NEEDED
-	unnecessary -- swbuffer/undispbuff did this already due to BFSCRTCH
-			/* remove the now unneeded buffer and exit */
+			/* remove the now unneeded buffer */
+			vbp->b_flag |= BFSCRTCH;  /* make sure it will go */
 			zotbuf(vbp);
-#endif
 		} else {
 			char *fname;
 			/* if .vilerc is one of the input files....
@@ -1095,16 +1110,24 @@ global_val_init()
 
 }
 
-#if UNIX
+#if UNIX || MSDOS
 SIGT
 catchintr(signo)
 int signo;
 {
 	interrupted = TRUE;
-#if USG
+#if USG || MSDOS
 	signal(SIGINT,catchintr);
 #endif
 	SIGRET;
+}
+#endif
+
+#if MSDOS
+void
+dos_crit_handler()
+{
+	_hardresume(_HARDERR_FAIL);
 }
 #endif
 
@@ -1543,7 +1566,7 @@ int size;	/* number of bytes to move */
 }
 #endif
 
-#if	(AZTEC | TURBO | LATTICE | ZTC) & MSDOS
+#if	(AZTEC || TURBO || LATTICE || ZTC) && MSDOS
 /*	strncpy:	copy a string...with length restrictions
 			ALWAYS null terminate
 Hmmmm...
@@ -1648,7 +1671,6 @@ mallocdbg(f,n)
 }
 #endif
 
-#ifdef DEBUGLOG
 
 /*
  *	the log file is left open, unbuffered.  thus any code can do 
@@ -1659,16 +1681,21 @@ mallocdbg(f,n)
  *	to log events without disturbing the screen
  */
 
+#ifdef DEBUGLOG
+/* suppress the declaration so that the link will fail if someone uses it */
 FILE *FF;
+#endif
 
+void
 start_debug_log(ac,av)
 int ac;
 char **av;
 {
+#ifdef DEBUGLOG
 	int i;
 	FF = fopen("vilelog", "w");
 	setbuf(FF,NULL);
 	for (i = 0; i < ac; i++)
 		fprintf(FF,"arg %d: %s\n",i,av[i]);
-}
 #endif
+}

@@ -4,7 +4,10 @@
  * All operating systems.
  *
  * $Log: termio.c,v $
- * Revision 1.47  1992/08/04 20:14:58  foxharp
+ * Revision 1.48  1992/08/19 23:02:47  foxharp
+ * ignore errors in ttunclean
+ *
+ * Revision 1.47  1992/08/04  20:14:58  foxharp
  * invert sense of ifdef -- it seems filio.h isn't as common as I thought
  *
  * Revision 1.46  1992/07/24  07:49:27  foxharp
@@ -360,10 +363,7 @@ ttunclean()
 #if ! LINUX
 	tcdrain(1);
 #endif
-	if (tcsetattr(0, TCSADRAIN, &ntermios) < 0) {
-		perror("ttunclean: tcsetattr");
-		exit(1);
-	}
+	tcsetattr(0, TCSADRAIN, &ntermios);
 #endif
 }
 

@@ -5,7 +5,10 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.20  1992/08/06 23:55:07  foxharp
+ * Revision 1.21  1992/08/19 23:00:37  foxharp
+ * new DOS routines for directory manip.
+ *
+ * Revision 1.20  1992/08/06  23:55:07  foxharp
  * added routines that deal with DOS drives
  *
  * Revision 1.19  1992/08/04  20:09:31  foxharp
@@ -105,6 +108,7 @@ extern int visual P(( int, int ));
 extern int ex P(( int, int ));
 extern int nullproc P(( int, int ));
 extern void charinit P(( void ));
+extern void start_debug_log P(( int , char ** ));
 extern void tcapopen P(( void ));
 extern void tcapclose P(( void ));
 extern void tcapkopen P(( void ));
@@ -512,11 +516,6 @@ extern int fmatchindent P(( void ));
 extern void catnap P(( int ));
 extern int istring P(( int, int ));
 extern char * current_directory P(( int ));
-#if MSDOS
-extern char * curr_dir_on_drive P(( int ));
-extern int curdrive P(( void ));
-extern int setdrive P(( int ));
-#endif
 extern int cd P(( int, int ));
 extern int pwd P(( int, int ));
 extern int set_directory P(( char * ));
@@ -697,4 +696,12 @@ extern	void x_preparse_args P(( int *, char *** ));
 extern  void x_set_geometry P(( char * ));
 extern	void x_set_dpy P(( char * ));
 extern void setcursor P(( int, int ));
+#endif
+
+#if MSDOS
+extern char * curr_dir_on_drive P(( int ));
+extern int curdrive P(( void ));
+extern int setdrive P(( int ));
+extern void update_dos_drv_dir P(( char * ));
+extern void dos_crit_handler P(( void ));
 #endif
