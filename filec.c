@@ -4,7 +4,10 @@
  *	Filename prompting and completion routines
  *
  * $Log: filec.c,v $
- * Revision 1.8  1993/04/01 15:50:34  pgf
+ * Revision 1.9  1993/04/02 11:00:40  pgf
+ * ls-style directory reading moved to path.c.  thanks -- much better, tom.
+ *
+ * Revision 1.8  1993/04/01  15:50:34  pgf
  * for sysV machines, without POSIX or BSD dirent, we now have code
  * that enumerates directories using /bin/ls.
  *
@@ -435,7 +438,6 @@ char *	name;
 {
 	register char	*s;
 
-#if ! USE_LS_FOR_DIRS
 	DIR	*dp;
 	DIRENT	*de;
 
@@ -494,52 +496,6 @@ char *	name;
 		}
 		(void)closedir(dp);
 	}
-#else
-	char	path[NFILEN];
-	char	filen[NFILEN];
-	char	lscmd[NFILEN + 4];
-	FILE *dp;
-
-	int	iflag;
-
-	(void)strcpy(path, name);
-	if (!is_directory(path)) {
-		*pathleaf(path) = EOS;
-		if (!is_directory(path))
-			return;
-	}
-
-	if (already_scanned(path))
-		return;
-
-	lsprintf(lscmd,"/bin/ls %s", path);
-
-	if ((dp = npopen(lscmd, "r")) != NULL) {
-
-		s = path;
-		s += force_slash(path);
-
-		while ((fgets(s, NFILEN, dp)) != NULL) {
-			s[strlen(s)-1] = EOS; /* tromp the newline */
-#if UNIX
-			if (!strcmp(s, ".")
-			 || !strcmp(s, ".."))
-			 	continue;
-#endif
-			if (only_dir) {
-				if (!is_directory(path))
-					continue;
-				iflag = -TRUE;
-			} else {
-				iflag = (global_g_val(GMDDIRC) && is_directory(path))
-					? -TRUE
-					: TRUE;
-			}
-			(void)bs_find(path, (int)strlen(path), MyBuff, iflag, (LINE **)0);
-		}
-		(void)npclose(dp);
-	}
-#endif
 }
 
 /*

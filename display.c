@@ -6,7 +6,10 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.71  1993/04/01 13:06:31  pgf
+ * Revision 1.72  1993/04/02 10:58:37  pgf
+ * first of probably many ioctl.h fixups :-(
+ *
+ * Revision 1.71  1993/04/01  13:06:31  pgf
  * turbo C support (mostly prototypes for static)
  *
  * Revision 1.70  1993/03/29  11:18:59  pgf
@@ -256,7 +259,11 @@
 #   include <termio.h>
 #  else
 #   if BERK
-#    include "ioctl.h"
+#    if APOLLO
+#     include <sys/ioctl.h>
+#   else
+#     include "ioctl.h"
+#    endif
 #   endif
 #  endif
 # endif
@@ -2204,9 +2211,9 @@ int *widthp, *heightp;
 	*heightp = 0;
 #ifdef TIOCGWINSZ
 	if (ioctl (0, TIOCGWINSZ, (caddr_t)&size) == 0) {
-		if (size.ws_row > 0)
+		if ((int)(size.ws_row) > 0)
 			*heightp = size.ws_row;
-		if (size.ws_col > 0)
+		if ((int)(size.ws_col) > 0)
 			*widthp = size.ws_col;
 	}
 	if (*widthp <= 0) {

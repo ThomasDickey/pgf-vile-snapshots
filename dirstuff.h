@@ -5,7 +5,11 @@
  *	Include this after "estruct.h"
  *
  * $Log: dirstuff.h,v $
- * Revision 1.2  1993/04/01 15:50:34  pgf
+ * Revision 1.3  1993/04/02 10:57:41  pgf
+ * cleanup of ls-based directory enumeration, and support (unused as yet?)
+ * for old-style directories
+ *
+ * Revision 1.2  1993/04/01  15:50:34  pgf
  * for sysV machines, without POSIX or BSD dirent, we now have code
  * that enumerates directories using /bin/ls.
  *
@@ -37,12 +41,13 @@ typedef	struct	{
 #else
 
 #define USE_LS_FOR_DIRS 0
+#define OLD_STYLE_DIRS 0	/* e.g., pre-SysV.2 14-char names */
 
 #if POSIX
 # include <dirent.h>
 # define	DIRENT	struct dirent
 #else	/* apollo & other old bsd's */
-# if BSD
+# if BERK
 #  include <sys/dir.h>
 #  define	DIRENT	struct direct
 # else
@@ -53,8 +58,24 @@ typedef	struct	{
 
 #endif	/* VMS */
 
-#if !UNIX
+#if USE_LS_FOR_DIRS
+#define	DIR	FILE
+typedef	struct	{
+	short	d_namlen;
+	char	d_name[NFILEN];
+	} DIRENT;
+#endif
+
+#if VMS || USE_LS_FOR_DIRS
 extern	DIR *	opendir P(( char * ));
 extern	DIRENT *readdir P(( DIR * ));
 extern	int	closedir P(( DIR * ));
+#endif
+
+#if OLD_STYLE_DIRS
+#define	DIR	FILE
+#define	DIRENT	struct direct
+#define	opendir(n)	fopen(n,"r")
+extern	DIRENT *readdir P(( DIR * ));
+#define	closedir(dp)	fclose(dp)
 #endif

@@ -1,17 +1,45 @@
 
+Changes for vile 3.41:
+(tom)
+	+ ifdef ioctl.h for APOLLO (note: you shouldn't use '"'-form for system
+	  includes, since that could pick up files in the current directory,
+	  and also because it does weird things to the include-path).
+
+	+ moved code to support USE_LS_FOR_DIRS from filec.c to path.c, making
+	  it look like unix-style directory routines.  Added ifdef for
+	  OLD_STYLE_DIRS just in case...
+
+	+ modified 'slowreadf()' in file.c so that piped input scrolls from the
+	  bottom of the window, rather than the middle.
+
 Changes for vile 3.40:
 (pgf)
 
 	+ the makefile no longer supplies any -I options.  this will cause some
-	  machines to not find "ioctl.h" where it's in the sys subdirectory, but
-	  I just spent a day tracking a bug caused by picking up the wrong system
-	  headers (i needed the gcc "fixincludes", and they had moved).
+	  machines to not find "ioctl.h" where it's in the sys subdirectory,
+	  but I just spent a day tracking a bug caused by picking up the wrong
+	  system headers (i needed the gcc "fixincludes", and they had moved).
 
 	+ now honor LINES and COLUMNS in getscreensize (display.c)
 
 	+ now handle searching multiple tags files specified in "set tags"
 
 	+ bugfix to fences.c, which fixes indentation when inserting '}'
+
+	+ added firstnonwhite() calls to godotplus, so we can publish it as
+	  "whole-lines" (files basic.c, cmdtbl).
+
+	+ added 'setjmp()' code to files main.c, input.c to handle ^C with
+	  BSD-style signals.
+
+	+ added define USE_LS_FOR_DIRS to files dirstuff.h and filec.c to
+	  accommodate systems w/o a 'readdir()' function.
+
+	+ corrected $pagewid (was returning length instead of width) in file
+	  eval.c
+
+	+ use lsprintf to form [Macro nn] names (file exec.c)
+
 (tom)
 	+ corrected 'ffwopen()' in fileio.c so that write of current buffer on
 	  VMS works properly (forgot to strip version number).
@@ -31,7 +59,7 @@ Changes for vile 3.40:
 	  vmsvt.c vt52.c window.c word.c wordmov.c x11.c z309.c z_ibmpc.c
 
 	+ moved macro 'P' from file proto.h to estruct.h, adjusted definitions
-	  in file 'estruct.h' to allow use of 'P' macro in CMDFUNC definition.
+	  in file 'estruct.h' to allow use of 'P' macro in CMDFUNC definition. 
 	  Added definition of type 'CmdFunc' for the actual pointer-type.
 
 	+ use P-macro for TERM struct definitions (and added TTscroll),

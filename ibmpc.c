@@ -7,7 +7,10 @@
  * display type.
  *
  * $Log: ibmpc.c,v $
- * Revision 1.10  1992/08/20 23:40:48  foxharp
+ * Revision 1.11  1993/04/02 09:48:48  pgf
+ * tom's changes for turbo
+ *
+ * Revision 1.10  1992/08/20  23:40:48  foxharp
  * typo fixes -- thanks, eric
  *
  * Revision 1.9  1992/07/08  08:23:57  foxharp
@@ -17,7 +20,7 @@
  * pgf cleanup (in general I can't leave well enough alone...).  somewhere
  * along the way I made it work properly -- I think the problem was a missing
  * page number in ibmputc() -- but it might have been a badly calculated
- * attribute byte somewhere else...
+ * attribute byte somewhere else...
  *
  * Revision 1.7  1992/06/25  23:00:50  foxharp
  * changes for dos/ibmpc
@@ -39,7 +42,6 @@
 
 #define	termdef	1			/* don't define "term" external */
 
-#include        <stdio.h>
 #include        "estruct.h"
 #include        "edef.h"
 
@@ -69,37 +71,42 @@ char drvname[][8] = {			/* screen resolution names	*/
 	"CGA", "MONO", "EGA", "VGA"
 };
 long scadd;				/* address of screen ram	*/
-short *scptr[NROW];			/* pointer to screen lines	*/
+unsigned short *scptr[NROW];		/* pointer to screen lines	*/
 unsigned short sline[NCOL];		/* screen line image		*/
 int egaexist = FALSE;			/* is an EGA card available?	*/
-union REGS rg;				/* cpu register for use of DOS calls */
+extern union REGS rg;			/* cpu register for use of DOS calls */
 
-extern  void     ttopen();               /* Forward references.          */
-extern  int     ttgetc();
-extern  void     ttputc();
-extern  void     ttflush();
-extern  void     ttclose();
-extern  int     ibmmove();
-extern  int     ibmeeol();
-extern  int     ibmeeop();
-extern  int     ibmbeep();
-extern  int     ibmopen();
-extern	int     ibmrev();
-extern	int	    ibmcres();
-extern	int	    ibmclose();
-extern	int	    ibmputc();
-extern	int	    ibmkopen();
-extern	int	    ibmkclose();
+					/* Forward references.          */
+extern  void	ibmmove   P((int,int));
+extern  void	ibmeeol   P((void));
+extern  void	ibmeeop   P((void));
+extern  void	ibmbeep   P((void));
+extern  void    ibmopen   P((void));
+extern	void	ibmrev    P((int));
+extern	int	ibmcres   P((int));
+extern	void	ibmclose  P((void));
+extern	void	ibmputc   P((int));
+extern	void	ibmkopen  P((void));
+extern	void	ibmkclose P((void));
 
 #if	COLOR
-extern	int	ibmfcol();
-extern	int	ibmbcol();
+extern	void	ibmfcol   P((int));
+extern	void	ibmbcol   P((int));
 
 int	cfcolor = -1;		/* current forground color */
 int	cbcolor = -1;		/* current background color */
 int	ctrans[] =		/* ansi to ibm color translation table */
 	{0, 4, 2, 6, 1, 5, 3, 7};
 #endif
+
+static	void	egaopen   P((void));
+static	void	egaclose  P((void));
+static	void	vgaopen   P((void));
+static	void	vgaclose  P((void));
+
+static	int	scinit    P((int));
+static	int	setboard  P((int));
+static	int	getboard  P((void));
 
 int ibmtype;		/* pjr - what to do about screen resolution */
 
@@ -115,7 +122,7 @@ TERM    term    = {
         MARGIN,
         SCRSIZ,
         NPAUSE,
-        ibmopen,
+	ibmopen,
         ibmclose,
         ibmkopen,
         ibmkclose,
@@ -136,19 +143,22 @@ TERM    term    = {
 };
 
 #if	COLOR
+void
 ibmfcol(color)		/* set the current output color */
 int color;	/* color to set */
 {
-        cfcolor = ctrans[color];
+	cfcolor = ctrans[color];
 }
 
+void
 ibmbcol(color)		/* set the current background color */
 int color;	/* color to set */
 {
-        cbcolor = ctrans[color];
+	cbcolor = ctrans[color];
 }
 #endif
 
+void
 ibmmove(row, col)
 {
 	rg.h.ah = 2;		/* set cursor position function code */
@@ -159,6 +169,7 @@ ibmmove(row, col)
 }
 
 /* erase to the end of the line */
+void
 ibmeeol()
 {
 	unsigned short *lnptr;	/* pointer to the destination line */
@@ -177,6 +188,7 @@ ibmeeol()
 }
 
 /* put a character at the current position in the current colors */
+void
 ibmputc(ch)
 int ch;
 {
@@ -193,6 +205,7 @@ int ch;
 
 }
 
+void
 ibmeeop()
 {
 	int attr;		/* attribute to fill screen with */
@@ -212,14 +225,14 @@ ibmeeop()
 	int86(0x10, &rg, &rg);
 }
 
-
+void
 ibmrev(state)		/* change reverse video state */
 int state;	/* TRUE = reverse, FALSE = normal */
 {
 	/* This never gets used under the IBM-PC driver */
 }
 
-
+int
 ibmcres(res)	/* change screen resolution */
 int res;	/* resolution to change to */
 {
@@ -239,6 +252,7 @@ spal()	/* reset the palette registers */
 	/* nothing here now..... */
 }
 
+void
 ibmbeep()
 {
 #if	MWC86
@@ -248,13 +262,15 @@ ibmbeep()
 #endif
 }
 
+void
 ibmopen()
 {
 	scinit(ibmtype);
 	revexist = TRUE;
-        ttopen();
+	ttopen();
 }
 
+void
 ibmclose()
 
 {
@@ -268,20 +284,23 @@ ibmclose()
 		vgaclose();
 }
 
+void
 ibmkopen()	/* open the keyboard */
 {
 }
 
+void
 ibmkclose()	/* close the keyboard */
 {
 }
 
+static int
 scinit(type)	/* initialize the screen head pointers */
 int type;	/* type of adapter to init for */
 {
 	union {
 		long laddr;	/* long form of address */
-		short *paddr;	/* pointer form of address */
+		unsigned short *paddr;	/* pointer form of address */
 	} addr;
 	int i;
 
@@ -405,7 +424,8 @@ int getboard()
  * variable in the rc file rather than trying to figure out automatically
  * which board is present, anyhow people may prefer 25 lines!
  */
-int setboard(type)
+static int
+setboard(type)
 int type;	/* board requested and type to return */
 {
 
@@ -435,8 +455,8 @@ int type;	/* board requested and type to return */
 	return(type);
 }
 
+static void
 egaopen()	/* init the computer to work with the EGA */
-
 {
 	/* put the beast into EGA 43 row mode */
 	rg.x.ax = 3;
@@ -460,14 +480,15 @@ egaopen()	/* init the computer to work with the EGA */
 	outp(0x3d5, 6);
 }
 
+static void
 egaclose()
-
 {
 	/* put the beast into 80 column mode */
 	rg.x.ax = 3;
 	int86(16, &rg, &rg);
 }
 
+static void
 vgaopen()	/* init the computer to work with the VGA */
 {
 	/* put the beast into VGA 50 row mode */
@@ -483,6 +504,7 @@ vgaopen()	/* init the computer to work with the VGA */
 	int86(16, &rg, &rg);
 }
 
+static void
 vgaclose()
 {
 	/* put the beast back into normal 80 column mode */
@@ -490,6 +512,7 @@ vgaclose()
 	int86(16, &rg, &rg);
 }
 
+void
 scwrite(row, col, nchar, outstr, forg, bacg)	/* write a line out*/
 int row, col, nchar;	/* row,col of screen to place outstr (len nchar) on */
 char *outstr;	/* string to write out (must be term.t_ncol long) */

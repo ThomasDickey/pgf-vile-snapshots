@@ -10,7 +10,10 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.106  1993/04/01 14:43:39  pgf
+ * Revision 1.107  1993/04/02 10:59:13  pgf
+ * vms needs setjmp.h
+ *
+ * Revision 1.106  1993/04/01  14:43:39  pgf
  * fix for NeXT
  *
  * Revision 1.105  1993/04/01  13:07:50  pgf
@@ -582,7 +585,7 @@
 # endif
 #endif
 
-#if UNIX || MSDOS
+#if UNIX || MSDOS || VMS
 #include	<setjmp.h>
 #endif
 

@@ -390,7 +390,7 @@ shar: link.msc /tmp/vilevers
 			-o shardir/vileshar `ls $(EVERYTHING)` link.msc
 
 bigshar: link.msc /tmp/vilevers
-	@echo Do you need to rebuild the revlist????
+	@echo 'Do you need to rebuild the revlist????'
 	vilevers=`cat /tmp/vilevers`; \
 	shar -spgf@cayman.com -nvile$${vilevers} \
 	    -o vile$${vilevers}shar README `ls $(EVERYTHING) | \
@@ -399,7 +399,7 @@ bigshar: link.msc /tmp/vilevers
 
 /tmp/vilevers: ALWAYS
 	expr "`egrep 'version\[\].*' edef.h`" : \
-		'.*\([0-9][0-9]*\.[0-9][0-9]*\).*' >/tmp/vilevers
+		'.* \([0-9][0-9]*\.[0-9].*\)".*' >/tmp/vilevers
 
 # only uucp things changed since last time
 uuto:
@@ -510,12 +510,20 @@ $(OBJ): estruct.h nemode.h edef.h # proto.h
 ALWAYS:
 
 bind.$O:	epath.h
+filec.$O:	dirstuff.h
 eval.$O:	nevars.h
 externs.$O:	nebind.h nename.h nefunc.h
+path.$O:	dirstuff.h
 vmalloc$O:	nevars.h
 
 # $Log: makefile,v $
-# Revision 1.97  1993/04/01 14:44:30  pgf
+# Revision 1.99  1993/04/02 15:23:36  pgf
+# more permissible in naming bigshar file
+#
+# Revision 1.98  1993/04/02  11:01:50  pgf
+# dependency updates
+#
+# Revision 1.97  1993/04/01  14:44:30  pgf
 # added -DNeXT for NeXT machines
 #
 # Revision 1.96  1993/04/01  12:55:37  pgf
