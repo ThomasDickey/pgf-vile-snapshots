@@ -6,7 +6,7 @@ H	The mvrightwind and mvleftwind functions are broken -- visiting lines
 	cause junk on the screen.
 
 E	DOS to-do:
-	- glomming (e.g. ":e *.c") does nothing under DOS -- the code in
+	- globbing (e.g. ":e *.c") does nothing under DOS -- the code in
 	expand_wild_args() can probably be used to accomplish this.
 	- filter-region -- this would be easier if I had used named pipes
 	as the conduit between child and parent, instead of regular pipes,
@@ -17,6 +17,9 @@ E	DOS to-do:
 	allow 256 bindings instead of the current 128, and we can't use
 	0x80 as the definition of the SPEC bit.  All this is easy -- it
 	just needs to be done.
+	- there used to be a "set screen {25|43|50} command -- what happened
+	to it?  should 'set-variable $sres "CGA"' do the same thing?  if not,
+	what's it for?
 
 E	should add a "show-vars" command
 
@@ -61,7 +64,7 @@ E	should add an option to support file locking, rather than the
 	get that style of locking right anyway.
 
 E	the scrsearch functions could become region based -- as in "search for
-	the next occrence of the region", which would usually be a word.  And
+	the next occurrence of the region", which would usually be a word.  And
 	the ^A/ version could become "a/ (search for teh contents of buffer a),
 	if you know what I mean.
 

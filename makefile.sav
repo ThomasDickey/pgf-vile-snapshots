@@ -435,7 +435,7 @@ $(OBJ): estruct.h edef.h
 
 externs.$O: nebind.h nename.h nefunc.h
 
-# $Log: makefile,v $
+# $Log: makefile.sav,v $
 # Revision 1.71  1992/08/28 08:55:08  foxharp
 # switch from -g to -O for releaseh
 #

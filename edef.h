@@ -9,7 +9,16 @@
 
 /*
  * $Log: edef.h,v $
- * Revision 1.63  1992/08/19 22:55:20  foxharp
+ * Revision 1.66  1992/08/28 09:08:01  foxharp
+ * changed tagsrelative to tagrelative, because of name conflict w/ tags
+ *
+ * Revision 1.65  1992/08/27  08:31:39  foxharp
+ * version four, finally
+ *
+ * Revision 1.64  1992/08/20  23:40:48  foxharp
+ * typo fixes -- thanks, eric
+ *
+ * Revision 1.63  1992/08/19  22:55:20  foxharp
  * v. 3.25
  *
  * Revision 1.62  1992/07/24  18:20:08  foxharp
@@ -232,7 +241,7 @@
 #endif
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version three point twenty-five");
+decl_init( char version[], "version four");
 
 decl_init( char slash, '/'); 		/* so DOS can use '\' as path separator */
 
@@ -309,7 +318,7 @@ decl_uninit( char golabel[NPAT] );	/* current line to go to	*/
 decl_uninit( int execlevel );		/* execution IF level		*/
 decl_init( int	eolexist, TRUE );	/* does clear to EOL exist	*/
 decl_uninit( int revexist );		/* does reverse video exist?	*/
-decl_uninit( int flickcode );		/* do flicker supression?	*/
+decl_uninit( int flickcode );		/* do flicker suppression?	*/
 decl_uninit( int curtabval );		/* current tab width		*/
 
 decl_init( MARK nullmark, { NULL comma 0 } );
@@ -338,7 +347,7 @@ struct VALNAMES b_valuenames[] = {
 	{ "showmatch"	comma "sm" comma VALTYPE_BOOL } comma
 	{ "showmode"	comma "smd" comma VALTYPE_BOOL } comma
 	{ "tabinsert"	comma "ti" comma VALTYPE_BOOL } comma
-	{ "tagsrelative"comma "tr" comma VALTYPE_BOOL } comma
+	{ "tagrelative" comma "tr" comma VALTYPE_BOOL } comma
 	{ "terse"	comma "X"  comma VALTYPE_BOOL } comma
 	{ "view"	comma "X"  comma VALTYPE_BOOL } comma
 	{ "wrapscan"	comma "ws" comma VALTYPE_BOOL } comma
@@ -352,7 +361,7 @@ struct VALNAMES b_valuenames[] = {
 	{ "taglength"	comma "tl" comma VALTYPE_INT } comma
 
 	{ "cwd"		comma "X"  comma VALTYPE_STRING } comma
-	{ "tags"	comma "tag" comma VALTYPE_STRING } comma
+	{ "tags"	comma "X" comma VALTYPE_STRING } comma
 
 	{ "c-suffixes"	comma "csuf" comma VALTYPE_REGEX } comma
 	{ "comments"	comma "X" comma VALTYPE_REGEX } comma
@@ -437,7 +446,7 @@ decl_init( int	kbdplayreg, -1 );	/* register currently playing back */
 decl_uninit( int kbdrep );		/* number of repetitions	*/
 decl_uninit( int seed );		/* random number seed		*/
 decl_uninit( long envram );		/* # of bytes current used malloc */
-decl_uninit( int macbug );		/* macro debuging flag		*/
+decl_uninit( int macbug );		/* macro debugging flag		*/
 decl_init( char	errorm[], "ERROR" );	/* error literal		*/
 decl_init( char	truem[], "TRUE" );	/* true literal			*/
 decl_init( char	falsem[], "FALSE" );	/* false litereal		*/

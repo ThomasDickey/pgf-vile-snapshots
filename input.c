@@ -3,7 +3,10 @@
  *		5/9/86
  *
  * $Log: input.c,v $
- * Revision 1.44  1992/07/24 07:49:38  foxharp
+ * Revision 1.45  1992/08/20 23:40:48  foxharp
+ * typo fixes -- thanks, eric
+ *
+ * Revision 1.44  1992/07/24  07:49:38  foxharp
  * shorten_name changes
  *
  * Revision 1.43  1992/07/18  13:13:56  foxharp
@@ -184,11 +187,11 @@ char *prompt;
 #if	NeWS
 		newsimmediateon() ;
 		mlprompt(,"%s [y/n]? ",prompt);
-		c = tgetc();		/* get the responce */
+		c = tgetc();		/* get the response */
 		newsimmediateoff() ;
 #else
 		mlprompt("%s [y/n]? ",prompt);
-		c = tgetc();		/* get the responce */
+		c = tgetc();		/* get the response */
 #endif
 
 		if (c == kcod2key(abortc))		/* Bail out! */
@@ -310,14 +313,14 @@ int eatit;  /* consume the character? */
 			if (dotcmdrep > 1)
 				return dotcmdm[0];
 		} else {
-			/* at the end of last repitition? */
+			/* at the end of last repetition? */
 			if (--dotcmdrep < 1) {
 				dotcmdmode = STOP;
 				dotcmdbegin(); /* immediately start recording
 						   again, just in case */
 			} else {
 
-				/* reset the macro to the begining
+				/* reset the macro to the beginning
 					for the next rep */
 				dotcmdptr = &dotcmdm[0];
 				if (eatit)
@@ -344,12 +347,12 @@ int eatit;  /* consume the character? */
 				return (int)*kbdptr;
 		}
 
-		/* at the end of last repitition? */
+		/* at the end of last repetition? */
 		if (--kbdrep < 1) {
 			kbdmode = STOP;
 		} else {
 
-			/* reset the macro to the begining for the next rep */
+			/* reset the macro to the beginning for the next rep */
 			kbdptr = &kbdm[0];
 			if (eatit)
 				return (int)*kbdptr++;

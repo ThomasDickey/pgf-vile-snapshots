@@ -2,7 +2,10 @@
  *	HP110:	Hewlett Packard 110 Screen Driver
  *
  * $Log: hp110.c,v $
- * Revision 1.4  1992/05/16 12:00:31  pgf
+ * Revision 1.5  1992/08/20 23:40:48  foxharp
+ * typo fixes -- thanks, eric
+ *
+ * Revision 1.4  1992/05/16  12:00:31  pgf
  * prototypes/ansi/void-int stuff/microsoftC
  *
  * Revision 1.3  1991/09/10  01:19:35  pgf
@@ -176,7 +179,7 @@ h110cres()	/* change screen resolution */
 	return(TRUE);
 }
 
-spal()		/* change pallette register */
+spal()		/* change palette register */
 
 {
 	/*   not here */

@@ -4,7 +4,10 @@
  * do any sentence mode commands, they are likely to be put in this file. 
  *
  * $Log: word.c,v $
- * Revision 1.20  1992/06/12 22:23:42  foxharp
+ * Revision 1.21  1992/08/20 23:40:48  foxharp
+ * typo fixes -- thanks, eric
+ *
+ * Revision 1.20  1992/06/12  22:23:42  foxharp
  * changes for separate 'comments' r.e. for formatregion
  *
  * Revision 1.19  1992/06/03  08:40:22  foxharp
@@ -91,7 +94,7 @@ wrapword(f,n)
 int f,n;
 {
 	register int cnt;	/* size of word wrapped to next line */
-	register int c;		/* charector temporary */
+	register int c;		/* character temporary */
 
 	/* backup from the <NL> 1 char */
 	if (!backchar(0, 1))
@@ -353,7 +356,7 @@ int f,n;
 int
 formatregion()
 {
-	register int c;			/* current char durring scan	*/
+	register int c;			/* current char during scan	*/
 	register int wordlen;		/* length of current word	*/
 	register int clength;		/* position on line during fill	*/
 	register int i;			/* index during word copy	*/

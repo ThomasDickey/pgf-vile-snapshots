@@ -8,7 +8,10 @@
  *  Last Updated: 07/14/87
  *
  * $Log: vmsvt.c,v $
- * Revision 1.2  1991/08/07 12:35:07  pgf
+ * Revision 1.3  1992/08/20 23:40:48  foxharp
+ * typo fixes -- thanks, eric
+ *
+ * Revision 1.2  1991/08/07  12:35:07  pgf
  * added RCS log messages
  *
  * revision 1.1
@@ -167,7 +170,7 @@ vmscres()
 
 #if	COLOR
 /***
- *  vmsfcol  -  Set the forground color (not implimented)
+ *  vmsfcol  -  Set the foreground color (not implemented)
  *
  *  Nothing returned
  ***/
@@ -176,7 +179,7 @@ vmsfcol()
 }
 
 /***
- *  vmsbcol  -  Set the background color (not implimented)
+ *  vmsbcol  -  Set the background color (not implemented)
  *
  *  Nothing returned
  ***/

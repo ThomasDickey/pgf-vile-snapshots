@@ -4,7 +4,10 @@
  *	written 11-feb-86 by Daniel Lawrence
  *
  * $Log: bind.c,v $
- * Revision 1.23  1992/06/04 19:45:14  foxharp
+ * Revision 1.24  1992/08/20 23:40:48  foxharp
+ * typo fixes -- thanks, eric
+ *
+ * Revision 1.23  1992/06/04  19:45:14  foxharp
  * cast strlen() to int for new ANSI promotion semantics :-(
  *
  * Revision 1.22  1992/05/19  08:55:44  foxharp
@@ -853,7 +856,7 @@ char *k;		/* name of key to translate to Command key form */
 /* translate printable code (like "M-r") to english command name */
 char *
 prc2engl(skey)	/* string key name to binding name.... */
-char *skey;	/* name of keey to get binding for */
+char *skey;	/* name of key to get binding for */
 {
 	char *bindname;
 

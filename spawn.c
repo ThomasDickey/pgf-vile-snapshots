@@ -2,7 +2,15 @@
  *		for MicroEMACS
  *
  * $Log: spawn.c,v $
- * Revision 1.30  1992/08/19 23:02:01  foxharp
+ * Revision 1.32  1992/08/21 18:18:19  foxharp
+ * cleaned up job control -- sort of.  how can I tell if someone wants
+ * the arg to getpgrp or not, since if they don't want it, their prototypes
+ * will get me...
+ *
+ * Revision 1.31  1992/08/20  23:40:48  foxharp
+ * typo fixes -- thanks, eric
+ *
+ * Revision 1.30  1992/08/19  23:02:01  foxharp
  * send SIGTSTP to whole pgrp, not just to pid
  *
  * Revision 1.29  1992/07/07  08:37:13  foxharp
@@ -148,7 +156,7 @@ extern  short   iochan;                         /* In "termio.c"        */
 #endif
 
 /*
- * Create a subjob with a copy of the command intrepreter in it. When the
+ * Create a subjob with a copy of the command interpreter in it. When the
  * command interpreter exits, mark the screen as garbage so that you do a full
  * repaint. The message at the start in VMS puts out a newline.
  * Under some (unknown) condition, you don't get one free when DCL starts up.
@@ -160,11 +168,11 @@ int f,n;
 {
 #if     UNIX
 # if     NeWS
-	mlforce("[Not availible under NeWS]");
+	mlforce("[Not available under NeWS]");
 	return(FALSE);
 # else
 #  if 	X11
-	mlforce("[Not availible under X11]");
+	mlforce("[Not available under X11]");
 	return(FALSE);
 #  else
         register char *cp;
@@ -235,28 +243,20 @@ int
 bktoshell(f,n)		/* suspend and wait to wake up */
 int f,n;
 {
-#if UNIX && defined(SIGTSTP)
-# if     NeWS
-	mlforce("[Not availible under NeWS]");
-	return(FALSE);
-# else
-#  if X11
-	mlforce("[Not availible under X11]");
-	return(FALSE);
-#  else
-	int pid;
-
+#if UNIX && defined(SIGTSTP) && !X11  && !NeWS
 	vttidy(TRUE);
 # if BERK
 	killpg(getpgrp(0), SIGTSTP);
 # else
+#  if AIX /* strict prototypes -- doesn't like the (0) */
+	kill(-getpgrp(), SIGTSTP);
+#  else
 	kill(-getpgrp(0), SIGTSTP);
-# endif
-	return TRUE;
 #  endif
-# endif
+#endif
+	return TRUE;
 #else
-	mlforce("[Not availible]");
+	mlforce("[Job control unavailable]");
 	return FALSE;
 #endif /* SIGTSTP */
 }
@@ -412,7 +412,7 @@ int rerun;
 		strcpy(STcmd,line);
 		STargs = NULL;
 	}
-	else {  /* seperate out the args from the command */
+	else {  /* separate out the args from the command */
 		/* resist the temptation to do ptr arithmetic */
 		STcmd = malloc(strlen(line) + 1);
 		for(i = 0,sptr = &line[0]; sptr != tptr; sptr++,i++)
@@ -606,11 +606,11 @@ pipecmd(f, n)
         }
 #endif
 #if     VMS
-	mlforce("[Not availible under VMS]");
+	mlforce("[Not available under VMS]");
 	return(FALSE);
 #endif
 #if     CPM
-        mlforce("[Not availible under CP/M-86]");
+        mlforce("[Not available under CP/M-86]");
         return(FALSE);
 #endif
 	/* get the command to pipe in */

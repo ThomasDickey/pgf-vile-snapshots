@@ -6,7 +6,10 @@
 
 /*
  * $Log: evar.h,v $
- * Revision 1.12  1992/07/13 20:03:54  foxharp
+ * Revision 1.13  1992/08/20 23:40:48  foxharp
+ * typo fixes -- thanks, eric
+ *
+ * Revision 1.12  1992/07/13  20:03:54  foxharp
  * the "terse" variable is now a boolean mode
  *
  * Revision 1.11  1992/03/24  07:37:12  pgf
@@ -69,7 +72,7 @@ char *envars[] = {
 	"curcol",		/* current column pos of cursor */
 	"curline",		/* current line in file */
 	"ram",			/* ram in use by malloc */
-	"flicker",		/* flicker supression */
+	"flicker",		/* flicker suppression */
 	"pagewid",		/* current screen width */
 	"cbufname",		/* current buffer name */
 	"cfilname",		/* current file name */
@@ -166,7 +169,7 @@ UFUNC funcs[] = {
 	"div", DYNAMIC,		/* division */
 	"mod", DYNAMIC,		/* mod */
 	"neg", MONAMIC,		/* negate */
-	"cat", DYNAMIC,		/* concatinate string */
+	"cat", DYNAMIC,		/* concatenate string */
 	"lef", DYNAMIC,		/* left string(string, len) */
 	"rig", DYNAMIC,		/* right string(string, pos) */
 	"mid", TRINAMIC,	/* mid string(string, pos, len) */
@@ -186,7 +189,7 @@ UFUNC funcs[] = {
 	"tru", MONAMIC,		/* Truth of the universe logical test */
 	"asc", MONAMIC,		/* char to integer conversion */
 	"chr", MONAMIC,		/* integer to char conversion */
-	"gtk", NILNAMIC,	/* get 1 charater */
+	"gtk", NILNAMIC,	/* get 1 character */
 	"rnd", MONAMIC,		/* get a random number */
 	"abs", MONAMIC,		/* absolute value of a number */
 	"sin", DYNAMIC,		/* find the index of one string in another */

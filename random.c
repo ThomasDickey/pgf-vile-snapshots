@@ -3,7 +3,10 @@
  * commands. There is no functional grouping here, for sure.
  *
  * $Log: random.c,v $
- * Revision 1.76  1992/08/19 23:06:06  foxharp
+ * Revision 1.77  1992/08/20 23:40:48  foxharp
+ * typo fixes -- thanks, eric
+ *
+ * Revision 1.76  1992/08/19  23:06:06  foxharp
  * handle DOS's multiple current directories better (i.e. one per drive), and
  * allow npopen to follow PATH to find "pwd", since it isn't always in /bin.
  * sheesh.
@@ -842,7 +845,7 @@ writemsg(f, n)
 int f, n;	/* arguments ignored */
 {
 	register int status;
-	char buf[NPAT]; 	/* buffer to recieve message into */
+	char buf[NPAT]; 	/* buffer to receive message into */
 
 	buf[0] = 0;
 	if ((status = mlreply("Message to write: ", buf, NPAT - 1)) != TRUE)

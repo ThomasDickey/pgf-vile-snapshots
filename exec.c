@@ -4,7 +4,10 @@
  *	written 1986 by Daniel Lawrence	
  *
  * $Log: exec.c,v $
- * Revision 1.32  1992/07/16 22:06:27  foxharp
+ * Revision 1.33  1992/08/20 23:40:48  foxharp
+ * typo fixes -- thanks, eric
+ *
+ * Revision 1.32  1992/07/16  22:06:27  foxharp
  * same change for kbdmode
  *
  * Revision 1.31  1992/07/15  23:24:12  foxharp
@@ -445,7 +448,7 @@ LINE		**markptr;	/* where to store the mark's value */
 			status = gotoline(TRUE,num);
 			if (status) lp = DOT.l;
 		} else if (*s == '\'') {
-			/* appostrophe means go to a set mark */
+			/* apostrophe means go to a set mark */
 			s++;
 			status = gonmmark(*s);
 			if (status) lp = DOT.l;
@@ -691,7 +694,7 @@ int f,n;
 		return status;
 	}
 
-	/* process leadin argument */
+	/* process leading argument */
 	if (toktyp(tkn) != TKCMD) {
 		f = TRUE;
 		strcpy(tkn, tokval(tkn));
@@ -1092,7 +1095,7 @@ BUFFER *bp;	/* buffer to execute */
 	WHBLOCK *scanpt;	/* ptr during scan */
 	register LINE *glp;	/* line to goto */
 	WHBLOCK *whtemp;	/* temporary ptr to a WHBLOCK */
-	char tkn[NSTRING];	/* buffer to evaluate an expresion in */
+	char tkn[NSTRING];	/* buffer to evaluate an expression in */
 #endif
 
 	static dobufnesting;
@@ -1536,7 +1539,7 @@ int
 dofile(fname)
 char *fname;	/* file name to execute */
 {
-	register BUFFER *bp;	/* buffer to place file to exeute */
+	register BUFFER *bp;	/* buffer to place file to execute */
 	register int status;	/* results of various calls */
 	register int odiscmd;
 	char bname[NBUFN];	/* name of buffer */

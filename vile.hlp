@@ -177,44 +177,6 @@ Window manipulation commands:
 	commands (which take their args (number of rows or columns
 	respectively) before you type the ":").
 
-X Window System commands:
--------------------------
-
-	If you are using xvile, the following additions are available:
-
-	Mouse buttons:
-
-	1 -	Sets cursor position and the start of the selection.
-		With any modifier, it will center the buffer at the cursor
-		(this results in a primitive form of scrolling.)
-		Motion with the button down will select text.
-		Multiple clicks will expand the selection to cover
-		words or the current line.
-	2 -	Paste the current PRIMARY selection.  With a modifier, it
-		pastes at the mouse position, otherwise it pastes at
-		the text cursor position.
-	3 -	Extends the current selection.
-
-	Additional command line arguments:
-
-	-f fontname	Font to use.
-	-r 		Use reverse video.
-	-d display	Use an alternate display.
-
-	X Resources:
-
-	font		Font to use.
-	charClass	Character classes for multiple click selections.
-			The format is identical to that of xterm(1).
-	multiClickTime	How long between clicks (in milliseconds) to
-			be accepted as a multi-click.
-
-	Changing the font on the fly:
-
-	Use the ':setv' command to set the $font variable:
-
-	: setv $font <fontname>
-
 File manipulation commands:  
 ---------------------------
 	The usual ":e", ":r", ":f", ":w" commands are available, though only
@@ -595,9 +557,9 @@ Editor modes
 		will not effect tags picked up from the cursor -- they are
 		always matched exactly. (B)
 
-	tagsrelative (tr) Causes files looked up via the tags mechanism to
-		be found reletive to the location of the tags file, rather
-		than the current directory. (B)
+	tagrelative (tr) Causes files looked up via the tags mechanism to
+		be found relative to the location of the tags file, rather
+		than relative to the current directory. (B)
 
 	terse   vile produces more "status" messages than vi, which may
 		become annoying at low baud rates.  Setting terse mode will
@@ -972,8 +934,59 @@ Invocation
 
 	Use "vile -?" to get the usage message.
 
-Differences
-------------
+X Window System specifics:
+-------------------------
+
+	If you are using xvile, the following additions are available:
+
+	Mouse buttons:
+
+	1 -	Sets cursor position and the start of the selection.
+		With any modifier, it will center the buffer at the cursor
+		(this results in a primitive form of scrolling.)
+		Motion with the button down will select text.
+		Multiple clicks will expand the selection to cover
+		words or the current line.
+	2 -	Paste the current PRIMARY selection.  With a modifier, it
+		pastes at the mouse position, otherwise it pastes at
+		the text cursor position.
+	3 -	Extends the current selection.
+
+	Additional command line arguments:
+
+	-f fontname	Font to use.
+	-r 		Use reverse video.
+	-d display	Use an alternate display.
+
+	X Resources:
+
+	font		Font to use.
+	charClass	Character classes for multiple click selections.
+			The format is identical to that of xterm(1).
+	multiClickTime	How long between clicks (in milliseconds) to
+			be accepted as a multi-click.
+
+	Changing the font on the fly:
+
+	Use the ':setv' command to set the $font variable:
+
+	: setv $font <fontname>
+
+DOS specifics
+-------------
+	You can force vile into one of three screen modes: 25, 43 and 50
+	lines.  It auto-senses, but can be overridden with a command
+	line option: -2, -4, and -5 give 25, 43 and 50 lines respectively.
+
+	If you shell out in 50 line mode, make sure you are in 50 line mode
+	before you exit the dos shell, otherwise you end up with a 50 line
+	edit window with only the top 25 displayed.
+
+	The vile.rc file can be located in the same directory as your
+	binary executable, since vile searches the PATH for this file.
+
+Differences from vi
+-------------------
 	Of course, this really isn't vi.  Some of the following differences
 	deserve changing, others do not.
 

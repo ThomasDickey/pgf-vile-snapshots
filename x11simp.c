@@ -1,7 +1,7 @@
 /*
  * 	X11 support, Dave Lemke, 11/91
  *
- * $Log: x11.c,v $
+ * $Log: x11simp.c,v $
  * Revision 1.9  1992/08/20 23:40:48  foxharp
  * typo fixes -- thanks, eric
  *

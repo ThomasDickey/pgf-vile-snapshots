@@ -8,11 +8,14 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: fences.c,v $
- *	Revision 1.3  1992/06/08 08:56:05  foxharp
- *	fixed infinite loop if simple fence not found, and
- *	suppressed beeping in input mode if fence not found
- *	,.
- *	
+ *	Revision 1.4  1992/08/20 23:40:48  foxharp
+ *	typo fixes -- thanks, eric
+ *
+ * Revision 1.3  1992/06/08  08:56:05  foxharp
+ * fixed infinite loop if simple fence not found, and
+ * suppressed beeping in input mode if fence not found
+ * ,.
+ * 
  *
  * Revision 1.2  1992/06/03  08:37:23  foxharp
  * removed nested comment
@@ -466,7 +469,7 @@ int ch;	/* fence type to match against */
 	}
 
 	/* if count is zero, we have a match, display the sucker */
-	/* there is a real machine dependant timing problem here we have
+	/* there is a real machine dependent timing problem here we have
 	   yet to solve......... */
 	if (count == 0) {
 		forwchar(FALSE, 1);

@@ -4,7 +4,10 @@
  * "termio.c". It compiles into nothing if not an ANSI device.
  *
  * $Log: ansi.c,v $
- * Revision 1.8  1992/05/16 12:00:31  pgf
+ * Revision 1.9  1992/08/20 23:40:48  foxharp
+ * typo fixes -- thanks, eric
+ *
+ * Revision 1.8  1992/05/16  12:00:31  pgf
  * prototypes/ansi/void-int stuff/microsoftC
  *
  * Revision 1.7  1992/04/10  18:47:25  pgf
@@ -80,7 +83,7 @@ int	cbcolor = -1;		/* current background color */
 
 #if	AMIGA
 /* apperently the AMIGA does not follow the ANSI standards as
-   regards to colors....maybe because of the default pallette
+   regards to colors....maybe because of the default palette
    settings?
 */
 
@@ -224,7 +227,7 @@ ansicres()	/* change screen resolution */
 	return(TRUE);
 }
 
-spal(dummy)		/* change pallette settings */
+spal(dummy)		/* change palette settings */
 {
 	/* none for now */
 }

@@ -5,7 +5,10 @@
  * compiles into nothing if not a 520ST style device.
  *
  * $Log: st520.c,v $
- * Revision 1.6  1992/05/16 12:00:31  pgf
+ * Revision 1.7  1992/08/20 23:40:48  foxharp
+ * typo fixes -- thanks, eric
+ *
+ * Revision 1.6  1992/05/16  12:00:31  pgf
  * prototypes/ansi/void-int stuff/microsoftC
  *
  * Revision 1.5  1992/01/05  00:06:13  pgf
@@ -74,8 +77,8 @@ extern	int	st520bcol();
 
 int		cfcolor = -1;		/* current fg (character) color */
 int		cbcolor = -1;		/* current bg color */
-int		oldpal[8];		/* pallette when emacs was invoked */
-int		newpal[8] = {		/* default emacs pallette */
+int		oldpal[8];		/* palette when emacs was invoked */
+int		newpal[8] = {		/* default emacs palette */
 	0x000, 0x700, 0x070, 0x770, 0x007, 0x707, 0x077, 0x777};
 #endif
 
@@ -223,7 +226,7 @@ st520open()
         
 /* IMPORTANT: it is ABSOLUTELY necessary that the default resolution be the
  *	largest possible so that display will allocate (malloc) the maximum
- *	size for the VIDEO arrray
+ *	size for the VIDEO array
  */
 	STrez = Getrez();
 	switch(STrez) {
@@ -552,7 +555,7 @@ the LATTICE compiler using the virtual VT52 Emulator
 #define INITMOUS	0	/* initialize the mouse */
 #define GETREZ		4	/* get current resolution */
 #define SETSCREEN	5	/* set screen resolution */
-#define SETPALETTE	6	/* set the color pallette */
+#define SETPALETTE	6	/* set the color palette */
 #define SETCOLOR	7	/* set or read a color */
 #define CURSCONF	21	/* set cursor configuration */
 #define IKBDWS		25	/* intelligent keyboard send command */
@@ -590,10 +593,10 @@ struct KVT {
 	long statvec;		/* IKBD status */
 	int (*mousevec)();	/* mouse vector */
 	long clockvec;		/* clock vector */
-	long joyvec;		/* joystict vector */
+	long joyvec;		/* joystick vector */
 } *ktable;
 
-int (*sysmint)();			/* system mouse interupt handler */
+int (*sysmint)();			/* system mouse interrupt handler */
 
 /* mouse parameter table */
 struct Param {
@@ -749,7 +752,7 @@ stbeep()
 	ttflush();
 }
 
-domouse()	/* mouse interupt handler */
+domouse()	/* mouse interrupt handler */
 
 {
 	return((*sysmint)());
@@ -825,7 +828,7 @@ stkclose()	/* close the keyboard (and mouse) */
 {
 	static char resetcmd[] = {0x80, 0x01};	/* keyboard reset command */
 
-	/* restore the mouse interupt routines */
+	/* restore the mouse interrupt routines */
 	xbios(INITMOUS, 2, &mparam, (long)sysmint);
 
 	/* and reset the keyboard controller */
