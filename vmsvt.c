@@ -7,40 +7,43 @@
  *  Author:  Curtis Smith
  *  Last Updated: 07/14/87
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/vmsvt.c,v 1.13 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/vmsvt.c,v 1.24 1995/08/18 12:32:58 pgf Exp $
  *
  */
 
 #include	"estruct.h"		/* Emacs' structures		*/
 #include	"edef.h"		/* Emacs' definitions		*/
 
-#if	VMSVT
+#if	DISP_VMSVT
 
-#include	 <descrip.h>		/* Descriptor definitions	*/
+#include	<descrip.h>		/* Descriptor definitions	*/
 #include	<iodef.h>		/* to get IO$_SENSEMODE		*/
 #include	<ttdef.h>		/* to get TT$_UNKNOWN		*/
+
+#include	<starlet.h>
 #include	<smgtrmptr.h>		/* to get SMG$K_??? definitions	*/
+#include	<smg$routines.h>
 
 /** Forward references **/
-extern	void	vmsopen	(void);
-extern	void	vmskopen(void);
-extern	void	vmskclose(void);
-extern	void	vmsmove	(int, int);
-extern	void	vmseeol	(void);
-extern	void	vmseeop	(void);
-extern	void	vmsbeep	(void);
-extern	void	vmsrev	(int);
-extern	int	vmscres	(void);
+static	void	vmsscrollregion P(( int, int ));
+static	void	vmsscroll_reg P(( int, int, int ));
+static	void	vmsscroll_delins(int from, int to, int n);
+static	void	vmsopen	(void);
+static	void	vmskopen(void);
+static	void	vmskclose(void);
+static	void	vmsmove	(int, int);
+static	void	vmseeol	(void);
+static	void	vmseeop	(void);
+static	void	vmsbeep	(void);
+static	void	vmsrev	(int);
+static	int	vmscres	(char *);
 
 extern	int	eolexist, revexist;
 extern	char	sres[];
 
-#if COLOR
-extern	int	vmsfcol(int);
-extern	int	vmsbcol(int);
-#endif
-#if SCROLLCODE
-extern	void	tcapscroll (int, int, int);
+#if OPT_COLOR
+static	int	vmsfcol(int);
+static	int	vmsbcol(int);
 #endif
 
 /** SMG stuff (just like termcap) */
@@ -50,18 +53,16 @@ static	char *	end_reverse;
 static	char *	erase_to_end_line;
 static	char *	erase_whole_display;
 
-#if SCROLLCODE
 static	char *	delete_line;
 static	char *	insert_line;
 static	char *	scroll_forw;
 static	char *	scroll_back;
 static	char *	scroll_regn;
-#endif
 
 /* Dispatch table. All hard fields just point into the terminal I/O code. */
 TERM	term	= {
-	24 - 1,				/* Max number of rows allowable */
-	/* Filled in */ - 1,		/* Current number of rows used	*/
+	24,				/* Max number of rows allowable */
+	/* Filled in */ 0,		/* Current number of rows used	*/
 	132,				/* Max number of columns	*/
 	/* Filled in */ 0,		/* Current number of columns	*/
 	64,				/* Min margin for extended lines*/
@@ -73,6 +74,7 @@ TERM	term	= {
 	vmskclose,			/* Close keyboard		*/
 	ttgetc,				/* Get character from keyboard	*/
 	ttputc,				/* Put character to display	*/
+	tttypahead,			/* char ready for reading	*/
 	ttflush,			/* Flush output buffers		*/
 	vmsmove,			/* Move cursor, origin 0	*/
 	vmseeol,			/* Erase to end of line		*/
@@ -80,13 +82,25 @@ TERM	term	= {
 	vmsbeep,			/* Beep				*/
 	vmsrev,				/* Set reverse video state	*/
 	vmscres				/* Change screen resolution	*/
-#if	COLOR
+#if	OPT_COLOR
 	, vmsfcol,			/* Set forground color		*/
 	vmsbcol				/* Set background color		*/
 #endif
-#if	SCROLLCODE
 	, NULL				/* set at init-time		*/
-#endif
+};
+
+static	struct	{
+	char	*seq;
+	int	code;
+} keyseqs[] = {
+	{ "\33[A",  KEY_Up },    { "\33A", KEY_Up },
+	{ "\33[B",  KEY_Down },  { "\33B", KEY_Down },
+	{ "\33[C",  KEY_Right }, { "\33C", KEY_Right },
+	{ "\33[D",  KEY_Left },  { "\33D", KEY_Left },
+	{ "\33OP",  KEY_KP_F1 }, { "\33P", KEY_KP_F1 },
+	{ "\33OQ",  KEY_KP_F2 }, { "\33Q", KEY_KP_F2 },
+	{ "\33OR",  KEY_KP_F3 }, { "\33R", KEY_KP_F3 },
+	{ "\33OS",  KEY_KP_F4 }, { "\33S", KEY_KP_F4 },
 };
 
 /***
@@ -94,8 +108,8 @@ TERM	term	= {
  *
  *  Nothing returned
  ***/
-ttputs(string)
-char * string;				/* String to write		*/
+static void
+ttputs(char * string)			/* String to write		*/
 {
 	if (string)
 		while (*string != EOS)
@@ -107,7 +121,8 @@ char * string;				/* String to write		*/
  *
  *  Nothing returned
  ***/
-static void putpad_tgoto(request_code, parm1, parm2)
+static void
+putpad_tgoto(request_code, parm1, parm2)
 {
 	char buffer[32];
 	int ret_length;
@@ -149,7 +164,8 @@ static void putpad_tgoto(request_code, parm1, parm2)
  *
  *  Nothing returned
  ***/
-void vmsmove (int row, int col)
+static void
+vmsmove (int row, int col)
 {
 	putpad_tgoto(SMG$K_SET_CURSOR_ABS, row+1, col+1);
 }
@@ -159,7 +175,8 @@ void vmsmove (int row, int col)
  *
  *  Nothing returned
  ***/
-void vmsrev(int status)
+static void
+vmsrev(int status)
 {
 	if (status)
 		ttputs(begin_reverse);
@@ -172,20 +189,23 @@ void vmsrev(int status)
  *
  *  Nothing returned
  ***/
-vmscres()
+static int
+vmscres(char *res)
 {
 	/* But it could.  For vt100/vt200s, one could switch from
 	80 and 132 columns modes */
+	return 0;
 }
 
 
-#if	COLOR
+#if	OPT_COLOR
 /***
  *  vmsfcol  -  Set the foreground color (not implemented)
  *
  *  Nothing returned
  ***/
-vmsfcol()
+static void
+vmsfcol(int fc)
 {
 }
 
@@ -194,7 +214,8 @@ vmsfcol()
  *
  *  Nothing returned
  ***/
-vmsbcol()
+static void
+vmsbcol(int bc)
 {
 }
 #endif
@@ -204,7 +225,8 @@ vmsbcol()
  *
  *  Nothing returned
  ***/
-void vmseeol(void)
+static void
+vmseeol(void)
 {
 	ttputs(erase_to_end_line);
 }
@@ -215,7 +237,8 @@ void vmseeol(void)
  *
  *  Nothing returned
  ***/
-void vmseeop(void)
+static void
+vmseeop(void)
 {
 	ttputs(erase_whole_display);
 }
@@ -226,7 +249,8 @@ void vmseeop(void)
  *
  *  Nothing returned
  ***/
-void vmsbeep(void)
+static void
+vmsbeep(void)
 {
 	ttputc(BEL);
 }
@@ -238,8 +262,8 @@ void vmsbeep(void)
  *  Returns:	Escape sequence
  *		NULL	No escape sequence available
  ***/ 
-char * vmsgetstr(request_code)
-int request_code;			/* Request code			*/
+static char *
+vmsgetstr(int request_code)
 {
 	register char * result;
 	static char seq_storage[1024];
@@ -318,7 +342,8 @@ static struct termchar tc;	/* Terminal characteristics		*/
  *
  *  Nothing returned
  ***/
-vmsgtty()
+static void
+vmsgtty(void)
 {
 	short fd;
 	int status;
@@ -328,7 +353,7 @@ vmsgtty()
 	/* Assign input to a channel */
 	status = sys$assign(&devnam, &fd, 0, 0);
 	if ((status & 1) == 0)
-		ExitProgram(status);
+		tidy_exit(status);
 
 	/* Get terminal characteristics */
 	status = sys$qiow(		/* Queue and wait		*/
@@ -343,13 +368,13 @@ vmsgtty()
 
 	/* De-assign the input device */
 	if ((sys$dassgn(fd) & 1) == 0)
-		ExitProgram(status);
+		tidy_exit(status);
 
 	/* Jump out if bad status */
 	if ((status & 1) == 0)
-		ExitProgram(status);
+		tidy_exit(status);
 	if ((iostatus.i_cond & 1) == 0)
-		ExitProgram(iostatus.i_cond);
+		tidy_exit(iostatus.i_cond);
 }
 
 
@@ -358,15 +383,18 @@ vmsgtty()
  *
  *  Nothing returned
  ***/
-void vmsopen(void)
+static void
+vmsopen(void)
 {
+	int	i;
+
 	/* Get terminal type */
 	vmsgtty();
 	if (tc.t_type == TT$_UNKNOWN) {
 		printf("Terminal type is unknown!\n");
 		printf("Try set your terminal type with SET TERMINAL/INQUIRE\n");
 		printf("Or get help on SET TERMINAL/DEVICE_TYPE\n");
-		ExitProgram(3);
+		tidy_exit(3);
 	}
 
 	/* Access the system terminal definition table for the		*/
@@ -376,7 +404,7 @@ void vmsopen(void)
 	}
 		
 	/* Set sizes */
-	term.t_nrow = ((UINT) tc.t_mandl >> 24) - 1;
+	term.t_nrow = ((UINT) tc.t_mandl >> 24);
 	term.t_ncol = tc.t_width;
 
 	if (term.t_mrow < term.t_nrow)
@@ -396,7 +424,6 @@ void vmsopen(void)
 
 	erase_whole_display = vmsgetstr(SMG$K_ERASE_WHOLE_DISPLAY);
 
-#if SCROLLCODE
 	insert_line	= vmsgetstr(SMG$K_INSERT_LINE);		/* al */
 	delete_line	= vmsgetstr(SMG$K_DELETE_LINE);		/* dl */
 	scroll_forw	= vmsgetstr(SMG$K_SCROLL_FORWARD);	/* SF */
@@ -412,19 +439,23 @@ void vmsopen(void)
 	if (scroll_regn && scroll_back) {
 		if (scroll_forw == NULL) /* assume '\n' scrolls forward */
 			scroll_forw = "\n";
-		term.t_scroll = tcapscroll_reg;
+		term.t_scroll = vmsscroll_reg;
 	} else if (delete_line && insert_line) {
-		term.t_scroll = tcapscroll_delins;
+		term.t_scroll = vmsscroll_delins;
 	} else {
 		term.t_scroll = NULL;
 	}
-#endif
 
 	/* Set resolution */
 	(void)strcpy(sres, "NORMAL");
 
 	/* Open terminal I/O drivers */
 	ttopen();
+
+	/* Set predefined keys */
+	for (i = TABLESIZE(keyseqs); i--; ) {
+		addtosysmap(keyseqs[i].seq, strlen(keyseqs[i].seq), keyseqs[i].code);
+	}
 }
 
 
@@ -433,7 +464,8 @@ void vmsopen(void)
  *
  *  Nothing returned
  ***/
-void vmskopen(void)
+static void
+vmskopen(void)
 {
 }
 
@@ -443,25 +475,10 @@ void vmskopen(void)
  *
  *  Nothing returned
  ***/
-void vmskclose(void)
+static void
+vmskclose(void)
 {
 }
-
-
-/***
- *  fnclabel  -  Label function keys (not used)
- *
- *  Nothing returned
- ***/
-#if	FLABEL
-fnclabel(f, n)		/* label a function key */
-int f,n;	/* default flag, numeric argument [unused] */
-{
-	/* on machines with no function keys...don't bother */
-	return(TRUE);
-}
-#endif
-
 
 /***
  *  spal  -  Set palette type  (Are you kidding?)
@@ -474,46 +491,43 @@ char	*dummy;
 {
 }
 
-#if SCROLLCODE
 /* copied/adapted from 'tcap.c' 19-apr-1993 dickey@software.org */
 
 /* move howmany lines starting at from to to */
-void
-tcapscroll_reg(from,to,n)
-int from, to, n;
+static void
+vmsscroll_reg(int from, int to, int n)
 {
 	int i;
 	if (to == from) return;
 	if (to < from) {
-		tcapscrollregion(to, from + n - 1);
+		vmsscrollregion(to, from + n - 1);
 		vmsmove(from + n - 1,0);
 		for (i = from - to; i > 0; i--)
 			ttputs(scroll_forw);
 	} else { /* from < to */
-		tcapscrollregion(from, to + n - 1);
+		vmsscrollregion(from, to + n - 1);
 		vmsmove(from,0);
 		for (i = to - from; i > 0; i--)
 			ttputs(scroll_back);
 	}
-	tcapscrollregion(0, term.t_nrow);
+	vmsscrollregion(0, term.t_nrow-1);
 }
 
 /* 
-PRETTIER_SCROLL is prettier but slower -- it scrolls 
+OPT_PRETTIER_SCROLL is prettier but slower -- it scrolls 
 		a line at a time instead of all at once.
 */
 
 /* move howmany lines starting at from to to */
-void
-tcapscroll_delins(from,to,n)
-int from, to, n;
+static void
+vmsscroll_delins(int from, int to, int n)
 {
 	int i;
 	if (to == from) return;
 	/* patch: should make this more like 'tcap.c', or merge logic somehow */
-#if PRETTIER_SCROLL
+#if OPT_PRETTIER_SCROLL
 	if (absol(from-to) > 1) {
-		tcapscroll_delins(from, (from<to) ? to-1:to+1, n);
+		vmsscroll_delins(from, (from<to) ? to-1:to+1, n);
 		if (from < to)
 			from = to-1;
 		else
@@ -538,14 +552,12 @@ int from, to, n;
 }
 
 /* cs is set up just like cm, so we use tgoto... */
-void
-tcapscrollregion(top,bot)
-int top,bot;
+static void
+vmsscrollregion(int top, int bot)
 {
 	putpad_tgoto(SMG$K_SET_SCROLL_REGION, top+1, bot+1);
 }
 
-#endif	/* SCROLLCODE */
 
 #else
 

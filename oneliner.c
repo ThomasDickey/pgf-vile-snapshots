@@ -1,270 +1,394 @@
 /*
  *	A few functions that used to operate on single whole lines, mostly
  *	here to support the globals() function.  They now work on regions.
- *	Written (except for delins()) for vile by Paul Fox, (c)1990
+ *	Copyright (c) 1990, 1995 by Paul Fox, except for delins(), which is
+ *	Copyright (c) 1986 by University of Toronto, as noted below.
  *
- * $Log: oneliner.c,v $
- * Revision 1.13  1991/10/29 14:35:29  pgf
- * implemented the & commands: substagain
- *
- * Revision 1.12  1991/10/27  01:50:16  pgf
- * switched from regex to regexp, and
- * used Spencer's regsub routine as the basis for a new delins()
- * that allows for replacement metachars
- *
- * Revision 1.11  1991/10/24  13:05:52  pgf
- * conversion to new regex package -- much faster
- *
- * Revision 1.10  1991/10/23  14:17:36  pgf
- * initialize nth_occur in all cases
- *
- * Revision 1.9  1991/09/26  13:11:19  pgf
- * LIST mode moved to the window
- *
- * Revision 1.8  1991/09/16  23:48:30  pgf
- * added "nth occurrence" support to s/repl/pat
- *
- * Revision 1.7  1991/09/10  00:55:24  pgf
- * don't re-popup the buffer everytime -- only on first call
- *
- * Revision 1.6  1991/08/07  12:35:07  pgf
- * added RCS log messages
- *
- * revision 1.5
- * date: 1991/08/06 15:24:19;
- *  global/local values
- * 
- * revision 1.4
- * date: 1991/06/27 18:33:47;
- * made screen oriented substitutes always act globally across line
- * 
- * revision 1.3
- * date: 1991/06/25 19:53:07;
- * massive data structure restructure
- * 
- * revision 1.2
- * date: 1991/05/31 11:14:50;
- * turned these into region operators.
- * they're not one-liners anymore
- * 
- * revision 1.1
- * date: 1990/09/21 10:25:51;
- * initial vile RCS revision
+ * $Header: /usr/build/VCS/pgf-vile/RCS/oneliner.c,v 1.74 1995/08/04 23:12:06 pgf Exp $
  */
 
 #include	"estruct.h"
 #include	"edef.h"
-#include	<stdio.h>
 
 #define PLIST	0x01
+
+static	int	delins P(( regexp *, char * ));
+static	int	pregion P(( int ));
+static	int	substline P(( regexp *, int, int, int, int * ));
+static	int	substreg1 P(( int, int ));
+static	void	showpat P(( regexp *, int ));
+
+static	int	lines_changed,
+		total_changes;
 
 /*
  * put lines in a popup window
  */
-pregion(f, n, flag)
+static int
+pregion(flag)
+int flag;
 {
 	register WINDOW *wp;
 	register BUFFER *bp;
-	register int	s;
+	register int	status;
 	REGION		region;
-	static char bname[] = "[p-lines]";
-	register LINE *linep;
-	int cb;
+	fast_ptr LINEPTR linep;
 
-	fulllineregions = TRUE;
-	        
-	if ((s=getregion(&region,NULL)) != TRUE)
-		return (s);
+	if ((status = get_fl_region(&region)) != TRUE) {
+		rls_region();
+		return (status);
+	}
 
 	linep = region.r_orig.l;		 /* Current line.	 */
-	        
+
 	/* first check if we are already here */
-	bp = bfind(bname, OK_CREAT, 0);
-	if (bp == NULL)
+	bp = bfind(P_LINES_BufName, 0);
+	if (bp == NULL) {
+		rls_region();
 		return FALSE;
+	}
+
+	if (bp == curbp
+	 || find_b_name(BUFFERLIST_BufName) != 0 /* patch */
+		) {
+		mlforce("[Can't do that from this buffer.]");
+		rls_region();
+		return FALSE;
+	}
 
 	if (!calledbefore) {		/* fresh start */
 		/* bring p-lines up */
-		if (popupbuff(bp) != TRUE)
+		if (popupbuff(bp) != TRUE) {
+			rls_region();
 			return FALSE;
-	        
+		}
+
 		bclear(bp);
-		make_local_b_val(bp,WMDLIST);
-		set_b_val(bp, WMDLIST, ((flag & PLIST) != 0) );
 		calledbefore = TRUE;
 	}
-        
+
 	do {
-		addline(bp,linep->l_text,llength(linep));
-		linep = lforw(linep);
-	} while (linep != region.r_end.l);
+		if (!addline(bp, l_ref(linep)->l_text, lLength(linep)))
+			break;	/* out of memory */
+		linep = lFORW(linep);
+	} while (!same_ptr(linep, region.r_end.l));
 
-	bp->b_flag &= ~BFCHG;
-        
-	strcpy(bp->b_bname,bname);
-	strcpy(bp->b_fname, "");
-
-	make_local_b_val(bp,MDVIEW);
-	set_b_val(bp,MDVIEW,TRUE);
-
-	make_local_b_val(bp,VAL_TAB);
+	set_bname(bp, P_LINES_BufName);
+	set_rdonly(bp, non_filename());
 	set_b_val(bp,VAL_TAB,tabstop_val(curbp));
 
-	bp->b_active = TRUE;
-	for (wp=wheadp; wp!=NULL; wp=wp->w_wndp) {
+	for_each_window(wp) {
 		if (wp->w_bufp == bp) {
+			make_local_w_val(wp,WMDLIST);
+			set_w_val(wp, WMDLIST, ((flag & PLIST) != 0) );
 			wp->w_flag |= WFMODE|WFFORCE;
-			wp->w_traits.w_vals = bp->b_wtraits.w_vals;
 		}
 	}
+	rls_region();
 	return TRUE;
 }
 
-llineregion(f,n)
+int
+llineregion()
 {
-	return pregion(f,n,PLIST);
+	return pregion(PLIST);
 }
 
-plineregion(f,n)
+int
+plineregion()
 {
-	return pregion(f,n,0);
+	return pregion(0);
 }
 
-substregion(f,n)
+static regexp *substexp;
+
+int
+substregion()
 {
-	return substreg1(f,n,TRUE);
+	return substreg1(TRUE,TRUE);
 }
 
-subst_again_region(f,n)
+int
+subst_again_region()
 {
-	return substreg1(f,n,FALSE);
+	return substreg1(FALSE,TRUE);
 }
 
-substreg1(f,n,needpats)
+/* traditional vi & command */
+/* ARGSUSED */
+int
+subst_again(f,n)
+int f,n;
 {
-	int c, s;
-	static int printit, globally, nth_occur;
+	int s;
+	MARK curpos;
+
+	curpos = DOT;
+
+	/* the region spans just the line */
+	MK.l = DOT.l;
+	DOT.o = 0;
+	MK.o = lLength(MK.l);
+	s = substreg1(FALSE,FALSE);
+	if (s != TRUE) {
+		mlforce("[No match.]");
+		DOT = curpos;
+		return s;
+	}
+	swapmark();
+	return TRUE;
+}
+
+static int
+substreg1(needpats, use_opts)
+int needpats, use_opts;
+{
+	int c, status;
+	static int printit, globally, nth_occur, confirm;
 	REGION region;
-	LINE *oline;
+	LINEPTR oline;
+	int	getopts = FALSE;
 
-	fulllineregions = TRUE;
-	        
-	if ((s=getregion(&region,NULL)) != TRUE)
-		return (s);
+	if ((status = get_fl_region(&region)) != TRUE) {
+		rls_region();
+		return (status);
+	}
 
 	if (calledbefore == FALSE && needpats) {
-		c = '\n';
-		if (isnamedcmd) {
-			c = tpeekc();
-			if (c < 0) {
-				c = '\n';
-			} else {
-				if (ispunct(c)) {
-					(void)kbd_key();
-				}
-			}
-		} else {
-			/* if it's a screen region, assume they want .../g */
-			globally = TRUE;
-		}
-		if ((s = readpattern("substitute pattern: ", &pat[0], TRUE, c,
-				FALSE)) != TRUE) {
-			if (s != ABORT)
-				mlwrite("No pattern.");
+		c = kbd_delimiter();
+		if ((status = readpattern("substitute pattern: ", &pat[0],
+					&gregexp, c, FALSE)) != TRUE) {
+			if (status != ABORT)
+				mlforce("[No pattern.]");
+			rls_region();
 			return FALSE;
 		}
-		if ((s = readpattern("replacement string: ", &rpat[0], FALSE, c,
-				FALSE)) != TRUE) {
-			if (s == ABORT)
-				return FALSE;
-			/* else the pattern is null, which is okay... */
+
+		if (gregexp) {
+			FreeIfNeeded(substexp);
+			substexp = castalloc(regexp,(ALLOC_T)(gregexp->size));
+			(void)memcpy((char *)substexp, (char *)gregexp, 
+							(SIZE_T)gregexp->size);
+		}
+
+		if ((status = readpattern("replacement string: ", &rpat[0], 
+						(regexp	**)0, c,
+				FALSE)) == ABORT) {
+			rls_region();
+			return FALSE;
+			/* if false, the pattern is null, which is okay... */
 		}
 		nth_occur = -1;
-		if (lastkey == c) { /* the user may have something to add */
-			char buf[3];
-			char *bp = buf;
-			buf[0] = 0;
-			mlreply(
-	"(g)lobally or ([1-9])th occurrence on line and/or (p)rint result: ",
-				buf, sizeof buf);
+		confirm = printit = globally = FALSE;
+		getopts = (lastkey == c); /* the user may have 
+						something to add */
+
+	} else {
+		if (!use_opts) {
+			nth_occur = -1;
 			printit = globally = FALSE;
-			nth_occur = 0;
-			while (*bp) {
-				if (*bp == 'p' && !printit) {
-					printit = TRUE;
-				} else if (*bp == 'g' &&
-						!globally && !nth_occur) {
-					globally = TRUE;
-				} else if (isdigit(*bp) &&
-						!nth_occur && !globally) {
-					nth_occur = *bp - '0';
-					globally = TRUE;
-				} else if (!isspace(*bp)) {
-					mlwrite("Unknown action %s",buf);
-					return FALSE;
-				}
-				bp++;
-			}
-			if (!nth_occur)
+		} else {
+			if (more_named_cmd()) {
+				unkeystroke(lastkey);
 				nth_occur = -1;
+				printit = globally = FALSE;
+				getopts = TRUE;
+			}
 		}
 	}
 
+	if (getopts) {
+		char buf[4];
+		char *bp = buf;
 
+		buf[0] = EOS;
+		status = mlreply(
+"(g)lobally, ([1-9])th occurrence on line, (c)onfirm, and/or (p)rint result: ",
+			buf, sizeof buf);
+		if (status == ABORT) {
+			rls_region();
+			return FALSE;
+		}
+		nth_occur = 0;
+		while (*bp) {
+			if (*bp == 'p' && !printit) {
+				printit = TRUE;
+			} else if (*bp == 'g' &&
+					!globally && !nth_occur) {
+				globally = TRUE;
+			} else if (isdigit(*bp) &&
+					!nth_occur && !globally) {
+				nth_occur = *bp - '0';
+				globally = TRUE;
+			} else if (*bp == 'c' && !confirm) {
+				confirm = TRUE;
+			} else if (!isspace(*bp)) {
+				mlforce("[Unknown action %s]",buf);
+				rls_region();
+				return FALSE;
+			}
+			bp++;
+		}
+		if (!nth_occur)
+			nth_occur = -1;
+	}
+
+	lines_changed =
+	total_changes = 0;
 	DOT.l = region.r_orig.l;	    /* Current line.	    */
-
-	ignorecase = b_val(curwp->w_bufp, MDIGNCASE);
-
 	do {
 		oline = DOT.l;
-		if ((s = substline(nth_occur, printit, globally)) != TRUE)
-			return s;
-		DOT.l = lforw(oline);
+		if ((status = substline(substexp, nth_occur, printit,
+						globally, &confirm)) != TRUE) {
+			rls_region();
+			return status;
+		}
+		DOT.l = lFORW(oline);
 	} while (!sameline(DOT, region.r_end));
 	calledbefore = TRUE;
+
+	rls_region();
+	if (do_report(total_changes)) {
+		mlforce("[%d change%s on %d line%s]",
+			total_changes, PLURAL(total_changes),
+			lines_changed, PLURAL(lines_changed));
+	}
 	return TRUE;
 }
 
-substline(nth_occur, printit, globally)
-int nth_occur, printit, globally;
+/* show the pattern we've matched */
+static void
+showpat(rp, on)
+regexp	*rp;
+int	on;
 {
-	MARK tdot;
+	fast_ptr LINEPTR	lp;
+	int	row;
+
+	for (lp = curwp->w_line.l, row = curwp->w_toprow;
+		!same_ptr(lp, DOT.l);
+			lp = lFORW(lp))
+		row += line_height(curwp,lp);
+
+	hilite(row,
+		offs2col(curwp, lp, DOT.o),
+		offs2col(curwp, lp, (C_NUM)(DOT.o + rp->mlen)), on);
+}
+
+static int
+substline(exp, nth_occur, printit, globally, confirmp)
+regexp *exp;
+int nth_occur, printit, globally, *confirmp;
+{
 	int foundit;
+	int again = 0;
 	register int s;
 	register int which_occur = 0;
+	int matched_at_eol = FALSE;
+	int yes, c, skipped;
+
+	/* if the "magic number" hasn't been set yet... */
+	if (!exp || UCHAR_AT(exp->program) != REGEXP_MAGIC) {
+		mlforce("[No pattern set yet]");
+		return FALSE;
+	}
+
+	ignorecase = window_b_val(curwp, MDIGNCASE);
+
 	foundit = FALSE;
-	tdot.l = DOT.l;
-	tdot.o = llength(DOT.l);
-	setboundry(TRUE, tdot, FORWARD);
+	scanboundpos.l = DOT.l;
+	scanbound_is_header = FALSE;
 	DOT.o = 0;
 	do {
-		s = thescanner(gregexp, FORWARD, FALSE);
+		scanboundpos.o = lLength(DOT.l);
+		s = scanner(exp, FORWARD, FALSE, (int *)0);
 		if (s != TRUE)
 			break;
-		        
+
 		/* found the pattern */
 		foundit = TRUE;
 		which_occur++;
 		if (nth_occur == -1 || which_occur == nth_occur) {
-			s = delins(matchlen, &rpat[0]);
-			if (s != TRUE)
-				return s;
+			(void)setmark();
+			/* only allow one match at the end of line, to
+				prevent loop with s/$/x/g  */
+			if (MK.o == lLength(DOT.l)) {
+				if (matched_at_eol)
+					break;
+				matched_at_eol = TRUE;
+			}
+
+			/* if we need confirmation, get it */
+			skipped = FALSE;
+			if (*confirmp) {
+
+				/* force the pattern onto the screen */
+				(void)gomark(FALSE, 0);
+				if (update(TRUE) == TRUE)
+					showpat(exp, TRUE);
+				s = mlquickask("Make change [y/n/q/a]?",
+					"ynqa\r",&c);
+
+				showpat(exp, FALSE);
+
+				if (s != TRUE)
+					c = 'q';
+
+				switch(c) {
+				case 'y' :
+					yes = TRUE;
+					break;
+				default:
+				case 'n' :
+					yes = FALSE;
+					(void)update(TRUE);
+					skipped = TRUE;
+					/* so we don't match this again */
+					DOT.o += exp->mlen;
+					break;
+				case 'q' :
+					mlerase();
+					return(FALSE);
+				case 'a' :
+					yes = TRUE;
+					*confirmp = FALSE;
+					mlerase();
+					break;
+				}
+			} else {
+				yes = TRUE;
+			}
+			if (yes) {
+				s = delins(exp, &rpat[0]);
+				if (s != TRUE)
+					return s;
+				if (!again++)
+					lines_changed++;
+				total_changes++;
+			}
+			if (*confirmp && !skipped) /* force a screen update */
+				(void)update(TRUE);
+
+			if (exp->mlen == 0 && forwchar(TRUE,1) == FALSE)
+				break;
 			if (nth_occur > 0)
 				break;
-		} else {
-			s = forwchar(TRUE,matchlen);
+		} else { /* non-overlapping matches */
+			s = forwchar(TRUE, (int)(exp->mlen));
 			if (s != TRUE)
 				return s;
 		}
-	} while (sameline(tdot,DOT) /* !boundry(DOT) */ && globally);
+	} while (globally && sameline(scanboundpos,DOT));
 	if (foundit && printit) {
 		register WINDOW *wp = curwp;
-		setmark();
-		s = plineregion(FALSE,1);
+		(void)setmark();
+		s = plineregion();
 		if (s != TRUE) return s;
 		/* back to our buffer */
 		swbuffer(wp->w_bufp);
 	}
+	if (*confirmp)
+		mlerase();
 	return TRUE;
 }
 
@@ -289,83 +413,177 @@ int nth_occur, printit, globally;
  *		be misrepresented as being the original software.
  */
 
-#ifndef CHARBITS
-#define	UCHARAT(p)	((int)*(unsigned char *)(p))
-#else
-#define	UCHARAT(p)	((int)*(p)&CHARBITS)
-#endif
+static	char	*buf_delins;
+static	UINT	len_delins;
 
 /*
  - delins - perform substitutions after a regexp match
  */
-delins(dlength, source)
-int dlength;
-char *source;
+static int
+delins(exp, sourc)
+regexp *exp;
+char *sourc;
 {
 	register char *src;
+	register ALLOC_T dlength;
 	register char c;
 	register int no;
-	register int len;
-	register char *buf;
-	extern char *strncpy();
+	int s;
+#define NO_CASE	0
+#define UPPER_CASE 1
+#define LOWER_CASE 2
+	int case_next, case_all;
 
-	if (gregexp == NULL || source == NULL) {
-		mlwrite("BUG: NULL parm to delins");
-		return;
+	if (exp == NULL || sourc == NULL) {
+		mlforce("BUG: NULL parm to delins");
+		return FALSE;
 	}
-	if (UCHARAT(gregexp->program) != REGEXP_MAGIC) {
+	if (UCHAR_AT(exp->program) != REGEXP_MAGIC) {
 		regerror("damaged regexp fed to delins");
-		return;
-	}
-
-	if ((buf = (char *)malloc(dlength+1)) == NULL) {
-		mlwrite("Out of memory in delins");
 		return FALSE;
 	}
 
-	strncpy(buf, gregexp->startp[0], dlength);
-	buf[dlength] = '\0';
+	dlength = exp->mlen;
+
+	if (buf_delins == NULL || dlength + 1 > len_delins) {
+		if (buf_delins)
+			free(buf_delins);
+		if ((buf_delins = castalloc(char,dlength+1)) == NULL) {
+			mlforce("[Out of memory in delins]");
+			return FALSE;
+		}
+		len_delins = dlength + 1;
+	}
+
+	(void)memcpy(buf_delins, exp->startp[0], (SIZE_T)dlength);
+	buf_delins[dlength] = EOS;
 
 	if (ldelete((long) dlength, FALSE) != TRUE) {
-		mlwrite("Error while deleting");
-		free(buf);
+		mlforce("[Error while deleting]");
 		return FALSE;
 	}
-	src = source;
-	while ((c = *src++) != '\0') {
-		if (c == '&')
-			no = 0;
-		else if (c == '\\' && '0' <= *src && *src <= '9')
-			no = *src++ - '0';
-		else {
-			if ((c == '\n'? lnewline(): linsert(1, c)) != TRUE) {
-			nomem:
-				mlwrite("Out of memory while inserting");
-				free(buf);
-				return FALSE;
-			}
-			continue;
-		}
+	src = sourc;
+	case_next = case_all = NO_CASE;
+	while ((c = *src++) != EOS) {
+	    no = 0;
+	    s = TRUE;
+	    switch(c) {
+	    case '\\':
+		    c = *src++;
+		    if (c == EOS)
+			return TRUE;
+		    if (!isdigit(c)) {
+			    /* here's where the \U \E \u \l \t etc.
+			    special escapes should be implemented */
+			    switch (c) {
+			    case 'U':
+				    case_all = UPPER_CASE;
+				    break;
+			    case 'L':
+				    case_all = LOWER_CASE;
+				    break;
+			    case 'u':
+				    case_next = UPPER_CASE;
+				    break;
+			    case 'l':
+				    case_next = LOWER_CASE;
+				    break;
+			    case 'E':
+			    case 'e':
+				    case_all = NO_CASE;
+				    break;
+			    case 'b':
+				    s = linsert(1,'\b');
+				    break;
+			    case 'f':
+				    s = linsert(1,'\f');
+				    break;
+			    case 'r':
+				    s = linsert(1,'\r');
+				    break;
+			    case 't':
+				    s = linsert(1,'\t');
+				    break;
+			    case 'n':
+				    s = lnewline();
+				    break;
+			    default:
+				    s = linsert(1,c);
+				    break;
+			    }
+			    break;
+		    }
+		    /* else it's a digit --
+		    	get pattern number, and fall through */
+		    no = c - '0';
+		    /* FALLTHROUGH */
+	    case '&':
+		    if (exp->startp[no] != NULL && exp->endp[no] != NULL) {
+			    char *cp = buf_delins;
+			    long len = exp->endp[no] - exp->startp[no];
+			    long adj = exp->startp[no] - exp->startp[0];
+			    cp += adj;
+			    while ((s == TRUE) && len--) {
+				    c = *cp++;
+				    if (c == EOS) {
+					    mlforce( "BUG: mangled replace");
+					    return FALSE;
+				    }
+				    if (c == '\n')
+					    s = lnewline();
+				    else if (case_next == NO_CASE && case_all == NO_CASE)
+					    s = linsert(1,c);
+				    else {
+					    int direction = case_next != NO_CASE ? case_next : case_all;
+					    case_next = NO_CASE;
+					    /* Somewhat convoluted to handle
+					       \u\L correctly (upper case first
+					       char, lower case remainder).
+					       This is the perl model, not the vi model. */
+					    if (isupper(c) && (direction == LOWER_CASE))
+						    c = tolower(c);
+					    if (islower(c) && (direction == UPPER_CASE))
+						    c = toupper(c);
+					    s = linsert(1,c);
+				    }
+			    }
+		    }
+		    break;
 
-		if (gregexp->startp[no] != NULL && gregexp->endp[no] != NULL) {
-			char *cp;
-			int len;
-			len = (gregexp->endp[no] - gregexp->startp[no]);
-			cp = (gregexp->startp[no] - gregexp->startp[0]) + buf;
-			while (len--) {
-				if ((*cp == '\n' ? lnewline() : linsert(1, *cp)) != TRUE) {
-					goto nomem;
-				}
-				if (!*cp) {
-					mlwrite("BUG: mangled replace");
-					free(buf);
-					return FALSE;
-				}
-				cp++;
-			}
-		}
+	    case '\n':
+	    case '\r':
+		    s = lnewline();
+		    break;
+
+	    default:
+		    if (case_next || case_all) {
+			    int direction = case_next != NO_CASE ? case_next : case_all;
+			    case_next = NO_CASE;
+			    /* Somewhat convoluted to handle
+			       \u\L correctly (upper case first
+			       char, lower case remainder).
+			       This is the perl model, not the vi model. */
+			    if (isupper(c) && (direction == LOWER_CASE))
+				    c = tolower(c);
+			    if (islower(c) && (direction == UPPER_CASE))
+				    c = toupper(c);
+		    }
+		    s = linsert(1,c);
+		    break;
+	    }
+	    if (s != TRUE) {
+		    mlforce("[Out of memory while inserting]");
+		    return FALSE;
+	    }
 	}
-	free(buf);
 	return TRUE;
-
 }
+
+#if NO_LEAKS
+void
+onel_leaks()
+{
+	FreeIfNeeded(substexp);
+	FreeIfNeeded(buf_delins);
+}
+#endif

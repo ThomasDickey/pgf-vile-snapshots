@@ -2,108 +2,285 @@
  * The routines in this file read and write ASCII files from the disk. All of
  * the knowledge about files are here.
  *
- * $Log: fileio.c,v $
- * Revision 1.13  1991/11/01 14:38:00  pgf
- * saber cleanup
+ * $Header: /usr/build/VCS/pgf-vile/RCS/fileio.c,v 1.106 1995/10/19 20:02:25 pgf Exp $
  *
- * Revision 1.12  1991/10/23  12:05:37  pgf
- * changed filio.h to ioctl.h as the source of FIONREAD
- *
- * Revision 1.11  1991/10/22  14:08:23  pgf
- * took out old ifdef BEFORE code
- *
- * Revision 1.10  1991/10/10  12:31:53  pgf
- * added more "ff" utilities:  ffread, ffseek, ffrewind, ffsize
- *
- * Revision 1.9  1991/09/25  00:24:27  pgf
- * ffhasdata now works most of the time for system V, by simply checking
- * the stdio buffer -- no system call necessary
- *
- * Revision 1.8  1991/08/08  13:20:23  pgf
- * set "dosfile" global after reading each line
- *
- * Revision 1.7  1991/08/07  12:35:07  pgf
- * added RCS log messages
- *
- * revision 1.6
- * date: 1991/06/18 20:08:09;
- * added decl for FILE *npopen()
- * 
- * revision 1.5
- * date: 1991/04/22 09:02:03;
- * portability
- * 
- * revision 1.4
- * date: 1991/04/08 15:49:44;
- * added ffhasdata routine
- * 
- * revision 1.3
- * date: 1991/04/04 09:37:25;
- * minor fixes
- * 
- * revision 1.2
- * date: 1990/10/12 19:30:46;
- * added beeps on non-writeable
- * 
- * revision 1.1
- * date: 1990/09/21 10:25:18;
- * initial vile RCS revision
  */
 
-#include        <stdio.h>
 #include	"estruct.h"
 #include        "edef.h"
-#if UNIX
-#include        <errno.h>
-#include        <fcntl.h>
-#endif
-#if	BSD
-#include "sys/ioctl.h"
+#if SYS_UNIX || SYS_VMS || SYS_MSDOS || SYS_OS2 || SYS_WINNT
+#include	<sys/stat.h>
 #endif
 
-FILE	*ffp;		/* File pointer, all functions. */
-int fileispipe;
-int eofflag;		/* end-of-file flag */
-#if DOSFILES
-int doslines, unixlines;
-int dosfile;
+#if SYS_VMS
+#include	<file.h>
 #endif
 
+#if HAVE_SYS_IOCTL_H
+#include	<sys/ioctl.h>
+#endif
+
+#if CC_NEWDOSCC
+#include	<io.h>
+#endif
+
+
+#ifndef EISDIR
+#define EISDIR EACCES
+#endif
+
+/*--------------------------------------------------------------------------*/
+
+static	void	free_fline P(( void ));
+#if OPT_FILEBACK
+static	int	copy_file P(( char *, char * ));
+static	int	write_backup_file P((char *, char * ));
+static	int	make_backup P(( char * ));
+#endif
+static	int	count_fline;	/* # of lines read with 'ffgetline()' */
+  
+
+/*--------------------------------------------------------------------------*/
+static void
+free_fline()
+{
+	FreeAndNull(fline);
+	flen = 0;
+}
+
+#if OPT_FILEBACK
+/*
+ * Copy file when making a backup
+ */
+static int
+copy_file (src, dst)
+char	*src;
+char	*dst;
+{
+	FILE	*ifp;
+	FILE	*ofp;
+	int	chr;
+	int	ok = FALSE;
+
+	if ((ifp = fopen(src, FOPEN_READ)) != 0) {
+		if ((ofp = fopen(dst, FOPEN_WRITE)) != 0) {
+			ok = TRUE;
+			for_ever {
+				chr = fgetc(ifp);
+				if (feof(ifp))
+					break;
+				fputc(chr, ofp);
+				if (ferror(ifp) || ferror(ofp)) {
+					ok = FALSE;
+					break;
+				}
+			}
+			(void)fclose(ofp);
+		}
+		(void)fclose(ifp);
+	}
+	return ok;
+}
+
+/*
+ * Before overwriting a file, rename any existing version as a backup.
+ * Copy-back to retain the modification-date of the original file.
+ *
+ * Note: for UNIX, the direction of file-copy should be reversed, if the
+ *       original file happens to be a symbolic link.
+ */
+
+#if SYS_UNIX
+# if ! HAVE_LONG_FILE_NAMES
+#  define MAX_FN_LEN 14
+# else
+#  define MAX_FN_LEN 255
+# endif
+#endif
+
+static int
+write_backup_file(orig, backup)
+char *orig;
+char *backup;
+{
+	int s;
+
+	struct stat ostat, bstat;
+
+	if (stat(SL_TO_BSL(orig), &ostat) != 0)
+		return FALSE;
+
+	if (stat(SL_TO_BSL(backup), &bstat) == 0) {  /* the backup file exists */
+		
+#if SYS_UNIX
+		/* same file, somehow? */
+		if (bstat.st_dev == ostat.st_dev &&
+		    bstat.st_ino == ostat.st_ino) {
+			return FALSE;
+		}
+#endif
+
+		/* remove it */
+		if (unlink(backup) != 0)
+			return FALSE;
+	}
+
+	/* there are many reasons for copying, rather than renaming
+	   and writing a new file -- the file may have links, which
+	   will follow the rename, rather than stay with the real-name.
+	   additionally, if the write fails, we need to re-rename back to
+	   the original name, otherwise two successive failed writes will
+	   destroy the file.
+	*/
+
+	s = copy_file(orig, backup);
+	if (s != TRUE)
+		return s;
+
+	/* change date and permissions to match original */
+#if HAVE_UTIMES
+	/* we favor utimes over utime, since not all implementations (i.e.
+		older ones) declare the utimbuf argument.  NeXT, for example,
+		declares it as an array of two timevals instead.  we think
+		utimes will be more standard, where it exists.  what we
+		really think is that it's probably BSD systems that got
+		utime wrong, and those will have utimes to cover for it.  :-) */
+	{
+	    struct timeval buf[2];
+	    buf[0].tv_sec = ostat.st_atime;
+	    buf[0].tv_usec = 0;
+	    buf[1].tv_sec = ostat.st_mtime;
+	    buf[1].tv_usec = 0;
+	    s = utimes(backup, buf);
+	    if (s != 0) {
+		    (void)unlink(backup);
+		    return FALSE;
+	    }
+	}
+#else
+# if HAVE_UTIME
+	{
+	    struct utimbuf buf;
+	    buf.actime = ostat.st_atime;
+	    buf.modtime = ostat.st_mtime;
+	    s = utime(backup, &buf);
+	    if (s != 0) {
+		    (void)unlink(backup);
+		    return FALSE;
+	    }
+	}
+#endif
+#endif
+
+#if SYS_OS2 && CC_CSETPP
+	s = chmod(backup, ostat.st_mode & (S_IREAD | S_IWRITE));
+#else
+	s = chmod(backup, ostat.st_mode & 0777);
+#endif
+	if (s != 0) {
+		(void)unlink(backup);
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+static int
+make_backup (fname)
+char	*fname;
+{
+	int	ok	= TRUE;
+
+	if (ffexists(fname)) { /* if the file exists, attempt a backup */
+		char	tname[NFILEN];
+		char	*s = pathleaf(strcpy(tname, fname)),
+			*t = strrchr(s, '.');
+		char *gvalfileback = global_g_val_ptr(GVAL_BACKUPSTYLE);
+
+		if (strcmp(gvalfileback,".bak") == 0) {
+			if (t == 0	/* i.e. no '.' at all */
+#if SYS_UNIX
+				|| t == s	/* i.e. leading char is '.' */
+#endif
+			)
+				t = s + strlen(s); /* then just append */
+			(void)strcpy(t, ".bak");
+#if SYS_UNIX
+		} else if (strcmp(gvalfileback, "tilde") == 0) {
+			t = s + strlen(s);
+#if ! HAVE_LONG_FILENAMES
+			if (t - s >= MAX_FN_LEN) {
+				if (t - s == MAX_FN_LEN &&
+					s[MAX_FN_LEN-2] == '.')
+					s[MAX_FN_LEN-2] = s[MAX_FN_LEN-1];
+				t = &s[MAX_FN_LEN-1];
+			}
+#endif
+			(void)strcpy(t, "~");
+#if SOMEDAY
+		} else if (strcmp(gvalfileback, "tilde_N_existing") {
+			/* numbered backups if one exists, else simple */
+		} else if (strcmp(gvalfileback, "tilde_N") {
+			/* numbered backups of all files*/
+#endif
+#endif /* SYS_UNIX */
+		} else {
+			mlwrite("BUG: bad fileback value");
+			return FALSE;
+		}
+
+		ok = write_backup_file(fname, tname);
+
+	}
+	return ok;
+}
+#endif /* OPT_FILEBACK */
 
 /*
  * Open a file for reading.
  */
+int
 ffropen(fn)
 char    *fn;
 {
-#if UNIX
-	FILE *npopen();
-#endif
-
-#if DOSFILES
-	doslines = unixlines = 0;
-	dosfile = FALSE;
-#endif
-
-#if UNIX
-	
-	if (*fn == '!') {
-	        if ((ffp=npopen(fn+1, "r")) == NULL)
-	                return (FIOERR);
-		fileispipe = TRUE;
-	} else {
-	        if ((ffp=fopen(fn, "r")) == NULL) {
-			if (errno == ENOENT)
-		                return (FIOFNF);
-	                return (FIOERR);
-		}
-		fileispipe = FALSE;
-	}
-#else
-        if ((ffp=fopen(fn, "r")) == NULL)
-                return (FIOFNF);
-#endif
+	fileispipe = FALSE;
 	eofflag = FALSE;
+
+	if (isShellOrPipe(fn)) {
+		ffp = 0;
+#if SYS_UNIX || SYS_MSDOS || SYS_OS2 || SYS_WINNT
+	        ffp = npopen(fn+1, FOPEN_READ);
+#endif
+#if SYS_VMS
+	        ffp = vms_rpipe(fn+1, 0, (char *)0);
+		/* really a temp-file, but we cannot fstat it to get size */
+#endif
+		if (ffp == 0) {
+			mlerror("opening pipe for read");
+			return (FIOERR);
+		}
+
+		fileispipe = TRUE;
+		count_fline = 0;
+
+	} else if (is_directory(fn)) {
+		set_errno(EISDIR);
+		mlerror("opening directory");
+		return (FIOERR);
+
+	} else if ((ffp=fopen(fn, FOPEN_READ)) == NULL) {
+		if (errno != ENOENT
+#if SYS_OS2 && CC_CSETPP
+                 && errno != ENOTEXIST
+                 && errno != EBADNAME
+#endif
+		 && errno != EINVAL) {	/* a problem with Linux to DOS-files */
+			mlerror("opening for read");
+			return (FIOERR);
+		}
+		return (FIOFNF);
+	}
+
         return (FIOSUC);
 }
 
@@ -111,38 +288,73 @@ char    *fn;
  * Open a file for writing. Return TRUE if all is well, and FALSE on error
  * (cannot create).
  */
-ffwopen(fn)
+int
+ffwopen(fn,forced)
 char    *fn;
+int	forced;
 {
-#if UNIX
-	FILE *npopen();
-	if (*fn == '!') {
-	        if ((ffp=npopen(fn+1, "w")) == NULL) {
-	                mlwrite("Cannot open pipe for writing");
-			TTbeep();
+#if SYS_UNIX || SYS_MSDOS || SYS_OS2 || SYS_WINNT
+	char	*name;
+	char	*mode = FOPEN_WRITE;
+
+	if (isShellOrPipe(fn)) {
+		if ((ffp=npopen(fn+1, mode)) == NULL) {
+	                mlerror("opening pipe for write");
 	                return (FIOERR);
 		}
 		fileispipe = TRUE;
 	} else {
-	        if ((ffp=fopen(fn, "w")) == NULL) {
-	                mlwrite("Cannot open file for writing");
-			TTbeep();
-	                return (FIOERR);
+		if ((name = is_appendname(fn)) != NULL) {
+			fn = name;
+			mode = FOPEN_APPEND;
+		}
+		if (is_directory(fn)) {
+			set_errno(EISDIR);
+			mlerror("opening directory");
+			return (FIOERR);
+		}
+
+#if OPT_FILEBACK
+		/* will we be able to write? (before attempting backup) */
+		if (ffexists(fn) && ffronly(fn)) {
+			mlerror("accessing for write");
+			return (FIOERR);
+		}
+
+		if (*global_g_val_ptr(GVAL_BACKUPSTYLE) != 'o') { /* "off" ? */
+			if (!make_backup(fn)) {
+				if (!forced) {
+					mlerror("making backup file");
+					return (FIOERR);
+				}
+			}
+		}
+#endif
+		if ((ffp = fopen(fn, mode)) == NULL) {
+			mlerror("opening for write");
+			return (FIOERR);
 		}
 		fileispipe = FALSE;
 	}
 #else
-#if     VMS
+#if     SYS_VMS
+	char	temp[NFILEN];
         register int    fd;
+	register char	*s;
 
-        if ((fd=creat(fn, 0666, "rfm=var", "rat=cr")) < 0
-        || (ffp=fdopen(fd, "w")) == NULL) {
-                mlwrite("Cannot open file for writing");
+	if ((s = strchr(fn = strcpy(temp, fn), ';')))	/* strip version */
+		*s = EOS;
+
+	if (is_appendname(fn)
+	||  is_directory(fn)
+	|| (fd=creat(fn, 0666, "rfm=var", "rat=cr")) < 0
+        || (ffp=fdopen(fd, FOPEN_WRITE)) == NULL) {
+                mlforce("[Cannot open file for writing]");
                 return (FIOERR);
         }
 #else
-        if ((ffp=fopen(fn, "w")) == NULL) {
-                mlwrite("Cannot open file for writing");
+        if ((ffp=fopen(fn, FOPEN_WRITE)) == NULL) {
+                mlerror("opening for write");
                 return (FIOERR);
         }
 #endif
@@ -150,173 +362,291 @@ char    *fn;
         return (FIOSUC);
 }
 
+/* wrapper for 'access()' */
+int
+ffaccess(fn, mode)
+char	*fn;
+int	mode;
+{
+#if HAVE_ACCESS
+	return (!isInternalName(fn)
+	   &&   access(SL_TO_BSL(fn), mode) == 0);
+#else
+	int	fd;
+	switch (mode) {
+	case FL_EXECABLE:
+		/* FALL-THRU */
+	case FL_READABLE:
+		if (ffropen(fn) == FIOSUC) {
+			ffclose();
+			return TRUE;
+		}
+        	return FALSE;
+	case FL_WRITEABLE:
+	        if ((fd=open(SL_TO_BSL(fn), O_WRONLY|O_APPEND)) < 0) {
+	                return FALSE;
+		}
+		(void)close(fd);
+		return TRUE;
+	default:
+		return ffexists(fn);
+	}
+#endif
+}
+
 /* is the file read-only?  true or false */
-#if UNIX  /* don't know how to do it for other systems */
+int
 ffronly(fn)
 char    *fn;
 {
-	int fd;
-
-	if (*fn == '!') {
+	if (isShellOrPipe(fn)) {
 		return TRUE;
 	} else {
-	        if ((fd=open(fn, O_WRONLY)) < 0) {
-	                return TRUE;
-		}
-		close(fd);
-		return FALSE;
+		return !ffaccess(fn, FL_WRITEABLE);
 	}
 }
-#endif
 
-#ifdef UNIX
+#if !OPT_MAP_MEMORY
+#if SYS_WINNT
 
-#include "sys/types.h"
-#include "sys/stat.h"
+off_t
+ffsize(void)
+{
+	int flen, prev;
+	prev = ftell(ffp);
+	if (fseek(ffp, 0, 2) < 0)
+		return -1L;
+	flen = ftell(ffp);
+	fseek(ffp, prev, 0);
+	return flen;
+}
 
-long
+#else
+#if SYS_UNIX || SYS_VMS || SYS_OS2
+off_t
 ffsize()
 {
 	struct stat statbuf;
 	if (fstat(fileno(ffp), &statbuf) == 0) {
 		return (long)statbuf.st_size;
 	}
-        mlwrite("File sizing error");
-        return -1;
+        return -1L;
+}
+#endif
+#endif
+
+#if SYS_MSDOS
+#if CC_DJGPP
+
+off_t
+ffsize(void)
+{
+	int flen, prev;
+	prev = ftell(ffp);
+	if (fseek(ffp, 0, 2) < 0)
+		return -1L;
+	flen = ftell(ffp);
+	fseek(ffp, prev, 0);
+	return flen;
+}
+
+#else
+
+off_t
+ffsize(void)
+{
+	int fd = fileno(ffp);
+	if (fd < 0)
+		return -1L;
+	return  filelength(fd);
+}
+
+#endif
+#endif
+#endif	/* !OPT_MAP_MEMORY */
+
+#if SYS_UNIX || SYS_VMS || SYS_OS2 || SYS_WINNT
+
+int
+ffexists(p)
+char *p;
+{
+	struct stat statbuf;
+	if (!isInternalName(p)
+	 && stat(SL_TO_BSL(p), &statbuf) == 0) {
+		return TRUE;
+	}
+        return FALSE;
 }
 
 #endif
 
-ffread(buf,len)
-char *buf;
-off_t len;
+#if SYS_MSDOS || SYS_WIN31
+
+int
+ffexists(p)
+char *p;
 {
-	return read(fileno(ffp), buf, (int)len);
+	if (!isInternalName(p)
+	 && ffropen(SL_TO_BSL(p)) == FIOSUC) {
+		ffclose();
+		return TRUE;
+	}
+        return FALSE;
 }
 
+#endif
+
+#if !SYS_MSDOS && !OPT_MAP_MEMORY
+#if ANSI_PROTOS
+int ffread(char *buf, long len)
+#else
+int
+ffread(buf,len)
+char *buf;
+long len;
+#endif
+{
+#if SYS_VMS
+	/*
+	 * If the input file is record-formatted (as opposed to stream-lf, a
+	 * single read won't get the whole file.
+	 */
+	int	total = 0;
+
+	while (len > 0) {
+		int	this = read(fileno(ffp), buf+total, len-total);
+		if (this <= 0)
+			break;
+		total += this;
+	}
+	fseek (ffp, len, 1);	/* resynchronize stdio */
+	return total;
+#else
+# if CC_CSETPP
+	int got = fread(buf, len, 1, ffp);
+	return got == 1 ? len : -1;
+# else
+	int got = read(fileno(ffp), buf, (SIZE_T)len);
+	if (got >= 0)
+	    fseek (ffp, len, 1);	/* resynchronize stdio */
+	return got;
+# endif
+#endif
+}
+
+#if ANSI_PROTOS
+void ffseek(long n)
+#else
+void
 ffseek(n)
 long n;
+#endif
 {
+#if SYS_VMS
+	ffrewind();	/* see below */
+#endif
 	fseek (ffp,n,0);
 }
 
+void
 ffrewind()
 {
+#if SYS_VMS
+	/* VAX/VMS V5.4-2, VAX-C 3.2 'rewind()' does not work properly, because
+	 * no end-of-file condition is returned after rewinding.  Reopening the
+	 * file seems to work.  We can get away with this because we only
+	 * reposition in "permanent" files that we are reading.
+	 */
+	char	temp[NFILEN];
+	fgetname(ffp, temp);
+	(void)fclose(ffp);
+	ffp = fopen(temp, FOPEN_READ);
+#else
 	fseek (ffp,0L,0);
+#endif
 }
+#endif
 
 /*
  * Close a file. Should look at the status in all systems.
  */
+int
 ffclose()
 {
-	int s;
+	int s = 0;
 
-	/* free this since we do not need it anymore */
-	if (fline) {
-		free(fline);
-		fline = NULL;
-		flen = 0;
-	}
+	free_fline();	/* free this since we do not need it anymore */
 
-#if	MSDOS & CTRLZ & NEVER
-	 but we NEVER want to do this on read closes!!!
-	fputc(26, ffp);		/* add a ^Z at the end of the file */
+#if SYS_UNIX || SYS_MSDOS || SYS_WIN31 || SYS_OS2 || SYS_WINNT
+	if (fileispipe) {
+		npclose(ffp);
+		mlforce("[Read %d lines%s]",
+			count_fline,
+			interrupted() ? "- Interrupted" : "");
+#ifdef	MDCHK_MODTIME
+		(void)check_visible_modtimes();
 #endif
-	
-#if DOSFILES
-	/* did we get more dos-style lines than unix-style? */
-	dosfile = (doslines > unixlines);
-	unixlines = 0;
-#endif
-#if UNIX | (MSDOS & (LATTICE | MSC | TURBO))
-#if UNIX
-	
-	if (fileispipe)
-		s = npclose(ffp);
-	else
-#endif
+	} else {
 		s = fclose(ffp);
+	}
         if (s != 0) {
-                mlwrite("Error on close");
+		mlerror("closing");
                 return(FIOERR);
         }
-        return(FIOSUC);
 #else
-        fclose(ffp);
-        return (FIOSUC);
+        (void)fclose(ffp);
 #endif
+        return (FIOSUC);
 }
 
 /*
  * Write a line to the already opened file. The "buf" points to the buffer,
  * and the "nbuf" is its length, less the free newline. Return the status.
- * Check only at the newline.
  */
-ffputline(buf, nbuf)
+int
+ffputline(buf, nbuf, ending)
 char    buf[];
 int	nbuf;
+char *	ending;
 {
         register int    i;
-#if	CRYPT
-	char c;		/* character to translate */
+	for (i = 0; i < nbuf; ++i)
+		if (ffputc(char2int(buf[i])) == FIOERR)
+			return FIOERR;
 
-	if (cryptflag) {
-	        for (i = 0; i < nbuf; ++i) {
-			c = buf[i] & 0xff;
-			crypt(&c, 1);
-			fputc(c, ffp);
-		}
-	} else
-	        for (i = 0; i < nbuf; ++i)
-        	        fputc(buf[i]&0xFF, ffp);
-#else
-        for (i = 0; i < nbuf; ++i)
-                fputc(buf[i]&0xFF, ffp);
-#endif
-
-#if	ST520
-        fputc('\r', ffp);
-#endif        
-#if DOSFILES
-	if (dosfile) {
-		/* put out CR, unless we just did */
-		if (i == 0 || buf[i-1] != '\r')
-		        fputc('\r', ffp);
+	while (*ending != EOS) {
+		if (*ending != '\r' || i == 0 || buf[i-1] != '\r')
+			fputc(*ending, ffp);
+		ending++;
 	}
-#endif
-        fputc('\n', ffp);
 
         if (ferror(ffp)) {
-                mlwrite("Write I/O error");
+                mlerror("writing");
                 return (FIOERR);
         }
 
         return (FIOSUC);
 }
+
 /*
- * Write a charto the already opened file.
+ * Write a char to the already opened file.
  * Return the status.
  */
+int
 ffputc(c)
 int c;
 {
-	static lastc;
-	c &= 0xff;
-#if DOSFILES
-	if (dosfile && c == '\n' && lastc != '\r')
-		 fputc('\r',ffp);
-#endif
-	lastc = c;
+	char	d = (char)c;
 
-#if	CRYPT
+#if	OPT_ENCRYPT
 	if (cryptflag)
-		crypt(&c, 1);
+		ue_crypt(&d, 1);
 #endif
-        fputc(c, ffp);
+	fputc(d, ffp);
 
         if (ferror(ffp)) {
-                mlwrite("Write I/O error");
+                mlerror("writing");
                 return (FIOERR);
         }
 
@@ -328,6 +658,8 @@ int c;
  * "flen" is the length of the buffer. Reallocate and copy as necessary.
  * Check for I/O errors. Return status.
  */
+
+int
 ffgetline(lenp)
 int *lenp;	/* to return the final length */
 {
@@ -341,48 +673,73 @@ int *lenp;	/* to return the final length */
 
 	/* if we don't have an fline, allocate one */
 	if (fline == NULL)
-		if ((fline = malloc(flen = NSTRING)) == NULL)
+		if ((fline = castalloc(char,flen = NSTRING)) == NULL)
 			return(FIOMEM);
 
 	/* read the line in */
-        i = 0;
-        while ((c = fgetc(ffp)) != EOF && c != '\n') {
-                fline[i++] = c;
+	i = 0;
+	for_ever {
+#if NEVER && OPT_WORKING && ! HAVE_RESTARTABLE_PIPEREAD
+/* i think some older kernels may lose data if a signal is
+received after some data has been tranferred to the user's buffer, so
+i don't think this code is safe... */
+		for_ever {
+			/* clear our signal memory.  this should
+			  become a bitmap if we need to notice more than
+			  just alarm signals */
+			signal_was = 0;
+			errno = 0;
+			c = fgetc(ffp);
+			if (!ferror(ffp) || errno != EINTR ||
+					signal_was != SIGALRM)
+				break;
+			clearerr(ffp);
+		}
+#else
+		c = fgetc(ffp);
+#endif
+		if ((c == '\n') || feof(ffp) || ferror(ffp))
+			break;
+		if (interrupted()) {
+			free_fline();
+			*lenp = 0;
+			return FIOABRT;
+		}
+                fline[i++] = (char)c;
 		/* if it's longer, get more room */
                 if (i >= flen) {
-                	if ((tmpline = malloc(flen+NSTRING)) == NULL)
+			/* "Small" exponential growth - EJK */
+			ALLOC_T growth = (flen >> 3) + NSTRING;
+			if ((tmpline = castalloc(char,flen+growth)) == NULL)
                 		return(FIOMEM);
-                	strncpy(tmpline, fline, flen);
-                	flen += NSTRING;
-                	free(fline);
+                	(void)memcpy(tmpline, fline, (SIZE_T)flen);
+                	flen += growth;
+			free(fline);
                 	fline = tmpline;
                 }
+#if OPT_WORKING
+		cur_working++;
+#endif
         }
 
-#if !DOSFILES
-#if	ST520
-	if(fline[i-1] == '\r') {
-		i--;
+#if !OPT_DOSFILES
+# if	SYS_ST520
+	if(c == '\n') {
+		if(i > 0 && fline[i-1] == '\r') {
+			i--;
+		}
 	}
-#endif
-#else
-	if(fline[i-1] == '\r') {
-		doslines++;
-		i--;
-	} else {
-		unixlines++;
-	}
-	dosfile = (doslines > unixlines);
+# endif
 #endif
 
 	*lenp = i;	/* return the length, not including final null */
-        fline[i] = 0;
+        fline[i] = EOS;
 
-	/* test for any errors that may have occured */
+	/* test for any errors that may have occurred */
         if (c == EOF) {
-                if (ferror(ffp)) {
-                        mlwrite("File read error");
-                        return(FIOERR);
+		if (!feof(ffp) && ferror(ffp)) {
+			mlerror("reading");
+			return(FIOERR);
                 }
 
                 if (i != 0)
@@ -391,59 +748,79 @@ int *lenp;	/* to return the final length */
 			return(FIOEOF);
         }
 
-#if	CRYPT
-	/* decrypt the string */
+#if	OPT_ENCRYPT
+	/* decrypt the line */
 	if (cryptflag)
-		crypt(fline, strlen(fline));
+		ue_crypt(fline, i);
 #endif
-        return(FIOSUC);
+	count_fline++;
+        return (eofflag ? FIOFUN : FIOSUC);
 }
 
-/* this possibly non-portable addition to the stdio set of macros 
-	is used to see if stdio has data for us, without actually
-	reading it and possibly blocking.  if you have trouble building
-	this, just force ffhasdata() to always return FALSE */
-#define	isready_c(p)	( (p)->_cnt > 0)
+/*
+ * isready_c()
+ *
+ * This fairly non-portable addition to the stdio set of macros is used to
+ * see if stdio has data for us, without actually reading it and possibly
+ * blocking.  If you have trouble building this, just define no_isready_c
+ * below, so that ffhasdata() always returns FALSE.  If you want to make it
+ * work, figure out how your getc in stdio.h knows whether or not to call
+ * _filbuf() (or the equivalent), and write isready_c so that it returns
+ * true if the buffer has chars available now.  The big win in getting it
+ * to work is that reading the output of a pipe (e.g.  ":e !co -p file.c")
+ * is _much_much_ faster, and I don't have to futz with non-blocking
+ * reads...
+ */
+#if CC_WATCOM || SYS_OS2
+#define no_isready_c 1 
+#endif
 
+#ifndef no_isready_c
+# ifdef __sgetc
+   /* 386bsd */
+#  define	isready_c(p)	( (p)->_r > 0)
+# else
+#  ifdef _STDIO_UCHAR_
+	/* C E Chew's package */
+#   define 	isready_c(p)	( (p)->__rptr < (p)->__rend)
+#  else
+#   ifdef _G_FOPEN_MAX
+	/* two versions of GNU iostream/stdio library */
+#     if _IO_STDIO
+#      define   isready_c(p)    ( (p)->_IO_read_ptr < (p)->_IO_read_end)
+#     else
+#      define 	isready_c(p)	( (p)->_gptr < (p)->_egptr)
+#     endif
+#   else
+#    if SYS_VMS
+#     define	isready_c(p)	( (*p)->_cnt > 0)
+#    endif
+#    if CC_TURBO
+#     define    isready_c(p)	( (p)->bsize > ((p)->curp - (p)->buffer) )
+#    endif
+#    ifndef isready_c	/* most other stdio's (?) */
+#     define	isready_c(p)	( (p)->_cnt > 0)
+#    endif
+#   endif
+#  endif
+# endif
+#endif
+
+
+int
 ffhasdata()
 {
-	long x;
+#ifdef isready_c
 	if (isready_c(ffp))
 		return TRUE;
-#if	BSD
-	return(((ioctl(fileno(ffp),FIONREAD,&x) < 0) || x == 0) ? FALSE : TRUE);
+#endif
+#ifdef	FIONREAD
+	{
+	long x;
+	return(((ioctl(fileno(ffp),FIONREAD,(caddr_t)&x) < 0) || x == 0) ? FALSE : TRUE);
+	}
 #else
 	return FALSE;
 #endif
 }
 
-#if	AZTEC & MSDOS
-#undef	fgetc
-/*	a1getc:		Get an ascii char from the file input stream
-			but DO NOT strip the high bit
-*/
-
-int a1getc(fp)
-
-FILE *fp;
-
-{
-	int c;		/* translated character */
-
-	c = getc(fp);	/* get the character */
-
-	/* if its a <LF> char, throw it out  */
-	while (c == '\n')
-		c = getc(fp);
-
-	/* if its a <RETURN> char, change it to a LF */
-	if (c == '\r')
-		c = '\n';
-
-	/* if its a ^Z, its an EOF */
-	if (c == 26)
-		c = EOF;
-
-	return(c);
-}
-#endif
