@@ -4,7 +4,11 @@
  *	written 1986 by Daniel Lawrence	
  *
  * $Log: exec.c,v $
- * Revision 1.67  1993/08/13 16:32:50  pgf
+ * Revision 1.68  1993/08/18 16:45:00  pgf
+ * added VIEWOK flag for functions that execute macros.  it says it's okay
+ * to execute them in view mode, even though they have the UNDO bit set
+ *
+ * Revision 1.67  1993/08/13  16:32:50  pgf
  * tom's 3.58 changes
  *
  * Revision 1.66  1993/08/05  14:29:12  pgf
@@ -949,7 +953,7 @@ int f,n;
 			dotcmdstop();
 		if (flags & UNDO) {
 			/* undoable command can't be permitted when read-only */
-			if (b_val(curbp,MDVIEW))
+			if (!(flags & VIEWOK) && b_val(curbp,MDVIEW))
 				return rdonly();
 			if (!kbd_replaying(FALSE))
 				mayneedundo();

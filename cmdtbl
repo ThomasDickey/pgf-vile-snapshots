@@ -72,7 +72,11 @@
 #		here for completeness.
 #
 # $Log: cmdtbl,v $
-# Revision 1.70  1993/08/13 16:32:50  pgf
+# Revision 1.71  1993/08/18 16:45:00  pgf
+# added VIEWOK flag for functions that execute macros.  it says it's okay
+# to execute them in view mode, even though they have the UNDO bit set
+#
+# Revision 1.70  1993/08/13  16:32:50  pgf
 # tom's 3.58 changes
 #
 # Revision 1.69  1993/08/05  14:35:57  pgf
@@ -421,7 +425,7 @@ kbd_mac_begin		NONE
 kbd_mac_end		NONE
 	"end-keyboard-macro"		!FEWNAMES
 	'^X-)'
-kbd_mac_exec		REDO|UNDO
+kbd_mac_exec		REDO|UNDO|VIEWOK
 	"execute-keyboard-macro"	!FEWNAMES
 	'^X-&'
 kbd_mac_save		NONE
@@ -565,7 +569,7 @@ execcmd		NONE			NEVER
 execfile	NONE			!SMALLER
 	"execute-file"			!FEWNAMES
 	"source"
-execkreg	REDO|UNDO
+execkreg	REDO|UNDO|VIEWOK
 	"execute-register"
 	'@'
 execproc	REDO			PROC
@@ -852,7 +856,7 @@ showkreg	NONE			!SMALLER
 	"list-registers"		!FEWNAMES
 map		NONE|(EXRCOK|BANG|EXTRA)
 	"map"
-map_proc		REDO|UNDO
+map_proc		REDO|UNDO|VIEWOK
 	"map_proc"
 cntl_af		NONE
 	"cntl_a-prefix"

@@ -795,7 +795,7 @@ Editor modes
 
 	xterm-mouse Enables mouse-clicking if you are running within an xterm.
 		This mode overrides xterm's cut & paste.  Your TERM variable
-		must be "xterm" for this to work.  (U)
+		must end with the string "xterm" for this to work.  (U)
 
 Command History
 ---------------

@@ -14,7 +14,10 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.136  1993/08/13 16:32:50  pgf
+ * Revision 1.137  1993/08/18 11:51:56  pgf
+ * turn of xterm-mouse mode by default
+ *
+ * Revision 1.136  1993/08/13  16:32:50  pgf
  * tom's 3.58 changes
  *
  * Revision 1.135  1993/08/05  14:29:12  pgf
@@ -1144,7 +1147,7 @@ global_val_init()
 #endif
 	set_global_g_val(GVAL_REPORT,	5);	/* report changes */
 #if	OPT_XTERM
-	set_global_g_val(GMDXTERM_MOUSE,TRUE);	/* mouse-clicking */
+	set_global_g_val(GMDXTERM_MOUSE,FALSE);	/* mouse-clicking */
 #endif
 
 	/*

@@ -10,7 +10,18 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.135  1993/08/13 16:32:50  pgf
+ * Revision 1.138  1993/08/18 16:45:00  pgf
+ * added VIEWOK flag for functions that execute macros.  it says it's okay
+ * to execute them in view mode, even though they have the UNDO bit set
+ *
+ * Revision 1.137  1993/08/18  15:10:36  pgf
+ * OPT_XTERM is now turned on for X11, as an ease-of-use feature for the
+ * user.  it doesn't actually do anything
+ *
+ * Revision 1.136  1993/08/18  11:52:12  pgf
+ * turn off OPT_WORKING for USG builds
+ *
+ * Revision 1.135  1993/08/13  16:32:50  pgf
  * tom's 3.58 changes
  *
  * Revision 1.134  1993/08/05  14:39:55  pgf
@@ -836,15 +847,22 @@
 
 /*	Code size options	*/
 #define	FEWNAMES 0	/* strip some names - will no longer be bindable */
-#define	SMALLER	0	/* strip out a bunch of uemacs fluff */
-			/* 	(to each their own... :-)  pgf) */
+#define	SMALLER	0	/* strip some fluff -- not a lot smaller, but some */
 #define OPT_MAP_MEMORY 0	/* tiny systems can page out data */
 
-#define OPT_WORKING    HAS_ALARM && !SMALLER	/* show "working..." message */
+/* show "working..." message */
+/* we suppress this on USG machines in case system calls are not restartable
+	after signals */
+#define OPT_WORKING (!USG && HAS_ALARM && !SMALLER)
+
 #define	OPT_EVAL   !SMALLER			/* expression-evaluation */
 #define OPT_UPBUFF !SMALLER			/* animated buffer-update */
 
-#if	TERMCAP && !SMALLER
+#if	(TERMCAP || X11) && !SMALLER
+/* we turn on OPT_XTERM under X11 _only_ because it's then easier for users to
+ * be able to put "set xterm-mouse" in their .vilerc which is shared between
+ * vile and xvile.  otherwise, xterm-mouse has _no_ effect under X11
+ */
 #define	OPT_XTERM	2	/* mouse-clicking support */
 #else
 #define	OPT_XTERM	0	/* vile doesn't recognize xterm mouse */
@@ -2086,6 +2104,8 @@ typedef struct {
 #define LISTED	256L	/* internal use only -- used in describing bindings
 				to only describe each once */
 #define NOMOVE  512L	/* dot doesn't move (although address may be used) */
+#define VIEWOK  1024L	/* command is okay in view mode, even though it _may_
+				be undoable (macros and maps) */
 
 /* these flags are ex argument descriptors. I simply moved them over 
 	from elvis.  Not all are used or honored or implemented */

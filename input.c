@@ -3,7 +3,10 @@
  *		5/9/86
  *
  * $Log: input.c,v $
- * Revision 1.84  1993/08/13 16:32:50  pgf
+ * Revision 1.85  1993/08/18 15:10:36  pgf
+ * don't let the OPT_XTERM code do anything under X11
+ *
+ * Revision 1.84  1993/08/13  16:32:50  pgf
  * tom's 3.58 changes
  *
  * Revision 1.83  1993/07/27  18:06:20  pgf
@@ -673,7 +676,7 @@ kbd_key()
 {
 	int    c;
 
-#if OPT_XTERM
+#if OPT_XTERM && !X11
 kbd_key_loop:
 #endif
 	/* get a keystroke */
@@ -703,12 +706,12 @@ kbd_key_loop:
 		if (nextc != -1 || typahead()) {
 			c = tgetc(FALSE);
 			if (c == SQUARE_LEFT || c == 'O') {
-#if OPT_XTERM
+#if OPT_XTERM && !X11
 				int	d = c;
 #endif
 				/* eat ansi sequences */
 				c = tgetc(FALSE);
-#if OPT_XTERM
+#if OPT_XTERM && !X11
 				if (d == SQUARE_LEFT
 				 && (d = xterm_button(c)) != FALSE) {
 					if (insertmode || (d != TRUE))

@@ -1,3 +1,39 @@
+Changes for vile 3.59: (released Wed Aug 18, 1993)
+(pgf)
+	+ added VIEWOK flag for functions that execute macros.  it says
+	  it's okay to execute them in view mode, even though they have the
+	  UNDO bit set.  this fixes not being able to run @, :map'ed, or
+	  ^X-& macros in view-only buffers.
+
+	+ made the xterm-mouse mode available in xvile as well as vile, to
+	  make it easier to share .vilerc between the two versions.  the
+	  alternative is to insist that people put ~force set xterm-mouse
+	  in .vilerc, to override the error they'll get in xvile from the
+	  mode not being present. (input.c, modes.c, estruct.h)
+
+	+ changed default value of "xterm-mouse" to off, to make vile behave
+	  like it used to, and like other character applications, by default.
+	  (main.c)
+
+	+ turned off support for the "working..." message for builds that
+	  define USG, since they probably have non-restartable system calls.
+	  (estruct.h)
+
+	+ accept any TERM variable that ends in "xterm" to be an xterm.
+	  (tcap.c, vile.hlp)
+
+	+ fixed "uninitialized variable 'req'" when compiling without REVSTA
+	  defined. (display.c)
+
+	+ fixed missing closing double quote in "make all" help output.
+	  (makefile)
+
+	+ bumped the maximum row count from 100 to 200.  i personally can't
+	  read more than about 70 lines on a 19" mono monitor, but maybe
+	  i need glasses. (tcap.c, x11.c)
+
+	+ took out extraneous trace.h include from x11.c
+
 Changes for vile 3.58: (released Fri Aug 13, 1993)
 (pgf)
 	+ added "sys$login:" to VMS file search path for vile.rc

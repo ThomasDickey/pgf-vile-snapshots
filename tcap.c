@@ -2,7 +2,13 @@
  *		for MicroEMACS
  *
  * $Log: tcap.c,v $
- * Revision 1.23  1993/08/13 16:32:50  pgf
+ * Revision 1.25  1993/08/18 16:50:10  pgf
+ * bumped mrow from 100 to 200 -- some people have very good eyesight
+ *
+ * Revision 1.24  1993/08/17  18:20:16  pgf
+ * only require that TERM _end_ in "xterm" to turn on xterm hacks
+ *
+ * Revision 1.23  1993/08/13  16:32:50  pgf
  * tom's 3.58 changes
  *
  * Revision 1.22  1993/07/08  15:03:52  pgf
@@ -200,11 +206,18 @@ tcapopen()
 		ExitProgram(BAD(1));
 	}
 
-	i_am_xterm = !strcmp(tv_stype, "xterm");
+	{ 	/* are we probably an xterm?  (anything ending with...) */
+		int l = strlen(tv_stype);
+		/* 5 == strlen("xterm") */
+		if (l >= 5 && !strcmp(tv_stype + l - 5, "xterm"))
+			i_am_xterm = TRUE;
+		else
+			i_am_xterm = TRUE;
+	}
 
 #ifdef SIGWINCH
 	term.t_mcol = 200;
-	term.t_mrow = 100;
+	term.t_mrow = 200;
 #else
 	term.t_mrow =  term.t_nrow;
 	term.t_mcol =  term.t_ncol;

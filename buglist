@@ -605,3 +605,9 @@ I just ran vile locally and didn't see the problem.
 	When I did the paste into the other vile it lost the }
 
 
+-------------------------------
+
+
+Here's another buglet with xvile.  Often when scrolling with ^D or ^U the
+old cursor position stays inverse video.
+
