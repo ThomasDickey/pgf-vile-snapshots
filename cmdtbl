@@ -71,7 +71,10 @@
 #		here for completeness.
 #
 # $Log: cmdtbl,v $
-# Revision 1.38  1992/06/01 20:44:47  foxharp
+# Revision 1.39  1992/07/08 08:19:43  foxharp
+# added DOS function keys
+#
+# Revision 1.38  1992/06/01  20:44:47  foxharp
 # always define bktoshell -- we make it a null routine instead of leaving
 # it out...
 #
@@ -234,6 +237,7 @@ backchar_to_bol	MOTION
 	'^H'
 	'^?'
 	'FN-D'				ANSI_SPEC
+	'FN-\113'			MSDOS
 backdelchar	REDO|UNDO
 	"delete-previous-character"	!FEWNAMES
 	'X'
@@ -251,6 +255,7 @@ backline	GOAL|MOTION|FL
 	'k'
 	'^P'
 	'FN-A'				ANSI_SPEC
+	'FN-\110'			MSDOS
 backbline	MOTION|FL
 	"previous-line-at-bol"		!FEWNAMES
 	"back-line-at-bol"		!FEWNAMES
@@ -260,10 +265,12 @@ backpage	MOTION
 	"previous-page"			!FEWNAMES
 	"back-page"			!FEWNAMES
 	'^B'
+	'FN-\111'			MSDOS
 backword	MOTION
 	"previous-word"			!FEWNAMES
 	"back-word"			!FEWNAMES
 	'B'
+	'FN-\163'			MSDOS
 backviword	MOTION
 	"previous-punctuated-word"		!FEWNAMES
 	"back-punctuated-word"		!FEWNAMES
@@ -323,35 +330,43 @@ kbd_mac_save		NONE
 	'^X-^'
 cbuf1		REDO
 	"execute-macro-1"		!FEWNAMES
-	'FN-1'
+	'FN-1'				UNIX
 	'FN-P'				ANSI_SPEC
 cbuf2		REDO
 	"execute-macro-2"		!FEWNAMES
-	'FN-2'
+	'FN-2'				UNIX
 	'FN-Q'				ANSI_SPEC
+	'FN-\125'			MSDOS
 cbuf3		REDO
 	"execute-macro-3"		!FEWNAMES
-	'FN-3'
+	'FN-3'				UNIX
 	'FN-R'				ANSI_SPEC
+	'FN-\126'			MSDOS
 cbuf4		REDO
 	"execute-macro-4"		!FEWNAMES
-	'FN-4'
+	'FN-4'				UNIX
 	'FN-S'				ANSI_SPEC
+	'FN-\127'			MSDOS
 cbuf5		REDO
 	"execute-macro-5"		!FEWNAMES
-	'FN-5'
+	'FN-5'				UNIX
+	'FN-\130'			MSDOS
 cbuf6		REDO
 	"execute-macro-6"		!FEWNAMES
-	'FN-6'
+	'FN-6'				UNIX
+	'FN-\131'			MSDOS
 cbuf7		REDO
 	"execute-macro-7"		!FEWNAMES
-	'FN-7'
+	'FN-7'				UNIX
+	'FN-\132'			MSDOS
 cbuf8		REDO
 	"execute-macro-8"		!FEWNAMES
-	'FN-8'
+	'FN-8'				UNIX
+	'FN-\133'			MSDOS
 cbuf9		REDO
 	"execute-macro-9"		!FEWNAMES
-	'FN-9'
+	'FN-9'				UNIX
+	'FN-\134'			MSDOS
 cbuf10		REDO
 	"execute-macro-10"		!FEWNAMES
 cbuf11		REDO			!SMALLER
@@ -510,6 +525,7 @@ fnclabel	NONE			FLABEL
 forwdelchar	REDO|UNDO
 	"delete-next-character"		!FEWNAMES
 	'x'
+	'FN-\123'			MSDOS
 forwhpage	NONE
 	"forward-half-page"		!FEWNAMES
 	"next-half-page"		!FEWNAMES
@@ -524,11 +540,13 @@ forwchar_to_eol	MOTION
 	' '
 	'l'
 	'FN-C'				ANSI_SPEC
+	'FN-\115'			MSDOS
 forwpage	MOTION
 	"forward-page"			!FEWNAMES
 	"next-page"			!FEWNAMES
 	"down-page"			!FEWNAMES
 	'^F'
+	'FN-\121'			MSDOS
 forwline	GOAL|MOTION|FL
 	"forward-line"			!FEWNAMES
 	"next-line"			!FEWNAMES
@@ -537,6 +555,7 @@ forwline	GOAL|MOTION|FL
 	'^J'
 	'^N'
 	'FN-B'				ANSI_SPEC
+	'FN-\120'			MSDOS
 forwbline	MOTION|FL
 	"forward-line-at-bol"		!FEWNAMES
 	"next-line-at-bol"		!FEWNAMES
@@ -547,6 +566,7 @@ forwword	MOTION
 	"forward-word"			!FEWNAMES
 	"next-word"			!FEWNAMES
 	'W'
+	'FN-\164'			MSDOS
 forwviword	MOTION
 	"forward-punctuated-word"		!FEWNAMES
 	"next-punctuated-word"		!FEWNAMES
@@ -581,19 +601,23 @@ gomark		MOTION|FL|(RANGE|ZERO)
 gotobop		ABS|MOTION		WORDPRO
 	"previous-paragraph"		!FEWNAMES
 	"back-paragraph"		!FEWNAMES
-	"up-paragraph"		!FEWNAMES
+	"up-paragraph"			!FEWNAMES
 	'{'
+#	'FN-\204'			MSDOS
 gotoeop		ABS|MOTION		WORDPRO
 	"forward-paragraph"		!FEWNAMES
 	"next-paragraph"		!FEWNAMES
 	"down-paragraph"		!FEWNAMES
 	'}'
+	'FN-\166'			MSDOS
 gotobob		ABS|MOTION		!SMALLER
 	"beginning-of-file"		!FEWNAMES
 	"goto-beginning-of-file"	!FEWNAMES
+	'FN-\107'			MSDOS
 gotoeob		ABS|MOTION		!SMALLER
 	"goto-end-of-file"		!FEWNAMES
 	"end-of-file"			!FEWNAMES
+	'FN-\117'			MSDOS
 gotobol		MOTION
 	"goto-bol"			!FEWNAMES
 	"beginning-of-line"		!FEWNAMES

@@ -10,7 +10,10 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.76  1992/07/07 08:36:07  foxharp
+ * Revision 1.77  1992/07/08 08:20:22  foxharp
+ * made the _rest_ of the command flags long.  sigh.
+ *
+ * Revision 1.76  1992/07/07  08:36:07  foxharp
  * redefined the command flags as long constants, so the upper 16 bits don't
  * get lost on 16 bit machines.  (DOS)
  *
@@ -1419,16 +1422,16 @@ typedef struct {
 
 /* these are the flags which can appear in the CMDFUNC structure, describing
 	a command */
-#define NONE	0
-#define UNDO	1	/* command is undo-able, so clean up undo lists */
-#define REDO	2	/* command is redo-able, record it for dotcmd */
-#define MOTION	4	/* command causes motion, okay after operator cmds */
-#define FL	8	/* if command causes motion, opers act on full lines */
-#define ABS	16	/* command causes absolute (i.e. non-relative) motion */
-#define GOAL	32	/* column goal should be retained */
-#define GLOBOK	64	/* permitted after global command */
-#define OPER	128	/* function is an operator, affects a region */
-#define LISTED	256	/* internal use only -- used in describing bindings
+#define NONE	0L
+#define UNDO	1L	/* command is undo-able, so clean up undo lists */
+#define REDO	2L	/* command is redo-able, record it for dotcmd */
+#define MOTION	4L	/* command causes motion, okay after operator cmds */
+#define FL	8L	/* if command causes motion, opers act on full lines */
+#define ABS	16L	/* command causes absolute (i.e. non-relative) motion */
+#define GOAL	32L	/* column goal should be retained */
+#define GLOBOK	64L	/* permitted after global command */
+#define OPER	128L	/* function is an operator, affects a region */
+#define LISTED	256L	/* internal use only -- used in describing bindings
 				to only describe each once */
 
 /* these flags are ex argument descriptors. I simply moved them over 

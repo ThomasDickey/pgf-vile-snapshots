@@ -9,7 +9,15 @@
  *	the output structures.
  *
  * $Log: mktbls.c,v $
- * Revision 1.7  1992/05/29 08:34:01  foxharp
+ * Revision 1.8  1992/07/08 08:35:09  foxharp
+ * don't report duplicate keymaps if the pre-processor conditionals are
+ * both present, and they don't match -- in that case, they're unlikely
+ * to both compile in at the same time.
+ *
+ * also, be sure to emit backslash escapes when printing ' and \ character
+ * constants, i.e. '\'' and '\\'
+ *
+ * Revision 1.7  1992/05/29  08:34:01  foxharp
  * prototypes, gcc -W cleanups
  *
  * Revision 1.6  1991/11/07  03:29:12  pgf
@@ -194,6 +202,17 @@ char *conditions[4][128];
 char *tblname[] = {"asciitbl", "ctlxtbl", "metatbl", "spectbl" };
 char *prefname[] = {"", "CTLX|", "CTLA|", "SPEC|" };
 
+two_conds(btype,c,cond)
+int btype,c;
+char *cond;
+{
+	/* return true if both bindings have different
+	 conditions associated with them */
+	return (cond[0] != 0 && 
+		conditions[btype][c] != NULL && 
+		strcmp(cond, conditions[btype][c]) != 0);
+}
+
 /* prc2kcod: translate printable code to C-language keycode */
 void
 savebindings(s,func,cond)
@@ -216,10 +235,11 @@ char *s, *func, *cond;
 	
 	if (*s == '\\') { /* try for an octal value */
 		c = 0;
-		while (*++s < '8' && *s >= '0') c = (c*8) + *s - '0';
+		while (*++s < '8' && *s >= '0')
+			c = (c*8) + *s - '0';
 		if (c > 127)
-			badfmt("octal character");
-		if (bindings[btype][c] != NULL)
+			badfmt("octal character too big");
+		if (bindings[btype][c] != NULL && !two_conds(btype,c,cond))
 			badfmt("duplicate key binding");
 		bindings[btype][c] = malloc(strlen(func)+1);
 		strcpy(bindings[btype][c], func);
@@ -227,13 +247,13 @@ char *s, *func, *cond;
 		if (c > 'a' &&  c < 'z')
 			c = toupper(c);
 		c = tocntrl(c);
-		if (bindings[btype][c] != NULL)
+		if (bindings[btype][c] != NULL && !two_conds(btype,c,cond))
 			badfmt("duplicate key binding");
 		bindings[btype][c] = malloc(strlen(func)+1);
 		strcpy(bindings[btype][c], func);
 		s += 2;
 	} else if (c = *s) {
-		if (bindings[btype][c] != NULL)
+		if (bindings[btype][c] != NULL && !two_conds(btype,c,cond))
 			badfmt("duplicate key binding");
 		bindings[btype][c] = malloc(strlen(func)+1);
 		strcpy(bindings[btype][c], func);
@@ -295,16 +315,19 @@ dumpbindings()
 					fprintf(nebind,"%s",
 						conditions[btype][i]);
 				}
-				if (i < ' ')
+				if (i < ' ') {
 					fprintf(nebind,
 					"	{ %stocntrl('%c'), &f_%s },\n",
 						prefname[btype],
 						toalpha(i),bindings[btype][i]);
-				else
+				} else {
 					fprintf(nebind,
-					"	{ %s'%c', &f_%s },\n",
+					"	{ %s'%s%c', &f_%s },\n",
 						prefname[btype],
+						(i == '\'' || i == '\\') ?
+							"\\":"",
 						i, bindings[btype][i]);
+				}
 				if (conditions[btype][i]) {
 					fprintf(nebind,"#endif\n");
 				}

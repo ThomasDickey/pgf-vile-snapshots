@@ -49,7 +49,7 @@ VILE -- VI Like Emacs: a vi workalike put together from Micro-Emacs by Paul Fox
 	In general, I suspect that the quality of the code is roughly
 	on a par with MicroEmacs.  I've been using vile regularly under
 	both SunOS and 386 UNIX for almost two years, with no major problems
-	(that havn't been fixed).  Version three was built and used by
+	(that haven't been fixed).  Version three was built and used by
 	many others on the net, and their feedback was invaluable.
 	I think all of the reported bugs have been fixed, and hopefully
 	not too many new ones introduced.
