@@ -6,7 +6,75 @@
  * framing, are hard.
  *
  * $Log: basic.c,v $
- * Revision 1.14  1991/09/27 02:48:16  pgf
+ * Revision 1.30  1992/02/17 08:49:47  pgf
+ * took out unused var for saber
+ *
+ * Revision 1.29  1992/01/22  17:15:25  pgf
+ * minor change to blank-line-skip for backward paragraph motions
+ *
+ * Revision 1.28  1992/01/22  16:58:20  pgf
+ * paragraph motions now treat consecutive blank lines as a single paragraph
+ * delimeter (note that this is independent of what the regexp says)
+ *
+ * Revision 1.27  1992/01/10  08:10:15  pgf
+ * don't bother with list mode in next_column(), since this should _always_
+ * give the "unlist-moded" column
+ *
+ * Revision 1.26  1992/01/05  00:06:13  pgf
+ * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
+ * often.  also normalized message appearance somewhat.
+ *
+ * Revision 1.25  1992/01/03  23:35:47  pgf
+ * screen motions (goto[emb]os()) now unconditionally return TRUE, to
+ * eliminate oddness when buffer doesn't fill window
+ *
+ * paragraph and section motions no longer fail at the bottom of the
+ * buffer (operators wouldn't work)
+ *
+ * paragraph motions are treated more vi-like.  in particular, whether
+ * a para motion is character or line oriented is determined by where
+ * the motion starts and finishes.  thanks to Eric Krohn for this tip.
+ * (forward, the motion is line oriented if it moves off the current line
+ * and it started at the beginning of the line.  otherwise it's character
+ * oriented.  backward, it's similar, but it's line oriented if it starts
+ * at the beginning _or_ end of a line.)
+ *
+ * Revision 1.24  1991/12/24  18:32:28  pgf
+ * don't reset lastdot mark if we're moving to a mark and it's on behalf
+ * of an opcmd
+ *
+ * Revision 1.23  1991/11/13  20:09:27  pgf
+ * X11 changes, from dave lemke
+ *
+ * Revision 1.22  1991/11/10  22:28:17  pgf
+ * the goto{end,begin}of{para,sec,sentence} motions now return TRUE, whether
+ * they really went to a para,sec, or sentence, or went to the beginning or
+ * end of the buffer because there were no more paras, secs, or sentences.
+ * this makes operators work right.
+ *
+ * Revision 1.21  1991/11/08  13:08:04  pgf
+ * moved firstchar() here, created lastchar(), and
+ * eliminated unused atmark()
+ *
+ * Revision 1.20  1991/11/03  17:33:20  pgf
+ * use new lregexec() routine to check for patterns in lines
+ *
+ * Revision 1.19  1991/11/01  14:38:00  pgf
+ * saber cleanup
+ *
+ * Revision 1.18  1991/11/01  14:10:35  pgf
+ * matchlen is now part of a regexp, not global
+ *
+ * Revision 1.17  1991/10/28  00:57:31  pgf
+ * cleaned the sentence motions some more
+ *
+ * Revision 1.16  1991/10/27  16:09:06  pgf
+ * improved the sentence motions
+ *
+ * Revision 1.15  1991/10/26  00:12:34  pgf
+ * section, paragraph, and new sentence motions are all regex based
+ *
+ * Revision 1.14  1991/09/27  02:48:16  pgf
  * remove unused automatics
  *
  * Revision 1.13  1991/09/26  13:05:45  pgf
@@ -69,7 +137,9 @@
  * beginning of the current line.
  * Trivial.
  */
+/* ARGSUSED */
 gotobol(f, n)
+int f,n;
 {
         curwp->w_dot.o  = 0;
         return (TRUE);
@@ -82,7 +152,8 @@ gotobol(f, n)
  * line pointer for dot changes.
  */
 backchar(f, n)
-register int    n;
+int f;
+register int n;
 {
         register LINE   *lp;
 
@@ -106,6 +177,7 @@ register int    n;
  * Move the cursor backwards by "n" characters. Stop at beginning of line.
  */
 backchar_to_bol(f, n)
+int f;
 register int    n;
 {
 
@@ -125,6 +197,7 @@ register int    n;
  * Move the cursor to the end of the current line. Trivial. No errors.
  */
 gotoeol(f, n)
+int f,n;
 {
 	if (f == TRUE) {
 		if (n > 0)
@@ -145,6 +218,7 @@ gotoeol(f, n)
  * buffer. Set the flag if the line pointer for dot changes.
  */
 forwchar(f, n)
+int f;
 register int    n;
 {
 	if (f == FALSE) n = 1;
@@ -168,6 +242,7 @@ register int    n;
  * Move the cursor forwards by "n" characters. Don't go past end-of-line
  */
 forwchar_to_eol(f, n)
+int f;
 register int    n;
 {
 	if (f == FALSE) n = 1;
@@ -182,9 +257,11 @@ register int    n;
         return TRUE;
 }
 
-gotoline(f, n)		/* move to a particular line.
-			   argument (n) must be a positive integer for
-			   this to actually do anything		*/
+/* move to a particular line.
+   argument (n) must be a positive integer for
+   this to actually do anything		*/
+gotoline(f, n)
+int f,n;
 {
 	register int status;	/* status return */
 
@@ -210,7 +287,9 @@ gotoline(f, n)		/* move to a particular line.
  * considered to be hard motion; it really isn't if the original value of dot
  * is the same as the new value of dot.
  */
+/* ARGSUSED */
 gotobob(f, n)
+int f,n;
 {
         curwp->w_dot.l  = lforw(curbp->b_line.l);
         curwp->w_dot.o  = 0;
@@ -219,36 +298,40 @@ gotobob(f, n)
 }
 
 /*
- * Move to the end of the buffer. Dot is always put at the end of the file
- * (ZJ). The standard screen code does most of the hard parts of update.
+ * Move to the end of the buffer. Dot is always put at the end of the file.
  */
+/* ARGSUSED */
 gotoeob(f, n)
+int f,n;
 {
         curwp->w_dot.l  = lback(curbp->b_line.l);
 	firstnonwhite(FALSE,1);
         curwp->w_flag |= WFMOVE;
-        return (TRUE);
+        return TRUE;
 }
 
 gotobos(f,n)
+int f,n;
 {
-	int s = TRUE;
 	if (f == FALSE || n <= 0) n = 1;
 	curwp->w_dot.l = curwp->w_line.l;
 	while (--n) {
-		if ((s = forwline(FALSE,1)) != TRUE)
+		if (forwline(FALSE,1) != TRUE)
 			break;
 	}
 	firstnonwhite(f,n);
-	return (s);
+	return TRUE;
 }
 
+/* ARGSUSED */
 gotomos(f,n)
+int f,n;
 {
 	return gotobos(TRUE,curwp->w_ntrows/2);
 }
 
 gotoeos(f,n)
+int f,n;
 {
 	return gotobos(TRUE,curwp->w_ntrows-(f==TRUE? n-1:0));
 }
@@ -260,6 +343,7 @@ gotoeos(f,n)
  * possible.
  */
 forwline(f, n)
+int f,n;
 {
         register LINE   *dlp;
 
@@ -288,27 +372,45 @@ forwline(f, n)
         return (TRUE);
 }
 
+/* ARGSUSED */
 firstnonwhite(f,n)
+int f,n;
 {
-        curwp->w_dot.o  = 0;
-	while ( !is_at_end_of_line(curwp->w_dot) &&
-			isspace(char_at(curwp->w_dot)) )
-		curwp->w_dot.o++;
+        DOT.o  = firstchar(DOT.l);
 	return TRUE;
 }
 
+/* ARGSUSED */
 lastnonwhite(f,n)
+int f,n;
 {
-        curwp->w_dot.o  = llength(curwp->w_dot.l)-1;
-	while ( curwp->w_dot.o != 0 && 
-			isspace(char_at(curwp->w_dot)))
-		curwp->w_dot.o--;
+        DOT.o  = lastchar(DOT.l);
 	return TRUE;
+}
 
+/* return the offset of the first non-white character on the line */
+firstchar(lp)
+LINE *lp;
+{
+	int off = 0;
+	while ( off != llength(lp) && isspace(lgetc(lp, off)) )
+		off++;
+	return off;
+}
+
+/* return the offset of the last non-white character on the line */
+lastchar(lp)
+LINE *lp;
+{
+	int off = llength(lp)-1;
+	while ( off > 0 && isspace(lgetc(lp, off)) )
+		off--;
+	return off;
 }
 
 /* like forwline, but got to first non-white char position */
 forwbline(f,n)
+int f,n;
 {
 	int s;
 
@@ -321,6 +423,7 @@ forwbline(f,n)
 
 /* like backline, but got to first non-white char position */
 backbline(f,n)
+int f,n;
 {
 	int s;
 
@@ -338,6 +441,7 @@ backbline(f,n)
  * motion. No errors are possible.
  */
 backline(f, n)
+int f,n;
 {
         register LINE   *dlp;
 
@@ -368,156 +472,175 @@ backline(f, n)
 
 #if	WORDPRO
 
+
 gotobop(f,n)
+int f,n;
 {
-	return(backlinebeg(f,n,"\n.","ILPQbSHN"));
+	MARK odot;
+	odot = DOT;
+	if (doingopcmd && 
+		(DOT.o <= firstchar(DOT.l)) && 
+		!is_first_line(DOT,curbp)) {
+		backchar(TRUE,DOT.o+1);
+		pre_op_dot = DOT;
+	}
+    retry:
+	if (findpat(f, n, b_val_rexp(curbp,VAL_PARAGRAPHS)->reg,
+							REVERSE) != TRUE) {
+		gotobob(f,n);
+	} else if (llength(DOT.l) == 0) {
+		/* special case -- if we found an empty line,
+			and it's adjacent to where we started,
+			skip all adjacent empty lines, and try again */
+		if (llength(DOT.l) == 0 && lforw(DOT.l) == odot.l) {
+			while (lback(DOT.l) != curbp->b_line.l &&
+					llength(lback(DOT.l)) == 0)
+				DOT.l = lback(DOT.l);
+			goto retry;
+		}
+	}
+	if (doingopcmd) {
+		if (!sameline(DOT,odot) && 
+			(pre_op_dot.o > lastchar(pre_op_dot.l)) && 
+			DOT.o <= firstchar(DOT.l)) {
+			fulllineregions = TRUE;
+		}
+	}
+	return TRUE;
 }
+
 gotoeop(f,n)
+int f,n;
 {
-	return(forwlinebeg(f,n,"\n.","ILPQbSHN"));
+	MARK odot;
+	int was_at_bol;
+	odot = DOT;
+	was_at_bol = (DOT.o <= firstchar(DOT.l));
+	if (findpat(f, n, b_val_rexp(curbp,VAL_PARAGRAPHS)->reg, 
+					FORWARD) != TRUE) {
+		DOT = curbp->b_line;
+	} else if (llength(DOT.l) == 0) {
+		/* special case -- if we found an empty line, skip all
+			adjacent empty lines */
+		while (lforw(DOT.l) != curbp->b_line.l &&
+				llength(lforw(DOT.l)) == 0)
+			DOT.l = lforw(DOT.l);
+	}
+	if (doingopcmd) {
+		/* if we're now at the beginning of a line and we can back up,
+		  do so to avoid eating the newline and leading whitespace */
+		if (DOT.o <= firstchar(DOT.l) && 
+			!is_first_line(DOT,curbp) &&
+			!sameline(DOT,odot) ) {
+			backchar(TRUE,DOT.o+1);
+		}
+		/* if we started at the start of line, eat the whole line */
+		if (!sameline(DOT,odot) && was_at_bol)
+			fulllineregions = TRUE;
+	}
+	return TRUE;
 }
-gotobosec(f,n)
-{
+
 #if STUTTER_SEC_CMD
+getstutter()
+{
 	int this1key;
 	if (!clexec) {
 		this1key = last1key;
 		kbd_seq();
 		if (this1key != last1key) {
 			TTbeep();
-			return(FALSE);
+			return FALSE;
 		}
 	}
+	return TRUE;
+}
 #endif
-	return(backlinebeg(f,n,"{\f.","SHN"));
+
+gotobosec(f,n)
+int f,n;
+{
+#if STUTTER_SEC_CMD
+	if (!getstutter())
+		return FALSE;
+#endif
+	if (findpat(f, n, b_val_rexp(curbp,VAL_SECTIONS)->reg,
+							REVERSE) != TRUE) {
+		gotobob(f,n);
+	}
+	return TRUE;
 }
 gotoeosec(f,n)
+int f,n;
 {
 #if STUTTER_SEC_CMD
-	int this1key;
-	if (!clexec) {
-		this1key = last1key;
-		kbd_seq();
-		if (this1key != last1key) {
-			TTbeep();
-			return(FALSE);
-		}
-	}
+	if (!getstutter())
+		return FALSE;
 #endif
-	return(forwlinebeg(f,n,"{\f.","SHN"));
+	if (findpat(f, n, b_val_rexp(curbp,VAL_SECTIONS)->reg,
+							FORWARD) != TRUE) {
+		DOT = curbp->b_line;
+	}
+	return TRUE;
 }
 
-backlinebeg(f, n, s1, s2)
-char *s1, *s2;
+gotobosent(f,n)
+int f,n;
 {
-	register int suc;	/* success of last backchar */
-	LINE *odotp;
+	MARK savepos;
+	int looped = 0;
+	int extra;
+	register regexp *exp;
 
-	if (f == FALSE) n = 1;
-	if (n < 0)	/* the other way...*/
-		return(gotoeop(f, -n));
-
-	odotp = curwp->w_dot.l;
-	while (n-- > 0) {	/* for each one asked for */
-
-		/* first scan back until we are in a word */
-		suc = backchar(FALSE, 1);
-		while (!inword() && suc)
-			suc = backchar(FALSE, 1);
-
-		while (!is_first_line(curwp->w_dot, curbp)) {
-			if (issecbeg(s1,s2) == TRUE)
-				break;
-			curwp->w_dot.l = lback(curwp->w_dot.l);
-		}
+	savepos = DOT;
+	exp = b_val_rexp(curbp,VAL_SENTENCES)->reg;
+ top:
+	extra = 0;
+	if (findpat(f, n, exp, REVERSE) != TRUE) {
+		gotobob(f,n);
+		return TRUE;
 	}
-	/* if doing an operation and we moved */
-	if (doingopcmd && odotp != curwp->w_dot.l) {
-		curwp->w_dot.l = lforw(curwp->w_dot.l);
-		curwp->w_dot.o = 0;
-	} else {
-		firstnonwhite(f,n);
+	forwchar(TRUE, exp->mlen?exp->mlen:1);
+	while (is_at_end_of_line(DOT) || isspace(char_at(DOT))) {
+		forwchar(TRUE,1);
+		extra++;
 	}
-	curwp->w_flag |= WFMOVE;	/* force screen update */
-	return(TRUE);
+	if (n == 1 && samepoint(savepos,DOT)) { /* try again */
+		if (looped > 10)
+			return FALSE;
+		backchar(TRUE, (exp->mlen?exp->mlen:1) + extra + looped);
+		while (is_at_end_of_line(DOT))
+			backchar(TRUE,1);
+		looped++;
+		goto top;
+
+	}
+	return TRUE;
 }
 
-forwlinebeg(f, n, s1, s2)
-char *s1, *s2;
+gotoeosent(f,n)
+int f,n;
 {
-	register int suc;	/* success of last backchar */
-	LINE *odotp;
+	register regexp *exp;
 
-	if (f == FALSE) n = 1;
-	if (n < 0)	/* the other way...*/
-		return(gotobop(f, -n));
-
-	odotp = curwp->w_dot.l;
-	while (n-- > 0) {	/* for each one asked for */
-
-		/* first scan forward until we are in a word */
-		suc = forwchar(FALSE, 1);
-		while (!inword() && suc)
-			suc = forwchar(FALSE, 1);
-		curwp->w_dot.o = 0;	/* and go to the B-O-Line */
-		if (suc)	/* of next line if not at EOF */
-			curwp->w_dot.l = lforw(curwp->w_dot.l);
-
-		while (!is_header_line(curwp->w_dot, curbp)) {
-			if (issecbeg(s1,s2) == TRUE)
-				break;
-			curwp->w_dot.l = lforw(curwp->w_dot.l);
-		}
-	}
-	/* if doing an operation and we moved */
-	if (doingopcmd && odotp != curwp->w_dot.l) {
-		curwp->w_dot.l = lback(curwp->w_dot.l);
-		curwp->w_dot.o = llength(curwp->w_dot.l)-1;
-	} else {
-		firstnonwhite(f,n);
-	}
-	curwp->w_flag |= WFMOVE;	/* force screen update */
-	return(TRUE);
-}
-
-/* a new "section" of some sort starts at the beginning of the line,
-	with either a character from s1 or a "." followed by a character
-	from s2 */
-issecbeg(s1,s2)
-char *s1,*s2;
-{
-	register char *cp1, *cp2;
-	register int l, c1, c2;
-
-	l = llength(curwp->w_dot.l);
-	for(cp1 = s1; *cp1 != 0; cp1++) {
-		if ( l == 0) {
-			if (*cp1 == '\n')
-				return TRUE;
-			else
-				continue;
-		}
-		c1 = lgetc(curwp->w_dot.l, 0);
-		if (c1 == '.' && *cp1 == '.' && s2) {
-			for(cp2 = s2; *cp2 != 0; cp2++) {
-				if ( l <= 1) {
-					if (*cp2 == '\n')
-						return TRUE;
-					else
-						continue;
-				} 
-				c2 = lgetc(curwp->w_dot.l, 1);
-				if ( *cp2 == c2 )
-					return TRUE;
-			}
-			
-		} else if ( *cp1 == c1 ) {
+	exp = b_val_rexp(curbp,VAL_SENTENCES)->reg;
+	/* if we're on the end of a sentence now, don't bother scanning
+		further, or we'll miss the immediately following sentence */
+	if (!(lregexec(exp, DOT.l, DOT.o, llength(DOT.l)) &&
+				exp->startp[0] - DOT.l->l_text == DOT.o)) {
+		if (findpat(f, n, exp, FORWARD) != TRUE) {
+			DOT = curbp->b_line;
 			return TRUE;
 		}
 	}
-	return FALSE;
+	forwchar(TRUE, exp->mlen?exp->mlen:1);
+	while (is_at_end_of_line(DOT) || isspace(char_at(DOT))) {
+		forwchar(TRUE,1);
+	}
+	return TRUE;
 }
-#endif
+
+#endif /* WORDPRO */
 
 /*
  * This routine, given a pointer to a LINE, and the current cursor goal
@@ -547,8 +670,9 @@ register LINE   *dlp;
 
 /* return the next column index, given the current char and column */
 next_column(c,col)
+int c, col;
 {
-	if (c == '\t' && (!w_val(curwp,WMDLIST)))
+	if (c == '\t')
                 return nextab(col);
         else if (!isprint(c))
                 return col+2;
@@ -563,6 +687,7 @@ next_column(c,col)
  * this zaps the top line in the display window, we have to do a hard update.
  */
 forwpage(f, n)
+int f;
 register int    n;
 {
         register LINE   *lp;
@@ -594,6 +719,7 @@ register int    n;
  * reason.
  */
 backpage(f, n)
+int f;
 register int    n;
 {
         register LINE   *lp;
@@ -625,6 +751,7 @@ register int    n;
  * this zaps the top line in the display window, we have to do a hard update.
  */
 forwhpage(f, n)
+int f;
 register int    n;
 {
         register LINE   *llp, *dlp;
@@ -659,6 +786,7 @@ register int    n;
  * reason.
  */
 backhpage(f, n)
+int f;
 register int    n;
 {
         register LINE   *llp, *dlp;
@@ -691,7 +819,9 @@ register int    n;
 /*
  * Set the named mark in the current window to the value of "." in the window.
  */
+/* ARGSUSED */
 setnmmark(f,n)
+int f,n;
 {
 	int c,i;
 
@@ -706,7 +836,7 @@ setnmmark(f,n)
         }
 	if (c < 'a' || c > 'z') {
 		TTbeep();
-		mlwrite("[Invalid mark name]");
+		mlforce("[Invalid mark name]");
 		return FALSE;
 	}
 		
@@ -714,7 +844,7 @@ setnmmark(f,n)
 		curbp->b_nmmarks = 
 			(struct MARK *)malloc(26*sizeof(struct MARK));
 		if (curbp->b_nmmarks == NULL) {
-			mlwrite("[OUT OF MEMORY]");
+			mlforce("[OUT OF MEMORY]");
 			return FALSE;
 		}
 		for (i = 0; i < 26; i++) {
@@ -728,6 +858,7 @@ setnmmark(f,n)
 }
 
 golinenmmark(f,n)
+int f,n;
 {
 	int status;
 	status = goexactnmmark(f,n);
@@ -737,7 +868,9 @@ golinenmmark(f,n)
 	return(TRUE);
 }
 
+/* ARGSUSED */
 goexactnmmark(f,n)
+int f,n;
 {
 	int c;
 	int this1key;
@@ -755,6 +888,7 @@ goexactnmmark(f,n)
 }
 
 gonmmark(c)
+int c;
 {
 	register MARK *markp;
 	MARK tmark;
@@ -762,7 +896,7 @@ gonmmark(c)
 
 	if (!islower(c) && c != '\'') {
 		TTbeep();
-		mlwrite("[Invalid mark name]");
+		mlforce("[Invalid mark name]");
 		return FALSE;
 	}
 
@@ -788,7 +922,7 @@ gonmmark(c)
 	}
 	if (!found) {
 		TTbeep();
-		mlwrite("[Mark not set]");
+		mlforce("[Mark not set]");
 		return (FALSE);
 	}
 	
@@ -798,8 +932,8 @@ gonmmark(c)
 	/* move to the selected mark */
 	DOT = *markp;
 
-	/* reset last-dot-mark to old dot */
-	curwp->w_lastdot = tmark;
+	if (!doingopcmd)	/* reset last-dot-mark to old dot */
+		curwp->w_lastdot = tmark;
 
         curwp->w_flag |= WFMOVE;
         return (TRUE);
@@ -815,7 +949,9 @@ setmark()
         return (TRUE);
 }
 
+/* ARGSUSED */
 gomark(f,n)
+int f,n;
 {
 	DOT = MK;
         curwp->w_flag |= WFMOVE;
@@ -826,6 +962,7 @@ gomark(f,n)
 /*  n == 1 leaves us at mark, n == 2 one line down, etc. */
 /*  this is for the use of stuttered commands, and line oriented regions */
 godotplus(f,n)
+int f,n;
 {
 	int s;
 	if (!f || n == 1)
@@ -838,11 +975,6 @@ godotplus(f,n)
 	return s;
 }
 
-atmark()
-{
-	return samepoint(MK,DOT);
-}
-
 /*
  * Swap the values of "." and "mark" in the current window. This is pretty
  * easy, bacause all of the hard work gets done by the standard routine
@@ -853,7 +985,7 @@ swapmark()
 	MARK odot;
 
         if (samepoint(MK, nullmark)) {
-                mlwrite("No mark in this window");
+                mlforce("BUG: No mark ");
                 return (FALSE);
         }
 	odot = DOT;
@@ -899,9 +1031,44 @@ WINDOW *wp0 ;		/* current window on entry */
 	curwp->w_dot.l = dlp ;			/* set dot line pointer */
 
 	/* now move the dot over until near the requested column */
-	curgoal = col ;		/* a global for this ?? */
+    	curgoal = col + w_val(curwp, WVAL_SIDEWAYS);
 	curwp->w_dot.o = getgoal(dlp) ;
 	curwp->w_flag |= WFMOVE;
 	return (TRUE);
+}
+#endif
+
+#if X11
+setcursor(row, col)
+{
+    register LINE *dlp;
+    WINDOW     *wp0;		/* current window on entry */
+
+/* find the window we are pointing to */
+    wp0 = curwp;
+    while (row < curwp->w_toprow ||
+	    row > curwp->w_ntrows + curwp->w_toprow) {
+	nextwind(FALSE, 0);
+	if (curwp == wp0)
+	    break;		/* full circle */
+    }
+
+/* move to the right row */
+    row -= curwp->w_toprow;
+    dlp = curwp->w_line.l;	/* get pointer to 1st line */
+    while (row-- && (dlp != curbp->b_line.l))
+	dlp = lforw(dlp);
+    DOT.l = dlp;	/* set dot line pointer */
+
+    /* now move the dot over until near the requested column */
+    curgoal = col + w_val(curwp, WVAL_SIDEWAYS);
+    DOT.o = getgoal(dlp);
+    /* don't allow the cursor to be set past end of line unless in
+     * insert mode
+     */
+    if (DOT.o >= llength(dlp) && DOT.o > 0 && !insertmode)
+    	DOT.o--;
+    curwp->w_flag |= WFMOVE;
+    return (TRUE);
 }
 #endif

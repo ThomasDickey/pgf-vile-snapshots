@@ -2,7 +2,14 @@
  * Written for vile by Paul Fox, (c)1990
  *
  * $Log: finderr.c,v $
- * Revision 1.5  1991/09/20 13:11:53  pgf
+ * Revision 1.7  1992/01/05 00:06:13  pgf
+ * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
+ * often.  also normalized message appearance somewhat.
+ *
+ * Revision 1.6  1991/11/01  14:38:00  pgf
+ * saber cleanup
+ *
+ * Revision 1.5  1991/09/20  13:11:53  pgf
  * protect against passing null l_text pointer to sscanf
  *
  * Revision 1.4  1991/08/07  12:35:07  pgf
@@ -37,11 +44,11 @@ struct LINE *getdot();
         the lines for you, so adding lines to the file throws off the
         later numbering.  Solutions to this seem messy at the moment */
 
+/* ARGSUSED */
 finderr(f,n)
+int f,n;
 {
 	register BUFFER *sbp;
-	register LINE *lp;
-	register int i = 0;
 	register int s = TRUE;
 	struct LINE *dotp;
 	int moveddot = FALSE;
@@ -54,7 +61,7 @@ finderr(f,n)
 
 	/* look up the right buffer */
         if ((sbp=bfind(febuff, NO_CREAT, 0)) == NULL) {
-        	mlwrite("No buffer to search for errors.");
+        	mlforce("[No buffer to search for errors.]");
                 return(FALSE);
         }
         
@@ -86,7 +93,7 @@ finderr(f,n)
 		}
 			
 		if (lforw(dotp) == sbp->b_line.l) {
-			mlwrite("No more errors in %s buffer", febuff);
+			mlforce("[No more errors in %s buffer]", febuff);
 			TTbeep();
 			/* start over at the top of file */
 			putdotback(sbp, lforw(sbp->b_line.l));

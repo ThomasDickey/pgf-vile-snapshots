@@ -1,4 +1,4 @@
-/*	ESTRUCT:	Structure and preprocesser defines for
+/*	ESTRUCT:	Structure and preprocessor defines for
 			vile.  Reshaped from the original, which
 			was for MicroEMACS 3.9
 
@@ -10,7 +10,65 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.34  1991/10/18 10:56:54  pgf
+ * Revision 1.51  1992/02/17 09:18:55  pgf
+ * turn off DEBUG and DEBUGM for release
+ *
+ * Revision 1.50  1992/02/17  09:00:28  pgf
+ * added "showmode" support, and
+ * kill registers now hold unsigned chars
+ *
+ * Revision 1.49  1992/01/22  20:30:08  pgf
+ * added HPUX "support", and big warning for non-CRYPT support
+ *
+ * Revision 1.48  1992/01/10  07:10:46  pgf
+ * added VAL_SWIDTH
+ *
+ * Revision 1.47  1992/01/03  23:29:37  pgf
+ * added UNIXPC support (on hints from Eric Krohn), and
+ * changed the b_fname element of a BUFFER to a pointer
+ *
+ * Revision 1.46  1992/01/01  16:16:52  pgf
+ * fixed typo
+ *
+ * Revision 1.45  1991/11/18  08:35:32  pgf
+ * ifdef botch
+ *
+ * Revision 1.44  1991/11/16  18:29:15  pgf
+ * ifdef cleanup
+ *
+ * Revision 1.43  1991/11/13  20:09:27  pgf
+ * X11 changes, from dave lemke
+ *
+ * Revision 1.42  1991/11/08  13:18:23  pgf
+ * added FIOABRT error
+ *
+ * Revision 1.41  1991/11/06  23:28:08  pgf
+ * added fence character type macros
+ * getfence() will scan for a fence if not on one to begin with.  it'll
+ * scan in either direction, depending on arg to matchfence or matchfenceback
+ *
+ * Revision 1.40  1991/11/01  14:24:11  pgf
+ * added lsprintf decl
+ *
+ * Revision 1.39  1991/11/01  14:10:35  pgf
+ * make matchlen part of the regexp struct:  mlen, and
+ * changed regmust from pointer to offset into program, to make
+ * regexps relocatable
+ *
+ * Revision 1.38  1991/10/28  14:24:04  pgf
+ * eliminated some useless macros, made gacount part of the BUFFER struct
+ *
+ * Revision 1.37  1991/10/27  01:58:53  pgf
+ * added declarations/definitions for the regexp stuff (courtesy Henry Spencer),
+ * and added the new regex value definitions
+ *
+ * Revision 1.36  1991/10/24  13:05:52  pgf
+ * conversion to new regex package -- much faster
+ *
+ * Revision 1.35  1991/10/23  12:05:37  pgf
+ * support for the NeXT machine
+ *
+ * Revision 1.34  1991/10/18  10:56:54  pgf
  * modified VALUE structures and lists to make them more easily settable
  *
  * Revision 1.33  1991/10/15  03:10:00  pgf
@@ -144,6 +202,10 @@
  * initial vile RCS revision
  */
 
+#ifdef	abs
+#undef	abs
+#endif
+
 
 #ifdef	LATTICE
 #undef	LATTICE		/* don't use their definitions...use ours	*/
@@ -169,10 +231,14 @@
 #define V7	0			/* V7 UNIX or Coherent or BSD4.2*/
 					/*     presumably also Minix?	*/
 /* unix sub-flavors */
+/* define POSIX if you can -- then you'll get termio tty handling... */
 #define ODT	0			/* UNIX OPEN DESK TOP		*/
 #define ULTRIX	0			/* UNIX ULTRIX			*/
-#define POSIX	0
 #define ISC	0			/* Interactive Systems */
+#define POSIX	0			/* maybe someday the only??? */
+#define NeXT	0
+#define UNIXPC	0
+#define HPUX	0
 
 /* non-unix flavors */
 #define AMIGA	0			/* AmigaDOS			*/
@@ -203,6 +269,7 @@
 # define POSIX	1
 # define BSD	0
 # define USG	1
+# define SVR3_PTEM	1	/* for ptem.h in display.c */
 #endif
 
 #if ULTRIX 
@@ -214,23 +281,62 @@
 # define USG	0
 #endif
 
-#define UNIX	(V7 | BSD | USG)	/* any unix		*/
-
-#define OS	(UNIX | AMIGA | ST520 | MSDOS | CPM | VMS)
-#if ! OS
-  you need to choose a system #define...
+#if HPUX	/* reported to work with 7.05.  Could someone confirm these? */
+# define setbuffer setbuf
+# define HAVE_SELECT
+# undef POSIX
+# undef BSD
+# undef USG
+# define POSIX	0
+# define BSD	0
+# define USG	1
 #endif
 
+#if NeXT
+#define __STRICT_BSD__
+#endif
+
+/* if anyone can verify that these are right, and work, let me know... -pgf */
+#if UNIXPC
+# undef BSD
+# undef USG
+# define BSD	0
+# define USG	1
+# define abs xxabs
+# define atoi xxatoi
+# define winit xxwinit
+# undef HAVE_MKDIR
+# undef HAVE_SELECT
+# define HAVE_MKDIR 0
+# define HAVE_SELECT 1
+#endif
+
+#define UNIX	(V7 | BSD | USG)	/* any unix		*/
+
 /*	Porting constraints			*/
-#define HAVE_MKDIR	1	/* if your system has the mkdir() system call */
+#ifndef HAVE_MKDIR
+# define HAVE_MKDIR	1	/* if your system has the mkdir() system call */
+#else
+# define HAVE_MKDIR	0
+#endif
+
 #define SHORTNAMES	0	/* if your compiler insists on 7 char names */
 
 /* has the select() or poll() call, only used for short sleeps in fmatch() */
-#if BSD
-# define HAVE_SELECT 1
+#ifndef HAVE_SELECT
+# if BSD
+#  define HAVE_SELECT 1
+# else
+#  define HAVE_SELECT 0
+# endif
 #endif
-#if POSIX || i386
-# define HAVE_POLL 1
+
+#ifndef HAVE_POLL
+# if POSIX || i386
+#  define HAVE_POLL 1
+# else
+#  define HAVE_POLL 0
+# endif
 #endif
 
 /*	Compiler definitions			*/
@@ -241,7 +347,7 @@
 #define	TURBO	0	/* Turbo C/MSDOS */
 
 /*	Terminal Output definitions		*/
-/* choose one of the following */
+/* choose ONLY one of the following */
 #define TERMCAP 1			/* Use TERMCAP			*/
 #define ANSI	0			/* ANSI escape sequences	*/
 #define AT386	0			/* AT style 386 unix console	*/
@@ -257,6 +363,7 @@
 #define	MAC	0			/* Macintosh			*/
 #define	ATARI	0			/* Atari 520/1040ST screen	*/
 #define NeWS	0			/* distributed */
+#define	X11	0			/* X Window System */
 
 /*   Special keyboard definitions	     */
 #define WANGPC	0		/* WangPC - mostly escape sequences	*/
@@ -282,9 +389,19 @@
 #define	FILOCK	0	/* file locking under unix BSD 4.2 (uses scanf) */
 #define	ISRCH	1	/* Incremental searches like ITS EMACS		*/
 #define	FLABEL	0	/* function key label code [HP150]		*/
+
+/* WARNING:  The code in crypt.c and the entry points marked
+	with #ifdef CRYPT are UNTESTED.  Several people turned the code
+	on and have reported bugs/coredumps/other problems.  If anyone
+	would like to take on the job of fixing this, be my guest!  If
+	you could, at the same time, make it compatible with UNIX crypt(1),
+	I'd be a happy man!  :-)
+	(I can forward details of at least one frustrated person's
+	experiences, in case someone wants to look at it.)
+*/
 #define	CRYPT	0	/* file encryption? (not crypt(1) compatible!)	*/
-#define MAGIC	1	/* include regular expression matching?		*/
-#define	TAGS	1	/* tags support.  requires MAGIC		*/
+
+#define	TAGS	1	/* tags support  				*/
 #define	WORDPRO	1	/* "Advanced" word processing features		*/
 #define	AEDIT	1	/* advanced editing options: e.g. en/detabbing	*/
 #define	PROC	1	/* named procedures				*/
@@ -312,16 +429,25 @@
 #define	RAMSIZE	0	/* dynamic RAM memory usage tracking */
 #define	RAMSHOW	0	/* auto dynamic RAM reporting */
 #define	VMALLOC	0	/* verify malloc operation (slow!) */
-#define	DEBUG	1	/* allows core dump from keyboard under UNIX */
+#define	DEBUG	0	/* allows core dump from keyboard under UNIX */
 #define	TIMING	0	/* shows user time spent on each user command */
 			/* TIMING doesn't work yet... sorry  -pgf */ 
-#define DEBUGM	1	/* $debug triggers macro debugging		*/
+#define DEBUGM	0	/* $debug triggers macro debugging		*/
 #define	VISMAC	0	/* update display during keyboard macros	*/
 
 
 /* That's the end of the user selections -- the rest is static definition */
 /* (i.e. you shouldn't need to touch anything below here */
 /* ====================================================================== */
+
+#if BSD
+#define USE_INDEX 1
+#endif
+
+#ifdef USE_INDEX
+#define strchr index
+#define strrchr rindex
+#endif
 
 #if SHORTNAMES
 #include "shorten/remap.h"
@@ -429,11 +555,6 @@ union REGS {
 #define	ENVFUNC	0
 #endif
 
-#if BSD
-#define strchr index
-#define strrchr rindex
-#endif
-
 /*	internal constants	*/
 
 #define	NBINDS	100			/* max # of bound prefixed keys	*/
@@ -528,6 +649,7 @@ union REGS {
 #define FIOERR	3			/* File I/O, error.		*/
 #define	FIOMEM	4			/* File I/O, out of memory	*/
 #define	FIOFUN	5			/* File I/O, eod of file/bad line*/
+#define	FIOABRT	6			/* File I/O, aborted		*/
 
 /* three flavors of insert mode	*/
 /* it's FALSE, or one of:	*/
@@ -577,27 +699,24 @@ union REGS {
 
 /*	Internal defined functions					*/
 
-#define	nextab(a)	(((a / TABVAL) + 1) * TABVAL)
-
-#ifdef	abs
-#undef	abs
-#endif
+#define	nextab(a)	(((a / curtabval) + 1) * curtabval)
 
 /* these are the bits that go into the _chartypes_ array */
 /* the macros below test for them */
 #define N_chars 128
-#define _upper 1		/* upper case */
-#define _lower 2		/* lower case */
-#define _digit 4		/* digits */
-#define _space 8		/* whitespace */
-#define _bspace 16		/* backspace character (^H, DEL, and user's) */
-#define _cntrl 32		/* control characterts, including DEL */
-#define _print 64		/* printable */
-#define _punct 128		/* punctuation */
-#define _ident 256		/* is typically legal in "normal" identifier */
-#define _path 512		/* is typically legal in a file's pathname */
-#define _wild 2048		/* is typically a shell wildcard char */
-#define _linespec 4096		/* ex-style line range: 1,$ or 13,15 or % etc.*/
+#define _upper	0x1		/* upper case */
+#define _lower	0x2		/* lower case */
+#define _digit	0x4		/* digits */
+#define _space	0x8		/* whitespace */
+#define _bspace 0x10		/* backspace character (^H, DEL, and user's) */
+#define _cntrl	0x20		/* control characterts, including DEL */
+#define _print	0x40		/* printable */
+#define _punct	0x80		/* punctuation */
+#define _ident	0x100		/* is typically legal in "normal" identifier */
+#define _path	0x200		/* is typically legal in a file's pathname */
+#define _wild	0x400		/* is typically a shell wildcard char */
+#define _linespec 0x800		/* ex-style line range: 1,$ or 13,15 or % etc.*/
+#define _fence	0x1000		/* a fence, i.e. (, ), [, ], {, } */
 
 /* these intentionally match the ctypes.h definitions, except that
 	they force the char to 7-bit ascii first */
@@ -616,6 +735,7 @@ union REGS {
 #define ispath(c)	istype(_path, c)
 #define isbackspace(c)	istype(_bspace, c)
 #define islinespecchar(c)	istype(_linespec, c)
+#define isfence(c)	istype(_fence, c)
 
 /* DIFCASE represents the difference between upper
    and lower case letters, DIFCNTRL the difference between upper case and
@@ -626,6 +746,9 @@ union REGS {
 #define tolower(c)	((c)^DIFCASE)
 #define tocntrl(c)	((c)^DIFCNTRL)
 #define toalpha(c)	((c)^DIFCNTRL)
+
+#define nocase_eq(bc,pc)	((bc) == (pc) || \
+			(isalpha(bc) && (((bc) ^ DIFCASE) == (pc))))
 
 #define ESC	tocntrl('[')
 #define RECORDED_ESC	-2
@@ -654,6 +777,46 @@ void vdump();
 #else
 # define vverify(s) ;
 #endif
+
+/*
+ * Definitions etc. for regexp(3) routines.
+ *
+ *	the regexp code is:
+ *	Copyright (c) 1986 by University of Toronto.
+ *	Written by Henry Spencer.  Not derived from licensed software.
+ *
+ */
+#define NSUBEXP  10
+typedef struct regexp {
+	char *startp[NSUBEXP];
+	char *endp[NSUBEXP];
+	short mlen;		/* convenience:  endp[0] - startp[0] */
+	char regstart;		/* Internal use only. */
+	char reganch;		/* Internal use only. */
+	int regmust;		/* Internal use only. */
+	int regmlen;		/* Internal use only. */
+	long size;		/* vile addition -- how big is this */
+	char program[1];	/* Unwarranted chumminess with compiler. */
+} regexp;
+
+extern regexp *regcomp();
+extern int regexec();
+extern void regsub();
+extern void regerror();
+
+/*
+ * The first byte of the regexp internal "program" is actually this magic
+ * number; the start node begins in the second byte.
+ */
+#define	REGEXP_MAGIC	0234
+
+#ifndef CHARBITS
+#define	UCHARAT(p)	((int)*(unsigned char *)(p))
+#else
+#define	UCHARAT(p)	((int)*(p)&CHARBITS)
+#endif
+
+/* end of regexp stuff */
 
 /*
  * All text is kept in circularly linked lists of "LINE" structures. These
@@ -735,13 +898,19 @@ struct VALNAMES {
 #define VALTYPE_INT 0
 #define VALTYPE_STRING 1
 #define VALTYPE_BOOL 2
+#define VALTYPE_REGEX 3
 
+struct regexval {
+	char *pat;
+	regexp *reg;
+};
 
 /* this is to ensure values can be of any type we wish.
    more can be added if needed.  */
 union V {
 	int i;
 	char *p;
+	struct regexval *r;
 };
 
 struct VAL {
@@ -821,24 +990,31 @@ typedef struct	W_TRAITS {
 #define	MDIGNCASE	6		/* Exact matching for searches	*/
 #define MDMAGIC		7		/* regular expresions in search */
 #define	MDSHOWMAT	8		/* auto-indent */
-#define	MDVIEW		9		/* read-only buffer		*/
-#define	MDSWRAP 	10		/* wrap-around search mode	*/
-#define	MDWRAP		11		/* word wrap			*/
-#define	MAX_BOOL_B_VALUE	11	/* max of boolean values	*/
+#define	MDSHOWMODE	9		/* show insert/replace/command mode */
+#define	MDVIEW		10		/* read-only buffer		*/
+#define	MDSWRAP 	11		/* wrap-around search mode	*/
+#define	MDWRAP		12		/* word wrap			*/
+#define	MAX_BOOL_B_VALUE	12	/* max of boolean values	*/
 
-#define VAL_ASAVE	(MAX_BOOL_B_VALUE+1)
+#define VAL_ASAVECNT	(MAX_BOOL_B_VALUE+1)
 #define VAL_C_TAB	(MAX_BOOL_B_VALUE+2)
 #define VAL_FILL	(MAX_BOOL_B_VALUE+3)
-#define VAL_TAB		(MAX_BOOL_B_VALUE+4)
-#define VAL_TAGLEN	(MAX_BOOL_B_VALUE+5)
-#define	MAX_INT_B_VALUE	(MAX_BOOL_B_VALUE+5) /* max of integer-valued modes */
+#define VAL_SWIDTH	(MAX_BOOL_B_VALUE+4)
+#define VAL_TAB		(MAX_BOOL_B_VALUE+5)
+#define VAL_TAGLEN	(MAX_BOOL_B_VALUE+6)
+#define	MAX_INT_B_VALUE	(MAX_BOOL_B_VALUE+6) /* max of integer-valued modes */
 
-#define VAL_CSUFFIXES	(MAX_INT_B_VALUE+1)
-#define VAL_CWD		(MAX_INT_B_VALUE+2)
-#define VAL_TAGS	(MAX_INT_B_VALUE+3)
-#define	MAX_STRING_B_VALUE (MAX_INT_B_VALUE+3) /* max of string-valued modes */
+#define VAL_CWD		(MAX_INT_B_VALUE+1)
+#define VAL_TAGS	(MAX_INT_B_VALUE+2)
+#define	MAX_STRING_B_VALUE (MAX_INT_B_VALUE+2) /* max of string-valued modes */
 
-#define	MAX_B_VALUES	(MAX_STRING_B_VALUE) /* max of buffer values */
+#define VAL_CSUFFIXES	(MAX_STRING_B_VALUE+1)
+#define VAL_PARAGRAPHS	(MAX_STRING_B_VALUE+2)
+#define VAL_SECTIONS	(MAX_STRING_B_VALUE+3)
+#define VAL_SENTENCES	(MAX_STRING_B_VALUE+4)
+#define	MAX_REGEX_B_VALUE (MAX_STRING_B_VALUE+4) /* max of string-valued modes */
+
+#define	MAX_B_VALUES	(MAX_REGEX_B_VALUE) /* max of buffer values */
 
 typedef struct B_VALUES {
 	/* each entry is a val, and a ptr to a val */
@@ -876,7 +1052,9 @@ typedef struct	BUFFER {
 	int	b_active;		/* window activated flag	*/
 	int	b_nwnd;		        /* Count of windows on buffer   */
 	int	b_flag;		        /* Flags 		        */
-	char	b_fname[NFILEN];	/* File name			*/
+	short	b_acount;		/* auto-save count	        */
+	char	*b_fname;		/* File name			*/
+	int	b_fnlen;		/* length of filename		*/
 	char	b_bname[NBUFN]; 	/* Buffer name			*/
 #if	CRYPT
 	char	b_key[NPAT];		/* current encrypted key	*/
@@ -887,11 +1065,15 @@ typedef struct	BUFFER {
 #define set_global_b_val(which,val) global_b_val(which) = val
 #define global_b_val_ptr(which) global_b_values.bv[which].v.p
 #define set_global_b_val_ptr(which,val) global_b_val_ptr(which) = val
+#define global_b_val_rexp(which) global_b_values.bv[which].v.r
+#define set_global_b_val_rexp(which,val) global_b_val_rexp(which) = val
 
 #define b_val(bp,val) (bp->b_values.bv[val].vp->i)
 #define set_b_val(bp,which,val) b_val(bp,which) = val
 #define b_val_ptr(bp,val) (bp->b_values.bv[val].vp->p)
 #define set_b_val_ptr(bp,which,val) b_val_ptr(bp,which) = val
+#define b_val_rexp(bp,val) (bp->b_values.bv[val].vp->r)
+#define set_b_val_rexp(bp,which,val) b_val_rexp(bp,which) = val
 
 #define make_local_b_val(bp,which)  \
 		bp->b_values.bv[which].vp = &(bp->b_values.bv[which].v)
@@ -904,7 +1086,6 @@ typedef struct	BUFFER {
 		(bp->b_values.bv[which].vp == &(bp->b_values.bv[which].v))
 
 #define is_empty_buf(bp) (lforw(bp->b_line.l) == bp->b_line.l)
-#define b_sideways b_wtraits.w_vals.w_side
 #define b_dot b_wtraits.w_dt
 #ifdef WINMARK
 #define b_mark b_wtraits.w_mk
@@ -946,7 +1127,6 @@ typedef struct	WINDOW {
 #define w_line w_traits.w_ln
 #define w_values w_traits.w_vals
 #define w_mode w_traits.w_vals.w_mod
-#define w_sideways w_traits.w_vals.w_side
 #define w_fcolor w_traits.w_vals.w_fcol
 #define w_bcolor w_traits.w_vals.w_bcol
 
@@ -972,11 +1152,6 @@ typedef struct	WINDOW {
 #define OTH_LAZY 0x01
 #define OTH_VERS 0x02
 
-#define TABVAL curtabstopval
-#define globalfillcol  global_b_val(VAL_FILL)
-#define fillcol 	b_val(curbp,VAL_FILL)
-/* #define gmode		global_b_val(VAL_MODES) */
-#define gasave		global_b_val(VAL_ASAVE)
 
 /*
  * The starting position of a region, and the size of the region in
@@ -1137,7 +1312,7 @@ typedef struct {
 
 typedef	struct KILL {
 	struct KILL *d_next;	/* link to next chunk, NULL if last */
-	char d_chunk[KBLOCK];	/* deleted text */
+	unsigned char d_chunk[KBLOCK];	/* deleted text */
 } KILL;
 
 typedef struct KILLREG {
@@ -1186,52 +1361,4 @@ typedef struct WHBLOCK {
 
 #endif
 
-#if	MAGIC
-
-/*
- * Defines for the metacharacters in the regular expressions in search
- * routines.
- */
-
-#define	MCNIL		0	/* Like the '\0' for strings.*/
-#define	LITCHAR		1
-#define	ANY		2
-#define	CCL		3
-#define	NCCL		4
-#define	BOL		5
-#define	EOL		6
-#define	CLOSURE		256	/* An or-able value.*/
-#define	MASKCL		CLOSURE - 1
-
-#define	MC_ANY		'.'	/* 'Any' character (except newline).*/
-#define	MC_CCL		'['	/* Character class.*/
-#define	MC_NCCL		'^'	/* Negate character class.*/
-#define	MC_RCCL		'-'	/* Range in character class.*/
-#define	MC_ECCL		']'	/* End of character class.*/
-#define	MC_BOL		'^'	/* Beginning of line.*/
-#define	MC_EOL		'$'	/* End of line.*/
-#define	MC_CLOSURE	'*'	/* Closure - does not extend past newline.*/
-
-#define	MC_ESC		'\\'	/* Escape - suppress meta-meaning.*/
-
-#define	BIT(n)		(1 << (n))	/* An integer with one bit set.*/
-#define	CHCASE(c)	((c) ^ DIFCASE)	/* Toggle the case of a letter.*/
-
-/* HICHAR - 1 is the largest character we will deal with.
- * HIBYTE represents the number of bytes in the bitmap.
- */
-
-#define	HICHAR		256
-#define	HIBYTE		HICHAR >> 3
-
-typedef char	*BITMAP;
-
-typedef	struct {
-	short int	mc_type;
-	union {
-		int	lchar;
-		BITMAP	cclmap;
-	} u;
-} MC;
-#endif
-
+extern char *lsprintf();

@@ -19,12 +19,11 @@ VILE -- VI Like Emacs: a vi workalike put together from Micro-Emacs by Paul Fox
 	missing, and the screen doesn't look quite the same.  But what
 	matters most is that one's "muscle memory" does the right thing
 	to the text in front of you, and that is what vile tries to do
-	for vi users.   THIS IS NOT A "CLONE"!
+	for vi users.   THIS IS NOT A "CLONE"!  But it feels good.
 
-	This is the first really public version of vile.  It is
-	version three.  Users of previous versions will hopefully find
-	the additions of ":" command line ranges and the ! filter
-	operator helpful. 
+	This is the second really public version of vile.  Users of
+	previous versions will hopefully find many new features -- see the
+	CHANGES file for details.
 
 	The collective developers of Micro-Emacs should be
 	complimented that the changes were as easy as they were.  The
@@ -43,52 +42,30 @@ VILE -- VI Like Emacs: a vi workalike put together from Micro-Emacs by Paul Fox
 		- "next error" cursor positioning after compilation
 	Of course, it _may_ lack some of vi's reliability. :-)
 
-	( Although I can't imagine the emacs folks wanting to buy much
-	of this stuff back (insert mode, anyone? :-), they might
-	want to look at:
-		- full global undo
-		- tags support
-		- better (maybe?) UNIX terminal handling
-		- better UNIX shell escapes
-		- terminal scroll support
-		- multiple yank registers (formerly called kill buffers)
-		- multiple marks  (actually kind of messy)
-		- improved aesthetics of window splitting and deleting
-		- "next error" cursor positioning
-		- list mode )
-
 	Take a look at vile.hlp for more information about features
 	and differences. 
 
 	In general, I suspect that the quality of the code is roughly
 	on a par with MicroEmacs.  I've been using vile regularly under
 	both SunOS and 386 UNIX for about a year, with no major problems
-	(that havn't been fixed).  Another dedicated user has been
-	running it on various flavors of 386 UNIX (Bell, Open DeskTop,
-	Xenix) and Ultrix, also with no problems.
+	(that havn't been fixed).  Version three was built and used by
+	many others on the net, and their feedback was invaluable.
+	I think all of the reported bugs have been fixed, and hopefully
+	not too many new ones introduced.
 
 	I have not tried this on a small system, or even _any_
 	non-UNIX system.  I'm sure work will be required to make
 	it work on DOS again, for instance -- especially for spawning
 	sub-shells, etc. 
 
-	I ifdef'ed out the language features (user-defined procs,
-	etc.) a long time ago -- I don't know if they still work,
-	though I didn't actively try to break them. 
-
-	If anyone is interested in doing major work on this thing, let me
-	know -- I have some ideas on how to make a full ex mode work, for 
-	instance, and on how to add the ":map" command.  Also, take a look 
-	at the buglist...
-
 	Hope you enjoy -- 
 
-	Paul G. Fox	June 3, 1991
+	Paul G. Fox	June, 1991, and October, 1992
 	pgf@cayman.com
 
 p.s.  The code distributed with vile in the "shortnames" subdirectory
 	is covered by GNU Public License.  The vile code itself in the
 	upper level directory is _not_ covered by the GNU public license. 
 
-p.p.s By the way, I'm _not_ the same Paul Fox who wrote Crisp, the Brief
+p.p.s. By the way, I'm _not_ the same Paul Fox who wrote Crisp, the Brief
 	work-alike.

@@ -4,7 +4,28 @@
  * written for vile by Paul Fox, (c)1990
  *
  * $Log: opers.c,v $
- * Revision 1.13  1991/09/10 00:51:05  pgf
+ * Revision 1.19  1992/01/06 23:09:33  pgf
+ * error message if bad function specified for motion
+ *
+ * Revision 1.18  1992/01/05  00:06:13  pgf
+ * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
+ * often.  also normalized message appearance somewhat.
+ *
+ * Revision 1.17  1992/01/03  23:26:48  pgf
+ * make the "pre-operator" position, pre_op_dot, a global so that it can
+ * be adjust slightly by some motions -- paragraph motions in particular
+ *
+ * Revision 1.16  1991/11/03  17:46:30  pgf
+ * removed f,n args from all region functions -- they don't use them,
+ * since they're no longer directly called by the user
+ *
+ * Revision 1.15  1991/11/01  14:38:00  pgf
+ * saber cleanup
+ *
+ * Revision 1.14  1991/10/29  14:35:29  pgf
+ * implemented the & commands: substagain
+ *
+ * Revision 1.13  1991/09/10  00:51:05  pgf
  * only restore dot with swapmark if the buffer hasn't switched on us
  *
  * Revision 1.12  1991/08/13  02:50:52  pgf
@@ -64,11 +85,13 @@
 #endif
 
 extern CMDFUNC f_godotplus;
+MARK pre_op_dot;
 
 /* For the "operator" commands -- the following command is a motion, or
  *  the operator itself is repeated.  All operate on regions.
  */
 operator(f,n,fn,str)
+int f,n;
 int (*fn)();
 char *str;
 {
@@ -77,12 +100,11 @@ char *str;
 	int status;
 	CMDFUNC *cfp;			/* function to execute */
 	char tok[NSTRING];		/* command incoming */
-	MARK ourmark;
 	BUFFER *ourbp;
 
 	doingopcmd = TRUE;
 
-	ourmark = DOT;
+	pre_op_dot = DOT;
 	ourbp = curbp;
 
 	if (havemotion != NULL) {
@@ -116,7 +138,10 @@ char *str;
 				cfp = kcod2fnc(c);
 
 		}
-		mlerase();
+		if (cfp)
+			mlerase();
+		else
+			mlforce("[No such function]");
 	}
 	if (!cfp)
 		return FALSE;
@@ -134,7 +159,7 @@ char *str;
 	status = execute(cfp, f, n);
 
 	if (status != TRUE || 
-	   ( samepoint(ourmark, DOT) && fulllineregions == FALSE) ) {
+	   ( samepoint(pre_op_dot, DOT) && fulllineregions == FALSE) ) {
 		doingopcmd = FALSE;
 		fulllineregions = FALSE;
 		return FALSE;
@@ -142,14 +167,14 @@ char *str;
 
 	opcmd = 0;
 
-	MK = ourmark;
+	MK = pre_op_dot;
 
 	/* we've successfully set up a region */
 	if (!fn) { /* be defensive */
-		mlwrite("BUG -- null func pointer in operator");
+		mlforce("BUG -- null func pointer in operator");
 		status = FALSE;
 	} else {
-		status = (fn)(f,n,NULL,NULL);
+		status = (fn)();
 	}
 
 	if (ourbp == curbp) /* in case the func switched buffers on us */
@@ -165,6 +190,7 @@ char *str;
 }
 
 operdel(f,n)
+int f,n;
 {
 	extern int killregion();
 
@@ -173,6 +199,7 @@ operdel(f,n)
 }
 
 operlinedel(f,n)
+int f,n;
 {
 	extern int killregion();
 
@@ -181,19 +208,20 @@ operlinedel(f,n)
 	return operator(f,n,killregion,"Delete of full lines");
 }
 
-chgreg(f,n)
+chgreg()
 {
-	killregion(f,n);
+	killregion();
 	if (fulllineregions) {
 		if (backline(FALSE,1) == TRUE) /* returns FALSE at top of buffer */
 			return opendown(TRUE,1);
 		else
 			return openup(TRUE,1);
 	}
-	return insert(f,n);
+	return ins();
 }
 
 operchg(f,n)
+int f,n;
 {
 	int s;
 
@@ -204,6 +232,7 @@ operchg(f,n)
 }
 
 operlinechg(f,n)
+int f,n;
 {
 	int s;
 
@@ -215,6 +244,7 @@ operlinechg(f,n)
 }
 
 operyank(f,n)
+int f,n;
 {
 	extern int yankregion();
 	opcmd = OPOTHER;
@@ -222,6 +252,7 @@ operyank(f,n)
 }
 
 operlineyank(f,n)
+int f,n;
 {
 	extern int yankregion();
 
@@ -231,6 +262,7 @@ operlineyank(f,n)
 }
 
 operflip(f,n)
+int f,n;
 {
 	extern int flipregion();
 
@@ -239,6 +271,7 @@ operflip(f,n)
 }
 
 operupper(f,n)
+int f,n;
 {
 	extern int upperregion();
 
@@ -247,6 +280,7 @@ operupper(f,n)
 }
 
 operlower(f,n)
+int f,n;
 {
 	extern int lowerregion();
 
@@ -256,6 +290,7 @@ operlower(f,n)
 
 
 operlshift(f,n)
+int f,n;
 {
 	extern int shiftlregion();
 
@@ -265,6 +300,7 @@ operlshift(f,n)
 }
 
 operrshift(f,n)
+int f,n;
 {
 	extern int shiftrregion();
 
@@ -274,6 +310,7 @@ operrshift(f,n)
 }
 
 operwrite(f,n)
+int f,n;
 {
         register int    s;
         static char fname[NFILEN];
@@ -290,6 +327,7 @@ operwrite(f,n)
 }
 
 operformat(f,n)
+int f,n;
 {
 	extern int formatregion();
 
@@ -299,6 +337,7 @@ operformat(f,n)
 }
 
 operfilter(f,n)
+int f,n;
 {
 	extern int filterregion();
 
@@ -309,6 +348,7 @@ operfilter(f,n)
 
 
 operprint(f,n)
+int f,n;
 {
 	extern int plineregion();
 
@@ -318,6 +358,7 @@ operprint(f,n)
 }
 
 operlist(f,n)
+int f,n;
 {
 	extern int llineregion();
 
@@ -327,6 +368,7 @@ operlist(f,n)
 }
 
 opersubst(f,n)
+int f,n;
 {
 	extern int substregion();
 
@@ -335,7 +377,18 @@ opersubst(f,n)
 	return operator(f,n,substregion,"Substitute");
 }
 
+opersubstagain(f,n)
+int f,n;
+{
+	extern int subst_again_region();
+
+	fulllineregions = TRUE;
+	opcmd = OPOTHER;
+	return operator(f,n,subst_again_region,"Substitute-again");
+}
+
 operentab(f,n)
+int f,n;
 {
 	extern int entab_region();
 
@@ -345,6 +398,7 @@ operentab(f,n)
 }
 
 operdetab(f,n)
+int f,n;
 {
 	extern int detab_region();
 
@@ -354,6 +408,7 @@ operdetab(f,n)
 }
 
 opertrim(f,n)
+int f,n;
 {
 	extern int trim_region();
 

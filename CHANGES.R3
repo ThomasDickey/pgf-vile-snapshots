@@ -1,12 +1,80 @@
 The following changes are grouped only roughly, and represent the delta
 of the current release from vile version three.  -pgf   10/22/91
+
+Peter Ruczynski has done a great job porting vile to DOS -- he calls that
+version "pcvile".  Unfortunately, we haven't yet been able to sync up
+our source code, so this version is just the UNIX code.  Don't be fooled
+by the DOS ifdefs -- Pete has done a lot of work to make pcvile run on
+all monitors, with memory management, etc...  -pgf 1/10/92
 ------------------------------------------------------
 
 VI COMPLIANCE:
+===============
 
 - made ^N, ^P, and ^T do exactly what they do in vi.  (next line,
 	previous-line, and tag-pop) Use ^X-o to switch windows, and ^X-2 to
 	split them.
+
+- ANSI style arrow keys now work from either command or insert mode.  Any
+	ANSI function key of the form ESC [ c can be used as a command
+	key -- the binding is FN-c
+
+- the '#' key may now be used to force the following character to be treated
+	as a function key.  Thus #1 is now euivalent to FN-1.
+
+- some modes/values have changed names: aindent is now autoindent, swrap is
+	now wrapscan, exact is now noignorecase, and they all have the vi
+	shorthands (e.g.  tabstop is the same as ts, ic is the same as
+	ignorecase).
+
+- the "paragraphs" and "sections" values are now implemented, but as
+	regular expressions -- they look pretty ugly, but I think they
+	do what vi does.
+
+- the sentence motions ')' and '(' now work.  they may not do exactly what
+	vi does, but they're close.  they're controlled by regular
+	expressions that find the ends of sentences -- then they move
+	forward to the start of the next one.  The regular expressions are
+	set in the new "sentences" value setting.
+
+- "showmatch" mode now works, and momentarily shows the previous matching '('
+	or '{'.
+
+- "magic" mode, or rather "nomagic" mode, now works more like vi:  special
+	characters are still available by escaping them in nomagic mode.
+
+- the '%' command now scans forward for a fence character if you're not on
+	one to begin with (thanks to Dave Lemke).  I also added '^X-%', which
+	scans backward instead.
+
+- the ":&" command now works, and repeats the last ":s" or '^X-s'
+	substitution.  it re-uses trailing p and l options, which vi does
+	not.
+
+- the '&' now works, and repeats the last ":s" or '^X-s' substitution.
+
+- there is a new operator, '^A-&', which is similar to '&' but acts on a
+	region.
+
+- ^W and ^U are now both read from the tty settings, and they work in both
+	insert mode and on the : line.  There is a "backspacelimit" setting
+	that controls whether these (and regular backspacing (^H or DEL)
+	will backspace past the insert point in insert mode.
+
+- The '@' command can now be used to execute the contents of a named register,
+	as if it were entered at the keyboard.  Thus @k executes register k.
+
+- The "keyboard macro" obtained with ^X-( and ^X-) can be saved into a named
+	register with the ^X-^ command.  This lets you record a keyboard
+	macro and save it for use with the new '@' command.
+
+- And, along to further complement the '@' command, it is possible to pre-load
+	the named registers with the "load-register" command.  In a .vilerc
+	you can say:
+		use-register a load-register ihello^[
+	(where ^[ is really an ESC entered with ^V-ESC), and then from
+	within vile you can execute '@a', and the word "hello" will be
+	inserted.
 
 - the H, M, and L commands are now absolute motions
 
@@ -16,28 +84,14 @@ VI COMPLIANCE:
 - a motion caused by an undo is considered absolute, and the "last dot"
 	mark is reset.
 
-- some modes/values have changed names: aindent is now autoindent, swrap is
-	now wrapscan, exact is now noignorecase, and they all have the vi
-	shorthands (e.g.  tabstop is the same as ts, ic is the same as
-	ignorecase).
-
 - added 'vi +/searchstring file.c' invocation syntax
 
-- "showmatch" mode now works
-
 - you can now specify a count to the ~ command.
-
-- "paragraphs" terminate at nroff sections, as well as nroff paragraphs.
 
 - backslashes now have a protective effect on the : line -- they guard
 	against expansion of #, %, :, and \.
 
 - a lone ":f" without filename now gives same info as ^G
-
-- ^W ad ^U are now both read from the tty settings, and they both work in
-	insert mode and on the : line.  There is a "backspacelimit" setting
-	that controls whether these (and ^H or DEL) will backspace past the
-	insert point in insert mode.
 
 - two new functions, to make normal motions more vi compliant --
 	forwchar_to_eol and backchar_to_bol, which won't move past the
@@ -52,9 +106,29 @@ VI COMPLIANCE:
 - there is now a "taglength" setting, and the name of the tags file is in
 	the "tags" setting.
 
-- ANSI style arrow keys now work from either command or insert mode.
+- the "cd" and "pwd" commands now work
+
+- shiftwidth has been partially implemented -- ^T works, ^D doesn't, and
+	the '>' and '<' operators use the tab setting instead of shiftwidth.
 
 MISCELLANEOUS
+===============
+
+- regular expressions are more powerful and much, much faster than they
+	were.  vile now uses Henry Spencer's regexp code.  This has the
+	side effect of making '\|' a new metacharacter, for alternation
+	of expressions.  '\+' and '\?' are also new, and stand for "one
+	or more" and "zero or one" occurences.
+
+- related to the above change, replacement metacharacters now work, so you
+	can use '&' and '\1' through '\9' in the replacement string, and
+	you'll get the right thing.
+
+- reading files in general is _much_ faster, unless the file contains lines
+	longer than 255 characters, in which case things slow down again.
+
+- Dave Lemke contributed code to support vile under X windows -- including
+	support for cutting/pasting, etc.  Thanks Dave!
 
 - tabstops can now be set to any value, and there is a separate value for
 	tabstops in C mode.  (c-tabstop)
@@ -114,9 +188,6 @@ MISCELLANEOUS
 
 - reading from other processes into a buffer is now _much_ faster
 
-- reading files in general is _much_ faster, unless the file contains lines
-	longer than 255 characters, in which case things slow down again.
-
 - it is no longer legal to write out the contents of a buffer that has view
 	mode set.
 
@@ -129,8 +200,9 @@ MISCELLANEOUS
 	visible again.
 
 - there is now a mode indicator on the modeline: I for insert, O for
-	overwrite, and R for replace-char.  No, it's not suppressable.  It
-	could be.
+	overwrite, and R for replace-char.
+
+- a line starting with '#' won't shift-right if the buffer is in C mode.
 
 - :s/s1/s2/5 now works, to change the 5th occurence on a line
 
@@ -141,15 +213,22 @@ MISCELLANEOUS
 - it is now legal to "kill-buffer" a displayed buffer
 
 IMPLEMENTORS NOTES:
+===================
 
 - internally, most pointers into the buffer, consisting of a LINE * and an
 	int offset are now represented with a MARK structure -- in the
 	nineties, it's time to start using structure assignment.
 
-- set of values that are frequently handed about between buffers and
+- the set of values that are frequently handed about between buffers and
 	windows, or windows and their "children" are now grouped into
 	B_TRAITS and W_TRAITS structures, for easier bookkeeping.  There
 	are lots of macros to hide the added data structure depth.
+
+- if you add a new setting that should be inherited by and selectable
+	on a per-buffer or per-window basis, add it to the W_VALUES or
+	B_VALUES structs.  Otherwise, if its just a global value, like the
+	X font, make it a variable.  I intend to merge the setting of
+	variables in with the other values one of these days.
 
 - there is now a generic printf facility built in, which is layered under
 	mlwrite() for the message line, bprintf() to print into a buffer,
@@ -172,3 +251,5 @@ IMPLEMENTORS NOTES:
 	work on full lines -- there isn't yet a similar wrapper for partial
 	line operators.
 
+- a lot of cleanup was done -- it's close to lint-free, and Saber has very
+	few problems with the code.

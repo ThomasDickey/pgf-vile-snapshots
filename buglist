@@ -1,32 +1,36 @@
 	(E means enhancement, L,M,H are low, medium, high priority)
 ----------------------
-H	do a 'd/.PP' at the start of a line containing ".PP"
 
-H	sys/filio.h and FIONREAD aren't there under ULTRIX  (POSIX?)
+H	output sometimes doesn't flush properly after a shell escape -- seems
+	to be related to turning on the USE_FCNTL code in termio.c.  If anyone
+	finds this -- let me know!  I'd love to know the answer.
 
-H	try building on the NeXt and the Sony.
+M	shiftwidth support is in, but the > and < operators still move things
+	by tabwidth, instead of shiftwidth.
 
-H	the gotoeop motion and regions interract wrongly.  For instance,
-	using ^W} to write the rest of the paragraph to a file writes
-	the wrong number of characters.
-
-M	make ^W work in kbd_string
-
-M	the section chars should be in variables and should perhaps be regexps
-
-M	the file accepted for c-mode should be expressable as regexps
-
-M	add "set autowrite", ":n file" (what does that do?)
-
-M	output doesn't flush properly after a shell escape
-
-M	longnames cause severe portability constraint -- does the shortnames
+L	longnames cause portability constraint -- does the shortnames
 	stuff take care of this?  I can't test it...
 
-L	should I make the "value'd" modes be variables?  should I add 
-	some syntax checks to "set" to call set-variable if it has an '='?
+E	everybody and their sibling wants "map", "map!", and "abb".
+	the first step to supporting this is making macro/dotcmd replay be
+	properly fully nested, and generalized.  I think, for instance that
+	if an @a macro invoked a @b macro, or a ^X-& macro, there'd be
+	reentrancy problems.
 
-L	searching is slow
+E	add "set autowrite", ":n file" (what does that do?)
+
+E	now that paragraphs, sections, and sentences are all selectable
+	with regexps, they (and the tabstop value) are prime candidates for
+	moving into a "mode-values" set of values.  A buffer would inherit
+	either the global normal-mode values, or the global c-mode values.
+
+E	should the "value'd" modes be variables?  vice-versa?  Probably the
+	notion of variables should be unified with the values somehow, possibly
+	via a new valueset containing just the variables.  they would not
+	be inherited by buffers, but would always be global.  the CSUFFIXES
+	value would be a good thing to move there, since it doesn't make sense
+	as a per-buffer value.  Or else the variables should be checked for
+	matches after the rest of the value sets.
 
 E	:k, to set a mark, won't work as ":ka" or ":kb".  Must use ":k a"
 
@@ -42,28 +46,25 @@ E	In vi, the join command is supposed to act either on a region (from
 
 E	should add an option to support file locking, rather than the
 	current ifdef stuff -- but this is only useful if we match the
-	GNU locking protocol, which I'm not inclined to do
+	GNU locking protocol, which I'm not inclined to do.  And it's not
+	clear that in an NFS'ed environment that it's all that easy to
+	get that style of locking right anyway.
 
-E	Wow. the scrsearch functions could become region based -- as in "search for
+E	the scrsearch functions could become region based -- as in "search for
 	the next occrence of the region", which would usually be a word.  And
 	the ^A/ version could become "a/ (search for teh contents of buffer a),
 	if you know what I mean.
 
 E	need a "file newer than buffer" warning.  Should stat the file, and
 	store it's mod time, compare to current when going back to that window,
-	after performing some shell command.  e.g., if you're editing a file
-	that is created by a script you're testing, then you want to be warned
-	that the file is out of date after doing a test run of the script.
+	after performing some shell command, or just before modifying it. 
+	e.g., if you're editing a file that is created by a script you're
+	testing, then you want to be warned that the file is out of date
+	after doing a test run of the script.
 
 E	should be able to refer to remote tags file, and have paths
 	contained there be relative to _its_ location, rather than the current
 	directory.  possibly a tagspath, and/or multiple tags files as well.
-
-E	add a command-line expansion character to be the list of files
-	mentioned in "tags"
-
-E	another mode, which will "!get -p" an SCCS or RCS file if 
-	the clear-text file isn't found
 
 E	it would be nice if ^X!! reran the last command into [Output]
 
@@ -89,7 +90,6 @@ E	mlreply line should ideally be a one line buffer, so editing
 E	BSD interrupt processing is botched during a read() of the keyboard.
 	The read doesn't return -1 as it does under sysV (USG).
 	So you can bang on ^C all day and nothing will happen.
-	[I'm not sure this is true anymore  -pgf]
 	
 E	I haven't even come close to testing vile for
 	memory-full conditions.  Some malloc() packages give 95%
@@ -104,10 +104,6 @@ E	marks should perhaps be linked onto lines.  this would make a lot
         sort of mark as well.  Implementation of the "tag stack"
 	would be aided by this as well.
 
-E	there is currently no way to change working directories -- it's
-	not clear whether that should be a global thing, or perhaps
-	a per-buffer notion.
-
 E	there is code (in imdying()) that attempts to save unwritten buffers
 	on hangups.  It is fairly crude, having been written quickly
 	in self-defense during debugging.  It should be examined and
@@ -118,8 +114,236 @@ E	:e and :n should be able to deal with multiple filenames resulting
 	vile lets you choose to choose the first such name.  if should show
 	you the first name, so you know whether to accept it or not.
 
-E	All code should pass lint.  This won't be easy... :-)
+
+User contributed:
+-------------------------
+
+  Any way of adding :ab???  :ab is too useful.   
+
+-------------------------
+ - I miss some :set commands
+
+H)    :set nu     ( I use when I manipulate lines, deleting, writing etc.)
+HH)   :set aw     ( useful for shell escape; should write all buffers 
+                    for which it is set in case of a shell escape )
+L)    :set noredraw ( When I am logged in over a modem (several hours/week)
+                      I could use such a mode. )
+
+M) - In vi you can do :n file. Should be trivial.
+
+M) - As you said, :map is one of vi's better features.
+ 
+M) - When a line is too long to fit on the screen, you have to move
+     over it to see the rest, and when you get to the edge of the screen,
+     it jumps. I would prefer a smooth(er) scroll.
+
+L) - Your helpfile could do with a command summary at the beginning,
+     so I don't have to hunt through the file to find what I need.
+
+L) - There is a very useful command summary for vi, called vi.ref.
+     Its available with anonymous ftp from star.cs.vu.nl, directory /maarten.
+     It would be great if this could be edited for vile.
+
+---------------------------------------------
+
+
+       I had to change some a lot of stuff(eg.  include files, system
+routines...) in order run on BSD 4.3 machine. 
+
+--------------------------------------------
+
+This code will not compile because of confusion about how #if works.
+`#if VAR' is correct only if VAR has been previously #defined.
+There are many places in vile where #if VAR was used, but #ifdef or
+#if defined() would have been more correct. Use of the #if construct
+in vile causes compilation to abort.
+
+---------------------------------
+
+	I have found that at least on my machines setting both SCROLL
+	options to 0 and linking to -lcurses produces considerably better
+	screen handling.
+
+====================   MY Makefile =========================================
+(for r6000)
+
+# LIBS = -ltermcap
+# LIBS = -lcurses	# RS6000
+LIBS = -lcurses -lcposix	# i386 and gcc
+
+# XCFLAGS = -D_POSIX_SOURCE -D_XOPEN_SOURCE -D_RS6000 -D_ALL_SOURCE	# RS600
+XCFLAGS = 	# i386
+
+# CFLAGS = -O
+#CFLAGS = -g -systype sysv	# for the mips machine
+CFLAGS = -g -O $(XCFLAGS)
+
+# CC =	gcc		# RS600
+CC =	gcc		# i386
+
+-------------------------------
+
+  #if V7 | BSD
+  #undef	CTRL
+***************
+*** 206,214 ****
+  	ntermio.c_lflag = ISIG;
+  	ntermio.c_cc[VMIN] = 1;
+  	ntermio.c_cc[VTIME] = 0;
+- #ifndef	_RS6000	/* FIXME */
+  	ntermio.c_cc[VSWTCH] = -1;
+ #endif
+  #ifdef SIGTSTP	/* suspension under sys5 -- is this a standard? */
+  #if POSIX	/* ODT uses this... */
+  	ntermio.c_cc[VSUSP] = -1;
+
+-------------------------------------------------------
+
+2. File completion would be nice for commands asking for filenames.
+This saves a lot of typing.
+
+----------------------------------------------
+In vi, you can put a number infront of just about every command, and that
+command will be done <number> of times.  
+
+Why doesn't this work for insert?  
+
+Suppose I want to insert 80 dashes on a line.  80i-<ESC>  But this
+doesn't work in vile.  (Yes, I know there is other ways of doing it,
+but this seemed the easiest way to remember).
+
+---------------------------------------------
+
+Here are some basic fixes to get the latest vile to run on dos, without
+some of these it won't even compile properly!!!
+
+estruct.h
+---------
+
+	I had to change these definitions due to incompatible ints !!
+
+#if MSC 		/* pjr */
+#define FROM	0x00000100	/* allow a linespec */
+#define	TO	0x00000200	/* allow a second linespec */
+#define BANG	0x00000400	/* allow a ! after the command name */
+#define EXTRA	0x00000800	/* allow extra args after command name */
+#define XFILE	0x00001000	/* expand wildcards in extra part */
+#define NOSPC	0x00002000	/* no spaces allowed in the extra part */
+#define	DFLALL	0x00004000	/* default file range is 1,$ */
+#define DFLNONE	0x00008000	/* no default file range */
+#define NODFL	0x00100000	/* do not default to the current file name */
+#define EXRCOK	0x00200000	/* can be in a .exrc file */
+#define NL	0x00400000	/* if !exmode, then write a newline first */
+#define PLUS	0x00800000	/* allow a line number, as in ":e +32 foo" */
+#define ZERO	0x01000000	/* allow 0 to be given as a line number */
+#else
+...
+
+random.c
+--------
+	Needed a definition for 'i' in catnap()
+
+fileio.c
+--------
+	Changed '#ifdef UNIX' to '#if UNIX' on line 181
+	I had to ifdef out the 'off_t' reference in ffread()
+
+file.c
+------
+	There was a stray '{' after a while at line 598 in slowread() I added
+	  a '}' at line 642
+
+	I put back the definition for 'cp1' in makename()
+
+	glob() only works for UNIX.  Default should return TRUE otherwise
+	  file loading is at the whim of the stack!
+
+	Also I added the following code...
+
+#if MSDOS
+#include        <sys/stat.h>
+
+extern FILE	*ffp;		/* File pointer, all functions. */
+
+
+/*
+ * ffronly
+ *
+ * find out if file fname if readonly - pjr
+ */
+/*****************************************************************************/
+int
+ffronly(char *fname)
+/*****************************************************************************/
+{
+struct stat s;
+int i;
+
+	if (!stat(fname, &s))
+		return(!(s.st_mode & S_IWRITE));
+	else
+		return(FALSE);
+} /* end of ffronly */
+
+
+/*
+ * ffsize
+ *
+ * find size of file ffp (declared in fileio.c) - pjr
+ */
+/*****************************************************************************/
+unsigned long
+ffsize(void)
+/*****************************************************************************/
+{
+int fd = fileno(ffp);
+unsigned long l = filelength(fd);
+
+	return(l);
+
+/* 	return(filelength(fileno(ffp))); pjr */
+} /* end of ffsize */
+
+#endif /* MSDOS */
+
+
+spawn.c
+-------
+	Added '| MSDOS' for pressreturn() as this is needed by dos too
+	ifdefed out filterregion()
+
+ibmpc.c
+-------
+	Added newscreensize() as this is required by this module but is not
+	  included as SIGWINCH is not defined for it to be included in display.c
+
+	ifdefed out the call too 'ttclose' in ibmclose() as this causes an
+	  infinite loop otherwise.
 	
+-------------------------------------------------- 
 
+I found a problem when using vile with encrypted files.  During a file edit if I
+set the mode to crypt and save the file, I am prompted for a encryption key.
 
+When I try to read in this encrypted file in another session using
+	
+	vile -kcryptkey file
 
+I am prompted for the encrypt key and when I type it in, I get the message
+
+	Encryption String: IOT trap
+
+-------------------------------------------------- 
+
+I tried porting the shell macro package which came with uemacs but the
+main problem arises because you cannot trap a carriage return once you
+are in insert mode.  I managed to sort of get it to work by inserting,
+escaping and then hitting another key to execute the command.  It works
+but feels like a dog when you do it.  Any ideas on neat way to trap the
+carriage return?  I'd really like a shell in a window (even if it is
+only simple stdout collection).  Its really useful if you do lots of
+greps etc.  The only solution I can come up with is to use the escape
+as the carriage return, i.e. once the user escapes execute.  It would
+be nicer to use proper carriage return though.
+
+-----------------------------------

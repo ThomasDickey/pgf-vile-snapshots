@@ -12,8 +12,265 @@
 #
 # original makefile for uemacs:	Adam Fritz	July 30,1987
 #
+
+
+# To change screen driver modules, change SCREEN below, and edit estruct.h to
+#  make sure the correct one is #defined as "1", and the others all as "0"
+# If you use tcap.c, you'll need libtermcap.a too.
+# If you use x11.c,  you'll need libX11.a too.
+
+SCREEN = tcap
+LIBS = -ltermcap
+
+#SCREEN = x11
+#LIBS = -lX11
+#TARGET = xvile
+
+TARGET = vile
+
+
+# install to DESTDIR1 if it's writable, else DESTDIR2
+DESTDIR1 = /usr/local/bin
+DESTDIR2 = $(HOME)/bin
+
+REMOTE=towno!pgf
+
+#CFLAGS = -O
+CFLAGS = -g
+#CFLAGS = -g -systype sysv	# for the mips machine
+CC=cc
+
+
+# All of the makefiles which should be preserved
+MAKEFILES = makefile make.ini
+HEADER_BUILDER = ./mktbls
+
+ALLTOOLS = $(MAKEFILES)
+
+# this stuff lives in the shorten subdirectory.  It was lifted from the
+#	GNU emacs distribution.  See the file COPYING for more info.
+#SHORTSTUFF = shorten/COPYING \
+#	shorten/names.c \
+#	shorten/dups.c \
+#	shorten/defines.c \
+#	shorten/header.h \
+#	shorten/reserved \
+#	shorten/special
+
+# these are normal editable headers
+HDRS = estruct.h epath.h evar.h edef.h
+
+# these headers are built by the mktbls program from the information in cmdtbl
+BUILTHDRS = nebind.h nefunc.h nename.h 
+
+ALLHDRS = $(HDRS)
+
+# All the C files which should be saved
+#  (including tools, like mktbls.c, unused screen drivers, etc.)
+CSRCac = ansi.c at386.c basic.c bind.c buffer.c crypt.c csrch.c
+CSRCde = dg10.c display.c eval.c exec.c
+CSRCfh = file.c fileio.c finderr.c globals.c hp110.c hp150.c
+CSRCim = ibmpc.c input.c isearch.c line.c main.c mktbls.c
+CSRCnr = news.c npopen.c opers.c oneliner.c random.c regexp.c region.c
+CSRCst = search.c spawn.c st520.c tags.c tcap.c termio.c tipc.c
+CSRCuz = undo.c vmalloc.c vmsvt.c vt52.c window.c word.c wordmov.c x11.c z309.c
+
+CSRC = $(CSRCac) $(CSRCde) $(CSRCfh) $(CSRCim) $(CSRCnr) \
+	$(CSRCst) $(CSRCuz)
+
+# non-C source code
+OTHERSRC = z100bios.asm news.cps
+
+# text and data files
+TEXTFILES = README CHANGES cmdtbl vile.hlp buglist readme.news
+
+ALLSRC = $(CSRC) $(OTHERSRC)
+
+EVERYTHING = $(ALLTOOLS) $(ALLHDRS) $(ALLSRC) $(TEXTFILES) $(SHORTSTUFF)
+
+SRC = npopen.c finderr.c main.c buffer.c $(SCREEN).c termio.c display.c \
+	word.c wordmov.c window.c spawn.c \
+	region.c search.c random.c isearch.c line.c \
+	input.c fileio.c exec.c file.c eval.c \
+	crypt.c bind.c basic.c opers.c undo.c csrch.c tags.c \
+	vmalloc.c globals.c oneliner.c regexp.c
+
+OBJ = npopen.o finderr.o main.o buffer.o $(SCREEN).o termio.o display.o \
+	word.o wordmov.o window.o spawn.o \
+	region.o search.o random.o isearch.o line.o \
+	input.o fileio.o exec.o file.o eval.o \
+	crypt.o bind.o basic.o opers.o undo.o csrch.o tags.o \
+	vmalloc.o globals.o oneliner.o regexp.o
+
+all: $(TARGET)
+
+$(TARGET) : $(BUILTHDRS) $(OBJ) makefile
+	-mv $(TARGET) o$(TARGET)
+	$(CC) $(CFLAGS) -o $(TARGET) $(OBJ) $(LIBS)
+#	$(CC) -Bstatic $(CFLAGS) -o $(TARGET) $(OBJ) $(LIBS)
+
+saber_src:
+	#load $(CFLAGS) $(SRC) $(LIBS)
+
+saber_obj: $(OBJ)
+	#load $(CFLAGS) $(OBJ) $(LIBS)
+
+#.c.src:
+#	#load $(CFLAGS) $<
+#.o.obj:
+#	#load $(CFLAGS) $<
+#
+#SUFFIXES: .c .h .o .src .obj
+
+
+$(BUILTHDRS): cmdtbl $(HEADER_BUILDER)
+	./$(HEADER_BUILDER) cmdtbl
+
+# install to DESTDIR1 if it's writable, else DESTDIR2
+install:
+	@[ -x $(TARGET) ] || (echo must make $(TARGET) first && exit 1)
+	[ -w $(DESTDIR1) ] && dest=$(DESTDIR1) || dest=$(DESTDIR2) ;\
+	mv $$dest/$(TARGET) $$dest/o$(TARGET) ;\
+	cp $(TARGET) $$dest ;\
+	test -f vile.hlp && /bin/rm -f $$dest/vile.hlp ;\
+	cp vile.hlp $$dest ;\
+	chmod 0644 $$dest/vile.hlp 
+
+compr-shar:
+	[ -d cshardir ] || mkdir cshardir
+#	add -a for archive headers, add -s pgf@cayman.com for submitted-by
+	shar -p -nvile -L55 -o cshardir/vileshar \
+		-T README -C `ls $(EVERYTHING) | sed /README/d`
+
+shar:
+	[ -d shardir ] || mkdir shardir
+#	add -a for archive headers, add -s pgf@cayman.com for submitted-by
+	shar -x -a -spgf@cayman.com -nVile -L55 \
+			-o shardir/vileshar `ls $(EVERYTHING)`
+
+bigshar:
+	shar -spgf@cayman.com -nVile \
+		-o vileBIGshar README `ls $(EVERYTHING) | sed /README/d`
+
+# only uucp things changed since last time
+uuto:
+	uuto `ls -t $(EVERYTHING) uutodone | sed '/uutodone/q'` $(REMOTE)
+	date >uutodone
+
+floppy:
+	ls $(EVERYTHING) | oo
+
+# you don't want to know...
+dosscript:
+	(								\
+	echo echo on							;\
+	for x in `ls -t $(EVERYTHING) dosback.bat | sed '/dosback.bat/q'` ;\
+	do								\
+		echo copy u:$$x a:					;\
+	done 								;\
+	#echo quit							;\
+	) >tmp.bat
+	ud < tmp.bat >dosback.bat
+	/bin/rm -f tmp.bat
+	#-dos
+	#>dosback.bat
+	
+newdosfloppy:
+	touch 0101010170 dosback.bat
+
+# dump a list of the important files
+list:
+	@ls $(EVERYTHING) | more
+
+# dump a list of files that may have changed since last backup
+rw list-writeable:
+	@ls -l $(EVERYTHING) | \
+		egrep '^[^l].w' | \
+		sed 's;.* ;;'   # strip to last space
+
+no-write:
+	chmod -w $(EVERYTHING)
+
+update:
+	nupdatefile.pl -r $(EVERYTHING)
+
+tagfile:
+	dotags $(SRC) $(HDRS)
+
+lint:	$(SRC)
+	#lint -hbvxac $(SRC) >lint.out 
+	lint  $(SRC) >lint.out 
+
+clean:
+	rm -f *.o o$(TARGET) $(BUILTHDRS) $(HEADER_BUILDER) news.h core *~ *.BAK
+
+clobber: clean
+	rm -f $(TARGET)
+
+news.h: news.cps
+	cps news.cps
+
+print:
+	pr makefile $(HDRS) $(SRC) | lpr
+
+depend:	 $(SRC) $(HDRS) $(BUILTHDRS)
+	mv -f makefile makefile.orig
+	(sed -e '/^#DEPENDS/,$$d' makefile.orig ; \
+		echo "#DEPENDS" ; \
+		$(CC) -M $(CFLAGS) $? ) > makefile
+
+populate: $(EVERYTHING)
+
+$(EVERYTHING):
+	co -r$(revision) $@
+
+# you need this if SHORTNAMES is 0 in estruct.h
+# estruct.h: shorten/remap.h
+
+shorten/remap.h:
+	cd shorten; $(MAKE) remap.h
+
 # $Log: makefile,v $
-# Revision 1.20  1991/10/22 14:36:01  pgf
+# Revision 1.32  1992/02/17 08:48:49  pgf
+# keep copy of current executable during install
+#
+# Revision 1.31  1991/12/30  23:15:04  pgf
+# rename the product of bigshar
+#
+# Revision 1.30  1991/11/27  10:17:21  pgf
+# changes to dos backup target
+#
+# Revision 1.29  1991/11/16  18:35:08  pgf
+# dropped the file locking files -- they didn't work, and were only
+# compatible with other's running vile
+#
+# Revision 1.28  1991/11/13  20:09:27  pgf
+# X11 changes, from dave lemke
+#
+# Revision 1.27  1991/11/07  02:00:32  pgf
+# lint cleanup
+#
+# Revision 1.26  1991/11/01  14:56:51  pgf
+# took tags file out of the distribution
+#
+# Revision 1.25  1991/11/01  14:20:24  pgf
+# a little bit more saber support
+#
+# Revision 1.24  1991/10/28  14:19:46  pgf
+# took out some old junk, moved the changelog down low
+#
+# Revision 1.23  1991/10/27  01:47:14  pgf
+# switched from regex to regexp
+#
+# Revision 1.22  1991/10/24  13:03:48  pgf
+# added regex.c
+#
+# Revision 1.21  1991/10/23  12:05:37  pgf
+# added bigshar, and put ./ in front of mktbls rule -- there seems
+# to be a bug in some makes that drops the ./ in the HEADER_BUILDER
+# variable
+#
+# Revision 1.20  1991/10/22  14:36:01  pgf
 # added the CHANGES file
 #
 # Revision 1.19  1991/10/10  12:20:26  pgf
@@ -90,210 +347,6 @@
 # date: 1990/09/21 10:25:38;
 # initial vile RCS revision
 #
-
-
-# To change screen driver modules, change SCREEN below, and edit estruct.h to
-#  make sure the correct one is #defined as "1", and the others all as "0"
-#SCREEN = at386
-# if you use tcap.c, you'll need libtermcap.a too.
-SCREEN = tcap
-
-TARGET = vile
-
-# install to DESTDIR1 if it's writable, else DESTDIR2
-DESTDIR1 = /usr/local/bin
-DESTDIR2 = $(HOME)/bin
-LIBS = -ltermcap
-
-REMOTE=towno!pgf
-
-#CFLAGS = -O
-CFLAGS = -g
-#CFLAGS = -g -systype sysv	# for the mips machine
-CC=cc
-
-
-# All of the makefiles which should be preserved
-MAKEFILES = makefile make.ini
-HEADER_BUILDER = ./mktbls
-
-ALLTOOLS = $(MAKEFILES)
-
-# this stuff lives in the shorten subdirectory.  It was lifted from the
-#	GNU emacs distribution.  See the file COPYING for more info.
-#SHORTSTUFF = shorten/COPYING \
-#	shorten/names.c \
-#	shorten/dups.c \
-#	shorten/defines.c \
-#	shorten/header.h \
-#	shorten/reserved \
-#	shorten/special
-
-# these are normal editable headers
-HDRS = estruct.h epath.h evar.h edef.h
-
-# these headers are built by the mktbls program from the information in cmdtbl
-BUILTHDRS = nebind.h nefunc.h nename.h 
-
-# this is obsolete stuff NOT needed by the build, but it shouldn't
-#  be thrown away (yet).  For instance, ebind.h has per-machine binding
-#  information that hasn't been incorporated into cmdtbl yet.
-OLDHDRS = ebind.h efunc.h
-
-ALLHDRS = $(HDRS) $(OLDHDRS)
-
-# All the C files which should be saved
-#  (including tools, like mktbls.c, unused screen drivers, etc.)
-CSRCac = ansi.c at386.c basic.c bind.c buffer.c crypt.c csrch.c
-CSRCde = dg10.c display.c dolock.c eval.c exec.c
-CSRCfh = file.c fileio.c finderr.c globals.c hp110.c hp150.c
-CSRCim = ibmpc.c input.c isearch.c line.c lock.c main.c mktbls.c
-CSRCnr = news.c npopen.c opers.c oneliner.c random.c region.c
-CSRCst = search.c spawn.c st520.c tags.c tcap.c termio.c tipc.c
-CSRCuz = undo.c vmalloc.c vmsvt.c vt52.c window.c word.c wordmov.c z309.c
-
-CSRC = $(CSRCac) $(CSRCde) $(CSRCfh) $(CSRCim) $(CSRCnr) \
-	$(CSRCst) $(CSRCuz)
-
-# non-C source code
-OTHERSRC = z100bios.asm news.cps
-
-# text and data files
-TEXTFILES = README CHANGES cmdtbl vile.hlp tags buglist readme.news
-
-ALLSRC = $(CSRC) $(OTHERSRC)
-
-EVERYTHING = $(ALLTOOLS) $(ALLHDRS) $(ALLSRC) $(TEXTFILES) $(SHORTSTUFF)
-
-SRC = npopen.c finderr.c main.c buffer.c $(SCREEN).c termio.c display.c \
-	word.c wordmov.c window.c spawn.c \
-	region.c search.c random.c isearch.c lock.c line.c \
-	input.c fileio.c exec.c file.c eval.c \
-	dolock.c crypt.c bind.c basic.c opers.c undo.c csrch.c tags.c \
-	vmalloc.c globals.c oneliner.c
-
-OBJ = npopen.o finderr.o main.o buffer.o $(SCREEN).o termio.o display.o \
-	word.o wordmov.o window.o spawn.o \
-	region.o search.o random.o isearch.o lock.o line.o \
-	input.o fileio.o exec.o file.o eval.o \
-	dolock.o crypt.o bind.o basic.o opers.o undo.o csrch.o tags.o \
-	vmalloc.o globals.o oneliner.o
-
-all: $(TARGET)
-
-$(TARGET) : $(BUILTHDRS) $(OBJ) makefile
-	-mv $(TARGET) o$(TARGET)
-	$(CC) $(CFLAGS) -o $(TARGET) $(OBJ) $(LIBS)
-
-saber_src: 
-	#load $(CFLAGS) $(SRC) $(LIBS) 
-
-saber_obj: $(OBJ) 
-	#load $(CFLAGS) $(OBJ) $(LIBS) 
-
-
-$(BUILTHDRS): cmdtbl $(HEADER_BUILDER)
-	$(HEADER_BUILDER) cmdtbl
-
-# install to DESTDIR1 if it's writable, else DESTDIR2
-install:
-	@[ -x $(TARGET) ] || (echo must make $(TARGET) first && exit 1)
-	[ -w $(DESTDIR1) ] && dest=$(DESTDIR1) || dest=$(DESTDIR2) ;\
-	cp $(TARGET) $$dest ;\
-	test -f vile.hlp && /bin/rm -f $$dest/vile.hlp ;\
-	cp vile.hlp $$dest ;\
-	chmod 0644 $$dest/vile.hlp 
-
-compr-shar:
-	[ -d cshardir ] || mkdir cshardir
-#	add -a for archive headers, add -s pgf@cayman.com for submitted-by
-	shar -p -nvile -L55 -o cshardir/vileshar \
-		-T README -C `ls $(EVERYTHING) | sed /README/d`
-
-shar:
-	[ -d shardir ] || mkdir shardir
-#	add -a for archive headers, add -s pgf@cayman.com for submitted-by
-	shar -x -a -spgf@cayman.com -nVile -L55 \
-			-o shardir/vileshar `ls $(EVERYTHING)`
-
-# only uucp things changed since last time
-uuto:
-	uuto `ls -t $(EVERYTHING) uutodone | sed '/uutodone/q'` $(REMOTE)
-	date >uutodone
-
-floppy:
-	ls $(EVERYTHING) | oo
-
-# you don't want to know...
-dosscript:
-	(								\
-	echo echo on							;\
-	for x in `ls -t $(EVERYTHING) dosback.bat | sed '/dosback.bat/q'` ;\
-	do								\
-		echo copy o:$$x a:					;\
-	done 								;\
-	echo quit							;\
-	) >tmp.bat
-	ud < tmp.bat >dosback.bat
-	/bin/rm -f tmp.bat
-	#-dos
-	#>dosback.bat
-	
-newdosfloppy:
-	touch 0101010170 dosback.bat
-
-# dump a list of the important files
-list:
-	@ls $(EVERYTHING) | more
-
-# dump a list of files that may have changed since last backup
-rw list-writeable:
-	@ls -l $(EVERYTHING) | \
-		egrep '^[^l].w' | \
-		sed 's;.* ;;'   # strip to last space
-
-no-write:
-	chmod -w $(EVERYTHING)
-
-update:
-	nupdatefile.pl -r $(EVERYTHING)
-
-tagfile:
-	dotags $(SRC) $(HDRS)
-
-lint:	$(SRC)
-	lint -hbvxac $(SRC) >lint.out 
-
-clean:
-	rm -f *.o o$(TARGET) $(BUILTHDRS) $(HEADER_BUILDER) news.h core *~ *.BAK
-
-clobber: clean
-	rm -f $(TARGET)
-
-news.h: news.cps
-	cps news.cps
-
-print:
-	pr makefile $(HDRS) $(SRC) | lpr
-
-depend:	 $(SRC) $(HDRS) $(BUILTHDRS)
-	mv -f makefile makefile.orig
-	(sed -e '/^#DEPENDS/,$$d' makefile.orig ; \
-		echo "#DEPENDS" ; \
-		$(CC) -M $(CFLAGS) $? ) > makefile
-
-populate: $(EVERYTHING)
-
-$(EVERYTHING):
-	co -r$(revision) $@
-
-# you need this if SHORTNAMES is 0 in estruct.h
-# estruct.h: shorten/remap.h
-
-# or this either
-shorten/remap.h:
-	cd shorten; $(MAKE) remap.h
-
 #DEPENDS
 news.o: news.c
 news.o: /usr/include/stdio.h
@@ -366,11 +419,6 @@ isearch.o: isearch.c
 isearch.o: /usr/include/stdio.h
 isearch.o: estruct.h
 isearch.o: edef.h
-lock.o: lock.c
-lock.o: /usr/include/stdio.h
-lock.o: estruct.h
-lock.o: edef.h
-lock.o: /usr/include/sys/errno.h
 line.o: line.c
 line.o: /usr/include/stdio.h
 line.o: estruct.h
@@ -412,7 +460,6 @@ display.o: display.c
 display.o: /usr/include/stdio.h
 display.o: estruct.h
 display.o: edef.h
-dolock.o: dolock.c
 buffer.o: buffer.c
 buffer.o: /usr/include/stdio.h
 buffer.o: estruct.h

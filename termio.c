@@ -4,7 +4,48 @@
  * All operating systems.
  *
  * $Log: termio.c,v $
- * Revision 1.11  1991/10/15 12:18:39  pgf
+ * Revision 1.23  1992/01/22 20:28:28  pgf
+ * call TTclose in ttunclean, to support tcapclose().  i hope this is safe
+ * for other screen types
+ *
+ * Revision 1.22  1992/01/10  08:11:41  pgf
+ * fixed signal handling, for sysV style handling.  also
+ * fixed 2nd arg to tcsetattr()
+ *
+ * Revision 1.21  1992/01/02  22:42:40  pgf
+ * oops -- dropped the termio restoral in ttclean
+ *
+ * Revision 1.20  1992/01/01  16:30:14  pgf
+ * more ifdef'ing on V_SUSP (for pyramid?), and
+ * now get tty chars under X11, though we still don't set new modes
+ *
+ * Revision 1.19  1991/12/20  08:12:00  pgf
+ * check the error return from tcsetattr()
+ *
+ * Revision 1.18  1991/12/04  09:22:19  pgf
+ * a little more massaging of ifdefs
+ *
+ * Revision 1.17  1991/11/27  10:13:10  pgf
+ * code split/re-arranged, cleaner posix support
+ *
+ * Revision 1.16  1991/11/16  18:35:55  pgf
+ * changed the ifdefing so termio or sgtty can be used independently of
+ * other UNIX choices
+ *
+ * Revision 1.15  1991/11/14  08:58:17  pgf
+ * switch to TCSETAW from TSSETAF in ttclean and unclean -- don't want to
+ * flush input needlessly
+ *
+ * Revision 1.14  1991/11/13  20:09:27  pgf
+ * X11 changes, from dave lemke
+ *
+ * Revision 1.13  1991/11/07  02:00:32  pgf
+ * lint cleanup
+ *
+ * Revision 1.12  1991/11/01  14:38:00  pgf
+ * saber cleanup
+ *
+ * Revision 1.11  1991/10/15  12:18:39  pgf
  * fetch more termio chars at startup, like wkillc, suspc, etc.
  *
  * Revision 1.10  1991/08/12  15:05:43  pgf
@@ -48,6 +89,519 @@
 #include        <stdio.h>
 #include	"estruct.h"
 #include        "edef.h"
+
+#if UNIX
+#include	<errno.h>
+extern int errno;
+
+/* there are three copies of the tt...() routines here -- one each for
+	POSIX termios, traditional termio, and sgtty.  If you have a
+	choice, I recommend them in that order. */
+
+/* ttopen() and ttclose() are responsible for putting the terminal in raw
+	mode, setting up terminal signals, etc.
+   ttclean() prepares the terminal for shell escapes, and ttunclean() gets
+   	us back into vile's mode
+*/
+
+
+#include	<signal.h>
+
+
+/* I suppose this config stuff should move to estruct.h */
+
+#if sun
+# undef POSIX
+# undef BSD
+# define POSIX 1
+#endif
+
+#if POSIX
+# define USE_POSIX_TERMIOS 1
+# define USE_FCNTL 1
+#else
+# if USG
+#  define USE_TERMIO 1
+#  define USE_FCNTL 1
+# else
+#  if BSD | V7
+#   define USE_SGTTY 1
+#   define USE_FIONREAD 1
+#  else
+ huh?
+#  endif
+# endif
+#endif
+
+#ifdef sun
+#undef USE_FCNTL 	/* I have trouble with this on my sun under xterm --
+				the screen doesn't always refresh correctly,
+				as if the fcntl is interfering with the
+				output drain */
+#endif
+
+#if X11
+# undef USE_FCNTL
+# undef USE_FIONREAD
+#endif
+
+#if USE_FCNTL
+/* this is used to determine whether input is pending from the user */
+#include	<fcntl.h>
+int kbd_flags;			/* saved keyboard fcntl flags	*/
+int kbd_is_polled;		/* in O_NDELAY mode?		*/
+int kbd_char_present;		/* there is a char in kbd_char	*/
+char kbd_char;			/* the char we've already read	*/
+#endif
+
+#define SMALL_STDOUT 1
+
+#if defined(SMALL_STDOUT) && (defined (USE_FCNTL) || defined(USE_FIONREAD))
+#define	TBUFSIZ	128 /* Provide a smaller terminal output buffer so that
+	   the type-ahead detection works better (more often).
+	   That is, we overlap screen writing with more keyboard polling */
+#else
+#define	TBUFSIZ	1024	/* reduces the number of writes */
+#endif
+
+extern CMDFUNC f_backchar;
+extern CMDFUNC f_backchar_to_bol;
+
+
+#if USE_POSIX_TERMIOS
+
+#include <sys/termios.h>
+
+struct termios otermios, ntermios;
+
+char tobuf[TBUFSIZ];		/* terminal output buffer */
+
+ttopen()
+{
+	int s;
+	s = tcgetattr(0, &otermios);
+	if (s < 0) {
+		perror("ttopen tcgetattr");
+		exit(1);
+	}
+	setbuffer(stdout, tobuf, TBUFSIZ);
+
+	suspc =   otermios.c_cc[VSUSP];
+	intrc =   otermios.c_cc[VINTR];
+	killc =   otermios.c_cc[VKILL];
+	startc =  otermios.c_cc[VSTART];
+	stopc =   otermios.c_cc[VSTOP];
+	backspc = otermios.c_cc[VERASE];
+#ifdef VWERASE  /* Sun has it.  any others? */
+	wkillc = otermios.c_cc[VWERASE];
+#else
+	wkillc =  tocntrl('W');
+#endif
+
+	{ /* this could probably be done more POSIX'ish? */
+	extern	int rtfrmshell();
+	signal(SIGTSTP,SIG_DFL);	/* set signals so that we can */
+	signal(SIGCONT,rtfrmshell);	/* suspend & restart */
+	signal(SIGTTOU,SIG_IGN);	/* ignore output prevention */
+	}
+
+#if USE_FCNTL
+	kbd_flags = fcntl( 0, F_GETFL, 0 );
+	kbd_is_polled = FALSE;
+#endif
+
+#if ! X11
+	ntermios = otermios;
+
+	/* setup new settings, preserve flow control, and allow BREAK */
+	ntermios.c_iflag = BRKINT|(otermios.c_iflag & IXON|IXANY|IXOFF);
+	ntermios.c_oflag = 0;
+	ntermios.c_lflag = ISIG;
+	ntermios.c_cc[VMIN] = 1;
+	ntermios.c_cc[VTIME] = 0;
+	ntermios.c_cc[VSWTCH] = -1;
+	ntermios.c_cc[VSUSP] = -1;
+	ntermios.c_cc[VSTART] = -1;
+	ntermios.c_cc[VSTOP] = -1;
+#endif
+
+	ttmiscinit();
+
+	ttunclean();
+
+
+}
+
+ttclose()
+{
+	ttclean(TRUE);
+}
+
+ttclean(f)
+int f;
+{
+	if (f) {
+		movecursor(term.t_nrow, ttcol); /* don't care about column */
+		ttputc('\n');
+		ttputc('\r');
+	}
+	fflush(stdout);
+	tcdrain(1);
+#if ! X11
+	tcsetattr(0, TCSADRAIN, &otermios);
+#endif
+	TTclose();
+#if USE_FCNTL
+	fcntl(0, F_SETFL, kbd_flags);
+#endif
+}
+
+ttunclean()
+{
+	tcdrain(1);
+#if ! X11
+	if (tcsetattr(0, TCSADRAIN, &ntermios) < 0) {
+		perror("ttunclean: tcsetattr");
+		exit(1);
+	}
+#endif
+}
+
+
+#endif /* USE_POSIX_TERMIOS */
+
+#if USE_TERMIO
+
+#include	<termio.h>
+
+/* original terminal characteristics and charactoristics to use inside */
+struct	termio	otermio, ntermio;
+
+#ifdef AVAILABLE  /* setbuffer() isn't on most termio systems */
+char tobuf[TBUFSIZ];		/* terminal output buffer */
+#endif
+
+ttopen()
+{
+
+	ioctl(0, TCGETA, &otermio);	/* save old settings */
+#ifdef AVAILABLE
+	setbuffer(stdout, tobuf, TBUFSIZ);
+#endif
+
+	intrc =   otermio.c_cc[VINTR];
+	killc =   otermio.c_cc[VKILL];
+	startc =  tocntrl('Q');
+	stopc =   tocntrl('S');
+	backspc = otermio.c_cc[VERASE];
+	wkillc =  tocntrl('W');
+
+#if USE_FCNTL
+	kbd_flags = fcntl( 0, F_GETFL, 0 );
+	kbd_is_polled = FALSE;
+#endif
+
+#if SIGTSTP
+/* be careful here -- VSUSP is sometimes out of the range of the c_cc array */
+# ifdef VSUSP /* ODT (all POSIX?) uses this... */
+	ntermio.c_cc[VSUSP] = -1;
+	ntermio.c_cc[VSTART] = -1;
+	ntermio.c_cc[VSTOP] = -1;
+	suspc =   otermio.c_cc[VSUSP];
+# else /* use V_SUSP */
+#  ifdef V_SUSP
+	ntermio.c_cc[V_SUSP] = -1;
+	suspc = otermio.c_cc[V_SUSP];
+#  else
+	suspc = -1;
+#  endif
+#  ifdef V_DSUSP
+	ntermio.c_cc[V_DSUSP] = -1;
+#  endif
+# endif
+	{
+	extern	int rtfrmshell();	/* return from suspended shell */
+	signal(SIGTSTP,SIG_DFL);	/* set signals so that we can */
+	signal(SIGCONT,rtfrmshell);	/* suspend & restart */
+	signal(SIGTTOU,SIG_IGN);	/* ignore output prevention */
+	}
+#else /* no SIGTSTP */
+	suspc =   tocntrl('Z');
+#endif
+
+#if ! X11
+	ntermio = otermio;
+
+	/* setup new settings, preserve flow control, and allow BREAK */
+	ntermio.c_iflag = BRKINT|(otermio.c_iflag & IXON|IXANY|IXOFF);
+	ntermio.c_oflag = 0;
+	ntermio.c_lflag = ISIG;
+	ntermio.c_cc[VMIN] = 1;
+	ntermio.c_cc[VTIME] = 0;
+	ntermio.c_cc[VSWTCH] = -1;
+#endif
+
+	ttmiscinit();
+	ttunclean();
+
+}
+
+ttclose()
+{
+	ttclean(TRUE);
+}
+
+ttclean(f)
+int f;
+{
+#if	X11
+	TTflush();
+	TTclose();
+#else
+	if (f) {
+		movecursor(term.t_nrow, ttcol); /* don't care about column */
+		ttputc('\n');
+		ttputc('\r');
+	}
+	TTflush();
+	TTclose();
+	ioctl(0, TCSETAF, &otermio);
+#if USE_FCNTL
+	fcntl(0, F_SETFL, kbd_flags);
+#endif
+#endif	/* X11 */
+}
+
+ttunclean()
+{
+#if ! X11
+	ioctl(0, TCSETAW, &ntermio);
+#endif
+}
+
+#endif /* USE_TERMIO */
+
+#if USE_SGTTY
+
+#undef	CTRL
+#include        <sgtty.h>        /* for stty/gtty functions */
+struct  sgttyb  ostate;          /* saved tty state */
+struct  sgttyb  nstate;          /* values for editor mode */
+struct  sgttyb  rnstate;          /* values for raw editor mode */
+int olstate;		/* Saved local mode values */
+int nlstate;		/* new local mode values */
+struct ltchars	oltchars;	/* Saved terminal special character set */
+struct ltchars	nltchars = { -1, -1, -1, -1, -1, -1 }; /* a lot of nothing */
+struct tchars	otchars;	/* Saved terminal special character set */
+struct tchars	ntchars; /*  = { -1, -1, -1, -1, -1, -1 }; */
+
+#if USE_FIONREAD
+#include <sys/ioctl.h>		/* to get at FIONREAD */
+char tobuf[TBUFSIZ];		/* terminal output buffer */
+#endif
+
+ttopen()
+{
+	ioctl(0,TIOCGETP,&ostate); /* save old state */
+	killc = ostate.sg_kill;
+	backspc = ostate.sg_erase;
+
+#if ! X11
+	nstate = ostate;
+        nstate.sg_flags |= CBREAK;
+        nstate.sg_flags &= ~(ECHO|CRMOD);       /* no echo for now... */
+	ioctl(0,TIOCSETP,&nstate); /* set new state */
+#endif
+
+	rnstate = nstate;
+        rnstate.sg_flags &= ~CBREAK;
+        rnstate.sg_flags |= RAW;
+
+	ioctl(0, TIOCGETC, &otchars);		/* Save old characters */
+	intrc =  otchars.t_intrc;
+	startc = otchars.t_startc;
+	stopc =  otchars.t_stopc;
+
+#if ! X11
+	ntchars = otchars;
+	ntchars.t_brkc = -1;
+	ntchars.t_eofc = -1;
+	ioctl(0, TIOCSETC, &ntchars);		/* Place new character into K */
+#endif
+
+	ioctl(0, TIOCGLTC, &oltchars);		/* Save old characters */
+	wkillc = oltchars.t_werasc;
+	suspc = oltchars.t_suspc;
+#if ! X11
+	ioctl(0, TIOCSLTC, &nltchars);		/* Place new character into K */
+#endif
+
+#if	BSD	/* this is probably not the right ifdef */
+	ioctl(0, TIOCLGET, &olstate);
+#if ! X11
+	nlstate = olstate;
+	nlstate |= LLITOUT;
+	ioctl(0, TIOCLSET, &nlstate);
+#endif
+#endif
+#if USE_FIONREAD
+	setbuffer(stdout, tobuf, TBUFSIZ);
+#endif
+#if ! X11
+	{
+	extern	int rtfrmshell();	/* return from suspended shell */
+	signal(SIGTSTP,SIG_DFL);	/* set signals so that we can */
+	signal(SIGCONT,rtfrmshell);	/* suspend & restart */
+	signal(SIGTTOU,SIG_IGN);	/* ignore output prevention */
+	}
+#endif
+
+	ttmiscinit();
+
+}
+
+ttclose()
+{
+	ttclean(TRUE);
+}
+
+ttclean(f)
+int f;
+{
+#if ! X11
+	if (f) {
+		movecursor(term.t_nrow, ttcol); /* don't care about column */
+		ttputc('\n');
+		ttputc('\r');
+	}
+	TTflush();
+	ioctl(0, TIOCSETP, &ostate);
+	ioctl(0, TIOCSETC, &otchars);
+	ioctl(0, TIOCSLTC, &oltchars);
+#if	BSD
+	ioctl(0, TIOCLSET, &olstate);
+#endif
+#endif
+}
+
+ttunclean()
+{
+#if ! X11
+	ioctl(0, TIOCSETP, &nstate);
+	ioctl(0, TIOCSETC, &ntchars);
+	ioctl(0, TIOCSLTC, &nltchars);
+#if	BSD
+	ioctl(0, TIOCLSET, &nlstate);
+#endif
+#endif
+}
+
+#endif /* USE_SGTTY */
+
+ttputc(c)
+int c;
+{
+        fputc(c, stdout);
+}
+
+ttflush()
+{
+        fflush(stdout);
+}
+
+extern int tungotc;
+
+/*
+ * Read a character from the terminal, performing no editing and doing no echo
+ * at all.
+ */
+ttgetc()
+{
+#if	USE_FCNTL
+	int n;
+	if( kbd_char_present ) {
+		kbd_char_present = FALSE;
+	} else {
+		if( kbd_is_polled && fcntl( 0, F_SETFL, kbd_flags ) < 0 )
+			imdying(2);
+		kbd_is_polled = FALSE;
+		n = read(0, &kbd_char, 1);
+		if (n <= 0) {
+			if (n < 0 && errno == EINTR)
+				return -1;
+			imdying(2);
+		}
+	}
+	return ( kbd_char & 0x7f );
+#else /* USE_FCNTL */
+	int c;
+        c = fgetc(stdin);
+	if (c == EOF) {
+		if (errno == EINTR)
+			return -1;
+		imdying(2);
+	} else {
+		c &= 0x7f;
+	}
+	return c;
+#endif
+}
+
+
+/* typahead:	Check to see if any characters are already in the
+		keyboard buffer
+*/
+typahead()
+{
+#if	NeWS
+	return(inhibit_update) ;
+#else
+# if X11
+	return x_key_events_ready();
+# else
+
+	if (tungotc > 0)
+		return TRUE;
+
+#  if	USE_FIONREAD
+	{
+	long x;
+	return((ioctl(0,FIONREAD,&x) < 0) ? 0 : (int)x);
+	}
+#  else
+#   if	USE_FCNTL
+	if( !kbd_char_present )
+	{
+		if( !kbd_is_polled &&
+				fcntl(0, F_SETFL, kbd_flags|O_NDELAY ) < 0 )
+			return(FALSE);
+		kbd_is_polled = TRUE;  /* I think */
+		kbd_char_present = (1 == read( 0, &kbd_char, 1 ));
+	}
+	return ( kbd_char_present );
+#   else
+	return FALSE;
+#   endif/* USE_FCNTL */
+#  endif/* USE_FIONREAD */
+# endif	/* X11 */
+#endif	/* NeWS */
+}
+
+/* this takes care of some stuff that's common across all ttopen's.  Some of
+	it should arguably be somewhere else, but... */
+ttmiscinit()
+{
+	/* make sure backspace is bound to backspace */
+	asciitbl[backspc] = &f_backchar_to_bol;
+
+	/* make sure backspace is considered a backspace by the code */
+	_chartypes_[backspc] |= _bspace;
+
+	/* no buffering on input */
+	setbuf(stdin, NULL);
+}
+
+#else /* not UNIX */
 
 #if   MSDOS & TURBO
 #include <conio.h>
@@ -101,50 +655,9 @@ int nxtchar = -1;	/* character held from type ahead    */
 #include "rainbow.h"
 #endif
 
-#if	USG			/* System V */
-#include	<signal.h>
-#include	<termio.h>
-#include	<fcntl.h>
-int kbdflgs;			/* saved keyboard fd flags	*/
-int kbdpoll;			/* in O_NDELAY mode			*/
-int kbdqp;			/* there is a char in kbdq	*/
-char kbdq;			/* char we've already read	*/
-struct	termio	otermio;	/* original terminal characteristics */
-struct	termio	ntermio;	/* charactoristics to use inside */
-#endif
-
-#if V7 | BSD
-#undef	CTRL
-#include        <sgtty.h>        /* for stty/gtty functions */
-#include	<signal.h>
-struct  sgttyb  ostate;          /* saved tty state */
-struct  sgttyb  nstate;          /* values for editor mode */
-struct  sgttyb  rnstate;          /* values for raw editor mode */
-int olstate;		/* Saved local mode values */
-int nlstate;		/* new local mode values */
-struct ltchars	oltchars;	/* Saved terminal special character set */
-struct ltchars	nltchars = { -1, -1, -1, -1, -1, -1 }; /* a lot of nothing */
-struct tchars	otchars;	/* Saved terminal special character set */
-struct tchars	ntchars; /*  = { -1, -1, -1, -1, -1, -1 }; */
-#if BSD
-#include <sys/ioctl.h>		/* to get at the typeahead */
-#define	TBUFSIZ	128
-char tobuf[TBUFSIZ];		/* terminal output buffer */
-#endif
-#endif
-
-#if POSIX
-#include <sys/termios.h>
-#endif
-
 extern CMDFUNC f_backchar;
 extern CMDFUNC f_backchar_to_bol;
 
-/*
- * This function is called once to set up the terminal device streams.
- * On VMS, it translates TT until it finds the terminal, then assigns
- * a channel to it and sets it raw. On CPM it is a no-op.
- */
 ttopen()
 {
 #if     AMIGA
@@ -217,109 +730,13 @@ ttopen()
 	intdos(&rg, &rg);	/* go for it! */
 #endif
 
-#if	USG
-	ioctl(0, TCGETA, &otermio);	/* save old settings */
-	ntermio = otermio;
-	/* setup new settings, preserve flow control, and allow BREAK */
-	ntermio.c_iflag = BRKINT|(otermio.c_iflag & IXON|IXANY|IXOFF);
-	ntermio.c_oflag = 0;
-	ntermio.c_lflag = ISIG;
-	ntermio.c_cc[VMIN] = 1;
-	ntermio.c_cc[VTIME] = 0;
-	ntermio.c_cc[VSWTCH] = -1;
-#ifdef SIGTSTP	/* suspension under sys5 -- is this a standard? */
-#if POSIX	/* ODT uses this... */
-	ntermio.c_cc[VSUSP] = -1;
-	ntermio.c_cc[VSTART] = -1;
-	ntermio.c_cc[VSTOP] = -1;
-	suspc =   otermio.c_cc[VSUSP];
-#else
-	ntermio.c_cc[V_SUSP] = -1;
-	ntermio.c_cc[V_DSUSP] = -1;
-	suspc =   otermio.c_cc[V_SUSP];
-#endif
-#else
-	suspc =   tocntrl('Z');
-#endif
-	ioctl(0, TCSETA, &ntermio);	/* and activate them */
-
-	intrc =   otermio.c_cc[VINTR];
-	killc =   otermio.c_cc[VKILL];
-	startc =  tocntrl('Q');
-	stopc =   tocntrl('S');
-	backspc = otermio.c_cc[VERASE];
-	wkillc =  tocntrl('W');
-
-	kbdflgs = fcntl( 0, F_GETFL, 0 );
-	kbdpoll = FALSE;
-#endif
-
-#if     V7 | BSD
-	ioctl(0,TIOCGETP,&ostate); /* save old state */
-	killc = ostate.sg_kill;
-	backspc = ostate.sg_erase;
-
-	nstate = ostate;
-        nstate.sg_flags |= CBREAK;
-        nstate.sg_flags &= ~(ECHO|CRMOD);       /* no echo for now... */
-	ioctl(0,TIOCSETP,&nstate); /* set new state */
-
-	rnstate = nstate;
-        rnstate.sg_flags &= ~CBREAK;
-        rnstate.sg_flags |= RAW;
-
-	ioctl(0, TIOCGETC, &otchars);		/* Save old characters */
-	intrc =  otchars.t_intrc;
-	startc = otchars.t_startc;
-	stopc =  otchars.t_stopc;
-
-	ntchars = otchars;
-	ntchars.t_brkc = -1;
-	ntchars.t_eofc = -1;
-	ioctl(0, TIOCSETC, &ntchars);		/* Place new character into K */
-
-	ioctl(0, TIOCGLTC, &oltchars);		/* Save old characters */
-	wkillc = oltchars.t_werasc;
-	suspc = oltchars.t_suspc;
-	ioctl(0, TIOCSLTC, &nltchars);		/* Place new character into K */
-
-#if	BSD
-	ioctl(0, TIOCLGET, &olstate);
-	nlstate = olstate;
-	nlstate |= LLITOUT;
-	ioctl(0, TIOCLSET, &nlstate);
-	/* provide a smaller terminal output buffer so that
-	   the type ahead detection works better (more often) */
-	setbuffer(stdout, &tobuf[0], TBUFSIZ);
-	setbuf(stdin, NULL);
-#endif
-#endif
-
-#if UNIX && defined(SIGTSTP)
-	{
-	extern	int rtfrmshell();	/* return from suspended shell */
-	signal(SIGTSTP,SIG_DFL);	/* set signals so that we can */
-	signal(SIGCONT,rtfrmshell);	/* suspend & restart */
-	signal(SIGTTOU,SIG_IGN);	/* ignore output prevention */
-	}
-#endif
 	/* make sure backspace is bound to backspace */
 	asciitbl[backspc] = &f_backchar_to_bol;
 
 	/* make sure backspace is considered a backspace by the code */
 	_chartypes_[backspc] |= _bspace;
-
-	/* on all screens we are not sure of the initial position */
-	/*  of the cursor					*/
-	ttrow = 999;
-	ttcol = 999;
 }
 
-/*
- * This function gets called just before we go back home to the command
- * interpreter. On VMS it puts the terminal back in a reasonable state.
- * Another no-operation on CPM.
- */
 ttclose()
 {
 #if     AMIGA
@@ -347,8 +764,6 @@ ttclose()
         if (status != SS$_NORMAL)
                 exit(status);
 #endif
-#if     CPM
-#endif
 #if     MSDOS & (HP150 == 0) & LATTICE
 	/* restore the ctrl-break interupt */
 	rg.h.ah = 0x33;		/* control-break check dos call */
@@ -361,6 +776,7 @@ ttclose()
 }
 
 ttclean(f)
+int f;
 {
 	if (f) {
 		movecursor(term.t_nrow, ttcol); /* don't care about column */
@@ -368,38 +784,12 @@ ttclean(f)
 		ttputc('\r');
 	}
 	TTflush();
-#if UNIX
-#if	USG
-	ioctl(0, TCSETAF, &otermio);
-	fcntl(0, F_SETFL, kbdflgs);
-#endif
-#if     V7 | BSD
-	ioctl(0,TIOCSETP,&ostate);
-	ioctl(0, TIOCSETC, &otchars);
-	ioctl(0, TIOCSLTC, &oltchars);
-#if	BSD
-	ioctl(0, TIOCLSET, &olstate);
-#endif
-#endif
-#else
 	TTclose();
 	TTkclose();
-#endif
 }
 
 ttunclean()
 {
-#if	USG
-	ioctl(0, TCSETAF, &ntermio);
-#endif
-#if     V7 | BSD
-	ioctl(0, TIOCSETP,&nstate);
-	ioctl(0, TIOCSETC, &ntchars);
-	ioctl(0, TIOCSLTC, &nltchars);
-#if	BSD
-	ioctl(0, TIOCLSET, &nlstate);
-#endif
-#endif
 }
 
 /*
@@ -411,6 +801,8 @@ ttunclean()
 ttputc(c)
 #if     AMIGA | (ST520 & MEGAMAX)
         char c;
+#else
+	int c;
 #endif
 {
 #if     AMIGA
@@ -443,10 +835,6 @@ ttputc(c)
         Put_Char(c);                    /* fast video */
 #endif
 
-
-#if     V7 | USG | BSD
-        fputc(c, stdout);
-#endif
 }
 
 #if	AMIGA
@@ -487,10 +875,6 @@ ttflush()
 
 #if     MSDOS
 #endif
-
-#if     V7 | USG | BSD
-        fflush(stdout);
-#endif
 }
 
 extern int tungotc;
@@ -502,15 +886,17 @@ extern int tungotc;
  */
 ttgetc()
 {
-	int c;
 #if     AMIGA
+	{
         char ch;
 
         amg_flush();
         Read(terminal, &ch, 1L);
         return(255 & (int)ch);
+	}
 #endif
 #if	ST520 & MEGAMAX
+	{
 	long ch;
 
 /*
@@ -522,8 +908,10 @@ ttgetc()
 	STcurblink(FALSE); /* the cursor is steady while we work */
 	STscancode = (ch >> 16) & 0xff;
        	return(255 & (int)ch);
+	}
 #endif
 #if     VMS
+	{
         int     status;
         int     iosb[2];
         int     term[2];
@@ -550,13 +938,20 @@ ttgetc()
                 }
         }
         return (ibuf[ibufi++] & 0xFF);    /* Allow multinational  */
+
+	}
 #endif
 
 #if     CPM
+	{
         return (biosb(BCONIN, 0, 0));
+
+	}
 #endif
 
 #if RAINBOW
+	{
+	int c;
 
         while ((c = Read_Keyboard()) < 0);
 
@@ -565,13 +960,19 @@ ttgetc()
                         c &= 0xFF;
 
         return c;
+	}
 #endif
 
 #if     MSDOS & MWC86
+	{
         return (getcnb());
+
+	}
 #endif
 
 #if	MSDOS & (LATTICE | MSC | TURBO | AZTEC)
+	{
+	int c;
 
 	/* if a char already is ready, return it */
 	if (nxtchar >= 0) {
@@ -585,54 +986,17 @@ ttgetc()
 	intdos(&rg, &rg);
 	c = rg.h.al;		/* grab the char */
 	return(c & 0xff);
-#endif
-
-#if     V7 | BSD
-        /*stty(0, &rnstate);                      /* set raw mode */
-        c = fgetc(stdin);
-	if (c == -1)
-		/* this doesn't work -- read doesn't return on interrupt */
-		c = kcod2key(intrc);
-	else
-		c &= 0x7f;
-        /*stty(0, &nstate);                       /* set mode */
-	return c;
-#endif
-
-#if	USG
-	if( kbdqp ) {
-		kbdqp = FALSE;
-	} else {
-		if( kbdpoll && fcntl( 0, F_SETFL, kbdflgs ) < 0 )
-			return FALSE;	/* what ??  i don't understand -- pgf */
-		kbdpoll = FALSE;
-		if (read(0, &kbdq, 1) < 0) {
-			return -1;
-		}
 	}
-	return ( kbdq & 0x7f );
-#endif
-}
-
-
-#if	NeWS
-/* typahead:	Check to see if any characters are already in the
-		keyboard buffer
-*/
-typahead()
-{
-	return(inhibit_update) ;
-}
 #endif
 
-#if	TYPEAH & (~ST520 | ~LATTICE ) & ~NeWS
+}
+
 
 /* typahead:	Check to see if any characters are already in the
 		keyboard buffer
 */
 typahead()
 {
-	long x;
 
 #if	MSDOS & (MSC | TURBO)
 	if (tungotc > 0)
@@ -672,28 +1036,6 @@ typahead()
 	nxtchar = c;
 	return(TRUE);
 #endif
-
-#if	BSD
-	if (tungotc > 0)
-		return TRUE;
-
-	return((ioctl(0,FIONREAD,&x) < 0) ? 0 : (int)x);
-#endif
-
-#if	USG
-	if (tungotc > 0)
-		return TRUE;
-
-	if( !kbdqp )
-	{
-		if( !kbdpoll && fcntl( 0, F_SETFL, kbdflgs | O_NDELAY ) < 0 )
-			return(FALSE);
-		kbdpoll = TRUE;  /* I think */
-		kbdqp = (1 == read( 0, &kbdq, 1 ));
-	}
-	return ( kbdqp );
-#endif
-
 }
-#endif
 
+#endif /* not UNIX */

@@ -6,7 +6,36 @@
  * internal use.
  *
  * $Log: region.c,v $
- * Revision 1.5  1991/08/07 12:35:07  pgf
+ * Revision 1.13  1992/01/10 08:09:23  pgf
+ * added arg to do_fl_region, which is passed on to the function it calls
+ * vi pointer
+ *
+ * Revision 1.12  1992/01/05  00:06:13  pgf
+ * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
+ * often.  also normalized message appearance somewhat.
+ *
+ * Revision 1.11  1991/11/27  10:09:09  pgf
+ * don't do left shifts on lines starting with # when we're in C mode.
+ * i'll bet someone's gonna complain about that.  let's give it a try
+ * anyway.
+ *
+ * Revision 1.10  1991/11/13  20:09:27  pgf
+ * X11 changes, from dave lemke
+ *
+ * Revision 1.9  1991/11/08  13:15:02  pgf
+ * yankregion now reports how much was yanked (proposed by dave lemke)
+ *
+ * Revision 1.8  1991/11/03  17:46:30  pgf
+ * removed f,n args from all region functions -- they don't use them,
+ * since they're no longer directly called by the user
+ *
+ * Revision 1.7  1991/11/01  14:38:00  pgf
+ * saber cleanup
+ *
+ * Revision 1.6  1991/10/28  14:26:15  pgf
+ * eliminated TABVAL macro -- now use curtabval directly
+ *
+ * Revision 1.5  1991/08/07  12:35:07  pgf
  * added RCS log messages
  *
  * revision 1.4
@@ -41,7 +70,7 @@ overlay	"region"
  * to figure out the bounds of the region.
  * Move "." to the start, and kill the characters.
  */
-killregion(f, n)
+killregion()
 {
         register int    s;
         REGION          region;
@@ -64,7 +93,7 @@ killregion(f, n)
  * at all. This is a bit like a kill region followed
  * by a yank.
  */
-yankregion(f, n)
+yankregion()
 {
 	MARK		m;
         register int    s;
@@ -93,25 +122,34 @@ yankregion(f, n)
                         ++m.o;
                 }
         }
-	mlwrite("[region yanked]");
+	if (klines)
+		mlwrite("[ %d line%c yanked]", klines,
+					klines == 1 ? ' ':'s');
+	else
+		mlwrite("[ %d character%c yanked]", kchars, 
+					kchars == 1 ? ' ':'s');
 	ukb = 0;
         return TRUE;
 }
 
 /*
  * insert a tab at the front of the line
+ * don't do it if we're in cmode and the line starts with '#'
  */
 shift_right_line()
 {
+	if (b_val(curbp, MDCMOD) &&
+		llength(DOT.l) > 0 && char_at(DOT) == '#')
+		return TRUE;
 	return tab(FALSE,1);
 }
 
 /*
  * shift region right by a tab stop
  */
-shiftrregion(f, n)
+shiftrregion()
 {
-	return do_fl_region(shift_right_line);
+	return do_fl_region(shift_right_line, 0);
 }
 
 /*
@@ -129,7 +167,7 @@ shift_left_line()
 
 	/* examine the line to the end, or the first tabstop, whichever
 		comes first */
-	lim = (TABVAL < llength(linep)) ? TABVAL:llength(linep);
+	lim = (curtabval < llength(linep)) ? curtabval:llength(linep);
 
 	/* count the leading spaces */
 	while ((c = lgetc(linep,i)) == ' ' && i < lim)
@@ -149,12 +187,139 @@ shift_left_line()
 /*
  * shift region left by a tab stop
  */
-shiftlregion(f, n)
+shiftlregion()
 {
-	return do_fl_region(shift_left_line);
+	return do_fl_region(shift_left_line, 0);
 }
 
+#ifdef VERSION_THREE_AND_NCD_SHIFTWIDTH
+/*
+ * shift region left by a tab stop
+ */
+shiftrregion(f, n)
+{
+        register LINE   *linep;
+        register int    loffs;
+        register int    s;
+        REGION          region;
+	int		i;
+
+	if (curbp->b_mode&MDVIEW)	/* don't allow this command if	*/
+		return(rdonly());	/* we are in read only mode	*/
+        if ((s=getregion(&region)) != TRUE)
+                return (s);
+        linep = region.r_linep;
+        loffs = region.r_offset;
+	if (loffs != 0) {  /* possibly on first time through */
+		region.r_size -= llength(linep)-loffs+1;
+		loffs = 0;
+		linep = lforw(linep);
+	}
+	s = TRUE;
+	while (region.r_size > 0) {
+		/* adjust r_size now, while line length is right */
+		region.r_size -= llength(linep)+1;
+		if (llength(linep) != 0) {
+#ifndef NCD_HACKS
+			curwp->w_dotp = linep;
+			curwp->w_doto = 0;
+			if ((s = linsert(1,'\t')) != TRUE)
+				return (s);
+#else
+			curwp->w_dotp = linep;
+			detab(FALSE, 1);
+			curwp->w_dotp = linep;
+			curwp->w_doto = 0;
+			if ((s = linsert(shiftwidth, ' ')) != TRUE)
+				return (s);
+			entab(FALSE, 1);
+        		forwline(TRUE, -1);
+#endif
+		}
+		linep = lforw(linep);
+        }
+	firstnonwhite(f,n);
+	return (TRUE);
+}
+
+/*
+ * shift region left by a tab stop
+ */
+shiftlregion(f, n)
+{
+        register LINE   *linep;
+        register int    loffs;
+        register int    c;
+        register int    s;
+	register int	i;
+	register int	icount = 0;
+        REGION          region;
+
+	if (curbp->b_mode&MDVIEW)	/* don't allow this command if	*/
+		return(rdonly());	/* we are in read only mode	*/
+        if ((s=getregion(&region)) != TRUE)
+                return (s);
+        linep = region.r_linep;
+        loffs = region.r_offset;
+	if (loffs != 0) {  /* possibly on first time through */
+		region.r_size -= llength(linep)-loffs+1;
+		loffs = 0;
+		linep = lforw(linep);
+	}
+	s = TRUE;
+	while (region.r_size > 0) {
+		/* adjust r_size now, while line length is right */
+		region.r_size -= llength(linep)+1;
+		if (llength(linep) != 0) {
+#ifndef NCD_HACKS
+			curwp->w_dotp = linep;
+			curwp->w_doto = 0;
+			if ((c = lgetc(linep,0)) == '\t') { /* delete the tab */
+				i = 1;
+			} else if (c == ' ') {
+				i = 1; 
+				/* after this, i'th char is _not_ a space, 
+					or 0-7 are spaces  */
+				while ((c = lgetc(linep,i)) == ' ' && i < TABVAL)
+					i++;
+				if (i != TABVAL && c == '\t') /* ith char is tab */
+					i++;
+			} else {
+				i = 0;
+			}
+#else
+			curwp->w_dotp = linep;
+			detab(FALSE, 1);
+			curwp->w_dotp = linep;
+			curwp->w_doto = 0;
+			if ((c = lgetc(linep, 0)) == ' ') {
+				i = 1; 
+				/* after this, i'th char is _not_ a space, 
+					or 0-7 are spaces  */
+				while ((c = lgetc(linep,i)) == ' ' && i < shiftwidth)
+					i++;
+			} else {
+				i = 0;
+			}
+#endif
+			
+			if ( i!=0 && (s = ldelete((long)i,FALSE)) != TRUE)
+				return (s);
+#ifdef NCD_HACKS
+			entab(FALSE, 1);
+        		forwline(TRUE, -1);
+#endif
+		}
+		linep = lforw(linep);
+        }
+	firstnonwhite(f,n);
+        return (TRUE);
+}
+
+#endif
+
 _to_lower(c)
+int c;
 {
 	if (isupper(c))
 		return c ^ DIFCASE;
@@ -162,6 +327,7 @@ _to_lower(c)
 }
 
 _to_upper(c)
+int c;
 {
 	if (islower(c))
 		return c ^ DIFCASE;
@@ -169,28 +335,29 @@ _to_upper(c)
 }
 
 _to_caseflip(c)
+int c;
 {
 	if (isalpha(c))
 		return c ^ DIFCASE;
 	return -1;
 }
 
-flipregion(f, n)
+flipregion()
 {
-	return charprocreg(f,n,_to_caseflip);
+	return charprocreg(_to_caseflip);
 }
 
-lowerregion(f, n)
+lowerregion()
 {
-	return charprocreg(f,n,_to_lower);
+	return charprocreg(_to_lower);
 }
 
-upperregion(f, n)
+upperregion()
 {
-	return charprocreg(f,n,_to_upper);
+	return charprocreg(_to_upper);
 }
 
-charprocreg(f, n, func)
+charprocreg(func)
 int (*func)();
 {
 	MARK		m;
@@ -236,7 +403,7 @@ register REGION *rp;
         long bsize;
 
         if (MK.l == NULL) {
-                mlwrite("Bug: getregion: no mark set in this window");
+                mlforce("BUG: getregion: no mark set in this window");
                 return FALSE;
         }
         if (sameline(DOT, MK)) {
@@ -305,12 +472,13 @@ register REGION *rp;
                         }
                 }
         }
-        mlwrite("Bug: lost mark");
+        mlforce("BUG: lost mark");
         return FALSE;
 }
 
-do_fl_region(lineprocfunc)
+do_fl_region(lineprocfunc,arg)
 int (*lineprocfunc)();
+int arg;
 {
         register LINE   *linep;
         register int    s;
@@ -333,7 +501,7 @@ int (*lineprocfunc)();
 		DOT.o = 0;
 
 		/* ...and process each line */
-		if ((s = (*lineprocfunc)()) != TRUE)
+		if ((s = (*lineprocfunc)(arg)) != TRUE)
 			return s;
 
         }

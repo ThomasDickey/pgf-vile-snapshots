@@ -11,7 +11,34 @@
  * which means that the dot and mark values in the buffer headers are nonsense.
  *
  * $Log: line.c,v $
- * Revision 1.11  1991/10/10 12:33:33  pgf
+ * Revision 1.19  1992/02/17 09:03:22  pgf
+ * kill registers now hold unsigned chars
+ *
+ * Revision 1.18  1992/01/22  18:38:34  pgf
+ * check for empty buffer in lnewline() was insufficient.  amazing what
+ * you find when you go looking...
+ *
+ * Revision 1.17  1992/01/05  00:06:13  pgf
+ * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
+ * often.  also normalized message appearance somewhat.
+ *
+ * Revision 1.16  1992/01/04  14:14:12  pgf
+ * attempt to keep all newly inserted lines in a fresh buffer visible, rather
+ * than have them "hidden" above the window, though the window might be empty
+ *
+ * Revision 1.15  1991/11/08  13:24:33  pgf
+ * added klines and kchars counters to kinsert()
+ *
+ * Revision 1.14  1991/11/01  14:38:00  pgf
+ * saber cleanup
+ *
+ * Revision 1.13  1991/10/29  03:02:04  pgf
+ * fixups to usekreg, and added execkreg and loadkreg
+ *
+ * Revision 1.12  1991/10/24  12:59:18  pgf
+ * new lgrow() routine, to add more space in a line
+ *
+ * Revision 1.11  1991/10/10  12:33:33  pgf
  * changes to support "block malloc" of line text -- now for most files
  * there is are two mallocs and a single read, no copies.  previously there
  * were two mallocs per line, and two copies (stdio's and ours).  This change
@@ -84,15 +111,16 @@ BUFFER *bp;
 	} else {
 		size = roundup(used);
 	}
-	if (lp = bp->b_freeLINEs) { /* see if the buffer LINE block has any */
+	/* see if the buffer LINE block has any */
+	if ((lp = bp->b_freeLINEs) != NULL) {
 		bp->b_freeLINEs = lp->l_fp;
 	} else if ((lp = (LINE *) malloc(sizeof(LINE))) == NULL) {
-		mlwrite("[OUT OF MEMORY]");
+		mlforce("[OUT OF MEMORY]");
 		return NULL;
 	}
 	lp->l_text = NULL;
 	if (size && (lp->l_text = malloc(size)) == NULL) {
-		mlwrite("[OUT OF MEMORY]");
+		mlforce("[OUT OF MEMORY]");
 		free((char *)lp);
 		return NULL;
 	}
@@ -101,6 +129,27 @@ BUFFER *bp;
 	lsetclear(lp);
 	lp->l_nxtundo = NULL;
 	return (lp);
+}
+
+lgrow(lp,howmuch,bp)
+register LINE	*lp;
+register int	howmuch;
+BUFFER *bp;
+{
+	register int	size;
+	char *ntext;
+
+	size = roundup(lp->l_size + howmuch);
+	ntext = (char *)malloc(size);
+	if (ntext == NULL) {
+		mlforce("[OUT OF MEMORY]");
+		return FALSE;
+	}
+	memcpy(ntext, lp->l_text, lp->l_used);
+	ltextfree(lp,bp);
+	lp->l_text = ntext;
+	lp->l_size = size;
+	return TRUE;
 }
 
 
@@ -133,9 +182,9 @@ register BUFFER *bp;
 		if (bp->b_ltext) { /* could it be in the big range? */
 			if (ltextp < bp->b_ltext || ltextp >= bp->b_ltext_end) {
 				free(ltextp);
-			} else {
-			/* could keep track of freed big range text here */
-			}
+			} /* else {
+			could keep track of freed big range text here;
+			} */
 		} else {
 			free(ltextp);
 		}
@@ -263,6 +312,7 @@ int f, n;	/* default flag and numeric argument */
  * well, and FALSE on errors.
  */
 linsert(n, c)
+int n, c;
 {
 	register char	*cp1;
 	register char	*cp2;
@@ -279,7 +329,7 @@ linsert(n, c)
 	lp1 = curwp->w_dot.l;			/* Current line 	*/
 	if (lp1 == curbp->b_line.l) {		/* At the end: special	*/
 		if (curwp->w_dot.o != 0) {
-			mlwrite("bug: linsert");
+			mlforce("BUG: linsert");
 			return (FALSE);
 		}
 		if ((lp2=lalloc(n,curbp)) == NULL) /* Allocate new line	*/
@@ -384,8 +434,8 @@ lnewline()
 	lchange(WFHARD|WFINS);
 	lp1  = curwp->w_dot.l;			/* Get the address and	*/
 	doto = curwp->w_dot.o;			/* offset of "."	*/
-	if (lp1 == curbp->b_line.l) { /* first line special -- just */
-					/* create empty line */
+	if (lp1 == curbp->b_line.l && lforw(lp1) == lp1) {
+		/* empty buffer -- just  create empty line */
 		if ((lp2=lalloc(doto,curbp)) == NULL)
 			return (FALSE);
 		/* put lp2 in below lp1 */
@@ -394,6 +444,14 @@ lnewline()
 		lp2->l_fp->l_bp = lp2;
 		lp2->l_bp = lp1;
 		tag_for_undo(lp2);
+		wp = wheadp;
+		while (wp != NULL) {
+			if (wp->w_line.l == lp1)
+				wp->w_line.l = lp2;
+			if (wp->w_dot.l == lp1)
+				wp->w_dot.l = lp2;
+			wp = wp->w_wndp;
+		}
 		return TRUE;
 	}
 	copy_for_undo(lp1);
@@ -648,7 +706,6 @@ ldelnewline()
 	register char	*cp2;
 	register LINE	*lp1;
 	register LINE	*lp2;
-	register LINE	*lp3;
 	register WINDOW *wp;
 
 	lp1 = curwp->w_dot.l;
@@ -748,6 +805,7 @@ kdelete()
 		kregflag = KAPPEND;
 	else
 		kregflag = KNEEDCLEAN;
+	kchars = klines = 0;
 
 }
 
@@ -776,7 +834,6 @@ int c;		/* character to insert in the kill buffer */
 		/* and reset all the kill buffer pointers */
 		kbs[ukb].kbufh = kbs[ukb].kbufp = NULL;
 		kbs[ukb].kused = KBLOCK; 	        
-
 	}
 	kregflag &= ~KNEEDCLEAN;
 	kbs[ukb].kbflag = kregflag;
@@ -797,6 +854,9 @@ int c;		/* character to insert in the kill buffer */
 
 	/* and now insert the character */
 	kbp->kbufp->d_chunk[kbp->kused++] = c;
+	kchars++;
+	if (c == '\n')
+		klines++;
 	return(TRUE);
 }
 
@@ -810,14 +870,25 @@ int c;		/* character to insert in the kill buffer */
 	operators(), the first in main())
 */
 usekreg(f,n)
+int f,n;
 {
 	int c, status;
+	CMDFUNC *cfp;			/* function to execute */
+	char tok[NSTRING];		/* command incoming */
 
 	/* take care of incrementing the buffer number, if we're replaying
 		a command via 'dot' */
 	incr_dot_kregnum();
 
-	c = kbd_key();
+	if (clexec || isnamedcmd) {
+		int stat;
+		static char cbuf[2];
+	        if ((stat=mlreply("Use named register: ", cbuf, 2)) != TRUE)
+	                return stat;
+		c = cbuf[0];
+        } else {
+		c = kbd_key();
+        }
 
 	if (isdigit(c))
 		ukb = c - '0';
@@ -825,23 +896,37 @@ usekreg(f,n)
 		ukb = c - 'a' + 10;  /* named buffs are in 10 through 36 */
 	else if (isupper(c)) {
 		ukb = c - 'A' + 10;
-		kregflag |= KAPPEND;
 	} else {
 		TTbeep();
 		return (FALSE);
 	}
 
-	/* get the next command from the keyboard */
-	c = kbd_seq();
+	if (kbdmode == PLAY && kbdplayreg == ukb) {
+		mlforce("[Error: currently executing register %c]",c);
+		kbdmode = STOP;
+		return FALSE;
+	}
+	
+	if (isupper(c))
+		kregflag |= KAPPEND;
 
-	/* allow second chance for entering counts */
-	if (f == FALSE) {
-		do_num_proc(&c,&f,&n);
-		do_rept_arg_proc(&c,&f,&n);
+	if (clexec) {
+		macarg(tok);	/* get the next token */
+		cfp = engl2fnc(tok);
+	} else {
+		/* get the next command from the keyboard */
+		c = kbd_seq();
+
+		/* allow second chance for entering counts */
+		if (f == FALSE) {
+			do_num_proc(&c,&f,&n);
+			do_rept_arg_proc(&c,&f,&n);
+		}
+		cfp = kcod2fnc(c);
 	}
 
 	/* and execute the command */
-	status = execute(kcod2fnc(c), f, n);
+	status = execute(cfp, f, n);
 
 	ukb = 0;
 	kregflag = 0;
@@ -854,6 +939,7 @@ usekreg(f,n)
 /* we re-use one of them until the KLINES flag is on, then we advance */
 /* to the next */
 kregcirculate(killing)
+int killing;
 {
 	static lastkb; /* index of the real "0 */
 
@@ -886,27 +972,32 @@ kregcirculate(killing)
 }
 
 putbefore(f,n)
+int f,n;
 {
 	return doput(f,n,FALSE,FALSE);
 }
 
 putafter(f,n)
+int f,n;
 {
 	return doput(f,n,TRUE,FALSE);
 }
 
 lineputbefore(f,n)
+int f,n;
 {
 	return doput(f,n,FALSE,TRUE);
 }
 
 lineputafter(f,n)
+int f,n;
 {
 	return doput(f,n,TRUE,TRUE);
 }
 
 
 doput(f,n,after,putlines)
+int f,n,after,putlines;
 {
 	int s, oukb, lining;
 	
@@ -917,7 +1008,7 @@ doput(f,n,after,putlines)
 	kregcirculate(FALSE);
 	if (kbs[ukb].kbufh == NULL) {
 		if (ukb != 0)
-			mlwrite("Nothing in register %c", 
+			mlforce("[Nothing in register %c]", 
 				(oukb<10)? oukb+'0' : oukb-10+'a');
 		TTbeep();
 		return(FALSE);
@@ -947,6 +1038,7 @@ doput(f,n,after,putlines)
  * Put text back from the kill register.
  */
 put(n,aslines)
+int n,aslines;
 {
 	register int	c;
 	register int	i;
@@ -972,7 +1064,7 @@ put(n,aslines)
 				i = kbs[ukb].kused;
 			else
 				i = KBLOCK;
-			sp = kp->d_chunk;
+			sp = (char *)kp->d_chunk;
 			while (i--) {
 				if ((c = *sp++) == '\n') {
 					if (lnewline() != TRUE)
@@ -1002,4 +1094,86 @@ put(n,aslines)
 	}
         curwp->w_flag |= WFHARD;
 	return (TRUE);
+}
+
+/* ARGSUSED */
+execkreg(f,n)
+int f,n;
+{
+	int c, i;
+	KILL *kp;		/* pointer into kill register */
+	static lastreg = -1;
+
+	if (kbdmode != STOP) {
+		mlforce("[Error: already executing macro]");
+		kbdmode = STOP;
+		return FALSE;
+	}
+
+	if (!f)
+		n = 1;
+	else if (n <= 0)
+		return TRUE;
+
+	if (clexec || isnamedcmd) {
+		int stat;
+		static char cbuf[2];
+	        if ((stat=mlreply("Execute register: ", cbuf, 2)) != TRUE)
+	                return stat;
+		c = cbuf[0];
+        } else {
+		c = kbd_key();
+        }
+
+	if (c == '@' && lastreg != -1) {
+		c = lastreg;
+	} else if (c < 'a' || c > 'z') {
+		TTbeep();
+		mlforce("[Invalid register name]");
+		return FALSE;
+	}
+
+	lastreg = c;
+
+	c = c - 'a' + 10;
+
+	/* make sure there is something to execure */
+	kp = kbs[c].kbufh;
+	if (kp == NULL)
+		return TRUE;		/* not an error, just nothing */
+
+	if (kp->d_next == NULL) {
+		i = kbs[c].kused;
+	} else {
+		mlforce("Warning:  only first %d characters will execute",
+								KBLOCK);
+		i = KBLOCK;
+	}
+	kbdrep = n;		/* remember how many times to execute */
+	kbdmode = PLAY; 	/* start us in play mode */
+	kbdplayreg = c;  	/* which buffer is playing */
+	kbdptr = kp->d_chunk;	/*    at the beginning */
+	kbdend = &kp->d_chunk[i];
+	dotcmdmode = STOP;
+	return TRUE;
+}
+
+/* ARGSUSED */
+loadkreg(f,n)
+int f,n;
+{
+	int s;
+	char respbuf[NFILEN];
+
+	kdelete();
+	s = kbd_string("Load register with: ", respbuf,
+					NFILEN - 1, '\n', NO_EXPAND, FALSE);
+	if (s != TRUE)
+		return FALSE;
+	for (s = 0; s < NFILEN; s++) {
+		if (!respbuf[s])
+			break;
+		kinsert(respbuf[s]);
+	}
+	return TRUE;
 }

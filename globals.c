@@ -7,7 +7,14 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: globals.c,v $
- * Revision 1.8  1991/09/10 00:52:55  pgf
+ * Revision 1.10  1992/01/05 00:06:13  pgf
+ * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
+ * often.  also normalized message appearance somewhat.
+ *
+ * Revision 1.9  1991/11/01  14:38:00  pgf
+ * saber cleanup
+ *
+ * Revision 1.8  1991/09/10  00:52:55  pgf
  * be careful to not rely on curbp during global ops, since some commands, like
  * print (pregion) change buffers
  *
@@ -41,22 +48,25 @@
 #if GLOBALS
 
 globals(f,n)
+int f,n;
 {
 	return globber(f,n,'g');
 }
 
 vglobals(f,n)
+int f,n;
 {
 #ifdef SOMEDAY
 	return globber(f,n,'v');
 #else
-	return unimpl();
+	return unimpl(f,n);
 #endif
 }
 
+/* ARGSUSED */
 globber(f, n, g_or_v)
+int f, n, g_or_v;
 {
-	static char buf[NFILEN];
 	int c, s;
 	register LINE *lp;
 	register char *fnp;	/* ptr to the name of the cmd to exec */
@@ -78,8 +88,8 @@ globber(f, n, g_or_v)
 			}
 		}
 	}
-	if (readpattern("global pattern: ", &pat[0], TRUE, c, FALSE) != TRUE) {
-		mlwrite("No pattern.");
+	if (readpattern("global pattern: ", &pat[0], &gregexp, c, FALSE) != TRUE) {
+		mlforce("[No pattern.]");
 		return FALSE;
 	}
 
@@ -88,18 +98,18 @@ globber(f, n, g_or_v)
                 searching delay is too long, and unexpected in the
                 middle of a command.  */
 
-	mlwrite("action to perform on each matching line: ");
+	mlprompt("action to perform on each matching line: ");
 	/* and now get the name of, and then the function to execute */
 	cfp = NULL;
 	fnp = kbd_engl();
 	if (!fnp || !fnp[0]) {
-	        mlwrite("[No function]");
+	        mlforce("[No function]");
 		return FALSE;
 	} else if (!(cfp = engl2fnc(fnp))) {
-	        mlwrite("[No such function]");
+	        mlforce("[No such function]");
 		return FALSE;
 	} else if ((cfp->c_flags & GLOBOK) == 0) {
-	        mlwrite("[Function not allowed]");
+	        mlforce("[Function not allowed]");
 		return FALSE;
 	}
 	

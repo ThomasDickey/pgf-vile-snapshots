@@ -4,7 +4,45 @@
 	written 1986 by Daniel Lawrence
  *
  * $Log: eval.c,v $
- * Revision 1.11  1991/10/22 14:10:07  pgf
+ * Revision 1.23  1992/02/17 09:01:16  pgf
+ * took out unused vars for saber
+ *
+ * Revision 1.22  1992/01/05  00:06:13  pgf
+ * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
+ * often.  also normalized message appearance somewhat.
+ *
+ * Revision 1.21  1992/01/03  23:31:49  pgf
+ * use new ch_fname() to manipulate filenames, since b_fname is now
+ * a malloc'ed sting, to avoid length limits
+ *
+ * Revision 1.20  1991/12/24  09:18:47  pgf
+ * added current/change directory support  (Dave Lemke's changes)
+ *
+ * Revision 1.19  1991/11/27  10:09:09  pgf
+ * bug fix, from pete
+ *
+ * Revision 1.18  1991/11/13  20:09:27  pgf
+ * X11 changes, from dave lemke
+ *
+ * Revision 1.17  1991/11/08  13:19:01  pgf
+ * lint cleanup
+ *
+ * Revision 1.16  1991/11/04  14:18:09  pgf
+ * use lsprintf in itoa
+ *
+ * Revision 1.15  1991/11/03  17:36:13  pgf
+ * picky saber change
+ *
+ * Revision 1.14  1991/11/01  14:38:00  pgf
+ * saber cleanup
+ *
+ * Revision 1.13  1991/10/28  14:25:06  pgf
+ * eliminated some variables that are now buffer-values
+ *
+ * Revision 1.12  1991/10/24  13:05:52  pgf
+ * conversion to new regex package -- much faster
+ *
+ * Revision 1.11  1991/10/22  14:10:07  pgf
  * more portable #if --> #ifdef
  *
  * Revision 1.10  1991/09/26  13:12:04  pgf
@@ -65,7 +103,6 @@ char *gtfun(fname)	/* evaluate a function */
 char *fname;		/* name of function to evaluate */
 {
 	register int fnum;		/* index to function to eval */
-	register int status;		/* return status */
 	char arg1[NSTRING];		/* value of first argument */
 	char arg2[NSTRING];		/* value of second argument */
 	char arg3[NSTRING];		/* value of third argument */
@@ -90,17 +127,17 @@ char *fname;		/* name of function to evaluate */
 
 	/* if needed, retrieve the first argument */
 	if (funcs[fnum].f_type >= MONAMIC) {
-		if ((status = macarg(arg1)) != TRUE)
+		if (macarg(arg1) != TRUE)
 			return(errorm);
 
 		/* if needed, retrieve the second argument */
 		if (funcs[fnum].f_type >= DYNAMIC) {
-			if ((status = macarg(arg2)) != TRUE)
+			if (macarg(arg2) != TRUE)
 				return(errorm);
 	
 			/* if needed, retrieve the third argument */
 			if (funcs[fnum].f_type >= TRINAMIC)
-				if ((status = macarg(arg3)) != TRUE)
+				if (macarg(arg3) != TRUE)
 					return(errorm);
 		}
 	}
@@ -152,8 +189,7 @@ char *fname;		/* name of function to evaluate */
 #endif
 		case UFBIND:	return(prc2engl(arg1));
 	}
-
-	exit(-11);	/* never should get here */
+	return errorm;
 }
 
 char *gtusr(vname)	/* look up a user var's value */
@@ -182,6 +218,10 @@ char *vname;		/* name of environment variable to retrieve */
 {
 	register int vnum;	/* ordinal number of var refrenced */
 	char *getkill();
+	char *current_directory();
+#if X11
+	char	*x_current_fontname(); 
+#endif
 
 	if (!vname[0])
 		return (errorm);
@@ -197,9 +237,6 @@ char *vname;		/* name of environment variable to retrieve */
 
 	/* otherwise, fetch the appropriate value */
 	switch (vnum) {
-#ifdef BEFORE
-		case EVFILLCOL:	return(itoa(fillcol));
-#endif
 		case EVPAGELEN:	return(itoa(term.t_nrow + 1));
 		case EVCURCOL:	return(itoa(getccol(FALSE)));
 		case EVCURLINE: return(itoa(getcline()));
@@ -212,8 +249,6 @@ char *vname;		/* name of environment variable to retrieve */
 		case EVDEBUG:	return(ltos(macbug));
 		case EVSTATUS:	return(ltos(cmdstatus));
 		case EVPALETTE:	return(palstr);
-		case EVASAVE:	return(itoa(gasave));
-		case EVACOUNT:	return(itoa(gacount));
 		case EVLASTKEY: return(itoa(lastkey));
 		case EVCURCHAR:
 			return(is_at_end_of_line(DOT) ? itoa('\n') :
@@ -238,8 +273,12 @@ char *vname;		/* name of environment variable to retrieve */
 #endif
 		case EVLWIDTH:	return(itoa(llength(DOT.l)));
 		case EVLINE:	return(getctext());
+		case EVDIR:	return(current_directory());
+#if X11
+		case EVFONT:	return(x_current_fontname());
+#endif
 	}
-	exit(-12);	/* again, we should never get here */
+	return errorm;
 }
 
 char *getkill()		/* return some of the contents of the kill buffer */
@@ -265,16 +304,10 @@ char *getkill()		/* return some of the contents of the kill buffer */
 }
 
 int setvar(f, n)		/* set a variable */
-
 int f;		/* default flag */
 int n;		/* numeric arg (can overide prompted value) */
-
 {
 	register int status;	/* status return */
-#if	DEBUGM
-	register char *sp;	/* temp string pointer */
-	register char *ep;	/* ptr to end of outline */
-#endif
 	VDESC vd;		/* variable num/type */
 	static char var[NVSIZE+1];	/* name of variable to fetch */
 	char value[NSTRING];	/* value to set variable to */
@@ -294,7 +327,7 @@ int n;		/* numeric arg (can overide prompted value) */
 	
 	/* if its not legal....bitch */
 	if (vd.v_type == -1) {
-		mlwrite("%%No such variable as '%s'", var);
+		mlforce("[No such variable as '%s']", var);
 		return(FALSE);
 	}
 
@@ -330,26 +363,9 @@ int n;		/* numeric arg (can overide prompted value) */
 		strcat(outline, value);
 		strcat(outline, ")))");
 
-		/* expand '%' to "%%" so mlwrite wont bitch */
-		sp = outline;
-		while (*sp)
-			if (*sp++ == '%') {
-				/* advance to the end */
-				ep = --sp;
-				while (*ep++)
-					;
-				/* null terminate the string one out */
-				*(ep + 1) = 0;
-				/* copy backwards */
-				while(ep-- > sp)
-					*(ep + 1) = *ep;
-
-				/* and advance sp past the new % */
-				sp += 2;					
-			}
 
 		/* write out the debug line */
-		mlforce(outline);
+		mlforce("%s",outline);
 		update(TRUE);
 
 		/* and get the keystroke to hold the output */
@@ -455,10 +471,6 @@ char *value;	/* value to set to */
 	case TKENV: /* set an environment variable */
 		status = TRUE;	/* by default */
 		switch (vnum) {
-#ifdef BEFORE
-		case EVFILLCOL: fillcol = atoi(value);
-				break;
-#endif
 		case EVCURCOL:	status = gotocol(TRUE,atoi(value));
 				break;
 		case EVCURLINE:	status = gotoline(TRUE, atoi(value));
@@ -473,7 +485,7 @@ char *value;	/* value to set to */
 		case EVCBUFNAME:strcpy(curbp->b_bname, value);
 				curwp->w_flag |= WFMODE;
 				break;
-		case EVCFNAME:	strcpy(curbp->b_fname, value);
+		case EVCFNAME:	ch_fname(curbp, value);
 				curwp->w_flag |= WFMODE;
 				break;
 		case EVSRES:	status = TTrez(value);
@@ -485,16 +497,12 @@ char *value;	/* value to set to */
 		case EVPALETTE:	strncpy(palstr, value, 48);
 				spal(palstr);
 				break;
-		case EVASAVE:	gasave = atoi(value);
-				break;
-		case EVACOUNT:	gacount = atoi(value);
-				break;
 		case EVLASTKEY:	lastkey = atoi(value);
 				break;
-		case EVCURCHAR:	ldelete(1, FALSE);	/* delete 1 char */
+		case EVCURCHAR:	ldelete(1L, FALSE);	/* delete 1 char */
 				c = atoi(value);
 				if (c == '\n')
-					lnewline(FALSE, 1);
+					lnewline();
 				else
 					linsert(1, c);
 				backchar(FALSE, 1);
@@ -513,8 +521,6 @@ char *value;	/* value to set to */
 						atoi(value) - getwpos());
 				break;
 		case EVSEARCH:	strcpy(pat, value);
-				rvstrcpy(tap, pat);
-				mcclear();
 				break;
 		case EVREPLACE:	strcpy(rpat, value);
 				break;
@@ -525,6 +531,11 @@ char *value;	/* value to set to */
 		case EVPENDING:	break;
 		case EVLWIDTH:	break;
 		case EVLINE:	putctext(value);
+		case EVDIR:	set_directory(value);
+#if X11
+		case EVFONT:	status = x_setfont(value);
+				break;
+#endif
 		}
 		break;
 	}
@@ -558,11 +569,13 @@ char *st;
 		++st;
 
 	/* scan digits, build value */
-	while ((c = *st++))
+	while (*st) {
+		c = *st++;
 		if (isdigit(c))
 			result = result * 10 + c - '0';
 		else
 			return(0);
+	}
 
 	return(result * sign);
 }
@@ -575,33 +588,9 @@ char *st;
 char *itoa(i)
 int i;	/* integer to translate to a string */
 {
-	register int digit;		/* current digit being used */
-	register char *sp;		/* pointer into result */
-	register int sign;		/* sign of resulting number */
 	static char result[INTWIDTH+1];	/* resulting string */
-
-	/* record the sign...*/
-	sign = 1;
-	if (i < 0) {
-		sign = -1;
-		i = -i;
-	}
-
-	/* and build the string (backwards!) */
-	sp = result + INTWIDTH;
-	*sp = 0;
-	do {
-		digit = i % 10;
-		*(--sp) = '0' + digit;	/* and install the new digit */
-		i = i / 10;
-	} while (i);
-
-	/* and fix the sign */
-	if (sign == -1) {
-		*(--sp) = '-';	/* and install the minus sign */
-	}
-
-	return(sp);
+	lsprintf(result,"%d",i);
+	return result;
 }
 #endif
 
@@ -649,19 +638,22 @@ char *tokn;		/* token to evaluate */
 	register BUFFER *bp;	/* temp buffer pointer */
 	register int blen;	/* length of buffer argument */
 	register int distmp;	/* temporary discmd flag */
-	char pad[20];		/* pad 20 bytes on stack for safety */
-	char buf[NSTRING];	/* string buffer for some returns */
+	int	oclexec;
+	static char buf[NSTRING];/* string buffer for some returns */
 
 	switch (toktyp(tokn)) {
 		case TKNUL:	return("");
 
 		case TKARG:	/* interactive argument */
+				oclexec = clexec;
 				strcpy(tokn, tokval(&tokn[1]));
 				distmp = discmd;	/* echo it always! */
 				discmd = TRUE;
+				clexec = FALSE;
 				status = kbd_string(tokn,
 					   buf, NSTRING, '\n',EXPAND,TRUE);
 				discmd = distmp;
+				clexec = oclexec;
 				if (status == ABORT)
 					return(errorm);
 				return(buf);
@@ -716,6 +708,7 @@ char *tokn;		/* token to evaluate */
 		case TKSTR:	return(tokn+1);
 		case TKCMD:	return(tokn);
 	}
+	return errorm;
 #else
 	return tokn;
 #endif
@@ -723,6 +716,7 @@ char *tokn;		/* token to evaluate */
 
 #if ! SMALLER
 
+/* ARGSUSED */
 gtlbl(tokn)	/* find the line number of the given label */
 char *tokn;	/* label name to find */
 {

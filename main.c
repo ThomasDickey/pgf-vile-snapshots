@@ -14,7 +14,63 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.34  1991/10/22 03:08:45  pgf
+ * Revision 1.51  1992/02/17 08:58:12  pgf
+ * added "showmode" support, and kill registers now hold unsigned chars
+ *
+ * Revision 1.50  1992/01/14  20:24:54  pgf
+ * don't ask for pressreturn() confirmation in quickexit() (ZZ command)
+ *
+ * Revision 1.49  1992/01/10  08:08:28  pgf
+ * added initialization of shiftwidth
+ *
+ * Revision 1.48  1992/01/05  00:06:13  pgf
+ * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
+ * often.  also normalized message appearance somewhat.
+ *
+ * Revision 1.47  1992/01/03  23:31:49  pgf
+ * use new ch_fname() to manipulate filenames, since b_fname is now
+ * a malloc'ed sting, to avoid length limits
+ *
+ * Revision 1.46  1991/11/27  10:09:09  pgf
+ * slight rearrangement of init code, to prevent null filenames in makecurrent
+ *
+ * Revision 1.45  1991/11/16  18:38:58  pgf
+ * changes for better magic mode -- the regexps for sections, paras etc. had
+ * to change
+ *
+ * Revision 1.44  1991/11/13  20:09:27  pgf
+ * X11 changes, from dave lemke
+ *
+ * Revision 1.43  1991/11/07  02:00:32  pgf
+ * lint cleanup
+ *
+ * Revision 1.42  1991/11/06  23:26:27  pgf
+ * recomp the search pattern if set from command line, and
+ * added _fence to chartypes
+ *
+ * Revision 1.41  1991/11/01  14:38:00  pgf
+ * saber cleanup
+ *
+ * Revision 1.40  1991/10/29  14:35:29  pgf
+ * implemented the & commands: substagain
+ *
+ * Revision 1.39  1991/10/29  03:02:55  pgf
+ * rename ctlx? routines to be ...kbd_macro... names, and allowed
+ * for replaying of named registers
+ *
+ * Revision 1.38  1991/10/28  14:25:44  pgf
+ * VAL_ASAVE --> VAL_ASAVECNT
+ *
+ * Revision 1.37  1991/10/27  01:45:10  pgf
+ * set new regex values in global_val_init
+ *
+ * Revision 1.36  1991/10/24  13:05:52  pgf
+ * conversion to new regex package -- much faster
+ *
+ * Revision 1.35  1991/10/23  14:20:53  pgf
+ * changes to fix interactions between dotcmdmode and kbdmode and tungetc
+ *
+ * Revision 1.34  1991/10/22  03:08:45  pgf
  * call cmdlinetag() for command-line tags
  *
  * Revision 1.33  1991/10/20  23:07:56  pgf
@@ -189,16 +245,15 @@ unsigned _stklen = 32768;
 #endif
 
 main(argc, argv)
+int	argc;
 char	*argv[];
 {
 	int    c;		/* command character */
-	int    f;		/* default flag */
-	int    n;		/* numeric repeat count */
-	int	s;
 	register BUFFER *bp;		/* temp buffer pointer */
 	register int	gotafile;	/* filename arg present? */
 	register int	carg;		/* current arg to scan */
 	register int	ranstartup;	/* startup executed flag */
+	int startstat = TRUE;		/* result of running startup */
 	BUFFER *firstbp = NULL; 	/* ptr to first buffer in cmd line */
 	int gotoflag;			/* do we need to goto a line at start? */
 	int helpflag;			/* do we need to goto a line at start? */
@@ -238,8 +293,17 @@ char	*argv[];
 	cryptflag = FALSE;	/* no encryption by default */
 #endif
 
+#if X11
+	x_preparse_args(&argc, &argv);
+#endif
 	/* Parse the command line */
 	for (carg = 1; carg < argc; ++carg) {
+#if X11
+		if (argv[carg][0] == '=') {
+                	x_set_geometry(argv[carg]);
+                        continue;
+                }
+#endif
 
 		/* Process Switches */
 		if (argv[carg][0] == '-') {
@@ -248,6 +312,26 @@ char	*argv[];
 			case 'l':	/* -l for screen lines */
 			case 'L':
 				term.t_nrow = atoi(&argv[carg][2]);
+				break;
+#endif
+#if X11
+			case 'd':
+				if (argv[carg + 1])
+					x_set_dpy(argv[++carg]);
+				else
+					goto usage;
+				break;
+			case 'r':
+			case 'R':
+				x_set_rv();
+				break;
+			case 'f':
+			case 'F':
+				if (argv[carg + 1])
+					x_setfont(argv[++carg]);
+				else
+					goto usage;
+
 				break;
 #endif
 			case 'e':	/* -e for Edit file */
@@ -299,7 +383,7 @@ char	*argv[];
 					else
 						goto usage;
 				}
-				rvstrcpy(tap, pat);
+				gregexp = regcomp(pat, global_b_val(MDMAGIC));
 				break;
 #if TAGS
 			case 't':  /* -t for initial tag lookup */
@@ -322,12 +406,17 @@ char	*argv[];
 			default:	/* unknown switch */
 			usage:
 				fprintf(stderr,
-			"usage: %s -flags files...\n%s%s%s%s%s%s",argv[0],
+			"usage: %s -flags files...\n%s%s%s%s%s%s%s",argv[0],
 			"	-h to get help on startup\n",
 			"	-gNNN or simply +NNN to go to line NNN\n",
 			"	-sstring to search for string\n",
 #if TAGS
 			"	-ttagname to look up a tag\n",
+#else
+			"",
+#endif
+#if X11
+			"	-f fontname\n",
 #else
 			"",
 #endif
@@ -348,7 +437,7 @@ char	*argv[];
 			gline = atoi(&argv[carg][1]);
 		} else if (argv[carg][0]== '@') {
 			/* Process Startup macroes */
-			if (startup(&argv[carg][1]) == TRUE)
+			if ((startstat = startup(&argv[carg][1])) == TRUE)
 				ranstartup = TRUE; /* don't execute .vilerc */
 		} else {
 
@@ -359,8 +448,8 @@ char	*argv[];
 			unqname(bname,FALSE);
 
 			bp = bfind(bname, OK_CREAT, 0);
+			ch_fname(bp, argv[carg]);
 			make_current(bp); /* pull it to the front */
-			strcpy(bp->b_fname, argv[carg]);
 			if (!gotafile) {
 				firstbp = bp;
 				gotafile = TRUE;
@@ -410,10 +499,10 @@ char	*argv[];
 		if (gotafile && strcmp(pathname[0], firstbp->b_bname) == 0) {
 			c = firstbp->b_bname[0];
 			firstbp->b_bname[0] = '[';
-			startup(pathname[0]);
+			startstat = startup(pathname[0]);
 			firstbp->b_bname[0] = c;
 		} else {
-			startup(pathname[0]);
+			startstat = startup(pathname[0]);
 		}
 		ranstartup = TRUE;
 	}
@@ -471,12 +560,15 @@ char	*argv[];
 	}
 
 	update(FALSE);
-	mlwrite(msg);
+	if (startstat == TRUE)  /* else there's probably an error message */
+		mlwrite(msg);
 
 
 	/* process commands */
 	loop();
 
+	/* NOTREACHED */
+	return 0;
 }
 
 /* this is nothing but the main command loop */
@@ -528,7 +620,7 @@ loop()
 		execute(kcod2fnc(c), f, n);
 	        
 		if (bheadp != curbp)
-			mlwrite("BUG: main: bheadp != curbp, bhead name is %s",
+			mlforce("BUG: main: bheadp != curbp, bhead name is %s",
 					 bheadp->b_bname);
 
 		/* stop recording for '.' command */
@@ -542,7 +634,7 @@ char *s;
 {
 	char *ns = malloc(strlen(s)+1);
 	if (ns)
-		strcpy(ns,s);
+		return strcpy(ns,s);
 	else
 		return NULL;
 
@@ -552,6 +644,7 @@ char *s;
 global_val_init()
 {
 	register int i;
+	struct regexval *rp;
 	/* set up so the global value pointers point at the global
 		values.  we never actually use the global pointers
 		directly, but but when buffers get a copy of the
@@ -576,13 +669,41 @@ global_val_init()
 	set_global_b_val(MDDOS,FALSE);	/* dos mode */
 	set_global_b_val(MDAIND,FALSE); /* auto-indent */
 	set_global_b_val(MDSHOWMAT,FALSE);	/* show-match */
+	set_global_b_val(MDSHOWMODE,TRUE);	/* show-mode */
 	set_global_b_val(VAL_TAB, 8);	/* tab stop */
+	set_global_b_val(VAL_SWIDTH, 8); /* shiftwidth */
 	set_global_b_val(VAL_TAGLEN, 0);	/* significant tag length */
 	set_global_b_val(VAL_C_TAB, 8); /* C file tab stop */
-	set_global_b_val(VAL_ASAVE, 256);	/* autosave count */
+	set_global_b_val(VAL_ASAVECNT, 256);	/* autosave count */
 	set_global_b_val_ptr(VAL_CWD, NULL);	/* current directory */
-	set_global_b_val_ptr(VAL_CSUFFIXES, strmalloc("chsCHS")); /* suffixes for C mode */
 	set_global_b_val_ptr(VAL_TAGS, strmalloc("tags")); /* suffixes for C mode */
+
+	/* suffixes for C mode */
+	rp = (struct regexval *)malloc(sizeof (struct regexval));
+	set_global_b_val_rexp(VAL_CSUFFIXES, rp);
+	rp->pat = strmalloc("\\.[chs]$");
+	rp->reg = regcomp(rp->pat, TRUE);
+
+	/* where do paragraphs start? */
+	rp = (struct regexval *)malloc(sizeof (struct regexval));
+	set_global_b_val_rexp(VAL_PARAGRAPHS, rp);
+	rp->pat = 
+		strmalloc("^\\.[ILPQ]P\\|^\\.P[ 	]\\|^\\.LI\\|^\\.[plinb]p\\|^\\.\\?$");
+	rp->reg = regcomp(rp->pat, TRUE);
+
+	/* where do sections start? */
+	rp = (struct regexval *)malloc(sizeof (struct regexval));
+	set_global_b_val_rexp(VAL_SECTIONS, rp);
+	rp->pat = strmalloc("^[{\014]\\|^\\.[NS]H\\|^\\.H[ 	U]\\|^\\.[us]h\\|^+c");
+	rp->reg = regcomp(rp->pat, TRUE);
+
+	/* where do sentences start? */
+	rp = (struct regexval *)malloc(sizeof (struct regexval));
+	set_global_b_val_rexp(VAL_SENTENCES, rp);
+	rp->pat = strmalloc(
+	"[.!?][])\"']* \\?$\\|[.!?][])\"']*  \\|^\\.[ILPQ]P\\|\
+^\\.P[ 	]\\|^\\.LI\\|^\\.[plinb]p\\|^\\.\\?$");
+	rp->reg = regcomp(rp->pat, TRUE);
 
 	set_global_w_val(WMDLIST,FALSE); /* list-mode */
 	set_global_w_val(WVAL_SIDEWAYS,0); /* list-mode */
@@ -591,7 +712,7 @@ global_val_init()
 
 }
 
-#if BSD | USG | V7
+#if UNIX
 catchintr()
 {
 	interrupted = TRUE;
@@ -712,6 +833,7 @@ int *cp, *fp, *np;
 int
 execute(execfunc, f, n)
 CMDFUNC *execfunc;		/* ptr to function to execute */
+int f,n;
 {
 	register int status, flags;
 	MARK odot;
@@ -719,9 +841,9 @@ CMDFUNC *execfunc;		/* ptr to function to execute */
 	if (execfunc == NULL) {
 		TTbeep();
 #if REBIND
-		mlwrite("[Key not bound]");	/* complain		*/
+		mlforce("[Key not bound]");	/* complain		*/
 #else
-		mlwrite("[Not a command]");	/* complain		*/
+		mlforce("[Not a command]");	/* complain		*/
 #endif
 		return FALSE;
 	}
@@ -746,12 +868,14 @@ CMDFUNC *execfunc;		/* ptr to function to execute */
 		odot = DOT;
 	}
 
-	status = (execfunc->c_func)(f, n, NULL, NULL);
+	status = (execfunc->c_func)(f, n);
 	if ((flags & GOAL) == 0) { /* goal should not be retained */
 		curgoal = -1;
 	}
+#if VMALLOC
 	if (flags & UNDO)	/* verify malloc arena after line changers */
 		vverify("main");
+#endif
 
 	/* if motion was absolute, and it wasn't just on behalf of an
 		operator, and we moved, update the "last dot" mark */
@@ -765,11 +889,11 @@ CMDFUNC *execfunc;		/* ptr to function to execute */
 
 /* write all _changed_ buffers */
 writeall(f,n)
+int f,n;
 {
 	register BUFFER *bp;	/* scanning pointer to buffers */
 	register BUFFER *oldbp; /* original current buffer */
 	register int status = TRUE;
-	int cnt;
 
 	oldbp = curbp;				/* save in case we fail */
 
@@ -786,20 +910,23 @@ writeall(f,n)
 		bp = bp->b_bufp;	/* on to the next buffer */
 	}
 	make_current(oldbp);
-	sgarbf = TRUE;
 	mlwrite("\n");
-	pressreturn();
+	if (status != TRUE || f == FALSE)
+		pressreturn();
+	sgarbf = TRUE;
 	return status;
 }
 
 /* the vi ZZ command -- write all, then quit */
 zzquit(f,n)
+int f,n;
 {
 	int thiscmd;
 	int cnt;
 
 	thiscmd = lastcmd;
-	if (cnt = anycb()) {
+	cnt = anycb();
+	if (cnt) {
 		mlwrite("Will write %d buffer%c  %s ",
 			cnt, cnt > 1 ? 's':'.',
 			clexec ? "" : "Repeat command to continue.");
@@ -825,6 +952,7 @@ zzquit(f,n)
  * changed do a write on that buffer and exit, otherwise simply exit.
  */
 quickexit(f, n)
+int f,n;
 {
 	if (writeall(TRUE,1) == TRUE)
 		quithard(f, n); 	/* conditionally quit	*/
@@ -832,7 +960,9 @@ quickexit(f, n)
 }
 
 /* Force quit by giving argument */
+/* ARGSUSED */
 quithard(f,n)
+int f,n;
 {
     quit(TRUE,1);
 }
@@ -841,7 +971,9 @@ quithard(f,n)
  * Quit command. If an argument, always quit. Otherwise confirm if a buffer
  * has been changed and not written out.
  */
+/* ARGSUSED */
 quit(f, n)
+int f,n;
 {
 	int cnt;
         
@@ -855,16 +987,18 @@ quit(f, n)
 		exit(GOOD);
 	}
 	if (cnt == 1)
-		mlwrite(
+		mlforce(
 		"There is an unwritten modified buffer.  Write it, or use :q!");
 	else
-		mlwrite(
+		mlforce(
 		"There are %d unwritten modified buffers.  Write them, or use :q!",
 			cnt);
 	return FALSE;
 }
 
+/* ARGSUSED */
 writequit(f,n)
+int f,n;
 {
 	int s;
 	s = filesave(FALSE,n);
@@ -880,6 +1014,10 @@ writequit(f,n)
  */
 dotcmdbegin()
 {
+	/* never record a playback */
+	if (kbdmode == PLAY)
+		return FALSE;
+
 	switch (dotcmdmode) {
 	case TMPSTOP:
 	case PLAY:
@@ -930,8 +1068,11 @@ dotcmdstop()
  * command gets an error. Return TRUE if all ok, else FALSE.
  */
 dotcmdplay(f, n)
+int f,n;
 {
-	if (n <= 0)
+	if (!f)
+		n = 1;
+	else if (n <= 0)
 		return TRUE;
 	dotcmdrep = n;		/* remember how many times to execute */
 	dotcmdmode = PLAY;		/* put us in play mode */
@@ -944,16 +1085,19 @@ dotcmdplay(f, n)
  * Error if not at the top level in keyboard processing. Set up variables and
  * return.
  */
-ctlxlp(f, n)
+/* ARGSUSED */
+kbd_mac_begin(f, n)
+int f,n;
 {
 	if (kbdmode != STOP) {
-		mlwrite("%%Macro already active");
+		mlforce("[Macro already active]");
 		return FALSE;
 	}
 	mlwrite("[Start macro]");
 	kbdptr = &kbdm[0];
 	kbdend = kbdptr;
 	kbdmode = RECORD;
+	kbdplayreg = -1;  /* default buffer */
 	return TRUE;
 }
 
@@ -961,16 +1105,23 @@ ctlxlp(f, n)
  * End keyboard macro. Check for the same limit conditions as the above
  * routine. Set up the variables and return to the caller.
  */
-ctlxrp(f, n)
+/* ARGSUSED */
+kbd_mac_end(f, n)
+int f,n;
 {
 	if (kbdmode == STOP) {
-		mlwrite("%%Macro not active");
+		mlforce("[Macro not active]");
 		return FALSE;
 	}
 	if (kbdmode == RECORD) {
 		mlwrite("[End macro]");
 		kbdmode = STOP;
+		kbdplayreg = -1;  /* default buffer */
+		kbdlim = kbdend;
 	}
+	/* note that if kbd_mode == PLAY, we do nothing -- that makes
+		the '^X-)' at the of the recorded buffer a no-op during
+		playback */
 	return TRUE;
 }
 
@@ -979,17 +1130,34 @@ ctlxrp(f, n)
  * The command argument is the number of times to loop. Quit as soon as a
  * command gets an error. Return TRUE if all ok, else FALSE.
  */
-ctlxe(f, n)
+/* ARGSUSED */
+kbd_mac_exec(f, n)
+int f,n;
 {
 	if (kbdmode != STOP) {
-		mlwrite("%%Macro already active");
+		mlforce("[Macro already active]");
 		return FALSE;
 	}
 	if (n <= 0)
 		return TRUE;
 	kbdrep = n;		/* remember how many times to execute */
 	kbdmode = PLAY; 	/* start us in play mode */
+	kbdplayreg = -1;	/* default playback register */
 	kbdptr = &kbdm[0];	/*    at the beginning */
+	kbdend = kbdlim;
+	dotcmdmode = STOP;
+	return TRUE;
+}
+
+/* ARGSUSED */
+kbd_mac_save(f,n)
+int f,n;
+{
+	register unsigned char *kp;
+	kdelete();
+	for (kp = kbdm; kp < kbdlim; kp++)
+		kinsert(*kp);
+	mlwrite("[Keyboard macro saved.]");
 	return TRUE;
 }
 
@@ -998,14 +1166,16 @@ ctlxe(f, n)
  * Beep the beeper. Kill off any keyboard macro, etc., that is in progress.
  * Sometimes called as a routine, to do general aborting of stuff.
  */
+/* ARGSUSED */
 esc(f, n)
+int f,n;
 {
 	TTbeep();
 	dotcmdmode = STOP;
 	fulllineregions = FALSE;
 	doingopcmd = FALSE;
 	opcmd = 0;
-	mlwrite("[Aborted]");
+	mlforce("[Aborted]");
 	return ABORT;
 }
 
@@ -1015,41 +1185,45 @@ esc(f, n)
 rdonly()
 {
 	TTbeep();
-	mlwrite("[No changes are allowed while in \"view\" mode]");
+	mlforce("[No changes are allowed while in \"view\" mode]");
 	return FALSE;
 }
 
+/* ARGSUSED */
 showversion(f,n)
+int f,n;
 {
-	mlwrite(version);
+	mlforce(version);
 	return TRUE;
 }
 
-unimpl()
+/* ARGSUSED */
+unimpl(f,n)
+int f,n;
 {
 	TTbeep();
-	mlwrite("[Sorry, that vi command is unimplemented in vile ]");
+	mlforce("[Sorry, that vi command is unimplemented in vile ]");
 	return FALSE;
 }
 
-opercopy() { return unimpl(); }
-opermove() { return unimpl(); }
-opertransf() { return unimpl(); }
+opercopy(f,n) int f,n; { return unimpl(f,n); }
+opermove(f,n) int f,n; { return unimpl(f,n); }
+opertransf(f,n) int f,n; { return unimpl(f,n); }
 
-operglobals() { return unimpl(); }
-opervglobals() { return unimpl(); }
+operglobals(f,n) int f,n; { return unimpl(f,n); }
+opervglobals(f,n) int f,n; { return unimpl(f,n); }
 
-map() { return unimpl(); }
-unmap() { return unimpl(); }
+map(f,n) int f,n; { return unimpl(f,n); }
+unmap(f,n) int f,n; { return unimpl(f,n); }
 
-source() { return unimpl(); }
+source(f,n) int f,n; { return unimpl(f,n); }
 
-subst_again() { return unimpl(); }
+visual(f,n) int f,n; { return unimpl(f,n); }
+ex(f,n) int f,n; { return unimpl(f,n); }
 
-visual() { return unimpl(); }
-ex() { return unimpl(); }
-
-nullproc()	/* user function that does (almost) NOTHING */
+/* ARGSUSED */
+nullproc(f,n)	/* user function that does (almost) NOTHING */
+int f,n;
 {
 	return TRUE;
 }
@@ -1142,6 +1316,14 @@ charinit()
 	_chartypes_['.'] |= _linespec;
 	_chartypes_['$'] |= _linespec;
 	_chartypes_['\''] |= _linespec;
+
+	/* fences */
+	_chartypes_['('] |= _fence;
+	_chartypes_[')'] |= _fence;
+	_chartypes_['['] |= _fence;
+	_chartypes_[']'] |= _fence;
+	_chartypes_['{'] |= _fence;
+	_chartypes_['}'] |= _fence;
 
 }
 
@@ -1249,4 +1431,19 @@ dspram()	/* display the amount of RAM currently malloced */
 	movecursor(term.t_nrow, 0);
 }
 #endif
+#endif
+
+#if MALLOCDEBUG
+mallocdbg(f,n)
+{
+	int lvl;
+	lvl = malloc_debug(n);
+	mlwrite("malloc debug level was %d",lvl);
+	if (!f) {
+		malloc_debug(lvl);
+	} else if (n > 2) {
+		malloc_verify();
+	}
+	return TRUE;
+}
 #endif

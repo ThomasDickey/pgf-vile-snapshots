@@ -10,7 +10,10 @@
  *	(pgf, 1989)
  *
  * $Log: vmalloc.c,v $
- * Revision 1.3  1991/10/08 01:30:59  pgf
+ * Revision 1.4  1991/11/01 14:38:00  pgf
+ * saber cleanup
+ *
+ * Revision 1.3  1991/10/08  01:30:59  pgf
  * brought up to date, and ifdef LATER'd some stuff in
  * the accounting section -- doesn't work due to header inclusion
  * problems
@@ -287,6 +290,7 @@ errout()
 }
 
 setvmalloc(f,n)
+int f,n;
 {
 	register struct mtype *mp;
 	int i,num,found;

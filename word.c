@@ -4,7 +4,26 @@
  * do any sentence mode commands, they are likely to be put in this file. 
  *
  * $Log: word.c,v $
- * Revision 1.8  1991/08/09 13:17:52  pgf
+ * Revision 1.14  1991/11/08 13:02:46  pgf
+ * ifdefed unneeded funcs
+ *
+ * Revision 1.13  1991/11/03  17:33:20  pgf
+ * use new lregexec() routine to check for patterns in lines
+ *
+ * Revision 1.12  1991/11/01  14:37:22  pgf
+ * saber cleanup
+ *
+ * Revision 1.11  1991/10/28  14:26:45  pgf
+ * eliminated TABVAL and fillcol macros -- now use curtabval and the VAL_FILL
+ * directly
+ *
+ * Revision 1.10  1991/10/28  01:01:06  pgf
+ * added start offset and end offset to regexec calls
+ *
+ * Revision 1.9  1991/10/27  01:57:45  pgf
+ * changed usage of issecbegin() in formatregion to use regexec instead
+ *
+ * Revision 1.8  1991/08/09  13:17:52  pgf
  * formatregion now restarts with each fresh paragraph, so you can
  * format an entire file at once, without collapsing it all into a
  * single paragraph
@@ -48,7 +67,9 @@
  * back to the end of the word.
  * Returns TRUE on success, FALSE on errors.
  */
-wrapword()
+/* ARGSUSED */
+wrapword(f,n)
+int f,n;
 {
 	register int cnt;	/* size of word wrapped to next line */
 	register int c;		/* charector temporary */
@@ -99,6 +120,7 @@ wrapword()
  */
 
 forwviword(f, n)
+int f,n;
 {
 	int s;
 
@@ -122,6 +144,7 @@ forwviword(f, n)
  * is done by "forwchar". Error if you try and move beyond the buffer's end.
  */
 forwword(f, n)
+int f,n;
 {
 	int s;
 
@@ -145,9 +168,12 @@ forwword(f, n)
  * is done by "forwchar". Error if you try and move beyond the buffer's end.
  */
 forwviendw(f, n)
+int f,n;
 {
 	int s;
-	if (n < 0)
+	if (!f)
+		n = 1;
+	else if (n < 0)
 		return (FALSE);
 	if (forwchar(FALSE, 1) == FALSE)
 		return (FALSE);
@@ -170,9 +196,12 @@ forwviendw(f, n)
  * is done by "forwchar". Error if you try and move beyond the buffer's end.
  */
 forwendw(f, n)
+int f,n;
 {
 	int s;
-	if (n < 0)
+	if (!f)
+		n = 1;
+	else if (n < 0)
 		return (FALSE);
 	if (forwchar(FALSE, 1) == FALSE)
 		return (FALSE);
@@ -196,6 +225,7 @@ forwendw(f, n)
  * move beyond the buffers.
  */
 backviword(f, n)
+int f,n;
 {
 	if (n < 0)
 		return (forwword(f, -n));
@@ -217,6 +247,7 @@ backviword(f, n)
  * move beyond the buffers.
  */
 backword(f, n)
+int f,n;
 {
 	if (n < 0)
 		return (forwword(f, -n));
@@ -232,6 +263,7 @@ backword(f, n)
 	return (forwchar(FALSE, 1));
 }
 
+#ifdef NEEDED
 /*
  * Return TRUE if the character at dot is a character that is considered to be
  * part of a word. The word character list is hard coded. Should be setable.
@@ -251,14 +283,20 @@ inword()
 		return (TRUE);
 	return (FALSE);
 }
+#endif
 
 join(f,n)
+int f,n;
 {
 	register int s;
 	register int doto;
 
-	if (n < 0) return FALSE;
-	if (n == 0) return TRUE;
+	if (!f) {
+		n = 1;
+	} else {
+		if (n < 0) return FALSE;
+		if (n == 0) return TRUE;
+	}
 	if (is_last_line(DOT, curbp))
 		return FALSE;
 	while(n--) {
@@ -267,7 +305,7 @@ join(f,n)
 		if (s == TRUE) s = setmark();
 		if (s == TRUE) s = forwline(f,1);
 		if (s == TRUE) s = firstnonwhite(f,1);
-		if (s == TRUE) s = killregion(f,1);
+		if (s == TRUE) s = killregion();
 		if (s != TRUE)
 			return s ;
 
@@ -285,7 +323,7 @@ join(f,n)
 	return s;
 }
 
-formatregion(f,n)
+formatregion()
 {
 	register int c;			/* current char durring scan	*/
 	register int wordlen;		/* length of current word	*/
@@ -299,6 +337,7 @@ formatregion(f,n)
 	char wbuf[NSTRING];		/* buffer for current word	*/
 	int secondindent;
 	REGION region;
+	regexp *exp;
 	int s;
 	
 	if (!sameline(MK, DOT)) {
@@ -310,9 +349,10 @@ formatregion(f,n)
 	if (pastline != curbp->b_line.l)
 		pastline = lforw(pastline);
 
+	exp = b_val_rexp(curbp,VAL_PARAGRAPHS)->reg;
  	finished = FALSE;
  	while (finished != TRUE) {  /* i.e. is FALSE or SORTOFTRUE */
-		while (issecbeg("\n.","ILPQb")) {
+		while (lregexec(exp, DOT.l, 0, llength(DOT.l)) ) {
 			DOT.l = lforw(DOT.l);
 			if (DOT.l == pastline) {
 				setmark();
@@ -351,7 +391,8 @@ formatregion(f,n)
 				DOT.l = lforw(DOT.l);
 				if (DOT.l == pastline) {
 					finished = TRUE;
-				} else if (issecbeg("\n.","ILPQb")) {
+				} else if (lregexec(exp, DOT.l,
+					0, llength(DOT.l))) {
 					/* we're at a section break */
 					finished = SORTOFTRUE;
 				}
@@ -376,7 +417,7 @@ formatregion(f,n)
 				/* calculate tentative new length
 							with word added */
 				newlength = clength + 1 + wordlen;
-				if (newlength <= fillcol) {
+				if (newlength <= b_val(curbp,VAL_FILL)) {
 					/* add word to current line */
 					if (!firstflag) {
 						/* the space */
@@ -387,9 +428,9 @@ formatregion(f,n)
 					firstflag = FALSE;
 				} else {
 			                if (lnewline() == FALSE ||
-						((i=secondindent/TABVAL)!=0 &&
+					((i=secondindent/curtabval)!=0 &&
 			                	   linsert(i, '\t')==FALSE) ||
-						((i=secondindent%TABVAL)!=0 &&
+					((i=secondindent%curtabval)!=0 &&
 				                   linsert(i,  ' ')==FALSE)) {
 			                        return FALSE;
 			                }

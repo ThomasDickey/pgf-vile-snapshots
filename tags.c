@@ -5,7 +5,24 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: tags.c,v $
- * Revision 1.11  1991/10/22 03:09:32  pgf
+ * Revision 1.16  1992/01/05 00:06:13  pgf
+ * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
+ * often.  also normalized message appearance somewhat.
+ *
+ * Revision 1.15  1991/11/08  13:07:09  pgf
+ * ifdefed out lazy filename matching
+ *
+ * Revision 1.14  1991/11/07  02:00:32  pgf
+ * lint cleanup
+ *
+ * Revision 1.13  1991/11/01  14:38:00  pgf
+ * saber cleanup
+ *
+ * Revision 1.12  1991/10/27  01:53:15  pgf
+ * use global taglen value for command line tags -- there's no current
+ * buffer yet
+ *
+ * Revision 1.11  1991/10/22  03:09:32  pgf
  * tags given on the command line now set the response for further tag commands
  *
  * Revision 1.10  1991/10/20  23:06:43  pgf
@@ -53,10 +70,15 @@
 #endif
 
 static char tagname[NFILEN];
+#ifdef PATH_RELATIVE
+static char tagprefix[NFILEN];
+#endif
 
+
+/* ARGSUSED */
 gototag(f,n)
+int f,n;
 {
-	register int i = 0;
 	register int s = TRUE;
 	int taglen;
 
@@ -77,7 +99,7 @@ cmdlinetag(t)
 char *t;
 {
 	strcpy(tagname,t);
-	return tags(tagname, b_val(curbp,VAL_TAGLEN));
+	return tags(tagname, global_b_val(VAL_TAGLEN));
 }
 
 static BUFFER *tagbp;
@@ -86,7 +108,6 @@ tags(tag,taglen)
 char *tag;
 int taglen;
 {
-	BUFFER *ocurbp;
 	register LINE *lp, *clp;
 	register int i, s;
 	char *tfp, *lplim;
@@ -108,7 +129,7 @@ int taglen;
 	lp = cheap_scan(tagbp, tname, taglen ? taglen : strlen(tname));
 	if (lp == NULL) {
 		TTbeep();
-		mlwrite("No such tag: %s",tname);
+		mlforce("[No such tag: \"%s\"]",tname);
 		return FALSE;
 	}
 	
@@ -119,11 +140,15 @@ int taglen;
 			break;
 
 	i = 0;
+#ifdef PATH_RELATIVE
+	strcpy(tfname, tagprefix);
+	i += strlen(tagprefix);
+#endif
 	while (i < NFILEN && tfp < lplim && *tfp != '\t') {
 		tfname[i++] = *tfp++;
 	}
 	if (tfp >= lplim - 2) {
-		mlwrite("Bad line in tags file.");
+		mlforce("[Bad line in tags file.]");
 		return FALSE;
 	}
 
@@ -146,7 +171,7 @@ int taglen;
 	} else {
 		if (tname[strlen(tname)-1] == '\t')
 			tname[strlen(tname)-1] = '\0'; /* get rid of tab we added */
-		mlwrite("[Tag \"%s\" in current buffer]", tname);
+		mlwrite("Tag \"%s\" in current buffer", tname);
 		changedfile = FALSE;
 	}
 
@@ -156,7 +181,7 @@ int taglen;
 	i = 0;
 	tfp++;  /* skip the tab */
 	if (isdigit(*tfp)) { /* then it's a line number */
-		int lineno = 0;
+		lineno = 0;
 		while (isdigit(*tfp)) {
 			lineno = 10*lineno + *tfp - '0';
 			tfp++;
@@ -175,7 +200,8 @@ int taglen;
 		tagpat[i] = 0;
 		lp = cheap_scan(curbp,tagpat,i);
 		if (lp == NULL) {
-			mlwrite("Tag not present");
+			mlforce("[Tag not present]");
+			TTbeep();
 			if (!changedfile)
 				tossuntag();
 			return FALSE;
@@ -197,6 +223,7 @@ gettagsfile()
 {
 	int s;
 	char *tagsfile;
+	char *strrchr();
 
 	/* is there a "tags" buffer around? */
         if ((tagbp=bfind("tags", NO_CREAT, 0)) == NULL) {
@@ -207,14 +234,14 @@ gettagsfile()
 		/* if it isn't around, don't sweat it */
 		if (tagsfile == NULL)
 		{
-	        	mlwrite("No tags file available.");
+	        	mlforce("[No tags file available.]");
 			return(FALSE);
 		}
 
 		/* find the pointer to that buffer */
 	        if ((tagbp=bfind("tags", NO_CREAT, BFINVS)) == NULL) {
 		        if ((tagbp=bfind(tagf, OK_CREAT, BFINVS)) == NULL) {
-		        	mlwrite("No tags buffer");
+		        	mlforce("[No tags buffer]");
 		                return(FALSE);
 			}
 	        }
@@ -224,7 +251,18 @@ gettagsfile()
 		}
 		strcpy(tagbp->b_bname, "tags");  /* be sure it's named tags */
 		tagbp->b_flag |= BFINVS;
+			
         }
+#ifdef PATH_RELATIVE
+	if (/* b_val(curbp,VAL_RELTAGS) && */
+			tagbp->b_fname[0] != '/' &&
+			strrchr(tagbp->b_fname,'/')) {
+		strcpy(tagprefix, tagbp->b_fname);
+		*(strrchr(tagprefix,'/')+1) = '\0';
+	} else {
+		tagprefix[0] = '\0';
+	}
+#endif
 	return TRUE;
 }
 
@@ -255,8 +293,8 @@ int f,n;
 	MARK odot;
 
 	if (!f) n = 1;
-	while (n-- && popuntag(fname,&lineno))
-		;
+	while (n && popuntag(fname,&lineno))
+		n--;
 	if (lineno && fname[0]) {
 		int s;
 		s = getfile(fname,FALSE);
@@ -273,7 +311,7 @@ int f,n;
 		return s;
 	}
 	TTbeep();
-	mlwrite("No stacked un-tags");
+	mlforce("[No stacked un-tags]");
 	return FALSE;
 }
 
@@ -342,6 +380,7 @@ tossuntag()
 
 }
 
+#ifdef LAZINESS
 BUFFER *filesbp;
 
 
@@ -351,10 +390,9 @@ BUFFER *filesbp;
  */
 makeflist()
 {
-	register LINE *tlp, *flp;
+	register LINE *tlp;
 	register char *fnp;
 	register int i;
-	register int len;
 	char fname[NFILEN];
 	char *strchr();
 
@@ -378,8 +416,8 @@ makeflist()
 	while (tlp != tagbp->b_line.l) {
 		/* skip the tagname */
 		i = 0;
-		while (i < llength(tlp) && lgetc(tlp,i++) != '\t')
-			;
+		while (i < llength(tlp) && lgetc(tlp,i) != '\t')
+			i++;
 		/* we're going to store the pathnames reversed, so that
 			the sorting puts all directories together (they'll
 			all start with their trailing slash) and all 
@@ -400,7 +438,8 @@ makeflist()
 							TRUE, NULL) == NULL)
 			return FALSE;
 
-		if (fnp = strchr(fnp, '/')) { /* first (really last) slash */
+		/* first (really last) slash */
+		if ((fnp = strchr(fnp, '/')) != NULL) {
 			/* insert the directory name into the file list again */
 			if (sortsearch(fnp, &fname[NFILEN-1]-fnp, filesbp,
 							TRUE, NULL) == NULL)
@@ -421,7 +460,7 @@ int insert;
 LINE **lpp;
 {
 	LINE *nlp, *lp;
-	register int i, r, cmplen;
+	register int r, cmplen;
 
 	if (lpp == NULL) {
 		lp = lforw(bp->b_line.l);
@@ -457,6 +496,7 @@ LINE **lpp;
 		lp = lforw(lp);
 	}
 }
+#endif
 
 
 #else
