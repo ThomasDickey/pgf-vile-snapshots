@@ -9,7 +9,10 @@
 
 /*
  * $Log: edef.h,v $
- * Revision 1.124  1994/02/11 14:19:45  pgf
+ * Revision 1.125  1994/02/14 15:46:31  pgf
+ * tom's interim post-3.65 changes
+ *
+ * Revision 1.124  1994/02/11  14:19:45  pgf
  * 3.65+
  *
  * Revision 1.123  1994/02/11  14:06:50  pgf
@@ -409,7 +412,7 @@
 decl_uninit( char *prog_arg );		/* argv[0] from main.c */
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version 3.65+");
+decl_init( char version[], "version 3.65a");
 
 decl_init( int slash, '/'); 		/* so DOS can use '\' as path separator */
 

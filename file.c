@@ -6,7 +6,10 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.116  1994/02/07 12:25:45  pgf
+ * Revision 1.117  1994/02/14 15:46:31  pgf
+ * tom's interim post-3.65 changes
+ *
+ * Revision 1.116  1994/02/07  12:25:45  pgf
  * if running under DOS, and there are equal no. of doslines and unixlines,
  * vote in favor of dos-mode, rather than against.
  * new capability to set_dosmode -- if it gets an argument, will clear
@@ -2061,8 +2064,9 @@ ACTUAL_SIG_DECL
 		 || (np = getenv("USER")) != 0) {
 #if HAVE_GETHOSTNAME
 			char hostname[128];
-			gethostname(hostname, 128);
-			hostname[127] = '\0';
+			if (gethostname(hostname, sizeof(hostname)) < 0)
+				(void)strcpy(hostname, "unknown");
+			hostname[sizeof(hostname)-1] = EOS;
 #endif
 			(void)lsprintf(cmd, "%s%s%s%s%s%s%s%s%s%s%s%s%s%s",
 			"(echo To: ", np, ";", "echo Subject: vile died; ",

@@ -10,7 +10,10 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.155  1994/02/11 11:06:07  pgf
+ * Revision 1.156  1994/02/14 15:46:31  pgf
+ * tom's interim post-3.65 changes
+ *
+ * Revision 1.155  1994/02/11  11:06:07  pgf
  * add linux to gethostname(), and made strtol prototype match proto.h
  *
  * Revision 1.154  1994/02/07  12:24:48  pgf
@@ -714,7 +717,7 @@
 
 #endif /* os_chosen */
 
-#if ! LINUX && ! DJGPP && !defined(__CLCC_) && !APOLLO
+#if ! LINUX && ! DJGPP && !defined(__CLCC_) && !defined(__GNUC__) && !APOLLO
     /* there are probably others that don't want/need const defined */
 # define const
 #endif

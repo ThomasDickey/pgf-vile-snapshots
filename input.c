@@ -3,7 +3,10 @@
  *		5/9/86
  *
  * $Log: input.c,v $
- * Revision 1.96  1994/02/11 14:10:47  pgf
+ * Revision 1.97  1994/02/14 15:46:31  pgf
+ * tom's interim post-3.65 changes
+ *
+ * Revision 1.96  1994/02/11  14:10:47  pgf
  * we now return altpoundc for function keys if we're in insertmode.  we
  * also trim the output of tgetc to ensure just 8 bits.
  *
@@ -1387,7 +1390,7 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 		int	EscOrQuo = ((quotef == TRUE) || ((backslashes & 1) != 0));
 
 		/* get a character from the user */
-		c = quotef ? tgetc(TRUE) : kbd_key();
+		c = quotef ? tgetc(TRUE) : kbd_seq();
 
 		/* if we echoed ^V, erase it now */
 		if (quotef) {

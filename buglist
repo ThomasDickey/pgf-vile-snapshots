@@ -413,7 +413,7 @@ xvile: I can't "cut and paste" between two different windows...
 
 --------------------------
 
-pcvile, compiled with djgpp or watcom:
+pcvile, compiled with watcom:
 	screen limited to 25 line mode -- i can't figure out how to
 	get the vga bios info successfully from a 32-bit application.
 
@@ -441,3 +441,15 @@ it ignores the argument?
 what are the symptoms?
 
 -----------------------
+
+Is it possible to bind keys which give a sequence like ^[[5~, that is other
+than ^[O<char.>, longer than 3 chars?
+
+
+---------------------
+
+you can't use ! as a regular expression delimiter, as in:
+	:s!pat!replace!g
+because the parser treats ":s!" as if it's ":q!" or ":w!".
+
+

@@ -4,7 +4,10 @@
 	written 1986 by Daniel Lawrence
  *
  * $Log: eval.c,v $
- * Revision 1.72  1994/02/08 13:23:10  pgf
+ * Revision 1.73  1994/02/14 15:46:31  pgf
+ * tom's interim post-3.65 changes
+ *
+ * Revision 1.72  1994/02/08  13:23:10  pgf
  * fix off-the-end problems related to strncpy
  *
  * Revision 1.71  1994/02/03  19:35:12  pgf
@@ -642,8 +645,7 @@ getkill()		/* return some of the contents of the kill buffer */
 			size = kbs[0].kused;
 		else
 			size = NSTRING - 1;
-		(void)strncpy(value, (char *)(kbs[0].kbufh->d_chunk), size);
-		value[size] = EOS;
+		strncpy(value, (char *)(kbs[0].kbufh->d_chunk), size)[size] = EOS;
 	}
 
 	/* and return the constructed value */
@@ -880,8 +882,7 @@ char *value;	/* value to set to */
 			cmdstatus = stol(value);
 
 		ElseIf( EVPALETTE )
-			(void)strncpy(palstr, value, 48);
-			spal(palstr);
+			spal(strncpy(palstr, value, 48));
 
 		ElseIf( EVLASTKEY )
 			lastkey = atoi(value);
@@ -1100,10 +1101,9 @@ char *tokn;		/* token to evaluate */
 					blen = 0;
 				if (blen > NSTRING)
 					blen = NSTRING;
-				(void)strncpy(buf,
+				strncpy(buf,
 					l_ref(bp->b_dot.l)->l_text + bp->b_dot.o,
-					blen);
-				buf[blen] = EOS;
+					blen)[blen] = EOS;
 
 				/* and step the buffer's line ptr
 					ahead a line */
@@ -1149,8 +1149,7 @@ is_truem(val)
 char *val;
 {
 	char	temp[8];
-	temp[sizeof(temp)-1] = '\0';
-	(void)mklower(strncpy(temp, val, sizeof(temp)-1));
+	mklower(strncpy(temp, val, sizeof(temp)-1))[sizeof(temp)-1] = EOS;
 	return (!strcmp(temp, "yes")
 	   ||   !strcmp(temp, "true")
 	   ||   !strcmp(temp, "t")
@@ -1167,8 +1166,7 @@ is_falsem(val)
 char *val;
 {
 	char	temp[8];
-	temp[sizeof(temp)-1] = '\0';
-	(void)mklower(strncpy(temp, val, sizeof(temp)-1));
+	mklower(strncpy(temp, val, sizeof(temp)-1))[sizeof(temp)-1] = EOS;
 	return (!strcmp(temp, "no")
 	   ||   !strcmp(temp, "false")
 	   ||   !strcmp(temp, "f")

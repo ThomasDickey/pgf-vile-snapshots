@@ -14,7 +14,10 @@
  *
  *
  * $Log: mktbls.c,v $
- * Revision 1.45  1994/02/03 19:35:12  pgf
+ * Revision 1.46  1994/02/14 15:46:31  pgf
+ * tom's interim post-3.65 changes
+ *
+ * Revision 1.45  1994/02/03  19:35:12  pgf
  * tom's changes for 3.65
  *
  * Revision 1.44  1994/01/31  15:08:04  pgf
@@ -167,16 +170,46 @@
 #define	OPT_IFDEF_MODES	1	/* true iff we can ifdef modes */
 
 /* stuff borrowed/adapted from estruct.h */
-#if defined(__TURBOC__) || defined(__WATCOMC__) || defined(__GO32__) || \
-	(defined(__GNUC__) && (defined(apollo) || defined(sun) || \
-	defined(__hpux) || defined(linux)))
+
+/* Note: VAX-C doesn't recognize continuation-line in ifdef lines */
+#ifdef vms
+# define HAS_STDLIB_H 1
+# define ANSI_PROTOS  1
+#endif
+
+	/* pc-stuff */
+#if defined(__TURBOC__) || defined(__WATCOMC__) || defined(__GO32__)
+# define HAS_STDLIB_H 1
+# define ANSI_PROTOS  1
+#endif
+
+	/* unix-stuff */
+#if (defined(__GNUC__) && (defined(apollo) || defined(sun) || defined(__hpux) || defined(linux)))
+# define HAS_STDLIB_H 1
+# define ANSI_PROTOS  1
+#endif
+
+#ifndef HAS_STDLIB_H
+# define HAS_STDLIB_H 0
+#endif
+
+#ifndef ANSI_PROTOS
+# define ANSI_PROTOS 0
+#endif
+
+#if HAS_STDLIB_H
 #include <stdlib.h>
-#define P(param) param
 #else
-#define P(param) ()
 extern char *malloc();
 #endif
 
+#if ANSI_PROTOS
+#define P(param) param
+#else
+#define P(param) ()
+#endif
+
+/*----------------------------------------------------------------------------*/
 #include <stdio.h>
 #include <string.h>
 

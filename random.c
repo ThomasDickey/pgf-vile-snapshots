@@ -3,7 +3,13 @@
  * commands. There is no functional grouping here, for sure.
  *
  * $Log: random.c,v $
- * Revision 1.114  1994/02/07 12:29:29  pgf
+ * Revision 1.116  1994/02/14 15:46:31  pgf
+ * tom's interim post-3.65 changes
+ *
+ * Revision 1.115  1994/02/14  15:14:57  pgf
+ * make catnap work on all NEWDOSCC compiles
+ *
+ * Revision 1.114  1994/02/07  12:29:29  pgf
  * inherit local dos mode from the global mode when undecided,
  * rather than setting it FALSE
  *
@@ -1099,11 +1105,11 @@ int watchinput;
 	lib$wait(&seconds);
 #endif
 
-#if TURBO
+#if NEWDOSCC
 	delay(milli);
 #endif
 
-#if !(UNIX|VMS|TURBO)
+#if !(UNIX|VMS|NEWDOSCC)
 	long i;
 	for (i = 0; i < term.t_pause; i++)
 		;
@@ -1309,8 +1315,7 @@ char	*dir;
     static char prevdir[NFILEN];
     char       exdir[NFILEN];
 #if UNIX
-    char       *cdpath = NULL;
-    char       cdpathcomp[NFILEN];
+    char       *cdpath;
     char       cdpathdir[NFILEN];
 #endif
     char *exdp;
@@ -1344,7 +1349,7 @@ char	*dir;
 	if (!strcmp(exdp, "-"))
 	{
 		if (*prevdir)
-			strcpy(exdp, prevdir);
+			(void) strcpy(exdp, prevdir);
 		else
 		{
 		    mlforce("[No previous directory");
@@ -1353,7 +1358,7 @@ char	*dir;
 	}
 
 	/* Save current directory for subsequent "cd -". */
-	strcpy(prevdir, current_directory(FALSE));
+	(void) strcpy(prevdir, current_directory(FALSE));
 
 	if (chdir(exdp) == 0) {
 		(void)pwd(TRUE,1);
@@ -1361,29 +1366,21 @@ char	*dir;
 		return TRUE;
 	}
 
-#if UNIX
+#if UNIX && PATHLOOK
 	/*
 	** chdir failed.  If the directory name doesn't begin with any of
 	** "/", "./", or "../", get the CDPATH environment variable and check
 	** if the specified directory name is a subdirectory of a
 	** directory in CDPATH.
 	*/
-	if (*exdp != '/' && strncmp(exdp, "./", 3) && strncmp(exdp, "../", 3))
-	{
-		if ((cdpath = getenv("CDPATH")) != 0)
-		{
-			strcpy(cdpathdir, cdpath);
-
-			/* For each colon-separated component in CDPATH */
-			for (cdpath = strtok(cdpathdir, ":"); cdpath;
-				cdpath = strtok(NULL, ":"))
-			{
-				if (chdir(strcat(strcat(strcpy(cdpathcomp,
-					cdpath), "/"), exdp)) == 0) {
-						(void)pwd(TRUE,1);
-						updatelistbuffers();
-						return TRUE;
-				}
+	if (!is_pathname(exdp)
+	 && (cdpath = getenv("CDPATH")) != 0) {
+		/* For each colon-separated component in CDPATH */
+		while ((cdpath = parse_pathlist(cdpath, cdpathdir)) != 0) {
+			if (chdir(pathcat(cdpathdir, cdpathdir, exdp)) == 0) {
+				(void)pwd(TRUE,1);
+				updatelistbuffers();
+				return TRUE;
 			}
 		}
 	}

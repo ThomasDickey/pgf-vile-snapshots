@@ -5,7 +5,10 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: tags.c,v $
- * Revision 1.46  1994/02/03 19:35:12  pgf
+ * Revision 1.47  1994/02/14 15:46:31  pgf
+ * tom's interim post-3.65 changes
+ *
+ * Revision 1.46  1994/02/03  19:35:12  pgf
  * tom's changes for 3.65
  *
  * Revision 1.45  1994/01/03  15:57:34  pgf
@@ -449,7 +452,7 @@ char *name;
 SIZE_T taglen;
 {
 	register LINE *lp,*retlp;
-	int namelen = strlen(name);
+	SIZE_T namelen = strlen(name);
 	int exact = (taglen == 0);
 	int added_tab;
 

@@ -614,8 +614,11 @@ Editor modes
 		leading indent from the previous line in the buffer. (B)
 
 	autosave (as) Automatic file saving.  Writes the file after every
-		256 characters of inserted text.  Other file changes are
-		not counted. (B)
+		'autosavecnt' characters of inserted text.  Other file
+		changes are not counted.  (B)
+
+	autosavecnt (ascnt) How often (after how many inserted characters)
+		will automatic saves take place.  256 by default. (B)
 
 	backspacelimit (bl)  When in insert mode, this controls whether
 		one can backspace past the point at which the insert began. (B)
@@ -1647,7 +1650,7 @@ Differences from vi
 
 		; set paragraph and section r.e.s for speed on C/C++/perl code.
 		set paragraphs=^$
-		set sections=^[{]
+		set sections=^[{^L]
 
 
 	The vi ":map!", and ":abbr" are not supported.

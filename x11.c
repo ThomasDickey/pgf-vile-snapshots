@@ -2,11 +2,14 @@
  * 	X11 support, Dave Lemke, 11/91
  *
  * $Log: x11.c,v $
- * Revision 1.38  1994/02/03 19:35:12  pgf
+ * Revision 1.39  1994/02/14 15:46:31  pgf
+ * tom's interim post-3.65 changes
+ *
+ * Revision 1.38  1994/02/03  19:35:12  pgf
  * tom's changes for 3.65
  *
  * Revision 1.37  1994/01/31  21:37:32  pgf
- * fix the interface to decode_key so it does what i think it was supposed
+ * fix the interface to decoded_key so it does what i think it was supposed
  * to do.  did this in the process of eliminating SPEC from the return
  * value of x_getc() -- it now returns a sequence of #-c for the mapped
  * keys.  we also no longer override a mapping already given to a key by X.
@@ -2517,12 +2520,12 @@ void
 x_working()
 {
 	register TextWindow tw = cur_win;
-	char buffer[100];
+	char buffer[NLINE];
 	XEvent	ev;
 
 	while (XPending(tw->dpy)) {
 		if (XCheckTypedEvent(tw->dpy, KeyPress, &ev)) {
-			int	num = decoded_key(&ev, buffer, 100);
+			int	num = decoded_key(&ev, buffer, sizeof(buffer));
 			if (num >= 0) {
 				if (buffer[0] == intrc) {
 					(void)tb_init(&PasteBuf, abortc);
@@ -2555,7 +2558,7 @@ x_getc()
 	XEvent	ev;
 	static int	num;
 	static int	i;
-	static char buffer[100];
+	static char buffer[NLINE];
 
 	while (1) {
 
@@ -2570,7 +2573,7 @@ x_getc()
 
 		XNextEvent(dpy, &ev);
 		if (ev.type == KeyPress) {
-			if ((num = decoded_key(&ev, buffer, 100)) > 0) {
+			if ((num = decoded_key(&ev, buffer, sizeof(buffer))) > 0) {
 				save_selection(cur_win);
 			    	i = 0;
 				continue;

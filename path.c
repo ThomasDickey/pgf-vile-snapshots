@@ -3,7 +3,10 @@
  *		strings.
  *
  * $Log: path.c,v $
- * Revision 1.21  1994/01/11 17:27:42  pgf
+ * Revision 1.22  1994/02/14 15:46:31  pgf
+ * tom's interim post-3.65 changes
+ *
+ * Revision 1.21  1994/01/11  17:27:42  pgf
  * changed GO32 to DJGPP
  *
  * Revision 1.20  1993/11/04  09:10:51  pgf
@@ -979,6 +982,35 @@ char *	path;
 	  &&	(stat(path, &sb) >= 0)
 	  &&	((sb.st_mode & S_IFMT) == S_IFDIR));
 }
+
+#if (UNIX||MSDOS) && PATHLOOK
+/*
+ * Parse the next entry in a list of pathnames, returning null only when no
+ * more entries can be parsed.
+ */
+char *parse_pathlist(list, result)
+char *list;
+char *result;
+{
+	if (list != NULL && *list != EOS) {
+		register int	len = 0;
+
+		while (*list && (*list != PATHCHR)) {
+			if (len < NFILEN-1)
+				result[len++] = *list;
+			list++;
+		}
+		if (len == 0)	/* avoid returning an empty-string */
+			result[len++] = '.';
+		result[len] = EOS;
+
+		if (*list == PATHCHR)
+			++list;
+	} else
+		list = NULL;
+	return list;
+}
+#endif	/* PATHLOOK */
 
 #if NO_LEAKS
 void

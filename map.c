@@ -3,7 +3,10 @@
  *		6/3/93
  *
  * $Log: map.c,v $
- * Revision 1.11  1994/02/03 19:35:12  pgf
+ * Revision 1.12  1994/02/14 15:46:31  pgf
+ * tom's interim post-3.65 changes
+ *
+ * Revision 1.11  1994/02/03  19:35:12  pgf
  * tom's changes for 3.65
  *
  * Revision 1.10  1993/12/22  15:28:34  pgf
@@ -169,6 +172,8 @@ int	key;
 	return status;
 }
 
+#define relist_mappings()
+
 #if OPT_SHOW_MAPS
 #define MAPS_PREFIX 12
 
@@ -213,6 +218,8 @@ BUFFER *bp;
 	b_clr_obsolete(bp);
 	return show_mapped_chars();
 }
+
+#undef relist_mappings
 
 void
 relist_mappings()
