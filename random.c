@@ -3,7 +3,10 @@
  * commands. There is no functional grouping here, for sure.
  *
  * $Log: random.c,v $
- * Revision 1.90  1993/04/08 14:59:16  pgf
+ * Revision 1.91  1993/04/20 12:18:32  pgf
+ * see tom's 3.43 CHANGES
+ *
+ * Revision 1.90  1993/04/08  14:59:16  pgf
  * moved istring() to insert.c
  *
  * Revision 1.89  1993/04/01  13:06:31  pgf
@@ -326,6 +329,8 @@
 
 #include	"estruct.h"
 #include	"edef.h"
+#include	"glob.h"
+
 #if HAVE_POLL
 # include <poll.h>
 #endif
@@ -368,9 +373,7 @@ char *carg;
 	if ((s=bclear(bp)) != TRUE) /* clear old text (?) */
 		return (s);
 	bp->b_flag |= BFSCRTCH;
-	s = TRUE;
-	if (!s || popupbuff(bp) == FALSE) {
-		mlforce("[Can't list. ]");
+	if (popupbuff(bp) == FALSE) {
 		zotbuf(bp);
 		return (FALSE);
 	}

@@ -72,7 +72,13 @@
 #		here for completeness.
 #
 # $Log: cmdtbl,v $
-# Revision 1.56  1993/04/09 13:35:14  pgf
+# Revision 1.58  1993/04/20 12:18:32  pgf
+# see tom's 3.43 CHANGES
+#
+# Revision 1.57  1993/04/12  19:19:37  pgf
+# added finderrbuf routine
+#
+# Revision 1.56  1993/04/09  13:35:14  pgf
 # take "onamedcmd" out of action
 #
 # Revision 1.55  1993/04/08  15:08:16  pgf
@@ -566,6 +572,9 @@ filter		REDO|UNDO
 finderr		NONE			FINDERR
 	"find-next-error"		!FEWNAMES
 	'^X-^X'
+finderrbuf	NONE			FINDERR
+	"find-next-error-buffer-name"
+	"error-buffer"
 firstbuffer	NONE
 	"rewind"
 firstnonwhite	MOTION
@@ -1102,6 +1111,8 @@ listvars	NONE
 	"showvars"
 showversion	NONE|(EXRCOK)
 	"version"
+showmemory	NONE			TURBO
+	"memory"
 shrinkwind	NONE
 	"shrink-window"			!FEWNAMES
 	'v'

@@ -6,7 +6,10 @@
  * framing, are hard.
  *
  * $Log: basic.c,v $
- * Revision 1.46  1993/04/01 12:53:33  pgf
+ * Revision 1.47  1993/04/20 12:18:32  pgf
+ * see tom's 3.43 CHANGES
+ *
+ * Revision 1.46  1993/04/01  12:53:33  pgf
  * removed redundant includes and declarations
  *
  * Revision 1.45  1993/03/31  19:30:50  pgf
@@ -1001,10 +1004,8 @@ int f,n;
 		
 	if (curbp->b_nmmarks == NULL) {
 		curbp->b_nmmarks = typeallocn(struct MARK,26);
-		if (curbp->b_nmmarks == NULL) {
-			mlforce("[OUT OF MEMORY]");
-			return FALSE;
-		}
+		if (curbp->b_nmmarks == NULL)
+			return no_memory("named-marks");
 		for (i = 0; i < 26; i++) {
 			curbp->b_nmmarks[i] = nullmark;
 		}

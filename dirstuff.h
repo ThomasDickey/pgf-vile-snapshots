@@ -5,7 +5,10 @@
  *	Include this after "estruct.h"
  *
  * $Log: dirstuff.h,v $
- * Revision 1.3  1993/04/02 10:57:41  pgf
+ * Revision 1.4  1993/04/20 12:18:32  pgf
+ * see tom's 3.43 CHANGES
+ *
+ * Revision 1.3  1993/04/02  10:57:41  pgf
  * cleanup of ls-based directory enumeration, and support (unused as yet?)
  * for old-style directories
  *
@@ -43,7 +46,7 @@ typedef	struct	{
 #define USE_LS_FOR_DIRS 0
 #define OLD_STYLE_DIRS 0	/* e.g., pre-SysV.2 14-char names */
 
-#if POSIX
+#if POSIX || TURBO
 # include <dirent.h>
 # define	DIRENT	struct dirent
 #else	/* apollo & other old bsd's */

@@ -4,7 +4,13 @@
 	written 1986 by Daniel Lawrence
  *
  * $Log: eval.c,v $
- * Revision 1.49  1993/04/01 13:06:31  pgf
+ * Revision 1.51  1993/04/21 15:43:05  pgf
+ * folded long line
+ *
+ * Revision 1.50  1993/04/20  12:18:32  pgf
+ * see tom's 3.43 CHANGES
+ *
+ * Revision 1.49  1993/04/01  13:06:31  pgf
  * turbo C support (mostly prototypes for static)
  *
  * Revision 1.48  1993/03/29  11:18:15  pgf
@@ -163,6 +169,7 @@
 #include	"estruct.h"
 #include	"edef.h"
 #include	"nevars.h"
+#include	"glob.h"
 
 #if ! SMALLER
 #if ENVFUNC
@@ -817,14 +824,15 @@ char *tokn;		/* token to evaluate */
 		case TKARG:	/* interactive argument */
 				oclexec = clexec;
 
-				/* clexec = FALSE; * in cline execution - added pjr */
-
 				strcpy(tokn, tokval(&tokn[1]));
 				distmp = discmd;	/* echo it always! */
 				discmd = TRUE;
 				clexec = FALSE;
 				buf[0] = 0;
-				status = kbd_string(tokn, buf, sizeof(buf), '\n', KBD_EXPAND|KBD_QUOTES,no_completion);
+				status = kbd_string(tokn, buf, 
+						sizeof(buf), '\n', 
+						KBD_EXPAND|KBD_QUOTES,
+						no_completion);
 				discmd = distmp;
 				clexec = oclexec;
 

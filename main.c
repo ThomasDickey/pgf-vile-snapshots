@@ -14,7 +14,17 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.105  1993/04/09 13:36:47  pgf
+ * Revision 1.108  1993/04/21 14:38:16  pgf
+ * support for glob mode
+ *
+ * Revision 1.107  1993/04/21  13:51:19  pgf
+ * multiple repeat counts (as in 3d2l) now multiply correctly, and
+ * repeat counts on '.' now take precedence over original counts
+ *
+ * Revision 1.106  1993/04/20  12:18:32  pgf
+ * see tom's 3.43 CHANGES
+ *
+ * Revision 1.105  1993/04/09  13:36:47  pgf
  * made the dummy functions more real, so that prototypes work
  *
  * Revision 1.104  1993/04/08  11:09:27  pgf
@@ -211,7 +221,7 @@
  *
  * Revision 1.47  1992/01/03  23:31:49  pgf
  * use new ch_fname() to manipulate filenames, since b_fname is now
- * a malloc'ed sting, to avoid length limits
+ * a malloc'ed string, to avoid length limits
  *
  * Revision 1.46  1991/11/27  10:09:09  pgf
  * slight rearrangement of init code, to prevent null filenames in makecurrent
@@ -383,6 +393,7 @@
 #define realdef
 #include	"estruct.h"	/* global structures and defines */
 #include	"edef.h"	/* global definitions */
+#include	"glob.h"
 
 extern char *pathname[];	/* startup file path/name array */
 
@@ -404,7 +415,7 @@ int _STKLOW = 0;		/* default is stack above heap (small only) */
 #endif
 
 #if	MSDOS & TURBO
-unsigned _stklen = 32768;
+unsigned _stklen = 32768L;
 #endif
 
 int
@@ -433,19 +444,25 @@ char	*argv[];
 	char ekey[NPAT];		/* startup encryption key */
 #endif
 
+	charinit();		/* character types -- we need these pretty
+					early  */
+
 #if MSDOS
 	slash = '\\';  /* getswitchar() == '/' ? '\\' : '/'; */
-	expand_wild_args(&argc, &argv);
 #else
+#if ST520
+	slash = '\\';
+#else	/* UNIX */
 	slash = '/';
 #endif
-
+#endif
+#if !UNIX
+	expand_wild_args(&argc, &argv);
+#endif
 	prog_arg = argv[0];	/* this contains our only clue to exec-path */
 
 	start_debug_log(argc,argv);
 
-	charinit();		/* character types -- we need these pretty
-					early  */
 	global_val_init();	/* global buffer values */
 
 	if (strcmp(pathleaf(prog_arg), "view") == 0)
@@ -675,9 +692,6 @@ char	*argv[];
 			/* Process an input file */
 
 			/* set up a buffer for this file */
-#if MSDOS
-			(void)glob(argv[carg]);
-#endif
 			makename(bname, argv[carg]);
 			unqname(bname,FALSE);
 
@@ -870,148 +884,6 @@ char	*argv[];
 	return BAD(1);
 }
 
-#if MSDOS
-/*
- * This is a replacement for the usual main routine.  It takes argc and
- * argv, and does wild card expansion on any arguments containing a '*' or
- * '?', and then calls main() with a new argc and argv.  Any errors result
- * in calling main() with the original arguments intact.  Arguments
- * containing wild cards that expand to 0 filenames are deleted.  Arguments
- * without wild cards are passed straight through.
- *
- * Arguments which are preceded by a " or ', are passed straight through. 
- * (cck)
- *
- * (taken from the winc app example of the zortech compiler - pjr)
- */
-
-void
-expand_wild_args(argcp, argvp)
-int *argcp;
-char ***argvp;
-{
-#ifdef FRESHMEM
-	char          **freshmem = NULL;
-	unsigned int    freshmemcount = 0;
-	unsigned int    freshmemmax = 0;
-#endif
-	int oargc;
-	char **oargv;
-
-#ifdef __ZTC__
-	struct FIND    *p;
-#else
-	struct find_t   p;
-	int             j = 0;
-#endif
-
-	int             i, nargc, path_size, nargvmax;
-	char          **nargv, path[FILENAME_MAX + 1], *cp, *end_path;
-
-	oargc = *argcp;
-	oargv = *argvp;
-
-	nargc = 0;
-	nargvmax = 2;		/* dimension of nargv[]		 */
-	if ((nargv = typeallocn(char *, nargvmax)) == NULL) {
-		mlforce("[OUT OF MEMORY]");
-		return;
-	}
-
-	for (i = 0; i < oargc; ++i) {
-		if (nargc + 2 >= nargvmax) {
-			nargvmax = nargc + 2;
-			if ((nargv = typereallocn( char *, nargv, nargvmax))
-						== NULL) {
-				mlforce("[OUT OF MEMORY]");
-				return;
-			}
-		}
-		cp = oargv[i];	/* cck */
-
-		/* if have expandable names */
-		if (!(cp[0] == '"' || cp[0] == '\'') && 
-			(strchr(cp, '*') || strchr(cp, '?'))) {
-			end_path = cp + strlen(cp);
-
-			while (end_path >= cp && *end_path != '\\'
-			       && *end_path != '/' && *end_path != ':')
-				--end_path;
-
-			path_size = 0;
-
-			if (end_path >= cp) {	/* if got a path */
-				path_size = end_path - cp + 1;
-				memcpy(path, cp, path_size);
-			}
-			path[path_size] = 0;
-#ifdef __ZTC__
-			p = findfirst(cp, 0);
-			while (p) {
-				if ((cp = castalloc(char,
-					path_size+strlen(p->name)+1)) == NULL)
-#else
-			j = _dos_findfirst(cp, 0, &p);
-			while (!j) {
-				if ((cp = castalloc(char,
-					path_size+strlen(p.name)+1)) == NULL)
-#endif
-				{
-					mlforce("[OUT OF MEMORY]");
-					return;
-				}
-				strcpy(cp, path);
-
-#ifdef __ZTC__
-				strcat(cp, p->name);
-#else
-				strcat(cp, p.name);
-#endif
-
-				if (nargc + 2 >= nargvmax) {
-					nargvmax = nargc + 2;
-					if ((nargv = (char **) realloc(
-						(char *)nargv,
-						nargvmax * sizeof(char *))
-						) == NULL) {
-						mlforce("[OUT OF MEMORY]");
-						return;
-					}
-				}
-				nargv[nargc++] = cp;
-
-#ifdef FRESHMEM
-				if (freshmemcount >= freshmemmax) {
-					freshmemmax += 4;
-
-					if ((freshmem = (char **) realloc(
-						freshmem, 
-						freshmemmax * sizeof(char *))
-							) == NULL) {
-						mlforce("[OUT OF MEMORY]");
-						return;
-					}
-				}
-				freshmem[freshmemcount++] = cp;
-#endif
-#ifdef __ZTC__
-				p = findnext();
-			}
-#else
-				j = _dos_findnext(&p);
-			}
-#endif
-		} else {
-			nargv[nargc++] = oargv[i];
-		}
-	}
-
-	nargv[nargc] = NULL;
-	*argcp = nargc;
-	*argvp = nargv;
-}
-#endif
-
 void do_num_proc();
 void do_rept_arg_proc();
 
@@ -1057,8 +929,7 @@ loop()
 		f = FALSE;
 		n = 1;
 
-		do_num_proc(&c,&f,&n);
-		do_rept_arg_proc(&c,&f,&n);
+		do_repeats(&c,&f,&n);
 
 		kregflag = 0;
 	        
@@ -1086,8 +957,15 @@ char *s;
 	else
 		return NULL;
 
-}
+} 
 
+int
+no_memory(s)
+char	*s;
+{
+	mlforce("[OUT OF MEMORY] %s", s);
+	return FALSE;
+}
 
 void
 global_val_init()
@@ -1113,6 +991,9 @@ global_val_init()
 	set_global_g_val(GMDDIRC,FALSE); 	/* directory-completion */
 #ifdef GMDTAGSLOOK
 	set_global_g_val(GMDTAGSLOOK,FALSE); 	/* tags-look */
+#endif
+#ifdef GMDHISTORY
+	set_global_g_val(GMDHISTORY,TRUE);
 #endif
 	set_global_g_val(GMDIMPLYBUFF,FALSE); 	/* imply-buffer */
 
@@ -1175,6 +1056,13 @@ global_val_init()
 ^\\.P\\s\\|^\\.LI\\s\\|^\\.[plinb]p\\s\\|^\\.\\?\\s$",
 			TRUE));
 
+#ifdef GMDGLOB
+	set_global_g_val(GMDGLOB, TRUE);
+#endif
+#ifdef GVAL_GLOB
+	set_global_g_val_ptr(GVAL_GLOB, strmalloc("!echo %s"));
+#endif
+
 	set_global_w_val(WMDLIST,FALSE); /* list-mode */
 	set_global_w_val(WVAL_SIDEWAYS,0); /* list-mode */
 	set_global_w_val(WVAL_FCOLOR,7); /* foreground color */
@@ -1207,6 +1095,22 @@ dos_crit_handler()
 }
 #endif
 
+/* handle all repeat counts */
+void
+do_repeats(cp,fp,np)
+int *cp,*fp,*np;
+{
+	do_num_proc(cp,fp,np);
+	do_rept_arg_proc(cp,fp,np);
+	if (dotcmdmode == PLAY) {
+		if (dotcmdarg)	/* then repeats are done by dotcmdcnt */
+			*np = 1;
+	} else {
+		/* then we want to cancel any dotcmdcnt repeats */
+		if (*fp) dotcmdarg = FALSE;
+	}
+}
+
 /* do number processing if needed */
 void
 do_num_proc(cp,fp,np)
@@ -1214,6 +1118,7 @@ int *cp, *fp, *np;
 {
 	register int c, f, n;
 	register int	mflag;
+	register int oldn;
 
 	c = *cp;
 	f = *fp;
@@ -1221,9 +1126,16 @@ int *cp, *fp, *np;
 
 	if (iscntrl(c) || (c & (CTLA|CTLX|SPEC)))
 		return;
+
+	if (f)
+		oldn = n;
+	else
+		oldn = 1;
+	n = 1;
+
 	if ( isdigit(c) && c != '0' ) {
-		f = TRUE;		/* there is a # arg */
-		n = 0;			/* start with a zero default */
+		n = 0;		/* start with a zero default */
+		f = TRUE;	/* there is a # arg */
 		mflag = 1;		/* current minus flag */
 		while (isdigit(c) || (c == '-')) {
 			if (c == '-') {
@@ -1245,7 +1157,7 @@ int *cp, *fp, *np;
 	}
 	*cp = c;
 	*fp = f;
-	*np = n;
+	*np = n * oldn;
 }
 
 /* do ^U-style repeat argument processing -- vile binds this to 'K' */
@@ -1255,17 +1167,24 @@ int *cp, *fp, *np;
 {
 	register int c, f, n;
 	register int	mflag;
+	register int	oldn;
 	c = *cp;
 
 	if (c != reptc) 
 		return;
 
-	f = TRUE;
-	n = 4;				/* with argument of 4 */
+	if (f)
+		oldn = n;
+	else
+		oldn = 1;
+
+	n = 4;		/* start with a 4 */
+	f = TRUE;	/* there is a # arg */
 	mflag = 0;			/* that can be discarded. */
-	mlwrite("arg: 4");
+	mlwrite("arg: %d",n);
 	while (isdigit(c=kbd_seq()) || c==reptc || c=='-'){
 		if (c == reptc)
+			/* wow.  what does this do?  -pgf */
 			if ((n > 0) == ((n*4) > 0))
 				n = n*4;
 			else
@@ -1305,7 +1224,7 @@ int *cp, *fp, *np;
 
 	*cp = c;
 	*fp = f;
-	*np = n;
+	*np = n * oldn;
 }
 
 /* the vi ZZ command -- write all, then quit */
@@ -1800,3 +1719,14 @@ char **av;
 		fprintf(FF,"arg %d: %s\n",i,av[i]);
 #endif
 }
+
+#if TURBO
+int
+showmemory(f,n)
+int	f,n;
+{
+	extern	long	coreleft(void);
+	mlforce("Memory left: %D bytes", coreleft());
+	return TRUE;
+}
+#endif

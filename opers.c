@@ -4,7 +4,11 @@
  * written for vile by Paul Fox, (c)1990
  *
  * $Log: opers.c,v $
- * Revision 1.27  1993/04/01 13:07:50  pgf
+ * Revision 1.28  1993/04/21 13:55:27  pgf
+ * consolidate repeat count processing into single routine in main.c, to
+ * make them multiply correctly
+ *
+ * Revision 1.27  1993/04/01  13:07:50  pgf
  * see tom's 3.40 CHANGES
  *
  * Revision 1.26  1993/03/16  10:53:21  pgf
@@ -149,10 +153,7 @@ char *str;
 			c = kbd_seq();
 
 			/* allow second chance for entering counts */
-			if (f == FALSE) {
-				do_num_proc(&c,&f,&n);
-				do_rept_arg_proc(&c,&f,&n);
-			}
+			do_repeats(&c,&f,&n);
 
 			if (this1key == last1key)
 				cfp = &f_godotplus;
@@ -183,12 +184,7 @@ char *str;
 	/* and execute the motion */
 	status = execute(cfp, f, n);
 
-	if (status != TRUE 
-#ifdef BEFORE
-	||
-	   ( samepoint(pre_op_dot, DOT) && fulllineregions == FALSE)
-#endif
-		) {
+	if (status != TRUE) {
 		doingopcmd = FALSE;
 		fulllineregions = FALSE;
 		mlforce("[Motion failed]");

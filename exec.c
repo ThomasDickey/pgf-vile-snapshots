@@ -4,7 +4,19 @@
  *	written 1986 by Daniel Lawrence	
  *
  * $Log: exec.c,v $
- * Revision 1.46  1993/04/09 13:35:49  pgf
+ * Revision 1.50  1993/04/22 12:18:08  pgf
+ * fixed unterminated comment
+ *
+ * Revision 1.49  1993/04/22  11:13:09  pgf
+ * support for remembering a dotcmd's kreg ( "a. )
+ *
+ * Revision 1.48  1993/04/21  15:44:33  pgf
+ * added check against command being terminated by ' ' in execute_named_cmd()
+ *
+ * Revision 1.47  1993/04/20  12:18:32  pgf
+ * see tom's 3.43 CHANGES
+ *
+ * Revision 1.46  1993/04/09  13:35:49  pgf
  * take "onamedcmd" out of action
  *
  * Revision 1.45  1993/04/01  13:06:31  pgf
@@ -280,7 +292,7 @@ int f, n;
 			if (status == TRUE) {
 				fnp = cspec;
 				c = end_string();
-				if (c != NAMEC && !isreturn(c))
+				if (c != NAMEC && c != ' ' && !isreturn(c))
 					tungetc(c);	/* e.g., !-command */
 				break;
 			} else if (status == SORTOFTRUE) {
@@ -857,6 +869,18 @@ int f,n;
 		}
 	}
 
+	if (dotcmdmode != PLAY) {
+		extern CMDFUNC f_dotcmdplay;
+		/* reset dotcmdkreg on any command where ukb is unspecified.
+			usekreg() does it on the one's where it is specified. */
+		if (execfunc != &f_dotcmdplay && ukb == 0)
+			dotcmdkreg = 0;
+	} else {
+		/* if we _are_ playing, re-use the previously kreg */
+		if (dotcmdkreg != 0)
+			ukb = dotcmdkreg;
+	}
+
 	/* if motion is absolute, remember where we are */
 	if (flags & ABS) {
 		odot = DOT;
@@ -1197,7 +1221,7 @@ BUFFER *bp;	/* buffer to execute */
 	scanpt = NULL;
 	/* scan the buffer to execute, building WHILE header blocks */
 	hlp = bp->b_line.l;
-	lp = hlp->l_fp;
+	lp = lforw(hlp);
 	bp->b_dot.o = 0;
 	while (lp != hlp) {
 		bp->b_dot.l = lp;
@@ -1265,7 +1289,7 @@ failexit:			freewhile(scanpt);
 		}
 
 nxtscan:	/* on to the next line */
-		lp = lp->l_fp;
+		lp = lforw(lp);
 	}
 
 	/* while and endwhile should match! */
@@ -1278,7 +1302,7 @@ nxtscan:	/* on to the next line */
 
 	/* starting at the beginning of the buffer */
 	hlp = bp->b_line.l;
-	lp = hlp->l_fp;
+	lp = lforw(hlp);
 	while (lp != hlp) {
 		bp->b_dot.l = lp;
 		/* allocate eline and copy macro line to it */
@@ -1387,10 +1411,10 @@ nxtscan:	/* on to the next line */
 				lputc(mp, i, eline[i]);
 	
 			/* attach the line to the end of the buffer */
-	       		bstore->b_line.l->l_bp->l_fp = mp;
-			mp->l_bp = bstore->b_line.l->l_bp;
-			bstore->b_line.l->l_bp = mp;
-			mp->l_fp = bstore->b_line.l;
+	       		lforw(lback(bstore->b_line.l)) = mp;
+			lback(mp) = lback(bstore->b_line.l);
+			lback(bstore->b_line.l) = mp;
+			lforw(mp) = bstore->b_line.l;
 			goto onward;
 		}
 	
@@ -1475,7 +1499,7 @@ nxtscan:	/* on to the next line */
 					/* grab label to jump to */
 					(void) token(eline, golabel, EOS);
 					linlen = strlen(golabel);
-					glp = hlp->l_fp;
+					glp = lforw(hlp);
 					while (glp != hlp) {
 						if (*glp->l_text == '*' &&
 						    (strncmp(&glp->l_text[1], golabel,
@@ -1483,7 +1507,7 @@ nxtscan:	/* on to the next line */
 							lp = glp;
 							goto onward;
 						}
-						glp = glp->l_fp;
+						glp = lforw(glp);
 					}
 					mlforce("[No such label \"%s\"]", golabel);
 					freewhile(whlist);
@@ -1521,7 +1545,7 @@ nxtscan:	/* on to the next line */
 					}
 		
 					/* reset the line pointer back.. */
-					lp = whtemp->w_begin->l_bp;
+					lp = lback(whtemp->w_begin);
 					goto onward;
 				}
 
@@ -1563,7 +1587,7 @@ nxtscan:	/* on to the next line */
 
 onward:		/* on to the next line */
 		free(einit);
-		lp = lp->l_fp;
+		lp = lforw(lp);
 	}
 
 #if ! SMALLER

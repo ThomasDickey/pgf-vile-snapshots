@@ -10,7 +10,10 @@
  *	(pgf, 1989)
  *
  * $Log: vmalloc.c,v $
- * Revision 1.9  1993/01/23 13:38:23  foxharp
+ * Revision 1.10  1993/04/20 12:18:32  pgf
+ * see tom's 3.43 CHANGES
+ *
+ * Revision 1.9  1993/01/23  13:38:23  foxharp
  * evar.h is now nevars.h
  *
  * Revision 1.8  1993/01/16  10:43:22  foxharp
@@ -329,8 +332,8 @@ int f,n;
 		for_each_buffer(bp) {
 			LINE *lp;
 			found++; /* for b_linep */
-			for(lp = bp->b_line.l; lp->l_fp != bp->b_line.l;
-								lp = lp->l_fp)
+			for(lp = bp->b_line.l; lforw(lp) != bp->b_line.l;
+								lp = lforw(lp))
 				found++;
 			if (bp->b_nmmarks)
 				found++;

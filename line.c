@@ -11,7 +11,17 @@
  * which means that the dot and mark values in the buffer headers are nonsense.
  *
  * $Log: line.c,v $
- * Revision 1.38  1993/04/01 13:06:31  pgf
+ * Revision 1.41  1993/04/22 11:15:08  pgf
+ * support for letting a dotcmd's kreg override the one originally specified
+ *
+ * Revision 1.40  1993/04/21  13:55:27  pgf
+ * consolidate repeat count processing into single routine in main.c, to
+ * make them multiply correctly
+ *
+ * Revision 1.39  1993/04/20  12:18:32  pgf
+ * see tom's 3.43 CHANGES
+ *
+ * Revision 1.38  1993/04/01  13:06:31  pgf
  * turbo C support (mostly prototypes for static)
  *
  * Revision 1.37  1993/03/25  19:50:58  pgf
@@ -183,12 +193,12 @@ BUFFER *bp;
 	if ((lp = bp->b_freeLINEs) != NULL) {
 		bp->b_freeLINEs = lp->l_nxtundo;
 	} else if ((lp = typealloc(LINE)) == NULL) {
-		mlforce("[OUT OF MEMORY]");
+		(void)no_memory("LINE");
 		return NULL;
 	}
 	lp->l_text = NULL;
 	if (size && (lp->l_text = castalloc(char,size)) == NULL) {
-		mlforce("[OUT OF MEMORY]");
+		(void)no_memory("LINE text");
 		poison(lp, sizeof(*lp));
 		free((char *)lp);
 		return NULL;
@@ -218,7 +228,7 @@ register BUFFER *bp;
 		bp->b_freeLINEs = lp;
 #ifdef POISON
 		/* catch references hard */
-		lp->l_bp = lp->l_bp = (LINE *)1;
+		lback(lp) = lback(lp) = (LINE *)1;
 		lp->l_text = (char *)1;
 		lp->l_size = lp->l_used = -1;
 #endif
@@ -265,44 +275,44 @@ register LINE	*lp;
 
 #if !WINMARK
 	if (MK.l == lp) {
-		MK.l = lp->l_fp;
+		MK.l = lforw(lp);
 		MK.o = 0;
 	}
 #endif
 	for_each_window(wp) {
 		if (wp->w_line.l == lp)
-			wp->w_line.l = lp->l_fp;
+			wp->w_line.l = lforw(lp);
 		if (wp->w_dot.l	== lp) {
-			wp->w_dot.l  = lp->l_fp;
+			wp->w_dot.l  = lforw(lp);
 			wp->w_dot.o  = 0;
 		}
 #if WINMARK
 		if (wp->w_mark.l == lp) {
-			wp->w_mark.l = lp->l_fp;
+			wp->w_mark.l = lforw(lp);
 			wp->w_mark.o = 0;
 		}
 #endif
 #if 0
 		if (wp->w_lastdot.l == lp) {
-			wp->w_lastdot.l = lp->l_fp;
+			wp->w_lastdot.l = lforw(lp);
 			wp->w_lastdot.o = 0;
 		}
 #endif
 	}
 	if (bp->b_nwnd == 0) {
 		if (bp->b_dot.l	== lp) {
-			bp->b_dot.l = lp->l_fp;
+			bp->b_dot.l = lforw(lp);
 			bp->b_dot.o = 0;
 		}
 #if WINMARK
 		if (bp->b_mark.l == lp) {
-			bp->b_mark.l = lp->l_fp;
+			bp->b_mark.l = lforw(lp);
 			bp->b_mark.o = 0;
 		}
 #endif
 #if 0
 		if (bp->b_lastdot.l == lp) {
-			bp->b_lastdot.l = lp->l_fp;
+			bp->b_lastdot.l = lforw(lp);
 			bp->b_lastdot.o = 0;
 		}
 #endif
@@ -314,14 +324,14 @@ register LINE	*lp;
 		for (i = 0; i < 26; i++) {
 			mp = &(bp->b_nmmarks[i]);
 			if (mp->p == lp) {
-				mp->p = lp->l_fp;
+				mp->p = lforw(lp);
 				mp->o = 0;
 			}
 		}
 	}
 #endif
-	lp->l_bp->l_fp = lp->l_fp;
-	lp->l_fp->l_bp = lp->l_bp;
+	lforw(lback(lp)) = lforw(lp);
+	lback(lforw(lp)) = lback(lp);
 }
 
 int
@@ -365,14 +375,14 @@ int n, c;
 		}
 		if ((lp2=lalloc(n,curbp)) == NULL) /* Allocate new line	*/
 			return (FALSE);
-		copy_for_undo(lp1->l_bp); /* don't want preundodot to point
+		copy_for_undo(lback(lp1)); /* don't want preundodot to point
 					   *	at a new line if this is the
 					   *	first change */
-		lp3 = lp1->l_bp;		/* Previous line	*/
-		lp3->l_fp = lp2;		/* Link in		*/
-		lp2->l_fp = lp1;
-		lp1->l_bp = lp2;
-		lp2->l_bp = lp3;
+		lp3 = lback(lp1);		/* Previous line	*/
+		lforw(lp3) = lp2;		/* Link in		*/
+		lforw(lp2) = lp1;
+		lback(lp1) = lp2;
+		lback(lp2) = lp3;
 		for (i=0; i<n; ++i)
 			lp2->l_text[i] = c;
 		curwp->w_dot.l = lp2;
@@ -470,10 +480,10 @@ lnewline()
 		if ((lp2=lalloc(doto,curbp)) == NULL)
 			return (FALSE);
 		/* put lp2 in below lp1 */
-		lp2->l_fp = lp1->l_fp;
-		lp1->l_fp = lp2;
-		lp2->l_fp->l_bp = lp2;
-		lp2->l_bp = lp1;
+		lforw(lp2) = lforw(lp1);
+		lforw(lp1) = lp2;
+		lback(lforw(lp2)) = lp2;
+		lback(lp2) = lp1;
 		tag_for_undo(lp2);
 		for_each_window(wp) {
 			if (wp->w_line.l == lp1)
@@ -497,10 +507,10 @@ lnewline()
 		lp1->l_used -= doto;
 	}
 	/* put lp2 in above lp1 */
-	lp2->l_bp = lp1->l_bp;
-	lp1->l_bp = lp2;
-	lp2->l_bp->l_fp = lp2;
-	lp2->l_fp = lp1;
+	lback(lp2) = lback(lp1);
+	lback(lp1) = lp2;
+	lforw(lback(lp2)) = lp2;
+	lforw(lp2) = lp1;
 	tag_for_undo(lp2);
 	dumpuline(lp1);
 #if ! WINMARK
@@ -670,7 +680,7 @@ int type;
 {
 	static char rline[NSTRING];	/* line to return */
 
-	(void)screen_string(rline, NSTRING, type);
+	(void)screen_string(rline, NSTRING, (CMASK)type);
 	return rline;
 }
 
@@ -730,7 +740,7 @@ ldelnewline()
 		lremove(curbp,lp1);
 		return (TRUE);
 	}
-	lp2 = lp1->l_fp;
+	lp2 = lforw(lp1);
 	/* if the next line is empty, that's "currline\n\n", so we
 		remove the second \n by deleting the next line */
 	/* but never delete the newline on the last non-empty line */
@@ -799,8 +809,8 @@ ldelnewline()
 		}
 	}
 	lp1->l_used += lp2->l_used;
-	lp1->l_fp = lp2->l_fp;
-	lp2->l_fp->l_bp = lp1;
+	lforw(lp1) = lforw(lp2);
+	lback(lforw(lp2)) = lp1;
 	dumpuline(lp1);
 	toss_to_undo(lp2);
 	return (TRUE);
@@ -962,7 +972,12 @@ int f,n;
 	}
 	if (kbm_started(i,FALSE))
 		return FALSE;
-	ukb = i;
+
+	/* if we're playing back dot, let its kreg override */
+	if (dotcmdmode == PLAY && dotcmdkreg != 0)
+		ukb = dotcmdkreg;
+	else
+		ukb = i;
 
 	if (isupper(c))
 		kregflag |= KAPPEND;
@@ -977,10 +992,8 @@ int f,n;
 		c = kbd_seq();
 
 		/* allow second chance for entering counts */
-		if (f == FALSE) {
-			do_num_proc(&c,&f,&n);
-			do_rept_arg_proc(&c,&f,&n);
-		}
+		do_repeats(&c,&f,&n);
+
 		cfp = kcod2fnc(c);
 	}
 

@@ -6,7 +6,10 @@
  * for the display system.
  *
  * $Log: buffer.c,v $
- * Revision 1.56  1993/04/01 13:06:31  pgf
+ * Revision 1.57  1993/04/20 12:18:32  pgf
+ * see tom's 3.43 CHANGES
+ *
+ * Revision 1.56  1993/04/01  13:06:31  pgf
  * turbo C support (mostly prototypes for static)
  *
  * Revision 1.55  1993/03/25  19:50:58  pgf
@@ -370,7 +373,7 @@ BUFFER *find_b_file(fname)
 
 	(void)lengthen_path(strcpy(nfname, fname));
 	for_each_buffer(bp)
-		if (!strcmp(nfname, bp->b_fname))
+		if (same_fname(nfname, bp, FALSE))
 			return bp;
 	return 0;
 }
@@ -699,7 +702,7 @@ int	lockfl;
 	if (global_g_val(GMDIMPLYBUFF)
 	 && curbp != 0
 	 && curbp->b_fname != 0
-	 && strcmp(nfname, curbp->b_fname)
+	 && !same_fname(nfname, curbp, FALSE)
 	 && !isInternalName(fname)) {
 		savebp = curbp;
 		if (!(bp = find_b_file(nfname))) {
@@ -1399,10 +1402,10 @@ int len;
 		return (FALSE);
 	for (i=0; i<ntext; ++i)
 		lputc(lp, i, text[i]);
-	bp->b_line.l->l_bp->l_fp = lp;	     /* Hook onto the end    */
-	lp->l_bp = bp->b_line.l->l_bp;
-	bp->b_line.l->l_bp = lp;
-	lp->l_fp = bp->b_line.l;
+	lforw(lback(bp->b_line.l)) = lp;	/* Hook onto the end    */
+	lback(lp) = lback(bp->b_line.l);
+	lback(bp->b_line.l) = lp;
+	lforw(lp) = bp->b_line.l;
 	if (sameline(bp->b_dot, bp->b_line))  /* If "." is at the end */
 		bp->b_dot.l = lp;	     /* move it to new line  */
 	return (TRUE);
@@ -1455,8 +1458,10 @@ char   *bname;
 	if (cflag == NO_CREAT)	/* don't create it */
 		return NULL;
         
-	if ((bp = typealloc(BUFFER)) == NULL)
+	if ((bp = typealloc(BUFFER)) == NULL) {
+		(void)no_memory("BUFFER");
 		return (NULL);
+	}
 
 	/* these affect lalloc(), below */
 	bp->b_LINEs = NULL;
@@ -1467,6 +1472,7 @@ char   *bname;
 
 	if ((lp=lalloc(0,bp)) == NULL) {
 		free((char *) bp);
+		(void)no_memory("BUFFER head");
 		return (NULL);
 	}
 
@@ -1498,8 +1504,8 @@ char   *bname;
 	bp->b_udstkindx = 0;
 	bp->b_ulinep = NULL;
 	bp->b_last_used = 0;
-	lp->l_fp = lp;
-	lp->l_bp = lp;
+	lforw(lp) = lp;
+	lback(lp) = lp;
         
 	/* append at the end */
 	if (lastb)

@@ -96,7 +96,7 @@ ALLTOOLS = $(MAKFILES)
 
 
 # these are normal editable headers
-HDRS = estruct.h epath.h edef.h proto.h dirstuff.h
+HDRS = estruct.h epath.h edef.h proto.h dirstuff.h glob.h
 
 # these headers are built by the mktbls program from the information in cmdtbl
 # and in modetbl
@@ -108,7 +108,7 @@ ALLHDRS = $(HDRS)
 #  (including tools, like mktbls.c, unused screen drivers, etc.)
 CSRCac = ansi.c at386.c basic.c bind.c buffer.c crypt.c csrch.c
 CSRCde = dg10.c display.c eval.c exec.c externs.c
-CSRCfh = fences.c file.c filec.c fileio.c finderr.c globals.c history.c hp110.c hp150.c
+CSRCfh = fences.c file.c filec.c fileio.c finderr.c glob.c globals.c history.c hp110.c hp150.c
 CSRCim = ibmpc.c input.c insert.c isearch.c line.c main.c modes.c mktbls.c
 CSRCnr = npopen.c opers.c oneliner.c path.c random.c regexp.c region.c
 CSRCst = search.c spawn.c st520.c tags.c tbuff.c tcap.c termio.c tipc.c
@@ -123,7 +123,7 @@ OTHERSRC = z100bios.asm
 
 # text and data files
 TEXTFILES = README CHANGES cmdtbl modetbl vile.hlp buglist revlist \
-	README.X11 vile.com
+	README.X11
 
 ALLSRC = $(CSRC) $(OTHERSRC)
 
@@ -132,14 +132,14 @@ EVERYTHING = $(ALLTOOLS) $(ALLHDRS) $(ALLSRC) $(TEXTFILES) $(SHORTSTUFF)
 
 SRC = main.c $(SCREEN).c basic.c bind.c buffer.c crypt.c \
 	csrch.c display.c eval.c exec.c externs.c fences.c file.c filec.c \
-	fileio.c finderr.c globals.c history.c input.c insert.c isearch.c \
+	fileio.c finderr.c glob.c globals.c history.c input.c insert.c isearch.c \
 	line.c modes.c npopen.c oneliner.c opers.c path.c random.c regexp.c \
 	region.c search.c spawn.c tags.c tbuff.c termio.c undo.c \
 	vmalloc.c window.c word.c wordmov.c
 
 OBJ = main.$O $(SCREEN).$O basic.$O bind.$O buffer.$O crypt.$O \
 	csrch.$O display.$O eval.$O exec.$O externs.$O fences.$O file.$O filec.$O \
-	fileio.$O finderr.$O globals.$O history.$O input.$O insert.$O isearch.$O \
+	fileio.$O finderr.$O glob.$O globals.$O history.$O input.$O insert.$O isearch.$O \
 	line.$O modes.$O npopen.$O oneliner.$O opers.$O path.$O random.$O regexp.$O \
 	region.$O search.$O spawn.$O tags.$O tbuff.$O termio.$O undo.$O \
 	vmalloc.$O window.$O word.$O wordmov.$O
@@ -509,15 +509,22 @@ $(OBJ): estruct.h nemode.h edef.h # proto.h
 
 ALWAYS:
 
+main.$O:	glob.h
 bind.$O:	epath.h
+eval.$O:	glob.h
 filec.$O:	dirstuff.h
 eval.$O:	nevars.h
+glob.$O:	dirstuff.h glob.h
 externs.$O:	nebind.h nename.h nefunc.h
 path.$O:	dirstuff.h
+random.$O:	glob.h
 vmalloc$O:	nevars.h
 
 # $Log: makefile,v $
-# Revision 1.99  1993/04/02 15:23:36  pgf
+# Revision 1.100  1993/04/20 12:18:32  pgf
+# see tom's 3.43 CHANGES
+#
+# Revision 1.99  1993/04/02  15:23:36  pgf
 # more permissible in naming bigshar file
 #
 # Revision 1.98  1993/04/02  11:01:50  pgf

@@ -36,19 +36,18 @@ Getting along with vile
 	and key sequences that are bound to the same function.
 	
 	You needn't type full command names -- type a few characters and
-	hit the space bar to perform command completion.  Type a question
-	mark to display a list of the characters that you would have to
-	type to complete the command.  For example, to complete
+	hit TAB to perform command completion.  Type a question mark to
+	display a list of the characters that you would have to type to
+	complete the command.  For example, to complete
 
 		:unm?			-- you type
 		:unm{a}[pr]		-- you see
 
 	The completion-display shows curly braces around the string that
-	will be supplied by pressing the spacebar, square brackets around
-	characters that you must type to disambiguate the command.
-
-	Name-completion applies as well to mode and environment-variable
-	names.
+	will be supplied by pressing TAB, and square brackets around
+	characters that you must type to make the command unique.
+	(Name-completion applies as well to mode and environment-variable
+	names.)
 
 	If your screen hops around a lot when you scroll, see the "Note on
 	Scrolling" section near the bottom of this file.
@@ -453,7 +452,9 @@ Miscellaneous commands
 		For example, "-!cc -c junk.c" puts all of the compiler output
 		into the buffer named "[Output]".  Repeatedly hitting ^X-^X 
 		will position the editor at each error in turn, and will
-		eventually start over again at the top.  The "Entering directory
+		eventually start over again at the top.  The buffer searched
+		for "errors" will be the last shell command run, or the buffer
+		named with the "error-buffer" command.  The "Entering directory
 		XXX" and "Leaving directory XXX" messages that GNU make puts
 		out with the -w switch are honored, so that files are found
 		with the correct path.  (Tip: I use the following
@@ -579,6 +580,23 @@ Editor modes
 
 	fillcol (fc) Will prompt for a new value for the fill column, where
 		auto-wrapping and region formatting will break lines. (B)
+
+	glob	Controls how wildcard characters (e.g., '*' and '?') are
+		treated in prompts for filenames.  Set glob to 'off' to
+		disable expansion, to 'on' to use the internal globber. 
+		The internal globber will handle *, ?, [a-z] style ranges,
+		and environment variables.
+
+		On UNIX, set glob to a pipe command to use that command to
+		expand more wildcards.  The default value of glob on UNIX is
+		"!echo %s".  If set to a command that will separate filenames
+		with newlines or nulls rather than spaces, then filenames
+		containing spaces may be more easily edited.  ("!/bin/ls -d %s"
+		is one possibility, "!glob %s" is another if you use csh.) (U).
+
+	history (hi) When true (the default), commands from the :-line are
+		logged in a buffer [History].  Turning this off causes the
+		buffer to be removed.  (U)
 
 	horizscroll (hs) If the cursor is moved "off-screen", this mode
 		controls what happens.  If set (as it is by default), the

@@ -8,8 +8,14 @@
  * Major extensions for vile by Paul Fox, 1991
  *
  *	$Log: modes.c,v $
- *	Revision 1.13  1993/04/01 13:06:31  pgf
- *	turbo C support (mostly prototypes for static)
+ *	Revision 1.15  1993/04/21 14:37:52  pgf
+ *	special cases for validating glob strings
+ *
+ * Revision 1.14  1993/04/20  12:18:32  pgf
+ * see tom's 3.43 CHANGES
+ *
+ * Revision 1.13  1993/04/01  13:06:31  pgf
+ * turbo C support (mostly prototypes for static)
  *
  * Revision 1.12  1993/03/16  10:53:21  pgf
  * see 3.36 section of CHANGES file
@@ -66,6 +72,9 @@ static	int	listvalueset P(( char *, int, struct VALNAMES *, struct VAL *, struct
 static	void	makemodelist P(( int, char * ));
 static	int	string_to_bool P(( char *, int * ));
 static	int	string_to_number P(( char *, int * ));
+#if defined(GMD_GLOB) || defined(GVAL_GLOB)
+static	int	legal_glob_mode P(( char * ));
+#endif
 static	int	adjvalueset P(( char *, int, struct VALNAMES *, int, struct VAL * ));
 static	int	mode_complete P(( int, char *, int * ));
 static	int	mode_eol P(( char *, int, int, int ));
@@ -74,11 +83,11 @@ static	int	adjustmode P(( int, int ));
 
 static	char	*cname[] = {	/* names of colors */
 #if	NeWS
-	"WHITE", "RED",     "GREEN", "YELLOW",
-	"BLUE",  "MAGENTA", "CYAN",  "BLACK"
+	"white", "red",     "green", "yellow",
+	"blue",  "magenta", "cyan",  "black"
 #else
-	"BLACK", "RED",     "GREEN", "YELLOW",
-	"BLUE",  "MAGENTA", "CYAN",  "WHITE"
+	"black", "red",     "green", "yellow",
+	"blue",  "magenta", "cyan",  "white"
 #endif
 	};
 
@@ -285,6 +294,12 @@ struct VAL *values, *globvalues;
 	return TRUE;
 }
 
+#ifdef lint
+/*ARGSUSED*/ WINDOW *ptr2WINDOW(p) char *p; { return 0; }
+#else
+#define	ptr2WINDOW(p)	(WINDOW *)p
+#endif
+
 /* list the current modes into the current buffer */
 /* ARGSUSED */
 static
@@ -297,7 +312,7 @@ void	makemodelist(dum1,ptr)
 			ww[] = "Window";
 	int	nflag;
 
-	register WINDOW *localwp = (WINDOW *)ptr;  /* alignment okay */
+	register WINDOW *localwp = ptr2WINDOW(ptr);  /* alignment okay */
 	register BUFFER *localbp = localwp->w_bufp;
 
 	bprintf("--- \"%s\" settings, if different than globals %*P\n",
@@ -505,6 +520,46 @@ int	*np;
 }
 
 /*
+ * Validate a 'glob' mode-value.  It is either a boolean, or it must be a
+ * pipe-expression with exactly one "%s" embedded (no other % characters,
+ * unless escaped).  That way, we can use the string to format the pipe
+ * command.
+ */
+#if defined(GMD_GLOB) || defined(GVAL_GLOB)
+static int
+legal_glob_mode(base)
+char	*base;
+{
+#ifdef GVAL_GLOB	/* string */
+	if (isShellOrPipe(base)) {
+		register char	*s = base;
+		int	count = 0;
+		while (*s != EOS) {
+			if (*s == '%') {
+				if (*++s != '%') {
+					if (*s == 's')
+						count++;
+					else
+						count = 2;
+				}
+			}
+			if (*s != EOS)
+				s++;
+		}
+		if (count == 1)
+			return TRUE;
+	}
+#endif
+	if (!strcmp(base, "off")
+	 || !strcmp(base, "on"))
+	 	return TRUE;
+
+	mlforce("[Illegal value for glob: '%s']", base);
+	return FALSE;
+}
+#endif
+
+/*
  * Lookup the mode named with 'cp[]' and adjust its value.
  */
 static int
@@ -564,6 +619,11 @@ register struct VAL *values;
 			if (!string_to_bool(rp, &kind))
 				return FALSE;
 		}
+#if defined(GMD_GLOB) || defined(GVAL_GLOB)
+		if (!strcmp(names->name, "glob")
+		 && !legal_glob_mode(rp))
+		 	return FALSE;
+#endif
 	} else
 		hst_glue(' ');
 
@@ -584,6 +644,7 @@ register struct VAL *values;
 
 	case VALTYPE_COLOR:
 		nval = -1;
+		(void)mklower(rp);
 		for (i = 0; i < NCOLORS; i++) {
 			if (strcmp(rp, cname[i]) == 0) {
 				nval = i;

@@ -12,7 +12,13 @@
 # The modes are table entries in the BUFFER and WINDOW structures.
 #
 # $Log: modetbl,v $
-# Revision 1.7  1993/04/08 11:09:27  pgf
+# Revision 1.9  1993/04/21 14:36:56  pgf
+# added VAL_GLOB
+#
+# Revision 1.8  1993/04/20  12:18:32  pgf
+# see tom's 3.43 CHANGES
+#
+# Revision 1.7  1993/04/08  11:09:27  pgf
 # implemented horizscroll mode
 #
 # Revision 1.6  1993/03/18  17:40:31  pgf
@@ -43,11 +49,14 @@ bool						# GMD prefix
 	"AutoBuffer"	ABUFF 		0	# auto-buffer (lru)
 	"dirc"		DIRC		0	# directory-completion (slow!)
 	"Alt-TabPos"	ALTTABPOS	0	# emacs-style cursor positioning
+	"HIstory"	HISTORY		0	# command-history
 	"ImplyBuffer"	IMPLYBUFF 	0	# imply-buffer (vi-like)
 #?	"LookTags"	TAGSLOOK	0	# use tags to find files
 	"SameBangs"	SAMEBANGS	0	# use same "!!" data for ^X-!
 regex						# VAL_ prefix
 	"C-SUFfixes"	CSUFFIXES	0
+string						# VAL_ prefix
+	"glob"		GLOB		0
 
 .buffers
 bool						# MD prefix

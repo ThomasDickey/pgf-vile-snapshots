@@ -3,7 +3,10 @@
  * the knowledge about files are here.
  *
  * $Log: fileio.c,v $
- * Revision 1.40  1993/04/02 11:01:07  pgf
+ * Revision 1.41  1993/04/20 12:18:32  pgf
+ * see tom's 3.43 CHANGES
+ *
+ * Revision 1.40  1993/04/02  11:01:07  pgf
  * use < > instead of " " on system includes.
  *
  * Revision 1.39  1993/04/01  13:07:50  pgf
@@ -160,6 +163,18 @@
 #endif
 #endif
 
+/* on MS-DOS we have to open files in binary mode to see the ^Z characters. */
+
+#if MSDOS
+#define	FOPEN_READ	"rb"
+#define	FOPEN_WRITE	"wb"
+#define	FOPEN_APPEND	"ab"
+#else
+#define	FOPEN_READ	"r"
+#define	FOPEN_WRITE	"w"
+#define	FOPEN_APPEND	"a"
+#endif
+
 FILE	*ffp;		/* File pointer, all functions. */
 int fileispipe;
 int eofflag;		/* end-of-file flag */
@@ -194,7 +209,7 @@ char    *fn;
 	if (isShellOrPipe(fn)) {
 		ffp = 0;
 #if UNIX
-	        ffp = npopen(fn+1, "r");
+	        ffp = npopen(fn+1, FOPEN_READ);
 #endif
 #if VMS
 	        ffp = vms_rpipe(fn+1, 0, (char *)0);
@@ -206,7 +221,7 @@ char    *fn;
 		fileispipe = TRUE;
 		count_fline = 0;
 
-	} else if ((ffp=fopen(fn, "r")) == NULL) {
+	} else if ((ffp=fopen(fn, FOPEN_READ)) == NULL) {
 #if UNIX
 		extern	int	errno;
 		if (errno != ENOENT)
@@ -230,21 +245,21 @@ char    *fn;
 	char *name;
 
 	if (isShellOrPipe(fn)) {
-	        if ((ffp=npopen(fn+1, "w")) == NULL) {
+	        if ((ffp=npopen(fn+1, FOPEN_WRITE)) == NULL) {
 	                mlforce("[Cannot open pipe for writing]");
 			TTbeep();
 	                return (FIOERR);
 		}
 		fileispipe = TRUE;
 	} else if ((name = is_appendname(fn)) != NULL) {
-		if ((ffp=fopen(name, "a")) == NULL) {
+		if ((ffp=fopen(name, FOPEN_APPEND)) == NULL) {
 			mlforce("[Cannot open file for appending]");
 			TTbeep();
 			return (FIOERR);
 		}
 		fileispipe = FALSE;
 	} else {
-	        if ((ffp=fopen(fn, "w")) == NULL) {
+	        if ((ffp=fopen(fn, FOPEN_WRITE)) == NULL) {
 	                mlforce("[Cannot open file for writing]");
 			TTbeep();
 	                return (FIOERR);
@@ -261,12 +276,12 @@ char    *fn;
 		*s = EOS;
 
         if ((fd=creat(fn, 0666, "rfm=var", "rat=cr")) < 0
-        || (ffp=fdopen(fd, "w")) == NULL) {
+        || (ffp=fdopen(fd, FOPEN_WRITE)) == NULL) {
                 mlforce("[Cannot open file for writing]");
                 return (FIOERR);
         }
 #else
-        if ((ffp=fopen(fn, "w")) == NULL) {
+        if ((ffp=fopen(fn, FOPEN_WRITE)) == NULL) {
                 mlforce("[Cannot open file for writing]");
                 return (FIOERR);
         }
@@ -276,24 +291,25 @@ char    *fn;
 }
 
 /* is the file read-only?  true or false */
-/* #if UNIX  / * don't know how to do it for other systems */
 int
 ffronly(fn)
 char    *fn;
 {
-	int fd;
-
 	if (isShellOrPipe(fn)) {
 		return TRUE;
 	} else {
+#if UNIX || VMS
+		return (access(fn, 2) != 0);	/* W_OK==2 */
+#else
+		int fd;
 	        if ((fd=open(fn, O_WRONLY)) < 0) {
 	                return TRUE;
 		}
 		(void)close(fd);
 		return FALSE;
+#endif
 	}
 }
-/* #endif */
 
 #if UNIX || VMS
 long

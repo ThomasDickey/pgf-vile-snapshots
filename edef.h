@@ -9,14 +9,14 @@
 
 /*
  * $Log: edef.h,v $
- * Revision 1.91  1993/04/09 13:51:01  pgf
- * v. 3.42
+ * Revision 1.94  1993/04/22 12:12:58  pgf
+ * dotcmdkreg should be 0 to start
  *
- * Revision 1.90  1993/04/05  10:45:07  pgf
- * v 3.41
+ * Revision 1.93  1993/04/21  14:09:01  pgf
+ * added dotcmdarg and dotcmdkreg (the latter is unused as yet)
  *
- * Revision 1.89  1993/04/02  14:59:56  pgf
- * v 3.40+
+ * Revision 1.92  1993/04/20  12:18:32  pgf
+ * see tom's 3.43 CHANGES
  *
  * Revision 1.88  1993/04/01  13:07:50  pgf
  * see tom's 3.40 CHANGES
@@ -318,18 +318,14 @@
 decl_uninit( char *prog_arg );		/* argv[0] from main.c */
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version 3.42");
+decl_init( char version[], "version 3.43");
 
 decl_init( char slash, '/'); 		/* so DOS can use '\' as path separator */
 
 decl_init( int autoindented , -1);	/* how many chars (not cols) indented */
 decl_uninit( int isnamedcmd );		/* are we typing a command name */
 decl_uninit( int calledbefore );	/* called before during this command? */
-#if !SMALLER
-decl_uninit( long _chartypes_[N_chars] );	/* character types	*/
-#else
-decl_uninit( short _chartypes_[N_chars] );	/* character types	*/
-#endif
+decl_uninit( CMASK _chartypes_[N_chars] );	/* character types	*/
 decl_uninit( int interrupted );		/* interrupt signal?		*/
 decl_uninit( int doing_kbd_read );	/* flag set during keyboard reading */
 decl_uninit( jmp_buf read_jmp_buf );	/* for setjmp/longjmp on SIGINT */
@@ -435,9 +431,11 @@ decl_uninit( int klines );
 
 decl_uninit( WINDOW *swindow );		/* saved window pointer		*/
 #if CRYPT
-decl_init( int cryptflag, FALSE );		/* currently encrypting?	*/
+decl_init( int cryptflag, FALSE );	/* currently encrypting?	*/
 #endif
 decl_init( int dotcmdmode, RECORD );	/* current dot command mode	*/
+decl_init( int dotcmdarg, FALSE);	/* was there an arg to '.'? */
+decl_uninit( int dotcmdkreg);		/* original dot command kill reg */
 decl_init( int	kbdmode, STOP );	/* current keyboard macro mode	*/
 decl_uninit( int seed );		/* random number seed		*/
 decl_uninit( long envram );		/* # of bytes current used malloc */
