@@ -18,10 +18,22 @@ TARGET = vile.exe
 SCRDEF = "VMSVT","scrn_chosen"
 
 # for building the X version, xvile, use these:
-#SCREEN = x11
+#SCREEN = x11simp
 #LIBS = #-lX11
 #TARGET = xvile.exe
 #SCRDEF = "X11","scrn_chosen"
+
+# for building the X-toolkit version:
+#SCREEN = x11
+#LIBS = #-lX11
+#TARGET = xvile.exe
+#SCRDEF = "NO_WIDGETS","XTOOLKIT","X11","scrn_chosen"
+
+# for building the Motif version (untested):
+#SCREEN = x11
+#LIBS = #-lX11
+#TARGET = xvile.exe
+#SCRDEF = "MOTIF_WIDGETS","XTOOLKIT","X11","scrn_chosen"
 
 # if you want the help file (vile.hlp) to go somewhere other than your $PATH
 #  or one of the hard-code paths in epath.h  (it goes to the same place vile
@@ -260,7 +272,10 @@ xvile.com :
 	@ write sys$output "** made $@"
 
 # $Log: descrip.mms,v $
-# Revision 1.12  1994/02/22 11:12:13  pgf
+# Revision 1.13  1994/03/24 12:04:05  pgf
+# new X support
+#
+# Revision 1.12  1994/02/22  11:12:13  pgf
 # truncated RCS log for 4.0
 #
 # Revision 1.11  1994/02/03  19:35:12  pgf

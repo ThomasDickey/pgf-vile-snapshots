@@ -2,7 +2,10 @@
  * 	older, simpler X11 support, Dave Lemke, 11/91
  *
  * $Log: x11simp.c,v $
- * Revision 1.43  1994/03/08 12:31:39  pgf
+ * Revision 1.44  1994/03/24 12:12:45  pgf
+ * arrow/escape key fixes
+ *
+ * Revision 1.43  1994/03/08  12:31:39  pgf
  * changed 'fulllineregions' to 'regionshape'.
  *
  * Revision 1.42  1994/03/02  10:01:23  pgf
@@ -168,7 +171,7 @@ static	void	multi_click P(( TextWindow, int, int ));
 static	void	start_selection P(( TextWindow, XButtonPressedEvent *, int, int ));
 static	XMotionEvent * compress_motion P(( XMotionEvent * ));
 static	void	x_process_event P(( XEvent * ));
-static	int	decoded_key P(( XEvent *, char *, int ));
+static	ALLOC_T	decoded_key P(( XEvent *, char *, int ));
 #if NEEDED
 static	Bool	check_kbd_ev P(( Display *, XEvent *, char * ));
 #endif
@@ -2394,8 +2397,8 @@ x_working()
 
 	while (XPending(tw->dpy)) {
 		if (XCheckTypedEvent(tw->dpy, KeyPress, &ev)) {
-			int	num = decoded_key(&ev, buffer, sizeof(buffer));
-			if (num >= 0) {
+			ALLOC_T	num = decoded_key(&ev, buffer, sizeof(buffer));
+			if (num != 0) {
 				if (buffer[0] == intrc) {
 					(void)tb_init(&PasteBuf, abortc);
 #if VMS
@@ -2425,26 +2428,19 @@ static int
 x_getc()
 {
 	XEvent	ev;
-	static int	num;
-	static int	i;
-	static char buffer[NLINE];
+	ALLOC_T	num;
+	char buffer[NLINE];
 
 	while (1) {
 
 		if (tb_more(PasteBuf))	/* handle any queued pasted text */
 			return tb_next(PasteBuf);
 
-		/* drain whatever the last key gave us */
-		if (num) {
-		    	num--;
-			return buffer[i++];
-		}
-
 		XNextEvent(dpy, &ev);
 		if (ev.type == KeyPress) {
-			if ((num = decoded_key(&ev, buffer, sizeof(buffer))) > 0) {
+			if ((num = decoded_key(&ev, buffer, sizeof(buffer))) != 0) {
 				save_selection(cur_win);
-			    	i = 0;
+				(void)tb_bappend(&PasteBuf, buffer, num);
 				continue;
 			}
 			/* else, could be shift-key, etc. */
@@ -2454,76 +2450,80 @@ x_getc()
 	}
 }
 
-static int
+static ALLOC_T
 decoded_key(ev, buffer, bufsize)
 	XEvent	*ev;
 	char	*buffer;
 	int	bufsize;
 {
 	KeySym	keysym;
-	int	num;
+	register int n, num;
+
+	static struct {
+		KeySym  key;
+		int     code;
+	} escapes[] = {
+		{XK_F11,     ESC},
+		/* Arrow keys */
+		{XK_Up,      SPEC|'A'},
+		{XK_Down,    SPEC|'B'},
+		{XK_Right,   SPEC|'C'},
+		{XK_Left,    SPEC|'D'},
+		/* page scroll */
+		{XK_Next,    SPEC|'n'},
+		{XK_Prior,   SPEC|'p'},
+		/* editing */
+		{XK_Insert,  SPEC|'i'},
+#if (ULTRIX || ultrix)
+		{DXK_Remove, SPEC|'r'},
+#endif
+		{XK_Find,    SPEC|'f'},
+		{XK_Select,  SPEC|'s'},
+		/* command keys */
+		{XK_Menu,    SPEC|'m'},
+		{XK_Help,    SPEC|'h'},
+		/* function keys */
+		{XK_F1,      SPEC|'1'},
+		{XK_F2,      SPEC|'2'},
+		{XK_F3,      SPEC|'3'},
+		{XK_F4,      SPEC|'4'},
+		{XK_F5,      SPEC|'5'},
+		{XK_F6,      SPEC|'6'},
+		{XK_F7,      SPEC|'7'},
+		{XK_F8,      SPEC|'8'},
+		{XK_F9,      SPEC|'9'},
+		{XK_F10,     SPEC|'0'},
+		{XK_F12,     SPEC|'@'},
+		{XK_F13,     SPEC|'#'},
+		{XK_F14,     SPEC|'$'},
+		{XK_F15,     SPEC|'%'},
+		{XK_F16,     SPEC|'^'},
+		{XK_F17,     SPEC|'&'},
+		{XK_F18,     SPEC|'*'},
+		{XK_F19,     SPEC|'('},
+		{XK_F20,     SPEC|')'},
+		/* keypad function keys */
+		{XK_KP_F1,   SPEC|'P'},
+		{XK_KP_F2,   SPEC|'Q'},
+		{XK_KP_F3,   SPEC|'R'},
+		{XK_KP_F4,   SPEC|'S'},
+	};
 
 	num = XLookupString((XKeyPressedEvent *) ev, buffer, bufsize,
 		&keysym, (XComposeStatus *) 0);
 
-	/* if a key is mapped, its data is in the buffer */
-	if (num)
-		return num;
-
-	/* we provide default mappings for unmapped keys */
-
-	/* they're all 'FN-' style bindings, so they all start with
-		the '#' key */
-	buffer[0] = poundc;
-
-	switch (keysym) {
-	/* Arrow keys */
-	case XK_Up:		buffer[1] = 'A';	return 2;
-	case XK_Down:		buffer[1] = 'B';	return 2;
-	case XK_Right:		buffer[1] = 'C';	return 2;
-	case XK_Left:		buffer[1] = 'D';	return 2;
-	/* page scroll */
-	case XK_Next:		buffer[1] = 'n';	return 2;
-	case XK_Prior:		buffer[1] = 'p';	return 2;
-	/* editing */
-	case XK_Insert:		buffer[1] = 'i';	return 2;
-#if (ULTRIX || ultrix)
-	case DXK_Remove:	buffer[1] = 'r';	return 2;
-#endif
-	case XK_Find:		buffer[1] = 'f';	return 2;
-	case XK_Select:		buffer[1] = 's';	return 2;
-	/* command keys */
-	case XK_Menu:		buffer[1] = 'm';	return 2;
-	case XK_Help:		buffer[1] = 'h';	return 2;
-	/* function keys */
-	case XK_F1:		buffer[1] = '1';	return 2;
-	case XK_F2:		buffer[1] = '2';	return 2;
-	case XK_F3:		buffer[1] = '3';	return 2;
-	case XK_F4:		buffer[1] = '4';	return 2;
-	case XK_F5:		buffer[1] = '5';	return 2;
-	case XK_F6:		buffer[1] = '6';	return 2;
-	case XK_F7:		buffer[1] = '7';	return 2;
-	case XK_F8:		buffer[1] = '8';	return 2;
-	case XK_F9:		buffer[1] = '9';	return 2;
-	case XK_F10:		buffer[1] = '0';	return 2;
-	case XK_F11:		buffer[0] = ESC;	return 1;
-	case XK_F12:		buffer[1] = '@';	return 2;
-	case XK_F13:		buffer[1] = '#';	return 2;
-	case XK_F14:		buffer[1] = '$';	return 2;
-	case XK_F15:		buffer[1] = '%';	return 2;
-	case XK_F16:		buffer[1] = '^';	return 2;
-	case XK_F17:		buffer[1] = '&';	return 2;
-	case XK_F18:		buffer[1] = '*';	return 2;
-	case XK_F19:		buffer[1] = '(';	return 2;
-	case XK_F20:		buffer[1] = ')';	return 2;
-	/* keypad function keys */
-	case XK_KP_F1:		buffer[1] = 'P';	return 2;
-	case XK_KP_F2:		buffer[1] = 'Q';	return 2;
-	case XK_KP_F3:		buffer[1] = 'R';	return 2;
-	case XK_KP_F4:		buffer[1] = 'S';	return 2;
+	/* If a key is mapped, its data is in the buffer.  Otherwise, we
+	 * provide default mappings for unmapped keys.
+	 */
+	if (num <= 0) {
+		for (n = 0; n < SIZEOF(escapes); n++) {
+			if (keysym == escapes[n].key) {
+				num = kcod2escape_seq(escapes[n].code, buffer);
+				break;
+			}
+		}
 	}
-
-	return 0;
+	return (num > 0) ? (ALLOC_T)num : 0;
 }
 
 #if NEEDED

@@ -5,7 +5,10 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: tags.c,v $
- * Revision 1.49  1994/02/22 11:03:15  pgf
+ * Revision 1.50  1994/03/18 18:30:38  pgf
+ * fixes for OPT_MAP_MEMORY compilation
+ *
+ * Revision 1.49  1994/02/22  11:03:15  pgf
  * truncated RCS log for 4.0
  *
  */
@@ -143,7 +146,7 @@ int taglen;
 			lineno++;
 #else
 		bsizes(curbp);
-		lineno = DOT.l->l_number;
+		lineno = l_ref(DOT.l)->l_number;
 #endif
 		pushuntag(curbp->b_fname, lineno, tag);
 	}

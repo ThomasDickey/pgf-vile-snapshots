@@ -6,7 +6,13 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.121  1994/02/22 18:02:19  pgf
+ * Revision 1.123  1994/03/23 12:56:02  pgf
+ * gave mlerror a default message
+ *
+ * Revision 1.122  1994/03/18  18:30:38  pgf
+ * fixes for OPT_MAP_MEMORY compilation
+ *
+ * Revision 1.121  1994/02/22  18:02:19  pgf
  * removed ifdefs from the killtilde code
  *
  * Revision 1.120  1994/02/22  11:03:15  pgf
@@ -1006,7 +1012,7 @@ kill_tildes:
 
 	/* and reset the current line-at-top-of-window */
 	if (!same_ptr(lp, win_head(wp)) /* mouse click could be past end */
-	 && lp != wp->w_line.l) {	/* no need to set it if already there */
+	 && !same_ptr(lp, wp->w_line.l)) { /* no need to set it if already there */
 		wp->w_line.l = lp;
 		wp->w_flag |= WFHARD;
 		wp->w_flag &= ~WFFORCE;
@@ -2457,8 +2463,14 @@ mlerror(s)
 char	*s;
 {
 #if UNIX || VMS || NEWDOSCC
+    	char *es;
+
 	if (errno > 0 && errno < sys_nerr)
-		mlforce("[%s: %s]", s, sys_errlist[errno]);
+		es = sys_errlist[errno];
+	else
+		es = "unknown system error";
+
+	mlforce("[Error %s: %s]", s, sys_errlist[errno]);
 #endif
 }
 

@@ -9,7 +9,13 @@
 
 /*
  * $Log: edef.h,v $
- * Revision 1.131  1994/03/11 14:08:06  pgf
+ * Revision 1.133  1994/03/23 13:06:58  pgf
+ * v. 4.2
+ *
+ * Revision 1.132  1994/03/16  19:00:41  pgf
+ * use #define for palette string length
+ *
+ * Revision 1.131  1994/03/11  14:08:06  pgf
  * v. 4.1
  *
  * Revision 1.130  1994/03/11  11:57:40  pgf
@@ -39,7 +45,7 @@
 decl_uninit( char *prog_arg );		/* argv[0] from main.c */
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version 4.1");
+decl_init( char version[], "version 4.2");
 
 decl_init( int slash, '/'); 		/* so DOS can use '\' as path separator */
 
@@ -206,7 +212,7 @@ decl_init( char	truem[], "TRUE" );	/* true literal			*/
 decl_init( char	falsem[], "FALSE" );	/* false literal		*/
 
 decl_init( int	cmdstatus, TRUE );	/* last command status		*/
-decl_uninit( char palstr[49] );		/* palette string		*/
+decl_uninit( char palstr[NSTRING] );	/* palette string		*/
 decl_uninit( char *fline );		/* dynamic return line		*/
 decl_uninit( ALLOC_T flen );		/* current length of fline	*/
 

@@ -34,7 +34,13 @@
  *	  are in-memory can have space allocated from them.
  *
  * $Log: tmp.c,v $
- * Revision 1.7  1994/02/22 11:03:15  pgf
+ * Revision 1.9  1994/03/24 12:45:28  pgf
+ * compiler workaround, from tom (gcc 2.5.5)
+ *
+ * Revision 1.8  1994/03/16  10:55:56  pgf
+ * switch over to cookie method of marking copied lines for undo
+ *
+ * Revision 1.7  1994/02/22  11:03:15  pgf
  * truncated RCS log for 4.0
  *
  *
@@ -785,7 +791,7 @@ SIZE_T	size;
 	LINEPTR	ptr;
 	OFF_T	need	= SizeToSpace(size);
 	register PAGE_T	*this, *prev;
-	register FREE_T	*q;
+	register FREE_T	*q  = 0;
 	register FREE_T	*q0 = 0;
 
 	TRACE1(("\n** allocate %x #%d\n", size, ++count))
@@ -1017,7 +1023,11 @@ LINE *	lp;
 	} else {
 		for_each_page(this,prev) {
 			long	off = ((long)lp - (long)this) - sizeof(FREE_T);
-			if (off >= sizeof(PAGE_T) && (off < NCHUNK)) {
+			/* Note: gcc 2.5.5 on sunos doesn't compare properly
+			 * unless I cast the sizeof to a long (23-mar-94)
+			 * dickey@software.org
+			 */
+			if ((off >= (long)sizeof(PAGE_T)) && (off < NCHUNK)) {
 				RecentPage(prev);
 				ptr.blk = this->block;
 				ptr.off = (OFF_T)off;
@@ -1075,6 +1085,7 @@ LINE	*lp;
 #endif
 	lp->l_nxtundo = null_ptr;
 	lp->l.l_flag  = 0;
+	lp->l.l_undo_cookie  = 0;
 }
 
 /*****************************************************************************

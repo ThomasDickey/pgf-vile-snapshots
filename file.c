@@ -6,7 +6,12 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.120  1994/02/22 18:09:24  pgf
+ * Revision 1.121  1994/03/23 12:57:57  pgf
+ * rationalized use of mlerror() and FIOERR.  now, the function that
+ * first generates FIOERR is guaranteed to have put out a message, probably
+ * via mlerror.
+ *
+ * Revision 1.120  1994/02/22  18:09:24  pgf
  * when choosing dos-mode for an ambiguous buffer, vote in favor of on
  * if the global mode is set, and we're running on DOS.  otherwise, choose
  * no-dos-mode.
@@ -586,7 +591,8 @@ int	mflg;		/* print messages? */
 	TTkclose();
 
         if ((s = ffropen(fname)) == FIOERR) {	/* Hard file open.      */
-		mlerror(fname);
+		TTkopen();	/* open the keyboard again */
+		return FALSE;
         } else if (s == FIOFNF) {		/* File not found.      */
                 if (mflg)
 			mlwrite("[New file]");
@@ -622,7 +628,7 @@ int	mflg;		/* print messages? */
 		cur_working = 0;
 #endif
 		if (s == FIOERR) {
-			mlerror(fname);
+			;
 		} else {
 
 			if (s == FIOFUN)	/* last line is incomplete */
@@ -689,19 +695,16 @@ int *nlinep;
         int incomplete = FALSE;
 	B_COUNT len, nbytes;
 
-	if ((len = ffsize()) < 0)
+	if ((len = ffsize()) < 0) {
+	    	mlforce("[Can't size file]");
 		return FIOERR;
+	}
 
 	/* avoid malloc(0) problems down below; let slowreadf() do the work */
 	if (len == 0)
 		return FIOMEM;
 #if OPT_WORKING
 	max_working = len;
-#endif
-#if     MSDOS
-	/* cannot allocate more than 64K in dos */
-	if (len >= 65535)
-		return FIOMEM;
 #endif
 	/* leave an extra byte at the front, for the length of the first
 		line.  after that, lengths go in place of the newline at
@@ -712,6 +715,7 @@ int *nlinep;
 
 	if ((len = ffread((char *)&bp->b_ltext[1], len)) < 0) {
 		FreeAndNull(bp->b_ltext);
+		mlerror("reading");
 		return FIOERR;
 	}
 

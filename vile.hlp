@@ -630,6 +630,15 @@ Rectangular regions
 		originally yanked or deleted.  The width of the rectangle
 		is the length of the longest line in register being 'put'.
 
+	Note that because it is sometimes hard to manipulate rectangles
+	containing or bordering on tab characters, currently (for some
+	operations) vile "detabs" the region being operated on before
+	commencing, and re-entabs the lines again after the operation.  The
+	re-entabing is limited to leading whitespace, and of course is
+	suppressed if "notabinsert" mode is set.  [ This misfeature is
+	arguably a bug, and may be fixed.  In the meantime, you've been
+	warned. ]
+
 	[If anyone has ideas on other or more useful ways of integrating
 	rectangles into the vile command set, please let me know...]
 
@@ -702,6 +711,8 @@ Editor modes
 	bcolor	On systems supporting this, will set the background color.
 		Currently only DOS can do color, although the X11 version
 		(xvile) can be given colors at startup or via .Xdefaults.
+		See notes about the color palette down below, under DOS
+		specifics.
 
 	check-modtime  Check modification-time.  If a file has changed since
 		it was last read or written, vile will issue a "file newer
@@ -765,6 +776,8 @@ Editor modes
 	fcolor	On systems supporting this, will set the foreground color.
 		Currently only DOS can do color, although the X11 version
 		(xvile) can be given colors at startup or via .Xdefaults.
+		See notes about the color palette down below, under DOS
+		specifics.
 
 	fillcol (fc) Will prompt for a new value for the fill column, where
 		auto-wrapping and region formatting will break lines. (B)
@@ -860,9 +873,7 @@ Editor modes
 	report A threshold value that is used to control messages that report
 		the number of lines deleted, changed, etc.  (U)
 
-	ruler Shows the current line and column in the status line.  When using
-		a mouse (xvile), the cursor line and column are also shown in
-		the message line.  (B)
+	ruler Shows the current line and column in the status line.  (B)
 
 	samebangs (sb) Controls whether the "!!" and "^X-!" commands use the
 		same command string.  (U)
@@ -1574,10 +1585,12 @@ Command files
 	On startup (in the absence of '@' arguments -- see Invocation
 	below), vile will attempt to read the file ".vilerc" in the current
 	directory, and then in $HOME, and will execute the commands found
-	therein.  It is possible to nest such executions.  For example, you
-	might keep your general default settings in your home directory,
-	and put the following lines in a .vilerc in a directory in which
-	you prefer tabs be set to 4 spaces:
+	therein.  [This file is called "vile.rc" under DOS, and is searched
+	for in the current directory and along the PATH.] It is possible to
+	nest such executions.  For example, you might keep your general
+	default settings in your home directory, and put the following
+	lines in a .vilerc in a directory in which you prefer tabs be set
+	to 4 spaces:
 
 		source "$HOME/.vilerc"
 		set tabstop 8
@@ -1632,34 +1645,103 @@ X Window System specifics:
 
 	If you are using xvile, the following additions are available:
 
-	Mouse buttons:
-	--------------
-	1 -	Sets cursor position and the start of the selection.
-		With any modifier, it will center the buffer at the cursor
-		(this results in a primitive form of scrolling.)
-		Motion with the button down will select text.
-		Multiple clicks will expand the selection to cover
-		words or the current line.
-	2 -	Paste the current PRIMARY selection.  With a modifier, it
-		pastes at the mouse position, otherwise it pastes at
-		the text cursor position.
-	3 -	Extends the current selection.
+  	Mouse buttons:
+  	--------------
+	1 -	Sets cursor position and the start of the selection when
+		mouse pointer is positioned in any vile window (but not the
+		message line).  Clicking on a mode line will set the
+		keyboard focus to the corresponding vile window.  Double
+		clicking on a mode line will do the above in addition to
+		clearing the highlighting associated with the current
+		selection.
 
-	Note: the selected area includes all highlighted characters except
-	for the special case in which the last highlighted character is the
-	first character on a line.  This exception is made to provide
-	control over whether the newline is selected as well.
+		Selections may be made by holding button one down and
+		"wiping" with the mouse.  Release of the mouse button will
+		cause the selection to be yanked and made available (if
+		desired) for pasting.  The region selected may be forced to
+		be rectangular by holding the control key down while wiping
+		with button one depressed.  If the wiping motion goes out of
+		the current window, text will be scrolled in the appropriate
+		direction if possible to accomodate selections larger than
+		the window.  The speed at which the scrolling occurs will
+		increase with the passage of time making it practical to
+		select large regions of text quickly.
 
-	Scrollbars:
-	-----------
-	If built with scrollbars enabled, you can resize windows by moving
-	the border between corresponding scrollbars (with the mouse).
+		Individual words or lines may be selected by double or
+		triple clicking.
+		
+  	2 -	Paste the current PRIMARY selection.  With a modifier, it
+  		pastes at the mouse position, otherwise it pastes at
+  		the text cursor position.
+  
+	3 -     Extend the current selection.  As with button one, the
+		selection may be adjusted or scrolled by holding down button
+		three and wiping with it.  Selections may be extended in any
+		window open to the same buffer as which the selection was
+		started in.
 
+	Note: The selected area includes all highlighted characters except
+  	for the special case in which the last highlighted character is the
+  	first character on a line.  This exception is made to provide
+  	control over whether the newline is selected as well.
+  
+  	Scrollbars:
+  	-----------
+	The X toolkit version of xvile provides default translations
+	similar to the translations for scrollbars found in the Athena
+	widget set.  (If you know how to use xterm's scrollbars, you know
+	how to use these scrollbars.) Button one scrolls forward.  Button
+	three scrolls backward.  The amount of scrolling obtained by these
+	buttons depends on the position at which they were pressed on the
+	scrollbar.  Clicking near the top of the scrollbar will scroll the
+	text by a small amount which may be as little as one line. 
+	Clicking in the middle will scroll by about half a page.  Clicking
+	near the bottom will scroll by a larger amount up to a whole page. 
+	Holding either one of these buttons down will cause repeated
+	scrolling.
+	
+	If simply pressed and released, button two will set the position in
+	the buffer to a position proportional to the location of the
+	pointer on the scroll bar.  Button two may be held down to "drag"
+	the slider from one place to another causing text to scroll
+	continuously.
+
+	The Motif and Openlook versions provide scrollbars from their
+	respective widget sets.  Both versions have a slider indicating the
+	position of the window over the buffer.  OpenLook's slider is fixed
+	in size with little arrows at the top and bottom of the slider. 
+	Pressing on one of these arrows will cause scrolling in the
+	appropriate direction.  The slider may be "grabbed" and moved by
+	pressing and dragging the middle portion between the arrows. 
+	Motif's slider is solid with size varying to indicate the size of
+	the window with respect to the size of the buffer.  Any portion of
+	it may be grabbed for movement.  There are little arrows at the top
+	and bottom of the scroll bar which may be clicked upon to cause
+	scrolling by one line.  In both of these widget sets, clicking on
+	the scrollbar either above or below the slider will cause scrolling
+	by a full page.  OpenLook has two additional control areas; the
+	buffer position may be set to either the beginning or end of the
+	buffer by pressing on one of the little rectangular areas at either
+	the top or bottom of the scrollbar. 
+
+	In all versions built with scrollbars enabled, you can resize
+	windows by moving the border between corresponding scrollbars (with
+	the mouse).  The X toolkit version is probably the most functional
+	with the windows being continuously resized as the mouse is moved. 
+	The OpenLook and Motif versions wait until after a position is
+	selected to resize the windows.  The OpenLook version is perhaps
+	the least functional; there is no visible indication (other than
+	the position of the mouse pointer) to indicate where the new border
+	will be.
+  
 	Splitting and deleting of windows may now be done with the mouse. 
-	Ctrl<Btn1Down> on a scrollbar will cause the scrollbar and the
-	corresponding vile window to be split with the new border at or
-	near the mouse cursor.  Ctrl<Btn2Down> will delete the window. 
-	Ctrl<Btn3Down> will make the corresponding window the only window.
+	In each case the action is selected by pressing one of the mouse
+	buttons over a scrollbar with the control key held down.  Button
+	one (with the control key held down) will split the scrollbar and
+	the corresponding vile window with the new border at or near the
+	mouse cursor.  Button two (with control key) will delete the
+	scrollbar and corresponding window.  Button three (with control
+	key) will make the corresponding window the only window.
 
 	Standard X command line arguments:
 	----------------------------------
@@ -1683,8 +1765,6 @@ X Window System specifics:
 
 	X Resources:
 	------------
-	rows		Number of rows to start with.
-	columns		Number of columns to start with.
 	font		Font to use.
 	geometry	Window dimensions.
 	charClass	Character classes for multiple click selections.
@@ -1696,12 +1776,12 @@ X Window System specifics:
 
 	focusFollowsMouse  If true, the "current" window is the window
 			inhabited by the mouse; no clicking is necessary
-			to change windows, therefore selected text is not
-			lost due to the extra clicking.
+			to change windows.
 
-	scrollbarPlacement  Either left or right; specifies on which side of
-			the window the scrollbars are placed.  By default,
-			the scrollbars are placed on the right.
+	scrollbarOnLeft Either true or false; control the placement of
+			the scrollbars.  By default, scrollbars are placed
+			on the right.
+	scrollbarWidth	An integer indicating the width of the scrollbar.
 
 
 	Fonts:
@@ -1713,9 +1793,20 @@ X Window System specifics:
 DOS specifics
 -------------
 
-	You can force vile into one of three screen modes: 25, 43 and 50
-	lines.  It auto-senses, but can be overridden with a command
-	line option: -2, -4, and -5 give 25, 43 and 50 lines respectively.
+	The .vilerc file is called vile.rc under DOS.
+
+	vile should leave your screen in the mode you're in when you
+	enter it, unless you change it to a different mode with a
+	"set sres=" line in your vile.rc, or if you use a command line
+	option to change it.  Command line options consist of a dash
+	followed by one of the following selectors (these are the same
+	values that can be assigned to "sres"):
+	    "default",
+	    "2",     "25",    "80x25", 
+	    "4",     "43",    "80x43", 
+	    "5",     "50",    "80x50", 
+	    "80x14", "80x28", 
+	    "40x12", "40x21", "40x25", "40x28", "40x50", 
 
 	If you shell out in 50 line mode, make sure you are in 50 line mode
 	before you exit the dos shell, otherwise you end up with a 50 line
@@ -1736,6 +1827,19 @@ DOS specifics
 	characters from the buffer so you don't end up with two of them per
 	line.  If you give the command an argument (e.g.  "1:set-dos-mode")
 	it will strip CRs but leave you in non-DOS mode.
+
+	If you wish to change the screen colors which correspond to vile's
+	internal notion of black, red, green, yellow, blue, magenta, cyan, 
+	and white, put a line in your vile.rc which resets the "palette"
+	variable.  By default its value is "0 4 2 14 1 5 3 15", which
+	associates each of the above colors with the appropriate PC
+	color attribute.  On some laptops (the HP OmniBook, for instance)
+	the color "light grey" is actually brighter than "white", so you
+	might prefer a setting of "0 4 2 14 1 5 3 7".  The palette values
+	are masked with 7 before being used as background colors, to prevent
+	blinking characters.
+
+
 
 Differences from vi
 -------------------

@@ -2,7 +2,16 @@
  * code by Paul Fox, original algorithm mostly by Julia Harper May, 89
  *
  * $Log: undo.c,v $
- * Revision 1.47  1994/03/08 12:28:21  pgf
+ * Revision 1.50  1994/03/18 18:30:38  pgf
+ * fixes for OPT_MAP_MEMORY compilation
+ *
+ * Revision 1.49  1994/03/18  12:00:07  pgf
+ * added comments on copied-marks and cookies
+ *
+ * Revision 1.48  1994/03/16  10:55:56  pgf
+ * switch over to cookie method of marking copied lines for undo
+ *
+ * Revision 1.47  1994/03/08  12:28:21  pgf
  * trial version of repointstuff() which attempts to preserve offsets of
  * marks attached to lines being replaced.
  *
@@ -63,7 +72,7 @@
  * inverse stack (the "forward", or "redo" stack) as we go, so that undo
  * can itself be undone.
  *
- * The "copied" flag in the LINE structure is unioned with the stack link
+ * The "copied" cookie in the LINE structure is unioned with the stack link
  * pointer on the undo stack, since they aren't both needed at once.  (This
  * isn't true when OPT_MAP_MEMORY is set, because it creates an illegal
  * pointer value).
@@ -93,6 +102,29 @@
  *	(The lineundo() command is kind of separate, and acts independently
  *	 of the normal undo stacks -- an extra copy of the line is simply
  *	 made when the first change is made.)
+ *
+ *
+ * Notes on how the "copied" marks work:
+ *
+ * Say you do a change to a line, like you go into insertmode, and type
+ * three characters.  The first character causes linsert to be called,
+ * which calls copy_for_undo(), which copies the line, and marks it as
+ * "copied".  Then, the second and third characters also call
+ * copy_for_undo(), but since the line is marked, nothing happens.  Now you
+ * hit ESC.  Now enter insertmode again.  So far, nothing has happened,
+ * except that the "needundocleanup" flag has been set (by execute()s call
+ * to mayneedundo()), since we're in an undo-able command.  Type a
+ * character.  linsert() calls copy_for_undo() which calls preundocleanup()
+ * (based on the "needundocleanup" flag.  In previous versions of vile,
+ * this cleanup required walking the entire buffer, to reset the "copied"
+ * flag.  Now, the "copied" flag is actually a word-sized "cookie", which
+ * matches the global "current_undo_cookie" when the line has bee copied. 
+ * By incrementing the global "current_undo_cookie" in preundocleanup(), we
+ * are effectively resetting all of the lines' "marks", since the cookie is
+ * now _guaranteed_ to not match against any of them.  Which is why, when
+ * the cookie wraps around to 0, we _do_ need to clean the buffer, because
+ * now there's a chance that the current_undo_cookie might match a very old
+ * marked line.
  */
 
 #define FORW 0
@@ -123,6 +155,9 @@ static	int	linesmatch P(( LINE *, LINE * ));
 static	void	setupuline P(( LINEPTR ));
 
 static	short	needundocleanup;
+
+/* this could be per-buffer, but i don't think it matters in practice */
+static unsigned short current_undo_cookie = 1;
 
 /* #define UNDOLOG 1 */
 #if UNDOLOG
@@ -404,8 +439,11 @@ preundocleanup()
 	/* there may be a way to clean these less drastically, by
 		using the information on the stacks above, but I
 		couldn't figure it out.  -pgf  */
-	for_each_line(lp, curbp) {
-		lsetnotcopied(lp);
+	if (++current_undo_cookie == 0) {
+		current_undo_cookie++;	/* never let it be zero */
+		for_each_line(lp, curbp) {  /* once in while, feel the pain */
+			lsetnotcopied(lp);
+		}
 	}
 
 	curbp->b_udstkindx = BACK;
@@ -926,14 +964,14 @@ fast_ptr LINEPTR olp;
 #if ! WINMARK
 	if (same_ptr(MK.l, olp)) {
 		MK.l = point;
-		MK.o = _min(MK.o, llength(point));
+		MK.o = _min(MK.o, lLength(point));
 	}
 #endif
 	/* fix anything important that points to it */
 	for_each_window(wp) {
 		if (same_ptr(wp->w_dot.l, olp)) {
 			wp->w_dot.l = point;
-			wp->w_dot.o = _min(wp->w_dot.o, llength(point));
+			wp->w_dot.o = _min(wp->w_dot.o, lLength(point));
 		}
 		if (same_ptr(wp->w_line.l, olp))
 			wp->w_line.l = point;
@@ -945,7 +983,7 @@ fast_ptr LINEPTR olp;
 #endif
 		if (same_ptr(wp->w_lastdot.l, olp)) {
 			wp->w_lastdot.l = point;
-			wp->w_lastdot.o = _min(wp->w_lastdot.o, llength(point));
+			wp->w_lastdot.o = _min(wp->w_lastdot.o, lLength(point));
 		}
 	}
 	if (curbp->b_nmmarks != NULL) {
@@ -957,7 +995,7 @@ fast_ptr LINEPTR olp;
 			if (same_ptr(mp->l, olp)) {
 				if (usenew) {
 					mp->l = point;
-					mp->o = _min(mp->o, llength(point));
+					mp->o = _min(mp->o, lLength(point));
 				} else {
 					mlforce("[Lost mark]");
 				}

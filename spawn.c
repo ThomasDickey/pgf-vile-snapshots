@@ -2,7 +2,13 @@
  *		for MicroEMACS
  *
  * $Log: spawn.c,v $
- * Revision 1.73  1994/03/10 20:15:32  pgf
+ * Revision 1.75  1994/03/24 12:10:58  pgf
+ * warning cleanup
+ *
+ * Revision 1.74  1994/03/23  16:04:05  pgf
+ * removed ifdef BEFORE code
+ *
+ * Revision 1.73  1994/03/10  20:15:32  pgf
  * prompt with name of modified buffer when there's only one of them
  *
  * Revision 1.72  1994/03/08  14:17:45  pgf
@@ -444,14 +450,7 @@ int rerun;
 	TTkopen();
 	/* if we are interactive, pause here */
 	if (clexec == FALSE) {
-#if BEFORE
-		kbd_expand = -1;
-		kbd_puts("\r\n\n[End]");
-		kbd_expand = 0;
-		tgetc(FALSE);
-#else
 		pressreturn();
-#endif
 	}
 #if	IBMPC
 	/* Reopen the display _after_ the prompt, to keep the shell-output
@@ -611,7 +610,7 @@ filterregion()
 		kregcirculate(FALSE);
 		kp = kbs[ukb].kbufh;
 		while (kp != NULL) {
-			fwrite((char *)kp->d_chunk, 1, (int)KbSize(ukb,kp), fw);
+			fwrite((char *)kp->d_chunk, 1, (SIZE_T)KbSize(ukb,kp), fw);
 			kp = kp->d_next;
 		}
 #if UNIX

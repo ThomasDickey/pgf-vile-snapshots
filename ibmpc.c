@@ -9,7 +9,14 @@
  * display type.
  *
  * $Log: ibmpc.c,v $
- * Revision 1.46  1994/03/11 12:03:40  pgf
+ * Revision 1.48  1994/03/16 19:20:15  pgf
+ * don't OR in the upper bit to the ctrans value.
+ *
+ * Revision 1.47  1994/03/16  19:01:44  pgf
+ * implement palette string variable -- whitespace separated list of
+ * seven "industry standard" color constants
+ *
+ * Revision 1.46  1994/03/11  12:03:40  pgf
  * cleaned up video driver selection -- now ibmcres is simply a string
  * based interface to scinit, which takes a driver number.  we search
  * the table top to bottom, in case there's more than one entry by the
@@ -103,7 +110,7 @@
 #endif
 
 #define	ColorDisplay()	(dtype != CDMONO && !monochrome)
-#define	AttrColor(b,f)	(((ctrans[b] & 7) << 4) | ((ctrans[f]|8) & 15))
+#define	AttrColor(b,f)	(((ctrans[b] & 7) << 4) | (ctrans[f] & 15))
 #define	Black(n)	((n) ? 0 : 7)
 #define	White(n)	((n) ? 7 : 0)
 #define	AttrMono(f)	(((Black(f) & 7) << 4) | (White(f) & 15))
@@ -267,16 +274,10 @@ extern	void	ibmbcol   P((int));
 
 int	cfcolor = -1;		/* current forground color */
 int	cbcolor = -1;		/* current background color */
-int	ctrans[] = {		/* ansi to ibm color translation table */
-		0,		/* black	*/
-		4,		/* red		*/
-		2,		/* green	*/
-		6,		/* yellow	*/
-		1,		/* blue		*/
-		5,		/* magenta	*/
-		3,		/* cyan		*/
-		7		/* white	*/
-	};
+int	ctrans[NCOLORS];
+/* ansi to ibm color translation table */
+char *initpalettestr = "0 4 2 14 1 5 3 15";
+/* black, red, green, yellow, blue, magenta, cyan, white   */
 #endif
 #if	SCROLLCODE
 extern	void	ibmscroll P((int,int,int));
@@ -550,10 +551,16 @@ char *res;	/* resolution to change to */
 }
 
 void
-spal(dummy)	/* reset the palette registers */
-char *dummy;
+spal(palstr)	/* reset the palette registers */
+char *palstr;
 {
-	/* nothing here now..... */
+#if COLOR
+    	/* this is pretty simplistic.  big deal. */
+	(void)sscanf(palstr,"%i %i %i %i %i %i %i %i",
+	    	&ctrans[0], &ctrans[1], &ctrans[2], &ctrans[3],
+	    	&ctrans[4], &ctrans[5], &ctrans[6], &ctrans[7] );
+#endif
+
 }
 
 #if OPT_MS_MOUSE || OPT_FLASH
@@ -741,6 +748,9 @@ ibmopen()
 	current_res_name = "25";
 #endif
 
+#if	COLOR
+	spal(initpalettestr);
+#endif
 	if (!ibmcres(current_res_name))
 		(void)scinit(ORIGTYPE);
 	revexist = TRUE;

@@ -6,7 +6,19 @@
  * internal use.
  *
  * $Log: region.c,v $
- * Revision 1.38  1994/03/11 13:57:10  pgf
+ * Revision 1.41  1994/03/18 18:30:38  pgf
+ * fixes for OPT_MAP_MEMORY compilation
+ *
+ * Revision 1.40  1994/03/15  18:33:09  pgf
+ * protect against kill_line going off the end of the line, and
+ * make sure region_corner does the right thing when swapping left
+ * and right.
+ *
+ * Revision 1.39  1994/03/11  18:27:57  pgf
+ * pass correct column-to-offset converter argument to yankline.
+ * add comment, so we remember to do this right the next time.
+ *
+ * Revision 1.38  1994/03/11  13:57:10  pgf
  * fix compiler problem
  *
  * Revision 1.37  1994/03/10  20:14:09  pgf
@@ -94,6 +106,9 @@ int 	l, r;
 
 	DOT.o = l;
 
+	if (r > lLength(DOT.l))
+	    r = lLength(DOT.l);
+
 	if (r > l) {
 	    s = ldelete(r - l, save);
 	    if (s != TRUE) return s;
@@ -163,14 +178,14 @@ int 	l, r;
 	s = detabline((void *)FALSE, 0, 0);
 	if (s != TRUE) return s;
 
-	if (llength(DOT.l) <= l) {	/* nothing to do if no string */
+	if (lLength(DOT.l) <= l) {	/* nothing to do if no string */
 		if (!string) {
 		    if (b_val(curbp,MDTABINSERT))
 			    s = entabline((void *)TRUE, 0, 0);
 		    DOT.o = saveo;
 		    return s;
 		} else {
-		    DOT.o = llength(DOT.l);
+		    DOT.o = lLength(DOT.l);
 		    linsert(l - DOT.o, ' ');
 		}
 	}
@@ -490,23 +505,23 @@ int	l, r;
 
 	s = detabline((void *)FALSE, 0, 0);
 
-	if (llength(DOT.l) <= l) {	/* nothing to do if no string */
+	if (lLength(DOT.l) <= l) {	/* nothing to do if no string */
 		if (!string) {
 		    if (b_val(curbp,MDTABINSERT))
 			    s = entabline((void *)TRUE, 0, 0);
 		    DOT.o = saveo;
 		    return s;
 		} else {
-		    DOT.o = llength(DOT.l);
+		    DOT.o = lLength(DOT.l);
 		    linsert(l - DOT.o, ' ');
 		}
 	}
 
 	DOT.o = l;
 
-	if (llength(DOT.l) <= r) {
+	if (lLength(DOT.l) <= r) {
 	    	/* then the rect doesn't extend to the end of line */
-		ldelete(llength(DOT.l) - l, FALSE);
+		ldelete(lLength(DOT.l) - l, FALSE);
 
 		/* so there's nothing beyond the rect, so insert at
 			most r-l chars of the string, or nothing */
@@ -555,7 +570,7 @@ int 	l, r;
 {
 	int s;
 	s = do_chars_in_line(_yankchar, l, r);
-	if (s && (r == llength(DOT.l) || regionshape == RECTANGLE)) {
+	if (s && (r == lLength(DOT.l) || regionshape == RECTANGLE)) {
 		/* we don't necessarily want to insert the last newline
 			in a region, so we delay it */
 		kinsertlater('\n');
@@ -575,7 +590,7 @@ yankregion()
 	} else if (regionshape == RECTANGLE) {
 		kregflag |= KRECT|KYANK;
 	}
-	s = do_lines_in_region(yank_line, (void *)0, FALSE);
+	s = do_lines_in_region(yank_line, (void *)0, TRUE);
 	if (s && do_report(klines+(kchars!=0))) {
 		mlwrite("[%d line%s, %d character%s yanked]",
 			klines, PLURAL(klines),
@@ -710,8 +725,12 @@ register REGION *rp;
 	/* enforce geometry */
 	if (rp->r_rightcol < rp->r_leftcol) {
 		C_NUM tmp = rp->r_rightcol;
-		rp->r_rightcol = rp->r_leftcol;
-		rp->r_leftcol = tmp;
+		/* swap and, correct for the off by one-ness of the region --
+		 * regions include their start, but not their end, so if we
+		 * switch left/right colums, we need to inc/decrement
+		 * appropriately */
+		rp->r_rightcol = rp->r_leftcol + 1;
+		rp->r_leftcol = tmp ? tmp - 1 : 0;
 	}
 }
 
@@ -768,16 +787,16 @@ register REGION *rp;
 
 	if (b_is_counted(curbp)) { /* we have valid line numbers */
 		L_NUM dno, mno;
-		dno = DOT.l->l_number;
-		mno = MK.l->l_number;
+		dno = l_ref(DOT.l)->l_number;
+		mno = l_ref(MK.l)->l_number;
 		if (mno > dno) {
-			flp = DOT.l;
-			blp = MK.l;
+			flp = l_ref(DOT.l);
+			blp = l_ref(MK.l);
 			rp->r_orig = DOT;
 			rp->r_end  = MK;
 		} else {
-			flp = MK.l;
-			blp = DOT.l;
+			flp = l_ref(MK.l);
+			blp = l_ref(DOT.l);
 			rp->r_orig = MK;
 			rp->r_end  = DOT;
 		}
@@ -912,7 +931,7 @@ int convert_cols; /* if rectangle, convert columns to offsets */
 			    }
 			} else {
 				l =  w_left_margin(curwp);
-				r = llength(DOT.l);
+				r = lLength(DOT.l);
 				if (sameline(region.r_orig, DOT))
 					l = region.r_orig.o;
 				if (sameline(region.r_end, DOT)) {
@@ -950,6 +969,12 @@ int convert_cols; /* if rectangle, convert columns to offsets */
 }
 
 
+/* walk through the characters in a line, applying a function.  the
+	line is marked changed if the function returns other than -1.
+	if it returns other than -1, then the char is replaced with
+	that value. 
+    the ll and rr args are OFFSETS, so if you use this routine with
+    	do_lines_in_region, tell it to CONVERT columns to offsets. */
 int
 do_chars_in_line(funcp, ll, rr)
 void	*funcp;
@@ -967,18 +992,18 @@ int	ll, rr;		/* offsets of of chars to be processed */
 	lp = l_ref(DOT.l);
 
 
-	if (llength(DOT.l) < ll)
+	if (lLength(DOT.l) < ll)
 		return TRUE;
 
 	DOT.o = ll;
-	if (llength(DOT.l) < rr)
-		rr = llength(DOT.l);
+	if (rr > lLength(DOT.l))
+		rr = lLength(DOT.l);
 
 	for (i = ll; i < rr; i++) {
 		c = lgetc(lp,i);
 		nc = (func)(c);
 		if (nc != -1) {
-			copy_for_undo(lp);
+			copy_for_undo(l_ptr(lp));
 			lputc(lp,i,nc);
 			changed++;
 		}

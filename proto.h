@@ -5,7 +5,10 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.102  1994/03/10 20:11:11  pgf
+ * Revision 1.103  1994/03/24 12:10:28  pgf
+ * new function, kcod2escape_seq()
+ *
+ * Revision 1.102  1994/03/10  20:11:11  pgf
  * kinsertlater() is new, anycb() now has arg
  *
  * Revision 1.101  1994/03/08  14:07:11  pgf
@@ -509,6 +512,7 @@ extern int tgetc P(( int ));
 extern int kbd_key P(( void ));
 extern int kbd_seq P(( void ));
 extern int kbd_escape_seq P(( void ));
+extern int kcod2escape_seq P(( int, char * ));
 extern int screen_string P(( char *, int, CMASK ));
 extern int end_string P(( void ));
 extern int kbd_delimiter P(( void ));

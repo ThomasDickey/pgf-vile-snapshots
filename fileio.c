@@ -3,7 +3,18 @@
  * the knowledge about files are here.
  *
  * $Log: fileio.c,v $
- * Revision 1.64  1994/02/22 11:03:15  pgf
+ * Revision 1.67  1994/03/24 12:29:20  pgf
+ * eliminate #elif for broken HP/UX compiler
+ *
+ * Revision 1.66  1994/03/23  12:57:57  pgf
+ * rationalized use of mlerror() and FIOERR.  now, the function that
+ * first generates FIOERR is guaranteed to have put out a message, probably
+ * via mlerror.
+ *
+ * Revision 1.65  1994/03/18  18:30:38  pgf
+ * fixes for OPT_MAP_MEMORY compilation
+ *
+ * Revision 1.64  1994/02/22  11:03:15  pgf
  * truncated RCS log for 4.0
  *
  */
@@ -29,15 +40,8 @@
 #endif
 
 
-#if WATCOM
-#define	errorIfDir()	set_errno(S_IFDIR)	/* not the same, but... */
-#endif
-#if DJGPP
-#define	errorIfDir()	set_errno(ENOENT)
-#endif
-
-#ifndef errorIfDir
-#define	errorIfDir()	set_errno(EISDIR)	/* e.g., the UNIX convention */
+#ifndef EISDIR
+#define EISDIR EACCES
 #endif
 
 /*--------------------------------------------------------------------------*/
@@ -148,19 +152,24 @@ char    *fn;
 	        ffp = vms_rpipe(fn+1, 0, (char *)0);
 		/* really a temp-file, but we cannot fstat it to get size */
 #endif
-		if (ffp == 0)
+		if (ffp == 0) {
+			mlerror("opening pipe for read");
 			return (FIOERR);
+		}
 
 		fileispipe = TRUE;
 		count_fline = 0;
 
 	} else if (is_directory(fn)) {
-		errorIfDir();
+		set_errno(EISDIR);
+		mlerror("opening directory");
 		return (FIOERR);
 
 	} else if ((ffp=fopen(fn, FOPEN_READ)) == NULL) {
-		if (errno != ENOENT)
+		if (errno != ENOENT) {
+			mlerror("opening for read");
 			return (FIOERR);
+		}
 		return (FIOFNF);
 	}
 
@@ -177,13 +186,11 @@ char    *fn;
 {
 #if UNIX || MSDOS
 	char	*name;
-	char	*what = "file";
 	char	*mode = FOPEN_WRITE;
-	char	*action = "writ";
 
 	if (isShellOrPipe(fn)) {
 		if ((ffp=npopen(fn+1, mode)) == NULL) {
-	                mlforce("[Cannot open pipe for writing]");
+	                mlerror("opening pipe for write");
 			TTbeep();
 	                return (FIOERR);
 		}
@@ -194,19 +201,20 @@ char    *fn;
 			appending = TRUE;
 			fn = name;
 			mode = FOPEN_APPEND;
-			action = "append";
 		}
 		if (is_directory(fn)) {
-			errorIfDir();
-			what = "directory";
+			set_errno(EISDIR);
+			mlerror("opening directory");
+			return (FIOERR);
 		}
 #if MSDOS	/* patch: should make this a mode */
-		if (!make_backup(fn, appending))
+		if (!make_backup(fn, appending)) {
+			mlforce("[Can't make backup file]");
 			return (FIOERR);
+		}
 #endif
-		if (*what != 'f'
-		 || (ffp = fopen(fn, mode)) == NULL) {
-			mlforce("[Cannot open %s for %sing]", what, action);
+		if ((ffp = fopen(fn, mode)) == NULL) {
+			mlerror("opening for write");
 			TTbeep();
 			return (FIOERR);
 		}
@@ -230,7 +238,7 @@ char    *fn;
         }
 #else
         if ((ffp=fopen(fn, FOPEN_WRITE)) == NULL) {
-                mlforce("[Cannot open file for writing]");
+                mlerror("opening for write");
                 return (FIOERR);
         }
 #endif
@@ -270,32 +278,9 @@ ffsize()
 	}
         return -1L;
 }
-
-int
-ffexists(p)
-char *p;
-{
-	struct stat statbuf;
-	if (stat(p, &statbuf) == 0) {
-		return TRUE;
-	}
-        return FALSE;
-}
 #endif
 
 #if MSDOS
-
-int
-ffexists(p)
-char *p;
-{
-	if (ffropen(p) == FIOSUC) {
-		ffclose();
-		return TRUE;
-	}
-        return FALSE;
-}
-
 #if DJGPP
 
 long
@@ -325,6 +310,36 @@ ffsize(void)
 #endif
 #endif	/* !OPT_MAP_MEMORY */
 
+#if UNIX || VMS
+
+int
+ffexists(p)
+char *p;
+{
+	struct stat statbuf;
+	if (stat(p, &statbuf) == 0) {
+		return TRUE;
+	}
+        return FALSE;
+}
+
+#endif
+
+#if MSDOS
+
+int
+ffexists(p)
+char *p;
+{
+	if (ffropen(p) == FIOSUC) {
+		ffclose();
+		return TRUE;
+	}
+        return FALSE;
+}
+
+#endif
+
 #if !MSDOS && !OPT_MAP_MEMORY
 int
 ffread(buf,len)
@@ -348,7 +363,8 @@ long len;
 	return total;
 #else
 	int got = read(fileno(ffp), buf, len);
-	fseek (ffp, len, 1);	/* resynchronize stdio */
+	if (got >= 0)
+	    fseek (ffp, len, 1);	/* resynchronize stdio */
 	return got;
 #endif
 }
@@ -401,10 +417,11 @@ ffclose()
 #ifdef	MDCHK_MODTIME
 		(void)check_visible_modtimes();
 #endif
-	} else
+	} else {
 		s = fclose(ffp);
+	}
         if (s != 0) {
-                mlforce("[Error on close]");
+		mlerror("closing");
                 return(FIOERR);
         }
 #else
@@ -425,7 +442,7 @@ char *	ending;
 {
         register int    i;
 	for (i = 0; i < nbuf; ++i)
-		if (ffputc(char2int(buf[i])) != FIOSUC)
+		if (ffputc(char2int(buf[i])) == FIOERR)
 			return FIOERR;
 
 	while (*ending != EOS) {
@@ -435,7 +452,7 @@ char *	ending;
 	}
 
         if (ferror(ffp)) {
-                mlforce("[Write I/O error]");
+                mlerror("writing");
                 return (FIOERR);
         }
 
@@ -459,7 +476,7 @@ int c;
 	fputc(d, ffp);
 
         if (ferror(ffp)) {
-                mlforce("[Write I/O error]");
+                mlerror("writing");
                 return (FIOERR);
         }
 
@@ -532,7 +549,7 @@ int *lenp;	/* to return the final length */
 	/* test for any errors that may have occurred */
         if (c == EOF) {
 		if (!feof(ffp) && ferror(ffp)) {
-			mlforce("[File read error]");
+			mlerror("reading");
 			return(FIOERR);
                 }
 

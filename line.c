@@ -11,7 +11,17 @@
  * which means that the dot and mark values in the buffer headers are nonsense.
  *
  * $Log: line.c,v $
- * Revision 1.61  1994/03/10 20:09:11  pgf
+ * Revision 1.64  1994/03/24 12:42:48  pgf
+ * warning cleanup
+ *
+ * Revision 1.63  1994/03/22  16:30:17  pgf
+ * fix animation of Registers buffer, using static flag to control
+ * work done on each call to relist_registers
+ *
+ * Revision 1.62  1994/03/18  18:30:38  pgf
+ * fixes for OPT_MAP_MEMORY compilation
+ *
+ * Revision 1.61  1994/03/10  20:09:11  pgf
  * added kinsertlater() routine, for doing delayed insertion of newlines
  *
  * Revision 1.60  1994/03/08  14:17:15  pgf
@@ -922,11 +932,10 @@ kdone()
 		kbs[ukb].kused = 0;
 		kbs[ukb].kbwidth = kregwidth = 0;
 		kcharpending = -1;
-		relist_registers(); /* this used to be outside the if --
-			pretty expensive, no? */
 	}
 	kregflag &= ~KNEEDCLEAN;
 	kbs[ukb].kbflag = kregflag;
+	relist_registers();
 }
 
 int
@@ -1190,7 +1199,7 @@ int
 doput(f,n,after,shaparg)
 int f,n,after,shaparg;
 {
-	int s, oukb, shape = EXACT;
+	int s, oukb, shape;
 
 	if (!f)
 		n = 1;
@@ -1250,7 +1259,7 @@ C_NUM goalcol, reached;
 	int status = TRUE;
 	if (reached < goalcol) {
 		/* pad out to col */
-		DOT.o = llength(DOT.l);
+		DOT.o = lLength(DOT.l);
 		status = linsert(goalcol-reached, ' ');
 	} else if (reached > goalcol) {
 		/* there must be a tab there. */
@@ -1270,11 +1279,11 @@ C_NUM *reachedp;
 {
 	int s = TRUE;
 	if (is_last_line(DOT,curbp)) {
-		DOT.o = llength(DOT.l);
+		DOT.o = lLength(DOT.l);
 		if (lnewline() != TRUE)
 			return FALSE;
 	} else {
-		DOT.l = lforw(DOT.l);
+		DOT.l = lFORW(DOT.l);
 	}
 	DOT.o = getoff(col, reachedp);
 	return s;
@@ -1500,7 +1509,7 @@ int f,n;
 	 && tb_init(&buffer, abortc)) {
 		while (kp != 0) {
 			if (!tb_bappend(&buffer, (char *)(kp->d_chunk), 
-					(int)KbSize(jj,kp)))
+					(ALLOC_T)KbSize(jj,kp)))
 				return FALSE;
 			kp = kp->d_next;
 		}
@@ -1545,7 +1554,7 @@ static	void	listregisters P(( int, char * ));
 
 #if OPT_UPBUFF
 static	int	show_Registers P(( BUFFER * ));
-static	int	show_all_regs;
+static	int	show_all_chars;
 #endif
 
 /*ARGSUSED*/
@@ -1560,7 +1569,7 @@ char *dummy;
 	int	any;
 
 #if OPT_UPBUFF
-	show_all_regs = iflag;
+	show_all_chars = iflag;
 #endif
 	b_set_left_margin(curbp, REGS_PREFIX);
 	any = (reg2index(lastreg) >= 0);
@@ -1617,31 +1626,38 @@ char *dummy;
 
 #define	REGISTERS_LIST_NAME ScratchName(Registers)
 
+static int will_relist_regs;
+
 /*ARGSUSED*/
 int
 showkreg(f,n)
 int f,n;
 {
+	will_relist_regs = FALSE;
 	return liststuff(REGISTERS_LIST_NAME, listregisters, f, (char *)0);
 }
 
 #if OPT_UPBUFF
+
+
 static int
 show_Registers(bp)
 BUFFER *bp;
 {
 	b_clr_obsolete(bp);
-	return showkreg(show_all_regs, 1);
+	return showkreg(show_all_chars, 1);
 }
 
 void
 relist_registers()
 {
-	register BUFFER *bp;
-	if ((bp = find_b_name(REGISTERS_LIST_NAME)) != 0) {
-		bp->b_upbuff = show_Registers;
-		b_set_obsolete(bp);
-	}
+
+	if (will_relist_regs) 	/* have we already done this? */
+		return;
+
+	will_relist_regs = TRUE;
+
+	update_scratch(REGISTERS_LIST_NAME, show_Registers);
 }
 #endif	/* OPT_UPBUFF */
 
