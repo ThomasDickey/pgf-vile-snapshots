@@ -4,7 +4,14 @@
  *	Filename prompting and completion routines
  *
  * $Log: filec.c,v $
- * Revision 1.12  1993/04/28 17:15:56  pgf
+ * Revision 1.14  1993/05/11 16:22:22  pgf
+ * see tom's CHANGES, 3.46
+ *
+ * Revision 1.13  1993/05/06  11:59:58  pgf
+ * added ifdefs for USE_D_NAMLEN, for systems that don't have or don't
+ * need it (d_name[] is null-terminated on most systems)
+ *
+ * Revision 1.12  1993/04/28  17:15:56  pgf
  * got rid of LOOKTAGS mode and ifdefs
  *
  * Revision 1.11  1993/04/28  14:34:11  pgf
@@ -71,9 +78,7 @@ static	int	only_dir;	/* can only match real directories */
 static void
 free_expansion P(( void ))
 {
-	if (MyGlob != 0)
-		glob_free(MyGlob);
-	MyGlob = 0;
+	MyGlob = glob_free(MyGlob);
 	in_glob = -1;
 }
 
@@ -285,10 +290,10 @@ char *	text;
 		(void)strcpy(np->l_text, text);
 		llength(np) -= 2;	/* hide the null */
 
-		lforw(lback(lp)) = np;
-		lback(np) = lback(lp);
-		lback(lp) = np;
-		lforw(np) = lp;
+		set_lforw(lback(lp), np);
+		set_lback(np, lback(lp));
+		set_lback(lp, np);
+		set_lforw(np, lp);
 		lp = np;
 	}
 	return lp;
@@ -481,13 +486,18 @@ char *	name;
 
 		while ((de = readdir(dp)) != 0) {
 #if UNIX || VMS
-			strncpy(s, de->d_name, (int)(de->d_namlen))[de->d_namlen] = EOS;
+# if USE_D_NAMLEN
+			strncpy(s, de->d_name, (int)(de->d_namlen));
+			s[de->d_namlen] = EOS;
+# else
+			strcpy(s, de->d_name);
+# endif
 #else
-#if MSDOS
+# if MSDOS
 			(void)mklower(strcpy(s, de->d_name));
-#else
+# else
 			huh??
-#endif
+# endif
 #endif
 #if UNIX || MSDOS
 			if (!strcmp(s, ".")

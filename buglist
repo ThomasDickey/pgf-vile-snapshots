@@ -88,11 +88,6 @@ E	When a line is too long to fit on the screen, you have to move
 
 L	vile really ought to use unix-crypt if it is available.
 
-E	Do autoindent after labels and case statements (lines ending in ':')
-	Alternately, _back_up_ if you type either of `case ' or `default:'.
-	and shift back all the way to the left for `label:'
-	In either case) then return the `normal' indent for the next line.
-
 E	in autoindent mode: 0^D and ^^D don't work
 
 E	can't search for a NUL in a buffer.

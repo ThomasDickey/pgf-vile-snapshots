@@ -10,7 +10,10 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.113  1993/05/05 11:41:05  pgf
+ * Revision 1.114  1993/05/11 16:22:22  pgf
+ * see tom's CHANGES, 3.46
+ *
+ * Revision 1.113  1993/05/05  11:41:05  pgf
  * backspc is now handled separately from chartypes[backspc]
  *
  * Revision 1.112  1993/05/04  17:05:14  pgf
@@ -720,6 +723,7 @@
 #define	FEWNAMES 0	/* strip some names - will no longer be bindable */
 #define	SMALLER	0	/* strip out a bunch of uemacs fluff */
 			/* 	(to each their own... :-)  pgf) */
+#define OPT_MAP_MEMORY 0	/* tiny systems can page out data */
 
 /*	Debugging options	*/
 #define	RAMSIZE	0	/* dynamic RAM memory usage tracking */
@@ -1260,8 +1264,25 @@ typedef struct	LINE {
 
 /* macros to ease the use of lines */
 #define	for_each_line(lp,bp) for (lp = lforw(bp->b_line.l); lp != bp->b_line.l; lp = lforw(lp))
+
+	/*
+	 * If we are configured with mapped-data, references to LINE pointers
+	 * are translated by functions.
+	 */
+#if OPT_MAP_MEMORY
+typedef	double		LINEPTR;
+#else
+typedef	struct	LINE*	LINEPTR;
+#define	lsync(lp)	lp
+#define set_lforw(a,b)	lforw(a) = b
+#define set_lback(a,b)	lback(a) = b
 #define lforw(lp)	(lp)->l_fp
 #define lback(lp)	(lp)->l_bp
+#endif
+
+	/*
+	 * Macros for referencing fields in the LINE struct.
+	 */
 #define lgetc(lp, n)	char2int((lp)->l_text[(n)])
 #define lputc(lp, n, c) ((lp)->l_text[(n)]=(c))
 #define llength(lp)	((lp)->l_used)
@@ -1286,7 +1307,7 @@ typedef struct	LINE {
 
 /* marks are a line and an offset into that line */
 typedef struct MARK {
-	LINE *l;
+	LINEPTR l;
 	C_NUM o;
 } MARK;
 
@@ -1414,15 +1435,15 @@ typedef struct	BUFFER {
 					/*  not displayed		*/
 	B_COUNT	b_bytecount;		/* # of chars			*/
 	L_NUM	b_linecount;		/* no. lines as of last read/write */
-	LINE 	*b_udstks[2];		/* undo stack pointers		*/
+	LINEPTR b_udstks[2];		/* undo stack pointers		*/
 	MARK 	b_uddot[2];		/* Link to "." before undoable op*/
 	short	b_udstkindx;		/* which of above to use	*/
-	LINE	*b_LINEs;		/* block-malloced LINE structs */
-	LINE	*b_LINEs_end;		/* end of 	"	"	" */
-	LINE	*b_freeLINEs;		/* list of free " 	"	" */
+	LINEPTR	b_LINEs;		/* block-malloced LINE structs */
+	LINEPTR	b_LINEs_end;		/* end of 	"	"	" */
+	LINEPTR	b_freeLINEs;		/* list of free " 	"	" */
 	unsigned char	*b_ltext;	/* block-malloced text */
 	unsigned char	*b_ltext_end;	/* end of block-malloced text */
-	LINE 	*b_ulinep;		/* pointer at 'Undo' line	*/
+	LINEPTR	b_ulinep;		/* pointer at 'Undo' line	*/
 	int	b_active;		/* window activated flag	*/
 	int	b_nwnd;		        /* Count of windows on buffer   */
 	int	b_flag;		        /* Flags 		        */
@@ -1654,7 +1675,7 @@ typedef struct  VIDEO {
 #define	CDMONO	1			/* monochrome text card		*/
 #define	CDEGA	2			/* EGA color adapter		*/
 #define	CDVGA	3			/* VGA color adapter		*/
-#define	CDSENSE	9			/* detect the card type		*/
+#define	CDSENSE	-1			/* detect the card type		*/
 
 #if COLOR
 #define	CD_25LINE	CDCGA
@@ -1801,8 +1822,8 @@ typedef struct VDESC {
 */
 
 typedef struct WHBLOCK {
-	LINE *w_begin;		/* ptr to !while statement */
-	LINE *w_end;		/* ptr to the !endwhile statement*/
+	LINEPTR	w_begin;	/* ptr to !while statement */
+	LINEPTR	w_end;		/* ptr to the !endwhile statement*/
 	int w_type;		/* block type */
 	struct WHBLOCK *w_next;	/* next while */
 } WHBLOCK;
@@ -1890,6 +1911,10 @@ extern char *getcwd();
 /* array/table size */
 #define	SIZEOF(v)	(sizeof(v)/sizeof(v[0]))
 
+#ifndef	offsetof	/* <stddef.h> */
+#define	offsetof(type, member)	((size_t)&(((type*)0)->member))
+#endif
+
 /* structure-allocate, for linting */
 #ifdef	lint
 #define	castalloc(cast,nbytes)		((cast *)0)
@@ -1967,9 +1992,9 @@ extern	void	dofree P((char *));
 
 #if VMALLOC
 extern	char *vmalloc P(( SIZE_T, char *, int ));
-extern	void vfree P(( unsigned char *, char *, int ));
+extern	void vfree P(( char *, char *, int ));
 extern	void rvverify P(( char *, char *, int ));
-extern	char *vrealloc P(( unsigned char *, SIZE_T, char *, int ));
+extern	char *vrealloc P(( char *, SIZE_T, char *, int ));
 extern	char *vcalloc P(( int, SIZE_T, char *, int ));
 extern	void vdump P(( char * ));
 # define malloc(x) vmalloc(x,__FILE__,__LINE__)

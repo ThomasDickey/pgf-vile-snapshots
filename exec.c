@@ -4,7 +4,10 @@
  *	written 1986 by Daniel Lawrence	
  *
  * $Log: exec.c,v $
- * Revision 1.53  1993/05/04 17:05:14  pgf
+ * Revision 1.54  1993/05/11 16:22:22  pgf
+ * see tom's CHANGES, 3.46
+ *
+ * Revision 1.53  1993/05/04  17:05:14  pgf
  * see tom's CHANGES, 3.45
  *
  * Revision 1.52  1993/04/28  17:11:22  pgf
@@ -1406,10 +1409,10 @@ nxtscan:	/* on to the next line */
 				lputc(mp, i, eline[i]);
 	
 			/* attach the line to the end of the buffer */
-	       		lforw(lback(bstore->b_line.l)) = mp;
-			lback(mp) = lback(bstore->b_line.l);
-			lback(bstore->b_line.l) = mp;
-			lforw(mp) = bstore->b_line.l;
+	       		set_lforw(lback(bstore->b_line.l), mp);
+			set_lback(mp, lback(bstore->b_line.l));
+			set_lback(bstore->b_line.l, mp);
+			set_lforw(mp, bstore->b_line.l);
 			goto onward;
 		}
 	

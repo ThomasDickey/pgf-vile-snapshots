@@ -115,7 +115,7 @@ CSRCde = dg10.c display.c eval.c exec.c externs.c
 CSRCfh = fences.c file.c filec.c fileio.c finderr.c glob.c globals.c history.c hp110.c hp150.c
 CSRCim = ibmpc.c input.c insert.c isearch.c line.c main.c modes.c mktbls.c
 CSRCnr = npopen.c opers.c oneliner.c path.c random.c regexp.c region.c
-CSRCst = search.c spawn.c st520.c tags.c tbuff.c tcap.c termio.c tipc.c
+CSRCst = search.c spawn.c st520.c tags.c tbuff.c tcap.c termio.c tipc.c tmp.c
 CSRCuw = undo.c vmalloc.c vms2unix.c vmspipe.c vmsvt.c vt52.c window.c word.c wordmov.c
 CSRCxz = x11.c z309.c z_ibmpc.c
 
@@ -138,14 +138,14 @@ SRC = main.c $(SCREEN).c basic.c bind.c buffer.c crypt.c \
 	csrch.c display.c eval.c exec.c externs.c fences.c file.c filec.c \
 	fileio.c finderr.c glob.c globals.c history.c input.c insert.c isearch.c \
 	line.c modes.c npopen.c oneliner.c opers.c path.c random.c regexp.c \
-	region.c search.c spawn.c tags.c tbuff.c termio.c undo.c \
+	region.c search.c spawn.c tags.c tbuff.c termio.c tmp.c undo.c \
 	vmalloc.c window.c word.c wordmov.c
 
 OBJ = main.$O $(SCREEN).$O basic.$O bind.$O buffer.$O crypt.$O \
 	csrch.$O display.$O eval.$O exec.$O externs.$O fences.$O file.$O filec.$O \
 	fileio.$O finderr.$O glob.$O globals.$O history.$O input.$O insert.$O isearch.$O \
 	line.$O modes.$O npopen.$O oneliner.$O opers.$O path.$O random.$O regexp.$O \
-	region.$O search.$O spawn.$O tags.$O tbuff.$O termio.$O undo.$O \
+	region.$O search.$O spawn.$O tags.$O tbuff.$O termio.$O tmp.$O undo.$O \
 	vmalloc.$O window.$O word.$O wordmov.$O
 
 
@@ -172,7 +172,7 @@ all:
 	echo "	make mach	(just pure bsd)"			;\
 	echo "	make svr4	(untested)"				;\
 	echo "	make mips	(uses systemV stuff)"			;\
-	echo "	make odt	(open desktop -- variant of svr3)"	;\
+	echo "	make odt	(SCO Open DeskTop -- variant of svr3)"	;\
 	echo "	make isc	(interactive -- another such variant)"	;\
 	echo "	make hpux"						;\
 	echo "	make next	(NeXT)"					;\
@@ -246,8 +246,8 @@ unixpc:
 		-DHAVE_MKDIR=0 -Dwinit=xxwinit -Dos_chosen -DUNIXPC" \
 		$(TARGET) $(ENVIR)
 
-uts:
-	$(MAKE) CFLAGS='$(CFLAGS1) -DUSG -Dos_chosen' \
+uts:		# use -eft to allow editing terabyte files.  :-)
+	$(MAKE) CFLAGS='$(CFLAGS1) -DUSG -eft -Dos_chosen' \
 		$(TARGET) $(ENVIR)
 
 # i've had reports that the curses lib is broken under AIX.  on the other
@@ -526,7 +526,16 @@ random.$O:	glob.h
 vmalloc$O:	nevars.h
 
 # $Log: makefile,v $
-# Revision 1.104  1993/05/05 12:28:57  pgf
+# Revision 1.107  1993/05/11 16:22:22  pgf
+# see tom's CHANGES, 3.46
+#
+# Revision 1.106  1993/05/06  16:21:28  pgf
+# uts compile-line change
+#
+# Revision 1.105  1993/05/06  10:48:29  pgf
+# mention sco in the make help
+#
+# Revision 1.104  1993/05/05  12:28:57  pgf
 # added some -DMACHINE defines to the compile lines (needed -DULTRIX)
 #
 # Revision 1.103  1993/04/29  19:19:16  pgf

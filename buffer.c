@@ -6,7 +6,10 @@
  * for the display system.
  *
  * $Log: buffer.c,v $
- * Revision 1.59  1993/05/04 17:05:14  pgf
+ * Revision 1.60  1993/05/11 16:22:22  pgf
+ * see tom's CHANGES, 3.46
+ *
+ * Revision 1.59  1993/05/04  17:05:14  pgf
  * see tom's CHANGES, 3.45
  *
  * Revision 1.58  1993/04/28  17:11:22  pgf
@@ -1405,10 +1408,10 @@ int len;
 		return (FALSE);
 	for (i=0; i<ntext; ++i)
 		lputc(lp, i, text[i]);
-	lforw(lback(bp->b_line.l)) = lp;	/* Hook onto the end    */
-	lback(lp) = lback(bp->b_line.l);
-	lback(bp->b_line.l) = lp;
-	lforw(lp) = bp->b_line.l;
+	set_lforw(lback(bp->b_line.l), lp);	/* Hook onto the end    */
+	set_lback(lp, lback(bp->b_line.l));
+	set_lback(bp->b_line.l, lp);
+	set_lforw(lp, bp->b_line.l);
 	if (sameline(bp->b_dot, bp->b_line))  /* If "." is at the end */
 		bp->b_dot.l = lp;	     /* move it to new line  */
 	return (TRUE);
@@ -1512,8 +1515,8 @@ char   *bname;
 	bp->b_udstkindx = 0;
 	bp->b_ulinep = NULL;
 	bp->b_last_used = 0;
-	lforw(lp) = lp;
-	lback(lp) = lp;
+	set_lforw(lp, lp);
+	set_lback(lp, lp);
         
 	/* append at the end */
 	if (lastb)

@@ -5,17 +5,21 @@ README for vile
 4/93:
 
 Well, here's the second net posting of vile.  The first was a long time
-ago.  Tom Dickey has been contributing a _whole_ lot of good changes.  Vile
-now runs on VMS, and is much more stable on DOS thanks to him.
+ago (a couple of years?).  Tom Dickey has been contributing a _whole_ lot
+of good changes.  vile now runs on VMS, and is much more stable on DOS
+thanks to Tom.  For me, vile is becoming an "old" program -- I first worked
+on it in 1989 sometime.  So it's been fun to have someone contributing
+fixes so energetically.  Thanks Tom.
 
 One thing that's changed since I first started vile is that "lots of eager
 programmers" have now tackled rewrites of vi.  There are several good work-
-alikes out there: elvis (the "king" :-), xvi, vim, stevie, vip-mode in GNU
-emacs.  From what little I've used any of these, they all seem like real
-good programs.  Vile feels different from most of them, mainly due to its
-roots in MicroEmacs.  You may or may not like it.  If you don't, try one of
-the others.  There's certainly no reason to not have a vi-like editor on
-just about any machine you choose.  Enjoy.
+alikes out there: elvis (the "king" :-), xvi, vim, stevie, and recent
+versions of vip-mode in GNU emacs.  From what little I've used any of
+these, they all seem like real good programs.  vile feels different from
+most of them, mainly due to its roots in MicroEmacs.  You may or may not
+like it.  If you don't, try one of the others.  There's certainly no reason
+to not have a vi-like editor on just about any machine you choose.  (yeah,
+I know -- I'm assuming you _want_ a vi-like editor...  :-) Enjoy.
 
 Oh yes -- building it.  On UNIX, type "make", and choose one of the predefined
 targets.  Like "make linux".
@@ -26,7 +30,7 @@ modetbl".  That'll build the headers you'll need to build vile.exe using
 the second makefile.  The current compiler of choice is Turbo C, but
 Microsoft C used to work, and so probably would again without too much
 work.  (The makefile support for msc is next to useless, though -- if
-anyone puts together a good nmake makefile, could you pass it along?
+anyone puts together a good "nmake" makefile, could you pass it along?
 
 The latest version of vile is usually available for ftp at "ftp.cayman.com",
 in the pub/vile directory.  Sometimes there's a compiled DOS binary there

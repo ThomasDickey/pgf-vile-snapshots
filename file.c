@@ -6,7 +6,16 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.84  1993/05/04 17:05:14  pgf
+ * Revision 1.87  1993/05/11 16:22:22  pgf
+ * see tom's CHANGES, 3.46
+ *
+ * Revision 1.86  1993/05/10  10:08:30  pgf
+ * new buffers should not be dos-mode by default
+ *
+ * Revision 1.85  1993/05/06  11:02:19  pgf
+ * don't try to realloc to size 0
+ *
+ * Revision 1.84  1993/05/04  17:05:14  pgf
  * see tom's CHANGES, 3.45
  *
  * Revision 1.83  1993/04/28  17:11:22  pgf
@@ -372,7 +381,6 @@ static char *
 resolve_filename(bp)
 BUFFER	*bp;
 {
-	extern	FILE *ffp;
 	char	temp[NFILEN];
 	ch_fname(bp, fgetname(ffp, temp));
 	return bp->b_fname;
@@ -705,6 +713,9 @@ int	mflg;		/* print messages? */
         } else if (s == FIOFNF) {		/* File not found.      */
                 if (mflg)
 			mlwrite("[New file]");
+#if DOSFILES
+		set_b_val(bp, MDDOS, FALSE);
+#endif
         } else {
 
         	if (mflg)
@@ -844,11 +855,14 @@ int *nlinep;
 				len = (long)(countp - bp->b_ltext);
 				incomplete = TRUE;
 				/* we'll re-read the rest later */
-				ffseek(len);
-				np = castrealloc(unsigned char,
+				if (len)  {
+					ffseek(len);
+					np = castrealloc(unsigned char,
 							bp->b_ltext, len);
-				if (np == NULL) { /* ugh.  can this happen? */
-					  /* (we're _reducing_ the size...) */
+				} else {
+					np = NULL;
+				}
+				if (np == NULL) {
 					ffrewind();
 					free((char *)bp->b_ltext);
 					bp->b_ltext = NULL;
@@ -893,8 +907,8 @@ int *nlinep;
 				lp->l_used = *textp;
 				lp->l_size = *textp + 1;
 				lp->l_text = (char *)textp + 1;
-				lforw(lp) = lp + 1;
-				lback(lp) = lp - 1;
+				set_lforw(lp, lp + 1);
+				set_lback(lp, lp - 1);
 				lsetclear(lp);
 				lp->l_nxtundo = NULL;
 				lp++;
@@ -908,12 +922,12 @@ int *nlinep;
 			lp--;  /* point at last line again */
 
 			/* connect the end of the list */
-			lforw(lp) = bp->b_line.l;
-			lback(bp->b_line.l) = lp;
+			set_lforw(lp, bp->b_line.l);
+			set_lback(bp->b_line.l, lp);
 
 			/* connect the front of the list */
-			lback(bp->b_LINEs) = bp->b_line.l;
-			lforw(bp->b_line.l) = bp->b_LINEs;
+			set_lback(bp->b_LINEs, bp->b_line.l);
+			set_lforw(bp->b_line.l, bp->b_LINEs);
 		}
 	}
 
@@ -1527,7 +1541,6 @@ FILE	*haveffp;
         register int    s;
         int    nbytes;
         register int    nline;
-	extern FILE	*ffp;
 
         bp = curbp;                             /* Cheap.               */
 	bp->b_flag &= ~BFINVS;			/* we are not temporary*/
@@ -1564,10 +1577,10 @@ FILE	*haveffp;
 		}
 
 		/* re-link new line between lp0 and lp2 */
-		lback(lp2) = lp1;
-		lforw(lp0) = lp1;
-		lback(lp1) = lp0;
-		lforw(lp1) = lp2;
+		set_lback(lp2, lp1);
+		set_lforw(lp0, lp1);
+		set_lback(lp1, lp0);
+		set_lforw(lp1, lp2);
 
 		if (nbytes)  /* l_text may be NULL in this case */
 			(void)memcpy(lp1->l_text, fline, nbytes);

@@ -7,7 +7,10 @@
 
 /*
  * $Log: epath.h,v $
- * Revision 1.7  1992/12/14 09:03:25  foxharp
+ * Revision 1.8  1993/05/11 16:22:22  pgf
+ * see tom's CHANGES, 3.46
+ *
+ * Revision 1.7  1992/12/14  09:03:25  foxharp
  * lint cleanup, mostly malloc
  *
  * Revision 1.6  1992/11/19  08:58:06  foxharp
@@ -87,6 +90,7 @@ char *pathname[] =
 {
 	".vilerc",
 	"vile.hlp",
+	".",		/* replaced at runtime with path-head of argv[0] */
 	"/usr/local/",
 	"/usr/lib/",
 	"/usr/local/bin/",

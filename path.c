@@ -3,7 +3,14 @@
  *		strings.
  *
  * $Log: path.c,v $
- * Revision 1.8  1993/04/20 12:18:32  pgf
+ * Revision 1.10  1993/05/11 16:22:22  pgf
+ * see tom's CHANGES, 3.46
+ *
+ * Revision 1.9  1993/05/06  11:59:58  pgf
+ * added ifdefs for USE_D_NAMLEN, for systems that don't have or don't
+ * need it (d_name[] is null-terminated on most systems)
+ *
+ * Revision 1.8  1993/04/20  12:18:32  pgf
  * see tom's 3.43 CHANGES
  *
  * Revision 1.7  1993/04/09  13:42:32  pgf
@@ -69,7 +76,8 @@ DIR	*dp;
 	static	DIRENT	dummy;
 
 	if ((fgets(dummy.d_name, NFILEN, dp)) != NULL) {
-		dummy.d_namlen = strlen(dummy.d_name)-1;
+		/* zap the newline */
+		dummy.d_name[strlen(dummy.d_name)-1] = EOS;
 		return &dummy;
 	}
 	return 0;
@@ -80,6 +88,7 @@ closedir (dp)
 DIR	*dp;
 {
 	(void)npclose(dp);
+	return 0;
 }
 #endif
 
@@ -261,6 +270,9 @@ char	*leaf;
 {
 	char	temp[NFILEN];
 	register char	*s = dst;
+
+	if (path == 0)
+		return strcpy(dst, leaf);
 
 	leaf = strcpy(temp, leaf);		/* in case leaf is in dst */
 

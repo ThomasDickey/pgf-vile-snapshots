@@ -3,7 +3,17 @@
  * the knowledge about files are here.
  *
  * $Log: fileio.c,v $
- * Revision 1.43  1993/05/04 17:05:14  pgf
+ * Revision 1.46  1993/05/11 16:22:22  pgf
+ * see tom's CHANGES, 3.46
+ *
+ * Revision 1.45  1993/05/06  16:34:27  pgf
+ * oops -- seek to current plus len, not to eof, in ffread
+ *
+ * Revision 1.44  1993/05/06  11:02:47  pgf
+ * keep stdio in sync, by seeking to end after reading whole file.  this
+ * keeps things working if we have to fseek back to the beginning later
+ *
+ * Revision 1.43  1993/05/04  17:05:14  pgf
  * see tom's CHANGES, 3.45
  *
  * Revision 1.42  1993/04/28  14:34:11  pgf
@@ -179,10 +189,6 @@
 #define	FOPEN_WRITE	"w"
 #define	FOPEN_APPEND	"a"
 #endif
-
-FILE	*ffp;		/* File pointer, all functions. */
-int fileispipe;
-int eofflag;		/* end-of-file flag */
 
 /*--------------------------------------------------------------------------*/
 
@@ -394,9 +400,12 @@ long len;
 			break;
 		total += this;
 	}
+	fseek (ffp, len, 1);	/* resynchronize stdio */
 	return total;
 #else
-	return read(fileno(ffp), buf, (int)len);
+	int got = read(fileno(ffp), buf, (int)len);
+	fseek (ffp, len, 1);	/* resynchronize stdio */
+	return got;
 #endif
 }
 

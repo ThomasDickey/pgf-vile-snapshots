@@ -3,7 +3,10 @@
  * code by Paul Fox, original algorithm mostly by Julia Harper May, 89
  *
  * $Log: undo.c,v $
- * Revision 1.23  1993/04/20 12:18:32  pgf
+ * Revision 1.24  1993/05/11 16:22:22  pgf
+ * see tom's CHANGES, 3.46
+ *
+ * Revision 1.23  1993/04/20  12:18:32  pgf
  * see tom's 3.43 CHANGES
  *
  * Revision 1.22  1993/01/23  13:38:23  foxharp
@@ -221,8 +224,8 @@ LINE *lp;
 	if (nlp == NULL)
 		return(FALSE);
 	llength(nlp) = LINENOTREAL;
-	lforw(nlp) = lforw(lp);
-	lback(nlp) = lback(lp);
+	set_lforw(nlp, lforw(lp));
+	set_lback(nlp, lback(lp));
 	pushline(nlp,CURSTK(curbp));
 	lsetcopied(lp);
 	if (ALTDOT(curbp).l == NULL) {
@@ -264,8 +267,8 @@ int type;
 	if (plp == NULL)
 		return;
 	llength(plp) = type;
-	lforw(plp) = olp;	/* lforw() is the original line */
-	lback(plp) = nlp;	/* lback() is the copy */
+	set_lforw(plp, olp);	/* lforw() is the original line */
+	set_lback(plp, nlp);	/* lback() is the copy */
 	pushline(plp,CURSTK(curbp));
 }
 
@@ -277,9 +280,9 @@ LINE *newlp, *oldlp;
 	for (tlp = *CURSTK(curbp); tlp != NULL ; tlp = tlp->l_nxtundo) {
 		if (!lispatch(tlp)) {
 			if (lforw(tlp) == oldlp)
-				lforw(tlp) = newlp;
+				set_lforw(tlp, newlp);
 			if (lback(tlp) == oldlp)
-				lback(tlp) = newlp;
+				set_lback(tlp, newlp);
 		}
 	}
 }
@@ -295,8 +298,8 @@ register LINE *lp;
 		return(NULL);
 	/* copy the text and forward and back pointers.  everything else 
 		matches already */
-	lforw(nlp) = lforw(lp);
-	lback(nlp) = lback(lp);
+	set_lforw(nlp, lforw(lp));
+	set_lback(nlp, lback(lp));
 	/* copy the rest */
 	if (lp->l_text && nlp->l_text)
 		memcpy(nlp->l_text, lp->l_text, lp->l_used);
@@ -358,8 +361,8 @@ int f,n;
 				alp = lforw(lback(lp));
 				repointstuff(lp,alp);
 				/* remove it */
-				lforw(lback(lp)) = lforw(alp);
-				lback(lforw(alp)) = lback(alp);
+				set_lforw(lback(lp), lforw(alp));
+				set_lback(lforw(alp), lback(alp));
 			} else { /* there is more than one line there */
 				mlforce("BUG: no stacked line for an insert");
 				/* cleanup ? naw, a bugs a bug */
@@ -371,15 +374,15 @@ int f,n;
 			if (alp == NULL)
 				return(FALSE);
 			llength(alp) = LINENOTREAL;
-			lforw(alp) = lforw(lp);
-			lback(alp) = lback(lp);
+			set_lforw(alp, lforw(lp));
+			set_lback(alp, lback(lp));
 		}
 
 		/* insert real lines into the buffer 
 			throw away the markers */
 		if (lisreal(lp)) {
-			lforw(lback(lp)) = lp;
-			lback(lforw(lp)) = lp;
+			set_lforw(lback(lp), lp);
+			set_lback(lforw(lp), lp);
 		} else {
 			lfree(lp,curbp);
 		}

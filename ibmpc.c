@@ -2,12 +2,18 @@
  * The routines in this file provide support for the IBM-PC and other
  * compatible terminals. It goes directly to the graphics RAM to do
  * screen output. It compiles into nothing if not an IBM-PC driver
- * Supported monitor cards include CGA, MONO and EGA.
+ *
+ * Supported monitor cards include
+ *	CGA, MONO, EGA, VGA.
+ *
  * Modified by Pete Ruczynski (pjr) for auto-sensing and selection of
  * display type.
  *
  * $Log: ibmpc.c,v $
- * Revision 1.14  1993/05/04 17:05:14  pgf
+ * Revision 1.15  1993/05/11 16:22:22  pgf
+ * see tom's CHANGES, 3.46
+ *
+ * Revision 1.14  1993/05/04  17:05:14  pgf
  * see tom's CHANGES, 3.45
  *
  * Revision 1.13  1993/04/28  14:34:11  pgf
@@ -43,7 +49,7 @@
  * revision 1.2
  * date: 1990/10/01 12:24:47;
  * changed newsize to newscreensize
- * 
+ *
  * revision 1.1
  * date: 1990/09/21 10:25:27;
  * initial vile RCS revision
@@ -58,7 +64,7 @@
 #if     IBMPC
 
 #define NROW	50			/* Max Screen size.		*/
-#define NCOL    80                      /* Edit if you want to.         */
+#define NCOL    80			/* Edit if you want to.         */
 #define	MARGIN	8			/* size of minimum margin and	*/
 #define	SCRSIZ	64			/* scroll size for extended lines */
 #define	NPAUSE	200			/* # times thru update to pause */
@@ -68,22 +74,78 @@
 #define	SCADM	0xb0000000L		/* MONO address of screen RAM	*/
 #define SCADE	0xb8000000L		/* EGA address of screen RAM	*/
 
-#define MONOCRSR 0x0B0D			/* monochrome cursor	    */
-#define CGACRSR 0x0607			/* CGA cursor		    */
-#define EGACRSR 0x0709			/* EGA cursor		    */
+#define	ColorDisplay()	(dtype != CDMONO && !monochrome)
+#define	AttrColor(b,f)	(((ctrans[b] & 7) << 4) | (ctrans[f] & 15))
+#define	Black(n)	((n) ? 0 : 7)
+#define	White(n)	((n) ? 7 : 0)
+#define	AttrMono(f)	(((Black(f) & 7) << 4) | (White(f) & 15))
 
-#define NDRIVE	4			/* number of screen drivers	upped to 4 (vga) */
+#define	uchar	unsigned char
 
+static	int	dtype = -1;		/* current display type		*/
 
-int dtype = -1;				/* current display type		*/
-char drvname[][8] = {			/* screen resolution names	*/
-	"CGA", "MONO", "EGA", "VGA"
-};
-long scadd;				/* address of screen ram	*/
+	/* scan-line resolution codes */
+#define	RES_250	0
+#define	RES_350	1
+#define	RES_400	2
+
+	/* character-size codes */
+#define	C9x16	0	/* the default */
+#define	C8x8	1
+#define	C8x14  	2
+#define	C8x16	4
+#define	C7x9	8
+#define	C7x16	16
+
+static	struct	{
+	char	*name;
+	uchar	type;
+	uchar	mode;
+	uchar	flags;
+	uchar	rows;
+	uchar	cols;
+	} drivers[] = {
+		/* the first 4 entries are reserved as synonyms for card-types */
+		{"CGA",    CDCGA,	3,	0,	25,  80},
+		{"MONO",   CDMONO,	3,	0,	25,  80},
+		{"EGA",    CDEGA,	3,	0,	43,  80},
+		{"VGA",    CDVGA,	3,	C8x8,	50,  80},
+		/* all VGA's */
+		{"40x25",  CDVGA,	1,	0,	25,  40},
+		{"80x25",  CDVGA,	3,	0,	25,  80},
+		{"80x50",  CDVGA,	3,	C8x8,	50,  80},
+		/* Paradise VGA (doesn't work yet...) */
+#ifdef TOP_2000_VGA
+#undef	NROW
+#define	NROW	75
+#undef	NCOL
+#define	NCOL	132
+		{"80x30",  CDVGA,	0x12,	C8x16,	30,  80},
+		{"100x75", CDVGA,	0x58,	C8x8,	75,  100},
+		{"132x25", CDVGA,	0x55,	C7x16,	25,  132},
+		{"132x43", CDVGA,	0x54,	C7x9,	43,  132},
+#endif
+	};
+
+static	long	ScreenAddress[] = {
+		SCADC,	/* CDCGA: Color graphics adapter */
+		SCADM,	/* CDMONO: Monochrome adapter */
+		SCADE,	/* CDEGA: Enhanced graphics adapter */
+		SCADE	/* CDVGA: VGA adapter */
+	};
+
 unsigned short *scptr[NROW];		/* pointer to screen lines	*/
 unsigned short sline[NCOL];		/* screen line image		*/
-int egaexist = FALSE;			/* is an EGA card available?	*/
 extern union REGS rg;			/* cpu register for use of DOS calls */
+
+static	int	original_mode	= -1,
+		original_cols,		/* width of display		*/
+		original_page,		/* display-page (we use 0)	*/
+		original_type,		/* one of CDMONO, ... CDVGA	*/
+		original_curs,		/* start/stop scan lines	*/
+		monochrome	= FALSE;
+
+static	int	egaexist = FALSE;	/* is an EGA card available?	*/
 
 					/* Forward references.          */
 extern  void	ibmmove   P((int,int));
@@ -120,12 +182,8 @@ extern	void	ibmscroll P((int,int,int));
 #endif
 
 static	void	egaopen   P((void));
-static	void	egaclose  P((void));
-static	void	vgaopen   P((void));
-static	void	vgaclose  P((void));
 
 static	int	scinit    P((int));
-static	int	setboard  P((int));
 static	int	getboard  P((void));
 static	int	scblank   P((void));
 
@@ -136,34 +194,76 @@ int ibmtype;		/* pjr - what to do about screen resolution */
  * "termio" code.
  */
 TERM    term    = {
-        NROW-1,
-        NROW-1,
-        NCOL,
-        NCOL,
-        MARGIN,
-        SCRSIZ,
-        NPAUSE,
+	NROW-1,
+	NROW-1,
+	NCOL,
+	NCOL,
+	MARGIN,
+	SCRSIZ,
+	NPAUSE,
 	ibmopen,
-        ibmclose,
-        ibmkopen,
-        ibmkclose,
-        ttgetc,
-        ibmputc,
-        ttflush,
-        ibmmove,
-        ibmeeol,
-        ibmeeop,
-        ibmbeep,
-        ibmrev,
-        ibmcres,
+	ibmclose,
+	ibmkopen,
+	ibmkclose,
+	ttgetc,
+	ibmputc,
+	ttflush,
+	ibmmove,
+	ibmeeol,
+	ibmeeop,
+	ibmbeep,
+	ibmrev,
+	ibmcres,
 #if	COLOR
-        ibmfcol,
-        ibmbcol,
+	ibmfcol,
+	ibmbcol,
 #endif
 #if	SCROLLCODE
 	ibmscroll
 #endif
 };
+
+static void
+set_display (int mode)
+{
+	rg.x.ax = mode;
+	int86(0x10, &rg, &rg);
+}
+
+static void
+set_80x25_display (void)
+{
+	set_display(3);
+}
+
+static void
+set_8x8_chars(void)
+{
+	rg.h.ah = 0x11;		/* set char. generator function code */
+	rg.h.al = 0x12;		/*  to 8 by 8 double dot ROM         */
+	rg.h.bl = 0;		/* block 0                           */
+	int86(0x10, &rg, &rg);	/* VIDEO - TEXT-MODE CHARACTER GENERATOR FUNCTIONS */
+}
+
+static void
+set_cursor(int start_stop)
+{
+	rg.h.ah = 1;		/* set cursor size function code */
+	rg.x.cx = start_stop;	/* turn cursor on code */
+	int86(0x10, &rg, &rg);	/* VIDEO - SET TEXT-MODE CURSOR SHAPE */
+}
+
+static void
+set_vertical_resolution(int code)
+{
+	rg.h.ah = 0x12;
+	rg.h.al = code;
+	rg.h.bl = 30;
+	int86(0x10, &rg, &rg);	/* VIDEO - SELECT VERTICAL RESOLUTION */
+
+}
+
+/*--------------------------------------------------------------------------*/
 
 #if	COLOR
 void
@@ -201,6 +301,7 @@ ibmeeol()
 	rg.h.ah = 3;		/* read cursor position function code */
 	rg.h.bh = 0;		/* current video page */
 	int86(0x10, &rg, &rg);
+
 	ccol = rg.h.dl;		/* record current column */
 	crow = rg.h.dh;		/* and row */
 
@@ -216,14 +317,13 @@ int ch;
 	rg.h.ah = 14;		/* write char to screen with current attrs */
 	rg.h.al = ch;
 #if	COLOR
-	if (dtype != CDMONO)
+	if (ColorDisplay())
 		rg.h.bl = cfcolor;
 	else
 #endif
-	 rg.h.bl = 0x07;
+	 rg.h.bl = White(TRUE);
 	rg.h.bh = 0;		/* current video page */
 	int86(0x10, &rg, &rg);
-
 }
 
 void
@@ -253,10 +353,8 @@ char *res;	/* resolution to change to */
 	register int i;		/* index */
 
 	/* find the default configuration */
-	if (!strcmp(res, "?")) {
-		scinit(CDSENSE);
-		return(TRUE);
-	}
+	if (!strcmp(res, "?"))
+		return scinit(CDSENSE);
 
 	/* specify a number */
 	if ((i = (int)strtol(res, &dst, 0)) >= 0
@@ -264,23 +362,21 @@ char *res;	/* resolution to change to */
 		switch (i) {
 		case 25:
 		case 2:
-			res = drvname[CD_25LINE];
+			res = drivers[CD_25LINE].name;
 			break;
 		case 43:
 		case 4:	/* 43 line mode */
-			res = drvname[CDEGA];
+			res = drivers[CDEGA].name;
 			break;
 		case 50:
 		case 5:	/* 50 line mode */
-			res = drvname[CDVGA];
+			res = drivers[CDVGA].name;
 		}
 	}
 
-	for (i = 0; i < NDRIVE; i++)
-		if (strcmp(res, drvname[i]) == 0) {
-			scinit(i);
-			return(TRUE);
-		}
+	for (i = 0; i < SIZEOF(drivers); i++)
+		if (strcmp(res, drivers[i].name) == 0)
+			return scinit(i);
 	return(FALSE);
 }
 
@@ -303,7 +399,21 @@ ibmbeep()
 void
 ibmopen()
 {
-	scinit(ibmtype);
+	rg.h.ah = 0xf;
+	int86(0x10,&rg, &rg);	/* VIDEO - GET DISPLAY MODE */
+
+	original_cols = rg.h.ah;
+	original_mode = rg.h.al;
+	original_page = rg.h.bh;
+	original_type = getboard();
+
+	rg.h.ah = 3;
+	rg.h.bh = 0;
+	int86(0x10, &rg, &rg);	/* VIDEO - GET CURSOR POSITION */
+	original_curs = rg.x.cx;
+
+	if (!scinit(ibmtype))
+		(void)scinit(CDSENSE);
 	revexist = TRUE;
 	ttopen();
 }
@@ -312,14 +422,8 @@ void
 ibmclose()
 
 {
-#if	COLOR
-	ibmfcol(7);
-	ibmbcol(0);
-#endif
-	if (dtype == CDEGA) /* if we had the EGA open... close it */
-		egaclose();
-	else if (dtype == CDVGA) /* if we had the VGA open... close it */
-		vgaclose();
+	set_display(original_mode);
+	set_cursor(original_mode <= 3 ? original_curs & 0x707 : original_curs);
 }
 
 void
@@ -333,223 +437,158 @@ ibmkclose()	/* close the keyboard */
 }
 
 static int
-scinit(type)	/* initialize the screen head pointers */
-int type;	/* type of adapter to init for */
+scinit(n)	/* initialize the screen head pointers */
+int n;		/* type of adapter to init for */
 {
 	union {
 		long laddr;	/* long form of address */
 		unsigned short *paddr;	/* pointer form of address */
 	} addr;
 	register int i;
-	int	rows;
+	int	type;
+	static	int	last = -1;
 
 	/* if asked...find out what display is connected */
-	if (type == CDSENSE)
-		type = getboard();
-	else
-		/* otherwise set up params as requested */
-		type = setboard(type);
+	if (n == CDSENSE)
+		n = type = original_type;
+	else {
+		type = drivers[n].type;
+		if (type == CDEGA && !egaexist)
+			return(FALSE);
+	}
 
-	/* if we have nothing to do....don't do it */
-	if (dtype == type)
-		return(TRUE);
-
-	/* if we try to switch to EGA and there is none, don't */
-	if ((type != CDVGA) && (type == CDEGA && egaexist != TRUE))
-		return(FALSE);
-
-	if (dtype == CDEGA) /* if we had the EGA open... close it */
-		egaclose();
-	else if (dtype == CDVGA) /* if we had the VGA open... close it */
-		vgaclose();
+	/* if changing resolution, we need a reset */
+	if (last >= 0) {
+		if (drivers[last].rows != drivers[n].rows
+		 || drivers[last].cols != drivers[n].cols)
+			set_80x25_display();
+		else if (dtype == type) {
+			(void)strcpy(sres, drivers[n].name);
+			return(TRUE);
+		}
+	}
 
 	/* and set up the various parameters as needed */
-	switch (type) {
-		case CDMONO:	/* Monochrome adapter */
-				scadd = SCADM;
-				rows = 25;
-				break;
-
-		case CDCGA:	/* Color graphics adapter */
-				scadd = SCADC;
-				rows = 25;
-				break;
-
-		case CDEGA:	/* Enhanced graphics adapter */
-				scadd = SCADE;
-				egaopen();
-				rows = 43;
-				break;
-
-		case CDVGA:	/* VGA adapter */
-				scadd = SCADE;
-				vgaopen();
-				rows = 50;
-				break;
+	if (type == CDEGA)
+		egaopen();
+	else if (type == CDVGA) {
+		set_display(drivers[n].mode);
+		set_vertical_resolution(RES_400);	/* if this needed? */
+		if (drivers[n].flags & C8x8)
+			set_8x8_chars();
 	}
-	newscreensize(rows, term.t_ncol);
+
+	newscreensize(drivers[n].rows, drivers[n].cols);
 
 	/* reset the $sres environment variable */
-	strcpy(sres, drvname[type]);
+	(void)strcpy(sres, drivers[n].name);
+
+	if ((type == CDMONO) != (dtype == CDMONO))
+		sgarbf = TRUE;
 	dtype = type;
+	last  = n;
 
 	/* initialize the screen pointer array */
-	addr.laddr = scadd;
+	if (monochrome)
+		addr.laddr = ScreenAddress[CDMONO];
+	else if (type == CDMONO)
+		addr.laddr = ScreenAddress[CDCGA];
+	else
+		addr.laddr = ScreenAddress[type];
+
 	for (i = 0; i < NROW; i++) {
-		scptr[i] = addr.paddr + NCOL * i;
+		scptr[i] = addr.paddr + term.t_ncol * i;
 	}
 	return(TRUE);
 }
 
 /* getboard:	Determine which type of display board is attached.
-		Current known types include:
-
-		CDMONO	Monochrome graphics adapter
-		CDCGA	Color Graphics Adapter
-		CDEGA	Extended graphics Adapter
-		CDVGA	VGA graphics Adapter
-*/
-
-/* getboard:	Detect the current display adapter
-		if MONO		set to MONO
-		   CGA		set to CGA	EGAexist = FALSE
-		   EGA		set to CGA	EGAexist = TRUE
-*/
+ *		Current known types include:
+ *
+ *		CDMONO	Monochrome graphics adapter
+ *		CDCGA	Color Graphics Adapter
+ *		CDEGA	Extended graphics Adapter
+ *		CDVGA	VGA graphics Adapter
+ */
 
 int getboard()
-
 {
-	int type;	/* board type to return */
-
-	type = CDCGA;
+	monochrome = FALSE;
 	egaexist = FALSE;
 
 	/* check for VGA or MCGA */
-	rg.h.ah = 0x1a;
+	rg.x.ax = 0x1a00;
 	rg.h.bl = 0x00;
-	int86(0x10,&rg, &rg);
+	int86(0x10,&rg, &rg);	/* VIDEO - GET DISPLAY COMBINATION CODE (PS,VGA,MCGA) */
 
-	if (rg.h.al == 0x1a) { /* its a VGA or MCGA */
-		if (rg.h.bl < 0x0a)
-			type = CDVGA;
-		else
-			type = CDCGA;
+	if (rg.h.al == 0x1a) {	/* function succeeded */
+		switch (rg.h.bl) {
+		case 0x01:	monochrome = TRUE;
+				return (CDMONO);
 
-		return(type);
+		case 0x02:	return (CDCGA);
+
+		case 0x05:	monochrome = TRUE;
+		case 0x04:	egaexist = TRUE;
+				return (CDEGA);
+
+		case 0x07:	monochrome = TRUE;
+		case 0x08:	return (CDVGA);
+
+		case 0x0b:	monochrome = TRUE;
+		case 0x0a:
+		case 0x0c:	return (CDCGA);	/* MCGA */
+		}
 	}
-	
-	/* check for MONO board first */
-	int86(0x11, &rg, &rg);
-	if (((rg.x.ax & 0x30) == 0x30))
-		return(CDMONO);
 
-	/* test if EGA present */
+	/*
+	 * Check for MONO board
+	 */
+	int86(0x11, &rg, &rg);	/* BIOS - GET EQUIPMENT LIST */
+
+	/* Bits 4-5 in ax are:
+	 *	00 EGA, VGA or PGA
+	 *	01 40x25 color
+	 *	10 80x25 color
+	 *	11 80x25 monochrome
+	 */
+	if (((rg.x.ax & 0x30) == 0x30)) {
+		monochrome = TRUE;
+		return(CDMONO);
+	}
+
+	/*
+	 * Test if EGA present
+	 */
 	rg.h.ah = 0x12;
 	rg.h.bl = 0x10;
-	int86(0x10,&rg, &rg);
+	int86(0x10,&rg, &rg);	/* VIDEO - GET EGA INFO */
 
-	if (rg.h.bl != 0x10) { /* its an EGA */
+	if (rg.h.bl != 0x10) {	/* function succeeded */
 		egaexist = TRUE;
 		return(CDEGA);
 	}
 
-	return(type);
-
+	return (CDCGA);
 }
 
 /*
- * setboard() - added by pjr
- *
- * This allows the user to set the monitor type by hand by using a set
- * variable in the rc file rather than trying to figure out automatically
- * which board is present, anyhow people may prefer 25 lines!
+ * Init the computer to work with the EGA (use 43-line mode)
  */
-static int
-setboard(type)
-int type;	/* board requested and type to return */
-{
-
-	switch (type)
-	{
-	case CDMONO:	/* 25 lines */
-		if (dtype == CDMONO)
-			type = CDMONO;
-		else
-			type = CDCGA;
-
-		egaexist = FALSE;
-		break;
-	case CDCGA:	/* 25 lines */
-		egaexist = FALSE;
-		break;
-	case CDEGA:	/* 43 lines */
-		egaexist = TRUE;
-		break;
-	case CDVGA:	/* 50 lines */
-		egaexist = FALSE;
-		break;
-	default:
-		egaexist = FALSE;
-	} /* end of switch */
-	
-	return(type);
-}
-
 static void
-egaopen()	/* init the computer to work with the EGA */
+egaopen()
 {
-	/* put the beast into EGA 43 row mode */
-	rg.x.ax = 3;
-	int86(0x10, &rg, &rg);
+	set_80x25_display();
+	set_8x8_chars();
 
-	rg.h.ah = 17;		/* set char. generator function code */
-	rg.h.al = 18;		/*  to 8 by 8 double dot ROM         */
-	rg.h.bl = 0;		/* block 0                           */
-	int86(0x10, &rg, &rg);
-
-	rg.h.ah = 18;		/* alternate select function code    */
+	rg.h.ah = 0x12;		/* alternate select function code    */
 	rg.h.al = 0;		/* clear AL for no good reason       */
-	rg.h.bl = 32;		/* alt. print screen routine         */
-	int86(0x10, &rg, &rg);
+	rg.h.bl = 0x20;		/* alt. print screen routine         */
+	int86(0x10, &rg, &rg);	/* VIDEO - SELECT ALTERNATE PRTSCRN  */
 
-	rg.h.ah = 1;		/* set cursor size function code */
-	rg.x.cx = 0x0607;	/* turn cursor on code */
-	int86(0x10, &rg, &rg);
-
+	set_cursor(0x0607);
 	outp(0x3d4, 10);	/* video bios bug patch */
 	outp(0x3d5, 6);
-}
-
-static void
-egaclose()
-{
-	/* put the beast into 80 column mode */
-	rg.x.ax = 3;
-	int86(0x10, &rg, &rg);
-}
-
-static void
-vgaopen()	/* init the computer to work with the VGA */
-{
-	/* put the beast into VGA 50 row mode */
-	rg.x.ax = 0x1202;
-	rg.h.bl = 30;
-	int86(0x10, &rg, &rg);
-
-	rg.x.ax = 3;
-	int86(0x10, &rg, &rg);
-
-	rg.x.ax = 0x1112;	/*  to 8 by 8 double dot ROM         */
-	rg.h.bl = 0;		/* block 0                           */
-	int86(0x10, &rg, &rg);
-}
-
-static void
-vgaclose()
-{
-	/* put the beast back into normal 80 column mode */
-	rg.x.ax = 3;
-	int86(0x10, &rg, &rg);
 }
 
 void
@@ -565,11 +604,11 @@ int bacg;	/* background color */
 
 	/* build the attribute byte and setup the screen pointer */
 #if	COLOR
-	if (dtype != CDMONO)
-		attr = ((ctrans[bacg] & 7) << 4) | (ctrans[forg] & 15);
+	if (ColorDisplay())
+		attr = AttrColor(bacg,forg);
 	else
 #endif
-	 attr = ((bacg & 15) << 4) | (forg & 15);
+	 attr = AttrMono(bacg<forg);
 	attr <<= 8;
 
 	if (flickcode && (dtype == CDCGA))
@@ -628,16 +667,16 @@ scblank()
 {
 	register int attr;
 #if	COLOR
-	if (dtype != CDMONO)
-		attr = ((ctrans[gbcolor] & 7) << 4) | (ctrans[gfcolor] & 15);
+	if (ColorDisplay())
+		attr = AttrColor(gbcolor,gfcolor);
 	else
 #endif
-	 attr = 0x07;
+	 attr = AttrMono(TRUE);
 	return attr;
 }
 
 #if SCROLLCODE
-/* 
+/*
  * Move 'n' lines starting at 'from' to 'to'
  *
  * PRETTIER_SCROLL is prettier but slower -- it scrolls a line at a time
@@ -653,7 +692,7 @@ int from, to, n;
 		if (from < to)
 			from = to-1;
 		else
-			from = to+1;    
+			from = to+1;
 	}
 #endif
 	rg.h.ah = 0x06;		/* scroll window up */
