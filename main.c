@@ -14,7 +14,13 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.119  1993/06/02 14:28:47  pgf
+ * Revision 1.121  1993/06/18 15:57:06  pgf
+ * tom's 3.49 changes
+ *
+ * Revision 1.120  1993/06/10  14:58:10  pgf
+ * initial :map support, from Otto Lind
+ *
+ * Revision 1.119  1993/06/02  14:28:47  pgf
  * see tom's 3.48 CHANGES
  *
  * Revision 1.118  1993/05/24  15:21:37  pgf
@@ -429,6 +435,7 @@
 #include	"estruct.h"	/* global structures and defines */
 #include	"edef.h"	/* global definitions */
 #include	"glob.h"
+#include	"nevars.h"
 
 extern char *pathname[];	/* startup file path/name array */
 
@@ -492,7 +499,7 @@ static	void print_usage P((void))
 	(void)fprintf(stderr, "usage: %s [-flags] [@cmdfile] files...\n", prog_arg);
 	for (j = 0; j < SIZEOF(options); j++)
 		(void)fprintf(stderr, "\t%s\n", options[j]);
-	exit(BAD(1));
+	ExitProgram(BAD(1));
 }
 
 /*--------------------------------------------------------------------------*/
@@ -671,7 +678,7 @@ char	*argv[];
 #endif
 			case 'V':
 				printf("vile %s\n", version);
-				exit(GOOD);
+				ExitProgram(GOOD);
 
 			case 'v':	/* -v for View File */
 				set_global_b_val(MDVIEW,TRUE);
@@ -833,7 +840,7 @@ char	*argv[];
 			}
 
 			if ((vbp=bfind(ScratchName(vileinit), OK_CREAT, 0))==NULL)
-				exit(BAD(1));
+				ExitProgram(BAD(1));
 
 			vbp->b_active = TRUE; /* don't want swbuffer to try to read it */
 			swbuffer(vbp);
@@ -975,6 +982,7 @@ loop()
 		n = 1;
 
 		do_repeats(&c,&f,&n);
+		map_check(c);
 
 		kregflag = 0;
 	        
@@ -1021,13 +1029,13 @@ global_val_init()
 		directly, but when buffers get a copy of the
 		global_b_values structure, the pointers will still point
 		back at the global values, which is what we want */
-	for (i = 0; i <= MAX_G_VALUES; i++)
+	for (i = 0; i <= NUM_G_VALUES; i++)
 		copy_val(global_g_values.gv, global_g_values.gv, i);
 
-	for (i = 0; i <= MAX_B_VALUES; i++)
+	for (i = 0; i <= NUM_B_VALUES; i++)
 		copy_val(global_b_values.bv, global_b_values.bv, i);
 
-	for (i = 0; i <= MAX_W_VALUES; i++)
+	for (i = 0; i <= NUM_W_VALUES; i++)
 		copy_val(global_w_values.wv, global_w_values.wv, i);
 
 
@@ -1043,7 +1051,9 @@ global_val_init()
 	set_global_b_val(MDASAVE,FALSE);	/* auto-save */
 	set_global_b_val(MDBACKLIMIT,TRUE); 	/* limit backspacing to insert point */
 	set_global_b_val(MDCMOD,FALSE); 	/* C mode */
+#ifdef MDCRYPT
 	set_global_b_val(MDCRYPT,FALSE);	/* crypt */
+#endif
 	set_global_b_val(MDIGNCASE,FALSE); 	/* exact matches */
 	set_global_b_val(MDDOS,FALSE);		/* dos mode */
 	set_global_b_val(MDMAGIC,TRUE); 	/* magic searches */
@@ -1107,8 +1117,10 @@ global_val_init()
 
 	set_global_w_val(WMDLIST,FALSE); /* list-mode */
 	set_global_w_val(WVAL_SIDEWAYS,0); /* list-mode */
+#if defined(WVAL_FCOLOR) || defined(WVAL_BCOLOR)
 	set_global_w_val(WVAL_FCOLOR,7); /* foreground color */
 	set_global_w_val(WVAL_BCOLOR,0); /* background color */
+#endif
 	set_global_w_val(WMDNUMBER,FALSE);	/* number */
 	set_global_w_val(WMDHORSCROLL,TRUE);	/* horizontal scrolling */
 
@@ -1350,7 +1362,7 @@ int f,n;
 	vttidy(TRUE);
 #if	FILOCK
 	if (lockrel() != TRUE) {
-		exit(BAD(1));
+		ExitProgram(BAD(1));
 		/* NOTREACHED */
 	}
 #endif
@@ -1380,8 +1392,8 @@ int f,n;
 		for (i = 0, v=w_valuenames; v[i].name != 0; i++)
 			free_val(v+i, &global_w_values.wv[i]);
 
-		if (gregexp != 0)	free((char *)gregexp);
-		if (patmatch != 0)	free(patmatch);
+		FreeAndNull(gregexp);
+		FreeAndNull(patmatch);
 
 #if UNIX
 		if (strcmp(pathname[2], ".")) free(pathname[2]);
@@ -1390,7 +1402,7 @@ int f,n;
 		show_alloc();
 	}
 #endif
-	exit(GOOD);
+	ExitProgram(GOOD);
 	/* NOTREACHED */
 	return FALSE;
 }
@@ -1462,9 +1474,6 @@ int opertransf(f,n) int f,n; { return unimpl(f,n); }
 
 int operglobals(f,n) int f,n; { return unimpl(f,n); }
 int opervglobals(f,n) int f,n; { return unimpl(f,n); }
-
-int map(f,n) int f,n; { return unimpl(f,n); }
-int unmap(f,n) int f,n; { return unimpl(f,n); }
 
 int source(f,n) int f,n; { return unimpl(f,n); }
 
@@ -1716,10 +1725,8 @@ dspram()	/* display the amount of RAM currently malloced */
 	TTforg(7);
 	TTbacg(0);
 #endif
-	lsprintf(mbuf, "[%ld]", envram);
-	sp = &mbuf[0];
-	while (*sp)
-		TTputc(*sp++);
+	(void)lsprintf(mbuf, "[%ld]", envram);
+	kbd_puts(mbuf);
 	TTmove(term.t_nrow, 0);
 	movecursor(term.t_nrow, 0);
 }
@@ -1778,5 +1785,19 @@ int	f,n;
 	extern	long	coreleft(void);
 	mlforce("Memory left: %D bytes", coreleft());
 	return TRUE;
+}
+#endif
+
+/*
+ * Try to invoke 'exit()' from only one point so we can cleanup temporary
+ * files.
+ */
+#if OPT_MAP_MEMORY
+void
+exit_program(code)
+int	code;
+{
+	tmp_cleanup();
+	exit(code);
 }
 #endif

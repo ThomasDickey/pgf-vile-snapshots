@@ -55,7 +55,7 @@ CSRCde = dg10.c display.c eval.c exec.c externs.c
 CSRCfh = fences.c file.c filec.c fileio.c finderr.c glob.c globals.c history.c hp110.c hp150.c
 CSRCim = ibmpc.c input.c insert.c isearch.c line.c main.c modes.c mktbls.c
 CSRCnr = npopen.c opers.c oneliner.c path.c random.c regexp.c region.c
-CSRCst = search.c spawn.c st520.c tags.c tbuff.c tcap.c termio.c tipc.c
+CSRCst = search.c spawn.c st520.c tags.c tbuff.c tcap.c termio.c tipc.c tmp.c
 CSRCuw = undo.c vmalloc.c vms2unix.c vmspipe.c vmsvt.c vt52.c window.c word.c wordmov.c
 CSRCxz = x11.c z309.c z_ibmpc.c
 
@@ -109,6 +109,7 @@ SRC =	main.c \
 	tags.c \
 	tbuff.c \
 	termio.c \
+	tmp.c \
 	undo.c \
 	vmalloc.c \
 	vms2unix.c \
@@ -153,6 +154,7 @@ OBJ =	main.obj,\
 	tags.obj,\
 	tbuff.obj,\
 	termio.obj,\
+	tmp.obj,\
 	undo.obj,\
 	vmalloc.obj,\
 	vms2unix.obj,\
@@ -166,10 +168,10 @@ all :	$(TARGET)
 
 nebind.h \
 nefunc.h \
-nename.h \
-nevars.h :	cmdtbl $(MKTBLS)
+nename.h :	cmdtbl $(MKTBLS)
 	MKTBLS cmdtbl
 
+nevars.h \
 nemode.h :	modetbl $(MKTBLS)
 	MKTBLS modetbl
 
@@ -192,7 +194,7 @@ clobber : clean
 
 $(OBJ) : estruct.h nemode.h edef.h proto.h
 
-main.obj :	glob.h
+main.obj :	nevars.h glob.h
 bind.obj :	epath.h
 eval.obj :	glob.h
 filec.obj :	dirstuff.h
@@ -227,7 +229,7 @@ CFLAGS =-
 $(MKTBLS) : mktbls.obj
 	$(LINK) $(LINKFLAGS) mktbls.obj,SYS$LIBRARY:VAXCRTL/LIB
 
-$(TARGET) : $(OBJ)
+$(TARGET) : $(OBJ), vms_link.opt
 	$(LINK) $(LINKFLAGS) main.obj, $(SCREEN).obj,vms_link/opt
 
 # Runs VILE from the current directory (used for testing)
@@ -243,7 +245,10 @@ vile.com :
 	@ write sys$output "** made $@"
 
 # $Log: descrip.mms,v $
-# Revision 1.5  1993/04/28 14:34:11  pgf
+# Revision 1.6  1993/06/18 15:57:06  pgf
+# tom's 3.49 changes
+#
+# Revision 1.5  1993/04/28  14:34:11  pgf
 # see CHANGES, 3.44 (tom)
 #
 # Revision 1.4  1993/04/20  12:18:32  pgf

@@ -4,7 +4,10 @@
  * All operating systems.
  *
  * $Log: termio.c,v $
- * Revision 1.71  1993/05/05 13:52:04  pgf
+ * Revision 1.72  1993/06/18 15:57:06  pgf
+ * tom's 3.49 changes
+ *
+ * Revision 1.71  1993/05/05  13:52:04  pgf
  * don't strip 8th bit in ttgetc()
  *
  * Revision 1.70  1993/05/05  12:25:16  pgf
@@ -342,7 +345,7 @@ ttopen()
 	s = tcgetattr(0, &otermios);
 	if (s < 0) {
 		perror("ttopen tcgetattr");
-		exit(BAD(1));
+		ExitProgram(BAD(1));
 	}
 #if ODT || ISC
 	setvbuf(stdout, tobuf, _IOLBF, TBUFSIZ);
@@ -905,7 +908,7 @@ ttopen()
                 odsc.dsc$w_length  = sizeof(oname);
                 status = LIB$SYS_TRNLOG(&idsc, &odsc.dsc$w_length, &odsc);
                 if (status!=SS$_NORMAL && status!=SS$_NOTRAN)
-                        exit(status);
+			ExitProgram(status);
                 if (oname[0] == 0x1B) {
                         odsc.dsc$a_pointer += 4;
                         odsc.dsc$w_length  -= 4;
@@ -913,11 +916,11 @@ ttopen()
         } while (status == SS$_NORMAL);
         status = SYS$ASSIGN(&odsc, &iochan, 0, 0);
         if (status != SS$_NORMAL)
-                exit(status);
+		ExitProgram(status);
         status = SYS$QIOW(EFN, iochan, IO$_SENSEMODE, iosb, 0, 0,
                           oldmode, sizeof(oldmode), 0, 0, 0, 0);
         if (status!=SS$_NORMAL || (iosb[0]&0xFFFF)!=SS$_NORMAL)
-                exit(status);
+		ExitProgram(status);
         newmode[0] = oldmode[0];
         newmode[1] = oldmode[1] | TT$M_NOECHO;
         newmode[1] &= ~(TT$M_TTSYNC|TT$M_HOSTSYNC);
@@ -925,7 +928,7 @@ ttopen()
         status = SYS$QIOW(EFN, iochan, IO$_SETMODE, iosb, 0, 0,
                           newmode, sizeof(newmode), 0, 0, 0, 0);
         if (status!=SS$_NORMAL || (iosb[0]&0xFFFF)!=SS$_NORMAL)
-                exit(status);
+		ExitProgram(status);
         term.t_nrow = (newmode[1]>>24) - 1;
         term.t_ncol = newmode[0]>>16;
 
@@ -971,10 +974,10 @@ ttclose()
 	if (status == SS$_IVCHAN)
 		return;	/* already closed it */
         if (status!=SS$_NORMAL || (iosb[0]&0xFFFF)!=SS$_NORMAL)
-                exit(status);
+		ExitProgram(status);
         status = SYS$DASSGN(iochan);
         if (status != SS$_NORMAL)
-                exit(status);
+		ExitProgram(status);
 #endif
 #if     MSDOS && (HP150 == 0) && LATTICE
 	/* restore the ctrl-break interrupt */
@@ -1133,7 +1136,7 @@ ttgetc()
                                  iosb, 0, 0, ibuf, 1, 0, term, 0, 0);
                         if (status != SS$_NORMAL
                         || (status = (iosb[0]&0xFFFF)) != SS$_NORMAL)
-                                exit(status);
+				ExitProgram(status);
                         nibuf = (iosb[0]>>16) + (iosb[1]>>16);
                 }
         }
@@ -1212,10 +1215,10 @@ typahead()
                 status = SYS$QIOW(EFN, iochan, IO$_READLBLK|IO$M_TIMED,
                          iosb, 0, 0, ibuf, NIBUF, 0, term, 0, 0);
                 if (status != SS$_NORMAL)
-                        exit(status);
+			ExitProgram(status);
                 status = iosb[0] & 0xFFFF;
                 if (status!=SS$_NORMAL && status!=SS$_TIMEOUT)
-                        exit(status);
+			ExitProgram(status);
                 nibuf = (iosb[0]>>16) + (iosb[1]>>16);
                 return (nibuf > 0);
 	}

@@ -17,7 +17,10 @@
  *	modify (ifdef-style) 'expand_leaf()' to allow ellipsis.
  *
  * $Log: glob.c,v $
- * Revision 1.9  1993/06/02 14:28:47  pgf
+ * Revision 1.10  1993/06/18 15:57:06  pgf
+ * tom's 3.49 changes
+ *
+ * Revision 1.9  1993/06/02  14:28:47  pgf
  * see tom's 3.48 CHANGES
  *
  * Revision 1.8  1993/05/11  16:22:22  pgf
@@ -359,7 +362,7 @@ char	*pattern;
 			len = de->d_namlen;
 			strncpy(leaf, de->d_name, len)[len] = EOS;
 #else
-			strcpy(leaf, de->d_name);
+			(void)strcpy(leaf, de->d_name);
 #endif
 #endif
 			if (!strcmp(leaf, ".")
@@ -405,12 +408,12 @@ char	*pattern;
 /*
  * Comparison-function for 'qsort()'
  */
-#if !__STDC__
+#if !__STDC__ && !defined(__TURBOC__)
 static	int	compar P(( char **, char ** ));
 #endif
 
 static int
-#if __STDC__
+#if __STDC__ || defined(__TURBOC__)
 compar (const void *a, const void *b)
 #else
 compar (a, b)
@@ -590,16 +593,11 @@ char	*item;
 				break;
 			}
 #else
-			strcpy(temp, de->d_name);
-			if (!record_a_match(de->d_name)) {
+			if (!record_a_match(strcpy(temp, de->d_name))) {
 				result = FALSE;
 				break;
 			}
 #endif
-			if (!record_a_match(temp)) {
-				result = FALSE;
-				break;
-			}
 		}
 		(void)closedir(dp);
 	} else

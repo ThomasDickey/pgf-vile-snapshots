@@ -8,7 +8,10 @@
  * routine is conditionalized on defining BEL.
  *
  * $Log: vt52.c,v $
- * Revision 1.5  1993/04/01 12:57:22  pgf
+ * Revision 1.6  1993/06/18 15:57:06  pgf
+ * tom's 3.49 changes
+ *
+ * Revision 1.5  1993/04/01  12:57:22  pgf
  * removed redundant includes and declarations
  *
  * Revision 1.4  1991/11/16  18:25:37  pgf
@@ -156,11 +159,11 @@ vt52open()
 
 	if ((cp = getenv("TERM")) == NULL) {
 		puts("Shell variable TERM not defined!");
-		exit(1);
+		ExitProgram(1);
 	}
 	if (strcmp(cp, "vt52") != 0 && strcmp(cp, "z19") != 0) {
 		puts("Terminal type not 'vt52'or 'z19' !");
-		exit(1);
+		ExitProgram(1);
 	}
 #endif
 	ttopen();

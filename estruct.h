@@ -10,7 +10,13 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.117  1993/06/02 14:28:47  pgf
+ * Revision 1.119  1993/06/22 10:27:31  pgf
+ * new macros for undo stack separators
+ *
+ * Revision 1.118  1993/06/18  15:57:06  pgf
+ * tom's 3.49 changes
+ *
+ * Revision 1.117  1993/06/02  14:28:47  pgf
  * see tom's 3.48 CHANGES
  *
  * Revision 1.116  1993/05/24  15:25:41  pgf
@@ -866,6 +872,21 @@ union REGS {
 };
 #endif
 
+/* on MS-DOS we have to open files in binary mode to see the ^Z characters. */
+
+#if MSDOS
+#define FOPEN_READ	"rb"
+#define FOPEN_WRITE	"wb"
+#define FOPEN_APPEND	"ab"
+#define FOPEN_UPDATE	"w+b"
+#else
+#define FOPEN_READ	"r"
+#define FOPEN_WRITE	"w"
+#define FOPEN_APPEND	"a"
+#define FOPEN_UPDATE	"w+"
+#endif
+
+
 #if MSDOS
 # define slashc(c) (c == '\\' || c == '/')
 #endif
@@ -1285,7 +1306,9 @@ typedef struct	LINE {
 #define LGMARK 2	/* line matched a global scan */
 
 /* macros to ease the use of lines */
-#define	for_each_line(lp,bp) for (lp = lForw(bp->b_line.l); lp != l_ref(bp->b_line.l); lp = lforw(lp))
+#define	for_each_line(lp,bp) for (lp = lForw(bp->b_line.l); \
+					lp != l_ref(bp->b_line.l); \
+					lp = lforw(lp))
 
 #define l_nxtundo		l.l_stklnk
 
@@ -1295,6 +1318,7 @@ typedef struct	LINE {
 #define LINENOTREAL	((int)(-1))
 #define LINEUNDOPATCH	((int)(-2))
 #define MARKPATCH	((int)(-3))
+#define STACKSEP	((int)(-4))
 
 	/*
 	 * If we are configured with mapped-data, references to LINE pointers
@@ -1350,6 +1374,7 @@ typedef struct	LINE {
 #define lislinepatch(lp)	((lp)->l_used == LINEUNDOPATCH)
 #define lismarkpatch(lp)	((lp)->l_used == MARKPATCH)
 #define lispatch(lp)		(lislinepatch(lp) || lismarkpatch(lp))
+#define lisstacksep(lp)		((lp)->l_used == STACKSEP)
 
 	/*
 	 * Corresponding (mixed-case : mixed-type) names for LINEPTR references
@@ -1876,6 +1901,26 @@ typedef struct {
 #define COMPLETE_DIRS   0
 #endif
 
+#ifndef P_tmpdir		/* not all systems define this */
+#if MSDOS
+#define P_tmpdir ""
+#endif
+#if UNIX
+#define P_tmpdir "/usr/tmp"
+#endif
+#if VMS
+#define P_tmpdir "sys$scratch:"
+#endif
+#endif	/* P_tmpdir */
+
+#undef TMPDIR
+
+#if !SMALLER
+#define TMPDIR gtenv("directory")
+#else
+#define TMPDIR P_tmpdir		/* defined in <stdio.h> */
+#endif	/* !SMALLER */
+
 /*	The editor holds deleted text chunks in the KILL registers. The
 	kill registers are logically a stream of ascii characters, however
 	due to unpredictable size, are implemented as a linked
@@ -2022,6 +2067,16 @@ extern char *getcwd P(( char *, int ));
 #define	typereallocn(cast,ptr,ntypes)	(cast *)realloc((char *)(ptr),\
 							(ntypes)*sizeof(cast))
 #define	typeallocplus(cast,extra)	(cast *)malloc((extra)+sizeof(cast))
+#endif
+
+#define	FreeAndNull(p)	if ((p) != 0) { free((char *)p); p = 0; }
+#define	FreeIfNeeded(p)	if ((p) != 0) free((char *)(p))
+
+/* extra level for cleanup of temp-file */
+#if OPT_MAP_MEMORY
+#define	ExitProgram(code)	exit_program(code)
+#else
+#define	ExitProgram(code)	exit(code)
 #endif
 
 #if HAVE_SELECT

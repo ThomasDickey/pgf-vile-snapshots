@@ -3,7 +3,10 @@
  * commands. There is no functional grouping here, for sure.
  *
  * $Log: random.c,v $
- * Revision 1.95  1993/06/02 14:28:47  pgf
+ * Revision 1.96  1993/06/18 15:57:06  pgf
+ * tom's 3.49 changes
+ *
+ * Revision 1.95  1993/06/02  14:28:47  pgf
  * see tom's 3.48 CHANGES
  *
  * Revision 1.94  1993/05/24  15:21:37  pgf
@@ -377,8 +380,7 @@ char	*name;
 	if (bp->b_fname == 0
 	 || name == 0
 	 || strcmp(bp->b_fname, name) != 0) {
-		if (bp->b_fname)
-			free(bp->b_fname);
+		FreeIfNeeded(bp->b_fname);
 		bp->b_fname = strmalloc(name);
 		bp->b_fnlen = strlen(bp->b_fname);
 	}

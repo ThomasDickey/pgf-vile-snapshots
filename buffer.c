@@ -6,7 +6,16 @@
  * for the display system.
  *
  * $Log: buffer.c,v $
- * Revision 1.63  1993/06/02 14:28:47  pgf
+ * Revision 1.66  1993/06/22 10:24:21  pgf
+ * new arg to freeundostacks()
+ *
+ * Revision 1.65  1993/06/21  14:23:41  pgf
+ * protect against printing filenames with percent chars in name
+ *
+ * Revision 1.64  1993/06/18  15:57:06  pgf
+ * tom's 3.49 changes
+ *
+ * Revision 1.63  1993/06/02  14:28:47  pgf
  * see tom's 3.48 CHANGES
  *
  * Revision 1.62  1993/05/24  15:25:41  pgf
@@ -527,8 +536,7 @@ void	FreeBuffer(bp)
 {
 	register BUFFER *bp1, *bp2;
 
-	if (bp->b_fname)
-		free(bp->b_fname);
+	FreeIfNeeded(bp->b_fname);
 
 #if !WINMARK
 	if (same_ptr(MK.l, bp->b_line.l)) {
@@ -612,16 +620,17 @@ int	hist_show()
 	for_each_buffer(bp) {
 		if (!InvisibleOrScratch(bp)) {
 			if (bp != curbp) {	/* don't bother with current */
-				(void)sprintf(line+strlen(line), "  %d", i);
-				(void)strcat(line, Changed(bp) ? "* " : " ");
-				(void)strcat(line, bp->b_bname);
+				(void)lsprintf(line+strlen(line), "  %d%s%s",
+					i,
+					Changed(bp) ? "* " : " ",
+					bp->b_bname);
 			}
 			if (++i > 9)	/* limit to single-digit */
 				break;
 		}
 	}
 	if (strcmp(line,"")) {
-		mlforce(line);
+		mlforce("%s",line);
 		return TRUE;
 	} else {
 		return FALSE;
@@ -730,6 +739,8 @@ int	lockfl;
 	 && !isInternalName(fname)) {
 		savebp = curbp;
 		if (!(bp = find_b_file(nfname))) {
+			L_NUM	top, now;
+
 			makename(bname, fname);
 			unqname(bname, TRUE);
 
@@ -739,10 +750,15 @@ int	lockfl;
 			}
 
 			/* fill the buffer */
-        		bp->b_flag &= ~(BFINVS|BFCHG);
+			bp->b_flag &= ~(BFINVS|BFCHG);
 			bp->b_flag |= BFIMPLY;
 			bp->b_active = TRUE;
 			ch_fname(bp, nfname);
+			if (curwp != 0 && curwp->w_bufp == curbp) {
+				top = line_no(curbp, curwp->w_line.l);
+				now = line_no(curbp, curwp->w_dot.l);
+			} else
+				top = now = -1;
 
 			if (copy) {
 				for_each_line(lp, savebp) {
@@ -753,6 +769,22 @@ int	lockfl;
 				}
 			} else
 				readin(fname, lockfl, bp, FALSE);
+
+			/* setup so that buffer-toggle works as in vi (i.e.,
+			 * the top/current lines of the screen are the same).
+			 */
+			if (now >= 0) {
+				for_each_line(lp,bp) {
+					if (--now == 0) {
+						bp->b_dot.l = l_ptr(lp);
+						bp->b_dot.o = curbp->b_dot.o;
+						break;
+					}
+					if (--top == 0) {
+						bp->b_wline.l = l_ptr(lp);
+					}
+				}
+			}
 
 			/* set last-used */
 			make_current(bp);
@@ -1579,23 +1611,19 @@ register BUFFER *bp;
 			return FALSE;
 	}
 	bp->b_flag  &= ~BFCHG;			/* Not changed		*/
-	freeundostacks(bp);	/* do this before removing lines */
+	freeundostacks(bp,TRUE);	/* do this before removing lines */
 	while ((l_ref(lp=lFORW(bp->b_line.l))) != l_ref(bp->b_line.l)) {
 		lremove(bp,lp);
 		lfree(lp,bp);
 	}
 
 #if !OPT_MAP_MEMORY
-	if (bp->b_ltext) {
-		free((char *)(bp->b_ltext));
-		bp->b_ltext = NULL;
-		bp->b_ltext_end = NULL;
-	}
-	if (bp->b_LINEs) {
-		free((char *)bp->b_LINEs);
-		bp->b_LINEs = NULL;
-		bp->b_LINEs_end = NULL;
-	}
+	FreeAndNull(bp->b_ltext);
+	bp->b_ltext_end = NULL;
+
+	FreeAndNull(bp->b_LINEs);
+	bp->b_LINEs_end = NULL;
+
 	bp->b_freeLINEs = NULL;
 #endif
 
@@ -1604,10 +1632,8 @@ register BUFFER *bp;
 	bp->b_mark = nullmark;			/* Invalidate "mark"	*/
 #endif
 	bp->b_lastdot = nullmark;		/* Invalidate "mark"	*/
-	if (bp->b_nmmarks != NULL) { /* free the named marks */
-		free((char *)(bp->b_nmmarks));
-		bp->b_nmmarks = NULL;
-	}
+	FreeAndNull(bp->b_nmmarks);	/* free the named marks */
+
 
 #if NO_LEAKS
 	free_local_vals(b_valuenames, bp->b_values.bv, global_b_values.bv);

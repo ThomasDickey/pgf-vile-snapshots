@@ -72,7 +72,16 @@
 #		here for completeness.
 #
 # $Log: cmdtbl,v $
-# Revision 1.61  1993/05/05 13:39:00  pgf
+# Revision 1.64  1993/06/22 10:28:03  pgf
+# new backundo and forwredo functions, for infinite undo
+#
+# Revision 1.63  1993/06/18  15:57:06  pgf
+# tom's 3.49 changes
+#
+# Revision 1.62  1993/06/10  14:58:10  pgf
+# initial :map support, from Otto Lind
+#
+# Revision 1.61  1993/05/05  13:39:00  pgf
 # changed special-prefix to function-prefix
 #
 # Revision 1.60  1993/05/04  17:05:14  pgf
@@ -824,6 +833,8 @@ showkreg	NONE			!SMALLER
 	"list-registers"		!FEWNAMES
 map		NONE|(EXRCOK|BANG|EXTRA)
 	"map"
+map_proc		REDO|UNDO
+	"map_proc"
 cntl_af		NONE
 	"cntl_a-prefix"
 	'^A'
@@ -1159,6 +1170,12 @@ unbindkey	NONE			REBIND
 undo		NONE
 	"undo-change"			!FEWNAMES
 	'u'
+backundo	NONE
+	"undo-changes-backward"		!FEWNAMES
+	'^X-u'
+forwredo	NONE
+	"redo-changes-forward"		!FEWNAMES
+	'^X-r'
 unarg		NONE
 	"universal-argument"		!FEWNAMES
 	'K'
@@ -1206,78 +1223,3 @@ yankline	NONE
 zzquit		NONE|(BANG|NL)
 	'Z'
 	"stuttered-write-all-and-quit"
-.environment
-"pagelen"	PAGELEN			# number of lines used by editor
-"curcol"	CURCOL			# current column pos of cursor
-"curline"	CURLINE			# current line in file
-"ram"		RAM			# ram in use by malloc
-"flicker"	FLICKER			# flicker suppression
-"pagewid"	CURWIDTH		# current screen width
-"cbufname"	CBUFNAME		# current buffer name
-"cfilname"	CFNAME			# current file name
-"sres"		SRES			# current screen resolution
-"debug"		DEBUG			# macro debugging
-"status"	STATUS			# returns the status of the last command
-"palette"	PALETTE			# current palette string
-"lastkey"	LASTKEY			# last keyboard char struck
-"char"		CURCHAR			# current character under the cursor
-"discmd"	DISCMD			# display commands on command line
-"version"	VERSION			# current version number
-"progname"	PROGNAME		# returns current prog name - "vile"
-"seed"		SEED			# current random number seed
-"disinp"	DISINP			# display command line input characters
-"wline"		WLINE			# # of lines in current window
-"cwline"	CWLINE			# current screen line in window
-"target"	TARGET			# target for line moves
-"search"	SEARCH			# search pattern
-"replace"	REPLACE			# replacement pattern
-"match"		MATCH			# last matched magic pattern
-"kill"		KILL			# kill buffer (read only)
-"cmode"		CMODE			# mode of current buffer
-"tpause"	TPAUSE			# length to pause for paren matching
-"pending"	PENDING			# type ahead pending flag
-"llength"	LLENGTH			# length of current line
-"line"		LINE			# text of current line
-"word"		WORD			# current word
-"identifier"	IDENTIF			# current identifier
-"qidentifier"	QIDENTIF		# current qualified identifier
-"pathname"	PATHNAME		# current path-like word
-"directory"	DIR			# current directory
-"font"		FONT			# current font patch: "#if X11"
-"shell"		SHELL			# shell-environment variable 
-
-.functions
-"add"	ADD		DYNAMIC		# add two numbers together
-"sub"	SUB		DYNAMIC		# subtraction
-"tim"	TIMES		DYNAMIC		# multiplication
-"div"	DIV		DYNAMIC		# division
-"mod"	MOD		DYNAMIC		# mod
-"neg"	NEG		MONAMIC		# negate
-"cat"	CAT		DYNAMIC		# concatenate string
-"lef"	LEFT		DYNAMIC		# left string(string, len)
-"rig"	RIGHT		DYNAMIC		# right string(string, pos)
-"mid"	MID		TRINAMIC	# mid string(string, pos, len)
-"not"	NOT		MONAMIC		# logical not
-"equ"	EQUAL		DYNAMIC		# logical equality check
-"les"	LESS		DYNAMIC		# logical less than
-"gre"	GREATER		DYNAMIC		# logical greater than
-"seq"	SEQUAL		DYNAMIC		# string logical equality check
-"sle"	SLESS		DYNAMIC		# string logical less than
-"sgr"	SGREAT		DYNAMIC		# string logical greater than
-"ind"	IND		MONAMIC		# evaluate indirect value
-"and"	AND		DYNAMIC		# logical and
-"or"	OR		DYNAMIC		# logical or
-"len"	LENGTH		MONAMIC		# string length
-"upp"	UPPER		MONAMIC		# uppercase string
-"low"	LOWER		MONAMIC		# lower case string
-"tru"	TRUTH		MONAMIC		# Truth of the universe logical test
-"asc"	ASCII		MONAMIC		# char to integer conversion
-"chr"	CHR		MONAMIC		# integer to char conversion
-"gtk"	GTKEY		NILNAMIC	# get 1 character
-"rnd"	RND		MONAMIC		# get a random number
-"abs"	ABS		MONAMIC		# absolute value of a number
-"sin"	SINDEX		DYNAMIC		# find the index of one string in another
-"env"	ENV		MONAMIC		# retrieve a system environment var
-"bin"	BIND		MONAMIC		# loopup what function name is bound to a key
-"rd"	READABLE	MONAMIC		# is a file readable?
-"wr"	WRITABLE	MONAMIC		# is a file writeable?

@@ -1,3 +1,108 @@
+Changes for vile 3.49:
+(pgf)
+	+ implemented infinite undo, on keys ^X-u (undo) and ^X-r (redo).
+	  probably affected location of cursor after some undo operations --
+	  don't if this will be significant or not -- i doubt we matched
+	  vi before in this regard anyway.  (undo.c, cmdtbl, buffer.c, proto.h
+	  estruct.h, vile.hlp)
+	
+	+ use an explicit %s when printing lone filename, to protect against
+	  filenames with % in name. (display.c)  (eric krohn)
+
+	+ don't allow kbd_putc to print to last column of display, since if
+	  the terminal autowraps, this causes a scroll.  this should check
+	  the :am: capability, but we're at the wrong layer to do that, and
+	  it doesn't seem worth adding to the TERM struct to make that info
+	  available (unix-pc behavior pointed out by eric krohn).
+
+	+ added Otto Lind's initial :map implementation (map.c, main.c,
+	  cmdtbl, makefile, proto.h)  This is a good start, but has the
+	  following limitations:  1) no string to string maps.  only simple
+	  keysequences are mappable.  2) not integrated with the keyboard
+	  macro routines -- this would make sense, and allow for recursion
+	  to be detected more properly.  but the keyboard macros are pretty
+	  tied into the named registers, which are stored in KILLREGS,
+	  which doesn't seem right for the :map'ed things.  perhaps we could
+	  dispense with the KILLREGS, and replace them with tbufs.  then some
+	  small changes the layering of start/finish_kbm and kbm_started
+	  could allow the :map code to share those routines.
+
+	+ added alistair crooks' lint stuff and change for the NeXT. (proto.h,
+	  mktbls.c)
+
+(tom)
+	+ modified file undo.c so that changes to scratch buffers can be
+	  undone.
+
+	+ modified 'imply_alt()' in file buffer.c so that the top/current line
+	  numbers are propagated into the alternate buffer.
+
+	+ changed environment variable 'directory' to 'cwd' so that 'directory'
+	  can be used for vi-compatible directory variable (used to control
+	  where the temp-file is written).
+
+	+ implemented environment variable 'directory' (files modetbl, eval.c)
+	  and used it to control temp-file location (npopen.c, tmp.c).  This is
+	  set by the environment variable TMP.
+
+	+ changed logic that opens/closes temp-file in tmp.c to use 'tempnam()'
+	  to derive the filename; added entrypoint 'tmp_cleanup()' to remove
+	  the temp-file on exit, and 'exit_program()' to file main.c to make a
+	  single exit-point from which to call 'tmp_cleanup()'.
+
+	+ Use macro 'ExitProgram()' to hide whether we call 'exit_program()' or
+	  'exit()' (files main.c, display.c, ibmpc.c, spawn.c, vmsvt.c, vt52.c,
+	  termio.c, termcap.c, file.c, window.c, x11.c).
+
+	+ modified 'mktbls.c' to generate definitions for 'nemode.h' in a
+	  form that allows modes to be conditionally compiled.
+
+	+ added a column to 'modetbl' to ifdef out modes that are not used.
+
+	+ made 'crypt', 'fcolor' and 'bcolor' modes ifdef-able (files main.c,
+	  modes.c, modetbl).
+
+	+ simplified 'promptpattern()' and 'expandp()' in file isearch.c
+
+	+ corrected USE_D_NAMLEN ifdef in 'expand_pattern()' (file glob.c)
+
+	+ corrected behavior when user inserts a newline into an empty buffer
+	  (file line.c).
+
+	+ moved environment variable definitions from cmdtbl to modetbl to
+	  ensure that name-completion table for modes+vars is updated in one
+	  place.  Sorted the environment variable names in modetbl and vile.hlp
+
+	+ include "nevars.h" within main.c to allow common name-completion
+	  table (without introducing lots of extra string-pointer variables).
+
+	+ modified mktbls.c to put the environment-variable names into the
+	  'all_modes[]' array in nemode.h (to support common name-completion).
+
+	+ modified 'listvars()' in file eval.c to optionally show all modes
+	  and environment variables in one list (if the user supplies a numeric
+	  argument before the "show-variables" command).
+
+	+ modified 'gtenv()' in file eval.c to recognize mode-names as well as
+	  environment names, and logic in file modes.c to recognize environment
+	  names.  Thus, for example, the commands
+	  	":setl dos" and
+		":setv $dos=true".
+	  are equivalent.
+
+	+ changed use of 'sprintf()' to 'lsprintf()' (files buffer.c, modes.c)
+
+	+ use macros 'FreeAndNull()' and 'FreeIfNeeded()' to simplify code
+	  (buffer.c, eval.c, file.c, filec.c, filec.c, main.c, modes.c,
+	  npopen.c, oneliner.c, search.c, random.c, x11.c)
+
+	+ changed case-statements for EV-variables to if-then-else-if in
+	  file eval.c because VAX-C cannot handle constant-expression
+	  OFFSETOF as case-values.
+
+	+ added 'tempnam()' to file vms2unix.c (to support testing of
+	  mapped-data configuration).
+
 Changes for vile 3.48:
 (pgf)
 	+ added FILEC_PROMPT flag to mlreply_file call in writeregion, to

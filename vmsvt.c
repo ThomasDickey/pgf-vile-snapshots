@@ -8,7 +8,10 @@
  *  Last Updated: 07/14/87
  *
  * $Log: vmsvt.c,v $
- * Revision 1.7  1993/04/20 12:18:32  pgf
+ * Revision 1.8  1993/06/18 15:57:06  pgf
+ * tom's 3.49 changes
+ *
+ * Revision 1.7  1993/04/20  12:18:32  pgf
  * see tom's 3.43 CHANGES
  *
  * Revision 1.6  1993/04/01  12:57:22  pgf
@@ -348,7 +351,7 @@ vmsgtty()
 	/* Assign input to a channel */
 	status = sys$assign(&devnam, &fd, 0, 0);
 	if ((status & 1) == 0)
-		exit (status);
+		ExitProgram(status);
 
 	/* Get terminal characteristics */
 	status = sys$qiow(		/* Queue and wait		*/
@@ -363,13 +366,13 @@ vmsgtty()
 
 	/* De-assign the input device */
 	if ((sys$dassgn(fd) & 1) == 0)
-		exit(status);
+		ExitProgram(status);
 
 	/* Jump out if bad status */
 	if ((status & 1) == 0)
-		exit(status);
+		ExitProgram(status);
 	if ((iostatus.i_cond & 1) == 0)
-		exit(iostatus.i_cond);
+		ExitProgram(iostatus.i_cond);
 }
 
 
@@ -386,7 +389,7 @@ void vmsopen(void)
 		printf("Terminal type is unknown!\n");
 		printf("Try set your terminal type with SET TERMINAL/INQUIRE\n");
 		printf("Or get help on SET TERMINAL/DEVICE_TYPE\n");
-		exit(3);
+		ExitProgram(3);
 	}
 
 	/* Access the system terminal definition table for the		*/

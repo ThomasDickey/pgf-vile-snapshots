@@ -11,7 +11,10 @@
  * which means that the dot and mark values in the buffer headers are nonsense.
  *
  * $Log: line.c,v $
- * Revision 1.44  1993/06/02 14:28:47  pgf
+ * Revision 1.45  1993/06/18 15:57:06  pgf
+ * tom's 3.49 changes
+ *
+ * Revision 1.44  1993/06/02  14:28:47  pgf
  * see tom's 3.48 CHANGES
  *
  * Revision 1.43  1993/05/24  15:21:37  pgf
@@ -591,7 +594,7 @@ lnewline()
 			if (same_ptr(wp->w_dot.l, lp1))
 				wp->w_dot.l = lp2;
 		}
-		return TRUE;
+		return lnewline();	/* vi really makes _2_ lines */
 	}
 
 	lp2 = lalloc(doto, curbp);	/* New first half line */

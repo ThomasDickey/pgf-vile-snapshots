@@ -17,7 +17,10 @@
  * ever equalled FALSE.
  * 
  * $Log: isearch.c,v $
- * Revision 1.20  1993/05/04 17:05:14  pgf
+ * Revision 1.21  1993/06/18 15:57:06  pgf
+ * tom's 3.49 changes
+ *
+ * Revision 1.20  1993/05/04  17:05:14  pgf
  * see tom's CHANGES, 3.45
  *
  * Revision 1.19  1993/04/28  17:11:22  pgf
@@ -78,6 +81,9 @@
 #include        "edef.h"
 
 #if	ISRCH
+
+static	int	promptpattern P(( char * ));
+static	char *	expandp P(( char *, char *, int ));
 
 /* A couple "own" variables for the command string */
 
@@ -404,20 +410,20 @@ match_pat(patrn)		/* See if the pattern string matches string
 
 /* Routine to prompt for I-Search string. */
 
-int 
+static int 
 promptpattern(prompt)
 	char           *prompt;
 {
-	char            tpat[NPAT + 20];
+	static	char	fmt[] = "%s [%s]: ";
+	char            tpat[NPAT],
+			temp[NPAT];
 
-	strcpy(tpat, prompt);	/* copy prompt to output string */
-	strcat(tpat, " [");	/* build new prompt string */
-	(void)expandp(pat, &tpat[strlen(tpat)], NPAT / 2);	/* add old pattern */
-	strcat(tpat, "]: ");
+	(void)lsprintf(tpat, fmt, prompt,
+		expandp(temp, pat, (int)(NPAT-sizeof(fmt)-strlen(prompt))));
 
 	/* check to see if we are executing a command line */
 	if (!clexec) {
-		mlforce(tpat);
+		mlforce("%s", tpat);
 	}
 	return (strlen(tpat));
 }
@@ -425,17 +431,18 @@ promptpattern(prompt)
 /*
  * expandp -- Expand control key sequences for output.
  */
-int
-expandp(srcstr, deststr, maxlength)
-	char           *srcstr;	/* string to expand */
-	char           *deststr;/* destination of expanded string */
+static char *
+expandp(deststr, srcstr, maxlength)
+	char           *deststr;	/* destination of expanded string */
+	char           *srcstr;		/* string to expand */
 	int             maxlength;	/* maximum chars in destination */
 {
+	char	*base = deststr;
 	unsigned char   c;	/* current char to translate */
 
 	/*
 	 * Scan through the string.
- */
+	 */
 	while ((c = *srcstr++) != 0) {
 		if (c == '\n') {/* it's a newline */
 			*deststr++ = '<';
@@ -447,10 +454,6 @@ expandp(srcstr, deststr, maxlength)
 			*deststr++ = '^';
 			*deststr++ = toalpha(c);
 			maxlength -= 2;
-		} else if (c == '%') {
-			*deststr++ = '%';
-			*deststr++ = '%';
-			maxlength -= 2;
 		} else {	/* any other character */
 			*deststr++ = c;
 			maxlength--;
@@ -459,12 +462,11 @@ expandp(srcstr, deststr, maxlength)
 		/* check for maxlength */
 		if (maxlength < 4) {
 			*deststr++ = '$';
-			*deststr = '\0';
-			return (FALSE);
+			break;
 		}
 	}
 	*deststr = '\0';
-	return (TRUE);
+	return base;
 }
 
 /* routine to echo i-search characters */

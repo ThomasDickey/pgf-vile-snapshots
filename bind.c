@@ -4,7 +4,11 @@
  *	written 11-feb-86 by Daniel Lawrence
  *
  * $Log: bind.c,v $
- * Revision 1.44  1993/06/02 14:28:47  pgf
+ * Revision 1.45  1993/06/21 14:22:38  pgf
+ * don't kbd_putc to the last column, to avoid auto-wrap problems.  should
+ * really check ":am:", but this means adding to the TERM struct.
+ *
+ * Revision 1.44  1993/06/02  14:28:47  pgf
  * see tom's 3.48 CHANGES
  *
  * Revision 1.43  1993/05/11  16:22:22  pgf
@@ -1196,7 +1200,7 @@ kbd_putc(c)
 		TTputc(c);
 		ttcol = 0;
 	} else if (isprint(c)) {
-		if (ttcol < term.t_ncol)
+		if (ttcol < term.t_ncol-1) /* -1 to avoid auto-wrap problems */
 			TTputc(c);
 		ttcol++;
 	} else if ((kbd_expand < 0) && (c == '\t')) {

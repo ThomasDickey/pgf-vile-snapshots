@@ -2,7 +2,10 @@
  *		for MicroEMACS
  *
  * $Log: tcap.c,v $
- * Revision 1.20  1993/06/02 14:28:47  pgf
+ * Revision 1.21  1993/06/18 15:57:06  pgf
+ * tom's 3.49 changes
+ *
+ * Revision 1.20  1993/06/02  14:28:47  pgf
  * see tom's 3.48 CHANGES
  *
  * Revision 1.19  1993/05/04  17:05:14  pgf
@@ -148,14 +151,14 @@ tcapopen()
 	if ((tv_stype = getenv("TERM")) == NULL)
 	{
 		puts("Environment variable TERM not defined!");
-		exit(1);
+		ExitProgram(BAD(1));
 	}
 
 	if ((tgetent(tcbuf, tv_stype)) != 1)
 	{
-		lsprintf(err_str, "Unknown terminal type %s!", tv_stype);
+		(void)lsprintf(err_str, "Unknown terminal type %s!", tv_stype);
 		puts(err_str);
-		exit(1);
+		ExitProgram(BAD(1));
 	}
 
 	/* Get screen size from system, or else from termcap.  */
@@ -163,14 +166,14 @@ tcapopen()
  
 	if ((term.t_nrow <= 0) && (term.t_nrow=(short)tgetnum("li")) == -1) {
 		puts("termcap entry incomplete (lines)");
-		exit(1);
+		ExitProgram(BAD(1));
 	}
 	term.t_nrow -= 1;
 
 
 	if ((term.t_ncol <= 0) &&(term.t_ncol=(short)tgetnum("co")) == -1){
 		puts("Termcap entry incomplete (columns)");
-		exit(1);
+		ExitProgram(BAD(1));
 	}
 
 #ifdef SIGWINCH
@@ -201,7 +204,7 @@ tcapopen()
 	if(CL == NULL || CM == NULL || UP == NULL)
 	{
 		puts("Incomplete termcap entry\n");
-		exit(1);
+		ExitProgram(BAD(1));
 	}
 
 	if (CE == NULL) 	/* will we be able to use clear to EOL? */
@@ -236,7 +239,7 @@ tcapopen()
 	if (p >= &tcapbuf[TCAPSLEN])
 	{
 		puts("Terminal description too big!\n");
-		exit(1);
+		ExitProgram(BAD(1));
 	}
 	ttopen();
 	if (TI)
@@ -258,7 +261,7 @@ tcapclose()
 void
 tcapkopen()
 {
-	strcpy(sres, "NORMAL");
+	(void)strcpy(sres, "NORMAL");
 }
 
 void

@@ -4,7 +4,10 @@
  *  heavily modified by Paul Fox, 1990
  *
  * $Log: search.c,v $
- * Revision 1.49  1993/05/24 15:21:37  pgf
+ * Revision 1.50  1993/06/18 15:57:06  pgf
+ * tom's 3.49 changes
+ *
+ * Revision 1.49  1993/05/24  15:21:37  pgf
  * tom's 3.47 changes, part a
  *
  * Revision 1.48  1993/04/20  12:18:32  pgf
@@ -716,8 +719,7 @@ int	fromscreen;
 	}
  	if (status == TRUE) {
 		if (srchexpp) {	/* If doing the search string, compile it */
-			if (*srchexpp)
-				free((char *)(*srchexpp));
+			FreeIfNeeded(*srchexpp);
 			*srchexpp = regcomp(pat, b_val(curbp, MDMAGIC));
 			if (!*srchexpp)
 				return FALSE;
@@ -742,8 +744,7 @@ int matchlen;
 
 	/* free any existing match string */
 	if (patmatch == NULL || patlen < matchlen) {
-		if (patmatch)
-			free(patmatch);
+		FreeIfNeeded(patmatch);
 		/* attempt to allocate a new one */
 		patmatch = castalloc(char, patlen = matchlen + 20);
 		if (patmatch == NULL)

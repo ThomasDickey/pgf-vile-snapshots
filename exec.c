@@ -4,7 +4,10 @@
  *	written 1986 by Daniel Lawrence	
  *
  * $Log: exec.c,v $
- * Revision 1.56  1993/06/02 14:28:47  pgf
+ * Revision 1.57  1993/06/18 15:57:06  pgf
+ * tom's 3.49 changes
+ *
+ * Revision 1.56  1993/06/02  14:28:47  pgf
  * see tom's 3.48 CHANGES
  *
  * Revision 1.55  1993/05/24  15:21:37  pgf
@@ -813,8 +816,7 @@ int f,n;
 	/* process leading argument */
 	if (toktyp(tkn) != TKCMD) {
 		f = TRUE;
-		strcpy(tkn, tokval(tkn));
-		n = atoi(tkn);
+		n = atoi(strcpy(tkn, tokval(tkn)));
 
 		/* and now get the command to execute */
 		if ((status = macarg(tkn)) != TRUE) {
@@ -987,7 +989,7 @@ char *tok;	/* buffer to place argument */
 	/* grab token and advance past */
 	execstr = token(execstr, tok, EOS);
 	/* evaluate it */
-	strcpy(tok, tokval(tok));
+	(void)strcpy(tok, tokval(tok));
 	clexec = savcle;	/* restore execution mode */
 	return TRUE;
 }
@@ -1016,7 +1018,7 @@ int n;		/* macro number to use */
 	}
 
 	/* construct the macro buffer name */
-	lsprintf(bname, ScratchName(Macro %d), n);
+	(void)lsprintf(bname, ScratchName(Macro %d), n);
 
 	/* set up the new macro buffer */
 	if ((bp = bfind(bname, OK_CREAT, BFINVS)) == NULL) {
@@ -1060,7 +1062,7 @@ int n;		/* macro number to use */
 
 	/* construct the macro buffer name */
 	bname[0] = SCRTCH_LEFT[0];
-	strcat(bname, SCRTCH_RIGHT);
+	(void)strcat(bname, SCRTCH_RIGHT);
 
 	/* set up the new macro buffer */
 	if ((bp = bfind(bname, OK_CREAT, BFINVS)) == NULL) {
@@ -1094,8 +1096,7 @@ int f, n;	/* default flag and numeric arg */
 
 	/* construct the buffer name */
 	bufn[0] = SCRTCH_LEFT[0];
-	strcpy(&bufn[1], obufn);
-	strcat(bufn, SCRTCH_RIGHT);
+	(void)strcat(strcpy(&bufn[1], obufn), SCRTCH_RIGHT);
 
 	/* find the pointer to that buffer */
         if ((bp=bfind(bufn, NO_CREAT, 0)) == NULL) {
@@ -1340,19 +1341,19 @@ nxtscan:	/* on to the next line */
 		   ^G will abort the command */
 	
 		if (macbug) {
-			strcpy(outline, "<<<");
+			(void)strcpy(outline, "<<<");
 	
 			/* debug macro name */
-			strcat(outline, bp->b_bname);
-			strcat(outline, ":");
+			(void)strcat(outline, bp->b_bname);
+			(void)strcat(outline, ":");
 	
 			/* debug if levels */
-			strcat(outline, l_itoa(execlevel));
-			strcat(outline, ":");
+			(void)strcat(outline, l_itoa(execlevel));
+			(void)strcat(outline, ":");
 
 			/* and lastly the line */
-			strcat(outline, eline);
-			strcat(outline, ">>>");
+			(void)strcat(outline, eline);
+			(void)strcat(outline, ">>>");
 	
 			/* write out the debug line */
 			mlforce("%s",outline);
@@ -1684,7 +1685,7 @@ int bufnum;	/* number of buffer to execute */
 	if (!f) n = 1;
 
 	/* make the buffer name */
-	lsprintf(bufname, ScratchName(Macro %d), bufnum);
+	(void)lsprintf(bufname, ScratchName(Macro %d), bufnum);
 
 	/* find the pointer to that buffer */
         if ((bp=bfind(bufname, NO_CREAT, 0)) == NULL) {

@@ -259,14 +259,6 @@ Text manipulation command:
 	Remember, these are only the new or different commands.  The 
 	standard vi set should still work.
 
-	Undo ("u") and line-undo ("U") are available for all commands.
-	They should be a little less capricious than their
-	vi counterparts, since they do not share the default yank register
-	for their operation.  Also, line-undo ("U") is available until
-	the next change anywhere in the file, rather than until you leave
-	the line.  Unfortunately, the cursor position after an undo may not 
-	always be the same as it would be in vi.
-
 	The vi "global" command is present, in its non-interactive form
 	only.  So is the "substitute" command.  These both look pretty
 	different while they're being used than they do in vi, and since
@@ -298,6 +290,24 @@ Text manipulation command:
 	the last substitution.  The '^A-&' command is a new operator (see
 	below), so it can work on regions: for example use '&}' to "repeat
 	the previous substitution over the rest of this paragraph".
+
+	Undo
+	----
+	Undo ("u") and line-undo ("U") are available for all commands.
+	They should be a little less capricious than their vi counterparts,
+	since they do not share the default yank register for their
+	operation.  Also, line-undo ("U") is available until the next
+	change anywhere in the file, rather than until you leave the line. 
+
+	In addition, vile lets you undo all changes made to a buffer since
+	it was first edited (so-called "infinite undo".  The '^X-u' command
+	will undo changes, one by one (or given a count, several at a
+	time).  Using '^X-r' will walk forward, redoing the previously
+	undone changes one by one.  A fresh change to the buffer will cause
+	the ability to redo previously undone changes to be lost.
+
+	The cursor position after an undo may not always be
+	the same as it would be in vi.
 
 	Operators
 	---------
@@ -857,50 +867,66 @@ Programmed macros
 	would be the equivalent of "5dd" since the word "lines" represents
 	the stuttered 'dd' style of operation.
 
-	There are some built-in variables that can be used in macros to
-	gain access to parts of vile status, and parts of the current
-	buffer.  Built-in variables are accessed by name, prefixed with
-	the '$' character.  (User-defined variables can also be set and
-	used; their names are prefixed with the '%' character.)
+	There are some built-in variables that can be used in macros to gain
+	access to parts of vile status, and parts of the current buffer. 
+	Built-in variables are accessed by name, prefixed with the '$'
+	character.  There are two types of built-in variables (the environment
+	variables, and mode values).  The environment variables are:
 
-	$pagelen	number of screen lines in use by editor
-	$pagewid	current screen width
-	$curcol		current column position of cursor
-	$curline	current line in file
 	$cbufname	current buffer name
 	$cfilname	current file name
-	$sres		current screen resolution
+	$char		character under the cursor
+	$curcol		current column position of cursor
+	$curline	current line in file
+	$cwd		current directory
+	$cwline		line offset in current window
 	$debug		macro debugging -- set true for line by line tracing
-	$status		returns the status of the last command
-	$palette	current palette string
-	$lastkey	last keyboard char struck
-	$version	current version number			(read-only)
-	$progname	returns current prog name - "vile"	(read-only)
-	$seed		current random number seed
+	$directory	controls location of temp-files
 	$discmd		display commands on command line
 	$disinp		display command line input characters
-	$wline		number of lines in current window
-	$cwline		line offset in current window
-	$search		search pattern
-	$replace	replacement pattern
-	$match		last matched magic pattern		(read only)
-	$kill		some of the kill register		(read only)
-	$tpause		length to pause for paren matching (pc versions)
-	$pending	typeahead pending flag			(read only)
-	$llength	length of current line			(read only)
-	$char		character under the cursor
-	$line		text of current line
-	$word		current "word"
-	$identifier	current punctuated word
-	$qidentifier	current qualified name (as with C++ ::)
-	$pathname	current path-like word
-	$directory	current directory
-	$terse		be terse -- suppress messages
 	$font		current font name (X version only)
+	$identifier	current punctuated word
+	$kill		some of the kill register		(read only)
+	$lastkey	last keyboard char struck
+	$line		text of current line
+	$llength	length of current line			(read only)
+	$match		last matched magic pattern		(read only)
+	$pagelen	number of screen lines in use by editor
+	$pagewid	current screen width
+	$palette	current palette string
+	$pathname	current path-like word
+	$pending	typeahead pending flag			(read only)
+	$progname	returns current prog name - "vile"	(read-only)
+	$qidentifier	current qualified name (as with C++ ::)
+	$replace	replacement pattern
+	$search		search pattern
+	$seed		current random number seed
+	$sres		current screen resolution
+	$status		returns the status of the last command
+	$terse		be terse -- suppress messages
+	$tpause		length to pause for paren matching (pc versions)
+	$version	current version number			(read-only)
+	$wline		number of lines in current window
+	$word		current "word"
 
-	There are also functions available, which can act on
-	those variables, or on hard-coded values.  Operations are expressed
-	in prefix notation, so to add to numbers you would say "&add 3 5".
+	In addition to the environment variables, you may set and use the
+	values of the editor modes (i.e., universal modes, buffer-only modes or
+	window-only modes), e.g., "setv $dos=true".  The global values of the
+	editor modes are not visible to the expression evaluator.
+
+	User-defined variables can also be set and used; their names are
+	prefixed with the '%' character.
+
+	Response variables (a '@' followed by a prompt-string) cause vile to
+	prompt for input with the given prompt-string.
+
+	Buffer variables (a '#' followed by a buffer name) return the current
+	line of the specified buffer, automatically setting the position to the
+	next line.
+
+	There are also functions available, which can act on those variables,
+	or on hard-coded values.  Operations are expressed in prefix notation,
+	so to add to numbers you would say "&add 3 5".
 
 	func	no. of
 	name	args

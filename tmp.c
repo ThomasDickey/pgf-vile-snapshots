@@ -34,7 +34,10 @@
  *	  are in-memory can have space allocated from them.
  *
  * $Log: tmp.c,v $
- * Revision 1.2  1993/06/02 14:28:47  pgf
+ * Revision 1.3  1993/06/18 15:57:06  pgf
+ * tom's 3.49 changes
+ *
+ * Revision 1.2  1993/06/02  14:28:47  pgf
  * see tom's 3.48 CHANGES
  *
  * Revision 1.1  1993/05/24  15:21:37  pgf
@@ -122,6 +125,7 @@ static	BLK_T	intern_pagenum;	/* next page # to allocate */
 static	BLK_T	extern_pagenum;	/* total # of pages written to temp-file */
 
 static	FILE	*temp_fp;	/* page-swapping file */
+static	char	*temp_is;	/* ...and its pathname */
 
 static	int	count_truncated;/* counts truncated lines for warning message */
 #endif
@@ -469,8 +473,11 @@ PAGE_T	*this;
 
 	TRACE1(("writing page #%ld:%ld =>%p\n", this->block, extern_pagenum, this))
 
-	if (temp_fp == 0)
-		temp_fp = tmpfile();
+	if (temp_fp == 0) {
+		if ((temp_is = tempnam(TMPDIR, "vile")) == 0
+		 || (temp_fp = fopen(temp_is, FOPEN_UPDATE)) == 0)
+			Oops();
+	}
 
 	if (fseek(temp_fp, PageOffset(this->block), 0) < 0
 	 || fwrite((char *)this, sizeof(char), NCHUNK, temp_fp) != NCHUNK) {
@@ -759,6 +766,17 @@ int	list;		/* ...list from which to remove the space */
 }
 
 /*----------------------------------------------------------------------------*/
+
+/* If we have opened the temp-file, close and remove it.
+ */
+void
+tmp_cleanup()
+{
+	if (temp_fp != 0)
+		(void)fclose(temp_fp);
+	if (temp_is != 0)
+		(void)unlink(temp_is);
+}
 
 /* Try to find an in-memory page with enough space to store the line.
  * If there is none, allocate a new page and return the line from that point.

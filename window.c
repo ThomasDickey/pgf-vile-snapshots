@@ -3,7 +3,10 @@
  * attached to keys that the user actually types.
  *
  * $Log: window.c,v $
- * Revision 1.26  1993/06/02 14:28:47  pgf
+ * Revision 1.27  1993/06/18 15:57:06  pgf
+ * tom's 3.49 changes
+ *
+ * Revision 1.26  1993/06/02  14:28:47  pgf
  * see tom's 3.48 CHANGES
  *
  * Revision 1.25  1993/05/24  15:21:37  pgf
@@ -968,7 +971,7 @@ winit()
 
         wp = typealloc(WINDOW);			/* First window         */
         if (wp==NULL)
-                exit(BAD(1));
+		ExitProgram(BAD(1));
         wheadp = wp;
         curwp  = wp;
         wp->w_wndp  = NULL;                     /* Initialize window    */

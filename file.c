@@ -6,7 +6,10 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.90  1993/06/02 14:57:32  pgf
+ * Revision 1.91  1993/06/18 15:57:06  pgf
+ * tom's 3.49 changes
+ *
+ * Revision 1.90  1993/06/02  14:57:32  pgf
  * added FILEC_PROMPT to writeregion's call to mlreply_file to force
  * prompting, and folded some long lines
  *
@@ -838,8 +841,7 @@ int *nlinep;
 		return FIOMEM;
 
 	if ((len = ffread((char *)&bp->b_ltext[1], len)) < 0) {
-		free((char *)bp->b_ltext);
-		bp->b_ltext = NULL;
+		FreeAndNull(bp->b_ltext);
 		return FIOERR;
 	}
 
@@ -876,8 +878,7 @@ int *nlinep;
 				}
 				if (np == NULL) {
 					ffrewind();
-					free((char *)bp->b_ltext);
-					bp->b_ltext = NULL;
+					FreeAndNull(bp->b_ltext);
 					return FIOMEM;
 				}
 				bp->b_ltext = np;
@@ -894,16 +895,13 @@ int *nlinep;
 	/* dbgwrite("lines %d, chars %d", nlines, textp - bp->b_ltext); */
 	if (nlines == 0) {
 		ffrewind();
-		if (bp->b_ltext)
-			free((char *)bp->b_ltext);
-		bp->b_ltext = NULL;
+		FreeAndNull(bp->b_ltext);
 		incomplete = TRUE;
 	} else {
 		/* allocate all of the line structs we'll need */
 		bp->b_LINEs = typeallocn(LINE,nlines);
 		if (bp->b_LINEs == NULL) {
-			free((char *)bp->b_ltext);
-			bp->b_ltext = NULL;
+			FreeAndNull(bp->b_ltext);
 			ffrewind();
 			return FIOMEM;
 		}
@@ -1723,7 +1721,7 @@ int signo;
 				(void)mktemp(dirnam);
 				if(mkdir(dirnam,0700) != 0) {
 					vttidy(FALSE);
-					exit(BAD(1));
+					ExitProgram(BAD(1));
 				}
 				created = 1;
 			}
@@ -1735,7 +1733,7 @@ int signo;
 			set_b_val(bp,MDVIEW,FALSE);
 			if (writeout(filnam,bp,FALSE) != TRUE) {
 				vttidy(FALSE);
-				exit(BAD(1));
+				ExitProgram(BAD(1));
 			}
 			wrote++;
 		}
@@ -1756,7 +1754,7 @@ int signo;
 	if (signo > 2)
 		abort();
 	else
-		exit(wrote ? BAD(wrote) : GOOD);
+		ExitProgram(wrote ? BAD(wrote) : GOOD);
 
 	/* NOTREACHED */
 	SIGRET;

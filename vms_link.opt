@@ -1,6 +1,9 @@
 ! Link with sharable C-runtime library
 ! $Log: vms_link.opt,v $
-! Revision 1.2  1993/04/20 12:18:32  pgf
+! Revision 1.3  1993/06/18 15:57:06  pgf
+! tom's 3.49 changes
+!
+! Revision 1.2  1993/04/20  12:18:32  pgf
 ! see tom's 3.43 CHANGES
 !
 ! Revision 1.1  1993/03/17  09:51:20  pgf
@@ -41,6 +44,7 @@ spawn.obj
 tags.obj
 tbuff.obj
 termio.obj
+tmp.obj
 undo.obj
 vmalloc.obj
 vms2unix.obj

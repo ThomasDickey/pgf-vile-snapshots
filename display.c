@@ -6,7 +6,14 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.85  1993/06/02 14:28:47  pgf
+ * Revision 1.87  1993/06/22 10:26:53  pgf
+ * dbgwrite now loops for a ^G to be typed -- safer when typing fast than
+ * a simple getchar()
+ *
+ * Revision 1.86  1993/06/18  15:57:06  pgf
+ * tom's 3.49 changes
+ *
+ * Revision 1.85  1993/06/02  14:28:47  pgf
  * see tom's 3.48 CHANGES
  *
  * Revision 1.84  1993/05/24  15:25:41  pgf
@@ -624,13 +631,13 @@ vtinit()
     vscreen = typeallocn(VIDEO *,term.t_mrow);
 
     if (vscreen == NULL)
-        exit(BAD(1));
+	ExitProgram(BAD(1));
 
 #if	! MEMMAP
     pscreen = typeallocn(VIDEO *,term.t_mrow);
 
     if (pscreen == NULL)
-        exit(BAD(1));
+	ExitProgram(BAD(1));
 #endif
 
     for (i = 0; i < term.t_mrow; ++i) {
@@ -638,7 +645,7 @@ vtinit()
         vp = typeallocplus(VIDEO, term.t_mcol - 4);
 
         if (vp == NULL)
-            exit(BAD(1));
+	    ExitProgram(BAD(1));
 
 
 	/* unnecessary */
@@ -654,7 +661,7 @@ vtinit()
         vp = typeallocplus(VIDEO, term.t_mcol - 4);
 
         if (vp == NULL)
-            exit(BAD(1));
+	    ExitProgram(BAD(1));
 
 	/* unnecessary */
 	/* (void)memset(vp, 0, sizeof(struct VIDEO) + term.t_mcol - 4); */
@@ -2091,7 +2098,8 @@ va_dcl
 	mlmsg(&ap);
 #endif
 	va_end(ap);
-	TTgetc();
+	while (TTgetc() != '\007')
+		;
 }
 
 /*
