@@ -11,7 +11,10 @@
  * which means that the dot and mark values in the buffer headers are nonsense.
  *
  * $Log: line.c,v $
- * Revision 1.76  1994/10/30 16:26:37  pgf
+ * Revision 1.77  1994/11/21 23:50:23  pgf
+ * pgf changes for map/remap etc.
+ *
+ * Revision 1.76  1994/10/30  16:26:37  pgf
  * changed SIZEOF to TABLESIZE
  *
  * Revision 1.75  1994/10/28  11:16:41  pgf
@@ -1571,7 +1574,7 @@ int f,n;
 {
 	int c, j, jj, status;
 	KILL *kp;		/* pointer into kill register */
-	static TBUFF	*buffer;
+	static ITBUFF	*buffer;
 	static	char	cbuf[2];
 
 	if (!f)
@@ -1596,10 +1599,10 @@ int f,n;
 		return TRUE;		/* not an error, just nothing */
 
 	/* for simplicity, keyboard-string needs a single buffer */
-	if (tb_alloc(&buffer, KBLOCK)
-	 && tb_init(&buffer, abortc)) {
+	if (itb_alloc(&buffer, KBLOCK)
+	 && itb_init(&buffer, abortc)) {
 		while (kp != 0) {
-			if (!tb_bappend(&buffer, (char *)(kp->d_chunk), 
+			if (!itb_bappend(&buffer, (char *)(kp->d_chunk), 
 					(ALLOC_T)KbSize(jj,kp)))
 				return FALSE;
 			kp = kp->d_next;
@@ -1610,7 +1613,7 @@ int f,n;
 		dotcmdmode = STOP;
 	}
 #if NO_LEAKS2
-	tb_free(&buffer);
+	itb_free(&buffer);
 #endif
 	return status;
 }

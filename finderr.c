@@ -1,14 +1,14 @@
 /* Find the next error in mentioned in the shell output window.
  * Written for vile by Paul Fox, (c)1990
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/finderr.c,v 1.38 1994/08/08 16:12:29 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/finderr.c,v 1.41 1994/11/29 04:02:03 pgf Exp $
  *
  */
 
 #include "estruct.h"
 #include "edef.h"
 
-#if FINDERR
+#if OPT_FINDERR
 
 static	char febuff[NBUFN+1];	/* name of buffer to find errors in */
 static	unsigned newfebuff;	/* is the name new since last time? */
@@ -45,7 +45,7 @@ int f,n;
 	static int oerrline = -1;
 	static char oerrfile[256];
 
-#if APOLLO
+#if SYS_APOLLO
 	static	char	lint_fmt1[] = "%32[^( \t] \t%[^(](%d)";
 	static	char	lint_fmt2[] = "%32[^(]( arg %d ) \t%32[^( \t](%d) :: %[^(](%d))";
 	int	num1, num2;
@@ -111,7 +111,7 @@ int f,n;
 				"%[^: \t]: %d:",
 				errfile, &errline) == 2
 
-#if APOLLO		 	/* C compiler */
+#if SYS_APOLLO		 	/* C compiler */
 			  ||  sscanf(text,
 				"%32[*] Line %d of \"%[^\" \t]\"",
 				verb, &errline, errfile) == 3
@@ -148,7 +148,7 @@ int f,n;
 			  	"  ::  %[^( \t](%d)", /* ) */
 				errfile, &errline) == 2)
 #endif
-#if TURBO
+#if CC_TURBO
 			  ||  sscanf(text,
 			  	"Error %[^ ] %d:",
 				errfile, &errline) == 2
@@ -285,12 +285,19 @@ finderrbuf(f, n)
 int f,n;
 {
 	register int    s;
-	char name[NBUFN+1];
+	char name[NFILEN+1];
+	BUFFER *bp;
 
 	(void)strcpy(name, febuff);
 	if ((s = mlreply("Buffer to scan for \"errors\": ", name, sizeof(name))) == ABORT)
 		return s;
-	set_febuff((s == FALSE) ? ScratchName(Output) : name);
+	if (s == FALSE) {
+		set_febuff(ScratchName(Output));
+	} else {
+		if ((bp = find_any_buffer(name)) == 0)
+			return FALSE;
+		set_febuff(get_bname(bp));
+	}
 	return TRUE;
 }
 #endif

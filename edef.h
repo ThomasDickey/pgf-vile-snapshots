@@ -8,7 +8,7 @@
 */
 
 /*
- * $Header: /usr/build/VCS/pgf-vile/RCS/edef.h,v 1.156 1994/10/03 13:24:35 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/edef.h,v 1.159 1994/11/29 15:56:08 pgf Exp $
  */
 
 /* I know this declaration stuff is really ugly, and I probably won't ever
@@ -25,30 +25,30 @@
 
 decl_uninit( char *prog_arg );		/* argv[0] from main.c */
 
-#if X11
+#if DISP_X11
 decl_init( char prognam[], "xvile");
 #else
 decl_init( char prognam[], "vile");
 #endif
 
-decl_init( char version[], "version 4.8");
+decl_init( char version[], "version 4.9");
 
-#if UNIX
+#if SYS_UNIX
 decl_init( char opersys[], "unix");
 #endif
-#if VMS
+#if SYS_VMS
 decl_init( char opersys[], "vms");
 #endif
-#if MSDOS
+#if SYS_MSDOS
 decl_init( char opersys[], "dos");
 #endif
-#if WIN31
+#if SYS_WIN31
 decl_init (char opersys[], "windows 3.1");
 #endif
-#if OS2
+#if SYS_OS2
 decl_init( char opersys[], "os/2");
 #endif
-#if NT
+#if SYS_WINNT
 decl_init( char opersys[], "windows/nt");
 #endif
 
@@ -91,7 +91,7 @@ decl_uninit( char sres[NBUFN] );	/* current screen resolution	*/
 decl_uninit( char pat[NPAT] );          /* Search pattern		*/
 decl_uninit( char rpat[NPAT] );		/* replacement pattern		*/
 
-#if PROC
+#if OPT_PROCEDURES
 decl_uninit( char cdhook[NBUFN+1] );	/* proc to run when change dir */
 decl_uninit( char readhook[NBUFN+1] );	/* proc to run when read file  */
 decl_uninit( char writehook[NBUFN+1] );	/* proc to run when write file */
@@ -114,7 +114,7 @@ decl_uninit( char golabel[NPAT] );	/* current line to go to	*/
 decl_uninit( int execlevel );		/* execution IF level		*/
 decl_init( int	eolexist, TRUE );	/* does clear to EOL exist	*/
 decl_uninit( int revexist );		/* does reverse video exist?	*/
-#if IBMPC || ZIBMPC || OPT_EVAL
+#if DISP_IBMPC || DISP_ZIBMPC || OPT_EVAL
 decl_uninit( int flickcode );		/* do flicker suppression?	*/
 #endif
 decl_uninit( int curtabval );		/* current tab width		*/
@@ -186,7 +186,7 @@ decl_uninit( int warnings );		/* from 'mlwarn()', for reporting */
 decl_uninit( WINDOW *swindow );		/* saved window pointer		*/
 #endif
 
-#if CRYPT
+#if OPT_ENCRYPT
 decl_init( int cryptflag, FALSE );	/* currently encrypting?	*/
 decl_init( char * cryptkey, 0 );	/* top-level crypt-key, if any	*/
 #endif
@@ -194,7 +194,7 @@ decl_init( char * cryptkey, 0 );	/* top-level crypt-key, if any	*/
 decl_init( int dotcmdmode, RECORD );	/* current dot command mode	*/
 decl_init( int dotcmdarg, FALSE);	/* was there an arg to '.'? */
 decl_uninit( int dotcmdkreg);		/* original dot command kill reg */
-decl_uninit( TBUFF *dotcmd );		/* recorded-text of dot-commands */
+decl_uninit( ITBUFF *dotcmd );		/* recorded-text of dot-commands */
 decl_uninit( int dotcmdcnt );		/* down-counter for dot-commands */
 decl_uninit( int dotcmdrep );		/* original dot-command repeat-count */
 
@@ -203,11 +203,11 @@ decl_init( int	kbdmode, STOP );	/* current keyboard macro mode	*/
 decl_uninit( int seed );		/* random number seed		*/
 #endif
 
-#if RAMSIZE
+#if OPT_RAMSIZE
 decl_uninit( long envram );		/* # of bytes current used malloc */
 #endif
 
-#if OPT_EVAL || DEBUGM
+#if OPT_EVAL || OPT_DEBUGMACROS
 decl_uninit( int macbug );		/* macro debugging flag		*/
 #endif
 
@@ -232,7 +232,7 @@ decl_init( char	truem[], "TRUE" );	/* true literal			*/
 decl_init( char	falsem[], "FALSE" );	/* false literal		*/
 
 decl_init( int	cmdstatus, TRUE );	/* last command status		*/
-#if OPT_EVAL || (ATARI & ST520 & MEGAMAX)
+#if OPT_EVAL || (DISP_ATARI & SYS_ST520 & MEGAMAX)
 decl_uninit( char palstr[NSTRING] );	/* palette string		*/
 #endif
 decl_uninit( char *fline );		/* dynamic return line		*/
@@ -259,6 +259,6 @@ extern KBIND kbindtbl[];
 extern  TERM    term;                   /* Terminal information.        */
 #endif
 
-#if IBMPC || BORLAND
+#if DISP_IBMPC || DISP_BORLAND
 decl_init( char *current_res_name, "default");
 #endif	/* IBMPC */

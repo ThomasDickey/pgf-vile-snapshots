@@ -2,7 +2,7 @@
  *		The routines in this file handle the conversion of pathname
  *		strings.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/path.c,v 1.31 1994/10/03 13:24:35 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/path.c,v 1.33 1994/11/29 04:02:03 pgf Exp $
  *
  *
  */
@@ -10,12 +10,12 @@
 #include	"estruct.h"
 #include        "edef.h"
 
-#if UNIX
+#if SYS_UNIX
 #include <sys/types.h>
 #include <pwd.h>
 #endif
 
-#if VMS
+#if SYS_VMS
 #include <file.h>
 #endif
 
@@ -23,7 +23,7 @@
 
 #include "dirstuff.h"
 
-#if WIN31 && TURBO
+#if SYS_WIN31 && CC_TURBO
 # include <direct.h>
 # define curdrive() _getdrive()
 # define curr_dir_on_drive(d) _getdcwd(d, temp, sizeof(temp))
@@ -220,7 +220,7 @@ char	*path;
  * Returns a pointer to the argument's last path-leaf (i.e., filename).
  */
 
-#ifdef __WATCOMC__
+#if CC_WATCOM
 
 char *
 pathleaf(path)
@@ -257,7 +257,7 @@ char	*path;
 		s++;
 	return s;
 }
-#endif /* __WATCOMC__ */
+#endif /* WATCOMC */
 
 
 #if OPT_VMS_PATH
@@ -323,7 +323,7 @@ char *fn;
  * the names that we lookup, because searching the password-file can be slow,
  * and users really don't move that often.
  */
-#if UNIX
+#if SYS_UNIX
 typedef	struct	_upath {
 	struct	_upath *next;
 	char	*name;
@@ -376,8 +376,14 @@ char	*name;
 		/* not-found, do a lookup */
 		if (*name != EOS)
 			p = getpwnam(name);
-		else
+		else {
 			p = getpwuid((int)getuid());
+			if (p == 0) {
+				char *env = getenv("HOME");
+				if (env != 0)
+					return save_user(name, env);
+			}
+		}
 
 		if (p != NULL)
 			return save_user(name, p->pw_dir);
@@ -444,7 +450,7 @@ char *ss;
 		s = ss;
 #endif
 
-#if UNIX
+#if SYS_UNIX
 	(void)home_path(s);
 #endif
 
@@ -460,14 +466,14 @@ char *ss;
 	}
 #endif
 
-#if UNIX || OPT_MSDOS_PATH || OPT_VMS_PATH
+#if SYS_UNIX || OPT_MSDOS_PATH || OPT_VMS_PATH
 	p = pp = s;
 	if (!is_slashc(*s)) {
 		mlforce("BUG: canonpath '%s'", s);
 		return ss;
 	}
 
-#if APOLLO
+#if SYS_APOLLO
 	if (!is_slashc(p[1])) {	/* could be something like "/usr" */
 		char	*cwd = current_directory(FALSE);
 		char	temp[NFILEN];
@@ -538,13 +544,13 @@ char *ss;
 	if (p == s)
 		*p++ = SLASHC;
 	*p = EOS;
-#endif	/* UNIX || MSDOS */
+#endif	/* SYS_UNIX || SYS_MSDOS */
 
 #if OPT_VMS_PATH
 	if (!is_vms_pathname(ss, -TRUE)) {
 		char *tt = ss + strlen(ss);
 		struct stat sb;
-#if VMS
+#if SYS_VMS
 		(void)strcpy(tt, ".DIR");
 #else
 		(void)mklower(ss);
@@ -665,7 +671,7 @@ int keep_cwd;
 	(void) strcpy(path, strcat(temp, ff));
 	TRACE(("     -> '%s' shorten\n", path))
 #else
-# if UNIX || OPT_MSDOS_PATH
+# if SYS_UNIX || OPT_MSDOS_PATH
 	cwd = current_directory(FALSE);
 	slp = ff = path;
 	while (*cwd && *ff && *cwd == *ff) {
@@ -700,7 +706,7 @@ int keep_cwd;
 		return strcpy(path, strcat(strcpy(temp, ".."), slp));
 
 	/* we're off by more than just '..', so use absolute path */
-# endif	/* UNIX || MSDOS */
+# endif	/* SYS_UNIX || SYS_MSDOS */
 #endif	/* OPT_VMS_PATH */
 
 	return path;
@@ -731,7 +737,7 @@ char *
 lengthen_path(path)
 char *path;
 {
-#if VMS
+#if SYS_VMS
 	struct	FAB	my_fab;
 	struct	NAM	my_nam;
 	char		my_esa[NAM$C_MAXRSS];	/* expanded: SYS$PARSE */
@@ -765,7 +771,7 @@ char *path;
 		return path;
 	}
 
-#if UNIX
+#if SYS_UNIX
 	(void)home_path(f);
 #endif
 
@@ -774,7 +780,7 @@ char *path;
 		unix2vms_path(path, path);
 	}
 #endif
-#if VMS
+#if SYS_VMS
 	/*
 	 * If the file exists, we can ask VMS to tell the full pathname.
 	 */
@@ -828,7 +834,7 @@ char *path;
 # endif
 #endif
 
-#if UNIX || OPT_MSDOS_PATH || OPT_VMS_PATH
+#if SYS_UNIX || OPT_MSDOS_PATH || OPT_VMS_PATH
 #if OPT_MSDOS_PATH
 	if ((f = is_msdos_drive(path)) != 0)
 		drive = *path;
@@ -838,7 +844,7 @@ char *path;
 	}
 #endif
 	if (!is_slashc(f[0])) {
-#if MSDOS || WIN31 || OS2
+#if SYS_MSDOS || SYS_WIN31 || SYS_OS2
 		cwd = curr_dir_on_drive(drive!=EOS?drive:curdrive());
 #else
 		cwd = current_directory(FALSE);
@@ -851,7 +857,7 @@ char *path;
 #endif
 		len = strlen(temp);
 		temp[len++] = SLASHC;
-#if DJGPP
+#if CC_DJGPP
 		temp[0] = SLASHC;  /* DJGCC returns '/', we may want '\' */
 #endif
 		(void)strcpy(temp + len, f);
@@ -865,7 +871,7 @@ char *path;
 		(void)strcpy(path, temp);
 	}
 #endif
-#endif	/* UNIX || MSDOS */
+#endif	/* SYS_UNIX || SYS_MSDOS */
 
 	return canonpath(path);
 }
@@ -891,9 +897,9 @@ char *path;
 		return TRUE;
 #endif
 
-#if UNIX || OPT_MSDOS_PATH || VMS
+#if SYS_UNIX || OPT_MSDOS_PATH || SYS_VMS
 	if ((f = path) != 0) {
-#if UNIX
+#if SYS_UNIX
 		if (f[0] == '~')
 			return TRUE;
 #endif
@@ -906,7 +912,7 @@ char *path;
 				return TRUE;
 		}
 	}
-#endif	/* UNIX || OPT_MSDOS_PATH || VMS */
+#endif	/* SYS_UNIX || OPT_MSDOS_PATH || SYS_VMS */
 
 	return FALSE;
 }
@@ -1025,7 +1031,7 @@ char *	path;
 	  &&	((sb.st_mode & S_IFMT) == S_IFDIR));
 }
 
-#if (UNIX||VMS||OPT_MSDOS_PATH) && PATHLOOK
+#if (SYS_UNIX||SYS_VMS||OPT_MSDOS_PATH) && OPT_PATHLOOKUP
 /*
  * Parse the next entry in a list of pathnames, returning null only when no
  * more entries can be parsed.
@@ -1052,9 +1058,9 @@ char *result;
 		list = NULL;
 	return list;
 }
-#endif	/* PATHLOOK */
+#endif	/* OPT_PATHLOOKUP */
 
-#if NT
+#if SYS_WINNT
 /********                                               \\  opendir  //
  *                                                        ===========
  * opendir
@@ -1162,13 +1168,13 @@ DIR *dirp;
 	return 0;
 }
 
-#endif /* NT */
+#endif /* SYS_WINNT */
 
 #if NO_LEAKS
 void
 path_leaks()
 {
-#if UNIX
+#if SYS_UNIX
 	while (user_paths != NULL) {
 		register UPATH *paths = user_paths;
 		user_paths = paths->next;

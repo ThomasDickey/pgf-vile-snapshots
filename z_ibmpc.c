@@ -9,7 +9,7 @@
  * is called whenever possible.
  * Modifications by Pete Ruczynski (pjr).
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/z_ibmpc.c,v 1.11 1994/09/13 17:15:48 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/z_ibmpc.c,v 1.13 1994/11/29 04:02:03 pgf Exp $
  *
  */
 #error This module is not actively maintained as part of vile.
@@ -22,13 +22,12 @@
 #include	"estruct.h"
 #include	"edef.h"
 
-#if ZIBMPC
+#if DISP_ZIBMPC
 
  this code has not been built or run in a while.
  in particular, the globlal set43 is no longer referenced outside
  of this file, so some mode changes probably no longer work.
  it should not be hard to fix, though.  
- of course, the first thing you will need to do is ifdef out this text. :-)
 
 #include	<disp.h>
 
@@ -82,7 +81,7 @@ extern	int	zibmputc();
 extern	int	zibmkopen();
 extern	int	zibmkclose();
 
-#if	COLOR
+#if	OPT_COLOR
 extern	int	zibmfcol();
 extern	int	zibmbcol();
 
@@ -110,6 +109,7 @@ TERM    term    = {
 	zibmkclose,
 	ttgetc,
 	zibmputc,
+	tttypahead,
 	ttflush,
 	zibmmove,
 	zibmeeol,
@@ -117,13 +117,13 @@ TERM    term    = {
 	zibmbeep,
 	zibmrev,
 	zibmcres
-#if	COLOR
+#if	OPT_COLOR
 	, zibmfcol,
 	zibmbcol
 #endif
 };
 
-#if	COLOR
+#if	OPT_COLOR
 zibmfcol(color)		/* set the current output color */
 
 int color;	/* color to set */
@@ -356,7 +356,7 @@ int bacg;		/* background color */
 	int i;
 
 	/* build the attribute byte and setup the screen pointer */
-#if	COLOR
+#if	OPT_COLOR
 	if (dtype != CDMONO)
 		attr = ((ctrans[bacg] & 15) << 4) | (ctrans[forg] & 15);
 	else
@@ -403,17 +403,6 @@ int param;
 
 } /* end of zibmsetcur */
 
-
-#if	FLABEL
-fnclabel(f, n)		/* label a function key */
-
-int f,n;	/* default flag, numeric argument [unused] */
-
-{
-	/* on machines with no function keys...don't bother */
-	return(TRUE);
-}
-#endif
 
 zibmkopen()	/* open the keyboard */
 

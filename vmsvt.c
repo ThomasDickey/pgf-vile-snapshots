@@ -7,7 +7,7 @@
  *  Author:  Curtis Smith
  *  Last Updated: 07/14/87
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/vmsvt.c,v 1.15 1994/09/13 17:15:48 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/vmsvt.c,v 1.17 1994/11/29 04:02:03 pgf Exp $
  *
  */
 
@@ -35,13 +35,11 @@ extern	int	vmscres	(void);
 extern	int	eolexist, revexist;
 extern	char	sres[];
 
-#if COLOR
+#if OPT_COLOR
 extern	int	vmsfcol(int);
 extern	int	vmsbcol(int);
 #endif
-#if SCROLLCODE
 extern	void	tcapscroll (int, int, int);
-#endif
 
 /** SMG stuff (just like termcap) */
 static	int	termtype;
@@ -50,13 +48,11 @@ static	char *	end_reverse;
 static	char *	erase_to_end_line;
 static	char *	erase_whole_display;
 
-#if SCROLLCODE
 static	char *	delete_line;
 static	char *	insert_line;
 static	char *	scroll_forw;
 static	char *	scroll_back;
 static	char *	scroll_regn;
-#endif
 
 /* Dispatch table. All hard fields just point into the terminal I/O code. */
 TERM	term	= {
@@ -73,6 +69,7 @@ TERM	term	= {
 	vmskclose,			/* Close keyboard		*/
 	ttgetc,				/* Get character from keyboard	*/
 	ttputc,				/* Put character to display	*/
+	tttypahead,			/* char ready for reading	*/
 	ttflush,			/* Flush output buffers		*/
 	vmsmove,			/* Move cursor, origin 0	*/
 	vmseeol,			/* Erase to end of line		*/
@@ -80,13 +77,11 @@ TERM	term	= {
 	vmsbeep,			/* Beep				*/
 	vmsrev,				/* Set reverse video state	*/
 	vmscres				/* Change screen resolution	*/
-#if	COLOR
+#if	OPT_COLOR
 	, vmsfcol,			/* Set forground color		*/
 	vmsbcol				/* Set background color		*/
 #endif
-#if	SCROLLCODE
 	, NULL				/* set at init-time		*/
-#endif
 };
 
 /***
@@ -179,7 +174,7 @@ vmscres()
 }
 
 
-#if	COLOR
+#if	OPT_COLOR
 /***
  *  vmsfcol  -  Set the foreground color (not implemented)
  *
@@ -396,7 +391,6 @@ void vmsopen(void)
 
 	erase_whole_display = vmsgetstr(SMG$K_ERASE_WHOLE_DISPLAY);
 
-#if SCROLLCODE
 	insert_line	= vmsgetstr(SMG$K_INSERT_LINE);		/* al */
 	delete_line	= vmsgetstr(SMG$K_DELETE_LINE);		/* dl */
 	scroll_forw	= vmsgetstr(SMG$K_SCROLL_FORWARD);	/* SF */
@@ -418,7 +412,6 @@ void vmsopen(void)
 	} else {
 		term.t_scroll = NULL;
 	}
-#endif
 
 	/* Set resolution */
 	(void)strcpy(sres, "NORMAL");
@@ -447,22 +440,6 @@ void vmskclose(void)
 {
 }
 
-
-/***
- *  fnclabel  -  Label function keys (not used)
- *
- *  Nothing returned
- ***/
-#if	FLABEL
-fnclabel(f, n)		/* label a function key */
-int f,n;	/* default flag, numeric argument [unused] */
-{
-	/* on machines with no function keys...don't bother */
-	return(TRUE);
-}
-#endif
-
-
 /***
  *  spal  -  Set palette type  (Are you kidding?)
  *
@@ -474,7 +451,6 @@ char	*dummy;
 {
 }
 
-#if SCROLLCODE
 /* copied/adapted from 'tcap.c' 19-apr-1993 dickey@software.org */
 
 /* move howmany lines starting at from to to */
@@ -499,7 +475,7 @@ int from, to, n;
 }
 
 /* 
-PRETTIER_SCROLL is prettier but slower -- it scrolls 
+OPT_PRETTIER_SCROLL is prettier but slower -- it scrolls 
 		a line at a time instead of all at once.
 */
 
@@ -511,7 +487,7 @@ int from, to, n;
 	int i;
 	if (to == from) return;
 	/* patch: should make this more like 'tcap.c', or merge logic somehow */
-#if PRETTIER_SCROLL
+#if OPT_PRETTIER_SCROLL
 	if (absol(from-to) > 1) {
 		tcapscroll_delins(from, (from<to) ? to-1:to+1, n);
 		if (from < to)
@@ -545,7 +521,6 @@ int top,bot;
 	putpad_tgoto(SMG$K_SET_SCROLL_REGION, top+1, bot+1);
 }
 
-#endif	/* SCROLLCODE */
 
 #else
 

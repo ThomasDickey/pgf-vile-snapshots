@@ -3,14 +3,14 @@
  *
  *	Miscellaneous routines for UNIX/VMS compatibility.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/vms2unix.c,v 1.7 1994/10/24 01:15:52 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/vms2unix.c,v 1.8 1994/11/29 04:02:03 pgf Exp $
  *
  */
 #include	"estruct.h"
 #include	"edef.h"
 #include	"dirstuff.h"
 
-#if VMS
+#if SYS_VMS
 #include	<unixio.h>
 
 #define	zfab	dirp->dd_fab

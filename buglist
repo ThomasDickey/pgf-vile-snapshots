@@ -1,7 +1,7 @@
 ------------------------
 vile bug/enhancement/wish list
 ------------------------
-$Header: /usr/build/VCS/pgf-vile/RCS/buglist,v 1.200 1994/10/31 15:16:01 pgf Exp $
+$Header: /usr/build/VCS/pgf-vile/RCS/buglist,v 1.207 1994/11/29 14:46:16 pgf Exp $
 ----------------------
 	(E means enhancement, L,M,H are low, medium, high priority)
 
@@ -418,13 +418,6 @@ be something to do with color initialization, or something like that...
 
 ---------------------------
 
-doing a ":e foo*.c" reads in all matching files.  it should instead read
-in the first, and mark the others as unread, at let them come in later.
-in addition, the order in which they come in is odd, at least under autobuffer
-mode -- i think they should be available with :n, and they are not.
-
----------------------------
-
 running a SunOS4.1.3 binary of vile on Solaris2.3 causes the "interrupted
 system call" problem, no doubt due to the differing BSD/SysV signal()
 semantics.  [ probable workaround:  ":set noworking" ]
@@ -464,12 +457,6 @@ into a buffer -- ":r !foo" is a little primitive when trying to insert a
 single word into a line.
 
 ---------------------------------
-
-the vile_bulletin script should use a list, or a special from address, to
-make it possible for users to filter it.
-
------------------
-
 
 autoindent skips blank lines when looking for the
 indent value.  apparently real vi doesn't?
@@ -560,10 +547,6 @@ break the insertion into multiple undoable chunks.
 pasting to a view-only buffer does not generate an error message.
 ----------------------------
 
-there's no way to get buffer status from within a macro, like "modified"
-
-----------------------------
-
 some folks would like to see smooth-scrolling enforced.  it seems they
 have keyboards that repeat just a little faster than their screen can keep up,
 and they'd like vile to scroll rather than jump with the typahead.
@@ -617,3 +600,68 @@ it's impossible to select them as a rectangle, since the middle line is
 longest.
 
 
+----------------
+
+
+It would be useful to have a search that is constrained to a certain
+movment.  For example, I might want to look for the string "foo" over the
+next paragraph, not the whole document.  This would really be useful to
+programmers who want to look for the instance of a variable or a function
+call only within the current scope (or #if).
+
+----------------
+xvile:
+ Is it possible to customize the color of the cursor ?
+   We haven't seen anything related in the documentation and the code.
+
+----------------
+xvile:
+ Is it possible to have an optional horizontal scrollbars ?
+   (just for maniac users)
+
+----------------------------
+
+we disassociate xvile from the terminal that starts it just a little
+too well.  it's not possible to suspend and background the job if you
+start it without the '&' (i.e. "xvile &").
+
+------------------
+
+put cursor on first ( after the =.  type 'i<cr><cr>".
+
+    struct maprec *mp = (reading_msg_line) ? map_message_line : 
+			(insertmode) ? map_insert : map_command;
+
+get the following:
+    struct maprec *mp = 
+    (reading_msg_line) ? map_message_line :
+
+			(insertmode) ? map_insert : map_command;
+------------------
+
+why the following in estruct.h?
+
+#if !TERMCAP || (APOLLO && defined(__GNUC__))
+#define	TTputc		(*term.t_putchar)
+#else
+#define	TTputc		(void)putchar
+#endif
+
+------------------
+ maplookup should take a function pointer, or two, to do the avail, get,
+ and put stuff.
+
+------------------
+ :abb should be implemented as a mapping of the _reversed_ abbreviation. 
+ the character get function in maplookup would get the next prev char, the
+ available func would tell us if we are at BOL or the insertion point yet,
+ and the unget would be null.  when inserting, when we hit whitespace or
+ newline, we would try mapping backwards, and if successful, do the delete
+ of the old and the insert of the new.  but there may be cases where going
+ backwards like this is inappropriate -- need to check the "spec" on how
+ and when abbr works.  for instance, i think abbreviations are not
+ recursive.  but that just means we don't map again until we've inserted
+ more.  and i happened to spot this in the vim code: "Historic vi practice:
+ The last character of an abbreviation must be an id character ([a-zA-Z0-9_]).
+ The characters in front of it must be all id characters or all non-id
+ characters.  This allows for abbr.  "#i" to "#include"."

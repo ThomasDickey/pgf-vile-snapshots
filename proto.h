@@ -4,7 +4,7 @@
  *
  *   Created: Thu May 14 15:44:40 1992
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/proto.h,v 1.150 1994/10/28 22:35:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/proto.h,v 1.158 1994/11/29 17:04:43 pgf Exp $
  *
  */
 
@@ -25,7 +25,7 @@ extern int quickexit P(( int, int ));
 extern int quithard P(( int, int ));
 extern int quit P(( int, int ));
 extern int writequit P(( int, int ));
-extern int esc P(( int, int ));
+extern int esc_func P(( int, int ));
 extern int rdonly P(( void ));
 extern int unimpl P(( int, int ));
 extern int opercopy P(( int, int ));
@@ -36,12 +36,13 @@ extern int opervglobals P(( int, int ));
 extern int source P(( int, int ));
 extern int visual P(( int, int ));
 extern int ex P(( int, int ));
-extern int cntl_af P(( int, int ));
-extern int cntl_xf P(( int, int ));
-extern int unarg P(( int, int ));
+extern int cntl_a_func P(( int, int ));
+extern int cntl_x_func P(( int, int ));
+extern int poundc_func P(( int, int ));
+extern int unarg_func P(( int, int ));
 extern int nullproc P(( int, int ));
 extern void charinit P(( void ));
-#if RAMSIZE
+#if OPT_RAMSIZE
 extern char *reallocate P(( char *, unsigned ));
 extern char *allocate P(( unsigned ));
 extern void release P(( char * ));
@@ -53,7 +54,7 @@ extern void exit_program P(( int ));
 extern char *strncpy0 P(( char *, char *, SIZE_T ));
 
 /* tcap.c and other screen-drivers */
-#if TERMCAP
+#if DISP_TERMCAP
 extern void tcapopen P(( void ));
 extern void tcapclose P(( void ));
 extern void tcapkopen P(( void ));
@@ -68,12 +69,15 @@ extern void putpad P(( char * ));
 extern void putnpad P(( char *, int ));
 #endif
 #if OPT_XTERM
+extern int xterm_mouse_M P(( int, int ));
+extern int xterm_mouse_t P(( int, int ));
+extern int xterm_mouse_T P(( int, int ));
 extern int xterm_button P(( int ));
 #endif
 extern void tcapscroll_reg P(( int, int, int ));
 extern void tcapscroll_delins P(( int, int, int ));
 extern void tcapscrollregion P(( int, int ));
-#if OPT_EVAL || COLOR
+#if OPT_EVAL || OPT_COLOR
 extern void spal P(( char * ));
 #endif
 
@@ -151,20 +155,25 @@ extern int apro P(( int, int ));
 extern int startup P(( char *));
 extern char * flook P(( char *, int ));
 extern char * kcod2pstr P(( int, char * ));
+extern int kcod2escape_seq P(( int, char * ));
 extern char * bytes2prc P(( char *, char *, int ));
 extern char * kcod2prc P(( int, char * ));
-#if X11
+#if DISP_X11
 extern int insertion_cmd P(( int ));
 #endif
 extern int fnc2kcod P(( CMDFUNC * ));
-#if X11
+#if DISP_X11
 extern char * fnc2pstr P(( CMDFUNC * ));
 #endif
+#if OPT_EVAL || OPT_REBIND
 extern char * fnc2engl P(( CMDFUNC * ));
+#endif
 extern CMDFUNC * engl2fnc P(( char * ));
 extern KBIND * kcode2kbind P(( int ));
 extern CMDFUNC * kcod2fnc P(( int ));
+#if OPT_EVAL || OPT_REBIND
 extern int prc2kcod P(( char * ));
+#endif
 #if OPT_EVAL
 extern char * prc2engl P(( char * ));
 #endif
@@ -198,6 +207,7 @@ extern int has_C_suffix P(( BUFFER * ));
 extern int killbuffer P(( int, int ));
 extern int zotbuf P(( BUFFER * ));
 extern int zotwp P(( BUFFER * ));
+extern BUFFER *find_any_buffer P(( char * ));
 extern int namebuffer P(( int, int ));
 extern int popupbuff P(( BUFFER * ));
 extern void sortlistbuffers P(( void ));
@@ -217,6 +227,7 @@ extern void set_bname P(( BUFFER *, char * ));
 extern char * get_bname P(( BUFFER * ));
 extern BUFFER * find_b_name P(( char * ));
 extern BUFFER * bfind P(( char *, int ));
+BUFFER * make_bp P(( char *, int, int ));
 extern int bclear P(( BUFFER * ));
 extern int bsizes P(( BUFFER * ));
 extern void chg_buff P(( BUFFER *, int ));
@@ -224,11 +235,11 @@ extern void unchg_buff P(( BUFFER *, int ));
 extern int unmark P(( int, int ));
 
 /* crypt.c */
-#if	CRYPT
+#if	OPT_ENCRYPT
 extern	int	ue_makekey P((char *, int));
 extern	int	ue_setkey P((int, int));
 extern	void	ue_crypt P((char *, int));
-#endif	/* CRYPT */
+#endif	/* OPT_ENCRYPT */
 
 /* csrch.c */
 extern int fscan P(( int, int, int ));
@@ -282,7 +293,7 @@ extern void dbgwrite P((char *, ... ));
 extern char * lsprintf P((char *, char *, ... ));
 extern void bputc P(( int ));
 extern void bprintf P((char *, ... ));
-#if !X11
+#if !DISP_X11
 extern void getscreensize P(( int *, int * ));
 #if defined(SIGWINCH)
 extern SIGT sizesignal (DEFINE_SIG_ARGS);
@@ -307,7 +318,7 @@ extern int l_strtol P(( char * ));
 extern int absol P(( int ));
 extern int is_truem P(( char * ));
 extern int is_falsem P(( char * ));
-#if OPT_EVAL || X11
+#if OPT_EVAL || DISP_X11
 extern int stol P(( char * ));
 #endif
 #if OPT_EVAL
@@ -318,6 +329,7 @@ extern char * gtusr P(( char * ));
 extern char * mkupper P(( char * ));
 #endif
 extern char * mklower P(( char * ));
+extern char * mktrimmed P(( char * ));
 #if OPT_EVAL
 extern int listvars P(( int, int ));
 extern int setvar P(( int, int ));
@@ -340,7 +352,7 @@ extern int execfile P(( int, int ));
 #endif
 extern int execute P(( CMDFUNC *, int, int ));
 extern int storemac P(( int, int ));
-#if PROC
+#if OPT_PROCEDURES
 extern int storeproc P(( int, int ));
 extern int execproc P(( int, int ));
 extern int run_procedure P(( char * ));
@@ -389,6 +401,7 @@ extern int cbuf40 P(( int, int ));
 #endif /* !SMALLER */
 
 /* file.c */
+extern long file_modified P(( char * ));
 #ifdef MDCHK_MODTIME
 extern int ask_shouldchange P(( BUFFER * ));
 extern int get_modtime P(( BUFFER *, long * ));
@@ -405,7 +418,8 @@ extern int viewfile P(( int, int ));
 extern int insfile P(( int, int ));
 extern int getfile P(( char *, int ));
 extern int readin P((char *, int, BUFFER *, int ));
-#if !(MSDOS || WIN31) && !OPT_MAP_MEMORY
+extern int bp2readin P(( BUFFER *, int ));
+#if !(SYS_MSDOS || SYS_WIN31) && !OPT_MAP_MEMORY
 extern int quickreadf P(( BUFFER *, int * ));
 #endif
 extern int slowreadf P(( BUFFER *, int * ));
@@ -422,7 +436,7 @@ extern int ifile P(( char *, int, FILE * ));
 extern int kifile P(( char * ));
 extern SIGT imdying (DEFINE_SIG_ARGS);
 extern void markWFMODE P(( BUFFER * ));
-#if CRYPT
+#if OPT_ENCRYPT
 extern int resetkey P(( BUFFER *, char * ));
 #endif
 
@@ -441,7 +455,8 @@ extern int ffwopen P(( char *, int ));
 extern int ffronly P(( char * ));
 extern long ffsize P(( void ));
 extern int ffexists P(( char * ));
-#if !(MSDOS || WIN31) && !OPT_MAP_MEMORY
+extern int ffreadable P(( char * ));
+#if !(SYS_MSDOS || SYS_WIN31) && !OPT_MAP_MEMORY
 extern int ffread P(( char *, long ));
 extern void ffseek P(( long ));
 extern void ffrewind P(( void ));
@@ -452,7 +467,7 @@ extern int ffputc P(( int ));
 extern int ffhasdata P(( void ));
 
 /* finderr.c */
-#if FINDERR
+#if OPT_FINDERR
 extern void set_febuff P(( char * ));
 extern int finderr P(( int, int ));
 extern LINE * getdot P(( BUFFER * ));
@@ -461,7 +476,7 @@ extern int finderrbuf P(( int, int ));
 #endif
 
 /* glob.c */
-#if !UNIX
+#if !SYS_UNIX
 extern	int	glob_needed P((char **));
 #endif
 extern	char **	glob_expand P((char **));
@@ -469,7 +484,7 @@ extern	char **	glob_string P((char *));
 extern	int	glob_length P((char **));
 extern	char **	glob_free   P((char **));
 
-#if !UNIX
+#if !SYS_UNIX
 extern	void	expand_wild_args P(( int * , char ***));
 #endif
 
@@ -506,14 +521,21 @@ extern int mlreply_reg_count P(( int, int *, int * ));
 extern int mlreply_no_bs P(( char *, char *, int ));
 extern int mlreply_no_opts P(( char *, char *, int ));
 extern void incr_dot_kregnum P(( void ));
+#if NEEDED
 extern void tungetc P(( int ));
 extern void tungetstr P(( char *, int ));
-extern int get_recorded_char P(( int ));
+#endif
+extern int mapped_keystroke P(( void ));
+extern int keystroke P(( void ));
+extern int keystroke8 P(( void ));
+extern int keystroke_raw8 P(( void ));
+extern int keystroke_avail P(( void ));
+extern void unkeystroke P(( int ));
 extern int tgetc P(( int ));
+extern int tgetc_avail P(( void ));
+extern int get_recorded_char P(( int ));
 extern int kbd_key P(( void ));
 extern int kbd_seq P(( void ));
-extern int speckey P(( int, int ));
-extern int kcod2escape_seq P(( int, char * ));
 extern int screen_string P(( char *, int, CHARTYPE ));
 extern int end_string P(( void ));
 extern int kbd_delimiter P(( void ));
@@ -533,7 +555,7 @@ extern int kbd_mac_end P(( int, int ));
 extern int kbd_mac_exec P(( int, int ));
 extern int kbd_mac_save P(( int, int ));
 extern int kbm_started P(( int, int ));
-extern int start_kbm P(( int, int, TBUFF * ));
+extern int start_kbm P(( int, int, ITBUFF * ));
 extern void finish_kbm P(( void ));
 
 /* insert.c */
@@ -572,7 +594,7 @@ extern char *current_modename P(( void ));
 #endif
 
 /* isearch.c */
-#if ISRCH
+#if OPT_ISRCH
 extern int risearch P(( int, int ));
 extern int fisearch P(( int, int ));
 extern int isearch P(( int, int ));
@@ -633,18 +655,18 @@ extern void relist_registers P(( void ));
 /* map.c */
 extern int map P(( int, int ));
 extern int map_bang P(( int, int ));
+extern int noremap P(( int, int ));
+extern int noremap_bang P(( int, int ));
 extern int unmap P(( int, int ));
 extern int unmap_bang P(( int, int ));
-extern void addtomaps P(( char *, int ));
-extern int maplookup P(( int, int * ));
-
-/* mapchars.c */
-#if NEW_VI_MAP
-extern void map_init P(( void ));
-extern int map_set P(( int, int ));
-extern int map_unset P(( int, int ));
-extern int map_read P(( void ));
-#endif
+extern void addtosysmap P(( char *, int, int ));
+extern int sysmapped_c P(( void ));
+extern int sysmapped_c_avail P(( void ));
+extern void mapungetc P(( int ));
+extern int mapgetc P(( int ));
+extern int mapgetc_avail P(( void ));
+extern int mapped_c P(( int, int ));
+extern int mapped_c_avail P(( void ));
 
 /* msgs.c */
 #if OPT_POPUP_MSGS
@@ -677,17 +699,17 @@ extern int listmodes P(( int, int ));
 extern int find_mode P(( char *, int, VALARGS * ));
 
 /* npopen.c */
-#if UNIX || MSDOS || WIN31 || OS2 || NT
+#if SYS_UNIX || SYS_MSDOS || SYS_WIN31 || SYS_OS2 || SYS_WINNT
 extern FILE * npopen P(( char *, char * ));
 extern void npclose P(( FILE * ));
 extern int inout_popen P(( FILE **, FILE **, char * ));
 extern int softfork P(( void ));
 #endif
-#if UNIX || OS2 || NT
+#if SYS_UNIX || SYS_OS2 || SYS_WINNT
 extern void exec_sh_c P(( char * ));
 extern int system_SHELL P(( char * ));
 #endif
-#if MSDOS || WIN31
+#if SYS_MSDOS || SYS_WIN31
 extern void npflush P(( void ));
 #endif
 
@@ -735,7 +757,7 @@ extern int is_vms_pathname P(( char *, int ));
 extern char * vms_pathleaf P(( char * ));
 extern char * unix_pathleaf P(( char * ));
 #endif
-#if UNIX
+#if SYS_UNIX
 extern char * home_path P(( char * ));
 #endif
 extern char * pathleaf P(( char * ));
@@ -750,7 +772,7 @@ extern char * is_appendname P(( char * ));
 extern char * non_filename P(( void ));
 extern int is_internalname P(( char * ));
 extern int is_directory P(( char * ));
-#if (UNIX||OPT_MSDOS_PATH) && PATHLOOK
+#if (SYS_UNIX||OPT_MSDOS_PATH) && OPT_PATHLOOKUP
 extern char *parse_pathlist P(( char *, char * ));
 #endif
 
@@ -903,7 +925,7 @@ extern int filterregion P(( void ));
 extern int filter P(( int, int ));
 
 /* tags.c */
-#if TAGS
+#if OPT_TAGS
 extern int gototag P(( int, int ));
 extern int cmdlinetag P(( char * ));
 extern int tags P(( char *, int ));
@@ -911,7 +933,7 @@ extern int untagpop P(( int, int ));
 #if OPT_SHOW_TAGS
 extern int showtagstack P(( int, int ));
 #endif
-#endif /* TAGS */
+#endif /* OPT_TAGS */
 
 /* termio.c */
 extern void ttopen P(( void ));
@@ -921,7 +943,7 @@ extern void ttunclean P(( void ));
 extern void ttputc P(( int ));
 extern void ttflush P(( void ));
 extern int ttgetc P(( void ));
-extern int typahead P(( void ));
+extern int tttypahead P(( void ));
 extern void ttmiscinit P(( void ));
 
 /* undo.c */
@@ -990,7 +1012,7 @@ extern int backword P(( int, int ));
 extern int joinregion P(( void ));
 extern int joinlines P(( int, int ));
 extern int formatregion P(( void ));
-#if	WORDCOUNT
+#if	OPT_WORDCOUNT
 extern int wordcount P(( int, int ));
 #endif
 
@@ -1035,9 +1057,40 @@ TBUFF *	tb_scopy P(( TBUFF **, char * ));
 void	tb_first P(( TBUFF * ));
 int	tb_more P(( TBUFF * ));
 int	tb_next P(( TBUFF * ));
+void	tb_unnext P(( TBUFF * ));
 int	tb_peek P(( TBUFF * ));
 char *	tb_values P(( TBUFF * ));
 ALLOC_T	tb_length P(( TBUFF * ));
+
+/* itbuff.c */
+ITBUFF * itb_alloc P(( ITBUFF **, ALLOC_T ));
+ITBUFF * itb_init P(( ITBUFF **, int ));
+void	 itb_free P(( ITBUFF ** ));
+ITBUFF * itb_put P(( ITBUFF **, ALLOC_T, int ));
+void	 itb_stuff P(( ITBUFF *, int ));
+int	 itb_get P(( ITBUFF *, ALLOC_T ));
+#if NEEDED
+void	 itb_unput P(( ITBUFF * ));
+#endif
+ITBUFF * itb_append P(( ITBUFF **, int ));
+ITBUFF * itb_copy P(( ITBUFF **, ITBUFF * ));
+ITBUFF * itb_bappend P(( ITBUFF **, char *, ALLOC_T ));
+ITBUFF * itb_sappend P(( ITBUFF **, char * ));
+#if NEEDED
+void	 itb_delete P(( ITBUFF	*, ALLOC_T ));
+ITBUFF * itb_insert P(( ITBUFF	**, int ));
+#endif
+ALLOC_T	 itb_seek P(( ITBUFF *, ALLOC_T, int ));
+void	 itb_first P(( ITBUFF * ));
+int	 itb_more P(( ITBUFF * ));
+int	 itb_next P(( ITBUFF * ));
+int	 itb_last P(( ITBUFF * ));
+#if NEEDED
+void	 itb_unnext P(( ITBUFF * ));
+#endif
+	
+int	 itb_peek P(( ITBUFF * ));
+ALLOC_T	 itb_length P(( ITBUFF * ));
 
 /* tmp.c */
 #if OPT_MAP_MEMORY
@@ -1077,7 +1130,7 @@ extern	void vt_leaks P(( void ));
 extern	void ev_leaks P(( void ));
 #endif
 
-#if X11
+#if DISP_X11
 #if XTOOLKIT
 extern	void	own_selection		P(( void ));
 extern	void	update_scrollbar	P(( WINDOW *uwp ));
@@ -1107,9 +1160,9 @@ extern void x_set_icon_name P(( char * ));
 extern char * x_get_icon_name P(( void ));
 extern void x_set_window_name P(( char * ));
 extern char * x_get_window_name P(( void ));
-#endif	/* X11 */
+#endif	/* DISP_X11 */
 
-#if MSDOS || OS2 || NT
+#if SYS_MSDOS || SYS_OS2 || SYS_WINNT
 /* ibmpc.c */
 extern	void scwrite P(( int, int, int, char *, VIDEO_ATTR *, int, int ));
 extern VIDEO *scread P(( VIDEO *, int ));
@@ -1118,7 +1171,7 @@ extern char * curr_dir_on_drive P(( int ));
 extern int curdrive P(( void ));
 extern int setdrive P(( int ));
 extern void update_dos_drv_dir P(( char * ));
-# if WATCOM
+# if CC_WATCOM
      extern int dos_crit_handler P(( unsigned, unsigned, unsigned *));
 # else
      extern void dos_crit_handler P(( void ));
@@ -1129,7 +1182,7 @@ extern void update_dos_drv_dir P(( char * ));
 # endif
 #endif
 
-#if UNIX
+#if SYS_UNIX
 #if MISSING_EXTERN__FILBUF
 extern	int	_filbuf	P(( FILE * ));
 #endif
@@ -1310,7 +1363,7 @@ extern	long	time	P(( long * ));
 extern	int	unlink	P(( char * ));
 #endif
 #if HAVE_UTIME && MISSING_EXTERN_UTIME
-extern	int	utime	P(( const char *, struct utimbuf * ));
+extern	int	utime	P(( const char *, const struct utimbuf * ));
 #endif
 #if HAVE_UTIMES && MISSING_EXTERN_UTIMES
 extern	int	utimes	P(( char *, struct timeval * ));
@@ -1323,7 +1376,7 @@ extern	int	write	P(( int, char *, int ));
 #endif
 #endif
 
-#if DJGPP
+#if CC_DJGPP
 /* djhandl.c */
 extern u_long was_ctrl_c_hit P(( void ));
 extern void want_ctrl_c P(( int ));
@@ -1338,6 +1391,7 @@ extern void delay P(( int ));
 /* select.c */
 extern	void	free_attribs	P(( BUFFER * ));
 extern	void	free_attrib	P(( BUFFER *, AREGION * ));
+extern	void	find_release_attr P(( BUFFER *, REGION * ));
 extern	int	sel_begin	P(( void ));
 extern	int	sel_extend	P(( int, int ));
 extern	void	sel_release	P(( void ));

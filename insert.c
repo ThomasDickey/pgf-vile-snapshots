@@ -7,7 +7,7 @@
  * Most code probably by Dan Lawrence or Dave Conroy for MicroEMACS
  * Extensions for vile by Paul Fox
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/insert.c,v 1.63 1994/10/27 21:46:42 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/insert.c,v 1.67 1994/11/29 04:02:03 pgf Exp $
  *
  */
 
@@ -302,13 +302,16 @@ int f,n;
 		curwp->w_flag |= WFMODE;
 	if (dotcmdmode != PLAY)
 		(void)update(FALSE);
-	c = tgetc(FALSE);
+	c = keystroke();
+	if (ABORTED(c))
+		return ABORT;
+	c = kcod2key(c);
 	insertmode = FALSE;
 	curwp->w_flag |= WFMODE;
 
 	if (!f || !n)
 		n = 1;
-	if (n < 0 || ABORTED(c))
+	if (n < 0)
 		s = FALSE;
 	else {
 		int	vi_fix = (!DOT_ARGUMENT || (dotcmdrep <= 1));
@@ -367,7 +370,7 @@ int *splice;
 	register int status;
 	int	c;		/* command character */
 	int backsp_limit;
-	static TBUFF *insbuff;
+	static ITBUFF *insbuff;
 	int osavedmode;
 
 	if (DOT_ARGUMENT) {
@@ -376,8 +379,8 @@ int *splice;
 	}
 
 	if (playback && (insbuff != 0))
-		tb_first(insbuff);
-	else if (!tb_init(&insbuff, abortc))
+		itb_first(insbuff);
+	else if (!itb_init(&insbuff, abortc))
 		return FALSE;
 
 	if (insertmode == FALSE) {
@@ -399,31 +402,16 @@ int *splice;
 		 */
 		c = abortc;
 		if (playback) {
-			if (*splice && !tb_more(insbuff))
+			if (*splice && !itb_more(insbuff))
 				playback = FALSE;
 			else
-				c = tb_next(insbuff);
-			if (c == '#') {
-				/* if the user entered this character, it's
-				    been doubled up.  if we entered it, it's
-				    followed by it's value+1. */
-			    	int nc;
-				nc = tb_next(insbuff);
-				if (nc == '#'+1) {
-					c = tb_next(insbuff);
-					c |= SPEC;
-				} else if (nc == '#') {
-				    /* nothing */ ;
-				} else {
-				    mlwrite("BUG: bad stored '#' seq.");
-				}
-			}
+				c = itb_next(insbuff);
 		}
 		if (!playback) {
 			if (dotcmdmode != PLAY)
 				(void)update(FALSE);
 
-			c = kbd_key();
+			c = mapped_keystroke();
 
 #if OPT_MOUSE
 			/*
@@ -438,45 +426,22 @@ int *splice;
 			    	wp0->w_traits.insmode = FALSE;
 				if (b_val(wp0->w_bufp, MDSHOWMODE))
 				    wp0->w_flag |= WFMODE;
-				tungetc(c);
+				unkeystroke(c);
 				goto leave;
 			}
 #endif
-			/* if this isn't a plain character, escape it */
-			if (isspecial(c)) {
-			    if (!tb_append(&insbuff, '#')) {
-				    status = FALSE;
-				    break;
-			    }
-			    if (!tb_append(&insbuff, '#'+1)) {
-				    status = FALSE;
-				    break;
-			    }
-			    if (!tb_append(&insbuff, kcod2key(c))) {
-				    status = FALSE;
-				    break;
-			    }
-			} else {
-			    if (c == '#') {
-				/* save it twice */
-				if (!tb_append(&insbuff, c)) {
-					status = FALSE;
-					break;
-				}
-			    }
-			    if (!tb_append(&insbuff, c)) {
-				    status = FALSE;
-				    break;
-			    }
+			if (!itb_append(&insbuff, c)) {
+			    status = FALSE;
+			    break;
 			}
 		}
 
 
 		if (isspecial(c)) {
-		    	/* if we're allowed to honor meta-character bindings,
+		    	/* if we're allowed to honor SPEC bindings,
 				then see if it's bound to something, and
-				insert it if not */
-			CMDFUNC *cfp = kcod2fnc( /* SPEC| */ c);
+				execute it */
+			CMDFUNC *cfp = kcod2fnc(c);
 			if (cfp) {
 				backsp_limit = w_left_margin(curwp);
 				if (curgoal < 0)
@@ -488,8 +453,8 @@ int *splice;
 		if (isreturn(c)) {
 			if ((cur_count+1) < max_count) {
 				if (DOT_ARGUMENT) {
-					while (tb_more(dotcmd))
-						(void)kbd_key();
+					while (itb_more(dotcmd))
+						(void)mapped_keystroke();
 				}
 				*splice = TRUE;
 				status = TRUE;
@@ -535,7 +500,7 @@ int *splice;
 		if (c == startc || c == stopc) {  /* ^Q and ^S */
 			continue;
 		}
-#if UNIX && defined(SIGTSTP)	/* job control, ^Z */
+#if SYS_UNIX && defined(SIGTSTP)	/* job control, ^Z */
 		else if (c == suspc) {
 			status = bktoshell(FALSE,1);
 		}
@@ -548,7 +513,7 @@ int *splice;
 		if (status != TRUE)
 			break;
 
-#if CFENCE
+#if OPT_CFENCE
 		/* check for CMODE fence matching */
 		if ((c == RBRACE || c == RPAREN || c == RBRACK ) &&
 						b_val(curbp, MDSHOWMAT))
@@ -931,8 +896,10 @@ int *bracefp;
 	/* we want the indent of this line if it's non-blank, or the indent
 		of the next non-blank line otherwise */
 	fc = firstchar(l_ref(DOT.l));
-	if (fc < 0 && forwword(FALSE,1) == FALSE) {
-		if (bracefp) *bracefp = FALSE;
+	if (fc < 0 && (   forwword(FALSE,1) == FALSE
+	               || (fc = firstchar(l_ref(DOT.l))) < 0)) {
+		if (bracefp)
+			*bracefp = FALSE;
 		DOT = MK;
 		return 0;
 	}
@@ -1007,7 +974,7 @@ int n;	/* repeat count */
 int c;	/* brace/paren to insert (always '}' or ')' for now) */
 {
 
-#if ! CFENCE
+#if ! OPT_CFENCE
 	/* wouldn't want to back up from here, but fences might take us
 		forward */
 	/* if we are at the beginning of the line, no go */
@@ -1021,7 +988,7 @@ int c;	/* brace/paren to insert (always '}' or ')' for now) */
 		return linsert(n,c);
 	}
 	skipindent = 0;
-#if ! CFENCE /* no fences?	then put brace one tab in from previous line */
+#if ! OPT_CFENCE /* no fences?	then put brace one tab in from previous line */
 	doindent(((previndent(NULL)-1) / curtabval) * curtabval);
 #else /* line up brace with the line containing its match */
 	doindent(fmatchindent(c));
@@ -1109,7 +1076,7 @@ int f,n;
 	register int	s;
 	register int	c;
 
-	c = tgetc(TRUE);
+	c = keystroke_raw8();
 	if (!f)
 		n = 1;
 	if (n < 0)

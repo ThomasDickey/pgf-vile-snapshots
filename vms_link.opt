@@ -1,5 +1,5 @@
 ! Link with sharable C-runtime library
-! $Header: /usr/build/VCS/pgf-vile/RCS/vms_link.opt,v 1.12 1994/08/08 16:12:29 pgf Exp $
+! $Header: /usr/build/VCS/pgf-vile/RCS/vms_link.opt,v 1.13 1994/11/23 01:13:23 pgf Exp $
 !
 ! There are too many object-files to list on the command-line.
 basic.obj
@@ -21,6 +21,7 @@ globals.obj
 history.obj
 input.obj
 insert.obj
+itbuff.obj
 isearch.obj
 line.obj
 map.obj

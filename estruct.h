@@ -9,7 +9,7 @@
 */
 
 /*
- * $Header: /usr/build/VCS/pgf-vile/RCS/estruct.h,v 1.206 1994/10/31 03:49:26 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/estruct.h,v 1.216 1994/11/29 21:03:42 pgf Exp $
  */
 
 #ifdef HAVE_CONFIG_H
@@ -22,83 +22,80 @@
 
 #ifdef VMS		/* predefined by VAX/VMS compiler */
 # define scrn_chosen
-# define VMSVT  1
+# define DISP_VMSVT  1
 #endif
 
 /* non-unix flavors */
-#undef	MSDOS
-#undef  WIN31
-#undef	CPM
-#undef	AMIGA
-#undef	EGA
+#undef SYS_MSDOS
+#undef SYS_WIN31
+#undef SYS_CPM
+#undef SYS_AMIGA
 
-#define AMIGA	0			/* AmigaDOS			*/
-#define ST520	0			/* ST520, TOS			*/
-#define MSDOS	0			/* MS-DOS			*/
-#define WIN31   0			/* Windows 3.1			*/
-#define OS2	0			/* son of DOS			*/
-#define CPM	0			/* CP/M-86			*/
-#define NT	0			/* Windows/NT			*/
+#define SYS_AMIGA	0			/* AmigaDOS			*/
+#define SYS_ST520	0			/* ST520, TOS			*/
+#define SYS_MSDOS	0			/* MS-DOS			*/
+#define SYS_WIN31	0			/* Windows 3.1			*/
+#define SYS_OS2		0			/* son of DOS			*/
+#define SYS_CPM		0			/* CP/M-86			*/
+#define SYS_WINNT	0			/* Windows/NT			*/
 
 /*	Compiler definitions			*/
-#define	MSC	0	/* MicroSoft C compile version 3 & 4 & 5 & 6 */
-#define	ZTC	0	/* Zortech C compiler */
-#define	TURBO	0	/* Turbo C/MSDOS or Borland C++ */
-#define	WATCOM	0	/* WATCOM C/386 version 9.0 or above */
-#define	DJGPP	0	/* DJ's GCC version 1.09 */
+#define CC_MSC		0	/* MicroSoft C compile version 3 & 4 & 5 & 6 */
+#define CC_ZTC		0	/* Zortech C compiler */
+#define CC_TURBO	0	/* Turbo C/MSDOS or Borland C++ */
+#define CC_WATCOM	0	/* WATCOM C/386 version 9.0 or above */
+#define CC_DJGPP	0	/* DJ's GCC version 1.09 */
 
 #ifdef __TURBOC__	/* predefined in Turbo C, both DOS and Windows */
-# undef TURBO
-# undef MSDOS
-# undef WIN31
+# undef CC_TURBO
+# undef SYS_MSDOS
+# undef SYS_WIN31
 # ifdef _Windows	/* predefined in TurboC for Windows */
-#  define WIN31  1
+#  define SYS_WIN31  1
 # else
-#  define MSDOS  1
+#  define SYS_MSDOS  1
 # endif
-# define TURBO  1
+# define CC_TURBO  1
 #endif
 
 #ifdef __WATCOMC__
-#undef MSDOS
-#undef WATCOM
-#define MSDOS  1
-#define WATCOM 1
+#undef SYS_MSDOS
+#undef CC_WATCOM
+#define SYS_MSDOS  1
+#define CC_WATCOM 1
 #endif
 
 #ifdef __OS2__
 /* assume compiler already chosen */
-#undef MSDOS
-#undef OS2
-#define OS2    1
+#undef SYS_MSDOS
+#undef SYS_OS2
+#define SYS_OS2    1
 #endif
 
 #ifdef __GO32__  	/* DJ's GCC version 1.09 */
-#undef DJGPP
-#undef BSD
-#undef MSDOS
-#define MSDOS  1
-#define DJGPP   1
+#undef CC_DJGPP
+#undef SYS_MSDOS
+#define SYS_MSDOS  1
+#define CC_DJGPP   1
 #endif
 
-#if NT
-#undef MSDOS
-#undef NT
-#define SVR3   0
-#define NT	1
+#if SYS_WINNT
+#undef SYS_MSDOS
+#undef SYS_WINNT
+#define SYS_WINNT	1
 #endif
 
-/* As of version 3.51 of vile, NEWDOSCC should be correct for Turbo,
+/* As of version 3.51 of vile, CC_NEWDOSCC should be correct for Turbo,
  * Watcom, and the DJ gcc (GO32) compilers.  I'm betting that it's also
  * probably correct for MSC (Microsoft C) and ZTC (Zortech), but I'm not
  * sure of those.  (It implies a lot of ANSI and POSIX behavior.)
  */
-#if TURBO || WATCOM || MSC || DJGPP || ZTC || NT
-# define NEWDOSCC 1
+#if CC_TURBO || CC_WATCOM || CC_MSC || CC_DJGPP || CC_ZTC || SYS_WINNT
+# define CC_NEWDOSCC 1
 # define HAVE_GETCWD 1
 # define CPP_SUBS_BEFORE_QUOTE 1
 #else
-# define NEWDOSCC 0
+# define CC_NEWDOSCC 0
 #endif
 
 #endif /* os_chosen */
@@ -117,7 +114,7 @@
 #endif
 
 #ifndef HAVE_UTIME
-# define HAVE_UTIME	1	/* if your system has the utime() system call */
+# define HAVE_UTIME	0	/* if your system has the utime() system call */
 #endif
 
 #ifndef HAVE_SETJMP_H
@@ -144,44 +141,41 @@
 /* Some code uses these as values in expressions, so we always want them
  * defined, just in case we run into a substandard preprocessor.
  */
-#ifndef X11
-# define X11 0
+#ifndef DISP_X11
+# define DISP_X11 0
 #endif
-#ifndef MSDOS
-# define MSDOS 0
+#ifndef SYS_MSDOS
+# define SYS_MSDOS 0
 #endif
-#ifndef OS2
-# define OS2 0
+#ifndef SYS_OS2
+# define SYS_OS2 0
 #endif
-#ifndef NT
-# define NT 	0
+#ifndef SYS_WIN31
+# define SYS_WIN31 0
+#endif
+#ifndef SYS_WINNT
+# define SYS_WINNT 	0
 #endif
 #ifdef VMS		/* predefined by VAX/VMS compiler (VAX C V3.2-044) */
 # define HAVE_GETCWD 1
 # define CPP_SUBS_OLDSTYLE 1
 #else
-# define VMS    0
+# define SYS_VMS    0
 #endif
 #ifdef apollo
-# define APOLLO 1	/* FIXME: still more ifdefs to autoconf */
+# define SYS_APOLLO 1	/* FIXME: still more ifdefs to autoconf */
 #endif
 #ifdef sun
-# define SUNOS 1	/* FIXME: need to tweak lint ifdefs */
+# define SYS_SUNOS 1	/* FIXME: need to tweak lint ifdefs */
 #endif
 
 /* Linux runs on other hardware than pc's? */
 
-#define IBM_KBD 	(MSDOS || OS2 || NT)
-#define IBM_VIDEO 	(MSDOS || OS2 || NT || defined(linux))
-#define CRLF_LINES 	(MSDOS || OS2 || NT)
+#define IBM_KBD 	(SYS_MSDOS || SYS_OS2 || SYS_WINNT)
+#define IBM_VIDEO 	(SYS_MSDOS || SYS_OS2 || SYS_WINNT || defined(linux))
+#define CRLF_LINES 	(SYS_MSDOS || SYS_OS2 || SYS_WINNT)
 
-
-#if 0	/* FIXME: Need to figure out what this should now be */
-    /* there are probably others that don't want/need const defined */
-# define const
-#endif
-
-#if NT
+#if SYS_WINNT
 #include <windows.h>
 #endif 
 #include <stdio.h>
@@ -215,7 +209,7 @@
 #endif
 
 /* definitions for testing apollo version with gcc warnings */
-#if APOLLO
+#if SYS_APOLLO
 # ifdef __GNUC__		/* only tested for SR10.3 with gcc 1.36 */
 #  ifndef _APOLLO_SOURCE	/* ...defined in gcc 2.4.5 */
 #  define _APOLLO_SOURCE	/* appease gcc by forcing extern-defs */
@@ -235,7 +229,7 @@
 #ifndef SIGT
 /* choose between void and int signal handler return type.
   "typedefs?  we don't need no steenking typedefs..." */
-# if NEWDOSCC
+# if CC_NEWDOSCC
 #  define SIGT void
 #  define SIGRET
 # else
@@ -246,7 +240,7 @@
 
 #if HAVE_SIGNAL_H
 #include	<signal.h>
-# if APOLLO
+# if SYS_APOLLO
 #  if APOLLO_STDLIB && !defined(lint)	/* SR10.3, CC 6.8 */
 #   define ACTUAL_SIG_ARGS int signo, ...
 #   define ACTUAL_SIG_DECL /* empty */
@@ -256,7 +250,7 @@
 #endif
 
 /* We use 'alarm()' as a timer to control a "working..." message */
-#if defined(SIGALRM) && !DJGPP
+#if defined(SIGALRM) && !CC_DJGPP
 # define HAS_ALARM 1
 #else
 # define HAS_ALARM 0
@@ -293,7 +287,7 @@
 #endif
 
 /* argument for 'exit()' or '_exit()' */
-#if	VMS
+#if SYS_VMS
 #include	<stsdef.h>
 #define GOODEXIT	(STS$M_INHIB_MSG | STS$K_SUCCESS)
 #define BADEXIT		(STS$M_INHIB_MSG | STS$K_ERROR)
@@ -307,7 +301,7 @@
 #undef HAVE_POLL
 #endif
 
-#if UNIX || MSDOS || WIN31 || VMS || OS2 || NT
+#if SYS_UNIX || SYS_MSDOS || SYS_WIN31 || SYS_VMS || SYS_OS2 || SYS_WINNT
 #define	ENVFUNC	1
 #else
 #define	ENVFUNC	0
@@ -317,104 +311,95 @@
 #ifndef scrn_chosen
 /*	Terminal Output definitions		*/
 /* choose ONLY one of the following */
-#define TERMCAP UNIX			/* Use TERMCAP			*/
-#define ANSI	0			/* ANSI escape sequences	*/
-#define AT386	0			/* AT style 386 unix console	*/
-#define	HP150	0			/* HP150 screen driver		*/
-#define	HP110	0			/* HP110 screen driver		*/
-#define	VMSVT	0			/* various VMS terminal entries	*/
-#define VT52	0			/* VT52 terminal (Zenith).	*/
-#define	BORLAND	0			/* Borland console I/O routines */
-#define	IBMPC	(MSDOS && !BORLAND && !ANSI) /* IBM-PC CGA/MONO/EGA driver */
-#define	ZIBMPC	0			/* Zortech lib IBM-PC CGA/MONO/EGA driver	*/
-#define	DG10	0			/* Data General system/10	*/
-#define	TIPC	0			/* TI Professional PC driver	*/
-#define	Z309	0			/* Zenith 100 PC family	driver	*/
-#define	MAC	0			/* Macintosh			*/
-#define	ATARI	0			/* Atari 520/1040ST screen	*/
-#define	X11	0			/* X Window System */
-#define NTCONS	0			/* Windows/NT console		*/
+#define DISP_TERMCAP	SYS_UNIX	/* Use TERMCAP			*/
+#define DISP_ANSI	0		/* ANSI escape sequences	*/
+#define DISP_AT386	0		/* AT style 386 unix console	*/
+#define	DISP_HP150	0		/* HP150 screen driver		*/
+#define	DISP_HP110	0		/* HP110 screen driver		*/
+#define	DISP_VMSVT	0		/* various VMS terminal entries	*/
+#define DISP_VT52	0		/* VT52 terminal (Zenith).	*/
+#define	DISP_BORLAND	0		/* Borland console I/O routines */
+#define	DISP_IBMPC	(SYS_MSDOS && !DISP_BORLAND && !DISP_ANSI) /* IBM-PC CGA/MONO/EGA driver */
+#define	DISP_ZIBMPC	0		/* Zortech lib IBM-PC CGA/MONO/EGA driver	*/
+#define	DISP_DG10	0		/* Data General system/10	*/
+#define	DISP_TIPC	0		/* TI Professional PC driver	*/
+#define	DISP_Z309	0		/* Zenith 100 PC family	driver	*/
+#define	DISP_MAC	0		/* Macintosh			*/
+#define	DISP_ATARI	0		/* Atari 520/1040ST screen	*/
+#define	DISP_X11	0		/* X Window System */
+#define DISP_NTCONS	0		/* Windows/NT console		*/
 
 /*   Special keyboard definitions	     */
-#define WANGPC	0		/* WangPC - mostly escape sequences	*/
-/* the WANGPC stuff isn't in the cmdtbl keyboard definitions: sorry -- pgf */
+#define DISP_WANGPC	0		/* funny escape sequences -- see ibmpc.c */
 #endif
 
 /* ====================================================================== */
 /*	Configuration options... pick and choose as you wish */
-
-/* Appearance */
-#define	TYPEAH	1	/* type ahead causes screen refresh to be delayed */
-#define	REVSTA	1	/* Status line appears in reverse video		*/
-
-/* NOTE -- COLOR doesn't currently do anything if you're using X or TERMCAP */
-/* (But I think X11 may honor colors from the command line or .Xdefaults) */
-/* (and DOS definitely does do things with COLOR, but it may not work) */
-#define	COLOR	(ANSI|IBM_VIDEO|X11)	/* color commands and windows	*/
-
-/* Feature turnon/turnoff */
-#define ANSI_SPEC	1 /* ANSI function/arrow keys */
-#define	DOSFILES 1	/* turn on code for DOS mode (lines that end in crlf) */
-			/* use DOSFILES, for instance, if you edit DOS- */
-			/*	created files under UNIX		*/
-#define	CFENCE	1	/* do fence matching in CMODE			*/
-#define	APROP	1	/* Add code for Apropos command	(needs OPT_REBIND) */
-#define	FILOCK	0	/* file locking under unix BSD 4.2 (uses scanf) */
-#define	LCKFILES 0	/* create lock files (file.lck style) 		*/
-#define	ISRCH	1	/* Incremental searches like ITS EMACS		*/
-#define	FLABEL	0	/* function key label code [HP150]		*/
-#define	CRYPT	0	/* file encryption (not crypt(1) compatible!)	*/
-#define	TAGS	1	/* tags support  				*/
-#define	WORDPRO	1	/* "Advanced" word processing features		*/
-#define	WORDCOUNT 0	/* "count-words" command"			*/
-#define	AEDIT	1	/* advanced editing options: e.g. en/detabbing	*/
-#define	PROC	1	/* named procedures				*/
-#define	FINDERR	1	/* finderr support. uses scanf()		*/
-#define	GLOBALS	1	/* "global" command support.			*/
-#define	KSH_HISTORY 0	/* ksh-style history commands			*/
-#define	PATHLOOK 1	/* look along $PATH for startup and help files	*/
-#define	SCROLLCODE 1	/* code in display.c for scrolling the screen.
-			   Only useful if your display can scroll
-			   regions, or at least insert/delete lines.
-			   ANSI, TERMCAP, IBMPC, VMSVT and AT386 can do this */
-#define CVMVAS	1	/* arguments to forward/back page and half page */
-			/* are in pages	instead of rows */
-#define PRETTIER_SCROLL 0 /* can improve the appearance of a scrolling screen */
-#define STUTTER_SEC_CMD 0 /* must the next/prev section commands (i.e.
-				']]' and '[[' be stuttered?  they must be
-				stuttered in real vi, I prefer them not
-				to be */
 
 /*	Code size options	*/
 #define	FEWNAMES 0	/* strip some names - will no longer be bindable */
 #define	SMALLER	0	/* strip some fluff -- not a lot smaller, but some */
 #define OPT_MAP_MEMORY 0	/* tiny systems can page out data */
 
-/* show "working..." message */
-#define OPT_WORKING (HAS_ALARM && !SMALLER)
+/* NOTE -- OPT_COLOR doesn't currently do anything using X11 or TERMCAP */
+/* (But I think X11 may honor colors from the command line or .Xdefaults) */
+/* (and DOS definitely does do things with OPT_COLOR, but it may not work) */
+#define	OPT_COLOR (DISP_ANSI|IBM_VIDEO|X11) /* color commands and windows */
 
-/* scrollbars */
-#define OPT_SCROLLBARS XTOOLKIT
+/* Feature turnon/turnoff */
+#define	OPT_BSD_FILOCK	0	/* file locking under unix BSD 4.2  */
+#define	OPT_DOSFILES	1	/* turn on code for DOS mode (lines that
+				   end in crlf).  use DOSFILES, for instance,
+				   if you edit DOS-created files under UNIX   */
+#define	OPT_REVSTA	1	/* Status line appears in reverse video       */
+#define	OPT_CFENCE	1	/* do fence matching in CMODE		      */
+#define	OPT_LCKFILES	0	/* create lock files (file.lck style) 	      */
+#define	OPT_ENCRYPT	0	/* file encryption (not crypt(1) compatible!) */
+#define	OPT_TAGS	1	/* tags support  			      */
+#define	OPT_FORMAT	1	/* region formatting support.		      */
+#define	OPT_WORDCOUNT	0	/* "count-words" command"		      */
+#define	OPT_PROCEDURES	1	/* named procedures			      */
+#define	OPT_KSH_HISTORY	0	/* ksh-style history commands		      */
+#define	OPT_PATHLOOKUP	1	/* search $PATH for startup and help files    */
+#define	OPT_SCROLLCODE	1	/* code in display.c for scrolling the screen.
+				   Only useful if your display can scroll
+				   regions, or at least insert/delete lines.
+				   ANSI, TERMCAP, IBMPC, VMSVT and AT386 can 
+				   do this */
+#define OPT_CVMVAS	1	/* arguments to forward/back page and half page
+				   are in pages	instead of rows (in vi,
+				   they're rows, and the argument is "sticky",
+				   i.e. it's remembered */
+#define OPT_PRETTIER_SCROLL 0	/* can improve the appearance of a scrolling
+				   screen, but it will in general be slower */
+#define OPT_STUTTER_SEC_CMD 0	/* must the next/prev section commands (i.e.
+				   ']]' and '[[' be stuttered?  they must be
+				   stuttered in real vi, I prefer them not
+				   to be */
 
-/* vms pathnames (testing/porting) */
-#define OPT_VMS_PATH    (VMS)			/* vax/vms pathname parsing */
+#define OPT_WORKING (HAS_ALARM && !SMALLER)	/* show "working..." message */
+#define OPT_SCROLLBARS XTOOLKIT			/* scrollbars */
+#define OPT_VMS_PATH    (SYS_VMS)  /* vax/vms path parsing (testing/porting)*/
 
 /* systems with MSDOS-like filename syntax */
-#define OPT_MSDOS_PATH  (MSDOS || WIN31 || OS2 || NT)
+#define OPT_MSDOS_PATH  (SYS_MSDOS || SYS_WIN31 || SYS_OS2 || SYS_WINNT)
 
 /* individual features that are (normally) controlled by SMALLER */
+#define	OPT_AEDIT	!SMALLER		/* advanced editing options: e.g. en/detabbing	*/
 #define OPT_B_LIMITS    !SMALLER		/* left-margin */
 #define OPT_ENUM_MODES  !SMALLER		/* fixed-string modes */
 #define OPT_EVAL        !SMALLER		/* expression-evaluation */
-#define OPT_FLASH       !SMALLER || IBMPC	/* visible-bell */
+#define	OPT_FINDERR	!SMALLER		/* finderr support. */
+#define OPT_FLASH       !SMALLER || DISP_IBMPC	/* visible-bell */
 #define OPT_HISTORY     !SMALLER		/* command-history */
+#define	OPT_ISRCH	!SMALLER		/* Incremental searches */
 #define OPT_LINEWRAP    !SMALLER		/* line-wrap mode */
 #define OPT_MLFORMAT    !SMALLER		/* modeline-format */
-#define OPT_MS_MOUSE    !SMALLER && IBMPC && TURBO 	/* MsDos-mouse */
+#define OPT_MS_MOUSE    !SMALLER && DISP_IBMPC && CC_TURBO 	/* MsDos-mouse */
 #define OPT_POPUPCHOICE !SMALLER		/* popup-choices mode */
 #define OPT_POPUP_MSGS  !SMALLER		/* popup-msgs mode */
 #define OPT_REBIND	!SMALLER		/* permit rebinding of keys at run-time	*/
-#define OPT_FILEBACK	!SMALLER && !VMS	/* file backup style */
+#define OPT_FILEBACK	!SMALLER && !SYS_VMS	/* file backup style */
 #define OPT_TERMCHRS    !SMALLER		/* set/show-terminal */
 #define OPT_UPBUFF      !SMALLER		/* animated buffer-update */
 #define OPT_WIDE_CTYPES !SMALLER		/* extra char-types tests */
@@ -423,7 +408,7 @@
 #define OPT_SHOW_EVAL   !SMALLER && OPT_EVAL	/* "show-variables" */
 #define OPT_SHOW_MAPS   !SMALLER 		/* display mapping for ":map" */
 #define OPT_SHOW_REGS   !SMALLER		/* "show-registers" */
-#define OPT_SHOW_TAGS   !SMALLER && TAGS	/* ":tags" displays tag-stack */
+#define OPT_SHOW_TAGS   !SMALLER && OPT_TAGS	/* ":tags" displays tag-stack */
 
 /* selections and attributed regions */
 #define OPT_VIDEO_ATTRS	!SMALLER
@@ -435,12 +420,11 @@
  */
 #define OPT_PSCREEN	(XTOOLKIT && OPT_VIDEO_ATTRS)
 
-#define NEW_VI_MAP      0		/* patch: working on ":map" */
-
-#if	(TERMCAP || X11) && !SMALLER
-/* we turn on OPT_XTERM under X11 _only_ because it's then easier for users to
- * be able to put "set xterm-mouse" in their .vilerc which is shared between
- * vile and xvile.  otherwise, xterm-mouse has _no_ effect under X11
+#if	DISP_TERMCAP && !SMALLER
+/* the setting "xterm-mouse" is always available, i.e.  the modetbl entry
+ * is not conditional.  but all of the code that supports xterm-mouse _is_
+ * ifdefed.  this makes it easier for users to be able to put "set
+ * xterm-mouse" in their .vilerc which is shared between vile and xvile. 
  */
 #define	OPT_XTERM	2	/* mouse-clicking support */
 #else
@@ -448,7 +432,7 @@
 #endif
 
 	/* any mouse capability */
-#define OPT_MOUSE       (X11 || OPT_XTERM || OPT_MS_MOUSE || NT)
+#define OPT_MOUSE       (DISP_X11 || OPT_XTERM || OPT_MS_MOUSE || SYS_WINNT)
 
 /*
  * If selections will be used to communicate between vile and other
@@ -473,30 +457,26 @@
  * Configuration options for globbing
  */
 #define	OPT_GLOB_ENVIRON	ENVFUNC && !SMALLER
-#define	OPT_GLOB_ELLIPSIS	VMS || UNIX || OS2 || (MSDOS && !SMALLER)
-#define	OPT_GLOB_PIPE		UNIX
-#define	OPT_GLOB_RANGE		UNIX || OS2 || (MSDOS && !SMALLER)
+#define	OPT_GLOB_ELLIPSIS	SYS_VMS || SYS_UNIX || SYS_OS2 || (SYS_MSDOS && !SMALLER)
+#define	OPT_GLOB_PIPE		SYS_UNIX
+#define	OPT_GLOB_RANGE		SYS_UNIX || SYS_OS2 || (SYS_MSDOS && !SMALLER)
 
 /*	Debugging options	*/
-#define	RAMSIZE		0	/* dynamic RAM memory usage tracking */
-#define DEBUGM		0	/* $debug triggers macro debugging	*/
-#define	VISMAC		0	/* update display during keyboard macros*/
-#define	VMALLOC		0	/* verify malloc operation (slow!) */
-#ifndef	DBMALLOC
-#define	DBMALLOC	0 	/* the dbmalloc package */
-#endif
-
-#define OPT_TRACE	0	/* turn on debug/trace (link with trace.o) */
+#define	OPT_RAMSIZE		0  /* dynamic RAM memory usage tracking */
+#define OPT_DEBUGMACROS		0  /* $debug triggers macro debugging	*/
+#define	OPT_VISIBLE_MACROS	0  /* update display during keyboard macros*/
+#define	OPT_VRFY_MALLOC		0  /* verify malloc operation (slow!) */
+#define OPT_TRACE		0  /* turn on debug/trace (link with trace.o) */
 
 /* That's the end of the user selections -- the rest is static definition */
 /* (i.e. you shouldn't need to touch anything below here */
 /* ====================================================================== */
 
 #include <errno.h>
-#if VMS
+#if SYS_VMS
 #include <perror.h>	/* defines 'sys_errlist[]' */
 #endif
-#if UNIX
+#if SYS_UNIX
 extern	int	errno;	/* some systems don't define this in <errno.h> */
 extern	int	sys_nerr;
 # ifndef HAVE_EXTERN_SYS_ERRLIST
@@ -511,11 +491,11 @@ extern	char *	sys_errlist[];
 
 /* use 'size_t' if we have it ... for unix systems, the configuration script
    will define size_t if it wasn't available in sys/types.h. */
-#if UNIX || VMS || NEWDOSCC
-# if defined(lint) && (SUNOS||APOLLO)
+#if SYS_UNIX || SYS_VMS || CC_NEWDOSCC
+# if defined(lint) && (SYS_SUNOS||SYS_APOLLO)
 #  define SIZE_T  size_t	/* note: SunOs 4.1.3 defines 'size_t' as 'int'*/
 #  define ALLOC_T unsigned
-#  if APOLLO && !APOLLO_STDLIB
+#  if SYS_APOLLO && !APOLLO_STDLIB
 #   undef SIZE_T
 #   define SIZE_T int
 #  endif
@@ -528,14 +508,14 @@ extern	char *	sys_errlist[];
 # define ALLOC_T unsigned
 #endif
 
-#if APOLLO
+#if SYS_APOLLO
 # if !defined(__STDCPP__) && !defined(__GNUC__)
 #  define ANSI_PROTOS 0 /* SR10.2 does not like protos w/o variable names */
 # endif
 #endif
 
 #ifndef ANSI_PROTOS
-#  if defined(__STDC__) || VMS || NEWDOSCC || defined(__CLCC__)
+#  if defined(__STDC__) || SYS_VMS || CC_NEWDOSCC || defined(__CLCC__)
 #    define ANSI_PROTOS 1
 #  else
 #    define ANSI_PROTOS 0
@@ -547,7 +527,7 @@ extern	char *	sys_errlist[];
 #endif
 
 #ifndef ANSI_VARARGS
-# if defined(__STDC__) || VMS || NEWDOSCC || defined(__CLCC__)
+# if defined(__STDC__) || SYS_VMS || CC_NEWDOSCC || defined(__CLCC__)
 #  define ANSI_VARARGS 1	/* look in <stdarg.h> */
 # else
 #  define ANSI_VARARGS 0	/* look in <varargs.h> */
@@ -594,11 +574,11 @@ extern char *rindex P((const char *, int));
 
 /*	System dependent library redefinitions, structures and includes	*/
 
-#if	NEWDOSCC
+#if CC_NEWDOSCC
 #include <dos.h>
 #endif
 
-#if	NEWDOSCC && ! DJGPP
+#if CC_NEWDOSCC && ! CC_DJGPP
 #undef peek
 #undef poke
 #define	peek(a,b,c,d)	movedata(a,b,FP_SEG(c),FP_OFF(c),d)
@@ -606,22 +586,22 @@ extern char *rindex P((const char *, int));
 #define	movmem(a, b, c)		memcpy(b, a, c)
 #endif
 
-#if 	WATCOM
+#if  CC_WATCOM
 #include      <string.h>
 #endif
 
-#if 	WATCOM || DJGPP
+#if  CC_WATCOM || CC_DJGPP
 #define	movmem(a, b, c)		memcpy(b, a, c)
 #endif
 
-#if	MSC || ZTC
+#if CC_MSC || CC_ZTC
 #include <memory.h>
 #endif
 
 
 /* on MS-DOS we have to open files in binary mode to see the ^Z characters. */
 
-#if MSDOS || WIN31 || OS2 || NT
+#if SYS_MSDOS || SYS_WIN31 || SYS_OS2 || SYS_WINNT
 #define FOPEN_READ	"rb"
 #define FOPEN_WRITE	"wb"
 #define FOPEN_APPEND	"ab"
@@ -639,7 +619,7 @@ extern char *rindex P((const char *, int));
 # define is_slashc(c) (c == '\\' || c == '/')
 #endif
 
-#if ST520
+#if SYS_ST520
 # define SLASHC '\\'
 # define is_slashc(c) (c == '\\')
 #endif
@@ -649,7 +629,7 @@ extern char *rindex P((const char *, int));
 # define is_slashc(c) (c == '/')
 #endif
 
-#if	VMS
+#if SYS_VMS
 #define	unlink(a)	delete(a)
 #endif
 
@@ -657,8 +637,8 @@ extern char *rindex P((const char *, int));
 
 	/* intermediate config-controls for filec.c (needed in nemode.h) */
 #if !SMALLER && !OPT_MAP_MEMORY
-#define COMPLETE_FILES  (UNIX || MSDOS || VMS || OS2 || NT)
-#define	COMPLETE_DIRS   (UNIX || MSDOS || OS2 || NT)
+#define COMPLETE_FILES  (SYS_UNIX || SYS_MSDOS || SYS_VMS || SYS_OS2 || SYS_WINNT)
+#define	COMPLETE_DIRS   (SYS_UNIX || SYS_MSDOS || SYS_OS2 || SYS_WINNT)
 #else
 #define COMPLETE_FILES  0
 #define COMPLETE_DIRS   0
@@ -693,7 +673,7 @@ extern char *rindex P((const char *, int));
 # endif
 #endif
 
-#if	IBMPC || Z309
+#if	DISP_IBMPC || DISP_Z309
 #define	MEMMAP	1
 #else
 #define	MEMMAP	0
@@ -706,7 +686,7 @@ extern char *rindex P((const char *, int));
 
 /*	internal constants	*/
 
-#if MSDOS || WIN31
+#if SYS_MSDOS || SYS_WIN31
 #define	BITS_PER_INT	16
 #endif
 
@@ -740,18 +720,18 @@ extern char *rindex P((const char *, int));
 #define C_BLACK 0
 #define C_WHITE (NCOLORS-1)
 
-#define N_chars 256			/* must be a power-of-2		*/
-#define HIGHBIT	0x0080			/* the meta bit			*/
-#define CTLA	0x0100			/* ^A flag, or'ed in		*/
-#define CTLX	0x0200			/* ^X flag, or'ed in		*/
-#define SPEC	0x0400			/* special key (function keys)	*/
+#define N_chars 256		/* must be a power-of-2		*/
+#define HIGHBIT	0x0080		/* the meta bit			*/
+#define CTLA	0x0100		/* ^A flag, or'ed in		*/
+#define CTLX	0x0200		/* ^X flag, or'ed in		*/
+#define SPEC	0x0400		/* special key (function keys)	*/
+#define NOREMAP	0x0800		/* unremappable -- _only_ appears in map.c */
 
 #define kcod2key(c)	(c & (N_chars-1)) /* strip off the above prefixes */
 #define	isspecial(c)	(c & ~(N_chars-1))
 
 #define	char2int(c)	((int)(c & 0xff)) /* mask off sign-extension, etc. */
 
-#define did_tungetc()   (tungotcnt > 0) /* test how many ungotten chars */
 #define	PLURAL(n)	((n!=1)?"s":"")
 
 #define	EOS     '\0'
@@ -773,6 +753,12 @@ extern char *rindex P((const char *, int));
 #define	PLAY	1			/*	"     "	  playing	*/
 #define	RECORD	2			/*	"     "   recording	*/
 
+#define QUOTED	TRUE
+#define NOQUOTED	FALSE
+
+#define DOMAP	TRUE
+#define NODOMAP	FALSE
+
 /* values for regionshape */
 typedef enum {
 	EXACT,
@@ -781,9 +767,12 @@ typedef enum {
 } REGIONSHAPE;
 
 /* flook options */
-#define FL_HERE 1
-#define FL_HERE_HOME 2
-#define FL_ANYWHERE 3
+#define FL_HERE      iBIT(0)	/* look in current directory */
+#define FL_HOME      iBIT(1)	/* look in home directory */
+#define FL_PATH      iBIT(2)	/* look along execution-path */
+
+#define FL_HERE_HOME (FL_HERE|FL_HOME)
+#define FL_ANYWHERE  (FL_HERE|FL_HOME|FL_PATH)
 
 /* definitions for name-completion */
 #define	NAMEC		name_cmpl /* char for forcing name-completion */
@@ -802,14 +791,14 @@ typedef enum {
 #define KBD_NOMAP	iBIT(9) /* don't permit mapping via kbd_key() */
 
 /* default option for 'mlreply' (used in modes.c also) */
-#if !(MSDOS || WIN31 || OS2 || NT)
+#if !(SYS_MSDOS || SYS_WIN31 || SYS_OS2 || SYS_WINNT)
 #define	KBD_NORMAL	KBD_EXPAND|KBD_QUOTES
 #else
 #define	KBD_NORMAL	KBD_EXPAND
 #endif
 
 /* reserve space for ram-usage option */
-#if RAMSIZE
+#if OPT_RAMSIZE
 #define	LastMsgCol	(term.t_ncol - 10)
 #else
 #define	LastMsgCol	(term.t_ncol - 1)
@@ -886,7 +875,7 @@ typedef enum {
 
 
 /* separator used when scanning PATH environment variable */
-#if VMS
+#if SYS_VMS
 #define	PATHCHR	','
 #endif
 
@@ -957,7 +946,7 @@ typedef	long CHARTYPE;
 typedef short CHARTYPE;
 #endif
 
-#if NT
+#if SYS_WINNT
 /* I dont like the warnings, so... */
 #undef islower
 #undef isupper
@@ -968,7 +957,7 @@ typedef short CHARTYPE;
 #undef ispunct
 #undef isalpha
 #undef isalnum
-#endif /* NT */
+#endif /* SYS_WINNT */
 
 /* these intentionally match the ctypes.h definitions, except that
 	they force the char to valid range first */
@@ -1058,6 +1047,17 @@ typedef	struct	_tbuff	{
 	ALLOC_T	tb_last;	/* last put/get index */
 	int	tb_endc;
 	} TBUFF;
+
+/*
+ * Definitions for 'itbuff.c' (temporary/dynamic int-buffers)
+ */
+typedef	struct	_itbuff	{
+	int *	itb_data;	/* the buffer-data */
+	ALLOC_T	itb_size;	/* allocated size */
+	ALLOC_T	itb_used;	/* total used in */
+	ALLOC_T	itb_last;	/* last put/get index */
+	int	itb_endc;
+	} ITBUFF;
 
 /*
  * Primitive types
@@ -1285,9 +1285,10 @@ typedef struct	{
 	C_NUM	r_leftcol;		/* Leftmost column. 		*/
 	C_NUM	r_rightcol;		/* Rightmost column. 		*/
 	B_COUNT	r_size; 		/* Length in characters.	*/
+	unsigned short	r_attr_id;	/* id of corresponding display  */
 }	REGION;
 
-#if COLOR
+#if OPT_COLOR
 typedef unsigned short VIDEO_ATTR;	/* assumption: short is at least 16 bits */
 #else
 typedef unsigned char VIDEO_ATTR;
@@ -1455,7 +1456,7 @@ typedef struct	{
 #define is_local_w_val(wp,which)  \
 	is_local_val(wp->w_values.wv,which)
 
-#if COLOR
+#if OPT_COLOR
 #define gfcolor global_w_val(WVAL_FCOLOR)
 #define gbcolor global_w_val(WVAL_BCOLOR)
 #else
@@ -1508,7 +1509,7 @@ typedef struct	BUFFER {
 	char	*b_fname;		/* File name			*/
 	int	b_fnlen;		/* length of filename		*/
 	char	b_bname[NBUFN]; 	/* Buffer name			*/
-#if	CRYPT
+#if	OPT_ENCRYPT
 	char	b_key[NPAT];		/* current encrypted key	*/
 #endif
 #ifdef	MDCHK_MODTIME
@@ -1755,6 +1756,7 @@ typedef struct	{
 	void	(*t_kclose) P((void));	/* close keyboard		*/
 	int	(*t_getchar) P((void)); /* Get character from keyboard. */
 	void	(*t_putchar) P((int)); 	/* Put character to display.	*/
+	int	(*t_typahead) P((void));/* character ready?		*/
 	void	(*t_flush) P((void));	/* Flush output buffers.	*/
 	void	(*t_move) P((int,int));	/* Move the cursor, origin 0.	*/
 	void	(*t_eeol) P((void));	/* Erase to end of line.	*/
@@ -1762,13 +1764,11 @@ typedef struct	{
 	void	(*t_beep) P((void));	/* Beep.			*/
 	void	(*t_rev) P((int));	/* set reverse video state	*/
 	int	(*t_rez) P((char *));	/* change screen resolution	*/
-#if	COLOR
+#if	OPT_COLOR
 	void	(*t_setfor) P((int));	/* set foreground color		*/
 	void	(*t_setback) P((int));	/* set background color		*/
 #endif
-#if	SCROLLCODE
 	void	(*t_scroll) P((int,int,int)); /* scroll a region of the screen */
-#endif
 #if 	OPT_PSCREEN
 	void	(*t_pflush) P((void));	/* really flush */
 #endif	/* OPT_PSCREEN */
@@ -1782,11 +1782,12 @@ typedef struct	{
 #define	TTkopen		(*term.t_kopen)
 #define	TTkclose	(*term.t_kclose)
 #define	TTgetc		(*term.t_getchar)
-#if !TERMCAP || (APOLLO && defined(__GNUC__))
+#if !DISP_TERMCAP || (SYS_APOLLO && defined(__GNUC__))
 #define	TTputc		(*term.t_putchar)
 #else
 #define	TTputc		(void)putchar
 #endif
+#define	TTtypahead	(*term.t_typahead)
 #define	TTflush		(*term.t_flush)
 #define	TTmove		(*term.t_move)
 #define	TTeeol		(*term.t_eeol)
@@ -1794,20 +1795,18 @@ typedef struct	{
 #define	TTbeep		(*term.t_beep)
 #define	TTrev		(*term.t_rev)
 #define	TTrez		(*term.t_rez)
-#if	COLOR
+#if	OPT_COLOR
 #define	TTforg		(*term.t_setfor)
 #define	TTbacg		(*term.t_setback)
 #endif
-#if	SCROLLCODE
 #define	TTscroll	(*term.t_scroll)
-#endif
 #if	OPT_PSCREEN
 #define	TTpflush	(*term.t_pflush)
 #endif
 
 typedef struct  VIDEO {
         int	v_flag;                 /* Flags */
-#if	COLOR
+#if	OPT_COLOR
 	int	v_fcolor;		/* current forground color */
 	int	v_bcolor;		/* current background color */
 	int	v_rfcolor;		/* requested forground color */
@@ -1824,7 +1823,7 @@ typedef struct  VIDEO {
 #define VideoText(vp) (vp)->v_text
 #define VideoAttr(vp) (vp)->v_attrs
 
-#if COLOR
+#if OPT_COLOR
 #define CurFcolor(vp) (vp)->v_fcolor
 #define CurBcolor(vp) (vp)->v_bcolor
 #define ReqFcolor(vp) (vp)->v_rfcolor
@@ -1842,7 +1841,7 @@ typedef struct  VIDEO {
 #define	VFREQ	0x0008			/* reverse video request	*/
 #define	VFCOL	0x0010			/* color change requested	*/
 
-#if IBMPC
+#if DISP_IBMPC
 /*
  * these need to go into edef.h eventually!
  */
@@ -1852,7 +1851,7 @@ typedef struct  VIDEO {
 #define	CDVGA	3			/* VGA color adapter		*/
 #define	CDSENSE	-1			/* detect the card type		*/
 
-#if COLOR
+#if OPT_COLOR
 #define	CD_25LINE	CDCGA
 #else
 #define	CD_25LINE	CDMONO
@@ -1935,7 +1934,7 @@ typedef struct  k_bind {
 #define NOMOVE  cmdBIT(9)	/* dot doesn't move (although address may be used) */
 #define VIEWOK  cmdBIT(10)	/* command is okay in view mode, even though it
 				 * _may_ be undoable (macros and maps) */
-#define RECT  cmdBIT(11)	/* motion causes rectangular operation */
+#define RECT    cmdBIT(11)	/* motion causes rectangular operation */
 
 /* These flags are 'ex' argument descriptors, adapted from elvis.  Not all are
  * used or honored or implemented.
@@ -1975,13 +1974,13 @@ typedef struct  k_bind {
 #define	FILEC_EXPAND   16	/* allow glob-expansion to multiple files */
 
 #ifndef P_tmpdir		/* not all systems define this */
-#if MSDOS || OS2 || NT
+#if SYS_MSDOS || SYS_OS2 || SYS_WINNT
 #define P_tmpdir ""
 #endif
-#if UNIX
+#if SYS_UNIX
 #define P_tmpdir "/usr/tmp"
 #endif
-#if VMS
+#if SYS_VMS
 #define P_tmpdir "sys$scratch:"
 #endif
 #endif	/* P_tmpdir */
@@ -2035,7 +2034,7 @@ typedef struct WHBLOCK {
 /*
  * Incremental search defines.
  */
-#if	ISRCH
+#if	OPT_ISRCH
 
 #define	CMDBUFLEN	256	/* Length of our command buffer */
 
@@ -2076,7 +2075,7 @@ typedef struct WHBLOCK {
 # define va_arg(ptr,cast) (cast)(ptr-(char *)0)
 #endif
 
-#if X11 && APOLLO
+#if DISP_X11 && SYS_APOLLO
 #define SYSV_STRINGS	/* <strings.h> conflicts with <string.h> */
 #endif
 
@@ -2088,10 +2087,10 @@ typedef struct WHBLOCK {
 #include <stddef.h>
 #endif
 
-#if (HAVE_STDLIB_H || VMS || NEWDOSCC)
+#if (HAVE_STDLIB_H || SYS_VMS || CC_NEWDOSCC)
 #include <stdlib.h>
 #else
-# if ! VMALLOC
+# if ! OPT_VRFY_MALLOC
 #if MISSING_EXTERN_MALLOC
 extern	char *	malloc	P(( unsigned int ));
 #endif
@@ -2156,7 +2155,7 @@ extern char *getcwd P(( char *, int ));
 # endif
 #endif
 
-#if HAVE_UTIME
+#if HAVE_UTIME_H
 # include <utime.h>
 #endif
 
@@ -2166,6 +2165,11 @@ extern char *getcwd P(( char *, int ));
  */
 
 #include "proto.h" 
+
+/*
+ * the list of generic function key bindings
+ */
+#include "nefkeys.h" 
 
 /*
  * Debugging/memory-leak testing
@@ -2204,7 +2208,7 @@ extern char *getcwd P(( char *, int ));
 #endif
 
 /*	Dynamic RAM tracking and reporting redefinitions	*/
-#if	RAMSIZE
+#if	OPT_RAMSIZE
 #undef	realloc
 #define	realloc	reallocate
 #undef	calloc
@@ -2215,7 +2219,7 @@ extern char *getcwd P(( char *, int ));
 #define	free	release
 #endif
 
-#if VMALLOC
+#if OPT_VRFY_MALLOC
 extern	char *vmalloc P(( SIZE_T, char *, int ));
 extern	void vfree P(( char *, char *, int ));
 extern	void rvverify P(( char *, char *, int ));
@@ -2232,6 +2236,6 @@ extern	void vdump P(( char * ));
 #endif
 
 /* for debugging VMS pathnames on UNIX... */
-#if UNIX && OPT_VMS_PATH
+#if SYS_UNIX && OPT_VMS_PATH
 #include "fakevms.h"
 #endif

@@ -2,17 +2,17 @@
  * The routines in this file read and write ASCII files from the disk. All of
  * the knowledge about files are here.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/fileio.c,v 1.81 1994/10/28 11:16:41 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/fileio.c,v 1.87 1994/11/29 17:04:43 pgf Exp $
  *
  */
 
 #include	"estruct.h"
 #include        "edef.h"
-#if UNIX || VMS || MSDOS || OS2 || NT
+#if SYS_UNIX || SYS_VMS || SYS_MSDOS || SYS_OS2 || SYS_WINNT
 #include	<sys/stat.h>
 #endif
 
-#if VMS
+#if SYS_VMS
 #include	<file.h>
 #endif
 
@@ -20,7 +20,7 @@
 #include	<sys/ioctl.h>
 #endif
 
-#if NEWDOSCC
+#if CC_NEWDOSCC
 #include	<io.h>
 #endif
 
@@ -34,8 +34,8 @@
 static	void	free_fline P(( void ));
 #if OPT_FILEBACK
 static	int	copy_file P(( char *, char * ));
-static	int	write_backup_file P((char *, char *, int));
-static	int	make_backup P(( char *, int ));
+static	int	write_backup_file P((char *, char * ));
+static	int	make_backup P(( char * ));
 #endif
 static	int	count_fline;	/* # of lines read with 'ffgetline()' */
   
@@ -50,7 +50,7 @@ free_fline()
 
 #if OPT_FILEBACK
 /*
- * Copy file when making a backup, when we are appending.
+ * Copy file when making a backup
  */
 static int
 copy_file (src, dst)
@@ -84,14 +84,13 @@ char	*dst;
 
 /*
  * Before overwriting a file, rename any existing version as a backup.
- * If appending, copy-back (retaining the modification-date of the original
- * file).
+ * Copy-back to retain the modification-date of the original file.
  *
  * Note: for UNIX, the direction of file-copy should be reversed, if the
  *       original file happens to be a symbolic link.
  */
 
-#if UNIX
+#if SYS_UNIX
 # if ! HAVE_LONG_FILENAMES
 #  define MAX_FN_LEN 14
 # else
@@ -100,10 +99,9 @@ char	*dst;
 #endif
 
 static int
-write_backup_file(orig, backup, appending)
+write_backup_file(orig, backup)
 char *orig;
 char *backup;
-int appending;
 {
 	int s;
 
@@ -114,10 +112,13 @@ int appending;
 
 	if (stat(backup, &bstat) == 0) {  /* the backup file exists */
 		
+#if SYS_UNIX
 		/* same file, somehow? */
 		if (bstat.st_dev == ostat.st_dev &&
-		    bstat.st_ino == ostat.st_ino)
+		    bstat.st_ino == ostat.st_ino) {
 			return FALSE;
+		}
+#endif
 
 		/* remove it */
 		if (unlink(backup) != 0)
@@ -175,14 +176,12 @@ int appending;
 }
 
 static int
-make_backup (fname, appending)
+make_backup (fname)
 char	*fname;
-int	appending;
 {
-	struct	stat	sb;
 	int	ok	= TRUE;
 
-	if (stat(fname, &sb) >= 0) { /* if the file exists, attempt a backup */
+	if (ffexists(fname) >= 0) { /* if the file exists, attempt a backup */
 		char	tname[NFILEN];
 		char	*s = pathleaf(strcpy(tname, fname)),
 			*t = strrchr(s, '.');
@@ -192,7 +191,7 @@ int	appending;
 			if (t == 0)
 				t = s + strlen(s);
 			(void)strcpy(t, ".bak");
-#if UNIX
+#if SYS_UNIX
 		} else if (strcmp(gvalfileback, "tilde") == 0) {
 			t = s + strlen(s);
 #if ! HAVE_LONG_FILENAMES
@@ -210,13 +209,13 @@ int	appending;
 		} else if (strcmp(gvalfileback, "tilde_N") {
 			/* numbered backups of all files*/
 #endif
-#endif /* UNIX */
+#endif /* SYS_UNIX */
 		} else {
 			mlwrite("BUG: bad fileback value");
 			return FALSE;
 		}
 
-		ok = write_backup_file(fname, tname, appending);
+		ok = write_backup_file(fname, tname);
 
 	}
 	return ok;
@@ -235,10 +234,10 @@ char    *fn;
 
 	if (isShellOrPipe(fn)) {
 		ffp = 0;
-#if UNIX || MSDOS || OS2 || NT
+#if SYS_UNIX || SYS_MSDOS || SYS_OS2 || SYS_WINNT
 	        ffp = npopen(fn+1, FOPEN_READ);
 #endif
-#if VMS
+#if SYS_VMS
 	        ffp = vms_rpipe(fn+1, 0, (char *)0);
 		/* really a temp-file, but we cannot fstat it to get size */
 #endif
@@ -276,7 +275,7 @@ ffwopen(fn,forced)
 char    *fn;
 int	forced;
 {
-#if UNIX || MSDOS || OS2 || NT
+#if SYS_UNIX || SYS_MSDOS || SYS_OS2 || SYS_WINNT
 	char	*name;
 	char	*mode = FOPEN_WRITE;
 
@@ -287,13 +286,7 @@ int	forced;
 		}
 		fileispipe = TRUE;
 	} else {
-#if OPT_FILEBACK
-		int	appending = FALSE;
-#endif
 		if ((name = is_appendname(fn)) != NULL) {
-#if OPT_FILEBACK
-			appending = TRUE;
-#endif
 			fn = name;
 			mode = FOPEN_APPEND;
 		}
@@ -302,9 +295,16 @@ int	forced;
 			mlerror("opening directory");
 			return (FIOERR);
 		}
+
 #if OPT_FILEBACK
+		/* will we be able to write? (before attempting backup) */
+		if (ffexists(fn) && ffronly(fn)) {
+			mlerror("accessing for write");
+			return (FIOERR);
+		}
+
 		if (*global_g_val_ptr(GVAL_BACKUPSTYLE) != 'o') { /* "off" ? */
-			if (!make_backup(fn, appending)) {
+			if (!make_backup(fn)) {
 				if (!forced) {
 					mlerror("making backup file");
 					return (FIOERR);
@@ -319,7 +319,7 @@ int	forced;
 		fileispipe = FALSE;
 	}
 #else
-#if     VMS
+#if     SYS_VMS
 	char	temp[NFILEN];
         register int    fd;
 	register char	*s;
@@ -356,7 +356,7 @@ char    *fn;
 		return (access(fn, 2) != 0);	/* W_OK==2 */
 #else
 		int fd;
-	        if ((fd=open(fn, O_WRONLY)) < 0) {
+	        if ((fd=open(fn, O_WRONLY|O_APPEND)) < 0) {
 	                return TRUE;
 		}
 		(void)close(fd);
@@ -366,7 +366,7 @@ char    *fn;
 }
 
 #if !OPT_MAP_MEMORY
-#if UNIX || VMS || OS2 || NT
+#if SYS_UNIX || SYS_VMS || SYS_OS2 || SYS_WINNT
 long
 ffsize()
 {
@@ -378,8 +378,8 @@ ffsize()
 }
 #endif
 
-#if MSDOS
-#if DJGPP
+#if SYS_MSDOS
+#if CC_DJGPP
 
 long
 ffsize(void)
@@ -408,7 +408,7 @@ ffsize(void)
 #endif
 #endif	/* !OPT_MAP_MEMORY */
 
-#if UNIX || VMS || OS2 || NT
+#if SYS_UNIX || SYS_VMS || SYS_OS2 || SYS_WINNT
 
 int
 ffexists(p)
@@ -423,7 +423,7 @@ char *p;
 
 #endif
 
-#if MSDOS || WIN31
+#if SYS_MSDOS || SYS_WIN31
 
 int
 ffexists(p)
@@ -438,13 +438,24 @@ char *p;
 
 #endif
 
-#if !MSDOS && !OPT_MAP_MEMORY
+int
+ffreadable(p)
+char *p;
+{
+	if (ffropen(p) == FIOSUC) {
+		ffclose();
+		return TRUE;
+	}
+        return FALSE;
+}
+
+#if !SYS_MSDOS && !OPT_MAP_MEMORY
 int
 ffread(buf,len)
 char *buf;
 long len;
 {
-#if VMS
+#if SYS_VMS
 	/*
 	 * If the input file is record-formatted (as opposed to stream-lf, a
 	 * single read won't get the whole file.
@@ -471,7 +482,7 @@ void
 ffseek(n)
 long n;
 {
-#if VMS
+#if SYS_VMS
 	ffrewind();	/* see below */
 #endif
 	fseek (ffp,n,0);
@@ -480,7 +491,7 @@ long n;
 void
 ffrewind()
 {
-#if VMS
+#if SYS_VMS
 	/* VAX/VMS V5.4-2, VAX-C 3.2 'rewind()' does not work properly, because
 	 * no end-of-file condition is returned after rewinding.  Reopening the
 	 * file seems to work.  We can get away with this because we only
@@ -506,7 +517,7 @@ ffclose()
 
 	free_fline();	/* free this since we do not need it anymore */
 
-#if UNIX || MSDOS || WIN31 || OS2 || NT
+#if SYS_UNIX || SYS_MSDOS || SYS_WIN31 || SYS_OS2 || SYS_WINNT
 	if (fileispipe) {
 		npclose(ffp);
 		mlforce("[Read %d lines%s]",
@@ -567,7 +578,7 @@ int c;
 {
 	char	d = c;
 
-#if	CRYPT
+#if	OPT_ENCRYPT
 	if (cryptflag)
 		ue_crypt(&d, 1);
 #endif
@@ -631,8 +642,8 @@ int *lenp;	/* to return the final length */
 #endif
         }
 
-#if !DOSFILES
-# if	ST520
+#if !OPT_DOSFILES
+# if	SYS_ST520
 	if(c == '\n') {
 		if(i > 0 && fline[i-1] == '\r') {
 			i--;
@@ -657,7 +668,7 @@ int *lenp;	/* to return the final length */
 			return(FIOEOF);
         }
 
-#if	CRYPT
+#if	OPT_ENCRYPT
 	/* decrypt the line */
 	if (cryptflag)
 		ue_crypt(fline, i);
@@ -680,7 +691,7 @@ int *lenp;	/* to return the final length */
  * is _much_much_ faster, and I don't have to futz with non-blocking
  * reads...
  */
-#if WATCOM || OS2 || NT
+#if CC_WATCOM || SYS_OS2 || SYS_WINNT
 #define no_isready_c 1 
 #endif
 
@@ -701,10 +712,10 @@ int *lenp;	/* to return the final length */
 #      define 	isready_c(p)	( (p)->_gptr < (p)->_egptr)
 #     endif
 #   else
-#    if VMS
+#    if SYS_VMS
 #     define	isready_c(p)	( (*p)->_cnt > 0)
 #    endif
-#    if TURBO
+#    if CC_TURBO
 #     define    isready_c(p)	( (p)->bsize > ((p)->curp - (p)->buffer) )
 #    endif
 #    ifndef isready_c	/* most other stdio's (?) */

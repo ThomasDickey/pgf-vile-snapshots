@@ -3,7 +3,7 @@
  * paragraph at a time.  There are all sorts of word mode commands.  If I
  * do any sentence mode commands, they are likely to be put in this file. 
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/word.c,v 1.41 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/word.c,v 1.42 1994/11/29 04:02:03 pgf Exp $
  *
  */
 
@@ -299,6 +299,7 @@ int f,n;
 	return(operjoin(f,n));
 }
 
+#if OPT_FORMAT
 int
 formatregion()
 {
@@ -470,9 +471,10 @@ formatregion()
 	}
 	return setmark();
 }
+#endif /* OPT_FORMAT */
 
 
-#if	WORDCOUNT
+#if	OPT_WORDCOUNT
 /*	wordcount:	count the # of words in the marked region,
 			along with average word sizes, # of chars, etc,
 			and report on them.			*/

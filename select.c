@@ -18,7 +18,7 @@
  * transfering the selection are not dealt with in this file.  Procedures
  * for dealing with the representation are maintained in this file.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/select.c,v 1.21 1994/10/27 21:46:42 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/select.c,v 1.27 1994/11/29 04:02:03 pgf Exp $
  *
  */
 
@@ -29,15 +29,7 @@
 
 extern REGION *haveregion;
 
-#if BEFORE /* we always need these now, for multimotion() */
-#if X11 && XTOOLKIT
-# define USE_SEL_FUNCS 1
-#else
-# define USE_SEL_FUNCS 0
-#endif
-#else
-# define USE_SEL_FUNCS 1
-#endif
+#define USE_SEL_FUNCS 1
 
 static	void	detach_attrib		P(( BUFFER *, AREGION * ));
 static	void	attach_attrib		P(( BUFFER *, AREGION * ));
@@ -45,8 +37,10 @@ static	void	attach_attrib		P(( BUFFER *, AREGION * ));
 #if USE_SEL_FUNCS
 static	void	fix_dot			P(( void ));
 static	void	output_selection_position_to_message_line P(( int ));
+#if DISP_X11 && XTOOLKIT
 static	WINDOW *push_fake_win		P(( BUFFER * ));
 static	void	pop_fake_win		P(( WINDOW * ));
+#endif
 #endif
 static REGION *extended_region		P(( void ));
 
@@ -125,6 +119,7 @@ detach_attrib(bp, arp)
 	while (*rpp != NULL) {
 	    if (*rpp == arp) {
 		*rpp = (*rpp)->ar_next;
+    		arp->ar_region.r_attr_id = 0;
 		break;
 	    }
 	    else
@@ -132,6 +127,26 @@ detach_attrib(bp, arp)
 	}
     }
 }
+
+void find_release_attr(bp,rp)
+BUFFER *bp;
+REGION *rp;
+{
+    if (bp != NULL) {
+	AREGION **rpp;
+	rpp = &bp->b_attribs;
+	while (*rpp != NULL) {
+	    if ((*rpp)->ar_region.r_attr_id == rp->r_attr_id) {
+		free_attrib(bp, *rpp);
+		break;
+	    }
+	    else
+		rpp = &(*rpp)->ar_next;
+	}
+    }
+}
+
+static attr_id;
 
 static void
 attach_attrib(bp, arp)
@@ -144,6 +159,7 @@ attach_attrib(bp, arp)
     for_each_window(wp)
 	if (wp->w_bufp == bp)
 	    wp->w_flag |= WFHARD;
+    arp->ar_region.r_attr_id = ++attr_id;
 }
 
 /*
@@ -316,6 +332,7 @@ sel_reassert_ownership(bp)
  */
 
 #if USE_SEL_FUNCS
+#if DISP_X11 && XTOOLKIT
 static WINDOW *
 push_fake_win(bp)
     BUFFER *bp;
@@ -404,17 +421,20 @@ sel_yank()
     return TRUE;
 }
 
+#if NEEDED
 int
 sel_attached()
 {
     return startbufp == NULL;
 }
+#endif  /* NEEDED */
 
 BUFFER *
 sel_buffer()
 {
     return (startbufp != NULL) ? startbufp : selbufp;
 }
+#endif  /* DISP_X11 && XTOOLKIT */
 
 int
 sel_setshape(shape)
@@ -563,12 +583,14 @@ int f,n;
 {
 	CMDFUNC	*cfp;
 	int s,c,waserr;
-	int shape = regionshape;
-	MARK savedot = DOT;
+	REGIONSHAPE shape = regionshape;
+	MARK savedot;
+	MARK savemark;
 	MARK realdot;
 	char	temp[NLINE];
 	extern CMDFUNC f_multimotion;
 
+	savedot = DOT;
 	if (sweeping) { /* the same command terminates as starts the sweep */
 		sweeping = FALSE;
 		mlforce("[Sweeping: Completed]");
@@ -633,7 +655,12 @@ int f,n;
 
 	}
 	regionshape = shape;
-	return TRUE;
+	savedot = DOT;
+	savemark = MK;
+	s = yankregion();
+	DOT = savedot;
+	MK = savemark;
+	return s;
 }
 
 int

@@ -33,7 +33,7 @@
  *	  freespace (or have been entirely freed).  Currently, only pages that
  *	  are in-memory can have space allocated from them.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/tmp.c,v 1.11 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/tmp.c,v 1.12 1994/11/29 04:02:03 pgf Exp $
  *
  */
 #include "estruct.h"
@@ -417,7 +417,7 @@ MaxPages()
 {
 	static	BLK_T	the_limit;
 	if (the_limit == 0) {
-#if MSDOS
+#if SYS_MSDOS
 		extern long coreleft(void);
 		the_limit = ((coreleft() / 3) * 2) / NCHUNK;
 #else

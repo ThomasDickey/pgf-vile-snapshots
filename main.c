@@ -13,7 +13,7 @@
  *	The same goes for vile.  -pgf
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/main.c,v 1.202 1994/10/30 01:03:51 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/main.c,v 1.207 1994/11/29 04:02:03 pgf Exp $
  *
  */
 
@@ -23,9 +23,9 @@
 #include	"edef.h"	/* global definitions */
 #include	"nevars.h"
 
-#if NEWDOSCC
+#if CC_NEWDOSCC
 #include <io.h>
-#if DJGPP
+#if CC_DJGPP
 #include <dpmi.h>
 #include <go32.h>
 #endif
@@ -34,7 +34,7 @@
 extern char *pathname[];	/* startup file path/name array */
 
 /* for MSDOS, increase the default stack space */
-#if	MSDOS && TURBO
+#if	SYS_MSDOS && CC_TURBO
 unsigned _stklen = 32768U;
 #endif
 
@@ -62,13 +62,12 @@ char	*argv[];
 	int gline = FALSE;		/* if so, what line? */
 	int helpflag = FALSE;		/* do we need help at start? */
 	int searchflag = FALSE; 	/* Do we need to search at start? */
-	char bname[NBUFN+1];		/* buffer name of file to read */
 	char *msg;
-#if TAGS
+#if OPT_TAGS
 	int didtag = FALSE;		/* look up a tag to start? */
 	char *tname = NULL;
 #endif
-#if	CRYPT
+#if	OPT_ENCRYPT
 	char ekey[NPAT];		/* startup encryption key */
 	*ekey = EOS;
 #endif
@@ -83,10 +82,7 @@ char	*argv[];
 #endif
 	global_val_init();	/* global buffer values */
 	charinit();	/* character types -- we need these pretty early  */
-#if NEW_VI_MAP
-	map_init();
-#endif
-#if !UNIX
+#if !SYS_UNIX
 	expand_wild_args(&argc, &argv);
 #endif
 	prog_arg = argv[0];	/* this contains our only clue to exec-path */
@@ -96,13 +92,13 @@ char	*argv[];
 	if (strcmp(pathleaf(prog_arg), "view") == 0)
 		set_global_b_val(MDVIEW,TRUE);
 
-#if X11
+#if DISP_X11
 	x_preparse_args(&argc, &argv);
 #endif
 	/* Parse the command line */
 	for (carg = 1; carg < argc; ++carg) {
 		register char *param = argv[carg];
-#if X11 && !XTOOLKIT
+#if DISP_X11 && !XTOOLKIT
 		if (*param == '=') {
 			x_set_geometry(param);
 			continue;
@@ -113,16 +109,16 @@ char	*argv[];
 		/* Process Switches */
 		if (*param == '-') {
 			++param;
-#if IBMPC || BORLAND
+#if DISP_IBMPC || DISP_BORLAND
 		    	/* if it's a digit, it's probably a screen
 				resolution */
 			if (isdigit(*param)) {
 				current_res_name = param;
 				continue;
 			} else
-#endif	/* IBMPC */
+#endif	/* DISP_IBMPC */
 			switch (*param) {
-#if X11 && !XTOOLKIT
+#if DISP_X11 && !XTOOLKIT
 			case 'd':
 				if ((param = argv[++carg]) != 0)
 					x_set_dpy(param);
@@ -165,7 +161,7 @@ char	*argv[];
 				else
 					goto usage;
 				break;
-#endif /* X11 */
+#endif /* DISP_X11 */
 			case 'e':	/* -e for Edit file */
 			case 'E':
 				set_global_b_val(MDVIEW,FALSE);
@@ -180,7 +176,7 @@ char	*argv[];
 			case 'H':
 				helpflag = TRUE;
 				break;
-#if	CRYPT
+#if	OPT_ENCRYPT
 			case 'k':	/* -k<key> for code key */
 			case 'K':
 				GetArgVal(param);
@@ -198,7 +194,7 @@ char	*argv[];
 				(void)strncpy0(pat, param, NPAT);
 				gregexp = regcomp(pat, global_b_val(MDMAGIC));
 				break;
-#if TAGS
+#if OPT_TAGS
 			case 't':  /* -t for initial tag lookup */
 			case 'T':
 				GetArgVal(param);
@@ -234,19 +230,15 @@ char	*argv[];
 		} else if (*param != EOS) {
 
 			/* Process an input file */
-#if CRYPT
+#if OPT_ENCRYPT
 			cryptkey = (*ekey != EOS) ? ekey : 0;
 #endif
 			/* set up a buffer for this file */
-			makename(bname, param);
-			(void)unqname(bname,FALSE);
-
-			bp = bfind(bname, BFARGS);
-			ch_fname(bp, param);
+			bp = make_bp(param, BFARGS, FALSE);
 			make_current(bp); /* pull it to the front */
 			if (firstbp == 0)
 				firstbp = bp;
-#if CRYPT
+#if OPT_ENCRYPT
 			cryptkey = 0;
 #endif
 		}
@@ -256,9 +248,9 @@ char	*argv[];
 	/* if stdin isn't a terminal, assume the user is trying to pipe a
 	 * file into a buffer.
 	 */
-#if UNIX || VMS || MSDOS || WIN31 || OS2 || NT
+#if SYS_UNIX || SYS_VMS || SYS_MSDOS || SYS_WIN31 || SYS_OS2 || SYS_WINNT
 	if (!isatty(fileno(stdin))) {
-#if UNIX
+#if SYS_UNIX
 # if HAS_TTYNAME
 		char	*tty = ttyname(fileno(stderr));
 # else
@@ -276,7 +268,7 @@ char	*argv[];
 		if (firstbp == 0)
 			firstbp = bp;
 		ffp = fdopen(dup(fileno(stdin)), "r");
-#if UNIX
+#if SYS_UNIX
 		/*
 		 * Note: On Linux, the low-level close/dup operation
 		 * doesn't work, since something hangs, apparently
@@ -289,7 +281,7 @@ char	*argv[];
 			ExitProgram(BADEXIT);
 		}
 #else
-# if VMS
+# if SYS_VMS
   		fd = open("tt:", 0);	/* or sys$command */
 # else					/* e.g., DOS-based systems */
   		fd = fileno(stderr);	/* this normally cannot be redirected */
@@ -299,7 +291,7 @@ char	*argv[];
   		 && (fd = dup(fd)) == 0
   		 && (in = fdopen(fd, "r")) != 0)
   			*stdin = *in;
-#endif	/* UNIX */
+#endif	/* SYS_UNIX */
   
   		(void)slowreadf(bp, &nline);
   		set_rdonly(bp, bp->b_fname);
@@ -309,7 +301,7 @@ char	*argv[];
 			(void)zotbuf(bp);
 			firstbp = lastbp;
 		}
-#if FINDERR
+#if OPT_FINDERR
 		else set_febuff(get_bname(bp));
 #endif
 	}
@@ -343,7 +335,7 @@ char	*argv[];
 	if (firstbp == 0) {
 		bp = bfind(ScratchName(unnamed), 0);
 		bp->b_active = TRUE;
-#if DOSFILES
+#if OPT_DOSFILES
 		/* an empty non-existent buffer defaults to line-style
 			favored by the OS */
 		make_local_b_val(bp,MDDOS);
@@ -402,7 +394,7 @@ char	*argv[];
 			char *fname;
 			/* if .vilerc is one of the input files....
 					don't clobber it */
-#if MSDOS || WIN31 || OS2 || NT
+#if SYS_MSDOS || SYS_WIN31 || SYS_OS2 || SYS_WINNT
 			/* search PATH for vilerc under dos */
 	 		fname = flook(pathname[0], FL_ANYWHERE);
 #else
@@ -430,7 +422,7 @@ char	*argv[];
 	if (firstbp != 0) {
 		startstat = swbuffer(firstbp);
 	}
-#if TAGS
+#if OPT_TAGS
 	else if (tname) {
 		cmdlinetag(tname);
 		didtag = TRUE;
@@ -448,11 +440,11 @@ char	*argv[];
 
 	/* Deal with startup gotos and searches */
 	if (gotoflag + searchflag
-#if TAGS
+#if OPT_TAGS
 		 + (tname?1:0)
 #endif
 		> 1) {
-#if TAGS
+#if OPT_TAGS
 		msg = "[Search, goto and tag are used one at a time]";
 #else
 		msg = "[Cannot search and goto at the same time]";
@@ -462,7 +454,7 @@ char	*argv[];
 			msg = "[Invalid goto argument]";
 	} else if (searchflag) {
 		forwhunt(FALSE, 0);
-#if TAGS
+#if OPT_TAGS
 	} else if (tname && !didtag) {
 		cmdlinetag(tname);
 #endif
@@ -540,7 +532,7 @@ loop()
 		if (insertmode != FALSE) {
 			if (!kbd_replaying(FALSE))
 			    mayneedundo();
-			tungetc(c);
+			unkeystroke(c);
 			insert(f,n);
 			dotcmdfinish();
 			continue;
@@ -646,11 +638,18 @@ global_val_init()
 	set_global_g_val(GVAL_PRINT_HIGH, 0);
 
 
-	set_global_g_val(GVAL_TIMEOUTVAL, 500);	/* catnap time -- how long
-							to wait for ESC seq */
+	/* catnap times: */
+	/* how long to wait for ESC seq */
+	set_global_g_val(GVAL_TIMEOUTVAL, 500);	
+	/* how long to wait for user seq */
+	set_global_g_val(GVAL_TIMEOUTUSERVAL, 60000); 
+
+	/* allow remapping by default */
+	set_global_g_val(GMDREMAP, TRUE);	
+
 #if OPT_VMS_PATH || OPT_MSDOS_PATH	/* ':' gets in the way of drives */
 	set_global_g_val_ptr(GVAL_EXPAND_CHARS,strmalloc("!%#"));
-#else	/* UNIX */
+#else	/* SYS_UNIX */
 	set_global_g_val_ptr(GVAL_EXPAND_CHARS,strmalloc("!%#:"));
 #endif
 	set_global_g_val(GMDEXPAND_PATH,FALSE);
@@ -670,13 +669,11 @@ global_val_init()
 # endif
 #endif
 #if	OPT_FILEBACK
-	set_global_g_val_ptr(GVAL_BACKUPSTYLE,
-#if MSDOS || WIN31 || OS2 || NT
-					strmalloc(".bak")
-#else
-					strmalloc("off")
-#endif
-		);
+# if	OPT_MSDOS_PATH
+	set_global_g_val_ptr(GVAL_BACKUPSTYLE, strmalloc(".bak"));
+# else
+	set_global_g_val_ptr(GVAL_BACKUPSTYLE, strmalloc("off"));
+# endif
 #endif
 #if	OPT_POPUP_MSGS
 	set_global_g_val(GMDPOPUP_MSGS,-TRUE);	/* popup-msgs */
@@ -724,7 +721,7 @@ global_val_init()
 #endif
 	set_global_b_val(MDVIEW,	FALSE); /* view-only */
 	set_global_b_val(MDWRAP,	FALSE); /* wrap */
-#if LCKFILES
+#if OPT_LCKFILES
 	/* locking defaults */
 	set_global_g_val(GMDUSEFILELOCK,FALSE);	/* Use filelocks */
 	set_global_b_val(MDLOCKED,	FALSE);	/* LOCKED */
@@ -742,10 +739,10 @@ global_val_init()
 
 	set_global_b_val_ptr(VAL_TAGS, strmalloc("tags")); /* tags filename */
 
-#if VMS
+#if SYS_VMS
 #define	DEFAULT_CSUFFIX	"\\.\\(\\([CHIS]\\)\\|CC\\|CXX\\|HXX\\)\\(;[0-9]*\\)\\?$"
 #endif
-#if MSDOS || WIN31
+#if SYS_MSDOS || SYS_WIN31
 #define	DEFAULT_CSUFFIX	"\\.\\(\\([chis]\\)\\|cpp\\|cxx\\|hxx\\)$"
 #endif
 #ifndef DEFAULT_CSUFFIX	/* UNIX or OS2/HPFS (mixed-case names) */
@@ -806,7 +803,7 @@ global_val_init()
 
 }
 
-#if UNIX || MSDOS || WIN31 || OS2 || NT || VMS
+#if SYS_UNIX || SYS_MSDOS || SYS_WIN31 || SYS_OS2 || SYS_WINNT || SYS_VMS
 
 /* have we been interrupted/ */
 static int am_interrupted = FALSE;
@@ -816,7 +813,7 @@ SIGT
 catchintr (ACTUAL_SIG_ARGS)
 {
 	am_interrupted = TRUE;
-#if MSDOS || OS2 || NT
+#if SYS_MSDOS || SYS_OS2 || SYS_WINNT
 	sgarbf = TRUE;	/* there's probably a ^C on the screen. */
 #endif
 	(void)signal(SIGINT,catchintr);
@@ -829,16 +826,16 @@ catchintr (ACTUAL_SIG_ARGS)
 int
 interrupted()
 {
-#if MSDOS && DJGPP
+#if SYS_MSDOS && CC_DJGPP
 
 	if (_go32_was_ctrl_break_hit() != 0) {
-		while(typahead())
-			(void)tgetc(FALSE);
+		while(keystroke_avail())
+			(void)keystroke();
 		return TRUE;
 	}
 	if (was_ctrl_c_hit() != 0) {
-		while(typahead())
-			(void)tgetc(FALSE);
+		while(keystroke_avail())
+			(void)keystroke();
 		return TRUE;
 	}
 
@@ -854,26 +851,26 @@ void
 not_interrupted()
 {
     am_interrupted = FALSE;
-#if MSDOS
-# if DJGPP
+#if SYS_MSDOS
+# if CC_DJGPP
     (void)_go32_was_ctrl_break_hit();  /* flush any pending kbd ctrl-breaks */
     (void)was_ctrl_c_hit();  /* flush any pending kbd ctrl-breaks */
 # endif
 #endif
 }
 
-#if MSDOS
-# if WATCOM
+#if SYS_MSDOS
+# if CC_WATCOM
     int  dos_crit_handler(unsigned deverror, unsigned errcode, unsigned *devhdr)
 # else
     void dos_crit_handler()
 # endif
 {
-# if WATCOM
+# if CC_WATCOM
 	_hardresume((int)_HARDERR_FAIL);
 	return (int)_HARDERR_FAIL;
 # else
-#  if ! DJGPP
+#  if ! CC_DJGPP
 	_hardresume(_HARDERR_FAIL);
 #  endif
 # endif
@@ -884,7 +881,7 @@ not_interrupted()
 void
 siginit()
 {
-#if UNIX
+#if SYS_UNIX
 	(void)signal(SIGINT,catchintr);
 	(void)signal(SIGHUP,imdying);
 #ifdef SIGBUS
@@ -901,30 +898,30 @@ siginit()
 	(void)signal(SIGQUIT,SIG_IGN);
 #endif
 	(void)signal(SIGPIPE,SIG_IGN);
-#if defined(SIGWINCH) && ! X11
+#if defined(SIGWINCH) && ! DISP_X11
 	(void)signal(SIGWINCH,sizesignal);
 #endif
 #else
-# if MSDOS
+# if SYS_MSDOS
 	(void)signal(SIGINT,catchintr);
-#  if DJGPP
+#  if CC_DJGPP
 	_go32_want_ctrl_break(TRUE);
 	setcbrk(FALSE);
 	want_ctrl_c(TRUE);
 	hard_error_catch_setup();
 #  else
-#   if WATCOM
+#   if CC_WATCOM
 	{
 	/* clean up Warning from Watcom C */
 	void *ptrfunc = dos_crit_handler;
 	_harderr(ptrfunc);
 	}
-#   else	/* TURBO */
+#   else	/* CC_TURBO */
 	_harderr(dos_crit_handler);
 #   endif
 #  endif
 # endif
-# if OS2 || NT
+# if SYS_OS2 || SYS_WINNT
 	(void)signal(SIGINT,catchintr);
 #endif
 #endif
@@ -934,8 +931,8 @@ siginit()
 void
 siguninit()
 {
-#if MSDOS
-# if DJGPP
+#if SYS_MSDOS
+# if CC_DJGPP
 	_go32_want_ctrl_break(FALSE);
 	want_ctrl_c(FALSE);
 	hard_error_teardown();
@@ -1151,7 +1148,7 @@ int f,n;
 	int cnt;
 	BUFFER *bp;
 
-#if PROC
+#if OPT_PROCEDURES
 	{ 
 	    static int exithooking;
 	    if (!exithooking && *exithook) {
@@ -1173,13 +1170,13 @@ int f,n;
 				cnt);
 		return FALSE;
 	}
-#if	FILOCK
+#if	OPT_BSD_FILOCK
 	if (lockrel() != TRUE) {
 		ExitProgram(BADEXIT);
 		/* NOTREACHED */
 	}
 #endif
-#if LCKFILES
+#if OPT_LCKFILES
 	/* Release all placed locks */
 	if ( global_g_val(GMDUSEFILELOCK) ) {
 		for_each_buffer(bp) {
@@ -1213,7 +1210,7 @@ int f,n;
 		vt_leaks();
 		ev_leaks();
 		tmp_leaks();
-#if X11
+#if DISP_X11
 		x11_leaks();
 #endif
 
@@ -1224,7 +1221,7 @@ int f,n;
 		FreeAndNull(gregexp);
 		FreeAndNull(patmatch);
 
-#if UNIX
+#if SYS_UNIX
 		if (strcmp(pathname[2], ".")) free(pathname[2]);
 #endif
 		/* whatever is left over must be a leak */
@@ -1255,7 +1252,7 @@ int f,n;
  */
 /* ARGSUSED */
 int
-esc(f, n)
+esc_func(f, n)
 int f,n;
 {
 	dotcmdmode = STOP;
@@ -1307,7 +1304,7 @@ int f,n;
 
 /* ARGSUSED */
 int
-cntl_af(f,n)	/* dummy function for binding to control-a prefix */
+cntl_a_func(f,n)	/* dummy function for binding to control-a prefix */
 int f,n;
 {
 	return TRUE;
@@ -1315,7 +1312,7 @@ int f,n;
 
 /* ARGSUSED */
 int
-cntl_xf(f,n)	/* dummy function for binding to control-x prefix */
+cntl_x_func(f,n)	/* dummy function for binding to control-x prefix */
 int f,n;
 {
 	return TRUE;
@@ -1323,7 +1320,15 @@ int f,n;
 
 /* ARGSUSED */
 int
-unarg(f,n) /* dummy function for binding to universal-argument */
+poundc_func(f,n)	/* dummy function for binding to poundsign prefix */
+int f,n;
+{
+	return TRUE;
+}
+
+/* ARGSUSED */
+int
+unarg_func(f,n) /* dummy function for binding to universal-argument */
 int f,n;
 {
 	return TRUE;
@@ -1400,7 +1405,7 @@ charinit()
 	/* wildcard chars for most shells */
 	_chartypes_['*'] |= _wild;
 	_chartypes_['?'] |= _wild;
-#if !VMS
+#if !SYS_VMS
 	_chartypes_['~'] |= _wild;
 	_chartypes_[LBRACK] |= _wild;
 	_chartypes_[RBRACK] |= _wild;
@@ -1458,7 +1463,7 @@ charinit()
 /*****		Compiler specific Library functions	****/
 
 
-#if	RAMSIZE
+#if	OPT_RAMSIZE
 /*	These routines will allow me to track memory usage by placing
 	a layer on top of the standard system malloc() and free() calls.
 	with this code defined, the environment variable, $RAM, will
@@ -1485,7 +1490,7 @@ display_ram_usage P((void))
 		if (saverow >= 0 && saverow < term.t_nrow
 		 && savecol >= 0 && savecol < term.t_ncol) {
 			movecursor(term.t_nrow-1, LastMsgCol);
-#if	COLOR
+#if	OPT_COLOR
 			TTforg(gfcolor);
 			TTbacg(gbcolor);
 #endif
@@ -1548,7 +1553,7 @@ char *mp;	/* chunk of RAM to release */
 		display_ram_usage();
 	}
 }
-#endif	/* RAMSIZE */
+#endif	/* OPT_RAMSIZE */
 
 #if MALLOCDEBUG
 mallocdbg(f,n)
@@ -1594,9 +1599,9 @@ char **av;
 #endif
 }
 
-#if MSDOS
+#if SYS_MSDOS
 
-#if TURBO
+#if CC_TURBO
 int
 showmemory(f,n)
 int	f,n;
@@ -1607,7 +1612,7 @@ int	f,n;
 }
 #endif
 
-#if WATCOM
+#if CC_WATCOM
 int
 showmemory(f,n)
 int	f,n;
@@ -1617,7 +1622,7 @@ int	f,n;
 }
 #endif
 
-#if DJGPP
+#if CC_DJGPP
 int
 showmemory(f,n)
 int	f,n;
@@ -1628,7 +1633,7 @@ int	f,n;
 	return TRUE;
 }
 #endif
-#endif /* MSDOS */
+#endif /* SYS_MSDOS */
 
 /*
  * Try to invoke 'exit()' from only one point so we can cleanup temporary

@@ -3,7 +3,7 @@
  *	Original interface by Otto Lind, 6/3/93
  *	Additional map and map! support by Kevin Buettner, 9/17/94
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/map.c,v 1.27 1994/10/16 02:57:55 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/map.c,v 1.34 1994/11/29 17:04:43 pgf Exp $
  * 
  */
 
@@ -68,14 +68,18 @@ struct maprec {
 					/*   matched sequence by	*/
 };
 
-#define MAPF_WAITLONGER 0x01
+#define MAPF_SYSTIMER	0x01
+#define MAPF_USERTIMER	0x02
+#define MAPF_TIMERS	0x03
+#define MAPF_NOREMAP	0x04
 
 static struct maprec *map_command = NULL;
 static struct maprec *map_insert = NULL;
+static struct maprec *map_syskey = NULL;
 
-static	int	map_common P(( int f, struct maprec **, char * ));
+static	int	map_common P(( int f, struct maprec **, char *, int ));
 static	int	unmap_common P(( struct maprec **, char * ));
-static	void	addtomap P(( struct maprec **, char *, int, int, char * ));
+static	void	addtomap P(( struct maprec **, char *, int, int, int, char * ));
 static	int	delfrommap P(( struct maprec **, char * ));
 
 
@@ -97,26 +101,48 @@ static void relist_mappings P(( char * ));
 #if OPT_SHOW_MAPS
 #define MAPS_PREFIX 12
 
-static	int	show_all;
+static	int	show_all;	/* show system mappings as well as user */
 
 /*ARGSUSED*/
 static void
-makecharslist(flag, ptr)
-    int   flag;
+makecharslist(all, ptr)
+    int   all;
     char *ptr;
 {
     char lhsstr[MAXLHS];
     struct maprec *lhsstack[MAXLHS];
     struct maprec *mp = (struct maprec *) ptr;
     int depth = 0;
+    int footnote = 0;
+    int i;
 
     for (;;) {
 	if (mp) {
+	    char *remapnote;
+	    char *mapstr;
+	    char esc_seq[10];
 	    lhsstr[depth] = mp->ch;
 	    lhsstack[depth++] = mp->flink;
+	    lhsstr[depth] = 0;
+
+	    mapstr = (char *)0;
 	    if (mp->srv) {
-		lhsstr[depth] = 0;
-		bprintf("%*S%s\n", MAPS_PREFIX, lhsstr, mp->srv);
+		mapstr = mp->srv;
+	    } else if (all && mp->irv != -1) {
+		(void)kcod2escape_seq(mp->irv, esc_seq);
+		mapstr = esc_seq;
+	    }
+	    if (mapstr) {
+		    if (mp->flags & MAPF_NOREMAP) {
+			remapnote = "(n)";
+			footnote++;
+		    } else {
+			remapnote = "   ";
+		    }
+		    bprintf("%s ", remapnote);
+		    for (i = 0; i < depth; i++)
+		    	bputc(lhsstr[i]);	/* may contain nulls */
+		    bprintf("\t%s\n", mapstr);
 	    }
 	    mp = mp->dlink;
 	}
@@ -124,6 +150,9 @@ makecharslist(flag, ptr)
 	    mp = lhsstack[--depth];
 	else
 	    break;
+    }
+    if (footnote) {
+	bprintf("[(n) means never remap]\n");
     }
 }
 
@@ -133,7 +162,9 @@ show_mapped_chars(bname)
 {
 	struct maprec *mp = (strcmp(bname, MAPPED_LIST_NAME_CM) == 0)
 	                  ? map_command : map_insert;
-	return liststuff(bname, makecharslist, 0, (char *)mp);
+	if (show_all)
+		mp = map_syskey;
+	return liststuff(bname, makecharslist, show_all, (char *)mp);
 }
 
 #if OPT_UPBUFF
@@ -165,7 +196,7 @@ int
 map(f, n)
     int f, n;
 {
-    return map_common(f, &map_command, MAPPED_LIST_NAME_CM);
+    return map_common(f, &map_command, MAPPED_LIST_NAME_CM, 0);
 }
 
 /* ARGSUSED */
@@ -173,14 +204,31 @@ int
 map_bang(f, n)
     int f, n;
 {
-    return map_common(f, &map_insert, MAPPED_LIST_NAME_IM);
+    return map_common(f, &map_insert, MAPPED_LIST_NAME_IM, 0);
+}
+
+/* ARGSUSED */
+int
+noremap(f, n)
+    int f, n;
+{
+    return map_common(f, &map_command, MAPPED_LIST_NAME_CM, MAPF_NOREMAP);
+}
+
+/* ARGSUSED */
+int
+noremap_bang(f, n)
+    int f, n;
+{
+    return map_common(f, &map_insert, MAPPED_LIST_NAME_IM, MAPF_NOREMAP);
 }
 
 static int
-map_common(f, mpp, bufname)
+map_common(f, mpp, bufname, remapflag)
     int f;
     struct maprec **mpp;
     char *bufname;
+    int remapflag;
 {
     int	 status;
     char kbuf[NSTRING];
@@ -193,15 +241,15 @@ map_common(f, mpp, bufname)
     }
 #endif
     kbuf[0] = EOS;
-    status = kbd_string("map key: ", kbuf, sizeof(kbuf),
-			' ', KBD_NOMAP, no_completion);
+    status = kbd_string("map this string: ", kbuf, sizeof(kbuf),
+			' ', KBD_NOMAP|KBD_NOEVAL, no_completion);
     if (status != TRUE)
 	return status;
 
     hst_glue(' ');
     val[0] = EOS;
     if (!clexec) {
-	    status = kbd_string("map value: ", val, sizeof(val),
+	    status = kbd_string("to this new string: ", val, sizeof(val),
 			'\n', KBD_NOMAP, no_completion);
     } else {
 	    (void)macliteralarg(val); /* consume to end of line */
@@ -210,7 +258,7 @@ map_common(f, mpp, bufname)
     if (status != TRUE)
 	return status;
 
-    addtomap(mpp, kbuf, 0, -1, val);
+    addtomap(mpp, kbuf, (int)strlen(kbuf), MAPF_USERTIMER|remapflag, -1, val);
     relist_mappings(bufname);
     return TRUE;
 }
@@ -243,62 +291,91 @@ unmap_common(mpp, bufname)
     char kbuf[NSTRING];
 
     kbuf[0] = EOS;
-    status = kbd_string("unmap key: ", kbuf, sizeof(kbuf),
+    status = kbd_string("unmap string: ", kbuf, sizeof(kbuf),
 			' ', KBD_NOMAP, no_completion);
     if (status != TRUE)
 	return status;
 
     if (delfrommap(mpp, kbuf) != TRUE) {
-	mlforce("[Key not mapped]");
+	mlforce("[Sequence not mapped]");
 	return FALSE;
     }
     relist_mappings(bufname);
     return TRUE;
 }
     
-/* addtomaps is used to initialize both the command and input maps */
+#if BEFORE
+/* addtomaps is used to initialize both the command and input maps
+	with the system default function key maps
+*/
 void
-addtomaps(seq, code)
+addtomaps(seq, seqlen, code)
     char * seq;
+    int    seqlen;
     int    code;
 {
-    addtomap(&map_command, seq, 0, code, (char *)0);
-    addtomap(&map_insert,  seq, 0, code, (char *)0);
+    addtomap(&map_command, seq, seqlen, MAPF_SYSTIMER,
+    			code, (char *)0);
+    addtomap(&map_insert,  seq, seqlen, MAPF_SYSTIMER,
+    			code, (char *)0);
+    switch (code) {
+    case KEY_Up:
+    case KEY_Down:
+    	addtomap(&map_message_line, seq, seqlen, MAPF_SYSTIMER,
+			code, (char *)0);
+    }
+}
+#endif
+
+/* addtosysmap is used to initialize the system default function key map
+*/
+void
+addtosysmap(seq, seqlen, code)
+    char * seq;
+    int    seqlen;
+    int    code;
+{
+    addtomap(&map_syskey, seq, seqlen, MAPF_SYSTIMER,
+    			code, (char *)0);
 }
 
 static void
-addtomap(mpp, ks, waitflag, irv, srv)
+addtomap(mpp, ks, kslen, flags, irv, srv)
     struct maprec **mpp;
     char *	ks;
-    int         waitflag;
+    int         kslen;
+    int         flags;
     int		irv;
     char *	srv;
 {
     struct maprec *mp = NULL;
 
-    if (ks == 0 || *ks == 0)
+    if (ks == 0 || kslen == 0)
 	return;
 
-    while (*mpp && *ks) {
+    while (*mpp && kslen) {
 	mp = *mpp;
-	mp->flags |= waitflag;
+	mp->flags |= flags;
 	if (*ks == mp->ch) {
 	    mpp = &mp->dlink;
 	    ks++;
+	    kslen--;
 	}
 	else
 	    mpp = &mp->flink;
     }
 
-    while (*ks) {
+    while (kslen) {
 	if (!(mp = typealloc(struct maprec)))
 	    break;
 	*mpp = mp;
 	mp->dlink = mp->flink = NULL;
 	mp->ch = *ks++;
 	mp->srv = NULL;
+	mp->flags = flags;
 	mp->irv = -1;
 	mpp = &mp->dlink;
+	kslen--;
     }
 
     if (irv != -1)
@@ -308,6 +385,7 @@ addtomap(mpp, ks, waitflag, irv, srv)
 	    free(mp->srv);
 	mp->srv = strmalloc(srv);
     }
+    mp->flags = flags;
 }
 
 static int
@@ -357,38 +435,191 @@ delfrommap(mpp, ks)
     return TRUE;
 }
 
-/*
- * The following function is given a character which may or may not start a
- * mapped sequence of characters.  If it does start a mapped sequence, then
- * that sequence is consumed via tgetc().  The first character of the
- * mapping will be returned.  The rest of the mapping will be ungotten via
- * tungetstr().  These mapped characters will then be read in subsequent
- * calls to tgetc().  If the character is determined to not have started a
- * mapped sequence, then it will be returned as the result of this function
- * and any subsquent characters which were read are ungotten.
- */
+static int maplookup P(( int, ITBUFF **, struct maprec *, int, int ));
+
+#define INPUT_FROM_TTGET 1
+#define INPUT_FROM_MAPGETC 2
+
+static ITBUFF *sysmappedchars = NULL;
+
 int
-maplookup(c, delayedptr)
-    int c;
-    int *delayedptr;
+sysmapped_c()
 {
-    struct maprec *mp = (reading_msg_line) 
-                            ? 0 : (insertmode) ? map_insert : map_command;
+    int c;
+
+    /* still some left? */
+    if (itb_more(sysmappedchars))
+	return itb_last(sysmappedchars);
+
+    c = TTgetc();
+
+
+    /* will push back on sysmappedchars successful, or not */
+    (void)maplookup(c, &sysmappedchars, map_syskey, INPUT_FROM_TTGET, 0);
+
+    return itb_last(sysmappedchars);
+}
+
+int
+sysmapped_c_avail()
+{
+    return itb_more(sysmappedchars) || TTtypahead();
+}
+
+
+static ITBUFF *mapgetc_ungottenchars = NULL;
+static int mapgetc_ungotcnt;
+
+void
+mapungetc(c)
+int c;
+{
+	itb_append(&mapgetc_ungottenchars, c);
+	mapgetc_ungotcnt++;
+}
+
+#define TOOMANY 1200
+static int infloopcount;
+
+int
+mapgetc(raw)
+int raw;
+{
+    int remapflag;
+    if (global_g_val(GMDREMAP))
+    	remapflag = 0;
+    else
+    	remapflag = NOREMAP;
+
+    if (mapgetc_ungotcnt > 0) {
+	    if (infloopcount++ > TOOMANY) {
+		itb_init(&mapgetc_ungottenchars, abortc);
+		mapgetc_ungotcnt = 0;
+		mlforce("[Infinite loop detected in %s sequence]",
+			    (insertmode) ? "map!" : "map");
+		catnap(1000,FALSE);  /* FIXX: be sure message gets out */
+		return abortc|NOREMAP;
+	    }
+	    mapgetc_ungotcnt--;
+	    return itb_last(mapgetc_ungottenchars) | remapflag;
+    }
+    infloopcount = 0;
+    return tgetc(raw);
+}
+
+int
+mapped_c_avail()
+{
+    return mapgetc_ungotcnt > 0 || tgetc_avail();
+}
+
+
+int
+mapped_c(remap, raw)
+int remap;
+int raw;
+{
+    int c;
+    int matched;
+    struct maprec *mp;
+    int speckey = FALSE;
+    static ITBUFF *mappedchars = NULL;
+    
+    /* still some pushback left? */
+    c = mapgetc(raw);
+
+    if (!remap || (c & NOREMAP))
+	return (c & ~NOREMAP);
+
+    if (reading_msg_line)
+    	mp = 0;
+    else if (insertmode)
+    	mp = map_insert;
+    else 
+    	mp = map_command;
+
+    /* if we got a function key from the lower layers, turn it into '#c'
+    	and see if the user remapped that */
+    if (c & SPEC) {
+	mapungetc(kcod2key(c));
+	c = poundc;
+	speckey = TRUE;
+    }
+
+    do {
+	itb_init(&mappedchars, abortc);
+
+	matched = maplookup(c, &mappedchars, mp, INPUT_FROM_MAPGETC, raw);
+
+
+	while(itb_more(mappedchars))
+	    mapungetc(itb_next(mappedchars));
+
+	/* if the user has not mapped '#c', we return the wide code we got
+	    in the first place */
+	if (speckey && !matched) {
+	    c = mapgetc(raw);
+	    if (c != poundc)
+		    dbgwrite("BUG: # problem in mapped_c");
+	    return (mapgetc(raw) & ~NOREMAP) | SPEC;
+	}
+
+	c = mapgetc(raw);
+
+	if (!global_g_val(GMDREMAPFIRST))
+		matched = FALSE;
+
+	speckey = FALSE;
+
+    } while (matched && remap && !(c & NOREMAP) );
+
+    return c & ~NOREMAP;
+
+}
+
+static int
+maplookup(c, outp, mp, where, raw)
+    int c;
+    ITBUFF **outp;
+    struct maprec *mp;
+    int where;
+    int raw;
+{
     struct maprec *rmp = NULL;
     char unmatched[MAXLHS];
     register char *s = unmatched;
     int cnt;
+    int use_sys_timing;
+
+#define KEY_AVAIL ((where == INPUT_FROM_MAPGETC) ?  \
+	    		mapped_c_avail() : TTtypahead())
+
+    /* 
+     * we don't want to delay for a user-specified :map!  starting with
+     * poundc since it's likely that the mapping is happening on behalf of
+     * a function key.  (it's so the user can ":map! #1 foobar" but still be
+     * able to insert a '#' character normally.)  if they've changed poundc
+     * so it's not something one normally inserts, then it's okay to delay
+     * on it.
+     */
+    use_sys_timing = (insertmode && c == poundc &&
+    				(isprint(poundc) || isspace(poundc)));
 
     *s++ = c;
-    *delayedptr = 0;
     cnt = 0;
     while (mp) {
 	if (c == mp->ch) {
-	    int nextc;
 	    if (mp->irv != -1 || mp->srv != NULL) {
 		rmp = mp;
 		cnt += (int) (s - unmatched);
 		s = unmatched;
+
+		/* our code supports matching the longer of two maps one of
+		 * which is a subset of the other.  vi matches the shorter
+		 * one.
+		 */
+	        if (!global_g_val(GMDMAPLONGER))
+		    break;
 	    }
 
 	    mp = mp->dlink;
@@ -397,19 +628,35 @@ maplookup(c, delayedptr)
 		break;
 
 	    /* if there's no recorded input, and no user typeahead */
-	    if ((nextc = get_recorded_char(FALSE)) == -1 && !typahead()) {
+	    if (!KEY_AVAIL) {
+
 		/* give it a little extra time... */
-		/* FIXME: Use MAPF_WAITLONGER to control length of nap */
-		catnap(global_g_val(GVAL_TIMEOUTVAL),TRUE);
-		(*delayedptr)++;
+		int timer = 0;
+
+		/* we want to use the longer of the two timers */
+
+		/* get the user timer.  it may be zero */
+		if (!use_sys_timing && (mp->flags & MAPF_USERTIMER) != 0)
+			timer = global_g_val(GVAL_TIMEOUTUSERVAL);
+
+		/* if there was no user timer, or this is a system
+			sequence, use the system timer if it's bigger */
+		if (timer == 0 || (mp->flags & MAPF_SYSTIMER) != 0) {
+			if (timer < global_g_val(GVAL_TIMEOUTVAL))
+				timer = global_g_val(GVAL_TIMEOUTVAL);
+		}
+
+		catnap(timer,TRUE);
+
+		if (!KEY_AVAIL)
+		    break;
 	    }
 
-	    /* and then, if there _was_ recorded input or new typahead... */
-	    if (nextc != -1 || typahead()) {
-		*s++ = c = tgetc(FALSE);
-	    }
+	    if (where == INPUT_FROM_MAPGETC)
+		*s++ = c = mapgetc(raw) & ~NOREMAP;
 	    else
-		break;
+		*s++ = c = TTgetc();
+
 	}
 	else
 	    mp = mp->flink;
@@ -418,19 +665,28 @@ maplookup(c, delayedptr)
     if (rmp) {
 	/* unget the unmatched suffix */
 	while (s > unmatched)
-	    tungetc(*--s);
-	/* unget the mapping and elide correct number or recorded chars */
+	    itb_append(outp,*--s);
+	/* unget the mapping and elide correct number of recorded chars */
 	if (rmp->srv) {
-	    tungetstr(rmp->srv, cnt);
-	    return tgetc(FALSE);
+	    int remapflag;
+	    s = rmp->srv + cnt;
+	    for (s = rmp->srv; *s; s++)
+	    	;
+	    if (rmp->flags & MAPF_NOREMAP)
+		remapflag = NOREMAP;
+	    else
+		remapflag = 0;
+	    while (s > rmp->srv)
+		itb_append(outp, (*--s)|remapflag);
 	}
 	else {
-	    return rmp->irv;
+	    itb_append(outp, rmp->irv);
 	}
+	return TRUE;
     }
     else {	/* didn't find a match */
-	while (s > unmatched+1)
-	    tungetc(*--s);
-	return char2int(unmatched[0]);
+	while (s > unmatched)
+	    itb_append(outp, *--s);
+	return FALSE;
     }
 }

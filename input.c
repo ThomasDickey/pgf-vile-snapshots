@@ -1,15 +1,55 @@
-/*	INPUT:	Various input routines for MicroEMACS
- *		written by Daniel Lawrence
- *		5/9/86
+/*	INPUT:	Various input routines for vile
+ *		written by Daniel Lawrence	5/9/86
+ *		variously munged/massaged/relayered/slashed/burned
+ *			since then. -pgf
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/input.c,v 1.116 1994/10/27 21:46:42 pgf Exp $
+ *	TTgetc()	raw 8-bit key from terminal driver.
+ *
+ *	sysmapped_c()	single "keystroke" -- may have SPEC bit, if it was
+ *			a sytem-mapped function key.  calls TTgetc().  these
+ *			system-mapped keys will never map to a multi-char
+ *			sequence.  the routine does have storage, to hold
+ *			keystrokes gathered "in error".
+ *
+ *	tgetc()		fresh, pushed back, or recorded output of result of 
+ *			rawkeystroke() (i.e. dotcmd and the keyboard macros
+ *			are recordedand played back at this level).  this is
+ *			only called from mapgetc() in map.c
+ *
+ *	mapped_c()	(map.c) worker routine which will return a mapped
+ *			or non-mapped character from the mapping engine.
+ *			determines correct map, and uses its own pushback 
+ *			buffers on top of calls to tgetc() (see mapgetc/
+ *			mapungetc).
+ *
+ *	mapped_keystroke() applies user-specified maps to user's input.
+ *			correct map used depending on mode (insert, command,
+ *			message-line).
+ *
+ *	keystroke()	returns pushback from mappings, the results of 
+ *			previous calls to mapped_keystroke().
+ *
+ *	keystroke8()	as above, but masks off any "wideness", i.e. SPEC bits.
+ *
+ *	keystroke_raw() as above, but recording is forced even if
+ *			sysmapped_c() returns intrc. (old "tgetc(TRUE)")
+ *
+ *	kbd_seq()	the vile prefix keys (^X,^A,#) are checked for, and
+ *			appropriate kbd_key() pairs are turned into CTLA|c,
+ *			CTLX|c, SPEC|c.
+ *	
+ *
+ *	TTtypahead() 	  true if a key is avail from TTgetc().
+ *	sysmapped_c_avail() "  if a key is avail from sysmapped_c() or below.
+ *	tgetc_avail()     true if a key is avail from tgetc() or below.
+ *	keystroke_avail() true if a key is avail from keystroke() or below.
+ *
+ * $Header: /usr/build/VCS/pgf-vile/RCS/input.c,v 1.125 1994/11/29 17:04:43 pgf Exp $
  *
  */
 
 #include	"estruct.h"
 #include	"edef.h"
-
-#define	SQUARE_LEFT	'['
 
 #define	DEFAULT_REG	-1
 
@@ -20,17 +60,17 @@ typedef	struct	_kstack	{
 	int	m_save;		/* old value of 'kbdmode'		*/
 	int	m_indx;		/* index identifying this macro		*/
 	int	m_rept;		/* the number of times to execute the macro */
-	TBUFF  *m_kbdm;		/* the macro-text to execute		*/
-	TBUFF  *m_dots;		/* workspace for "." command		*/
+	ITBUFF  *m_kbdm;		/* the macro-text to execute		*/
+	ITBUFF  *m_dots;		/* workspace for "." command		*/
 #ifdef GMDDOTMACRO
-	TBUFF  *m_DOTS;		/* save-area for "." command		*/
+	ITBUFF  *m_DOTS;		/* save-area for "." command		*/
 	int	m_RPT0;		/* saves 'dotcmdcnt'			*/
 	int	m_RPT1;		/* saves 'dotcmdrep'			*/
 #endif
 	} KSTACK;
 
 /*--------------------------------------------------------------------------*/
-static	TBUFF *	TempDot P(( int ));
+static	ITBUFF *	TempDot P(( int ));
 static	void	record_dot_char P(( int ));
 static	void	record_kbd_char P(( int ));
 static	void	record_char P(( int ));
@@ -46,7 +86,7 @@ static	void	dot_replays_macro P(( int ));
 #endif
 
 static	KSTACK *KbdStack;	/* keyboard/@-macros that are replaying */
-static	TBUFF  *KbdMacro;	/* keyboard macro, recorded	*/
+static	ITBUFF  *KbdMacro;	/* keyboard macro, recorded	*/
 static	int	last_eolchar;	/* records last eolchar-match in 'kbd_string' */
 
 /*--------------------------------------------------------------------------*/
@@ -55,19 +95,19 @@ static	int	last_eolchar;	/* records last eolchar-match in 'kbd_string' */
  * Returns a pointer to the buffer that we use for saving text to replay with
  * the "." command.
  */
-static TBUFF *
+static ITBUFF *
 TempDot(init)
 int	init;
 {
-	static	TBUFF  *tmpcmd;		/* dot commands, 'til we're sure */
+	static	ITBUFF  *tmpcmd;	/* dot commands, 'til we're sure */
 
 	if (kbdmode == PLAY) {
 		if (init)
-			(void)tb_init(&(KbdStack->m_dots), abortc);
+			(void)itb_init(&(KbdStack->m_dots), abortc);
 		return KbdStack->m_dots;
 	}
 	if (init || (tmpcmd == 0))
-		(void)tb_init(&tmpcmd, abortc);
+		(void)itb_init(&tmpcmd, abortc);
 	return tmpcmd;
 }
 
@@ -101,7 +141,7 @@ char *prompt;
 
 	for (;;) {
 		mlforce("%s [y/n]? ",prompt);
-		c = tgetc(FALSE);	/* get the response */
+		c = keystroke();	/* get the response */
 
 		if (ABORTED(c))		/* Bail out! */
 			return(ABORT);
@@ -130,7 +170,7 @@ int *cp;
 
 	for (;;) {
 		mlforce("%s ",prompt);
-		*cp = tgetc(FALSE);	/* get the response */
+		*cp = keystroke();	/* get the response */
 
 		if (ABORTED(*cp))	/* Bail out! */
 			return(ABORT);
@@ -160,7 +200,9 @@ int	at_dft;		/* default-value (e.g., for "@@" command) */
 			return status;
 		c = cbuf[0];
 	} else {
-		c = tgetc(FALSE);
+		c = keystroke();
+		if (ABORTED(c))
+			return ABORT;
 	}
 
 	if (c == '@' && at_dft != -1) {
@@ -241,18 +283,6 @@ int bufn;
 	return kbd_string(prompt, buf, bufn, '\n', KBD_NORMAL, no_completion);
 }
 
-#ifdef NEEDED
-/* as above, but don't expand special punctuation, like #, %, ~, etc. */
-int
-mlreply_no_exp(prompt, buf, bufn)
-char *prompt;
-char *buf;
-int bufn;
-{
-	return kbd_string(prompt, buf, bufn, '\n', KBD_QUOTES, no_completion);
-}
-#endif
-
 /* as above, but don't do anything to backslashes */
 int
 mlreply_no_bs(prompt, buf, bufn)
@@ -279,9 +309,9 @@ void
 incr_dot_kregnum()
 {
 	if (dotcmdmode == PLAY) {
-		register int	c = tb_peek(dotcmd);
+		register int	c = itb_peek(dotcmd);
 		if (isdigit(c) && c < '9')
-			tb_stuff(dotcmd, ++c);
+			itb_stuff(dotcmd, ++c);
 	}
 }
 
@@ -293,8 +323,8 @@ record_dot_char(c)
 int c;
 {
 	if (dotcmdmode == RECORD) {
-		TBUFF	*tmp = TempDot(FALSE);
-		(void)tb_append(&tmp, c);
+		ITBUFF	*tmp = TempDot(FALSE);
+		(void)itb_append(&tmp, c);
 	}
 }
 
@@ -306,7 +336,7 @@ record_kbd_char(c)
 int c;
 {
 	if (dotcmdmode != PLAY && kbdmode == RECORD)
-		(void)tb_append(&KbdMacro, c);
+		(void)itb_append(&KbdMacro, c);
 }
 
 /* if we should preserve this input, do so */
@@ -324,7 +354,7 @@ get_recorded_char(eatit)
 int eatit;  /* consume the character? */
 {
 	register int	c = -1;
-	register TBUFF	*buffer;
+	register ITBUFF	*buffer;
 
 	if (dotcmdmode == PLAY) {
 
@@ -333,10 +363,10 @@ int eatit;  /* consume the character? */
 			return intrc;
 		} else {
 
-			if (!tb_more(buffer = dotcmd)) {
+			if (!itb_more(buffer = dotcmd)) {
 				if (!eatit) {
 					if (dotcmdrep > 1)
-						return tb_get(buffer, 0);
+						return itb_get(buffer, 0);
 				} else { /* at the end of last repetition?  */
 					if (--dotcmdrep < 1) {
 						dotcmdmode = STOP;
@@ -348,17 +378,17 @@ int eatit;  /* consume the character? */
 						/* reset the macro to the
 						 * beginning for the next rep.
 						 */
-						tb_first(buffer);
+						itb_first(buffer);
 					}
 				}
 			}
 
 			/* if there is some left... */
-			if (tb_more(buffer)) {
+			if (itb_more(buffer)) {
 				if (eatit)
-					c = tb_next(buffer);
+					c = itb_next(buffer);
 				else
-					c = tb_peek(buffer);
+					c = itb_peek(buffer);
 				return c;
 			}
 		}
@@ -372,9 +402,9 @@ int eatit;  /* consume the character? */
 			return intrc;
 		} else {
 
-			if (!tb_more(buffer = KbdStack->m_kbdm)) {
+			if (!itb_more(buffer = KbdStack->m_kbdm)) {
 				if (--(KbdStack->m_rept) >= 1)
-					tb_first(buffer);
+					itb_first(buffer);
 				else
 					finish_kbm();
 			}
@@ -382,9 +412,9 @@ int eatit;  /* consume the character? */
 			if (kbdmode == PLAY) {
 				buffer = KbdStack->m_kbdm;
 				if (eatit)
-					record_dot_char(c = tb_next(buffer));
+					record_dot_char(c = itb_next(buffer));
 				else
-					c = tb_peek(buffer);
+					c = itb_peek(buffer);
 			}
 		}
 	}
@@ -392,72 +422,63 @@ int eatit;  /* consume the character? */
 	return c;
 }
 
-static TBUFF *tungottenchars = NULL;
+static ITBUFF *tungottenchars = NULL;
 
 void
-tungetc(c)
+unkeystroke(c)
 int c;
 {
-	int i, n;
-	char esc_seq[10];
-
-	n = kcod2escape_seq(c, esc_seq);
-
-	for (i = n-1; i >= 0; i--)
-		(void) tb_put(&tungottenchars, (ALLOC_T) tungotcnt++, esc_seq[i]);
-
-	for (i = n; i--; ) {
-	    if (dotcmdmode == RECORD) {
-		    tb_unput(TempDot(FALSE));
-		    if (kbdmode == RECORD)
-			    tb_unput(KbdMacro);
-	    } else if (dotcmdmode != PLAY && kbdmode == RECORD)
-		    tb_unput(KbdMacro);
-	}
+	mapungetc(c|NOREMAP);
 }
 
-void
-tungetstr(s, n)
-char *s;		/* string to unget */
-int n;			/* number of recorded characters to elide */
+int
+mapped_keystroke()
 {
-	if (s) {
-	    register char *t;
-	    for (t = s; *t; t++);
-	    while (t > s)
-		    (void) tb_put(&tungottenchars, (ALLOC_T) tungotcnt++, *--t);
-	}
-
-	while (n-- > 0) {
-	    if (dotcmdmode == RECORD) {
-		    tb_unput(TempDot(FALSE));
-		    if (kbdmode == RECORD)
-			    tb_unput(KbdMacro);
-	    } else if (dotcmdmode != PLAY && kbdmode == RECORD)
-		    tb_unput(KbdMacro);
-	}
+	return lastkey = mapped_c(DOMAP,NOQUOTED);
 }
 
-/*	tgetc:	Get a key from the terminal driver, resolve any keyboard
-		macro action					*/
+int
+keystroke()
+{
+	return lastkey = mapped_c(NODOMAP,NOQUOTED);
+}
+
+int
+keystroke8()
+{
+	return lastkey = mapped_c(NODOMAP,NOQUOTED) & 0xff;
+}
+
+int
+keystroke_raw8()
+{
+	return lastkey = mapped_c(NODOMAP,QUOTED) & 0xff;
+}
+
+int
+keystroke_avail()
+{
+	return mapped_c_avail();
+}
+
+int
+tgetc_avail()
+{
+	return tungotcnt > 0 ||
+		get_recorded_char(FALSE) != -1 || 
+		sysmapped_c_avail();
+}
+
 int
 tgetc(quoted)
 int quoted;
 {
-	static int infloopcnt = 0;
 	register int c;	/* fetched character */
 
 	if (tungotcnt > 0) {
-		if (++infloopcnt >= INFINITE_LOOP_COUNT) {
-			mlforce("[Infinite loop due to map detected]");
-			tungotcnt = 0;
-			c = abortc;
-		}	
-		else
-			c = tb_get(tungottenchars, (ALLOC_T) --tungotcnt);
+		c = itb_get(tungottenchars, (ALLOC_T) --tungotcnt);
 		record_char(c);
 	} else {
-		infloopcnt = 0;
 		if ((c = get_recorded_char(TRUE)) == -1) {
 			/* fetch a character from the terminal driver */ 
 			not_interrupted();
@@ -469,121 +490,19 @@ int quoted;
 					 we want to try again, since this
 					 must not have been SIGINT, but
 					 was probably SIGWINCH */
-					c = TTgetc();
+					c = sysmapped_c();
 				} while (c == -1);
 			}
 			doing_kbd_read = FALSE;
 			if (quoted || (c != kcod2key(intrc)))
 				record_char(c);
 		}
-		c = char2int(c);
 	}
 
 	/* and finally give the char back */
-	return lastkey = c;
+	return c;
 }
 
-/*	KBD_KEY:	Get one keystroke.  system function keys are
-	translated to the internal representation SPEC|c */
-int
-kbd_key()
-{
-	int    c;
-	int    delayed = 0;
-
-#if OPT_XTERM && !X11
-kbd_key_loop:
-#endif
-
-	/* get a keystroke */
-	c = maplookup(tgetc(FALSE), &delayed);
-
-#if ANSI_SPEC
-
-	if (c == ESC) {
-		int nextc;
-
-		/* if there's no recorded input, and no user typeahead */
-		if ( (nextc = get_recorded_char(FALSE)) == -1 
-		  && !typahead() && !delayed) {
-			/* give it a little extra time... */
-			catnap(global_g_val(GVAL_TIMEOUTVAL),TRUE);
-		}
-
-		/* and then, if there _was_ recorded input or new typahead... */
-		if (nextc != -1 || typahead()) {
-			c = tgetc(FALSE);
-			if (c == SQUARE_LEFT || c == 'O') {
-#if OPT_XTERM && !X11
-				int	d = c;
-#endif
-				/* eat ansi sequences */
-				c = tgetc(FALSE);
-#if OPT_XTERM && !X11
-				if (d == SQUARE_LEFT
-				 && (d = xterm_button(c)) != FALSE) {
-					if (insertmode || (d != TRUE))
-						return abortc;
-					goto kbd_key_loop;
-				}
-#endif
-				if (insertmode == REPLACECHAR) {
-					/* eat the sequence, but return abort */
-					return abortc;
-				}
-				return c|SPEC;
-			} else {
-				if (abortc != ESC)
-					return (c);
-				tungetc(c);
-				return (ESC);
-			}
-		}
-	}
-#endif
-
-#if	IBM_KBD || ST520
-	if (c == 0) {			/* Apply SPEC prefix	*/
-		c = tgetc(FALSE);
-		return c | SPEC;
-	}
-#endif
-
-#if	AMIGA
-	/* apply SPEC prefix */
-	if ((unsigned)c == 155) {
-		int	d;
-		c = tgetc(FALSE);
-
-		/* first try to see if it is a cursor key */
-		if ((c >= 'A' && c <= 'D') || c == 'S' || c == 'T') {
-			return c | SPEC;
-		}
-
-		/* next, a 2 char sequence */
-		d = tgetc(FALSE);
-		if (d == '~') {
-			return c | SPEC;
-		}
-
-		/* decode a 3 char sequence */
-		c = d + ' ';
-		/* if a shifted function key, eat the tilde */
-		if (d >= '0' && d <= '9')
-			d = tgetc(FALSE);
-		return c | SPEC;
-	}
-#endif
-
-#if  WANGPC
-	if (c == 0x1F) {	/* Apply SPEC prefix	*/
-		c = tgetc(FALSE);
-		return c | SPEC;
-	}
-#endif
-
-	return (c);
-}
 
 /*	KBD_SEQ:	Get a command sequence (multiple keystrokes) from 
 		the keyboard.
@@ -597,88 +516,23 @@ kbd_seq()
 
 	int prefix = 0;	/* accumulate prefix */
 
-	c = kbd_key();
+	c = mapped_keystroke();
 
 	if (c == cntl_a) {
 		prefix = CTLA;
-		c = kbd_key();
+		c = mapped_keystroke();
 	} else if (c == cntl_x) {
 		prefix = CTLX;
-		c = kbd_key();
+		c = mapped_keystroke();
+	} else if (c == poundc) {
+		prefix = SPEC;
+		c = mapped_keystroke();
 	}
 
 	c |= prefix;
 
 	/* otherwise, just return it */
 	return (lastcmd = c);
-}
-
-/* this is a _command_, which implements the poundsign vi command, which
-	allows any keyboard to produce function keys */
-/* ARGSUSED */
-int
-speckey(f,n)
-int f,n;
-{
-
-	tungetc( SPEC | kbd_key() );
-
-	return TRUE;
-}
-
-/* Translate a 16-bit keycode to a string that will replay into the same
- * code, This differs from 'kcod2str()', which produces results that could
- * be routed via 'kbd_seq()'.
- */
-int
-kcod2escape_seq (c, ptr)
-int	c;
-char *	ptr;
-{
-	char	*base = ptr;
-
-	/* ...just for completeness */
-	if (c & CTLA) *ptr++ = cntl_a;
-	if (c & CTLX) *ptr++ = cntl_x;
-
-	/* ...this is why we're here */
-	if (c & SPEC) {
-		c = char2int(c);
-#if ANSI_SPEC
-		*ptr++ = ESC;
-		*ptr++ = SQUARE_LEFT;
-#endif
-
-#if	IBM_KBD || ST520
-		*ptr++ = 0;
-#endif
-
-#if	AMIGA
-		/* FIXME: untested 22-mar-94 dickey@software.org */
-		*ptr++ = 155;
-
-		/* first try to see if it is a cursor key */
-		if ((c < 'A' || c > 'D') && c != 'S' && c != 'T') {
-			int	d;
-
-			if (c != '~') {
-				/* decode a 3 char sequence */
-				d = c - ' ';
-				/* if a shifted function key, eat the tilde */
-				if (d >= '0' && d <= '9') {
-					*ptr++ = c;
-					c = '~';
-				}
-			}
-		}
-#endif
-
-#if  WANGPC
-		*ptr++ = 0x1F;
-#endif
-	}
-	*ptr++ = c;
-	return (int)(ptr - base);
 }
 
 /* get a string consisting of inclchartype characters from the current
@@ -1152,7 +1006,7 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 		 * Get a character from the user. If not quoted, treat escape
 		 * sequences as a single (16-bit) special character.
 		 */
-		c = (quotef || dontmap) ? tgetc(TRUE) : kbd_key();
+		c = (quotef || dontmap) ? keystroke_raw8() : keystroke();
 
 		/* if we echoed ^V, erase it now */
 		if (quotef) {
@@ -1199,7 +1053,7 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 				if (ok) {
 					done = TRUE;
 					if (c != NAMEC) /* cancel the unget */
-						(void)tgetc(FALSE);
+						(void)keystroke();
 				} else {
 					if (done) {	/* stay til matched! */
 						buf[cpos] = EOS;
@@ -1252,7 +1106,7 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 #endif
 		if (ABORTED(c) && quotef == FALSE && !dontmap) {
 			buf[cpos] = EOS;
-			status = esc(FALSE, 1);
+			status = esc_func(FALSE, 1);
 			break;
 		} else if ((isbackspace(c) ||
 			c == wkillc ||
@@ -1266,7 +1120,7 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 				if (prompt)
 					mlerase();
 				if (isbackspace(c)) {	/* splice calls */
-					tungetc(c);
+					unkeystroke(c);
 					status = SORTOFTRUE;
 					break;
 				}
@@ -1286,7 +1140,7 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 		} else {
 			if (firstch == TRUE) {
 				/* clean the buffer on the first char typed */
-				tungetc(c);
+				unkeystroke(c);
 				c = killc;
 				goto killit;
 			}
@@ -1301,7 +1155,7 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 
 				if (isspecial(c)
 				 || (cpos >= bufn-1)) {
-					if (!typahead())
+					if (!keystroke_avail())
 						kbd_alarm();
 					continue; /* keep firstch==TRUE */
 				} else {
@@ -1338,7 +1192,7 @@ int	macnum;
 {
 	extern	CMDFUNC	f_kbd_mac_exec;
 	char	temp[NSTRING];
-	TBUFF	*tmp;
+	ITBUFF	*tmp;
 	int	c;
 
 	if (macnum == DEFAULT_REG) {
@@ -1350,7 +1204,7 @@ int	macnum;
 	}
 	dotcmdbegin();
 	tmp = TempDot(FALSE);
-	(void)tb_sappend(&tmp, temp);
+	(void)itb_sappend(&tmp, temp);
 	dotcmdfinish();
 	dotcmdbegin();
 }
@@ -1380,10 +1234,10 @@ int
 dotcmdfinish()
 {
 	if (dotcmdmode == RECORD) {
-		TBUFF	*tmp = TempDot(FALSE);
-		if (tb_length(tmp) == 0	/* keep the old value */
-		 || tb_copy(&dotcmd, tmp) != 0) {
-			tb_first(dotcmd);
+		ITBUFF	*tmp = TempDot(FALSE);
+		if (itb_length(tmp) == 0	/* keep the old value */
+		 || itb_copy(&dotcmd, tmp) != 0) {
+			itb_first(dotcmd);
 			dotcmdmode = STOP;
 			return TRUE;
 		}
@@ -1420,7 +1274,7 @@ int f,n;
 	/* else
 		leave dotcmdarg alone; */
 
-	if (dotcmdmode != STOP || tb_length(dotcmd) == 0) {
+	if (dotcmdmode != STOP || itb_length(dotcmd) == 0) {
 		dotcmdmode = STOP;
 		dotcmdarg = FALSE;
 		return FALSE;
@@ -1430,7 +1284,7 @@ int f,n;
 
 	dotcmdcnt = dotcmdrep = n;  /* remember how many times to execute */
 	dotcmdmode = PLAY;	/* put us in play mode */
-	tb_first(dotcmd);	/*    at the beginning */
+	itb_first(dotcmd);	/*    at the beginning */
 
 	if (ukb != 0) /* save our kreg, if one was specified */
 		dotcmdkreg = ukb;
@@ -1456,7 +1310,7 @@ int	match;
 		 && insertmode == INSERT
 		 && b_val(curbp, MDSHOWMAT)
 		 && KbdStack == 0
-		 && (dotcmd->tb_last+1 >= dotcmd->tb_used)) {
+		 && (dotcmd->itb_last+1 >= dotcmd->itb_used)) {
 			return FALSE;
 		}
 		return TRUE;
@@ -1479,7 +1333,7 @@ int f,n;
 	mlwrite("[Start macro]");
 
 	kbdmode = RECORD;
-	return (tb_init(&KbdMacro, abortc) != 0);
+	return (itb_init(&KbdMacro, abortc) != 0);
 }
 
 /*
@@ -1530,9 +1384,9 @@ kbd_mac_save(f,n)
 int f,n;
 {
 	ksetup();
-	tb_first(KbdMacro);
-	while (tb_more(KbdMacro))
-		if (!kinsert(tb_next(KbdMacro)))
+	itb_first(KbdMacro);
+	while (itb_more(KbdMacro))
+		if (!kinsert(itb_next(KbdMacro)))
 			break;
 	kdone();
 	mlwrite("[Keyboard macro saved in register %c.]", index2reg(ukb));
@@ -1571,10 +1425,10 @@ int
 start_kbm(n, macnum, ptr)
 int	n;			/* # of times to repeat */
 int	macnum;			/* register to execute */
-TBUFF *	ptr;			/* data to interpret */
+ITBUFF *	ptr;			/* data to interpret */
 {
 	register KSTACK *sp;
-	TBUFF  *tp = 0;
+	ITBUFF  *tp = 0;
 
 	if (interrupted())
 		return FALSE;
@@ -1582,12 +1436,12 @@ TBUFF *	ptr;			/* data to interpret */
 	if (kbdmode == RECORD && KbdStack != 0)
 		return TRUE;
 
-	if (tb_length(ptr)
+	if (itb_length(ptr)
 	 && (sp = typealloc(KSTACK)) != 0
-	 && tb_copy(&tp, ptr) != 0) {
+	 && itb_copy(&tp, ptr) != 0) {
 
 		/* make a copy of the macro in case recursion alters it */
-		tb_first(tp);
+		itb_first(tp);
 
 		sp->m_save = kbdmode;
 		sp->m_indx = macnum;
@@ -1614,8 +1468,8 @@ TBUFF *	ptr;			/* data to interpret */
 			sp->m_DOTS = 0;
 		  }
 #endif
-		return (tb_init(&dotcmd, abortc) != 0
-		  &&    tb_init(&(sp->m_dots), abortc) != 0);
+		return (itb_init(&dotcmd, abortc) != 0
+		  &&    itb_init(&(sp->m_dots), abortc) != 0);
 	}
 	return FALSE;
 }
@@ -1634,10 +1488,10 @@ finish_kbm()
 			kbdmode  = sp->m_save;
 			KbdStack = sp->m_link;
 
-			tb_free(&(sp->m_kbdm));
-			tb_free(&(sp->m_dots));
+			itb_free(&(sp->m_kbdm));
+			itb_free(&(sp->m_dots));
 #ifdef GMDDOTMACRO
-			tb_free(&dotcmd);
+			itb_free(&dotcmd);
 			if (sp->m_DOTS != 0) {
 				dotcmd     = sp->m_DOTS;
 				dotcmdcnt  = sp->m_RPT0;

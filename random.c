@@ -2,7 +2,7 @@
  * This file contains the command processing functions for a number of random
  * commands. There is no functional grouping here, for sure.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/random.c,v 1.140 1994/10/16 02:57:55 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/random.c,v 1.145 1994/11/29 14:47:13 pgf Exp $
  *
  */
 
@@ -13,19 +13,19 @@
 # include <poll.h>
 #endif
 
-#if WATCOM
+#if CC_WATCOM
 #   include <direct.h>
 #endif
 
-#if TURBO
+#if CC_TURBO
 #   include <dir.h>
 #endif
 
-#if DJGPP
+#if CC_DJGPP
 #   include <dirent.h>
 #endif
 
-#if OS2
+#if SYS_OS2
 #   include <dos.h>  /* for _dos_getdrive */
 #   include <dir.h>
 #endif
@@ -33,7 +33,7 @@
 extern CMDFUNC f_forwchar, f_backchar, f_forwchar_to_eol, f_backchar_to_bol;
 
 /*--------------------------------------------------------------------------*/
-#if MSDOS || OS2 || NT
+#if SYS_MSDOS || SYS_OS2 || SYS_WINNT
 static	int	drive2char P(( int ));
 static	int	char2drive P(( int ));
 #endif
@@ -138,7 +138,7 @@ int f,n;
 	C_NUM savepos;			/* temp save for current offset */
 	C_NUM ecol;			/* column pos/end of current line */
 
-#if WATCOM || DJGPP /* for testing interrupts */
+#if CC_WATCOM || CC_DJGPP /* for testing interrupts */
 	if (f && n == 11) {
 		mlwrite("DOS interrupt test.  hit control-C or control-BREAK");
 		while (!interrupted())
@@ -414,7 +414,7 @@ int f,n;
 
 
 
-#if AEDIT
+#if OPT_AEDIT
 /*
  * Delete blank lines around dot. What this command does depends if dot is
  * sitting on a blank line. If dot is sitting on a blank line, this command
@@ -587,20 +587,21 @@ int f, n;
 
 
 /* delay for the given number of milliseconds.  if "watchinput" is true,
-	then user input will abort the delay
-	FIXXXX -- the second arg is only implemented for UNIX with select() */
+	then user input will abort the delay */
 void
 catnap(milli,watchinput)
 int milli;
 int watchinput;
 {
-#if X11
+    if (milli == 0)
+    	return;
+#if DISP_X11
     if (watchinput)
 	x_typahead(milli);
     else
 #endif
     {
-#if UNIX
+#if SYS_UNIX
 # if HAVE_SELECT
 
 	struct timeval tval;
@@ -632,25 +633,50 @@ int watchinput;
 
 #  else
 
-	sleep((milli + 999) / 1000); /* 1 second granularity. ugh. */
+	int seconds = (milli + 999) / 1000;
+	if (watchinput)  {
+		while(seconds > 0) {
+			sleep(1);
+			if (TTtypahead())
+				return;
+			seconds -= 1;
+		}
+	} else {
+		sleep(seconds);
+	}
 
 #  endif
 # endif
 #define have_slept 1
 #endif
 
-#if VMS
+#if SYS_VMS
 	float	seconds = milli/1000.;
+	if (watchinput)  {
+		float tenth = .1;
+		while(seconds > 0.1) {
+			lib$wait(&tenth);
+			if (TTtypahead())
+				return;
+			seconds -= tenth;
+		}
+	}
 	lib$wait(&seconds);
 #define have_slept 1
 #endif
 
-#if NT
-	Sleep(milli);
-#define have_slept 1
+#if SYS_WINNT || (CC_NEWDOSCC && SYS_MSDOS)
+#if SYS_WINNT
+#define delay(a) Sleep(a)
 #endif
-
-#if NEWDOSCC && MSDOS
+	if (watchinput)  {
+		while(milli > 100) {
+			delay(100);
+			if (TTtypahead())
+				return;
+			milli -= 100;
+		}
+	}
 	delay(milli);
 #define have_slept 1
 #endif
@@ -663,7 +689,7 @@ int watchinput;
     }
 }
 
-#if UNIX
+#if SYS_UNIX
 #include	<sys/param.h>
 #endif
 
@@ -700,7 +726,7 @@ int force;
 	}
 # endif
 #endif
-#if MSDOS || OS2 || NT
+#if SYS_MSDOS || SYS_OS2 || SYS_WINNT
 	(void)mklower(cwd);
 #endif
 	if (cwd == NULL) {
@@ -713,14 +739,14 @@ int force;
 			*s = EOS;
 	}
 
-#if MSDOS || OS2
+#if SYS_MSDOS || SYS_OS2
 	update_dos_drv_dir(cwd);
 #endif
 
 	return cwd;
 }
 
-#if MSDOS || OS2
+#if SYS_MSDOS || SYS_OS2
 
 /* convert drive index to _letter_ */
 static int
@@ -753,7 +779,7 @@ int	d;
 int
 curdrive()
 {
-#if OS2
+#if SYS_OS2
 	int d;
 	_dos_getdrive(&d);  	/* A=1 B=2 ... */
 	return drive2char((d-1) & 0xff);
@@ -768,7 +794,7 @@ setdrive(d)
 int d;
 {
 	if (isalpha(d)) {
-#if OS2
+#if SYS_OS2
 		int maxdrives;
 		_dos_setdrive(char2drive(d)+1, &maxdrives); /* 1 based */
 #else
@@ -841,11 +867,11 @@ int f, n;
 	char cdirname[NFILEN];
 
 	status = mlreply_dir("Change to directory: ", &last, cdirname);
-#if UNIX || VMS
+#if SYS_UNIX || SYS_VMS
 	if (status == FALSE) {		/* empty reply, go HOME */
-#if UNIX
+#if SYS_UNIX
 		(void)lengthen_path(strcpy(cdirname, "~"));
-#else	/* VMS */
+#else	/* SYS_VMS */
 		(void)strcpy(cdirname, "sys$login");
 #endif
 	} else
@@ -884,16 +910,16 @@ set_directory(dir)
 char	*dir;
 {
     char       exdir[NFILEN];
-#if UNIX
+#if SYS_UNIX
     char       *cdpath;
     char       cdpathdir[NFILEN];
 #endif
     char *exdp;
-#if MSDOS || OS2
+#if SYS_MSDOS || SYS_OS2
     int curd = curdrive();
 #endif
     WINDOW *wp;
-#if PROC
+#if OPT_PROCEDURES
     static int cdhooking;
 #endif
 
@@ -903,7 +929,7 @@ char	*dir;
     exdp = strcpy(exdir, dir);
 
     if (doglob(exdp)) {
-#if MSDOS || OS2
+#if SYS_MSDOS || SYS_OS2
 	char	*s;
 	if ((s = is_msdos_drive(exdp)) != 0) {
 		if (setdrive(*exdp) == TRUE) {
@@ -935,7 +961,7 @@ char	*dir;
 
 	if (chdir(exdp) == 0) {
 		(void)pwd(TRUE,1);
-#if PROC
+#if OPT_PROCEDURES
 	{ 
 	    if (!cdhooking && *cdhook) {
 		    cdhooking = TRUE;
@@ -948,7 +974,7 @@ char	*dir;
 		return TRUE;
 	}
 
-#if UNIX && PATHLOOK
+#if SYS_UNIX && OPT_PATHLOOKUP
 	/*
 	** chdir failed.  If the directory name doesn't begin with any of
 	** "/", "./", or "../", get the CDPATH environment variable and check
@@ -961,7 +987,7 @@ char	*dir;
 		while ((cdpath = parse_pathlist(cdpath, cdpathdir)) != 0) {
 			if (chdir(pathcat(cdpathdir, cdpathdir, exdp)) == 0) {
 				(void)pwd(TRUE,1);
-#if PROC
+#if OPT_PROCEDURES
 				{ 
 				    if (!cdhooking && *cdhook) {
 					    cdhooking = TRUE;
@@ -977,7 +1003,7 @@ char	*dir;
 	}
 #endif
     }
-#if MSDOS || OS2
+#if SYS_MSDOS || SYS_OS2
     setdrive(curd);
     current_directory(TRUE);
 #endif

@@ -2,7 +2,7 @@
  * The routines in this file provide support for the Data General Model 10
  * Microcomputer.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/dg10.c,v 1.9 1994/09/13 17:15:48 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/dg10.c,v 1.11 1994/11/29 04:02:03 pgf Exp $
  *
  */
 #error This module is not actively maintained as part of vile.
@@ -15,7 +15,7 @@
 #include	"estruct.h"
 #include	"edef.h"
 
-#if	DG10
+#if	DISP_DG10
 
 #define NROW	24			/* Screen size. 		*/
 #define NCOL	80			/* Edit if you want to. 	*/
@@ -40,7 +40,7 @@ extern	int	dg10rev();
 extern	int	dg10close();
 extern	int	dg10cres();
 
-#if	COLOR
+#if	OPT_COLOR
 extern	int	dg10fcol();
 extern	int	dg10bcol();
 
@@ -68,6 +68,7 @@ TERM	term	= {
 	dg10kclose,
 	ttgetc,
 	ttputc,
+	tttypahead,
 	ttflush,
 	dg10move,
 	dg10eeol,
@@ -75,13 +76,13 @@ TERM	term	= {
 	dg10beep,
 	dg10rev,
 	dg10cres
-#if	COLOR
+#if	OPT_COLOR
 	, dg10fcol,
 	dg10bcol
 #endif
 };
 
-#if	COLOR
+#if	OPT_COLOR
 dg10fcol(color) 	/* set the current output color */
 
 int color;	/* color to set */
@@ -123,7 +124,7 @@ dg10eeol()
 
 dg10eeop()
 {
-#if	COLOR
+#if	OPT_COLOR
 	dg10fcol(gfcolor);
 	dg10bcol(gbcolor);
 #endif
@@ -137,7 +138,7 @@ dg10rev(state)		/* change reverse video state */
 int state;	/* TRUE = reverse, FALSE = normal */
 
 {
-#if	COLOR
+#if	OPT_COLOR
 	if (state == TRUE) {
 		dg10fcol(0);
 		dg10bcol(7);
@@ -176,7 +177,7 @@ dg10open()
 dg10close()
 
 {
-#if	COLOR
+#if	OPT_COLOR
 	dg10fcol(7);
 	dg10bcol(0);
 #endif
@@ -192,18 +193,6 @@ dg10kclose()
 
 {
 }
-
-#if	FLABEL
-int
-fnclabel(f, n)		/* label a function key */
-
-int f,n;	/* default flag, numeric argument [unused] */
-
-{
-	/* on machines with no function keys...don't bother */
-	return(TRUE);
-}
-#endif
 #else
 dg10hello()
 {

@@ -5,7 +5,7 @@
  * keys. Like everyone else, they set hints
  * for the display system.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/buffer.c,v 1.99 1994/10/30 16:26:37 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/buffer.c,v 1.107 1994/11/29 04:02:03 pgf Exp $
  *
  */
 
@@ -28,7 +28,6 @@ static	BUFFER *find_latest P(( void ));
 static	BUFFER *find_b_file P(( char * ));
 static	BUFFER *find_b_hist P(( int ));
 static	BUFFER *find_b_number P(( char * ));
-static	BUFFER *find_any_buffer P(( char * ));
 static	void	MarkDeleted P(( BUFFER * ));
 static	void	MarkUnused P(( BUFFER * ));
 static	void	FreeBuffer P(( BUFFER * ));
@@ -187,7 +186,6 @@ BUFFER *find_b_number(number)
 /*
  * Find buffer, given (possibly) filename, buffer name or buffer number
  */
-static
 BUFFER *find_any_buffer(name)
 	char *name;
 {
@@ -325,10 +323,10 @@ void	TrackAlternate(newbp)
 	if (!updating_list) {
 		MarkUnused(newbp);
 		if ((bp = find_latest()) != 0) {
-			if (bp != newbp)
-				newbp->b_last_used = (bp->b_last_used + 1);
-		} else
+			newbp->b_last_used = (bp->b_last_used + 1);
+		} else {	/* shouldn't happen... */
 			newbp->b_last_used = 1;
+		}
 	}
 }
 
@@ -365,14 +363,19 @@ int	hist_show()
 	register BUFFER *bp;
 	register int i = 0;
 	char line[NLINE];
+	BUFFER *abp = (BUFFER *)0;
+
+	if (!global_g_val(GMDABUFF))
+		abp = find_alt();
 
 	(void)strcpy(line,"");
 	for_each_buffer(bp) {
 		if (!b_is_temporary(bp)) {
 			if (bp != curbp) {	/* don't bother with current */
-				(void)lsprintf(line+strlen(line), "  %d%s%s",
+				(void)lsprintf(line+strlen(line), "  %d%s%s %s",
 					i,
-					b_is_changed(bp) ? "* " : " ",
+					b_is_changed(bp) ? "*" : "",
+					(abp && abp == bp) ? "#" : "",
 					get_bname(bp));
 			}
 			if (++i > 9)	/* limit to single-digit */
@@ -416,7 +419,7 @@ int f,n;
 		if (!hist_show())
 			return FALSE;
 		thiskey = lastkey;
-		c = tgetc(FALSE);
+		c = keystroke8();
 		mlerase();
 		if (c == thiskey) {
 			c = lookup_hist(bp = find_alt());
@@ -424,7 +427,7 @@ int f,n;
 			c = c - '0';
 		} else {
 			if (!isreturn(c))
-				tungetc(c);
+				unkeystroke(c);
 			return FALSE;
 		}
 	} else {
@@ -461,7 +464,7 @@ BUFFER *find_alt()
 			bp = bheadp;
 		for (; bp; bp = bp->b_bufp) {
 			if (bp != curbp) {
-				if (b_is_scratch(bp)) {
+				if (b_is_temporary(bp)) {
 					if (!any_bp)
 						any_bp = bp;
 				} else
@@ -475,7 +478,7 @@ BUFFER *find_alt()
 
 		for_each_buffer(bp) {
 			if ((bp != next)
-			 && (bp->b_active)) {
+			 && !b_is_temporary(bp)) {
 				if (last) {
 					if (last->b_last_used < bp->b_last_used)
 						last = bp;
@@ -497,7 +500,6 @@ int	lockfl;
 	register BUFFER *bp;
 	register LINE	*lp;
 	BUFFER *savebp;
-	char bname[NBUFN+1];
 	char nfname[NFILEN];
 
 	if (interrupted() || fname == 0) /* didn't really have a filename */
@@ -513,10 +515,7 @@ int	lockfl;
 		if ((bp = find_b_file(nfname)) == 0) {
 			L_NUM	top, now;
 
-			makename(bname, fname);
-			(void)unqname(bname, TRUE);
-
-			if ((bp=bfind(bname, 0)) == 0) {
+			if ((bp = make_bp(fname, 0, TRUE)) == 0) {
 				mlforce("[Cannot create buffer]");
 				return;
 			}
@@ -660,7 +659,7 @@ int f, n;	/* default flag, numeric argument */
 	return swbuffer(stopatbp);
 }
 
-#if PROC
+#if OPT_PROCEDURES
 static int bufhooking;
 #endif
 /* bring nbp to the top of the list, where curbp usually lives */
@@ -669,7 +668,7 @@ make_current(nbp)
 BUFFER *nbp;
 {
 	register BUFFER *bp;
-#if PROC
+#if OPT_PROCEDURES
 	register BUFFER *ocurbp;
 
 	ocurbp = curbp;
@@ -693,7 +692,7 @@ BUFFER *nbp;
 	} else
 		curbp = nbp;
 
-#if PROC
+#if OPT_PROCEDURES
 	if (curbp != ocurbp) { 
 	    if (!bufhooking && *bufhook) {
 		    bufhooking = TRUE;
@@ -751,7 +750,7 @@ register BUFFER *bp;
 		if (bp != find_BufferList())
 			updatelistbuffers();
 #endif
-#if BEFORE && PROC
+#if BEFORE && OPT_PROCEDURES
 		{ 
 		    if (!bufhooking && *bufhook) {
 			    bufhooking = TRUE;
@@ -774,18 +773,14 @@ register BUFFER *bp;
 	}
 
 	if (bp->b_active != TRUE) {		/* buffer not active yet*/
-		/* read it in and activate it */
-		s = readin(bp->b_fname, TRUE, bp, TRUE);
-		DOT.l = lFORW(buf_head(bp));
-		DOT.o = 0;
-		bp->b_active = TRUE;
+		s = bp2readin(bp, TRUE);	/* read and activate it */
 	}
 #ifdef MDCHK_MODTIME
 	else
 		(void)check_modtime( bp, bp->b_fname );
 #endif
 	updatelistbuffers();
-#if BEFORE && PROC
+#if BEFORE && OPT_PROCEDURES
 	{ 
 	    if (!bufhooking && *bufhook) {
 		    bufhooking = TRUE;
@@ -1001,7 +996,7 @@ register BUFFER *bp;
 	}
 
 #endif
-#if LCKFILES
+#if OPT_LCKFILES
 	/* If Buffer is killed and not locked by other then release own lock */
 	if ( global_g_val(GMDUSEFILELOCK) ) {
 		if ( bp->b_active )
@@ -1033,6 +1028,8 @@ int f, n;		/* default Flag & Numeric arg */
 	/* prompt for and get the new buffer name */
 	do {
 		if (mlreply(prompt, bufn, sizeof(bufn)) != TRUE)
+			return(FALSE);
+		if (*mktrimmed(bufn) == EOS)
 			return(FALSE);
 		prompt = "That name's been used.  New name: ";
 		bp = find_b_name(bufn);
@@ -1098,6 +1095,13 @@ sortlistbuffers()
 
 	if (global_g_val(GMDABUFF)) {
 		c = 1;
+#if kev_fix
+		for_each_buffer(bp)
+		    if (bp->b_last_used == 0) {
+			bp->b_relink = newhead;
+			newhead = bp;
+		    }
+#endif
 		while ((bp = find_nth_used(c++)) != 0) {
 			bp->b_relink = newhead;
 			newhead = bp;
@@ -1499,6 +1503,7 @@ char *bname;
 {
 	register BUFFER *bp;
 	BUFFER	temp;
+
 	set_bname(&temp, bname); /* make a canonical buffer-name */
 
 	for_each_buffer(bp)
@@ -1521,6 +1526,7 @@ char *bname;
 	register BUFFER *bp;
 	fast_ptr LINEPTR lp;
 	register BUFFER *lastb = NULL;	/* buffer to insert after */
+	register BUFFER *bp2;
 
 	for_each_buffer(bp) {
 		if (eql_bname(bp, bname))
@@ -1528,12 +1534,11 @@ char *bname;
 		lastb = bp;
 	}
 
-	if ((bp = typealloc(BUFFER)) == NULL) {
+	/* set everything to 0's unless we want nonzero */
+	if ((bp = typecalloc(BUFFER)) == NULL) {
 		(void)no_memory("BUFFER");
 		return (NULL);
 	}
-	/* set everything to 0's unless we want nonzero */
-	(void)memset((char *)bp, 0, sizeof(BUFFER));
 
 	/* set this first, to make it simple to trace */
 	set_bname(bp, bname);
@@ -1557,16 +1562,13 @@ char *bname;
 	bp->b_mark = nullmark;
 #endif
 	bp->b_lastdot = nullmark;
-	bp->b_nmmarks = NULL;
 #if OPT_VIDEO_ATTRS
-	bp->b_attribs = NULL;
 #endif
 	bp->b_flag  = bflag;
-	bp->b_nwnd  = 0;
 	bp->b_acount = b_val(bp, VAL_ASAVECNT);
 	bp->b_fname = NULL;
 	ch_fname(bp, "");
-#if	CRYPT
+#if	OPT_ENCRYPT
 	if (cryptkey != 0 && *cryptkey != EOS) {
 		(void)strcpy(bp->b_key, cryptkey);
 		make_local_b_val(bp, MDCRYPT);
@@ -1578,16 +1580,11 @@ char *bname;
 #if OPT_MAP_MEMORY	/* _all_ pointers must be clean */
 	bp->b_uddot[0] = bp->b_uddot[1] = nullmark;
 #endif
-	bp->b_udstkindx = 0;
 	bp->b_ulinep = null_ptr;
-	bp->b_last_used = 0;
 	bp->b_udtail = null_ptr;
 	bp->b_udlastsep = null_ptr;
-	bp->b_udcount = 0;
 
 	b_set_counted(bp);	/* buffer is empty */
-	bp->b_bytecount = 0;
-	bp->b_linecount = 0;
 	set_lFORW(lp, lp);
 	set_lBACK(lp, lp);
 
@@ -1599,7 +1596,31 @@ char *bname;
 	bp->b_bufp = NULL;
 	bp->b_created = countBuffers();
 
+	for_each_buffer(bp2)
+		bp2->b_last_used += 1;
+	bp->b_last_used = 1;
+
 	return (bp);
+}
+
+/*
+ * Given a filename, set up a buffer pointer to correspond
+ */
+BUFFER *
+make_bp (fname, flags, ok_to_prompt)
+char *fname;
+int flags;
+int ok_to_prompt;
+{
+	BUFFER *bp;
+	char bname[NBUFN+1];
+
+	makename(bname, fname);
+	(void)unqname(bname, ok_to_prompt);
+
+	if ((bp = bfind(bname, flags)) != 0)
+		ch_fname(bp, fname);
+	return bp;
 }
 
 /*

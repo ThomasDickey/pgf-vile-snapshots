@@ -4,24 +4,57 @@
  * "termio.c". It compiles into nothing if not an ANSI device.
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/ansi.c,v 1.17 1994/09/13 17:15:48 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/ansi.c,v 1.20 1994/11/29 04:02:03 pgf Exp $
  */
+
+#if	SYS_AMIGA
+#if comments
+
+ this is the code that used to parse function keys in kbd_key().  function
+ keys are installed as maps these days.  see tcap.c or ibmpc.c for examples.
+ 	pgf 11/94
+
+	/* apply SPEC prefix */
+	if ((unsigned)c == 155) {
+		int	d;
+		c = TTgetc();
+
+		/* first try to see if it is a cursor key */
+		if ((c >= 'A' && c <= 'D') || c == 'S' || c == 'T') {
+			return c | SPEC;
+		}
+
+		/* next, a 2 char sequence */
+		d = TTgetc();
+		if (d == '~') {
+			return c | SPEC;
+		}
+
+		/* decode a 3 char sequence */
+		c = d + ' ';
+		/* if a shifted function key, eat the tilde */
+		if (d >= '0' && d <= '9')
+			d = TTgetc();
+		return c | SPEC;
+	}
+#endif
+#endif
 
 #define termdef 1			/* don't define "term" external */
 
 #include	"estruct.h"
 #include	"edef.h"
 
-#if	ANSI
+#if	DISP_ANSI
 
 #define SCROLL_REG 1
 
-#if	AMIGA
+#if	SYS_AMIGA
 #define NROW	23			/* Screen size.			*/
 #define NCOL	77			/* Edit if you want to.		*/
 #endif
 
-#if	MSDOS
+#if	SYS_MSDOS
 #define NROW    25
 #define NCOL    80
 #define MAXNROW	60
@@ -53,18 +86,16 @@ extern	void	ansiclose  P((void));
 extern	void	ansikopen  P((void));
 extern	void	ansikclose P((void));
 extern	int	ansicres   P((char *));
-#if SCROLLCODE
 extern	void	ansiscroll P((int,int,int));
-#endif
 
-#if	COLOR
+#if	OPT_COLOR
 extern	void	ansifcol P((int));
 extern	void	ansibcol P((int));
 
 int	cfcolor = -1;		/* current forground color */
 int	cbcolor = -1;		/* current background color */
 
-#if	AMIGA
+#if	SYS_AMIGA
 /* apparently the AMIGA does not follow the ANSI standards as regards to
  * colors ...maybe because of the default palette settings?
  */
@@ -90,6 +121,7 @@ TERM	term	= {
 	ansikclose,
 	ttgetc,
 	ttputc,
+	tttypahead,
 	ttflush,
 	ansimove,
 	ansieeol,
@@ -97,13 +129,11 @@ TERM	term	= {
 	ansibeep,
 	ansirev,
 	ansicres
-#if	COLOR
+#if	OPT_COLOR
 	, ansifcol,
 	ansibcol
 #endif
-#if SCROLLCODE
 	, ansiscroll
-#endif
 };
 
 static	void	ansiparm P((int));
@@ -118,7 +148,7 @@ csi P((void))
 	ttputc('[');
 }
 
-#if	COLOR
+#if	OPT_COLOR
 void
 ansifcol(color)		/* set the current output color */
 	int	color;	/* color to set */
@@ -126,7 +156,7 @@ ansifcol(color)		/* set the current output color */
 	if (color == cfcolor)
 		return;
 	csi();
-#if	AMIGA
+#if	SYS_AMIGA
 	ansiparm(coltran[color]+30);
 #else
 	ansiparm(color+30);
@@ -142,7 +172,7 @@ ansibcol(color)		/* set the current background color */
 	if (color == cbcolor)
 		return;
 	csi();
-#if	AMIGA
+#if	SYS_AMIGA
 	ansiparm(coltran[color]+40);
 #else
 	ansiparm(color+40);
@@ -174,7 +204,7 @@ ansieeol()
 void
 ansieeop()
 {
-#if	COLOR
+#if	OPT_COLOR
 	ansifcol(gfcolor);
 	ansibcol(gbcolor);
 #endif
@@ -193,7 +223,7 @@ void
 ansirev(state)		/* change reverse video state */
 int state;	/* TRUE = reverse, FALSE = normal */
 {
-#if	COLOR
+#if	OPT_COLOR
 	int ftmp, btmp;	/* temporaries for colors */
 #else
 	static int revstate = -1;
@@ -203,15 +233,15 @@ int state;	/* TRUE = reverse, FALSE = normal */
 #endif
 
 	csi();
-#if COLOR && MSDOS
+#if OPT_COLOR && SYS_MSDOS
 	ttputc('1');	/* bold-on */
 #else
 	if (state) ttputc('7');	/* reverse-video on */
 #endif
 	ttputc('m');
 
-#if	COLOR
-#if	MSDOS
+#if	OPT_COLOR
+#if	SYS_MSDOS
 	/*
 	 * Setting reverse-video with ANSI.SYS seems to reset the colors to
 	 * monochrome.  Using the colors directly to simulate reverse video
@@ -233,7 +263,7 @@ int state;	/* TRUE = reverse, FALSE = normal */
 		ansibcol(btmp);
 	}
 #endif	/* MSDOS vs ANSI-reverse */
-#endif	/* COLOR */
+#endif	/* OPT_COLOR */
 }
 
 #else
@@ -276,7 +306,6 @@ ansibeep()
 	ttflush();
 }
 
-#if SCROLLCODE
 
 /* if your ansi terminal can scroll regions, like the vt100, then define
 	SCROLL_REG.  If not, you can use delete/insert line code, which
@@ -310,7 +339,7 @@ int	n;
 	ansiscrollregion(0, term.t_mrow);
 
 #else /* use insert and delete line */
-#if PRETTIER_SCROLL
+#if OPT_PRETTIER_SCROLL
 	if (absol(from-to) > 1) {
 		ansiscroll(from, (from<to) ? to-1:to+1, n);
 		if (from < to)
@@ -355,7 +384,6 @@ int	bot;
 }
 #endif
 
-#endif
 
 void
 ansiparm(n)
@@ -389,7 +417,7 @@ ansiopen()
 void
 ansiclose()
 {
-#if	COLOR
+#if	OPT_COLOR
 	ansifcol(7);
 	ansibcol(0);
 #endif
@@ -406,14 +434,4 @@ ansikclose()	/* close the keyboard (a noop here) */
 {
 }
 
-#if	FLABEL
-int
-fnclabel(f, n)		/* label a function key */
-int f,n;	/* default flag, numeric argument [unused] */
-{
-	/* on machines with no function keys...don't bother */
-	return(TRUE);
-}
-#endif
-
-#endif	/* ANSI */
+#endif	/* DISP_ANSI */

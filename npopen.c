@@ -1,16 +1,16 @@
 /*	npopen:  like popen, but grabs stderr, too
  *		written by John Hutchinson, heavily modified by Paul Fox
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/npopen.c,v 1.39 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/npopen.c,v 1.40 1994/11/29 04:02:03 pgf Exp $
  *
  */
 
 #include "estruct.h"
 #include "edef.h"
 
-#if UNIX || OS2 || NT
+#if SYS_UNIX || SYS_OS2 || SYS_WINNT
 
-#if UNIX
+#if SYS_UNIX
 #include <sys/param.h>
 #else
 #include <process.h>
@@ -38,7 +38,7 @@ char *cmd, *type;
 		return NULL;
 
 	if (*type == 'r') {
-#if OS2 || NT
+#if SYS_OS2 || SYS_WINNT
  		if ((ff = _popen(cmd,"r")) == NULL)
 #else
   		if (inout_popen(&ff, (FILE **)0, cmd) != TRUE)
@@ -46,7 +46,7 @@ char *cmd, *type;
 			return NULL;
 		return ff;
 	} else {
-#if OS2 || NT
+#if SYS_OS2 || SYS_WINNT
 		if ((ff = _popen(cmd,"w")) == NULL)
 #else
 		if (inout_popen((FILE **)0, &ff, cmd) != TRUE)
@@ -55,9 +55,9 @@ char *cmd, *type;
 		return ff;
 	}
 }
-#endif /* UNIX || OS2 */
+#endif /* SYS_UNIX || SYS_OS2 */
 
-#if UNIX
+#if SYS_UNIX
 
 int
 inout_popen(fr, fw, cmd)
@@ -132,9 +132,9 @@ char *cmd;
 	}
 	return TRUE;
 }
-#endif /* UNIX */
+#endif /* SYS_UNIX */
 
-#if OS2 || NT
+#if SYS_OS2 || SYS_WINNT
 void
 npclose (fp)
 FILE *fp;
@@ -143,7 +143,7 @@ FILE *fp;
 }
 #endif
 
-#if UNIX
+#if SYS_UNIX
 void
 npclose (fp)
 FILE *fp;
@@ -243,11 +243,11 @@ softfork()
 
 #endif
 
-#if MSDOS || WIN31
+#if SYS_MSDOS || SYS_WIN31
 #include <fcntl.h>		/* defines O_RDWR */
 #include <io.h>			/* defines 'dup2()', etc. */
 
-#if WIN31
+#if SYS_WIN31
 /* FIXME: is it possible to execute a DOS program from Windows? */
 int	system(const char *command) { return (-1); }
 #endif
@@ -270,7 +270,7 @@ char	*type;
 	register int n = (*type == 'r');
 	register int fd;
 
-#if WATCOM
+#if CC_WATCOM
 	myName[n] = tmpnam((char *)0);
 #else
 	myName[n] = tempnam(TMPDIR, type);
@@ -359,7 +359,7 @@ char *cmd, *type;
 
 /*
  * Create pipe with either write- and/or read-semantics.  Fortunately for us,
- * on MSDOS, we don't need both at the same instant.
+ * on SYS_MSDOS, we don't need both at the same instant.
  */
 int
 inout_popen(fr, fw, cmd)
@@ -424,4 +424,4 @@ softfork()	/* dummy function to make filter-region work */
 {
 	return 0;
 }
-#endif /* MSDOS */
+#endif /* SYS_MSDOS */

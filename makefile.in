@@ -21,7 +21,7 @@
 # gnu autoconf support by kevin buettner, 5/94
 # original makefile for uemacs: Adam Fritz July 30,1987  (do you recognize it?)
 #
-# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.in,v 1.19 1994/10/31 15:26:44 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.in,v 1.25 1994/11/29 21:03:42 pgf Exp $
 #
 
 #### Start of system configuration section. ####
@@ -100,13 +100,13 @@ OTHERSRC = z100bios.asm vms2unix.c vmspipe.c djhandl.c \
 DOCS = vile.hlp vile.1 macros.doc
 
 # miscellaneous text files
-TEXTFILES = README README.CFG README.X11 README.PC \
+TEXTFILES = README README.CFG README.PC \
 	INSTALL CHANGES CHANGES.R3 buglist revlist
 
 VILESRC = main.c basic.c bind.c buffer.c crypt.c csrch.c \
 	display.c eval.c exec.c externs.c fences.c file.c \
 	filec.c fileio.c finderr.c glob.c globals.c \
-	history.c input.c insert.c isearch.c lckfiles.c line.c map.c \
+	history.c input.c insert.c isearch.c itbuff.c lckfiles.c line.c map.c \
 	modes.c msgs.c npopen.c oneliner.c opers.c path.c random.c \
 	regexp.c region.c search.c select.c spawn.c tags.c \
 	tbuff.c termio.c tmp.c undo.c version.c vmalloc.c \
@@ -116,12 +116,11 @@ ALLSRC = $(VILESRC) $(SCREENS) $(OTHERSRC) $(HDRS)
 
 # this is for work-in-progress files being shared among developers
 #  which don't need to go into general releases yet.
-DEVELOPER_ONLY = empty.rc mktbls.bat \
+DEVELOPER_ONLY = NOTES.X11 empty.rc mktbls.bat \
 	win31drv.c win31drv.def win31tbl.c win31tbl.def \
 	win31tbl.h win31tbl.rc  commdlg.msg \
 	trace.c trace.h \
-	fakevms.c fakevms.h \
-	mapchars.c mapchars.h
+	fakevms.c fakevms.h
 
 # these are the files that go to everyone
 DISTFILES = $(ALLTOOLS) $(ALLSRC) $(DOCS) $(TEXTFILES)
@@ -135,13 +134,13 @@ MKTBLS = ./mktbls
 
 # these headers are built by the mktbls program from the information in cmdtbl
 # and in modetbl
-BUILTHDRS = nebind.h nefunc.h nemode.h nename.h nevars.h
+BUILTHDRS = nebind.h nefunc.h nemode.h nename.h nevars.h nefkeys.h
 
 OBJ = $(SCREEN).o \
 	main.o basic.o bind.o buffer.o crypt.o csrch.o \
 	display.o eval.o exec.o externs.o fences.o file.o \
 	filec.o fileio.o finderr.o glob.o globals.o \
-	history.o input.o insert.o isearch.o lckfiles.o line.o map.o \
+	history.o input.o insert.o isearch.o itbuff.o lckfiles.o line.o map.o \
 	modes.o msgs.o npopen.o oneliner.o opers.o path.o random.o \
 	regexp.o region.o search.o select.o spawn.o tags.o \
 	tbuff.o termio.o tmp.o undo.o version.o vmalloc.o \
@@ -157,6 +156,7 @@ manfilt: manfilt.o
 	$(LINK) $(LDFLAGS) -o manfilt manfilt.o
 
 nebind.h \
+nefkeys.h \
 nefunc.h \
 nename.h :	cmdtbl $(MKTBLS)
 	$(MKTBLS) $(srcdir)/cmdtbl
@@ -181,7 +181,10 @@ uninstall:
 	-$(RM) $(bindir)/$(TARGET) $(bindir)/vile-manfilt \
 	      $(mandir)/vile.$(manext) $(libdir)/vile.hlp
 
-makefile: makefile.in config.status
+# The makefile is technically dependent upon the config.status file, but
+# gmake gets overly ambitious and remakes the makefile too often.
+makefile: makefile.in
+	if test ! -f config.status; then $(SHELL) ./configure; fi
 	$(SHELL) ./config.status
 
 # defining this target, though technically (i think) correct, causes
@@ -244,7 +247,7 @@ tar:	$(DISTFILES) /tmp/vilevers release_warnings
 	@echo Created `cat .fname`.tar.gz 
 	rm -rf `cat .fname` .fname
 
-	# this builds vileN.Nshar, for general release
+#	 this builds vileN.Nshar, for general release
 bigshar: $(DISTFILES) /tmp/vilevers release_warnings
 	vilevers=`cat /tmp/vilevers`; \
 	shar -spgf@foxharp.boston.ma.us -nvile$${vilevers} \
@@ -269,8 +272,15 @@ multicshar: $(DISTFILES) /tmp/vilevers
 
 zipfile: $(DISTFILES) /tmp/vilevers
 	vilevers=`cat /tmp/vilevers | sed 's/\.//'`; \
-	zip -k vile$${vilevers}.zip $(DISTFILES) ;\
-	echo Created vile$${vilevers}.zip
+	zip -k vile$${vilevers}s.zip $(DISTFILES) ;\
+	echo Created vile$${vilevers}s.zip
+
+DOSBINARIES = README README.PC vile.hlp vile.exe dos4gw.exe 
+
+binzip: $(DOSBINARIES) /tmp/vilevers
+	vilevers=`cat /tmp/vilevers | sed 's/\.//'`; \
+	zip -k vile$${vilevers}b.zip $(DOSBINARIES) ;\
+	echo Created vile$${vilevers}b.zip
 
 patch:	/tmp/vilevers
 	@orevlistrev=`rlog -h revlist | egrep head: | cut -f2 -d'.'`	;\

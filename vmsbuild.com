@@ -1,4 +1,4 @@
-$! $Header: /usr/build/VCS/pgf-vile/RCS/vmsbuild.com,v 1.1 1994/10/03 13:23:51 pgf Exp $
+$! $Header: /usr/build/VCS/pgf-vile/RCS/vmsbuild.com,v 1.2 1994/11/23 01:13:23 pgf Exp $
 $! VMS build-script for vile.  Requires "VAX-C"
 $!
 $! Tested with:
@@ -68,6 +68,7 @@ $	call make globals
 $	call make history
 $	call make input
 $	call make insert
+$	call make itbuff
 $	call make isearch
 $	call make line
 $	call make map

@@ -3,7 +3,7 @@
  * family.  It goes directly to the graphics RAM to do screen output. 
  * It compiles into nothing if not a Zenith driver.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/z309.c,v 1.8 1994/09/13 17:15:48 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/z309.c,v 1.10 1994/11/29 04:02:03 pgf Exp $
  *
  */
 
@@ -17,7 +17,7 @@
 #include	"estruct.h"
 #include        "edef.h"
 
-#if     Z309
+#if     DISP_Z309
 
 /* set NROW to 25 for 25-line interlaced mode */
 #define NROW    50                      /* Screen size.                 */
@@ -61,7 +61,7 @@ extern	int	z309putc();
 extern	int	z309kopen();
 extern	int	z309kclose();
 
-#if	COLOR
+#if	OPT_COLOR
 extern	int	z309fcol();
 extern	int	z309bcol();
 
@@ -89,6 +89,7 @@ TERM    term    = {
 	z309kclose,
         ttgetc,
 	z309putc,
+	tttypahead,
         ttflush,
         z309move,
         z309eeol,
@@ -96,7 +97,7 @@ TERM    term    = {
         z309beep,
 	z309rev,
 	z309cres
-#if	COLOR
+#if	OPT_COLOR
 	, z309fcol,
 	z309bcol
 #endif
@@ -104,7 +105,7 @@ TERM    term    = {
 
 extern union REGS rg;
 
-#if	COLOR
+#if	OPT_COLOR
 z309fcol(color)		/* set the current output color */
 
 int color;	/* color to set */
@@ -147,7 +148,7 @@ z309eeol()	/* erase to the end of the line */
 	crow = rg.h.dh;		/* and row */
 
 	/* build the attribute byte and setup the screen pointer */
-#if	COLOR
+#if	OPT_COLOR
 	if (dtype != CDMONO)
 		attr = (((cbcolor & 15) << 4) | (cfcolor & 15)) << 8;
 	else
@@ -184,7 +185,7 @@ int ch;
 {
 	rg.h.ah = 14;		/* write char to screen with current attrs */
 	rg.h.al = ch;
-#if	COLOR
+#if	OPT_COLOR
 	if (dtype != CDMONO)
 		rg.h.bl = cfcolor;
 	else
@@ -203,7 +204,7 @@ z309eeop()
 	rg.h.al = 0;		/* # lines to scroll (clear it) */
 	rg.x.cx = 0;		/* upper left corner of scroll */
 /*HERE*/	rg.x.dx = 0x184f;	/* lower right corner of scroll */
-#if	COLOR
+#if	OPT_COLOR
 	if (dtype != CDMONO)
 		attr = ((ctrans[gbcolor] & 15) << 4) | (ctrans[gfcolor] & 15);
 	else
@@ -260,7 +261,7 @@ z309close()
 	rg.h.ah = 101;
 	rg.h.al = 1;	/* 25-line interlace mode */
 	int86(0x10, &rg, &rg); 
-#if	COLOR
+#if	OPT_COLOR
 	z309fcol(7);
 	z309bcol(0);
 #endif
@@ -325,7 +326,7 @@ int bacg;	/* background color */
 	int i;
 
 	/* build the attribute byte and setup the screen pointer */
-#if	COLOR
+#if	OPT_COLOR
 	if (dtype != CDMONO)
 		attr = (((ctrans[bacg] & 15) << 4) | (ctrans[forg] & 15)) << 8;
 	else
@@ -353,16 +354,6 @@ int bacg;	/* background color */
 	movmem(&sline[0], scptr[row]+col,term.t_ncol*2);
 }
 
-#if	FLABEL
-fnclabel(f, n)		/* label a function key */
-
-int f,n;	/* default flag, numeric argument [unused] */
-
-{
-	/* on machines with no function keys...don't bother */
-	return(TRUE);
-}
-#endif
 #else
 z309hello()
 {

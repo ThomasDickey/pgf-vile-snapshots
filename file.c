@@ -5,20 +5,21 @@
  *	reading and writing of the disk are in "fileio.c".
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/file.c,v 1.139 1994/10/30 12:57:50 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/file.c,v 1.144 1994/11/29 04:02:03 pgf Exp $
  *
  */
 
 #include	"estruct.h"
 #include        "edef.h"
 
-#if UNIX || defined(MDCHK_MODTIME)
+#if SYS_UNIX || defined(MDCHK_MODTIME)
 #include	<sys/stat.h>  /* for mkdir() declaration */
 #endif
 
 static	void	readlinesmsg P(( int, int, char *, int ));
-static	int	getfile2 P(( char *, int ));
-#if DOSFILES
+static	BUFFER *getfile2bp P(( char * ));
+static	int	bp2swbuffer P(( BUFFER *, int, int ));
+#if OPT_DOSFILES
 static	void	guess_dosmode P(( BUFFER * ));
 /* give DOS the benefit of the doubt on ambiguous files */
 # if CRLF_LINES
@@ -28,11 +29,34 @@ static	void	guess_dosmode P(( BUFFER * ));
 # endif
 #endif
 static	int	writereg P(( REGION *, char *, int, BUFFER *, int ));
-#if UNIX
+#if SYS_UNIX
 static	int	slowtime P(( long * ));
 #endif
 
 /*--------------------------------------------------------------------------*/
+
+/* Returns the modification time iff the path corresponds to an existing file,
+ * otherwise it returns zero.
+ */
+#if	defined(MDCHK_MODTIME) || SYS_VMS || SYS_UNIX
+long
+file_modified(path)
+char *path;
+{
+	struct stat	statbuf;
+	long		the_time = 0;
+
+	if (stat(path, &statbuf) >= 0
+	 && (statbuf.st_mode & S_IFMT) == S_IFREG) {
+#if SYS_VMS
+		the_time = statbuf.st_ctime; /* e.g., creation-time */
+#else
+		the_time = statbuf.st_mtime;
+#endif
+	}
+	return the_time;
+}
+#endif
 
 #ifdef	MDCHK_MODTIME
 static	int	PromptModtime P(( BUFFER *, char *, char *, int));
@@ -97,20 +121,12 @@ get_modtime (bp, the_time)
 BUFFER	*bp;
 long	*the_time;
 {
-	struct stat	statbuf;
+	if (isInternalName(bp->b_fname))
+		*the_time = 0;
+	else
+		*the_time = file_modified(bp->b_fname);
 
-	*the_time = 0;
-	if (!isInternalName(bp->b_fname)) {
-		if (stat(bp->b_fname, &statbuf) >= 0) {
-#if VMS
-			*the_time = statbuf.st_ctime; /* e.g., creation-time */
-#else
-			*the_time = statbuf.st_mtime;
-#endif
-			return TRUE;
-		}
-	}
-	return FALSE;
+	return (*the_time != 0);
 }
 
 void
@@ -134,7 +150,7 @@ char *fn;
 	int status = TRUE;
 
 	if (PromptModtime(bp, fn, "Read from disk", FALSE) == TRUE) {
-#if LCKFILES
+#if OPT_LCKFILES
 		/* release own lock before read the file again */
 		if ( global_g_val(GMDUSEFILELOCK) ) {
 			release_lock(fn);
@@ -170,7 +186,7 @@ check_visible_modtimes ()
 }
 #endif	/* MDCHK_MODTIME */
 
-#if UNIX
+#if SYS_UNIX
 static	void	CleanAfterPipe P((int));
 
 #define	CleanToPipe()	if (fileispipe) ttclean(TRUE)
@@ -196,7 +212,7 @@ int	Wrote;
  * function is used by 'slowreadf()' to test if we've not done an update
  * recently even if this is the case.
  */
-#if UNIX
+#if SYS_UNIX
 static int
 slowtime (refp)
 long	*refp;
@@ -248,9 +264,9 @@ char *ver;
 	}
 	return FALSE;
 }
-#endif OPT_VMS_PATH
+#endif /* OPT_VMS_PATH */
 
-#if VMS
+#if SYS_VMS
 static char *
 resolve_filename(bp)
 BUFFER	*bp;
@@ -317,17 +333,17 @@ int f,n;
         char bname[NBUFN+1];
 	char fname[NFILEN];
 
-	if ((s = mlreply_file("Replace with file: ", (TBUFF **)0, 
+	if ((s = mlreply_file("Replace with file: ", (TBUFF **)0,
 			FILEC_REREAD, fname)) != TRUE)
 		return s;
 
-#if LCKFILES
+#if OPT_LCKFILES
 	/* release own lock before read the replaced file */
 	if ( global_g_val(GMDUSEFILELOCK) ) {
 		release_lock(curbp->b_fname);
 	}
 #endif
-	
+
 	/* we want no errors or complaints, so mark it unchanged */
 	b_clr_changed(curbp);
         s = readin(fname, TRUE, curbp, TRUE);
@@ -354,16 +370,25 @@ filefind(f, n)
 int f,n;
 {
 	register int	s;
+	register BUFFER *bp;
+
 	char fname[NFILEN];
 	char *actual;
+	BUFFER *firstbp = 0;
+
 	static	TBUFF	*last;
 
 	if ((s = mlreply_file("Find file: ", &last, FILEC_READ|FILEC_EXPAND,
 			fname)) == TRUE) {
 		while ((actual = filec_expand()) != 0) {
-			if ((s = getfile(actual, TRUE)) != TRUE)
+			if ((bp = getfile2bp(actual)) == 0)
 				break;
+			bp->b_flag |= BFARGS;	/* treat this as an argument */
+			if (firstbp == 0)
+				firstbp = bp;
 		}
+		if (firstbp != 0)
+			s = bp2swbuffer(firstbp, FALSE, TRUE);
 	}
 	return s;
 }
@@ -418,10 +443,9 @@ int f,n;
 	        return kifile(fname);
 }
 
-static int
-getfile2(fname, lockfl)
+static BUFFER *
+getfile2bp(fname)
 char *fname;		/* file name to find */
-int lockfl;		/* check the file for locks? */
 {
 	register BUFFER *bp;
         register int    s;
@@ -438,23 +462,12 @@ int lockfl;		/* check the file for locks? */
 		(void)lengthen_path(strcpy(nfname, fname));
 		if (is_internalname(nfname)) {
 			mlforce("[Buffer not found]");
-			return FALSE;
+			return 0;
 		}
 	        for_each_buffer(bp) {
 			/* is it here by that filename? */
 	                if (same_fname(nfname, bp, FALSE)) {
-				(void)swbuffer(bp);
-	                        curwp->w_flag |= WFMODE|WFHARD;
-				if (!isShellOrPipe(fname)) {
-		                        mlwrite("[Old buffer]");
-				} else {
-		                        if (mlyesno(
-				 "Old command output -- rerun") == TRUE) {
-					        return readin(fname, lockfl, 
-								curbp, TRUE);
-					}
-				}					
-	                        return TRUE;
+				return bp;
 	                }
 	        }
 		/* it's not here */
@@ -463,11 +476,11 @@ int lockfl;		/* check the file for locks? */
 		while ((bp = find_b_name(bname)) != NULL) {
 			if ( !b_is_changed(bp) && is_empty_buf(bp) &&
 			    		!ffexists(bp->b_fname)) {
-				/* empty and unmodified -- then it's okay 
+				/* empty and unmodified -- then it's okay
 					to re-use this buffer */
 				bp->b_active = FALSE;
-				return readin(fname, lockfl, bp, TRUE) &&
-						swbuffer(bp);
+				ch_fname(bp, nfname);
+				return bp;
 			}
 			/* old buffer name conflict code */
 			if (unqname(bname,!clexec) || clexec)
@@ -475,19 +488,61 @@ int lockfl;		/* check the file for locks? */
 			hst_glue(' ');
 			s = mlreply("Will use buffer name: ", bname, sizeof(bname));
 	                if (s == ABORT)
-	                        return s;
+	                        return 0;
 			if (s == FALSE || bname[0] == EOS)
 		                makename(bname, fname);
 	        }
 		/* okay, we've got a unique name -- create it */
 		if (bp==NULL && (bp=bfind(bname, 0))==NULL) {
 			mlwarn("[Cannot create buffer]");
-	                return FALSE;
+	                return 0;
 	        }
 		/* switch and read it in. */
 		ch_fname(bp, nfname);
 	}
-	return swbuffer(bp);
+	return bp;
+}
+
+static int
+bp2swbuffer(bp, ask_rerun, lockfl)
+BUFFER *bp;
+int ask_rerun;
+int lockfl;
+{
+	register int s;
+
+	if ((s = (bp != 0)) != FALSE) {
+		if (bp->b_active) {
+			if (ask_rerun) {
+				switch (mlyesno(
+					"Old command output -- rerun")) {
+				case TRUE:
+					bp->b_active = FALSE;
+					break;
+				case ABORT:
+					s = FALSE;
+				default:
+					mlerase();
+					break;
+				}
+			} else {
+				mlwrite("[Old buffer]");
+			}
+		}
+
+		/*
+		 * The 'swbuffer()' function will invoke 'readin()', but it
+		 * doesn't accept the 'lockfl' parameter, so we call it here.
+		 */
+		if (!(bp->b_active))
+			s = bp2readin(bp, lockfl);
+		if (s == TRUE)
+			s = swbuffer(bp);
+		if (s == TRUE)
+			curwp->w_flag |= WFMODE|WFHARD;
+	}
+
+	return s;
 }
 
 int
@@ -500,21 +555,21 @@ int lockfl;		/* check the file for locks? */
 	/* if there are no path delimiters in the name, then the user
 		is likely asking for an existing buffer -- try for that
 		first */
-        if (strlen(fname) < NBUFN
-	 && !maybe_pathname(fname)
-	 && (bp = find_b_name(fname)) != NULL) {
-		return swbuffer(bp);
+        if (strlen(fname) > NBUFN
+	 || maybe_pathname(fname)
+	 || (bp = find_b_name(fname)) == NULL) {
+		/* oh well.  canonicalize the name, and try again */
+		bp = getfile2bp(fname);
 	}
 
-	/* oh well.  canonicalize the name, and try again */
-	return getfile2(fname, lockfl);
+	return bp2swbuffer(bp, isShellOrPipe(bp->b_fname), lockfl);
 }
 
 /*
  * Scan a buffer to see if it contains more lines terminated by CR-LF than by
  * LF alone.  If so, set the DOS-mode to true, otherwise false.
  */
-#if DOSFILES
+#if OPT_DOSFILES
 static void
 guess_dosmode(bp)
 BUFFER *bp;
@@ -526,7 +581,7 @@ BUFFER *bp;
 	make_local_b_val(bp, MDDOS);	/* keep it local, if not */
 	/* first count 'em */
 	for_each_line(lp,bp) {
-		if (llength(lp) > 0 && 
+		if (llength(lp) > 0 &&
 				lgetc(lp, llength(lp)-1) == '\r') {
 			doslines++;
 		} else {
@@ -537,7 +592,7 @@ BUFFER *bp;
 	if (b_val(bp, MDDOS)) {
 		/* then eliminate 'em if necessary */
 		for_each_line(lp,bp) {
-			if (llength(lp) > 0 && 
+			if (llength(lp) > 0 &&
 					lgetc(lp, llength(lp)-1) == '\r') {
 				llength(lp)--;
 			}
@@ -567,7 +622,7 @@ int	f,n;
 }
 #endif
 
-#if LCKFILES
+#if OPT_LCKFILES
 static void grab_lck_file P(( BUFFER *, char * ));
 
 static void
@@ -582,7 +637,7 @@ char *fname;
 	{
 		char	locker[100];
 
-		if ( ! set_lock(fname,locker,sizeof(locker)) ) { 
+		if ( ! set_lock(fname,locker,sizeof(locker)) ) {
 			/* we didn't get it */
 			make_local_b_val(bp,MDVIEW);
 			set_b_val(bp,MDVIEW,TRUE);
@@ -611,7 +666,7 @@ int	mflg;		/* print messages? */
         register WINDOW *wp;
 	register int    s;
         int    nline;
-#if VMALLOC
+#if OPT_VRFY_MALLOC
 	extern int doverifys;
 	int odv;
 #endif
@@ -619,11 +674,11 @@ int	mflg;		/* print messages? */
 	if (bp == 0)				/* doesn't hurt to check */
 		return FALSE;
 
-#if	FILOCK
+#if	OPT_BSD_FILOCK
 	if (lockfl && lockchk(fname) == ABORT)
 		return ABORT;
 #endif
-#if	CRYPT
+#if	OPT_ENCRYPT
 	if ((s = resetkey(bp, fname)) != TRUE)
 		return s;
 #endif
@@ -631,7 +686,7 @@ int	mflg;		/* print messages? */
                 return s;
 	b_clr_flags(bp, BFINVS|BFCHG);
 	ch_fname(bp,fname);
-#if DOSFILES
+#if OPT_DOSFILES
 	make_local_b_val(bp,MDDOS);
 	/* assume that if our OS wants it, that the buffer will have CRLF
 	 * lines.  this may change when the file is read, based on actual
@@ -657,13 +712,13 @@ int	mflg;		/* print messages? */
 
         	if (mflg)
 			mlforce("[Reading %s ]", fname);
-#if VMS
+#if SYS_VMS
 		if (!isInternalName(bp->b_fname))
 			fname = resolve_filename(bp);
 #endif
 		/* read the file in */
         	nline = 0;
-#if VMALLOC
+#if OPT_VRFY_MALLOC
 		/* we really think this stuff is clean... */
 		odv = doverifys;
 		doverifys = 0;
@@ -671,11 +726,11 @@ int	mflg;		/* print messages? */
 #if OPT_WORKING
 		max_working = cur_working = old_working = 0;
 #endif
-#if ! (MSDOS||WIN31) && !OPT_MAP_MEMORY
+#if ! (SYS_MSDOS||SYS_WIN31) && !OPT_MAP_MEMORY
 		if (fileispipe || (s = quickreadf(bp, &nline)) == FIOMEM)
 #endif
 			s = slowreadf(bp, &nline);
-#if VMALLOC
+#if OPT_VRFY_MALLOC
 		doverifys = odv;
 #endif
 #if OPT_WORKING
@@ -688,7 +743,7 @@ int	mflg;		/* print messages? */
 			if (s == FIOFUN)	/* last line is incomplete */
 				set_b_val(bp, MDNEWLINE, FALSE);
 			b_clr_changed(bp);
-#if FINDERR
+#if OPT_FINDERR
 			if (fileispipe == TRUE)
 				set_febuff(get_bname(bp));
 #endif
@@ -702,7 +757,7 @@ int	mflg;		/* print messages? */
 				make_local_b_val(bp, MDVIEW);
 				set_b_val(bp, MDVIEW, TRUE);
 			}
-	
+
 			bp->b_active = TRUE;
 		}
 
@@ -731,12 +786,12 @@ int	mflg;		/* print messages? */
 	imply_alt(fname, FALSE, lockfl);
 	updatelistbuffers();
 
-#if LCKFILES
+#if OPT_LCKFILES
 	if (lockfl && s != FIOERR)
 		grab_lck_file(bp,fname);
 #endif
-#if PROC
-	if (s == TRUE) { 
+#if OPT_PROCEDURES
+	if (s == TRUE) {
 	    static int readhooking;
 	    if (!readhooking && *readhook) {
 		    readhooking = TRUE;
@@ -748,7 +803,22 @@ int	mflg;		/* print messages? */
 	return (s != FIOERR);
 }
 
-#if ! (MSDOS || WIN31) && !OPT_MAP_MEMORY
+/*
+ * Read the file into a given buffer, setting dot to the first line.
+ */
+int
+bp2readin(bp, lockfl)
+BUFFER *bp;
+int lockfl;
+{
+	register int s = readin(bp->b_fname, lockfl, bp, TRUE);
+	bp->b_dot.l  = lFORW(buf_head(bp));
+	bp->b_dot.o  = 0;
+	bp->b_active = TRUE;
+	return s;
+}
+
+#if ! (SYS_MSDOS || SYS_WIN31) && !OPT_MAP_MEMORY
 int
 quickreadf(bp, nlinep)
 register BUFFER *bp;
@@ -784,7 +854,7 @@ int *nlinep;
 		return FIOERR;
 	}
 
-#if CRYPT
+#if OPT_ENCRYPT
 	if (b_val(bp, MDCRYPT)
 	 && bp->b_key[0]) {	/* decrypt the file */
 	 	char	temp[NPAT];
@@ -902,14 +972,14 @@ int *nlinep;
 
 	if (incomplete)
 		return FIOMEM;
-#if DOSFILES
+#if OPT_DOSFILES
 	if (global_b_val(MDDOS))
 		guess_dosmode(bp);
 #endif
 	return b_val(bp, MDNEWLINE) ? FIOSUC : FIOFUN;
 }
 
-#endif /* ! MSDOS */
+#endif /* ! SYS_MSDOS */
 
 int
 slowreadf(bp, nlinep)
@@ -918,20 +988,20 @@ int *nlinep;
 {
 	int s;
 	int len;
-#if DOSFILES
+#if OPT_DOSFILES
 	int	doslines = 0,
 		unixlines = 0;
 #endif
-#if UNIX || MSDOS || WIN31 || OS2 || NT	/* i.e., we can read from a pipe */
+#if SYS_UNIX || SYS_MSDOS || SYS_WIN31 || SYS_OS2 || SYS_WINNT	/* i.e., we can read from a pipe */
 	int	flag = 0;
 	int	done_update = FALSE;
 #endif
-#if UNIX
+#if SYS_UNIX
 	long	last_updated = time((long *)0);
 #endif
 	b_set_counted(bp);	/* make 'addline()' do the counting */
         while ((s = ffgetline(&len)) <= FIOSUC) {
-#if DOSFILES
+#if OPT_DOSFILES
 		/*
 		 * Strip CR's if we are reading in DOS-mode.  Otherwise,
 		 * keep any CR's that we read.
@@ -947,8 +1017,8 @@ int *nlinep;
 		if (addline(bp,fline,len) != TRUE) {
                         s = FIOMEM;             /* Keep message on the  */
                         break;                  /* display.             */
-                } 
-#if UNIX || MSDOS || WIN31 || OS2 || NT
+                }
+#if SYS_UNIX || SYS_MSDOS || SYS_WIN31 || SYS_OS2 || SYS_WINNT
 		else {
                 	/* reading from a pipe, and internal? */
 			if (slowtime(&last_updated)) {
@@ -971,9 +1041,9 @@ int *nlinep;
 			        }
 
 				/* track changes in dosfile as lines arrive */
-#if DOSFILES
+#if OPT_DOSFILES
 				if (global_b_val(MDDOS))
-					set_b_val(bp, MDDOS, 
+					set_b_val(bp, MDDOS,
 						doslines MORETHAN unixlines);
 #endif
 				curwp->w_flag |= WFMODE|WFKILLS;
@@ -986,7 +1056,7 @@ int *nlinep;
 			} else {
 				flag |= WFHARD;
 			}
-			
+
 		}
 #endif
                 ++(*nlinep);
@@ -995,13 +1065,13 @@ int *nlinep;
 			break;
 		}
         }
-#if DOSFILES
+#if OPT_DOSFILES
 	if (global_b_val(MDDOS)) {
 		set_b_val(bp, MDDOS, doslines MORETHAN unixlines);
 		if (b_val(bp, MDDOS)) {  /* if it _is_ a dos file, strip 'em */
         		register LINE   *lp;
 			for_each_line(lp,bp) {
-				if (llength(lp) > 0 && 
+				if (llength(lp) > 0 &&
 					  lgetc(lp, llength(lp)-1) == '\r') {
 					llength(lp)--;
 				}
@@ -1054,7 +1124,7 @@ char    fname[];
         register char *bcp;
 	register int j;
 
-#if VMS
+#if SYS_VMS
 	if (is_vms_pathname(fname, TRUE)) {
 		(void)strcpy(bname, "NoName");
 		return;
@@ -1074,7 +1144,7 @@ char    fname[];
 	fcp = &fname[strlen(fname)];
 	/* trim trailing whitespace */
 	while (fcp != fname && (isblank(fcp[-1])
-#if UNIX || OPT_MSDOS_PATH	/* trim trailing slashes as well */
+#if SYS_UNIX || OPT_MSDOS_PATH	/* trim trailing slashes as well */
 					 || is_slashc(fcp[-1])
 #endif
 							) )
@@ -1084,9 +1154,9 @@ char    fname[];
 	while (isblank(*fcp))
 		fcp++;
 
-#if     UNIX || MSDOS || WIN31 || VMS || OS2 || NT
+#if     SYS_UNIX || SYS_MSDOS || SYS_WIN31 || SYS_VMS || SYS_OS2 || SYS_WINNT
 	bcp = bname;
-	if (isShellOrPipe(fcp)) { 
+	if (isShellOrPipe(fcp)) {
 		/* ...it's a shell command; bname is first word */
 		*bcp++ = SHPIPE_LEFT[0];
 		do {
@@ -1105,7 +1175,7 @@ char    fname[];
 
 	(void)strncpy(bcp, pathleaf(fcp), NBUFN);
 
-#if	UNIX
+#if	SYS_UNIX
 	/* UNIX filenames can have any characters (other than EOS!).  Refuse
 	 * (rightly) to deal with leading/trailing blanks, but allow embedded
 	 * blanks.  For this special case, ensure that the buffer name has no
@@ -1120,14 +1190,14 @@ char    fname[];
 	}
 #endif
 
-#else	/* !(UNIX||VMS||MSDOS) */
+#else	/* !(SYS_UNIX||SYS_VMS||SYS_MSDOS) */
 
 	bcp = fcp + strlen(fcp);
-#if     AMIGA || ST520
+#if     SYS_AMIGA || SYS_ST520
 	while (bcp!=fcp && bcp[-1]!=':' && !is_slashc(bcp[-1]))
                 --bcp;
 #endif
-#if     CPM
+#if     SYS_CPM
         while (bcp!=fcp && bcp[-1]!=':')
                 --bcp;
 #endif
@@ -1211,7 +1281,7 @@ int f,n;
 	int 		forced = (f && n == SPECIAL_BANG_ARG);
 
 	if (more_named_cmd()) {
-	        if ((s= mlreply_file("Write to file: ", (TBUFF **)0, 
+	        if ((s= mlreply_file("Write to file: ", (TBUFF **)0,
 				FILEC_WRITE, fname)) != TRUE)
 	                return s;
         } else
@@ -1269,7 +1339,7 @@ int forced;
         region.r_orig.o = 0;
         region.r_size   = bp->b_bytecount;
         region.r_end    = bp->b_line;
- 
+
 	return writereg(&region, fn, msgf, bp, forced);
 }
 
@@ -1287,7 +1357,7 @@ writeregion()
 		}
 		(void)strcpy(fname, curbp->b_fname);
 	} else {
-	        if ((status = mlreply_file("Write region to file: ", 
+	        if ((status = mlreply_file("Write region to file: ",
 			(TBUFF **)0, FILEC_WRITE|FILEC_PROMPT, fname)) != TRUE)
 	                return status;
         }
@@ -1312,15 +1382,15 @@ int	forced;
 	char	fname[NFILEN];
 	long	nchar;
 	char *	ending =
-#if DOSFILES
+#if OPT_DOSFILES
 			b_val(bp, MDDOS) ? "\r\n" : "\n"
 #else
-#if ST520
+#if SYS_ST520
 			"\r\n"
-#else	/* UNIX */
+#else	/* SYS_UNIX */
 			"\n"
 #endif
-#endif	/* DOSFILES */
+#endif	/* OPT_DOSFILES */
 		;
 	C_NUM	offset = rp->r_orig.o;
 
@@ -1341,8 +1411,8 @@ int	forced;
 		return FALSE;
 	}
 
-#if PROC
-	{ 
+#if OPT_PROCEDURES
+	{
 	    static int writehooking;
 	    if (!writehooking && *writehook) {
 		    writehooking = TRUE;
@@ -1358,7 +1428,7 @@ int	forced;
 		return FALSE;
 	}
 
-#if	CRYPT
+#if	OPT_ENCRYPT
 	if ((s = resetkey(curbp, fn)) != TRUE)
 		return s;
 #endif
@@ -1366,7 +1436,7 @@ int	forced;
 #ifdef MDCHK_MODTIME
 	if ( ! inquire_modtime( bp, fn ) )
 		return FALSE;
-#endif  
+#endif
         if ((s=ffwopen(fn,forced)) != FIOSUC)       /* Open writes message. */
                 return FALSE;
 
@@ -1412,7 +1482,7 @@ int	forced;
 
  out:
         if (s == FIOSUC) {                      /* No write error.      */
-#if VMS
+#if SYS_VMS
 		if (same_fname(fn, bp, FALSE))
 			fn = resolve_filename(bp);
 #endif
@@ -1426,7 +1496,7 @@ int	forced;
 				} else {
 					action = "Wrote";
 				}
-				mlforce("[%s %d line%s %ld char%s to \"%s\"]", 
+				mlforce("[%s %d line%s %ld char%s to \"%s\"]",
 					action, nline, PLURAL(nline),
 					nchar, PLURAL(nchar), fn);
 			} else {
@@ -1475,7 +1545,7 @@ int	msgf;
 		return FALSE;		/* not an error, just nothing */
 	}
 
-#if	CRYPT
+#if	OPT_ENCRYPT
 	if ((s = resetkey(curbp, fn)) != TRUE)
 		return s;
 #endif
@@ -1543,13 +1613,13 @@ int f,n;
 		return showcpos(FALSE,1);
 	}
 
-        if ((s = mlreply_file("Name: ", (TBUFF **)0, FILEC_UNKNOWN, fname)) 
+        if ((s = mlreply_file("Name: ", (TBUFF **)0, FILEC_UNKNOWN, fname))
 						== ABORT)
                 return s;
         if (s == FALSE)
                 return s;
 	make_global_b_val(curbp,MDVIEW); /* no longer read only mode */
-#if LCKFILES
+#if OPT_LCKFILES
 	if ( global_g_val(GMDUSEFILELOCK) ) {
 		release_lock(curbp->b_fname);
 		ch_fname(curbp, fname);
@@ -1588,7 +1658,7 @@ FILE	*haveffp;
 	                goto out;
 	        if (s == FIOFNF)		/* File not found.      */
 			return no_such_file(fname);
-#if	CRYPT
+#if	OPT_ENCRYPT
 		if ((s = resetkey(curbp, fname)) != TRUE)
 			return s;
 #endif
@@ -1605,7 +1675,7 @@ FILE	*haveffp;
 	nline = 0;
 	nextp = null_ptr;
 	while ((s=ffgetline(&nbytes)) <= FIOSUC) {
-#if DOSFILES
+#if OPT_DOSFILES
 		if (b_val(curbp,MDDOS)
 		 && (nbytes > 0)
 		 && fline[nbytes-1] == '\r')
@@ -1666,7 +1736,7 @@ char    *fname;
 		return no_such_file(fname);
 
         nline = 0;
-#if	CRYPT
+#if	OPT_ENCRYPT
 	if ((s = resetkey(curbp, fname)) == TRUE)
 #endif
 	{
@@ -1692,7 +1762,7 @@ out:
 	return (s != FIOERR);
 }
 
-#if UNIX
+#if SYS_UNIX
 
 /* called on hangups, interrupts, and quits */
 /* This code is definitely not production quality, or probably very
@@ -1717,23 +1787,23 @@ ACTUAL_SIG_DECL
 	int created = FALSE;
 	extern char *mktemp P(( char * ));
 
-#if APOLLO
+#if SYS_APOLLO
 	extern	char	*getlogin(void);
 	static	int	i_am_dead;
-#endif	/* APOLLO */
+#endif	/* SYS_APOLLO */
 
 #if OPT_WORKING && defined(SIGALRM)
 	(void)signal(SIGALRM, SIG_IGN);
 #endif
 
-#if APOLLO
+#if SYS_APOLLO
 	if (i_am_dead++)	/* prevent recursive faults */
 		_exit(signo);
 	(void)lsprintf(cmd,
 		"(echo signal %d killed vile;/com/tb %d)| /bin/mail %s",
 		signo, getpid(), getlogin());
 	(void)system(cmd);
-#endif	/* APOLLO */
+#endif	/* SYS_APOLLO */
 
 	/* write all modified buffers to the temp directory */
 	set_global_g_val(GMDIMPLYBUFF,FALSE);	/* avoid side-effects! */
@@ -1776,7 +1846,7 @@ ACTUAL_SIG_DECL
 			"(echo To: ", np, ";", "echo Subject: vile died; ",
 			"echo Files saved in directory ", dirnam,
 #if HAVE_GETHOSTNAME
-			" on host ", hostname, 
+			" on host ", hostname,
 #else
 			", host unknown", "",
 #endif
@@ -1820,7 +1890,7 @@ BUFFER *bp;
         }
 }
 
-#if	CRYPT
+#if	OPT_ENCRYPT
 int
 resetkey(bp, fname)	/* reset the encryption key if needed */
 BUFFER	*bp;

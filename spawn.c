@@ -1,21 +1,21 @@
 /*	Spawn:	various DOS access commands
  *		for MicroEMACS
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/spawn.c,v 1.87 1994/10/27 21:46:42 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/spawn.c,v 1.90 1994/11/29 04:02:03 pgf Exp $
  *
  */
 
 #include	"estruct.h"
 #include	"edef.h"
-#if UNIX || OS2 || NT
+#if SYS_UNIX || SYS_OS2 || SYS_WINNT
 #include	<sys/stat.h>
 #endif
 
-#if	AMIGA
+#if	SYS_AMIGA
 #define  NEW	1006L
 #endif
 
-#if		ST520 & MEGAMAX
+#if		SYS_ST520 & MEGAMAX
 #include <osbind.h>
 #define LOAD_EXEC 0	/* load and execute the program */
 char	*STcmd,		/* the command filename & path  */
@@ -24,7 +24,7 @@ char	*STcmd,		/* the command filename & path  */
 	*STwork;	/* work area			*/
 #endif
 
-#if	VMS
+#if	SYS_VMS
 #define EFN	0				/* Event flag.		*/
 
 #include	<ssdef.h>			/* Random headers.	*/
@@ -37,7 +37,7 @@ extern  int	newmode[3];			/* In "termio.c"	*/
 extern  short	iochan;				/* In "termio.c"	*/
 #endif
 
-#if NEWDOSCC && !DJGPP			/* Typo, was NEWSDOSCC 	*/
+#if CC_NEWDOSCC && !CC_DJGPP			/* Typo, was NEWSDOSCC 	*/
 #include	<process.h>
 #endif
 
@@ -62,11 +62,11 @@ spawncli(f, n)
 int f,n;
 {
 /* i never thought i'd see an ifdef like this one... strange bedfellows */
-#if X11 || CPM || ST520 || WIN31
+#if DISP_X11 || SYS_CPM || SYS_ST520 || SYS_WIN31
 	mlforce("[This version of vile cannot spawn an interactive shell]");
 	return FALSE;
 #else
-#if	UNIX
+#if	SYS_UNIX
 	bottomleft();
 	ttclean(TRUE);
 	TTputc('\n');
@@ -75,9 +75,9 @@ int f,n;
 	ttunclean();
 	sgarbf = TRUE;
 	return AfterShell();
-#endif /* UNIX */
+#endif /* SYS_UNIX */
 
-#if	AMIGA
+#if	SYS_AMIGA
 	long newcli;
 	mlwrite("[Starting new CLI]");
 	Execute("NEWCLI \"CON:0/0/640/200/MicroEMACS Subprocess\"", 0L, 0L);
@@ -85,28 +85,28 @@ int f,n;
 	return AfterShell();
 #endif
 
-#if	VMS
+#if	SYS_VMS
 	bottomleft();
 	mlforce("[Starting DCL]\r\n");
 	TTflush();				/* Ignore "ttcol".	*/
 	sgarbf = TRUE;
 	return sys(NULL);			/* NULL => DCL.		*/
 #endif
-#if	MSDOS || OS2 || NT
+#if	SYS_MSDOS || SYS_OS2 || SYS_WINNT
 	bottomleft();
 	TTflush();
 	TTkclose();
 	{ 
 		char *shell;
 		if ((shell = getenv("COMSPEC")) == NULL) {
-#if OS2 || NT
+#if SYS_OS2 || SYS_WINNT
 			shell = "cmd.exe";
 #else
 			shell = "command.com";
 #endif
 			system(shell);          /* Will search path     */
 		} else {
-#if OS2
+#if SYS_OS2
 /*
  *	spawn it if we know it.  Some 3rd party command processors fail
  *	if they system themselves (eg 4OS2).  CCM 24-MAR-94
@@ -130,7 +130,7 @@ int
 bktoshell(f,n)		/* suspend and wait to wake up */
 int f,n;
 {
-#if UNIX && defined(SIGTSTP) && !X11
+#if SYS_UNIX && defined(SIGTSTP) && !DISP_X11
 	vttidy(TRUE);
 
 /* #define simulate_job_control_for_debug */
@@ -151,11 +151,11 @@ SIGT
 rtfrmshell(ACTUAL_SIG_ARGS)
 ACTUAL_SIG_DECL
 {
-#if UNIX && defined(SIGTSTP)
-# if ! X11
+#if SYS_UNIX && defined(SIGTSTP)
+# if ! DISP_X11
 	ttunclean();
 	sgarbf = TRUE;
-#  if APOLLO
+#  if SYS_APOLLO
 	(void)TTgetc();		/* have to skip a character */
 	ttunclean();		/* ...so that I can finally suppress echo */
 #  endif
@@ -181,11 +181,11 @@ pressreturn()
 	discmd = odiscmd;
 	TTflush();
 	/* loop for a CR, a space, or a : to do another named command */
-	while ((c = tgetc(FALSE)) != '\r' &&
+	while ((c = keystroke()) != '\r' &&
 			c != ' ' && !ABORTED(c)) {
 		extern CMDFUNC f_namedcmd;
 		if (kcod2fnc(c) == &f_namedcmd) {
-			tungetc(c);
+			unkeystroke(c);
 			break;
 		}
 	}
@@ -209,7 +209,7 @@ int f,n;
 	return spawn1(FALSE, !f);
 }
 
-#define COMMON_SH_PROMPT (UNIX || VMS || MSDOS || OS2 || NT || (ST520 & LATTICE))
+#define COMMON_SH_PROMPT (SYS_UNIX || SYS_VMS || SYS_MSDOS || SYS_OS2 || SYS_WINNT || (SYS_ST520 & CC_LATTICE))
 
 #if COMMON_SH_PROMPT
 static	int	ShellPrompt P(( TBUFF **, char *, int ));
@@ -282,7 +282,7 @@ spawn1(rerun,pressret)
 int rerun;
 int pressret;
 {
-#if IBMPC
+#if DISP_IBMPC
 	int	closed;
 #endif
 #if COMMON_SH_PROMPT
@@ -293,8 +293,8 @@ int pressret;
 		return s;
 #endif	/* COMMON_SH_PROMPT */
 
-#if UNIX
-#if X11
+#if SYS_UNIX
+#if DISP_X11
 	(void)system_SHELL(line);
 #else
 	ttclean(TRUE);
@@ -306,11 +306,11 @@ int pressret;
 	TTopen();
 	TTflush();
 	sgarbf = TRUE;
-#endif /* X11 */
+#endif /* DISP_X11 */
 	return AfterShell();
-#endif /* UNIX */
+#endif /* SYS_UNIX */
 
-#if	AMIGA
+#if	SYS_AMIGA
 	register int	s;
 	static char oline[NLINE];	/* command line send to shell */
 	char	line[NLINE];	/* command line send to shell */
@@ -325,11 +325,11 @@ int pressret;
 	newcli = Open("CON:0/0/640/200/MicroEMACS Subprocess", NEW);
 	Execute(line, 0L, newcli);
 	Close(newcli);
-	tgetc(FALSE);			/* Pause.		*/
+	(void)keystroke();			/* Pause.		*/
 	sgarbf = TRUE;
 	return AfterShell();
 #endif
-#if	ST520 & MEGAMAX
+#if	SYS_ST520 & MEGAMAX
 	register int	s;
 	static char oline[NLINE];	/* command line send to shell */
 	char	line[NLINE];	/* command line send to shell */
@@ -403,32 +403,32 @@ int pressret;
 	TTgetc();			/* Pause.		*/
 	sgarbf = TRUE;
 	return AfterShell();
-#endif	/* ST520 & MEGAMAX */
+#endif	/* SYS_ST520 & MEGAMAX */
 
-#if	VMS
+#if	SYS_VMS
 	TTputc('\n');			/* Already have '\r'	*/
 	TTflush();
 	s = sys(line);			/* Run the command.	*/
 	mlforce("\r\n\n[End]");		/* Pause.		*/
 	TTflush();
-	tgetc(FALSE);
+	(void)keystroke();
 	sgarbf = TRUE;
 	return (s);
 #endif
-#if	CPM
+#if	SYS_CPM
 	mlforce("[Not in CP/M-86]");
 	return (FALSE);
 #endif
-#if	WIN31
+#if	SYS_WIN31
 	mlforce("[Not in Windows 3.1]");
 	return FALSE;
 #endif
-#if	MSDOS || OS2 || NT || (ST520 & LATTICE)
+#if	SYS_MSDOS || SYS_OS2 || SYS_WINNT || (SYS_ST520 & CC_LATTICE)
 	bottomleft();
 	TTputc('\n');
 	TTflush();
 	TTkclose();
-#if	IBMPC
+#if	DISP_IBMPC
 	/* If we don't reset to 80x25, parts of the shell-output will go
 	 * astray.
 	 */
@@ -442,7 +442,7 @@ int pressret;
 	if (pressret) {
 		pressreturn();
 	}
-#if	IBMPC
+#if	DISP_IBMPC
 	/* Reopen the display _after_ the prompt, to keep the shell-output
 	 * in the same type of screen as the prompt.
 	 */
@@ -454,7 +454,7 @@ int pressret;
 #endif
 }
 
-#if UNIX || MSDOS || VMS || OS2 || NT
+#if SYS_UNIX || SYS_MSDOS || SYS_VMS || SYS_OS2 || SYS_WINNT
 /*
  * Pipe a one line command into a window
  */
@@ -484,7 +484,7 @@ int f,n;
 	return (s);
 }
 
-#else /* ! UNIX */
+#else /* ! SYS_UNIX */
 
 /*
  * Pipe a one line command into a window
@@ -500,14 +500,14 @@ pipecmd(f, n)
 	static char bname[] = ScratchName(Output);
 	WINDOW *ocurwp;		/* save the current window during delete */
 
-#if	AMIGA
+#if	SYS_AMIGA
 	static char filnam[] = "ram:command";
 	long newcli;
 #else
 	static char filnam[NSTRING] = "command";
 #endif
 
-#if	CPM
+#if	SYS_CPM
 	mlforce("[Not available under CP/M-86]");
 	return(FALSE);
 #endif
@@ -537,7 +537,7 @@ pipecmd(f, n)
 			return(FALSE);
 	}
 
-#if	AMIGA
+#if	SYS_AMIGA
 	newcli = Open("CON:0/0/640/200/MicroEMACS Subprocess", NEW);
 	(void)strcat(line, " >");
 	(void)strcat(line, filnam);
@@ -565,7 +565,7 @@ pipecmd(f, n)
 	set_b_val(curwp->w_bufp,MDVIEW,TRUE);
 	markWFMODE(curbp);
 
-#if FINDERR
+#if OPT_FINDERR
 	set_febuff(bname);
 #endif
 
@@ -573,14 +573,14 @@ pipecmd(f, n)
 	unlink(filnam);
 	return AfterShell();
 }
-#endif /* UNIX */
+#endif /* SYS_UNIX */
 
 /* run a region through an external filter, replace it with its output */
 int
 filterregion()
 {
 /* FIXX work on this for OS2, need inout_popen support, or named pipe? */
-#if UNIX || MSDOS
+#if SYS_UNIX || SYS_MSDOS
 	static char oline[NLINE];	/* command line send to shell */
 	char	line[NLINE];	/* command line send to shell */
 	FILE *fr, *fw;
@@ -604,7 +604,7 @@ filterregion()
 			fwrite((char *)kp->d_chunk, 1, (SIZE_T)KbSize(ukb,kp), fw);
 			kp = kp->d_next;
 		}
-#if UNIX
+#if SYS_UNIX
 		(void)fflush(fw);
 		(void)fclose(fw);
 		ExitProgram (GOODEXIT);
@@ -635,18 +635,18 @@ int
 filter(f, n)
 int f,n;
 {
-#if !(UNIX||MSDOS) /* filterregion up above is better */
+#if !(SYS_UNIX||SYS_MSDOS) /* filterregion up above is better */
 	register int	s;	/* return status from CLI */
 	register BUFFER *bp;	/* pointer to buffer to zot */
 	static char oline[NLINE];	/* command line send to shell */
 	char	line[NLINE];	/* command line send to shell */
 	char tnam[NFILEN];	/* place to store real file name */
 	static char bname1[] = "fltinp";
-#if	UNIX
+#if	SYS_UNIX
 	char	*t;
 #endif
 
-#if	AMIGA
+#if	SYS_AMIGA
 	static char filnam1[] = "ram:fltinp";
 	static char filnam2[] = "ram:fltout";
 	long newcli;
@@ -655,11 +655,11 @@ int f,n;
 	static char filnam2[] = "fltout";
 #endif
 
-#if	VMS
+#if	SYS_VMS
 	mlforce("[Not available under VMS]");
 	return(FALSE);
 #endif
-#if	CPM
+#if	SYS_CPM
 	mlforce("[Not available under CP/M-86]");
 	return(FALSE);
 #endif
@@ -680,7 +680,7 @@ int f,n;
 		return(FALSE);
 	}
 
-#if	AMIGA
+#if	SYS_AMIGA
 	newcli = Open("CON:0/0/640/200/MicroEMACS Subprocess", NEW);
 	(void)strcat(line, " <ram:fltinp >ram:fltout");
 	Execute(line,0L,newcli);
@@ -688,7 +688,7 @@ int f,n;
 	Close(newcli);
 	sgarbf = TRUE;
 #endif
-#if	MSDOS || OS2 || NT
+#if	SYS_MSDOS || SYS_OS2 || SYS_WINNT
 	(void)strcat(line," <fltinp >fltout");
 	bottomleft();
 	TTkclose();
@@ -697,7 +697,7 @@ int f,n;
 	sgarbf = TRUE;
 	s = TRUE;
 #endif
-#if	UNIX
+#if	SYS_UNIX
 	bottomleft();
 	ttclean(TRUE);
 	if ((t = strchr(line, '|')) != 0) {
@@ -739,7 +739,7 @@ int f,n;
 #endif
 }
 
-#if	VMS
+#if	SYS_VMS
 /*
  * Run a command. The "cmd" is a pointer to a command string, or NULL if you
  * want to run a copy of DCL in the subjob (this is how the standard routine

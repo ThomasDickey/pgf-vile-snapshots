@@ -2,7 +2,7 @@
  * 	X11 support, Dave Lemke, 11/91
  *	X Toolkit support, Kevin Buettner, 2/94
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/x11.c,v 1.88 1994/10/30 16:26:37 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/x11.c,v 1.94 1994/11/29 04:02:03 pgf Exp $
  *
  */
 /*
@@ -34,12 +34,12 @@
 #include	"estruct.h"
 #include	"edef.h"
 
-#if X11 && XTOOLKIT
+#if DISP_X11 && XTOOLKIT
 
 #define MY_CLASS	"XVile"
 
-#if VMS
-#undef UNIX
+#if SYS_VMS
+#undef SYS_UNIX
 #define coreWidgetClass widgetClass /* patch for VMS 5.4-3 (dickey) */
 #endif
 
@@ -291,14 +291,12 @@ static	void	x_open   P(( void )),
 		x_beep   P(( void )),
 		x_rev    P(( int ));
 
-#if COLOR
+#if OPT_COLOR
 static	void	x_fcol   P(( int )),
 		x_bcol   P(( int ));
 #endif
 
-#ifdef SCROLLCODE
 static	void	x_scroll P(( int, int, int ));
-#endif
 
 static	SIGT	x_quit (DEFINE_SIG_ARGS);
 
@@ -322,7 +320,7 @@ static	void	x_key_press P(( Widget, XtPointer, XEvent *, Boolean * ));
 static	void	x_wm_delwin P(( Widget, XtPointer, XEvent *, Boolean * ));
 static	char *	strndup P(( char *, int ));
 static	void	wait_for_scroll P(( TextWindow ));
-static	void	flush_line P(( UCHAR *, int, int /*VIDEO_ATTR*/, int, int ));
+static	void	flush_line P(( UCHAR *, int, unsigned int, int, int ));
 static	int	set_character_class_range P(( int, int, int ));
 static	void	x_lose_selection P(( TextWindow ));
 static	int	add2paste P(( TBUFF **, int ));
@@ -387,6 +385,7 @@ TERM        term = {
     x_kclose,
     x_getc,
     psc_putchar,
+    tttypahead,
     psc_flush,
     psc_move,
     psc_eeol,
@@ -395,15 +394,11 @@ TERM        term = {
     x_rev,
     x_cres
 
-#if	COLOR
+#if	OPT_COLOR
     ,x_fcol,
     x_bcol
 #endif
-
-#if SCROLLCODE
     ,x_scroll
-#endif
-
     ,x_flush
 };
 
@@ -2340,8 +2335,10 @@ x_open()
     kqinit(cur_win);
     cur_win->sel_prop = XInternAtom(dpy, "VILE_SELECTION", False);
     cur_win->scrollbars = NULL;
+#if NO_WIDGETS
     cur_win->scrollinfo = NULL;
     cur_win->grips = NULL;
+#endif
 #if OL_WIDGETS
     cur_win->sliders = NULL;
 #endif
@@ -2500,7 +2497,7 @@ static void
 flush_line(text, len, attr, sr, sc)
     UCHAR *text;
     int	   len;
-    VIDEO_ATTR attr;
+    unsigned int attr;
     int	   sr;
     int	   sc;
 {
@@ -2727,7 +2724,7 @@ x_flush()
 	    }
 	    /* write out the portion from sc thru ec */
 	    flush_line(&CELL_TEXT(r,sc), ec-sc+1,
-	               (VIDEO_ATTR) VATTRIB(CELL_ATTR(r,sc)), r, sc);
+	               (unsigned int) VATTRIB(CELL_ATTR(r,sc)), r, sc);
 	}
     }
     XFlush(dpy);
@@ -3513,10 +3510,14 @@ x_process_event(w, unused, ev, continue_to_dispatch)
          && (absol(ev->xmotion.time - cur_win->lasttime) < cur_win->click_timeout))
 	    return;
 	if (do_sel) {
+	    static int onr = -1, onc = -1;
 	    if (ev->xbutton.state & ControlMask) {
 		(void)sel_setshape(RECTANGLE);
 	    }
-	    extend_selection(cur_win, nr, nc, True);
+	    if (nr != onr || nc != onc)
+		extend_selection(cur_win, nr, nc, True);
+	    onr = nr;
+	    onc = nc;
 	}
 	else {
 	    if (!reading_msg_line && (wp = row2window(nr)) && wp != curwp) {
@@ -3728,8 +3729,10 @@ int check_scrollbar_allocs()
 #if OL_WIDGETS
 		GROW(cur_win->sliders, Widget, oldmax-1, newmax-1);
 #endif
+#if NO_WIDGETS
 		GROW(cur_win->scrollinfo, ScrollInfo, oldmax, newmax);
 		GROW(cur_win->grips, Widget, oldmax-1, newmax-1);
+#endif
 
 		cur_win->maxscrollbars = newmax;
 	}
@@ -3981,7 +3984,7 @@ x_working()
 	    int c = kqpop(cur_win);
 	    if (c == intrc) {
 		kqadd(cur_win, abortc);
-#if VMS
+#if SYS_VMS
 		kbd_alarm(); /* signals? */
 #else
 		(void)signal_pg(SIGINT);
@@ -4177,7 +4180,7 @@ display_cursor(client_data, idp)
 	MARK_CELL_DIRTY(ttrow,ttcol);
 	MARK_LINE_DIRTY(ttrow);
 	flush_line(&CELL_TEXT(ttrow,ttcol), 1,
-	           (VIDEO_ATTR) (VATTRIB(CELL_ATTR(ttrow,ttcol))
+	           (unsigned int) (VATTRIB(CELL_ATTR(ttrow,ttcol))
 		                ^ ((cur_win->blink_status & BLINK_TOGGLE)
 				  ? 0 : VAREV)),
 		   ttrow, ttcol);
@@ -4192,7 +4195,7 @@ display_cursor(client_data, idp)
 	MARK_CELL_DIRTY(ttrow,ttcol);
 	MARK_LINE_DIRTY(ttrow);
 	flush_line(&CELL_TEXT(ttrow,ttcol), 1,
-	           (VIDEO_ATTR) VATTRIB(CELL_ATTR(ttrow,ttcol)), ttrow, ttcol);
+	    (unsigned int) VATTRIB(CELL_ATTR(ttrow,ttcol)), ttrow, ttcol);
 	XDrawRectangle(dpy, cur_win->win,
 	               IS_REVERSED(ttrow,ttcol) ? cur_win->reversegc 
 		                                : cur_win->textgc,
@@ -4346,52 +4349,52 @@ x_key_press(w, unused, ev, continue_to_dispatch)
 	KeySym  key;
 	int     code;
     } escapes[] = {
-	{XK_F11,     ESC},
 	/* Arrow keys */
-	{XK_Up,      SPEC|'A'},
-	{XK_Down,    SPEC|'B'},
-	{XK_Right,   SPEC|'C'},
-	{XK_Left,    SPEC|'D'},
+	{XK_Up,      KEY_Up},
+	{XK_Down,    KEY_Down},
+	{XK_Right,   KEY_Right},
+	{XK_Left,    KEY_Left},
 	/* page scroll */
-	{XK_Next,    SPEC|'n'},
-	{XK_Prior,   SPEC|'p'},
-	{XK_Home,    SPEC|'H'},
-	{XK_End,     SPEC|'E'},
+	{XK_Next,    KEY_Next},
+	{XK_Prior,   KEY_Prior},
+	{XK_Home,    KEY_Home},
+	{XK_End,     KEY_End},
 	/* editing */
-	{XK_Insert,  SPEC|'i'},
+	{XK_Insert,  KEY_Insert},
 #if (ULTRIX || ultrix)
-	{DXK_Remove, SPEC|'r'},
+	{DXK_Remove, KEY_Remove},
 #endif
-	{XK_Find,    SPEC|'f'},
-	{XK_Select,  SPEC|'s'},
+	{XK_Find,    KEY_Find},
+	{XK_Select,  KEY_Select},
 	/* command keys */
-	{XK_Menu,    SPEC|'m'},
-	{XK_Help,    SPEC|'h'},
+	{XK_Menu,    KEY_Menu},
+	{XK_Help,    KEY_Help},
 	/* function keys */
-	{XK_F1,      SPEC|'1'},
-	{XK_F2,      SPEC|'2'},
-	{XK_F3,      SPEC|'3'},
-	{XK_F4,      SPEC|'4'},
-	{XK_F5,      SPEC|'5'},
-	{XK_F6,      SPEC|'6'},
-	{XK_F7,      SPEC|'7'},
-	{XK_F8,      SPEC|'8'},
-	{XK_F9,      SPEC|'9'},
-	{XK_F10,     SPEC|'0'},
-	{XK_F12,     SPEC|'@'},
-	{XK_F13,     SPEC|'#'},
-	{XK_F14,     SPEC|'$'},
-	{XK_F15,     SPEC|'%'},
-	{XK_F16,     SPEC|'^'},
-	{XK_F17,     SPEC|'&'},
-	{XK_F18,     SPEC|'*'},
-	{XK_F19,     SPEC|'('},
-	{XK_F20,     SPEC|')'},
+	{XK_F1,      KEY_F1},
+	{XK_F2,      KEY_F2},
+	{XK_F3,      KEY_F3},
+	{XK_F4,      KEY_F4},
+	{XK_F5,      KEY_F5},
+	{XK_F6,      KEY_F6},
+	{XK_F7,      KEY_F7},
+	{XK_F8,      KEY_F8},
+	{XK_F9,      KEY_F9},
+	{XK_F10,     KEY_F10},
+	{XK_F11,     KEY_F11},
+	{XK_F12,     KEY_F12},
+	{XK_F13,     KEY_F13},
+	{XK_F14,     KEY_F14},
+	{XK_F15,     KEY_F15},
+	{XK_F16,     KEY_F16},
+	{XK_F17,     KEY_F17},
+	{XK_F18,     KEY_F18},
+	{XK_F19,     KEY_F19},
+	{XK_F20,     KEY_F20},
 	/* keypad function keys */
-	{XK_KP_F1,   SPEC|'P'},
-	{XK_KP_F2,   SPEC|'Q'},
-	{XK_KP_F3,   SPEC|'R'},
-	{XK_KP_F4,   SPEC|'S'},
+	{XK_KP_F1,   KEY_KP_F1},
+	{XK_KP_F2,   KEY_KP_F2},
+	{XK_KP_F3,   KEY_KP_F3},
+	{XK_KP_F4,   KEY_KP_F4}
     };
 
     if (ev->type != KeyPress)
@@ -4437,7 +4440,7 @@ char *flag;
     return TRUE;
 }
 
-#if COLOR
+#if OPT_COLOR
 static void
 x_fcol(color)
 int color;
@@ -4548,4 +4551,4 @@ x_get_window_name()
     	return x_window_name;
 }
 
-#endif	/* X11 && XTOOLKIT */
+#endif	/* DISP_X11 && XTOOLKIT */

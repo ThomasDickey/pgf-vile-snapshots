@@ -10,7 +10,7 @@
  * Note: Visual flashes are not yet supported.
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/borland.c,v 1.7 1994/10/10 13:22:06 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/borland.c,v 1.9 1994/11/29 04:02:03 pgf Exp $
  *
  */
 
@@ -21,8 +21,7 @@
 #include <os2.h>
 
 #undef OFFSETOF
-#undef COLOR
-#undef COLOR 1
+#undef OPT_COLOR
 
 #endif /* OS2 */
 
@@ -31,12 +30,12 @@
 #include        "estruct.h"
 #include        "edef.h"
 
-#if !BORLAND || IBMPC
-#error misconfigured:  BORLAND should be defined if using borland.c
-#error (and IBMPC should not be defined)
+#if !DISP_BORLAND || DISP_IBMPC
+#error misconfigured:  DISP_BORLAND should be defined if using borland.c
+#error (and DISP_IBMPC should not be defined)
 #endif
 
-#define NROW	60			/* Max Screen size.		*/
+#define NROW	50			/* Max Screen size.		*/
 #define NCOL    80			/* Edit if you want to.         */
 #define	MARGIN	8			/* size of minimum margin and	*/
 #define	SCRSIZ	64			/* scroll size for extended lines */
@@ -74,9 +73,7 @@ int	ctrans[NCOLORS];
 char *initpalettestr = "0 4 2 14 1 5 3 7";  /* 15 is too bright */
 /* black, red, green, yellow, blue, magenta, cyan, white   */
 
-#if	SCROLLCODE
 extern	void	borscroll P((int,int,int));
-#endif
 
 static	int	scinit    P((int));
 static	int	scblank   P((void));
@@ -102,6 +99,7 @@ TERM    term    = {
 	borkclose,
 	ttgetc,
 	borputc,
+	tttypahead,
 	ttflush,
 	bormove,
 	boreeol,
@@ -111,9 +109,7 @@ TERM    term    = {
 	borcres,
 	borfcol,
 	borbcol,
-#if	SCROLLCODE
 	borscroll
-#endif
 };
 
 void
@@ -293,7 +289,7 @@ borkclose()	/* close the keyboard */
 	/* ms_deinstall(); */
 }
 
-#if OS2  		/* all modes are available under OS/2 */
+#if SYS_OS2  		/* all modes are available under OS/2 */
 static
 int scinit(rows)	/* initialize the screen head pointers */
 int rows;		/* Number of rows. only do 80 col */
@@ -356,7 +352,7 @@ int rows;		/* Number of rows. only do 80 col */
 	return(TRUE);
 }
 
-#else /* OS2 */
+#else /* SYS_OS2 */
 
 static
 int scinit(rows)	/* initialize the screen head pointers */
@@ -401,7 +397,7 @@ int rows;		/* Number of rows. only do 80 col */
 	return(TRUE);
 }
 
-#endif /* OS2 */
+#endif /* SYS_OS2 */
 
 /* returns attribute for blank/empty space */
 static int
@@ -410,11 +406,10 @@ scblank()
 	return AttrColor(gbcolor,gfcolor);
 }
 
-#if SCROLLCODE
 /*
  * Move 'n' lines starting at 'from' to 'to'
  *
- * PRETTIER_SCROLL is prettier but slower -- it scrolls a line at a time
+ * OPT_PRETTIER_SCROLL is prettier but slower -- it scrolls a line at a time
  *	instead of all at once.
  */
 
@@ -429,7 +424,7 @@ int from, to, n;
 #if VIO
 	VioScrollUp(min(to,from),0,max(to,from),term.t_ncol,n,&a,0);
 #else
-#if PRETTIER_SCROLL
+#if OPT_PRETTIER_SCROLL
 	if (absol(from-to) > 1) {
 		borscroll(from, (from<to) ? to-1:to+1, n);
 		if (from < to)
@@ -455,7 +450,6 @@ int from, to, n;
 	}
 #endif	/* VIO */
 }
-#endif	/* SCROLLCODE */
 
 
 /*--------------------------------------------------------------------------*/

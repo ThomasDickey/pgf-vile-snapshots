@@ -1,6 +1,5 @@
-
 #!/bin/sh
-# From configure.in Revision: 1.7 
+# From configure.in Revision: 1.11 
 
 ### Use "configure -with-screen" to override the default configuration, which is
 ### termcap-based on unix systems.
@@ -861,7 +860,7 @@ fi
 
 for ac_hdr in unistd.h stdlib.h stddef.h string.h memory.h fcntl.h \
                 poll.h termios.h termio.h sgtty.h \
-		ioctl.h select.h setjmp.h signal.h
+		ioctl.h select.h setjmp.h signal.h utime.h
 do
 ac_tr_hdr=HAVE_`echo $ac_hdr | tr '[a-z]./' '[A-Z]__'`
 test -n "$silent" || echo "checking for ${ac_hdr}"
@@ -1631,9 +1630,9 @@ done
 
 {
 test -n "$verbose" && \
-echo "	defining UNIX"
-echo "#define" UNIX "1" >> confdefs.h
-DEFS="$DEFS -DUNIX=1"
+echo "	defining SYS_UNIX"
+echo "#define" SYS_UNIX "1" >> confdefs.h
+DEFS="$DEFS -DSYS_UNIX=1"
 }
 
 
@@ -1987,9 +1986,9 @@ EOF
 		
 {
 test -n "$verbose" && \
-echo "	defining X11"
-echo "#define" X11 "1" >> confdefs.h
-DEFS="$DEFS -DX11=1"
+echo "	defining DISP_X11"
+echo "#define" DISP_X11 "1" >> confdefs.h
+DEFS="$DEFS -DDISP_X11=1"
 }
 
 		
@@ -2261,9 +2260,9 @@ DEFS="$DEFS -DNO_WIDGETS=1"
 		
 {
 test -n "$verbose" && \
-echo "	defining TERMCAP"
-echo "#define" TERMCAP "1" >> confdefs.h
-DEFS="$DEFS -DTERMCAP=1"
+echo "	defining DISP_TERMCAP"
+echo "#define" DISP_TERMCAP "1" >> confdefs.h
+DEFS="$DEFS -DDISP_TERMCAP=1"
 }
 
 		ac_save_LIBS="${LIBS}"
@@ -2413,6 +2412,9 @@ cat > conftest.${ac_ext} <<EOF
 #endif
 #ifdef HAVE_STDDEF_H
 #include <stddef.h>
+#endif
+#if HAVE_UTIME_H
+# include <utime.h>
 #endif
 
 #if STDC_HEADERS || HAVE_STRING_H
@@ -2674,6 +2676,9 @@ cat > conftest.${ac_ext} <<EOF
 #endif
 #ifdef HAVE_STDDEF_H
 #include <stddef.h>
+#endif
+#if HAVE_UTIME_H
+# include <utime.h>
 #endif
 
 #if STDC_HEADERS || HAVE_STRING_H

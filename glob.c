@@ -15,7 +15,7 @@
  *
  *	modify (ifdef-style) 'expand_leaf()' to allow ellipsis.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/glob.c,v 1.23 1994/10/03 13:24:35 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/glob.c,v 1.25 1994/11/29 04:02:03 pgf Exp $
  *
  */
 
@@ -27,7 +27,7 @@
 #define	isname(c)	(isalnum(c) || ((c) == '_'))
 #define	isdelim(c)	((c) == '(' || ((c) == '{'))
 
-#if MSDOS || WIN31 || OS2 || NT
+#if SYS_MSDOS || SYS_WIN31 || SYS_OS2 || SYS_WINNT
 # define UNIX_GLOBBING !SMALLER
 # if UNIX_GLOBBING
 #  define DirEntryStr(p)		p->d_name
@@ -45,13 +45,13 @@
 #  endif
 # endif
 # define DirEntryLen(p)			strlen(DirEntryStr(p))
-#endif	/* MSDOS */
+#endif	/* SYS_MSDOS */
 
 /*
  * Make the default unix globbing code use 'echo' rather than our internal
  * globber if we do not configure the 'glob' string-mode.
  */
-#if UNIX && defined(GVAL_GLOB) && !OPT_VMS_PATH
+#if SYS_UNIX && defined(GVAL_GLOB) && !OPT_VMS_PATH
 # define UNIX_GLOBBING 1
 #endif
 
@@ -112,7 +112,7 @@ static int
 string_has_wildcards (item)
 char	*item;
 {
-#if OPT_VMS_PATH || UNIX || OPT_MSDOS_PATH
+#if OPT_VMS_PATH || SYS_UNIX || OPT_MSDOS_PATH
 	while (*item != EOS) {
 #if UNIX_GLOBBING
 		if (iswild(*item))
@@ -120,7 +120,7 @@ char	*item;
 #endif
 		if (*item == GLOB_SINGLE || *item == GLOB_MULTI)
 			return TRUE;
-#if OPT_GLOB_ELLIPSIS || VMS
+#if OPT_GLOB_ELLIPSIS || SYS_VMS
 		if (!strncmp(item, GLOB_ELLIPSIS, sizeof(GLOB_ELLIPSIS)-1))
 			return TRUE;
 #endif
@@ -356,12 +356,13 @@ char	*pattern;
 					s = leaf + strlen(leaf);
 					*s++ = SLASHC;
 					(void)strcpy(s, next);
-					if (!record_a_match(path)) {
+					if (ffexists(path)
+					 && !record_a_match(path)) {
 						result = FALSE;
 						break;
 					}
 				} else if (is_directory(path)) {
-#if MSDOS || WIN31
+#if SYS_MSDOS || SYS_WIN31
 					s = strrchr(path, '.');
 					if (s[1] == EOS)
 						s[0] = EOS;
@@ -389,7 +390,7 @@ char	*pattern;
 /*
  * Comparison-function for 'qsort()'
  */
-#if __STDC__ || defined(__TURBOC__) || WATCOM || defined(__CLCC__)
+#if __STDC__ || defined(TURBOC) || CC_WATCOM || defined(__CLCC__)
 #if defined(apollo) && !(defined(__STDCPP__) || defined(__GNUC__))
 #define	ANSI_QSORT 0	/* cc 6.7 */
 #else
@@ -642,7 +643,7 @@ char	*item;
 		result = record_a_match(pattern);
 	}
 #endif				/* UNIX-style globbing */
-#if (MSDOS || WIN31 || OS2 || NT) && !UNIX_GLOBBING
+#if (SYS_MSDOS || SYS_WIN31 || SYS_OS2 || SYS_WINNT) && !UNIX_GLOBBING
 	/* native DOS-wildcards */
 	DeclareFind(p);
 	char	temp[FILENAME_MAX + 1];
@@ -671,7 +672,7 @@ char	*item;
 /*
  * Tests a list of items to see if at least one of them needs to be globbed.
  */
-#if !UNIX
+#if !SYS_UNIX
 int
 glob_needed (list_of_items)
 char	**list_of_items;
@@ -707,7 +708,7 @@ char	**list_of_items;
 		 * For UNIX, expand '~' expressions in case we've got a pattern
 		 * like "~/test*.log".
 		 */
-#if UNIX
+#if SYS_UNIX
 		char	temp[NFILEN];
 		item = home_path(strcpy(temp, item));
 #endif
@@ -777,7 +778,7 @@ char	**list_of_items;
 }
 
 
-#if !UNIX
+#if !SYS_UNIX
 /*
  * Expand wildcards for the main program a la UNIX shell.
  */

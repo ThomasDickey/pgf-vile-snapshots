@@ -9,11 +9,11 @@
  *	They and the accompanying article were written by Eric White.
  *	(pgf, 1989)
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/vmalloc.c,v 1.20 1994/09/05 19:33:50 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/vmalloc.c,v 1.21 1994/11/29 04:02:03 pgf Exp $
  *
  */
 
-#if VMALLOC
+#if OPT_VRFY_MALLOC
 
 #undef malloc
 #undef free
@@ -22,7 +22,7 @@
 #undef vverify
 
 /* max buffers alloc'ed but not yet free'd */
-#if TURBO
+#if CC_TURBO
 #define MAXMALLOCS 1000	/* sorry, not very big ! */
 #else
 #define MAXMALLOCS 20000
@@ -273,7 +273,7 @@ static void
 errout()
 {
 	sleep(1);
-#if UNIX
+#if SYS_UNIX
 	kill(getpid(),3);
 	pause();
 #endif
@@ -334,7 +334,7 @@ int f,n;
 			found += 3;
 	}
 #endif
-#if	FILOCK
+#if	OPT_BSD_FILOCK
 	need to count lock mallocs...
 #endif
 	{ /* searching */

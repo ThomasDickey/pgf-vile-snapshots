@@ -3,7 +3,7 @@
  * that take motion operators.
  * written for vile by Paul Fox, (c)1990
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/opers.c,v 1.47 1994/08/08 16:12:29 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/opers.c,v 1.51 1994/11/29 04:02:03 pgf Exp $
  *
  */
 
@@ -64,7 +64,7 @@ char *str;
 
 #if OPT_MOUSE
 			if (curwp != wp0) {
-				tungetc(c);
+				unkeystroke(c);
 			    	doingopcmd = FALSE;
 				return FALSE;
 			}
@@ -325,6 +325,7 @@ int f,n;
 	}
 }
 
+#if OPT_FORMAT
 int
 operformat(f,n)
 int f,n;
@@ -333,6 +334,7 @@ int f,n;
 	opcmd = OPOTHER;
 	return operator(f,n,formatregion,"Format");
 }
+#endif
 
 int
 operfilter(f,n)
@@ -380,6 +382,7 @@ int f,n;
 	return operator(f,n,subst_again_region,"Substitute-again");
 }
 
+#if OPT_AEDIT
 int
 operentab(f,n)
 int f,n;
@@ -388,7 +391,9 @@ int f,n;
 	opcmd = OPOTHER;
 	return operator(f,n,entab_region,"Spaces-->Tabs");
 }
+#endif
 
+#if OPT_AEDIT
 int
 operdetab(f,n)
 int f,n;
@@ -397,7 +402,9 @@ int f,n;
 	opcmd = OPOTHER;
 	return operator(f,n,detab_region,"Tabs-->Spaces");
 }
+#endif
 
+#if OPT_AEDIT
 int
 opertrim(f,n)
 int f,n;
@@ -406,7 +413,9 @@ int f,n;
 	opcmd = OPOTHER;
 	return operator(f,n,trim_region,"Trim whitespace");
 }
+#endif
 
+#if OPT_AEDIT
 int
 operblank(f,n)
 int f,n;
@@ -414,6 +423,7 @@ int f,n;
 	opcmd = OPOTHER;
 	return operator(f,n,blank_region,"Blanking");
 }
+#endif
 
 int
 operopenrect(f,n)

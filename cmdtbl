@@ -38,6 +38,15 @@
 #		'FN-2'				DOS
 #		'M-s'
 #
+# As a special case, if a function key definition ('FN-A') is followed
+# by a conditional beginning with "KEY_", like:
+#		'FN-A'				KEY_Up
+# then that name is output to nefkeys.h as a SPEC|x definition, for use
+# by the screen/keyboard drivers.  The key is also bound, as usual, and
+# is made conditional on the _third_ field on the line.  (Since KEY_xxx
+# definitions are meant to be pretty generic, there should be little
+# need for conditional build-time binding.)
+#
 # This says that somefunc() is an absolute motion command, that it should
 #  only be included in the editor if we're running BSD or DOS, that its
 #  english name as one would type on the command line is "funkycom", and
@@ -86,7 +95,7 @@
 #		in '!' listed, then the flag does nothing, and should be
 #		viewed simply as documentation.
 #
-# $Header: /usr/build/VCS/pgf-vile/RCS/cmdtbl,v 1.102 1994/10/27 14:26:35 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/cmdtbl,v 1.109 1994/11/29 04:02:03 pgf Exp $
 #
 #
 
@@ -97,9 +106,9 @@ append		REDO|UNDO
 	"append-chars"			!FEWNAMES
 	'a'
 appendeol	REDO|UNDO
-	"append-chars-at-eol"			!FEWNAMES
+	"append-chars-at-eol"		!FEWNAMES
 	'A'
-apro		NONE			APROP&&OPT_REBIND
+apro		NONE			OPT_REBIND
 	"apropos"
 	"list-commands-apropos-to"
 backchar	MOTION
@@ -109,8 +118,7 @@ backchar_to_bol	MOTION
 	'h'
 	'^H'
 	'^?'
-	'FN-D'				ANSI_SPEC
-	'FN-\113'			IBM_KBD
+	'FN-D'				KEY_Left
 backdelchar	REDO|UNDO
 	"delete-previous-character"	!FEWNAMES
 	'X'
@@ -119,7 +127,7 @@ backhunt	ABSM|MOTION		!SMALLER
 backhpage	MOTION
 	"previous-half-page"		!FEWNAMES
 	"back-half-page"		!FEWNAMES
-	"up-half-page"		!FEWNAMES
+	"up-half-page"			!FEWNAMES
 	'^U'
 backline	GOAL|MOTION|FL
 	"previous-line"			!FEWNAMES
@@ -127,8 +135,7 @@ backline	GOAL|MOTION|FL
 	"up-line"			!FEWNAMES
 	'k'
 	'^P'
-	'FN-A'				ANSI_SPEC
-	'FN-\110'			IBM_KBD
+	'FN-A'				KEY_Up
 backbline	MOTION|FL
 	"previous-line-at-bol"		!FEWNAMES
 	"back-line-at-bol"		!FEWNAMES
@@ -138,15 +145,14 @@ backpage	MOTION
 	"previous-page"			!FEWNAMES
 	"back-page"			!FEWNAMES
 	'^B'
-	'FN-p'				defined(linux)
-	'FN-\111'			IBM_KBD
+	'FN-p'				KEY_Prior
 backword	MOTION
 	"previous-word"			!FEWNAMES
 	"back-word"			!FEWNAMES
 	'B'
-	'FN-\163'			IBM_KBD
+#	'FN-\163'			IBM_KBD
 backviword	MOTION
-	"previous-punctuated-word"		!FEWNAMES
+	"previous-punctuated-word"	!FEWNAMES
 	"back-punctuated-word"		!FEWNAMES
 	'b'
 backsearch	ABSM|MOTION
@@ -168,103 +174,105 @@ bktoshell	NONE
 cd		NONE
 	"cd"
 	"change-directory"
-cntl_xf		NONE
+cntl_x_func	NONE
 	"cntl_x-prefix"
 	'^X'
 chgchar		REDO|UNDO
 	"change-char"			!FEWNAMES
-	"delete-char-and-insert-chars"		!FEWNAMES
+	"delete-char-and-insert-chars"	!FEWNAMES
 	's'
 chgline		REDO|UNDO
 	"change-line"			!FEWNAMES
-	"delete-line-and-insert-chars"		!FEWNAMES
+	"delete-line-and-insert-chars"	!FEWNAMES
 	'S'
 chgtoeol	REDO|UNDO
-	"change-to-eol"		!FEWNAMES
-	"delete-to-eol-and-insert-chars"	!FEWNAMES
+	"change-to-eol"			!FEWNAMES
+	"delete-to-eol-and-insert-chars" !FEWNAMES
 	'C'
 clrmes		NONE
 	"clear-message-line"		!FEWNAMES
 consearch	ABSM|MOTION
 	"continue-search"		!FEWNAMES
 	'n'
-wordcount	RANGE			WORDCOUNT
+wordcount	RANGE			OPT_WORDCOUNT
 	"count-words"
-opercopy		OPER|(RANGE|EXTRA)
+opercopy	OPER|(RANGE|EXTRA)
 	"copy-til"
 	"c"
-kbd_mac_begin		NONE
+kbd_mac_begin	NONE
 	"begin-keyboard-macro"		!FEWNAMES
 	'^X-('
-kbd_mac_end		NONE
+kbd_mac_end	NONE
 	"end-keyboard-macro"		!FEWNAMES
 	'^X-)'
-kbd_mac_exec		REDO|UNDO|VIEWOK
+kbd_mac_exec	REDO|UNDO|VIEWOK
 	"execute-keyboard-macro"	!FEWNAMES
 	'^X-&'
-kbd_mac_save		NONE
+kbd_mac_save	NONE
 	"save-keyboard-macro"
 	'^X-^'
 cbuf1		REDO
 	"execute-macro-1"		!FEWNAMES
-	'FN-1'				UNIX
-	'FN-P'				ANSI_SPEC
+	'FN-1'				KEY_F1
+	'FN-P'				KEY_KP_F1
 cbuf2		REDO
 	"execute-macro-2"		!FEWNAMES
-	'FN-2'				UNIX
-	'FN-Q'				ANSI_SPEC
-	'FN-\125'			IBM_KBD
+	'FN-2'				KEY_F2
+	'FN-Q'				KEY_KP_F2
 cbuf3		REDO
 	"execute-macro-3"		!FEWNAMES
-	'FN-3'				UNIX
-	'FN-R'				ANSI_SPEC
-	'FN-\126'			IBM_KBD
+	'FN-3'				KEY_F3
+	'FN-R'				KEY_KP_F3
 cbuf4		REDO
 	"execute-macro-4"		!FEWNAMES
-	'FN-4'				UNIX
-	'FN-S'				ANSI_SPEC
-	'FN-\127'			IBM_KBD
+	'FN-4'				KEY_F4
+	'FN-S'				KEY_KP_F4
 cbuf5		REDO
 	"execute-macro-5"		!FEWNAMES
-	'FN-5'				UNIX
-	'FN-\130'			IBM_KBD
+	'FN-5'				KEY_F5
 cbuf6		REDO
 	"execute-macro-6"		!FEWNAMES
-	'FN-6'				UNIX
-	'FN-\131'			IBM_KBD
+	'FN-6'				KEY_F6
 cbuf7		REDO
 	"execute-macro-7"		!FEWNAMES
-	'FN-7'				UNIX
-	'FN-\132'			IBM_KBD
+	'FN-7'				KEY_F7
 cbuf8		REDO
 	"execute-macro-8"		!FEWNAMES
-	'FN-8'				UNIX
-	'FN-\133'			IBM_KBD
+	'FN-8'				KEY_F8
 cbuf9		REDO
 	"execute-macro-9"		!FEWNAMES
-	'FN-9'				UNIX
-	'FN-\134'			IBM_KBD
+	'FN-9'				KEY_F9
 cbuf10		REDO
+	'FN-0'				KEY_F10
 	"execute-macro-10"		!FEWNAMES
 cbuf11		REDO			!SMALLER
 	"execute-macro-11"		!FEWNAMES
 cbuf12		REDO			!SMALLER
+	'FN-@'				KEY_F12
 	"execute-macro-12"		!FEWNAMES
 cbuf13		REDO			!SMALLER
+	'FN-#'				KEY_F13
 	"execute-macro-13"		!FEWNAMES
 cbuf14		REDO			!SMALLER
+	'FN-$'				KEY_F14
 	"execute-macro-14"		!FEWNAMES
 cbuf15		REDO			!SMALLER
+	'FN-%'				KEY_F15
 	"execute-macro-15"		!FEWNAMES
 cbuf16		REDO			!SMALLER
+	'FN-^'				KEY_F16
 	"execute-macro-16"		!FEWNAMES
 cbuf17		REDO			!SMALLER
+	'FN-&'				KEY_F17
 	"execute-macro-17"		!FEWNAMES
 cbuf18		REDO			!SMALLER
+	'FN-*'				KEY_F18
 	"execute-macro-18"		!FEWNAMES
 cbuf19		REDO			!SMALLER
+	'FN-('				KEY_F19
 	"execute-macro-19"		!FEWNAMES
 cbuf20		REDO			!SMALLER
+	'FN-)'				KEY_F20
 	"execute-macro-20"		!FEWNAMES
 cbuf21		REDO			!SMALLER
 	"execute-macro-21"		!FEWNAMES
@@ -310,7 +318,7 @@ delwind		NONE
 	"delete-window"			!FEWNAMES
 	'^K'
 	'^X-0'
-deblank		REDO|UNDO		AEDIT
+deblank		REDO|UNDO		OPT_AEDIT
 	"delete-blank-lines"		!FEWNAMES
 	'^A-d'
 delglobmode	NONE
@@ -324,11 +332,12 @@ dellocmode	NONE|(EXRCOK|EXTRA)
 	"setlno"
 	"unsetl"
 deltoeol	REDO|UNDO
-	"delete-to-eol"		!FEWNAMES
+	"delete-to-eol"			!FEWNAMES
 	'D'
 desbind		NONE			OPT_REBIND
 	"describe-bindings"
 	"list-bindings"
+	"show-bindings"
 deskey		NONE			OPT_REBIND
 	"describe-key"
 dotcmdplay	UNDO
@@ -338,23 +347,22 @@ ex	NONE|(BANG|FILE1)
 	"ex"
 execbuf		NONE			!SMALLER
 	"execute-buffer"		!FEWNAMES
-execcmd		NONE			NEVER
-	"execute-command-line"		!FEWNAMES
 execfile	NONE			!SMALLER
 	"execute-file"			!FEWNAMES
 	"source"
 execkreg	REDO|UNDO|VIEWOK
 	"execute-register"
 	'@'
-execproc	REDO			PROC
+execproc	REDO			OPT_PROCEDURES
 	"execute-procedure"		!FEWNAMES
 	"run"
 enlargewind	NONE
 	"grow-window"			!FEWNAMES
 	'V'
-esc		NONE
+esc_func	NONE
 	"abort-command"			!FEWNAMES
 	'^['
+	'FN-!'				KEY_F11
 fcsrch		MOTION
 	"forward-char-scan"		!FEWNAMES
 	'f'
@@ -384,10 +392,10 @@ filewrite	NONE|BANG
 filter		REDO|UNDO
 	"|"
 	"filter-buffer"			!FEWNAMES
-finderr		NONE			FINDERR
+finderr		NONE			OPT_FINDERR
 	"find-next-error"		!FEWNAMES
 	'^X-^X'
-finderrbuf	NONE			FINDERR
+finderrbuf	NONE			OPT_FINDERR
 	"find-next-error-buffer-name"
 	"error-buffer"
 firstbuffer	NONE
@@ -395,20 +403,19 @@ firstbuffer	NONE
 firstnonwhite	MOTION
 	"first-nonwhite"		!FEWNAMES
 	'^'
-fisearch	NONE			ISRCH
+fisearch	NONE			OPT_ISRCH
 	"incremental-search"		!FEWNAMES
 	'^X-S'
 flipchar	REDO|UNDO
 	"flip-character"		!FEWNAMES
 	'~'
-fnclabel	NONE			FLABEL
+fnclabel	NONE			DISP_HP150
 	"label-function-key"		!FEWNAMES
 	"label-fkey"
 forwdelchar	REDO|UNDO
 	"delete-next-character"		!FEWNAMES
 	'x'
-	'FN-d'				defined(linux)
-	'FN-\123'			IBM_KBD
+	'FN-d'				KEY_Delete
 forwhpage	MOTION
 	"forward-half-page"		!FEWNAMES
 	"next-half-page"		!FEWNAMES
@@ -422,15 +429,13 @@ forwchar_to_eol	MOTION
 	"next-character-to-eol"		!FEWNAMES
 	' '
 	'l'
-	'FN-C'				ANSI_SPEC
-	'FN-\115'			IBM_KBD
+	'FN-C'				KEY_Right
 forwpage	MOTION
 	"forward-page"			!FEWNAMES
 	"next-page"			!FEWNAMES
 	"down-page"			!FEWNAMES
 	'^F'
-	'FN-n'				defined(linux)
-	'FN-\121'			IBM_KBD
+	'FN-n'				KEY_Next
 forwline	GOAL|MOTION|FL
 	"forward-line"			!FEWNAMES
 	"next-line"			!FEWNAMES
@@ -438,8 +443,7 @@ forwline	GOAL|MOTION|FL
 	'j'
 	'^J'
 	'^N'
-	'FN-B'				ANSI_SPEC
-	'FN-\120'			IBM_KBD
+	'FN-B'				KEY_Down
 forwbline	MOTION|FL
 	"forward-line-at-bol"		!FEWNAMES
 	"next-line-at-bol"		!FEWNAMES
@@ -450,31 +454,32 @@ forwword	MOTION
 	"forward-word"			!FEWNAMES
 	"next-word"			!FEWNAMES
 	'W'
-	'FN-\164'			IBM_KBD
+#	'FN-\164'			IBM_KBD
 forwviword	MOTION
-	"forward-punctuated-word"		!FEWNAMES
+	"forward-punctuated-word"	!FEWNAMES
 	"next-punctuated-word"		!FEWNAMES
 	'w'
 forwendw	MOTION
-	"forward-word-end"			!FEWNAMES
+	"forward-word-end"		!FEWNAMES
 	"next-word-end"			!FEWNAMES
 	'E'
 forwviendw	MOTION
-	"forward-punctuated-word-end"		!FEWNAMES
-	"next-punctuated-word-end"		!FEWNAMES
+	"forward-punctuated-word-end"	!FEWNAMES
+	"next-punctuated-word-end"	!FEWNAMES
 	'e'
 forwhunt	ABSM|MOTION		!SMALLER
 	"hunt-forward"			!FEWNAMES
 forwsearch	ABSM|MOTION
 	"search-forward"		!FEWNAMES
 	'/'
-matchfence	ABSM|MOTION		CFENCE
+	'FN-f'				KEY_Find
+matchfence	ABSM|MOTION		OPT_CFENCE
 	"goto-matching-fence"		!FEWNAMES
 	'%'
-matchfenceback	ABSM|MOTION		CFENCE
+matchfenceback	ABSM|MOTION		OPT_CFENCE
 	"goto-matching-fence-behind"	!FEWNAMES
 	'^X-%'
-globals		NONE			GLOBALS
+globals		NONE
 	"og"
 
 # the gotdotplus() function is mostly for internal use only, for the
@@ -486,37 +491,34 @@ godotplus	MOTION|FL
 # this function is for internal use only, for ex commands
 gomark		MOTION|FL|(RANGE|ZERO)
 
-gotobop		ABSM|MOTION		WORDPRO
+gotobop		ABSM|MOTION
 	"previous-paragraph"		!FEWNAMES
 	"back-paragraph"		!FEWNAMES
 	"up-paragraph"			!FEWNAMES
 	'{'
-#	'FN-\204'			IBM_KBD
-gotoeop		ABSM|MOTION		WORDPRO
+gotoeop		ABSM|MOTION
 	"forward-paragraph"		!FEWNAMES
 	"next-paragraph"		!FEWNAMES
 	"down-paragraph"		!FEWNAMES
 	'}'
-	'FN-\166'			IBM_KBD
+#	'FN-\166'			IBM_KBD
 gotobob		ABSM|MOTION		!SMALLER
 	"beginning-of-file"		!FEWNAMES
 	"goto-beginning-of-file"	!FEWNAMES
-	'FN-\107'			IBM_KBD
+	'FN-H'				KEY_Home
 gotoeob		ABSM|MOTION		!SMALLER
 	"goto-end-of-file"		!FEWNAMES
 	"end-of-file"			!FEWNAMES
-	'FN-\117'			IBM_KBD
+	'FN-E'				KEY_End
 gotobol		MOTION
 	"goto-bol"			!FEWNAMES
 	"beginning-of-line"		!FEWNAMES
 	"bol"				!FEWNAMES
-	'FN-h'				defined(linux)
 	'0'
 gotoeol		MOTION|GOAL
 	"goto-eol"			!FEWNAMES
 	"end-of-line"			!FEWNAMES
 	"eol"				!FEWNAMES
-	'FN-H'				defined(linux)
 	'$'
 gotobos		ABSM|MOTION|FL
 	"goto-beginning-of-screen"	!FEWNAMES
@@ -530,27 +532,27 @@ gotoeos		ABSM|MOTION|FL
 	"goto-end-of-screen"		!FEWNAMES
 	"end-of-screen"			!FEWNAMES
 	'L'
-gotobosec	ABSM|MOTION		WORDPRO
+gotobosec	ABSM|MOTION
 	"previous-section"		!FEWNAMES
 	"back-section"			!FEWNAMES
 	"up-section"			!FEWNAMES
 	'['
-gotoeosec	ABSM|MOTION		WORDPRO
+gotoeosec	ABSM|MOTION
 	"forward-section"		!FEWNAMES
 	"next-section"			!FEWNAMES
 	"down-section"			!FEWNAMES
 	']'
-gotobosent	ABSM|MOTION		WORDPRO
+gotobosent	ABSM|MOTION
 	"previous-sentence"		!FEWNAMES
 	"back-sentence"			!FEWNAMES
 	"up-sentence"			!FEWNAMES
 	'('
-gotoeosent	ABSM|MOTION		WORDPRO
+gotoeosent	ABSM|MOTION
 	"forward-sentence"		!FEWNAMES
 	"next-sentence"			!FEWNAMES
 	"down-sentence"			!FEWNAMES
 	')'
-gototag		NONE			TAGS
+gototag		NONE			OPT_TAGS
 	"ta"
 	"tag"
 	"find-tag"			!FEWNAMES
@@ -578,15 +580,18 @@ help		NONE
 	"h"
 	"help"
 	"list-help"
+	"show-help"
 	'^A-h'
 	'^X-h'
+	'FN-?'				KEY_Help
+	'FN-m'				KEY_Menu
 histbuff	NONE
 	"historical-buffer"		!FEWNAMES
 	'_'
 	"_"
 insert		REDO|UNDO
 	"insert-chars"			!FEWNAMES
-	'FN-i'				defined(linux)
+	'FN-i'				KEY_Insert
 	'i'
 insert_no_aindent	REDO|UNDO
 	"insert-chars-no-autoindent"	!FEWNAMES
@@ -618,6 +623,7 @@ lastnonwhite	MOTION			!SMALLER
 	"last-nonwhite"			!FEWNAMES
 listbuffers	NONE
 	"list-buffers"			!FEWNAMES
+	"show-buffers"			!FEWNAMES
 	"args"
 	'^A-*'
 showhistory	NONE			OPT_HISTORY
@@ -649,11 +655,15 @@ showkreg	NONE			OPT_SHOW_REGS
 	"list-registers"		!FEWNAMES
 map		NONE|(EXRCOK|EXTRA)
 	"map"
+	"show-mapped-chars"
 map_bang	NONE|(EXRCOK|EXTRA)
 	"map!"
-map_set		NONE|(EXRCOK|EXTRA) NEW_VI_MAP
-	"MAP"
-cntl_af		NONE
+	"show-mapped!-chars"
+noremap		NONE|(EXRCOK|EXTRA)
+	"noremap"
+noremap_bang	NONE|(EXRCOK|EXTRA)
+	"noremap!"
+cntl_a_func		NONE
 	"cntl_a-prefix"
 	'^A'
 mvdnnxtwind	NONE
@@ -692,9 +702,6 @@ nextwind	NONE
 nullproc	NONE
 	"nop"				!FEWNAMES
 	'^Q'
-onamedcmd	NONE			UNUSED
-	"execute-named-command-old"	!FEWNAMES
-	'^A-:'
 namedcmd	NONE
 	"execute-named-command"		!FEWNAMES
 	":"
@@ -735,10 +742,10 @@ operchg		OPER|REDO|UNDO
 	"change-til"			!FEWNAMES
 	"delete-and-insert-chars-til"	!FEWNAMES
 	'c'
-operdetab	OPER|REDO|UNDO|GLOBOK|(RANGE)	AEDIT
+operdetab	OPER|REDO|UNDO|GLOBOK|(RANGE)	OPT_AEDIT
 	"detab-lines-til"		!FEWNAMES
 	'^A- '
-operentab	OPER|REDO|UNDO|GLOBOK|(RANGE)	AEDIT
+operentab	OPER|REDO|UNDO|GLOBOK|(RANGE)	OPT_AEDIT
 	"entab-lines-til"		!FEWNAMES
 	'^A-^I'
 opermove	OPER|(RANGE|EXTRA)
@@ -763,7 +770,7 @@ operfilter	OPER|REDO|UNDO|(EXRCOK|RANGE|NAMEDFS|DFLNONE|NL)
 	"filter-til"			!FEWNAMES
 	"!"
 	'!'
-operformat	OPER|REDO|UNDO|(RANGE)		WORDPRO
+operformat	OPER|REDO|UNDO|(RANGE)	OPT_FORMAT
 	"format-til"			!FEWNAMES
 	'^A-f'
 	'^A-j'
@@ -772,20 +779,20 @@ operflip	OPER|REDO|UNDO|GLOBOK|(RANGE)
 	"~"
 	'^A-~'
 # RANGE commented out, since it's not done.... 
-operglobals	(/*RANGE|*/BANG|EXTRA|DFLALL)	GLOBALS
+operglobals	(/*RANGE|*/BANG|EXTRA|DFLALL)
 	"global"
 	"g"
-opervglobals	(/*RANGE|*/BANG|EXTRA|DFLALL)	GLOBALS
+opervglobals	(/*RANGE|*/BANG|EXTRA|DFLALL)
 	"vglobal"
 	"v"
 operlower	OPER|REDO|UNDO|GLOBOK|(RANGE)
 	"lower-til"			!FEWNAMES
 	"L"
 	'^A-l'
-operlist	OPER|GLOBOK|(RANGE)		GLOBALS
+operlist	OPER|GLOBOK|(RANGE)
 	"list-lines-til"		!FEWNAMES
 	"l"
-operprint	OPER|GLOBOK|(RANGE)		GLOBALS
+operprint	OPER|GLOBOK|(RANGE)
 	"print-lines-til"		!FEWNAMES
 	"p"
 operselect	OPER|GLOBOK|(RANGE)	OPT_SELECTIONS
@@ -807,11 +814,11 @@ opersubst	OPER|REDO|UNDO|GLOBOK|(RANGE|EXTRA)
 	"substitute-til"		!FEWNAMES
 	"s"
 	'^X-s'
-opertrim	REDO|UNDO|GLOBOK|UNDO|(RANGE)	AEDIT
+opertrim	REDO|UNDO|GLOBOK|UNDO|(RANGE)	OPT_AEDIT
 	"trim-lines-til"		!FEWNAMES
 	"trim"
 	'^A-t'
-operblank	REDO|UNDO|GLOBOK|UNDO|(RANGE)	AEDIT
+operblank	REDO|UNDO|GLOBOK|UNDO|(RANGE)	OPT_AEDIT
 	"blank-region"
 	"blank"
 	'^A-b'
@@ -850,7 +857,6 @@ poswind		NONE
 prevwind	NONE
 	"previous-window"		!FEWNAMES
 	'^X-O'
-#	'^P'
 pipecmd		NONE
 	"pipe-command"			!FEWNAMES
 	'^X-!'
@@ -905,7 +911,7 @@ restwnd		NONE			!SMALLER
 rev_csrch	MOTION
 	"reverse-char-scan"		!FEWNAMES
 	','
-risearch	NONE			ISRCH
+risearch	NONE			OPT_ISRCH
 	"reverse-incremental-search"	!FEWNAMES
 	'^X-R'
 revsearch	ABSM|MOTION
@@ -923,7 +929,7 @@ scrbacksearch	ABSM|MOTION
 scrsearchpat	NONE
 	"screen-search-pattern-grab"	!FEWNAMES
 	'^A-/'
-set_dosmode	NONE			DOSFILES
+set_dosmode	NONE			OPT_DOSFILES
 	"set-dos-mode"
 settab		NONE
 	"handle-tab"			!FEWNAMES
@@ -932,7 +938,7 @@ settab		NONE
 set_termchrs	NONE			OPT_REBIND&&OPT_TERMCHRS
 	"set-terminal"
 show_termchrs	NONE			OPT_REBIND&&OPT_TERMCHRS
-	"show-terminal"
+	"show-terminal-chars"
 spawncli	NONE
 	"sh"
 	"shell"
@@ -948,13 +954,14 @@ scrnextdw	NONE
 setfillcol	NONE
 	"set-fill-column"
 	'^X-f'
-multimotion		MOTION
-	"multi-motion"			!FEWNAMES
+multimotion		MOTION		OPT_SELECTIONS
+	"quoted-motion"			!FEWNAMES
 	'q'
-multimotionrectangle		MOTION
-	"multi-rectangular-motion"	!FEWNAMES
+	'FN-s'				KEY_Select
+multimotionrectangle		MOTION	OPT_SELECTIONS
+	"quoted-rectangular-motion"	!FEWNAMES
 	'^A-q'
-ue_setkey	NONE			CRYPT
+ue_setkey	NONE			OPT_ENCRYPT
 	"set-crypt-key"
 	'^X-X'
 setlocmode	NONE|(EXRCOK|EXTRA)
@@ -972,7 +979,7 @@ setnmmark	NONE|(FROM|EXTRA|NOMOVE)
 setvar		NONE			OPT_EVAL
 	"setv"
 	"set-variable"
-setvmalloc	NONE			VMALLOC
+setvmalloc	NONE			OPT_VRFY_MALLOC
 	"vmalloc"
 	'^X-v'
 showcpos	NONE
@@ -990,25 +997,25 @@ listmodes	NONE
 	"showmodes"
 	"showgmodes"
 listvars	NONE			OPT_SHOW_EVAL
-	"list-vars"			!FEWNAMES
-	"show-vars"
+	"list-variables"		!FEWNAMES
+	"show-variables"
 	"showvars"			!FEWNAMES
 showversion	NONE|(EXRCOK)
 	"version"
-showmemory	NONE			MSDOS&&(TURBO|WATCOM|DJGPP)
+showmemory	NONE			SYS_MSDOS&&(CC_TURBO||CC_WATCOM||CC_DJGPP)
 	"memory"
 showtagstack	NONE			OPT_SHOW_TAGS
 	"tags"				!FEWNAMES
 	"tagstack"
+	"show-tagstack"
 shrinkwind	NONE
 	"shrink-window"			!FEWNAMES
 	'v'
 source		NONE|(EXRCOK|NAMEDF)
 	"exsource"
 spawn		NONE
-#	"!"
 	"shell-command"			!FEWNAMES
-speckey		NONE
+poundc_func	NONE
 	"function-prefix"
 	'#'
 splitwind	NONE
@@ -1016,7 +1023,7 @@ splitwind	NONE
 	'^X-2'
 storemac	NONE
 	"store-macro"
-storeproc	NONE			PROC
+storeproc	NONE			OPT_PROCEDURES
 	"store-procedure"
 subst_again	REDO|UNDO|GLOBOK
 	"substitute-again"		!FEWNAMES
@@ -1038,7 +1045,7 @@ backundo	NONE
 forwredo	NONE
 	"redo-changes-forward"		!FEWNAMES
 	'^X-r'
-unarg		NONE
+unarg_func		NONE
 	"universal-argument"		!FEWNAMES
 	'K'
 unimpl		NONE
@@ -1049,7 +1056,7 @@ unmap		NONE|(EXRCOK|BANG|EXTRA)
 	"unmap"
 unmap_bang	NONE|(EXRCOK|EXTRA)
 	"unmap!"
-untagpop	NONE			TAGS
+untagpop	NONE			OPT_TAGS
 	"pop"
 	"untag-pop"			!FEWNAMES
 	'^X-^]'
@@ -1067,7 +1074,7 @@ userbeep	NONE			!SMALLER
 	"beep"
 visual		NONE
 	"visual"
-vglobals	NONE			GLOBALS
+vglobals	NONE
 	"ov"
 viewfile	NONE
 	"view-file"
@@ -1086,6 +1093,12 @@ writemsg	NONE			!SMALLER
 yankline	NONE
 	"yank-line"			!FEWNAMES
 	'Y'
+xterm_mouse_M	NONE			OPT_XTERM
+	'FN-M'				KEY_Mouse
+xterm_mouse_t	NONE			(OPT_XTERM>=3)
+	'FN-t'				KEY_text
+xterm_mouse_T	NONE			(OPT_XTERM>=3)
+	'FN-T'				KEY_textInvalid
 zzquit		NONE|(BANG|NL)
 	'Z'
 	"stuttered-write-all-and-quit"
