@@ -12,7 +12,10 @@
 # The modes are table entries in the BUFFER and WINDOW structures.
 #
 # $Log: modetbl,v $
-# Revision 1.6  1993/03/18 17:40:31  pgf
+# Revision 1.7  1993/04/08 11:09:27  pgf
+# implemented horizscroll mode
+#
+# Revision 1.6  1993/03/18  17:40:31  pgf
 # renamed VITABPOS to ALTTABPOS
 #
 # Revision 1.5  1993/03/16  10:53:21  pgf
@@ -85,6 +88,7 @@ regex						# VAL_ prefix
 bool						# WMD prefix
 	"LIst"		LIST		WFHARD		# "list" mode -- show tabs and EOL
 	"NUmber"	NUMBER		WFMODE|WFHARD	# line-numbers shown
+	"HorizScroll"	HORSCROLL	0	# scroll whole screen
 int							# VAL_ prefix
 	"SIDEways"	SIDEWAYS	WFMODE|WFHARD
 color

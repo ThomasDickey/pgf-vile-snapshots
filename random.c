@@ -3,7 +3,10 @@
  * commands. There is no functional grouping here, for sure.
  *
  * $Log: random.c,v $
- * Revision 1.89  1993/04/01 13:06:31  pgf
+ * Revision 1.90  1993/04/08 14:59:16  pgf
+ * moved istring() to insert.c
+ *
+ * Revision 1.89  1993/04/01  13:06:31  pgf
  * turbo C support (mostly prototypes for static)
  *
  * Revision 1.88  1993/03/25  19:50:58  pgf
@@ -951,50 +954,9 @@ int milli;
 #endif
 }
 
-#if ! SMALLER
-int
-istring(f, n)	/* ask for and insert a string into the current
-		   buffer at the current point */
-int f, n;
-{
-	register char *tp;	/* pointer into string to add */
-	register int status;	/* status return code */
-	static char tstring[NPAT+1];	/* string to add */
-
-	/* ask for string to insert */
-	status = mlreply("String to insert: ", tstring, NPAT);
-	if (status != TRUE)
-		return(status);
-
-	if (f == FALSE)
-		n = 1;
-
-	if (n < 0)
-		n = - n;
-
-	/* insert it */
-	while (n--) {
-		tp = &tstring[0];
-		while (*tp) {
-			if (*tp == '\n')
-				status = lnewline();
-			else
-				status = linsert(1, *tp);
-			++tp;
-			if (status != TRUE)
-				return(status);
-		}
-	}
-
-	return(TRUE);
-}
-#endif
-
 #if UNIX
 #include	<sys/param.h>
 #endif
-
-
 
 /* return a string naming the current directory */
 char *

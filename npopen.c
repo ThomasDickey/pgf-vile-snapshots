@@ -2,7 +2,10 @@
  *		written by John Hutchinson, heavily modified by Paul Fox
  *
  * $Log: npopen.c,v $
- * Revision 1.21  1993/04/01 12:53:33  pgf
+ * Revision 1.22  1993/04/09 13:41:01  pgf
+ * include sys/wait.h on LINUX, to get prototype
+ *
+ * Revision 1.21  1993/04/01  12:53:33  pgf
  * removed redundant includes and declarations
  *
  * Revision 1.20  1993/03/25  19:50:58  pgf
@@ -77,6 +80,10 @@
 
 #include <errno.h>
 #include <sys/param.h>
+
+#if LINUX
+#include <sys/wait.h>
+#endif
 
 #if !SMALLER
 #define	user_SHELL()	gtenv("shell")

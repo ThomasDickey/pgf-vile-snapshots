@@ -4,7 +4,10 @@
  *	written 1986 by Daniel Lawrence	
  *
  * $Log: exec.c,v $
- * Revision 1.45  1993/04/01 13:06:31  pgf
+ * Revision 1.46  1993/04/09 13:35:49  pgf
+ * take "onamedcmd" out of action
+ *
+ * Revision 1.45  1993/04/01  13:06:31  pgf
  * turbo C support (mostly prototypes for static)
  *
  * Revision 1.44  1993/04/01  12:01:30  pgf
@@ -689,6 +692,7 @@ int		*zerop;
 	return TRUE;
 }
 
+#ifdef UNUSED
 /* old namedcmd:	execute a named command even if it is not bound */
 int
 onamedcmd(f, n)
@@ -721,6 +725,7 @@ int f, n;	/* command arguments [passed through to command executed] */
 
 	return s;
 }
+#endif
 
 #if NEVER
 /*	execcmd:	Execute a command line command by name alone */

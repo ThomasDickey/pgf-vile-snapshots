@@ -14,7 +14,13 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.103  1993/04/01 14:43:16  pgf
+ * Revision 1.105  1993/04/09 13:36:47  pgf
+ * made the dummy functions more real, so that prototypes work
+ *
+ * Revision 1.104  1993/04/08  11:09:27  pgf
+ * implemented horizscroll mode
+ *
+ * Revision 1.103  1993/04/01  14:43:16  pgf
  * typo -- missing semicolon
  *
  * Revision 1.102  1993/04/01  13:07:50  pgf
@@ -1118,7 +1124,6 @@ global_val_init()
 	set_global_b_val(MDIGNCASE,FALSE); 	/* exact matches */
 	set_global_b_val(MDDOS,FALSE);		/* dos mode */
 	set_global_b_val(MDMAGIC,TRUE); 	/* magic searches */
-	set_global_b_val(WMDNUMBER,FALSE);	/* number */
 	set_global_b_val(MDSHOWMAT,FALSE);	/* show-match */
 	set_global_b_val(MDSHOWMODE,TRUE);	/* show-mode */
 	set_global_b_val(MDSWRAP,TRUE); 	/* scan wrap */
@@ -1174,6 +1179,9 @@ global_val_init()
 	set_global_w_val(WVAL_SIDEWAYS,0); /* list-mode */
 	set_global_w_val(WVAL_FCOLOR,7); /* foreground color */
 	set_global_w_val(WVAL_BCOLOR,0); /* background color */
+	set_global_w_val(WMDNUMBER,FALSE);	/* number */
+	set_global_w_val(WMDHORSCROLL,TRUE);	/* horizontal scrolling */
+
 
 }
 
@@ -1502,20 +1510,26 @@ int f,n;
 	return TRUE;
 }
 
+/* ARGSUSED */
 int
-cntl_af()	/* dummy function for binding to control-a prefix */
+cntl_af(f,n)	/* dummy function for binding to control-a prefix */
+int f,n;
 {
 	return TRUE;
 }
 
+/* ARGSUSED */
 int
-cntl_xf()	/* dummy function for binding to control-x prefix */
+cntl_xf(f,n)	/* dummy function for binding to control-x prefix */
+int f,n;
 {
 	return TRUE;
 }
 
+/* ARGSUSED */
 int
-unarg() /* dummy function for binding to universal-argument */
+unarg(f,n) /* dummy function for binding to universal-argument */
+int f,n;
 {
 	return TRUE;
 }

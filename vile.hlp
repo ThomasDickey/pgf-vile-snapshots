@@ -580,6 +580,12 @@ Editor modes
 	fillcol (fc) Will prompt for a new value for the fill column, where
 		auto-wrapping and region formatting will break lines. (B)
 
+	horizscroll (hs) If the cursor is moved "off-screen", this mode
+		controls what happens.  If set (as it is by default), the
+		whole screen will shift sideways to make the cursor position
+		visible.  If not set, then only the current line will shift,
+		which may be desirable on slower displays. (W)
+
 	ignorecase (ic) Text searches normally match the pattern exactly.
 		With this set, searches are case-insensitive. (B)
 
