@@ -10,7 +10,13 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.165  1994/03/08 12:01:09  pgf
+ * Revision 1.167  1994/03/18 18:31:26  pgf
+ * cleanup of OPT_WORKING ifdefs
+ *
+ * Revision 1.166  1994/03/16  10:54:56  pgf
+ * switch over to cookie method of marking copied lines for undo
+ *
+ * Revision 1.165  1994/03/08  12:01:09  pgf
  * augmented region structure, kill-register struct, and some flag
  * sets to describe rectangles.
  *
@@ -275,9 +281,17 @@
 # endif
 #endif
 
+/* We use 'alarm()' as a timer to control a "working..." message */
 #if defined(SIGALRM) && !DJGPP
 # define HAS_ALARM 1
 #else
+# define HAS_ALARM 0
+#endif
+
+/* We suppress this on USG machines in case system calls are not restartable
+	after signals */
+#if USG && !defined(SA_RESTART)
+# undef HAS_ALARM
 # define HAS_ALARM 0
 #endif
 
@@ -421,9 +435,7 @@
 #define OPT_MAP_MEMORY 0	/* tiny systems can page out data */
 
 /* show "working..." message */
-/* we suppress this on USG machines in case system calls are not restartable
-	after signals */
-#define OPT_WORKING ((!USG || defined(SA_RESTART)) && HAS_ALARM && !SMALLER)
+#define OPT_WORKING (HAS_ALARM && !SMALLER)
 
 /* scrollbars */
 #define OPT_SCROLLBARS XTOOLKIT
@@ -1079,7 +1091,10 @@ typedef	struct	_tbuff	{
  */
 typedef	int		L_NUM;		/* line-number */
 typedef	int		C_NUM;		/* column-number */
-typedef	long		L_FLAG;		/* LINE-flags */
+typedef	struct {
+    unsigned short flgs;
+    unsigned short cook;
+} L_FLAG;		/* LINE-flags */
 
 typedef	ULONG		CMDFLAGS;	/* CMDFUNC flags */
 typedef	long		B_COUNT;	/* byte-count */
@@ -1127,7 +1142,7 @@ typedef struct	LINE {
 #endif
 	{
 	    LINEPTR	l_stklnk;	/* Link for undo stack		*/
-	    L_FLAG	l_flag;		/* flags for undo ops		*/
+	    L_FLAG	l_flg;		/* flags for undo ops		*/
 	} l;
 }	LINE;
 
@@ -1137,6 +1152,9 @@ typedef struct	LINE {
 #define l_back_offs	l_n_bo.l_bo
 #define l_text		lt.l_txt
 #define l_nextsep	lt.l_nxt
+
+#define l_undo_cookie	l_flg.cook
+#define l_flag		l_flg.flgs
 
 /* LINE.l_flag values */
 #define LCOPIED  lBIT(0)	/* original line is already on an undo stack */
@@ -1199,18 +1217,20 @@ typedef struct	LINE {
 #define lputc(lp, n, c) 	((lp)->l_text[(n)]=(c))
 #define llength(lp)		((lp)->l_used)
 
-#define liscopied(lp)		((lp)->l.l_flag & LCOPIED)
+#define liscopied(lp)		((lp)->l.l_undo_cookie == current_undo_cookie)
+#define lsetcopied(lp)		((lp)->l.l_undo_cookie = current_undo_cookie)
+#define lsetnotcopied(lp)	((lp)->l.l_undo_cookie = 0)
+
 #define lismarked(lp)		((lp)->l.l_flag & LGMARK)
-#define listrimmed(lp)		((lp)->l.l_flag & LTRIMMED)
-#define lsetcopied(lp)		((lp)->l.l_flag |= LCOPIED)
-#define lsetnotcopied(lp)	((lp)->l.l_flag &= ~LCOPIED)
 #define lsetmarked(lp)		((lp)->l.l_flag |= LGMARK)
 #define lsetnotmarked(lp)	((lp)->l.l_flag &= ~LGMARK)
 #define lflipmark(lp)		((lp)->l.l_flag ^= LGMARK)
+
+#define listrimmed(lp)		((lp)->l.l_flag & LTRIMMED)
 #define lsettrimmed(lp)		((lp)->l.l_flag |= LTRIMMED)
 #define lsetnottrimmed(lp)	((lp)->l.l_flag &= ~LTRIMMED)
 #if !OPT_MAP_MEMORY
-#define lsetclear(lp)		((lp)->l.l_flag = 0)
+#define lsetclear(lp)		((lp)->l.l_flag = (lp)->l.l_undo_cookie = 0)
 #endif
 
 #define lisreal(lp)		((lp)->l_used >= 0)

@@ -14,7 +14,13 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.169  1994/03/11 11:58:52  pgf
+ * Revision 1.171  1994/03/24 12:59:47  pgf
+ * replace lost bug
+ *
+ * Revision 1.170  1994/03/15  18:45:06  pgf
+ * disabled Watcom's showmemory() call
+ *
+ * Revision 1.169  1994/03/11  11:58:52  pgf
  * we now pass the name of the desired screen resolution directly to
  * the ibm screen driver via the current_res_name global.  any option
  * starting with a digit is considered a screen resolution, preserving
@@ -341,7 +347,7 @@ char	*argv[];
 		set_rdonly(bp, bp->b_fname);
 		(void)ffclose();
 
-		if (!isatty(fileno(stdout)) && is_empty_buf(bp)) {
+		if (is_empty_buf(bp)) {
 			(void)zotbuf(bp);
 			firstbp = lastbp;
 		}
@@ -1596,8 +1602,7 @@ int
 showmemory(f,n)
 int	f,n;
 {
-	extern	long	_memavl(void);
-	mlforce("Memory left: %D bytes", _memavl());
+	mlforce("Watcom C doesn't provide a very useful 'memory-left' call.");
 	return TRUE;
 }
 #endif

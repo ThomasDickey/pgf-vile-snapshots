@@ -3,7 +3,10 @@
  *		strings.
  *
  * $Log: path.c,v $
- * Revision 1.23  1994/02/22 11:03:15  pgf
+ * Revision 1.24  1994/03/24 12:10:07  pgf
+ * vms fix
+ *
+ * Revision 1.23  1994/02/22  11:03:15  pgf
  * truncated RCS log for 4.0
  *
  *
@@ -919,7 +922,7 @@ char *	path;
 	  &&	((sb.st_mode & S_IFMT) == S_IFDIR));
 }
 
-#if (UNIX||MSDOS) && PATHLOOK
+#if (UNIX||VMS||MSDOS) && PATHLOOK
 /*
  * Parse the next entry in a list of pathnames, returning null only when no
  * more entries can be parsed.

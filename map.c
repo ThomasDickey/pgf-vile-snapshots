@@ -3,7 +3,10 @@
  *		6/3/93
  *
  * $Log: map.c,v $
- * Revision 1.13  1994/02/22 11:03:15  pgf
+ * Revision 1.14  1994/03/22 16:26:53  pgf
+ * used updatescratch() for buffer animation triggering
+ *
+ * Revision 1.13  1994/02/22  11:03:15  pgf
  * truncated RCS log for 4.0
  *
  * 
@@ -185,11 +188,7 @@ BUFFER *bp;
 void
 relist_mappings()
 {
-	register BUFFER *bp;
-	if ((bp = find_b_name(MAPPED_LIST_NAME)) != 0) {
-		bp->b_upbuff = show_Mappings;
-		b_set_obsolete(bp);
-	}
+	update_scratch(MAPPED_LIST_NAME, show_Mappings);
 }
 #endif	/* OPT_UPBUFF */
 

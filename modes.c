@@ -8,8 +8,11 @@
  * Major extensions for vile by Paul Fox, 1991
  *
  *	$Log: modes.c,v $
- *	Revision 1.33  1994/02/22 11:03:15  pgf
- *	truncated RCS log for 4.0
+ *	Revision 1.34  1994/03/22 16:26:53  pgf
+ *	used updatescratch() for buffer animation triggering
+ *
+ * Revision 1.33  1994/02/22  11:03:15  pgf
+ * truncated RCS log for 4.0
  *
  *
  */
@@ -912,11 +915,7 @@ BUFFER *bp;
 void
 relist_settings()
 {
-	register BUFFER *bp;
-	if ((bp = find_b_name(MODES_LIST_NAME)) != 0) {
-		bp->b_upbuff = show_Settings;
-		b_set_obsolete(bp);
-	}
+	update_scratch(MODES_LIST_NAME, show_Settings);
 }
 #endif	/* OPT_UPBUFF */
 

@@ -2,7 +2,10 @@
  *		written by John Hutchinson, heavily modified by Paul Fox
  *
  * $Log: npopen.c,v $
- * Revision 1.33  1994/02/22 11:03:15  pgf
+ * Revision 1.34  1994/03/23 12:54:50  pgf
+ * both copies of npopen() should be silent on errors
+ *
+ * Revision 1.33  1994/02/22  11:03:15  pgf
  * truncated RCS log for 4.0
  *
  */
@@ -329,7 +332,6 @@ char *cmd, *type;
 		if (inout_popen((FILE **)0, &ff, cmd) == TRUE)
 			return ff;
 	}
-	mlerror("pipe");
 	return NULL;
 }
 

@@ -8,8 +8,11 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: insert.c,v $
- *	Revision 1.51  1994/03/11 13:57:31  pgf
- *	make backspace non-destructive in overwrite mode
+ *	Revision 1.52  1994/03/18 18:30:38  pgf
+ *	fixes for OPT_MAP_MEMORY compilation
+ *
+ * Revision 1.51  1994/03/11  13:57:31  pgf
+ * make backspace non-destructive in overwrite mode
  *
  * Revision 1.50  1994/03/08  12:10:13  pgf
  * changed 'fulllineregions' to 'regionshape'.
@@ -878,7 +881,7 @@ int *bracefp;
 		non-blank here, or on the nearest previous non-blank line. */
 	/* (at start of buffer, may leave us on empty line) */
 	do {
-	    if (backword(FALSE,1) == FALSE || llength(DOT.l) == 0) {
+	    if (backword(FALSE,1) == FALSE || lLength(DOT.l) == 0) {
 		    gomark(FALSE,1);
 		    return 0;
 	    }

@@ -472,12 +472,6 @@ like 40x12 or 40x25.
 
 ----------
 
-the 25 line mode should be the vga-ish 25-line mode on vga-capable machines.
-right now if you use "-2" or "set sres 25" you get the 200 scanline CGA style
-mode.  there may be a similar problem with ega cards.
-
--------------
-
 the ^W and ^R commands don't work with shell-files, i.e.
 	^WG!lpr
 or 
@@ -501,14 +495,6 @@ breaks a bunch of other stuff.
 ---------------------------------
 
 
-i broke the show-registers animation, intentionally.  it relied
-on a call to relist_registers() on _every_ call kdone.  i think tom
-didn't realize that kdone is called on _every_ kinsert, meaning we
-do the whole buffer find and possible (i assume we don't do it if
-it's not displayed?) recalc on every deleted or yanked character.
-
--------------------------
-
 width of a region is kept in units of offset, not of columns.
 i think this will break rectangular inserts of non-rectangular regions,
 where the longest line may not extend to the furthest column, due to
@@ -519,9 +505,7 @@ tabs in other lines.
 
 In vile 3.65 on SunOS 4.1.3, when I do execute-keyboard-macro while
 defining a keyboard macro, vile seems to go to an infinite loop (but can
-be stopped by Ctrl-C).  I guess this bug/feature come from the original
-MicroEmacs source code, but anyway, it would be nice if
-execute-keyboard-macro is disabled while defining the macro.
+be stopped by Ctrl-C).  
 
 -------------------------
 
@@ -535,3 +519,57 @@ using the % as a delimeter rather than /.
 
 This operation was not permitted until I had searched for something already.
 
+------------------------
+
+
+I found something strange in xvile: if a specify a startup file with @
+it dumps core:
+
+xvile @.vilerc
+
+segmentation fault (core dumped)
+
+[unreproducible here.  -pgf ]
+
+------------------------
+
+I compiled Xvile for hpux and had a problem with x11.c, because the X11R4
+Xos.h include file does its own definitions for struct timeval when USG
+is defined.  Thus I undefined USG before Xos.h was included and re-defined it
+afterwards, like
+
+#include        <X11/keysym.h>
+#ifdef USG
+#define RESTORE_USG
+#undef USG
+#endif
+#include        <X11/Xos.h>
+#ifdef RESTORE_USG
+#define USG
+#endif
+#include        <X11/Xatom.h>
+
+
+-------------------------------------------------------------------------------
+
+Hi, This is to report a 'xvile' v3.65 problem:
+
+- With the defaults (no ~/.vilerc), if I use :e to edit a file, then
+  use :e again, but instead of inputing a filename, if I press ^C it
+  aborts the action. However if I have ~/.vilerc
+	set-terminal name-complete \e
+  the above doesn't work (the interrupt function
+  doesn't work when completing a filename)...
+
+- Once I got a very strange thing -- with the "set-terminal" command in
+  my ~/.vilerc, I was editing several files. Then I tried to use the :e
+  command to bring in another file. But then I realized that's not what
+  I wanted, so I hit ^C (I'm not sure whether I hit ESC by accident or
+  not). Then 'xvile' displayed a "working..." note at the bottom right
+  corner -- after 2 or 3 seconds, the X server (X11R5, patch level 24,
+  SunOS 4.1.3) crashed!
+
+  However I couldn't reproduce this... I don't know what exactly I
+  typed... Just let you know...
+
+-------------------------

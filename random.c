@@ -3,7 +3,10 @@
  * commands. There is no functional grouping here, for sure.
  *
  * $Log: random.c,v $
- * Revision 1.119  1994/03/08 12:23:03  pgf
+ * Revision 1.120  1994/03/18 18:30:38  pgf
+ * fixes for OPT_MAP_MEMORY compilation
+ *
+ * Revision 1.119  1994/03/08  12:23:03  pgf
  * reworked the gocol/gotocol/getccol etc routines to provide slightly
  * different interface.  added getoff() routine.  moved region-oriented
  * functions to region.c
@@ -369,7 +372,7 @@ int n;
 		return TRUE;
 	}
 
-	DOT.o = llength(DOT.l) - 1;
+	DOT.o = lLength(DOT.l) - 1;
 	return FALSE;
 
 }

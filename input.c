@@ -3,7 +3,10 @@
  *		5/9/86
  *
  * $Log: input.c,v $
- * Revision 1.99  1994/02/22 11:03:15  pgf
+ * Revision 1.100  1994/03/24 12:04:37  pgf
+ * arrow key fix from tom
+ *
+ * Revision 1.99  1994/02/22  11:03:15  pgf
  * truncated RCS log for 4.0
  *
  */
@@ -435,10 +438,11 @@ int quoted;
 			else
 				record_char(c);
 		}
+		c = char2int(c);
 	}
 
 	/* and finally give the char back */
-	return lastkey = char2int(c);
+	return lastkey = c;
 }
 
 /*	KBD_KEY:	Get one keystroke.  system function keys are
@@ -460,7 +464,6 @@ kbd_key_loop:
 	c = tgetc(FALSE);
 
 #if ANSI_SPEC
-
 
 	if (c == ESC) {
 		int nextc;
@@ -601,6 +604,61 @@ kbd_escape_seq ()
 		c = SPEC | kbd_key();
 	}
 	return c;
+}
+
+/* Translate a 16-bit keycode to a string that will replay into the same code,
+ * i.e., when routed via 'kbd_escape_seq()'.  This differs from 'kcod2str()',
+ * which produces results that could be routed via 'kbd_seq()'.
+ */
+int
+kcod2escape_seq (c, ptr)
+int	c;
+char *	ptr;
+{
+	char	*base = ptr;
+
+	/* ...just for completeness */
+	if (c & CTLA) *ptr++ = cntl_a;
+	if (c & CTLX) *ptr++ = cntl_x;
+
+	/* ...this is why we're here */
+	if (c & SPEC) {
+		c = char2int(c);
+#if ANSI_SPEC
+		*ptr++ = ESC;
+		*ptr++ = SQUARE_LEFT;
+
+#endif
+#if	MSDOS | ST520
+		*ptr++ = 0;
+#endif
+
+#if	AMIGA
+		/* FIXME: untested 22-mar-94 dickey@software.org */
+		*ptr++ = 155;
+
+		/* first try to see if it is a cursor key */
+		if ((c < 'A' || c > 'D') && c != 'S' && c != 'T') {
+			int	d;
+
+			if (c != '~') {
+				/* decode a 3 char sequence */
+				d = c - ' ';
+				/* if a shifted function key, eat the tilde */
+				if (d >= '0' && d <= '9') {
+					*ptr++ = c;
+					c = '~';
+				}
+			}
+		}
+#endif
+
+#if  WANGPC
+		*ptr++ = 0x1F;
+#endif
+	}
+	*ptr++ = c;
+	return (int)(ptr - base);
 }
 
 /* get a string consisting of inclchartype characters from the current

@@ -10,21 +10,23 @@ C.  Feel free to do so if you'd like.
 The source for vile is always available for ftp from ftp.cayman.com in
 the directory pub/vile.
 
-This version of vile was built using the DJGPP compiler suite, a wonderful
-port of GCC to DOS, done by DJ Delorie.  It creates 32 bit extended apps,
-complete with virtual memory support.  This gives vile the ability to
-edit _very_ large files under DOS.  I highly recommend getting a copy
-of the DJGPP compiler if you want to port UNIX code to DOS.  The version I
-used was 1.11maint1.  I got my copy via ftp, from one of the big simtel
-mirror sites, probably oak.oakland.edu.  I don't remember.  Look in
-/pub/msdos/djgpp.  If you can't find a copy, let me know -- I'm required
-to help you find it.  I think.  Anyway, I will.
+    This version of vile was built using the Watcom C/386 compiler suite,
+    with the command "wmake -f makefile.wat".  Although the Watcom compiler
+    costs money (not a sin in and of itself :-), it is very stable and
+    reliable (for me).  It creates 32 bit extended apps, complete with
+    virtual memory support.  This gives vile the ability to edit very
+    large files under DOS.
 
-You'll need to have both vile.exe and go32.exe in your path to run vile.
+    You'll need to have both vile.exe and dos4gw.exe in your path to run
+    vile.
+    
+    (Other versions of vile for the PC have been built using the DJGPP
+    compiler, and needed the go32.exe extender to run.  This extender is
+    not needed with this version.  I would continue to use the DJGPP
+    compiler, because it is free software, and because the paging behavior
+    is better than with Watcom/DOS4gw, but vile won't run under windows
+    when i build that version.)
 
-(Earlier versions of vile for the PC were built using the Watcom compiler,
-and needed the Rational Systems dos4gw.exe extender to run.  This extender
-is no longer used.)
 
 Let me know about bugs/oddities when you use vile on a PC -- i probably don't
 use it as much as you do.

@@ -3,7 +3,10 @@
  *	X Toolkit support, Kevin Buettner, 2/94
  *
  * $Log: x11.c,v $
- * Revision 1.51  1994/03/11 14:02:19  pgf
+ * Revision 1.52  1994/03/24 12:12:17  pgf
+ * arrow/escape key fixes
+ *
+ * Revision 1.51  1994/03/11  14:02:19  pgf
  * many many changes from tom and kevin -- no more athena widget support,
  * scrollbars now supplied, a lot of cleanup.  feels good.
  *
@@ -2818,14 +2821,11 @@ SIZE_T	length;
 		 */
 		if (setwmark(ttrow, ttcol)) {	/* MK gets cursor */
 			LINE	*lp	= l_ref(MK.l);
-			int	first	= -1;
-			int	last	= -1;
+			int	first   = firstchar(lp);
+			int	last    = lastchar(lp);
 			CMDFUNC	*f = NULL;
 			extern CMDFUNC f_opendown_no_aindent;
 			extern CMDFUNC f_openup_no_aindent;
-
-			first = firstchar(lp);
-			last = lastchar(lp);
 
 			/* If the line contains only a single nonwhite,
 			 * we will insert before it.
@@ -3797,7 +3797,7 @@ x_wm_delwin(w, unused, ev, continue_to_dispatch)
 int
 x_is_pasting()
 {
-	return tb_more(PasteBuf);
+	return !kqempty(cur_win) || tb_more(PasteBuf);
 }
 
 /*
@@ -3946,75 +3946,79 @@ x_key_press(w, unused, ev, continue_to_dispatch)
     KeySym	keysym;
     int		num;
 
+    register int i, n;
+
+    static struct {
+	KeySym  key;
+	int     code;
+    } escapes[] = {
+	{XK_F11,     ESC},
+	/* Arrow keys */
+	{XK_Up,      SPEC|'A'},
+	{XK_Down,    SPEC|'B'},
+	{XK_Right,   SPEC|'C'},
+	{XK_Left,    SPEC|'D'},
+	/* page scroll */
+	{XK_Next,    SPEC|'n'},
+	{XK_Prior,   SPEC|'p'},
+	/* editing */
+	{XK_Insert,  SPEC|'i'},
+#if (ULTRIX || ultrix)
+	{DXK_Remove, SPEC|'r'},
+#endif
+	{XK_Find,    SPEC|'f'},
+	{XK_Select,  SPEC|'s'},
+	/* command keys */
+	{XK_Menu,    SPEC|'m'},
+	{XK_Help,    SPEC|'h'},
+	/* function keys */
+	{XK_F1,      SPEC|'1'},
+	{XK_F2,      SPEC|'2'},
+	{XK_F3,      SPEC|'3'},
+	{XK_F4,      SPEC|'4'},
+	{XK_F5,      SPEC|'5'},
+	{XK_F6,      SPEC|'6'},
+	{XK_F7,      SPEC|'7'},
+	{XK_F8,      SPEC|'8'},
+	{XK_F9,      SPEC|'9'},
+	{XK_F10,     SPEC|'0'},
+	{XK_F12,     SPEC|'@'},
+	{XK_F13,     SPEC|'#'},
+	{XK_F14,     SPEC|'$'},
+	{XK_F15,     SPEC|'%'},
+	{XK_F16,     SPEC|'^'},
+	{XK_F17,     SPEC|'&'},
+	{XK_F18,     SPEC|'*'},
+	{XK_F19,     SPEC|'('},
+	{XK_F20,     SPEC|')'},
+	/* keypad function keys */
+	{XK_KP_F1,   SPEC|'P'},
+	{XK_KP_F2,   SPEC|'Q'},
+	{XK_KP_F3,   SPEC|'R'},
+	{XK_KP_F4,   SPEC|'S'},
+    };
+
     if (ev->type != KeyPress)
 	return;
 
     num = XLookupString((XKeyPressedEvent *) ev, buffer, sizeof(buffer),
 		&keysym, (XComposeStatus *) 0);
 
+    if (num <= 0) {
+	for (n = 0; n < SIZEOF(escapes); n++) {
+	    if (keysym == escapes[n].key) {
+		num = kcod2escape_seq(escapes[n].code, buffer);
+		break;
+	    }
+	}
+    }
+
     /* FIXME: Should do something about queue full conditions */
     if (num > 0) {
-	register int i;
 	for (i=0; i<num && !kqfull(cur_win); i++)
 	    kqadd(cur_win, buffer[i]);
-	return;
     }
 
-    if (keysym == XK_F11) {
-	kqadd(cur_win, ESC);
-	return;
-    }
-
-    switch (keysym) {
-	/* Arrow keys */
-	case XK_Up:		num = 'A';	break;
-	case XK_Down:		num = 'B';	break;
-	case XK_Right:		num = 'C';	break;
-	case XK_Left:		num = 'D';	break;
-	/* page scroll */
-	case XK_Next:		num = 'n';	break;
-	case XK_Prior:		num = 'p';	break;
-	/* editing */
-	case XK_Insert:		num = 'i';	break;
-#if (ULTRIX || ultrix)
-	case DXK_Remove:	num = 'r';	break;
-#endif
-	case XK_Find:		num = 'f';	break;
-	case XK_Select:		num = 's';	break;
-	/* command keys */
-	case XK_Menu:		num = 'm';	break;
-	case XK_Help:		num = 'h';	break;
-	/* function keys */
-	case XK_F1:		num = '1';	break;
-	case XK_F2:		num = '2';	break;
-	case XK_F3:		num = '3';	break;
-	case XK_F4:		num = '4';	break;
-	case XK_F5:		num = '5';	break;
-	case XK_F6:		num = '6';	break;
-	case XK_F7:		num = '7';	break;
-	case XK_F8:		num = '8';	break;
-	case XK_F9:		num = '9';	break;
-	case XK_F10:		num = '0';	break;
-	case XK_F12:		num = '@';	break;
-	case XK_F13:		num = '#';	break;
-	case XK_F14:		num = '$';	break;
-	case XK_F15:		num = '%';	break;
-	case XK_F16:		num = '^';	break;
-	case XK_F17:		num = '&';	break;
-	case XK_F18:		num = '*';	break;
-	case XK_F19:		num = '(';	break;
-	case XK_F20:		num = ')';	break;
-	/* keypad function keys */
-	case XK_KP_F1:		num = 'P';	break;
-	case XK_KP_F2:		num = 'Q';	break;
-	case XK_KP_F3:		num = 'R';	break;
-	case XK_KP_F4:		num = 'S';	break;
-	default:		num = 0;	break;
-    }
-    if (num) {
-	kqadd(cur_win, poundc);
-	kqadd(cur_win, num);
-    }
 }
 
 /*
