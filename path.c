@@ -3,7 +3,10 @@
  *		strings.
  *
  * $Log: path.c,v $
- * Revision 1.14  1993/07/06 16:39:04  pgf
+ * Revision 1.15  1993/07/09 13:59:37  pgf
+ * comment on djgcc ifdef
+ *
+ * Revision 1.14  1993/07/06  16:39:04  pgf
  * integrated Tuan DANG's changes for the djgpp compiler under DOS
  *
  * Revision 1.13  1993/06/25  11:25:55  pgf
@@ -721,7 +724,7 @@ char *path;
 		len = strlen(strcpy(temp, cwd));
 		temp[len++] = slash;
 #if GO32
-		temp[0] = slash;
+		temp[0] = slash;  /* DJGCC returns '/', we may want '\' */
 #endif
 		(void)strcpy(temp + len, f);
 		(void)strcpy(path, temp);

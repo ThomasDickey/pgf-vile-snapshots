@@ -2,7 +2,10 @@
  * code by Paul Fox, original algorithm mostly by Julia Harper May, 89
  *
  * $Log: undo.c,v $
- * Revision 1.36  1993/07/07 16:31:59  pgf
+ * Revision 1.37  1993/07/09 19:26:30  pgf
+ * add static decl to setupuline()
+ *
+ * Revision 1.36  1993/07/07  16:31:59  pgf
  * typo maintenance
  *
  * Revision 1.35  1993/07/07  15:30:33  pgf
@@ -833,7 +836,7 @@ int stkindx;
 	return TRUE;
 }
 
-void
+static void
 setupuline(lp)
 LINEPTR lp;
 {

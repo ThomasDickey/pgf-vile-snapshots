@@ -4,7 +4,12 @@
  *	Filename prompting and completion routines
  *
  * $Log: filec.c,v $
- * Revision 1.20  1993/07/07 10:15:04  pgf
+ * Revision 1.21  1993/07/09 19:10:27  pgf
+ * changed a couple of routine names -- it looked like watcom might
+ * have been doing caseless symbol compares, making trailing_slash() and
+ * trailing_SLASH() match, and also force_slash/force_SLASH.
+ *
+ * Revision 1.20  1993/07/07  10:15:04  pgf
  * fix coredump on filecompletion, by making sure BFSIZES bit is cleared
  * when building MyBuff
  *
@@ -107,8 +112,8 @@ free_expansion P(( void ))
 
 static	int	trailing_slash P((char *));
 static	int	force_slash P((char *));
-static	int	trailing_SLASH P((char *));
-static	int	force_SLASH P((char *));
+static	int	trailing__SLASH P((char *));
+static	int	force__SLASH P((char *));
 static	void	conv_path P((char *, char *, int));
 static	int	pathcmp P((LINE *, char *));
 static	LINE *	makeString P((BUFFER *, LINE *, char *));
@@ -158,7 +163,7 @@ char *	path;
  * Test if the path has a trailing SLASH-delimiter
  */
 static int
-trailing_SLASH(path)
+trailing__SLASH(path)
 char *	path;
 {
 	register int	len = strlen(path);
@@ -171,12 +176,12 @@ char *	path;
  * resulting path.
  */
 static int
-force_SLASH(path)
+force__SLASH(path)
 char *	path;
 {
 	register int	len = strlen(path);
 
-	if (!trailing_SLASH(path)) {
+	if (!trailing__SLASH(path)) {
 		path[len++] = SLASH;
 		path[len] = EOS;
 	}
@@ -252,10 +257,10 @@ char *	text;
 	 * be a directory.  Append a slash to the tst-value in that case to
 	 * force a match if it is otherwise the same.
 	 */
-	if (trailing_SLASH(ref))
-		(void)force_SLASH(tst);
-	else if (trailing_SLASH(tst))
-		(void)force_SLASH(ref);
+	if (trailing__SLASH(ref))
+		(void)force__SLASH(tst);
+	else if (trailing__SLASH(tst))
+		(void)force__SLASH(ref);
 
 	/* count the slashes embedded in text-string */
 	for (j = k = 0; tst[j] != EOS; j++)

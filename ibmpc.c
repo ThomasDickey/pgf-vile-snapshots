@@ -10,7 +10,13 @@
  * display type.
  *
  * $Log: ibmpc.c,v $
- * Revision 1.18  1993/07/06 16:39:04  pgf
+ * Revision 1.20  1993/07/09 19:11:48  pgf
+ * fixed typo for watcom
+ *
+ * Revision 1.19  1993/07/09  14:03:30  pgf
+ * oops.  inp() has only one arg
+ *
+ * Revision 1.18  1993/07/06  16:39:04  pgf
  * integrated Tuan DANG's changes for the djgpp compiler under DOS
  *
  * Revision 1.17  1993/06/25  11:25:55  pgf
@@ -77,7 +83,7 @@
 #define min(a,b) (((a) < (b)) ? (a) : (b))
 #define max(a,b) (((a) > (b)) ? (a) : (b))
 #define outp(p,v) outportb(p,v)
-#define inp(p) inportb(p,v)
+#define inp(p) inportb(p)
 #endif
   
 
@@ -114,7 +120,7 @@
 #ifdef __WATCOMC__
 #define	INTX86(a,b,c)	int386(a, b, c)
 #define	_AX_		eax
-#define	_CX_		cax
+#define	_CX_		ecx
 #else
 #define	INTX86(a,b,c)	int86(a, b, c)
 #define	_AX_		ax

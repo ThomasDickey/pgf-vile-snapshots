@@ -2,7 +2,14 @@
  * 	X11 support, Dave Lemke, 11/91
  *
  * $Log: x11.c,v $
- * Revision 1.18  1993/06/18 15:57:06  pgf
+ * Revision 1.20  1993/07/08 15:13:21  pgf
+ * removed inadvertent debug code
+ *
+ * Revision 1.19  1993/07/08  15:04:58  pgf
+ * up max columns from 150 to 200 -- my screen is 164.  reduce max rows
+ * from 200 to 100.
+ *
+ * Revision 1.18  1993/06/18  15:57:06  pgf
  * tom's 3.49 changes
  *
  * Revision 1.17  1993/05/05  11:18:08  pgf
@@ -671,8 +678,8 @@ x_open()
 
 
     /* these can go bigger, but they suck up lots of VM if they do */
-    term.t_mcol = 160;		/* XXX */
-    term.t_mrow = 150;		/* XXX */
+    term.t_mcol = 200;		/* XXX */
+    term.t_mrow = 100;		/* XXX */
 
     xsh.flags = PPosition | PResizeInc | PSize | PMaxSize;
     if (flags & (XValue | YValue))

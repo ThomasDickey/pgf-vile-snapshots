@@ -8,8 +8,35 @@
  *	See the file "cmdtbls" for input data formats, and "estruct.h" for
  *	the output structures.
  *
+ * Heavily modified/enhanced to also generate the table of mode and variable
+ * names and their #define "bindings", based on input from the file modetbl,
+ * by Tom Dickey, 1993.    -pgf
+ *
+ *
  * $Log: mktbls.c,v $
- * Revision 1.27  1993/07/06 16:39:04  pgf
+ * Revision 1.33  1993/07/09 19:30:13  pgf
+ * changed name of all_FUNCs to not be caseless-compared identical to
+ * all_funcs, for the watcom compiler.  (there's probably a compiler option
+ * i'm missing somewhere for this)
+ *
+ * Revision 1.32  1993/07/09  19:13:52  pgf
+ * adde commentary, to mention the new role of modetbl, and to give tom
+ * credit....
+ *
+ * Revision 1.31  1993/07/09  14:02:50  pgf
+ * djgcc doesn't like the fprintf prototype
+ *
+ * Revision 1.30  1993/07/09  09:45:44  pgf
+ * be sure we malloc enough space for the longer symbol names
+ *
+ * Revision 1.29  1993/07/08  14:00:41  pgf
+ * last change didn't work -- let's try "s_name__" instead
+ *
+ * Revision 1.28  1993/07/08  13:52:22  pgf
+ * make generated symbols more unique: _s_name_ instead of s_name.  there
+ * was a conflict with a typedef of signed char to s_char on mips/osf1.
+ *
+ * Revision 1.27  1993/07/06  16:39:04  pgf
  * integrated Tuan DANG's changes for the djgpp compiler under DOS
  *
  * Revision 1.26  1993/07/01  16:15:54  pgf
@@ -156,7 +183,7 @@ extern char *malloc();
 #define	Fprintf	(void)fprintf
 #define	Sprintf	(void)sprintf
 
-#if defined(lint) || defined(__GNUC__)
+#if defined(lint) || (defined(__GNUC__) && !defined(__GO32__))
 #if !LINUX && defined(__STDC__)		/* this ifdef needs work, clearly */
 extern       int     fprintf(FILE *, char *, ... );
 #else
@@ -179,7 +206,7 @@ typedef	struct stringl {
 
 static	LIST	*all_names,
 		*all_funcs,	/* data for extern-lines in nefunc.h */
-		*all_FUNCs,	/* data for {}-lines in nefunc.h */
+		*all__FUNCs,	/* data for {}-lines in nefunc.h */
 		*all_envars,
 		*all_ufuncs,
 		*all_modes,	/* data for name-completion of modes */
@@ -666,7 +693,8 @@ char	*name;
 	register char c;
 
 	/* allocate enough for adjustment in 'Name2Address()' */
-	base = dst = malloc((unsigned)(strlen(name) + 3));
+	/*   "+ 10" for comfort */
+	base = dst = malloc((unsigned)(strlen(name) + 10));
 
 	*dst++ = 's';
 	*dst++ = '_';
@@ -675,6 +703,8 @@ char	*name;
 			c = '_';
 		*dst++ = c;
 	}
+	*dst++ = '_';
+	*dst++ = '_';
 	*dst = '\0';
 	return base;
 }
@@ -685,7 +715,8 @@ Name2Address(name, type)
 char	*name;
 char	*type;
 {
-	char	*base = malloc((unsigned)(strlen(name) + 7));
+	/*  "+ 10" for comfort */
+	char	*base = malloc((unsigned)(strlen(name) + 10));
 	char	*temp;
 
 	temp = Name2Symbol(name);
@@ -1225,12 +1256,12 @@ char	*old_cond;
 	if (strcmp(cond, old_cond)) {
 		if (*old_cond) {
 			SaveEndif(all_funcs);
-			SaveEndif(all_FUNCs);
+			SaveEndif(all__FUNCs);
 		}
 		if (*cond) {
 			Sprintf(temp, "#if %s", cond);
 			InsertOnEnd(&all_funcs, temp);
-			InsertOnEnd(&all_FUNCs, temp);
+			InsertOnEnd(&all__FUNCs, temp);
 		}
 		(void)strcpy(old_cond, cond);
 	}
@@ -1242,7 +1273,7 @@ char	*old_cond;
 	s = append(append(append(s, "= { "), func), ",");
 	(void)PadTo(56, temp);
 	(void)append(append(s, flags), " };");
-	InsertOnEnd(&all_FUNCs, temp);
+	InsertOnEnd(&all__FUNCs, temp);
 }
 
 static void
@@ -1605,7 +1636,7 @@ char    *argv[];
 
 	if (*old_fcond) {
 		SaveEndif(all_funcs);
-		SaveEndif(all_FUNCs);
+		SaveEndif(all__FUNCs);
 	}
 
 	if (all_names) {
@@ -1615,7 +1646,7 @@ char    *argv[];
 		dump_names();
 		dump_bindings();
 		dump_funcs(all_funcs);
-		dump_funcs(all_FUNCs);
+		dump_funcs(all__FUNCs);
 	}
 
 	if (all_envars) {

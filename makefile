@@ -68,7 +68,7 @@ DESTDIR2 = $(HOME)/bin
 REMOTE=gutso!foxharp
 
 #CC = gcc
-#OPTFLAGS = -g -O -Wall -Wshadow -Wconversion -Wstrict-prototypes -Wmissing-prototypes
+#OPTFLAGS = -g -O -Wall -Wshadow # -Wconversion -Wstrict-prototypes -Wmissing-prototypes
 
 CC = cc
 #OPTFLAGS = -g
@@ -542,7 +542,10 @@ random.$O:	glob.h
 vmalloc$O:	nevars.h
 
 # $Log: makefile,v $
-# Revision 1.112  1993/07/06 16:55:58  pgf
+# Revision 1.113  1993/07/08 10:41:15  pgf
+# turn off the strict gcc warnings by default -- we don't pass yet.
+#
+# Revision 1.112  1993/07/06  16:55:58  pgf
 # added makefile.djg for dj gcc
 #
 # Revision 1.111  1993/06/25  15:05:12  pgf

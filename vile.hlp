@@ -612,7 +612,8 @@ Editor modes
 		buffer if the majority of lines ended that way.  If global
 		DOS mode is _not_ set, then incoming CR characters will be
 		visible on the screen.  Setting this makes editing binary
-		files unreliable.  (B)
+		files unreliable.  (This mode is set _on_ in DOS versions
+		of vile, and should be turned off if doing binary editing.) (B)
 
 	fcolor	On systems supporting this, will set the foreground color.
 		Currently only DOS can do color, although the X11 version

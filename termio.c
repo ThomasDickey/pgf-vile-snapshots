@@ -4,7 +4,11 @@
  * All operating systems.
  *
  * $Log: termio.c,v $
- * Revision 1.75  1993/07/06 16:39:04  pgf
+ * Revision 1.76  1993/07/08 11:51:39  pgf
+ * use setvbuf if USG and POSIX_TERMIOS, since svr4 doesn't have setbuffer
+ * unless you have the ucb extensions (Solaris, anyway)
+ *
+ * Revision 1.75  1993/07/06  16:39:04  pgf
  * integrated Tuan DANG's changes for the djgpp compiler under DOS
  *
  * Revision 1.74  1993/06/25  11:25:55  pgf
@@ -360,7 +364,9 @@ ttopen()
 		perror("ttopen tcgetattr");
 		ExitProgram(BAD(1));
 	}
-#if ODT || ISC
+ /* the "|| USG" below is to support SVR4 -- let me know if
+ 	it conflicts on other systems */
+#if ODT || ISC || USG
 	setvbuf(stdout, tobuf, _IOLBF, TBUFSIZ);
 #else
   	setbuffer(stdout, tobuf, TBUFSIZ);
