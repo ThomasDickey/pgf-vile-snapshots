@@ -11,7 +11,10 @@
  * which means that the dot and mark values in the buffer headers are nonsense.
  *
  * $Log: line.c,v $
- * Revision 1.27  1992/11/19 09:10:16  foxharp
+ * Revision 1.28  1992/12/14 09:03:25  foxharp
+ * lint cleanup, mostly malloc
+ *
+ * Revision 1.27  1992/11/19  09:10:16  foxharp
  * renamed kdelete() to ksetup(), and created kdone() routine, which cleans
  * up a buffer that was setup if nothing was ever put in it
  *
@@ -138,7 +141,7 @@ register int	used;
 BUFFER *bp;
 {
 	register LINE	*lp;
-	register int	size;
+	register unsigned size;
 
 	/* lalloc(-1) is used by undo for placeholders */
 	if (used < 0)  {
@@ -149,12 +152,12 @@ BUFFER *bp;
 	/* see if the buffer LINE block has any */
 	if ((lp = bp->b_freeLINEs) != NULL) {
 		bp->b_freeLINEs = lp->l_nxtundo;
-	} else if ((lp = (LINE *) malloc(sizeof(LINE))) == NULL) {
+	} else if ((lp = typealloc(LINE)) == NULL) {
 		mlforce("[OUT OF MEMORY]");
 		return NULL;
 	}
 	lp->l_text = NULL;
-	if (size && (lp->l_text = malloc(size)) == NULL) {
+	if (size && (lp->l_text = castalloc(char,size)) == NULL) {
 		mlforce("[OUT OF MEMORY]");
 		poison(lp, sizeof(*lp));
 		free((char *)lp);
@@ -173,11 +176,11 @@ register LINE	*lp;
 register int	howmuch;
 BUFFER *bp;
 {
-	register int	size;
+	register unsigned size;
 	char *ntext;
 
 	size = roundup(lp->l_size + howmuch);
-	ntext = (char *)malloc(size);
+	ntext = castalloc(char,size);
 	if (ntext == NULL) {
 		mlforce("[OUT OF MEMORY]");
 		return FALSE;
@@ -375,7 +378,7 @@ int n, c;
 	register int	i;
 	register WINDOW *wp;
 	register char	*ntext;
-	int nsize;
+	unsigned nsize;
 
 	lchange(WFEDIT);
 	lp1 = curwp->w_dot.l;			/* Current line 	*/
@@ -405,7 +408,8 @@ int n, c;
 	if (lp1->l_used+n > lp1->l_size) {	/* Hard: reallocate	*/
 		copy_for_undo(lp1);
 		/* first, create the new image */
-		if ((ntext=malloc(nsize = roundup(lp1->l_used+n))) == NULL)
+		nsize = roundup(lp1->l_used+n);
+		if ((ntext=castalloc(char,nsize)) == NULL)
 			return (FALSE);
 		if (lp1->l_text) /* possibly NULL if l_size == 0 */
 			memcpy(&ntext[0],      &lp1->l_text[0],    doto);
@@ -774,10 +778,10 @@ ldelnewline()
 	/* no room in line above, make room */
 	if (lp2->l_used > lp1->l_size-lp1->l_used) {
 		char *ntext;
-		int nsize;
+		unsigned nsize;
 		/* first, create the new image */
-		if ((ntext=malloc(nsize = roundup(lp1->l_used + lp2->l_used)))
-								 == NULL)
+		nsize = roundup(lp1->l_used + lp2->l_used);
+		if ((ntext=castalloc(char, nsize)) == NULL)
 			return (FALSE);
 		if (lp1->l_text) { /* possibly NULL if l_size == 0 */
 			memcpy(&ntext[0], &lp1->l_text[0], lp1->l_used);
@@ -895,7 +899,7 @@ int c;		/* character to insert in the kill buffer */
 
 	/* check to see if we need a new chunk */
 	if (kbp->kused >= KBLOCK || kbp->kbufh == NULL) {
-		if ((nchunk = (KILL *)malloc(sizeof(KILL))) == NULL)
+		if ((nchunk = typealloc(KILL)) == NULL)
 			return(FALSE);
 		if (kbp->kbufh == NULL)	/* set head ptr if first time */
 			kbp->kbufh = nchunk;

@@ -14,7 +14,10 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.88  1992/12/04 09:24:12  foxharp
+ * Revision 1.89  1992/12/14 09:03:25  foxharp
+ * lint cleanup, mostly malloc
+ *
+ * Revision 1.88  1992/12/04  09:24:12  foxharp
  * deleted unused assigns
  *
  * Revision 1.87  1992/12/02  09:13:16  foxharp
@@ -887,7 +890,7 @@ char ***argvp;
 
 	nargc = 0;
 	nargvmax = 2;		/* dimension of nargv[]		 */
-	if ((nargv = (char **)malloc(nargvmax * sizeof(char *))) == NULL) {
+	if ((nargv = typeallocn(char *, nargvmax) == NULL) {
 		mlforce("[OUT OF MEMORY]");
 		return;
 	}
@@ -895,7 +898,8 @@ char ***argvp;
 	for (i = 0; i < oargc; ++i) {
 		if (nargc + 2 >= nargvmax) {
 			nargvmax = nargc + 2;
-			if ((nargv = (char **) realloc(nargv, nargvmax * sizeof(char *))) == NULL) {
+			if ((nargv = typereallocn( char *, nargv, nargvmax))
+						== NULL) {
 				mlforce("[OUT OF MEMORY]");
 				return;
 			}
@@ -921,13 +925,13 @@ char ***argvp;
 #ifdef __ZTC__
 			p = findfirst(cp, 0);
 			while (p) {
-				if ((cp = malloc(path_size+strlen(p->name)+1))
-							== NULL)
+				if ((cp = castalloc(char,
+					path_size+strlen(p->name)+1)) == NULL)
 #else
 			j = _dos_findfirst(cp, 0, &p);
 			while (!j) {
-				if ((cp = malloc(path_size+strlen(p.name)+1))
-							== NULL)
+				if ((cp = castalloc(char,
+					path_size+strlen(p.name)+1)) == NULL)
 #endif
 				{
 					mlforce("[OUT OF MEMORY]");
@@ -1057,7 +1061,7 @@ char *
 strmalloc(s)
 char *s;
 {
-	char *ns = malloc(strlen(s)+1);
+	register char *ns = castalloc(char,strlen(s)+1);
 	if (ns)
 		return strcpy(ns,s);
 	else
@@ -1109,13 +1113,13 @@ global_val_init()
 	set_global_b_val_ptr(VAL_TAGS, strmalloc("tags")); /* tags filename */
 
 	/* suffixes for C mode */
-	rp = (struct regexval *)malloc(sizeof (struct regexval));
+	rp = typealloc(struct regexval);
 	set_global_b_val_rexp(VAL_CSUFFIXES, rp);
 	rp->pat = strmalloc("\\.[chs]$");
 	rp->reg = regcomp(rp->pat, TRUE);
 
 	/* where do paragraphs start? */
-	rp = (struct regexval *)malloc(sizeof (struct regexval));
+	rp = typealloc(struct regexval);
 	set_global_b_val_rexp(VAL_PARAGRAPHS, rp);
 	rp->pat = 
 		strmalloc("^\\.[ILPQ]P\\s\\|^\\.P\\s\\|^\\.LI\\s\\|\
@@ -1123,21 +1127,21 @@ global_val_init()
 	rp->reg = regcomp(rp->pat, TRUE);
 
 	/* where do comments start and end, for formatting them */
-	rp = (struct regexval *)malloc(sizeof (struct regexval));
+	rp = typealloc(struct regexval);
 	set_global_b_val_rexp(VAL_COMMENTS, rp);
 	rp->pat = 
 		strmalloc("^\\s/\\?[#*>]\\+/\\?\\s$");
 	rp->reg = regcomp(rp->pat, TRUE);
 
 	/* where do sections start? */
-	rp = (struct regexval *)malloc(sizeof (struct regexval));
+	rp = typealloc(struct regexval);
 	set_global_b_val_rexp(VAL_SECTIONS, rp);
 	rp->pat = strmalloc("^[{\014]\\|^\\.[NS]H\\s\\|^\\.HU\\?\\s\\|\
 ^\\.[us]h\\s\\|^+c\\s");
 	rp->reg = regcomp(rp->pat, TRUE);
 
 	/* where do sentences start? */
-	rp = (struct regexval *)malloc(sizeof (struct regexval));
+	rp = typealloc(struct regexval);
 	set_global_b_val_rexp(VAL_SENTENCES, rp);
 	rp->pat = strmalloc(
 	"[.!?][])\"']* \\?$\\|[.!?][])\"']*  \\|^\\.[ILPQ]P\\s\\|\
@@ -1152,6 +1156,7 @@ global_val_init()
 }
 
 #if UNIX || MSDOS
+/* ARGSUSED */
 SIGT
 catchintr(signo)
 int signo;
@@ -1481,19 +1486,22 @@ int f,n;
 	return TRUE;
 }
 
-void
+int
 cntl_af()	/* dummy function for binding to control-a prefix */
 {
+	return TRUE;
 }
 
-void
+int
 cntl_xf()	/* dummy function for binding to control-x prefix */
 {
+	return TRUE;
 }
 
-void
+int
 unarg() /* dummy function for binding to universal-argument */
 {
+	return TRUE;
 }
 
 /* initialize our version of the "chartypes" stuff normally in ctypes.h */
@@ -1727,7 +1735,7 @@ FILE *FF;
 #endif
 
 void
-start_debug_log(ac,av)
+start_debug_log(ac,av)	/* ARGSUSED */
 int ac;
 char **av;
 {

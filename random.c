@@ -3,7 +3,10 @@
  * commands. There is no functional grouping here, for sure.
  *
  * $Log: random.c,v $
- * Revision 1.79  1992/12/04 09:51:00  foxharp
+ * Revision 1.80  1992/12/14 09:03:25  foxharp
+ * lint cleanup, mostly malloc
+ *
+ * Revision 1.79  1992/12/04  09:51:00  foxharp
  * assume POSIX machines have getcwd.  they should.
  *
  * Revision 1.78  1992/12/04  09:14:36  foxharp
@@ -878,7 +881,7 @@ int milli;
 	struct timeval tval;
 	tval.tv_sec = 0;
 	tval.tv_usec = milli * 1000;	/* microseconds */
-	select (0, NULL, NULL, NULL, &tval);
+	select (0, (fd_set*)0, (fd_set*)0, (fd_set*)0, &tval);
 
 # else
 #  if HAVE_POLL
@@ -1023,7 +1026,7 @@ int drive;
 	if (cwds[drive-'A'])
 		return cwds[drive-'A'];
 	else
-		cwds[drive-'A'] = (char *)malloc(NFILEN);
+		cwds[drive-'A'] = castalloc(char,NFILEN);
 
 	if (!cwds[drive-'A'])
 		return current_directory(FALSE);
@@ -1050,7 +1053,7 @@ char *cwd;
 		return;
 
 	if (!cwds[drive-'A'])
-		cwds[drive-'A'] = (char *)malloc(NFILEN);
+		cwds[drive-'A'] = castalloc(char,NFILEN);
 
 	if (!cwds[drive-'A'])
 		return;

@@ -6,7 +6,10 @@
  * internal use.
  *
  * $Log: region.c,v $
- * Revision 1.19  1992/12/04 09:20:58  foxharp
+ * Revision 1.20  1992/12/13 13:34:25  foxharp
+ * got rid of extraneous assign
+ *
+ * Revision 1.19  1992/12/04  09:20:58  foxharp
  * deleted unused assigns
  *
  * Revision 1.18  1992/12/02  09:13:16  foxharp
@@ -202,8 +205,6 @@ shift_left_line()
 	register int	lim;
 	register int	s;
 	register LINE *linep = DOT.l;
-
-	i = 0;
 
 	s = curswval;
 

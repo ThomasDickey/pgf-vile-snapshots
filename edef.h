@@ -9,7 +9,13 @@
 
 /*
  * $Log: edef.h,v $
- * Revision 1.69  1992/12/04 09:49:50  foxharp
+ * Revision 1.71  1992/12/14 09:04:55  foxharp
+ * v. 3.28
+ *
+ * Revision 1.70  1992/12/14  09:03:25  foxharp
+ * lint cleanup, mostly malloc
+ *
+ * Revision 1.69  1992/12/04  09:49:50  foxharp
  * for you, eric, i'll make the version string numeric...
  *
  * Revision 1.68  1992/12/02  09:13:16  foxharp
@@ -250,7 +256,7 @@
 #endif
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version 3.27");
+decl_init( char version[], "version 3.28");
 
 decl_init( char slash, '/'); 		/* so DOS can use '\' as path separator */
 
@@ -464,7 +470,7 @@ decl_init( char	falsem[], "FALSE" );	/* false litereal		*/
 decl_init( int	cmdstatus, TRUE );	/* last command status		*/
 decl_uninit( char palstr[49] );		/* palette string		*/
 decl_uninit( char *fline );		/* dynamic return line		*/
-decl_uninit( int flen );		/* current length of fline	*/
+decl_uninit( unsigned flen );		/* current length of fline	*/
 
 #if FINDERR
 decl_init( char febuff[NBUFN], "" );	/* name of buffer to find errors in */

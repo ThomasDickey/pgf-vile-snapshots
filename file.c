@@ -6,7 +6,10 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.63  1992/12/05 13:55:06  foxharp
+ * Revision 1.64  1992/12/14 09:03:25  foxharp
+ * lint cleanup, mostly malloc
+ *
+ * Revision 1.63  1992/12/05  13:55:06  foxharp
  * rvstrcpy is now here, and ifdef'ed
  *
  * Revision 1.62  1992/12/04  09:26:43  foxharp
@@ -406,7 +409,7 @@ int f,n;
 			return FALSE;
 	}
 	if (ukb == 0)
-	        return ifile(insfname,TRUE,NULL);
+	        return ifile(insfname,TRUE,(FILE *)0);
 	else
 	        return kifile(insfname);
 }
@@ -439,7 +442,7 @@ int lockfl;		/* check the file for locks? */
 	/* oh well.  canonicalize the name, and try again */
 
 	if (!tbp) {
-		if ((tbp=(BUFFER *)malloc(sizeof(BUFFER))) == NULL)
+		if ((tbp = typealloc(BUFFER)) == NULL)
 			return FALSE;
 	}
 	tbp->b_fname = NULL;
@@ -670,13 +673,10 @@ int *nlinep;
 	if (len >= 65535)
 		return FIOMEM;
 #endif
-
-
-
 	/* leave an extra byte at the front, for the length of the first
 		line.  after that, lengths go in place of the newline at
 		the end of the previous line */
-	bp->b_ltext = (unsigned char *)malloc(len + 1);
+	bp->b_ltext = castalloc(unsigned char, len + 1);
 	if (bp->b_ltext == NULL)
 		return FIOMEM;
 
@@ -701,7 +701,8 @@ int *nlinep;
 				incomplete = TRUE;
 				/* we'll re-read the rest later */
 				ffseek(len);
-				np = (unsigned char *)realloc(bp->b_ltext, len);
+				np = castrealloc(unsigned char,
+							bp->b_ltext, len);
 				if (np == NULL) { /* ugh.  can this happen? */
 					  /* (we're _reducing_ the size...) */
 					ffrewind();
@@ -729,7 +730,7 @@ int *nlinep;
 		incomplete = TRUE;
 	} else {
 		/* allocate all of the line structs we'll need */
-		bp->b_LINEs = (LINE *)malloc(nlines * sizeof(LINE));
+		bp->b_LINEs = typeallocn(LINE,nlines);
 		if (bp->b_LINEs == NULL) {
 			free((char *)bp->b_ltext);
 			bp->b_ltext = NULL;

@@ -3,7 +3,15 @@
  * attached to keys that the user actually types.
  *
  * $Log: window.c,v $
- * Revision 1.16  1992/12/04 09:15:38  foxharp
+ * Revision 1.18  1992/12/14 09:36:50  foxharp
+ * now that sideways scrolling works on short lines, don't need to restrict user to
+ * certain cursor positions
+ *
+ * Revision 1.17  1992/12/14  08:32:20  foxharp
+ * fix for the sideways-shifted-but-deextended bug.  thanks to Tom Dickey.
+ * also lint cleanup.
+ *
+ * Revision 1.16  1992/12/04  09:15:38  foxharp
  * delete unused assigns
  *
  * Revision 1.15  1992/08/20  23:40:48  foxharp
@@ -324,11 +332,6 @@ int f,n;
 	else
 		move = term.t_ncol/3;
 
-	if (w_val(curwp, WVAL_SIDEWAYS) + move > getccol(FALSE) - 1) {
-		TTbeep();
-		return FALSE;
-	}
-
 	make_local_w_val(curwp,WVAL_SIDEWAYS);
 
 	w_val(curwp, WVAL_SIDEWAYS) += move;
@@ -342,14 +345,19 @@ int
 mvleftwind(f,n)
 int f,n;
 {
+	int	original;
 	make_local_w_val(curwp,WVAL_SIDEWAYS);
+	original = w_val(curwp,WVAL_SIDEWAYS);
 	if (f)
 		w_val(curwp, WVAL_SIDEWAYS) -= n;
 	else
 		w_val(curwp, WVAL_SIDEWAYS) -= term.t_ncol/3;
 
-	if (w_val(curwp, WVAL_SIDEWAYS) < 0)
+	if (w_val(curwp, WVAL_SIDEWAYS) < 0) {
+		if (original == 0)
+			TTbeep();
 		w_val(curwp, WVAL_SIDEWAYS) = 0;
+	}
 
         curwp->w_flag  |= WFHARD|WFMOVE;
 
@@ -486,7 +494,7 @@ int f,n;
                 mlforce("[Cannot split a %d line window]", curwp->w_ntrows);
                 return NULL;
         }
-        if ((wp = (WINDOW *) malloc(sizeof(WINDOW))) == NULL) {
+        if ((wp = typealloc(WINDOW)) == NULL) {
                 mlforce("[OUT OF MEMORY]");
                 return NULL;
         }
@@ -916,7 +924,7 @@ winit()
 {
         register WINDOW *wp;
 
-        wp = (WINDOW *) malloc(sizeof(WINDOW)); /* First window         */
+        wp = typealloc(WINDOW);			/* First window         */
         if (wp==NULL )
                 exit(1);
         wheadp = wp;

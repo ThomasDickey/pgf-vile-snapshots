@@ -6,7 +6,11 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.54  1992/12/04 09:12:25  foxharp
+ * Revision 1.55  1992/12/14 08:32:20  foxharp
+ * fix for the sideways-shifted-but-deextended bug.  thanks to Tom Dickey.
+ * also lint cleanup.
+ *
+ * Revision 1.54  1992/12/04  09:12:25  foxharp
  * deleted unused assigns
  *
  * Revision 1.53  1992/08/20  23:40:48  foxharp
@@ -212,6 +216,28 @@
 # endif
 #endif
 
+#ifndef __STDC__
+
+#ifndef va_dcl	 /* then try these out */
+
+typedef char *va_list;
+#define va_dcl int va_alist;
+#define va_start(list) list = (char *) &va_alist
+#define va_end(list)
+#define va_arg(list, mode) ((mode *)(list += sizeof(mode)))[-1]
+
+#endif
+
+#endif /* __STDC__ */
+
+#ifdef	lint
+# undef  va_dcl
+# define va_dcl char * va_alist;
+# undef  va_start
+# define va_start(list) list = (char *) &va_alist
+# undef  va_arg
+# define va_arg(ptr,cast) (cast)(ptr-(char *)0)
+#endif
 
 VIDEO   **vscreen;                      /* Virtual screen. */
 #if	! MEMMAP
@@ -239,14 +265,14 @@ vtinit()
     TTopen();		/* open the screen */
     TTkopen();		/* open the keyboard */
     TTrev(FALSE);
-    vscreen = (VIDEO **) malloc(term.t_mrow*sizeof(VIDEO *));
+    vscreen = typeallocn(VIDEO *,term.t_mrow);
 
     if (vscreen == NULL)
         exit(1);
 
 
 #if	! MEMMAP
-    pscreen = (VIDEO **) malloc(term.t_mrow*sizeof(VIDEO *));
+    pscreen = typeallocn(VIDEO *,term.t_mrow);
 
     if (pscreen == NULL)
         exit(1);
@@ -254,7 +280,7 @@ vtinit()
 
     for (i = 0; i < term.t_mrow; ++i) {
     	/* struct VIDEO already has 4 of the bytes */
-        vp = (VIDEO *) malloc(sizeof(struct VIDEO) + term.t_mcol - 4);
+        vp = typeallocplus(VIDEO, term.t_mcol - 4);
 
         if (vp == NULL)
             exit(1);
@@ -270,7 +296,7 @@ vtinit()
         vscreen[i] = vp;
 #if	! MEMMAP
     	/* struct VIDEO already has 4 of the bytes */
-        vp = (VIDEO *) malloc(sizeof(struct VIDEO) + term.t_mcol - 4);
+        vp = typeallocplus(VIDEO, term.t_mcol - 4);
 
         if (vp == NULL)
             exit(1);
@@ -773,6 +799,12 @@ updpos()
 	} else if (w_val(curwp,WVAL_SIDEWAYS) && curcol < 1) {
 		return updext_before();
 	} else {
+		if (vscreen[currow]->v_flag & VFEXT) {
+			l_to_vline(curwp,lp,currow);
+			vteeol();
+			/* this line no longer is extended */
+			vscreen[currow]->v_flag &= ~VFEXT;
+		}
 		return curcol;
 	}
 }
@@ -796,8 +828,10 @@ upddex()
 
 		while (i < wp->w_toprow + wp->w_ntrows) {
 			if (vscreen[i]->v_flag & VFEXT) {
-				if ((wp != curwp) || (lp != wp->w_dot.l) ||
-				   (curcol < term.t_ncol - 1)) {
+				if ((wp != curwp)
+				 || (lp != wp->w_dot.l)
+				 || ((i != currow)
+				  && (curcol < term.t_ncol - 1))) {
 					l_to_vline(wp,lp,i);
 					vteeol();
 					/* this line no longer is extended */
@@ -1046,19 +1080,18 @@ int	n;
 int
 updext_past()
 {
-	register int lbound, rcursor;
+	register int rcursor;
 
 	/* calculate what column the real cursor will end up in */
 	/* why is term.t_ncol in here? */
 	rcursor = ((curcol - term.t_ncol) % term.t_scrsiz) + term.t_margin;
-	lbound = curcol - rcursor;
-	taboff = lbound + w_val(curwp,WVAL_SIDEWAYS);
+	taboff = curcol - rcursor + w_val(curwp,WVAL_SIDEWAYS);
 
 	/* scan through the line outputing characters to the virtual screen */
 	/* once we reach the left edge					*/
 
 	/* start scanning offscreen */
-	vtmove(currow, -lbound-w_val(curwp,WVAL_SIDEWAYS));
+	vtmove(currow, -taboff);
 	vtset(DOT.l, curwp);
 
 	/* truncate the virtual line, restore tab offset */
@@ -1078,25 +1111,28 @@ updext_past()
 int
 updext_before()
 {
-	register int lbound, rcursor;
+	register int rcursor;
+
+	curcol = w_val(curwp,WVAL_SIDEWAYS) + curcol;
 
 	/* calculate what column the real cursor will end up in */
-	rcursor = (curcol % (term.t_ncol-term.t_margin));
-	lbound = curcol - rcursor + 1;
-	taboff = lbound;
+	rcursor = (curcol % (term.t_ncol - term.t_margin));
+	taboff = curcol - rcursor;
 
 	/* scan through the line outputing characters to the virtual screen */
 	/* once we reach the left edge					*/
-	vtmove(currow, -lbound);	/* start scanning offscreen */
+	vtmove(currow, -taboff);	/* start scanning offscreen */
 	vtset(DOT.l, curwp);
 
 	/* truncate the virtual line, restore tab offset */
 	vteeol();
 	taboff = 0;
 
-	/* and put a '<' in column 1 */
-	vscreen[currow]->v_text[0] = '<';
-	vscreen[currow]->v_flag |= (VFEXT | VFCHG);
+	if (curcol != rcursor) { /* ... put a '<' in column 1 */
+		vscreen[currow]->v_text[0] = '<';
+		vscreen[currow]->v_flag |= VFEXT;
+	}
+	vscreen[currow]->v_flag |= (VFEXT|VFCHG);
 	return rcursor;
 }
 
@@ -1507,22 +1543,6 @@ mlerase()
     TTflush();
     mpresf = FALSE;
 }
-
-
-
-#ifndef __STDC__
-
-#ifndef va_dcl	 /* then try these out */
-
-typedef char *va_list;
-#define va_dcl int va_alist;
-#define va_start(list) list = (char *) &va_alist
-#define va_end(list)
-#define va_arg(list, mode) ((mode *)(list += sizeof(mode)))[-1]
-
-#endif
-
-#endif /* __STDC__ */
 
 char *mlsavep;
 char mlsave[NSTRING];
@@ -2102,8 +2122,9 @@ int *widthp, *heightp;
 }
 
 #if defined( SIGWINCH) && ! X11
+/* ARGSUSED */
 SIGT
-sizesignal (signo)
+sizesignal(signo)
 int signo;
 {
 	int w, h;

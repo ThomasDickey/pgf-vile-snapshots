@@ -5,7 +5,10 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.25  1992/12/05 13:52:20  foxharp
+ * Revision 1.26  1992/12/14 09:03:25  foxharp
+ * lint cleanup, mostly malloc
+ *
+ * Revision 1.25  1992/12/05  13:52:20  foxharp
  * make the apollo compiler happy
  *
  * Revision 1.24  1992/12/03  00:32:59  foxharp
@@ -100,7 +103,9 @@
 #endif
 
 extern int main P(( int, char *[] ));
+#if MSDOS
 extern void expand_wild_args P(( int * , char ***));
+#endif /* MSDOS */
 extern void loop P(( void ));
 extern char * strmalloc P(( char * ));
 extern void global_val_init P(( void ));
@@ -203,7 +208,6 @@ extern int histbuff P(( int, int ));
 extern int altbuff P(( int, int ));
 extern int usebuffer P(( int, int ));
 extern int nextbuffer P(( int, int ));
-extern int prevbuffer P(( int, int ));
 extern void make_current P(( BUFFER * ));
 extern int swbuffer P(( BUFFER * ));
 extern void undispbuff P(( BUFFER *, WINDOW * ));
@@ -593,8 +597,10 @@ extern int eq P(( int, int ));
 extern int scrsearchpat P(( int, int ));
 extern int readpattern P(( char *, char *, regexp **, int, int ));
 extern void savematch P(( MARK, int ));
+#ifdef	LAZINESS
 extern void rvstrcpy P(( char *, char * ));
 extern void rvstrncpy P(( char *, char *, int ));
+#endif
 extern void scanboundry P(( int, MARK, int ));
 extern void nextch P(( MARK *, int ));
 extern int findpat P(( int, int, regexp *, int ));

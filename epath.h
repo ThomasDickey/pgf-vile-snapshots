@@ -7,7 +7,10 @@
 
 /*
  * $Log: epath.h,v $
- * Revision 1.6  1992/11/19 08:58:06  foxharp
+ * Revision 1.7  1992/12/14 09:03:25  foxharp
+ * lint cleanup, mostly malloc
+ *
+ * Revision 1.6  1992/11/19  08:58:06  foxharp
  * added HELP_LOC support -- set in makefile, as alternate place to put vile.hlp
  *
  * Revision 1.5  1992/08/20  23:40:48  foxharp
@@ -89,7 +92,9 @@ char *pathname[] =
 	"/usr/local/bin/",
 	"/usr/local/lib/",
 #ifdef HELP_LOC
+#ifndef lint	/* makefile gives inconsistent quoting for lint, compiler */
 	HELP_LOC,
+#endif	/* lint */
 #endif
 	""
 };

@@ -4,7 +4,10 @@
  *	Written (except for delins()) for vile by Paul Fox, (c)1990
  *
  * $Log: oneliner.c,v $
- * Revision 1.33  1992/12/07 23:32:29  foxharp
+ * Revision 1.34  1992/12/14 08:31:06  foxharp
+ * now handle \U \L \u \l \e in the replacement pattern.  thanks to eric krohn.
+ *
+ * Revision 1.33  1992/12/07  23:32:29  foxharp
  * fix backslash processing in the replacement pattern in delins()
  *
  * Revision 1.32  1992/05/19  09:14:27  foxharp
@@ -286,11 +289,11 @@ int needpats, use_opts;
 		if (gregexp) {
 			if (substexp)
 				free((char *)substexp);
-			substexp = (regexp *)malloc(gregexp->size);
+			substexp = castalloc(regexp,gregexp->size);
 			memcpy((char *)substexp, (char *)gregexp, gregexp->size);
 		}
 
-		if ((s = readpattern("replacement string: ", &rpat[0], NULL, c,
+		if ((s = readpattern("replacement string: ", &rpat[0], (regexp	**)0, c,
 				FALSE)) != TRUE) {
 			if (s == ABORT)
 				return FALSE;
@@ -453,12 +456,16 @@ regexp *exp;
 char *sourc;
 {
 	register char *src;
-	register int dlength;
+	register unsigned dlength;
 	register char c;
 	register int no;
 	static char *buf = NULL;
 	static buflen = -1;
 	int s;
+#define NO_CASE	0
+#define UPPER_CASE 1
+#define LOWER_CASE 2
+	int case_next, case_all;
 
 	if (exp == NULL || sourc == NULL) {
 		mlforce("BUG: NULL parm to delins");
@@ -474,7 +481,7 @@ char *sourc;
 	if (buf == NULL || dlength + 1 > buflen) {
 		if (buf)
 			free(buf);
-		if ((buf = (char *)malloc(dlength+1)) == NULL) {
+		if ((buf = castalloc(char,dlength+1)) == NULL) {
 			mlforce("[Out of memory in delins]");
 			return FALSE;
 		}
@@ -489,6 +496,7 @@ char *sourc;
 		return FALSE;
 	}
 	src = sourc;
+	case_next = case_all = NO_CASE;
 	while ((c = *src++) != '\0') {
 	    no = 0;
 	    s = TRUE;
@@ -500,7 +508,42 @@ char *sourc;
 		    if (!isdigit(c)) {
 			    /* here's where the \U \E \u \l \t etc.
 			    special escapes should be implemented */
-			    s = linsert(1,c);
+			    switch (c) {
+			    case 'U':
+				    case_all = UPPER_CASE;
+				    break;
+			    case 'L':
+				    case_all = LOWER_CASE;
+				    break;
+			    case 'u':
+				    case_next = UPPER_CASE;
+				    break;
+			    case 'l':
+				    case_next = LOWER_CASE;
+				    break;
+			    case 'E':
+			    case 'e':
+				    case_all = NO_CASE;
+				    break;
+			    case 'b':
+				    s = linsert(1,'\b');
+				    break;
+			    case 'f':
+				    s = linsert(1,'\f');
+				    break;
+			    case 'r':
+				    s = linsert(1,'\r');
+				    break;
+			    case 't':
+				    s = linsert(1,'\t');
+				    break;
+			    case 'n':
+				    s = lnewline();
+				    break;
+			    default:
+				    s = linsert(1,c);
+				    break;
+			    }
 			    break;
 		    }
 		    /* else it's a digit --
@@ -519,8 +562,22 @@ char *sourc;
 				    }
 				    if (*cp == '\n')
 					    s = lnewline();
-				    else
+				    else if (case_next == NO_CASE && case_all == NO_CASE)
 					    s = linsert(1,*cp);
+				    else {
+					    int direction = case_next != NO_CASE ? case_next : case_all;
+					    case_next = NO_CASE;
+					    c = *cp;
+					    /* Somewhat convoluted to handle
+					       \u\L correctly (upper case first 
+					       char, lower case remainder).
+					       This is the perl model, not the vi model. */
+					    if (isupper(c) && (direction == LOWER_CASE))
+						    c = tolower(c);
+					    if (islower(c) && (direction == UPPER_CASE))
+						    c = toupper(c);
+					    s = linsert(1,c);
+				    }
 				    if (s != TRUE)
 					    goto nomem;
 				    cp++;
@@ -533,6 +590,18 @@ char *sourc;
 		    break;
 
 	    default:
+		    if (case_next || case_all) {
+			    int direction = case_next != NO_CASE ? case_next : case_all;
+			    case_next = NO_CASE;
+			    /* Somewhat convoluted to handle
+			       \u\L correctly (upper case first 
+			       char, lower case remainder).
+			       This is the perl model, not the vi model. */
+			    if (isupper(c) && (direction == LOWER_CASE))
+				    c = tolower(c);
+			    if (islower(c) && (direction == UPPER_CASE))
+				    c = toupper(c);
+		    }
 		    s = linsert(1,c);
 		    break;
 	    }

@@ -5,7 +5,10 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: tags.c,v $
- * Revision 1.25  1992/11/19 22:24:25  foxharp
+ * Revision 1.26  1992/12/14 09:02:46  foxharp
+ * lint cleanup for malloc
+ *
+ * Revision 1.25  1992/11/19  22:24:25  foxharp
  * recheck tagsprefix on every fetch of file
  *
  * Revision 1.24  1992/11/19  08:49:25  foxharp
@@ -261,7 +264,6 @@ int taglen;
 BUFFER *
 gettagsfile()
 {
-	int s;
 	char *tagsfile;
 	BUFFER *tagbp;
 
@@ -284,7 +286,7 @@ gettagsfile()
 			return NULL;
 		}
 
-		if ((s = readin(tagsfile, FALSE, tagbp, FALSE)) != TRUE) {
+		if (readin(tagsfile, FALSE, tagbp, FALSE) != TRUE) {
 			return NULL;
 		}
 		/* be sure it's named TAGBUF */
@@ -366,11 +368,11 @@ char *fname;
 int lineno;
 {
 	struct untag *utp;
-	utp = (struct untag *)malloc(sizeof(struct untag));
+	utp = typealloc(struct untag);
 	if (!utp)
 		return;
 
-	utp->u_fname = (char *)malloc(strlen(fname)+1);
+	utp->u_fname = castalloc(char, strlen(fname)+1);
 	if (!utp->u_fname) {
 		free((char *)utp);
 		return;

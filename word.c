@@ -4,7 +4,10 @@
  * do any sentence mode commands, they are likely to be put in this file. 
  *
  * $Log: word.c,v $
- * Revision 1.21  1992/08/20 23:40:48  foxharp
+ * Revision 1.22  1992/12/16 21:19:07  foxharp
+ * fixups (from tom dickey) for 'J' command, wrt blank lines and counts
+ *
+ * Revision 1.21  1992/08/20  23:40:48  foxharp
  * typo fixes -- thanks, eric
  *
  * Revision 1.20  1992/06/12  22:23:42  foxharp
@@ -329,9 +332,9 @@ int f,n;
 	}
 	if (is_last_line(DOT, curbp))
 		return FALSE;
-	while(n--) {
+	while(n-- > 0) {
 		s = lastnonwhite(f,n);
-		if (s == TRUE) s = forwchar(FALSE,1);
+		if (s == TRUE) s = forwchar_to_eol(FALSE,1);
 		if (s == TRUE) s = setmark();
 		if (s == TRUE) s = forwline(f,1);
 		if (s == TRUE) s = firstnonwhite(f,1);
@@ -341,10 +344,10 @@ int f,n;
 
 		doto = DOT.o;
 		if (doto == 0)
-			return  TRUE;
-		if (lgetc(DOT.l, doto) == ')')
-			return TRUE;
-		if (lgetc(DOT.l, doto-1) == '.')
+			;	/* join at column 0 to empty line */
+		else if (lgetc(DOT.l, doto) == ')')
+			;	/* join after parentheses */
+		else if (lgetc(DOT.l, doto-1) == '.')
 			s = linsert(2,' ');
 		else
 			s = linsert(1,' ');

@@ -8,8 +8,11 @@
  * Major extensions for vile by Paul Fox, 1991
  *
  *	$Log: modes.c,v $
- *	Revision 1.4  1992/12/04 09:14:36  foxharp
- *	deleted unused assigns
+ *	Revision 1.5  1992/12/14 09:03:25  foxharp
+ *	lint cleanup, mostly malloc
+ *
+ * Revision 1.4  1992/12/04  09:14:36  foxharp
+ * deleted unused assigns
  *
  * Revision 1.3  1992/08/20  23:40:48  foxharp
  * typo fixes -- thanks, eric
@@ -50,7 +53,7 @@ makemodelist(dum1,ptr)
 int dum1;
 char *ptr;
 {
-	register WINDOW *localwp = (WINDOW *)ptr;
+	register WINDOW *localwp = (WINDOW *)ptr;  /* alignment okay */
 	register BUFFER *localbp = localwp->w_bufp;
 	bprintf("--- \"%s\" settings, if different than globals %*P\n",
 			localbp->b_bname, term.t_ncol-1, '-');
@@ -424,8 +427,7 @@ register struct VAL *values;
 			break;
 		case VALTYPE_REGEX:
 			if (!values->vp->r) {
-				values->vp->r = (struct regexval *)malloc(
-											sizeof (struct regexval));
+				values->vp->r = typealloc(struct regexval);
 			} else {
 				if (values->vp->r->pat)
 					free(values->vp->r->pat);
