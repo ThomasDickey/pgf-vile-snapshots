@@ -2,7 +2,10 @@
  *		for MicroEMACS
  *
  * $Log: spawn.c,v $
- * Revision 1.42  1993/03/16 16:04:01  pgf
+ * Revision 1.43  1993/03/17 10:00:29  pgf
+ * initial changes to make VMS work again
+ *
+ * Revision 1.42  1993/03/16  16:04:01  pgf
  * fix 'parentheses suggested' warnings
  *
  * Revision 1.41  1993/03/16  10:53:21  pgf
@@ -231,9 +234,8 @@ int f,n;
         movecursor(term.t_nrow, 0);             /* In last line.        */
         mlforce("[Starting DCL]\r\n");
         TTflush(); 	                     /* Ignore "ttcol".      */
-	s = sys(NULL);                     /* NULL => DCL.         */
         sgarbf = TRUE;
-        return (s);
+        return sys(NULL);                     /* NULL => DCL.         */
 #endif
 #if     CPM
         mlforce("[Not in CP/M-86]");

@@ -4,7 +4,10 @@
  *	Filename prompting and completion routines
  *
  * $Log: filec.c,v $
- * Revision 1.3  1993/03/16 16:04:01  pgf
+ * Revision 1.4  1993/03/17 10:00:29  pgf
+ * initial changes to make VMS work again
+ *
+ * Revision 1.3  1993/03/16  16:04:01  pgf
  * fix 'parentheses suggested' warnings
  *
  * Revision 1.2  1993/03/16  10:53:21  pgf
@@ -22,6 +25,8 @@
 #include "edef.h"
 
 #define	SLASH (EOS+1) /* less than everything but EOS */
+
+static	int	only_dir;	/* can only match real directories */
 
 #if UNIX || defined(MDTAGSLOOK)
 
@@ -344,7 +349,6 @@ static	BUFFER	*MyBuff;	/* the buffer containing pathnames */
 static	char	*MyName;	/* name of buffer for name-completion */
 static	char	**MyList;	/* list, for name-completion code */
 static	unsigned MySize;	/* length of list, for (re)allocation */
-static	int	only_dir;	/* can only match real directories */
 
 /*
  * Tests if the given path has been scanned during this prompt/reply operation
@@ -552,6 +556,8 @@ int	*pos;
 	}
 	return code;
 }
+#else	/* VMS */
+#define	freeMyList()
 #endif	/* UNIX */
 
 /******************************************************************************/

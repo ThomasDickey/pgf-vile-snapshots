@@ -3,7 +3,10 @@
  * the knowledge about files are here.
  *
  * $Log: fileio.c,v $
- * Revision 1.35  1993/03/16 10:53:21  pgf
+ * Revision 1.36  1993/03/17 10:00:29  pgf
+ * initial changes to make VMS work again
+ *
+ * Revision 1.35  1993/03/16  10:53:21  pgf
  * see 3.36 section of CHANGES file
  *
  * Revision 1.34  1993/03/05  17:50:54  pgf
@@ -123,11 +126,15 @@
 
 #include	"estruct.h"
 #include        "edef.h"
-#if UNIX
+#if UNIX || VMS
 #include	<sys/stat.h>
 #include        <errno.h>
 #endif
+#if VMS
+#include	<file.h>
+#else
 #include        <fcntl.h>
+#endif
 #if	BERK
 #include "sys/ioctl.h"
 #endif
@@ -247,7 +254,7 @@ char    *fn;
 }
 /* #endif */
 
-#if UNIX
+#if UNIX || VMS
 long
 ffsize()
 {

@@ -4,7 +4,14 @@
  * All operating systems.
  *
  * $Log: termio.c,v $
- * Revision 1.57  1993/03/16 10:53:21  pgf
+ * Revision 1.59  1993/03/17 10:07:21  pgf
+ * extra includes/defs for correct operation on OSF (shouldn't termios.h
+ * provide TIOCGWINSIZE, and shouldn't FION_READ work?)
+ *
+ * Revision 1.58  1993/03/17  10:00:29  pgf
+ * initial changes to make VMS work again
+ *
+ * Revision 1.57  1993/03/16  10:53:21  pgf
  * see 3.36 section of CHANGES file
  *
  * Revision 1.56  1993/03/05  17:50:54  pgf
@@ -190,7 +197,6 @@
  * date: 1990/09/21 10:26:10;
  * initial vile RCS revision
  */
-#include        <stdio.h>
 #include	"estruct.h"
 #include        "edef.h"
 
@@ -212,11 +218,6 @@ extern int errno;
 
 /* I suppose this config stuff should move to estruct.h */
 
-#if OSF1		/* don't know why termios doesn't yet work in osf 1.1 */
-# undef POSIX
-# undef BERK
-# define BERK 1
-#endif
 
 
 #if POSIX
@@ -234,6 +235,13 @@ extern int errno;
  huh?
 #  endif
 # endif
+#endif
+
+#if OSF1		/* don't know why termios doesn't work in osf */
+# undef POSIX
+# undef BERK
+# define BERK 1
+# undef USE_FIONREAD	/* because of osf screen refresh problems */
 #endif
 
 #if (BERK || AIX || AUX2) && !defined(FIONREAD)
@@ -1038,7 +1046,9 @@ ttflush()
                         status = iosb[0] & 0xFFFF;
                 nobuf = 0;
         }
+#if NEVER
         return (status);
+#endif
 #endif
 
 #if     CPM
@@ -1213,3 +1223,5 @@ typahead()
 }
 
 #endif /* not UNIX */
+
+

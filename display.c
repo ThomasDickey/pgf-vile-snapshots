@@ -6,7 +6,14 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.64  1993/03/16 10:53:21  pgf
+ * Revision 1.66  1993/03/17 10:07:21  pgf
+ * extra includes/defs for correct operation on OSF (shouldn't termios.h
+ * provide TIOCGWINSIZE, and shouldn't FION_READ work?)
+ *
+ * Revision 1.65  1993/03/17  09:57:59  pgf
+ * fix for calling shorten_path() correctly
+ *
+ * Revision 1.64  1993/03/16  10:53:21  pgf
  * see 3.36 section of CHANGES file
  *
  * Revision 1.63  1993/03/05  18:46:39  pgf
@@ -222,9 +229,9 @@
  * initial vile RCS revision
  */
 
-
 #include	"estruct.h"
 #include        "edef.h"
+
 #if UNIX
 # include <signal.h>
 # if POSIX
@@ -243,6 +250,10 @@
 #  include <sys/stream.h>
 #  include <sys/ptem.h>
 # endif
+#endif
+
+#if OSF1
+# include "ioctl.h"
 #endif
 
 #define	NU_WIDTH 8
@@ -1683,6 +1694,7 @@ WINDOW *wp;
 	register BUFFER *bp;
 	register lchar;		/* character to draw line in buffer with */
 	int	left, col;
+	char	temp[NFILEN];
 
 	n = wp->w_toprow+wp->w_ntrows;      	/* Location. */
 	vscreen[n]->v_flag |= VFCHG | VFREQ | VFCOL;/* Redraw next time. */
@@ -1728,7 +1740,7 @@ WINDOW *wp;
 		vtputsn(" [modified]", 20);
 	if (bp->b_fname && bp->b_fname[0]) {
 		char *p;
-		p = shorten_path(bp->b_fname);
+		p = shorten_path(strcpy(temp,bp->b_fname));
 		if (p && strcmp(p,bp->b_bname) != 0) {
 			if (!isspace(p[0])) {
 				vtprintf(" is ");
@@ -2250,6 +2262,8 @@ int h, w;
 
 	update(TRUE);
 }
+
+
 
 /* For memory-leak testing (only!), releases all display storage. */
 #if NO_LEAKS

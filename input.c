@@ -3,7 +3,10 @@
  *		5/9/86
  *
  * $Log: input.c,v $
- * Revision 1.59  1993/03/16 10:53:21  pgf
+ * Revision 1.60  1993/03/17 09:57:59  pgf
+ * fix for calling shorten_path() correctly
+ *
+ * Revision 1.59  1993/03/16  10:53:21  pgf
  * see 3.36 section of CHANGES file
  *
  * Revision 1.58  1993/03/15  12:01:59  pgf
@@ -800,9 +803,7 @@ int	c;
 	register int	cpos = *position;
 	register char *	cp;
 	register BUFFER *bp;
-#if ! MSDOS
 	char str[NFILEN];
-#endif
 
 	switch(c) {
 	case '%':
@@ -810,13 +811,13 @@ int	c;
 			isspace(*(curbp->b_fname)))
 			cp = curbp->b_bname;
 		else {
-			cp = shorten_path(curbp->b_fname);
+			cp = shorten_path(strcpy(str, curbp->b_fname));
 			if (!cp) cp = curbp->b_bname;
 		}
 		break;
 	case '#':
 		if ((bp = find_alt()) != 0) {
-			cp = shorten_path(bp->b_fname);
+			cp = shorten_path(strcpy(str, bp->b_fname));
 			if (!cp || !*cp || isspace(*cp)) {
 				/* oh well, use the buffer */
 				cp = bp->b_bname;
