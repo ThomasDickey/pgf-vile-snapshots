@@ -3,7 +3,10 @@
  *		5/9/86
  *
  * $Log: input.c,v $
- * Revision 1.85  1993/08/18 15:10:36  pgf
+ * Revision 1.86  1993/09/03 09:11:54  pgf
+ * tom's 3.60 changes
+ *
+ * Revision 1.85  1993/08/18  15:10:36  pgf
  * don't let the OPT_XTERM code do anything under X11
  *
  * Revision 1.84  1993/08/13  16:32:50  pgf
@@ -429,6 +432,88 @@ int *cp;
 
 		TTbeep();
 	}
+}
+
+/*
+ * Prompt for a named-buffer (i.e., "register")
+ */
+int
+mlreply_reg(prompt, cbuf, retp, at_dft)
+char	*prompt;
+char	*cbuf;		/* 2-char buffer for register+eol */
+int	*retp;		/* => the register-name */
+int	at_dft;		/* default-value (e.g., for "@@" command) */
+{
+	register int status;
+	register int c;
+
+	if (clexec || isnamedcmd) {
+		if ((status = mlreply(prompt, cbuf, 2)) != TRUE)
+			return status;
+		c = cbuf[0];
+	} else {
+		c = kbd_key();
+	}
+
+	if (c == '@' && at_dft != -1) {
+		c = at_dft;
+	} else if (reg2index(c) < 0) {
+		TTbeep();
+		mlforce("[Invalid register name]");
+		return FALSE;
+	}
+
+	*retp = c;
+	return TRUE;
+}
+
+/*
+ * Prompt for a register-name and/or line-count (e.g., for the ":yank" and
+ * ":put" commands).  The register-name, if given, is first.
+ */
+int
+mlreply_reg_count(state, retp, next)
+int	state;		/* negative=register, positive=count, zero=either */
+int	*retp;		/* returns the register-index or line-count */
+int	*next;		/* returns 0/1=register, 2=count */
+{
+	register int status;
+	char	prompt[80];
+	char	expect[80];
+	char	buffer[10];
+	int	length;
+
+	*expect = EOS;
+	if (state <= 0) {
+		(void)strcat(expect, " register");
+		length = 2;
+	} else	length = sizeof(buffer);
+	if (state == 0)
+		(void)strcat(expect, " or");
+	if (state >= 0)
+		(void)strcat(expect, " line-count");
+
+	(void)lsprintf(prompt, "Specify%s: ", expect);
+	*buffer = EOS;
+	status = kbd_string(prompt, buffer, length, ' ', 0, no_completion);
+
+	if (status == TRUE) {
+		if (state <= 0
+		 && isalpha(buffer[0])
+		 && buffer[1] == EOS
+		 && (*retp = reg2index(*buffer)) >= 0) {
+			*next = isupper(*buffer) ? 1 : 0;
+		} else if (state >= 0
+		 && string_to_number(buffer, retp)
+		 && *retp) {
+			*next = 2;
+		} else {
+			mlforce("[Expected%s]", expect);
+			kbd_alarm();
+			status = ABORT;
+		}
+	}
+	return status;
 }
 
 /*
@@ -994,7 +1079,7 @@ int	c;
 		}
 		cp = bp->b_fname;
 		if (isInternalName(cp))
-			cp = bp->b_bname;
+			cp = get_bname(bp);
 		else if (!global_g_val(GMDEXPAND_PATH))
 			cp = shorten_path(strcpy(str, cp), FALSE);
 	} else if (c == ':') {
@@ -1084,24 +1169,13 @@ int	options;
 	j = k = 0;
 	/* add backslash escapes in front of volatile characters */
 	while ((c = src[k++]) != EOS && k < bufn) {
-		if (c == eolchar && eolchar != '\n')
-			goto is_eolchar;
-		switch(c) {
-		case '%':
-		case '#':
-#if ! MSDOS
-		case ':':
-#endif
+		if ((c == '\\') || (c == eolchar && eolchar != '\n')) {
+			if (options & KBD_QUOTES)
+				dst[j++] = '\\'; /* add extra */
+		} else if (strchr(global_g_val_ptr(GVAL_EXPAND_CHARS),c) != 0) {
 			if ((options & KBD_QUOTES)
 			 && (options & KBD_EXPAND))
 				dst[j++] = '\\'; /* add extra */
-		default:
-			break;
-		case '\\':
-		is_eolchar:
-			if (options & KBD_QUOTES)
-				dst[j++] = '\\'; /* add extra */
-			break;
 		}
 		dst[j++] = c;
 	}
@@ -1174,12 +1248,16 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 	int	c;
 	int	done;
 	int	cpos;		/* current character position in string */
+	int	expanded;
+	int	status;
 
 	register int quotef;	/* are we quoting the next char? */
 	register int backslashes; /* are we quoting the next expandable char? */
 	int firstch = TRUE;
 	int newpos;
 	char buf[NLINE];
+
+	last_eolchar = EOS;	/* ...in case we don't set it elsewhere */
 
 	if (clexec) {
 		int	s;
@@ -1191,21 +1269,23 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 			else if ((options & KBD_UPPERC))
 				(void)mkupper(extbuf);
 #endif
+			if (!(options & KBD_NOEVAL)) {
+				(void)strncpy(extbuf, tokval(extbuf), (SIZE_T)bufn);
+			}
 			if (complete != no_completion) {
 				cpos =
 				newpos = strlen(extbuf);
 				if (!(*complete)(NAMEC, extbuf, &newpos))
 					extbuf[cpos] = EOS;
 			}
-			if (!(options & KBD_NOEVAL)) {
-				(void)strncpy(extbuf, tokval(extbuf), (SIZE_T)bufn);
-			}
 			last_eolchar = *execstr;
+			extbuf[bufn-1] = EOS;
 		}
 		return s;
 	}
 
 	quotef = FALSE;
+	reading_msg_line = TRUE;
 
 	/* prompt the user for the input string */
 	if (prompt != 0)
@@ -1276,11 +1356,12 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 
 			/* if buffer is empty, return FALSE */
 			hst_append(buf, eolchar);
-			return (*strncpy(extbuf, buf, (SIZE_T)bufn) != EOS);
+			status = (*strncpy(extbuf, buf, (SIZE_T)bufn) != EOS);
+			break;
 		}
 
 
-#if	!SMALLER
+#if	OPT_HISTORY
 		if (!EscOrQuo
 		 && edithistory(buf, &cpos, &c, options, endfunc, eolchar)) {
 			backslashes = countBackSlashes(buf, cpos);
@@ -1290,11 +1371,14 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 #endif
 		if (c == abortc && quotef == FALSE) {
 			buf[cpos] = EOS;
-			(void)esc(FALSE, 0);
-			return ABORT;
+			status = esc(FALSE, 1);
+			break;
 		} else if ((isbackspace(c) ||
 			c == wkillc ||
 			c == killc) && quotef==FALSE) {
+
+			if (prompt == 0 && c == killc)
+				cpos = 0;
 
 			if (cpos == 0) {
 				buf[0] = EOS;
@@ -1302,44 +1386,50 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 					mlerase();
 				if (isbackspace(c)) {	/* splice calls */
 					tungetc(c);
-					return SORTOFTRUE;
+					status = SORTOFTRUE;
+					break;
 				}
-				return FALSE;
+				status = FALSE;
+				break;
 			}
 
 		killit:
 			kbd_kill_response(buf, &cpos, c);
 			backslashes = countBackSlashes(buf, cpos);
 
-		} else if ((options & KBD_EXPAND) && ((backslashes & 1 ) == 0)) {
+		} else if (c == quotec && quotef == FALSE) {
+			quotef = TRUE;
+			continue;	/* keep firstch==TRUE */
+
+		} else {
 			if (firstch == TRUE) {
+				/* clean the buffer on the first char typed */
 				tungetc(c);
 				c = killc;
 				goto killit;
 			}
-			if (!expandChar(buf, bufn, &cpos, c))
-				goto trymore;
-		} else {
-		trymore:
-			if (c == quotec && quotef == FALSE) {
-				quotef = TRUE;
-				continue;	/* keep firstch==TRUE */
-			} else	{
-				if (firstch == TRUE) {
-					/* we always clean the buf on the
-						first char typed */
-					tungetc(c);
-					c = killc;
-					goto killit;
-				}
+
+			expanded = FALSE;
+			if (!EscOrQuo) {
+				if ((options & KBD_EXPAND)
+#if OPT_HISTORY
+				 || ((options & KBD_EXPCMD) && isShellOrPipe(buf))
+#endif
+				   )
+					expanded = expandChar(buf, bufn, &cpos, c);
+			}
+
+			if (!expanded) {
 				if (c == '\\')
 					backslashes++;
 				else
 					backslashes = 0;
 				quotef = FALSE;
 
-				if (isspecial(c)) {
-					kbd_alarm();
+				if (isspecial(c)
+				 || (cpos >= bufn-1)) {
+					if (!typahead())
+						kbd_alarm();
 					continue; /* keep firstch==TRUE */
 				} else {
 #if !SMALLER
@@ -1361,6 +1451,8 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 		}
 		firstch = FALSE;
 	}
+	reading_msg_line = FALSE;
+	return status;
 }
 
 /* ARGSUSED */

@@ -14,8 +14,14 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.137  1993/08/18 11:51:56  pgf
- * turn of xterm-mouse mode by default
+ * Revision 1.139  1993/09/06 16:29:26  pgf
+ * added multibeep mode
+ *
+ * Revision 1.138  1993/09/03  09:11:54  pgf
+ * tom's 3.60 changes
+ *
+ * Revision 1.137  1993/08/18  11:51:56  pgf
+ * turn off xterm-mouse mode by default
  *
  * Revision 1.136  1993/08/13  16:32:50  pgf
  * tom's 3.58 changes
@@ -399,82 +405,82 @@
  * revision 1.20
  * date: 1991/08/06 15:55:24;
  * fixed dos mode on empty buffer
- * 
+ *
  * revision 1.19
  * date: 1991/08/06 15:23:42;
  *  global/local values
- * 
+ *
  * revision 1.18
  * date: 1991/07/23 11:12:19;
  * don't reset lastdot if absolute motion is on behalf of an operator
- * 
+ *
  * revision 1.17
  * date: 1991/07/19 17:16:03;
  * ignore SIG_QUIT unless DEBUG
- * 
+ *
  * revision 1.16
  * date: 1991/06/28 10:53:42;
  * undo last change -- was breaking some ops
- * 
+ *
  * revision 1.15
  * date: 1991/06/27 19:45:16;
  * moved back from eol and eob to execute()
- * 
+ *
  * revision 1.14
  * date: 1991/06/26 09:38:15;
  * removed an ifdef BEFORE
- * 
+ *
  * revision 1.13
  * date: 1991/06/25 19:52:59;
  * massive data structure restructure
- * 
+ *
  * revision 1.12
  * date: 1991/06/16 17:36:17;
  * support for local vs. global fillcol value
- * 
+ *
  * revision 1.11
  * date: 1991/06/07 22:00:18;
  * changed header
- * 
+ *
  * revision 1.10
  * date: 1991/06/07 13:22:23;
  * don't move "last dot" mark if ABS command doesn't change dot
- * 
+ *
  * revision 1.9
  * date: 1991/06/03 17:34:55;
  * switch from "meta" etc. to "ctla" etc.
- * 
+ *
  * revision 1.8
  * date: 1991/06/03 10:25:16;
  * command loop is now a separate routine, and
  * if (doingopcmd) stuff is now in operators()
- * 
+ *
  * revision 1.7
  * date: 1991/05/31 12:54:25;
  * put _wild chartypes back in -- dropped by mistake
- * 
+ *
  * revision 1.6
  * date: 1991/05/31 11:12:19;
  * changed args to execute(), and
  * added linespec character class, and
  * added unimplemented ex functions
- * 
+ *
  * revision 1.5
  * date: 1991/04/22 09:00:12;
  * added iswild type to chartypes
- * 
+ *
  * revision 1.4
  * date: 1991/04/04 09:37:48;
  * new arg. to unqname
- * 
+ *
  * revision 1.3
  * date: 1991/02/19 17:27:03;
  * set up the reverse pattern if -s is given
- * 
+ *
  * revision 1.2
  * date: 1990/10/03 16:00:57;
  * make backspace work for everyone
- * 
+ *
  * revision 1.1
  * date: 1990/09/21 10:25:35;
  * initial vile RCS revision
@@ -512,46 +518,6 @@ unsigned _stklen = 32768U;
 
 static	void	do_num_proc P(( int *, int *, int * ));
 static	void	do_rept_arg_proc P(( int *, int *, int * ));
-
-/*--------------------------------------------------------------------------*/
-
-static	void print_usage P((void))
-{
-	static	char	*options[] = {
-	"-h             to get help on startup",
-	"-gNNN          or simply +NNN to go to line NNN",
-	"-sstring       or +/string to search for \"string\"",
-#if TAGS
-	"-ttagname      to look up a tag",
-#endif
-	"-v             to view files as read-only",
-#if CRYPT
-	"-kcryptkey     for encrypted files",
-#endif
-#if X11
-	"-name name     to change program name for X resources",
-	"-fg color      to change foreground color",
-	"-bg color      to change background color",
-	"-f fontname    to change font",
-	"-d displayname to change the default display",
-	"-r             for reverse video",
-	"=geometry      to set window size (like '=80x50')",
-#endif
-#if MSDOS
-	"-2             25-line mode",
-	"-4             43-line mode",
-	"-5             50-line mode",
-#endif
-	"-V             for version info",
-	"use @filename to run filename as commands",
-	" (this will suppress .vilerc)" };
-	register int	j;
-
-	(void)fprintf(stderr, "usage: %s [-flags] [@cmdfile] files...\n", prog_arg);
-	for (j = 0; j < SIZEOF(options); j++)
-		(void)fprintf(stderr, "\t%s\n", options[j]);
-	ExitProgram(BAD(1));
-}
 
 /*--------------------------------------------------------------------------*/
 #define	GetArgVal(param)	if (!*(++param))\
@@ -612,16 +578,8 @@ char	*argv[];
 #endif
 	prog_arg = argv[0];	/* this contains our only clue to exec-path */
 
-#if UNIX
-	{	/* remember the directory from which we were run */
-		char	temp[NFILEN];
-		char	*s = strmalloc(lengthen_path(strcpy(temp, prog_arg))),
-			*t = pathleaf(s);
-		if (t != s) {
-			t[-1] = EOS;
-			pathname[2] = s;
-		}
-	}
+#if UNIX || VMS
+	makeversion();
 #endif
 
 	start_debug_log(argc,argv);
@@ -629,9 +587,9 @@ char	*argv[];
 	if (strcmp(pathleaf(prog_arg), "view") == 0)
 		set_global_b_val(MDVIEW,TRUE);
 
-#if IBMPC	/* pjr */
-	ibmtype = CDSENSE;   
-#endif	/* IBMPC */
+#if IBMPC
+	ibmtype = CDSENSE;
+#endif
 
 #if X11
 	x_preparse_args(&argc, &argv);
@@ -642,8 +600,8 @@ char	*argv[];
 #if X11
 		if (*param == '=') {
 			x_set_geometry(param);
-                        continue;
-                }
+			continue;
+		}
 #endif
 
 
@@ -728,7 +686,7 @@ char	*argv[];
 				break;
 #endif
 			case 'V':
-				printf("vile %s\n", version);
+				(void)printf("vile %s\n", version);
 				ExitProgram(GOOD);
 
 			case 'v':	/* -v for View File */
@@ -737,7 +695,7 @@ char	*argv[];
 
 			/*
 			 * Note that ibmtype is now only used to detect
-			 * whether a command line option was given, ie if
+			 * whether a command line option was given, i.e., if
 			 * it is not equal to CDSENSE then a command line
 			 * option was given
 			 */
@@ -774,7 +732,7 @@ char	*argv[];
 			/* Process Startup macros */
 			if ((startstat = startup(++param)) == TRUE)
 				ranstartup = TRUE; /* don't execute .vilerc */
-		} else {
+		} else if (*param != EOS) {
 
 			/* Process an input file */
 #if CRYPT
@@ -784,7 +742,7 @@ char	*argv[];
 			makename(bname, param);
 			unqname(bname,FALSE);
 
-			bp = bfind(bname, OK_CREAT, BFARGS);
+			bp = bfind(bname, BFARGS);
 			ch_fname(bp, param);
 			make_current(bp); /* pull it to the front */
 			if (firstbp == 0)
@@ -803,7 +761,7 @@ char	*argv[];
 	if (!isatty(fileno(stdin))) {
 		FILE	*in;
 
-		bp = bfind(ScratchName(Standard Input), OK_CREAT, BFARGS);
+		bp = bfind(ScratchName(Standard Input), BFARGS);
 		make_current(bp); /* pull it to the front */
 		if (firstbp == 0)
 			firstbp = bp;
@@ -816,6 +774,9 @@ char	*argv[];
 		(void)slowreadf(bp, &(bp->b_linecount));
 		set_rdonly(bp, bp->b_fname);
 		(void)ffclose();
+#if FINDERR
+		set_febuff(get_bname(bp));
+#endif
 	}
 #endif
 
@@ -873,7 +834,7 @@ char	*argv[];
 
 	/* pull in an unnamed buffer, if we were given none to work with */
 	if (firstbp == 0) {
-		bp = bfind(ScratchName(unnamed), OK_CREAT, 0);
+		bp = bfind(ScratchName(unnamed), 0);
 		bp->b_active = TRUE;
 #if DOSFILES
 		make_local_b_val(bp,MDDOS);
@@ -899,8 +860,7 @@ char	*argv[];
 				b_set_changed(obp);
 			}
 
-			if ((vbp=bfind(ScratchName(vileinit), OK_CREAT,
-						0))==NULL)
+			if ((vbp=bfind(ScratchName(vileinit), 0))==NULL)
 				ExitProgram(BAD(1));
 
 			/* don't want swbuffer to try to read it */
@@ -926,19 +886,19 @@ char	*argv[];
 			}
 			/* remove the now unneeded buffer */
 			b_set_scratch(vbp);  /* make sure it will go */
-			zotbuf(vbp);
+			(void)zotbuf(vbp);
 		} else {
 			char *fname;
 			/* if .vilerc is one of the input files....
 					don't clobber it */
 #if MSDOS
 			/* search PATH for vilerc under dos */
-	 		fname = flook(pathname[0], FL_ANYWHERE); /* pjr - find it! */
+	 		fname = flook(pathname[0], FL_ANYWHERE);
 #else
 			fname = pathname[0];
 #endif
 			if (firstbp != 0
-			 && strcmp(pathname[0], firstbp->b_bname) == 0) {
+			 && eql_bname(firstbp, pathname[0])) {
 				c = firstbp->b_bname[0];
 				firstbp->b_bname[0] = SCRTCH_LEFT[0];
 				startstat = startup(fname);
@@ -968,7 +928,7 @@ char	*argv[];
 	msg = "";
 	if (helpflag) {
 		if (help(TRUE,1) != TRUE) {
-			msg = 
+			msg =
 	"[Problem with help information. Type \":quit\" to exit if you wish]";
 		}
 	} else {
@@ -978,7 +938,7 @@ char	*argv[];
 	/* Deal with startup gotos and searches */
 	if (gotoflag + searchflag
 #if TAGS
-		 + (tname?1:0) 
+		 + (tname?1:0)
 #endif
 		> 1) {
 #if TAGS
@@ -1014,9 +974,10 @@ char	*argv[];
 void
 loop()
 {
+	CMDFUNC	*cfp, *last_cfp = NULL;
 	int s,c,f,n;
+
 	while(1) {
-		extern int insert_mode_was;
 
 		/* vi doesn't let the cursor rest on the newline itself.  This
 			takes care of that. */
@@ -1056,7 +1017,7 @@ loop()
 		map_check(c);
 
 		kregflag = 0;
-	        
+
 		/* flag the first time through for some commands -- e.g. subst
 			must know to not prompt for strings again, and pregion
 			must only restart the p-lines buffer once for each
@@ -1064,10 +1025,25 @@ loop()
 		calledbefore = FALSE;
 
 		/* and execute the command */
-		execute(kcod2fnc(c), f, n);
-	        
+		cfp = kcod2fnc(c);
+		s = execute(cfp, f, n);
+
 		/* stop recording for '.' command */
 		dotcmdfinish();
+
+		/* If this was a motion that failed, sound the alarm (like vi),
+		 * but limit it to once, in case the user is holding down the
+		 * autorepeat-key.
+		 */
+		if ( (cfp != NULL)
+		 && ((cfp->c_flags & MOTION) != 0)
+		 && (s != TRUE) ) {
+			if (cfp != last_cfp || global_g_val(GMDMULTIBEEP)) {
+				last_cfp = cfp;
+				kbd_alarm();
+			}
+		} else
+			last_cfp = NULL; /* avoid noise! */
 	}
 }
 
@@ -1081,7 +1057,7 @@ char *s;
 	else
 		return NULL;
 
-} 
+}
 
 int
 no_memory(s)
@@ -1101,13 +1077,13 @@ global_val_init()
 		global_b_values structure, the pointers will still point
 		back at the global values, which is what we want */
 	for (i = 0; i <= NUM_G_VALUES; i++)
-		copy_val(global_g_values.gv, global_g_values.gv, i);
+		make_local_val(global_g_values.gv, i);
 
 	for (i = 0; i <= NUM_B_VALUES; i++)
-		copy_val(global_b_values.bv, global_b_values.bv, i);
+		make_local_val(global_b_values.bv, i);
 
 	for (i = 0; i <= NUM_W_VALUES; i++)
-		copy_val(global_w_values.wv, global_w_values.wv, i);
+		make_local_val(global_w_values.wv, i);
 
 
 	/*
@@ -1117,6 +1093,8 @@ global_val_init()
 	set_global_g_val(GMDALTTABPOS,	FALSE); /* emacs-style tab
 							positioning */
 	set_global_g_val(GMDDIRC,	FALSE); /* directory-completion */
+	set_global_g_val(GMDMULTIBEEP,	TRUE); /* multiple beeps for multiple
+						motion failures */
 #ifdef GMDHISTORY
 	set_global_g_val(GMDHISTORY,	TRUE);
 #endif
@@ -1249,8 +1227,8 @@ global_val_init()
 
 	set_global_w_val(WVAL_SIDEWAYS,	0);	/* list-mode */
 #if defined(WVAL_FCOLOR) || defined(WVAL_BCOLOR)
-	set_global_w_val(WVAL_FCOLOR,	7);	/* foreground color */
-	set_global_w_val(WVAL_BCOLOR,	0);	/* background color */
+	set_global_w_val(WVAL_FCOLOR,	C_WHITE); /* foreground color */
+	set_global_w_val(WVAL_BCOLOR,	C_BLACK); /* background color */
 #endif
 
 
@@ -1348,7 +1326,7 @@ int *cp, *fp, *np;
 	register int	oldn;
 	c = *cp;
 
-	if (c != reptc) 
+	if (c != reptc)
 		return;
 
 	f = *fp;
@@ -1452,8 +1430,7 @@ int f,n;
 		if (thiscmd != kbd_seq())
 			return FALSE;
 	}
-	quithard(f, n);
-	return TRUE;
+	return quithard(f, n);
 }
 
 /*
@@ -1464,9 +1441,10 @@ int
 quickexit(f, n)
 int f,n;
 {
-	if (writeall(TRUE,1) == TRUE)
-		quithard(f, n); 	/* conditionally quit	*/
-	return TRUE;
+	register int status;
+	if ((status = writeall(TRUE,1)) == TRUE)
+		status = quithard(f, n);  /* conditionally quit	*/
+	return status;
 }
 
 /* Force quit by giving argument */
@@ -1475,7 +1453,7 @@ int
 quithard(f,n)
 int f,n;
 {
-    return quit(TRUE,1);
+	return quit(TRUE,1);
 }
 
 /*
@@ -1488,7 +1466,7 @@ quit(f, n)
 int f,n;
 {
 	int cnt;
-        
+
 	if (f == FALSE && (cnt = anycb()) != 0) {
 		if (cnt == 1)
 			mlforce(
@@ -1511,10 +1489,11 @@ int f,n;
 #endif
 #if NO_LEAKS
 	{
-		register int i;
-		register struct VALNAMES *v;
+		beginDisplay;		/* ...this may take a while... */
 
 		/* free all of the global data structures */
+		onel_leaks();
+		path_leaks();
 		kbs_leaks();
 		tb_leaks();
 		wp_leaks();
@@ -1526,14 +1505,9 @@ int f,n;
 		x11_leaks();
 #endif
 
-		for (i = 0, v=g_valuenames; v[i].name != 0; i++)
-			free_val(v+i, &global_g_values.gv[i]);
-
-		for (i = 0, v=b_valuenames; v[i].name != 0; i++)
-			free_val(v+i, &global_b_values.bv[i]);
-
-		for (i = 0, v=w_valuenames; v[i].name != 0; i++)
-			free_val(v+i, &global_w_values.wv[i]);
+		free_local_vals(g_valuenames, global_g_values.gv);
+		free_local_vals(b_valuenames, global_b_values.bv);
+		free_local_vals(w_valuenames, global_w_values.wv);
 
 		FreeAndNull(gregexp);
 		FreeAndNull(patmatch);
@@ -1590,15 +1564,6 @@ rdonly()
 	TTbeep();
 	mlforce("[No changes are allowed while in \"view\" mode]");
 	return FALSE;
-}
-
-/* ARGSUSED */
-int
-showversion(f,n)
-int f,n;
-{
-	mlforce(version);
-	return TRUE;
 }
 
 /* ARGSUSED */
@@ -1662,10 +1627,10 @@ charinit()
 	register int c;
 
 	/* legal in pathnames */
-	_chartypes_['.'] = 
-		_chartypes_['_'] = 
+	_chartypes_['.'] =
+		_chartypes_['_'] =
 		_chartypes_['-'] =
-		_chartypes_['*'] = 
+		_chartypes_['*'] =
 		_chartypes_['/'] = _pathn;
 
 	/* legal in "identifiers" */
@@ -1674,9 +1639,9 @@ charinit()
 
 	/* whitespace */
 	_chartypes_[' '] =
-		_chartypes_['\t'] = 
+		_chartypes_['\t'] =
 		_chartypes_['\r'] =
-		_chartypes_['\n'] = 
+		_chartypes_['\n'] =
 		_chartypes_['\f'] = _space;
 
 	/* control characters */
@@ -1785,29 +1750,6 @@ int size;	/* number of bytes to move */
 
 	for (i=0; i < size; i++)
 		*dest++ = *source++;
-}
-#endif
-
-#if	(AZTEC || LATTICE || ZTC) && MSDOS
-/*	strncpy:	copy a string...with length restrictions
-			ALWAYS null terminate
-Hmmmm...
-I don't know much about DOS, but I do know that strncpy shouldn't ALWAYS
-	null terminate.  -pgf
-*/
-
-char *strncpy(dst, src, maxlen)
-char *dst;	/* destination of copied string */
-char *src;	/* source */
-int maxlen;	/* maximum length */
-{
-	char *dptr;	/* ptr into dst */
-
-	dptr = dst;
-	while (*src && (maxlen-- > 0))
-		*dptr++ = *src++;
-	*dptr = 0;
-	return dst;
 }
 #endif
 
@@ -1920,11 +1862,11 @@ mallocdbg(f,n)
 
 
 /*
- *	the log file is left open, unbuffered.  thus any code can do 
-
- 	extern FILE *FF;
-	fprintf(FF, "...", ...);
-	
+ *	the log file is left open, unbuffered.  thus any code can do
+ *
+ * 	extern FILE *FF;
+ *	fprintf(FF, "...", ...);
+ *
  *	to log events without disturbing the screen
  */
 
@@ -1943,7 +1885,7 @@ char **av;
 	FF = fopen("vilelog", "w");
 	setbuf(FF,NULL);
 	for (i = 0; i < ac; i++)
-		fprintf(FF,"arg %d: %s\n",i,av[i]);
+		(void)fprintf(FF,"arg %d: %s\n",i,av[i]);
 #endif
 }
 

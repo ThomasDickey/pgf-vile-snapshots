@@ -4,7 +4,10 @@
  * All operating systems.
  *
  * $Log: termio.c,v $
- * Revision 1.80  1993/08/13 16:32:50  pgf
+ * Revision 1.81  1993/09/03 09:11:54  pgf
+ * tom's 3.60 changes
+ *
+ * Revision 1.80  1993/08/13  16:32:50  pgf
  * tom's 3.58 changes
  *
  * Revision 1.79  1993/08/05  14:29:12  pgf
@@ -448,7 +451,7 @@ int f;
 		TTputc('\n');
 		TTputc('\r');
 	}
-	fflush(stdout);
+	(void)fflush(stdout);
 #if ! LINUX
 	tcdrain(1);
 #endif
@@ -572,7 +575,7 @@ int f;
 		TTputc('\n');
 		TTputc('\r');
 	}
-	fflush(stdout);
+	(void)fflush(stdout);
 	TTkclose();	/* xterm */
 	TTflush();
 	TTclose();
@@ -710,7 +713,7 @@ ttunclean()
 #if APOLLO
 	int literal = LLITOUT;
 
-	fflush(stdout);
+	(void)fflush(stdout);
 	ioctl(0, TIOCLSET, (caddr_t)&olstate);
 	ioctl(0, TIOCSETP, (caddr_t)&nstate);	/* setting nlstate changes sb_flags */
 	TTflush();
@@ -738,13 +741,13 @@ void
 ttputc(c)
 int c;
 {
-        putchar(c);
+        (void)putchar(c);
 }
 
 void
 ttflush()
 {
-        fflush(stdout);
+        (void)fflush(stdout);
 }
 
 /*
@@ -1072,12 +1075,13 @@ int c;
 #if     CPM
         bios(BCONOUT, c, 0);
 #endif
-#if     MSDOS && MWC86
-        putcnb(c);
-#endif
-#if	MSDOS && (LATTICE || AZTEC) && ~IBMPC
+#if	MSDOS && !IBMPC
+#if     MWC86
+	putcnb(c);
+#else	/* LATTICE || AZTEC || TURBO */
 	bdos(6, c, 0);
 #endif
+#endif	/* MSDOS && !IBMPC */
 }
 
 #if	AMIGA

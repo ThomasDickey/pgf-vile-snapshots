@@ -1,4 +1,4 @@
-/* 
+/*
  *
  *	modes.c
  *
@@ -8,8 +8,15 @@
  * Major extensions for vile by Paul Fox, 1991
  *
  *	$Log: modes.c,v $
- *	Revision 1.23  1993/08/18 15:10:36  pgf
- *	don't let the OPT_XTERM code do anything under X11
+ *	Revision 1.25  1993/09/06 16:30:22  pgf
+ *	set shiftwidth and tabstop globals after any mode change, to ensure
+ *	they're consistently set with cmode/csw/cts/sw/ts
+ *
+ * Revision 1.24  1993/09/03  09:11:54  pgf
+ * tom's 3.60 changes
+ *
+ * Revision 1.23  1993/08/18  15:10:36  pgf
+ * don't let the OPT_XTERM code do anything under X11
  *
  * Revision 1.22  1993/08/13  16:32:50  pgf
  * tom's 3.58 changes
@@ -83,11 +90,14 @@
 
 #include	"estruct.h"
 #include	"edef.h"
- 
+
 #define MODES_LIST_NAME  ScratchName(Settings)
 #define	NonNull(s)	((s == 0) ? "" : s)
 #define	ONE_COL	26
 #define	NCOLS	3
+
+#define isLocalVal(valptr)          ((valptr)->vp == &((valptr)->v))
+#define makeLocalVal(valptr)        ((valptr)->vp = &((valptr)->v))
 
 /*--------------------------------------------------------------------------*/
 
@@ -96,7 +106,6 @@ static	int	size_val P(( struct VALNAMES *, struct VAL * ));
 static	int	listvalueset P(( char *, int, struct VALNAMES *, struct VAL *, struct VAL * ));
 static	void	makemodelist P(( int, char * ));
 static	int	string_to_bool P(( char *, int * ));
-static	int	string_to_number P(( char *, int * ));
 #if defined(GMD_GLOB) || defined(GVAL_GLOB)
 static	int	legal_glob_mode P(( char * ));
 #endif
@@ -174,10 +183,11 @@ struct VAL *values;
  * Returns a mode-value formatted as a string
  */
 char *
-string_mode_val(names, values)
-register struct VALNAMES *names;
-register struct VAL *values;
+string_mode_val(args)
+VALARGS *args;
 {
+	register struct VALNAMES *names = args->names;
+	register struct VAL     *values = args->local;
 	switch(names->type) {
 	case VALTYPE_BOOL:
 		return values->vp->i ? truem : falsem;
@@ -214,6 +224,7 @@ struct VAL *values, *globvalues;
 	int	show[MAX_G_VALUES+MAX_B_VALUES+MAX_W_VALUES];
 	int	any	= 0,
 		passes	= 1,
+		padded,
 		perline,
 		percol,
 		total;
@@ -295,16 +306,21 @@ struct VAL *values, *globvalues;
 
 			if (col == 0)
 				bputc(' ');
+			padded = (col+1) < perline ? ONE_COL : 1;
 			if (names[j].type == VALTYPE_BOOL) {
 				bprintf("%s%s%*P",
 					values[j].vp->i ? "" : "no",
 					names[j].name,
-					ONE_COL, ' ');
+					padded, ' ');
 			} else {
+				VALARGS args;	/* patch */
+				args.names  = names+j;
+				args.local  = values+j;
+				args.global = 0;
 				bprintf("%s=%s%*P",
 					names[j].name,
-					string_mode_val(names+j, values+j),
-					ONE_COL, ' ');
+					string_mode_val(&args),
+					padded, ' ');
 			}
 			if (++col >= perline) {
 				col = 0;
@@ -342,7 +358,7 @@ void	makemodelist(dum1,ptr)
 	register BUFFER *localbp = localwp->w_bufp;
 
 	bprintf("--- \"%s\" settings, if different than globals %*P\n",
-			localbp->b_bname, term.t_ncol-1, '-');
+			get_bname(localbp), term.t_ncol-1, '-');
 	if (!(nflag = listvalueset(bb, FALSE, b_valuenames, localbp->b_values.bv, global_b_values.bv))
 	 && !(nflag = listvalueset(ww, nflag, w_valuenames, localwp->w_values.wv, global_w_values.wv)))
 	 	bputc('\n');
@@ -384,7 +400,8 @@ int f,n;
 	}
 	if (!global_b_val(MDTERSE) || !f)
 		mlwrite("[%sabs are %d columns apart, using %s value.]", whichtabs,
-			curtabval, is_global_b_val(curbp,val)?"global":"local" );
+			curtabval,
+			is_local_b_val(curbp,val) ? "local" : "global" );
 	return TRUE;
 }
 
@@ -404,8 +421,9 @@ int f,n;
 		return FALSE;
 	}
 	if (!global_b_val(MDTERSE) || !f)
-		mlwrite("[Fill column is %d, and is %s]", b_val(curbp,VAL_FILL),
-			is_global_b_val(curbp,VAL_FILL) ? "global" : "local" );
+		mlwrite("[Fill column is %d, and is %s]",
+			b_val(curbp,VAL_FILL),
+			is_local_b_val(curbp,VAL_FILL) ? "local" : "global" );
 	return(TRUE);
 }
 
@@ -424,22 +442,6 @@ int	magic;
 		rp->reg = regcomp(rp->pat, magic);
 	}
 	return rp;
-}
-
-/*
- * Copy the struct-pointer for the given VAL-struct, to make local or global
- * mode value.
- */
-void
-copy_val (dst, src, which)
-struct VAL *dst;
-struct VAL *src;
-int	which;
-{
-	if (dst[which].vp != &(src[which].v)) {
-		dst[which].vp = &(src[which].v);
-		src[which].refs += 1;
-	}
 }
 
 /*
@@ -464,30 +466,52 @@ free_val(names, values)
 struct VALNAMES *names;
 struct VAL *values;
 {
-	if (values->refs > 0) {
-		values->refs -= 1;
-		if (values->refs == 0) {
-			switch (names->type) {
-			case VALTYPE_STRING:
-				FreeAndNull(values->v.p);
-				break;
-			case VALTYPE_REGEX:
-				free_regexval(values->v.r);
-				break;
-			default:	/* nothing to free */
-				break;
-			}
-		}
+	switch (names->type) {
+	case VALTYPE_STRING:
+		FreeAndNull(values->v.p);
+		break;
+	case VALTYPE_REGEX:
+		free_regexval(values->v.r);
+		break;
+	default:	/* nothing to free */
+		break;
 	}
 }
 
 /*
- * These are special routines designed to save the values of local modes and to
+ * Copy a VAL-struct, preserving the sense of local/global.
+ */
+int
+copy_val(dst, src)
+struct VAL *dst;
+struct VAL *src;
+{
+	register int local = isLocalVal(src);
+
+	*dst = *src;
+	if (local)
+		makeLocalVal(dst);
+	return local;
+}
+
+void
+copy_mvals(maximum, dst, src)
+int maximum;
+struct VAL *dst;
+struct VAL *src;
+{
+	register int	n;
+	for (n = 0; n < maximum; n++)
+		(void)copy_val(&dst[n], &src[n]);
+}
+
+/*
+ * This is a special routine designed to save the values of local modes and to
  * restore them.  The 'recompute_buffer()' procedure assumes that global modes
  * do not change during the recomputation process (so there is no point in
  * trying to convert any of those values to local ones).
  */
-#if	OPT_UPBUFF
+#if OPT_UPBUFF
 void
 save_vals(maximum, gbl, dst, src)
 int maximum;
@@ -496,51 +520,27 @@ struct VAL *dst;
 struct VAL *src;
 {
 	register int	n;
-	for (n = 0; n < maximum; n++) {
-		dst[n] = src[n];
-		if (src[n].vp == &src[n].v) {	/* local value? */
-			dst[n].vp = &dst[n].v;
-			copy_val(src, gbl, n);
-		}
-	}
+	for (n = 0; n < maximum; n++)
+		if (copy_val(&dst[n], &src[n]))
+			make_global_val(src, gbl, n);
 }
+#endif
 
-void
-restore_vals(maximum, dst, src)
-int maximum;
-struct VAL *dst;
-struct VAL *src;
-{
-	register int	n;
-	for (n = 0; n < maximum; n++) {
-		if (dst[n].vp == &dst[n].v) {
-			src[n] = dst[n];
-			src[n].vp = &src[n].v;
-		}
-	}
-}
-#endif /* OPT_UPBUFF */
-
-#if NO_LEAKS
 /*
  * free storage used by local mode-values, called only when we are freeing
  * all other storage associated with a buffer or window.
  */
 void
-free_local_vals(names, local, global)
+free_local_vals(names, val)
 struct VALNAMES *names;
-struct VAL *local;
-struct VAL *global;
+struct VAL *val;
 {
 	register int	j;
 
-	for (j = 0; names[j].name != 0; j++) {
-		if (local[j].vp == &(local[j].v)) {
-			free_val(names+j, local+j);
-		}
-	}
+	for (j = 0; names[j].name != 0; j++)
+		if (is_local_val(val,j))
+			free_val(names+j, val+j);
 }
-#endif
 
 /*
  * Convert a string to boolean, checking for errors
@@ -564,7 +564,7 @@ int	*np;
 /*
  * Convert a string to number, checking for errors
  */
-static int
+int
 string_to_number(base, np)
 char	*base;
 int	*np;
@@ -626,25 +626,26 @@ char	*base;
  * Lookup the mode named with 'cp[]' and adjust its value.
  */
 int
-adjvalueset(cp, kind, names, global, values)
-char *cp;
-int kind;
-struct VALNAMES *names;
+adjvalueset(cp, setting, global, args)
+char *cp;			/* name of the mode we are changing */
+int setting;			/* true if setting, false if unsetting */
 int global;
-register struct VAL *values;
+VALARGS *args;			/* symbol-table entry for the mode */
 {
+	struct VALNAMES *names = args->names;
+	struct VAL     *values = args->local;
+	struct VAL     *globls = args->global;
+
 	struct VAL oldvalue;
 	char prompt[NLINE];
 	char respbuf[NFILEN];
 	int no = !strncmp(cp, "no", 2);
 	char *rp = no ? cp+2 : cp;
 	int nval, s;
+	int unsetting = !setting && !global;
 #if COLOR
 	register int i;
 #endif
-
-	if (no)
-		kind = !kind;
 
 	if (no && (names->type != VALTYPE_BOOL))
 		return FALSE;		/* this shouldn't happen */
@@ -660,7 +661,7 @@ register struct VAL *values;
 
 	/* get a value if we need one */
 	if ((end_string() == '=')
-	 || (names->type != VALTYPE_BOOL)) {
+	 || (names->type != VALTYPE_BOOL && !unsetting)) {
 		int	regex = (names->type == VALTYPE_REGEX);
 		int	opts = regex ? 0 : KBD_NORMAL;
 		int	eolchar = (names->type == VALTYPE_REGEX
@@ -671,13 +672,13 @@ register struct VAL *values;
 			cp,
 			regex ? "pattern" : "value");
 
-		s = kbd_string(prompt, respbuf, sizeof(respbuf) - 1, eolchar, opts, no_completion);
+		s = kbd_string(prompt, respbuf, sizeof(respbuf), eolchar, opts, no_completion);
 		if (s != TRUE)
 			return s;
 		if (!strlen(rp = respbuf))
-			return FALSE; 	
+			return FALSE;
 		if (names->type == VALTYPE_BOOL) {
-			if (!string_to_bool(rp, &kind))
+			if (!string_to_bool(rp, &setting))
 				return FALSE;
 		}
 #if defined(GMD_GLOB) || defined(GVAL_GLOB)
@@ -686,63 +687,63 @@ register struct VAL *values;
 		 	return FALSE;
 #endif
 	}
-#if !SMALLER
+#if OPT_HISTORY
 	else
 		hst_glue(' ');
 #endif
 
-	oldvalue = *values;	/* save, to simplify no-change testing */
-	if (oldvalue.vp == &(values->v))
-		oldvalue.vp = &(oldvalue.v);
-	else
-		oldvalue.refs += 1;	/* fake a reference */
+	/* save, to simplify no-change testing */
+	(void)copy_val(&oldvalue, values);
 
-	values->vp = &(values->v);	/* make sure we point to result! */
-	values->refs = 1;		/* we just created an object */
+	if (unsetting) {
+		make_global_val(values, globls, 0);
+	} else {
+		makeLocalVal(values);	/* make sure we point to result! */
 
-	/* we matched a name -- get the value */
-	switch(names->type) {
-	case VALTYPE_BOOL:
-		values->vp->i = kind;
-		break;
+		/* we matched a name -- set the value */
+		switch(names->type) {
+		case VALTYPE_BOOL:
+			values->vp->i = no ? !setting : setting;
+			break;
 
 #if COLOR
-	case VALTYPE_COLOR:
-		nval = -1;
-		(void)mklower(rp);
-		for (i = 0; i < NCOLORS; i++) {
-			if (strcmp(rp, cname[i]) == 0) {
-				nval = i;
-				break;
+		case VALTYPE_COLOR:
+			nval = -1;
+			(void)mklower(rp);
+			for (i = 0; i < NCOLORS; i++) {
+				if (strcmp(rp, cname[i]) == 0) {
+					nval = i;
+					break;
+				}
 			}
-		}
-		if ((nval < 0) && !string_to_number(rp, &nval))
-			return FALSE;
-		if (nval >= NCOLORS) {
-			mlforce("[Not a legal color-index: %d]", nval);
-			return FALSE;
-		}
-		values->vp->i = nval;
-		break;
+			if ((nval < 0) && !string_to_number(rp, &nval))
+				return FALSE;
+			if (nval >= NCOLORS) {
+				mlforce("[Not a legal color-index: %d]", nval);
+				return FALSE;
+			}
+			values->vp->i = nval;
+			break;
 #endif /* COLOR */
 
-	case VALTYPE_INT:
-		if (!string_to_number(rp, &nval))
+		case VALTYPE_INT:
+			if (!string_to_number(rp, &nval))
+				return FALSE;
+			values->vp->i = nval;
+			break;
+
+		case VALTYPE_STRING:
+			values->vp->p = strmalloc(rp);
+			break;
+
+		case VALTYPE_REGEX:
+			values->vp->r = new_regexval(rp, TRUE);
+			break;
+
+		default:
+			mlforce("BUG: bad type %s %d", names->name, names->type);
 			return FALSE;
-		values->vp->i = nval;
-		break;
-
-	case VALTYPE_STRING:
-		values->vp->p = strmalloc(rp);
-		break;
-
-	case VALTYPE_REGEX:
-		values->vp->r = new_regexval(rp, TRUE);
-		break;
-
-	default:
-		mlforce("BUG: bad type %s %d", names->name, names->type);
-		return FALSE;
+		}
 	}
 
 	if (!same_val(names, values, &oldvalue)) {
@@ -761,7 +762,8 @@ register struct VAL *values;
 		}
 	}
 
-	free_val(names, &oldvalue);
+	if (isLocalVal(&oldvalue))
+		free_val(names, &oldvalue);
 	return TRUE;
 }
 
@@ -775,7 +777,8 @@ int f,n;
 
 	s = liststuff(MODES_LIST_NAME, makemodelist,0,(char *)wp);
 	/* back to the buffer whose modes we just listed */
-	(void)swbuffer(wp->w_bufp);
+	if (swbuffer(wp->w_bufp))
+		curwp = wp;
 	return s;
 }
 
@@ -804,43 +807,52 @@ int	eolchar;
 }
 
 int
-find_mode(mode, global, namesp, valuep)
+find_mode(mode, global, args)
 char	*mode;
 int	global;
-struct VALNAMES **namesp;
-struct VAL **valuep;
+VALARGS *args;
 {
 	register char *rp = !strncmp(mode, "no", 2) ? mode+2 : mode;
-	register struct VALNAMES *nn;
-	register struct VAL *vv;
 	register int	class;
+	register int	j;
 
 	for (class = 0; class < 3; class++) {
 		switch (class) {
 		default: /* universal modes */
-			nn = g_valuenames;
-			vv = (global != FALSE) ? global_g_values.gv : (struct VAL *)0;
+			args->names  = g_valuenames;
+			args->global = global_g_values.gv;
+			args->local  = (global != FALSE)
+				? args->global
+				: (struct VAL *)0;
 			break;
 		case 1:	/* buffer modes */
-			nn = b_valuenames;
-			vv = (global == TRUE) ? global_b_values.bv : curbp->b_values.bv;
+			args->names  = b_valuenames;
+			args->global = global_b_values.bv;
+			args->local  = (global == TRUE)
+				? args->global
+				: ((curbp != 0)
+					? curbp->b_values.bv
+					: (struct VAL *)0);
 			break;
 		case 2:	/* window modes */
-			nn = w_valuenames;
-			vv = (global == TRUE) ? global_w_values.wv : curwp->w_values.wv;
+			args->names  = w_valuenames;
+			args->global = global_w_values.wv;
+			args->local  = (global == TRUE)
+				? args->global
+				: ((curwp != 0)
+					? curwp->w_values.wv
+					: (struct VAL *)0);
 			break;
 		}
-
-		if (vv != 0) {
-			while (nn->name != NULL) {
-				if (!strcmp(rp, nn->name)
-				 || !strcmp(rp, nn->shortname)) {
-					*namesp = nn;
-					*valuep = vv;
+		if (args->local != 0) {
+			for (j = 0; args->names[j].name != NULL; j++) {
+				if (!strcmp(rp, args->names[j].name)
+				 || !strcmp(rp, args->names[j].shortname)) {
+					args->names  += j;
+					args->local  += j;
+					args->global += j;
 					return TRUE;
 				}
-				nn++;
-				vv++;
 			}
 		}
 	}
@@ -855,8 +867,7 @@ do_a_mode(kind, global)
 int	kind;
 int	global;
 {
-	struct VALNAMES	*nn;
-	struct VAL	*vv;
+	VALARGS	args;
 	register int	s;
 	static char cbuf[NLINE]; 	/* buffer to receive mode name into */
 
@@ -873,13 +884,13 @@ int	global;
 		return listmodes(FALSE,1);
 	}
 
-	if ((s = find_mode(cbuf, global, &nn, &vv)) != TRUE) {
+	if ((s = find_mode(cbuf, global, &args)) != TRUE) {
 #if OPT_EVAL
 		return set_variable(cbuf);
 #else
 		mlforce("[Not a legal set option: \"%s\"]", cbuf);
 #endif
-	} else if ((s = adjvalueset(cbuf, kind, nn, global, vv)) != 0) {
+	} else if ((s = adjvalueset(cbuf, kind, global, &args)) != 0) {
 		if (s == TRUE)
 			mlerase();	/* erase the junk */
 		return s;
@@ -909,7 +920,7 @@ int global;	/* true = global flag,	false = current buffer flag */
 		return TRUE;
 
 	/* if the settings are up, redisplay them */
-	if (bfind(MODES_LIST_NAME, NO_CREAT, BFSCRTCH))
+	if (find_b_name(MODES_LIST_NAME))
 		(void)listmodes(FALSE,1);
 
 	if (autobuff != global_g_val(GMDABUFF)) sortlistbuffers();
@@ -922,6 +933,11 @@ int global;	/* true = global flag,	false = current buffer flag */
 		set_global_g_val(GMDXTERM_MOUSE,!xterm_mouse);
 	}
 #endif
+
+	if (curbp) {
+		curtabval = tabstop_val(curbp);
+		curswval = shiftwid_val(curbp);
+	}
 
 	return s;
 }

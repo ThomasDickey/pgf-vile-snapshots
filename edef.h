@@ -9,7 +9,10 @@
 
 /*
  * $Log: edef.h,v $
- * Revision 1.113  1993/08/18 16:48:29  pgf
+ * Revision 1.114  1993/09/03 09:11:54  pgf
+ * tom's 3.60 changes
+ *
+ * Revision 1.113  1993/08/18  16:48:29  pgf
  * v. 3.59
  *
  * Revision 1.112  1993/08/13  16:32:50  pgf
@@ -378,7 +381,7 @@
 decl_uninit( char *prog_arg );		/* argv[0] from main.c */
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version 3.59");
+decl_init( char version[], "version 3.60");
 
 decl_init( int slash, '/'); 		/* so DOS can use '\' as path separator */
 
@@ -389,6 +392,7 @@ decl_uninit( CMASK _chartypes_[N_chars] );	/* character types	*/
 decl_uninit( int interrupted );		/* interrupt signal?		*/
 decl_uninit( int displaying );		/* flag set during screen updates */
 decl_uninit( int doing_kbd_read );	/* flag set during keyboard reading */
+decl_uninit( int reading_msg_line );	/* flag set during msgline reading */
 decl_uninit( jmp_buf read_jmp_buf );	/* for setjmp/longjmp on SIGINT */
 decl_uninit( int insertmode );		/* are we inserting or overwriting? */
 decl_uninit( int insert_mode_was );	/* were we (and will we be?)	*/

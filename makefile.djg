@@ -3,10 +3,13 @@
 #
 # T.DANG (dang@cogit.ign.fr)
 #
-# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.djg,v 1.0 1993/07/06 16:53:05 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.djg,v 1.1 1993/09/03 09:11:54 pgf Exp $
 #
 # $Log: makefile.djg,v $
-# Revision 1.0  1993/07/06 16:53:05  pgf
+# Revision 1.1  1993/09/03 09:11:54  pgf
+# tom's 3.60 changes
+#
+# Revision 1.0  1993/07/06  16:53:05  pgf
 # Initial revision
 #
 
@@ -26,14 +29,14 @@ SRC = 	main.c ibmpc.c basic.c bind.c buffer.c crypt.c \
 	fileio.c finderr.c glob.c globals.c history.c input.c insert.c isearch.c \
 	line.c modes.c npopen.c oneliner.c opers.c path.c random.c regexp.c \
 	region.c search.c spawn.c tags.c tbuff.c termio.c tmp.c undo.c \
-	vmalloc.c window.c word.c wordmov.c map.c
+	version.c vmalloc.c window.c word.c wordmov.c map.c
 
 OBJ = 	main.o ibmpc.o basic.o bind.o buffer.o crypt.o \
       	csrch.o display.o eval.o exec.o externs.o fences.o file.o filec.o \
 	fileio.o finderr.o glob.o globals.o history.o input.o insert.o isearch.o \
 	line.o modes.o npopen.o oneliner.o opers.o path.o random.o regexp.o \
 	region.o search.o spawn.o tags.o tbuff.o termio.o tmp.o undo.o \
-	vmalloc.o window.o word.o wordmov.o map.o
+	version.o vmalloc.o window.o word.o wordmov.o map.o
 
 %.o:	%.c estruct.h nemode.h edef.h proto.h 
 	gcc $(CFLAGS) -c $< -o $@ 

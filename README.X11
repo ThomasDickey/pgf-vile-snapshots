@@ -29,13 +29,9 @@ current bugs & limitations:
 
 - selections are weak at best:
 	- they stop displaying when the screen changes
-	- there's no support for multi-click
 	- there's no support for more than a screen's worth
 
 - can get badly behind auto-repeated keys
-
-- the 'have_selection' field is cleared (sometimes unnecessarily), e.g.,
-  when scrolling.
 
 ===================================
 notes:
@@ -53,8 +49,6 @@ fix:
 
 	- in vi, yank/kill goes to default buffer as well as named buffer.
     		vile only sends them to named buffer
-
-	- autoindent, with leading spaces -- vi eats them, vile doesn't
 
         - talk to Saber -- use CUT_BUFFER0 as well as PRIMARY
 

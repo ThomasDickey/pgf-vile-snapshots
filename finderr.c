@@ -2,7 +2,16 @@
  * Written for vile by Paul Fox, (c)1990
  *
  * $Log: finderr.c,v $
- * Revision 1.24  1993/06/02 14:28:47  pgf
+ * Revision 1.27  1993/09/06 16:26:34  pgf
+ * added DEC OSF/1 error message formats
+ *
+ * Revision 1.26  1993/09/03  16:17:24  pgf
+ * added in initialization of name[] in finderrbug()
+ *
+ * Revision 1.25  1993/09/03  09:11:54  pgf
+ * tom's 3.60 changes
+ *
+ * Revision 1.24  1993/06/02  14:28:47  pgf
  * see tom's 3.48 CHANGES
  *
  * Revision 1.23  1993/05/24  15:21:37  pgf
@@ -71,29 +80,29 @@
  * revision 1.3
  * date: 1991/08/06 15:21:44;
  * sprintf changes
- * 
+ *
  * revision 1.2
  * date: 1991/06/25 19:52:42;
  * massive data structure restructure
- * 
+ *
  * revision 1.1
  * date: 1990/09/21 10:25:19;
  * initial vile RCS revision
-*/
+ */
 
-#include	"estruct.h"
-#include        "edef.h"
+#include "estruct.h"
+#include "edef.h"
 
 #if FINDERR
 
-static	char febuff[NBUFN];	/* name of buffer to find errors in */
+static	char febuff[NBUFN+1];	/* name of buffer to find errors in */
 static	unsigned newfebuff;	/* is the name new since last time? */
 
 void
 set_febuff(name)
 char	*name;
 {
-	(void)strncpy(febuff, name, sizeof(febuff));
+	(void)strncpy(febuff, name, NBUFN);
 	newfebuff = TRUE;
 }
 
@@ -112,12 +121,12 @@ int f,n;
 	struct LINE *dotp;
 	int moveddot = FALSE;
 	char	*text;
-	
+
 	int errline;
 	char errfile[NFILEN];
 	char ferrfile[NFILEN];
 	char verb[32];
-	
+
 	static int oerrline = -1;
 	static char oerrfile[256];
 
@@ -133,18 +142,18 @@ int f,n;
 	static char *dirs[DIRLEVELS];
 
 	/* look up the right buffer */
-        if ((sbp=bfind(febuff, NO_CREAT, 0)) == NULL) {
-        	mlforce("[No buffer to search for errors.]");
-                return(FALSE);
-        }
-        
-        if (newfebuff) {
-        	oerrline = -1;
-        	oerrfile[0] = '\0';
+	if ((sbp = find_b_name(febuff)) == NULL) {
+		mlforce("[No buffer to search for errors.]");
+		return(FALSE);
+	}
+ 
+	if (newfebuff) {
+		oerrline = -1;
+		oerrfile[0] = EOS;
 		while (l)
 			free(dirs[l--]);
-        }
-        newfebuff = FALSE;
+	}
+	newfebuff = FALSE;
 
 	dotp = getdot(sbp);
 
@@ -166,7 +175,7 @@ int f,n;
 #endif
 
 			if (tb_init(&tmp, EOS) != 0
-			 && tb_bappend(&tmp, dotp->l_text, 
+			 && tb_bappend(&tmp, dotp->l_text,
 			 	(unsigned)llength(dotp)) != 0
 			 && tb_append(&tmp, EOS) != 0)
 			 	text = tb_values(tmp);
@@ -176,22 +185,32 @@ int f,n;
 			if ( (sscanf(text,
 				"\"%[^\" \t]\", line %d:",
 				errfile, &errline) == 2
-#if APOLLO
-				/* C compiler */
+#if APOLLO 	/* C compiler */
 			  ||  sscanf(text,
 				"%32[*] Line %d of \"%[^\" \t]\"",
-				verb, &errline, errfile) == 3 
+				verb, &errline, errfile) == 3
 				/* sys5 lint */
 			  ||  (!strncmp(text, "    ", 4)
 			    && (sscanf(text+4, lint_fmt1,
 			    	verb, errfile, &errline) == 3)
 			     || sscanf(text+4, lint_fmt2,
-			     	verb, &num1, nofile, &num2, errfile, &errline) == 6)
+			     	verb, &num1, nofile, &num2,
+						errfile, &errline) == 6)
+			  	/* C++ compiler */
+			  ||  sscanf(text,
+			  	"CC: \"%[^\"]\", line %d",
+						errfile, &errline) == 2
+#endif
+#if OSF1
+/* 	/usr/lib/cmplrs/cc/cfe: Error: test.c, line 8: Syntax Error  */
+			  ||  sscanf(text,
+			  	"%*s %*s %[^, \t], line %d",
+						errfile, &errline) == 2
 #endif
 			  ||  sscanf(text,
 				"%[^: \t]: %d:",
-				errfile, &errline) == 2 
-#if SUNOS			/* lint-output */
+				errfile, &errline) == 2
+#if SUNOS	/* lint-output */
 			  ||  sscanf(text,
 			  	"%[^:( \t](%d):",
 				errfile, &errline) == 2
@@ -200,7 +219,7 @@ int f,n;
 			  	"  ::  %[^( \t](%d)",
 				errfile, &errline) == 2)
 #endif
-				) && (oerrline != errline || 
+				) && (oerrline != errline ||
 					strcmp(errfile,oerrfile))) {
 				break;
 			} else if (sscanf(text,
@@ -218,7 +237,7 @@ int f,n;
 						if (!e)
 							continue;
 						/* put a null in its place */
-						*e = '\0';
+						*e = EOS;
 						/* make a copy */
 						dirs[++l] = strmalloc(d);
 						/* put the quote back */
@@ -230,7 +249,7 @@ int f,n;
 				}
 			}
 		}
-			
+
 		if (lforw(dotp) == l_ref(sbp->b_line.l)) {
 			mlforce("[No more errors in %s buffer]", febuff);
 			TTbeep();
@@ -250,12 +269,12 @@ int f,n;
 
 	(void)pathcat(ferrfile, dirs[l], errfile);
 
-	if (strcmp(ferrfile,curbp->b_bname) &&
+	if (!eql_bname(curbp, ferrfile) &&
 		strcmp(ferrfile,curbp->b_fname)) {
 		/* if we must change windows */
 		struct WINDOW *wp;
 		for_each_window(wp) {
-			if (!strcmp(wp->w_bufp->b_bname,ferrfile)
+			if (eql_bname(wp->w_bufp, ferrfile)
 			 || !strcmp(wp->w_bufp->b_fname,ferrfile))
 				break;
 		}
@@ -274,13 +293,12 @@ int f,n;
 
 	/* it's an absolute move */
 	curwp->w_lastdot = curwp->w_dot;
-	gotoline(TRUE, -(curbp->b_linecount - errline + 1));
+	s = gotoline(TRUE, -(curbp->b_linecount - errline + 1));
 
 	oerrline = errline;
 	(void)strcpy(oerrfile,errfile);
 
-	return TRUE;
-
+	return s;
 }
 
 struct LINE *
@@ -289,15 +307,15 @@ struct BUFFER *bp;
 {
 	register WINDOW *wp;
 	if (bp->b_nwnd) {
-		/* scan for windows holding that buffer, 
+		/* scan for windows holding that buffer,
 					pull dot from the first */
-	        for_each_window(wp) {
-	                if (wp->w_bufp == bp) {
-	                        return l_ref(wp->w_dot.l);
+		for_each_window(wp) {
+			if (wp->w_bufp == bp) {
+				return l_ref(wp->w_dot.l);
 			}
-	        }
+		}
 	}
-        return l_ref(bp->b_dot.l);
+	return l_ref(bp->b_dot.l);
 }
 
 void
@@ -308,18 +326,18 @@ struct LINE *dotp;
 	register WINDOW *wp;
 
 	if (bp->b_nwnd) {
-	        for_each_window(wp) {
-	                if (wp->w_bufp == bp) {
-		                wp->w_dot.l = l_ptr(dotp);
-		                wp->w_dot.o = 0;
-			        wp->w_flag |= WFMOVE;
+		for_each_window(wp) {
+			if (wp->w_bufp == bp) {
+				wp->w_dot.l = l_ptr(dotp);
+				wp->w_dot.o = 0;
+				wp->w_flag |= WFMOVE;
 			}
-	        }
+		}
 		return;
 	}
 	/* then the buffer isn't displayed */
-        bp->b_dot.l = l_ptr(dotp);
-        bp->b_dot.o = 0;
+	bp->b_dot.l = l_ptr(dotp);
+	bp->b_dot.o = 0;
 }
 
 /*
@@ -330,14 +348,13 @@ int
 finderrbuf(f, n)
 int f,n;
 {
-        register int    s;
-        char name[NFILEN];
-	static	TBUFF	*last;
+	register int    s;
+	char name[NBUFN+1];
 
-        if ((s = mlreply_file("Buffer to scan for \"errors\": ", &last,
-			FILEC_UNKNOWN, name)) == ABORT)
-                return s;
+	(void)strcpy(name, febuff);
+	if ((s = mlreply("Buffer to scan for \"errors\": ", name, sizeof(name))) == ABORT)
+		return s;
 	set_febuff((s == FALSE) ? ScratchName(Output) : name);
-        return TRUE;
+	return TRUE;
 }
 #endif

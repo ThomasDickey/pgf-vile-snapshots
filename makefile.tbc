@@ -126,6 +126,7 @@ VILE_DEPS =  \
  termio.obj \
  tmp.obj \
  undo.obj \
+ version.obj \
  vmalloc.obj \
  window.obj \
  word.obj \
@@ -173,6 +174,7 @@ tbuff.obj+
 termio.obj+
 tmp.obj+
 undo.obj+
+version.obj+
 vmalloc.obj+
 window.obj+
 word.obj+
@@ -259,6 +261,8 @@ termio.obj: vile.cfg termio.c
 tmp.obj: vile.cfg tmp.c 
 
 undo.obj: vile.cfg undo.c 
+
+version.obj: vile.cfg version.c 
 
 vmalloc.obj: vile.cfg vmalloc.c 
 

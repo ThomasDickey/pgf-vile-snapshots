@@ -5,7 +5,10 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: tags.c,v $
- * Revision 1.39  1993/08/05 14:29:12  pgf
+ * Revision 1.40  1993/09/03 09:11:54  pgf
+ * tom's 3.60 changes
+ *
+ * Revision 1.39  1993/08/05  14:29:12  pgf
  * tom's 3.57 changes
  *
  * Revision 1.38  1993/07/01  16:15:54  pgf
@@ -153,7 +156,7 @@
 };
 
 
-static	LINE *	cheap_scan P(( BUFFER *, char *, SIZE_T ));
+static	LINE *	cheap_scan P(( BUFFER *, char *, SIZE_T, int ));
 static	void	free_untag P(( UNTAG * ));
 static	BUFFER *gettagsfile P(( int, int * ));
 static	void	nth_name P(( char *,  char *, int ));
@@ -173,11 +176,11 @@ int f,n;
 	int taglen;
 
 	if (clexec || isnamedcmd) {
-	        if ((s=mlreply("Tag name: ", tagname, NFILEN)) != TRUE)
+	        if ((s=mlreply("Tag name: ", tagname, sizeof(tagname))) != TRUE)
 	                return (s);
 		taglen = b_val(curbp,VAL_TAGLEN);
 	} else {
-		s = screen_string(tagname,NFILEN,(CMASK)_ident);
+		s = screen_string(tagname,sizeof(tagname),(CMASK)_ident);
 		taglen = 0;
 	}
 	if (s == TRUE)
@@ -210,8 +213,9 @@ int taglen;
 	BUFFER *tagbp;
 	int nomore;
 	int gotafile = FALSE;
+	int exact = (taglen == 0);
 
-	(void)strcpy(tagname,tag);
+	(void)strncpy(tagname, tag, sizeof(tagname));
 
 	i = 0;
 	do {
@@ -227,8 +231,7 @@ int taglen;
 		}
 
 		if (tagbp) {
-			lp = cheap_scan(tagbp, tagname, taglen ? 
-					(SIZE_T)taglen : strlen(tagname));
+			lp = cheap_scan(tagbp, tagname, (SIZE_T)taglen, exact);
 			gotafile = TRUE;
 		} else {
 			lp = NULL;
@@ -251,7 +254,7 @@ int taglen;
 		while (lastsl != first)
 			tfname[i++] = *first++;
 	}
-	while (i < NFILEN && tfp < lplim && *tfp != '\t') {
+	while (i < sizeof(tfname) && tfp < lplim && *tfp != '\t') {
 		tfname[i++] = *tfp++;
 	}
 	tfname[i] = EOS;
@@ -287,7 +290,6 @@ int taglen;
 	/* it's an absolute move -- remember where we are */
 	odot = DOT;
 
-	i = 0;
 	tfp++;  /* skip the tab */
 	if (tfp >= lplim) {
 		mlforce("[Bad line in tags file.]");
@@ -303,15 +305,16 @@ int taglen;
 		if (s != TRUE && !changedfile)
 			tossuntag();
 	} else {
+		i = 0;
 		tfp += 2; /* skip the "/^" */
 		lplim -= 2; /* skip the "$/" */
-		while (i < NPAT && tfp < lplim) {
+		while (i < sizeof(tagpat) && tfp < lplim) {
 			if (*tfp == '\\' && tfp < lplim - 1)
 				tfp++;  /* the backslash escapes the next char */
 			tagpat[i++] = *tfp++;
 		}
-		tagpat[i] = 0;
-		lp = cheap_scan(curbp,tagpat,(SIZE_T)i);
+		tagpat[i] = EOS;
+		lp = cheap_scan(curbp, tagpat, (SIZE_T)i, FALSE);
 		if (lp == NULL) {
 			mlforce("[Tag not present]");
 			TTbeep();
@@ -367,7 +370,7 @@ int *endofpathflagp;
 	(void)lsprintf(tagbufname, ScratchName(Tags %d), n+1);
 
 	/* is the buffer around? */
-        if ((tagbp=bfind(tagbufname, NO_CREAT, 0)) == NULL) {
+	if ((tagbp=find_b_name(tagbufname)) == NULL) {
 		char *tagf = global_b_val_ptr(VAL_TAGS);
 
 		nth_name(tagfilename, tagf, n);
@@ -386,7 +389,7 @@ int *endofpathflagp;
 		}
 
 		/* find the pointer to that buffer */
-		if ((tagbp=bfind(tagf, OK_CREAT, BFINVS)) == NULL) {
+		if ((tagbp=bfind(tagf, BFINVS)) == NULL) {
 			mlforce("[Can't create tags buffer]");
 			return NULL;
 		}
@@ -395,26 +398,37 @@ int *endofpathflagp;
 			return NULL;
 		}
 		/* be sure it has the right name */
-		(void)strcpy(tagbp->b_bname, tagbufname);
+		set_bname(tagbp, tagbufname);
 		b_set_invisible(tagbp);
 			
         }
 	return tagbp;
 }
 
+/*
+ * Do exact/inexact lookup of string in a buffer.  We only need exact match if
+ * the string is a tag (in which case it must be followed by a tab).
+ */
 static LINE *
-cheap_scan(bp,name,len)
+cheap_scan(bp, name, len, exact)
 BUFFER *bp;
 char *name;
 SIZE_T len;
+int exact;
 {
 	register LINE *lp;
 
+	if (exact)
+		len = strlen(name);
+
 	for_each_line(lp, bp) {
 		if (llength(lp) >= len) {
-			if (llength(lp) >= len &&
-				 !strncmp(lp->l_text, name, len))
-				return lp;
+			if (llength(lp) >= len
+			 && !strncmp(lp->l_text, name, len)) {
+				if (!exact
+				 || (lp->l_text[len] == '\t'))
+					return lp;
+			 }
 		}
 	}
 	return NULL;

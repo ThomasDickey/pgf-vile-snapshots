@@ -11,7 +11,10 @@
  * which means that the dot and mark values in the buffer headers are nonsense.
  *
  * $Log: line.c,v $
- * Revision 1.52  1993/08/13 16:32:50  pgf
+ * Revision 1.53  1993/09/03 09:11:54  pgf
+ * tom's 3.60 changes
+ *
+ * Revision 1.52  1993/08/13  16:32:50  pgf
  * tom's 3.58 changes
  *
  * Revision 1.51  1993/08/05  14:29:12  pgf
@@ -160,33 +163,33 @@
  * revision 1.8
  * date: 1991/08/06 15:22:27;
  * allow null l_text pointers for empty lines
- * 
+ *
  * revision 1.7
  * date: 1991/07/19 17:14:49;
  * fixed missing "copy_for_undo" bug introduced a while ago
- * 
+ *
  * revision 1.6
  * date: 1991/06/25 19:52:54;
  * massive data structure restructure
- * 
+ *
  * revision 1.5
  * date: 1991/06/16 17:35:32;
  * fixed bug -- wasn't assigning new size to line struct when re-allocing
  * for a line merge
- * 
+ *
  * revision 1.4
  * date: 1991/06/03 10:24:26;
  * took out old #ifdef INLINE stuff, and
  * added comments for usekreg
- * 
+ *
  * revision 1.3
  * date: 1991/05/31 11:11:16;
  * change args to execute()
- * 
+ *
  * revision 1.2
  * date: 1991/04/04 09:28:37;
  * line text is now separate from LINE struct
- * 
+ *
  * revision 1.1
  * date: 1990/09/21 10:25:32;
  * initial vile RCS revision
@@ -508,7 +511,7 @@ int n, c;
 		(void)memset(l_ref(lp2)->l_text, c, (SIZE_T)n);
 
 		tag_for_undo(lp2);
-		
+
 		/* don't move DOT until after tagging for undo */
 		/*  (it's important in an empty buffer) */
 		curwp->w_dot.l = lp2;
@@ -1018,7 +1021,6 @@ ldelnewline()
 void
 ksetup()
 {
-
 	if ((kregflag & KAPPEND) != 0)
 		kregflag = KAPPEND;
 	else
@@ -1026,6 +1028,7 @@ ksetup()
 	kchars = klines = 0;
 
 }
+
 /*
  * clean up the old contents of a kill register.
  * if called from other than kinsert, only does anything in the case where
@@ -1047,17 +1050,17 @@ kdone()
 
 		/* and reset all the kill buffer pointers */
 		kbs[ukb].kbufh = kbs[ukb].kbufp = NULL;
-		kbs[ukb].kused = KBLOCK; 	        
+		kbs[ukb].kused = 0;
 	}
 	kregflag &= ~KNEEDCLEAN;
 	kbs[ukb].kbflag = kregflag;
+	relist_registers();
 }
 
 /*
  * Insert a character to the kill buffer, allocating new chunks as needed.
  * Return TRUE if all is well, and FALSE on errors.
  */
-
 int
 kinsert(c)
 int c;		/* character to insert in the kill buffer */
@@ -1117,9 +1120,13 @@ int	c;
 {
 	register int n;
 
-	if (isdigit(c))
-		n = c - '0';
-	else if (islower(c))
+	if (isdigit(c)) {
+		int	save = ukb;
+		ukb = c - '0';
+		kregcirculate(FALSE);
+		n = ukb;
+		ukb = save;
+	} else if (islower(c))
 		n = c - 'a' + 10;  /* named buffs are in 10 through 36 */
 	else if (isupper(c))
 		n = c - 'A' + 10;
@@ -1130,7 +1137,7 @@ int	c;
 }
 
 /* select one of the named registers for use with the following command */
-/*  this could actually be handled as a command prefix, in kbdseq(), much
+/*  this could actually be handled as a command prefix, in kbd_seq(), much
 	the way ^X-cmd and META-cmd are done, except that we need to be
 	able to accept any of
 		 3"adw	"a3dw	"ad3w
@@ -1143,27 +1150,17 @@ usekreg(f,n)
 int f,n;
 {
 	int c, i, status;
-	CMDFUNC *cfp;			/* function to execute */
 	char tok[NSTRING];		/* command incoming */
+	static	char	cbuf[2];
 
 	/* take care of incrementing the buffer number, if we're replaying
 		a command via 'dot' */
 	incr_dot_kregnum();
 
-	if (clexec || isnamedcmd) {
-		int stat;
-		static char cbuf[2];
-	        if ((stat=mlreply("Use named register: ", cbuf, 2)) != TRUE)
-	                return stat;
-		c = cbuf[0];
-        } else {
-		c = kbd_key();
-        }
+	if ((status = mlreply_reg("Use named register: ", cbuf, &c, -1)) != TRUE)
+		return status;
 
-	if ((i = reg2index(c)) < 0) {
-		TTbeep();
-		return (FALSE);
-	}
+	i = reg2index(c);
 	if (kbm_started(i,FALSE))
 		return FALSE;
 
@@ -1178,9 +1175,9 @@ int f,n;
 
 	if (clexec) {
 		macarg(tok);	/* get the next token */
-		cfp = engl2fnc(tok);
+		status = execute(engl2fnc(tok), f, n);
 	} else if (isnamedcmd) {
-		return namedcmd(f,n);
+		status = namedcmd(f,n);
 	} else {
 		/* get the next command from the keyboard */
 		c = kbd_seq();
@@ -1188,17 +1185,13 @@ int f,n;
 		/* allow second chance for entering counts */
 		do_repeats(&c,&f,&n);
 
-		cfp = kcod2fnc(c);
+		status = execute(kcod2fnc(c), f, n);
 	}
-
-	/* and execute the command */
-	status = execute(cfp, f, n);
 
 	ukb = 0;
 	kregflag = 0;
 
 	return(status);
-	
 }
 
 /* buffers 0 through 9 are circulated automatically for full-line deletes */
@@ -1208,7 +1201,7 @@ void
 kregcirculate(killing)
 int killing;
 {
-	static lastkb; /* index of the real "0 */
+	static	int	lastkb;	/* index of the real "0 */
 
 	if (ukb >= 10) /* then the user specified a lettered buffer */
 		return;
@@ -1216,7 +1209,7 @@ int killing;
 	/* we only allow killing into the real "0 */
 	/* ignore any other buffer spec */
 	if (killing) {
-		if ((kbs[lastkb].kbflag & KLINES) && 
+		if ((kbs[lastkb].kbflag & (KLINES|KAPPEND)) &&
 			! (kbs[lastkb].kbflag & KYANK)) {
 			if (--lastkb < 0) lastkb = 9;
 			kbs[lastkb].kbflag = 0;
@@ -1225,17 +1218,16 @@ int killing;
 	} else {
 		/* let 0 pass unmolested -- it is the default */
 		if (ukb == 0) {
-			ukb = lastkb; 
+			ukb = lastkb;
 		} else {
 		/* for the others, if the current "0 has lines in it, it
 		    must be `"1', else "1 is `"1'.  get it? */
-			if (kbs[lastkb].kbflag & KLINES)
+			if (kbs[lastkb].kbflag & (KLINES|KAPPEND))
 				ukb = (lastkb + ukb - 1) % 10;
 			else
 				ukb = (lastkb + ukb) % 10;
 		}
 	}
-	
 }
 
 int
@@ -1272,10 +1264,10 @@ doput(f,n,after,putlines)
 int f,n,after,putlines;
 {
 	int s, oukb, lining;
-	
+
 	if (!f)
 		n = 1;
-		
+
 	oukb = ukb;
 	kregcirculate(FALSE);
 	if (kbs[ukb].kbufh == NULL) {
@@ -1284,7 +1276,7 @@ int f,n,after,putlines;
 		TTbeep();
 		return(FALSE);
 	}
-	lining = (putlines == TRUE || (kbs[ukb].kbflag & KLINES));
+	lining = (putlines == TRUE || (kbs[ukb].kbflag & (KLINES|KAPPEND)));
 	if (lining) {
 		if (after && !is_header_line(curwp->w_dot, curbp))
 			curwp->w_dot.l = lFORW(curwp->w_dot.l);
@@ -1300,7 +1292,7 @@ int f,n,after,putlines;
 	if (is_header_line(curwp->w_dot, curbp))
 		curwp->w_dot.l = lBACK(curwp->w_dot.l);
 	if (lining)
-		(void)firstnonwhite(FALSE,0);
+		(void)firstnonwhite(FALSE,1);
 	ukb = 0;
 	return (s);
 }
@@ -1314,17 +1306,20 @@ int n,aslines;
 {
 	register int	c;
 	register int	i;
-	int wasnl, suppressnl;
+	int status, wasnl, suppressnl;
+	L_NUM before;
 	register char	*sp;	/* pointer into string to insert */
 	KILL *kp;		/* pointer into kill register */
-	
+
 	if (n < 0)
 		return FALSE;
-		
+
 	/* make sure there is something to put */
 	if (kbs[ukb].kbufh == NULL)
 		return TRUE;		/* not an error, just nothing */
 
+	status = TRUE;
+	before = line_count(curbp);
 	suppressnl = FALSE;
 	wasnl = FALSE;
 
@@ -1339,34 +1334,49 @@ int n,aslines;
 			sp = (char *)kp->d_chunk;
 			while (i--) {
 				if ((c = *sp++) == '\n') {
-					if (lnewline() != TRUE)
-						return FALSE;
+					if (lnewline() != TRUE) {
+						status = FALSE;
+						break;
+					}
 					wasnl = TRUE;
 				} else {
 					if (is_header_line(curwp->w_dot,curbp))
 						suppressnl = TRUE;
-					if (linsert(1, c) != TRUE)
-						return FALSE;
+					if (linsert(1, c) != TRUE) {
+						status = FALSE;
+						break;
+					}
 					wasnl = FALSE;
 				}
 			}
+			if (status != TRUE)
+				break;
 			kp = kp->d_next;
 		}
+		if (status != TRUE)
+			break;
 		if (wasnl) {
 			if (suppressnl) {
-				if (ldelnewline() != TRUE)
-					return FALSE;
+				if (ldelnewline() != TRUE) {
+					status = FALSE;
+					break;
+				}
 			}
 		} else {
 			if (aslines && !suppressnl) {
-				if (lnewline() != TRUE)
-					return FALSE;
+				if (lnewline() != TRUE) {
+					status = FALSE;
+					break;
+				}
 			}
 		}
 	}
-        curwp->w_flag |= WFHARD;
-	return (TRUE);
+	curwp->w_flag |= WFHARD;
+	line_report(before);
+	return status;
 }
+
+static int	lastreg = -1;
 
 /* ARGSUSED */
 int
@@ -1375,35 +1385,23 @@ int f,n;
 {
 	int c, j, status;
 	KILL *kp;		/* pointer into kill register */
-	static int	lastreg = -1;
 	static TBUFF	*buffer;
+	static	char	cbuf[2];
 
 	if (!f)
 		n = 1;
 	else if (n <= 0)
 		return TRUE;
 
-	if (clexec || isnamedcmd) {
-		int stat;
-		static char cbuf[2];
-	        if ((stat=mlreply("Execute register: ", cbuf, 2)) != TRUE)
-	                return stat;
-		c = cbuf[0];
-        } else {
-		c = kbd_key();
-        }
+	if ((status = mlreply_reg("Execute register: ", cbuf, &c, lastreg)) != TRUE)
+		return status;
 
-	if (c == '@' && lastreg != -1) {
-		c = lastreg;
-	} else if (reg2index(c) < 0) {
-		TTbeep();
-		mlforce("[Invalid register name]");
-		return FALSE;
-	}
-
-	j = reg2index(lastreg = c);
+	j = reg2index(c);
 	if (kbm_started(j,TRUE))
 		return FALSE;
+
+	lastreg = c;
+	relist_registers();
 
 	/* make sure there is something to execute */
 	kp = kbs[j].kbufh;
@@ -1440,7 +1438,7 @@ int f,n;
 	char respbuf[NFILEN];
 
 	ksetup();
-	s = mlreply_no_opts("Load register with: ", respbuf, sizeof(respbuf) - 1);
+	s = mlreply_no_opts("Load register with: ", respbuf, sizeof(respbuf));
 	if (s != TRUE)
 		return FALSE;
 	for (s = 0; s < NFILEN; s++) {
@@ -1455,7 +1453,14 @@ int f,n;
 
 /* Show the contents of the kill-buffers */
 #if !SMALLER
+#define	REGS_PREFIX	12	/* non-editable portion of the display */
+
 static	void	listregisters P(( int, char * ));
+
+#if OPT_UPBUFF
+static	int	show_Registers P(( BUFFER * ));
+static	int	show_all_regs;
+#endif
 
 /*ARGSUSED*/
 static void
@@ -1464,24 +1469,46 @@ int iflag;	/* list nonprinting chars flag */
 char *dummy;
 {
 	register KILL	*kp;
-	register int	i, j, c;
+	register int	i, ii, j, c;
 	register UCHAR	*p;
-	int	any = 0;
+	int	any;
+
+#if OPT_UPBUFF
+	show_all_regs = iflag;
+#endif
+	b_set_left_margin(curbp, REGS_PREFIX);
+	any = (reg2index(lastreg) >= 0);
+	if (any)
+		bprintf("last=%c", lastreg);
 
 	for (i = 0; i < SIZEOF(kbs); i++) {
-		if ((kp = kbs[i].kbufh) != 0) {
-			int first = TRUE;
+		int	save = ukb;
+
+		ii = i;
+		if (i >= 1 && i < 10) {	/* "1 ... "9 are special */
+			ukb = i;
+			kregcirculate(FALSE);
+			ii = ukb;
+		}
+		if ((kp = kbs[ii].kbufh) != 0) {
+			int first = FALSE;
 			if (any++)
 				bputc('\n');
-			bprintf("%c:", index2reg(i));
+			if (i > 0)
+				bprintf("%c:%*p",
+					index2reg(i),
+					REGS_PREFIX-2, ' ');
+			else
+				bprintf("%*S",
+					REGS_PREFIX, "(unnamed)");
 			do {
-				j = (kp->d_next != 0) ? KBLOCK : kbs[i].kused;
+				j = (kp->d_next != 0) ? KBLOCK : kbs[ii].kused;
 				p = kp->d_chunk;
 
 				while (j-- > 0) {
 					if (first) {
 						first = FALSE;
-						bputc('\t');
+						bprintf("%*p", REGS_PREFIX, ' ');
 					}
 					c = *p++;
 					if (isprint(c) || !iflag) {
@@ -1492,22 +1519,50 @@ char *dummy;
 						if (c == '\n')
 							bputc('\n');
 					}
-					if (c == '\n')
+					if (c == '\n') {
 						first = TRUE;
+						any = 0;
+					} else
+						any = 1;
 				}
 			} while ((kp = kp->d_next) != 0);
 		}
+		if (i < 10)
+			ukb = save;
 	}
 }
+
+#define	REGISTERS_LIST_NAME ScratchName(Registers)
 
 /*ARGSUSED*/
 int
 showkreg(f,n)
 int f,n;
 {
-	return liststuff(ScratchName(Registers), listregisters, f, (char *)0);
+	return liststuff(REGISTERS_LIST_NAME, listregisters, f, (char *)0);
 }
-#endif
+
+#if OPT_UPBUFF
+static int
+show_Registers(bp)
+BUFFER *bp;
+{
+	b_clr_obsolete(bp);
+	return showkreg(show_all_regs, 1);
+}
+
+void
+relist_registers()
+{
+	register BUFFER *bp;
+	if ((bp = find_b_name(REGISTERS_LIST_NAME)) != 0) {
+		bp->b_upbuff = show_Registers;
+		b_set_obsolete(bp);
+	}
+}
+#endif	/* OPT_UPBUFF */
+
+#endif	/* !SMALLER */
 
 /* For memory-leak testing (only!), releases all kill-buffer storage. */
 #if NO_LEAKS

@@ -4,7 +4,13 @@
 	written 1986 by Daniel Lawrence
  *
  * $Log: eval.c,v $
- * Revision 1.64  1993/08/13 16:32:50  pgf
+ * Revision 1.66  1993/09/06 16:36:47  pgf
+ * changed glob() to doglob() to avoid symbol conflicts
+ *
+ * Revision 1.65  1993/09/03  09:11:54  pgf
+ * tom's 3.60 changes
+ *
+ * Revision 1.64  1993/08/13  16:32:50  pgf
  * tom's 3.58 changes
  *
  * Revision 1.63  1993/08/05  14:29:12  pgf
@@ -249,7 +255,7 @@ static	void	SetEnv P(( char **, char * ));
 #endif
 #if !SMALLER
 static	void	makevarslist P(( int, char *));
-static	int	is_mode_name P(( char *, int, struct VALNAMES **, struct VAL ** ));
+static	int	is_mode_name P(( char *, int, VALARGS * ));
 static	char *	get_listvalue P(( char *, int ));
 #endif
 static	int	gtlbl P(( char * ));
@@ -324,17 +330,16 @@ char *ptr;
  * such as "all" and "noview"
  */
 static int
-is_mode_name(name, showall, nn, vv)
+is_mode_name(name, showall, args)
 char *name;
 int showall;
-struct VALNAMES	**nn;
-struct VAL	**vv;
+VALARGS	*args;
 {
 
 	if (strncmp(name, "no", 2)
 	 && strcmp(name, "all")) {
-		if (find_mode(name, -TRUE, nn, vv)) {
-			if (!showall || !strcmp(name, (*nn)->shortname))
+		if (find_mode(name, -TRUE, args)) {
+			if (!showall || !strcmp(name, args->names->shortname))
 				return FALSE;
 			return TRUE;
 		}
@@ -349,12 +354,11 @@ get_listvalue(name, showall)
 char *name;
 int showall;
 {
-	struct VALNAMES	*nn;
-	struct VAL	*vv;
+	VALARGS args;
 	register int	s;
 
-	if ((s = is_mode_name(name, showall, &nn, &vv)) == TRUE)
-		return string_mode_val(nn, vv);
+	if ((s = is_mode_name(name, showall, &args)) == TRUE)
+		return string_mode_val(&args);
 	else if (s == SORTOFTRUE)
 		return gtenv(name);
 	return 0;
@@ -485,9 +489,9 @@ char *fname;		/* name of function to evaluate */
 		case UFSINDEX:	return(l_itoa(sindex(arg1, arg2)));
 		case UFENV:	return(GetEnv(arg1));
 		case UFBIND:	return(prc2engl(arg1));
-		case UFREADABLE:return(ltos(glob(arg1)
+		case UFREADABLE:return(ltos(doglob(arg1)
 				  &&   flook(arg1, FL_HERE) != NULL));
-		case UFWRITABLE:return(ltos(glob(arg1)
+		case UFWRITABLE:return(ltos(doglob(arg1)
 				  &&   !ffronly(arg1)));
 	}
 	return errorm;
@@ -522,11 +526,10 @@ char *vname;		/* name of environment variable to retrieve */
 		/* return errorm on a bad reference */
 		if (envars[vnum] == 0) {
 #if !SMALLER
-			struct VALNAMES	*nn;
-			struct VAL	*vv;
+			VALARGS	args;
 
-			if (is_mode_name(vname, TRUE, &nn, &vv) == TRUE)
-				value = string_mode_val(nn, vv);
+			if (is_mode_name(vname, TRUE, &args) == TRUE)
+				value = string_mode_val(&args);
 #endif
 			return (value);
 		}
@@ -547,7 +550,7 @@ char *vname;		/* name of environment variable to retrieve */
 #endif
 		ElseIf( EVFLICKER )	value = ltos(flickcode);
 		ElseIf( EVCURWIDTH )	value = l_itoa(term.t_ncol);
-		ElseIf( EVCBUFNAME )	value = curbp->b_bname;
+		ElseIf( EVCBUFNAME )	value = get_bname(curbp);
 		ElseIf( EVCFNAME )	value = curbp->b_fname;
 		ElseIf( EVSRES )	value = sres;
 		ElseIf( EVDEBUG )	value = ltos(macbug);
@@ -653,10 +656,9 @@ fvar:
 				}
 #if !SMALLER
 			if (vtype == ILLEGAL_NUM) {
-				struct VALNAMES	*nn;
-				struct VAL	*vv;
+				VALARGS	args;
 
-				if (is_mode_name(&var[1], TRUE, &nn, &vv) == TRUE) {
+				if (is_mode_name(&var[1], TRUE, &args) == TRUE) {
 					vnum  = MODE_NUM;
 					vtype = TKENV;
 				}
@@ -757,10 +759,9 @@ int	f,n;
 		mlforce("[No such variable as '%s']", var);
 		return(FALSE);
 	} else if (vd.v_type == TKENV && vd.v_num == MODE_NUM) {
-		struct VALNAMES	*nn;
-		struct VAL	*vv;
-		(void)find_mode(var+1, -TRUE, &nn, &vv);
-		return adjvalueset(var+1, TRUE, nn, -TRUE, vv);
+		VALARGS	args;
+		(void)find_mode(var+1, -TRUE, &args);
+		return adjvalueset(var+1, TRUE, -TRUE, &args);
 	}
 
 	/* get the value for that variable */
@@ -841,7 +842,7 @@ char *value;	/* value to set to */
 			status = newlength(TRUE,atoi(value));
 
 		ElseIf( EVCBUFNAME )
-			(void)strcpy(curbp->b_bname, value);
+			set_bname(curbp, value);
 			curwp->w_flag |= WFMODE;
 
 		ElseIf( EVCFNAME )
@@ -1057,8 +1058,7 @@ char *tokn;		/* token to evaluate */
 
 				/* grab the right buffer */
 				(void)strcpy(tokn, tokval(&tokn[1]));
-				bp = bfind(tokn, NO_CREAT, 0);
-				if (bp == NULL)
+				if ((bp = find_b_name(tokn)) == NULL)
 					return(errorm);
 
 				/* if the buffer is displayed, get the window

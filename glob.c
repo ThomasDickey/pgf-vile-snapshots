@@ -4,11 +4,10 @@
  * Performs wildcard-expansion for UNIX, VMS and MS-DOS systems.
  * Written by T.E.Dickey for vile (april 1993).
  *
- * (MS-DOS code was originally taken from the winc app example of the zortech compiler - pjr)
+ * (MS-DOS code was originally taken from the winc app example of the
+ * zortech compiler - pjr)
  *
  * To do:
- *	make this expand ~ (currently done only in lengthen_path)
- *
  *	allow '^' treatment in range-expressions.
  *
  *	make the wildcard expansion know about escaped characters (e.g.,
@@ -17,7 +16,13 @@
  *	modify (ifdef-style) 'expand_leaf()' to allow ellipsis.
  *
  * $Log: glob.c,v $
- * Revision 1.12  1993/08/05 14:29:12  pgf
+ * Revision 1.14  1993/09/06 16:36:47  pgf
+ * changed glob() to doglob() to avoid symbol conflicts
+ *
+ * Revision 1.13  1993/09/03  09:11:54  pgf
+ * tom's 3.60 changes
+ *
+ * Revision 1.12  1993/08/05  14:29:12  pgf
  * tom's 3.57 changes
  *
  * Revision 1.11  1993/06/25  11:25:55  pgf
@@ -710,12 +715,21 @@ char	**list_of_items;
 	myVec = 0;
 
 	for (i = 0; i < len; ++i) {
-		if (!isInternalName(list_of_items[i])
+		char	*item = list_of_items[i];
+		/*
+		 * For UNIX, expand '~' expressions in case we've got a pattern
+		 * like "~/test*.log".
+		 */
+#if UNIX
+		char	temp[NFILEN];
+		item = home_path(strcpy(temp, item));
+#endif
+		if (!isInternalName(item)
 		 && globbing_active()
-		 && string_has_wildcards(list_of_items[i])) {
-			if (!expand_pattern(list_of_items[i]))
+		 && string_has_wildcards(item)) {
+			if (!expand_pattern(item))
 				return 0;
-		} else if (!record_a_match(list_of_items[i])) {
+		} else if (!record_a_match(item)) {
 			return 0;
 		}
 	}
@@ -799,7 +813,7 @@ char ***argvp;
  * Expand a string, permitting only one match.
  */
 int
-glob (path)
+doglob (path)
 char	*path;
 {
 	char	**expand = glob_string(path);

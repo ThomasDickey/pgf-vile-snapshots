@@ -4,7 +4,13 @@
  *	Filename prompting and completion routines
  *
  * $Log: filec.c,v $
- * Revision 1.21  1993/07/09 19:10:27  pgf
+ * Revision 1.23  1993/09/06 16:36:47  pgf
+ * changed glob() to doglob() to avoid symbol conflicts
+ *
+ * Revision 1.22  1993/09/03  09:11:54  pgf
+ * tom's 3.60 changes
+ *
+ * Revision 1.21  1993/07/09  19:10:27  pgf
  * changed a couple of routine names -- it looked like watcom might
  * have been doing caseless symbol compares, making trailing_slash() and
  * trailing_SLASH() match, and also force_slash/force_SLASH.
@@ -341,7 +347,7 @@ int	first;
 {
 	register BUFFER *bp;
 
-	if ((bp = bfind(name, OK_CREAT, BFINVS)) != 0) {
+	if ((bp = bfind(name, BFINVS)) != 0) {
 		b_clr_flags(bp, BFSCRTCH);	/* make it nonvolatile */
 		if (first == -TRUE) {
 			(void)bclear(bp);
@@ -794,7 +800,7 @@ char *	result;
 			mlforce("[No files found] %s", Reply);
 			return FALSE;
 		}
-	} else if (glob(Reply) != TRUE) {
+	} else if (doglob(Reply) != TRUE) {
 		return FALSE;
 	}
 

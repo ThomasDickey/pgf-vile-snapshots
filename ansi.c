@@ -4,7 +4,10 @@
  * "termio.c". It compiles into nothing if not an ANSI device.
  *
  * $Log: ansi.c,v $
- * Revision 1.11  1993/07/15 10:37:58  pgf
+ * Revision 1.12  1993/09/03 09:11:54  pgf
+ * tom's 3.60 changes
+ *
+ * Revision 1.11  1993/07/15  10:37:58  pgf
  * see 3.55 CHANGES
  *
  * Revision 1.10  1993/04/01  12:53:33  pgf
@@ -32,11 +35,11 @@
  * date: 1991/06/19 01:32:21;
  * change name of howmany 'cuz of HP/UX conflict
  * sheesh
- * 
+ *
  * revision 1.2
  * date: 1991/05/31 10:26:19;
  * moved PRETTIER_SCROLL #define to estruct.h
- * 
+ *
  * revision 1.1
  * date: 1990/09/21 10:24:38;
  * initial vile RCS revision
@@ -50,12 +53,22 @@
 #if	ANSI
 
 #if	AMIGA
-#define NROW	23			/* Screen size. 		*/
-#define NCOL	77			/* Edit if you want to. 	*/
-#else
-#define NROW	24			/* Screen size. 		*/
-#define NCOL	80			/* Edit if you want to. 	*/
+#define NROW	23			/* Screen size.			*/
+#define NCOL	77			/* Edit if you want to.		*/
 #endif
+
+#if	MSDOS
+#define NROW    25
+#define NCOL    80
+#undef SCROLLCODE
+#define SCROLLCODE 0			/* ANSI.SYS doesn't do scrolling */
+#endif
+
+#ifndef NROW
+#define NROW	24			/* Screen size.			*/
+#define NCOL	80			/* Edit if you want to.		*/
+#endif
+
 #define NPAUSE	100			/* # times thru update to pause */
 #define MARGIN	8			/* size of minimim margin and	*/
 #define SCRSIZ	64			/* scroll size for extended lines */
@@ -82,11 +95,9 @@ int	cfcolor = -1;		/* current forground color */
 int	cbcolor = -1;		/* current background color */
 
 #if	AMIGA
-/* apperently the AMIGA does not follow the ANSI standards as
-   regards to colors....maybe because of the default palette
-   settings?
-*/
-
+/* apparently the AMIGA does not follow the ANSI standards as regards to
+ * colors ...maybe because of the default palette settings?
+ */
 int coltran[8] = {2, 3, 5, 7, 0, 4, 6, 1};	/* color translation table */
 #endif
 #endif
@@ -140,10 +151,8 @@ csi P((void))
 
 #if	COLOR
 void
-ansifcol(color) 	/* set the current output color */
-
-int color;	/* color to set */
-
+ansifcol(color)		/* set the current output color */
+	int	color;	/* color to set */
 {
 	if (color == cfcolor)
 		return;
@@ -158,10 +167,8 @@ int color;	/* color to set */
 }
 
 void
-ansibcol(color) 	/* set the current background color */
-
-int color;	/* color to set */
-
+ansibcol(color)		/* set the current background color */
+	int	color;	/* color to set */
 {
 	if (color == cbcolor)
 		return;
@@ -211,7 +218,7 @@ ansirev(state)		/* change reverse video state */
 int state;	/* TRUE = reverse, FALSE = normal */
 {
 #if	COLOR
-	int ftmp, btmp; 	/* temporaries for colors */
+	int ftmp, btmp;	/* temporaries for colors */
 #else
 	static int revstate = -1;
 	if (state == revstate)
@@ -220,9 +227,27 @@ int state;	/* TRUE = reverse, FALSE = normal */
 #endif
 
 	csi();
-	if (state) ttputc('7');
+#if COLOR && MSDOS
+	ttputc('1');	/* bold-on */
+#else
+	if (state) ttputc('7');	/* reverse-video on */
+#endif
 	ttputc('m');
+
 #if	COLOR
+#if	MSDOS
+	/*
+	 * Setting reverse-video with ANSI.SYS seems to reset the colors to
+	 * monochrome.  Using the colors directly to simulate reverse video
+	 * works better. Bold-face makes the foreground colors "look" right.
+	 */
+	ftmp = cfcolor;
+	btmp = cbcolor;
+	cfcolor = -1;
+	cbcolor = -1;
+	ansifcol(state ? btmp : ftmp);
+	ansibcol(state ? ftmp : btmp);
+#else	/* normal ANSI-reverse */
 	if (state == FALSE) {
 		ftmp = cfcolor;
 		btmp = cbcolor;
@@ -231,7 +256,8 @@ int state;	/* TRUE = reverse, FALSE = normal */
 		ansifcol(ftmp);
 		ansibcol(btmp);
 	}
-#endif
+#endif	/* MSDOS vs ANSI-reverse */
+#endif	/* COLOR */
 }
 
 int
@@ -287,7 +313,7 @@ int	n;
 		}
 	}
 	ansiscrollregion(0, term.t_mrow);
-	        
+
 #else /* use insert and delete line */
 #if PRETTIER_SCROLL
 	if (absol(from-to) > 1) {
@@ -295,7 +321,7 @@ int	n;
 		if (from < to)
 			from = to-1;
 		else
-			from = to+1;    
+			from = to+1;
 	}
 #endif
 	if (to < from) {
@@ -390,8 +416,5 @@ int f,n;	/* default flag, numeric argument [unused] */
 	return(TRUE);
 }
 #endif
-#else
-ansihello()
-{
-}
-#endif
+
+#endif	/* ANSI */

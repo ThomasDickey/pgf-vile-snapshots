@@ -125,7 +125,7 @@ CSRCil = ibmpc.c input.c insert.c isearch.c line.c
 CSRCm = main.c map.c modes.c mktbls.c
 CSRCnr = npopen.c opers.c oneliner.c path.c random.c regexp.c region.c
 CSRCst = search.c spawn.c st520.c tags.c tbuff.c tcap.c termio.c tipc.c tmp.c
-CSRCuv = undo.c vmalloc.c vms2unix.c vmspipe.c vmsvt.c vt52.c
+CSRCuv = undo.c version.c vmalloc.c vms2unix.c vmspipe.c vmsvt.c vt52.c
 CSRCw = window.c word.c wordmov.c
 CSRCxz = x11.c z309.c z_ibmpc.c
 
@@ -153,7 +153,7 @@ SRC = main.c $(SCREEN).c basic.c bind.c buffer.c crypt.c \
 	opers.c path.c random.c regexp.c \
 	region.c search.c spawn.c tags.c tbuff.c \
 	termio.c tmp.c undo.c \
-	vmalloc.c window.c word.c wordmov.c
+	version.c vmalloc.c window.c word.c wordmov.c
 
 OBJ = main.$O $(SCREEN).$O basic.$O bind.$O buffer.$O crypt.$O \
 	csrch.$O display.$O eval.$O exec.$O externs.$O \
@@ -164,7 +164,7 @@ OBJ = main.$O $(SCREEN).$O basic.$O bind.$O buffer.$O crypt.$O \
 	opers.$O path.$O random.$O regexp.$O \
 	region.$O search.$O spawn.$O tags.$O tbuff.$O \
 	termio.$O tmp.$O undo.$O \
-	vmalloc.$O window.$O word.$O wordmov.$O
+	version.$O vmalloc.$O window.$O word.$O wordmov.$O
 
 
 # if your pre-processor won't treat undefined macros as having value 0, or
@@ -338,14 +338,14 @@ $(TARGET)2: $(BUILTHDRS) $(OBJ) makefile
 # this has to be run on a unix system, unfortunately.
 #  once on dos, you'll have to maintain link.msc by hand
 link.msc: makefile
-	echo +>$@
-	(echo $(OBJ) | xargs -n5 ) | \
+	@echo +>$@
+	@(echo $(OBJ) | xargs -n5 ) | \
 		sed -e 's/$(SCREEN)/ibmpc/' \
 		    -e 's/\.o/\.obj/g' \
 		    -e 's/$$/+/' >> $@
-	echo >> $@
-	echo vile.exe >> $@
-	echo vile.map\; >> $@
+	@echo >> $@
+	@echo vile.exe >> $@
+	@echo vile.map\; >> $@
 
 # end of file
 
@@ -424,9 +424,24 @@ bigshar: link.msc /tmp/vilevers
 	    sed '/^README$$/d'` link.msc ; \
 	mv vile$${vilevers}shar.01 vile$${vilevers}shar
 
+patch:	link.msc /tmp/vilevers
+	@orevlistrev=`rlog -h revlist | egrep head: | cut -f2 -d'.'`	;\
+	orevlistrev=1.`expr $$orevlistrev - 1`				;\
+	ovilevers=`cat /tmp/vilevers | cut -f2 -d'.'`			;\
+	ovilemajor=`cat /tmp/vilevers | cut -f1 -d'.'`			;\
+	ovilevers=$$ovilemajor.`expr $$ovilevers - 1`			;\
+	echo Previous version is $$ovilevers				;\
+	vilevers=`cat /tmp/vilevers`					;\
+	co -p$$orevlistrev revlist |					 \
+	while read file filerev						;\
+	do								 \
+	  rcsdiff -c -r$$filerev $$file 2>/dev/null || true		;\
+	done  >patch$$ovilevers-$$vilevers 
+
 /tmp/vilevers: ALWAYS
-	expr "`egrep 'version\[\].*' edef.h`" : \
+	@expr "`egrep 'version\[\].*' edef.h`" : \
 		'.* \([0-9][0-9]*\.[0-9].*\)".*' >/tmp/vilevers
+	@echo Current version is `cat /tmp/vilevers`
 
 # only uucp things changed since last time
 uuto:
@@ -499,7 +514,7 @@ update:
 protos:
 	cextract -D__STDC__ +E +P +s +r -o nproto.h $(SRC)
 
-tagfile:
+TAGS tagfile:
 	dotags $(SRC) $(HDRS)
 
 lint:	$(SRC)
@@ -548,7 +563,13 @@ random.$O:	glob.h
 vmalloc$O:	nevars.h
 
 # $Log: makefile,v $
-# Revision 1.118  1993/08/16 14:04:39  pgf
+# Revision 1.120  1993/09/03 09:11:54  pgf
+# tom's 3.60 changes
+#
+# Revision 1.119  1993/08/18  18:48:49  pgf
+# added patch: target, for creating release patches
+#
+# Revision 1.118  1993/08/16  14:04:39  pgf
 # fixed broken all: target -- missing double quote
 #
 # Revision 1.117  1993/08/13  16:24:47  pgf
@@ -929,17 +950,20 @@ vmalloc$O:	nevars.h
 
 # (dickey's rules)
 CPP_OPTS= $(CFLAGS0) -DBERK -DAPOLLO -Dos_chosen
+#CPP_OPTS= $(CFLAGS0) -DBERK -DSUNOS -DPOSIX -Dos_chosen
 .SUFFIXES: .i .i2 .lint
 
 lintlib::	llib-lVi1.ln
 llib-lVi1.ln:	llib-lVi1 $(ALLHDRS)	; makellib $(CPP_OPTS) llib-lVi1 Vi1
-llib-lVi1:	$(SRC)			; cproto -l $(CPP_OPTS) `find $(SRC) -print |grep '^[a-k]'` >$@
+llib-lVi1:	$(BUILTHDRS) $(SRC)	; cproto -l $(CPP_OPTS) `find $(SRC) -print |grep '^[a-k]'` >$@
 
 lintlib::	llib-lVi2.ln
 llib-lVi2.ln:	llib-lVi2 $(ALLHDRS)	; makellib $(CPP_OPTS) llib-lVi2 Vi2
-llib-lVi2:	$(SRC)			; cproto -l $(CPP_OPTS) `find $(SRC) -print |grep '^[l-z]'` >$@
+llib-lVi2:	$(BUILTHDRS) $(SRC)	; cproto -l $(CPP_OPTS) `find $(SRC) -print |grep '^[l-z]'` >$@
 
-lint.out:	;tdlint $(CPP_OPTS) $(SRC) >$@
+lint.out:	$(BUILTHDRS) ;tdlint $(CPP_OPTS) $(LIBS) $(SRC) >$@
+
 .c.i:		;$(CC)  $(CPP_OPTS) -C -E $< >$@
-.c.i2:		;/usr/lib/cpp  $(CPP_OPTS) -C -E $< >$@
-.c.lint:	;tdlint -lVi1 -lVi2 $(CPP_OPTS) $< >$@
+.c.i2:		;/usr/lib/cpp  $(CPP_OPTS) -C $< >$@
+.c.lint:	;tdlint -lVi1 -lVi2 $(LIBS) $(CPP_OPTS) $< >$@
+

@@ -10,7 +10,10 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.138  1993/08/18 16:45:00  pgf
+ * Revision 1.139  1993/09/03 09:11:54  pgf
+ * tom's 3.60 changes
+ *
+ * Revision 1.138  1993/08/18  16:45:00  pgf
  * added VIEWOK flag for functions that execute macros.  it says it's okay
  * to execute them in view mode, even though they have the UNDO bit set
  *
@@ -676,6 +679,9 @@
 
 #define UNIX	(V7 | BERK | USG)	/* any unix		*/
 
+#include <stdio.h>
+#include <sys/types.h>
+
 /* definitions for testing apollo version with gcc warnings */
 #if APOLLO
 # ifdef __GNUC__		/* only tested for SR10.3 with gcc 1.36 */
@@ -683,7 +689,7 @@
 #  define __attribute(s)
 #  define APOLLO_STDLIB 1
 # endif
-# if defined(__STDC__) && defined(__STDCPP__)	/* SR10.3 */
+# if defined(L_tmpnam)		/* SR10.3, CC 6.8 defines in <stdio.h> */
 #  define APOLLO_STDLIB 1
 # endif
 #endif
@@ -694,7 +700,7 @@
 
 /* choose between void and int signal handler return type.
   "typedefs?  we don't need no steenking typedefs..." */
-#if POSIX || (BERK && BSD386) || SVR3 || APOLLO || NEWDOSCC
+#if POSIX || (BERK && BSD386) || SVR3 || APOLLO_STDLIB || NEWDOSCC
 # define SIGT void
 # define SIGRET
 #else
@@ -705,7 +711,7 @@
 #if UNIX || MSDOS || VMS
 #include	<signal.h>
 # if APOLLO
-#  if APOLLO_STDLIB	/* SR10.3, CC 6.8 */
+#  if APOLLO_STDLIB && !defined(lint)	/* SR10.3, CC 6.8 */
 #   define ACTUAL_SIG_ARGS int signo, ...
 #   define ACTUAL_SIG_DECL /* empty */
 #   define DEFINE_SIG_ARGS ACTUAL_SIG_ARGS
@@ -855,8 +861,10 @@
 	after signals */
 #define OPT_WORKING (!USG && HAS_ALARM && !SMALLER)
 
-#define	OPT_EVAL   !SMALLER			/* expression-evaluation */
-#define OPT_UPBUFF !SMALLER			/* animated buffer-update */
+#define OPT_B_LIMITS    !SMALLER		/* left-margin */
+#define OPT_EVAL        !SMALLER		/* expression-evaluation */
+#define OPT_HISTORY     !SMALLER		/* command-history */
+#define OPT_UPBUFF      !SMALLER		/* animated buffer-update */
 
 #if	(TERMCAP || X11) && !SMALLER
 /* we turn on OPT_XTERM under X11 _only_ because it's then easier for users to
@@ -879,9 +887,6 @@
 /* That's the end of the user selections -- the rest is static definition */
 /* (i.e. you shouldn't need to touch anything below here */
 /* ====================================================================== */
-
-#include <sys/types.h>
-#include <stdio.h>
 
 #include <errno.h>
 #if VMS
@@ -951,6 +956,14 @@ extern char *rindex();
 #else
 # if POSIX
 #  include <memory.h>
+# endif
+#endif
+
+#if APOLLO
+# ifndef L_tmpnam		/* CC 6.8 <stdio.h> defines, CC 6.7 doesn't */
+#  include <memory.h>
+   extern time_t time P((time_t *));
+   extern uid_t  getuid P((void));
 # endif
 #endif
 
@@ -1141,6 +1154,9 @@ union REGS {
 #define	NKREGS	36			/* number of kill buffers	*/
 #define	NBLOCK	16			/* line block chunk size	*/
 
+#define C_BLACK 0
+#define C_WHITE (NCOLORS-1)
+
 /* SPEC is just 8th bit set, for convenience in some systems */
 #define N_chars 128			/* must be a power-of-2		*/
 #define SPEC	0x0080			/* special key (function keys)	*/
@@ -1178,10 +1194,6 @@ union REGS {
 #define FL_HERE_HOME 2
 #define FL_ANYWHERE 3
 
-/* bfind options */
-#define OK_CREAT TRUE
-#define NO_CREAT FALSE
-
 /* definitions for name-completion */
 #define	NAMEC		name_cmpl /* char for forcing name-completion */
 #define	TESTC		test_cmpl /* char for testing name-completion */
@@ -1194,6 +1206,7 @@ union REGS {
 #define KBD_NOEVAL	0x10	/* disable 'tokval()' (e.g., from buffer) */
 #define KBD_MAYBEC	0x20	/* may be completed -- or not */
 #define KBD_NULLOK	0x40	/* may be empty -- or not */
+#define KBD_EXPCMD	0x80	/* expand %, #, : only in shell-command */
 
 /* default option for 'mlreply' (used in modes.c also) */
 #if !MSDOS
@@ -1259,9 +1272,9 @@ union REGS {
 
 /* kill register control */
 #define KNEEDCLEAN   0x01		/* Kill register needs cleaning */
-#define KYANK	0x02			/* Kill register resulted from yank */
-#define KLINES	0x04			/* Kill register contains full lines */
-#define KAPPEND  0x04			/* Kill register should be appended */
+#define KYANK        0x02		/* Kill register resulted from yank */
+#define KLINES       0x04		/* Kill register contains full lines */
+#define KAPPEND      0x08		/* Kill register should be appended */
 
 /* operator types.  Needed mainly because word movement changes depending on
 	whether operator is "delete" or not.  Aargh.  */
@@ -1361,6 +1374,9 @@ typedef short CMASK;
 
 /* macro for cases where return & newline are equivalent */
 #define	isreturn(c)	((c == '\r') || (c == '\n'))
+
+/* macro for whitespace (non-return) */
+#define	isblank(c)      ((c == '\t') || (c == ' '))
 
 /* DIFCASE represents the difference between upper
    and lower case letters, DIFCNTRL the difference between upper case and
@@ -1656,10 +1672,23 @@ union V {
 };
 
 struct VAL {
-	int	refs;	/* reference-count, for copying */
 	union V v;
 	union V *vp;
 };
+
+typedef	struct	{
+	struct VALNAMES *names;
+	struct VAL      *local;
+	struct VAL      *global;
+} VALARGS;
+
+	/*
+	 * Values are either local or global. We distinguish the two cases
+	 * by whether the value-pointer points into the VAL-struct or not.
+	 */
+#define is_local_val(lv,which)          (lv[which].vp == &(lv[which].v))
+#define make_local_val(lv,which)        (lv[which].vp = &(lv[which].v))
+#define make_global_val(lv,gv,which)    (lv[which].vp = &(gv[which].v))
 
 /* these are masks for the WINDOW.w_flag hint */
 #define WFFORCE 0x01			/* Window needs forced reframe	*/
@@ -1685,7 +1714,7 @@ struct VAL {
 #define set_global_g_val_rexp(which,val) global_g_val_rexp(which) = val
 
 /* these are window properties affecting window appearance _only_ */
-typedef struct	W_TRAITS {
+typedef struct	{
 	MARK 	w_dt;			/* Line containing "."	       */
 		/* i don't think "mark" needs to be here -- I think it 
 			could safely live only in the buffer -pgf */
@@ -1702,23 +1731,26 @@ typedef struct	W_TRAITS {
 #define global_w_val_ptr(which) global_w_values.wv[which].v.p
 #define set_global_w_val_ptr(which,val) global_w_val_ptr(which) = val
 
-#define w_val(wp,val) (wp->w_traits.w_vals.wv[val].vp->i)
+#define w_val(wp,val) (wp->w_values.wv[val].vp->i)
 #define set_w_val(wp,which,val) w_val(wp,which) = val
-#define w_val_ptr(wp,val) (wp->w_traits.w_vals.wv[val].vp->p)
+#define w_val_ptr(wp,val) (wp->w_values.wv[val].vp->p)
 #define set_w_val_ptr(wp,which,val) w_val_ptr(wp,which) = val
 
 #define make_local_w_val(wp,which)  \
-	copy_val(wp->w_traits.w_vals.wv, wp->w_traits.w_vals.wv, which)
+	make_local_val(wp->w_values.wv, which)
 #define make_global_w_val(wp,which)  \
-	copy_val(wp->w_traits.w_vals.wv, global_wvalues.wv, which)
+	make_global_val(wp->w_values.wv, global_wvalues.wv, which)
 
-#define is_global_w_val(wp,which)  \
-	(wp->w_traits.w_vals.wv[which].vp == &(global_w_values.wv[which].v))
 #define is_local_w_val(wp,which)  \
-	(wp->w_traits.w_vals.wv[which].vp == &(wp->w_traits.w_vals.wv[which].v))
+	is_local_val(wp->w_values.wv,which)
 
+#if COLOR
 #define gfcolor global_w_val(WVAL_FCOLOR)
 #define gbcolor global_w_val(WVAL_BCOLOR)
+#else
+#define gfcolor C_WHITE
+#define gbcolor C_BLACK
+#endif
 
 /*
  * Text is kept in buffers. A buffer header, described below, exists for every
@@ -1737,7 +1769,7 @@ typedef struct	BUFFER {
 	MARK 	*b_nmmarks;		/* named marks a-z		*/
 	B_VALUES b_values;		/* buffer traits we inherit from */
 					/*  global values		*/
-	struct	W_TRAITS b_wtraits;	/* saved window traits, while we're */
+	W_TRAITS b_wtraits;		/* saved window traits, while we're */
 					/*  not displayed		*/
 	B_COUNT	b_bytecount;		/* # of chars			*/
 	L_NUM	b_linecount;		/* no. lines as of last read/write */
@@ -1772,6 +1804,9 @@ typedef struct	BUFFER {
 #if	OPT_UPBUFF
 	int	(*b_upbuff) P((struct BUFFER *)); /* call to recompute  */
 #endif
+#if	OPT_B_LIMITS
+	int	b_lim_left;		/* extra left-margin (cf:show-reg) */
+#endif
 	struct	BUFFER *b_relink; 	/* Link to next BUFFER (sorting) */
 	int	b_created;
 	int	b_last_used;
@@ -1786,9 +1821,12 @@ typedef struct	BUFFER {
 
 /* warning:  code in file.c and fileio.c knows how long the shell, pipe, and
 	append prefixes are (e.g. fn += 2 when appending) */
-#define	isShellOrPipe(s)  (s[0] == SHPIPE_LEFT[0])
+#define	isShellOrPipe(s)  ((s)[0] == SHPIPE_LEFT[0])
 #define	isInternalName(s) (isShellOrPipe(s) || is_internalname(s))
-#define	isAppendToName(s) (s[0] == '>' && s[1] == '>')
+#define	isAppendToName(s) ((s)[0] == '>' && (s)[1] == '>')
+
+/* shift-commands can be repeated when typed on :-command */
+#define isRepeatable(c)   ((c) == '<' || (c) == '>')
 
 #if	defined(apollo)
 #if	defined(__STDCPP__)	/* cc 6.8 */
@@ -1828,14 +1866,12 @@ typedef struct	BUFFER {
 #define set_b_val_rexp(bp,which,val) b_val_rexp(bp,which) = val
 
 #define make_local_b_val(bp,which)  \
-		copy_val(bp->b_values.bv, bp->b_values.bv, which)
+		make_local_val(bp->b_values.bv, which)
 #define make_global_b_val(bp,which)  \
-		copy_val(bp->b_values.bv, global_b_values.bv, which)
+		make_global_val(bp->b_values.bv, global_b_values.bv, which)
 
-#define is_global_b_val(bp,which)  \
-		(bp->b_values.bv[which].vp == &(global_b_values.bv[which].v))
 #define is_local_b_val(bp,which)  \
-		(bp->b_values.bv[which].vp == &(bp->b_values.bv[which].v))
+	is_local_val(bp->b_values.bv,which)
 
 #define is_empty_buf(bp) (lForw(bp->b_line.l) == l_ref(bp->b_line.l))
 
@@ -1845,6 +1881,10 @@ typedef struct	BUFFER {
 #endif
 #define b_lastdot b_wtraits.w_ld
 #define b_wline   b_wtraits.w_ln
+
+/* buffer-name may not have trailing null */
+#define set_bname(bp,name) (void)strncpy(bp->b_bname, name, NBUFN)
+#define eql_bname(bp,name) !strncmp(bp->b_bname, name, NBUFN)
 
 /* values for b_flag */
 #define BFINVS     0x01			/* Internal invisible buffer	*/
@@ -1869,12 +1909,21 @@ typedef struct	BUFFER {
 #define b_set_changed(bp)       b_set_flags(bp, BFCHG)
 #define b_set_counted(bp)       b_set_flags(bp, BFSIZES)
 #define b_set_invisible(bp)     b_set_flags(bp, BFINVS)
+#define b_set_obsolete(bp)      b_set_flags(bp, BFUPBUFF)
 #define b_set_scratch(bp)       b_set_flags(bp, BFSCRTCH)
 
 #define b_clr_flags(bp,flags)   (bp)->b_flag &= ~(flags)
 #define b_clr_changed(bp)       b_clr_flags(bp, BFCHG)
 #define b_clr_counted(bp)       b_clr_flags(bp, BFSIZES)
+#define b_clr_obsolete(bp)      b_clr_flags(bp, BFUPBUFF)
 
+#if OPT_B_LIMITS
+#define b_left_margin(bp)       bp->b_lim_left
+#define b_set_left_margin(bp,n) b_left_margin(bp) = n
+#else
+#define b_left_margin(bp)       0
+#define b_set_left_margin(bp,n)
+#endif
 
 /*
  * There is a window structure allocated for every active display window. The
@@ -1921,6 +1970,11 @@ typedef struct	WINDOW {
 #else
 #define MK Mark
 #endif
+
+	/* we use left-margin for protecting the prefix-area of [Registers]
+	 * from cut/paste selection.
+	 */
+#define w_left_margin(wp) b_left_margin(wp->w_bufp)
 
 /*
  * The starting position of a region, and the size of the region in
@@ -2254,7 +2308,7 @@ typedef struct WHBLOCK {
 #include "unistd.h"
 #include "stdlib.h"
 #else
-# if APOLLO_STDLIB || VMS || NEWDOSCC
+# if (APOLLO_STDLIB && !defined(lint)) || VMS || NEWDOSCC
 #include <stdlib.h>
 # else
 #  if ! VMALLOC
@@ -2274,7 +2328,7 @@ extern char *getcwd P(( char *, int ));
 #endif
 
 #ifndef	free
-#if	APOLLO && !APOLLO_STDLIB
+#if	APOLLO && (!APOLLO_STDLIB || defined(lint))
  extern void free (/*char *s*/);
 #endif
 #endif	/* free */

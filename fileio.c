@@ -3,7 +3,10 @@
  * the knowledge about files are here.
  *
  * $Log: fileio.c,v $
- * Revision 1.55  1993/08/05 14:29:12  pgf
+ * Revision 1.56  1993/09/03 09:11:54  pgf
+ * tom's 3.60 changes
+ *
+ * Revision 1.55  1993/08/05  14:29:12  pgf
  * tom's 3.57 changes
  *
  * Revision 1.54  1993/07/27  18:06:20  pgf
@@ -184,7 +187,7 @@
 
 #include	"estruct.h"
 #include        "edef.h"
-#if UNIX || VMS
+#if UNIX || VMS || MSDOS
 #include	<sys/stat.h>
 #endif
 
@@ -198,11 +201,8 @@
 #include	<sys/ioctl.h>
 #endif
 
-#if MSDOS
-#include	<sys/stat.h>
-#if NEWDOSCC
+#if MSDOS && NEWDOSCC
 #include	<io.h>
-#endif
 #endif
 
 /*--------------------------------------------------------------------------*/

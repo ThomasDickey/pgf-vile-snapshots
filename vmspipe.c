@@ -4,7 +4,10 @@
  *		Chris Janton's (chj) VMS Icon port.
  *
  * $Log: vmspipe.c,v $
- * Revision 1.2  1993/08/05 14:29:12  pgf
+ * Revision 1.3  1993/09/03 09:11:54  pgf
+ * tom's 3.60 changes
+ *
+ * Revision 1.2  1993/08/05  14:29:12  pgf
  * tom's 3.57 changes
  *
  * Revision 1.1  1993/04/01  12:54:44  pgf
@@ -255,7 +258,7 @@ vms_rpipe (char *cmd, int fd, char *input_file)
 			}
 			mlforce("[Read %d lines from %s ]", count, cmd);
 			vms_rpclose(pfile);
-			fflush(pp);
+			(void)fflush(pp);
 			rewind(pp);
 			return pp;
 		}

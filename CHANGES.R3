@@ -1,3 +1,216 @@
+Changes for vile 3.60: (released  ??)
+(pgf)
+	+ added "stop" command (synonym for "suspend-vile", aka ^Z) (cmdtbl)
+
+	+ ensure shiftwidth and tabstop are always set correctly after modes
+	  are adjusted -- any of cmode, cts/ts, csw/sw can affect. (modes.c)
+
+	+ added support to finderr() for OSF1 (DEC Alpha's, at least) compiler
+	  errors, of the form:
+		/usr/lib/cmplrs/cc/cfe: Error: test.c, line 8: Syntax Error
+
+	+ took out leftover dbwrite() call from rangespec() -- may fix errant
+	  behavior on ":.$d" (exec.c)
+
+	+ fixed helpfile note about X11 -name option -- it sets the name
+	  used for resource lookups, not the window name.  (vile.hlp)
+	  how do we set the window name?
+
+	+ under DOS, leave the cursor shape and the keyboard repeat rate
+	  alone.  if we get complaints, perhaps we should mode-ify these,
+	  but in general, settings like that are personal, and we shouldn't
+	  muck with them.  (ibmpc.c)
+
+	+ don't introduce extra path separators in pathcat() (path.c)
+
+	+ protect against NULL returns from getcwd, in case the directory
+	  we're in has been removed. (random.c)
+	  (tom -- could you check VMS behavior sometime?)
+
+	+ changed symbol "glob()" to "doglob()" to stop name conflict with
+	  standard libraries (glob.c, eval.c, random.c, filec.c)
+
+	+ added prototypes for glob.c to proto.h
+
+	+ eliminated infinite loop when using goto-beginning-of-sentence from
+	  end of buffer (basic.c)
+
+	+ added mode "multibeep" to control the "one beep per failed motion"
+	  logic -- if multibeep is on (default), then every failed motion
+	  produces a beep.  if it's off, then only the first (of a set of
+	  identical) causes a beep. (modetbl, main.c)
+
+	+ corrected possible use of uninited locals in file.c (was really
+	  only a warning suppression) and  display.c
+
+	+ turned off beeping in search.c and csrch.c, now that all failed
+	  motions cause beeps.
+
+	+ change "Date" to "installed" in version.c, since modtime really
+	  only reflects installation date.
+
+	+ don't let vile use a screen dimension of less than 2 in either
+	  direction (display.c, tcap.c)
+
+	+ fixed bug that made all TERM types be thought of as xterms. (tcap.c)
+
+	+ fixed documentation of the help commands.  it's been wrong
+	  for over three years now, and it's in the first screen of
+	  help! (^X-^H and ^A-^H shoul be ^X-h and ^A-h) (vile.hlp)
+
+	+ added AIX to the machines that need sys/ioctl.h, to pick up
+	  TIOCGWINSIZE (display.c)
+
+	+ reset the "calledbefore" flag in docmd().  fixes chris sherman's
+	  problem where a second substitute-til in a macro would appear to
+	  do nothing.  (actually it was reusing its previous args, so there
+	  was simply nothing to do)  (exec.c)
+
+	+ added '>' to the characters known to the reformatting code, so
+	  you can reformat most email replies. (word.c)
+
+	+ added automatic patchfile generation to the makefile.  hopefully
+	  i can generate patches for all future releases, in addition to
+	  shar files. (makefile)
+
+(tom)
+	+ made ansi.c work with TurboC (ansi.c, main.c, display.c, termio.c),
+	  to use as test-case for COLOR.
+
+	+ corrected highlighting code for ":%s" command with ibmpc display
+	  (display.c, ibmpc.c).
+
+	+ modified 'bfind()' to always return a buffer (unless it cannot create
+	  the buffer), use 'find_b_name()' for the no-create mode (bind.c,
+	  buffer.c, eval.c, exec.c, file.c, filec.c, finderr.c, history.c,
+	  main.c, map.c, modes.c, oneliner.c, random.c, spawn.c, tags.c).
+
+	+ use macros 'set_bname()' and 'eql_bname()' and function 'get_bname()'
+	  to encapsulate buffer name, which does not necessarily have a
+	  trailing null (bind.c, buffer.c, display.c, estruct.h, eval.c,
+	  exec.c, file.c, finderr.c, input.c, main.c, modes.c, oneliner.c,
+	  spawn.c, tags.c, tmp.c).
+
+	+ removed nonstandard 'strncpy()' (main.c).
+
+	+ corrected 'kbd_show_response()' to work with expand-chars mode
+	  (input.c).
+
+	+ corrected 'kbd_reply()' to make the number of characters shown have
+	  the same limit as the caller's buffer-length, and to make it always
+	  return the data with a trailing null (input.c).
+
+	+ made 'animated' mode work for [Registers] buffer (line.c), and
+	  modified the logic so that numbered-buffers are displayed in a
+	  vi-compatible manner.
+
+	+ make shift-commands work more like vi, allowing repeated '<' or '>'
+	  characters in a :-command to imply a repeat count (bind.c, exec.c,
+	  opers.c).
+
+	+ corrected logic of 'dofile()' so that if an error is found in the
+	  startup file, vile properly sets curbp and curwp (exec.c).
+
+	+ simplified/corrected command-history logic of to fix error that
+	  prevented scrolling past ":e!" command, and to allow scrolling of
+	  '<', '>' command even when repeated (bind.c, exec.c, history.c,
+	  spawn.c).
+
+	+ added flag KBD_EXPCMD to handle the case (from rewrite of history)
+	  where %,#,: expansion must be done for shell commands (estruct.h,
+	  bind.c, input.c).
+
+	+ added OPT_HISTORY to allow ifdef'ing of history.c code (estruct.h,
+	  history.c)
+
+	+ cache home-directories looked up in 'home_path()' to make it run
+	  faster (path.c)
+
+	+ modified glob-expansion to allow "~" expansion. This doesn't work
+	  with wildcards in the user-portion (e.g., "~ab?"), but suffices for
+	  most cases (glob.c).
+
+	+ added a find-error case for apollo's C++ compiler (finderr.c).
+
+	+ modified logic for 'displaying' vs 'imworking()' slightly, to get rid
+	  of erroneous cursor movement (display.c).
+
+	+ added function 'slowtime()' to force updates in 'slowreadf()' more
+	  often (file.c).
+
+	+ adjusted definitions for better lint checks on apollo sr10.2
+	  (estruct.h, makefile).
+
+	+ make piped-input also set error-buffer (main.c).
+
+	+ revised logic that sets VAL-structs for modes to correct places where
+	  buffer & window traits are saved without converting to local values. 
+	  Also removed code (e.g., copy_val) that checks reference counts,
+	  since they aren't really necessary (buffer.c estruct.h main.c modes.c
+	  proto.h)
+
+	+ modified behavior of 'unsetl' command to delete local setting
+	  (eval.c, modes.c).  It was only modifying (toggling) boolean modes.
+
+	+ corrected 'reframe()' to handle linewrapping case submitted by
+	  alistair (display.c).
+
+	+ corrected cursor-update in 'x_scroll()' that left stray cursor images
+	  remaining after ^D/^U commands (x11.c).
+
+	+ corrected logic that caused selection-text to be lost when keypress
+	  was received (x11.c).
+
+	+ modified X-windows pasting to trim unneeded whitespace when inserting
+	  into cmode or autoindent buffer (bind.c, x11.c).
+
+	+ corrected kill-buffer flag KAPPEND, which had the same value as
+	  KLINES (estruct.h, line.c).
+
+	+ corrected error in 'doindent()' that caused a "<nl>}" insertion to
+	  delete nonwhite characters (insert.c).
+
+	+ corrected ":tags" command for exact (taglen=0) lookups (tags.c)
+
+	+ make failed motion-commands sound an alarm like vi (main.c).
+
+	+ modified logic for h,j,k,l,^D,^U,^F,^B commands to return false when
+	  they fail, so failed-motion alarm works (basic.c).
+
+	+ corrected logic for b,B,w,W,e,E commands to return false only when
+	  backing/forwarding past the buffer ends (word.c).
+
+	+ modified alternate-window motions 'scrnextup()', 'scrnextdw()',
+	  'mvdnnxtwind()', 'mvupnxtwind()' to also return failed-motion status,
+	  for consistency (window.c)
+
+	+ made new function 'forwchar_in_line()' to do the vi "l" command,
+	  dissociating it from the internal motion-command (basic.c, cmdtbl).
+
+	+ made 'backhpage()', 'forwhpage()' motion-commands (cmdtbl).
+
+	+ make failed quit-commands return false (main.c).
+
+	+ make version-command show UNIX or VMS executable's date (main.c)
+
+	+ corrected behavior of 'histbuff()' when user simply toggles with the
+	  "_" command.  This did not handle the case in which the alternate
+	  buffer was temporary, and thus had no number (buffer.c).
+
+	+ introduced new buffer-attribute 'b_lim_left', macro
+	  'w_left_margin()', ifdef'd with OPT_B_LIMITS, use this to control
+	  cut/paste selection in [Registers] (basic.c, buffer.c, csrch.c,
+	  display.c, random.c, region.c, window.c, x11.c).
+
+	+ modified 'execute_named_command()' to recognize register name and
+	  line-count for commands such as ":yank", making it handle cases such
+	  as ":5>6", ":y a 6", ":10,20y b" (exec.c, input.c, line.c).
+
+	+ modified ":put" command to report the number of lines added (line.c).
+
+	+ split out 'version.c' because main.c got too large for apollo lint
+	  (main.c, makefile*, vms_link.opt, link.msc).
+
 Changes for vile 3.59: (released Wed Aug 18, 1993)
 (pgf)
 	+ added VIEWOK flag for functions that execute macros.  it says
@@ -33,6 +246,9 @@ Changes for vile 3.59: (released Wed Aug 18, 1993)
 	  i need glasses. (tcap.c, x11.c)
 
 	+ took out extraneous trace.h include from x11.c
+
+	+ corrected 'col2offs()' to make it easier to position the mouse on a
+	  tab character (display.c).
 
 Changes for vile 3.58: (released Fri Aug 13, 1993)
 (pgf)
@@ -678,7 +894,7 @@ Changes for vile 3.49:
 	+ changed use of 'sprintf()' to 'lsprintf()' (files buffer.c, modes.c)
 
 	+ use macros 'FreeAndNull()' and 'FreeIfNeeded()' to simplify code
-	  (buffer.c, eval.c, file.c, filec.c, filec.c, main.c, modes.c,
+	  (buffer.c, eval.c, file.c, filec.c, main.c, modes.c,
 	  npopen.c, oneliner.c, search.c, random.c, x11.c)
 
 	+ changed case-statements for EV-variables to if-then-else-if in

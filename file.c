@@ -6,7 +6,13 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.100  1993/08/13 16:32:50  pgf
+ * Revision 1.102  1993/09/06 16:25:48  pgf
+ * used-before-set warning cleanup
+ *
+ * Revision 1.101  1993/09/03  09:11:54  pgf
+ * tom's 3.60 changes
+ *
+ * Revision 1.100  1993/08/13  16:32:50  pgf
  * tom's 3.58 changes
  *
  * Revision 1.99  1993/08/05  14:29:12  pgf
@@ -369,6 +375,9 @@ static	int	getfile2 P(( char *, int ));
 static	void	guess_dosmode P(( BUFFER * ));
 #endif
 static	int	writereg P(( REGION *, char *, int, BUFFER * ));
+#if UNIX
+static	int	slowtime P(( long * ));
+#endif
 
 /*--------------------------------------------------------------------------*/
 
@@ -411,7 +420,7 @@ int	iswrite;
 		if (check_against != current) {
 			(void)lsprintf(prompt,
 			"%sFile for buffer \"%s\" has changed %son disk.  %s",
-				remind, bp->b_bname, again, question);
+				remind, get_bname(bp), again, question);
 			if ((status = mlyesno( prompt )) != TRUE)
 				mlerase();
 			/* avoid reprompts */
@@ -508,6 +517,31 @@ int	Wrote;
 #else
 #define	CleanToPipe()		TTkclose()
 #define	CleanAfterPipe(f)	TTkopen()
+#endif
+
+/*
+ * On faster machines, a pipe-writer will tend to keep the pipe full. This
+ * function is used by 'slowreadf()' to test if we've not done an update
+ * recently even if this is the case.
+ */
+#if UNIX
+static int
+slowtime (refp)
+long	*refp;
+{
+	int	status = FALSE;
+
+	if (fileispipe) {
+		long	temp = time((long *)0);
+
+		status = (!ffhasdata() || (temp != *refp));
+		if (status)
+			*refp = temp;
+	}
+	return status;
+}
+#else
+#define	slowtime(refp)	(fileispipe && !ffhasdata())
 #endif
 
 int
@@ -610,10 +644,10 @@ int f,n;
 	/* we want no errors or complaints, so mark it unchanged */
 	b_clr_changed(curbp);
         s = readin(fname, TRUE, curbp, TRUE);
-	curbp->b_bname[0] = EOS;
+	curbp->b_bname[0] = EOS;	/* ...so 'unqname()' doesn't find me */
 	makename(bname, fname);
 	unqname(bname, TRUE);
-	(void)strcpy(curbp->b_bname, bname);
+	set_bname(curbp, bname);
 	updatelistbuffers();
 	return s;
 }
@@ -704,11 +738,11 @@ int lockfl;		/* check the file for locks? */
 {
 	register BUFFER *bp;
         register int    s;
-        char bname[NBUFN];	/* buffer name to put file */
+	char bname[NBUFN+1];	/* buffer name to put file */
 	char nfname[NFILEN];	/* canonical form of 'fname' */
 
 	/* user may have renamed buffer to look like filename */
-        if ((bp=bfind(fname, NO_CREAT, 0)) == NULL) {
+	if ((bp = find_b_name(fname)) == NULL) {
 
 		/* It's not already here by that buffer name.
 		 * Try to find it assuming we're given the file name.
@@ -738,7 +772,7 @@ int lockfl;		/* check the file for locks? */
 		/* it's not here */
 	        makename(bname, fname);            /* New buffer name.     */
 		/* make sure the buffer name doesn't exist */
-	        while ((bp=bfind(bname, NO_CREAT, 0)) != NULL) {
+		while ((bp = find_b_name(bname)) != NULL) {
 			if ( !b_is_changed(bp) && is_empty_buf(bp)) {
 				/* empty and unmodified -- then it's okay 
 					to re-use this buffer */
@@ -749,14 +783,14 @@ int lockfl;		/* check the file for locks? */
 			/* old buffer name conflict code */
 			unqname(bname,TRUE);
 			hst_glue(' ');
-	                s = mlreply("Will use buffer name: ", bname, NBUFN);
+			s = mlreply("Will use buffer name: ", bname, sizeof(bname));
 	                if (s == ABORT)
 	                        return s;
 			if (s == FALSE || bname[0] == EOS)
 		                makename(bname, fname);
 	        }
 		/* okay, we've got a unique name -- create it */
-	        if (bp==NULL && (bp=bfind(bname, OK_CREAT, 0))==NULL) {
+		if (bp==NULL && (bp=bfind(bname, 0))==NULL) {
 			mlforce("[Cannot create buffer]");
 	                return FALSE;
 	        }
@@ -777,7 +811,7 @@ int lockfl;		/* check the file for locks? */
 		is likely asking for an existing buffer -- try for that
 		first */
         if (!maybe_pathname(fname)
-	 && (bp=bfind(fname, NO_CREAT, 0)) != NULL) {
+	 && (bp = find_b_name(fname)) != NULL) {
 		return swbuffer(bp);
 	}
 
@@ -852,6 +886,9 @@ int	mflg;		/* print messages? */
 	int odv;
 #endif
 
+	if (bp == 0)				/* doesn't hurt to check */
+		return FALSE;
+
 #if	FILOCK
 	if (lockfl && lockchk(fname) == ABORT)
 		return ABORT;
@@ -913,7 +950,7 @@ int	mflg;		/* print messages? */
 			b_clr_changed(bp);
 #if FINDERR
 			if (fileispipe == TRUE)
-				set_febuff(bp->b_bname);
+				set_febuff(get_bname(bp));
 #endif
         		(void)ffclose();	/* Ignore errors.       */
 			if (mflg)
@@ -1135,6 +1172,9 @@ int *nlinep;
 	int	flag = 0;
 	int	done_update = FALSE;
 #endif
+#if UNIX
+	long	last_updated = time((long *)0);
+#endif
 	b_set_counted(bp);	/* make 'addline()' do the counting */
         while ((s = ffgetline(&len)) <= FIOSUC) {
 #if DOSFILES
@@ -1158,7 +1198,7 @@ int *nlinep;
 #if UNIX || MSDOS
 		else {
                 	/* reading from a pipe, and internal? */
-			if (fileispipe && !ffhasdata()) {
+			if (slowtime(&last_updated)) {
 				register WINDOW *wp;
 
 				flag |= (WFEDIT|WFFORCE);
@@ -1235,7 +1275,7 @@ int rdo;
 }
 
 /*
- * Take a file name, and from it
+ * Take a (null-terminated) file name, and from it
  * fabricate a buffer name. This routine knows
  * about the syntax of file names on the target system.
  * I suppose that this information could be put in
@@ -1249,6 +1289,7 @@ char    fname[];
 {
 	register char *fcp;
         register char *bcp;
+	register int j;
 
 #if VMS
 	if (is_vms_pathname(fname, TRUE)) {
@@ -1260,7 +1301,7 @@ char    fname[];
 			fcp > fname && !strchr(":]", fcp[-1]);
 				fcp--)
 				;
-		(void)strncpy(bname, fcp, NBUFN-1);
+		(void)strncpy(bname, fcp, NBUFN);
 		if (bcp = strchr(bname, ';'))	/* strip version */
 			*bcp = EOS;
 		(void)mklower(bname);
@@ -1269,7 +1310,7 @@ char    fname[];
 #endif
 	fcp = &fname[strlen(fname)];
 	/* trim trailing whitespace */
-	while (fcp != fname && (fcp[-1] == ' ' || fcp[-1] == '\t'
+	while (fcp != fname && (isblank(fcp[-1])
 #if UNIX || MSDOS /* trim trailing slashes as well */
 					 || slashc(fcp[-1])
 #endif
@@ -1277,7 +1318,7 @@ char    fname[];
                 *(--fcp) = EOS;
 	fcp = fname;
 	/* trim leading whitespace */
-	while (*fcp == ' ' || *fcp == '\t')
+	while (isblank(*fcp))
 		fcp++;
 
 #if     UNIX || MSDOS || VMS
@@ -1288,13 +1329,18 @@ char    fname[];
 		do {
 			++fcp;
 		} while (isspace(*fcp));
-		while (!isspace(*fcp) && bcp < &bname[NBUFN-1])
-			*bcp++ = *fcp++;
-		*bcp = EOS;
+		(void)strncpy(bcp, fcp, NBUFN);
+		for (j = 1; j < NBUFN; j++) {
+			if (isspace(*bcp)) {
+				*bcp = EOS;
+				break;
+			}
+			bcp++;
+		}
 		return;
 	}
 
-	strncpy(bcp, pathleaf(fcp), NBUFN)[NBUFN-1] = EOS;
+	(void)strncpy(bcp, pathleaf(fcp), NBUFN);
 
 #if	UNIX
 	/* UNIX filenames can have any characters (other than EOS!).  Refuse
@@ -1302,14 +1348,17 @@ char    fname[];
 	 * blanks.  For this special case, ensure that the buffer name has no
 	 * blanks, otherwise it is difficult to reference from commands.
 	 */
-	while (*bcp != EOS) {
+	for (j = 0; j < NBUFN; j++) {
+		if (*bcp == EOS)
+			break;
 		if (isspace(*bcp))
 			*bcp = '-';
 		bcp++;
 	}
 #endif
 
-#else
+#else	/* !(UNIX||VMS||MSDOS) */
+
 	bcp = fcp + strlen(fcp);
 #if     AMIGA || ST520
 	while (bcp!=fcp && bcp[-1]!=':' && !slashc(bcp[-1]))
@@ -1320,11 +1369,15 @@ char    fname[];
                 --bcp;
 #endif
 	{
-	register char *cp2;
-	cp2 = &bname[0];
-	while (cp2!=&bname[NBUFN-1] && *bcp!=EOS && *bcp!=';')
-                *cp2++ = *bcp++;
-        *cp2 = EOS;
+		register char *cp2 = bname;
+
+		do {
+			if (cp2 == bname+NBUFN)
+				break;
+			*cp2 = EOS;
+			if (*bcp == ';')
+				break;
+		} while ((*cp2++ = *bcp++) != EOS);
 	}
 #endif
 }
@@ -1335,21 +1388,29 @@ char *name;	/* name to check on */
 int ok_to_ask;  /* prompts allowed? */
 {
 	register char *sp;
+	register SIZE_T	j;
 
 	/* check to see if it is in the buffer list */
-	while (bfind(name, 0, NO_CREAT) != NULL) {
+	while (find_b_name(name) != NULL) {
 
-		sp = &name[strlen(name)-1];  /* last char */
-		if (sp - name >= 2 && sp[-1] == '-') {
-			if (sp[0] == '9')
-				sp[0] = 'A';
-			else if ((sp[0] == 'Z') || 
-					 (!isdigit(sp[0]) && !isupper(sp[0])))
-				goto choosename;
+		/* "strnlen()", if there were such a thing */
+		for (j = 0; (j < NBUFN) && (name[j] != EOS); j++)
+			;
+		if (j == 0)
+			j = strlen(strcpy(name, "NoName"));
+
+		sp = name+j-1;	/* point to last char of name */
+
+		if (j > 2 && sp[-1] == '-') {
+			if (*sp == '9')
+				*sp = 'A';
 			else
-				sp[0] += 1;
-		} else if (sp + 2 < &name[NBUFN-1])  {
-			(void)strcat(sp, "-1");
+				*sp += 1;
+			if (!isdigit(*sp) && !isupper(*sp))
+				goto choosename;
+
+		} else if (j < NBUFN-2)  {
+			(void)strncpy(sp+1, "-1", 2);
 		} else {
 		choosename:
 			if (ok_to_ask) {
@@ -1717,7 +1778,7 @@ FILE	*haveffp;
 {
 	fast_ptr LINEPTR prevp;
 	fast_ptr LINEPTR newlp;
-	fast_ptr LINEPTR nextp;
+	fast_ptr LINEPTR nextp = NULL; /* to satisfy compiler uninit warning */
         register BUFFER *bp;
         register int    s;
         int    nbytes;
@@ -1778,7 +1839,7 @@ out:
 	curwp->w_dot.l = lFORW(curwp->w_dot.l);
 
 	/* copy window parameters back to the buffer structure */
-	curbp->b_wtraits = curwp->w_traits;
+	copy_traits(&(curbp->b_wtraits), &(curwp->w_traits));
 
 	imply_alt(fname, FALSE, FALSE);
 	chg_buff (curbp, WFHARD);
@@ -1889,10 +1950,10 @@ ACTUAL_SIG_DECL
 				}
 				created = TRUE;
 			}
-			(void)pathcat(filnam, dirnam, bp->b_bname);
+			(void)pathcat(filnam, dirnam, get_bname(bp));
 #else
 			(void)pathcat(filnam, dirnam,
-				strcat(strcpy(temp, "V"), bp->b_bname));
+				strcat(strcpy(temp, "V"), get_bname(bp)));
 #endif
 			set_b_val(bp,MDVIEW,FALSE);
 			if (writeout(filnam,bp,FALSE) != TRUE) {
@@ -1956,7 +2017,7 @@ char	*fname;
 		 && strcmp(lengthen_path(strcpy(temp, fname)), bp->b_fname)) {
 			char	prompt[80];
 			(void)lsprintf(prompt,
-				"Use crypt-key from %s", bp->b_bname);
+				"Use crypt-key from %s", get_bname(bp));
 			s = mlyesno(prompt);
 			if (s != TRUE)
 				return (s == FALSE);

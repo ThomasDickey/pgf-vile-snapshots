@@ -8,8 +8,11 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: insert.c,v $
- *	Revision 1.31  1993/08/13 16:32:50  pgf
- *	tom's 3.58 changes
+ *	Revision 1.32  1993/09/03 09:11:54  pgf
+ *	tom's 3.60 changes
+ *
+ * Revision 1.31  1993/08/13  16:32:50  pgf
+ * tom's 3.58 changes
  *
  * Revision 1.30  1993/08/05  14:29:12  pgf
  * tom's 3.57 changes
@@ -182,7 +185,7 @@ int f,n;
 	if (n < 0) return (FALSE);
 	if (n == 0) return ins();
 
-	gotobol(TRUE,1);
+	(void)gotobol(TRUE,1);
 
 	/* if we are in C mode and this is a default <NL> */
 	if (n == 1 && (b_val(curbp,MDCMOD) || b_val(curbp,MDAIND)) &&
@@ -877,6 +880,7 @@ int ind;
 	register int i;
 
 	/* first clean up existing leading whitespace */
+	DOT.o = 0;
 	i = firstchar(l_ref(DOT.l));
 	if (i > 0)
 		(void)ldelete((long)i,FALSE);

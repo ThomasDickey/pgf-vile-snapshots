@@ -3,7 +3,10 @@
  * attached to keys that the user actually types.
  *
  * $Log: window.c,v $
- * Revision 1.31  1993/08/13 16:32:50  pgf
+ * Revision 1.32  1993/09/03 09:11:54  pgf
+ * tom's 3.60 changes
+ *
+ * Revision 1.31  1993/08/13  16:32:50  pgf
  * tom's 3.58 changes
  *
  * Revision 1.30  1993/08/05  14:29:12  pgf
@@ -117,6 +120,7 @@ overlay	"window"
 static	void	unlink_window P(( WINDOW * ));
 static	LINEPTR	adjust_forw P(( WINDOW *, LINEPTR, int ));
 static	LINEPTR	adjust_back P(( WINDOW *, LINEPTR, int ));
+static	int	scroll_sideways P(( int, int ));
 
 /*--------------------------------------------------------------------------*/
 
@@ -412,50 +416,39 @@ int
 mvdnnxtwind(f, n)
 int f,n;
 {
+	int	status;
+
 	(void)nextwind(FALSE, 1);
-	mvdnwind(f, n);
+	status = mvdnwind(f, n);
 	(void)prevwind(FALSE, 1);
-	return TRUE;
+	return status;
 }
 
 int
 mvupnxtwind(f, n)
 int f,n;
 {
+	int	status;
+
 	(void)nextwind(FALSE, 1);
-	mvupwind(f, n);
+	status = mvupwind(f, n);
 	(void)prevwind(FALSE, 1);
-	return TRUE;
+	return status;
 }
 
-int
-mvrightwind(f,n)
-int f,n;
-{
-	if (!f)
-		n = term.t_ncol/2;
-
-	make_local_w_val(curwp,WVAL_SIDEWAYS);
-
-	w_val(curwp, WVAL_SIDEWAYS) += n;
-
-        curwp->w_flag  |= WFHARD|WFMOVE|WFMODE;
-
-	return TRUE;
-}
-
-int
-mvleftwind(f,n)
-int f,n;
+static int
+scroll_sideways(f,n)
+int	f,n;
 {
 	int	original = w_val(curwp,WVAL_SIDEWAYS);
 
+	if (!f) {
+		int	nominal = term.t_ncol / 2;
+		n = (n > 0) ? nominal : -nominal;
+	}
+
 	make_local_w_val(curwp,WVAL_SIDEWAYS);
-
-	if (!f)
-		n = term.t_ncol/2;
-
-	w_val(curwp, WVAL_SIDEWAYS) -= n;
+	w_val(curwp, WVAL_SIDEWAYS) += n;
 
 	if (w_val(curwp, WVAL_SIDEWAYS) < 0) {
 		if (original == 0)
@@ -463,9 +456,24 @@ int f,n;
 		w_val(curwp, WVAL_SIDEWAYS) = 0;
 	}
 
-        curwp->w_flag  |= WFHARD|WFMOVE|WFMODE;
+	if (original != w_val(curwp,WVAL_SIDEWAYS))
+        	curwp->w_flag  |= WFHARD|WFMOVE|WFMODE;
 
 	return TRUE;
+}
+
+int
+mvrightwind(f,n)
+int f,n;
+{
+	return scroll_sideways(f,n);
+}
+
+int
+mvleftwind(f,n)
+int f,n;
+{
+	return scroll_sideways(f,-n);
 }
 
 /*
@@ -562,6 +570,19 @@ WINDOW *thewp;
 }
 
 /*
+ * Copy the window-traits struct, and adjust the embedded VAL struct so that
+ * modes that are local remain so.
+ */
+void
+copy_traits(dst, src)
+W_TRAITS *dst;
+W_TRAITS *src;
+{
+	*dst = *src;
+	copy_mvals(NUM_W_VALUES, dst->w_vals.wv, src->w_vals.wv);
+}
+
+/*
 	Split the current window.  A window smaller than 3 lines cannot be
 	split.  An argument of 1 forces the cursor into the upper window, an
 	argument of two forces the cursor to the lower window.  The only other
@@ -590,8 +611,7 @@ int f,n;
         }
 	++curwp->w_bufp->b_nwnd;	       /* Displayed twice.     */
         wp->w_bufp  = curwp->w_bufp;
-        wp->w_line = curwp->w_line;
-        wp->w_traits  = curwp->w_traits;
+        copy_traits(&(wp->w_traits), &(curwp->w_traits));
         wp->w_flag  = 0;
         wp->w_force = 0;
         ntru = (curwp->w_ntrows-1) / 2;         /* Upper size           */
@@ -804,20 +824,24 @@ int
 scrnextup(f, n)		/* scroll the next window up (back) a page */
 int f,n;
 {
+	int	status;
+
 	(void)nextwind(FALSE, 1);
-	backhpage(f, n);
+	status = backhpage(f, n);
 	(void)prevwind(FALSE, 1);
-	return TRUE;
+	return status;
 }
 
 int
 scrnextdw(f, n)		/* scroll the next window down (forward) a page */
 int f,n;
 {
+	int	status;
+
 	(void)nextwind(FALSE, 1);
-	(void)forwhpage(f, n);
+	status = forwhpage(f, n);
 	(void)prevwind(FALSE, 1);
-	return TRUE;
+	return status;
 }
 
 #if ! SMALLER
