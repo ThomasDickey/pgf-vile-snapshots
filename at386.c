@@ -2,7 +2,10 @@
  *		have libtermcap.   grrr.
  *
  * $Log: at386.c,v $
- * Revision 1.6  1991/09/10 01:19:35  pgf
+ * Revision 1.7  1992/04/10 18:47:25  pgf
+ * change abs to absol to get rid of name conflicts
+ *
+ * Revision 1.6  1991/09/10  01:19:35  pgf
  * re-tabbed, and moved ESC and BEL to estruct.h
  *
  * Revision 1.5  1991/08/07  12:34:39  pgf
@@ -212,7 +215,7 @@ at386scroll_delins(from,to,n)
 	int i;
 	if (to == from) return;
 #if PRETTIER_SCROLL
-	if (abs(from-to) > 1) {
+	if (absol(from-to) > 1) {
 		at386scroll_delins(from, (from<to) ? to-1:to+1, n);
 		if (from < to)
 			from = to-1;

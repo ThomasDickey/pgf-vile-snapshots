@@ -2,7 +2,10 @@
  * 	X11 support, Dave Lemke, 11/91
  *
  * $Log: x11.c,v $
- * Revision 1.4  1992/03/07 10:27:03  pgf
+ * Revision 1.5  1992/04/10 18:47:25  pgf
+ * change abs to absol to get rid of name conflicts
+ *
+ * Revision 1.4  1992/03/07  10:27:03  pgf
  * avoid macro expansion loop -- Xos.h defines strchr and strrchr
  *
  * Revision 1.3  1991/12/11  21:23:13  pgf
@@ -44,7 +47,7 @@
 #define	NPAUSE	10		/* # times thru update to pause */
 #define min(x,y)	((x) < (y) ? (x) : (y))
 #define max(x,y)	((x) > (y) ? (x) : (y))
-#define	abs(x)		((x) > 0 ? (x) : -(x))
+#define	absol(x)	((x) > 0 ? (x) : -(x))
 
 /* XX -- use xcutsel instead */
 #undef	SABER_HACK		/* hack to support Saber since it doesn't do
@@ -795,8 +798,8 @@ x_scroll(from, to, count)
      * gets 'smart' and realizes it doesn't have to copy all the lines around,
      * but then it doesn't bother to clean them either.
      */
-    if (abs(from - to) != count) {
-	diff = abs(from - to) - count;
+    if (absol(from - to) != count) {
+	diff = absol(from - to) - count;
 	for (i = 0, rf = fst; i <= diff; i++, rf -= finc) {
 	    memset((char *) cur_win->sc[rf], ' ', cur_win->cols);
 	    cur_win->line_attr[rf] |= LINE_DIRTY;
@@ -1663,7 +1666,7 @@ start_selection(tw, ev, nr, nc)
     int         nr,
                 nc;
 {
-    if (tw->lasttime && (abs(ev->time - tw->lasttime) < tw->click_timeout)) {
+    if (tw->lasttime && (absol(ev->time - tw->lasttime) < tw->click_timeout)) {
 	/* ignore extra clicks on other rows */
 	if (nr == tw->sel_start_row) {
 	    multi_click(tw, nr, nc);

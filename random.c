@@ -3,7 +3,10 @@
  * commands. There is no functional grouping here, for sure.
  *
  * $Log: random.c,v $
- * Revision 1.55  1992/03/24 22:45:09  pgf
+ * Revision 1.56  1992/04/14 08:51:44  pgf
+ * missing local var in DOS ifdef
+ *
+ * Revision 1.55  1992/03/24  22:45:09  pgf
  * allow ^D to back up past autoindented whitespace
  *
  * Revision 1.54  1992/03/24  07:45:08  pgf
@@ -2192,6 +2195,7 @@ catnap(milli)
 int milli;
 {
 #if ! UNIX
+	int i;
 	for (i = 0; i < term.t_pause; i++)
 		;
 #else

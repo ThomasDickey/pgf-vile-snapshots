@@ -71,8 +71,6 @@ E	g should become a region command.  Then it could take ranges, as
 
 E	add C comments to CFENCE matching code
 
-E	add C ifdefs to CFENCE matching code
-
 E	adjust window size of popups based on length of buffer.  currently
 	popups get half the window they're splitting, no matter what
 
@@ -140,12 +138,6 @@ L) - There is a very useful command summary for vi, called vi.ref.
      Its available with anonymous ftp from star.cs.vu.nl, directory /maarten.
      It would be great if this could be edited for vile.
 
----------------------------------------------
-
-
-       I had to change some a lot of stuff(eg.  include files, system
-routines...) in order run on BSD 4.3 machine. 
-
 --------------------------------------------
 
 This code will not compile because of confusion about how #if works.
@@ -154,46 +146,10 @@ There are many places in vile where #if VAR was used, but #ifdef or
 #if defined() would have been more correct. Use of the #if construct
 in vile causes compilation to abort.
 
+[ I think his compiler is broken -- pgf ]
+
 ---------------------------------
 
-	I have found that at least on my machines setting both SCROLL
-	options to 0 and linking to -lcurses produces considerably better
-	screen handling.
-
-====================   MY Makefile =========================================
-(for r6000)
-
-# LIBS = -ltermcap
-# LIBS = -lcurses	# RS6000
-LIBS = -lcurses -lcposix	# i386 and gcc
-
-# XCFLAGS = -D_POSIX_SOURCE -D_XOPEN_SOURCE -D_RS6000 -D_ALL_SOURCE	# RS600
-XCFLAGS = 	# i386
-
-# CFLAGS = -O
-#CFLAGS = -g -systype sysv	# for the mips machine
-CFLAGS = -g -O $(XCFLAGS)
-
-# CC =	gcc		# RS600
-CC =	gcc		# i386
-
--------------------------------
-
-  #if V7 | BSD
-  #undef	CTRL
-***************
-*** 206,214 ****
-  	ntermio.c_lflag = ISIG;
-  	ntermio.c_cc[VMIN] = 1;
-  	ntermio.c_cc[VTIME] = 0;
-- #ifndef	_RS6000	/* FIXME */
-  	ntermio.c_cc[VSWTCH] = -1;
- #endif
-  #ifdef SIGTSTP	/* suspension under sys5 -- is this a standard? */
-  #if POSIX	/* ODT uses this... */
-  	ntermio.c_cc[VSUSP] = -1;
-
--------------------------------------------------------
 
 2. File completion would be nice for commands asking for filenames.
 This saves a lot of typing.
@@ -208,115 +164,6 @@ Suppose I want to insert 80 dashes on a line.  80i-<ESC>  But this
 doesn't work in vile.  (Yes, I know there is other ways of doing it,
 but this seemed the easiest way to remember).
 
----------------------------------------------
-
-Here are some basic fixes to get the latest vile to run on dos, without
-some of these it won't even compile properly!!!
-
-estruct.h
----------
-
-	I had to change these definitions due to incompatible ints !!
-
-#if MSC 		/* pjr */
-#define FROM	0x00000100	/* allow a linespec */
-#define	TO	0x00000200	/* allow a second linespec */
-#define BANG	0x00000400	/* allow a ! after the command name */
-#define EXTRA	0x00000800	/* allow extra args after command name */
-#define XFILE	0x00001000	/* expand wildcards in extra part */
-#define NOSPC	0x00002000	/* no spaces allowed in the extra part */
-#define	DFLALL	0x00004000	/* default file range is 1,$ */
-#define DFLNONE	0x00008000	/* no default file range */
-#define NODFL	0x00100000	/* do not default to the current file name */
-#define EXRCOK	0x00200000	/* can be in a .exrc file */
-#define NL	0x00400000	/* if !exmode, then write a newline first */
-#define PLUS	0x00800000	/* allow a line number, as in ":e +32 foo" */
-#define ZERO	0x01000000	/* allow 0 to be given as a line number */
-#else
-...
-
-random.c
---------
-	Needed a definition for 'i' in catnap()
-
-fileio.c
---------
-	Changed '#ifdef UNIX' to '#if UNIX' on line 181
-	I had to ifdef out the 'off_t' reference in ffread()
-
-file.c
-------
-	There was a stray '{' after a while at line 598 in slowread() I added
-	  a '}' at line 642
-
-	I put back the definition for 'cp1' in makename()
-
-	glob() only works for UNIX.  Default should return TRUE otherwise
-	  file loading is at the whim of the stack!
-
-	Also I added the following code...
-
-#if MSDOS
-#include        <sys/stat.h>
-
-extern FILE	*ffp;		/* File pointer, all functions. */
-
-
-/*
- * ffronly
- *
- * find out if file fname if readonly - pjr
- */
-/*****************************************************************************/
-int
-ffronly(char *fname)
-/*****************************************************************************/
-{
-struct stat s;
-int i;
-
-	if (!stat(fname, &s))
-		return(!(s.st_mode & S_IWRITE));
-	else
-		return(FALSE);
-} /* end of ffronly */
-
-
-/*
- * ffsize
- *
- * find size of file ffp (declared in fileio.c) - pjr
- */
-/*****************************************************************************/
-unsigned long
-ffsize(void)
-/*****************************************************************************/
-{
-int fd = fileno(ffp);
-unsigned long l = filelength(fd);
-
-	return(l);
-
-/* 	return(filelength(fileno(ffp))); pjr */
-} /* end of ffsize */
-
-#endif /* MSDOS */
-
-
-spawn.c
--------
-	Added '| MSDOS' for pressreturn() as this is needed by dos too
-	ifdefed out filterregion()
-
-ibmpc.c
--------
-	Added newscreensize() as this is required by this module but is not
-	  included as SIGWINCH is not defined for it to be included in display.c
-
-	ifdefed out the call too 'ttclose' in ibmclose() as this causes an
-	  infinite loop otherwise.
-	
--------------------------------------------------- 
 
 I found a problem when using vile with encrypted files.  During a file edit if I
 set the mode to crypt and save the file, I am prompted for a encryption key.

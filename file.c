@@ -6,7 +6,10 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.37  1992/04/02 08:28:59  pgf
+ * Revision 1.38  1992/04/14 08:51:44  pgf
+ * ifdef fixups for pjr and DOS
+ *
+ * Revision 1.37  1992/04/02  08:28:59  pgf
  * fixed the realloc case of quickreadf()
  *
  * Revision 1.36  1992/03/20  09:00:40  pgf
@@ -658,8 +661,9 @@ int *nlinep;
 		if (addline(bp,fline,len) != TRUE) {
                         s = FIOMEM;             /* Keep message on the  */
                         break;                  /* display.             */
-                } else {
+                } 
 #if UNIX
+		else {
                 	/* reading from a pipe, and internal? */
 			if (fileispipe && !ffhasdata()) {
 				flag |= WFEDIT;
@@ -1490,8 +1494,8 @@ char *buf;
 		}
 		cp++;
 	}
-	return TRUE;
 #endif
+	return TRUE;
 }
 
 #if	CRYPT

@@ -8,7 +8,10 @@
 
 /*
  * $Log: edef.h,v $
- * Revision 1.43  1992/04/03 07:23:08  pgf
+ * Revision 1.44  1992/04/10 19:54:00  pgf
+ * v 3.15
+ *
+ * Revision 1.43  1992/04/03  07:23:08  pgf
  * v. 3.14
  *
  * Revision 1.42  1992/03/24  07:35:39  pgf
@@ -203,7 +206,7 @@ LINE    *lalloc();              /* Allocate a line              */
 #endif
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version three point fourteen");
+decl_init( char version[], "version three point fifteen");
 
 decl_init( int autoindented , -1);	/* how many chars (not cols) indented */
 decl_uninit( int isnamedcmd );		/* are we typing a command name */

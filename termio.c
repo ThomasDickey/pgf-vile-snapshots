@@ -4,7 +4,15 @@
  * All operating systems.
  *
  * $Log: termio.c,v $
- * Revision 1.29  1992/03/26 09:16:59  pgf
+ * Revision 1.31  1992/04/14 08:40:11  pgf
+ * added osf hack, to use sgtty instead of posix, and fixed sun hack, to use
+ * fionread instead of fcntl, to prevent output flush during typeahead check
+ *
+ * Revision 1.30  1992/04/10  18:50:22  pgf
+ * always include termios.h, not sys/termios.h, and
+ * don't call setbuffer on odt or isc
+ *
+ * Revision 1.29  1992/03/26  09:16:59  pgf
  * ifdef cleanup
  *
  * Revision 1.28  1992/03/25  19:13:17  pgf
@@ -126,6 +134,12 @@ extern int errno;
 
 /* I suppose this config stuff should move to estruct.h */
 
+#if OSF1		/* don't know why termios doesn't yet work in osf 1.1 */
+# undef POSIX
+# undef BERK
+# define BERK 1
+#endif
+
 #if POSIX
 # define USE_POSIX_TERMIOS 1
 # define USE_FCNTL 1
@@ -148,6 +162,8 @@ extern int errno;
 				the screen doesn't always refresh correctly,
 				as if the fcntl is interfering with the
 				output drain */
+#define USE_FIONREAD 	1
+#include <sys/filio.h>		/* to get at FIONREAD */
 #endif
 
 #if X11
@@ -180,11 +196,7 @@ extern CMDFUNC f_backchar_to_bol;
 
 #if USE_POSIX_TERMIOS
 
-#ifdef NOT_SYS_TERMIOS
-# include <termios.h>
-#else
-# include <sys/termios.h>
-#endif
+#include <termios.h>
 
 struct termios otermios, ntermios;
 
@@ -199,6 +211,11 @@ ttopen()
 		exit(1);
 	}
 	setbuffer(stdout, tobuf, TBUFSIZ);
+#if ODT || ISC
+	setvbuf(stdout, tobuf, _IOLBF, TBUFSIZ);
+#else
+  	setbuffer(stdout, tobuf, TBUFSIZ);
+#endif
 
 	suspc =   otermios.c_cc[VSUSP];
 	intrc =   otermios.c_cc[VINTR];
@@ -405,6 +422,10 @@ ttunclean()
 
 #if USE_SGTTY
 
+#if USE_FIONREAD
+char tobuf[TBUFSIZ];		/* terminal output buffer */
+#endif
+
 #undef	CTRL
 #include        <sgtty.h>        /* for stty/gtty functions */
 struct  sgttyb  ostate;          /* saved tty state */
@@ -416,11 +437,6 @@ struct ltchars	oltchars;	/* Saved terminal special character set */
 struct ltchars	nltchars = { -1, -1, -1, -1, -1, -1 }; /* a lot of nothing */
 struct tchars	otchars;	/* Saved terminal special character set */
 struct tchars	ntchars; /*  = { -1, -1, -1, -1, -1, -1 }; */
-
-#if USE_FIONREAD
-#include <sys/ioctl.h>		/* to get at FIONREAD */
-char tobuf[TBUFSIZ];		/* terminal output buffer */
-#endif
 
 ttopen()
 {

@@ -2,7 +2,10 @@
  *		for MicroEMACS
  *
  * $Log: spawn.c,v $
- * Revision 1.18  1992/03/19 23:26:04  pgf
+ * Revision 1.19  1992/04/14 08:54:02  pgf
+ * removed #if UNIX from pressreturn
+ *
+ * Revision 1.18  1992/03/19  23:26:04  pgf
  * SIGT for signals
  *
  * Revision 1.17  1992/03/05  09:19:55  pgf
@@ -239,7 +242,6 @@ rtfrmshell()
 }
 #endif /* SIGTSTP */
 
-#if UNIX
 pressreturn()
 {
 	int s;
@@ -255,7 +257,6 @@ pressreturn()
 		}
 	}
 }
-#endif
 
 /* ARGSUSED */
 respawn(f,n)

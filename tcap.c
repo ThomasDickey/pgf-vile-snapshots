@@ -2,7 +2,10 @@
  *		for MicroEMACS
  *
  * $Log: tcap.c,v $
- * Revision 1.12  1992/03/24 08:46:02  pgf
+ * Revision 1.13  1992/04/10 18:47:25  pgf
+ * change abs to absol to get rid of name conflicts
+ *
+ * Revision 1.12  1992/03/24  08:46:02  pgf
  * fixed support for AL,DL -- I hope it's really safe to use tgoto as
  * a generic parm capability expander.  I
  *
@@ -327,7 +330,7 @@ int from, to, n;
 		}
 	} else { /* must be dl and al */
 #if PRETTIER_SCROLL
-		if (abs(from-to) > 1) {
+		if (absol(from-to) > 1) {
 			tcapscroll_delins(from, (from<to) ? to-1:to+1, n);
 			if (from < to)
 				from = to-1;

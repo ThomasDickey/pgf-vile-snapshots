@@ -14,7 +14,17 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.59  1992/04/02 23:00:28  pgf
+ * Revision 1.62  1992/04/14 08:42:42  pgf
+ * don't handle SIGWINCH in X11 case
+ *
+ * Revision 1.61  1992/04/10  18:49:23  pgf
+ * mark VILEINIT buf as scratch, so it goes away quickly
+ *
+ * Revision 1.60  1992/04/09  08:32:35  pgf
+ * new vilerc processing was happening too late, after the first buffer
+ * was already in.  this kept some modes from "sticking"
+ *
+ * Revision 1.59  1992/04/02  23:00:28  pgf
  * fixed empty buffer bug, just introduced
  *
  * Revision 1.58  1992/03/24  07:44:05  pgf
@@ -504,7 +514,7 @@ char	*argv[];
 	signal(SIGQUIT,SIG_IGN);
 #endif
 	signal(SIGPIPE,SIG_IGN);
-#ifdef SIGWINCH
+#if defined(SIGWINCH) && ! X11
 	signal(SIGWINCH,sizesignal);
 #endif
 #endif
@@ -523,18 +533,8 @@ char	*argv[];
 		list order.  this set curbp, which isn't actually kosher */
 	curbp = NULL;
 
-
-	/* if there are any files to read, read the first one! */
-	if (gotafile) {
-		nextbuffer(FALSE,0);
-	}
-#if TAGS
-	else if (tagflag) {
-		cmdlinetag(tname);
-		didtag = TRUE;
-	}
-#endif
-	if (!curbp) {
+	/* pull in an unnamed buffer, if we were given none to work with */
+	if (!gotafile) {
 		bp = bfind("[unnamed]", OK_CREAT, 0);
 		bp->b_active = TRUE;
 #if DOSFILES
@@ -552,15 +552,18 @@ char	*argv[];
 		vileinit = getenv("VILEINIT");
 		if (vileinit != NULL) {
 			int odiscmd;
-			BUFFER *vbp, *obp = curbp;
+			BUFFER *vbp, *obp;
 			int oflags;
 
 			/* mark as modified, to prevent undispbuff() from
 				 clobbering */
-			oflags = obp->b_flag;
-			obp->b_flag |= BFCHG;
+			obp = curbp;
+			if (obp) {
+				oflags = obp->b_flag;
+				obp->b_flag |= BFCHG;
+			}
 
-			if ((vbp=bfind("[vileinit]", OK_CREAT, 0))==NULL)
+			if ((vbp=bfind("[vileinit]", OK_CREAT, BFSCRTCH))==NULL)
 				return FALSE;
 			/* mark the buffer as read only */
 			make_local_b_val(vbp,MDVIEW);
@@ -581,8 +584,11 @@ char	*argv[];
 				swbuffer(obp);
 				obp->b_flag = oflags;
 			}
+#ifdef NEEDED
+	unnecessary -- swbuffer/undispbuff did this already due to BFSCRTCH
 			/* remove the now unneeded buffer and exit */
 			zotbuf(vbp);
+#endif
 		} else {
 			/* if .vilerc is one of the input files....
 					don't clobber it */
@@ -599,6 +605,17 @@ char	*argv[];
 		ranstartup = TRUE;
 	}
 
+
+	/* if there are any files to read, read the first one! */
+	if (gotafile) {
+		nextbuffer(FALSE,0);
+	}
+#if TAGS
+	else if (tagflag) {
+		cmdlinetag(tname);
+		didtag = TRUE;
+	}
+#endif
 	msg = "";
 	if (helpflag) {
 		if (help(TRUE,1) != TRUE) {
