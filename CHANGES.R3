@@ -1,11 +1,6 @@
 The following changes are grouped only roughly, and represent the delta
 of the current release from vile version three.  -pgf   10/22/91
 
-Peter Ruczynski has done a great job porting vile to DOS -- he calls that
-version "pcvile".  Unfortunately, we haven't yet been able to sync up
-our source code, so this version is just the UNIX code.  Don't be fooled
-by the DOS ifdefs -- Pete has done a lot of work to make pcvile run on
-all monitors, with memory management, etc...  -pgf 1/10/92
 ------------------------------------------------------
 
 VI COMPLIANCE:
@@ -160,8 +155,12 @@ MISCELLANEOUS
 	declarations of system calls and lib routines.  the code should now
 	be more portable, to various compilers and systems.  there are new
 	targets in the makefile to make building on various platforms
-	easier.  the makefile even supports microsoft C, even if the code
-	doesn't quite yet.
+	easier.  the makefile even supports microsoft C.
+
+- the code now builds and runs under DOS, using (at least) Microsoft C 6.0. 
+	Peter Ruczynski has done a great job porting vile to DOS -- he
+	calls that version "pcvile".  He has used the Zortech compiler in
+	the past -- I didn't try to break that, but you never know.
 
 - quite a few bug fixes, including all (I think) of those reported by users
 

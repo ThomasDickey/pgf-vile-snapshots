@@ -3,7 +3,10 @@
  * the knowledge about files are here.
  *
  * $Log: fileio.c,v $
- * Revision 1.26  1992/05/19 08:55:44  foxharp
+ * Revision 1.27  1992/06/25 23:00:50  foxharp
+ * changes for dos/ibmpc
+ *
+ * Revision 1.26  1992/05/19  08:55:44  foxharp
  * more prototype and shadowed decl fixups
  *
  * Revision 1.25  1992/05/16  14:02:55  pgf
@@ -269,12 +272,7 @@ ffclose()
 		flen = 0;
 	}
 
-#if	MSDOS & CTRLZ & NEVER
-	 but we NEVER want to do this on read closes!!!
-	fputc(26, ffp);		/* add a ^Z at the end of the file */
-#endif
-	
-#if UNIX | (MSDOS & (LATTICE | MSC | TURBO))
+#if UNIX | (MSDOS & (LATTICE | MSC | TURBO | ZTC))
 #if UNIX
 	
 	if (fileispipe)

@@ -47,8 +47,8 @@ REMOTE=gutso!foxharp
 
 CC = cc
 LINK = cc
-#OPTFLAGS = -g
-OPTFLAGS = -O
+OPTFLAGS = -g
+#OPTFLAGS = -O
 
 # some older bsd systems keep ioctl in sys only -- easier to
 # search both places than to ifdef the code.  color me lazy.
@@ -81,17 +81,18 @@ CSRCfh = fences.c file.c fileio.c finderr.c globals.c hp110.c hp150.c
 CSRCim = ibmpc.c input.c insert.c isearch.c line.c main.c modes.c mktbls.c
 CSRCnr = npopen.c opers.c oneliner.c random.c regexp.c region.c
 CSRCst = search.c spawn.c st520.c tags.c tcap.c termio.c tipc.c
-CSRCuz = undo.c vmalloc.c vmsvt.c vt52.c window.c word.c wordmov.c x11.c z309.c
+CSRCuw = undo.c vmalloc.c vmsvt.c vt52.c window.c word.c wordmov.c
+CSRCxz = x11.c z309.c z_ibmpc.c
 
 CSRC = $(CSRCac) $(CSRCde) $(CSRCfh) $(CSRCim) $(CSRCnr) \
-	$(CSRCst) $(CSRCuz)
+	$(CSRCst) $(CSRCuw) $(CSRCxz)
 
 # non-C source code
 OTHERSRC = z100bios.asm
 
 # text and data files
 TEXTFILES = README CHANGES cmdtbl vile.hlp buglist revlist \
-	README.X11 link.msc
+	README.X11
 
 ALLSRC = $(CSRC) $(OTHERSRC)
 
@@ -158,75 +159,76 @@ bsd_posix ultrix sun:
 		$(TARGET)
 
 bsd386:
-	make CFLAGS="$(OPTFLAGS) -DBERK -DBSD386 -Dos_chosen" \
+	make CFLAGS="$(OPTFLAGS) $(INCS) -DBERK -DBSD386 -Dos_chosen" \
 	    MAKE=/usr/bin/make $(TARGET)
 
 att:
-	$(MAKE) CFLAGS="$(OPTFLAGS) -DUSG -Dos_chosen" \
+	$(MAKE) CFLAGS="$(OPTFLAGS) $(INCS) -DUSG -Dos_chosen" \
 		$(TARGET)
 
 att_posix svr4:
-	$(MAKE) CFLAGS="$(OPTFLAGS) -DUSG -DPOSIX -Dos_chosen" \
+	$(MAKE) CFLAGS="$(OPTFLAGS) $(INCS) -DUSG -DPOSIX -Dos_chosen" \
 		$(TARGET)
 
 svr3:
-	$(MAKE) CFLAGS="$(OPTFLAGS) -DSVR3 -Dos_chosen" \
+	$(MAKE) CFLAGS="$(OPTFLAGS) $(INCS) -DSVR3 -Dos_chosen" \
 		LIBS="-ltermcap -lc_s" $(TARGET)
 
 mips:
-	$(MAKE) CFLAGS="$(OPTFLAGS) -systype sysv -DSVR3 -Dos_chosen" \
+	$(MAKE) CFLAGS="$(OPTFLAGS) -systype sysv $(INCS) -DSVR3 -Dos_chosen" \
 		$(TARGET)
 
 odt:
 	$(MAKE) \
-	CFLAGS="$(OPTFLAGS) -DODT -DUSG -DPOSIX -DSVR3_PTEM -Dos_chosen" \
+	CFLAGS="$(OPTFLAGS) $(INCS) -DODT -DUSG -DPOSIX -DSVR3_PTEM -Dos_chosen" \
 		$(TARGET)
 
 isc:
 	$(MAKE) \
-	CFLAGS="$(OPTFLAGS) -DISC -DUSG -DPOSIX -DSVR3_PTEM -Dos_chosen" \
+	CFLAGS="$(OPTFLAGS) $(INCS) -DISC -DUSG -DPOSIX -DSVR3_PTEM -Dos_chosen" \
 		$(TARGET)
 
 hpux:
-	$(MAKE) CFLAGS="$(OPTFLAGS) -DUSG -DHAVE_SELECT -Dos_chosen" \
+	$(MAKE) CFLAGS="$(OPTFLAGS) $(INCS) -DUSG -DHAVE_SELECT -Dos_chosen" \
 		$(TARGET)
 
 next:
-	$(MAKE) CFLAGS="$(OPTFLAGS) $(INCS) -DBERK -D__STRICT_BSD__ -Dos_chosen" \
-		$(TARGET)
+	$(MAKE) CFLAGS="$(OPTFLAGS) $(INCS) -DBERK -D__STRICT_BSD__ \
+		-Dos_chosen" $(TARGET)
 
 unixpc:
-	$(MAKE) CFLAGS="$(OPTFLAGS) -DUSG -DHAVE_SELECT \
-		-DHAVE_MKDIR=0 -Dwinit=xxwinit -Dos_chosen" \
+	$(MAKE) CFLAGS="$(OPTFLAGS) $(INCS) -DUSG -DHAVE_SELECT \
+		-DHAVE_MKDIR=0 -Dwinit=xxwinit -Dos_chosen -DUNIXPC" \
 		$(TARGET)
 
 aix:
-	$(MAKE) CFLAGS="$(OPTFLAGS) -DUSG \
+	$(MAKE) CFLAGS="$(OPTFLAGS) $(INCS) -DUSG \
 		-DPOSIX -DAIX -DHAVE_SELECT -U__STR__ -Dos_chosen -qpgmsize=l" \
 		LIBS=-lcurses \
 		$(TARGET)
 
 osf1:
-	$(MAKE) CFLAGS="$(OPTFLAGS) -DBERK -DPOSIX -DOSF1 -Dos_chosen" \
+	$(MAKE) CFLAGS="$(OPTFLAGS) $(INCS) -DBERK -DPOSIX -DOSF1 -Dos_chosen" \
 		$(TARGET)
 
 linux:
-	$(MAKE) CFLAGS="$(OPTFLAGS) -DUSG \
+	$(MAKE) CFLAGS="$(OPTFLAGS) $(INCS) -DUSG \
 		-DPOSIX -DHAVE_SELECT -DHAVE_POLL=0 -Dos_chosen" \
 		$(TARGET)
 
 msc:
-	$(MAKE) MKTBLS=mktbls.exe CFLAGS="/EM /qc /AL /nologo \
+	$(MAKE) MKTBLS=mktbls.exe CFLAGS="/qc /AL /nologo \
 		-DMSDOS -DMSC -Dos_chosen -DIBMPC -Dscrn_chosen" \
 		O=obj CC=cl SCREEN=ibmpc \
-		LINK="link /ST:8192 @link.msc" $(TARGET)2
+		LNKFILE=link.msc \
+		LINK="link /MAP /CO /NOI /STACK:4096 @link.msc" $(TARGET)2
 
 aux2:
-	$(MAKE) CFLAGS="$(OPTFLAGS) -DUSG -DAUX2 -Dos_chosen" \
+	$(MAKE) CFLAGS="$(OPTFLAGS) $(INCS) -DUSG -DAUX2 -Dos_chosen" \
 		$(TARGET)
 
 default:
-	$(MAKE) CFLAGS="$(OPTFLAGS) -Uos_chosen" \
+	$(MAKE) CFLAGS="$(OPTFLAGS) $(INCS) -Uos_chosen" \
 		$(TARGET)
 
 $(TARGET): $(BUILTHDRS) $(OBJ) makefile
@@ -238,6 +240,20 @@ $(TARGET): $(BUILTHDRS) $(OBJ) makefile
 $(TARGET)2: $(BUILTHDRS) $(OBJ) makefile
 	-mv $(TARGET) o$(TARGET)
 	$(LINK)
+
+# this has to be run on a unix system, unfortunately.
+#  once on dos, you'll have to maintain link.msc by hand
+link.msc: makefile
+	echo +>$@
+	(echo $(OBJ) | xargs -n5 ) | \
+		sed -e 's/$(SCREEN)/ibmpc/' \
+		    -e 's/\.o/\.obj/g' \
+		    -e 's/$$/+/' >> $@
+	echo >> $@
+	echo vile.exe >> $@
+	echo vile.map\; >> $@
+
+# end of file
 
 saber_src:
 	#load $(CFLAGS) $(SRC) $(LIBS)
@@ -269,21 +285,21 @@ install:
 	cp vile.hlp $$dest ;\
 	chmod 0644 $$dest/vile.hlp 
 
-compr-shar:
+compr-shar: link.msc
 	[ -d cshardir ] || mkdir cshardir
 #	add -a for archive headers, add -s pgf@cayman.com for submitted-by
 	shar -p -nvile -L55 -o cshardir/vileshar \
-		-T README -C `ls $(EVERYTHING) | sed /README/d`
+		-T README -C `ls $(EVERYTHING) | sed /README/d` link.msc
 
-shar:
+shar: link.msc
 	[ -d shardir ] || mkdir shardir
 #	add -a for archive headers, add -s pgf@cayman.com for submitted-by
 	shar -x -a -spgf@cayman.com -nVile -L55 \
-			-o shardir/vileshar `ls $(EVERYTHING)`
+			-o shardir/vileshar `ls $(EVERYTHING)` link.msc
 
-bigshar:
+bigshar: link.msc
 	shar -spgf@cayman.com -nVile \
-		-o vileBIGshar README `ls $(EVERYTHING) | sed /README/d`
+	-o vileBIGshar README `ls $(EVERYTHING) | sed /README/d` link.msc
 
 # only uucp things changed since last time
 uuto:
@@ -388,7 +404,16 @@ $(OBJ): estruct.h edef.h
 externs.$O: nebind.h nename.h nefunc.h
 
 # $Log: makefile,v $
-# Revision 1.57  1992/06/14 11:33:17  foxharp
+# Revision 1.60  1992/07/01 17:03:12  foxharp
+# added z_ibmpc.c
+#
+# Revision 1.59  1992/06/25  23:00:50  foxharp
+# changes for dos/ibmpc
+#
+# Revision 1.58  1992/06/22  08:40:02  foxharp
+# added INCS to all targets, especially aix, so it'll get ioctl.h in termio.c
+#
+# Revision 1.57  1992/06/14  11:33:17  foxharp
 # added -DAIX
 #
 # Revision 1.56  1992/06/12  20:21:28  foxharp

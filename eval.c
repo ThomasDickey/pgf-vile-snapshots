@@ -4,7 +4,10 @@
 	written 1986 by Daniel Lawrence
  *
  * $Log: eval.c,v $
- * Revision 1.33  1992/05/19 08:55:44  foxharp
+ * Revision 1.34  1992/06/25 23:00:50  foxharp
+ * changes for dos/ibmpc
+ *
+ * Revision 1.33  1992/05/19  08:55:44  foxharp
  * more prototype and shadowed decl fixups
  *
  * Revision 1.32  1992/05/16  12:00:31  pgf
@@ -686,14 +689,19 @@ char *tokn;		/* token to evaluate */
 
 		case TKARG:	/* interactive argument */
 				oclexec = clexec;
+
+				/* clexec = FALSE; * in cline execution - added pjr */
+
 				strcpy(tokn, tokval(&tokn[1]));
 				distmp = discmd;	/* echo it always! */
 				discmd = TRUE;
 				clexec = FALSE;
+				buf[0] = 0;
 				status = kbd_string(tokn,
 					   buf, NSTRING, '\n',EXPAND,TRUE);
 				discmd = distmp;
 				clexec = oclexec;
+
 				if (status == ABORT)
 					return(errorm);
 				return(buf);

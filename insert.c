@@ -8,9 +8,14 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: insert.c,v $
- *	Revision 1.2  1992/06/01 20:37:31  foxharp
- *	added tabinsert
- *	mode
+ *	Revision 1.3  1992/07/04 14:34:52  foxharp
+ *	added ability to call SPEC-key bound functions (motion only) during
+ *	insert mode, on the assumption that you don't _really_ want to insert
+ *	function keys into your buffer.
+ *
+ * Revision 1.2  1992/06/01  20:37:31  foxharp
+ * added tabinsert
+ * mode
  *
  * Revision 1.1  1992/05/29  09:38:33  foxharp
  * Initial revision
@@ -248,6 +253,18 @@ ins()
 			if (b_val(curbp, MDSHOWMODE))
 				curwp->w_flag |= WFMODE;
 			return (TRUE);
+		}
+
+		if (c & SPEC) {
+			CMDFUNC *cfp;
+			cfp = kcod2fnc(c);
+			if (!cfp || ((cfp->c_flags & MOTION|REDO|UNDO)
+						!= MOTION)) {
+				startoff = 0;
+				curgoal = getccol(FALSE);
+				execute(cfp,FALSE,1);
+			}
+			continue;
 		}
 
 		execfunc = NULL;

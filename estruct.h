@@ -10,7 +10,16 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.72  1992/06/12 22:23:42  foxharp
+ * Revision 1.75  1992/07/01 17:00:59  foxharp
+ * added ZIBMPC define, and comment re: COLOR support
+ *
+ * Revision 1.74  1992/06/25  23:00:50  foxharp
+ * changes for dos/ibmpc
+ *
+ * Revision 1.73  1992/06/22  08:33:28  foxharp
+ * another ifdef for UNIXPC
+ *
+ * Revision 1.72  1992/06/12  22:23:42  foxharp
  * changes for separate 'comments' r.e. for formatregion
  *
  * Revision 1.71  1992/06/04  19:42:37  foxharp
@@ -389,7 +398,8 @@
 #define MWC86	0	/* marc williams compiler */
 #define	LATTICE	0	/* Lattice 2.14 through 3.0 compilers */
 #define	AZTEC	0	/* Aztec C 3.20e */
-#define	MSC	0	/* MicroSoft C compile version 3 & 4 */
+#define	MSC	0	/* MicroSoft C compile version 3 & 4 & 5 & 6 */
+#define	ZTC	0	/* Zortech C compiler */
 #define	TURBO	0	/* Turbo C/MSDOS */
 
 #endif /* os_chosen */
@@ -450,6 +460,7 @@
 #define VT52	0			/* VT52 terminal (Zenith).	*/
 #define RAINBOW 0			/* Use Rainbow fast video.	*/
 #define	IBMPC	0			/* IBM-PC CGA/MONO/EGA driver	*/
+#define	ZIBMPC	0			/* Zortech lib IBM-PC CGA/MONO/EGA driver	*/
 #define	DG10	0			/* Data General system/10	*/
 #define	TIPC	0			/* TI Professional PC driver	*/
 #define	Z309	0			/* Zenith 100 PC family	driver	*/
@@ -471,6 +482,7 @@
 
 /* NOTE -- COLOR doesn't currently do anything if you're using X or TERMCAP */
 /* (But I think X11 may honor colors from the command line or .Xdefaults) */
+/* (and DOS definitely does do things with COLOR, but it may not work) */
 #define	COLOR	0	/* color commands and windows			*/
 #define	CLRMSG	0	/* space clears the message line with no insert	*/
 
@@ -539,6 +551,7 @@
 
 #if BERK && ! POSIX
 #define USE_INDEX 1
+#define USE_BCOPY 1
 #endif
 
 #ifdef USE_INDEX
@@ -546,6 +559,12 @@
 #define strrchr rindex
 extern char *index();
 extern char *rindex();
+#endif
+
+#ifdef USE_BCOPY
+#define memcmp		bcmp
+#define memcpy(a,b,c)	bcopy(b,a,c)
+#define memset(a,c,b)	bfill(a,b,c)
 #endif
 
 /*	System dependent library redefinitions, structures and includes	*/
@@ -596,7 +615,7 @@ union REGS {
 };
 #endif
 
-#if	MSDOS & MWC86
+#if	MSDOS && MWC86
 #include	<dos.h>
 #define	int86(a, b, c)	intcall(b, c, a)
 #define	inp	in
@@ -616,7 +635,7 @@ union REGS {
 };
 #endif
 
-#if	MSDOS & MSC
+#if	MSDOS && ( MSC || ZTC )
 #include	<dos.h>
 #include	<memory.h>
 #define	peek(a,b,c,d)	movedata(a,b,FP_SEG(c),FP_OFF(c),d)
@@ -624,7 +643,7 @@ union REGS {
 #define	movmem(a, b, c)		memcpy(b, a, c)
 #endif
 
-#if	MSDOS & LATTICE
+#if	MSDOS && LATTICE
 #undef	CPM
 #undef	LATTICE
 #include	<dos.h>
@@ -637,13 +656,13 @@ union REGS {
 
 /*	define some ability flags */
 
-#if	IBMPC | Z309
+#if	IBMPC || Z309
 #define	MEMMAP	1
 #else
 #define	MEMMAP	0
 #endif
 
-#if	((MSDOS) & (LATTICE | AZTEC | MSC | TURBO)) | UNIX
+#if	((MSDOS) && (LATTICE || AZTEC || MSC || TURBO || ZTC)) || UNIX
 #define	ENVFUNC	1
 #else
 #define	ENVFUNC	0
@@ -1338,6 +1357,19 @@ typedef struct  VIDEO {
 #define	VFREQ	0x0008			/* reverse video request	*/
 #define	VFCOL	0x0010			/* color change requested	*/
 
+#if IBMPC
+/*
+ * these need to go into edef.h eventually!
+ */
+#define	CDCGA	0			/* color graphics card		*/
+#define	CDMONO	1			/* monochrome text card		*/
+#define	CDEGA	2			/* EGA color adapter		*/
+#define	CDVGA	3			/* VGA color adapter		*/
+#define	CDSENSE	9			/* detect the card type		*/
+
+#endif
+
+
 /* Commands are represented as CMDFUNC structures, which contain a
  *	pointer to the actual function, and flags which help to classify it.
  *	(things like is it a MOTION, can it be UNDOne)
@@ -1505,7 +1537,11 @@ extern char *getcwd();
 #endif
 
 #if HAVE_SELECT
+#if UNIXPC
+#include <select.h>
+#else
 #include <sys/time.h>
+#endif
 #endif
 
 

@@ -2,7 +2,10 @@
  *		for MicroEMACS
  *
  * $Log: spawn.c,v $
- * Revision 1.27  1992/06/01 21:23:40  foxharp
+ * Revision 1.28  1992/06/25 23:00:50  foxharp
+ * changes for dos/ibmpc
+ *
+ * Revision 1.27  1992/06/01  21:23:40  foxharp
  * fix ret codes on bktoshell and rtfrmshell
  *
  * Revision 1.26  1992/06/01  20:43:10  foxharp
@@ -134,7 +137,7 @@ extern  short   iochan;                         /* In "termio.c"        */
 #include        <string.h>
 #endif
 
-#if	MSDOS & (MSC | TURBO)
+#if	MSDOS & (MSC | TURBO | ZTC)
 #include	<process.h>
 #endif
 
@@ -200,7 +203,7 @@ int f,n;
 	mlforce("[Not in TOS]");
 	return FALSE;
 #endif
-#if     MSDOS & (AZTEC | MSC | TURBO)
+#if     MSDOS & (AZTEC | MSC | TURBO | ZTC)
         movecursor(term.t_nrow, 0);             /* Seek to last line.   */
         TTflush();
 	TTkclose();
@@ -676,7 +679,7 @@ pipecmd(f, n)
 	}
 
 #if FINDERR
-	strcpy(febuff,bp->b_bname);
+	strcpy(febuff,"[Cmd Output]");
 	newfebuff = TRUE;
 #endif
 
@@ -876,7 +879,7 @@ register char   *cmd;
 }
 #endif
 
-#if	~AZTEC & ~MSC & ~TURBO & MSDOS
+#if	~AZTEC & ~MSC & ~TURBO & ~ZTC & MSDOS
 
 /*
  * This routine, once again by Bob McNamara, is a C translation of the "system"

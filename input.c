@@ -3,7 +3,13 @@
  *		5/9/86
  *
  * $Log: input.c,v $
- * Revision 1.38  1992/05/19 08:55:44  foxharp
+ * Revision 1.40  1992/07/04 14:32:08  foxharp
+ * rearranged/improved the insertmode arrow key code
+ *
+ * Revision 1.39  1992/06/25  23:00:50  foxharp
+ * changes for dos/ibmpc
+ *
+ * Revision 1.38  1992/05/19  08:55:44  foxharp
  * more prototype and shadowed decl fixups
  *
  * Revision 1.37  1992/05/16  12:00:31  pgf
@@ -196,7 +202,14 @@ char *prompt;
 char *buf;
 int bufn;
 {
-	return kbd_string(prompt, buf, bufn, '\n',EXPAND,TRUE);
+	return kbd_string(prompt, buf, bufn, '\n', EXPAND,
+#if MSDOS
+		/* we certainly quote with a '\' */
+		FALSE
+#else
+		TRUE
+#endif
+	);
 }
 
 #ifdef NEEDED
@@ -403,14 +416,11 @@ int
 kbd_key()
 {
 	int    c;
-#ifdef ANSI_SPEC
-	static insert_mode_was;
-#endif
 
 	/* get a keystroke */
 	c = tgetc();
 
-#ifdef ANSI_SPEC
+#if ANSI_SPEC
 	if (insert_mode_was && last1key == -abortc) {
 		/* then we just read the command we pushed before */
 		extern CMDFUNC f_insert;
@@ -437,9 +447,10 @@ kbd_key()
 	if (c == ESC) {
 		int nextc;
 
+#if BEFORE
 		if (abortc != ESC) {  /* then just eat the sequence */
 			c = tgetc();
-			if (c == '[') {
+			if (c == '[' || c == 'O') {
 				c = tgetc();
 				return(last1key = SPEC | c);
 			}
@@ -447,6 +458,7 @@ kbd_key()
 		}
 
 		/* else abortc must be ESC.  big surprise. */
+#endif
 
 		/* if there's no recorded input, and no user typeahead */
 		if ((nextc = get_recorded_char(FALSE)) == -1 && !typahead())
@@ -454,24 +466,25 @@ kbd_key()
 
 		/* and then, if there _was_ recorded input or new typahead... */
 		if (nextc != -1 || typahead()) {
-			if ((c = tgetc()) == '[' || c == 'O') {
+			c = tgetc();
+			if (c == '[' || c == 'O') {
 				/* eat ansi sequences */
 				c = tgetc();
+				if (abortc != ESC || !insertmode)
+					return (last1key = SPEC | c);
 				if (insertmode == REPLACECHAR) {
 					/* eat the sequence, but return abort */
 					return abortc;
 				}
-				if (insertmode) {
-					/* remember we were in insert mode */
-					insert_mode_was = insertmode;
-					/* save the code, but return flag to
-						ins() so it can clean up */
-					tungetc(SPEC | c);
-					return(last1key = -abortc);
-				} else { /* just return the function code */
-					return(last1key = SPEC | c);
-				}
+				/* remember we were in insert mode */
+				insert_mode_was = insertmode;
+				/* save the code, but return flag to
+					ins() so it can clean up */
+				tungetc(SPEC | c);
+				return(last1key = -abortc);
 			} else {
+				if (abortc != ESC)
+					return (last1key = c);
 				tungetc(c);
 				return (last1key = ESC);
 			}
@@ -482,8 +495,7 @@ kbd_key()
 #if	MSDOS | ST520
 	if (c == 0) {			/* Apply SPEC prefix	*/
 		c = tgetc();
-		if (!insertmode)
-			return(last1key = SPEC | c);
+		return(last1key = SPEC | c);
 	}
 #endif
 
@@ -623,7 +635,9 @@ int dobackslashes;	/* do we add and delete '\' chars for the caller */
 		switch(extbuf[extcpos]) {
 		case '%':
 		case '#':
+#if ! MSDOS
 		case ':':
+#endif
 			if (dobackslashes && expand == EXPAND)
 				buf[cpos++] = '\\'; /* add extra */
 		default:
@@ -778,6 +792,8 @@ int dobackslashes;	/* do we add and delete '\' chars for the caller */
 					}
 				}
 				break;
+#if ! MSDOS
+/* drive letters get in the way */
 			case ':':
 				{
 				char str[80];
@@ -785,6 +801,7 @@ int dobackslashes;	/* do we add and delete '\' chars for the caller */
 					cp = str;
 				break;
 				}
+#endif
 			default:
 				goto trymore;
 			}

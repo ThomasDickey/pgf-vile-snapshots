@@ -11,7 +11,10 @@
  * which means that the dot and mark values in the buffer headers are nonsense.
  *
  * $Log: line.c,v $
- * Revision 1.23  1992/05/16 12:00:31  pgf
+ * Revision 1.24  1992/07/04 14:36:17  foxharp
+ * added temporary line-poisoner, to catch core dump on buffer/line reuse.
+ *
+ * Revision 1.23  1992/05/16  12:00:31  pgf
  * prototypes/ansi/void-int stuff/microsoftC
  *
  * Revision 1.22  1992/03/24  07:37:35  pgf
@@ -101,6 +104,9 @@
  * initial vile RCS revision
  */
 
+#define poison(p,s) memset(p, 0xdf, s)
+/* #define poison(p,s)  */
+
 #include	<stdio.h>
 #include	"estruct.h"
 #include	"edef.h"
@@ -136,6 +142,7 @@ BUFFER *bp;
 	lp->l_text = NULL;
 	if (size && (lp->l_text = malloc(size)) == NULL) {
 		mlforce("[OUT OF MEMORY]");
+		poison(lp, sizeof(*lp));
 		free((char *)lp);
 		return NULL;
 	}
@@ -180,11 +187,13 @@ register BUFFER *bp;
 	/* if the buffer doesn't have its own block of LINEs, or this
 		one isn't in that range, free it */
 	if (!bp->b_LINEs || lp < bp->b_LINEs || lp >= bp->b_LINEs_end) {
+		poison(lp, sizeof(*lp));
 		free((char *)lp);
 	} else {
 		/* keep track of freed buffer LINEs here */
 		lp->l_fp = bp->b_freeLINEs;
 		bp->b_freeLINEs = lp;
+		lp->l_text = (char *)1; /* catch references hard */
 	}
 }
 
@@ -199,11 +208,13 @@ register BUFFER *bp;
 	if (ltextp) {
 		if (bp->b_ltext) { /* could it be in the big range? */
 			if (ltextp < bp->b_ltext || ltextp >= bp->b_ltext_end) {
+				poison(ltextp, lp->l_size);
 				free((char *)ltextp);
 			} /* else {
 			could keep track of freed big range text here;
 			} */
 		} else {
+			poison(ltextp, lp->l_size);
 			free((char *)ltextp);
 		}
 		lp->l_text = NULL;

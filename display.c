@@ -6,7 +6,13 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.39  1992/05/29 08:36:06  foxharp
+ * Revision 1.41  1992/07/01 16:59:46  foxharp
+ * scwrite() arg changes, and some fore/background color cleanup
+ *
+ * Revision 1.40  1992/06/26  22:21:05  foxharp
+ * small almost cosmetic changes to mlsav'ing
+ *
+ * Revision 1.39  1992/05/29  08:36:06  foxharp
  * moved the SVR3_PTEM ifdef so it works with POSIX too
  *
  * Revision 1.38  1992/05/19  08:55:44  foxharp
@@ -176,6 +182,7 @@ int displaying = FALSE;
 /* for window size changes */
 int chg_width, chg_height;
 
+extern FILE *FF;
 /*
  * Initialize the data structures used by the display code. The edge vectors
  * used to access the screens are set up. The operating system's terminal I/O
@@ -197,6 +204,7 @@ vtinit()
     if (vscreen == NULL)
         exit(1);
 
+
 #if	! MEMMAP
     pscreen = (VIDEO **) malloc(term.t_mrow*sizeof(VIDEO *));
 
@@ -210,6 +218,7 @@ vtinit()
 
         if (vp == NULL)
             exit(1);
+
 
 	/* unnecessary */
 	/* (void)memset(vp, ' ', sizeof(struct VIDEO) + term.t_mcol - 4); */
@@ -410,7 +419,7 @@ int force;	/* force update past type ahead? */
 
 #if	MEMMAP
 	/* update the cursor and flush the buffers */
-	movecursor(currow, screencol);
+	/* movecursor(currow, screencol); */
 #endif
 
 	/* check for lines to de-extend */
@@ -425,6 +434,7 @@ int force;	/* force update past type ahead? */
 
 	/* update the cursor and flush the buffers */
 	movecursor(currow, screencol);
+    
 	TTflush();
 	displaying = FALSE;
 	while (chg_width || chg_height)
@@ -721,10 +731,12 @@ updgar()
 	(*term.t_eeop)();
 	sgarbf = FALSE;			 /* Erase-page clears */
 	mpresf = FALSE;			 /* the message area. */
-	if (mlsave[0])
+	if (mlsave[0]) {
 		mlforce(mlsave);
+	}
 #if	COLOR
-	mlerase();			/* needs to be cleared if colored */
+	else
+		mlerase();		/* needs to be cleared if colored */
 #endif
 }
 
@@ -1006,14 +1018,15 @@ struct VIDEO *vpdummy;	/* virtual screen image */
 
 {
 #if	COLOR
-	scwrite(row, vp1->v_text, vp1->v_rfcolor, vp1->v_rbcolor);
+	scwrite(row, 0, term.t_ncol-1,
+		vp1->v_text, vp1->v_rfcolor, vp1->v_rbcolor);
 	vp1->v_fcolor = vp1->v_rfcolor;
 	vp1->v_bcolor = vp1->v_rbcolor;
 #else
 	if (vp1->v_flag & VFREQ)
-		scwrite(row, vp1->v_text, 0, 7);
+		scwrite(row, 0, term.t_ncol-1, vp1->v_text, 0, 7);
 	else
-		scwrite(row, vp1->v_text, 7, 0);
+		scwrite(row, 0, term.t_ncol-1, vp1->v_text, 7, 0);
 #endif
 	vp1->v_flag &= ~(VFCHG | VFCOL);	/* flag this line as changed */
 
@@ -1215,8 +1228,8 @@ WINDOW *wp;
 
 
 #if	COLOR
-	vscreen[n]->v_rfcolor = 0;			/* black on */
-	vscreen[n]->v_rbcolor = 7;			/* white.....*/
+	vscreen[n]->v_rfcolor = gbcolor;		/* black on */
+	vscreen[n]->v_rbcolor = gfcolor;		/* white.....*/
 #endif
 	vtmove(n, 0);                       	/* Seek to right line. */
 	if (wp == curwp) {				/* mark the current buffer */
@@ -1369,7 +1382,7 @@ void
 mlerase()
 {
     int i;
-    
+
     if (mpresf == FALSE)
 		return;
     movecursor(term.t_nrow, 0);
@@ -1377,8 +1390,8 @@ mlerase()
     	return;
 
 #if	COLOR
-     TTforg(7);
-     TTbacg(0);
+     TTforg(gfcolor);
+     TTbacg(gbcolor);
 #endif
     if (eolexist == TRUE)
 	    TTeeol();
@@ -1415,8 +1428,11 @@ void
 mlsavec(c)
 int c;
 {
-	if (mlsavep - mlsave < NSTRING)
+	if (mlsavep - mlsave < NSTRING-1) {
 		*mlsavep++ = c;
+		*mlsavep = '\0';
+	}
+
 }
 
 /*
@@ -1543,14 +1559,13 @@ va_list *app;	/* ptr to current data field */
 #else
 		dofmt(app);
 #endif
-		*mlsavep = '\0';
 		return;
 	}
 
 #if	COLOR
 	/* set up the proper colors for the command line */
-	TTforg(7);
-	TTbacg(0);
+	TTforg(gfcolor);
+	TTbacg(gbcolor);
 #endif
 
 	/* if we cannot erase to end-of-line, do it manually */

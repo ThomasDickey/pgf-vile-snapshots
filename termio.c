@@ -4,7 +4,21 @@
  * All operating systems.
  *
  * $Log: termio.c,v $
- * Revision 1.39  1992/06/14 11:33:54  foxharp
+ * Revision 1.43  1992/07/01 17:04:33  foxharp
+ * always use && and || in #if statements, and
+ * MSC now uses getch() to get characters, and
+ * use TTputc() to put out cr-nl pairs instead of ttputc()
+ *
+ * Revision 1.42  1992/06/26  22:19:32  foxharp
+ * improved (i hope) the FIONREAD ifdefs.  needs testing.
+ *
+ * Revision 1.41  1992/06/25  23:00:50  foxharp
+ * changes for dos/ibmpc
+ *
+ * Revision 1.40  1992/06/22  08:35:13  foxharp
+ * AIX has the fcntl bug, but isn't BERK.  also added ifdef VSWTCH protection
+ *
+ * Revision 1.39  1992/06/14  11:33:54  foxharp
  * fcntl hack for AIX
  *
  * Revision 1.38  1992/06/11  09:44:10  foxharp
@@ -161,6 +175,7 @@ extern int errno;
 # define BERK 1
 #endif
 
+
 #if POSIX
 # define USE_POSIX_TERMIOS 1
 # define USE_FCNTL 1
@@ -169,7 +184,7 @@ extern int errno;
 #  define USE_TERMIO 1
 #  define USE_FCNTL 1
 # else
-#  if BERK | V7
+#  if BERK || V7
 #   define USE_SGTTY 1
 #   define USE_FIONREAD 1
 #  else
@@ -178,23 +193,30 @@ extern int errno;
 # endif
 #endif
 
-#if BERK
-# include "ioctl.h"
+#if (BERK || AIX || AUX2) && !defined(FIONREAD)
+/* try harder to get it */
+# if AUX2
+#  include "ioctl.h"
+# else
+#  include "filio.h"
+# endif
 #endif
 
 #if X11	/* don't use either one */
 # undef USE_FCNTL
 # undef USE_FIONREAD
-#elif defined(FIONREAD) || defined(sun) || AUX2 || AIX
- /* there seems to be a bug in someone's implementation of fcntl -- it
-  * causes output to be flushed if you change to ndelay input while output
-  * is pending.  for these systems, we use FIONREAD instead, if possible. 
-  * In fact, if try and use FIONREAD in any case if present.  If you have
-  * the problem with fcntl, you'll notice that the screen doesn't always
-  * refresh correctly, as if the fcntl is interfering with the output drain
-  */
-# undef USE_FCNTL
-# define USE_FIONREAD 	1
+#else
+# if defined(FIONREAD) /*  || defined(sun) || AUX2 || AIX */
+  /* there seems to be a bug in someone's implementation of fcntl -- it
+   * causes output to be flushed if you change to ndelay input while output
+   * is pending.  for these systems, we use FIONREAD instead, if possible. 
+   * In fact, if try and use FIONREAD in any case if present.  If you have
+   * the problem with fcntl, you'll notice that the screen doesn't always
+   * refresh correctly, as if the fcntl is interfering with the output drain
+   */
+#  undef USE_FCNTL
+#  define USE_FIONREAD 	1
+# endif
 #endif
 
 #if USE_FCNTL
@@ -303,8 +325,8 @@ int f;
 #if !X11
 	if (f) {
 		movecursor(term.t_nrow, ttcol); /* don't care about column */
-		ttputc('\n');
-		ttputc('\r');
+		TTputc('\n');
+		TTputc('\r');
 	}
 	fflush(stdout);
 #if ! LINUX
@@ -404,7 +426,9 @@ ttopen()
 	ntermio.c_lflag = ISIG;
 	ntermio.c_cc[VMIN] = 1;
 	ntermio.c_cc[VTIME] = 0;
+#ifdef	VSWTCH
 	ntermio.c_cc[VSWTCH] = -1;
+#endif
 #endif
 
 	ttmiscinit();
@@ -428,8 +452,8 @@ int f;
 #else
 	if (f) {
 		movecursor(term.t_nrow, ttcol); /* don't care about column */
-		ttputc('\n');
-		ttputc('\r');
+		TTputc('\n');
+		TTputc('\r');
 	}
 	TTflush();
 	TTclose();
@@ -542,8 +566,8 @@ int f;
 #if ! X11
 	if (f) {
 		movecursor(term.t_nrow, ttcol); /* don't care about column */
-		ttputc('\n');
-		ttputc('\r');
+		TTputc('\n');
+		TTputc('\r');
 	}
 	TTflush();
 	ioctl(0, TIOCSETN, &ostate);
@@ -680,7 +704,7 @@ ttmiscinit()
 
 #else /* not UNIX */
 
-#if   MSDOS & TURBO
+#if   MSDOS && (TURBO || MSC)
 #include <conio.h>
 #endif
 
@@ -692,7 +716,7 @@ static char     scrn_tmp[AMG_MAXBUF+1];
 static long     scrn_tmp_p = 0;
 #endif
 
-#if ST520 & MEGAMAX
+#if ST520 && MEGAMAX
 #include <osbind.h>
 	int STscancode = 0;	
 #endif
@@ -723,7 +747,7 @@ short   iochan;                  /* TTY I/O channel             */
 #include        <bdos.h>
 #endif
 
-#if     MSDOS & (LATTICE | MSC | TURBO | AZTEC | MWC86)
+#if     MSDOS && (LATTICE || TURBO || AZTEC || MWC86 || ZTC)
 union REGS rg;		/* cpu register for use of DOS calls */
 int nxtchar = -1;	/* character held from type ahead    */
 #endif
@@ -800,7 +824,7 @@ ttopen()
 #if     CPM
 #endif
 
-#if     MSDOS & (HP150 == 0) & LATTICE
+#if     MSDOS && (HP150 == 0) && LATTICE
 	/* kill the ctrl-break interupt */
 	rg.h.ah = 0x33;		/* control-break check dos call */
 	rg.h.al = 1;		/* set the current state */
@@ -843,7 +867,7 @@ ttclose()
         if (status != SS$_NORMAL)
                 exit(status);
 #endif
-#if     MSDOS & (HP150 == 0) & LATTICE
+#if     MSDOS && (HP150 == 0) && LATTICE
 	/* restore the ctrl-break interupt */
 	rg.h.ah = 0x33;		/* control-break check dos call */
 	rg.h.al = 1;		/* set the current state */
@@ -860,8 +884,8 @@ int f;
 {
 	if (f) {
 		movecursor(term.t_nrow, ttcol); /* don't care about column */
-		ttputc('\n');
-		ttputc('\r');
+		TTputc('\n');
+		TTputc('\r');
 	}
 	TTflush();
 	TTclose();
@@ -881,18 +905,14 @@ ttunclean()
  */
 void
 ttputc(c)
-#if     AMIGA | (ST520 & MEGAMAX)
-        int c;
-#else
-	int c;
-#endif
+int c;
 {
 #if     AMIGA
         scrn_tmp[scrn_tmp_p++] = c;
         if(scrn_tmp_p>=AMG_MAXBUF)
                 amg_flush();
 #endif
-#if	ST520 & MEGAMAX
+#if	ST520 && MEGAMAX
 	Bconout(2,c);
 #endif
 #if     VMS
@@ -900,23 +920,18 @@ ttputc(c)
                 ttflush();
         obuf[nobuf++] = c;
 #endif
-
 #if     CPM
         bios(BCONOUT, c, 0);
 #endif
-
-#if     MSDOS & MWC86
+#if     MSDOS && MWC86
         putcnb(c);
 #endif
-
-#if	MSDOS & (LATTICE | AZTEC) & ~IBMPC
+#if	MSDOS && (LATTICE || AZTEC) && ~IBMPC
 	bdos(6, c, 0);
 #endif
-
 #if RAINBOW
         Put_Char(c);                    /* fast video */
 #endif
-
 }
 
 #if	AMIGA
@@ -979,7 +994,7 @@ ttgetc()
         return(255 & (int)ch);
 	}
 #endif
-#if	ST520 & MEGAMAX
+#if	ST520 && MEGAMAX
 	{
 	long ch;
 
@@ -1025,14 +1040,12 @@ ttgetc()
 
 	}
 #endif
-
 #if     CPM
 	{
         return (biosb(BCONIN, 0, 0));
 
 	}
 #endif
-
 #if RAINBOW
 	{
 	int c;
@@ -1046,15 +1059,18 @@ ttgetc()
         return c;
 	}
 #endif
-
-#if     MSDOS & MWC86
+#if     MSDOS && MWC86
 	{
         return (getcnb());
 
 	}
 #endif
-
-#if	MSDOS & (LATTICE | MSC | TURBO | AZTEC)
+#if	MSDOS && MSC
+	{
+	return getch();
+	}
+#endif
+#if	MSDOS && (LATTICE || TURBO || AZTEC || ZTC)
 	{
 	int c;
 
@@ -1083,7 +1099,7 @@ int
 typahead()
 {
 
-#if	MSDOS & (MSC | TURBO)
+#if	MSDOS && (MSC || TURBO || ZTC)
 	if (tungotc > 0)
 		return TRUE;
 
@@ -1093,7 +1109,7 @@ typahead()
 		return(FALSE);
 #endif
 
-#if	MSDOS & (LATTICE | AZTEC | MWC86)
+#if	MSDOS && (LATTICE || AZTEC || MWC86)
 	int c;		/* character read */
 	int flags;	/* cpu flags from dos call */
 
@@ -1105,7 +1121,7 @@ typahead()
 
 	rg.h.ah = 6;	/* Direct Console I/O call */
 	rg.h.dl = 255;	/*         does console input */
-#if	LATTICE | AZTEC
+#if	LATTICE || AZTEC
 	flags = intdos(&rg, &rg);
 #else
 	intcall(&rg, &rg, 0x21);
