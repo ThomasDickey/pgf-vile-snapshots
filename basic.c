@@ -6,7 +6,10 @@
  * framing, are hard.
  *
  * $Log: basic.c,v $
- * Revision 1.36  1992/05/16 12:00:31  pgf
+ * Revision 1.37  1992/08/04 20:09:03  foxharp
+ * prototype fixups, for xvile
+ *
+ * Revision 1.36  1992/05/16  12:00:31  pgf
  * prototypes/ansi/void-int stuff/microsoftC
  *
  * Revision 1.35  1992/03/22  10:54:41  pgf
@@ -1072,20 +1075,20 @@ int f,n;
  * easy, bacause all of the hard work gets done by the standard routine
  * that moves the mark about. The only possible error is "no mark".
  */
-int
+void
 swapmark()
 {
 	MARK odot;
 
         if (samepoint(MK, nullmark)) {
                 mlforce("BUG: No mark ");
-                return (FALSE);
+                return;
         }
 	odot = DOT;
 	DOT = MK;
 	MK = odot;
         curwp->w_flag |= WFMOVE;
-        return (TRUE);
+        return;
 }
 
 
@@ -1127,12 +1130,14 @@ WINDOW *wp0 ;		/* current window on entry */
     	curgoal = col + w_val(curwp, WVAL_SIDEWAYS);
 	curwp->w_dot.o = getgoal(dlp) ;
 	curwp->w_flag |= WFMOVE;
-	return (TRUE);
+	return;
 }
 #endif
 
 #if X11
+void
 setcursor(row, col)
+int row, col;
 {
     register LINE *dlp;
     WINDOW     *wp0;		/* current window on entry */
@@ -1162,6 +1167,6 @@ setcursor(row, col)
     if (DOT.o >= llength(dlp) && DOT.o > 0 && !insertmode)
     	DOT.o--;
     curwp->w_flag |= WFMOVE;
-    return (TRUE);
+    return;
 }
 #endif

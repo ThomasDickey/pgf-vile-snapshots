@@ -26,11 +26,13 @@
 SCREEN = tcap
 LIBS = -ltermcap
 TARGET = vile
+SCRDEF = -DTERMCAP -Dscrn_chosen
 
 # for building the X version (also edit estruct.h, turn TERMCAP off and X11 on)
 #SCREEN = x11
 #LIBS = -lX11
 #TARGET = xvile
+#SCRDEF = -DX11 -Dscrn_chosen
 
 
 
@@ -51,19 +53,23 @@ LINK = cc
 OPTFLAGS = -g
 #OPTFLAGS = -O
 
+LDFLAGS = 
+
 # some older bsd systems keep ioctl in sys only -- easier to
 # search both places than to ifdef the code.  color me lazy.
 INCS = -I. $(GINCS) -I/usr/include -I/usr/include/sys
+
+CFLAGS1 = $(OPTFLAGS) $(INCS) $(SCRDEF)
 
 # suffix for object files.
 # this get changes to "obj" for DOS builds
 O = o
 
 # All of the makefiles which should be preserved
-MAKEFILES = makefile make.ini
+MAKFILES = makefile make.ini
 MKTBLS = ./mktbls
 
-ALLTOOLS = $(MAKEFILES)
+ALLTOOLS = $(MAKFILES)
 
 
 # these are normal editable headers
@@ -148,78 +154,89 @@ all:
 	echo "	make osf1	(OSF/1)"				;\
 	echo "	make linux	(ported to 0.95)"			;\
 	echo "	make aux2	(A/UX 2.0) (3.0 is probably svr3)"	;\
-	echo "	nmake msc	(MicroSoft C 6.0) (buggy)"		;\
+	echo "	nmake msc	(MicroSoft C 6.0) (buggy?)"		;\
+	echo "	make sx1100	(SX1100 running on Unisys 1100)"	;\
 	echo "	make default	(to use config internal to estruct.h)"
 
 bsd sony mach:
-	make CFLAGS="$(OPTFLAGS) $(INCS) -DBERK -Dos_chosen" \
+	make CFLAGS="$(CFLAGS1) -DBERK -Dos_chosen" \
 	    MAKE=/usr/bin/make $(TARGET)
 
-bsd_posix ultrix sunos:
-	$(MAKE) CFLAGS="$(OPTFLAGS) $(INCS) -DBERK -DPOSIX -Dos_chosen" \
+bsd_posix ultrix:
+	$(MAKE) CFLAGS="$(CFLAGS1) -DBERK -DPOSIX -Dos_chosen" \
+		$(TARGET)
+
+sunos:
+	$(MAKE) CFLAGS="$(CFLAGS1) -DBERK -DPOSIX -DSUNOS -Dos_chosen" \
 		$(TARGET)
 
 bsd386:
-	make CFLAGS="$(OPTFLAGS) $(INCS) -DBERK -DBSD386 -Dos_chosen" \
+	make CFLAGS="$(CFLAGS1) -DBERK -DBSD386 -Dos_chosen" \
 	    MAKE=/usr/bin/make $(TARGET)
 
 att:
-	$(MAKE) CFLAGS="$(OPTFLAGS) $(INCS) -DUSG -Dos_chosen" \
+	$(MAKE) CFLAGS="$(CFLAGS1) -DUSG -Dos_chosen" \
 		$(TARGET)
 
 att_posix svr4:
-	$(MAKE) CFLAGS="$(OPTFLAGS) $(INCS) -DUSG -DPOSIX -Dos_chosen" \
+	$(MAKE) CFLAGS="$(CFLAGS1) -DUSG -DPOSIX -Dos_chosen" \
 		$(TARGET)
 
 svr3:
-	$(MAKE) CFLAGS="$(OPTFLAGS) $(INCS) -DSVR3 -Dos_chosen" \
+	$(MAKE) CFLAGS="$(CFLAGS1) -DSVR3 -Dos_chosen" \
 		LIBS="-ltermcap" \
 		$(TARGET)
 
 #		LIBS="-ltermcap -lc_s"
 
 mips:
-	$(MAKE) CFLAGS="$(OPTFLAGS) -systype sysv $(INCS) -DSVR3 -Dos_chosen" \
+	$(MAKE) CFLAGS="$(CFLAGS1) -systype sysv $(INCS) -DSVR3 -Dos_chosen" \
 		$(TARGET)
 
 odt:
 	$(MAKE) \
-	CFLAGS="$(OPTFLAGS) $(INCS) -DODT -DUSG -DPOSIX -DSVR3_PTEM -Dos_chosen" \
+	CFLAGS="$(CFLAGS1) -DODT -DUSG -DPOSIX -DSVR3_PTEM -Dos_chosen" \
 		$(TARGET)
 
 isc:
 	$(MAKE) \
-	CFLAGS="$(OPTFLAGS) $(INCS) -DISC -DUSG -DPOSIX -DSVR3_PTEM -Dos_chosen" \
+	CFLAGS="$(CFLAGS1) -DISC -DUSG -DPOSIX -DSVR3_PTEM -Dos_chosen" \
 		$(TARGET)
 
 hpux:
-	$(MAKE) CFLAGS="$(OPTFLAGS) $(INCS) -DUSG -DHAVE_SELECT -Dos_chosen" \
+	$(MAKE) CFLAGS="$(CFLAGS1) -DUSG -DHAVE_SELECT -Dos_chosen" \
 		$(TARGET)
 
 next:
-	$(MAKE) CFLAGS="$(OPTFLAGS) $(INCS) -DBERK -D__STRICT_BSD__ \
+	$(MAKE) CFLAGS="$(CFLAGS1) -DBERK -D__STRICT_BSD__ \
 		-Dos_chosen" $(TARGET)
 
 unixpc:
-	$(MAKE) CFLAGS="$(OPTFLAGS) $(INCS) -DUSG -DHAVE_SELECT \
+	$(MAKE) CFLAGS="$(CFLAGS1) -DUSG -DHAVE_SELECT \
 		-DHAVE_MKDIR=0 -Dwinit=xxwinit -Dos_chosen -DUNIXPC" \
 		$(TARGET)
 
 aix:
-	$(MAKE) CFLAGS="$(OPTFLAGS) $(INCS) -DUSG \
+	$(MAKE) CFLAGS="$(CFLAGS1) -DUSG \
 		-DPOSIX -DAIX -DHAVE_SELECT -U__STR__ -Dos_chosen -qpgmsize=l" \
 		LIBS=-lcurses \
 		$(TARGET)
 
 osf1:
-	$(MAKE) CFLAGS="$(OPTFLAGS) $(INCS) -DBERK -DPOSIX -DOSF1 -Dos_chosen" \
+	$(MAKE) CFLAGS="$(CFLAGS1) -DBERK -DPOSIX -DOSF1 -Dos_chosen" \
 		$(TARGET)
 
 linux:
-	$(MAKE) CFLAGS="$(OPTFLAGS) $(INCS) -DUSG \
+	$(MAKE) CFLAGS="$(CFLAGS1) -DUSG \
 		-DPOSIX -DHAVE_SELECT -DHAVE_POLL=0 -DLINUX -Dos_chosen" \
 		$(TARGET)
 
+# It has been pointed out to me that the stock COMMAND.COM can't possibly
+# handle the length of the commands that this causes.  You may have to
+# create your own makefile for DOS.  I think it's only this top level
+# re-invocation of make that's a problem -- everything else should fit in
+# 128 characters.  I think.  (It works as-is under SoftPC, which is why
+# I wrote it this way.)
 msc:
 	$(MAKE) MKTBLS=mktbls.exe CFLAGS="/qc /AL /nologo \
 		-DMSDOS -DMSC -Dos_chosen -DIBMPC -Dscrn_chosen" \
@@ -228,16 +245,21 @@ msc:
 		LINK="link /MAP /CO /NOI /STACK:4096 @link.msc" $(TARGET)2
 
 aux2:
-	$(MAKE) CFLAGS="$(OPTFLAGS) $(INCS) -DUSG -DAUX2 -Dos_chosen" \
+	$(MAKE) CFLAGS="$(CFLAGS1) -DUSG -DAUX2 -Dos_chosen" \
+		$(TARGET)
+
+sx1100:
+	$(MAKE) CFLAGS="$(CFLAGS1) -DSVR3 -Dos_chosen" \
+		LDFLAGS="-h 400000" LIBS="-ltermcap" \
 		$(TARGET)
 
 default:
-	$(MAKE) CFLAGS="$(OPTFLAGS) $(INCS) -Uos_chosen" \
+	$(MAKE) CFLAGS="$(CFLAGS1) -Uos_chosen" \
 		$(TARGET)
 
 $(TARGET): $(BUILTHDRS) $(OBJ) makefile
 	-mv $(TARGET) o$(TARGET)
-	$(LINK) -o $(TARGET) $(OBJ) $(LIBS)
+	$(LINK) $(LDFLAGS) -o $(TARGET) $(OBJ) $(LIBS)
 #	$(LINK) -pg -o $(TARGET) $(OBJ) $(LIBS) -lc_p
 #	$(LINK) -Bstatic -o $(TARGET) $(OBJ) $(LIBS)
 
@@ -278,7 +300,7 @@ $(BUILTHDRS): cmdtbl $(MKTBLS)
 	$(MKTBLS) cmdtbl
 
 $(MKTBLS):  mktbls.c
-	$(CC) $(CFLAGS) -o $(MKTBLS)  mktbls.c
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $(MKTBLS)  mktbls.c
 
 # install to DESTDIR1 if it's writable, else DESTDIR2
 install:
@@ -409,7 +431,20 @@ $(OBJ): estruct.h edef.h
 externs.$O: nebind.h nename.h nefunc.h
 
 # $Log: makefile,v $
-# Revision 1.64  1992/07/22 00:50:32  foxharp
+# Revision 1.68  1992/08/07 18:05:27  pgf
+# fixed mips systype botch
+#
+# Revision 1.67  1992/08/04  20:12:00  foxharp
+# split out sunos, so SUNOS gets defined, added comment about DOS command
+# line lengths, and consolidated some vars into CFLAGS1
+#
+# Revision 1.66  1992/08/03  09:10:29  foxharp
+# added eric krohn's changes for sx1100 -- introduced LDFLAGS
+#
+# Revision 1.65  1992/07/24  18:22:06  foxharp
+# change name of MAKEFILES -- that name is special to GNU make
+#
+# Revision 1.64  1992/07/22  00:50:32  foxharp
 # turn off shared libs
 #
 # Revision 1.63  1992/07/20  22:48:17  foxharp

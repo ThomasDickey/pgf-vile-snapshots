@@ -5,7 +5,13 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: tags.c,v $
- * Revision 1.21  1992/07/15 09:00:35  foxharp
+ * Revision 1.23  1992/08/05 21:51:10  foxharp
+ * use "slash" instead of '/'
+ *
+ * Revision 1.22  1992/07/30  07:29:19  foxharp
+ * further fix off-by-one on tags that use line numbers
+ *
+ * Revision 1.21  1992/07/15  09:00:35  foxharp
  * fixed off-by-one in tags-buffer line scan, so single digit line
  * numbers now work, e.g. "file.c	src/file.c	1".
  * also, always set up "tagprefix", in case we switch to tagsrelative
@@ -171,7 +177,7 @@ int taglen;
 	}
 	tfname[i] = 0;
 
-	if (tfp > lplim - 1) {
+	if (tfp >= lplim) {
 		mlforce("[Bad line in tags file.]");
 		return FALSE;
 	}
@@ -203,19 +209,15 @@ int taglen;
 
 	i = 0;
 	tfp++;  /* skip the tab */
-	if (tfp > lplim - 1) {
+	if (tfp >= lplim) {
 		mlforce("[Bad line in tags file.]");
 		return FALSE;
 	}
 	if (isdigit(*tfp)) { /* then it's a line number */
 		lineno = 0;
-		while (isdigit(*tfp)) {
+		while (isdigit(*tfp) && (tfp < lplim)) {
 			lineno = 10*lineno + *tfp - '0';
 			tfp++;
-			if (tfp > lplim - 1) {
-				mlforce("[Bad line in tags file.]");
-				return FALSE;
-			}
 		}
 		s = gotoline(TRUE,lineno);
 		if (s != TRUE && !changedfile)
@@ -468,7 +470,7 @@ makeflist()
 			return FALSE;
 
 		/* first (really last) slash */
-		if ((fnp = strchr(fnp, '/')) != NULL) {
+		if ((fnp = strchr(fnp, slash)) != NULL) {
 			/* insert the directory name into the file list again */
 			if (sortsearch(fnp, &fname[NFILEN-1]-fnp, filesbp,
 							TRUE, NULL) == NULL)

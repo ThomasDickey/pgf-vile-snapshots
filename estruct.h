@@ -10,7 +10,19 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.81  1992/07/20 22:45:53  foxharp
+ * Revision 1.85  1992/08/07 17:32:47  pgf
+ * don't use bcopy
+ *
+ * Revision 1.84  1992/08/06  23:51:47  foxharp
+ * nextsw() now finds next "shiftwidth stop", like nextab() finds next tabstop
+ *
+ * Revision 1.83  1992/08/04  20:09:59  foxharp
+ * bsd386 doesn't have bfill, but it does have mem{set,cpy}
+ *
+ * Revision 1.82  1992/07/24  18:22:51  foxharp
+ * deleted local atoi() routine -- now we use the system's copy
+ *
+ * Revision 1.81  1992/07/20  22:45:53  foxharp
  * if using TERMCAP, define TTputc directly as putchar(),
  * for some performance gain
  *
@@ -378,7 +390,6 @@
 # undef USG
 # define BERK	0
 # define USG	1
-# define atoi xxatoi
 # define winit xxwinit
 # undef HAVE_MKDIR
 # undef HAVE_SELECT
@@ -574,6 +585,8 @@
 
 #if BERK && ! POSIX
 #define USE_INDEX 1
+#endif
+#if never && BERK && ! POSIX && ! BSD386
 #define USE_BCOPY 1
 #endif
 
@@ -602,7 +615,6 @@ extern char *rindex();
 #endif
 
 #if	VMS
-#define	atoi	xatoi
 #define	getname	xgetname
 #endif
 
@@ -836,6 +848,8 @@ union REGS {
 /*	Internal defined functions					*/
 
 #define	nextab(a)	(((a / curtabval) + 1) * curtabval)
+#define	nextsw(a)	(((a / b_val(curbp, VAL_SWIDTH)) + 1) * \
+					b_val(curbp, VAL_SWIDTH))
 
 /* these are the bits that go into the _chartypes_ array */
 /* the macros below test for them */
@@ -1540,6 +1554,10 @@ typedef struct WHBLOCK {
 # define NULL 0
 #endif
 
+/*
+ * General purpose includes
+ */
+
 #ifdef __STDC__
 #include <stdarg.h>
 #else
@@ -1574,6 +1592,9 @@ extern char *getcwd();
 #endif
 
 
+/*
+ * Local prototypes
+ */
 
 #include "proto.h"
 

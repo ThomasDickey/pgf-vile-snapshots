@@ -3,7 +3,17 @@
  * commands. There is no functional grouping here, for sure.
  *
  * $Log: random.c,v $
- * Revision 1.72  1992/07/20 22:49:51  foxharp
+ * Revision 1.75  1992/08/06 23:55:07  foxharp
+ * changes to canonical pathnames and directory changing to support DOS and
+ * its drive designators
+ *
+ * Revision 1.74  1992/08/05  22:10:03  foxharp
+ * hopefully handle DOS pathnames better
+ *
+ * Revision 1.73  1992/08/04  20:13:29  foxharp
+ * fclose() --> npclose().  thanks eric.
+ *
+ * Revision 1.72  1992/07/20  22:49:51  foxharp
  * took out ifdef'ed BEFORE code
  *
  * Revision 1.71  1992/07/18  13:13:56  foxharp
@@ -914,6 +924,8 @@ int f, n;
 #include	<sys/param.h>
 #endif
 
+
+
 /* return a string naming the current directory */
 char *
 current_directory(force)
@@ -922,25 +934,32 @@ int force;
 	char *s;
 	static char	dirname[NFILEN*2];
 	static char *cwd;
-#if USG
-	FILE *f, *npopen();
-	int n;
+
+#if MSDOS	/* drive switching makes the caching not work right */
+	force = TRUE;
+#endif
+
 	if (!force && cwd)
 		return cwd;
+
+#if USG
+	{
+	FILE *f, *npopen();
+	int n;
 	f = npopen("/bin/pwd", "r");
 	if (f == NULL) {
-		fclose(f);
+		npclose(f);
 		return NULL;
 	}
 	n = fread(dirname, 1, NFILEN, f);
 
 	dirname[n] = '\0';
-	fclose(f);
+	npclose(f);
 	cwd = dirname;
+	}
 #else
-	if (!force && cwd)
-		return cwd;
 # if MSDOS & MSC
+
 	cwd = getcwd(dirname, NFILEN*2);
 # else
 	cwd = getwd(dirname);
@@ -951,6 +970,50 @@ int force;
 		*s = '\0';
 	return cwd;
 }
+
+#if MSDOS
+
+int
+curdrive()
+{
+	return (bdos(0x19, 0, 0) & 0xff) + 'A';
+}
+
+int
+setdrive(d)
+int d;
+{
+/* FIXME must put some error range/checking in here */
+	bdos(0x0e, d-'A', 0);
+	return TRUE;
+#if LATER
+	mlforce("[Bad drive specifier]");
+#endif
+}
+
+char *
+curr_dir_on_drive(drive)
+int drive;
+{
+	int curd;
+	static char cwd[512];
+
+	if (drive == 0)
+		return current_directory(FALSE);
+
+	curd = curdrive();
+	if (curd == drive)
+		return current_directory(FALSE);
+
+	if (setdrive(drive) == TRUE) {
+		strcpy(cwd, current_directory(TRUE));
+		setdrive(curd);
+		return cwd;
+	} else {
+		return current_directory(FALSE);
+	}
+}
+#endif
 
 
 /* ARGSUSED */
@@ -977,15 +1040,16 @@ int f, n;
 	return TRUE;
 }
 
-/* move to the named directory.  adjust all non-absolute filenames
-	to be absolute.
-	(Dave Lemke)
-*/
+/* move to the named directory.  (Dave Lemke) */
 int
 set_directory(dir)
 char	*dir;
 {
     char       exdir[NFILEN];
+    char *exdp;
+#if MSDOS
+    int curd = curdrive();
+#endif
     WINDOW *wp;
 
     for (wp = wheadp; wp != NULL; wp = wp->w_wndp)
@@ -993,10 +1057,28 @@ char	*dir;
 
     strcpy(exdir, dir);
 
-    if (glob(exdir) && (chdir(exdir) == 0)) {
-	pwd(TRUE,1);
-	return TRUE;
+    exdp = exdir;
+
+    if (glob(exdp)) {
+#if MSDOS
+	if (isupper(exdp[0]) && exdp[1] == ':') {
+		if (setdrive(exdp[0]) == TRUE) {
+			exdp += 2;
+			if (!*exdp)
+				return TRUE;
+		} else {
+			return FALSE;
+		}
+	}
+#endif
+	if (chdir(exdp) == 0) {
+		pwd(TRUE,1);
+		return TRUE;
+	}
     }
+#if MSDOS
+    setdrive(curd);
+#endif
     mlforce("[Couldn't change to \"%s\"]", exdir);
     return FALSE;
 }
@@ -1014,27 +1096,26 @@ char *fname;
 	char *name;
 
 	name = fname;
-#if LATER 
-/* not sure whether we need this or not -- it might be
-		taken care of in canonpath()  */
-	/* pretend the drive designator isn't there */
-	if (isalpha(name[0]) && name[1] == ':') {
-		drive = name[0];
-		if (islower(drive))
-			drive = toupper(drive);
-		name += 2;
-	}
-#endif
 
 	/* produce a full pathname, unless already absolute or "internal" */
-	if (name[0] == '\0' || name[0] == '[' || name[0] == '!') {
-		np = name;
-	} else if (name[0] != slash &&
-			(cwd = current_directory(FALSE)) != NULL ) {
-		lsprintf(nfilen, "%s/%s", cwd, name );
-		np = canonpath(nfilen);
-	} else {
-		np = canonpath(name);
+	np = name;
+	if (name[0] != '\0' && name[0] != '[' && name[0] != '!') {
+#if MSDOS
+		char drive = 0;
+		if (isupper(np[0]) && np[1] == ':') {
+			drive = *np;
+			np += 2;
+		}
+		cwd = curr_dir_on_drive(drive);
+#else
+		cwd = current_directory(FALSE);
+#endif
+		if (np[0] != slash && cwd != NULL) {
+			lsprintf(nfilen, "%s%c%s", cwd, slash, np );
+			np = canonpath(nfilen);
+		} else {
+			np = canonpath(name);
+		}
 	}
 
 	len = strlen(np)+1;

@@ -4,7 +4,10 @@
  * All operating systems.
  *
  * $Log: termio.c,v $
- * Revision 1.46  1992/07/24 07:49:27  foxharp
+ * Revision 1.47  1992/08/04 20:14:58  foxharp
+ * invert sense of ifdef -- it seems filio.h isn't as common as I thought
+ *
+ * Revision 1.46  1992/07/24  07:49:27  foxharp
  * aix has no filio.h
  *
  * Revision 1.45  1992/07/20  22:50:40  foxharp
@@ -204,10 +207,10 @@ extern int errno;
 
 #if (BERK || AIX || AUX2) && !defined(FIONREAD)
 /* try harder to get it */
-# if AUX2 || AIX
-#  include "ioctl.h"
-# else
+# if SUNOS
 #  include "filio.h"
+# else
+#  include "ioctl.h"
 # endif
 #endif
 

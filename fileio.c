@@ -3,7 +3,14 @@
  * the knowledge about files are here.
  *
  * $Log: fileio.c,v $
- * Revision 1.27  1992/06/25 23:00:50  foxharp
+ * Revision 1.29  1992/07/28 21:42:36  foxharp
+ * linux switched to GNU stdio... okay, so maybe isready_c() _wasn't_
+ * such a good idea...
+ *
+ * Revision 1.28  1992/07/24  18:21:17  foxharp
+ * cleanup and better comments re: isready_c, and linux support
+ *
+ * Revision 1.27  1992/06/25  23:00:50  foxharp
  * changes for dos/ibmpc
  *
  * Revision 1.26  1992/05/19  08:55:44  foxharp
@@ -441,21 +448,51 @@ int *lenp;	/* to return the final length */
         return(FIOSUC);
 }
 
-/* this possibly non-portable addition to the stdio set of macros 
-	is used to see if stdio has data for us, without actually
-	reading it and possibly blocking.  if you have trouble building
-	this, just force ffhasdata() to always return FALSE */
-#ifdef __sgetc  /* 386bsd */
-# define	isready_c(p)	( (p)->_r > 0)
-#else
-# define	isready_c(p)	( (p)->_cnt > 0)
+/* 
+ * isready_c()
+ *
+ * This fairly non-portable addition to the stdio set of macros is used to
+ * see if stdio has data for us, without actually reading it and possibly
+ * blocking.  If you have trouble building this, just define no_isready_c
+ * below, so that ffhasdata() always returns FALSE.  If you want to make it
+ * work, figure out how your getc in stdio.h knows whether or not to call
+ * _filbuf() (or the equivalent), and write isready_c so that it returns
+ * true if the buffer has chars available now.  The big win in getting it
+ * to work is that reading the output of a pipe (e.g.  ":e !co -p file.c")
+ * is _much_much_ faster, and I don't have to futz with non-blocking
+ * reads...
+ */
+
+/* #define no_isready_c 1 */
+
+#ifndef no_isready_c
+# ifdef __sgetc
+   /* 386bsd */
+#  define	isready_c(p)	( (p)->_r > 0)
+# else
+#  ifdef _STDIO_UCHAR_
+	/* C E Chew's package */
+#   define 	isready_c(p)	( (p)->__rptr < (p)->__rend)
+#  else
+#   ifdef _G_FOPEN_MAX
+	/* GNU iostream/stdio library */
+#    define 	isready_c(p)	( (p)->_gptr < (p)->_egptr)
+#   else
+	/* most other stdio's (?) */
+#    define	isready_c(p)	( (p)->_cnt > 0)
+#   endif
+#  endif
+# endif
 #endif
+
 
 int
 ffhasdata()
 {
+#ifdef isready_c
 	if (isready_c(ffp))
 		return TRUE;
+#endif
 #ifdef	FIONREAD
 	{
 	long x;

@@ -5,7 +5,19 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.16  1992/07/24 07:49:38  foxharp
+ * Revision 1.20  1992/08/06 23:55:07  foxharp
+ * added routines that deal with DOS drives
+ *
+ * Revision 1.19  1992/08/04  20:09:31  foxharp
+ * prototype fixups for xvile
+ *
+ * Revision 1.18  1992/07/28  22:02:55  foxharp
+ * patchstk() renamed applypatch()
+ *
+ * Revision 1.17  1992/07/24  18:22:51  foxharp
+ * deleted local atoi() routine -- now we use the system's copy
+ *
+ * Revision 1.16  1992/07/24  07:49:38  foxharp
  * shorten_name changes
  *
  * Revision 1.15  1992/07/21  09:09:51  foxharp
@@ -150,7 +162,7 @@ extern int gonmmark P(( int ));
 extern int setmark P(( void ));
 extern int gomark P(( int, int ));
 extern int godotplus P(( int, int ));
-extern int swapmark P(( void ));
+extern void swapmark P(( void ));
 extern int help P(( int, int ));
 extern int deskey P(( int, int ));
 extern int desbind P(( int, int ));
@@ -248,7 +260,6 @@ extern SIGT sizesignal P(( int ));
 extern void newscreensize P(( int, int ));
 extern int newwidth P(( int, int ));
 extern int newlength P(( int, int ));
-extern int atoi P(( char * ));
 extern char * l_itoa P(( int ));
 extern char * ltos P(( int ));
 extern int absol P(( int ));
@@ -501,6 +512,11 @@ extern int fmatchindent P(( void ));
 extern void catnap P(( int ));
 extern int istring P(( int, int ));
 extern char * current_directory P(( int ));
+#if MSDOS
+extern char * curr_dir_on_drive P(( int ));
+extern int curdrive P(( void ));
+extern int setdrive P(( int ));
+#endif
 extern int cd P(( int, int ));
 extern int pwd P(( int, int ));
 extern int set_directory P(( char * ));
@@ -594,7 +610,7 @@ extern int tag_for_undo P(( LINE * ));
 extern void pushline P(( LINE *, LINE ** ));
 extern LINE * popline P(( LINE ** ));
 extern void make_undo_patch P(( LINE *, LINE *, int ));
-extern void patchstk P(( LINE *, LINE * ));
+extern void applypatch P(( LINE *, LINE * ));
 extern LINE * copyline P(( LINE * ));
 extern void freeundostacks P(( BUFFER * ));
 extern int undo P(( int, int ));
@@ -610,6 +626,7 @@ extern int reposition P(( int, int ));
 extern int refresh P(( int, int ));
 extern int poswind P(( int, int ));
 extern int prevwind P(( int, int ));
+extern int nextwind P(( int, int ));
 extern int mvdnwind P(( int, int ));
 extern int mvupwind P(( int, int ));
 extern int mvdnnxtwind P(( int, int ));
@@ -673,3 +690,11 @@ extern int simple_fence P(( int, int, int ));
 extern int adjustmode P(( int, int ));
 extern void putdotback P(( BUFFER *, LINE * ));
 
+#if X11
+extern	void x_set_rv P(( void ));
+extern	int x_setfont P(( char * ));
+extern	void x_preparse_args P(( int *, char *** ));
+extern  void x_set_geometry P(( char * ));
+extern	void x_set_dpy P(( char * ));
+extern void setcursor P(( int, int ));
+#endif

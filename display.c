@@ -6,7 +6,10 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.51  1992/07/24 07:49:38  foxharp
+ * Revision 1.52  1992/08/05 21:55:16  foxharp
+ * handle files with DOS drive designators properly on mode line
+ *
+ * Revision 1.51  1992/07/24  07:49:38  foxharp
  * shorten_name changes
  *
  * Revision 1.50  1992/07/22  19:25:57  foxharp
@@ -1365,6 +1368,12 @@ WINDOW *wp;
 		if (p && strcmp(p,bp->b_bname) != 0) {
 			if (!isspace(p[0])) {
 				vtprintf(" is ");
+#if MSDOS
+				if (isupper(p[0]) && p[1] == ':') {
+					vtprintf("%c:",p[0]);
+					p += 2;
+				}
+#endif
 				if (p[0] != slash &&
 					p[0] != '.' &&
 					p[0] != '!')
