@@ -4,7 +4,7 @@
  *	need to back up to get to the char. before the transition.
  *	Written for vile: Copyright (c) 1990, 1995 by Paul Fox
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/wordmov.c,v 1.14 1995/03/25 02:53:53 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/wordmov.c,v 1.17 1996/02/05 02:19:21 pgf Exp $
  *
  */
 
@@ -22,14 +22,8 @@
 
 static int ochartype;
 
-void
-setchartype()
-{
-	ochartype = getchartype();
-}
-
-int
-getchartype()
+static int
+getchartype(void)
 {
 	register int	c;
 
@@ -41,9 +35,15 @@ getchartype()
 			( isident(c) ? ISIDENT : ISOTHER ) );
 }
 
+void
+setchartype(void)
+{
+	ochartype = getchartype();
+}
+
 
 int
-isnewwordf()
+isnewwordf(void)
 {
 	register int	ret = FALSE;
 	register int	type;
@@ -98,7 +98,7 @@ isnewwordf()
 }
 
 int
-isnewwordb()
+isnewwordb(void)
 {
 	register int	ret = FALSE;
 	register int	type;
@@ -131,7 +131,7 @@ isnewwordb()
 }
 
 int
-isnewviwordf()
+isnewviwordf(void)
 {
 	register int	ret = FALSE;
 	register int	type;
@@ -208,7 +208,7 @@ isnewviwordf()
 }
 
 int
-isnewviwordb()
+isnewviwordb(void)
 {
 	register int	ret = FALSE;
 	register int	type;
@@ -241,7 +241,7 @@ isnewviwordb()
 }
 
 int
-isendwordf()
+isendwordf(void)
 {
 	register int	ret = FALSE;
 	register int	type;
@@ -282,7 +282,7 @@ isendwordf()
 }
 
 int
-isendviwordf()
+isendviwordf(void)
 {
 	register int	ret = FALSE;
 	register int	type;
@@ -324,7 +324,7 @@ isendviwordf()
 
 #ifdef template
 int
-isANYTHING()
+isANYTHING(void)
 {
 	register int	ret = FALSE;
 	register int	type;
@@ -371,4 +371,3 @@ isANYTHING()
 	return (ret);
 }
 #endif /* template */
-

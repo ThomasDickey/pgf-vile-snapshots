@@ -1,0 +1,66 @@
+Changes for vile 6.1 (released Tue Sep 10, 1996)
+(pgf) 960910
+	+ added text to README and vile.hlp regarding possibility of
+	  tom's taking over the source tree.  not completely firmed
+	  up yet, but likely.  thanks tom!!!!
+
+(tom) 960903 (d)
+	+ adapted patch by Larry Schwimmer's (schwim@cyclone.stanford.edu)
+	  for configure.in
+
+	+ modify configure script to ensure that cached information is used
+	  only on the system/version that was used to extract the data.
+
+	+ remove (and correct rules for generating) vms_link.opt, vmsshare.opt
+
+(pgf) 960812 (c)
+	+ removed const from dirnam[] buffer in imdying.  removed cast
+	  to (char *) which prevented any compiler in the world from
+	  showing us this error.  grrr.  i hope no one else loses
+	  work because of this one.  (file.c)
+
+	+ fix minor warning from extern'd prototype in buffer.c.
+
+	+ removed vile.man production rule from makefile.in.
+
+	+ applied changes from martin zinser (m.zinser@gsi.de) for VMS
+	  builds -- mostly casts, and some changes to the vms build scripts.
+
+(jrs)	960809 (b)
+
+	+ on NT reset the console input mode after a shell escape to fix
+	  the problem reported by paul with ^C.  (ntconio.c)
+
+	+ fixed a file corrupting bug caused by reading in a <CR><LF> file
+	  which contained lines longer than 255 characters by accounting
+	  for the possible fall-through of fastreadf into slowreadf in that
+	  case.  (file.c)
+
+	+ don't reset the keyboard when simply writing a file since it
+	  causes an annoying screen flash with the new NT screen buffer
+	  handling.  (file.c)
+
+	+ some minor changes to prevent us accessing (not even dereferencing)
+	  dangling pointers.  (buffer.c, file.c, itbuff.c, tbuff.c, path.c,
+	  search.c)
+
+	+ fix leak of the minibuffer window structure.  (window.c) 
+
+	+ make sure ttgetc returns something on all platforms, even if
+	  it isn't used.  (termio.c)
+
+	+ make nthandler return a value (in case it ever gets called :-).
+	  (ntconio.c)
+
+(pgf)	960717 (a)
+	+ applied rick's changes for proper operation in an NT command
+	  window with scrollbars.  (ntconio.c)
+
+	+ add target for formatting the man page, so a readable version
+	  can go in the pc zip distributions.  (makefile.in)
+
+	+ don't run the readhook for is_temporary() buffers.  (file.c)
+
+	+ fix usage message. (version.c)
+
+This change log started on Friday Jun 28, 1996.
