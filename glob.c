@@ -17,7 +17,14 @@
  *	modify (ifdef-style) 'expand_leaf()' to allow ellipsis.
  *
  * $Log: glob.c,v $
- * Revision 1.6  1993/04/28 14:34:11  pgf
+ * Revision 1.8  1993/05/11 16:22:22  pgf
+ * see tom's CHANGES, 3.46
+ *
+ * Revision 1.7  1993/05/06  11:59:58  pgf
+ * added ifdefs for USE_D_NAMLEN, for systems that don't have or don't
+ * need it (d_name[] is null-terminated on most systems)
+ *
+ * Revision 1.6  1993/04/28  14:34:11  pgf
  * see CHANGES, 3.44 (tom)
  *
  * Revision 1.5  1993/04/22  11:08:03  pgf
@@ -344,9 +351,13 @@ char	*pattern;
 			(void)mklower(strcpy(leaf, de->d_name));
 			if (strchr(pattern, '.') && !strchr(leaf, '.'))
 				(void)strcat(leaf, ".");
-#else /* UNIX isn't null-terminated necessarily */
+#else
+#if USE_D_NAMLEN
 			len = de->d_namlen;
 			strncpy(leaf, de->d_name, len)[len] = EOS;
+#else
+			strcpy(leaf, de->d_name);
+#endif
 #endif
 			if (!strcmp(leaf, ".")
 			 || !strcmp(leaf, ".."))
@@ -563,9 +574,21 @@ char	*item;
 	result = TRUE;
 	if (dp = opendir(item)) {
 		while (de = readdir(dp)) {
+#if USE_D_NAMLEN
 			char	temp[NFILEN];
 			int	len = de->d_namlen;
 			strncpy(temp, de->d_name, len)[len] = EOS;
+			if (!record_a_match(temp)) {
+				result = FALSE;
+				break;
+			}
+#else
+			strcpy(temp, de->d_name);
+			if (!record_a_match(de->d_name)) {
+				result = FALSE;
+				break;
+			}
+#endif
 			if (!record_a_match(temp)) {
 				result = FALSE;
 				break;
@@ -718,7 +741,7 @@ char	**list_of_items;
  * not be used for the main program's original argv, because on some systems
  * it is a part of a larger data area, as are the command strings.
  */
-void
+char **
 glob_free (list_of_items)
 char	**list_of_items;
 {
@@ -728,6 +751,7 @@ char	**list_of_items;
 			free(list_of_items[len]);
 		free ((char *)list_of_items);
 	}
+	return 0;
 }
 
 
@@ -757,17 +781,15 @@ int
 glob (path)
 char	*path;
 {
-	static	char	**expand;
-
-	glob_free(expand);	/* free results of prior call (leak) */
-	expand = glob_string(path);
+	char	**expand = glob_string(path);
 
 	if (glob_length(expand) > 1) {
 		if (mlyesno("Too many filenames.  Use first") != TRUE) {
-			glob_free(expand);
+			(void)glob_free(expand);
 			return FALSE;
 		}
 	}
 	(void)strcpy(path, expand[0]);
+	(void)glob_free(expand);
 	return TRUE;
 }

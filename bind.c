@@ -4,7 +4,14 @@
  *	written 11-feb-86 by Daniel Lawrence
  *
  * $Log: bind.c,v $
- * Revision 1.41  1993/05/05 12:30:11  pgf
+ * Revision 1.43  1993/05/11 16:22:22  pgf
+ * see tom's CHANGES, 3.46
+ *
+ * Revision 1.42  1993/05/10  12:04:04  pgf
+ * fnc2engl() now trys to return a long name for a function, rather
+ * than a real short name
+ *
+ * Revision 1.41  1993/05/05  12:30:11  pgf
  * name changes for set-terminal stuff, and took out the keys that are
  * bindable with bind-key
  *
@@ -318,7 +325,9 @@ int f,n;
 {
 	register int s, j;
 	char	name[NLINE];
+#ifdef BEFORE
 	CMDFUNC	*kcmd;
+#endif
 
 	/* get the table-entry */
 	*name = EOS;
@@ -1015,13 +1024,23 @@ fnc2engl(cfp)
 CMDFUNC *cfp;	/* ptr to the requested function to bind to */
 {
 	register NTAB *nptr;	/* pointer into the name table */
+	register NTAB *shortnptr = NULL; /* pointer into the name table */
 
 	/* skim through the table, looking for a match */
 	for (nptr = nametbl; nptr->n_cmd; nptr++) {
 		if (nptr->n_cmd == cfp) {
-			return(nptr->n_name);
+			/* if it's a long name, return it */
+			if ((int)strlen(nptr->n_name) > 2)
+				return nptr->n_name;
+			/* remember the first short name, in case there's
+				no long name */
+			if (!shortnptr)
+				shortnptr = nptr;
 		}
 	}
+	if (shortnptr)
+		return shortnptr->n_name;
+
 	return NULL;
 }
 

@@ -5,7 +5,10 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.53  1993/05/04 17:05:14  pgf
+ * Revision 1.54  1993/05/11 16:22:22  pgf
+ * see tom's CHANGES, 3.46
+ *
+ * Revision 1.53  1993/05/04  17:05:14  pgf
  * see tom's CHANGES, 3.45
  *
  * Revision 1.52  1993/05/03  14:24:30  pgf
@@ -989,6 +992,15 @@ int	tb_next P(( TBUFF * ));
 int	tb_peek P(( TBUFF * ));
 char *	tb_values P(( TBUFF * ));
 unsigned tb_length P(( TBUFF * ));
+
+/* tmp.c */
+#if OPT_MAP_MEMORY
+extern	LINE *lsync P(( LINEPTR ));
+extern	LINE *set_lforw P(( LINE *, LINE * ));
+extern	LINE *set_lback P(( LINE *, LINE * ));
+extern	LINE *lforw P(( LINE * ));
+extern	LINE *lback P(( LINE * ));
+#endif
 
 #if NO_LEAKS
 extern	void kbs_leaks P(( void ));

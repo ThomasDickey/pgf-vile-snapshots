@@ -39,6 +39,14 @@ is invoked as
 .IP -V
 .I vile
 will report its version number.
+.SH "INVOCATION"
+vile will edit the files specified on the command line.  If no files
+are specified, and standard input is not connected to a terminal, then
+vile will bring up a buffer containing the output of the pipe it is
+connected to, and will re-open /dev/tty for commands.  Files (except for
+the first) are not actually read into buffers until "visited".  All buffers
+are kept in memory: machines with not much memory or swap space may
+have trouble with this.
 .SH "SPIRIT"
 .I vile
 retains the "finger-feel", if you will, of
@@ -93,4 +101,5 @@ which was written by a Paul
 .IR D .
 Fox.  I'm not him.
 .SH "BUGS"
-The "\fBVI L\fRike\fR \fBE\fRmacs" joke gets stale fairly quickly.
+The "\fBVI L\fRike\fR \fBE\fRmacs" joke isn't really funny.  It only
+sounds that way.  :-)

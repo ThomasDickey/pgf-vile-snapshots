@@ -9,7 +9,13 @@
 
 /*
  * $Log: edef.h,v $
- * Revision 1.97  1993/05/04 17:05:14  pgf
+ * Revision 1.99  1993/05/11 16:22:22  pgf
+ * see tom's CHANGES, 3.46
+ *
+ * Revision 1.98  1993/05/11  15:48:03  pgf
+ * 3.46
+ *
+ * Revision 1.97  1993/05/04  17:05:14  pgf
  * see tom's CHANGES, 3.45
  *
  * Revision 1.96  1993/04/28  17:11:22  pgf
@@ -327,7 +333,7 @@
 decl_uninit( char *prog_arg );		/* argv[0] from main.c */
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version 3.45");
+decl_init( char version[], "version 3.46");
 
 decl_init( int slash, '/'); 		/* so DOS can use '\' as path separator */
 
@@ -463,6 +469,11 @@ decl_uninit( unsigned flen );		/* current length of fline	*/
 
 decl_uninit( int kbd_expand );		/* -1 kbd_putc shows tab as space */
 					/* +1 kbd_putc shows cr as ^M */
+
+
+decl_uninit( FILE *ffp );		/* File pointer, all functions. */
+decl_uninit( int fileispipe );
+decl_uninit( int eofflag );		/* end-of-file flag */
 
 /* defined in nebind.h and nename.h */
 extern NTAB nametbl[];

@@ -6,7 +6,14 @@
  * framing, are hard.
  *
  * $Log: basic.c,v $
- * Revision 1.49  1993/04/29 19:14:28  pgf
+ * Revision 1.51  1993/05/11 16:22:22  pgf
+ * see tom's CHANGES, 3.46
+ *
+ * Revision 1.50  1993/05/08  00:23:13  pgf
+ * gotomos() and gotoeos() now deal correctly with hitting end of file
+ * in window
+ *
+ * Revision 1.49  1993/04/29  19:14:28  pgf
  * allow goto-named-mark command to be used from command line
  *
  * Revision 1.48  1993/04/28  17:11:22  pgf
@@ -381,33 +388,84 @@ int f,n;
         return TRUE;
 }
 
+/*
+ * Move to first (or nth) line in window
+ */
 int
 gotobos(f,n)
 int f,n;
 {
 	if (f == FALSE || n <= 0) n = 1;
-	curwp->w_dot.l = curwp->w_line.l;
+	DOT.l = curwp->w_line.l;
 	while (--n) {
-		if (forwline(FALSE,1) != TRUE)
+		if (is_last_line(DOT,curbp))
 			break;
+		DOT.l = lforw(DOT.l);
 	}
 	firstnonwhite(f,n);
 	return TRUE;
 }
 
+/*
+ * Move to the middle of lines displayed in window
+ */
 /* ARGSUSED */
 int
 gotomos(f,n)
 int f,n;
 {
-	return gotobos(TRUE,curwp->w_ntrows/2);
+	int midrow;
+	LINE *midln;
+	midln = DOT.l = curwp->w_line.l;
+	midrow = curwp->w_ntrows/2;
+	n = 1;
+	while (n < curwp->w_ntrows) {
+		if (n == midrow)	/* remember the middle line */
+			midln = DOT.l;
+		if (is_last_line(DOT,curbp))
+			break;
+		DOT.l = lforw(DOT.l);
+		n++;
+	}
+	if (n < curwp->w_ntrows) { /* then we hit eof before eos */
+		n /= 2;  /* go back up */
+		while (n--)
+			DOT.l = lback(DOT.l);
+	} else {
+		DOT.l = midln;
+	}
+	firstnonwhite(f,n);
+	return TRUE;
 }
 
+/*
+ * Move to the last (or nth last) line in window
+ */
 int
 gotoeos(f,n)
 int f,n;
 {
-	return gotobos(TRUE,curwp->w_ntrows-(f==TRUE? n-1:0));
+	int nn;
+	if (f == FALSE || n <= 0)
+		n = 1;
+
+	/* first get to the end */
+	DOT.l = curwp->w_line.l;
+	nn = curwp->w_ntrows;
+	while (--nn) {
+		if (is_last_line(DOT,curbp))
+			break;
+		DOT.l = lforw(DOT.l);
+	}
+	/* and then go back up */
+	/* (we're either at eos or eof) */
+	while (--n) {
+		if (DOT.l == curwp->w_line.l)
+			break;
+		DOT.l = lback(DOT.l);
+	}
+	firstnonwhite(f,n);
+	return TRUE;
 }
 
 /*
@@ -437,11 +495,15 @@ int f,n;
 
 	/* and move the point down */
         dlp = curwp->w_dot.l;
-        while (n-- && dlp!=curbp->b_line.l)
-                dlp = lforw(dlp);
+	while (n-- > 0) {
+		register LINE *nlp = lforw(dlp);
+		if (nlp == curbp->b_line.l)
+			break;
+		dlp = nlp;
+	}
 
 	/* resetting the current position */
-        curwp->w_dot.l  = (dlp == curbp->b_line.l) ? lback(dlp) : dlp;
+	curwp->w_dot.l  = dlp;
         curwp->w_dot.o  = getgoal(dlp);
         curwp->w_flag |= WFMOVE;
         return (TRUE);
@@ -569,8 +631,8 @@ int f,n;
 
 	/* and move the point up */
         dlp = curwp->w_dot.l;
-        while (n-- && lback(dlp) != curbp->b_line.l)
-                dlp = lback(dlp);
+	while (n-- && lback(dlp) != curbp->b_line.l)
+		dlp = lback(dlp);
 
 	/* reseting the current position */
         curwp->w_dot.l  = dlp;

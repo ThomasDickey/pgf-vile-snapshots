@@ -11,7 +11,10 @@
  * which means that the dot and mark values in the buffer headers are nonsense.
  *
  * $Log: line.c,v $
- * Revision 1.41  1993/04/22 11:15:08  pgf
+ * Revision 1.42  1993/05/11 16:22:22  pgf
+ * see tom's CHANGES, 3.46
+ *
+ * Revision 1.41  1993/04/22  11:15:08  pgf
  * support for letting a dotcmd's kreg override the one originally specified
  *
  * Revision 1.40  1993/04/21  13:55:27  pgf
@@ -228,7 +231,7 @@ register BUFFER *bp;
 		bp->b_freeLINEs = lp;
 #ifdef POISON
 		/* catch references hard */
-		lback(lp) = lback(lp) = (LINE *)1;
+		set_lback(lp, set_lback(lp, (LINE *)1)); /* patch: why twice? */
 		lp->l_text = (char *)1;
 		lp->l_size = lp->l_used = -1;
 #endif
@@ -330,8 +333,8 @@ register LINE	*lp;
 		}
 	}
 #endif
-	lforw(lback(lp)) = lforw(lp);
-	lback(lforw(lp)) = lback(lp);
+	set_lforw(lback(lp), lforw(lp));
+	set_lback(lforw(lp), lback(lp));
 }
 
 int
@@ -379,10 +382,10 @@ int n, c;
 					   *	at a new line if this is the
 					   *	first change */
 		lp3 = lback(lp1);		/* Previous line	*/
-		lforw(lp3) = lp2;		/* Link in		*/
-		lforw(lp2) = lp1;
-		lback(lp1) = lp2;
-		lback(lp2) = lp3;
+		set_lforw(lp3, lp2);		/* Link in		*/
+		set_lforw(lp2, lp1);
+		set_lback(lp1, lp2);
+		set_lback(lp2, lp3);
 		for (i=0; i<n; ++i)
 			lp2->l_text[i] = c;
 		curwp->w_dot.l = lp2;
@@ -480,10 +483,10 @@ lnewline()
 		if ((lp2=lalloc(doto,curbp)) == NULL)
 			return (FALSE);
 		/* put lp2 in below lp1 */
-		lforw(lp2) = lforw(lp1);
-		lforw(lp1) = lp2;
-		lback(lforw(lp2)) = lp2;
-		lback(lp2) = lp1;
+		set_lforw(lp2, lforw(lp1));
+		set_lforw(lp1, lp2);
+		set_lback(lforw(lp2), lp2);
+		set_lback(lp2, lp1);
 		tag_for_undo(lp2);
 		for_each_window(wp) {
 			if (wp->w_line.l == lp1)
@@ -507,10 +510,10 @@ lnewline()
 		lp1->l_used -= doto;
 	}
 	/* put lp2 in above lp1 */
-	lback(lp2) = lback(lp1);
-	lback(lp1) = lp2;
-	lforw(lback(lp2)) = lp2;
-	lforw(lp2) = lp1;
+	set_lback(lp2, lback(lp1));
+	set_lback(lp1, lp2);
+	set_lforw(lback(lp2), lp2);
+	set_lforw(lp2, lp1);
 	tag_for_undo(lp2);
 	dumpuline(lp1);
 #if ! WINMARK
@@ -809,8 +812,8 @@ ldelnewline()
 		}
 	}
 	lp1->l_used += lp2->l_used;
-	lforw(lp1) = lforw(lp2);
-	lback(lforw(lp2)) = lp1;
+	set_lforw(lp1, lforw(lp2));
+	set_lback(lforw(lp2), lp1);
 	dumpuline(lp1);
 	toss_to_undo(lp2);
 	return (TRUE);

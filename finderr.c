@@ -2,7 +2,10 @@
  * Written for vile by Paul Fox, (c)1990
  *
  * $Log: finderr.c,v $
- * Revision 1.21  1993/04/28 14:34:11  pgf
+ * Revision 1.22  1993/05/11 16:22:22  pgf
+ * see tom's CHANGES, 3.46
+ *
+ * Revision 1.21  1993/04/28  14:34:11  pgf
  * see CHANGES, 3.44 (tom)
  *
  * Revision 1.20  1993/04/28  09:41:21  pgf
@@ -225,11 +228,7 @@ int f,n;
 	if (moveddot)
 		putdotback(sbp,dotp);
 
-	if (dirs[l]) {
-		lsprintf(ferrfile,"%s%c%s",dirs[l],slash,errfile);
-	} else {
-		(void)strcpy(ferrfile,errfile);
-	}
+	(void)pathcat(ferrfile, dirs[l], errfile);
 
 	if (strcmp(ferrfile,curbp->b_bname) &&
 		strcmp(ferrfile,curbp->b_fname)) {

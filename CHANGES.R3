@@ -1,3 +1,57 @@
+Changes for vile 3.46:
+(pgf)
+	+ suppress attempts at reading a null file into the [vileinit]
+	  buffer (main.c)
+
+	+ don't require the d_namlen field in a DIRENT struct -- some systems
+	  don't have it, and most of those that do null terminate the name
+	  anyway.  (dirstuff.h, filec.c, glob.c, path.c)
+
+	+ changed compile flags for uts, on user suggestion (makefile)
+
+	+ in ffread(), after doing read(), do an fseek to sync up.  this
+	  keeps some stdio implementations from not bothering to seek back
+	  to the start in case we have to discard the read and resort to
+	  slowreadf() due to long lines. (fileio.c)
+
+	+ avoid realloc(ptr,0) when long lines are encountered in quickreadf()
+	  (file.c)
+
+	+ make M and L commands take account of too few lines in window (i.e.
+	  do the right thing when end of file is on screen). (basic.c)
+
+	+ even if the global dos-mode is on, empty (new) buffers should come
+	  up as non-dos.  (file.c)
+
+	+ fnc2engl() now tries to return a longer, meaningful name for a
+	  function (i.e. "exit" rather than "Q"). (bind.c)
+
+(tom)
+	+ test-compiled VMALLOC, DEBUGM options on apollo.
+
+	+ introduced 'set_lforw()' and 'set_lback()' macros to use in mapped
+	  memory option.  Added stubs in new file 'tmp.c'.  Modified files
+	  buffer.c exec.c file.c filec.c line.c undo.c, verified mechanically.
+
+	+ added definition of LINEPTR and 'lsync()' to files estruct.h, proto.h
+
+	+ fixed a memory leak in 'glob()', and changed interface to
+	  'glob_free()' (files filec.c, glob.c, glob.h).
+
+	+ revised logic in ibmpc.c that sets screen resolution ($sres) to
+	  make it more table-driven.
+
+	+ corrected 'forwline()' in file basic.c (repeated movement down
+	  sometimes reset the cursor to column 1 unlike vi).
+
+	+ added prototypes to 'mktbls.c'.
+
+	+ modified file main.c so that if the standard input isn't a terminal
+	  then vile reads it into a buffer and reopens /dev/tty (unix only).
+
+	+ modified files main.c and epath.h to allow (for unix systems) vile
+	  to find vile.hlp even if vile isn't in the path.
+
 Changes for vile 3.45:
 (pgf)
 	+ got rid of LOOKTAGS mode, and all of its ifdefs (filec.c, main.c,

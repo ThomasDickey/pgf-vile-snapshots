@@ -10,7 +10,10 @@
  *	(pgf, 1989)
  *
  * $Log: vmalloc.c,v $
- * Revision 1.11  1993/04/28 14:34:11  pgf
+ * Revision 1.12  1993/05/11 16:22:22  pgf
+ * see tom's CHANGES, 3.46
+ *
+ * Revision 1.11  1993/04/28  14:34:11  pgf
  * see CHANGES, 3.44 (tom)
  *
  * Revision 1.10  1993/04/20  12:18:32  pgf
@@ -55,17 +58,19 @@
 #undef calloc
 #undef vverify
 
-/* max buffers alloced but not yet freed */
+/* max buffers alloc'ed but not yet free'd */
 #if TURBO
 #define MAXMALLOCS 1000	/* sorry, not very big ! */
-#define	ulong	unsigned long
 #else
 #define MAXMALLOCS 20000
 #endif
 
+#define	uchar	unsigned char
+#define	ulong	unsigned long
+
 /* known pattern, and how many of them */
 #define KP 0xaaaaaaaaL
-#define KPW (2*sizeof(unsigned long))
+#define KPW (2*sizeof(ulong))
 
 static void dumpbuf P(( int ));
 static void trace P(( char * ));
@@ -73,7 +78,7 @@ static void errout P(( void ));
 
 static int nummallocs = 0;
 struct mtype {
-	unsigned char *addr;
+	uchar *addr;
 	int size;
 };
 
@@ -88,9 +93,9 @@ static void
 dumpbuf(x)
 int x;
 {
-	unsigned char *c;
+	uchar *c;
 	char s [80];
-	c = (unsigned char *)m[x].addr - 2;
+	c = (uchar *)m[x].addr - 2;
 	/* dump malloc buffer to the vmalloc file */
 	while (c <= m[x].addr + m[x].size + KPW + KPW + 1) {
 		sprintf(s, "%04.4lx : %02x ", (long)c, *c);
@@ -143,13 +148,13 @@ int	l;
 #ifdef VERBOSE
 	char s[80];
 #endif
-	unsigned char *buffer;
+	uchar *buffer;
 	char *sp;
 	register struct mtype *mp;
 
 	if (doverifys & VMAL)
 		rvverify("vmalloc",f,l);
-	if (( buffer = (unsigned char *)malloc(size + KPW + KPW)) == NULL) {
+	if (( buffer = (uchar *)malloc(size + KPW + KPW)) == NULL) {
 		sp = "ERROR: real malloc returned NULL\n";
 		fprintf(stderr,sp);
 		trace(sp);
@@ -190,7 +195,7 @@ int	l;
 
 void
 vfree(buffer,f,l)
-unsigned char *buffer;
+char	*buffer;
 char	*f;
 int	l;
 {
@@ -198,10 +203,10 @@ int	l;
 	char *sp;
 #endif
 	char s[80];
-	unsigned char *b;
+	uchar *b;
 	register struct mtype *mp;
 
-	b = buffer - KPW;
+	b = (uchar *)(buffer - KPW);
 	if (doverifys & VFRE)
 		rvverify("vfree",f,l);
 	for (mp = &m[nummallocs-1]; mp >= m && mp->addr != b; mp--)
@@ -233,16 +238,16 @@ int	l;
 
 char *
 vrealloc(buffer,size,f,l)
-unsigned char *buffer;
+char	*buffer;
 SIZE_T	size;
 char	*f;
 int	l;
 {
-	unsigned char *b, *b2;
+	uchar *b, *b2;
 	char s[80];
 	register struct mtype *mp;
 
-	b = buffer - KPW;
+	b = (uchar *)(buffer - KPW);
 	if (doverifys & VREA)
 		rvverify("vrealloc",f,l);
 
@@ -263,7 +268,7 @@ int	l;
 #endif
 	*(ulong *)(mp->addr) = KP;
 	*(ulong *)(mp->addr + sizeof (ulong)) = KP;
-	b2 = (unsigned char *)realloc(b,size+KPW+KPW);
+	b2 = (uchar *)realloc(b,size+KPW+KPW);
 	*(ulong *)(mp->addr + mp->size + KPW) = KP;
 	*(ulong *)(mp->addr + mp->size + KPW + sizeof (ulong)) = KP;
 	return (char *)(b2 + KPW);
@@ -371,11 +376,9 @@ int f,n;
 	need to count lock mallocs...
 #endif
 	{ /* searching */
+#if UNUSED
 		register MC	*mcptr;
 
-		if (patmatch)
-			found++;
-			
 		mcptr = &mcpat[0];
 		while (mcptr->mc_type != MCNIL)
 		{
@@ -384,6 +387,9 @@ int f,n;
 				if (mcptr->u.cclmap) found++;
 			mcptr++;
 		}
+#endif
+		if (patmatch)
+			found++; 	
 	}
 	{ /* kill registers */
 		for (i = 0; i < NKREGS; i++) {

@@ -2,7 +2,10 @@
  *	glob.h
  *
  * $Log: glob.h,v $
- * Revision 1.1  1993/04/21 14:38:41  pgf
+ * Revision 1.2  1993/05/11 16:22:22  pgf
+ * see tom's CHANGES, 3.46
+ *
+ * Revision 1.1  1993/04/21  14:38:41  pgf
  * glob mode support
  *
  * Revision 1.0  1993/04/20  12:14:39  pgf
@@ -32,7 +35,7 @@ extern	int	glob_needed P((char **));
 extern	char **	glob_expand P((char **));
 extern	char **	glob_string P((char *));
 extern	int	glob_length P((char **));
-extern	void	glob_free   P((char **));
+extern	char **	glob_free   P((char **));
 
 #if !UNIX
 extern	void	expand_wild_args P(( int * , char ***));

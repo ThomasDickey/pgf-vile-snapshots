@@ -14,7 +14,17 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.114  1993/05/05 11:27:48  pgf
+ * Revision 1.117  1993/05/11 16:22:22  pgf
+ * see tom's CHANGES, 3.46
+ *
+ * Revision 1.116  1993/05/11  15:46:42  pgf
+ * commentary
+ *
+ * Revision 1.115  1993/05/06  11:56:59  pgf
+ * mark the "vileinit" buffer active before switching to it, so swbuffer
+ * doesn't try a readin()
+ *
+ * Revision 1.114  1993/05/05  11:27:48  pgf
  * reordered initial message and initial update, to make sure the update
  * happens for X11
  *
@@ -492,7 +502,6 @@ char	*argv[];
 {
 	int    c;			/* command character */
 	register BUFFER *bp;		/* temp buffer pointer */
-	register int	gotafile = FALSE;/* filename arg present? */
 	register int	carg;		/* current arg to scan */
 	register int	ranstartup = FALSE;/* startup executed flag */
 	int startstat = TRUE;		/* result of running startup */
@@ -530,6 +539,18 @@ char	*argv[];
 	expand_wild_args(&argc, &argv);
 #endif
 	prog_arg = argv[0];	/* this contains our only clue to exec-path */
+
+#if UNIX
+	{	/* remember the directory from which we were run */
+		char	temp[NFILEN];
+		char	*s = strmalloc(lengthen_path(strcpy(temp, prog_arg))),
+			*t = pathleaf(s);
+		if (t != s) {
+			t[-1] = EOS;
+			pathname[2] = s;
+		}
+	}
+#endif
 
 	start_debug_log(argc,argv);
 
@@ -694,16 +715,37 @@ char	*argv[];
 			bp = bfind(bname, OK_CREAT, BFARGS);
 			ch_fname(bp, param);
 			make_current(bp); /* pull it to the front */
-			if (!gotafile) {
+			if (firstbp == 0)
 				firstbp = bp;
-				gotafile = TRUE;
-			}
 #if CRYPT
 			cryptkey = 0;
 #endif
 		}
 	}
 
+
+	/* if stdin isn't a terminal, assume the user is trying to pipe a
+	 * file into a buffer.
+	 */
+#if UNIX
+	if (!isatty(fileno(stdin))) {
+		FILE	*in;
+
+		bp = bfind(ScratchName(Standard Input), OK_CREAT, BFARGS);
+		make_current(bp); /* pull it to the front */
+		if (firstbp == 0)
+			firstbp = bp;
+		ffp = fdopen(dup(fileno(stdin)), "r");
+		if ((in = fopen("/dev/tty", "r")) != 0) {
+			close(0);	/* not all systems have dup2() */
+			dup(fileno(in));	/* so 'ttopen()' will work */
+			*stdin = *in;
+		}
+		(void)slowreadf(bp, &(bp->b_linecount));
+		set_rdonly(bp, bp->b_fname);
+		(void)ffclose();
+	}
+#endif
 
 	/* we made some calls to make_current() above, to shuffle the
 		list order.  this set curbp, which isn't actually kosher */
@@ -736,6 +778,7 @@ char	*argv[];
 	_harderr(dos_crit_handler);
 # endif
 #endif
+
 	vtinit();		/* Display */
 	winit();		/* windows */
 	varinit();		/* user variables */
@@ -748,7 +791,7 @@ char	*argv[];
 	}
 
 	/* pull in an unnamed buffer, if we were given none to work with */
-	if (!gotafile) {
+	if (firstbp == 0) {
 		bp = bfind(ScratchName(unnamed), OK_CREAT, 0);
 		bp->b_active = TRUE;
 #if DOSFILES
@@ -778,6 +821,7 @@ char	*argv[];
 			if ((vbp=bfind(ScratchName(vileinit), OK_CREAT, 0))==NULL)
 				exit(BAD(1));
 
+			vbp->b_active = TRUE; /* don't want swbuffer to try to read it */
 			swbuffer(vbp);
 			bprintf("%s", vileinit);
 			set_rdonly(vbp, vbp->b_fname);
@@ -804,8 +848,8 @@ char	*argv[];
 #else
 			fname = pathname[0];
 #endif
-			if (gotafile && 
-				strcmp(pathname[0], firstbp->b_bname) == 0) {
+			if (firstbp != 0
+			 && strcmp(pathname[0], firstbp->b_bname) == 0) {
 				c = firstbp->b_bname[0];
 				firstbp->b_bname[0] = SCRTCH_LEFT[0];
 				startstat = startup(fname);
@@ -821,7 +865,7 @@ char	*argv[];
 
 
 	/* if there are any files to read, read the first one! */
-	if (gotafile) {
+	if (firstbp != 0) {
 		nextbuffer(FALSE,0);
 	}
 #if TAGS
@@ -1156,6 +1200,7 @@ int *cp, *fp, *np;
 	while (isdigit(c=kbd_seq()) || c==reptc || c=='-'){
 		if (c == reptc)
 			/* wow.  what does this do?  -pgf */
+			/* (i've been told it controls overflow...) */
 			if ((n > 0) == ((n*4) > 0))
 				n = n*4;
 			else

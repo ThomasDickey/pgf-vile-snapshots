@@ -9,7 +9,10 @@
  *	the output structures.
  *
  * $Log: mktbls.c,v $
- * Revision 1.20  1993/04/01 13:06:31  pgf
+ * Revision 1.21  1993/05/11 16:22:22  pgf
+ * see tom's CHANGES, 3.46
+ *
+ * Revision 1.20  1993/04/01  13:06:31  pgf
  * turbo C support (mostly prototypes for static)
  *
  * Revision 1.19  1993/03/17  10:00:29  pgf
@@ -79,6 +82,15 @@
  * initial vile RCS revision
  */
 
+/* stuff borrowed/adapted from estruct.h */
+#if defined(__TURBOC__)
+#include <stdlib.h>
+#define P(param) param
+#else
+#define P(param) ()
+extern char *malloc();
+#endif
+
 #include <stdio.h>
 #include <string.h>
 
@@ -93,6 +105,8 @@
 #define GOOD	0
 #define BAD(c)	(c)
 #endif
+
+/*--------------------------------------------------------------------------*/
 
 #define	MAX_BIND	4	/* total # of binding-types */
 #define	MAX_PARSE	5	/* maximum # of tokens on line */
@@ -115,20 +129,22 @@
 #define	FALSE	(0)
 #endif
 
+#define	L_CURL	'{'
+#define	R_CURL	'}'
+
 #define	Fprintf	(void)fprintf
 #define	Sprintf	(void)sprintf
 
 #define	SaveEndif(head)	InsertOnEnd(&head, "#endif")
 
-extern char *malloc();
-
-static	void	save_all_modes();
+/*--------------------------------------------------------------------------*/
 
 typedef	struct stringl {
-	char *s1;	/* stores primary-data */
-	char *s2;	/* stores secondary-data */
-	char *s3;	/* stores ifdef-flags */
-	char *s4;	/* stores comment, if any */
+	char *Name;	/* stores primary-data */
+	char *Func;	/* stores secondary-data */
+	char *Data;	/* associated data, if any */
+	char *Cond;	/* stores ifdef-flags */
+	char *Note;	/* stores comment, if any */
 	struct stringl *nst;
 } LIST;
 
@@ -141,6 +157,53 @@ static	LIST	*all_names,
 		*all_gmodes,	/* data for GLOBAL modes */
 		*all_bmodes,	/* data for BUFFER modes */
 		*all_wmodes;	/* data for WINDOW modes */
+
+static	int	isspace P((int));
+static	int	isprint P((int));
+static	char *	StrAlloc P((char *));
+static	LIST *	ListAlloc P((void));
+static	void	badfmt P((char *));
+static	void	badfmt2 P((char *, int));
+static	void	WriteLines P((FILE *, char **, int));
+static	FILE *	OpenHeader P((char *, char **));
+static	void	InsertSorted P((LIST **, char *, char *, char *, char *, char *));
+static	void	InsertOnEnd P((LIST **, char *));
+static	char *	append P((char *, char *));
+static	char *	formcond P((char *, char *));
+static	int	LastCol P((char *));
+static	char *	PadTo P((int, char *));
+static	int	two_conds P((int, int, char *));
+static	int	Parse P((char *, char **));
+static	char *	AbbrevMode P((char *));
+static	char *	NormalMode P((char *));
+static	char *	c2TYPE P((int));
+static	char *	Mode2Key P((char *, char *));
+static	char *	Name2Symbol P((char *));
+static	char *	Name2Address P((char *, char *));
+static	void	WriteModeDefines P((LIST *, char *));
+static	void	WriteModeSymbols P((LIST *));
+static	void	save_all_modes P((char *, char *, char *));
+static	void	dump_all_modes P((void));
+static	void	save_bindings P((char *, char *, char *));
+static	void	dump_bindings P((void));
+static	void	save_bmodes P((char *, char **));
+static	void	dump_bmodes P((void));
+static	void	start_evar_h P((char **));
+static	void	finish_evar_h P((void));
+static	void	init_envars P((void));
+static	void	save_envars P((char **));
+static	void	dump_envars P((void));
+static	void	save_funcs P((char *, char *, char *, char *));
+static	void	dump_funcs P((LIST *));
+static	void	save_gmodes P((char *, char **));
+static	void	dump_gmodes P((void));
+static	void	save_names P((char *, char *, char *));
+static	void	dump_names P((void));
+static	void	init_ufuncs P((void));
+static	void	save_ufuncs P((char **));
+static	void	dump_ufuncs P((void));
+static	void	save_wmodes P((char *, char **));
+static	void	dump_wmodes P((void));
 
 	/* definitions for sections of cmdtbl */
 #define	SECT_CMDS 0
@@ -173,6 +236,7 @@ int c;
 {
 	return c == ' ' || c == '\t' || c == '\n';
 }
+
 static int
 isprint(c)
 int c;
@@ -195,12 +259,12 @@ ListAlloc()
 }
 
 /******************************************************************************/
-static void	
+static void
 badfmt(s)
 char *s;
 {
 	Fprintf(stderr,"\"%s\", line %d: bad format:", inputfile, l);
-	Fprintf(stderr,"	%s\n",s);
+	Fprintf(stderr,"\t%s\n",s);
 	exit(BAD(1));
 }
 
@@ -247,10 +311,11 @@ char	**argv;
 
 /******************************************************************************/
 static void
-InsertSorted(headp, name, func, cond, note)
+InsertSorted(headp, name, func, data, cond, note)
 LIST	**headp;
 char	*name;
 char	*func;
+char	*data;
 char	*cond;
 char	*note;
 {
@@ -258,13 +323,14 @@ char	*note;
 	register int  r;
 
 	n = ListAlloc();
-	n->s1 = StrAlloc(name);
-	n->s2 = StrAlloc(func);
-	n->s3 = StrAlloc(cond);
-	n->s4 = StrAlloc(note);
+	n->Name = StrAlloc(name);
+	n->Func = StrAlloc(func);
+	n->Data = StrAlloc(data);
+	n->Cond = StrAlloc(cond);
+	n->Note = StrAlloc(note);
 
 	for (p = *headp, q = 0; p != 0; q = p, p = p->nst) {
-		if ((r = strcmp(n->s1, p->s1)) < 0)
+		if ((r = strcmp(n->Name, p->Name)) < 0)
 			break;
 		else if (r == 0)
 			badfmt("duplicate name");
@@ -284,10 +350,10 @@ char	*name;
 	register LIST *n, *p, *q;
 
 	n = ListAlloc();
-	n->s1 = StrAlloc(name);
-	n->s2 = "";
-	n->s3 = "";
-	n->s4 = "";
+	n->Name = StrAlloc(name);
+	n->Func = "";
+	n->Cond = "";
+	n->Note = "";
 
 	for (p = *headp, q = 0; p != 0; q = p, p = p->nst)
 		;
@@ -479,7 +545,6 @@ int	c;
 	return value;
 }
 
-
 /* make a sort-key for mode-name */
 static char *
 Mode2Key(type, name)
@@ -552,16 +617,16 @@ char	*ppref;
 	int	count	= 0;
 
 	while (p != 0) {
-		(void)Parse(strcpy(line, p->s1), vec);
+		(void)Parse(strcpy(line, p->Name), vec);
 		Sprintf(temp, "#define %.1s%s%s ",
 			(*ppref == 'B') ? "" : ppref,
 			(*vec[2] == 'b') ? "MD" : "VAL_",
-			p->s2);
+			p->Func);
 		(void)PadTo(24, temp);
 		Sprintf(temp+strlen(temp), "%d", count++);
-		if (p->s4[0]) {
+		if (p->Note[0]) {
 			(void)PadTo(32, temp);
-			Sprintf(temp+strlen(temp), "/* %s */", p->s4);
+			Sprintf(temp+strlen(temp), "/* %s */", p->Note);
 		}
 		Fprintf(nemode, "%s\n", temp);
 		p = p->nst;
@@ -585,7 +650,7 @@ LIST	*p;
 
 	/* generate the symbol-table */
 	while (p != 0) {
-		(void)Parse(strcpy(line, p->s1), vec);
+		(void)Parse(strcpy(line, p->Name), vec);
 		Sprintf(temp, "\t{ %s,",
 			Name2Address(vec[1], vec[2]));
 		(void)PadTo(32, temp);
@@ -594,7 +659,7 @@ LIST	*p;
 		(void)PadTo(48, temp);
 		Sprintf(temp+strlen(temp), "VALTYPE_%s,", c2TYPE(*vec[2]));
 		(void)PadTo(64, temp);
-		Sprintf(temp+strlen(temp), "%s },", p->s3);
+		Sprintf(temp+strlen(temp), "%s },", p->Cond);
 		Fprintf(nemode, "%s\n", temp);
 		p = p->nst;
 	}
@@ -617,9 +682,9 @@ char	*abbrev;
 				? strcat(strcpy(t_abbrev, "no"), abbrev)
 				: "");
 	}
-	InsertSorted(&all_modes, normal, type, "", "");
+	InsertSorted(&all_modes, normal, type, "", "", "");
 	if (*abbrev)
-		InsertSorted(&all_modes, abbrev, type, "", "");
+		InsertSorted(&all_modes, abbrev, type, "", "", "");
 }
 
 static void
@@ -649,25 +714,25 @@ dump_all_modes()
 	char	temp[MAX_BUFFER];
 	register LIST *p, *q;
 
-	InsertSorted(&all_modes, "all", "?", "", "");
+	InsertSorted(&all_modes, "all", "?", "", "", "");
 	write_lines(nemode, top);
 	for (p = all_modes; p; p = p->nst) {
-		if (p->s2[0] != 'b') {
+		if (p->Func[0] != 'b') {
 			for (q = p->nst; q != 0; q = q->nst)
-				if (q->s2[0] != 'b')
+				if (q->Func[0] != 'b')
 					break;
-			Sprintf(temp, "\t%s[]", Name2Symbol(p->s1));
+			Sprintf(temp, "\t%s[]", Name2Symbol(p->Name));
 			(void)PadTo(32, temp);
 			Sprintf(temp+strlen(temp), "= \"%s\"%c",
-				p->s1, (q != 0) ? ',' : ';');
+				p->Name, (q != 0) ? ',' : ';');
 			(void)PadTo(64, temp);
-			Fprintf(nemode, "%s/* %s */\n", temp, p->s2);
+			Fprintf(nemode, "%s/* %s */\n", temp, p->Func);
 		}
 	}
 
 	write_lines(nemode, middle);
 	for (p = all_modes; p; p = p->nst) {
-		Fprintf(nemode, "\t%s,\n", Name2Address(p->s1, p->s2));
+		Fprintf(nemode, "\t%s,\n", Name2Address(p->Name, p->Func));
 	}
 
 	write_lines(nemode, bottom);
@@ -765,7 +830,7 @@ dump_bindings()
 	}
 	Fprintf(nebind,"};\n");
 
-	Fprintf(nebind,"\nKBIND kbindtbl[NBINDS] = {\n");
+	Fprintf(nebind,"\nKBIND kbindtbl[NBINDS] = %c\n", L_CURL);
 	for (btype = 1; btype <= 3; btype++) {
 		*old_cond = '\0';
 		for (i = 0; i < LEN_CHRSET; i++) {
@@ -785,7 +850,8 @@ dump_bindings()
 						toalpha(i));
 				} else {
 					Sprintf(temp,
-					"\t{ %s'%s%c',",
+					"\t%c %s'%s%c',",
+						L_CURL,
 						prefname[btype],
 						(i == '\'' || i == '\\') ?
 							"\\":"",
@@ -798,8 +864,8 @@ dump_bindings()
 		if (*old_cond)
 			Fprintf(nebind,"#endif\n");
 	}
-	Fprintf(nebind,"	{ 0, NULL }\n");
-	Fprintf(nebind,"};\n");
+	Fprintf(nebind,"\t{ 0, NULL }\n");
+	Fprintf(nebind,"%c;\n", R_CURL);
 }
 
 /******************************************************************************/
@@ -808,7 +874,7 @@ save_bmodes(type, vec)
 char	*type;
 char	**vec;
 {
-	InsertSorted(&all_bmodes, Mode2Key(type,vec[1]), vec[2], vec[3], vec[0]);
+	InsertSorted(&all_bmodes, Mode2Key(type,vec[1]), vec[2], "", vec[3], vec[0]);
 }
 
 static void
@@ -816,7 +882,7 @@ dump_bmodes()
 {
 	static	char	*top[] = {
 		"",
-		"/* buffer mode flags	*/",
+		"/* buffer mode flags\t*/",
 		"/* the indices of B_VALUES.v[] */",
 		};
 	static	char	*middle[] = {
@@ -901,7 +967,7 @@ static void
 save_envars(vec)
 char	**vec;
 {
-	InsertSorted(&all_envars, vec[1], vec[2], vec[3], vec[0]);
+	InsertSorted(&all_envars, vec[1], vec[2], "", vec[3], vec[0]);
 }
 
 static void
@@ -923,21 +989,21 @@ dump_envars()
 	for (p = all_envars, count = 0; p != 0; p = p->nst) {
 		if (!count++)
 			init_envars();
-		if (p->s3[0])
-			Fprintf(nevars, "#if %s\n", p->s3);
-		Sprintf(temp, "\t\"%s\",", p->s1);
-		if (p->s4[0]) {
+		if (p->Cond[0])
+			Fprintf(nevars, "#if %s\n", p->Cond);
+		Sprintf(temp, "\t\"%s\",", p->Name);
+		if (p->Note[0]) {
 			(void)PadTo(24, temp);
-			Sprintf(temp+strlen(temp), "/* %s */", p->s4);
+			Sprintf(temp+strlen(temp), "/* %s */", p->Note);
 		}
 		Fprintf(nevars, "%s\n", temp);
-		if (p->s3[0])
+		if (p->Cond[0])
 			Fprintf(nevars, "#endif\n");
 	}
 	for (p = all_envars, count = 0; p != 0; p = p->nst) {
 		if (!count)
 			write_lines(nevars, middle);
-		Sprintf(temp, "#define\tEV%s", p->s2);
+		Sprintf(temp, "#define\tEV%s", p->Func);
 		Fprintf(nevars, "%s%d\n", PadTo(24, temp), count++);
 	}
 }
@@ -982,7 +1048,7 @@ LIST	*head;
 {
 	register LIST *p;
 	for (p = head; p != 0; p = p->nst)
-		Fprintf(nefunc, "%s\n", p->s1);
+		Fprintf(nefunc, "%s\n", p->Name);
 }
 
 /******************************************************************************/
@@ -991,7 +1057,7 @@ save_gmodes(type, vec)
 char	*type;
 char	**vec;
 {
-	InsertSorted(&all_gmodes, Mode2Key(type,vec[1]), vec[2], vec[3], vec[0]);
+	InsertSorted(&all_gmodes, Mode2Key(type,vec[1]), vec[2], "", vec[3], vec[0]);
 }
 
 static void
@@ -999,7 +1065,7 @@ dump_gmodes()
 {
 	static	char	*top[] = {
 		"",
-		"/* global mode flags	*/",
+		"/* global mode flags\t*/",
 		"/* the indices of G_VALUES.v[] */",
 		};
 	static	char	*middle[] = {
@@ -1036,7 +1102,7 @@ char *name, *func, *cond;
 	char tmpline[80];
 
 	Sprintf(tmpline,"\t{ \"%s\",\t&f_%s },\n", name, func);
-	InsertSorted(&all_names, name, func, cond, "");
+	InsertSorted(&all_names, name, func, "", cond, "");
 }
 
 static void
@@ -1044,27 +1110,27 @@ dump_names()
 {
 	register LIST *m;
 	char	temp[MAX_BUFFER];
-	char	old_s3[LEN_BUFFER];
+	char	old_Cond[LEN_BUFFER];
 
 	Fprintf(nename,"\n/* if you maintain this by hand, keep it in */\n");
 	Fprintf(nename,"/* alphabetical order!!!! */\n\n");
 	Fprintf(nename,"NTAB nametbl[] = {\n");
-	*old_s3 = '\0';
+	*old_Cond = '\0';
 
 	for (m = all_names; m != NULL; m = m->nst) {
-		if (strcmp(old_s3, m->s3)) {
-			if (*old_s3)
+		if (strcmp(old_Cond, m->Cond)) {
+			if (*old_Cond)
 				Fprintf(nename,"#endif\n");
-			if (m->s3[0])
-				Fprintf(nename,"%s",m->s3);
-			(void)strcpy(old_s3, m->s3);
+			if (m->Cond[0])
+				Fprintf(nename,"%s",m->Cond);
+			(void)strcpy(old_Cond, m->Cond);
 		}
-		Sprintf(temp, "\t{ \"%s\",", m->s1);
-		Fprintf(nename, "%s&f_%s },\n", PadTo(40, temp), m->s2);
+		Sprintf(temp, "\t{ \"%s\",", m->Name);
+		Fprintf(nename, "%s&f_%s },\n", PadTo(40, temp), m->Func);
 	}
-	if (*old_s3)
+	if (*old_Cond)
 		Fprintf(nename,"#endif\n");
-	Fprintf(nename,"	{ NULL, NULL }\n};\n");
+	Fprintf(nename,"\t{ NULL, NULL }\n};\n");
 }
 
 /******************************************************************************/
@@ -1097,7 +1163,7 @@ static void
 save_ufuncs(vec)
 char	**vec;
 {
-	InsertSorted(&all_ufuncs, vec[1], vec[2], vec[3], vec[0]);
+	InsertSorted(&all_ufuncs, vec[1], vec[2], "", vec[3], vec[0]);
 }
 
 static void
@@ -1118,19 +1184,19 @@ dump_ufuncs()
 	for (p = all_ufuncs, count = 0; p != 0; p = p->nst) {
 		if (!count++)
 			init_ufuncs();
-		Sprintf(temp, "\t{\"%s\",", p->s1);
+		Sprintf(temp, "\t{\"%s\",", p->Name);
 		(void)PadTo(15, temp);
-		Sprintf(temp+strlen(temp), "%s},", p->s3);
-		if (p->s4[0]) {
+		Sprintf(temp+strlen(temp), "%s},", p->Cond);
+		if (p->Note[0]) {
 			(void)PadTo(32, temp);
-			Sprintf(temp+strlen(temp), "/* %s */", p->s4);
+			Sprintf(temp+strlen(temp), "/* %s */", p->Note);
 		}
 		Fprintf(nevars, "%s\n", temp);
 	}
 	for (p = all_ufuncs, count = 0; p != 0; p = p->nst) {
 		if (!count)
 			write_lines(nevars, middle);
-		Sprintf(temp, "#define\tUF%s", p->s2);
+		Sprintf(temp, "#define\tUF%s", p->Func);
 		Fprintf(nevars, "%s%d\n", PadTo(24, temp), count++);
 	}
 }
@@ -1141,7 +1207,7 @@ save_wmodes(type, vec)
 char	*type;
 char	**vec;
 {
-	InsertSorted(&all_wmodes, Mode2Key(type,vec[1]), vec[2], vec[3], vec[0]);
+	InsertSorted(&all_wmodes, Mode2Key(type,vec[1]), vec[2], "", vec[3], vec[0]);
 }
 
 static void
