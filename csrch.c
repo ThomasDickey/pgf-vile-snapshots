@@ -1,10 +1,22 @@
+/* These functions perform vi's on-this-line character scanning functions.
+ *	written for vile by Paul Fox, (c)1990
+ *
+ * $Log: csrch.c,v $
+ * Revision 1.3  1991/08/07 12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.2
+ * date: 1991/06/25 19:52:11;
+ * massive data structure restructure
+ * 
+ * revision 1.1
+ * date: 1990/09/21 10:24:56;
+ * initial vile RCS revision
+*/
 
 #include "estruct.h"
 #include "edef.h"
 
-/* These functions perform vi's on-this-line character scanning functions.
-	written for vile by Paul Fox, (c)1990
-*/
 static short lastscan;
 static short lastchar;
 #define BACK 0
@@ -26,11 +38,11 @@ fscan(f,n,c)
 	lastchar = c;
 	lastscan = FORW;
 
-	doto = curwp->w_doto;
+	doto = curwp->w_dot.o;
 
 	i = doto+1;
-	while(i < llength(curwp->w_dotp)) {
-		if ( c == lgetc(curwp->w_dotp,i)) {
+	while(i < llength(curwp->w_dot.l)) {
+		if ( c == lgetc(curwp->w_dot.l,i)) {
 			doto = i;
 			n--;
 			if (!n) break;
@@ -38,14 +50,14 @@ fscan(f,n,c)
 		i++;
 	}
 
-	if ( i == llength(curwp->w_dotp)) {
+	if ( i == llength(curwp->w_dot.l)) {
 		TTbeep();
 		return(FALSE);
 	}
 	if (doingopcmd)
 		doto++;
 
-	curwp->w_doto = doto;
+	curwp->w_dot.o = doto;
 	curwp->w_flag |= WFMOVE;
 	return(TRUE);
 			
@@ -61,11 +73,11 @@ bscan(f,n,c)
 	lastchar = c;
 	lastscan = BACK;
 
-	doto = curwp->w_doto;
+	doto = curwp->w_dot.o;
 
 	i = doto-1;
 	while(i >= 0) {
-		if ( c == lgetc(curwp->w_dotp,i)) {
+		if ( c == lgetc(curwp->w_dot.l,i)) {
 			doto = i;
 			n--;
 			if (!n) break;
@@ -78,7 +90,7 @@ bscan(f,n,c)
 		return(FALSE);
 	}
 
-	curwp->w_doto = doto;
+	curwp->w_dot.o = doto;
 	curwp->w_flag |= WFMOVE;
 	return(TRUE);
 

@@ -1,5 +1,13 @@
 /*	Crypt:	Encryption routines for MicroEMACS
-		written by Dana Hoggatt and Daniel Lawrence
+ *		written by Dana Hoggatt and Daniel Lawrence
+ *
+ * $Log: crypt.c,v $
+ * Revision 1.2  1991/08/07 12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.1
+ * date: 1990/09/21 10:24:54;
+ * initial vile RCS revision
 */
 
 #include	<stdio.h>

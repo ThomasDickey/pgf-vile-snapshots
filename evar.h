@@ -4,6 +4,20 @@
 		written 1986 by Daniel Lawrence
 */
 
+/*
+ * $Log: evar.h,v $
+ * Revision 1.3  1991/08/07 11:51:32  pgf
+ * added RCS log entries
+ *
+ * revision 1.2	locked by: pgf;
+ * date: 1990/10/01 11:05:29;
+ * change name to vile
+ * ----------------------------
+ * revision 1.1
+ * date: 1990/09/21 10:25:13;
+ * initial vile RCS revision
+ */
+
 #if !SMALLER
 
 /*	structure to hold user variables and their definitions	*/

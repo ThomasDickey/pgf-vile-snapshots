@@ -1,6 +1,43 @@
 /*	Spawn:	various DOS access commands
-		for MicroEMACS
-*/
+ *		for MicroEMACS
+ *
+ * $Log: spawn.c,v $
+ * Revision 1.9  1991/08/07 12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.8
+ * date: 1991/08/06 15:25:58;
+ *  global/local values
+ * and sprintf changes
+ * 
+ * revision 1.7
+ * date: 1991/06/25 19:53:29;
+ * massive data structure restructure
+ * 
+ * revision 1.6
+ * date: 1991/05/30 16:10:14;
+ * added extern decl for getenv()
+ * 
+ * revision 1.5
+ * date: 1991/04/22 09:03:37;
+ * removed non-portable initialization
+ * 
+ * revision 1.4
+ * date: 1991/04/08 15:46:56;
+ * fixed readin() arg count
+ * 
+ * revision 1.3
+ * date: 1991/04/04 09:43:21;
+ * added filterregion
+ * 
+ * revision 1.2
+ * date: 1990/12/06 18:53:59;
+ * added abortc to list that will terminate pressreturn
+ * 
+ * revision 1.1
+ * date: 1990/09/21 10:26:01;
+ * initial vile RCS revision
+ */
 
 #include        <stdio.h>
 #include	"estruct.h"
@@ -86,7 +123,7 @@ spawncli(f, n)
 
 #if     VMS
         movecursor(term.t_nrow, 0);             /* In last line.        */
-        mlputs("[Starting DCL]\r\n");
+        mlwrite("[Starting DCL]\r\n");
         TTflush(); 	                     /* Ignore "ttcol".      */
         sgarbf = TRUE;
         return (sys(NULL));                     /* NULL => DCL.         */
@@ -157,7 +194,7 @@ pressreturn()
 {
 	int s;
 
-        mlputs("[Press return to continue]");
+        mlwrite("[Press return to continue]");
         TTflush();
 	/* loop for a CR, a space, or a : to do another named command */
         while ((s = kbd_key()) != '\r' && s != ' ' && s != kcod2key(abortc)) {
@@ -195,10 +232,10 @@ spawn(f, n, rerun)
 
 	if (!rerun) {
 		if (cb = anycb())
-			sprintf(prompt,"Warning: %d modified buffer%s: !",
+			lsprintf(prompt,"Warning: %d modified buffer%s: !",
 				cb, cb>1 ? "s":"");
 		else
-			sprintf(prompt,": !");
+			lsprintf(prompt,": !");
 
 	        if ((s=mlreply(prompt, oline, NLINE)) != TRUE)
 	                return (s);
@@ -210,7 +247,7 @@ spawn(f, n, rerun)
 	strcpy(line,oline);
         if ((cp = getenv("SHELL")) == NULL || *cp == '\0')
                 cp = "/bin/sh";
-	sprintf(line2, "%s -c \"%s\"", cp, line);
+	lsprintf(line2, "%s -c \"%s\"", cp, line);
 #if	NeWS
 	system(line2);
 #else
@@ -312,7 +349,7 @@ spawn(f, n, rerun)
 	else
 	        Pexec(LOAD_EXEC,STcmd,STargs,STenv);
 	TTopen();
-        mlputs("\r\n\n[End]");                  /* Pause.               */
+        mlwrite("\r\n\n[End]");                  /* Pause.               */
         TTgetc();			     /* Pause.               */
         sgarbf = TRUE;
         return (TRUE);
@@ -331,7 +368,7 @@ spawn(f, n, rerun)
         TTputc('\n');                /* Already have '\r'    */
         TTflush();
         s = sys(line);                          /* Run the command.     */
-        mlputs("\r\n\n[End]");                  /* Pause.               */
+        mlwrite("\r\n\n[End]");                  /* Pause.               */
         TTflush();
         tgetc();
         sgarbf = TRUE;
@@ -358,7 +395,7 @@ spawn(f, n, rerun)
 	TTkopen();
 	/* if we are interactive, pause here */
 	if (clexec == FALSE) {
-	        mlputs("\r\n\n[End]");
+	        mlwrite("\r\n\n[End]");
         	tgetc();
         }
         sgarbf = TRUE;
@@ -388,10 +425,10 @@ pipecmd(f, n)
 	}
 
 	if (cb = anycb())
-		sprintf(prompt,"Warning: %d modified buffer%s. !",
+		lsprintf(prompt,"Warning: %d modified buffer%s. !",
 			cb, cb>1 ? "s":"");
 	else
-		sprintf(prompt,"!");
+		lsprintf(prompt,"!");
 		
 	/* get the command to pipe in */
         if ((s=mlreply(prompt, &oline[1], NLINE)) != TRUE)
@@ -402,15 +439,24 @@ pipecmd(f, n)
 	if (bp == NULL)
 		return FALSE;
 
+	make_local_b_val(bp,MDCMOD);
+	set_b_val(bp,MDCMOD,FALSE);
+
+	make_local_b_val(bp,MDDOS);
+	set_b_val(bp,MDDOS,FALSE);
+
+	make_local_b_val(bp,MDVIEW);
+	set_b_val(bp,MDVIEW,TRUE);
+
 	/* and read the stuff in */
 	if (popupbuff(bp) != TRUE || 
-		swbuffer(bp) != TRUE || 
+		swbuffer(bp) != TRUE ||
 		readin(oline, FALSE, bp, TRUE) != TRUE) {
 		return(FALSE);
 	}
 	strcpy(bp->b_bname,bname);
 	strncpy(bp->b_fname, oline, NFILEN-1);
-	bp->b_mode |= MDVIEW;
+
 	return TRUE;
 }
 
@@ -517,7 +563,7 @@ pipecmd(f, n)
 		return(s);
 
 	/* split the current window to make room for the command output */
-	if (splitwind(FALSE, 1) == FALSE)
+	if (splitwind(FALSE, 1) == NULL)
 			return(FALSE);
 
 	/* and read the stuff in */
@@ -525,7 +571,8 @@ pipecmd(f, n)
 		return(FALSE);
 
 	/* make this window in VIEW mode, update all mode lines */
-	curwp->w_bufp->b_mode |= MDVIEW;
+	make_local_b_val(curwp->w_bufp,MDVIEW);
+	set_b_val(curwp->w_bufp,MDVIEW,TRUE);
 	wp = wheadp;
 	while (wp != NULL) {
 		wp->w_flag |= WFMODE;
@@ -564,7 +611,7 @@ filterregion(f,n)
 	if (fork()) {
 		fclose(fw);
 		/* backline(FALSE,1); */
-		curwp->w_dotp = lback(curwp->w_dotp);
+		DOT.l = lback(DOT.l);
 		s = ifile(NULL,TRUE,fr);
 		npclose(fr);
 		firstnonwhite();

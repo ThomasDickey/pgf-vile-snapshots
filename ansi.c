@@ -2,6 +2,23 @@
  * The routines in this file provide support for ANSI style terminals
  * over a serial line. The serial I/O services are provided by routines in
  * "termio.c". It compiles into nothing if not an ANSI device.
+ *
+ * $Log: ansi.c,v $
+ * Revision 1.4  1991/08/07 12:34:39  pgf
+ * added RCS log messages
+ *
+ * revision 1.3
+ * date: 1991/06/19 01:32:21;
+ * change name of howmany 'cuz of HP/UX conflict
+ * sheesh
+ * 
+ * revision 1.2
+ * date: 1991/05/31 10:26:19;
+ * moved PRETTIER_SCROLL #define to estruct.h
+ * 
+ * revision 1.1
+ * date: 1990/09/21 10:24:38;
+ * initial vile RCS revision
  */
 
 #define	termdef	1			/* don't define "term" external */
@@ -219,18 +236,18 @@ ansibeep()
 #define SCROLL_REG 1
 
 /* move howmany lines starting at from to to */
-ansiscroll(from,to,howmany)
+ansiscroll(from,to,n)
 {
 	int i;
 	if (to == from) return;
 #if SCROLL_REG
 	if (to < from) {
-		ansiscrollregion(to, from + howmany - 1);
-		ansimove(from + howmany - 1,0);
+		ansiscrollregion(to, from + n - 1);
+		ansimove(from + n - 1,0);
 		for (i = from - to; i > 0; i--)
 			ttputc('\n');
 	} else { /* from < to */
-		ansiscrollregion(from, to + howmany - 1);
+		ansiscrollregion(from, to + n - 1);
 		ansimove(from);
 		for (i = to - from; i > 0; i--) {
 			ttputc(ESC);
@@ -242,7 +259,7 @@ ansiscroll(from,to,howmany)
 #else /* use insert and delete line */
 #if PRETTIER_SCROLL
 	if (abs(from-to) > 1) {
-		ansiscroll(from, (from<to) ? to-1:to+1, howmany);
+		ansiscroll(from, (from<to) ? to-1:to+1, n);
 		if (from < to)
 			from = to-1;
 		else
@@ -254,12 +271,12 @@ ansiscroll(from,to,howmany)
 		csi();
 		if (from - to > 1) ansiparm(from - to);
 		ttputc('M'); /* delete */
-		ansimove(to+howmany,0);
+		ansimove(to+n,0);
 		csi();
 		if (from - to > 1) ansiparm(from - to);
 		ttputc('L'); /* insert */
 	} else {
-		ansimove(from+howmany,0);
+		ansimove(from+n,0);
 		csi();
 		if (to - from > 1) ansiparm(to - from);
 		ttputc('M'); /* delete */

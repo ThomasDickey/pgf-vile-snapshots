@@ -6,6 +6,14 @@
  *
  *  Author:  Curtis Smith
  *  Last Updated: 07/14/87
+ *
+ * $Log: vmsvt.c,v $
+ * Revision 1.2  1991/08/07 12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.1
+ * date: 1990/09/21 10:26:19;
+ * initial vile RCS revision
  */
 
 #include	<stdio.h>		/* Standard I/O package		*/

@@ -1,5 +1,26 @@
-/*	npopen:  like popen, but grabs stderr, too	*/
-/*		written by John Hutchinson, heavily modified by Paul Fox */
+/*	npopen:  like popen, but grabs stderr, too
+ *		written by John Hutchinson, heavily modified by Paul Fox
+ *
+ * $Log: npopen.c,v $
+ * Revision 1.5  1991/08/07 12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.4
+ * date: 1991/08/06 15:30:25;
+ * took out setbuf(NULL)'s, as an experiment, on Dave's suggestion
+ * 
+ * revision 1.3
+ * date: 1991/06/25 14:22:33;
+ * defensinve checks against fdopen failure
+ * 
+ * revision 1.2
+ * date: 1991/04/04 09:38:39;
+ * support for bidirectional pipes
+ * 
+ * revision 1.1
+ * date: 1990/09/21 10:25:49;
+ * initial vile RCS revision
+ */
 
 #include <stdio.h>
 #include "estruct.h"
@@ -68,11 +89,23 @@ char *cmd;
 	if (pid) { /* parent */
 
 		*fr = fdopen (rp[0], "r");
+		if (*fr == NULL) {
+			fprintf(stderr,"fdopen r failed\n");
+			abort();
+		}
+#ifdef BEFORE
 		setbuf(*fr,NULL);
+#endif
 		(void) close (rp[1]);
 
 		*fw = fdopen (wp[1], "w");
+		if (*fw == NULL) {
+			fprintf(stderr,"fdopen r failed\n");
+			abort();
+		}
+#ifdef BEFORE
 		setbuf(*fw,NULL);
+#endif
 		(void) close (wp[0]);
 		return TRUE;
 

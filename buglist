@@ -1,6 +1,12 @@
-
 	(E means enhancement, L,M,H are low, medium, high priority)
 ----------------------
+H	:e! (fileread()) should rename the buffer to match the file 
+
+H	sys/filio.h and FIONREAD aren't there under ULTRIX  (POSIX?)
+
+H	empty buffer, "ijjjjESCuij" gives "bug: linsert"
+
+H	try building on the NeXt and the Sony.
 
 H	the gotoeop motion and regions interract wrongly.  For instance,
 	using ^W} to write the rest of the paragraph to a file writes
@@ -9,6 +15,11 @@ H	the gotoeop motion and regions interract wrongly.  For instance,
 H	when reading the output of a shell command, it's far too slow -- should
 	read as much as possible, put it into the buffer, and _then_ update
 	[ This has been fixed for BSD -- other implementations not yet ]
+
+M	the section chars and suffixes for c mode should be in variables, and
+	should perhaps be regexps
+
+M	add "set autowrite", "write-all-buffers", ":n file" (what does that do?)
 
 M	output doesn't flush properly after a shell escape
 
@@ -19,8 +30,8 @@ M	:k, to set a mark, won't work as ":ka" or ":kb".  Must use ":k a"
 
 M	:set all should be made to work (fix help)
 
-L	formatregion sometimes appends a space to the last line, for instance
-	when a paragraph is reformatted
+L	should I make the "value'd" modes be variables?  should I add 
+	some syntax checks to "set" to call set-variable if it has an '='?
 
 L	dos-style is set even when file is majority unix-lines?
 
@@ -28,10 +39,7 @@ L	why does file reading seem so slow?
 
 L	why is searching so slow?
 
-L	with two window displayed, hitting * twice makes one go away.
-	perhaps popup should _always_ split a window, rather than sometimes
-	taking over an existing one.  but then we'd have to remember who we
-	split, so we could give the space back to the donor.
+E	add support for ansi arrow keys 
 
 E	patterns as addresses do not work, e.g. ":/str1/,/str2/d".  They're
 	hard to parse the way things are set up right now.  We could accumulate
@@ -145,3 +153,63 @@ E	^W should erase word in input mode, and killc should erase line
 
 E	All code should pass lint.  This won't be easy... :-)
 	
+--------
+new 
+
+------------
+from pcsherma@eos.ncsu.edu
+  1) :f doesn't give ^G info.
+
+
+
+from David Giddy, d.giddy@trl.oz.au
+
+		wants to map the arrow keys, as in:
+                up      ^[[A    k
+                down    ^[[B    j
+                left    ^[[D    h
+                right   ^[[C    l
+
+From Dave Lemke
+ > i also managed to crash it with one of my earlier tests with this macro:
+ >
+ > 5 store-macro
+ >  write-file
+ >  replace-with-file %
+ > ~endm
+ >
+ > its apparently looking at the '%' as the start of an argument, and derefs
+ > the NULL on the end.
+
+
+
+
+
+from Todd Ogasawar, todd@pinhead.pegasus.com
+	config changes for ISC2.2
+        estruct.h       /* really system configuration changes */
+        display.c
+        termio.c
+	<estruct.h>
+	30,31c30,31
+	< #define BSD   1                       /* UNIX BSD 4.2 and ULTRIX      */
+	< #define USG   0                       /* UNIX system V                */
+	---
+	> #define BSD   0                       /* UNIX BSD 4.2 and ULTRIX      */
+	> #define USG   1                       /* UNIX system V                */
+	37c37
+	< #define POSIX 0
+	---
+	> #define POSIX 1
+	=====================================
+	display.c
+	16a17,19
+	> #include      <sys/types.h>   /* t.o. */
+	> #include      <sys/stream.h>  /* t.o. */
+	> #include      <sys/ptem.h>    /* t.o. */
+	=====================================
+	termio.c
+	6a7
+	> #include      <termios.h>     /* t.o. */
+
+

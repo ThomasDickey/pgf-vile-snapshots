@@ -1,3 +1,29 @@
+/* Look up vi-style tags in the file "tags".
+ *	Invoked either by ":ta routine-name" or by "^]" while sitting
+ *	on a string.  In the latter case, the tag is the word under
+ *	the cursor.
+ *	written for vile by Paul Fox, (c)1990
+ *
+ * $Log: tags.c,v $
+ * Revision 1.5  1991/08/07 12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.4
+ * date: 1991/06/25 19:53:33;
+ * massive data structure restructure
+ * 
+ * revision 1.3
+ * date: 1991/06/07 13:23:30;
+ * don't move "last dot" mark if dot doesn't change
+ * 
+ * revision 1.2
+ * date: 1991/04/08 15:47:17;
+ * fixed readin() arg count
+ * 
+ * revision 1.1
+ * date: 1990/09/21 10:26:07;
+ * initial vile RCS revision
+ */
 #include	"estruct.h"
 #include        "edef.h"
 
@@ -7,12 +33,6 @@
 #define NULL 0
 #endif
 
-/* Look up vi-style tags in the file "tags".
-	Invoked either by ":ta routine-name" or by "^]" while sitting
-	on a string.  In the latter case, the tag is the word under
-	the cursor.
-	written for vile by Paul Fox, (c)1990
- */
 gototag(f,n)
 {
 	register int i = 0;
@@ -44,8 +64,7 @@ char *tag;
 	char tagpat[NPAT];
 	int lineno;
 	int changedfile;
-	LINE *odotp;
-	int odoto;
+	MARK odot;
 	LINE *cheap_scan();
 
 	strcpy(tname,tag);
@@ -77,8 +96,8 @@ char *tag;
 
 	if (curbp && curwp) {
 		lineno = 1;
-	        for(clp = lforw(curbp->b_linep); 
-				clp != curwp->w_dotp; clp = lforw(clp))
+	        for(clp = lforw(curbp->b_line.l); 
+				clp != curwp->w_dot.l; clp = lforw(clp))
 			lineno++;
 		pushuntag(curbp->b_fname, lineno);
 	}
@@ -98,8 +117,7 @@ char *tag;
 	}
 
 	/* it's an absolute move -- remember where we are */
-	odotp  = curwp->w_dotp;
-	odoto  = curwp->w_doto;
+	odot = DOT;
 
 	i = 0;
 	tfp++;  /* skip the tab */
@@ -128,15 +146,14 @@ char *tag;
 				tossuntag();
 			return FALSE;
 		}
-		curwp->w_dotp = lp;
+		curwp->w_dot.l = lp;
 		curwp->w_flag |= WFMOVE;
 		firstnonwhite(FALSE,1);
 		s = TRUE;
 	}
 	/* if we moved, update the "last dot" mark */
-	if (s == TRUE && curwp->w_dotp != odotp) {
-		curwp->w_ldmkp = odotp;
-		curwp->w_ldmko = odoto;
+	if (s == TRUE && !sameline(DOT, odot)) {
+		curwp->w_lastdot = odot;
 	}
 	return s;
 	
@@ -181,8 +198,8 @@ char *name;
 	LINE *lp;
 	register int len;
 	len = strlen(name);
-	lp = lforw(bp->b_linep);
-	while (lp != bp->b_linep) {
+	lp = lforw(bp->b_line.l);
+	while (lp != bp->b_line.l) {
 		if (llength(lp) >= len) {
 			if (llength(lp) >= len &&
 				 !strncmp(lp->l_text, name, len))
@@ -310,8 +327,8 @@ makeflist()
 	filesbp->b_active = TRUE;
 
 	/* loop through the tags file */
-	tlp = lforw(tagbp->b_linep);
-	while (tlp != tagbp->b_linep) {
+	tlp = lforw(tagbp->b_line.l);
+	while (tlp != tagbp->b_line.l) {
 		/* skip the tagname */
 		i = 0;
 		while (i < llength(tlp) && lgetc(tlp,i++) != '\t')
@@ -360,11 +377,11 @@ LINE **lpp;
 	register int i, r, cmplen;
 
 	if (lpp == NULL) {
-		lp = lforw(bp->b_linep);
+		lp = lforw(bp->b_line.l);
 	} else {
 		lp = *lpp;
 		if (lp == NULL)
-			lp = lforw(bp->b_linep);
+			lp = lforw(bp->b_line.l);
 		else
 			lp = lforw(lp);
 	}
@@ -372,7 +389,7 @@ LINE **lpp;
 	while (1) {
 		cmplen = (len < llength(lp) && !insert) ? len : llength(lp);
 		if ((r = strncmp(text, lp->l_text, cmplen)) > 0 ||
-		     lp == bp->b_linep) { /* stick line into buffer */
+		     lp == bp->b_line.l) { /* stick line into buffer */
 		     	if (!insert)
 				return FALSE;
 		        if ((nlp=lalloc(len)) == NULL)

@@ -1,10 +1,21 @@
 /*
-
-The routines in this file provide support for the Atari 520 or 1040ST
-using VT52 emulation.  The I/O services are provided here as well.  It
-compiles into nothing if not a 520ST style device.
-
-*/
+ *
+ * The routines in this file provide support for the Atari 520 or 1040ST
+ * using VT52 emulation.  The I/O services are provided here as well.  It
+ * compiles into nothing if not a 520ST style device.
+ *
+ * $Log: st520.c,v $
+ * Revision 1.3  1991/08/07 12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.2
+ * date: 1990/10/01 12:24:59;
+ * changed newsize to newscreensize
+ * 
+ * revision 1.1
+ * date: 1990/09/21 10:26:03;
+ * initial vile RCS revision
+ */
 
 #define	termdef	1			/* don't define "term" external */
 

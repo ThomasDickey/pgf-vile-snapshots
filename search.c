@@ -3,6 +3,50 @@
  * and backward directions.
  *  heavily modified by Paul Fox, 1990
  *
+ * $Log: search.c,v $
+ * Revision 1.11  1991/08/07 12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.10
+ * date: 1991/08/06 15:55:24;
+ * fixed null l_text dereference in nextch()
+ * 
+ * revision 1.9
+ * date: 1991/08/06 15:25:24;
+ *  global/local values
+ * 
+ * revision 1.8
+ * date: 1991/06/25 19:53:21;
+ * massive data structure restructure
+ * 
+ * revision 1.7
+ * date: 1991/06/20 17:20:56;
+ * added missing status return in forwsearch()
+ * 
+ * revision 1.6
+ * date: 1991/06/03 12:18:46;
+ * ifdef'ed MAGIC for unresolved ref
+ * 
+ * revision 1.5
+ * date: 1991/05/31 11:23:11;
+ * cleaned up so forwsearch no longer depends on 3rd or 4th arg.
+ * 
+ * revision 1.4
+ * date: 1990/10/12 19:31:44;
+ * added scrsearchpat function
+ * 
+ * revision 1.3
+ * date: 1990/09/25 11:38:22;
+ * took out old ifdef BEFORE code
+ * 
+ * revision 1.2
+ * date: 1990/09/24 20:36:24;
+ * fixed core dump resulting from not checking return code of thescanner()
+ * for ABORT
+ * 
+ * revision 1.1
+ * date: 1990/09/21 10:25:59;
+ * initial vile RCS revision
  * Aug. 1986 John M. Gamble:
  *	... a limited number of regular expressions - 'any',
  *	'character class', 'closure', 'beginning of line', and
@@ -46,8 +90,8 @@ void     setbit();
 #endif
 
 int lastdirec;
-LINE *boundline;
-int boundoff;
+
+MARK boundpos;
 
 scrforwsearch(f,n)
 {
@@ -71,7 +115,7 @@ char notfoundmsg[] = "Not found";
 forwsearch(f, n)
 int f, n;
 {
-	fsearch(f, n, FALSE, NULL);
+	return fsearch(f, n, FALSE, NULL);
 }
 
 /* extra args -- marking if called from globals, and should mark lines, and
@@ -83,14 +127,13 @@ int f, n;
 	register int status = TRUE;
 	int wrapok;
 	int c;
-	LINE *curdotp;
-	int curoff;
+	MARK curpos;
 	int didmark = FALSE;
 
 	if (f && n < 0)
 		return bsearch(f, -n, NULL, NULL);
 
-	wrapok = marking || (curwp->w_bufp->b_mode & MDSWRAP) != 0;
+	wrapok = marking || b_val(curwp->w_bufp, MDSWRAP);
 
 	lastdirec = 0;
 
@@ -108,17 +151,15 @@ int f, n;
 		return status;
 	}
 		
-	curdotp = curwp->w_dotp;
-	curoff = curwp->w_doto;
-	setboundry(wrapok,curwp->w_dotp,curwp->w_doto,FORWARD);
+	curpos = DOT;
+	setboundry(wrapok,curpos,FORWARD);
 	do {
-		nextch(&(curwp->w_dotp),&(curwp->w_doto), FORWARD,wrapok);
+		nextch(&(DOT), FORWARD);
 		status = thescanner(&pat[0], FORWARD, PTBEG, wrapok);
 		if (status == ABORT) {
 			TTbeep();
 			mlwrite("[Aborted]");
-			curwp->w_dotp = curdotp;
-			curwp->w_doto = curoff;
+			DOT = curpos;
 			return status;
 		}
 		/* if found, mark the line */
@@ -127,24 +168,23 @@ int f, n;
 				thescanner returns TRUE, even though it's
 				on a boundary. quit if we find ourselves
 				marking a line twice */
-			if (lismarked(curwp->w_dotp))
+			if (lismarked(DOT.l))
 				break;
-			lsetmarked(curwp->w_dotp);
+			lsetmarked(DOT.l);
 			/* and, so the next nextch gets to next line */
-			curwp->w_doto = llength(curwp->w_dotp);
+			DOT.o = llength(DOT.l);
 			didmark = TRUE;
 		}
 	} while ((marking || --n > 0) && status == TRUE);
 	
 	if (!marking && !status)
-		nextch(&(curwp->w_dotp),&(curwp->w_doto), REVERSE,wrapok);
+		nextch(&(DOT),REVERSE);
 		
 	if (marking) {  /* restore dot and offset */
-		curwp->w_dotp = curdotp;
-		curwp->w_doto = curoff;
+		DOT = curpos;
 	} else if (status) {
 		savematch();
-		if (curwp->w_dotp == curdotp && curwp->w_doto == curoff) {
+		if (samepoint(DOT,curpos)) {
 			mlwrite(onlyonemsg);
 			TTbeep();
 		}
@@ -172,10 +212,9 @@ int f, n;	/* default flag / numeric argument */
 {
 	register int status = TRUE;
 	int wrapok;
-	LINE *curdotp;
-	int curoff;
+	MARK curpos;
 	
-	wrapok = (curwp->w_bufp->b_mode & MDSWRAP) != 0;
+	wrapok = b_val(curwp->w_bufp, MDSWRAP);
 
 	if (n < 0)		/* search backwards */
 		return(backhunt(f, -n));
@@ -190,7 +229,7 @@ int f, n;	/* default flag / numeric argument */
 	}
 	/* mlwrite("Searching ahead..."); */
 #if	MAGIC
-	if ((curwp->w_bufp->b_mode & MDMAGIC) && (mcpat[0].mc_type == MCNIL))
+	if (b_val(curwp->w_bufp, MDMAGIC) && (mcpat[0].mc_type == MCNIL))
 	{
 		if (!mcstr())
 			return FALSE;
@@ -201,34 +240,32 @@ int f, n;	/* default flag / numeric argument */
 	 * n is positive (n == 0 will go through once, which
 	 * is just fine).
 	 */
-	curdotp = curwp->w_dotp;
-	curoff = curwp->w_doto;
-	setboundry(wrapok,curwp->w_dotp,curwp->w_doto,FORWARD);
+	curpos = DOT;
+	setboundry(wrapok,DOT,FORWARD);
 	do {
-		nextch(&(curwp->w_dotp),&(curwp->w_doto),FORWARD,wrapok);
+		nextch(&(DOT),FORWARD);
 		status = thescanner(&pat[0], FORWARD, PTBEG, wrapok);
 	} while ((--n > 0) && status == TRUE);
 
 	/* Save away the match, or complain if not there.  */
 	if (status == TRUE) {
 		savematch();
-		if (curwp->w_dotp == curdotp && curwp->w_doto == curoff) {
+		if (samepoint(DOT,curpos)) {
 			mlwrite(onlyonemsg);
 			TTbeep();
 		}
 	} else if (status == FALSE) {
-		nextch(&(curwp->w_dotp),&(curwp->w_doto),REVERSE,wrapok);
+		nextch(&(DOT),REVERSE);
 		mlwrite(notfoundmsg);
 		TTbeep();
 	} else if (status == ABORT) {
 		TTbeep();
 		mlwrite("[Aborted]");
-		curwp->w_dotp = curdotp;
-		curwp->w_doto = curoff;
+		DOT = curpos;
 		return status;
 	}
 
-	return(status);
+	return status;
 }
 
 /*
@@ -248,13 +285,12 @@ int f, n;	/* default flag / numeric argument */
 {
 	register int status = TRUE;
 	int wrapok;
-	LINE *curdotp;
-	int curoff;
+	MARK curpos;
 	
 	if (n < 0)
 		return fsearch(f, -n, NULL, fromscreen);
 
-	wrapok = (curwp->w_bufp->b_mode & MDSWRAP) != 0;
+	wrapok = b_val(curwp->w_bufp, MDSWRAP);
 
 	lastdirec = 1;
 
@@ -266,32 +302,28 @@ int f, n;	/* default flag / numeric argument */
 	 */
 	if ((status = readpattern("Reverse search: ", &pat[0],
 					TRUE, lastkey, fromscreen)) == TRUE) {
-		curdotp = curwp->w_dotp;
-		curoff = curwp->w_doto;
-		setboundry(wrapok,curwp->w_dotp,curwp->w_doto,REVERSE);
+		curpos = DOT;
+		setboundry(wrapok,DOT,REVERSE);
 		do {
-			nextch(&(curwp->w_dotp),&(curwp->w_doto),REVERSE,
-									wrapok);
+			nextch(&(DOT),REVERSE);
 			status = thescanner(&tap[0], REVERSE, PTBEG, wrapok);
 		} while ((--n > 0) && status == TRUE);
 
 		/* Save away the match, or complain if not there.  */
 		if (status == TRUE)
 			savematch();
-			if (curwp->w_dotp == curdotp && curwp->w_doto == curoff) {
+			if (samepoint(DOT,curpos)) {
 				mlwrite(onlyonemsg);
 				TTbeep();
 			}
 		else if (status == FALSE) {
-			nextch(&(curwp->w_dotp),&(curwp->w_doto),FORWARD,
-									wrapok);
+			nextch(&(DOT),FORWARD);
 			mlwrite(notfoundmsg);
 			TTbeep();
 		} else if (status == ABORT) {
 			TTbeep();
 			mlwrite("[Aborted]");
-			curwp->w_dotp = curdotp;
-			curwp->w_doto = curoff;
+			DOT = curpos;
 			return status;
 		}
 	}
@@ -309,10 +341,9 @@ int f, n;	/* default flag / numeric argument */
 {
 	register int status = TRUE;
 	int wrapok;
-	LINE *curdotp;
-	int curoff;
+	MARK curpos;
 	
-	wrapok = (curwp->w_bufp->b_mode & MDSWRAP) != 0;
+	wrapok = b_val(curwp->w_bufp, MDSWRAP);
 
 	if (n < 0)
 		return(forwhunt(f, -n));
@@ -327,7 +358,7 @@ int f, n;	/* default flag / numeric argument */
 	}
 	/* mlwrite("Searching back..."); */
 #if	MAGIC
-	if ((curwp->w_bufp->b_mode & MDMAGIC) && (tapcm[0].mc_type == MCNIL))
+	if (b_val(curwp->w_bufp, MDMAGIC) && (tapcm[0].mc_type == MCNIL))
 	{
 		if (!mcstr())
 			return FALSE;
@@ -339,11 +370,10 @@ int f, n;	/* default flag / numeric argument */
 	 * is just fine).
 	 */
 
-	curdotp = curwp->w_dotp;
-	curoff = curwp->w_doto;
-	setboundry(wrapok,curwp->w_dotp,curwp->w_doto,REVERSE);
+	curpos = DOT;
+	setboundry(wrapok,DOT,REVERSE);
 	do {
-		nextch(&(curwp->w_dotp),&(curwp->w_doto),REVERSE,wrapok);
+		nextch(&(DOT),REVERSE);
 		status = thescanner(&tap[0], REVERSE, PTBEG, wrapok);
 	} while ((--n > 0) && status == TRUE);
 
@@ -352,19 +382,18 @@ int f, n;	/* default flag / numeric argument */
 	 */
 	if (status == TRUE) {
 		savematch();
-		if (curwp->w_dotp == curdotp && curwp->w_doto == curoff) {
+		if (samepoint(DOT, curpos)) {
 			mlwrite(onlyonemsg);
 			TTbeep();
 		}
 	} else if (status == FALSE) {
-		nextch(&(curwp->w_dotp),&(curwp->w_doto), FORWARD,wrapok);
+		nextch(&(DOT),FORWARD);
 		mlwrite(notfoundmsg);
 		TTbeep();
 	} else if (status == ABORT) {
 		TTbeep();
 		mlwrite("[Aborted]");
-		curwp->w_dotp = curdotp;
-		curwp->w_doto = curoff;
+		DOT = curpos;
 		return status;
 	}
 
@@ -399,8 +428,7 @@ char	*patrn;		/* pointer into pattern */
 int	direct;		/* which way to go.*/
 int	beg_or_end;	/* put point at beginning or end of pattern.*/
 {
-	LINE *curline;			/* current line during scan */
-	int curoff;			/* position within current line */
+	MARK curpos;
 	int found;
 	int (*matcher)();
 	int mcmatch();
@@ -421,10 +449,9 @@ int	beg_or_end;	/* put point at beginning or end of pattern.*/
 
 	/* Setup local scan pointers to global ".".
 	 */
-	curline = curwp->w_dotp;
-	curoff  = curwp->w_doto;
+	curpos = DOT;
 #if MAGIC
-	if (magical && (curwp->w_bufp->b_mode & MDMAGIC)) {
+	if (magical && b_val(curwp->w_bufp, MDMAGIC)) {
 		matcher = mcmatch;
 		if (direct == FORWARD)
 			patrn = (char *)mcpat;
@@ -449,24 +476,17 @@ int	beg_or_end;	/* put point at beginning or end of pattern.*/
 		 * restore it on a match, and initialize matchlen to
 		 * zero in case we are doing a search for replacement.
 		 */
-		matchline = curline;
-		matchoff = curoff;
+		matchpos = curpos;
 		matchlen = 0;
 		
-		if ((*matcher)(patrn, direct, &curline, &curoff)) {
+		if ((*matcher)(patrn, direct, &curpos)) {
 			/* A SUCCESSFULL MATCH!!!
 			 * reset the global "." pointers.
 			 */
 			if (beg_or_end == PTEND)	/* at end of string */
-			{
-				curwp->w_dotp = curline;
-				curwp->w_doto = curoff;
-			}
+				DOT = curpos;
 			else		/* at beginning of string */
-			{
-				curwp->w_dotp = matchline;
-				curwp->w_doto = matchoff;
-			}
+				DOT = matchpos;
 
 			curwp->w_flag |= WFMOVE; /* flag that we have moved */
 			return TRUE;
@@ -474,8 +494,8 @@ int	beg_or_end;	/* put point at beginning or end of pattern.*/
 
 		/* Advance the cursor.
 		 */
-		nextch(&curline, &curoff, direct,wrapok);
-	} while (!boundry(curline, curoff, direct, wrapok));
+		nextch(&curpos, direct);
+	} while (!boundry(curpos));
 
 	return FALSE;	/* We could not find a match.*/
 }
@@ -486,23 +506,20 @@ int	beg_or_end;	/* put point at beginning or end of pattern.*/
  *	recursive routine amatch() (for "anchored match") in
  *	Kernighan & Plauger's "Software Tools".
  */
-mcmatch(mcptr, direct, pcwline, pcwoff)
-register MC	*mcptr;	/* string to scan for */
+mcmatch(mcptr, direct, pcwpos)
+register MC	*mcptr;		/* string to scan for */
 int		direct;		/* which way to go.*/
-LINE		**pcwline;	/* current line during scan */
-int		*pcwoff;	/* position within current line */
+MARK		*pcwpos;	/* current point during scan */
 {
 	register int c;			/* character at current position */
-	LINE *curline;			/* current line during scan */
-	int curoff;			/* position within current line */
+	MARK curpos;			/* current line during scan */
 	int nchars;
 
 	/* Set up local scan pointers to ".", and get
 	 * the current character.  Then loop around
 	 * the pattern pointer until success or failure.
 	 */
-	curline = *pcwline;
-	curoff = *pcwoff;
+	curpos = *pcwpos;
 
 	/* The beginning-of-line and end-of-line metacharacters
 	 * do not compare against characters, they compare
@@ -512,35 +529,30 @@ int		*pcwoff;	/* position within current line */
 	 * for reverse searches.  The reverse is true for EOL.
 	 * So, for a start, we check for them on entry.
 	 */
-	if (mcptr->mc_type == BOL)
-	{
-		if (curoff != 0)
+	if (mcptr->mc_type == BOL) {
+		if (curpos.o != 0)
 			return FALSE;
 		mcptr++;
 	}
 
-	if (mcptr->mc_type == EOL)
-	{
-		if (curoff != llength(curline))
+	if (mcptr->mc_type == EOL) {
+		if (curpos.o != llength(curpos.l))
 			return FALSE;
 		mcptr++;
 	}
 
-	while (mcptr->mc_type != MCNIL)
-	{
-		c = nextch(&curline, &curoff, direct, FALSE);
+	while (mcptr->mc_type != MCNIL) {
+		c = nextch(&curpos, direct);
 
-		if (mcptr->mc_type & CLOSURE)
-		{
+		if (mcptr->mc_type & CLOSURE) {
 			/* Try to match as many characters as possible
 			 * against the current meta-character.  A
 			 * newline or boundary never matches a closure.
 			 */
 			nchars = 0;
-			while (c != '\n' && c != -1 && mceq(c, mcptr))
-			{
+			while (c != '\n' && c != -1 && mceq(c, mcptr)) {
 				nchars++;
-				c = nextch(&curline, &curoff, direct, FALSE);
+				c = nextch(&curpos, direct);
 			}
 
 			/* We are now at the character that made us
@@ -553,14 +565,11 @@ int		*pcwoff;	/* position within current line */
 			 */
 			mcptr++;
 
-			for (;;)
-			{
+			for (;;) {
 				/* back up, since mcmatch goes forward first */
-				(void)nextch(&curline, &curoff, 
-					direct ^ REVERSE, FALSE);
+				(void)nextch(&curpos, direct ^ REVERSE);
 
-				if (mcmatch(mcptr, direct, &curline, &curoff))
-				{
+				if (mcmatch(mcptr, direct, &curpos)) {
 					matchlen += nchars;
 					goto success;
 				}
@@ -568,9 +577,7 @@ int		*pcwoff;	/* position within current line */
 				if (nchars-- == 0)
 					return FALSE;
 			}
-		}
-		else			/* Not closure.*/
-		{
+		} else {		/* Not closure.*/
 			/* The only way we'd get a BOL metacharacter
 			 * at this point is at the end of the reversed pattern.
 			 * The only way we'd get an EOL metacharacter
@@ -587,29 +594,19 @@ int		*pcwoff;	/* position within current line */
 			 * notion that the meta-character '$' (and likewise
 			 * '^') match positions, not characters.
 			 */
-			if (mcptr->mc_type == BOL)
-			{
-				if (curoff == llength(curline))
-				{
-					(void)nextch(&curline, &curoff,
-						   direct ^ REVERSE, FALSE);
+			if (mcptr->mc_type == BOL) {
+				if (is_at_end_of_line(curpos)) {
+					(void)nextch(&curpos, direct ^ REVERSE);
 					goto success;
-				}
-				else
-				{
+				} else {
 					return FALSE;
 				}
 			}
-			if (mcptr->mc_type == EOL)
-			{
-				if (curoff == 0)
-				{
-					(void)nextch(&curline, &curoff,
-						   direct ^ REVERSE, FALSE);
+			if (mcptr->mc_type == EOL) {
+				if (curpos.o == 0) {
+					(void)nextch(&curpos, direct ^ REVERSE);
 					goto success;
-				}
-				else
-				{
+				} else {
 					return FALSE;
 				}
 			}
@@ -633,10 +630,8 @@ int		*pcwoff;	/* position within current line */
 	 * Reset the "." pointers.
 	 */
 success:
-	*pcwline = curline;
-	*pcwoff  = curoff;
+	*pcwpos = curpos;
 	
-
 	return TRUE;
 }
 #endif
@@ -644,25 +639,22 @@ success:
 /*
  * litmatch -- Search for a literal match in either direction.
  */
-litmatch(patptr, direct, pcwline, pcwoff)
+litmatch(patptr, direct, pcwpos)
 register char	*patptr;	/* string to scan for */
 int		direct;		/* which way to go.*/
-LINE		**pcwline;	/* current line during scan */
-int		*pcwoff;	/* position within current line */
+MARK		*pcwpos;	/* current point during scan */
 {
 	register int c;			/* character at current position */
-	LINE *curline;		/* current line during scan */
-	int curoff;		/* position within current line */
+	MARK curpos;		/* current point during scan */
 
 	/* Set up local scan pointers to ".", and get
 	 * the current character.  Then loop around
 	 * the pattern pointer until success or failure.
 	 */
-	curline = *pcwline;
-	curoff = *pcwoff;
+	curpos = *pcwpos;
 
 	while (*patptr != '\0') {
-		c = nextch(&curline, &curoff, direct, FALSE);
+		c = nextch(&curpos, direct);
 
 		if (!eq(c, *patptr))
 			return FALSE;
@@ -673,10 +665,7 @@ int		*pcwoff;	/* position within current line */
 		matchlen++;
 		patptr++;
 	}
-
-	*pcwline = curline;
-	*pcwoff  = curoff;
-	
+	*pcwpos = curpos;
 
 	return TRUE;
 }
@@ -691,8 +680,8 @@ eq(bc, pc)
 register char	bc;
 register char	pc;
 {
-	if (curwp->w_bufp->b_mode & MDEXACT)
-		return (bc ^ pc) == 0;
+	if (b_val(curwp->w_bufp, MDEXACT))
+		return bc == pc;
 	/* take out the bit that makes upper and lowercase different */
 	return ((bc ^ pc) & ~DIFCASE) == 0;
 }
@@ -746,10 +735,10 @@ int	fromscreen;
 			 * since the pattern in question might have an
 			 * invalid meta combination.
 			 */
-			if ((curwp->w_bufp->b_mode & MDMAGIC) == 0)
-				mcclear();
-			else
+			if (b_val(curwp->w_bufp, MDMAGIC))
 				status = mcstr();
+			else
+				mcclear();
 #endif
 		}
 	} else if (status == FALSE && *apat != 0) { /* Old one */
@@ -767,8 +756,7 @@ savematch()
 {
 	register char *ptr;	/* ptr into malloced last match string */
 	register int j;		/* index */
-	LINE *curline;		/* line of last match */
-	int curoff;		/* offset "      "    */
+	MARK curpos;		/* last match */
 
 	/* free any existing match string */
 	if (patmatch != NULL)
@@ -780,11 +768,10 @@ savematch()
 		return;
 
 	/* save the match! */
-	curoff = matchoff;
-	curline = matchline;
+	curpos = matchpos;
 
 	for (j = 0; j < matchlen; j++)
-		*ptr++ = nextch(&curline, &curoff, FORWARD, FALSE);
+		*ptr++ = nextch(&curpos,FORWARD);
 
 	/* null terminate the match string */
 	*ptr = '\0';
@@ -859,8 +846,8 @@ int	kind;	/* Query enabled flag */
 	int nlrepl;		/* was a replace done on the last line? */
 	int c;			/* input char for query */
 	char tpat[NPAT];	/* temporary to hold search pattern */
-	LINE *lastline;		/* position of last replace and */
-	int lastoff;		/* offset (for 'u' query option) */
+	MARK lastpos;		/* position of last replace
+						 (for 'u' query option) */
 	REGION region;
 
 	/* we don't really care much about size, etc., but getregion does
@@ -868,23 +855,23 @@ int	kind;	/* Query enabled flag */
 		we pretend that wrapping around the bottom of the file is
 		okay, and use the boundary code to keep us from going
 		past the region end. */
-	if (curwp->w_mkp == curwp->w_dotp) {
-		if (curwp->w_doto > curwp->w_mko) {
+	if (sameline(DOT,MK)) {
+		if (DOT.o > MK.o) {
 			int tmpoff;
-			tmpoff = curwp->w_doto;
-			curwp->w_doto = curwp->w_mko;
-			curwp->w_mko = tmpoff;
+			tmpoff = DOT.o
+			DOT.o = MK.o;
+			MK.o = tmpoff;
 		}
 	} else {
 		getregion(&region);
-		if (region.r_linep == curwp->w_mkp)
+		if (sameline(region.r_orig, MK))
 			swapmark();
 	}
 	if (fulllineregions) {
-		curwp->w_doto = 0;
-		curwp->w_mko = llength(curwp->w_mkp);
+		DOT.o = 0;
+		MK.o = llength(MK.l);
 	}
-	if (curwp->w_mkp == curbp->b_linep) {
+	if (is_header_line(MK, curbp)) {
 		mlwrite("BUG: mark is at b_linep");
 		return FALSE;
 	}
@@ -924,8 +911,7 @@ int	kind;	/* Query enabled flag */
 
 		/* Initialize last replaced pointers.
 		 */
-		lastline = NULL;
-		lastoff = 0;
+		lastpos = nullmark;
 #if	NeWS
 		newsimmediateon() ;
 #endif
@@ -942,9 +928,9 @@ int	kind;	/* Query enabled flag */
 		 * matchlen is reset to the true length of
 		 * the matched string.
 		 */
-		setboundry(TRUE,curwp->w_mkp,curwp->w_mko,FORWARD);
+		setboundry(TRUE,MK,FORWARD);
 #if	MAGIC
-		if (magical && (curwp->w_bufp->b_mode & MDMAGIC) != 0) {
+		if (magical && b_val(curwp->w_bufp, MDMAGIC)) {
 			if (!thescanner(&mcpat[0], FORWARD, PTBEG, TRUE))
 				break;
 		} else
@@ -954,7 +940,7 @@ int	kind;	/* Query enabled flag */
 
 		/* Check if we are on the last line.
 		 */
-		nlrepl = (lforw(curwp->w_dotp) == curwp->w_bufp->b_linep);
+		nlrepl = is_last_line(DOT, curwp->w_bufp);
 
 		/* Check for query.
 		 */
@@ -987,8 +973,7 @@ nprompt:
 					break;
 
 				case 'n':	/* no, onward */
-					nextch( &(curwp->w_dotp),
-						&(curwp->w_doto),FORWARD,TRUE);
+					nextch(&(DOT), FORWARD);
 					continue;
 
 				case '!':	/* yes/stop asking */
@@ -999,17 +984,15 @@ nprompt:
 
 					/* Restore old position.
 					 */
-					if (lastline == NULL)
+					if (samepoint(lastpos,nullmark))
 					{
 						/* There is nothing to undo.
 						 */
 						TTbeep();
 						goto pprompt;
 					}
-					curwp->w_dotp = lastline;
-					curwp->w_doto = lastoff;
-					lastline = NULL;
-					lastoff = 0;
+					DOT = lastpos;
+					lastpos = nullmark;
 
 					/* Delete the new string.
 					 */
@@ -1024,8 +1007,7 @@ nprompt:
 					 */
 					--numsub;
 					backchar(TRUE, mlenold);
-					matchline = curwp->w_dotp;
-					matchoff  = curwp->w_doto;
+					matchpos = DOT;
 					goto pprompt;
 
 				default:	/* bitch and beep */
@@ -1052,10 +1034,7 @@ nprompt:
 		/* Save where we are if we might undo this....
 		 */
 		if (kind)
-		{
-			lastline = curwp->w_dotp;
-			lastoff = curwp->w_doto;
-		}
+			lastpos = DOT;
 
 		numsub++;	/* increment # of substitutions */
 	}
@@ -1155,31 +1134,20 @@ int maxlength;	/* maximum chars in destination */
 	return(TRUE);
 }
 
-/*
- * boundry -- Return information depending on whether we may search no
- *	further.  Beginning of file and end of file are the obvious
- *	cases, but we may want to add further optional boundary restrictions
- *	in future, a' la VMS EDT.  At the moment, just return TRUE or
- *	FALSE depending on if a boundary is hit (ouch).
- */
-int	
-boundry(curline, curoff)
-LINE	*curline;
-int	curoff;
+boundry(d)
+MARK d;
 {
-	return (curline == boundline) && (curoff == boundoff);
+	return samepoint(d,boundpos);
 }
 
-setboundry(wrapok,lp,off,dir)
-LINE *lp;
+setboundry(wrapok,dot,dir)
+MARK dot;
 {
 	if (wrapok) {
-		(void)nextch(&lp,&off,dir,TRUE);
-		boundline = lp;
-		boundoff = off;
+		(void)nextch(&dot,dir);
+		boundpos = dot;
 	} else {
-		boundline = curbp->b_linep;
-		boundoff = 0;
+		boundpos = curbp->b_line;
 	}
 }
 
@@ -1191,9 +1159,8 @@ LINE *lp;
  *	the current character and move, reverse searches move and
  *	look at the character.
  */
-nextch(pcurline, pcuroff, dir, wrapok)
-LINE	**pcurline;
-int	*pcuroff;
+nextch(pdot, dir)
+MARK	*pdot;
 int	dir;
 {
 	register LINE	*curline;
@@ -1203,34 +1170,42 @@ int	dir;
 	/* dummy up a -1, which will never match anything, as the only
 		character on the header line */
 	
-	curline = *pcurline;
-	curoff = *pcuroff;
+	curline = pdot->l;
+	curoff = pdot->o;
 	if (dir == FORWARD) {
-		if (curoff == ((curline == curbp->b_linep)?1:llength(curline)))
+		if (curoff == ((curline == curbp->b_line.l)?
+						1 : llength(curline)))
 		{	/* if at EOL */
 			curline = lforw(curline);	/* skip to next line */
 			curoff = 0;
 			c = '\n';			/* and return a <NL> */
 		} else {
-			c = lgetc(curline, curoff++);	/* get the char */
-			if (curline == curbp->b_linep)
+			if (curline == curbp->b_line.l) {
 				c = -1;
+				curoff++;
+			} else {
+				c = lgetc(curline, curoff++);	/* get the char */
+			}
 		}
-	} else	 {		/* Reverse.*/
+	} else {		/* Reverse.*/
 		if (curoff == 0) {
 			curline = lback(curline);
-			curoff = (curline == curbp->b_linep)?1:llength(curline);
+			curoff = (curline == curbp->b_line.l)?
+							1 : llength(curline);
 			c = '\n';
 		} else {
-			c = lgetc(curline, --curoff);
-			if (curline == curbp->b_linep)
+			if (curline == curbp->b_line.l) {
 				c = -1;
+				--curoff;
+			} else {
+				c = lgetc(curline, --curoff);
+			}
 		}
 	}
-	*pcurline = curline;
-	*pcuroff = curoff;
+	pdot->l = curline;
+	pdot->o = curoff;
 
-	return (c);
+	return c;
 }
 
 #if	MAGIC
@@ -1413,7 +1388,7 @@ MC	*mt;
 		case CCL:
 			if (!(result = biteq(bc, mt->u.cclmap)))
 			{
-				if ((curwp->w_bufp->b_mode & MDEXACT) == 0 &&
+				if (!b_val(curwp->w_bufp, MDEXACT) &&
 				    isalpha(bc))
 				{
 					result = biteq(CHCASE(bc),mt->u.cclmap);
@@ -1428,7 +1403,7 @@ MC	*mt;
 			} else {
 				result = !biteq(bc, mt->u.cclmap);
 
-				if ((curwp->w_bufp->b_mode & MDEXACT) == 0 &&
+				if (!b_val(curwp->w_bufp, MDEXACT) &&
 					    isalpha(bc))
 				{
 					result &= !biteq(CHCASE(bc),

@@ -3,6 +3,18 @@
  * compatible terminals. It goes directly to the graphics RAM to do
  * screen output. It compiles into nothing if not an IBM-PC driver
  * Supported monitor cards include CGA, MONO and EGA.
+ *
+ * $Log: ibmpc.c,v $
+ * Revision 1.3  1991/08/07 12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.2
+ * date: 1990/10/01 12:24:47;
+ * changed newsize to newscreensize
+ * 
+ * revision 1.1
+ * date: 1990/09/21 10:25:27;
+ * initial vile RCS revision
  */
 
 #define	termdef	1			/* don't define "term" external */

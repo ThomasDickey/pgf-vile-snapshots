@@ -9,6 +9,44 @@
  * Since all the code acts on the current window, the buffer that we are
  * editing must be being displayed, which means that "b_nwnd" is non zero,
  * which means that the dot and mark values in the buffer headers are nonsense.
+ *
+ * $Log: line.c,v $
+ * Revision 1.9  1991/08/07 12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.8
+ * date: 1991/08/06 15:22:27;
+ * allow null l_text pointers for empty lines
+ * 
+ * revision 1.7
+ * date: 1991/07/19 17:14:49;
+ * fixed missing "copy_for_undo" bug introduced a while ago
+ * 
+ * revision 1.6
+ * date: 1991/06/25 19:52:54;
+ * massive data structure restructure
+ * 
+ * revision 1.5
+ * date: 1991/06/16 17:35:32;
+ * fixed bug -- wasn't assigning new size to line struct when re-allocing
+ * for a line merge
+ * 
+ * revision 1.4
+ * date: 1991/06/03 10:24:26;
+ * took out old #ifdef INLINE stuff, and
+ * added comments for usekreg
+ * 
+ * revision 1.3
+ * date: 1991/05/31 11:11:16;
+ * change args to execute()
+ * 
+ * revision 1.2
+ * date: 1991/04/04 09:28:37;
+ * line text is now separate from LINE struct
+ * 
+ * revision 1.1
+ * date: 1990/09/21 10:25:32;
+ * initial vile RCS revision
  */
 
 #include	<stdio.h>
@@ -34,15 +72,13 @@ register int	used;
 		size = 0;
 	} else {
 		size = roundup(used);
-		if (size == 0)			/* Assume that an empty */
-			size = NBLOCK;		/* line is for type-in. */
 	}
-	/* malloc 4 less, because struct LINE is 4 too big */
 	if ((lp = (LINE *) malloc(sizeof(LINE))) == NULL) {
 		mlwrite("[OUT OF MEMORY]");
 		return NULL;
 	}
-	if ((lp->l_text = malloc(size)) == NULL) {
+	lp->l_text = NULL;
+	if (size && (lp->l_text = malloc(size)) == NULL) {
 		mlwrite("[OUT OF MEMORY]");
 		free((char *)lp);
 		return NULL;
@@ -75,39 +111,49 @@ register LINE	*lp;
 {
 	register WINDOW *wp;
 
+#if !WINMARK
+	if (MK.l == lp) {
+		MK.l = lp->l_fp;
+		MK.o = 0;
+	}
+#endif
 	wp = wheadp;
 	while (wp != NULL) {
-		if (wp->w_linep == lp)
-			wp->w_linep = lp->l_fp;
-		if (wp->w_dotp	== lp) {
-			wp->w_dotp  = lp->l_fp;
-			wp->w_doto  = 0;
+		if (wp->w_line.l == lp)
+			wp->w_line.l = lp->l_fp;
+		if (wp->w_dot.l	== lp) {
+			wp->w_dot.l  = lp->l_fp;
+			wp->w_dot.o  = 0;
 		}
-		if (wp->w_mkp == lp) {
-			wp->w_mkp = lp->l_fp;
-			wp->w_mko = 0;
+#if WINMARK
+		if (wp->w_mark.l == lp) {
+			wp->w_mark.l = lp->l_fp;
+			wp->w_mark.o = 0;
 		}
+#endif
 #if 0
-		if (wp->w_ldmkp == lp) {
-			wp->w_ldmkp = lp->l_fp;
-			wp->w_ldmko = 0;
+		if (wp->w_lastdot.l == lp) {
+			wp->w_lastdot.l = lp->l_fp;
+			wp->w_lastdot.o = 0;
 		}
 #endif
 		wp = wp->w_wndp;
 	}
 	if (bp->b_nwnd == 0) {
-		if (bp->b_dotp	== lp) {
-			bp->b_dotp = lp->l_fp;
-			bp->b_doto = 0;
+		if (bp->b_dot.l	== lp) {
+			bp->b_dot.l = lp->l_fp;
+			bp->b_dot.o = 0;
 		}
-		if (bp->b_markp == lp) {
-			bp->b_markp = lp->l_fp;
-			bp->b_marko = 0;
+#if WINMARK
+		if (bp->b_mark.l == lp) {
+			bp->b_mark.l = lp->l_fp;
+			bp->b_mark.o = 0;
 		}
+#endif
 #if 0
-		if (bp->b_ldmkp == lp) {
-			bp->b_ldmkp = lp->l_fp;
-			bp->b_ldmko = 0;
+		if (bp->b_lastdot.l == lp) {
+			bp->b_lastdot.l = lp->l_fp;
+			bp->b_lastdot.o = 0;
 		}
 #endif
 	}
@@ -117,9 +163,9 @@ register LINE	*lp;
 		struct MARK *mp;
 		for (i = 0; i < 26; i++) {
 			mp = &(bp->b_nmmarks[i]);
-			if (mp->markp == lp) {
-				mp->markp = lp->l_fp;
-				mp->marko = 0;
+			if (mp->p == lp) {
+				mp->p = lp->l_fp;
+				mp->o = 0;
 			}
 		}
 	}
@@ -185,9 +231,9 @@ linsert(n, c)
 	int nsize;
 
 	lchange(WFEDIT);
-	lp1 = curwp->w_dotp;			/* Current line 	*/
-	if (lp1 == curbp->b_linep) {		/* At the end: special	*/
-		if (curwp->w_doto != 0) {
+	lp1 = curwp->w_dot.l;			/* Current line 	*/
+	if (lp1 == curbp->b_line.l) {		/* At the end: special	*/
+		if (curwp->w_dot.o != 0) {
 			mlwrite("bug: linsert");
 			return (FALSE);
 		}
@@ -203,21 +249,25 @@ linsert(n, c)
 		lp2->l_bp = lp3;
 		for (i=0; i<n; ++i)
 			lp2->l_text[i] = c;
-		curwp->w_dotp = lp2;
-		curwp->w_doto = n;
+		curwp->w_dot.l = lp2;
+		curwp->w_dot.o = n;
 		tag_for_undo(lp2);
 		return (TRUE);
 	}
-	doto = curwp->w_doto;			/* Save for later.	*/
+	doto = curwp->w_dot.o;			/* Save for later.	*/
 	if (lp1->l_used+n > lp1->l_size) {	/* Hard: reallocate	*/
 		copy_for_undo(lp1);
 		/* first, create the new image */
 		if ((ntext=malloc(nsize = roundup(lp1->l_used+n))) == NULL)
 			return (FALSE);
-		memcpy(&ntext[0],      &lp1->l_text[0],    doto);
+		if (lp1->l_text) /* possibly NULL if l_size == 0 */
+			memcpy(&ntext[0],      &lp1->l_text[0],    doto);
 		memset(&ntext[doto],   c, n);
-		memcpy(&ntext[doto+n], &lp1->l_text[doto], lp1->l_used-doto );
-		free((char *)lp1->l_text);
+		if (lp1->l_text) {
+			memcpy(&ntext[doto+n], &lp1->l_text[doto],
+							lp1->l_used-doto );
+			free((char *)lp1->l_text);
+		}
 		lp1->l_text = ntext;
 		lp1->l_size = nsize;
 		lp1->l_used += n;
@@ -232,19 +282,27 @@ linsert(n, c)
 		for (i=0; i<n; ++i)		/* Add the characters	*/
 			lp1->l_text[doto+i] = c;
 	}
+#if ! WINMARK
+	if (MK.l == lp1) {
+		if (MK.o > doto)
+			MK.o += n;
+	}
+#endif
 	wp = wheadp;				/* Update windows	*/
 	while (wp != NULL) {
-		if (wp->w_dotp == lp1) {
-			if (wp==curwp || wp->w_doto>doto)
-				wp->w_doto += n;
+		if (wp->w_dot.l == lp1) {
+			if (wp==curwp || wp->w_dot.o>doto)
+				wp->w_dot.o += n;
 		}
-		if (wp->w_mkp == lp1) {
-			if (wp->w_mko > doto)
-				wp->w_mko += n;
+#if WINMARK
+		if (wp->w_mark.l == lp1) {
+			if (wp->w_mark.o > doto)
+				wp->w_mark.o += n;
 		}
-		if (wp->w_ldmkp == lp1) {
-			if (wp->w_ldmko > doto)
-				wp->w_ldmko += n;
+#endif
+		if (wp->w_lastdot.l == lp1) {
+			if (wp->w_lastdot.o > doto)
+				wp->w_lastdot.o += n;
 		}
 		wp = wp->w_wndp;
 	}
@@ -252,9 +310,9 @@ linsert(n, c)
 		struct MARK *mp;
 		for (i = 0; i < 26; i++) {
 			mp = &(curbp->b_nmmarks[i]);
-			if (mp->markp == lp1) {
-				if (mp->marko > doto)
-					mp->marko += n;
+			if (mp->l == lp1) {
+				if (mp->o > doto)
+					mp->o += n;
 			}
 		}
 	}
@@ -279,9 +337,9 @@ lnewline()
 	register WINDOW *wp;
 
 	lchange(WFHARD|WFINS);
-	lp1  = curwp->w_dotp;			/* Get the address and	*/
-	doto = curwp->w_doto;			/* offset of "."	*/
-	if (lp1 != curbp->b_linep)
+	lp1  = curwp->w_dot.l;			/* Get the address and	*/
+	doto = curwp->w_dot.o;			/* offset of "."	*/
+	if (lp1 != curbp->b_line.l)
 		copy_for_undo(lp1);
 	if ((lp2=lalloc(doto)) == NULL) 	/* New first half line	*/
 		return (FALSE);
@@ -300,27 +358,37 @@ lnewline()
 	lp2->l_fp = lp1;
 	tag_for_undo(lp2);
 	dumpuline(lp1);
+#if ! WINMARK
+	if (MK.l == lp1) {
+		if (MK.o < doto)
+			MK.l = lp2;
+		else
+			MK.o -= doto;
+	}
+#endif
 	wp = wheadp;				/* Windows		*/
 	while (wp != NULL) {
-		if (wp->w_linep == lp1)
-			wp->w_linep = lp2;
-		if (wp->w_dotp == lp1) {
-			if (wp->w_doto < doto)
-				wp->w_dotp = lp2;
+		if (wp->w_line.l == lp1)
+			wp->w_line.l = lp2;
+		if (wp->w_dot.l == lp1) {
+			if (wp->w_dot.o < doto)
+				wp->w_dot.l = lp2;
 			else
-				wp->w_doto -= doto;
+				wp->w_dot.o -= doto;
 		}
-		if (wp->w_mkp == lp1) {
-			if (wp->w_mko < doto)
-				wp->w_mkp = lp2;
+#if WINMARK
+		if (wp->w_mark.l == lp1) {
+			if (wp->w_mark.o < doto)
+				wp->w_mark.l = lp2;
 			else
-				wp->w_mko -= doto;
+				wp->w_mark.o -= doto;
 		}
-		if (wp->w_ldmkp == lp1) {
-			if (wp->w_ldmko < doto)
-				wp->w_ldmkp = lp2;
+#endif
+		if (wp->w_lastdot.l == lp1) {
+			if (wp->w_lastdot.o < doto)
+				wp->w_lastdot.l = lp2;
 			else
-				wp->w_ldmko -= doto;
+				wp->w_lastdot.o -= doto;
 		}
 		wp = wp->w_wndp;
 	}
@@ -329,11 +397,11 @@ lnewline()
 		struct MARK *mp;
 		for (i = 0; i < 26; i++) {
 			mp = &(curbp->b_nmmarks[i]);
-			if (mp->markp == lp1) {
-				if (mp->marko < doto)
-					mp->markp = lp2;
+			if (mp->l == lp1) {
+				if (mp->o < doto)
+					mp->l = lp2;
 				else
-					mp->marko -= doto;
+					mp->o -= doto;
 			}
 		}
 	}
@@ -360,9 +428,9 @@ int kflag;	/* put killed text in kill buffer flag */
 	register int i,s;
 
 	while (n != 0) {
-		dotp = curwp->w_dotp;
-		doto = curwp->w_doto;
-		if (dotp == curbp->b_linep)	/* Hit end of buffer.	*/
+		dotp = DOT.l;
+		doto = DOT.o;
+		if (dotp == curbp->b_line.l)	/* Hit end of buffer.	*/
 			return (FALSE);
 		chunk = dotp->l_used-doto;	/* Size of chunk.	*/
 		if (chunk > (int)n)
@@ -371,7 +439,7 @@ int kflag;	/* put killed text in kill buffer flag */
 			lchange(WFHARD|WFKILLS);
 			/* first take out any whole lines below this one */
 			nlp = lforw(dotp);
-			while (nlp != curbp->b_linep && llength(nlp)+1 < n) {
+			while (nlp != curbp->b_line.l && llength(nlp)+1 < n) {
 				if (kflag) {
 					s = kinsert('\n');
 					for (i = 0; i < llength(nlp) && 
@@ -407,22 +475,31 @@ int kflag;	/* put killed text in kill buffer flag */
 		while (cp2 != &dotp->l_text[dotp->l_used])
 			*cp1++ = *cp2++;
 		dotp->l_used -= chunk;
+#if ! WINMARK
+		if (MK.l && MK.o > doto) {
+			MK.o -= chunk;
+			if (MK.o < doto)
+				MK.o = doto;
+		}
+#endif
 		wp = wheadp;			/* Fix windows		*/
 		while (wp != NULL) {
-			if (wp->w_dotp==dotp && wp->w_doto > doto) {
-				wp->w_doto -= chunk;
-				if (wp->w_doto < doto)
-					wp->w_doto = doto;
+			if (wp->w_dot.l==dotp && wp->w_dot.o > doto) {
+				wp->w_dot.o -= chunk;
+				if (wp->w_dot.o < doto)
+					wp->w_dot.o = doto;
 			}
-			if (wp->w_mkp==dotp && wp->w_mko > doto) {
-				wp->w_mko -= chunk;
-				if (wp->w_mko < doto)
-					wp->w_mko = doto;
+#if WINMARK
+			if (wp->w_mark.l==dotp && wp->w_mark.o > doto) {
+				wp->w_mark.o -= chunk;
+				if (wp->w_mark.o < doto)
+					wp->w_mark.o = doto;
 			}
-			if (wp->w_ldmkp==dotp && wp->w_ldmko > doto) {
-				wp->w_ldmko -= chunk;
-				if (wp->w_ldmko < doto)
-					wp->w_ldmko = doto;
+#endif
+			if (wp->w_lastdot.l==dotp && wp->w_lastdot.o > doto) {
+				wp->w_lastdot.o -= chunk;
+				if (wp->w_lastdot.o < doto)
+					wp->w_lastdot.o = doto;
 			}
 			wp = wp->w_wndp;
 		}
@@ -430,10 +507,10 @@ int kflag;	/* put killed text in kill buffer flag */
 			struct MARK *mp;
 			for (i = 0; i < 26; i++) {
 				mp = &(curbp->b_nmmarks[i]);
-				if (mp->markp==dotp && mp->marko > doto) {
-					mp->marko -= chunk;
-					if (mp->marko < doto)
-						mp->marko = doto;
+				if (mp->l==dotp && mp->o > doto) {
+					mp->o -= chunk;
+					if (mp->o < doto)
+						mp->o = doto;
 				}
 			}
 		}
@@ -453,10 +530,10 @@ char *getctext()
 	register int size;	/* length of line to return */
 	register char *sp;	/* string pointer into line */
 	register char *dp;	/* string pointer into returned line */
-	char rline[NSTRING];	/* line to return */
+	static char rline[NSTRING];	/* line to return */
 
 	/* find the contents of the current line and its length */
-	lp = curwp->w_dotp;
+	lp = curwp->w_dot.l;
 	sp = lp->l_text;
 	size = lp->l_used;
 	if (size >= NSTRING)
@@ -479,7 +556,7 @@ char *iline;	/* contents of new line */
 	register int status;
 
 	/* delete the current line */
-	curwp->w_doto = 0;	/* starting at the beginning of the line */
+	curwp->w_dot.o = 0;	/* starting at the beginning of the line */
 	if ((status = deltoeol(TRUE, 1)) != TRUE)
 		return(status);
 
@@ -518,7 +595,7 @@ ldelnewline()
 	register LINE	*lp3;
 	register WINDOW *wp;
 
-	lp1 = curwp->w_dotp;
+	lp1 = curwp->w_dot.l;
 	/* if the current line is empty, remove it */
 	if (lp1->l_used == 0) {		/* Blank line.		*/
 		lremove(curbp,lp1);
@@ -529,7 +606,7 @@ ldelnewline()
 	/* if the next line is empty, that's "currline\n\n", so we
 		remove the second \n by deleting the next line */
 	/* but never delete the newline on the last non-empty line */
-	if (lp2 == curbp->b_linep)
+	if (lp2 == curbp->b_line.l)
 		return (TRUE);
 	else if (lp2->l_used == 0) {
 		/* next line blank? */
@@ -537,39 +614,50 @@ ldelnewline()
 		toss_to_undo(lp2);
 		return (TRUE);
 	}
+	copy_for_undo(lp1);
 	/* no room in line above, make room */
 	if (lp2->l_used > lp1->l_size-lp1->l_used) {
 		char *ntext;
 		int nsize;
-		copy_for_undo(lp1);
 		/* first, create the new image */
 		if ((ntext=malloc(nsize = roundup(lp1->l_used + lp2->l_used)))
 								 == NULL)
 			return (FALSE);
-		memcpy(&ntext[0],      &lp1->l_text[0],    lp1->l_used);
-		free((char *)lp1->l_text);
+		if (lp1->l_text) { /* possibly NULL if l_size == 0 */
+			memcpy(&ntext[0], &lp1->l_text[0], lp1->l_used);
+			free((char *)lp1->l_text);
+		}
 		lp1->l_text = ntext;
+		lp1->l_size = nsize;
 	}
 	cp1 = &lp1->l_text[lp1->l_used];
 	cp2 = &lp2->l_text[0];
 	while (cp2 != &lp2->l_text[lp2->l_used])
 		*cp1++ = *cp2++;
+#if ! WINMARK
+	if (MK.l == lp2) {
+		MK.l  = lp1;
+		MK.o += lp1->l_used;
+	}
+#endif
 	/* check all windows for references to the deleted line */
 	wp = wheadp;
 	while (wp != NULL) {
-		if (wp->w_linep == lp2)
-			wp->w_linep = lp1;
-		if (wp->w_dotp == lp2) {
-			wp->w_dotp  = lp1;
-			wp->w_doto += lp1->l_used;
+		if (wp->w_line.l == lp2)
+			wp->w_line.l = lp1;
+		if (wp->w_dot.l == lp2) {
+			wp->w_dot.l  = lp1;
+			wp->w_dot.o += lp1->l_used;
 		}
-		if (wp->w_mkp == lp2) {
-			wp->w_mkp  = lp1;
-			wp->w_mko += lp1->l_used;
+#if WINMARK
+		if (wp->w_mark.l == lp2) {
+			wp->w_mark.l  = lp1;
+			wp->w_mark.o += lp1->l_used;
 		}
-		if (wp->w_ldmkp == lp2) {
-			wp->w_ldmkp  = lp1;
-			wp->w_ldmko += lp1->l_used;
+#endif
+		if (wp->w_lastdot.l == lp2) {
+			wp->w_lastdot.l  = lp1;
+			wp->w_lastdot.o += lp1->l_used;
 		}
 		wp = wp->w_wndp;
 	}
@@ -578,9 +666,9 @@ ldelnewline()
 		struct MARK *mp;
 		for (i = 0; i < 26; i++) {
 			mp = &(curbp->b_nmmarks[i]);
-			if (mp->markp == lp2) {
-				mp->markp  = lp1;
-				mp->marko += lp1->l_used;
+			if (mp->l == lp2) {
+				mp->l  = lp1;
+				mp->o += lp1->l_used;
 			}
 		}
 	}
@@ -780,19 +868,19 @@ doput(f,n,after,putlines)
 	}
 	lining = (putlines == TRUE || (kbs[ukb].kbflag & KLINES));
 	if (lining) {
-		if (after && curwp->w_dotp != curbp->b_linep)
-			curwp->w_dotp = lforw(curwp->w_dotp);
-		curwp->w_doto = 0;
+		if (after && !is_header_line(curwp->w_dot, curbp))
+			curwp->w_dot.l = lforw(curwp->w_dot.l);
+		curwp->w_dot.o = 0;
 	} else {
-		if (after && curwp->w_doto != llength(curwp->w_dotp))
+		if (after && !is_at_end_of_line(curwp->w_dot))
 			forwchar(TRUE,1);
 	}
 	setmark();
 	s = put(n,lining);
 	if (s == TRUE)
 		swapmark();
-	if (curwp->w_dotp == curbp->b_linep)
-		curwp->w_dotp = lback(curwp->w_dotp);
+	if (is_header_line(curwp->w_dot, curbp))
+		curwp->w_dot.l = lback(curwp->w_dot.l);
 	if (lining)
 		firstnonwhite(FALSE,0);
 	ukb = 0;
@@ -835,7 +923,7 @@ put(n,aslines)
 						return FALSE;
 					wasnl = TRUE;
 				} else {
-					if (curwp->w_dotp == curbp->b_linep)
+					if (is_header_line(curwp->w_dot,curbp))
 						suppressnl = TRUE;
 					if (linsert(1, c) != TRUE)
 						return FALSE;

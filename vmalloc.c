@@ -2,8 +2,18 @@
 #include "edef.h"
 
 /* these routines copied without permission from "The C User's Journal",
-	issue of Feb. 1989.  I assume they are Copyright 1989 by them.
-	They and the accompanying article were written by Eric White */
+ *	issue of Feb. 1989.  I assume they are Copyright 1989 by them.
+ *	They and the accompanying article were written by Eric White.
+ *	(pgf, 1989)
+ *
+ * $Log: vmalloc.c,v $
+ * Revision 1.2  1991/08/07 12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.1
+ * date: 1990/09/21 10:26:17;
+ * initial vile RCS revision
+ */
 
 #if VMALLOC
 

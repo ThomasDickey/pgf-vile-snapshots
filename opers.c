@@ -2,6 +2,56 @@
  * This file contains the command processing functions for the commands
  * that take motion operators.
  * written for vile by Paul Fox, (c)1990
+ *
+ * $Log: opers.c,v $
+ * Revision 1.12  1991/08/13 02:50:52  pgf
+ * fixed chgreg case of butting against top of buffer
+ *
+ * Revision 1.11  1991/08/07  12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.10
+ * date: 1991/07/19 17:23:06;
+ * added status return to chgreg()
+ * 
+ * revision 1.9
+ * date: 1991/07/19 17:16:41;
+ * fix null pointer de-ref
+ * 
+ * revision 1.8
+ * date: 1991/06/25 19:53:04;
+ * massive data structure restructure
+ * 
+ * revision 1.7
+ * date: 1991/06/16 17:36:47;
+ * added entab, detab, and trim operator routines
+ * 
+ * revision 1.6
+ * date: 1991/06/15 09:11:23;
+ * hardened chgreg[ion] against motions that don't succeed, leaving
+ * the mark unset, so swapmark fails
+ * 
+ * revision 1.5
+ * date: 1991/06/03 10:26:34;
+ * cleanup, and
+ * pulled some code out of execute() into here
+ * 
+ * revision 1.4
+ * date: 1991/05/31 11:38:43;
+ * syntax error from bad merge
+ * 
+ * revision 1.3
+ * date: 1991/05/31 11:17:31;
+ * lot of cleanup, some new operators -- now use godotplus() instead of
+ * stutterfunc().  much better
+ * 
+ * revision 1.2
+ * date: 1991/04/04 09:39:56;
+ * added operfilter (!) command
+ * 
+ * revision 1.1
+ * date: 1990/09/21 10:25:52;
+ * initial vile RCS revision
  */
 
 #include	"estruct.h"
@@ -24,13 +74,11 @@ char *str;
 	int status;
 	CMDFUNC *cfp;			/* function to execute */
 	char tok[NSTRING];		/* command incoming */
-	LINE *ourmarkp;
-	int ourmarko;
+	MARK ourmark;
 
 	doingopcmd = TRUE;
 
-        ourmarkp = curwp->w_dotp;
-        ourmarko = curwp->w_doto;
+	ourmark = DOT;
 
 	if (havemotion != NULL) {
 		cfp = havemotion;
@@ -65,6 +113,8 @@ char *str;
 		}
 		mlerase();
 	}
+	if (!cfp)
+		return FALSE;
 
 	if ((cfp->c_flags & MOTION) == 0) {
 		TTbeep();
@@ -79,17 +129,15 @@ char *str;
 	status = execute(cfp, f, n);
 
 	if (status != TRUE || 
-	   ( (ourmarkp == curwp->w_dotp && ourmarko == curwp->w_doto) &&
-			fulllineregions == FALSE) ) {
+	   ( samepoint(ourmark, DOT) && fulllineregions == FALSE) ) {
 		doingopcmd = FALSE;
 		fulllineregions = FALSE;
-		return status;
+		return FALSE;
 	}
 
 	opcmd = 0;
 
-	curwp->w_mkp = ourmarkp;
-	curwp->w_mko = ourmarko;
+	MK = ourmark;
 
 	/* we've successfully set up a region */
 	if (!fn) { /* be defensive */
@@ -131,11 +179,12 @@ chgreg(f,n)
 {
 	killregion(f,n);
 	if (fulllineregions) {
-		backline(FALSE,1);
-		opendown(TRUE,1);
-	} else {
-		insert(f,n);
+		if (backline(FALSE,1) == TRUE) /* returns FALSE at top of buffer */
+			return opendown(TRUE,1);
+		else
+			return openup(TRUE,1);
 	}
+	return insert(f,n);
 }
 
 operchg(f,n)
@@ -144,7 +193,7 @@ operchg(f,n)
 
 	opcmd = OPOTHER;
 	s = operator(f,n,chgreg,"Change");
-	swapmark();
+	if (s == TRUE) swapmark();
 	return s;
 }
 
@@ -155,7 +204,7 @@ operlinechg(f,n)
 	fulllineregions = TRUE;
 	opcmd = OPOTHER;
 	s = operator(f,n,chgreg,"Change of full lines");
-	swapmark();
+	if (s == TRUE) swapmark();
 	return s;
 }
 
@@ -278,4 +327,31 @@ opersubst(f,n)
 	fulllineregions = TRUE;
 	opcmd = OPOTHER;
 	return operator(f,n,substregion,"Substitute");
+}
+
+operentab(f,n)
+{
+	extern int entab_region();
+
+	fulllineregions = TRUE;
+	opcmd = OPOTHER;
+	return operator(f,n,entab_region,"Spaces-->Tabs");
+}
+
+operdetab(f,n)
+{
+	extern int detab_region();
+
+	fulllineregions = TRUE;
+	opcmd = OPOTHER;
+	return operator(f,n,detab_region,"Tabs-->Spaces");
+}
+
+opertrim(f,n)
+{
+	extern int trim_region();
+
+	fulllineregions = TRUE;
+	opcmd = OPOTHER;
+	return operator(f,n,trim_region,"Trim whitespace");
 }

@@ -6,6 +6,66 @@
 			greatly modified by Daniel Lawrence
 */
 
+/*
+ * $Log: edef.h,v $
+ * Revision 1.14  1991/08/13 02:47:23  pgf
+ * alphabetized VAL_XXX's, and added "showmatch"
+ *
+ * Revision 1.13  1991/08/07  11:51:32  pgf
+ * added RCS log entries
+ *
+ * revision 1.12
+ * date: 1991/08/06 15:08:00;
+ * global/local values
+ * ----------------------------
+ * revision 1.11
+ * date: 1991/06/25 19:51:57;
+ * massive data structure restructure
+ * ----------------------------
+ * revision 1.10
+ * date: 1991/06/16 17:32:01;
+ * added ctabstop, switched over to "values" array (global and local) to
+ * hold things like tabstops and fillcol
+ * ----------------------------
+ * revision 1.9
+ * date: 1991/06/06 13:58:06;
+ * added auto-indent mode
+ * ----------------------------
+ * revision 1.8
+ * date: 1991/06/03 18:07:34;
+ * changed version number
+ * to version three
+ * ----------------------------
+ * revision 1.7
+ * date: 1991/06/03 17:34:49;
+ * switch from "meta" etc. to "ctla" etc.
+ * ----------------------------
+ * revision 1.6
+ * date: 1991/06/03 10:36:32;
+ * added exmode flag
+ * ----------------------------
+ * revision 1.5
+ * date: 1991/05/31 10:36:44;
+ * bumped version no. to 2.3, and
+ * changed plinesdone flag to more generic "calledbefore"
+ * ----------------------------
+ * revision 1.4
+ * date: 1991/02/21 10:02:45;
+ * don't need lbound for display anymore
+ * ----------------------------
+ * revision 1.3
+ * date: 1990/10/03 16:04:07;
+ * up'ed version number to 2.2
+ * ----------------------------
+ * revision 1.2
+ * date: 1990/10/03 16:00:47;
+ * make backspace work for everyone
+ * ----------------------------
+ * revision 1.1
+ * date: 1990/09/21 10:25:05;
+ * initial vile RCS revision
+ */
+
 /* some global function declarations */
 
 char *flook();
@@ -50,12 +110,8 @@ LINE    *lalloc();              /* Allocate a line              */
 #endif
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version three");
+decl_init( char version[], "version three X");
 
-decl_init( int tabval, 8);		/* which column tabs are on,
-						 always power of two */
-decl_init( int tabmask, 7);		/* one less than above. I know it's
-						wasteful */
 decl_init( int autoindented , -1);	/* how many chars (not cols) indented */
 decl_uninit( int isnamedcmd );		/* are we typing a command name */
 decl_uninit( int calledbefore );	/* called before during this command? */
@@ -71,7 +127,6 @@ decl_uninit( short doingopcmd );        /* operator command in progress */
 decl_uninit( short opcmd );             /* what sort of operator?	*/
 decl_uninit( CMDFUNC *havemotion );	/* so we can use "oper" routines
 					   internally */
-decl_uninit( int fillcol );             /* Fill column                  */
 decl_uninit( short kbdm[NKBDM] );	/* Macro                        */
 decl_uninit( short dotcmdm[NKBDM] );	/* dot commands			*/
 decl_uninit( short tmpcmdm[NKBDM] );	/* dot commands, 'til we're sure */
@@ -92,14 +147,13 @@ decl_uninit( char rpat[NPAT] );		/* replacement pattern		*/
  * string - used by the replace functions.
  * The variable patmatch holds the string that satisfies
  * the search command.
- * The variables matchline and matchoff hold the line and
+ * The mark matchpos holds the line and
  * offset position of the start of match.
  */
 decl_uninit( int matchlen );
 decl_uninit( int mlenold );
 decl_uninit( char *patmatch );
-decl_uninit( LINE *matchline );
-decl_uninit( int matchoff );
+decl_uninit( MARK matchpos );
 
 #if	MAGIC
 /*
@@ -140,8 +194,6 @@ decl_uninit( char outline[NSTRING] );
 decl_uninit( int inhibit_update );	/* prevents output to terminal */
 #endif
 
-/* initialized global definitions */
-
 decl_init( int curgoal, -1 );           /* column goal			*/
 decl_uninit( char *execstr );		/* pointer to string to execute	*/
 decl_uninit( char golabel[NPAT] );	/* current line to go to	*/
@@ -149,6 +201,12 @@ decl_uninit( int execlevel );		/* execution IF level		*/
 decl_init( int	eolexist, TRUE );	/* does clear to EOL exist	*/
 decl_uninit( int revexist );		/* does reverse video exist?	*/
 decl_uninit( int flickcode );		/* do flicker supression?	*/
+decl_uninit( int curtabstopval );	/* current tab width		*/
+
+decl_init( MARK nullmark, { NULL comma 0 } );
+#if ! WINMARK
+decl_uninit( MARK Mark );		/* the worker mark */
+#endif
 
 /* THE FOLLOWING MODE NAME TABLES MUST CORRESPOND EXACTLY WITH THE #DEFINES
 	IN ESTRUCT.H */
@@ -158,30 +216,59 @@ decl_init( char	*othermodes[] , {
 
 decl_init( int othmode, 0);   /* "other" global modes	*/
 
-decl_init( char	*valuemodes[] , {
-	"tabstop" comma
-	"fillcol" } );
+#if TRIED
+decl_init( B_VALUES global_b_values , {
+	{
+		FALSE	comma	/* wrap */
+		FALSE	comma	/* C mode */
+		TRUE	comma	/* scan wrap */
+		TRUE	comma	/* exact matches */
+		FALSE	comma	/* view-only */
+		TRUE	comma	/* magic searches */
+		FALSE	comma	/* crypt */
+		FALSE	comma	/* auto-save */
+		FALSE	comma	/* list-mode */
+		FALSE	comma	/* dos mode */
+		FALSE	comma	/* auto-indent */
+		8	comma	/* tabstop */
+		8	comma	/* C code tabstop */
+		70	comma	/* fill column */
+		256	comma	/* autosave count */
+		NULL	comma	/* current directory */
+		NULL	comma	/* C code suffixes */
+	} comma { NULL }	/* leave all the pointers unset */
+	);
+#else
+decl_uninit( B_VALUES global_b_values );
+#endif
+decl_init( struct {
+		char *name;
+		short type;
+} valuenames[] , {
+	{ "aindent"	comma VALTYPE_BOOL } comma
+	{ "asave"	comma VALTYPE_BOOL } comma
+	{ "cmode"	comma VALTYPE_BOOL } comma
+	{ "crypt"	comma VALTYPE_BOOL } comma
+	{ "dos"		comma VALTYPE_BOOL } comma
+	{ "exact"	comma VALTYPE_BOOL } comma
+	{ "list"	comma VALTYPE_BOOL } comma
+	{ "magic"	comma VALTYPE_BOOL } comma
+	{ "showmatch"	comma VALTYPE_BOOL } comma
+	{ "swrap"	comma VALTYPE_BOOL } comma
+	{ "view"	comma VALTYPE_BOOL } comma
+	{ "wrap"	comma VALTYPE_BOOL } comma
 
-decl_init( char	*modename[] , {		/* names of modes		*/
-	"wrap" comma
-	"cmode" comma
-	"swrap" comma
-	"exact" comma
-	"view" comma
-	"magic" comma
-	"crypt" comma
-	"asave" comma
-	"list" comma
-	"dos" comma
-	"aindent" } );
+	{ "autosave"	comma VALTYPE_INT } comma
+	{ "c-tabstop"	comma VALTYPE_INT } comma
+	{ "fillcol"	comma VALTYPE_INT } comma
+	{ "tabstop"	comma VALTYPE_INT } comma
+
+	{ "c-suffixes"	comma VALTYPE_STRING } comma
+	{ "cwd"		comma VALTYPE_STRING } comma
+}  );
 
 decl_init( char	modecode[], "wcsevmyaldi" );/* letters to represent modes */
 
-decl_init( int gmode, MDSWRAP|MDEXACT|MDMAGIC );/* global editor mode	*/
-
-decl_init( int gfcolor, 7 );		/* global forgrnd color (white)	*/
-decl_uninit( int gbcolor );		/* global backgrnd color (black)*/
-decl_init( int gasave, 256 );		/* global ASAVE size		*/
 decl_init( int gacount, 256 );		/* count until next ASAVE	*/
 decl_init( int sgarbf, TRUE );          /* TRUE if screen is garbage	*/
 decl_uninit( int mpresf );              /* TRUE if message in last line */
@@ -213,6 +300,24 @@ decl_init( char	*cname[], {		/* names of colors		*/
 decl_init( char	*cname[], {		/* names of colors		*/
 	"BLACK" comma "RED" comma "GREEN" comma "YELLOW" comma "BLUE" comma
 	"MAGENTA" comma "CYAN" comma "WHITE"} );
+#endif
+
+/*  window modes */
+/*  sideways offset */
+/* foregound color (white) */
+/* background color (black) */
+#if ! COLOR
+decl_init( W_VALS global_w_values, {
+	0 comma
+	0 comma
+} );
+#else
+decl_init( W_VALS global_w_values, {
+	0 comma
+	0 comma
+	7 comma
+	0 comma
+} );
 #endif
 
 decl_uninit( int exmode );
@@ -258,5 +363,8 @@ extern KBIND kbindtbl[];
 #ifndef	termdef
 extern  TERM    term;                   /* Terminal information.        */
 #endif
+
+/* per-character output function called by dofmt() */
+decl_uninit( int (*dfoutfn)() );
 
 

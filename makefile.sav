@@ -12,7 +12,7 @@
 #
 # original makefile for uemacs:	Adam Fritz	July 30,1987
 #
-# $Log: makefile,v $
+# $Log: makefile.sav,v $
 # Revision 1.17  1991/08/10 01:24:28  pgf
 # added update target, and
 # removed the BUILTHDRS list

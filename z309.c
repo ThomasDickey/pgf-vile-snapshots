@@ -2,6 +2,14 @@
  * The routines in this file provide support for the Zenith Z-100 PC
  * family.  It goes directly to the graphics RAM to do screen output. 
  * It compiles into nothing if not a Zenith driver.
+ *
+ * $Log: z309.c,v $
+ * Revision 1.2  1991/08/07 12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.1
+ * date: 1990/09/21 10:26:29;
+ * initial vile RCS revision
  */
 
 #define	termdef	1			/* don't define "term" external */

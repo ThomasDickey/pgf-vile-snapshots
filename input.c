@@ -1,6 +1,60 @@
 /*	INPUT:	Various input routines for MicroEMACS
-		written by Daniel Lawrence
-		5/9/86						*/
+ *		written by Daniel Lawrence
+ *		5/9/86
+ *
+ * $Log: input.c,v $
+ * Revision 1.13  1991/08/12 15:06:21  pgf
+ * added ANSI_SPEC capability -- can now use the arrow keys from
+ * command or insert mode
+ *
+ * Revision 1.12  1991/08/12  10:24:16  pgf
+ * interrupts can now interrupt keyboard recording
+ *
+ * Revision 1.11  1991/08/07  12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.10
+ * date: 1991/06/26 09:37:37;
+ * removed ifdef BEFORE
+ * 
+ * revision 1.9
+ * date: 1991/06/25 19:52:47;
+ * massive data structure restructure
+ * 
+ * revision 1.8
+ * date: 1991/06/04 09:20:31;
+ * kcod2key is now a macro
+ * 
+ * revision 1.7
+ * date: 1991/06/03 17:34:53;
+ * switch from "meta" etc. to "ctla" etc.
+ * 
+ * revision 1.6
+ * date: 1991/06/03 10:22:14;
+ * took out some old ifdefs, and
+ * fixed "can't escape a slash w/ a backslash" bug in searching
+ * 
+ * revision 1.5
+ * date: 1991/02/19 18:05:36;
+ * took out extraneous check
+ * 
+ * revision 1.4
+ * date: 1990/12/03 12:02:16;
+ * change 'word-under-cursor' expansion char to ':'
+ * 
+ * revision 1.3
+ * date: 1990/11/07 14:28:41;
+ * added '+' expansion character, to expand to the path-style string under the
+ * cursor
+ * 
+ * revision 1.2
+ * date: 1990/10/03 16:00:52;
+ * make backspace work for everyone
+ * 
+ * revision 1.1
+ * date: 1990/09/21 10:25:28;
+ * initial vile RCS revision
+*/
 
 #include	<stdio.h>
 #include	"estruct.h"
@@ -130,6 +184,11 @@ tgetc()
 	} else if (kbdmode == PLAY) {
 	/* if we are playing a keyboard macro back, */
 
+		if (interrupted) {
+			kbdmode = STOP;
+			return (kcod2key(abortc));
+		}
+
 		/* if there is some left... */
 		if (kbdptr < kbdend)
 			return((int)*kbdptr++);
@@ -188,7 +247,6 @@ tgetc()
 	}
 
 	/* and finally give the char back */
-	/* record it for $lastkey */
 	return(lastkey = c);
 }
 
@@ -197,15 +255,62 @@ tgetc()
 kbd_key()
 {
 	int    c;
+#ifdef ANSI_SPEC
+	static insert_mode_was;
+#endif
 
 	/* get a keystroke */
         c = tgetc();
 
+#ifdef ANSI_SPEC
+	if (insert_mode_was && last1key == -abortc) {
+		/* then we just read the command we pushed before */
+		int f_insert();
+		static back_to_ins_char = -1;
+		if (back_to_ins_char == -1) /* try to initialize it.. */
+			back_to_ins_char = fnc2key(f_insert);
+		if (back_to_ins_char == -1) /* ... but couldn't */
+			mlwrite("Can't re-enter insert mode");
+		else
+			tungetc(back_to_ins_char);
+		insertmode = insert_mode_was;
+		insert_mode_was = FALSE;
+	}
+
+	if (c == tocntrl('[')) {
+		if (abortc != tocntrl('[')) {
+		        c = tgetc();
+			if (c == '[') {
+			        c = tgetc();
+				return(last1key = SPEC | c);
+			}
+			return(last1key = c);
+		}
+		/* else abortc must be ESC.  big surprise. */
+		/* remember whether we were insert or not */
+		if (typahead()) {
+			if ((c = tgetc()) == '[') {
+				c = tgetc();
+				if (insertmode) {
+					insert_mode_was = insertmode;
+					tungetc(SPEC | c);
+					return(last1key = -abortc);
+				} else {
+					return(last1key = SPEC | c);
+				}
+			} else {
+				tungetc(c);
+			        return (last1key = tocntrl('['));
+			}
+		}
+	}
+#endif
+
 #if	MSDOS | ST520
 	if (c == 0) {			/* Apply SPEC prefix	*/
 	        c = tgetc();
-		if (insertmode) continue;
-		return(last1key = SPEC | c);
+		if (!insertmode)
+			return(last1key = SPEC | c);
 	}
 #endif
 
@@ -217,15 +322,15 @@ kbd_key()
 
 		/* first try to see if it is a cursor key */
 		if ((c >= 'A' && c <= 'D') || c == 'S' || c == 'T') {
-			if (insertmode) continue;
-			return(last1key = SPEC | c);
+			if (!insertmode)
+				return(last1key = SPEC | c);
 		}
 
 		/* next, a 2 char sequence */
 		d = tgetc();
 		if (d == '~') {
-			if (insertmode) continue;
-			return(last1key = SPEC | c);
+			if (!insertmode)
+				return(last1key = SPEC | c);
 		}
 
 		/* decode a 3 char sequence */
@@ -233,16 +338,16 @@ kbd_key()
 		/* if a shifted function key, eat the tilde */
 		if (d >= '0' && d <= '9')
 			d = tgetc();
-		if (insertmode) continue;
-		return(last1key = SPEC | c);
+		if (!insertmode)
+			return(last1key = SPEC | c);
 	}
 #endif
 
 #if  WANGPC
 	if (c == 0x1F) {	/* Apply SPEC prefix    */
 	        c = tgetc();
-		if (insertmode) continue;
-		return(last1key = SPEC | c);
+		if (!insertmode)
+			return(last1key = SPEC | c);
 	}
 #endif
 
@@ -264,10 +369,6 @@ kbd_seq()
 	/* process CTLA prefix */
 	if (c == cntl_a) {
 		c = kbd_key();
-#if BEFORE
-	        if (islower(c))		/* Force to upper */
-        	        c = toupper(c);
-#endif
 		return (lastcmd = CTLA | c);
 	}
 
@@ -287,10 +388,9 @@ char *buf;
 	register int i = 0;
 	register int s = TRUE;
 
-	setmark();
-	while (s == TRUE && i < bufn && 
-			curwp->w_doto != llength(curwp->w_dotp)) {
-		buf[i] = lgetc(curwp->w_dotp, curwp->w_doto);
+	MK = DOT;
+	while (s == TRUE && i < bufn && !is_at_end_of_line(DOT)) {
+		buf[i] = char_at(DOT);
 		if (!istype(inclchartype, buf[i]))
 			break;
 		s = forwchar(FALSE, 1);

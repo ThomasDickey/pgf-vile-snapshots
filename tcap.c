@@ -1,5 +1,30 @@
 /*	tcap:	Unix V5, V7 and BS4.2 Termcap video driver
-		for MicroEMACS
+ *		for MicroEMACS
+ *
+ * $Log: tcap.c,v $
+ * Revision 1.6  1991/08/07 12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.5
+ * date: 1991/08/06 15:26:22;
+ * sprintf changes
+ * 
+ * revision 1.4
+ * date: 1991/06/19 01:32:21;
+ * change name of howmany 'cuz of HP/UX conflict
+ * sheesh
+ * 
+ * revision 1.3
+ * date: 1991/05/31 11:25:14;
+ * moved PRETTIER_SCROLL to esturct.h
+ * 
+ * revision 1.2
+ * date: 1990/10/01 10:37:44;
+ * un-#ifdef spal()
+ * 
+ * revision 1.1
+ * date: 1990/09/21 10:26:09;
+ * initial vile RCS revision
 */
 
 #define	termdef	1			/* don't define "term" external */
@@ -97,7 +122,7 @@ tcapopen()
 
         if ((tgetent(tcbuf, tv_stype)) != 1)
         {
-                sprintf(err_str, "Unknown terminal type %s!", tv_stype);
+                lsprintf(err_str, "Unknown terminal type %s!", tv_stype);
                 puts(err_str);
                 exit(1);
         }
@@ -221,17 +246,17 @@ tcapcres()	/* change screen resolution */
 #if SCROLLCODE
 
 /* move howmany lines starting at from to to */
-tcapscroll_reg(from,to,howmany)
+tcapscroll_reg(from,to,n)
 {
 	int i;
 	if (to == from) return;
 	if (to < from) {
-		tcapscrollregion(to, from + howmany - 1);
-		tcapmove(from + howmany - 1,0);
+		tcapscrollregion(to, from + n - 1);
+		tcapmove(from + n - 1,0);
 		for (i = from - to; i > 0; i--)
 			putpad(SF);
 	} else { /* from < to */
-		tcapscrollregion(from, to + howmany - 1);
+		tcapscrollregion(from, to + n - 1);
 		tcapmove(from,0);
 		for (i = to - from; i > 0; i--)
 			putpad(SR);
@@ -245,13 +270,13 @@ PRETTIER_SCROLL is prettier but slower -- it scrolls
 */
 
 /* move howmany lines starting at from to to */
-tcapscroll_delins(from,to,howmany)
+tcapscroll_delins(from,to,n)
 {
 	int i;
 	if (to == from) return;
 #if PRETTIER_SCROLL
 	if (abs(from-to) > 1) {
-		tcapscroll_delins(from, (from<to) ? to-1:to+1, howmany);
+		tcapscroll_delins(from, (from<to) ? to-1:to+1, n);
 		if (from < to)
 			from = to-1;
 		else
@@ -262,11 +287,11 @@ tcapscroll_delins(from,to,howmany)
 		tcapmove(to,0);
 		for (i = from - to; i > 0; i--)
 			putpad(DL);
-		tcapmove(to+howmany,0);
+		tcapmove(to+n,0);
 		for (i = from - to; i > 0; i--)
 			putpad(AL);
 	} else {
-		tcapmove(from+howmany,0);
+		tcapmove(from+n,0);
 		for (i = to - from; i > 0; i--)
 			putpad(DL);
 		tcapmove(from,0);

@@ -1,7 +1,63 @@
 /*	This file is for functions dealing with execution of
-	commands, command lines, buffers, files and startup files
-
-	written 1986 by Daniel Lawrence				*/
+ *	commands, command lines, buffers, files and startup files
+ *
+ *	written 1986 by Daniel Lawrence	
+ *
+ * $Log: exec.c,v $
+ * Revision 1.13  1991/08/07 12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.12
+ * date: 1991/08/06 15:20:45;
+ * global/local values
+ * 
+ * revision 1.11
+ * date: 1991/06/25 19:52:27;
+ * massive data structure restructure
+ * 
+ * revision 1.10
+ * date: 1991/06/20 17:22:02;
+ * changed comments -- ! is now ~ ???
+ * 
+ * revision 1.9
+ * date: 1991/06/13 15:17:46;
+ * added globbing and uniq'ifying to execfile names
+ * 
+ * revision 1.8
+ * date: 1991/06/07 13:39:06;
+ * cleanup
+ * 
+ * revision 1.7
+ * date: 1991/06/03 15:53:46;
+ * initialize fulllineregions and havemotion in dobuf()
+ * 
+ * revision 1.6
+ * date: 1991/06/03 12:17:32;
+ * ifdef'ed GLOBALS for unresolved ref
+ * 
+ * revision 1.5
+ * date: 1991/06/03 10:20:18;
+ * cleanup, and
+ * namedcmd now calls execute() directly, allowing
+ * removal of cfp arg to docmd
+ * 
+ * revision 1.4
+ * date: 1991/05/31 10:53:21;
+ * new namedcmd(), linespec(), and rangespec() routines to support
+ * line ranges on ex commands.  mostly borrowed from kirkendall's elvis
+ * 
+ * revision 1.3
+ * date: 1991/04/08 15:46:08;
+ * fixed readin() arg count
+ * 
+ * revision 1.2
+ * date: 1990/12/06 19:49:44;
+ * turn off command display during file exec
+ * 
+ * revision 1.1
+ * date: 1990/09/21 10:25:14;
+ * initial vile RCS revision
+*/
 
 #include	<stdio.h>
 #include	"estruct.h"
@@ -96,7 +152,7 @@ int f, n;
 	}
 
 	/* if range given, and it wasn't "0" and the buffer's empty */
-	if (!isdfl && !zero && (lforw(curbp->b_linep) == curbp->b_linep)) {
+	if (!isdfl && !zero && is_empty_buf(curbp)) {
 		mlwrite("[No range possible in empty buffer]", fnp);
 		return FALSE;
 	}
@@ -124,7 +180,7 @@ int f, n;
 #ifdef EXRC_FILES
 seems like we need one more check here -- is it from a .exrc file?
 	    cmd not ok in .exrc 		empty file
-	if (!(flags & EXRCOK) && (lforw(curbp->b_linep) == curbp->b_linep)) {
+	if (!(flags & EXRCOK) && is_empty_buf(curbp)) {
 		mlwrite("[Can't use the \"%s\" command in a %s file.]", 
 					cmdnames[cmdidx].name, EXRC);
 		return FALSE;
@@ -160,9 +216,9 @@ seems like we need one more check here -- is it from a .exrc file?
 
 	/* if we're not supposed to have a line no., and the line no. isn't
 		the current line, and there's more than one line */
-	if (!(flags & FROM) && fromline != curwp->w_dotp && 
-			(lforw(curbp->b_linep)  != curbp->b_linep) &&
-		  (lforw(lforw(curbp->b_linep)) != curbp->b_linep) ) {
+	if (!(flags & FROM) && fromline != curwp->w_dot.l &&
+			!is_empty_buf(curbp) &&
+		  (lforw(lforw(curbp->b_line.l)) != curbp->b_line.l) ) {
 		mlwrite("[Can't use address with \"%s\" command.]", fnp);
 		return FALSE;
 	}
@@ -170,8 +226,8 @@ seems like we need one more check here -- is it from a .exrc file?
 		isn't the same as the first line no., and there's more than
 		one line */
 	if (!(flags & TO) && toline != fromline &&
-			(lforw(curbp->b_linep) != curbp->b_linep) &&
-		  (lforw(lforw(curbp->b_linep)) != curbp->b_linep) ) {
+			!is_empty_buf(curbp) &&
+		  (lforw(lforw(curbp->b_line.l)) != curbp->b_line.l) ) {
 		mlwrite("[Can't use a range with \"%s\" command.]", fnp);
 		return FALSE;
 	}
@@ -246,16 +302,15 @@ seems like we need one more check here -- is it from a .exrc file?
 
 	if (toline || fromline) {  /* assume it's an absolute motion */
 				   /* we could probably do better */
-		curwp->w_ldmkp = curwp->w_dotp;
-		curwp->w_ldmko = curwp->w_doto;
+		curwp->w_lastdot = curwp->w_dot;
 	}
 	if (toline) {
-		curwp->w_dotp = toline;
+		curwp->w_dot.l = toline;
 		firstnonwhite();
 		setmark();
 	}
 	if (fromline) {
-		curwp->w_dotp = fromline;
+		curwp->w_dot.l = fromline;
 		firstnonwhite();
 		if (!toline)
 			setmark();
@@ -305,23 +360,23 @@ LINE		**markptr;	/* where to store the mark's value */
 		/* dot means current position */
 		if (*s == '.') {
 			s++;
-			lp = curwp->w_dotp;
+			lp = curwp->w_dot.l;
 		} else if (*s == '$') { /* '$' means the last line */
 			s++;
 			status = gotoeob(TRUE,1);
-			if (status) lp = curwp->w_dotp;
+			if (status) lp = curwp->w_dot.l;
 		} else if (isdigit(*s)) {
 			/* digit means an absolute line number */
 			for (num = 0; isdigit(*s); s++) {
 				num = num * 10 + *s - '0';
 			}
 			status = gotoline(TRUE,num);
-			if (status) lp = curwp->w_dotp;
+			if (status) lp = curwp->w_dot.l;
 		} else if (*s == '\'') {
 			/* appostrophe means go to a set mark */
 			s++;
 			status = gonmmark(*s);
-			if (status) lp = curwp->w_dotp;
+			if (status) lp = curwp->w_dot.l;
 			s++;
 		} 
 #if PATTERNS
@@ -362,7 +417,7 @@ LINE		**markptr;	/* where to store the mark's value */
 			if (num == 0)
 				num = 1;
 			forwline(TRUE, (*t == '+') ? num : -num);
-			lp = curwp->w_dotp;
+			lp = curwp->w_dot.l;
 		}
 	} while (*s == ';' || *s == '+' || *s == '-');
 
@@ -390,7 +445,7 @@ int		*zerop;
 
 	/* ignore command lines that start with a double-quote */
 	if (*specp == '"') {
-		*fromlinep = *tolinep = curwp->w_dotp;
+		*fromlinep = *tolinep = curwp->w_dot.l;
 		return TRUE;
 	}
 
@@ -401,21 +456,21 @@ int		*zerop;
 
 	/* parse the line specifier */
 	scan = specp;
-	if (lforw(curbp->b_linep) == curbp->b_linep) {
+	if (is_empty_buf(curbp)) {
 		fromline = toline = NULL;
 	} else if (*scan == '%') {
 		/* '%' means all lines */
-		fromline = lforw(curbp->b_linep);
-		toline = lback(curbp->b_linep);
+		fromline = lforw(curbp->b_line.l);
+		toline = lback(curbp->b_line.l);
 		scan++;
 	} else if (*scan == '0') {
-		fromline = toline = curbp->b_linep; /* _very_ top of buffer */
+		fromline = toline = curbp->b_line.l; /* _very_ top of buffer */
 		*zerop = TRUE;
 		scan++;
 	} else {
 		scan = linespec(scan, &fromline);
 		if (!fromline)
-			fromline = curwp->w_dotp;
+			fromline = curwp->w_dot.l;
 		toline = fromline;
 		if (*scan == ',') {
 			scan++;
@@ -799,20 +854,20 @@ int f, n;	/* default flag and numeric arg */
 /*	dobuf:	execute the contents of the buffer pointed to
 		by the passed BP
 
-	Directives start with a "!" and include:
+	Directives start with a "~" and include:
 
 #if SMALLER
-	!endm		End a macro
+	~endm		End a macro
 #else
-	!endm		End a macro
-	!if (cond)	conditional execution
-	!else
-	!endif
-	!return		Return (terminating current macro)
-	!goto <label>	Jump to a label in the current macro
-	!force		Force macro to continue...even if command fails
-	!while (cond)	Execute a loop if the condition is true
-	!endwhile
+	~endm		End a macro
+	~if (cond)	conditional execution
+	~else
+	~endif
+	~return		Return (terminating current macro)
+	~goto <label>	Jump to a label in the current macro
+	~force		Force macro to continue...even if command fails
+	~while (cond)	Execute a loop if the condition is true
+	~endwhile
 	
 	Line Labels begin with a "*" as the first nonblank char, like:
 
@@ -847,6 +902,13 @@ BUFFER *bp;	/* buffer to execute */
 	char *sp;			/* temp for building debug string */
 	register char *ep;	/* ptr to end of outline */
 #endif
+	static dobufnesting;
+
+	if (++dobufnesting > 9) {
+		dobufnesting--;
+		return FALSE;
+	}
+		
 
 	/* clear IF level flags/while ptr */
 	execlevel = 0;
@@ -857,7 +919,7 @@ BUFFER *bp;	/* buffer to execute */
 #if ! SMALLER
 	scanner = NULL;
 	/* scan the buffer to execute, building WHILE header blocks */
-	hlp = bp->b_linep;
+	hlp = bp->b_line.l;
 	lp = hlp->l_fp;
 	while (lp != hlp) {
 		/* scan the current line */
@@ -880,6 +942,7 @@ noram:				mlwrite("%%Out of memory during while scan");
 failexit:			freewhile(scanner);
 				freewhile(whlist);
 				mstore = FALSE;
+				dobufnesting--;
 				return FALSE;
 			}
 			whtemp->w_begin = lp;
@@ -935,7 +998,7 @@ nxtscan:	/* on to the next line */
 #endif
 
 	/* starting at the beginning of the buffer */
-	hlp = bp->b_linep;
+	hlp = bp->b_line.l;
 	lp = hlp->l_fp;
 	while (lp != hlp) {
 		/* allocate eline and copy macro line to it */
@@ -944,6 +1007,7 @@ nxtscan:	/* on to the next line */
 			mlwrite("%%Out of Memory during macro execution");
 			freewhile(whlist);
 			mstore = FALSE;
+			dobufnesting--;
 			return FALSE;
 		}
 		strncpy(eline, lp->l_text, linlen);
@@ -1004,6 +1068,7 @@ nxtscan:	/* on to the next line */
 				mlforce("[Macro aborted]");
 				freewhile(whlist);
 				mstore = FALSE;
+				dobufnesting--;
 				return FALSE;
 			}
 		}
@@ -1024,6 +1089,7 @@ nxtscan:	/* on to the next line */
 				mlwrite("%%Unknown Directive");
 				freewhile(whlist);
 				mstore = FALSE;
+				dobufnesting--;
 				return FALSE;
 			}
 
@@ -1045,6 +1111,7 @@ nxtscan:	/* on to the next line */
 			if ((mp=lalloc(linlen)) == NULL) {
 				mlwrite("%%Out of memory while storing macro");
 				mstore = FALSE;
+				dobufnesting--;
 				return FALSE;
 			}
 	
@@ -1053,10 +1120,10 @@ nxtscan:	/* on to the next line */
 				lputc(mp, i, eline[i]);
 	
 			/* attach the line to the end of the buffer */
-	       		bstore->b_linep->l_bp->l_fp = mp;
-			mp->l_bp = bstore->b_linep->l_bp;
-			bstore->b_linep->l_bp = mp;
-			mp->l_fp = bstore->b_linep;
+	       		bstore->b_line.l->l_bp->l_fp = mp;
+			mp->l_bp = bstore->b_line.l->l_bp;
+			bstore->b_line.l->l_bp = mp;
+			mp->l_fp = bstore->b_line.l;
 			goto onward;
 		}
 	
@@ -1114,6 +1181,7 @@ nxtscan:	/* on to the next line */
 					mlwrite("%%Internal While loop error");
 					freewhile(whlist);
 					mstore = FALSE;
+					dobufnesting--;
 					return FALSE;
 				}
 			
@@ -1153,6 +1221,7 @@ nxtscan:	/* on to the next line */
 					mlwrite("%%No such label");
 					freewhile(whlist);
 					mstore = FALSE;
+					dobufnesting--;
 					return FALSE;
 				}
 				goto onward;
@@ -1180,6 +1249,7 @@ nxtscan:	/* on to the next line */
 						mlwrite("%%Internal While loop error");
 						freewhile(whlist);
 						mstore = FALSE;
+						dobufnesting--;
 						return FALSE;
 					}
 		
@@ -1207,19 +1277,20 @@ nxtscan:	/* on to the next line */
 			while (wp != NULL) {
 				if (wp->w_bufp == bp) {
 					/* and point it */
-					wp->w_dotp = lp;
-					wp->w_doto = 0;
+					wp->w_dot.l = lp;
+					wp->w_dot.o = 0;
 					wp->w_flag |= WFHARD;
 				}
 				wp = wp->w_wndp;
 			}
 			/* in any case set the buffer . */
-			bp->b_dotp = lp;
-			bp->b_doto = 0;
+			bp->b_dot.l = lp;
+			bp->b_dot.o = 0;
 			free(einit);
 			execlevel = 0;
 			mstore = FALSE;
 			freewhile(whlist);
+			dobufnesting--;
 			return status;
 		}
 
@@ -1234,6 +1305,7 @@ eexec:	/* exit the current function */
 	mstore = FALSE;
 	execlevel = 0;
 	freewhile(whlist);
+	dobufnesting--;
         return TRUE;
 }
 
@@ -1260,7 +1332,9 @@ int f, n;	/* default flag and numeric arg to pass on to file */
 		return status;
 	strcpy(fname,ofname);
 
-#if	1
+	if ((status = glob(fname)) != TRUE)
+		return status;
+
 	/* look up the path for the file */
 	fspec = flook(fname, FL_ANYWHERE);
 
@@ -1268,7 +1342,6 @@ int f, n;	/* default flag and numeric arg to pass on to file */
 	if (fspec == NULL)
 		return FALSE;
 
-#endif
 	/* otherwise, execute it */
 	while (n-- > 0)
 		if ((status=dofile(fspec)) != TRUE)
@@ -1290,10 +1363,17 @@ char *fname;	/* file name to execute */
 	char bname[NBUFN];	/* name of buffer */
 
 	makename(bname, fname);		/* derive the name of the buffer */
-	if ((bp = bfind(bname, OK_CREAT, 0)) == NULL) /* get the needed buffer */
-		return FALSE;
+	unqname(bname,FALSE);
 
-	bp->b_mode = MDVIEW;	/* mark the buffer as read only */
+	/* okay, we've got a unique name -- create it */
+	if ((bp=bfind(bname, OK_CREAT, 0))==NULL) {
+		return FALSE;
+	}
+
+	/* mark the buffer as read only */
+	make_local_b_val(bp,MDVIEW);
+	set_b_val(bp,MDVIEW,TRUE);
+
 	/* and try to read in the file to execute */
 	if ((status = readin(fname, FALSE, bp, TRUE)) != TRUE) {
 		return status;

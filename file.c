@@ -1,9 +1,70 @@
 /*	FILE.C:   for MicroEMACS
-
-	The routines in this file handle the reading, writing
-	and lookup of disk files.  All of details about the
-	reading and writing of the disk are in "fileio.c".
-
+ *
+ *	The routines in this file handle the reading, writing
+ *	and lookup of disk files.  All of details about the
+ *	reading and writing of the disk are in "fileio.c".
+ *
+ *
+ * $Log: file.c,v $
+ * Revision 1.15  1991/08/12 09:25:10  pgf
+ * now store w_line in w_traits while buffer is offscreen, so reframe
+ * isn't always necessary.  don't force reframe on redisplay.
+ *
+ * Revision 1.14  1991/08/08  13:19:08  pgf
+ * fixed MDDOS processing, and don't allow writes of view-only buffers
+ *
+ * Revision 1.13  1991/08/07  12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.12
+ * date: 1991/08/06 15:21:21;
+ * global/local values
+ * 
+ * revision 1.11
+ * date: 1991/06/25 19:52:35;
+ * massive data structure restructure
+ * 
+ * revision 1.10
+ * date: 1991/06/13 15:18:28;
+ * fixed comment on glob()
+ * 
+ * revision 1.9
+ * date: 1991/06/03 12:18:17;
+ * ifdef'ed TAGS for unresolved ref
+ * 
+ * revision 1.8
+ * date: 1991/05/31 10:58:11;
+ * fixed bug in writereg, and
+ * made writeregion more like writefile
+ * 
+ * revision 1.7
+ * date: 1991/04/25 12:08:28;
+ * use npopen instead of popen for globbing
+ * 
+ * revision 1.6
+ * date: 1991/04/22 08:59:37;
+ * fixed globbing to always use /bin/sh
+ * 
+ * revision 1.5
+ * date: 1991/04/08 15:48:59;
+ * only update() in readin() if no input pending
+ * 
+ * revision 1.4
+ * date: 1991/04/04 09:36:10;
+ * allow for internal callers of ifile()
+ * fixed bug with non-unique buffer names at startup
+ * 
+ * revision 1.3
+ * date: 1990/10/01 12:16:11;
+ * make mkdir() stuff conditional on ifdef HAVE_MKDIR
+ * 
+ * revision 1.2
+ * date: 1990/09/25 11:38:17;
+ * took out old ifdef BEFORE code
+ * 
+ * revision 1.1
+ * date: 1990/09/21 10:25:16;
+ * initial vile RCS revision
 */
 
 #include        <stdio.h>
@@ -95,7 +156,8 @@ viewfile(f, n)	/* visit a file in VIEW mode */
 		return FALSE;
 	s = getfile(fname, FALSE);
 	if (s == TRUE) {	/* if we succeed, put it in view mode */
-		curwp->w_bufp->b_mode |= MDVIEW;
+		make_local_b_val(curwp->w_bufp,MDVIEW);
+		set_b_val(curwp->w_bufp,MDVIEW,TRUE);
 		markWFMODE(curwp->w_bufp);
 	}
 	return s;
@@ -125,19 +187,6 @@ insfile(f, n)
 	        return kifile(insfname);
 }
 
-#if BEFORE
-insfiletop(f, n)
-{
-        register int    s;
-        if ((s=mlreply("Insert file: ", insfname, NFILEN)) != TRUE)
-                return s;
-	if ((s = glob(insfname)) != TRUE)
-		return FALSE;
-	curwp->w_dotp = curbp->b_linep;
-        return ifile(insfname,TRUE,NULL);
-}
-#endif
-
 getfile(fname, lockfl)
 char fname[];		/* file name to find */
 int lockfl;		/* check the file for locks? */
@@ -157,11 +206,6 @@ int lockfl;		/* check the file for locks? */
 			/* is it here by that filename? */
 	                if (strcmp(bp->b_fname, fname)==0) {
 				swbuffer(bp);
-	                        lp = curwp->w_dotp;
-	                        i = curwp->w_ntrows/2;
-	                        while (i-- && lback(lp)!=curbp->b_linep)
-	                                lp = lback(lp);
-	                        curwp->w_linep = lp;
 	                        curwp->w_flag |= WFMODE|WFHARD;
 				if (fname[0] != '!') {
 		                        mlwrite("[Old buffer]");
@@ -180,13 +224,12 @@ int lockfl;		/* check the file for locks? */
 	        makename(bname, fname);            /* New buffer name.     */
 		/* make sure the buffer name doesn't exist */
 	        while ((bp=bfind(bname, NO_CREAT, 0)) != NULL) {
-			if ( !(bp->b_flag & BFCHG) && 
-					lforw(bp->b_linep) == bp->b_linep ) {
-				/* empty and unmodiefied -- then its okay 
+			if ( !(bp->b_flag & BFCHG) && is_empty_buf(bp)) {
+				/* empty and unmodified -- then it's okay 
 					to re-use this buffer */
 				bp->b_active = 0;
 				return readin(fname, lockfl, bp, TRUE) &&
-						swbuffer(bp);;
+						swbuffer(bp);
 			}
 			/* old buffer name conflict code */
 			unqname(bname,TRUE);
@@ -245,11 +288,15 @@ int	mflg;		/* print messages? */
                 return s;
         bp->b_flag &= ~(BFINVS|BFCHG);
         strcpy(bp->b_fname, fname);
+#if DOSFILES
+	make_local_b_val(bp,MDDOS);
+	set_b_val(bp, MDDOS, global_b_val(MDDOS) );
+#endif
 
 	/* turn off ALL keyboard translation in case we get a dos error */
 	TTkclose();
 
-        if ((s=ffropen(fname)) == FIOERR)       /* Hard file open.      */
+        if ((s = ffropen(fname)) == FIOERR)       /* Hard file open.      */
                 goto out;
 
         if (s == FIOFNF) {                      /* File not found.      */
@@ -285,12 +332,17 @@ int	mflg;		/* print messages? */
 					flag |= WFHARD;
 			        for (wp=wheadp; wp!=NULL; wp=wp->w_wndp) {
 			                if (wp->w_bufp == bp) {
-			                        wp->w_linep=lforw(bp->b_linep);
-			                        wp->w_dotp =lback(bp->b_linep);
-			                        wp->w_doto = 0;
+			                        wp->w_line.l=
+							lforw(bp->b_line.l);
+			                        wp->w_dot.l =
+							lback(bp->b_line.l);
+			                        wp->w_dot.o = 0;
 						wp->w_flag |= flag;
 			                }
 			        }
+				set_b_val(bp, MDDOS, 
+					dosfile && global_b_val(MDDOS) );
+				curwp->w_flag |= WFMODE;
 				update(FALSE);
 				done_update = TRUE;
 				flag = 0;
@@ -306,13 +358,6 @@ int	mflg;		/* print messages? */
 	doverifys = odv;
 #endif
 	bp->b_flag &= ~BFCHG;
-#if UNIX & before
-	if (fileispipe == TRUE) {
-		ttunclean();
-	        TTflush();
-	        sgarbf = TRUE;
-	}
-#endif
 #if FINDERR
 	if (fileispipe == TRUE) {
 		strncpy(febuff,bp->b_bname,NBUFN);
@@ -320,10 +365,6 @@ int	mflg;		/* print messages? */
 	}
 #endif
         ffclose();                              /* Ignore errors.       */
-#if DOSFILES
-	if (dosfile && (gmode & MDDOS))
-		bp->b_mode |= MDDOS;
-#endif
 	if (mflg)
 		readlinesmsg(nline,s,fname,ffronly(fname));
 
@@ -333,31 +374,41 @@ int	mflg;		/* print messages? */
 		|| ffronly(fname) 
 #endif
 	) {
-		bp->b_mode |= MDVIEW;
+		make_local_b_val(bp,MDVIEW);
+		set_b_val(bp,MDVIEW,TRUE);
 	}
 	
 	bp->b_active = TRUE;
 
+out:
+#if DOSFILES
+	set_b_val(bp, MDDOS, dosfile && global_b_val(MDDOS) );
+#endif
 	/* set C mode for C files */
-	if (gmode & MDCMOD) {
+	make_local_b_val(bp,MDCMOD); /* make it local for all, so that
+					subsequent changes to global value
+					will _not_ affect this buffer */
+	set_b_val(bp,MDCMOD,FALSE); /* assume non-C */
+	if (global_b_val(MDCMOD)) { 
 		char *cp;
 		cp = &fname[strlen(fname)-2];
-		if (cp >= fname && cp[0] == '.' && strchr("chCH",cp[1]) ) {
-			bp->b_mode |= MDCMOD;
+		if (cp >= fname && cp[0] == '.' && 
+			strchr(b_val_ptr(bp,VAL_CSUFFIXES),cp[1]) ) {
+			/* assumption proven wrong */
+			set_b_val(bp,MDCMOD,TRUE);
 		}
 	}
 
-out:
 	TTkopen();	/* open the keyboard again */
         for (wp=wheadp; wp!=NULL; wp=wp->w_wndp) {
                 if (wp->w_bufp == bp) {
-                        wp->w_linep = lforw(bp->b_linep);
-                        wp->w_dotp  = lforw(bp->b_linep);
-                        wp->w_doto  = 0;
-                        wp->w_mkp = NULL;
-                        wp->w_mko = 0;
-                        wp->w_ldmkp = NULL;
-                        wp->w_ldmko = 0;
+                        wp->w_line.l = lforw(bp->b_line.l);
+                        wp->w_dot.l  = lforw(bp->b_line.l);
+                        wp->w_dot.o  = 0;
+#ifdef WINMARK
+                        wp->w_mark = nullmark;
+#endif
+                        wp->w_lastdot = nullmark;
                         wp->w_flag |= WFMODE|WFHARD;
                 }
         }
@@ -521,6 +572,10 @@ filewrite(f, n)
 			}
 		}
         }
+	if (!strcmp(fname,curbp->b_fname) && b_val(curbp,MDVIEW)) {
+		mlwrite("[Can't write-back from view mode]");
+		return FALSE;
+	}
         if ((s=writeout(fname,curbp,TRUE)) == TRUE) {
                 curbp->b_flag &= ~BFCHG;
 		markWFMODE(curbp);
@@ -571,20 +626,21 @@ BUFFER *bp;
         REGION region;
 
 	/* starting at the beginning of the buffer */
-        lp = lforw(bp->b_linep);
-        region.r_linep = lp;
-        region.r_offset = 0;
+        lp = lforw(bp->b_line.l);
+        region.r_orig.l = lp;
+        region.r_orig.o = 0;
 
 	/* start counting chars */
         numchars = 0;
-        while (lp != bp->b_linep) {
+        while (lp != bp->b_line.l) {
 		numchars += llength(lp) + 1;
 		lp = lforw(lp);
         }
         region.r_size = numchars;
+        region.r_end = bp->b_line;
         
 #if DOSFILES
-	dosfile = bp->b_mode & MDDOS;
+	dosfile = b_val(bp, MDDOS);
 #endif
 
 	return writereg(&region,fn,msgf);
@@ -596,12 +652,6 @@ writeregion(f,n)
 	int s;
         static char fname[NFILEN];
 
-#ifdef BEFORE
-        if ((s=mlreply("Write file: ", fname, NFILEN)) != TRUE)
-                return s;
-	if ((s = glob(fname)) != TRUE)
-		return FALSE;
-#else
 	if (isnamedcmd && lastkey == '\r') {
 		strncpy(fname, curbp->b_fname, NFILEN);
 
@@ -626,11 +676,10 @@ writeregion(f,n)
 			}
 		}
         }
-#endif
         if ((s=getregion(&region,NULL)) != TRUE)
                 return s;
 #if DOSFILES
-	dosfile = curbp->b_mode & MDDOS;
+	dosfile = b_val(curbp, MDDOS);
 #endif
 	s = writereg(&region,fname,TRUE);
         return s;
@@ -672,15 +721,15 @@ char    *fn;
 	TTkclose();
 #endif
 
-        lp = rp->r_linep;
+        lp = rp->r_orig.l;
         nline = 0;                              /* Number of lines     */
         nchar = 0;                              /* Number of chars     */
 
 	/* First and maybe only line. */
-	if (rp->r_offset <= llength(lp)) {
-		if ((lim = rp->r_offset+rp->r_size) > llength(lp))
+	if (rp->r_orig.o <= llength(lp)) {
+		if ((lim = rp->r_orig.o+rp->r_size) > llength(lp))
 			lim = (long)llength(lp);
-		for (i = rp->r_offset; i < lim; i++) {
+		for (i = rp->r_orig.o; i < lim; i++) {
 		        if ((s=ffputc(lgetc(lp,i))) != FIOSUC)
 		                goto out;
 			nchar++;
@@ -841,7 +890,7 @@ filename(f, n)
                 strcpy(curbp->b_fname, "");
         else
                 strcpy(curbp->b_fname, fname);
-	curbp->b_mode &= ~MDVIEW;	/* no longer read only mode */
+	make_global_b_val(curbp,MDVIEW); /* no longer read only mode */
 	markWFMODE(curbp);
         return TRUE;
 }
@@ -890,9 +939,9 @@ FILE *haveffp;
 	} else { /* we already have the file pointer */
 		ffp = haveffp;
 	}
-	lp0 = curwp->w_dotp;
-	curwp->w_doto = 0;
-	setmark();
+	lp0 = curwp->w_dot.l;
+	curwp->w_dot.o = 0;
+	MK = DOT;
 
 	nline = 0;
 	while ((s=ffgetline(&nbytes)) == FIOSUC) {
@@ -913,19 +962,8 @@ FILE *haveffp;
 		lp1->l_bp = lp0;
 		lp1->l_fp = lp2;
 
-#if BEFORE
-		/* and advance and write out the current line */
-		curwp->w_dotp = lp1;
-#endif
-#if BEFORE
-		for (i=0; i<nbytes; ++i)
-			lputc(lp1, i, fline[i]);
-#else
-		memcpy(lp1->l_text, fline, nbytes);
-#endif
-#if BEFORE
-		curwp->w_dotp = curwp->w_mkp;
-#endif
+		if (nbytes)  /* l_text may be NULL in this case */
+			memcpy(lp1->l_text, fline, nbytes);
 		tag_for_undo(lp1);
 		if (belowthisline)
 			lp0 = lp1;
@@ -944,21 +982,13 @@ FILE *haveffp;
 		ffclose();				/* Ignore errors.	*/
 		readlinesmsg(nline,s,fname,FALSE);
 	}
-#if BEFORE
-	curwp->w_mkp = lforw(curwp->w_mkp);
-#endif
 out:
 	/* advance to the next line and mark the window for changes */
-	curwp->w_dotp = lforw(curwp->w_dotp);
+	curwp->w_dot.l = lforw(curwp->w_dot.l);
 	curwp->w_flag |= WFHARD | WFMODE;
 
 	/* copy window parameters back to the buffer structure */
-	curbp->b_dotp = curwp->w_dotp;
-	curbp->b_doto = curwp->w_doto;
-	curbp->b_markp = curwp->w_mkp;
-	curbp->b_marko = curwp->w_mko;
-	curbp->b_ldmkp = curwp->w_ldmkp;
-	curbp->b_ldmko = curwp->w_ldmko;
+	curbp->b_wtraits = curwp->w_traits;
 
         if (s == FIOERR)                        /* False if error.      */
                 return FALSE;
@@ -1074,7 +1104,7 @@ imdying(signo)
 	}
 	if (wrote) {
 		if ((np = getenv("LOGNAME")) || (np = getenv("USER"))) {
-			sprintf(cmd,
+			lsprintf(cmd,
 #if HAVE_MKDIR
     "(echo Subject: vile died; echo Files saved: ; ls %s/* ) | /bin/mail %s",
 #else
@@ -1103,7 +1133,6 @@ BUFFER *bp;
 }
 
 /* use the shell to expand wildcards */
-/*  should optimize this to only call shell if wildcards are suspected */
 glob(buf)
 char *buf;
 {
@@ -1129,7 +1158,7 @@ char *buf;
 
 	while (*cp) {
 		if (iswild(*cp)) {
-			sprintf(cmd, "echo %s", buf);
+			lsprintf(cmd, "echo %s", buf);
 			cf = npopen(cmd,"r");
 			if (cf == NULL) {
 				return TRUE;
@@ -1176,7 +1205,7 @@ BUFFER *bp;
 	cryptflag = FALSE;
 
 	/* if we are in crypt mode */
-	if (bp->b_mode & MDCRYPT) {
+	if (b_val(bp, MDCRYPT)) {
 		if (bp->b_key[0] == 0) {
 			s = setkey(FALSE, 0);
 			if (s != TRUE)

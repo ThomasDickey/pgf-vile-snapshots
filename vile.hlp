@@ -18,13 +18,24 @@ Getting along with vile
 		:q!	(quits without writing changes!)
 		Q
 		ZZ	(will write all unwritten buffers)
-		^X-^C	(don't know why.  _They_ don't put in ":q" for _us_!)
+		^X-^C	(don't know why.  _They_ don't put in ":q" for _us_!
+			 actually, if ^C is your interrupt character, this
+			 won't get you out of vile.)
 
 	To get help (probably just this text), use any of:
 		:h
 		:help
 		^X-^H
 		^A-^H
+
+	To get a complete list of all commands, type ":describe-bindings".
+	To get a list of all commands that contain the strings "name",
+	type ":apropos name".  These lists will show all command synonyms
+	and key sequences that are bound to the same function.
+	
+	You needn't type full command names --
+	type a few characters and hit the space bar to perform command
+	completion. 
 
 General Remarks
 ---------------
@@ -230,7 +241,7 @@ Text manipulation command:
 	< (left shift), > (right shift), r (read file), d (delete),
 	L (lower case), U (upper case), ~ (flip case), put (append
 	yanked text), Put (prepend yanked text), s (substitute),
-	t (trim trailing whitespace).  For example, ":g/pattern/Put"
+	trim (trim trailing whitespace).  For example, ":g/pattern/Put"
 	will insert the contents of the default yank register just
 	above every line containing "pattern". 
 
@@ -268,19 +279,33 @@ Text manipulation command:
 	^A-u	Like ^A-~, but converts the region to upper case.
 	^A-l	Like ^A-~, but converts the region to lower case.
 
-	^A-f	Format the region based on the current fill column.  The
-                initial indentation of both the first and second lines
-                of the region are preserved, and all subsequent lines
-                get the second line's indentation.  This makes indented/
-		outdented paragraphs work correctly.  The usual use of
-                this command is "^A-f}", which does it to the current
-                paragraph.  (This is intentionally _not_ the same bevavior
-		obtained by "!fmt", since that behavior is obviously 
-		available elsewhere.)
+	^A-f Format the region based on the current fill column.  The
+		initial indentation of both the first and second lines of
+		each "paragraph" in the region are preserved, and all
+		subsequent lines get the second line's indentation.  This
+		makes indented/outdented paragraphs (like this one) work
+		correctly.  (This is intentionally _not_ the same bevavior
+		obtained by using "!fmt", since that behavior is obviously
+		available elsewhere.)  The usual usage of this command is
+		"^A-f}", which reformats the current paragraph.  The
+		re-formatting begins again with each new paragraph, where a
+		paragraph has the same boundaries used by the '{' and '}'
+		commands -- i.e.  blank lines, or lines beginning in .I .L
+		.P .Q or .b.  This make is possible to use "3^A-f}" or
+		"^A-fG" to reformat multiple paragraphs.
+
+	^X-s	For every occurrence of a search string, put in a replace-
+		ment string.  This is similar to "s/pattern/replacement/g"
+		over the region.
 
 	^X-d	Delete the region, including the lines it starts and ends on.
 	^X-c	Change the region, including the lines it starts and ends on.
 	^X-y	Yank the region, including the lines it starts and ends on.
+
+	^A-t	Trim trailing whitespace from all lines in the region.
+
+	^A-<SPACE> Convert tabs to spaces, using the current tabstop value.
+	^A-<TAB>   Convert as many spaces to tabs as appropriate.
 
 	Text insertion
 	--------------
@@ -319,9 +344,12 @@ Text manipulation command:
 		to that file and location.
 	^]	Uses the identifier currently under the cursor as the 
 		tagname.
-	^X-^]	"Un-tag" - pops to the file and location just previous to 
-		the last tag command.  (Some versions of vi have this command
-		attached to ^T)
+	^X-^] "Un-tag" - pops to the file and location just previous to the
+		last tag command.  (Some versions of vi have this command
+		attached to ^T.  You can use ":bind-key untag-pop ^T" to
+		get this back, if you're willing to lose '^T' as the window
+		splitting command.  You can use '^X-2' (or rebind it) for
+		that instead.)
 
 	When one of these commands is used, vile will look for a file named
 	"tags" in the current directory, and load it into a hidden buffer
@@ -331,15 +359,8 @@ Text manipulation command:
 	will be used instead of a file called "tags", and of course will
 	remain visible.
 
-	"Advanced" editing
-	------------------
-	[ Eventually, these will be rewritten to become "operators", similar to
-	those described above. ]
-	^A-<SPACE>	Convert tabs to spaces on the current line. An argument
-		tells how many lines.
-	^A-<TAB>	Convert as many spaces to tabs as possible on the 
-		current line.  Argument tells how many lines.
-	^A-o	Remove all but one blank line at the current spot.
+	^A-o	Remove all blank lines containing or immediately following
+		the current line.
 
 Miscellaneous commands
 ----------------------
@@ -465,8 +486,8 @@ Key Rebinding
 		":bind-key englishname keyseq"
 	where keyseq is the exact keyboard sequence (i.e. single character,
 	or ^X or ^A followed by a single character) to which the
-	command should be bound.  In a ".vilerc" file, keyseq should be the
-	printable representation of the sequence, e.g. M-a or ^X-S.
+	command should be bound.  In a .vilerc file, keyseq should be the
+	printable representation of the sequence, e.g. ^A-a or ^X-S.
 
 	Examples:
 	 To cause the / and ? commands to perform incremental
@@ -488,6 +509,10 @@ Key Rebinding
 	if they are rebound, however, the binding list and bind-key
 	commands will refer to them as ^A and ^X.
 
+	Note that when interactive, ^A is typed using the control key.  In a
+	file, however, it should be a caret (^) followed by a letter.
+
+
 Macros
 ------
 
@@ -506,14 +531,39 @@ Macros
 	the following lines appear in a .vilerc file:
 
 		1 store-macro
-		5 delete-til next-word
-		endm
+		 5 delete-til next-word
+		~endm
 
-		bind-key execute-macro-1 M-1
+		bind-key execute-macro-1 ^A-1
 
-	then when M-1 is executed, 5 words will be deleted.  The "-til"
+	then when ^A-1 is executed, 5 words will be deleted.  The "-til"
 	suffix on an englishname denotes that it is a vi operator style
 	command, and expects to be followed by a motion command.
+
+Command files
+-------------
+	On startup, vile will attempt to read the file ".vilerc" in the
+	current directory, and then in $HOME, and will execute the
+	commands found therein.  It is possible to nest such executions.
+	For example, you might keep your general default settings in your
+	home directory, and put the following lines in a .vilerc in a
+	directory in which you prefer tabs be set to 4 spaces:
+
+		source "$HOME/.vilerc"
+		set tabstop 8
+
+	The quotes surrounding the filename part are necessary to
+	protect the name from interpretation as an as-yet undocumented
+	and untested vile variable. 
+
+	Files can be executed at any time with the ":source" (or
+	":execute-file") command.  There are (mostly untested) control
+	structures available, such as !while, !if, etc.  Refer to the
+	source code for more information.
+
+	Nesting of source'd files is limited to a depth of ten, to prevent
+	infinite recursion.
+
 
 Differences
 ------------
@@ -564,6 +614,100 @@ Differences
 	on the last word of a line ending in whitespace deletes the
 	trailing whitespace.  Vi does not delete the whitespace. 
 
+Sample .vilerc
+--------------
+	Here's a sample .vilerc, to help get you started with the
+	syntax and style of vile macros:
+
+	setg aindent
+	setg cmode
+	setg fillcol 70
+	setg tabstop 4
+	
+	; sitting on a brace, run the C code block through indent
+	1 store-macro
+		write-file 
+		filter-til goto-matching-fence "indent -st"
+	~endm
+
+	
+	; format the current paragraph
+	2 store-macro
+		previous-paragraph 
+		filter-til next-paragraph "/usr/ucb/fmt"
+	~endm
+	
+	; put 'fprintf(stderr,"\n");" into the file, and
+	; position the cursor to add to the string
+	3 store-macro
+		~force next-line
+		beginning-of-line
+		insert-string "fprintf(stderr, \"\\n\");\n"
+		; six back, because it counts the newline
+		6 backward-character
+		insert-chars
+	~endm
+	
+	; insert '> ' in front of every line from here til the end
+	; (this works because without argument, the default action 
+	; for "goto-line" is to go to the end of file.
+	4 store-macro
+		substitute goto-line "^" "> "
+	~endm
+	
+	bind-key execute-macro-1 ^A-C
+	bind-key execute-macro-2 ^A-F
+	bind-key execute-macro-3 ^A-K
+	bind-key execute-macro-4 ^A-M
+
+Note on Scrolling
+-----------------
+	If scrolling is really ugly (the status line hops around a lot),
+	and you're using a vt102 or compatible termianal that you
+	think should be able to scroll okay, then the problem is
+	almost certainly your termcap entry, which probably doesn't
+	describe the scrolling regions adequately.  Most standard
+	termcap entries are insufficient.  Here's one that should
+	work:
+
+        dy|vt102|vt-102|dec vt102:\
+            :do=^J:co#80:li#24:cl=50\E[;H\E[2J:\
+            :le=^H:bs:cm=5\E[%i%d;%dH:nd=2\E[C:up=2\E[A:\
+            :ce=3\E[K:cd=50\E[J:so=2\E[7m:se=2\E[m:us=2\E[4m:ue=2\E[m:\
+            :md=2\E[1m:mr=2\E[7m:mb=2\E[5m:me=2\E[m:is=\E[1;24r\E[24;1H:\
+            :rs=\E>\E[?3l\E[?4l\E[?5l\E[?7h\E[?8h:ks=\E[?1h\E=:ke=\E[?1l\E>:\
+            :ku=\EOA:kd=\EOB:kr=\EOC:kl=\EOD:kb=^H:\
+            :ho=\E[H:k1=\EOP:k2=\EOQ:k3=\EOR:k4=\EOS:pt:sr=5\EM:vt#3:\
+            :sc=\E7:rc=\E8:cs=\E[%i%d;%dr:vs=\E[?7l:ve=\E[?7h:
+
+	The crucial entries are cs and sr -- without both of them,
+	vile will attempt to use dl and al, and will scroll by
+	deleting and inserting a block of lines, giving the behavior
+	ugly you see.  If you define PRETTIER_SCROLL when building
+	vile, it will alternately delete and insert lines, instead of
+	deleting them all and then inserting them all.  This makes it
+	look a _little_ better, but it's slower.
+
+	( The terminfo entry equivalent to the above termcap entry:
+
+	vt102|vt-102|dec vt102,
+		xon,
+		cols#80, lines#24, vt#3,
+		bel=^G, blink=\E[5m$<2>, bold=\E[1m$<2>,
+		clear=\E[;H\E[2J$<50>, cnorm=\E[?7h, cr=\r,
+		csr=\E[%i%p1%d;%p2%dr, cub1=\b, cud1=\n,
+		cuf1=\E[C$<2>, cup=\E[%i%p1%d;%p2%dH$<5>,
+		cuu1=\E[A$<2>, cvvis=\E[?7l, ed=\E[J$<50>,
+		el=\E[K$<3>, home=\E[H, ht=\t, ind=\n,
+		is2=\E[1;24r\E[24;1H, kbs=\b, kcub1=\EOD, kcud1=\EOB,
+		kcuf1=\EOC, kcuu1=\EOA, kf1=\EOP, kf2=\EOQ, kf3=\EOR,
+		kf4=\EOS, rc=\E8, rev=\E[7m$<2>, ri=\EM$<5>,
+		rmkx=\E[?1l\E>, rmso=\E[m$<2>, rmul=\E[m$<2>,
+		rs2=\E>\E[?3l\E[?4l\E[?5l\E[?7h\E[?8h, sc=\E7,
+		sgr0=\E[m$<2>, smkx=\E[?1h\E=, smso=\E[7m$<2>,
+		smul=\E[4m$<2>,
+	)
+
 Credits
 -------
 	This code has been written by a _lot_ of people.  Names appearing
@@ -571,9 +715,9 @@ Credits
 	Conroy, Daniel Lawrence, John Gamble, Roger Ove, Dana Hoggatt,
 	Jon Reid, Steve Wilhite, George Jones, Adam Fritz, D.R.Banks,
 	Bob McNamara.  In addition, some of the "ex" code is by Steve
-	Kirkendall, author of the vi clone called "elvis".  The
-	changes to create vile from micro-Emacs were all done by Paul
-	Fox, who can be reached at pgf@cayman.com.   (By the way, this is
-	not the same Paul Fox who did the Crisp editor.)
-
+	Kirkendall, author of the vi clone called "elvis".  The sample
+	.vilerc was created by Dave Lemke.  The changes to create vile
+	from micro-Emacs were all done by Paul Fox, who can be reached
+	at pgf@cayman.com.  (By the way, this is not the same Paul Fox
+	that did the Crisp editor.)
 

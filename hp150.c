@@ -3,6 +3,14 @@
  * and routines to access the Keyboard through KEYCODE mode.
  * It compiles into nothing if not an HP150 screen device.
  * added by Daniel Lawrence
+ *
+ * $Log: hp150.c,v $
+ * Revision 1.2  1991/08/07 12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.1
+ * date: 1990/09/21 10:25:25;
+ * initial vile RCS revision
  */
 
 #define	termdef	1			/* don't define "term" external */

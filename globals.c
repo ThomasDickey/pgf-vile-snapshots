@@ -3,8 +3,36 @@
 #include        <stdio.h>
 
 /* ed/vi/ex style global commands, where first the file is scanned for
-	matching lines, then for each such line, an action is performed.
-	written for vile by Paul Fox, (c)1990
+ *	matching lines, then for each such line, an action is performed.
+ *	written for vile by Paul Fox, (c)1990
+ *
+ * $Log: globals.c,v $
+ * Revision 1.7  1991/08/07 12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.6
+ * date: 1991/08/06 15:22:03;
+ *  global/local values
+ * 
+ * revision 1.5
+ * date: 1991/06/27 18:43:40;
+ * fixed infinite loop if a global referenced '^' or '$' as the search string
+ * 
+ * revision 1.4
+ * date: 1991/06/25 19:52:44;
+ * massive data structure restructure
+ * 
+ * revision 1.3
+ * date: 1991/05/31 11:07:32;
+ * clean up globals routine, so it doesn't need or provide extra args
+ * 
+ * revision 1.2
+ * date: 1991/04/22 09:02:42;
+ * removed non-portable initialization
+ * 
+ * revision 1.1
+ * date: 1990/09/21 10:25:21;
+ * initial vile RCS revision
 */
 #if GLOBALS
 
@@ -80,11 +108,11 @@ globber(f, n, g_or_v)
 	
 	/* loop through the buffer -- we must clear the marks no matter what */
 	s = TRUE;
-	lp = lforw(curbp->b_linep);
+	lp = lforw(curbp->b_line.l);
 	/* loop until there are no marked lines in the buffer */
 	foundone = FALSE;
 	for(;;) {
-		if (lp == curbp->b_linep) {
+		if (lp == curbp->b_line.l) {
 			/* at the end -- only quit if we found no 
 				marks on the last pass through. otherwise,
 				go through again */
@@ -92,17 +120,18 @@ globber(f, n, g_or_v)
 				foundone = FALSE;
 			else
 				break;
+			lsetnotmarked(lp); /* always unmark the header line */
 		}
 		if (lismarked(lp)) {
 			foundone = TRUE;
 			lsetnotmarked(lp);
-			curwp->w_dotp = lp;
-			curwp->w_doto = 0;
+			curwp->w_dot.l = lp;
+			curwp->w_dot.o = 0;
 			/* call the function, if there is one, and results
 				have been ok so far */
 			if (cfp && s) {
 				if (!calledbefore && (cfp->c_flags & UNDO)) {
-					if (curbp->b_mode&MDVIEW)
+					if (b_val(curbp,MDVIEW))
 						return(rdonly());
 					mayneedundo();
 				}
@@ -111,10 +140,10 @@ globber(f, n, g_or_v)
 				havemotion = NULL;
 				calledbefore = TRUE;
 			}
-			if (lp != curwp->w_dotp) {
+			if (lp != curwp->w_dot.l) {
 				/* make sure we're still in the buffer, since
 					action might have caused delete, etc. */
-				lp = curwp->w_dotp;
+				lp = curwp->w_dot.l;
 			}
 		}
 		lp = lforw(lp);

@@ -6,6 +6,14 @@
  * into nothing if not a VT52 style device. The
  * bell on the VT52 is terrible, so the "beep"
  * routine is conditionalized on defining BEL.
+ *
+ * $Log: vt52.c,v $
+ * Revision 1.2  1991/08/07 12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.1
+ * date: 1990/09/21 10:26:20;
+ * initial vile RCS revision
  */
 #define	termdef	1			/* don't define "term" external */
 

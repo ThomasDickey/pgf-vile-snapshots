@@ -69,22 +69,115 @@
 #		currently used or implemented, but they were defined in the command
 #		table for the Steve Kirkendall's elvis editor, so I included them
 #		here for completeness.
+#
+# $Log: cmdtbl,v $
+# Revision 1.21  1991/08/14 12:08:54  pgf
+# showmodes command now does new-style show
+#
+# Revision 1.20  1991/08/12  15:06:21  pgf
+# added ANSI_SPEC capability -- can now use the arrow keys from
+# command or insert mode
+#
+# Revision 1.19  1991/08/07  11:56:58  pgf
+# added RCS log entries
+#
+# revision 1.18
+# date: 1991/08/06 15:55:01;
+# added "Q!"
+# 
+# revision 1.17
+# date: 1991/08/06 15:28:15;
+# mode listing changes
+# 
+# revision 1.16
+# date: 1991/07/23 11:10:51;
+# made the top, bottom, and middle of screen commands (H,M,L) absolute
+# 
+# revision 1.15
+# date: 1991/07/19 17:18:58;
+# change over-wordy "end-of-line" and "begi..." to "eol" and "bol"
+# 
+# revision 1.14
+# date: 1991/06/26 09:34:53;
+# new, rationalized(?) names
+# 
+# revision 1.13
+# date: 1991/06/16 17:41:39;
+# added entab, detab, and trim operator commands
+# 
+# revision 1.12
+# date: 1991/06/15 09:08:01;
+# added new forwchar_to_eol, and backchar_to_eol
+# 
+# revision 1.11
+# date: 1991/06/13 15:19:03;
+# made "source" a synonym for "execute-file"
+# 
+# revision 1.10
+# date: 1991/06/03 17:34:59;
+# switch from "meta" etc. to "ctla" etc.
+# 
+# revision 1.9
+# date: 1991/06/03 15:53:18;
+# added "set-variable"
+# 
+# revision 1.8
+# date: 1991/06/03 12:19:25;
+# added some ifdefs for unresoved refs when TAGS, GLOBALS, or WORDPRO
+# is turned off
+# 
+# revision 1.7
+# date: 1991/06/03 10:27:54;
+# added rebind-key synonym for bind-key, and
+# took out named version and GLOBOK flag on "join", since it
+# doesn't work after "g" command anymore (need to take a region to
+# work now)
+# 
+# revision 1.6
+# date: 1991/05/31 11:37:16;
+# a bunch of changes for ex commands and line ranges
+# 
+# revision 1.5
+# date: 1991/04/04 09:35:07;
+# added filterregion, and some text improvements
+# 
+# revision 1.4
+# date: 1991/04/04 09:31:59;
+# added horiz. scrolling and window resizing commands
+# 
+# revision 1.3
+# date: 1990/10/12 19:33:30;
+# added ^A-/ for scrsearchpat
+# 
+# revision 1.2
+# date: 1990/10/01 10:38:25;
+# change execcmd to NEVER -- the routine itself has been ifdefed out
+# 
+# revision 1.1
+# date: 1990/09/21 10:24:53;
+# initial vile RCS revision
+#
 
 altbuff		NONE
 	"alternate-buffer"		!FEWNAMES
 	'^^'
 append		REDO|UNDO
-	"appendchar"			!FEWNAMES
+	"append-chars"			!FEWNAMES
 	'a'
 appendeol	REDO|UNDO
-	"append-eol"			!FEWNAMES
+	"append-chars-at-eol"			!FEWNAMES
 	'A'
 apro		NONE			APROP|REBIND
 	"apropos"
+	"list-commands-apropos-to"
 backchar	MOTION
 	"backward-character"		!FEWNAMES
+backchar_to_bol	MOTION
+	"backward-character-to-bol"	!FEWNAMES
 	'h'
 	'^H'
+	'^?'
+	'FN-D'				ANSI_SPEC
 backdelchar	REDO|UNDO
 	"delete-previous-character"	!FEWNAMES
 	'X'
@@ -92,21 +185,31 @@ backhunt	ABS|MOTION		!SMALLER
 	"hunt-backward"
 backhpage	NONE
 	"previous-half-page"		!FEWNAMES
+	"back-half-page"		!FEWNAMES
+	"up-half-page"		!FEWNAMES
 	'^U'
 backline	GOAL|MOTION|FL
 	"previous-line"			!FEWNAMES
+	"back-line"			!FEWNAMES
+	"up-line"			!FEWNAMES
 	'k'
+	'FN-A'				ANSI_SPEC
 backbline	MOTION|FL
 	"previous-line-at-bol"		!FEWNAMES
+	"back-line-at-bol"		!FEWNAMES
+	"up-line-at-bol"		!FEWNAMES
 	'-'
 backpage	MOTION
 	"previous-page"			!FEWNAMES
+	"back-page"			!FEWNAMES
 	'^B'
 backword	MOTION
 	"previous-word"			!FEWNAMES
+	"back-word"			!FEWNAMES
 	'B'
 backviword	MOTION
-	"previous-punc-word"		!FEWNAMES
+	"previous-punctuated-word"		!FEWNAMES
+	"back-punctuated-word"		!FEWNAMES
 	'b'
 backsearch	ABS|MOTION
 	"search-reverse"		!FEWNAMES
@@ -128,12 +231,15 @@ cntl_xf		NONE
 	'^X'
 chgchar		REDO|UNDO
 	"change-char"			!FEWNAMES
+	"delete-char-and-insert-chars"		!FEWNAMES
 	's'
 chgline		REDO|UNDO
 	"change-line"			!FEWNAMES
+	"delete-line-and-insert-chars"		!FEWNAMES
 	'S'
 chgtoeol	REDO|UNDO
-	"change-to-end-of-line"		!FEWNAMES
+	"change-to-eol"		!FEWNAMES
+	"delete-to-eol-and-insert-chars"	!FEWNAMES
 	'C'
 clrmes		NONE
 	"clear-message-line"		!FEWNAMES
@@ -141,7 +247,7 @@ consearch	ABS|MOTION
 	"continue-search"		!FEWNAMES
 	'n'
 opercopy		OPER|(RANGE|EXTRA)
-	"copy"
+	"copy-til"
 	"c"
 ctlxlp		NONE
 	"begin-macro"			!FEWNAMES
@@ -252,20 +358,20 @@ delgmode	NONE
 	"delete-global-mode"		!FEWNAMES
 	"setgno"
 	"unsetg"
-delmode		NONE|(EXRCOK|EXTRA)
-	"delete-mode"			!FEWNAMES
 	"setno"
 	"unset"
+delmode		NONE|(EXRCOK|EXTRA)
+	"delete-mode"			!FEWNAMES
+	"setlno"
+	"unsetl"
 deltoeol	REDO|UNDO
-	"delete-to-end-of-line"		!FEWNAMES
+	"delete-to-eol"		!FEWNAMES
 	'D'
 desbind		NONE			REBIND
 	"describe-bindings"
+	"list-bindings"
 deskey		NONE			REBIND
 	"describe-key"
-detab		REDO|UNDO		AEDIT
-	"detab-line"			!FEWNAMES
-	'^A- '
 dotcmdplay	NONE
 	"repeat-last-cmd"		!FEWNAMES
 	'.'
@@ -275,15 +381,13 @@ execcmd		NONE			NEVER
 	"execute-command-line"		!FEWNAMES
 execfile	NONE			!SMALLER
 	"execute-file"			!FEWNAMES
+	"source"
 execproc	REDO			PROC
 	"execute-procedure"		!FEWNAMES
 	"run"
 enlargewind	NONE
 	"grow-window"			!FEWNAMES
 	'V'
-entab		REDO|UNDO		AEDIT
-	"entab-line"			!FEWNAMES
-	'^A-^I'
 esc		NONE
 	"abort-command"			!FEWNAMES
 	'^['
@@ -291,7 +395,7 @@ fcsrch		MOTION
 	"forward-char-scan"		!FEWNAMES
 	'f'
 fcsrch_to	MOTION
-	"forward-char-scan-to"		!FEWNAMES
+	"forward-char-scan-up-to"	!FEWNAMES
 	't'
 filefind	NONE|(BANG|FILE1|PLUS)
 	"e"
@@ -335,34 +439,52 @@ forwdelchar	REDO|UNDO
 	"delete-next-character"		!FEWNAMES
 	'x'
 forwhpage	NONE
+	"forward-half-page"		!FEWNAMES
 	"next-half-page"		!FEWNAMES
+	"down-half-page"		!FEWNAMES
 	'^D'
 forwchar	MOTION
 	"forward-character"		!FEWNAMES
+	"next-character"		!FEWNAMES
+forwchar_to_eol	MOTION
+	"forward-character-to-eol"	!FEWNAMES
+	"next-character-to-eol"	!FEWNAMES
 	' '
 	'l'
+	'FN-C'				ANSI_SPEC
 forwpage	MOTION
+	"forward-page"			!FEWNAMES
 	"next-page"			!FEWNAMES
+	"down-page"			!FEWNAMES
 	'^F'
 forwline	GOAL|MOTION|FL
+	"forward-line"			!FEWNAMES
 	"next-line"			!FEWNAMES
+	"down-line"			!FEWNAMES
 	'j'
 	'^J'
+	'FN-B'				ANSI_SPEC
 forwbline	MOTION|FL
+	"forward-line-at-bol"		!FEWNAMES
 	"next-line-at-bol"		!FEWNAMES
+	"down-line-at-bol"		!FEWNAMES
 	'+'
 	'^M'
 forwword	MOTION
+	"forward-word"			!FEWNAMES
 	"next-word"			!FEWNAMES
 	'W'
 forwviword	MOTION
-	"next-punc-word"		!FEWNAMES
+	"forward-punctuated-word"		!FEWNAMES
+	"next-punctuated-word"		!FEWNAMES
 	'w'
 forwendw	MOTION
+	"forward-word-end"			!FEWNAMES
 	"next-word-end"			!FEWNAMES
 	'E'
 forwviendw	MOTION
-	"next-punc-word-end"		!FEWNAMES
+	"forward-punctuated-word-end"		!FEWNAMES
+	"next-punctuated-word-end"		!FEWNAMES
 	'e'
 forwhunt	ABS|MOTION		!SMALLER
 	"hunt-forward"			!FEWNAMES
@@ -382,34 +504,51 @@ gomark		MOTION|FL|(RANGE)
 
 gotobop		ABS|MOTION		WORDPRO
 	"previous-paragraph"		!FEWNAMES
+	"back-paragraph"		!FEWNAMES
+	"up-paragraph"		!FEWNAMES
 	'{'
 gotoeop		ABS|MOTION		WORDPRO
+	"forward-paragraph"		!FEWNAMES
 	"next-paragraph"		!FEWNAMES
+	"down-paragraph"		!FEWNAMES
 	'}'
 gotobob		ABS|MOTION		!SMALLER
 	"beginning-of-file"		!FEWNAMES
+	"goto-beginning-of-file"	!FEWNAMES
 gotoeob		ABS|MOTION		!SMALLER
+	"goto-end-of-file"		!FEWNAMES
 	"end-of-file"			!FEWNAMES
 gotobol		MOTION
+	"goto-bol"			!FEWNAMES
 	"beginning-of-line"		!FEWNAMES
+	"bol"				!FEWNAMES
 	'0'
 gotoeol		MOTION|GOAL
+	"goto-eol"			!FEWNAMES
 	"end-of-line"			!FEWNAMES
+	"eol"				!FEWNAMES
 	'$'
-gotobos		MOTION|FL
+gotobos		ABS|MOTION|FL
+	"goto-beginning-of-screen"	!FEWNAMES
 	"beginning-of-screen"		!FEWNAMES
 	'H'
-gotomos		MOTION|FL
+gotomos		ABS|MOTION|FL
+	"goto-middle-of-screen"		!FEWNAMES
 	"middle-of-screen"		!FEWNAMES
 	'M'
-gotoeos		MOTION|FL
+gotoeos		ABS|MOTION|FL
+	"goto-end-of-screen"		!FEWNAMES
 	"end-of-screen"			!FEWNAMES
 	'L'
 gotobosec	ABS|MOTION		WORDPRO
 	"previous-section"		!FEWNAMES
+	"back-section"			!FEWNAMES
+	"up-section"			!FEWNAMES
 	'['
 gotoeosec	ABS|MOTION		WORDPRO
+	"forward-section"		!FEWNAMES
 	"next-section"			!FEWNAMES
+	"down-section"			!FEWNAMES
 	']'
 gototag		NONE|(BANG|WORD1)		TAGS
 	"ta"
@@ -435,6 +574,7 @@ goexactnmmark	MOTION
 help		NONE
 	"h"
 	"help"
+	"list-help"
 	'^A-h'
 	'^X-h'
 histbuff	NONE
@@ -442,17 +582,15 @@ histbuff	NONE
 	'_'
 	"_"
 insert		REDO|UNDO
-	"insertchar"			!FEWNAMES
+	"insert-chars"			!FEWNAMES
 	'i'
 insertbol	REDO|UNDO
-	"insert-bol"			!FEWNAMES
+	"insert-chars-at-bol"	!FEWNAMES
 	'I'
-insfiletop		REDO|UNDO	BEFORE
-	"R"
-	"insert-file-at-top"			!FEWNAMES
 insfile		REDO|UNDO|GLOBOK|(FROM|ZERO|NAMEDF)
 	"r"
 	"insert-file"			!FEWNAMES
+	"read-file"			!FEWNAMES
 	'^R'
 insspace	REDO|UNDO		!SMALLER
 	"insert-space"			!FEWNAMES
@@ -489,9 +627,6 @@ map		NONE|(EXRCOK|BANG|EXTRA)
 cntl_af		NONE
 	"cntl_a-prefix"
 	'^A'
-opermove	OPER|(RANGE|EXTRA)
-	"move"
-	"m"
 mvdnnxtwind	NONE
 	"move-next-window-down"		!FEWNAMES
 	'^A-^E'
@@ -539,9 +674,20 @@ ex	NONE|(BANG|FILE1)
 	"ex"
 operchg		OPER|REDO|UNDO
 	"change-til"			!FEWNAMES
+	"delete-and-insert-chars-til"			!FEWNAMES
 	'c'
+operdetab	OPER|REDO|UNDO|GLOBOK|(RANGE)	AEDIT
+	"detab-lines-til"		!FEWNAMES
+	'^A- '
+operentab	OPER|REDO|UNDO|GLOBOK|(RANGE)	AEDIT
+	"entab-lines-til"		!FEWNAMES
+	'^A-^I'
+opermove	OPER|(RANGE|EXTRA)
+	"move-til"
+	"m"
 operlinechg	OPER|REDO|UNDO|(RANGE)
 	"change-lines-til"		!FEWNAMES
+	"delete-lines-and-insert-chars-til"		!FEWNAMES
 	"ch"
 	'^X-c'
 operdel		OPER|REDO|UNDO
@@ -564,10 +710,10 @@ operflip	OPER|REDO|UNDO|GLOBOK|(RANGE)
 	"~"
 	'^A-~'
 # RANGE commented out, since it's not done.... 
-operglobals	OPER|(/*RANGE|*/BANG|EXTRA|DFLALL)	GLOBALS
+operglobals	(/*RANGE|*/BANG|EXTRA|DFLALL)	GLOBALS
 	"global"
 	"g"
-opervglobals	OPER|(RANGE|BANG|EXTRA|DFLALL)	GLOBALS
+opervglobals	(RANGE|BANG|EXTRA|DFLALL)	GLOBALS
 	"vglobal"
 	"v"
 operlower	OPER|REDO|UNDO|GLOBOK|(RANGE)
@@ -593,9 +739,13 @@ operrshift	OPER|REDO|UNDO|GLOBOK|(RANGE)
 	">"
 	'>'
 opersubst	OPER|REDO|UNDO|GLOBOK|(RANGE|EXTRA)
-	"substitute"			!FEWNAMES
+	"substitute-til"		!FEWNAMES
 	"s"
 	'^X-s'
+opertrim	REDO|UNDO|GLOBOK|UNDO|(RANGE)	AEDIT
+	"trim-lines-til"		!FEWNAMES
+	"trim"
+	'^A-t'
 operyank	OPER
 	"yank-til"			!FEWNAMES
 	'y'
@@ -604,13 +754,11 @@ operlineyank	OPER|(RANGE|WORD1)
 	"y"
 	'^X-y'
 openup		REDO|UNDO|(FROM)
-	"open-line-above"		!FEWNAMES
-	"insert"
+	"open-line-above-and-insert-chars"	!FEWNAMES
 	"i"
 	'O'
 opendown	REDO|UNDO|(FROM|ZERO)
-	"open-line-below"		!FEWNAMES
-	"append"
+	"open-line-below-and-append-chars"	!FEWNAMES
 	"a"
 	'o'
 operwrite	OPER|(RANGE|BANG|FILE1|DFLALL)
@@ -619,7 +767,7 @@ operwrite	OPER|(RANGE|BANG|FILE1|DFLALL)
 	"write-til"			!FEWNAMES
 	'^W'
 overwrite	REDO|UNDO
-	"overwrite"			!FEWNAMES
+	"overwrite-chars"		!FEWNAMES
 	'R'
 onlywind	NONE
 	"delete-other-windows"		!FEWNAMES
@@ -644,17 +792,20 @@ quit		NONE|(BANG)
 	"q"
 	"Q"
 	"exit"
+	"quit"
 	'Q'
 	'^X-^C'
 quithard	NONE
+	"quit-without-save"
 	"q!"
+	"Q!"
 quickexit	NONE|(BANG|NL)
 	"x"
 	"xit"
 	"quick-exit"			!FEWNAMES
 	'Z'
 quote		REDO|UNDO
-	"quote-character"		!FEWNAMES
+	"quote-next-character"		!FEWNAMES
 	'^V'
 refresh		NONE
 	"clear-and-redraw"		!FEWNAMES
@@ -703,10 +854,10 @@ spawncli	NONE
 savewnd		NONE			!SMALLER
 	"save-window"
 scrnextup	NONE
-	"scroll-next-up"		!FEWNAMES
+	"scroll-next-window-up"		!FEWNAMES
 	'^A-^U'
 scrnextdw	NONE
-	"scroll-next-down"		!FEWNAMES
+	"scroll-next-window-down"	!FEWNAMES
 	'^A-^D'
 setfillcol	NONE
 	"set-fill-column"
@@ -715,9 +866,10 @@ setkey		NONE			CRYPT
 	"set-crypt-key"
 	'^X-X'
 setmode		NONE|(EXRCOK|EXTRA)
-	"set"
+	"setl"
 	"set-mode"			!FEWNAMES
 setgmode	NONE
+	"set"
 	"setg"
 	"set-global-mode"
 setnmmark	NONE|(FROM+WORD1)
@@ -731,24 +883,28 @@ setvmalloc	NONE			VMALLOC
 	"vmalloc"
 	'^X-v'
 showcpos	NONE
-	"position"		!FEWNAMES
+	"position"			!FEWNAMES
 	'^G'
 	'^X-='
-showmodes	NONE
+listmodes	NONE
 	"modes"
 	"show-modes"
+	"list-modes"
 	"setall"
-showgmodes	NONE
+	"setgall"
 	"gmodes"
 	"show-global-modes"
-	"setgall"
+	"showmodes"
+showmodes	NONE			BEFORE
+showgmodes	NONE
+	"showgmodes"
 showversion	NONE|(EXRCOK)
 	"version"
 shrinkwind	NONE
 	"shrink-window"			!FEWNAMES
 	'v'
 source		NONE|(EXRCOK|NAMEDF)
-	"source"
+	"exsource"
 spawn		NONE
 #	"!"
 	"shell-command"			!FEWNAMES
@@ -764,15 +920,12 @@ subst_again	REDO|UNDO|GLOBOK|(RANGE|EXTRA)
 	"substitute-again"		!FEWNAMES
 	"&"
 opertransf	OPER|(RANGE+EXTRA)
+	"transfer-til"
 	"t"
 togglelistbuffers	NONE
 	"*"
 	"toggle-buffer-list"		!FEWNAMES
 	'*'
-trimline		REDO|UNDO|GLOBOK
-	"trim-line"			!FEWNAMES
-	"trim"
-	'^A-t'
 twiddle		REDO|UNDO		!SMALLER
 	"transpose-characters"		!FEWNAMES
 unbindkey	NONE			REBIND

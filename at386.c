@@ -1,5 +1,26 @@
 /*	AT386:   hacked tcap.c for the 386 console, when you don't
-		have libtermcap.   grrr.
+ *		have libtermcap.   grrr.
+ *
+ * $Log: at386.c,v $
+ * Revision 1.5  1991/08/07 12:34:39  pgf
+ * added RCS log messages
+ *
+ * revision 1.4
+ * date: 1991/06/19 01:32:21;
+ * change name of howmany 'cuz of HP/UX conflict
+ * sheesh
+ * 
+ * revision 1.3
+ * date: 1991/05/31 10:27:03;
+ * moved PRETTIER_SCROLL #define to estruct.h
+ * 
+ * revision 1.2
+ * date: 1990/10/01 10:37:32;
+ * un-#ifdef spal()
+ * 
+ * revision 1.1
+ * date: 1990/09/21 10:24:39;
+ * initial vile RCS revision
 */
 
 #define	termdef	1			/* don't define "term" external */
@@ -185,13 +206,13 @@ PRETTIER_SCROLL is prettier but slower -- it scrolls
 */
 
 /* move howmany lines starting at from to to */
-at386scroll_delins(from,to,howmany)
+at386scroll_delins(from,to,n)
 {
 	int i;
 	if (to == from) return;
 #if PRETTIER_SCROLL
 	if (abs(from-to) > 1) {
-		at386scroll_delins(from, (from<to) ? to-1:to+1, howmany);
+		at386scroll_delins(from, (from<to) ? to-1:to+1, n);
 		if (from < to)
 			from = to-1;
 		else
@@ -202,11 +223,11 @@ at386scroll_delins(from,to,howmany)
 		at386move(to,0);
 		for (i = from - to; i > 0; i--)
 			fputs(DL,stdout);
-		at386move(to+howmany,0);
+		at386move(to+n,0);
 		for (i = from - to; i > 0; i--)
 			fputs(AL,stdout);
 	} else {
-		at386move(from+howmany,0);
+		at386move(from+n,0);
 		for (i = to - from; i > 0; i--)
 			fputs(DL,stdout);
 		at386move(from,0);

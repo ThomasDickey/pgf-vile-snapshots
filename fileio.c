@@ -1,6 +1,37 @@
 /*
  * The routines in this file read and write ASCII files from the disk. All of
  * the knowledge about files are here.
+ *
+ * $Log: fileio.c,v $
+ * Revision 1.8  1991/08/08 13:20:23  pgf
+ * set "dosfile" global after reading each line
+ *
+ * Revision 1.7  1991/08/07  12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.6
+ * date: 1991/06/18 20:08:09;
+ * added decl for FILE *npopen()
+ * 
+ * revision 1.5
+ * date: 1991/04/22 09:02:03;
+ * portability
+ * 
+ * revision 1.4
+ * date: 1991/04/08 15:49:44;
+ * added ffhasdata routine
+ * 
+ * revision 1.3
+ * date: 1991/04/04 09:37:25;
+ * minor fixes
+ * 
+ * revision 1.2
+ * date: 1990/10/12 19:30:46;
+ * added beeps on non-writeable
+ * 
+ * revision 1.1
+ * date: 1990/09/21 10:25:18;
+ * initial vile RCS revision
  */
 
 #include        <stdio.h>
@@ -38,6 +69,7 @@ char    *fn;
 
 #if DOSFILES
 	doslines = unixlines = 0;
+	dosfile = FALSE;
 #endif
 
 #if UNIX
@@ -70,6 +102,7 @@ ffwopen(fn)
 char    *fn;
 {
 #if UNIX
+	FILE *npopen();
 	if (*fn == '!') {
 	        if ((ffp=npopen(fn+1, "w")) == NULL) {
 	                mlwrite("Cannot open pipe for writing");
@@ -297,6 +330,7 @@ int *lenp;	/* to return the final length */
 	} else {
 		unixlines++;
 	}
+	dosfile = (doslines > unixlines);
 #endif
 
 	*lenp = i;	/* return the length, not including final null */
