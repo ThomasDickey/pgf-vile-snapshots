@@ -4,7 +4,10 @@
  * do any sentence mode commands, they are likely to be put in this file. 
  *
  * $Log: word.c,v $
- * Revision 1.28  1993/06/02 14:28:47  pgf
+ * Revision 1.29  1993/08/05 14:29:12  pgf
+ * tom's 3.57 changes
+ *
+ * Revision 1.28  1993/06/02  14:28:47  pgf
  * see tom's 3.48 CHANGES
  *
  * Revision 1.27  1993/05/24  15:21:37  pgf
@@ -424,7 +427,7 @@ formatregion()
 			
 		/* and back where we should be */
 		DOT.l = lBACK(DOT.l);
-		firstnonwhite(FALSE,1);
+		(void)firstnonwhite(FALSE,1);
 		
 		clength = indentlen(l_ref(DOT.l));
 		wordlen = 0;

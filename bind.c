@@ -4,7 +4,10 @@
  *	written 11-feb-86 by Daniel Lawrence
  *
  * $Log: bind.c,v $
- * Revision 1.53  1993/07/27 18:06:20  pgf
+ * Revision 1.54  1993/08/05 14:29:12  pgf
+ * tom's 3.57 changes
+ *
+ * Revision 1.53  1993/07/27  18:06:20  pgf
  * see tom's 3.56 CHANGES entry
  *
  * Revision 1.52  1993/07/19  15:28:23  pgf
@@ -1048,6 +1051,7 @@ char *seq;	/* destination string for sequence */
 }
 
 /* insertion_cmd -- what char puts us in insert mode? */
+#if X11
 int
 insertion_cmd()
 {
@@ -1057,6 +1061,7 @@ insertion_cmd()
 		back_to_ins_char = fnc2key(&f_insert);
 	return back_to_ins_char;
 }
+#endif /* X11 */
 
 /* kcode2kbind: translate a 10-bit key-binding to the table-pointer
  */
@@ -1139,6 +1144,7 @@ CMDFUNC *cfp;	/* ptr to the requested function to bind to */
 		to that function
 */
 
+#if X11
 int
 fnc2key(cfp)
 CMDFUNC *cfp;	/* ptr to the requested function to bind to */
@@ -1151,6 +1157,7 @@ CMDFUNC *cfp;	/* ptr to the requested function to bind to */
 	}
 	return -1;
 }
+#endif
 
 #if NEEDED
 /* translate a function pointer to its associated flags */

@@ -4,7 +4,10 @@
  *	written 1986 by Daniel Lawrence	
  *
  * $Log: exec.c,v $
- * Revision 1.65  1993/07/27 18:06:20  pgf
+ * Revision 1.66  1993/08/05 14:29:12  pgf
+ * tom's 3.57 changes
+ *
+ * Revision 1.65  1993/07/27  18:06:20  pgf
  * see tom's 3.56 CHANGES entry
  *
  * Revision 1.64  1993/07/19  15:27:06  pgf
@@ -279,6 +282,32 @@ int	eolchar;
 	return TRUE;
 }
 
+/* returns true iff we are in a named-command and if the user ended the last
+ * prompt with a carriage-return.
+ */
+int
+end_named_cmd()
+{
+	if (isnamedcmd) {
+		register int c = end_string();
+		return isreturn(c);
+	}
+	return FALSE;
+}
+
+/* returns true iff we are in a named-command and if the user did not end the
+ * last prompt with a carriage-return.
+ */
+int
+more_named_cmd()
+{
+	if (isnamedcmd) {
+		register int c = end_string();
+		return !isreturn(c);
+	}
+	return FALSE;
+}
+
 /* namedcmd:	execute a named command even if it is not bound */
 #if SMALLER
 #define execute_named_command namedcmd
@@ -517,12 +546,12 @@ seems like we need one more check here -- is it from a .exrc file?
 	}
 	if (!same_ptr(toline, null_ptr) && (flags & TO)) {
 		DOT.l = toline;
-		firstnonwhite(f,n);
+		(void)firstnonwhite(f,n);
 		setmark();
 	}
 	if (!same_ptr(fromline, null_ptr) && (flags & FROM)) {
 		DOT.l = fromline;
-		firstnonwhite(f,n);
+		(void)firstnonwhite(f,n);
 		if (same_ptr(toline, null_ptr))
 			setmark();
 	}

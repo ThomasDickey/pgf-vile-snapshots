@@ -3,7 +3,10 @@
  *		6/3/93
  *
  * $Log: map.c,v $
- * Revision 1.6  1993/07/15 10:37:58  pgf
+ * Revision 1.7  1993/08/05 14:29:12  pgf
+ * tom's 3.57 changes
+ *
+ * Revision 1.6  1993/07/15  10:37:58  pgf
  * see 3.55 CHANGES
  *
  * Revision 1.5  1993/07/01  16:15:54  pgf
@@ -210,15 +213,16 @@ int f,n;
 	char 	kbuf[NSTRING];
 	char 	val[NSTRING];
 
+#if OPT_MAP_DISPLAY
+	if (end_named_cmd()) {
+		show_mapped_chars();
+		return TRUE;
+	}
+#endif
 	kbuf[0] = EOS;
 	status = mlreply("map key: ", kbuf, sizeof(kbuf));
-	if (status != TRUE) {
-#if OPT_MAP_DISPLAY
-		if (status == FALSE)
-			show_mapped_chars();
-#endif
+	if (status != TRUE)
 		return status;
-	}
 
 	hst_glue(' ');
 	val[0] = EOS;
@@ -273,10 +277,16 @@ int	f,n;
 	}
 
 	(void)tb_init(&MapMacro, abortc);
+	if (n != 1) {
+		char	num[10];
+		(void)lsprintf(num, "%d", n);
+		if (!tb_sappend(&MapMacro, num))
+			return FALSE;
+	}
 	if (!tb_sappend(&MapMacro, keymapped->kbdseq))
 		return FALSE;
 
 	keymapped = NULL;
 
-	return start_kbm(n, DEFAULT_REG, MapMacro);
+	return start_kbm(1, DEFAULT_REG, MapMacro);
 }

@@ -11,7 +11,10 @@
  * which means that the dot and mark values in the buffer headers are nonsense.
  *
  * $Log: line.c,v $
- * Revision 1.50  1993/07/27 18:06:20  pgf
+ * Revision 1.51  1993/08/05 14:29:12  pgf
+ * tom's 3.57 changes
+ *
+ * Revision 1.50  1993/07/27  18:06:20  pgf
  * see tom's 3.56 CHANGES entry
  *
  * Revision 1.49  1993/07/21  11:35:21  pgf
@@ -1293,7 +1296,7 @@ int f,n,after,putlines;
 	if (is_header_line(curwp->w_dot, curbp))
 		curwp->w_dot.l = lBACK(curwp->w_dot.l);
 	if (lining)
-		firstnonwhite(FALSE,0);
+		(void)firstnonwhite(FALSE,0);
 	ukb = 0;
 	return (s);
 }

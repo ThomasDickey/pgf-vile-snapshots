@@ -17,7 +17,10 @@
  *	modify (ifdef-style) 'expand_leaf()' to allow ellipsis.
  *
  * $Log: glob.c,v $
- * Revision 1.11  1993/06/25 11:25:55  pgf
+ * Revision 1.12  1993/08/05 14:29:12  pgf
+ * tom's 3.57 changes
+ *
+ * Revision 1.11  1993/06/25  11:25:55  pgf
  * patches for Watcom C/386, from Tuan DANG
  *
  * Revision 1.10  1993/06/18  15:57:06  pgf
@@ -411,12 +414,22 @@ char	*pattern;
 /*
  * Comparison-function for 'qsort()'
  */
-#if !__STDC__ && !defined(__TURBOC__)
+#if __STDC__ || defined(__TURBOC__) || WATCOM
+#if defined(apollo) && !defined(__STDCPP__)
+#define	ANSI_QSORT 0	/* cc 6.7 */
+#else
+#define	ANSI_QSORT 1
+#endif
+#else
+#define	ANSI_QSORT 0
+#endif
+
+#if !ANSI_QSORT
 static	int	compar P(( char **, char ** ));
 #endif
 
 static int
-#if __STDC__ || defined(__TURBOC__) || WATCOM
+#if ANSI_QSORT
 compar (const void *a, const void *b)
 #else
 compar (a, b)

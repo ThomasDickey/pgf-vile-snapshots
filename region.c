@@ -6,7 +6,10 @@
  * internal use.
  *
  * $Log: region.c,v $
- * Revision 1.26  1993/07/27 18:06:20  pgf
+ * Revision 1.27  1993/08/05 14:29:12  pgf
+ * tom's 3.57 changes
+ *
+ * Revision 1.26  1993/07/27  18:06:20  pgf
  * see tom's 3.56 CHANGES entry
  *
  * Revision 1.25  1993/06/23  21:27:54  pgf
@@ -206,8 +209,7 @@ int	flag;
 		if (b_val(curbp,MDTABINSERT))
 			entabline(TRUE);
 	}
-	firstnonwhite(FALSE,1);
-	return TRUE;
+	return firstnonwhite(FALSE,1);
 }
 
 /*
@@ -483,7 +485,7 @@ int arg;
 			}
 
         	}
-		firstnonwhite(FALSE,1);
+		(void)firstnonwhite(FALSE,1);
 	}
 	rls_region();
         return status;

@@ -4,7 +4,10 @@
  *		Chris Janton's (chj) VMS Icon port.
  *
  * $Log: vmspipe.c,v $
- * Revision 1.1  1993/04/01 12:54:44  pgf
+ * Revision 1.2  1993/08/05 14:29:12  pgf
+ * tom's 3.57 changes
+ *
+ * Revision 1.1  1993/04/01  12:54:44  pgf
  * Initial revision
  *
  */
@@ -232,10 +235,8 @@ vms_rpipe (char *cmd, int fd, char *input_file)
 	} else {
 		FILE	*pp;
 		int	len;
-		int	count	= 0,
-			working	= 0;
+		int	count	= 0;
 		char	buffer[MAXBFR];
-		long	that	= time(0);
 
 		pd->running = 1;
 
@@ -246,13 +247,6 @@ vms_rpipe (char *cmd, int fd, char *input_file)
 		 */
 		if (pp = tmpfile()) {
 			for (;;) {
-				long	this = time(0);
-				if (this > that) {
-					mlforce((working++ & 1)
-						? "Working..."
-						: "...Working");
-					that = this;
-				}
 				len = vms_pread(pfile, buffer, sizeof(buffer));
 				if (len <= 0)
 					break;

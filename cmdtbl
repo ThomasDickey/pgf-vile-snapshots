@@ -72,7 +72,14 @@
 #		here for completeness.
 #
 # $Log: cmdtbl,v $
-# Revision 1.67  1993/07/15 10:37:58  pgf
+# Revision 1.69  1993/08/05 14:35:57  pgf
+# changed name of setmode to avoid library conflict with djgpp compiler
+# (also changed delmode, setgmode, and delgmode to be consistent)
+#
+# Revision 1.68  1993/08/05  14:29:12  pgf
+# tom's 3.57 changes
+#
+# Revision 1.67  1993/07/15  10:37:58  pgf
 # see 3.55 CHANGES
 #
 # Revision 1.66  1993/06/30  10:05:54  pgf
@@ -525,13 +532,13 @@ delwind		NONE
 deblank		REDO|UNDO		AEDIT
 	"delete-blank-lines"		!FEWNAMES
 	'^A-o'
-delgmode	NONE
+delglobmode	NONE
 	"delete-global-mode"		!FEWNAMES
 	"setgno"
 	"unsetg"
 	"setno"
 	"unset"
-delmode		NONE|(EXRCOK|EXTRA)
+dellocmode	NONE|(EXRCOK|EXTRA)
 	"delete-mode"			!FEWNAMES
 	"setlno"
 	"unsetl"
@@ -1107,10 +1114,10 @@ setfillcol	NONE
 ue_setkey	NONE			CRYPT
 	"set-crypt-key"
 	'^X-X'
-setmode		NONE|(EXRCOK|EXTRA)
+setlocmode	NONE|(EXRCOK|EXTRA)
 	"setl"
 	"set-mode"			!FEWNAMES
-setgmode	NONE
+setglobmode	NONE
 	"se"
 	"set"
 	"setg"
@@ -1147,6 +1154,9 @@ showversion	NONE|(EXRCOK)
 	"version"
 showmemory	NONE			TURBO|WATCOM
 	"memory"
+showtagstack	NONE			!SMALLER
+	"tags"				!FEWNAMES
+	"tagstack"
 shrinkwind	NONE
 	"shrink-window"			!FEWNAMES
 	'v'

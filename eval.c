@@ -4,7 +4,10 @@
 	written 1986 by Daniel Lawrence
  *
  * $Log: eval.c,v $
- * Revision 1.62  1993/07/27 18:06:20  pgf
+ * Revision 1.63  1993/08/05 14:29:12  pgf
+ * tom's 3.57 changes
+ *
+ * Revision 1.62  1993/07/27  18:06:20  pgf
  * see tom's 3.56 CHANGES entry
  *
  * Revision 1.61  1993/07/20  18:08:18  pgf
@@ -1130,16 +1133,7 @@ char *val;
 	   ||   !strcmp(temp, "off"));
 }
 
-#if ! SMALLER
-
-/* ARGSUSED */
-int
-gtlbl(tokn)	/* find the line number of the given label */
-char *tokn;	/* label name to find */
-{
-	return(1);
-}
-
+#if !SMALLER || X11
 int stol(val)	/* convert a string to a numeric logical */
 char *val;	/* value to check for stol */
 {
@@ -1151,6 +1145,17 @@ char *val;	/* value to check for stol */
 
 	/* check for numeric truth (!= 0) */
 	return((atoi(val) != 0));
+}
+#endif
+
+#if ! SMALLER
+
+/* ARGSUSED */
+int
+gtlbl(tokn)	/* find the line number of the given label */
+char *tokn;	/* label name to find */
+{
+	return(1);
 }
 
 char *ltos(val)		/* numeric logical to string logical */

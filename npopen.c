@@ -2,7 +2,10 @@
  *		written by John Hutchinson, heavily modified by Paul Fox
  *
  * $Log: npopen.c,v $
- * Revision 1.26  1993/06/25 11:25:55  pgf
+ * Revision 1.27  1993/08/05 14:29:12  pgf
+ * tom's 3.57 changes
+ *
+ * Revision 1.26  1993/06/25  11:25:55  pgf
  * patches for Watcom C/386, from Tuan DANG
  *
  * Revision 1.25  1993/06/18  15:57:06  pgf
@@ -266,11 +269,13 @@ char *cmd;
 
 	if (cpid) { /* parent */
 		int child;
+		if_OPT_WORKING(displaying = SORTOFTRUE)
 		while ((child = wait ((int *)0)) != cpid) {
 			if (child < 0 && errno == EINTR) {
 				(void) kill (SIGKILL, cpid);
 			}
 		}
+		if_OPT_WORKING(displaying = FALSE)
 		return 0;
 	} else {
 		exec_sh_c(cmd);

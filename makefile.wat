@@ -4,7 +4,10 @@
 # T.DANG (dang@cogit.ign.fr)
 #
 # $Log: makefile.wat,v $
-# Revision 1.1  1993/07/09 14:01:14  pgf
+# Revision 1.2  1993/07/27 19:20:00  pgf
+# changed default flags to /ols, to optimize by default
+#
+# Revision 1.1  1993/07/09  14:01:14  pgf
 # new clean target, added map.c/map.obj, added /p to compile lines
 #
 # Revision 1.0  1993/06/25  14:41:16  pgf
@@ -49,7 +52,8 @@ vile.lnk: $(OBJ)
 	for %i in ($(OBJ)) do echo FILE %i >>$^@
 
 .c.obj:	estruct.h nemode.h edef.h proto.h 
-	wcl386/p $[* /c /d2 $(CFLAGS) 
+#	wcl386/p $[* /c /d2 $(CFLAGS) 
+	wcl386/p $[* /c /ols $(CFLAGS) 
 
 nebind.h &
 nefunc.h &

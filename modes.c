@@ -8,8 +8,12 @@
  * Major extensions for vile by Paul Fox, 1991
  *
  *	$Log: modes.c,v $
- *	Revision 1.20  1993/07/15 10:37:58  pgf
- *	see 3.55 CHANGES
+ *	Revision 1.21  1993/08/05 14:35:57  pgf
+ *	changed name of setmode to avoid library conflict with djgpp compiler
+ *	(also changed delmode, setgmode, and delgmode to be consistent)
+ *
+ * Revision 1.20  1993/07/15  10:37:58  pgf
+ * see 3.55 CHANGES
  *
  * Revision 1.19  1993/07/01  16:15:54  pgf
  * tom's 3.51 changes
@@ -863,7 +867,7 @@ int global;	/* true = global flag,	false = current buffer flag */
 
 /* ARGSUSED */
 int
-setmode(f, n)	/* prompt and set an editor mode */
+setlocmode(f, n)	/* prompt and set an editor mode */
 int f, n;	/* default and argument */
 {
 	return adjustmode(TRUE, FALSE);
@@ -871,7 +875,7 @@ int f, n;	/* default and argument */
 
 /* ARGSUSED */
 int
-delmode(f, n)	/* prompt and delete an editor mode */
+dellocmode(f, n)	/* prompt and delete an editor mode */
 int f, n;	/* default and argument */
 {
 	return adjustmode(FALSE, FALSE);
@@ -879,7 +883,7 @@ int f, n;	/* default and argument */
 
 /* ARGSUSED */
 int
-setgmode(f, n)	/* prompt and set a global editor mode */
+setglobmode(f, n)	/* prompt and set a global editor mode */
 int f, n;	/* default and argument */
 {
 	return adjustmode(TRUE, TRUE);
@@ -887,7 +891,7 @@ int f, n;	/* default and argument */
 
 /* ARGSUSED */
 int
-delgmode(f, n)	/* prompt and delete a global editor mode */
+delglobmode(f, n)	/* prompt and delete a global editor mode */
 int f, n;	/* default and argument */
 {
 	return adjustmode(FALSE, TRUE);

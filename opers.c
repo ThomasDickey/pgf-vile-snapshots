@@ -4,7 +4,10 @@
  * written for vile by Paul Fox, (c)1990
  *
  * $Log: opers.c,v $
- * Revision 1.30  1993/07/27 18:06:20  pgf
+ * Revision 1.31  1993/08/05 14:29:12  pgf
+ * tom's 3.57 changes
+ *
+ * Revision 1.30  1993/07/27  18:06:20  pgf
  * see tom's 3.56 CHANGES entry
  *
  * Revision 1.29  1993/06/02  14:58:17  pgf
@@ -214,7 +217,7 @@ char *str;
 
 	if (fulllineregions) {
 		fulllineregions = FALSE;
-		firstnonwhite(f,n);
+		(void)firstnonwhite(f,n);
 	}
 
 	doingopcmd = FALSE;

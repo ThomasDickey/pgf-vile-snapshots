@@ -5,7 +5,14 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.72  1993/07/27 18:06:20  pgf
+ * Revision 1.74  1993/08/05 14:35:57  pgf
+ * changed name of setmode to avoid library conflict with djgpp compiler
+ * (also changed delmode, setgmode, and delgmode to be consistent)
+ *
+ * Revision 1.73  1993/08/05  14:29:12  pgf
+ * tom's 3.57 changes
+ *
+ * Revision 1.72  1993/07/27  18:06:20  pgf
  * see tom's 3.56 CHANGES entry
  *
  * Revision 1.71  1993/07/19  15:28:59  pgf
@@ -231,7 +238,7 @@ extern void loop P(( void ));
 extern char * strmalloc P(( char * ));
 extern int no_memory P(( char * ));
 extern void global_val_init P(( void ));
-extern DEFINE_SIGNAL(catchintr);
+extern SIGT catchintr (DEFINE_SIG_ARGS);
 extern void do_repeats P(( int *, int *, int * ));
 extern int writeall P(( int, int ));
 extern int zzquit P(( int, int ));
@@ -351,7 +358,9 @@ extern char * flook P(( char *, int ));
 extern char * kcod2str P(( int, char * ));
 extern char * string2prc P(( char *, char * ));
 extern char * kcod2prc P(( int, char * ));
+#if X11
 extern int insertion_cmd P(( void ));
+#endif
 #ifdef GMDDOTMACRO
 extern int fnc2kcod P(( CMDFUNC * ));
 #endif
@@ -361,7 +370,9 @@ extern KBIND * kcode2kbind P(( int ));
 extern CMDFUNC * kcod2fnc P(( int ));
 extern int prc2kcod P(( char * ));
 extern char * prc2engl P(( char * ));
+#if X11
 extern int fnc2key P(( CMDFUNC * ));
+#endif
 extern char * kbd_engl P(( char *, char * ));
 extern void kbd_alarm P(( void ));
 extern void kbd_putc P(( int ));
@@ -441,10 +452,16 @@ extern void reframe P(( WINDOW * ));
 extern int update P(( int ));
 extern void upmode P(( void ));
 extern int offs2col P(( WINDOW *, LINEPTR, C_NUM ));
+#if X11
+extern int col2offs P(( WINDOW *, LINEPTR, C_NUM ));
+#endif
 #ifdef WMDLINEWRAP
 extern int line_height P(( WINDOW *, LINEPTR ));
 #else
 #define line_height(wp,lp) 1
+#endif
+#if defined(WMDLINEWRAP) || defined(X11)
+extern WINDOW *row2window P(( int ));
 #endif
 extern void hilite P((int, int, int, int));
 extern void scrscroll P(( int, int, int ));
@@ -466,8 +483,13 @@ extern char * _lsprintf P(( char *, ... ));
 extern void bputc P(( int ));
 extern void bprintf P((char *, ... ));
 extern void getscreensize P(( int *, int * ));
-extern DEFINE_SIGNAL(sizesignal);
+#if defined(SIGWINCH) && ! X11
+extern SIGT sizesignal (DEFINE_SIG_ARGS);
+#endif
 extern void newscreensize P(( int, int ));
+#if OPT_WORKING
+extern SIGT imworking (DEFINE_SIG_ARGS);
+#endif
 
 /* eval.c */
 extern char * l_itoa P(( int ));
@@ -489,6 +511,8 @@ extern int sindex P(( char *, char * ));
 extern int ernd P(( void ));
 
 /* exec.c */
+extern int end_named_cmd P(( void ));
+extern int more_named_cmd P(( void ));
 extern int namedcmd P(( int, int ));
 extern int rangespec P(( char *, LINEPTR *, LINEPTR *, int *, int * ));
 extern int docmd P(( char *, int, int, int ));
@@ -549,9 +573,6 @@ extern int get_modtime P(( BUFFER *, long * ));
 extern void set_modtime P(( BUFFER *, char * ));
 extern int check_modtime P(( BUFFER *, char * ));
 extern int inquire_modtime P(( BUFFER *, char * ));
-#ifdef not_needed
-extern int check_all_modtimes P(( void ));
-#endif
 extern int check_visible_modtimes P(( void ));
 #endif
 extern int no_such_file P(( char * ));
@@ -577,7 +598,7 @@ extern int kwrite P(( char *, int ));
 extern int filename P(( int, int ));
 extern int ifile P(( char *, int, FILE * ));
 extern int kifile P(( char * ));
-extern DEFINE_SIGNAL(imdying);
+extern SIGT imdying (DEFINE_SIG_ARGS);
 extern void markWFMODE P(( BUFFER * ));
 #if CRYPT
 extern int resetkey P(( BUFFER *, char * ));
@@ -702,10 +723,12 @@ extern int indentlen P(( LINE * ));
 extern char *current_modename P(( void ));
 
 /* isearch.c */
+#if ISRCH
 extern int risearch P(( int, int ));
 extern int fisearch P(( int, int ));
 extern int isearch P(( int, int ));
 extern int get_char P(( void ));
+#endif
 
 /* line.c */
 extern int do_report P(( L_NUM ));
@@ -746,10 +769,10 @@ extern void map_check P(( int ));
 extern int map_proc P((int, int));
 
 /* modes.c */
-extern int setmode P(( int, int ));
-extern int delmode P(( int, int ));
-extern int setgmode P(( int, int ));
-extern int delgmode P(( int, int ));
+extern int setlocmode P(( int, int ));
+extern int dellocmode P(( int, int ));
+extern int setglobmode P(( int, int ));
+extern int delglobmode P(( int, int ));
 extern int settab P(( int, int ));
 extern int adjvalueset P(( char *, int, struct VALNAMES *, int, struct VAL * ));
 extern int setfillcol P(( int, int ));
@@ -937,7 +960,7 @@ extern int findpat P(( int, int, regexp *, int ));
 
 /* spawn.c */
 extern int spawncli P(( int, int ));
-extern DEFINE_SIGNAL(rtfrmshell);
+extern SIGT rtfrmshell (DEFINE_SIG_ARGS);
 extern int bktoshell P(( int, int ));
 extern void pressreturn P(( void ));
 extern int respawn P(( int, int ));
@@ -952,13 +975,10 @@ extern int filter P(( int, int ));
 extern int gototag P(( int, int ));
 extern int cmdlinetag P(( char * ));
 extern int tags P(( char *, int ));
-extern void nth_name P(( char *,  char *, int ));
-extern BUFFER * gettagsfile P(( int, int * ));
-extern LINE * cheap_scan P(( BUFFER *, char *, int ));
 extern int untagpop P(( int, int ));
-extern void pushuntag P(( char *, int ));
-extern int popuntag P(( char *, int * ));
-extern void tossuntag P(( void ));
+#if !SMALLER
+extern int showtagstack P(( int, int ));
+#endif
 #endif /* TAGS */
 
 /* termio.c */
@@ -986,6 +1006,7 @@ extern int lineundo P(( int, int ));
 extern void dumpuline P(( LINEPTR ));
 
 /* window.c */
+extern int set_curwp P(( WINDOW * ));
 extern int getwpos P(( void ));
 extern int reposition P(( int, int ));
 extern int refresh P(( int, int ));
@@ -1119,10 +1140,16 @@ extern	void x_setbackground P(( char * ));
 extern	void x_preparse_args P(( int *, char *** ));
 extern  void x_set_geometry P(( char * ));
 extern	void x_set_dpy P(( char * ));
-extern	void setcursor P(( int, int ));
 extern	void x_putline P(( int, char *, int ));
 extern	int x_key_events_ready P(( void ));
+extern	int x_is_pasting P((void));
+extern	int x_on_msgline P((void));
+extern	int setwmark P(( int, int ));
+extern	int setcursor P(( int, int ));
+#if NO_LEAKS
+extern	void x11_leaks P(( void ));
 #endif
+#endif	/* X11 */
 
 #if MSDOS
 /* ibmpc.c */

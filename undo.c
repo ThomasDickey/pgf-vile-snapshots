@@ -2,7 +2,11 @@
  * code by Paul Fox, original algorithm mostly by Julia Harper May, 89
  *
  * $Log: undo.c,v $
- * Revision 1.39  1993/07/27 18:06:20  pgf
+ * Revision 1.40  1993/07/30 16:48:46  pgf
+ * discovering that b_ulinep points at a newly inserted line is no
+ * longer a bug, since the addition of infinite undo
+ *
+ * Revision 1.39  1993/07/27  18:06:20  pgf
  * see tom's 3.56 CHANGES entry
  *
  * Revision 1.38  1993/07/15  10:37:58  pgf
@@ -1022,7 +1026,9 @@ fast_ptr LINEPTR olp;
 		if (usenew) {
 			ulp->l_nxtundo = point;
 		} else {
-			mlforce("BUG: b_ulinep pointed at inserted line!");
+			/* we lose the ability to undo all changes
+				to this line, since it's going away */
+			curbp->b_ulinep = NULL;
 		}
 	}
 

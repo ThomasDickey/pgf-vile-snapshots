@@ -38,6 +38,8 @@ TARGET = vile
 SCRDEF = -DTERMCAP -Dscrn_chosen
 
 # for building the X version, xvile, use these:
+#  note that if you switch from "vile" to "xvile" or back, you _must_ do
+#  a "make clean" in between.
 #SCREEN = x11
 #LIBS = -lX11
 #TARGET = xvile
@@ -542,7 +544,10 @@ random.$O:	glob.h
 vmalloc$O:	nevars.h
 
 # $Log: makefile,v $
-# Revision 1.115  1993/07/19 10:39:26  pgf
+# Revision 1.116  1993/07/28 10:44:51  pgf
+# comment about "make clean" when doing xvile
+#
+# Revision 1.115  1993/07/19  10:39:26  pgf
 # svr4 now tested
 #
 # Revision 1.114  1993/07/15  10:37:58  pgf
