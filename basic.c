@@ -179,7 +179,7 @@ forwline(f, n)
 	if (curwp->w_dotp == curbp->b_linep)
 		return(FALSE);
 
-	/* if the last command was not not a line move,
+	/* if the last command was not a line move,
 	   reset the goal column */
         if (curgoal < 0)
                 curgoal = getccol(FALSE);
@@ -189,7 +189,7 @@ forwline(f, n)
         while (n-- && dlp!=curbp->b_linep)
                 dlp = lforw(dlp);
 
-	/* reseting the current position */
+	/* resetting the current position */
         curwp->w_dotp  = (dlp == curbp->b_linep) ? lback(dlp) : dlp;
         curwp->w_doto  = getgoal(dlp);
         curwp->w_flag |= WFMOVE;
@@ -602,7 +602,15 @@ setnmmark(f,n)
 	char *s;
 	int c,i;
 
-	c = kbd_key();
+	if (clexec || isnamedcmd) {
+		int stat;
+		static char cbuf[2];
+	        if ((stat=mlreply("Set mark: ", cbuf, 2)) != TRUE)
+	                return stat;
+		c = cbuf[0];
+        } else {
+		c = kbd_key();
+        }
 	if (c < 'a' || c > 'z') {
 		TTbeep();
 		mlwrite("[Invalid mark name]");
@@ -614,7 +622,7 @@ setnmmark(f,n)
 			(struct MARK *)malloc(26*sizeof(struct MARK));
 		if (curbp->b_nmmarks == NULL) {
 			mlwrite("[OUT OF MEMORY]");
-			return(FALSE);
+			return FALSE;
 		}
 		for (i = 0; i < 26; i++) {
 			curbp->b_nmmarks[i].markp = NULL;
@@ -627,7 +635,7 @@ setnmmark(f,n)
         s = "[Mark X set]";
 	s[6] = c;
         mlwrite(s);
-        return (TRUE);
+        return TRUE;
 }
 
 golinenmmark(f,n)
@@ -642,21 +650,30 @@ golinenmmark(f,n)
 
 goexactnmmark(f,n)
 {
-	register int c;
+	int c;
+	int this1key;
+	int useldmark;
+
+	this1key = last1key;
+	c = kbd_seq();
+	useldmark = (last1key == this1key);  /* '' or `` */
+	c = kcod2key(c);
+
+	if (useldmark)
+		c = '\'';
+
+	return gonmmark(c);
+}
+
+gonmmark(c)
+{
 	register LINE **markpp;
 	register int *markop;
 	LINE *tmarkp;
 	int tmarko;
-	int this1key;
-	int useldmark;
 	int found;
 
-	this1key = last1key;
-	c = kbd_seq();
-	useldmark = (last1key == this1key);
-	c = kcod2key(c);
-
-	if ((c < 'a' || c > 'z') && !useldmark) {
+	if (!islower(c) && c != '\'') {
 		TTbeep();
 		mlwrite("[Invalid mark name]");
 		return FALSE;
@@ -664,7 +681,7 @@ goexactnmmark(f,n)
 
 	markpp = NULL;
 
-	if (useldmark) { /* it's a stutter */
+	if (c == '\'') { /* use the 'last dot' mark */
 		markpp = &(curwp->w_ldmkp);
 		markop = &(curwp->w_ldmko);
 	} else if (curbp->b_nmmarks != NULL) {
@@ -688,19 +705,18 @@ goexactnmmark(f,n)
 		mlwrite("[Mark not set]");
 		return (FALSE);
 	}
-		
-	if (useldmark) {
-		tmarkp = curwp->w_dotp;
-		tmarko = curwp->w_doto;
-	}
+	
+	/* save current dot */
+	tmarkp = curwp->w_dotp;
+	tmarko = curwp->w_doto;
 
+	/* move to the selected mark */
 	curwp->w_dotp = *markpp;
 	curwp->w_doto = *markop;
 
-	if (useldmark) {
-		*markpp = tmarkp;
-		*markop = tmarko;
-	}
+	/* reset last-dot-mark to old dot */
+	curwp->w_ldmkp = tmarkp;
+	curwp->w_ldmko = tmarko;
 
         curwp->w_flag |= WFMOVE;
         return (TRUE);
@@ -717,12 +733,28 @@ setmark()
         return (TRUE);
 }
 
-gomark()
+gomark(f,n)
 {
         curwp->w_dotp = curwp->w_mkp;
         curwp->w_doto = curwp->w_mko;
         curwp->w_flag |= WFMOVE;
         return (TRUE);
+}
+
+/* this odd routine puts us at the internal mark, plus an offset of lines */
+/*  n == 1 leaves us at mark, n == 2 one line down, etc. */
+/*  this is for the use of stuttered commands, and line oriented regions */
+godotplus(f,n)
+{
+	int s;
+	if (!f || n == 1)
+	        return (TRUE);
+	if (n < 1)
+	        return (FALSE);
+	s = forwline(TRUE,n-1);
+	if (s && curwp->w_dotp == curbp->b_linep)
+		s = backline(FALSE,1);
+	return s;
 }
 
 atmark()

@@ -6,10 +6,12 @@
 #
 # All that is necessary to add a new function to the editor is to add
 #  an entry to this file, write the function, make sure it's in the
-#  makefile, and rebuild.
+#  makefile, and rebuild.  (This is not to be confused with adding a
+#  new key binding, which can be done with the rebind command if it
+#  was compiled in.)
 #
 # If you want to know which keyboard bindings are already taken, look
-#  at nebind.h.
+#  at nebind.h, after you build it.
 #
 # The entries are functions within the editor.  They _must_ match the
 #  functions' names.  On the same line as the name is the set of flags
@@ -20,14 +22,14 @@
 #  at runtime.  English names must be all lowercase.
 # Any function, name, or key may be followed by a conditional, i.e. the
 #  name of a preprocessor #define which must be defined non-zero for that
-#  line to become part of the editor.  If a function name is conditional,
+#  line to become part of the editor.  If a function name is made conditional,
 #  the names and keys listed with it will be conditional also.
 # The names and keys must be preceded by a tab character.
 # Blank lines must be completely empty.
 # For convenience only, this table is kept in roughly alphabetical order, 
 #  by first character of function name.
 #
-# For example, the folowing entry:
+# For example, consider the following entry:
 #
 # 	somefunc	ABS|MOTION		BSD|DOS
 #		"funkycom"
@@ -35,7 +37,7 @@
 #		'FN-2'				DOS
 #
 # This says that somefunc() is an absolute motion command, that it should
-#  only be included in the list if we're running BSD or DOS, that it's
+#  only be included in the editor if we're running BSD or DOS, that its
 #  english name as one would type on the command line is "funkycom", and
 #  that it is bound to ^X-F, and also to function key 2 under DOS.
 #
@@ -44,6 +46,9 @@
 #		the command can be redone.
 #	UNDO means the undo stacks should be cleared, in preparation for
 #		an undoable command.
+#	OPER means the command is an "operator", that is, it acts on a region
+#		demarcated by the current cursor postion and the cursor position
+#		following a subsequent motion command.
 #	MOTION means this command moves dot, and specifically is compatible
 #		with the operator commands.
 #	FL only occurs with MOTION, means that if the motion is an argument
@@ -55,15 +60,21 @@
 #	GOAL signifies a motion that will attempt to retain the 
 #		current column postition after the motion.
 #	GLOBOK says the function can follow a global command
-#		(i.e. "g/pattern/d")
+#		(e.g. the 'd' in "g/pattern/d")
 #
-#	This file was designed and constructed by Paul Fox for uvi, (c)1990
+#	This file was designed and constructed by Paul Fox for vile, (c)1990
+#
+#	The flags given in parentheses are "ex" flags, related to what
+#		kind of line-range arguments the command can take.  Not all are
+#		currently used or implemented, but they were defined in the command
+#		table for the Steve Kirkendall's elvis editor, so I included them
+#		here for completeness.
 
 altbuff		NONE
 	"alternate-buffer"		!FEWNAMES
 	'^^'
 append		REDO|UNDO
-	"append"			!FEWNAMES
+	"appendchar"			!FEWNAMES
 	'a'
 appendeol	REDO|UNDO
 	"append-eol"			!FEWNAMES
@@ -108,9 +119,13 @@ bcsrch_to	MOTION
 	'T'
 bindkey		NONE			REBIND
 	"bind-key"
+	"rebind-key"
 bktoshell	NONE			UNIX&&defined(SIGTSTP)
 	"suspend-emacs"			!FEWNAMES
 	'^Z'
+cntl_xf		NONE
+	"cntl_x-prefix"			!FEWNAMES
+	'^X'
 chgchar		REDO|UNDO
 	"change-char"			!FEWNAMES
 	's'
@@ -125,9 +140,9 @@ clrmes		NONE
 consearch	ABS|MOTION
 	"continue-search"		!FEWNAMES
 	'n'
-cex		NONE
-	"ctlx-prefix"			!FEWNAMES
-	'^X'
+opercopy		OPER|(RANGE|EXTRA)
+	"copy"
+	"c"
 ctlxlp		NONE
 	"begin-macro"			!FEWNAMES
 	'^X-('
@@ -136,37 +151,36 @@ ctlxrp		NONE
 	'^X-)'
 ctlxe		REDO
 	"execute-macro"			!FEWNAMES
-	'&'
+	'^X-&'
 cbuf1		REDO
 	"execute-macro-1"		!FEWNAMES
-	'FN-0'				TERMCAP
+	'FN-1'				TERMCAP
 cbuf2		REDO
 	"execute-macro-2"		!FEWNAMES
-	'FN-1'				TERMCAP
+	'FN-2'				TERMCAP
 cbuf3		REDO
 	"execute-macro-3"		!FEWNAMES
-	'FN-2'				TERMCAP
+	'FN-3'				TERMCAP
 cbuf4		REDO
 	"execute-macro-4"		!FEWNAMES
-	'FN-3'				TERMCAP
+	'FN-4'				TERMCAP
 cbuf5		REDO
 	"execute-macro-5"		!FEWNAMES
-	'FN-4'				TERMCAP
+	'FN-5'				TERMCAP
 cbuf6		REDO
 	"execute-macro-6"		!FEWNAMES
-	'FN-5'				TERMCAP
+	'FN-6'				TERMCAP
 cbuf7		REDO
 	"execute-macro-7"		!FEWNAMES
-	'FN-6'				TERMCAP
+	'FN-7'				TERMCAP
 cbuf8		REDO
 	"execute-macro-8"		!FEWNAMES
-	'FN-7'				TERMCAP
+	'FN-8'				TERMCAP
 cbuf9		REDO
 	"execute-macro-9"		!FEWNAMES
-	'FN-8'				TERMCAP
+	'FN-9'				TERMCAP
 cbuf10		REDO
 	"execute-macro-10"		!FEWNAMES
-	'FN-9'				TERMCAP
 cbuf11		REDO			!SMALLER
 	"execute-macro-11"		!FEWNAMES
 cbuf12		REDO			!SMALLER
@@ -233,12 +247,12 @@ delwind		NONE
 	'^X-0'
 deblank		REDO|UNDO		AEDIT
 	"delete-blank-lines"		!FEWNAMES
-	'M-O'
+	'^A-o'
 delgmode	NONE
 	"delete-global-mode"		!FEWNAMES
 	"setgno"
 	"unsetg"
-delmode		NONE
+delmode		NONE|(EXRCOK|EXTRA)
 	"delete-mode"			!FEWNAMES
 	"setno"
 	"unset"
@@ -251,7 +265,7 @@ deskey		NONE			REBIND
 	"describe-key"
 detab		REDO|UNDO		AEDIT
 	"detab-line"			!FEWNAMES
-	'M- '
+	'^A- '
 dotcmdplay	NONE
 	"repeat-last-cmd"		!FEWNAMES
 	'.'
@@ -269,7 +283,7 @@ enlargewind	NONE
 	'V'
 entab		REDO|UNDO		AEDIT
 	"entab-line"			!FEWNAMES
-	'M-^I'
+	'^A-^I'
 esc		NONE
 	"abort-command"			!FEWNAMES
 	'^['
@@ -279,23 +293,25 @@ fcsrch		MOTION
 fcsrch_to	MOTION
 	"forward-char-scan-to"		!FEWNAMES
 	't'
-filefind	NONE
+filefind	NONE|(BANG|FILE1|PLUS)
 	"e"
 	"E"
 	"edit-file"			!FEWNAMES
 	"find-file"			!FEWNAMES
 	'^X-e'
-filename	NONE
+filename	NONE|(NAMEDF)
 	"change-file-name"		!FEWNAMES
 	"f"
+	"file"
+	"filename"
 fileread	NONE
 	"e!"
 	"replace-with-file"		!FEWNAMES
 filesave	NONE			!SMALLER
 	"save-file"
 filewrite	NONE
-	"w"
-	"W"
+#	"w"
+#	"W"
 	"write-file"			!FEWNAMES
 filter		REDO|UNDO
 	"|"
@@ -308,7 +324,7 @@ firstnonwhite	MOTION
 	'^'
 fisearch	NONE			ISRCH
 	"incremental-search"		!FEWNAMES
-	'^X-s'
+	'^X-S'
 flipchar	REDO|UNDO
 	"flip-character"		!FEWNAMES
 	'~'
@@ -357,7 +373,13 @@ getfence	ABS|MOTION		CFENCE
 	"goto-matching-fence"		!FEWNAMES
 	'%'
 globals		NONE			GLOBALS
-	"g"
+	"og"
+# this function is for internal use only, for the operator commands
+godotplus	MOTION|FL
+
+# this function is for internal use only, for ex commands
+gomark		MOTION|FL|(RANGE)
+
 gotobop		ABS|MOTION		WORDPRO
 	"previous-paragraph"		!FEWNAMES
 	'{'
@@ -383,13 +405,13 @@ gotomos		MOTION|FL
 gotoeos		MOTION|FL
 	"end-of-screen"			!FEWNAMES
 	'L'
-gotobosec	ABS|MOTION
+gotobosec	ABS|MOTION		WORDPRO
 	"previous-section"		!FEWNAMES
 	'['
-gotoeosec	ABS|MOTION
+gotoeosec	ABS|MOTION		WORDPRO
 	"next-section"			!FEWNAMES
 	']'
-gototag		NONE			TAGS
+gototag		NONE|(BANG|WORD1)		TAGS
 	"ta"
 	"tag"
 	"find-tag"			!FEWNAMES
@@ -397,11 +419,12 @@ gototag		NONE			TAGS
 gotocol		MOTION
 	"goto-column"			!FEWNAMES
 	'|'
-gotoline	ABS|MOTION|FL
+gotoline	ABS|MOTION|FL|(RANGE)
 	"goto-line"			!FEWNAMES
 	'G'
 # golinenmmark and goexactnmmark are special cases--	
-# 	no ABS even though they are absolute
+# 	no ABS even though they are absolute, since these are the commands
+#	that maintain the last-dot-mark
 golinenmmark	MOTION|FL
 	"goto-named-mark"		!FEWNAMES
 #  single quote -- can't use '''
@@ -412,21 +435,22 @@ goexactnmmark	MOTION
 help		NONE
 	"h"
 	"help"
-	'M-H'
+	'^A-h'
 	'^X-h'
 histbuff	NONE
 	"historical-buffer"		!FEWNAMES
 	'_'
+	"_"
 insert		REDO|UNDO
-	"insert"			!FEWNAMES
+	"insertchar"			!FEWNAMES
 	'i'
 insertbol	REDO|UNDO
 	"insert-bol"			!FEWNAMES
 	'I'
-insfiletop		REDO|UNDO
+insfiletop		REDO|UNDO	BEFORE
 	"R"
 	"insert-file-at-top"			!FEWNAMES
-insfile		REDO|UNDO|GLOBOK
+insfile		REDO|UNDO|GLOBOK|(FROM|ZERO|NAMEDF)
 	"r"
 	"insert-file"			!FEWNAMES
 	'^R'
@@ -434,53 +458,69 @@ insspace	REDO|UNDO		!SMALLER
 	"insert-space"			!FEWNAMES
 istring		REDO|UNDO		!SMALLER
 	"insert-string"
-join		REDO|UNDO|GLOBOK
+join		REDO|UNDO
 	"join-lines"			!FEWNAMES
-	"j"
 	'J'
 killbuffer	NONE
 	"delete-buffer"			!FEWNAMES
 	"kill-buffer"			!FEWNAMES
-	"k"
+	"ki"
+showlength	NONE
+	"buffer-length"			!FEWNAMES
+	"="
 lastnonwhite	MOTION			!SMALLER
 	"last-nonwhite"			!FEWNAMES
 listbuffers	NONE
 	"list-buffers"			!FEWNAMES
-	'M-*'
-lineputafter	REDO|UNDO
+	'^A-*'
+lineputafter	REDO|UNDO|GLOBOK|(FROM|ZERO|WORD1)
 	"put-as-lines-after"		!FEWNAMES
+	"put"
 	'^X-p'
-lineputbefore	REDO|UNDO
+lineputbefore	REDO|UNDO|GLOBOK|(FROM|WORD1)
 	"put-as-lines-before"		!FEWNAMES
+	"Put"
 	'^X-P'
 lineundo	NONE
 	"undo-line-changes"		!FEWNAMES
 	'U'
-lline		GLOBOK			GLOBALS
-	"list-line"			!FEWNAMES
-	"l"
-meta		NONE
-	"meta-prefix"
+map		NONE|(EXRCOK|BANG|EXTRA)
+	"map"
+cntl_af		NONE
+	"cntl_a-prefix"
 	'^A'
+opermove	OPER|(RANGE|EXTRA)
+	"move"
+	"m"
 mvdnnxtwind	NONE
 	"move-next-window-down"		!FEWNAMES
-	'M-^E'
+	'^A-^E'
 mvupnxtwind	NONE
 	"move-next-window-up"		!FEWNAMES
-	'M-^Y'
+	'^A-^Y'
 mvdnwind	GOAL
 	"move-window-down"		!FEWNAMES
 	'^E'
 mvupwind	GOAL
 	"move-window-up"		!FEWNAMES
 	'^Y'
-nextbuffer	NONE
+mvrightwind	GOAL
+	"move-window-right"		!FEWNAMES
+	'^X-^R'
+mvleftwind	GOAL
+	"move-window-left"		!FEWNAMES
+	'^X-^L'
+nextbuffer	NONE|(BANG|NAMEDFS)
 	"n"
 	"next-buffer"			!FEWNAMES
 namebuffer	NONE
 	"rename-buffer"
 newline		REDO|UNDO		!SMALLER
 	"newline"
+newlength	NONE
+	"screen-rows"
+newwidth	NONE
+	"screen-columns"
 nextwind	NONE
 	"next-window"			!FEWNAMES
 	'^N'
@@ -488,60 +528,94 @@ nullproc	NONE
 	"nop"				!FEWNAMES
 	'^Q'
 	'^S'
+onamedcmd	NONE
+	"execute-named-command-old"	!FEWNAMES
+	'^A-:'
 namedcmd	NONE
 	"execute-named-command"		!FEWNAMES
 	":"
 	':'
-operchg		REDO|UNDO
+ex	NONE|(BANG|FILE1)
+	"ex"
+operchg		OPER|REDO|UNDO
 	"change-til"			!FEWNAMES
 	'c'
-operlinechg	REDO|UNDO
+operlinechg	OPER|REDO|UNDO|(RANGE)
 	"change-lines-til"		!FEWNAMES
+	"ch"
 	'^X-c'
-operdel		REDO|UNDO|GLOBOK
+operdel		OPER|REDO|UNDO
 	"delete-til"			!FEWNAMES
-	"d"
 	'd'
-operlinedel	REDO|UNDO
+operlinedel	OPER|REDO|UNDO|GLOBOK|(RANGE+WORD1)
 	"delete-lines-til"		!FEWNAMES
+	"d"
 	'^X-d'
-operformat	REDO|UNDO		WORDPRO
+operfilter	OPER|REDO|UNDO|(EXRCOK|RANGE|NAMEDFS|DFLNONE|NL)
+	"filter-til"			!FEWNAMES
+	"!"
+	'!'
+operformat	OPER|REDO|UNDO|(RANGE)		WORDPRO
 	"format-til"			!FEWNAMES
-	'M-F'
-	'M-J'
-operflip	REDO|UNDO|GLOBOK
+	'^A-f'
+	'^A-j'
+operflip	OPER|REDO|UNDO|GLOBOK|(RANGE)
 	"flip-til"			!FEWNAMES
 	"~"
-	'M-~'
-operlower	REDO|UNDO|GLOBOK
+	'^A-~'
+# RANGE commented out, since it's not done.... 
+operglobals	OPER|(/*RANGE|*/BANG|EXTRA|DFLALL)	GLOBALS
+	"global"
+	"g"
+opervglobals	OPER|(RANGE|BANG|EXTRA|DFLALL)	GLOBALS
+	"vglobal"
+	"v"
+operlower	OPER|REDO|UNDO|GLOBOK|(RANGE)
 	"lower-til"			!FEWNAMES
 	"L"
-	'M-L'
-operupper	REDO|UNDO|GLOBOK
+	'^A-l'
+operlist	OPER|GLOBOK|(RANGE)		GLOBALS
+	"list-lines-til"		!FEWNAMES
+	"l"
+operprint	OPER|GLOBOK|(RANGE)		GLOBALS
+	"print-lines-til"		!FEWNAMES
+	"p"
+operupper	OPER|REDO|UNDO|GLOBOK|(RANGE)
 	"upper-til"			!FEWNAMES
 	"U"
-	'M-U'
-operlshift	REDO|UNDO|GLOBOK
+	'^A-u'
+operlshift	OPER|REDO|UNDO|GLOBOK|(RANGE)
 	"shift-left-til"		!FEWNAMES
 	"<"
 	'<'
-operrshift	REDO|UNDO|GLOBOK
+operrshift	OPER|REDO|UNDO|GLOBOK|(RANGE)
 	"shift-right-til"		!FEWNAMES
 	">"
 	'>'
-operyank	NONE
+opersubst	OPER|REDO|UNDO|GLOBOK|(RANGE|EXTRA)
+	"substitute"			!FEWNAMES
+	"s"
+	'^X-s'
+operyank	OPER
 	"yank-til"			!FEWNAMES
 	'y'
-operlineyank	NONE
+operlineyank	OPER|(RANGE|WORD1)
 	"yank-lines-til"		!FEWNAMES
+	"y"
 	'^X-y'
-openup		REDO|UNDO
+openup		REDO|UNDO|(FROM)
 	"open-line-above"		!FEWNAMES
+	"insert"
+	"i"
 	'O'
-opendown	REDO|UNDO
+opendown	REDO|UNDO|(FROM|ZERO)
 	"open-line-below"		!FEWNAMES
+	"append"
+	"a"
 	'o'
-operwrite	NONE
+operwrite	OPER|(RANGE|BANG|FILE1|DFLALL)
+	"w"
+	"W"
 	"write-til"			!FEWNAMES
 	'^W'
 overwrite	REDO|UNDO
@@ -551,8 +625,6 @@ onlywind	NONE
 	"delete-other-windows"		!FEWNAMES
 	'^O'
 	'^X-1'
-pline		GLOBOK			GLOBALS
-	"p"
 poswind		NONE
 	"position-window"		!FEWNAMES
 	'z'
@@ -562,15 +634,13 @@ prevwind	NONE
 pipecmd		NONE
 	"pipe-command"			!FEWNAMES
 	'^X-!'
-putafter	REDO|UNDO|GLOBOK
+putafter	REDO|UNDO
 	"put-after"			!FEWNAMES
-	"put"
 	'p'
-putbefore	REDO|UNDO|GLOBOK
+putbefore	REDO|UNDO
 	"put-before"			!FEWNAMES
-	"Put"
 	'P'
-quit		NONE
+quit		NONE|(BANG)
 	"q"
 	"Q"
 	"exit"
@@ -578,8 +648,9 @@ quit		NONE
 	'^X-^C'
 quithard	NONE
 	"q!"
-quickexit	NONE
+quickexit	NONE|(BANG|NL)
 	"x"
+	"xit"
 	"quick-exit"			!FEWNAMES
 	'Z'
 quote		REDO|UNDO
@@ -608,7 +679,7 @@ rev_csrch	MOTION
 	','
 risearch	NONE			ISRCH
 	"reverse-incremental-search"	!FEWNAMES
-	'^X-r'
+	'^X-R'
 revsearch	ABS|MOTION
 	"reverse-search"		!FEWNAMES
 	'N'
@@ -618,40 +689,49 @@ scrforwsearch	ABS|MOTION
 scrbacksearch	ABS|MOTION
 	"screen-search-reverse"		!FEWNAMES
 	'^X-?'
+scrsearchpat	NONE
+	"screen-search-pattern-grab"	!FEWNAMES
+	'^A-/'
 settab		NONE
 	"handle-tab"			!FEWNAMES
 	"set-tab"
 	'^X-t'
 spawncli	NONE
 	"sh"
+	"shell"
 	"i-shell"			!FEWNAMES
 savewnd		NONE			!SMALLER
 	"save-window"
 scrnextup	NONE
 	"scroll-next-up"		!FEWNAMES
-	'M-^U'
+	'^A-^U'
 scrnextdw	NONE
 	"scroll-next-down"		!FEWNAMES
-	'M-^D'
+	'^A-^D'
 setfillcol	NONE
 	"set-fill-column"
 	'^X-f'
 setkey		NONE			CRYPT
 	"set-crypt-key"
 	'^X-X'
-setmode		NONE
+setmode		NONE|(EXRCOK|EXTRA)
 	"set"
 	"set-mode"			!FEWNAMES
 setgmode	NONE
 	"setg"
 	"set-global-mode"
-setnmmark	NONE
+setnmmark	NONE|(FROM+WORD1)
 	"set-named-mark"		!FEWNAMES
+	"k"
 	'm'
 setvar		NONE			!SMALLER
 	"setv"
+	"set-variable"
+setvmalloc	NONE			VMALLOC
+	"vmalloc"
+	'^X-v'
 showcpos	NONE
-	"buffer-position"		!FEWNAMES
+	"position"		!FEWNAMES
 	'^G'
 	'^X-='
 showmodes	NONE
@@ -662,11 +742,15 @@ showgmodes	NONE
 	"gmodes"
 	"show-global-modes"
 	"setgall"
+showversion	NONE|(EXRCOK)
+	"version"
 shrinkwind	NONE
 	"shrink-window"			!FEWNAMES
 	'v'
+source		NONE|(EXRCOK|NAMEDF)
+	"source"
 spawn		NONE
-	"!"
+#	"!"
 	"shell-command"			!FEWNAMES
 splitwind	NONE
 	"split-current-window"		!FEWNAMES
@@ -676,17 +760,19 @@ storemac	NONE
 	"store-macro"
 storeproc	NONE			PROC
 	"store-procedure"
-subst		REDO|UNDO|GLOBOK
-	"substitute"			!FEWNAMES
-	"s"
+subst_again	REDO|UNDO|GLOBOK|(RANGE|EXTRA)
+	"substitute-again"		!FEWNAMES
+	"&"
+opertransf	OPER|(RANGE+EXTRA)
+	"t"
 togglelistbuffers	NONE
 	"*"
 	"toggle-buffer-list"		!FEWNAMES
 	'*'
 trimline		REDO|UNDO|GLOBOK
 	"trim-line"			!FEWNAMES
-	"t"
-	'M-T'
+	"trim"
+	'^A-t'
 twiddle		REDO|UNDO		!SMALLER
 	"transpose-characters"		!FEWNAMES
 unbindkey	NONE			REBIND
@@ -699,29 +785,31 @@ unarg		NONE
 	'K'
 unimpl		NONE
 	"unimplemented-command"		!FEWNAMES
-	'!'
 	'('
 	')'
 unmark		NONE
 	"unmark-buffer"
-upscreen	NONE			!SMALLER
-	"update-screen"
-untagpop	NONE
+unmap		NONE|(EXRCOK|BANG|EXTRA)
+	"unmap"
+untagpop	NONE			TAGS
 	"untag-pop"			!FEWNAMES
 	'^X-^]'
+upscreen	NONE			!SMALLER
+	"update-screen"
 usebuffer	NONE
 	"b"
+	"buffer"
 	"select-buffer"			!FEWNAMES
 usekreg		REDO
 	"use-named-kill-register"	!FEWNAMES
 	'"'
+visual		NONE
+	"visual"
+vglobals	NONE			GLOBALS
+	"ov"
 viewfile	NONE
-	"view-file"			!FEWNAMES
-	"v"
-setvmalloc	NONE			VMALLOC
-	"vmalloc"
-	'^X-v'
-writequit	NONE
+	"view-file"
+writequit	NONE|(NL)
 	"wq"
 	"Wq"
 	"WQ"
@@ -733,3 +821,4 @@ writemsg	NONE			!SMALLER
 yankline	NONE
 	"yank-line"			!FEWNAMES
 	'Y'
+

@@ -195,10 +195,11 @@ register BUFFER *bp;
                 curwp->w_mko = bp->b_marko;
                 curwp->w_ldmkp = bp->b_ldmkp;
                 curwp->w_ldmko = bp->b_ldmko;
+                curwp->w_sideways = bp->b_sideways;
         }
 	if (bp->b_active != TRUE) {		/* buffer not active yet*/
 		/* read it in and activate it */
-		(void)readin(bp->b_fname, TRUE, bp, TRUE, NULL);
+		(void)readin(bp->b_fname, TRUE, bp, TRUE);
 		curwp->w_dotp = lforw(bp->b_linep);
 		curwp->w_doto = 0;
 		bp->b_active = TRUE;
@@ -226,6 +227,7 @@ register WINDOW *wp;
 		bp->b_marko = wp->w_mko;
 		bp->b_ldmkp = wp->w_ldmkp;
 		bp->b_ldmko = wp->w_ldmko;
+		bp->b_sideways = wp->w_sideways;
 	}
 }
 
@@ -295,7 +297,7 @@ register BUFFER *bp;
         if ((s=bclear(bp)) != TRUE)             /* Blow text away.      */
                 return (s);
                 
-        free((char *) bp->b_linep);             /* Release header line. */
+        lfree(bp->b_linep);             /* Release header line. */
         bp1 = NULL;                             /* Find the header.     */
         bp2 = bheadp;
         while (bp2 != bp) {
@@ -348,7 +350,12 @@ popupbuff(bp)
 BUFFER *bp;
 {
         register WINDOW *wp;
-        if (bp->b_nwnd == 0) {              /* Not on screen yet.   */
+
+	if (!curbp) {
+		curbp = bp;  /* possibly at startup time */
+		curwp->w_bufp = curbp;
+                ++curbp->b_nwnd;
+	} else if (bp->b_nwnd == 0) {              /* Not on screen yet.   */
                 if ((wp = wpopup()) == NULL)
                         return FALSE;
                 if (--wp->w_bufp->b_nwnd == 0)
@@ -366,6 +373,7 @@ BUFFER *bp;
                         wp->w_mko = 0;
                         wp->w_ldmkp = NULL;
                         wp->w_ldmko = 0;
+                        wp->w_sideways = 0;
                         wp->w_flag |= WFMODE|WFHARD;
 				
                 }
@@ -404,7 +412,7 @@ togglelistbuffers(f, n)
 		}
                 wp = wp->w_wndp;
 	}
-	return(s);
+	return s;
 }
 
 listbuffers(f, n)
@@ -417,21 +425,20 @@ listbuffers(f, n)
 	if (bp == NULL)
 		return FALSE;
 	
-	if (bp->b_active == FALSE) { /* never been used */
-	        if ((s=bclear(bp)) != TRUE) /* clear old text (?) */
-	                return (s);
-		bp->b_flag |= BFSCRTCH;
-	        s = makelist(f,bp);
-		if (!s || popupbuff(bp) == FALSE) {
-			mlwrite("[Sorry, can't list. ]");
-			zotbuf(bp);
-	                return (FALSE);
-	        }
-	        sprintf(bp->b_fname, "       %s   %s",prognam,version);
-	        bp->b_flag &= ~BFCHG;               /* Don't complain!      */
-	        bp->b_active = TRUE;
-	}
-        return (TRUE);
+        if ((s=bclear(bp)) != TRUE) /* clear old text (?) */
+                return (s);
+	bp->b_flag |= BFSCRTCH;
+        s = makelist(f,bp);
+	if (!s || popupbuff(bp) == FALSE) {
+		mlwrite("[Sorry, can't list. ]");
+		zotbuf(bp);
+                return (FALSE);
+        }
+        sprintf(bp->b_fname, "       %s   %s",prognam,version);
+        bp->b_flag &= ~BFCHG;               /* Don't complain!      */
+        bp->b_active = TRUE;
+
+        return TRUE;
 }
 
 /*
@@ -679,6 +686,7 @@ char   *bname;
         bp->b_flag  = bflag;
 	bp->b_mode  = gmode & ~(MDCMOD|MDDOS); /* handled in readin() */
         bp->b_nwnd  = 0;
+        bp->b_sideways = 0;
         bp->b_linep = lp;
         strcpy(bp->b_fname, "");
         strcpy(bp->b_bname, bname);
@@ -729,7 +737,7 @@ register BUFFER *bp;
 	freeundostacks(bp);	/* do this before removing lines */
         while ((lp=lforw(bp->b_linep)) != bp->b_linep) {
                 lremove(bp,lp);
-                free((char *)lp);
+                lfree(lp);
 	}
         bp->b_dotp  = bp->b_linep;              /* Fix "."              */
         bp->b_doto  = 0;

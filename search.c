@@ -36,12 +36,14 @@ int    readpattern();
 int    replaces();
 #endif
 int    nextch();
+#if MAGIC
 int    mcstr();
 int    mceq();
 int    cclmake();
 int    biteq();
 BITMAP   clearbits();
 void     setbit();
+#endif
 
 int lastdirec;
 LINE *boundline;
@@ -49,24 +51,34 @@ int boundoff;
 
 scrforwsearch(f,n)
 {
-	return forwsearch(f,n,NULL,TRUE);
+	return fsearch(f,n,FALSE,TRUE);
 }
 
 scrbacksearch(f,n)
 {
-	return backsearch(f,n,NULL,TRUE);
+	return bsearch(f,n,FALSE,TRUE);
 }
 
 char onlyonemsg[] = "Only one occurence of pattern";
 char notfoundmsg[] = "Not found";
+
 /*
  * forwsearch -- Search forward.  Get a search string from the user, and
  *	search for the string.  If found, reset the "." to be just after
  *	the match string, and (perhaps) repaint the display.
  */
 
-forwsearch(f, n, marking, fromscreen)
-int f, n;	/* default flag / numeric argument */
+forwsearch(f, n)
+int f, n;
+{
+	fsearch(f, n, FALSE, NULL);
+}
+
+/* extra args -- marking if called from globals, and should mark lines, and
+	fromscreen, if the searchpattern is on the screen, so we don't need to
+	ask for it.  */
+fsearch(f, n, marking, fromscreen)
+int f, n;
 {
 	register int status = TRUE;
 	int wrapok;
@@ -74,14 +86,11 @@ int f, n;	/* default flag / numeric argument */
 	LINE *curdotp;
 	int curoff;
 	int didmark = FALSE;
-	
-	wrapok = marking || (curwp->w_bufp->b_mode & MDSWRAP) != 0;
 
-	/* If n is negative, search backwards.
-	 * Otherwise proceed by asking for the search string.
-	 */
 	if (f && n < 0)
-		return(backsearch(f, -n, NULL, fromscreen));
+		return bsearch(f, -n, NULL, NULL);
+
+	wrapok = marking || (curwp->w_bufp->b_mode & MDSWRAP) != 0;
 
 	lastdirec = 0;
 
@@ -228,7 +237,13 @@ int f, n;	/* default flag / numeric argument */
  *	If found "." is left pointing at the first character of the pattern
  *	(the last character that was matched).
  */
-backsearch(f, n, dummy, fromscreen)
+backsearch(f, n)
+int f, n;
+{
+	return bsearch(f, n, FALSE, NULL);
+}
+
+bsearch(f, n, dummy, fromscreen)
 int f, n;	/* default flag / numeric argument */
 {
 	register int status = TRUE;
@@ -236,13 +251,10 @@ int f, n;	/* default flag / numeric argument */
 	LINE *curdotp;
 	int curoff;
 	
-	wrapok = (curwp->w_bufp->b_mode & MDSWRAP) != 0;
-
-	/* If n is negative, search forwards.
-	 * Otherwise proceed by asking for the search string.
-	 */
 	if (n < 0)
-		return(forwsearch(f, -n, NULL, fromscreen));
+		return fsearch(f, -n, NULL, fromscreen);
+
+	wrapok = (curwp->w_bufp->b_mode & MDSWRAP) != 0;
 
 	lastdirec = 1;
 
@@ -685,6 +697,14 @@ register char	pc;
 	return ((bc ^ pc) & ~DIFCASE) == 0;
 }
 
+scrsearchpat(f,n)
+{
+	int s;
+	s =  readpattern("", pat, TRUE, 0, TRUE);
+	mlwrite("Search pattern is now %s", pat);
+	lastdirec = 0;
+	return s;
+}
 /*
  * readpattern -- Read a pattern.  Stash it in apat.  If it is the
  *	search string, create the reverse pattern and the magic

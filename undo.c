@@ -16,12 +16,11 @@
 		the undo list, and mark the original as having been copied.
 		Do not copy/push lines that are marked as having been copied.
 		Push a tag matching up the copy with the original.  Later,
-		when the copy has been put into the file,
+		when the copy has been put into the file, we can
 		go back through the undo stack, find lines there pointing
-		to the original, and repoint them at the copy.
-	3) For every newly created line, push an "unreal" place holder
-		onto the undo list.  Mark the inserted line as having
-		been copied.
+		at the original, and make them point at the copy.  ugh.
+		This wouldn't be necessary if we used line no's as the pointers,
+		instead of real pointers.
 
 	On the actual undo, we pop these things one by one.  There should
 	either be no lines where it goes (it was deleted), or exactly
@@ -39,6 +38,8 @@
 #define ALTSTK(bp) (&(bp->b_udstks[1^(bp->b_udstkindx)]))
 #define CURDOTP(bp) (bp->b_uddotps[bp->b_udstkindx])
 #define ALTDOTP(bp) (bp->b_uddotps[1^(bp->b_udstkindx)])
+#define CURDOTO(bp) (bp->b_uddotos[bp->b_udstkindx])
+#define ALTDOTO(bp) (bp->b_uddotos[1^(bp->b_udstkindx)])
 #define SWITCHSTKS(bp) (bp->b_udstkindx = 1 ^ bp->b_udstkindx)
 
 short needundocleanup;
@@ -51,9 +52,17 @@ LINE *lp;
 	if (needundocleanup)
 		preundocleanup();
 	pushline(lp,CURSTK(curbp));
-	if ((ALTDOTP(curbp) == NULL) || (ALTDOTP(curbp) == lp))
-		ALTDOTP(curbp) = (lp->l_fp == curbp->b_linep) ?
-						lp->l_bp : lp->l_fp;
+	if ((ALTDOTP(curbp) == NULL) || (ALTDOTP(curbp) == lp)) {
+		/* need to save a dot -- either the next line or 
+			the previous one */
+		if (lp->l_fp == curbp->b_linep) {
+			ALTDOTP(curbp) = lp->l_bp;
+			ALTDOTO(curbp) = firstchar(lp->l_bp);
+		} else {
+			ALTDOTP(curbp) = lp->l_fp;
+			ALTDOTO(curbp) = firstchar(lp->l_fp);
+		}
+	}
 	dumpuline(lp);
 }
 
@@ -87,8 +96,10 @@ LINE *lp;
 
 	setupuline(lp);
 
-	if (ALTDOTP(curbp) == NULL)
+	if (ALTDOTP(curbp) == NULL) {
 		ALTDOTP(curbp) = lp;
+		ALTDOTO(curbp) = curwp->w_doto;
+	}
 	return (TRUE);
 }
 
@@ -113,8 +124,10 @@ LINE *lp;
 	nlp->l_bp = lp->l_bp;
 	pushline(nlp,CURSTK(curbp));
 	lsetcopied(lp);
-	if (ALTDOTP(curbp) == NULL)
+	if (ALTDOTP(curbp) == NULL) {
 		    ALTDOTP(curbp) = lp;
+		    ALTDOTO(curbp) = curwp->w_doto;
+	}
 	return (TRUE);
 }
 
@@ -196,7 +209,7 @@ register BUFFER *bp;
 
 	for (i = 0; i <= 1; i++, SWITCHSTKS(bp)) {
 		while ((lp = popline(CURSTK(bp))) != NULL) {
-			free((char *)lp);
+			lfree(lp);
 		}
 	}
 
@@ -235,7 +248,7 @@ undo(f,n)
 #endif
 		if (lislinepatch(lp)) {
 			patchstk(lp->l_bp, lp->l_fp);
-			free(lp);
+			lfree(lp);
 			continue;
 		}
 		lchange(WFHARD|WFINS|WFKILLS);
@@ -270,7 +283,7 @@ undo(f,n)
 			lp->l_bp->l_fp = lp;
 			lp->l_fp->l_bp = lp;
 		} else {
-			free((char *)lp);
+			lfree(lp);
 		}
 
 		pushline(alp,ALTSTK(curbp));
@@ -283,7 +296,11 @@ undo(f,n)
 
 
 	curwp->w_dotp = CURDOTP(curbp);
-	firstnonwhite(f,n);
+	curwp->w_doto = CURDOTO(curbp);
+	if (curwp->w_doto >= llength(curwp->w_dotp))
+		curwp->w_doto = llength(curwp->w_dotp) - 1;
+	else if (curwp->w_doto < firstchar(curwp->w_dotp))
+		curwp->w_doto = firstchar(curwp->w_dotp);
 
 	SWITCHSTKS(curbp);
 	
@@ -301,7 +318,9 @@ preundocleanup()
 {
 	freeundostacks(curbp);
 	CURDOTP(curbp) = curwp->w_dotp;
+	CURDOTO(curbp) = curwp->w_doto;
 	ALTDOTP(curbp) = NULL;
+	ALTDOTO(curbp) = curwp->w_doto;
 	needundocleanup = FALSE;
 }
 
@@ -309,7 +328,8 @@ lineundo(f,n)
 {
 	register LINE *ulp;	/* the Undo line */
 	register LINE *lp;	/* the line we may replace */
-	register LINE *nlp;	/* the line we replace with */
+	register WINDOW *wp;
+	register char *ntext;
 
 	ulp = curbp->b_ulinep;
 	if (ulp == NULL) {
@@ -334,19 +354,41 @@ lineundo(f,n)
 	preundocleanup();
 
 
-	nlp = copyline(ulp);
-	if (nlp == NULL)
+	ntext = malloc(ulp->l_size);
+	if (ntext == NULL)
 		return (FALSE);
 
-	repointstuff(nlp,lp);
-	toss_to_undo(lp);
+	copy_for_undo(lp);
 
-	/* re-introduce ourself to our neighbors */
-	nlp->l_fp->l_bp = nlp;
-	nlp->l_bp->l_fp = nlp;
+	memcpy(ntext, ulp->l_text, llength(ulp));
+	free(lp->l_text);
+	lp->l_text = ntext;
+	lp->l_used = ulp->l_used;
+	lp->l_size = ulp->l_size;
 
-	curwp->w_dotp = CURDOTP(curbp);
-	firstnonwhite(f,n);
+	/* let's be defensive about this */
+	wp = wheadp;
+	while (wp != NULL) {
+		if (wp->w_dotp == lp)
+			wp->w_doto = 0;
+		if (wp->w_mkp == lp)
+			wp->w_mko = 0;
+		if (wp->w_ldmkp == lp)
+			wp->w_ldmko = 0;
+		wp = wp->w_wndp;
+	}
+	if (CURDOTP(curbp) == lp)
+		CURDOTO(curbp) = 0;
+	if (curbp->b_nmmarks != NULL) {
+		/* fix the named marks */
+		int i;
+		struct MARK *mp;
+		for (i = 0; i < 26; i++) {
+			mp = &(curbp->b_nmmarks[i]);
+			if (mp->markp == lp)
+				mp->marko = 0;
+		}
+	}
 
 	curwp->w_flag |= WFEDIT;
 	
@@ -388,6 +430,7 @@ register LINE *nlp,*olp;
 		wp = wp->w_wndp;
 	}
 #if 0
+no code for ALTDOTO, but this was ifdef'ed out before I put that in...  pgf
 	if (ALTDOTP(curbp) == olp) {
 		if (lisreal(nlp)) {
 			ALTDOTP(curbp) = nlp;
@@ -438,7 +481,7 @@ LINE *lp;
 {
 	if ((curbp->b_ulinep != NULL) &&
 		    (curbp->b_ulinep->l_nxtundo == lp)) {
-		free((char *)curbp->b_ulinep);
+		lfree(curbp->b_ulinep);
 		curbp->b_ulinep = NULL;
 	}
 }
@@ -449,7 +492,7 @@ LINE *lp;
 	/* take care of the U line */
 	if ((curbp->b_ulinep == NULL) || (curbp->b_ulinep->l_nxtundo != lp)) {
 		if (curbp->b_ulinep != NULL)
-			free((char *)curbp->b_ulinep);
+			lfree(curbp->b_ulinep);
 		curbp->b_ulinep = copyline(lp);
 		if (curbp->b_ulinep != NULL)
 			curbp->b_ulinep->l_nxtundo = lp;
@@ -463,16 +506,16 @@ register LINE *olp,*nlp;
 		if (lisreal(nlp)) {
 			curbp->b_ulinep->l_nxtundo = nlp;
 		} else {
-			/* mlwrite("Bug: b_ulinep pointed at inserted line!");
-			*/
-			/* this case IS a bug, but unavoidable right now. */
-			/* the problem is that in linsert, if the line grows
-			too big, it is reallocated, deleted, and inserted.
-			ulinep is updated to the new line, but since this is
-			an insert, on undo we end up in this code. */
-			dumpuline(olp);
-			mlwrite("@");  /* just a reminder */
+			mlwrite("Bug: b_ulinep pointed at inserted line!");
 		}
 	}
 }
 
+firstchar(lp)
+LINE *lp;
+{
+	int off = 0;
+	while ( off != llength(lp) && isspace(lgetc(lp, off)) )
+		off++;
+	return off;
+}

@@ -193,20 +193,20 @@ _to_caseflip(c)
 
 flipregion(f, n)
 {
-	return charprocregion(f,n,_to_caseflip);
+	return charprocreg(f,n,_to_caseflip);
 }
 
 lowerregion(f, n)
 {
-	return charprocregion(f,n,_to_lower);
+	return charprocreg(f,n,_to_lower);
 }
 
 upperregion(f, n)
 {
-	return charprocregion(f,n,_to_upper);
+	return charprocreg(f,n,_to_upper);
 }
 
-charprocregion(f, n, func)
+charprocreg(f, n, func)
 int (*func)();
 {
         register LINE   *linep;
@@ -246,9 +246,6 @@ int (*func)();
  * to by "rp". Because the dot and mark are usually very
  * close together, we scan outward from dot looking for
  * mark. This should save time. Return a standard code.
- * Callers of this routine should be prepared to get
- * an "ABORT" status; we might make this have the
- * conform thing later.
  */
 getregion(rp)
 register REGION *rp;
@@ -260,23 +257,28 @@ register REGION *rp;
 
         if (curwp->w_mkp == NULL) {
                 mlwrite("No mark set in this window");
-                return (FALSE);
+                return FALSE;
         }
         if (curwp->w_dotp == curwp->w_mkp) {
                 rp->r_linep = curwp->w_dotp;
 		if (fulllineregions) {
                         rp->r_offset = 0;
                         rp->r_size = (long)llength(curwp->w_dotp)+1;
-			return (TRUE);
+	                rp->r_endlinep = lforw(curwp->w_dotp);
+                        rp->r_endoffset = 0;
+			return TRUE;
 		}
+                rp->r_endlinep = curwp->w_dotp;
                 if (curwp->w_doto < curwp->w_mko) {
                         rp->r_offset = curwp->w_doto;
                         rp->r_size = (long)(curwp->w_mko-curwp->w_doto);
+                        rp->r_endoffset = curwp->w_mko;
                 } else {
                         rp->r_offset = curwp->w_mko;
                         rp->r_size = (long)(curwp->w_doto-curwp->w_mko);
+                        rp->r_endoffset = curwp->w_doto;
                 }
-                return (TRUE);
+                return TRUE;
         }
         blp = curwp->w_dotp;
         flp = curwp->w_dotp;
@@ -292,17 +294,19 @@ register REGION *rp;
                         flp = lforw(flp);
                         if (flp == curwp->w_mkp) {
                                 rp->r_linep = curwp->w_dotp;
-                                rp->r_offset = curwp->w_doto;
-                                rp->r_size = fsize+curwp->w_mko;
 				if (fulllineregions) {
 					rp->r_offset = 0;
 					rp->r_size = fsize+
 						    llength(curwp->w_mkp)+1;
-				} else {
-					rp->r_offset = curwp->w_doto;
-					rp->r_size = fsize+curwp->w_mko;
+	                                rp->r_endlinep = lforw(flp);
+					rp->r_endoffset = 0;
+	                                return TRUE;
 				}
-                                return (TRUE);
+				rp->r_offset = curwp->w_doto;
+				rp->r_size = fsize+curwp->w_mko;
+                                rp->r_endlinep = flp;
+				rp->r_endoffset = curwp->w_mko;
+                                return TRUE;
                         }
                         fsize += llength(flp)+1;
                 }
@@ -314,15 +318,19 @@ register REGION *rp;
 				if (fulllineregions) {
 					rp->r_offset = 0;
 					rp->r_size = bsize;
-				} else {
-					rp->r_offset = curwp->w_mko;
-					rp->r_size = bsize - curwp->w_mko;
+	                                rp->r_endlinep = lforw(curwp->w_dotp);
+					rp->r_endoffset = 0;
+	                                return TRUE;
 				}
-                                return (TRUE);
+                                rp->r_endlinep = curwp->w_dotp;
+				rp->r_endoffset = curwp->w_doto;
+				rp->r_offset = curwp->w_mko;
+				rp->r_size = bsize - curwp->w_mko;
+                                return TRUE;
                         }
                 }
         }
         mlwrite("Bug: lost mark");
-        return (FALSE);
+        return FALSE;
 }
 

@@ -183,7 +183,6 @@ at386cres()	/* change screen resolution */
 PRETTIER_SCROLL is prettier but slower -- it scrolls 
 		a line at a time instead of all at once.
 */
-#define PRETTIER_SCROLL 1
 
 /* move howmany lines starting at from to to */
 at386scroll_delins(from,to,howmany)

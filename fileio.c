@@ -8,8 +8,14 @@
 #include        "edef.h"
 #if UNIX
 #include        <errno.h>
-#include        <sys/fcntl.h>
+#include        <fcntl.h>
 #endif
+#if	BSD
+#include "sys/filio.h"
+#endif
+
+/* possibly non-portable addition to stdio set of macros */
+#define	isready_c(p)	((p)->_cnt>0? TRUE:FALSE)
 
 FILE	*ffp;		/* File pointer, all functions. */
 int fileispipe;
@@ -67,12 +73,14 @@ char    *fn;
 	if (*fn == '!') {
 	        if ((ffp=npopen(fn+1, "w")) == NULL) {
 	                mlwrite("Cannot open pipe for writing");
+			TTbeep();
 	                return (FIOERR);
 		}
 		fileispipe = TRUE;
 	} else {
 	        if ((ffp=fopen(fn, "w")) == NULL) {
 	                mlwrite("Cannot open file for writing");
+			TTbeep();
 	                return (FIOERR);
 		}
 		fileispipe = FALSE;
@@ -247,12 +255,14 @@ int *lenp;	/* to return the final length */
 	if (eofflag)
 		return(FIOEOF);
 
+#if BEFORE	/* no no no -- malloc is expensive... */
 	/* dump fline if it ended up too big */
 	if (flen > NSTRING) {
 		free(fline);
 		fline = NULL;
 		flen = 0;
 	}
+#endif
 
 	/* if we don't have an fline, allocate one */
 	if (fline == NULL)
@@ -289,6 +299,23 @@ int *lenp;	/* to return the final length */
 	}
 #endif
 
+	*lenp = i;	/* return the length, not including final null */
+        fline[i] = 0;
+#if TESTING
+if (i > 0) {
+	if (isready_c(ffp))
+		fline[0] = 'y';
+	else
+		fline[0] = 'n';
+	if (i > 1) {
+		long x;
+		if ((ioctl(fileno(ffp),FIONREAD,&x) < 0) || x == 0)
+			fline[1] = 'n';
+		else
+			fline[1] = 'y';
+	}	
+}	
+#endif
 	/* test for any errors that may have occured */
         if (c == EOF) {
                 if (ferror(ffp)) {
@@ -302,14 +329,24 @@ int *lenp;	/* to return the final length */
 			return(FIOEOF);
         }
 
-	/* terminate and decrypt the string */
-        fline[i] = 0;
 #if	CRYPT
+	/* decrypt the string */
 	if (cryptflag)
 		crypt(fline, strlen(fline));
 #endif
-	*lenp = i;	/* return the length, not including final null */
         return(FIOSUC);
+}
+
+ffhasdata()
+{
+	long x;
+#if	BSD
+	if (isready_c(ffp))
+		return TRUE;
+	return(((ioctl(fileno(ffp),FIONREAD,&x) < 0) || x == 0) ? FALSE : TRUE);
+#else
+	return FALSE;
+#endif
 }
 
 #if	AZTEC & MSDOS

@@ -6,11 +6,11 @@
 #  mktbls program parses this to produce nebind.h, nename.h, and nefunc.h,
 #  which are used by the rest of the build.
 #
-#  The version number (currently two point one) is found near the top of
-#  edef.h, and is displayed with the '*' command.
+#  The version number (currently three) is found near the top of
+#  edef.h, and is displayed with the '*' and ":version" commands.
 # 		Paul Fox
 #
-# original for uemacs:		Adam Fritz			July 30,1987
+# original makefile for uemacs:	Adam Fritz	July 30,1987
 
 
 # To change screen driver modules, change SCREEN below, and edit estruct.h to
@@ -25,7 +25,7 @@ TARGET = vile
 DESTDIR = /usr/local/bin
 LIBS = -ltermcap
 
-REMOTE=jdhome!us
+REMOTE=towno!pgf
 
 #CFLAGS = -O
 CFLAGS = -g
@@ -57,7 +57,7 @@ HDRS = estruct.h epath.h evar.h edef.h
 #  distributed anyway, in case you can't get mktbls running
 BUILTHDRS = nebind.h nefunc.h nename.h 
 
-# this is stuff not normally included in the build, but which shouldn't
+# this is obsolete stuff NOT needed by the build, but it shouldn't
 #  be thrown away (yet).  For instance, ebind.h has per-machine binding
 #  information that hasn't been incorporated into cmdtbl yet.
 OLDHDRS = ebind.h efunc.h
@@ -120,12 +120,13 @@ compr-shar:
 	[ -d cshardir ] || mkdir cshardir
 #	add -a for archive headers, add -s pgf@cayman.com for submitted-by
 	shar -p -nvile -L55 -o cshardir/vileshar \
-		-t README -C `ls $(EVERYTHING) | sed /README/d`
+		-T README -C `ls $(EVERYTHING) | sed /README/d`
 
 shar:
 	[ -d shardir ] || mkdir shardir
 #	add -a for archive headers, add -s pgf@cayman.com for submitted-by
-	shar -x -nvile -l55 -o shardir/vileshar `ls $(EVERYTHING)`
+	shar -x -a -spgf@cayman.com -nVile -L55 \
+			-o shardir/vileshar `ls $(EVERYTHING)`
 
 # only uucp things changed since last time
 uuto:
@@ -136,19 +137,19 @@ floppy:
 	ls $(EVERYTHING) | oo
 
 # you don't want to know...
-dosfloppy:
+dosscript:
 	(								\
 	echo echo on							;\
 	for x in `ls -t $(EVERYTHING) dosback.bat | sed '/dosback.bat/q'` ;\
 	do								\
-		echo copy u:$$x a:					;\
+		echo copy o:$$x a:					;\
 	done 								;\
 	echo quit							;\
 	) >tmp.bat
 	ud < tmp.bat >dosback.bat
 	/bin/rm -f tmp.bat
-	-dos
-	>dosback.bat
+	#-dos
+	#>dosback.bat
 	
 newdosfloppy:
 	touch 0101010170 dosback.bat
@@ -158,7 +159,7 @@ list:
 	@ls $(EVERYTHING) | more
 
 # dump a list of files that may have changed since last backup
-list-writeable:
+rw list-writeable:
 	@for x in $(EVERYTHING) ;\
 	do \
 		if [ -w $$x ] ;\
@@ -194,9 +195,10 @@ depend:	 $(SRC) $(HDRS) $(BUILTHDRS)
 		echo "#DEPENDS" ; \
 		$(CC) -M $(CFLAGS) $? ) > makefile
 
-# you don't need this if SHORTNAMES is 0 in estruct.h
-estruct.h: shorten/remap.h
+# you need this if SHORTNAMES is 0 in estruct.h
+# estruct.h: shorten/remap.h
 
+# or this either
 shorten/remap.h:
 	cd shorten; $(MAKE) remap.h
 

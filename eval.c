@@ -403,8 +403,6 @@ char *value;	/* value to set to */
 		switch (vnum) {
 		case EVFILLCOL:	fillcol = atoi(value);
 				break;
-		case EVPAGELEN:	status = newscreensize(atoi(value),term.t_ncol);
-				break;
 		case EVCURCOL:	status = gotocol(TRUE,atoi(value));
 				break;
 		case EVCURLINE:	status = gotoline(TRUE, atoi(value));
@@ -413,6 +411,8 @@ char *value;	/* value to set to */
 		case EVFLICKER:	flickcode = stol(value);
 				break;
 		case EVCURWIDTH:status = newwidth(TRUE, atoi(value));
+				break;
+		case EVPAGELEN:	status = newlength(TRUE,atoi(value));
 				break;
 		case EVCBUFNAME:strcpy(curbp->b_bname, value);
 				curwp->w_flag |= WFMODE;

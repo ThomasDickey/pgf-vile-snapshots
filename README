@@ -4,33 +4,32 @@
 VILE -- VI Like Emacs: a vi workalike put together from Micro-Emacs by Paul Fox
 -------------------------------------------------------------------------------
 
-	This editor grew out of a frustration that although lots of eager
-	programmers have tackled rewrites of Emacs, with new and better 
-	features (not to mention free source), I've not seen anything
-	similar done with the Second True Editor.  (The First, of course,
-	being /bin/ed)
+	This editor grew out of a frustration that although lots of
+	eager programmers have tackled rewrites of Emacs, with new and
+	better features (not to mention free source), I've not seen
+	anything similar done with the Second True Editor.  (The
+	First, of course, being /bin/ed)
 
-	So I took a copy of MicroEmacs 3.9 (which I've since discovered was
-        out of date, unfortunately) and bashed and badgered it into a vi
-        work-alike.  It retains the multiple buffer/multiple window
-        features of uemacs, but the "finger-feel", if you will, is very
-        much that of vi.  The collective developers of Micro-Emacs should be
-        complimented that the changes were as easy as they were.  The code
-        was pretty clean and well designed before I started on it.  I'm not
-	sure that the same can be said anymore...
+	So I took a copy of MicroEmacs 3.9 (which I've since
+	discovered was out of date, unfortunately) and bashed and
+	badgered it into a vi "feel-alike".  It retains the multiple
+	buffer/multiple window features of uemacs, but the
+	"finger-feel", if you will, is very much that of vi.  It is
+	definitely not a clone, in that some substantial stuff is
+	missing, and the screen doesn't look quite the same.  But what
+	matters most is that one's "muscle memory" does the right thing
+	to the text in front of you, and that is what vile tries to do
+	for vi users.   THIS IS NOT A "CLONE"!
 
-	Although I can't imagine the emacs folks wanting to buy much of this
-	stuff back (insert mode, anyone? (grin), they might want to look at:
-		- full global undo
-		- tags support
-		- better (maybe?) UNIX terminal handling
-		- better UNIX shell escapes
-		- terminal scroll support
-		- multiple yank registers (formerly called kill buffers)
-		- multiple marks  (actually kind of messy)
-		- improved aesthetics of window splitting and deleting
-		- "next error" cursor positioning
-		- list mode
+	This is the first really public version of vile.  It is
+	version three.  Users of previous versions will hopefully find
+	the additions of ":" command line ranges and the ! filter
+	operator helpful. 
+
+	The collective developers of Micro-Emacs should be
+	complimented that the changes were as easy as they were.  The
+	code was pretty clean and well designed before I started on
+	it.  I'm not sure that the same can be said anymore... 
 
 	The benefits over standard vi include:
 		- multiple files open at once
@@ -40,28 +39,56 @@ VILE -- VI Like Emacs: a vi workalike put together from Micro-Emacs by Paul Fox
 			(mind you, I haven't even tried this on a small
 				UNIX machine, let alone DOS etc...)
 		- more uniform undo/yank register treatment
-		- tags doesn't lose your last search pattern
+		- using tags doesn't lose your last search pattern
+		- "next error" cursor positioning after compilation
+	Of course, it _may_ lack some of vi's reliability. :-)
+
+	( Although I can't imagine the emacs folks wanting to buy much
+	of this stuff back (insert mode, anyone? :-), they might
+	want to look at:
+		- full global undo
+		- tags support
+		- better (maybe?) UNIX terminal handling
+		- better UNIX shell escapes
+		- terminal scroll support
+		- multiple yank registers (formerly called kill buffers)
+		- multiple marks  (actually kind of messy)
+		- improved aesthetics of window splitting and deleting
 		- "next error" cursor positioning
-	  Of course, it _may_ lack some of vi's reliability. (grin)
+		- list mode )
 
-	Take a look at vile.hlp for more information about features and
-	differences.
+	Take a look at vile.hlp for more information about features
+	and differences. 
 
-	I have not tried this on a small system, or even _any_ non-UNIX
-	system.  I'm sure some work will be required to make it work on
-	DOS again, for instance -- especially for spawning sub-shells, etc.
+	In general, I suspect that the quality of the code is roughly
+	on a par with MicroEmacs.  I've been using vile regularly under
+	both SunOS and 386 UNIX for about a year, with no major problems
+	(that havn't been fixed).  Another dedicated user has been
+	running it on various flavors of 386 UNIX (Bell, Open DeskTop,
+	Xenix) and Ultrix, also with no problems.
 
-	I ifdef'ed out the language features (user-defined procs, etc.) a
-	long time ago -- I don't know if they still work, though I didn't
-	actively try to break them.
+	I have not tried this on a small system, or even _any_
+	non-UNIX system.  I'm sure work will be required to make
+	it work on DOS again, for instance -- especially for spawning
+	sub-shells, etc. 
+
+	I ifdef'ed out the language features (user-defined procs,
+	etc.) a long time ago -- I don't know if they still work,
+	though I didn't actively try to break them. 
+
+	If anyone is interested in doing major work on this thing, let me
+	know -- I have some ideas on how to make a full ex mode work, for 
+	instance, and on how to add the ":map" command.  Also, take a look 
+	at the buglist...
 
 	Hope you enjoy -- 
 
-	Paul Fox
+	Paul G. Fox	June 3, 1991
 	pgf@cayman.com
 
 p.s.  The code distributed with vile in the "shortnames" subdirectory
-	is covered by GNU Public License.  The vile code itself in the upper
-	level directory is _not_ covered by the GNU public license.
+	is covered by GNU Public License.  The vile code itself in the
+	upper level directory is _not_ covered by the GNU public license. 
 
-
+p.p.s By the way, I'm _not_ the same Paul Fox who wrote Crisp, the Brief
+	work-alike.

@@ -78,8 +78,8 @@ struct	termio	ntermio;	/* charactoristics to use inside */
 struct  sgttyb  ostate;          /* saved tty state */
 struct  sgttyb  nstate;          /* values for editor mode */
 struct  sgttyb  rnstate;          /* values for raw editor mode */
-short olstate;		/* Saved local mode values */
-short nlstate;		/* new local mode values */
+int olstate;		/* Saved local mode values */
+int nlstate;		/* new local mode values */
 struct ltchars	oltchars;	/* Saved terminal special character set */
 struct ltchars	nltchars = { -1, -1, -1, -1, -1, -1 }; /* a lot of nothing */
 struct tchars	otchars;	/* Saved terminal special character set */
@@ -89,6 +89,10 @@ struct tchars	ntchars; /*  = { -1, -1, -1, -1, -1, -1 }; */
 #define	TBUFSIZ	128
 char tobuf[TBUFSIZ];		/* terminal output buffer */
 #endif
+#endif
+
+#if ULTRIX
+#include <sys/termios.h>
 #endif
 
 extern CMDFUNC f_backchar;
@@ -181,8 +185,14 @@ ttopen()
 	ntermio.c_cc[VTIME] = 0;
 	ntermio.c_cc[VSWTCH] = -1;
 #ifdef SIGTSTP	/* suspension under sys5 -- is this a standard? */
+#if POSIX	/* ODT uses this... */
+	ntermio.c_cc[VSUSP] = -1;
+	ntermio.c_cc[VSTART] = -1;
+	ntermio.c_cc[VSTOP] = -1;
+#else
 	ntermio.c_cc[V_SUSP] = -1;
 	ntermio.c_cc[V_DSUSP] = -1;
+#endif
 #endif
 	intrc = ntermio.c_cc[VINTR];
 	killc = ntermio.c_cc[VKILL];
@@ -324,7 +334,7 @@ ttclean(f)
 ttunclean()
 {
 #if	USG
-	ioctl(0, TCSETA, &ntermio);
+	ioctl(0, TCSETAF, &ntermio);
 #endif
 #if     V7 | BSD
 	ioctl(0, TIOCSETP,&nstate);
@@ -523,7 +533,12 @@ ttgetc()
 
 #if     V7 | BSD
         /*stty(0, &rnstate);                      /* set raw mode */
-        c = fgetc(stdin) & 0x7f;
+        c = fgetc(stdin);
+	if (c == -1)
+		/* this doesn't work -- read doesn't return on interrupt */
+		c = kcod2key(intrc);
+	else
+		c &= 0x7f;
         /*stty(0, &nstate);                       /* set mode */
 	return c;
 #endif
@@ -533,7 +548,7 @@ ttgetc()
 		kbdqp = FALSE;
 	} else {
 		if( kbdpoll && fcntl( 0, F_SETFL, kbdflgs ) < 0 )
-			return FALSE;
+			return FALSE;	/* what ??  i don't understand -- pgf */
 		kbdpoll = FALSE;
 		if (read(0, &kbdq, 1) < 0) {
 			return -1;

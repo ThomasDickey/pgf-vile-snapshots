@@ -54,7 +54,6 @@ filefind(f, n)
 	char rnfname[NFILEN];
         register int s;		/* status return */
 	LINE *lp;
-	extern BUFFER *filesbp;
 
 	if (clexec || isnamedcmd) {
 	        if ((s=mlreply("Find file: ", fname, NFILEN)) != TRUE)
@@ -65,7 +64,9 @@ filefind(f, n)
 	if ((s = glob(fname)) != TRUE)
 		return FALSE;
 	strcpy (nfname, fname);
+#if TAGS
 	if (othmode & OTH_LAZY) {
+		extern BUFFER *filesbp;
 		lp = NULL;
 		while (flook(nfname, FL_HERE) == NULL) {
 			rvstrcpy(rnfname, fname);
@@ -78,6 +79,7 @@ filefind(f, n)
 			rvstrncpy(nfname, lp->l_text, llength(lp));
 		}
 	}
+#endif
 	return getfile(nfname, TRUE);
 }
 
@@ -107,22 +109,23 @@ viewfile(f, n)	/* visit a file in VIEW mode */
  */
 static char insfname[NFILEN];
 
-insfile(f, n, dummy, gotresponse)
+insfile(f, n)
 {
         register int    s;
 
-	if (!gotresponse) {
+	if (!calledbefore) {
 	        if ((s=mlreply("Insert file: ", insfname, NFILEN)) != TRUE)
 	                return s;
 		if ((s = glob(insfname)) != TRUE)
 			return FALSE;
 	}
 	if (ukb == 0)
-	        return ifile(insfname,FALSE);
+	        return ifile(insfname,TRUE,NULL);
 	else
 	        return kifile(insfname);
 }
 
+#if BEFORE
 insfiletop(f, n)
 {
         register int    s;
@@ -130,8 +133,10 @@ insfiletop(f, n)
                 return s;
 	if ((s = glob(insfname)) != TRUE)
 		return FALSE;
-        return ifile(insfname,TRUE);
+	curwp->w_dotp = curbp->b_linep;
+        return ifile(insfname,TRUE,NULL);
 }
+#endif
 
 getfile(fname, lockfl)
 char fname[];		/* file name to find */
@@ -184,7 +189,7 @@ int lockfl;		/* check the file for locks? */
 						swbuffer(bp);;
 			}
 			/* old buffer name conflict code */
-			unqname(bname);
+			unqname(bname,TRUE);
 	                s = mlreply("Will use buffer name: ", bname, NBUFN);
 	                if (s == ABORT)
 	                        return s;
@@ -218,6 +223,7 @@ int	mflg;		/* print messages? */
         register int    nline;
         int    len;
 	char *errst;
+	int flag = 0;
 #if UNIX
         int    done_update = FALSE;
 #endif
@@ -270,13 +276,11 @@ int	mflg;		/* print messages? */
 		if (addline(bp,fline,len) != TRUE) {
                         s = FIOMEM;             /* Keep message on the  */
                         break;                  /* display.             */
-                }
+                } else {
 #if UNIX
-                else {
                 	/* reading from a pipe, and internal? */
-			if (fileispipe) {
-				int flag;
-				flag = WFEDIT;
+			if (fileispipe && !ffhasdata()) {
+				flag |= WFEDIT;
 				if (!done_update || bp->b_nwnd > 1)
 					flag |= WFHARD;
 			        for (wp=wheadp; wp!=NULL; wp=wp->w_wndp) {
@@ -289,7 +293,11 @@ int	mflg;		/* print messages? */
 			        }
 				update(FALSE);
 				done_update = TRUE;
+				flag = 0;
+			} else {
+				flag |= WFHARD;
 			}
+			
 		}
 #endif
                 ++nline;
@@ -455,7 +463,7 @@ char    fname[];
 #endif
 }
 
-unqname(name)	/* make sure a buffer name is unique */
+unqname(name,ok_to_ask)	/* make sure a buffer name is unique */
 char *name;	/* name to check on */
 {
 	register char *sp;
@@ -475,10 +483,15 @@ char *name;	/* name to check on */
 			strcat(sp, "-1");
 		} else {
 		choosename:
-			do {
-				mlreply("Choose a unique buffer name: ",
+			if (ok_to_ask) {
+				do {
+					mlreply("Choose a unique buffer name: ",
 						 name, NBUFN);
-			} while (name[0] == '\0');
+				} while (name[0] == '\0');
+			} else { /* can't ask, just overwrite end of name */
+				sp[-1] = '-';
+				sp[0] = '1';
+			}
 		}
 	}
 }
@@ -583,11 +596,38 @@ writeregion(f,n)
 	int s;
         static char fname[NFILEN];
 
+#ifdef BEFORE
         if ((s=mlreply("Write file: ", fname, NFILEN)) != TRUE)
                 return s;
 	if ((s = glob(fname)) != TRUE)
 		return FALSE;
-        if ((s=getregion(&region)) != TRUE)
+#else
+	if (isnamedcmd && lastkey == '\r') {
+		strncpy(fname, curbp->b_fname, NFILEN);
+
+		if (mlyesno("Okay to write [possible] partial range") != TRUE) {
+			mlwrite("Range not written");
+			return FALSE;
+		}
+	} else {
+		/* HACK -- this implies knowledge of 
+					how kbd_engl works! */
+	        if ((s=mlreply("Write region to file: ", fname, NFILEN))
+							 != TRUE)
+	                return s;
+		if ((s = glob(fname)) != TRUE)
+			return FALSE;
+		if (strcmp(fname,curbp->b_fname) &&
+			fname[0] != '!' && flook(fname,FL_HERE)) {
+			if (mlyesno("File exists, okay to overwrite")
+							!= TRUE) {
+				mlwrite("File not written");
+				return FALSE;
+			}
+		}
+        }
+#endif
+        if ((s=getregion(&region,NULL)) != TRUE)
                 return s;
 #if DOSFILES
 	dosfile = curbp->b_mode & MDDOS;
@@ -672,7 +712,8 @@ char    *fn;
 
 	/* last line */
 	if (rp->r_size > 0) {
-		for (i = 0; i < rp->r_size; i++) {
+		lim = rp->r_size;
+		for (i = 0; i < lim; i++) {
 		        if ((s=ffputc(lgetc(lp,i))) != FIOSUC)
 		                goto out;
 			nchar++;
@@ -810,8 +851,9 @@ filename(f, n)
  * buffer, Called by insert file command. Return the final
  * status of the read.
  */
-ifile(fname,attopoffile)
+ifile(fname,belowthisline,haveffp)
 char    fname[];
+FILE *haveffp;
 {
         register LINE   *lp0;
         register LINE   *lp1;
@@ -822,33 +864,35 @@ char    fname[];
         int    nbytes;
         register int    nline;
 	char mesg[NSTRING];
+	extern FILE	*ffp;
 
         bp = curbp;                             /* Cheap.               */
         bp->b_flag |= BFCHG;			/* we have changed	*/
 	bp->b_flag &= ~BFINVS;			/* and are not temporary*/
-        if ((s=ffropen(fname)) == FIOERR)       /* Hard file open.      */
-                goto out;
-        if (s == FIOFNF) {                      /* File not found.      */
-                mlwrite("[No such file \"%s\" ]", fname);
-		return FALSE;
-        }
-        mlwrite("[Inserting...]");
+	if (!haveffp) {
+	        if ((s=ffropen(fname)) == FIOERR)       /* Hard file open.      */
+	                goto out;
+	        if (s == FIOFNF) {                      /* File not found.      */
+	                mlwrite("[No such file \"%s\" ]", fname);
+			return FALSE;
+	        }
+	        mlwrite("[Inserting...]");
 #if UNIX
-	if (fileispipe)
-		ttclean(TRUE);
+		if (fileispipe)
+			ttclean(TRUE);
 #endif
 
 #if	CRYPT
-	s = resetkey(curbp);
-	if (s != TRUE)
-		return s;
+		s = resetkey(curbp);
+		if (s != TRUE)
+			return s;
 #endif
-	if (attopoffile)
-		curwp->w_dotp = curbp->b_linep;
+	} else { /* we already have the file pointer */
+		ffp = haveffp;
+	}
 	lp0 = curwp->w_dotp;
 	curwp->w_doto = 0;
-	curwp->w_mkp = lp0;
-	curwp->w_mko = 0;
+	setmark();
 
 	nline = 0;
 	while ((s=ffgetline(&nbytes)) == FIOSUC) {
@@ -856,7 +900,12 @@ char    fname[];
 			s = FIOMEM;		/* Keep message on the	*/
 			break;			/* display.		*/
 		}
-		lp2 = lp0->l_fp;	/* line after insert */
+		if (belowthisline) {
+			lp2 = lp0->l_fp;	/* line after insert */
+		} else {
+			lp2 = lp0;
+			lp0 = lp0->l_bp;
+		}
 
 		/* re-link new line between lp0 and lp2 */
 		lp2->l_bp = lp1;
@@ -864,26 +913,40 @@ char    fname[];
 		lp1->l_bp = lp0;
 		lp1->l_fp = lp2;
 
+#if BEFORE
 		/* and advance and write out the current line */
 		curwp->w_dotp = lp1;
+#endif
+#if BEFORE
 		for (i=0; i<nbytes; ++i)
 			lputc(lp1, i, fline[i]);
+#else
+		memcpy(lp1->l_text, fline, nbytes);
+#endif
+#if BEFORE
 		curwp->w_dotp = curwp->w_mkp;
+#endif
 		tag_for_undo(lp1);
-		lp0 = lp1;
+		if (belowthisline)
+			lp0 = lp1;
+		else
+			lp0 = lp2;
 		++nline;
 	}
+	if (!haveffp) {
 #if UNIX
-	if (fileispipe == TRUE) {
-		ttunclean();
-		TTflush();
-		sgarbf = TRUE;
-	}
+		if (fileispipe == TRUE) {
+			ttunclean();
+			TTflush();
+			sgarbf = TRUE;
+		}
 #endif
-	ffclose();				/* Ignore errors.	*/
+		ffclose();				/* Ignore errors.	*/
+		readlinesmsg(nline,s,fname,FALSE);
+	}
+#if BEFORE
 	curwp->w_mkp = lforw(curwp->w_mkp);
-
-	readlinesmsg(nline,s,fname,FALSE);
+#endif
 out:
 	/* advance to the next line and mark the window for changes */
 	curwp->w_dotp = lforw(curwp->w_dotp);
@@ -1065,10 +1128,7 @@ char *buf;
 		return TRUE;		/* internal name, don't bother */
 
 	while (*cp) {
-		if (ispunct(*cp) && 
-			*cp != '.' && 
-			*cp != '_' && 
-			*cp != '/' ) {
+		if (iswild(*cp)) {
 			sprintf(cmd, "echo %s", buf);
 			cf = npopen(cmd,"r");
 			if (cf == NULL) {

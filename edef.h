@@ -50,7 +50,7 @@ LINE    *lalloc();              /* Allocate a line              */
 #endif
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version two point two");
+decl_init( char version[], "version three");
 
 decl_init( int tabval, 8);		/* which column tabs are on,
 						 always power of two */
@@ -58,6 +58,7 @@ decl_init( int tabmask, 7);		/* one less than above. I know it's
 						wasteful */
 decl_init( int autoindented , -1);	/* how many chars (not cols) indented */
 decl_uninit( int isnamedcmd );		/* are we typing a command name */
+decl_uninit( int calledbefore );	/* called before during this command? */
 decl_uninit( short _chartypes_[N_chars] );	/* character types	*/
 decl_uninit( int interrupted );		/* interrupt signal?		*/
 decl_uninit( int insertmode );		/* are we inserting or overwriting? */
@@ -70,7 +71,6 @@ decl_uninit( short doingopcmd );        /* operator command in progress */
 decl_uninit( short opcmd );             /* what sort of operator?	*/
 decl_uninit( CMDFUNC *havemotion );	/* so we can use "oper" routines
 					   internally */
-decl_uninit( short plinesdone );        /* have we already used pline()? */
 decl_uninit( int fillcol );             /* Fill column                  */
 decl_uninit( short kbdm[NKBDM] );	/* Macro                        */
 decl_uninit( short dotcmdm[NKBDM] );	/* dot commands			*/
@@ -172,9 +172,10 @@ decl_init( char	*modename[] , {		/* names of modes		*/
 	"crypt" comma
 	"asave" comma
 	"list" comma
-	"dos" } );
+	"dos" comma
+	"aindent" } );
 
-decl_init( char	modecode[], "wcsevmyald" );/* letters to represent modes	*/
+decl_init( char	modecode[], "wcsevmyaldi" );/* letters to represent modes */
 
 decl_init( int gmode, MDSWRAP|MDEXACT|MDMAGIC );/* global editor mode	*/
 
@@ -193,12 +194,10 @@ decl_uninit( int vtrow );               /* Row location of SW cursor	*/
 decl_uninit( int vtcol );               /* Column location of SW cursor */
 decl_init( int ttrow, HUGE );           /* Row location of HW cursor	*/
 decl_init( int ttcol, HUGE );           /* Column location of HW cursor */
-decl_uninit( int lbound	);		/* leftmost column of current line
-					   being displayed */
 decl_uninit( int taboff	);		/* tab offset for display	*/
 
-decl_init( int metac, tocntrl('A') );	/* current meta character	*/
-decl_init( int ctlxc, tocntrl('X') );	/* current control X prefix char */
+decl_init( int cntl_a, tocntrl('A') );	/* current meta character	*/
+decl_init( int cntl_x, tocntrl('X') );	/* current control X prefix char */
 decl_init( int reptc, 'K' );		/* current universal repeat char */
 decl_init( int abortc, tocntrl('[') );	/* ESC: current abort command char */
 decl_init( int quotec, tocntrl('V') );	/* quote char during mlreply()	*/
@@ -215,6 +214,8 @@ decl_init( char	*cname[], {		/* names of colors		*/
 	"BLACK" comma "RED" comma "GREEN" comma "YELLOW" comma "BLUE" comma
 	"MAGENTA" comma "CYAN" comma "WHITE"} );
 #endif
+
+decl_uninit( int exmode );
 
 decl_uninit( KILLREG kbs[NKREGS] );	/* all chars, 1 thru 9, and default */
 decl_uninit( short ukb );		/* index of current kbuffs */
