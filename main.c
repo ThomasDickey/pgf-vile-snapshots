@@ -14,7 +14,33 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.51  1992/02/17 08:58:12  pgf
+ * Revision 1.59  1992/04/02 23:00:28  pgf
+ * fixed empty buffer bug, just introduced
+ *
+ * Revision 1.58  1992/03/24  07:44:05  pgf
+ * added support for VILEINIT variable for initialization
+ *
+ * Revision 1.57  1992/03/19  23:22:46  pgf
+ * SIGT for signals, linux port
+ *
+ * Revision 1.56  1992/03/19  23:09:22  pgf
+ * usage cleanup
+ *
+ * Revision 1.55  1992/03/07  10:36:29  pgf
+ * fix missing goto-line argument problem.  "vile + file.c" now goes to end of
+ * file, as it should
+ *
+ * Revision 1.54  1992/03/05  09:19:55  pgf
+ * changed some mlwrite() to mlforce(), due to new terse support
+ *
+ * Revision 1.53  1992/03/03  21:59:02  pgf
+ * added '`' to the _wild character set
+ *
+ * Revision 1.52  1992/03/03  09:35:52  pgf
+ * added support for getting "words" out of the buffer via variables --
+ * needed _nonspace character type
+ *
+ * Revision 1.51  1992/02/17  08:58:12  pgf
  * added "showmode" support, and kill registers now hold unsigned chars
  *
  * Revision 1.50  1992/01/14  20:24:54  pgf
@@ -271,9 +297,9 @@ char	*argv[];
 #endif
 	char *strncpy();
 #if UNIX
-	extern int catchintr();
-	extern int imdying();
-	extern int sizesignal();
+	extern SIGT catchintr();
+	extern SIGT imdying();
+	extern SIGT sizesignal();
 #endif
 	extern char *pathname[];	/* startup file path/name array */
 
@@ -403,30 +429,32 @@ char	*argv[];
 			case 'V':
 				set_global_b_val(MDVIEW,TRUE);
 				break;
+
+			case '?':
 			default:	/* unknown switch */
 			usage:
-				fprintf(stderr,
-			"usage: %s -flags files...\n%s%s%s%s%s%s%s",argv[0],
-			"	-h to get help on startup\n",
-			"	-gNNN or simply +NNN to go to line NNN\n",
-			"	-sstring to search for string\n",
+	fprintf(stderr, "usage: %s [-flags] [@cmdfile] files...\n",argv[0]);
+	fprintf(stderr, "	-h to get help on startup\n");
+	fprintf(stderr, "	-gNNN or simply +NNN to go to line NNN\n");
+	fprintf(stderr, "	-sstring or +/string to search for \"string\"\n");
 #if TAGS
-			"	-ttagname to look up a tag\n",
-#else
-			"",
+	fprintf(stderr, "	-ttagname to look up a tag\n");
+#endif
+	fprintf(stderr, "	-v to view files as read-only\n");
+	/* fprintf(stderr, "	-e to edit (as opposed to view) files\n"); */
+#if CRYPT
+	fprintf(stderr, "	-kcryptkey for encrypted files\n");
 #endif
 #if X11
-			"	-f fontname\n",
-#else
-			"",
+	fprintf(stderr, "	-f fontname to change font\n");
+	fprintf(stderr, "	-d displayname to change the default display\n");
+	fprintf(stderr, "	-r for reverse video\n");
 #endif
-			"	-v to view files as read-only\n",
-#if CRYPT
-			"	-kcryptkey for encrypted files\n"
-#else
-			""
+#if NeWS
+	fprintf(stderr, "	-lLINES to set the screen length\n");
 #endif
-				);
+	fprintf(stderr, "	use @filename to run filename as commands\n");
+	fprintf(stderr, "	 (this will suppress .vilerc)\n");
 				exit(1);
 			}
 
@@ -462,9 +490,13 @@ char	*argv[];
 #if UNIX
 	signal(SIGHUP,imdying);
 	signal(SIGINT,catchintr);
+#ifdef SIGBUS
 	signal(SIGBUS,imdying);
-	signal(SIGSEGV,imdying);
+#endif
+#ifdef SIGSYS
 	signal(SIGSYS,imdying);
+#endif
+	signal(SIGSEGV,imdying);
 	signal(SIGTERM,imdying);
 #if DEBUG
 	signal(SIGQUIT,imdying);
@@ -491,21 +523,6 @@ char	*argv[];
 		list order.  this set curbp, which isn't actually kosher */
 	curbp = NULL;
 
-	/* if invoked with no other startup files,
-	   run the system startup file here */
-	if (!ranstartup) {
-
-		/* if .vilerc is one of the input files....don't clobber it */
-		if (gotafile && strcmp(pathname[0], firstbp->b_bname) == 0) {
-			c = firstbp->b_bname[0];
-			firstbp->b_bname[0] = '[';
-			startstat = startup(pathname[0]);
-			firstbp->b_bname[0] = c;
-		} else {
-			startstat = startup(pathname[0]);
-		}
-		ranstartup = TRUE;
-	}
 
 	/* if there are any files to read, read the first one! */
 	if (gotafile) {
@@ -525,6 +542,61 @@ char	*argv[];
 		set_b_val(bp, MDDOS, FALSE );
 #endif
 		swbuffer(bp);
+	}
+
+	/* if invoked with no other startup files,
+	   run the system startup file here */
+	if (!ranstartup) {
+		char *getenv();
+		char *vileinit;
+		vileinit = getenv("VILEINIT");
+		if (vileinit != NULL) {
+			int odiscmd;
+			BUFFER *vbp, *obp = curbp;
+			int oflags;
+
+			/* mark as modified, to prevent undispbuff() from
+				 clobbering */
+			oflags = obp->b_flag;
+			obp->b_flag |= BFCHG;
+
+			if ((vbp=bfind("[vileinit]", OK_CREAT, 0))==NULL)
+				return FALSE;
+			/* mark the buffer as read only */
+			make_local_b_val(vbp,MDVIEW);
+			set_b_val(vbp,MDVIEW,TRUE);
+
+			vbp->b_active = TRUE;
+
+			swbuffer(vbp);
+			bprintf("%s", vileinit);
+			vbp->b_flag &= ~BFCHG;
+
+			/* go execute it! */
+			odiscmd = discmd;
+			discmd = FALSE;
+			startstat = dobuf(vbp);
+			discmd = odiscmd;
+			if (obp) {
+				swbuffer(obp);
+				obp->b_flag = oflags;
+			}
+			/* remove the now unneeded buffer and exit */
+			zotbuf(vbp);
+		} else {
+			/* if .vilerc is one of the input files....
+					don't clobber it */
+			if (gotafile && 
+				strcmp(pathname[0], firstbp->b_bname) == 0) {
+				c = firstbp->b_bname[0];
+				firstbp->b_bname[0] = '[';
+				startstat = startup(pathname[0]);
+				firstbp->b_bname[0] = c;
+			} else {
+				startstat = startup(pathname[0]);
+			}
+		}
+		ranstartup = TRUE;
 	}
 
 	msg = "";
@@ -549,7 +621,7 @@ char	*argv[];
 		msg = "[Cannot search and goto at the same time]";
 #endif
 	} else if (gotoflag) {
-		if (gotoline(TRUE,gline) == FALSE)
+		if (gotoline(gline != 0, gline) == FALSE)
 			msg = "[Invalid goto argument]";
 	} else if (searchflag) {
 		forwhunt(FALSE, 0);
@@ -561,7 +633,7 @@ char	*argv[];
 
 	update(FALSE);
 	if (startstat == TRUE)  /* else there's probably an error message */
-		mlwrite(msg);
+		mlforce(msg);
 
 
 	/* process commands */
@@ -713,6 +785,7 @@ global_val_init()
 }
 
 #if UNIX
+SIGT
 catchintr()
 {
 	interrupted = TRUE;
@@ -901,16 +974,16 @@ int f,n;
 	while (bp != NULL) {
 		if ((bp->b_flag&BFCHG) != 0 && (bp->b_flag&BFINVS) == 0) {
 			make_current(bp);
-			mlwrite("[Saving %s]",bp->b_fname);
-			mlwrite("\n");
+			mlforce("[Saving %s]",bp->b_fname);
+			mlforce("\n");
 			if ((status = filesave(f, n)) != TRUE)
 				break;
-			mlwrite("\n");
+			mlforce("\n");
 		}
 		bp = bp->b_bufp;	/* on to the next buffer */
 	}
 	make_current(oldbp);
-	mlwrite("\n");
+	mlforce("\n");
 	if (status != TRUE || f == FALSE)
 		pressreturn();
 	sgarbf = TRUE;
@@ -927,7 +1000,7 @@ int f,n;
 	thiscmd = lastcmd;
 	cnt = anycb();
 	if (cnt) {
-		mlwrite("Will write %d buffer%c  %s ",
+		mlprompt("Will write %d buffer%c  %s ",
 			cnt, cnt > 1 ? 's':'.',
 			clexec ? "" : "Repeat command to continue.");
 		if (!clexec && !isnamedcmd) {
@@ -1250,7 +1323,7 @@ charinit()
 		_chartypes_['_'] = 
 		_chartypes_['-'] =
 		_chartypes_['*'] = 
-		_chartypes_['/'] = _path;
+		_chartypes_['/'] = _pathn;
 
 	/* legal in "identifiers" */
 	_chartypes_['_'] |= _ident;
@@ -1269,15 +1342,15 @@ charinit()
 
 	/* lowercase */
 	for (c = 'a'; c <= 'z'; c++)
-		_chartypes_[c] |= _lower|_path|_ident;
+		_chartypes_[c] |= _lower|_pathn|_ident;
 
 	/* uppercase */
 	for (c = 'A'; c <= 'Z'; c++)
-		_chartypes_[c] |= _upper|_path|_ident;
+		_chartypes_[c] |= _upper|_pathn|_ident;
 
 	/* digits */
 	for (c = '0'; c <= '9'; c++)
-		_chartypes_[c] |= _digit|_path|_ident|_linespec;
+		_chartypes_[c] |= _digit|_pathn|_ident|_linespec;
 
 	/* punctuation */
 	for (c = '!'; c <= '/'; c++)
@@ -1307,6 +1380,7 @@ charinit()
 	_chartypes_['$'] |= _wild;
 	_chartypes_['{'] |= _wild;
 	_chartypes_['}'] |= _wild;
+	_chartypes_['`'] |= _wild;
 
 	/* ex mode line specifiers */
 	_chartypes_[','] |= _linespec;
@@ -1324,6 +1398,10 @@ charinit()
 	_chartypes_[']'] |= _fence;
 	_chartypes_['{'] |= _fence;
 	_chartypes_['}'] |= _fence;
+
+	for (c = 0; c < N_chars; c++)
+			if ((_chartypes_[c] & _space) == 0)
+					_chartypes_[c] |= _nonspace;
 
 }
 

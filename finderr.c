@@ -2,7 +2,14 @@
  * Written for vile by Paul Fox, (c)1990
  *
  * $Log: finderr.c,v $
- * Revision 1.7  1992/01/05 00:06:13  pgf
+ * Revision 1.9  1992/03/19 23:35:27  pgf
+ * use b_linecount to index from end of file instead of top, to be
+ * less affected by insertions deletions up above
+ *
+ * Revision 1.8  1992/03/05  09:01:12  pgf
+ * shortened "found error" msg, and force it
+ *
+ * Revision 1.7  1992/01/05  00:06:13  pgf
  * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
  * often.  also normalized message appearance somewhat.
  *
@@ -126,11 +133,11 @@ int f,n;
 		}
 	}
 
-	mlwrite("Error is %*S", dotp->l_used, dotp->l_text);
+	mlforce("Error: %*S", dotp->l_used, dotp->l_text);
 
 	/* it's an absolute move */
 	curwp->w_lastdot = curwp->w_dot;
-	gotoline(TRUE,errline);
+	gotoline(TRUE, -(curbp->b_linecount - errline + 1));
 
 	oerrline = errline;
 	strcpy(oerrfile,errfile);

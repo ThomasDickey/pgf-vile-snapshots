@@ -7,7 +7,10 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: globals.c,v $
- * Revision 1.10  1992/01/05 00:06:13  pgf
+ * Revision 1.11  1992/03/07 10:21:29  pgf
+ * arg mismatch on fsearch()
+ *
+ * Revision 1.10  1992/01/05  00:06:13  pgf
  * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
  * often.  also normalized message appearance somewhat.
  *
@@ -115,7 +118,7 @@ int f, n, g_or_v;
 	
 	
 	/* call the searcher, telling it to do line marking */
-	s = fsearch(FALSE,0,TRUE,NULL);
+	s = fsearch(FALSE,0,TRUE,FALSE);
 	if (s != TRUE)
 		return s;
 	

@@ -6,7 +6,22 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.32  1992/02/17 09:04:03  pgf
+ * Revision 1.37  1992/04/02 08:28:59  pgf
+ * fixed the realloc case of quickreadf()
+ *
+ * Revision 1.36  1992/03/20  09:00:40  pgf
+ * fixed typo
+ *
+ * Revision 1.35  1992/03/19  23:34:53  pgf
+ * set b_linecount on reads and writes of a file
+ *
+ * Revision 1.34  1992/03/19  23:20:22  pgf
+ * SIGT for signals, linux portability
+ *
+ * Revision 1.33  1992/03/05  09:19:55  pgf
+ * changed some mlwrite() to mlforce(), due to new terse support
+ *
+ * Revision 1.32  1992/02/17  09:04:03  pgf
  * fix null filename dereference, and
  * kill registers now hold unsigned chars
  *
@@ -131,11 +146,10 @@
 */
 
 #include        <stdio.h>
+#include        <string.h>
 #include	"estruct.h"
 #include        "edef.h"
 
-char *strchr();
-char *strrchr();
 
 extern int fileispipe;
 int doslines, unixlines;
@@ -215,7 +229,7 @@ int f,n;
 	        if ((s=mlreply("Find file: ", fname, NFILEN)) != TRUE)
 	                return s;
         } else {
-		screen_string(fname,NFILEN,_path);
+		screen_string(fname,NFILEN,_pathn);
         }
 	if ((s = glob(fname)) != TRUE)
 		return FALSE;
@@ -432,6 +446,8 @@ int	mflg;		/* print messages? */
 	if (mflg)
 		readlinesmsg(nline,s,fname,ffronly(fname));
 
+	bp->b_linecount = nline;
+
 	/* set read-only mode for read-only files */
 	if (fname[0] == '!' 
 #if RONLYVIEW
@@ -536,24 +552,21 @@ int *nlinep;
 	while (len--) {
 		if (*textp == '\n') {
 			if (textp - countp >= 255) {
+				unsigned char *np;
 				len = (long)(countp - bp->b_ltext);
 				incomplete = TRUE;
 				/* we'll re-read the rest later */
 				ffseek(len);
-				if ((unsigned char *)realloc(bp->b_ltext, len)
-							!= bp->b_ltext) {
-					/* ugh.  can this happen?
-						we're reducing the size... */
+				np = (unsigned char *)realloc(bp->b_ltext, len);
+				if (np == NULL) { /* ugh.  can this happen? */
+					  /* (we're _reducing_ the size...) */
 					ffrewind();
-					if ((len = ffread((char *)&bp->b_ltext[1],
-							len)) < 0) {
-						free(bp->b_ltext);
-						bp->b_ltext = NULL;
-						return FIOERR;
-					}
-					goto retry;
+					free(bp->b_ltext);
+					bp->b_ltext = NULL;
+					return FIOMEM;
 				}
-				bp->b_ltext_end = bp->b_ltext + len + 1;
+				bp->b_ltext = np;
+				bp->b_ltext_end = np + len + 1;
 				break;
 			}
 			*countp = textp - countp - 1;
@@ -694,8 +707,11 @@ int rdonly;
 		case FIOABRT:	m = "ABORTED, ";	break;
 		default:	m = "";			break;
 	}
-	mlwrite("[%sRead %d line%s from \"%s\"%s]", m,
-		n, n != 1 ? "s":"", f, rdonly ? "  (read-only)":"" );
+	if (!terse)
+		mlwrite("[%sRead %d line%s from \"%s\"%s]", m,
+			n, n != 1 ? "s":"", f, rdonly ? "  (read-only)":"" );
+	else
+		mlforce("[%s%d lines]",m,n);
 }
 
 /*
@@ -907,7 +923,7 @@ int msgf;
         region.r_size = numchars;
         region.r_end = bp->b_line;
         
-	return writereg(&region,fn,msgf,b_val(bp, MDDOS));
+	return writereg(&region,fn,msgf,b_val(bp, MDDOS),&bp);
 }
 
 writeregion()
@@ -942,16 +958,17 @@ writeregion()
         }
         if ((s=getregion(&region)) != TRUE)
                 return s;
-	s = writereg(&region,fname,TRUE,b_val(curbp, MDDOS));
+	s = writereg(&region,fname,TRUE,b_val(curbp, MDDOS), NULL);
         return s;
 }
 
 
-writereg(rp,fn,msgf, do_cr)
+writereg(rp,fn,msgf, do_cr, bpp)
 REGION	*rp;
 char    *fn;
 int 	msgf;
 int	do_cr;
+BUFFER	**bpp;
 {
         register int    s;
         register LINE   *lp;
@@ -1042,13 +1059,18 @@ int	do_cr;
         if (s == FIOSUC) {                      /* No write error.      */
                 s = ffclose();
                 if (s == FIOSUC && msgf) {      /* No close error.      */
-	                mlwrite("[Wrote %d line%s %ld char%s to %s]", 
-				nline, (nline>1)?"s":"",
-				nchar, (nchar>1)?"s":"", fn);
+			if (!terse)
+				mlwrite("[Wrote %d line%s %ld char%s to %s]", 
+					nline, (nline>1)?"s":"",
+					nchar, (nchar>1)?"s":"", fn);
+			else
+				mlforce("[%d lines]", nline);
                 }
         } else {                                /* Ignore close error   */
                 ffclose();                      /* if a write error.    */
 	}
+	if (bpp)
+		(*bpp)->b_linecount = nline;
 #if UNIX & ! NeWS
 	if (fileispipe == TRUE) {
 		ttunclean();
@@ -1083,7 +1105,7 @@ int	msgf;
 
 	/* make sure there is something to put */
 	if (kbs[ukb].kbufh == NULL) {
-		if (msgf) mlwrite("Nothing to write");
+		if (msgf) mlforce("Nothing to write");
 		return FALSE;		/* not an error, just nothing */
 	}
 
@@ -1122,8 +1144,11 @@ int	msgf;
 	if (s == FIOSUC) {			/* No write error.	*/
 		s = ffclose();
 		if (s == FIOSUC && msgf) {	/* No close error.	*/
-			mlwrite("[Wrote %d line%s to %s ]",
+			if (!terse)
+				mlwrite("[Wrote %d line%s to %s ]",
 					nline,nline!=1?"s":"", fn);
+			else
+				mlforce("[%d lines]", nline);
 		}
 	} else	{				/* Ignore close error	*/
 		ffclose();			/* if a write error.	*/
@@ -1327,6 +1352,8 @@ out:
 /* This code is definitely not production quality, or probably very
 	robust, or probably very secure.  I whipped it up to save
 	myself while debugging...		pgf */
+/* on the other hand, it has worked for well over two years now :-) */
+SIGT
 imdying(signo)
 int signo;
 {

@@ -2,7 +2,13 @@
  *		written by John Hutchinson, heavily modified by Paul Fox
  *
  * $Log: npopen.c,v $
- * Revision 1.9  1991/11/18 08:33:25  pgf
+ * Revision 1.11  1992/03/25 19:13:17  pgf
+ * BSD portability changes
+ *
+ * Revision 1.10  1992/03/19  23:25:04  pgf
+ * linux port, and default NOFILE to 20 (bogus)
+ *
+ * Revision 1.9  1991/11/18  08:33:25  pgf
  * added missing arg to strrchr
  *
  * Revision 1.8  1991/11/16  18:36:46  pgf
@@ -40,7 +46,7 @@
 
 #if UNIX
 
-#include <sys/signal.h>
+#include <signal.h>
 #include <errno.h>
 #include <sys/param.h>
 
@@ -48,7 +54,6 @@
 #define W 1
 
 extern char *getenv();
-extern char *strrchr();
 
 static int pid;
 
@@ -129,6 +134,9 @@ char *cmd;
 		if (dup (wp[0]) != 0)
 			exit(-1);
 			
+#ifndef NOFILE
+# define NOFILE 20
+#endif
 		/* Make sure there are no inherited file descriptors */
 		for (i = 3; i < NOFILE; i += 1)
 			(void) close (i);
@@ -160,6 +168,7 @@ char *cmd;
 npclose (fp)
 FILE *fp;
 {
+	extern int errno;
 	fflush(fp);
 	fclose(fp);
 	if (wait ((int *)0) < 0 && errno == EINTR) {

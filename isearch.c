@@ -17,7 +17,11 @@
  * ever equalled FALSE.
  * 
  * $Log: isearch.c,v $
- * Revision 1.12  1992/01/05 00:06:13  pgf
+ * Revision 1.13  1992/03/01 18:41:31  pgf
+ * took out the checknext optimization, since we no longer move along
+ * the found string quite the way we used to
+ *
+ * Revision 1.12  1992/01/05  00:06:13  pgf
  * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
  * often.  also normalized message appearance somewhat.
  *
@@ -314,15 +318,14 @@ start_over:
 		if (!status) {	/* If we lost last time */
 			TTbeep();	/* Feep again */
 			TTflush();	/* see that the feep feeps */
-		} else
-		 /* Otherwise, we must have won */
-		 	if (!(status = checknext(c, pat, n)))/* See if match */
-				status = scanmore(pat, n);   /* or find the next
+		} else /* Otherwise, we must have won */
+			status = scanmore(pat, n);   /* or find the next
 							      * match */
 		c = kcod2key(get_char());	/* Get the next char */
 	}			/* for {;;} */
 }
 
+#ifdef BEFORE
 /*
  * Trivial routine to insure that the next character in the search string is
  * still true to whatever we're pointing to in the buffer.  This routine will
@@ -343,7 +346,6 @@ checknext(chr, patrn, dir)	/* Check next character in search string */
 	register int    buffchar;	/* character at current position */
 	int             status;	/* how well things go */
 	MARK            curpos;
-
 
 	/* setup the local scan pointer to current "." */
 	curpos = DOT;		/* get  current point */
@@ -371,6 +373,7 @@ checknext(chr, patrn, dir)	/* Check next character in search string */
 						 * place */
 	}
 }
+#endif
 
 /*
  * This hack will search for the next occurrence of <pat> in the buffer,

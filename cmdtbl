@@ -71,7 +71,17 @@
 #		here for completeness.
 #
 # $Log: cmdtbl,v $
-# Revision 1.33  1991/12/24 09:18:47  pgf
+# Revision 1.36  1992/03/19 23:42:49  pgf
+# took out scrsearchforwword stuff -- macros can handle i
+#
+# Revision 1.35  1992/03/13  08:10:37  pgf
+# added ZERO flag to gomark, so ":0" can work
+#
+# Revision 1.34  1992/03/07  10:19:17  pgf
+# added Eric Krohn's srcsearchword() functions.  All of this screen search
+# stuff could be done with macros if variables worked right.
+#
+# Revision 1.33  1991/12/24  09:18:47  pgf
 # added current/change directory support  (Dave Lemke's changes)
 #
 # Revision 1.32  1991/11/07  14:56:59  pgf
@@ -559,7 +569,7 @@ globals		NONE			GLOBALS
 godotplus	MOTION|FL
 
 # this function is for internal use only, for ex commands
-gomark		MOTION|FL|(RANGE)
+gomark		MOTION|FL|(RANGE|ZERO)
 
 gotobop		ABS|MOTION		WORDPRO
 	"previous-paragraph"		!FEWNAMES

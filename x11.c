@@ -2,7 +2,10 @@
  * 	X11 support, Dave Lemke, 11/91
  *
  * $Log: x11.c,v $
- * Revision 1.3  1991/12/11 21:23:13  pgf
+ * Revision 1.4  1992/03/07 10:27:03  pgf
+ * avoid macro expansion loop -- Xos.h defines strchr and strrchr
+ *
+ * Revision 1.3  1991/12/11  21:23:13  pgf
  * added Log keyword
  *
  * Revision 1.2  1991/12/10
@@ -21,6 +24,11 @@
 #undef ISC
 
 #if X11
+
+/* redefined in X11/Xos.h */
+#undef strchr
+#undef strrchr
+
 #include	<X11/Xlib.h>
 #include	<X11/Xutil.h>
 #include	<X11/keysym.h>

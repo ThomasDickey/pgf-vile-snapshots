@@ -4,7 +4,14 @@
  *  heavily modified by Paul Fox, 1990
  *
  * $Log: search.c,v $
- * Revision 1.30  1992/02/17 08:54:07  pgf
+ * Revision 1.32  1992/03/19 23:46:24  pgf
+ * took out scrsearchword stuff -- macros can do it
+ *
+ * Revision 1.31  1992/03/07  10:19:17  pgf
+ * added Eric Krohn's srcsearchword() functions.  All of this screen search
+ * stuff could be done with macros if variables worked right.
+ *
+ * Revision 1.30  1992/02/17  08:54:07  pgf
  * took out unused var for saber
  *
  * Revision 1.29  1992/01/22  16:58:20  pgf
@@ -174,7 +181,7 @@ char notfoundmsg[] = "Not found";
 forwsearch(f, n)
 int f, n;
 {
-	return fsearch(f, n, FALSE, NULL);
+	return fsearch(f, n, FALSE, FALSE);
 }
 
 /* extra args -- marking if called from globals, and should mark lines, and
@@ -190,7 +197,7 @@ int marking, fromscreen;
 	int didmark = FALSE;
 
 	if (f && n < 0)
-		return rsearch(f, -n, NULL, NULL);
+		return rsearch(f, -n, NULL, FALSE);
 
 	wrapok = marking || b_val(curwp->w_bufp, MDSWRAP);
 
@@ -332,7 +339,7 @@ int f, n;	/* default flag / numeric argument */
 backsearch(f, n)
 int f, n;
 {
-	return rsearch(f, n, FALSE, NULL);
+	return rsearch(f, n, FALSE, FALSE);
 }
 
 /* ARGSUSED */
@@ -605,6 +612,7 @@ int f,n;
 	lastdirec = 0;
 	return s;
 }
+
 /*
  * readpattern -- Read a pattern.  Stash it in apat.  If it is the
  *	search string, re_comp() it.
@@ -624,12 +632,11 @@ int	fromscreen;
 	int status;
 
 	/* Read a pattern.  Either we get one,
-	 * or we just get the META charater, and use the previous pattern.
+	 * or we don't, and use the previous pattern.
 	 * Then, if it's the search string, make a reversed pattern.
-	 * *Then*, make the meta-pattern, if we are defined that way.
 	 */
 	if (fromscreen) {
-	 	status = screen_string(apat, NPAT, _ident);
+		status = screen_string(apat, NPAT, _ident);
 		if (status != TRUE)
 			return status;
 	} else {

@@ -4,7 +4,25 @@
  * All operating systems.
  *
  * $Log: termio.c,v $
- * Revision 1.23  1992/01/22 20:28:28  pgf
+ * Revision 1.29  1992/03/26 09:16:59  pgf
+ * ifdef cleanup
+ *
+ * Revision 1.28  1992/03/25  19:13:17  pgf
+ * BSD portability changes
+ *
+ * Revision 1.27  1992/03/20  08:59:28  pgf
+ * kbd_is_polled was out of sync after ttclean/unclean
+ *
+ * Revision 1.26  1992/03/19  23:27:20  pgf
+ * SIGT for signals, linux port
+ *
+ * Revision 1.25  1992/03/19  23:09:46  pgf
+ * TIOCSETP is now TIOCSETN, in all cases
+ *
+ * Revision 1.24  1992/03/07  10:25:58  pgf
+ * AIX support (where is termios.h supposed to be?)
+ *
+ * Revision 1.23  1992/01/22  20:28:28  pgf
  * call TTclose in ttunclean, to support tcapclose().  i hope this is safe
  * for other screen types
  *
@@ -104,17 +122,9 @@ extern int errno;
    	us back into vile's mode
 */
 
-
 #include	<signal.h>
 
-
 /* I suppose this config stuff should move to estruct.h */
-
-#if sun
-# undef POSIX
-# undef BSD
-# define POSIX 1
-#endif
 
 #if POSIX
 # define USE_POSIX_TERMIOS 1
@@ -124,7 +134,7 @@ extern int errno;
 #  define USE_TERMIO 1
 #  define USE_FCNTL 1
 # else
-#  if BSD | V7
+#  if BERK | V7
 #   define USE_SGTTY 1
 #   define USE_FIONREAD 1
 #  else
@@ -170,7 +180,11 @@ extern CMDFUNC f_backchar_to_bol;
 
 #if USE_POSIX_TERMIOS
 
-#include <sys/termios.h>
+#ifdef NOT_SYS_TERMIOS
+# include <termios.h>
+#else
+# include <sys/termios.h>
+#endif
 
 struct termios otermios, ntermios;
 
@@ -199,7 +213,7 @@ ttopen()
 #endif
 
 	{ /* this could probably be done more POSIX'ish? */
-	extern	int rtfrmshell();
+	extern	SIGT rtfrmshell();
 	signal(SIGTSTP,SIG_DFL);	/* set signals so that we can */
 	signal(SIGCONT,rtfrmshell);	/* suspend & restart */
 	signal(SIGTTOU,SIG_IGN);	/* ignore output prevention */
@@ -219,7 +233,9 @@ ttopen()
 	ntermios.c_lflag = ISIG;
 	ntermios.c_cc[VMIN] = 1;
 	ntermios.c_cc[VTIME] = 0;
+#ifdef	VSWTCH
 	ntermios.c_cc[VSWTCH] = -1;
+#endif
 	ntermios.c_cc[VSUSP] = -1;
 	ntermios.c_cc[VSTART] = -1;
 	ntermios.c_cc[VSTOP] = -1;
@@ -246,19 +262,24 @@ int f;
 		ttputc('\r');
 	}
 	fflush(stdout);
+#if ! LINUX
 	tcdrain(1);
+#endif
 #if ! X11
 	tcsetattr(0, TCSADRAIN, &otermios);
 #endif
 	TTclose();
 #if USE_FCNTL
 	fcntl(0, F_SETFL, kbd_flags);
+	kbd_is_polled = FALSE;
 #endif
 }
 
 ttunclean()
 {
+#if ! LINUX
 	tcdrain(1);
+#endif
 #if ! X11
 	if (tcsetattr(0, TCSADRAIN, &ntermios) < 0) {
 		perror("ttunclean: tcsetattr");
@@ -320,7 +341,7 @@ ttopen()
 #  endif
 # endif
 	{
-	extern	int rtfrmshell();	/* return from suspended shell */
+	extern	SIGT rtfrmshell();	/* return from suspended shell */
 	signal(SIGTSTP,SIG_DFL);	/* set signals so that we can */
 	signal(SIGCONT,rtfrmshell);	/* suspend & restart */
 	signal(SIGTTOU,SIG_IGN);	/* ignore output prevention */
@@ -368,6 +389,7 @@ int f;
 	ioctl(0, TCSETAF, &otermio);
 #if USE_FCNTL
 	fcntl(0, F_SETFL, kbd_flags);
+	kbd_is_polled = FALSE;
 #endif
 #endif	/* X11 */
 }
@@ -410,7 +432,7 @@ ttopen()
 	nstate = ostate;
         nstate.sg_flags |= CBREAK;
         nstate.sg_flags &= ~(ECHO|CRMOD);       /* no echo for now... */
-	ioctl(0,TIOCSETP,&nstate); /* set new state */
+	ioctl(0,TIOCSETN,&nstate); /* set new state */
 #endif
 
 	rnstate = nstate;
@@ -436,7 +458,7 @@ ttopen()
 	ioctl(0, TIOCSLTC, &nltchars);		/* Place new character into K */
 #endif
 
-#if	BSD	/* this is probably not the right ifdef */
+#ifdef	TIOCLGET
 	ioctl(0, TIOCLGET, &olstate);
 #if ! X11
 	nlstate = olstate;
@@ -449,7 +471,7 @@ ttopen()
 #endif
 #if ! X11
 	{
-	extern	int rtfrmshell();	/* return from suspended shell */
+	extern	SIGT rtfrmshell();	/* return from suspended shell */
 	signal(SIGTSTP,SIG_DFL);	/* set signals so that we can */
 	signal(SIGCONT,rtfrmshell);	/* suspend & restart */
 	signal(SIGTTOU,SIG_IGN);	/* ignore output prevention */
@@ -475,10 +497,10 @@ int f;
 		ttputc('\r');
 	}
 	TTflush();
-	ioctl(0, TIOCSETP, &ostate);
+	ioctl(0, TIOCSETN, &ostate);
 	ioctl(0, TIOCSETC, &otchars);
 	ioctl(0, TIOCSLTC, &oltchars);
-#if	BSD
+#ifdef	TIOCLSET
 	ioctl(0, TIOCLSET, &olstate);
 #endif
 #endif
@@ -487,10 +509,10 @@ int f;
 ttunclean()
 {
 #if ! X11
-	ioctl(0, TIOCSETP, &nstate);
+	ioctl(0, TIOCSETN, &nstate);
 	ioctl(0, TIOCSETC, &ntchars);
 	ioctl(0, TIOCSLTC, &nltchars);
-#if	BSD
+#ifdef	TIOCLSET
 	ioctl(0, TIOCLSET, &nlstate);
 #endif
 #endif

@@ -5,11 +5,7 @@ H	output sometimes doesn't flush properly after a shell escape -- seems
 	to be related to turning on the USE_FCNTL code in termio.c.  If anyone
 	finds this -- let me know!  I'd love to know the answer.
 
-M	shiftwidth support is in, but the > and < operators still move things
-	by tabwidth, instead of shiftwidth.
-
-L	longnames cause portability constraint -- does the shortnames
-	stuff take care of this?  I can't test it...
+E	should add a "show-vars" command
 
 E	everybody and their sibling wants "map", "map!", and "abb".
 	the first step to supporting this is making macro/dotcmd replay be
@@ -346,4 +342,38 @@ greps etc.  The only solution I can come up with is to use the escape
 as the carriage return, i.e. once the user escapes execute.  It would
 be nicer to use proper carriage return though.
 
------------------------------------
+
+-------------------------------------------------- 
+
+I'm leery of automatically running ./.vilerc -- that is a security hole
+waiting for a Trojan horse.  Safer is the vi approach that sources
+$EXINIT if it exists or $HOME/.exrc.  Then it either executes ./.exrc
+(SVR2, security hole again) or executes it only if a :set exrc was 
+previously run (SVR4, security hole only if I choose to allow it).
+
+
+-------------------------------------------------- 
+The latest x11 version of vile coredumps on a sunos 4.1 sparcstation 2
+when you resize it smaller
+
+the problem seems to be sigwinches being recieved which have a bogus
+window size (maybe the size of the controlling terminal it was started in ??). 
+
+I just turned off the sigwinch handler via an #if !X11 for the X11 version and 
+that seems to fix the problem.
+
+>
+> > 
+> > I just turned off the sigwinch handler via an #if !X11 for the X11 version and 
+> > that seems to fix the problem.
+>So how does vile learn about the size change?  (Or am I missing something...)
+
+well, my guess is that it's got the same stdin, stdout , and stderr
+(which are undoubtedly pty(s)) as the shelltool i started it up in and
+that's causing it to get SIGWINCH's which don't have anything to do
+with the actual display window. I really did not investigate the
+intricacies of why it's happening. I just ran dbx on the core file and
+discovered that the thing was in a sigwinch handler with bogus screen
+dimensions. I suppose an experiment to try would have been to disassociate
+vile from shelltool process group and see if it still got the signals.
+

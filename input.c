@@ -3,7 +3,23 @@
  *		5/9/86
  *
  * $Log: input.c,v $
- * Revision 1.31  1992/02/17 09:05:12  pgf
+ * Revision 1.36  1992/03/19 23:21:33  pgf
+ * linux portability (pathn)
+ *
+ * Revision 1.35  1992/03/07  10:28:52  pgf
+ * don't write a null past the end of the input buffer in kbd_string
+ *
+ * Revision 1.34  1992/03/03  21:58:32  pgf
+ * minor optimization in screen_string
+ *
+ * Revision 1.33  1992/03/03  09:35:52  pgf
+ * added support for getting "words" out of the buffer via variables --
+ * needed _nonspace character type
+ *
+ * Revision 1.32  1992/03/03  08:42:01  pgf
+ * took out pre_colon_pos
+ *
+ * Revision 1.31  1992/02/17  09:05:12  pgf
  * make "RECORDED_ESC" work on machines whose natural chars are unsigned, and
  * add support for "pre_colon_pos", which is the value of DOT just before the
  * named command was run -- this lets ':' expand correctly in all cases
@@ -261,12 +277,6 @@ int eatit;  /* consume the character? */
 			dotcmdmode = STOP;
 			dotcmdbegin(); /* immediately start recording
 					   again, just in case */
-#if BEFORE
-#if	VISMAC == 0
-			/* force a screen update after all is done */
-			update(FALSE);
-#endif
-#endif
 			return -1;
 		} else {
 
@@ -296,12 +306,6 @@ int eatit;  /* consume the character? */
 		/* at the end of last repitition? */
 		if (--kbdrep < 1) {
 			kbdmode = STOP;
-#if BEFORE
-#if	VISMAC == 0
-			/* force a screen update after all is done */
-			update(FALSE);
-#endif
-#endif
 		} else {
 
 			/* reset the macro to the begining for the next rep */
@@ -406,7 +410,7 @@ kbd_key()
 		insert_mode_was = FALSE;
 	}
 
-	if (c == (unsigned char)RECORDED_ESC) {
+	if ((unsigned char)c == (unsigned char)RECORDED_ESC) {
 		/* if this is being replayed... */
 		/* ...then only look for esc sequences if there's input left */
 		if (get_recorded_char(FALSE) != -1)
@@ -536,26 +540,28 @@ kbd_seq()
 	return (lastcmd = c);
 }
 
+
+/* get a string consisting of inclchartype characters from the current
+	position.  if inclchartype is 0, return everything to eol */
 screen_string(buf,bufn,inclchartype)
 char *buf;
 int bufn, inclchartype;
 {
 	register int i = 0;
-	register int s = TRUE;
+	/* register int s = TRUE; */
 	MARK mk;
-	extern MARK pre_colon_pos;
 
 	mk = DOT;
-	if (pre_colon_pos.l)
-		DOT = pre_colon_pos;
-	while (s == TRUE && i < bufn && !is_at_end_of_line(DOT)) {
+	while ( i < bufn && !is_at_end_of_line(DOT)) {
 		buf[i] = char_at(DOT);
-		if (!istype(inclchartype, buf[i]))
+		if (inclchartype && !istype(inclchartype, buf[i]))
 			break;
-		s = forwchar(FALSE, 1);
+		DOT.o++;
 		i++;
 	}
-	buf[i] = '\0';
+	buf[bufn-1] = '\0';
+	if (i < bufn)
+		buf[i] = '\0';
 	DOT = mk;
 
 	return buf[0] != '\0';
@@ -756,7 +762,7 @@ int dobackslashes;	/* do we add and delete '\' chars for the caller */
 			case ':':
 				{
 				char str[80];
-				if (screen_string(str, 80, _path))
+				if (screen_string(str, 80, _pathn))
 					cp = str;
 				break;
 				}

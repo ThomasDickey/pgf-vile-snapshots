@@ -6,7 +6,10 @@
  * for the display system.
  *
  * $Log: buffer.c,v $
- * Revision 1.31  1992/01/05 00:06:13  pgf
+ * Revision 1.32  1992/03/05 09:19:55  pgf
+ * changed some mlwrite() to mlforce(), due to new terse support
+ *
+ * Revision 1.31  1992/01/05  00:06:13  pgf
  * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
  * often.  also normalized message appearance somewhat.
  *
@@ -170,7 +173,7 @@ hist_show()
 		}
 	}
 	if (strcmp(line,"")) {
-		mlwrite(line,1,2,3,4,5,6,7,8,9,10);
+		mlforce(line,1,2,3,4,5,6,7,8,9,10);
 		return TRUE;
 	} else {
 		return FALSE;
@@ -454,7 +457,7 @@ register BUFFER *bp;
 #define no_del 
 #ifdef no_del
 	if (bp->b_nwnd != 0) {			/* Error if on screen.	*/
-		mlwrite("Buffer is being displayed");
+		mlforce("[Buffer is being displayed]");
 		return (FALSE);
 	}
 #else

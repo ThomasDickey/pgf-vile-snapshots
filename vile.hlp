@@ -34,9 +34,8 @@ Getting along with vile
 	type ":apropos name".  These lists will show all command synonyms
 	and key sequences that are bound to the same function.
 	
-	You needn't type full command names --
-	type a few characters and hit the space bar to perform command
-	completion. 
+	You needn't type full command names -- type a few characters and
+	hit the space bar to perform command completion. 
 
 General Remarks
 ---------------
@@ -61,6 +60,11 @@ General Remarks
 	Undo operations are attached to a buffer, not a window.  Thus if
 	you have two windows to the same buffer, and make a change in one,
 	you can undo it in the other.
+
+	vile produces more "status" messages than vi, which may become
+	annoying at low baud rates.  Setting the $terse variable to true
+	will suppress many of these.  (Use "set-variable $terse true".)
+
 
 Buffer manipulation commands:  
 -----------------------------
@@ -150,9 +154,9 @@ Window manipulation commands:
 		bottom of the screen, respectively.
 
 	^X-^R	Scroll the window right by 1/3 of a screen, or by the
-		number of lines specifed.  Changes the "sideways" value.
+		number of lines specified.  Changes the "sideways" value.
 	^X-^L	Scroll the window left by 1/3 of a screen, or by the
-		number of lines specifed.  Changes the "sideways" value.
+		number of lines specified.  Changes the "sideways" value.
 
 	If for some reason you can't get your screen set right via a
 	TERM variable, try the ":screen-rows" or ":screen-columns"
@@ -168,16 +172,16 @@ X Window System commands:
 
 	1 -	Sets cursor position and the start of the selection.
 		With any modifier, it will center the buffer at the cursor
-		(this results in a primitve form of scrolling.)
+		(this results in a primitive form of scrolling.)
 		Motion with the button down will select text.
 		Multiple clicks will expand the selection to cover
 		words or the current line.
-	2 -	Paste the current PRIMARY selection.  With a modifer, it
+	2 -	Paste the current PRIMARY selection.  With a modifier, it
 		pastes at the mouse position, otherwise it pastes at
 		the text cursor position.
 	3 -	Extends the current selection.
 
-	Additonal command line arguments:
+	Additional command line arguments:
 
 	-f fontname	Font to use.
 	-r 		Use reverse video.
@@ -193,7 +197,7 @@ X Window System commands:
 
 	Changing the font on the fly:
 
-	Use the ':setv' command:
+	Use the ':setv' command to set the $font variable:
 
 	: setv $font <fontname>
 
@@ -303,7 +307,7 @@ Text manipulation command:
 	completed.  Thus the delete operator ('d') can be followed by
 	the word motion command ('w'), causing the next word to be
 	deleted.  The sequence "dG" will delete through the end of the
-	file, and "d/junk" will delete to the next occurence of the
+	file, and "d/junk" will delete to the next occurrence of the
 	string "junk".  Operators can all be "stuttered" to affect
 	lines.  Thus "dd" deletes one line, "4dd" affects 4 lines,
 	etc. 
@@ -336,7 +340,7 @@ Text manipulation command:
 		each "paragraph" in the region are preserved, and all
 		subsequent lines get the second line's indentation.  This
 		makes indented/outdented paragraphs (like this one) work
-		correctly.  (This is intentionally _not_ the same bevavior
+		correctly.  (This is intentionally _not_ the same behavior
 		obtained by using "!fmt", since that behavior is obviously
 		available elsewhere.)  The usual usage of this command is
 		"^A-f}", which reformats the current paragraph.  The
@@ -424,7 +428,12 @@ Miscellaneous commands
 		For example, "-!cc -c junk.c" puts all of the compiler output
 		into the buffer named "[Output]".  Repeatedly hitting ^X-^X 
 		will position the editor at each error in turn, and will
-		eventually start over again at the top..
+		eventually start over again at the top..  (I use the following
+		macro to quickly grep a source directory for the string under
+		the cursor:
+		    use-register g load-register "^X!egrep -n : *.[chs]^M"
+		where the ^X and ^M are each single control characters, entered
+		using ^V to escape them.  Then I invoke with @g to execute.)
 	^X-t Set or report on the tab-stop width.  To set, the spacing must
 		precede the command, as in "4^X-t".  The "set tabstop"
 		command described below does the same thing.  The status
@@ -474,7 +483,7 @@ Editor modes
 		with '#' it is moved to column 1.  If the global cmode is
 		set, then the buffer's C mode is turned on automatically
 		only for files ending in a character from c-suffixes.
-		Additionsally, if a line begins with a '#' character, it
+		Additionally, if a line begins with a '#' character, it
 		will not shift right with the '>>' command. (B)
 
 	crypt	Causes files to be encrypted.  This is NOT compatible
@@ -624,8 +633,13 @@ Macros
 		use-register a load-register ihello^[
 	will load register 'a' with a command to insert the word "hello".
 	(The ^[ should be a real ESC character, entered by preceding it
-	with ^V.)
+	with ^V.)  A better example, is this:
+	    use-register w load-register ":!chmod +w %^M:w^M"
+	which makes the current file writable and writes it.  (Again, use
+	^V to get the CR characters into the .vilerc file.)
 
+Programmed macros
+-----------------
 	Vile can also be extended (though I confess this has only been
 	lightly used or tested) by defining macros and then binding
 	execution of those macros to key sequences.  For example, if
@@ -643,37 +657,152 @@ Macros
 	would be the equivalent of "5dd" since the word "lines" represents
 	the stuttered 'dd' style of operation.
 
-Command files
--------------
-	On startup, vile will attempt to read the file ".vilerc" in the
-	current directory, and then in $HOME, and will execute the
-	commands found therein.  It is possible to nest such executions.
-	For example, you might keep your general default settings in your
-	home directory, and put the following lines in a .vilerc in a
-	directory in which you prefer tabs be set to 4 spaces:
+	There are some built-in variables that can be used in macros to
+	gain access to parts of vile status, and parts of the current
+	buffer.  Built-in variables are accessed by name, prefixed with
+	the '$' character.  (User-defined variables can also be set and
+	used; their names are prefixed with the '%' character.)
 
-		source "$HOME/.vilerc"
-		set tabstop 8
+	$pagelen	number of screen lines in use by editor
+	$pagewid	current screen width
+	$curcol		current column position of cursor
+	$curline	current line in file
+	$cbufname	current buffer name
+	$cfilname	current file name
+	$sres		current screen resolution
+	$debug		macro debugging -- set true for line by line tracing
+	$status		returns the status of the last command
+	$palette	current palette string
+	$lastkey	last keyboard char struck
+	$version	current version number			(read-only)
+	$progname	returns current prog name - "vile"	(read-only)
+	$seed		current random number seed
+	$discmd		display commands on command line
+	$disinp		display command line input characters
+	$wline		number of lines in current window
+	$cwline		line offset in current window
+	$search		search pattern
+	$replace	replacement pattern
+	$match		last matched magic pattern		(read only)
+	$kill		some of the kill register		(read only)
+	$tpause		length to pause for paren matching (pc versions)
+	$pending	typeahead pending flag			(read only)
+	$llength	length of current line			(read only)
+	$char		character under the cursor
+	$line		text of current line
+	$word		current "word"
+	$identifier	current punctuated word
+	$pathname	current path-like word
+	$directory	current directory
+	$terse		be terse -- suppress messages
+	$font		current font name (X version only)
 
-	The quotes surrounding the filename part are necessary to
-	protect the name from interpretation as an as-yet undocumented
-	and untested vile variable. 
+	There are also functions available, which can act on
+	those variables, or on hard-coded values.  Operations are expressed
+	in prefix notation, so to add to numbers you would say "&add 3 5".
 
-	Files can be executed at any time with the ":source" (or
-	":execute-file") command.  There are (mostly untested) control
-	structures available, such as !while, !if, etc.  Refer to the
-	source code for more information.
+	func	no. of
+	name	args
+	--------------
+	&add	2	add two numbers together
+	&sub	2	subtraction
+	&tim	2	multiplication
+	&div	2	division
+	&mod	2	modulus
+	&neg	1	negate
+	&cat	2	concatenate string
+	&lef	2	left string(string, len)
+	&rig	2	right string(string, pos)
+	&mid	3	mid string(string, pos, len)
+	&not	1	logical not
+	&equ	2	logical equality
+	&les	2	logical less than
+	&gre	2	logical greater than
+	&seq	2	string logical equality check
+	&sle	2	string logical less than
+	&sgr	2	string logical greater than
+	&ind	1	evaluate indirect value
+	&and	2	logical and
+	&or 	2	logical or
+	&len	1	string length
+	&upp	1	uppercase string
+	&low	1	lower case string
+	&tru	1	Truth of the universe logical test
+	&asc	1	char to integer conversion
+	&chr	1	integer to char conversion
+	&gtk	0	get 1 character
+	&rnd	1	get a random number from 1 to n
+	&abs	1	absolute value of a number
+	&sin	2	find the index of one string in another
+	&env	1	retrieve a system environment var
+	&bin	1	lookup what function name is bound to key
+	&rd	1	is a file readable
+	&wr	1	is a file writable
 
-	Nesting of source'd files is limited to a depth of ten, to prevent
-	infinite recursion.
+	To prevent vile from thinking that a failed command is an error in
+	the macro, you can put "~force" in front of it.  So, to write a
+	macro which will run the "man" command on the identifier under the
+	cursor, where you don't really consider it an error if the command
+	fails, you might use:
+
+		9 store-macro
+			~force shell-command &cat "man " $identifier
+		~endm
+		bind-key execute-macro-9 ^X-m
+
+	The "screen-search-forward" command could be re-implemented as:
+		10 store-macro
+			~force search-forward $identifier
+		~endm
+		bind-key execute-macro-10 ^X-/
+
+	And the "screen-search-pattern-grab" command, normally bound to
+	^A-/, could be implemented with:
+		11 store-macro
+		    set-variable $search $identifier
+		    write-message &cat "Search pattern is now " $search
+		~endm
+		bind-key execute-macro-11 ^A-/
+
+	A variation, which will not find the identifier if it is not a
+	substring of another word, is:
+		12 store-macro
+			~force search-forward &cat "\\<" &cat $identifier "\\>"
+		~endm
+	This works by surrounding the string with the \< and \> meta-
+	characters.
+
+	Primitive flow-of-control within a macro may be obtained with
+	certain directives.  Macro directives start with a "~" and include:
+
+	~if cond	conditional execution
+	~else
+	~endif
+	~return		Return (terminating current macro)
+	~goto *label	Jump to a label in the current macro
+	~force		Force macro to continue...even if command fails
+	~while cond	Execute a loop if the condition is true
+	~break
+	~endwhile
+	
+	~endm		End a macro
+
+	Line Labels begin with a "*" as the first nonblank char, like:
+
+	*LBL01
+
 
 Regular Expressions
 -------------------
-	Major differences from vi:
-	The \< and \> metacharacters are missing, and \+ and \| are new
-	magic.
+	Searches use regular expressions, which, as in vi, may be magic
+	by default or not.
 
-	Quoting from Henry Spencer's regexp(3) man page:
+	Major differences from vi:
+
+	The metacharacters \+ and \| are new magic.
+
+	The code that implements the expressions is based directly on
+	Henry Spencer's regexp code.  Quoting from the original man page:
 
 	"A regular expression is zero or more branches, separated by `\|'. 
 	It matches anything that matches one of the branches."
@@ -685,7 +814,7 @@ Regular Expressions
 	followed by `*' matches a sequence of 0 or more matches of the
 	atom.  An atom followed by `\+' matches a sequence of 1 or more
 	matches of the atom.  An atom followed by `\?' matches a match of
-	the atom, or the null string." [i.e., `\?' matches 0 or 1 occurences]
+	the atom, or the null string." [i.e., `\?' matches 0 or 1 occurrences]
 
 	"An atom is a regular expression in backslashed parentheses
 	(matching a match for the regular expression), a range (see below),
@@ -693,11 +822,13 @@ Regular Expressions
 	at the beginning of the input string), `$' (matching the null
 	string at the end of the input string), a `\' followed by a
 	single character (matching that character), or a single character
-	with no other significance (matching that character)."
+	with no other significance (matching that character)." [ In
+	addition, vile atoms may be \< and \>, which match the beginning
+	and end of a "word". ]
 
 	"A range is a sequence of characters enclosed in `[]'.  It normally
 	matches any single character from the sequence.  If the sequence
-	begins with `^', it matches any single charac- ter not from the
+	begins with `^', it matches any single character not from the
 	rest of the sequence.  If two characters in the sequence are
 	separated by `-', this is shorthand for the full list of ASCII
 	characters between them (e.g.  `[0-9]' matches any decimal digit). 
@@ -718,10 +849,61 @@ Regular Expressions
 	If magic mode is _not_ on, only ^ and $ are special if not escaped. 
 	All of the following must be preceded with a '\' to be special,
 	otherwise they are taken literally:
-		? + ( ) | * [ .		( '<' and '>' will be here someday)
+		? + ( ) | * [ . < >
+
+Command files
+-------------
+	On startup (in the absence of '@' arguments -- see Invocation
+	below), vile will attempt to read the file ".vilerc" in the current
+	directory, and then in $HOME, and will execute the commands found
+	therein.  It is possible to nest such executions.  For example, you
+	might keep your general default settings in your home directory,
+	and put the following lines in a .vilerc in a directory in which
+	you prefer tabs be set to 4 spaces:
+
+		source "$HOME/.vilerc"
+		set tabstop 8
+
+	The quotes surrounding the filename part are necessary to
+	protect the name from interpretation as a vile variable. 
+
+	Files can be executed at any time with the ":source" (or
+	":execute-file") command.  There are (mostly untested) control
+	structures available, such as !while, !if, etc.  Refer to the
+	source code for more information.
+
+	Nesting of source'd files is limited to a depth of ten, to prevent
+	infinite recursion.
+
+Invocation
+----------
+	If set in the environment, the variable VILEINIT is used as a set
+	of vile commands to initialize the editor.  If unset, vile looks
+	for files called "./.vilerc" and "$HOME/.vilerc, and executes the
+	first one found.  As a not-very-useful example of a VILEINIT
+	sequence, the following setting will exactly recreate the default
+	(i.e. no VILEINIT variable) behavior:
+
+		export VILEINIT
+		VILEINIT="
+		~if &rd \"./.vilerc\"
+			source \"./.vilerc\"
+		~else
+			~if &rd \"$HOME/.vilerc\"
+				source \"$HOME/.vilerc\"
+			~endif
+		~endif"
 
 
+	The command line options are fairly straightforward.  Vile does not
+	support running _any_ command after a '+', as does vi, but does
+	support the commonly used '+400' to go to line 400 and '+/foo' to
+	search for foo.  Command files (see below) can be explicitly
+	executed on startup by prefixing them with the '@' character, as in
+	"vile @mycmds file.c".  This will suppress the operation of VILEINIT
+	and the .vilerc files.
 
+	Use "vile -?" to get the usage message.
 
 Differences
 ------------
@@ -738,7 +920,7 @@ Differences
 	on startup.
 
 	There is no expansion of ! in filenames or shell escapes.  The
-	command ":!!" does rerun the previous shell command.  Occurences of
+	command ":!!" does rerun the previous shell command.  Occurrences of
 	'#' and '%' are recognized and expanded to the previous or current
 	filename.  Other punctuation (e.g.  '~') may be expanded by your
 	shell (sh, csh), since it is handed filenames for expansion if they
@@ -748,13 +930,12 @@ Differences
 	are configurable, but may not exactly match those in vi.  They
 	are expressed via regular expressions.
 
+	The vi ":map", ":map!", and ":abbr" are not supported.
+
 	There is no special lisp support.  But then, when was the last time
 	you heard of a lisp programmer that used vi?
 
 	Of course, ex and open mode aren't there.
-
-	There is no concept of shiftwidth.  ^D and ^T are aliased to backspace
-	and tab for those whose fingers are too old for new tricks.
 
 	Most, but not all, of the word-motion-with-operator and end-of-line 
 	anomalies have been recreated.  One missing anomaly: In vile, "dw"
@@ -763,7 +944,7 @@ Differences
 
 	If you use "cd" to change directories, all buffers whose filenames
 	do not already begin with '/' will be made absolute, by prepending
-	the current directory name.
+	the current directory name to the filename.
 
 Sample .vilerc
 --------------
@@ -819,7 +1000,7 @@ Sample .vilerc
 Note on Scrolling
 -----------------
 	If scrolling is really ugly (the status line hops around a lot),
-	and you're using a vt102 or compatible termianal that you
+	and you're using a vt102 or compatible terminal that you
 	think should be able to scroll okay, then the problem is
 	almost certainly your termcap entry, which probably doesn't
 	describe the scrolling regions adequately.  Most standard
@@ -874,7 +1055,8 @@ Credits
 	Kirkendall, author of the vi clone called "elvis".  The regular
 	expression code and documentation is by Henry Spencer.  The sample
 	.vilerc was created by Dave Lemke; he also contributed code for
-	new features and bug fixes.  The changes to create vile from
+	new features and bug fixes.  Eric Krohn has done some excellent
+	testing and enhancement.  The changes to create vile from
 	micro-Emacs were all done by Paul Fox, who can be reached at
 	pgf@cayman.com.  (By the way, this is not the same Paul Fox that
 	did the Crisp editor.)

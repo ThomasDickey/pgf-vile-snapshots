@@ -6,7 +6,10 @@
  * internal use.
  *
  * $Log: region.c,v $
- * Revision 1.13  1992/01/10 08:09:23  pgf
+ * Revision 1.14  1992/02/26 21:57:20  pgf
+ * shift operators now go by shiftwidth, not tabstop
+ *
+ * Revision 1.13  1992/01/10  08:09:23  pgf
  * added arg to do_fl_region, which is passed on to the function it calls
  * vi pointer
  *
@@ -133,15 +136,31 @@ yankregion()
 }
 
 /*
- * insert a tab at the front of the line
+ * insert a shiftwidth at the front of the line
  * don't do it if we're in cmode and the line starts with '#'
  */
 shift_right_line()
 {
+	int s, t;
+	int odot;
 	if (b_val(curbp, MDCMOD) &&
 		llength(DOT.l) > 0 && char_at(DOT) == '#')
 		return TRUE;
-	return tab(FALSE,1);
+	s = b_val(curbp, VAL_SWIDTH);
+	t = curtabval;
+	DOT.o = 0;
+	if (s) {  /* try to just insert tabs if possible */
+		if (s >= t && (s % t == 0)) {
+			s = linsert(s/t, '\t');
+		} else {
+			detabline(TRUE);
+			DOT.o = 0;
+			s = linsert(s, ' ');
+		}
+		entabline(TRUE);
+	}
+	firstnonwhite();
+	return TRUE;
 }
 
 /*
@@ -153,7 +172,7 @@ shiftrregion()
 }
 
 /*
- * delete a tab-equivalent from the front of the line
+ * delete a shiftwidth-equivalent from the front of the line
  */
 shift_left_line()
 {
@@ -165,22 +184,28 @@ shift_left_line()
 
 	i = 0;
 
-	/* examine the line to the end, or the first tabstop, whichever
-		comes first */
-	lim = (curtabval < llength(linep)) ? curtabval:llength(linep);
+	s = b_val(curbp, VAL_SWIDTH);
 
+	detabline(TRUE);
+
+	/* examine the line to the end, or the first shiftwidth, whichever
+		comes first */
+	lim = (s < llength(linep)) ? s : llength(linep);
+
+
+	i = 0;
 	/* count the leading spaces */
 	while ((c = lgetc(linep,i)) == ' ' && i < lim)
 		i++;
 
-	/* the i'th char is _not_ a space, or else we hit lim */
-	if (c == '\t' && i < lim) /* ith char is tab? */
-		i++;
-
 	if (i != 0) { /* did we find space/tabs to kill? */
+		DOT.o = 0;
 		if ((s = ldelete((long)i,FALSE)) != TRUE)
 			return s;
 	}
+
+	DOT.o = 0;
+	entabline(TRUE);
 	return TRUE;
 }
 
