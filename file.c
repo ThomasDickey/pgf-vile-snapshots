@@ -6,7 +6,13 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.94  1993/07/06 12:34:53  pgf
+ * Revision 1.96  1993/07/07 11:32:28  pgf
+ * use mlforce instead of mlwrite for write-status message
+ *
+ * Revision 1.95  1993/07/07  09:01:30  pgf
+ * took out unnecessary subsequent window check from check_visible_modtimes()
+ *
+ * Revision 1.94  1993/07/06  12:34:53  pgf
  * tweaks to the check-modtime behavior -- always prompt, whether prompted
  * previously or not, when writing.  also, new routine to only check visible
  * buffers' modtimes, for use after shell escapes.
@@ -475,23 +481,10 @@ check_all_modtimes ()
 int
 check_visible_modtimes ()
 {
-	register BUFFER *bp;
 	register WINDOW *wp;
 
-	for_each_window(wp) {
-		if (wp->w_bufp->b_nwnd > 1) {
-			/* don't prompt twice for a doubly-visible buffer */
-			register WINDOW *wp2;
-			for_each_window(wp2) {
-				if (wp->w_bufp == wp2->w_bufp)
-					break;
-			}
-			if (wp != wp2)  /* we've seen it before */
-				continue;
-		}
-		bp = wp->w_bufp;
-		(void)check_modtime(bp, bp->b_fname);
-	}
+	for_each_window(wp)
+		(void)check_modtime(wp->w_bufp, wp->w_bufp->b_fname);
 	return TRUE;
 }
 #endif	/* MDCHK_MODTIME */
@@ -1570,7 +1563,7 @@ BUFFER	*bp;
 				} else {
 					action = "Wrote";
 				}
-				mlwrite("[%s %d line%s %ld char%s to \"%s\"]", 
+				mlforce("[%s %d line%s %ld char%s to \"%s\"]", 
 					action, nline, PLURAL(nline),
 					nchar, PLURAL(nchar), fn);
 			} else {

@@ -1,3 +1,20 @@
+Changes for vile 3.53:
+(pgf)
+	+ stop core dump on file completion (":e fi<tab>") by making sure
+	  BFSIZES bit is cleared when building MyBuff
+
+	+ in rtfrmshell(), there was a "curwp->w_flag = WFHARD" statement,
+	  with a comment asking if it was needed.  in fact, it's wrong, so
+	  i took it out.  it was tromping other flags, like WFMODE, for that
+	  window only (spawn.c).
+
+	+ in update(), don't add nu_width to screencol if the buffer is empty,
+	  since there is no line number in that case. (display.c)
+
+	+ fixed bug when undoing the first insertion into an empty buffer.
+	  the value of dot was being restored to the inserted (and now gone)
+	  line.  (line.c)
+
 Changes for vile 3.52:
 (pgf)
 	+ added a couple of tweaks to tom's check-modtime changes -- prompts

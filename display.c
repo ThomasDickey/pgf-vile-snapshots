@@ -6,7 +6,11 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.90  1993/07/06 16:39:04  pgf
+ * Revision 1.91  1993/07/07 12:59:30  pgf
+ * don't put cursor at nu_width if the buffer is empty, since there won't be
+ * a line number in that case.
+ *
+ * Revision 1.90  1993/07/06  16:39:04  pgf
  * integrated Tuan DANG's changes for the djgpp compiler under DOS
  *
  * Revision 1.89  1993/07/01  16:15:54  pgf
@@ -976,7 +980,8 @@ int force;	/* force update past type ahead? */
 	updupd(force);
 
 	/* update the cursor and flush the buffers */
-	movecursor(currow, screencol + nu_width(curwp));
+	movecursor(currow, screencol +
+		(is_empty_buf(curwp->w_bufp) ? 0 : nu_width(curwp)) );
 
 	TTflush();
 	displaying = FALSE;

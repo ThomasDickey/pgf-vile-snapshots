@@ -6,7 +6,13 @@
  * for the display system.
  *
  * $Log: buffer.c,v $
- * Revision 1.68  1993/07/01 16:15:54  pgf
+ * Revision 1.70  1993/07/07 12:31:09  pgf
+ * small reformats
+ *
+ * Revision 1.69  1993/07/07  11:33:06  pgf
+ * use mlforce instead of mlwrite for write-status message
+ *
+ * Revision 1.68  1993/07/01  16:15:54  pgf
  * tom's 3.51 changes
  *
  * Revision 1.67  1993/06/23  21:31:16  pgf
@@ -897,7 +903,8 @@ BUFFER *nbp;
 
 	if (!updating_list && global_g_val(GMDABUFF)) {
 		if (nbp != bheadp) {	/* remove nbp from the list */
-			bp = bheadp; while(bp->b_bufp != nbp)
+			bp = bheadp;
+			while(bp->b_bufp != nbp)
 				bp = bp->b_bufp;
 			bp->b_bufp = nbp->b_bufp;
 
@@ -1821,11 +1828,10 @@ int f,n;
 	mlforce("\n");
 	if (status != TRUE) {
 		pressreturn();
-		sgarbf = TRUE;
 	} else {
-		sgarbf = TRUE;
-		mlwrite("[Wrote %d buffer%c]",count,(count==1)?' ':'s');
+		mlforce("[Wrote %d buffer%c]",count,(count==1)?' ':'s');
 	}
+	sgarbf = TRUE;
 	return status;
 }
 

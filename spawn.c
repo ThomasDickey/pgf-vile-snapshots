@@ -2,7 +2,11 @@
  *		for MicroEMACS
  *
  * $Log: spawn.c,v $
- * Revision 1.59  1993/07/06 16:39:04  pgf
+ * Revision 1.60  1993/07/07 12:32:33  pgf
+ * don't reset curwp->w_flag to HARD in rtfrmshell -- it clobbers WFMODE if
+ * present
+ *
+ * Revision 1.59  1993/07/06  16:39:04  pgf
  * integrated Tuan DANG's changes for the djgpp compiler under DOS
  *
  * Revision 1.58  1993/07/06  12:32:00  pgf
@@ -319,15 +323,21 @@ int f,n;
 {
 #if UNIX && defined(SIGTSTP) && !X11
 	vttidy(TRUE);
-# if BERK
-	killpg(getpgrp(0), SIGTSTP);
+
+/* #define simulate_job_control_for_debug */
+# ifdef simulate_job_control_for_debug
+	rtfrmshell(SIGCONT);
 # else
-#  if AIX || LINUX /* strict prototypes -- doesn't like the (0) */
-	kill(-getpgrp(), SIGTSTP);
+#  if BERK
+	killpg(getpgrp(0), SIGTSTP);
 #  else
+#   if AIX || LINUX /* strict prototypes -- doesn't like the (0) */
+	kill(-getpgrp(), SIGTSTP);
+#   else
 	kill(-getpgrp(0), SIGTSTP);
+#   endif
 #  endif
-#endif
+# endif
 	return TRUE;
 #else
 	mlforce("[Job control unavailable]");
@@ -343,16 +353,15 @@ int signo;
 #if UNIX && defined(SIGTSTP)
 # if ! X11
 	ttunclean();
-	curwp->w_flag = WFHARD;  /* is this needed, with sgarbf == TRUE? */
 	sgarbf = TRUE;
-# if APOLLO
+#  if APOLLO
 	(void)TTgetc();		/* have to skip a character */
 	ttunclean();		/* ...so that I can finally suppress echo */
-# endif
-# if USG
+#  endif
+#  if USG
 	signal(SIGCONT,rtfrmshell);	/* suspend & restart */
 	update(TRUE);
-# endif
+#  endif
 # endif
 #endif
 #ifdef	MDCHK_MODTIME

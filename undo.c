@@ -2,7 +2,13 @@
  * code by Paul Fox, original algorithm mostly by Julia Harper May, 89
  *
  * $Log: undo.c,v $
- * Revision 1.34  1993/07/01 16:15:54  pgf
+ * Revision 1.36  1993/07/07 16:31:59  pgf
+ * typo maintenance
+ *
+ * Revision 1.35  1993/07/07  15:30:33  pgf
+ * repackaged some U-line processing into setupuline()
+ *
+ * Revision 1.34  1993/07/01  16:15:54  pgf
  * tom's 3.51 changes
  *
  * Revision 1.33  1993/06/29  17:58:56  pgf
@@ -228,6 +234,7 @@ static	int	undoworker P(( int ));
 static	void	preundocleanup P(( void ));
 static	void	repointstuff P(( LINEPTR, LINEPTR ));
 static	int	linesmatch P(( LINE *, LINE * ));
+static	void	setupuline P(( LINEPTR ));
 
 static	short	needundocleanup;
 
@@ -324,7 +331,6 @@ copy_for_undo(lp)
 LINEPTR lp;
 {
 	fast_ptr LINEPTR nlp;
-	register LINE *  ulp;
 
 	if (!OkUndo())
 		return;
@@ -346,15 +352,7 @@ LINEPTR lp;
 
 	lsetcopied(l_ref(lp));
 
-	/* take care of the U line */
-	if ((ulp = l_ref(curbp->b_ulinep)) == NULL
-	 || !same_ptr(ulp->l_nxtundo, lp)) {
-		if (ulp != NULL)
-			lfree(curbp->b_ulinep, curbp);
-		ulp = l_ref(curbp->b_ulinep = copyline(l_ref(lp)));
-		if (ulp != NULL)
-			ulp->l_nxtundo = lp;
-	}
+	setupuline(lp);
 
 	FORWDOT(curbp).l = lp;
 	FORWDOT(curbp).o = curwp->w_dot.o;
@@ -833,6 +831,22 @@ int stkindx;
 	lfree(lp,curbp);
 
 	return TRUE;
+}
+
+void
+setupuline(lp)
+LINEPTR lp;
+{
+	register LINE *  ulp;
+	/* take care of the U line */
+	if ((ulp = l_ref(curbp->b_ulinep)) == NULL
+	 || !same_ptr(ulp->l_nxtundo, lp)) {
+		if (ulp != NULL)
+			lfree(curbp->b_ulinep, curbp);
+		ulp = l_ref(curbp->b_ulinep = copyline(l_ref(lp)));
+		if (ulp != NULL)
+			ulp->l_nxtundo = lp;
+	}
 }
 
 void

@@ -11,7 +11,10 @@
  * which means that the dot and mark values in the buffer headers are nonsense.
  *
  * $Log: line.c,v $
- * Revision 1.47  1993/06/24 12:10:52  pgf
+ * Revision 1.48  1993/07/07 16:09:45  pgf
+ * don't move dot until after tagging for undo in linsert/at-end case
+ *
+ * Revision 1.47  1993/06/24  12:10:52  pgf
  * cosmetics
  *
  * Revision 1.46  1993/06/23  21:27:54  pgf
@@ -463,20 +466,26 @@ int n, c;
 		if (same_ptr(lp2, null_ptr))
 			return (FALSE);
 
+#if BEFORE
 		copy_for_undo(lBACK(lp1)); /* don't want preundodot to point
 					    *	at a new line if this is the
 					    *	first change
 					    */
+#endif
 		lp3 = lBACK(lp1);		/* Previous line	*/
 		set_lFORW(lp3, lp2);		/* Link in		*/
 		set_lFORW(lp2, lp1);
 		set_lBACK(lp1, lp2);
 		set_lBACK(lp2, lp3);
 		(void)memset(l_ref(lp2)->l_text, c, (SIZE_T)n);
+
+		tag_for_undo(lp2);
+		
+		/* don't move DOT until after tagging for undo */
+		/*  (it's important in an empty buffer) */
 		curwp->w_dot.l = lp2;
 		curwp->w_dot.o = n;
-		tag_for_undo(lp2);
-		chg_buff(curbp, WFEDIT);
+		chg_buff(curbp, WFINS|WFEDIT);
 		return (TRUE);
 	}
 	doto = curwp->w_dot.o;			/* Save for later.	*/
