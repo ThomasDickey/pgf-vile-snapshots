@@ -5,7 +5,7 @@
  * keys. Like everyone else, they set hints
  * for the display system.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/buffer.c,v 1.130 1995/10/06 17:07:02 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/buffer.c,v 1.132 1995/11/14 01:06:35 pgf Exp $
  *
  */
 
@@ -726,6 +726,14 @@ int
 swbuffer(bp)	/* make buffer BP current */
 register BUFFER *bp;
 {
+	return swbuffer_lfl(bp, TRUE);
+}
+
+int
+swbuffer_lfl(bp, lockfl)	/* make buffer BP current */
+register BUFFER *bp;
+int lockfl;
+{
 	int s = TRUE;
 
 	if (!bp) {
@@ -737,8 +745,13 @@ register BUFFER *bp;
 	if (curbp == bp
 	 && curwp != 0
 	 && l_ref(DOT.l) != 0
-	 && curwp->w_bufp == bp)  /* no switching to be done */
+	 && curwp->w_bufp == bp) {  /* no switching to be done */
+
+		if (!bp->b_active) /* on second thought, yes there is */
+			goto suckitin;
+
 		return TRUE;
+	 }
 
 	if (curbp) {
 		/* if we'll have to take over this window, and it's the last */
@@ -781,13 +794,18 @@ register BUFFER *bp;
 	/* oh well, suck it into this window */
 
 	curwp->w_bufp  = bp;
-	curwp->w_flag |= WFMODE|WFHARD;		/* Quite nasty.		*/
 	if (bp->b_nwnd++ == 0) {		/* First use.		*/
-		copy_traits(&(curwp->w_traits), &(bp->b_wtraits));
+		register WINDOW *wp;
+    suckitin:
+		for_each_window(wp) {
+			if (wp->w_bufp == bp)
+				copy_traits(&(wp->w_traits), &(bp->b_wtraits));
+		}
 	}
+	curwp->w_flag |= WFMODE|WFHARD;		/* Quite nasty.		*/
 
 	if (bp->b_active != TRUE) {		/* buffer not active yet*/
-		s = bp2readin(bp, TRUE);	/* read and activate it */
+		s = bp2readin(bp, lockfl);	/* read and activate it */
 	}
 #ifdef MDCHK_MODTIME
 	else

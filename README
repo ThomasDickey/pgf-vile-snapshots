@@ -1,6 +1,6 @@
 
-README for vile
-----------------
+README for vile, version 5.5
+-----------------------------
 
 vile is a text editor which is extremely compatible with vi in terms
 of "finger feel".  in addition, it has extended capabilities in many areas,
@@ -14,17 +14,15 @@ many patches have been contributed by a lot of users.  we thank them.
 more recent additions to this README appear near the bottom.  that is, most
 of the newest stuff is at the end, not up here where you are.
 
+visit
+	ftp://id.wing.net/pub/pgf/vile
+to be sure it's still the latest.
+
 impatient?  just type "./configure; make", and get a cup of coffee, decaf
 if necessary.  
 
 want X11 support?  you'd better look at README.CFG, although 
 "./configure --with-screen=x11"; make" may well do what you want.
-
-if you've installed older vile releases (4.5 or earlier) in the past, be
-sure you eradicate the old help file -- it was installed to a different
-location by default than it is now (it used to go in /usr/local/bin), and
-getting the wrong help when you ask for it might be worse than no help at
-all.  (but mostly you'll just miss out on descriptions of newer features...)
 
 if you like vile, and wish to be informed of new releases, let me
 know -- i maintain a mailing list for that purpose.  don't worry -- the
@@ -290,12 +288,14 @@ Febrary, 1995
 
 
 -------------------------------
-October, 1995
+November, 1995
 	lots of new users in the last year, due to better advertising
 	and inclusion in some of the big linux and freebsd archives.
 	support for NT and OS/2 has gotten much better, and lots of
-	little bugs have been fixed, and features added.
+	little bugs have been fixed, and features added.  Win32 support
+	is very good these days, thanks mostly to the efforts of Rick
+	Sladkey.
 
 -------------------------------
-$Header: /usr/build/VCS/pgf-vile/RCS/README,v 1.49 1995/10/19 20:11:57 pgf Exp $
+$Header: /usr/build/VCS/pgf-vile/RCS/README,v 1.51 1995/11/21 14:16:46 pgf Exp $
 -------------------------------

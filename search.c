@@ -3,7 +3,7 @@
  * and backward directions.
  *  heavily modified by Paul Fox, 1990
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/search.c,v 1.91 1995/10/19 20:02:25 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/search.c,v 1.93 1995/11/17 04:03:42 pgf Exp $
  *
  * original written Aug. 1986 by John M. Gamble, but I (pgf) have since
  * replaced his regex stuff with Henry Spencer's regexp package.
@@ -12,8 +12,6 @@
 
 #include	"estruct.h"
 #include        "edef.h"
-
-static	int	lastdirec;
 
 static char onlyonemsg[] = "Only one occurrence of pattern";
 static char notfoundmsg[] = "Not found";
@@ -84,7 +82,7 @@ int marking, fromscreen;
 
 	wrapok = marking || window_b_val(curwp, MDSWRAP);
 
-	lastdirec = FORWARD;
+	last_srch_direc = FORWARD;
 
 	/* Ask the user for the text of a pattern.  If the
 	 * response is TRUE (responses other than FALSE are
@@ -252,7 +250,7 @@ int dummy, fromscreen;
 
 	wrapok = window_b_val(curwp, MDSWRAP);
 
-	lastdirec = REVERSE;
+	last_srch_direc = REVERSE;
 
 	/* Ask the user for the text of a pattern.  If the
 	 * response is TRUE (responses other than FALSE are
@@ -367,7 +365,7 @@ int
 consearch(f,n)
 int f,n;
 {
-	if (lastdirec == FORWARD)
+	if (last_srch_direc == FORWARD)
 		return(forwhunt(f,n));
 	else
 		return(backhunt(f,n));
@@ -378,7 +376,7 @@ int
 revsearch(f,n)
 int f,n;
 {
-	if (lastdirec == FORWARD)
+	if (last_srch_direc == FORWARD)
 		return(backhunt(f,n));
 	else
 		return(forwhunt(f,n));
@@ -585,21 +583,7 @@ attrib_matches()
 	MARK origdot;
 	int status = TRUE;
 	REGIONSHAPE oregionshape = regionshape;
-	char *attrname = b_val_ptr(curbp,VAL_HILITEMATCH);
-	VIDEO_ATTR vattr = 0;
-	int i;
-	static struct attrmap {
-		char *name;
-		int val;
-	} attrmap[] = {
-	    {"none",		0},
-	    {"underline",	VAUL},
-	    {"bold",		VABOLD},
-	    {"italic",		VAITAL},
-	    {"reverse",		VAREV},
-	    {"color",		VACOLOR},
-	    {NULL,		0},
-	};
+	VIDEO_ATTR vattr = b_val(curbp,VAL_HILITEMATCH); 
 
 	if (!need_to_rehilite())
 		return;
@@ -611,13 +595,6 @@ attrib_matches()
 #ifdef track_hilite
 	mlwrite("rehighlighting");
 #endif
-
-	for (i = 0; i < TABLESIZE(attrmap); i++) {
-		if (strcmp(attrname, attrmap[i].name) == 0) {
-			vattr =  attrmap[i].val;
-			break;
-		}
-	}
 
 	if (vattr == 0)
 		return;
@@ -697,7 +674,7 @@ int f,n;
 	int s;
 	s =  readpattern("", pat, &gregexp, EOS, TRUE);
 	mlwrite("Search pattern is now %s", pat);
-	lastdirec = FORWARD;
+	last_srch_direc = FORWARD;
 	return s;
 }
 

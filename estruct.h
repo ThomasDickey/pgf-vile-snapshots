@@ -9,7 +9,7 @@
 */
 
 /*
- * $Header: /usr/build/VCS/pgf-vile/RCS/estruct.h,v 1.269 1995/10/13 00:14:18 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/estruct.h,v 1.270 1995/11/17 04:03:42 pgf Exp $
  */
 
 #ifdef HAVE_CONFIG_H
@@ -959,6 +959,11 @@ typedef enum {
 #define OPDEL 1
 #define OPOTHER 2
 
+/* popup-choices values */
+#define POPUP_CHOICES_OFF      0
+#define POPUP_CHOICES_IMMED    1
+#define POPUP_CHOICES_DELAYED  2
+
 /* define these so C-fence matching doesn't get confused when we're editing
 	the cfence code itself */
 #define LBRACE '{'
@@ -1534,11 +1539,11 @@ struct VALNAMES {
 		ChgdFunc side_effect;
 };
 /* the values of VALNAMES->type */
-#define VALTYPE_INT 0
+#define VALTYPE_INT    0
 #define VALTYPE_STRING 1
-#define VALTYPE_BOOL 2
-#define VALTYPE_REGEX 3
-#define VALTYPE_COLOR 4
+#define VALTYPE_BOOL   2
+#define VALTYPE_REGEX  3
+#define VALTYPE_ENUM   4
 
 	/*
 	 * Values are either local or global. We distinguish the two cases
@@ -1612,8 +1617,8 @@ typedef struct	{
 	is_local_val(wp->w_values.wv,which)
 
 #if OPT_COLOR
-#define gfcolor global_w_val(WVAL_FCOLOR)
-#define gbcolor global_w_val(WVAL_BCOLOR)
+#define gfcolor global_g_val(GVAL_FCOLOR)
+#define gbcolor global_g_val(GVAL_BCOLOR)
 #else
 #define gfcolor C_WHITE
 #define gbcolor C_BLACK
@@ -1928,6 +1933,7 @@ typedef struct	{
 #if	OPT_COLOR
 	void	(*t_setfor) P((int));	/* set foreground color		*/
 	void	(*t_setback) P((int));	/* set background color		*/
+	void	(*t_setpal) P((char*)); /* set color palette		*/
 #endif
 	void	(*t_scroll) P((int,int,int)); /* scroll a region of the screen */
 #if 	OPT_PSCREEN
@@ -1958,6 +1964,7 @@ typedef struct	{
 #if	OPT_COLOR
 #define	TTforg		(*term.t_setfor)
 #define	TTbacg		(*term.t_setback)
+#define	TTspal		(*term.t_setpal)
 #endif
 #define	TTscroll	(*term.t_scroll)
 #if	OPT_PSCREEN

@@ -4,7 +4,7 @@
  * using VT52 emulation.  The I/O services are provided here as well.  It
  * compiles into nothing if not a 520ST style device.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/st520.c,v 1.16 1994/11/29 04:02:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/st520.c,v 1.17 1995/11/17 04:03:42 pgf Exp $
  *
  */
 #error This module is not actively maintained as part of vile.
@@ -68,6 +68,7 @@ extern	int st520chgrez();
 #if	OPT_COLOR
 extern	int	st520fcol();
 extern	int	st520bcol();
+extern	void	st520spal();
 
 int		cfcolor = -1;		/* current fg (character) color */
 int		cbcolor = -1;		/* current bg color */
@@ -110,8 +111,9 @@ TERM	term	= {
 	, &st520chgrez
 #endif
 #if	OPT_COLOR
-	, &st520fcol,
-	&st520bcol
+	, &st520fcol
+	, &st520bcol
+	, &st520spal
 #endif
 };
 	struct KBDvecs {
@@ -155,8 +157,8 @@ st520eeop()
 {
 
 #if	OPT_COLOR
-		st520fcol(gfcolor);
-		st520bcol(gbcolor);
+	st520fcol(gfcolor);
+	st520bcol(gbcolor);
 #endif
 	ttputc(ESC);
 	ttputc('J');
@@ -205,6 +207,39 @@ int color;
 			cbcolor = color;
 		}
 
+}
+
+/*	stkspal(pstr):	reset the current palette according to a
+			"palette string" of the form
+
+	000111222333444555666777
+
+	which contains the octal values for the palette registers
+*/
+
+stkspal(pstr)
+
+char *pstr;	/* palette string */
+
+{
+	int pal;	/* current palette position */
+	int clr;	/* current color value */
+	int i;
+
+	for (pal = 0; pal < 16; pal++) {
+		if (*pstr== 0)
+			break;
+
+		/* parse off a color */
+		clr = 0;
+		for (i = 0; i < 3; i++)
+			if (*pstr)
+				clr = clr * 16 + (*pstr++ - '0');
+		palette[pal] = clr;
+	};
+
+	/* and now set it */
+	xbios(SETPALETTE, palette);
 }
 #endif
 
@@ -812,7 +847,7 @@ stopen()	/* open the screen */
 	}
 
 	/* and set up the default palette */
-	spal(palstr);
+	stkspal(palstr);
 
 	stputc(ESC);	/* automatic overflow off */
 	stputc('w');
@@ -848,39 +883,6 @@ stclose()
 	xbios(SETPALETTE, spalette);
 
 	ttclose();
-}
-
-/*	spal(pstr):	reset the current palette according to a
-			"palette string" of the form
-
-	000111222333444555666777
-
-	which contains the octal values for the palette registers
-*/
-
-spal(pstr)
-
-char *pstr;	/* palette string */
-
-{
-	int pal;	/* current palette position */
-	int clr;	/* current color value */
-	int i;
-
-	for (pal = 0; pal < 16; pal++) {
-		if (*pstr== 0)
-			break;
-
-		/* parse off a color */
-		clr = 0;
-		for (i = 0; i < 3; i++)
-			if (*pstr)
-				clr = clr * 16 + (*pstr++ - '0');
-		palette[pal] = clr;
-	};
-
-	/* and now set it */
-	xbios(SETPALETTE, palette);
 }
 
 stgetc()	/* get a char from the keyboard */
@@ -973,7 +975,7 @@ char *newrez;	/* requested resolution */
 	}
 
 	/* and set up the default palette */
-	spal(palstr);
+	stkspal(palstr);
 	currez = nrez;
 	strcpy(sres, resname[currez]);
 

@@ -1,7 +1,7 @@
 /*	tcap:	Unix V5, V7 and BS4.2 Termcap video driver
  *		for MicroEMACS
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/tcap.c,v 1.71 1995/08/21 02:42:06 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/tcap.c,v 1.72 1995/11/17 04:03:42 pgf Exp $
  *
  */
 
@@ -47,7 +47,7 @@ static char *vb;	/* visible-bell */
  * max_pairs        "pairs"   num    "pa"    maximum number of color-pairs on the screen
  * no_color_video   "ncv"     num    "NC"    video attributes that can't be used with colors
  * orig_pair        "op"      str    "op"    
- * orig_colors      "oc"      str    "oc"
+ * orig_colors      "oc"      str    "oc"    set original colors
  * initialize_color "initc"   str    "Ic"
  * initialize_pair  "initp"   str    "Ip"
  * set_color_pair   "scp"     str    "sp"
@@ -62,16 +62,20 @@ static char *vb;	/* visible-bell */
  *	Co (hardcoded to NCOLORS)
  *	Sf (e.g., "\E[%a+c\036%dm" for Linux)
  *	Sb (e.g., "\E[%a+c\050%dm" for Linux)
+ *	oc (e.g., "\E[0m" for Linux)
  *
  * Using termcap alone, we cannot get "yellow" on IBM-PC, since that's a
- * combination of bold+(fcolor=3).
+ * combination of bold+(fcolor=3).  We cannot make that automatically with a
+ * termcap expression (without making a special case).  It's possible to do
+ * this with terminfo, however (FIXME).
  */
 
-#define	Num2Color(n) ctrans[(n) & (NCOLORS-1)]
 #define NO_COLOR (-1)
+#define	Num2Color(n) ((n >= 0) ? ctrans[(n) & (NCOLORS-1)] : NO_COLOR)
 
 static	char	*Sf;
 static	char	*Sb;
+static	char	*orig_colors;
 
 static	int	ctrans[NCOLORS];
 	/* ansi to ibm color translation table */
@@ -82,9 +86,11 @@ static	char *	initpalettestr = "0 1 2 3 4 5 6 7";
  * values of the current_[fb]color are set to an illegal value to force the
  * colors to be set.
  */
-static	int	current_fcolor = NO_COLOR;
-static	int	current_bcolor = NO_COLOR;
+static	int	given_fcolor = NO_COLOR;
+static	int	given_bcolor = NO_COLOR;
 
+static	int	shown_fcolor = NO_COLOR;
+static	int	shown_bcolor = NO_COLOR;
 #endif /* OPT_COLOR */
 
 static struct {
@@ -158,6 +164,7 @@ extern int tputs P((char *, int, void(*_f)(int) ));
 #if OPT_COLOR
 static void tcapfcol P(( int ));
 static void tcapbcol P(( int ));
+static void tcapspal P(( char * ));
 #endif
 
 #if OPT_VIDEO_ATTRS
@@ -195,6 +202,7 @@ TERM term = {
 #if	OPT_COLOR
 	, tcapfcol
 	, tcapbcol
+	, tcapspal
 #endif
 	, NULL		/* set dynamically at open time */
 };
@@ -334,7 +342,10 @@ tcapopen()
 #if	OPT_COLOR
 	Sf = tgetstr("Sf", &p);
 	Sb = tgetstr("Sb", &p);
-	spal(initpalettestr);
+	orig_colors = tgetstr("oc", &p);
+	if (orig_colors == 0)
+		orig_colors = tgetstr("me", &p);
+	set_palette(initpalettestr);
 #endif
 #if OPT_VIDEO_ATTRS
 	ME = tgetstr("me", &p);
@@ -395,8 +406,8 @@ tcapclose()
 	TTmove(term.t_nrow-1, 0);	/* cf: dumbterm.c */
 	tcapeeol();
 #if OPT_COLOR
-	current_fcolor =
-	current_bcolor = NO_COLOR;
+	shown_fcolor = shown_bcolor =
+	given_fcolor = given_bcolor = NO_COLOR;
 #endif
 }
 
@@ -553,50 +564,52 @@ int top,bot;
 	putpad(tgoto(CS, bot, top));
 }
 
-
-#if OPT_EVAL || OPT_COLOR
-/* ARGSUSED */
-void
-spal(thePalette)	/* reset the palette registers */
-char *thePalette;
-{
-#if OPT_COLOR
-    	/* this is pretty simplistic.  big deal. */
-	(void)sscanf(thePalette,"%i %i %i %i %i %i %i %i",
-	    	&ctrans[0], &ctrans[1], &ctrans[2], &ctrans[3],
-	    	&ctrans[4], &ctrans[5], &ctrans[6], &ctrans[7] );
-#endif
-}
-#endif /* OPT_EVAL */
-
 #if	OPT_COLOR
 static void
 show_ansi_colors P((void))
 {
 	char	*t;
 
-	if ((current_fcolor >= 0)
+	if (shown_fcolor == NO_COLOR
+	 || shown_bcolor == NO_COLOR) {
+		if (orig_colors)
+			putpad(orig_colors);
+	}
+
+	if ((shown_fcolor != NO_COLOR)
 	 && (Sf != 0)
-	 && (t = tparam(Sf, (char *)0, 0, Num2Color(current_fcolor))) != 0) {
+	 && (t = tparam(Sf, (char *)0, 0, shown_fcolor)) != 0) {
 		putpad(t);
 		free(t);
 	}
-	if ((current_bcolor >= 0)
+	if ((shown_bcolor != NO_COLOR)
 	 && (Sb != 0)
-	 && (t = tparam(Sb, (char *)0, 0, Num2Color(current_bcolor))) != 0) {
+	 && (t = tparam(Sb, (char *)0, 0, shown_bcolor)) != 0) {
 		putpad(t);
 		free(t);
 	}
 }
-#endif
 
-#if	OPT_COLOR
+static void
+reinitialize_colors P((void))
+{
+	int	saved_fcolor = given_fcolor;
+	int	saved_bcolor = given_bcolor;
+
+	shown_fcolor = shown_bcolor =
+	given_fcolor = given_bcolor = NO_COLOR;
+
+	tcapfcol(saved_fcolor);
+	tcapbcol(saved_bcolor);
+}
+
 static void
 tcapfcol(color)
 int color;
 {
-	if (color != current_fcolor) {
-		current_fcolor = color;
+	if (color != given_fcolor) {
+		given_fcolor = color;
+		shown_fcolor = Num2Color(color);
 		show_ansi_colors();
 	}
 }
@@ -605,10 +618,22 @@ static void
 tcapbcol(color)
 int color;
 {
-	if (color != current_bcolor) {
-		current_bcolor = color;
+	if (color != given_bcolor) {
+		given_bcolor = color;
+		shown_bcolor = Num2Color(color);
 		show_ansi_colors();
 	}
+}
+
+static void
+tcapspal(thePalette)	/* reset the palette registers */
+char *thePalette;
+{
+    	/* this is pretty simplistic.  big deal. */
+	(void)sscanf(thePalette,"%i %i %i %i %i %i %i %i",
+	    	&ctrans[0], &ctrans[1], &ctrans[2], &ctrans[3],
+	    	&ctrans[4], &ctrans[5], &ctrans[6], &ctrans[7] );
+	reinitialize_colors();
 }
 #endif /* OPT_COLOR */
 
@@ -617,14 +642,10 @@ int color;
  * NOTE:
  * On Linux console, the 'me' termcap setting \E[m resets _all_ attributes,
  * including color.  However, if we use 'se' instead, it doesn't clear the
- * boldface.  To compensate, we reset the colors when we put out 'me'.
+ * boldface.  To compensate, we reset the colors when we put out any "ending"
+ * sequence, such as 'me'.
  *
- * The color logic is disabled for Linux xterm, because the eeop and eeol
- * operations don't seem to propagate the colors (they're left untouched). 
- * Also, setting _any_ attribute seems to clobber the color settings.  (The
- * latter problem could be "fixed" by always emitting a complete escape sequence
- * for all attributes - boldface, reverse, color), but the former breaks the
- * screen optimization logic.
+ * In rxvt (2.12), setting _any_ attribute seems to clobber the color settings. 
  */
 static void
 tcapattr(attr)
@@ -658,17 +679,10 @@ int attr;
 			 && (tbl[n].mask & attr) == 0
 			 && (s = *(tbl[n].end))  != 0) {
 				putpad(s);
-				if (s == ME || s == UE) {
 #if OPT_COLOR
-					int save_fc = current_fcolor;
-					int save_bc = current_bcolor;
-					current_fcolor =
-					current_bcolor = NO_COLOR;
-					tcapfcol(save_fc);
-					tcapbcol(save_bc);
+				reinitialize_colors();
 #endif
-					ends = TRUE;
-				}
+				ends = TRUE;
 				diff &= ~(tbl[n].mask);
 			}
 		}

@@ -1,7 +1,7 @@
 /*
  * version & usage-messages for vile
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/version.c,v 1.27 1995/08/18 12:32:58 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/version.c,v 1.28 1995/11/12 16:59:43 pgf Exp $
  *
  */
 
@@ -52,7 +52,7 @@ print_usage P((void))
 	" (this will suppress .vilerc)" };
 	register int	j;
 
-	vttidy(TRUE);
+	ttclean(TRUE);
 	(void)fprintf(stderr, "usage: %s [-flags] [@cmdfile] files...\n", 
 		prog_arg);
 	for (j = 0; j < TABLESIZE(options); j++)

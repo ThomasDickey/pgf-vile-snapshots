@@ -3,7 +3,7 @@
 
 	written 1986 by Daniel Lawrence
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/eval.c,v 1.121 1995/08/04 23:12:06 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/eval.c,v 1.125 1995/11/18 00:36:16 pgf Exp $
  *
  */
 
@@ -371,6 +371,14 @@ char *fname;		/* name of function to evaluate */
 	case UFWRITABLE:
 		it = ltos(doglob(arg1)
 			&& flook(arg1, FL_HERE|FL_WRITEABLE) != NULL);
+		break;
+	case UFLOCMODE:
+	case UFGLOBMODE:
+		{ VALARGS args;
+		if (find_mode(arg1, (fnum == UFGLOBMODE), &args) != TRUE)
+			break;
+		it = string_mode_val(&args);
+		}
 		break;
 	default:
 		it = errorm;
@@ -814,7 +822,7 @@ char *value;	/* value to set to */
 			cmdstatus = stol(value);
 
 		ElseIf( EVPALETTE )
-			spal(strncpy0(palstr, value, (SIZE_T)(NSTRING)));
+			status = set_palette(value);
 
 		ElseIf( EVLASTKEY )
 			lastkey = l_strtol(value);
@@ -851,6 +859,7 @@ char *value;	/* value to set to */
 #if OPT_MLFORMAT
 		ElseIf( EVMLFORMAT )
 			SetEnv(&modeline_format, value);
+			upmode();
 #endif
 
 		ElseIf( EVSEARCH )
@@ -954,6 +963,28 @@ char *value;	/* value to set to */
 	}
 #endif
 	return(status);
+}
+#endif
+
+/*
+ * This function is used in several terminal drivers.
+ */
+#if OPT_EVAL || OPT_COLOR
+int
+set_palette(value)
+char *value;
+{
+	(void)strncpy0(palstr, value, (SIZE_T)(NSTRING));
+#if OPT_COLOR
+	if (term.t_setpal != 0) {
+		TTspal(palstr);
+		refresh(FALSE,0);
+		return TRUE;
+	}
+	return FALSE;
+#else
+	return TRUE;
+#endif
 }
 #endif
 

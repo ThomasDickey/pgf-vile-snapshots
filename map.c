@@ -3,7 +3,7 @@
  *	Original interface by Otto Lind, 6/3/93
  *	Additional map and map! support by Kevin Buettner, 9/17/94
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/map.c,v 1.60 1995/09/05 12:37:39 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/map.c,v 1.61 1995/11/18 00:36:16 pgf Exp $
  * 
  */
 
@@ -524,8 +524,6 @@ normal_typeahead()
 }
 
 #define NUMKEYSTR (KBLOCK / 2)
-char keystrokes[NUMKEYSTR * 2];
-int keystrindex = 0;
 
 static void
 save_keystroke(c)
@@ -546,7 +544,9 @@ int c;
 
 	kp->d_chunk[kr->kused++] = (UCHAR)c;
 	if (kr->kused >= NUMKEYSTR * 2) { /* time to dump the oldest half */
-		memcpy(kp->d_chunk, &kp->d_chunk[NUMKEYSTR / 2], NUMKEYSTR / 2);
+		memcpy((char *)(kp->d_chunk),
+			(char *)(&kp->d_chunk[NUMKEYSTR / 2]),
+			NUMKEYSTR / 2);
 		kr->kused = NUMKEYSTR / 2;
 	}
 

@@ -2,7 +2,7 @@
  *		The routines in this file handle the conversion of pathname
  *		strings.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/path.c,v 1.59 1995/10/19 20:02:25 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/path.c,v 1.61 1995/11/21 01:50:52 pgf Exp $
  *
  *
  */
@@ -30,13 +30,7 @@
 # define curr_dir_on_drive(d) _getdcwd(d, temp, sizeof(temp))
 #endif
 
-#if HAVE_SYMLINK && !OPT_VMS_PATH
-#define USE_RESOLVE_DIR 1
-#else
-#define USE_RESOLVE_DIR 0
-#endif
-
-#if USE_RESOLVE_DIR
+#ifdef GMDRESOLVE_LINKS
 #if HAVE_SYS_ITIMER_H && SYSTEM_LOOKS_LIKE_SCO
 #include <sys/itimer.h>
 #endif
@@ -466,7 +460,7 @@ char	*path;
 }
 #endif
 
-#if USE_RESOLVE_DIR
+#ifdef GMDRESOLVE_LINKS
 /*
  * Some of this code was "borrowed" from the GNU C library (getcwd.c).  It has
  * been largely rewritten and bears little resemblance to what it started out
@@ -639,7 +633,7 @@ resolve_directory(path_name, file_namep)
 			}
 			target[got] = EOS;
 
-			if (tb_alloc(&last_temp, strlen(temp_name)+got+1) == 0)
+			if (tb_alloc(&last_temp, (ALLOC_T)(strlen(temp_name)+got+1)) == 0)
 				return NULL;
 
 			temp_name = tb_values(last_temp);
@@ -805,7 +799,7 @@ resolve_directory(path_name, file_namep)
 
 	return tb_values(cachep->ce_dirname);
 }
-#endif	/* USE_RESOLVE_DIR */
+#endif	/* defined(GMDRESOLVE_LINKS) */
 
 #if OPT_CASELESS
 
@@ -921,9 +915,7 @@ static char *
 canonpath(ss)
 char *ss;
 {
-#if !USE_RESOLVE_DIR
 	char *p, *pp;
-#endif
 	char *s;
 
 	TRACE(("canonpath '%s'\n", ss))
@@ -971,9 +963,12 @@ char *ss;
 
 	/*
 	 * If the system supports symbolic links (most UNIX systems do), we
-	 * cannot do dead reckoning to resolve the pathname.
+	 * cannot do dead reckoning to resolve the pathname.  We've made this a
+	 * user-mode because some systems have problems with NFS timeouts which
+	 * can make running vile _slow_.
 	 */
-#if USE_RESOLVE_DIR
+#ifdef GMDRESOLVE_LINKS
+	if (global_g_val(GMDRESOLVE_LINKS))
 	{
 		char temp[NFILEN];
 		char *leaf;
@@ -985,8 +980,9 @@ char *ss;
 				(void)strcpy(s, head);
 		}
 	}
-
-#else	/* !USE_RESOLVE_DIR */
+	else
+#endif
+	{
 	p = pp = s;
 
 #if SYS_APOLLO
@@ -1053,7 +1049,7 @@ char *ss;
 	if (p == s)
 		*p++ = SLASHC;
 	*p = EOS;
-#endif	/* USE_RESOLVE_DIR */
+	}
 #endif	/* SYS_UNIX || SYS_MSDOS */
 
 #if OPT_VMS_PATH

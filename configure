@@ -1,6 +1,6 @@
 #! /bin/sh
 
-# From configure.in Revision: 1.29 
+# From configure.in Revision: 1.31 
 ### Use "configure -with-screen" to override the default configuration, which is
 ### termcap-based on unix systems.
 
@@ -2789,7 +2789,7 @@ if eval "test \"`echo '$''{'ac_cv_lib_Xt'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
   ac_save_LIBS="$LIBS"
-LIBS="-lXt  $LIBS"
+LIBS="-lXt $X_PRE_LIBS $LIBS"
 cat > conftest.$ac_ext <<EOF
 #line 2795 "configure"
 #include "confdefs.h"

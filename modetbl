@@ -11,7 +11,7 @@
 #
 # The modes are table entries in the BUFFER and WINDOW structures.
 #
-# $Header: /usr/build/VCS/pgf-vile/RCS/modetbl,v 1.63 1995/10/06 17:07:02 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/modetbl,v 1.66 1995/11/21 01:50:52 pgf Exp $
 #
 #
 # Mode-table entries.  Capitalized letters are used for abbreviations.
@@ -35,6 +35,7 @@ bool							# GMD prefix
 	"Popup-Msgs"	POPUP_MSGS	0		OPT_POPUP_MSGS	# popup buffer when multiple messages emitted
 	"remap"		REMAP		0		# should mappings be reapplied
 	"remapfirst"	REMAPFIRST	0		# should 1st char of a map be remapped?
+	"resolve-links"	RESOLVE_LINKS	0		HAVE_SYMLINK&&!OPT_VMS_PATH # cache/resolve directory names (can be slow if NFS times-out)
 	"ShowRam"	RAMSIZE		0		OPT_RAMSIZE	# show ram-usage
 	"SameBangs"	SAMEBANGS	0		# use same "!!" data for ^X-!
 	"working"	WORKING		chgd_working	OPT_WORKING # "working" message
@@ -42,7 +43,11 @@ bool							# GMD prefix
 	"view-on-readonly" RONLYVIEW	0		# set view mode for readonly files
 	"warn-unread"	WARNUNREAD	0		# warn if quitting with unread buffers
 	"xterm-mouse"	XTERM_MOUSE	chgd_xterm	# mode to control whether we allow mouse-clicking
-	"SmoothScroll" SMOOTH_SCROLL	0		# should we update even if there is typeahead?
+	"SmoothScroll"	SMOOTH_SCROLL	0		# should we update even if there is typeahead?
+enum
+	"fcolor"	FCOLOR		chgd_color	OPT_COLOR	# foreground color
+	"bcolor"	BCOLOR		chgd_color	OPT_COLOR	# background color
+	"Popup-Choices"	POPUP_CHOICES	0		OPT_POPUPCHOICE&&OPT_ENUM_MODES # popup buffer showing file-completion choices
 int							# VAL_ prefix
 	"printing-low"	PRINT_LOW	chgd_charset	# low end of high-bit-set printable range
 	"printing-high"	PRINT_HIGH	chgd_charset	# high end of high-bit-set printable range
@@ -55,7 +60,6 @@ string							# VAL_ prefix
 	"backup-style"  BACKUPSTYLE	0		OPT_FILEBACK # file backup style
 	"expand-chars"	EXPAND_CHARS	0		# list of chars we can expand (%,#,:)
 	"glob"		GLOB		0		OPT_GLOB_PIPE # select filename globbing style
-	"Popup-Choices"	POPUP_CHOICES	0		OPT_POPUPCHOICE&&OPT_ENUM_MODES # popup buffer showing file-completion choices
 
 .buffers
 bool							# MD prefix
@@ -81,6 +85,8 @@ bool							# MD prefix
 	"view"		VIEW		chgd_major	# read-only buffer
 	"WrapScan"	SWRAP 		0		# wrap-around search mode
 	"WrapWords"	WRAP		0		# word wrap
+enum
+	"visual-matches"  HILITEMATCH	0		OPT_HILITEMATCH # highlight all search matches
 int							# VAL_ prefix
 	"AutoSaveCNT"	ASAVECNT	0		# how often auto-saves occur
 	"C-ShiftWidth"	C_SWIDTH	0		# shift-width for C buffers
@@ -95,7 +101,6 @@ string							# VAL_ prefix
 	"fence-pairs"	FENCES		chgd_fences	# pairs of fences {,}; (,); etc.
 	"locker"	LOCKER		chgd_disabled	OPT_LCKFILES  # Name of locker
 	"tags"		TAGS		0		# list of tags files
-	"visual-matches"  HILITEMATCH	0		OPT_HILITEMATCH # highlight all search matches
 regex							# VAL_ prefix
 	"comments"	COMMENTS	0		# matches leading comment for comment reformatting
 	"paragraphs"	PARAGRAPHS	0		# delimits a paragraph
@@ -113,9 +118,6 @@ bool							# WMD prefix
 	"Terse-SELections" TERSELECT	0		OPT_SELECTIONS # don't display extent of selections on message line
 int							# VAL_ prefix
 	"SIDEways"	SIDEWAYS	chgd_major_w	# sideways offset for display
-color
-	"fcolor"	FCOLOR		chgd_color	OPT_COLOR	# foreground color
-	"bcolor"	BCOLOR		chgd_color	OPT_COLOR	# background color
 #
 # The "environment" variables are similar to modes, but are not so neatly
 # organized into groups of universal/buffer/window.
@@ -184,12 +186,14 @@ color
 "div"	DIV		DYNAMIC		# division
 "env"	ENV		MONAMIC		# retrieve a system environment var
 "equ"	EQUAL		DYNAMIC		# logical equality check
+"glo"	GLOBMODE	MONAMIC		# retrieve global setting
 "gre"	GREATER		DYNAMIC		# logical greater than
 "gtk"	GTKEY		NILNAMIC	# get 1 character
 "ind"	IND		MONAMIC		# evaluate indirect value
 "lef"	LEFT		DYNAMIC		# left string(string, len)
 "len"	LENGTH		MONAMIC		# string length
 "les"	LESS		DYNAMIC		# logical less than
+"loc"	LOCMODE		MONAMIC		# retrieve local setting
 "low"	LOWER		MONAMIC		# lower case string
 "mid"	MID		TRINAMIC	# mid string(string, pos, len)
 "mod"	MOD		DYNAMIC		# modulo

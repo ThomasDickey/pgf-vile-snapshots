@@ -1,4 +1,3 @@
-
 /*
  * Uses Borland console i/o routines.
  * (Created for OS/2 by Charles Moschel 29-MAR-94.)
@@ -10,7 +9,7 @@
  * Note: Visual flashes are not yet supported.
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/borland.c,v 1.13 1995/08/21 02:42:06 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/borland.c,v 1.14 1995/11/17 04:03:42 pgf Exp $
  *
  */
 
@@ -44,9 +43,6 @@
 
 #include <conio.h>
 
-
-#define	AttrColor(b,f)	(((ctrans[b] & 7) << 4) | (ctrans[f] & 15))
-
 extern  void	borflush  P((void));
 extern  void	bormove   P((int,int));
 extern  void	boreeol   P((void));
@@ -60,8 +56,11 @@ extern	void	borputc   P((int));
 extern	void	borkopen  P((void));
 extern	void	borkclose P((void));
 
+#if OPT_COLOR
 extern	void	borfcol   P((int));
 extern	void	borbcol   P((int));
+extern	void	borspal   P((char *));
+#endif
 
 #if OPT_ICURSOR
 extern	void	icursor   P((int));
@@ -144,8 +143,11 @@ TERM    term    = {
 	borbeep,
 	borrev,
 	borcres,
+#if OPT_COLOR
 	borfcol,
 	borbcol,
+	borspal,
+#endif
 	borscroll,
 #if OPT_ICURSOR
 	icursor,
@@ -164,6 +166,7 @@ icursor(int cmode)
 }
 #endif
 
+#if OPT_COLOR
 void
 borfcol(color)		/* set the current output color */
 int color;	/* color to set */
@@ -179,6 +182,18 @@ int color;	/* color to set */
 	cbcolor = ctrans[color];
 	textbackground(cbcolor & 7);
 }
+
+void
+borspal(thePalette)	/* reset the palette registers */
+char *thePalette;
+{
+	borflush();
+    	/* this is pretty simplistic.  big deal. */
+	(void)sscanf(thePalette,"%i %i %i %i %i %i %i %i",
+	    	&ctrans[0], &ctrans[1], &ctrans[2], &ctrans[3],
+	    	&ctrans[4], &ctrans[5], &ctrans[6], &ctrans[7] );
+}
+#endif
 
 void
 borflush()
@@ -291,17 +306,6 @@ char *res;	/* resolution to change to */
 	return status;
 }
 
-void
-spal(palstr)	/* reset the palette registers */
-char *palstr;
-{
-	borflush();
-    	/* this is pretty simplistic.  big deal. */
-	(void)sscanf(palstr,"%i %i %i %i %i %i %i %i",
-	    	&ctrans[0], &ctrans[1], &ctrans[2], &ctrans[3],
-	    	&ctrans[4], &ctrans[5], &ctrans[6], &ctrans[7] );
-}
-
 
 void
 borbeep()
@@ -315,9 +319,11 @@ boropen()
 {
 	int i;
 
-	spal(initpalettestr);
+	set_palette(initpalettestr);
+#if OPT_COLOR
 	borfcol(gfcolor);
 	borbcol(gbcolor);
+#endif
 	if (!borcres(current_res_name))
 		(void)scinit(-1);
 	ttopen();

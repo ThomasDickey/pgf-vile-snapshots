@@ -15,7 +15,7 @@
  * by Tom Dickey, 1993.    -pgf
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/mktbls.c,v 1.69 1995/08/04 23:12:06 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/mktbls.c,v 1.71 1995/11/17 04:03:42 pgf Exp $
  *
  */
 
@@ -38,8 +38,7 @@
 # endif
 
 	/* pc-stuff */
-# if defined(__TURBOC__) || defined(__WATCOMC__) || \
-	defined(__GO32__) || defined(__IBMC__)
+# if defined(__TURBOC__) || defined(__WATCOMC__) || defined(__GO32__) || defined(__IBMC__)
 #  define HAVE_STDLIB_H 1
 #  define ANSI_PROTOS  1
 # endif
@@ -678,7 +677,7 @@ int	c;
 	char	*value;
 	switch (c) {
 	case 'b':	value	= "BOOL";	break;
-	case 'c':	value	= "COLOR";	break;
+	case 'e':	value	= "ENUM";	break;
 	case 'i':	value	= "INT";	break;
 	case 's':	value	= "STRING";	break;
 	case 'x':	value	= "REGEX";	break;
@@ -711,7 +710,7 @@ char	*type, *name, *cond;
 
 	switch (c = *type) {
 	case 'b':
-	case 'c':
+	case 'e':
 	case 'i':
 	case 's':	break;
 	case 'r':	c = 'x';	/* make this sort after strings */
@@ -1747,7 +1746,7 @@ char    *argv[];
 			case SECT_WIND:
 				if (r != 1
 				 || (!strcmp(vec[1], "bool")
-				  && !strcmp(vec[1], "color")
+				  && !strcmp(vec[1], "enum")
 				  && !strcmp(vec[1], "int")
 				  && !strcmp(vec[1], "string")
 				  && !strcmp(vec[1], "regex")))

@@ -7,7 +7,7 @@
  * Most code probably by Dan Lawrence or Dave Conroy for MicroEMACS
  * Extensions for vile by Paul Fox
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/insert.c,v 1.84 1995/10/13 00:14:18 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/insert.c,v 1.87 1995/11/18 00:36:16 pgf Exp $
  *
  */
 
@@ -21,6 +21,7 @@
 			: w_left_margin(curwp)
 
 static	int	backspace P(( void ));
+static	int	blanks_on_line P(( void ));
 static	int	doindent P(( int ));
 static	int	indented_newline P(( void ));
 static	int	indented_newline_above P(( void ));
@@ -622,6 +623,22 @@ int ub;
 	return TRUE;
 }
 
+static int
+blanks_on_line()
+{
+	register LINE *lp = l_ref(DOT.l);
+	int	code = FALSE;
+	int	n;
+
+	for (n = 0; n < llength(lp); n++) {
+		if (isspace(lgetc(lp,n))) {
+			code = TRUE;
+			break;
+		}
+	}
+	return code;
+}
+
 int
 inschar(c,backsp_limit_p)
 int c;
@@ -639,15 +656,20 @@ int *backsp_limit_p;
 		 * we are now past fill column, perform word wrap.
 		 */
 		if (wrap_at_col(c)) {
-			int wm_flag = (past_wrapmargin(c) >= 0);
-			if (isspace(c)) {
-				int status = wrapword(wm_flag, 1);
+			int offset = past_wrapmargin(c);
+			int wm_flag = (offset >= 0);
+			int is_print = (!isspecial(c) && isprint(c));
+			int is_space = (!isspecial(c) && isspace(c));
+
+			if (is_space
+			 || (is_print && (offset >= 1) && blanks_on_line())) {
+				int status = wrapword(wm_flag, is_space);
 				*backsp_limit_p = w_left_margin(curwp);
-				if (wm_flag)
+				if (wm_flag && is_space)
 					return status;
 			} else if (wm_flag
-			    && (c == '\t'
-			     || (!isspecial(c) && isprint(c)))) {
+			    && !blanks_on_line()
+			    && (c == '\t' || is_print)) {
 				kbd_alarm();	/* vi beeps past the margin */
 			}
 		}
@@ -1170,10 +1192,11 @@ int f,n;
 	if (space_count + add_spaces > curtabval) {
 	    space_count = curtabval - add_spaces;
 	}
-	if ( (add_spaces + logical_col) % curtabval == 0) {
+	if (b_val(curbp,MDTABINSERT) &&
+		((add_spaces + logical_col) % curtabval == 0)) {
 	    if (space_count > 0) {
 		DOT.o -= space_count;
-		s = ldelete(space_count, FALSE);
+		s = ldelete((B_COUNT)space_count, FALSE);
 	    } else {
 		space_count = 0;
 		s = TRUE;

@@ -3,7 +3,7 @@
  * Modified from a really old version of "borland.c" (before the VIO
  * stuff went in there.)
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/os2vio.c,v 1.4 1995/08/04 23:12:06 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/os2vio.c,v 1.5 1995/11/17 04:03:42 pgf Exp $
  */
 
 #include "estruct.h"
@@ -47,8 +47,11 @@ static	void	vio_putc   P((int));
 static	void	vio_kopen  P((void));
 static	void	vio_kclose P((void));
 static	void	vio_flush  P((void));
+#if OPT_COLOR
 static	void	vio_fcol   P((int));
 static	void	vio_bcol   P((int));
+static	void	vio_spal   P((char *));
+#endif
 #if	SCROLLCODE
 static	void	vio_scroll P((int,int,int));
 #endif
@@ -98,8 +101,11 @@ TERM term =
 	vio_beep,
 	vio_rev,
 	vio_cres,
+#if OPT_COLOR
 	vio_fcol,
 	vio_bcol,
+	vio_spal,
+#endif
 #if	SCROLLCODE
 	vio_scroll
 #endif
@@ -210,6 +216,7 @@ set_cursor(int cmode)
 }
 #endif /* CURSOR_SHAPE */
 
+#if OPT_COLOR
 /*
  * Set the current foreground colour.  'color' specifies an ANSI colour
  * index.
@@ -237,6 +244,19 @@ vio_bcol(int color)
 	cbcolor  = color;
 	TextAttr = AttrColor(cbcolor, cfcolor);
 }
+
+/*
+ * Reset the palette registers.
+ */
+void
+vio_spal(char *thePalette)
+{
+	/* this is pretty simplistic.  big deal. */
+	(void)sscanf(thePalette, "%i %i %i %i %i %i %i %i",
+	    	&ctrans[0], &ctrans[1], &ctrans[2], &ctrans[3],
+	    	&ctrans[4], &ctrans[5], &ctrans[6], &ctrans[7]);
+}
+#endif
 
 static void
 vio_move(int row, int col)
@@ -352,18 +372,6 @@ vio_cres(char *res)	/* change screen resolution */
 	return scinit(-1);
 }
 
-/*
- * Reset the palette registers.
- */
-void
-spal(char *palstr)
-{
-	/* this is pretty simplistic.  big deal. */
-	(void)sscanf(palstr, "%i %i %i %i %i %i %i %i",
-	    	&ctrans[0], &ctrans[1], &ctrans[2], &ctrans[3],
-	    	&ctrans[4], &ctrans[5], &ctrans[6], &ctrans[7]);
-}
-
 static void
 vio_beep()
 {
@@ -387,8 +395,10 @@ vio_open(void)
 		addtosysmap(VIO_KeyMap[i].seq, 2, VIO_KeyMap[i].code);
 	}
 
+#if OPT_COLOR
 	vio_fcol(gfcolor);
 	vio_bcol(gbcolor);
+#endif
 
 #if CURSOR_SHAPE
 	set_cursor(1);

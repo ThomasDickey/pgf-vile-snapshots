@@ -1,7 +1,7 @@
 /*	AT386:	 hacked tcap.c for the 386 console, when you don't
  *		have libtermcap.   grrr.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/at386.c,v 1.15 1994/11/29 04:02:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/at386.c,v 1.16 1995/11/17 04:03:42 pgf Exp $
  *
  */
 #error This module is not actively maintained as part of vile.
@@ -74,8 +74,9 @@ TERM term = {
 	at386rev,
 	at386cres
 #if	OPT_COLOR
-	, at386fcol,
-	at386bcol
+	, at386fcol
+	, at386bcol
+	, 0
 #endif
 	, NULL		/* set dynamically at open time */
 };
@@ -209,11 +210,6 @@ at386scroll_delins(from,to,n)
 	}
 }
 
-
-spal(dummy)	/* change palette string */
-{
-	/*	Does nothing here	*/
-}
 
 
 #if	OPT_COLOR

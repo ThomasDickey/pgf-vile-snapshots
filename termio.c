@@ -3,7 +3,7 @@
  * characters, and write characters in a barely buffered fashion on the display.
  * All operating systems.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/termio.c,v 1.129 1995/08/18 12:32:58 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/termio.c,v 1.133 1995/11/18 00:36:16 pgf Exp $
  *
  */
 #include	"estruct.h"
@@ -245,6 +245,12 @@ ttclose()
 	ttclean(TRUE);
 }
 
+/*
+ * Clean up in anticipation for a return to the
+ * operating system. Move down to the last line and advance, to make room
+ * for the system prompt. Shut down the channel to the
+ * terminal.
+ */
 /*ARGSUSED*/
 void
 ttclean(f)
@@ -259,7 +265,7 @@ int f;
 	(void)fflush(stdout);
 	tcdrain(1);
 	tcsetattr(0, TCSADRAIN, &otermios);
-	TTkclose();	/* xterm */
+	TTkclose();
 	TTclose();
 	TTflush();
 #if USE_FCNTL
@@ -1214,9 +1220,11 @@ static void null_close()	{ }
 static void null_kopen()	{ }
 static void null_kclose()	{ }
 static int  null_getc()		{ return abortc; }
+/*ARGSUSED*/
 static void null_putc(c) int c;	{ }
 static int  null_typahead()	{ return FALSE; }
 static void null_flush()	{ }
+/*ARGSUSED*/
 static void null_move(row, col) int row, col; { }
 static void null_eeol()		{ }
 static void null_eeop()		{ }

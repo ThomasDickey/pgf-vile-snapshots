@@ -1,7 +1,7 @@
 /*
  * Uses the Win32 console API.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/ntconio.c,v 1.10 1995/09/26 03:09:52 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/ntconio.c,v 1.11 1995/11/17 04:03:42 pgf Exp $
  *
  */
 
@@ -32,8 +32,11 @@ extern	void	ntputc		(int);
 extern	int	nttypahead	(void);
 extern	void	ntkopen		(void);
 extern	void	ntkclose	(void);
+#if OPT_COLOR
 extern	void	ntfcol		(int);
 extern	void	ntbcol		(int);
+extern	void	ntspal		(char *);
+#endif
 extern	void	ntflush		(void);
 extern	void	ntscroll	(int, int, int);
 
@@ -94,8 +97,11 @@ TERM    term    = {
 	ntbeep,
 	ntrev,
 	ntcres,
+#if OPT_COLOR
 	ntfcol,
 	ntbcol,
+	ntspal,
+#endif
 	ntscroll
 };
 
@@ -121,6 +127,7 @@ set_cursor(int cmode)
 	SetConsoleCursorInfo(hConsoleOutput, &cci);
 }
 
+#if OPT_COLOR
 void
 ntfcol(int color)		/* set the current output color */
 {
@@ -134,6 +141,16 @@ ntbcol(int color)		/* set the current background color */
 	scflush();
 	nbcolor = cbcolor = color;
 }
+
+void
+ntspal(char *thePalette)	/* reset the palette registers */
+{
+    	/* this is pretty simplistic.  big deal. */
+	sscanf(thePalette, "%i %i %i %i %i %i %i %i",
+		&ctrans[0], &ctrans[1], &ctrans[2], &ctrans[3],
+		&ctrans[4], &ctrans[5], &ctrans[6], &ctrans[7]);
+}
+#endif
 
 void
 scflush(void)
@@ -292,15 +309,6 @@ ntcres(char *res)	/* change screen resolution */
 }
 
 void
-spal(char *palstr)	/* reset the palette registers */
-{
-    	/* this is pretty simplistic.  big deal. */
-	sscanf(palstr,"%i %i %i %i %i %i %i %i",
-		&ctrans[0], &ctrans[1], &ctrans[2], &ctrans[3],
-		&ctrans[4], &ctrans[5], &ctrans[6], &ctrans[7]);
-}
-
-void
 ntbeep(void)
 {
 	MessageBeep(0xffffffff);
@@ -336,7 +344,7 @@ static int backfill_scrolled_areas_manually = 0;
 void
 ntopen(void)
 {
-	spal(initpalettestr);
+	set_palette(initpalettestr);
 	hConsoleOutput = GetStdHandle(STD_OUTPUT_HANDLE);
 	GetConsoleScreenBufferInfo(hConsoleOutput, &csbi);
 	originalAttribute = csbi.wAttributes;

@@ -3,7 +3,7 @@
  *
  *	written 11-feb-86 by Daniel Lawrence
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/bind.c,v 1.126 1995/09/20 13:06:17 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/bind.c,v 1.127 1995/11/17 04:03:42 pgf Exp $
  *
  */
 
@@ -1785,7 +1785,7 @@ SIZE_T	size_entry;
 	int status = FALSE;
 #if OPT_POPUPCHOICE
 # if OPT_ENUM_MODES
-	int gvalpopup_choices = *global_g_val_ptr(GVAL_POPUP_CHOICES);
+	int gvalpopup_choices = global_g_val(GVAL_POPUP_CHOICES);
 # else
 	int gvalpopup_choices = global_g_val(GMDPOPUP_CHOICES);
 # endif
@@ -1837,7 +1837,8 @@ SIZE_T	size_entry;
 						(SIZE_T)(NLINE - 1));
 				*pos = strlen(buf);
 #if OPT_POPUPCHOICE
-				if (gvalpopup_choices != 'o' && !clexec && (c == NAMEC))
+				if (gvalpopup_choices != POPUP_CHOICES_OFF
+				 && !clexec && (c == NAMEC))
 					status = FALSE;
 				else
 #endif
@@ -1852,8 +1853,12 @@ SIZE_T	size_entry;
 			}
 #if OPT_POPUPCHOICE
 # if OPT_ENUM_MODES
-			if (!clexec && gvalpopup_choices != 'o' && c == NAMEC && *pos == cpos) {
-				if (gvalpopup_choices == 'i' || cmplcol == ttcol) {
+			if (!clexec
+			 && gvalpopup_choices != POPUP_CHOICES_OFF
+			 && c == NAMEC
+			 && *pos == cpos) {
+				if (gvalpopup_choices == POPUP_CHOICES_IMMED
+				 || cmplcol == ttcol) {
 					show_completions(case_insensitive, buf, cpos, nbp, size_entry);
 					cmplcol = -ttcol;
 				}
@@ -1865,7 +1870,7 @@ SIZE_T	size_entry;
 # else
 			if (!clexec && gvalpopup_choices 
 			 && c == NAMEC && *pos == cpos) {
-+				show_completions(case_insensitive, buf, cpos, nbp, size_entry);
+				show_completions(case_insensitive, buf, cpos, nbp, size_entry);
 				cmplcol = -ttcol;
 			}
 			else

@@ -2,7 +2,7 @@
  * This file contains the command processing functions for a number of random
  * commands. There is no functional grouping here, for sure.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/random.c,v 1.170 1995/10/19 20:02:25 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/random.c,v 1.172 1995/11/18 00:36:16 pgf Exp $
  *
  */
 
@@ -470,23 +470,30 @@ int f,n;
 	register LINE	*lp2;
 	B_COUNT nld;
 	B_COUNT n_arg;
+	C_NUM	nchar;
 	int s = TRUE;
-
-	lp1 = l_ref(DOT.l);
-	/* scan backward */
-	while (llength(lp1)==0 && (lp2=lback(lp1))!=l_ref(buf_head(curbp)))
-		lp1 = lp2;
-	lp2 = lp1;
-
-	nld = 0;
-
-	/* scan forward */
-	while ((lp2=lforw(lp2))!=l_ref(buf_head(curbp)) && llength(lp2)==0)
-		++nld;
 
 	if (!f || n < 0)
 		n = 0;
 	n_arg = n;
+
+	lp1 = l_ref(DOT.l);
+	/* scan backward */
+	while (firstchar(lp1) < 0 && 
+			(lp2 = lback(lp1)) != l_ref(buf_head(curbp)))
+		lp1 = lp2;
+	lp2 = lp1;
+
+	nld = 0;
+	nchar = 0;
+
+	/* scan forward */
+	while ((lp2 = lforw(lp2)) != l_ref(buf_head(curbp)) && 
+			firstchar(lp2) < 0) {
+		++nld;
+		if (nld > n_arg)
+			nchar += llength(lp2) + 1;
+	}
 
 	DOT.l = l_ptr(lforw(lp1));
 	DOT.o = 0;
@@ -494,8 +501,10 @@ int f,n;
 	if (n_arg == nld) {		/* things are just right */
 		/*EMPTY*/;
 	} else if (n_arg < nld) {	/* delete (nld - n_arg) lines */
-		n_arg = nld - n_arg;
-		s = ldelete(n_arg, FALSE);
+		DOT.l = l_ptr(lp2);
+		DOT.o = 0;
+		backchar(TRUE,nchar);
+		s = ldelete((B_COUNT)nchar, FALSE);
 	} else { 			/* insert (n_arg - nld) lines */
 		n_arg = n_arg - nld;
 		while (s && n_arg--)
@@ -503,7 +512,8 @@ int f,n;
 	}
 
 	/* scan forward */
-	while ((lLength(DOT.l) == 0) && (!same_ptr(DOT.l, buf_head(curbp))))
+	while ((firstchar(l_ref(DOT.l)) < 0) &&
+			(!same_ptr(DOT.l, buf_head(curbp))))
 		DOT.l = lFORW(DOT.l);
 
 	return s;

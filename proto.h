@@ -4,7 +4,7 @@
  *
  *   Created: Thu May 14 15:44:40 1992
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/proto.h,v 1.207 1995/10/01 14:44:59 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/proto.h,v 1.210 1995/11/17 04:03:42 pgf Exp $
  *
  */
 
@@ -37,10 +37,6 @@ extern void setup_handler P(( int, void (*) (DEFINE_SIG_ARGS) ));
 extern int xterm_mouse_t P(( int, int ));
 extern int xterm_mouse_T P(( int, int ));
 #endif
-#if OPT_EVAL || OPT_COLOR
-extern void spal P(( char * ));
-#endif
-
 
 /* basic.c */
 extern int firstchar P(( LINE * ));
@@ -96,6 +92,7 @@ extern BUFFER * find_alt P(( void ));
 extern BUFFER * find_bp P(( BUFFER * ));
 extern void make_current P(( BUFFER * ));
 extern int swbuffer P(( BUFFER * ));
+extern int swbuffer_lfl P(( BUFFER *, int ));
 extern void undispbuff P(( BUFFER *, WINDOW * ));
 extern int tabstop_val P(( BUFFER * ));
 extern int shiftwid_val P(( BUFFER * ));
@@ -141,11 +138,10 @@ extern int nu_width P(( WINDOW * ));
 extern int col_limit P(( WINDOW * ));
 extern int vtinit P(( void ));
 extern int video_alloc P(( VIDEO ** ));
-extern void vttidy P(( int ));
 extern int update P(( int ));
 extern void upmode P(( void ));
 extern int offs2col P(( WINDOW *, LINEPTR, C_NUM ));
-#if OPT_MOUSE
+#if OPT_MOUSE || defined(WMDLINEWRAP)
 extern int col2offs P(( WINDOW *, LINEPTR, C_NUM ));
 #endif
 #ifdef WMDLINEWRAP
@@ -207,6 +203,9 @@ extern char * mklower P(( char * ));
 extern char * mktrimmed P(( char * ));
 #if OPT_EVAL
 extern int set_variable P(( char * ));
+#endif
+#if OPT_EVAL || OPT_COLOR
+extern int set_palette P(( char * ));
 #endif
 
 /* exec.c */

@@ -1,7 +1,7 @@
 /*
  * 	older, simpler X11 support, Dave Lemke, 11/91
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/x11simp.c,v 1.55 1995/01/04 18:07:46 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/x11simp.c,v 1.56 1995/11/17 04:03:42 pgf Exp $
  *
  */
 #error This module is not actively maintained as part of vile.
@@ -223,8 +223,9 @@ TERM        term = {
     x_cres
 
 #if	OPT_COLOR
-    ,x_fcol,
-    x_bcol
+    ,x_fcol
+    ,x_bcol
+    ,0			/* no palette */
 #endif
     ,x_scroll
 };
@@ -2570,14 +2571,6 @@ int color;
 }
 
 #endif
-
-/* change palette string */
-/* ARGSUSED */
-void
-spal(dummy)
-char *dummy;
-{
-}
 
 #if OPT_FLASH
 static void

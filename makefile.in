@@ -21,7 +21,7 @@
 # gnu autoconf support by kevin buettner, 5/94
 # original makefile for uemacs: Adam Fritz July 30,1987  (do you recognize it?)
 #
-# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.in,v 1.53 1995/10/01 14:43:44 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.in,v 1.57 1995/11/21 14:16:46 pgf Exp $
 #
 
 #### Start of system configuration section. ####
@@ -43,6 +43,7 @@ LINT		= lint
 X_CFLAGS	= @X_CFLAGS@
 X_LIBS		= @X_LIBS@
 X_EXTRA_LIBS	= @X_EXTRA_LIBS@
+X_PRE_LIBS	= @X_PRE_LIBS@
 
 SCREEN		= @SCREEN@
 TARGET		= @TARGET@
@@ -155,7 +156,7 @@ all:	$(TARGET) vile-manfilt vile-c-filt
 
 $(TARGET): $(BUILTHDRS) $(OBJ)
 	-mv $(TARGET) o$(TARGET)
-	$(LINK) $(LDFLAGS) -o $(TARGET) $(OBJ) $(X_LIBS) $(LIBS) $(X_EXTRA_LIBS)
+	$(LINK) $(LDFLAGS) -o $(TARGET) $(OBJ) $(X_LIBS) $(X_PRE_LIBS) $(LIBS) $(X_EXTRA_LIBS)
 
 vile-manfilt: manfilt.o
 	$(LINK) $(LDFLAGS) -o vile-manfilt manfilt.o
@@ -294,7 +295,10 @@ zipfile: $(DISTFILES) /tmp/vilevers
 	zip -k vile$${vilevers}s.zip $(DISTFILES) ;\
 	echo Created vile$${vilevers}s.zip
 
-DOSBINARIES = README README.PC vile.hlp vile.exe dos4gw.exe 
+# watcom builds...
+# DOSBINARIES = README README.PC vile.hlp vile.exe dos4gw.exe 
+# djgpp builds...
+DOSBINARIES = README README.PC vile.hlp vile.exe go32.exe 
 
 binzip: $(DOSBINARIES) /tmp/vilevers
 	vilevers=`cat /tmp/vilevers | sed 's/\.//'`; \
@@ -338,6 +342,8 @@ release_warnings:
 	@sed -n -e '/Changes/s/^/	/p' -e '2q' CHANGES
 	@echo 'or maybe update the version info in edef.h?  it contains:'
 	@sed -n -e '/.*decl_init.*version.*,/s//	/p' edef.h
+	@echo 'how about the README?  it contains:'
+	@sed -n -e '/version/s/^/	/p' -e '3q' README
 	@echo 'or in vile.hlp?  it has:'
 	@sed -n -e '/.*Getting along with vile	*/s//	/p' -e '5q' vile.hlp
 	@echo 'did you reset patchlev.h?'

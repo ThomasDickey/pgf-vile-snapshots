@@ -13,7 +13,7 @@
  *	The same goes for vile.  -pgf, 1990-1995
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/main.c,v 1.257 1995/10/06 17:07:02 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/main.c,v 1.261 1995/11/21 01:50:52 pgf Exp $
  *
  */
 
@@ -692,7 +692,7 @@ void
 tidy_exit(code)
 int code;
 {
-	vttidy (TRUE);
+	ttclean (TRUE);
 	ExitProgram(code);
 }
 
@@ -774,6 +774,11 @@ global_val_init()
 	/* allow remapping by default */
 	set_global_g_val(GMDREMAP, TRUE);
 
+	/* set noresolve-links by default in case we've got NFS problems */
+#ifdef GMDRESOLVE_LINKS
+	set_global_g_val(GMDRESOLVE_LINKS, FALSE);
+#endif
+
 #if OPT_VMS_PATH || OPT_MSDOS_PATH	/* ':' gets in the way of drives */
 	set_global_g_val_ptr(GVAL_EXPAND_CHARS,strmalloc("!%#"));
 #else	/* SYS_UNIX */
@@ -790,7 +795,7 @@ global_val_init()
 	set_global_g_val(GMDIMPLYBUFF,	FALSE); /* imply-buffer */
 #if	OPT_POPUPCHOICE
 # if	OPT_ENUM_MODES
-	set_global_g_val_ptr(GVAL_POPUP_CHOICES,strmalloc("delayed"));
+	set_global_g_val(GVAL_POPUP_CHOICES, POPUP_CHOICES_DELAYED);
 # else
 	set_global_g_val(GMDPOPUP_CHOICES,TRUE);
 # endif
@@ -815,6 +820,10 @@ global_val_init()
 	set_global_g_val(GMDWARNUNREAD,TRUE);	/* warn if quitting without
 						looking at all buffers */
 	set_global_g_val(GMDSMOOTH_SCROLL, FALSE);
+#if OPT_COLOR
+	set_global_g_val(GVAL_FCOLOR,	C_WHITE); /* foreground color */
+	set_global_g_val(GVAL_BCOLOR,	C_BLACK); /* background color */
+#endif
 
 	/*
 	 * Buffer-mode defaults
@@ -843,7 +852,7 @@ global_val_init()
 	set_global_b_val(MDTAGSRELTIV,	FALSE);	/* path relative tag lookups */
 	set_global_b_val(MDTERSE,	FALSE);	/* terse messaging */
 #if	OPT_HILITEMATCH
-	set_global_b_val_ptr(VAL_HILITEMATCH, strmalloc("none"));
+	set_global_b_val(VAL_HILITEMATCH, 0);	/* no hilite */
 #endif
 #if	OPT_UPBUFF
 	set_global_b_val(MDUPBUFF,	TRUE);	/* animated */
@@ -926,10 +935,6 @@ global_val_init()
 #endif
 
 	set_global_w_val(WVAL_SIDEWAYS,	0);	/* list-mode */
-#if defined(WVAL_FCOLOR) || defined(WVAL_BCOLOR)
-	set_global_w_val(WVAL_FCOLOR,	C_WHITE); /* foreground color */
-	set_global_w_val(WVAL_BCOLOR,	C_BLACK); /* background color */
-#endif
 
 }
 
@@ -1342,7 +1347,7 @@ int f,n;
 	mlerase();
 #endif
 #endif
-	vttidy(TRUE);
+	ttclean(TRUE);
 #if NO_LEAKS
 	{
 		beginDisplay;		/* ...this may take a while... */

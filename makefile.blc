@@ -1,7 +1,7 @@
 #
 # makefile for vile on WIN32 using Borland C++
 #
-# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.blc,v 1.1 1995/08/01 13:10:53 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.blc,v 1.2 1995/11/11 17:30:25 pgf Exp $
 #
 #
 
@@ -25,7 +25,7 @@ SRC = 	main.c ntconio.c basic.c bind.c buffer.c crypt.c \
 	path.c random.c regexp.c \
 	region.c search.c select.c spawn.c \
 	tags.c tbuff.c termio.c tmp.c undo.c \
-	version.c vmalloc.c window.c word.c wordmov.c map.c 
+	version.c window.c word.c wordmov.c map.c 
 
 OBJ = 	main.obj ntconio.obj basic.obj bind.obj buffer.obj crypt.obj \
       	csrch.obj display.obj eval.obj exec.obj externs.obj \
@@ -36,7 +36,7 @@ OBJ = 	main.obj ntconio.obj basic.obj bind.obj buffer.obj crypt.obj \
 	path.obj random.obj regexp.obj \
 	region.obj search.obj select.obj spawn.obj \
 	tags.obj tbuff.obj termio.obj tmp.obj undo.obj \
-	version.obj vmalloc.obj window.obj word.obj wordmov.obj map.obj 
+	version.obj window.obj word.obj wordmov.obj map.obj 
 
 .c.obj:	
 	$(CC) $(CFLAGS) -c $<
@@ -72,6 +72,5 @@ eval.obj:	nevars.h
 glob.obj:	dirstuff.h
 externs.obj:	nebind.h nename.h nefunc.h
 path.obj:	dirstuff.h
-vmalloc.obj:	nevars.h
 version.obj:	patchlev.h
 

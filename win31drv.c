@@ -10,7 +10,7 @@
  *	    otherwise TurboC finds a syntax error.
  *	(2) must compile with a LARGE model
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/win31drv.c,v 1.4 1994/11/29 04:02:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/win31drv.c,v 1.5 1995/11/17 04:03:42 pgf Exp $
  */
 
 #include <windows.h>
@@ -84,6 +84,13 @@ win31_bcol(color)		/* set the current background color */
 	ttputc('m');
 	cbcolor = color;
 }
+
+void
+win31_spal(char *dummy)		/* change palette settings */
+{
+	/* none for now */
+}
+
 #endif
 
 void
@@ -137,13 +144,6 @@ win31_cres(flag)	/* change screen resolution */
 char	*flag;
 {
 	return(TRUE);
-}
-
-void
-spal(dummy)		/* change palette settings */
-char	*dummy;
-{
-	/* none for now */
 }
 
 void
@@ -371,8 +371,9 @@ TERM	term	= {
 	win31_rev,
 	win31_cres
 #if	OPT_COLOR
-	, win31_fcol,
-	win31_bcol
+	, win31_fcol
+	, win31_bcol
+	, win31_spal
 #endif
 	, win31_scroll
 };

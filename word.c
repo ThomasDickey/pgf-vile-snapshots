@@ -3,7 +3,7 @@
  * paragraph at a time.  There are all sorts of word mode commands.  If I
  * do any sentence mode commands, they are likely to be put in this file. 
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/word.c,v 1.47 1995/10/13 00:14:18 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/word.c,v 1.49 1995/11/09 12:27:14 pgf Exp $
  *
  */
 
@@ -26,6 +26,7 @@ int f,n;
 	register int cnt = 0;	/* size of word wrapped to next line */
 	register int c;		/* character temporary */
 	B_COUNT	to_delete;
+	C_NUM to_append = 0;
 
 	/* Back up from the <NL> 1 char */
 	if (!backchar(FALSE, 1))
@@ -35,19 +36,33 @@ int f,n;
 	 * to support a vi-like wrapmargin mode (see insert.c).  Unlike vi,
 	 * we're deleting all of the trailing whitespace; vi deletes only the
 	 * portion that was added during the current insertion.
+	 *
+	 * If there's no trailing whitespace, try to split the line at the
+	 * last embedded whitespace.
 	 */
 	if (f) {
+		register LINE *lp = l_ref(DOT.l);
 		to_delete = 0L;
-		for_ever {
-			if (is_header_line(DOT,curbp)
-			 || (lLength(DOT.l) > 0 && !isspace(char_at(DOT)))) {
-				forwchar(FALSE, 1);
+		if (DOT.o >= 0 && !isspace(lgetc(lp,DOT.o))) {
+			for (c = DOT.o; c >= 0; c--) {
+				if (isspace(lgetc(lp,c))) {
+					to_append = n;
+					cnt = (DOT.o - c);
+					DOT.o = c;
+					break;
+				}
+			}
+		}
+		for (c = DOT.o; c >= 0; c--) {
+			if (isspace(lgetc(lp,c))) {
+				to_delete++;
+				DOT.o = c;
+			} else {
 				break;
 			}
-			to_delete++;
-			if (DOT.o <= 0 || !backchar(FALSE, 1))
-				break;
 		}
+		if (to_delete == 0)
+			DOT.o++;
 	} else {
 		/* Back up until we aren't in a word, make sure there is a
 		 * break in the line
@@ -78,6 +93,8 @@ int f,n;
 		if (forwchar(FALSE, 1) == FALSE)
 			return(FALSE);
 	}
+	if (to_append > 0)
+		linsert(to_append, ' ');
 	return(TRUE);
 }
 
@@ -431,7 +448,8 @@ formatregion()
 			/* if not a separator, just add it in */
 			if (!isblank(c)) {
 				/* was it the end of a "sentence"? */
-				sentence = (c == '.' || c == '?' || c == '!');
+				sentence = (c == '.' || c == '?' ||
+						c == ':' || c == '!');
 				if (wordlen < NSTRING - 1)
 					wbuf[wordlen++] = (char)c;
 			} else if (wordlen) {

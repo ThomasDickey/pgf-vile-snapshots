@@ -3,7 +3,7 @@
 #
 # T.DANG (dang@cogit.ign.fr)
 #
-# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.djg,v 1.14 1995/03/18 16:50:27 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.djg,v 1.15 1995/11/02 20:06:40 pgf Exp $
 #
 #
 
@@ -39,7 +39,7 @@ SRC = 	main.c $(DISP_SRC) basic.c bind.c buffer.c crypt.c \
 	path.c random.c regexp.c \
 	region.c search.c select.c spawn.c \
 	tags.c tbuff.c termio.c tmp.c undo.c \
-	version.c vmalloc.c window.c word.c wordmov.c map.c djhandl.c
+	version.c window.c word.c wordmov.c map.c djhandl.c
 
 OBJ =	$(SRC:.c=.o)
 
@@ -100,6 +100,5 @@ eval.o:	nevars.h
 glob.o:	dirstuff.h
 externs.o:	nebind.h nename.h nefunc.h
 path.o:	dirstuff.h
-vmalloc.o:	nevars.h
 version.o:	patchlev.h
 

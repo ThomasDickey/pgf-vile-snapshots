@@ -4,7 +4,7 @@
  * It compiles into nothing if not an HP150 screen device.
  * added by Daniel Lawrence
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/hp150.c,v 1.13 1994/11/29 04:02:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/hp150.c,v 1.14 1995/11/17 04:03:42 pgf Exp $
  *
  */
 #error This module is not actively maintained as part of vile.
@@ -107,8 +107,9 @@ TERM	term	= {
 	hp15rev,
 	hp15cres
 #if	OPT_COLOR
-	, hp15fcol,
-	hp15bcol
+	, hp15fcol
+	, hp15bcol
+	, 0
 #endif
 };
 
@@ -156,12 +157,6 @@ hp15cres()	/* change screen resolution */
 
 {
 	return(TRUE);
-}
-
-spal()		/* change palette register */
-
-{
-	/*   not here */
 }
 
 hp15beep()

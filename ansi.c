@@ -4,7 +4,7 @@
  * "termio.c". It compiles into nothing if not an ANSI device.
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/ansi.c,v 1.21 1995/04/22 03:22:53 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/ansi.c,v 1.22 1995/11/17 04:03:42 pgf Exp $
  */
 
 #if	SYS_AMIGA
@@ -63,6 +63,11 @@
 #define SCROLL_REG 0
 #endif
 
+#if	defined(linux)
+#define NROW	25			/* Screen size.			*/
+#define NCOL	80			/* Edit if you want to.		*/
+#endif
+
 #ifndef NROW
 #define NROW	24			/* Screen size.			*/
 #define NCOL	80			/* Edit if you want to.		*/
@@ -91,6 +96,7 @@ static	void	ansiscroll P((int,int,int));
 #if	OPT_COLOR
 static	void	ansifcol P((int));
 static	void	ansibcol P((int));
+static	void	force_colors P(( int, int ));
 
 static	int	cfcolor = -1;		/* current forground color */
 static	int	cbcolor = -1;		/* current background color */
@@ -131,8 +137,9 @@ TERM	term	= {
 	ansirev,
 	ansicres
 #if	OPT_COLOR
-	, ansifcol,
-	ansibcol
+	, ansifcol
+	, ansibcol
+	, 0			/* no palette */
 #endif
 	, ansiscroll
 };
@@ -214,6 +221,19 @@ ansieeop()
 	ttputc('J');
 }
 
+#if OPT_COLOR
+static void
+force_colors(fc, bc)
+int fc;
+int bc;
+{
+	cfcolor =
+	cbcolor = -1;
+	ansifcol(fc);
+	ansibcol(bc);
+}
+#endif
+
 #if BROKEN_REVERSE_VIDEO
 /* there was something wrong with this "fix".  the "else" of
 		the ifdef just uses "ESC [ 7 m" to set reverse
@@ -224,9 +244,7 @@ static void
 ansirev(state)		/* change reverse video state */
 int state;	/* TRUE = reverse, FALSE = normal */
 {
-#if	OPT_COLOR
-	int ftmp, btmp;	/* temporaries for colors */
-#else
+#if	!OPT_COLOR
 	static int revstate = -1;
 	if (state == revstate)
 		return;
@@ -248,20 +266,13 @@ int state;	/* TRUE = reverse, FALSE = normal */
 	 * monochrome.  Using the colors directly to simulate reverse video
 	 * works better. Bold-face makes the foreground colors "look" right.
 	 */
-	ftmp = cfcolor;
-	btmp = cbcolor;
-	cfcolor = -1;
-	cbcolor = -1;
-	ansifcol(state ? btmp : ftmp);
-	ansibcol(state ? ftmp : btmp);
+	if (state)
+		force_colors(cbcolor, cfcolor);
+	else
+		force_colors(cfcolor, cbcolor);
 #else	/* normal ANSI-reverse */
 	if (state == FALSE) {
-		ftmp = cfcolor;
-		btmp = cbcolor;
-		cfcolor = -1;
-		cbcolor = -1;
-		ansifcol(ftmp);
-		ansibcol(btmp);
+		force_colors(cfcolor, cbcolor);
 	}
 #endif	/* MSDOS vs ANSI-reverse */
 #endif	/* OPT_COLOR */
@@ -269,7 +280,7 @@ int state;	/* TRUE = reverse, FALSE = normal */
 
 #else
 
-void
+static void
 ansirev(state)		/* change reverse video state */
 int state;	/* TRUE = reverse, FALSE = normal */
 {
@@ -281,7 +292,9 @@ int state;	/* TRUE = reverse, FALSE = normal */
 	csi();
 	if (state) ttputc('7');	/* reverse-video on */
 	ttputc('m');
-
+#if OPT_COLOR
+	force_colors(cfcolor, cbcolor);
+#endif
 }
 
 #endif
@@ -291,13 +304,6 @@ ansicres(flag)	/* change screen resolution */
 char	*flag;
 {
 	return(TRUE);
-}
-
-void
-spal(dummy)		/* change palette settings */
-char	*dummy;
-{
-	/* none for now */
 }
 
 static void
@@ -418,11 +424,12 @@ ansiopen()
 static void
 ansiclose()
 {
+	TTmove(term.t_nrow-1, 0);	/* cf: dumbterm.c */
+	ansieeol();
 #if	OPT_COLOR
-	ansifcol(7);
-	ansibcol(0);
+	ansifcol(C_WHITE);
+	ansibcol(C_BLACK);
 #endif
-	/*ttclose();*/
 }
 
 static void

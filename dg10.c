@@ -2,7 +2,7 @@
  * The routines in this file provide support for the Data General Model 10
  * Microcomputer.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/dg10.c,v 1.11 1994/11/29 04:02:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/dg10.c,v 1.12 1995/11/17 04:03:42 pgf Exp $
  *
  */
 #error This module is not actively maintained as part of vile.
@@ -77,8 +77,9 @@ TERM	term	= {
 	dg10rev,
 	dg10cres
 #if	OPT_COLOR
-	, dg10fcol,
-	dg10bcol
+	, dg10fcol
+	, dg10bcol
+	, 0
 #endif
 };
 
@@ -153,12 +154,6 @@ dg10cres()	/* change screen resolution */
 
 {
 	return(TRUE);
-}
-
-spal()		/* change palette string */
-
-{
-	/*	Does nothing here	*/
 }
 
 dg10beep()

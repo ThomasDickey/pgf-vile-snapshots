@@ -1,3 +1,103 @@
+Changes for vile 5.5 (released Sun Nov 19, 1995)
+(pgf)
+	+ added tags file format information to vile.hlp.
+
+	+ removed vmalloc.{c,obj} from makefile.{djgpp,wnt,blc}
+
+	+ prevent ^T from inserting spaces if "notabinsert" is set. (insert.c)
+
+	+ force two spaces after a ':' when reformatting paragraphs. (word.c)
+
+	+ mention screen resolution control on PC in man page. (vile.1)
+
+	+ trimmed trailing whitespace from vile.hlp.  where does that stuff
+	  come from, anyway?
+
+	+ fix forceblank() to consider lines containing whitespace to be
+	  blank.  (random.c)
+
+	+ call upmode() when resetting modeline format.  (eval.c)
+
+	+ vms C compiler complains about folded pre-processor lines.  sigh.
+	    (mktbls.c)
+
+	+ added two new macro accessible functions, &local and &global, which
+	  return the value of a vile setting.  for instance, "&global cmode"
+	  will give the global cmode setting (true or false) and "&local list"
+	  will give the local autoindent mode setting.  (modes.c, eval.c,
+	  modetbl, macros.doc, vile.hlp)
+
+	+ minor fixes for incremental searching: better tie-in with 'n' and
+	  'N' commands, and uses CR as search terminator.  (search.c,
+	  isearch.c, edef.h)  (from s.suresh)
+
+	+ eliminate vttidy(), since it had degenerated to a simple
+	  wrapper for ttclean().  call ttclean() directly in all cases.
+	  (spawn.c, termio.c, version.c, file.c, main.c, proto.h, display.c)
+
+	+ put TTkopen() call into ttunclean, so that keybad and xterm-mouse
+	  translation get turned back on after a suspend or shell escape.
+	  and then i removed it again.  the TI sequence for the linux
+	  console homes the cursor.  not a good thing just before a
+	  pressreturn().  but pressreturn() needs the termio stuff that
+	  ttunclean does.  so they have to remain separate.
+	  (termio.c, main.c)
+
+	+ introduced swbuffer_lfl() which takes lockfl as arg.  swbuffer() is
+	  a wrapper which calls swbuffer_lfl() with lockfl == TRUE (the old
+	  behavior).  this allows getting rid of the early readin() that was
+	  happening in bp2swbuffer() (due to the lack of a lockfl arg), which
+	  was in turn causing read hooks to run too early, before the buffer
+	  state (modes, name, etc.) was set up correctly.  (buffer.c, file.c,
+	  proto.h)
+
+	+ rearranged swbuffer_lfl to make sure it does the right thing
+	  with inactive buffers.  (buffer.c)
+
+	+ small addition to vile.hlp regarding where comments can appear
+	  in command files (i.e. probably only on lines by themselves)
+
+	+ i couldn't configure xvile on sunos 4.1.3 with X11R6 installed,
+	  because the test link against -lXt failed, due to missing -lSM
+	  and -lICE.  these have already been tested for and found, so i
+	  added $X_PRE_LIBS to the check for -lXt.  this seems to fix it
+	  and also seems benign.  is this right?  (configure.in, configure,
+	  makefile.in)
+
+(tom)
+	+ corrected a bug in wrapmargin that caused it to split and alarm
+	  at the wrong point (insert.c, word.c).
+  
+	+ corrected a bug in linewrap; when the user appended to the end of
+	  a line longer than the window, the beginning of the line was
+	  overwriting the modeline of the next window (display.c).
+
+	+ modified termcap color support to work with rxvt 2.12 (tcap.c).
+
+	+ rewrote logic for color mode-type to make it an enum-type, more
+	  general, and made the visual-matches mode an enum (modetbl, main.c,
+	  modes.c, search.c).  This makes name-completion work properly on
+	  enumerated types.
+
+	+ added 'default' enum value for termcap colors and added logic to
+	  reset colors to default, i.e., orig_colors on exit (modes.c, tcap.c).
+
+	+ modified color modes to be global, since we don't support per-window
+	  colors anymore (modetbl, display.c, main.c).
+
+	+ changed 'popup-choices' to a enum-type (modetbl, bind.c, main.c).
+
+	+ make the 'spal()' function a member of the TERM struct to eliminate
+	  unused/dummy functions, and to capture internal initialization
+	  of 'palstr' (lot of places).
+
+	+ corrected error in vile-manfilt that dumped core due to off-by-one
+	  in realloc threshold, and fixed a memory leak (manfilt.c)
+
+	+ added global mode 'resolve-links' to control whether vile resolves
+	  and caches directory names (modetbl, main.c, path.c).
+
+
 Changes for vile 5.4 (released Thu Oct 19, 1995)
 
 (jrs)
@@ -302,7 +402,7 @@ Changes for vile 5.4 (released Thu Oct 19, 1995)
 	  completes to ../vile-5.3/file.  At this point I too hastily hit
 	  return (having mistakenly expected the completion to be unique). 
 	  I realize my error and hit ":e " I see ../vile-5.3/file.  I press
-	  <TAB> see see the other completions (I have popup-choices set to
+	  <TAB> and see the other completions (I have popup-choices set to
 	  immediate).  I see the other completions and expect to be able to
 	  modify the default response since I _have_ pressed a key _and_
 	  the default response has not been erased.
