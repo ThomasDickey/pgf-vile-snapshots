@@ -1,7 +1,7 @@
 ------------------------
 vile bug/enhancement/wish list
 ------------------------
-$Header: /usr/build/VCS/pgf-vile/RCS/buglist,v 1.226 1995/02/20 00:18:09 pgf Exp $
+$Header: /usr/build/VCS/pgf-vile/RCS/buglist,v 1.228 1995/02/24 00:48:33 pgf Exp $
 ----------------------
 	(E means enhancement, L,M,H are low, medium, high priority)
 
@@ -442,6 +442,11 @@ of modes from within macros, so that values can be saved and restored.
 
 -------------------------
 
+there should be a way to reference buffer attributes of the currently-
+executing macro (or stack of macros).
+
+-------------------------
+
 [regarding the ^X^X find-error code (from tom)]
 Rather than have the long if-then-else-if sequence, we could have a table
 of structs something like
@@ -618,40 +623,12 @@ solution:
 	I had to add a
 #define HAVE_ACCESS 0
 	in estruct.h (actually, I just put it in fileio.c).
-
------------------------------------------------------------------
-VMS6.0 on VAXstation 4000/90.  DEC C for OpenVMS VAX compiler
-version V4.0-000.  Shared library (specified in VMSSHARE.OPT)
-is DECC$SHR.EXE instead of the default VAXCRTL.EXE.
-
-symptoms:
-	the arrow keys did not move the cursor on my VMS version.
-
-reason:
-	it seems these things now get added to the system map
-	via addtosysmap calls.  The VMSVT function vmsopen
-	wasn't updated when ibmpc.c and tcap.c were.
-
-solution:
-	I added the following lines to the end of vmsopen() in
-	vmsvt.c:
-
-	addtosysmap("\33\133\101", 3, KEY_Up);
-	addtosysmap("\33\133\102", 3, KEY_Down);
-	addtosysmap("\33\133\103", 3, KEY_Right);
-	addtosysmap("\33\133\104", 3, KEY_Left);
-
-	This is somewhat ugly - I tried to be consistent and use the
-	SMG$ routines to obtain the character sequences, but they
-	apparently return the wrong strings for some reason (they
-	stick a decimal 48 character before the last character,
-	which doesn't get detected by the ttgetc).  In any event, the
-	above fixed the problem for me.
+[ there's a fix in estruct.h, but untested ]
 
 -----------------------------------------------------------------
 
 it sure looks like flush_line() in x11.c should take (char *) as arg 1
-rather than (uchar *).  i don't want to change it for 5.1 though.
+rather than (uchar *).  i don't want to change it for 5.2 though.
 
 -----------------------------------------------------------------
 

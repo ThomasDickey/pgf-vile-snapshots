@@ -1,7 +1,7 @@
 /* Find the next error in mentioned in the shell output window.
  * written for vile: Copyright (c) 1990, 1995 by Paul Fox
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/finderr.c,v 1.43 1995/02/08 03:29:23 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/finderr.c,v 1.44 1995/02/24 00:35:23 pgf Exp $
  *
  */
 
@@ -88,7 +88,7 @@ int f,n;
 		*/
 		if (lisreal(dotp)) {
 			static	TBUFF	*tmp;
-#if defined(sun)
+#if SYS_SUNOS
 			char *t;
 #endif
 
@@ -139,7 +139,7 @@ int f,n;
 			  ||  sscanf(text,
 			  	"%*s %*s %[^, \t], line %d",
 						errfile, &errline) == 2
-#if defined(sun)			/* lint-output */
+#if SYS_SUNOS
 			  ||  sscanf(text,
 			  	"%[^:( \t](%d):",  /* ) */
 				errfile, &errline) == 2

@@ -1,5 +1,5 @@
 
-Getting along with vile						(version 5.1)
+Getting along with vile						(version 5.2)
 -----------------------						-------------
 
 	Use Ctrl-D and Ctrl-U to scroll through this help information.
@@ -3101,4 +3101,4 @@ Credits
 
 Copyright 1995 by Paul Fox, Tom Dickey, and Kevin Buettner
 -----------------------------------------------------------
- $Header: /usr/build/VCS/pgf-vile/RCS/vile.hlp,v 1.235 1995/02/20 13:48:14 pgf Exp $
+ $Header: /usr/build/VCS/pgf-vile/RCS/vile.hlp,v 1.236 1995/02/24 00:49:19 pgf Exp $

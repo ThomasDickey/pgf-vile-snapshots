@@ -1,3 +1,34 @@
+Changes for vile 5.2 (released Thu Feb 23, 1995)
+(pgf)
+	+ added vile-c-filt to the man page.  (vile.1)
+
+	+ remove root cause of"C<right-arrow>c" core dump -- no longer
+	  allow an extra amount of right-motion just 'cuz we're in insert
+	  mode.  whatever the reason for this extra was, it doesn't seem
+	  to be necessary anymore.  recoded remaining conditions for
+	  clarity.  (basic.c)
+
+(kev)
+	+ estruct.h (OPT_COLOR): Don't define in terms of DISP_X11.  This
+	  fixes the ":set all" core dump.  OPT_COLOR indicates that the
+	  older (line-by-line) color mechanisms should be used.  These
+	  mechanisms are stubbed in x11.c, but are not implemented (and
+	  probably won't be).  My recent change to NCOLORS (for DISP_X11)
+	  made some OPT_COLOR ifdef'd code in modes.c break (there are only
+	  eight entries in the cname array but there are now sixteen
+	  colors.) So rather than put NCOLORS back to 8, it seemed more
+	  expedient to simply disable all of the OPT_COLOR code which xvile
+	  was never able to make use of anyway.  We should also probably
+	  take the OPT_COLOR related ifdefs and stubs out of x11.c.
+
+	  (VIDEO_ATTR): Make sure that this is typedef'd to be a short
+	  when DISP_X11 is defined.
+
+(tom)
+	+ corrected core dump when user types "C<right-arrow>c" (line.c).
+
+	+ change "defined(sun)" to "SYS_SUNOS".  (finderr.c)
+	  
 Changes for vile 5.1 (released Tue Feb 21, 1995)
 (pgf)
 	+ fix longstanding bug when keyboard macro is executed while
