@@ -61,9 +61,6 @@ General Remarks
 	you have two windows to the same buffer, and make a change in one,
 	you can undo it in the other.
 
-	vile produces more "status" messages than vi, which may become
-	annoying at low baud rates.  Setting the $terse variable to true
-	will suppress many of these.  (Use "set-variable $terse true".)
 
 
 Buffer manipulation commands:  
@@ -442,7 +439,10 @@ Miscellaneous commands
 		For example, "-!cc -c junk.c" puts all of the compiler output
 		into the buffer named "[Output]".  Repeatedly hitting ^X-^X 
 		will position the editor at each error in turn, and will
-		eventually start over again at the top..  (I use the following
+		eventually start over again at the top.  The "Entering directory
+		XXX" and "Leavind directory XXX" messages that GNU make puts
+		out with the -w switch are honored, so that files are found
+		with the correct path.  (Tip: I use the following
 		macro to quickly grep a source directory for the string under
 		the cursor:
 		    use-register g load-register "^X!egrep -n : *.[chs]^M"
@@ -577,6 +577,14 @@ Editor modes
 		otherwise, tags must match the lookup pattern exactly.  This
 		will not effect tags picked up from the cursor -- they are
 		always matched exactly. (B)
+
+	tagsrelative (tr) Causes files looked up via the tags mechanism to
+		be found reletive to the location of the tags file, rather
+		than the current directory. (B)
+
+	terse   vile produces more "status" messages than vi, which may
+		become annoying at low baud rates.  Setting terse mode will
+		suppress many of these.  (B)
 
 	wrapscan (ws) Text searches will continue from past the bottom of
 		the file to the top, and vice-versa.  (B)

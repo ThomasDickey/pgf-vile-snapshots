@@ -6,7 +6,10 @@
 
 /*
  * $Log: evar.h,v $
- * Revision 1.11  1992/03/24 07:37:12  pgf
+ * Revision 1.12  1992/07/13 20:03:54  foxharp
+ * the "terse" variable is now a boolean mode
+ *
+ * Revision 1.11  1992/03/24  07:37:12  pgf
  * added &rd and &wr functions, for file access
  *
  * Revision 1.10  1992/03/19  23:08:42  pgf
@@ -142,8 +145,7 @@ char *envars[] = {
 #define	EVIDENTIF	32
 #define	EVPATHNAME	33
 #define	EVDIR		34
-#define	EVTERSE		35
-#define	EVFONT		36
+#define	EVFONT		35
 
 /*	list of recognized user functions	*/
 

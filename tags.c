@@ -5,7 +5,19 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: tags.c,v $
- * Revision 1.18  1992/05/16 12:00:31  pgf
+ * Revision 1.21  1992/07/15 09:00:35  foxharp
+ * fixed off-by-one in tags-buffer line scan, so single digit line
+ * numbers now work, e.g. "file.c	src/file.c	1".
+ * also, always set up "tagprefix", in case we switch to tagsrelative
+ * mode later on
+ *
+ * Revision 1.20  1992/07/13  20:09:27  foxharp
+ * path-relative tags are now controlled by a boolean mode "set tagsrelative"
+ *
+ * Revision 1.19  1992/07/13  19:45:51  foxharp
+ * added "tags relative to where we found the tags file" code
+ *
+ * Revision 1.18  1992/05/16  12:00:31  pgf
  * prototypes/ansi/void-int stuff/microsoftC
  *
  * Revision 1.17  1992/03/19  23:26:23  pgf
@@ -71,14 +83,13 @@
 
 #if TAGS
 
+
 #ifndef NULL
 #define NULL 0
 #endif
 
 static char tagname[NFILEN];
-#ifdef PATH_RELATIVE
 static char tagprefix[NFILEN];
-#endif
 
 void pushuntag();
 
@@ -151,14 +162,16 @@ int taglen;
 			break;
 
 	i = 0;
-#ifdef PATH_RELATIVE
-	strcpy(tfname, tagprefix);
-	i += strlen(tagprefix);
-#endif
+	if (b_val(curbp,MDTAGSRELTIV) && *tfp != '/') {
+		strcpy(tfname, tagprefix);
+		i += strlen(tagprefix);
+	}
 	while (i < NFILEN && tfp < lplim && *tfp != '\t') {
 		tfname[i++] = *tfp++;
 	}
-	if (tfp >= lplim - 2) {
+	tfname[i] = 0;
+
+	if (tfp > lplim - 1) {
 		mlforce("[Bad line in tags file.]");
 		return FALSE;
 	}
@@ -171,7 +184,6 @@ int taglen;
 		pushuntag(curbp->b_fname, lineno);
 	}
 
-	tfname[i] = 0;
 	if (curbp == NULL || strcmp(tfname,curbp->b_fname)) {
 		s = getfile(tfname,TRUE);
 		if (s != TRUE) {
@@ -191,11 +203,19 @@ int taglen;
 
 	i = 0;
 	tfp++;  /* skip the tab */
+	if (tfp > lplim - 1) {
+		mlforce("[Bad line in tags file.]");
+		return FALSE;
+	}
 	if (isdigit(*tfp)) { /* then it's a line number */
 		lineno = 0;
 		while (isdigit(*tfp)) {
 			lineno = 10*lineno + *tfp - '0';
 			tfp++;
+			if (tfp > lplim - 1) {
+				mlforce("[Bad line in tags file.]");
+				return FALSE;
+			}
 		}
 		s = gotoline(TRUE,lineno);
 		if (s != TRUE && !changedfile)
@@ -264,16 +284,12 @@ gettagsfile()
 		tagbp->b_flag |= BFINVS;
 			
         }
-#ifdef PATH_RELATIVE
-	if (/* b_val(curbp,VAL_RELTAGS) && */
-			tagbp->b_fname[0] != '/' &&
-			strrchr(tagbp->b_fname,'/')) {
+	if (strrchr(tagbp->b_fname,'/')) {
 		strcpy(tagprefix, tagbp->b_fname);
 		*(strrchr(tagprefix,'/')+1) = '\0';
 	} else {
 		tagprefix[0] = '\0';
 	}
-#endif
 	return TRUE;
 }
 

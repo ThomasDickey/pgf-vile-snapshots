@@ -9,7 +9,20 @@
 
 /*
  * $Log: edef.h,v $
- * Revision 1.57  1992/07/07 08:41:33  foxharp
+ * Revision 1.61  1992/07/15 08:53:12  foxharp
+ * added "slash", for UNIX vs. DOS path separators
+ *
+ * Revision 1.60  1992/07/13  20:08:17  foxharp
+ * "terse" is now a boolean mode rather than a variable, and
+ * added "tagsrelative" mode
+ *
+ * Revision 1.59  1992/07/13  09:25:32  foxharp
+ * added "usefullpaths", which tells us all filenames are absolute
+ *
+ * Revision 1.58  1992/07/08  08:48:46  foxharp
+ * v. 3.23
+ *
+ * Revision 1.57  1992/07/07  08:41:33  foxharp
  * v. 3.22
  *
  * Revision 1.56  1992/07/07  08:35:40  foxharp
@@ -213,7 +226,9 @@
 #endif
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version three point twenty-two");
+decl_init( char version[], "version three point twenty-three");
+
+decl_init( char slash, '/'); 		/* so DOS can use '\' as path separator */
 
 decl_init( int autoindented , -1);	/* how many chars (not cols) indented */
 decl_uninit( int isnamedcmd );		/* are we typing a command name */
@@ -289,7 +304,6 @@ decl_uninit( int execlevel );		/* execution IF level		*/
 decl_init( int	eolexist, TRUE );	/* does clear to EOL exist	*/
 decl_uninit( int revexist );		/* does reverse video exist?	*/
 decl_uninit( int flickcode );		/* do flicker supression?	*/
-decl_uninit( int terse );		/* be terse with messages? 	*/
 decl_uninit( int curtabval );		/* current tab width		*/
 
 decl_init( MARK nullmark, { NULL comma 0 } );
@@ -318,6 +332,8 @@ struct VALNAMES b_valuenames[] = {
 	{ "showmatch"	comma "sm" comma VALTYPE_BOOL } comma
 	{ "showmode"	comma "smd" comma VALTYPE_BOOL } comma
 	{ "tabinsert"	comma "ti" comma VALTYPE_BOOL } comma
+	{ "tagsrelative"comma "tr" comma VALTYPE_BOOL } comma
+	{ "terse"	comma "X"  comma VALTYPE_BOOL } comma
 	{ "view"	comma "X"  comma VALTYPE_BOOL } comma
 	{ "wrapscan"	comma "ws" comma VALTYPE_BOOL } comma
 	{ "wrapwords"	comma "ww" comma VALTYPE_BOOL } comma

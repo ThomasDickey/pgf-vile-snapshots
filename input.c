@@ -3,7 +3,21 @@
  *		5/9/86
  *
  * $Log: input.c,v $
- * Revision 1.40  1992/07/04 14:32:08  foxharp
+ * Revision 1.44  1992/07/24 07:49:38  foxharp
+ * shorten_name changes
+ *
+ * Revision 1.43  1992/07/18  13:13:56  foxharp
+ * put all path-shortening in one place (shorten_path()), and took out some old code now
+ * unnecessary
+ *
+ * Revision 1.42  1992/07/16  22:08:34  foxharp
+ * make keyboard macros redoable -- when out of input on a dotcmd, be
+ * sure to check for pending kbdmode input
+ *
+ * Revision 1.41  1992/07/15  23:23:12  foxharp
+ * made '80i-ESC' work
+ *
+ * Revision 1.40  1992/07/04  14:32:08  foxharp
  * rearranged/improved the insertmode arrow key code
  *
  * Revision 1.39  1992/06/25  23:00:50  foxharp
@@ -259,9 +273,10 @@ int c;
 		}
 	}
 	if (kbdmode == RECORD) {
-		if (kbdend > kbdm)
+		if (kbdend > kbdm) {
 			kbdend--;
 			kbdptr--;
+		}
 	}
 }
 
@@ -292,28 +307,28 @@ int eatit;  /* consume the character? */
 		}
 
 		if (!eatit) {
-			if (dotcmdrep <= 1)
-				return -1;
-			else
+			if (dotcmdrep > 1)
 				return dotcmdm[0];
-		}
-
-		/* at the end of last repitition? */
-		if (--dotcmdrep < 1) {
-			dotcmdmode = STOP;
-			dotcmdbegin(); /* immediately start recording
-					   again, just in case */
-			return -1;
 		} else {
+			/* at the end of last repitition? */
+			if (--dotcmdrep < 1) {
+				dotcmdmode = STOP;
+				dotcmdbegin(); /* immediately start recording
+						   again, just in case */
+			} else {
 
-			/* reset the macro to the begining for the next rep */
-			dotcmdptr = &dotcmdm[0];
-			if (eatit)
-				return (int)*dotcmdptr++;
-			else
-				return (int)*dotcmdptr;
+				/* reset the macro to the begining
+					for the next rep */
+				dotcmdptr = &dotcmdm[0];
+				if (eatit)
+					return (int)*dotcmdptr++;
+				else
+					return (int)*dotcmdptr;
+			}
 		}
-	} else if (kbdmode == PLAY) {
+	} 
+
+	if (kbdmode == PLAY) {
 	/* if we are playing a keyboard macro back, */
 
 		if (interrupted) {
@@ -357,30 +372,34 @@ int c;
 
 	/* save it if we need to */
 	if (dotcmdmode == RECORD) {
+		/* don't overrun the buffer  */
+		if (tmpcmdptr > &tmpcmdm[NKBDM - 1])
+			return;
+
+		/* force the last char to be abortc */
+		if (tmpcmdptr == &tmpcmdm[NKBDM - 1])
+			c = abortc; /* safest terminator */
+
 		*tmpcmdptr++ = c;
 		tmpcmdend = tmpcmdptr;
-
-		/* don't overrun the buffer  */
-		/* (we're recording, so must be using tmp) */
-		if (tmpcmdptr == &tmpcmdm[NKBDM - 1]) {
-			dotcmdmode = STOP;
-			TTbeep();
-		}
 	}
 
 	/* save it if we need to */
 	if (kbdmode == RECORD) {
+		/* don't overrun the buffer */
+		if (kbdptr > &kbdm[NKBDM - 1])
+			return;
 
+		/* force the last char to be abortc */
+		if (kbdptr == &kbdm[NKBDM - 1]) {
+			c = abortc; /* safest terminator */
+			kbdmode = STOP;
+		}
 		*kbdptr++ = c;
 		kbdend = kbdptr;
-
-		/* don't overrun the buffer */
-		if (kbdptr == &kbdm[NKBDM - 1]) {
-			kbdmode = STOP;
-			TTbeep();
-		}
 	}
 }
+
 /*	tgetc:	Get a key from the terminal driver, resolve any keyboard
 		macro action					*/
 int 
@@ -446,19 +465,6 @@ kbd_key()
 
 	if (c == ESC) {
 		int nextc;
-
-#if BEFORE
-		if (abortc != ESC) {  /* then just eat the sequence */
-			c = tgetc();
-			if (c == '[' || c == 'O') {
-				c = tgetc();
-				return(last1key = SPEC | c);
-			}
-			return(last1key = c);
-		}
-
-		/* else abortc must be ESC.  big surprise. */
-#endif
 
 		/* if there's no recorded input, and no user typeahead */
 		if ((nextc = get_recorded_char(FALSE)) == -1 && !typahead())
@@ -776,8 +782,13 @@ int dobackslashes;	/* do we add and delete '\' chars for the caller */
 			switch(c) {
 			case '%':
 				cp = curbp->b_fname;
-				if (!*cp || isspace(*cp))
+				if (!*(curbp->b_fname) ||
+					isspace(*(curbp->b_fname)))
 					cp = curbp->b_bname;
+				else {
+					cp = shorten_path(curbp->b_fname);
+					if (!cp) cp = curbp->b_bname;
+				}
 				break;
 			case '#':
 				cp = hist_lookup(1);  /* returns buffer name */
@@ -785,8 +796,8 @@ int dobackslashes;	/* do we add and delete '\' chars for the caller */
 					/* but we want a file */
 					BUFFER *bp;
 					bp = bfind(cp,NO_CREAT,0);
-					cp = bp->b_fname;
-					if (!*cp || isspace(*cp)) {
+					cp = shorten_path(bp->b_fname);
+					if (!cp || !*cp || isspace(*cp)) {
 						/* oh well, use the buffer */
 						cp = bp->b_bname;
 					}
@@ -955,6 +966,7 @@ dotcmdfinish()
 	return TRUE;
 }
 
+
 /* stop recording a dot command, 
 	probably because the command is not re-doable */ 
 void
@@ -1052,7 +1064,6 @@ int f,n;
 	kbdplayreg = -1;	/* default playback register */
 	kbdptr = &kbdm[0];	/*    at the beginning */
 	kbdend = kbdlim;
-	dotcmdmode = STOP;
 	return TRUE;
 }
 

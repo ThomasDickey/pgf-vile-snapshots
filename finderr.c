@@ -2,7 +2,10 @@
  * Written for vile by Paul Fox, (c)1990
  *
  * $Log: finderr.c,v $
- * Revision 1.10  1992/05/16 12:00:31  pgf
+ * Revision 1.11  1992/07/16 22:06:58  foxharp
+ * honor the "Entering/Leaving directory" messages that GNU make puts out
+ *
+ * Revision 1.10  1992/05/16  12:00:31  pgf
  * prototypes/ansi/void-int stuff/microsoftC
  *
  * Revision 1.9  1992/03/19  23:35:27  pgf
@@ -66,9 +69,13 @@ int f,n;
 	
 	int errline;
 	char errfile[NFILEN];
+	char ferrfile[3*NFILEN];
 	
 	static int oerrline = -1;
-	static char oerrfile[NFILEN];
+	static char oerrfile[256];
+	static int l = 0;
+#define DIRLEVELS 20
+	static char *dirs[DIRLEVELS];
 
 	/* look up the right buffer */
         if ((sbp=bfind(febuff, NO_CREAT, 0)) == NULL) {
@@ -79,6 +86,8 @@ int f,n;
         if (newfebuff) {
         	oerrline = -1;
         	oerrfile[0] = '\0';
+		l = 0;
+		dirs[0] = NULL;
         }
         newfebuff = FALSE;
 
@@ -93,14 +102,26 @@ int f,n;
 			or
 			file.c: 223: error....
 		*/
-		if ( dotp->l_text &&
-		    (sscanf(dotp->l_text,
+		if ( dotp->l_text) {
+			char verb[20];
+			if ( (sscanf(dotp->l_text,
 			"\"%[^\" 	]\", line %d:",errfile,&errline) == 2 ||
-		     sscanf(dotp->l_text,
+			     sscanf(dotp->l_text,
 			"%[^: 	]: %d:",errfile,&errline) == 2 
-			) &&
-			(oerrline != errline || strcmp(errfile,oerrfile))) {
+				) && (oerrline != errline || 
+					strcmp(errfile,oerrfile))) {
 				break;
+			} else if (sscanf(dotp->l_text,
+			"%*[^ 	:`]: %20[^ 	`] directory `",verb) == 1 ) {
+				char *d = strchr(dotp->l_text,'`') + 1;
+				if (verb[0] == 'E') { /* Entering */
+					if (l < DIRLEVELS)
+						dirs[++l] = d;
+				} else if (verb[0] == 'L'){ /* Leaving */
+					if (l > 0)
+						--l;
+				}
+			}
 		}
 			
 		if (lforw(dotp) == sbp->b_line.l) {
@@ -108,6 +129,8 @@ int f,n;
 			TTbeep();
 			/* start over at the top of file */
 			putdotback(sbp, lforw(sbp->b_line.l));
+			l = 0;
+			dirs[0] = NULL;
 			return FALSE;
 		}
 		dotp = lforw(dotp);
@@ -118,11 +141,26 @@ int f,n;
 	if (moveddot)
 		putdotback(sbp,dotp);
 
-	if (strcmp(errfile,curbp->b_fname)) { /* if we must change windows */
+	if (dirs[l]) {
+		int i = 0;
+		while(dirs[l][i] != '\'') {
+			ferrfile[i] = dirs[l][i];
+			i++;
+		}
+		ferrfile[i++] = '/';
+		strcpy(&ferrfile[i],errfile);
+	} else {
+		/* lsprintf(ferrfile,"%s/%s",current_directory(FALSE),errfile); */
+		strcpy(ferrfile,errfile);
+	}
+	if (strcmp(ferrfile,curbp->b_bname) &&
+		strcmp(ferrfile,curbp->b_fname)) {
+		/* if we must change windows */
 		struct WINDOW *wp;
 		wp = wheadp;
 		while (wp != NULL) {
-			if (!strcmp(wp->w_bufp->b_fname,errfile))
+			if (!strcmp(wp->w_bufp->b_bname,ferrfile) ||
+				!strcmp(wp->w_bufp->b_fname,ferrfile))
 				break;
 			wp = wp->w_wndp;
 		}
@@ -131,7 +169,7 @@ int f,n;
 			make_current(curwp->w_bufp);
 			upmode();
 		} else {
-			s = getfile(errfile,TRUE);
+			s = getfile(ferrfile,TRUE);
 			if (s != TRUE)
 				return s;
 		}

@@ -4,7 +4,16 @@
  * All operating systems.
  *
  * $Log: termio.c,v $
- * Revision 1.43  1992/07/01 17:04:33  foxharp
+ * Revision 1.46  1992/07/24 07:49:27  foxharp
+ * aix has no filio.h
+ *
+ * Revision 1.45  1992/07/20  22:50:40  foxharp
+ * use putchar/getchar instead of fputc/fgetc
+ *
+ * Revision 1.44  1992/07/17  19:19:47  foxharp
+ * took out commented cruft
+ *
+ * Revision 1.43  1992/07/01  17:04:33  foxharp
  * always use && and || in #if statements, and
  * MSC now uses getch() to get characters, and
  * use TTputc() to put out cr-nl pairs instead of ttputc()
@@ -195,7 +204,7 @@ extern int errno;
 
 #if (BERK || AIX || AUX2) && !defined(FIONREAD)
 /* try harder to get it */
-# if AUX2
+# if AUX2 || AIX
 #  include "ioctl.h"
 # else
 #  include "filio.h"
@@ -206,7 +215,7 @@ extern int errno;
 # undef USE_FCNTL
 # undef USE_FIONREAD
 #else
-# if defined(FIONREAD) /*  || defined(sun) || AUX2 || AIX */
+# if defined(FIONREAD)
   /* there seems to be a bug in someone's implementation of fcntl -- it
    * causes output to be flushed if you change to ndelay input while output
    * is pending.  for these systems, we use FIONREAD instead, if possible. 
@@ -598,7 +607,7 @@ void
 ttputc(c)
 int c;
 {
-        fputc(c, stdout);
+        putchar(c);
 }
 
 void
@@ -634,7 +643,7 @@ ttgetc()
 	return ( kbd_char & 0x7f );
 #else /* USE_FCNTL */
 	int c;
-        c = fgetc(stdin);
+        c = getchar();
 	if (c == EOF) {
 		if (errno == EINTR)
 			return -1;

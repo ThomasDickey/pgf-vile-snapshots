@@ -9,7 +9,10 @@
  *	the output structures.
  *
  * $Log: mktbls.c,v $
- * Revision 1.8  1992/07/08 08:35:09  foxharp
+ * Revision 1.9  1992/07/17 19:12:44  foxharp
+ * explicit int return on func
+ *
+ * Revision 1.8  1992/07/08  08:35:09  foxharp
  * don't report duplicate keymaps if the pre-processor conditionals are
  * both present, and they don't match -- in that case, they're unlikely
  * to both compile in at the same time.
@@ -202,6 +205,7 @@ char *conditions[4][128];
 char *tblname[] = {"asciitbl", "ctlxtbl", "metatbl", "spectbl" };
 char *prefname[] = {"", "CTLX|", "CTLA|", "SPEC|" };
 
+int
 two_conds(btype,c,cond)
 int btype,c;
 char *cond;

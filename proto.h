@@ -5,7 +5,28 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.9  1992/07/07 08:34:08  foxharp
+ * Revision 1.16  1992/07/24 07:49:38  foxharp
+ * shorten_name changes
+ *
+ * Revision 1.15  1992/07/21  09:09:51  foxharp
+ * pass lp to vtset() directly
+ *
+ * Revision 1.14  1992/07/21  08:57:53  foxharp
+ * wp param to vtset(), for list mode choice
+ *
+ * Revision 1.13  1992/07/20  22:48:42  foxharp
+ * changes...
+ *
+ * Revision 1.12  1992/07/18  13:13:22  foxharp
+ * created shorten_path and vtprintf and lssetbuf/_lsprintf
+ *
+ * Revision 1.11  1992/07/16  22:18:54  foxharp
+ * ins() takes an argument -- whether or not to playback, usually FALSE
+ *
+ * Revision 1.10  1992/07/13  09:27:33  foxharp
+ * added getkill, canonpath, and changed current_directory to take int
+ *
+ * Revision 1.9  1992/07/07  08:34:08  foxharp
  * added not_found_msg, from search.c
  *
  * Revision 1.8  1992/06/26  22:19:10  foxharp
@@ -175,9 +196,12 @@ extern int rev_csrch P(( int, int ));
 extern void vtinit P(( void ));
 extern void vttidy P(( int ));
 extern void vtmove P(( int, int ));
-extern void vtputc P(( int, int ));
+extern void vtputc P(( int ));
+extern void vtlistc P(( int ));
 extern int vtgetc P(( int ));
 extern void vtputsn P(( char *, int ));
+extern void vtset P(( LINE *, WINDOW * ));
+extern void vtprintf P(( char *, ... ));
 extern void vteeol P(( void ));
 extern int upscreen P(( int, int ));
 extern void reframe P(( WINDOW * ));
@@ -215,6 +239,8 @@ extern int dfputi P(( int, int ));
 extern int dfputli P(( long, int ));
 extern void lspputc P(( int ));
 extern char * lsprintf P((char *, char *, ... ));
+extern void lssetbuf P(( char * ));
+extern char * _lsprintf P(( char *, ... ));
 extern void bputc P(( int ));
 extern void bprintf P((char *, ... ));
 extern void getscreensize P(( int *, int * ));
@@ -229,6 +255,7 @@ extern int absol P(( int ));
 extern int stol P(( char * ));
 extern int gtlbl P(( char * ));
 extern char * gtenv P(( char * ));
+extern char * getkill P(( void ));
 extern char * gtusr P(( char * ));
 extern char * mklower P(( char * ));
 extern char * mkupper P(( char * ));
@@ -307,6 +334,12 @@ extern int kifile P(( char * ));
 extern SIGT imdying P(( int ));
 extern void markWFMODE P(( BUFFER * ));
 extern int glob P(( char * ));
+extern char * canonpath P(( char * ));
+#if BEFORE
+extern void shorten_path P(( char *, void (*) P(( char *, ...)) ));
+#else
+extern char * shorten_path P(( char * ));
+#endif
 extern char * flook P(( char *, int ));
 extern int ffropen P(( char * ));
 extern int ffwopen P(( char * ));
@@ -443,7 +476,7 @@ extern int insertbol P(( int, int ));
 extern int append P(( int, int ));
 extern int appendeol P(( int, int ));
 extern int overwrite P(( int, int ));
-extern int ins P(( void ));
+extern int ins P(( int ));
 extern int backspace P(( void ));
 extern int newline P(( int, int ));
 extern int indented_newline P(( int ));
@@ -467,7 +500,7 @@ extern int matchfenceback P(( int, int ));
 extern int fmatchindent P(( void ));
 extern void catnap P(( int ));
 extern int istring P(( int, int ));
-extern char * current_directory P(( void ));
+extern char * current_directory P(( int ));
 extern int cd P(( int, int ));
 extern int pwd P(( int, int ));
 extern int set_directory P(( char * ));
