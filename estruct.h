@@ -9,7 +9,7 @@
 */
 
 /*
- * $Header: /usr/build/VCS/pgf-vile/RCS/estruct.h,v 1.216 1994/11/29 21:03:42 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/estruct.h,v 1.218 1994/12/05 14:08:22 pgf Exp $
  */
 
 #ifdef HAVE_CONFIG_H
@@ -157,6 +157,7 @@
 # define SYS_WINNT 	0
 #endif
 #ifdef VMS		/* predefined by VAX/VMS compiler (VAX C V3.2-044) */
+# define SYS_VMS    1
 # define HAVE_GETCWD 1
 # define CPP_SUBS_OLDSTYLE 1
 #else
@@ -356,7 +357,6 @@
 #define	OPT_LCKFILES	0	/* create lock files (file.lck style) 	      */
 #define	OPT_ENCRYPT	0	/* file encryption (not crypt(1) compatible!) */
 #define	OPT_TAGS	1	/* tags support  			      */
-#define	OPT_FORMAT	1	/* region formatting support.		      */
 #define	OPT_WORDCOUNT	0	/* "count-words" command"		      */
 #define	OPT_PROCEDURES	1	/* named procedures			      */
 #define	OPT_KSH_HISTORY	0	/* ksh-style history commands		      */
@@ -385,21 +385,22 @@
 #define OPT_MSDOS_PATH  (SYS_MSDOS || SYS_WIN31 || SYS_OS2 || SYS_WINNT)
 
 /* individual features that are (normally) controlled by SMALLER */
-#define	OPT_AEDIT	!SMALLER		/* advanced editing options: e.g. en/detabbing	*/
+#define OPT_AEDIT       !SMALLER		/* advanced editing options: e.g. en/detabbing	*/
 #define OPT_B_LIMITS    !SMALLER		/* left-margin */
 #define OPT_ENUM_MODES  !SMALLER		/* fixed-string modes */
 #define OPT_EVAL        !SMALLER		/* expression-evaluation */
-#define	OPT_FINDERR	!SMALLER		/* finderr support. */
+#define OPT_FINDERR     !SMALLER		/* finderr support. */
 #define OPT_FLASH       !SMALLER || DISP_IBMPC	/* visible-bell */
 #define OPT_HISTORY     !SMALLER		/* command-history */
-#define	OPT_ISRCH	!SMALLER		/* Incremental searches */
+#define OPT_ISRCH       !SMALLER		/* Incremental searches */
 #define OPT_LINEWRAP    !SMALLER		/* line-wrap mode */
 #define OPT_MLFORMAT    !SMALLER		/* modeline-format */
 #define OPT_MS_MOUSE    !SMALLER && DISP_IBMPC && CC_TURBO 	/* MsDos-mouse */
+#define OPT_ONLINEHELP  !SMALLER		/* short per-command help */
 #define OPT_POPUPCHOICE !SMALLER		/* popup-choices mode */
 #define OPT_POPUP_MSGS  !SMALLER		/* popup-msgs mode */
-#define OPT_REBIND	!SMALLER		/* permit rebinding of keys at run-time	*/
-#define OPT_FILEBACK	!SMALLER && !SYS_VMS	/* file backup style */
+#define OPT_REBIND      !SMALLER		/* permit rebinding of keys at run-time	*/
+#define OPT_FILEBACK    !SMALLER && !SYS_VMS	/* file backup style */
 #define OPT_TERMCHRS    !SMALLER		/* set/show-terminal */
 #define OPT_UPBUFF      !SMALLER		/* animated buffer-update */
 #define OPT_WIDE_CTYPES !SMALLER		/* extra char-types tests */
@@ -411,14 +412,14 @@
 #define OPT_SHOW_TAGS   !SMALLER && OPT_TAGS	/* ":tags" displays tag-stack */
 
 /* selections and attributed regions */
-#define OPT_VIDEO_ATTRS	!SMALLER
-#define OPT_SELECTIONS	OPT_VIDEO_ATTRS
+#define OPT_VIDEO_ATTRS !SMALLER
+#define OPT_SELECTIONS  OPT_VIDEO_ATTRS
 
 /* OPT_PSCREEN permits a direct interface to the pscreen data structure
  * in display.c. This allows us to avoid storing the screen data on the
  * screen interface side.
  */
-#define OPT_PSCREEN	(XTOOLKIT && OPT_VIDEO_ATTRS)
+#define OPT_PSCREEN  (XTOOLKIT && OPT_VIDEO_ATTRS)
 
 #if	DISP_TERMCAP && !SMALLER
 /* the setting "xterm-mouse" is always available, i.e.  the modetbl entry
@@ -659,18 +660,17 @@ extern char *rindex P((const char *, int));
 #define ShowWorking() (!global_b_val(MDTERSE))
 #endif
 
-	/* how to signal this process group */
-#if HAVE_KILLPG
+	/* how to signal this process group:
+	 * Pass the 0 to 'getpgrp()' if we can, since it's safer --- the
+	 * machines where we can't are probably POSIX machines with ANSI C.
+	 */
+#if !HAVE_KILLPG
+# define killpg kill
+#endif
+#if GETPGRP_HAS_ARG || MISSING_EXTERN_GETPGRP
 # define signal_pg(sig) killpg(getpgrp(0), sig)
 #else
-/* pass the 0 if we can, since it's safer --- the machines where we can't are
- * probably POSIX machines with ANSI C.
- */
-# if STDC_HEADERS && __STDC__		/* FIXME: Design specific test */
-#  define signal_pg(sig) kill(-getpgrp(), sig)
-# else
-#  define signal_pg(sig) kill(-getpgrp(0), sig)
-# endif
+# define signal_pg(sig) killpg(getpgrp(), sig)
 #endif
 
 #if	DISP_IBMPC || DISP_Z309
@@ -1543,14 +1543,14 @@ typedef struct	BUFFER {
 /* shift-commands can be repeated when typed on :-command */
 #define isRepeatable(c)   ((c) == '<' || (c) == '>')
 
-#if CPP_SUBS_OLDSTYLE
-# define	ScratchName(s)	"[s]"	/* K&R-style macro */
+#if CPP_SUBS_AFTER_QUOTE
+# define	ScratchName(s) SCRTCH_LEFT ## #s ## SCRTCH_RIGHT
 #else
-# if CPP_SUBS_AFTER_QUOTE
-#  define	ScratchName(s) SCRTCH_LEFT ## #s ## SCRTCH_RIGHT
+# if CPP_SUBS_BEFORE_QUOTE
+#  define	ScratchName(s) SCRTCH_LEFT    #s    SCRTCH_RIGHT
 # else
-#  if CPP_SUBS_BEFORE_QUOTE
-#   define	ScratchName(s) SCRTCH_LEFT    #s    SCRTCH_RIGHT
+#  if CPP_SUBS_OLDSTYLE
+#   define	ScratchName(s)	"[s]"	/* K&R-style macro */
 #  else
     error "Cannot construct ScratchName macro"
 #  endif
@@ -1880,6 +1880,9 @@ typedef	int	(*CmdFunc) P(( int, int ));
 typedef	struct {
 	CmdFunc  c_func;	/* function name is bound to */
 	CMDFLAGS c_flags;	/* what sort of command is it? */
+#if OPT_ONLINEHELP
+	char	*c_help;	/* short help message for the command */
+#endif
 }	CMDFUNC;
 
 /* when referencing a command by name (e.g ":e file") it is looked up in

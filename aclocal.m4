@@ -1,7 +1,7 @@
 dnl
 dnl Local definitions for autoconf.
 dnl ------------------------
-dnl $Header: /usr/build/VCS/pgf-vile/RCS/aclocal.m4,v 1.7 1994/11/04 15:35:56 pgf Exp $
+dnl $Header: /usr/build/VCS/pgf-vile/RCS/aclocal.m4,v 1.8 1994/12/05 14:08:22 pgf Exp $
 dnl ------------------------
 dnl
 dnl VC_HAVE_LIBRARY is a slightly modifid version of AC_HAVE_LIBRARY from 
@@ -317,3 +317,18 @@ define([VC_SYS_ERRLIST],
 ],
 [ char *c = (char *) *sys_errlist; ],
 [AC_DEFINE(HAVE_EXTERN_SYS_ERRLIST)])])dnl
+dnl ---------------------------------------------------------------------------
+dnl	Check if 'getpgrp()' accepts an argument.
+define([VC_TEST_GETPGRP],
+[AC_COMPILE_CHECK([argument of getpgrp],
+[
+#include <sys/types.h>
+#if HAVE_STDLIB_H
+#include <stdlib.h>
+#endif
+#if HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+],
+[ getpgrp(0) ],
+[AC_DEFINE(GETPGRP_HAS_ARG)])])dnl
