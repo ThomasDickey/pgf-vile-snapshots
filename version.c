@@ -2,7 +2,10 @@
  * version & usage-messages for vile
  *
  * $Log: version.c,v $
- * Revision 1.11  1994/04/22 14:34:15  pgf
+ * Revision 1.12  1994/04/27 11:22:50  pgf
+ * changes for  and
+ *
+ * Revision 1.11  1994/04/22  14:34:15  pgf
  * changed BAD and GOOD to BADEXIT and GOODEXIT
  *
  * Revision 1.10  1994/04/20  19:54:50  pgf
@@ -33,9 +36,7 @@
 
 extern char *pathname[];	/* startup file path/name array */
 
-#if UNIX || VMS
-static	char	built_at[40];
-#endif
+static	char	version_string[NSTRING];
 
 void
 print_usage P((void))
@@ -84,24 +85,29 @@ print_usage P((void))
 	ExitProgram(BADEXIT);
 }
 
-#if UNIX || VMS
-void
-makeversion()
+char *
+getversion()
 {
+	if (*version_string)
+		return version_string;
+#if UNIX || VMS
 	/*
 	 * Remember the directory from which we were run, to use in finding the
 	 * help-file.
 	 */
-	char	temp[NFILEN];
-	char	*s = strmalloc(lengthen_path(strcpy(temp, prog_arg))),
-		*t = pathleaf(s);
-	if (t != s) {
-#if UNIX	/* 't' points past slash */
-		t[-1] = EOS;
-#else		/* 't' points to ']' */
-		*t = EOS;
-#endif
-		pathname[2] = s;
+	{
+		char	temp[NFILEN];
+		char	*s, *t;
+		s = strmalloc(lengthen_path(strcpy(temp, prog_arg)));
+		t = pathleaf(s);
+		if (t != s) {
+# if UNIX	/* 't' points past slash */
+			t[-1] = EOS;
+# else		/* 't' points to ']' */
+			*t = EOS;
+# endif
+			pathname[2] = s;
+		}
 	}
 
 	/*
@@ -110,44 +116,45 @@ makeversion()
 	 * Getting the executable's modification-time is a reasonable
 	 * compromise.
 	 */
-	*built_at = EOS;
-	if ((s = flook(prog_arg, FL_ANYWHERE)) != NULL) {
-		struct	stat	sb;
-		if (stat(s, &sb) >= 0) {
-			(void)lsprintf(built_at, ", installed %s",
-				ctime(&sb.st_mtime));
-			built_at[strlen(built_at)-1] = EOS;
+	lsprintf(version_string, "%s %s for %s", prognam, version, opersys);
+	{
+		char *s;
+		if ((s = flook(prog_arg, FL_ANYWHERE)) != NULL) {
+			struct	stat	sb;
+			if (stat(s, &sb) >= 0) {
+				strcat(version_string, ", installed ");
+				strcat(version_string, ctime(&sb.st_mtime));
+				/* trim the newline */
+				version_string[strlen(version_string)-1] = EOS;
+			}
 		}
 	}
+#else
+# if MSDOS || OS2
+#  if defined(__DATE__) && !SMALLER
+	(void)lsprintf(version_string,"%s %s for %s, built %s %s with %s", 
+		prognam, version, opersys, __DATE__, __TIME__,
+#   if WATCOM
+		"Watcom C/386"
+#   endif
+#   if DJGPP
+		"DJGPP"
+#   endif
+#   if TURBO
+		"TurboC/BorlandC++"
+#   endif
+	);
+#  endif
+# endif /* MSDOS || OS2 */
+#endif /* not UNIX or VMS */
+	return version_string;
 }
-#endif
 
 /* ARGSUSED */
 int
 showversion(f,n)
 int f,n;
 {
-#if UNIX || VMS
-	mlforce("%s%s", version, built_at);
-#endif
-
-#if MSDOS || OS2
-# if defined(__DATE__) && !SMALLER
-	mlforce("%s, built %s %s with %s", version, __DATE__, __TIME__,
-#  if WATCOM
-	"Watcom C/386"
-#  endif
-#  if DJGPP
-	"DJGPP"
-#  endif
-#  if TURBO
-	"TurboC/BorlandC++"
-#  endif
-	);
-# endif
-#else
-	mlforce(version);
-#endif
-
+	mlforce(getversion());
 	return TRUE;
 }

@@ -115,123 +115,122 @@ Environmental Variables
 	as part of an expression.  All environmental variable names begin
 	with a dollar sign ($) and are in lower case.
 
-	$abufname     [READ ONLY] Name of the "other" buffer, the one most
-		      recently visited.  This is what you would get if you
-		      typed '#' at a prompt.
+	$abufname	[READ ONLY] Name of the "other" buffer, the one most
+			recently visited.  This is what you would get if you
+			typed '#' at a prompt.
 
-	$buffer-hook  Name of procedure to run when switching to a buffer.
+	$buffer-hook	Name of procedure to run when switching to a buffer.
 
-	$cbufname     Name of the current buffer.
+	$cbufname	Name of the current buffer.
 
-	$cd-hook      Name of procedure to run when changing directories.
+	$cd-hook	Name of procedure to run when changing directories.
 
-	$cfilname     File name of the current buffer.
+	$cfilname	File name of the current buffer.
 
-	$char         Ascii value of  the character currently at the
-		      point.
+	$char		Ascii value of the character currently at the
+			point.
 
-	$curcol       Current column of point in current buffer.
+	$curcol 	Current column of point in current buffer.
 
-	$curline      Current line of point in current buffer.
+	$curline	Current line of point in current buffer.
 
-	$cwd	      [READ ONLY] Current directory.
+	$cwd		[READ ONLY] Current directory.
 
-	$cwline       Current display line in current window.
+	$cwline 	Current display line in current window.
 
-	$debug        Flag to trigger macro debugging.
+	$debug		Flag to trigger macro debugging.
 
-	$directory    Controls location of temp files.  unused.
+	$directory	Controls location of temp files.  unused.
 
-	$discmd       Flag to disable the echoing of messages on the
-		      command line.
+	$discmd 	Flag to disable the echoing of messages on the
+			command line.
 
-	$disinp       Flag  to disable  the  echoing  of  characters
-		      during command line input.
+	$disinp 	Flag to disable the echoing of characters
+			during command line input.
 
-	$exit-hook    Name of procedure to run when quitting.
+	$exit-hook	Name of procedure to run when quitting.
 
-	$flicker      Flicker Flag set to TRUE  if  IBM  CGA  set to
-		      FALSE for most others.
+	$flicker	Flicker Flag set to TRUE if IBM CGA set to
+			FALSE for most others.
 
-	$font	      under X11, contains the name of the current font.
+	$font		under X11, contains the name of the current font.
 
-	$iconname     under X11, contains current icon name.
+	$iconname	under X11, contains current icon name.
 
-	$identifier   the name of the current "identifier-like" word under
-		      the cursor.
+	$identifier	the name of the current "identifier-like" word under
+			the cursor.
 
-	$kill         This   contains   the   first  127  characters
-		      currently in the kill buffer and  can  be used
-		      to set the contents of the kill buffer.
+	$kill		This contains the first 127 characters currently
+			in the kill buffer and can be used to set the
+			contents of the kill buffer.
 
-	$lastkey      [READ ONLY] Last keyboard character typed.
+	$lastkey	[READ ONLY] Last keyboard character typed.
 
-	$line         The current line in the current buffer  can be
-		      retrieved  and  set   with   this  environment
-		      variable.
+	$line		The current line in the current buffer can be
+			retrieved and set with this environment variable.
 
-	$llength      [READ ONLY] Returns the number of characters in
-		      the current line.
+	$llength	[READ ONLY] Returns the number of characters in
+			the current line.
 
-	$match        [READ ONLY] Last string matched in a search.
+	$match		[READ ONLY] Last string matched in a search.
 
-	$mode	      [READ ONLY] "insert" or "command" mode.
+	$mode		[READ ONLY] "insert" or "command" mode.
 
-	$pagelen      Number of screen lines used currently.
+	$ocwd		[READ ONLY] Previous directory.
 
-	$pagewid      Number of screen columns used currently.
+	$os		[READ ONLY] Operating system for which was vile was
+			built.  Currently "unix", "dos", "vms", "os/2".
 
-	$palette      string used to control the color mappings in some
-		      versions.  The usual form consists of digits setting
-		      the red, green, and blue levels.
+	$pagelen	Number of screen lines used currently.
 
-	$pathname     [READ ONLY] current "path-like" word, under the cursor.
+	$pagewid	Number of screen columns used currently.
 
-	$pcvile       [READ ONLY] true if running pcvile (on DOS/OS2).
+	$palette	string used to control the color mappings in some
+			versions.  The usual form consists of digits setting
+			the red, green, and blue levels.
 
-	$pending      [READ ONLY] Flag to determine if there are user
-		      keystrokes waiting to be processed.
+	$pathname	[READ ONLY] current "path-like" word, under the cursor.
 
-	$progname     [READ   ONLY] Always   contains    the   string "vile".
-		      Useful, no?
+	$pending	[READ ONLY] Flag to determine if there are user
+			keystrokes waiting to be processed.
 
-	$qidentifier  the name of the current "qualified-identifier-like"
-		      word under the cursor, useful for C++ programmers.
+	$progname	[READ ONLY] Contains the string "vile" or "xvile",
+			as appropriate.
 
-	$replace      Current default replace string.
+	$qidentifier	the name of the current "qualified-identifier-like"
+			word under the cursor, useful for C++ programmers.
 
-	$search       Current default search string.
+	$replace	Current default replace string.
 
-	$seed         Integer seed of the random number generator.
+	$search 	Current default search string.
 
-	$shell	      Name of the shell program for spawned commands.
+	$seed		Integer seed of the random number generator.
 
-	$sres         Current  screen resolution on a PC.  Values:
-			"2",     "25",    "80x25", 
-			"4",     "43",    "80x43", 
-			"5",     "50",    "80x50", 
-			"80x14", "80x28", 
-			"40x12", "40x21", "40x25", "40x28", "40x50"
+	$shell		Name of the shell program for spawned commands.
 
-	$status       [READ  ONLY] Status of the success of the  last
-		      command (TRUE or FALSE).  This is usually used
-		      with ~force  to  check  on  the  success  of a
-		      search, or a file operation.
+	$sres		Current  screen resolution on a PC.  Values:
+			  "2",	   "25",    "80x25",
+			  "4",	   "43",    "80x43",
+			  "5",	   "50",    "80x50",
+			  "80x14", "80x28",
+			  "40x12", "40x21", "40x25", "40x28", "40x50"
 
-	$title        Under X11, the current window title.
+	$status 	[READ  ONLY] Status of the success of the last
+			command (TRUE or FALSE).  This is usually used with
+			~force to check on the success of a search, or a
+			file operation.
 
-	$tpause       On a PC, time to pause for paren matching.
+	$title		Under X11, the current window title.
 
-	$version      [READ  ONLY] Contains  the  current  vile version number.
+	$tpause 	On a PC, time to pause for paren matching.
 
-	$wline        Number of display lines in current window.
+	$version	[READ  ONLY] Contains  the  current  vile version number.
 
-	$word         [READ ONLY] The current "word" under the cursor.
+	$wline		Number of display lines in current window.
 
-	$write-hook   Name of procedure to run before a file is written
+	$word		[READ ONLY] The current "word" under the cursor.
 
-	$xvile        [READ ONLY] True if running xvile (vile under X11).
-
+	$write-hook	Name of procedure to run before a file is written
 
 
 User variables

@@ -5,7 +5,10 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.125  1994/04/25 20:28:14  pgf
+ * Revision 1.126  1994/04/27 11:22:50  pgf
+ * changes for  and
+ *
+ * Revision 1.125  1994/04/25  20:28:14  pgf
  * fixes from kev
  *
  * Revision 1.124  1994/04/22  16:18:29  pgf
@@ -1003,9 +1006,7 @@ extern void dumpuline P(( LINEPTR ));
 
 /* version.c */
 extern void print_usage P(( void ));
-#if UNIX
-extern void makeversion P(( void ));
-#endif
+extern char *getversion P(( void ));
 extern int showversion P(( int, int ));
 
 /* window.c */

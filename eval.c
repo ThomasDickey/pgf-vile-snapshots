@@ -4,7 +4,10 @@
 	written 1986 by Daniel Lawrence
  *
  * $Log: eval.c,v $
- * Revision 1.87  1994/04/25 21:31:39  pgf
+ * Revision 1.88  1994/04/27 11:22:50  pgf
+ * changes for  and
+ *
+ * Revision 1.87  1994/04/25  21:31:39  pgf
  * cfix strncpy0() calls
  *
  * Revision 1.86  1994/04/25  20:24:12  pgf
@@ -406,6 +409,7 @@ char *vname;		/* name of environment variable to retrieve */
 		ElseIf( EVDISCMD )	value = ltos(discmd);
 		ElseIf( EVVERSION )	value = version;
 		ElseIf( EVPROGNAME )	value = prognam;
+		ElseIf( EVOS )		value = opersys;
 		ElseIf( EVSEED )	value = l_itoa(seed);
 		ElseIf( EVDISINP )	value = ltos(disinp);
 		ElseIf( EVWLINE )	value = l_itoa(curwp->w_ntrows);
@@ -455,9 +459,6 @@ char *vname;		/* name of environment variable to retrieve */
 
 		ElseIf( EVNTILDES )	value = l_itoa(ntildes);
 
-		ElseIf( EVXVILE )	value = ltos( X11 );
-
-		ElseIf( EVPCVILE )	value = ltos( MSDOS );
 
 		EndIf
 	}
@@ -803,8 +804,7 @@ char *value;	/* value to set to */
 			/* EVLLENGTH */
 			/* EVRAM */
 			/* EVMODE */
-			/* EVXVILE */
-			/* EVPCVILE */
+			/* EVOS */
 			status = ABORT;	/* must be readonly */
 		EndIf
 		break;

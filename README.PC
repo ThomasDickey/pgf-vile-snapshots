@@ -3,7 +3,12 @@
 what you got, consider it informative -- there's also some information
 on build options for the PC down below. ]
 
-This is a binary-only distribution of vile version 3.65, for 386 PC
+[ There are two executables in this distribution.  vil45ans.exe is vile 4.5
+built with the ANSI display driver.  you will need ANSI.SYS installed to
+run this.  (i uses a public replacement called NNANSI.)  if you display
+adapter has trouble with the standard vile45.exe, try this instead. ]
+
+This is a binary-only distribution of vile version 4.5, for 386 PC
 machines.  This version of vile will _not_ run on anything less than a 386. 
 However, vile can be built for an 8086 (or 286) class machine, using Turbo
 C.  Feel free to do so if you'd like.

@@ -1303,16 +1303,16 @@ Programmed procedures and macros
 	$line		text of current line
 	$llength	length of current line			(read only)
 	$match		last matched magic pattern		(read only)
-	$mode		current mode ("command","insert","overwrite") (read o.)
+	$mode		current mode ("command","insert","overwrite") (rd. o.)
 	$ntildes	percent of window filled by ~ chars, at end of buffer
-	$ocwd		previous directory
+	$ocwd		previous directory			(read only)
+	$os		operating system ("unix", "dos", "vms", "os/2") (rd. o.)
 	$pagelen	number of screen lines in use by editor
 	$pagewid	current screen width
 	$palette	current palette string
 	$pathname	current path-like word
-	$pcvile		true if running pcvile (on DOS/OS2) 	(read only)
 	$pending	typeahead pending flag			(read only)
-	$progname	returns current prog name - "vile"	(read-only)
+	$progname	returns "vile" or "xvile". (read-only)
 	$qidentifier	current qualified name (as with C++ ::)
 	$read-hook	name of procedure to run after a file is read
 	$replace	replacement pattern
@@ -1327,7 +1327,6 @@ Programmed procedures and macros
 	$wline		number of lines in current window
 	$word		current "word"
 	$write-hook	name of procedure to run before a file is written
-	$xvile		true if running xvile (vile under X11) (read only)
 
 	In addition to the environment variables, you may set and use the
 	values of the editor modes (i.e., universal modes, buffer-only modes or
@@ -1424,7 +1423,7 @@ Programmed procedures and macros
 
 	    store-procedure my_cd_action
 		write-message &cat &cat &cat "moved from " $ocwd " to " $cwd
-		~if $xvile
+		~if &seq $progname "xvile"
 		    set $title $cwd
 		~endif
 	    ~endm
@@ -1776,7 +1775,131 @@ Invocation
 
 	Use "vile -?" to get the usage message.
 
-X Window System specifics:
+Filtering "man" pages
+---------------------
+
+	When used in conjunction with the manfilt program (supplied),
+	either vile or xvile may be used to filter and view manual pages.
+	In xvile (with your font set properly), xvile will even display
+	certain portions of the manual page text in bold or italics as
+	appropriate.
+
+	The file man-bindings (found in the vile source directory) contains
+	a macro which is bound to ^X-m.  It will prompt for a manual page,
+	filter it, attach attributes and display it in the current window. 
+	The text of man-bindings may be either incorporated verbatim into
+	you .vilerc file or may be read from your .vilerc as follows:
+
+		source ~/man-bindings
+
+	This assumes that you have moved the man-bindings file to your home
+	directory.
+
+	For the above to work, however, the manual page filter needs to be
+	compiled and installed as vile-manfilt somewhere in your search
+	path.  From your vile build directory, this may be accomplished as
+	follows:
+
+		# you will need an ANSI compiler to compile manfilt.c
+		gcc -o manfilt manfilt.c
+		cp manfilt /usr/local/bin/vile-manfilt
+
+	Substitute /usr/local/bin for the place where you've installed
+	vile or xvile.  (A perl script (manfilt.pl) is also available for
+	doing the filtering.  It is quite a bit slower however than the
+	corresponding C version.)
+
+	If you do all of this and use vile rather than xvile, you will
+	still end up with a legible man page, albeit without the spiffy
+	formatting.
+
+	The manual page filtering program may also be used to look at other
+	text formatted with nroff.  From the vile source directory, for
+	example, the following command will format and filter the vile
+	manual page (which is nroff source).
+
+		:e !nroff -man vile.1 | vile-manfilt
+
+	Once loaded, it will look rather funny.  There will be Cntl-A
+	characters scattered throughout the text followed by a sequence of
+	digits followed by one or more uppercase letters followed by a
+	colon.  These Cntl-A sequences specify how the text following the
+	colon should be attributed.  The vile command
+	"attribute-cntl_a-sequences-til" (bound to ^A-A) may be used to
+	format a region of text containing these sequences.  To continue our
+	example, the following command will translate this representation of
+	attributed text into one which is more pleasing to look at.
+
+		-AG
+
+
+	Fonts
+	-----
+
+	At present, only xvile is capable of displaying bold and italic (or
+	underline) text associated with attributes.  It is anticipated that
+	other versions of vile will catch up to the best of their ability. 
+	Users of xvile will find that the italic font in particular is not
+	always available with the font that they've chosen (or have had
+	chosen for them).  If an italic font is unavailable, xvile will
+	underline text which is meant to be italic.  The program xfontsel is
+	quite useful for determining which fonts are available on your
+	display server and whether there are corresponding bold and/or
+	italic fonts available.
+
+	Here are some tips on using xfontsel to find an appropriate font.
+
+		1) Set rgstry (registry) to iso8859
+		2) Set spc (spacing) to either "c" (cell font) or "m"
+		   (monospaced font).  You will be more likely to find a
+		   font which will work as italic if you choose a
+		   monospaced font, however.  You definitely do not want
+		   a proportional font.
+		3) Now pull down the slant menu.  Select either "i"
+		   (italic) or "o" (oblique).  If neither of these are
+		   available, go back to step 2 and choose a different
+		   spacing.
+		4) Set avgWdth (average width) next. If you divide the
+		   value you've chosen by ten, this will be width of a
+		   glyph in the font in pixels.
+		5) Set wght (weight) to medium.  If you have a hard time
+		   seeing the characters, you might want to choose bold,
+		   but xvile will not be able to use the bold font for
+		   displaying bold text.  It will be forced to overwrite
+		   text that it wants to be bold with the text shifted by
+		   one pixel.  This works fairly well for larger fonts.
+		6) Set fmly (family) to a value according to personal taste. 
+		   By this step, you might not have any choice on the matter
+		   anyway.
+		7) If only one font is available at this point, the other
+		   fields don't matter that much.  Otherwise set these
+		   according to taste.
+		8) Go back to the slant menu and change either the "i" or
+		   "o" to "r".
+
+		This will be the font to use.  xvile will be attempt to get
+		the italic font when needed by substituting either "o" or
+		"i" for the "r".
+
+	If the above seems too tedious, you can just try the following font
+	which (on many display servers) is pretty close to the size of the
+	default font that xvile will start up with.
+
+		-*-courier-medium-r-*-*-*-*-*-*-*-70-*-*
+
+	You can try it out by issuing the appropriate "set font" command
+	from xvile.  For longer term use, you will probably want to put it
+	in your .Xdefaults file.  It will look something like this:
+
+		XVile*font: -*-courier-medium-r-*-*-*-*-*-*-*-70-*-*
+
+	You may also set the font from your .vilerc file.  This is not
+	recommended, however, as you loose the ability to choose a different
+	font from the command line or resource file.  It may also cause the
+	xvile window to be unnecessarily resized during initialization.
+
+
+X Window System specifics
 -------------------------
 
 	If you are using xvile under X11, the following additions are
