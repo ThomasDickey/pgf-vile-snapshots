@@ -8,6 +8,112 @@
 			substantially modified by Daniel Lawrence
 */
 
+/*
+ * $Log: estruct.h,v $
+ * Revision 1.25  1991/08/13 02:48:59  pgf
+ * added select and poll selectors, and alphabetized the VAL_XXX's
+ *
+ * Revision 1.24  1991/08/12  15:06:21  pgf
+ * added ANSI_SPEC capability -- can now use the arrow keys from
+ * command or insert mode
+ *
+ * Revision 1.23  1991/08/12  09:25:10  pgf
+ * now store w_line in w_traits while buffer is offscreen, so reframe
+ * isn't always necessary.  don't force reframe on redisplay.
+ *
+ * Revision 1.22  1991/08/07  11:51:32  pgf
+ * added RCS log entries
+ *
+ * revision 1.21
+ * date: 1991/08/06 15:07:43;
+ * global/local values
+ * ----------------------------
+ * revision 1.20
+ * date: 1991/06/28 10:52:53;
+ * added config for ISC, and changed some "#if" to "#ifdef"
+ * ----------------------------
+ * revision 1.19
+ * date: 1991/06/25 19:51:43;
+ * massive data structure restructure
+ * ----------------------------
+ * revision 1.18
+ * date: 1991/06/16 17:30:21;
+ * fixed tabs to be modulo intead of mask, added ctabstop capability, added
+ * LOCAL_VALUES #define to control local buffer values
+ * ----------------------------
+ * revision 1.17
+ * date: 1991/06/06 13:57:52;
+ * added auto-indent mode
+ * ----------------------------
+ * revision 1.16
+ * date: 1991/06/04 09:20:53;
+ * kcod2key is now a macro
+ * ----------------------------
+ * revision 1.15
+ * date: 1991/06/03 17:34:35;
+ * switch from "meta" etc. to "ctla" etc.
+ * ----------------------------
+ * revision 1.14
+ * date: 1991/06/03 13:58:40;
+ * made bind description list better
+ * ----------------------------
+ * revision 1.13
+ * date: 1991/06/03 10:16:34;
+ * cleanup, for release of 2.3
+ * ----------------------------
+ * revision 1.12
+ * date: 1991/05/31 10:46:27;
+ * added lspec character class for ex line specifiers
+ * added end pointer and offset to the region struct
+ * added #defines for the ex range allowances
+ * ----------------------------
+ * revision 1.11
+ * date: 1991/04/22 09:00:46;
+ * added ODT, POSIX defines.
+ * also added iswild() support
+ * ----------------------------
+ * revision 1.10
+ * date: 1991/04/05 13:04:55;
+ * fixed "shorten" directory name
+ * ----------------------------
+ * revision 1.9
+ * date: 1991/04/04 09:28:32;
+ * line text is now separate from LINE struct
+ * ----------------------------
+ * revision 1.8
+ * date: 1991/03/26 17:01:11;
+ * new undo dot offset field
+ * ----------------------------
+ * revision 1.7
+ * date: 1991/02/21 09:13:00;
+ * added sideways offsets for horiz scrolling
+ * ----------------------------
+ * revision 1.6
+ * date: 1990/12/16 22:23:19;
+ * changed the default configuration
+ * ----------------------------
+ * revision 1.5
+ * date: 1990/10/04 13:07:38;
+ * added #define for ODT
+ * ----------------------------
+ * revision 1.4
+ * date: 1990/10/03 16:00:49;
+ * make backspace work for everyone
+ * ----------------------------
+ * revision 1.3
+ * date: 1990/10/01 12:16:36;
+ * make provisions for shortnames, and added HAVE_MKDIR define
+ * ----------------------------
+ * revision 1.2
+ * date: 1990/09/28 14:36:22;
+ * cleanup of ifdefs, response to porting problems
+ * ----------------------------
+ * revision 1.1
+ * date: 1990/09/21 10:25:09;
+ * initial vile RCS revision
+ */
+
+
 #ifdef	LATTICE
 #undef	LATTICE		/* don't use their definitions...use ours	*/
 #endif
@@ -35,6 +141,7 @@
 #define ODT	0			/* UNIX OPEN DESK TOP		*/
 #define ULTRIX	0			/* UNIX ULTRIX			*/
 #define POSIX	0
+#define ISC	0			/* Interactive Systems */
 
 /* non-unix flavors */
 #define AMIGA	0			/* AmigaDOS			*/
@@ -43,37 +150,37 @@
 #define CPM	0			/* CP/M-86		       */
 #define VMS	0			/* VAX/VMS		       */
 
-/* the following overrides for sun, i386, and mips are for convenience only */
-#if sun
+/* the following overrides are for convenience only */
+#if defined(sun)
 # undef BSD
 # undef USG
-# define BSD	1			/* UNIX BSD 4.2	and ULTRIX	*/
-# define USG	0			/* UNIX system V		*/
+# define BSD	1
+# define USG	0
 #endif
 
-#if i386 || mips
+#if defined(i386) || defined(mips)
 # undef BSD
 # undef USG
-# define BSD	0			/* UNIX BSD 4.2	and ULTRIX	*/
-# define USG	1			/* UNIX system V		*/
+# define BSD	0
+# define USG	1
 #endif
 
-#if ODT
+#if ODT || ISC 
 # undef POSIX
 # undef BSD
 # undef USG
 # define POSIX	1
-# define BSD	0			/* UNIX BSD 4.2	and ULTRIX	*/
-# define USG	1			/* UNIX system V		*/
+# define BSD	0
+# define USG	1
 #endif
 
-#if ULTRIX
+#if ULTRIX 
 # undef POSIX
 # undef BSD
 # undef USG
 # define POSIX	1
 # define BSD	1
-# define USG	0			/* UNIX system V		*/
+# define USG	0
 #endif
 
 #define UNIX	(V7 | BSD | USG)	/* any unix		*/
@@ -86,6 +193,14 @@
 /*	Porting constraints			*/
 #define HAVE_MKDIR	1	/* if your system has the mkdir() system call */
 #define SHORTNAMES	0	/* if your compiler insists on 7 char names */
+
+/* has the select() or poll() call, only used for short sleeps in fmatch() */
+#if BSD
+# define HAVE_SELECT 1
+#endif
+#if POSIX || i386
+# define HAVE_POLL 1
+#endif
 
 /*	Compiler definitions			*/
 #define MWC86	0	/* marc williams compiler */
@@ -125,6 +240,7 @@
 #define	CLRMSG	0	/* space clears the message line with no insert	*/
 
 /* Feature turnon/turnoff */
+#define ANSI_SPEC	1 /* ANSI function/arrow keys */
 #define	CTRLZ	0	/* add a ^Z at end of files under MSDOS only	*/
 #define	DOSFILES 1	/* turn on code for DOS mode (lines that end in crlf) */
 			/* use DOSFILES, for instance, if you edit DOS- */
@@ -148,6 +264,14 @@
 			   Only useful if your display can scroll
 			   regions, or at least insert/delete lines. 
 			   ANSI, TERMCAP, and AT386 can do this		 */
+#define LOCAL_VALUES 1	/* this causes buffers to have local copies of the
+			    tabstop and fillcol values, which they inherit
+			    from global copies, much as other modes are
+			    inherited.	Otherwise, only the global copies
+			    of these values are used.  I find it confusing
+			    to have a copy with each buffer, since then
+			    changing the tabstop for all (already edited)
+			    files at once is difficult */
 
 #define CVMVAS	1	/* arguments to forward/back page and half page */
 			/* are in pages	instead of rows */
@@ -169,7 +293,7 @@
 #define	DEBUG	1	/* allows core dump from keyboard under UNIX */
 #define	TIMING	0	/* shows user time spent on each user command */
 			/* TIMING doesn't work yet... sorry  -pgf */ 
-#define DEBUGM	0	/* $debug triggers macro debugging		*/
+#define DEBUGM	1	/* $debug triggers macro debugging		*/
 #define	VISMAC	0	/* update display during keyboard macros	*/
 
 
@@ -287,9 +411,6 @@ union REGS {
 #define strchr index
 #define strrchr rindex
 #endif
-
-#define TABVAL tabval
-#define TABMASK tabmask
 
 /*	internal constants	*/
 
@@ -432,7 +553,7 @@ union REGS {
 
 /*	Internal defined functions					*/
 
-#define	nextab(a)	((a & ~TABMASK) + TABVAL)
+#define	nextab(a)	(((a / TABVAL) + 1) * TABVAL)
 
 #ifdef	abs
 #undef	abs
@@ -506,128 +627,6 @@ void vdump();
 #endif
 
 /*
- * There is a window structure allocated for every active display window. The
- * windows are kept in a big list, in top to bottom screen order, with the
- * listhead at "wheadp". Each window contains its own values of dot and mark.
- * The flag field contains some bits that are set by commands to guide
- * redisplay. Although this is a bit of a compromise in terms of decoupling,
- * the full blown redisplay is just too expensive to run for every input
- * character.
- */
-typedef struct	WINDOW {
-	struct	WINDOW *w_wndp; 	/* Next window			*/
-	struct	BUFFER *w_bufp; 	/* Buffer displayed in window	*/
-	struct	LINE *w_linep;		/* Top line in the window	*/
-	struct	LINE *w_dotp;		/* Line containing "."		*/
-	struct	LINE *w_mkp;	      /* Line containing "mark"       */
-	struct	LINE *w_ldmkp;	      /* Line containing "lastdotmark"*/
-	int	w_doto;		      /* Byte offset for "."	      */
-	int	w_mko;		    /* Byte offset for "mark"	    */
-	int	w_ldmko;		    /* Byte offset for "lastdotmark"*/
-	int	w_toprow;	       /* Origin 0 top row of window   */
-	int	w_ntrows;	       /* # of rows of text in window  */
-	int	w_force; 	       /* If non-zero, forcing row.   */
-	int	w_flag;		       /* Flags.		       */
-	int	w_sideways;	       /* sideways offset */
-#if	COLOR
-	int	w_fcolor;		/* current forground color	*/
-	int	w_bcolor;		/* current background color	*/
-#endif
-}	WINDOW;
-
-#define WFFORCE 0x01			/* Window needs forced reframe	*/
-#define WFMOVE	0x02			/* Movement from line to line	*/
-#define WFEDIT	0x04			/* Editing within a line	*/
-#define WFHARD	0x08			/* Better do a full display	*/
-#define WFMODE	0x10			/* Update mode line.		*/
-#define	WFCOLR	0x20			/* Needs a color change		*/
-#define	WFKILLS	0x40			/* something was deleted	*/
-#define	WFINS	0x80			/* something was inserted	*/
-
-struct MARK {
-	struct LINE *markp;
-	int marko;
-};
-
-/*
- * Text is kept in buffers. A buffer header, described below, exists for every
- * buffer in the system. The buffers are kept in a big list, so that commands
- * that search for a buffer by name can find the buffer header. There is a
- * safe store for the dot and mark in the header, but this is only valid if
- * the buffer is not being displayed (that is, if "b_nwnd" is 0). The text for
- * the buffer is kept in a circularly linked list of lines, with a pointer to
- * the header line in "b_linep"	Buffers may be "Inactive" which means the files associated with them
- * have not been read in yet. These get read in at "use buffer" time.
- */
-typedef struct	BUFFER {
-	struct	BUFFER *b_bufp; 	/* Link to next BUFFER		*/
-	struct	MARK *b_nmmarks;	/* named marks a-z		*/
-	struct	LINE *b_linep;		/* Link to the header LINE	*/
-	struct	LINE *b_dotp;		/* Link to "." LINE structure	*/
-	struct	LINE *b_markp;		/* The same as the above two,	*/
-	struct	LINE *b_ldmkp;	        /* The same as the above two,   */
-	int	b_doto;		        /* Offset of "." in above LINE  */
-	int	b_marko;		/* same but for the "mark"	*/
-	int	b_ldmko;		/* same but for the "last dot mark" */
-	int	b_sideways;		/* sideways offset		*/
-	int	b_mode;			/* editor mode of this buffer	*/
-	struct	LINE *b_udstks[2];	/* undo stack pointers		*/
-	short	b_udstkindx;		/* which of above to use	*/
-	struct	LINE *b_uddotps[2];	/* Link to "." before undoable op*/
-	int	b_uddotos[2];		/* offset of "." before undoable op*/
-	struct	LINE *b_ulinep;		/* pointer at 'Undo' line	*/
-	int	b_active;		/* window activated flag	*/
-	int	b_nwnd;		        /* Count of windows on buffer   */
-	int	b_flag;		        /* Flags 		        */
-	char	b_fname[NFILEN];	/* File name			*/
-	char	b_bname[NBUFN]; 	/* Buffer name			*/
-#if	CRYPT
-	char	b_key[NPAT];		/* current encrypted key	*/
-#endif
-}	BUFFER;
-
-#define BFINVS	0x01			/* Internal invisable buffer	*/
-#define BFCHG	0x02			/* Changed since last write	*/
-#define BFSCRTCH   0x04 		/* scratch -- gone on last close */
-
-/*	mode flags	*/
-/* the first set are bitmapped, and are inherited from global to per-buffer */
-#define	NUMMODES	11 /* # of defined modes		*/
-#define	MDWRAP	0x0001			/* word wrap			*/
-#define	MDCMOD	0x0002			/* C indentation and fence match*/
-#define	MDSWRAP 0x0004			/* wrap-around search mode	*/
-#define	MDEXACT	0x0008			/* Exact matching for searches	*/
-#define	MDVIEW	0x0010			/* read-only buffer		*/
-#define MDMAGIC	0x0020			/* regular expresions in search */
-#define	MDCRYPT	0x0040			/* encrytion mode active	*/
-#define	MDASAVE	0x0080			/* auto-save mode		*/
-#define	MDLIST	0x0100			/* "list" mode -- show tabs and EOL */
-#define	MDDOS	0x0200			/* "dos" mode -- lines end in crlf */
-#define	MDAIND	0x0400			/* auto-indent */
-
-/* the next set are global, bit-mapped, but are meaningless per-buffer */
-#define	NUMOTHERMODES	2 /* # of defined modes		*/
-#define OTH_LAZY 0x01
-#define OTH_VERS 0x02
-
-/* the last set are global, and have values */
-#define	NUMVALUEMODES	2 /* # of defined modes		*/
-#define VAL_TAB 0
-#define VAL_FILL 1
-
-/*
- * The starting position of a region, and the size of the region in
- * characters, is kept in a region structure.  Used by the region commands.
- */
-typedef struct	{
-	struct	LINE *r_linep;		/* Origin LINE address. 	*/
-	int	r_offset;		/* Origin LINE offset.		*/
-	struct	LINE *r_endlinep;	/* Ending LINE address. 	*/
-	int	r_endoffset;		/* Ending LINE offset.		*/
-	long	r_size; 		/* Length in characters.	*/
-}	REGION;
-
-/*
  * All text is kept in circularly linked lists of "LINE" structures. These
  * begin at the header line. This line is pointed to by the "BUFFER".
  * Each line contains:
@@ -678,6 +677,242 @@ typedef struct	LINE {
 #define lismarkpatch(lp)     ((lp)->l_used == MARKPATCH)
 #define lispatch(lp)	 (lislinepatch(lp) || lismarkpatch(lp))
 #define lneedscopying(lp)     ((lp)->l_copied != TRUE)
+
+/* marks are a line and an offset into that line */
+typedef struct MARK {
+	LINE *l;
+	int o;
+} MARK;
+
+/* some macros that take marks as arguments */
+#define is_at_end_of_line(m)	(m.o == llength(m.l))
+#define is_empty_line(m)	(llength(m.l) == 0)
+#define sameline(m1,m2)		(m1.l == m2.l)
+#define samepoint(m1,m2)	((m1.l == m2.l) && (m1.o == m2.o))
+#define char_at(m)		(lgetc(m.l,m.o))
+#define put_char_at(m,c)	(lputc(m.l,m.o,c))
+#define is_header_line(m,bp)	( m.l == bp->b_line.l)
+#define is_last_line(m,bp)	( lforw(m.l) == bp->b_line.l)
+#define is_first_line(m,bp)	( lback(m.l) == bp->b_line.l)
+
+/*
+ * Text is kept in buffers. A buffer header, described below, exists for every
+ * buffer in the system. The buffers are kept in a big list, so that commands
+ * that search for a buffer by name can find the buffer header. There is a
+ * safe store for the dot and mark in the header, but this is only valid if
+ * the buffer is not being displayed (that is, if "b_nwnd" is 0). The text for
+ * the buffer is kept in a circularly linked list of lines, with a pointer to
+ * the header line in "b_line"	Buffers may be "Inactive" which means the files associated with them
+ * have not been read in yet. These get read in at "use buffer" time.
+ */
+
+/* these are window properties inherited from editor globals */
+typedef struct	W_VALS {
+	int	w_mod;	       /* window modes */
+	int	w_side;		       /* sideways offset */
+#if	COLOR
+	int	w_fcol;			/* current forground color	*/
+	int	w_bcol;			/* current background color	*/
+#endif
+} W_VALS;
+
+#define gfcolor global_w_values.w_fcol
+#define gbcolor global_w_values.w_bcol
+
+/* these are window properties affecting window appearance _only_ */
+typedef struct	W_TRAITS {
+	MARK 	w_dt;			/* Line containing "."	       */
+		/* i don't think "mark" needs to be here -- I think it 
+			could safely live only in the buffer -pgf */
+#ifdef WINMARK
+	MARK 	w_mk;	        	/* Line containing "mark"      */
+#endif
+	MARK 	w_ld;	        	/* Line containing "lastdotmark"*/
+	MARK 	w_ln;		/* Top line in the window (offset unused) */
+	W_VALS	w_vals;
+} W_TRAITS;
+
+/* buffer mode flags	*/
+/* the indices of B_VALUES.v[] */
+/* the first set are boolean */
+#define	MDAIND		0		/* auto-indent */
+#define	MDASAVE		1		/* auto-save mode		*/
+#define	MDCMOD		2		/* C indentation and fence match*/
+#define	MDCRYPT		3		/* encrytion mode active	*/
+#define	MDDOS		4		/* "dos" mode -- lines end in crlf */
+#define	MDEXACT		5		/* Exact matching for searches	*/
+#define	MDLIST		6		/* "list" mode -- show tabs and EOL */
+#define MDMAGIC		7		/* regular expresions in search */
+#define	MDSHOWMAT	8		/* auto-indent */
+#define	MDSWRAP 	9		/* wrap-around search mode	*/
+#define	MDVIEW		10		/* read-only buffer		*/
+#define	MDWRAP		11		/* word wrap			*/
+#define	MAX_BOOL_VALUE	11		/* max of boolean values	*/
+
+#define VAL_ASAVE	(MAX_BOOL_VALUE+1)
+#define VAL_C_TAB	(MAX_BOOL_VALUE+2)
+#define VAL_FILL	(MAX_BOOL_VALUE+3)
+#define VAL_TAB		(MAX_BOOL_VALUE+4)
+#define	MAX_INT_VALUE	(MAX_BOOL_VALUE+4) /* max of integer-valued modes */
+
+#define VAL_CSUFFIXES	(MAX_INT_VALUE+1)
+#define VAL_CWD		(MAX_INT_VALUE+2)
+#define	MAX_STRING_VALUE (MAX_INT_VALUE+2) /* max of string-valued modes */
+
+#define	MAX_B_VALUES	(MAX_STRING_VALUE) /* max of buffer values */
+
+#define VALTYPE_INT 0
+#define VALTYPE_STRING 1
+#define VALTYPE_BOOL 2
+
+/* this is to ensure b_values can be of any type we wish.
+   more can be added if needed.  */
+union v {
+	int i;
+	char *p;
+};
+
+typedef struct B_VALUES {
+	union v v[MAX_B_VALUES+1];	/* either an ints or (char *)s */
+	union v *vp[MAX_B_VALUES+1];	/* pointer to local or global values */
+} B_VALUES;
+
+typedef struct	BUFFER {
+	MARK 	b_line;		/* Link to the header LINE (offset unused) */
+	struct	BUFFER *b_bufp; 	/* Link to next BUFFER		*/
+	MARK 	*b_nmmarks;		/* named marks a-z		*/
+	B_VALUES b_values;		/* buffer traits we inherit from */
+					/*  global values		*/
+	struct	W_TRAITS b_wtraits;	/* saved window traits, while we're */
+					/*  not displayed		*/
+	LINE 	*b_udstks[2];		/* undo stack pointers		*/
+	MARK 	b_uddot[2];		/* Link to "." before undoable op*/
+	short	b_udstkindx;		/* which of above to use	*/
+	LINE 	*b_ulinep;		/* pointer at 'Undo' line	*/
+	int	b_active;		/* window activated flag	*/
+	int	b_nwnd;		        /* Count of windows on buffer   */
+	int	b_flag;		        /* Flags 		        */
+	char	b_fname[NFILEN];	/* File name			*/
+	char	b_bname[NBUFN]; 	/* Buffer name			*/
+#if	CRYPT
+	char	b_key[NPAT];		/* current encrypted key	*/
+#endif
+}	BUFFER;
+
+#define global_b_val(which) global_b_values.v[which].i
+#define set_global_b_val(which,val) global_b_val(which) = val
+#define global_b_val_ptr(which) global_b_values.v[which].p
+#define set_global_b_val_ptr(which,val) global_b_val_ptr(which) = val
+
+#define b_val(bp,val) (bp->b_values.vp[val]->i)
+#define set_b_val(bp,which,val) b_val(bp,which) = val
+#define b_val_ptr(bp,val) (bp->b_values.vp[val]->p)
+#define set_b_val_ptr(bp,which,val) b_val_ptr(bp,which) = val
+
+#define make_local_b_val(bp,which)  \
+		bp->b_values.vp[which] = &(bp->b_values.v[which])
+#define make_global_b_val(bp,which)  \
+		bp->b_values.vp[which] = &(global_b_values.v[which])
+
+#define is_global_b_val(bp,which)  \
+		(bp->b_values.vp[which] == &(global_b_values.v[which]))
+#define is_local_b_val(bp,which)  \
+		(bp->b_values.vp[which] == &(bp->b_values.v[which]))
+
+#if BEFORE
+#define global_b_val(val, type) global_b_values.v[val].type
+
+#if LOCAL_VALUES
+# define local_b_val(bp, val, type) (bp->b_values.vp[val]->type)
+# define b_mode b_values.vp[VAL_MODES]->i
+#else
+# define local_b_val(bp, val, type) global_b_val(val,type)
+#endif
+#endif
+
+#define is_empty_buf(bp) (lforw(bp->b_line.l) == bp->b_line.l)
+#define b_sideways b_wtraits.w_vals.w_side
+#define b_dot b_wtraits.w_dt
+#ifdef WINMARK
+#define b_mark b_wtraits.w_mk
+#endif
+#define b_lastdot b_wtraits.w_ld
+
+/* values for b_flag */
+#define BFINVS	0x01			/* Internal invisable buffer	*/
+#define BFCHG	0x02			/* Changed since last write	*/
+#define BFSCRTCH   0x04 		/* scratch -- gone on last close */
+
+/*
+ * There is a window structure allocated for every active display window. The
+ * windows are kept in a big list, in top to bottom screen order, with the
+ * listhead at "wheadp". Each window contains its own values of dot and mark.
+ * The flag field contains some bits that are set by commands to guide
+ * redisplay. Although this is a bit of a compromise in terms of decoupling,
+ * the full blown redisplay is just too expensive to run for every input
+ * character.
+ */
+
+typedef struct	WINDOW {
+	W_TRAITS w_traits;		/* features of the window we should */
+					/*  remember between displays */
+	struct	WINDOW *w_wndp; 	/* Next window			*/
+	BUFFER  *w_bufp; 		/* Buffer displayed in window	*/
+	int	w_toprow;	        /* Origin 0 top row of window   */
+	int	w_ntrows;	        /* # of rows of text in window  */
+	int	w_force; 	        /* If non-zero, forcing row.    */
+	int	w_flag;		        /* Flags.		        */
+}	WINDOW;
+
+#define w_dot w_traits.w_dt
+#ifdef WINMARK
+#define w_mark w_traits.w_mk
+#endif
+#define w_lastdot w_traits.w_ld
+#define w_line w_traits.w_ln
+#define w_values w_traits.w_vals
+#define w_mode w_traits.w_vals.w_mod
+#define w_sideways w_traits.w_vals.w_side
+#define w_fcolor w_traits.w_vals.w_fcol
+#define w_bcolor w_traits.w_vals.w_bcol
+
+#define DOT curwp->w_traits.w_dt
+#ifdef WINMARK
+#define MK curwp->w_traits.w_mk
+#else
+#define MK Mark
+#endif
+
+#define WFFORCE 0x01			/* Window needs forced reframe	*/
+#define WFMOVE	0x02			/* Movement from line to line	*/
+#define WFEDIT	0x04			/* Editing within a line	*/
+#define WFHARD	0x08			/* Better do a full display	*/
+#define WFMODE	0x10			/* Update mode line.		*/
+#define	WFCOLR	0x20			/* Needs a color change		*/
+#define	WFKILLS	0x40			/* something was deleted	*/
+#define	WFINS	0x80			/* something was inserted	*/
+
+
+/* the next set are global, bit-mapped, but are meaningless per-buffer */
+#define	NUMOTHERMODES	2 /* # of defined modes		*/
+#define OTH_LAZY 0x01
+#define OTH_VERS 0x02
+
+#define TABVAL curtabstopval
+#define globalfillcol  global_b_val(VAL_FILL)
+#define fillcol 	b_val(curbp,VAL_FILL)
+/* #define gmode		global_b_val(VAL_MODES) */
+#define gasave		global_b_val(VAL_ASAVE)
+
+/*
+ * The starting position of a region, and the size of the region in
+ * characters, is kept in a region structure.  Used by the region commands.
+ */
+typedef struct	{
+	MARK 	r_orig;			/* Origin LINE address. 	*/
+	MARK	r_end;			/* Ending LINE address. 	*/
+	long	r_size; 		/* Length in characters.	*/
+}	REGION;
 
 /*
  * The editor communicates with the display using a high level interface. A

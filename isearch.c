@@ -18,6 +18,31 @@
  *	- Eliminated the passing of 'status' to scanmore() and
  *	  checknext(), since there were no circumstances where
  *	  it ever equalled FALSE.
+ *
+ * $Log: isearch.c,v $
+ * Revision 1.6  1991/08/07 12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.5
+ * date: 1991/06/26 09:37:56;
+ * renamed an ifdef BEFORE
+ * 
+ * revision 1.4
+ * date: 1991/06/25 19:52:50;
+ * massive data structure restructure
+ * 
+ * revision 1.3
+ * date: 1991/06/03 10:23:22;
+ * cleanup, and
+ * made it work with newer scanner (setboundry())
+ * 
+ * revision 1.2
+ * date: 1990/10/03 16:00:54;
+ * make backspace work for everyone
+ * 
+ * revision 1.1
+ * date: 1990/09/21 10:25:30;
+ * initial vile RCS revision
  */
 
 
@@ -30,12 +55,13 @@
 extern int thescanner();		/* Handy search routine */
 extern int eq();			/* Compare chars, match case */
 
+#ifdef USE_REEAT
 /* A couple of "own" variables for re-eat */
-
 int	(*saved_get_char)();		/* Get character routine */
 int	eaten_char = -1;		/* Re-eaten char */
+#endif
 
-/* A couple more "own" variables for the command string */
+/* A couple "own" variables for the command string */
 
 int	cmd_buff[CMDBUFLEN];		/* Save the command args here */
 int	cmd_offset;			/* Current offset into command buff */
@@ -49,13 +75,11 @@ int	cmd_reexecute = -1;		/* > 0 if re-executing command */
  
 int risearch(f, n)
 {
-    LINE *curline;			/* Current line on entry	      */
-    int  curoff;			/* Current offset on entry	      */
+    MARK curpos;			/* Current point on entry	      */
 
     /* remember the initial . on entry: */
 
-    curline = curwp->w_dotp;		/* Save the current line pointer      */
-    curoff  = curwp->w_doto;		/* Save the current offset	      */
+    curpos = DOT; 			/* Save the current point	      */
 
     /* Make sure the search doesn't match where we already are:		      */
 
@@ -67,8 +91,7 @@ int risearch(f, n)
 
     if (!(isearch(f, -n)))		/* Call ISearch backwards	      */
     {					/* If error in search:		      */
-	curwp->w_dotp = curline;	/* Reset the line pointer	      */
-	curwp->w_doto = curoff;		/*  and the offset to original value  */
+	DOT = curpos;			/* Reset the pointer		      */
 	curwp->w_flag |= WFMOVE;	/* Say we've moved		      */
 	update(FALSE);			/* And force an update		      */
 	mlwrite ("[search failed]");	/* Say we died			      */
@@ -85,13 +108,11 @@ int risearch(f, n)
 
 int fisearch(f, n)
 {
-    LINE *curline;			/* Current line on entry	      */
-    int  curoff;			/* Current offset on entry	      */
+    MARK curpos;			/* current line on entryl	*/
 
     /* remember the initial . on entry: */
 
-    curline = curwp->w_dotp;		/* Save the current line pointer      */
-    curoff  = curwp->w_doto;		/* Save the current offset	      */
+    curpos = DOT;			/* save current point */
 
     /* do the search */
 
@@ -101,8 +122,7 @@ int fisearch(f, n)
 
     if (!(isearch(f, n)))		/* Call ISearch forwards	      */
     {					/* If error in search:		      */
-	curwp->w_dotp = curline;	/* Reset the line pointer	      */
-	curwp->w_doto = curoff;		/*  and the offset to original value  */
+	DOT = curpos;			/* reset */
 	curwp->w_flag |= WFMOVE;	/* Say we've moved		      */
 	update(FALSE);			/* And force an update		      */
 	mlwrite ("[search failed]");	/* Say we died			      */
@@ -148,8 +168,7 @@ isearch(f, n)
     register int	cpos;		/* character number in search string  */
     register int	c;		/* current input character */
     char		pat_save[NPAT];	/* Saved copy of the old pattern str  */
-    LINE		*curline;	/* Current line on entry	      */
-    int			curoff;		/* Current offset on entry	      */
+    MARK		curpos;		/* Current point on entry	      */
     int			init_direction;	/* The initial search direction	      */
 
     /* Initialize starting conditions */
@@ -158,10 +177,10 @@ isearch(f, n)
     cmd_offset = 0;			/* Start at the beginning of the buff */
     cmd_buff[0] = '\0';		/* Init the command buffer	      */
     strncpy (pat_save, pat, NPAT);	/* Save the old pattern string	      */
-    curline = curwp->w_dotp;		/* Save the current line pointer      */
-    curoff  = curwp->w_doto;		/* Save the current offset	      */
+    curpos = DOT;			/* Save the current pointer	      */
     init_direction = n;			/* Save the initial search direction  */
-    setboundry(FALSE,NULL,0,0);		/* keep thescanner() finite */
+
+    setboundry(FALSE,DOT,FORWARD);	/* keep thescanner() finite */
 
     /* This is a good place to start a re-execution: */
 
@@ -234,8 +253,7 @@ start_over:
 		return (TRUE);			/* No, just exit	      */
 	    --cmd_offset;			/* Back up over the Rubout    */
 	    cmd_buff[--cmd_offset] = '\0';	/* Yes, delete last char   */
-	    curwp->w_dotp = curline;		/* Reset the line pointer     */
-	    curwp->w_doto = curoff;		/*  and the offset	      */
+	    DOT = curpos;			/* Reset the pointer          */
 	    n = init_direction;			/* Reset the search direction */
 	    strncpy (pat, pat_save, NPAT);	/* Restore the old search str */
 	    cmd_reexecute = 0;			/* Start the whole mess over  */
@@ -246,7 +264,7 @@ start_over:
 	  default:				/* All other chars    	      */
 	    if (c < ' ')			/* Is it printable?	      */
 	    {					/* Nope.		      */
-		reeat (c);			/* Re-eat the char	      */
+		tungetc (c);			/* Re-eat the char	      */
 		return (TRUE);			/* And return the last status */
 	    }
 	}  /* Switch */
@@ -287,37 +305,35 @@ char	chr;			/* Next char to look for		 */
 char	*patrn;			/* The entire search string (incl chr)   */
 int	dir;			/* Search direction			 */
 {
-    register LINE *curline;		/* current line during scan	      */
-    register int curoff;		/* position within current line	      */
     register int buffchar;		/* character at current position      */
     int status;				/* how well things go		      */
+    MARK	curpos;
 
 
     /* setup the local scan pointer to current "." */
-
-    curline = curwp->w_dotp;		/* Get the current line structure     */
-    curoff  = curwp->w_doto;		/* Get the offset within that line    */
+    curpos = DOT;			/* get  current point */
 
     if (dir > 0)			/* If searching forward		      */
     {
-    	if (curoff == llength(curline)) /* If at end of line		      */
+    	if (is_at_end_of_line(curpos)) /* If at end of line		      */
     	{
-	    curline = lforw(curline);	/* Skip to the next line	      */
-	    if (curline == curbp->b_linep)
-		return (FALSE);		/* Abort if at end of buffer	      */
-	    curoff = 0;			/* Start at the beginning of the line */
+	    curpos.l = lforw(curpos.l);	/* Skip to the next line	      */
+	    if (is_header_line(curpos, curbp))
+		return FALSE;		/* Abort if at end of buffer	      */
+	    curpos.o = 0;		/* Start at the beginning of the line */
 	    buffchar = '\n';		/* And say the next char is NL	      */
-	} else
-	    buffchar = lgetc(curline, curoff++); /* Get the next char	      */
-	if (status = eq(buffchar, chr))	/* Is it what we're looking for?      */
-	{
-	    curwp->w_dotp = curline;	/* Yes, set the buffer's point	      */
-	    curwp->w_doto = curoff;	/*  to the matched character	      */
+	} else {
+	    buffchar = char_at(curpos); /* Get the next char	      */
+	    curpos.o++;
+	}
+	if (status = eq(buffchar, chr))	{ /* Is it what we're looking for?   */
+	    DOT = curpos;		/* Yes, set the buffer's point	      */
 	    curwp->w_flag |= WFMOVE;	/* Say that we've moved		      */
 	}
-	return (status);		/* And return the status	      */
-    } else				/* Else, if reverse search:	      */
-	return (match_pat (patrn));	/* See if we're in the right place    */
+	return status;			/* And return the status	      */
+    } else {				/* Else, if reverse search:	      */
+	return match_pat (patrn);	/* See if we're in the right place    */
+    }
 }
 
 /*
@@ -368,27 +384,25 @@ char	*patrn;		/* String to match to buffer			     */
 {
     register int  i;			/* Generic loop index/offset	      */
     register int buffchar;		/* character at current position      */
-    register LINE *curline;		/* current line during scan	      */
-    register int curoff;		/* position within current line	      */
+    MARK curpos;
 
     /* setup the local scan pointer to current "." */
-
-    curline = curwp->w_dotp;		/* Get the current line structure     */
-    curoff  = curwp->w_doto;		/* Get the offset within that line    */
+    DOT = curpos;			/* Get the current point	     */
 
     /* top of per character compare loop: */
-
     for (i = 0; i < strlen(patrn); i++)	/* Loop for all characters in patrn   */
     {
-    	if (curoff == llength(curline)) /* If at end of line		      */
+    	if (is_at_end_of_line(curpos)) /* If at end of line		      */
     	{
-	    curline = lforw(curline);	/* Skip to the next line	      */
-	    curoff = 0;			/* Start at the beginning of the line */
-	    if (curline == curbp->b_linep)
+	    curpos.l = lforw(curpos.l);	/* Skip to the next line	      */
+	    curpos.o = 0;		/* Start at the beginning of the line */
+	    if (is_header_line(curpos, curbp))
 		return (FALSE);		/* Abort if at end of buffer	      */
 	    buffchar = '\n';		/* And say the next char is NL	      */
-	} else
-	    buffchar = lgetc(curline, curoff++); /* Get the next char	      */
+	} else {
+	    buffchar = char_at(curpos); /* Get the next char	      */
+	    curpos.o++;
+	}
 	if (!eq(buffchar, patrn[i]))	/* Is it what we're looking for?      */
 	    return (FALSE);		/* Nope, just punt it then	      */
     }
@@ -464,6 +478,7 @@ int get_char ()
     return (c);				/* Return the character		      */
 }
 
+#ifdef USE_REEAT /* tungetc replaces this */
 /*
  * Hacky routine to re-eat a character.  This will save the character to be
  * re-eaten by redirecting the input call to a routine here.  Hack, etc.
@@ -490,6 +505,7 @@ int	c;
     saved_get_char = term.t_getchar;	/* Save the char get routine	      */
     term.t_getchar = uneat;		/* Replace it with ours		      */
 }
+#endif
 #else
 isearch()
 {

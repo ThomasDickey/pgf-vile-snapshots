@@ -1,16 +1,31 @@
-#include <stdio.h>
-
 /* This standalone utility program constructs the function, key and command
-	binding tables for vile.  The input is a data file containing the
-	desired default relationships among the three entities.  Output
-	is nebind.h, nefunc.h, and nename.h, all of which are then included
-	in main.c
-	This code written by Paul Fox, (c)1990
-	
-	See the file "cmdtbls" for input data formats, and "estruct.h" for
-	the output structures.
-	
-*/
+ *	binding tables for vile.  The input is a data file containing the
+ *	desired default relationships among the three entities.  Output
+ *	is nebind.h, nefunc.h, and nename.h, all of which are then included
+ *	in main.c
+ *	This code written by Paul Fox, (c)1990
+ *	
+ *	See the file "cmdtbls" for input data formats, and "estruct.h" for
+ *	the output structures.
+ *
+ * $Log: mktbls.c,v $
+ * Revision 1.4  1991/08/07 12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.3
+ * date: 1991/06/03 17:34:57;
+ * switch from "meta" etc. to "ctla" etc.
+ * 
+ * revision 1.2
+ * date: 1991/06/03 10:26:03;
+ * commentary change
+ * 
+ * revision 1.1
+ * date: 1990/09/21 10:25:40;
+ * initial vile RCS revision
+ */
+
+#include <stdio.h>
 
 char *progcreat = "/* %s: this header file was produced automatically by\n\
  * the %s program, based on input from the file %s\n */\n";

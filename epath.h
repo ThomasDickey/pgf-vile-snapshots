@@ -5,6 +5,20 @@
 
 /*	possible names and paths of help files under different OSs	*/
 
+/*
+ * $Log: epath.h,v $
+ * Revision 1.3  1991/08/07 11:51:32  pgf
+ * added RCS log entries
+ *
+ * revision 1.2
+ * date: 1991/06/26 09:43:03;
+ * added trailing slash on some file search paths
+ * ----------------------------
+ * revision 1.1
+ * date: 1990/09/21 10:25:08;
+ * initial vile RCS revision
+ */
+
 /* first two entries are default startup and help files, the rest are
 	possible places to look for them */
 
@@ -39,8 +53,8 @@ char *pathname[] =
 {
 	"vile.rc",
 	"vile.hlp",
-	"/bin",
-	"/sys/public",
+	"/bin/",
+	"/sys/public/",
 	""
 };
 #endif
@@ -63,8 +77,8 @@ char *pathname[] =
 	"vile.hlp",
 	"/usr/local/",
 	"/usr/lib/",
-	"/usr/local/bin",
-	"/usr/local/lib",
+	"/usr/local/bin/",
+	"/usr/local/lib/",
 	""
 };
 #endif

@@ -4,6 +4,51 @@
  * and some are actually attached to user
  * keys. Like everyone else, they set hints
  * for the display system.
+ *
+ * $Log: buffer.c,v $
+ * Revision 1.11  1991/08/12 09:25:10  pgf
+ * now store w_line in w_traits while buffer is offscreen, so reframe
+ * isn't always necessary.  don't force reframe on redisplay.
+ *
+ * Revision 1.10  1991/08/08  13:15:25  pgf
+ * removed some ifdef BEFORE
+ *
+ * Revision 1.9  1991/08/07  12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.8
+ * date: 1991/08/06 15:11:31;
+ * global/local values
+ * and printf/list stuff
+ * 
+ * revision 1.7
+ * date: 1991/06/25 19:52:06;
+ * massive data structure restructure
+ * 
+ * revision 1.6
+ * date: 1991/06/16 17:34:23;
+ * added support for local values of tabstops and fillcol
+ * 
+ * revision 1.5
+ * date: 1991/04/08 15:45:31;
+ * fixed readin() arg count
+ * 
+ * revision 1.4
+ * date: 1991/04/04 09:28:02;
+ * line text is now separate from LINE struct
+ * 
+ * revision 1.3
+ * date: 1991/02/21 09:15:35;
+ * added horizontal scroll support
+ * 
+ * revision 1.2
+ * date: 1990/12/06 19:47:56;
+ * fixed list-buffer window re-use problem, and startup core dumps
+ * if popupbuff was called in startup file
+ * 
+ * revision 1.1
+ * date: 1990/09/21 10:24:46;
+ * initial vile RCS revision
  */
 #include        <stdio.h>
 #include	"estruct.h"
@@ -105,9 +150,10 @@ histbuff(f,n)
 	}
 }
 
+/* switch back to the most recent buffer */
 altbuff(f,n)
 {
-	return(histbuff(TRUE,1));
+	return histbuff(TRUE,1);
 }
 
 /*
@@ -167,8 +213,8 @@ register BUFFER *bp;
 			undispbuff(curbp,curwp);
 		}
         }
-	make_current(bp);
-	
+	make_current(bp);	/* sets curbp */
+
 	/* get it already on the screen if possible */
         if (bp->b_nwnd > 0)  { /* then it's on the screen somewhere */
         	register WINDOW *wp;
@@ -186,22 +232,15 @@ register BUFFER *bp;
 	
 	/* oh well, suck it into this window */
         curwp->w_bufp  = bp;
-        curwp->w_linep = bp->b_linep;           /* For macros, ignored. */
-        curwp->w_flag |= WFMODE|WFFORCE|WFHARD; /* Quite nasty.         */
+        curwp->w_flag |= WFMODE|WFHARD; /* Quite nasty.         */
         if (bp->b_nwnd++ == 0) {                /* First use.           */
-                curwp->w_dotp  = bp->b_dotp;
-                curwp->w_doto  = bp->b_doto;
-                curwp->w_mkp = bp->b_markp;
-                curwp->w_mko = bp->b_marko;
-                curwp->w_ldmkp = bp->b_ldmkp;
-                curwp->w_ldmko = bp->b_ldmko;
-                curwp->w_sideways = bp->b_sideways;
+		curwp->w_traits = bp->b_wtraits;
         }
 	if (bp->b_active != TRUE) {		/* buffer not active yet*/
 		/* read it in and activate it */
 		(void)readin(bp->b_fname, TRUE, bp, TRUE);
-		curwp->w_dotp = lforw(bp->b_linep);
-		curwp->w_doto = 0;
+		curwp->w_dot.l = lforw(bp->b_line.l);
+		curwp->w_dot.o = 0;
 		bp->b_active = TRUE;
 	}
 #if     NeWS
@@ -217,17 +256,11 @@ register WINDOW *wp;
 {
 	/* get rid of it completely if it's a scratch buffer,
 		or it's empty and unmodified */
-	if ( (bp->b_flag & BFSCRTCH) || ( !(bp->b_flag & BFCHG) && 
-				lforw(bp->b_linep) == bp->b_linep ) ) {
+	if ( (bp->b_flag & BFSCRTCH) || 
+		( !(bp->b_flag & BFCHG) && is_empty_buf(bp)) ) {
 		(void)zotbuf(bp);
 	} else {  /* otherwise just adjust it off the screen */
-		bp->b_dotp  = wp->w_dotp;
-		bp->b_doto  = wp->w_doto;
-		bp->b_markp = wp->w_mkp;
-		bp->b_marko = wp->w_mko;
-		bp->b_ldmkp = wp->w_ldmkp;
-		bp->b_ldmko = wp->w_ldmko;
-		bp->b_sideways = wp->w_sideways;
+		bp->b_wtraits  = wp->w_traits;
 	}
 }
 
@@ -252,6 +285,29 @@ BUFFER *nbp;
 	
 	bheadp = nbp;
 	curbp = nbp;
+
+	curtabstopval = tabstop_val(curbp);
+}
+
+tabstop_val(bp)
+register BUFFER *bp;
+{
+	if (is_local_b_val(bp,MDCMOD))
+		return b_val(bp,
+			b_val(bp, MDCMOD) ? VAL_C_TAB : VAL_TAB);
+	else
+		return b_val(bp,
+			(b_val(bp, MDCMOD) && has_C_suffix(bp))
+					 ? VAL_C_TAB : VAL_TAB);
+}
+
+has_C_suffix(bp)
+register BUFFER *bp;
+{
+	char *cp;
+	cp = &bp->b_fname[strlen(bp->b_fname)-2];
+	return cp >= bp->b_fname && cp[0] == '.' && 
+		strchr(b_val_ptr(bp,VAL_CSUFFIXES),cp[1]);
 }
 
 /*
@@ -297,7 +353,7 @@ register BUFFER *bp;
         if ((s=bclear(bp)) != TRUE)             /* Blow text away.      */
                 return (s);
                 
-        lfree(bp->b_linep);             /* Release header line. */
+        lfree(bp->b_line.l);             /* Release header line. */
         bp1 = NULL;                             /* Find the header.     */
         bp2 = bheadp;
         while (bp2 != bp) {
@@ -366,19 +422,20 @@ BUFFER *bp;
         wp = wheadp;
         while (wp != NULL) {
                 if (wp->w_bufp == bp) {
-                        wp->w_linep = lforw(bp->b_linep);
-                        wp->w_dotp  = lforw(bp->b_linep);
-                        wp->w_doto  = 0;
-                        wp->w_mkp = NULL;
-                        wp->w_mko = 0;
-                        wp->w_ldmkp = NULL;
-                        wp->w_ldmko = 0;
-                        wp->w_sideways = 0;
+                        wp->w_line.l = lforw(bp->b_line.l);
+                        wp->w_dot.l  = lforw(bp->b_line.l);
+                        wp->w_dot.o  = 0;
+#ifdef WINMARK
+                        wp->w_mark = nullmark;
+#endif
+                        wp->w_lastdot = nullmark;
+                        wp->w_values = global_w_values;
                         wp->w_flag |= WFMODE|WFHARD;
 				
                 }
                 wp = wp->w_wndp;
         }
+	swbuffer(bp);
         return TRUE;
 }
 
@@ -391,6 +448,9 @@ BUFFER *bp;
 	A numeric argument forces it to list invisable buffers as
 	well.
 */
+
+#define BUFFER_LIST_NAME "[Buffer List]"
+
 togglelistbuffers(f, n)
 {
         register WINDOW *wp;
@@ -398,7 +458,7 @@ togglelistbuffers(f, n)
 	int s;
 
 	/* if it doesn't exist, create it */
-	if ((bp = bfind("[List]", NO_CREAT, BFSCRTCH)) == NULL)
+	if ((bp = bfind(BUFFER_LIST_NAME, NO_CREAT, BFSCRTCH)) == NULL)
 		return listbuffers(f,n);
 
 	/* if it does exist, delete the window, which in turn 
@@ -417,28 +477,8 @@ togglelistbuffers(f, n)
 
 listbuffers(f, n)
 {
-        register BUFFER *bp;
-        register int    s;
-
-	/* create the buffer list buffer   */
-	bp = bfind("[List]", OK_CREAT, BFSCRTCH);
-	if (bp == NULL)
-		return FALSE;
-	
-        if ((s=bclear(bp)) != TRUE) /* clear old text (?) */
-                return (s);
-	bp->b_flag |= BFSCRTCH;
-        s = makelist(f,bp);
-	if (!s || popupbuff(bp) == FALSE) {
-		mlwrite("[Sorry, can't list. ]");
-		zotbuf(bp);
-                return (FALSE);
-        }
-        sprintf(bp->b_fname, "       %s   %s",prognam,version);
-        bp->b_flag &= ~BFCHG;               /* Don't complain!      */
-        bp->b_active = TRUE;
-
-        return TRUE;
+	int makebufflist();
+        return liststuff(BUFFER_LIST_NAME, makebufflist, f, NULL);
 }
 
 /*
@@ -450,41 +490,19 @@ listbuffers(f, n)
  * is an error (if there is no memory). Iflag
  * indicates whether to list hidden buffers.
  */
-/* returns no. of lines in list */
-int
-makelist(iflag,blistp)
+makebufflist(iflag,dummy)
 int iflag;	/* list hidden buffer flag */
-BUFFER *blistp;
+char *dummy;
 {
-        register char   *cp1;
-        register char   *cp2;
-        register int    c;
+        register int    i, j;
         register BUFFER *bp;
-        register LINE   *lp;
-        register int    s;
-	register int	i;
-        long nbytes;		/* # of bytes in current buffer */
 	int nbuf = 0;	/* no. of buffers */
-        int nlines = 0;  /* no. of lines in list */
-        char b[10];
-        char line[NFILEN+NBUFN+30];
-        static char dashes[] =
-			"-------------------------------------------------";
+        long nbytes;		/* # of bytes in current buffer */
 	int footnote = FALSE;
 
-	sprintf(line,"    %-*s %7s %-*s %s",
-			NUMMODES,"Modes","Size",NBUFN,"Buffer name","Contents");
-        if(addline(blistp,line, -1) == FALSE)
-                return (FALSE);
-        nlines++;
+	bprintf("     %7s %*s %s\n", "Size",NBUFN,"Buffer name","Contents");
+	bprintf("     %7p %*p %30p\n", '-',NBUFN,'-','-');
                 
-	/* put some spaces into the separator line... */
-	dashes[3] = dashes[NUMMODES+4] = dashes[NUMMODES+4+8] = 
-		dashes[NUMMODES+4+8+NBUFN+1] = ' ';
-        if (addline(blistp,dashes, -1) == FALSE)
-                return (FALSE);
-        nlines++;
-
         bp = bheadp;                            /* For all buffers      */
 
 	/* output the list of buffers */
@@ -494,83 +512,43 @@ BUFFER *blistp;
                         bp = bp->b_bufp;
                         continue;
                 }
-
-
-                cp1 = &line[0];                 /* Start at left edge   */
 		/* output status of ACTIVE flag (has the file been read in? */
                 if (bp->b_active == TRUE) {   /* if activated       */
 	                if ((bp->b_flag&BFCHG) != 0) {    /* if changed     */
-	                        *cp1++ = 'm';
+				bputc('m');
 				footnote = TRUE;
 	                } else {
-	                        *cp1++ = ' ';
+				bputc(' ');
 			}
 		} else {
-                        *cp1++ = 'u';
+			bputc('u');
 			footnote = TRUE;
 		}
 
-		sprintf(cp1,"%2d ",nbuf++);
+		bprintf(" %2d ",nbuf++);
 
-                cp1 = &line[strlen(line)];
-
+#if BEFORE
 		/* output the mode codes */
-		for (i = 0; i < NUMMODES; i++) {
-			if (bp->b_mode & (1 << i))
-				*cp1++ = modecode[i];
-			else
-				*cp1++ = '.';
+		for (i = 0; i <= MAX_BOOL_VALUE; i++)
+			bputc(b_val(bp,i) ? modecode[i] : '.');
+		bputc('\n');
+#endif
+        	{ 	/* Count bytes in buf.	*/
+			register LINE   *lp;
+			nbytes = 0L;
+	                lp = lforw(bp->b_line.l);
+	                while (lp != bp->b_line.l) {
+	                        nbytes += (long)llength(lp)+1L;
+	                        lp = lforw(lp);
+	                }
 		}
-                *cp1++ = ' ';                   /* Gap.                 */
-                nbytes = 0L;                    /* Count bytes in buf.  */
-                lp = lforw(bp->b_linep);
-                while (lp != bp->b_linep) {
-                        nbytes += (long)llength(lp)+1L;
-                        lp = lforw(lp);
-                }
-		sprintf(cp1,"%7ld %-*s %s",nbytes,
-			NBUFN, bp->b_bname, bp->b_fname);
-                if (addline(blistp,line,-1) == FALSE)
-                        return (FALSE);
-	        nlines++;
+		bprintf("%7ld %*s %s\n",nbytes, NBUFN, 
+						bp->b_bname, bp->b_fname);
                 bp = bp->b_bufp;
         }
 
-	if (footnote == TRUE) {
-	        if (addline(blistp,
-	        	"('m' means modified, 'u' means unread)",-1)
-								 == FALSE) {
-			return FALSE;
-		}
-	        nlines++;
-	}
-
-	/* build line to report global mode settings */
-	sprintf(line,"    ");
-	cp1 = &line[4];
-
-	/* output the mode codes */
-	for (i = 0; i < NUMMODES; i++)
-		if (gmode & (1 << i))
-			*cp1++ = modecode[i];
-		else
-			*cp1++ = '.';
-	strcpy(cp1, "    are the global modes");
-	if (addline(blistp,line,-1) == FALSE)
-		return(FALSE);
-
-	sprintf(line," tabstop = %d; fillcol = %d", TABVAL, fillcol);
-	if (addline(blistp,line,-1) == FALSE)
-		return(FALSE);
-
-	sprintf(line," lazy filename matching is %s",
-					(othmode & OTH_LAZY) ? "on":"off");
-	if (addline(blistp,line,-1) == FALSE)
-		return(FALSE);
-
-	nlines++;
-
-        return (nlines);
+	if (footnote == TRUE)
+        	bprintf("('m' means modified, 'u' means unread)\n");
 }
 
 ltoa(buf, width, num)
@@ -609,12 +587,12 @@ int len;
                 return (FALSE);
         for (i=0; i<ntext; ++i)
                 lputc(lp, i, text[i]);
-        bp->b_linep->l_bp->l_fp = lp;       /* Hook onto the end    */
-        lp->l_bp = bp->b_linep->l_bp;
-        bp->b_linep->l_bp = lp;
-        lp->l_fp = bp->b_linep;
-        if (bp->b_dotp == bp->b_linep)  /* If "." is at the end */
-                bp->b_dotp = lp;            /* move it to new line  */
+        bp->b_line.l->l_bp->l_fp = lp;       /* Hook onto the end    */
+        lp->l_bp = bp->b_line.l->l_bp;
+        bp->b_line.l->l_bp = lp;
+        lp->l_fp = bp->b_line.l;
+        if (sameline(bp->b_dot, bp->b_line))  /* If "." is at the end */
+                bp->b_dot.l = lp;            /* move it to new line  */
         return (TRUE);
 }
 
@@ -656,6 +634,7 @@ char   *bname;
         register BUFFER *bp;
         register LINE   *lp;
 	register BUFFER *lastb = NULL;	/* buffer to insert after */
+	register int i;
 
         bp = bheadp;
         while (bp != NULL) {
@@ -676,18 +655,19 @@ char   *bname;
 
 	/* and set up the other buffer fields */
 	bp->b_active = FALSE;
-        bp->b_dotp  = lp;
-        bp->b_doto  = 0;
-        bp->b_markp = NULL;
-        bp->b_marko = 0;
-        bp->b_ldmkp = NULL;
-        bp->b_ldmko = 0;
+        bp->b_dot.l  = lp;
+        bp->b_dot.o  = 0;
+#if WINMARK
+        bp->b_mark = nullmark;
+#endif
+        bp->b_lastdot = nullmark;
         bp->b_nmmarks = NULL;
         bp->b_flag  = bflag;
-	bp->b_mode  = gmode & ~(MDCMOD|MDDOS); /* handled in readin() */
+	bp->b_values = global_b_values;
         bp->b_nwnd  = 0;
         bp->b_sideways = 0;
-        bp->b_linep = lp;
+        bp->b_line.l = lp;
+        bp->b_line.o = 0;
         strcpy(bp->b_fname, "");
         strcpy(bp->b_bname, bname);
 #if	CRYPT
@@ -735,16 +715,15 @@ register BUFFER *bp;
 	}
         bp->b_flag  &= ~BFCHG;                  /* Not changed          */
 	freeundostacks(bp);	/* do this before removing lines */
-        while ((lp=lforw(bp->b_linep)) != bp->b_linep) {
+        while ((lp=lforw(bp->b_line.l)) != bp->b_line.l) {
                 lremove(bp,lp);
                 lfree(lp);
 	}
-        bp->b_dotp  = bp->b_linep;              /* Fix "."              */
-        bp->b_doto  = 0;
-        bp->b_markp = NULL;                     /* Invalidate "mark"    */
-        bp->b_marko = 0;
-        bp->b_ldmkp = NULL;                     /* Invalidate "mark"    */
-        bp->b_ldmko = 0;
+        bp->b_dot  = bp->b_line;                /* Fix "."              */
+#if WINMARK
+        bp->b_mark = nullmark;                  /* Invalidate "mark"    */
+#endif
+        bp->b_lastdot = nullmark;               /* Invalidate "mark"    */
 	if (bp->b_nmmarks != NULL) { /* free the named marks */
 		free((char *)(bp->b_nmmarks));
 		bp->b_nmmarks = NULL;

@@ -1,8 +1,57 @@
 /*	This file is for functions having to do with key bindings,
-	descriptions, help commands and startup file.
-
-	written 11-feb-86 by Daniel Lawrence
-								*/
+ *	descriptions, help commands and startup file.
+ *
+ *	written 11-feb-86 by Daniel Lawrence
+ *
+ * $Log: bind.c,v $
+ * Revision 1.12  1991/08/12 15:05:14  pgf
+ * added fnc2key function, for getting back into insert mode
+ *
+ * Revision 1.11  1991/08/07  12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.10
+ * date: 1991/08/06 15:10:56;
+ * global/local values
+ * and new printf/list stuff
+ * 
+ * revision 1.9
+ * date: 1991/06/27 19:45:08;
+ * fixed prompts
+ * 
+ * revision 1.8
+ * date: 1991/06/03 17:34:51;
+ * switch from "meta" etc. to "ctla" etc.
+ * 
+ * revision 1.7
+ * date: 1991/06/03 13:58:22;
+ * made bind description list better
+ * 
+ * revision 1.6
+ * date: 1991/06/03 10:18:31;
+ * fix apropos bug, and a bind nit
+ * 
+ * revision 1.5
+ * date: 1991/05/31 10:31:34;
+ * new kbd_engl_stat() routine, which returns more status, for use in the
+ * new namedcmd() code
+ * 
+ * revision 1.4
+ * date: 1990/12/06 19:49:07;
+ * always rebuild Binding List buffer on request
+ * 
+ * revision 1.3
+ * date: 1990/10/03 16:00:30;
+ * make backspace work for everyone
+ * 
+ * revision 1.2
+ * date: 1990/09/28 14:34:57;
+ * changed prc2kcod decl to int
+ * 
+ * revision 1.1
+ * date: 1990/09/21 10:24:44;
+ * initial vile RCS revision
+*/
 
 #include	<stdio.h>
 #include	"estruct.h"
@@ -38,9 +87,13 @@ help(f, n)
 			return(FALSE);
 		}
 		strcpy(bp->b_bname,"[Help]");
-	        sprintf(bp->b_fname, "       %s   %s",prognam,version);
-		bp->b_mode |= MDVIEW;
-		bp->b_mode &= ~MDEXACT;
+	        lsprintf(bp->b_fname, "       %s   %s",prognam,version);
+		make_local_b_val(bp,MDVIEW);
+		set_b_val(bp,MDVIEW,TRUE);
+		make_local_b_val(bp,MDEXACT);
+		set_b_val(bp,MDEXACT,FALSE);
+		make_local_b_val(bp,VAL_TAB);
+		set_b_val(bp,VAL_TAB,8);
 		bp->b_flag |= BFSCRTCH;
 	}
 	return swbuffer(bp);
@@ -56,7 +109,7 @@ deskey(f, n)	/* describe the command for a certain key */
 	char *kcod2prc();
 
 	/* prompt the user to type us a key to describe */
-	mlwrite(": describe-key ");
+	mlwrite("Describe the function bound to this key sequence: ");
 
 	/* get the command sequence to describe
 	   change it to something we can print as well */
@@ -98,7 +151,7 @@ int f, n;	/* command arguments [IGNORED] */
 	char *kcod2prc();
 
 	/* prompt the user to type in a key to bind */
-	mlwrite(": bind-to-key ");
+	mlwrite("Bind function with english name: ");
 
 	/* get the function name to bind it to */
 #if	NeWS
@@ -113,8 +166,7 @@ int f, n;	/* command arguments [IGNORED] */
 		mlwrite("[No such function]");
 		return(FALSE);
 	}
-	ostring(" ");
-	TTflush();
+	mlwrite("...to keyboard sequence (type it exactly): ");
 
 	/* get the command sequence to bind */
 	if (clexec) {
@@ -197,7 +249,7 @@ int f, n;	/* command arguments [IGNORED] */
 	char *kcod2prc();
 
 	/* prompt the user to type in a key to unbind */
-	mlwrite(": unbind-key ");
+	mlwrite("Unbind this key sequence: ");
 
 	/* get the command sequence to unbind */
 	if (clexec) {
@@ -261,13 +313,19 @@ int c;		/* command key to unbind */
 		   into it with view mode			*/
 desbind(f, n)
 {
-	return mkblist(NULL);
+#if ! BEFORE
+	int makebindlist();
+        return liststuff("[Binding List]",makebindlist,1,NULL);
+#else
+	return mkblist(1,NULL);
+#endif
 }
 
 #if	APROP
 apro(f, n)	/* Apropos (List functions that match a substring) */
 {
 	static char mstring[NSTRING] = 0;	/* string to match cmd names to */
+	int makebindlist();
         register int    s;
 
 
@@ -275,43 +333,52 @@ apro(f, n)	/* Apropos (List functions that match a substring) */
 	if (s != TRUE)
 		return(s);
 
-	return mkblist(mstring);
+#if ! BEFORE
+        return liststuff("[Binding List]",makebindlist,1,mstring);
+#else
+	return mkblist(1,mstring);
+#endif
 }
 #endif
 
+#if BEFORE
 mkblist(mstring)
 char *mstring;
 {
         register BUFFER *bp;
         register int    s;
 
-	/* create the buffer list buffer   */
+	/* create the binding list buffer   */
 	bp = bfind("[Binding List]", OK_CREAT, BFSCRTCH);
 	if (bp == NULL)
 		return FALSE;
 	
         if ((s=bclear(bp)) != TRUE) /* clear old text (?) */
                 return (s);
-        s = buildlist(mstring,bp);
+        s = makebindlist(1,mstring,bp);
 	if (s != TRUE || popupbuff(bp) == FALSE) {
-		mlwrite("[Sorry, can't list. ]");
+		mlwrite("[Sorry, can't list.]");
 		zotbuf(bp);
                 return (s);
         }
         strcpy(bp->b_fname, "");
-	bp->b_mode |= MDVIEW;
+	make_local_b_val(bp,MDVIEW);
+	set_b_val(bp,MDVIEW,TRUE);
+	make_local_b_val(bp,VAL_TAB);
+	set_b_val(bp,VAL_TAB,8);
 	bp->b_flag |= BFSCRTCH;
         bp->b_flag &= ~BFCHG;        /* Don't complain!      */
         bp->b_active = TRUE;
 
         return TRUE;
 }
+#endif
 
 
 /* build a binding list (limited or full) */
-buildlist(mstring, bp)
+makebindlist(dummy, mstring)
+int dummy;
 char *mstring;		/* match string if partial list, NULL to list all */
-register BUFFER *bp;	/* buffer to put binding list into */
 {
 #if	ST520 & LATTICE
 #define	register		
@@ -379,7 +446,7 @@ register BUFFER *bp;	/* buffer to put binding list into */
 			}
 		}
 		/* dump the line */
-		addline(bp,outseq,-1);
+		addline(curbp,outseq,-1);
 
 		cpos = 0;
 
@@ -400,7 +467,7 @@ register BUFFER *bp;	/* buffer to put binding list into */
 			strcat(outseq,"\"");
 			strcat(outseq,nptr2->n_name);
 			strcat(outseq,"\"");
-			addline(bp,outseq,-1);
+			addline(curbp,outseq,-1);
 			cpos = 0;	/* and clear the line */
 
 		}
@@ -663,6 +730,23 @@ CMDFUNC *cfp;	/* ptr to the requested function to bind to */
 		}
 	}
 	return NULL;
+}
+
+/* fnc2key: translate a function pointer to a simple key that is bound
+		to that function
+*/
+
+int
+fnc2key(cfp)
+CMDFUNC *cfp;	/* ptr to the requested function to bind to */
+{
+	register int i;
+
+	for(i = 0; i < 128; i++) {
+		if (cfp == asciitbl[i])
+			return i;
+	}
+	return -1;
 }
 
 #if NEEDED

@@ -1,4 +1,22 @@
-/* written for vile by Paul Fox, (c)1990 */
+/* Find the next error in mentioned in the shell output window.
+ * Written for vile by Paul Fox, (c)1990
+ *
+ * $Log: finderr.c,v $
+ * Revision 1.4  1991/08/07 12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.3
+ * date: 1991/08/06 15:21:44;
+ * sprintf changes
+ * 
+ * revision 1.2
+ * date: 1991/06/25 19:52:42;
+ * massive data structure restructure
+ * 
+ * revision 1.1
+ * date: 1990/09/21 10:25:19;
+ * initial vile RCS revision
+*/
 
 #include	"estruct.h"
 #include        "edef.h"
@@ -63,11 +81,11 @@ finderr(f,n)
 				break;
 		}
 			
-		if (lforw(dotp) == sbp->b_linep) {
+		if (lforw(dotp) == sbp->b_line.l) {
 			mlwrite("No more errors in %s buffer", febuff);
 			TTbeep();
 			/* start over at the top of file */
-			putdotback(sbp, lforw(sbp->b_linep));
+			putdotback(sbp, lforw(sbp->b_line.l));
 			return FALSE;
 		}
 		dotp = lforw(dotp);
@@ -97,11 +115,10 @@ finderr(f,n)
 		}
 	}
 
-	mlwrite("Error is %S", dotp->l_used, dotp->l_text);
+	mlwrite("Error is %*S", dotp->l_used, dotp->l_text);
 
 	/* it's an absolute move */
-	curwp->w_ldmkp = curwp->w_dotp;
-	curwp->w_ldmko = curwp->w_doto;
+	curwp->w_lastdot = curwp->w_dot;
 	gotoline(TRUE,errline);
 
 	oerrline = errline;
@@ -122,12 +139,12 @@ struct BUFFER *bp;
 	        wp = wheadp;
 	        while (wp != NULL) {
 	                if (wp->w_bufp == bp) {
-	                        return wp->w_dotp;
+	                        return wp->w_dot.l;
 			}
 	                wp = wp->w_wndp;
 	        }
 	}
-        return bp->b_dotp;
+        return bp->b_dot.l;
 }
 
 putdotback(bp,dotp)
@@ -140,8 +157,8 @@ struct LINE *dotp;
 	        wp = wheadp;
 	        while (wp != NULL) {
 	                if (wp->w_bufp == bp) {
-		                wp->w_dotp = dotp;
-		                wp->w_doto = 0;
+		                wp->w_dot.l = dotp;
+		                wp->w_dot.o = 0;
 			        wp->w_flag |= WFMOVE;
 			}
 	                wp = wp->w_wndp;
@@ -149,8 +166,8 @@ struct LINE *dotp;
 		return;
 	}
 	/* then the buffer isn't displayed */
-        bp->b_dotp = dotp;
-        bp->b_doto = 0;
+        bp->b_dot.l = dotp;
+        bp->b_dot.o = 0;
 }
 
 #else

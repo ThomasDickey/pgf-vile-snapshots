@@ -2,6 +2,39 @@
  * The routines in this file implement commands that work word or a
  * paragraph at a time.  There are all sorts of word mode commands.  If I
  * do any sentence mode commands, they are likely to be put in this file. 
+ *
+ * $Log: word.c,v $
+ * Revision 1.8  1991/08/09 13:17:52  pgf
+ * formatregion now restarts with each fresh paragraph, so you can
+ * format an entire file at once, without collapsing it all into a
+ * single paragraph
+ *
+ * Revision 1.7  1991/08/07  12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.6
+ * date: 1991/08/06 15:27:52;
+ * removed old rdonly check
+ * 
+ * revision 1.5
+ * date: 1991/06/28 10:54:14;
+ * suppress trailing space after paragraph reformat
+ * 
+ * revision 1.4
+ * date: 1991/06/25 19:53:45;
+ * massive data structure restructure
+ * 
+ * revision 1.3
+ * date: 1991/06/06 13:58:09;
+ * added auto-indent mode
+ * 
+ * revision 1.2
+ * date: 1991/03/26 17:02:20;
+ * formatting now knows about ! and ? as well as .
+ * 
+ * revision 1.1
+ * date: 1990/09/21 10:26:25;
+ * initial vile RCS revision
  */
 
 #include	<stdio.h>
@@ -27,12 +60,12 @@ wrapword()
 	/* back up until we aren't in a word,
 	   make sure there is a break in the line */
 	cnt = 0;
-	while (c = lgetc(curwp->w_dotp, curwp->w_doto), !isspace(c)) {
+	while (c = char_at(DOT), !isspace(c)) {
 		cnt++;
 		if (!backchar(0, 1))
 			return(FALSE);
 		/* if we make it to the beginning, start a new line */
-		if (curwp->w_doto == 0) {
+		if (DOT.o == 0) {
 			gotoeol(FALSE, 0);
 			return(lnewline());
 		}
@@ -207,9 +240,9 @@ inword()
 {
 	register int	c;
 
-	if (curwp->w_doto == llength(curwp->w_dotp))
+	if (is_at_end_of_line(DOT))
 		return (FALSE);
-	c = lgetc(curwp->w_dotp, curwp->w_doto);
+	c = char_at(DOT);
 	if (islower(c))
 		return (TRUE);
 	if (isupper(c))
@@ -226,7 +259,7 @@ join(f,n)
 
 	if (n < 0) return FALSE;
 	if (n == 0) return TRUE;
-	if (lforw(curwp->w_dotp) == curbp->b_linep)
+	if (is_last_line(DOT, curbp))
 		return FALSE;
 	while(n--) {
 		s = lastnonwhite(f,n);
@@ -238,12 +271,12 @@ join(f,n)
 		if (s != TRUE)
 			return s ;
 
-		doto = curwp->w_doto;
+		doto = DOT.o;
 		if (doto == 0)
 			return  TRUE;
-		if (lgetc(curwp->w_dotp,doto) == ')')
+		if (lgetc(DOT.l, doto) == ')')
 			return TRUE;
-		if (lgetc(curwp->w_dotp,doto-1) == '.')
+		if (lgetc(DOT.l, doto-1) == '.')
 			s = linsert(2,' ');
 		else
 			s = linsert(1,' ');
@@ -268,99 +301,118 @@ formatregion(f,n)
 	REGION region;
 	int s;
 	
-	if (curbp->b_mode & MDVIEW)	/* don't allow this command if	*/
-		return(rdonly());	/* we are in read only mode	*/
-
-	if (curwp->w_mkp != curwp->w_dotp) {
+	if (!sameline(MK, DOT)) {
 		getregion(&region);
-		if (region.r_linep == curwp->w_mkp)
+		if (sameline(region.r_orig, MK))
 			swapmark();
 	}
-	pastline = curwp->w_mkp;
-	if (pastline != curbp->b_linep)
+	pastline = MK.l;
+	if (pastline != curbp->b_line.l)
 		pastline = lforw(pastline);
-		
-	secondindent = indentlen(curwp->w_dotp);
-	
-	/* go forward to get the indent for the second and following lines */
-	curwp->w_dotp = lforw(curwp->w_dotp);
 
-	if (curwp->w_dotp != pastline) {
-		secondindent = indentlen(curwp->w_dotp);
-	}
-		
-	/* and back where we should be */
-	curwp->w_dotp = lback(curwp->w_dotp);
-	firstnonwhite(FALSE,1);
-	
-	clength = indentlen(curwp->w_dotp);
-	wordlen = 0;
-	sentence = FALSE;
-
-	/* scan through lines, filling words */
-	firstflag = TRUE;
-	finished = FALSE;
-	while (!finished) {
-
-		if (interrupted) return ABORT;
-
-		/* get the next character in the paragraph */
-		if (curwp->w_doto == llength(curwp->w_dotp)) {
-			c = ' ';
-			if (lforw(curwp->w_dotp) == pastline)
-				finished = TRUE;
-		} else {
-			c = lgetc(curwp->w_dotp, curwp->w_doto);
-		}
-		/* and then delete it */
-		if (!finished) {
-			s = ldelete(1L, FALSE);
-			if (s != TRUE) return s;
+ 	finished = FALSE;
+ 	while (finished != TRUE) {  /* i.e. is FALSE or SORTOFTRUE */
+		while (issecbeg("\n.","ILPQb")) {
+			DOT.l = lforw(DOT.l);
+			if (DOT.l == pastline) {
+				setmark();
+				return TRUE;
+			}
 		}
 
-		/* if not a separator, just add it in */
-		if (c != ' ' && c != '\t') {
-			/* was it the end of a "sentence"? */
-			sentence = (c == '.' || c == '?' || c == '!');
-			if (wordlen < NSTRING - 1)
-				wbuf[wordlen++] = c;
-		} else if (wordlen) {
-			/* at a word break with a word waiting */
-			/* calculate tentative new length with word added */
-			newlength = clength + 1 + wordlen;
-			if (newlength <= fillcol) {
-				/* add word to current line */
-				if (!firstflag) {
-					s = linsert(1, ' '); /* the space */
+		secondindent = indentlen(DOT.l);
+		
+		/* go forward to get the indent for the second
+			and following lines */
+		DOT.l = lforw(DOT.l);
+
+		if (DOT.l != pastline) {
+			secondindent = indentlen(DOT.l);
+		}
+			
+		/* and back where we should be */
+		DOT.l = lback(DOT.l);
+		firstnonwhite(FALSE,1);
+		
+		clength = indentlen(DOT.l);
+		wordlen = 0;
+		sentence = FALSE;
+
+		/* scan through lines, filling words */
+		firstflag = TRUE;
+		finished = FALSE;
+		while (finished == FALSE) { /* i.e. is not TRUE  */
+					    /* or SORTOFTRUE */
+			if (interrupted) return ABORT;
+
+			/* get the next character */
+			if (is_at_end_of_line(DOT)) {
+				c = ' ';
+				DOT.l = lforw(DOT.l);
+				if (DOT.l == pastline) {
+					finished = TRUE;
+				} else if (issecbeg("\n.","ILPQb")) {
+					/* we're at a section break */
+					finished = SORTOFTRUE;
+				}
+				DOT.l = lback(DOT.l);
+			} else {
+				c = char_at(DOT);
+			}
+			/* and then delete it */
+			if (finished == FALSE) {
+				s = ldelete(1L, FALSE);
+				if (s != TRUE) return s;
+			}
+
+			/* if not a separator, just add it in */
+			if (c != ' ' && c != '\t') {
+				/* was it the end of a "sentence"? */
+				sentence = (c == '.' || c == '?' || c == '!');
+				if (wordlen < NSTRING - 1)
+					wbuf[wordlen++] = c;
+			} else if (wordlen) {
+				/* at a word break with a word waiting */
+				/* calculate tentative new length
+							with word added */
+				newlength = clength + 1 + wordlen;
+				if (newlength <= fillcol) {
+					/* add word to current line */
+					if (!firstflag) {
+						/* the space */
+						s = linsert(1, ' ');
+						if (s != TRUE) return s;
+						++clength;
+					}
+					firstflag = FALSE;
+				} else {
+			                if (lnewline() == FALSE ||
+						((i=secondindent/TABVAL)!=0 &&
+			                	   linsert(i, '\t')==FALSE) ||
+						((i=secondindent%TABVAL)!=0 &&
+				                   linsert(i,  ' ')==FALSE)) {
+			                        return FALSE;
+			                }
+					clength = secondindent;
+				}
+
+				/* and add the word in in either case */
+				for (i=0; i<wordlen; i++) {
+					s = linsert(1, wbuf[i]);
 					if (s != TRUE) return s;
 					++clength;
 				}
-				firstflag = FALSE;
-			} else {
-		                if (lnewline() == FALSE
-			                || ((i=secondindent/TABVAL)!=0 &&
-			                	linsert(i, '\t')==FALSE)
-			                || ((i=secondindent%TABVAL)!=0 &&
-			                	linsert(i,  ' ')==FALSE)) {
-		                        return FALSE;
-		                }
-				clength = secondindent;
+				if (finished == FALSE && sentence) {
+					s = linsert(1, ' ');
+					if (s != TRUE) return s;
+					++clength;
+				}
+				wordlen = 0;
 			}
-
-			/* and add the word in in either case */
-			for (i=0; i<wordlen; i++) {
-				s = linsert(1, wbuf[i]);
-				if (s != TRUE) return s;
-				++clength;
-			}
-			if (sentence) {
-				s = linsert(1, ' ');
-				if (s != TRUE) return s;
-				++clength;
-			}
-			wordlen = 0;
 		}
+		DOT.l = lforw(DOT.l);
 	}
+	setmark();
 	return(TRUE);
 }
 

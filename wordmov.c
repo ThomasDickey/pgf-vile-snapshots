@@ -1,14 +1,26 @@
+/* These routines report on transitions between word boundaries, both 
+ *	in the punctuated vi sense, and in the whitespace/darkspace
+ *	sense.  The transition is reported _after_ it has occurred.  You
+ *	need to back up to get to the char. before the transition.
+ *	Written for vile by Paul Fox, (c)1990
+ *
+ * $Log: wordmov.c,v $
+ * Revision 1.3  1991/08/07 12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.2
+ * date: 1991/06/25 19:53:49;
+ * massive data structure restructure
+ * 
+ * revision 1.1
+ * date: 1990/09/21 10:26:27;
+ * initial vile RCS revision
+ */
 
 #include	<stdio.h>
 #include "estruct.h"
 #include "edef.h"
 
-/* These routines report on transitions between word boundaries, both 
-	in the punctuated vi sense, and in the whitespace/darkspace
-	sense.  The transition is reported _after_ it has occurred.  You
-	need to back up to get to the char. before the transition.
-	Written for vile by Paul Fox, (c)1990
-*/
 
 #define WASSPACE 0
 #define ISSPACE 0
@@ -30,10 +42,10 @@ getchartype()
 {
 	register int	c;
 
-	if (curwp->w_doto == llength(curwp->w_dotp))
+	if (is_at_end_of_line(DOT))
 		return (ISNL);
 	else
-		c = lgetc(curwp->w_dotp, curwp->w_doto);
+		c = char_at(DOT);
 	return (isspace(c) ? ISSPACE : 
 			( isident(c) ? ISIDENT : ISOTHER ) );
 }

@@ -2,6 +2,45 @@
  * The functions in this file negotiate with the operating system for
  * characters, and write characters in a barely buffered fashion on the display.
  * All operating systems.
+ *
+ * $Log: termio.c,v $
+ * Revision 1.10  1991/08/12 15:05:43  pgf
+ * rearranged read-ahead in one of the tgetc options
+ *
+ * Revision 1.9  1991/08/07  12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.8
+ * date: 1991/07/19 17:17:49;
+ * change backspace action to back_char_to_bol()
+ * 
+ * revision 1.7
+ * date: 1991/06/28 10:54:00;
+ * change a config ifdef
+ * 
+ * revision 1.6
+ * date: 1991/04/22 09:06:57;
+ * POSIX/ULTRIX changes
+ * 
+ * revision 1.5
+ * date: 1991/02/14 15:50:41;
+ * fixed size problem on olstate/nlstate
+ * 
+ * revision 1.4
+ * date: 1990/12/06 18:54:48;
+ * tried to get ttgetc to return -1 on interrupt -- doesn't work
+ * 
+ * revision 1.3
+ * date: 1990/10/12 19:32:11;
+ * do SETAF, not SETA in ttunclean
+ * 
+ * revision 1.2
+ * date: 1990/10/03 16:01:04;
+ * make backspace work for everyone
+ * 
+ * revision 1.1
+ * date: 1990/09/21 10:26:10;
+ * initial vile RCS revision
  */
 #include        <stdio.h>
 #include	"estruct.h"
@@ -91,11 +130,12 @@ char tobuf[TBUFSIZ];		/* terminal output buffer */
 #endif
 #endif
 
-#if ULTRIX
+#if POSIX
 #include <sys/termios.h>
 #endif
 
 extern CMDFUNC f_backchar;
+extern CMDFUNC f_backchar_to_bol;
 
 /*
  * This function is called once to set up the terminal device streams.
@@ -248,7 +288,7 @@ ttopen()
 	}
 #endif
 	/* make sure backspace is bound to backspace */
-	asciitbl[backspc] = &f_backchar;
+	asciitbl[backspc] = &f_backchar_to_bol;
 
 	/* make sure backspace is considered a backspace by the code */
 	_chartypes_[backspc] |= _bspace;
@@ -592,12 +632,11 @@ typahead()
 	int c;		/* character read */
 	int flags;	/* cpu flags from dos call */
 
-	if (nxtchar >= 0)
-		return(TRUE);
-
 	if (tungotc > 0)
 		return TRUE;
 
+	if (nxtchar >= 0)
+		return(TRUE);
 
 	rg.h.ah = 6;	/* Direct Console I/O call */
 	rg.h.dl = 255;	/*         does console input */

@@ -1,6 +1,44 @@
 
-/* these routines take care of undo operations */
-/* code by Paul Fox, original algorithm mostly by Julia Harper May, 89 */
+/* these routines take care of undo operations
+ * code by Paul Fox, original algorithm mostly by Julia Harper May, 89
+ *
+ * $Log: undo.c,v $
+ * Revision 1.9  1991/08/07 12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.8
+ * date: 1991/08/06 15:26:42;
+ * no undo on scratch buffers, and
+ * allow for null l_text pointers
+ * 
+ * revision 1.7
+ * date: 1991/07/23 11:11:42;
+ * undo is an absolute motion -- maintain "lastdot" properly
+ * 
+ * revision 1.6
+ * date: 1991/06/25 19:53:36;
+ * massive data structure restructure
+ * 
+ * revision 1.5
+ * date: 1991/06/03 10:27:18;
+ * took out #if INLINE code
+ * 
+ * revision 1.4
+ * date: 1991/04/04 09:44:09;
+ * undo line makes use of the separated line text
+ * 
+ * revision 1.3
+ * date: 1991/04/04 09:28:41;
+ * line text is now separate from LINE struct
+ * 
+ * revision 1.2
+ * date: 1991/03/26 17:01:36;
+ * preserve offset across undo
+ * 
+ * revision 1.1
+ * date: 1990/09/21 10:26:14;
+ * initial vile RCS revision
+ */
 
 #include "estruct.h"
 #include "edef.h"
@@ -36,10 +74,14 @@
 
 #define CURSTK(bp) (&(bp->b_udstks[bp->b_udstkindx]))
 #define ALTSTK(bp) (&(bp->b_udstks[1^(bp->b_udstkindx)]))
-#define CURDOTP(bp) (bp->b_uddotps[bp->b_udstkindx])
-#define ALTDOTP(bp) (bp->b_uddotps[1^(bp->b_udstkindx)])
-#define CURDOTO(bp) (bp->b_uddotos[bp->b_udstkindx])
-#define ALTDOTO(bp) (bp->b_uddotos[1^(bp->b_udstkindx)])
+/*
+#define CURDOTP(bp) (bp->b_uddot[bp->b_udstkindx].l)
+#define ALTDOTP(bp) (bp->b_uddot[1^(bp->b_udstkindx)].l)
+#define CURDOTO(bp) (bp->b_uddot[bp->b_udstkindx].o)
+#define ALTDOTO(bp) (bp->b_uddot[1^(bp->b_udstkindx)].o)
+*/
+#define CURDOT(bp) bp->b_uddot[bp->b_udstkindx]
+#define ALTDOT(bp) bp->b_uddot[1^(bp->b_udstkindx)]
 #define SWITCHSTKS(bp) (bp->b_udstkindx = 1 ^ bp->b_udstkindx)
 
 short needundocleanup;
@@ -49,18 +91,20 @@ LINE *copyline();
 toss_to_undo(lp)
 LINE *lp;
 {
+	if (curbp->b_flag & BFSCRTCH)
+		return TRUE;
 	if (needundocleanup)
 		preundocleanup();
 	pushline(lp,CURSTK(curbp));
-	if ((ALTDOTP(curbp) == NULL) || (ALTDOTP(curbp) == lp)) {
+	if ((ALTDOT(curbp).l == NULL) || (ALTDOT(curbp).l == lp)) {
 		/* need to save a dot -- either the next line or 
 			the previous one */
-		if (lp->l_fp == curbp->b_linep) {
-			ALTDOTP(curbp) = lp->l_bp;
-			ALTDOTO(curbp) = firstchar(lp->l_bp);
+		if (lp->l_fp == curbp->b_line.l) {
+			ALTDOT(curbp).l = lp->l_bp;
+			ALTDOT(curbp).o = firstchar(lp->l_bp);
 		} else {
-			ALTDOTP(curbp) = lp->l_fp;
-			ALTDOTO(curbp) = firstchar(lp->l_fp);
+			ALTDOT(curbp).l = lp->l_fp;
+			ALTDOT(curbp).o = firstchar(lp->l_fp);
 		}
 	}
 	dumpuline(lp);
@@ -78,6 +122,8 @@ LINE *lp;
 {
 	register LINE *nlp;
 
+	if (curbp->b_flag & BFSCRTCH)
+		return TRUE;
 	if (needundocleanup)
 		preundocleanup();
 
@@ -96,9 +142,9 @@ LINE *lp;
 
 	setupuline(lp);
 
-	if (ALTDOTP(curbp) == NULL) {
-		ALTDOTP(curbp) = lp;
-		ALTDOTO(curbp) = curwp->w_doto;
+	if (ALTDOT(curbp).l == NULL) {
+		ALTDOT(curbp).l = lp;
+		ALTDOT(curbp).o = curwp->w_dot.o;
 	}
 	return (TRUE);
 }
@@ -110,6 +156,8 @@ LINE *lp;
 {
 	register LINE *nlp;
 
+	if (curbp->b_flag & BFSCRTCH)
+		return TRUE;
 	if (needundocleanup)
 		preundocleanup();
 
@@ -124,9 +172,9 @@ LINE *lp;
 	nlp->l_bp = lp->l_bp;
 	pushline(nlp,CURSTK(curbp));
 	lsetcopied(lp);
-	if (ALTDOTP(curbp) == NULL) {
-		    ALTDOTP(curbp) = lp;
-		    ALTDOTO(curbp) = curwp->w_doto;
+	if (ALTDOT(curbp).l == NULL) {
+		    ALTDOT(curbp).l = lp;
+		    ALTDOT(curbp).o = curwp->w_dot.o;
 	}
 	return (TRUE);
 }
@@ -194,7 +242,8 @@ register LINE *lp;
 	nlp->l_fp = lp->l_fp;
 	nlp->l_bp = lp->l_bp;
 	/* copy the rest */
-	memcpy(nlp->l_text, lp->l_text, llength(lp));
+	if (lp->l_text && nlp->l_text)
+		memcpy(nlp->l_text, lp->l_text, lp->l_used);
 	return nlp;
 }
 
@@ -217,8 +266,8 @@ register BUFFER *bp;
 	/* there may be a way to clean these less drastically, by
 		using the information on the stacks above, but I
 		couldn't figure it out.  -pgf  */
-	lp = lforw(bp->b_linep);
-	while (lp != bp->b_linep) {
+	lp = lforw(bp->b_line.l);
+	while (lp != bp->b_line.l) {
 		lsetnotcopied(lp);
 		lp = lforw(lp);
 	}
@@ -230,7 +279,7 @@ undo(f,n)
 	LINE *lp, *alp;
 	int nopops = TRUE;
 	
-	if (curbp->b_mode & MDVIEW)
+	if (b_val(curbp, MDVIEW))
 		return(rdonly());
 
 	while ((lp = popline(CURSTK(curbp))) != NULL) {
@@ -295,12 +344,22 @@ undo(f,n)
 	}
 
 
-	curwp->w_dotp = CURDOTP(curbp);
-	curwp->w_doto = CURDOTO(curbp);
-	if (curwp->w_doto >= llength(curwp->w_dotp))
-		curwp->w_doto = llength(curwp->w_dotp) - 1;
-	else if (curwp->w_doto < firstchar(curwp->w_dotp))
-		curwp->w_doto = firstchar(curwp->w_dotp);
+	{
+		/* it's an absolute move -- remember where we are */
+		MARK odot;
+		odot = DOT;
+
+		DOT = CURDOT(curbp);
+		if (DOT.o >= llength(DOT.l))
+			DOT.o = llength(DOT.l) - 1;
+		else if (DOT.o < firstchar(DOT.l))
+			DOT.o = firstchar(DOT.l);
+
+		/* if we moved, update the "last dot" mark */
+		if (!sameline(DOT, odot)) {
+			curwp->w_lastdot = odot;
+		}
+	}
 
 	SWITCHSTKS(curbp);
 	
@@ -317,10 +376,8 @@ mayneedundo()
 preundocleanup()
 {
 	freeundostacks(curbp);
-	CURDOTP(curbp) = curwp->w_dotp;
-	CURDOTO(curbp) = curwp->w_doto;
-	ALTDOTP(curbp) = NULL;
-	ALTDOTO(curbp) = curwp->w_doto;
+	CURDOT(curbp) = curwp->w_dot;
+	ALTDOT(curbp) = nullmark;
 	needundocleanup = FALSE;
 }
 
@@ -350,43 +407,52 @@ lineundo(f,n)
 	if (linesmatch(ulp,lp) == TRUE) 
 		return TRUE;
 
-	curwp->w_dotp = lp;
+	curwp->w_dot.l = lp;
 	preundocleanup();
 
 
-	ntext = malloc(ulp->l_size);
-	if (ntext == NULL)
+	
+	ntext = NULL;
+	if (ulp->l_size && (ntext = malloc(ulp->l_size)) == NULL)
 		return (FALSE);
 
 	copy_for_undo(lp);
 
-	memcpy(ntext, ulp->l_text, llength(ulp));
-	free(lp->l_text);
+	if (ntext && lp->l_text) {
+		memcpy(ntext, ulp->l_text, llength(ulp));
+		free(lp->l_text);
+	}
 	lp->l_text = ntext;
 	lp->l_used = ulp->l_used;
 	lp->l_size = ulp->l_size;
 
+#if ! WINMARK
+	if (MK.l == lp)
+		MK.o = 0;
+#endif
 	/* let's be defensive about this */
 	wp = wheadp;
 	while (wp != NULL) {
-		if (wp->w_dotp == lp)
-			wp->w_doto = 0;
-		if (wp->w_mkp == lp)
-			wp->w_mko = 0;
-		if (wp->w_ldmkp == lp)
-			wp->w_ldmko = 0;
+		if (wp->w_dot.l == lp)
+			wp->w_dot.o = 0;
+#if WINMARK
+		if (wp->w_mark.l == lp)
+			wp->w_mark.o = 0;
+#endif
+		if (wp->w_lastdot.l == lp)
+			wp->w_lastdot.o = 0;
 		wp = wp->w_wndp;
 	}
-	if (CURDOTP(curbp) == lp)
-		CURDOTO(curbp) = 0;
+	if (CURDOT(curbp).l == lp)
+		CURDOT(curbp).o = 0;
 	if (curbp->b_nmmarks != NULL) {
 		/* fix the named marks */
 		int i;
 		struct MARK *mp;
 		for (i = 0; i < 26; i++) {
 			mp = &(curbp->b_nmmarks[i]);
-			if (mp->markp == lp)
-				mp->marko = 0;
+			if (mp->l == lp)
+				mp->o = 0;
 		}
 	}
 
@@ -402,46 +468,66 @@ register LINE *nlp,*olp;
 {
 	register WINDOW *wp;
 
+	if (DOT.l == olp) {
+		if (lisreal(nlp)) {
+			DOT.l = nlp;
+		} else {
+			DOT.l = olp->l_fp;
+		}
+		DOT.o = 0;
+	}
+#if ! WINMARK
+	if (MK.l == olp) {
+		if (lisreal(nlp)) {
+			MK.l = nlp;
+		} else {
+			MK.l = olp->l_fp;
+		}
+		MK.o = 0;
+	}
+#endif
 	/* fix anything important that points to it */
 	wp = wheadp;
 	while (wp != NULL) {
-		if (wp->w_linep == olp)
+		if (wp->w_line.l == olp)
 			if (lisreal(nlp)) {
-				wp->w_linep = nlp;
+				wp->w_line.l = nlp;
 			} else {
-				wp->w_linep = olp->l_fp;
+				wp->w_line.l = olp->l_fp;
 			}
-		if (wp->w_mkp == olp) {
+#if WINMARK
+		if (wp->w_mark.l == olp) {
 			if (lisreal(nlp)) {
-				wp->w_mkp = nlp;
+				wp->w_mark.l = nlp;
 			} else {
-				wp->w_mkp = olp->l_fp;
+				wp->w_mark.l = olp->l_fp;
 			}
-			wp->w_mko = 0;
+			wp->w_mark.o = 0;
 		}
-		if (wp->w_ldmkp == olp) {
+#endif
+		if (wp->w_lastdot.l == olp) {
 			if (lisreal(nlp)) {
-				wp->w_ldmkp = nlp;
+				wp->w_lastdot.l = nlp;
 			} else {
-				wp->w_ldmkp = olp->l_fp;
+				wp->w_lastdot.l = olp->l_fp;
 			}
-			wp->w_ldmko = 0;
+			wp->w_lastdot.o = 0;
 		}
 		wp = wp->w_wndp;
 	}
 #if 0
-no code for ALTDOTO, but this was ifdef'ed out before I put that in...  pgf
-	if (ALTDOTP(curbp) == olp) {
+no code for ALTDOT, but this was ifdef'ed out before I put that in...  pgf
+	if (ALTDOT(curbp).l == olp) {
 		if (lisreal(nlp)) {
-			ALTDOTP(curbp) = nlp;
+			ALTDOT(curbp).l = nlp;
 		} else {
 		    mlwrite("Bug: preundodot points at newly inserted line!");
 		}
 	}
 #endif
-	if (CURDOTP(curbp) == olp) {
+	if (CURDOT(curbp).l == olp) {
 		if (lisreal(nlp)) {
-			CURDOTP(curbp) = nlp;
+			CURDOT(curbp).l = nlp;
 		} else {
 		    mlwrite("Bug: preundodot points at newly inserted line!");
 		}
@@ -452,12 +538,12 @@ no code for ALTDOTO, but this was ifdef'ed out before I put that in...  pgf
 		struct MARK *mp;
 		for (i = 0; i < 26; i++) {
 			mp = &(curbp->b_nmmarks[i]);
-			if (mp->markp == olp) {
+			if (mp->l == olp) {
 				if (lisreal(nlp)) {
-					mp->markp = nlp;
-					mp->marko = 0;
+					mp->l = nlp;
+					mp->o = 0;
 				} else {
-				mlwrite("Sorry, lost the mark.");
+					mlwrite("Sorry, lost the mark.");
 				}
 			}
 		}
@@ -473,6 +559,8 @@ register LINE *lp1,*lp2;
 	int i;
 	if (llength(lp1) != llength(lp2))
 		return FALSE;
+	if (llength(lp1) == 0)
+		return TRUE;
 	return !memcmp(lp1->l_text, lp2->l_text, llength(lp1));
 }
 

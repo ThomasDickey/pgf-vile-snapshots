@@ -1,10 +1,22 @@
 /*	news:	Unix (SunOS4 and Unicos) NeWS video driver
-		for MicroEMACS
-
-	The bulk of the code is contained in news.cps.
-
-	P.R.Ove
-*/
+ *		for MicroEMACS
+ *
+ *	The bulk of the code is contained in news.cps.
+ *
+ *	P.R.Ove
+ *
+ * $Log: news.c,v $
+ * Revision 1.3  1991/08/07 12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.2
+ * date: 1991/08/06 15:24:00;
+ * global/local values
+ * 
+ * revision 1.1
+ * date: 1990/09/21 10:25:46;
+ * initial vile RCS revision
+ */
 
 #define	termdef	1			/* don't define "term" external */
 
@@ -290,11 +302,11 @@ int	i ;
 
 for (i=0; i < NUMMODES; i++) {
 	if (strcmp("OVER", modename[i]) == 0) {
-		if ( 1 << i & curwp->w_bufp->b_mode ) ps_insertoff() ;
+		if ( b_val(curwp->w_bufp,i)) ps_insertoff() ;
 		else ps_inserton() ;
 	}
 	else if (strcmp("CMODE", modename[i]) == 0) {
-		if ( 1 << i & curwp->w_bufp->b_mode ) ps_cmodeon() ;
+		if ( b_val(curwp->w_bufp,i)) ps_cmodeon() ;
 		else ps_cmodeoff() ;
 	}
 }

@@ -4,6 +4,29 @@
  * between "." and mark. Some functions are
  * commands. Some functions are just for
  * internal use.
+ *
+ * $Log: region.c,v $
+ * Revision 1.5  1991/08/07 12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.4
+ * date: 1991/06/25 19:53:18;
+ * massive data structure restructure
+ * 
+ * revision 1.3
+ * date: 1991/06/16 17:40:10;
+ * fixed bug in shiftlregion due to not stopping at end of line when scanning
+ * for spaces, and
+ * added do_fl_region() wrapper routine to do full-line region processing, and
+ * rewrote shift[lr]region to use it
+ * 
+ * revision 1.2
+ * date: 1991/05/31 11:21:54;
+ * added endline pointer and offset to region struct and getregion() code
+ * 
+ * revision 1.1
+ * date: 1990/09/21 10:25:58;
+ * initial vile RCS revision
  */
 #include        <stdio.h>
 #include	"estruct.h"
@@ -23,19 +46,16 @@ killregion(f, n)
         register int    s;
         REGION          region;
 
-	if (curbp->b_mode&MDVIEW)	/* don't allow this command if	*/
-		return(rdonly());	/* we are in read only mode	*/
         if ((s=getregion(&region)) != TRUE)
-                return (s);
+                return s;
 	kregcirculate(TRUE);
         kdelete();                      /* command, so do magic */
-        curwp->w_dotp = region.r_linep;
-        curwp->w_doto = region.r_offset;
+	DOT = region.r_orig;
 	if (fulllineregions)
 		kregflag |= KLINES;
 	s = ldelete(region.r_size, TRUE);
 	ukb = 0;
-        return (s);
+        return s;
 }
 
 /*
@@ -46,75 +66,84 @@ killregion(f, n)
  */
 yankregion(f, n)
 {
-        register LINE   *linep;
-        register int    loffs;
+	MARK		m;
         register int    s;
         REGION          region;
 
         if ((s=getregion(&region)) != TRUE)
-                return (s);
+                return s;
 	kregcirculate(TRUE);
         kdelete();
-        linep = region.r_linep;                 /* Current line.        */
-        loffs = region.r_offset;                /* Current offset.      */
+	m = region.r_orig;
 	if (fulllineregions)
 		kregflag |= KLINES|KYANK;
         while (region.r_size--) {
-                if (loffs == llength(linep)) {  /* End of line.         */
+                if (is_at_end_of_line(m)) {  /* End of line.         */
                         if ((s=kinsert('\n')) != TRUE) {
 				ukb = 0;
-                                return (s);
+                                return s;
 			}
-                        linep = lforw(linep);
-                        loffs = 0;
+                        m.l = lforw(m.l);
+                        m.o = 0;
                 } else {                        /* Middle of line.      */
-                        if ((s=kinsert(lgetc(linep, loffs))) != TRUE) {
+                        if ((s=kinsert(char_at(m))) != TRUE) {
 				ukb = 0;
-                                return (s);
+                                return s;
 			}
-                        ++loffs;
+                        ++m.o;
                 }
         }
 	mlwrite("[region yanked]");
 	ukb = 0;
-        return (TRUE);
+        return TRUE;
 }
 
 /*
- * shift region left by a tab stop
+ * insert a tab at the front of the line
+ */
+shift_right_line()
+{
+	return tab(FALSE,1);
+}
+
+/*
+ * shift region right by a tab stop
  */
 shiftrregion(f, n)
 {
-        register LINE   *linep;
-        register int    loffs;
-        register int    s;
-        REGION          region;
+	return do_fl_region(shift_right_line);
+}
 
-	if (curbp->b_mode&MDVIEW)	/* don't allow this command if	*/
-		return(rdonly());	/* we are in read only mode	*/
-        if ((s=getregion(&region)) != TRUE)
-                return (s);
-        linep = region.r_linep;
-        loffs = region.r_offset;
-	if (loffs != 0) {  /* possibly on first time through */
-		region.r_size -= llength(linep)-loffs+1;
-		loffs = 0;
-		linep = lforw(linep);
+/*
+ * delete a tab-equivalent from the front of the line
+ */
+shift_left_line()
+{
+        register int    c;
+	register int	i;
+	register int	lim;
+	register int	s;
+	register LINE *linep = DOT.l;
+
+	i = 0;
+
+	/* examine the line to the end, or the first tabstop, whichever
+		comes first */
+	lim = (TABVAL < llength(linep)) ? TABVAL:llength(linep);
+
+	/* count the leading spaces */
+	while ((c = lgetc(linep,i)) == ' ' && i < lim)
+		i++;
+
+	/* the i'th char is _not_ a space, or else we hit lim */
+	if (c == '\t' && i < lim) /* ith char is tab? */
+		i++;
+
+	if (i != 0) { /* did we find space/tabs to kill? */
+		if ((s = ldelete((long)i,FALSE)) != TRUE)
+			return s;
 	}
-	s = TRUE;
-	while (region.r_size > 0) {
-		/* adjust r_size now, while line length is right */
-		region.r_size -= llength(linep)+1;
-		if (llength(linep) != 0) {
-			curwp->w_dotp = linep;
-			curwp->w_doto = 0;
-			if ((s = linsert(1,'\t')) != TRUE)
-				return (s);
-		}
-		linep = lforw(linep);
-        }
-	firstnonwhite(f,n);
-	return (TRUE);
+	return TRUE;
 }
 
 /*
@@ -122,72 +151,27 @@ shiftrregion(f, n)
  */
 shiftlregion(f, n)
 {
-        register LINE   *linep;
-        register int    loffs;
-        register int    c;
-        register int    s;
-	register int	i;
-        REGION          region;
-
-	if (curbp->b_mode&MDVIEW)	/* don't allow this command if	*/
-		return(rdonly());	/* we are in read only mode	*/
-        if ((s=getregion(&region)) != TRUE)
-                return (s);
-        linep = region.r_linep;
-        loffs = region.r_offset;
-	if (loffs != 0) {  /* possibly on first time through */
-		region.r_size -= llength(linep)-loffs+1;
-		loffs = 0;
-		linep = lforw(linep);
-	}
-	s = TRUE;
-	while (region.r_size > 0) {
-		/* adjust r_size now, while line length is right */
-		region.r_size -= llength(linep)+1;
-		if (llength(linep) != 0) {
-			curwp->w_dotp = linep;
-			curwp->w_doto = 0;
-			if ((c = lgetc(linep,0)) == '\t') { /* delete the tab */
-				i = 1;
-			} else if (c == ' ') {
-				i = 1; 
-				/* after this, i'th char is _not_ a space, 
-					or 0-7 are spaces  */
-				while ((c = lgetc(linep,i)) == ' ' && i < TABVAL)
-					i++;
-				if (i != TABVAL && c == '\t') /* ith char is tab */
-					i++;
-			} else {
-				i = 0;
-			}
-			
-			if ( i!=0 && (s = ldelete((long)i,FALSE)) != TRUE)
-				return (s);
-		}
-		linep = lforw(linep);
-        }
-	firstnonwhite(f,n);
-        return (TRUE);
+	return do_fl_region(shift_left_line);
 }
 
 _to_lower(c)
 {
 	if (isupper(c))
-		return(c ^ DIFCASE);
+		return c ^ DIFCASE;
 	return -1;
 }
 
 _to_upper(c)
 {
 	if (islower(c))
-		return(c ^ DIFCASE);
+		return c ^ DIFCASE;
 	return -1;
 }
 
 _to_caseflip(c)
 {
 	if (isalpha(c))
-		return(c ^ DIFCASE);
+		return c ^ DIFCASE;
 	return -1;
 }
 
@@ -209,34 +193,30 @@ upperregion(f, n)
 charprocreg(f, n, func)
 int (*func)();
 {
-        register LINE   *linep;
-        register int    loffs;
+	MARK		m;
         register int    c,nc;
         register int    s;
         REGION          region;
 
-	if (curbp->b_mode&MDVIEW)	/* don't allow this command if	*/
-		return(rdonly());	/* we are in read only mode	*/
         if ((s=getregion(&region)) != TRUE)
-                return (s);
+                return s;
         lchange(WFHARD);
-        linep = region.r_linep;
-        loffs = region.r_offset;
+	m = region.r_orig;
         while (region.r_size--) {
-                if (loffs == llength(linep)) {
-                        linep = lforw(linep);
-                        loffs = 0;
+                if (is_at_end_of_line(m)) {
+                        m.l = lforw(m.l);
+                        m.o = 0;
                 } else {
-                        c = lgetc(linep, loffs);
+                        c = char_at(m);
 			nc = (func)(c);
 			if (nc != -1) {
-				copy_for_undo(linep);
-                                lputc(linep, loffs, nc);
+				copy_for_undo(m.l);
+                                put_char_at(m, nc);
 			}
-                        ++loffs;
+                        ++m.o;
                 }
         }
-        return (TRUE);
+        return TRUE;
 }
 
 /*
@@ -255,82 +235,109 @@ register REGION *rp;
         long fsize;
         long bsize;
 
-        if (curwp->w_mkp == NULL) {
-                mlwrite("No mark set in this window");
+        if (MK.l == NULL) {
+                mlwrite("Bug: getregion: no mark set in this window");
                 return FALSE;
         }
-        if (curwp->w_dotp == curwp->w_mkp) {
-                rp->r_linep = curwp->w_dotp;
+        if (sameline(DOT, MK)) {
 		if (fulllineregions) {
-                        rp->r_offset = 0;
-                        rp->r_size = (long)llength(curwp->w_dotp)+1;
-	                rp->r_endlinep = lforw(curwp->w_dotp);
-                        rp->r_endoffset = 0;
+	                rp->r_orig.l = DOT.l;
+                        rp->r_orig.o = 0;
+	                rp->r_end.l = lforw(DOT.l);
+                        rp->r_end.o = 0;
+                        rp->r_size = (long)llength(DOT.l)+1;
 			return TRUE;
 		}
-                rp->r_endlinep = curwp->w_dotp;
-                if (curwp->w_doto < curwp->w_mko) {
-                        rp->r_offset = curwp->w_doto;
-                        rp->r_size = (long)(curwp->w_mko-curwp->w_doto);
-                        rp->r_endoffset = curwp->w_mko;
+                rp->r_orig.l = rp->r_end.l = DOT.l;
+                if (DOT.o < MK.o) {
+                        rp->r_orig.o = DOT.o;
+                        rp->r_end.o = MK.o;
+                        rp->r_size = (long)(MK.o-DOT.o);
                 } else {
-                        rp->r_offset = curwp->w_mko;
-                        rp->r_size = (long)(curwp->w_doto-curwp->w_mko);
-                        rp->r_endoffset = curwp->w_doto;
+                        rp->r_orig.o = MK.o;
+                        rp->r_end.o = DOT.o;
+                        rp->r_size = (long)(DOT.o-MK.o);
                 }
                 return TRUE;
         }
-        blp = curwp->w_dotp;
-        flp = curwp->w_dotp;
+        blp = DOT.l;
+        flp = DOT.l;
 	if (fulllineregions) {
 		bsize = (long)(llength(blp)+1);
 		fsize = (long)(llength(flp)+1);
 	} else {
-		bsize = (long)curwp->w_doto;
-		fsize = (long)(llength(flp)-curwp->w_doto+1);
+		bsize = (long)DOT.o;
+		fsize = (long)(llength(flp) - DOT.o + 1);
 	}
-        while (flp!=curbp->b_linep || lback(blp)!=curbp->b_linep) {
-                if (flp != curbp->b_linep) {
+        while ((flp!=curbp->b_line.l) || (lback(blp) != curbp->b_line.l)) {
+                if (flp != curbp->b_line.l) {
                         flp = lforw(flp);
-                        if (flp == curwp->w_mkp) {
-                                rp->r_linep = curwp->w_dotp;
+                        if (flp == MK.l) {
+                                rp->r_orig = DOT;
 				if (fulllineregions) {
-					rp->r_offset = 0;
-					rp->r_size = fsize+
-						    llength(curwp->w_mkp)+1;
-	                                rp->r_endlinep = lforw(flp);
-					rp->r_endoffset = 0;
+					rp->r_orig.o = 0;
+					rp->r_size = fsize + llength(MK.l)+1;
+	                                rp->r_end.l = lforw(flp);
+					rp->r_end.o = 0;
 	                                return TRUE;
 				}
-				rp->r_offset = curwp->w_doto;
-				rp->r_size = fsize+curwp->w_mko;
-                                rp->r_endlinep = flp;
-				rp->r_endoffset = curwp->w_mko;
+				rp->r_size = fsize + MK.o;
+                                rp->r_end = MK;
                                 return TRUE;
                         }
                         fsize += llength(flp)+1;
                 }
-                if (lback(blp) != curbp->b_linep) {
+                if (lback(blp) != curbp->b_line.l) {
                         blp = lback(blp);
                         bsize += llength(blp)+1;
-                        if (blp == curwp->w_mkp) {
-                                rp->r_linep = blp;
+                        if (blp == MK.l) {
+                                rp->r_orig = MK;
 				if (fulllineregions) {
-					rp->r_offset = 0;
+					rp->r_orig.o = 0;
 					rp->r_size = bsize;
-	                                rp->r_endlinep = lforw(curwp->w_dotp);
-					rp->r_endoffset = 0;
+	                                rp->r_end.l = lforw(DOT.l);
+					rp->r_end.o = 0;
 	                                return TRUE;
 				}
-                                rp->r_endlinep = curwp->w_dotp;
-				rp->r_endoffset = curwp->w_doto;
-				rp->r_offset = curwp->w_mko;
-				rp->r_size = bsize - curwp->w_mko;
+                                rp->r_end = DOT;
+				rp->r_size = bsize - MK.o;
                                 return TRUE;
                         }
                 }
         }
         mlwrite("Bug: lost mark");
         return FALSE;
+}
+
+do_fl_region(lineprocfunc)
+int (*lineprocfunc)();
+{
+        register LINE   *linep;
+        register int    s;
+        REGION          region;
+
+	fulllineregions = TRUE;
+        if ((s=getregion(&region)) != TRUE)
+                return s;
+
+	/* for each line in the region, ... */
+	for ( linep = region.r_orig.l;
+			linep != region.r_end.l; linep = lforw(linep) ) {
+
+		/* nothing on the line? */
+		if (llength(linep) == 0)
+			continue;
+
+		/* move through the region... */
+		DOT.l = linep;
+		DOT.o = 0;
+
+		/* ...and process each line */
+		if ((s = (*lineprocfunc)()) != TRUE)
+			return s;
+
+        }
+	firstnonwhite(FALSE,1);
+        return TRUE;
 }
 

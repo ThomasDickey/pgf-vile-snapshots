@@ -1,7 +1,36 @@
 /*	EVAL.C:	Expresion evaluation functions for
 		MicroEMACS
 
-	written 1986 by Daniel Lawrence				*/
+	written 1986 by Daniel Lawrence
+ *
+ * $Log: eval.c,v $
+ * Revision 1.7  1991/08/07 12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.6
+ * date: 1991/08/06 15:13:27;
+ * global/local values
+ * 
+ * revision 1.5
+ * date: 1991/06/25 19:52:23;
+ * massive data structure restructure
+ * 
+ * revision 1.4
+ * date: 1991/06/03 10:19:11;
+ * newscreensize() is now named newlength()
+ * 
+ * revision 1.3
+ * date: 1990/10/01 11:05:54;
+ * progname --> prognam
+ * 
+ * revision 1.2
+ * date: 1990/09/25 11:38:13;
+ * took out old ifdef BEFORE code
+ * 
+ * revision 1.1
+ * date: 1990/09/21 10:25:11;
+ * initial vile RCS revision
+*/
 
 #include	<stdio.h>
 #include	"estruct.h"
@@ -147,7 +176,9 @@ char *vname;		/* name of environment variable to retrieve */
 
 	/* otherwise, fetch the appropriate value */
 	switch (vnum) {
+#if BEFORE
 		case EVFILLCOL:	return(itoa(fillcol));
+#endif
 		case EVPAGELEN:	return(itoa(term.t_nrow + 1));
 		case EVCURCOL:	return(itoa(getccol(FALSE)));
 		case EVCURLINE: return(itoa(getcline()));
@@ -164,9 +195,8 @@ char *vname;		/* name of environment variable to retrieve */
 		case EVACOUNT:	return(itoa(gacount));
 		case EVLASTKEY: return(itoa(lastkey));
 		case EVCURCHAR:
-			return(curwp->w_dotp->l_used ==
-					curwp->w_doto ? itoa('\n') :
-				itoa(lgetc(curwp->w_dotp, curwp->w_doto)));
+			return(is_at_end_of_line(DOT) ? itoa('\n') :
+				itoa(char_at(DOT)));
 		case EVDISCMD:	return(ltos(discmd));
 		case EVVERSION:	return(version);
 		case EVPROGNAME:return(prognam);
@@ -178,8 +208,6 @@ char *vname;		/* name of environment variable to retrieve */
 		case EVREPLACE:	return(rpat);
 		case EVMATCH:	return((patmatch == NULL)? "": patmatch);
 		case EVKILL:	return(getkill());
-		case EVCMODE:	return(itoa(curbp->b_mode));
-		case EVGMODE:	return(itoa(gmode));
 		case EVTPAUSE:	return(itoa(term.t_pause));
 		case EVPENDING:
 #if	TYPEAH
@@ -187,7 +215,7 @@ char *vname;		/* name of environment variable to retrieve */
 #else
 				return(falsem);
 #endif
-		case EVLWIDTH:	return(itoa(llength(curwp->w_dotp)));
+		case EVLWIDTH:	return(itoa(llength(DOT.l)));
 		case EVLINE:	return(getctext());
 	}
 	exit(-12);	/* again, we should never get here */
@@ -401,8 +429,10 @@ char *value;	/* value to set to */
 	case TKENV: /* set an environment variable */
 		status = TRUE;	/* by default */
 		switch (vnum) {
-		case EVFILLCOL:	fillcol = atoi(value);
+#if BEFORE
+		case EVFILLCOL: fillcol = atoi(value);
 				break;
+#endif
 		case EVCURCOL:	status = gotocol(TRUE,atoi(value));
 				break;
 		case EVCURLINE:	status = gotoline(TRUE, atoi(value));
@@ -464,11 +494,6 @@ char *value;	/* value to set to */
 				break;
 		case EVMATCH:	break;
 		case EVKILL:	break;
-		case EVCMODE:	curbp->b_mode = atoi(value);
-				curwp->w_flag |= WFMODE;
-				break;
-		case EVGMODE:	gmode = atoi(value);
-				break;
 		case EVTPAUSE:	term.t_pause = atoi(value);
 				break;
 		case EVPENDING:	break;
@@ -626,30 +651,30 @@ char *tokn;		/* token to evaluate */
 				/* if the buffer is displayed, get the window
 				   vars instead of the buffer vars */
 				if (bp->b_nwnd > 0) {
-					curbp->b_dotp = curwp->w_dotp;
-					curbp->b_doto = curwp->w_doto;
+					curbp->b_dot = curwp->w_dot;
 				}
 
 				/* make sure we are not at the end */
-				if (bp->b_linep == bp->b_dotp)
+				if (is_header_line(bp->b_dot,bp))
 					return(errorm);
 		
 				/* grab the line as an argument */
-				blen = bp->b_dotp->l_used - bp->b_doto;
+				blen = llength(bp->b_dot.l) - bp->b_dot.o;
 				if (blen > NSTRING)
 					blen = NSTRING;
-				strncpy(buf, bp->b_dotp->l_text + bp->b_doto,
+				strncpy(buf, bp->b_dot.l->l_text + bp->b_dot.o,
 					blen);
 				buf[blen] = 0;
 		
-				/* and step the buffer's line ptr ahead a line */
-				bp->b_dotp = bp->b_dotp->l_fp;
-				bp->b_doto = 0;
+				/* and step the buffer's line ptr 
+					ahead a line */
+				bp->b_dot.l = lforw(bp->b_dot.l);
+				bp->b_dot.o = 0;
 
 				/* if displayed buffer, reset window ptr vars*/
 				if (bp->b_nwnd > 0) {
-					curwp->w_dotp = curbp->b_dotp;
-					curwp->w_doto = 0;
+					curwp->w_dot.l = curbp->b_dot.l;
+					curwp->w_dot.o = 0;
 					curwp->w_flag |= WFMOVE;
 				}
 

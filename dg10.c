@@ -1,6 +1,14 @@
 /*
  * The routines in this file provide support for the Data General Model 10
  * Microcomputer.
+ *
+ * $Log: dg10.c,v $
+ * Revision 1.2  1991/08/07 12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.1
+ * date: 1990/09/21 10:24:57;
+ * initial vile RCS revision
  */
 
 #define	termdef	1			/* don't define "term" external */

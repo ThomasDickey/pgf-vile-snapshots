@@ -1,5 +1,5 @@
 /*
- *	MicroEMACS 3.9
+ *	This used to be MicroEMACS 3.9
  * 			written by Dave G. Conroy.
  *			substatially modified by Daniel M. Lawrence
  *
@@ -13,6 +13,108 @@
  * This file contains the main driving routine, and some keyboard processing
  * code, for the screen editor.
  *
+ *
+ * $Log: main.c,v $
+ * Revision 1.26  1991/08/13 02:50:13  pgf
+ * initialize showmatch b_val
+ *
+ * Revision 1.25  1991/08/12  11:22:52  pgf
+ * added 'vi +/searchstring file.c' invocation
+ *
+ * Revision 1.24  1991/08/12  10:23:43  pgf
+ * esc() no longer kills keyboard recording
+ *
+ * Revision 1.23  1991/08/08  23:28:49  pgf
+ * moved init of VAL_FILL to after vtinit, since it depends on term.t_ncol
+ *
+ * Revision 1.22  1991/08/08  13:19:58  pgf
+ * removed ifdef BEFORE
+ *
+ * Revision 1.21  1991/08/07  12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.20
+ * date: 1991/08/06 15:55:24;
+ * fixed dos mode on empty buffer
+ * 
+ * revision 1.19
+ * date: 1991/08/06 15:23:42;
+ *  global/local values
+ * 
+ * revision 1.18
+ * date: 1991/07/23 11:12:19;
+ * don't reset lastdot if absolute motion is on behalf of an operator
+ * 
+ * revision 1.17
+ * date: 1991/07/19 17:16:03;
+ * ignore SIG_QUIT unless DEBUG
+ * 
+ * revision 1.16
+ * date: 1991/06/28 10:53:42;
+ * undo last change -- was breaking some ops
+ * 
+ * revision 1.15
+ * date: 1991/06/27 19:45:16;
+ * moved back from eol and eob to execute()
+ * 
+ * revision 1.14
+ * date: 1991/06/26 09:38:15;
+ * removed an ifdef BEFORE
+ * 
+ * revision 1.13
+ * date: 1991/06/25 19:52:59;
+ * massive data structure restructure
+ * 
+ * revision 1.12
+ * date: 1991/06/16 17:36:17;
+ * support for local vs. global fillcol value
+ * 
+ * revision 1.11
+ * date: 1991/06/07 22:00:18;
+ * changed header
+ * 
+ * revision 1.10
+ * date: 1991/06/07 13:22:23;
+ * don't move "last dot" mark if ABS command doesn't change dot
+ * 
+ * revision 1.9
+ * date: 1991/06/03 17:34:55;
+ * switch from "meta" etc. to "ctla" etc.
+ * 
+ * revision 1.8
+ * date: 1991/06/03 10:25:16;
+ * command loop is now a separate routine, and
+ * if (doingopcmd) stuff is now in operators()
+ * 
+ * revision 1.7
+ * date: 1991/05/31 12:54:25;
+ * put _wild chartypes back in -- dropped by mistake
+ * 
+ * revision 1.6
+ * date: 1991/05/31 11:12:19;
+ * changed args to execute(), and
+ * added linespec character class, and
+ * added unimplemented ex functions
+ * 
+ * revision 1.5
+ * date: 1991/04/22 09:00:12;
+ * added iswild type to chartypes
+ * 
+ * revision 1.4
+ * date: 1991/04/04 09:37:48;
+ * new arg. to unqname
+ * 
+ * revision 1.3
+ * date: 1991/02/19 17:27:03;
+ * set up the reverse pattern if -s is given
+ * 
+ * revision 1.2
+ * date: 1990/10/03 16:00:57;
+ * make backspace work for everyone
+ * 
+ * revision 1.1
+ * date: 1990/09/21 10:25:35;
+ * initial vile RCS revision
  */
 
 #include        <stdio.h>
@@ -74,7 +176,6 @@ char    *argv[];
 	register int	carg;		/* current arg to scan */
 	register int	ranstartup;	/* startup executed flag */
 	BUFFER *firstbp = NULL;		/* ptr to first buffer in cmd line */
-	int viewflag;			/* are we starting in view mode? */
         int gotoflag;                   /* do we need to goto a line at start? */
         int helpflag;                   /* do we need to goto a line at start? */
         int gline;                      /* if so, what line? */
@@ -99,8 +200,8 @@ char    *argv[];
 
 	charinit();		/* character types -- we need these pretty
 					early  */
+	global_val_init();	/* global buffer values */
 
-	viewflag = FALSE;	/* view mode defaults off in command line */
 	gotoflag = FALSE;	/* set to off to begin with */
 	helpflag = FALSE;	/* set to off to begin with */
 	searchflag = FALSE;	/* set to off to begin with */
@@ -127,7 +228,7 @@ char    *argv[];
 #endif
 			case 'e':	/* -e for Edit file */
 			case 'E':
-				viewflag = FALSE;
+				set_global_b_val(MDVIEW,FALSE);
 				break;
 			case 'g':	/* -g for initial goto */
 			case 'G':
@@ -157,10 +258,14 @@ char    *argv[];
 					else
 						goto usage;
 				}
+				set_global_b_val(MDCRYPT,TRUE);
+				crypt((char *)NULL, 0);
+				crypt(ekey, strlen(ekey));
 				break;
 #endif
 			case 's':  /* -s for initial search string */
 			case 'S':
+		dosearch:
 				searchflag = TRUE;
 				if (argv[carg][2]) {
 					strncpy(pat,&argv[carg][2],NPAT);
@@ -170,6 +275,7 @@ char    *argv[];
 					else
 						goto usage;
 				}
+				rvstrcpy(tap, pat);
 				break;
 #if TAGS
 			case 't':  /* -t for initial tag lookup */
@@ -187,7 +293,7 @@ char    *argv[];
 #endif
 			case 'v':	/* -v for View File */
 			case 'V':
-				viewflag = TRUE;
+				set_global_b_val(MDVIEW,TRUE);
 				break;
 			default:	/* unknown switch */
 			usage:
@@ -212,6 +318,8 @@ char    *argv[];
 			}
 
 		} else if (argv[carg][0]== '+') { /* alternate form of -g */
+ 			if (argv[carg][1] == '/')
+				goto dosearch;
 			gotoflag = TRUE;
 			gline = atoi(&argv[carg][1]);
 		} else if (argv[carg][0]== '@') {
@@ -224,7 +332,7 @@ char    *argv[];
 
 			/* set up a buffer for this file */
 	                makename(bname, argv[carg]);
-			unqname(bname);
+			unqname(bname,FALSE);
 
 			bp = bfind(bname, OK_CREAT, 0);
 			make_current(bp); /* pull it to the front */
@@ -234,17 +342,6 @@ char    *argv[];
 				gotafile = TRUE;
 			}
 
-			/* set the modes appropriatly */
-			if (viewflag)
-				bp->b_mode |= MDVIEW;
-#if	CRYPT
-			if (cryptflag) {
-				bp->b_mode |= MDCRYPT;
-				crypt((char *)NULL, 0);
-				crypt(ekey, strlen(ekey));
-				strncpy(bp->b_key, ekey, NPAT);
-			}
-#endif
 		}
 	}
 
@@ -256,7 +353,11 @@ char    *argv[];
 	signal(SIGSEGV,imdying);
 	signal(SIGSYS,imdying);
 	signal(SIGTERM,imdying);
+#if DEBUG
 	signal(SIGQUIT,imdying);
+#else
+	signal(SIGQUIT,SIG_IGN);
+#endif
 	signal(SIGPIPE,SIG_IGN);
 #ifdef SIGWINCH
 	signal(SIGWINCH,sizesignal);
@@ -266,14 +367,16 @@ char    *argv[];
 	winit();		/* windows */
 	varinit();		/* user variables */
 	
+	/* this comes out to 70 on an 80 (or greater) column display */
+	{    	register int fill;
+		fill = (7 * term.t_ncol) / 8;  /* must be done after vtinit() */
+		if (fill > 70) fill = 70;
+		set_global_b_val(VAL_FILL, fill);
+	}
+
 	/* we made some calls to makecurrent() above, to shuffle the
 		list order.  this set curbp, which isn't actually kosher */
 	curbp = NULL;
-
-	/* this comes out to 70 on an 80 column display */
-	fillcol = (7 * term.t_ncol) / 8;
-	if (fillcol > 70)
-		fillcol = 70;
 
 	/* if invoked with no other startup files,
 	   run the system startup file here */
@@ -304,9 +407,12 @@ char    *argv[];
 	if (!curbp) {
 		bp = bfind("[unnamed]", OK_CREAT, 0);
 		bp->b_active = TRUE;
+#if DOSFILES
+		make_local_b_val(bp,MDDOS);
+		set_b_val(bp, MDDOS, FALSE );
+#endif
 		swbuffer(bp);
 	}
-	curbp->b_mode |= (gmode & ~(MDCMOD|MDDOS));
 
 	msg = "";
 	if (helpflag) {
@@ -344,19 +450,23 @@ char    *argv[];
 	mlwrite(msg);
 
 
-	/* setup to process commands */
+	/* process commands */
+	loop();
 
+}
+
+loop()
+{
+	int s,c,f,n;
 	while(1) {
+
 		/* Vi doesn't let the cursor rest on the newline itself.  This
-			takes care of that in most cases.  This fix has
-			not been applied to the docmd()!!! */
-		if (curwp->w_doto == llength(curwp->w_dotp) &&
-				llength(curwp->w_dotp) != 0)
+			takes care of that. */
+		if (is_at_end_of_line(DOT) && !is_empty_line(DOT))
 			backchar(TRUE,1);
 
 		/* same goes for end of file */
-		if (curwp->w_dotp == curbp->b_linep &&
-			lback(curwp->w_dotp) != curbp->b_linep)
+		if (is_header_line(DOT,curbp) && !is_empty_buf(curbp))
 			backline(TRUE,1);
 
 		/* start recording for '.' command */
@@ -383,11 +493,14 @@ char    *argv[];
 
 		kregflag = 0;
 		
-		/* flag so we restart the plines buffer for each new command */
-		plinesdone = FALSE;
-		
+		/* flag the first time through for some commands -- e.g. subst
+			must know to not prompt for strings again, and pregion
+			must only restart the p-lines buffer once for each
+			command. */
+		calledbefore = FALSE;
+
 		/* and execute the command */
-		execute(c, f, n, NULL);
+		execute(kcod2fnc(c), f, n);
 		
 		if (bheadp != curbp)
 			mlwrite("BUG: main: bheadp != curbp, bhead name is %s",
@@ -396,6 +509,37 @@ char    *argv[];
 		/* stop recording for '.' command */
 		dotcmdfinish();
 	}
+}
+
+global_val_init()
+{
+	register int i;
+	/* set up so the global value pointers point at the global
+		values.  we never actually use the global pointers
+		directly, but but when buffers get a copy of the
+		global_b_values structure, the pointers will still point
+		back at the global values, which is what we want */
+	for (i = 0; i <= MAX_B_VALUES; i++)
+		global_b_values.vp[i] = &(global_b_values.v[i]);
+
+	set_global_b_val(MDWRAP,FALSE);	/* wrap */
+	set_global_b_val(MDCMOD,FALSE);	/* C mode */
+	set_global_b_val(MDSWRAP,TRUE);	/* scan wrap */
+	set_global_b_val(MDEXACT,TRUE);	/* exact matches */
+	set_global_b_val(MDVIEW,FALSE);	/* view-only */
+	set_global_b_val(MDMAGIC,TRUE);	/* magic searches */
+	set_global_b_val(MDCRYPT,FALSE);	/* crypt */
+	set_global_b_val(MDASAVE,FALSE);	/* auto-save */
+	set_global_b_val(MDLIST,FALSE);	/* list-mode */
+	set_global_b_val(MDDOS,FALSE);	/* dos mode */
+	set_global_b_val(MDAIND,FALSE);	/* auto-indent */
+	set_global_b_val(MDSHOWMAT,FALSE);	/* show-match */
+	set_global_b_val(VAL_TAB, 8);	/* tab stop */
+	set_global_b_val(VAL_C_TAB, 8);	/* C file tab stop */
+	set_global_b_val(VAL_ASAVE, 256);	/* autosave count */
+	set_global_b_val_ptr(VAL_CWD, NULL);	/* current directory */
+	set_global_b_val_ptr(VAL_CSUFFIXES, "chsCHS"); /* suffixes for C mode */
+
 }
 
 #if BSD | USG | V7
@@ -419,7 +563,7 @@ int *cp, *fp, *np;
 	f = *fp;
 	n = *np;
 
-	if (iscntrl(c) || (c & (META|SPEC)))
+	if (iscntrl(c) || (c & (CTLA|CTLX|SPEC)))
 		return;
 	if ( isdigit(c) && c != '0' ) {
 		f = TRUE;		/* there is a # arg */
@@ -448,7 +592,7 @@ int *cp, *fp, *np;
 	*np = n;
 }
 
-/* do ^U repeat argument processing */
+/* do ^U-style repeat argument processing -- vile binds this to 'K' */
 do_rept_arg_proc(cp,fp,np)
 int *cp, *fp, *np;
 {
@@ -511,20 +655,17 @@ int *cp, *fp, *np;
 
 
 /*
- * This is the general command execution routine. It handles the fake binding
- * of all the keys to "self-insert".
+ * This is the general command execution routine. It takes care of checking
+ * flags, globals, etc, to be sure we're not doing something dumb.
  * Return the status of command.
  */
 
 int
-execute(c, f, n, execfunc)
+execute(execfunc, f, n)
 CMDFUNC *execfunc;		/* ptr to function to execute */
 {
         register int status, flags;
-
-	/* if the keystroke is a bound function...do it */
-	if (execfunc == NULL)
-		execfunc = kcod2fnc(c);
+	MARK odot;
 
 	if (execfunc == NULL) {
 		TTbeep();
@@ -545,26 +686,15 @@ CMDFUNC *execfunc;		/* ptr to function to execute */
 			dotcmdstop();
 		if (flags & UNDO) {
 			/* undoable command can't be permitted when read-only */
-			if (curbp->b_mode&MDVIEW)
+			if (b_val(curbp,MDVIEW))
 				return(rdonly());
 			mayneedundo();
 		}
 	}
 
-	/* commands that don't move can't follow operators */
-	if ( doingopcmd ) {
-		if ((flags & MOTION) == 0) {
-			TTbeep();
-			return(ABORT);
-		}
-		/* motion is interpreted as affecting full lines */
-		if (flags & FL)
-			fulllineregions = TRUE;
-	}
-
-	if (flags & ABS) { /* motion is absolute */
-		curwp->w_ldmkp = curwp->w_dotp;
-		curwp->w_ldmko = curwp->w_doto;
+	/* if motion is absolute, remember where we are */
+	if (flags & ABS) {
+		odot = DOT;
 	}
 
 	status = (execfunc->c_func)(f, n, NULL, NULL);
@@ -573,6 +703,14 @@ CMDFUNC *execfunc;		/* ptr to function to execute */
 	}
 	if (flags & UNDO)	/* verify malloc arena after line changers */
 		vverify("main");
+
+	/* if motion was absolute, and it wasn't just on behalf of an
+		operator, and we moved, update the "last dot" mark */
+	if ((flags & ABS) && !doingopcmd && !sameline(DOT, odot)) {
+		curwp->w_lastdot = odot;
+	}
+
+
 	return (status);
 }
 
@@ -792,7 +930,6 @@ ctlxe(f, n)
 esc(f, n)
 {
         TTbeep();
-	kbdmode = STOP;
 	dotcmdmode = STOP;
 	fulllineregions = FALSE;
 	doingopcmd = FALSE;
@@ -808,26 +945,49 @@ rdonly()
 {
 	TTbeep();
 	mlwrite("[No changes are allowed while in \"view\" mode]");
-	return(FALSE);
+	return FALSE;
+}
+
+showversion(f,n)
+{
+	mlwrite(version);
+	return TRUE;
 }
 
 unimpl()
 {
 	TTbeep();
 	mlwrite("[Sorry, that vi command is unimplemented in vile ]");
-	return(FALSE);
+	return FALSE;
 }
+
+opercopy() { return unimpl(); }
+opermove() { return unimpl(); }
+opertransf() { return unimpl(); }
+
+operglobals() { return unimpl(); }
+opervglobals() { return unimpl(); }
+
+map() { return unimpl(); }
+unmap() { return unimpl(); }
+
+source() { return unimpl(); }
+
+subst_again() { return unimpl(); }
+
+visual() { return unimpl(); }
+ex() { return unimpl(); }
 
 nullproc()	/* user function that does (almost) NOTHING */
 {
 	return TRUE;
 }
 
-meta()	/* dummy function for binding to meta prefix */
+cntl_af()	/* dummy function for binding to control-a prefix */
 {
 }
 
-cex()	/* dummy function for binding to control-x prefix */
+cntl_xf()	/* dummy function for binding to control-x prefix */
 {
 }
 
@@ -872,7 +1032,7 @@ charinit()
 
 	/* digits */
 	for (c = '0'; c <= '9'; c++)
-		_chartypes_[c] |= _digit|_path|_ident;
+		_chartypes_[c] |= _digit|_path|_ident|_linespec;
 
 	/* punctuation */
 	for (c = '!'; c <= '/'; c++)
@@ -887,6 +1047,31 @@ charinit()
 	/* printable */
 	for (c = ' '; c <= '~'; c++)
 		_chartypes_[c] |= _print;
+
+	/* backspacers: ^H, rubout, and the user's backspace char */
+	/* we'll add the user's char later */
+	_chartypes_['\b'] |= _bspace;
+	_chartypes_[127] |= _bspace;
+
+	/* wildcard chars for most shells */
+	_chartypes_['*'] |= _wild;
+	_chartypes_['?'] |= _wild;
+	_chartypes_['~'] |= _wild;
+	_chartypes_['['] |= _wild;
+	_chartypes_[']'] |= _wild;
+	_chartypes_['$'] |= _wild;
+	_chartypes_['{'] |= _wild;
+	_chartypes_['}'] |= _wild;
+
+	/* ex mode line specifiers */
+	_chartypes_[','] |= _linespec;
+	_chartypes_['%'] |= _linespec;
+	_chartypes_['-'] |= _linespec;
+	_chartypes_['+'] |= _linespec;
+	_chartypes_['.'] |= _linespec;
+	_chartypes_['$'] |= _linespec;
+	_chartypes_['\''] |= _linespec;
+
 }
 
 
@@ -985,7 +1170,7 @@ dspram()	/* display the amount of RAM currently malloced */
 	TTforg(7);
 	TTbacg(0);
 #endif
-	sprintf(mbuf, "[%lu]", envram);
+	lsprintf(mbuf, "[%ld]", envram);
 	sp = &mbuf[0];
 	while (*sp)
 		TTputc(*sp++);
