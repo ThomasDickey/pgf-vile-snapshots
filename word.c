@@ -4,7 +4,10 @@
  * do any sentence mode commands, they are likely to be put in this file. 
  *
  * $Log: word.c,v $
- * Revision 1.24  1993/03/05 17:50:54  pgf
+ * Revision 1.25  1993/04/01 12:53:33  pgf
+ * removed redundant includes and declarations
+ *
+ * Revision 1.24  1993/03/05  17:50:54  pgf
  * see CHANGES, 3.35 section
  *
  * Revision 1.23  1992/12/23  09:28:15  foxharp
@@ -86,7 +89,6 @@
  * initial vile RCS revision
  */
 
-#include	<stdio.h>
 #include	"estruct.h"
 #include	"edef.h"
 

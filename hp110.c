@@ -2,7 +2,10 @@
  *	HP110:	Hewlett Packard 110 Screen Driver
  *
  * $Log: hp110.c,v $
- * Revision 1.5  1992/08/20 23:40:48  foxharp
+ * Revision 1.6  1993/04/01 12:53:33  pgf
+ * removed redundant includes and declarations
+ *
+ * Revision 1.5  1992/08/20  23:40:48  foxharp
  * typo fixes -- thanks, eric
  *
  * Revision 1.4  1992/05/16  12:00:31  pgf
@@ -21,7 +24,6 @@
 
 #define termdef 1			/* don't define "term" external */
 
-#include	<stdio.h>
 #include	"estruct.h"
 #include	"edef.h"
 

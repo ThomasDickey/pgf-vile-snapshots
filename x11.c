@@ -2,7 +2,10 @@
  * 	X11 support, Dave Lemke, 11/91
  *
  * $Log: x11.c,v $
- * Revision 1.14  1993/03/05 17:50:54  pgf
+ * Revision 1.15  1993/04/01 12:53:33  pgf
+ * removed redundant includes and declarations
+ *
+ * Revision 1.14  1993/03/05  17:50:54  pgf
  * see CHANGES, 3.35 section
  *
  * Revision 1.13  1993/02/24  10:59:02  pgf
@@ -49,7 +52,6 @@
  * Initial revision
  */
 
-#include	<stdio.h>
 #include	"estruct.h"
 #include	"edef.h"
 

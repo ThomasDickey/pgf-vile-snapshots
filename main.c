@@ -14,7 +14,23 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.98  1993/03/16 10:53:21  pgf
+ * Revision 1.103  1993/04/01 14:43:16  pgf
+ * typo -- missing semicolon
+ *
+ * Revision 1.102  1993/04/01  13:07:50  pgf
+ * see tom's 3.40 CHANGES
+ *
+ * Revision 1.101  1993/04/01  12:05:46  pgf
+ * add setjmp/longjmp to tgetc() and catchintr(), so that ^C gets
+ * through on BSD-style signals
+ *
+ * Revision 1.100  1993/03/25  19:50:58  pgf
+ * see 3.39 section of CHANGES
+ *
+ * Revision 1.99  1993/03/17  11:35:04  pgf
+ * cleaned up confusion in alt-tabstop mode
+ *
+ * Revision 1.98  1993/03/16  10:53:21  pgf
  * see 3.36 section of CHANGES file
  *
  * Revision 1.97  1993/03/05  18:46:39  pgf
@@ -91,7 +107,7 @@
  * allow the cursor to rest on the 'newline', in the case where we're in
  * the middle of insert mode, and are only out here due to using arrow
  * keys.  otherwise, there's no way to append to end of line with arrow
- * keys -- you're blocked at the last character.:
+ * keys -- you're blocked at the last character.
  *
  * Revision 1.75  1992/07/01  17:01:42  foxharp
  * make sure startstat is always set properly, and
@@ -357,8 +373,6 @@
  * initial vile RCS revision
  */
 
-#include	<stdio.h>
-
 /* Make global definitions not external */
 #define realdef
 #include	"estruct.h"	/* global structures and defines */
@@ -412,21 +426,15 @@ char	*argv[];
 #if	CRYPT
 	char ekey[NPAT];		/* startup encryption key */
 #endif
-	char *us;
 
 #if MSDOS
-	char *simplename( char * );
 	slash = '\\';  /* getswitchar() == '/' ? '\\' : '/'; */
 	expand_wild_args(&argc, &argv);
 #else
 	slash = '/';
 #endif
 
-	us = strrchr(argv[0],slash);
-	if (!us)
-		us = argv[0];
-	else
-		us++;
+	prog_arg = argv[0];	/* this contains our only clue to exec-path */
 
 	start_debug_log(argc,argv);
 
@@ -434,9 +442,8 @@ char	*argv[];
 					early  */
 	global_val_init();	/* global buffer values */
 
-	if (strcmp(us, "view") == 0)
+	if (strcmp(pathleaf(prog_arg), "view") == 0)
 		set_global_b_val(MDVIEW,TRUE);
-
 
 #if IBMPC	/* pjr */
 	ibmtype = CDSENSE;
@@ -735,9 +742,7 @@ char	*argv[];
 	/* if invoked with no other startup files,
 	   run the system startup file here */
 	if (!ranstartup) {
-		char *getenv();
-		char *vileinit;
-		vileinit = getenv("VILEINIT");
+		char *vileinit = getenv("VILEINIT");
 		if (vileinit != NULL) {
 			int odiscmd;
 			BUFFER *vbp, *obp;
@@ -852,14 +857,11 @@ char	*argv[];
 	if (startstat == TRUE)  /* else there's probably an error message */
 		mlforce(msg);
 
-
 	/* process commands */
 	loop();
 
 	/* NOTREACHED */
-
-	return 1;
-
+	return BAD(1);
 }
 
 #if MSDOS
@@ -905,7 +907,7 @@ char ***argvp;
 
 	nargc = 0;
 	nargvmax = 2;		/* dimension of nargv[]		 */
-	if ((nargv = typeallocn(char *, nargvmax) == NULL) {
+	if ((nargv = typeallocn(char *, nargvmax)) == NULL) {
 		mlforce("[OUT OF MEMORY]");
 		return;
 	}
@@ -963,7 +965,7 @@ char ***argvp;
 				if (nargc + 2 >= nargvmax) {
 					nargvmax = nargc + 2;
 					if ((nargv = (char **) realloc(
-						nargv, 
+						(char *)nargv,
 						nargvmax * sizeof(char *))
 						) == NULL) {
 						mlforce("[OUT OF MEMORY]");
@@ -1101,7 +1103,7 @@ global_val_init()
 
 
 	set_global_g_val(GMDABUFF,TRUE); 	/* auto-buffer */
-	set_global_g_val(GMDVITABPOS,TRUE); 	/* vi-style tab positioning */
+	set_global_g_val(GMDALTTABPOS,FALSE); 	/* emacs-style tab positioning */
 	set_global_g_val(GMDDIRC,FALSE); 	/* directory-completion */
 #ifdef GMDTAGSLOOK
 	set_global_g_val(GMDTAGSLOOK,FALSE); 	/* tags-look */
@@ -1183,6 +1185,8 @@ ACTUAL_SIGNAL(catchintr)
 #if USG || MSDOS
 	signal(SIGINT,catchintr);
 #endif
+	if (doing_kbd_read)
+		longjmp(read_jmp_buf, signo);
 	SIGRET;
 }
 #endif
@@ -1579,6 +1583,7 @@ charinit()
 	/* wildcard chars for most shells */
 	_chartypes_['*'] |= _wild;
 	_chartypes_['?'] |= _wild;
+#if !VMS
 	_chartypes_['~'] |= _wild;
 	_chartypes_['['] |= _wild;
 	_chartypes_[']'] |= _wild;
@@ -1586,6 +1591,7 @@ charinit()
 	_chartypes_['{'] |= _wild;
 	_chartypes_['}'] |= _wild;
 	_chartypes_['`'] |= _wild;
+#endif
 
 	/* ex mode line specifiers */
 	_chartypes_[','] |= _linespec;
@@ -1604,17 +1610,26 @@ charinit()
 	_chartypes_['{'] |= _fence;
 	_chartypes_['}'] |= _fence;
 
+#if VMS
+	_chartypes_['['] |= _pathn;	/* actually, "<", ">" too */
+	_chartypes_[']'] |= _pathn;
+	_chartypes_['$'] |= _pathn;
+	_chartypes_[':'] |= _pathn;
+	_chartypes_[';'] |= _pathn;
+#endif
+
 #if !SMALLER
-	/* scratch-buffer-names (superset of _pathn) */
+	/* scratch-buffer-names (usually superset of _pathn) */
 	_chartypes_[(unsigned)SCRTCH_LEFT[0]]  |= _scrtch;
 	_chartypes_[(unsigned)SCRTCH_RIGHT[0]] |= _scrtch;
+	_chartypes_[' '] |= _scrtch;	/* ...to handle "[Buffer List]" */
 #endif
 
 	for (c = 0; c < N_chars; c++) {
 #if !SMALLER
 		if (isspace(c) || isprint(c))
 			_chartypes_[c] |= _shpipe;
-		if (isspace(c) || isalnum(c))
+		if (ispath(c))
 			_chartypes_[c] |= _scrtch;
 #endif
 		if ((_chartypes_[c] & _space) == 0)
@@ -1638,7 +1653,7 @@ int size;	/* number of bytes to move */
 }
 #endif
 
-#if	(AZTEC || TURBO || LATTICE || ZTC) && MSDOS
+#if	(AZTEC || LATTICE || ZTC) && MSDOS
 /*	strncpy:	copy a string...with length restrictions
 			ALWAYS null terminate
 Hmmmm...

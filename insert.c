@@ -8,8 +8,14 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: insert.c,v $
- *	Revision 1.15  1993/03/17 10:01:18  pgf
- *	overwrite() renamed to overwritechars()
+ *	Revision 1.17  1993/04/01 13:06:31  pgf
+ *	turbo C support (mostly prototypes for static)
+ *
+ * Revision 1.16  1993/03/18  17:42:20  pgf
+ * see 3.38 section of CHANGES
+ *
+ * Revision 1.15  1993/03/17  10:01:18  pgf
+ * overwrite() renamed to overwritechars()
  *
  * Revision 1.14  1993/03/16  10:53:21  pgf
  * see 3.36 section of CHANGES file
@@ -61,12 +67,14 @@
  *
  */
 
-#include	<stdio.h>
 #include	"estruct.h"
 #include	"edef.h"
-#if UNIX
-#include	<signal.h>
-#endif
+
+static	int	wrap_at_col P(( void ));
+static	void	advance_one_char P(( void ));
+static	int	ins_n_times P(( int, int, int ));
+
+/*--------------------------------------------------------------------------*/
 
 /* returns nonzero iff wrap-margin or wrap-words is active */
 static int
@@ -194,7 +202,6 @@ int n;
 /*
  * Go into insert mode.  I guess this isn't emacs anymore...
  */
-/* ARGSUSED */
 int
 insert(f, n)
 int f,n;
@@ -202,15 +209,14 @@ int f,n;
 	int	s,
 		t = dotreplaying(FALSE);
 
-	s = ins_n_times(f,n,FALSE);
+	s = ins_n_times(f,n,n>0);
 	if (t)
 		advance_one_char();
-	update(FALSE);
+	(void)update(FALSE);
 
 	return s;
 }
 
-/* ARGSUSED */
 int
 insertbol(f, n)
 int f,n;
@@ -222,14 +228,13 @@ int f,n;
 		return insert(f,n);
 
 	firstnonwhite(f,n);
-	s = ins_n_times(f,n,FALSE);
+	s = ins_n_times(f,n,n>0);
 	if (t)
 		advance_one_char();
 
 	return s;
 }
 
-/* ARGSUSED */
 int
 append(f, n)
 int f,n;
@@ -239,7 +244,6 @@ int f,n;
 	return ins_n_times(f,n,TRUE);
 }
 
-/* ARGSUSED */
 int
 appendeol(f, n)
 int f,n;
@@ -250,7 +254,6 @@ int f,n;
 	return ins_n_times(f,n,FALSE);
 }
 
-/* ARGSUSED */
 int
 overwritechars(f, n)
 int f,n;
@@ -282,7 +285,7 @@ int f,n;
 	insertmode = REPLACECHAR;  /* need to fool the SPEC prefix code */
 	if (b_val(curbp, MDSHOWMODE))
 		curwp->w_flag |= WFMODE;
-	update(FALSE);
+	(void)update(FALSE);
 	c = kbd_key();
 	insertmode = FALSE;
 	curwp->w_flag |= WFMODE;
@@ -346,7 +349,7 @@ int playback;
 		if (playback) {
 			c = tb_next(insbuff);
 		} else {
-			update(FALSE);
+			(void)update(FALSE);
 			if (!tb_append(&insbuff, c = kbd_key()))
 				return FALSE;
 		}
@@ -519,7 +522,7 @@ int playback;
 		if (b_val(curbp, MDASAVE))
 			if (--curbp->b_acount <= 0) {
 				/* and save the file if needed */
-				upscreen(FALSE, 0);
+				(void)update(TRUE);
 				filesave(FALSE, 0);
 				curbp->b_acount = b_val(curbp,VAL_ASAVECNT);
 			}
@@ -776,7 +779,6 @@ inspound()	/* insert a # into the text here...we are in CMODE */
 }
 
 /* insert a tab into the file */
-/* ARGSUSED */
 int
 tab(f, n)
 int f,n;

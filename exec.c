@@ -4,7 +4,19 @@
  *	written 1986 by Daniel Lawrence	
  *
  * $Log: exec.c,v $
- * Revision 1.41  1993/03/16 10:53:21  pgf
+ * Revision 1.45  1993/04/01 13:06:31  pgf
+ * turbo C support (mostly prototypes for static)
+ *
+ * Revision 1.44  1993/04/01  12:01:30  pgf
+ * fix macro naming (off by one)
+ *
+ * Revision 1.43  1993/04/01  09:44:54  pgf
+ * use lsprintf to form [Macro nn] names
+ *
+ * Revision 1.42  1993/03/22  10:46:25  pgf
+ * remember previously source'ed filename
+ *
+ * Revision 1.41  1993/03/16  10:53:21  pgf
  * see 3.36 section of CHANGES file
  *
  * Revision 1.40  1993/03/05  17:50:54  pgf
@@ -150,14 +162,36 @@
  * revision 1.1
  * date: 1990/09/21 10:25:14;
  * initial vile RCS revision
-*/
+ */
 
-#include	<stdio.h>
 #include	"estruct.h"
 #include	"edef.h"
 
 
 extern CMDFUNC f_gomark;
+
+static	int	eol_range P(( char *, int, int, int ));
+#if !SMALLER
+static	int	execute_named_command P(( int, int ));
+#endif
+static	char *	linespec P(( char *, LINE ** ));
+static	void	freewhile P(( WHBLOCK * ));
+
+/* directive name table:
+	This holds the names of all the directives....	*/
+
+static	char	*dname[] = {
+#if ! SMALLER
+	"if",    "else",     "endif",
+	"goto",  "return",   "endm",
+	"while", "endwhile", "break",
+	"force"
+#else
+	 "endm"
+#endif
+	};
+
+/*----------------------------------------------------------------------------*/
 
 /*ARGSUSED*/
 static int
@@ -186,6 +220,8 @@ int	eolchar;
 /* namedcmd:	execute a named command even if it is not bound */
 #if SMALLER
 #define execute_named_command namedcmd
+#else
+static	/* next procedure is local */
 #endif
 
 int
@@ -463,7 +499,7 @@ int f,n;
 /* parse an ex-style line spec -- code culled from elvis, file ex.c, by
 	Steve Kirkendall
 */
-char *
+static char *
 linespec(s, markptr)
 register char	*s;		/* start of the line specifier */
 LINE		**markptr;	/* where to store the mark's value */
@@ -939,9 +975,7 @@ int n;		/* macro number to use */
 	}
 
 	/* construct the macro buffer name */
-	strcpy(bname, ScratchName(Macro xx));
-	bname[7] = '0' + (n / 10);
-	bname[8] = '0' + (n % 10);
+	lsprintf(bname, ScratchName(Macro %d), n);
 
 	/* set up the new macro buffer */
 	if ((bp = bfind(bname, OK_CREAT, BFINVS)) == NULL) {
@@ -1104,7 +1138,7 @@ int f, n;	/* default flag and numeric arg */
 
 */
 
-void
+static void
 freewhile(wp)	/* free a list of while block pointers */
 WHBLOCK *wp;	/* head of structure to free */
 {
@@ -1547,8 +1581,9 @@ int f, n;	/* default flag and numeric arg to pass on to file */
 	register int status;	/* return status of name query */
 	char fname[NFILEN];	/* name of file to execute */
 	char *fspec;		/* full file spec */
+	static	TBUFF	*last;
 
-	if ((status = mlreply_file("File to execute: ", (TBUFF **)0, FILEC_READ, fname)) != TRUE)
+	if ((status = mlreply_file("File to execute: ", &last, FILEC_READ, fname)) != TRUE)
 		return status;
 
 	/* look up the path for the file */
@@ -1609,23 +1644,23 @@ char *fname;	/* file name to execute */
 		zotbuf(bp);
 	return TRUE;
 }
+static	int	cbuf P(( int, int, int ));
 
 /*	cbuf:	Execute the contents of a numbered buffer	*/
 
-int
+static int
 cbuf(f, n, bufnum)
 int f, n;	/* default flag and numeric arg */
 int bufnum;	/* number of buffer to execute */
 {
         register BUFFER *bp;		/* ptr to buffer to execute */
         register int status;		/* status return */
-	static char bufname[] = ScratchName(Macro xx);
+	static char bufname[NBUFN];
 
 	if (!f) n = 1;
 
 	/* make the buffer name */
-	bufname[7] = '0' + (bufnum / 10);
-	bufname[8] = '0' + (bufnum % 10);
+	lsprintf(bufname, ScratchName(Macro %d), bufnum);
 
 	/* find the pointer to that buffer */
         if ((bp=bfind(bufname, NO_CREAT, 0)) == NULL) {

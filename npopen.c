@@ -2,7 +2,13 @@
  *		written by John Hutchinson, heavily modified by Paul Fox
  *
  * $Log: npopen.c,v $
- * Revision 1.19  1993/03/16 10:53:21  pgf
+ * Revision 1.21  1993/04/01 12:53:33  pgf
+ * removed redundant includes and declarations
+ *
+ * Revision 1.20  1993/03/25  19:50:58  pgf
+ * see 3.39 section of CHANGES
+ *
+ * Revision 1.19  1993/03/16  10:53:21  pgf
  * see 3.36 section of CHANGES file
  *
  * Revision 1.18  1993/03/05  17:50:54  pgf
@@ -69,7 +75,6 @@
 
 #if UNIX
 
-#include <signal.h>
 #include <errno.h>
 #include <sys/param.h>
 
@@ -212,7 +217,7 @@ char *cmd;
 		sh = "/bin/sh";
 		shname = "sh";
 	} else {
-		shname = strrchr(sh,'/');
+		shname = last_slash(sh);
 		if (shname == NULL) {
 			shname = sh;
 		} else {
@@ -276,5 +281,6 @@ softfork()
 }
 
 #else
+void
 npopenhello() {}
 #endif

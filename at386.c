@@ -2,7 +2,10 @@
  *		have libtermcap.   grrr.
  *
  * $Log: at386.c,v $
- * Revision 1.8  1992/05/16 12:00:31  pgf
+ * Revision 1.9  1993/04/01 12:53:33  pgf
+ * removed redundant includes and declarations
+ *
+ * Revision 1.8  1992/05/16  12:00:31  pgf
  * prototypes/ansi/void-int stuff/microsoftC
  *
  * Revision 1.7  1992/04/10  18:47:25  pgf
@@ -30,11 +33,10 @@
  * revision 1.1
  * date: 1990/09/21 10:24:39;
  * initial vile RCS revision
-*/
+ */
 
 #define termdef 1			/* don't define "term" external */
 
-#include <stdio.h>
 #include	"estruct.h"
 #include	"edef.h"
 
@@ -111,7 +113,6 @@ TERM term = {
 
 at386open()
 {
-	char *getenv();
 	char *t, *p, *tgetstr();
 	char tcbuf[1024];
 	char *tv_stype;

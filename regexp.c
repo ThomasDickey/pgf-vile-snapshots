@@ -13,7 +13,13 @@
  *		pgf, 11/91
  * 
  * $Log: regexp.c,v $
- * Revision 1.31  1993/02/24 10:59:02  pgf
+ * Revision 1.33  1993/04/01 13:06:31  pgf
+ * turbo C support (mostly prototypes for static)
+ *
+ * Revision 1.32  1993/03/25  19:50:58  pgf
+ * see 3.39 section of CHANGES
+ *
+ * Revision 1.31  1993/02/24  10:59:02  pgf
  * see 3.34 changes, in CHANGES file
  *
  * Revision 1.30  1992/12/28  23:50:45  foxharp
@@ -148,7 +154,7 @@
  * precedence is structured in regular expressions.  Serious changes in
  * regular-expression syntax might require a total rethink.
  */
-#include <stdio.h>
+
 #include "estruct.h"
 #include "edef.h"
 
@@ -729,14 +735,12 @@ int at_bop;
 	case '|':
 	case ')':
 		FAIL("internal urp");	/* Supposed to be caught earlier. */
-		/* NOTREACHED */
-		break;
+
 	case '?':
 	case '+':
 	case '*':
 		FAIL("?+* follows nothing");
-		/* NOTREACHED */
-		break;
+
 	case '\\':
 		switch(*regparse) {
 		case '\0':	
@@ -1284,13 +1288,13 @@ char *prog;
 			break;
 		case ANYOF:
 			if (reginput == regnomore || regstrchr(OPERAND(scan),
-					*reginput, NULL) == NULL)
+					*reginput, (char *)0) == NULL)
 				return(0);
 			reginput++;
 			break;
 		case ANYBUT:
 			if (reginput == regnomore || regstrchr(OPERAND(scan),
-					*reginput, NULL) != NULL)
+					*reginput, (char *)0) != NULL)
 				return(0);
 			reginput++;
 			break;
@@ -1326,7 +1330,7 @@ char *prog;
 					return(0);
 			}
 			/* NOTREACHED */
-			break;
+
 		case CLOSE+1:
 		case CLOSE+2:
 		case CLOSE+3:
@@ -1355,7 +1359,7 @@ char *prog;
 					return(0);
 			}
 			/* NOTREACHED */
-			break;
+
 		case BRANCH: {
 				register char *save;
 
@@ -1416,7 +1420,7 @@ char *prog;
 				return(0);
 			}
 			/* NOTREACHED */
-			break;
+
 		case END:
 			return(1);	/* Success! */
 		default:
@@ -1467,14 +1471,14 @@ char *p;
 		break;
 	case ANYOF:
 		while (scan != regnomore && regstrchr(opnd, *scan,
-						NULL) != NULL) {
+						(char *)0) != NULL) {
 			count++;
 			scan++;
 		}
 		break;
 	case ANYBUT:
 		while (scan != regnomore && regstrchr(opnd, *scan,
-						NULL) == NULL) {
+						(char *)0) == NULL) {
 			count++;
 			scan++;
 		}

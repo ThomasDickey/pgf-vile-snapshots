@@ -9,7 +9,10 @@
  *  is called whenever possible.
  *  Modifications by Pete Ruczynski (pjr).
  * $Log: z_ibmpc.c,v $
- * Revision 1.2  1992/08/20 23:40:48  foxharp
+ * Revision 1.3  1993/04/01 12:53:33  pgf
+ * removed redundant includes and declarations
+ *
+ * Revision 1.2  1992/08/20  23:40:48  foxharp
  * typo fixes -- thanks, eric
  *
  * Revision 1.1  1992/07/01  16:57:45  foxharp
@@ -20,7 +23,6 @@
 
 #define	termdef	1			/* don't define "term" external */
 
-#include	<stdio.h>
 #include	"estruct.h"
 #include	"edef.h"
 

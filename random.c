@@ -3,7 +3,13 @@
  * commands. There is no functional grouping here, for sure.
  *
  * $Log: random.c,v $
- * Revision 1.87  1993/03/17 10:00:29  pgf
+ * Revision 1.89  1993/04/01 13:06:31  pgf
+ * turbo C support (mostly prototypes for static)
+ *
+ * Revision 1.88  1993/03/25  19:50:58  pgf
+ * see 3.39 section of CHANGES
+ *
+ * Revision 1.87  1993/03/17  10:00:29  pgf
  * initial changes to make VMS work again
  *
  * Revision 1.86  1993/03/16  10:53:21  pgf
@@ -324,8 +330,19 @@
 # include <sys/select.h>
 #endif
 
+#if TURBO
+#include <dir.h>
+#endif
+
 extern CMDFUNC f_forwchar, f_backchar, f_forwchar_to_eol, f_backchar_to_bol;
 
+/*--------------------------------------------------------------------------*/
+#if MSDOS
+static	int	drive2char P(( int ));
+static	int	char2drive P(( int ));
+#endif
+
+/*--------------------------------------------------------------------------*/
 
 /* generic "lister", which takes care of popping a window/buffer pair under
 	the given name, and calling "func" with a couple of args to fill in
@@ -333,7 +350,7 @@ extern CMDFUNC f_forwchar, f_backchar, f_forwchar_to_eol, f_backchar_to_bol;
 int
 liststuff(name,func,iarg,carg)
 char *name;
-void (*func)();		/* ptr to function to execute */
+void (*func) P(( int, char *));	/* ptr to function to execute */
 int iarg;
 char *carg;
 {
@@ -358,14 +375,13 @@ char *carg;
 		character pointer arguments */
 	(*func)(iarg,carg);
 	gotobob(FALSE,1);
-	{ char buf[80];
-	  lsprintf(buf, "       %s   %s",prognam,version);
-	  if (bp->b_fname)
+
+	if (bp->b_fname)
 		free(bp->b_fname);
-	  bp->b_fname = strmalloc(buf);
-	  bp->b_fnlen = strlen(buf);
-	  /* was ch_fname() */
-	}
+	bp->b_fname = strmalloc(non_filename());
+	bp->b_fnlen = strlen(bp->b_fname);
+	/* was ch_fname() */
+
 	bp->b_flag &= ~BFCHG;
 	bp->b_active = TRUE;
 	make_local_b_val(bp,MDVIEW);
@@ -904,22 +920,27 @@ catnap(milli)
 int milli;
 {
 #if ! UNIX
+#if VMS
+	float	seconds = milli/1000.;
+	lib$wait(&seconds);
+#else
 	long i;
 	for (i = 0; i < term.t_pause; i++)
 		;
+#endif
 #else
 # if HAVE_SELECT
 
 	struct timeval tval;
 	tval.tv_sec = 0;
 	tval.tv_usec = milli * 1000;	/* microseconds */
-	select (0, (fd_set*)0, (fd_set*)0, (fd_set*)0, &tval);
+	(void)select (0, (fd_set*)0, (fd_set*)0, (fd_set*)0, &tval);
 
 # else
 #  if HAVE_POLL
 
 	struct pollfd pfd;
-	poll(&pfd, 0, milli); /* milliseconds */
+	(void)poll(&pfd, 0, milli); /* milliseconds */
 
 #  else
 
@@ -1002,17 +1023,19 @@ int force;
 	cwd = dirname;
 	}
 #else
-# if (MSDOS & MSC) || POSIX || VMS
-
+# if (MSDOS & (MSC || TURBO)) || POSIX || VMS
 	cwd = getcwd(dirname, NFILEN);
 # else
 	cwd = getwd(dirname);
 # endif
 #endif
+#if MSDOS
+	(void)mklower(cwd);
+#endif
 	s = strchr(cwd, '\n');
 	if (s)
 		*s = EOS;
-#if MSDOS & MSC
+#if MSDOS & (MSC || TURBO)
 	update_dos_drv_dir(cwd);
 #endif
 
@@ -1021,11 +1044,38 @@ int force;
 
 #if MSDOS
 
+/* convert drive index to _letter_ */
+static int
+drive2char(d)
+int	d;
+{
+	if (d < 0 || d >= 26) {
+		mlforce("[Illegal drive index %d]", d);
+		d = 0;
+	}
+	return (d + 'A');
+}
+
+/* convert drive _letter_ to index */
+static int
+char2drive(d)
+int	d;
+{
+	if (isalpha(d)) {
+		if (islower(d))
+			d = toupper(d);
+	} else {
+		mlforce("[Not a drive '%c']", d);
+		d = curdrive();
+	}
+	return (d - 'A');
+}
+
 /* returns drive _letter_ */
 int
 curdrive()
 {
-	return (bdos(0x19, 0, 0) & 0xff) + 'A';
+	return drive2char(bdos(0x19, 0, 0) & 0xff);
 }
 
 /* take drive _letter_ as arg. */
@@ -1033,41 +1083,42 @@ int
 setdrive(d)
 int d;
 {
-/* FIXME must put some error range/checking in here */
-	bdos(0x0e, d-'A', 0);
-	return TRUE;
-#if LATER
+	if (isalpha(d)) {
+		bdos(0x0e, char2drive(d), 0);
+		return TRUE;
+	}
 	mlforce("[Bad drive specifier]");
-#endif
+	return FALSE;
 }
 
 
-static int curd;
-static char *cwds[26];
+static int curd;		/* current drive-letter */
+static char *cwds[26];		/* list of current dirs on each drive */
 
 char *
 curr_dir_on_drive(drive)
 int drive;
 {
-	if (drive == 0)
-		return current_directory(FALSE);
+	int	n = char2drive(drive);
 
-	if (curd == 0)
-		curd = curdrive();
+	if (n != 0) {
+		if (curd == 0)
+			curd = curdrive();
 
-	if (cwds[drive-'A'])
-		return cwds[drive-'A'];
-	else
-		cwds[drive-'A'] = castalloc(char,NFILEN);
+		if (cwds[n])
+			return cwds[n];
+		else {
+			cwds[n] = castalloc(char,NFILEN);
 
-	if (!cwds[drive-'A'])
-		return current_directory(FALSE);
-
-	if (setdrive(drive) == TRUE) {
-		(void)strcpy(cwds[drive-'A'], current_directory(TRUE));
-		setdrive(curd);
-		(void)current_directory(TRUE);
-		return cwds[drive-'A'];
+			if (cwds[n]) {
+				if (setdrive(drive) == TRUE) {
+					(void)strcpy(cwds[n], current_directory(TRUE));
+					(void)setdrive(curd);
+					(void)current_directory(TRUE);
+					return cwds[n];
+				}
+			}
+		}
 	}
 	return current_directory(FALSE);
 }
@@ -1076,22 +1127,17 @@ void
 update_dos_drv_dir(cwd)
 char *cwd;
 {
-	char drive = 0;
-	if (isupper(cwd[0]) && cwd[1] == ':') {
-		drive = *cwd;
-		cwd += 2;
-	}
-	if (!drive)
-		return;
+	char	*s;
 
-	if (!cwds[drive-'A'])
-		cwds[drive-'A'] = castalloc(char,NFILEN);
+	if ((s = is_msdos_drive(cwd)) != 0) {
+		int n = char2drive(*cwd);
 
-	if (!cwds[drive-'A'])
-		return;
+		if (!cwds[n])
+			cwds[n] = castalloc(char,NFILEN);
 
-	(void)strcpy(cwds[drive-'A'],cwd);
-	
+		if (cwds[n])
+			(void)strcpy(cwds[n], s);
+	}	
 }
 #endif
 
@@ -1106,10 +1152,18 @@ int f, n;
 	char cdirname[NFILEN];
 
 	status = mlreply_dir("Change to directory: ", &last, cdirname);
-	if (status != TRUE) {
-		/* should go HOME here */
+#if UNIX || VMS
+	if (status == FALSE) {		/* empty reply, go HOME */
+#if UNIX
+		(void)lengthen_path(strcpy(cdirname, "~"));
+#else	/* VMS */
+		(void)strcpy(cdirname, "sys$login");
+#endif
+	} else
+#endif
+	if (status != TRUE)
 		return status;
-	}
+
 	return set_directory(cdirname);
 }
 
@@ -1141,12 +1195,12 @@ char	*dir;
 
     if (glob(exdp)) {
 #if MSDOS
-	if (isupper(exdp[0]) && exdp[1] == ':') {
-		if (setdrive(exdp[0]) == TRUE) {
-			exdp += 2;
+	char	*s;
+	if ((s = is_msdos_drive(exdp)) != 0) {
+		if (setdrive(*exdp) == TRUE) {
+			exdp = s;	/* skip device-part */
 			if (!*exdp) {
-				pwd(TRUE,1);
-				return TRUE;
+				return pwd(TRUE,1);
 			}
 		} else {
 			return FALSE;
@@ -1154,7 +1208,7 @@ char	*dir;
 	}
 #endif
 	if (chdir(exdp) == 0) {
-		pwd(TRUE,1);
+		(void)pwd(TRUE,1);
 		updatelistbuffers();
 		return TRUE;
 	}
@@ -1180,7 +1234,7 @@ char *fname;
 	np = fname;
 
 	/* produce a full pathname, unless already absolute or "internal" */
-	if (np[0] != EOS && !isScratchName(np) && !isShellOrPipe(np))
+	if (!isInternalName(np))
 		np = lengthen_path(strcpy(nfilen, np));
 
 	len = strlen(np)+1;

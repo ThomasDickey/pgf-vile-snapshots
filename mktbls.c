@@ -9,7 +9,10 @@
  *	the output structures.
  *
  * $Log: mktbls.c,v $
- * Revision 1.19  1993/03/17 10:00:29  pgf
+ * Revision 1.20  1993/04/01 13:06:31  pgf
+ * turbo C support (mostly prototypes for static)
+ *
+ * Revision 1.19  1993/03/17  10:00:29  pgf
  * initial changes to make VMS work again
  *
  * Revision 1.18  1993/03/05  17:50:54  pgf
@@ -1363,6 +1366,6 @@ char    *argv[];
 		dump_bmodes();
 	}
 
-	exit(GOOD);
+	return(GOOD);
 	/*NOTREACHED*/
 }

@@ -17,7 +17,10 @@
  * ever equalled FALSE.
  * 
  * $Log: isearch.c,v $
- * Revision 1.17  1992/12/23 09:20:10  foxharp
+ * Revision 1.18  1993/04/01 12:53:33  pgf
+ * removed redundant includes and declarations
+ *
+ * Revision 1.17  1992/12/23  09:20:10  foxharp
  * ifdef of unused code
  *
  * Revision 1.16  1992/05/25  21:07:48  foxharp
@@ -65,8 +68,6 @@
  * revision 1.1 date: 1990/09/21 10:25:30; initial vile RCS revision
  */
 
-
-#include        <stdio.h>
 #include	"estruct.h"
 #include        "edef.h"
 

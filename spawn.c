@@ -2,7 +2,16 @@
  *		for MicroEMACS
  *
  * $Log: spawn.c,v $
- * Revision 1.43  1993/03/17 10:00:29  pgf
+ * Revision 1.46  1993/04/01 13:07:50  pgf
+ * see tom's 3.40 CHANGES
+ *
+ * Revision 1.45  1993/03/25  19:50:58  pgf
+ * see 3.39 section of CHANGES
+ *
+ * Revision 1.44  1993/03/18  17:42:20  pgf
+ * see 3.38 section of CHANGES
+ *
+ * Revision 1.43  1993/03/17  10:00:29  pgf
  * initial changes to make VMS work again
  *
  * Revision 1.42  1993/03/16  16:04:01  pgf
@@ -149,7 +158,6 @@
 
 #include	"estruct.h"
 #include        "edef.h"
-#include        <stdio.h>
 #if UNIX
 #include	<sys/stat.h>
 #endif
@@ -160,7 +168,6 @@
 
 #if		ST520 & MEGAMAX
 #include <osbind.h>
-#include <string.h>
 #define LOAD_EXEC 0 	/* load and execute the program */
 char	*STcmd,		/* the command filename & path  */
 	*STargs,	/* command args (if any)        */
@@ -179,11 +186,6 @@ char	*STcmd,		/* the command filename & path  */
 extern  int     oldmode[3];                     /* In "termio.c"        */
 extern  int     newmode[3];                     /* In "termio.c"        */
 extern  short   iochan;                         /* In "termio.c"        */
-#endif
-
-#if     UNIX
-#include        <signal.h>
-#include        <string.h>
 #endif
 
 #if	MSDOS & (MSC | TURBO | ZTC)
@@ -213,7 +215,7 @@ int f,n;
         movecursor(term.t_nrow, 0);             /* Seek to last line.   */
 	ttclean(TRUE);
         TTputc('\n');
-	(void)system_SHELL(NULL);
+	(void)system_SHELL((char *)0);
         TTflush();
 	ttunclean();
         sgarbf = TRUE;
@@ -347,7 +349,7 @@ int f,n;
 	return spawn1(FALSE);
 }
 
-#if UNIX
+#if UNIX || VMS
 static	TBUFF	*save_shell[2];
 
 /*
@@ -382,10 +384,10 @@ int	rerun;		/* TRUE/FALSE: spawn, -TRUE: pipecmd */
 	(void)strcpy(line, save);
 	if (rerun != TRUE) {
 		if (cb != 0)
-			lsprintf(temp, "Warning: %d modified buffer%s: %s",
-				cb, cb>1 ? "s":"", bang);
+			(void)lsprintf(temp, "Warning: %d modified buffer%s: %s",
+				cb, PLURAL(cb), bang);
 		else
-			lsprintf(temp, ": %s", bang);
+			(void)lsprintf(temp, "%s%s", rerun == -TRUE ? "" : ": ", bang);
 
 		if ((s = mlreply_no_bs(temp, line+1, NLINE)) != TRUE)
 			return s;
@@ -585,7 +587,7 @@ int rerun;
 #endif
 }
 
-#if UNIX
+#if UNIX || VMS
 /*
  * Pipe a one line command into a window
  */
@@ -657,9 +659,7 @@ pipecmd(f, n)
 
 #if	MSDOS
 	char *tmp;
-	char *getenv();
 	FILE *fp;
-	FILE *fopen();
 #endif
 
 #if	MSDOS
@@ -803,6 +803,7 @@ filterregion()
 	return s;
 #else
 	mlforce("[Region filtering not available]");
+	return FALSE;
 #endif
 }
 
@@ -989,7 +990,6 @@ system(cmd)
 char *cmd;	/*  Incoming command line to execute  */
 
 {
-	char *getenv();
 	static char *swchar = "/C";	/*  Execution switch  */
 	union REGS inregs;	/*  parameters for dos call  */
 	union REGS outregs;	/*  Return results from dos call  */

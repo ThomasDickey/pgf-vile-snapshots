@@ -4,7 +4,10 @@
  *  heavily modified by Paul Fox, 1990
  *
  * $Log: search.c,v $
- * Revision 1.46  1993/03/09 19:57:33  pgf
+ * Revision 1.47  1993/04/01 12:53:33  pgf
+ * removed redundant includes and declarations
+ *
+ * Revision 1.46  1993/03/09  19:57:33  pgf
  * fixed pointer/integer mismatch on calls to fsearch/rsearch
  *
  * Revision 1.45  1993/03/05  17:50:54  pgf
@@ -172,7 +175,6 @@
  *
  */
 
-#include        <stdio.h>
 #include	"estruct.h"
 #include        "edef.h"
 

@@ -10,7 +10,19 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.102  1993/03/17 10:00:29  pgf
+ * Revision 1.106  1993/04/01 14:43:39  pgf
+ * fix for NeXT
+ *
+ * Revision 1.105  1993/04/01  13:07:50  pgf
+ * see tom's 3.40 CHANGES
+ *
+ * Revision 1.104  1993/04/01  12:01:07  pgf
+ * add setjmp.h
+ *
+ * Revision 1.103  1993/03/25  19:50:58  pgf
+ * see 3.39 section of CHANGES
+ *
+ * Revision 1.102  1993/03/17  10:00:29  pgf
  * initial changes to make VMS work again
  *
  * Revision 1.101  1993/03/16  10:53:21  pgf
@@ -512,6 +524,15 @@
 #define	ZTC	0	/* Zortech C compiler */
 #define	TURBO	0	/* Turbo C/MSDOS */
 
+#ifdef __TURBOC__	/* Borland C/C++ 3.0 */
+#undef TURBO
+#undef SVR3
+#undef MSDOS
+#define SVR3   0
+#define TURBO  1
+#define MSDOS  1
+#endif
+
 #endif /* os_chosen */
 
 #if SVR3
@@ -537,7 +558,7 @@
 
 /* choose between void and int signal handler return type.
   "typedefs?  we don't need no steenking typedefs..." */
-#if POSIX || (BERK && BSD386) || SVR3 || APOLLO
+#if POSIX || (BERK && BSD386) || SVR3 || APOLLO || TURBO
 # define SIGT void
 # define SIGRET
 #else
@@ -559,6 +580,10 @@
 #   endif
 #  endif
 # endif
+#endif
+
+#if UNIX || MSDOS
+#include	<setjmp.h>
 #endif
 
 #ifndef DEFINE_SIGNAL
@@ -704,6 +729,38 @@
 /* (i.e. you shouldn't need to touch anything below here */
 /* ====================================================================== */
 
+#include <sys/types.h>
+#include <stdio.h>
+
+#if APOLLO
+# ifndef __STDCPP__
+#  define ANSI_VARARGS 0
+#  define ANSI_PROTOS 0 /* SR10.2 does not like protos w/o variable names */
+# endif
+#endif
+
+#ifndef ANSI_PROTOS
+#  if defined(__STDC__) || VMS || TURBO
+#    define ANSI_PROTOS 1
+#  else
+#    define ANSI_PROTOS 0
+#  endif
+#endif
+
+#ifndef ANSI_VARARGS
+# if defined(__STDC__) || VMS || TURBO
+#  define ANSI_VARARGS 1	/* look in <stdarg.h> */
+# else
+#  define ANSI_VARARGS 0	/* look in <varargs.h> */
+# endif
+#endif
+
+#if ANSI_PROTOS
+# define P(a) a
+#else
+# define P(a) ()
+#endif
+
 #if BERK && ! POSIX && !APOLLO
 #define USE_INDEX 1
 #endif
@@ -737,10 +794,6 @@ extern char *rindex();
 #undef poke
 #define       peek(a,b,c,d)   movedata(a,b,FP_SEG(c),FP_OFF(c),d)
 #define       poke(a,b,c,d)   movedata(FP_SEG(c),FP_OFF(c),a,b,d)
-#endif
-
-#if	VMS
-#define	getname	xgetname
 #endif
 
 #if	LATTICE
@@ -828,7 +881,7 @@ union REGS {
 #define	MEMMAP	0
 #endif
 
-#if	((MSDOS) && (LATTICE || AZTEC || MSC || TURBO || ZTC)) || UNIX
+#if	((MSDOS) && (LATTICE || AZTEC || MSC || TURBO || ZTC)) || UNIX || VMS
 #define	ENVFUNC	1
 #else
 #define	ENVFUNC	0
@@ -860,6 +913,8 @@ union REGS {
 #define	isspecial(c)	(c & ~(N_chars-1))
 
 #define	char2int(c)	((int)(c & 0xff)) /* mask off sign-extension, etc. */
+
+#define	PLURAL(n)	((n!=1)?"s":"")
 
 #define	EOS     '\0'
 
@@ -899,6 +954,7 @@ union REGS {
 #define	KBD_LOWERC	4	/* do we force input to lowercase */
 #define KBD_NOEVAL	8	/* disable 'tokval()' (e.g., from buffer) */
 #define KBD_MAYBEC	0x10	/* may be completed -- or not */
+#define KBD_UPPERC      0x20	/* do we force input to uppercase */
 
 /* default option for 'mlreply' (used in modes.c also) */
 #if !MSDOS
@@ -971,10 +1027,17 @@ union REGS {
 #define RBRACE '}'
 
 
-#if UNIX
-#define	PATHCHR	':'
-#else
+/* separator used when scanning PATH environment variable */
+#if VMS
+#define	PATHCHR	','
+#endif
+
+#if MSDOS
 #define	PATHCHR	';'
+#endif
+
+#ifndef PATHCHR				/* e.g., UNIX */
+#define	PATHCHR	':'
 #endif
 
 /* how big is the ascii rep. of an int? */
@@ -1109,10 +1172,6 @@ typedef struct regexp {
 	unsigned size;		/* vile addition -- how big is this */
 	char program[1];	/* Unwarranted chumminess with compiler. */
 } regexp;
-
-extern regexp *regcomp();
-extern int regexec();
-extern void regerror();
 
 /*
  * The first byte of the regexp internal "program" is actually this magic
@@ -1360,19 +1419,24 @@ typedef struct	BUFFER {
 /* warning:  code in file.c and fileio.c knows how long the shell, pipe, and 
 	append prefixes are (e.g. fn += 2 when appending) */
 #define	isShellOrPipe(s)  (s[0] == SHPIPE_LEFT[0])
-#define	isScratchName(s)  (s[0] == SCRTCH_LEFT[0])
-#define	isInternalName(s) (isShellOrPipe(s) || isScratchName(s))
+#define	isInternalName(s) (isShellOrPipe(s) || is_internalname(s))
 #define	isAppendToName(s) (s[0] == '>' && s[1] == '>')
 
+#if TURBO || NeXT	/* tokens are replaced differently than apollo */
+#define	ScratchName(s) SCRTCH_LEFT    #s    SCRTCH_RIGHT
+#endif
+
+#ifndef	ScratchName
 #ifdef	__STDC__
 #if	!defined(apollo) || defined(__STDCPP__)
 #define	ScratchName(s) SCRTCH_LEFT ## #s ## SCRTCH_RIGHT
 #endif
-#endif
+#endif	/* __STDC__ */
+#endif	/* ScratchName */
 
-#ifndef	ScratchName	/* K&R-style macro */
-#define	ScratchName(s)	"[s]"
-#endif
+#ifndef	ScratchName
+#define	ScratchName(s)	"[s]"	/* K&R-style macro */
+#endif	/* ScratchName */
 
 /*
  * Macros for manipulating buffer-struct members.
@@ -1484,25 +1548,25 @@ typedef struct	{
 	int	t_margin;		/* min margin for extended lines*/
 	int	t_scrsiz;		/* size of scroll region "	*/
 	int	t_pause;		/* # times thru update to pause */
-	void	(*t_open)();		/* Open terminal at the start.	*/
-	void	(*t_close)();		/* Close terminal at end.	*/
-	void	(*t_kopen)();		/* Open keyboard		*/
-	void	(*t_kclose)();		/* close keyboard		*/
-	int	(*t_getchar)(); 	/* Get character from keyboard. */
-	void	(*t_putchar)(); 	/* Put character to display.	*/
-	void	(*t_flush)();		/* Flush output buffers.	*/
-	void	(*t_move)();		/* Move the cursor, origin 0.	*/
-	void	(*t_eeol)();		/* Erase to end of line.	*/
-	void	(*t_eeop)();		/* Erase to end of page.	*/
-	void	(*t_beep)();		/* Beep.			*/
-	void	(*t_rev)();		/* set reverse video state	*/
-	int	(*t_rez)();		/* change screen resolution	*/
+	void	(*t_open) P((void));	/* Open terminal at the start.	*/
+	void	(*t_close) P((void));	/* Close terminal at end.	*/
+	void	(*t_kopen) P((void));	/* Open keyboard		*/
+	void	(*t_kclose) P((void));	/* close keyboard		*/
+	int	(*t_getchar) P((void)); /* Get character from keyboard. */
+	void	(*t_putchar) P((int)); 	/* Put character to display.	*/
+	void	(*t_flush) P((void));	/* Flush output buffers.	*/
+	void	(*t_move) P((int,int));	/* Move the cursor, origin 0.	*/
+	void	(*t_eeol) P((void));	/* Erase to end of line.	*/
+	void	(*t_eeop) P((void));	/* Erase to end of page.	*/
+	void	(*t_beep) P((void));	/* Beep.			*/
+	void	(*t_rev) P((int));	/* set reverse video state	*/
+	int	(*t_rez) P((int));	/* change screen resolution	*/
 #if	COLOR
-	void	(*t_setfor)();		/* set foreground color		*/
-	void	(*t_setback)();		/* set background color		*/
+	void	(*t_setfor) P((int));	/* set foreground color		*/
+	void	(*t_setback) P((int));	/* set background color		*/
 #endif
 #if	SCROLLCODE
-	void	(*t_scroll)();		/* scroll a region of the screen */
+	void	(*t_scroll) P((int,int,int)); /* scroll a region of the screen */
 #endif
 }	TERM;
 
@@ -1529,6 +1593,9 @@ typedef struct	{
 #if	COLOR
 #define	TTforg		(*term.t_setfor)
 #define	TTbacg		(*term.t_setback)
+#endif
+#if	SCROLLCODE
+#define	TTscroll	(*term.t_scroll)
 #endif
 
 typedef struct  VIDEO {
@@ -1569,9 +1636,11 @@ typedef struct  VIDEO {
  *
  *	These structures are generated automatically from the cmdtbl file,
  *	and can be found in the file nefunc.h
-*/
+ */
+typedef	int	(*CmdFunc) P(( int, int ));
+
 typedef  struct {
-	int (*c_func)();	/* function name is bound to */
+	CmdFunc       c_func;		/* function name is bound to */
 	unsigned long c_flags;		/* what sort of command is it? */
 }	CMDFUNC;
 
@@ -1716,37 +1785,29 @@ typedef struct WHBLOCK {
  * General purpose includes
  */
 
-#if APOLLO
-# ifndef __STDCPP__
-#  define ANSI_VARARGS 0
-#  define ANSI_PROTOS 0 /* SR10.2 does not like protos w/o variable names */
-# endif
-#endif
-
-#ifndef ANSI_VARARGS
-# ifdef __STDC__
-#  define ANSI_VARARGS 1	/* look in <stdarg.h> */
-# else
-#  define ANSI_VARARGS 0	/* look in <varargs.h> */
-# endif
-#endif
-
 #if ANSI_VARARGS
-#include <stdarg.h>
+# include <stdarg.h>
 #else
-#include <varargs.h>
-#endif
-
-#ifndef ANSI_PROTOS
-#  ifdef __STDC__
-#    define ANSI_PROTOS 1
-#  else
-#    define ANSI_PROTOS 0
+# include <varargs.h>
+# ifndef lint
+#  ifndef va_dcl	 /* then try these out */
+    typedef char *va_list;
+#   define va_dcl int va_alist;
+#   define va_start(list) list = (char *) &va_alist
+#   define va_end(list)
+#   define va_arg(list, mode) ((mode *)(list += sizeof(mode)))[-1]
 #  endif
-#endif
+# endif
+#endif /* ANSI_VARARGS */
 
-#include <sys/types.h>
-#include <stdio.h>
+#ifdef lint
+# undef  va_dcl
+# define va_dcl char * va_alist;
+# undef  va_start
+# define va_start(list) list = (char *) &va_alist
+# undef  va_arg
+# define va_arg(ptr,cast) (cast)(ptr-(char *)0)
+#endif
 
 #if X11 && APOLLO
 #define SYSV_STRINGS
@@ -1757,7 +1818,7 @@ typedef struct WHBLOCK {
 #include "unistd.h"
 #include "stdlib.h"
 #else
-# if APOLLO_STDLIB
+# if APOLLO_STDLIB || VMS || TURBO
 #include <stdlib.h>
 # else
 #  if ! VMALLOC
@@ -1837,6 +1898,9 @@ extern char *getcwd();
 #undef free
 #include "malloc.h"
 #else
+#if	NO_LEAKS
+extern	void	show_alloc P((void));
+#endif
 #if	DOALLOC
 extern	char *	doalloc P((char *,unsigned));
 extern	void	dofree P((char *));
@@ -1846,6 +1910,5 @@ extern	void	dofree P((char *));
 #define	realloc(p,n)	doalloc(p,n)
 #undef	free
 #define	free(p)		dofree(p)
-#else
 #endif	/* DOALLOC */
 #endif	/* DBMALLOC */

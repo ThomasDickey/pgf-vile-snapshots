@@ -12,7 +12,10 @@
 # The modes are table entries in the BUFFER and WINDOW structures.
 #
 # $Log: modetbl,v $
-# Revision 1.5  1993/03/16 10:53:21  pgf
+# Revision 1.6  1993/03/18 17:40:31  pgf
+# renamed VITABPOS to ALTTABPOS
+#
+# Revision 1.5  1993/03/16  10:53:21  pgf
 # see 3.36 section of CHANGES file
 #
 # Revision 1.4  1993/03/05  18:46:39  pgf
@@ -36,7 +39,7 @@
 bool						# GMD prefix
 	"AutoBuffer"	ABUFF 		0	# auto-buffer (lru)
 	"dirc"		DIRC		0	# directory-completion (slow!)
-	"Alt-TabPos"	VITABPOS	0	# vi-style cursor positioning
+	"Alt-TabPos"	ALTTABPOS	0	# emacs-style cursor positioning
 	"ImplyBuffer"	IMPLYBUFF 	0	# imply-buffer (vi-like)
 #?	"LookTags"	TAGSLOOK	0	# use tags to find files
 	"SameBangs"	SAMEBANGS	0	# use same "!!" data for ^X-!

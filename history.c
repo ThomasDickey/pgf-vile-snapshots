@@ -64,7 +64,10 @@
  *	Allow left/right scrolling of input lines (when they get too long).
  *
  * $Log: history.c,v $
- * Revision 1.3  1993/03/16 10:53:21  pgf
+ * Revision 1.4  1993/04/01 13:06:31  pgf
+ * turbo C support (mostly prototypes for static)
+ *
+ * Revision 1.3  1993/03/16  10:53:21  pgf
  * see 3.36 section of CHANGES file
  *
  * Revision 1.2  1993/03/05  17:50:54  pgf
@@ -87,10 +90,23 @@
 typedef	struct	{
 	char *	buffer;
 	int *	position;
-	int	(*endfunc)();
+	int	(*endfunc) P(( char *, int, int, int ));
 	int	eolchar;
 	int	options;
 	} HST;
+
+/*--------------------------------------------------------------------------*/
+static	BUFFER *makeMyBuff P(( void ));
+static	int	willGlue P(( void ));
+static	int	willExtend P(( char *, int ));
+static	int	sameLine P(( LINE *, char *, int ));
+static	int	parseArg P(( HST *, LINE * ));
+static	int	hst_macroize P(( char * ));
+static	LINE *	hst_find P(( HST *, BUFFER *, LINE *, int ));
+static	void	hst_display P(( HST *, char *, int ));
+static	void	display_LINE P(( HST *, LINE * ));
+static	void	display_TBUFF P(( HST *, TBUFF * ));
+static	LINE *	hst_scroll P(( LINE *, HST * ));
 
 static	char	*MyBuff = ScratchName(History);
 static	TBUFF	*MyText,	/* current command to display */
@@ -99,6 +115,8 @@ static	int	MyGlue,		/* most recent eolchar */
 		MyLevel,	/* logging iff level is 1 */
 		save_flg;	/* saves 'clexec' */
 static	char *	save_ptr;	/* saves 'execstr' */
+
+/*--------------------------------------------------------------------------*/
 
 static BUFFER *
 makeMyBuff()
@@ -303,10 +321,10 @@ hst_flush()
 	}
 
 	if ((tb_length(MyText) != 0)
-	 && (bp = makeMyBuff())) {
+	 && ((bp = makeMyBuff()) != 0)) {
 
 		/* suppress if this is the same as previous line */
-		if ((lp = lback(bp->b_line.l))
+		if (((lp = lback(bp->b_line.l)) != 0)
 		 && (lp != bp->b_line.l)
 		 && (sameLine(lp, tb_args(MyText)) == 0)) {
 	 		(void)tb_init(&MyText, abortc);
@@ -531,7 +549,7 @@ char *	buffer;
 int *	position;
 int *	given;
 int	options;
-int	(*endfunc)();
+int	(*endfunc) P(( char *, int, int, int ));
 int	eolchar;
 {
 	HST	param;
@@ -592,7 +610,7 @@ int	eolchar;
 			*given = c;
 			return FALSE;
 		} else if (is_edit_char(c)
-		 || (endfunc)(buffer, position, c, eolchar)
+		 || (endfunc)(buffer, *position, c, eolchar)
 		 || (isgraph(c) && !escaped) ) {
 			*given = c;
 			if (any_edit)

@@ -2,7 +2,10 @@
  *		for MicroEMACS
  *
  * $Log: tcap.c,v $
- * Revision 1.17  1992/12/23 09:27:14  foxharp
+ * Revision 1.18  1993/04/01 12:53:33  pgf
+ * removed redundant includes and declarations
+ *
+ * Revision 1.17  1992/12/23  09:27:14  foxharp
  * hack in missing CS or SR for xterms
  *
  * Revision 1.16  1992/12/04  09:18:31  foxharp
@@ -60,14 +63,12 @@
  * revision 1.1
  * date: 1990/09/21 10:26:09;
  * initial vile RCS revision
-*/
+ */
 
 #define termdef 1			/* don't define "term" external */
 
-#include <stdio.h>
 #include	"estruct.h"
 #include	"edef.h"
-#include <signal.h>
 
 #if TERMCAP
 
@@ -123,7 +124,6 @@ TERM term = {
 void
 tcapopen()
 {
-	char *getenv();
 	char *t, *p, *tgetstr();
 	char tcbuf[1024];
 	char *tv_stype;
@@ -296,8 +296,10 @@ int state;		/* FALSE = normal video, TRUE = reverse video */
 	}
 }
 
+/*ARGSUSED*/
 int
-tcapcres()	/* change screen resolution */
+tcapcres(res)	/* change screen resolution */
+int	res;
 {
 	return(TRUE);
 }

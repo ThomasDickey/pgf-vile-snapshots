@@ -72,7 +72,10 @@
 #		here for completeness.
 #
 # $Log: cmdtbl,v $
-# Revision 1.53  1993/03/17 10:01:18  pgf
+# Revision 1.54  1993/03/31 19:31:48  pgf
+# make the godotplus() function bindable as "whole-lines"
+#
+# Revision 1.53  1993/03/17  10:01:18  pgf
 # overwrite() renamed to overwritechars()
 #
 # Revision 1.52  1993/03/16  10:53:21  pgf
@@ -640,8 +643,12 @@ matchfenceback	ABS|MOTION		CFENCE
 	'^X-%'
 globals		NONE			GLOBALS
 	"og"
-# this function is for internal use only, for the operator commands
+
+# the gotdotplus() function is mostly for internal use only, for the
+# stuttered operator commands, but it corresponds to the real vi '_'
+# command, so we give it a name, so it can be bound to if desired.
 godotplus	MOTION|FL
+	"whole-lines"
 
 # this function is for internal use only, for ex commands
 gomark		MOTION|FL|(RANGE|ZERO)

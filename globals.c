@@ -1,13 +1,15 @@
-#include	"estruct.h"
-#include        "edef.h"
-#include        <stdio.h>
-
 /* ed/vi/ex style global commands, where first the file is scanned for
  *	matching lines, then for each such line, an action is performed.
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: globals.c,v $
- * Revision 1.16  1993/03/16 10:53:21  pgf
+ * Revision 1.18  1993/04/01 12:53:33  pgf
+ * removed redundant includes and declarations
+ *
+ * Revision 1.17  1993/03/18  17:42:20  pgf
+ * see 3.38 section of CHANGES
+ *
+ * Revision 1.16  1993/03/16  10:53:21  pgf
  * see 3.36 section of CHANGES file
  *
  * Revision 1.15  1993/02/24  10:59:02  pgf
@@ -63,7 +65,11 @@
  * revision 1.1
  * date: 1990/09/21 10:25:21;
  * initial vile RCS revision
-*/
+ */
+
+#include	"estruct.h"
+#include        "edef.h"
+
 #if GLOBALS
 
 int
@@ -167,8 +173,11 @@ int f, n, g_or_v;
 				have been ok so far */
 			if (cfp && s) {
 				if (!calledbefore && (cfp->c_flags & UNDO)) {
-					if (b_val(wp->w_bufp,MDVIEW))
+					if (b_val(wp->w_bufp,MDVIEW)) {
+						if (tpeekc() != -1)
+							(void)tgetc(FALSE);
 						return(rdonly());
+					}
 					mayneedundo();
 				}
 				havemotion = &f_godotplus;
