@@ -6,7 +6,12 @@
 
 /*
  * $Log: evar.h,v $
- * Revision 1.13  1992/08/20 23:40:48  foxharp
+ * Revision 1.14  1992/11/19 09:05:21  foxharp
+ * took out "terse", which should have gone away before, and
+ * added "qidentifier", which represents the "qualified" (c++) identifier
+ * under the cursor
+ *
+ * Revision 1.13  1992/08/20  23:40:48  foxharp
  * typo fixes -- thanks, eric
  *
  * Revision 1.12  1992/07/13  20:03:54  foxharp
@@ -100,10 +105,10 @@ char *envars[] = {
 	"llength",		/* length of current line */
 	"line",			/* text of current line */
 	"word",			/* current word */
-	"identifier",		/* current punctuated */
+	"identifier",		/* current identifier */
+	"qidentifier",		/* current qualified identifier */
 	"pathname",		/* current path-like word */
 	"directory",		/* current directory */
-	"terse",		/* be terse -- suppress messages */
 #if X11
 	"font",
 #endif
@@ -146,9 +151,10 @@ char *envars[] = {
 #define	EVLINE		30
 #define	EVWORD		31
 #define	EVIDENTIF	32
-#define	EVPATHNAME	33
-#define	EVDIR		34
-#define	EVFONT		35
+#define	EVQIDENTIF	33
+#define	EVPATHNAME	34
+#define	EVDIR		35
+#define	EVFONT		36
 
 /*	list of recognized user functions	*/
 

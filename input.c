@@ -3,7 +3,13 @@
  *		5/9/86
  *
  * $Log: input.c,v $
- * Revision 1.45  1992/08/20 23:40:48  foxharp
+ * Revision 1.46  1992/11/19 09:07:30  foxharp
+ * added check on recursive replay in dotcmdplay() -- I think we should
+ * never play or record a call to dotcmdplay, so we abort if we find ourselves
+ * doing so.
+ * also added kdone() call to finish up after ksetup()
+ *
+ * Revision 1.45  1992/08/20  23:40:48  foxharp
  * typo fixes -- thanks, eric
  *
  * Revision 1.44  1992/07/24  07:49:38  foxharp
@@ -992,6 +998,12 @@ int f,n;
 		n = 1;
 	else if (n <= 0)
 		return TRUE;
+
+	if (dotcmdmode != STOP) {
+		dotcmdmode = STOP;
+		return FALSE;
+	}
+
 	dotcmdrep = n;		/* remember how many times to execute */
 	dotcmdmode = PLAY;		/* put us in play mode */
 	dotcmdptr = &dotcmdm[0];	/*    at the beginning */
@@ -1076,9 +1088,10 @@ kbd_mac_save(f,n)
 int f,n;
 {
 	register unsigned char *kp;
-	kdelete();
+	ksetup();
 	for (kp = kbdm; kp < kbdlim; kp++)
 		kinsert(*kp);
+	kdone();
 	mlwrite("[Keyboard macro saved.]");
 	return TRUE;
 }

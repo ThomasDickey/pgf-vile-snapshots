@@ -71,7 +71,11 @@
 #		here for completeness.
 #
 # $Log: cmdtbl,v $
-# Revision 1.42  1992/08/20 23:40:48  foxharp
+# Revision 1.43  1992/11/19 08:56:35  foxharp
+# add "args" as a synonym for "list-buffers".  i know it's not much
+# like the vi "args" command, but it's about as close as i can get easily
+#
+# Revision 1.42  1992/08/20  23:40:48  foxharp
 # typo fixes -- thanks, eric
 #
 # Revision 1.41  1992/07/16  22:03:35  foxharp
@@ -729,6 +733,7 @@ lastnonwhite	MOTION			!SMALLER
 	"last-nonwhite"			!FEWNAMES
 listbuffers	NONE
 	"list-buffers"			!FEWNAMES
+	"args"
 	'^A-*'
 lineputafter	REDO|UNDO|GLOBOK|(FROM|ZERO|WORD1)
 	"put-as-lines-after"		!FEWNAMES

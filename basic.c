@@ -6,7 +6,10 @@
  * framing, are hard.
  *
  * $Log: basic.c,v $
- * Revision 1.38  1992/08/20 23:40:48  foxharp
+ * Revision 1.39  1992/11/30 23:06:03  foxharp
+ * firstchar/lastchar now return -1 for no non-white chars in line
+ *
+ * Revision 1.38  1992/08/20  23:40:48  foxharp
  * typo fixes -- thanks, eric
  *
  * Revision 1.37  1992/08/04  20:09:03  foxharp
@@ -419,6 +422,12 @@ firstnonwhite(f,n)
 int f,n;
 {
         DOT.o  = firstchar(DOT.l);
+	if (DOT.o < 0) {
+		if (llength(DOT.l) == 0)
+			DOT.o = 0;
+		else
+			DOT.o = llength(DOT.l) - 1;
+	}
 	return TRUE;
 }
 
@@ -428,10 +437,13 @@ lastnonwhite(f,n)
 int f,n;
 {
         DOT.o  = lastchar(DOT.l);
+	if (DOT.o < 0)
+		DOT.o = 0;
 	return TRUE;
 }
 
-/* return the offset of the first non-white character on the line */
+/* return the offset of the first non-white character on the line,
+	or -1 if there are no non-white characters on the line */
 int
 firstchar(lp)
 LINE *lp;
@@ -439,16 +451,19 @@ LINE *lp;
 	int off = 0;
 	while ( off != llength(lp) && isspace(lgetc(lp, off)) )
 		off++;
+	if (off == llength(lp))
+		return -1;
 	return off;
 }
 
-/* return the offset of the last non-white character on the line */
+/* return the offset of the last non-white character on the line
+	or -1 if there are no non-white characters on the line */
 int
 lastchar(lp)
 LINE *lp;
 {
 	int off = llength(lp)-1;
-	while ( off > 0 && isspace(lgetc(lp, off)) )
+	while ( off >= 0 && isspace(lgetc(lp, off)) )
 		off--;
 	return off;
 }
@@ -526,11 +541,17 @@ gotobop(f,n)
 int f,n;
 {
 	MARK odot;
-	int was_on_empty = (llength(DOT.l) == 0);
-	odot = DOT;
+	int was_on_empty;
+	int fc;
+
 	if (!f) n = 1;
+
+	was_on_empty = (llength(DOT.l) == 0);
+	odot = DOT;
+
+	fc = firstchar(DOT.l);
 	if (doingopcmd && 
-		(DOT.o <= firstchar(DOT.l)) && 
+		((fc > 0 && DOT.o <= fc) || fc < 0) && 
 		!is_first_line(DOT,curbp)) {
 		backchar(TRUE,DOT.o+1);
 		pre_op_dot = DOT;
@@ -554,9 +575,10 @@ int f,n;
 		n--;
 	}
 	if (doingopcmd) {
+		int fc = firstchar(DOT.l);
 		if (!sameline(DOT,odot) && 
-			(pre_op_dot.o > lastchar(pre_op_dot.l)) && 
-			DOT.o <= firstchar(DOT.l)) {
+			(pre_op_dot.o > lastchar(pre_op_dot.l)) &&
+			((fc > 0 && DOT.o <= fc) || fc < 0)) {
 			fulllineregions = TRUE;
 		}
 	}
@@ -568,10 +590,15 @@ gotoeop(f,n)
 int f,n;
 {
 	MARK odot;
-	int was_at_bol = (DOT.o <= firstchar(DOT.l));
-	int was_on_empty = (llength(DOT.l) == 0);
-	odot = DOT;
+	int was_at_bol;
+	int was_on_empty;
+
 	if (!f) n = 1;
+
+	was_on_empty = (llength(DOT.l) == 0);
+	was_at_bol = (DOT.o <= firstchar(DOT.l));
+	odot = DOT;
+
 	while (n) {
 		if (findpat(TRUE, 1, b_val_rexp(curbp,VAL_PARAGRAPHS)->reg, 
 						FORWARD) != TRUE) {
@@ -593,7 +620,8 @@ int f,n;
 	if (doingopcmd) {
 		/* if we're now at the beginning of a line and we can back up,
 		  do so to avoid eating the newline and leading whitespace */
-		if (DOT.o <= firstchar(DOT.l) && 
+		int fc = firstchar(DOT.l);
+		if (((fc > 0 && DOT.o <= fc) || fc < 0) && 
 			!is_first_line(DOT,curbp) &&
 			!sameline(DOT,odot) ) {
 			backchar(TRUE,DOT.o+1);

@@ -6,7 +6,11 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.60  1992/08/20 23:40:48  foxharp
+ * Revision 1.61  1992/11/19 09:06:35  foxharp
+ * added kdone() call to complete the ksetup() operation, and
+ * fixed possible someday bug with crypt leaving open files around
+ *
+ * Revision 1.60  1992/08/20  23:40:48  foxharp
  * typo fixes -- thanks, eric
  *
  * Revision 1.59  1992/08/19  22:56:50  foxharp
@@ -1417,7 +1421,7 @@ char    *fname;
         register int    nline;
         int    nbytes;
 
-	kdelete();
+	ksetup();
         if ((s=ffropen(fname)) == FIOERR)       /* Hard file open.      */
                 goto out;
         if (s == FIOFNF) {                      /* File not found.      */
@@ -1431,18 +1435,17 @@ char    *fname;
 		ttclean(TRUE);
 #endif
 
+        nline = 0;
 #if	CRYPT
 	s = resetkey(curbp);
-	if (s != TRUE)
-		return s;
+	if (s == TRUE)
 #endif
-        nline = 0;
-        while ((s=ffgetline(&nbytes)) == FIOSUC) {
-                for (i=0; i<nbytes; ++i)
-                        kinsert(fline[i]);
-                kinsert('\n');
-                ++nline;
-        }
+		while ((s=ffgetline(&nbytes)) == FIOSUC) {
+			for (i=0; i<nbytes; ++i)
+				kinsert(fline[i]);
+			kinsert('\n');
+			++nline;
+		}
 #if UNIX
 	if (fileispipe == TRUE) {
 		ttunclean();
@@ -1450,6 +1453,7 @@ char    *fname;
 	        sgarbf = TRUE;
 	}
 #endif
+	kdone();
         ffclose();                              /* Ignore errors.       */
 	readlinesmsg(nline,s,fname,FALSE);
 

@@ -9,7 +9,10 @@
 
 /*
  * $Log: edef.h,v $
- * Revision 1.66  1992/08/28 09:08:01  foxharp
+ * Revision 1.67  1992/11/19 08:57:34  foxharp
+ * not version four yet -- 3.26
+ *
+ * Revision 1.66  1992/08/28  09:08:01  foxharp
  * changed tagsrelative to tagrelative, because of name conflict w/ tags
  *
  * Revision 1.65  1992/08/27  08:31:39  foxharp
@@ -241,7 +244,7 @@
 #endif
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version four");
+decl_init( char version[], "version three twenty six");
 
 decl_init( char slash, '/'); 		/* so DOS can use '\' as path separator */
 

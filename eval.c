@@ -4,7 +4,11 @@
 	written 1986 by Daniel Lawrence
  *
  * $Log: eval.c,v $
- * Revision 1.38  1992/08/20 23:40:48  foxharp
+ * Revision 1.39  1992/11/19 09:03:56  foxharp
+ * fix identification of single character tokens that happen to be prefixes
+ * for special constructs, like '~', '*', etc.
+ *
+ * Revision 1.38  1992/08/20  23:40:48  foxharp
  * typo fixes -- thanks, eric
  *
  * Revision 1.37  1992/07/24  18:22:51  foxharp
@@ -320,6 +324,7 @@ char *vname;		/* name of environment variable to retrieve */
 		case EVLINE:	return(getctext(0));
 		case EVWORD:	return(getctext(_nonspace));
 		case EVIDENTIF:	return(getctext(_ident));
+		case EVQIDENTIF:return(getctext(_qident));
 		case EVPATHNAME:return(getctext(_pathn));
 		case EVDIR:	return(current_directory(FALSE));
 #if X11
@@ -609,21 +614,24 @@ int i;	/* integer to translate to a string */
 int toktyp(tokn)	/* find the type of a passed token */
 char *tokn;	/* token to analyze */
 {
-	register char c;	/* first char in token */
-
-	/* grab the first char (this is all we need) */
-	c = *tokn;
 
 	/* no blanks!!! */
-	if (c == 0)
+	if (tokn[0] == '\0')
 		return(TKNUL);
 
 	/* a numeric literal? */
-	if (isdigit(c))
+	if (isdigit(tokn[0]))
 		return(TKLIT);
 
+	if (tokn[0] == '"')
+		return(TKSTR);
+
+	/* if it's any other single char, it must be itself */
+	if (tokn[1] == '\0')
+		return(TKCMD);
+
 #if ! SMALLER
-	switch (c) {
+	switch (tokn[0]) {
 		case '"':	return(TKSTR);
 
 		case '~':	return(TKDIR);

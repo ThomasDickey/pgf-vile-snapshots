@@ -5,7 +5,14 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.21  1992/08/19 23:00:37  foxharp
+ * Revision 1.23  1992/11/19 09:16:43  foxharp
+ * rename of kdelete() to ksetup(), and new kdone().
+ * also, new X11 routines, x_setname, x_setforeground, and x_setbackground
+ *
+ * Revision 1.22  1992/11/19  08:50:16  foxharp
+ * gettagsfile now returns a BUFFER *
+ *
+ * Revision 1.21  1992/08/19  23:00:37  foxharp
  * new DOS routines for directory manip.
  *
  * Revision 1.20  1992/08/06  23:55:07  foxharp
@@ -415,7 +422,8 @@ extern int lnewline P(( void ));
 extern char * getctext P(( int ));
 extern int putctext P(( char * ));
 extern int ldelnewline P(( void ));
-extern void kdelete P(( void ));
+extern void ksetup P(( void ));
+extern void kdone P(( void ));
 extern int usekreg P(( int, int ));
 extern void kregcirculate P(( int ));
 extern int putbefore P(( int, int ));
@@ -588,7 +596,7 @@ extern int filter P(( int, int ));
 extern int gototag P(( int, int ));
 extern int cmdlinetag P(( char * ));
 extern int tags P(( char *, int ));
-extern int gettagsfile P(( void ));
+extern BUFFER * gettagsfile P(( void ));
 extern LINE * cheap_scan P(( BUFFER *, char *, int ));
 extern int untagpop P(( int, int ));
 extern void pushuntag P(( char *, int ));
@@ -692,6 +700,9 @@ extern void putdotback P(( BUFFER *, LINE * ));
 #if X11
 extern	void x_set_rv P(( void ));
 extern	int x_setfont P(( char * ));
+extern	void x_setname P(( char * ));
+extern	void x_setforeground P(( char * ));
+extern	void x_setbackground P(( char * ));
 extern	void x_preparse_args P(( int *, char *** ));
 extern  void x_set_geometry P(( char * ));
 extern	void x_set_dpy P(( char * ));

@@ -2,7 +2,11 @@
  * 	X11 support, Dave Lemke, 11/91
  *
  * $Log: x11.c,v $
- * Revision 1.9  1992/08/20 23:40:48  foxharp
+ * Revision 1.10  1992/11/19 09:20:44  foxharp
+ * eric krohn's window resize fix, and his new name, foreground, and
+ * background support
+ *
+ * Revision 1.9  1992/08/20  23:40:48  foxharp
  * typo fixes -- thanks, eric
  *
  * Revision 1.8  1992/08/04  20:16:14  foxharp
@@ -170,6 +174,8 @@ static char *geometry = NULL;
 static char *progname;
 
 static Bool reverse_video;
+static char *foreground_name = 0,
+            *background_name = 0;
 static int  foreground = -1,
             background = -1;
 
@@ -246,6 +252,15 @@ x_preparse_args(pargc, pargv)
 	progname = rindex(progname, '/');
 }
 
+/* ARGSUSED */
+void
+x_setname(name)
+    char     *name;
+{
+    if (name && *name != '\0')
+	progname = name;
+}
+
 char       *
 x_current_fontname()
 {
@@ -270,6 +285,20 @@ x_set_dpy(dn)
     char       *dn;
 {
     displayname = dn;
+}
+
+void
+x_setforeground(colorname)
+    char       *colorname;
+{
+    foreground_name = colorname;
+}
+
+void
+x_setbackground(colorname)
+    char       *colorname;
+{
+    background_name = colorname;
 }
 
 int
@@ -369,6 +398,8 @@ x_resize_screen(tw, rows, cols)
 	    malloc(sizeof(unsigned char) * tw->rows);
     }
     tw->cols = cols;
+    if (tw->cur_col >= tw->cols)
+        tw->cur_col = tw->cols - 1;
 
     if (!tw->sc || !tw->attr || !tw->line_attr) {
 	fprintf(stderr, "couldn't allocate memory for screen\n");
@@ -388,6 +419,8 @@ x_resize_screen(tw, rows, cols)
 	    tw->attr[r][c] = CELL_DIRTY;
 	}
     }
+    if (tw->cur_row >= tw->rows)
+        tw->cur_row = tw->rows - 1;
 }
 
 struct {
@@ -486,11 +519,17 @@ x_get_defaults(disp, screen)
     t = XGetDefault(disp, progname, "foreground");
     if (t)
 	foreground = color_value(disp, screen, t);
+    t = foreground_name;
+    if (t)
+	foreground = color_value(disp, screen, t);
 
     t = XGetDefault(disp, "XVile", "background");
     if (t)
 	background = color_value(disp, screen, t);
     t = XGetDefault(disp, progname, "background");
+    if (t)
+	background = color_value(disp, screen, t);
+    t = background_name;
     if (t)
 	background = color_value(disp, screen, t);
 }

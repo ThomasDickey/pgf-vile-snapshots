@@ -11,7 +11,11 @@
  * which means that the dot and mark values in the buffer headers are nonsense.
  *
  * $Log: line.c,v $
- * Revision 1.26  1992/08/20 23:40:48  foxharp
+ * Revision 1.27  1992/11/19 09:10:16  foxharp
+ * renamed kdelete() to ksetup(), and created kdone() routine, which cleans
+ * up a buffer that was setup if nothing was ever put in it
+ *
+ * Revision 1.26  1992/08/20  23:40:48  foxharp
  * typo fixes -- thanks, eric
  *
  * Revision 1.25  1992/07/10  22:01:14  foxharp
@@ -838,7 +842,7 @@ ldelnewline()
  * in case the buffer has grown to immense size. No errors.
  */
 void
-kdelete()
+ksetup()
 {
 
 	if ((kregflag & KAPPEND) != 0)
@@ -848,19 +852,14 @@ kdelete()
 	kchars = klines = 0;
 
 }
-
 /*
- * Insert a character to the kill buffer, allocating new chunks as needed.
- * Return TRUE if all is well, and FALSE on errors.
+ * clean up the old contents of a kill register.
+ * if called from other than kinsert, only does anything in the case where
+ * nothing was yanked
  */
-
-int
-kinsert(c)
-int c;		/* character to insert in the kill buffer */
+void
+kdone()
 {
-	KILL *nchunk;	/* ptr to newly malloced chunk */
-	KILLREG *kbp = &kbs[ukb];
-
 	if ((kregflag & KNEEDCLEAN) && kbs[ukb].kbufh != NULL) {
 		KILL *kp;	/* ptr to scan kill buffer chunk list */
 
@@ -878,6 +877,21 @@ int c;		/* character to insert in the kill buffer */
 	}
 	kregflag &= ~KNEEDCLEAN;
 	kbs[ukb].kbflag = kregflag;
+}
+
+/*
+ * Insert a character to the kill buffer, allocating new chunks as needed.
+ * Return TRUE if all is well, and FALSE on errors.
+ */
+
+int
+kinsert(c)
+int c;		/* character to insert in the kill buffer */
+{
+	KILL *nchunk;	/* ptr to newly malloced chunk */
+	KILLREG *kbp = &kbs[ukb];
+
+	kdone(); /* clean up the (possible) old contents */
 
 	/* check to see if we need a new chunk */
 	if (kbp->kused >= KBLOCK || kbp->kbufh == NULL) {
@@ -1218,7 +1232,7 @@ int f,n;
 	int s;
 	char respbuf[NFILEN];
 
-	kdelete();
+	ksetup();
 	s = kbd_string("Load register with: ", respbuf,
 					NFILEN - 1, '\n', NO_EXPAND, FALSE);
 	if (s != TRUE)
@@ -1228,5 +1242,6 @@ int f,n;
 			break;
 		kinsert(respbuf[s]);
 	}
+	kdone();
 	return TRUE;
 }

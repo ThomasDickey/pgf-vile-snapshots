@@ -5,7 +5,14 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: tags.c,v $
- * Revision 1.23  1992/08/05 21:51:10  foxharp
+ * Revision 1.25  1992/11/19 22:24:25  foxharp
+ * recheck tagsprefix on every fetch of file
+ *
+ * Revision 1.24  1992/11/19  08:49:25  foxharp
+ * allow more dynamic killing/creating of the tags buffer, so if you get
+ * the wrong tags file by mistake, you can ":kill tags" and retry
+ *
+ * Revision 1.23  1992/08/05  21:51:10  foxharp
  * use "slash" instead of '/'
  *
  * Revision 1.22  1992/07/30  07:29:19  foxharp
@@ -129,7 +136,6 @@ char *t;
 	return tags(tagname, global_b_val(VAL_TAGLEN));
 }
 
-static BUFFER *tagbp;
 
 int
 tags(tag,taglen)
@@ -146,13 +152,12 @@ int taglen;
 	int changedfile;
 	MARK odot;
 	LINE *cheap_scan();
+	BUFFER *tagbp;
 
 	strcpy(tname,tag);
 
-	if (tagbp == NULL) {
-		if (gettagsfile() == FALSE)
-			return FALSE;
-	}
+	if ((tagbp = gettagsfile()) == NULL )
+		return FALSE;
 
 	lp = cheap_scan(tagbp, tname, taglen ? taglen : strlen(tname));
 	if (lp == NULL) {
@@ -252,14 +257,16 @@ int taglen;
 	
 }
 
-int
+#define TAGBUF "tags"
+BUFFER *
 gettagsfile()
 {
 	int s;
 	char *tagsfile;
+	BUFFER *tagbp;
 
-	/* is there a "tags" buffer around? */
-        if ((tagbp=bfind("tags", NO_CREAT, 0)) == NULL) {
+	/* is there a TAGBUF buffer around? */
+        if ((tagbp=bfind(TAGBUF, NO_CREAT, 0)) == NULL) {
 		char *tagf = global_b_val_ptr(VAL_TAGS);
 		/* look up the tags file */
 		tagsfile = flook(tagf, FL_HERE);
@@ -268,21 +275,20 @@ gettagsfile()
 		if (tagsfile == NULL)
 		{
 	        	mlforce("[No tags file available.]");
-			return(FALSE);
+			return NULL;
 		}
 
 		/* find the pointer to that buffer */
-	        if ((tagbp=bfind("tags", NO_CREAT, BFINVS)) == NULL) {
-		        if ((tagbp=bfind(tagf, OK_CREAT, BFINVS)) == NULL) {
-		        	mlforce("[No tags buffer]");
-		                return(FALSE);
-			}
-	        }
+		if ((tagbp=bfind(tagf, OK_CREAT, BFINVS)) == NULL) {
+			mlforce("[Can't create tags buffer]");
+			return NULL;
+		}
 
 		if ((s = readin(tagsfile, FALSE, tagbp, FALSE)) != TRUE) {
-			return(s);
+			return NULL;
 		}
-		strcpy(tagbp->b_bname, "tags");  /* be sure it's named tags */
+		/* be sure it's named TAGBUF */
+		strcpy(tagbp->b_bname, TAGBUF);
 		tagbp->b_flag |= BFINVS;
 			
         }
@@ -292,7 +298,7 @@ gettagsfile()
 	} else {
 		tagprefix[0] = '\0';
 	}
-	return TRUE;
+	return tagbp;
 }
 
 LINE *
@@ -426,11 +432,12 @@ makeflist()
 	register char *fnp;
 	register int i;
 	char fname[NFILEN];
+	BUFFER *tagbp;
 
 	if (!(othmode & OTH_LAZY))
 		return TRUE;
 
-	if (!tagbp && gettagsfile() == FALSE)
+	if ((tagbp = gettagsfile()) == NULL)
 			return FALSE;
 
 	if (filesbp != NULL)

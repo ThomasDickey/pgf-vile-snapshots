@@ -7,7 +7,10 @@
 
 /*
  * $Log: epath.h,v $
- * Revision 1.5  1992/08/20 23:40:48  foxharp
+ * Revision 1.6  1992/11/19 08:58:06  foxharp
+ * added HELP_LOC support -- set in makefile, as alternate place to put vile.hlp
+ *
+ * Revision 1.5  1992/08/20  23:40:48  foxharp
  * typo fixes -- thanks, eric
  *
  * Revision 1.4  1992/03/19  23:16:33  pgf
@@ -85,6 +88,9 @@ char *pathname[] =
 	"/usr/lib/",
 	"/usr/local/bin/",
 	"/usr/local/lib/",
+#ifdef HELP_LOC
+	HELP_LOC,
+#endif
 	""
 };
 #endif

@@ -3,7 +3,10 @@
  * code by Paul Fox, original algorithm mostly by Julia Harper May, 89
  *
  * $Log: undo.c,v $
- * Revision 1.18  1992/07/28 22:02:55  foxharp
+ * Revision 1.19  1992/11/30 23:07:03  foxharp
+ * firstchar/lastchar now return -1 for no non-white chars on line
+ *
+ * Revision 1.18  1992/07/28  22:02:55  foxharp
  * took out crufty ifdefs and commented-out code.  reworded some commentary.
  *
  * Revision 1.17  1992/05/16  12:00:31  pgf
@@ -122,14 +125,23 @@ LINE *lp;
 		preundocleanup();
 	pushline(lp,CURSTK(curbp));
 	if ((ALTDOT(curbp).l == NULL) || (ALTDOT(curbp).l == lp)) {
+		int fc;
 		/* need to save a dot -- either the next line or 
 			the previous one */
 		if (lp->l_fp == curbp->b_line.l) {
 			ALTDOT(curbp).l = lp->l_bp;
-			ALTDOT(curbp).o = firstchar(lp->l_bp);
+			fc =  firstchar(lp->l_bp);
+			if (fc < 0) /* all white */
+				ALTDOT(curbp).o = llength(lp->l_bp) - 1;
+			else
+				ALTDOT(curbp).o = fc;
 		} else {
 			ALTDOT(curbp).l = lp->l_fp;
-			ALTDOT(curbp).o = firstchar(lp->l_fp);
+			fc =  firstchar(lp->l_fp);
+			if (fc < 0) /* all white */
+				ALTDOT(curbp).o = 0;
+			else
+				ALTDOT(curbp).o = fc;
 		}
 	}
 	dumpuline(lp);
@@ -371,14 +383,17 @@ int f,n;
 
 	{
 		/* it's an absolute move -- remember where we are */
+		int fc;
 		MARK odot;
 		odot = DOT;
 
 		DOT = CURDOT(curbp);
-		if (DOT.o >= llength(DOT.l))
-			DOT.o = llength(DOT.l);
-		else if (DOT.o < firstchar(DOT.l))
-			DOT.o = firstchar(DOT.l);
+		DOT.o = firstchar(DOT.l);
+		if (DOT.o < 0) {
+			DOT.o = llength(DOT.l) - 1;
+			if (DOT.o < 0)
+				DOT.o = 0;
+		}
 
 		/* if we moved, update the "last dot" mark */
 		if (!sameline(DOT, odot)) {
