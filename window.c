@@ -3,7 +3,10 @@
  * attached to keys that the user actually types.
  *
  * $Log: window.c,v $
- * Revision 1.15  1992/08/20 23:40:48  foxharp
+ * Revision 1.16  1992/12/04 09:15:38  foxharp
+ * delete unused assigns
+ *
+ * Revision 1.15  1992/08/20  23:40:48  foxharp
  * typo fixes -- thanks, eric
  *
  * Revision 1.14  1992/05/16  12:00:31  pgf
@@ -810,7 +813,6 @@ int f,n;	/* numeric argument */
 
 		/* rebuild the window structure */
 		nextwp = wheadp;
-		wp = NULL;
 		lastwp = NULL;
 		while (nextwp != NULL) {
 			wp = nextwp;

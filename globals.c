@@ -7,7 +7,10 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: globals.c,v $
- * Revision 1.12  1992/05/16 12:00:31  pgf
+ * Revision 1.13  1992/12/04 09:12:25  foxharp
+ * deleted unused assigns
+ *
+ * Revision 1.12  1992/05/16  12:00:31  pgf
  * prototypes/ansi/void-int stuff/microsoftC
  *
  * Revision 1.11  1992/03/07  10:21:29  pgf
@@ -109,7 +112,6 @@ int f, n, g_or_v;
 
 	mlprompt("action to perform on each matching line: ");
 	/* and now get the name of, and then the function to execute */
-	cfp = NULL;
 	fnp = kbd_engl();
 	if (!fnp || !fnp[0]) {
 	        mlforce("[No function]");
@@ -172,7 +174,6 @@ int f, n, g_or_v;
 		lp = lforw(lp);
 	}
 
-	cfp = NULL;
 
 	return s;
 }

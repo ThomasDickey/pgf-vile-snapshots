@@ -2,7 +2,18 @@
  *		for MicroEMACS
  *
  * $Log: spawn.c,v $
- * Revision 1.32  1992/08/21 18:18:19  foxharp
+ * Revision 1.35  1992/12/04 09:51:54  foxharp
+ * linux apparently has strict prototypes
+ *
+ * Revision 1.34  1992/12/04  09:19:17  foxharp
+ * reopen and flush the tty after returning from the shell, and
+ * don't wait for children at this level when filtering
+ *
+ * Revision 1.33  1992/12/03  00:32:59  foxharp
+ * use new mlreply_no_bs, so backslashes go to commands unchanges.  also,
+ * use new system_SHELL routine, and exec_sh_c routine to spawn processes
+ *
+ * Revision 1.32  1992/08/21  18:18:19  foxharp
  * cleaned up job control -- sort of.  how can I tell if someone wants
  * the arg to getpgrp or not, since if they don't want it, their prototypes
  * will get me...
@@ -175,16 +186,12 @@ int f,n;
 	mlforce("[Not available under X11]");
 	return(FALSE);
 #  else
-        register char *cp;
         char    *getenv();
         
         movecursor(term.t_nrow, 0);             /* Seek to last line.   */
 	ttclean(TRUE);
         TTputc('\n');
-        if ((cp = getenv("SHELL")) != NULL && *cp != '\0')
-                system(cp);
-        else
-                system("exec /bin/sh");
+	system_SHELL(NULL);
         TTflush();
 	ttunclean();
         sgarbf = TRUE;
@@ -248,7 +255,7 @@ int f,n;
 # if BERK
 	killpg(getpgrp(0), SIGTSTP);
 # else
-#  if AIX /* strict prototypes -- doesn't like the (0) */
+#  if AIX || LINUX /* strict prototypes -- doesn't like the (0) */
 	kill(-getpgrp(), SIGTSTP);
 #  else
 	kill(-getpgrp(0), SIGTSTP);
@@ -294,6 +301,8 @@ pressreturn()
 			break;
 		}
 	}
+	TTputc('\r');
+	TTputc('\n');
 }
 
 /* ARGSUSED */
@@ -327,8 +336,6 @@ int rerun;
         register int    s;
         static char oline[NLINE];	/* command line send to shell */
         char	line[NLINE];	/* command line send to shell */
-	register char	*cp;
-	char		line2[NLINE];
 	int cb;
 	char prompt[50];
 	char *getenv();
@@ -341,7 +348,7 @@ int rerun;
 		else
 			lsprintf(prompt,": !");
 
-	        if ((s=mlreply(prompt, oline, NLINE)) != TRUE)
+	        if ((s=mlreply_no_bs(prompt, oline, NLINE)) != TRUE)
 	                return (s);
 	} else {
 		if (!oline[0])
@@ -349,17 +356,17 @@ int rerun;
 		mlwrite(": !%s",oline);
 	}
 	strcpy(line,oline);
-        if ((cp = getenv("SHELL")) == NULL || *cp == '\0')
-                cp = "/bin/sh";
-	lsprintf(line2, "%s -c \"%s\"", cp, line);
+
 #if	NeWS || X11
-	system(line2);
+	system_SHELL(line);
 #else
 	ttclean(TRUE);
-	system(line2);
+	system_SHELL(line);
         TTflush();
 	ttunclean();
 	pressreturn();
+	TTopen();
+	TTflush();
         sgarbf = TRUE;
 #endif /* NeWS */
         return (TRUE);
@@ -538,7 +545,7 @@ int f,n;
 		lsprintf(prompt,"!");
 		
 	/* get the command to pipe in */
-        if ((s=mlreply(prompt, &oline[1], NLINE)) != TRUE)
+        if ((s=mlreply_no_bs(prompt, &oline[1], NLINE)) != TRUE)
                 return(s);
 
 	/* first check if we are already here */
@@ -706,10 +713,10 @@ filterregion()
         static char oline[NLINE];	/* command line send to shell */
         char	line[NLINE];	/* command line send to shell */
 	FILE *fr, *fw;
-	int s, status;
+	int s;
 
 	/* get the filter name and its args */
-        if ((s=mlreply("!", oline, NLINE)) != TRUE)
+        if ((s=mlreply_no_bs("!", oline, NLINE)) != TRUE)
                 return(s);
 	strcpy(line,oline);
 	if ((s = inout_popen(&fr, &fw, line)) != TRUE) {
@@ -718,7 +725,7 @@ filterregion()
 	}
 
 	killregion();
-	if (!fork()) {
+	if (!softfork()) {
 		KILL *kp;		/* pointer into kill register */
 		kregcirculate(FALSE);
 		kp = kbs[ukb].kbufh;
@@ -738,7 +745,6 @@ filterregion()
 	DOT.l = lback(DOT.l);
 	s = ifile(NULL,TRUE,fr);
 	npclose(fr);
-	(void)wait(&status);
 	firstnonwhite(FALSE,1);
 	setmark();
 	return s;

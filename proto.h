@@ -5,7 +5,13 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.23  1992/11/19 09:16:43  foxharp
+ * Revision 1.25  1992/12/05 13:52:20  foxharp
+ * make the apollo compiler happy
+ *
+ * Revision 1.24  1992/12/03  00:32:59  foxharp
+ * new system_SHELL and exec_sh_c routines
+ *
+ * Revision 1.23  1992/11/19  09:16:43  foxharp
  * rename of kdelete() to ksetup(), and new kdone().
  * also, new X11 routines, x_setname, x_setforeground, and x_setbackground
  *
@@ -85,12 +91,20 @@
 # define P(a) ()
 #endif
 
+#if APOLLO && defined(__STDC__) && defined(__STDCPP__)	/* SR10.3 */
+# define DEFINE_SIGNAL(func)	SIGT func(int signo, ...)
+# define ACTUAL_SIGNAL(func)	SIGT func(int signo, ...)
+#else
+# define DEFINE_SIGNAL(func)	SIGT func P(( int ))
+# define ACTUAL_SIGNAL(func)	SIGT func(signo) int signo;
+#endif
+
 extern int main P(( int, char *[] ));
 extern void expand_wild_args P(( int * , char ***));
 extern void loop P(( void ));
 extern char * strmalloc P(( char * ));
 extern void global_val_init P(( void ));
-extern SIGT catchintr P(( int ));
+extern DEFINE_SIGNAL(catchintr);
 extern void do_num_proc P(( int *, int *, int * ));
 extern void do_rept_arg_proc P(( int *, int *, int * ));
 extern int writeall P(( int, int ));
@@ -194,6 +208,7 @@ extern void make_current P(( BUFFER * ));
 extern int swbuffer P(( BUFFER * ));
 extern void undispbuff P(( BUFFER *, WINDOW * ));
 extern int tabstop_val P(( BUFFER * ));
+extern int shiftwid_val P(( BUFFER * ));
 extern int has_C_suffix P(( BUFFER * ));
 extern int killbuffer P(( int, int ));
 extern int zotbuf P(( BUFFER * ));
@@ -267,7 +282,7 @@ extern char * _lsprintf P(( char *, ... ));
 extern void bputc P(( int ));
 extern void bprintf P((char *, ... ));
 extern void getscreensize P(( int *, int * ));
-extern SIGT sizesignal P(( int ));
+extern DEFINE_SIGNAL(sizesignal);
 extern void newscreensize P(( int, int ));
 extern int newwidth P(( int, int ));
 extern int newlength P(( int, int ));
@@ -353,15 +368,11 @@ extern int kwrite P(( char *, int ));
 extern int filename P(( int, int ));
 extern int ifile P(( char *, int, FILE * ));
 extern int kifile P(( char * ));
-extern SIGT imdying P(( int ));
+extern DEFINE_SIGNAL(imdying);
 extern void markWFMODE P(( BUFFER * ));
 extern int glob P(( char * ));
 extern char * canonpath P(( char * ));
-#if BEFORE
-extern void shorten_path P(( char *, void (*) P(( char *, ...)) ));
-#else
 extern char * shorten_path P(( char * ));
-#endif
 extern char * flook P(( char *, int ));
 extern int ffropen P(( char * ));
 extern int ffwopen P(( char * ));
@@ -382,6 +393,7 @@ extern int vglobals P(( int, int ));
 extern int globber P(( int, int, int ));
 extern int mlyesno P(( char * ));
 extern int mlreply P(( char *, char *, int ));
+extern int mlreply_no_bs P(( char *, char *, int ));
 extern int kbd_string P((char *, char *, int, int, int, int));
 extern void incr_dot_kregnum P(( void ));
 extern void tungetc P(( int ));
@@ -438,6 +450,9 @@ extern FILE * npopen P(( char *, char * ));
 extern int inout_popen P(( FILE **, FILE **, char * ));
 extern void npclose P(( FILE * ));
 extern int pregion P(( int ));
+extern void exec_sh_c P(( char * ));
+extern int system_SHELL P(( char * ));
+extern int softfork P(( void ));
 extern int llineregion P(( void ));
 extern int plineregion P(( void ));
 extern int substregion P(( void ));
@@ -584,7 +599,7 @@ extern void scanboundry P(( int, MARK, int ));
 extern void nextch P(( MARK *, int ));
 extern int findpat P(( int, int, regexp *, int ));
 extern int spawncli P(( int, int ));
-extern SIGT rtfrmshell P(( int ));
+extern DEFINE_SIGNAL(rtfrmshell);
 extern int bktoshell P(( int, int ));
 extern void pressreturn P(( void ));
 extern int respawn P(( int, int ));

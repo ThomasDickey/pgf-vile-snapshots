@@ -477,20 +477,23 @@ Editor modes
 
 	cmode	C-code mode..  Maintains current indentation level
 		automatically during insert, like autoindent, above.  If a
-		line ends with a '{', then the next line indents further. 
-		If a line begins with a '}', it is lined up with the line
-		containing its matching paired brace.  If a line starts
-		with '#' it is moved to column 1.  If the global cmode is
-		set, then the buffer's C mode is turned on automatically
-		only for files ending in a character from c-suffixes.
-		Additionally, if a line begins with a '#' character, it
-		will not shift right with the '>>' command. (B)
+		line ends with a '{' or a ':', then the next line indents
+		further.  If a line begins with a '}', it is lined up with
+		the line containing its matching paired brace.  If a line
+		starts with '#' it is moved to column 1.  If the global
+		cmode is set, then the buffer's C mode is turned on
+		automatically only for files ending in a character from
+		c-suffixes.  Additionally, if a line begins with a '#'
+		character, it will not shift right with the '>>' command. (B)
 
 	crypt	Causes files to be encrypted.  This is NOT compatible
 		with the UNIX crypt(1) routines. (B)
 
-	c-tabstop Will prompt for a new value for spacing of tabstops for
-		use if a file is in cmode. (B)
+	c-shiftwidth (csw)  Will prompt for a new value for the shiftwidth
+		(see below) which will be used if a file is in cmode. (B)
+
+	c-tabstop (cts)  Will prompt for a new value for spacing of tabstops
+		which will be used if a file is in cmode. (B)
 
 	comments A regular expression defining commented paragraph
 		delimiters.  This is used in addition to the "paragraphs"
@@ -526,6 +529,12 @@ Editor modes
 	sections A regular expression defining where the "next-section" (']')
 		and "previous-section" ('[') commands will go. (B)
 
+	shiftwidth (sw) This is much like a tabstop, except that it is
+		independent of hardware tabs and tab characters.  It is the
+		number of columns a line will shift by if the '<<' or '>>'
+		commands are used, and it chooses the next column stop for
+		the cursor if a '^T' or '^D' is typed during insert mode.
+
 	showmatch (sm) During insert, if a closing '}', ']', or ')' character
 		is typed, the cursor will highlight the matching member
 		of the pair for about a quarter second. (B)
@@ -546,7 +555,7 @@ Editor modes
 		appropriate number of space characters will be inserted
 		instead.  Use '^V^I' to insert a real tab, and remember
                 that pre-existing tabs will not be affected.  Use '^A-SP'
-                to eliminate tabs from a region of text. (B)
+                to eliminate pre-existing tabs from a region of text. (B)
 
 	tabstop (ts) Will prompt for a new value for spacing of normal
 		tabstops. (B)

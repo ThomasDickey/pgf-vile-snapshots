@@ -8,8 +8,14 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: insert.c,v $
- *	Revision 1.7  1992/11/30 23:06:03  foxharp
- *	firstchar/lastchar now return -1 for no non-white chars in line
+ *	Revision 1.9  1992/12/04 09:25:03  foxharp
+ *	deleted unused assigns
+ *
+ * Revision 1.8  1992/12/02  09:13:16  foxharp
+ * changes for "c-shiftwidth"
+ *
+ * Revision 1.7  1992/11/30  23:06:03  foxharp
+ * firstchar/lastchar now return -1 for no non-white chars in line
  *
  * Revision 1.6  1992/11/19  09:08:49  foxharp
  * experiment -- cause further indent on lines following lines that end
@@ -129,7 +135,7 @@ int
 insert(f, n)
 int f,n;
 {
-	int s = TRUE;
+	int s;
 
 	if (!f || n < 0) n = 1;
 
@@ -147,7 +153,7 @@ int
 insertbol(f, n)
 int f,n;
 {
-	int s = TRUE;
+	int s;
 	firstnonwhite(f,n);
 
 	if (!f || n < 0) n = 1;
@@ -165,7 +171,7 @@ int
 append(f, n)
 int f,n;
 {
-	int s = TRUE;
+	int s;
 
 	if (! is_header_line(DOT,curbp) && !is_at_end_of_line(DOT))
 		forwchar(TRUE,1); /* END OF LINE HACK */
@@ -185,7 +191,7 @@ int
 appendeol(f, n)
 int f,n;
 {
-	int s = TRUE;
+	int s;
 	if (!is_header_line(DOT,curbp))
 		gotoeol(FALSE,0);
 
@@ -204,7 +210,7 @@ int
 overwrite(f, n)
 int f,n;
 {
-	int s = TRUE;
+	int s;
 	insertmode = OVERWRITE;
 	if (b_val(curbp, MDSHOWMODE))
 		curwp->w_flag |= WFMODE;
@@ -379,8 +385,7 @@ int playback;
 				if (c == tocntrl('D')) {
 					int goal;
 					int col;
-					int sw = 
-					 b_val(curbp, VAL_SWIDTH);
+					int sw = curswval;
 					col = getccol(FALSE);
 					if (col > 0)
 						goal = ((col-1)/sw)*sw;
@@ -752,15 +757,14 @@ shiftwidth()
 	int fc;
 	fc = firstchar(DOT.l);
 	if (fc >= 0 && fc < DOT.o) {
-		s = linsert(b_val(curbp, VAL_SWIDTH), ' ');
+		s = linsert(curswval, ' ');
 		/* should entab mult ^T inserts */
 		return s;
 	}
 	detabline(TRUE);
-	s = b_val(curbp, VAL_SWIDTH) - 
-		(getccol(FALSE) % b_val(curbp,VAL_SWIDTH));
+	s = curswval - (getccol(FALSE) % curswval);
 	if (s)
-		s = linsert(s, ' ');
+		linsert(s, ' ');
 	if (b_val(curbp,MDTABINSERT))
                 entabline(TRUE);
 	if (autoindented >= 0) {

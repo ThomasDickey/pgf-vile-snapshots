@@ -2,7 +2,10 @@
  * Written for vile by Paul Fox, (c)1990
  *
  * $Log: finderr.c,v $
- * Revision 1.12  1992/08/19 22:57:45  foxharp
+ * Revision 1.13  1992/12/04 09:12:25  foxharp
+ * deleted unused assigns
+ *
+ * Revision 1.12  1992/08/19  22:57:45  foxharp
  * no longer need to multiply NFILEN -- it's bigger
  *
  * Revision 1.11  1992/07/16  22:06:58  foxharp
@@ -66,7 +69,7 @@ finderr(f,n)
 int f,n;
 {
 	register BUFFER *sbp;
-	register int s = TRUE;
+	register int s;
 	struct LINE *dotp;
 	int moveddot = FALSE;
 	

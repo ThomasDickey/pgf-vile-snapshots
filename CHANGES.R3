@@ -114,6 +114,9 @@ VI COMPLIANCE:
 - shiftwidth has been implemented, so ^T, ^D, '<', and '>' all do pretty
 	much what they do in vi
 
+- there is a separate c-shiftwidth, used when in cmode, much as c-tabstop
+	replaces tabstop when in cmode.
+
 - ": args" is now similar in spirit to the vi command of that name
 
 

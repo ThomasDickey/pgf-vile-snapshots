@@ -10,7 +10,16 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.87  1992/11/19 08:59:00  foxharp
+ * Revision 1.90  1992/12/05 13:53:56  foxharp
+ * fix APOLLO signal types
+ *
+ * Revision 1.89  1992/12/04  09:28:35  foxharp
+ * added APOLLO
+ *
+ * Revision 1.88  1992/12/02  09:13:16  foxharp
+ * changes for "c-shiftwidth"
+ *
+ * Revision 1.87  1992/11/19  08:59:00  foxharp
  * added "qident" bit definition, for "qualified" (a la c++) identifiers
  *
  * Revision 1.86  1992/08/19  22:55:55  foxharp
@@ -347,6 +356,7 @@
 #define OSF1	0
 #define LINUX	0
 #define BSD386	0
+#define APOLLO	0
 #define AUX2	0			/* Apple A/UX 2.0 */
 
 /* the following overrides are mostly for convenience only */
@@ -419,6 +429,15 @@
 # define HAVE_POLL 0
 #endif
 
+#if APOLLO
+# undef POSIX
+# undef BERK
+# undef USG
+# define POSIX 0
+# define BERK 1
+# define USG 0
+#endif
+
 
 
 /* non-unix flavors */
@@ -455,7 +474,7 @@
 
 /* choose between void and int signal handler return type.
   "typedefs?  we don't need no steenking typedefs..." */
-#if POSIX || (BERK && BSD386) || SVR3
+#if POSIX || (BERK && BSD386) || SVR3 || APOLLO
 # define SIGT void
 # define SIGRET
 #else
@@ -854,8 +873,7 @@ union REGS {
 /*	Internal defined functions					*/
 
 #define	nextab(a)	(((a / curtabval) + 1) * curtabval)
-#define	nextsw(a)	(((a / b_val(curbp, VAL_SWIDTH)) + 1) * \
-					b_val(curbp, VAL_SWIDTH))
+#define	nextsw(a)	(((a / curswval) + 1) * curswval)
 
 /* these are the bits that go into the _chartypes_ array */
 /* the macros below test for them */
@@ -1158,12 +1176,13 @@ typedef struct	W_TRAITS {
 #define	MAX_BOOL_B_VALUE	15	/* max of boolean values	*/
 
 #define VAL_ASAVECNT	(MAX_BOOL_B_VALUE+1)
-#define VAL_C_TAB	(MAX_BOOL_B_VALUE+2)
-#define VAL_FILL	(MAX_BOOL_B_VALUE+3)
-#define VAL_SWIDTH	(MAX_BOOL_B_VALUE+4)
-#define VAL_TAB		(MAX_BOOL_B_VALUE+5)
-#define VAL_TAGLEN	(MAX_BOOL_B_VALUE+6)
-#define	MAX_INT_B_VALUE	(MAX_BOOL_B_VALUE+6) /* max of integer-valued modes */
+#define VAL_C_SWIDTH	(MAX_BOOL_B_VALUE+2)
+#define VAL_C_TAB	(MAX_BOOL_B_VALUE+3)
+#define VAL_FILL	(MAX_BOOL_B_VALUE+4)
+#define VAL_SWIDTH	(MAX_BOOL_B_VALUE+5)
+#define VAL_TAB		(MAX_BOOL_B_VALUE+6)
+#define VAL_TAGLEN	(MAX_BOOL_B_VALUE+7)
+#define	MAX_INT_B_VALUE	(MAX_BOOL_B_VALUE+7) /* max of integer-valued modes */
 
 #define VAL_CWD		(MAX_INT_B_VALUE+1)
 #define VAL_TAGS	(MAX_INT_B_VALUE+2)

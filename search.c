@@ -4,7 +4,19 @@
  *  heavily modified by Paul Fox, 1990
  *
  * $Log: search.c,v $
- * Revision 1.38  1992/08/20 23:40:48  foxharp
+ * Revision 1.41  1992/12/07 23:31:00  foxharp
+ * whoops -- on second though, _don't_ do backslash processing in kbd_string,
+ * do it in delins()
+ *
+ * Revision 1.40  1992/12/05  13:36:14  foxharp
+ * tell kbd_string() to do backslash processing on the replacement pattern.
+ * some comment revisions, and moved rvstrcpy to file.c, where it's now
+ * ifdefed along with the code that calls it
+ *
+ * Revision 1.39  1992/12/04  09:14:36  foxharp
+ * deleted unused assigns
+ *
+ * Revision 1.38  1992/08/20  23:40:48  foxharp
  * typo fixes -- thanks, eric
  *
  * Revision 1.37  1992/07/13  20:03:54  foxharp
@@ -139,22 +151,9 @@
  * revision 1.1
  * date: 1990/09/21 10:25:59;
  * initial vile RCS revision
- * Aug. 1986 John M. Gamble:
- *	... a limited number of regular expressions - 'any',
- *	'character class', 'closure', 'beginning of line', and
- *	'end of line'.
  *
- *	Replacement metacharacters will have to wait for a re-write of
- *	the replaces function, and a new variation of ldelete().
- *
- *	For those curious as to my references, i made use of
- *	Kernighan & Plauger's "Software Tools."
- *	I deliberately did not look at any published grep or editor
- *	source (aside from this one) for inspiration.  I did make use of
- *	Allen Hollub's bitmap routines as published in Doctor Dobb's Journal,
- *	June, 1985 and modified them for the limited needs of character class
- *	matching.  Any inefficiences, bugs, stupid coding examples, etc.,
- *	are therefore my own responsibility.
+ * original written Aug. 1986 by John M. Gamble, but I (pgf) have since
+ * replaced his regex stuff with Henry Spencer's regexp package.
  *
  */
 
@@ -167,9 +166,6 @@
 #endif
 
 int    readpattern();
-#if SEARCH_AND_REPLACE
-int    replaces();
-#endif
 
 void savematch();
 void scanboundry();
@@ -228,7 +224,7 @@ fsearch(f, n, marking, fromscreen)
 int f, n;
 int marking, fromscreen;
 {
-	register int status = TRUE;
+	register int status;
 	int wrapok;
 	MARK curpos;
 	int didmark = FALSE;
@@ -316,7 +312,7 @@ int
 forwhunt(f, n)
 int f, n;	/* default flag / numeric argument */
 {
-	register int status = TRUE;
+	register int status;
 	int wrapok;
 	MARK curpos;
 	
@@ -387,7 +383,7 @@ rsearch(f, n, dummy, fromscreen)
 int f, n;	/* default flag / numeric argument */
 int dummy, fromscreen;
 {
-	register int status = TRUE;
+	register int status;
 	int wrapok;
 	MARK curpos;
 	
@@ -446,7 +442,7 @@ int
 backhunt(f, n)
 int f, n;	/* default flag / numeric argument */
 {
-	register int status = TRUE;
+	register int status;
 	int wrapok;
 	MARK curpos;
 	
@@ -500,6 +496,7 @@ int f, n;	/* default flag / numeric argument */
 	return(status);
 }
 
+/* continue searching in the same direction as previous */
 int
 consearch(f,n)
 int f,n;
@@ -510,6 +507,7 @@ int f,n;
 		return(backhunt(f,n));
 }
 
+/* continue searching in the opposite direction as previous */
 int
 revsearch(f,n)
 int f,n;
@@ -684,7 +682,11 @@ int	fromscreen;
 		if (status != TRUE)
 			return status;
 	} else {
-	 	status = kbd_string(prompt, apat, NPAT, c, NO_EXPAND, FALSE);
+		/* don't expand #, %, :, and never process backslashes
+			since they're handled by regexp directly for the
+			search pattern, and in delins() for the replacement
+			pattern */
+	 	status = kbd_string(prompt, apat, NPAT, c, NO_EXPAND, FALSE );
 	}
  	if (status == TRUE) {
 		if (srchexpp) {	/* If doing the search string, compile it */
@@ -726,41 +728,6 @@ int matchlen;
 
 	/* null terminate the match string */
 	patmatch[matchlen] = '\0';
-}
-
-/*
- * rvstrcpy -- Reverse string copy.
- */
-void
-rvstrcpy(rvstr, str)
-register char	*rvstr, *str;
-{
-	register int i;
-
-	str += (i = strlen(str));
-
-	while (i-- > 0)
-		*rvstr++ = *--str;
-
-	*rvstr = '\0';
-}
-
-void
-rvstrncpy(rvstr, str, n)
-register char	*rvstr, *str;
-int n;
-{
-	register int i;
-
-	i = strlen(str);
-	if (n < i) i = n;
-
-	str += i;
-
-	while (i-- > 0)
-		*rvstr++ = *--str;
-
-	*rvstr = '\0';
 }
 
 void

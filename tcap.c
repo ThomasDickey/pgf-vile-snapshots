@@ -2,7 +2,10 @@
  *		for MicroEMACS
  *
  * $Log: tcap.c,v $
- * Revision 1.15  1992/05/19 08:55:44  foxharp
+ * Revision 1.16  1992/12/04 09:18:31  foxharp
+ * allow the open routine to be called again, to emit TI, KS
+ *
+ * Revision 1.15  1992/05/19  08:55:44  foxharp
  * more prototype and shadowed decl fixups
  *
  * Revision 1.14  1992/05/16  12:00:31  pgf
@@ -122,6 +125,16 @@ tcapopen()
 	char tcbuf[1024];
 	char *tv_stype;
 	char err_str[72];
+	static int already_open = 0;
+
+	if (already_open) 
+	{
+		if (TI)
+			putnpad(TI, strlen(TI));
+		if (KS)
+			putpad(KS);
+		return;
+	}
 
 	if ((tv_stype = getenv("TERM")) == NULL)
 	{
@@ -214,6 +227,7 @@ tcapopen()
 		putnpad(TI, strlen(TI));
 	if (KS)
 		putpad(KS);
+	already_open = TRUE;
 }
 
 void

@@ -6,7 +6,14 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.61  1992/11/19 09:06:35  foxharp
+ * Revision 1.63  1992/12/05 13:55:06  foxharp
+ * rvstrcpy is now here, and ifdef'ed
+ *
+ * Revision 1.62  1992/12/04  09:26:43  foxharp
+ * added apollo leading '//' fix to canonpath (probably needs work elsewhere
+ * as well), and deleted unused assigns
+ *
+ * Revision 1.61  1992/11/19  09:06:35  foxharp
  * added kdone() call to complete the ksetup() operation, and
  * fixed possible someday bug with crypt leaving open files around
  *
@@ -317,6 +324,43 @@ int f,n;
 #endif
 	return getfile(nfname, TRUE);
 }
+
+#ifdef LAZINESS
+/*
+ * rvstrcpy -- Reverse string copy.
+ */
+void
+rvstrcpy(rvstr, str)
+register char	*rvstr, *str;
+{
+	register int i;
+
+	str += (i = strlen(str));
+
+	while (i-- > 0)
+		*rvstr++ = *--str;
+
+	*rvstr = '\0';
+}
+
+void
+rvstrncpy(rvstr, str, n)
+register char	*rvstr, *str;
+int n;
+{
+	register int i;
+
+	i = strlen(str);
+	if (n < i) i = n;
+
+	str += i;
+
+	while (i-- > 0)
+		*rvstr++ = *--str;
+
+	*rvstr = '\0';
+}
+#endif
 
 /* ARGSUSED */
 int
@@ -845,12 +889,14 @@ char    fname[];
 #endif
 							) )
                 *(--fcp) = '\0';
-	bcp = fcp;
 	fcp = fname;
 	/* trim leading whitespace */
 	while (*fcp == ' ' || *fcp == '\t')
 		fcp++;
 
+#if	! UNIX
+	bcp = fcp;
+#endif
 #if     AMIGA
         while (bcp!=fcp && bcp[-1]!=':' && bcp[-1]!='/')
                 --bcp;
@@ -1683,6 +1729,11 @@ char *ss;
 		mlforce("BUG: canonpath called with relative path");
 		return ss;
 	}
+#if APOLLO
+	if (slashc(p[0]) && slashc(p[1])) /* ...true for all absolute paths */
+		p++;
+#endif
+
 	p++; pp++;	/* leave the leading slash */
 	while (*pp) {
 		switch (*pp) {

@@ -9,7 +9,13 @@
 
 /*
  * $Log: edef.h,v $
- * Revision 1.67  1992/11/19 08:57:34  foxharp
+ * Revision 1.69  1992/12/04 09:49:50  foxharp
+ * for you, eric, i'll make the version string numeric...
+ *
+ * Revision 1.68  1992/12/02  09:13:16  foxharp
+ * changes for "c-shiftwidth"
+ *
+ * Revision 1.67  1992/11/19  08:57:34  foxharp
  * not version four yet -- 3.26
  *
  * Revision 1.66  1992/08/28  09:08:01  foxharp
@@ -244,7 +250,7 @@
 #endif
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version three twenty six");
+decl_init( char version[], "version 3.27");
 
 decl_init( char slash, '/'); 		/* so DOS can use '\' as path separator */
 
@@ -323,6 +329,7 @@ decl_init( int	eolexist, TRUE );	/* does clear to EOL exist	*/
 decl_uninit( int revexist );		/* does reverse video exist?	*/
 decl_uninit( int flickcode );		/* do flicker suppression?	*/
 decl_uninit( int curtabval );		/* current tab width		*/
+decl_uninit( int curswval );		/* current shiftwidth		*/
 
 decl_init( MARK nullmark, { NULL comma 0 } );
 #if ! WINMARK
@@ -357,6 +364,7 @@ struct VALNAMES b_valuenames[] = {
 	{ "wrapwords"	comma "ww" comma VALTYPE_BOOL } comma
 
 	{ "autosavecnt"	comma "ascnt" comma VALTYPE_INT } comma
+	{ "c-shiftwidth"comma "csw" comma VALTYPE_INT } comma
 	{ "c-tabstop"	comma "cts" comma VALTYPE_INT } comma
 	{ "fillcol"	comma "fc" comma VALTYPE_INT } comma
 	{ "shiftwidth"	comma "sw" comma VALTYPE_INT } comma

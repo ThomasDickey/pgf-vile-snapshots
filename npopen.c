@@ -2,7 +2,13 @@
  *		written by John Hutchinson, heavily modified by Paul Fox
  *
  * $Log: npopen.c,v $
- * Revision 1.13  1992/05/25 21:07:48  foxharp
+ * Revision 1.15  1992/12/04 09:21:52  foxharp
+ * don't close the half of a child's io that we're _not_ using
+ *
+ * Revision 1.14  1992/12/03  00:32:59  foxharp
+ * new system_SHELL and exec_sh_c routines
+ *
+ * Revision 1.13  1992/05/25  21:07:48  foxharp
  * extern func declarations moved to header
  *
  * Revision 1.12  1992/05/16  12:00:31  pgf
@@ -59,28 +65,26 @@
 #define R 0
 #define W 1
 
-static int pid;
+static int pipe_pid;
 
-/* define MY_EXEC to use $SHELL -- you probably don't want to do that */
 
 FILE *
 npopen (cmd, type)
 char *cmd, *type;
 {
-	FILE *fr, *fw;
+	FILE *ff;
 
 	if (*type != 'r' && *type != 'w')
 		return NULL;
 
-	if (inout_popen(&fr, &fw, cmd) != TRUE)
-		return NULL;
-
 	if (*type == 'r') {
-		fclose(fw);
-		return fr;
+		if (inout_popen(&ff, NULL, cmd) != TRUE)
+			return NULL;
+		return ff;
 	} else {
-		fclose(fr);
-		return fw;
+		if (inout_popen(NULL, &ff, cmd) != TRUE)
+			return NULL;
+		return ff;
 	}
 }
 
@@ -89,11 +93,8 @@ inout_popen(fr, fw, cmd)
 FILE **fr, **fw;
 char *cmd;
 {
-	int tries = 5;
-	unsigned slp = 1;
 	int rp[2];
 	int wp[2];
-	char *sh, *shname;
 	
 
 	if (pipe(rp))
@@ -101,70 +102,61 @@ char *cmd;
 	if (pipe(wp))
 		return FALSE;
 		
-	/* Try & fork 5 times, backing off 1, 2, 4 .. seconds each try */
-	while ((pid = fork ()) < 0) {
-		if (--tries == 0)
-			return FALSE;
-		(void) sleep (slp);
-		slp <<= 1;
-	}
+	pipe_pid = softfork();
+	if (pipe_pid < 0)
+		return FALSE;
 
-	if (pid) { /* parent */
+	if (pipe_pid) { /* parent */
 
-		*fr = fdopen (rp[0], "r");
-		if (*fr == NULL) {
-			fprintf(stderr,"fdopen r failed\n");
-			abort();
+		if (fr) {
+			*fr = fdopen (rp[0], "r");
+			if (*fr == NULL) {
+				fprintf(stderr,"fdopen r failed\n");
+				abort();
+			}
+		} else {
+			(void)close(rp[0]);
 		}
 		(void) close (rp[1]);
 
-		*fw = fdopen (wp[1], "w");
-		if (*fw == NULL) {
-			fprintf(stderr,"fdopen w failed\n");
-			abort();
+		if (fw) {
+			*fw = fdopen (wp[1], "w");
+			if (*fw == NULL) {
+				fprintf(stderr,"fdopen w failed\n");
+				abort();
+			}
+		} else {
+			(void)close(wp[1]);
 		}
 		(void) close (wp[0]);
 		return TRUE;
 
 	} else {			/* child */
-		int i;
 
-		(void)close (1);
-		if (dup (rp[1]) != 1)
-			exit(-1);
-		(void)close (2);
-		if (dup (rp[1]) != 2)
-			exit(-1);
-		(void)close (0);
-		if (dup (wp[0]) != 0)
-			exit(-1);
-			
-#ifndef NOFILE
-# define NOFILE 20
-#endif
-		/* Make sure there are no inherited file descriptors */
-		for (i = 3; i < NOFILE; i += 1)
-			(void) close (i);
-
-#if ! MY_EXEC
-	        if ((sh = getenv("SHELL")) == NULL || *sh == '\0') {
-			sh = "/bin/sh";
-			shname = "sh";
-		} else {
-			shname = strrchr(sh,'/');
-			if (shname == NULL)
-				shname = sh;
-			else {
-				shname++;
-				if (*shname == '\0')
-					shname = sh;
+		if (fw) {
+			(void)close (0);
+			if (dup (wp[0]) != 0) {
+				write(2,"dup 0 failed\r\n",15);
+				exit(-1);
 			}
 		}
-		(void) execl (sh, shname, "-c", cmd, 0);
-#else
-		my_exec(cmd);
-#endif
-		exit (-1);
+		(void) close (wp[1]);
+		if (fr) {
+			(void)close (1);
+			if (dup (rp[1]) != 1) {
+				write(2,"dup 1 failed\r\n",15);
+				exit(-1);
+			}
+			(void)close (2);
+			if (dup (rp[1]) != 2) {
+				write(1,"dup 2 failed\r\n",15);
+				exit(-1);
+			}
+		} else {
+			(void) close (rp[1]);
+		}
+		(void) close (rp[0]);
+		exec_sh_c(cmd);
 
 	}
 	return TRUE;
@@ -175,60 +167,98 @@ npclose (fp)
 FILE *fp;
 {
 	extern int errno;
+	int child;
 	fflush(fp);
 	fclose(fp);
-	if (wait ((int *)0) < 0 && errno == EINTR) {
-		(void) kill (SIGKILL, pid);
-	}
-}
-
-#if MY_EXEC
-
-static
-my_exec (cmd)
-register char *cmd;
-{
-	char *argv [256];
-	register char **argv_p, *cp;
-	
-        if ((argv[0] = getenv("SHELL")) == NULL || argv[0][0] == '\0') {
-		argv[0] = "/bin/sh";
-		argv[1] = "sh";
-	} else {
-		argv[1] = strrchr(argv[0],'/');
-		if (argv[1] == NULL) {
-			argv[1] = argv[0];
-		} else {
-			argv[1]++;
-			if (argv[1][0] == '\0')
-				argv[1] = argv[0];
+	while ((child = wait ((int *)0)) != pipe_pid) {
+		if (child < 0 && errno == EINTR) {
+			(void) kill (SIGKILL, pipe_pid);
 		}
 	}
-	argv[2] = "-c";
-
-	argv_p = &argv[3];
-
-	cp = cmd;
-	/* Scan up cmd, splitting arguments into argv. This is the
-	 * child, so we can zap things in cmd safely */
-	
-	while (*cp) {
-		/* Skip any white space */
-		while (*cp && isspace(*cp))
-			cp++;
-		if (!*cp)
-			break;
-		*argv_p++ = cp;
-		while (*cp && !isspace(*cp))
-			cp++;
-		if (!*cp)
-			break;
-		*cp++ = '\0';
-	}
-	*argv_p = NULL;
-	execv (argv[0], &argv[1]);
 }
+
+void
+exec_sh_c(cmd)
+char *cmd;
+{
+	static char *sh, *shname;
+	int i;
+
+#ifndef NOFILE
+# define NOFILE 20
 #endif
+	/* Make sure there are no upper inherited file descriptors */
+	for (i = 3; i < NOFILE; i++)
+		(void) close (i);
+
+	if (sh == NULL) {
+		if ((sh = getenv("SHELL")) == NULL || *sh == '\0') {
+			sh = "/bin/sh";
+			shname = "sh";
+		} else {
+			shname = strrchr(sh,'/');
+			if (shname == NULL) {
+				shname = sh;
+			} else {
+				shname++;
+				if (*shname == '\0')
+					shname = sh;
+			}
+		}
+	}
+
+	if (cmd)
+		(void) execlp (sh, shname, "-c", cmd, 0);
+	else
+		(void) execlp (sh, shname, 0);
+	write(2,"exec failed\r\n",14);
+	exit (-1);
+}
+
+int
+system_SHELL(cmd)
+char *cmd;
+{
+	int cpid;
+
+	cpid = softfork();
+	if (cpid < 0) {
+		write(2,"cannot fork\n",13);
+		return cpid;
+	}
+
+	if (cpid) { /* parent */
+		int child;
+		while ((child = wait ((int *)0)) != cpid) {
+			if (child < 0 && errno == EINTR) {
+				(void) kill (SIGKILL, cpid);
+			}
+		}
+		return 0;
+	} else {
+		exec_sh_c(cmd);
+		write(2,"cannot exec\n",13);
+		return -1;
+	}
+
+}
+
+int
+softfork()
+{
+	/* Try & fork 5 times, backing off 1, 2, 4 .. seconds each try */
+	int fpid;
+	int tries = 5;
+	unsigned slp = 1;
+
+	while ((fpid = fork ()) < 0) {
+		if (--tries == 0)
+			return -1;
+		(void) sleep (slp);
+		slp <<= 1;
+	}
+	return fpid;
+}
 
 #else
 npopenhello() {}

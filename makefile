@@ -39,6 +39,13 @@ SCRDEF = -DTERMCAP -Dscrn_chosen
 #TARGET = xvile
 #SCRDEF = -DX11 -Dscrn_chosen
 
+CO=co
+#CO="@echo co"
+
+# for passing along the above settings to sub-makes
+ENV = SCREEN="$(SCREEN)" LIBS="$(LIBS)" TARGET="$(TARGET)" SCRDEF="$(SCRDEF)" \
+	CO="$(CO)"
+
 # install to DESTDIR1 if it's writable, else DESTDIR2
 DESTDIR1 = /usr/local/bin
 DESTDIR2 = $(HOME)/bin
@@ -163,82 +170,88 @@ all:
 	echo "	make osf1	(OSF/1)"				;\
 	echo "	make linux	(ported to 0.95)"			;\
 	echo "	make aux2	(A/UX 2.0) (3.0 is probably svr3)"	;\
+	echo "	make apollo						;\
 	echo "	nmake msc	(MicroSoft C 6.0) (buggy?)"		;\
 	echo "	make sx1100	(SX1100 running on Unisys 1100)"	;\
 	echo "	make default	(to use config internal to estruct.h)"
 
 bsd sony mach:
 	make CFLAGS="$(CFLAGS1) -DBERK -Dos_chosen" \
-	    MAKE=/usr/bin/make $(TARGET)
+	    MAKE=/usr/bin/make $(TARGET) $(ENV)
 
 bsd_posix ultrix:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DBERK -DPOSIX -Dos_chosen" \
-		$(TARGET)
+		$(TARGET) $(ENV)
 
 sunos:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DBERK -DPOSIX -DSUNOS -Dos_chosen" \
-		$(TARGET)
+		$(TARGET) $(ENV)
 
 bsd386:
 	make CFLAGS="$(CFLAGS1) -DBERK -DBSD386 -Dos_chosen" \
-	    MAKE=/usr/bin/make $(TARGET)
+	    MAKE=/usr/bin/make $(TARGET) $(ENV)
 
 att:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DUSG -Dos_chosen" \
-		$(TARGET)
+		LIBS="-ltermcap" \
+		$(TARGET) $(ENV)
 
 att_posix svr4:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DUSG -DPOSIX -Dos_chosen" \
-		$(TARGET)
+		$(TARGET) $(ENV)
 
 svr3:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DSVR3 -Dos_chosen" \
 		LIBS="-ltermcap" \
-		$(TARGET)
+		$(TARGET) $(ENV)
 
 #		LIBS="-ltermcap -lc_s"
 
 mips:
 	$(MAKE) CFLAGS="$(CFLAGS1) -systype sysv $(INCS) -DSVR3 -Dos_chosen" \
-		$(TARGET)
+		$(TARGET) $(ENV)
 
 odt:
 	$(MAKE) \
 	CFLAGS="$(CFLAGS1) -DODT -DUSG -DPOSIX -DSVR3_PTEM -Dos_chosen" \
-		$(TARGET)
+		$(TARGET) $(ENV)
 
 isc:
 	$(MAKE) \
 	CFLAGS="$(CFLAGS1) -DISC -DUSG -DPOSIX -DSVR3_PTEM -Dos_chosen" \
-		$(TARGET)
+		$(TARGET) $(ENV)
 
 hpux:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DUSG -DHAVE_SELECT -Dos_chosen" \
-		$(TARGET)
+		$(TARGET) $(ENV)
 
 next:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DBERK -D__STRICT_BSD__ \
-		-Dos_chosen" $(TARGET)
+		-Dos_chosen" $(TARGET) $(ENV)
 
 unixpc:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DUSG -DHAVE_SELECT \
 		-DHAVE_MKDIR=0 -Dwinit=xxwinit -Dos_chosen -DUNIXPC" \
-		$(TARGET)
+		$(TARGET) $(ENV)
 
 aix:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DUSG \
 		-DPOSIX -DAIX -DHAVE_SELECT -U__STR__ -Dos_chosen -qpgmsize=l" \
 		LIBS=-lcurses \
-		$(TARGET)
+		$(TARGET) $(ENV)
+
+apollo:
+	make CFLAGS="$(CFLAGS1) -DBERK -Dos_chosen" \
+	    MAKE=/usr/bin/make $(TARGET) $(ENV)
 
 osf1:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DBERK -DPOSIX -DOSF1 -Dos_chosen" \
-		$(TARGET)
+		$(TARGET) $(ENV)
 
 linux:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DUSG \
 		-DPOSIX -DHAVE_SELECT -DHAVE_POLL=0 -DLINUX -Dos_chosen" \
-		$(TARGET)
+		$(TARGET) $(ENV)
 
 # It has been pointed out to me that the stock COMMAND.COM can't possibly
 # handle the length of the commands that this causes.  You may have to
@@ -255,16 +268,16 @@ msc:
 
 aux2:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DUSG -DAUX2 -Dos_chosen" \
-		$(TARGET)
+		$(TARGET) $(ENV)
 
 sx1100:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DSVR3 -Dos_chosen" \
 		LDFLAGS="-h 400000" LIBS="-ltermcap" \
-		$(TARGET)
+		$(TARGET) $(ENV)
 
 default:
 	$(MAKE) CFLAGS="$(CFLAGS1) -Uos_chosen" \
-		$(TARGET)
+		$(TARGET) $(ENV)
 
 $(TARGET): $(BUILTHDRS) $(OBJ) makefile
 	-mv $(TARGET) o$(TARGET)
@@ -436,7 +449,7 @@ depend:	 $(SRC) $(HDRS) $(BUILTHDRS)
 populate: $(EVERYTHING)
 
 $(EVERYTHING):
-	co -r$(revision) $@
+	$(CO) -r$(revision) $@
 
 
 $(OBJ): estruct.h edef.h
@@ -444,7 +457,13 @@ $(OBJ): estruct.h edef.h
 externs.$O: nebind.h nename.h nefunc.h
 
 # $Log: makefile,v $
-# Revision 1.72  1992/11/19 09:14:41  foxharp
+# Revision 1.74  1992/12/04 09:50:24  foxharp
+# pass SCREEN etc. to lower makes via ENV variable
+#
+# Revision 1.73  1992/12/04  09:23:08  foxharp
+# added apollo
+#
+# Revision 1.72  1992/11/19  09:14:41  foxharp
 # added HELP_LOC support -- allows easy choice of new dest for vile.hlp
 #
 # Revision 1.71  1992/08/28  08:55:08  foxharp

@@ -2,7 +2,10 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: csrch.c,v $
- * Revision 1.5  1992/05/16 12:00:31  pgf
+ * Revision 1.6  1992/12/04 09:12:25  foxharp
+ * deleted unused assigns
+ *
+ * Revision 1.5  1992/05/16  12:00:31  pgf
  * prototypes/ansi/void-int stuff/microsoftC
  *
  * Revision 1.4  1991/11/01  14:38:00  pgf
@@ -38,7 +41,7 @@ int
 fscan(f,n,c)
 int f,n,c;
 {
-	int i = 0;
+	int i;
 	int doto;
 
 	if (!f || n <= 0)
@@ -76,7 +79,7 @@ int
 bscan(f,n,c)
 int f,n,c;
 {
-	int i = 0;
+	int i;
 	int doto;
 
 	if (f || n <= 0)

@@ -6,7 +6,10 @@
  * for the display system.
  *
  * $Log: buffer.c,v $
- * Revision 1.41  1992/11/19 08:48:14  foxharp
+ * Revision 1.42  1992/12/02 09:13:16  foxharp
+ * changes for "c-shiftwidth"
+ *
+ * Revision 1.41  1992/11/19  08:48:14  foxharp
  * took out restriction against killing invisible buffers
  *
  * Revision 1.40  1992/08/20  23:40:48  foxharp
@@ -321,6 +324,7 @@ BUFFER *nbp;
 	if (nbp == bheadp) {	/* already at the head */
 		curbp = bheadp;
 		curtabval = tabstop_val(curbp);
+		curswval = shiftwid_val(curbp);
 		return;
 	}
 	        
@@ -336,6 +340,7 @@ BUFFER *nbp;
 	curbp = nbp;
 
 	curtabval = tabstop_val(curbp);
+	curswval = shiftwid_val(curbp);
 }
 
 
@@ -408,6 +413,7 @@ register WINDOW *wp;
 	}
 }
 
+/* return the correct tabstop setting for this buffer */
 int
 tabstop_val(bp)
 register BUFFER *bp;
@@ -419,6 +425,20 @@ register BUFFER *bp;
 		return b_val(bp,
 			(b_val(bp, MDCMOD) && has_C_suffix(bp))
 					 ? VAL_C_TAB : VAL_TAB);
+}
+
+/* return the correct shiftwidth setting for this buffer */
+int
+shiftwid_val(bp)
+register BUFFER *bp;
+{
+	if (is_local_b_val(bp,MDCMOD))
+		return b_val(bp,
+			b_val(bp, MDCMOD) ? VAL_C_SWIDTH : VAL_SWIDTH);
+	else
+		return b_val(bp,
+			(b_val(bp, MDCMOD) && has_C_suffix(bp))
+					 ? VAL_C_SWIDTH : VAL_SWIDTH);
 }
 
 int
