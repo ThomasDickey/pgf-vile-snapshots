@@ -4,7 +4,11 @@
  * written for vile by Paul Fox, (c)1990
  *
  * $Log: opers.c,v $
- * Revision 1.22  1992/07/16 22:18:54  foxharp
+ * Revision 1.23  1992/11/19 09:15:37  foxharp
+ * be sure to turn doingopcmd off if the motion fails or is aborted.
+ * also, allow null regions -- i don't know why i didn't used to allow them
+ *
+ * Revision 1.22  1992/07/16  22:18:54  foxharp
  * ins() takes an argument -- whether or not to playback, usually FALSE
  *
  * Revision 1.21  1992/05/25  21:07:48  foxharp
@@ -153,11 +157,14 @@ char *str;
 		else
 			mlforce("[No such function]");
 	}
-	if (!cfp)
+	if (!cfp) {
+		doingopcmd = FALSE;
 		return FALSE;
+	}
 
 	if ((cfp->c_flags & MOTION) == 0) {
 		TTbeep();
+		doingopcmd = FALSE;
 		return(ABORT);
 	}
 
@@ -168,8 +175,12 @@ char *str;
 	/* and execute the motion */
 	status = execute(cfp, f, n);
 
-	if (status != TRUE || 
-	   ( samepoint(pre_op_dot, DOT) && fulllineregions == FALSE) ) {
+	if (status != TRUE 
+#ifdef BEFORE
+	||
+	   ( samepoint(pre_op_dot, DOT) && fulllineregions == FALSE)
+#endif
+		) {
 		doingopcmd = FALSE;
 		fulllineregions = FALSE;
 		return FALSE;

@@ -114,6 +114,8 @@ VI COMPLIANCE:
 - shiftwidth has been implemented, so ^T, ^D, '<', and '>' all do pretty
 	much what they do in vi
 
+- ": args" is now similar in spirit to the vi command of that name
+
 
 MISCELLANEOUS
 ===============
@@ -125,7 +127,8 @@ MISCELLANEOUS
 	were.  vile now uses Henry Spencer's regexp code.  This has the
 	side effect of making '\|' a new metacharacter, for alternation
 	of expressions.  '\+' and '\?' are also new, and stand for "one
-	or more" and "zero or one" occurrences.
+	or more" and "zero or one" occurrences.  they can be used from
+	the I-search commands as well.
 
 - in addition, \< and \> find beginnings and ends of words, and \w, \s,
 	and \d find "word" characters, "space" characters, and digits.
@@ -167,6 +170,7 @@ MISCELLANEOUS
 	Peter Ruczynski has done a great job porting vile to DOS -- he
 	calls that version "pcvile".  He has used the Zortech compiler in
 	the past -- I didn't try to break that, but you never know.
+	NOTE THAT THE DOS CODE IS KNOWN TO BE MUCH BUGGIER THAN THE UNIX CODE!
 
 - quite a few bug fixes, including all (I think) of those reported by users
 

@@ -13,7 +13,10 @@
  *		pgf, 11/91
  * 
  * $Log: regexp.c,v $
- * Revision 1.26  1992/05/25 21:44:45  foxharp
+ * Revision 1.27  1992/11/19 09:17:42  foxharp
+ * allow trailing backslashes in expressions, so isearch can use backslash
+ *
+ * Revision 1.26  1992/05/25  21:44:45  foxharp
  * moved func declarations to header
  *
  * Revision 1.25  1992/05/19  23:46:09  pgf
@@ -718,9 +721,18 @@ int at_bop;
 		/* NOTREACHED */
 		break;
 	case '\\':
-		if (*regparse == '\0')
-			FAIL("trailing \\");
 		switch(*regparse) {
+		case '\0':	
+#ifdef BEFORE
+			FAIL("trailing \\");
+#else
+			/* as a special case, treat a trailing '\' char as
+			 * a trailing '.'.  This makes '\' work in isearch
+			 * most of the time */
+			ret = regnode(ANY);
+			*flagp |= HASWIDTH|SIMPLE;
+			return ret;
+#endif
 		case 's':
 			ret = regnode(WHITESP);
 			break;

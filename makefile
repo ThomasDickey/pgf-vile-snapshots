@@ -39,11 +39,15 @@ SCRDEF = -DTERMCAP -Dscrn_chosen
 #TARGET = xvile
 #SCRDEF = -DX11 -Dscrn_chosen
 
-
-
 # install to DESTDIR1 if it's writable, else DESTDIR2
 DESTDIR1 = /usr/local/bin
 DESTDIR2 = $(HOME)/bin
+
+# if you want the help file (vile.hlp) to go somewhere other than your $PATH
+#  or one of the hard-code paths in epath.h  (it goes to the same place vile
+#  does by default)
+#HELP_LOC=/my/local/help/lib
+ HELP_LOC=
 
 REMOTE=gutso!foxharp
 
@@ -64,7 +68,7 @@ LDFLAGS =
 # search both places than to ifdef the code.  color me lazy.
 INCS = -I. $(GINCS) -I/usr/include -I/usr/include/sys
 
-CFLAGS1 = $(OPTFLAGS) $(INCS) $(SCRDEF)
+CFLAGS1 = $(OPTFLAGS) $(INCS) $(SCRDEF) -DHELP_LOC=\\\"$(HELP_LOC)\\\"
 
 # suffix for object files.
 # this get changes to "obj" for DOS builds
@@ -310,12 +314,16 @@ $(MKTBLS):  mktbls.c
 # install to DESTDIR1 if it's writable, else DESTDIR2
 install:
 	@[ -x $(TARGET) ] || (echo must make $(TARGET) first && exit 1)
-	[ -w $(DESTDIR1) ] && dest=$(DESTDIR1) || dest=$(DESTDIR2) ;\
+	@[ -w $(DESTDIR1) ] && dest=$(DESTDIR1) || dest=$(DESTDIR2) ;\
 	mv $$dest/$(TARGET) $$dest/o$(TARGET) ;\
+	echo Installing $(TARGET) to $$dest ; \
 	cp $(TARGET) $$dest ;\
 	test -f vile.hlp && /bin/rm -f $$dest/vile.hlp ;\
-	cp vile.hlp $$dest ;\
-	chmod 0644 $$dest/vile.hlp 
+	[ "$(HELP_LOC)" ] && dest="$(HELP_LOC)" ; \
+	echo Installing vile.hlp to $$dest ; \
+	cp vile.hlp $$dest; \
+	chmod 0644 $$dest/vile.hlp
+	
 
 compr-shar: link.msc
 	[ -d cshardir ] || mkdir cshardir
@@ -436,7 +444,10 @@ $(OBJ): estruct.h edef.h
 externs.$O: nebind.h nename.h nefunc.h
 
 # $Log: makefile,v $
-# Revision 1.71  1992/08/28 08:55:08  foxharp
+# Revision 1.72  1992/11/19 09:14:41  foxharp
+# added HELP_LOC support -- allows easy choice of new dest for vile.hlp
+#
+# Revision 1.71  1992/08/28  08:55:08  foxharp
 # switch from -g to -O for releaseh
 #
 # Revision 1.70  1992/08/20  23:40:48  foxharp

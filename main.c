@@ -14,7 +14,15 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.84  1992/08/20 23:40:48  foxharp
+ * Revision 1.86  1992/11/19 09:11:45  foxharp
+ * eric krohn's changes for xvile "foreground", "background", and "name"
+ * arguments, and
+ * the "_qident" class of characters, useful for C++ "qualified" identifiers
+ *
+ * Revision 1.85  1992/11/19  08:48:48  foxharp
+ * comment fixup
+ *
+ * Revision 1.84  1992/08/20  23:40:48  foxharp
  * typo fixes -- thanks, eric
  *
  * Revision 1.83  1992/08/19  22:59:05  foxharp
@@ -445,8 +453,28 @@ char	*argv[];
 				break;
 			case 'f':
 			case 'F':
-				if (argv[carg + 1])
+				if (strcmp(&argv[carg][1], "foreground") == 0)
+					x_setforeground(argv[++carg]);
+				else if (strcmp(&argv[carg][1], "fg") == 0)
+					x_setforeground(argv[++carg]);
+				else if (argv[carg + 1])
 					x_setfont(argv[++carg]);
+				else
+					goto usage;
+
+				break;
+			case 'b':
+				if (strcmp(&argv[carg][1], "background") == 0)
+					x_setbackground(argv[++carg]);
+				else if (strcmp(&argv[carg][1], "bg") == 0)
+					x_setbackground(argv[++carg]);
+				else
+					goto usage;
+
+				break;
+			case 'n':
+				if (strcmp(&argv[carg][1], "name") == 0)
+					x_setname(argv[++carg]);
 				else
 					goto usage;
 
@@ -580,6 +608,9 @@ char	*argv[];
 	fprintf(stderr, "	-kcryptkey for encrypted files\n");
 #endif
 #if X11
+	fprintf(stderr, "	-name name to change program name for X resources\n");
+	fprintf(stderr, "	-fg color to change foreground color\n");
+	fprintf(stderr, "	-bg color to change background color\n");
 	fprintf(stderr, "	-f fontname to change font\n");
 	fprintf(stderr, "	-d displayname to change the default display\n");
 	fprintf(stderr, "	-r for reverse video\n");
@@ -1068,7 +1099,7 @@ global_val_init()
 	set_global_b_val(VAL_C_TAB, 8); /* C file tab stop */
 	set_global_b_val(VAL_ASAVECNT, 256);	/* autosave count */
 	set_global_b_val_ptr(VAL_CWD, NULL);	/* current directory */
-	set_global_b_val_ptr(VAL_TAGS, strmalloc("tags")); /* suffixes for C mode */
+	set_global_b_val_ptr(VAL_TAGS, strmalloc("tags")); /* tags filename */
 
 	/* suffixes for C mode */
 	rp = (struct regexval *)malloc(sizeof (struct regexval));
@@ -1474,7 +1505,8 @@ charinit()
 		_chartypes_['/'] = _pathn;
 
 	/* legal in "identifiers" */
-	_chartypes_['_'] |= _ident;
+	_chartypes_['_'] |= _ident|_qident;
+	_chartypes_[':'] |= _qident;
 
 	/* whitespace */
 	_chartypes_[' '] =
@@ -1490,15 +1522,15 @@ charinit()
 
 	/* lowercase */
 	for (c = 'a'; c <= 'z'; c++)
-		_chartypes_[c] |= _lower|_pathn|_ident;
+		_chartypes_[c] |= _lower|_pathn|_ident|_qident;
 
 	/* uppercase */
 	for (c = 'A'; c <= 'Z'; c++)
-		_chartypes_[c] |= _upper|_pathn|_ident;
+		_chartypes_[c] |= _upper|_pathn|_ident|_qident;
 
 	/* digits */
 	for (c = '0'; c <= '9'; c++)
-		_chartypes_[c] |= _digit|_pathn|_ident|_linespec;
+		_chartypes_[c] |= _digit|_pathn|_ident|_qident|_linespec;
 
 	/* punctuation */
 	for (c = '!'; c <= '/'; c++)

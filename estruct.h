@@ -10,7 +10,10 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.86  1992/08/19 22:55:55  foxharp
+ * Revision 1.87  1992/11/19 08:59:00  foxharp
+ * added "qident" bit definition, for "qualified" (a la c++) identifiers
+ *
+ * Revision 1.86  1992/08/19  22:55:55  foxharp
  * made NFILEN bigger -- much safer
  *
  * Revision 1.85  1992/08/07  17:32:47  pgf
@@ -871,6 +874,7 @@ union REGS {
 #define _linespec 0x800		/* ex-style line range: 1,$ or 13,15 or % etc.*/
 #define _fence	0x1000		/* a fence, i.e. (, ), [, ], {, } */
 #define _nonspace	0x2000	/* non-whitespace */
+#define _qident	0x4000		/* is typically legal in "qualified" identifier */
 
 /* these intentionally match the ctypes.h definitions, except that
 	they force the char to 7-bit ascii first */

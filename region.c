@@ -6,7 +6,10 @@
  * internal use.
  *
  * $Log: region.c,v $
- * Revision 1.16  1992/06/01 20:42:15  foxharp
+ * Revision 1.17  1992/11/19 09:18:45  foxharp
+ * name change of kdelete() to ksetup(), and close off with kdone()
+ *
+ * Revision 1.16  1992/06/01  20:42:15  foxharp
  * honor "tabinsert" mode in {en,de}tabline()
  *
  * Revision 1.15  1992/05/16  12:00:31  pgf
@@ -88,11 +91,12 @@ killregion()
         if ((s=getregion(&region)) != TRUE)
                 return s;
 	kregcirculate(TRUE);
-        kdelete();                      /* command, so do magic */
+        ksetup();                      /* command, so do magic */
 	DOT = region.r_orig;
 	if (fulllineregions)
 		kregflag |= KLINES;
 	s = ldelete(region.r_size, TRUE);
+	kdone();
 	ukb = 0;
         return s;
 }
@@ -113,7 +117,7 @@ yankregion()
         if ((s=getregion(&region)) != TRUE)
                 return s;
 	kregcirculate(TRUE);
-        kdelete();
+        ksetup();
 	m = region.r_orig;
 	if (fulllineregions)
 		kregflag |= KLINES|KYANK;
@@ -139,6 +143,7 @@ yankregion()
 	else
 		mlwrite("[ %d character%c yanked]", kchars, 
 					kchars == 1 ? ' ':'s');
+	kdone();
 	ukb = 0;
         return TRUE;
 }

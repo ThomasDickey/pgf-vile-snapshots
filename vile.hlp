@@ -716,6 +716,7 @@ Programmed macros
 	$line		text of current line
 	$word		current "word"
 	$identifier	current punctuated word
+	$qidentifier	current qualified name (as with C++ ::)
 	$pathname	current path-like word
 	$directory	current directory
 	$terse		be terse -- suppress messages
@@ -815,6 +816,21 @@ Programmed macros
 
 	*LBL01
 
+	Note that for simple key-remappings, binding is often preferable
+	to creating a macro.  Some people prefer using lower-case 'g' to
+	as an equivalent to 'G', to goto a specific line.  If done as a
+	macro, like this:
+
+		3 store-macro
+		    goto-line
+		~endm
+		bind-key execute-macro-3 g
+
+	then both g and G go to the end of the file, but whereas 1000G goes
+	to line 1000, 1000g goes to the end of the file 1000 times.  It is
+	easier (and works correctly) to do:
+
+		bind-key goto-line g
 
 Regular Expressions
 -------------------
@@ -904,6 +920,9 @@ Command files
 	Nesting of source'd files is limited to a depth of ten, to prevent
 	infinite recursion.
 
+	The ';' character can be used as a comment character in command
+	files.
+
 Invocation
 ----------
 	If set in the environment, the variable VILEINIT is used as a set
@@ -957,6 +976,9 @@ X Window System specifics:
 	-f fontname	Font to use.
 	-r 		Use reverse video.
 	-d display	Use an alternate display.
+	-fg color	change foreground color (or -foreground)
+	-bg color	change background color (or -background)
+	-name name	change window name
 
 	X Resources:
 

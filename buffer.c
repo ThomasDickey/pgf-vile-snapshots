@@ -6,7 +6,10 @@
  * for the display system.
  *
  * $Log: buffer.c,v $
- * Revision 1.40  1992/08/20 23:40:48  foxharp
+ * Revision 1.41  1992/11/19 08:48:14  foxharp
+ * took out restriction against killing invisible buffers
+ *
+ * Revision 1.40  1992/08/20  23:40:48  foxharp
  * typo fixes -- thanks, eric
  *
  * Revision 1.39  1992/08/05  21:52:33  foxharp
@@ -454,8 +457,10 @@ int f,n;
 		mlforce("[No such buffer]");
 		return FALSE;
 	}
+#ifdef BEFORE /* now allow killing the specials, like "tags" */
 	if(bp->b_flag & BFINVS) 	/* Deal with special buffers	*/
 			return (TRUE);		/* by doing nothing.	*/
+#endif
 	if (curbp == bp) {
 		if (histbuff(TRUE,1) != TRUE) {
 			mlforce("[Can't kill that buffer]");

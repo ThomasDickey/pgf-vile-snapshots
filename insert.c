@@ -8,8 +8,15 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: insert.c,v $
- *	Revision 1.5  1992/08/06 23:53:51  foxharp
- *	autoindent now goes by shiftwidth, instead of tabstop
+ *	Revision 1.7  1992/11/30 23:06:03  foxharp
+ *	firstchar/lastchar now return -1 for no non-white chars in line
+ *
+ * Revision 1.6  1992/11/19  09:08:49  foxharp
+ * experiment -- cause further indent on lines following lines that end
+ * in a ':' when in c-mode, so we indent after labels, case xxx:, and default:
+ *
+ * Revision 1.5  1992/08/06  23:53:51  foxharp
+ * autoindent now goes by shiftwidth, instead of tabstop
  *
  * Revision 1.4  1992/07/15  23:23:46  foxharp
  * made '80i-ESC' work
@@ -584,9 +591,12 @@ int *bracefp;
 		return 0;
 	}
 	ind = indentlen(DOT.l);
-	if (bracefp)
-		*bracefp = (llength(DOT.l) > 0 &&
-			lgetc(DOT.l,lastchar(DOT.l)) == '{');
+	if (bracefp) {
+		int lc = lastchar(DOT.l);
+		*bracefp = (lc >= 0 &&
+			(lgetc(DOT.l,lc) == LBRACE ||
+			 lgetc(DOT.l,lc) == ':') );
+	}
 		    
 	gomark(FALSE,1);
 	    
@@ -609,9 +619,10 @@ int *bracefp;
 		return 0;
 	}
 	ind = indentlen(DOT.l);
-	if (bracefp)
-		*bracefp = (llength(DOT.l) > 0 &&
-			lgetc(DOT.l,firstchar(DOT.l)) == '}');
+	if (bracefp) {
+		int fc = firstchar(DOT.l);
+		*bracefp = (fc >= 0 && lgetc(DOT.l,fc) == RBRACE);
+	}
 		    
 	gomark(FALSE,1);
 	    
@@ -629,7 +640,7 @@ int ind;
 	autoindented = 0;
 	/* first clean up existing leading whitespace */
 	i = firstchar(DOT.l);
-	if (i)
+	if (i > 0)
 		ldelete((long)i,FALSE);
 	if ((i=ind/curtabval)!=0) {
 		autoindented += i;
@@ -740,7 +751,7 @@ shiftwidth()
 	int s;
 	int fc;
 	fc = firstchar(DOT.l);
-	if (fc < DOT.o) {
+	if (fc >= 0 && fc < DOT.o) {
 		s = linsert(b_val(curbp, VAL_SWIDTH), ' ');
 		/* should entab mult ^T inserts */
 		return s;
@@ -753,7 +764,11 @@ shiftwidth()
 	if (b_val(curbp,MDTABINSERT))
                 entabline(TRUE);
 	if (autoindented >= 0) {
-		autoindented = firstchar(DOT.l);
+		fc = firstchar(DOT.l);
+		if (fc >= 0)
+			autoindented = fc;
+		else /* all white */
+			autoindented = llength(DOT.l);
 	}
 	return TRUE;
 }
