@@ -4,7 +4,7 @@
  * Support functions for "popup-msgs" mode.
  * Written by T.E.Dickey for vile (august 1994).
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/msgs.c,v 1.1 1994/08/08 16:12:29 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/msgs.c,v 1.3 1994/10/06 14:13:24 pgf Exp $
  */
 #include "estruct.h"
 
@@ -43,12 +43,15 @@ int	c;
 {
 	BUFFER	*savebp = curbp;
 	WINDOW	*savewp = curwp;
-	MARK	savemk  = DOT;
+	MARK	savemk;
 	int	saverow = ttrow;
 	int	savecol = ttcol;
-	register BUFFER *bp = create_msgs();
+	register BUFFER *bp;
 	register WINDOW *wp;
 
+	if (savewp)
+	    savemk  = DOT;
+	bp = create_msgs();
 	beginDisplay;
 	/*
 	 * Modify the current-buffer state as unobtrusively as possible (i.e.,
@@ -79,7 +82,8 @@ int	c;
 	 */
 	curbp = savebp;
 	curwp = savewp;
-	DOT   = savemk;
+	if (savewp)
+	    DOT   = savemk;
 	movecursor(saverow, savecol);
 	if (c != '\n') {
 		if (sgarbf) {
@@ -96,10 +100,13 @@ popup_msgs()
 {
 	BUFFER	*savebp = curbp;
 	WINDOW	*savewp = curwp;
-	MARK	savemk = DOT;
-	register BUFFER *bp = create_msgs();
+	MARK	savemk;
+	register BUFFER *bp;
 	WINDOW  *wp;
 
+	if (savewp)
+	    savemk = DOT;
+	bp = create_msgs();
 	if (!is_empty_buf(bp)) {
 		if ((curwp == 0) || sgarbf) {
 			return;		/* CAN'T popup yet */
@@ -116,7 +123,8 @@ popup_msgs()
 		set_rdonly(bp, non_filename());
 		curbp = savebp;
 		curwp = savewp;
-		DOT   = savemk;
+		if (savewp)
+		    DOT   = savemk;
 	}
 }
 

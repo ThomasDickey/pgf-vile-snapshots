@@ -3,7 +3,7 @@
 ;;
 ;; Author: Kevin Buettner
 ;;
-;; $Header: /usr/build/VCS/pgf-vile/RCS/manpage.rc,v 1.1 1994/07/11 22:56:20 pgf Exp $
+;; $Header: /usr/build/VCS/pgf-vile/RCS/manpage.rc,v 1.2 1994/10/27 14:28:04 pgf Exp $
 ;;
 
 29 store-macro
@@ -20,8 +20,10 @@
 		~force error-buffer %manpagebuf
 		write-message "[Attaching bold and underline attributes...]"
 		goto-beginning-of-file
+		setl noview
 		attribute-cntl_a-sequences-til end-of-file
 		unmark-buffer
+		setl view
 		goto-beginning-of-file
 		write-message "[Done formatting manual page.]"
 	~endif

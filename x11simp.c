@@ -1,7 +1,7 @@
 /*
  * 	older, simpler X11 support, Dave Lemke, 11/91
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/x11simp.c,v 1.48 1994/09/05 19:30:21 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/x11simp.c,v 1.50 1994/10/30 16:26:37 pgf Exp $
  *
  */
 #error This module is not actively maintained as part of vile.
@@ -30,7 +30,7 @@
 #include	<X11/Xos.h>
 #include	<X11/Xatom.h>
 
-#define	XCalloc(type)	((type*)calloc(1, sizeof(type)))
+#define	XCalloc(type)	typecalloc(type)
 
 #if !APOLLO || defined(__STDCPP__)	/* not in apollo sr10.2 */
 extern	XClassHint *XAllocClassHint P((void)); /* usually in <X11/xutil.h> */
@@ -2507,7 +2507,7 @@ decoded_key(ev, buffer, bufsize)
 	 * provide default mappings for unmapped keys.
 	 */
 	if (num <= 0) {
-		for (n = 0; n < SIZEOF(escapes); n++) {
+		for (n = 0; n < TABLESIZE(escapes); n++) {
 			if (keysym == escapes[n].key) {
 				num = kcod2escape_seq(escapes[n].code, buffer);
 				break;

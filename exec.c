@@ -3,7 +3,7 @@
  *
  *	written 1986 by Daniel Lawrence
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/exec.c,v 1.94 1994/09/05 19:31:19 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/exec.c,v 1.98 1994/10/27 21:46:42 pgf Exp $
  *
  */
 
@@ -35,6 +35,8 @@ static	char	*dname[] = {
 	 "endm"
 #endif
 	};
+
+static int token_ended_line;  /* did the last token end at end of line? */
 
 /*----------------------------------------------------------------------------*/
 
@@ -80,7 +82,10 @@ int
 end_named_cmd()
 {
 	if (isnamedcmd) {
-		return end_of_cmd();
+		if (clexec)
+			return token_ended_line;
+		else
+			return end_of_cmd();
 	}
 	return FALSE;
 }
@@ -92,7 +97,10 @@ int
 more_named_cmd()
 {
 	if (isnamedcmd) {
-		return !end_of_cmd();
+		if (clexec)
+			return !token_ended_line;
+		else
+			return !end_of_cmd();
 	}
 	return FALSE;
 }
@@ -468,6 +476,13 @@ seems like we need one more check here -- is it from a .exrc file?
 	havemotion = &f_gomark;
 	regionshape = FULLLINE;
 
+	/* if the command ended with a bang, let the function know
+		that so it can take special action */
+	if ((flags & BANG) && (fnp[strlen(fnp)-1] == '!')) {
+		f = TRUE;
+		n = SPECIAL_BANG_ARG;
+	}
+
 	status = execute(cfp,f,n);
 
 	havemotion = NULL;
@@ -777,7 +792,8 @@ int f,n;
 	}
 
 	do {
-		if ((status = macarg(tkn)) != TRUE) {	/* and grab the first token */
+		if ((status = macarg(tkn)) != TRUE) {	/* and grab the 
+								first token */
 			execstr = oldestr;
 			return status;
 		}
@@ -838,7 +854,7 @@ int f,n;
 	MARK odot;
 
 	if (execfunc == NULL) {
-#if REBIND
+#if OPT_REBIND
 		mlwarn("[Key not bound]");	/* complain		*/
 #else
 		mlwarn("[Not a command]");	/* complain		*/
@@ -1004,6 +1020,11 @@ int eolchar;
 		}
 	}
 
+	/* scan past any whitespace remaining in the source string */
+	while (isspace(*src))
+		++src;
+	token_ended_line = isreturn(*src) || *src == EOS;
+
 	*tok = EOS;
 	return src;
 }
@@ -1051,6 +1072,17 @@ char *tok;	/* buffer to place argument */
 	/* evaluate it */
 	(void)strcpy(tok, tokval(tok));
 	clexec = savcle;	/* restore execution mode */
+	return TRUE;
+}
+
+int
+macliteralarg(tok)	/* get a macro line argument */
+char *tok;	/* buffer to place argument */
+{
+	/* grab everything on this line, literally */
+	(void)strcpy(tok, execstr);
+	execstr += strlen(execstr);
+	token_ended_line = TRUE;
 	return TRUE;
 }
 
@@ -1431,7 +1463,9 @@ nxtscan:	/* on to the next line */
 			++eline;
 
 		/* dump comments and blank lines */
-		if (*eline == ';' || *eline == EOS)
+		/* ';' for uemacs backward compatibility, and
+		   '"' for vi compatibility */
+		if (*eline == ';' || *eline == '"' || *eline == EOS)
 			goto onward;
 
 #if	DEBUGM
@@ -1460,7 +1494,7 @@ nxtscan:	/* on to the next line */
 			(void)update(TRUE);
 
 			/* and get the keystroke */
-			if (tgetc(FALSE) == abortc) {
+			if (ABORTED(tgetc(FALSE))) {
 				mlforce("[Macro aborted]");
 				freewhile(whlist);
 				mstore = FALSE;

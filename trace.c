@@ -1,7 +1,7 @@
 /*
  * debugging support -- tom dickey.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/trace.c,v 1.2 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/trace.c,v 1.3 1994/10/03 13:24:35 pgf Exp $
  *
  */
 #ifdef __TURBOC__
@@ -13,6 +13,8 @@
 #else
 #include "estruct.h"
 #endif
+
+#undef fopen	/* avoid conflict with 'fakevms.c' */
 
 #ifndef _trace_h
 #include "trace.h"
@@ -151,7 +153,7 @@ void	fail_alloc(msg, ptr)
 	char	*msg;
 	char	*ptr;
 {
-	Trace("%s: %#x\n", msg, ptr);
+	Trace("%s: %p\n", msg, ptr);
 	Trace("allocs %d, frees %d\n", count_alloc, count_freed);
 	WalkBack();
 #if NO_LEAKS

@@ -47,7 +47,9 @@ Programmed Macros in vile
 
 Comments
 --------
-	Any line beginning with a semi-colon (;) character is ignored.
+	Any line beginning with a semi-colon (;) or double-quote (")
+	character is ignored.  The semi-colon is inherited from MicroEMACS,
+	the double-quote is for vi compatibility.
 
 Constants
 ---------
@@ -576,5 +578,5 @@ Directives
 		insert-string "You are on an old machine!\n"
 
 -----------------------------------
-  $Header: /usr/build/VCS/pgf-vile/RCS/macros.doc,v 1.6 1994/07/11 22:56:20 pgf Exp $
+  $Header: /usr/build/VCS/pgf-vile/RCS/macros.doc,v 1.7 1994/10/02 15:08:09 pgf Exp $
 -----------------------------------

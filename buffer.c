@@ -5,7 +5,7 @@
  * keys. Like everyone else, they set hints
  * for the display system.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/buffer.c,v 1.97 1994/08/29 18:20:48 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/buffer.c,v 1.99 1994/10/30 16:26:37 pgf Exp $
  *
  */
 
@@ -1001,6 +1001,13 @@ register BUFFER *bp;
 	}
 
 #endif
+#if LCKFILES
+	/* If Buffer is killed and not locked by other then release own lock */
+	if ( global_g_val(GMDUSEFILELOCK) ) {
+		if ( bp->b_active )
+			release_lock(bp->b_fname);
+	}
+#endif
 	/* Blow text away.	*/
 	if ((s=bclear(bp)) != TRUE) {
 		/* the user must have answered no */
@@ -1152,7 +1159,7 @@ void	footnote(c)
 		};
 	register int	j, next;
 
-	for (j = next = 0; j < SIZEOF(table); j++) {
+	for (j = next = 0; j < TABLESIZE(table); j++) {
 		if (c != 0) {
 			if (table[j].name[0] == c) {
 				bputc(c);

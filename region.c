@@ -5,7 +5,7 @@
  * commands. Some functions are just for
  * internal use.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/region.c,v 1.53 1994/07/22 01:45:44 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/region.c,v 1.56 1994/10/28 11:16:41 pgf Exp $
  *
  */
 
@@ -283,7 +283,7 @@ int	l,r;
 
 	if (i != 0) { /* did we find space/tabs to kill? */
 		DOT.o = w_left_margin(curwp);
-		if ((s = ldelete((long)i,FALSE)) != TRUE)
+		if ((s = ldelete((B_COUNT)i,FALSE)) != TRUE)
 			return s;
 	}
 
@@ -395,7 +395,7 @@ int l, r;
 				fspace = -1;
 			else {
 				backchar(TRUE, ccol - fspace);
-				(void)ldelete((long)(ccol - fspace), FALSE);
+				(void)ldelete((B_COUNT)(ccol - fspace), FALSE);
 				linsert(1, '\t');
 				fspace = -1;
 			}
@@ -460,7 +460,7 @@ int	l, r;
 
 	DOT.o = off+1;
 
-	return ldelete((long)(orig - off),FALSE);
+	return ldelete((B_COUNT)(orig - off),FALSE);
 }
 
 /*
@@ -703,10 +703,10 @@ int (*func) P((int));
 
 /* finish filling in the left/right column info for a rectangular
 	region */
-static void region_corners P(( REGION * ));
+static void set_rect_columns P(( REGION * ));
 
 static void
-region_corners(rp)
+set_rect_columns(rp)
 register REGION *rp;
 {
 	if (regionshape != RECTANGLE)
@@ -726,6 +726,7 @@ register REGION *rp;
 		rp->r_leftcol = tmp ? tmp - 1 : 0;
 	}
 }
+
 
 /*
  * This routine figures out the
@@ -783,11 +784,12 @@ register REGION *rp;
 				rp->r_end.o  = rp->r_rightcol = DOT.o;
 			}
 			rp->r_size = rp->r_end.o - rp->r_orig.o;
-			region_corners(rp);
+			set_rect_columns(rp);
 		}
 		return TRUE;
 	}
 
+#if !SMALLER
 	if (b_is_counted(curbp)) { /* we have valid line numbers */
 		L_NUM dno, mno;
 		dno = l_ref(DOT.l)->l_number;
@@ -823,13 +825,15 @@ register REGION *rp;
 				} else {
 					fsize -= 
 					    (line_length(flp) - rp->r_end.o);
-					region_corners(rp);
+					set_rect_columns(rp);
 				}
 				rp->r_size = fsize;
 				return TRUE;
 			}
 		}
-	} else  {
+	} else
+#endif /* !SMALLER */
+	{
 		blp = l_ref(DOT.l);
 		flp = l_ref(DOT.l);
 		if (regionshape == FULLLINE) {
@@ -854,7 +858,7 @@ register REGION *rp;
 					rp->r_end.l  = lFORW(rp->r_end.l);
 				} else {
 					fsize -= (line_length(flp) - MK.o);
-					region_corners(rp);
+					set_rect_columns(rp);
 				}
 				rp->r_size = fsize;
 				return TRUE;
@@ -872,7 +876,7 @@ register REGION *rp;
 					rp->r_end.l  = lFORW(rp->r_end.l);
 				} else {
 					bsize -= (MK.o - w_left_margin(curwp));
-					region_corners(rp);
+					set_rect_columns(rp);
 				}
 				rp->r_size = bsize;
 				return TRUE;

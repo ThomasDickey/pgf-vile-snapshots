@@ -2,7 +2,7 @@
  *		written by Daniel Lawrence
  *		5/9/86
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/input.c,v 1.113 1994/09/23 04:21:19 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/input.c,v 1.116 1994/10/27 21:46:42 pgf Exp $
  *
  */
 
@@ -97,14 +97,13 @@ char *prompt;
 	char c; 		/* input character */
 
 	/* in case this is right after a shell escape */
-	if (sgarbf)
-		update(TRUE);
+	update(TRUE);
 
 	for (;;) {
-		mlprompt("%s [y/n]? ",prompt);
+		mlforce("%s [y/n]? ",prompt);
 		c = tgetc(FALSE);	/* get the response */
 
-		if (c == abortc)		/* Bail out! */
+		if (ABORTED(c))		/* Bail out! */
 			return(ABORT);
 
 		if (c=='y' || c=='Y')
@@ -127,14 +126,13 @@ char *respchars;
 int *cp;
 {
 
-	if (sgarbf)
-		update(TRUE);
+	update(TRUE);
 
 	for (;;) {
-		mlprompt("%s ",prompt);
+		mlforce("%s ",prompt);
 		*cp = tgetc(FALSE);	/* get the response */
 
-		if (*cp == abortc)	/* Bail out! */
+		if (ABORTED(*cp))	/* Bail out! */
 			return(ABORT);
 
 		if (strchr(respchars,*cp))
@@ -332,7 +330,7 @@ int eatit;  /* consume the character? */
 
 		if (interrupted()) {
 			dotcmdmode = STOP;
-			return abortc;
+			return intrc;
 		} else {
 
 			if (!tb_more(buffer = dotcmd)) {
@@ -371,7 +369,7 @@ int eatit;  /* consume the character? */
 		if (interrupted()) {
 			while (kbdmode == PLAY)
 				finish_kbm();
-			return abortc;
+			return intrc;
 		} else {
 
 			if (!tb_more(buffer = KbdStack->m_kbdm)) {
@@ -406,7 +404,7 @@ int c;
 	n = kcod2escape_seq(c, esc_seq);
 
 	for (i = n-1; i >= 0; i--)
-		tb_put(&tungottenchars, (ALLOC_T) tungotcnt++, esc_seq[i]);
+		(void) tb_put(&tungottenchars, (ALLOC_T) tungotcnt++, esc_seq[i]);
 
 	for (i = n; i--; ) {
 	    if (dotcmdmode == RECORD) {
@@ -427,7 +425,7 @@ int n;			/* number of recorded characters to elide */
 	    register char *t;
 	    for (t = s; *t; t++);
 	    while (t > s)
-		    tb_put(&tungottenchars, (ALLOC_T) tungotcnt++, *--t);
+		    (void) tb_put(&tungottenchars, (ALLOC_T) tungotcnt++, *--t);
 	}
 
 	while (n-- > 0) {
@@ -475,9 +473,7 @@ int quoted;
 				} while (c == -1);
 			}
 			doing_kbd_read = FALSE;
-			if (!quoted && (c == kcod2key(intrc)))
-				c = abortc;
-			else
+			if (quoted || (c != kcod2key(intrc)))
 				record_char(c);
 		}
 		c = char2int(c);
@@ -737,7 +733,7 @@ CHARTYPE inclchartype;
 	}
 
 #if OPT_WIDE_CTYPES
-#if VMS
+#if OPT_VMS_PATH
 	if (inclchartype & _pathn) {
 		;	/* override conflict with "[]" */
 	} else
@@ -1104,7 +1100,8 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 
 	if (clexec) {
 		execstr = token(execstr, extbuf, eolchar);
-		if ((status = (*extbuf != EOS)) != FALSE) {
+		status = (*extbuf != EOS);
+		if (status) { /* i.e. we got some input */
 #if !SMALLER
 			if ((options & KBD_LOWERC))
 				(void)mklower(extbuf);
@@ -1253,7 +1250,7 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 			continue;
 		} else
 #endif
-		if (c == abortc && quotef == FALSE && !dontmap) {
+		if (ABORTED(c) && quotef == FALSE && !dontmap) {
 			buf[cpos] = EOS;
 			status = esc(FALSE, 1);
 			break;

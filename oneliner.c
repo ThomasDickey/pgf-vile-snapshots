@@ -3,7 +3,7 @@
  *	here to support the globals() function.  They now work on regions.
  *	Written (except for delins()) for vile by Paul Fox, (c)1990
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/oneliner.c,v 1.64 1994/09/23 04:30:41 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/oneliner.c,v 1.66 1994/10/16 02:57:55 pgf Exp $
  */
 
 #include	"estruct.h"
@@ -166,10 +166,12 @@ int needpats, use_opts;
 		if (gregexp) {
 			FreeIfNeeded(substexp);
 			substexp = castalloc(regexp,(ALLOC_T)(gregexp->size));
-			(void)memcpy((char *)substexp, (char *)gregexp, (SIZE_T)gregexp->size);
+			(void)memcpy((char *)substexp, (char *)gregexp, 
+							(SIZE_T)gregexp->size);
 		}
 
-		if ((status = readpattern("replacement string: ", &rpat[0], (regexp	**)0, c,
+		if ((status = readpattern("replacement string: ", &rpat[0], 
+						(regexp	**)0, c,
 				FALSE)) == ABORT) {
 			rls_region();
 			return FALSE;
@@ -177,7 +179,8 @@ int needpats, use_opts;
 		}
 		nth_occur = -1;
 		confirm = printit = globally = FALSE;
-		getopts = (lastkey == c); /* the user may have something to add */
+		getopts = (lastkey == c); /* the user may have 
+						something to add */
 
 	} else {
 		if (!use_opts) {
@@ -297,7 +300,7 @@ int nth_occur, printit, globally, *confirmp;
 	DOT.o = 0;
 	do {
 		scanboundpos.o = lLength(DOT.l);
-		s = scanner(exp, FORWARD, FALSE, NULL);
+		s = scanner(exp, FORWARD, FALSE, (int *)0);
 		if (s != TRUE)
 			break;
 

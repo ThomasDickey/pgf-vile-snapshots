@@ -4,7 +4,7 @@
  *
  *   Created: Thu May 14 15:44:40 1992
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/proto.h,v 1.142 1994/09/23 04:21:19 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/proto.h,v 1.150 1994/10/28 22:35:03 pgf Exp $
  *
  */
 
@@ -73,7 +73,9 @@ extern int xterm_button P(( int ));
 extern void tcapscroll_reg P(( int, int, int ));
 extern void tcapscroll_delins P(( int, int, int ));
 extern void tcapscrollregion P(( int, int ));
+#if OPT_EVAL || COLOR
 extern void spal P(( char * ));
+#endif
 
 /* basic.c */
 extern int gotobol P(( int, int ));
@@ -139,7 +141,7 @@ extern int bindkey P(( int, int ));
 extern int desbind P(( int, int ));
 extern void makebindlist P(( int, char *));
 extern int strinc P(( char *, char *));
-#if REBIND
+#if OPT_REBIND
 extern int rebind_key P(( int, CMDFUNC * ));
 extern int install_bind P(( int, CMDFUNC *, CMDFUNC ** ));
 #endif
@@ -155,7 +157,9 @@ extern char * kcod2prc P(( int, char * ));
 extern int insertion_cmd P(( int ));
 #endif
 extern int fnc2kcod P(( CMDFUNC * ));
+#if X11
 extern char * fnc2pstr P(( CMDFUNC * ));
+#endif
 extern char * fnc2engl P(( CMDFUNC * ));
 extern CMDFUNC * engl2fnc P(( char * ));
 extern KBIND * kcode2kbind P(( int ));
@@ -241,6 +245,7 @@ extern int rev_csrch P(( int, int ));
 extern int nu_width P(( WINDOW * ));
 extern int col_limit P(( WINDOW * ));
 extern int vtinit P(( void ));
+extern int video_alloc P(( VIDEO ** ));
 extern int vtalloc P(( void ));
 extern void vtfree P(( void ));
 extern void vttidy P(( int ));
@@ -298,7 +303,7 @@ extern	void	psc_rev		P(( int ));
 
 /* eval.c */
 extern char * l_itoa P(( int ));
-extern long l_strtol P(( char * ));
+extern int l_strtol P(( char * ));
 extern int absol P(( int ));
 extern int is_truem P(( char * ));
 extern int is_falsem P(( char * ));
@@ -409,7 +414,7 @@ extern void makename P(( char *, char * ));
 extern int unqname P((char *, int));
 extern int filewrite P(( int, int ));
 extern int filesave P(( int, int ));
-extern int writeout P(( char *, BUFFER *, int ));
+extern int writeout P(( char *, BUFFER *, int, int ));
 extern int writeregion P(( void ));
 extern int kwrite P(( char *, int ));
 extern int filename P(( int, int ));
@@ -432,7 +437,7 @@ extern char *filec_expand P(( void ));
 
 /* fileio.c */
 extern int ffropen P(( char * ));
-extern int ffwopen P(( char * ));
+extern int ffwopen P(( char *, int ));
 extern int ffronly P(( char * ));
 extern long ffsize P(( void ));
 extern int ffexists P(( char * ));
@@ -573,6 +578,10 @@ extern int fisearch P(( int, int ));
 extern int isearch P(( int, int ));
 extern int get_char P(( void ));
 #endif
+
+/* lckfiles.c */
+extern int set_lock P(( char *, char *, int));
+extern void release_lock P(( char * ));
 
 /* line.c */
 extern int do_report P(( L_NUM ));
@@ -718,12 +727,13 @@ extern int operblank P(( int, int ));
 extern int operopenrect P(( int, int ));
 
 /* path.c */
-#if MSDOS || WIN31 || OS2 || NT
+#if OPT_MSDOS_PATH
 extern char * is_msdos_drive P(( char * ));
 #endif
-#if VMS
+#if OPT_VMS_PATH
 extern int is_vms_pathname P(( char *, int ));
 extern char * vms_pathleaf P(( char * ));
+extern char * unix_pathleaf P(( char * ));
 #endif
 #if UNIX
 extern char * home_path P(( char * ));
@@ -740,7 +750,7 @@ extern char * is_appendname P(( char * ));
 extern char * non_filename P(( void ));
 extern int is_internalname P(( char * ));
 extern int is_directory P(( char * ));
-#if (UNIX||MSDOS||WIN31||OS2||NT) && PATHLOOK
+#if (UNIX||OPT_MSDOS_PATH) && PATHLOOK
 extern char *parse_pathlist P(( char *, char * ));
 #endif
 
@@ -784,7 +794,9 @@ extern void catnap P(( int, int ));
 extern char * current_directory P(( int ));
 extern int cd P(( int, int ));
 extern int pwd P(( int, int ));
+#if OPT_EVAL
 extern char * previous_directory P(( void ));
+#endif
 extern int set_directory P(( char * ));
 extern void ch_fname P(( BUFFER *, char * ));
 
@@ -964,9 +976,7 @@ extern int scrnextdw P(( int, int ));
 extern int savewnd P(( int, int ));
 extern int restwnd P(( int, int ));
 #endif
-#if !SMALLER || OPT_EVAL
 extern int resize P(( int, int ));
-#endif
 extern void winit P(( void ));
 
 /* word.c */
@@ -998,6 +1008,7 @@ extern char * token P(( char *, char *, int ));
 extern int ffgetline P(( int * ));
 extern int macroize P(( TBUFF **, char *, char * ));
 extern int macarg P(( char * ));
+extern int macliteralarg P(( char * ));
 extern int echochar P(( int, int ));
 extern int scanmore P(( char *, int ));
 extern int scanner P((regexp *, int, int, int * ));
@@ -1218,6 +1229,9 @@ extern	int	kill	P((int, int));
 #if HAVE_KILLPG && MISSING_EXTERN_KILLPG
 extern	int	killpg	P(( int, int ));
 #endif
+#if HAVE_LINK && MISSING_EXTERN_LINK
+extern	int	link	P(( char *, char * ));
+#endif
 #if MISSING_EXTERN_LONGJMP
 extern	void	longjmp	P((jmp_buf env, int val));
 #endif
@@ -1295,6 +1309,12 @@ extern	long	time	P(( long * ));
 #if MISSING_EXTERN_UNLINK
 extern	int	unlink	P(( char * ));
 #endif
+#if HAVE_UTIME && MISSING_EXTERN_UTIME
+extern	int	utime	P(( const char *, struct utimbuf * ));
+#endif
+#if HAVE_UTIMES && MISSING_EXTERN_UTIMES
+extern	int	utimes	P(( char *, struct timeval * ));
+#endif
 #if MISSING_EXTERN_WAIT
 extern	int	wait	P(( int * ));
 #endif
@@ -1319,7 +1339,7 @@ extern void delay P(( int ));
 extern	void	free_attribs	P(( BUFFER * ));
 extern	void	free_attrib	P(( BUFFER *, AREGION * ));
 extern	int	sel_begin	P(( void ));
-extern	int	sel_extend	P(( int ));
+extern	int	sel_extend	P(( int, int ));
 extern	void	sel_release	P(( void ));
 extern	void	sel_reassert_ownership P(( BUFFER * ));
 extern	int	sel_yank	P(( void ));
@@ -1328,12 +1348,20 @@ extern	BUFFER *sel_buffer	P(( void ));
 extern	int	sel_setshape	P(( REGIONSHAPE ));
 extern	int	sel_motion	P(( int, int ));
 extern	int	selectregion	P(( void ));
+extern	int	multimotion	P(( int, int ));
+extern	int	multimotionrectangle	P(( int, int ));
 extern	int	attributeregion P(( void ));
 extern	int	attribute_cntl_a_sequences	P(( void ));
 extern	int	operselect	P(( int, int ));
 extern	int	operattrbold	P(( int, int ));
 extern	int	operattrital	P(( int, int ));
+extern	int	operattrno	P(( int, int ));
 extern	int	operattrul	P(( int, int ));
 extern	int	operattrcaseq	P(( int, int ));
 #endif /* OPT_SELECTIONS */
 
+#if OPT_VMS_PATH
+extern	char *	vms2unix_path   P((char *dst, const char *src));
+extern	char *	unix2vms_path   P((char *dst, const char *src));
+extern	char *	vms_path2dir    P((const char *src));
+#endif

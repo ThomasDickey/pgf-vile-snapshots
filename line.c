@@ -11,7 +11,13 @@
  * which means that the dot and mark values in the buffer headers are nonsense.
  *
  * $Log: line.c,v $
- * Revision 1.74  1994/09/07 22:00:47  pgf
+ * Revision 1.76  1994/10/30 16:26:37  pgf
+ * changed SIZEOF to TABLESIZE
+ *
+ * Revision 1.75  1994/10/28  11:16:41  pgf
+ * tom's 4.7l changes
+ *
+ * Revision 1.74  1994/09/07  22:00:47  pgf
  * kev's 4.6g patches
  *
  * Revision 1.73  1994/08/29  22:15:10  pgf
@@ -1056,7 +1062,7 @@ int	c;
 
 	if (c >= 0 && c < 10)
 		n = (c + '0');
-	else if (c >= 10 && c < SIZEOF(kbs))
+	else if (c >= 10 && c < TABLESIZE(kbs))
 		n = (c - 10 + 'a');
 	else
 		n = '?';
@@ -1515,11 +1521,11 @@ REGIONSHAPE shape;
 					ep++;
 				    }
 				    /* Open up space in current line */
-				    status = linsert(ep - sp, ' ');
+				    status = linsert((int)(ep - sp), ' ');
 				    if (status != TRUE)
 					break;
 				    dp = l_ref(DOT.l)->l_text 
-					    + DOT.o - (ep - sp);
+					    + DOT.o - (int)(ep - sp);
 				    /* Copy killbuf portion to the line */
 				    while (sp < ep) {
 					*dp++ = *sp++;
@@ -1661,7 +1667,7 @@ char *dummy;
 	if (any)
 		bprintf("last=%c", lastreg);
 
-	for (i = 0; i < SIZEOF(kbs); i++) {
+	for (i = 0; i < TABLESIZE(kbs); i++) {
 		int	save = ukb;
 
 		ii = index2ukb(i);
@@ -1752,7 +1758,7 @@ relist_registers()
 #if NO_LEAKS
 void	kbs_leaks()
 {
-	for (ukb = 0; ukb < SIZEOF(kbs); ukb++) {
+	for (ukb = 0; ukb < TABLESIZE(kbs); ukb++) {
 		ksetup();
 		kdone();
 	}

@@ -3,7 +3,7 @@
  *	Original interface by Otto Lind, 6/3/93
  *	Additional map and map! support by Kevin Buettner, 9/17/94
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/map.c,v 1.22 1994/09/23 18:08:11 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/map.c,v 1.27 1994/10/16 02:57:55 pgf Exp $
  * 
  */
 
@@ -94,42 +94,12 @@ static void relist_mappings P(( char * ));
 #define relist_mappings(name)
 #endif
 
-#define relist_mappings()
-
 #if OPT_SHOW_MAPS
 #define MAPS_PREFIX 12
 
 static	int	show_all;
 
 /*ARGSUSED*/
-#if 0
-static void
-makecharslist(flag, ptr)
-int	flag;
-char	*ptr;
-{
-	register Mapping *m;
-	char	temp[NSTRING];
-
-	b_set_left_margin(curbp, MAPS_PREFIX);
-	for (m = mhead; m != 0; m = m->next) {
-		if (m != mhead) {
-			bputc('\n');
-			lsettrimmed(lBack(DOT.l));
-		}
-		bprintf("%*S", MAPS_PREFIX, show_all
-			? kcod2pstr(m->key, temp) + 1	/* FIXXX: nulls */
-			: kcod2prc(m->key, temp));
-
-
-		/* patch -- m->kbdseq cannot have nulls in it.  need length */
-		bprintf("%s", show_all
-			? m->kbdseq
-			: bytes2prc(temp, m->kbdseq, (int)strlen(m->kbdseq)));
-		lsettrimmed(l_ref(DOT.l));
-	}
-}
-#endif
 static void
 makecharslist(flag, ptr)
     int   flag;
@@ -177,9 +147,7 @@ BUFFER *bp;
 
 #undef relist_mappings
 
-
-
-void
+static void
 relist_mappings(bufname)
     char * bufname;
 {
@@ -232,8 +200,13 @@ map_common(f, mpp, bufname)
 
     hst_glue(' ');
     val[0] = EOS;
-    status = kbd_string("map value: ", val, sizeof(val),
+    if (!clexec) {
+	    status = kbd_string("map value: ", val, sizeof(val),
 			'\n', KBD_NOMAP, no_completion);
+    } else {
+	    (void)macliteralarg(val); /* consume to end of line */
+	    status = (*val != EOS);
+    }
     if (status != TRUE)
 	return status;
 
@@ -253,6 +226,7 @@ unmap(f, n)
     return unmap_common(&map_command, MAPPED_LIST_NAME_CM);
 }
 
+/* ARGSUSED */
 int
 unmap_bang(f, n)
     int f, n;
@@ -288,8 +262,8 @@ addtomaps(seq, code)
     char * seq;
     int    code;
 {
-    addtomap(&map_command, seq, 0, code, NULL);
-    addtomap(&map_insert,  seq, 0, code, NULL);
+    addtomap(&map_command, seq, 0, code, (char *)0);
+    addtomap(&map_insert,  seq, 0, code, (char *)0);
 }
 
 static void
@@ -375,7 +349,7 @@ delfrommap(mpp, ks)
 	    *mstk[depth] = mp->flink;
 	    if (depth > 0 && (*mstk[depth-1])->dlink == mp)
 		(*mstk[depth-1])->dlink = NULL;
-	    free(mp);
+	    free((char *)mp);
 	}
 	else
 	    break;
@@ -413,7 +387,7 @@ maplookup(c, delayedptr)
 	    int nextc;
 	    if (mp->irv != -1 || mp->srv != NULL) {
 		rmp = mp;
-		cnt += (s - unmatched);
+		cnt += (int) (s - unmatched);
 		s = unmatched;
 	    }
 
@@ -457,6 +431,6 @@ maplookup(c, delayedptr)
     else {	/* didn't find a match */
 	while (s > unmatched+1)
 	    tungetc(*--s);
-	return unmatched[0];
+	return char2int(unmatched[0]);
     }
 }

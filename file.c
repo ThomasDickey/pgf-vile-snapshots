@@ -5,7 +5,7 @@
  *	reading and writing of the disk are in "fileio.c".
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/file.c,v 1.134 1994/08/08 16:12:29 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/file.c,v 1.139 1994/10/30 12:57:50 pgf Exp $
  *
  */
 
@@ -27,7 +27,7 @@ static	void	guess_dosmode P(( BUFFER * ));
 #  define MORETHAN >
 # endif
 #endif
-static	int	writereg P(( REGION *, char *, int, BUFFER * ));
+static	int	writereg P(( REGION *, char *, int, BUFFER *, int ));
 #if UNIX
 static	int	slowtime P(( long * ));
 #endif
@@ -134,6 +134,12 @@ char *fn;
 	int status = TRUE;
 
 	if (PromptModtime(bp, fn, "Read from disk", FALSE) == TRUE) {
+#if LCKFILES
+		/* release own lock before read the file again */
+		if ( global_g_val(GMDUSEFILELOCK) ) {
+			release_lock(fn);
+		}
+#endif
 		status = readin(fn, TRUE, bp, TRUE);
 	}
 	return status;
@@ -218,9 +224,13 @@ char *	fname;
 	return FALSE;
 }
 
-#if VMS
+#if OPT_VMS_PATH
+static	char *	version_of P((char *));
+static	int	explicit_version P((char *));
+
 static char *
-version_of(char *fname)
+version_of(fname)
+char *fname;
 {
 	register char	*s = strchr(fname, ';');
 	if (s == 0)
@@ -229,15 +239,18 @@ version_of(char *fname)
 }
 
 static int
-explicit_version(char *version)
+explicit_version(ver)
+char *ver;
 {
-	if (*version++ == ';') {
-		if (isdigit(*version))
+	if (*ver++ == ';') {
+		if (isdigit(*ver))
 			return TRUE;
 	}
 	return FALSE;
 }
+#endif OPT_VMS_PATH
 
+#if VMS
 static char *
 resolve_filename(bp)
 BUFFER	*bp;
@@ -272,7 +285,7 @@ int	lengthen;
 	if (lengthen)
 		fname = lengthen_path(strcpy(temp, fname));
 
-#if VMS
+#if OPT_VMS_PATH
 	/* ignore version numbers in this comparison unless both are given */
 	if (is_vms_pathname(fname, FALSE)) {
 		char	*bname = bp->b_fname,
@@ -282,7 +295,7 @@ int	lengthen;
 		if (!explicit_version(s)
 		 || !explicit_version(t))
 			if ((s-bname) == (t-fname))
-				return !strncmp(fname, bname, s-bname);
+				return !strncmp(fname, bname, (SIZE_T)(s-bname));
 	}
 #endif
 
@@ -308,6 +321,13 @@ int f,n;
 			FILEC_REREAD, fname)) != TRUE)
 		return s;
 
+#if LCKFILES
+	/* release own lock before read the replaced file */
+	if ( global_g_val(GMDUSEFILELOCK) ) {
+		release_lock(curbp->b_fname);
+	}
+#endif
+	
 	/* we want no errors or complaints, so mark it unchanged */
 	b_clr_changed(curbp);
         s = readin(fname, TRUE, curbp, TRUE);
@@ -504,16 +524,25 @@ BUFFER *bp;
 	register LINE *lp;
 
 	make_local_b_val(bp, MDDOS);	/* keep it local, if not */
+	/* first count 'em */
 	for_each_line(lp,bp) {
-		if (llength(lp) > 0
-		 && lgetc(lp, llength(lp)-1) == '\r') {
-			llength(lp)--;
+		if (llength(lp) > 0 && 
+				lgetc(lp, llength(lp)-1) == '\r') {
 			doslines++;
 		} else {
 			unixlines++;
 		}
 	}
 	set_b_val(bp, MDDOS, doslines MORETHAN unixlines);
+	if (b_val(bp, MDDOS)) {
+		/* then eliminate 'em if necessary */
+		for_each_line(lp,bp) {
+			if (llength(lp) > 0 && 
+					lgetc(lp, llength(lp)-1) == '\r') {
+				llength(lp)--;
+			}
+		}
+	}
 	bp->b_bytecount -= doslines;
 }
 
@@ -538,6 +567,34 @@ int	f,n;
 }
 #endif
 
+#if LCKFILES
+static void grab_lck_file P(( BUFFER *, char * ));
+
+static void
+grab_lck_file(bp, fname)
+BUFFER *bp;
+char *fname;
+{
+	/* Write the lock */
+	if (global_g_val(GMDUSEFILELOCK)	&&
+		! isShellOrPipe(fname)		&&
+		! b_val(bp,MDVIEW) )
+	{
+		char	locker[100];
+
+		if ( ! set_lock(fname,locker,sizeof(locker)) ) { 
+			/* we didn't get it */
+			make_local_b_val(bp,MDVIEW);
+			set_b_val(bp,MDVIEW,TRUE);
+			make_local_b_val(bp,MDLOCKED);
+			set_b_val(bp,MDLOCKED,TRUE);
+			make_local_b_val(bp,VAL_LOCKER);
+			set_b_val_ptr(bp,VAL_LOCKER, strmalloc(locker));
+			markWFMODE(bp);
+		}
+	}
+}
+#endif
 /*
  *	Read file "fname" into a buffer, blowing away any text
  *	found there.  Returns the final status of the read.
@@ -674,6 +731,10 @@ int	mflg;		/* print messages? */
 	imply_alt(fname, FALSE, lockfl);
 	updatelistbuffers();
 
+#if LCKFILES
+	if (lockfl && s != FIOERR)
+		grab_lck_file(bp,fname);
+#endif
 #if PROC
 	if (s == TRUE) { 
 	    static int readhooking;
@@ -877,7 +938,6 @@ int *nlinep;
 		 */
 		if (global_b_val(MDDOS)) {
 			if (fline[len-1] == '\r') {
-				len--;
 				doslines++;
 			} else {
 				unixlines++;
@@ -936,8 +996,18 @@ int *nlinep;
 		}
         }
 #if DOSFILES
-	if (global_b_val(MDDOS))
+	if (global_b_val(MDDOS)) {
 		set_b_val(bp, MDDOS, doslines MORETHAN unixlines);
+		if (b_val(bp, MDDOS)) {  /* if it _is_ a dos file, strip 'em */
+        		register LINE   *lp;
+			for_each_line(lp,bp) {
+				if (llength(lp) > 0 && 
+					  lgetc(lp, llength(lp)-1) == '\r') {
+					llength(lp)--;
+				}
+			}
+		}
+	}
 #endif
 	return s;
 }
@@ -1004,7 +1074,7 @@ char    fname[];
 	fcp = &fname[strlen(fname)];
 	/* trim trailing whitespace */
 	while (fcp != fname && (isblank(fcp[-1])
-#if UNIX || MSDOS || WIN31 || OS2 || NT /* trim trailing slashes as well */
+#if UNIX || OPT_MSDOS_PATH	/* trim trailing slashes as well */
 					 || is_slashc(fcp[-1])
 #endif
 							) )
@@ -1132,13 +1202,13 @@ int ok_to_ask;  /* prompts allowed? */
  * Ask for a file name, and write the
  * contents of the current buffer to that file.
  */
-/* ARGSUSED */
 int
 filewrite(f, n)
 int f,n;
 {
         register int    s;
         char            fname[NFILEN];
+	int 		forced = (f && n == SPECIAL_BANG_ARG);
 
 	if (more_named_cmd()) {
 	        if ((s= mlreply_file("Write to file: ", (TBUFF **)0, 
@@ -1147,7 +1217,7 @@ int f,n;
         } else
 		(void) strcpy(fname, curbp->b_fname);
 
-        if ((s=writeout(fname,curbp,TRUE)) == TRUE)
+        if ((s=writeout(fname,curbp,forced,TRUE)) == TRUE)
 		unchg_buff(curbp, 0);
         return s;
 }
@@ -1164,12 +1234,14 @@ filesave(f, n)
 int f,n;
 {
         register int    s;
+	int forced = (f && n == SPECIAL_BANG_ARG); /* then it was :w! */
 
         if (curbp->b_fname[0] == EOS) {		/* Must have a name.    */
                 mlwarn("[No file name]");
                 return FALSE;
         }
-        if ((s=writeout(curbp->b_fname,curbp,TRUE)) == TRUE)
+
+        if ((s=writeout(curbp->b_fname,curbp,forced,TRUE)) == TRUE)
 		unchg_buff(curbp, 0);
         return s;
 }
@@ -1183,10 +1255,11 @@ int f,n;
  * checking of some sort.
  */
 int
-writeout(fn,bp,msgf)
+writeout(fn,bp,forced,msgf)
 char    *fn;
 BUFFER *bp;
 int msgf;
+int forced;
 {
         REGION region;
 
@@ -1197,7 +1270,7 @@ int msgf;
         region.r_size   = bp->b_bytecount;
         region.r_end    = bp->b_line;
  
-	return writereg(&region, fn, msgf, bp);
+	return writereg(&region, fn, msgf, bp, forced);
 }
 
 int
@@ -1219,17 +1292,18 @@ writeregion()
 	                return status;
         }
         if ((status=getregion(&region)) == TRUE)
-		status = writereg(&region, fname, TRUE, curbp);
+		status = writereg(&region, fname, TRUE, curbp, FALSE);
 	return status;
 }
 
 
 static int
-writereg(rp, fn, msgf, bp)
+writereg(rp, fn, msgf, bp, forced)
 REGION	*rp;
 char    *fn;
 int 	msgf;
 BUFFER	*bp;
+int	forced;
 {
         register int    s;
         register LINE   *lp;
@@ -1293,7 +1367,7 @@ BUFFER	*bp;
 	if ( ! inquire_modtime( bp, fn ) )
 		return FALSE;
 #endif  
-        if ((s=ffwopen(fn)) != FIOSUC)       /* Open writes message. */
+        if ((s=ffwopen(fn,forced)) != FIOSUC)       /* Open writes message. */
                 return FALSE;
 
 	/* tell us we're writing */
@@ -1408,7 +1482,7 @@ int	msgf;
 	/* turn off ALL keyboard translation in case we get a dos error */
 	TTkclose();
 
-	if ((s=ffwopen(fn)) != FIOSUC) {	/* Open writes message. */
+	if ((s=ffwopen(fn,FALSE)) != FIOSUC) {	/* Open writes message. */
 		TTkopen();
 		return FALSE;
 	}
@@ -1473,10 +1547,16 @@ int f,n;
 						== ABORT)
                 return s;
         if (s == FALSE)
-                ch_fname(curbp, "");
-        else
-                ch_fname(curbp, fname);
+                return s;
 	make_global_b_val(curbp,MDVIEW); /* no longer read only mode */
+#if LCKFILES
+	if ( global_g_val(GMDUSEFILELOCK) ) {
+		release_lock(curbp->b_fname);
+		ch_fname(curbp, fname);
+		grab_lck_file(curbp, fname);
+	} else
+#endif
+	 ch_fname(curbp, fname);
 	markWFMODE(curbp);
 	updatelistbuffers();
         return TRUE;
@@ -1676,7 +1756,7 @@ ACTUAL_SIG_DECL
 				strcat(strcpy(temp, "V"), get_bname(bp)));
 #endif
 			set_b_val(bp,MDVIEW,FALSE);
-			if (writeout(filnam,bp,FALSE) != TRUE) {
+			if (writeout(filnam,bp,TRUE,FALSE) != TRUE) {
 				vttidy(FALSE);
 				ExitProgram(BADEXIT);
 			}

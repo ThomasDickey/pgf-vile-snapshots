@@ -1,7 +1,7 @@
 dnl
 dnl Local definitions for autoconf.
 dnl ------------------------
-dnl $Header: /usr/build/VCS/pgf-vile/RCS/aclocal.m4,v 1.4 1994/07/22 01:45:44 pgf Exp $
+dnl $Header: /usr/build/VCS/pgf-vile/RCS/aclocal.m4,v 1.5 1994/10/31 03:49:26 pgf Exp $
 dnl ------------------------
 dnl
 dnl VC_HAVE_LIBRARY is a slightly modifid version of AC_HAVE_LIBRARY from 
@@ -301,3 +301,16 @@ define([VC_SIZE_T],
 int main() { size_t x; exit (0);}
 ], ,
 [AC_DEFINE(size_t, unsigned)])])dnl
+dnl ---------------------------------------------------------------------------
+dnl	Check for declarion of sys_errlist in one of stdio.h and errno.h.  
+dnl	Declaration of sys_errlist on BSD4.4 interferes with our declaration.
+dnl	Reported by Keith Bostic.
+define([VC_SYS_ERRLIST],
+[AC_COMPILE_CHECK([declaration of sys_errlist],
+[
+#include <stdio.h>
+#include <sys/types.h>
+#include <errno.h>
+],
+[ char *c = (char *) *sys_errlist; ],
+[AC_DEFINE(HAVE_EXTERN_SYS_ERRLIST)])])

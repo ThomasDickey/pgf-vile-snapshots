@@ -2,7 +2,7 @@
  * The routines in this file read and write ASCII files from the disk. All of
  * the knowledge about files are here.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/fileio.c,v 1.77 1994/08/08 16:12:29 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/fileio.c,v 1.81 1994/10/28 11:16:41 pgf Exp $
  *
  */
 
@@ -32,8 +32,9 @@
 /*--------------------------------------------------------------------------*/
 
 static	void	free_fline P(( void ));
-#if MSDOS || OS2 || NT
+#if OPT_FILEBACK
 static	int	copy_file P(( char *, char * ));
+static	int	write_backup_file P((char *, char *, int));
 static	int	make_backup P(( char *, int ));
 #endif
 static	int	count_fline;	/* # of lines read with 'ffgetline()' */
@@ -47,7 +48,7 @@ free_fline()
 	flen = 0;
 }
 
-#if MSDOS || OS2 || NT
+#if OPT_FILEBACK
 /*
  * Copy file when making a backup, when we are appending.
  */
@@ -89,6 +90,90 @@ char	*dst;
  * Note: for UNIX, the direction of file-copy should be reversed, if the
  *       original file happens to be a symbolic link.
  */
+
+#if UNIX
+# if ! HAVE_LONG_FILENAMES
+#  define MAX_FN_LEN 14
+# else
+#  define MAX_FN_LEN 255
+# endif
+#endif
+
+static int
+write_backup_file(orig, backup, appending)
+char *orig;
+char *backup;
+int appending;
+{
+	int s;
+
+	struct stat ostat, bstat;
+
+	if (stat(orig, &ostat) != 0)
+		return FALSE;
+
+	if (stat(backup, &bstat) == 0) {  /* the backup file exists */
+		
+		/* same file, somehow? */
+		if (bstat.st_dev == ostat.st_dev &&
+		    bstat.st_ino == ostat.st_ino)
+			return FALSE;
+
+		/* remove it */
+		if (unlink(backup) != 0)
+			return FALSE;
+	}
+
+	/* there are many reasons for copying, rather than renaming
+	   and writing a new file -- the file may have links, which
+	   will follow the rename, rather than stay with the real-name.
+	   additionally, if the write fails, we need to re-rename back to
+	   the original name, otherwise two successive failed writes will
+	   destroy the file.
+	*/
+
+	s = copy_file(orig, backup);
+	if (s != TRUE)
+		return s;
+
+	/* change date and permissions to match original */
+#if HAVE_UTIME
+	{
+	    struct utimbuf buf;
+	    buf.actime = ostat.st_atime;
+	    buf.modtime = ostat.st_mtime;
+	    s = utime(backup, &buf);
+	    if (s != 0) {
+		    (void)unlink(backup);
+		    return FALSE;
+	    }
+	}
+#else
+#if HAVE_UTIMES
+	{
+	    struct timeval buf[2];
+	    buf[0].tv_sec = ostat.st_atime;
+	    buf[0].tv_usec = 0;
+	    buf[1].tv_sec = ostat.st_mtime;
+	    buf[1].tv_usec = 0;
+	    s = utimes(backup, buf);
+	    if (s != 0) {
+		    (void)unlink(backup);
+		    return FALSE;
+	    }
+	}
+#endif
+#endif
+
+	s = chmod(backup, ostat.st_mode & 0777);
+	if (s != 0) {
+		(void)unlink(backup);
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
 static int
 make_backup (fname, appending)
 char	*fname;
@@ -97,26 +182,46 @@ int	appending;
 	struct	stat	sb;
 	int	ok	= TRUE;
 
-	if (stat(fname, &sb) >= 0) {
+	if (stat(fname, &sb) >= 0) { /* if the file exists, attempt a backup */
 		char	tname[NFILEN];
 		char	*s = pathleaf(strcpy(tname, fname)),
 			*t = strrchr(s, '.');
-		if (t == 0)
+		char *gvalfileback = global_g_val_ptr(GVAL_BACKUPSTYLE);
+
+		if (strcmp(gvalfileback,".bak") == 0) {
+			if (t == 0)
+				t = s + strlen(s);
+			(void)strcpy(t, ".bak");
+#if UNIX
+		} else if (strcmp(gvalfileback, "tilde") == 0) {
 			t = s + strlen(s);
-		(void)strcpy(t, ".bak");
-		(void)unlink(tname);
-		ok = (rename(fname, tname) >= 0);
-		if (ok && appending) {
-			ok = copy_file(tname, fname);
-			if (!ok) {	/* try to put things back together */
-				(void)unlink(fname);
-				(void)rename(tname, fname);
+#if ! HAVE_LONG_FILENAMES
+			if (t - s >= MAX_FN_LEN) {
+				if (t - s == MAX_FN_LEN &&
+					s[MAX_FN_LEN-2] == '.')
+					s[MAX_FN_LEN-2] = s[MAX_FN_LEN-1];
+				t = &s[MAX_FN_LEN-1];
 			}
+#endif
+			(void)strcpy(t, "~");
+#if SOMEDAY
+		} else if (strcmp(gvalfileback, "tilde_N_existing") {
+			/* numbered backups if one exists, else simple */
+		} else if (strcmp(gvalfileback, "tilde_N") {
+			/* numbered backups of all files*/
+#endif
+#endif /* UNIX */
+		} else {
+			mlwrite("BUG: bad fileback value");
+			return FALSE;
 		}
+
+		ok = write_backup_file(fname, tname, appending);
+
 	}
 	return ok;
 }
-#endif
+#endif /* OPT_FILEBACK */
 
 /*
  * Open a file for reading.
@@ -151,7 +256,8 @@ char    *fn;
 		return (FIOERR);
 
 	} else if ((ffp=fopen(fn, FOPEN_READ)) == NULL) {
-		if (errno != ENOENT) {
+		if (errno != ENOENT
+		 && errno != EINVAL) {	/* a problem with Linux to DOS-files */
 			mlerror("opening for read");
 			return (FIOERR);
 		}
@@ -166,8 +272,9 @@ char    *fn;
  * (cannot create).
  */
 int
-ffwopen(fn)
+ffwopen(fn,forced)
 char    *fn;
+int	forced;
 {
 #if UNIX || MSDOS || OS2 || NT
 	char	*name;
@@ -180,11 +287,11 @@ char    *fn;
 		}
 		fileispipe = TRUE;
 	} else {
-#if MSDOS || OS2 || NT
+#if OPT_FILEBACK
 		int	appending = FALSE;
 #endif
 		if ((name = is_appendname(fn)) != NULL) {
-#if MSDOS || OS2 || NT
+#if OPT_FILEBACK
 			appending = TRUE;
 #endif
 			fn = name;
@@ -195,10 +302,14 @@ char    *fn;
 			mlerror("opening directory");
 			return (FIOERR);
 		}
-#if MSDOS	/* patch: should make this a mode */
-		if (!make_backup(fn, appending)) {
-			mlforce("[Can't make backup file]");
-			return (FIOERR);
+#if OPT_FILEBACK
+		if (*global_g_val_ptr(GVAL_BACKUPSTYLE) != 'o') { /* "off" ? */
+			if (!make_backup(fn, appending)) {
+				if (!forced) {
+					mlerror("making backup file");
+					return (FIOERR);
+				}
+			}
 		}
 #endif
 		if ((ffp = fopen(fn, mode)) == NULL) {

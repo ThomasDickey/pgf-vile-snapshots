@@ -1,7 +1,7 @@
 /* These functions perform vi's on-this-line character scanning functions.
  *	written for vile by Paul Fox, (c)1990
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/csrch.c,v 1.17 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/csrch.c,v 1.18 1994/10/27 21:46:42 pgf Exp $
  *
 */
 
@@ -107,7 +107,7 @@ int *cp;
 		c = tgetc(FALSE);
 		if (c == quotec)
 			c = tgetc(TRUE);
-		else if (c == abortc)
+		else if (ABORTED(c))
 			return FALSE;
 	}
 

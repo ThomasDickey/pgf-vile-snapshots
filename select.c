@@ -18,23 +18,37 @@
  * transfering the selection are not dealt with in this file.  Procedures
  * for dealing with the representation are maintained in this file.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/select.c,v 1.17 1994/09/13 17:17:08 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/select.c,v 1.21 1994/10/27 21:46:42 pgf Exp $
  *
  */
 
 #include	"estruct.h"
 #include	"edef.h"
 
+#if OPT_SELECTIONS
+
 extern REGION *haveregion;
 
-#if OPT_SELECTIONS
+#if BEFORE /* we always need these now, for multimotion() */
+#if X11 && XTOOLKIT
+# define USE_SEL_FUNCS 1
+#else
+# define USE_SEL_FUNCS 0
+#endif
+#else
+# define USE_SEL_FUNCS 1
+#endif
+
 static	void	detach_attrib		P(( BUFFER *, AREGION * ));
 static	void	attach_attrib		P(( BUFFER *, AREGION * ));
+
+#if USE_SEL_FUNCS
 static	void	fix_dot			P(( void ));
 static	void	output_selection_position_to_message_line P(( int ));
 static	WINDOW *push_fake_win		P(( BUFFER * ));
 static	void	pop_fake_win		P(( WINDOW * ));
-static	REGION *extended_region		P(( void ));
+#endif
+static REGION *extended_region		P(( void ));
 
 /*
  * startbufp and startregion are used to represent the start of a selection
@@ -56,9 +70,11 @@ static AREGION	startregion;
 static BUFFER *	selbufp = NULL;
 static AREGION	selregion;
 
+#if USE_SEL_FUNCS
 typedef enum { ORIG_FIXED, END_FIXED, UNFIXED } WHICHEND;
 
 static WHICHEND whichend;
+#endif
 
 void
 free_attribs(bp)
@@ -135,6 +151,7 @@ attach_attrib(bp, arp)
  * can happen when selecting with the mouse.
  */
 
+#if USE_SEL_FUNCS
 static void
 fix_dot()
 {
@@ -188,8 +205,9 @@ sel_begin()
 
 /* Extend the current selection to dot */
 int
-sel_extend(wiping)
+sel_extend(wiping, include_dot)
     int wiping;
+    int include_dot;
 {
     REGIONSHAPE save_shape = regionshape;
     REGION a,b;
@@ -221,9 +239,11 @@ sel_extend(wiping)
      * in the selection.  To include DOT, we must advance it one char since
      * a region runs from r_orig up to but not including r_end.
      */
-    DOT.o += 1;
+    if (include_dot)
+	    DOT.o += 1;
     getregion(&a);
-    DOT.o -= 1;
+    if (include_dot)
+	    DOT.o -= 1;
 
     if (wiping && whichend == ORIG_FIXED)
 	MK = selregion.ar_region.r_orig;
@@ -267,11 +287,12 @@ sel_release()
     detach_attrib(selbufp, &selregion);
     selbufp = NULL;
 }
+#endif /* USE_SEL_FUNCS */
 
 /*
  * Assert/reassert ownership of selection if appropriate.  This is necessary
- * in order to paste a selection after its already been pasted once and
- * then modified.
+ * in order to paste a selection after it's already been pasted once and then
+ * modified.
  */
 
 void
@@ -294,6 +315,7 @@ sel_reassert_ownership(bp)
  * together with the rest of the window manipulation code.
  */
 
+#if USE_SEL_FUNCS
 static WINDOW *
 push_fake_win(bp)
     BUFFER *bp;
@@ -382,8 +404,6 @@ sel_yank()
     return TRUE;
 }
 
-
-
 int
 sel_attached()
 {
@@ -412,6 +432,7 @@ sel_setshape(shape)
 	return FALSE;
     }
 }
+#endif /* USE_SEL_FUNCS */
 
 /* return a region which goes from DOT to the far end of the current
 	selection region.  shape is maintained.  returns pointer to static
@@ -534,6 +555,96 @@ selectregion()
 	return status;
 }
 
+int sweeping;
+
+int
+multimotion(f,n)
+int f,n;
+{
+	CMDFUNC	*cfp;
+	int s,c,waserr;
+	int shape = regionshape;
+	MARK savedot = DOT;
+	MARK realdot;
+	char	temp[NLINE];
+	extern CMDFUNC f_multimotion;
+
+	if (sweeping) { /* the same command terminates as starts the sweep */
+		sweeping = FALSE;
+		mlforce("[Sweeping: Completed]");
+		regionshape = shape;
+		return TRUE;
+	} else {
+		kcod2pstr(fnc2kcod(&f_multimotion), temp);
+		sweeping = TRUE;
+		mlwrite("[Begin cursor sweep... (end with %*S)]",*temp,temp+1);
+		sel_begin();
+		(void)sel_setshape(shape);
+	}
+
+	waserr = TRUE; /* to force message "state-machine" */
+
+	while (sweeping) {
+
+		/* Fix up the screen	*/
+		s = update(FALSE);
+
+		/* get the next command from the keyboard */
+		c = kbd_seq();
+
+		if (ABORTED(c)) {
+			sweeping = FALSE;
+			mlforce("[Sweeping: Aborted]");
+			sel_release();
+			return FALSE;
+		}
+
+		f = FALSE;
+		n = 1;
+
+		do_repeats(&c,&f,&n);
+
+		/* and execute the command */
+		cfp = kcod2fnc(c);
+		if ( (cfp != NULL)
+		 && ((cfp->c_flags & MOTION) != 0)) {
+			s = execute(cfp, f, n);
+			if (s != TRUE) {
+				mlforce(
+				"[Sweeping: Motion failed. (end with %*S)]",*temp,temp+1);
+				waserr = TRUE;
+			} else {
+				if (waserr) {
+					mlforce("[Sweeping... (end with %*S)]",*temp,temp+1);
+					waserr = FALSE;
+				}
+				realdot = DOT;
+				DOT = savedot;
+				sel_begin();
+				DOT = realdot;
+				(void)sel_setshape(shape);
+				sel_extend(TRUE,FALSE);
+			}
+		 } else {
+			mlforce(
+			"[Sweeping: Only motions permitted (end with %*S)]",*temp,temp+1);
+			waserr = TRUE;
+		 }
+
+	}
+	regionshape = shape;
+	return TRUE;
+}
+
+int
+multimotionrectangle(f,n)
+int f,n;
+{
+	regionshape = RECTANGLE;
+	return multimotion(f,n);
+}
+
+
 int
 attributeregion()
 {
@@ -547,10 +658,29 @@ attributeregion()
 		rls_region();
 		return FALSE;
 	    }
-	    arp->ar_region = region;
-	    arp->ar_vattr = videoattribute;
-	    arp->ar_shape = regionshape;
-	    attach_attrib(curbp, arp);
+	    if (videoattribute != 0) {	/* add new attribute-region */
+	    	arp->ar_region = region;
+	    	arp->ar_vattr = videoattribute;
+	    	arp->ar_shape = regionshape;
+	    	attach_attrib(curbp, arp);
+	    } else { /* purge attributes in this region */
+		L_NUM first = line_no(curbp, region.r_orig.l);
+		L_NUM last  = line_no(curbp, region.r_end.l);
+		AREGION *p, *q;
+
+		for (p = curbp->b_attribs; p != 0; p = q) {
+		    L_NUM f0 = line_no(curbp, p->ar_region.r_orig.l);
+		    L_NUM l0 = line_no(curbp, p->ar_region.r_end.l);
+		    q = p->ar_next;
+		    if (l0 < first
+		     || f0 > last)
+		    	continue;	/* no overlap */
+		    /* FIXME: this removes the whole of an overlapping region;
+		     * we really only want to remove the overlapping portion...
+		     */
+		    detach_attrib(curbp, p);
+		}
+	    }
 	}
 	rls_region();
 	return status;
@@ -584,6 +714,15 @@ int f,n;
       opcmd = OPOTHER;
       videoattribute = VAITAL;
       return operator(f,n,attributeregion,"Set italic attribute");
+}
+
+int
+operattrno(f,n)
+int f,n;
+{
+      opcmd = OPOTHER;
+      videoattribute = 0;
+      return operator(f,n,attributeregion,"Set normal attribute");
 }
 
 int
@@ -631,7 +770,7 @@ attribute_cntl_a_sequences()
 {
     register int c;		/* current char during scan */
     fast_ptr LINEPTR pastline;	/* pointer to line just past EOP */
-    int offset;			/* offset in cur line of place to attribute */
+    C_NUM offset;		/* offset in cur line of place to attribute */
 
 #if EFFICIENCY_HACK
     AREGION *orig_attribs;
@@ -685,10 +824,10 @@ attribute_found:
 #if EFFICIENCY_HACK
 		new_attribs = curbp->b_attribs;
 		curbp->b_attribs = orig_attribs;
-		ldelete(offset - DOT.o, FALSE);
+		ldelete((B_COUNT)(offset - DOT.o), FALSE);
 		curbp->b_attribs = new_attribs;
 #else
-		ldelete(offset - DOT.o, FALSE);
+		ldelete((B_COUNT)(offset - DOT.o), FALSE);
 #endif
 		MK = DOT;
 		MK.o += count;

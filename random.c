@@ -2,7 +2,7 @@
  * This file contains the command processing functions for a number of random
  * commands. There is no functional grouping here, for sure.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/random.c,v 1.139 1994/09/23 04:21:19 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/random.c,v 1.140 1994/10/16 02:57:55 pgf Exp $
  *
  */
 
@@ -575,6 +575,7 @@ int f, n;	/* arguments ignored */
 	return(TRUE);
 }
 
+/* ARGSUSED */
 int
 userbeep(f, n)
 int f, n;
@@ -582,7 +583,7 @@ int f, n;
 	TTbeep();
 	return TRUE;
 }
-#endif
+#endif /* !SMALLER */
 
 
 /* delay for the given number of milliseconds.  if "watchinput" is true,
@@ -620,7 +621,7 @@ int watchinput;
 	(void)select (1, &read_bits, (fd_set*)0, (fd_set*)0, &tval);
 
 #  if HAVE_SIGPROCMASK
-	sigprocmask(SIG_SETMASK, &oldset, NULL);
+	sigprocmask(SIG_SETMASK, &oldset, (sigset_t*)0);
 #  endif
 
 # else
@@ -866,6 +867,7 @@ int f, n;
 
 static char prevdir[NFILEN];
 
+#if OPT_EVAL
 char *
 previous_directory()
 {
@@ -874,6 +876,7 @@ previous_directory()
 	else
 		return current_directory(FALSE);
 }
+#endif
 
 /* move to the named directory.  (Dave Lemke) */
 int

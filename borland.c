@@ -10,7 +10,7 @@
  * Note: Visual flashes are not yet supported.
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/borland.c,v 1.6 1994/09/13 17:15:48 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/borland.c,v 1.7 1994/10/10 13:22:06 pgf Exp $
  *
  */
 
@@ -116,14 +116,13 @@ TERM    term    = {
 #endif
 };
 
-
-static void
+void
 set_cursor(int cmode)
 {
 	switch (cmode) {
-	case 0: _setcursortype( _NOCURSOR);	break;
-	case 1: _setcursortype( _SOLIDCURSOR);	break;
-	case 2: _setcursortype( _NORMALCURSOR);	break;
+	case -1: _setcursortype( _NOCURSOR);		break;
+	case  0: _setcursortype( _NORMALCURSOR);	break;
+	case  1: _setcursortype( _SOLIDCURSOR);		break;
 	} 
 }
 
@@ -275,7 +274,7 @@ borclose()
 {
 	int	current_type = ibmtype;
 
-	set_cursor(_NORMALCURSOR);
+	_setcursortype(_NORMALCURSOR);
 	ibmtype = current_type;	/* ...so subsequent TTopen restores us */
 
 	movecursor(0,0);	/* clear the screen */

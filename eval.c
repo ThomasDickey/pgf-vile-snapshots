@@ -3,7 +3,7 @@
 
 	written 1986 by Daniel Lawrence
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/eval.c,v 1.96 1994/09/05 19:31:41 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/eval.c,v 1.100 1994/10/27 21:46:42 pgf Exp $
  *
  */
 
@@ -754,6 +754,7 @@ char *value;	/* value to set to */
 			if (b_val(curbp,MDVIEW))
 				status = rdonly();
 			else {
+				mayneedundo();
 				(void)ldelete(1L, FALSE); /* delete 1 char */
 				c = l_strtol(value);
 				if (c == '\n')
@@ -792,8 +793,10 @@ char *value;	/* value to set to */
 		ElseIf( EVLINE )
 			if (b_val(curbp,MDVIEW))
 				status = rdonly();
-			else
+			else {
+				mayneedundo();
 				status = putctext(value);
+			}
 
 		ElseIf( EVCWD )
 			status = set_directory(value);
@@ -868,7 +871,7 @@ char *value;	/* value to set to */
 		(void)update(TRUE);
 
 		/* and get the keystroke to hold the output */
-		if (tgetc(FALSE) == abortc) {
+		if (ABORTED(tgetc(FALSE))) {
 			mlforce("[Macro aborted]");
 			status = FALSE;
 		}
@@ -891,15 +894,17 @@ int i;	/* integer to translate to a string */
 
 
 /* like strtol, but also allow character constants */
-long l_strtol(s)
+#if OPT_EVAL
+int l_strtol(s)
 char *s;
 {
-	if (s[0] == '\'' && 
-	    s[2] == '\'' && 
+	if (s[0] == '\'' &&
+	    s[2] == '\'' &&
 	    s[3] == EOS)
-	    return (long)s[1];
-	return strtol(s,NULL,0);
+	    return s[1];
+	return (int)strtol(s, (char **)0, 0);
 }
+#endif
 
 int toktyp(tokn)	/* find the type of a passed token */
 char *tokn;	/* token to analyze */
@@ -1166,11 +1171,13 @@ char *str;		/* string to lower case */
 	return(str);
 }
 
+#if OPT_EVAL
 int absol(x)	/* take the absolute value of an integer */
 int x;
 {
 	return(x < 0 ? -x : x);
 }
+#endif
 
 #if OPT_EVAL
 int ernd()	/* returns a random integer */

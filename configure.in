@@ -1,9 +1,9 @@
 dnl Process this file with autoconf to produce a configure script.
-AC_REVISION($Revision: 1.7 $)
+AC_REVISION($Revision: 1.10 $)
 ### Use "configure -with-screen" to override the default configuration, which is
 ### termcap-based on unix systems.
 
-dnl $Header: /usr/build/VCS/pgf-vile/RCS/configure.in,v 1.7 1994/09/23 04:21:19 pgf Exp $
+dnl $Header: /usr/build/VCS/pgf-vile/RCS/configure.in,v 1.10 1994/10/31 03:49:26 pgf Exp $
 
 dnl
 AC_INIT(mktbls.c)
@@ -111,8 +111,10 @@ dnl LIBS on SunOS (and perhaps some others as well).
 dnl
 dnl Note: VC_KILLPG will call VC_SETPGRP
 VC_KILLPG
+VC_SYS_ERRLIST
 AC_HAVE_FUNCS(sigprocmask setsid select poll strchr strrchr gethostname \
-	getcwd getwd setvbuf access mkdir tcgetattr ttyname)
+	getcwd getwd setvbuf access mkdir tcgetattr ttyname link \
+	utime utimes)
 
 AC_DEFINE(UNIX)
 AC_DEFINE(scrn_chosen)
@@ -258,6 +260,7 @@ ioctl \
 isatty \
 kill \
 killpg \
+link \
 longjmp \
 memset \
 mkdir \
@@ -280,6 +283,8 @@ sscanf \
 system \
 time \
 unlink \
+utime \
+utimes \
 wait \
 write \
 )

@@ -3,7 +3,7 @@
  * and backward directions.
  *  heavily modified by Paul Fox, 1990
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/search.c,v 1.67 1994/09/01 15:59:32 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/search.c,v 1.69 1994/10/16 02:57:55 pgf Exp $
  *
  * original written Aug. 1986 by John M. Gamble, but I (pgf) have since
  * replaced his regex stuff with Henry Spencer's regexp package.
@@ -553,12 +553,14 @@ int	fromscreen;
 {
 	int status;
 
+#if BEFORE
 	if (did_tungetc()) /* cf: execute_named_command */
 		tgetc(TRUE);
+#endif
 
 	/* Read a pattern.  Either we get one,
 	 * or we don't, and use the previous pattern.
-	 * Then, if it's the search string, make a reversed pattern.
+	 * Then, if it's the search string, compile it.
 	 */
 	if (fromscreen) {
 		status = screen_string(apat, NPAT, _ident);
@@ -682,7 +684,7 @@ int direc;
 		savepos = DOT;
 		s = (direc == FORWARD) ? forwchar(TRUE,1) : backchar(TRUE,1);
 		if (s == TRUE)
-			s = scanner(exp, direc, FALSE, NULL);
+			s = scanner(exp, direc, FALSE, (int *)0);
 	}
 	if (s != TRUE)
 		DOT = savepos;

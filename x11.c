@@ -2,7 +2,7 @@
  * 	X11 support, Dave Lemke, 11/91
  *	X Toolkit support, Kevin Buettner, 2/94
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/x11.c,v 1.82 1994/09/23 04:21:19 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/x11.c,v 1.88 1994/10/30 16:26:37 pgf Exp $
  *
  */
 /*
@@ -67,7 +67,7 @@
 #include	<Xm/SashP.h>
 #endif /* MOTIF_WIDGETS */
 
-#define	XCalloc(type)	((type*)calloc(1, sizeof(type)))
+#define	XCalloc(type)	typecalloc(type)
 
 #define	MARGIN	8
 #define	SCRSIZ	64
@@ -1024,7 +1024,7 @@ do_scroll(w, event, params, num_params)
 
     if (scrollmode == drag
      && event->type == MotionNotify
-     && XtAppPending(cur_win->app_context)
+     && (XtAppPending(cur_win->app_context) & XtIMXEvent)
      && XtAppPeekEvent(cur_win->app_context, &nev)
      && (nev.type == MotionNotify || nev.type == ButtonRelease))
 	return;
@@ -1145,7 +1145,7 @@ resize_bar(w, event, params, num_params)
     /* Return immediately if behind in processing motion events */
     if (motion_permitted
      && event->type == MotionNotify
-     && XtAppPending(cur_win->app_context)
+     && (XtAppPending(cur_win->app_context) & XtIMXEvent)
      && XtAppPeekEvent(cur_win->app_context, &nev)
      && (nev.type == MotionNotify || nev.type == ButtonRelease))
 	return;
@@ -2351,8 +2351,8 @@ x_open()
     (void)signal(SIGTERM, x_quit);
 
     /* main code assumes that it can access a cell at nrow x ncol */
-    term.t_ncol = cur_win->cols;
-    term.t_nrow = cur_win->rows;
+    term.t_mcol = term.t_ncol = cur_win->cols;
+    term.t_mrow = term.t_nrow = cur_win->rows;
 
 #ifndef HAVE_BSD_SETPGRP
     /* 
@@ -2657,6 +2657,10 @@ x_flush()
 	CLEAR_CELL_DIRTY(ttrow, ttcol);
 	display_cursor((XtPointer) 0, (XtIntervalId *) 0);
     }
+
+    /* sometimes we're the last to know about resizing...*/
+    if (cur_win->rows > term.t_mrow)
+    	cur_win->rows = term.t_mrow;
 
     for (r = 0; r < cur_win->rows; r++) {
 	if (!IS_DIRTY_LINE(r))
@@ -3244,7 +3248,7 @@ extend_selection(tw, nr, nc, wipe)
     else {
 	scroll_count = 0;
     }
-    if (setcursor(nr,nc) && sel_extend(wipe))
+    if (setcursor(nr,nc) && sel_extend(wipe,TRUE))
 	update(TRUE);
     else
 	x_beep();
@@ -3712,6 +3716,7 @@ x_configure_window(w, unused, ev, continue_to_dispatch)
 #endif
 }
 
+static
 int check_scrollbar_allocs()
 {
 	int newmax = cur_win->rows/2;
@@ -3922,7 +3927,7 @@ x_working()
 {
     XEvent ev;
     x_set_watch_cursor(TRUE);
-    while (XtAppPending(cur_win->app_context)
+    while ((XtAppPending(cur_win->app_context) & XtIMXEvent)
         && !kqfull(cur_win)) {
 
 	/* Get and dispatch next event */
@@ -4240,7 +4245,8 @@ x_getc()
 	    XEvent ev;
 	    XtAppNextEvent(cur_win->app_context, &ev);
 	    XtDispatchEvent(&ev);
-	} while (XtAppPending(cur_win->app_context) && !kqfull(cur_win));
+	} while ((XtAppPending(cur_win->app_context) & XtIMXEvent)
+	    && !kqfull(cur_win));
     }
 
     return c;
@@ -4291,7 +4297,8 @@ x_typahead(milli)
 	 * Process pending events until we get some keyboard input.
 	 * Note that we do not block here.
 	 */
-	while (kqempty(cur_win) && XtAppPending(cur_win->app_context)) {
+	while (kqempty(cur_win) &&
+		(XtAppPending(cur_win->app_context) & XtIMXEvent)) {
 	    XEvent ev;
 	    XtAppNextEvent(cur_win->app_context, &ev);
 	    XtDispatchEvent(&ev);
@@ -4394,7 +4401,7 @@ x_key_press(w, unused, ev, continue_to_dispatch)
 		&keysym, (XComposeStatus *) 0);
 
     if (num <= 0) {
-	for (n = 0; n < SIZEOF(escapes); n++) {
+	for (n = 0; n < TABLESIZE(escapes); n++) {
 	    if (keysym == escapes[n].key) {
 		num = kcod2escape_seq(escapes[n].code, buffer);
 		break;
@@ -4407,9 +4414,8 @@ x_key_press(w, unused, ev, continue_to_dispatch)
     /* FIXME: Should do something about queue full conditions */
     if (num > 0) {
 	for (i=0; i<num && !kqfull(cur_win); i++)
-	    kqadd(cur_win, buffer[i]);
+	    kqadd(cur_win, char2int(buffer[i]));
     }
-
 }
 
 /*

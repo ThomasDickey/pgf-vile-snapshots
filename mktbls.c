@@ -13,7 +13,7 @@
  * by Tom Dickey, 1993.    -pgf
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/mktbls.c,v 1.53 1994/07/22 01:45:44 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/mktbls.c,v 1.56 1994/10/30 16:26:37 pgf Exp $
  *
  */
 
@@ -106,11 +106,11 @@ extern	void	free	P(( char * ));
 #define BADEXIT		1
 #endif
 
-#define	SIZEOF(v)	(sizeof(v)/sizeof(v[0]))
+#define	TABLESIZE(v)	(sizeof(v)/sizeof(v[0]))
 
 /*--------------------------------------------------------------------------*/
 
-#define	MAX_BIND	4	/* total # of binding-types */
+#define MAX_BIND        4	/* maximum # of key-binding types */
 #define	MAX_PARSE	5	/* maximum # of tokens on line */
 #define	LEN_BUFFER	50	/* nominal buffer-length */
 #define	MAX_BUFFER	(LEN_BUFFER*10)
@@ -161,6 +161,7 @@ typedef	struct stringl {
 static	char	*Blank = "";
 
 static	LIST	*all_names,
+		*all_kbind,	/* data for kbindtbl[] */
 		*all_funcs,	/* data for extern-lines in nefunc.h */
 		*all__FUNCs,	/* data for {}-lines in nefunc.h */
 		*all_envars,
@@ -192,7 +193,7 @@ static	char *	append P((char *, char *));
 static	char *	formcond P((char *, char *));
 static	int	LastCol P((char *));
 static	char *	PadTo P((int, char *));
-static	int	two_conds P((int, int, char *));
+static	int	two_conds P((int, char *));
 static	void	set_binding P((int, int, char *, char *));
 static	int	Parse P((char *, char **));
 
@@ -252,14 +253,14 @@ static	void	dump_wmodes P((void));
 #define	SECT_BUFF 4
 #define	SECT_WIND 5
 
-	/* definitions for [MAX_BIND] indices */
+	/* definitions for indices to 'asciitbl[]' vs 'kbindtbl[]' */
 #define ASCIIBIND 0
 #define CTLXBIND 1
 #define CTLABIND 2
 #define SPECBIND 3
 
-static	char *bindings  [MAX_BIND][LEN_CHRSET];
-static	char *conditions[MAX_BIND][LEN_CHRSET];
+static	char *bindings  [LEN_CHRSET];
+static	char *conditions[LEN_CHRSET];
 static	char *tblname   [MAX_BIND] = {"asciitbl", "ctlxtbl", "metatbl", "spectbl" };
 static	char *prefname  [MAX_BIND] = {"",         "CTLX|",   "CTLA|",   "SPEC|" };
 
@@ -338,7 +339,7 @@ int	count;
 	while (count-- > 0)
 		Fprintf(fp, "%s\n", *list++);
 }
-#define	write_lines(fp,list) WriteLines(fp, list, (int)SIZEOF(list))
+#define	write_lines(fp,list) WriteLines(fp, list, (int)TABLESIZE(list))
 
 /******************************************************************************/
 static FILE *
@@ -484,15 +485,15 @@ char	*buffer;
 }
 
 static int
-two_conds(btype,c,cond)
-int btype,c;
+two_conds(c,cond)
+int c;
 char *cond;
 {
 	/* return true if both bindings have different
 	 conditions associated with them */
-	return (cond[0] != 0 &&
-		conditions[btype][c] != NULL &&
-		strcmp(cond, conditions[btype][c]) != 0);
+	return (cond[0] != '\0' &&
+		conditions[c] != NULL &&
+		strcmp(cond, conditions[c]) != '\0');
 }
 
 static void
@@ -502,12 +503,37 @@ int	c;
 char *	cond;
 char *	func;
 {
-	if (bindings[btype][c] != NULL) {
-		free(bindings[btype][c]);
-		if (!two_conds(btype,c,cond))
-			badfmt("duplicate key binding");
+	char	name[MAX_BUFFER];
+
+	if (btype != ASCIIBIND) {
+		if (c < ' ') {
+			Sprintf(name, "%stocntrl('%c')",
+				prefname[btype],
+				toalpha(c));
+		} else if (c >= 0x80) {
+			Sprintf(name, "%s0x%x",
+				prefname[btype], c);
+		} else {
+			Sprintf(name, "%s'%s%c'",
+				prefname[btype],
+				(c == '\'' || c == '\\') ? "\\" : "",
+				c);
+		}
+		InsertSorted(&all_kbind, name, func, "", cond, "");
+	} else {
+		if (bindings[c] != NULL) {
+			if (!two_conds(c,cond))
+				badfmt("duplicate key binding");
+			free(bindings[c]);
+		}
+		bindings[c] = StrAlloc(func);
+		if (cond[0]) {
+			FreeIfNeeded(conditions[c]);
+			conditions[c] = StrAlloc(cond);
+		} else {
+			conditions[c] = NULL;
+		}
 	}
-	bindings[btype][c] = StrAlloc(func);
 }
 
 /******************************************************************************/
@@ -831,7 +857,7 @@ char	*ppref;
 #endif /* OPT_IFDEF_MODES */
 
 	(void)PadTo(32, temp);
-	Sprintf(temp+strlen(temp), "/* SIZEOF(%c_valuenames) -- %s */\n",
+	Sprintf(temp+strlen(temp), "/* TABLESIZE(%c_valuenames) -- %s */\n",
 		tolower(*ppref), ppref);
 	Fprintf(nemode, "%s", temp);
 	Fprintf(nemode, "#define MAX_%c_VALUES\t%d\n\n", *ppref, count);
@@ -1008,12 +1034,6 @@ char *s, *func, *cond;
 	} else {
 		badfmt("getting binding");
 	}
-	if (cond[0]) {
-		FreeIfNeeded(conditions[btype][c]);
-		conditions[btype][c] = StrAlloc(cond);
-	} else {
-		conditions[btype][c] = NULL;
-	}
 
 	if (*s != EOS)
 		badfmt("got extra characters");
@@ -1025,6 +1045,7 @@ dump_bindings()
 	char	temp[MAX_BUFFER];
 	char *sctl, *meta;
 	int i, c, btype;
+	register LIST *p;
 
 	btype = ASCIIBIND;
 
@@ -1033,7 +1054,7 @@ dump_bindings()
 
 	BeginIf();
 	for (i = 0; i < LEN_CHRSET; i++) {
-		WriteIf(nebind, conditions[btype][i]);
+		WriteIf(nebind, conditions[i]);
 
 		sctl = "";
 		if (i & 0x80)
@@ -1046,53 +1067,30 @@ dump_bindings()
 			c = toalpha(c);
 		}
 
-		if (bindings[btype][i])
-			Sprintf(temp, "\t&f_%s,", bindings[btype][i]);
+		if (bindings[i])
+			Sprintf(temp, "\t&f_%s,", bindings[i]);
 		else
 			Sprintf(temp, "\tNULL,");
 
 		Fprintf(nebind, "%s/* %s%s%c */\n", PadTo(32, temp),
 							meta, sctl, c);
-		if (conditions[btype][i] != 0)
+		if (conditions[i] != 0)
 			Fprintf(nebind,"#else\n\tNULL,\n");
 		FlushIf(nebind);
 
 	}
 	Fprintf(nebind, "%c;\n", R_CURL);
 
-	Fprintf(nebind,"\nKBIND kbindtbl[NBINDS] = %c\n", L_CURL);
-	for (btype = 1; btype <= 3; btype++) {
-		BeginIf();
-		for (i = 0; i < LEN_CHRSET; i++) {
-			if (bindings[btype][i]) {
-				WriteIf(nebind, conditions[btype][i]);
-				if (i < ' ') {
-					Sprintf(temp,
-					"\t%c %stocntrl('%c'),",
-						L_CURL,
-						prefname[btype],
-						toalpha(i));
-				} else if (i >= 0x80) {
-					Sprintf(temp,
-					"\t%c %s0x%x,",
-						L_CURL,
-						prefname[btype], i);
-				} else {
-					Sprintf(temp,
-					"\t%c %s'%s%c',",
-						L_CURL,
-						prefname[btype],
-						(i == '\'' || i == '\\') ?
-							"\\":"",
-						i);
-				}
-				Fprintf(nebind, "%s&f_%s %c,\n",
-					PadTo(32, temp), bindings[btype][i],
-						R_CURL);
-			}
-		}
-		FlushIf(nebind);
+	Fprintf(nebind,"\nKBIND kbindtbl[] = %c\n", L_CURL);
+	BeginIf();
+	for (p = all_kbind; p; p = p->nst) {
+		WriteIf(nebind, p->Cond);
+		Sprintf(temp, "\t%c %s,", L_CURL, p->Name);
+		Fprintf(nebind, "%s&f_%s %c,\n",
+			PadTo(32, temp), p->Func, R_CURL);
 	}
+	FlushIf(nebind);
+
 	Fprintf(nebind,"\t{ 0, NULL }\n");
 	Fprintf(nebind,"%c;\n", R_CURL);
 }
@@ -1542,15 +1540,14 @@ free_mktbls ()
 	free_LIST(&all_envars);
 	free_LIST(&all_ufuncs);
 	free_LIST(&all_modes);
+	free_LIST(&all_kbind);
 	free_LIST(&all_gmodes);
 	free_LIST(&all_bmodes);
 	free_LIST(&all_wmodes);
 
-	for (j = 0; j < MAX_BIND; j++) {
-		for (k = 0; k < LEN_CHRSET; k++) {
-			FreeIfNeeded(bindings[j][k]);
-			FreeIfNeeded(conditions[j][k]);
-		}
+	for (k = 0; k < LEN_CHRSET; k++) {
+		FreeIfNeeded(bindings[k]);
+		FreeIfNeeded(conditions[k]);
 	}
 #if DOALLOC
 	show_alloc();

@@ -4,13 +4,20 @@
  *	need to back up to get to the char. before the transition.
  *	Written for vile by Paul Fox, (c)1990
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/wordmov.c,v 1.8 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/wordmov.c,v 1.9 1994/10/25 19:09:30 pgf Exp $
  *
  */
 
 #include "estruct.h"
 #include "edef.h"
 
+extern int sweeping;
+
+#if BEFORE
+#define SPECIAL (doingopcmd)
+#else
+#define SPECIAL (doingopcmd && !sweeping)
+#endif
 
 #define WASSPACE 0
 #define ISSPACE 0
@@ -55,7 +62,7 @@ isnewwordf()
 	case WASNL:
 	case WASSPACE:
 		switch (type) {
-		case ISNL:    if (doingopcmd) { ret = SORTOFTRUE; break;}
+		case ISNL:    if (SPECIAL) { ret = SORTOFTRUE; break;}
 		case ISSPACE: ret = FALSE;	break;
 		case ISIDENT:
 		case ISOTHER: ret = TRUE;	break;
@@ -64,8 +71,8 @@ isnewwordf()
 	case WASIDENT:
 	case WASOTHER:
 		switch (type) {
-		case ISNL:    if (doingopcmd) { ret = SORTOFTRUE; break;}
-		case ISSPACE: if (doingopcmd && opcmd != OPDEL) 
+		case ISNL:    if (SPECIAL) { ret = SORTOFTRUE; break;}
+		case ISSPACE: if (SPECIAL && opcmd != OPDEL) 
 						{ ret = SORTOFTRUE; break;}
 		case ISIDENT:
 		case ISOTHER: ret = FALSE;	break;
@@ -121,7 +128,7 @@ isnewviwordf()
 	case WASNL:
 	case WASSPACE:
 		switch (type) {
-		case ISNL:    if (doingopcmd) { ret = SORTOFTRUE; break;}
+		case ISNL:    if (SPECIAL) { ret = SORTOFTRUE; break;}
 		case ISSPACE: ret = FALSE;	break;
 		case ISIDENT:
 		case ISOTHER: ret = TRUE;	break;
@@ -129,8 +136,8 @@ isnewviwordf()
 		break;
 	case WASIDENT:
 		switch (type) {
-		case ISNL:    if (doingopcmd) { ret = SORTOFTRUE; break;}
-		case ISSPACE: if (doingopcmd && opcmd != OPDEL) 
+		case ISNL:    if (SPECIAL) { ret = SORTOFTRUE; break;}
+		case ISSPACE: if (SPECIAL && opcmd != OPDEL) 
 						{ ret = SORTOFTRUE; break;}
 		case ISIDENT: ret = FALSE;	break;
 		case ISOTHER: ret = TRUE;	break;
@@ -138,8 +145,8 @@ isnewviwordf()
 		break;
 	case WASOTHER:
 		switch (type) {
-		case ISNL:    if (doingopcmd) { ret = SORTOFTRUE; break;}
-		case ISSPACE: if (doingopcmd && opcmd != OPDEL) 
+		case ISNL:    if (SPECIAL) { ret = SORTOFTRUE; break;}
+		case ISSPACE: if (SPECIAL && opcmd != OPDEL) 
 						{ ret = SORTOFTRUE; break;}
 		case ISOTHER: ret = FALSE;	break;
 		case ISIDENT: ret = TRUE;	break;
@@ -267,7 +274,7 @@ isendwordf()
 		switch (type) {
 		case ISNL:
 		case ISSPACE:
-			if (doingopcmd) ret = SORTOFTRUE;
+			if (SPECIAL) ret = SORTOFTRUE;
 			else ret = TRUE;
 			break;
 		case ISIDENT:
@@ -278,7 +285,7 @@ isendwordf()
 		switch (type) {
 		case ISNL:
 		case ISSPACE:
-			if (doingopcmd) ret = SORTOFTRUE;
+			if (SPECIAL) ret = SORTOFTRUE;
 			else ret = TRUE;
 			break;
 		case ISIDENT:
@@ -307,7 +314,7 @@ isendviwordf()
 		case ISNL:
 		case ISSPACE:
 		case ISOTHER:
-			if (doingopcmd) ret = SORTOFTRUE;
+			if (SPECIAL) ret = SORTOFTRUE;
 			else ret = TRUE;
 			break;
 		case ISIDENT: ret = FALSE;	break;
@@ -318,7 +325,7 @@ isendviwordf()
 		case ISNL:
 		case ISSPACE:
 		case ISIDENT:
-			if (doingopcmd) ret = SORTOFTRUE;
+			if (SPECIAL) ret = SORTOFTRUE;
 			else ret = TRUE;
 			break;
 		case ISOTHER: ret = FALSE;	break;

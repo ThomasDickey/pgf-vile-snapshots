@@ -63,7 +63,7 @@
  *
  *	Allow left/right scrolling of input lines (when they get too long).
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/history.c,v 1.19 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/history.c,v 1.20 1994/10/27 21:46:42 pgf Exp $
  *
  */
 
@@ -535,7 +535,7 @@ int	eolchar;
 #endif
 	if (!isspecial(c)) {
 		if (is_edit_char(c)
-		 || (c == abortc)
+		 || ABORTED(c)
 		 || (c == quotec)
 		 || isspace(c)
 		 || !iscntrl(c))
@@ -585,7 +585,7 @@ int	eolchar;
 			escaped = !escaped;
 		} else
 #endif
-		if (c == abortc) {
+		if (ABORTED(c)) {
 			*given = c;
 			return FALSE;
 

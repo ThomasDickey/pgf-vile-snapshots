@@ -3,7 +3,7 @@
  *		adapted from elvis, in turn from
  *		Chris Janton's (chj) VMS Icon port.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/vmspipe.c,v 1.5 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/vmspipe.c,v 1.6 1994/10/30 16:26:37 pgf Exp $
  *
  */
 
@@ -57,7 +57,7 @@ Pipe _pipes[_NFILE];		/* one for every open file */
 static int
 vms_rpclose(int pfile)
 {
-	Pipe *pd = (pfile >= 0 && pfile < SIZEOF(_pipes)) ? &_pipes[pfile] : 0;
+	Pipe *pd = (pfile >= 0 && pfile < TABLESIZE(_pipes)) ? &_pipes[pfile] : 0;
 	int status;
 	int fstatus;
 
@@ -75,7 +75,7 @@ static int
 vms_pread (int pfile, char *buffer, int size)
 /* Be compatible when we read data in (handle newlines). */
 {
-	Pipe *pd = (pfile >= 0 && pfile < SIZEOF(_pipes)) ? &_pipes[pfile] : 0;
+	Pipe *pd = (pfile >= 0 && pfile < TABLESIZE(_pipes)) ? &_pipes[pfile] : 0;
 	struct {
 		short	status,
 			count;

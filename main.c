@@ -13,7 +13,7 @@
  *	The same goes for vile.  -pgf
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/main.c,v 1.195 1994/09/23 04:21:19 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/main.c,v 1.202 1994/10/30 01:03:51 pgf Exp $
  *
  */
 
@@ -349,6 +349,8 @@ char	*argv[];
 		make_local_b_val(bp,MDDOS);
 		set_b_val(bp, MDDOS, CRLF_LINES);
 #endif
+		make_local_b_val(bp,MDCMOD);
+		set_b_val(bp, MDCMOD, FALSE);
 		swbuffer(bp);
 	}
 
@@ -646,7 +648,7 @@ global_val_init()
 
 	set_global_g_val(GVAL_TIMEOUTVAL, 500);	/* catnap time -- how long
 							to wait for ESC seq */
-#if VMS || MSDOS || WIN31 || OS2 || NT	/* ':' gets in the way of drives */
+#if OPT_VMS_PATH || OPT_MSDOS_PATH	/* ':' gets in the way of drives */
 	set_global_g_val_ptr(GVAL_EXPAND_CHARS,strmalloc("!%#"));
 #else	/* UNIX */
 	set_global_g_val_ptr(GVAL_EXPAND_CHARS,strmalloc("!%#:"));
@@ -661,11 +663,27 @@ global_val_init()
 
 	set_global_g_val(GMDIMPLYBUFF,	FALSE); /* imply-buffer */
 #if	OPT_POPUPCHOICE
-	/* popup-choices */
+# if	OPT_ENUM_MODES
 	set_global_g_val_ptr(GVAL_POPUP_CHOICES,strmalloc("delayed")); 
+# else
+	set_global_g_val(GMDPOPUP_CHOICES,TRUE); 
+# endif
+#endif
+#if	OPT_FILEBACK
+	set_global_g_val_ptr(GVAL_BACKUPSTYLE,
+#if MSDOS || WIN31 || OS2 || NT
+					strmalloc(".bak")
+#else
+					strmalloc("off")
+#endif
+		);
 #endif
 #if	OPT_POPUP_MSGS
 	set_global_g_val(GMDPOPUP_MSGS,-TRUE);	/* popup-msgs */
+#endif
+#if	OPT_MLFORMAT
+	set_global_g_val_ptr(GVAL_MLFORMAT, strmalloc(
+	    "%-%i%- %b %m:: :%f:is : :%=%F: : :%l:(:,:%c::) :%p::% :%S%-%-%|"));
 #endif
 #ifdef GMDRAMSIZE
 	set_global_g_val(GMDRAMSIZE,	TRUE);	/* show ram-usage */
@@ -706,6 +724,13 @@ global_val_init()
 #endif
 	set_global_b_val(MDVIEW,	FALSE); /* view-only */
 	set_global_b_val(MDWRAP,	FALSE); /* wrap */
+#if LCKFILES
+	/* locking defaults */
+	set_global_g_val(GMDUSEFILELOCK,FALSE);	/* Use filelocks */
+	set_global_b_val(MDLOCKED,	FALSE);	/* LOCKED */
+	set_global_b_val_ptr(VAL_LOCKER, strmalloc("")); /* Name locker */
+#endif
+	set_global_g_val(GMDRONLYVIEW,	FALSE);	/* Set view-on-readonly */
 
 	set_global_b_val(VAL_ASAVECNT,	256);	/* autosave count */
 	set_global_b_val(VAL_C_SWIDTH,	8); 	/* C file shiftwidth */
@@ -1148,11 +1173,20 @@ int f,n;
 				cnt);
 		return FALSE;
 	}
-	vttidy(TRUE);
 #if	FILOCK
 	if (lockrel() != TRUE) {
 		ExitProgram(BADEXIT);
 		/* NOTREACHED */
+	}
+#endif
+#if LCKFILES
+	/* Release all placed locks */
+	if ( global_g_val(GMDUSEFILELOCK) ) {
+		for_each_buffer(bp) {
+			if ( bp->b_active ) {
+				release_lock(bp->b_fname);
+			}
+		}
 	}
 #endif
 	siguninit();
@@ -1164,6 +1198,7 @@ int f,n;
 	mpresf = 1;
 	mlerase();
 #endif
+	vttidy(TRUE);
 #if NO_LEAKS
 	{
 		beginDisplay;		/* ...this may take a while... */
@@ -1392,7 +1427,7 @@ charinit()
 	_chartypes_[LBRACK] |= _fence;
 	_chartypes_[RBRACK] |= _fence;
 
-#if VMS
+#if OPT_VMS_PATH
 	_chartypes_[LBRACK] |= _pathn;	/* actually, "<", ">" too */
 	_chartypes_[RBRACK] |= _pathn;
 	_chartypes_['$'] |= _pathn;
