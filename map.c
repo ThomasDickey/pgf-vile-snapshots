@@ -3,7 +3,7 @@
  *	Original interface by Otto Lind, 6/3/93
  *	Additional map and map! support by Kevin Buettner, 9/17/94
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/map.c,v 1.44 1994/12/10 00:15:04 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/map.c,v 1.47 1994/12/20 19:39:40 pgf Exp $
  * 
  */
 
@@ -297,7 +297,8 @@ map_common(mpp, bufname, remapflag)
 
 
     len = strlen(kbuf);
-    if (*mpp == abbr_map) { /* reverse the lhs */
+    if ((*mpp && *mpp == abbr_map) || (strcmp(bufname, ABBR_BufName) == 0)) {
+	/* reverse the lhs */
 	int i, t;
 	for (i = 0; i < len/2; i++) {
 	    t = kbuf[len-i-1];
@@ -489,6 +490,22 @@ delfrommap(mpp, ks)
 
 static ITBUFF *sysmappedchars = NULL;
 
+/* these two wrappers are provided because at least one pcc-based
+	compiler balks at passing TTgetc or TTtypahead as a function pointer */
+static int normal_getc P(( void ));
+static int normal_typeahead P(( void ));
+
+static int
+normal_getc()
+{
+      return(TTgetc());
+}
+static int
+normal_typeahead()
+{
+      return(TTtypahead());
+}
+
 int
 sysmapped_c()
 {
@@ -500,9 +517,9 @@ sysmapped_c()
 
     c = TTgetc();
 
-
     /* will push back on sysmappedchars successful, or not */
-    (void)maplookup(c, &sysmappedchars, map_syskey, TTgetc, TTtypahead);
+    (void)maplookup(c, &sysmappedchars, map_syskey, 
+    		normal_getc, normal_typeahead);
 
     return itb_last(sysmappedchars);
 }

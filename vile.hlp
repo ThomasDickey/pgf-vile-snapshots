@@ -848,11 +848,11 @@ Editor modes
 		buffers include:
 			[Binding List]
 			[Buffer List]
-			[Mapped Characters]
-			[Map! Characters]
+			[Map Sequences]
+			[Map! Sequences]
 			[Registers]
 			[Settings]
-			[Terminal]
+			[Terminal Characters]
 			[Tag Stack]
 		Turning off "animated" is rarely necessary: the capability
 		is present mostly as a debugging aid.  (B)
@@ -1114,7 +1114,9 @@ Editor modes
 
 	ruler Shows the current line and column in the status line, as
 		well as what percentage of the current buffer's lines lie
-		in front of the cursor.  (B)
+		in front of the cursor.  (This percentage is different than
+		that given by ^G (the "position" function), which gives a
+		percentage of characters rather than lines.) (B)
 
 	samebangs (sb) Controls whether the "!!" and "^X-!" commands use the
 		same command string.  (U)
@@ -1333,10 +1335,10 @@ Key Rebinding
 		bind-key previous-window ^P
 	 To cause the space bar to move forward by pages, as in the "more"
 	  command, use:
-		bind-key next-page <sp>
+		bind-key next-page \s
 
-	(Space and tab can be represented with the strings: "<sp>" and 
-	"<tab>".)  The englishname "rebind-key" is synonymous with "bind-key".
+	(Space and tab can be represented with: "\s" and 
+	"\t".)  The englishname "rebind-key" is synonymous with "bind-key".
 
 	Note that even the ^A and ^X prefix characters can be rebound, using
 	the dummy functions "cntl_a-prefix" and "cntl_x-prefix".
@@ -1404,11 +1406,9 @@ Key Rebinding
 			^C	(two chars)
 			\NNN	(max of four chars, where NNN are octal digits)
 			\xNN	(max of four chars, where NN are hex digits)
-			\n,\r,\t,\b,\f (two chars each, usual meanings)
+			\n,\r,\t,\b,\f,\a (two chars each, usual meanings)
 			\e	(two chars, means ESC)
-			<tab>	(five chars)
-			<sp>	(four chars)
-
+			\s	(two chars, means SPACE)
 
 	(The "one char" control character entries in the above table are
 	represented in this help file as two printable characters, to
@@ -1516,6 +1516,12 @@ Key Rebinding
 	line (assuming j has not been rebound or remapped).  But if 'z' is
 	pressed twice rapidly (enough) in succession, vile will move to the
 	previous line. 
+
+	The left hand side of a map[!] definition may contain the usual
+	backslash escapes:  \n, \r, \t, \b, \f, \a (^G), \e (ESC),
+	\s (SPACE), \xNN (hex), \NNN (octal).  The right hand side is
+	taken exactly literally, so special characters must be expressed
+	as themselves.
 
 	The current set of mappings or "map!"ings may be viewed with
 	the commands ":map<CR>" (or ":show-mapped-chars") or ":map!<CR>"
@@ -2129,6 +2135,8 @@ Invocation
 		~endif"
 
 
+	Command line options
+	--------------------
 	The command line options are fairly straightforward.  vile does not
 	support running just _any_ command after a '+', as does vi, but does
 	support the commonly used '+400' to go to line 400 and '+/foo' to
@@ -2138,6 +2146,29 @@ Invocation
 	and the .vilerc files.
 
 	Use "vile -?" to get the usage message.
+
+	+NNN and -gNNN  vile will begin the session on the first file
+		at the specified line number.
+
+	+/pattern or -s pattern   In the first file, vile will execute an
+		initial search for the given pattern.
+
+	-t tag  vile will edit the correct file and move the cursor
+		to the location of the tag.  This requires a tagsfile
+		created with the ctags(1) command.
+
+	-h      Invokes vile on the helpfile.
+
+	-v	Invokes vile in "view" mode - no changes are permitted
+		to the buffer in this mode.  (This will also be true if
+		vile is invoked as view.)
+
+	-V	vile will report its version number.
+
+	@cmdfile   vile will run the specified file as its startup
+		file, and will bypass any normal startup file (i.e.
+		.vilerc) or environment variable (i.e. $VILEINIT).
+
 
 Mode line customization
 -----------------------
@@ -2221,11 +2252,12 @@ Filtering "man" pages
 	xvile will even display (with your font set properly) certain
 	portions of the manual page text in bold or italics as appropriate.
 
-	The file manpage.rc (found in the vile source directory) contains
-	a macro which is bound to ^X-m.  It will prompt for a manual page,
-	filter it, attach attributes and display it in the current window. 
-	The text of manpage.rc may be either incorporated verbatim into
-	your .vilerc file or may be read from your .vilerc as follows:
+	The file manpage.rc (found in the vile source directory, and also
+	copied below) contains a macro which is bound to ^X-m.  It will
+	prompt for a manual page, filter it, attach attributes and display
+	it in the current window.  The text of manpage.rc may be either
+	incorporated verbatim into your .vilerc file or may be read from
+	your .vilerc as follows:
 
 		source ~/manpage.rc
 
@@ -2252,6 +2284,37 @@ Filtering "man" pages
 	attributed text into one which is more pleasing to look at.
 
 		^A-AG
+
+	Here is the macro from the file manpage.rc:
+	;;
+	;; Macros for obtaining manual pages and then attributing them.
+	;;
+	;; Author: Kevin Buettner
+
+	29 store-macro
+		set-variable %manpage @"man page? "
+		~if &or &seq %manpage "ERROR" & seq %manpage ""
+			~return
+		~endif
+		set-variable %manpagebuf &cat "<" &cat %manpage ">"
+		set terse
+		~force select-buffer %manpagebuf
+		~if &not $status
+			edit-file &cat "!man " &cat %manpage " | vile-manfilt"
+			~force rename-buffer %manpagebuf
+			~force error-buffer %manpagebuf
+			write-message "[Attaching attributes...]"
+			goto-beginning-of-file
+			setl noview
+			attribute-cntl_a-sequences-til end-of-file
+			unmark-buffer
+			setl view
+			goto-beginning-of-file
+			write-message "[Done formatting manual page.]"
+		~endif
+		set noterse
+	~endm
+	bind-key execute-macro-29 ^X-m
 
 
 	Fonts
@@ -2848,4 +2911,4 @@ Credits
 	(By the way, he is not the Paul D. Fox that wrote the Crisp editor.)
 
 ------------------------------------
- $Header: /usr/build/VCS/pgf-vile/RCS/vile.hlp,v 1.212 1994/12/16 23:01:46 pgf Exp $
+ $Header: /usr/build/VCS/pgf-vile/RCS/vile.hlp,v 1.215 1994/12/22 11:10:44 pgf Exp $

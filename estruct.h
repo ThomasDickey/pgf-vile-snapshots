@@ -9,7 +9,7 @@
 */
 
 /*
- * $Header: /usr/build/VCS/pgf-vile/RCS/estruct.h,v 1.223 1994/12/15 14:39:48 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/estruct.h,v 1.224 1994/12/19 14:38:37 pgf Exp $
  */
 
 #ifdef HAVE_CONFIG_H
@@ -1287,7 +1287,9 @@ typedef struct	{
 	C_NUM	r_leftcol;		/* Leftmost column. 		*/
 	C_NUM	r_rightcol;		/* Rightmost column. 		*/
 	B_COUNT	r_size; 		/* Length in characters.	*/
+#if OPT_SELECTIONS
 	unsigned short	r_attr_id;	/* id of corresponding display  */
+#endif
 }	REGION;
 
 #if OPT_COLOR

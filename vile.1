@@ -1,8 +1,8 @@
 .\" obligatory man page for vile
-.\" $Header: /usr/build/VCS/pgf-vile/RCS/vile.1,v 1.8 1994/12/16 14:30:29 pgf Exp $
+.\" $Header: /usr/build/VCS/pgf-vile/RCS/vile.1,v 1.9 1994/12/22 11:11:48 pgf Exp $
 .TH VILE 1
 .SH NAME
-vile \- \fBVI L\fRike\fR \fBE\fRmacs
+vile, xvile \- \fBVI L\fRike\fR \fBE\fRmacs
 .SH SYNOPSIS
 .B "vile [-hVv] [-s\fIpattern\fB] [+\fI/pattern\fB] [-t\fItag\fB] [-g\fINNN\fB] [+\fINNN\fB] [@\fIcmdfile\fB] [\fIfilename\fB]..."
 .SH DESCRIPTION
@@ -11,6 +11,10 @@ is a text editor.  This man page is fairly terse.  More information can
 be obtained from the internal help, available with the \fB-h\fR option
 or by using the ":help" command from within
 .IR vile .
+.PP
+.I xvile
+is the same text editor, built as an X-windows application, with fully
+integrated mouse support, scrollbars, etc.
 .SH "SPIRIT"
 .I vile
 retains the "finger-feel", if you will, of
@@ -29,7 +33,7 @@ to the text in front of you, and that is what
 .I vile
 tries to do for vi users.
 .SH OPTIONS
-.IP "+NNN and -gNNN"
+.IP "+\fINNN\fR and -g\fINNN\fR"
 .I vile
 will begin the session on the first file at the specified line number.
 .IP "+/\fIpattern\fR or -s \fIpattern\fR"
@@ -58,6 +62,18 @@ is invoked as
 .IP -V
 .I vile
 will report its version number.
+.IP @\fIcmdfile\fR
+.I vile
+will run the specified file as its startup
+file, and will bypass any normal startup file (i.e.
+.IR .vilerc )
+or environment variable (i.e. 
+.IR $VILEINIT ).
+.PP
+.IR xvile -specific
+command-line options are detailed in the help file (see "Standard X command
+line arguments").  The standard ones (e.g. -display, -fn, -geometry, -name,
+etc.) are all supported.
 .SH "INVOCATION"
 vile will edit the files specified on the command line.  If no files
 are specified, and standard input is not connected to a terminal, then
@@ -66,6 +82,21 @@ connected to, and will re-open /dev/tty for commands.  Files (except for
 the first) are not actually read into buffers until "visited".  All buffers
 are kept in memory: machines with not much memory or swap space may
 have trouble with this.
+.SH "STARTUP"
+If the
+.IR @ cmdfile
+option is given, then the file given as "cmdfile"
+will be run before any files are loaded.  If no
+.I @
+option appears, startup commands will be taken from the user's
+.I VILEINIT
+variable, if it is set, from the file
+.I .vilerc
+in the current directory, if it exists, or from
+.IR $HOME/.vilerc ,
+as a last resort.
+See the help file for examples of what sorts of things might go into
+these command files.
 .SH "COMMANDS"
 Please refer to the help available within 
 .I vile
@@ -82,12 +113,6 @@ command may be obtained with the ": describe-function" and
 Additional documentation on writing macros using the internal scripting
 language can be found in the file "macros.doc", distributed with the vile
 source.
-.SH "STARTUP"
-.I vile
-will read initial commands from a
-.I .vilerc
-file in the current or home directories.
-See the help file for examples of how this can be used.
 .SH "RELATED PROGRAMS"
 .I vile
 may also be built and installed as
@@ -106,7 +131,7 @@ It may be used in conjunction with
 .I vile
 or
 .I xvile
-(which the help of the macro in the file manpage.rc)
+(with the help of the macro in the file manpage.rc)
 to filter and view system manual pages.
 .I xvile
 will even 

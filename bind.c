@@ -3,7 +3,7 @@
  *
  *	written 11-feb-86 by Daniel Lawrence
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/bind.c,v 1.105 1994/12/15 15:01:52 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/bind.c,v 1.107 1994/12/20 23:41:04 pgf Exp $
  *
  */
 
@@ -988,9 +988,7 @@ int	n;
 			c &= ~HIGHBIT;
 		}
 		if (c == ' ') {
-			tmp = "<sp>";
-		} else if (c == '\t') {
-			tmp = "<tab>";
+			tmp = "<space>";
 		} else if (iscntrl(c)) {
 			*dst++ = '^';
 			*dst = tocntrl(c);
@@ -1217,12 +1215,14 @@ char *kk;		/* name of key to translate to Command key form */
 		if (islower(c)) c = toupper(c);
 		c = tocntrl(c);
 		k += 2;
+#if BEFORE
 	} else if (!strcmp((char *)k,"<sp>")) {
 		c = ' ';		/* the string <sp> */
 		k += 4;
 	} else if (!strcmp((char *)k,"<tab>")) {
 		c = '\t';		/* the string <tab> */
 		k += 5;
+#endif
 	} else {		/* any single char, control or not */
 		c = *k++;
 	}
@@ -1467,7 +1467,7 @@ makecmpllist(dummy, cinfop)
     if (slashcol != 0) {
 	char b[NLINE];
 	(void)strncpy(b, buf, (SIZE_T)slashcol);
-	buf[slashcol] = EOS;
+	b[slashcol] = EOS;
 	bprintf("Completions prefixed by %s:\n", b);
     }
 

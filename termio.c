@@ -3,7 +3,7 @@
  * characters, and write characters in a barely buffered fashion on the display.
  * All operating systems.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/termio.c,v 1.112 1994/12/05 14:08:22 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/termio.c,v 1.113 1994/12/20 22:34:53 pgf Exp $
  *
  */
 #include	"estruct.h"
@@ -136,9 +136,9 @@ ttopen()
 #if !DISP_X11
 #if HAVE_SETVBUF
 # if SETVBUF_REVERSED
-	setvbuf(stdout, _IOLBF, tobuf, TBUFSIZ);
+	setvbuf(stdout, _IOFBF, tobuf, TBUFSIZ);
 # else
-	setvbuf(stdout, tobuf, _IOLBF, TBUFSIZ);
+	setvbuf(stdout, tobuf, _IOFBF, TBUFSIZ);
 # endif
 #else /* !HAVE_SETVBUF */
   	setbuffer(stdout, tobuf, TBUFSIZ);

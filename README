@@ -4,8 +4,8 @@ README for vile
 
 vile is a text editor which is extremely compatible with vi in terms
 of "finger feel".  in addition, it has extended capabilities in many areas,
-notably multi-file editing and viewing, key rebinding, and X window system
-support.
+notably multi-file editing and viewing, key rebinding, and real X window
+system support.
 
 the authors of vile are Paul Fox, Tom Dickey, and Kevin Buettner.
 
@@ -20,8 +20,10 @@ if necessary.
 want X11 support?  you'd better look at README.CFG, although 
 "./configure --with-screen=x11"; make" may well do what you want
 
+paul fox, pgf@foxharp.boston.ma.us
 
-2/92
+---------------------------
+February, 1992
 
 VILE -- VI Like Emacs: a vi workalike put together from Micro-Emacs by Paul Fox
 -------------------------------------------------------------------------------
@@ -69,11 +71,12 @@ VILE -- VI Like Emacs: a vi workalike put together from Micro-Emacs by Paul Fox
 
 	In general, I suspect that the quality of the code is roughly
 	on a par with MicroEmacs.  I've been using vile regularly under
-	both SunOS and 386 UNIX for almost two years, with no major problems
-	(that haven't been fixed).  Version three was built and used by
-	many others on the net, and their feedback was invaluable.
-	I think all of the reported bugs have been fixed, and hopefully
-	not too many new ones introduced.
+	both SunOS and 386 UNIX for almost two years [more like 5 years
+	now, on a lot more platforms than that -pgf 12/94], with no major
+	problems (that haven't been fixed).  Version three was built and
+	used by many others on the net, and their feedback was invaluable. 
+	I think all of the reported bugs have been fixed, and hopefully not
+	too many new ones introduced.
 
 	I have not run this much on a small system, and not much at all on
 	DOS.  Pete Rusczinski has done an excellent job of porting
@@ -85,13 +88,14 @@ VILE -- VI Like Emacs: a vi workalike put together from Micro-Emacs by Paul Fox
 	Hope you enjoy -- 
 
 	Paul G. Fox	June, 1991, and February, 1992
-	pgf@foxharp.boston.ma.us
 
 p.s. By the way, I'm _not_ the same Paul Fox who wrote Crisp, the Brief
 	work-alike.
 
 
-9/92:
+-----------------------
+
+September, 1992
 
 I don't have much to add to the original README -- vile has gotten a lot
 better since I first released it, thanks to a lot of users and a lot of
@@ -105,7 +109,8 @@ Warren Vik, Julia Harper, Chris Sherman, Thomas Woo, Yanek Martinson, Miura
 Masahiro, Tom Dickey for lots of bug reports and suggestions and patience.)
 
 ------------------------------
-4/93:
+
+April, 1993
 
 Well, here's an update on vile.  The first release was a long time
 ago (a couple of years?).  Tom Dickey has been contributing a _whole_ lot
@@ -117,41 +122,44 @@ fixes so energetically.  Thanks Tom.
 One thing that's changed since I first started vile is that "lots of eager
 programmers" have now tackled rewrites of vi.  There are several good work-
 alikes out there: elvis (the "king" :-), xvi, vim, stevie, and recent
-versions of vip-mode in GNU emacs.  From what little I've used any of
+versions of vip-mode in GNU emacs.  [add "nvi" to that list.  and whatever
+happened to xvi?  -pgf 12/94]  From what little I've used any of
 these, they all seem like real good programs.  vile feels different from
 most of them, mainly due to its roots in MicroEmacs.  You may or may not
 like it.  If you don't, try one of the others.  There's certainly no reason
 to not have a vi-like editor on just about any machine you choose.  (yeah,
-I know -- I'm assuming you _want_ a vi-like editor...  :-) Enjoy.
+I know -- I'm assuming you _want_ a vi-like editor...  :-)  Enjoy.
 
 Oh yes -- building it.  On UNIX, type "make", and choose one of the predefined
-targets.  Like "make linux".
+targets.  Like "make linux". [ not anymore -- use "configure; make"  -pgf 12/94]
 
 DOS makefiles are named after the compiler they support:  makefile.tbc for
 Turbo-C, makefile.wat.  There is support in "makefile" for Microsoft-C, but
 it's next to useless -- if anyone puts together a good "nmake" makefile,
-could you pass it along?
+could you pass it along?  [that support isn't there anymore.  -pgf 12/94]
 
 The Watcom C/386 v9.0 compiler should also work -- the makefile to use is
 makefile.wat.
 
 The latest version of vile is usually available for ftp at "ftp.cayman.com",
-in the pub/vile directory.  Sometimes there's a compiled DOS binary there
-too.  I don't maintain a mailing list, or anything like that to inform folks
-of new releases -- you just sort of have to check once in a while, or send
-me mail...  [ I've set up a mailing list -- contact me to be added -pgf 7/93]
+in the pub/vile directory.  [not anymore -- it's at "id.wing.net" in the
+"pub/pgf/vile" directory.  -pgf 12/94] Sometimes there's a compiled DOS
+binary there too.  I don't maintain a mailing list, or anything like that
+to inform folks of new releases -- you just sort of have to check once in a
+while, or send me mail...  [ I've set up a mailing list -- contact me to be
+added -pgf 7/93]
 
 paul
 
 ------------------------------
 
-7/93:
+July, 1993
 
 More new features:  infinite undo, modification time checking, and, at
-long last, primitive support for the :map command.  I've also received
-patches that let vile compile for DOS with the DJ GCC compiler.
-Have I mentioned filename completion?  Tom Dickey provided that and
-variable/modename/command completion too.
+long last, primitive support for the :map command.  [:map is now fully
+functional -pgf, 12/94] I've also received patches that let vile compile
+for DOS with the DJ GCC compiler.  Have I mentioned filename completion? 
+Tom Dickey provided that and variable/modename/command completion too.
 
 If you would like to be informed, via email, of new vile releases (bearing
 in mind that the newest release may be _more_ likely to be buggy, rather
@@ -168,7 +176,7 @@ pgf
 
 -------------------------------
 
-3/94
+March, 1994
 
 The X support in xvile has been given a huge boost with contributions from
 Kevin Buettner -- scrollbars, Motif widget support make it feel like a real
@@ -182,7 +190,7 @@ pgf, pgf@foxharp.boston.ma.us
 
 
 -------------------------------
-12/94
+December, 1994
 
 hmmmm -- lets see.  new stuff.  see the CHANGES and help files for details.
 
@@ -214,7 +222,7 @@ hmmmm -- lets see.  new stuff.  see the CHANGES and help files for details.
 
 	- new modes to better control beeping and the "working..." message.
 
-	- autowrite mode now supported.
+	- autowrite mode now supported, on a global or buffer-by-buffer basis.
 
 	- popup windows now adjust their size to their contents -- less screen
 	space is wasted for small window, and more is used for big windows.
@@ -235,7 +243,7 @@ hmmmm -- lets see.  new stuff.  see the CHANGES and help files for details.
 	- it's now possible to break lines by putting ^M in the replacement
 	pattern.
 
-	- selections, the modelines, and the cursor, under xvile, can be all
+	- selections, the modelines, and the cursor, under xvile, can all
 	have different colors.
 
 	- color support for termcap, at least on the linux console.
@@ -249,12 +257,15 @@ hmmmm -- lets see.  new stuff.  see the CHANGES and help files for details.
 	- a simple, probably incomplete file-locking protocol is available,
 	but is not compiled in by default.  the organization which
 	contributed the code (Baan Development) uses it to aid their
-	multi-user development.
+	multi-user development.  turn on OPT_LCKFILES in estruct.h and
+	"set usefilelock" in your .vilerc to play with it.
 
-	- Windows NT support -- console mode only.
+	- Windows NT support -- console mode only.  anyone want to port this
+	to the Windows95 console?  it's probably not hard, though i haven't
+	looked into it very hard.
 
 	- lots of bug fixes
 
 -------------------------------
-$Header: /usr/build/VCS/pgf-vile/RCS/README,v 1.42 1994/12/15 15:56:35 pgf Exp $
+$Header: /usr/build/VCS/pgf-vile/RCS/README,v 1.44 1994/12/22 10:50:00 pgf Exp $
 -------------------------------

@@ -13,7 +13,7 @@
  *	The same goes for vile.  -pgf
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/main.c,v 1.217 1994/12/16 22:54:21 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/main.c,v 1.218 1994/12/22 11:22:11 pgf Exp $
  *
  */
 
@@ -55,7 +55,7 @@ char	*argv[];
 	int    c;			/* command character */
 	register BUFFER *bp;		/* temp buffer pointer */
 	register int	carg;		/* current arg to scan */
-	register int	ranstartup = FALSE;/* startup executed flag */
+	char *vileinit = NULL;		/* the startup file or VILEINIT var */
 	int startstat = TRUE;		/* result of running startup */
 	BUFFER *firstbp = NULL; 	/* ptr to first buffer in cmd line */
 	int gotoflag = FALSE;		/* do we need to goto line at start? */
@@ -222,11 +222,7 @@ char	*argv[];
 			gotoflag = TRUE;
 			gline = atoi(param);
 		} else if (*param == '@') {
-			BUFFER *oldbp = curbp;
-			/* Process Startup macros */
-			if ((startstat = startup(++param)) == TRUE
-			 || (curbp != oldbp))
-				ranstartup = TRUE; /* don't execute .vilerc */
+			vileinit = ++param;
 		} else if (*param != EOS) {
 
 			/* Process an input file */
@@ -350,57 +346,65 @@ char	*argv[];
 		swbuffer(bp);
 	}
 
-	/* if invoked with no other startup files,
-	   run the system startup file here */
-	if (!ranstartup) {
-		char *vileinit = getenv("VILEINIT");
-		if (vileinit != NULL) {
+	/* run the specified, or the system startup file here.
+	   if vileinit is set, it's the name of the user's
+	   command-line startup file, i.e. 'vile @mycmds'
+	 */
+	if (vileinit && *vileinit) {
+		if ((startstat = startup(vileinit)) != TRUE)
+			goto begin;
+	} else {
+
+		/* now vileinit is the contents of their VILEINIT variable */
+		vileinit = getenv("VILEINIT");
+		if (vileinit != NULL) { /* set... */
 			int odiscmd;
 			BUFFER *vbp, *obp;
 			int oflags = 0;
+			if (*vileinit) { /* ...and not null */
+				/* mark as modified, to prevent
+				 * undispbuff() from clobbering */
+				obp = curbp;
+				if (obp) {
+					oflags = obp->b_flag;
+					b_set_changed(obp);
+				}
 
-			/* mark as modified, to prevent undispbuff() from
-				 clobbering */
-			obp = curbp;
-			if (obp) {
-				oflags = obp->b_flag;
-				b_set_changed(obp);
+				if ((vbp=bfind(VILEINIT_BufName, 0))==NULL)
+					ExitProgram(BADEXIT);
+
+				/* don't want swbuffer to try to read it */
+				vbp->b_active = TRUE;
+				swbuffer(vbp);
+				b_set_scratch(vbp);
+				bprintf("%s", vileinit);
+				/* if we leave it scratch, swbuffer(obp) 
+					may zot it, and we may zot it again */
+				b_clr_flags(vbp,BFSCRTCH);
+				set_rdonly(vbp, vbp->b_fname);
+
+				/* go execute it! */
+				odiscmd = discmd;
+				discmd = FALSE;
+				startstat = dobuf(vbp);
+				discmd = odiscmd;
+				if (startstat != TRUE)
+					goto begin;
+				if (obp) {
+					swbuffer(obp);
+					obp->b_flag = oflags;
+				}
+				/* remove the now unneeded buffer */
+				b_set_scratch(vbp);  /* make sure it will go */
+				(void)zotbuf(vbp);
 			}
-
-			if ((vbp=bfind(VILEINIT_BufName, 0))==NULL)
-				ExitProgram(BADEXIT);
-
-			/* don't want swbuffer to try to read it */
-			vbp->b_active = TRUE;
-			swbuffer(vbp);
-			b_set_scratch(vbp);
-			bprintf("%s", vileinit);
-			/* if we leave it scratch, swbuffer(obp) may zot it,
-				and we may zot it again */
-			b_clr_flags(vbp,BFSCRTCH);
-			set_rdonly(vbp, vbp->b_fname);
-
-			/* go execute it! */
-			odiscmd = discmd;
-			discmd = FALSE;
-			startstat = dobuf(vbp);
-			discmd = odiscmd;
-			if (startstat != TRUE)
-				goto begin;
-			if (obp) {
-				swbuffer(obp);
-				obp->b_flag = oflags;
-			}
-			/* remove the now unneeded buffer */
-			b_set_scratch(vbp);  /* make sure it will go */
-			(void)zotbuf(vbp);
-		} else {
+		} else {  /* find and run .vilerc */
 			char *fname;
 			/* if .vilerc is one of the input files....
 					don't clobber it */
 #if SYS_MSDOS || SYS_WIN31 || SYS_OS2 || SYS_WINNT
 			/* search PATH for vilerc under dos */
-	 		fname = flook(pathname[0], FL_ANYWHERE|FL_READABLE);
+			fname = flook(pathname[0], FL_ANYWHERE|FL_READABLE);
 #else
 			fname = pathname[0];
 #endif
