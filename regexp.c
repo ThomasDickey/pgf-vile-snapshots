@@ -13,7 +13,13 @@
  *		pgf, 11/91
  * 
  * $Log: regexp.c,v $
- * Revision 1.27  1992/11/19 09:17:42  foxharp
+ * Revision 1.29  1992/12/14 09:03:25  foxharp
+ * lint cleanup, mostly malloc
+ *
+ * Revision 1.28  1992/12/13  13:20:21  foxharp
+ * optimization (set regstart) for \<string\> style patterns
+ *
+ * Revision 1.27  1992/11/19  09:17:42  foxharp
  * allow trailing backslashes in expressions, so isearch can use backslash
  *
  * Revision 1.26  1992/05/25  21:44:45  foxharp
@@ -351,7 +357,7 @@ int magic;
 	register regexp *r;
 	register char *scan;
 	register char *longest;
-	register int len;
+	register unsigned len;
 	int flags;
 	static char *exp;
 	static int explen;
@@ -363,7 +369,7 @@ int magic;
 	if (explen < 2*len+20) {
 		if (exp)
 			free(exp);
-		exp = malloc(2*len+20);
+		exp = castalloc(char, 2*len+20);
 		if (exp == NULL)
 			FAIL("couldn't allocate exp copy");
 		explen = 2*len+20;
@@ -385,7 +391,7 @@ int magic;
 		FAIL("regexp too big");
 
 	/* Allocate space. */
-	r = (regexp *)malloc(sizeof(regexp) + (unsigned)regsize);
+	r = typeallocplus(regexp, regsize);
 	if (r == NULL)
 		FAIL("out of space");
 
@@ -412,6 +418,8 @@ int magic;
 		/* Starting-point info. */
 		if (OP(scan) == EXACTLY)
 			r->regstart = *OPERAND(scan);
+		else if (OP(scan) == BEGWORD && OP(regnext(scan)) == EXACTLY)
+			r->regstart = *OPERAND(regnext(scan));
 		else if (OP(scan) == BOL)
 			r->reganch++;
 

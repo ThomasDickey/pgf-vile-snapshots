@@ -6,7 +6,10 @@
  * for the display system.
  *
  * $Log: buffer.c,v $
- * Revision 1.42  1992/12/02 09:13:16  foxharp
+ * Revision 1.43  1992/12/14 09:03:25  foxharp
+ * lint cleanup, mostly malloc
+ *
+ * Revision 1.42  1992/12/02  09:13:16  foxharp
  * changes for "c-shiftwidth"
  *
  * Revision 1.41  1992/11/19  08:48:14  foxharp
@@ -873,7 +876,7 @@ char   *bname;
 	if (cflag == NO_CREAT)	/* don't create it */
 		return NULL;
         
-	if ((bp=(BUFFER *)malloc(sizeof(BUFFER))) == NULL)
+	if ((bp = typealloc(BUFFER)) == NULL)
 		return (NULL);
 
 	/* these affect lalloc(), below */

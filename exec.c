@@ -4,7 +4,10 @@
  *	written 1986 by Daniel Lawrence	
  *
  * $Log: exec.c,v $
- * Revision 1.34  1992/12/04 09:12:25  foxharp
+ * Revision 1.35  1992/12/14 09:03:25  foxharp
+ * lint cleanup, mostly malloc
+ *
+ * Revision 1.34  1992/12/04  09:12:25  foxharp
  * deleted unused assigns
  *
  * Revision 1.33  1992/08/20  23:40:48  foxharp
@@ -1137,7 +1140,7 @@ BUFFER *bp;	/* buffer to execute */
 
 		/* if is a while directive, make a block... */
 		if (eline[0] == DIRECTIVE_CHAR && eline[1] == 'w' && eline[2] == 'h') {
-			whtemp = (WHBLOCK *)malloc(sizeof(WHBLOCK));
+			whtemp = typealloc(WHBLOCK);
 			if (whtemp == NULL) {
 noram:				mlforce("[Out of memory during while scan]");
 failexit:			freewhile(scanpt);
@@ -1158,7 +1161,7 @@ failexit:			freewhile(scanpt);
 				mlforce("[BREAK outside of any WHILE loop]");
 				goto failexit;
 			}
-			whtemp = (WHBLOCK *)malloc(sizeof(WHBLOCK));
+			whtemp = typealloc(WHBLOCK);
 			if (whtemp == NULL)
 				goto noram;
 			whtemp->w_begin = lp;
@@ -1205,7 +1208,7 @@ nxtscan:	/* on to the next line */
 		bp->b_dot.l = lp;
 		/* allocate eline and copy macro line to it */
 		linlen = lp->l_used;
-		if ((einit = eline = malloc(linlen+1)) == NULL) {
+		if ((einit = eline = castalloc(char, linlen+1)) == NULL) {
 			mlforce("[Out of Memory during macro execution]");
 			freewhile(whlist);
 			mstore = FALSE;
@@ -1297,7 +1300,7 @@ nxtscan:	/* on to the next line */
 		if (mstore) {
 			/* allocate the space for the line */
 			linlen = strlen(eline);
-			if ((mp=lalloc(linlen,bstore)) == NULL) {
+			if ((mp=lalloc((int)linlen,bstore)) == NULL) {
 				mlforce("[Out of memory while storing macro]");
 				mstore = FALSE;
 				dobufnesting--;

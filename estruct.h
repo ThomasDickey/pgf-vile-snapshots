@@ -10,7 +10,11 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.90  1992/12/05 13:53:56  foxharp
+ * Revision 1.91  1992/12/14 08:29:18  foxharp
+ * changes for lint support, from Tom Dickey.  Still not nearly 100% lint free,
+ * and may not get much closer -- the code gets too ugly for me....
+ *
+ * Revision 1.90  1992/12/05  13:53:56  foxharp
  * fix APOLLO signal types
  *
  * Revision 1.89  1992/12/04  09:28:35  foxharp
@@ -506,7 +510,6 @@
 # endif
 #endif
 
-
 #ifndef scrn_chosen
 /*	Terminal Output definitions		*/
 /* choose ONLY one of the following */
@@ -977,7 +980,6 @@ typedef struct regexp {
 
 extern regexp *regcomp();
 extern int regexec();
-extern void regsub();
 extern void regerror();
 
 /*
@@ -1533,7 +1535,7 @@ typedef	struct KILL {
 typedef struct KILLREG {
 	struct KILL *kbufp;	/* current kill register chunk pointer */
 	struct KILL *kbufh;	/* kill register header pointer	*/
-	int   kused;		/* # of bytes used in kill last chunk	*/
+	int kused;		/* # of bytes used in kill last chunk	*/
 	short kbflag;		/* flags describing kill register	*/
 } KILLREG;
 
@@ -1598,15 +1600,44 @@ typedef struct WHBLOCK {
 #include "unistd.h"
 #include "stdlib.h"
 #else
-# if ! VMALLOC
+# if APOLLO && defined(__STDC__)	/* e.g., while running lint */
+#include <stdlib.h>
+# else
+#  if ! VMALLOC
  extern char *malloc();
  extern char *realloc();
-# endif
+#  endif
 extern char *getenv();
-#endif
+# endif	/* APOLLO (special handling of lint vs __STDC__) */
+#endif	/* POSIX */
+
 #if ! USG
 extern char *getwd();
 extern char *getcwd();
+#endif
+
+#ifndef	free
+#if	APOLLO && !defined(__STDC__)
+ extern void free (/*char *s*/);
+#endif
+#endif	/* free */
+
+/* structure-allocate, for linting */
+#ifdef	lint
+#define	castalloc(cast,nbytes)		((cast *)0)
+#define	castrealloc(cast,ptr,nbytes)	((ptr)+(nbytes))
+#define	typealloc(cast)			((cast *)0)
+#define	typeallocn(cast,ntypes)		(((cast *)0)+(ntypes))
+#define	typereallocn(cast,ptr,ntypes)	((ptr)+(ntypes))
+#define	typeallocplus(cast,extra)	(((cast *)0)+(extra))
+#else
+#define	castalloc(cast,nbytes)		(cast *)malloc(nbytes)
+#define	castrealloc(cast,ptr,nbytes)	(cast *)realloc((char *)(ptr),(nbytes))
+#define	typealloc(cast)			(cast *)malloc(sizeof(cast))
+#define	typeallocn(cast,ntypes)		(cast *)malloc((ntypes)*sizeof(cast))
+#define	typereallocn(cast,ptr,ntypes)	(cast *)realloc((char *)(ptr),\
+							(ntypes)*sizeof(cast))
+#define	typeallocplus(cast,extra)	(cast *)malloc((extra)+sizeof(cast))
 #endif
 
 #if HAVE_SELECT
@@ -1616,7 +1647,6 @@ extern char *getcwd();
 #include <sys/time.h>
 #endif
 #endif
-
 
 /*
  * Local prototypes

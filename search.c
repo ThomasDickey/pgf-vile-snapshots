@@ -4,7 +4,10 @@
  *  heavily modified by Paul Fox, 1990
  *
  * $Log: search.c,v $
- * Revision 1.41  1992/12/07 23:31:00  foxharp
+ * Revision 1.42  1992/12/14 09:03:25  foxharp
+ * lint cleanup, mostly malloc
+ *
+ * Revision 1.41  1992/12/07  23:31:00  foxharp
  * whoops -- on second though, _don't_ do backslash processing in kbd_string,
  * do it in delins()
  *
@@ -719,7 +722,7 @@ int matchlen;
 		if (patmatch)
 			free(patmatch);
 		/* attempt to allocate a new one */
-		patmatch = malloc(patlen = matchlen + 20);
+		patmatch = castalloc(char, patlen = matchlen + 20);
 		if (patmatch == NULL)
 			return;
 	}

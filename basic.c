@@ -6,7 +6,10 @@
  * framing, are hard.
  *
  * $Log: basic.c,v $
- * Revision 1.41  1992/12/05 13:12:16  foxharp
+ * Revision 1.42  1992/12/14 09:03:25  foxharp
+ * lint cleanup, mostly malloc
+ *
+ * Revision 1.41  1992/12/05  13:12:16  foxharp
  * fix paragraph problem -- i didn't fix all the firstchar() calls before
  *
  * Revision 1.40  1992/12/04  09:08:45  foxharp
@@ -969,8 +972,7 @@ int f,n;
 	}
 		
 	if (curbp->b_nmmarks == NULL) {
-		curbp->b_nmmarks = 
-			(struct MARK *)malloc(26*sizeof(struct MARK));
+		curbp->b_nmmarks = typeallocn(struct MARK,26);
 		if (curbp->b_nmmarks == NULL) {
 			mlforce("[OUT OF MEMORY]");
 			return FALSE;

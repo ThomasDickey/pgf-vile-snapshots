@@ -3,7 +3,10 @@
  *		5/9/86
  *
  * $Log: input.c,v $
- * Revision 1.49  1992/12/05 13:22:10  foxharp
+ * Revision 1.50  1992/12/13 13:32:36  foxharp
+ * got rid of extraneous assign
+ *
+ * Revision 1.49  1992/12/05  13:22:10  foxharp
  * make sure we escape eolchar with '\' if passed in in kbd_strings buffer,
  * since the user would have had to type the '\' to put it there themselves
  *
@@ -814,7 +817,6 @@ int dobackslashes;	/* do we add and delete '\' chars for the caller */
 			}
 			switch(c) {
 			case '%':
-				cp = curbp->b_fname;
 				if (!*(curbp->b_fname) ||
 					isspace(*(curbp->b_fname)))
 					cp = curbp->b_bname;

@@ -2,7 +2,10 @@
  *		for MicroEMACS
  *
  * $Log: spawn.c,v $
- * Revision 1.35  1992/12/04 09:51:54  foxharp
+ * Revision 1.36  1992/12/14 09:03:25  foxharp
+ * lint cleanup, mostly malloc
+ *
+ * Revision 1.35  1992/12/04  09:51:54  foxharp
  * linux apparently has strict prototypes
  *
  * Revision 1.34  1992/12/04  09:19:17  foxharp
@@ -268,6 +271,7 @@ int f,n;
 #endif /* SIGTSTP */
 }
 
+/*ARGSUSED*/
 SIGT
 rtfrmshell(signo)
 int signo;
@@ -415,13 +419,13 @@ int rerun;
 	 */
 	STenv = NULL;
 	if((tptr = index(&line[0],' ')) == NULL) { /* no args */
-		STcmd = malloc(strlen(line) + 1);
+		STcmd = castalloc(char, strlen(line) + 1);
 		strcpy(STcmd,line);
 		STargs = NULL;
 	}
 	else {  /* separate out the args from the command */
 		/* resist the temptation to do ptr arithmetic */
-		STcmd = malloc(strlen(line) + 1);
+		STcmd = castalloc(char, strlen(line) + 1);
 		for(i = 0,sptr = &line[0]; sptr != tptr; sptr++,i++)
 			STcmd[i] = *sptr;
 		STcmd[i] = '\0';
@@ -429,7 +433,7 @@ int rerun;
 		if(*tptr == '\0')
 			STargs = NULL;
 		else {
-			STargs = malloc(strlen(tptr) + 2);
+			STargs = castalloc(char, strlen(tptr) + 2);
 /* first byte of STargs is the length of the string */
 			STargs[0] = strlen(tptr);
 			STargs[1] = NULL; /* fake it for strcat */
@@ -442,7 +446,7 @@ int rerun;
 	 * issue the command as is
 	 */
 	if((tptr = index(STcmd,'.')) == NULL) {
- 		STwork = malloc(strlen(STcmd) + 4);
+ 		STwork = castalloc(char,strlen(STcmd) + 4);
  		strcpy(STwork,STcmd);
  		strcat(STwork,".prg");
  		tptr = index(STwork,'.');

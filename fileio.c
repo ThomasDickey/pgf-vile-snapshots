@@ -3,7 +3,10 @@
  * the knowledge about files are here.
  *
  * $Log: fileio.c,v $
- * Revision 1.30  1992/08/20 23:40:48  foxharp
+ * Revision 1.31  1992/12/14 09:03:25  foxharp
+ * lint cleanup, mostly malloc
+ *
+ * Revision 1.30  1992/08/20  23:40:48  foxharp
  * typo fixes -- thanks, eric
  *
  * Revision 1.29  1992/07/28  21:42:36  foxharp
@@ -391,7 +394,7 @@ int *lenp;	/* to return the final length */
 
 	/* if we don't have an fline, allocate one */
 	if (fline == NULL)
-		if ((fline = malloc(flen = NSTRING)) == NULL)
+		if ((fline = castalloc(char,flen = NSTRING)) == NULL)
 			return(FIOMEM);
 
 	/* read the line in */
@@ -407,8 +410,8 @@ int *lenp;	/* to return the final length */
 		/* if it's longer, get more room */
                 if (i >= flen) {
 			/* "Small" exponential growth - EJK */
-			long growth = (flen >> 3) + NSTRING;
-			if ((tmpline = malloc(flen+growth)) == NULL)
+			unsigned growth = (flen >> 3) + NSTRING;
+			if ((tmpline = castalloc(char,flen+growth)) == NULL)
                 		return(FIOMEM);
                 	memcpy(tmpline, fline, flen);
                 	flen += growth;

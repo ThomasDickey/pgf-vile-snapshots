@@ -44,7 +44,9 @@ CO=co
 
 # for passing along the above settings to sub-makes
 ENV = SCREEN="$(SCREEN)" LIBS="$(LIBS)" TARGET="$(TARGET)" SCRDEF="$(SCRDEF)" \
-	CO="$(CO)"
+	CO="$(CO)" CC="$(CC)" LINK="$(LINK)" OPTFLAGS="$(OPTFLAGS)" \
+	GINCS="$(GINCS)"
+
 
 # install to DESTDIR1 if it's writable, else DESTDIR2
 DESTDIR1 = /usr/local/bin
@@ -59,23 +61,23 @@ DESTDIR2 = $(HOME)/bin
 REMOTE=gutso!foxharp
 
 #CC = gcc
-#LINK = gcc
 #OPTFLAGS = -g -Wall -Wshadow -O # -pg
 #gincdir = /usr/local/lib/gcc-include
 #GINCS = -I$(gincdir) -I$(gincdir)/sys
 
 CC = cc
-LINK = cc
 #OPTFLAGS = -g
 OPTFLAGS = -O
 
+LINK = $(CC)
 LDFLAGS = 
 
 # some older bsd systems keep ioctl in sys only -- easier to
 # search both places than to ifdef the code.  color me lazy.
 INCS = -I. $(GINCS) -I/usr/include -I/usr/include/sys
 
-CFLAGS1 = $(OPTFLAGS) $(INCS) $(SCRDEF) -DHELP_LOC=\\\"$(HELP_LOC)\\\"
+CFLAGS0 = $(INCS) $(SCRDEF) -DHELP_LOC=\\\"$(HELP_LOC)\\\"
+CFLAGS1 = $(OPTFLAGS) $(CFLAGS0)
 
 # suffix for object files.
 # this get changes to "obj" for DOS builds
@@ -170,13 +172,13 @@ all:
 	echo "	make osf1	(OSF/1)"				;\
 	echo "	make linux	(ported to 0.95)"			;\
 	echo "	make aux2	(A/UX 2.0) (3.0 is probably svr3)"	;\
-	echo "	make apollo						;\
+	echo "	make apollo	(HP/Apollo SR10.3 CC 6.8)"		;\
 	echo "	nmake msc	(MicroSoft C 6.0) (buggy?)"		;\
 	echo "	make sx1100	(SX1100 running on Unisys 1100)"	;\
 	echo "	make default	(to use config internal to estruct.h)"
 
 bsd sony mach:
-	make CFLAGS="$(CFLAGS1) -DBERK -Dos_chosen" \
+	$(MAKE) CFLAGS="$(CFLAGS1) -DBERK -Dos_chosen" \
 	    MAKE=/usr/bin/make $(TARGET) $(ENV)
 
 bsd_posix ultrix:
@@ -193,7 +195,6 @@ bsd386:
 
 att:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DUSG -Dos_chosen" \
-		LIBS="-ltermcap" \
 		$(TARGET) $(ENV)
 
 att_posix svr4:
@@ -202,10 +203,7 @@ att_posix svr4:
 
 svr3:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DSVR3 -Dos_chosen" \
-		LIBS="-ltermcap" \
 		$(TARGET) $(ENV)
-
-#		LIBS="-ltermcap -lc_s"
 
 mips:
 	$(MAKE) CFLAGS="$(CFLAGS1) -systype sysv $(INCS) -DSVR3 -Dos_chosen" \
@@ -241,7 +239,7 @@ aix:
 		$(TARGET) $(ENV)
 
 apollo:
-	make CFLAGS="$(CFLAGS1) -DBERK -Dos_chosen" \
+	$(MAKE) CFLAGS="$(CFLAGS1) -DBERK -DAPOLLO -Dos_chosen" \
 	    MAKE=/usr/bin/make $(TARGET) $(ENV)
 
 osf1:
@@ -272,7 +270,7 @@ aux2:
 
 sx1100:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DSVR3 -Dos_chosen" \
-		LDFLAGS="-h 400000" LIBS="-ltermcap" \
+		LDFLAGS="-h 400000" \
 		$(TARGET) $(ENV)
 
 default:
@@ -406,6 +404,10 @@ nrevlist:
 	rm /tmp/vile__files /tmp/vile__revs
 	mv /tmp/vile_revlist nrevlist
 
+nchanges: nrevlist
+	revlistdiff nrevlist revlist >changes
+
+
 # dump a list of files that may have changed since last backup
 rw list-writeable:
 	@ls -l $(EVERYTHING) | \
@@ -426,7 +428,9 @@ tagfile:
 
 lint:	$(SRC)
 	#lint -hbvxac $(SRC) >lint.out 
-	lint  $(SRC) >lint.out 
+	#lint $(CFLAGS0) $(ENV) $(SRC) >lint.out 
+	#lint $(CFLAGS0) -DBERK -DPOSIX -DSUNOS -Dos_chosen  $(SRC) >lint.out 
+	lint $(CFLAGS0) -DSVR3 -Dos_chosen  $(SRC) >lint.out 
 
 cflow:	$(SRC)
 	cflow  $(SRC) >cflow.out 
@@ -457,7 +461,16 @@ $(OBJ): estruct.h edef.h
 externs.$O: nebind.h nename.h nefunc.h
 
 # $Log: makefile,v $
-# Revision 1.74  1992/12/04 09:50:24  foxharp
+# Revision 1.77  1992/12/16 21:38:34  foxharp
+# rule for nchanges target
+#
+# Revision 1.76  1992/12/14  09:02:08  foxharp
+# svr3 lint command
+#
+# Revision 1.75  1992/12/13  13:27:04  foxharp
+# various changes, for easier command-line ENV setting, and for linting
+#
+# Revision 1.74  1992/12/04  09:50:24  foxharp
 # pass SCREEN etc. to lower makes via ENV variable
 #
 # Revision 1.73  1992/12/04  09:23:08  foxharp
@@ -701,3 +714,9 @@ externs.$O: nebind.h nename.h nefunc.h
 # date: 1990/09/21 10:25:38;
 # initial vile RCS revision
 #
+CPP_OPTS= $(CFLAGS0) -DBERK -DAPOLLO -Dos_chosen
+.SUFFIXES: .i .i2 .lint
+lint.out:	;tdlint $(CPP_OPTS) $(SRC) >$@
+.c.i:		;$(CC)  $(CPP_OPTS) -C -E $< >$@
+.c.i2:		;/usr/lib/cpp  $(CPP_OPTS) -C -E $< >$@
+.c.lint:	;tdlint $(CPP_OPTS) $< >$@

@@ -4,7 +4,10 @@
 	written 1986 by Daniel Lawrence
  *
  * $Log: eval.c,v $
- * Revision 1.39  1992/11/19 09:03:56  foxharp
+ * Revision 1.40  1992/12/14 09:03:25  foxharp
+ * lint cleanup, mostly malloc
+ *
+ * Revision 1.39  1992/11/19  09:03:56  foxharp
  * fix identification of single character tokens that happen to be prefixes
  * for special constructs, like '~', '*', etc.
  *
@@ -214,7 +217,7 @@ char *fname;		/* name of function to evaluate */
 		case UFIND:	return(tokval(arg1));
 		case UFAND:	return(ltos(stol(arg1) && stol(arg2)));
 		case UFOR:	return(ltos(stol(arg1) || stol(arg2)));
-		case UFLENGTH:	return(l_itoa(strlen(arg1)));
+		case UFLENGTH:	return(l_itoa((int)strlen(arg1)));
 		case UFUPPER:	return(mkupper(arg1));
 		case UFLOWER:	return(mklower(arg1));
 		case UFTRUTH:	return(ltos(atoi(arg1) == 42));
@@ -510,7 +513,7 @@ char *value;	/* value to set to */
 	case TKVAR: /* set a user variable */
 		if (uv[vnum].u_value != NULL)
 			free(uv[vnum].u_value);
-		sp = malloc(strlen(value) + 1);
+		sp = castalloc(char, strlen(value) + 1);
 		if (sp == NULL)
 			return(FALSE);
 		strcpy(sp, value);

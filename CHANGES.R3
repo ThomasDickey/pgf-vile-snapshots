@@ -52,6 +52,8 @@ VI COMPLIANCE:
 
 - the '&' now works, and repeats the last ":s" or '^X-s' substitution.
 
+- replacement sub-expressions work (\( and \), \1, etc.), as do \U \L \u \l
+
 - there is a new operator, '^A-&', which is similar to '&' but acts on a
 	region.  I expect that if you want it, you'll probably rebind it to
 	something else (like '&') since typing it is awkward, to say the least.
@@ -152,9 +154,7 @@ MISCELLANEOUS
 - tabstops can now be set to any value, and there is a separate value for
 	tabstops in C mode.  (c-tabstop)
 
-- there is now minimal support for horizontal scrolling -- the code for
-	keeping the cursor on lines that are too short to be visible at all
-	is still broken.
+- there is now some support for horizontal scrolling, using ^X-^R and ^X-^L
 
 - the ! filter command for running text through an external filter now
 	works
