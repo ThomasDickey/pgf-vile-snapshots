@@ -2,93 +2,62 @@
  * Window management. Some of the functions are internal, and some are
  * attached to keys that the user actually types.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/window.c,v 1.58 1995/04/26 04:35:17 pgf Exp $
+ * $Log: window.c,v $
+ * Revision 1.13  1992/01/05 00:06:13  pgf
+ * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
+ * often.  also normalized message appearance somewhat.
  *
+ * Revision 1.12  1991/11/04  14:20:18  pgf
+ * fixed broken mvdnwind()
+ *
+ * Revision 1.11  1991/11/01  14:38:00  pgf
+ * saber cleanup
+ *
+ * Revision 1.10  1991/10/22  14:08:23  pgf
+ * took out old ifdef BEFORE code
+ *
+ * Revision 1.9  1991/09/30  01:47:24  pgf
+ * keep sideways motions local to a window
+ *
+ * Revision 1.8  1991/09/26  13:09:55  pgf
+ * w_sideways is now one of the window values
+ *
+ * Revision 1.7  1991/08/07  12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.6
+ * date: 1991/08/06 15:27:21;
+ * new splitwind algorithm
+ * 
+ * revision 1.5
+ * date: 1991/08/02 10:27:07;
+ * added dave lemke's scroll fix to mvupwind()
+ * 
+ * revision 1.4
+ * date: 1991/06/25 19:53:41;
+ * massive data structure restructure
+ * 
+ * revision 1.3
+ * date: 1991/02/21 09:14:20;
+ * added horizontal scrolling, and made newlength and
+ * newwidth into commands
+ * 
+ * revision 1.2
+ * date: 1990/09/25 11:38:28;
+ * took out old ifdef BEFORE code
+ * 
+ * revision 1.1
+ * date: 1990/09/21 10:26:21;
+ * initial vile RCS revision
  */
 
+#include        <stdio.h>
 #include        "estruct.h"
 #include	"edef.h"
 
-static	void	unlink_window P(( WINDOW * ));
-static	LINEPTR	adjust_forw P(( WINDOW *, LINEPTR, int ));
-static	LINEPTR	adjust_back P(( WINDOW *, LINEPTR, int ));
-static	int	scroll_sideways P(( int, int ));
-static	WINDOW *splitw P(( int, int ));
-
-/*--------------------------------------------------------------------------*/
-
-/*
- * Unlink the given window-pointer from the list
- */
-static
-void	unlink_window(thewp)
-	WINDOW	*thewp;
-{
-	register WINDOW *p, *q;
-
-	for (p = wheadp, q = 0; p != 0; q = p, p = p->w_wndp)
-		if (p == thewp) {
-			if (q != 0)
-				q->w_wndp = p->w_wndp;
-			else
-				wheadp = p->w_wndp;
-			break;
-		}
-}
-
-/*
- * Set the current window (and associated current buffer).
- */
-int
-set_curwp (wp)
-WINDOW	*wp;
-{
-	if (wp == curwp)
-		return (TRUE);
-	curwp = wp;
-	make_current(curwp->w_bufp);
-	upmode();
-	updatelistbuffers();
-	return (TRUE);
-}
-
-/*
- * Adjust a LINEPTR forward by the given number of screen-rows, limited by
- * the end of the buffer.
- */
-static LINEPTR
-adjust_forw(wp, lp, n)
-WINDOW	*wp;
-LINEPTR	lp;
-int	n;
-{
-	register int i;
-	for (i = n; i > 0 && !same_ptr(lp, win_head(wp)); ) {
-		if ((i -= line_height(wp, lp)) < 0)
-			break;
-		lp = lFORW(lp);
-	}
-	return lp;
-}
-
-/*
- * Adjust a LINEPTR backward by the given number of screen-rows, limited by
- * the end of the buffer.
- */
-static LINEPTR
-adjust_back(wp, lp, n)
-WINDOW	*wp;
-LINEPTR	lp;
-int	n;
-{
-	register int i;
-	for (i = n; i > 0 && !same_ptr(lp, win_head(wp)); ) {
-		if ((i -= line_height(wp, lp)) < 0)
-			break;
-		lp = lBACK(lp);
-	}
-	return lp;
-}
+#if	MEGAMAX & ST520
+overlay	"window"
+#endif
 
 /*
  * Reposition dot's line to line "n" of the window. If the argument is
@@ -96,15 +65,13 @@ int	n;
  * bottom. If it is 0 the window is centered around dot (this is what 
  * the standard redisplay code does). Defaults to 0.
  */
-int
 reposition(f, n)
 int f,n;
 {
-	if (f) {
-		curwp->w_force = n;
-		curwp->w_flag |= WFFORCE;
-	}
-	update(TRUE);
+	if (f == FALSE)		/* default to 0 to center screen */
+		n = 0;
+	curwp->w_force = n;
+	curwp->w_flag |= WFFORCE;
 	return (TRUE);
 }
 
@@ -113,10 +80,12 @@ int f,n;
  * argument it recenters "." in the current window.
  */
 /* ARGSUSED */
-int
 refresh(f, n)
 int f,n;
 {
+#if	NeWS	/* see if the window has changed size */
+    newsrefresh() ;
+#endif	
 
 	if (f == FALSE) {
 		sgarbf = TRUE;
@@ -125,6 +94,9 @@ int f,n;
 	        curwp->w_flag |= WFFORCE;
 	}
 
+#if     NeWS
+	newsreportmodes() ;
+#endif
 	return (TRUE);
 }
 
@@ -136,7 +108,6 @@ int f,n;
  * with an argument this command finds the <n>th window from the top
  *
  */
-int
 nextwind(f, n)
 int f, n;	/* default flag and numeric argument */
 {
@@ -146,9 +117,12 @@ int f, n;	/* default flag and numeric argument */
 	if (f) {
 
 		/* first count the # of windows */
-		nwindows = 0;
-		for_each_window(wp)
+		wp = wheadp;
+		nwindows = 1;
+		while (wp->w_wndp != NULL) {
 			nwindows++;
+			wp = wp->w_wndp;
+		}
 
 		/* if the argument is negative, it is the nth window
 		   from the bottom of the screen			*/
@@ -168,10 +142,12 @@ int f, n;	/* default flag and numeric argument */
 		if ((wp = curwp->w_wndp) == NULL)
 			wp = wheadp;
 	}
-	return set_curwp(wp);
+	curwp = wp;
+	make_current(curwp->w_bufp);
+	upmode();
+	return (TRUE);
 }
 
-int
 poswind(f,n)
 int f,n;
 {
@@ -179,8 +155,8 @@ int f,n;
 	register int rows;
 	int s;
 
-	c = keystroke();
-	if (ABORTED(c))
+	c = kbd_key();
+	if (c == abortc)
 		return FALSE;
 
 	if (c == '+' || c == '\r' || c == 'H') {
@@ -190,7 +166,7 @@ int f,n;
 	} else if (c == '-' || c == 'L') {
 		rows = -1;
 	} else {
-		kbd_alarm();
+		TTbeep();
 		return FALSE;
 	}
 
@@ -204,10 +180,9 @@ int f,n;
 
 /*
  * This command makes the previous window (previous => up the screen) the
- * current window. There aren't any errors, although the command does not do a
+ * current window. There arn't any errors, although the command does not do a
  * lot if there is 1 window.
  */
-int
 prevwind(f, n)
 int f,n;
 {
@@ -227,7 +202,10 @@ int f,n;
 	while (wp1->w_wndp != wp2)
 		wp1 = wp1->w_wndp;
 
-	return set_curwp(wp1);
+	curwp = wp1;
+	make_current(curwp->w_bufp);
+	upmode();
+	return (TRUE);
 }
 
 /*
@@ -237,7 +215,6 @@ int f,n;
  * a new dot. We share the code by having "move down" just be an interface to
  * "move up". Magic.
  */
-int
 mvdnwind(f, n)
 int f,n;
 {
@@ -253,7 +230,6 @@ int f,n;
  * (this command does not really move "." (except as above); it moves the 
  * frame).
  */
-int
 mvupwind(f, n)
 int f,n;
 {
@@ -261,7 +237,7 @@ int f,n;
 	register int    i;
 	int             was_n = n;
 
-	lp = l_ref(curwp->w_line.l);
+	lp = curwp->w_line.l;
 
 	if (!f)
 		n = 1;
@@ -272,24 +248,23 @@ int f,n;
 		curwp->w_flag |= WFINS;
 
 	if (n < 0) {
-		while (n++ && lforw(lp) != l_ref(buf_head(curbp)))
+		while (n++ && lforw(lp) != curbp->b_line.l)
 			lp = lforw(lp);
 	} else {
-		while (n-- && lback(lp) != l_ref(buf_head(curbp)))
+		while (n-- && lback(lp) != curbp->b_line.l)
 			lp = lback(lp);
 	}
 
-	curwp->w_line.l = l_ptr(lp);
+	curwp->w_line.l = lp;
 	curwp->w_flag |= WFHARD | WFMODE;
 
 	/* is it still in the window */
-	for (i = 0; i < curwp->w_ntrows; lp = lforw(lp)) {
-		if ((i += line_height(curwp,l_ptr(lp))) > curwp->w_ntrows)
-			break;
-		if (lp == l_ref(DOT.l))
+	for (i = 0; i < curwp->w_ntrows; ++i) {
+		if (lp == curwp->w_dot.l)
 			return (TRUE);
-		if (lforw(lp) == l_ref(buf_head(curbp)))
+		if (lforw(lp) == curbp->b_line.l)
 			break;
+		lp = lforw(lp);
 	}
 	/*
 	 * now lp is either just past the window bottom, or it's the last
@@ -301,75 +276,68 @@ int f,n;
 		curgoal = getccol(FALSE);
 
 	if (was_n < 0)
-		DOT.l = curwp->w_line.l;
+		curwp->w_dot.l = curwp->w_line.l;
 	else
-		DOT.l = l_ptr(lback(lp));
-	DOT.o = getgoal(l_ref(DOT.l));
+		curwp->w_dot.l = lback(lp);
+	curwp->w_dot.o = getgoal(curwp->w_dot.l);
 	return (TRUE);
 }
 
-int
 mvdnnxtwind(f, n)
 int f,n;
 {
-	int	status;
-
-	(void)nextwind(FALSE, 1);
-	status = mvdnwind(f, n);
-	(void)prevwind(FALSE, 1);
-	return status;
+	nextwind(FALSE, 1);
+	mvdnwind(f, n);
+	prevwind(FALSE, 1);
 }
 
-int
 mvupnxtwind(f, n)
 int f,n;
 {
-	int	status;
-
-	(void)nextwind(FALSE, 1);
-	status = mvupwind(f, n);
-	(void)prevwind(FALSE, 1);
-	return status;
+	nextwind(FALSE, 1);
+	mvupwind(f, n);
+	prevwind(FALSE, 1);
 }
 
-static int
-scroll_sideways(f,n)
-int	f,n;
+mvrightwind(f,n)
+int f,n;
 {
-	int	original = w_val(curwp,WVAL_SIDEWAYS);
+	int move;
 
-	if (!f) {
-		int	nominal = term.t_ncol / 2;
-		n = (n > 0) ? nominal : -nominal;
+	if (f)
+		move = n;
+	else
+		move = term.t_ncol/3;
+
+	if (w_val(curwp, WVAL_SIDEWAYS) + move > getccol(FALSE) - 1) {
+		TTbeep();
+		return FALSE;
 	}
 
 	make_local_w_val(curwp,WVAL_SIDEWAYS);
-	w_val(curwp, WVAL_SIDEWAYS) += n;
 
-	if (w_val(curwp, WVAL_SIDEWAYS) < 0) {
-		if (original == 0)
-			kbd_alarm();
-		w_val(curwp, WVAL_SIDEWAYS) = 0;
-	}
+	w_val(curwp, WVAL_SIDEWAYS) += move;
 
-	if (original != w_val(curwp,WVAL_SIDEWAYS))
-        	curwp->w_flag  |= WFHARD|WFMOVE|WFMODE;
+        curwp->w_flag  |= WFHARD|WFMOVE;
 
 	return TRUE;
 }
 
-int
-mvrightwind(f,n)
-int f,n;
-{
-	return scroll_sideways(f,n);
-}
-
-int
 mvleftwind(f,n)
 int f,n;
 {
-	return scroll_sideways(f,-n);
+	make_local_w_val(curwp,WVAL_SIDEWAYS);
+	if (f)
+		w_val(curwp, WVAL_SIDEWAYS) -= n;
+	else
+		w_val(curwp, WVAL_SIDEWAYS) -= term.t_ncol/3;
+
+	if (w_val(curwp, WVAL_SIDEWAYS) < 0)
+		w_val(curwp, WVAL_SIDEWAYS) = 0;
+
+        curwp->w_flag  |= WFHARD|WFMOVE;
+
+	return TRUE;
 }
 
 /*
@@ -380,11 +348,12 @@ int f,n;
  * become undisplayed.
  */
 /* ARGSUSED */
-int
 onlywind(f, n)
 int f,n;
 {
         register WINDOW *wp;
+        register LINE   *lp;
+        register int    i;
 
         wp = wheadp;
         while (wp != NULL) {
@@ -393,70 +362,43 @@ int f,n;
         	if (wp != curwp) {
 	                if (--wp->w_bufp->b_nwnd == 0)
 	                        undispbuff(wp->w_bufp,wp);
-			unlink_window(wp);
 	                free((char *) wp);
 	        }
                 wp = nwp;
         }
         wheadp = curwp;
         wheadp->w_wndp = NULL;
-
-        curwp->w_line.l = adjust_back(curwp, curwp->w_line.l, curwp->w_toprow);
-        curwp->w_ntrows = term.t_nrow-2;
+        lp = curwp->w_line.l;
+        i  = curwp->w_toprow;
+        while (i!=0 && lback(lp)!=curbp->b_line.l) {
+                --i;
+                lp = lback(lp);
+        }
         curwp->w_toprow = 0;
-        curwp->w_flag  |= WFMODE|WFHARD|WFSBAR;
-	curwp->w_split_hist = 0;
+        curwp->w_ntrows = term.t_nrow-1;
+        curwp->w_line.l  = lp;
+        curwp->w_flag  |= WFMODE|WFHARD;
         return (TRUE);
 }
 
 /*
- * Delete the current window
+ * Delete the current window, placing its space in the window above,
+ * or, if it is the top window, the window below.
  */
 
 /* ARGSUSED */
-int
 delwind(f,n)
 int f, n;	/* arguments are ignored for this command */
 {
 	return delwp(curwp);
 }
 
-/* 
- * We attach to each window structure another field (an unsigned long)
- * which I called w_split_history.  When we split a window, we shift this
- * field left by one bit.  The least significant bit for the upper window
- * is 0, the bottom window's lsb is set to 1.
- * 
- * We examine the lsb when deleting windows to decide whether to give up
- * the space for the deleted window to the upper window or lower window. 
- * If the lsb is 0, we give it to the lower window.  If it is 1 we give it
- * to the upper window.  If the lsb of the receiving window is different
- * from that of the window being deleted, this means that the two match and
- * so the history is shifted right by one bit for the receiving window. 
- * Otherwise we leave the history alone.
- *							kev, 2/94
- * 
- * Example:
- * 
- * |    |       | 00    | 00    | 00    | 00
- * |    | 0     -       -       -       -
- * |    |       | 01    | 01    | 01    | 01
- * | 0 -->      -   --> -   --> -   --> -   --> |
- * |    |       |       | 10    |       |
- * |    | 1     | 1     -       | 1     |
- * |    |       |       | 11    |       |
- * 
- * Full Split   Split   and     Kill    Kill
- * Screen               Again   Again   either  1
- *                              10 or
- *                              11
- */
-
-int
 delwp(thewp)
 WINDOW *thewp;
 {
-	register WINDOW *wp;	/* window to receive deleted space */
+	register WINDOW *wp;	/* window to recieve deleted space */
+	register LINE *lp;	/* line pointer */
+	register int i;
 
 	/* if there is only one window, don't delete it */
 	if (wheadp->w_wndp == NULL) {
@@ -464,25 +406,19 @@ WINDOW *thewp;
 		return(FALSE);
 	}
 
-	/* find receiving window and give up our space */
-	if (thewp == wheadp 
-	 || ((thewp->w_split_hist & 1) == 0 && thewp->w_wndp)) {
-		/* merge with next window down */
+	/* find recieving window and give up our space */
+	if (thewp == wheadp) { /* there's nothing before */
+		/* find the next window down */
 		wp = thewp->w_wndp;
-                wp->w_line.l = adjust_back(wp, wp->w_line.l,
-						thewp->w_ntrows+1);
-		wp->w_ntrows += thewp->w_ntrows+1;
-		wp->w_toprow = thewp->w_toprow;
-		if (thewp == wheadp)
-			wheadp = wp;
-		else {
-			WINDOW *pwp = wheadp;
-			while(pwp->w_wndp != thewp)
-				pwp = pwp->w_wndp;
-			pwp->w_wndp = wp;
-		}
-		if (wp->w_split_hist & 1)
-			wp->w_split_hist >>= 1;
+                lp = wp->w_line.l;
+                /* the prev. window (thewp) has wp->w_toprow rows in it */
+                for (i = wp->w_toprow;
+        		 i > 0 && lback(lp) != wp->w_bufp->b_line.l; --i)
+                        lp = lback(lp);
+                wp->w_line.l  = lp;
+		wp->w_ntrows += wp->w_toprow;  /* add in the new rows */
+		wp->w_toprow = 0;	/* and we're at the top of the screen */
+		wheadp = wp;	/* and at the top of the list as well */
 	} else {
 		/* find window before thewp in linked list */
 		wp = wheadp;
@@ -492,8 +428,6 @@ WINDOW *thewp;
 		wp->w_ntrows += thewp->w_ntrows+1;
 		
 		wp->w_wndp = thewp->w_wndp; /* make their next window ours */
-		if ((wp->w_split_hist & 1) == 0)
-			wp->w_split_hist >>= 1;
 	}
 
 	/* get rid of the current window */
@@ -501,25 +435,12 @@ WINDOW *thewp;
 		undispbuff(thewp->w_bufp,thewp);
 	if (thewp == curwp) {
 		curwp = wp;
+		curwp->w_flag |= WFHARD;
 		make_current(curwp->w_bufp);
 	}
 	free((char *)thewp);
 	upmode();
-	wp->w_flag |= WFSBAR | WFHARD;
 	return(TRUE);
-}
-
-/*
- * Copy the window-traits struct, and adjust the embedded VAL struct so that
- * modes that are local remain so.
- */
-void
-copy_traits(dst, src)
-W_TRAITS *dst;
-W_TRAITS *src;
-{
-	*dst = *src;
-	copy_mvals(NUM_W_VALUES, dst->w_vals.wv, src->w_vals.wv);
 }
 
 /*
@@ -529,7 +450,7 @@ W_TRAITS *src;
 	error that is possible is a "malloc" failure allocating the structure
 	for the new window.
  */
-static WINDOW *
+WINDOW *
 splitw(f, n)
 int f,n;
 {
@@ -540,29 +461,30 @@ int f,n;
         register int    ntrd;
         register WINDOW *wp1;
         register WINDOW *wp2;
+	register int i;
 
-        if (curwp->w_ntrows < MINWLNS) {
+        if (curwp->w_ntrows < 3) {
                 mlforce("[Cannot split a %d line window]", curwp->w_ntrows);
                 return NULL;
         }
-	/* set everything to 0's unless we want nonzero */
-        if ((wp = typecalloc(WINDOW)) == NULL) {
-		(void)no_memory("WINDOW");
+        if ((wp = (WINDOW *) malloc(sizeof(WINDOW))) == NULL) {
+                mlforce("[OUT OF MEMORY]");
                 return NULL;
         }
 	++curwp->w_bufp->b_nwnd;	       /* Displayed twice.     */
         wp->w_bufp  = curwp->w_bufp;
-        copy_traits(&(wp->w_traits), &(curwp->w_traits));
+        wp->w_line = curwp->w_line;
+        wp->w_traits  = curwp->w_traits;
+        wp->w_flag  = 0;
+        wp->w_force = 0;
         ntru = (curwp->w_ntrows-1) / 2;         /* Upper size           */
         ntrl = (curwp->w_ntrows-1) - ntru;      /* Lower size           */
-
-        lp = l_ref(curwp->w_line.l);
+        lp = curwp->w_line.l;
         ntrd = 0;
-        while (lp != l_ref(DOT.l)) {
-                ntrd += line_height(wp,l_ptr(lp));
+        while (lp != curwp->w_dot.l) {
+                ++ntrd;
                 lp = lforw(lp);
         }
-
 	/* ntrd is now the row containing dot */
         if (((f == FALSE) && (ntrd <= ntru)) || ((f == TRUE) && (n == 1))) {
                 /* Old is upper window. */
@@ -572,7 +494,7 @@ int f,n;
 				ntru++;
 				ntrl--;
 			} else {
-	                        curwp->w_line.l = lFORW(curwp->w_line.l);
+	                        curwp->w_line.l = lforw(curwp->w_line.l);
 			}
 		}
                 curwp->w_ntrows = ntru; /* new size */
@@ -583,12 +505,12 @@ int f,n;
                 wp->w_toprow = curwp->w_toprow+ntru+1;
                 wp->w_ntrows = ntrl;
 		/* try to keep lower from reframing */
-		wp->w_line.l = adjust_forw(wp, wp->w_line.l, ntru+1);
+		for (i = ntru+1; i > 0 &&
+				 wp->w_line.l != wp->w_bufp->b_line.l; i--) {
+			wp->w_line.l = lforw(wp->w_line.l);
+		}
 		wp->w_dot.l = wp->w_line.l;
 		wp->w_dot.o = 0;
-		/* update the split history */
-		curwp->w_split_hist <<= 1;
-		wp->w_split_hist = curwp->w_split_hist | 1;
         } else {
 		/* Old is lower window  */
                 wp1 = NULL;
@@ -609,21 +531,20 @@ int f,n;
                 curwp->w_ntrows  = ntrl;
 		wp->w_dot.l = wp->w_line.l;
 		/* move upper window dot to bottom line of upper */
-		wp->w_dot.l = adjust_forw(wp, wp->w_dot.l, ntru-2);
+		for (i = ntru-2; 
+			i > 0 && wp->w_dot.l!=wp->w_bufp->b_line.l; i--)
+			wp->w_dot.l = lforw(wp->w_dot.l);
 		wp->w_dot.o = 0;
 		/* adjust lower window topline */
-		curwp->w_line.l = adjust_forw(curwp, curwp->w_line.l, ntru);
-		/* update the split history */
-		wp->w_split_hist <<= 1;
-		curwp->w_split_hist = wp->w_split_hist | 1;
+                while (ntru--)
+                        curwp->w_line.l = lforw(curwp->w_line.l);
         }
-        curwp->w_flag |= WFMODE|WFHARD|WFSBAR;
+        curwp->w_flag |= WFMODE|WFHARD;
         wp->w_flag |= WFMODE|WFHARD;
         return wp;
 }
 
-/* external callable version -- return int instead of (WINDOW *) */
-int
+/* externall callable version -- return int instead of (WINDOW *) */
 splitwind(f,n)
 int f,n;
 {
@@ -637,11 +558,12 @@ int f,n;
  * move.
  */
 /* ARGSUSED */
-int
 enlargewind(f, n)
 int f,n;
 {
         register WINDOW *adjwp;
+        register LINE   *lp;
+        register int    i;
 
         if (n < 0)
                 return (shrinkwind(f, -n));
@@ -659,15 +581,21 @@ int f,n;
                 return (FALSE);
         }
         if (curwp->w_wndp == adjwp) {           /* Shrink below.        */
-                adjwp->w_line.l  = adjust_forw(adjwp, adjwp->w_line.l, n);
+                lp = adjwp->w_line.l;
+                for (i=0; i<n && lp!=adjwp->w_bufp->b_line.l; ++i)
+                        lp = lforw(lp);
+                adjwp->w_line.l  = lp;
                 adjwp->w_toprow += n;
         } else {                                /* Shrink above.        */
-                curwp->w_line.l  = adjust_back(curwp, curwp->w_line.l, n);
+                lp = curwp->w_line.l;
+                for (i=0; i<n && lback(lp)!=curbp->b_line.l; ++i)
+                        lp = lback(lp);
+                curwp->w_line.l  = lp;
                 curwp->w_toprow -= n;
         }
         curwp->w_ntrows += n;
         adjwp->w_ntrows -= n;
-        curwp->w_flag |= WFMODE|WFHARD|WFINS|WFSBAR;
+        curwp->w_flag |= WFMODE|WFHARD|WFINS;
         adjwp->w_flag |= WFMODE|WFHARD|WFKILLS;
         return (TRUE);
 }
@@ -676,11 +604,12 @@ int f,n;
  * Shrink the current window. Find the window that gains space. Hack at the
  * window descriptions. Ask the redisplay to do all the hard work.
  */
-int
 shrinkwind(f, n)
 int f,n;
 {
         register WINDOW *adjwp;
+        register LINE   *lp;
+        register int    i;
 
         if (n < 0)
                 return (enlargewind(f, -n));
@@ -698,21 +627,28 @@ int f,n;
                 return (FALSE);
         }
         if (curwp->w_wndp == adjwp) {           /* Grow below.          */
-                adjwp->w_line.l  = adjust_back(adjwp, adjwp->w_line.l, n);
+                lp = adjwp->w_line.l;
+                for (i=0; i<n && lback(lp)!=adjwp->w_bufp->b_line.l; ++i)
+                        lp = lback(lp);
+                adjwp->w_line.l  = lp;
                 adjwp->w_toprow -= n;
         } else {                                /* Grow above.          */
-                curwp->w_line.l  = adjust_forw(curwp, curwp->w_line.l, n);
+                lp = curwp->w_line.l;
+                for (i=0; i<n && lp!=curbp->b_line.l; ++i)
+                        lp = lforw(lp);
+                curwp->w_line.l  = lp;
                 curwp->w_toprow += n;
         }
         curwp->w_ntrows -= n;
         adjwp->w_ntrows += n;
-        curwp->w_flag |= WFMODE|WFHARD|WFKILLS|WFSBAR;
+        curwp->w_flag |= WFMODE|WFHARD|WFKILLS;
         adjwp->w_flag |= WFMODE|WFHARD|WFINS;
         return (TRUE);
 }
 
+#if !SMALLER
+
 /*	Resize the current window to the requested size	*/
-int
 resize(f, n)
 int f, n;	/* default flag and numeric argument */
 {
@@ -731,6 +667,7 @@ int f, n;	/* default flag and numeric argument */
 
 	return(enlargewind(TRUE, n - clines));
 }
+#endif
 
 /*
  * Pick a window for a pop-up. Split the screen if there is only one window.
@@ -751,100 +688,35 @@ wpopup()
 		if(wp->w_ntrows > biggest_wp->w_ntrows)
 			biggest_wp = wp;
 	}
-	if (biggest_wp->w_ntrows >= MINWLNS) {
-	    curwp = biggest_wp;
-	    wp = splitw(FALSE,0); /* yes -- choose the unoccupied half */
-	    curwp = owp;
-	}
-	else {
-		/*  biggest_wp was too small  */
+	curwp = biggest_wp;
+	wp = splitw(FALSE,0); /* yes -- choose the unoccupied half */
+	curwp = owp;
+	if (wp == NULL ) { /* maybe biggest_wp was too small  */
 		wp = wheadp;		/* Find window to use	*/
 	        while (wp!=NULL && wp==curwp) /* uppermost non-current window */
 	                wp = wp->w_wndp;
-		if (wp == NULL)
-		    wp = wheadp;
 	}
         return wp;
 }
 
-/*
- * Shrink or expand current window to the number of lines in the buffer.
- * If the buffer is too large, make the window as large as possible using
- * space from window closest in the split history.
- */
-
-void
-shrinkwrap()
-{
-    L_NUM nlines;
-
-    if (wheadp->w_wndp == NULL)
-	return;			/* only one window */
-
-    nlines = line_count(curwp->w_bufp);
-    if (nlines <= 0)
-	nlines = 1;
-
-    if (nlines == curwp->w_ntrows)
-	return;
-
-    if ((curwp->w_split_hist & 1) == 0 || wheadp == curwp) {
-	int nrows, snrows;
-	/* give/steal from lower window */
-	nrows = curwp->w_ntrows + curwp->w_wndp->w_ntrows - 1;
-	/* don't take more than 3/4 of its rows */
-	snrows = (nrows*3)/4;
-	if (nlines > snrows)
-	    nlines = snrows;
-	resize(TRUE, nlines);
-    }
-    else {
-	/* give/steal from upper window; need to find upper window */
-	register WINDOW *wp;
-	WINDOW *savewp = curwp;
-	int nrows, snrows;
-	for (wp = wheadp; 
-	     wp->w_wndp != curwp && wp->w_wndp != NULL; 
-	     wp = wp->w_wndp)
-	    ;
-	curwp = wp;
-	nrows = curwp->w_ntrows + curwp->w_wndp->w_ntrows - 1;
-	/* don't take more than 3/4 of its rows */
-	snrows = (nrows*3)/4;
-	if (nlines > snrows)
-	    nlines = snrows;
-	resize(TRUE, nrows - nlines + 1);
-	curwp = savewp;
-    }
-}
-
-int
 scrnextup(f, n)		/* scroll the next window up (back) a page */
 int f,n;
 {
-	int	status;
-
-	(void)nextwind(FALSE, 1);
-	status = backhpage(f, n);
-	(void)prevwind(FALSE, 1);
-	return status;
+	nextwind(FALSE, 1);
+	backhpage(f, n);
+	prevwind(FALSE, 1);
 }
 
-int
 scrnextdw(f, n)		/* scroll the next window down (forward) a page */
 int f,n;
 {
-	int	status;
-
-	(void)nextwind(FALSE, 1);
-	status = forwhpage(f, n);
-	(void)prevwind(FALSE, 1);
-	return status;
+	nextwind(FALSE, 1);
+	forwhpage(f, n);
+	prevwind(FALSE, 1);
 }
 
 #if ! SMALLER
 /* ARGSUSED */
-int
 savewnd(f, n)		/* save ptr to current window */
 int f,n;
 {
@@ -853,16 +725,21 @@ int f,n;
 }
 
 /* ARGSUSED */
-int
 restwnd(f, n)		/* restore the saved screen */
 int f,n;
 {
 	register WINDOW *wp;
 
 	/* find the window */
-	for_each_window(wp) {
-		if (wp == swindow)
-			return set_curwp(wp);
+	wp = wheadp;
+	while (wp != NULL) {
+		if (wp == swindow) {
+			curwp = wp;
+			make_current(curwp->w_bufp);
+			upmode();
+			return (TRUE);
+		}
+		wp = wp->w_wndp;
 	}
 
 	mlforce("[No such window exists]");
@@ -870,13 +747,13 @@ int f,n;
 }
 #endif
 
-int
 newlength(f,n)	/* resize the screen, re-writing the screen */
 int f,n;	/* numeric argument */
 {
 	WINDOW *wp;	/* current window being examined */
 	WINDOW *nextwp;	/* next window to scan */
 	WINDOW *lastwp;	/* last window scanned */
+	int lastline;	/* screen line of last line of current window */
 
 	if (!f) {
 		mlforce("[No length given]");
@@ -884,14 +761,14 @@ int f,n;	/* numeric argument */
 	}
 
 	/* make sure it's in range */
-	if (n < MINWLNS || n > term.t_mrow) {
+	if (n < 3 || n > term.t_mrow + 1) {
 		mlforce("[Screen length out of range]");
 		return(FALSE);
 	}
 
-	if (term.t_nrow == n)
+	if (term.t_nrow == n - 1)
 		return(TRUE);
-	else if (term.t_nrow < n) {
+	else if (term.t_nrow < n - 1) {
 
 		/* go to the last window */
 		wp = wheadp;
@@ -906,23 +783,23 @@ int f,n;	/* numeric argument */
 
 		/* rebuild the window structure */
 		nextwp = wheadp;
+		wp = NULL;
 		lastwp = NULL;
 		while (nextwp != NULL) {
 			wp = nextwp;
 			nextwp = wp->w_wndp;
 	
 			/* get rid of it if it is too low */
-			if (wp->w_toprow >= n - 2) {
+			if (wp->w_toprow > n - 2) {
 
 				if (--wp->w_bufp->b_nwnd == 0) {
 					undispbuff(wp->w_bufp,wp);
 				}
 	
 				/* update curwp and lastwp if needed */
-				if (wp == curwp) {
+				if (wp == curwp)
 					curwp = wheadp;
 					make_current(curwp->w_bufp);
-				}
 				if (lastwp != NULL)
 					lastwp->w_wndp = NULL;
 
@@ -932,7 +809,8 @@ int f,n;	/* numeric argument */
 
 			} else {
 				/* need to change this window size? */
-				if (mode_row(wp) >= n - 3) {
+				lastline = wp->w_toprow + wp->w_ntrows - 1;
+				if (lastline >= n - 2) {
 					wp->w_ntrows = n - wp->w_toprow - 2;
 					wp->w_flag |= WFHARD|WFMODE;
 				}
@@ -943,12 +821,11 @@ int f,n;	/* numeric argument */
 	}
 
 	/* screen is garbage */
-	term.t_nrow = n;
+	term.t_nrow = n - 1;
 	sgarbf = TRUE;
 	return(TRUE);
 }
 
-int
 newwidth(f,n)	/* resize the screen, re-writing the screen */
 int f,n;	/* numeric argument */
 {
@@ -961,8 +838,14 @@ int f,n;	/* numeric argument */
 
 	/* make sure it's in range */
 	if (n < 10 || n > term.t_mcol) {
+#if	NeWS		/* serious error for NeWS, halt */
+		fprintf(stderr, "Screen width out of range\n") ;
+		newsclose() ;
+		exit(1) ;
+#else
 		mlforce("[Screen width out of range]");
 		return(FALSE);
+#endif
 	}
 
 	/* otherwise, just re-width it (no big deal) */
@@ -971,26 +854,27 @@ int f,n;	/* numeric argument */
 	term.t_scrsiz = n - (term.t_margin * 2);
 
 	/* force all windows to redraw */
-	for_each_window(wp)
+	wp = wheadp;
+	while (wp) {
 		wp->w_flag |= WFHARD | WFMOVE | WFMODE;
-
+		wp = wp->w_wndp;
+	}
 	sgarbf = TRUE;
 
 	return(TRUE);
 }
 
-#if OPT_EVAL
-int
-getwpos()	/* get screen offset of current line in current window */
+#if ! SMALLER
+int getwpos()	/* get screen offset of current line in current window */
 {
 	register int sline;	/* screen line from top of window */
 	register LINE *lp;	/* scannile line pointer */
 
 	/* search down the line we want */
-	lp = l_ref(curwp->w_line.l);
+	lp = curwp->w_line.l;
 	sline = 1;
-	while (lp != l_ref(DOT.l)) {
-		sline += line_height(curwp,l_ptr(lp));
+	while (lp != curwp->w_dot.l) {
+		++sline;
 		lp = lforw(lp);
 	}
 
@@ -1002,14 +886,13 @@ getwpos()	/* get screen offset of current line in current window */
 /*
  * Initialize all of the windows.
  */
-void
 winit()
 {
         register WINDOW *wp;
 
-        wp = typecalloc(WINDOW);		/* First window         */
-        if (wp==NULL)
-		ExitProgram(BADEXIT);
+        wp = (WINDOW *) malloc(sizeof(WINDOW)); /* First window         */
+        if (wp==NULL )
+                exit(1);
         wheadp = wp;
         curwp  = wp;
         wp->w_wndp  = NULL;                     /* Initialize window    */
@@ -1021,22 +904,10 @@ winit()
         wp->w_lastdot = nullmark;
         wp->w_toprow = 0;
         wp->w_values = global_w_values;
-        wp->w_ntrows = term.t_nrow-2;           /* "-1" for mode line.  */
+        wp->w_ntrows = term.t_nrow-1;           /* "-1" for mode line.  */
         wp->w_force = 0;
         wp->w_flag  = WFMODE|WFHARD;            /* Full.                */
 	wp->w_bufp = NULL;
 }
 
-/* For memory-leak testing (only!), releases all display storage. */
-#if NO_LEAKS
-void	wp_leaks()
-{
-	register WINDOW *wp;
 
-	while ((wp = wheadp) != 0) {
-        	wp = wp->w_wndp;
-		free((char *)wheadp);
-		wheadp = wp;
-	}
-}
-#endif

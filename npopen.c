@@ -1,75 +1,99 @@
 /*	npopen:  like popen, but grabs stderr, too
  *		written by John Hutchinson, heavily modified by Paul Fox
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/npopen.c,v 1.45 1995/05/08 03:06:17 pgf Exp $
+ * $Log: npopen.c,v $
+ * Revision 1.13  1992/05/25 21:07:48  foxharp
+ * extern func declarations moved to header
  *
+ * Revision 1.12  1992/05/16  12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.11  1992/03/25  19:13:17  pgf
+ * BSD portability changes
+ *
+ * Revision 1.10  1992/03/19  23:25:04  pgf
+ * linux port, and default NOFILE to 20 (bogus)
+ *
+ * Revision 1.9  1991/11/18  08:33:25  pgf
+ * added missing arg to strrchr
+ *
+ * Revision 1.8  1991/11/16  18:36:46  pgf
+ * no #define for strrchr needed here
+ *
+ * Revision 1.7  1991/10/22  14:08:23  pgf
+ * took out old ifdef BEFORE code
+ *
+ * Revision 1.6  1991/10/21  13:39:54  pgf
+ * plugged file descriptor leak
+ *
+ * Revision 1.5  1991/08/07  12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.4
+ * date: 1991/08/06 15:30:25;
+ * took out setbuf(NULL)'s, as an experiment, on Dave's suggestion
+ * 
+ * revision 1.3
+ * date: 1991/06/25 14:22:33;
+ * defensinve checks against fdopen failure
+ * 
+ * revision 1.2
+ * date: 1991/04/04 09:38:39;
+ * support for bidirectional pipes
+ * 
+ * revision 1.1
+ * date: 1990/09/21 10:25:49;
+ * initial vile RCS revision
  */
 
+#include <stdio.h>
 #include "estruct.h"
 #include "edef.h"
 
-#if SYS_UNIX || SYS_OS2 || SYS_WINNT
+#if UNIX
 
-/*
- * For OS/2 implementations of inout_popen(), npflush(), and npclose(),
- * see "os2pipe.c".
- */
-
-#if SYS_OS2 || SYS_WINNT
-#include <process.h>
-#endif
-
-#if OPT_EVAL
-#define	user_SHELL()	gtenv("shell")
-#else
-#define	user_SHELL()	getenv("SHELL")
-#endif
+#include <signal.h>
+#include <errno.h>
+#include <sys/param.h>
 
 #define R 0
 #define W 1
 
-static int pipe_pid;
+static int pid;
 
-static void exec_sh_c P(( char * ));
+/* define MY_EXEC to use $SHELL -- you probably don't want to do that */
 
 FILE *
 npopen (cmd, type)
 char *cmd, *type;
 {
-	FILE *ff;
+	FILE *fr, *fw;
 
 	if (*type != 'r' && *type != 'w')
 		return NULL;
 
+	if (inout_popen(&fr, &fw, cmd) != TRUE)
+		return NULL;
+
 	if (*type == 'r') {
-#if SYS_WINNT
- 		if ((ff = _popen(cmd,"r")) == NULL)
-#else
-  		if (inout_popen(&ff, (FILE **)0, cmd) != TRUE)
-#endif
-			return NULL;
-		return ff;
+		fclose(fw);
+		return fr;
 	} else {
-#if SYS_WINNT
-		if ((ff = _popen(cmd,"w")) == NULL)
-#else
-		if (inout_popen((FILE **)0, &ff, cmd) != TRUE)
-#endif
-			return NULL;
-		return ff;
+		fclose(fr);
+		return fw;
 	}
 }
-#endif /* SYS_UNIX || SYS_OS2 || SYS_WINNT */
-
-#if SYS_UNIX
 
 int
 inout_popen(fr, fw, cmd)
 FILE **fr, **fw;
 char *cmd;
 {
+	int tries = 5;
+	unsigned slp = 1;
 	int rp[2];
 	int wp[2];
+	char *sh, *shname;
 	
 
 	if (pipe(rp))
@@ -77,379 +101,135 @@ char *cmd;
 	if (pipe(wp))
 		return FALSE;
 		
-	pipe_pid = softfork();
-	if (pipe_pid < 0)
-		return FALSE;
+	/* Try & fork 5 times, backing off 1, 2, 4 .. seconds each try */
+	while ((pid = fork ()) < 0) {
+		if (--tries == 0)
+			return FALSE;
+		(void) sleep (slp);
+		slp <<= 1;
+	}
 
-	if (pipe_pid) { /* parent */
+	if (pid) { /* parent */
 
-		if (fr) {
-			*fr = fdopen (rp[0], "r");
-			if (*fr == NULL) {
-				(void)fprintf(stderr,"fdopen r failed\n");
-				abort();
-			}
-		} else {
-			(void)close(rp[0]);
+		*fr = fdopen (rp[0], "r");
+		if (*fr == NULL) {
+			fprintf(stderr,"fdopen r failed\n");
+			abort();
 		}
 		(void) close (rp[1]);
 
-		if (fw) {
-			*fw = fdopen (wp[1], "w");
-			if (*fw == NULL) {
-				(void)fprintf(stderr,"fdopen w failed\n");
-				abort();
-			}
-		} else {
-			(void)close(wp[1]);
+		*fw = fdopen (wp[1], "w");
+		if (*fw == NULL) {
+			fprintf(stderr,"fdopen w failed\n");
+			abort();
 		}
 		(void) close (wp[0]);
 		return TRUE;
 
 	} else {			/* child */
+		int i;
 
-		if (fw) {
-			(void)close (0);
-			if (dup (wp[0]) != 0) {
-				(void)write(2,"dup 0 failed\r\n",15);
-				exit(-1);
-			}
-		}
-		(void) close (wp[1]);
-		if (fr) {
-			(void)close (1);
-			if (dup (rp[1]) != 1) {
-				(void)write(2,"dup 1 failed\r\n",15);
-				exit(-1);
-			}
-			(void)close (2);
-			if (dup (rp[1]) != 2) {
-				(void)write(1,"dup 2 failed\r\n",15);
-				exit(-1);
-			}
+		(void)close (1);
+		if (dup (rp[1]) != 1)
+			exit(-1);
+		(void)close (2);
+		if (dup (rp[1]) != 2)
+			exit(-1);
+		(void)close (0);
+		if (dup (wp[0]) != 0)
+			exit(-1);
+			
+#ifndef NOFILE
+# define NOFILE 20
+#endif
+		/* Make sure there are no inherited file descriptors */
+		for (i = 3; i < NOFILE; i += 1)
+			(void) close (i);
+
+#if ! MY_EXEC
+	        if ((sh = getenv("SHELL")) == NULL || *sh == '\0') {
+			sh = "/bin/sh";
+			shname = "sh";
 		} else {
-			(void) close (rp[1]);
+			shname = strrchr(sh,'/');
+			if (shname == NULL)
+				shname = sh;
+			else {
+				shname++;
+				if (*shname == '\0')
+					shname = sh;
+			}
 		}
-		(void) close (rp[0]);
-		exec_sh_c(cmd);
+		(void) execl (sh, shname, "-c", cmd, 0);
+#else
+		my_exec(cmd);
+#endif
+		exit (-1);
 
 	}
 	return TRUE;
 }
-#endif /* SYS_UNIX */
 
-#if SYS_WINNT
 void
 npclose (fp)
 FILE *fp;
 {
-	_pclose(fp);
-}
-#endif
-
-#if SYS_UNIX
-void
-npclose (fp)
-FILE *fp;
-{
-	int child;
-	(void)fflush(fp);
-	(void)fclose(fp);
-	while ((child = wait ((int *)0)) != pipe_pid) {
-		if (child < 0 && errno == EINTR) {
-			(void) kill (SIGKILL, pipe_pid);
-		}
+	extern int errno;
+	fflush(fp);
+	fclose(fp);
+	if (wait ((int *)0) < 0 && errno == EINTR) {
+		(void) kill (SIGKILL, pid);
 	}
 }
 
-static void
-exec_sh_c(cmd)
-char *cmd;
+#if MY_EXEC
+
+static
+my_exec (cmd)
+register char *cmd;
 {
-	char *sh, *shname;
-	int i;
-
-#ifndef NOFILE
-# define NOFILE 20
-#endif
-	/* Make sure there are no upper inherited file descriptors */
-	for (i = 3; i < NOFILE; i++)
-		(void) close (i);
-
-	if ((sh = user_SHELL()) == NULL || *sh == EOS) {
-		sh = "/bin/sh";
-		shname = "sh";
+	char *argv [256];
+	register char **argv_p, *cp;
+	
+        if ((argv[0] = getenv("SHELL")) == NULL || argv[0][0] == '\0') {
+		argv[0] = "/bin/sh";
+		argv[1] = "sh";
 	} else {
-		shname = last_slash(sh);
-		if (shname == NULL) {
-			shname = sh;
+		argv[1] = strrchr(argv[0],'/');
+		if (argv[1] == NULL) {
+			argv[1] = argv[0];
 		} else {
-			shname++;
-			if (*shname == EOS)
-				shname = sh;
+			argv[1]++;
+			if (argv[1][0] == '\0')
+				argv[1] = argv[0];
 		}
 	}
+	argv[2] = "-c";
 
-	if (cmd)
-		(void) execlp (sh, shname, "-c", cmd, 0);
-	else
-		(void) execlp (sh, shname, 0);
-	(void)write(2,"exec failed\r\n",14);
-	exit (-1);
-}
+	argv_p = &argv[3];
 
-
-#if LATER
-
-int shellstatus;
-
-static int
-process_exit_status(status)
-int status;
-{
-    if (WIFSIGNALED(status))
-	return (128 + WTERMSIG(status));
-    else if (!WIFSTOPPED(status))
-	return (WEXITSTATUS(status));
-    else
-	return (EXECUTION_SUCCESS);
-}
-
-#endif /* LATER */
-
-
-int
-system_SHELL(cmd)
-char *cmd;
-{
-	int cpid;
-
-	cpid = softfork();
-	if (cpid < 0) {
-		(void)write(2,"cannot fork\n",13);
-		return cpid;
+	cp = cmd;
+	/* Scan up cmd, splitting arguments into argv. This is the
+	 * child, so we can zap things in cmd safely */
+	
+	while (*cp) {
+		/* Skip any white space */
+		while (*cp && isspace(*cp))
+			cp++;
+		if (!*cp)
+			break;
+		*argv_p++ = cp;
+		while (*cp && !isspace(*cp))
+			cp++;
+		if (!*cp)
+			break;
+		*cp++ = '\0';
 	}
-
-	if (cpid) { /* parent */
-		int child;
-		int status;
-		beginDisplay;
-		while ((child = wait (&status)) != cpid) {
-			if (child < 0 && errno == EINTR) {
-				(void) kill (SIGKILL, cpid);
-			}
-		}
-		endofDisplay;
-#if LATER
-		shellstatus = process_exit_status(status);
-#endif
-		return 0;
-	} else {
-		exec_sh_c(cmd);
-		(void)write(2,"cannot exec\n",13);
-		return -1;
-	}
-
+	*argv_p = NULL;
+	execv (argv[0], &argv[1]);
 }
-
-int
-softfork()
-{
-	/* Try & fork 5 times, backing off 1, 2, 4 .. seconds each try */
-	int fpid;
-	int tries = 5;
-	unsigned slp = 1;
-
-	while ((fpid = fork ()) < 0) {
-		if (--tries == 0)
-			return -1;
-		(void) sleep (slp);
-		slp <<= 1;
-	}
-	return fpid;
-}
-
 #endif
 
-#if SYS_MSDOS || SYS_WIN31
-#include <fcntl.h>		/* defines O_RDWR */
-#include <io.h>			/* defines 'dup2()', etc. */
-
-#if SYS_WIN31
-/* FIXME: is it possible to execute a DOS program from Windows? */
-int	system(const char *command) { return (-1); }
-#endif
-
-static	int	createTemp P(( char * ));
-static	void	deleteTemp P(( void ));
-static	void	closePipe P(( FILE *** ));
-static	FILE *	readPipe P(( char *, int, int ));
-
-static	FILE **	myPipe;		/* current pipe-file pointer */
-static	FILE **	myWrtr;		/* write-pipe pointer */
-static	char *	myName[2];	/* name of temporary file for pipe */
-static	char *	myCmds;		/* command to execute on read-pipe */
-static	int	myRval;		/* return-value of 'system()' */
-
-static int
-createTemp (type)
-char	*type;
-{
-	register int n = (*type == 'r');
-	register int fd;
-
-#if CC_WATCOM
-	myName[n] = tmpnam((char *)0);
 #else
-	myName[n] = tempnam(TMPDIR, type);
+npopenhello() {}
 #endif
-	if (myName[n] == 0)
-		return -1;
-	(void)close(creat(myName[n], 0666));
-	if ((fd = open(myName[n], O_RDWR)) < 0) {
-		deleteTemp();
-		return -1;
-	}
-	return fd;
-}
-
-static void
-deleteTemp ()
-{
-	register int n;
-
-	for (n = 0; n < 2; n++) {
-		if (myName[n] != 0) {
-			(void)unlink(myName[n]);
-			FreeAndNull(myName[n]);
-		}
-	}
-}
-
-static void
-closePipe(pp)
-FILE	***pp;
-{
-	if (*pp != 0) {
-		if (**pp != 0) {
-			(void)fclose(**pp);
-			**pp = 0;
-		}
-		*pp = 0;
-	}
-}
-
-static FILE *
-readPipe(cmd, in, out)
-char	*cmd;
-int	in;
-int	out;
-{
-	/* save and redirect stdin, stdout, and stderr */
-	int	old0 = dup(0);
-	int	old1 = dup(1);
-	int	old2 = dup(2);
-
-	if (in >= 0)	{
-		dup2(in, 0);
-		close(in);
-	}
-	dup2(out, 1);
-	dup2(out, 2);
-
-	myRval = system(cmd);
-
-	/* restore old std... */
-	dup2(old0, 0); close(old0);
-	dup2(old1, 1); close(old1);
-	dup2(old2, 2); close(old2);
-
-	/* rewind command output */
-	lseek(out, 0L, 0);
-	return fdopen(out, "r");
-}
-
-FILE *
-npopen (cmd, type)
-char *cmd, *type;
-{
-	FILE *ff;
-
-	if (*type == 'r') {
-		if (inout_popen(&ff, (FILE **)0, cmd) == TRUE)
-			return ff;
-	} else if (*type == 'w') {
-		if (inout_popen((FILE **)0, &ff, cmd) == TRUE)
-			return ff;
-	}
-	return NULL;
-}
-
-/*
- * Create pipe with either write- and/or read-semantics.  Fortunately for us,
- * on SYS_MSDOS, we don't need both at the same instant.
- */
-int
-inout_popen(fr, fw, cmd)
-FILE **fr, **fw;
-char *cmd;
-{
-	char	*type = (fw != 0) ? "w" : "r";
-	FILE	*pp;
-	int	fd;
-
-	/* Create the file that will hold the pipe's content */
-	if ((fd = createTemp(type)) < 0)
-		return FALSE;
-
-	if (fw == 0) {
-		*fr = pp = readPipe(cmd, -1, fd);
-		myWrtr = 0;
-		myPipe = 0;
-		myCmds = 0;
-	} else {
-		*fw = pp = fdopen(fd, type);
-		myPipe = fr;
-		myWrtr = fw;
-		myCmds = strmalloc(cmd);
-	}
-	return (pp != 0);
-}
-
-/*
- * If we were writing to a pipe, invoke the read-process with stdin set to the
- * temporary-file.  This is used in the filter-buffer code, which needs both
- * read- and write-pipes.
- */
-void
-npflush ()
-{
-	if (myCmds != 0) {
-		if (myWrtr != 0) {
-			(void)fflush(*myWrtr);
-#if UNUSED
-			(void)fclose(*myWrtr);
-			*myWrtr = fopen(myName[0], "r");
-#endif
-			rewind(*myWrtr);
-			*myPipe = readPipe(myCmds, fileno(*myWrtr), createTemp("r"));
-		}
-		FreeAndNull(myCmds);
-	}
-}
-
-void
-npclose (fp)
-FILE *fp;
-{
-	closePipe(&myWrtr);
-	closePipe(&myPipe);
-	deleteTemp();
-}
-
-int
-softfork()	/* dummy function to make filter-region work */
-{
-	return 0;
-}
-#endif /* SYS_MSDOS */

@@ -1,21 +1,104 @@
-/*	EDEF:		Global variable definitions for vile
-			
+/*	EDEF:		Global variable definitions for
+			MicroEMACS 3.9
 
-			written for MicroEMACS 3.9 by Dave G. Conroy
+			written by Dave G. Conroy
 			modified by Steve Wilhite, George Jones
 			greatly modified by Daniel Lawrence
-			modified even more than that by Paul Fox.  honest.
 */
 
 /*
- * $Header: /usr/build/VCS/pgf-vile/RCS/edef.h,v 1.178 1995/05/09 13:08:23 pgf Exp $
+ * $Log: edef.h,v $
+ * Revision 1.13  1991/08/07 11:51:32  pgf
+ * added RCS log entries
+ *
+ * revision 1.12
+ * date: 1991/08/06 15:08:00;
+ * global/local values
+ * ----------------------------
+ * revision 1.11
+ * date: 1991/06/25 19:51:57;
+ * massive data structure restructure
+ * ----------------------------
+ * revision 1.10
+ * date: 1991/06/16 17:32:01;
+ * added ctabstop, switched over to "values" array (global and local) to
+ * hold things like tabstops and fillcol
+ * ----------------------------
+ * revision 1.9
+ * date: 1991/06/06 13:58:06;
+ * added auto-indent mode
+ * ----------------------------
+ * revision 1.8
+ * date: 1991/06/03 18:07:34;
+ * changed version number
+ * to version three
+ * ----------------------------
+ * revision 1.7
+ * date: 1991/06/03 17:34:49;
+ * switch from "meta" etc. to "ctla" etc.
+ * ----------------------------
+ * revision 1.6
+ * date: 1991/06/03 10:36:32;
+ * added exmode flag
+ * ----------------------------
+ * revision 1.5
+ * date: 1991/05/31 10:36:44;
+ * bumped version no. to 2.3, and
+ * changed plinesdone flag to more generic "calledbefore"
+ * ----------------------------
+ * revision 1.4
+ * date: 1991/02/21 10:02:45;
+ * don't need lbound for display anymore
+ * ----------------------------
+ * revision 1.3
+ * date: 1990/10/03 16:04:07;
+ * up'ed version number to 2.2
+ * ----------------------------
+ * revision 1.2
+ * date: 1990/10/03 16:00:47;
+ * make backspace work for everyone
+ * ----------------------------
+ * revision 1.1
+ * date: 1990/09/21 10:25:05;
+ * initial vile RCS revision
  */
+
+/* some global function declarations */
+
+char *flook();
+char *getctext();
+char *fnc2engl();
+char *tokval();
+#if ! SMALLER
+char *gtenv();
+char *gtfun();
+char *gtusr();
+char *itoa();
+char *ltos();
+char *mklower();
+char *mkupper();
+#endif
+#if ! VMALLOC
+char *malloc();
+#endif
+char *strcat();
+char *strcpy();
+char *strncpy();
+char *token();
+char *prc2engl();
+CMDFUNC *engl2fnc();
+CMDFUNC *kcod2fnc();
+int prc2kcod();
+BUFFER  *bfind();               /* Lookup a buffer by name      */
+WINDOW  *wpopup();              /* Pop up window creation       */
+LINE    *lalloc();              /* Allocate a line              */
 
 /* I know this declaration stuff is really ugly, and I probably won't ever
  *	do it again.  promise.  but it _does_ make it easy to add/change
- *	globals. -pgf
+ *	globals.  Too bad about "comma".    -pgf
  */
-#ifdef realdef
+#ifdef maindef
+# define comma ,
 # define decl_init(thing,value) thing = value
 # define decl_uninit(thing) thing
 #else
@@ -23,132 +106,166 @@
 # define decl_uninit(thing) extern thing
 #endif
 
-decl_uninit( char *prog_arg );		/* argv[0] from main.c */
-
-#if DISP_X11
-decl_init( char prognam[], "xvile");
-#else
 decl_init( char prognam[], "vile");
-#endif
-
-decl_init( char version[], "version 5.3");
-
-#if SYS_UNIX
-decl_init( char opersys[], "unix");
-#endif
-#if SYS_VMS
-decl_init( char opersys[], "vms");
-#endif
-#if SYS_MSDOS
-decl_init( char opersys[], "dos");
-#endif
-#if SYS_WIN31
-decl_init (char opersys[], "windows 3.1");
-#endif
-#if SYS_OS2
-decl_init( char opersys[], "os/2");
-#endif
-#if SYS_WINNT
-decl_init( char opersys[], "windows/nt");
-#endif
-
-decl_uninit( int am_interrupted );	/* have we been interrupted/ */
-
+decl_init( char version[], "version three X");
 
 decl_init( int autoindented , -1);	/* how many chars (not cols) indented */
 decl_uninit( int isnamedcmd );		/* are we typing a command name */
 decl_uninit( int calledbefore );	/* called before during this command? */
-decl_uninit( CHARTYPE _chartypes_[N_chars] );	/* character types	*/
-decl_uninit( int displaying );		/* flag set during screen updates */
-decl_uninit( int doing_kbd_read );	/* flag set during keyboard reading */
-decl_uninit( int reading_msg_line );	/* flag set during msgline reading */
-decl_uninit( jmp_buf read_jmp_buf );	/* for setjmp/longjmp on SIGINT */
-#ifndef insertmode
+decl_uninit( short _chartypes_[N_chars] );	/* character types	*/
+decl_uninit( int interrupted );		/* interrupt signal?		*/
 decl_uninit( int insertmode );		/* are we inserting or overwriting? */
-#endif
+decl_uninit( int lineinput );		/* are we inserting linestyle? */
 decl_uninit( int lastkey );		/* last keystoke (tgetc)	*/
+decl_uninit( int last1key );		/* last keystoke (kbd_key)	*/
 decl_uninit( int lastcmd );		/* last command	(kbd_seq)	*/
-decl_uninit( REGIONSHAPE regionshape );	/* shape of region		*/
-#if OPT_VIDEO_ATTRS
-decl_uninit( VIDEO_ATTR videoattribute );
-					/* attribute to set in call to
-					   attributeregion()		*/
-#endif
-decl_uninit( int doingopcmd );		/* operator command in progress */
-decl_uninit( int doingsweep );		/* operator command in progress */
-decl_uninit( int sweephack );		/* don't include dot when sweeping */
-decl_uninit( MARK pre_op_dot );		/* current pos. before operator cmd */
-decl_uninit( MARK scanboundpos );	/* oneliner/search state */
-decl_uninit( short opcmd );		/* what sort of operator?	*/
+decl_uninit( short fulllineregions );   /* regions should be full lines */
+decl_uninit( short doingopcmd );        /* operator command in progress */
+decl_uninit( short opcmd );             /* what sort of operator?	*/
 decl_uninit( CMDFUNC *havemotion );	/* so we can use "oper" routines
 					   internally */
-decl_uninit( int currow );		/* Cursor row                   */
-decl_uninit( int curcol );		/* Cursor column                */
-decl_uninit( WINDOW *curwp );		/* Current window               */
-decl_uninit( BUFFER *curbp );		/* Current buffer               */
-decl_uninit( WINDOW *wheadp );		/* Head of list of windows      */
-decl_uninit( BUFFER *bheadp );		/* Head of list of buffers      */
+decl_uninit( short kbdm[NKBDM] );	/* Macro                        */
+decl_uninit( short dotcmdm[NKBDM] );	/* dot commands			*/
+decl_uninit( short tmpcmdm[NKBDM] );	/* dot commands, 'til we're sure */
+decl_uninit( int currow );              /* Cursor row                   */
+decl_uninit( int curcol );              /* Cursor column                */
+decl_uninit( WINDOW *curwp );           /* Current window               */
+decl_uninit( BUFFER *curbp );           /* Current buffer               */
+decl_uninit( WINDOW *wheadp );          /* Head of list of windows      */
+decl_uninit( BUFFER *bheadp );          /* Head of list of buffers      */
 
-decl_uninit( TBUFF *save_shell[2] );	/* last ":!" or ^X-!  command	*/
+decl_uninit( char sres[NBUFN] );		/* current screen resolution	*/
 
-decl_uninit( char sres[NBUFN] );	/* current screen resolution	*/
-
-decl_uninit( char pat[NPAT] );		/* Search pattern		*/
+decl_uninit( char pat[NPAT] );          /* Search pattern		*/
+decl_uninit( char tap[NPAT] );		/* Reversed pattern array.	*/
 decl_uninit( char rpat[NPAT] );		/* replacement pattern		*/
 
-#if OPT_PROCEDURES
-decl_uninit( char cdhook[NBUFN+1] );	/* proc to run when change dir */
-decl_uninit( char readhook[NBUFN+1] );	/* proc to run when read file  */
-decl_uninit( char writehook[NBUFN+1] );	/* proc to run when write file */
-decl_uninit( char bufhook[NBUFN+1] );	/* proc to run when change buf */
-decl_uninit( char exithook[NBUFN+1] );	/* proc to run when exiting */
+/* The variable matchlen holds the length of the matched
+ * string - used by the replace functions.
+ * The variable patmatch holds the string that satisfies
+ * the search command.
+ * The mark matchpos holds the line and
+ * offset position of the start of match.
+ */
+decl_uninit( int matchlen );
+decl_uninit( int mlenold );
+decl_uninit( char *patmatch );
+decl_uninit( MARK matchpos );
+
+#if	MAGIC
+/*
+ * The variable magical determines if there are actual
+ * metacharacters in the string - if not, then we don't
+ * have to use the slower MAGIC mode search functions.
+ */
+decl_uninit( short int magical );
+decl_uninit( MC	mcpat[NPAT] );		/* the magic pattern		*/
+decl_uninit( MC	tapcm[NPAT] );		/* the reversed magic pattern	*/
+
 #endif
 
-decl_uninit( regexp *gregexp );		/* compiled version of pat */
+/* directive name table:
+	This holds the names of all the directives....	*/
 
-/* patmatch holds the string that satisfied the search command.  */
-decl_uninit( char *patmatch );
+#if ! SMALLER
+decl_init(char *dname[],
+	 { "if" comma "else" comma "endif" comma
+	"goto" comma "return" comma "endm" comma
+	"while" comma "endwhile" comma "break" comma
+	"force" }
+	 );
+#else
+decl_init(char *dname[],
+	 { "endm" }
+	);
+#endif
 
-decl_uninit( int ignorecase );
+
+#if	DEBUGM
+/*	vars needed for macro debugging output	*/
+/* global string to hold debug line text */
+decl_uninit( char outline[NSTRING] );
+#endif
+
+#if	NeWS
+decl_uninit( int inhibit_update );	/* prevents output to terminal */
+#endif
 
 decl_init( int curgoal, -1 );           /* column goal			*/
 decl_uninit( char *execstr );		/* pointer to string to execute	*/
-#if OPT_EVAL
 decl_uninit( char golabel[NPAT] );	/* current line to go to	*/
-#endif
-#if OPT_MLFORMAT
-decl_uninit( char *modeline_format );	/* modeline formatting string */
-#endif
 decl_uninit( int execlevel );		/* execution IF level		*/
 decl_init( int	eolexist, TRUE );	/* does clear to EOL exist	*/
 decl_uninit( int revexist );		/* does reverse video exist?	*/
-#if DISP_IBMPC || DISP_ZIBMPC || OPT_EVAL
-decl_uninit( int flickcode );		/* do flicker suppression?	*/
-#endif
-decl_uninit( int curtabval );		/* current tab width		*/
-decl_uninit( int curswval );		/* current shiftwidth		*/
+decl_uninit( int flickcode );		/* do flicker supression?	*/
+decl_uninit( int curtabstopval );	/* current tab width		*/
 
-#ifdef realdef
-#if OPT_MAP_MEMORY
-	MARK	nullmark = { {0,0}, 0 };
-#else
-	MARK	nullmark = { NULL, 0 };
-#endif
-#else
-extern	MARK	nullmark;
-#endif
-
+decl_init( MARK nullmark, { NULL comma 0 } );
 #if ! WINMARK
 decl_uninit( MARK Mark );		/* the worker mark */
 #endif
 
-/* these get their initial values in main.c, in global_val_init() */
-decl_uninit( G_VALUES global_g_values );
-decl_uninit( B_VALUES global_b_values );
-decl_uninit( W_VALUES global_w_values );
+/* THE FOLLOWING MODE NAME TABLES MUST CORRESPOND EXACTLY WITH THE #DEFINES
+	IN ESTRUCT.H */
+decl_init( char	*othermodes[] , {
+	"lazy" comma
+	"versionctrl" } );
 
+decl_init( int othmode, 0);   /* "other" global modes	*/
+
+#if TRIED
+decl_init( B_VALUES global_b_values , {
+	{
+		FALSE	comma	/* wrap */
+		FALSE	comma	/* C mode */
+		TRUE	comma	/* scan wrap */
+		TRUE	comma	/* exact matches */
+		FALSE	comma	/* view-only */
+		TRUE	comma	/* magic searches */
+		FALSE	comma	/* crypt */
+		FALSE	comma	/* auto-save */
+		FALSE	comma	/* list-mode */
+		FALSE	comma	/* dos mode */
+		FALSE	comma	/* auto-indent */
+		8	comma	/* tabstop */
+		8	comma	/* C code tabstop */
+		70	comma	/* fill column */
+		256	comma	/* autosave count */
+		NULL	comma	/* current directory */
+		NULL	comma	/* C code suffixes */
+	} comma { NULL }	/* leave all the pointers unset */
+	);
+#else
+decl_uninit( B_VALUES global_b_values );
+#endif
+decl_init( struct {
+		char *name;
+		short type;
+} valuenames[] , {
+	{ "wrap"	comma VALTYPE_BOOL } comma
+	{ "cmode"	comma VALTYPE_BOOL } comma
+	{ "swrap"	comma VALTYPE_BOOL } comma
+	{ "exact"	comma VALTYPE_BOOL } comma
+	{ "view"	comma VALTYPE_BOOL } comma
+	{ "magic"	comma VALTYPE_BOOL } comma
+	{ "crypt"	comma VALTYPE_BOOL } comma
+	{ "asave"	comma VALTYPE_BOOL } comma
+	{ "list"	comma VALTYPE_BOOL } comma
+	{ "dos"		comma VALTYPE_BOOL } comma
+	{ "aindent"	comma VALTYPE_BOOL } comma
+	{ "tabstop"	comma VALTYPE_INT } comma
+	{ "c-tabstop"	comma VALTYPE_INT } comma
+	{ "fillcol"	comma VALTYPE_INT } comma
+	{ "autosave"	comma VALTYPE_INT } comma
+	{ "cwd"		comma VALTYPE_STRING } comma
+	{ "c-suffixes"	comma VALTYPE_STRING } comma
+}  );
+
+decl_init( char	modecode[], "wcsevmyaldi" );/* letters to represent modes */
+
+decl_init( int gacount, 256 );		/* count until next ASAVE	*/
 decl_init( int sgarbf, TRUE );          /* TRUE if screen is garbage	*/
-decl_uninit( int mpresf );              /* zero if message-line empty	*/
+decl_uninit( int mpresf );              /* TRUE if message in last line */
 decl_uninit( int clexec	);		/* command line execution flag	*/
 decl_uninit( int mstore	);		/* storing text to macro flag	*/
 decl_init( int discmd, TRUE );		/* display command flag		*/
@@ -159,161 +276,75 @@ decl_uninit( int vtcol );               /* Column location of SW cursor */
 decl_init( int ttrow, HUGE );           /* Row location of HW cursor	*/
 decl_init( int ttcol, HUGE );           /* Column location of HW cursor */
 decl_uninit( int taboff	);		/* tab offset for display	*/
-decl_init( int ntildes, 100 );		/* number of tildes displayed at eob
-					  (expressed as percent of window) */
 
-/* Special characters, used in keyboard control (some values are set on
- * initialization in termio.c).
- */
 decl_init( int cntl_a, tocntrl('A') );	/* current meta character	*/
 decl_init( int cntl_x, tocntrl('X') );	/* current control X prefix char */
 decl_init( int reptc, 'K' );		/* current universal repeat char */
 decl_init( int abortc, tocntrl('[') );	/* ESC: current abort command char */
-decl_init( int poundc, '#' );		/* pseudo function key prefix */
 decl_init( int quotec, tocntrl('V') );	/* quote char during mlreply()	*/
 decl_init( int killc, tocntrl('U') );	/* current line kill char	*/
-decl_init( int wkillc, tocntrl('W') );	/* current word kill char	*/
 decl_init( int intrc, tocntrl('C') );	/* current interrupt char	*/
-decl_init( int suspc, tocntrl('Z') );	/* current suspend char	*/
-decl_init( int startc, tocntrl('Q') );	/* current output start char	*/
-decl_init( int stopc, tocntrl('S') );	/* current output stop char	*/
 decl_init( int backspc, '\b');		/* current backspace char	*/
-decl_init( int name_cmpl, '\t');	/* do name-completion		*/
-decl_init( int test_cmpl, '?');		/* show name-completion		*/
 
-#if OPT_MSDOS_PATH
-decl_init( int slashc, '\\');		/* default path delimiter	*/
+#if	NeWS
+decl_init( char	*cname[], {		/* names of colors		*/
+	"WHITE" comma "RED" comma "GREEN" comma "YELLOW" comma "BLUE" comma
+	"MAGENTA" comma "CYAN" comma "BLACK"} );
+#else
+decl_init( char	*cname[], {		/* names of colors		*/
+	"BLACK" comma "RED" comma "GREEN" comma "YELLOW" comma "BLUE" comma
+	"MAGENTA" comma "CYAN" comma "WHITE"} );
 #endif
+
+/*  window modes */
+/*  sideways offset */
+/* foregound color (white) */
+/* background color (black) */
+#if ! COLOR
+decl_init( W_VALS global_w_values, {
+	0 comma
+	0 comma
+} );
+#else
+decl_init( W_VALS global_w_values, {
+	0 comma
+	0 comma
+	7 comma
+	0 comma
+} );
+#endif
+
+decl_uninit( int exmode );
 
 decl_uninit( KILLREG kbs[NKREGS] );	/* all chars, 1 thru 9, and default */
 decl_uninit( short ukb );		/* index of current kbuffs */
 decl_uninit( int kregflag );		/* info for pending kill into reg */
-decl_uninit( C_NUM kregwidth );		/* max width of current kill */
-decl_uninit( int kchars );		/* how much did we kill? */
-decl_uninit( int klines );
-decl_uninit( int lines_deleted );	/* from 'ldelete()', for reporting */
-decl_uninit( int warnings );		/* from 'mlwarn()', for reporting */
-
-#if !SMALLER
 decl_uninit( WINDOW *swindow );		/* saved window pointer		*/
-#endif
-
-#if OPT_ENCRYPT
-decl_init( int cryptflag, FALSE );	/* currently encrypting?	*/
-decl_init( char * cryptkey, 0 );	/* top-level crypt-key, if any	*/
-#endif
-
+decl_uninit( int cryptflag );		/* currently encrypting?	*/
+decl_uninit( short *tmpcmdptr );	/* current position in dot cmd buf */
+decl_init( short *tmpcmdend, &tmpcmdm[0] );/* ptr to end of the dot cmd */
+decl_uninit( short *dotcmdptr );	/* current position in dot cmd buf */
+decl_init( short *dotcmdend, &dotcmdm[0] );/* ptr to end of the dot command */
 decl_init( int dotcmdmode, RECORD );	/* current dot command mode	*/
-decl_init( int dotcmdarg, FALSE);	/* was there an arg to '.'? */
-decl_uninit( int dotcmdkreg);		/* original dot command kill reg */
-decl_uninit( ITBUFF *dotcmd );		/* recorded-text of dot-commands */
-decl_uninit( int dotcmdcnt );		/* down-counter for dot-commands */
-decl_uninit( int dotcmdrep );		/* original dot-command repeat-count */
-
+decl_uninit( int dotcmdrep );		/* number of repetitions	*/
+decl_uninit( short *kbdptr );		/* current position in keyboard buf */
+decl_init( short *kbdend, &kbdm[0] );	/* ptr to end of the keyboard */
 decl_init( int	kbdmode, STOP );	/* current keyboard macro mode	*/
-#if OPT_EVAL
+decl_uninit( int kbdrep );		/* number of repetitions	*/
 decl_uninit( int seed );		/* random number seed		*/
-#endif
-
-#if OPT_RAMSIZE
 decl_uninit( long envram );		/* # of bytes current used malloc */
-#endif
-
-#if OPT_EVAL || OPT_DEBUGMACROS
-decl_uninit( int macbug );		/* macro debugging flag		*/
-#endif
-
-#if OPT_WORKING
-decl_uninit( B_COUNT max_working );	/* 100% value for slowreadf	*/
-decl_uninit( B_COUNT cur_working );	/* current-value for slowreadf	*/
-decl_uninit( B_COUNT old_working );	/* previous-value for slowreadf	*/
-decl_uninit( int no_working );		/* disabling flag */
-#endif
-decl_uninit( int signal_was );		/* what was the last signal */
-
-	/* These pointers are nonnull only while animating a given buffer or
-	 * window.  They are used to obtain local mode-values.
-	 */
-#if OPT_UPBUFF
-decl_uninit( struct VAL *relisting_b_vals );
-decl_uninit( struct VAL *relisting_w_vals );
-#endif
-
-decl_init( char out_of_mem[], "OUT OF MEMORY" );
+decl_uninit( int macbug );		/* macro debuging flag		*/
 decl_init( char	errorm[], "ERROR" );	/* error literal		*/
 decl_init( char	truem[], "TRUE" );	/* true literal			*/
-decl_init( char	falsem[], "FALSE" );	/* false literal		*/
-
+decl_init( char	falsem[], "FALSE" );	/* false litereal		*/
 decl_init( int	cmdstatus, TRUE );	/* last command status		*/
-#if OPT_EVAL || (DISP_ATARI & SYS_ST520 & MEGAMAX)
-decl_uninit( char palstr[NSTRING] );	/* palette string		*/
-#endif
+decl_uninit( char palstr[49] );		/* palette string		*/
 decl_uninit( char *fline );		/* dynamic return line		*/
-decl_uninit( ALLOC_T flen );		/* current length of fline	*/
+decl_uninit( int flen );		/* current length of fline	*/
 
-decl_uninit( int kbd_expand );		/* -1 kbd_putc shows tab as space */
-					/* +1 kbd_putc shows cr as ^M */
-
-
-decl_uninit( FILE *ffp );		/* File pointer, all functions. */
-decl_uninit( int fileispipe );
-decl_uninit( int eofflag );		/* end-of-file flag */
-
-decl_init( char hexdigits[], "0123456789ABCDEF");
-
-decl_init( char HELP_BufName[],	 	"[Help]");
-#if OPT_REBIND
-decl_init( char BINDINGLIST_BufName[],	"[Binding List]");
-#endif
-# if OPT_TERMCHRS
-decl_init( char TERMINALCHARS_BufName[],"[Terminal Chars]");
-#endif
-#if OPT_POPUPCHOICE
-decl_init( char COMPLETIONS_BufName[],	"[Completions]");
-#endif
-decl_init( char BUFFERLIST_BufName[],	"[Buffer List]");
-#if OPT_SHOW_EVAL
-decl_init( char VARIABLES_BufName[],	"[Variables]");
-#endif
-decl_init( char MACRO_N_BufName[],	"[Macro %d]");
-#if COMPLETE_FILES
-decl_init( char FILECOMPLETION_BufName[],"[FileCompletion]");
-#endif
-#if COMPLETE_DIRS
-decl_init( char DIRCOMPLETION_BufName[],"[DirCompletion]");
-#endif
-decl_init( char OUTPUT_BufName[],	"[Output]");
-#if OPT_HISTORY
-decl_init( char HISTORY_BufName[],	"[History]");
-#endif
-#if OPT_SHOW_REGS
-decl_init( char REGISTERS_BufName[],	"[Registers]");
-#endif
-decl_init( char STDIN_BufName[],	"[Standard Input]");
-decl_init( char UNNAMED_BufName[],	"[unnamed]");
-decl_init( char VILEINIT_BufName[],	"[vileinit]");
-#if OPT_SHOW_MAPS
-decl_init( char MAP_BufName[],		"[Map Sequences]");
-decl_init( char MAPBANG_BufName[],	"[Map! Sequences]");
-decl_init( char ABBR_BufName[],		"[Abbreviations]");
-decl_init( char SYSMAP_BufName[],	"[System Maps]");
-#else
-/* needed anyway, since they're passed around as args */
-decl_init( char MAP_BufName[],		"");
-decl_init( char MAPBANG_BufName[],	"");
-decl_init( char ABBR_BufName[],		"");
-decl_init( char SYSMAP_BufName[],	"");
-#endif
-decl_init( char SETTINGS_BufName[],	"[Settings]");
-#if OPT_POPUP_MSGS
-decl_init( char MESSAGES_BufName[],	"[Messages]");
-#endif
-decl_init( char P_LINES_BufName[],	"[p-lines]");
-#if OPT_SHOW_TAGS
-decl_init( char TAGSTACK_BufName[],	"[Tag Stack]");
-#endif
-#if OPT_TAGS
-decl_init( char TAGFILE_BufName[],	"[Tags %d]");
+#if FINDERR
+decl_init( char febuff[NBUFN], "" );	/* name of buffer to find errors in */
+decl_uninit( unsigned newfebuff );	/* is the name new since last time? */
 #endif
 
 /* defined in nebind.h and nename.h */
@@ -327,6 +358,7 @@ extern KBIND kbindtbl[];
 extern  TERM    term;                   /* Terminal information.        */
 #endif
 
-#if DISP_IBMPC || DISP_BORLAND || DISP_VIO
-decl_init( char *current_res_name, "default");
-#endif	/* IBMPC */
+/* per-character output function called by dofmt() */
+decl_uninit( int (*dfoutfn)() );
+
+
