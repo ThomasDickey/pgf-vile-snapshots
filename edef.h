@@ -9,7 +9,10 @@
 
 /*
  * $Log: edef.h,v $
- * Revision 1.110  1993/07/27 18:06:20  pgf
+ * Revision 1.111  1993/08/05 14:29:12  pgf
+ * tom's 3.57 changes
+ *
+ * Revision 1.110  1993/07/27  18:06:20  pgf
  * see tom's 3.56 CHANGES entry
  *
  * Revision 1.109  1993/07/15  10:37:58  pgf
@@ -369,7 +372,7 @@
 decl_uninit( char *prog_arg );		/* argv[0] from main.c */
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version 3.56");
+decl_init( char version[], "version 3.57");
 
 decl_init( int slash, '/'); 		/* so DOS can use '\' as path separator */
 
@@ -378,6 +381,7 @@ decl_uninit( int isnamedcmd );		/* are we typing a command name */
 decl_uninit( int calledbefore );	/* called before during this command? */
 decl_uninit( CMASK _chartypes_[N_chars] );	/* character types	*/
 decl_uninit( int interrupted );		/* interrupt signal?		*/
+decl_uninit( int displaying );		/* flag set during screen updates */
 decl_uninit( int doing_kbd_read );	/* flag set during keyboard reading */
 decl_uninit( jmp_buf read_jmp_buf );	/* for setjmp/longjmp on SIGINT */
 decl_uninit( int insertmode );		/* are we inserting or overwriting? */
@@ -494,6 +498,13 @@ decl_uninit( int seed );		/* random number seed		*/
 decl_uninit( long envram );		/* # of bytes current used malloc */
 #endif
 decl_uninit( int macbug );		/* macro debugging flag		*/
+
+#if OPT_WORKING
+decl_uninit( B_COUNT max_working );	/* 100% value for slowreadf	*/
+decl_uninit( B_COUNT cur_working );	/* current-value for slowreadf	*/
+#endif
+
+decl_init( char out_of_mem[], "OUT OF MEMORY" );
 decl_init( char	errorm[], "ERROR" );	/* error literal		*/
 decl_init( char	truem[], "TRUE" );	/* true literal			*/
 decl_init( char	falsem[], "FALSE" );	/* false literal		*/

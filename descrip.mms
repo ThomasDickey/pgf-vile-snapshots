@@ -13,13 +13,13 @@
 
 # for regular vile, use these:
 SCREEN = vmsvt
-LIBS = -ltermcap
+LIBS =
 TARGET = vile.exe
 SCRDEF = "VMSVT","scrn_chosen"
 
 # for building the X version, xvile, use these:
 #SCREEN = x11
-#LIBS = -lX11
+#LIBS = #-lX11
 #TARGET = xvile.exe
 #SCRDEF = "X11","scrn_chosen"
 
@@ -219,10 +219,11 @@ vms2unix.obj :	dirstuff.h
 	@- if f$search("*.exe") .nes. "" then purge *.exe
 	@- if f$search("*.log") .nes. "" then purge *.log
 
+# used /G_FLOAT with vaxcrtlg/share in vms_link.opt
 # can also use /Listing, /Show=All
 CFLAGS =-
 	/Diagnostics /Debug /Define=("os_chosen",$(SCRDEF)) -
-	/Object=$@ /Include=($(INCS)) /G_FLOAT
+	/Object=$@ /Include=($(INCS))
 
 .C.OBJ :
 	$(CC) $(CFLAGS) $(MMS$SOURCE)
@@ -231,8 +232,8 @@ CFLAGS =-
 $(MKTBLS) : mktbls.obj
 	$(LINK) $(LINKFLAGS) mktbls.obj,SYS$LIBRARY:VAXCRTL/LIB
 
-$(TARGET) : $(OBJ), vms_link.opt
-	$(LINK) $(LINKFLAGS) main.obj, $(SCREEN).obj,vms_link/opt
+$(TARGET) : $(OBJ), vms_link.opt, descrip.mms
+	$(LINK) $(LINKFLAGS) main.obj, $(SCREEN).obj, vms_link/opt
 
 # Runs VILE from the current directory (used for testing)
 vile.com :
@@ -246,8 +247,23 @@ vile.com :
 	@ close test_script
 	@ write sys$output "** made $@"
 
+# Runs XVILE from the current directory (used for testing)
+xvile.com :
+	@- if "''f$search("$@")'" .nes. "" then delete $@;*
+	@- copy nl: $@
+	@ open/append  test_script $@
+	@ write test_script "$ xvile :== $""sys$disk:''f$directory()'xvile.exe""
+	@ write test_script "$ define/user_mode sys$input  sys$command"
+	@ write test_script "$ define/user_mode sys$output sys$command"
+	@ write test_script "$ xvile 'p1 'p2 'p3 'p4 'p5 'p6 'p7 'p8"
+	@ close test_script
+	@ write sys$output "** made $@"
+
 # $Log: descrip.mms,v $
-# Revision 1.8  1993/07/15 10:37:58  pgf
+# Revision 1.9  1993/08/05 14:29:12  pgf
+# tom's 3.57 changes
+#
+# Revision 1.8  1993/07/15  10:37:58  pgf
 # see 3.55 CHANGES
 #
 # Revision 1.7  1993/07/06  16:53:50  pgf

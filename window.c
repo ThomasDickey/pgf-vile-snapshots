@@ -3,7 +3,10 @@
  * attached to keys that the user actually types.
  *
  * $Log: window.c,v $
- * Revision 1.29  1993/07/27 18:06:20  pgf
+ * Revision 1.30  1993/08/05 14:29:12  pgf
+ * tom's 3.57 changes
+ *
+ * Revision 1.29  1993/07/27  18:06:20  pgf
  * see tom's 3.56 CHANGES entry
  *
  * Revision 1.28  1993/07/01  16:15:54  pgf
@@ -109,7 +112,6 @@ overlay	"window"
 #endif
 
 static	void	unlink_window P(( WINDOW * ));
-static	int	SetCurrentWindow P(( WINDOW * ));
 static	LINEPTR	adjust_forw P(( WINDOW *, LINEPTR, int ));
 static	LINEPTR	adjust_back P(( WINDOW *, LINEPTR, int ));
 
@@ -137,8 +139,8 @@ void	unlink_window(thewp)
 /*
  * Set the current window (and associated current buffer).
  */
-static int
-SetCurrentWindow (wp)
+int
+set_curwp (wp)
 WINDOW	*wp;
 {
 	curwp = wp;
@@ -263,7 +265,7 @@ int f, n;	/* default flag and numeric argument */
 		if ((wp = curwp->w_wndp) == NULL)
 			wp = wheadp;
 	}
-	return SetCurrentWindow(wp);
+	return set_curwp(wp);
 }
 
 int
@@ -322,7 +324,7 @@ int f,n;
 	while (wp1->w_wndp != wp2)
 		wp1 = wp1->w_wndp;
 
-	return SetCurrentWindow(wp1);
+	return set_curwp(wp1);
 }
 
 /*
@@ -407,9 +409,9 @@ int
 mvdnnxtwind(f, n)
 int f,n;
 {
-	nextwind(FALSE, 1);
+	(void)nextwind(FALSE, 1);
 	mvdnwind(f, n);
-	prevwind(FALSE, 1);
+	(void)prevwind(FALSE, 1);
 	return TRUE;
 }
 
@@ -417,9 +419,9 @@ int
 mvupnxtwind(f, n)
 int f,n;
 {
-	nextwind(FALSE, 1);
+	(void)nextwind(FALSE, 1);
 	mvupwind(f, n);
-	prevwind(FALSE, 1);
+	(void)prevwind(FALSE, 1);
 	return TRUE;
 }
 
@@ -799,9 +801,9 @@ int
 scrnextup(f, n)		/* scroll the next window up (back) a page */
 int f,n;
 {
-	nextwind(FALSE, 1);
+	(void)nextwind(FALSE, 1);
 	backhpage(f, n);
-	prevwind(FALSE, 1);
+	(void)prevwind(FALSE, 1);
 	return TRUE;
 }
 
@@ -809,9 +811,9 @@ int
 scrnextdw(f, n)		/* scroll the next window down (forward) a page */
 int f,n;
 {
-	nextwind(FALSE, 1);
-	forwhpage(f, n);
-	prevwind(FALSE, 1);
+	(void)nextwind(FALSE, 1);
+	(void)forwhpage(f, n);
+	(void)prevwind(FALSE, 1);
 	return TRUE;
 }
 
@@ -835,7 +837,7 @@ int f,n;
 	/* find the window */
 	for_each_window(wp) {
 		if (wp == swindow)
-			return SetCurrentWindow(wp);
+			return set_curwp(wp);
 	}
 
 	mlforce("[No such window exists]");

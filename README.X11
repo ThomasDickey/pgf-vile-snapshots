@@ -25,7 +25,7 @@ Using xvile:
 
 see vile.hlp for a summary of the standard commands
 
-current bugs & limitiations:
+current bugs & limitations:
 
 - selections are weak at best:
 	- they stop displaying when the screen changes
@@ -33,6 +33,11 @@ current bugs & limitiations:
 	- there's no support for more than a screen's worth
 
 - can get badly behind auto-repeated keys
+
+- handles expose-events only when waiting for input.
+
+- the 'have_selection' field is cleared (sometimes unnecessarily), e.g.,
+  when scrolling.
 
 ===================================
 notes:
@@ -48,16 +53,10 @@ add new functions for:
 fix:
 	- charClass gets confused if it has quotes around it
 
-	- '!!cmd' causes lots of confusion abotu editor state
-
-	- X version seems to be reading keyboard
-
 	- in vi, yank/kill goes to default buffer as well as named buffer.
     		vile only sends them to named buffer
 
 	- autoindent, with leading spaces -- vi eats them, vile doesn't
-
-        - cursor doesn't unlcear when in selection
 
         - talk to Saber -- use CUT_BUFFER0 as well as PRIMARY
 
@@ -74,13 +73,6 @@ selections:
 		situations
 		- maybe l_to_vline()?
 	- > screen size
-
-selection bugs:
-	problem with Button1.  sets selection & point, which probably isn't
-	what we want.  make one of them require a modifier?
-
-screen dirt:
-	'>' gets left behind sometimes when line was too long
 
 optimize:
 

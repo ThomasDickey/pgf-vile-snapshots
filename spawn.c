@@ -2,7 +2,10 @@
  *		for MicroEMACS
  *
  * $Log: spawn.c,v $
- * Revision 1.62  1993/07/27 18:06:20  pgf
+ * Revision 1.63  1993/08/05 14:29:12  pgf
+ * tom's 3.57 changes
+ *
+ * Revision 1.62  1993/07/27  18:06:20  pgf
  * see tom's 3.56 CHANGES entry
  *
  * Revision 1.61  1993/07/20  18:08:50  pgf
@@ -357,8 +360,8 @@ int f,n;
 
 /*ARGSUSED*/
 SIGT
-rtfrmshell(signo)
-int signo;
+rtfrmshell(ACTUAL_SIG_ARGS)
+ACTUAL_SIG_DECL
 {
 #if UNIX && defined(SIGTSTP)
 # if ! X11
@@ -369,7 +372,7 @@ int signo;
 	ttunclean();		/* ...so that I can finally suppress echo */
 #  endif
 #  if USG
-	signal(SIGCONT,rtfrmshell);	/* suspend & restart */
+	(void)signal(SIGCONT,rtfrmshell); /* suspend & restart */
 	(void)update(TRUE);
 #  endif
 # endif
@@ -816,7 +819,7 @@ filterregion()
 	DOT.l = lBACK(DOT.l);
 	s = ifile((char *)0,TRUE,fr);
 	npclose(fr);
-	firstnonwhite(FALSE,1);
+	(void)firstnonwhite(FALSE,1);
 	setmark();
 	return s;
 #else

@@ -1,3 +1,84 @@
+Changes for vile 3.57: (released Fri Aug 06, 1993)
+(pgf)
+	+ the bug check for b_ulinep pointing at a newly inserted line is
+	  no longer valid, since we can now insert a line, make changes (which
+	  will set b_ulinep), undo those changes, and then undo the insert.
+	  we now just null out b_ulinep when we remove the line it references.
+	  (undo.c)
+
+	+ changed name of setmode() to avoid library conflict with djgpp, and
+	  changed the other del/setg/delg versions as well.  (cmdtbl, modes.c,
+	  proto.h)
+
+	+ took out #define USG 0 since djgpp uses an #ifdef on this in a header
+	  (estruct.h)
+(tom)
+	+ whitespace in basic.c
+
+	+ corrected definition of ScratchName macro for apollo SR10.2
+	  (estruct.h) and a compiler warning (in glob.c).
+
+	+ corrected gcc warnings about 'signal()'-arguments for SunOs.
+
+	+ use new macros ACTUAL_SIG_ARGS, etc., instead of ACTUAL_SIGNAL so
+	  that the tag-file can find the signal-handling procedures (estruct.h,
+	  display.c, file.c, main.c, proto.h, spawn.c, x11.c).
+
+	+ customized the c-suffix default values for VMS, MSDOS and UNIX.
+
+	+ VAX/VMS C does not allow continuation-lines in ifdefs (mktbls.c).
+
+	+ VAX/VMS C may incorrectly set ferror() when feof() is true (fileio.c)
+
+	+ VAX/VMS C 'rewind()' does not work correctly (fileio.c)
+
+	+ added code to show "working..." message for time-consuming operations
+	  (display.c, npopen.c, vmspipe.c), and to allow 'slowreadf()' to show
+	  its progress (file.c, fileio.c).
+
+	+ linted calls on 'signal()', (main.c, display.c, spawn.c, termio.c).
+
+	+ linted calls on 'firstnonwhite()' (basic.c, exec.c, insert.c, line.c,
+	  opers.c, region.c, spawn.c, word.c).
+
+	+ use new functions 'end_named_cmd()', 'more_named_cmd()' for clarity
+	  (exec.c, file.c, map.c, oneliner.c)
+
+	+ added new mode 'ruler' (to display line+column in a window on the
+	  modeline), and new window-flag WFSTAT to support it (by allowing
+	  non-modal information to affect the modeline).  (display.c)
+
+	+ corrected error I introduced into 'reframe()', and in 'row2window()'
+	  while adding 'linewrap' mode (display.c).
+
+	+ corrected code that frees buffer's fname-field for the special case
+	  of out-of-memory (buffer.c, random.c).
+
+	+ added new command 'tagstack' to show the contents of the tag-stack.
+	  Modified 'tags()' to use module-level 'tagname[]' rather than local
+	  copy of tag-string.  (tags.c)
+
+	+ always update the modtime-at-warn buffer field when prompting
+	  for the check-modtime mode (file.c).
+
+	+ removed (obsolete) code for DEC Rainbow (estruct.h, display.c,
+	  termio.c).
+
+	+ modified 'line_no()' to return values in the range 1..MAX+1
+	  instead of 0..MAX (random.c).
+
+	+ corrections to make X11 version work with 'number', 'linewrap' modes,
+	  to guard against selection extending outside a window, to highlight
+	  only the actual text within a window, and to use 'yankregion()' to
+	  save the paste-text.  (basic.c, display.c, window.c, x11.c)
+
+	+ modified 'typahead()' to know when X-windows is pasting, and the
+	  paste-init code to supply an escape to end insert-mode, and to use
+	  TBUFF's so that nulls can be inserted (termio.c, x11.c).
+
+	+ put the repeat-count in 'map_proc()' back the way Otto Lind had it
+	  (map.c).
+
 Changes for vile 3.56:	(released Tue Jul 27, 1993)
 (pgf)
 	+ after a confirm substitute operation, we now mlerase the confirm

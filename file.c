@@ -6,7 +6,10 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.98  1993/07/27 18:06:20  pgf
+ * Revision 1.99  1993/08/05 14:29:12  pgf
+ * tom's 3.57 changes
+ *
+ * Revision 1.98  1993/07/27  18:06:20  pgf
  * see tom's 3.56 CHANGES entry
  *
  * Revision 1.97  1993/07/15  10:37:58  pgf
@@ -406,11 +409,10 @@ int	iswrite;
 			(void)lsprintf(prompt,
 			"%sFile for buffer \"%s\" has changed %son disk.  %s",
 				remind, bp->b_bname, again, question);
-			if ((status = mlyesno( prompt )) != TRUE) {
-				/* avoid reprompts */
-				bp->b_modtime_at_warn = current;
+			if ((status = mlyesno( prompt )) != TRUE)
 				mlerase();
-			}
+			/* avoid reprompts */
+			bp->b_modtime_at_warn = current;
 		}
 	}
 	return status;
@@ -472,18 +474,6 @@ char *fn;
 	}
 	return TRUE;
 }
-
-#ifdef not_needed
-int
-check_all_modtimes ()
-{
-	register BUFFER *bp;
-
-	for_each_buffer(bp)
-		(void)check_modtime(bp, bp->b_fname);
-	return TRUE;
-}
-#endif
 
 int
 check_visible_modtimes ()
@@ -894,7 +884,8 @@ int	mflg;		/* print messages? */
         	if (mflg)
 			mlforce("[Reading %s ]", fname);
 #if VMS
-		fname = resolve_filename(bp);
+		if (!isInternalName(bp->b_fname))
+			fname = resolve_filename(bp);
 #endif
 		/* read the file in */
         	nline = 0;
@@ -903,6 +894,7 @@ int	mflg;		/* print messages? */
 		odv = doverifys;
 		doverifys = 0;
 #endif
+		if_OPT_WORKING(max_working = cur_working = 0)
 #if ! MSDOS && !OPT_MAP_MEMORY
 		if (fileispipe || (s = quickreadf(bp, &nline)) == FIOMEM)
 #endif
@@ -982,6 +974,7 @@ int *nlinep;
 	/* avoid malloc(0) problems down below; let slowreadf() do the work */
 	if (len == 0)
 		return FIOMEM;
+	if_OPT_WORKING(max_working = len)
 #if     MSDOS
 	/* cannot allocate more than 64K in dos */
 	if (len >= 65535)
@@ -1027,6 +1020,7 @@ int *nlinep;
 		if (*textp == '\n') {
 			if (textp - countp >= 255) {
 				UCHAR *np;
+				if_OPT_WORKING(max_working = bp->b_ltext_end - countp)
 				len = (B_COUNT)(countp - bp->b_ltext);
 				incomplete = TRUE;
 				/* we'll re-read the rest later */
@@ -1381,7 +1375,7 @@ int f,n;
         register int    s;
         char            fname[NFILEN];
 
-	if (isnamedcmd && !isreturn(end_string())) {
+	if (more_named_cmd()) {
 	        if ((s= mlreply_file("Write to file: ", (TBUFF **)0, 
 				FILEC_WRITE, fname)) != TRUE)
 	                return s;
@@ -1448,7 +1442,7 @@ writeregion()
 	int status;
         char fname[NFILEN];
 
-	if (isnamedcmd && isreturn(end_string())) {
+	if (end_named_cmd()) {
 		if (mlyesno("Okay to write [possible] partial range") != TRUE) {
 			mlwrite("Range not written");
 			return FALSE;
@@ -1689,7 +1683,7 @@ int f,n;
         register int    s;
         char            fname[NFILEN];
 
-	if (isnamedcmd && isreturn(end_string())) {
+	if (end_named_cmd()) {
 		return showcpos(FALSE,1);
 	}
 
@@ -1843,8 +1837,8 @@ out:
 	myself while debugging...		pgf */
 /* on the other hand, it has worked for well over two years now :-) */
 SIGT
-imdying(signo)
-int signo;
+imdying(ACTUAL_SIG_ARGS)
+ACTUAL_SIG_DECL
 {
 #if HAVE_MKDIR
 	static char dirnam[NSTRING] = "/tmp/vileDXXXXXX";

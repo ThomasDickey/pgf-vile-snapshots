@@ -5,7 +5,10 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: tags.c,v $
- * Revision 1.38  1993/07/01 16:15:54  pgf
+ * Revision 1.39  1993/08/05 14:29:12  pgf
+ * tom's 3.57 changes
+ *
+ * Revision 1.38  1993/07/01  16:15:54  pgf
  * tom's 3.51 changes
  *
  * Revision 1.37  1993/06/18  15:57:06  pgf
@@ -137,7 +140,29 @@
 
 #if TAGS
 
-static char tagname[NFILEN];
+#define	TAGS_LIST_NAME	ScratchName(Tag Stack)
+
+#define	UNTAG	struct	untag
+	UNTAG {
+	char *u_fname;
+	int u_lineno;
+	UNTAG *u_stklink;
+#if !SMALLER
+	char	*u_templ;
+#endif
+};
+
+
+static	LINE *	cheap_scan P(( BUFFER *, char *, SIZE_T ));
+static	void	free_untag P(( UNTAG * ));
+static	BUFFER *gettagsfile P(( int, int * ));
+static	void	nth_name P(( char *,  char *, int ));
+static	int	popuntag P(( char *, int * ));
+static	void	pushuntag P(( char *, int ));
+static	void	tossuntag P(( void ));
+
+static	UNTAG *	untaghead = NULL;
+static	char	tagname[NFILEN];
 
 /* ARGSUSED */
 int
@@ -177,7 +202,6 @@ int taglen;
 	register LINE *lp, *clp;
 	register int i, s;
 	char *tfp, *lplim;
-	char tname[NFILEN];
 	char tfname[NFILEN];
 	char tagpat[NPAT];
 	int lineno;
@@ -187,7 +211,7 @@ int taglen;
 	int nomore;
 	int gotafile = FALSE;
 
-	(void)strcpy(tname,tag);
+	(void)strcpy(tagname,tag);
 
 	i = 0;
 	do {
@@ -195,7 +219,7 @@ int taglen;
 		if (nomore) {
 			if (gotafile) {
 				TTbeep();
-				mlforce("[No such tag: \"%s\"]",tname);
+				mlforce("[No such tag: \"%s\"]",tagname);
 			} else {
 				mlforce("[No tags file available.]");
 			}
@@ -203,8 +227,8 @@ int taglen;
 		}
 
 		if (tagbp) {
-			lp = cheap_scan(tagbp, tname, taglen ? 
-					taglen : (int)strlen(tname));
+			lp = cheap_scan(tagbp, tagname, taglen ? 
+					(SIZE_T)taglen : strlen(tagname));
 			gotafile = TRUE;
 		} else {
 			lp = NULL;
@@ -230,7 +254,7 @@ int taglen;
 	while (i < NFILEN && tfp < lplim && *tfp != '\t') {
 		tfname[i++] = *tfp++;
 	}
-	tfname[i] = '\0';
+	tfname[i] = EOS;
 
 	if (tfp >= lplim) {
 		mlforce("[Bad line in tags file.]");
@@ -254,9 +278,9 @@ int taglen;
 		}
 		changedfile = TRUE;
 	} else {
-		if (tname[strlen(tname)-1] == '\t')
-			tname[strlen(tname)-1] = '\0'; /* get rid of tab we added */
-		mlwrite("Tag \"%s\" in current buffer", tname);
+		if (tagname[strlen(tagname)-1] == '\t')
+			tagname[strlen(tagname)-1] = EOS; /* get rid of tab we added */
+		mlwrite("Tag \"%s\" in current buffer", tagname);
 		changedfile = FALSE;
 	}
 
@@ -287,7 +311,7 @@ int taglen;
 			tagpat[i++] = *tfp++;
 		}
 		tagpat[i] = 0;
-		lp = cheap_scan(curbp,tagpat,i);
+		lp = cheap_scan(curbp,tagpat,(SIZE_T)i);
 		if (lp == NULL) {
 			mlforce("[Tag not present]");
 			TTbeep();
@@ -312,7 +336,7 @@ int taglen;
  * return (in buf) the Nth whitespace 
  *	separated word in "path", counting from 0
  */
-void
+static void
 nth_name(buf, path, n)
 char *buf;
 char *path;
@@ -324,11 +348,11 @@ int n;
 	}
 	while (*path &&  isspace(*path)) path++;
 	while (*path && !isspace(*path)) *buf++ = *path++;
-	*buf = '\0';
+	*buf = EOS;
 }
 
 
-BUFFER *
+static BUFFER *
 gettagsfile(n, endofpathflagp)
 int n;
 int *endofpathflagp;
@@ -347,7 +371,7 @@ int *endofpathflagp;
 		char *tagf = global_b_val_ptr(VAL_TAGS);
 
 		nth_name(tagfilename, tagf, n);
-		if (tagfilename[0] == '\0') {
+		if (tagfilename[0] == EOS) {
 			*endofpathflagp = TRUE;
 			return NULL;
 		}
@@ -378,11 +402,11 @@ int *endofpathflagp;
 	return tagbp;
 }
 
-LINE *
+static LINE *
 cheap_scan(bp,name,len)
 BUFFER *bp;
 char *name;
-int len;
+SIZE_T len;
 {
 	register LINE *lp;
 
@@ -428,71 +452,123 @@ int f,n;
 }
 
 
-struct untag {
-	char *u_fname;
-	int u_lineno;
-	struct untag *u_stklink;
-};
+static void
+free_untag(utp)
+UNTAG	*utp;
+{
+	FreeIfNeeded(utp->u_fname);
+#if !SMALLER
+	FreeIfNeeded(utp->u_templ);
+#endif
+	free((char *)utp);
+}
 
-struct untag *untaghead = NULL;
 
-void
+static void
 pushuntag(fname,lineno)
 char *fname;
 int lineno;
 {
-	struct untag *utp;
-	utp = typealloc(struct untag);
+	UNTAG *utp;
+	utp = typealloc(UNTAG);
 	if (!utp)
 		return;
 
-	utp->u_fname = castalloc(char, strlen(fname)+1);
-	if (!utp->u_fname) {
-		free((char *)utp);
+	if (!(utp->u_fname = strmalloc(fname))
+#if !SMALLER
+	 || !(utp->u_templ = strmalloc(tagname))
+#endif
+	   ) {
+		free_untag(utp);
 		return;
 	}
 
-	(void)strcpy(utp->u_fname, fname);
 	utp->u_lineno = lineno;
 	utp->u_stklink = untaghead;
 	untaghead = utp;
 }
 
-int
+
+static int
 popuntag(fname,linenop)
 char *fname;
 int *linenop;
 {
-	register struct untag *utp;
+	register UNTAG *utp;
 
 	if (untaghead) {
 		utp = untaghead;
 		untaghead = utp->u_stklink;
 		(void)strcpy(fname, utp->u_fname);
 		*linenop = utp->u_lineno;
-		free(utp->u_fname);
-		free((char *)utp);
+		free_untag(utp);
 		return TRUE;
 	}
-	fname[0] = '\0';
+	fname[0] = EOS;
 	*linenop = 0;
 	return FALSE;
 
 }
 
 /* discard without returning anything */
-void
+static void
 tossuntag()
 {
-	register struct untag *utp;
+	register UNTAG *utp;
 
 	if (untaghead) {
 		utp = untaghead;
 		untaghead = utp->u_stklink;
-		free((char *)utp);
+		free_untag(utp);
 	}
 }
 
-#else
-void taghello() { }
-#endif
+#if !SMALLER
+static	void	maketagslist P(( int, char * ));
+
+/*ARGSUSED*/
+static void
+maketagslist (value, ptr)
+int	value;
+char	*ptr;
+{
+	register UNTAG *utp;
+	register int	n;
+	int	taglen = global_b_val(VAL_TAGLEN);
+	char	temp[NFILEN];
+
+	if (taglen == 0) {
+		for (utp = untaghead; utp != 0; utp = utp->u_stklink) {
+			n = strlen(utp->u_templ);
+			if (n > taglen)
+				taglen = n;
+		}
+	}
+	if (taglen < 10)
+		taglen = 10;
+
+	bprintf("    %*s FROM line in file\n", taglen, "TO tag");
+	bprintf("    %*p --------- %30p",      taglen, '-', '-');
+
+	for (utp = untaghead, n = 0; utp != 0; utp = utp->u_stklink)
+		bprintf("\n %2d %*s %8d  %s",
+			++n,
+			taglen, utp->u_templ,
+			utp->u_lineno,
+			shorten_path(strcpy(temp, utp->u_fname), TRUE));
+}
+
+
+/*
+ * Display the contents of the tag-stack
+ */
+/*ARGSUSED*/
+int
+showtagstack(f,n)
+int	f,n;
+{
+	return liststuff(TAGS_LIST_NAME, maketagslist, f, (char *)0);
+}
+#endif	/* !SMALLER */
+
+#endif	/* TAGS */

@@ -9,7 +9,10 @@
  *  is called whenever possible.
  *  Modifications by Pete Ruczynski (pjr).
  * $Log: z_ibmpc.c,v $
- * Revision 1.5  1993/07/27 18:06:20  pgf
+ * Revision 1.6  1993/08/05 14:29:12  pgf
+ * tom's 3.57 changes
+ *
+ * Revision 1.5  1993/07/27  18:06:20  pgf
  * see tom's 3.56 CHANGES entry
  *
  * Revision 1.4  1993/05/04  17:05:14  pgf
@@ -337,9 +340,6 @@ zibmclose()
 		disp_reset43();
 	}
 } /* end of zibmclose */
-
-
-extern int displaying;
 
 
 /*

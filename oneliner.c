@@ -4,7 +4,10 @@
  *	Written (except for delins()) for vile by Paul Fox, (c)1990
  *
  * $Log: oneliner.c,v $
- * Revision 1.51  1993/07/27 18:06:20  pgf
+ * Revision 1.52  1993/08/05 14:29:12  pgf
+ * tom's 3.57 changes
+ *
+ * Revision 1.51  1993/07/27  18:06:20  pgf
  * see tom's 3.56 CHANGES entry
  *
  * Revision 1.50  1993/07/21  13:08:00  pgf
@@ -354,7 +357,7 @@ int needpats, use_opts;
 			nth_occur = -1;
 			printit = globally = FALSE;
 		} else {
-			if (isnamedcmd && !isreturn(end_string())) {
+			if (more_named_cmd()) {
 				tungetc(lastkey);
 				nth_occur = -1;
 				printit = globally = FALSE;

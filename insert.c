@@ -8,9 +8,12 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: insert.c,v $
- *	Revision 1.29  1993/06/30 17:43:14  pgf
- *	added call to map_check() when we're about to execute a SPEC binding,
- *	to make sure :maps work
+ *	Revision 1.30  1993/08/05 14:29:12  pgf
+ *	tom's 3.57 changes
+ *
+ * Revision 1.29  1993/06/30  17:43:14  pgf
+ * added call to map_check() when we're about to execute a SPEC binding,
+ * to make sure :maps work
  *
  * Revision 1.28  1993/06/28  20:10:27  pgf
  * new variable
@@ -270,7 +273,7 @@ int f,n;
 	if (dotreplaying(TRUE))
 		return insert(f,n);
 
-	firstnonwhite(f,n);
+	(void)firstnonwhite(f,n);
 	s = ins_n_times(f,n,n>0);
 	if (t)
 		advance_one_char();

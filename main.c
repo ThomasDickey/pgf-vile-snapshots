@@ -14,7 +14,10 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.134  1993/07/27 18:06:20  pgf
+ * Revision 1.135  1993/08/05 14:29:12  pgf
+ * tom's 3.57 changes
+ *
+ * Revision 1.134  1993/07/27  18:06:20  pgf
  * see tom's 3.56 CHANGES entry
  *
  * Revision 1.133  1993/07/22  14:02:38  pgf
@@ -526,7 +529,7 @@ static	void print_usage P((void))
 	"-f fontname    to change font",
 	"-d displayname to change the default display",
 	"-r             for reverse video",
-	"=geometry	to set window size (like '=80x50')",
+	"=geometry      to set window size (like '=80x50')",
 #endif
 #if MSDOS
 	"-2             25-line mode",
@@ -816,28 +819,28 @@ char	*argv[];
 
 	/* initialize the editor */
 #if UNIX
-	signal(SIGINT,catchintr);
-	signal(SIGHUP,imdying);
+	(void)signal(SIGINT,catchintr);
+	(void)signal(SIGHUP,imdying);
 #ifdef SIGBUS
-	signal(SIGBUS,imdying);
+	(void)signal(SIGBUS,imdying);
 #endif
 #ifdef SIGSYS
-	signal(SIGSYS,imdying);
+	(void)signal(SIGSYS,imdying);
 #endif
-	signal(SIGSEGV,imdying);
-	signal(SIGTERM,imdying);
+	(void)signal(SIGSEGV,imdying);
+	(void)signal(SIGTERM,imdying);
 #if DEBUG
-	signal(SIGQUIT,imdying);
+	(void)signal(SIGQUIT,imdying);
 #else
-	signal(SIGQUIT,SIG_IGN);
+	(void)signal(SIGQUIT,SIG_IGN);
 #endif
-	signal(SIGPIPE,SIG_IGN);
+	(void)signal(SIGPIPE,SIG_IGN);
 #if defined(SIGWINCH) && ! X11
-	signal(SIGWINCH,sizesignal);
+	(void)signal(SIGWINCH,sizesignal);
 #endif
 #else
 # if MSDOS
-	signal(SIGINT,catchintr);
+	(void)signal(SIGINT,catchintr);
 #  if ! GO32
 #   if WATCOM
 	{
@@ -1079,7 +1082,7 @@ int
 no_memory(s)
 char	*s;
 {
-	mlforce("[OUT OF MEMORY] %s", s);
+	mlforce("[%s] %s", out_of_mem, s);
 	return FALSE;
 }
 
@@ -1174,10 +1177,20 @@ global_val_init()
 
 	set_global_b_val_ptr(VAL_TAGS, strmalloc("tags")); /* tags filename */
 
+#if VMS
+#define	DEFAULT_CSUFFIX	"\\.\\(\\([CHIS]\\)\\|CC\\|CXX\\|HXX\\)\\(;[0-9]*\\)\\?$"
+#endif
+#if MSDOS
+#define	DEFAULT_CSUFFIX	"\\.\\(\\([chis]\\)\\|cpp\\|cxx\\|hxx\\)$"
+#endif
+#ifndef DEFAULT_CSUFFIX	/* UNIX (mixed-case names) */
+#define	DEFAULT_CSUFFIX	"\\.\\(\\([Cchis]\\)\\|CC\\|cpp\\|cxx\\|hxx\\)$"
+#endif
+
 	/* suffixes for C mode */
 	set_global_g_val_rexp(GVAL_CSUFFIXES,
 		new_regexval(
-			"\\.[Cchis]$",
+			DEFAULT_CSUFFIX,
 			TRUE));
 
 	/* where do paragraphs start? */
@@ -1228,11 +1241,12 @@ global_val_init()
 
 #if UNIX || MSDOS
 /* ARGSUSED */
-ACTUAL_SIGNAL(catchintr)
+SIGT
+catchintr (ACTUAL_SIG_ARGS)
 {
 	interrupted = TRUE;
 #if USG || MSDOS
-	signal(SIGINT,catchintr);
+	(void)signal(SIGINT,catchintr);
 #endif
 	if (doing_kbd_read)
 		longjmp(read_jmp_buf, signo);
@@ -1476,7 +1490,7 @@ int f,n;
 	}
 #endif
 #if UNIX
-	signal(SIGHUP,SIG_DFL);	/* I don't care anymore */
+	(void)signal(SIGHUP,SIG_DFL);	/* I don't care anymore */
 #endif
 #if NO_LEAKS
 	{
@@ -1491,6 +1505,9 @@ int f,n;
 		vt_leaks();
 		ev_leaks();
 		tmp_leaks();
+#if X11
+		x11_leaks();
+#endif
 
 		for (i = 0, v=g_valuenames; v[i].name != 0; i++)
 			free_val(v+i, &global_g_values.gv[i]);

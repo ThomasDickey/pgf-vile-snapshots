@@ -3,7 +3,10 @@
  * the knowledge about files are here.
  *
  * $Log: fileio.c,v $
- * Revision 1.54  1993/07/27 18:06:20  pgf
+ * Revision 1.55  1993/08/05 14:29:12  pgf
+ * tom's 3.57 changes
+ *
+ * Revision 1.54  1993/07/27  18:06:20  pgf
  * see tom's 3.56 CHANGES entry
  *
  * Revision 1.53  1993/07/06  16:39:04  pgf
@@ -458,13 +461,28 @@ void
 ffseek(n)
 long n;
 {
+#if VMS
+	ffrewind();	/* see below */
+#endif
 	fseek (ffp,n,0);
 }
 
 void
 ffrewind()
 {
+#if VMS
+	/* VAX/VMS V5.4-2, VAX-C 3.2 'rewind()' does not work properly, because
+	 * no end-of-file condition is returned after rewinding.  Reopening the
+	 * file seems to work.  We can get away with this because we only
+	 * reposition in "permanent" files that we are reading.
+	 */
+	char	temp[NFILEN];
+	fgetname(ffp, temp);
+	fclose(ffp);
+	ffp = fopen(temp, FOPEN_READ);
+#else
 	fseek (ffp,0L,0);
+#endif
 }
 #endif
 
@@ -576,7 +594,10 @@ int *lenp;	/* to return the final length */
 
 	/* read the line in */
 	i = 0;
-	while ((c = fgetc(ffp)) != EOF && c != '\n') {
+	for (;;) {
+		c = fgetc(ffp);
+		if ((c == '\n') || feof(ffp) || ferror(ffp))
+			break;
 		if (interrupted) {
 			free_fline();
 			*lenp = 0;
@@ -594,6 +615,7 @@ int *lenp;	/* to return the final length */
 			free(fline);
                 	fline = tmpline;
                 }
+		if_OPT_WORKING(cur_working++)
         }
 
 #if !DOSFILES
@@ -611,7 +633,7 @@ int *lenp;	/* to return the final length */
 
 	/* test for any errors that may have occurred */
         if (c == EOF) {
-		if (ferror(ffp)) {
+		if (!feof(ffp) && ferror(ffp)) {
 			mlforce("[File read error]");
 			return(FIOERR);
                 }

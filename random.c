@@ -3,7 +3,10 @@
  * commands. There is no functional grouping here, for sure.
  *
  * $Log: random.c,v $
- * Revision 1.102  1993/07/27 18:06:20  pgf
+ * Revision 1.103  1993/08/05 14:29:12  pgf
+ * tom's 3.57 changes
+ *
+ * Revision 1.102  1993/07/27  18:06:20  pgf
  * see tom's 3.56 CHANGES entry
  *
  * Revision 1.101  1993/07/06  16:39:04  pgf
@@ -404,13 +407,7 @@ set_rdonly(bp, name)
 BUFFER	*bp;
 char	*name;
 {
-	if (bp->b_fname == 0
-	 || name == 0
-	 || strcmp(bp->b_fname, name) != 0) {
-		FreeIfNeeded(bp->b_fname);
-		bp->b_fname = strmalloc(name);
-		bp->b_fnlen = strlen(bp->b_fname);
-	}
+	ch_fname(bp, name);
 
 	b_clr_changed(bp);		/* assumes text is loaded... */
 	bp->b_active = TRUE;
@@ -575,8 +572,11 @@ BUFFER *the_buffer;
 LINEPTR the_line;
 {
 #if !SMALLER
+	L_NUM	it;
 	(void)bsizes(the_buffer);
-	return l_ref(the_line)->l_number;
+	if ((it = l_ref(the_line)->l_number) == 0)
+		it = the_buffer->b_linecount + 1;
+	return it;
 #else
 	register LINE	*lp;		/* current line */
 	register L_NUM	numlines = 0;	/* # of lines before point */
@@ -1319,8 +1319,8 @@ char *fname;
 		if (!bp->b_fname) {
 			bp->b_fname = strmalloc(np);
 			if (!bp->b_fname) {
-				bp->b_fname = "NO MEMORY";
-				bp->b_fnlen = 9;
+				bp->b_fname = out_of_mem;
+				bp->b_fnlen = strlen(bp->b_fname);
 				return;
 			}
 			bp->b_fnlen = len;
@@ -1329,8 +1329,8 @@ char *fname;
 		/* it'll fit, leave len untouched */
 		(void)strcpy(bp->b_fname, np);
 
-		if (holdp)
-			free(holdp);
+		if (holdp != out_of_mem)
+			FreeIfNeeded(holdp);
 		updatelistbuffers();
 	}
 #ifdef	MDCHK_MODTIME

@@ -6,7 +6,10 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.94  1993/07/27 18:28:06  pgf
+ * Revision 1.95  1993/08/05 14:29:12  pgf
+ * tom's 3.57 changes
+ *
+ * Revision 1.94  1993/07/27  18:28:06  pgf
  * one more change from tom -- missed inequality in reframe()
  *
  * Revision 1.93  1993/07/27  18:06:20  pgf
@@ -322,9 +325,6 @@
 #include	"estruct.h"
 #include        "edef.h"
 
-#define	buf_head(bp)	(bp)->b_line.l
-#define	win_head(wp)	buf_head((wp)->w_bufp)
-
 #if UNIX
 # if POSIX
 #  include <termios.h>
@@ -381,13 +381,16 @@ VIDEO   **pscreen;                      /* Physical screen. */
 #define CAN_SCROLL 0
 #endif
 
-int displaying = FALSE;
+static	int	displayed;
+
 /* for window size changes */
 int chg_width, chg_height;
 
 /******************************************************************************/
 
 static	void	(*dfoutfn) P(( int ));
+
+static	char *	right_num P(( char *, int, long ));
 static	int	dfputs P(( void (*f)(int), char * ));
 static	int	dfputsn P(( void (*f)(int), char *, int ));
 static	int	dfputi P(( void (*f)(int), int, int ));
@@ -413,11 +416,29 @@ static	int	texttest P(( int, int ));
 #if CAN_SCROLL
 static	int	scrolls P(( int ));
 #endif
-#ifdef WMDLINEWRAP
-static	WINDOW	*row2window P(( int ));
-#endif
 
 /*--------------------------------------------------------------------------*/
+
+/*
+ * Format a number, right-justified, returning a pointer to the formatted
+ * buffer.
+ */
+static char *
+right_num (buffer, len, value)
+	char	*buffer;
+	int	len;
+	long	value;
+{
+	char	temp[NSTRING];
+	register char	*p = lsprintf(temp, "%D", value);
+	register char	*q = buffer + len;
+
+	*q = EOS;
+	while (q != buffer)
+		*(--q) = (p != temp) ? *(--p) : ' ';
+	return buffer;
+}
+
 /*
  * Do format a string.
  */
@@ -562,7 +583,7 @@ va_list *app;
 			c = *fmt++;
 		}
 		switch (c) {
-			case '\0':
+			case EOS:
 				n = 0;
 				break;
 			case 'c':
@@ -725,6 +746,7 @@ vtinit()
         pscreen[i] = vp;
 #endif
         }
+	if_OPT_WORKING(imworking(0))
 }
 
 /*
@@ -841,13 +863,13 @@ WINDOW *wp;
 
 	if (nu_mode(wp)) {
 		register int j, k, jk;
-		int	line = line_no(wp->w_bufp, lp);
+		L_NUM	line = line_no(wp->w_bufp, lp);
 		int	fill = ' ';
 		char	temp[NU_WIDTH+2];
 
-		(void)sprintf(temp, "%*d  ", NU_WIDTH-2, line);
 		vtcol = 0;	/* make sure we always see line numbers */
-		vtputsn(temp, NU_WIDTH);
+		vtputsn(right_num(temp, NU_WIDTH-2, (long)line), NU_WIDTH-2);
+		vtputsn("  ", 2);
 		taboff = skip - vtcol;
 
 		/* account for leading fill; this repeats logic in vtputc so
@@ -995,6 +1017,17 @@ int force;	/* force update past type ahead? */
 		}
 	}
 
+	/* look for windows that need the ruler updated */
+#ifdef WMDRULER
+	for_each_window(wp) {
+		if ((w_val(wp,WMDRULER) || wp->w_flag & WFSTAT)
+		 && !(wp->w_flag & WFMODE)) {
+			wp->w_flag |= WFMODE;
+			wp->w_flag &= ~WFSTAT;
+		}
+	}
+#endif
+
  restartupdate:
 
 	/* update any windows that need refreshing */
@@ -1035,10 +1068,15 @@ int force;	/* force update past type ahead? */
 	updupd(force);
 
 	/* update the cursor and flush the buffers */
+#if X11
+	if (!x_on_msgline())
+#endif
 	movecursor(screenrow, screencol);
 
 	TTflush();
 	displaying = FALSE;
+	displayed  = TRUE;
+
 	while (chg_width || chg_height)
 		newscreensize(chg_height,chg_width);
 	return(TRUE);
@@ -1154,12 +1192,14 @@ WINDOW *wp;
 			if ((i > 0)
 			 && (--i <= 0))
 				break;
-			if ((rows -= line_height(wp, lp)) < 0)
-				break;
 			if (same_ptr(dlp = lBACK(lp), win_head(wp)))
+				break;
+			if ((rows -= line_height(wp, lp)) < 0)
 				break;
 			lp = dlp;
 		}
+		if (rows > 0)
+			i = 0;
 		while (i++ < 0) {
 			if (!same_ptr(dlp = lFORW(lp), win_head(wp)))
 				lp = dlp;
@@ -1492,6 +1532,7 @@ WINDOW	*wp;
 LINEPTR	lp;
 C_NUM	offset;
 {
+	SIZE_T	length = lLength(lp);
 	int	column = 0;
 	int	tabs = tabstop_val(wp->w_bufp);
 	int	list = w_val(wp,WMDLIST);
@@ -1503,8 +1544,8 @@ C_NUM	offset;
 
 	register int	n, c;
 
-	for (n = 0; n < offset; n++) {
-		c = l_ref(lp)->l_text[n];
+	for (n = 0; (n < offset) && (n <= length); n++) {
+		c = (n == length) ? '\n' : l_ref(lp)->l_text[n];
 		if (isprint(c)) {
 			column++;
 		} else if (list) {
@@ -1515,6 +1556,45 @@ C_NUM	offset;
 	}
 	return column - left + nu_width(wp);
 }
+
+/*
+ * Translate a display-column (assuming an infinitely-wide display) into the
+ * line's offset, taking into account the tabstop, sideways, number and list
+ * modes.
+ */
+#if X11
+int
+col2offs(wp, lp, col)
+WINDOW	*wp;
+LINEPTR	lp;
+C_NUM	col;
+{
+	int	tabs = tabstop_val(wp->w_bufp);
+	int	list = w_val(wp,WMDLIST);
+	int	left =
+#ifdef WMDLINEWRAP	/* overrides left/right scrolling */
+			w_val(wp,WMDLINEWRAP) ? 0 :
+#endif
+			w_val(wp,WVAL_SIDEWAYS);
+	int	goal = col + left - nu_width(wp);
+
+	register C_NUM	offset;
+	register C_NUM	len	= llength(l_ref(lp));
+	register char	*text	= l_ref(lp)->l_text;
+
+	for (offset = 0, col = 0; (offset < len) && (col < goal); offset++) {
+		register int c = text[offset];
+		if (isprint(c)) {
+			col++;
+		} else if (list) {
+			col += 2;
+		} else if (c == '\t') {
+			col = ((col / tabs) + 1) * tabs;
+		}
+	}
+	return offset;
+}
+#endif
 
 /*
  * Compute the number of rows required for displaying a line.
@@ -1536,16 +1616,20 @@ LINEPTR	lp;
 }
 #endif
 
-#ifdef WMDLINEWRAP
-static WINDOW *
+/*
+ * Given a row on the screen, determines which window it belongs to.  Returns
+ * null only for the message line.
+ */
+#if defined(WMDLINEWRAP) || defined(X11)
+WINDOW *
 row2window (row)
 int	row;
 {
 	register WINDOW *wp;
 
 	for_each_window(wp)
-		if (row > wp->w_toprow && row < wp->w_ntrows + wp->w_toprow)
-		return wp;
+		if (row >= wp->w_toprow && row <= wp->w_ntrows + wp->w_toprow)
+			return wp;
 	return 0;
 }
 #endif
@@ -1820,8 +1904,7 @@ int	col;
 /*
  * Update a single line. This does not know how to use insert or delete
  * character sequences; we are using VT52 functionality. Update the physical
- * row and column variables. It does try an exploit erase to end of line. The
- * RAINBOW version of this routine uses fast video.
+ * row and column variables. It does try an exploit erase to end of line.
  */
 #if	MEMMAP
 /*	UPDATELINE specific code for the IBM-PC and other compatibles */
@@ -1861,30 +1944,6 @@ int	colto;		/* first column on screen */
 {
     struct VIDEO *vp1 = vscreen[row];	/* virtual screen image */
     struct VIDEO *vp2 = PSCREEN[row];	/* physical screen image */
-#if RAINBOW
-/*	UPDATELINE specific code for the DEC rainbow 100 micro	*/
-
-    register char *cp1;
-    register char *cp2;
-    register int nch;
-
-    /* since we don't know how to make the rainbow do this, turn it off */
-    flags &= (~VFREV & ~VFREQ);
-
-    cp1 = &vp1->v_text[0];                    /* Use fast video. */
-    cp2 = &vp2->v_text[0];
-    putline(row+1, 1, cp1);
-    nch = term.t_ncol;
-
-    do
-        {
-        *cp2 = *cp1;
-        ++cp2;
-        ++cp1;
-        }
-    while (--nch);
-    *flags &= ~VFCHG;
-#else
 /*	UPDATELINE code for all other versions		*/
 
 	register char *cp1;
@@ -2027,7 +2086,6 @@ int	colto;		/* first column on screen */
 #endif
 	vp1->v_flag &= ~VFCHG;		/* flag this line as updated */
 	return;
-#endif
 }
 #endif
 
@@ -2147,6 +2205,21 @@ WINDOW *wp;
 	while (vtcol < n)
 		vtputc(lchar);
 
+#ifdef WMDRULER
+	if (w_val(wp,WMDRULER)) {
+		WINDOW	*save = curwp;
+
+		curwp = wp;
+		col = getccol(FALSE) + 1;
+		curwp = save;
+
+		(void)lsprintf(temp, "(%d,%d)",
+			line_no(wp->w_bufp, wp->w_dot.l),
+			col);
+		vtcol = n - strlen(temp);
+		vtputsn(temp, sizeof(temp));
+	} else
+#endif
 	{ /* determine if top line, bottom line, or both are visible */
 		LINE *lp = l_ref(wp->w_line.l);
 		int rows = wp->w_ntrows;
@@ -2288,7 +2361,7 @@ int c;
 {
 	if (mlsavep - mlsave < NSTRING-1) {
 		*mlsavep++ = c;
-		*mlsavep = '\0';
+		*mlsavep = EOS;
 	}
 
 }
@@ -2441,7 +2514,7 @@ va_list *app;	/* ptr to current data field */
 	/* if we can, erase to the end of screen */
 	erase_remaining_msg(ttcol);
 	mpresf = TRUE;
-	mlsave[0] = '\0';
+	mlsave[0] = EOS;
 }
 
 /*
@@ -2503,7 +2576,7 @@ va_dcl
 #endif
 	va_end(ap);
 
-	*lsp = '\0';
+	*lsp = EOS;
 	return lsp;
 }
 
@@ -2544,7 +2617,7 @@ va_dcl
 #endif
 	va_end(ap);
 
-	*lsp = '\0';
+	*lsp = EOS;
 	return lsp;
 }
 #endif	/* UNUSED */
@@ -2589,22 +2662,6 @@ va_dcl
 	va_end(ap);
 
 }
-
-#if RAINBOW
-
-putline(row, col, buf)
-int row, col;
-char buf[];
-{
-    int n;
-
-    n = strlen(buf);
-    if (col + n - 1 > term.t_ncol)
-	n = term.t_ncol - col + 1;
-    Put_Data(row, col, n, buf);
-}
-#endif
-
 
 /* Get terminal size from system, first trying the driver, and then
  * the environment.  Store number of lines into *heightp and width
@@ -2653,8 +2710,8 @@ int *widthp, *heightp;
 #if defined( SIGWINCH) && ! X11
 /* ARGSUSED */
 SIGT
-sizesignal(signo)
-int signo;
+sizesignal (ACTUAL_SIG_ARGS)
+ACTUAL_SIG_DECL
 {
 	int w, h;
 	int old_errno = errno;
@@ -2664,7 +2721,7 @@ int signo;
 	if ((h && h-1 != term.t_nrow) || (w && w != term.t_ncol))
 		newscreensize(h, w);
 
-	(void) signal (SIGWINCH, sizesignal);
+	(void)signal(SIGWINCH, sizesignal);
 	errno = old_errno;
 	SIGRET;
 }
@@ -2691,7 +2748,67 @@ int h, w;
 	(void)update(TRUE);
 }
 
+/*
+ * Displays alternate
+ *	"working..." and
+ *	"...working"
+ * at the end of the message line if it has been at least a second since
+ * displaying anything or waiting for keyboard input.  The cur_working and
+ * max_working values are used in 'slowreadf()' to show the progress of reading
+ * large files.
+ */
+#if OPT_WORKING
+/*ARGSUSED*/
+SIGT
+imworking (ACTUAL_SIG_ARGS)
+ACTUAL_SIG_DECL
+{
+	static	char	*msg[] = {"working", "..."};
+	static	int	flip;
+	static	int	skip;
+	static	B_COUNT	cur_temp;
 
+	if (!displaying && !doing_kbd_read) {
+		if (skip) {
+			skip = FALSE;
+		} else if (displayed) {
+			int	save_row = ttrow;
+			int	save_col = ttcol;
+			int	show_col = LastMsgCol - 10;
+			if (show_col < 0)
+				show_col = 0;
+			movecursor(term.t_nrow, show_col);
+			if (cur_working != 0
+			 && cur_working != cur_temp) {
+				char	temp[20];
+				int	len = cur_working > 999999L ? 10 : 6;
+
+				cur_temp = cur_working;
+				kbd_puts(right_num(temp, len, cur_working));
+				if (len == 10)
+					;
+				else if (max_working != 0) {
+					kbd_putc(' ');
+					kbd_puts(right_num(temp, 2,
+						(100 * cur_working) / max_working));
+					kbd_putc('%');
+				} else
+					kbd_puts(" ...");
+			} else {
+				kbd_puts(msg[ flip]);
+				kbd_puts(msg[!flip]);
+			}
+			movecursor(save_row, save_col);
+			mpresf = TRUE;
+			TTflush();
+		}
+	} else
+		skip = TRUE;
+	(void)signal(SIGALRM,imworking);
+	(void)alarm(1);
+	flip = !flip;
+}
+#endif
 
 /* For memory-leak testing (only!), releases all display storage. */
 #if NO_LEAKS

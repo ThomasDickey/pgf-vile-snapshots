@@ -17,7 +17,10 @@
  * ever equalled FALSE.
  * 
  * $Log: isearch.c,v $
- * Revision 1.23  1993/07/27 18:06:20  pgf
+ * Revision 1.24  1993/08/05 14:29:12  pgf
+ * tom's 3.57 changes
+ *
+ * Revision 1.23  1993/07/27  18:06:20  pgf
  * see tom's 3.56 CHANGES entry
  *
  * Revision 1.22  1993/07/01  16:15:54  pgf
@@ -528,8 +531,4 @@ get_char()
 	return (c);		/* Return the character */
 }
 
-#else
-isearch()
-{
-}
 #endif

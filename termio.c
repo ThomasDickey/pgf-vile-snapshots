@@ -4,7 +4,10 @@
  * All operating systems.
  *
  * $Log: termio.c,v $
- * Revision 1.78  1993/07/23 12:03:39  pgf
+ * Revision 1.79  1993/08/05 14:29:12  pgf
+ * tom's 3.57 changes
+ *
+ * Revision 1.78  1993/07/23  12:03:39  pgf
  * make ttclean a no-op under _all_ variants for X11 -- it was flushing
  * and closing in the USE_TERMIO case
  *
@@ -391,11 +394,10 @@ ttopen()
 	wkillc =  tocntrl('W');
 #endif
 
-	{ /* this could probably be done more POSIX'ish? */
-	signal(SIGTSTP,SIG_DFL);	/* set signals so that we can */
-	signal(SIGCONT,rtfrmshell);	/* suspend & restart */
-	signal(SIGTTOU,SIG_IGN);	/* ignore output prevention */
-	}
+	/* this could probably be done more POSIX'ish? */
+	(void)signal(SIGTSTP,SIG_DFL);		/* set signals so that we can */
+	(void)signal(SIGCONT,rtfrmshell);	/* suspend & restart */
+	(void)signal(SIGTTOU,SIG_IGN);		/* ignore output prevention */
 
 #if USE_FCNTL
 	kbd_flags = fcntl( 0, F_GETFL, 0 );
@@ -521,11 +523,11 @@ ttopen()
 	ntermio.c_cc[V_DSUSP] = -1;
 #  endif
 # endif
-	{
-	signal(SIGTSTP,SIG_DFL);	/* set signals so that we can */
-	signal(SIGCONT,rtfrmshell);	/* suspend & restart */
-	signal(SIGTTOU,SIG_IGN);	/* ignore output prevention */
-	}
+
+	(void)signal(SIGTSTP,SIG_DFL);		/* set signals so that we can */
+	(void)signal(SIGCONT,rtfrmshell);	/* suspend & restart */
+	(void)signal(SIGTTOU,SIG_IGN);		/* ignore output prevention */
+
 #else /* no SIGTSTP */
 	suspc =   tocntrl('Z');
 #endif
@@ -653,11 +655,11 @@ ttopen()
 	setbuffer(stdout, tobuf, TBUFSIZ);
 #endif
 #if ! X11
-	{
-	signal(SIGTSTP,SIG_DFL);	/* set signals so that we can */
-	signal(SIGCONT,rtfrmshell);	/* suspend & restart */
-	signal(SIGTTOU,SIG_IGN);	/* ignore output prevention */
-	}
+
+	(void)signal(SIGTSTP,SIG_DFL);		/* set signals so that we can */
+	(void)signal(SIGCONT,rtfrmshell);	/* suspend & restart */
+	(void)signal(SIGTTOU,SIG_IGN);		/* ignore output prevention */
+
 #endif
 
 	ttmiscinit();
@@ -796,7 +798,7 @@ typahead()
 this seems to think there is something ready more often than there really is
 	return x_key_events_ready();
 #else
-	return FALSE;
+	return x_is_pasting();
 #endif
 #else
 
@@ -890,10 +892,6 @@ short	iochan;				/* TTY I/O channel		*/
 #if     MSDOS && ((!MSC && NEWDOSCC) || LATTICE || AZTEC)
 union REGS rg;		/* cpu register for use of DOS calls */
 int nxtchar = -1;	/* character held from type ahead    */
-#endif
-
-#if RAINBOW
-#include "rainbow.h"
 #endif
 
 extern CMDFUNC f_backchar;
@@ -1070,9 +1068,6 @@ int c;
 #if	MSDOS && (LATTICE || AZTEC) && ~IBMPC
 	bdos(6, c, 0);
 #endif
-#if RAINBOW
-        Put_Char(c);                    /* fast video */
-#endif
 }
 
 #if	AMIGA
@@ -1178,19 +1173,6 @@ ttgetc()
 
 	}
 #endif
-#if RAINBOW
-	{
-	int c;
-
-        while ((c = Read_Keyboard()) < 0);
-
-        if ((c & Function_Key) == 0)
-                if (!((c & 0xFF) == 015 || (c & 0xFF) == 0177))
-                        c &= 0xFF;
-
-        return c;
-	}
-#endif
 #if     MSDOS && MWC86
 	{
         return (getcnb());
@@ -1230,7 +1212,11 @@ ttgetc()
 int
 typahead()
 {
-#if	VMS
+#if	X11
+	return x_is_pasting();
+#endif
+
+#if	VMSVT
 	if (ibufi >= nibuf) {
 		int	status,
 			iosb[2],

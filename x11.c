@@ -2,7 +2,10 @@
  * 	X11 support, Dave Lemke, 11/91
  *
  * $Log: x11.c,v $
- * Revision 1.23  1993/07/27 18:06:20  pgf
+ * Revision 1.24  1993/08/05 14:29:12  pgf
+ * tom's 3.57 changes
+ *
+ * Revision 1.23  1993/07/27  18:06:20  pgf
  * see tom's 3.56 CHANGES entry
  *
  * Revision 1.22  1993/07/20  18:09:46  pgf
@@ -86,6 +89,10 @@
 
 #if X11
 
+#if VMS
+#undef UNIX
+#endif
+
 /* redefined in X11/Xos.h */
 #undef strchr
 #undef strrchr
@@ -96,6 +103,14 @@
 #include	<X11/Xos.h>
 #include	<X11/Xatom.h>
 
+#define	XCalloc(type)	((type*)calloc(1, sizeof(type)))
+
+#if !APOLLO || defined(__STDCPP__)	/* not in apollo sr10.2 */
+extern	XClassHint *XAllocClassHint P((void)); /* usually in <X11/xutil.h> */
+#else
+#define XAllocClassHint() XCalloc(XClassHint)
+#endif
+
 #define	MARGIN	8
 #define	SCRSIZ	64
 #define	NPAUSE	10		/* # times thru update to pause */
@@ -103,7 +118,9 @@
 #define max(x,y)	((x) > (y) ? (x) : (y))
 #define	absol(x)	((x) > 0 ? (x) : -(x))
 
-/* XX -- use xcutsel instead */
+#define onMsgRow(tw)	(ttrow == (tw->rows - 1))
+
+/* XXX -- use xcutsel instead */
 #undef	SABER_HACK		/* hack to support Saber since it doesn't do
 				 * selections right */
 
@@ -142,8 +159,6 @@ typedef struct _text_win {
     Bool        reverse;
     unsigned    rows,
                 cols;
-    int         last_col,
-                last_row;
     Bool        show_cursor;
     int         cur_row,
                 cur_col;
@@ -163,15 +178,15 @@ typedef struct _text_win {
                 wipe_col;
     Bool        have_selection;
     Bool        show_selection;
+    Bool	was_on_msgline;
     Atom        sel_prop;
     UCHAR *	selection_data;
     int         selection_len;
 }           TextWindowRec, *TextWindow;
 
-static TextWindow cur_win;
-static char *paste;
-static char *pp;
-static int  plen;
+static	TextWindow cur_win;
+static	TBUFF	*PasteBuf;
+static	int	drawing_ruler;	/* for 'ruler' mode */
 
 static	int	x_getc   P(( void )),
 		x_cres   P(( char * ));
@@ -197,8 +212,12 @@ static	void	x_fcol   P(( int )),
 static	void	x_scroll P(( int, int, int ));
 #endif
 
-static	DEFINE_SIGNAL(x_quit);
+static	SIGT	x_quit (DEFINE_SIG_ARGS);
 
+static	LINEPTR	row2line P(( WINDOW *, int, int * ));
+static	void	free_selection P(( TextWindow ));
+static	void	free_win_data P(( TextWindow ));
+static	void	clear_row_selection P(( TextWindow, int, int, int ));
 static	void	change_selection P(( TextWindow, Bool, Bool ));
 static	void	x_stash_selection P(( TextWindow ));
 static	int	set_character_class P(( char * ));
@@ -301,6 +320,32 @@ strndup(str, n)
     return t;
 }
 
+static void
+free_selection(tw)
+	TextWindow tw;
+{
+	if (tw->selection_len != 0) {
+		free((char *)(tw->selection_data));
+		tw->selection_len = 0;
+	}
+}
+
+static void
+free_win_data(tw)
+	TextWindow tw;
+{
+	register int r;
+	if (tw->sc != 0) {
+		for (r = 0; r < tw->rows; r++) {
+			free((char *)(tw->sc[r]));
+			free((char *)(tw->attr[r]));
+		}
+		free((char *)(tw->sc));
+		free((char *)(tw->attr));
+		free((char *)(tw->line_attr));
+	}
+}
+
 /* ARGSUSED */
 void
 x_preparse_args(pargc, pargv)
@@ -309,7 +354,7 @@ x_preparse_args(pargc, pargv)
 {
     progname = *pargv[0];
     if (*progname == '/')
-	progname = rindex(progname, '/');
+	progname = strrchr(progname, '/');
 }
 
 /* ARGSUSED */
@@ -425,7 +470,7 @@ x_setfont(fname)
 
 static
 /* ARGSUSED */
-ACTUAL_SIGNAL(x_quit)
+SIGT x_quit (ACTUAL_SIG_ARGS)
 {
     x_close();
     ExitProgram(GOOD);
@@ -443,15 +488,7 @@ x_resize_screen(tw, rows, cols)
                 c;
 
     if (rows != tw->rows) {
-	if (tw->sc) {
-	    for (r = 0; r < tw->rows; r++) {
-		free((char *)(tw->sc[r]));
-		free((char *)(tw->attr[r]));
-	    }
-	    free((char *)(tw->sc));
-	    free((char *)(tw->attr));
-	    free((char *)(tw->line_attr));
-	}
+	free_win_data(tw);
 	tw->rows = rows;
 	/* allocate screen */
 	tw->sc   = typeallocn(UCHAR *, tw->rows);
@@ -562,7 +599,7 @@ x_open()
     XWMHints    xwmh;
     int         flags;
 
-    tw = (TextWindow) calloc(1, sizeof(TextWindowRec));
+    tw = XCalloc(TextWindowRec);
     if (!tw) {
 	(void)fprintf(stderr, "insufficient memory, exiting\n");
 	ExitProgram(BAD(-1));
@@ -671,7 +708,6 @@ x_open()
 
     {
       XClassHint *class_hints;
-      extern XClassHint *XAllocClassHint P((void)); /* usually in <X11/xutil.h> */
       class_hints = XAllocClassHint();
       class_hints->res_name = strmalloc(MY_NAME);
       class_hints->res_class = strmalloc(MY_CLASS);
@@ -977,8 +1013,9 @@ x_flush()
     int         clear_start;
 
 #endif
+    int		revmask = (CELL_REVERSE | CELL_SELECTION | (drawing_ruler ? 0 : CELL_CURSOR));
 
-#define	reversed(c)	((c) & (CELL_REVERSE | CELL_CURSOR | CELL_SELECTION))
+#define	reversed(c)	((c) & revmask)
 
     for (r = 0; r < cur_win->rows; r++) {
 	if (!(cur_win->line_attr[r] & LINE_DIRTY))
@@ -1091,6 +1128,9 @@ x_putline(row, str, len)
     int         c,
                 i;
 
+    if (len > cur_win->cols - cur_win->cur_col)
+	len = cur_win->cols - cur_win->cur_col;
+
     /*
      * XXX since there aren't any hooks (yet) for scrolling, stop showing the
      * selection as soon as the text changes
@@ -1122,7 +1162,7 @@ x_putline(row, str, len)
 
 static void
 x_putc(c)
-    char        c;
+    int	c;
 {
     /*
      * XXX since there aren't any hooks (yet) for scrolling, stop showing the
@@ -1363,7 +1403,7 @@ set_character_class(s)
 
     for (i = 0, len = strlen(s), acc = 0, numbers = digits = 0;
 	    i < len; i++) {
-	char        c = s[i];
+	int        c = s[i];
 
 	if (isspace(c)) {
 	    continue;
@@ -1440,86 +1480,147 @@ set_character_class(s)
 }
 
 static void
-change_selection(tw, set, save)
-    TextWindow  tw;
-    Bool        set;
-    Bool        save;
+clear_row_selection(tw, row, left, right)
+	TextWindow  tw;
+	int         row;
+	int         left;
+	int         right;
 {
-    int         r,
-                c,
-                start,
-                end;
+	register int	col;
 
-    tw->show_selection = set;
-    if (save) {
-	x_stash_selection(tw);
-	tw->have_selection = False;
-    }
-    start = tw->sel_start_col;
-    for (r = tw->sel_start_row; r <= tw->sel_end_row; r++) {
-	end = (r == tw->sel_end_row) ? tw->sel_end_col : (tw->cols - 1);
-	tw->line_attr[r] |= LINE_DIRTY;
-	for (c = start; c <= end; c++) {
-	    tw->attr[r][c] |= CELL_DIRTY;
-	    if (set) {
-		tw->attr[r][c] |= CELL_SELECTION;
-	    } else {
-		tw->attr[r][c] &= ~CELL_SELECTION;
-	    }
+	if (right > tw->cols)
+		right = tw->cols;
+	if (left < right) {
+		tw->line_attr[row] |= LINE_DIRTY;
+		for (col = left; col < right; col++) {
+			tw->attr[row][col] |= CELL_DIRTY;
+			tw->attr[row][col] &= ~CELL_SELECTION;
+		}
 	}
-	start = 0;
-    }
+}
+
+static void
+change_selection(tw, set, save)
+	TextWindow  tw;
+	Bool        set;
+	Bool        save;
+{
+	WINDOW	*wp;
+	int     r,
+		c,
+		start,
+		end,
+		left;
+
+	tw->show_selection = set;
+	if (save) {
+		x_stash_selection(tw);
+		tw->have_selection = False;
+	}
+	start = tw->sel_start_col;
+
+	wp = row2window(tw->sel_start_row);
+
+	for (r = tw->sel_start_row; r <= tw->sel_end_row; r++) {
+		end = (r == tw->sel_end_row) ? tw->sel_end_col : (tw->cols - 1);
+		left = 0;
+		if (wp != 0) {
+			fast_ptr LINEPTR lp;
+			int	row, next, right;
+
+			lp = row2line(wp, r, &row);
+			if (!same_ptr(lp, win_head(wp))) {
+				left  = nu_width(wp);
+				right = offs2col(wp, lp, lLength(lp)
+							+ w_val(wp,WMDLIST));
+#ifdef WMDLINEWRAP
+				next = line_height(wp,lp);
+				if (w_val(wp, WMDLINEWRAP) && (next > 1)) {
+					if ((row + next - 1) == r)
+						right = right % tw->cols;
+					else
+						right = tw->cols;
+					if (r != row
+					 && r != tw->sel_start_row)
+						start = left = 0;
+				}
+#endif
+				if (start >= right)
+					start = right-1;
+				if (end >= right) {
+					end = right-1;
+					if (end < left)
+						end = left;
+				}
+			} else {
+				end = left-1;
+			}
+		}
+		if (start < left)
+			start = left;
+		if (start <= end) {
+			clear_row_selection(tw, r, 0, start);
+			tw->line_attr[r] |= LINE_DIRTY;
+			for (c = start; c <= end; c++) {
+				tw->attr[r][c] |= CELL_DIRTY;
+				if (set) {
+					tw->attr[r][c] |= CELL_SELECTION;
+				} else {
+					tw->attr[r][c] &= ~CELL_SELECTION;
+				}
+			}
+		} else {
+			clear_row_selection(tw, r, 0, end+1);
+		}
+		clear_row_selection(tw, r, end+1, (int)tw->cols);
+		start = left;
+	}
 }
 
 static void
 x_lose_selection(tw)
-    TextWindow  tw;
+	TextWindow  tw;
 {
-    if (tw->have_selection)
-	change_selection(tw, False, False);
-    tw->have_selection = False;
-    tw->selection_len = 0;
-    x_flush();			/* show the changes */
+	if (tw->have_selection)
+		change_selection(tw, False, False);
+	tw->have_selection = False;
+	free_selection(tw);
+	tw->was_on_msgline = False;
+	x_flush();			/* show the changes */
 }
 
 /* ARGSUSED */
 static void
 x_get_selection(tw, selection, type, value, length, format)
-    TextWindow  tw;
-    Atom        selection;
-    Atom        type;
-    char       *value;
-    SIZE_T      length;
-    int         format;
+	TextWindow  tw;
+	Atom        selection;
+	Atom        type;
+	char       *value;
+	SIZE_T      length;
+	int         format;
 {
-    if (format != 8 || type != XA_STRING)
-	return;			/* can't handle incoming data */
+	int	c, do_ins;
 
-    if (length) {
-	/* should be impossible to hit this with existing paste */
-	/* XXX massive hack -- leave out 'i' if in prompt line */
-	if (!insertmode && (tw->cur_row < (tw->rows - 1))) {
-	    int c;
-	    length++;
-	    pp = paste = malloc((unsigned)length);
-	    if (!paste)
-		goto bail;
-	    if ((c = insertion_cmd()) == -1)
-	    	goto bail;
-	    *pp = (char)c;
-	    plen = length;
-	    length--;
-	    (void)memcpy(pp + 1, (char *) value, length);
-	} else {
-	    pp = paste = malloc((unsigned)length);
-	    if (!paste)
-		goto bail;
-	    (void)memcpy(pp, (char *) value, length);
-	    plen = length;
+	if (format != 8 || type != XA_STRING)
+		return;			/* can't handle incoming data */
+
+	if (length != 0) {
+		/* should be impossible to hit this with existing paste */
+		/* XXX massive hack -- leave out 'i' if in prompt line */
+		do_ins = !insertmode
+			&& !onMsgRow(tw)
+			&& ((c = insertion_cmd()) != -1);
+
+		if (tb_init(&PasteBuf, abortc)) {
+			if ((do_ins && !tb_append(&PasteBuf, c))
+			 || !tb_bappend(&PasteBuf, value, (unsigned)length)
+			 || (do_ins && !tb_append(&PasteBuf, abortc)))
+				tb_free(&PasteBuf);
+		}
 	}
-    }
-bail:
-    free(value);
+#if !defined(DOALLOC) || !defined(DBMALLOC) /* cannot intercept that one */
+	free(value);
+#endif
 }
 
 static void
@@ -1541,61 +1642,105 @@ x_paste_selection(tw)
 
 static void
 x_stash_selection(tw)
-    TextWindow  tw;
+	TextWindow tw;
 {
-    UCHAR	*data;
-    UCHAR	*dp;
-    int         r;
-    int         length = 0;
-    int         start,
-                end;
+	WINDOW	*wp;
+	UCHAR	*data;
+	UCHAR	*dp;
+	int	length;
 
-    if (!tw->have_selection)
-	return;
-    if (tw->selection_len) {
-	free((char *)(tw->selection_data));
-	tw->selection_len = 0;
-    }
-    if (tw->sel_start_row == tw->sel_end_row) {
-	length = tw->sel_end_col - tw->sel_start_col + 1;
-	data = castalloc(UCHAR, length);
-	if (!data)
-	    return;
-	(void)memcpy(
-		(char *)data,
-		(char *) &(tw->sc[tw->sel_start_row][tw->sel_start_col]),
-		(SIZE_T)length);
-	tw->selection_len = length;
-    } else {
-	start = tw->sel_start_col;
-	for (r = tw->sel_start_row; r <= tw->sel_end_row; r++) {
-	    end = (r == tw->sel_end_row) ? tw->sel_end_col : (tw->cols - 1);
-	    length += end - start + 2;	/* add CR */
-	    start = 0;
+	if (!tw->have_selection)
+		return;
+	free_selection(tw);
+
+	if ((wp = row2window(tw->sel_start_row)) != 0) {
+		KILL	*kp;		/* pointer into kill register */
+		MARK	save;
+		int	region_flag = fulllineregions;
+		int	report_flag = global_g_val(GVAL_REPORT);
+		int	saverow = ttrow;
+		int	savecol = ttcol;
+		int	extend_left = FALSE;
+		int	extend_right = FALSE;
+
+		/*
+		 * If the selection is in a non-linewrapped window, extend the
+		 * selection to the end of the line whenever it is already on
+		 * the end-markers.
+		 */
+#ifdef WMDLINEWRAP
+		if (!w_val(wp,WMDLINEWRAP))
+#endif
+		{
+			if (w_val(wp,WVAL_SIDEWAYS)
+			 && (tw->sel_start_col <= nu_width(wp)))
+				extend_left = TRUE;
+			if (tw->sel_end_col >= tw->cols - 1) {
+				(void)setwmark(tw->sel_end_row, tw->sel_end_col);
+				if ((nu_width(wp)
+				   + lLength(MK.l)
+				   - w_val(wp,WVAL_SIDEWAYS)) > tw->cols)
+					extend_right = TRUE;
+			}
+		}
+
+		save = DOT;	/* just in case it isn't start or end */
+		(void)setwmark(tw->sel_start_row, tw->sel_start_col);
+		swapmark();
+		(void)setwmark(tw->sel_end_row,   tw->sel_end_col);
+
+		if (extend_left)
+			DOT.o = 0;
+		if (extend_right)
+			MK.o = lLength(MK.l);
+		else if (MK.o != 0 && !is_at_end_of_line(MK))
+			MK.o += 1;
+
+		if (x_on_msgline())	/* disable messages? */
+			set_global_g_val(GVAL_REPORT,0);
+
+		fulllineregions = FALSE;
+		(void)yankregion();
+		fulllineregions = region_flag;
+
+		DOT = save;
+		if (saverow != ttrow)	/* we showed a message */
+			movecursor(saverow, savecol);
+		set_global_g_val(GVAL_REPORT,report_flag);
+
+		if (!(length = kchars)
+		 || !(dp = data = castalloc(UCHAR, kchars))
+		 || !(kp = kbs[0].kbufh))
+			return;
+
+		while (kp->d_next != 0) {
+			(void)memcpy((char *)dp, (char *)kp->d_chunk, KBLOCK);
+			kp = kp->d_next;
+			dp += KBLOCK;
+		}
+		(void)memcpy((char *)dp, (char *)kp->d_chunk, (SIZE_T)(kbs[0].kused));
+
+	} else {	/* must be message-line */
+		length = tw->sel_end_col - tw->sel_start_col + 1;
+		data = castalloc(UCHAR, length);
+		if (!data)
+			return;
+		(void)memcpy(
+			(char *)data,
+			(char *) &(tw->sc[tw->sel_start_row][tw->sel_start_col]),
+			(SIZE_T)length);
 	}
-	dp = data = castalloc(UCHAR, length);
-	if (!data)
-	    return;
-	tw->selection_len = length;
-	start = tw->sel_start_col;
-	for (r = tw->sel_start_row; r <= tw->sel_end_row; r++) {
-	    end = (r == tw->sel_end_row) ? tw->sel_end_col : (tw->cols - 1);
-	    length = end - start + 1;
-	    (void)memcpy(
-	    	(char *)dp,
-		(char *) &(tw->sc[r][start]),
-		(SIZE_T)length);
-	    dp += length;
-	    *dp++ = '\n';	/* add CR */
-	    start = 0;
-	}
-    }
-    tw->selection_data = data;
+	tw->selection_len  = length;
+	tw->selection_data = data;
+
+	/* clear the highlighting */
+	change_selection(tw, False, False);
+	x_flush();
 
 #ifdef SABER_HACK
-    XChangeProperty(dpy, RootWindow(tw->dpy, tw->screen), XA_CUT_BUFFER0,
-		    XA_STRING, 8, PropModeReplace,
-		    tw->selection_data, tw->selection_len);
+	XChangeProperty(dpy, RootWindow(tw->dpy, tw->screen), XA_CUT_BUFFER0,
+		XA_STRING, 8, PropModeReplace,
+		tw->selection_data, tw->selection_len);
 #endif
 }
 
@@ -1616,169 +1761,285 @@ x_give_selection(tw, ev, target, prop)
 
 static void
 x_own_selection(tw)
-    TextWindow  tw;
+	TextWindow  tw;
 {
-    if (tw->selection_len) {	/* get rid of old one */
-	tw->selection_len = 0;
-	free((char *)(tw->selection_data));
-    }
-    if (!tw->have_selection) {
-	XSetSelectionOwner(tw->dpy, XA_PRIMARY, tw->win, CurrentTime);
-    }
-    change_selection(tw, True, False);
-    x_flush();			/* show the changes */
+	free_selection(tw);
+	if (!tw->have_selection)
+		XSetSelectionOwner(tw->dpy, XA_PRIMARY, tw->win, CurrentTime);
+	change_selection(tw, True, False);
+	x_flush();			/* show the changes */
+	tw->have_selection = True;
 }
 
 static void
 extend_selection(tw, nr, nc, wipe)
-    TextWindow  tw;
-    int         nr,
-                nc;
-    Bool        wipe;
+	TextWindow  tw;
+	int	nr;
+	int	nc;
+	Bool	wipe;
 {
-    if (tw->have_selection)	/* erase any old one */
-	change_selection(tw, False, False);
+	WINDOW	*wp0, *wp1;
 
-    if (wipe) {			/* a wipe is always relative to its starting
-				 * point */
-	if (nr > tw->wipe_row) {
-	    tw->sel_end_row = nr;
-	    tw->sel_end_col = nc;
-	    tw->sel_start_col = tw->wipe_col;
-	    tw->sel_start_row = tw->wipe_row;
-	} else if (nr == tw->wipe_row) {
-	    tw->sel_end_row = tw->sel_start_row = nr;
-	    if (nc > tw->wipe_col) {
-		tw->sel_start_col = tw->wipe_col;
-		tw->sel_end_col = nc;
-	    } else {
-		tw->sel_start_col = nc;
-		tw->sel_end_col = tw->wipe_col;
-	    }
-	} else {
-	    tw->sel_start_row = nr;
-	    tw->sel_start_col = nc;
-	    tw->sel_end_col = tw->wipe_col;
-	    tw->sel_end_row = tw->wipe_row;
-	}
-    } else {
-	if (nr < tw->sel_start_row) {
-	    if (!tw->have_selection)
-		tw->sel_end_row = tw->sel_start_row;
-	    tw->sel_start_row = nr;
-	} else {
-	    tw->sel_end_row = nr;
+	/* Don't allow selection to go onto the modeline.
+	 * XXX Later, modify this to cause autoscrolling.
+	 */
+	if ((wp0 = row2window(nr)) != 0) {
+		if (nr == mode_row(wp0)) {
+			nr--;
+			nc = tw->cols;
+		}
 	}
 
-	if (nc < tw->sel_start_col) {
-	    if (!tw->have_selection)
-		tw->sel_end_col = tw->sel_start_col;
-	    tw->sel_start_col = nc;
-	} else {
-	    tw->sel_end_col = nc;
-	}
-    }
+	wp1 = row2window(tw->sel_start_row);
 
-    tw->show_selection = True;
-    x_own_selection(tw);
-    tw->have_selection = True;
+	if (tw->have_selection)	/* erase any old one */
+		change_selection(tw, False, False);
+
+	if (wipe) {	/* a wipe is always relative to its starting point */
+
+		/* Don't allow selection to go outside a window */
+		if (wp0 != wp1) {
+			if (nr > tw->wipe_row) {
+				nr = tw->sel_end_row;
+				nc = tw->cols;
+			} else {
+				nr = tw->sel_start_row;
+				nc = 0;
+			}
+		}
+
+		if (nr > tw->wipe_row) {
+			tw->sel_end_row = nr;
+			tw->sel_end_col = nc;
+			tw->sel_start_col = tw->wipe_col;
+			tw->sel_start_row = tw->wipe_row;
+		} else if (nr == tw->wipe_row) {
+			tw->sel_end_row = tw->sel_start_row = nr;
+			if (nc > tw->wipe_col) {
+				tw->sel_start_col = tw->wipe_col;
+				tw->sel_end_col = nc;
+			} else {
+				tw->sel_start_col = nc;
+				tw->sel_end_col = tw->wipe_col;
+			}
+		} else {
+			tw->sel_start_row = nr;
+			tw->sel_start_col = nc;
+			tw->sel_end_col = tw->wipe_col;
+			tw->sel_end_row = tw->wipe_row;
+		}
+	} else {	/* extend-selection */
+
+		/* Don't allow selection to go outside a window */
+		if (wp0 != wp1) {
+			if (wp0 != 0) {
+				if (wp1 != 0) {
+					if (nr < tw->sel_start_row) {
+						nr = wp1->w_toprow;
+						nc = 0;
+					} else {
+						nr = mode_row(wp1) - 1;
+						nc = tw->cols;
+					}
+				} else {
+					nr = term.t_nrow - 1;
+					nc = 0;
+				}
+			} else {
+				nr = mode_row(wp1) - 1;
+				nc = tw->cols;
+			}
+		}
+
+		if (nr < tw->sel_start_row) {
+			if (!tw->have_selection)
+				tw->sel_end_row = tw->sel_start_row;
+			tw->sel_start_row = nr;
+		} else {
+			tw->sel_end_row = nr;
+		}
+
+		if (nc < tw->sel_start_col) {
+			if (!tw->have_selection)
+				tw->sel_end_col = tw->sel_start_col;
+				tw->sel_start_col = nc;
+			} else {
+				tw->sel_end_col = nc;
+		}
+	}
+
+	x_own_selection(tw);
 
 #ifdef SABER_HACK
-    x_stash_selection(tw);
+	x_stash_selection(tw);
 #endif
+
+	/* Show the extended location on the message line if 'ruler' mode is
+	 * enabled.
+	 */
+	(void)setwmark(nr,nc);
+#ifdef WMDRULER
+	if (wp1 != 0 && w_val(wp1,WMDRULER) && !x_on_msgline()) {
+		int savecol = ttcol;
+		int saverow = ttrow;
+		int saveflg = curwp->w_flag;
+
+		drawing_ruler = True;
+		swapmark();
+		mlforce("%s (%d,%d)\n",
+			wipe ? "select" : "extend",
+			line_no(curwp->w_bufp, DOT.l), DOT.o+1);
+		swapmark();
+		curwp->w_flag = saveflg;
+		drawing_ruler = False;
+
+		movecursor(saverow, savecol);
+	}
+#endif
+}
+
+static LINEPTR
+row2line(wp, r, rowp)
+	WINDOW	*wp;
+	int	r;
+	int	*rowp;
+{
+	fast_ptr LINEPTR lp;
+	register int	row,
+			next;
+
+	for (lp = wp->w_line.l, row = wp->w_toprow; ; ) {
+		next = line_height(wp,lp);
+		if (row+next > r)
+			break;
+		row += next;
+		if (!same_ptr(lp, win_head(wp)))
+			lp = lFORW(lp);
+	}
+	*rowp = row;
+	return lp;
 }
 
 static void
 multi_click(tw, nr, nc)
-    TextWindow  tw;
-    int         nr,
-                nc;
+	TextWindow  tw;
+	int         nr;
+	int         nc;
 {
-    UCHAR	*p;
-    int         sc;
-    int         cclass;
+	WINDOW	*wp;
+	LINEPTR	lp;
+	int	row;
+	UCHAR	*p;
+	int	sc;
+	int	cclass;
 
-    tw->numclicks++;
+	tw->numclicks++;
 
-    sc = tw->sel_start_col;
-    switch (tw->numclicks) {
-    case 0:
-    case 1:
-	abort();
-    case 2:			/* word */
-	/* find word start */
-	p = &(tw->sc[nr][sc]);
-	cclass = charClass[*p];
-	do {
-	    --sc;
-	    --p;
-	} while (sc >= 0 && charClass[*p] == cclass);
-	sc++;
-	/* and end */
-	p = &(tw->sc[nr][nc]);
-	cclass = charClass[*p];
-	do {
-	    ++nc;
-	    ++p;
-	} while (nc < tw->cols && charClass[*p] == cclass);
-	--nc;
-	break;
-    case 3:			/* line */
-	sc = 0;
-	nc = tw->cols - 1;
-	break;
-    case 4:			/* screen */
-	/* XXX blow off till we can figure out where screen starts & ends */
-    default:
-	break;
-    }
-    tw->sel_start_col = sc;
-    tw->sel_end_col = nc;
-    tw->show_selection = True;
-    x_own_selection(tw);
-    tw->have_selection = True;
+	sc = tw->sel_start_col;
+	switch (tw->numclicks) {
+	case 0:
+	case 1:			/* shouldn't happen */
+		abort();
+	case 2:			/* word */
+		/* find word start */
+		p = &(tw->sc[nr][sc]);
+		cclass = charClass[*p];
+		do {
+			--sc;
+			--p;
+		} while (sc >= 0 && charClass[*p] == cclass);
+		sc++;
+		/* and end */
+		p = &(tw->sc[nr][nc]);
+		cclass = charClass[*p];
+		do {
+			++nc;
+			++p;
+		} while (nc < tw->cols && charClass[*p] == cclass);
+		--nc;
+		break;
+	case 3:			/* line (includes trailing newline) */
+		sc = 0;
+		if ((wp = row2window(tw->sel_start_row)) != 0) {
+			lp = row2line(wp, tw->sel_start_row, &row);
+			if (!same_ptr(lp, win_head(wp))) {
+				nc = 0;
+				tw->sel_start_row = row;
+				tw->sel_end_row = row + line_height(wp,lp);
+			}
+		} else {
+			nc = tw->cols;
+		}
+		break;
+	case 4:			/* screen */
+		/* XXX blow off till we can figure out where screen starts & ends */
+	default:
+		break;
+	}
+	tw->sel_start_col = sc;
+	tw->sel_end_col = nc;
+	x_own_selection(tw);
 
 #ifdef SABER_HACK
-    x_stash_selection(tw);
+	x_stash_selection(tw);
 #endif
 }
 
 
 static void
 start_selection(tw, ev, nr, nc)
-    TextWindow  tw;
-    XButtonPressedEvent *ev;
-    int         nr,
-                nc;
+	TextWindow  tw;
+	XButtonPressedEvent *ev;
+	int	nr;
+	int	nc;
 {
-    if (tw->lasttime && (absol(ev->time - tw->lasttime) < tw->click_timeout)) {
-	/* ignore extra clicks on other rows */
-	if (nr == tw->sel_start_row) {
-	    multi_click(tw, nr, nc);
-	    return;
+	if ((tw->lasttime != 0)
+	 && (absol(ev->time - tw->lasttime) < tw->click_timeout)
+	 && (nr == tw->sel_start_row)) { /* ignore extra clicks on other rows */
+		multi_click(tw, nr, nc);
+	} else {
+		int	my_row	= ttrow;
+		int	my_col	= ttcol;
+		int	saved_selection = tw->have_selection;
+
+		tw->lasttime = ev->time;
+		tw->numclicks = 1;
+
+		if (tw->have_selection)
+			change_selection(tw, False, True);
+
+		tw->was_on_msgline = onMsgRow(tw);
+		tw->sel_start_row = tw->sel_end_row = tw->wipe_row = nr;
+		tw->sel_start_col = tw->sel_end_col = tw->wipe_col = nc;
+
+		/* If we're not on the message-line, update the cursor position
+		 * on the screen.  Note that clicking on the modeline causes
+		 * the window to scroll up by one line.
+		 */
+		if (setcursor(nr, nc)) {
+			/* Calling 'refresh()' forces the point to be centered,
+			 * but the ensuing 'update()' causes the message-line
+			 * to be cleared (including the yank-message from the
+			 * previous selection).  So we call 'x_flush()'
+			 * directly to get rid of the selection highlighting.
+			 */
+			if (ev->state)
+				(void) refresh(True, 0);
+			else
+				x_flush();
+			(void)update(FALSE);
+			if (x_on_msgline()) {
+				movecursor(my_row, my_col);
+				x_flush();
+			} else if (!saved_selection) {
+				int	row = ttrow;
+				int	col = ttcol;
+				mlerase();
+				movecursor(row,col);
+				x_flush();
+			}
+		}
 	}
-    }
-    tw->lasttime = ev->time;
-    tw->numclicks = 1;
-
-    if (tw->have_selection) {
-	change_selection(tw, False, True);
-	tw->show_selection = False;
-    }
-    tw->sel_start_row = nr;
-    tw->sel_start_col = nc;
-    tw->sel_end_row = nr;
-    tw->sel_end_col = nc;
-    tw->wipe_row = nr;
-    tw->wipe_col = nc;
-
-    if (tw->cur_row == (tw->rows - 1)) {
-	return;
-    }
-    setcursor(nr, nc);
-    /* 'True' forces the point to be centered */
-    (void) refresh((ev->state ? True : False), 0);
-    (void) update(False);
 }
 
 static XMotionEvent *
@@ -1853,7 +2114,7 @@ x_process_event(ev)
 				      &length, &bytesafter, &value);
 	    XDeleteProperty(dpy, cur_win->win, ev->xselection.property);
 	    x_get_selection(cur_win, ev->xselection.selection,
-			    type, (char *) value, (int)length, format);
+			    type, (char *) value, (SIZE_T)length, format);
 	}
 	break;
 
@@ -1920,8 +2181,12 @@ x_process_event(ev)
 	    start_selection(cur_win, (XButtonPressedEvent *) ev, nr, nc);
 	    break;
 	case Button2:		/* paste selection */
-	    if (ev->xbutton.state)	/* if modifier, paste at mouse */
-		setcursor(nr, nc);
+	    if (ev->xbutton.state) {	/* if modifier, paste at mouse */
+		if (!setcursor(nr, nc)) {
+		    kbd_alarm();	/* don't know how to paste here */
+		    break;
+		}
+	    }
 	    x_paste_selection(cur_win);
 	    break;
 	case Button3:		/* end selection */
@@ -1932,6 +2197,26 @@ x_process_event(ev)
 	}
 	break;
     }
+}
+
+/*
+ * Return true if there are characters remaining to be pasted.  This is used in
+ * the type-ahead check.
+ */
+int
+x_is_pasting()
+{
+	return tb_more(PasteBuf);
+}
+
+/*
+ * Return true if we want to disable updates of the cursor position because the
+ * cursor really should be on the message-line.
+ */
+int
+x_on_msgline()
+{
+	return cur_win->was_on_msgline;
 }
 
 /*
@@ -1946,20 +2231,15 @@ x_getc()
     char        buffer[10];
     KeySym      keysym;
     int         num;
-    int         c;
 
-   
     while (1) {
 
+	if (tb_more(PasteBuf))	/* handle any queued pasted text */
+		return tb_next(PasteBuf);
 
-	if (plen) {		/* handle any queued pasted text */
-	    c = *pp++;
-	    if (--plen == 0)
-		free(paste);
-	    return c;
-	}
 	XNextEvent(dpy, &ev);
 	if (ev.type == KeyPress) {
+		x_lose_selection(cur_win);
 	        num = XLookupString((XKeyPressedEvent *) &ev, buffer, 10,
 				&keysym, (XComposeStatus *) 0);
 		switch (keysym) {
@@ -2091,6 +2371,18 @@ x_beep()
 {
     XBell(cur_win->dpy, 0);
 }
+
+#if NO_LEAKS
+void
+x11_leaks()
+{
+	if (cur_win != 0) {
+		free_selection(cur_win);
+		free_win_data(cur_win);
+		FreeIfNeeded(cur_win->fontname);
+	}
+}
+#endif
 
 #else
 x11hello() {}

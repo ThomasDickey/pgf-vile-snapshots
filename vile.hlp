@@ -677,6 +677,10 @@ Editor modes
 	report A threshold value that is used to control messages that report
 		the number of lines deleted, changed, etc.  (U)
 
+	ruler Shows the current line and column in the status line.  When using
+		a mouse (xvile), the cursor line and column are also shown in
+		the message line.  (B)
+
 	samebangs (sb) Controls whether the "!!" and "^X-!" commands use the
 		same command string.  (U)
 

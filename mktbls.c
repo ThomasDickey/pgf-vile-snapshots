@@ -14,7 +14,10 @@
  *
  *
  * $Log: mktbls.c,v $
- * Revision 1.33  1993/07/09 19:30:13  pgf
+ * Revision 1.34  1993/08/05 14:29:12  pgf
+ * tom's 3.57 changes
+ *
+ * Revision 1.33  1993/07/09  19:30:13  pgf
  * changed name of all_FUNCs to not be caseless-compared identical to
  * all_funcs, for the watcom compiler.  (there's probably a compiler option
  * i'm missing somewhere for this)
@@ -130,8 +133,7 @@
 #define	OPT_IFDEF_MODES	1	/* true iff we can ifdef modes */
 
 /* stuff borrowed/adapted from estruct.h */
-#if defined(__TURBOC__) || defined(__WATCOMC__) || defined(__GO32__) || \
-		(defined(__GNUC__) && defined(sun))
+#if defined(__TURBOC__) || defined(__WATCOMC__) || defined(__GO32__) || (defined(__GNUC__) && defined(sun))
 #include <stdlib.h>
 #define P(param) param
 #else
@@ -213,6 +215,8 @@ static	LIST	*all_names,
 		*all_gmodes,	/* data for GLOBAL modes */
 		*all_bmodes,	/* data for BUFFER modes */
 		*all_wmodes;	/* data for WINDOW modes */
+
+	int	main P(( int, char ** ));
 
 static	int	isspace P((int));
 static	int	isprint P((int));

@@ -6,7 +6,10 @@
  * for the display system.
  *
  * $Log: buffer.c,v $
- * Revision 1.72  1993/07/27 18:06:20  pgf
+ * Revision 1.73  1993/08/05 14:29:12  pgf
+ * tom's 3.57 changes
+ *
+ * Revision 1.72  1993/07/27  18:06:20  pgf
  * see tom's 3.56 CHANGES entry
  *
  * Revision 1.71  1993/07/15  10:37:58  pgf
@@ -547,7 +550,8 @@ void	FreeBuffer(bp)
 {
 	register BUFFER *bp1, *bp2;
 
-	FreeIfNeeded(bp->b_fname);
+	if (bp->b_fname != out_of_mem)
+		FreeIfNeeded(bp->b_fname);
 
 #if !WINMARK
 	if (same_ptr(MK.l, bp->b_line.l)) {

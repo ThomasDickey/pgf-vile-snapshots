@@ -10,7 +10,13 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.132  1993/07/27 18:06:20  pgf
+ * Revision 1.134  1993/08/05 14:39:55  pgf
+ * removed conflicting #define USG 0 from djgpp settings
+ *
+ * Revision 1.133  1993/08/05  14:29:12  pgf
+ * tom's 3.57 changes
+ *
+ * Revision 1.132  1993/07/27  18:06:20  pgf
  * see tom's 3.56 CHANGES entry
  *
  * Revision 1.131  1993/07/20  18:07:24  pgf
@@ -631,7 +637,6 @@
 #undef USG
 #undef MSDOS
 #define SVR3   0
-#define USG    0
 #define MSDOS  1
 #define GO32   1
 #endif
@@ -669,6 +674,10 @@
 # endif
 #endif
 
+#ifndef APOLLO_STDLIB
+# define APOLLO_STDLIB 0
+#endif
+
 /* choose between void and int signal handler return type.
   "typedefs?  we don't need no steenking typedefs..." */
 #if POSIX || (BERK && BSD386) || SVR3 || APOLLO || NEWDOSCC
@@ -679,29 +688,44 @@
 # define SIGRET return 0
 #endif
 
-#if UNIX || MSDOS
+#if UNIX || MSDOS || VMS
 #include	<signal.h>
 # if APOLLO
 #  if APOLLO_STDLIB	/* SR10.3, CC 6.8 */
-#   define DEFINE_SIGNAL(func)	SIGT func(int signo, ...)
-#   define ACTUAL_SIGNAL(func)	SIGT func(int signo, ...)
-#   if defined(__GNUC__)
-#    undef  SIG_DFL
-#    undef  SIG_IGN
-#    define SIG_DFL	(void (*)(int,...))0
-#    define SIG_IGN	(void (*)(int,...))1
-#   endif
+#   define ACTUAL_SIG_ARGS int signo, ...
+#   define ACTUAL_SIG_DECL /* empty */
+#   define DEFINE_SIG_ARGS ACTUAL_SIG_ARGS
 #  endif
 # endif
 #endif
 
-#if UNIX || MSDOS || VMS
-#include	<setjmp.h>
+#ifdef SIGALRM
+# define HAS_ALARM 1
+#else
+# define HAS_ALARM 0
 #endif
 
-#ifndef DEFINE_SIGNAL
-# define DEFINE_SIGNAL(func)	SIGT func P(( int ))
-# define ACTUAL_SIGNAL(func)	SIGT func(signo) int signo;
+#ifndef ACTUAL_SIG_ARGS
+# if __STDC__
+#  define ACTUAL_SIG_ARGS int signo
+#  define ACTUAL_SIG_DECL /* empty */
+#  define DEFINE_SIG_ARGS int
+# else
+#  define ACTUAL_SIG_ARGS signo
+#  define ACTUAL_SIG_DECL int signo;
+#  define DEFINE_SIG_ARGS
+# endif
+#endif
+
+#if defined(__GNUC__)
+# undef  SIG_DFL
+# undef  SIG_IGN
+# define SIG_DFL	(SIGT (*)(DEFINE_SIG_ARGS))0
+# define SIG_IGN	(SIGT (*)(DEFINE_SIG_ARGS))1
+#endif
+
+#if UNIX || MSDOS || VMS
+#include	<setjmp.h>
 #endif
 
 /* argument for 'exit()' or '_exit()' */
@@ -749,7 +773,6 @@
 #define	HP110	0			/* HP110 screen driver		*/
 #define	VMSVT	0			/* various VMS terminal entries	*/
 #define VT52	0			/* VT52 terminal (Zenith).	*/
-#define RAINBOW 0			/* Use Rainbow fast video.	*/
 #define	IBMPC	MSDOS			/* IBM-PC CGA/MONO/EGA driver	*/
 #define	ZIBMPC	0			/* Zortech lib IBM-PC CGA/MONO/EGA driver	*/
 #define	DG10	0			/* Data General system/10	*/
@@ -813,6 +836,7 @@
 #define	SMALLER	0	/* strip out a bunch of uemacs fluff */
 			/* 	(to each their own... :-)  pgf) */
 #define OPT_MAP_MEMORY 0	/* tiny systems can page out data */
+#define OPT_WORKING    HAS_ALARM && !SMALLER
 
 /*	Debugging options	*/
 #define	RAMSIZE	0	/* dynamic RAM memory usage tracking */
@@ -1017,6 +1041,12 @@ union REGS {
 #endif
 
 /*	define some ability flags */
+
+#if OPT_WORKING
+# define if_OPT_WORKING(statement) statement;
+#else
+# define if_OPT_WORKING(statement)
+#endif
 
 #if	IBMPC || Z309
 #define	MEMMAP	1
@@ -1588,6 +1618,7 @@ struct VAL {
 #define WFCOLR	0x20			/* Needs a color change		*/
 #define WFKILLS	0x40			/* something was deleted	*/
 #define WFINS	0x80			/* something was inserted	*/
+#define WFSTAT	0x100			/* Update mode line (info only).*/
 
 /* define indices for GLOBAL, BUFFER, WINDOW modes */
 #include "nemode.h"
@@ -1704,17 +1735,19 @@ typedef struct	BUFFER {
 #define	isInternalName(s) (isShellOrPipe(s) || is_internalname(s))
 #define	isAppendToName(s) (s[0] == '>' && s[1] == '>')
 
+#if	defined(apollo)
+#if	defined(__STDCPP__)	/* cc 6.8 */
+#define	ScratchName(s) SCRTCH_LEFT ## #s ## SCRTCH_RIGHT
+#else				/* cc 6.7 */
+#define	ScratchName(s)	"[s]"	/* K&R-style macro */
+#endif
+#endif	/* apollo */
+
+#ifndef	ScratchName
 #if defined(__STDC__) || NEWDOSCC || NeXT
 #define	ScratchName(s) SCRTCH_LEFT    #s    SCRTCH_RIGHT
 #endif
-
-#ifndef	ScratchName
-#ifdef	__STDC__
-#if	!defined(apollo) || defined(__STDCPP__)
-#define	ScratchName(s) SCRTCH_LEFT ## #s ## SCRTCH_RIGHT
 #endif
-#endif	/* __STDC__ */
-#endif	/* ScratchName */
 
 #ifndef	ScratchName
 #define	ScratchName(s)	"[s]"	/* K&R-style macro */
@@ -1816,6 +1849,10 @@ typedef struct	WINDOW {
 #define w_lastdot w_traits.w_ld
 #define w_line    w_traits.w_ln
 #define w_values  w_traits.w_vals
+
+#define mode_row(wp)	((wp)->w_toprow + (wp)->w_ntrows)
+#define	buf_head(bp)	(bp)->b_line.l
+#define	win_head(wp)	buf_head((wp)->w_bufp)
 
 #define DOT curwp->w_dot
 #ifdef WINMARK
