@@ -6,7 +6,12 @@
  * internal use.
  *
  * $Log: region.c,v $
- * Revision 1.24  1993/06/02 14:28:47  pgf
+ * Revision 1.25  1993/06/23 21:27:54  pgf
+ * moved calls to chg_buff, to ensure an undo routine is called first.
+ * this allows undo to record the initial modified state of the buffer
+ * correctly
+ *
+ * Revision 1.24  1993/06/02  14:28:47  pgf
  * see tom's 3.48 CHANGES
  *
  * Revision 1.23  1993/05/24  15:21:37  pgf
@@ -314,7 +319,6 @@ int (*func) P((int));
         REGION          region;
 
         if ((status = getregion(&region)) == TRUE) {
-        	chg_buff(curbp, WFHARD);
 		m = region.r_orig;
         	while (region.r_size--) {
                 	if (is_at_end_of_line(m)) {
@@ -332,6 +336,7 @@ int (*func) P((int));
         	}
 	}
 	rls_region();
+	chg_buff(curbp, WFHARD);
         return (status);
 }
 

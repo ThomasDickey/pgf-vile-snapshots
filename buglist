@@ -107,9 +107,6 @@ E	'updatelistbuffers()' should be revisited to make it happen at the
 E	should ifdef the 'autobuffer' code for users who do not need vi-style
 	buffering.
 
-E	should have a numeric mode to limit undo history -- non-zero would
-	keep that many back changes.  0 (off?) would mean be infinite.
-
 ===================================================
 
     Is it possible to get vile to prompt you if you try to exit without

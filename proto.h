@@ -5,7 +5,13 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.60  1993/06/22 10:24:21  pgf
+ * Revision 1.62  1993/06/24 12:13:55  pgf
+ * changed copy_for_undo and tag_for_undo to return void
+ *
+ * Revision 1.61  1993/06/23  21:29:29  pgf
+ * ifdefs for linux -- our ifdefs are obviously not right yet
+ *
+ * Revision 1.60  1993/06/22  10:24:21  pgf
  * new arg to freeundostacks, and new forw/back undo routines
  *
  * Revision 1.59  1993/06/18  16:16:34  pgf
@@ -922,13 +928,14 @@ extern void ttmiscinit P(( void ));
 
 /* undo.c */
 extern void toss_to_undo P(( LINEPTR ));
-extern int copy_for_undo P(( LINEPTR ));
-extern int tag_for_undo P(( LINEPTR ));
+extern void copy_for_undo P(( LINEPTR ));
+extern void tag_for_undo P(( LINEPTR ));
+extern void nounmodifiable P(( BUFFER * ));
 extern void freeundostacks P(( BUFFER *, int ));
+extern void mayneedundo P(( void ));
 extern int undo P(( int, int ));
 extern int backundo P(( int, int ));
 extern int forwredo P(( int, int ));
-extern void mayneedundo P(( void ));
 extern int lineundo P(( int, int ));
 extern void dumpuline P(( LINEPTR ));
 
@@ -1083,7 +1090,7 @@ extern void update_dos_drv_dir P(( char * ));
 extern void dos_crit_handler P(( void ));
 #endif
 
-#if UNIX
+#if UNIX && !LINUX
 #if (SUNOS || NeXT) && defined(lint) || __GNUC__
 extern	int	_filbuf	P(( FILE * ));
 extern	int	_flsbuf	P(( unsigned char, FILE * ));

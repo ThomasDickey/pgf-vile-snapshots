@@ -2,7 +2,11 @@
  *		for MicroEMACS
  *
  * $Log: spawn.c,v $
- * Revision 1.54  1993/06/18 15:57:06  pgf
+ * Revision 1.55  1993/06/24 12:11:52  pgf
+ * added nounmodifiable() call to filter(), since this operation is not
+ * undoable.
+ *
+ * Revision 1.54  1993/06/18  15:57:06  pgf
  * tom's 3.49 changes
  *
  * Revision 1.53  1993/06/02  14:28:47  pgf
@@ -865,7 +869,9 @@ int f,n;
 	}
 
 	ch_fname(bp, tnam); /* restore name */
-	bp->b_flag |= BFCHG;		/* flag it as changed */
+
+	bp->b_flag |= BFCHG;	/* flag it as changed */
+	nounmodifiable(bp);	/* and it can never be "un-changed" */
 
 	/* and get rid of the temporary file */
 	unlink(filnam1);

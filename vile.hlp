@@ -291,20 +291,25 @@ Text manipulation command:
 	below), so it can work on regions: for example use '&}' to "repeat
 	the previous substitution over the rest of this paragraph".
 
-	Undo
-	----
-	Undo ("u") and line-undo ("U") are available for all commands.
-	They should be a little less capricious than their vi counterparts,
-	since they do not share the default yank register for their
-	operation.  Also, line-undo ("U") is available until the next
+	Infinite Undo 
+	--------------
+	The regular undo ('u') and line-undo ('U') are available for all
+	commands.  They are a little more predictable than their vi
+	counterparts, since they do not share the default yank register for
+	their operation.  Also, line-undo ('U') is available until the next
 	change anywhere in the file, rather than until you leave the line. 
 
 	In addition, vile lets you undo all changes made to a buffer since
-	it was first edited (so-called "infinite undo".  The '^X-u' command
-	will undo changes, one by one (or given a count, several at a
-	time).  Using '^X-r' will walk forward, redoing the previously
-	undone changes one by one.  A fresh change to the buffer will cause
-	the ability to redo previously undone changes to be lost.
+	it was first edited (so-called "infinite undo").  The '^X-u'
+	command will undo changes, one by one (or given a count, several at
+	a time).  The '^X-r' command will walk forward, redoing the
+	previously undone changes one by one.  A fresh change to the buffer
+	will cause previously undone changes to no longer be redoable.
+	
+	The number of changes stored in the undo "history" is controlled by
+	the numeric mode "undolimit".  The default history length is 10 --
+	that is, only 10 changes may be undone.  Set the undolimit to 0 for
+	truly infinite undo.  This can consume a lot of memory.
 
 	The cursor position after an undo may not always be
 	the same as it would be in vi.
@@ -704,6 +709,10 @@ Editor modes
 	terse   vile produces more "status" messages than vi, which may
 		become annoying at low baud rates.  Setting terse mode will
 		suppress many of these.  (B)
+
+	undolimit (ul) Sets a limit on how many undoable buffer-changing
+		commands will be saved.  If set to 0, there is no limit,
+		and all changes are undoable.  The default value is 10. (B)
 
 	view	View the file only.  No changes are permitted.  This is set
 		automatically for the output of shell commands.  (B)

@@ -10,7 +10,11 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.119  1993/06/22 10:27:31  pgf
+ * Revision 1.120  1993/06/23 21:32:25  pgf
+ * added "undolimit" mode, and made undo able to restore unmodified state
+ * to buffer, based on a new type of stack separator
+ *
+ * Revision 1.119  1993/06/22  10:27:31  pgf
  * new macros for undo stack separators
  *
  * Revision 1.118  1993/06/18  15:57:06  pgf
@@ -1286,7 +1290,10 @@ typedef struct	LINE {
 	LINEPTR l_bp;			/* Link to the previous line	*/
 	SIZE_T	l_size;			/* Allocated size 		*/
 	int	l_used;			/* Used size (may be negative)	*/
-	char *	l_text;			/* The data for this line	*/
+	union {
+	    char *l_txt;		/* The data for this line	*/
+	    LINEPTR l_nxt;		/* if an undo stack separator,	*/
+	} lt;				/*  a pointer to the next one	*/
 #if !SMALLER
 	L_NUM	l_number;		/* line-# iff b_numlines > 0	*/
 #endif
@@ -1300,6 +1307,9 @@ typedef struct	LINE {
 	    L_FLAG	l_flag;		/* flags for undo ops		*/
 	} l;
 }	LINE;
+
+#define l_text lt.l_txt
+#define l_nextsep lt.l_nxt
 
 /* flag values */
 #define LCOPIED 1	/* original line is already on an undo stack */
@@ -1315,10 +1325,12 @@ typedef struct	LINE {
 	/*
 	 * Special values used in LINE.l_used
 	 */
-#define LINENOTREAL	((int)(-1))
-#define LINEUNDOPATCH	((int)(-2))
-#define MARKPATCH	((int)(-3))
-#define STACKSEP	((int)(-4))
+#define LINENOTREAL	((int)(-1)) /* for undo, marks an inserted line */
+#define LINEUNDOPATCH	((int)(-2)) /* provides stack patching value for undo */
+/* #define MARKPATCH	((int)(-3)) *//*	unused */
+#define STACKSEP	((int)(-4)) /* delimit set of changes on undo stack */
+#define PURESTACKSEP	((int)(-5)) /* as above, but buffer unmodified before */
+					/* this change */
 
 	/*
 	 * If we are configured with mapped-data, references to LINE pointers
@@ -1372,9 +1384,11 @@ typedef struct	LINE {
 #define lisreal(lp)		((lp)->l_used >= 0)
 #define lisnotreal(lp)		((lp)->l_used == LINENOTREAL)
 #define lislinepatch(lp)	((lp)->l_used == LINEUNDOPATCH)
-#define lismarkpatch(lp)	((lp)->l_used == MARKPATCH)
-#define lispatch(lp)		(lislinepatch(lp) || lismarkpatch(lp))
-#define lisstacksep(lp)		((lp)->l_used == STACKSEP)
+/* #define lismarkpatch(lp)	((lp)->l_used == MARKPATCH) */
+#define lispatch(lp)		(lislinepatch(lp) /* || lismarkpatch(lp) */ )
+#define lisstacksep(lp)		((lp)->l_used == STACKSEP || \
+					(lp)->l_used == PURESTACKSEP)
+#define lispurestacksep(lp)	((lp)->l_used == PURESTACKSEP)
 
 	/*
 	 * Corresponding (mixed-case : mixed-type) names for LINEPTR references
@@ -1552,6 +1566,9 @@ typedef struct	BUFFER {
 	LINEPTR b_udstks[2];		/* undo stack pointers		*/
 	MARK 	b_uddot[2];		/* Link to "." before undoable op*/
 	short	b_udstkindx;		/* which of above to use	*/
+	LINEPTR b_udtail;		/* tail of undo backstack	*/
+	LINEPTR b_udlastsep;		/* last stack separator pushed	*/
+	int	b_udcount;		/* how many undo's we can do	*/
 #if !OPT_MAP_MEMORY
 	LINEPTR	b_LINEs;		/* block-malloced LINE structs */
 	LINEPTR	b_LINEs_end;		/* end of 	"	"	" */
