@@ -1,18 +1,20 @@
 #
 # makefile for vile.  
-# The defs for what system this is really running on are in estruct.h.
-#  Be sure to edit that, to define your system.
+# Various targets in the makefile support various systems -- if yours isn't
+#  here, and none of the one's provided will work, then edit estruct.h, and
+#  use "make default"
 # The command/name/key/function bindings are defined in the file "cmdtbl". The
 #  mktbls program parses this to produce nebind.h, nename.h, and nefunc.h,
 #  which are used by the rest of the build.
 #
-#  The version number (currently three) is found near the top of
+#  The version number (currently three something) is found near the top of
 #  edef.h, and is displayed with the '*' and ":version" commands.
 # 		Paul Fox
 #
 # original makefile for uemacs:	Adam Fritz	July 30,1987
 #
 
+MAKE=/bin/make
 
 # To change screen driver modules, change SCREEN below, and edit estruct.h to
 #  make sure the correct one is #defined as "1", and the others all as "0"
@@ -21,7 +23,6 @@
 
 SCREEN = tcap
 LIBS = -ltermcap
-#LIBS=-lcurses		# for AIX
 TARGET = vile
 
 #SCREEN = x11
@@ -36,11 +37,8 @@ DESTDIR2 = $(HOME)/bin
 
 REMOTE=towno!pgf
 
-# for the mips
-#CFLAGS = -g -systype sysv
-
-#CFLAGS = -O
-CFLAGS = -g
+#OPTFLAGS = -O
+OPTFLAGS = -g
 CC=cc
 
 
@@ -98,7 +96,97 @@ OBJ = main.o $(SCREEN).o basic.o bind.o buffer.o \
 	region.o search.o spawn.o tags.o termio.o undo.o \
 	vmalloc.o window.o word.o wordmov.o
 
-all: $(TARGET)
+
+# if your pre-processor won't treat undefined macros as having value 0, or
+#	won't give unvalue'd defines the value 1, you'll have to do your
+#	config inside of estruct.h, and use "make default"
+# otherwise, there are essentially four choices, unless your machine is
+#	one of the more "specific" targets.  you can be either att or bsd, with
+#	or without posix extensions.
+
+# please report bugs with these config options
+
+all:
+	@echo "	there is no longer an unnamed target"	;\
+	echo "	please use one of the following:"	;\
+	echo "	make bsd"		;\
+	echo "	make bsd_posix"		;\
+	echo "	make att"		;\
+	echo "	make att_posix"		;\
+	echo "	make svr3"		;\
+	echo "	make sun"		;\
+	echo "	make ultrix"		;\
+	echo "	make svr4"		;\
+	echo "	make mips"		;\
+	echo "	make odt"		;\
+	echo "	make isc"		;\
+	echo "	make hpux"		;\
+	echo "	make next"		;\
+	echo "	make unixpc"		;\
+	echo "	make aix"		;\
+	echo "	make osf1"		;\
+	echo "	make linux"		;\
+	echo "	make default (to use config internal to estruct.h)"
+
+bsd :
+	$(MAKE) CFLAGS="$(OPTFLAGS) -DBERK -Dos_chosen" \
+		$(TARGET)
+
+bsd_posix ultrix sun :
+	$(MAKE) CFLAGS="$(OPTFLAGS) -DBERK -DPOSIX -Dos_chosen" \
+		$(TARGET)
+
+att :
+	$(MAKE) CFLAGS="$(OPTFLAGS) -DUSG -Dos_chosen" \
+		$(TARGET)
+
+att_posix svr4 :
+	$(MAKE) CFLAGS="$(OPTFLAGS) -DUSG -DPOSIX -Dos_chosen" \
+		$(TARGET)
+
+svr3 :
+	$(MAKE) CFLAGS="$(OPTFLAGS) -DSVR3 -Dos_chosen" \
+		$(TARGET)
+
+mips :
+	$(MAKE) CFLAGS="$(OPTFLAGS) -systype sysv -DSVR3 -Dos_chosen" \
+		$(TARGET)
+
+odt isc :
+	$(MAKE) CFLAGS="$(OPTFLAGS) -DUSG -DPOSIX -DSVR3_PTEM -Dos_chosen" \
+		$(TARGET)
+
+hpux:
+	$(MAKE) CFLAGS="$(OPTFLAGS) -DUSG -DHAVE_SELECT -Dos_chosen" \
+		$(TARGET)
+
+next:
+	$(MAKE) CFLAGS="$(OPTFLAGS) -DBERK -D__STRICT_BSD__ -Dos_chosen" \
+		$(TARGET)
+
+unixpc:
+	$(MAKE) CFLAGS="$(OPTFLAGS) -DUSG -DHAVE_SELECT \
+		-DHAVE_MKDIR=0 -Dwinit=xxwinit -Dos_chosen" \
+		$(TARGET)
+
+aix:
+	$(MAKE) CFLAGS="$(OPTFLAGS) -DUSG \
+		-DPOSIX -DHAVE_SELECT -U__STR__ -Dos_chosen -qpgmsize=l" \
+		LIBS=-lcurses \
+		$(TARGET)
+
+osf1:
+	$(MAKE) CFLAGS="$(OPTFLAGS) -DBERK -DPOSIX -DOSF1 -Dos_chosen" \
+		$(TARGET)
+
+linux:
+	$(MAKE) CFLAGS="$(OPTFLAGS) -DUSG \
+		-DPOSIX -DHAVE_SELECT -DHAVE_POLL=0 -Dos_chosen" \
+		$(TARGET)
+
+default:
+	$(MAKE) CFLAGS="$(OPTFLAGS) -Uos_chosen" \
+		$(TARGET)
 
 $(TARGET) : $(BUILTHDRS) $(OBJ) makefile
 	-mv $(TARGET) o$(TARGET)
@@ -232,7 +320,13 @@ $(EVERYTHING):
 	co -r$(revision) $@
 
 # $Log: makefile,v $
-# Revision 1.41  1992/04/06 09:43:55  pgf
+# Revision 1.43  1992/04/14 08:55:38  pgf
+# added support for OSF1 (affects termio only)
+#
+# Revision 1.42  1992/04/10  18:52:21  pgf
+# add config targets for various platforms
+#
+# Revision 1.41  1992/04/06  09:43:55  pgf
 # fixed nrevlist target
 #
 # Revision 1.40  1992/04/06  09:29:57  pgf

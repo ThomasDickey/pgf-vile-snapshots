@@ -4,7 +4,10 @@
  * "termio.c". It compiles into nothing if not an ANSI device.
  *
  * $Log: ansi.c,v $
- * Revision 1.6  1991/11/16 18:28:25  pgf
+ * Revision 1.7  1992/04/10 18:47:25  pgf
+ * change abs to absol to get rid of name conflicts
+ *
+ * Revision 1.6  1991/11/16  18:28:25  pgf
  * removed an old ifdef
  *
  * Revision 1.5  1991/09/10  01:19:35  pgf
@@ -262,7 +265,7 @@ ansiscroll(from,to,n)
 	        
 #else /* use insert and delete line */
 #if PRETTIER_SCROLL
-	if (abs(from-to) > 1) {
+	if (absol(from-to) > 1) {
 		ansiscroll(from, (from<to) ? to-1:to+1, n);
 		if (from < to)
 			from = to-1;

@@ -10,7 +10,16 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.59  1992/03/26 09:15:23  pgf
+ * Revision 1.62  1992/04/14 08:55:38  pgf
+ * added support for OSF1 (affects termio only)
+ *
+ * Revision 1.61  1992/04/10  19:52:40  pgf
+ * make sure svr3 implies usg
+ *
+ * Revision 1.60  1992/04/10  18:51:31  pgf
+ * rearrange some config ifdefs, so makefile can do config with targets
+ *
+ * Revision 1.59  1992/03/26  09:15:23  pgf
  * system choice ifdef cleanup
  *
  * Revision 1.58  1992/03/25  19:13:17  pgf
@@ -227,10 +236,11 @@
  * initial vile RCS revision
  */
 
-#ifdef	abs
-#undef	abs
-#endif
+#ifndef os_chosen
 
+/* Note that as of vile 3.15, most of these choices can be made
+	from the makefile, using separate make targets, so you may
+	not need to edit this... */
 
 /*	Machine/OS definitions			*/
 /* unix flavors */
@@ -252,39 +262,9 @@
 #define UNIXPC	0
 #define HPUX	0
 #define AIX	0
+#define OSF1	0
 #define LINUX	0
 #define BSD386	0
-
-/* non-unix flavors */
-#ifdef	LATTICE
-#undef	LATTICE		/* don't use their definitions...use ours	*/
-#endif
-#ifdef	MSDOS
-#undef	MSDOS
-#endif
-#ifdef	CPM
-#undef	CPM
-#endif
-#ifdef	AMIGA
-#undef	AMIGA
-#endif
-#ifdef	EGA
-#undef	EGA
-#endif
-
-#define AMIGA	0			/* AmigaDOS			*/
-#define ST520	0			/* ST520, TOS		       */
-#define MSDOS	0			/* MS-DOS		       */
-#define CPM	0			/* CP/M-86		       */
-#define VMS	0			/* VAX/VMS		       */
-
-/* choose between void and int signal handler return type.
-  "typedefs?  we don't need no steenking typedefs..." */
-#if POSIX || (BERK && BSD386)
-# define SIGT void
-#else
-# define SIGT int
-#endif
 
 /* the following overrides are mostly for convenience only */
 #if ULTRIX || defined(sun)
@@ -296,7 +276,7 @@
 # define POSIX	1
 #endif
 
-#if SVR3 || defined(mips)
+#if defined(mips)
 # undef BERK
 # undef USG
 # define BERK	0
@@ -314,7 +294,6 @@
 #endif
 
 #if HPUX	/* reported to work with 7.05.  Could someone confirm these? */
-# define setbuffer setbuf
 # define HAVE_SELECT
 # undef POSIX
 # undef BERK
@@ -334,7 +313,6 @@
 # undef USG
 # define BERK	0
 # define USG	1
-# define abs xxabs
 # define atoi xxatoi
 # define winit xxwinit
 # undef HAVE_MKDIR
@@ -351,7 +329,6 @@
 # define BERK	0
 # define USG	1
 # define HAVE_SELECT 1
-# define NOT_SYS_TERMIOS 1	/* termios.h is in /usr/include */
 # undef __STR__
 #endif
 
@@ -360,7 +337,47 @@
 # define HAVE_POLL 0
 #endif
 
+
+#endif /* os_chosen */
+
+#if SVR3
+# undef BERK
+# undef USG
+# define BERK	0
+# define USG	1
+#endif
+
 #define UNIX	(V7 | BERK | USG)	/* any unix		*/
+
+
+/* non-unix flavors */
+#undef	LATTICE		/* don't use their definitions...use ours	*/
+#undef	MSDOS
+#undef	CPM
+#undef	AMIGA
+#undef	EGA
+
+#define AMIGA	0			/* AmigaDOS			*/
+#define ST520	0			/* ST520, TOS		       */
+#define MSDOS	0			/* MS-DOS		       */
+#define CPM	0			/* CP/M-86		       */
+#define VMS	0			/* VAX/VMS		       */
+
+/*	Compiler definitions			*/
+#define MWC86	0	/* marc williams compiler */
+#define	LATTICE	0	/* Lattice 2.14 through 3.0 compilers */
+#define	AZTEC	0	/* Aztec C 3.20e */
+#define	MSC	0	/* MicroSoft C compile version 3 & 4 */
+#define	TURBO	0	/* Turbo C/MSDOS */
+
+/* choose between void and int signal handler return type.
+  "typedefs?  we don't need no steenking typedefs..." */
+#if POSIX || (BERK && BSD386)
+# define SIGT void
+#else
+# define SIGT int
+#endif
+
 
 /*	Porting constraints			*/
 #ifndef HAVE_MKDIR
@@ -387,13 +404,6 @@
 # endif
 #endif
 
-
-/*	Compiler definitions			*/
-#define MWC86	0	/* marc williams compiler */
-#define	LATTICE	0	/* Lattice 2.14 through 3.0 compilers */
-#define	AZTEC	0	/* Aztec C 3.20e */
-#define	MSC	0	/* MicroSoft C compile version 3 & 4 */
-#define	TURBO	0	/* Turbo C/MSDOS */
 
 /*	Terminal Output definitions		*/
 /* choose ONLY one of the following */
@@ -514,7 +524,6 @@
 
 #if	VMS
 #define	atoi	xatoi
-#define	abs	xabs
 #define	getname	xgetname
 #endif
 

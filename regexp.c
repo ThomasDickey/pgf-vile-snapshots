@@ -13,7 +13,14 @@
  *		pgf, 11/91
  * 
  * $Log: regexp.c,v $
- * Revision 1.18  1992/03/26 09:15:48  pgf
+ * Revision 1.20  1992/04/16 18:56:10  pgf
+ * better fix for non-leading ^ and non-trailing $
+ *
+ * Revision 1.19  1992/04/14  08:34:25  pgf
+ * make $ and ^ be special only at end and start of pattern, and literal
+ * elsewhere
+ *
+ * Revision 1.18  1992/03/26  09:15:48  pgf
  * took out include of string.h
  *
  * Revision 1.17  1992/03/07  10:23:31  pgf
@@ -249,7 +256,8 @@ STATIC char *regatom();
 STATIC char *regnode();
 STATIC char *regnext();
 STATIC void regc();
-STATIC void reginsert();
+STATIC void regopinsert();
+STATIC void regninsert();
 STATIC void regtail();
 STATIC void regoptail();
 #ifdef STRCSPN
@@ -514,9 +522,16 @@ int *flagp;
 	ret = regnode(BRANCH);
 	chain = NULL;
 	while (*regparse != '\0' && *regparse != '|' && *regparse != ')') {
-		latest = regpiece(&flags);
+		latest = regpiece(&flags, chain == NULL);
 		if (latest == NULL)
 			return(NULL);
+		if (chain && OP(chain) == EOL) {
+			regninsert(2,latest);
+			OP(chain) = EXACTLY;
+			*latest++ = '$';
+			*latest++ = '\0';
+			flags |= HASWIDTH|SIMPLE;
+		}
 		*flagp |= flags&HASWIDTH;
 		if (chain == NULL)	/* First piece. */
 			*flagp |= flags&SPSTART;
@@ -540,15 +555,16 @@ int *flagp;
  * endmarker role is not redundant.
  */
 static char *
-regpiece(flagp)
+regpiece(flagp, at_bop)
 int *flagp;
+int at_bop;
 {
 	register char *ret;
 	register char op;
 	register char *next;
 	int flags;
 
-	ret = regatom(&flags);
+	ret = regatom(&flags, at_bop);
 	if (ret == NULL)
 		return(NULL);
 
@@ -563,16 +579,16 @@ int *flagp;
 	*flagp = (op != '+') ? (WORST|SPSTART) : (WORST|HASWIDTH);
 
 	if (op == '*' && (flags&SIMPLE))
-		reginsert(STAR, ret);
+		regopinsert(STAR, ret);
 	else if (op == '*') {
 		/* Emit x* as (x&|), where & means "self". */
-		reginsert(BRANCH, ret);			/* Either x */
+		regopinsert(BRANCH, ret);			/* Either x */
 		regoptail(ret, regnode(BACK));		/* and loop */
 		regoptail(ret, ret);			/* back */
 		regtail(ret, regnode(BRANCH));		/* or */
 		regtail(ret, regnode(NOTHING));		/* null. */
 	} else if (op == '+' && (flags&SIMPLE))
-		reginsert(PLUS, ret);
+		regopinsert(PLUS, ret);
 	else if (op == '+') {
 		/* Emit x+ as x(&|), where & means "self". */
 		next = regnode(BRANCH);			/* Either */
@@ -582,7 +598,7 @@ int *flagp;
 		regtail(ret, regnode(NOTHING));		/* null. */
 	} else if (op == '?') {
 		/* Emit x? as (x|) */
-		reginsert(BRANCH, ret);			/* Either x */
+		regopinsert(BRANCH, ret);			/* Either x */
 		regtail(ret, regnode(BRANCH));		/* or */
 		next = regnode(NOTHING);		/* null. */
 		regtail(ret, next);
@@ -604,16 +620,22 @@ int *flagp;
  * separate node; the code is simpler that way and it's not worth fixing.
  */
 static char *
-regatom(flagp)
+regatom(flagp, at_bop)
 int *flagp;
+int at_bop;
 {
 	register char *ret;
 	int flags;
+	int len = 1;
 
 	*flagp = WORST;		/* Tentatively. */
 
 	switch (*regparse++) {
 	case '^':
+		if (!at_bop) {
+			regparse--;
+			goto defchar;
+		}
 		ret = regnode(BOL);
 		break;
 	case '$':
@@ -691,7 +713,6 @@ int *flagp;
 		*flagp |= HASWIDTH|SIMPLE;
 		break;
 	default: {
-			register int len;
 			register char ender;
 
 			regparse--;
@@ -701,6 +722,7 @@ int *flagp;
 			ender = *(regparse+len);
 			if (len > 1 && ISMULT(ender))
 				len--;		/* Back off clear of ?+* operand. */
+		defchar:
 			*flagp |= HASWIDTH;
 			if (len == 1)
 				*flagp |= SIMPLE;
@@ -756,13 +778,13 @@ int b;
 }
 
 /*
- - reginsert - insert an operator in front of already-emitted operand
+ - regninsert - insert n bytes in front of already-emitted operand
  *
  * Means relocating the operand.
  */
 static void
-reginsert(op, opnd)
-char op;
+regninsert(n, opnd)
+register int n;
 char *opnd;
 {
 	register char *src;
@@ -770,21 +792,37 @@ char *opnd;
 	register char *place;
 
 	if (regcode == &regdummy) {
-		regsize += 3;
+		regsize += n;
 		return;
 	}
 
 	src = regcode;
-	regcode += 3;
+	regcode += n;
 	dst = regcode;
 	while (src > opnd)
 		*--dst = *--src;
 
 	place = opnd;		/* Op node, where operand used to be. */
-	*place++ = op;
-	*place++ = '\0';
-	*place++ = '\0';
+	while (n--)
+		*place++ = '\0';
 }
+
+/*
+ - regopinsert - insert an operator in front of already-emitted operand
+ *
+ * Means relocating the operand.
+ */
+static void
+regopinsert(op, opnd)
+char op;
+char *opnd;
+{
+	regninsert(3, opnd);
+	if (regcode == &regdummy)
+		return;
+	*opnd = op;
+}
+
 
 /*
  - regtail - set the next-pointer at the end of a node chain

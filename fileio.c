@@ -3,7 +3,10 @@
  * the knowledge about files are here.
  *
  * $Log: fileio.c,v $
- * Revision 1.22  1992/03/25 19:13:17  pgf
+ * Revision 1.23  1992/04/14 08:51:44  pgf
+ * ifdef fixups for pjr and DOS
+ *
+ * Revision 1.22  1992/03/25  19:13:17  pgf
  * BSD portability changes
  *
  * Revision 1.21  1992/03/19  23:21:12  pgf
@@ -92,6 +95,9 @@
 #endif
 #if	BERK
 #include "sys/ioctl.h"
+#endif
+#if MSDOS
+#include	<sys/stat.h>
 #endif
 
 FILE	*ffp;		/* File pointer, all functions. */
@@ -194,7 +200,7 @@ char    *fn;
 }
 #endif
 
-#ifdef UNIX
+#if UNIX
 long
 ffsize()
 {
@@ -205,12 +211,20 @@ ffsize()
         mlforce("[File sizing error]");
         return -1;
 }
+#endif
 
+#if MSDOS
+unsigned long
+ffsize(void)
+{
+	int fd = fileno(ffp);
+	return  filelength(fd);
+}
 #endif
 
 ffread(buf,len)
 char *buf;
-off_t len;
+long len;
 {
 	return read(fileno(ffp), buf, (int)len);
 }

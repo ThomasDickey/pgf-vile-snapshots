@@ -4,7 +4,10 @@
 	written 1986 by Daniel Lawrence
  *
  * $Log: eval.c,v $
- * Revision 1.29  1992/03/24 09:02:18  pgf
+ * Revision 1.30  1992/04/10 18:48:17  pgf
+ * change abs to absol to get rid of name conflicts
+ *
+ * Revision 1.29  1992/03/24  09:02:18  pgf
  * need to glob() filenames for &rd and &wr
  *
  * Revision 1.28  1992/03/24  07:36:23  pgf
@@ -197,8 +200,8 @@ char *fname;		/* name of function to evaluate */
 		case UFGTKEY:	result[0] = tgetc();
 				result[1] = 0;
 				return(result);
-		case UFRND:	return(itoa((ernd() % abs(atoi(arg1))) + 1));
-		case UFABS:	return(itoa(abs(atoi(arg1))));
+		case UFRND:	return(itoa((ernd() % absol(atoi(arg1))) + 1));
+		case UFABS:	return(itoa(absol(atoi(arg1))));
 		case UFSINDEX:	return(itoa(sindex(arg1, arg2)));
 		case UFENV:
 #if	ENVFUNC
@@ -810,7 +813,7 @@ char *str;		/* string to lower case */
 
 #if ! SMALLER
 
-int abs(x)	/* take the absolute value of an integer */
+int absol(x)	/* take the absolute value of an integer */
 int x;
 {
 	return(x < 0 ? -x : x);
@@ -818,7 +821,7 @@ int x;
 
 int ernd()	/* returns a random integer */
 {
-	seed = abs(seed * 1721 + 10007);
+	seed = absol(seed * 1721 + 10007);
 	return(seed);
 }
 

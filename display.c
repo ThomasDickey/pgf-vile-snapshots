@@ -6,7 +6,10 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.34  1992/03/25 19:13:17  pgf
+ * Revision 1.35  1992/04/14 08:50:01  pgf
+ * fix SIGWINCH handling for X11 case
+ *
+ * Revision 1.34  1992/03/25  19:13:17  pgf
  * BSD portability changes
  *
  * Revision 1.33  1992/03/19  23:31:54  pgf
@@ -170,10 +173,8 @@ VIDEO   **pscreen;                      /* Physical screen. */
 
 
 int displaying = FALSE;
-#ifdef SIGWINCH
 /* for window size changes */
 int chg_width, chg_height;
-#endif
 
 /*
  * Initialize the data structures used by the display code. The edge vectors
@@ -421,10 +422,8 @@ int force;	/* force update past type ahead? */
 	movecursor(currow, screencol);
 	TTflush();
 	displaying = FALSE;
-#if SIGWINCH
 	while (chg_width || chg_height)
 		newscreensize(chg_height,chg_width);
-#endif
 	return(TRUE);
 }
 
@@ -2148,7 +2147,7 @@ int *widthp, *heightp;
 #endif
 }
 
-#ifdef SIGWINCH
+#if defined( SIGWINCH) && ! X11
 SIGT
 sizesignal ()
 {
@@ -2164,6 +2163,7 @@ sizesignal ()
 	signal (SIGWINCH, sizesignal);
 	errno = old_errno;
 }
+#endif
 
 newscreensize (h, w)
 int h, w;
@@ -2184,4 +2184,3 @@ int h, w;
 	return;
 }
 
-#endif
