@@ -4,7 +4,10 @@
  *	written 1986 by Daniel Lawrence
  *
  * $Log: exec.c,v $
- * Revision 1.82  1994/02/22 11:03:15  pgf
+ * Revision 1.83  1994/03/08 12:09:11  pgf
+ * changed 'fulllineregions' to 'regionshape'.
+ *
+ * Revision 1.82  1994/02/22  11:03:15  pgf
  * truncated RCS log for 4.0
  *
  */
@@ -463,13 +466,13 @@ seems like we need one more check here -- is it from a .exrc file?
 	/* and then execute the command */
 	isnamedcmd = TRUE;
 	havemotion = &f_gomark;
-	fulllineregions = TRUE;
+	regionshape = FULLLINE;
 
 	status = execute(cfp,f,n);
 
 	havemotion = NULL;
 	isnamedcmd = FALSE;
-	fulllineregions = FALSE;
+	regionshape = EXACT;
 
 	if (flags & NOMOVE) {	/* don't use this if the command modifies! */
 		DOT = save_DOT;
@@ -1292,7 +1295,7 @@ BUFFER *bp;	/* buffer to execute */
 	/* clear IF level flags/while ptr */
 	execlevel = 0;
 	whlist = NULL;
-	fulllineregions = FALSE;
+	regionshape = EXACT;
 	havemotion = NULL;
 
 #if ! SMALLER

@@ -4,7 +4,16 @@
  * written for vile by Paul Fox, (c)1990
  *
  * $Log: opers.c,v $
- * Revision 1.36  1994/02/22 11:03:15  pgf
+ * Revision 1.38  1994/03/08 14:06:43  pgf
+ * renamed routine, and gcc warning cleanup
+ *
+ * Revision 1.37  1994/03/08  12:20:50  pgf
+ * changed 'fulllineregions' to 'regionshape'.
+ * added operblank() and operopenrect() functions.
+ * made some operator functions rectangle aware, in the cases where a
+ * different region routine is needed.
+ *
+ * Revision 1.36  1994/02/22  11:03:15  pgf
  * truncated RCS log for 4.0
  *
  */
@@ -86,15 +95,19 @@ char *str;
 	}
 
 	/* motion is interpreted as affecting full lines */
-	if (cfp->c_flags & FL)
-		fulllineregions = TRUE;
+	if (regionshape == EXACT) {
+	    if (cfp->c_flags & FL)
+		    regionshape = FULLLINE;
+	    if (cfp->c_flags & RECT)
+		    regionshape = RECTANGLE;
+	}
 
 	/* and execute the motion */
 	status = execute(cfp, f,n);
 
 	if (status != TRUE) {
 		doingopcmd = FALSE;
-		fulllineregions = FALSE;
+		regionshape = EXACT;
 		mlforce("[Motion failed]");
 		return FALSE;
 	}
@@ -114,10 +127,10 @@ char *str;
 	if (ourbp == curbp) /* in case the func switched buffers on us */
 		swapmark();
 
-	if (fulllineregions) {
-		fulllineregions = FALSE;
+	if (regionshape == FULLLINE)
 		(void)firstnonwhite(FALSE,1);
-	}
+
+	regionshape = EXACT;
 
 	doingopcmd = FALSE;
 	return status;
@@ -132,7 +145,7 @@ int f,n;
 	opcmd = OPDEL;
 	lines_deleted = 0;
 	status = operator(f, n, killregion,
-		fulllineregions
+		regionshape == FULLLINE
 			? "Delete of full lines"
 			: "Delete");
 	if (do_report(lines_deleted))
@@ -144,21 +157,26 @@ int
 operlinedel(f,n)
 int f,n;
 {
-	fulllineregions = TRUE;
+	regionshape = FULLLINE;
 	return operdel(f,n);
 }
 
 static int
 chgreg()
 {
-	killregion();
-	if (fulllineregions) {
-		if (backline(FALSE,1) == TRUE) /* returns FALSE at top of buf */
-			return opendown(TRUE,1);
-		else
-			return openup(TRUE,1);
+	if (regionshape == RECTANGLE) {
+		return stringrect();
+	} else {
+		killregion();
+		if (regionshape == FULLLINE) {
+			if (backline(FALSE,1) == TRUE) 
+				/* backline returns FALSE at top of buf */
+				return opendown(TRUE,1);
+			else
+				return openup(TRUE,1);
+		}
+		return ins();
 	}
-	return ins();
 }
 
 int
@@ -179,7 +197,7 @@ int f,n;
 {
 	int s;
 
-	fulllineregions = TRUE;
+	regionshape = FULLLINE;
 	opcmd = OPOTHER;
 	s = operator(f,n,chgreg,"Change of full lines");
 	if (s == TRUE) swapmark();
@@ -206,7 +224,7 @@ int
 operlineyank(f,n)
 int f,n;
 {
-	fulllineregions = TRUE;
+	regionshape = FULLLINE;
 	opcmd = OPOTHER;
 	return operator(f,n,yankregion,"Yank of full lines");
 }
@@ -247,7 +265,7 @@ char	*msg;
 {
 	register int status = FALSE;
 
-	fulllineregions = TRUE;
+	regionshape = FULLLINE;
 	opcmd = OPOTHER;
 
 	if (havemotion != NULL) {
@@ -298,7 +316,7 @@ int
 operformat(f,n)
 int f,n;
 {
-	fulllineregions = TRUE;
+	regionshape = FULLLINE;
 	opcmd = OPOTHER;
 	return operator(f,n,formatregion,"Format");
 }
@@ -307,7 +325,7 @@ int
 operfilter(f,n)
 int f,n;
 {
-	fulllineregions = TRUE;
+	regionshape = FULLLINE;
 	opcmd = OPOTHER;
 	return operator(f,n,filterregion,"Filter");
 }
@@ -317,7 +335,7 @@ int
 operprint(f,n)
 int f,n;
 {
-	fulllineregions = TRUE;
+	regionshape = FULLLINE;
 	opcmd = OPOTHER;
 	return operator(f,n,plineregion,"Line print");
 }
@@ -326,7 +344,7 @@ int
 operlist(f,n)
 int f,n;
 {
-	fulllineregions = TRUE;
+	regionshape = FULLLINE;
 	opcmd = OPOTHER;
 	return operator(f,n,llineregion,"Line list");
 }
@@ -335,7 +353,7 @@ int
 opersubst(f,n)
 int f,n;
 {
-	fulllineregions = TRUE;
+	regionshape = FULLLINE;
 	opcmd = OPOTHER;
 	return operator(f,n,substregion,"Substitute");
 }
@@ -344,7 +362,7 @@ int
 opersubstagain(f,n)
 int f,n;
 {
-	fulllineregions = TRUE;
+	regionshape = FULLLINE;
 	opcmd = OPOTHER;
 	return operator(f,n,subst_again_region,"Substitute-again");
 }
@@ -353,7 +371,7 @@ int
 operentab(f,n)
 int f,n;
 {
-	fulllineregions = TRUE;
+	regionshape = FULLLINE;
 	opcmd = OPOTHER;
 	return operator(f,n,entab_region,"Spaces-->Tabs");
 }
@@ -362,7 +380,7 @@ int
 operdetab(f,n)
 int f,n;
 {
-	fulllineregions = TRUE;
+	regionshape = FULLLINE;
 	opcmd = OPOTHER;
 	return operator(f,n,detab_region,"Tabs-->Spaces");
 }
@@ -371,7 +389,24 @@ int
 opertrim(f,n)
 int f,n;
 {
-	fulllineregions = TRUE;
+	regionshape = FULLLINE;
 	opcmd = OPOTHER;
 	return operator(f,n,trim_region,"Trim whitespace");
+}
+
+int
+operblank(f,n)
+int f,n;
+{
+	opcmd = OPOTHER;
+	return operator(f,n,blank_region,"Blanking");
+}
+
+int
+operopenrect(f,n)
+int f,n;
+{
+	opcmd = OPOTHER;
+	regionshape = RECTANGLE;
+	return operator(f,n,openregion,"Opening");
 }

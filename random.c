@@ -3,7 +3,12 @@
  * commands. There is no functional grouping here, for sure.
  *
  * $Log: random.c,v $
- * Revision 1.118  1994/02/22 18:09:24  pgf
+ * Revision 1.119  1994/03/08 12:23:03  pgf
+ * reworked the gocol/gotocol/getccol etc routines to provide slightly
+ * different interface.  added getoff() routine.  moved region-oriented
+ * functions to region.c
+ *
+ * Revision 1.118  1994/02/22  18:09:24  pgf
  * when choosing dos-mode for an ambiguous buffer, vote in favor of on
  * if the global mode is set, and we're running on DOS.  otherwise, choose
  * no-dos-mode.
@@ -269,21 +274,35 @@ getcline()	/* get the current line number */
 #endif
 
 /*
+ * Return the screen column in any line given an offset.
+ * Assume the line is in curwp/curbp
+ * Stop at first non-blank given TRUE argument.
+ */
+int
+getcol(lp,offs,bflg)
+LINEPTR lp;
+C_NUM offs;
+int bflg;
+{
+	register C_NUM c, i, col;
+	col = 0;
+	for (i = w_left_margin(curwp); i < offs; ++i) {
+		c = lGetc(lp, i);
+		if (!isspace(c) && bflg)
+			break;
+		col = next_column(c,col);	/* assumes curbp */
+	}
+	return col;
+}
+
+/*
  * Return current screen column.  Stop at first non-blank given TRUE argument.
  */
 int
 getccol(bflg)
 int bflg;
 {
-	register int c, i, col;
-	col = 0;
-	for (i = w_left_margin(curwp); i < DOT.o; ++i) {
-		c = lGetc(DOT.l, i);
-		if (!isspace(c) && bflg)
-			break;
-		col = next_column(c,col);
-	}
-	return col;
+	return getcol(DOT.l, DOT.o, bflg);
 }
 
 
@@ -299,15 +318,18 @@ int f,n;
 	return gocol(n - 1);
 }
 
-/* really set column, based on counting from 0, for internal use */
+/* given a column, return the offset */
+/*  if there aren't that many columns, return how too few we were */
+/*	also, if non-null, return the column we _did_ reach in *rcolp */
 int
-gocol(n)
-int n;
+getoff(goal,rcolp)
+C_NUM goal;
+C_NUM *rcolp;
 {
-	register int c;		/* character being scanned */
-	register int i;		/* index into current line */
-	register int col;	/* current cursor column   */
-	register int llen;	/* length of line in bytes */
+	register C_NUM c;		/* character being scanned */
+	register C_NUM i;		/* index into current line */
+	register C_NUM col;	/* current cursor column   */
+	register C_NUM llen;	/* length of line in bytes */
 
 	col = 0;
 	llen = lLength(DOT.l);
@@ -315,7 +337,7 @@ int n;
 	/* scan the line until we are at or past the target column */
 	for (i = w_left_margin(curwp); i < llen; ++i) {
 		/* upon reaching the target, drop out */
-		if (col >= n)
+		if (col >= goal)
 			break;
 
 		/* advance one character */
@@ -323,12 +345,35 @@ int n;
 		col = next_column(c,col);
 	}
 
-	/* set us at the new position */
-	DOT.o = i;
+	if (rcolp)
+		*rcolp = col;
 
 	/* and tell whether we made it */
-	return(col >= n);
+	if (col >= goal)
+		return i;	/* we made it */
+	else
+		return col - goal; /* else how far short (in spaces) we were */
 }
+
+/* really set column, based on counting from 0, for internal use */
+int
+gocol(n)
+int n;
+{
+	register int offs;	/* current cursor column   */
+
+	offs = getoff(n,NULL);
+
+	if (offs >= 0) {
+		DOT.o = offs;
+		return TRUE;
+	}
+
+	DOT.o = llength(DOT.l) - 1;
+	return FALSE;
+
+}
+
 
 #if ! SMALLER
 /*
@@ -365,150 +410,6 @@ int f,n;
 #endif
 
 
-/*
- * change all tabs in the line to the right number of spaces.
- * leadingonly says only do leading whitespace
- */
-int
-detabline(leadingonly)
-int leadingonly;
-{
-	register int	s;
-	register int	c;
-	int	ocol;
-
-	ocol = getccol(FALSE);
-
-	DOT.o = 0;
-
-	/* detab the entire current line */
-	while (DOT.o < lLength(DOT.l)) {
-		c = char_at(DOT);
-		if (leadingonly && !isspace(c))
-			break;
-		/* if we have a tab */
-		if (c == '\t') {
-			if ((s = ldelete(1L, FALSE)) != TRUE) {
-				return s;
-			}
-			insspace( TRUE, curtabval - (DOT.o % curtabval) );
-		}
-		DOT.o++;
-	}
-	(void)gocol(ocol);
-	return TRUE;
-}
-
-/*
- * change all tabs in the region to the right number of spaces
- */
-int
-detab_region()
-{
-	return do_fl_region(detabline,FALSE);
-}
-
-/*
- * convert all appropriate spaces in the line to tab characters.
- * leadingonly says only do leading whitespace
- */
-int
-entabline(leadingonly)
-int leadingonly;
-{
-	register int fspace;	/* pointer to first space if in a run */
-	register int ccol;	/* current cursor column */
-	register char cchar;	/* current character */
-	int	ocol;
-
-	ocol = getccol(FALSE);
-
-	/* entab the current line */
-	/* would this have been easier if it had started at
-		the _end_ of the line, rather than the beginning?  -pgf */
-	fspace = -1;
-	ccol = 0;
-
-	detabline(leadingonly);	/* get rid of possible existing tabs */
-	DOT.o = 0;
-	while (1) {
-		/* see if it is time to compress */
-		if ((fspace >= 0) && (nextab(fspace) <= ccol))
-			if (ccol - fspace < 2)
-				fspace = -1;
-			else {
-				backchar(TRUE, ccol - fspace);
-				(void)ldelete((long)(ccol - fspace), FALSE);
-				linsert(1, '\t');
-				fspace = -1;
-			}
-
-		if (DOT.o >= lLength(DOT.l))
-			break;
-
-		/* get the current character */
-		cchar = char_at(DOT);
-
-		if (cchar == ' ') { /* a space...compress? */
-			if (fspace == -1)
-				fspace = ccol;
-		} else {
-			if (leadingonly)
-				break;
-			fspace = -1;
-		}
-		ccol++;
-		DOT.o++;
-	}
-	(void)gocol(ocol);
-	return TRUE;
-}
-
-/*
- * convert all appropriate spaces in the region to tab characters
- */
-int
-entab_region()
-{
-	return do_fl_region(entabline,FALSE);
-}
-
-/* trim trailing whitespace from a line.  leave dot at end of line */
-/*ARGSUSED*/
-int
-trimline(flag)
-int	flag;
-{
-	register int off, orig;
-	register LINE *lp;
-
-	lp = l_ref(DOT.l);
-
-	off = llength(lp)-1;
-	orig = off;
-	while (off >= 0) {
-		if (!isspace(lgetc(lp,off)))
-			break;
-		off--;
-	}
-
-	if (off == orig)
-		return TRUE;
-
-	DOT.o = off+1;
-
-	return ldelete((long)(orig - off),FALSE);
-}
-
-/*
- * trim trailing whitespace from a region
- */
-int
-trim_region()
-{
-	return do_fl_region(trimline,0);
-}
-
 
 #if AEDIT
 /*
@@ -543,7 +444,7 @@ int f,n;
 
 #endif
 
-/* '~' is synonymous with 'M-~<space>' */
+/* '~' is the traditional vi flip: flip a char and advance one */
 int
 flipchar(f, n)
 int f,n;

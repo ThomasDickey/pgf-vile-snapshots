@@ -37,10 +37,10 @@ LIBS = -ltermcap
 TARGET = vile
 SCRDEF = -DTERMCAP -Dscrn_chosen
 
-# Five xvile options:
-# These options build differently depending on whether you have the
-# Athena widget library, the Motif widget library, the OpenLook widget library,
-# just the X toolkit library, or none of these (just the X11 library).
+# Four xvile options:
+# These options build differently depending on whether you have the just
+# the Tookkit library, the Motif widget library, the OpenLook widget library,
+# or none of these (just the X11 library).
 #
 # In each case the LIBS line is just a suggested starting point.  You may be
 # able to get by without -lXext on some platforms. Others will require the
@@ -53,18 +53,21 @@ SCRDEF = -DTERMCAP -Dscrn_chosen
 # Your platform may well have its own idiosyncracies which will require other
 # libraries.
 
-# 1) for building the X toolkit version of xvile with the Athena widget set,
-# use these definitions.
+# you may need to uncomment or add something like this to find X libraries...
+# XLIBS="-L/usr/X386/lib"
+
+# 1) for building the X toolkit version of xvile, which needs no widget sets,
+# but does need libXt.a, use these lines.
 #SCREEN = x11
-#LIBS = -lXaw -lXmu -lXext -lXt -lX11
+#LIBS = $(XLIBS) -lXt -lX11
 #TARGET = xvile
-#SCRDEF = -DX11 -Dscrn_chosen -DXTOOLKIT -DATHENA_WIDGETS
+#SCRDEF = -DX11 -Dscrn_chosen -DXTOOLKIT -DNO_WIDGETS
 
 # 2) for building the X toolkit version of xvile with the Motif widget set,
 # use these definitions.  Not all systems have nor require -lgen.  Take it
 # out if your platform can't find it. 
 #SCREEN = x11
-#LIBS = -lXm -lXmu -lXext -lXt -lX11 -lgen
+#LIBS = $(XLIBS) -lXm -lXmu -lXext -lXt -lX11 -lgen
 #TARGET = xvile
 #SCRDEF = -DX11 -Dscrn_chosen -DXTOOLKIT -DMOTIF_WIDGETS
 
@@ -74,23 +77,14 @@ SCRDEF = -DTERMCAP -Dscrn_chosen
 # it.  If you don't, you will have to figure out where OPENWINHOME is and
 # set it appropriately.  It is often in /usr/openwin.
 #SCREEN = x11
-#LIBS = -L${OPENWINHOME}/lib -lXol -lXmu -lXt -lX11
+#LIBS = $(XLIBS) -L${OPENWINHOME}/lib -lXol -lXmu -lXt -lX11
 #TARGET = xvile
 #SCRDEF = -DX11 -Dscrn_chosen -DXTOOLKIT -DOL_WIDGETS -I${OPENWINHOME}/include
 
-# 4) if you don't have any of the above widget sets (not very probable), but
-# have the X toolkit (libXt.a), use these lines.  The biggest loss in this case
-# is the absence of scrollbars.
-#SCREEN = x11
-#LIBS = -lXt -lX11
-#TARGET = xvile
-#SCRDEF = -DX11 -Dscrn_chosen -DXTOOLKIT -DNO_WIDGETS
-
-# 5) for building the simple X version (if you don't have libXaw.a _or_
-# libXt.a) use these lines.  You won't get scrollbars, and some other
-# things.  Visually, this looks much the same as the one above.
+# 4) for building the simple X version (if you don't even have libXt.a) use
+# these lines.  You won't get scrollbars, and some other things.
 #SCREEN = x11simp
-#LIBS = -lX11
+#LIBS = $(XLIBS) -lX11
 #TARGET = xvile
 #SCRDEF = -DX11 -Dscrn_chosen
 
@@ -113,7 +107,7 @@ REMOTE=foxharp!pgf
 
 # choose a compiler you like.  anything should work.
 #CC = gcc
-#OPTFLAGS = -g -O -Wall -Wshadow
+#OPTFLAGS = -g -O -Wall -Wshadow # -Wconversion -Wstrict-prototypes -Wmissing-prototypes
 
 CC = cc
 #OPTFLAGS = -g
@@ -185,14 +179,15 @@ CSRCf = fences.c file.c filec.c fileio.c finderr.c
 CSRCgh = glob.c globals.c history.c hp110.c hp150.c
 CSRCil = ibmpc.c input.c insert.c isearch.c line.c
 CSRCm = main.c map.c modes.c mktbls.c
-CSRCnr = npopen.c opers.c oneliner.c path.c random.c regexp.c region.c
+CSRCnq = npopen.c opers.c oneliner.c path.c
+CSRCr = random.c regexp.c region.c
 CSRCst = search.c spawn.c st520.c tags.c tbuff.c tcap.c termio.c tipc.c tmp.c
 CSRCuv = undo.c version.c vmalloc.c vms2unix.c vmspipe.c vmsvt.c vt52.c
 CSRCw = window.c word.c wordmov.c
 CSRCxz = x11.c x11simp.c z309.c z_ibmpc.c
 
-CSRC = $(CSRCac) $(CSRCde) $(CSRCf) $(CSRCgh) $(CSRCil) $(CSRCm) $(CSRCnr) \
-	$(CSRCst) $(CSRCuv) $(CSRCw) $(CSRCxz)
+CSRC = $(CSRCac) $(CSRCde) $(CSRCf) $(CSRCgh) $(CSRCil) $(CSRCm) $(CSRCnq) \
+	$(CSRCr) $(CSRCst) $(CSRCuv) $(CSRCw) $(CSRCxz)
 
 # non-C source code
 OTHERSRC = z100bios.asm
@@ -218,16 +213,16 @@ SRC = main.c $(SCREEN).c basic.c bind.c buffer.c crypt.c \
 	termio.c tmp.c undo.c \
 	version.c vmalloc.c window.c word.c wordmov.c
 
-OBJ = main.$O $(SCREEN).$O basic.$O bind.$O buffer.$O crypt.$O \
-	csrch.$O display.$O eval.$O exec.$O externs.$O \
-	fences.$O file.$O filec.$O \
-	fileio.$O finderr.$O glob.$O globals.$O history.$O \
-	input.$O insert.$O isearch.$O \
-	line.$O map.$O modes.$O npopen.$O oneliner.$O \
-	opers.$O path.$O random.$O regexp.$O \
-	region.$O search.$O spawn.$O tags.$O tbuff.$O \
-	termio.$O tmp.$O undo.$O \
-	version.$O vmalloc.$O window.$O word.$O wordmov.$O
+OBJ = main.o $(SCREEN).o basic.o bind.o buffer.o crypt.o \
+	csrch.o display.o eval.o exec.o externs.o \
+	fences.o file.o filec.o \
+	fileio.o finderr.o glob.o globals.o history.o \
+	input.o insert.o isearch.o \
+	line.o map.o modes.o npopen.o oneliner.o \
+	opers.o path.o random.o regexp.o \
+	region.o search.o spawn.o tags.o tbuff.o \
+	termio.o tmp.o undo.o \
+	version.o vmalloc.o window.o word.o wordmov.o
 
 
 # if your pre-processor won't treat undefined macros as having value 0, or
@@ -266,7 +261,6 @@ all:
 	echo "	make linux	(ported to 0.95)"			;\
 	echo "	make aux2	(A/UX 2.0) (3.0 is probably svr3)"	;\
 	echo "	make apollo	(HP/Apollo SR10.3 CC 6.8)"		;\
-	echo "	nmake msc	(MicroSoft C 6.0) (buggy?)"		;\
 	echo "	make sx1100	(SX1100 running on Unisys 1100)"	;\
 	echo "	make delta88r3	(Motorola Delta 88, SVR3)"		;\
 	echo "	make delta88r4	(Motorola Delta 88, SVR4)"		;\
@@ -374,19 +368,6 @@ linux:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DUSG \
 		-DPOSIX -DHAVE_SELECT -DHAVE_POLL=0 -DLINUX -Dos_chosen" \
 		$(TARGET) $(ENVIR)
-
-# It has been pointed out to me that the stock COMMAND.COM can't possibly
-# handle the length of the commands that this causes.  You may have to
-# create your own makefile for DOS.  I think it's only this top level
-# re-invocation of make that's a problem -- everything else should fit in
-# 128 characters.  I think.  (It works as-is under SoftPC, which is why
-# I wrote it this way.)
-msc:
-	$(MAKE) MKTBLS=mktbls.exe CFLAGS="/qc /AL /nologo \
-		-DMSDOS -DMSC -Dos_chosen -DIBMPC -Dscrn_chosen" \
-		O=obj CC=cl SCREEN=ibmpc \
-		LNKFILE=link.msc \
-		LINK="link /MAP /CO /NOI /STACK:4096 @link.msc" $(TARGET)2
 
 aux2:
 	$(MAKE) CFLAGS="$(CFLAGS1) -DUSG -DAUX2 -Dos_chosen" \
@@ -619,7 +600,7 @@ cflow:	$(SRC)
 	cflow  $(SRC) >cflow.out
 
 clean:
-	rm -f *.$O o$(TARGET) $(BUILTHDRS) $(MKTBLS) core *~ *.BAK
+	rm -f *.o o$(TARGET) $(BUILTHDRS) $(MKTBLS) core *~ *.BAK
 
 clobber: clean
 	rm -f $(TARGET)
@@ -643,17 +624,27 @@ $(OBJ): estruct.h nemode.h edef.h proto.h
 
 ALWAYS:
 
-main.$O:	nevars.h
-bind.$O:	epath.h
-filec.$O:	dirstuff.h
-eval.$O:	nevars.h
-glob.$O:	dirstuff.h
-externs.$O:	nebind.h nename.h nefunc.h
-path.$O:	dirstuff.h
-vmalloc$O:	nevars.h
+main.o:	nevars.h
+bind.o:	epath.h
+filec.o:	dirstuff.h
+eval.o:	nevars.h
+glob.o:	dirstuff.h
+externs.o:	nebind.h nename.h nefunc.h
+path.o:	dirstuff.h
+vmalloco:	nevars.h
 
 # $Log: makefile,v $
-# Revision 1.136  1994/02/22 17:46:08  pgf
+# Revision 1.139  1994/03/11 14:00:52  pgf
+# new X configs -- no support for athena widgets.
+#
+# Revision 1.138  1994/03/10  20:25:21  pgf
+# added XLIBS placeholder, and change $O back to o, since this is never
+# used as a DOS makefile anymore.  removed msc target.
+#
+# Revision 1.137  1994/02/25  10:24:11  pgf
+# changes from tom
+#
+# Revision 1.136  1994/02/22  17:46:08  pgf
 # added kev's motif and openlook support
 #
 # Revision 1.135  1994/02/22  11:10:04  pgf
@@ -662,21 +653,10 @@ vmalloc$O:	nevars.h
 #
 
 # (dickey's rules)
-CPP_OPTS= $(CFLAGS0) -DBERK -DAPOLLO -Dos_chosen
-#CPP_OPTS= $(CFLAGS0) -DBERK -DSUNOS -DPOSIX -Dos_chosen
-.SUFFIXES: .i .i2 .lint
-
-lintlib::	llib-lVi1.ln
-llib-lVi1.ln:	llib-lVi1 $(ALLHDRS)	; makellib $(CPP_OPTS) llib-lVi1 Vi1
-llib-lVi1:	$(BUILTHDRS) $(SRC)	; cproto -l $(CPP_OPTS) `find $(SRC) -print |grep '^[a-k]'` >$@
-
-lintlib::	llib-lVi2.ln
-llib-lVi2.ln:	llib-lVi2 $(ALLHDRS)	; makellib $(CPP_OPTS) llib-lVi2 Vi2
-llib-lVi2:	$(BUILTHDRS) $(SRC)	; cproto -l $(CPP_OPTS) `find $(SRC) -print |grep '^[l-z]'` >$@
+CPP_OPTS= $(CFLAGS0) -DBERK -DSUNOS -DPOSIX -Dos_chosen
+.SUFFIXES: .i .i2
 
 lint.out:	$(BUILTHDRS) ;tdlint $(CPP_OPTS) $(LIBS) $(SRC) >$@
 
 .c.i:		;$(CC)  $(CPP_OPTS) -C -E $< >$@
 .c.i2:		;/usr/lib/cpp  $(CPP_OPTS) -C $< >$@
-.c.lint:	;tdlint -lVi1 -lVi2 $(LIBS) $(CPP_OPTS) $< >$@
-

@@ -55,7 +55,7 @@ Getting along with vile
 General Remarks
 ---------------
 
-	Vile holds text in "buffers".  Usually, these correspond to a file
+	vile holds text in "buffers".  Usually, these correspond to a file
 	that you are editing, but not always.  For instance, a buffer
 	might be used to display this help text, or to hold the output
 	of a shell command that you have run.  Buffers have names, and
@@ -77,7 +77,7 @@ General Remarks
 	you have two windows to the same buffer, and make a change in one,
 	you can undo it in the other.
 
-	Vile is 8-bit clean, allowing it to be used more easily at non-
+	vile is 8-bit clean, allowing it to be used more easily at non-
 	English speaking sites.  The section on "8-Bit Operation" for
 	more information.
 
@@ -160,7 +160,7 @@ Buffer manipulation commands:
 		the '_' command must be used, since '_' will only accept a
 		single following digit.)  The order of the list is either
 		most-recently-used, or fixed, depending on the setting 
-		of "autobuffer" mode (see below).  Vile attempts to keep
+		of "autobuffer" mode (see below).  vile attempts to keep
 		the contents of the buffer list window up to date.
 
 	^A-*	Always display a list of all buffers.  Useful for updating the
@@ -335,29 +335,48 @@ Text manipulation command:
 
 	Operators
 	---------
-	Vi has a class of commands known as "operators".  Operator
-	commands are always immediately followed by a motion command. 
-	The region of text affected by an operator is bounded by the
-	initial position, and the cursor position after the motion is
-	completed.  Thus the delete operator ('d') can be followed by the
-	word motion command ('w'), causing the next word to be deleted. 
-	The sequence "dG" will delete through the end of the file, and
-	"d/junk" will delete to the next occurrence of the string "junk". 
-	Operators can all be "stuttered" to affect lines.  Thus "dd"
-	deletes one line, "4dd" affects 4 lines, etc. 
+	vi has a class of commands known as "operators".  Operator commands
+	are always immediately followed by a motion command.  The region of
+	text affected by an operator is bounded on one end by the initial
+	position of the cursor, and on the other by the cursor position
+	after the motion is completed.  Thus the delete operator ('d') can
+	be followed by the word motion command ('w'), causing the next word
+	to be deleted.  The sequence "dG" will delete from the cursor
+	through the end of the file, and "d/junk" will delete to the next
+	occurrence of the string "junk".  As a special "honorary" type of
+	motion, operators can all be "stuttered" to affect lines.  Thus
+	"dd" deletes one line, "4dd" affects 4 lines, etc. 
 
-	Some operators in vile can be forced to affect regions of whole
+	Most operators affect the region exactly, but some cause only whole
+	lines to be affected.  This is usually a function of what sort of  motion
+	follows the operator, but can sometimes be affected by the operator
+	itself.  The best example of motions having different effects is
+	the 'goto-mark' motions, the ''' and '`' commands.  If a mark
+	is set, say mark 'a', with the 'ma' command, then if the
+	command d` is executed, the exact text between the cursor and
+	the mark will be deleted.  If, on the other hand, the d' command
+	is used, the deleted region will include the lines containing
+	the cursor and the mark in their entirety.
+
+	Some operators in vile can be "forced" to affect regions of whole
 	lines, though the motion wouldn't normally imply it, by using the
-	^X form of the command.  For example, "d%" (assuming you are on a
+	'^X' form of the command.  (It's not really forced -- it's really
+	a separate operator.)  For example, "d%" (assuming you are on a
 	curly brace) will delete a C-style block of code.  "^X-d%" will
 	delete that same area, plus anything else on the lines containing
 	the curly-brace endpoints.
 
 	Note that some operators always affect whole lines, no matter
-	how the motion is specified.  For instance, "!w" will always
-	filter an entire line, and not just a single word. 
+	how the motion is specified.  The '!' operator is an example:
+	"!w" will always filter an entire line, and not just a single word. 
 
-	There are several new operator commands:
+	vile extends this notion of the "shape" of a region by adding
+	the concept of rectangular regions, whose boundaries are
+	delimited by the rectangle whose opposite corners are at the
+	cursor and at the other end of the motion, respectively.  See
+	the section "Rectangular regions" below.
+
+	There are several new operator commands in vile:
 
 	^A-~	Is the operator form of the '~' command, so "^A-~~"
 		changes the case of all characters on the current
@@ -407,6 +426,12 @@ Text manipulation command:
 	^A-<SPACE> Convert tabs to spaces, using the current tabstop value.
 	^A-<TAB>   Convert as many spaces to tabs as appropriate.
 
+	^A-b	Blank out a region.  Turns the region to whitespace.  Useful
+		with rectangular regions.
+	^A-r	Open up a rectangle.  Text to the right of the left edge
+		of the rectangular region will shift to the right by the
+		width of the rectangle, leaving a whitespace "hole".
+
 	Text insertion
 	--------------
 	^X-p	Causes the previously yanked or deleted text, no matter
@@ -452,7 +477,7 @@ Text manipulation command:
 
 	Tags
 	----
-	Vile supports vi-style "tags" files.
+	vile supports vi-style "tags" files.
 
 	":ta" or ":tag" allows you to enter a tagname to locate.  Changes
 		to that file and location.
@@ -487,13 +512,13 @@ Text manipulation command:
 Miscellaneous commands
 ----------------------
 
-	^A-r	Remove all blank lines containing or immediately following
-		the current line.
+	^A-d	Remove all blank lines (deblank) containing or immediately
+		following the current line.
 
 	^X-^X	The "error finder".  Goes to the next file/line error pair 
 		specified in the last buffer captured from a command's
 		output.  This buffer is usually created with the ^X-! command.
-		For example, "-!cc -c junk.c" puts all of the compiler output
+		For example, "^X-!cc -c junk.c" puts all of the compiler output
 		into the buffer named "[Output]".  Repeatedly hitting ^X-^X 
 		will position the editor at each error in turn, and will
 		eventually start over again at the top.  The buffer searched
@@ -507,6 +532,8 @@ Miscellaneous commands
 		    use-register g load-register "^X!egrep -n : *.[chs]^M"
 		where the ^X and ^M are each single control characters, entered
 		using ^V to escape them.  Then I invoke with @g to execute.)
+		Unfortunately, the parsing of the compiler output to get
+		the file and line numbers is currently hard-coded.
 	^X-t Set or report on the tab-stop width.  To set, the spacing must
 		precede the command, as in "4^X-t".  The "set tabstop"
 		command described below does the same thing.  The status
@@ -533,11 +560,17 @@ Miscellaneous commands
 		"#endif" it will go back up to the "#if".  If the cursor is
 		on any part of a "/*" or "*/" sequence, it will find the
 		appropriate corresponding C comment endpoint.
+	\	Identical to the ` motion, in that the cursor moves to
+		the specified mark (i.e. \a moves to mark 'a').  When
+		used with an operator command, the resulting region is
+		rectangular instead of "exact".  This is similar to
+		the ' motion, which also goes to [the line holding] the
+		mark, and causes regions to become "full line" regions.
 
 Arrow keys
 ----------
 
-	Vile understands ANSI-style arrow keys, which are produced by
+	vile understands ANSI-style arrow keys, which are produced by
 	the keypad on VT100-style terminals and terminal emulators,
 	including xterm.  The keys are interpreted as function keys, and
 	are by default bound to the up, down, left, and right screen
@@ -559,6 +592,49 @@ Arrow keys
 	insert into your text.  (This is not the default since it makes
 	full 8-bit operation difficult to implement.)
 
+Rectangular regions
+-------------------
+	Just as the regions defined by vi's commands and motions can either
+	be "exact", or encompass "full lines", regions in vile can in
+	addition be "rectangular".  The easiest way to use a rectangular
+	region is with the '\' motion, which, like '`' and ''', goes to a
+	named mark.  The region it describes, however, is "rectangular"
+	(instead of "exact" or "full line").  The following operators know
+	how to correctly act on rectangular regions:
+
+	^A-r	Opens up a rectangle.  Text to the right of the left
+		edge of the rectangle is shifted right by the width of
+		the rectangle.
+	>	Shift right.  Identical to '^A-r' when region is rectangular.
+	d	Deletes the (rectangular) region.  Text to the right moves
+		left to fill the rectangle.
+	>	Shift left.  Identical to 'd' when region is rectangular.
+	y	Yanks the (rectangular) region.  (vile remembers that the
+		yanked text is rectangular in shape.
+	c	Change the region.  If the region is _not_ rectangular,
+		insert mode is entered after the region is deleted.  If
+		the region _is_ rectangular, the user is prompted for
+		text with which the lines of the rectangle will be filled.
+	^A-u ^A-l ^A-~ ^A-b	These four operators perform their character
+		transformations on rectangular regions, as well as exact or
+		full-line regions. (uppercase, lowercase, flip-case, and
+		blank, respectively)
+
+	p P 	The 'put'ting commands know whether the text being 'put' was
+		originally rectangular, and will do a rectangular insert
+		of the text, in front of or behind the cursor.  The
+		cursor position defines the upper left corner of the
+		insertion.
+	^A-p	These two forms of the put command force the text being
+	^A-P	'put' to be inserted as if it had been rectangular when
+		originally yanked or deleted.  The width of the rectangle
+		is the length of the longest line in register being 'put'.
+
+	[If anyone has ideas on other or more useful ways of integrating
+	rectangles into the vile command set, please let me know...]
+
+
+
 
 Editor modes
 ------------
@@ -575,7 +651,7 @@ Editor modes
 	":set all".  Local values are only shown if they differ from the
 	global values, whether they have been independently set or not. 
 	The "local" version of the set/unset commands ("setl"/"unsetl") do
-	not make sense when used with univeral modes.
+	not make sense when used with universal modes.
 
 	The possible modes, with synonyms in parentheses, and a trailing U,
 	B or W indicating whether the mode is universal, or belongs to
@@ -771,7 +847,7 @@ Editor modes
 	paragraphs A regular expression defining where the "next-paragraph"
 		('}') and "previous-paragraph" ('{') commands will go. (B)
 
-	printing-low The integer value repesenting the first of the
+	printing-low The integer value representing the first of the
 		printable set of "high bit" characters.  Defaults to 0.
 		Most foreign (relative to me!) users would set this to 160,
 		the first printable character in the upper range of the 
@@ -895,7 +971,7 @@ Editor modes
 8-Bit Operation
 ---------------
 
-	Vile allows input, manipulation, and display of all 256 possible
+	vile allows input, manipulation, and display of all 256 possible
 	byte-wide characters.  (Double-wide characters are not supported.)
 	
 	Output: By default, characters with the high bit set (decimal value
@@ -1016,7 +1092,7 @@ Key Rebinding
 	Function and meta key bindings are available in insert mode, as
 	well as in command mode.  (But only via either the "meta bit" or
 	ANSI ESC sequence form -- the '#' prefix will not work in insert
-	mode.) So the following macro will work corrently in both command
+	mode.) So the following macro will work correctly in both command
 	and insert modes:
 
 		15 store-macro
@@ -1143,7 +1219,7 @@ Macros
 Programmed macros
 -----------------
 
-	Vile can also be extended (though I confess this has only been
+	vile can also be extended (though I confess this has only been
 	lightly used or tested) by defining macros and then binding
 	execution of those macros to key sequences.  For example, if
 	the following lines appear in a .vilerc file:
@@ -1256,7 +1332,7 @@ Programmed macros
 	&rnd	1	get a random number from 1 to n
 	&abs	1	absolute value of a number
 	&sin	2	find the index of second string in first
-	&env	1	retrieve a system environment var
+	&env	1	retrieve a system environment variable
 	&bin	1	lookup what function name is bound to key
 	&rd	1	is a file readable
 	&wr	1	is a file writable
@@ -1541,8 +1617,8 @@ Invocation
 		~endif"
 
 
-	The command line options are fairly straightforward.  Vile does not
-	support running _any_ command after a '+', as does vi, but does
+	The command line options are fairly straightforward.  vile does not
+	support running just _any_ command after a '+', as does vi, but does
 	support the commonly used '+400' to go to line 400 and '+/foo' to
 	search for foo.  Command files (see below) can be explicitly
 	executed on startup by prefixing them with the '@' character, as in
@@ -1585,25 +1661,36 @@ X Window System specifics:
 	near the mouse cursor.  Ctrl<Btn2Down> will delete the window. 
 	Ctrl<Btn3Down> will make the corresponding window the only window.
 
-	Additional command line arguments:
+	Standard X command line arguments:
 	----------------------------------
-	-f fontname	Font to use.
-	-r 		Use reverse video.
-	-d display	Use an alternate display.
-	-fg color	change foreground color (or -foreground)
-	-bg color	change background color (or -background)
-	-name name	change name used for resource lookups
-	=geometry	change window dimensions
+	-fn fontname	Font to use (or -font).
+	-rv 		Use reverse video (also -reverse).
+	+rv		Don't use reverse video.
+	-display disp	Display to run xvile on.
+	-fg color	Foreground color (or -foreground).
+	-bg color	Background color (or -background).
+	-bd color	Border color (or -bordercolor).
+	-name name	Name used for resource lookups.
+	-title name	Name to be displayed in titlebar.
+	-geometry geom	Initial window dimensions in columns and rows.
+	-iconic		Start xvile iconified.
+	-xrm Resource	Specify or change an X resource internal to xvile.
+
+	Additional xvile command line arguments:
+	----------------------------------------
+	-leftbar	Put scrollbar(s) on left.
+	-rightbar	Put scrollbar(s) on right (default).
 
 	X Resources:
 	------------
+	rows		Number of rows to start with.
+	columns		Number of columns to start with.
 	font		Font to use.
 	geometry	Window dimensions.
 	charClass	Character classes for multiple click selections.
 			The format is identical to that of xterm(1).
 	multiClickTime	How long between clicks (in milliseconds) to
 			be accepted as a multi-click.
-    	reverseVideo	Foreground/background reversal.
 	foreground	Foreground color.
 	background	Background color.
 
@@ -1611,6 +1698,10 @@ X Window System specifics:
 			inhabited by the mouse; no clicking is necessary
 			to change windows, therefore selected text is not
 			lost due to the extra clicking.
+
+	scrollbarPlacement  Either left or right; specifies on which side of
+			the window the scrollbars are placed.  By default,
+			the scrollbars are placed on the right.
 
 
 	Fonts:
@@ -1684,12 +1775,13 @@ Differences from vi
 	There is no special lisp support.  But then, when was the last time
 	you heard of a lisp programmer that used vi?
 
-	Of course, ex and open mode aren't there.
+	Of course, ex and open mode aren't there.  (Too bad.  I'd love
+	to have a companion editor called "exile".)
 
 	Most, but not all, of the word-motion-with-operator and end-of-line 
 	anomalies have been recreated.  One missing anomaly: In vile, "dw"
 	on the last word of a line ending in whitespace deletes the
-	trailing whitespace.  Vi does not delete the whitespace. 
+	trailing whitespace.  vi does not delete the whitespace. 
 
 	In the real vi, the '_' command is a little-used motion command,
 	which moves the cursor to the start of the Nth next line, where N
@@ -1791,10 +1883,10 @@ Notes on TERM types and Scrolling
 	The crucial entries are cs and sr -- without both of them,
 	vile will attempt to use dl and al, and will scroll by
 	deleting and inserting a block of lines, giving the ugly
-	behavior you see.  If you define PRETTIER_SCROLL when building
-	vile, it will alternately delete and insert lines, instead of
-	deleting them all and then inserting them all.  This makes it
-	look a _little_ better, but it's slower.
+	behavior you're probably seeing.  If you define PRETTIER_SCROLL
+	when building vile, it will alternately delete and insert lines,
+	instead of deleting them all and then inserting them all.  This
+	makes it look a _little_ better, but it's slower.
 
 	( The terminfo entry equivalent to the above termcap entry:
 
@@ -1829,8 +1921,12 @@ Credits
 	"elvis".  The regular expression code and documentation is by Henry
 	Spencer.  The sample .vilerc was created by Dave Lemke; he also
 	contributed code for new features (native X support) and bug fixes. 
-	Eric Krohn has done some excellent testing and enhancement.  The
-	initial changes to create vile from micro-Emacs were all done by
-	Paul Fox, who can be reached at pgf@cayman.com.  (By the way, this
-	is not the same Paul Fox that did the Crisp editor.)
+	Eric Krohn has done some excellent testing and enhancement.  Kevin
+	Buettner contributed changes for X11 Toolkit support.  The
+	implementation of rectangles and their operations was inspired by
+	code from the 'notgnu' editor, by Julie Melbin.  The initial
+	changes to create vile from micro-Emacs were all done by Paul Fox,
+	who can be reached at pgf@cayman.com, or at home at pgf@foxharp.
+	boston.ma.us.  (By the way, this is not the same Paul Fox that did
+	the Crisp editor.)
 

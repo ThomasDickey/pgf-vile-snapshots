@@ -2,7 +2,17 @@
  * 	older, simpler X11 support, Dave Lemke, 11/91
  *
  * $Log: x11simp.c,v $
- * Revision 1.40  1994/02/22 11:03:15  pgf
+ * Revision 1.43  1994/03/08 12:31:39  pgf
+ * changed 'fulllineregions' to 'regionshape'.
+ *
+ * Revision 1.42  1994/03/02  10:01:23  pgf
+ * no longer trim leading whitespace from pasted text -- and suppress
+ * autoindent on the insertion.
+ *
+ * Revision 1.41  1994/02/25  10:23:47  pgf
+ * took out redundant global ifdef
+ *
+ * Revision 1.40  1994/02/22  11:03:15  pgf
  * truncated RCS log for 4.0
  *
  */
@@ -13,8 +23,6 @@
 /* undef for the benefit of some X header files -- if you really _are_
 	both ISC and X11, well, you know what to do. */
 #undef ISC
-
-#if X11
 
 #if VMS
 #undef UNIX
@@ -1609,8 +1617,9 @@ int	c;
  *
  *	+ the window's buffer is modifiable (if not, don't waste time copying
  *	  text!)
- *	+ the buffer uses 'autoindent' mode (if so, trim leading whitespace
- *	  from each line).
+ *	+ the buffer uses 'autoindent' mode (if so, do some heuristics
+ *	  for placement of the pasted text -- we may put it on lines by
+ *	  itself, above or below the current line)
  */
 static int
 copy_paste(p, value, length)
@@ -1619,78 +1628,61 @@ char	*value;
 SIZE_T	length;
 {
 	WINDOW	*wp = row2window(ttrow);
-	BUFFER	*bp = (wp != NULL) ? wp->w_bufp : 0;
+	BUFFER	*bp = (wp != NULL) ? wp->w_bufp : NULL;
 	int	status;
 
-	if (bp != 0 && b_val(bp,MDVIEW)) {
-		status = FALSE;
-	} else {
-		status = TRUE;
+	if (bp != NULL && b_val(bp,MDVIEW))
+		return FALSE;
 
-		if (bp != 0 && (b_val(bp,MDCMOD) || b_val(bp,MDAIND))) {
-			register int	trim = TRUE;
-			register int	c;
+	status = TRUE;
 
-			/*
-			 * If the cursor points before the first nonwhite on
-			 * the line, convert the insert into an 'O' command. 
-			 * If it points to the end of the line, convert it into
-			 * an 'o' command.  Otherwise (if it is within the
-			 * nonwhite portion of the line), assume the user knows
-			 * what (s)he is doing.
+	if (bp != NULL && (b_val(bp,MDCMOD) || b_val(bp,MDAIND))) {
+
+		/*
+		 * If the cursor points before the first nonwhite on
+		 * the line, convert the insert into an 'O' command. 
+		 * If it points to the end of the line, convert it into
+		 * an 'o' command.  Otherwise (if it is within the
+		 * nonwhite portion of the line), assume the user knows
+		 * what (s)he is doing.
+		 */
+		if (setwmark(ttrow, ttcol)) {	/* MK gets cursor */
+			LINE	*lp	= l_ref(MK.l);
+			int	first	= -1;
+			int	last	= -1;
+			CMDFUNC	*f = NULL;
+			extern CMDFUNC f_opendown_no_aindent;
+			extern CMDFUNC f_openup_no_aindent;
+
+			first = firstchar(lp);
+			last = lastchar(lp);
+
+			/* If the line contains only a single nonwhite,
+			 * we will insert before it.
 			 */
-			if (setwmark(ttrow, ttcol)) {	/* MK gets cursor */
-				LINE	*lp	= l_ref(MK.l);
-				int	first	= -1;
-				int	last	= -1;
-				int	cmd	= 0;
-
-				for (c = 0; c < llength(lp); c++) {
-					if (!isblank(lp->l_text[c])) {
-						if (first < 0)
-							first = c;
-						last = c;
-					}
-				}
-				/* If the line contains only a single nonwhite,
-				 * we will insert before it.
-				 */
-				if (first >= MK.o)
-					cmd = -1;
-				else if (last <= MK.o)
-					cmd = 1;
-				if (insertmode) {
-					if ((*value != '\n')
-					 && (cmd > 1 || (MK.o == 0)))
-						(void)tb_append(p, '\n');
-				} else if (cmd != 0
-					&& (c = insertion_cmd(cmd)) >= 0) {
-					*tb_values(*p) = c;
-				}
-			}
-
-			while (length-- != 0) {
-				if ((c = *value++) == '\n')
-					trim = TRUE;
-				else if (trim && isblank(c))
-					continue;
-				else
-					trim = FALSE;
-
-				if (!add2paste(p, c)) {
-					status = FALSE;
-					break;
-				}
-			}
-		} else {
-			while (length-- > 0) {
-				if (!add2paste(p, *value++)) {
-					status = FALSE;
-					break;
-				}
+			if (first >= MK.o)
+				f = &f_openup_no_aindent;
+			else if (last <= MK.o)
+				f = &f_opendown_no_aindent;
+			if (insertmode) {
+				if ((*value != '\n') && MK.o == 0)
+					(void)tb_append(p, '\n');
+			} else if (f) {
+				/* we're _replacing_ the default
+					insertion command, so reinit */
+				tb_init(p, abortc);
+				tb_sappend(p, fnc2str(f));
 			}
 		}
 	}
+
+	while (length-- > 0) {
+		if (!add2paste(p, *value++)) {
+			status = FALSE;
+			break;
+		}
+	}
+
 	return status;
 }
 
@@ -1704,28 +1696,28 @@ x_get_selection(tw, selection, type, value, length, format)
 	SIZE_T      length;
 	int         format;
 {
-	int	c, do_ins;
+	int	do_ins;
 
 	if (format != 8 || type != XA_STRING)
 		return;			/* can't handle incoming data */
 
 	if (length != 0) {
-		c = EOS;		/* stifle compiler warning */
-
+		char *s = NULL;		/* stifle warning */
+		extern CMDFUNC f_insert_no_aindent;
 		/* should be impossible to hit this with existing paste */
 		/* XXX massive hack -- leave out 'i' if in prompt line */
 		do_ins = !insertmode
 			&& !onMsgRow(tw)
-			&& ((c = insertion_cmd(0)) != -1);
+			&& ((s = fnc2str(&f_insert_no_aindent)) != NULL);
 
 		if (tb_init(&PasteBuf, abortc)) {
-			if ((do_ins && !tb_append(&PasteBuf, c))
+			if ((do_ins && !tb_sappend(&PasteBuf, s))
 			 || !copy_paste(&PasteBuf, value, length)
 			 || (do_ins && !tb_append(&PasteBuf, abortc)))
 				tb_free(&PasteBuf);
 		}
 	}
-#if !defined(DOALLOC) || !defined(DBMALLOC) /* cannot intercept that one */
+#if !(DOALLOC || DBMALLOC) /* cannot intercept that one */
 	free(value);
 #endif
 }
@@ -1764,7 +1756,7 @@ x_stash_selection(tw)
 	if ((wp = row2window(tw->sel_start_row)) != 0) {
 		KILL	*kp;		/* pointer into kill register */
 		MARK	save;
-		int	region_flag = fulllineregions;
+		int	region_flag = regionshape;
 		int	report_flag = global_g_val(GVAL_REPORT);
 		int	saverow;
 		int	savecol;
@@ -1812,9 +1804,9 @@ x_stash_selection(tw)
 		if (x_on_msgline())	/* disable messages? */
 			set_global_g_val(GVAL_REPORT,0);
 
-		fulllineregions = FALSE;
+		regionshape = EXACT;
 		(void)yankregion();
-		fulllineregions = region_flag;
+		regionshape = region_flag;
 
 		DOT = save;
 		if (saverow != ttrow)	/* we showed a message */
@@ -2643,7 +2635,3 @@ x11_leaks()
 	}
 }
 #endif
-
-#else
-x11hello() {}
-#endif				/* X11 */

@@ -9,7 +9,17 @@
 
 /*
  * $Log: edef.h,v $
- * Revision 1.128  1994/02/22 11:10:04  pgf
+ * Revision 1.131  1994/03/11 14:08:06  pgf
+ * v. 4.1
+ *
+ * Revision 1.130  1994/03/11  11:57:40  pgf
+ * replaced the ibmtype integer with the current_res_name string
+ *
+ * Revision 1.129  1994/03/08  11:57:26  pgf
+ * changed 'fulllineregions' to 'regionshape'.
+ * added kregwidth for keeping width of a register
+ *
+ * Revision 1.128  1994/02/22  11:10:04  pgf
  * truncated RCS log for 4.0
  *
  */
@@ -29,7 +39,7 @@
 decl_uninit( char *prog_arg );		/* argv[0] from main.c */
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version 4.0");
+decl_init( char version[], "version 4.1");
 
 decl_init( int slash, '/'); 		/* so DOS can use '\' as path separator */
 
@@ -47,7 +57,7 @@ decl_uninit( int insert_mode_was );	/* were we (and will we be?)	*/
 decl_uninit( int lastkey );		/* last keystoke (tgetc)	*/
 decl_init( int tungotc , -1);		/* last un-gotten key (tungetc) */
 decl_uninit( int lastcmd );		/* last command	(kbd_seq)	*/
-decl_uninit( short fulllineregions );   /* regions should be full lines */
+decl_uninit( short regionshape );	/* regions should be full lines */
 decl_uninit( short doingopcmd );        /* operator command in progress */
 decl_uninit( MARK pre_op_dot );		/* current pos. before operator cmd */
 decl_uninit( short opcmd );             /* what sort of operator?	*/
@@ -80,7 +90,7 @@ decl_uninit( char golabel[NPAT] );	/* current line to go to	*/
 decl_uninit( int execlevel );		/* execution IF level		*/
 decl_init( int	eolexist, TRUE );	/* does clear to EOL exist	*/
 decl_uninit( int revexist );		/* does reverse video exist?	*/
-#if MSDOS || ZIBMPC || OPT_EVAL
+#if IBMPC || ZIBMPC || OPT_EVAL
 decl_uninit( int flickcode );		/* do flicker suppression?	*/
 #endif
 decl_uninit( int curtabval );		/* current tab width		*/
@@ -143,6 +153,7 @@ decl_init( int test_cmpl, '?');		/* show name-completion		*/
 decl_uninit( KILLREG kbs[NKREGS] );	/* all chars, 1 thru 9, and default */
 decl_uninit( short ukb );		/* index of current kbuffs */
 decl_uninit( int kregflag );		/* info for pending kill into reg */
+decl_uninit( C_NUM kregwidth );		/* max width of current kill */
 decl_uninit( int kchars );		/* how much did we kill? */
 decl_uninit( int klines );
 decl_uninit( int lines_deleted );	/* from 'ldelete()', for reporting */
@@ -221,9 +232,5 @@ extern  TERM    term;                   /* Terminal information.        */
 #endif
 
 #if IBMPC
-#if __ZTC__
-extern int set43;
-#endif	/* __ZTC__ */
-
-extern int ibmtype;
+decl_init( char *current_res_name, "default");
 #endif	/* IBMPC */

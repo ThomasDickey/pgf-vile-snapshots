@@ -6,7 +6,11 @@
  * framing, are hard.
  *
  * $Log: basic.c,v $
- * Revision 1.64  1994/02/22 11:03:15  pgf
+ * Revision 1.65  1994/03/08 11:47:06  pgf
+ * changed 'fulllineregions' to 'regionshape'.
+ * added gorectnmmark() function.
+ *
+ * Revision 1.64  1994/02/22  11:03:15  pgf
  * truncated RCS log for 4.0
  *
  */
@@ -587,7 +591,7 @@ int f,n;
 		if (!sameline(DOT,odot) &&
 			(pre_op_dot.o > lastchar(l_ref(pre_op_dot.l))) &&
 			((fc >= 0 && DOT.o <= fc) || fc < 0)) {
-			fulllineregions = TRUE;
+			regionshape = FULLLINE;
 		}
 	}
 	return TRUE;
@@ -641,7 +645,7 @@ int f,n;
 		}
 		/* if we started at the start of line, eat the whole line */
 		if (!sameline(DOT,odot) && was_at_bol)
-			fulllineregions = TRUE;
+			regionshape = FULLLINE;
 	}
 	return TRUE;
 }
@@ -1025,6 +1029,22 @@ int f,n;
 	if (s != TRUE)
 		return s;
 
+	return gonmmark(c);
+}
+
+/* ARGSUSED */
+int
+gorectnmmark(f,n)
+int f,n;
+{
+	int c;
+	register int s;
+
+	s = getnmmarkname(&c);
+	if (s != TRUE)
+		return s;
+
+	regionshape = RECTANGLE;
 	return gonmmark(c);
 }
 

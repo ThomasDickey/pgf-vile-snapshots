@@ -2,7 +2,13 @@
  * version & usage-messages for vile
  *
  * $Log: version.c,v $
- * Revision 1.6  1994/02/22 11:03:15  pgf
+ * Revision 1.8  1994/02/25 12:08:54  pgf
+ * removed rows/columns options
+ *
+ * Revision 1.7  1994/02/23  05:31:03  pgf
+ * x options up to date
+ *
+ * Revision 1.6  1994/02/22  11:03:15  pgf
  * truncated RCS log for 4.0
  *
  *
@@ -38,13 +44,16 @@ print_usage P((void))
 #endif
 #if X11
 	"-name name     to change program name for X resources",
+	"-title name	to set name in title bar",
 	"-fg color      to change foreground color",
 	"-bg color      to change background color",
-	"-f fontname    to change font",
-	"-d displayname to change the default display",
-	"-r             for reverse video",
-	"-wm title      to set window title (default XVile)",
-	"=geometry      to set window size (like '=80x50')",
+	"-fn fontname   to change font",
+	"-display displayname to change the default display",
+	"-rv            for reverse video",
+	"-geometry CxR	to set initial size to R rows and C columns",
+	"-xrm Resource  to change an xvile resource",
+	"-leftbar	Put scrollbar(s) on left",
+	"-rightbar	Put scrollbar(s) on right (default)",
 #endif
 #if IBMPC
 	"-2             25-line mode",

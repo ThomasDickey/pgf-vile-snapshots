@@ -1,7 +1,6 @@
 /*
- * The routines in this file provide support for the IBM-PC and other
- * compatible terminals. It goes directly to the graphics RAM to do
- * screen output. It compiles into nothing if not an IBM-PC driver
+ * The routines in this file provide support for the IBM-PC family
+ * of machines. It goes directly to the graphics RAM to do screen output.
  *
  * Supported monitor cards include
  *	CGA, MONO, EGA, VGA.
@@ -10,7 +9,22 @@
  * display type.
  *
  * $Log: ibmpc.c,v $
- * Revision 1.42  1994/02/22 11:55:59  pgf
+ * Revision 1.46  1994/03/11 12:03:40  pgf
+ * cleaned up video driver selection -- now ibmcres is simply a string
+ * based interface to scinit, which takes a driver number.  we search
+ * the table top to bottom, in case there's more than one entry by the
+ * same name, for different screen resolutions.
+ *
+ * Revision 1.45  1994/03/08  12:09:39  pgf
+ * changed 'fulllineregions' to 'regionshape'.
+ *
+ * Revision 1.44  1994/03/07  11:24:14  pgf
+ * took out the omnibook specific modes
+ *
+ * Revision 1.43  1994/02/25  13:09:00  pgf
+ * fixes for watcom compiler and get_vga_bios_info
+ *
+ * Revision 1.42  1994/02/22  11:55:59  pgf
  * CSENSE should map directly to the original display type/mode
  *
  * Revision 1.41  1994/02/22  11:03:15  pgf
@@ -23,8 +37,6 @@
 #include        "estruct.h"
 #include        "edef.h"
 
-
-#if     IBMPC
 
 #if DJGPP
 #include <pc.h>
@@ -114,6 +126,7 @@ static	int	dtype = -1;	/* current display type		*/
 #else
 #define PACKED
 #endif
+
 	/* mode-independent VGA-BIOS status information */
 typedef	struct {
 	UCHAR	video_modes[3] PACKED;	/* 00 Supported video-modes */
@@ -180,34 +193,39 @@ typedef	struct	{
 	UCHAR	vres;	/* required scan-lines, RES_200, ... */
 	} DRIVERS;
 
+#define ORIGTYPE  0	/* store original info in this slot.
+			   (these values should all (?) get replaced 
+			   at open time) */
+
+/* order this table so that more higher resolution entries for the same
+ *  name come first.  remember -- synonyms take only 10 bytes, plus the
+ *  name itself.
+ */
 static	DRIVERS drivers[] = {
-		/* the first 4 entries are reserved as synonyms for card-types */
+		{"default",ORIGTYPE,    3,      C8x8,   25,  80, RES_200},
+		{"2",      CDVGA,	3,	C8x16,	25,  80, RES_400},
+		{"25",     CDVGA,	3,	C8x16,	25,  80, RES_400},
+		{"2",      CDCGA,	3,	C8x8,	25,  80, RES_200},
+		{"25",     CDCGA,	3,	C8x8,	25,  80, RES_200},
 		{"CGA",    CDCGA,	3,	C8x8,	25,  80, RES_200},
 		{"MONO",   CDMONO,	3,	C8x8,	25,  80, RES_200},
+		{"80x25",  CDVGA,	3,	C8x16,	25,  80, RES_400},
+		{"80x28",  CDVGA,	3,	C8x14,  28,  80, RES_400},
 		{"EGA",    CDEGA,	3,	C8x8,	43,  80, RES_350},
+		{"4",      CDEGA,	3,	C8x8,	43,  80, RES_350},
+		{"43",     CDEGA,	3,	C8x8,	43,  80, RES_350},
+		{"80x43",  CDVGA,	3,	C8x8,   43,  80, RES_350},
+		{"5",      CDVGA,	3,	C8x8,	50,  80, RES_400},
+		{"50",     CDVGA,	3,	C8x8,	50,  80, RES_400},
 		{"VGA",    CDVGA,	3,	C8x8,	50,  80, RES_400},
-
-		/* store original info in this slot */
-#define original_type  CDVGA+1		/* one past CDMONO ... CDVGA	*/
-		{"default",CDSENSE,     3,      C8x8,   25,  80, RES_200},
-
-		/* all VGA's */
+		{"80x50",  CDVGA,	3,	C8x8,	50,  80, RES_400},
+		{"80x14",  CDVGA,	3,	C8x14,  14,  80, RES_200},
 		{"40x12",  CDVGA,	1,	C8x16,	12,  40, RES_200},
 		{"40x21",  CDVGA,	1,	C8x16,	21,  40, RES_350},
 		{"40x25",  CDVGA,	1,	C8x16,	25,  40, RES_400},
 		{"40x28",  CDVGA,	1,	C8x14,  28,  40, RES_400},
 		{"40x50",  CDVGA,	1,	C8x8,   50,  40, RES_400},
-		{"80x14",  CDVGA,	3,	C8x14,  14,  80, RES_200},
-		{"80x25",  CDVGA,	3,	C8x16,	25,  80, RES_400},
-		{"80x28",  CDVGA,	3,	C8x14,  28,  80, RES_400},
-		{"80x43",  CDVGA,	3,	C8x8,   43,  80, RES_350},
-		{"80x50",  CDVGA,	3,	C8x8,	50,  80, RES_400},
 
-		{"omni",  CDVGA,	3,	C8x16,	25,  80, RES_480},
-	/* none of the rest work */
-		{"omni2",  CDVGA,	3,	C8x8,	60,  80, RES_480},
-		{"omni3",  CDVGA,	3,	C8x16,	30,  80, RES_480},
-		{"omni4",  CDVGA,	3,	C8x8,	50,  80, RES_480},
 	};
 
 static	long	ScreenAddress[] = {
@@ -223,9 +241,9 @@ USHORT sline[NCOL];			/* screen line image		*/
 extern union REGS rg;			/* cpu register for use of DOS calls */
 
 static	int	ibm_opened,
-		original_page,		/* display-page (we use 0)	*/
-		allowed_vres,		/* possible scan-lines, 1 bit per value */
-		original_curs,		/* start/stop scan lines	*/
+		original_page,	/* display-page (we use 0)	*/
+		allowed_vres,	/* possible scan-lines, 1 bit per value */
+		original_curs,	/* start/stop scan lines	*/
 		monochrome	= FALSE;
 
 static	int	egaexist = FALSE;	/* is an EGA card available?	*/
@@ -273,7 +291,7 @@ static	VIDEO * videoAlloc P(( VIDEO ** ));
 static	void	maxkbdrate   P((void));
 #endif
 
-int ibmtype;
+static int current_ibmtype;
 
 /*
  * Standard terminal interface dispatch table. Most of the fields point into
@@ -316,8 +334,7 @@ _go32_dpmi_seginfo vgainfo;
 static int
 get_vga_bios_info(dynamic_VGA_info *buffer)
 {
-#if WATCOM || DJGPP
-# if DJGPP 	/* this should work, but doesn't seem to */
+# if DJGPP
 	_go32_dpmi_registers regs;
 	vgainfo.size = (sizeof (dynamic_VGA_info)+15) / 16;
 	if (_go32_dpmi_allocate_dos_memory(&vgainfo) != 0) {
@@ -337,17 +354,17 @@ get_vga_bios_info(dynamic_VGA_info *buffer)
 	_go32_dpmi_free_dos_memory(&vgainfo);
 
 	return (regs.h.al == 0x1b);
-# else
-	/* if someone figures this out for watcom, let me know... */
-	return FALSE;
-# endif
 #else
 	struct SREGS segs;
 
+#if WATCOM
+	segread(&segs);
+#else
+	segs.es   = FP_SEG(buffer);
+#endif
+	rg.x._DI_ = FP_OFF(buffer);
 	rg.x._AX_ = 0x1b00;
 	rg.x._BX_ = 0;
-	segs.es   = FP_SEG(buffer);
-	rg.x._DI_ = FP_OFF(buffer);
 	INTX86X(0x10, &rg, &rg, &segs); /* Get VGA-BIOS status */
 
 	return (rg.h.al == 0x1b);
@@ -402,7 +419,7 @@ static void
 set_cursor(int start_stop)
 {
 	rg.h.ah = 1;		/* set cursor size function code */
-	rg.x._CX_ = (drivers[original_type].mode <= 3) ?
+	rg.x._CX_ = (drivers[ORIGTYPE].mode <= 3) ?
 		start_stop & 0x707 : start_stop;
 	INTX86(0x10, &rg, &rg);	/* VIDEO - SET TEXT-MODE CURSOR SHAPE */
 }
@@ -514,44 +531,21 @@ int
 ibmcres(res)	/* change screen resolution */
 char *res;	/* resolution to change to */
 {
-	char	*dst;
 	register int i;		/* index */
 	int	status = FALSE;
 
-	/* find the default configuration */
-	if (!strcmp(res, "?")) {
-		status = scinit(CDSENSE);
-	} else {	/* specify a number */
-		if ((i = (int)strtol(res, &dst, 0)) >= 0
-		 && !*dst) {
-			switch (i) {
-			case 25:
-			case 2:
-				res = drivers[CD_25LINE].name;
-				break;
-			case 43:
-			case 4:	/* 43 line mode */
-				res = drivers[CDEGA].name;
-				break;
-			case 50:
-			case 5:	/* 50 line mode */
-				res = drivers[CDVGA].name;
-			}
-		}
+	if (!res || !strcmp(res, "?")) 	/* find the default configuration */
+		res = "default";
 
-		for (i = 0; i < SIZEOF(drivers); i++) {
-			if (strcmp(res, drivers[i].name) == 0) {
-				status = scinit(i);
+	/* try for a name match on all drivers, until we find it
+		and succeed or fall off the bottom */
+	for (i = 0; i < SIZEOF(drivers); i++) {
+		if (strcmp(res, drivers[i].name) == 0) {
+			if ((status = scinit(i)) == TRUE) {
 				break;
 			}
 		}
 	}
-#if OPT_MS_MOUSE
-	if ((status == TRUE) && ms_exists()) {
-		ms_deinstall();
-		ms_install();
-	}
-#endif
 	return status;
 }
 
@@ -668,7 +662,13 @@ ibmbeep()
 void
 ibmopen()
 {
-	register DRIVERS *driver = &drivers[original_type];
+	register DRIVERS *driver = &drivers[ORIGTYPE];
+
+	if (sizeof(dynamic_VGA_info) != 64) {
+		printf("DOS vile build error -- dynamic_VGA_info struct"
+			" must be packed (ibmpc.c)\n");
+		exit(1);
+	}
 
 	rg.h.ah = 0xf;
 	INTX86(0x10,&rg, &rg);	/* VIDEO - GET DISPLAY MODE */
@@ -686,15 +686,23 @@ ibmopen()
 		dynamic_VGA_info buffer;
 
 		if (get_vga_bios_info(&buffer)) {
+#undef TESTIT
+#ifdef TESTIT
+			printf ("call succeeded\n");
+			printf ("static_info is 0x%x\n", buffer.static_info);
+			printf ("code_number is 0x%x\n", buffer.code_number);
+			printf ("num_columns is 0x%x\n", buffer.num_columns);
+			printf ("page_length is 0x%x\n", buffer.page_length);
+			printf ("curr_page is 0x%x\n", buffer.curr_page);
+			printf ("num_rows is 0x%x\n", buffer.num_rows);
+#endif
 			switch (buffer.char_height) {
 			case 8:		driver->vchr = C8x8;	break;
 			case 14:	driver->vchr = C8x14;	break;
 			case 16:	driver->vchr = C8x16;	break;
 			}
 			driver->rows = buffer.num_rows;
-#if !DJGPP
-			allowed_vres = buffer.static_info->text_scanlines;
-#else
+#if DJGPP
 			{ u_long staticinfop;
 			static_VGA_info static_info;
 			staticinfop = ((u_long)buffer.static_info & 0xffffL);
@@ -704,19 +712,19 @@ ibmopen()
 					&static_info);
 			allowed_vres = static_info.text_scanlines;
 			}
+#elif WATCOM
+			{
+			static_VGA_info __far *staticinfop;
+			staticinfop = MK_FP (
+			((unsigned long)(buffer.static_info) >> 16) & 0xffffL,
+			((unsigned long)(buffer.static_info)      ) & 0xffffL
+				);
+			allowed_vres = staticinfop->text_scanlines;
+			}
+#else
+			allowed_vres = buffer.static_info->text_scanlines;
 #endif
 			driver->vres = buffer.num_pixel_rows;
-			if (driver->vres == 0) {
-				/* my HP omnibook returns 0 here, so */
-				/* set it to a supported resolution */
-				int b,j;
-				for (b = 1, j = 0; b != 0x100; b <<= 1, j++) {
-					if (b & allowed_vres) {
-						driver->vres = j;
-						break;
-					}
-				}
-			}
 		}
 	} else if (driver->type == CDEGA) {
 		allowed_vres |= (1<<RES_350);
@@ -730,11 +738,11 @@ ibmopen()
 	rg.h.bh = 0x01;		/* set non-VGA mode */
 	INTX86(0x10,&rg, &rg);
 	set_display(7);		/* set Hercule mode */
-	ibmtype = CD_25LINE;
+	current_res_name = "25";
 #endif
 
-	if (!scinit(ibmtype))
-		(void)scinit(CDSENSE);
+	if (!ibmcres(current_res_name))
+		(void)scinit(ORIGTYPE);
 	revexist = TRUE;
 	ttopen();
 
@@ -747,17 +755,18 @@ ibmopen()
 void
 ibmclose()
 {
-	int	current_type = ibmtype;
+	int	ctype = current_ibmtype;
 
-	scinit(original_type);
+	if (current_ibmtype != ORIGTYPE)
+		scinit(ORIGTYPE);
 	if (original_page != 0)
 		set_page(original_page);
 	set_cursor(original_curs);
-	ibmtype = current_type;	/* ...so subsequent TTopen restores us */
+
+	current_ibmtype = ctype; /* ...so subsequent TTopen restores us */
 
 	dtype = CDMONO;		/* ...force monochrome */
-	movecursor(0,0);	/* clear the screen */
-	TTeeop();
+	movecursor(term.t_nrow, 0);
 }
 
 void
@@ -779,8 +788,8 @@ ibmkclose()	/* close the keyboard */
 }
 
 static int
-scinit(n)	/* initialize the screen head pointers */
-int n;		/* type of adapter to init for */
+scinit(newtype)	/* initialize the screen head pointers */
+int newtype;		/* type of adapter to init for */
 {
 	dynamic_VGA_info buffer;
 	union {
@@ -792,20 +801,15 @@ int n;		/* type of adapter to init for */
 	register int i;
 	int	     type, rows, cols;
 
-	/* If asked, use the driver/mode combo we found when we started,
-	 * which is also what we will use when we quit.
-	 */
-	if (n == CDSENSE)
-		n = original_type;
-
-	driver = &drivers[n];
-	type = driver->type;
-	rows = driver->rows;
-	cols = driver->cols;
+	driver = &drivers[newtype];
 
 	/* check to see if we're allow this many scan-lines */
 	if ((allowed_vres & (1 << (driver->vres))) == 0)
 		return FALSE;
+
+	type = driver->type;
+	rows = driver->rows;
+	cols = driver->cols;
 
 	/* and set up the various parameters as needed */
 	set_vertical_resolution(driver->vres);
@@ -839,7 +843,7 @@ int n;		/* type of adapter to init for */
 	if ((type == CDMONO) != (dtype == CDMONO))
 		sgarbf = TRUE;
 	dtype = type;
-	ibmtype = n;
+	current_ibmtype = newtype;
 
 	/* initialize the screen pointer array */
 	if (monochrome)
@@ -884,6 +888,12 @@ int n;		/* type of adapter to init for */
 #endif
 	/* changing the screen-size forces an update, so we do this last */
 	newscreensize(rows, cols);
+#if OPT_MS_MOUSE
+	if (ms_exists()) {
+		ms_deinstall();
+		ms_install();
+	}
+#endif
 	return(TRUE);
 }
 
@@ -1165,7 +1175,7 @@ ms_processing ()
 					 pixels2col(last_x));
 				if (!same_ptr(DOT.l,MK.l)
 				 || DOT.o != MK.o) {
-					fulllineregions = FALSE;
+					regionshape = EXACT;
 					(void)yankregion();
 					(void)update(TRUE);
 				}
@@ -1356,5 +1366,3 @@ ms_showcrsr(void)
 	rodent_cursor_display = TRUE;
 } /* End of ms_showcrsr() */
 #endif /* OPT_MS_MOUSE */
-
-#endif	/* IBMPC */

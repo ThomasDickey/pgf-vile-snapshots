@@ -11,12 +11,25 @@
  * which means that the dot and mark values in the buffer headers are nonsense.
  *
  * $Log: line.c,v $
- * Revision 1.58  1994/02/22 11:03:15  pgf
+ * Revision 1.61  1994/03/10 20:09:11  pgf
+ * added kinsertlater() routine, for doing delayed insertion of newlines
+ *
+ * Revision 1.60  1994/03/08  14:17:15  pgf
+ * warning cleanup, and alternate form of the put routine.
+ *
+ * Revision 1.59  1994/03/08  12:17:57  pgf
+ * maintain record of longest line in a kill-register, in kregwidth.
+ * fixed old bug in the maintenance of MK.o when adjusting duet
+ * to character edits.
+ * turned off the POISON #define.
+ * major changes to the put() routine, to make it rectangle-aware.
+ *
+ * Revision 1.58  1994/02/22  11:03:15  pgf
  * truncated RCS log for 4.0
  *
  */
 
-#define POISON
+/* #define POISON */
 #ifdef POISON
 #define poison(p,s) (void)memset((char *)p, 0xdf, s)
 #else
@@ -277,8 +290,37 @@ int
 insspace(f, n)	/* insert spaces forward into text */
 int f, n;	/* default flag and numeric argument */
 {
-	linsert(n, ' ');
+	if (!linsert(n, ' '))
+		return FALSE;
 	return backchar(f, n);
+}
+
+int
+lstrinsert(s,len)	/* insert string forward into text */
+char *s;	/* if NULL, treat as "" */
+int len;	/* if non-zero, insert exactly this amount.  pad if needed */
+{
+	char *p = s;
+	int n, b = 0;
+	if (len <= 0)
+		n = HUGE;
+	else
+		n = len;
+	while (p && *p && n) {
+		b++;
+		if (!linsert(1, *p++))
+			return FALSE;
+		n--;
+	}
+	if (n && len > 0) {	/* need to pad? */
+		if (!linsert(n, ' '))
+			return FALSE;
+		b += n;
+	}
+
+	DOT.o -= b;
+
+	return TRUE;
 }
 
 /*
@@ -633,7 +675,7 @@ int kflag;	/* put killed text in kill buffer flag */
 			*cp1++ = *cp2++;
 		l_ref(dotp)->l_used -= chunk;
 #if ! WINMARK
-		if (l_ref(MK.l) && MK.o > doto) {
+		if (same_ptr(MK.l, dotp) && MK.o > doto) {
 			MK.o -= chunk;
 			if (MK.o < doto)
 				MK.o = doto;
@@ -849,6 +891,7 @@ ksetup()
 	else
 		kregflag = KNEEDCLEAN;
 	kchars = klines = 0;
+	kregwidth = 0;
 
 }
 
@@ -857,6 +900,9 @@ ksetup()
  * if called from other than kinsert, only does anything in the case where
  * nothing was yanked
  */
+
+static int kcharpending = -1;
+
 void
 kdone()
 {
@@ -874,10 +920,27 @@ kdone()
 		/* and reset all the kill buffer pointers */
 		kbs[ukb].kbufh = kbs[ukb].kbufp = NULL;
 		kbs[ukb].kused = 0;
+		kbs[ukb].kbwidth = kregwidth = 0;
+		kcharpending = -1;
+		relist_registers(); /* this used to be outside the if --
+			pretty expensive, no? */
 	}
 	kregflag &= ~KNEEDCLEAN;
 	kbs[ukb].kbflag = kregflag;
-	relist_registers();
+}
+
+int
+kinsertlater(c)
+int c;
+{
+    	int s = TRUE;
+	if (kcharpending >= 0) {
+		int oc = kcharpending;
+		kcharpending = -1;
+		s = kinsert(oc);
+	}
+	kcharpending = c;
+	return s;
 }
 
 /*
@@ -892,6 +955,13 @@ int c;		/* character to insert in the kill buffer */
 	KILLREG *kbp = &kbs[ukb];
 
 	kdone(); /* clean up the (possible) old contents */
+
+	if (kcharpending >= 0) {
+		int oc = kcharpending;
+		kcharpending = -1;
+		kinsert(oc);
+	}
+
 
 	/* check to see if we need a new chunk */
 	if (kbp->kused >= KBLOCK || kbp->kbufh == NULL) {
@@ -910,8 +980,14 @@ int c;		/* character to insert in the kill buffer */
 	/* and now insert the character */
 	kbp->kbufp->d_chunk[kbp->kused++] = c;
 	kchars++;
-	if (c == '\n')
+	if (c == '\n') {
 		klines++;
+		if (kregwidth > kbp->kbwidth)
+			kbp->kbwidth = kregwidth;
+		kregwidth = 0;
+	} else {
+		kregwidth++;
+	}
 	return(TRUE);
 }
 
@@ -1046,7 +1122,7 @@ int killing;
 	/* we only allow killing into the real "0 */
 	/* ignore any other buffer spec */
 	if (killing) {
-		if ((kbs[lastkb].kbflag & (KLINES|KAPPEND)) &&
+		if ((kbs[lastkb].kbflag & (KLINES|KRECT|KAPPEND)) &&
 			! (kbs[lastkb].kbflag & KYANK)) {
 			if (--lastkb < 0) lastkb = 9;
 			kbs[lastkb].kbflag = 0;
@@ -1071,36 +1147,50 @@ int
 putbefore(f,n)
 int f,n;
 {
-	return doput(f,n,FALSE,FALSE);
+	return doput(f,n,FALSE,EXACT);
 }
 
 int
 putafter(f,n)
 int f,n;
 {
-	return doput(f,n,TRUE,FALSE);
+	return doput(f,n,TRUE,EXACT);
 }
 
 int
 lineputbefore(f,n)
 int f,n;
 {
-	return doput(f,n,FALSE,TRUE);
+	return doput(f,n,FALSE,FULLLINE);
 }
 
 int
 lineputafter(f,n)
 int f,n;
 {
-	return doput(f,n,TRUE,TRUE);
+	return doput(f,n,TRUE,FULLLINE);
+}
+
+int
+rectputbefore(f,n)
+int f,n;
+{
+	return doput(f,n,FALSE,RECTANGLE);
+}
+
+int
+rectputafter(f,n)
+int f,n;
+{
+	return doput(f,n,TRUE,RECTANGLE);
 }
 
 
 int
-doput(f,n,after,putlines)
-int f,n,after,putlines;
+doput(f,n,after,shaparg)
+int f,n,after,shaparg;
 {
-	int s, oukb, lining;
+	int s, oukb, shape = EXACT;
 
 	if (!f)
 		n = 1;
@@ -1113,8 +1203,19 @@ int f,n,after,putlines;
 		TTbeep();
 		return(FALSE);
 	}
-	lining = (putlines == TRUE || (kbs[ukb].kbflag & (KLINES|KAPPEND)));
-	if (lining) {
+
+	if (shaparg != EXACT) {
+		shape = shaparg;
+	} else {
+		if ((kbs[ukb].kbflag & (KLINES|KAPPEND)))
+			shape = FULLLINE;
+		else if (kbs[ukb].kbflag & KRECT)
+			shape = RECTANGLE;
+		else
+			shape = EXACT;
+	}
+
+	if (shape == FULLLINE) {
 		if (after && !is_header_line(DOT, curbp))
 			DOT.l = lFORW(DOT.l);
 		DOT.o = 0;
@@ -1122,29 +1223,77 @@ int f,n,after,putlines;
 		if (after && !is_at_end_of_line(DOT))
 			forwchar(TRUE,1);
 	}
+
 	(void)setmark();
-	s = put(n,lining);
+	s = put(n,shape);
 	if (s == TRUE)
 		swapmark();
 	if (is_header_line(DOT, curbp))
 		DOT.l = lBACK(DOT.l);
-	if (lining)
+	if (shape == FULLLINE)
 		(void)firstnonwhite(FALSE,1);
 	ukb = 0;
 	return (s);
+}
+
+/* designed to be used with the result of "getoff()", which returns
+ *	the offset of the character whose column is "close" to a goal.
+ *	it may be to the left if the line is too short, or to the right
+ *	if the column is spanned by a tab character.
+ */
+static int force_text_at_col P(( C_NUM, C_NUM ));
+
+static int
+force_text_at_col(goalcol, reached)
+C_NUM goalcol, reached;
+{
+	int status = TRUE;
+	if (reached < goalcol) {
+		/* pad out to col */
+		DOT.o = llength(DOT.l);
+		status = linsert(goalcol-reached, ' ');
+	} else if (reached > goalcol) {
+		/* there must be a tab there. */
+		/* pad to hit column we want */
+		DOT.o--;
+		status = linsert(goalcol%curtabval, ' ');
+	}
+	return status;
+}
+
+static int next_line_at_col P(( C_NUM, C_NUM * ));
+
+static int
+next_line_at_col(col, reachedp)
+C_NUM col;
+C_NUM *reachedp;
+{
+	int s = TRUE;
+	if (is_last_line(DOT,curbp)) {
+		DOT.o = llength(DOT.l);
+		if (lnewline() != TRUE)
+			return FALSE;
+	} else {
+		DOT.l = lforw(DOT.l);
+	}
+	DOT.o = getoff(col, reachedp);
+	return s;
 }
 
 /*
  * Put text back from the kill register.
  */
 int
-put(n,aslines)
-int n,aslines;
+put(n,shape)
+int n,shape;
 {
 	register int	c;
 	register int	i;
 	int status, wasnl, suppressnl;
 	L_NUM before;
+	C_NUM col = 0, width = 0;
+	C_NUM reached = 0;
+	int checkpad = FALSE;
 	register char	*sp;	/* pointer into string to insert */
 	KILL *kp;		/* pointer into kill register */
 
@@ -1160,20 +1309,62 @@ int n,aslines;
 	suppressnl = FALSE;
 	wasnl = FALSE;
 
+
 	/* for each time.... */
 	while (n--) {
 		kp = kbs[ukb].kbufh;
+		if (shape == RECTANGLE) {
+			width = kbs[ukb].kbwidth;
+			col = getcol(DOT.l, DOT.o, FALSE);
+		}
 		while (kp != NULL) {
 			i = KbSize(ukb,kp);
 			sp = (char *)kp->d_chunk;
 			while (i--) {
-				if ((c = *sp++) == '\n') {
+				c = *sp++;
+#if BEFORE
+				if (shape == RECTANGLE &&
+						(width == 0 || c == '\n')) {
+					if (checkpad) {
+						status = force_text_at_col(
+								col, reached);
+						if (status != TRUE)
+							break;
+						checkpad = FALSE;
+					}
+					if (width && 
+						 linsert(width, ' ') != TRUE) {
+						status = FALSE;
+						break;
+					}
+					if (next_line_at_col(col,&reached)
+							!= TRUE) {
+						status = FALSE;
+						break;
+					}
+					checkpad = TRUE;
+					width = kbs[ukb].kbwidth;
+				}
+				if (c == '\n') {
+					if (shape == RECTANGLE) {
+						continue; /* did it already */
+					}
 					if (lnewline() != TRUE) {
 						status = FALSE;
 						break;
 					}
 					wasnl = TRUE;
 				} else {
+					if (shape == RECTANGLE) {
+					    if (checkpad) {
+						status = force_text_at_col(
+								col, reached);
+						if (status != TRUE)
+							break;
+						checkpad = FALSE;
+					    }
+					    width--;
+					}
 					if (is_header_line(DOT,curbp))
 						suppressnl = TRUE;
 					if (linsert(1, c) != TRUE) {
@@ -1182,6 +1373,67 @@ int n,aslines;
 					}
 					wasnl = FALSE;
 				}
+#else
+				if (shape == RECTANGLE) {
+				    if (width == 0 || c == '\n') {
+					    if (checkpad) {
+						    status = force_text_at_col(
+							    col, reached);
+						    if (status != TRUE)
+							    break;
+						    checkpad = FALSE;
+					    }
+					    if (width && linsert(width, ' ') 
+								!= TRUE) {
+						    status = FALSE;
+						    break;
+					    }
+					    if (next_line_at_col(col,&reached)
+							    != TRUE) {
+						    status = FALSE;
+						    break;
+					    }
+					    checkpad = TRUE;
+					    width = kbs[ukb].kbwidth;
+				    }
+				    if (c == '\n') {
+					    continue; /* did it already */
+				    } else {
+					    if (checkpad) {
+						status = force_text_at_col(
+								col, reached);
+						if (status != TRUE)
+							break;
+						checkpad = FALSE;
+					    }
+					    width--;
+
+					    if (is_header_line(DOT,curbp))
+						    suppressnl = TRUE;
+					    if (linsert(1, c) != TRUE) {
+						    status = FALSE;
+						    break;
+					    }
+					    wasnl = FALSE;
+				    }
+				} else { /* not rectangle */
+				    if (c == '\n') {
+					    if (lnewline() != TRUE) {
+						    status = FALSE;
+						    break;
+					    }
+					    wasnl = TRUE;
+				    } else {
+					    if (is_header_line(DOT,curbp))
+						    suppressnl = TRUE;
+					    if (linsert(1, c) != TRUE) {
+						    status = FALSE;
+						    break;
+					    }
+					    wasnl = FALSE;
+				    }
+				}
+#endif
 			}
 			if (status != TRUE)
 				break;
@@ -1197,7 +1449,7 @@ int n,aslines;
 				}
 			}
 		} else {
-			if (aslines && !suppressnl) {
+			if (shape == FULLLINE && !suppressnl) {
 				if (lnewline() != TRUE) {
 					status = FALSE;
 					break;
@@ -1247,7 +1499,8 @@ int f,n;
 	if (tb_alloc(&buffer, KBLOCK)
 	 && tb_init(&buffer, abortc)) {
 		while (kp != 0) {
-			if (!tb_bappend(&buffer, (char *)(kp->d_chunk), KbSize(jj,kp)))
+			if (!tb_bappend(&buffer, (char *)(kp->d_chunk), 
+					(int)KbSize(jj,kp)))
 				return FALSE;
 			kp = kp->d_next;
 		}

@@ -8,7 +8,10 @@
  *		editing.
  *
  * $Log: tbuff.c,v $
- * Revision 1.13  1994/02/22 11:03:15  pgf
+ * Revision 1.14  1994/03/02 09:49:06  pgf
+ * eliminated need for strlen() call in tb_sappend
+ *
+ * Revision 1.13  1994/02/22  11:03:15  pgf
  * truncated RCS log for 4.0
  *
  *
@@ -212,8 +215,10 @@ TBUFF *	tb_sappend(p, s)
 	char	*s;
 {
 	if (!s)
-		s = "";
-	return tb_bappend(p, s, (ALLOC_T)strlen(s));
+		return *p;
+	while (*s && tb_append(p, (int)(*s++)) != 0)
+		;
+	return *p;
 }
 
 /*
