@@ -224,7 +224,7 @@ File manipulation commands:
 
 	^W	is a writing operator, which prompts for a filename, and 
 		writes the specified region to that file.  Like all operators,
-		it the command is repeated, as in ^W^W, then lines are 
+		if the command is repeated, as in ^W^W, then lines are 
 		affected.  Use 10^W^W to write 10 lines.
 
 		If a register is specified (e.g. "a^W ) then the command 
@@ -428,6 +428,8 @@ Text manipulation command:
 	remain visible.  If the ":ta" form of the command is used, tag
 	matches must be exact, unless "taglength" is set non-zero, in which
 	case the first tag matching that many characters will be used.
+	If your tags file is not named "tags", simply edit it and name the
+	buffer "tags" with the ":rename-buffer" command.
 
 	^A-o	Remove all blank lines containing or immediately following
 		the current line.
@@ -799,8 +801,8 @@ Programmed macros
 		~endm
 		bind-key execute-macro-11 ^A-/
 
-	A variation, which will not find the identifier if it is not a
-	substring of another word, is:
+	A variation, which will not find the identifier if it is a substring
+	of another word, is:
 		12 store-macro
 			~force search-forward &cat "\\<" &cat $identifier "\\>"
 		~endm

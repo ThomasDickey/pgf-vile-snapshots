@@ -6,7 +6,10 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.41  1992/05/27 08:32:57  foxharp
+ * Revision 1.42  1992/06/25 23:00:50  foxharp
+ * changes for dos/ibmpc
+ *
+ * Revision 1.41  1992/05/27  08:32:57  foxharp
  * force screen updates while reading from pipes, otherwise bumping the
  * keyboard freezes the screen until the spawned process is done
  *
@@ -447,7 +450,9 @@ int	mflg;		/* print messages? */
 	odv = doverifys;
 	doverifys = 0;
 #endif
+#if ! MSDOS	/* DOS has too many 64K limits for this to work */
 	if (fileispipe || (s = quickreadf(bp, &nline)) == FIOMEM)
+#endif
 		s = slowreadf(bp, &nline);
 
 	if (s == FIOERR)
@@ -530,6 +535,7 @@ out:
         return TRUE;
 }
 
+#if ! MSDOS
 int
 quickreadf(bp, nlinep)
 register BUFFER *bp;
@@ -548,6 +554,13 @@ int *nlinep;
 	/* avoid malloc(0) problems down below; let slowreadf() do the work */
 	if (len == 0)
 		return FIOMEM;
+#if     MSDOS
+	/* cannot allocate more than 64K in dos */
+	if (len >= 65535)
+		return FIOMEM;
+#endif
+
+
 
 	/* leave an extra byte at the front, for the length of the first
 		line.  after that, lengths go in place of the newline at
@@ -654,6 +667,8 @@ int *nlinep;
 		return FIOMEM;
 	return FIOSUC;
 }
+
+#endif /* ! MSDOS */
 
 int
 slowreadf(bp, nlinep)

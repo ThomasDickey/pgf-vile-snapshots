@@ -54,11 +54,12 @@ VILE -- VI Like Emacs: a vi workalike put together from Micro-Emacs by Paul Fox
 	I think all of the reported bugs have been fixed, and hopefully
 	not too many new ones introduced.
 
-	I have not tried this on a small system, or even _any_ non-UNIX 
-	system.  Pete Rusczinski has done an excellent job of porting
-	version three to DOS -- unfortunately his changes are not
-	incorporated here as yet.  The code _will_ build for DOS, using
-	Microsoft C 6.0, but it's a little buggy, and I haven't attacked it.
+	I have not run this much on a small system, and not much at all on
+	DOS.  Pete Rusczinski has done an excellent job of porting
+	version three to DOS -- his changes are now incorporated here (as
+	of version 3.20), but since in general the DOS version has been
+	less well exercised than the UNIX version, it probably harbors
+	more bugs.
 
 	Hope you enjoy -- 
 

@@ -9,7 +9,16 @@
 
 /*
  * $Log: edef.h,v $
- * Revision 1.52  1992/06/12 22:23:42  foxharp
+ * Revision 1.55  1992/07/04 14:31:06  foxharp
+ * insert_mode_was is now a global
+ *
+ * Revision 1.54  1992/06/25  23:00:50  foxharp
+ * changes for dos/ibmpc
+ *
+ * Revision 1.53  1992/06/14  12:40:30  foxharp
+ * working on v. 3.20
+ *
+ * Revision 1.52  1992/06/12  22:23:42  foxharp
  * changes for separate 'comments' r.e. for formatregion
  *
  * Revision 1.51  1992/06/03  22:19:49  foxharp
@@ -198,7 +207,7 @@
 #endif
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version three point nineteen");
+decl_init( char version[], "version three point twenty");
 
 decl_init( int autoindented , -1);	/* how many chars (not cols) indented */
 decl_uninit( int isnamedcmd );		/* are we typing a command name */
@@ -206,6 +215,8 @@ decl_uninit( int calledbefore );	/* called before during this command? */
 decl_uninit( short _chartypes_[N_chars] );	/* character types	*/
 decl_uninit( int interrupted );		/* interrupt signal?		*/
 decl_uninit( int insertmode );		/* are we inserting or overwriting? */
+decl_uninit( int insert_mode_was );	/* were we (and will we be?)	*/
+					/*	inserting or overwriting? */
 decl_uninit( int lineinput );		/* are we inserting linestyle? */
 decl_uninit( int lastkey );		/* last keystoke (tgetc)	*/
 decl_uninit( int last1key );		/* last keystoke (kbd_key)	*/
@@ -426,4 +437,10 @@ extern  TERM    term;                   /* Terminal information.        */
 /* per-character output function called by dofmt() */
 decl_uninit( void (*dfoutfn)() );
 
+#if IBMPC
+#if __ZTC__
+extern int set43;
+#endif	/* __ZTC__ */
 
+extern int ibmtype;
+#endif	/* IBMPC */

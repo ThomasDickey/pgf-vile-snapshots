@@ -5,7 +5,10 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.7  1992/06/04 19:42:37  foxharp
+ * Revision 1.8  1992/06/26 22:19:10  foxharp
+ * added dos argument globber
+ *
+ * Revision 1.7  1992/06/04  19:42:37  foxharp
  * use #ifdef __STDC__ in favor of #if
  *
  * Revision 1.6  1992/05/29  08:36:53  foxharp
@@ -37,6 +40,7 @@
 #endif
 
 extern int main P(( int, char *[] ));
+extern void expand_wild_args P(( int * , char ***));
 extern void loop P(( void ));
 extern char * strmalloc P(( char * ));
 extern void global_val_init P(( void ));

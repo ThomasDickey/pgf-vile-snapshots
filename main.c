@@ -14,7 +14,29 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.71  1992/06/12 22:23:42  foxharp
+ * Revision 1.76  1992/07/04 14:37:49  foxharp
+ * allow the cursor to rest on the 'newline', in the case where we're in
+ * the middle of insert mode, and are only out here due to using arrow
+ * keys.  otherwise, there's no way to append to end of line with arrow
+ * keys -- you're blocked at the last character.:
+ *
+ * Revision 1.75  1992/07/01  17:01:42  foxharp
+ * make sure startstat is always set properly, and
+ * commented the usage of the FF logfile
+ *
+ * Revision 1.74  1992/06/26  22:22:23  foxharp
+ * moved reset of curbp (after makecurrent()) up higher -- vtinit may
+ * call update().
+ * some small fixes to the dos arg. expander.
+ * took out all the freshmem stuff -- it wasn't doing anything.
+ *
+ * Revision 1.73  1992/06/25  23:00:50  foxharp
+ * changes for dos/ibmpc
+ *
+ * Revision 1.72  1992/06/22  08:36:14  foxharp
+ * bug in section r.e.
+ *
+ * Revision 1.71  1992/06/12  22:23:42  foxharp
  * changes for separate 'comments' r.e. for formatregion
  *
  * Revision 1.70  1992/06/08  08:56:05  foxharp
@@ -306,6 +328,10 @@ unsigned _stklen = 32768;
 #define GOOD	0
 #endif
 
+#ifdef DEBUGLOG
+extern FILE *FF;
+#endif
+
 int
 main(argc, argv)
 int	argc;
@@ -332,9 +358,21 @@ char	*argv[];
 	char ekey[NPAT];		/* startup encryption key */
 #endif
 
+#if MSDOS
+	expand_wild_args(&argc, &argv);
+#endif
+
+#ifdef DEBUGLOG
+	start_debug_log(argc,argv);
+#endif
+
 	charinit();		/* character types -- we need these pretty
 					early  */
 	global_val_init();	/* global buffer values */
+
+#if IBMPC	/* pjr */
+	ibmtype = CDSENSE;
+#endif	/* IBMPC */
 
 #if X11
 	x_preparse_args(&argc, &argv);
@@ -347,6 +385,7 @@ char	*argv[];
                         continue;
                 }
 #endif
+
 
 		/* Process Switches */
 		if (argv[carg][0] == '-') {
@@ -449,6 +488,45 @@ char	*argv[];
 			case 'v':	/* -v for View File */
 				set_global_b_val(MDVIEW,TRUE);
 				break;
+#if IBMPC
+#if __ZTC__
+			/*
+			 * Note that ibmtype is now only used to detect
+			 * whether a comamnd line option was given, ie if
+			 * it is not equal to CDSENSE then a command line
+			 * option was given
+			 */
+			case '2':	/* 25 line mode */
+				ibmtype = CDMONO;
+				set43 = FALSE;
+  				break;
+
+			case '4':	/* 43 line mode */
+				ibmtype = CDEGA;
+				set43 = TRUE;
+				break;
+
+			case '5':	/* 50 line mode */
+				ibmtype = CDVGA;
+				set43 = TRUE;
+				break;
+#else
+			case '2':	/* 25 line mode */
+#if COLOR
+				ibmtype = CDCGA;
+#else
+				ibmtype = CDMONO;
+#endif
+				break;
+			case '4':	/* 43 line mode */
+				ibmtype = CDEGA;
+				break;
+			case '5':	/* 50 line mode */
+				ibmtype = CDVGA;
+				break;
+
+#endif	/* __ZTC__ */
+#endif	/* IBMPC */
 
 			case '?':
 			default:	/* unknown switch */
@@ -496,6 +574,7 @@ char	*argv[];
 			makename(bname, argv[carg]);
 			unqname(bname,FALSE);
 
+
 			bp = bfind(bname, OK_CREAT, 0);
 			ch_fname(bp, argv[carg]);
 			make_current(bp); /* pull it to the front */
@@ -506,6 +585,10 @@ char	*argv[];
 
 		}
 	}
+
+	/* we made some calls to makecurrent() above, to shuffle the
+		list order.  this set curbp, which isn't actually kosher */
+	curbp = NULL;
 
 	/* initialize the editor */
 #if UNIX
@@ -539,10 +622,6 @@ char	*argv[];
 		if (fill > 70) fill = 70;
 		set_global_b_val(VAL_FILL, fill);
 	}
-
-	/* we made some calls to makecurrent() above, to shuffle the
-		list order.  this set curbp, which isn't actually kosher */
-	curbp = NULL;
 
 	/* pull in an unnamed buffer, if we were given none to work with */
 	if (!gotafile) {
@@ -601,16 +680,26 @@ char	*argv[];
 			zotbuf(vbp);
 #endif
 		} else {
+			char *fname;
 			/* if .vilerc is one of the input files....
 					don't clobber it */
+#if MSDOS
+			/* search PATH for vilerc under dos */
+	 		fname = flook(pathname[0], FL_ANYWHERE); /* pjr - find it! */
+#else
+			fname = pathname[0];
+#endif
 			if (gotafile && 
 				strcmp(pathname[0], firstbp->b_bname) == 0) {
 				c = firstbp->b_bname[0];
 				firstbp->b_bname[0] = '[';
-				startstat = startup(pathname[0]);
+				startstat = startup(fname);
 				firstbp->b_bname[0] = c;
 			} else {
-				startstat = startup(pathname[0]);
+				if (fname)
+					startstat = startup(fname);
+				else
+					startstat = TRUE;
 			}
 		}
 		ranstartup = TRUE;
@@ -677,6 +766,147 @@ char	*argv[];
 
 }
 
+#if MSDOS
+/*
+ * This is a replacement for the usual main routine.  It takes argc and
+ * argv, and does wild card expansion on any arguments containing a '*' or
+ * '?', and then calls main() with a new argc and argv.  Any errors result
+ * in calling main() with the original arguments intact.  Arguments
+ * containing wild cards that expand to 0 filenames are deleted.  Arguments
+ * without wild cards are passed straight through.
+ *
+ * Arguments which are preceded by a " or ', are passed straight through. 
+ * (cck)
+ *
+ * (taken from the winc app example of the zortech compiler - pjr)
+ */
+
+void
+expand_wild_args(argcp, argvp)
+int *argcp;
+char ***argvp;
+{
+#ifdef FRESHMEM
+	char          **freshmem = NULL;
+	unsigned int    freshmemcount = 0;
+	unsigned int    freshmemmax = 0;
+#endif
+	int oargc;
+	char **oargv;
+
+#ifdef __ZTC__
+	struct FIND    *p;
+#else
+	struct find_t   p;
+	int             j = 0;
+#endif
+
+	int             i, nargc, path_size, nargvmax;
+	char          **nargv, path[FILENAME_MAX + 1], *cp, *end_path;
+
+	oargc = *argcp;
+	oargv = *argvp;
+
+	nargc = 0;
+	nargvmax = 2;		/* dimension of nargv[]		 */
+	if ((nargv = (char **)malloc(nargvmax * sizeof(char *))) == NULL) {
+		mlforce("[OUT OF MEMORY]");
+		return;
+	}
+
+	for (i = 0; i < oargc; ++i) {
+		if (nargc + 2 >= nargvmax) {
+			nargvmax = nargc + 2;
+			if ((nargv = (char **) realloc(nargv, nargvmax * sizeof(char *))) == NULL) {
+				mlforce("[OUT OF MEMORY]");
+				return;
+			}
+		}
+		cp = oargv[i];	/* cck */
+
+		/* if have expandable names */
+		if (!(cp[0] == '"' || cp[0] == '\'') && 
+			(strchr(cp, '*') || strchr(cp, '?'))) {
+			end_path = cp + strlen(cp);
+
+			while (end_path >= cp && *end_path != '\\'
+			       && *end_path != '/' && *end_path != ':')
+				--end_path;
+
+			path_size = 0;
+
+			if (end_path >= cp) {	/* if got a path */
+				path_size = end_path - cp + 1;
+				memcpy(path, cp, path_size);
+			}
+			path[path_size] = 0;
+#ifdef __ZTC__
+			p = findfirst(cp, 0);
+			while (p) {
+				if ((cp = malloc(path_size+strlen(p->name)+1))
+							== NULL)
+#else
+			j = _dos_findfirst(cp, 0, &p);
+			while (!j) {
+				if ((cp = malloc(path_size+strlen(p.name)+1))
+							== NULL)
+#endif
+				{
+					mlforce("[OUT OF MEMORY]");
+					return;
+				}
+				strcpy(cp, path);
+
+#ifdef __ZTC__
+				strcat(cp, p->name);
+#else
+				strcat(cp, p.name);
+#endif
+
+				if (nargc + 2 >= nargvmax) {
+					nargvmax = nargc + 2;
+					if ((nargv = (char **) realloc(
+						nargv, 
+						nargvmax * sizeof(char *))
+						) == NULL) {
+						mlforce("[OUT OF MEMORY]");
+						return;
+					}
+				}
+				nargv[nargc++] = cp;
+
+#ifdef FRESHMEM
+				if (freshmemcount >= freshmemmax) {
+					freshmemmax += 4;
+
+					if ((freshmem = (char **) realloc(
+						freshmem, 
+						freshmemmax * sizeof(char *))
+							) == NULL) {
+						mlforce("[OUT OF MEMORY]");
+						return;
+					}
+				}
+				freshmem[freshmemcount++] = cp;
+#endif
+#ifdef __ZTC__
+				p = findnext();
+			}
+#else
+				j = _dos_findnext(&p);
+			}
+#endif
+		} else {
+			nargv[nargc++] = oargv[i];
+		}
+	}
+
+	nargv[nargc] = NULL;
+	*argcp = nargc;
+	*argvp = nargv;
+}
+#endif
+
 void do_num_proc();
 void do_rept_arg_proc();
 
@@ -686,13 +916,20 @@ loop()
 {
 	int s,c,f,n;
 	while(1) {
+		extern int insert_mode_was;
 
-		/* Vi doesn't let the cursor rest on the newline itself.  This
+		/* vi doesn't let the cursor rest on the newline itself.  This
 			takes care of that. */
-		if (is_at_end_of_line(DOT) && !is_empty_line(DOT))
+		/* if we're inserting, or will be inserting again, then
+			suppress.  this happens if we're using arrow keys
+			during insert */
+		if (is_at_end_of_line(DOT) && !is_empty_line(DOT) &&
+				!insertmode && !insert_mode_was)
 			backchar(TRUE,1);
 
-		/* same goes for end of file */
+		/* same goes for end-of-file -- I'm actually not sure if
+			this can ever happen, but I _am_ sure that it's
+			a lot safer not to let it... */
 		if (is_header_line(DOT,curbp) && !is_empty_buf(curbp))
 			backline(TRUE,1);
 
@@ -814,7 +1051,7 @@ global_val_init()
 	/* where do sections start? */
 	rp = (struct regexval *)malloc(sizeof (struct regexval));
 	set_global_b_val_rexp(VAL_SECTIONS, rp);
-	rp->pat = strmalloc("^[{\014]\\|^\\.[NS]H\\s\\|^\\.H[ 	U]\\s\\|\
+	rp->pat = strmalloc("^[{\014]\\|^\\.[NS]H\\s\\|^\\.HU\\?\\s\\|\
 ^\\.[us]h\\s\\|^+c\\s");
 	rp->reg = regcomp(rp->pat, TRUE);
 
@@ -1281,7 +1518,7 @@ int size;	/* number of bytes to move */
 }
 #endif
 
-#if	(AZTEC | TURBO | LATTICE) & MSDOS
+#if	(AZTEC | TURBO | LATTICE | ZTC) & MSDOS
 /*	strncpy:	copy a string...with length restrictions
 			ALWAYS null terminate
 Hmmmm...
@@ -1383,5 +1620,30 @@ mallocdbg(f,n)
 		malloc_verify();
 	}
 	return TRUE;
+}
+#endif
+
+#ifdef DEBUGLOG
+
+/*
+ *	the log file is left open, unbuffered.  thus any code can do 
+
+ 	extern FILE *FF;
+	fprintf(FF, "...", ...);
+	
+ *	to log events without disturbing the screen
+ */
+
+FILE *FF;
+
+start_debug_log(ac,av)
+int ac;
+char **av;
+{
+	int i;
+	FF = fopen("vilelog", "w");
+	setbuf(FF,NULL);
+	for (i = 0; i < ac; i++)
+		fprintf(FF,"arg %d: %s\n",i,av[i]);
 }
 #endif

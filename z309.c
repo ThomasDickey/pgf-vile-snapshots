@@ -4,7 +4,10 @@
  * It compiles into nothing if not a Zenith driver.
  *
  * $Log: z309.c,v $
- * Revision 1.2  1991/08/07 12:35:07  pgf
+ * Revision 1.3  1992/07/01 17:00:31  foxharp
+ * scwrite arg changes
+ *
+ * Revision 1.2  1991/08/07  12:35:07  pgf
  * added RCS log messages
  *
  * revision 1.1
@@ -313,9 +316,9 @@ int type;	/* type of adapter to init for */
 	}
 }
 
-scwrite(row, outstr, forg, bacg)	/* write a line out*/
+scwrite(row, col, nchar, outstr, forg, bacg)	/* write a line out*/
 
-int row;	/* row of screen to place outstr on */
+int row, col, nchar;	/* row,col of screen to place nchars of outstr on */
 char *outstr;	/* string to write out (must be term.t_ncol long) */
 int forg;	/* forground color of string to write */
 int bacg;	/* background color */
@@ -335,7 +338,7 @@ int bacg;	/* background color */
 	attr = (((bacg & 15) << 4) | (forg & 15)) << 8;
 #endif
 	lnptr = &sline[0];
-	for (i=0; i<term.t_ncol; i++)
+	for (i=0; i<nchar; i++)
 		*lnptr++ = (outstr[i] & 255) | attr;
 
 #if 0	/* Heath/Zenith builds flicker-less CGAs */
@@ -351,7 +354,7 @@ int bacg;	/* background color */
 #endif	
 
 	/* and send the string out */
-	movmem(&sline[0], scptr[row],term.t_ncol*2);
+	movmem(&sline[0], scptr[row]+col,term.t_ncol*2);
 }
 
 #if	FLABEL

@@ -3,7 +3,10 @@
  * commands. There is no functional grouping here, for sure.
  *
  * $Log: random.c,v $
- * Revision 1.64  1992/05/29 09:40:53  foxharp
+ * Revision 1.65  1992/06/25 23:00:50  foxharp
+ * changes for dos/ibmpc
+ *
+ * Revision 1.64  1992/05/29  09:40:53  foxharp
  * split out modes.c, fences.c, and insert.c from random.c
  *
  * Revision 1.63  1992/05/29  08:37:59  foxharp
@@ -815,7 +818,7 @@ catnap(milli)
 int milli;
 {
 #if ! UNIX
-	int i;
+	long i;
 	for (i = 0; i < term.t_pause; i++)
 		;
 #else

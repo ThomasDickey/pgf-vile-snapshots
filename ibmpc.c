@@ -3,13 +3,18 @@
  * compatible terminals. It goes directly to the graphics RAM to do
  * screen output. It compiles into nothing if not an IBM-PC driver
  * Supported monitor cards include CGA, MONO and EGA.
+ * Modified by Pete Ruczynski (pjr) for auto-sensing and selection of
+ * display type.
  *
  * $Log: ibmpc.c,v $
- * Revision 1.6  1992/05/20 18:54:33  foxharp
- * prototype changes
+ * Revision 1.8  1992/07/01 17:06:32  foxharp
+ * pgf cleanup (in general I can't leave well enough alone...).  somewhere
+ * along the way I made it work properly -- I think the problem was a missing
+ * page number in ibmputc() -- but it might have been a badly calculated
+ * attribute byte somewhere else...
  *
- * Revision 1.5  1992/05/16  12:00:31  pgf
- * prototypes/ansi/void-int stuff/microsoftC
+ * Revision 1.7  1992/06/25  23:00:50  foxharp
+ * changes for dos/ibmpc
  *
  * Revision 1.4  1991/09/10  01:19:35  pgf
  * re-tabbed, and moved ESC and BEL to estruct.h
@@ -26,59 +31,63 @@
  * initial vile RCS revision
  */
 
-#define termdef 1			/* don't define "term" external */
+#define	termdef	1			/* don't define "term" external */
 
-#include	<stdio.h>
-#include	"estruct.h"
-#include	"edef.h"
+#include        <stdio.h>
+#include        "estruct.h"
+#include        "edef.h"
 
-#if	IBMPC
-#define NROW	43			/* Max Screen size.		*/
-#define NCOL	80			/* Edit if you want to. 	*/
-#define MARGIN	8			/* size of minimim margin and	*/
-#define SCRSIZ	64			/* scroll size for extended lines */
-#define NPAUSE	200			/* # times thru update to pause */
 
-#define SCADC	0xb8000000L		/* CGA address of screen RAM	*/
-#define SCADM	0xb0000000L		/* MONO address of screen RAM	*/
+#if     IBMPC
+
+#define NROW	50			/* Max Screen size.		*/
+#define NCOL    80                      /* Edit if you want to.         */
+#define	MARGIN	8			/* size of minimim margin and	*/
+#define	SCRSIZ	64			/* scroll size for extended lines */
+#define	NPAUSE	200			/* # times thru update to pause */
+#define	SPACE	32			/* space character		*/
+
+#define	SCADC	0xb8000000L		/* CGA address of screen RAM	*/
+#define	SCADM	0xb0000000L		/* MONO address of screen RAM	*/
 #define SCADE	0xb8000000L		/* EGA address of screen RAM	*/
 
-#define MONOCRSR 0x0B0D 		/* monochrome cursor	    */
+#define MONOCRSR 0x0B0D			/* monochrome cursor	    */
 #define CGACRSR 0x0607			/* CGA cursor		    */
 #define EGACRSR 0x0709			/* EGA cursor		    */
 
-#define CDCGA	0			/* color graphics card		*/
-#define CDMONO	1			/* monochrome text card 	*/
-#define CDEGA	2			/* EGA color adapter		*/
-#define CDSENSE 9			/* detect the card type 	*/
+#define NDRIVE	4			/* number of screen drivers	upped to 4 (vga) */
 
-#define NDRIVE	3			/* number of screen drivers	*/
 
-int dtype = -1; 			/* current display type 	*/
+int dtype = -1;				/* current display type		*/
 char drvname[][8] = {			/* screen resolution names	*/
-	"CGA", "MONO", "EGA"
+	"CGA", "MONO", "EGA", "VGA"
 };
 long scadd;				/* address of screen ram	*/
-int *scptr[NROW];			/* pointer to screen lines	*/
-unsigned int sline[NCOL];		/* screen line image		*/
+short *scptr[NROW];			/* pointer to screen lines	*/
+unsigned short sline[NCOL];		/* screen line image		*/
 int egaexist = FALSE;			/* is an EGA card available?	*/
-extern union REGS rg;			/* cpu register for use of DOS calls */
+union REGS rg;				/* cpu register for use of DOS calls */
 
-extern	void	ibmmove();
-extern	void	ibmeeol();
-extern	void	ibmeeop();
-extern	void	ibmbeep();
-extern	void	ibmopen();
-extern	void	ibmrev();
-extern	int	ibmcres();
-extern	void	ibmclose();
-extern	void	ibmputc();
-extern	void	ibmkopen();
-extern	void	ibmkclose();
+extern  void     ttopen();               /* Forward references.          */
+extern  int     ttgetc();
+extern  void     ttputc();
+extern  void     ttflush();
+extern  void     ttclose();
+extern  int     ibmmove();
+extern  int     ibmeeol();
+extern  int     ibmeeop();
+extern  int     ibmbeep();
+extern  int     ibmopen();
+extern	int     ibmrev();
+extern	int	    ibmcres();
+extern	int	    ibmclose();
+extern	int	    ibmputc();
+extern	int	    ibmkopen();
+extern	int	    ibmkclose();
 
 #if	COLOR
-extern	void	ibmfcol();
-extern	void	ibmbcol();
+extern	int	ibmfcol();
+extern	int	ibmbcol();
 
 int	cfcolor = -1;		/* current forground color */
 int	cbcolor = -1;		/* current background color */
@@ -86,56 +95,54 @@ int	ctrans[] =		/* ansi to ibm color translation table */
 	{0, 4, 2, 6, 1, 5, 3, 7};
 #endif
 
+int ibmtype;		/* pjr - what to do about screen resolution */
+
 /*
  * Standard terminal interface dispatch table. Most of the fields point into
  * "termio" code.
  */
-TERM	term	= {
-	NROW-1,
-	NROW-1,
-	NCOL,
-	NCOL,
-	MARGIN,
-	SCRSIZ,
-	NPAUSE,
-	ibmopen,
-	ibmclose,
-	ibmkopen,
-	ibmkclose,
-	ttgetc,
-	ibmputc,
-	ttflush,
-	ibmmove,
-	ibmeeol,
-	ibmeeop,
-	ibmbeep,
-	ibmrev,
-	ibmcres
+TERM    term    = {
+        NROW-1,
+        NROW-1,
+        NCOL,
+        NCOL,
+        MARGIN,
+        SCRSIZ,
+        NPAUSE,
+        ibmopen,
+        ibmclose,
+        ibmkopen,
+        ibmkclose,
+        ttgetc,
+        ibmputc,
+        ttflush,
+        ibmmove,
+        ibmeeol,
+        ibmeeop,
+        ibmbeep,
+        ibmrev,
+        ibmcres,
 #if	COLOR
-	, ibmfcol,
-	ibmbcol
+        ibmfcol,
+        ibmbcol,
 #endif
+	NULL
 };
 
 #if	COLOR
 ibmfcol(color)		/* set the current output color */
-
 int color;	/* color to set */
-
 {
-	cfcolor = ctrans[color];
+        cfcolor = ctrans[color];
 }
 
 ibmbcol(color)		/* set the current background color */
-
 int color;	/* color to set */
-
 {
-	cbcolor = ctrans[color];
+        cbcolor = ctrans[color];
 }
 #endif
 
-void
 ibmmove(row, col)
 {
 	rg.h.ah = 2;		/* set cursor position function code */
@@ -145,54 +152,27 @@ ibmmove(row, col)
 	int86(0x10, &rg, &rg);
 }
 
-void
-ibmeeol()	/* erase to the end of the line */
-
+/* erase to the end of the line */
+ibmeeol()
 {
-	unsigned int attr;	/* attribute byte mask to place in RAM */
-	unsigned int *lnptr;	/* pointer to the destination line */
+	unsigned short attr;	/* attribute byte mask to place in RAM */
+	unsigned short *lnptr;	/* pointer to the destination line */
 	int i;
-	int ccol;	/* current column cursor lives */
-	int crow;	/*	   row	*/
+	int ccol,crow;	/* current column,row for cursor */
 
 	/* find the current cursor position */
 	rg.h.ah = 3;		/* read cursor position function code */
 	rg.h.bh = 0;		/* current video page */
 	int86(0x10, &rg, &rg);
-	ccol = rg.h.dl; 	/* record current column */
-	crow = rg.h.dh; 	/* and row */
+	ccol = rg.h.dl;		/* record current column */
+	crow = rg.h.dh;		/* and row */
 
-	/* build the attribute byte and setup the screen pointer */
-#if	COLOR
-	if (dtype != CDMONO)
-		attr = (((cbcolor & 15) << 4) | (cfcolor & 15)) << 8;
-	else
-		attr = 0x0700;
-#else
-	attr = 0x0700;
-#endif
-	lnptr = &sline[0];
-	for (i=0; i < term.t_ncol; i++)
-		*lnptr++ = ' ' | attr;
-
-	if (flickcode && (dtype == CDCGA)) {
-		/* wait for vertical retrace to be off */
-		while ((inp(0x3da) & 8))
-			;
-        
-		/* and to be back on */
-		while ((inp(0x3da) & 8) == 0)
-			;
-	}		        
-
-	/* and send the string out */
-	movmem(&sline[0], scptr[crow]+ccol, (term.t_ncol-ccol)*2);
+	scwrite(crow, ccol, term.t_ncol-ccol, NULL, gfcolor, gbcolor);
 
 }
 
-void
-ibmputc(ch)	/* put a character at the current position in the
-		   current colors */
+/* put a character at the current position in the current colors */
+ibmputc(ch)
 int ch;
 {
 	rg.h.ah = 14;		/* write char to screen with current attrs */
@@ -201,14 +181,13 @@ int ch;
 	if (dtype != CDMONO)
 		rg.h.bl = cfcolor;
 	else
-		rg.h.bl = 0x07;
-#else
-	rg.h.bl = 0x07;
 #endif
+	 rg.h.bl = 0x07;
+	rg.h.bh = 0;		/* current video page */
 	int86(0x10, &rg, &rg);
+
 }
 
-void
 ibmeeop()
 {
 	int attr;		/* attribute to fill screen with */
@@ -216,87 +195,78 @@ ibmeeop()
 	rg.h.ah = 6;		/* scroll page up function code */
 	rg.h.al = 0;		/* # lines to scroll (clear it) */
 	rg.x.cx = 0;		/* upper left corner of scroll */
-	rg.x.dx = (term.t_nrow << 8) | (term.t_ncol - 1);
-				/* lower right corner of scroll */
+	rg.h.dh = term.t_nrow;  /* lower right corner of scroll */
+	rg.h.dl = term.t_ncol - 1;
 #if	COLOR
 	if (dtype != CDMONO)
 		attr = ((ctrans[gbcolor] & 15) << 4) | (ctrans[gfcolor] & 15);
 	else
-		attr = 0;
-#else
-	attr = 0;
 #endif
+	 attr = 0;
 	rg.h.bh = attr;
 	int86(0x10, &rg, &rg);
 }
 
-void
+
 ibmrev(state)		/* change reverse video state */
 int state;	/* TRUE = reverse, FALSE = normal */
 {
 	/* This never gets used under the IBM-PC driver */
 }
 
+
 ibmcres(res)	/* change screen resolution */
-char *res;	/* resolution to change to */
+int res;	/* resolution to change to */
 {
 	int i;		/* index */
 
 	for (i = 0; i < NDRIVE; i++)
-		if (strcmp(res, drvname[i]) == 0) {
+		if (strcmp(drvname[res], drvname[i]) == 0) {
 			scinit(i);
 			return(TRUE);
 		}
 	return(FALSE);
 }
 
-/* ARGSUSED */
 void
-spal(dummy)	/* change palette string */
-char *dummy;
+spal()	/* reset the pallette registers */
 {
-	/*	Does nothing here	*/
+	/* nothin here now..... */
 }
 
-
-void
 ibmbeep()
 {
 #if	MWC86
 	putcnb(BEL);
 #else
-	bdos(6, BEL, 0);
+	bdos(6, BEL, 0);	/* annoying!! */
 #endif
 }
 
-void
 ibmopen()
 {
-	scinit(CDSENSE);
+	scinit(ibmtype);
 	revexist = TRUE;
-	ttopen();
+        ttopen();
 }
 
-void
 ibmclose()
+
 {
 #if	COLOR
 	ibmfcol(7);
 	ibmbcol(0);
 #endif
-	/* if we had the EGA open... close it */
-	if (dtype == CDEGA)
+	if (dtype == CDEGA) /* if we had the EGA open... close it */
 		egaclose();
-
-	ttclose();
+	else if (dtype == CDVGA) /* if we had the VGA open... close it */
+		vgaclose();
 }
 
-void
 ibmkopen()	/* open the keyboard */
 {
 }
 
-void
 ibmkclose()	/* close the keyboard */
 {
 }
@@ -306,25 +276,29 @@ int type;	/* type of adapter to init for */
 {
 	union {
 		long laddr;	/* long form of address */
-		int *paddr;	/* pointer form of address */
+		short *paddr;	/* pointer form of address */
 	} addr;
 	int i;
 
 	/* if asked...find out what display is connected */
 	if (type == CDSENSE)
 		type = getboard();
+	else
+		/* otherwise set up params as requested */
+		type = setboard(type);
 
 	/* if we have nothing to do....don't do it */
 	if (dtype == type)
 		return(TRUE);
 
 	/* if we try to switch to EGA and there is none, don't */
-	if (type == CDEGA && egaexist != TRUE)
+	if ((type != CDVGA) && (type == CDEGA && egaexist != TRUE))
 		return(FALSE);
 
-	/* if we had the EGA open... close it */
-	if (dtype == CDEGA)
+	if (dtype == CDEGA) /* if we had the EGA open... close it */
 		egaclose();
+	else if (dtype == CDVGA) /* if we had the VGA open... close it */
+		vgaclose();
 
 	/* and set up the various parameters as needed */
 	switch (type) {
@@ -343,6 +317,12 @@ int type;	/* type of adapter to init for */
 				egaopen();
 				newscreensize(43, term.t_ncol);
 				break;
+
+		case CDVGA:	/* VGA adapter */
+				scadd = SCADE;
+				vgaopen();
+				newscreensize(50, term.t_ncol);
+				break;
 	}
 
 	/* reset the $sres environment variable */
@@ -350,9 +330,9 @@ int type;	/* type of adapter to init for */
 	dtype = type;
 
 	/* initialize the screen pointer array */
+	addr.laddr = scadd;
 	for (i = 0; i < NROW; i++) {
-		addr.laddr = scadd + (long)(NCOL * i * 2);
-		scptr[i] = addr.paddr;
+		scptr[i] = addr.paddr + NCOL * i;
 	}
 	return(TRUE);
 }
@@ -363,45 +343,108 @@ int type;	/* type of adapter to init for */
 		CDMONO	Monochrome graphics adapter
 		CDCGA	Color Graphics Adapter
 		CDEGA	Extended graphics Adapter
+		CDVGA	VGA graphics Adapter
 */
 
 /* getbaord:	Detect the current display adapter
-		if MONO 	set to MONO
+		if MONO		set to MONO
 		   CGA		set to CGA	EGAexist = FALSE
 		   EGA		set to CGA	EGAexist = TRUE
 */
 
 int getboard()
+
 {
 	int type;	/* board type to return */
 
 	type = CDCGA;
+	egaexist = FALSE;
+
+	/* check for VGA or MCGA */
+	rg.h.ah = 0x1a;
+	rg.h.bl = 0x00;
+	int86(0x10,&rg, &rg);
+
+	if (rg.h.al == 0x1a) { /* its a VGA or MCGA */
+		if (rg.h.bl < 0x0a)
+			type = CDVGA;
+		else
+			type = CDCGA;
+
+		return(type);
+	}
+	
+	/* check for MONO board first */
 	int86(0x11, &rg, &rg);
-	if ((((rg.x.ax >> 4) & 3) == 3))
-		type = CDMONO;
+	if (((rg.x.ax & 0x30) == 0x30))
+		return(CDMONO);
 
 	/* test if EGA present */
-	rg.x.ax = 0x1200;
-	rg.x.bx = 0xff10;
-	int86(0x10,&rg, &rg);		/* If EGA, bh=0-1 and bl=0-3 */
-	egaexist = !(rg.x.bx & 0xfefc); /* Yes, it's EGA */
+	rg.h.ah = 0x12;
+	rg.h.bl = 0x10;
+	int86(0x10,&rg, &rg);
+
+	if (rg.h.bl != 0x10) { /* its an EGA */
+		egaexist = TRUE;
+		return(CDEGA);
+	}
+
+	return(type);
+
+}
+
+/*
+ * setboard() - added by pjr
+ *
+ * This allows the user to set the monitor type by hand by using a set
+ * variable in the rc file rathher than trying to figure out automatically
+ * which board is present, anyhow people may prefer 25 lines!
+ */
+int setboard(type)
+int type;	/* board requested and type to return */
+{
+
+	switch (type)
+	{
+	case CDMONO:	/* 25 lines */
+		if (dtype == CDMONO)
+			type = CDMONO;
+		else
+			type = CDCGA;
+
+		egaexist = FALSE;
+		break;
+	case CDCGA:	/* 25 lines */
+		egaexist = FALSE;
+		break;
+	case CDEGA:	/* 43 lines */
+		egaexist = TRUE;
+		break;
+	case CDVGA:	/* 50 lines */
+		egaexist = FALSE;
+		break;
+	default:
+		egaexist = FALSE;
+	} /* end of switch */
+	
 	return(type);
 }
 
 egaopen()	/* init the computer to work with the EGA */
+
 {
 	/* put the beast into EGA 43 row mode */
 	rg.x.ax = 3;
 	int86(16, &rg, &rg);
 
 	rg.h.ah = 17;		/* set char. generator function code */
-	rg.h.al = 18;		/*  to 8 by 8 double dot ROM	     */
-	rg.h.bl = 0;		/* block 0			     */
+	rg.h.al = 18;		/*  to 8 by 8 double dot ROM         */
+	rg.h.bl = 0;		/* block 0                           */
 	int86(16, &rg, &rg);
 
 	rg.h.ah = 18;		/* alternate select function code    */
-	rg.h.al = 0;		/* clear AL for no good reason	     */
-	rg.h.bl = 32;		/* alt. print screen routine	     */
+	rg.h.al = 0;		/* clear AL for no good reason       */
+	rg.h.bl = 32;		/* alt. print screen routine         */
 	int86(16, &rg, &rg);
 
 	rg.h.ah = 1;		/* set cursor size function code */
@@ -413,51 +456,82 @@ egaopen()	/* init the computer to work with the EGA */
 }
 
 egaclose()
+
 {
 	/* put the beast into 80 column mode */
 	rg.x.ax = 3;
 	int86(16, &rg, &rg);
 }
 
-scwrite(row, outstr, forg, bacg)	/* write a line out*/
-int row;	/* row of screen to place outstr on */
+vgaopen()	/* init the computer to work with the VGA */
+{
+	/* put the beast into VGA 50 row mode */
+	rg.x.ax = 0x1202;
+	rg.h.bl = 30;
+	int86(16, &rg, &rg);
+
+	rg.x.ax = 3;
+	int86(16, &rg, &rg);
+
+	rg.x.ax = 0x1112;	/*  to 8 by 8 double dot ROM         */
+	rg.h.bl = 0;		/* block 0                           */
+	int86(16, &rg, &rg);
+}
+
+vgaclose()
+{
+	/* put the beast back into normal 80 column mode */
+	rg.x.ax = 3;
+	int86(16, &rg, &rg);
+}
+
+scwrite(row, col, nchar, outstr, forg, bacg)	/* write a line out*/
+int row, col, nchar;	/* row,col of screen to place outstr (len nchar) on */
 char *outstr;	/* string to write out (must be term.t_ncol long) */
 int forg;	/* forground color of string to write */
 int bacg;	/* background color */
 {
-	unsigned int attr;	/* attribute byte mask to place in RAM */
-	unsigned int *lnptr;	/* pointer to the destination line */
+	unsigned short attr;	/* attribute byte mask to place in RAM */
+	unsigned short *lnptr;	/* pointer to the destination line */
 	int i;
 
 	/* build the attribute byte and setup the screen pointer */
 #if	COLOR
 	if (dtype != CDMONO)
-		attr = (((ctrans[bacg] & 15) << 4) | (ctrans[forg] & 15)) << 8;
+		attr = ((ctrans[bacg] & 15) << 4) | (ctrans[forg] & 15);
 	else
-		attr = (((bacg & 15) << 4) | (forg & 15)) << 8;
-#else
-	attr = (((bacg & 15) << 4) | (forg & 15)) << 8;
 #endif
-	lnptr = &sline[0];
-	for (i=0; i<term.t_ncol; i++)
-		*lnptr++ = (outstr[i] & 255) | attr;
+	 attr = ((bacg & 15) << 4) | (forg & 15);
+	attr <<= 8;
+
+	if (flickcode && (dtype == CDCGA))
+		lnptr = &sline[0];
+	else
+		lnptr = scptr[row]+col;
+
+	if (outstr) {
+		for (i = 0; i < nchar; i++) {
+			*lnptr++ = (outstr[i] & 255) | attr;
+		}
+	} else {
+		for (i = 0; i < nchar; i++) {
+			*lnptr++ = (SPACE & 255) | attr;
+		}
+	}
 
 	if (flickcode && (dtype == CDCGA)) {
 		/* wait for vertical retrace to be off */
 		while ((inp(0x3da) & 8))
 			;
-        
 		/* and to be back on */
 		while ((inp(0x3da) & 8) == 0)
 			;
+		/* and send the string out */
+		movmem(&sline[0], scptr[row], nchar*sizeof(short));
 	}
-
-	/* and send the string out */
-	movmem(&sline[0], scptr[row],term.t_ncol*2);
 }
 
 #if	FLABEL
-int
 fnclabel(f, n)		/* label a function key */
 int f,n;	/* default flag, numeric argument [unused] */
 {
@@ -465,9 +539,9 @@ int f,n;	/* default flag, numeric argument [unused] */
 	return(TRUE);
 }
 #endif
+
 #else
 ibmhello()
 {
 }
 #endif
-

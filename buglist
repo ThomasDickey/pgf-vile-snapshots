@@ -5,6 +5,11 @@ H	output sometimes doesn't flush properly after a shell escape -- seems
 	to be related to turning on the USE_FCNTL code in termio.c.  If anyone
 	finds this -- let me know!  I'd love to know the answer.
 
+E	DOS to-do:
+	- glomming (e.g. ":e *.c") does nothing under DOS -- the code in
+	expand_wild_args() can probably be used to accomplish this.
+	- filter-region
+
 E	should add a "show-vars" command
 
 E	everybody and their sibling wants "map", "map!", and "abb".
@@ -107,6 +112,9 @@ E	:e and :n should be able to deal with multiple filenames resulting
 	from filename globbing.  vi has this problem too.  At least
 	vile lets you choose to choose the first such name.  if should show
 	you the first name, so you know whether to accept it or not.
+
+E	vi lets you say: "set ai nows ic".  These must be separate commands
+	in vile.
 
 
 User contributed:

@@ -4,7 +4,10 @@
  *	written 1986 by Daniel Lawrence	
  *
  * $Log: exec.c,v $
- * Revision 1.28  1992/05/19 08:55:44  foxharp
+ * Revision 1.29  1992/06/25 22:44:06  foxharp
+ * better string quoting parse, from pjr
+ *
+ * Revision 1.28  1992/05/19  08:55:44  foxharp
  * more prototype and shadowed decl fixups
  *
  * Revision 1.27  1992/05/16  12:00:31  pgf
@@ -782,14 +785,8 @@ char *src, *tok;	/* source string, destination token string */
 	while (isspace(*src))
 		++src;
 
-	/* set quote mode if qoute found */
-	if (*src == '"') {
-		quotef = TRUE;
-		*tok++ = *src++;
-	} else {
-		quotef = FALSE;
-	}
 
+	quotef = FALSE;
 	/* scan through the source string */
 	while (*src) {
 		/* process special characters */
@@ -814,6 +811,10 @@ char *src, *tok;	/* source string, destination token string */
 				if (*src == ' ' || *src == '\t')
 					break;
 			}
+
+			/* set quote mode if qoute found */
+			if (*src == '"')
+				quotef = TRUE;
 
 			/* record the character */
 			*tok++ = *src++;
@@ -1191,7 +1192,10 @@ nxtscan:	/* on to the next line */
 			dobufnesting--;
 			return FALSE;
 		}
-		strncpy(eline, lp->l_text, linlen);
+
+		/* pjr - must check for empty line before copy */
+		if (linlen)
+			strncpy(eline, lp->l_text, linlen);
 		eline[linlen] = 0;	/* make sure it ends */
 
 		/* trim leading whitespace */
