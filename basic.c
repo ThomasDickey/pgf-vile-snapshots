@@ -6,7 +6,10 @@
  * framing, are hard.
  *
  * $Log: basic.c,v $
- * Revision 1.52  1993/05/24 15:21:37  pgf
+ * Revision 1.53  1993/06/02 14:28:47  pgf
+ * see tom's 3.48 CHANGES
+ *
+ * Revision 1.52  1993/05/24  15:21:37  pgf
  * tom's 3.47 changes, part a
  *
  * Revision 1.51  1993/05/11  16:22:22  pgf
@@ -463,7 +466,7 @@ int f,n;
 	/* and then go back up */
 	/* (we're either at eos or eof) */
 	while (--n) {
-		if (l_ref(DOT.l) == l_ref(curwp->w_line.l))
+		if (same_ptr(DOT.l, curwp->w_line.l))
 			break;
 		DOT.l = lBACK(DOT.l);
 	}
@@ -1179,8 +1182,7 @@ int c;
 	/* if we have any named marks, and the one we want isn't null */
 	if (markp != NULL && !samepoint((*markp), nullmark)) {
 		register LINE *lp;
-		for (lp = lForw(curbp->b_line.l);
-				lp != l_ref(curbp->b_line.l); lp = lforw(lp)) {
+		for_each_line(lp, curbp) {
 			if (l_ref((*markp).l) == lp) {
 				found = TRUE;
 				break;

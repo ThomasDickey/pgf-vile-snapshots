@@ -17,7 +17,10 @@
  *	modify (ifdef-style) 'expand_leaf()' to allow ellipsis.
  *
  * $Log: glob.c,v $
- * Revision 1.8  1993/05/11 16:22:22  pgf
+ * Revision 1.9  1993/06/02 14:28:47  pgf
+ * see tom's 3.48 CHANGES
+ *
+ * Revision 1.8  1993/05/11  16:22:22  pgf
  * see tom's CHANGES, 3.46
  *
  * Revision 1.7  1993/05/06  11:59:58  pgf
@@ -141,7 +144,7 @@ char	*item;
 		if (*item == GLOB_RANGE[0])
 			return TRUE;
 #endif
-#if OPT_GLOB_ENVIRON
+#if OPT_GLOB_ENVIRON && !VMS
 		if (*item == '$' && (isname(item[1]) || isdelim(item[1])))
 			return TRUE;
 #endif
@@ -402,8 +405,12 @@ char	*pattern;
 /*
  * Comparison-function for 'qsort()'
  */
+#if !__STDC__
+static	int	compar P(( char **, char ** ));
+#endif
+
 static int
-#if TURBO
+#if __STDC__
 compar (const void *a, const void *b)
 #else
 compar (a, b)

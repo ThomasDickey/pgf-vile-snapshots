@@ -4,7 +4,10 @@
 	written 1986 by Daniel Lawrence
  *
  * $Log: eval.c,v $
- * Revision 1.54  1993/05/24 15:25:41  pgf
+ * Revision 1.55  1993/06/02 14:28:47  pgf
+ * see tom's 3.48 CHANGES
+ *
+ * Revision 1.54  1993/05/24  15:25:41  pgf
  * tom's 3.47 changes, part b
  *
  * Revision 1.53  1993/05/24  15:21:37  pgf
@@ -187,8 +190,8 @@ static	char	*GetEnv P(( char * ));
 static	void	makevarslist P(( int, char *));
 static	char *	gtfun P(( char * ));
 static	void	findvar P(( char *, VDESC * ));
-#endif
 static	int	vars_complete P(( int, char *, int * ));
+#endif
 
 /*--------------------------------------------------------------------------*/
 
@@ -206,7 +209,9 @@ char	*GetEnv(s)
 
 /* points to current "shell" environment variable, either in malloc'ed
 	if user set it, or in environment ($SHELL) otherwise */
+#if !SMALLER
 static char *shell;
+#endif
 
 void
 varinit()		/* initialize the user variable list */
@@ -282,6 +287,8 @@ int f,n;
 	/* back to the buffer whose modes we just listed */
 	swbuffer(wp->w_bufp);
 	return s;
+#else
+	return unimpl(f,n);
 #endif
 }
 

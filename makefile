@@ -66,7 +66,7 @@ DESTDIR2 = $(HOME)/bin
 REMOTE=gutso!foxharp
 
 #CC = gcc
-#OPTFLAGS = -g -O -Wall -Wshadow # -pg
+#OPTFLAGS = -g -O -Wall -Wshadow -Wconversion -Wstrict-prototypes -Wmissing-prototypes
 
 CC = cc
 #OPTFLAGS = -g
@@ -526,7 +526,10 @@ random.$O:	glob.h
 vmalloc$O:	nevars.h
 
 # $Log: makefile,v $
-# Revision 1.107  1993/05/11 16:22:22  pgf
+# Revision 1.108  1993/06/02 14:46:13  pgf
+# added more gcc warnings
+#
+# Revision 1.107  1993/05/11  16:22:22  pgf
 # see tom's CHANGES, 3.46
 #
 # Revision 1.106  1993/05/06  16:21:28  pgf

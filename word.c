@@ -4,7 +4,10 @@
  * do any sentence mode commands, they are likely to be put in this file. 
  *
  * $Log: word.c,v $
- * Revision 1.27  1993/05/24 15:21:37  pgf
+ * Revision 1.28  1993/06/02 14:28:47  pgf
+ * see tom's 3.48 CHANGES
+ *
+ * Revision 1.27  1993/05/24  15:21:37  pgf
  * tom's 3.47 changes, part a
  *
  * Revision 1.26  1993/04/28  14:34:11  pgf
@@ -311,50 +314,48 @@ int f,n;
 int
 joinregion()
 {
-	register int s;
+	register int status;
 	register int doto, c;
 	LINE	*end;
 	REGION	region;
 	int	done = FALSE;
 
-	if ((s = getregion(&region)) != TRUE)
-		return(s);
+	if ((status = getregion(&region)) == TRUE
+	 && (status = !is_last_line(region.r_orig, curbp)) == TRUE) {
 
-	if (is_last_line(region.r_orig, curbp))
-		return FALSE;
+		DOT = region.r_orig;
+		end = l_ref(region.r_end.l);
+		fulllineregions = FALSE;
 
-	DOT = region.r_orig;
-	end = l_ref(region.r_end.l);
-	fulllineregions = FALSE;
+		while (!done) {
+			c = EOS;
+			status = gotoeol(FALSE,1);
+			if (DOT.o > 0)
+				c = lGetc(DOT.l, DOT.o-1);
+			if (status == TRUE) status = setmark();
+			if (status == TRUE) status = forwline(FALSE,1);
+			if (status == TRUE) status = firstnonwhite(FALSE,1);
 
-	while (!done) {
-		c = EOS;
-		s = gotoeol(FALSE,1);
-		if (DOT.o > 0)
-			c = lGetc(DOT.l, DOT.o-1);
-		if (s == TRUE) s = setmark();
-		if (s == TRUE) s = forwline(FALSE,1);
-		if (s == TRUE) s = firstnonwhite(FALSE,1);
+			done = ((l_ref(DOT.l) == end) || (lForw(DOT.l) == end));
+			if (status == TRUE) status = killregion();
+			if (status != TRUE)
+				break;
 
-		done = ((l_ref(DOT.l) == end) || (lForw(DOT.l) == end));
-		if (s == TRUE) s = killregion();
-		if (s != TRUE)
-			return s ;
-
-		doto = DOT.o;
-		if (doto == 0)
-			;	/* join at column 0 to empty line */
-		else if (doto < lLength(DOT.l)) {
-			if (lGetc(DOT.l, doto) == ')')
-				;	/* join after parentheses */
-			else if (lGetc(DOT.l, doto-1) == '.')
-				s = linsert(2,' ');
-			else if (!isspace(c))
-				s = linsert(1,' ');
+			doto = DOT.o;
+			if (doto == 0)
+				;	/* join at column 0 to empty line */
+			else if (doto < lLength(DOT.l)) {
+				if (lGetc(DOT.l, doto) == ')')
+					;	/* join after parentheses */
+				else if (lGetc(DOT.l, doto-1) == '.')
+					status = linsert(2,' ');
+				else if (!isspace(c))
+					status = linsert(1,' ');
+			}
 		}
 	}
-
-	return s;
+	rls_region();
+	return status;
 }
 
 int
@@ -379,22 +380,24 @@ formatregion()
 	register int is_comment;	/* doing a comment block?	*/
 	register int comment_char = -1;	/* # or *, for shell or C	*/
 	register int at_nl = TRUE;	/* just saw a newline?		*/
-	register LINE *pastline;	/* pointer to line just past EOP */
+	fast_ptr LINEPTR pastline;	/* pointer to line just past EOP */
 	register int sentence;		/* was the last char a period?	*/
 	char wbuf[NSTRING];		/* buffer for current word	*/
 	int secondindent;
-	REGION region;
 	regexp *expP, *expC;
 	int s;
 	
 	if (!sameline(MK, DOT)) {
+		REGION region;
+
 		getregion(&region);
 		if (sameline(region.r_orig, MK))
 			swapmark();
+		rls_region();
 	}
-	pastline = l_ref(MK.l);
-	if (pastline != l_ref(curbp->b_line.l))
-		pastline = lforw(pastline);
+	pastline = MK.l;
+	if (!same_ptr(pastline, curbp->b_line.l))
+		pastline = lFORW(pastline);
 
 	expP = b_val_rexp(curbp,VAL_PARAGRAPHS)->reg;
 	expC = b_val_rexp(curbp,VAL_COMMENTS)->reg;
@@ -403,7 +406,7 @@ formatregion()
 		while (lregexec(expP, l_ref(DOT.l), 0, lLength(DOT.l)) ||
 			lregexec(expC, l_ref(DOT.l), 0, lLength(DOT.l)) ) {
 			DOT.l = lFORW(DOT.l);
-			if (l_ref(DOT.l) == pastline) {
+			if (same_ptr(DOT.l, pastline)) {
 				setmark();
 				return TRUE;
 			}
@@ -415,7 +418,7 @@ formatregion()
 			and following lines */
 		DOT.l = lFORW(DOT.l);
 
-		if (l_ref(DOT.l) != pastline) {
+		if (!same_ptr(DOT.l, pastline)) {
 			secondindent = indentlen(l_ref(DOT.l));
 		}
 			
@@ -447,7 +450,7 @@ formatregion()
 			if (is_at_end_of_line(DOT)) {
 				c = ' ';
 				DOT.l = lFORW(DOT.l);
-				if (l_ref(DOT.l) == pastline) {
+				if (same_ptr(DOT.l, pastline)) {
 					finished = TRUE;
 				} else if (
 				lregexec(expP, l_ref(DOT.l), 0, lLength(DOT.l)) ||
@@ -553,9 +556,11 @@ wordcount(f, n)
 	REGION region;		/* region to look at */
 
 	/* make sure we have a region to count */
-	if ((status = getregion(&region)) != TRUE)
+	if ((status = getregion(&region)) != TRUE) {
+		rls_region();
 		return(status);
-	lp     = region.r_orig.l;
+	}
+	lp     = l_ref(region.r_orig.l);
 	offset = region.r_orig.o;
 	size   = region.r_size;
 
@@ -592,6 +597,8 @@ wordcount(f, n)
 
 	mlforce("lines %d, words %D, chars %D, avg chars/word %f",
 		nlines, nwords, nchars, avgch);
+
+	rls_region();
 	return(TRUE);
 }
 #endif

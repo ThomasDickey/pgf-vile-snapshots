@@ -3,7 +3,10 @@
  *		5/9/86
  *
  * $Log: input.c,v $
- * Revision 1.76  1993/05/24 15:25:41  pgf
+ * Revision 1.77  1993/06/02 14:28:47  pgf
+ * see tom's 3.48 CHANGES
+ *
+ * Revision 1.76  1993/05/24  15:25:41  pgf
  * tom's 3.47 changes, part b
  *
  * Revision 1.75  1993/05/05  10:31:30  pgf
@@ -453,6 +456,7 @@ void
 tungetc(c)
 int c;
 {
+
 	tungotc = c;
 	if (dotcmdmode == RECORD) {
 		tb_unput(TempDot(FALSE));

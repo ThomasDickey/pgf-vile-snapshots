@@ -14,7 +14,10 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.118  1993/05/24 15:21:37  pgf
+ * Revision 1.119  1993/06/02 14:28:47  pgf
+ * see tom's 3.48 CHANGES
+ *
+ * Revision 1.118  1993/05/24  15:21:37  pgf
  * tom's 3.47 changes, part a
  *
  * Revision 1.117  1993/05/11  16:22:22  pgf
@@ -525,10 +528,11 @@ char	*argv[];
 #endif
 
 #if OPT_MAP_MEMORY
-	pre_op_dot.l = l_ptr((LINE *)0);
-	nullmark.l = l_ptr((LINE *)0);
+	null_ptr = l_ptr((LINE *)0);
+	pre_op_dot.l = null_ptr;
+	nullmark.l = null_ptr;
 #if !WINMARK
-	Mark.l = l_ptr((LINE *)0);	/* ...so we don't confuse with blk 0 */
+	Mark.l = null_ptr;	/* ...so we don't confuse with blk 0 */
 #endif
 #endif
 	charinit();		/* character types -- we need these pretty

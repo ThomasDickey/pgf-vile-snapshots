@@ -4,7 +4,10 @@
  *	Written (except for delins()) for vile by Paul Fox, (c)1990
  *
  * $Log: oneliner.c,v $
- * Revision 1.42  1993/05/24 15:21:37  pgf
+ * Revision 1.43  1993/06/02 14:28:47  pgf
+ * see tom's 3.48 CHANGES
+ *
+ * Revision 1.42  1993/05/24  15:21:37  pgf
  * tom's 3.47 changes, part a
  *
  * Revision 1.41  1993/05/04  17:05:14  pgf
@@ -162,45 +165,46 @@ int flag;
 {
 	register WINDOW *wp;
 	register BUFFER *bp;
-	register int	s;
+	register int	status;
 	REGION		region;
 	static char bname[] = ScratchName(p-lines);
-	register LINE *linep;
+	fast_ptr LINEPTR linep;
 
-	fulllineregions = TRUE;
-	        
-	s = getregion(&region);
+	if ((status = get_fl_region(&region)) != TRUE) {
+		rls_region();
+		return (status);
+	}
 
-	fulllineregions = FALSE;
-
-	if (s != TRUE)
-		return (s);
-
-	linep = l_ref(region.r_orig.l);		 /* Current line.	 */
+	linep = region.r_orig.l;		 /* Current line.	 */
 	        
 	/* first check if we are already here */
 	bp = bfind(bname, OK_CREAT, 0);
-	if (bp == NULL)
+	if (bp == NULL) {
+		rls_region();
 		return FALSE;
+	}
 
 	if (bp == curbp) {
 		mlforce("[Can't do that from this buffer.]");
+		rls_region();
 		return FALSE;
 	}
 
 	if (!calledbefore) {		/* fresh start */
 		/* bring p-lines up */
-		if (popupbuff(bp) != TRUE)
+		if (popupbuff(bp) != TRUE) {
+			rls_region();
 			return FALSE;
+		}
 	        
 		bclear(bp);
 		calledbefore = TRUE;
 	}
         
 	do {
-		addline(bp,linep->l_text,llength(linep));
-		linep = lforw(linep);
-	} while (linep != l_ref(region.r_end.l));
+		addline(bp, l_ref(linep)->l_text, lLength(linep));
+		linep = lFORW(linep);
+	} while (!same_ptr(linep, region.r_end.l));
 
 	(void)strcpy(bp->b_bname,bname);
 	set_rdonly(bp, "");
@@ -213,6 +217,7 @@ int flag;
 			wp->w_flag |= WFMODE|WFFORCE;
 		}
 	}
+	rls_region();
 	return TRUE;
 }
 
@@ -271,26 +276,24 @@ int
 substreg1(needpats, use_opts)
 int needpats, use_opts;
 {
-	int c, s;
+	int c, status;
 	static int printit, globally, nth_occur;
 	REGION region;
-	LINE *oline;
+	LINEPTR oline;
+	int	getopts = FALSE;
 
-	fulllineregions = TRUE;
-	        
-	s = getregion(&region);
-
-	fulllineregions = FALSE;
-
-	if (s != TRUE)
-		return (s);
+	if ((status = get_fl_region(&region)) != TRUE) {
+		rls_region();
+		return (status);
+	}
 
 	if (calledbefore == FALSE && needpats) {
 		c = kbd_delimiter();
-		if ((s = readpattern("substitute pattern: ", &pat[0],
+		if ((status = readpattern("substitute pattern: ", &pat[0],
 					&gregexp, c, FALSE)) != TRUE) {
-			if (s != ABORT)
+			if (status != ABORT)
 				mlforce("[No pattern.]");
+			rls_region();
 			return FALSE;
 		}
 
@@ -298,72 +301,81 @@ int needpats, use_opts;
 			if (substexp)
 				free((char *)substexp);
 			substexp = castalloc(regexp,gregexp->size);
-			memcpy((char *)substexp, (char *)gregexp, gregexp->size);
+			(void)memcpy((char *)substexp, (char *)gregexp, (SIZE_T)gregexp->size);
 		}
 
-		if ((s = readpattern("replacement string: ", &rpat[0], (regexp	**)0, c,
-				FALSE)) != TRUE) {
-			if (s == ABORT)
-				return FALSE;
-			/* else the pattern is null, which is okay... */
+		if ((status = readpattern("replacement string: ", &rpat[0], (regexp	**)0, c,
+				FALSE)) == ABORT) {
+			rls_region();
+			return FALSE;
+			/* if false, the pattern is null, which is okay... */
 		}
 		nth_occur = -1;
 		printit = globally = FALSE;
-		if (lastkey == c) { /* the user may have something to add */
-			char buf[3];
-			char *bp;
-		getopts:
-			bp = buf;
-			buf[0] = 0;
-			s = mlreply(
-	"(g)lobally or ([1-9])th occurrence on line and/or (p)rint result: ",
-				buf, sizeof buf);
-			if (s == ABORT)
-				return FALSE;
-			nth_occur = 0;
-			while (*bp) {
-				if (*bp == 'p' && !printit) {
-					printit = TRUE;
-				} else if (*bp == 'g' &&
-						!globally && !nth_occur) {
-					globally = TRUE;
-				} else if (isdigit(*bp) &&
-						!nth_occur && !globally) {
-					nth_occur = *bp - '0';
-					globally = TRUE;
-				} else if (!isspace(*bp)) {
-					mlforce("[Unknown action %s]",buf);
-					return FALSE;
-				}
-				bp++;
-			}
-			if (!nth_occur)
-				nth_occur = -1;
-		}
+		getopts = (lastkey == c); /* the user may have something to add */
+
 	} else {
 		if (!use_opts) {
 			nth_occur = -1;
 			printit = globally = FALSE;
 		} else {
-			if (isnamedcmd && lastkey != '\r') {
+			if (isnamedcmd && !isreturn(end_string())) {
 				tungetc(lastkey);
 				nth_occur = -1;
 				printit = globally = FALSE;
-				goto getopts;
+				getopts = TRUE;
 			}
 		}
+	}
+
+	if (getopts) {
+		char buf[3];
+		char *bp = buf;
+
+		buf[0] = EOS;
+		status = mlreply(
+	"(g)lobally or ([1-9])th occurrence on line and/or (p)rint result: ",
+			buf, sizeof buf);
+		if (status == ABORT) {
+			rls_region();
+			return FALSE;
+		}
+		nth_occur = 0;
+		while (*bp) {
+			if (*bp == 'p' && !printit) {
+				printit = TRUE;
+			} else if (*bp == 'g' &&
+					!globally && !nth_occur) {
+				globally = TRUE;
+			} else if (isdigit(*bp) &&
+					!nth_occur && !globally) {
+				nth_occur = *bp - '0';
+				globally = TRUE;
+			} else if (!isspace(*bp)) {
+				mlforce("[Unknown action %s]",buf);
+				rls_region();
+				return FALSE;
+			}
+			bp++;
+		}
+		if (!nth_occur)
+			nth_occur = -1;
 	}
 
 	DOT.l = region.r_orig.l;	    /* Current line.	    */
 
 	do {
-		oline = l_ref(DOT.l);
-		if ((s = substline( substexp, nth_occur, printit, globally))
-								!= TRUE)
-			return s;
-		DOT.l = l_ptr(lforw(oline));
+		oline = DOT.l;
+		if ((status = substline( substexp, nth_occur, printit, globally))
+								!= TRUE) {
+			rls_region();
+			return status;
+		}
+		DOT.l = lFORW(oline);
 	} while (!sameline(DOT, region.r_end));
 	calledbefore = TRUE;
+
+	rls_region();
 	return TRUE;
 }
 
@@ -493,7 +505,7 @@ char *sourc;
 		buflen = dlength + 1;
 	}
 
-	memcpy(buf, exp->startp[0], dlength);
+	(void)memcpy(buf, exp->startp[0], (SIZE_T)dlength);
 	buf[dlength] = '\0';
 
 	if (ldelete((long) dlength, FALSE) != TRUE) {

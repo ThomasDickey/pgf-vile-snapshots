@@ -6,7 +6,10 @@
  * for the display system.
  *
  * $Log: buffer.c,v $
- * Revision 1.62  1993/05/24 15:25:41  pgf
+ * Revision 1.63  1993/06/02 14:28:47  pgf
+ * see tom's 3.48 CHANGES
+ *
+ * Revision 1.62  1993/05/24  15:25:41  pgf
  * tom's 3.47 changes, part b
  *
  * Revision 1.61  1993/05/24  15:21:37  pgf
@@ -528,12 +531,12 @@ void	FreeBuffer(bp)
 		free(bp->b_fname);
 
 #if !WINMARK
-	if (l_ref(MK.l) == l_ref(bp->b_line.l)) {
-		MK.l = l_ptr((LINE *)0);
+	if (same_ptr(MK.l, bp->b_line.l)) {
+		MK.l = null_ptr;
 		MK.o = 0;
 	}
 #endif
-	lfree(l_ref(bp->b_line.l), bp);	 /* Release header line. */
+	lfree(bp->b_line.l, bp);	 	/* Release header line. */
 	bp1 = NULL;				/* Find the header.	*/
 	bp2 = bheadp;
 	while (bp2 != bp) {
@@ -1366,8 +1369,8 @@ updatelistbuffers()
 			for_each_window(wp) {
 				if (wp->w_bufp == bp) {
 					tbl[num].wp   = wp;
-					tbl[num].top  = line_no(bp, l_ref(wp->w_line.l));
-					tbl[num].line = line_no(bp, l_ref(wp->w_dot.l));
+					tbl[num].top  = line_no(bp, wp->w_line.l);
+					tbl[num].line = line_no(bp, wp->w_dot.l);
 					tbl[num].col  = wp->w_dot.o;
 					if (++num >= SIZEOF(tbl))
 						break;
@@ -1411,21 +1414,26 @@ register BUFFER *bp;
 char	*text;
 int len;
 {
-	register LINE	*lp;
-	register int	i;
+	fast_ptr LINEPTR lp;
 	register int	ntext;
 
 	ntext = (len < 0) ? strlen(text) : len;
-	if ((lp=lalloc(ntext,bp)) == NULL)
+	lp = lalloc(ntext, bp);
+	if (same_ptr(lp, null_ptr))
 		return (FALSE);
-	for (i=0; i<ntext; ++i)
-		lputc(lp, i, text[i]);
-	set_lforw(lBack(bp->b_line.l), lp);	/* Hook onto the end    */
-	set_lback(lp, lBack(bp->b_line.l));
-	set_lback(l_ref(bp->b_line.l), lp);
-	set_lforw(lp, l_ref(bp->b_line.l));
+#if OPT_MAP_MEMORY
+	if (ntext > l_ref(lp)->l_size)
+		ntext = l_ref(lp)->l_size;
+#endif
+	if (ntext > 0)
+		(void)memcpy(l_ref(lp)->l_text, text, (SIZE_T)ntext);
+
+	set_lForw(lBack(bp->b_line.l), lp);	/* Hook onto the end    */
+	set_lBACK(lp, lBACK(bp->b_line.l));
+	set_lBACK(bp->b_line.l, lp);
+	set_lFORW(lp, bp->b_line.l);
 	if (sameline(bp->b_dot, bp->b_line))  /* If "." is at the end */
-		bp->b_dot.l = l_ptr(lp);	/* move it to new line  */
+		bp->b_dot.l = lp;		/* move it to new line  */
 	return (TRUE);
 }
 
@@ -1465,7 +1473,7 @@ int cflag, bflag;
 char   *bname;
 {
 	register BUFFER *bp;
-	register LINE	*lp;
+	fast_ptr LINEPTR lp;
 	register BUFFER *lastb = NULL;	/* buffer to insert after */
 
 	for_each_buffer(bp) {
@@ -1490,7 +1498,8 @@ char   *bname;
 	bp->b_ltext_end = NULL;
 #endif
 
-	if ((lp=lalloc(0,bp)) == NULL) {
+	lp = lalloc(0, bp);
+	if (same_ptr(lp, null_ptr)) {
 		free((char *) bp);
 		(void)no_memory("BUFFER head");
 		return (NULL);
@@ -1498,7 +1507,7 @@ char   *bname;
 
 	/* and set up the other buffer fields */
 	bp->b_active = FALSE;
-	bp->b_dot.l  = l_ptr(lp);
+	bp->b_dot.l  = lp;
 	bp->b_dot.o  = 0;
 #if WINMARK
 	bp->b_mark = nullmark;
@@ -1509,9 +1518,9 @@ char   *bname;
 	bp->b_values = global_b_values;
 	bp->b_wtraits.w_vals = global_w_values;
 	bp->b_nwnd  = 0;
-	bp->b_wline.l = l_ptr(lp);
+	bp->b_wline.l = lp;
 	bp->b_wline.o = 0;  /* unused */
-	bp->b_line.l = l_ptr(lp);
+	bp->b_line.l = lp;
 	bp->b_line.o = 0;
 	bp->b_acount = b_val(bp, VAL_ASAVECNT);
 	bp->b_fname = NULL;
@@ -1525,21 +1534,15 @@ char   *bname;
 	} else
 		bp->b_key[0] = EOS;
 #endif
-	bp->b_udstks[0] = bp->b_udstks[1] = l_ptr((LINE *)0);
+	bp->b_udstks[0] = bp->b_udstks[1] = null_ptr;
 #if OPT_MAP_MEMORY	/* _all_ pointers must be clean */
-	bp->b_wtraits.w_dt =
-#ifdef WINMARK
-	bp->b_wtraits.w_mk =
-#endif
-	bp->b_wtraits.w_ld =
-	bp->b_wtraits.w_ln =
 	bp->b_uddot[0] = bp->b_uddot[1] = nullmark;
 #endif
 	bp->b_udstkindx = 0;
-	bp->b_ulinep = l_ptr((LINE *)0);
+	bp->b_ulinep = null_ptr;
 	bp->b_last_used = 0;
-	set_lforw(lp, lp);
-	set_lback(lp, lp);
+	set_lFORW(lp, lp);
+	set_lBACK(lp, lp);
         
 	/* append at the end */
 	if (lastb)
@@ -1566,7 +1569,7 @@ int
 bclear(bp)
 register BUFFER *bp;
 {
-	register LINE	*lp;
+	fast_ptr LINEPTR lp;
 
 	if (!InvisibleOrScratch(bp) /* Not invisible or scratch */
 	 &&  Changed(bp)) {	    /* Something changed    */
@@ -1577,7 +1580,7 @@ register BUFFER *bp;
 	}
 	bp->b_flag  &= ~BFCHG;			/* Not changed		*/
 	freeundostacks(bp);	/* do this before removing lines */
-	while ((lp=lForw(bp->b_line.l)) != l_ref(bp->b_line.l)) {
+	while ((l_ref(lp=lFORW(bp->b_line.l))) != l_ref(bp->b_line.l)) {
 		lremove(bp,lp);
 		lfree(lp,bp);
 	}

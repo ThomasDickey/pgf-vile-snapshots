@@ -3,7 +3,10 @@
  *		strings.
  *
  * $Log: path.c,v $
- * Revision 1.11  1993/05/24 15:21:37  pgf
+ * Revision 1.12  1993/06/02 14:28:47  pgf
+ * see tom's 3.48 CHANGES
+ *
+ * Revision 1.11  1993/05/24  15:21:37  pgf
  * tom's 3.47 changes, part a
  *
  * Revision 1.10  1993/05/11  16:22:22  pgf
@@ -46,6 +49,7 @@
 #if UNIX
 #include <sys/types.h>
 #include <pwd.h>
+static	void	home_path P(( char * ));
 #endif
 
 #if VMS

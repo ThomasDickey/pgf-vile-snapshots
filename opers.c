@@ -4,7 +4,10 @@
  * written for vile by Paul Fox, (c)1990
  *
  * $Log: opers.c,v $
- * Revision 1.28  1993/04/21 13:55:27  pgf
+ * Revision 1.29  1993/06/02 14:58:17  pgf
+ * folded some long lines
+ *
+ * Revision 1.28  1993/04/21  13:55:27  pgf
  * consolidate repeat count processing into single routine in main.c, to
  * make them multiply correctly
  *
@@ -237,7 +240,7 @@ chgreg()
 {
 	killregion();
 	if (fulllineregions) {
-		if (backline(FALSE,1) == TRUE) /* returns FALSE at top of buffer */
+		if (backline(FALSE,1) == TRUE) /* returns FALSE at top of buf */
 			return opendown(TRUE,1);
 		else
 			return openup(TRUE,1);
@@ -346,7 +349,8 @@ int f,n;
         char fname[NFILEN];
 
 	if (ukb != 0) {
-	        if ((s=mlreply_file("Write to file: ", (TBUFF **)0, FILEC_WRITE|FILEC_PROMPT, fname)) != TRUE)
+	        if ((s=mlreply_file("Write to file: ", (TBUFF **)0,
+				FILEC_WRITE|FILEC_PROMPT, fname)) != TRUE)
 	                return s;
 		return kwrite(fname,TRUE);
 	} else {

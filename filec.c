@@ -4,7 +4,13 @@
  *	Filename prompting and completion routines
  *
  * $Log: filec.c,v $
- * Revision 1.15  1993/05/24 15:21:37  pgf
+ * Revision 1.17  1993/06/02 14:58:17  pgf
+ * folded some long lines
+ *
+ * Revision 1.16  1993/06/02  14:28:47  pgf
+ * see tom's 3.48 CHANGES
+ *
+ * Revision 1.15  1993/05/24  15:21:37  pgf
  * tom's 3.47 changes, part a
  *
  * Revision 1.14  1993/05/11  16:22:22  pgf
@@ -287,7 +293,7 @@ char *	text;
 	register LINE	*np;
 	register int	len = strlen(text);
 
-	if ((np=lalloc(len+2,bp)) == NULL) {
+	if ((np = l_ref(lalloc(len+2,bp))) == NULL) {
 		lp = 0;
 	} else {
 		(void)strcpy(np->l_text, text);
@@ -340,7 +346,7 @@ char *	text;	/* pathname to find */
 int	len;	/* ...its length */
 BUFFER *bp;	/* buffer to search */
 int	iflag;	/* true to insert if not found, -true if it is directory */
-LINE **	lpp;	/* in/out line pointer, for iteration */
+LINEPTR *lpp;	/* in/out line pointer, for iteration */
 {
 	register LINE	*lp;
 	int	doit	= FALSE;
@@ -365,7 +371,7 @@ LINE **	lpp;	/* in/out line pointer, for iteration */
 	}
 #endif
 
-	if (lpp == NULL || (lp = *lpp) == NULL)
+	if (lpp == NULL || (lp = l_ref(*lpp)) == NULL)
 		lp = l_ref(bp->b_line.l);
 	lp = lforw(lp);
 
@@ -377,7 +383,7 @@ LINE **	lpp;	/* in/out line pointer, for iteration */
 			 &&  trailing_slash(fname)
 			 && !trailing_slash(lp->l_text)) {
 				/* reinsert so it is sorted properly! */
-				lremove(bp, lp);
+				lremove(bp, l_ptr(lp));
 				return bs_find(text, len,  bp, iflag, lpp);
 			}
 			break;
@@ -399,7 +405,7 @@ LINE **	lpp;	/* in/out line pointer, for iteration */
 		lp = makeString(bp, lp, fname);
 
 	if (lpp)
-		*lpp = lp;
+		*lpp = l_ptr(lp);
 	return TRUE;
 }
 #endif /* COMPLETE_DIRS || COMPLETE_FILES */
@@ -412,6 +418,7 @@ static	void	makeMyList P((void));
 #if NO_LEAKS
 static	void	freeMyList P((void));
 #endif
+static	int	path_completion P(( int, char *, int * ));
 
 static	BUFFER	*MyBuff;	/* the buffer containing pathnames */
 static	char	*MyName;	/* name of buffer for name-completion */
@@ -447,7 +454,7 @@ char *	path;
 		}
 
 	/* force the name in with a trailing slash */
-	(void)bs_find(fname, len, MyBuff, -TRUE, (LINE **)0);
+	(void)bs_find(fname, len, MyBuff, -TRUE, (LINEPTR*)0);
 	return FALSE;
 }
 
@@ -526,11 +533,13 @@ char *	name;
 					continue;
 				iflag = -TRUE;
 			} else {
-				iflag = (global_g_val(GMDDIRC) && is_directory(path))
+				iflag = (global_g_val(GMDDIRC) && 
+						is_directory(path))
 					? -TRUE
 					: TRUE;
 			}
-			(void)bs_find(path, (int)strlen(path), MyBuff, iflag, (LINE **)0);
+			(void)bs_find(path, (int)strlen(path), MyBuff, iflag,
+					(LINEPTR*)0);
 		}
 		(void)closedir(dp);
 	}
@@ -729,7 +738,8 @@ char *	result;
 		(void)tb_scopy(
 			buf = &last,
 			had_fname && is_pathname(curbp->b_fname)
-				? shorten_path(strcpy(Reply, curbp->b_fname), FALSE)
+				? shorten_path(strcpy(Reply, curbp->b_fname),
+				FALSE)
 				: "");
 	}
 

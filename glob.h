@@ -2,7 +2,10 @@
  *	glob.h
  *
  * $Log: glob.h,v $
- * Revision 1.2  1993/05/11 16:22:22  pgf
+ * Revision 1.3  1993/06/02 14:28:47  pgf
+ * see tom's 3.48 CHANGES
+ *
+ * Revision 1.2  1993/05/11  16:22:22  pgf
  * see tom's CHANGES, 3.46
  *
  * Revision 1.1  1993/04/21  14:38:41  pgf
@@ -24,7 +27,7 @@
 /*
  * Configuration options
  */
-#define	OPT_GLOB_ENVIRON	ENVFUNC
+#define	OPT_GLOB_ENVIRON	ENVFUNC && !SMALLER
 #define	OPT_GLOB_ELLIPSIS	VMS || UNIX || (MSDOS && !SMALLER)
 #define	OPT_GLOB_PIPE		UNIX
 #define	OPT_GLOB_RANGE		UNIX || (MSDOS && !SMALLER)

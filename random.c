@@ -3,7 +3,10 @@
  * commands. There is no functional grouping here, for sure.
  *
  * $Log: random.c,v $
- * Revision 1.94  1993/05/24 15:21:37  pgf
+ * Revision 1.95  1993/06/02 14:28:47  pgf
+ * see tom's 3.48 CHANGES
+ *
+ * Revision 1.94  1993/05/24  15:21:37  pgf
  * tom's 3.47 changes, part a
  *
  * Revision 1.93  1993/05/04  17:05:14  pgf
@@ -518,7 +521,7 @@ int f,n;
 int
 line_no(the_buffer, the_line)	/* return the number of the given line */
 BUFFER *the_buffer;
-LINE *the_line;
+LINEPTR the_line;
 {
 	register LINE	*lp;		/* current line */
 	register int	numlines;	/* # of lines before point */
@@ -530,7 +533,7 @@ LINE *the_line;
 	numlines = 0;
 	while (lp != l_ref(the_buffer->b_line.l)) {
 		/* if we are on the specified line, record it */
-		if (lp == the_line)
+		if (lp == l_ref(the_line))
 			break;
 		++numlines;
 		lp = lforw(lp);
@@ -544,7 +547,7 @@ LINE *the_line;
 int
 getcline()	/* get the current line number */
 {
-	return line_no(curbp, l_ref(DOT.l));
+	return line_no(curbp, DOT.l);
 }
 #endif
 
@@ -635,7 +638,7 @@ int f,n;
 	if (--dot.o < 0)
 		return (FALSE);
 	cl = char_at(dot);
-	copy_for_undo(l_ref(dot.l));
+	copy_for_undo(dot.l);
 	put_char_at(dot, cr);
 	++dot.o;
 	put_char_at(dot, cl);
@@ -754,8 +757,10 @@ entab_region()
 }
 
 /* trim trailing whitespace from a line.  leave dot at end of line */
+/*ARGSUSED*/
 int
-trimline()
+trimline(flag)
+int	flag;
 {
 	register int off, orig;
 	register LINE *lp;

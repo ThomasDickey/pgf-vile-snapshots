@@ -3,7 +3,10 @@
  * attached to keys that the user actually types.
  *
  * $Log: window.c,v $
- * Revision 1.25  1993/05/24 15:21:37  pgf
+ * Revision 1.26  1993/06/02 14:28:47  pgf
+ * see tom's 3.48 CHANGES
+ *
+ * Revision 1.25  1993/05/24  15:21:37  pgf
  * tom's 3.47 changes, part a
  *
  * Revision 1.24  1993/04/20  12:18:32  pgf
@@ -576,7 +579,7 @@ int f,n;
                 wp->w_ntrows = ntrl;
 		/* try to keep lower from reframing */
 		for (i = ntru+1; i > 0 &&
-				 l_ref(wp->w_line.l) != l_ref(wp->w_bufp->b_line.l); i--) {
+				 !same_ptr(wp->w_line.l, wp->w_bufp->b_line.l); i--) {
 			wp->w_line.l = lFORW(wp->w_line.l);
 		}
 		wp->w_dot.l = wp->w_line.l;
@@ -602,7 +605,7 @@ int f,n;
 		wp->w_dot.l = wp->w_line.l;
 		/* move upper window dot to bottom line of upper */
 		for (i = ntru-2; 
-			i > 0 && l_ref(wp->w_dot.l) != l_ref(wp->w_bufp->b_line.l); i--)
+			i > 0 && !same_ptr(wp->w_dot.l, wp->w_bufp->b_line.l); i--)
 			wp->w_dot.l = lFORW(wp->w_dot.l);
 		wp->w_dot.o = 0;
 		/* adjust lower window topline */

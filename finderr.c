@@ -2,7 +2,10 @@
  * Written for vile by Paul Fox, (c)1990
  *
  * $Log: finderr.c,v $
- * Revision 1.23  1993/05/24 15:21:37  pgf
+ * Revision 1.24  1993/06/02 14:28:47  pgf
+ * see tom's 3.48 CHANGES
+ *
+ * Revision 1.23  1993/05/24  15:21:37  pgf
  * tom's 3.47 changes, part a
  *
  * Revision 1.22  1993/05/11  16:22:22  pgf
@@ -113,9 +116,17 @@ int f,n;
 	int errline;
 	char errfile[NFILEN];
 	char ferrfile[NFILEN];
+	char verb[32];
 	
 	static int oerrline = -1;
 	static char oerrfile[256];
+
+#if APOLLO
+	static	char	lint_fmt1[] = "%32[^( \t] \t%[^(](%d)";
+	static	char	lint_fmt2[] = "%32[^(]( arg %d ) \t%32[^( \t](%d) :: %[^(](%d))";
+	int	num1, num2;
+	char	nofile[NFILEN];
+#endif
 
 #define DIRLEVELS 20
 	static int l = 0;
@@ -150,7 +161,6 @@ int f,n;
 		*/
 		if (lisreal(dotp)) {
 			static	TBUFF	*tmp;
-			char verb[20];
 #if SUNOS
 			char *t;
 #endif
@@ -166,6 +176,18 @@ int f,n;
 			if ( (sscanf(text,
 				"\"%[^\" \t]\", line %d:",
 				errfile, &errline) == 2
+#if APOLLO
+				/* C compiler */
+			  ||  sscanf(text,
+				"%32[*] Line %d of \"%[^\" \t]\"",
+				verb, &errline, errfile) == 3 
+				/* sys5 lint */
+			  ||  (!strncmp(text, "    ", 4)
+			    && (sscanf(text+4, lint_fmt1,
+			    	verb, errfile, &errline) == 3)
+			     || sscanf(text+4, lint_fmt2,
+			     	verb, &num1, nofile, &num2, errfile, &errline) == 6)
+#endif
 			  ||  sscanf(text,
 				"%[^: \t]: %d:",
 				errfile, &errline) == 2 
@@ -178,16 +200,11 @@ int f,n;
 			  	"  ::  %[^( \t](%d)",
 				errfile, &errline) == 2)
 #endif
-#if APOLLO
-			  ||  sscanf(text,
-				"%20[*] Line %d of \"%[^\" \t]\"",
-				verb, &errline, errfile) == 3 
-#endif
 				) && (oerrline != errline || 
 					strcmp(errfile,oerrfile))) {
 				break;
 			} else if (sscanf(text,
-			"%*[^ \t:`]: %20[^ \t`] directory `",verb) == 1 ) {
+			"%*[^ \t:`]: %32[^ \t`] directory `", verb) == 1 ) {
 				if (!strcmp(verb, "Entering")) {
 					if (l < DIRLEVELS) {
 						char *e,*d;
@@ -323,6 +340,4 @@ int f,n;
 	set_febuff((s == FALSE) ? ScratchName(Output) : name);
         return TRUE;
 }
-#else
-finderrhello() { }
 #endif

@@ -3,19 +3,41 @@
  *
  * Manages temporary file (or extended memory) to cache buffer data on systems
  * where main memory is not sufficient to hold large amounts of data.
+ * Written by T.E.Dickey for vile (may 1993).
  *
  * We store the lines of all files in a cache of pages which are in-memory
  * when referenced with 'LINE *'.
  *
- * TODO:
- *	implement temp-file swapping
+ * This is _not_ (yet) a recovery-file mechanism, nor does it store all dynamic
+ * memory used by vile.  To make a recovery-file, we would have to store the
+ * following data:
  *
- *	discount 'next' pointer from NCHUNK allocation
+ *	list of BUFFER structs
+ *	buffer- and file-name associated with each BUFFER struct
+ *	header-LINEPTR for each BUFFER struct.
  *
- *	make REGION stuff work properly
+ * Dynamic memory not stored here includes
+ *
+ *	BUFFER structs
+ *	WINDOW structs
+ *	buffer- and window-mode arrays
+ *	kill-buffers
+ *
+ * To do:
+ *
+ *	+ investigate whether it is feasible (or desirable) to add logic that
+ *	  keeps track of modified pages so we don't write unmodified pages
+ *	  during swapping.
+ *
+ *	+ improve temp-file page reuse by keeping track of pages that have
+ *	  freespace (or have been entirely freed).  Currently, only pages that
+ *	  are in-memory can have space allocated from them.
  *
  * $Log: tmp.c,v $
- * Revision 1.1  1993/05/24 15:21:37  pgf
+ * Revision 1.2  1993/06/02 14:28:47  pgf
+ * see tom's 3.48 CHANGES
+ *
+ * Revision 1.1  1993/05/24  15:21:37  pgf
  * tom's 3.47 changes, part a
  *
  * Revision 1.0  1993/05/11  16:26:18  pgf
@@ -25,19 +47,253 @@
 #include "estruct.h"
 #include "edef.h"
 
+/*****************************************************************************
+ *      Configuration Settings                                               *
+ *****************************************************************************/
+
+#undef	LP_TABLE
 #undef	TESTING
-#define TESTING 1	/* values: 0, 1,2,3 */
+
+#define TESTING 0		/* values: 0, 1,2,3 */
+
+#define	MAX_PAGES       4	/* patch: maximum # in in-memory pages */
+
+#define	NCHUNK          1024	/* size of page-buffers */
+
+/*****************************************************************************
+ *      Local types & data                                                   *
+ *****************************************************************************/
+
+#if OPT_MAP_MEMORY
+
+#define	BAD_PAGE	-1
+
+	/*
+	 * Definitions for the maximum space and line-length we can have in
+	 * a page-buffer.  The maximum space is forced to be a multiple of
+	 * the FREE_T's size to simplify allocation.
+	 */
+#define	MAX_SPACE	((((NCHUNK - sizeof(PAGE_T)) / sizeof(FREE_T)) - 1) * sizeof(FREE_T))
+#define	MAX_LINELEN	(MAX_SPACE - sizeof(LINE) - sizeof(FREE_T))
+
+#define	for_each_page(p,q)	for (p = recent_pages, q = 0; p != 0; q = p, p = p->next)
+
+#define	set_text(lp)	lp->l_text = (lp->l_size > 0) ? (char *)(lp+1) : 0
+
+	/*
+	 * We keep the FREE_T header before each allocated LINE struct to
+	 * allow us to reclaim storage when a LINE is deallocated.
+	 */
+#define	Area2Line(a)	(LINE *)((a)+1)
+#define	Line2Area(lp)	((FREE_T *)(lp)-1)
+#define	Page2Line(p,o)	(LINE *)((long)p + o + sizeof(FREE_T))
+
+	/*
+	 * Linked-list type for inuse/freespace blocks within a page.
+	 */
+typedef	struct	free_t	{
+	OFF_T	skip;		/* in-page pointer to next freespace */
+	OFF_T	size;		/* size of this freespace (0 is end-mark) */
+	} FREE_T;
+
+	/*
+	 * Linked-list type for pages holding LINE structs (and some freespace)
+	 * The member 'space[]' points to two lists:
+	 *	space[0] = offset to freespace
+	 *	space[1] = offset to inuse-space
+	 */
+#define	PAGE_T	struct	buff_t
+typedef	PAGE_T	{
+	PAGE_T	*next;		/* pointer to next in-memory page */
+	BLK_T	block;		/* identifies this page */
+	OFF_T	space[2];	/* offset of first freespace in page */
+	};
+
+#define	REGIONPTR	struct	regionptr
+	REGIONPTR {
+	REGIONPTR *next;
+	REGION	*data;
+	};
+
+static	REGIONPTR *region_list;
+
+static	PAGE_T	*recent_pages;	/* LRU list of pages of LINE structs */
+static	BLK_T	intern_pagenum;	/* next page # to allocate */
+static	BLK_T	extern_pagenum;	/* total # of pages written to temp-file */
+
+static	FILE	*temp_fp;	/* page-swapping file */
+
+static	int	count_truncated;/* counts truncated lines for warning message */
+#endif
+
+/*****************************************************************************
+ *      Debugging (general)                                                  *
+ *****************************************************************************/
 
 #if TESTING
 extern	void	WalkBack P(( void ));
 extern	void	Trace P(( char *, ... ));
-static	void	dump_line P(( char *, LINEPTR ));
+
+static	int	dumping;
+	int	dump_line P(( char *, LINEPTR ));
 	void	dumpBuffer P(( BUFFER * ));
-static	void	invalidate_ref P(( LINE * ));
+
+#endif
+
+#if TESTING || OPT_MAP_MEMORY
+static	void	Oops P(( void ));
+
+static	void
+Oops()
+{
+#if TESTING
+	WalkBack();
+	Trace((char *)0);
+#endif
+	ttclean(TRUE);
+	abort();
+}
+#endif
+
+#if TESTING
+
+/*----------------------------------------------------------------------------*/
+int
+dump_line(tag, p)
+char	*tag;
+LINEPTR	p;
+{
+	LINE	*q = l_ref(p);
+	char	temp[80];
+
+#if OPT_MAP_MEMORY && (TESTING > 2)
+	(void)sprintf(temp, "%p\t%ld.%x", q, p.blk, p.off);
+#else
+	(void)sprintf(temp, "%p", q);
+#endif
+
+	if ((long)q > 10) {
+		Trace("%s\t%20s %d:'%.*s'\n",
+			temp, tag,
+			llength(q),
+			lisreal(q) ? llength(q) : 1,
+			lisreal(q) ? q->l_text  : "");
+	} else {
+		Trace("%s\t%20s (null)\n",
+			temp, tag);
+		return FALSE;
+	}
+	return TRUE;
+}
+
+#if __STDC__
+#define	dumpLine(p)	dump_line(#p,p)
+#else
+#define	dumpLine(p)	dump_line("",p)
+#endif
+#define	dumpMark(p)	dumpLine(p.l)
+
+/*----------------------------------------------------------------------------*/
+void
+dumpBuffer(bp)
+BUFFER	*bp;
+{
+	WINDOW	*wp;
+	LINE	*p;
+	LINEPTR	s;
+	REGIONPTR *q;
+	int	n;
+
+	dumping = TRUE;
+	Trace("dumpBuffer(%s) %d windows\n", bp->b_bname, bp->b_nwnd);
+	if (bp->b_nwnd != 0) {	/* only show if displayed */
+		(void)dumpMark(bp->b_dot);
+#ifdef WINMARK
+		(void)dumpMark(bp->b_mark);
+#endif
+		(void)dumpMark(bp->b_lastdot);
+		(void)dumpMark(bp->b_wline);
+	}
+
+#ifndef WINMARK
+	(void)dumpMark(MK);
+#endif
+	for_each_window(wp) {
+		if (wp->w_bufp == bp) {
+			(void)dumpMark(wp->w_dot);
+#ifdef WINMARK
+			(void)dumpMark(wp->w_mark);
+#endif
+			(void)dumpMark(wp->w_lastdot);
+			(void)dumpMark(wp->w_line);
+		}
+	}
+
+	if (bp->b_nmmarks != 0)
+		for (n = 0; n < 26; n++)
+			(void)dumpMark(bp->b_nmmarks[n]);
+
+	for (n = 0; n < 2; n++) {
+		(void)dumpMark(bp->b_uddot[n]);
+
+		(void)dumpLine(bp->b_udstks[n]);
+		for (s = bp->b_udstks[n]; (p = l_ref(s)) != 0; s = p->l_nxtundo) {
+			(void)dumpLine(p->l_fp);
+			(void)dumpLine(p->l_bp);
+			if (!dumpLine(p->l_nxtundo))	break;
+		}
+	}
+
+	(void)dumpLine(bp->b_ulinep);
+	for (s = bp->b_ulinep; (p = l_ref(s)) != 0; s = p->l_nxtundo) {
+		(void)dumpLine(p->l_fp);
+		(void)dumpLine(p->l_bp);
+		if (!dumpLine(p->l_nxtundo))	break;
+	}
+
+	(void)dump_line("HEAD", bp->b_line.l);
+	for_each_line(p,bp) {
+		(void)dump_line("text", l_ptr(p));
+	}
+
+	for (q = region_list; q != 0; q = q->next) {
+		(void)dumpMark(q->data->r_orig);
+		(void)dumpMark(q->data->r_end);
+	}
+	dumping = FALSE;
+}
+#endif	/* TESTING */
+
+/*****************************************************************************
+ *      Local Definitions and Data                                           *
+ *****************************************************************************/
+
+#if OPT_MAP_MEMORY
+static	BLK_T	MaxPages    P(( void ));
+static	void	RecentPage  P(( PAGE_T * ));
+static	void	WritePage   P(( PAGE_T * ));
+static	void	ReadPage    P(( PAGE_T *, BLK_T ));
+static	void	FlushPages  P(( PAGE_T * ));
+static	LINE *	AdjustPtrs  P(( LINE *, LINE *, BUFFER * ));
+static	OFF_T	SizeToSpace P(( SIZE_T ));
+static	FREE_T *FirstSpace  P(( PAGE_T *, int ));
+static	FREE_T *NextSpace   P(( FREE_T * ));
+static	OFF_T	SpaceOffset P(( PAGE_T *, FREE_T * ));
+static	void	ShrinkSpace P(( FREE_T *, OFF_T ));
+static	void	AdjustSpace P(( PAGE_T *, FREE_T *, OFF_T, int ));
+#if TESTING
 static	LINE *	ValidateDst P(( char *, LINE * ));
 static	LINE *	ValidateSrc P(( char *, LINE * ));
-static	void	add_to_cache P(( LINE *, LINEPTR ));
+static	void	CheckSpace  P(( PAGE_T * ));
+#else
+#define	ValidateDst(tag,lp)	lp
+#define	ValidateSrc(tag,lp)	lp
+#define	CheckSpace(p)
 #endif
+
+/*****************************************************************************
+ *      Debugging (map-memory)                                               *
+ *****************************************************************************/
 
 #if TESTING > 1
 #define	TRACE1(s)	Trace s;
@@ -51,220 +307,133 @@ static	void	add_to_cache P(( LINE *, LINEPTR ));
 #define	TRACE2(s)
 #endif
 
-#if OPT_MAP_MEMORY
-
-#define	MAX_PAGES	4	/* patch: maximum # in in-memory pages */
-#define	BAD_PAGE	-1
-#define	CHUNK	1024		/* patch: size of line-buffers */
-
-#define	for_each_page(p,q)	for (p = recent_pages, q = 0; p != 0; q = p, p = p->next)
-
-typedef	struct	free_t	{
-	OFF_T		skip;	/* in-page pointer to next freespace */
-	OFF_T		size;	/* size of this freespace */
-	} FREE_T;
-
-typedef	struct	buff_t	{
-	struct	buff_t	*next;	/* pointer to next in-memory page */
-	BLK_T		block;	/* identifies this page */
-	OFF_T		space;	/* offset of first freespace in page */
-	} PAGE_T;
-
-static	PAGE_T	*recent_pages;
-static	BLK_T	next_page;	/* next page # to allocate */
-
-static	FILE	*temp_fp;	/* page-swapping file */
-static	BLK_T	temp_pages;	/* highest temp-file page # written */
-
-static	void	Oops P(( void ));
-static	void	RecentPage P(( PAGE_T * ));
-static	void	adjust_ptr P(( LINE *, LINE *, BUFFER * ));
-static	OFF_T	SizeToSpace P(( SIZE_T ));
-static	FREE_T *FirstSpace  P(( PAGE_T * ));
-static	FREE_T *NextSpace   P(( FREE_T * ));
-static	OFF_T	SpaceOffset P(( PAGE_T *, FREE_T * ));
-static	void	ShrinkSpace P(( FREE_T *, OFF_T ));
-static	void	DelinkSpace P(( PAGE_T *, FREE_T *, OFF_T ));
-
 /*----------------------------------------------------------------------------*/
-static void
-Oops()
-{
-#if TESTING
-	WalkBack();
-	Trace((char *)0);
-#endif
-	ttclean(TRUE);
-	abort();
-}
-
-/*----------------------------------------------------------------------------*/
-#if TESTING
-#define	MAX_CACHE	1000
-static	LINE	*cache[MAX_CACHE];
 
 #if TESTING
-#define	ShowCache(tag,ptr,i,lp)	TRACE2(("%s %s #%d %p\n", tag, ptr, i, lp))
-#else
-#define	ShowCache(tag,ptr,i,lp)
-#endif
+static	char	*listnames[2] = {"free", "inuse"};
 
-void
-dump_line(tag, p)
-char	*tag;
-LINEPTR	p;
-{
-	LINE	*q = l_ref(p);
-
-	if (q != 0) {
-		Trace("%p\t%d.%x\t%20s %d:'%.*s'\n",
-			q, p.blk, p.off, tag,
-			llength(q),
-			lisreal(q) ? llength(q) : 1,
-			lisreal(q) ? q->l_text  : "");
-	} else {
-		Trace("%p\t%d.%x\t%20s (null)\n",
-			q, p.blk, p.off, tag);
-	}
-}
-
-#define	dumpLine(p)	dump_line(#p,p)
-#define	dumpMark(p)	dumpLine(p.l)
-
-void
-dumpBuffer(bp)
-BUFFER	*bp;
-{
-	WINDOW	*wp;
-	LINE	*p;
-	LINEPTR	s;
-	int	n;
-
-	dumpMark(bp->b_wtraits.w_dt);
-#ifdef WINMARK
-	dumpMark(bp->b_wtraits.w_mk);
-#endif
-	dumpMark(bp->b_wtraits.w_ld);
-	dumpMark(bp->b_wtraits.w_ln);
-
-	for_each_window(wp) {
-		if (wp->w_bufp == bp) {
-			dumpMark(wp->w_traits.w_dt);
-#ifdef WINMARK
-			dumpMark(wp->w_traits.w_mk);
-#endif
-			dumpMark(wp->w_traits.w_ld);
-			dumpMark(wp->w_traits.w_ln);
-		}
-	}
-
-	if (bp->b_nmmarks != 0)
-		for (n = 0; n < 26; n++)
-			dumpMark(bp->b_nmmarks[n]);
-
-	for (n = 0; n < 2; n++) {
-		dumpMark(bp->b_uddot[n]);
-
-		dumpLine(bp->b_udstks[n]);
-		for (s = bp->b_udstks[n]; (p = l_ref(s)) != 0; s = p->l_nxtundo) {
-			dumpLine(p->l_fp);
-			dumpLine(p->l_bp);
-			dumpLine(p->l_nxtundo);
-		}
-	}
-
-	dumpLine(bp->b_ulinep);
-	for (s = bp->b_ulinep; (p = l_ref(s)) != 0; s = p->l_nxtundo) {
-		dumpLine(p->l_fp);
-		dumpLine(p->l_bp);
-		dumpLine(p->l_nxtundo);
-	}
-}
-
-static void
-invalidate_ref(lp)
-LINE	*lp;
-{
-	if (lp == (LINE *)0
-	 || lp == (LINE *)1) {
-		Trace("cannot invalidate %p\n", lp);
-		Oops();
-	} else {
-		register int	i;
-		for (i = 0; i < SIZEOF(cache); i++) {
-			if (cache[i] == lp) {
-				cache[i] = 0;
-				return;
-			}
-		}
-	}
-}
-
-static LINE *
+static	LINE *
 ValidateDst(tag, lp)
 char	*tag;
 LINE	*lp;
 {
-	register int i;
+	register PAGE_T *p;
+	register FREE_T *f;
+	register int	list;
 
-	if (lp != (LINE *)0
-	 && lp != (LINE *)1) {
-		for (i = 0; i < SIZEOF(cache); i++)
-			if (cache[i] == lp) {
-				ShowCache("<=", tag, i, lp);
-				return lp;
+	for (p = recent_pages; p != 0; p = p->next) {
+		long	offset = (long)lp - (long)p;
+		if (offset >= 0 && offset < NCHUNK) {
+			for (f = FirstSpace(p,1); f != 0; f = NextSpace(f)) {
+				if (lp == Page2Line(p,SpaceOffset(p,f)))
+					return lp;
 			}
+			Trace("Cannot find line in %p .. %p (offset %lx)\n",
+				p,
+				(char *)((long)p + offset - 1),
+				offset);
+			for (list = 0; list < 2; list++) {
+				Trace("%s:\n", listnames[list]);
+				for (f = FirstSpace(p,list); f != 0; f = NextSpace(f)) {
+					offset = SpaceOffset(p,f);
+					Trace("\t%p (%x.%x)\n", f, f->skip, f->size);
+					if (offset < 0 || offset > NCHUNK) {
+						Trace("? error\n");
+						break;
+					}
+				}
+			}
+			break;
+		}
 	}
 	Trace("(%s) illegal value of lp:%p\n", tag, lp);
-	Oops();
-	return 0;
+	if (!dumping)
+		Oops();
+	return lp;
 }
 
-static LINE *
+static	LINE *
 ValidateSrc(tag, lp)
 char	*tag;
 LINE	*lp;
 {
-	if (lp == (LINE *)0) {
-		ShowCache("==", tag, BAD_PAGE, lp);
+	if (lp == (LINE *)0
+	 || lp == (LINE *)1)	/* poison-value used in 'lfree()' */
 		return lp;
-	}
-	if (lp == (LINE *)1) {	/* poison-value used in 'lfree()' */
-		ShowCache("::", tag, BAD_PAGE, lp);
-		return lp;
-	}
 	return ValidateDst(tag,lp);
 }
 
-static void
-add_to_cache(ref, ptr)
-LINE	*ref;
-LINEPTR	ptr;
+static	void
+CheckSpace (page)
+PAGE_T	*page;
 {
-	register int i;
-	for (i = 0; i < SIZEOF(cache); i++)
-		if (cache[i] == 0) {
-			ShowCache("=>", "ADD", i, ref);
-			cache[i] = ref;
-			return;
-		}
-	Trace("** CACHE FULL\n");
-	Oops();
-}
-#else
-#define	invalidate_ref(lp)
-#define	ValidateDst(tag,lp)	lp
-#define	ValidateSrc(tag,lp)	lp
-#define	add_to_cache(ref,ptr)
-#endif
+	register FREE_T	*temp;
+	int	list;
+	OFF_T	total = 0;
 
-/*----------------------------------------------------------------------------*/
+	TRACE2(("check PAGE %ld\n", page->block))
+	for (list = 0; list < 2; list++) {
+		TRACE2(("\t%s-list\n", listnames[list]))
+		for (temp = FirstSpace(page, list); temp != 0; temp = NextSpace(temp)) {
+			long	test = (long)temp - (long)page;
+			if (test < 0
+			 || test > NCHUNK) {
+				Trace("bad space-pointer %p vs %p\n", temp, page);
+				Oops();
+			}
+			if (temp->size < 0
+			 || temp->size > NCHUNK
+			 || temp->size % sizeof(FREE_T)) {
+				Trace("bad size-value %x\n", temp->size);
+				Oops();
+			}
+			if (temp->skip < 0
+			 || temp->skip > NCHUNK) {
+				Trace("bad skip-value %x\n", temp->skip);
+				Oops();
+			}
+			TRACE2(("\t\t%p (%x.%x)\n", temp, temp->skip, temp->size))
+			total += temp->size;
+		}
+	}
+	if (total != MAX_SPACE) {
+		Trace("bad total in page %ld is %x\n", page->block, total);
+		Oops();
+	}
+	TRACE2(("\ttotal %#x\n", total))
+}
+#endif	/* TESTING */
+
+/*****************************************************************************
+ *      Local procedures                                                     *
+ *****************************************************************************/
+
+/*
+ * The first time this is called, it determines how much memory we can
+ * allocate (leaving a generous share for the non-line data).  It returns
+ * the number of pages so that we can use this to limit the growth of the
+ * page-list in memory.
+ */
+static BLK_T
+MaxPages()
+{
+	static	BLK_T	the_limit;
+	if (the_limit == 0) {
+#if MSDOS
+		extern long coreleft(void);
+		the_limit = ((coreleft() / 3) * 2) / NCHUNK;
+#else
+		the_limit = MAX_PAGES;
+#endif
+	}
+	return the_limit;
+}
 
 /*
  * Given the prev-pointer for the page, relink a page to the front of the
  * list of recent pages.
  */
-static void
+static	void
 RecentPage (p)
 PAGE_T	*p;
 {
@@ -273,34 +442,105 @@ PAGE_T	*p;
 		p->next = q->next;
 		q->next = recent_pages;
 		recent_pages = q;
+#if TESTING
+		{ int	count = 0;
+			TRACE2(("recent-page #%ld => %p\n", q->block, q))
+			for (p = recent_pages; p != 0; p = p->next) {
+				TRACE2(("... #%ld => %p\n", p->block, p))
+				if (count++ > MaxPages())
+					Oops();
+			}
+		}
+#endif
+	}
+}
+
+#define	PageOffset(number) ((number) * NCHUNK)
+
+/*
+ * Write the referenced page to the temporary file
+ */
+static	void
+WritePage(this)
+PAGE_T	*this;
+{
+	if (this->block+1 > extern_pagenum)
+		extern_pagenum = this->block+1;
+
+	TRACE1(("writing page #%ld:%ld =>%p\n", this->block, extern_pagenum, this))
+
+	if (temp_fp == 0)
+		temp_fp = tmpfile();
+
+	if (fseek(temp_fp, PageOffset(this->block), 0) < 0
+	 || fwrite((char *)this, sizeof(char), NCHUNK, temp_fp) != NCHUNK) {
+		Oops();
 	}
 }
 
 /*
- * Write the referenced page (and any unwritten pages up to that point)
+ * Read the referenced page (always into the least-recent position in the
+ * page-list).
  */
-static void
-WritePage()
+static	void
+ReadPage(this, number)
+PAGE_T	*this;
+BLK_T	number;
 {
-	/* patch: unimplemented */
+	register FREE_T	*p;
+
+	TRACE1(("reading page #%ld:%ld =>%p\n", number, extern_pagenum, this))
+
+	if (fseek(temp_fp, PageOffset(number), 0) < 0
+	 || fread((char *)this, sizeof(char), NCHUNK, temp_fp) != NCHUNK) {
+		Oops();
+	}
+	this->next = 0;
+	for (p = FirstSpace(this,1); p != 0; p = NextSpace(p)) {
+		register LINE	*lp = Page2Line(this,SpaceOffset(this,p));
+		set_text(lp);
+	}
 }
 
 /*
- * Read the referenced page, making it the most recently-referenced
+ * Write unwritten pages through the one referenced, so we can reuse it in a
+ * new (or retrieved) page.  Note that the page-list is not in any particular
+ * order, but that we must write initial blocks to the temp-file in order.
  */
-static void
-ReadPage()
+static	void
+FlushPages(thru)
+PAGE_T	*thru;
 {
-	/* patch: unimplemented */
+	register PAGE_T	*p;
+
+	while (extern_pagenum < thru->block) {
+		for (p = recent_pages; p != 0; p = p->next) {
+			if (p->block == extern_pagenum) {
+				WritePage(p);
+				break;
+			}
+		}
+	}
+
+	/* always write the final block, since we don't know if it changed */
+	WritePage(thru);
 }
 
 /*----------------------------------------------------------------------------*/
 
-#define	AdjustLine(ptr)	if (l_ref(ptr) == oldp) ptr = newptr
-#define	AdjustMark(m)	if (l_ref(m.l) == oldp) m.l = newptr
+/*
+ * Adjust LINEPTR structs to reflect a reallocation.  This is necessary because
+ * (unlike the normal configuration), we keep the LINE struct and its text
+ * together.
+ *
+ * Use 'same_ptr()' for comparisons to avoid swapping unnecessarily, as well
+ * as to avoid errors due to referencing obsolete (deallocated) pointers.
+ */
+#define	AdjustLine(ptr)	if (same_ptr(ptr, oldptr)) ptr = newptr
+#define	AdjustMark(m)	AdjustLine(m.l)
 
-static void
-adjust_ptr(oldp, newp, bp)
+static	LINE *
+AdjustPtrs(oldp, newp, bp)
 LINE	*oldp;
 LINE	*newp;
 BUFFER	*bp;
@@ -309,26 +549,37 @@ BUFFER	*bp;
 	register int	n;
 	LINEPTR	s;
 	LINE	*p;
+	LINEPTR	oldptr;
 	LINEPTR	newptr;
+	REGIONPTR *q;
+
+	set_lforw(lback(oldp), newp);
+	set_lback(lforw(oldp), newp);
+	set_lforw(newp, lforw(oldp));
+	set_lback(newp, lback(oldp));
 
 	newptr = l_ptr(newp);
+	oldptr = l_ptr(oldp);
 
 	/* adjust pointers in buffer and its windows */
-	AdjustMark(bp->b_wtraits.w_dt);
+	AdjustMark(bp->b_dot);
 #ifdef WINMARK
-	AdjustMark(bp->b_wtraits.w_mk);
+	AdjustMark(bp->b_mark);
 #endif
-	AdjustMark(bp->b_wtraits.w_ld);
-	AdjustMark(bp->b_wtraits.w_ln);
+	AdjustMark(bp->b_lastdot);
+	AdjustMark(bp->b_wline);
 
+#ifndef WINMARK
+	AdjustMark(MK);
+#endif
 	for_each_window(wp) {
 		if (wp->w_bufp == bp) {
-			AdjustMark(wp->w_traits.w_dt);
+			AdjustMark(wp->w_dot);
 #ifdef WINMARK
-			AdjustMark(wp->w_traits.w_mk);
+			AdjustMark(wp->w_mark);
 #endif
-			AdjustMark(wp->w_traits.w_ld);
-			AdjustMark(wp->w_traits.w_ln);
+			AdjustMark(wp->w_lastdot);
+			AdjustMark(wp->w_line);
 		}
 	}
 
@@ -356,8 +607,14 @@ BUFFER	*bp;
 		AdjustLine(p->l_nxtundo);
 	}
 
-	/* patch: MARK's in REGION? */
+	for (q = region_list; q != 0; q = q->next) {
+		AdjustMark(q->data->r_orig);
+		AdjustMark(q->data->r_end);
+	}
+
 	/* patch: MARK's in struct WHBLOCK? */
+
+	return l_ref(newptr);	/* forces it back to most-recent-page */
 }
 
 /*----------------------------------------------------------------------------*/
@@ -371,73 +628,133 @@ static	OFF_T
 SizeToSpace (size)
 SIZE_T	size;
 {
-	OFF_T	need = sizeof(LINE) + size;
+	OFF_T	need = sizeof(LINE) + sizeof(FREE_T) + size;
 	if (need & (sizeof(FREE_T)-1))
 		need = (need | (sizeof(FREE_T)-1)) + 1;
 	return need;
 }
 
 static	FREE_T *
-FirstSpace (page)
+FirstSpace (page, list)
 PAGE_T	*page;
+int	list;
 {
-	return (page->space != 0) ? (FREE_T *)((char *)page + page->space) : 0;
+	return (page->space[list] != 0) ? (FREE_T *)((long)page + page->space[list]) : 0;
 }
 
 static	FREE_T *
-NextSpace (q)
-FREE_T	*q;
+NextSpace (area)
+FREE_T	*area;
 {
-	return (q->skip != 0) ? (FREE_T *)((char *)q + q->skip) : 0;
+	return (area->skip != 0) ? (FREE_T *)((long)area + area->skip) : 0;
 }
 
 static	OFF_T
-SpaceOffset (page, q)
+SpaceOffset (page, area)
 PAGE_T	*page;
-FREE_T	*q;
+FREE_T	*area;
 {
-	return (q != 0) ? (OFF_T)((char *)q - (char *)page) : 0;
+	return (area != 0) ? (OFF_T)((long)area - (long)page) : 0;
 }
 
 static	void
-ShrinkSpace (q, size)
-FREE_T	*q;
+ShrinkSpace (area, size)
+FREE_T	*area;
 OFF_T	size;
 {
-	q->skip -= size;	/* closer to the next space now */
-	q->size -= size;	/* ...smaller by the same amount */
+	if (area->skip != 0)
+		area->skip -= size;	/* closer to the next space now */
+	area->size -= size;		/* ...smaller by the same amount */
 }
 
 /*----------------------------------------------------------------------------*/
-static	void
-DelinkSpace (page, q0, size)
-PAGE_T	*page;
-FREE_T	*q0;
-OFF_T	size;
-{
-	register FREE_T	*temp;
-	register FREE_T *first = FirstSpace(page);
 
-	if (q0 == first) {
-		if (q0->size == size) {
-			page->space = SpaceOffset(page, NextSpace(q0));
+/*
+ * Remove a given space-size at an area-pointer from the given list. Then,
+ * add the area to the complementary list.
+ */
+static	void
+AdjustSpace (page, area, size, list)
+PAGE_T	*page;
+FREE_T	*area;		/* area to remove or reduce */
+OFF_T	size;		/* ...amount by which to reduce */
+int	list;		/* ...list from which to remove the space */
+{
+	register FREE_T	*temp, *next;
+	register FREE_T *first = FirstSpace(page, list);
+
+	if (area == first) {
+		if (area->size == size) {
+			page->space[list] = SpaceOffset(page, NextSpace(area));
 		} else {
-			page->space += size;
-			*(temp = FirstSpace(page)) = *q0;
+			page->space[list] += size;
+			*(temp = FirstSpace(page, list)) = *area;
 			ShrinkSpace(temp, size);
 		}
 	} else {
-		for (temp = first; temp != 0; temp = NextSpace(temp)) {
-			if (NextSpace(temp) == q0) {
-				if (temp == first) {
-					page->space = SpaceOffset(page, q0);
+		for (temp = first; temp != 0; temp = next) {
+			next = NextSpace(temp);
+			if (next == area) {
+				if (area->size == size) {
+					if (area->skip != 0)
+						temp->skip += area->skip;
+					else
+						temp->skip = 0;
 				} else {
 					temp->skip += size;
+					*(next = NextSpace(temp)) = *area;
+					ShrinkSpace(next, size);
 				}
 				break;
 			}
 		}
-		ShrinkSpace(q0, size);
+	}
+
+	/* add the area to the complementary list */
+	list  = !list;
+	first = FirstSpace(page, list);
+	area->size = size;
+
+	if (first == 0) {
+		area->skip = 0;
+		page->space[list] = SpaceOffset(page, area);
+	} else {
+		OFF_T	a = SpaceOffset(page, area),
+			b = SpaceOffset(page, first);
+		if (a < b) {
+			/* link area before first */
+			area->skip = b - a;
+			page->space[list] = a;
+		} else {
+			for (temp = first; temp != 0; temp = next) {
+				if ((next = NextSpace(temp)) == 0)
+					break;
+				if (SpaceOffset(page, next) > a)
+					break;
+			}
+			/* link area after temp */
+			if (next != 0)
+				area->skip = SpaceOffset(page, next) - a;
+			else
+				area->skip = 0;
+			temp->skip = a - SpaceOffset(page, temp);
+		}
+	}
+
+	/* merge adjacent areas in the freespace list */
+	if (!list) {
+		for (temp = FirstSpace(page,0); temp != 0; temp = next) {
+			next = NextSpace(temp);
+			if (temp->skip != 0
+			 && temp->skip == temp->size) {
+				if (next->skip == 0)
+					temp->skip = 0;
+				else
+					temp->skip += next->skip;
+				temp->size += next->size;
+				break;
+			}
+		}
 	}
 }
 
@@ -446,18 +763,14 @@ OFF_T	size;
 /* Try to find an in-memory page with enough space to store the line.
  * If there is none, allocate a new page and return the line from that point.
  *
- * patch: must address line-truncation, in case we try to read a line that
- *	needs more than a page to store it.
- *
- * patch: must adjust allocation of lines to avoid losing stray space when
- *	we get too small a remainder for FREE_T structs.  Mostly this is
- *	done in line.c with 'roundup()' macro.
  */
 LINEPTR
 l_allocate(size)
 SIZE_T	size;
 {
-	static int	count;
+#if TESTING > 1
+	static	int	count;
+#endif
 
 	LINEPTR	ptr;
 	OFF_T	need	= SizeToSpace(size);
@@ -466,22 +779,15 @@ SIZE_T	size;
 	register FREE_T	*q0 = 0;
 
 	TRACE1(("\n** allocate %x #%d\n", size, ++count))
+	if (size > MAX_LINELEN) {
+		need = SizeToSpace(size = MAX_LINELEN);
+		TRACE1(("...truncate to %x\n", size))
+		count_truncated++;
+	}
 
 	/* allocate from the first in-memory page that has enough space */
 	for_each_page(this, prev) {
-		for (q = FirstSpace(this); q != 0; q = NextSpace(q)) {
-#if TESTING
-			if (q->skip < 0 || q->size < 0) {
-				TRACE1(("negative space-value (%d,%d)\n",
-					q->skip, q->size))
-				Oops();
-			}
-			if (q->skip > CHUNK || q->size > CHUNK) {
-				TRACE1(("space-value too large (%d,%d)\n",
-					q->skip, q->size))
-				Oops();
-			}
-#endif
+		for (q = FirstSpace(this, 0); q != 0; q = NextSpace(q)) {
 			if (q->size > need) {
 				if (q0 != 0) {
 					if (q0->size > q->size)
@@ -490,7 +796,7 @@ SIZE_T	size;
 					q0 = q;
 			}
 		}
-		if (q0 != 0)
+		if (q0 != 0 || this->next == 0)
 			break;
 	}
 
@@ -498,42 +804,46 @@ SIZE_T	size;
 	ptr.off = 0;
 
 	if (q0 == 0) {	/* allocate a new page */
-		/* patch: must limit page-growth here */
-		if ((this = castalloc(PAGE_T, CHUNK)) == 0)
-			return ptr;
+		if (intern_pagenum >= MaxPages()) {
+			FlushPages(this);
+			RecentPage(prev);
+		} else {
+			if ((this = castalloc(PAGE_T, NCHUNK)) == 0)
+				return ptr;
+			this->next = recent_pages;
+			recent_pages = this;
+		}
 
-		this->next = recent_pages;
-		this->block = next_page++;
-		this->space = sizeof(PAGE_T);
-		recent_pages = this;
+		this->block = intern_pagenum++;
+		this->space[0] = sizeof(PAGE_T);
+		this->space[1] = 0;
 
-		q0 = FirstSpace(this);
-		q0->skip =
-		q0->size = (((CHUNK - sizeof(PAGE_T)) / sizeof(FREE_T)) - 1) * sizeof(FREE_T);
-		q = NextSpace(q0);
-		q->skip  = 0;
-		q->size  = 0;
-		TRACE1(("ALLOC-PAGE %lx =>%p (%p, %p)\n", this->block, this, q0, q))
+		q0 = FirstSpace(this, 0);
+		q0->skip = 0;
+		q0->size = MAX_SPACE;
+
+		TRACE1(("ALLOC-PAGE %ld =>%p (%p, %p) (%d:%d)\n",
+			this->block, this, q0, q, q0->skip, q0->size))
+		CheckSpace(this);
 	}
 
 	if (q0 != 0) {	/* de-link LINE from the page's freespace */
-		LINE	*lp = (LINE *)q0;
+		LINE	*lp = Area2Line(q0);
 
-		DelinkSpace(this, q0, need);
+		AdjustSpace(this, q0, need, 0);
 
 		/* setup return-data */
 		ptr.blk = this->block;
 		ptr.off = SpaceOffset(this, q0);
 
 		lp->l_size = size;
-		lp->l_text = (size > 0) ? (char *)(lp+1) : 0;
+		set_text(lp);
 		lp->l_fp   =
 		lp->l_bp   =
-		lp->l_nxtundo = nullmark.l;
-		add_to_cache(lp,ptr);
-		(void)l_ptr(lp);	/* patch: trace */
+		lp->l_nxtundo = null_ptr;
 
-		TRACE1(("ALLOC-LINE %lx.%x (%x) =>%p\n", ptr.blk, ptr.off, size, lp))
+		TRACE1(("ALLOC-LINE %ld.%x (%x) =>%p\n", ptr.blk, ptr.off, size, lp))
+		CheckSpace(this);
 	} else
 		Oops();
 	return ptr;
@@ -542,23 +852,17 @@ SIZE_T	size;
 /*----------------------------------------------------------------------------*/
 
 void
-l_deallocate(ptr,bp)
+l_deallocate(ptr)
 LINEPTR	ptr;
-BUFFER	*bp;
 {
-	LINE	*lp = l_ref(ptr);
-#if TESTING
+	LINE	*lp = l_ref(ptr);	/* forces page-lookup */
+	FREE_T	*f = Line2Area(ValidateDst("free",lp));
+#if TESTING > 1
 	static	int	count;
-	TRACE1(("deallocate #%d %lx.%x %p\n", ++count, ptr.blk, ptr.off, l_ref(ptr)))
 #endif
-	/* ad hoc fixes to ensure that we don't refer to this later... */
-/*patch:	adjust_ptr(lp, (LINE *)0, bp);*/
-
-	/* patch: unimplemented */
-
-#if TESTING
-	invalidate_ref(lp);
-#endif
+	TRACE1(("deallocate #%d %ld.%x %p\n", ++count, ptr.blk, ptr.off, lp))
+	AdjustSpace(recent_pages, f, f->size, 1);
+	CheckSpace(recent_pages);
 }
 
 /*----------------------------------------------------------------------------*/
@@ -573,131 +877,175 @@ LINEPTR	lp;
 SIZE_T	size;
 BUFFER	*bp;
 {
-	LINE	*oldp = l_ref(lp);
-	LINE	*newp = l_ref(l_allocate(size));
+	LINE	*oldp	= l_ref(lp),
+		*newp;
+
+	if (size > MAX_LINELEN) {
+		size = MAX_LINELEN;
+		count_truncated++;
+	}
+
+	if (size > oldp->l_size)
+		newp = l_ref(l_allocate(size));
+	else
+		newp = oldp;
 
 	TRACE1(("reallocate %p to %p (%x bytes)\n", oldp, newp, size))
-	if (newp != 0) {
+	if (newp != 0 && newp != oldp) {
+		*newp = *oldp;	/* copy everything that we don't change */
 		newp->l_size = size;
-		newp->l_used = oldp->l_used;
-		newp->l_text = (char *)(newp+1);
+		set_text(newp);
 		if (oldp->l_text != 0
+		 && newp->l_text != 0
 		 && oldp->l_used >= 1)
-			memcpy(newp->l_text, oldp->l_text, oldp->l_used);
+			(void)memcpy(newp->l_text, oldp->l_text, (SIZE_T)oldp->l_used);
 
-		/*
-		 * Note that (unlike the virtual memory configuration), this
-		 * requires that we adjust pointers that point to the old line,
-		 * because we keep the LINE struct and its text together.
-		 */
-		(void)set_lforw(lback(oldp), newp);
-		(void)set_lback(lforw(oldp), newp);
-		(void)set_lforw(newp, lforw(oldp));
-		(void)set_lback(newp, lback(oldp));
-		adjust_ptr(oldp, newp, bp);
+		(void)AdjustPtrs(oldp, newp, bp);
 
-		/* finally, get rid of the old buffer */
-		/* patch? l_deallocate(lp,bp); */
-#if TESTING
-		invalidate_ref(oldp);
-#endif
+		/* finally, get rid of the old line-struct */
+		l_deallocate(lp);
 	}
 	return newp;
 }
 
 /*
- * Mark the page holding the given line as "changed", so that we remember to
- * write it out when we need to reuse its space.
+ * Returns the number of lines truncated (i.e., allocation requests longer than
+ * MAX_LINELEN) since the last call.
+ */
+int
+l_truncated()
+{
+	int	it = count_truncated;
+	count_truncated = 0;
+	return it;
+}
+
+/*
+ * Maintains a list of pointers to REGION structs to allow adjustment of the
+ * corresponding LINEPTR's in 'AdjustPtrs()'.
  */
 void
-l_changed(lp)
-LINEPTR	lp;
+l_region(rp)
+REGION	*rp;
 {
-	/* patch: unimplemented */
+	register REGIONPTR *p;
+
+	if (rp != 0) {
+		if ((p = typealloc(REGIONPTR)) != 0) {
+			p->next = region_list;
+			p->data = rp;
+			region_list = p;
+		}
+	} else {	/* pop */
+		if ((p = region_list) != 0) {
+			region_list = p->next;
+			free((char *)p);
+		}
+	}
 }
 
 /*
  * Ensure that the LINE referenced by the argument is in memory, return the
- * pointer to it.
+ * pointer to it.  If it isn't in memory, read it in and make it the most
+ * recent page.
  */
 LINE *
 l_ref (ptr)
 LINEPTR	ptr;
 {
-	register PAGE_T	*p, *q;
 	register LINE	*lp;
 
 	if (ptr.blk == BAD_PAGE) {
 		lp = (LINE *)(ptr.off);
 		return ValidateSrc("ref", lp);
-	}
+	} else {
+		register PAGE_T	*this, *prev;
+		register int	found = FALSE;
 
-	for_each_page(p,q) {
-		if (p->block == ptr.blk) {
-			lp = (LINE *)((char *)p + ptr.off);
-			TRACE2(("l_ref(%lx.%x) = %p\n", ptr.blk, ptr.off, lp))
-			RecentPage(q);
-			return ValidateDst("ref", lp);
+		lp = 0;	/* make the compiler shut up */
+		for_each_page(this,prev) {
+			if (this->block == ptr.blk) {
+				lp = Page2Line(this, ptr.off);
+				TRACE2(("l_ref(%ld.%x) = %p\n", ptr.blk, ptr.off, lp))
+				found = TRUE;
+				break;
+			} else if (this->next == 0)
+				break;	/* ...setup for page-read */
 		}
+
+		if (found) {
+			;
+		} else if (ptr.blk < extern_pagenum) {
+			FlushPages(this);
+			ReadPage(this, ptr.blk);
+			lp = Page2Line(this, ptr.off);
+		} else {
+			TRACE1(("Cannot find pointer (%ld.%x)\n", ptr.blk, ptr.off))
+			Oops();
+		}
+		RecentPage(prev);
+		return ValidateDst("ref", lp);
 	}
-	TRACE1(("Cannot find pointer (%lx.%x)\n", ptr.blk, ptr.off))
-	Oops();
-	return 0;
 }
 
 LINEPTR
 l_ptr (lp)
 LINE *	lp;
 {
-	register PAGE_T *p, *q;
+	register PAGE_T *this, *prev;
+	register int	found = FALSE;
 	LINEPTR	ptr;
 
+#if TESTING
 	(void)ValidateSrc("ptr", lp);
+#endif
 	if (lp == (LINE *)0
 	 || lp == (LINE *)1) {
 		ptr.blk = BAD_PAGE;
 		ptr.off = (OFF_T)lp;
-		return ptr;
-	}
-
-	for_each_page(p,q) {
-		long	off = ((long)lp - (long)p);
-		if (off >= sizeof(PAGE_T) && (off < CHUNK)) {
-			RecentPage(q);
-			ptr.blk = p->block;
-			ptr.off = (OFF_T)off;
-			TRACE2(("l_ptr(%p) = %lx.%x\n", lp, ptr.blk, ptr.off))
-			return ptr;
+		found = TRUE;
+	} else {
+		for_each_page(this,prev) {
+			long	off = ((long)lp - (long)this) - sizeof(FREE_T);
+			if (off >= sizeof(PAGE_T) && (off < NCHUNK)) {
+				RecentPage(prev);
+				ptr.blk = this->block;
+				ptr.off = (OFF_T)off;
+				TRACE2(("l_ptr(%p) = %ld.%x\n", lp, ptr.blk, ptr.off))
+				found = TRUE;
+				break;
+			}
 		}
 	}
-	TRACE1(("Cannot find line %p\n", lp))
-	Oops();
+
+	if (!found) {
+		TRACE1(("Cannot find line %p\n", lp))
+		Oops();
+		/*NOTREACHED*/
+	}
 	return ptr;
 }
 
-LINE *
+void
 set_lforw (dst, src)
 LINE	*dst;
 LINE	*src;
 {
-	TRACE2(("set_lforw:"))
-	return l_ref((ValidateDst("set",dst)->l_fp = l_ptr(src)));
+	ValidateDst("set",dst)->l_fp = l_ptr(src);
 }
 
-LINE *
+void
 set_lback (dst, src)
 LINE	*dst;
 LINE	*src;
 {
-	TRACE2(("set_lback:"))
-	return l_ref((ValidateDst("set",dst)->l_bp = l_ptr(src)));
+	ValidateDst("set",dst)->l_bp = l_ptr(src);
 }
 
 LINE *
 lforw (lp)
 LINE	*lp;
 {
-	TRACE2(("lforw:"))
 	return l_ref(ValidateDst("get",lp)->l_fp);
 }
 
@@ -705,7 +1053,6 @@ LINE *
 lback (lp)
 LINE	*lp;
 {
-	TRACE2(("lback:"))
 	return l_ref(ValidateDst("get",lp)->l_bp);
 }
 
@@ -713,11 +1060,78 @@ void
 lsetclear (lp)
 LINE	*lp;
 {
-	ValidateDst("flag", lp);
-	lp->l_nxtundo = l_ptr((LINE *)0);
+#if TESTING
+	(void)ValidateDst("flag", lp);
+#endif
+	lp->l_nxtundo = null_ptr;
 	lp->l.l_flag  = 0;
 }
-#endif
+
+/*****************************************************************************
+ *      Variations on the LINE/LINEPTR translations                          *
+ *****************************************************************************/
+
+LINE *
+lforw_p2r (lp)
+LINEPTR lp;
+{
+	return lforw(l_ref(lp));
+}
+
+LINE *
+lback_p2r (lp)
+LINEPTR lp;
+{
+	return lback(l_ref(lp));
+}
+
+LINEPTR
+lforw_p2p (lp)
+LINEPTR lp;
+{
+	return ValidateDst("get",l_ref(lp))->l_fp;
+}
+
+LINEPTR
+lback_p2p (lp)
+LINEPTR lp;
+{
+	return ValidateDst("get",l_ref(lp))->l_bp;
+}
+
+void
+set_lforw_p2r (dst, src)
+LINE *	dst;
+LINEPTR src;
+{
+	ValidateDst("set",dst)->l_fp = src;
+}
+
+void
+set_lback_p2r (dst, src)
+LINE *	dst;
+LINEPTR src;
+{
+	ValidateDst("set",dst)->l_bp = src;
+}
+
+void
+set_lforw_p2p (dst, src)
+LINEPTR	dst;
+LINEPTR src;
+{
+	set_lforw_p2r (l_ref(dst), src);
+}
+
+void
+set_lback_p2p (dst, src)
+LINEPTR	dst;
+LINEPTR src;
+{
+	set_lback_p2r (l_ref(dst), src);
+}
+
+#endif	/* OPT_MAP_MEMORY */
 
 
 /* For memory-leak testing (only!), releases all tmp-buffer storage. */

@@ -10,7 +10,10 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.116  1993/05/24 15:25:41  pgf
+ * Revision 1.117  1993/06/02 14:28:47  pgf
+ * see tom's 3.48 CHANGES
+ *
+ * Revision 1.116  1993/05/24  15:25:41  pgf
  * tom's 3.47 changes, part b
  *
  * Revision 1.115  1993/05/24  15:21:37  pgf
@@ -1139,7 +1142,7 @@ union REGS {
 typedef	long CMASK;
 #else
 #define	screen_to_bname(buf)\
-	screen_string(buf,sizeof(buf),((CMASK)(_pathn))
+	screen_string(buf,sizeof(buf),(CMASK)(_pathn))
 typedef short CMASK;
 #endif
 
@@ -1260,8 +1263,8 @@ typedef	struct	LINE*	LINEPTR;
 typedef struct	LINE {
 	LINEPTR l_fp;			/* Link to the next line	*/
 	LINEPTR l_bp;			/* Link to the previous line	*/
-	int	l_size;			/* Allocated size 		*/
-	int	l_used;			/* Used size			*/
+	SIZE_T	l_size;			/* Allocated size 		*/
+	int	l_used;			/* Used size (may be negative)	*/
 	char *	l_text;			/* The data for this line	*/
 #if !SMALLER
 	L_NUM	l_number;		/* line-# iff b_numlines > 0	*/
@@ -1286,17 +1289,35 @@ typedef struct	LINE {
 
 #define l_nxtundo		l.l_stklnk
 
+	/*
+	 * Special values used in LINE.l_used
+	 */
 #define LINENOTREAL	((int)(-1))
 #define LINEUNDOPATCH	((int)(-2))
 #define MARKPATCH	((int)(-3))
 
 	/*
 	 * If we are configured with mapped-data, references to LINE pointers
-	 * are translated by functions.
+	 * are translated by functions to/from LINEPTR structs (see file tmp.c).
+	 *
+	 * LINEPTR is a structure holding the block- and offset-value in the
+	 * mapped-data file.  Each LINEPTR corresponds to a LINE struct.
+	 *
+	 * Basically, l_ref and l_ptr map into functions that translate between
+	 * 'LINE *' and LINEPTR.  If you forget to use one of these functions,
+	 * then the C-compiler will nag you about it if you turn on
+	 * OPT_MAP_MEMORY, since you cannot really assign or compare between
+	 * these two types.  (To be honest, my compiler doesn't catch all of
+	 * the comparison cases; I also linted the code). 
 	 */
 #if OPT_MAP_MEMORY
+#define fast_ptr	/* can't do it */
+#define	same_ptr(a,b)	(((a).blk == (b).blk) && ((a).off == (b).off))
 #define	null_ptr	nullmark.l
+#define	rls_region()	l_region((REGION *)0)
 #else
+#define fast_ptr	register
+#define	same_ptr(a,b)	((a) == (b))
 #define	null_ptr	(LINE *)0
 #define	l_ref(lp)	lp
 #define	l_ptr(lp)	lp
@@ -1304,6 +1325,7 @@ typedef struct	LINE {
 #define set_lback(a,b)	lback(a) = b
 #define lforw(lp)	(lp)->l_fp
 #define lback(lp)	(lp)->l_bp
+#define	rls_region()	/* unused */
 #endif
 
 	/*
@@ -1328,20 +1350,49 @@ typedef struct	LINE {
 #define lislinepatch(lp)	((lp)->l_used == LINEUNDOPATCH)
 #define lismarkpatch(lp)	((lp)->l_used == MARKPATCH)
 #define lispatch(lp)		(lislinepatch(lp) || lismarkpatch(lp))
-#define lneedscopying(lp)	((lp)->l_copied != TRUE)
 
 	/*
 	 * Corresponding (mixed-case : mixed-type) names for LINEPTR references
+	 *
+	 * I introduced the mixed-case macros so that the l_ref/l_ptr
+	 * translations wouldn't be _too_ intrusive (and also to limit the
+	 * amount of text that I changed).  They all serve the same function.
+	 * (dickey@software.org)
 	 */
 #define lGetc(lp, n)		lgetc(l_ref(lp), n)
 #define lPutc(lp, n, c)		lputc(l_ref(lp), n, c)
 #define lLength(lp)		llength(l_ref(lp))
+
+#if OPT_MAP_MEMORY
+
+#define	lForw(lp)		lforw_p2r(lp)
+#define	lBack(lp)		lback_p2r(lp)
+
+#define	lFORW(lp)		lforw_p2p(lp)
+#define	lBACK(lp)		lback_p2p(lp)
+
+#define	set_lForw(dst,src)	set_lforw_p2r(dst, src)
+#define	set_lBack(dst,src)	set_lback_p2r(dst, src)
+
+#define	set_lFORW(dst,src)	set_lforw_p2p(dst, src)
+#define	set_lBACK(dst,src)	set_lback_p2p(dst, src)
+
+#else	/* 'LINEPTR' == 'LINE*' */
 
 #define	lForw(lp)		lforw(l_ref(lp))
 #define	lBack(lp)		lback(l_ref(lp))
 
 #define	lFORW(lp)		l_ptr(lForw(lp))
 #define	lBACK(lp)		l_ptr(lBack(lp))
+
+#define	set_lForw(dst,src)	set_lforw(dst, src)
+#define	set_lBack(dst,src)	set_lback(dst, src)
+
+#define	set_lFORW(dst,src)	set_lforw(dst, src)
+#define	set_lBACK(dst,src)	set_lback(dst, src)
+
+#endif
+
 
 /* marks are a line and an offset into that line */
 typedef struct MARK {
@@ -1350,15 +1401,15 @@ typedef struct MARK {
 } MARK;
 
 /* some macros that take marks as arguments */
-#define is_at_end_of_line(m)	(m.o == llength(l_ref(m.l)))
-#define is_empty_line(m)	(llength(l_ref(m.l)) == 0)
-#define sameline(m1,m2)		(l_ref(m1.l) == l_ref(m2.l))
+#define is_at_end_of_line(m)	(m.o == lLength(m.l))
+#define is_empty_line(m)	(lLength(m.l) == 0)
+#define sameline(m1,m2)		(same_ptr(m1.l, m2.l))
 #define samepoint(m1,m2)	(sameline(m1,m2) && (m1.o == m2.o))
 #define char_at(m)		(lGetc(m.l,m.o))
 #define put_char_at(m,c)	(lPutc(m.l,m.o,c))
-#define is_header_line(m,bp)	(l_ref(m.l) == l_ref(bp->b_line.l))
-#define is_last_line(m,bp)	(lforw(l_ref(m.l)) == l_ref(bp->b_line.l))
-#define is_first_line(m,bp)	(lback(l_ref(m.l)) == l_ref(bp->b_line.l))
+#define is_header_line(m,bp)	(same_ptr(m.l, bp->b_line.l))
+#define is_last_line(m,bp)	(lForw(m.l) == l_ref(bp->b_line.l))
+#define is_first_line(m,bp)	(lBack(m.l) == l_ref(bp->b_line.l))
 
 /* settable values have their names stored here, along with a synonym, and
 	what type they are */
@@ -1557,13 +1608,14 @@ typedef struct	BUFFER {
 #define is_local_b_val(bp,which)  \
 		(bp->b_values.bv[which].vp == &(bp->b_values.bv[which].v))
 
-#define is_empty_buf(bp) (lforw(l_ref(bp->b_line.l)) == l_ref(bp->b_line.l))
-#define b_dot b_wtraits.w_dt
+#define is_empty_buf(bp) (lForw(bp->b_line.l) == l_ref(bp->b_line.l))
+
+#define b_dot     b_wtraits.w_dt
 #ifdef WINMARK
-#define b_mark b_wtraits.w_mk
+#define b_mark    b_wtraits.w_mk
 #endif
 #define b_lastdot b_wtraits.w_ld
-#define b_wline b_wtraits.w_ln
+#define b_wline   b_wtraits.w_ln
 
 /* values for b_flag */
 #define BFINVS     0x01			/* Internal invisible buffer	*/
@@ -1595,18 +1647,17 @@ typedef struct	WINDOW {
 
 #define	for_each_window(wp) for (wp = wheadp; wp; wp = wp->w_wndp)
 
-#define w_dot w_traits.w_dt
+#define w_dot     w_traits.w_dt
 #ifdef WINMARK
-#define w_mark w_traits.w_mk
+#define w_mark    w_traits.w_mk
 #endif
 #define w_lastdot w_traits.w_ld
-#define w_line w_traits.w_ln
-#define w_values w_traits.w_vals
-#define w_mode w_traits.w_vals.w_mod
+#define w_line    w_traits.w_ln
+#define w_values  w_traits.w_vals
 
-#define DOT curwp->w_traits.w_dt
+#define DOT curwp->w_dot
 #ifdef WINMARK
-#define MK curwp->w_traits.w_mk
+#define MK curwp->w_mark
 #else
 #define MK Mark
 #endif
@@ -1938,8 +1989,8 @@ extern void _exit P((int));
 #endif	/* POSIX */
 
 #if ! USG
-extern char *getwd();
-extern char *getcwd();
+extern char *getwd P(( char * ));
+extern char *getcwd P(( char *, int ));
 #endif
 
 #ifndef	free
