@@ -7,7 +7,8 @@
 	in main.c
 	This code written by Paul Fox, (c)1990
 	
-	See the file "cmdtbls" for data formats.
+	See the file "cmdtbls" for input data formats, and "estruct.h" for
+	the output structures.
 	
 */
 
@@ -145,12 +146,12 @@ badfmt(s)
 
 #define ASCIIBIND 0
 #define CTLXBIND 1
-#define METABIND 2
+#define CTLABIND 2
 #define SPECBIND 3
 char *bindings[4][128];
 char *conditions[4][128];
 char *tblname[] = {"asciitbl", "ctlxtbl", "metatbl", "spectbl" };
-char *prefname[] = {"", "CTLX|", "META|", "SPEC|" };
+char *prefname[] = {"", "CTLX|", "CTLA|", "SPEC|" };
 
 /* prc2kcod: translate printable code to C-language keycode */
 savebindings(s,func,cond)
@@ -160,9 +161,9 @@ char *s, *func, *cond;
 	
 	btype = ASCIIBIND;
 	
-	if (*s == 'M' && *(s+1) == '-') {
-		s += 2;
-		btype = METABIND;
+	if (*s == '^' && *(s+1) == 'A'&& *(s+2) == '-') {
+		btype = CTLABIND;
+		s += 3;
 	} else if (*s == 'F' && *(s+1) == 'N' && *(s+2) == '-') {
 		btype = SPECBIND;
 		s += 3;

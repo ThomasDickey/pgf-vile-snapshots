@@ -15,6 +15,7 @@
 #include	"estruct.h"
 #include	"edef.h"
 
+#define roundup(n) ((n+NBLOCK-1) & ~(NBLOCK-1))
 /*
  * This routine allocates a block of memory large enough to hold a LINE
  * containing "used" characters. The block is always rounded up a bit. Return
@@ -32,20 +33,33 @@ register int	used;
 	if (used < 0)  {
 		size = 0;
 	} else {
-		size = (used+NBLOCK-1) & ~(NBLOCK-1);
+		size = roundup(used);
 		if (size == 0)			/* Assume that an empty */
 			size = NBLOCK;		/* line is for type-in. */
 	}
 	/* malloc 4 less, because struct LINE is 4 too big */
-	if ((lp = (LINE *) malloc(sizeof(LINE) + size - 4)) == NULL) {
+	if ((lp = (LINE *) malloc(sizeof(LINE))) == NULL) {
 		mlwrite("[OUT OF MEMORY]");
-		return (NULL);
+		return NULL;
+	}
+	if ((lp->l_text = malloc(size)) == NULL) {
+		mlwrite("[OUT OF MEMORY]");
+		free((char *)lp);
+		return NULL;
 	}
 	lp->l_size = size;
 	lp->l_used = used;
 	lsetclear(lp);
 	lp->l_nxtundo = NULL;
 	return (lp);
+}
+
+lfree(lp)
+register LINE *lp;
+{
+	if (lp->l_text)
+		free(lp->l_text);
+	free((char *)lp);
 }
 
 /*
@@ -167,6 +181,8 @@ linsert(n, c)
 	register int	doto;
 	register int	i;
 	register WINDOW *wp;
+	register char	*ntext;
+	int nsize;
 
 	lchange(WFEDIT);
 	lp1 = curwp->w_dotp;			/* Current line 	*/
@@ -194,62 +210,39 @@ linsert(n, c)
 	}
 	doto = curwp->w_doto;			/* Save for later.	*/
 	if (lp1->l_used+n > lp1->l_size) {	/* Hard: reallocate	*/
-		/* for the sake of undo(), handle this as an insert and
-			a delete */
+		copy_for_undo(lp1);
 		/* first, create the new image */
-		if ((lp2=lalloc(lp1->l_used+n)) == NULL)
+		if ((ntext=malloc(nsize = roundup(lp1->l_used+n))) == NULL)
 			return (FALSE);
-		cp1 = &lp1->l_text[0];
-		cp2 = &lp2->l_text[0];
-		while (cp1 != &lp1->l_text[doto])
-			*cp2++ = *cp1++;
-		cp2 += n;
-		while (cp1 != &lp1->l_text[lp1->l_used])
-			*cp2++ = *cp1++;
-		/* then insert it into the file */
-		lp2->l_bp = lp1->l_bp;
-		lp1->l_bp = lp2;
-		lp2->l_bp->l_fp = lp2;
-		lp2->l_fp = lp1;
-#if NEWUNDO
-		make_undo_patch(lp1,lp2,MARKPATCH);
-#endif
-		/* repoint the U line */
-		resetuline(lp1,lp2);
-		tag_for_undo(lp2);
-		if (lismarked(lp1))
-			lsetmarked(lp2);
-		/* then remove lp1 from existence */
-		lp1->l_bp->l_fp = lp1->l_fp;
-		lp1->l_fp->l_bp = lp1->l_bp;
-		toss_to_undo(lp1);
+		memcpy(&ntext[0],      &lp1->l_text[0],    doto);
+		memset(&ntext[doto],   c, n);
+		memcpy(&ntext[doto+n], &lp1->l_text[doto], lp1->l_used-doto );
+		free((char *)lp1->l_text);
+		lp1->l_text = ntext;
+		lp1->l_size = nsize;
+		lp1->l_used += n;
 	} else {				/* Easy: in place	*/
 		copy_for_undo(lp1);
-		lp2 = lp1;			/* Pretend new line	*/
-		lp2->l_used += n;
+		/* don't used memcpy:  overlapping regions.... */
+		lp1->l_used += n;
 		cp2 = &lp1->l_text[lp1->l_used];
 		cp1 = cp2-n;
 		while (cp1 != &lp1->l_text[doto])
 			*--cp2 = *--cp1;
+		for (i=0; i<n; ++i)		/* Add the characters	*/
+			lp1->l_text[doto+i] = c;
 	}
-	for (i=0; i<n; ++i)			/* Add the characters	*/
-		lp2->l_text[doto+i] = c;
 	wp = wheadp;				/* Update windows	*/
 	while (wp != NULL) {
-		if (wp->w_linep == lp1)
-			wp->w_linep = lp2;
 		if (wp->w_dotp == lp1) {
-			wp->w_dotp = lp2;
 			if (wp==curwp || wp->w_doto>doto)
 				wp->w_doto += n;
 		}
 		if (wp->w_mkp == lp1) {
-			wp->w_mkp = lp2;
 			if (wp->w_mko > doto)
 				wp->w_mko += n;
 		}
 		if (wp->w_ldmkp == lp1) {
-			wp->w_ldmkp = lp2;
 			if (wp->w_ldmko > doto)
 				wp->w_ldmko += n;
 		}
@@ -260,7 +253,6 @@ linsert(n, c)
 		for (i = 0; i < 26; i++) {
 			mp = &(curbp->b_nmmarks[i]);
 			if (mp->markp == lp1) {
-				mp->markp = lp2;
 				if (mp->marko > doto)
 					mp->marko += n;
 			}
@@ -545,98 +537,38 @@ ldelnewline()
 		toss_to_undo(lp2);
 		return (TRUE);
 	}
-	copy_for_undo(lp1);
-	/* room in line before nl for contents of line after nl */
-	if (lp2->l_used <= lp1->l_size-lp1->l_used) {
-		cp1 = &lp1->l_text[lp1->l_used];
-		cp2 = &lp2->l_text[0];
-		while (cp2 != &lp2->l_text[lp2->l_used])
-			*cp1++ = *cp2++;
-		/* check all windows for references to the deleted line */
-		wp = wheadp;
-		while (wp != NULL) {
-			if (wp->w_linep == lp2)
-				wp->w_linep = lp1;
-			if (wp->w_dotp == lp2) {
-				wp->w_dotp  = lp1;
-				wp->w_doto += lp1->l_used;
-			}
-			if (wp->w_mkp == lp2) {
-				wp->w_mkp  = lp1;
-				wp->w_mko += lp1->l_used;
-			}
-			if (wp->w_ldmkp == lp2) {
-				wp->w_ldmkp  = lp1;
-				wp->w_ldmko += lp1->l_used;
-			}
-			wp = wp->w_wndp;
-		}
-		if (curbp->b_nmmarks != NULL) { /* fix the named marks */
-			int i;
-			struct MARK *mp;
-			for (i = 0; i < 26; i++) {
-				mp = &(curbp->b_nmmarks[i]);
-				if (mp->markp == lp2) {
-					mp->markp  = lp1;
-					mp->marko += lp1->l_used;
-				}
-			}
-		}
-		lp1->l_used += lp2->l_used;
-		lp1->l_fp = lp2->l_fp;
-		lp2->l_fp->l_bp = lp1;
-		dumpuline(lp1);
-		toss_to_undo(lp2);
-		return (TRUE);
+	/* no room in line above, make room */
+	if (lp2->l_used > lp1->l_size-lp1->l_used) {
+		char *ntext;
+		int nsize;
+		copy_for_undo(lp1);
+		/* first, create the new image */
+		if ((ntext=malloc(nsize = roundup(lp1->l_used + lp2->l_used)))
+								 == NULL)
+			return (FALSE);
+		memcpy(&ntext[0],      &lp1->l_text[0],    lp1->l_used);
+		free((char *)lp1->l_text);
+		lp1->l_text = ntext;
 	}
-	/* need a new line */
-	if ((lp3=lalloc(lp1->l_used+lp2->l_used)) == NULL)
-		return (FALSE);
-	/* copy the text */
-	cp1 = &lp1->l_text[0];
-	cp2 = &lp3->l_text[0];
-	while (cp1 != &lp1->l_text[lp1->l_used])
-		*cp2++ = *cp1++;
-	cp1 = &lp2->l_text[0];
-	while (cp1 != &lp2->l_text[lp2->l_used])
-		*cp2++ = *cp1++;
-	/* do this one step at a time, so undo can put 
-			things back together right */
-	toss_to_undo(lp1);
-
-	/* now take out lp1 */
-	lp1->l_bp->l_fp = lp2;
-	lp2->l_bp = lp1->l_bp;
-	toss_to_undo(lp2);
-
-	/* now replace lp2 with lp3 */
-	lp2->l_bp->l_fp = lp3;
-	lp3->l_fp = lp2->l_fp;
-	lp2->l_fp->l_bp = lp3;
-	lp3->l_bp = lp2->l_bp;
-	tag_for_undo(lp3);
-
-	/* check all lwindows for references, and update */
+	cp1 = &lp1->l_text[lp1->l_used];
+	cp2 = &lp2->l_text[0];
+	while (cp2 != &lp2->l_text[lp2->l_used])
+		*cp1++ = *cp2++;
+	/* check all windows for references to the deleted line */
 	wp = wheadp;
 	while (wp != NULL) {
-		if (wp->w_linep==lp1 || wp->w_linep==lp2)
-			wp->w_linep = lp3;
-		if (wp->w_dotp == lp1)
-			wp->w_dotp  = lp3;
-		else if (wp->w_dotp == lp2) {
-			wp->w_dotp  = lp3;
+		if (wp->w_linep == lp2)
+			wp->w_linep = lp1;
+		if (wp->w_dotp == lp2) {
+			wp->w_dotp  = lp1;
 			wp->w_doto += lp1->l_used;
 		}
-		if (wp->w_mkp == lp1)
-			wp->w_mkp  = lp3;
-		else if (wp->w_mkp == lp2) {
-			wp->w_mkp  = lp3;
+		if (wp->w_mkp == lp2) {
+			wp->w_mkp  = lp1;
 			wp->w_mko += lp1->l_used;
 		}
-		if (wp->w_ldmkp == lp1)
-			wp->w_ldmkp  = lp3;
-		else if (wp->w_ldmkp == lp2) {
-			wp->w_ldmkp  = lp3;
+		if (wp->w_ldmkp == lp2) {
+			wp->w_ldmkp  = lp1;
 			wp->w_ldmko += lp1->l_used;
 		}
 		wp = wp->w_wndp;
@@ -646,14 +578,17 @@ ldelnewline()
 		struct MARK *mp;
 		for (i = 0; i < 26; i++) {
 			mp = &(curbp->b_nmmarks[i]);
-			if (mp->markp == lp1)
-				mp->markp  = lp3;
-			else if (mp->markp == lp2) {
-				mp->markp  = lp3;
+			if (mp->markp == lp2) {
+				mp->markp  = lp1;
 				mp->marko += lp1->l_used;
 			}
 		}
 	}
+	lp1->l_used += lp2->l_used;
+	lp1->l_fp = lp2->l_fp;
+	lp2->l_fp->l_bp = lp1;
+	dumpuline(lp1);
+	toss_to_undo(lp2);
 	return (TRUE);
 }
 
@@ -721,6 +656,15 @@ int c;		/* character to insert in the kill buffer */
 	return(TRUE);
 }
 
+/* select one of the named registers for use with the following command */
+/*  this could actually be handled as a command prefix, in kbdseq(), much
+	the way ^X-cmd and META-cmd are done, except that we need to be
+	able to accept any of
+		 3"adw	"a3dw	"ad3w
+	to delete 3 words into register a.  So this routine gives us an
+	easy way to handle the second case.  (The third case is handled in
+	operators(), the first in main())
+*/
 usekreg(f,n)
 {
 	int c, status;
@@ -753,7 +697,7 @@ usekreg(f,n)
 	}
 
 	/* and execute the command */
-	status = execute(c, f, n, NULL);
+	status = execute(kcod2fnc(c), f, n);
 
 	ukb = 0;
 	kregflag = 0;

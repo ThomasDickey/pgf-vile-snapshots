@@ -10,7 +10,7 @@
 #include	"epath.h"
 
 /* dummy prefix binding functions */
-extern CMDFUNC f_meta, f_cex, f_unarg, f_esc;
+extern CMDFUNC f_cntl_af, f_cntl_xf, f_unarg, f_esc;
 
 /* give me some help!!!! bring up a buffer and read the help file into it */
 help(f, n)
@@ -53,6 +53,7 @@ deskey(f, n)	/* describe the command for a certain key */
 	register int c;		/* key to describe */
 	register char *ptr;	/* string pointer to scan output strings */
 	char outseq[NSTRING];	/* output buffer for command sequence */
+	char *kcod2prc();
 
 	/* prompt the user to type us a key to describe */
 	mlwrite(": describe-key ");
@@ -94,6 +95,7 @@ int f, n;	/* command arguments [IGNORED] */
 	char outseq[80];	/* output buffer for keystroke sequence */
 	char *fnp;
 	char *kbd_engl();
+	char *kcod2prc();
 
 	/* prompt the user to type in a key to bind */
 	mlwrite(": bind-to-key ");
@@ -101,10 +103,10 @@ int f, n;	/* command arguments [IGNORED] */
 	/* get the function name to bind it to */
 #if	NeWS
 	newsimmediateon() ;
+#endif
 	fnp = kbd_engl();
+#if	NeWS
 	newsimmediateoff() ;
-#else
-	fnp = kbd_engl();
 #endif
 
 	if (fnp == NULL || (kcmd = engl2fnc(fnp)) == NULL) {
@@ -112,6 +114,7 @@ int f, n;	/* command arguments [IGNORED] */
 		return(FALSE);
 	}
 	ostring(" ");
+	TTflush();
 
 	/* get the command sequence to bind */
 	if (clexec) {
@@ -121,7 +124,7 @@ int f, n;	/* command arguments [IGNORED] */
 	} else {
 		/* perhaps we only want a single key, not a sequence */
 		/* 	(see more comments below) */
-		if ((kcmd == &f_meta) || (kcmd == &f_cex) ||
+		if ((kcmd == &f_cntl_af) || (kcmd == &f_cntl_xf) ||
 	            (kcmd == &f_unarg) || (kcmd == &f_esc))
 			c = kbd_key();
 		else
@@ -137,7 +140,7 @@ int f, n;	/* command arguments [IGNORED] */
 	/* if the function is a prefix key, i.e. we're changing the definition
 		of a prefix key, then they typed a dummy function name, which
 		has been translated into a dummy function pointer */
-	if (kcmd == &f_meta || kcmd == &f_cex ||
+	if (kcmd == &f_cntl_af || kcmd == &f_cntl_xf ||
 	    kcmd == &f_unarg || kcmd == &f_esc) {
 	    	register CMDFUNC **cfp;
 		/* search for an existing binding for the prefix key */
@@ -151,17 +154,17 @@ int f, n;	/* command arguments [IGNORED] */
 		}
 
 		/* reset the appropriate global prefix variable */
-		if (kcmd == &f_meta)
-			metac = c;
-		if (kcmd == &f_cex)
-			ctlxc = c;
+		if (kcmd == &f_cntl_af)
+			cntl_a = c;
+		if (kcmd == &f_cntl_xf)
+			cntl_x = c;
 		if (kcmd == &f_unarg)
 			reptc = c;
 		if (kcmd == &f_esc)
 			abortc = c;
 	}
 	
-	if ((c & (META|SPEC|CTLX)) == 0) {
+	if ((c & (CTLA|SPEC|CTLX)) == 0) {
 		asciitbl[c] = kcmd;
 	} else {
 		for(kbp = kbindtbl; kbp->k_cmd && kbp->k_code != c; kbp++)
@@ -191,6 +194,7 @@ int f, n;	/* command arguments [IGNORED] */
 {
 	register int c;		/* command key to unbind */
 	char outseq[80];	/* output buffer for keystroke sequence */
+	char *kcod2prc();
 
 	/* prompt the user to type in a key to unbind */
 	mlwrite(": unbind-key ");
@@ -225,7 +229,7 @@ int c;		/* command key to unbind */
 	register KBIND *skbp;	/* saved pointer into the command table */
 	register int found;	/* matched command flag */
 
-	if ((c & (META|SPEC|CTLX)) == 0) {
+	if ((c & (CTLA|SPEC|CTLX)) == 0) {
 		asciitbl[c] = NULL;
 	} else {
 		/* search the table to see if the key exists */
@@ -257,37 +261,13 @@ int c;		/* command key to unbind */
 		   into it with view mode			*/
 desbind(f, n)
 {
-        register BUFFER *bp;
-        register int    s;
-
-	/* create the buffer list buffer   */
-	bp = bfind("[Binding List]", OK_CREAT, BFSCRTCH);
-	if (bp == NULL)
-		return FALSE;
-	
-	if (bp->b_active == FALSE) { /* never been used */
-	        if ((s=bclear(bp)) != TRUE) /* clear old text (?) */
-	                return (s);
-	        s = buildlist(TRUE,"",bp);
-		if (s != TRUE || popupbuff(bp) == FALSE) {
-			mlwrite("[Sorry, can't list. ]");
-			zotbuf(bp);
-	                return (s);
-	        }
-	        strcpy(bp->b_fname, "");
-		bp->b_mode |= MDVIEW;
-		bp->b_flag |= BFSCRTCH;
-	        bp->b_flag &= ~BFCHG;        /* Don't complain!      */
-	        bp->b_active = TRUE;
-	}
-        return (TRUE);
+	return mkblist(NULL);
 }
 
 #if	APROP
 apro(f, n)	/* Apropos (List functions that match a substring) */
 {
 	static char mstring[NSTRING] = 0;	/* string to match cmd names to */
-        register BUFFER *bp;
         register int    s;
 
 
@@ -295,34 +275,42 @@ apro(f, n)	/* Apropos (List functions that match a substring) */
 	if (s != TRUE)
 		return(s);
 
+	return mkblist(mstring);
+}
+#endif
+
+mkblist(mstring)
+char *mstring;
+{
+        register BUFFER *bp;
+        register int    s;
+
 	/* create the buffer list buffer   */
 	bp = bfind("[Binding List]", OK_CREAT, BFSCRTCH);
 	if (bp == NULL)
 		return FALSE;
 	
-	if (bp->b_active == FALSE) { /* never been used */
-	        if ((s=bclear(bp)) != TRUE) /* clear old text (?) */
-	                return (s);
-	        s = buildlist(FALSE,mstring,bp);
-		if (s != TRUE || popupbuff(bp) == FALSE) {
-			mlwrite("[Sorry, can't list. ]");
-			zotbuf(bp);
-	                return (s);
-	        }
-	        strcpy(bp->b_fname, "");
-		bp->b_mode |= MDVIEW;
-		bp->b_flag |= BFSCRTCH;
-	        bp->b_flag &= ~BFCHG;        /* Don't complain!      */
-	        bp->b_active = TRUE;
-	}
-        return (TRUE);
+        if ((s=bclear(bp)) != TRUE) /* clear old text (?) */
+                return (s);
+        s = buildlist(mstring,bp);
+	if (s != TRUE || popupbuff(bp) == FALSE) {
+		mlwrite("[Sorry, can't list. ]");
+		zotbuf(bp);
+                return (s);
+        }
+        strcpy(bp->b_fname, "");
+	bp->b_mode |= MDVIEW;
+	bp->b_flag |= BFSCRTCH;
+        bp->b_flag &= ~BFCHG;        /* Don't complain!      */
+        bp->b_active = TRUE;
+
+        return TRUE;
 }
-#endif
+
 
 /* build a binding list (limited or full) */
-buildlist(type, mstring, bp)
-int type;		/* true = full list,   false = partial list */
-char *mstring;		/* match string if a partial list */
+buildlist(mstring, bp)
+char *mstring;		/* match string if partial list, NULL to list all */
 register BUFFER *bp;	/* buffer to put binding list into */
 {
 #if	ST520 & LATTICE
@@ -331,52 +319,98 @@ register BUFFER *bp;	/* buffer to put binding list into */
 	register WINDOW *wp;	/* scanning pointer to windows */
 	register KBIND *kbp;	/* pointer into a key binding table */
 	register CMDFUNC **cfp;	/* pointer into the ascii table */
-	register NTAB *nptr;	/* pointer into the name table */
+	register NTAB *nptr,*nptr2;	/* pointer into the name table */
 	char *strp;		/* pointer int string to send */
 	int cpos;		/* current position to use in outseq */
 	char outseq[81];	/* output buffer for keystroke sequence */
-	int i;
+	int i,pass;
+	char *kcod2prc();
 
 
 	/* let us know this is in progress */
 	mlwrite("[Building binding list]");
 
 	/* build the contents of this window, inserting it line by line */
-	for (nptr = nametbl; nptr->n_cmd != NULL; ++nptr) {
+	for (pass = 0; pass < 2; pass++) {
+	    for (nptr = nametbl; nptr->n_name != NULL; ++nptr) {
+
+		/* if we've already described this one, move on */
+		if (nptr->n_cmd->c_flags & LISTED)
+			continue;
+
+		/* try to avoid alphabetizing by the real short names */
+		if (pass == 0 && strlen(nptr->n_name) <= 2)
+			continue;
 
 		/* add in the command name */
-		strcpy(outseq, fnc2engl(nptr->n_cmd));
+		strcpy(outseq,"\"");
+		strcat(outseq, nptr->n_name);
+		strcat(outseq,"\"");
 		cpos = strlen(outseq);
+		while (cpos < 32)
+			outseq[cpos++] = ' ';
+		outseq[cpos] = 0;
 		
 #if	APROP
 		/* if we are executing an apropos command
 		   and current string doesn't include the search string */
-		if (type == FALSE && strinc(outseq, mstring) == FALSE)
+		if (mstring && (strinc(outseq, mstring) == FALSE))
 		    	continue;
 #endif
+		/* look in the simple ascii binding table first */
 		for(cfp = asciitbl, i = 0; cfp < &asciitbl[128]; cfp++, i++) {
 			if (*cfp == nptr->n_cmd) {
-				while (cpos < 25) outseq[cpos++] = ' ';
-				kcod2prc(i, &outseq[cpos]);
-				addline(bp,outseq,-1);
-				cpos = 0;	/* and clear the line */
+				cpos = kcod2prc(i, &outseq[strlen(outseq)]) -
+					outseq;
+				while(cpos & 7)
+					outseq[cpos++] = ' ';
+				outseq[cpos] = '\0';
 			}
 		}
+		/* then look in the multi-key table */
 		for(kbp = kbindtbl; kbp->k_cmd; kbp++) {
 			if (kbp->k_cmd == nptr->n_cmd) {
-				while (cpos < 25)
+				cpos = 
+				kcod2prc(kbp->k_code, &outseq[strlen(outseq)]) -
+					outseq;
+				while(cpos & 7)
 					outseq[cpos++] = ' ';
-				kcod2prc(kbp->k_code, &outseq[cpos]);
-				addline(bp,outseq,-1);
-				cpos = 0;	/* and clear the line */
+				outseq[cpos] = '\0';
 			}
 		}
-		/* if no key was bound, we need to dump it anyway */
-		if (cpos > 0) {
-			outseq[cpos] = 0;
+		/* dump the line */
+		addline(bp,outseq,-1);
+
+		cpos = 0;
+
+		/* then look for synonyms */
+		for (nptr2 = nametbl; nptr2->n_name != NULL; ++nptr2) {
+			/* if it's the one we're on, skip */
+			if (nptr2 == nptr)
+				continue;
+			/* if it's already been listed, skip */
+			if (nptr2->n_cmd->c_flags & LISTED)
+				continue;
+			/* if it's not a synonym, skip */
+			if (nptr2->n_cmd != nptr->n_cmd)
+				continue;
+			while (cpos < 8)
+				outseq[cpos++] = ' ';
+			outseq[cpos] = '\0';
+			strcat(outseq,"\"");
+			strcat(outseq,nptr2->n_name);
+			strcat(outseq,"\"");
 			addline(bp,outseq,-1);
+			cpos = 0;	/* and clear the line */
+
 		}
+
+		nptr->n_cmd->c_flags |= LISTED; /* mark it as already listed */
+	    }
 	}
+
+	for (nptr = nametbl; nptr->n_name != NULL; ++nptr)
+		nptr->n_cmd->c_flags &= ~LISTED; /* mark it as unlisted */
 
 	mlwrite("");	/* clear the mode line */
 	return(TRUE);
@@ -535,6 +569,7 @@ int hflag;	/* Look in the HOME environment variable first? */
 }
 
 /* translate a 10-bit keycode to its printable name (like "M-j")  */
+char *
 kcod2prc(c, seq)
 int c;		/* sequence to translate */
 char *seq;	/* destination string for sequence */
@@ -543,17 +578,10 @@ char *seq;	/* destination string for sequence */
 
 	ptr = seq;
 
-	/* apply meta sequence if needed */
-	if (c & META) {
-		if (isprint(metac)) {
-			*ptr++ = c;
-		} else {
-			/*
-			*ptr++ = '^';
-			*ptr++ = toalpha(kcod2key(c));
-			*/
-			*ptr++ = 'M';
-		}
+	/* apply cntl_a sequence if needed */
+	if (c & CTLA) {
+		*ptr++ = '^';
+		*ptr++ = 'A';
 		*ptr++ = '-';
 	}
 
@@ -596,6 +624,7 @@ char *seq;	/* destination string for sequence */
 		*ptr++ = c;
 	}
 	*ptr = 0;	/* terminate the string */
+	return ptr;
 }
 
 
@@ -607,7 +636,7 @@ int c;	/* key to find what is bound to it */
 {
 	register KBIND *kbp;
 
-	if ((c & (META|SPEC|CTLX)) == 0) {
+	if ((c & (CTLA|SPEC|CTLX)) == 0) {
 		return asciitbl[c];
 	} else {
 		for (kbp = kbindtbl; kbp->k_cmd && kbp->k_code != c; kbp++)
@@ -687,10 +716,10 @@ char *k;		/* name of key to translate to Command key form */
 	/* parse it up */
 	c = 0;
 
-	/* first, the META prefix */
-	if (*k == 'M' && *(k+1) == '-') {
-		c = META;
-		k += 2;
+	/* first, the CTLA prefix */
+	if (*k == '^' && *(k+1) == toalpha(cntl_a) && *(k+2) == '-') {
+		c = CTLA;
+		k += 3;
 	}
 
 	/* next the function prefix */
@@ -700,7 +729,8 @@ char *k;		/* name of key to translate to Command key form */
 	}
 
 	/* control-x as well... (but not with FN) */
-	if (*k == '^' && *(k+1) == 'X' && *(k+2) == '-' && !(c & SPEC)) {
+	if (*k == '^' && *(k+1) == toalpha(cntl_x) && 
+				*(k+2) == '-' && !(c & SPEC)) {
 		c |= CTLX;
 		k += 3;
 	}
@@ -711,8 +741,10 @@ char *k;		/* name of key to translate to Command key form */
 		c |= *k;
 		if (islower(c)) c = toupper(c);
 		c = tocntrl(c);
-	} else if (!isprint(*k)) {
-		*k = toalpha(c);
+	} else if (!strcmp(k,"<sp>")) {
+		c |= ' ';
+	} else if (!strcmp(k,"<tab>")) {
+		c |= '\t';
 	} else {
 		c |= *k;
 	}
@@ -743,25 +775,44 @@ char *skey;	/* name of keey to get binding for */
 char *
 kbd_engl()
 {
+	int status;
+	char *buf;
+
+
+	status = kbd_engl_stat(&buf);
+	if (status == SORTOFTRUE) /* something was tungetc'ed */
+		(void)tgetc();
+	if (status == TRUE)
+		return buf;
+	return NULL;
+}
+
+/* *bufp only valid if return is TRUE */
+kbd_engl_stat(bufp)
+char **bufp;
+{
 #if	ST520 & LATTICE
 #define register		
 #endif
-	register int cpos;	/* current column on screen output */
 	register int c;
+	register int cpos;	/* current column on screen output */
 	register char *sp;	/* pointer to string for output */
 	register NTAB *nbp;	/* first ptr to entry in name binding table */
 	register NTAB *cnbp;	/* current ptr to entry in name binding table */
 	register NTAB *lnbp;	/* last ptr to entry in name binding table */
-	static char buf[NSTRING]; /* buffer to hold tentative command name */
+	static char buf[NLINE]; /* buffer to hold tentative command name */
 
-	/* starting at the beginning of the string buffer */
 	cpos = 0;
+
+	*bufp = NULL;
 
 	/* if we are executing a command line just get the next arg and return */
 	if (clexec) {
-		if (macarg(buf) != TRUE)
-			return NULL;
-		return buf;
+		if (macarg(buf) != TRUE) {
+			return FALSE;
+		}
+		*bufp = buf;
+		return TRUE;
 	}
 
 	lineinput = TRUE;
@@ -770,32 +821,35 @@ kbd_engl()
 	while (TRUE) {
 		c = tgetc();
 
-		/* if we are at the end, just match it */
+		if (cpos == 0) {
+			if (isbackspace(c) ||
+			    c == kcod2key(abortc) ||
+			    c == kcod2key(killc) ||
+			    c == '\r' ||
+			    islinespecchar(c) ) {
+				tungetc(c);
+				return SORTOFTRUE;
+			}
+		}
+
 		if (c == '\r') {
 			buf[cpos] = 0;
-
-			/* and match it off */
 			lineinput = FALSE;
-			return buf;
+			*bufp = buf;
+			return TRUE;
 
 		} else if (c == kcod2key(abortc)) {	/* Bell, abort */
 			buf[0] = '\0';
 			lineinput = FALSE;
-			return buf;
+			return FALSE;
 
 		} else if (isbackspace(c)) {
-			if (cpos != 0) {
-				TTputc('\b');
-				TTputc(' ');
-				TTputc('\b');
-				--ttcol;
-				--cpos;
-				TTflush();
-			} else {
-				buf[0] = '\0';
-				lineinput = FALSE;
-				return buf;
-			}
+			TTputc('\b');
+			TTputc(' ');
+			TTputc('\b');
+			--ttcol;
+			--cpos;
+			TTflush();
 
 		} else if (c == kcod2key(killc)) {	/* ^U, kill */
 			while (cpos != 0) {
@@ -805,9 +859,11 @@ kbd_engl()
 				--cpos;
 				--ttcol;
 			}
-
 			TTflush();
+			tungetc(c);
+			return SORTOFTRUE;
 
+		} /* else... */
 /* the following mess causes the command to terminate if:
 	we've got a space
 		-or-
@@ -822,7 +878,7 @@ kbd_engl()
 	If we pass this "if" with c != ' ', then c is ungotten below,
 	so it can be picked up by the commands argument getter later.
 */
-		} else if (c == ' ' || (cpos > 0 && cpos < 3 &&
+		else if (c == ' ' || (cpos > 0 && cpos < 3 &&
 			     ((!ispunct(c) &&  ispunct(buf[cpos-1])) ||
 	   ((c != '!' && ispunct(c)) &&
 	   	 (buf[cpos-1] == '!' || !ispunct(buf[cpos-1]))) )
@@ -847,7 +903,10 @@ kbd_engl()
 				if (c != ' ')  /* put it back */
 					tungetc(c);
 				lineinput = FALSE;
-				return nbp->n_name;
+				/* return nbp->n_name; */
+				strncpy(buf,nbp->n_name,NLINE);
+				*bufp = buf;
+				return TRUE;
 			} else {
 /* << << << << << << << << << << << << << << << << << */
 	/* try for a partial match against the list */
@@ -888,7 +947,7 @@ onward:;
 	TTflush();
 /* <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< */
 		} else {
-			if (cpos < NSTRING-1 && isprint(c)) {
+			if (cpos < NLINE-1 && isprint(c)) {
 				buf[cpos++] = c;
 				TTputc(c);
 			}

@@ -10,6 +10,443 @@
 /* namedcmd:	execute a named command even if it is not bound */
 
 namedcmd(f, n)
+int f, n;
+{
+	char *fnp;	/* ptr to the name of the cmd to exec */
+	LINE *fromline;	/* first linespec */
+	LINE *toline;	/* second linespec */
+	char lspec[NLINE];
+	int cpos = 0;
+	int s,c,isdfl,zero,flags;
+	char *kbd_engl();
+	CMDFUNC *cfp;		/* function to execute */
+	extern CMDFUNC f_gomark;
+
+	/* prompt the user to type a named command */
+	mlwrite(": ");
+
+	/* and now get the function name to execute */
+#if	NeWS
+	newsimmediateon() ;
+#endif
+
+	while(1) {
+		c = tgetc();
+		if (c == '\r') {
+			lspec[cpos] = 0;
+			fnp = NULL;
+			break;
+		} else if (c == kcod2key(abortc)) {	/* Bell, abort */
+		isabortc:
+			lspec[0] = '\0';
+			return FALSE;
+		} else if (isbackspace(c)) {
+			if (cpos != 0) {
+				TTputc('\b');
+				TTputc(' ');
+				TTputc('\b');
+				--ttcol;
+				--cpos;
+			} else {
+				lspec[0] = '\0';
+				lineinput = FALSE;
+				return FALSE;
+			}
+
+		} else if (c == kcod2key(killc)) {	/* ^U, kill */
+		iskillc:
+			while (cpos != 0) {
+				TTputc('\b');
+				TTputc(' ');
+				TTputc('\b');
+				--cpos;
+				--ttcol;
+			}
+		} else if (islinespecchar(c) ||
+			/* special test for 'a style mark references */
+				(cpos > 0 &&
+				 lspec[cpos-1] == '\'' &&
+				 (islower(c) || (c == '\'') )
+				)
+			 ) {
+			lspec[cpos++] = c;
+			TTputc(c);
+			++ttcol;
+		} else {
+			int status;
+			tungetc(c);
+			lspec[cpos] = 0;
+			status = kbd_engl_stat(&fnp);
+			if (status == TRUE) {
+				break;
+			} else if (status == SORTOFTRUE) {
+				fnp = NULL;
+				continue;
+			} else {
+				return status;
+			}
+		}
+		TTflush();
+	}
+
+	/* parse the accumulated lspec */
+	if (rangespec(lspec,&fromline,&toline,&isdfl,&zero) != TRUE) {
+		mlwrite("[Improper line range]");
+		return FALSE;
+	}
+
+	/* if range given, and it wasn't "0" and the buffer's empty */
+	if (!isdfl && !zero && (lforw(curbp->b_linep) == curbp->b_linep)) {
+		mlwrite("[No range possible in empty buffer]", fnp);
+		return FALSE;
+	}
+
+#if	NeWS
+	newsimmediateoff() ;
+#endif
+
+	/* did we get a name? */
+	if (fnp == NULL) {
+		if (isdfl) { /* no range, no function */
+			mlwrite("[No such function]");
+			return FALSE;
+		} else { /* range, no function */
+			cfp = &f_gomark;
+			fnp = "";
+		}
+	} else if ((cfp = engl2fnc(fnp)) == NULL) { /* bad function */
+		mlwrite("[No such function %s]",fnp);
+		return FALSE;
+	}
+	flags = cfp->c_flags;
+	
+	/* bad arguments? */
+#ifdef EXRC_FILES
+seems like we need one more check here -- is it from a .exrc file?
+	    cmd not ok in .exrc 		empty file
+	if (!(flags & EXRCOK) && (lforw(curbp->b_linep) == curbp->b_linep)) {
+		mlwrite("[Can't use the \"%s\" command in a %s file.]", 
+					cmdnames[cmdidx].name, EXRC);
+		return FALSE;
+	}
+#endif
+
+	/* was: if (!(flags & (ZERO | EXRCOK)) && fromline == NULL ) { */
+	if (zero) {
+		extern CMDFUNC f_lineputafter, f_opendown, f_insfile;
+		extern CMDFUNC f_lineputbefore, f_openup;
+		if (!(flags & ZERO)) {
+			mlwrite("[Can't use address 0 with \"%s\" command]", fnp);
+			return FALSE;
+		}
+		/*  we're positioned at fromline == curbp->b_linep, so commands
+			must be willing to go _down_ from there.  Seems easiest
+			to special case the commands that prefer going up */
+		if (cfp == &f_insfile) {
+			/* works okay -- acts down normally */
+		} else if (cfp == &f_lineputafter) {
+			cfp = &f_lineputbefore;
+			fromline = lforw(fromline);
+		} else if (cfp == &f_opendown) {
+			cfp = &f_openup;
+			fromline = lforw(fromline);
+		} else {
+			mlwrite("[Configuration error: ZERO]");
+			return FALSE;
+		}
+		flags = cfp->c_flags;
+		toline = fromline;
+	}
+
+	/* if we're not supposed to have a line no., and the line no. isn't
+		the current line, and there's more than one line */
+	if (!(flags & FROM) && fromline != curwp->w_dotp && 
+			(lforw(curbp->b_linep)  != curbp->b_linep) &&
+		  (lforw(lforw(curbp->b_linep)) != curbp->b_linep) ) {
+		mlwrite("[Can't use address with \"%s\" command.]", fnp);
+		return FALSE;
+	}
+	/* if we're not supposed to have a second line no., and the line no. 
+		isn't the same as the first line no., and there's more than
+		one line */
+	if (!(flags & TO) && toline != fromline &&
+			(lforw(curbp->b_linep) != curbp->b_linep) &&
+		  (lforw(lforw(curbp->b_linep)) != curbp->b_linep) ) {
+		mlwrite("[Can't use a range with \"%s\" command.]", fnp);
+		return FALSE;
+	}
+#ifdef NEEDED
+	if (!(flags & EXTRA) && *scan) {
+		mlwrite("[Extra characters after \"%s\" command.]", 
+						cmdnames[cmdidx].name);
+		return FALSE;
+	}
+#endif
+#ifdef NEEDED
+	if ((flags & NOSPC) && !(cmd == CMD_READ && (forceit || *scan == '!'))) {
+		build = scan;
+#ifndef CRUNCH  /* what is this for? -pgf */
+		if ((flags & PLUS) && *build == '+') {
+			while (*build && !(isspace(*build))) {
+				build++;
+			}
+			while (*build && isspace(*build)) {
+				build++;
+			}
+		}
+#endif /* not CRUNCH */
+		for (; *build; build++) {
+			if (isspace(*build)) {
+				mlwrite("[Too many %s to \"%s\" command.]",
+					(flags & XFILE) ? "filenames" : "arguments",
+					cmdnames[cmdidx].name);
+				return FALSE;
+			}
+		}
+	}
+#endif /* NEEDED */
+
+	/* some commands have special default ranges */
+	if (isdfl) {
+		if (flags & DFLALL) {
+			extern CMDFUNC f_operwrite, f_filewrite, f_operglobals,
+					f_globals, f_opervglobals, f_vglobals;
+			if (cfp == &f_operwrite) {
+				cfp = &f_filewrite;
+#if GLOBALS
+			} else if (cfp == &f_operglobals) {
+				cfp = &f_globals;
+			} else if (cfp == &f_opervglobals) {
+				cfp = &f_vglobals;
+#endif
+			} else {
+				mlwrite("[Configuration error: DFLALL]");
+				return FALSE;
+			}
+		} else if (flags & DFLNONE) {
+			extern CMDFUNC f_operfilter, f_spawn;
+			if (cfp == &f_operfilter) {
+				cfp = &f_spawn;
+				setmark();  /* not that it matters */
+			} else {
+				mlwrite("[Configuration error: DFLNONE]");
+				return FALSE;
+			}
+			fromline = toline = NULL;
+		}
+	}
+
+#ifdef NEEDED
+	/* write a newline if called from visual mode */
+	if ((flags & NL) && !exmode /* && !exwrote */) {
+		TTputc('\n');
+		/* exrefresh(); */
+	}
+#endif
+
+	if (toline || fromline) {  /* assume it's an absolute motion */
+				   /* we could probably do better */
+		curwp->w_ldmkp = curwp->w_dotp;
+		curwp->w_ldmko = curwp->w_doto;
+	}
+	if (toline) {
+		curwp->w_dotp = toline;
+		firstnonwhite();
+		setmark();
+	}
+	if (fromline) {
+		curwp->w_dotp = fromline;
+		firstnonwhite();
+		if (!toline)
+			setmark();
+	}
+
+	/* and then execute the command */
+	isnamedcmd = TRUE;
+	havemotion = &f_gomark;
+	fulllineregions = TRUE;
+
+	s = execute(cfp,f,n);
+
+	havemotion = NULL;
+	isnamedcmd = FALSE;
+	fulllineregions = FALSE;
+
+	return s;
+}
+
+/* parse an ex-style line spec -- code culled from elvis, file ex.c, by
+	Steve Kirkendall
+*/
+char *
+linespec(s, markptr)
+register char	*s;		/* start of the line specifier */
+LINE		**markptr;	/* where to store the mark's value */
+{
+	long		num;
+	LINE		*lp;	/* where the linespec takes us */
+	register char	*t;
+	int		status;
+
+	setmark();
+	lp = NULL;
+
+	/* parse each ;-delimited clause of this linespec */
+	do
+	{
+		/* skip an initial ';', if any */
+		if (*s == ';')
+			s++;
+
+		/* skip leading spaces */
+		while (isspace(*s))
+			s++;
+	
+		/* dot means current position */
+		if (*s == '.') {
+			s++;
+			lp = curwp->w_dotp;
+		} else if (*s == '$') { /* '$' means the last line */
+			s++;
+			status = gotoeob(TRUE,1);
+			if (status) lp = curwp->w_dotp;
+		} else if (isdigit(*s)) {
+			/* digit means an absolute line number */
+			for (num = 0; isdigit(*s); s++) {
+				num = num * 10 + *s - '0';
+			}
+			status = gotoline(TRUE,num);
+			if (status) lp = curwp->w_dotp;
+		} else if (*s == '\'') {
+			/* appostrophe means go to a set mark */
+			s++;
+			status = gonmmark(*s);
+			if (status) lp = curwp->w_dotp;
+			s++;
+		} 
+#if PATTERNS
+		else if (*s == '/' || *s == '?') { /* slash means do a search */
+			/* put a '\0' at the end of the search pattern */
+			t = parseptrn(s);
+	
+			/* search for the pattern */
+			lp &= ~(BLKSIZE - 1);
+			if (*s == '/') {
+				pfetch(markline(lp));
+				if (plen > 0)
+					lp += plen - 1;
+				lp = m_fsrch(lp, s);
+			} else {
+				lp = m_bsrch(lp, s);
+			}
+	
+			/* adjust command string pointer */
+			s = t;
+		}
+#endif
+	
+		/* if linespec was faulty, quit now */
+		if (!lp) {
+			*markptr = lp;
+			swapmark();
+			return s;
+		}
+	
+		/* maybe add an offset */
+		t = s;
+		if (*t == '-' || *t == '+') {
+			s++;
+			for (num = 0; *s >= '0' && *s <= '9'; s++) {
+				num = num * 10 + *s - '0';
+			}
+			if (num == 0)
+				num = 1;
+			forwline(TRUE, (*t == '+') ? num : -num);
+			lp = curwp->w_dotp;
+		}
+	} while (*s == ';' || *s == '+' || *s == '-');
+
+	*markptr = lp;
+	swapmark();
+	return s;
+}
+
+/* parse an ex-style line range -- code culled from elvis, file ex.c, by
+	Steve Kirkendall
+*/
+rangespec(specp,fromlinep,tolinep,isdefaultp,zerop)
+char		*specp;	/* string containing a line range */
+LINE		**fromlinep;	/* first linespec */
+LINE		**tolinep;	/* second linespec */
+int		*isdefaultp;
+int		*zerop;
+{
+	register char	*scan;		/* used to scan thru specp */
+	LINE		*fromline;	/* first linespec */
+	LINE		*toline;	/* second linespec */
+	int		noaddrallowed;
+
+	*zerop = FALSE;
+
+	/* ignore command lines that start with a double-quote */
+	if (*specp == '"') {
+		*fromlinep = *tolinep = curwp->w_dotp;
+		return TRUE;
+	}
+
+	/* permit extra colons at the start of the line */
+	while (isspace(*specp) || *specp == ':') {
+		specp++;
+	}
+
+	/* parse the line specifier */
+	scan = specp;
+	if (lforw(curbp->b_linep) == curbp->b_linep) {
+		fromline = toline = NULL;
+	} else if (*scan == '%') {
+		/* '%' means all lines */
+		fromline = lforw(curbp->b_linep);
+		toline = lback(curbp->b_linep);
+		scan++;
+	} else if (*scan == '0') {
+		fromline = toline = curbp->b_linep; /* _very_ top of buffer */
+		*zerop = TRUE;
+		scan++;
+	} else {
+		scan = linespec(scan, &fromline);
+		if (!fromline)
+			fromline = curwp->w_dotp;
+		toline = fromline;
+		if (*scan == ',') {
+			scan++;
+			scan = linespec(scan, &toline);
+		}
+		if (!toline) {
+			/* faulty line spec -- fault already described */
+			dbgwrite("null toline");
+			return FALSE;
+		}
+	}
+
+	*isdefaultp = (scan == specp);
+
+	/* skip whitespace */
+	while (isspace(*scan))
+		scan++;
+
+	if (*scan) {
+		dbgwrite("crud at end %s",specp);
+		return FALSE;
+	}
+
+	*fromlinep = fromline;
+	*tolinep = toline;
+	
+	return TRUE;
+}
+
+/* old namedcmd:	execute a named command even if it is not bound */
+onamedcmd(f, n)
 int f, n;	/* command arguments [passed through to command executed] */
 {
 	register char *fnp;	/* ptr to the name of the cmd to exec */
@@ -22,15 +459,17 @@ int f, n;	/* command arguments [passed through to command executed] */
 	/* and now get the function name to execute */
 #if	NeWS
 	newsimmediateon() ;
+#endif
+
 	fnp = kbd_engl();
+
+#if	NeWS
 	newsimmediateoff() ;
-#else
-	fnp = kbd_engl();
 #endif
 
 	if (fnp == NULL) {
 		mlwrite("[No such function]");
-		return(FALSE);
+		return FALSE;
 	}
 
 	/* and then execute the command */
@@ -38,13 +477,11 @@ int f, n;	/* command arguments [passed through to command executed] */
 	s = docmd(fnp,FALSE,f,n);
 	isnamedcmd = FALSE;
 
-	return(s);
+	return s;
 }
 
-#ifdef WHY_BOTH_THIS_AND_ABOVE
-/*	execcmd:	Execute a command line command to be typed in
-			by the user					*/
-
+#if NEVER
+/*	execcmd:	Execute a command line command by name alone */
 execcmd(f, n)
 int f, n;	/* default Flag and Numeric argument */
 {
@@ -53,11 +490,11 @@ int f, n;	/* default Flag and Numeric argument */
 
 	/* get the line wanted */
 	cmdbuf[0] = 0;
-	if ((status = mlreply(": ", cmdbuf, NSTRING)) != TRUE)
-		return(status);
+	if ((status = mlreply("cmd: ", cmdbuf, NSTRING)) != TRUE)
+		return status;
 
 	execlevel = 0;
-	return(docmd(cmdbuf,TRUE,f,n));
+	return docmd(cmdbuf,TRUE,f,n);
 }
 #endif
 
@@ -75,17 +512,17 @@ int f, n;	/* default Flag and Numeric argument */
 docmd(cline,newcle,f,n)
 char *cline;	/* command line to execute */
 {
-	CMDFUNC *cfp;		/* function to execute */
 	int status;		/* return status of function */
 	int flags;		/* function flags */
 	int oldcle;		/* old contents of clexec flag */
 	char *oldestr;		/* original exec string */
 	char tkn[NSTRING];	/* next token off of command line */
-	extern CMDFUNC f_stutterfunc;
+	CMDFUNC *cfp;
+	extern CMDFUNC f_godotplus;
 		
 	/* if we are scanning and not executing..go back here */
 	if (execlevel)
-		return(TRUE);
+		return TRUE;
 
 	oldestr = execstr;	/* save last ptr to string to execute */
 	execstr = cline;	/* and set this one as current */
@@ -98,7 +535,7 @@ char *cline;	/* command line to execute */
 
 	if ((status = macarg(tkn)) != TRUE) {	/* and grab the first token */
 		execstr = oldestr;
-		return(status);
+		return status;
 	}
 
 	/* process leadin argument */
@@ -110,54 +547,25 @@ char *cline;	/* command line to execute */
 		/* and now get the command to execute */
 		if ((status = macarg(tkn)) != TRUE) {
 			execstr = oldestr;
-			return(status);	
+			return status;	
 		}	
 	}
 
 	/* and match the token to see if it exists */
 	if ((cfp = engl2fnc(tkn)) == NULL) {
-		mlwrite("[No such function]");
+		mlwrite("[No such function %s]",tkn);
 		execstr = oldestr;
-		return(FALSE);
+		return FALSE;
 	}
 	
 	/* save the arguments and go execute the command */
 	oldcle = clexec;		/* save old clexec flag */
 	clexec = newcle;		/* in cline execution */
-	flags = cfp->c_flags;
-	if ((flags & UNDO) != 0) {
-		/* any undoable command can't be permitted when read-only */
-		if (curbp->b_mode&MDVIEW)
-			return(rdonly());
-		mayneedundo();
-	}
-	if ((flags & ABS) != 0) { /* motion is absolute */
-		curwp->w_ldmkp = curwp->w_dotp;
-		curwp->w_ldmko = curwp->w_doto;
-	}
-	/* commands that don't move can't follow operators */
-	if ( doingopcmd ) {
-		if ((flags & MOTION) == 0) {
-			mlwrite("[A motion must follow an operator]");
-			execstr = oldestr;
-			return(FALSE);
-		}
-		/* motion is interpreted as affecting full lines */
-		if ((flags & FL) != 0)
-			fulllineregions = TRUE;
-	}
-	if (isnamedcmd && (flags & GLOBOK)) {
-		/* ":d" is just like "dd" */
-		havemotion = &f_stutterfunc;
-	}
-	status = (cfp->c_func)(f, n, NULL, NULL);	/* call the function */
-	if ((flags & GOAL) == 0) { /* goal should not be retained */
-		curgoal = -1;
-	}
+	status = execute(cfp,f,n);
 	cmdstatus = status;		/* save the status */
 	clexec = oldcle;		/* restore clexec flag */
 	execstr = oldestr;
-	return(status);
+	return status;
 }
 
 /* token:	chop a token off a string
@@ -213,7 +621,7 @@ char *src, *tok;	/* source string, destination token string */
 	if (*src)
 		++src;
 	*tok = 0;
-	return(src);
+	return src;
 }
 
 macarg(tok)	/* get a macro line argument */
@@ -228,7 +636,7 @@ char *tok;	/* buffer to place argument */
 	/* evaluate it */
 	strcpy(tok, tokval(tok));
 	clexec = savcle;	/* restore execution mode */
-	return(TRUE);
+	return TRUE;
 }
 
 /*	nextarg:	get the next argument	*/
@@ -240,7 +648,7 @@ char *buffer;		/* buffer to put token into */
 	execstr = token(execstr, buffer);
 	/* evaluate it */
 	strcpy(buffer, tokval(buffer));
-	return(TRUE);
+	return TRUE;
 }
 
 /*	storemac:	Set up a macro buffer and flag to store all
@@ -256,13 +664,13 @@ int n;		/* macro number to use */
 	/* must have a numeric argument to this function */
 	if (f == FALSE) {
 		mlwrite("No macro specified");
-		return(FALSE);
+		return FALSE;
 	}
 
 	/* range check the macro number */
 	if (n < 1 || n > 40) {
-		mlwrite("Macro number out of range");
-		return(FALSE);
+		mlwrite("[Macro number out of range]");
+		return FALSE;
 	}
 
 	/* construct the macro buffer name */
@@ -272,8 +680,8 @@ int n;		/* macro number to use */
 
 	/* set up the new macro buffer */
 	if ((bp = bfind(bname, OK_CREAT, BFINVS)) == NULL) {
-		mlwrite("Can not create macro");
-		return(FALSE);
+		mlwrite("[Cannot create macro]");
+		return FALSE;
 	}
 
 	/* and make sure it is empty */
@@ -282,7 +690,7 @@ int n;		/* macro number to use */
 	/* and set the macro store pointers to it */
 	mstore = TRUE;
 	bstore = bp;
-	return(TRUE);
+	return TRUE;
 }
 
 #if	PROC
@@ -299,12 +707,12 @@ int n;		/* macro number to use */
 
 	/* a numeric argument means its a numbered macro */
 	if (f == TRUE)
-		return(storemac(f, n));
+		return storemac(f, n);
 
 	/* get the name of the procedure */
 	bname[1] = 0;
         if ((status = mlreply("Procedure name: ", &bname[1], NBUFN-2)) != TRUE)
-                return(status);
+                return status;
 
 	/* construct the macro buffer name */
 	bname[0] = '[';
@@ -312,8 +720,8 @@ int n;		/* macro number to use */
 
 	/* set up the new macro buffer */
 	if ((bp = bfind(bname, OK_CREAT, BFINVS)) == NULL) {
-		mlwrite("Can not create macro");
-		return(FALSE);
+		mlwrite("[Can not create macro]");
+		return FALSE;
 	}
 
 	/* and make sure it is empty */
@@ -322,7 +730,7 @@ int n;		/* macro number to use */
 	/* and set the macro store pointers to it */
 	mstore = TRUE;
 	bstore = bp;
-	return(TRUE);
+	return TRUE;
 }
 
 /*	execproc:	Execute a procedure				*/
@@ -337,7 +745,7 @@ int f, n;	/* default flag and numeric arg */
 
 	/* find out what buffer the user wants to execute */
         if ((status = mlreply("Execute procedure: ", obufn, NBUFN)) != TRUE)
-                return(status);
+                return status;
 
 	/* construct the buffer name */
 	bufn[0] = '[';
@@ -346,15 +754,16 @@ int f, n;	/* default flag and numeric arg */
 
 	/* find the pointer to that buffer */
         if ((bp=bfind(bufn, NO_CREAT, 0)) == NULL) {
-		mlwrite("No such procedure");
-                return(FALSE);
+		mlwrite("[No such procedure]");
+                return FALSE;
         }
 
 	/* and now execute it as asked */
-	while (n-- > 0)
+	while (n-- > 0) {
 		if ((status = dobuf(bp)) != TRUE)
-			return(status);
-	return(TRUE);
+			return status;
+	}
+	return TRUE;
 }
 #endif
 
@@ -370,19 +779,20 @@ int f, n;	/* default flag and numeric arg */
 
 	/* find out what buffer the user wants to execute */
         if ((status = mlreply("Execute buffer: ", bufn, NBUFN)) != TRUE)
-                return(status);
+                return status;
 
 	/* find the pointer to that buffer */
         if ((bp=bfind(bufn, NO_CREAT, 0)) == NULL) {
 		mlwrite("No such buffer");
-                return(FALSE);
+                return FALSE;
         }
 
 	/* and now execute it as asked */
-	while (n-- > 0)
+	while (n-- > 0) {
 		if ((status = dobuf(bp)) != TRUE)
-			return(status);
-	return(TRUE);
+			return status;
+	}
+	return TRUE;
 }
 #endif
 
@@ -441,6 +851,8 @@ BUFFER *bp;	/* buffer to execute */
 	/* clear IF level flags/while ptr */
 	execlevel = 0;
 	whlist = NULL;
+	fulllineregions = FALSE;
+	havemotion = FALSE;
 
 #if ! SMALLER
 	scanner = NULL;
@@ -468,7 +880,7 @@ noram:				mlwrite("%%Out of memory during while scan");
 failexit:			freewhile(scanner);
 				freewhile(whlist);
 				mstore = FALSE;
-				return(FALSE);
+				return FALSE;
 			}
 			whtemp->w_begin = lp;
 			whtemp->w_type = BTWHILE;
@@ -532,7 +944,7 @@ nxtscan:	/* on to the next line */
 			mlwrite("%%Out of Memory during macro execution");
 			freewhile(whlist);
 			mstore = FALSE;
-			return(FALSE);
+			return FALSE;
 		}
 		strncpy(eline, lp->l_text, linlen);
 		eline[linlen] = 0;	/* make sure it ends */
@@ -592,7 +1004,7 @@ nxtscan:	/* on to the next line */
 				mlforce("[Macro aborted]");
 				freewhile(whlist);
 				mstore = FALSE;
-				return(FALSE);
+				return FALSE;
 			}
 		}
 #endif
@@ -612,7 +1024,7 @@ nxtscan:	/* on to the next line */
 				mlwrite("%%Unknown Directive");
 				freewhile(whlist);
 				mstore = FALSE;
-				return(FALSE);
+				return FALSE;
 			}
 
 			/* service only the !ENDM macro here */
@@ -631,9 +1043,9 @@ nxtscan:	/* on to the next line */
 			/* allocate the space for the line */
 			linlen = strlen(eline);
 			if ((mp=lalloc(linlen)) == NULL) {
-				mlwrite("Out of memory while storing macro");
+				mlwrite("%%Out of memory while storing macro");
 				mstore = FALSE;
-				return (FALSE);
+				return FALSE;
 			}
 	
 			/* copy the text into the new line */
@@ -702,7 +1114,7 @@ nxtscan:	/* on to the next line */
 					mlwrite("%%Internal While loop error");
 					freewhile(whlist);
 					mstore = FALSE;
-					return(FALSE);
+					return FALSE;
 				}
 			
 				/* reset the line pointer back.. */
@@ -741,7 +1153,7 @@ nxtscan:	/* on to the next line */
 					mlwrite("%%No such label");
 					freewhile(whlist);
 					mstore = FALSE;
-					return(FALSE);
+					return FALSE;
 				}
 				goto onward;
 	
@@ -768,7 +1180,7 @@ nxtscan:	/* on to the next line */
 						mlwrite("%%Internal While loop error");
 						freewhile(whlist);
 						mstore = FALSE;
-						return(FALSE);
+						return FALSE;
 					}
 		
 					/* reset the line pointer back.. */
@@ -808,7 +1220,7 @@ nxtscan:	/* on to the next line */
 			execlevel = 0;
 			mstore = FALSE;
 			freewhile(whlist);
-			return(status);
+			return status;
 		}
 
 onward:		/* on to the next line */
@@ -822,7 +1234,7 @@ eexec:	/* exit the current function */
 	mstore = FALSE;
 	execlevel = 0;
 	freewhile(whlist);
-        return(TRUE);
+        return TRUE;
 }
 
 freewhile(wp)	/* free a list of while block pointers */
@@ -845,7 +1257,7 @@ int f, n;	/* default flag and numeric arg to pass on to file */
 	char *fspec;		/* full file spec */
 
 	if ((status = mlreply("File to execute: ", ofname, NSTRING -1)) != TRUE)
-		return(status);
+		return status;
 	strcpy(fname,ofname);
 
 #if	1
@@ -854,15 +1266,15 @@ int f, n;	/* default flag and numeric arg to pass on to file */
 
 	/* if it isn't around */
 	if (fspec == NULL)
-		return(FALSE);
+		return FALSE;
 
 #endif
 	/* otherwise, execute it */
 	while (n-- > 0)
 		if ((status=dofile(fspec)) != TRUE)
-			return(status);
+			return status;
 
-	return(TRUE);
+	return TRUE;
 }
 #endif
 
@@ -874,26 +1286,31 @@ char *fname;	/* file name to execute */
 {
 	register BUFFER *bp;	/* buffer to place file to exeute */
 	register int status;	/* results of various calls */
+	register int odiscmd;
 	char bname[NBUFN];	/* name of buffer */
 
 	makename(bname, fname);		/* derive the name of the buffer */
 	if ((bp = bfind(bname, OK_CREAT, 0)) == NULL) /* get the needed buffer */
-		return(FALSE);
+		return FALSE;
 
 	bp->b_mode = MDVIEW;	/* mark the buffer as read only */
 	/* and try to read in the file to execute */
-	if ((status = readin(fname, FALSE, bp, TRUE, NULL)) != TRUE) {
-		return(status);
+	if ((status = readin(fname, FALSE, bp, TRUE)) != TRUE) {
+		return status;
 	}
 
 	/* go execute it! */
-	if ((status = dobuf(bp)) != TRUE)
-		return(status);
+	odiscmd = discmd;
+	discmd = FALSE;
+	status = dobuf(bp);
+	discmd = odiscmd;
+	if (status != TRUE)
+		return status;
 
 	/* if not displayed, remove the now unneeded buffer and exit */
 	if (bp->b_nwnd == 0)
 		zotbuf(bp);
-	return(TRUE);
+	return TRUE;
 }
 
 /*	cbuf:	Execute the contents of a numbered buffer	*/
@@ -912,15 +1329,15 @@ int bufnum;	/* number of buffer to execute */
 
 	/* find the pointer to that buffer */
         if ((bp=bfind(bufname, NO_CREAT, 0)) == NULL) {
-        	mlwrite("Macro not defined");
-                return(FALSE);
+        	mlwrite("[Macro not defined]");
+                return FALSE;
         }
 
 	/* and now execute it as asked */
 	while (n-- > 0)
 		if ((status = dobuf(bp)) != TRUE)
-			return(status);
-	return(TRUE);
+			return status;
+	return TRUE;
 }
 
 cbuf1(f, n)

@@ -27,64 +27,67 @@ FILE *
 npopen (cmd, type)
 char *cmd, *type;
 {
-	int tries = 5;
-	unsigned slp = 1;
-	int p[2];
-	int typ;
-	char *sh, *shname;
-	
-	if (!strcmp(type, "r"))
-		typ = R;
-	else if (!strcmp(type, "w"))
-		typ = W;
-	else
+	FILE *fr, *fw;
+
+	if (*type != 'r' && *type != 'w')
 		return NULL;
 
-	if (pipe(p))
+	if (inout_popen(&fr, &fw, cmd) != TRUE)
 		return NULL;
+
+	if (*type == 'r')
+		return fr;
+	else
+		return fw;
+}
+
+inout_popen(fr, fw, cmd)
+FILE **fr, **fw;
+char *cmd;
+{
+	int tries = 5;
+	unsigned slp = 1;
+	int rp[2];
+	int wp[2];
+	char *sh, *shname;
+	
+
+	if (pipe(rp))
+		return FALSE;
+	if (pipe(wp))
+		return FALSE;
 		
 	/* Try & fork 5 times, backing off 1, 2, 4 .. seconds each try */
 	while ((pid = fork ()) < 0) {
 		if (--tries == 0)
-			return NULL;
+			return FALSE;
 		(void) sleep (slp);
 		slp <<= 1;
 	}
 
 	if (pid) { /* parent */
-		FILE *filep;
 
-		if (typ == R) {
-			filep = fdopen (p[0], "r");
-			setbuf(filep,NULL);
-			(void) close (p[1]);
-		} else {
-			filep = fdopen (p[1], "w");
-			setbuf(filep,NULL);
-			(void) close (p[0]);
-		}
-		return filep;
+		*fr = fdopen (rp[0], "r");
+		setbuf(*fr,NULL);
+		(void) close (rp[1]);
+
+		*fw = fdopen (wp[1], "w");
+		setbuf(*fw,NULL);
+		(void) close (wp[0]);
+		return TRUE;
 
 	} else {			/* child */
 		int i;
 
-		if (typ == R) { /* then child wants to write */
-#if close_stdin
-			(void)close (0);
-			if (open("/dev/null",0) != 0)
-				exit(-1);
-#endif
-			(void)close (1);
-			if (dup (p[1]) != 1)
-				exit(-1);
-			(void)close (2);
-			if (dup (p[1]) != 2)
-				exit(-1);
-		} else { /* child wants to read */
-			(void)close (0);
-			if (dup (p[0]) != 0)
-				exit(-1);
-		}
+		(void)close (1);
+		if (dup (rp[1]) != 1)
+			exit(-1);
+		(void)close (2);
+		if (dup (rp[1]) != 2)
+			exit(-1);
+		(void)close (0);
+		if (dup (wp[0]) != 0)
+			exit(-1);
 			
 		/* Make sure there are no inherited file descriptors */
 		for (i = 3; i < NOFILE; i += 1)
@@ -111,6 +114,7 @@ char *cmd, *type;
 		exit (-1);
 
 	}
+	return TRUE;
 }
 
 npclose (fp)

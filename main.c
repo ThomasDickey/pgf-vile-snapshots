@@ -887,12 +887,6 @@ charinit()
 	/* printable */
 	for (c = ' '; c <= '~'; c++)
 		_chartypes_[c] |= _print;
-
-	/* backspacers: ^H, rubout, and the user's backspace char */
-	/* we'll add the user's char later */
-	_chartypes_['\b'] |= _bspace;
-	_chartypes_[127] |= _bspace;
-
 }
 
 

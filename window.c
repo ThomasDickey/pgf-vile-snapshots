@@ -232,6 +232,41 @@ mvupnxtwind(f, n)
 	prevwind(FALSE, 1);
 }
 
+mvrightwind(f,n)
+{
+	int move, col;
+
+	if (f)
+		move = n;
+	else
+		move = term.t_ncol/3;
+
+	if (curwp->w_sideways + move > (col = getccol(FALSE)) - 1) {
+		TTbeep();
+		return FALSE;
+	}
+
+	curwp->w_sideways += move;
+
+        curwp->w_flag  |= WFHARD|WFMOVE;
+
+	return TRUE;
+}
+
+mvleftwind(f,n)
+{
+	if (f)
+		curwp->w_sideways -= n;
+	else
+		curwp->w_sideways -= term.t_ncol/3;
+
+	if (curwp->w_sideways < 0)
+		curwp->w_sideways = 0;
+
+        curwp->w_flag  |= WFHARD|WFMOVE;
+
+	return TRUE;
+}
 
 /*
  * This command makes the current window the only window on the screen.
@@ -367,6 +402,7 @@ splitwind(f, n)
         wp->w_linep = curwp->w_linep;
         wp->w_ldmkp = curwp->w_ldmkp;
         wp->w_ldmko = curwp->w_ldmko;
+        wp->w_sideways  = curwp->w_sideways;
         wp->w_flag  = 0;
         wp->w_force = 0;
 #if	COLOR
@@ -614,13 +650,18 @@ restwnd(f, n)		/* restore the saved screen */
 }
 #endif
 
-newlength(n)	/* resize the screen, re-writing the screen */
+newlength(f,n)	/* resize the screen, re-writing the screen */
 int n;	/* numeric argument */
 {
 	WINDOW *wp;	/* current window being examined */
 	WINDOW *nextwp;	/* next window to scan */
 	WINDOW *lastwp;	/* last window scanned */
 	int lastline;	/* screen line of last line of current window */
+
+	if (!f) {
+		mlwrite("No length given");
+		return FALSE;
+	}
 
 	/* make sure it's in range */
 	if (n < 3 || n > term.t_mrow + 1) {
@@ -688,10 +729,15 @@ int n;	/* numeric argument */
 	return(TRUE);
 }
 
-newwidth(n)	/* resize the screen, re-writing the screen */
+newwidth(f,n)	/* resize the screen, re-writing the screen */
 int n;	/* numeric argument */
 {
 	register WINDOW *wp;
+
+	if (!f) {
+		mlwrite("No width given");
+		return FALSE;
+	}
 
 	/* make sure it's in range */
 	if (n < 10 || n > term.t_mcol) {
@@ -759,6 +805,7 @@ winit()
         wp->w_ldmkp = NULL;
         wp->w_ldmko = 0;
         wp->w_toprow = 0;
+        wp->w_sideways = 0;
 #if	COLOR
 	/* initalize colors to global defaults */
 	wp->w_fcolor = gfcolor;

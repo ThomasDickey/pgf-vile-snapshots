@@ -27,8 +27,7 @@ wrapword()
 	/* back up until we aren't in a word,
 	   make sure there is a break in the line */
 	cnt = 0;
-	while (((c = lgetc(curwp->w_dotp, curwp->w_doto)) != ' ')
-				&& (c != '\t')) {
+	while (c = lgetc(curwp->w_dotp, curwp->w_doto), !isspace(c)) {
 		cnt++;
 		if (!backchar(0, 1))
 			return(FALSE);
@@ -44,8 +43,8 @@ wrapword()
 		return(FALSE);
 
 	/* put in a end of line */
-	if (!lnewline())
-		return(FALSE);
+	if (!newline(TRUE,1))
+		return FALSE;
 
 	/* and past the first word */
 	while (cnt-- > 0) {
@@ -263,7 +262,7 @@ formatregion(f,n)
 	register int finished;		/* Are we at the End-Of-Paragraph? */
 	register int firstflag;		/* first word? (needs no space)	*/
 	register LINE *pastline;		/* pointer to line just past EOP */
-	register int dotflag;		/* was the last char a period?	*/
+	register int sentence;		/* was the last char a period?	*/
 	char wbuf[NSTRING];		/* buffer for current word	*/
 	int secondindent;
 	REGION region;
@@ -296,7 +295,7 @@ formatregion(f,n)
 	
 	clength = indentlen(curwp->w_dotp);
 	wordlen = 0;
-	dotflag = FALSE;
+	sentence = FALSE;
 
 	/* scan through lines, filling words */
 	firstflag = TRUE;
@@ -321,7 +320,8 @@ formatregion(f,n)
 
 		/* if not a separator, just add it in */
 		if (c != ' ' && c != '\t') {
-			dotflag = (c == '.');		/* was it a dot */
+			/* was it the end of a "sentence"? */
+			sentence = (c == '.' || c == '?' || c == '!');
 			if (wordlen < NSTRING - 1)
 				wbuf[wordlen++] = c;
 		} else if (wordlen) {
@@ -353,7 +353,7 @@ formatregion(f,n)
 				if (s != TRUE) return s;
 				++clength;
 			}
-			if (dotflag) {
+			if (sentence) {
 				s = linsert(1, ' ');
 				if (s != TRUE) return s;
 				++clength;

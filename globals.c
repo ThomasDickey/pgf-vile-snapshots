@@ -10,15 +10,29 @@
 
 globals(f,n)
 {
-	static char buf[NFILEN] = '\0';
-	int c, s, calledbefore;
+	return globber(f,n,'g');
+}
+
+vglobals(f,n)
+{
+#ifdef SOMEDAY
+	return globber(f,n,'v');
+#else
+	return unimpl();
+#endif
+}
+
+globber(f, n, g_or_v)
+{
+	static char buf[NFILEN];
+	int c, s;
 	register LINE *lp;
 	register char *fnp;	/* ptr to the name of the cmd to exec */
 	char *kbd_engl();
 	CMDFUNC *engl2fnc();
 	CMDFUNC *cfp;
 	int foundone;
-	extern CMDFUNC f_stutterfunc;
+	extern CMDFUNC f_godotplus;
 	
 	c = '\n';
 	if (isnamedcmd) {
@@ -58,7 +72,7 @@ globals(f,n)
 	
 	
 	/* call the searcher, telling it to do line marking */
-	s = forwsearch(FALSE,0,TRUE,NULL);
+	s = fsearch(FALSE,0,TRUE,NULL);
 	if (s != TRUE)
 		return s;
 	
@@ -92,10 +106,10 @@ globals(f,n)
 						return(rdonly());
 					mayneedundo();
 				}
-				havemotion = &f_stutterfunc;
-				s = (cfp->c_func)(FALSE, 1, NULL, calledbefore);
-				calledbefore = TRUE;
+				havemotion = &f_godotplus;
+				s = (cfp->c_func)(FALSE, 1, NULL, NULL);
 				havemotion = NULL;
+				calledbefore = TRUE;
 			}
 			if (lp != curwp->w_dotp) {
 				/* make sure we're still in the buffer, since

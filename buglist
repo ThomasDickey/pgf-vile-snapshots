@@ -2,24 +2,55 @@
 	(E means enhancement, L,M,H are low, medium, high priority)
 ----------------------
 
-M	longnames cause severe portability constraint -- does the shortnames
-	stuff take care of this?
+H	the gotoeop motion and regions interract wrongly.  For instance,
+	using ^W} to write the rest of the paragraph to a file writes
+	the wrong number of characters.
 
-L	formatregion code leaves an extra space after reformatting a paragraph
+H	when reading the output of a shell command, it's far too slow -- should
+	read as much as possible, put it into the buffer, and _then_ update
+	[ This has been fixed for BSD -- other implementations not yet ]
+
+M	output doesn't flush properly after a shell escape
+
+M	longnames cause severe portability constraint -- does the shortnames
+	stuff take care of this?  I can't test it...
+
+M	:k, to set a mark, won't work as ":ka" or ":kb".  Must use ":k a"
+
+M	:set all should be made to work (fix help)
+
+L	formatregion sometimes appends a space to the last line, for instance
+	when a paragraph is reformatted
+
+L	dos-style is set even when file is majority unix-lines?
 
 L	why does file reading seem so slow?
 
 L	why is searching so slow?
 
-L	the ^A-* command doesn't work as advertised -- won't replace
-	list if already there.
+L	with two window displayed, hitting * twice makes one go away.
+	perhaps popup should _always_ split a window, rather than sometimes
+	taking over an existing one.  but then we'd have to remember who we
+	split, so we could give the space back to the donor.
 
-L	there may be a bug in queryreplace due to output of thescanner() not
-	being checked for ABORT, but it's ifdefed BEFORE anyway
+E	patterns as addresses do not work, e.g. ":/str1/,/str2/d".  They're
+	hard to parse the way things are set up right now.  We could accumulate
+	the whole commandline, and then parse it, the way real vi does, but we'd
+	lose the "prompt and display last response" behavior.
 
-E	The "0r" command, for reading a file in above line 1 doesn't work,
-	because token parsing sees the zero as a number, not part of the
-	command.  The "R" synonym does, however -- okay for now.
+E	In vi, the join command is supposed to act either on a region (from
+	the command line, as in ":13,15j"), or it should take a simple
+	count, from vi mode, as in "3j".  Right now vile _only_ does the
+	simple count form of the command.
+
+E	should add an option to support file locking, rather than the
+	current ifdef stuff -- but this is only useful if we match the
+	GNU locking protocol, which I'm not inclined to do
+
+E	Wow. the scrsearch functions could become region based -- as in "search for
+	the next occrence of the region", which would usually be a word.  And
+	the ^A/ version could become "a/ (search for teh contents of buffer a),
+	if you know what I mean.
 
 E	need a "file newer than buffer" warning.  Should stat the file, and
 	store it's mod time, compare to current when going back to that window,
@@ -31,14 +62,12 @@ E	should be able to refer to remote tags file, and have paths
 	contained there be relative to _its_ location, rather than the current
 	directory.
 
-E	wrap mode doesn't autoindent, even with cmode set.  kinda useless.
-
 E	add a command-line expansion character to be the list of files
 	mentioned in "tags"
 
 E	should there be a "significant-length" for tags?
 
-E	add another mode, which will "!get -p" an SCCS or RCS file if 
+E	another mode, which will "!get -p" an SCCS or RCS file if 
 	the clear-text file isn't found
 
 E	add _another_ mode, similar to the above, which will do a caseless 
@@ -46,38 +75,32 @@ E	add _another_ mode, similar to the above, which will do a caseless
 
 E	it would be nice if ^X!! reran the last command into [Output]
 
-E	add support for sh comments to format() code
+E	add support for sh or C comments to formatregion() code
 
 E	why can't I kill a displayed buffer?  simply bring up the previous.
 	
-E	can g become an operator?  It should, since we don't have addresses.
+E	g should become a region command.  Then it could take ranges, as
+	it should, and could also become an operator command.
 
 E	add C comments to CFENCE matching code
 
-E	add support for C comments to format() code
+E	add C ifdefs to CFENCE matching code
 
-E	adjust window size of popups based on length of buffer
+E	adjust window size of popups based on length of buffer.  currently
+	popups get half the window they're splitting, no matter what
 
 E	collapse command execution code to as few places as possible.
 	Its currently spread through main(), execute(), operator(),
-	docmd(), and usekreg(). The usekreg() function should be 
-	moved into getcmd(), since it is really processing prefixes,
-	and isn't really a command.
+	docmd(), and usekreg().
 	
 E	mlreply line should ideally be a one line buffer, so editing
-	can be done on it.  or possibly have a subset of line-
-	oriented commands that would work on it.
+	and history can be done on it.
 
 E	BSD interrupt processing is botched during a read() of the keyboard.
 	The read doesn't return -1 as it does under sysV (USG).
 	So you can bang on ^C all day and nothing will happen.
 	[I'm not sure this is true anymore  -pgf]
 	
-E	The ! operator shouldn't be too hard to add.  A combination of
-	^W, killregion, fork, and ^R should do it.  Use a named
-	pipe (i.e. popen("command >pipe &","w"); fork; read("pipe"))
-	to make #ifdefing with the non-unix versions easier.
-
 E	This editor does not virtualize buffers out to disk.  It is quite 
 	a memory hog.  But isn't that what /dev/swap is for?  But
 	seriously, I haven't even come close to testing it for
@@ -90,6 +113,8 @@ E	to make the code shrink, could probably try to eliminate
 	expansion, it could probably be turned into a doprnt-like
 	beast, and that used as a basis for our own sprintf,fprintf
 	How does one write [sfp]printf and doprnt using varargs?
+
+E	likewise for scanf
 
 E	marks should perhaps be linked onto lines.  this would make a lot
         of things a lot easier, since a mark would travel with the
@@ -110,10 +135,13 @@ E	there is code (in imdying()) that attempts to save unwritten buffers
 
 E	:e and :n should be able to deal with multiple filenames resulting
 	from filename globbing.  vi has this problem too.  At least
-	vile lets you choose to choose the first such name.
+	vile lets you choose to choose the first such name.  if should show
+	you the first name, so you know whether to accept it or not.
 
-E	^W should erase word in input mode
-E	killc should erase line in input mode
+E	^W should erase word in input mode, and killc should erase line 
+	in input mode.  (but only back to where the input started, if it
+	started on this line.  right now we have no record of that, hence
+	you can backspace past the insert point)
 
-E	All code should pass lint.  This won't be easy...
+E	All code should pass lint.  This won't be easy... :-)
 	

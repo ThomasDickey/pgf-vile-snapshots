@@ -160,7 +160,7 @@ pressreturn()
         mlputs("[Press return to continue]");
         TTflush();
 	/* loop for a CR, a space, or a : to do another named command */
-        while ((s = kbd_key()) != '\r' && s != ' ') {
+        while ((s = kbd_key()) != '\r' && s != ' ' && s != kcod2key(abortc)) {
 		extern CMDFUNC f_namedcmd;
                 if (kcod2fnc(s) == &f_namedcmd) {
 			tungetc(kcod2key(s));
@@ -191,6 +191,7 @@ spawn(f, n, rerun)
 	char		line2[NLINE];
 	int cb;
 	char prompt[50];
+	char *getenv();
 
 	if (!rerun) {
 		if (cb = anycb())
@@ -373,7 +374,7 @@ pipecmd(f, n)
 {
 	register WINDOW *wp;	/* pointer to new window */
 	register BUFFER *bp;	/* pointer to buffer to zot */
-        static char oline[NLINE] = 0;	/* command line send to shell */
+        static char oline[NLINE];	/* command line send to shell */
         register int    s;
 	static char bname[] = "[Output]";
 	int cb;
@@ -423,7 +424,7 @@ pipecmd(f, n)
         register int    s;	/* return status from CLI */
 	register WINDOW *wp;	/* pointer to new window */
 	register BUFFER *bp;	/* pointer to buffer to zot */
-        static char oline[NLINE] = 0;	/* command line send to shell */
+        static char oline[NLINE];	/* command line send to shell */
         char	line[NLINE];	/* command line send to shell */
 	static char bname[] = "[output]";
 	WINDOW *ocurwp;		/* save the current window during delete */
@@ -542,14 +543,63 @@ pipecmd(f, n)
 }
 #endif /* UNIX */
 
+/* run a region through an external filter, replace it with its output */
+filterregion(f,n)
+{
+        static char oline[NLINE];	/* command line send to shell */
+        char	line[NLINE];	/* command line send to shell */
+	FILE *fr, *fw;
+	int s;
+
+	/* get the filter name and its args */
+        if ((s=mlreply("!", oline, NLINE)) != TRUE)
+                return(s);
+	strcpy(line,oline);
+	if ((s = inout_popen(&fr, &fw, line)) != TRUE) {
+		mlwrite("Couldn't open pipe or command");
+		return s;
+	}
+
+	killregion(f,n);
+	if (fork()) {
+		fclose(fw);
+		/* backline(FALSE,1); */
+		curwp->w_dotp = lback(curwp->w_dotp);
+		s = ifile(NULL,TRUE,fr);
+		npclose(fr);
+		firstnonwhite();
+		setmark();
+		return s;
+	} else {
+		KILL *kp;		/* pointer into kill register */
+		kregcirculate(FALSE);
+		/* make sure there is something to put */
+		if (kbs[ukb].kbufh == NULL)
+			return TRUE;		/* not an error, just nothing */
+
+		kp = kbs[ukb].kbufh;
+		while (kp != NULL) {
+			if (kp->d_next == NULL)
+				fwrite(kp->d_chunk, 1, kbs[ukb].kused, fw);
+			else
+				fwrite(kp->d_chunk, 1, KBLOCK, fw);
+			kp = kp->d_next;
+		}
+		fflush(fw);
+		fclose(fw);
+		exit (0);
+	}
+}
+
 /*
  * filter a buffer through an external DOS program
+ * this is obsolete, the filterregion code is better.
  */
 filter(f, n)
 {
         register int    s;	/* return status from CLI */
 	register BUFFER *bp;	/* pointer to buffer to zot */
-        static char oline[NLINE] = 0;	/* command line send to shell */
+        static char oline[NLINE];	/* command line send to shell */
         char	line[NLINE];	/* command line send to shell */
 	char tmpnam[NFILEN];	/* place to store real file name */
 	static char bname1[] = "fltinp";
@@ -620,7 +670,7 @@ filter(f, n)
 #endif
 
 	/* on failure, escape gracefully */
-	if (s != TRUE || (readin(filnam2,FALSE,curbp,TRUE,NULL) == FALSE)) {
+	if (s != TRUE || (readin(filnam2,FALSE,curbp,TRUE) == FALSE)) {
 		mlwrite("[Execution failed]");
 		strcpy(bp->b_fname, tmpnam);
 		unlink(filnam1);

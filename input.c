@@ -63,11 +63,14 @@ char *buf;
 }
 
 /*	kcod2key:	translate 10-bit keycode to single key value */
+/* probably defined as a macro in estruct.h */
+#ifndef kcod2key
 kcod2key(c)
 int c;
 {
 	return c & 0x7f;
 }
+#endif
 
 
 /* the numbered buffer names increment each time they are referenced */
@@ -243,14 +246,6 @@ kbd_key()
 	}
 #endif
 
-#if  TERMCAP & are_you_sure
-	/* Apply SPEC prefix    */
-	if (c == '#' && !lineinput && !insertmode && !isnamedcmd) {
-	        c = tgetc();
-		return(last1key = SPEC | c);
-	}
-#endif
-
         return (last1key = c);
 }
 
@@ -266,22 +261,18 @@ kbd_seq()
 	/* get initial character */
 	c = kbd_key();
 
-	/* process META prefix */
-	if (c == metac) {
+	/* process CTLA prefix */
+	if (c == cntl_a) {
 		c = kbd_key();
+#if BEFORE
 	        if (islower(c))		/* Force to upper */
         	        c = toupper(c);
-#if	0	/* temporary ESC sequence fix......... */
-		if (c == '[') {
-			c = kbd_key();
-			return (lastcmd = SPEC | c);
-		}
 #endif
-		return (lastcmd = META | c);
+		return (lastcmd = CTLA | c);
 	}
 
 	/* process CTLX prefix */
-	if (c == ctlxc) {
+	if (c == cntl_x) {
 		c = kbd_key();
 		return (lastcmd = CTLX | c);
 	}
@@ -297,7 +288,8 @@ char *buf;
 	register int s = TRUE;
 
 	setmark();
-	while (s == TRUE && i < bufn) {
+	while (s == TRUE && i < bufn && 
+			curwp->w_doto != llength(curwp->w_dotp)) {
 		buf[i] = lgetc(curwp->w_dotp, curwp->w_doto);
 		if (!istype(inclchartype, buf[i]))
 			break;
@@ -365,7 +357,9 @@ int eolchar;
 		/* don't allow newlines in the string -- they cause real
 			problems, especially when searching for patterns
 			containing them -pgf */
-		if (c == '\n' || (c == eolchar && quotef == FALSE))
+		/* never a newline, and only eolchar if ^V or \ precedes it */
+		if (c == '\n' || (c == eolchar && 
+			quotef == FALSE && cpos > 0 && buf[cpos-1] != '\\'))
 		{
 			if (buf[cpos] != '\0')
 				buf[cpos++] = 0;
@@ -385,9 +379,7 @@ int eolchar;
 		c = kcod2key(c);
 		
 		if (c == kcod2key(abortc) && quotef == FALSE) {
-			/* Abort the input? */
-			if (buf[cpos] != '\0')
-				buf[cpos] = 0;
+			buf[cpos] = 0;
 			esc(FALSE, 0);
 			TTflush();
 			lineinput = FALSE;
@@ -425,7 +417,7 @@ int eolchar;
 			}
 			TTflush();
 
-		} else if (expand == EXPAND && (c == '%' || c == '#')) {
+		} else if (expand == EXPAND) {
 			/* we prefer to expand to filenames, but a buffer name
 				will do */
 			char *cp = NULL;
@@ -434,11 +426,13 @@ int eolchar;
 				tungetc(c);
 				goto killit;
 			}
-			if (c == '%') {
+			switch(c) {
+			case '%':
 				cp = curbp->b_fname;
 				if (!*cp || isspace(*cp))
 					cp = curbp->b_bname;
-			} else if (c == '#') {
+				break;
+			case '#':
 				cp = hist_lookup(1);  /* returns buffer name */
 				if (cp) {
 					/* but we want a file */
@@ -450,6 +444,17 @@ int eolchar;
 						cp = bp->b_bname;
 					}
 				}
+				break;
+			/* case tocntrl('W'): */
+			case ':':
+				{
+				char str[80];
+			 	if (screen_string(str, 80, _path))
+					cp = str;
+				break;
+				}
+			default:
+				goto trymore;
 			}
 			
 			if (!cp) {
@@ -468,28 +473,31 @@ int eolchar;
 				++ttcol;
 			}
 			TTflush();
-		} else if (c == kcod2key(quotec) && quotef == FALSE) {
-			quotef = TRUE;
 		} else {
-			quotef = FALSE;
-			if (firstchar == TRUE) {
-				tungetc(c);
-				goto killit;
-			}
-			if (cpos < bufn-1) {
-				buf[cpos++] = c;
-
-				if (!isprint(c)) {
-					outstring("^");
-					++ttcol;
-					c = toalpha(c);
+		trymore:
+			if (c == kcod2key(quotec) && quotef == FALSE) {
+				quotef = TRUE;
+			} else {
+				quotef = FALSE;
+				if (firstchar == TRUE) {
+					tungetc(c);
+					goto killit;
 				}
+				if (cpos < bufn-1) {
+					buf[cpos++] = c;
 
-				if (disinp)
-					TTputc(c);
+					if (!isprint(c)) {
+						outstring("^");
+						++ttcol;
+						c = toalpha(c);
+					}
 
-				++ttcol;
-				TTflush();
+					if (disinp)
+						TTputc(c);
+
+					++ttcol;
+					TTflush();
+				}
 			}
 		}
 		firstchar = FALSE;

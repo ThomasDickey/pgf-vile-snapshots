@@ -1,3 +1,4 @@
+/* vile note, 6/1/91, pgf -- I haven't tried this code in a long time */
 /*
  * The functions in this file implement commands that perform incremental
  * searches in the forward and backward directions.  This "ISearch" command
@@ -19,13 +20,14 @@
  *	  it ever equalled FALSE.
  */
 
+
 #include        <stdio.h>
 #include	"estruct.h"
 #include        "edef.h"
 
 #if	ISRCH
 
-extern int scanner();			/* Handy search routine */
+extern int thescanner();		/* Handy search routine */
 extern int eq();			/* Compare chars, match case */
 
 /* A couple of "own" variables for re-eat */
@@ -145,7 +147,6 @@ isearch(f, n)
     int			col;		/* prompt column */
     register int	cpos;		/* character number in search string  */
     register int	c;		/* current input character */
-    register int	expc;		/* function expanded input char	      */
     char		pat_save[NPAT];	/* Saved copy of the old pattern str  */
     LINE		*curline;	/* Current line on entry	      */
     int			curoff;		/* Current offset on entry	      */
@@ -160,6 +161,7 @@ isearch(f, n)
     curline = curwp->w_dotp;		/* Save the current line pointer      */
     curoff  = curwp->w_doto;		/* Save the current offset	      */
     init_direction = n;			/* Save the initial search direction  */
+    setboundry(FALSE,NULL,0,0);		/* keep thescanner() finite */
 
     /* This is a good place to start a re-execution: */
 
@@ -176,10 +178,9 @@ start_over:
        or Control-R, re-use the old search string and find the first occurrence
      */
 
-    c = kcod2key(expc = get_char());		/* Get the first character    */
+    c = kcod2key(get_char());			/* Get the first character    */
     if ((c == IS_FORWARD) ||
-        (c == IS_REVERSE) ||
-        (c == IS_VMSFORW))			/* Reuse old search string?   */
+        (c == IS_REVERSE))			/* Reuse old search string?   */
     {
     	for (cpos = 0; pat[cpos] != 0; cpos++)	/* Yup, find the length	      */
     	    col = echochar(pat[cpos],col);	/*  and re-echo the string    */
@@ -189,7 +190,7 @@ start_over:
 	} else
 	    n = 1;				/* Yes, search forward	      */
 	status = scanmore(pat, n);		/* Do the search	      */
-	c = kcod2key(expc = get_char());		/* Get another character      */
+	c = kcod2key(get_char());		/* Get another character      */
     }
 
     /* Top of the per character loop */
@@ -199,40 +200,36 @@ start_over:
 	/* Check for special characters first: */
 	/* Most cases here change the search */
 
-	if (expc == abortc)			/* Want to quit searching?    */
+	if (c == kcod2key(abortc))			/* Want to quit searching?    */
 	    return (TRUE);			/* Quit searching now	      */
 
-	if (c == backspc) c = IS_RUBOUT;
+	if (isbackspace(c))
+		 c = '\b';
+
+	if (c == kcod2key(quotec))			/* quote character?	      */
+	    c = kcod2key(get_char());		/* Get the next char	      */
+
 	switch (c)				/* dispatch on the input char */
 	{
-	  case IS_ABORT:			/* If abort search request    */
-	    return(FALSE);			/* Quit searching again	      */
-
 	  case IS_REVERSE:			/* If backward search	      */
 	  case IS_FORWARD:			/* If forward search	      */
-	  case IS_VMSFORW:			/*  of either flavor	      */
 	    if (c == IS_REVERSE)		/* If reverse search	      */
 		n = -1;				/* Set the reverse direction  */
 	    else				/* Otherwise, 		      */
 		n = 1;				/*  go forward		      */
 	    status = scanmore(pat, n);		/* Start the search again     */
-	    c = kcod2key(expc = get_char());	/* Get the next char	      */
+	    c = kcod2key(get_char());		/* Get the next char	      */
 	    continue;				/* Go continue with the search*/
 
-	  case IS_NEWLINE:			/* Carriage return	      */
+	  case '\r':				/* Carriage return	      */
 	    c = '\n';				/* Make it a new line	      */
 	    break;				/* Make sure we use it	      */
 
-	  case IS_QUOTE:			/* Quote character	      */
-	  case IS_VMSQUOTE:			/*  of either variety	      */
-	    c = kcod2key(expc = get_char());	/* Get the next char	      */
-
-	  case IS_TAB:				/* Generically allowed	      */
+	  case '\t':				/* Generically allowed	      */
 	  case '\n':				/*  controlled characters     */
 	    break;				/* Make sure we use it	      */
 
-	  case IS_BACKSP:			/* If a backspace:            */
-	  case IS_RUBOUT:			/*  or if a Rubout:	      */
+	  case '\b':				/*  or if a Rubout:	      */
 	    if (cmd_offset <= 1)		/* Anything to delete?	      */
 		return (TRUE);			/* No, just exit	      */
 	    --cmd_offset;			/* Back up over the Rubout    */
@@ -265,12 +262,12 @@ start_over:
 	pat[cpos] = 0;				/* null terminate the buffer  */
 	col = echochar(c,col);			/* Echo the character	      */
 	if (!status) {				/* If we lost last time	      */
-	    TTputc(BELL);		/* Feep again		      */
-	    TTflush();			/* see that the feep feeps    */
+	    TTbeep();				/* Feep again		      */
+	    TTflush();				/* see that the feep feeps    */
 	} else					/* Otherwise, we must have won*/
 	    if (!(status = checknext(c, pat, n))) /* See if match	      */
 		status = scanmore(pat, n);	/*  or find the next match    */
-	c = kcod2key(expc = get_char());		/* Get the next char	      */
+	c = kcod2key(get_char());		/* Get the next char	      */
     } /* for {;;} */
 }
 
@@ -342,14 +339,14 @@ int	dir;			/* direction to search			      */
     	if (dir < 0)				/* reverse search?	      */
     	{
 		rvstrcpy(tap, patrn);		/* Put reversed string in tap */
-		sts = scanner(tap, REVERSE, PTBEG, FALSE);
+		sts = thescanner(tap, REVERSE, PTBEG, FALSE);
 	}
 	else 	/* Nope. Go forward   */
-		sts = scanner(patrn, FORWARD, PTEND, FALSE);
+		sts = thescanner(patrn, FORWARD, PTEND, FALSE);
 
 	if (!sts)
 	{
-		TTputc(BELL);	/* Feep if search fails       */
+		TTbeep();		/* Feep if search fails       */
 		TTflush();		/* see that the feep feeps    */
 	}
 
@@ -424,26 +421,15 @@ int	c;	/* character to be echoed */
 int	col;	/* column to be echoed in */
 {
     movecursor(term.t_nrow,col);		/* Position the cursor	      */
-    if (iscntrl(c))				/* Control character?	      */
-    {
-	switch (c)				/* Yes, dispatch special cases*/
-	{
-
-	  case IS_RUBOUT:				/* Rubout:		      */
-	    TTputc('^');		/* Output a funny looking     */
-	    TTputc('?');		/*  indication of Rubout      */
-	    col++;				/* Count the extra char       */
-	    break;
-
-	  default:				/* Vanilla control char       */
-	    TTputc('^');		/* Yes, output prefix	      */
-    	    TTputc(c+0x40);		/* Make it "^X"		      */
-	    col++;				/* Count this char	      */
-	}
-    } else
+    if (!isprint(c)) {	 		/* control char			*/
+	TTputc('^');		/* Yes, output prefix	      */
+	TTputc(toalpha(c));		/* Make it "^X"		      */
+	col++;			/* Count this char	      */
+    } else {
 	TTputc(c);			/* Otherwise, output raw char */
+    }
     TTflush();				/* Flush the output	      */
-    return(++col);				/* return the new column no   */
+    return(++col);			/* return the new column no   */
 }
 
 /*

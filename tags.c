@@ -44,6 +44,8 @@ char *tag;
 	char tagpat[NPAT];
 	int lineno;
 	int changedfile;
+	LINE *odotp;
+	int odoto;
 	LINE *cheap_scan();
 
 	strcpy(tname,tag);
@@ -94,10 +96,10 @@ char *tag;
 		mlwrite("[Tag \"%s\" in current buffer]", tname);
 		changedfile = FALSE;
 	}
-	/* it's an absolute move */
-	curwp->w_ldmkp = curwp->w_dotp;
-	curwp->w_ldmko = curwp->w_doto;
 
+	/* it's an absolute move -- remember where we are */
+	odotp  = curwp->w_dotp;
+	odoto  = curwp->w_doto;
 
 	i = 0;
 	tfp++;  /* skip the tab */
@@ -110,7 +112,6 @@ char *tag;
 		s = gotoline(TRUE,lineno);
 		if (s != TRUE && !changedfile)
 			tossuntag();
-		return s;
 	} else {
 		tfp += 2; /* skip the "/^" */
 		lplim -= 2; /* skip the "$/" */
@@ -130,8 +131,14 @@ char *tag;
 		curwp->w_dotp = lp;
 		curwp->w_flag |= WFMOVE;
 		firstnonwhite(FALSE,1);
-		return TRUE;
+		s = TRUE;
 	}
+	/* if we moved, update the "last dot" mark */
+	if (s == TRUE && curwp->w_dotp != odotp) {
+		curwp->w_ldmkp = odotp;
+		curwp->w_ldmko = odoto;
+	}
+	return s;
 	
 }
 
@@ -158,7 +165,7 @@ gettagsfile()
 	                return(FALSE);
 	        }
 
-		if ((s = readin(tagsfile, FALSE, tagbp, FALSE, NULL)) != TRUE) {
+		if ((s = readin(tagsfile, FALSE, tagbp, FALSE)) != TRUE) {
 			return(s);
 		}
 		tagbp->b_flag |= BFINVS;

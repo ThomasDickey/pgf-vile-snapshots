@@ -64,26 +64,6 @@ Buffer manipulation commands:
 			:e#
 			^^   (ctrl-^)  (but many keyboards can't produce this)
 
-	*	Display a list of all buffers, or make that display go away
-		if it's already present.  Leave your finger on the key, and
-		it's easy to create and destroy the list.  The buffers are
-		numbered; the numbers correspond to the history numbers
-		shown and used by the '_' command, described above.  (If
-		the buffer number is greater than 9, then the "nn_" form of
-		the '_' command must be used, since '_' will only accept a
-		single following digit.)  Note that since the buffer names
-		are displayed in order of use, the list can quickly grow
-		"stale" -- the numbers may be meaningless if buffer
-		switching has been done since the last display of the list. 
-
-		The program version is also displayed with this command.
-
-	^A-*	Always display a list of all buffers.  Useful for updating the
-		list if it's already on the screen but may be out of date.
-		Any argument will cause the list to include _all_ buffers,
-		even those normally considered "invisible".  (For example,
-		macros are stored in "invisible" buffers.)
-
 	:e	Edit a file.  If the file is already in a buffer, that buffer
 		will be recalled into the current window.
 
@@ -106,23 +86,46 @@ Buffer manipulation commands:
 	:b	Edit a buffer.  Recalls the named buffer.  Does not look for
 		a file of that name.  Will find "invisible" buffers.
 
-	:k	Kill a buffer.  Remove the buffer and its contents from the
+	:ki	Kill a buffer.  Remove the buffer and its contents from the
 		editor.  Will ask if changes to the buffer should be discarded.
 		Currently, a buffer that is being displayed cannot be killed.
 		
+	*	Display a list of all buffers, or make that display go away
+		if it's already present.  Leave your finger on the key, and
+		it's easy to create and destroy the list.  The buffers are
+		numbered; the numbers correspond to the history numbers
+		shown and used by the '_' command, described above.  (If
+		the buffer number is greater than 9, then the "nn_" form of
+		the '_' command must be used, since '_' will only accept a
+		single following digit.)  Note that since the buffer names
+		are displayed in order of use, the list can quickly grow
+		"stale" -- the numbers may be meaningless if buffer
+		switching has been done since the last display of the list. 
+
+		The program version is also displayed with this command.
+
+	^A-*	Always display a list of all buffers.  Useful for updating the
+		list if it's already on the screen but may be out of date.
+		Any argument will cause the list to include _all_ buffers,
+		even those normally considered "invisible".  (For example,
+		macros are stored in "invisible" buffers.)
+
 Window manipulation commands:  
 -----------------------------
 	^T	Make Two windows.  Splits the current window in half. This
 		is the usual way to create a new window.
-		The emacs-style commands ^X-0, ^X-1, and ^X-2 are also 
-		included.
 	^K	Get rid of (Kill) this window.
 	^O	Make this the Only window on the screen.
 
+		The emacs-style commands ^X-2, ^X-0, and ^X-1 are also 
+		included, and are synonymous with ^T, ^K, and ^O.
+
 	^N	Go to the next window on the screen.
 	^P	Go to the previous window on the screen.
+
 		These two commands may be disturbing to vi users who use
-		^N and ^P to move between lines.
+		^N and ^P to move between lines.  See the examples under
+		Key Rebinding for how to fix this.
 
 	v	Make the current window smaller.
 	V	Make the current window larger.
@@ -138,16 +141,28 @@ Window manipulation commands:
 		position the line holding the cursor at the top, middle, or
 		bottom of the screen, respectively.
 
+	^X-^R	Scroll the window right by 1/3 of a screen, or by the
+		number of lines specifed.
+	^X-^L	Scroll the window left by 1/3 of a screen, or by the
+		number of lines specifed.
+
+	If for some reason you can't get your screen set right via a
+	TERM variable, try the ":screen-rows" or ":screen-columns"
+	commands (which take their args (number of rows or columns
+	respectively) before you type the ":").
+
 File manipulation commands:  
 ---------------------------
 	The usual :e, :r, :f, :w commands are available, though only
 	":e!" is available of the "!" options.  The :r command reads the
 	named file in after the current line.  To read a file before the
-	first line, one would use ":0r" in real vi, but the vile command parser
-	doesn't accept this -- so use :R" instead.
+	first line, use ":0r".
 	
-	No line numbers or marks may precede these commands, so two 
-	non-"colon" commands have been added:
+	As in vi, ranges of lines specified by line numbers (including '.',
+	'$', and '%' shorthands) or marks may precede these commands.  
+	Unlike vi, search patterns cannot be used as line specifiers.
+
+	In addition, two non-"colon" commands have been added:
 
 	^R	Prompts for a filename, and then reads it in _above_ the
 		current line.  If a register is specified (e.g. "a^R ), 
@@ -173,6 +188,8 @@ Shell Access
 
 	The ": !cmd" shell escape works pretty much as it does in vi.
 	The command ":!!" will rerun the previous such shell command.
+
+	The '!' operator works as expected.
 	
 	In addition, the ^X-! command runs a shell command and captures
 	its output in a specific buffer, called "[Output]".  This is
@@ -193,7 +210,9 @@ Text manipulation command:
 	They should be a little less capricious than their
 	vi counterparts, since they do not share the default yank register
 	for their operation.  Also, line-undo ("U") is available until
-	the next change to the file, rather than until you leave the line.
+	the next change anywhere in the file, rather than until you leave
+	the line.  Unfortunately, the cursor position after an undo may not 
+	always be the same as it would be in vi.
 
 	The vi "global" command is present, in its non-interactive form
 	only.  So is the "substitute" command.  These both look pretty
@@ -203,14 +222,17 @@ Text manipulation command:
 	complete command.  You can type commands just as you would have
 	in vi, i.e. ":g/oldpat/s//newstring/" will work.  But you won't
 	see any of the '/' characters.  Try it-- you'll get the idea.
+	Line ranges are not possible on ":g", but they are on ":s".
+
+	The ":v" counterpart to ":g" is not implemented.
 
 	The ":g" command can be followed by any of l (list), p (print),
-	< (left shift), > (right shift), r (read file), j (join lines),
-	d (delete), L (lower case), U (upper case), ~ (flip case), put
-	(append yanked text), Put (prepend yanked text), s (substitute),
+	< (left shift), > (right shift), r (read file), d (delete),
+	L (lower case), U (upper case), ~ (flip case), put (append
+	yanked text), Put (prepend yanked text), s (substitute),
 	t (trim trailing whitespace).  For example, ":g/pattern/Put"
-	will insert the contents of the default yank register just above
-	every line containing "pattern". 
+	will insert the contents of the default yank register just
+	above every line containing "pattern". 
 
 	Operators
 	---------
@@ -222,7 +244,7 @@ Text manipulation command:
 	the word motion command ('w'), causing the next word to be
 	deleted.  The sequence "dG" will delete through the end of the
 	file, and "d/junk" will delete to the next occurence of the
-	string "junk".  Operators can all be stuttered to affect
+	string "junk".  Operators can all be "stuttered" to affect
 	lines.  Thus "dd" deletes one line, "4dd" affects 4 lines,
 	etc. 
 
@@ -231,7 +253,11 @@ Text manipulation command:
 	form of the command.  For example, "d%" (assuming you are on a
 	curly brace) will delete a C-style block of code.  "^X-d%"
 	will delete that same area, plus anything else on the lines
-	containing the curly- brace endpoints. 
+	containing the curly- brace endpoints.
+
+	Note that some operators always affect whole lines, no matter
+	how the motion is specified.  For instance, "!w" will always
+	filter an entire line, and not just a single word. 
 
 	There are several new operator commands:
 
@@ -248,7 +274,9 @@ Text manipulation command:
                 get the second line's indentation.  This makes indented/
 		outdented paragraphs work correctly.  The usual use of
                 this command is "^A-f}", which does it to the current
-                paragraph. 
+                paragraph.  (This is intentionally _not_ the same bevavior
+		obtained by "!fmt", since that behavior is obviously 
+		available elsewhere.)
 
 	^X-d	Delete the region, including the lines it starts and ends on.
 	^X-c	Change the region, including the lines it starts and ends on.
@@ -271,12 +299,17 @@ Text manipulation command:
 		cursor.
 	^X-?	Does a reverse search for the "word" located under the
 		cursor.
+	^A-/	Does not do a search, but sets the search pattern to the
+		"word" under the cursor.  Useful for "picking up" a word
+		from one buffer, and searching for it in another.
 
-	The following  two commands may not always be present in vile:
-	^X-s	Incremental forward searching.  As you enter the search 
+	The following two commands may not always be present in vile,
+		depeinding on how it was built:
+	^X-S	Incremental forward searching.  As you enter the search 
 		string, the cursor is advanced to the next match with 
-		what you've typed so far.
-	^X-r	As above, but in reverse.
+		what you've typed so far.  Use ^F and ^R to continue the
+		search forward or in reverse, using the current pattern.
+	^X-R	As above, but in reverse.
 
 	Tags
 	----
@@ -300,6 +333,8 @@ Text manipulation command:
 
 	"Advanced" editing
 	------------------
+	[ Eventually, these will be rewritten to become "operators", similar to
+	those described above. ]
 	^A-<SPACE>	Convert tabs to spaces on the current line. An argument
 		tells how many lines.
 	^A-<TAB>	Convert as many spaces to tabs as possible on the 
@@ -323,10 +358,6 @@ Miscellaneous commands
 		insert.  The default value is 7/8's of the screen size, with
 		a maximum of 70.  Since arguments come before commands, you
 		type: 65^X-f.  The "set fillcol" command does the same thing.
-	^X-(	Begin recording a keyboard macro.  The keystrokes you then type
-		are remembered until you use ^X-).
-	^X-)	Finish recording a keyboard macro.
-	^X-e or &	Execute a keyboard macro.
 	^X-x	Set encryption key. (not well tested, but hopefully not broken)
 		The CRYPT mode must be set for this to do anything.
 	K	Count prefix.  The first time you type it, it is equivalent
@@ -336,14 +367,17 @@ Miscellaneous commands
 Editor modes
 ------------
 	Modes are associated with buffers, and are inherited from a set of
-	global modes.  To set a mode on a buffer, use ":set", to remove
-	the mode, use ":unset" or ":setno" (the latter is more similar to vi.
-	To set and reset global modes, use ":setg", ":unsetg", ":setgno".
-	To display modes, use ":setall", ":modes", or ":setgall", ":gmodes".
-	The possible modes are:
+	global modes.  To set a mode on a buffer, use ":set", to remove the
+	mode, use ":unset", ":setno", or ":set" with the modename prefixed
+	with "no".  To set and reset global modes, use ":setg", ":unsetg",
+	":setgno".  To display modes, use ":setall", ":modes", or
+	":setgall", ":gmodes".  (The modename "all" is also accepted as a
+	dummy mode, which sets nothing, but display instead.  So vi's "set all"
+	works as well.)  The possible modes are:
 
 	wrap	similar to vi's auto-wrap mode.  While inserting, words are
 		moved to the next line if the current line gets too long.
+		Unlike vi, wrapping is only attempted when a space is typed.
 
 	cmode	C-code mode..  Maintains current indentation level
 		automatically during insert.  If a line ends with a '{',
@@ -352,7 +386,8 @@ Editor modes
 		line starts with '#' it is started at the beginning of
 		line.  If the global CMODE is set, then the buffer's mode
 		is turned on automatically only for files ending in ".c" or
-		".h". 
+		".h".  A common mistake is to put "set cmode" in a .vilerc
+		file.  One almost always wants "setg cmode".
 
 	swrap	Scanwrap mode.  Text searches will continue from past the
 		bottom of the file to the top, and vice-versa.
@@ -390,12 +425,16 @@ Editor modes
 		DOS mode is _not_ set, then incoming CR characters will be
 		visible on the screen. 
 
+	aindent Similar to C mode, above, but works for any buffer, and is
+		not sensitive to {, }, or #.  Attempts to align new lines
+		of text with previous lines.
+
 	lazy	If an attempt is made to edit a file (with ":e filename")
 		which does not exist in the current directory, vile will
 		try looking for a file of the same name (but in a different
 		directory) which has been referenced in the tags file. 
 		This mode is global to the editor, and is not "inherited"
-		by buffers. It's not very fast, either.
+		by buffers.  It's not very fast, either.
 
 	tabstop Will prompt for a new value for spacing of tabstops.  The
 		only supported values are 2, 4, 8, and 16.  This value is,
@@ -406,17 +445,85 @@ Editor modes
 		value is, unfortunately, not settable on a per-buffer
 		basis. 
 
+Special Character Expansion
+---------------------------
+
+	As in vi, the % and # characters typed while responding to a prompt
+	will expand to the current or "alternate" filename.  In addition,
+	the colon character (":") expands to the identifier name under the
+	cursor.  Expansion of ! to the last command run is not implemented.
+
+Key Rebinding
+-------------
+
+	The vi "map", "map!", and "abbr" commands are not currently supported.
+
+	There is a key rebinding facility (if vile is built to include it),
+	which is invoked as follows.  One must know the "english" name for the
+	command being rebound.  Use ":describe-bindings" or ":apropos string"
+	to find englishnames containing "string".  Then use the command:
+		":bind-key englishname keyseq"
+	where keyseq is the exact keyboard sequence (i.e. single character,
+	or ^X or ^A followed by a single character) to which the
+	command should be bound.  In a ".vilerc" file, keyseq should be the
+	printable representation of the sequence, e.g. M-a or ^X-S.
+
+	Examples:
+	 To cause the / and ? commands to perform incremental
+	  searches, use:
+		bind-key incremental-search /
+		bind-key reverse-incremental-search ?
+	 To change the default window-switching behavior of ^N and ^P, try
+		bind-key next-line ^N
+		bind-key previous-line ^P
+	 To cause the space bar to move forward by pages, as in them "more"
+	  command, use:
+		bind-key next-page <sp>
+
+	(Space and tab can be represented with the strings: "<sp>" and 
+	"<tab>".)  The englishname "rebind-key" is synonymous with "bind-key".
+
+	Note that even the ^A and ^X prefix characters can be rebound, using
+	the dummy functions "cntl_a-prefix" and "cntl_x-prefix".  Even
+	if they are rebound, however, the binding list and bind-key
+	commands will refer to them as ^A and ^X.
+
+Macros
+------
+
+	The first type of macro in vile, is for temporary, quick macro
+	usage, and lets you record a macro as you execute vile commands.
+	You can then replay those keystrokes with a single key. 
+
+	^X-(	Begin recording a keyboard macro.  The keystrokes you type
+		are recorded, until you use ^X-).
+	^X-)	Finish recording a keyboard macro.
+	^X-&	Execute the keyboard macro.
+
+	Vile can also be extended (though I confess this has only been
+	lightly used or tested) by defining macros and then binding
+	execution of those macros to key sequences.  For example, if
+	the following lines appear in a .vilerc file:
+
+		1 store-macro
+		5 delete-til next-word
+		endm
+
+		bind-key execute-macro-1 M-1
+
+	then when M-1 is executed, 5 words will be deleted.  The "-til"
+	suffix on an englishname denotes that it is a vi operator style
+	command, and expects to be followed by a motion command.
+
 Differences
 ------------
 	Of course, this really isn't vi.  Some of the following differences
 	deserve changing, others do not.
 
-	Currently, the parser for the ':' commands is not very vi-like.
-	For instance, ":e" will prompt you for a file name.
-	Most commands remember their last argument, and will present it 
-	as the default reply to their prompt.
-
-	The '!' operator, for running a region through a filter, is missing.
+	The parser for the ':' commands is not very vi-like.  For instance,
+	":e" will prompt you for a file name.  Most commands remember their
+	last argument, and will present it as the default reply to their
+	prompt. 
 
 	The backspace, line kill, job control, etc. characters are not
 	taken from the terminal settings on startup, but are hard-coded.
@@ -432,10 +539,7 @@ Differences
 	'#' and '%' are recognized and expanded to the previous or current
 	filename.  Other punctuation (e.g.  '~') may be expanded by your
 	shell (sh, csh), since it is handed filenames for expansion if they
-	contain punctuation characters other than '.', '/', or '_'. 
-
-	No line ranges are available to ":" commands.  This is partially
-	alleviated by the new ^R and ^W commands.  (See above.)
+	contain any of these characters: * ? ~ [ ] $ { }
 
 	Paragraph and section boundaries, for the {, }, [, and ] commands
 	are not configurable, and do not exactly match those in vi.  The
@@ -445,7 +549,7 @@ Differences
 	I think these will find more boundaries than vi, rather than fewer.
 
 	There is no special lisp support.  But then, when was the last time
-	you heard of a lisp programmer used vi?
+	you heard of a lisp programmer that used vi?
 
 	Of course, ex and open mode aren't there.
 
@@ -456,17 +560,20 @@ Differences
 	missing.
 
 	Most, but not all, of the word-motion-with-operator and end-of-line 
-	anomalies have been recreated.  For example, "dw" on the last word 
-	of a line followed by whitespace deletes the trailing whitespace, 
-	unlike vi, which does not.
+	anomalies have been recreated.  One missing anomaly: In vile, "dw"
+	on the last word of a line ending in whitespace deletes the
+	trailing whitespace.  Vi does not delete the whitespace. 
 
 Credits
 -------
 	This code has been written by a _lot_ of people.  Names appearing
-	within comments in the micro-Emacs source code are: Dave Conroy,
-	Daniel Lawrence, John Gamble, Roger Ove, Dana Hoggatt, Jon Reid, Steve
-	Wilhite, George Jones, Adam Fritz, D.R.Banks, Bob McNamara.  The
-	changes to create vile from micro-Emacs were all done by Paul Fox,
-	who can be reached at pgf@cayman.com.
+	within comments in the micro-Emacs source code are: Dave
+	Conroy, Daniel Lawrence, John Gamble, Roger Ove, Dana Hoggatt,
+	Jon Reid, Steve Wilhite, George Jones, Adam Fritz, D.R.Banks,
+	Bob McNamara.  In addition, some of the "ex" code is by Steve
+	Kirkendall, author of the vi clone called "elvis".  The
+	changes to create vile from micro-Emacs were all done by Paul
+	Fox, who can be reached at pgf@cayman.com.   (By the way, this is
+	not the same Paul Fox who did the Crisp editor.)
 
 

@@ -217,7 +217,6 @@ ansibeep()
 */
 
 #define SCROLL_REG 1
-#define PRETTIER_SCROLL 1
 
 /* move howmany lines starting at from to to */
 ansiscroll(from,to,howmany)

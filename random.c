@@ -9,12 +9,12 @@
 
 showgmodes(f,n)
 {
-	showm(TRUE);
+	return showm(TRUE);
 }
 
 showmodes(f,n)
 {
-	showm(FALSE);
+	return showm(FALSE);
 }
 
 showm(g)
@@ -38,6 +38,7 @@ showm(g)
 		mlwrite("No modes set");
 	else
 		mlwrite(modes);
+	return TRUE;
 }
 
 /*
@@ -114,7 +115,22 @@ showcpos(f, n)
 "Line %d of %d, Col %d of %d, Char %D of %D (%d%%) char is 0x%x",
 		predlines+1, numlines, col+1, ecol,
 		predchars+1, numchars, ratio, curchar);
-        return (TRUE);
+        return TRUE;
+}
+
+showlength(f,n)
+{
+        register LINE   *lp;		/* current line */
+        register int	numlines = 0;	/* # of lines in file */
+
+	/* starting at the beginning of the buffer */
+        lp = lforw(curbp->b_linep);
+        while (lp != curbp->b_linep) {
+		++numlines;
+		lp = lforw(lp);
+        }
+	mlwrite("%d",numlines);
+	return TRUE;
 }
 
 #if ! SMALLER
@@ -613,19 +629,19 @@ ins(f,n)
 		return (TRUE);
 	}
 
-        /*
-         * If a space was typed, fill column is defined, the argument is non-
-         * negative, wrap mode is enabled, and we are now past fill column,
-	 * perform word wrap.
-         */
-        if (c == ' ' && (curwp->w_bufp->b_mode & MDWRAP) && fillcol > 0 &&
-	    n >= 0 && getccol(FALSE) > fillcol )
-	    	wrapword();
-
 	execfunc = NULL;
 	if (c == quotec) {
 		execfunc = quote;
 	} else {
+	        /*
+	         * If a space was typed, fill column is defined, the
+		 * argument is non- negative, wrap mode is enabled, and
+		 * we are now past fill column, perform word wrap. 
+	         */
+	        if (isspace(c) /* c == ' ' */ && (curwp->w_bufp->b_mode & MDWRAP) && fillcol > 0 &&
+		    n >= 0 && getccol(FALSE) > fillcol )
+		    	wrapword();
+
 		if (isbackspace(c))
 			c = '\b';
 		switch(c) {
@@ -745,9 +761,9 @@ newline(f, n)
 #endif
 	
 	/* if we are in C mode and this is a default <NL> */
-	if (n == 1 && (curbp->b_mode & MDCMOD) &&
+	if (n == 1 && (curbp->b_mode & (MDCMOD|MDAIND)) &&
 	    curwp->w_dotp != curbp->b_linep)
-		return(cnewline());
+		return indented_newline(curbp->b_mode & MDCMOD);
 
         /*
          * If a newline was typed, fill column is defined, the argument is non-
@@ -768,7 +784,7 @@ newline(f, n)
 }
 
 /* insert a newline and indentation for C */
-cnewline()
+indented_newline(cmode)
 {
 	register int indentwas;	/* indent to reproduce */
 	int bracef;	/* was there a brace at the end of line? */
@@ -776,9 +792,9 @@ cnewline()
 	indentwas = previndent(&bracef);
 	if (lnewline() == FALSE)
 		return FALSE;
-	if (bracef)
+	if (cmode & bracef)
 		indentwas = (indentwas + TABVAL) & ~TABMASK;
-	if (doindent(indentwas) == FALSE)
+	if (doindent(indentwas) != TRUE)
 		return FALSE;
 	return TRUE;
 }
@@ -793,8 +809,11 @@ int *bracefp;
 	
 	setmark();
 	
-	if (backword(FALSE,1) == FALSE)
+	if (backword(FALSE,1) == FALSE) {
+		if (bracefp) *bracefp = FALSE;
+		gomark();
 		return 0;
+	}
 	ind = indentlen(curwp->w_dotp);
 	if (bracefp)
 		*bracefp = (llength(curwp->w_dotp) > 0 &&
@@ -808,8 +827,9 @@ int *bracefp;
 doindent(ind)
 {
 	int i;
+	/* if no indent was asked for, we're done */
 	if (ind <= 0)
-		return;
+		return TRUE;
 	autoindented = 0;
         if ((i=ind/TABVAL)!=0) {
 		autoindented += i;
@@ -991,18 +1011,16 @@ chgtoeol(f, n)
 /* 'Y' is synonymous with 'yy' */
 yankline(f, n)
 {
-	extern CMDFUNC f_stutterfunc;
-
-	havemotion = &f_stutterfunc;
+	extern CMDFUNC f_godotplus;
+	havemotion = &f_godotplus;
 	return(operyank(f,n));
 }
 
 /* 'S' is synonymous with 'cc' */
 chgline(f, n)
 {
-	extern CMDFUNC f_stutterfunc;
-
-	havemotion = &f_stutterfunc;
+	extern CMDFUNC f_godotplus;
+	havemotion = &f_godotplus;
 	return(operchg(f,n));
 }
 
@@ -1050,6 +1068,8 @@ int global;	/* true = global flag,	false = current buffer flag */
 #if	COLOR
 	register int uflag;		/* was modename uppercase?	*/
 #endif
+	int no = 0;
+	int okind;
 	char prompt[50];	/* string to prompt user with */
 	static char cbuf[NPAT];		/* buffer to recieve mode name into */
 
@@ -1082,6 +1102,10 @@ int global;	/* true = global flag,	false = current buffer flag */
 		scan++;
 	}
 
+	if (!strcmp(cbuf,"all")) {
+		return showm(global);
+	}
+
 	/* test it first against the colors we know */
 	for (i=0; i<NCOLORS; i++) {
 		if (strcmp(cbuf, cname[i]) == 0) {
@@ -1108,8 +1132,13 @@ int global;	/* true = global flag,	false = current buffer flag */
 
 	/* test it against the modes we know */
 
+	if (strncmp(cbuf, "no", 2) == 0) {
+		okind = kind;
+		kind = !kind;
+		no = 2;
+	}
 	for (i=0; i < NUMMODES; i++) {
-		if (strcmp(cbuf, modename[i]) == 0) {
+		if (strcmp(&cbuf[no], modename[i]) == 0) {
 			/* finding a match, we process it */
 			if (kind == TRUE) {
 				if (global) {
@@ -1135,7 +1164,7 @@ int global;	/* true = global flag,	false = current buffer flag */
 	/* test it against other modes... */
 	/* these are global modes that don't inherit to windows */
 	for (i=0; i < NUMOTHERMODES; i++) {
-		if (strcmp(cbuf, othermodes[i]) == 0) {
+		if (strcmp(&cbuf[no], othermodes[i]) == 0) {
 			/* finding a match, we process it */
 			if (kind == TRUE)
 				othmode |= (1 << i);
@@ -1145,6 +1174,7 @@ int global;	/* true = global flag,	false = current buffer flag */
 			return(TRUE);
 		}
 	}
+	kind = okind;
 
 	/* test it against valued  modes... */
 	/* these are global modes that have values */

@@ -15,6 +15,8 @@
 #include <signal.h>
 #include <termio.h>
 #if ODT
+#include <sys/types.h>
+#include <sys/stream.h>
 #include <sys/ptem.h>
 #endif
 #endif
@@ -27,7 +29,7 @@ typedef struct  VIDEO {
 	int	v_rfcolor;		/* requested forground color */
 	int	v_rbcolor;		/* requested background color */
 #endif
-	/* allocate 4 bytes here, and malloc 4 bytes less than we need, 
+	/* allocate 4 bytes here, and malloc 4 bytes less than we need,
 		to keep malloc from rounding up. */
         char    v_text[4];              /* Screen data. */
 }       VIDEO;
@@ -176,11 +178,8 @@ char *s;
  */
 vteeol()
 {
-    register VIDEO      *vp;
-
-    vp = vscreen[vtrow];
     while (vtcol < term.t_ncol)
-        vp->v_text[vtcol++] = ' ';
+        vtputc(' ',FALSE);
 }
 
 /* upscreen:	user routine to force a screen update
@@ -203,6 +202,7 @@ update(force)
 int force;	/* force update past type ahead? */
 {
 	register WINDOW *wp;
+	int screencol;
 
 #if	TYPEAH
 	if (force == FALSE && typahead())
@@ -244,9 +244,9 @@ int force;	/* force update past type ahead? */
 				scrflags |= (wp->w_flag & (WFINS|WFKILLS));
 				wp->w_flag &= ~(WFKILLS|WFINS);
 			}
-			if ((wp->w_flag & ~WFMODE) == WFEDIT)
+			if ((wp->w_flag & ~(/* WFMOVE| */WFMODE)) == WFEDIT)
 				updone(wp);	/* update EDITed line */
-			else if (wp->w_flag & ~WFMOVE)
+			else if (wp->w_flag & ~(WFMOVE))
 				updall(wp);	/* update all lines */
 			if (scrflags || (wp->w_flag & WFMODE))
 				modeline(wp);	/* update modeline */
@@ -258,11 +258,11 @@ int force;	/* force update past type ahead? */
 	}
 
 	/* recalc the current hardware cursor location */
-	updpos();
+	screencol = updpos();
 
 #if	MEMMAP
 	/* update the cursor and flush the buffers */
-	movecursor(currow, curcol - lbound);
+	movecursor(currow, screencol);
 #endif
 
 	/* check for lines to de-extend */
@@ -280,7 +280,7 @@ int force;	/* force update past type ahead? */
 #endif
 
 	/* update the cursor and flush the buffers */
-	movecursor(currow, curcol - lbound);
+	movecursor(currow, screencol);
 	TTflush();
 	displaying = FALSE;
 #if SIGWINCH
@@ -432,14 +432,25 @@ LINE *lp;
 	/* and update the virtual line */
 	vscreen[sline]->v_flag |= VFCHG;
 	vscreen[sline]->v_flag &= ~VFREQ;
-	vtmove(sline, 0);
+	if (wp->w_sideways)
+		taboff = wp->w_sideways;
 	if (lp != wp->w_bufp->b_linep) {
-		for (i = 0; i < llength(lp); ++i)
+		vtmove(sline, -wp->w_sideways);
+		i = 0;
+		while ( i < llength(lp) ) {
 			vtputc(lgetc(lp, i), wp->w_bufp->b_mode & MDLIST);
+			++i;
+		}
 		vtputc('\n', wp->w_bufp->b_mode & MDLIST);
+		if (wp->w_sideways) {
+			vscreen[sline]->v_text[0] = '<';
+			if (vtcol < 1) vtcol = 1;
+		}
 	} else {
-		vtputc('~');
+		vtmove(sline, 0);
+		vtputc('~',FALSE);
 	}
+	taboff = 0;
 #if	COLOR
 	vscreen[sline]->v_rfcolor = wp->w_fcolor;
 	vscreen[sline]->v_rbcolor = wp->w_bcolor;
@@ -447,8 +458,8 @@ LINE *lp;
 }
 
 /*	updpos:	update the position of the hardware cursor and handle extended
-		lines. This is the only update for simple moves.	*/
-
+		lines. This is the only update for simple moves.
+		returns the screen column for the cursor	*/
 updpos()
 {
 	register LINE *lp;
@@ -469,28 +480,33 @@ updpos()
 	}
 
 	/* find the current column */
-	curcol = 0;
+	curcol = -curwp->w_sideways;
 	i = 0;
 	while (i < curwp->w_doto) {
 		c = lgetc(lp, i++);
-		if (((curwp->w_bufp->b_mode&MDLIST) == 0) && c == '\t')
-			curcol |= TABMASK;
-		else
+		if (((curwp->w_bufp->b_mode&MDLIST) == 0) && c == '\t') {
+			do {
+				curcol++;
+			} while (((curcol + curwp->w_sideways)&TABMASK) != 0);
+		} else {
 			if (!isprint(c))
 				++curcol;
+			++curcol;
+		}
 
-		++curcol;
 	}
 
 	/* if extended, flag so and update the virtual line image */
 	if (curcol >=  term.t_ncol - 1) {
-		vscreen[currow]->v_flag |= (VFEXT | VFCHG);
-		updext(curwp);
-	} else
-		lbound = 0;
+		return updext_past();
+	} else if (curwp->w_sideways && curcol < 1){
+		return updext_before();
+	} else {
+		return curcol;
+	}
 }
 
-/*	upddex:	de-extend any line that derserves it		*/
+/*	upddex:	de-extend any line that deserves it		*/
 
 upddex()
 {
@@ -508,16 +524,10 @@ upddex()
 			if (vscreen[i]->v_flag & VFEXT) {
 				if ((wp != curwp) || (lp != wp->w_dotp) ||
 				   (curcol < term.t_ncol - 1)) {
-					vtmove(i, 0);
-					for (j = 0; j < llength(lp); ++j)
-						vtputc(lgetc(lp, j),
-						wp->w_bufp->b_mode&MDLIST);
-					vtputc('\n', wp->w_bufp->b_mode&MDLIST);
+					l_to_vline(wp,lp,i);
 					vteeol();
-
 					/* this line no longer is extended */
 					vscreen[i]->v_flag &= ~VFEXT;
-					vscreen[i]->v_flag |= VFCHG;
 				}
 			}
 			lp = lforw(lp);
@@ -743,30 +753,29 @@ int	i ;
 #endif /* SCROLLCODE */
 
 
-/*	updext: update the extended line which the cursor is currently
+/*	updext_past: update the extended line which the cursor is currently
 		on at a column greater than the terminal width. The line
 		will be scrolled right or left to let the user see where
-		the cursor is
-								*/
-
-updext(wp)
-WINDOW *wp;	/* window to update lines in */
+		the cursor is		*/
+updext_past()
 {
-	register int rcursor;	/* real cursor location */
+	register int lbound, rcursor;
 	register LINE *lp;	/* pointer to current line */
 	register int j;		/* index into line */
 
 	/* calculate what column the real cursor will end up in */
+	/* why is term.t_ncol in here? */
 	rcursor = ((curcol - term.t_ncol) % term.t_scrsiz) + term.t_margin;
-	taboff = lbound = curcol - rcursor + 1;
+	lbound = curcol - rcursor;
+	taboff = lbound + curwp->w_sideways;
 
 	/* scan through the line outputing characters to the virtual screen */
 	/* once we reach the left edge					*/
-	vtmove(currow, -lbound);	/* start scanning offscreen */
+	vtmove(currow, -lbound-curwp->w_sideways);	/* start scanning offscreen */
 	lp = curwp->w_dotp;		/* line to output */
 	for (j = 0; j < llength(lp); ++j)
-		vtputc(lgetc(lp, j), wp->w_bufp->b_mode&MDLIST);
-	vtputc('\n', wp->w_bufp->b_mode&MDLIST);
+		vtputc(lgetc(lp, j), curwp->w_bufp->b_mode&MDLIST);
+	vtputc('\n', curwp->w_bufp->b_mode&MDLIST);
 
 	/* truncate the virtual line, restore tab offset */
 	vteeol();
@@ -774,6 +783,41 @@ WINDOW *wp;	/* window to update lines in */
 
 	/* and put a '<' in column 1 */
 	vscreen[currow]->v_text[0] = '<';
+	vscreen[currow]->v_flag |= (VFEXT | VFCHG);
+	return rcursor;
+}
+
+/*	updext_before: update the extended line which the cursor is currently
+		on at a column less than the terminal width. The line
+		will be scrolled right or left to let the user see where
+		the cursor is		*/
+updext_before()
+{
+	register int lbound, rcursor;
+	register LINE *lp;	/* pointer to current line */
+	register int j;		/* index into line */
+
+	/* calculate what column the real cursor will end up in */
+	rcursor = (curcol % (term.t_ncol-term.t_margin));
+	lbound = curcol - rcursor + 1;
+	taboff = lbound;
+
+	/* scan through the line outputing characters to the virtual screen */
+	/* once we reach the left edge					*/
+	vtmove(currow, -lbound);	/* start scanning offscreen */
+	lp = curwp->w_dotp;		/* line to output */
+	for (j = 0; j < llength(lp); ++j)
+		vtputc(lgetc(lp, j), curwp->w_bufp->b_mode&MDLIST);
+	vtputc('\n', curwp->w_bufp->b_mode&MDLIST);
+
+	/* truncate the virtual line, restore tab offset */
+	vteeol();
+	taboff = 0;
+
+	/* and put a '<' in column 1 */
+	vscreen[currow]->v_text[0] = '<';
+	vscreen[currow]->v_flag |= (VFEXT | VFCHG);
+	return rcursor;
 }
 
 
@@ -1187,7 +1231,7 @@ struct VIDEO *vp2;	/* physical screen image */
 #endif
 
 	/* advance past any common chars at the left */
-	while (cp1 != &vp1->v_text[term.t_ncol] && cp1[0] == cp2[0]) {
+	while (cp1 != &vp1->v_text[term.t_ncol] && *cp1 == *cp2) {
 		++cp1;
 		++cp2;
 	}
@@ -1470,6 +1514,12 @@ typedef char *va_list;
 
 #endif
 
+dbgwrite(s,x,y,z)
+{
+	mlwrite(s,x,y,z);
+	tgetc();
+}
+
 /*
  * Write a message into the message line. Keep track of the physical cursor
  * position. A small class of printf like format items is handled.
@@ -1746,9 +1796,9 @@ int h, w;
 	}
 	chg_width = chg_height = 0;
 	if (h - 1 < term.t_mrow)
-		newlength(h);
+		newlength(TRUE,h);
 	if (w < term.t_mcol)
-		newwidth(w);
+		newwidth(TRUE,w);
 
 	update(TRUE);
 	return TRUE;
