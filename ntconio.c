@@ -1,7 +1,7 @@
 /*
  * Uses the Win32 console API.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/ntconio.c,v 1.15 1996/04/14 23:37:50 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/ntconio.c,v 1.17 1996/08/13 02:10:07 pgf Exp $
  *
  */
 
@@ -48,6 +48,7 @@ static	void	nttitle		(char *);
 #endif
 
 static HANDLE hConsoleOutput;		/* handle to the console display */
+static HANDLE hOldConsoleOutput;	/* handle to the old console display */
 static HANDLE hConsoleInput;
 static CONSOLE_SCREEN_BUFFER_INFO csbi;
 static WORD originalAttribute;
@@ -349,14 +350,26 @@ nthandler(DWORD ctrl_type)
 		imdying(1);
 		break;
 	}
+	return TRUE;
 }
 
 static void
 ntopen(void)
 {
 	set_palette(initpalettestr);
+	hOldConsoleOutput = 0;
 	hConsoleOutput = GetStdHandle(STD_OUTPUT_HANDLE);
 	GetConsoleScreenBufferInfo(hConsoleOutput, &csbi);
+	if (csbi.dwMaximumWindowSize.Y !=
+	    csbi.srWindow.Bottom - csbi.srWindow.Top + 1
+	    || csbi.dwMaximumWindowSize.X !=
+	    csbi.srWindow.Right - csbi.srWindow.Left + 1) {
+		hOldConsoleOutput = hConsoleOutput;
+		hConsoleOutput = CreateConsoleScreenBuffer(GENERIC_READ|GENERIC_WRITE,
+			0, NULL, CONSOLE_TEXTMODE_BUFFER, NULL);
+		SetConsoleActiveScreenBuffer(hConsoleOutput);
+		GetConsoleScreenBufferInfo(hConsoleOutput, &csbi);
+	}
 	originalAttribute = csbi.wAttributes;
 	crow = csbi.dwCursorPosition.Y;
 	ccol = csbi.dwCursorPosition.X;
@@ -365,7 +378,6 @@ ntopen(void)
 	newscreensize(csbi.dwMaximumWindowSize.Y, csbi.dwMaximumWindowSize.X);
 	hConsoleInput = GetStdHandle(STD_INPUT_HANDLE);
 	SetConsoleCtrlHandler(nthandler, TRUE);
-	SetConsoleMode(hConsoleInput, ENABLE_MOUSE_INPUT|ENABLE_WINDOW_INPUT);
 }
 
 static int old_title_set = 0;
@@ -381,7 +393,12 @@ ntclose(void)
 	nteeol();
 	ntflush();
 	SetConsoleTextAttribute(hConsoleOutput, originalAttribute);
+	if (hOldConsoleOutput) {
+		SetConsoleActiveScreenBuffer(hOldConsoleOutput);
+		CloseHandle(hConsoleOutput);
+	}
 	SetConsoleCtrlHandler(nthandler, FALSE);
+	SetConsoleMode(hConsoleInput, ENABLE_LINE_INPUT|ENABLE_ECHO_INPUT|ENABLE_PROCESSED_INPUT);
 }
 
 static void
@@ -395,7 +412,11 @@ ntkopen(void)	/* open the keyboard */
 		orig_title_set = TRUE;
 		GetConsoleTitle(orig_title, sizeof(orig_title));
 	}
+	if (hConsoleOutput)
+		SetConsoleActiveScreenBuffer(hConsoleOutput);
 	keyboard_open = TRUE;
+	SetConsoleCtrlHandler(NULL, TRUE);
+	SetConsoleMode(hConsoleInput, ENABLE_MOUSE_INPUT|ENABLE_WINDOW_INPUT);
 }
 
 static void
@@ -408,6 +429,9 @@ ntkclose(void)	/* close the keyboard */
 	GetConsoleTitle(old_title, sizeof(old_title));
 	if (orig_title_set)
 		SetConsoleTitle(orig_title);
+	if (hOldConsoleOutput)
+		SetConsoleActiveScreenBuffer(hOldConsoleOutput);
+	SetConsoleCtrlHandler(NULL, FALSE);
 }
 
 static struct {

@@ -1,7 +1,7 @@
 /*
  * version & usage-messages for vile
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/version.c,v 1.32 1996/02/26 04:24:35 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/version.c,v 1.33 1996/06/28 20:35:15 pgf Exp $
  *
  */
 
@@ -21,7 +21,8 @@ print_usage (void)
 #if OPT_TAGS
 	"-ttagname      to look up a tag",
 #endif
-	"-v             to view files as read-only",
+	"-v             to edit in \"view\" mode -- no changes permitted",
+	"-R             to edit files \"read-only\" -- no writes permitted",
 #if OPT_ENCRYPT
 	"-kcryptkey     for encrypted files",
 #endif

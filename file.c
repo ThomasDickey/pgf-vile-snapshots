@@ -5,7 +5,7 @@
  *	reading and writing of the disk are in "fileio.c".
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/file.c,v 1.191 1996/05/22 22:54:16 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/file.c,v 1.196 1996/08/13 03:00:08 pgf Exp $
  *
  */
 
@@ -47,7 +47,7 @@ file_modified(const char *path)
 	struct stat	statbuf;
 	time_t		the_time = 0;
 
-	if (stat(SL_TO_BSL(path), &statbuf) >= 0
+	if (stat((char *)SL_TO_BSL(path), &statbuf) >= 0
 #if CC_CSETPP
 	 && (statbuf.st_mode & S_IFREG) == S_IFREG)
 #else
@@ -801,7 +801,7 @@ int	mflg)		/* print messages? */
 #if OPT_PROCEDURES
 	if (s <= FIOEOF) {
 	    static int readhooking;
-	    if (!readhooking && *readhook) {
+	    if (!readhooking && *readhook && !b_is_temporary(bp)) {
 		    readhooking = TRUE;
 		    run_procedure(readhook);
 		    readhooking = FALSE;
@@ -950,7 +950,8 @@ quickreadf(register BUFFER *bp, int *nlinep)
 				lp->l_size = *textp + 1;
 				lp->l_text = (char *)textp + 1;
 				set_lforw(lp, lp + 1);
-				set_lback(lp, lp - 1);
+				if (lp != bp->b_LINEs)
+					set_lback(lp, lp - 1);
 				lsetclear(lp);
 				lp->l_nxtundo = null_ptr;
 				lp++;
@@ -1003,6 +1004,23 @@ slowreadf(register BUFFER *bp, int *nlinep)
 	time_t	last_updated = time((time_t *)0);
 #endif
 	b_set_counted(bp);	/* make 'addline()' do the counting */
+#if OPT_DOSFILES
+	/*
+	 * There might be some pre-existing lines if quickreadf
+	 * read part of the file and then left the rest up to us.
+	 */
+	if (global_b_val(MDDOS)) {
+		register LINE   *lp;
+		for_each_line(lp,bp) {
+			if (llength(lp) > 0 &&
+				  lgetc(lp, llength(lp)-1) == '\r') {
+				doslines++;
+			} else {
+				unixlines++;
+			}
+		}
+	}
+#endif
         while ((s = ffgetline(&len)) <= FIOSUC) {
 #if OPT_DOSFILES
 		/*
@@ -1411,7 +1429,8 @@ int	forced)
 	if (msgf == TRUE)
 		mlwrite("[Writing...]");
 
-	CleanToPipe();
+	if (isShellOrPipe(given_fn))
+		CleanToPipe();
 
         lp = rp->r_orig.l;
         nline = 0;                              /* Number of lines     */
@@ -1478,7 +1497,8 @@ int	forced)
 			bp->b_lines_on_disk = nline;
 	}
 
-	CleanAfterPipe(TRUE);
+	if (isShellOrPipe(given_fn))
+		CleanAfterPipe(TRUE);
 
         if (s != FIOSUC)                        /* Some sort of error.  */
                 return FALSE;
@@ -1743,16 +1763,16 @@ imdying(int ACTUAL_SIG_ARGS)
 {
 #if SYS_UNIX
 #if HAVE_MKDIR
-	static const char dirnam[NSTRING] = "/tmp/vileDXXXXXX";
+	static char dirnam[NSTRING] = "/tmp/vileDXXXXXX";
 #else
-	static const char dirnam[NSTRING] = "/tmp";
+	static char dirnam[NSTRING] = "/tmp";
 	char temp[NFILEN];
 #endif
 #else
 #if HAVE_MKDIR && !SYS_MSDOS && !SYS_OS2
-	static const char dirnam[NSTRING] = "vileDXXXXXX";
+	static char dirnam[NSTRING] = "vileDXXXXXX";
 #else
-	static const char dirnam[NSTRING] = "";
+	static char dirnam[NSTRING] = "";
 	char temp[NFILEN];
 #endif
 #endif
@@ -1793,7 +1813,7 @@ imdying(int ACTUAL_SIG_ARGS)
 			b_is_changed(bp)) {
 #if HAVE_MKDIR && !SYS_MSDOS && !SYS_OS2
 			if (!created) {
-				(void)mktemp((char *)dirnam);
+				(void)mktemp(dirnam);
 				if(mkdir(dirnam,0700) != 0) {
 					tidy_exit(BADEXIT);
 				}
