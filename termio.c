@@ -4,7 +4,10 @@
  * All operating systems.
  *
  * $Log: termio.c,v $
- * Revision 1.62  1993/04/01 12:53:33  pgf
+ * Revision 1.63  1993/04/02 11:02:50  pgf
+ * ioctl.h --> sys/ioctl.h for APOLLO
+ *
+ * Revision 1.62  1993/04/01  12:53:33  pgf
  * removed redundant includes and declarations
  *
  * Revision 1.61  1993/04/01  12:03:26  pgf
@@ -253,9 +256,12 @@ extern int errno;
 /* try harder to get it */
 # if SUNOS
 #  include "sys/filio.h"
-# else
-	/* if you have trouble including ioctl.h, try "sys/ioctl.h" instead */
-#  include "ioctl.h"
+# else /* if you have trouble including ioctl.h, try "sys/ioctl.h" instead */
+#  if APOLLO
+#   include <sys/ioctl.h>
+#  else
+#   include <ioctl.h>
+#  endif
 # endif
 #endif
 

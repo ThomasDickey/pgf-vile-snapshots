@@ -3,7 +3,10 @@
  *		strings.
  *
  * $Log: path.c,v $
- * Revision 1.5  1993/04/01 15:55:02  pgf
+ * Revision 1.6  1993/04/02 11:02:15  pgf
+ * ls-based directory routines, and support for "old-style" directories
+ *
+ * Revision 1.5  1993/04/01  15:55:02  pgf
  * added extern decls for getpw{nam,uid}()
  *
  * Revision 1.4  1993/04/01  13:07:50  pgf
@@ -29,9 +32,61 @@
 
 #if VMS
 #include <file.h>
-#include "dirstuff.h"
 #endif
 
+#include "dirstuff.h"
+
+/*
+ * Fake directory-routines for system where we cannot otherwise figure out how
+ * to read the directory-file.
+ */
+#if USE_LS_FOR_DIRS
+DIR *
+opendir (path)
+char	*path;
+{
+	static	char	fmt[] = "/bin/ls %s";
+	char	lscmd[NFILEN+sizeof(fmt)];
+
+	(void)lsprintf(lscmd, fmt, path);
+	return npopen(lscmd, "r");
+}
+
+DIRENT *
+readdir (dp)
+DIR	*dp;
+{
+	static	DIRENT	dummy;
+
+	if ((fgets(dummy.d_name, NFILEN, dp)) != NULL) {
+		dummy.d_namlen = strlen(dummy.d_name)-1;
+		return &dummy;
+	}
+	return 0;
+}
+
+int
+closedir (dp)
+DIR	*dp;
+{
+	(void)npclose(dp);
+}
+#endif
+
+/*
+ * Use this routine to fake compatibility with unix directory routines.
+ */
+#if OLD_STYLE_DIRS
+DIRENT *
+readdir(dp)
+DIR	*dp;
+{
+	static	DIRENT	dbfr;
+	return (fread(&dbfr, sizeof(dbfr), 1, dp)\
+				? &dbfr\
+				: (DIRENT *)0);
+}
+#endif
 
 #if MSDOS
 /*
@@ -235,8 +290,8 @@ char	*path;
 		char	temp[NFILEN];
 		struct	passwd *p;
 		char	*s, *d;
-		extern struct	passwd *getpwnam();
-		extern struct	passwd *getpwuid();
+		extern struct	passwd *getpwnam P((char *));
+		extern struct	passwd *getpwuid P((int));
 
 		/* parse out the user-name portion */
 		for (s = path+1, d = temp; (*d = *s) != 0; d++, s++) {

@@ -3,7 +3,10 @@
  * the knowledge about files are here.
  *
  * $Log: fileio.c,v $
- * Revision 1.39  1993/04/01 13:07:50  pgf
+ * Revision 1.40  1993/04/02 11:01:07  pgf
+ * use < > instead of " " on system includes.
+ *
+ * Revision 1.39  1993/04/01  13:07:50  pgf
  * see tom's 3.40 CHANGES
  *
  * Revision 1.38  1993/03/25  19:50:58  pgf
@@ -147,7 +150,7 @@
 #endif
 
 #if	BERK
-#include "sys/ioctl.h"
+#include	<sys/ioctl.h>
 #endif
 
 #if MSDOS

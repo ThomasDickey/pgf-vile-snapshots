@@ -6,7 +6,10 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.76  1993/04/01 13:07:50  pgf
+ * Revision 1.77  1993/04/02 11:00:02  pgf
+ * force scrolling from bottom line when reading pipe
+ *
+ * Revision 1.76  1993/04/01  13:07:50  pgf
  * see tom's 3.40 CHANGES
  *
  * Revision 1.75  1993/03/25  19:50:58  pgf
@@ -854,7 +857,7 @@ int *nlinep;
 		else {
                 	/* reading from a pipe, and internal? */
 			if (fileispipe && !ffhasdata()) {
-				flag |= WFEDIT;
+				flag |= (WFEDIT|WFFORCE);
 
 				if (!done_update || bp->b_nwnd > 1)
 					flag |= WFHARD;
@@ -866,6 +869,7 @@ int *nlinep;
 							lback(bp->b_line.l);
 			                        wp->w_dot.o = 0;
 						wp->w_flag |= flag;
+						wp->w_force = -1;
 			                }
 			        }
 
