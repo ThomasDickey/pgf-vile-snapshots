@@ -4,7 +4,13 @@
  *	written 11-feb-86 by Daniel Lawrence
  *
  * $Log: bind.c,v $
- * Revision 1.35  1993/04/01 13:07:50  pgf
+ * Revision 1.37  1993/04/21 15:40:40  pgf
+ * change alternate eolchar for kbd_engl_stat to ' ', since NAMEC is now TAB
+ *
+ * Revision 1.36  1993/04/20  12:18:32  pgf
+ * see tom's 3.43 CHANGES
+ *
+ * Revision 1.35  1993/04/01  13:07:50  pgf
  * see tom's 3.40 CHANGES
  *
  * Revision 1.34  1993/03/25  19:50:58  pgf
@@ -463,6 +469,7 @@ char *mstring;		/* match string if partial list, NULL to list all */
 	int cpos;		/* current position to use in outseq */
 	char outseq[81];	/* output buffer for keystroke sequence */
 	int i,pass;
+	int ok = TRUE;		/* reset if out-of-memory, etc. */
 
 	/* let us know this is in progress */
 	mlwrite("[Building binding list]");
@@ -504,8 +511,10 @@ char *mstring;		/* match string if partial list, NULL to list all */
 			}
 		}
 		/* dump the line */
-		if (!addline(curbp,outseq,-1))
+		if (!addline(curbp,outseq,-1)) {
+			ok = FALSE;
 			break;
+		}
 
 		cpos = 0;
 
@@ -523,8 +532,10 @@ char *mstring;		/* match string if partial list, NULL to list all */
 			while (cpos < 8)
 				outseq[cpos++] = ' ';
 			(void)quoted(outseq+cpos, nptr2->n_name);
-			if (!addline(curbp,outseq,-1))
+			if (!addline(curbp,outseq,-1)) {
+				ok = FALSE;
 				break;
+			}
 			cpos = 0;	/* and clear the line */
 
 		}
@@ -536,7 +547,8 @@ char *mstring;		/* match string if partial list, NULL to list all */
 	for (nptr = nametbl; nptr->n_name != NULL; ++nptr)
 		nptr->n_cmd->c_flags &= ~LISTED; /* mark it as unlisted */
 
-	mlerase();	/* clear the message line */
+	if (ok)
+		mlerase();	/* clear the message line */
 }
 
 #if	APROP
@@ -806,6 +818,7 @@ int c;	/* key to find what is bound to it */
 }
 
 /* fnc2kcod: translate a function pointer to a keycode */
+#ifdef GMDDOTMACRO
 int
 fnc2kcod(f)
 CMDFUNC *f;
@@ -824,6 +837,7 @@ CMDFUNC *f;
 
 	return -1;	/* none found */
 }
+#endif
 
 /* fnc2engl: translate a function pointer to the english name for 
 		that function
@@ -1127,6 +1141,7 @@ unsigned size_entry;
 		for (p = NEXT_DATA(first); p != last; p = NEXT_DATA(p))
 			if (THIS_NAME(p)[n] != buf[n]) {
 				buf[n] = EOS;
+				if (n == pos) TTbeep();
 				TTflush();
 				return n;
 			}
@@ -1291,7 +1306,7 @@ char	*buffer;
 		buffer,		/* in/out buffer */
 		NLINE,		/* sizeof(buffer) */
 		eol_command,
-		NAMEC,		/* may be a conflict */
+		' ',
 		KBD_MAYBEC,	/* allow blank-return */
 		cmd_complete);
 }

@@ -4,7 +4,10 @@
  *  heavily modified by Paul Fox, 1990
  *
  * $Log: search.c,v $
- * Revision 1.47  1993/04/01 12:53:33  pgf
+ * Revision 1.48  1993/04/20 12:18:32  pgf
+ * see tom's 3.43 CHANGES
+ *
+ * Revision 1.47  1993/04/01  12:53:33  pgf
  * removed redundant includes and declarations
  *
  * Revision 1.46  1993/03/09  19:57:33  pgf
@@ -697,7 +700,7 @@ int	fromscreen;
 	 * Then, if it's the search string, make a reversed pattern.
 	 */
 	if (fromscreen) {
-		status = screen_string(apat, NPAT, _ident);
+		status = screen_string(apat, NPAT, (CMASK)_ident);
 		if (status != TRUE)
 			return status;
 	} else {

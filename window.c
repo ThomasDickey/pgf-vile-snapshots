@@ -3,7 +3,13 @@
  * attached to keys that the user actually types.
  *
  * $Log: window.c,v $
- * Revision 1.22  1993/04/01 12:57:22  pgf
+ * Revision 1.24  1993/04/20 12:18:32  pgf
+ * see tom's 3.43 CHANGES
+ *
+ * Revision 1.23  1993/04/20  12:00:59  pgf
+ * scroll sideways by a half screen by default in mv{left,right}window()
+ *
+ * Revision 1.22  1993/04/01  12:57:22  pgf
  * removed redundant includes and declarations
  *
  * Revision 1.21  1993/02/24  10:59:02  pgf
@@ -363,7 +369,7 @@ int f,n;
 	if (f)
 		move = n;
 	else
-		move = term.t_ncol/3;
+		move = term.t_ncol/2;
 
 	make_local_w_val(curwp,WVAL_SIDEWAYS);
 
@@ -384,7 +390,7 @@ int f,n;
 	if (f)
 		w_val(curwp, WVAL_SIDEWAYS) -= n;
 	else
-		w_val(curwp, WVAL_SIDEWAYS) -= term.t_ncol/3;
+		w_val(curwp, WVAL_SIDEWAYS) -= term.t_ncol/2;
 
 	if (w_val(curwp, WVAL_SIDEWAYS) < 0) {
 		if (original == 0)
@@ -529,7 +535,7 @@ int f,n;
                 return NULL;
         }
         if ((wp = typealloc(WINDOW)) == NULL) {
-                mlforce("[OUT OF MEMORY]");
+		(void)no_memory("WINDOW");
                 return NULL;
         }
 	++curwp->w_bufp->b_nwnd;	       /* Displayed twice.     */
@@ -955,7 +961,7 @@ winit()
         register WINDOW *wp;
 
         wp = typealloc(WINDOW);			/* First window         */
-        if (wp==NULL )
+        if (wp==NULL)
                 exit(BAD(1));
         wheadp = wp;
         curwp  = wp;

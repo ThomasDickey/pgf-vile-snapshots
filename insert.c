@@ -8,8 +8,11 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: insert.c,v $
- *	Revision 1.18  1993/04/08 15:01:05  pgf
- *	broke up ins(), to create inschar(), usable by insstring and ovrwstring
+ *	Revision 1.19  1993/04/20 12:18:32  pgf
+ *	see tom's 3.43 CHANGES
+ *
+ * Revision 1.18  1993/04/08  15:01:05  pgf
+ * broke up ins(), to create inschar(), usable by insstring and ovrwstring
  *
  * Revision 1.17  1993/04/01  13:06:31  pgf
  * turbo C support (mostly prototypes for static)
@@ -325,7 +328,6 @@ ins(playback)
 int playback;
 {
 	register int status;
-	int f,n;
 	int    c;		/* command character */
 	int startoff = DOT.o;	/* starting offset on that line */
 	static TBUFF *insbuff;
@@ -343,9 +345,6 @@ int playback;
 
 	/* get the next command from the keyboard */
 	while(1) {
-
-		f = FALSE;
-		n = 1;
 
 		if (playback) {
 			c = tb_next(insbuff);
@@ -455,7 +454,6 @@ int startoff;
 				trimline();
 				autoindented = -1;
 			}
-			newlineyet = TRUE;
 		} else if ( isbackspace(c) ||
 				c == tocntrl('D') || 
 				c == killc ||
@@ -580,7 +578,7 @@ int mode;
 	while (n--) {
 		tp = &tstring[0];
 		while (*tp) {
-			inschar(*tp++,0);
+			status = inschar(*tp++,0);
 			if (status != TRUE) {
 				insertmode = FALSE;
 				return(status);

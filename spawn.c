@@ -2,7 +2,13 @@
  *		for MicroEMACS
  *
  * $Log: spawn.c,v $
- * Revision 1.46  1993/04/01 13:07:50  pgf
+ * Revision 1.48  1993/04/21 14:36:41  pgf
+ * lint change
+ *
+ * Revision 1.47  1993/04/20  12:18:32  pgf
+ * see tom's 3.43 CHANGES
+ *
+ * Revision 1.46  1993/04/01  13:07:50  pgf
  * see tom's 3.40 CHANGES
  *
  * Revision 1.45  1993/03/25  19:50:58  pgf
@@ -565,10 +571,7 @@ int rerun;
 #if     MSDOS | (ST520 & LATTICE)
         register int    s;
         static char oline[NLINE];	/* command line send to shell */
-        char	line[NLINE];	/* command line send to shell */
-	register char	*cp;
-	char		line2[NLINE];
-
+	char	line[NLINE];	/* command line send to shell */
 
         if ((s=mlreply("cmd: !", oline, NLINE)) != TRUE)
                 return(s);
@@ -796,7 +799,7 @@ filterregion()
 	}
 	fclose(fw);
 	DOT.l = lback(DOT.l);
-	s = ifile(NULL,TRUE,fr);
+	s = ifile((char *)0,TRUE,fr);
 	npclose(fr);
 	firstnonwhite(FALSE,1);
 	setmark();

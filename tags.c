@@ -5,7 +5,10 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: tags.c,v $
- * Revision 1.31  1993/04/01 09:46:37  pgf
+ * Revision 1.32  1993/04/20 12:18:32  pgf
+ * see tom's 3.43 CHANGES
+ *
+ * Revision 1.31  1993/04/01  09:46:37  pgf
  * name the tag buffers with "internal" style names, i.e. [Tags nn]
  *
  * Revision 1.30  1993/03/31  19:56:08  pgf
@@ -131,7 +134,7 @@ int f,n;
 	                return (s);
 		taglen = b_val(curbp,VAL_TAGLEN);
 	} else {
-		s = screen_string(tagname,NFILEN,_ident);
+		s = screen_string(tagname,NFILEN,(CMASK)_ident);
 		taglen = 0;
 	}
 	if (s == TRUE)
@@ -226,7 +229,8 @@ int taglen;
 		pushuntag(curbp->b_fname, lineno);
 	}
 
-	if (curbp == NULL || strcmp(tfname,curbp->b_fname)) {
+	if (curbp == NULL
+	 || !same_fname(tfname, curbp, TRUE)) {
 		s = getfile(tfname,TRUE);
 		if (s != TRUE) {
 			tossuntag();

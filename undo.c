@@ -3,7 +3,10 @@
  * code by Paul Fox, original algorithm mostly by Julia Harper May, 89
  *
  * $Log: undo.c,v $
- * Revision 1.22  1993/01/23 13:38:23  foxharp
+ * Revision 1.23  1993/04/20 12:18:32  pgf
+ * see tom's 3.43 CHANGES
+ *
+ * Revision 1.22  1993/01/23  13:38:23  foxharp
  * lchange is now chg_buff
  *
  * Revision 1.21  1993/01/16  10:43:22  foxharp
@@ -137,16 +140,16 @@ LINE *lp;
 		int fc;
 		/* need to save a dot -- either the next line or 
 			the previous one */
-		if (lp->l_fp == curbp->b_line.l) {
-			ALTDOT(curbp).l = lp->l_bp;
-			fc =  firstchar(lp->l_bp);
+		if (lforw(lp) == curbp->b_line.l) {
+			ALTDOT(curbp).l = lback(lp);
+			fc =  firstchar(lback(lp));
 			if (fc < 0) /* all white */
-				ALTDOT(curbp).o = llength(lp->l_bp) - 1;
+				ALTDOT(curbp).o = llength(lback(lp)) - 1;
 			else
 				ALTDOT(curbp).o = fc;
 		} else {
-			ALTDOT(curbp).l = lp->l_fp;
-			fc =  firstchar(lp->l_fp);
+			ALTDOT(curbp).l = lforw(lp);
+			fc =  firstchar(lforw(lp));
 			if (fc < 0) /* all white */
 				ALTDOT(curbp).o = 0;
 			else
@@ -199,7 +202,7 @@ LINE *lp;
 }
 
 /* push an unreal line onto the right undo stack */
-/* lp should be the new line, _after_ insertion, so l_fp and l_bp are right */
+/* lp should be the new line, _after_ insertion, so lforw() and lback() are right */
 int
 tag_for_undo(lp)
 LINE *lp;
@@ -218,8 +221,8 @@ LINE *lp;
 	if (nlp == NULL)
 		return(FALSE);
 	llength(nlp) = LINENOTREAL;
-	nlp->l_fp = lp->l_fp;
-	nlp->l_bp = lp->l_bp;
+	lforw(nlp) = lforw(lp);
+	lback(nlp) = lback(lp);
 	pushline(nlp,CURSTK(curbp));
 	lsetcopied(lp);
 	if (ALTDOT(curbp).l == NULL) {
@@ -261,8 +264,8 @@ int type;
 	if (plp == NULL)
 		return;
 	llength(plp) = type;
-	plp->l_fp = olp;	/* l_fp is the original line */
-	plp->l_bp = nlp;	/* l_bp is the copy */
+	lforw(plp) = olp;	/* lforw() is the original line */
+	lback(plp) = nlp;	/* lback() is the copy */
 	pushline(plp,CURSTK(curbp));
 }
 
@@ -273,10 +276,10 @@ LINE *newlp, *oldlp;
 	register LINE *tlp;
 	for (tlp = *CURSTK(curbp); tlp != NULL ; tlp = tlp->l_nxtundo) {
 		if (!lispatch(tlp)) {
-			if (tlp->l_fp == oldlp)
-				tlp->l_fp = newlp;
-			if (tlp->l_bp == oldlp)
-				tlp->l_bp = newlp;
+			if (lforw(tlp) == oldlp)
+				lforw(tlp) = newlp;
+			if (lback(tlp) == oldlp)
+				lback(tlp) = newlp;
 		}
 	}
 }
@@ -292,8 +295,8 @@ register LINE *lp;
 		return(NULL);
 	/* copy the text and forward and back pointers.  everything else 
 		matches already */
-	nlp->l_fp = lp->l_fp;
-	nlp->l_bp = lp->l_bp;
+	lforw(nlp) = lforw(lp);
+	lback(nlp) = lback(lp);
 	/* copy the rest */
 	if (lp->l_text && nlp->l_text)
 		memcpy(nlp->l_text, lp->l_text, lp->l_used);
@@ -342,21 +345,21 @@ int f,n;
 	while ((lp = popline(CURSTK(curbp))) != NULL) {
 		nopops = FALSE;
 		if (lislinepatch(lp)) {
-			applypatch(lp->l_bp, lp->l_fp);
+			applypatch(lback(lp), lforw(lp));
 			lfree(lp,curbp);
 			continue;
 		}
 		chg_buff(curbp, WFHARD|WFINS|WFKILLS);
-		if (lp->l_bp->l_fp != lp->l_fp) { /* theres something there */
-			if (lp->l_bp->l_fp->l_fp == lp->l_fp) {
+		if (lforw(lback(lp)) != lforw(lp)) { /* theres something there */
+			if (lforw(lforw(lback(lp))) == lforw(lp)) {
 				/* then there is exactly one line there */
 				/* alp is the line to remove */
 				/* lp is the line we're putting in */
-				alp = lp->l_bp->l_fp;
+				alp = lforw(lback(lp));
 				repointstuff(lp,alp);
 				/* remove it */
-				lp->l_bp->l_fp = alp->l_fp;
-				alp->l_fp->l_bp = alp->l_bp;
+				lforw(lback(lp)) = lforw(alp);
+				lback(lforw(alp)) = lback(alp);
 			} else { /* there is more than one line there */
 				mlforce("BUG: no stacked line for an insert");
 				/* cleanup ? naw, a bugs a bug */
@@ -368,15 +371,15 @@ int f,n;
 			if (alp == NULL)
 				return(FALSE);
 			llength(alp) = LINENOTREAL;
-			alp->l_fp = lp->l_fp;
-			alp->l_bp = lp->l_bp;
+			lforw(alp) = lforw(lp);
+			lback(alp) = lback(lp);
 		}
 
 		/* insert real lines into the buffer 
 			throw away the markers */
 		if (lisreal(lp)) {
-			lp->l_bp->l_fp = lp;
-			lp->l_fp->l_bp = lp;
+			lforw(lback(lp)) = lp;
+			lback(lforw(lp)) = lp;
 		} else {
 			lfree(lp,curbp);
 		}
@@ -449,8 +452,8 @@ int f,n;
 
 	lp = ulp->l_nxtundo;
 
-	if (ulp->l_fp != lp->l_fp ||
-	    ulp->l_bp != lp->l_bp) {
+	if (lforw(ulp) != lforw(lp) ||
+	    lback(ulp) != lback(lp)) {
 	    	/* then the change affected more than one line */
 		dumpuline(ulp);
 		return FALSE;
@@ -523,7 +526,7 @@ register LINE *nlp,*olp;
 		if (lisreal(nlp)) {
 			DOT.l = nlp;
 		} else {
-			DOT.l = olp->l_fp;
+			DOT.l = lforw(olp);
 		}
 		DOT.o = 0;
 	}
@@ -532,7 +535,7 @@ register LINE *nlp,*olp;
 		if (lisreal(nlp)) {
 			MK.l = nlp;
 		} else {
-			MK.l = olp->l_fp;
+			MK.l = lforw(olp);
 		}
 		MK.o = 0;
 	}
@@ -543,14 +546,14 @@ register LINE *nlp,*olp;
 			if (lisreal(nlp)) {
 				wp->w_line.l = nlp;
 			} else {
-				wp->w_line.l = olp->l_fp;
+				wp->w_line.l = lforw(olp);
 			}
 #if WINMARK
 		if (wp->w_mark.l == olp) {
 			if (lisreal(nlp)) {
 				wp->w_mark.l = nlp;
 			} else {
-				wp->w_mark.l = olp->l_fp;
+				wp->w_mark.l = lforw(olp);
 			}
 			wp->w_mark.o = 0;
 		}
@@ -559,7 +562,7 @@ register LINE *nlp,*olp;
 			if (lisreal(nlp)) {
 				wp->w_lastdot.l = nlp;
 			} else {
-				wp->w_lastdot.l = olp->l_fp;
+				wp->w_lastdot.l = lforw(olp);
 			}
 			wp->w_lastdot.o = 0;
 		}

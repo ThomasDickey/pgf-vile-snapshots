@@ -6,7 +6,17 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.76  1993/04/09 16:50:17  pgf
+ * Revision 1.79  1993/04/20 12:18:32  pgf
+ * see tom's 3.43 CHANGES
+ *
+ * Revision 1.78  1993/04/20  12:03:35  pgf
+ * AIX needs sys/ioctl.h (actually it doesn't, since it's POSIX, but i'm
+ * adding it here for completeness)
+ *
+ * Revision 1.77  1993/04/20  12:00:02  pgf
+ * scroll sideways by half screens
+ *
+ * Revision 1.76  1993/04/09  16:50:17  pgf
  * fix off-by-one when doing auto-horizontal-scroll leftward, and
  * allow the cursor to sit on the last column if it's the last char on the
  * line
@@ -273,7 +283,7 @@
 #   include <termio.h>
 #  else
 #   if BERK
-#    if APOLLO
+#    if APOLLO || AIX
 #     include <sys/ioctl.h>
 #   else
 #     include <ioctl.h>
@@ -306,6 +316,17 @@ VIDEO   **vscreen;                      /* Virtual screen. */
 VIDEO   **pscreen;                      /* Physical screen. */
 #endif
 
+#if IBMPC
+#define PScreen(n) scread((VIDEO *)0,n)
+#else
+#define	PScreen(n) pscreen[n]
+#endif
+
+#if SCROLLCODE && (IBMPC || !MEMMAP)
+#define CAN_SCROLL 1
+#else
+#define CAN_SCROLL 0
+#endif
 
 int displaying = FALSE;
 /* for window size changes */
@@ -723,7 +744,7 @@ char *s;
 int n;
 {
 	int c;
-	while (n-- && (c = *s++) != 0)
+	while (n-- && (c = *s++) != EOS)
 		vtputc(c);
 }
 
@@ -908,11 +929,6 @@ int force;	/* force update past type ahead? */
 	if (updpos(&screencol)) /* if true, full horizontal scroll happened */
 		goto restartupdate;
 
-#if	MEMMAP
-	/* update the cursor and flush the buffers */
-	/* movecursor(currow, screencol); */
-#endif
-
 	/* check for lines to de-extend */
 	upddex();
 
@@ -944,7 +960,7 @@ WINDOW *wp;
 
 	/* if not a requested reframe, check for a needed one */
 	if ((wp->w_flag & WFFORCE) == 0) {
-#if SCROLLCODE && ! MEMMAP
+#if CAN_SCROLL
 		/* loop from one line above the window to one line after */
 		lp = lback(wp->w_line.l);
 		for (i = -1; i <= wp->w_ntrows; i++)
@@ -957,7 +973,7 @@ WINDOW *wp;
 
 			/* if the line is in the window, no reframe */
 			if (lp == wp->w_dot.l) {
-#if SCROLLCODE && ! MEMMAP
+#if CAN_SCROLL
 				/* if not _quite_ in, we'll reframe gently */
 				if ( i < 0 || i == wp->w_ntrows) {
 					/* if the terminal can't help, then
@@ -979,7 +995,7 @@ WINDOW *wp;
 		}
 	}
 
-#if SCROLLCODE && ! MEMMAP
+#if CAN_SCROLL
 	if (i == -1) {	/* we're just above the window */
 		i = 1;	/* put dot at first line */
 		scrflags |= WFINS;
@@ -1157,14 +1173,14 @@ int *screencolp;
 	if ((excess > 0) || (excess == 0 && 
 			(DOT.o < llength(DOT.l) - 1 ))) {
 		if (w_val(curwp,WMDHORSCROLL)) {
-			mvrightwind(TRUE, excess + 3*collimit/4 );
+			(void)mvrightwind(TRUE, excess + collimit/2 );
 			moved = TRUE;
 		} else {
 			*screencolp = updext_past(col, excess);
 		}
 	} else if (w_val(curwp,WVAL_SIDEWAYS) && (curcol < 1)) {
 		if (w_val(curwp,WMDHORSCROLL)) {
-			mvleftwind(TRUE, -curcol + 3*collimit/4 + 1);
+			(void)mvleftwind(TRUE, -curcol + collimit/2 + 1);
 			moved = TRUE;
 		} else {
 			*screencolp = updext_before(col);
@@ -1223,8 +1239,11 @@ extern char mlsave[];
 void
 updgar()
 {
+#if !MEMMAP
 	register char *txt;
-	register int i,j;
+	register int j;
+#endif
+	register int i;
 
 	for (i = 0; i < term.t_nrow; ++i) {
 		vscreen[i]->v_flag |= VFCHG;
@@ -1264,7 +1283,7 @@ int force;	/* forced update flag */
 	register VIDEO *vp1;
 	register int i;
 
-#if SCROLLCODE && ! MEMMAP
+#if CAN_SCROLL
 	if (scrflags & WFKILLS)
 		scrolls(FALSE);
 	if (scrflags & WFINS)
@@ -1290,7 +1309,7 @@ int force;	/* forced update flag */
 	}
 }
 
-#if SCROLLCODE && ! MEMMAP
+#if CAN_SCROLL
 /* optimize out scrolls (line breaks, and newlines) */
 /* arg. chooses between looking for inserts or deletes */
 int	
@@ -1323,7 +1342,7 @@ int inserts;
 		return FALSE;		/* no text changes */
 
 	vpv = vscreen[first] ;
-	vpp = pscreen[first] ;
+	vpp = PScreen(first) ;
 
 	if (inserts) {
 		/* determine types of potential scrolls */
@@ -1385,7 +1404,7 @@ int inserts;
 		}
 		scrscroll(from, to, count) ;
 		for (i = 0; i < count; i++) {
-			vpp = pscreen[to+i] ;
+			vpp = PScreen(to+i) ;
 			vpv = vscreen[to+i];
 			(void)strncpy(vpp->v_text, vpv->v_text, cols) ;
 		}
@@ -1398,7 +1417,7 @@ int inserts;
 		}
 		for (i = from; i < to; i++) {
 			char *txt;
-			txt = pscreen[i]->v_text;
+			txt = PScreen(i)->v_text;
 			for (j = 0; j < term.t_ncol; ++j)
 				txt[j] = ' ';
 			vscreen[i]->v_flag |= VFCHG;
@@ -1422,7 +1441,7 @@ texttest(vrow,prow)		/* return TRUE on text match */
 int	vrow, prow ;		/* virtual, physical rows */
 {
 	struct	VIDEO *vpv = vscreen[vrow] ;	/* virtual screen image */
-	struct	VIDEO *vpp = pscreen[prow]  ;	/* physical screen image */
+	struct	VIDEO *vpp = PScreen(prow)  ;	/* physical screen image */
 
 	return (!memcmp(vpv->v_text, vpp->v_text, term.t_ncol)) ;
 }
@@ -1528,15 +1547,15 @@ struct VIDEO *vpdummy;	/* virtual screen image */
 
 {
 #if	COLOR
-	scwrite(row, 0, term.t_ncol-1,
+	scwrite(row, 0, term.t_ncol,
 		vp1->v_text, vp1->v_rfcolor, vp1->v_rbcolor);
 	vp1->v_fcolor = vp1->v_rfcolor;
 	vp1->v_bcolor = vp1->v_rbcolor;
 #else
 	if (vp1->v_flag & VFREQ)
-		scwrite(row, 0, term.t_ncol-1, vp1->v_text, 0, 7);
+		scwrite(row, 0, term.t_ncol, vp1->v_text, 0, 7);
 	else
-		scwrite(row, 0, term.t_ncol-1, vp1->v_text, 7, 0);
+		scwrite(row, 0, term.t_ncol, vp1->v_text, 7, 0);
 #endif
 	vp1->v_flag &= ~(VFCHG | VFCOL);	/* flag this line as changed */
 
@@ -1781,11 +1800,33 @@ WINDOW *wp;
 		vtputsn(" [dos-style]", 20);
 	if (bp->b_flag&BFCHG)
 		vtputsn(" [modified]", 20);
-	if (bp->b_fname && bp->b_fname[0]) {
+	if (bp->b_fname != 0 && bp->b_fname[0] != EOS) {
 		char *p;
 		p = shorten_path(strcpy(temp,bp->b_fname), FALSE);
-		if (p != 0 && strcmp(p,bp->b_bname) != 0)
-			vtprintf(" is %s",p);
+		if (p != 0 && strcmp(p,bp->b_bname) != 0) {
+			/* line-up the internal-names */
+#if !SMALLER
+			if (is_internalname(p)) {
+				int	fix,
+					len = strlen(p),
+					gap = term.t_ncol - (11 + len + vtcol);
+				vtputc(' ');
+				while (gap-- > 0)
+					vtputc(lchar);
+				fix = vtcol;
+				vtputsn(p, len);
+				if (lchar != ' ') {
+					register int m;
+					char	*s = vscreen[vtrow]->v_text;
+
+					for (m = fix; m < vtcol && isspace(s[m]); m++)
+						s[m] = lchar;
+					s[--m] = ' ';
+				}
+			} else
+#endif /* !SMALLER */
+				vtprintf(" is %s", p);
+		}
 	}
 	vtputc(' ');
 

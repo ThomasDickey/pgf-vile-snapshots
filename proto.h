@@ -5,7 +5,16 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.44  1993/04/09 13:43:18  pgf
+ * Revision 1.47  1993/04/21 14:08:28  pgf
+ * added do_repeats()
+ *
+ * Revision 1.46  1993/04/20  12:18:32  pgf
+ * see tom's 3.43 CHANGES
+ *
+ * Revision 1.45  1993/04/12  19:19:58  pgf
+ * added finderrbuf routine
+ *
+ * Revision 1.44  1993/04/09  13:43:18  pgf
  * added a bunch of missing prototypes, found with -Wmissing-prototypes
  *
  * Revision 1.43  1993/04/08  15:00:53  pgf
@@ -143,13 +152,12 @@
  */
 
 extern int main P(( int, char *[] ));
-#if MSDOS
-extern void expand_wild_args P(( int * , char ***));
-#endif /* MSDOS */
 extern void loop P(( void ));
 extern char * strmalloc P(( char * ));
+extern int no_memory P(( char * ));
 extern void global_val_init P(( void ));
 extern DEFINE_SIGNAL(catchintr);
+extern void do_repeats P(( int *, int *, int * ));
 extern void do_num_proc P(( int *, int *, int * ));
 extern void do_rept_arg_proc P(( int *, int *, int * ));
 extern int writeall P(( int, int ));
@@ -255,7 +263,9 @@ extern char * flook P(( char *, int ));
 extern char * kcod2str P(( int, char * ));
 extern char * kcod2prc P(( int, char * ));
 extern int insertion_cmd P(( void ));
+#ifdef GMDDOTMACRO
 extern int fnc2kcod P(( CMDFUNC * ));
+#endif
 extern char * fnc2engl P(( CMDFUNC * ));
 extern CMDFUNC * engl2fnc P(( char * ));
 extern CMDFUNC * kcod2fnc P(( int ));
@@ -447,6 +457,7 @@ extern int cbuf40 P(( int, int ));
 
 /* file.c */
 extern int no_such_file P(( char * ));
+extern int same_fname P(( char *, BUFFER *, int ));
 extern int fileread P(( int, int ));
 extern int filefind P(( int, int ));
 extern int viewfile P(( int, int ));
@@ -463,7 +474,6 @@ extern int filewrite P(( int, int ));
 extern int filesave P(( int, int ));
 extern int writeout P(( char *, BUFFER *, int ));
 extern int writeregion P(( void ));
-extern int writereg P(( REGION *, char *, int, int, BUFFER ** ));
 extern int kwrite P(( char *, int ));
 extern int filename P(( int, int ));
 extern int ifile P(( char *, int, FILE * ));
@@ -472,12 +482,13 @@ extern DEFINE_SIGNAL(imdying);
 extern void markWFMODE P(( BUFFER * ));
 
 /* filec.c */
-#if UNIX || defined(MDTAGSLOOK)
+#if COMPLETE_DIRS || COMPLETE_FILES || defined(MDTAGSLOOK)
 extern BUFFER *bs_init P(( char *, int ));
 extern int bs_find P(( char *, int, BUFFER *, int, LINE ** ));
 #endif
 extern int mlreply_file P(( char *, TBUFF **, int, char * ));
 extern int mlreply_dir P(( char *, TBUFF **, char * ));
+extern char *filec_expand P(( void ));
 
 /* fileio.c */
 extern int ffropen P(( char * ));
@@ -494,6 +505,9 @@ extern int ffhasdata P(( void ));
 extern int finderr P(( int, int ));
 extern struct LINE * getdot P(( struct BUFFER * ));
 extern void putdotback P(( BUFFER *, LINE * ));
+extern int finderrbuf P(( int, int ));
+
+/* globals.c */
 extern int globals P(( int, int ));
 extern int vglobals P(( int, int ));
 extern int globber P(( int, int, int ));
@@ -528,7 +542,7 @@ extern int get_recorded_char P(( int ));
 extern int tgetc P(( int ));
 extern int kbd_key P(( void ));
 extern int kbd_seq P(( void ));
-extern int screen_string P(( char *, int, int ));
+extern int screen_string P(( char *, int, CMASK ));
 extern int end_string P(( void ));
 extern int is_edit_char P(( int ));
 extern void kbd_kill_response P(( char *, int *, int ));
@@ -660,7 +674,6 @@ extern char * vms_pathleaf P(( char * ));
 extern char * pathleaf P(( char * ));
 extern char * pathcat P(( char *, char *, char * ));
 extern char * last_slash P(( char * ));
-extern int glob P(( char * ));
 extern char * canonpath P(( char * ));
 extern char * shorten_path P(( char *, int ));
 extern char * lengthen_path P(( char * ));
@@ -669,6 +682,7 @@ extern int maybe_pathname P(( char * ));
 extern char * is_appendname P(( char * ));
 extern char * non_filename P(( void ));
 extern int is_internalname P(( char * ));
+extern int is_directory P(( char * ));
 
 /* random.c */
 extern int line_no P(( BUFFER *, LINE * ));
@@ -968,6 +982,7 @@ extern	int x_key_events_ready P(( void ));
 #if MSDOS
 /* ibmpc.c */
 extern	void scwrite P(( int, int, int, char *, int, int ));
+extern VIDEO *scread P(( VIDEO *, int ));
 /* random.c */
 extern char * curr_dir_on_drive P(( int ));
 extern int curdrive P(( void ));

@@ -1,4 +1,119 @@
 
+Changes for vile 3.43:
+(pgf)
+	+ changed NAMEC from SPACE to TAB (estruct.h).  changed eolchar arg
+	  passed to kbd_reply in kbd_engl_stat from NAMEC to ' ', to
+	  compensate.  added check against command term'ed with ' ' in 
+	  execute_named_cmd() (exec.c).
+
+	+ added check for iswild() when scanning for wildcard chars in glob.c
+
+	+ allow nulls as well as newlines to separate filenames in glob-pipe
+	  output.
+
+	+ added finderrbuf() routine (command is "error-buffer" or "find-next-
+	  error-buffer-name"), to set the name of the buffer to scan for errors.
+	  (finderr.c, proto.h, cmdtbl, vile.hlp)
+
+	+ fixed pathname bug when scanning output that contains Entering/
+	  Leaving pairs.  We no longer just keep a pointer to where we
+	  found the directory name, but now malloc space for it.
+
+	+ horizontal scrolling moves by half screens by default (window.c,
+	  display.c)
+
+	+ added AIX to machines that need sys/ioctl.h (termio.c, display.c)
+	
+	+ further fix to repeat counts and the '.' command, so that all cases
+	  ( 6dw , 3d2w , etc.) work.
+
+	+ support for letting a named register on a '.' command override
+	  what was originally typed:  "adw"b.  will put one word in register
+	  a and the nex in register b.  (input.c line.c exec.c)
+
+(tom)
+	+ corrected define in dirstuff.h to make TurboC compile again.
+
+	+ corrected logic of 'makename()' in file.c for MS-DOS.
+
+	+ added type CMASK to correct use of _chartypes[] array on MS-DOS
+	  (e.g., in 'screen_string()' in input.c).
+
+	+ deleted VMS-DCL file 'vile.com', since this causes conflict on
+	  MS-DOS.
+
+	+ lowercased color names in file modes.c
+
+	+ modified ibmpc.c to get true white and yellow colors (had gray and
+	  brown).
+
+	+ modified files ibmpc.c and display.c to allow MS-DOS version to do
+	  scrolling.
+
+	+ removed unused assignments from file insert.c
+
+	+ substituted all l_fp references to lforw macro, l_bp references to
+	  lback macro, verified mechanically.
+
+	+ make special case in 'dotcmdplay()' to allow (like vi) the repeat
+	  count on '.' command to replace that on the replayed command.
+
+	+ modified logic of 'writereg()' to allow its call on 'imply_alt()' to
+	  correctly set the 'copy' parameter (only if a whole file is written).
+
+	+ introduced new function 'same_fname()' to correct places where
+	  matches between a filename and the buffer's filename broke (either
+	  because it was not in canonical form, or because VMS version numbers
+	  were not stripped).
+
+	+ modified fileio.c to read/write binary files on MS-DOS to avoid
+	  truncating files at ^Z.  This does not make ^M visible however.
+
+	+ ifdefd out contents of 'dot_replays_macro()' in input.c to avoid
+	  side-effects
+
+	+ corrected logic of 'tungetc()' in file input.c; this had broken
+	  replay of keyboard macro "iX<esc>/Y^MaZ<esc>".
+
+	+ split out 'expand_wild_args()' from main.c into a new file glob.c,
+	  which contains globbing code.  Moved 'glob()' from path.c to glob.c
+	  also.
+
+	+ moved function 'is_directory()' from filec.c to path.c; made it
+	  public.
+
+	+ added function 'no_memory()' to encapsulate the more common places
+	  that vile/msdos runs out of memory; use this in several places to
+	  simplify error reporting.
+
+	+ added universal-mode "history", to allow turning that function off,
+	  and instrumented history.c to automatically turn logging off if vile
+	  runs out of memory.  (It is annoying to get out-of-memory errors on
+	  _every_ command).
+
+	+ modified display.c to fill in the long space before program & version
+	  identifier for the scratch buffer (on the mode line).
+
+	+ added option to 'mlreply_file()' to allow expansion of wildcard to
+	  multiple files.  Use this in file.c (for ":e" and ":view" commands).
+
+	+ modified files descrip.mms and vms_link.opt because (with new module
+	  glob.c) the link-command line got too long.  Other mods to file
+	  descrip.mms to make file vile.com generated (to avoid leaving it
+	  around for ms-dos configuration), and the 'clean' and '.last' rules
+	  (to make them less noisy).
+
+	+ corrected 'ffronly()' in fileio.c; on VMS this caused some files to
+	  be touched.
+
+	+ implemented scrolling in file vmsvt.c
+
+	+ implemented 'glob' mode to control how wildcards are expanded
+	  (affects files main.c, modes.c, glob.c) and the corresponding piped
+	  commands for glob-mode.
+
+	+ added logic to 'makename()' to handle embedded blanks in filenames.
+
 Changes for vile 3.42:
 (pgf)
 	+ added routine tb_stuff() (tbuff.c), which is roughly the

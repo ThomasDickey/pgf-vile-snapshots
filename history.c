@@ -64,7 +64,10 @@
  *	Allow left/right scrolling of input lines (when they get too long).
  *
  * $Log: history.c,v $
- * Revision 1.4  1993/04/01 13:06:31  pgf
+ * Revision 1.5  1993/04/20 12:18:32  pgf
+ * see tom's 3.43 CHANGES
+ *
+ * Revision 1.4  1993/04/01  13:06:31  pgf
  * turbo C support (mostly prototypes for static)
  *
  * Revision 1.3  1993/03/16  10:53:21  pgf
@@ -97,6 +100,7 @@ typedef	struct	{
 
 /*--------------------------------------------------------------------------*/
 static	BUFFER *makeMyBuff P(( void ));
+static	void	stopMyBuff P(( void ));
 static	int	willGlue P(( void ));
 static	int	willExtend P(( char *, int ));
 static	int	sameLine P(( LINE *, char *, int ));
@@ -122,12 +126,31 @@ static BUFFER *
 makeMyBuff()
 {
 	register BUFFER *bp;
-	if ((bp = bfind(MyBuff, OK_CREAT, BFINVS)) != 0) { 
+
+	if (!global_g_val(GMDHISTORY)) {
+		bp = 0;
+	} else if ((bp = bfind(MyBuff, OK_CREAT, BFINVS)) != 0) { 
 		bp->b_flag |= BFINVS;
 		bp->b_flag &= ~BFSCRTCH;	/* make it nonvolatile */
 		bp->b_active = TRUE;
+	} else {
+		stopMyBuff();
 	}
 	return bp;
+}
+
+static void
+stopMyBuff()
+{
+	register BUFFER *bp;
+
+	if ((bp = bfind(MyBuff, NO_CREAT, 0)) != 0)
+		zotbuf(bp);
+
+	set_global_g_val(GMDABUFF,FALSE);
+
+	tb_free(&MyText);
+	tb_free(&MyArgs);
 }
 
 /*
@@ -332,7 +355,7 @@ hst_flush()
 		 }
 
 		if (!addline(bp, tb_args(MyText))) {
-	 		(void)tb_init(&MyText, abortc);
+	 		stopMyBuff();
 			return;
 		}
 
@@ -363,10 +386,8 @@ int	f,n;
 {
 	register BUFFER *bp = makeMyBuff();
 
-	if (bp == 0 || popupbuff(bp) == FALSE) {
-		mlforce("[Can't list History]");
-		return FALSE;
-	}
+	if (bp == 0 || popupbuff(bp) == FALSE)
+		return no_memory("show-history");
 	return TRUE;
 }
 

@@ -2,7 +2,17 @@
  * Written for vile by Paul Fox, (c)1990
  *
  * $Log: finderr.c,v $
- * Revision 1.16  1993/04/01 13:07:50  pgf
+ * Revision 1.19  1993/04/20 12:18:32  pgf
+ * see tom's 3.43 CHANGES
+ *
+ * Revision 1.18  1993/04/13  18:49:58  pgf
+ * fixed leak in prev. fix
+ *
+ * Revision 1.17  1993/04/12  19:23:52  pgf
+ * fixed bug in pathname handling when doing Entering/Leaving pairs, and
+ * added finderrbuf() command
+ *
+ * Revision 1.16  1993/04/01  13:07:50  pgf
  * see tom's 3.40 CHANGES
  *
  * Revision 1.15  1993/03/05  17:50:54  pgf
@@ -89,8 +99,9 @@ int f,n;
 	
 	static int oerrline = -1;
 	static char oerrfile[256];
-	static int l = 0;
+
 #define DIRLEVELS 20
+	static int l = 0;
 	static char *dirs[DIRLEVELS];
 
 	/* look up the right buffer */
@@ -102,8 +113,8 @@ int f,n;
         if (newfebuff) {
         	oerrline = -1;
         	oerrfile[0] = '\0';
-		l = 0;
-		dirs[0] = NULL;
+		while (l)
+			free(dirs[l--]);
         }
         newfebuff = FALSE;
 
@@ -128,7 +139,8 @@ int f,n;
 #endif
 
 			if (tb_init(&tmp, EOS) != 0
-			 && tb_bappend(&tmp, dotp->l_text, (unsigned)llength(dotp)) != 0
+			 && tb_bappend(&tmp, dotp->l_text, 
+			 	(unsigned)llength(dotp)) != 0
 			 && tb_append(&tmp, EOS) != 0)
 			 	text = tb_values(tmp);
 			else
@@ -159,13 +171,28 @@ int f,n;
 				break;
 			} else if (sscanf(text,
 			"%*[^ \t:`]: %20[^ \t`] directory `",verb) == 1 ) {
-				char *d = strchr(text, '`') + 1;
-				if (verb[0] == 'E') { /* Entering */
-					if (l < DIRLEVELS)
-						dirs[++l] = d;
-				} else if (verb[0] == 'L'){ /* Leaving */
+				if (!strcmp(verb, "Entering")) {
+					if (l < DIRLEVELS) {
+						char *e,*d;
+						/* find the start of path */
+						d = strchr(text, '`');
+						if (!d)
+							continue;
+						d += 1;
+						/* find the term. quote */
+						e = strchr(d, '\'');
+						if (!e)
+							continue;
+						/* put a null in its place */
+						*e = '\0';
+						/* make a copy */
+						dirs[++l] = strmalloc(d);
+						/* put the quote back */
+						*e = '\'';
+					}
+				} else if (!strcmp(verb, "Leaving")) {
 					if (l > 0)
-						--l;
+						free(dirs[l--]);
 				}
 			}
 		}
@@ -175,8 +202,8 @@ int f,n;
 			TTbeep();
 			/* start over at the top of file */
 			putdotback(sbp, lforw(sbp->b_line.l));
-			l = 0;
-			dirs[0] = NULL;
+			while (l)
+				free(dirs[l--]);
 			return FALSE;
 		}
 		dotp = lforw(dotp);
@@ -188,24 +215,18 @@ int f,n;
 		putdotback(sbp,dotp);
 
 	if (dirs[l]) {
-		int i = 0;
-		while(dirs[l][i] != '\'') {
-			ferrfile[i] = dirs[l][i];
-			i++;
-		}
-		ferrfile[i++] = '/';
-		(void)strcpy(&ferrfile[i],errfile);
+		lsprintf(ferrfile,"%s%c%s",dirs[l],slash,errfile);
 	} else {
-		/* lsprintf(ferrfile,"%s/%s",current_directory(FALSE),errfile); */
 		(void)strcpy(ferrfile,errfile);
 	}
+
 	if (strcmp(ferrfile,curbp->b_bname) &&
 		strcmp(ferrfile,curbp->b_fname)) {
 		/* if we must change windows */
 		struct WINDOW *wp;
 		for_each_window(wp) {
-			if (!strcmp(wp->w_bufp->b_bname,ferrfile) ||
-				!strcmp(wp->w_bufp->b_fname,ferrfile))
+			if (!strcmp(wp->w_bufp->b_bname,ferrfile)
+			 || !strcmp(wp->w_bufp->b_fname,ferrfile))
 				break;
 		}
 		if (wp) {
@@ -271,6 +292,29 @@ struct LINE *dotp;
         bp->b_dot.o = 0;
 }
 
+/*
+ * Ask for a new finderr buffer name
+ */
+/* ARGSUSED */
+int
+finderrbuf(f, n)
+int f,n;
+{
+        register int    s;
+        char name[NFILEN];
+
+        if ((s = mlreply_file("Buffer to scan for \"errors\": ", (TBUFF **)0, 
+			FILEC_UNKNOWN, name)) == ABORT)
+                return s;
+        if (s == FALSE)
+                strcpy(febuff, ScratchName(Output));
+        else
+                strcpy(febuff, name);
+
+	newfebuff = TRUE;
+
+        return TRUE;
+}
 #else
 finderrhello() { }
 #endif

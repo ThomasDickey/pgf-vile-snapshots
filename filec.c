@@ -4,7 +4,10 @@
  *	Filename prompting and completion routines
  *
  * $Log: filec.c,v $
- * Revision 1.9  1993/04/02 11:00:40  pgf
+ * Revision 1.10  1993/04/20 12:18:32  pgf
+ * see tom's 3.43 CHANGES
+ *
+ * Revision 1.9  1993/04/02  11:00:40  pgf
  * ls-style directory reading moved to path.c.  thanks -- much better, tom.
  *
  * Revision 1.8  1993/04/01  15:50:34  pgf
@@ -39,6 +42,7 @@
 
 #include "estruct.h"
 #include "edef.h"
+#include "glob.h"
 
 #define	SLASH (EOS+1) /* less than everything but EOS */
 
@@ -54,30 +58,32 @@
 #define	KBD_OPTIONS	KBD_NORMAL
 #endif
 
+static	char	**MyGlob;	/* expanded list */
+static	int	in_glob;	/* index into MyGlob[] */
 static	int	only_dir;	/* can only match real directories */
 
-#if VMS|| UNIX || defined(MDTAGSLOOK)
+static void
+free_expansion P(( void ))
+{
+	if (MyGlob != 0)
+		glob_free(MyGlob);
+	MyGlob = 0;
+	in_glob = -1;
+}
 
-#include <sys/stat.h>
+#if COMPLETE_DIRS || COMPLETE_FILES || defined(MDTAGSLOOK)
+
 #include "dirstuff.h"
 
-/*
- * Test if the given path is a directory
- */
-static int
-is_directory(path)
-char *	path;
-{
-	struct	stat	sb;
+static	int	trailing_slash P((char *));
+static	int	force_slash P((char *));
+static	int	trailing_SLASH P((char *));
+static	int	force_SLASH P((char *));
+static	void	conv_path P((char *, char *, int));
+static	int	pathcmp P((LINE *, char *));
+static	LINE *	makeString P((BUFFER *, LINE *, char *));
 
-#if VMS
-	if (is_vms_pathname(path, TRUE))
-		return TRUE;
-#endif
-	return ((*path != EOS)
-	  &&	(stat(path, &sb) >= 0)
-	  &&	((sb.st_mode & S_IFMT) == S_IFDIR));
-}
+/*--------------------------------------------------------------------------*/
 
 /*
  * Test if the path has a trailing slash-delimiter (i.e., can be syntactically
@@ -160,7 +166,7 @@ int	len;
 {
 	register int	c;
 
-	while ((len-- > 0) && (c = *src++)) {
+	while ((len-- > 0) && (c = *src++) != EOS) {
 #if VMS
 		if (strchr(":[]!", c))
 			c = SLASH;
@@ -182,8 +188,8 @@ pathcmp(lp, text)
 LINE *	lp;
 char *	text;
 {
-	char	ref[NFILEN],
-		tst[NFILEN];
+	char	refbfr[NFILEN], *ref = refbfr,
+		tstbfr[NFILEN], *tst = tstbfr;
 	int	reflen = llength(lp),	/* length, less null */
 		tstlen = strlen(text);
 	register int	j, k;
@@ -193,6 +199,24 @@ char *	text;
 
 	conv_path(ref, lp->l_text, reflen);
 	conv_path(tst, text,       tstlen);
+
+#if MSDOS
+	/*
+	 * Check to see if the drives are the same.  If not, there is no
+	 * point in further comparison.
+	 */
+	if ((ref = is_msdos_drive(refbfr)) != 0) {
+		if ((tst = is_msdos_drive(tstbfr)) != 0) {
+			if (*refbfr != *tstbfr)
+				return (*refbfr - *tstbfr);
+		} else
+			tst = tstbfr;
+	} else {
+		ref = refbfr;
+		if ((tst = is_msdos_drive(tstbfr)) == 0)
+			tst = tstbfr;
+	}
+#endif
 
 	/* If we stored a trailing slash on the ref-value, then it was known to
 	 * be a directory.  Append a slash to the tst-value in that case to
@@ -255,10 +279,10 @@ char *	text;
 		(void)strcpy(np->l_text, text);
 		llength(np) -= 2;	/* hide the null */
 
-		lp->l_bp->l_fp = np;
-		np->l_bp = lp->l_bp;
-		lp->l_bp = np;
-		np->l_fp = lp;
+		lforw(lback(lp)) = np;
+		lback(np) = lback(lp);
+		lback(lp) = np;
+		lforw(np) = lp;
 		lp = np;
 	}
 	return lp;
@@ -385,9 +409,17 @@ LINE **	lpp;	/* in/out line pointer, for iteration */
 		*lpp = lp;
 	return TRUE;
 }
-#endif /* UNIX || defined(MDTAGSLOOK) */
+#endif /* COMPLETE_DIRS || COMPLETE_FILES || defined(MDTAGSLOOK) */
 
-#if UNIX || VMS
+#if COMPLETE_DIRS || COMPLETE_FILES
+
+static	int	already_scanned P((char *));
+static	void	fillMyBuff P((char *));
+static	void	makeMyList P((void));
+#if NO_LEAKS
+static	void	freeMyList P((void));
+#endif
+
 static	BUFFER	*MyBuff;	/* the buffer containing pathnames */
 static	char	*MyName;	/* name of buffer for name-completion */
 static	char	**MyList;	/* list, for name-completion code */
@@ -463,8 +495,16 @@ char *	name;
 		s += force_slash(path);
 
 		while ((de = readdir(dp)) != 0) {
+#if UNIX || VMS
 			strncpy(s, de->d_name, (int)(de->d_namlen))[de->d_namlen] = EOS;
-#if UNIX
+#else
+#if MSDOS
+			(void)mklower(strcpy(s, de->d_name));
+#else
+			huh??
+#endif
+#endif
+#if UNIX || MSDOS
 			if (!strcmp(s, ".")
 			 || !strcmp(s, ".."))
 			 	continue;
@@ -656,7 +696,7 @@ int	*pos;
 }
 #else	/* no filename-completion */
 #define	freeMyList()
-#endif	/* UNIX */
+#endif	/* filename-completion */
 
 /******************************************************************************/
 int
@@ -672,15 +712,16 @@ char *	result;
 	int	(*complete) P(( int, char *, int *)) = no_completion;
 	int	had_fname = (curbp != 0 && curbp->b_fname != 0);
 	int	do_prompt = (clexec || isnamedcmd || (flag & FILEC_PROMPT));
+	int	ok_expand = (flag & FILEC_EXPAND);
 
-	flag &= ~ FILEC_PROMPT;
+	flag &= ~ (FILEC_PROMPT | FILEC_EXPAND);
 
 #ifdef GMDTAGSLOOK	/* looktags overrides file completion */
 	if (flag >= FILEC_UNKNOWN && global_g_val(GMDTAGSLOOK))
 		;
 	else
 #endif
-#if UNIX || VMS
+#if COMPLETE_FILES
 	if (isnamedcmd && !clexec) {
 		complete = path_completion;
 		MyBuff = 0;
@@ -725,12 +766,21 @@ char *	result;
 		mlforce("[file is not a legal input]");
 		return FALSE;
 	}
-	if ((s = glob(Reply)) != TRUE)
+
+	free_expansion();
+	if (ok_expand) {
+		if ((MyGlob = glob_string(Reply)) == 0
+		 || glob_length(MyGlob) == 0) {
+			mlforce("[No files found] %s", Reply);
+			return FALSE;
+		}
+	} else if (glob(Reply) != TRUE) {
 		return FALSE;
+	}
 
 	(void)strcpy (result, Reply);
 #ifdef GMDTAGSLOOK
-	if (flag >= FILEC_UNKNOWN && global_g_val(GMDTAGSLOOK)) {
+	if (flag >= FILEC_UNKNOWN && !ok_expand && global_g_val(GMDTAGSLOOK)) {
 		LINE	*lp = 0;
 		BUFFER	*bp;
 		int	count = 0;
@@ -747,8 +797,7 @@ char *	result;
 	}
 #endif
 	if (flag <= FILEC_WRITE) {	/* we want to write a file */
-		if (strcmp(Reply, curbp->b_fname) != 0
-		 && !isShellOrPipe(Reply)
+		if (!same_fname(Reply, curbp, TRUE)
 		 && flook(Reply, FL_HERE)) {
 			if (mlyesno("File exists, okay to overwrite") != TRUE) {
 				mlwrite("File not written");
@@ -772,7 +821,7 @@ char *	result;
 	char	Reply[NFILEN];
 	int	(*complete) P(( int, char *, int *)) = no_completion;
 
-#if UNIX
+#if COMPLETE_DIRS
 	if (isnamedcmd && !clexec) {
 		complete = path_completion;
 		MyBuff = 0;
@@ -799,4 +848,21 @@ char *	result;
 
 	(void)tb_scopy(buf, strcpy(result, Reply));
 	return TRUE;
+}
+
+/******************************************************************************/
+
+/*
+ * This is called after 'mlreply_file()' to iterate over the list of files
+ * that are matched by a glob-expansion.
+ */
+char *
+filec_expand()
+{
+	if (MyGlob != 0) {
+		if (MyGlob[++in_glob] != 0)
+			return MyGlob[in_glob];
+		free_expansion();
+	}
+	return 0;
 }

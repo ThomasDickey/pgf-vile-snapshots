@@ -3,7 +3,10 @@
  *		strings.
  *
  * $Log: path.c,v $
- * Revision 1.7  1993/04/09 13:42:32  pgf
+ * Revision 1.8  1993/04/20 12:18:32  pgf
+ * see tom's 3.43 CHANGES
+ *
+ * Revision 1.7  1993/04/09  13:42:32  pgf
  * ifdefed out extern decls for getpw{nam,uid} -- to many type/prototyple
  * clashes
  *
@@ -38,6 +41,8 @@
 #if VMS
 #include <file.h>
 #endif
+
+#include <sys/stat.h>
 
 #include "dirstuff.h"
 
@@ -225,8 +230,13 @@ unix_pathleaf(path)
 char	*path;
 {
 	register char	*s = last_slash(path);
-	if (s == 0)
+	if (s == 0) {
+#if MSDOS
+		if (!(s = is_msdos_drive(path)))
+#endif
 		s = path;
+	} else
+		s++;
 	return s;
 }
 
@@ -317,108 +327,6 @@ char	*path;
 	}
 }
 #endif
-
-/* use the shell to expand wildcards */
-int
-glob(buf)
-char *buf;
-{
-#if UNIX
-	char *cp;
-	char cmd[NFILEN];
-	FILE *cf;
-	FILE *npopen();
-
-	/* trim trailing whitespace */
-	cp = &buf[strlen(buf)-1];
-	while (cp != buf) {
-		if (isspace(*cp))
-			*cp = EOS;
-		else
-			break;
-		cp--;
-	}
-
-	cp = buf;
-	if (isInternalName(cp))		/* it's a shell command, or an */
-		return TRUE;		/* internal name, don't bother */
-
-	while (*cp) {
-		if (iswild(*cp)) {
-			(void)lsprintf(cmd, "echo %s", buf);
-			cf = npopen(cmd,"r");
-			if (cf == NULL) {
-				return TRUE;
-			}
-			if (fread(buf,1,NFILEN,cf) <= 0) {
-				npclose(cf);
-				return FALSE;
-			}
-			npclose(cf);
-			cp = buf;
-			while (*cp) {
-				if (*cp == ' ' ) {
-					if (mlyesno(
-					"Too many filenames.  Use first"
-							) == TRUE) {
-						*cp = EOS;
-						break;
-					} else {
-						buf[0] = EOS;
-						return FALSE;
-					}
-				} else if (*cp == '\n') {
-					*cp = EOS;
-					break;
-				}
-				cp++;
-			}
-			return TRUE;
-
-		}
-		cp++;
-	}
-#endif
-#if MSDOS
-	/* not implemented */
-#endif
-#if VMS
-	/*
-	 * Exploit the directory-scanning behavior of VMS to expand the wildcards
-	 */
-	register char	*cp;
-
-	for (cp = buf; *cp != EOS; cp++) {
-		if (iswild(*cp) || !strncmp(cp, "...", 3)) {
-			DIR	*dp;
-			DIRENT	*de;
-
-			if (dp = opendir(buf)) {
-				int	count	= 0;
-
-				while (de = readdir(dp)) {
-					if (count++)
-						break;
-					(void)strcpy(buf, de->d_name);
-				}
-				(void)closedir(dp);
-
-				if (count > 1) {
-					if (mlyesno(
-					"Too many filenames.  Use first"
-							) == TRUE) {
-						break;
-					} else {
-						buf[0] = EOS;
-						return FALSE;
-					}
-				}
-			}
-		}
-	}
-#endif
-	return TRUE;
-}
 
 /* canonicalize a pathname, to eliminate extraneous /./, /../, and ////
 	sequences.  only guaranteed to work for absolute pathnames */
@@ -902,4 +810,22 @@ char *fn;
 	if (!strcmp(fn, non_filename()))
 		return TRUE;
 	return (*fn == EOS) || (*fn == SCRTCH_LEFT[0]);
+}
+
+/*
+ * Test if the given path is a directory
+ */
+int
+is_directory(path)
+char *	path;
+{
+	struct	stat	sb;
+
+#if VMS
+	if (is_vms_pathname(path, TRUE))
+		return TRUE;
+#endif
+	return ((*path != EOS)
+	  &&	(stat(path, &sb) >= 0)
+	  &&	((sb.st_mode & S_IFMT) == S_IFDIR));
 }

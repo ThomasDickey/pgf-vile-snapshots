@@ -6,8 +6,6 @@
 #	MMS version 2.6
 #	VAX-C version 3.2
 #
-# Note: 'remove' is a unix-like utility that can delete files silently.
-
 # To change screen driver modules, change SCREEN and SCRDEF below, OR edit
 # estruct.h to make sure the correct one is #defined as "1", and the others
 # all as "0".  If you use tcap.c, you'll need libtermcap.a too.  If you use
@@ -30,7 +28,7 @@ SCRDEF = "VMSVT","scrn_chosen"
 #  does by default)
 HELP_LOC=
 
-LINKFLAGS = /MAP/CROSS_REFERENCE/EXEC=$(MMS$TARGET_NAME).EXE
+LINKFLAGS = /MAP=$(MMS$TARGET_NAME)/CROSS_REFERENCE/EXEC=$(MMS$TARGET_NAME).EXE
 
 INCS = []
 
@@ -42,7 +40,7 @@ ALLTOOLS = $(MAKFILES)
 
 
 # these are normal editable headers
-HDRS = estruct.h epath.h edef.h proto.h dirstuff.h
+HDRS = estruct.h epath.h edef.h proto.h dirstuff.h glob.h
 
 # these headers are built by the mktbls program from the information in cmdtbl
 # and in modetbl
@@ -54,7 +52,7 @@ ALLHDRS = $(HDRS)
 #  (including tools, like mktbls.c, unused screen drivers, etc.)
 CSRCac = ansi.c at386.c basic.c bind.c buffer.c crypt.c csrch.c
 CSRCde = dg10.c display.c eval.c exec.c externs.c
-CSRCfh = fences.c file.c filec.c fileio.c finderr.c globals.c history.c hp110.c hp150.c
+CSRCfh = fences.c file.c filec.c fileio.c finderr.c glob.c globals.c history.c hp110.c hp150.c
 CSRCim = ibmpc.c input.c insert.c isearch.c line.c main.c modes.c mktbls.c
 CSRCnr = npopen.c opers.c oneliner.c path.c random.c regexp.c region.c
 CSRCst = search.c spawn.c st520.c tags.c tbuff.c tcap.c termio.c tipc.c
@@ -69,7 +67,7 @@ OTHERSRC = z100bios.asm
 
 # text and data files
 TEXTFILES = README CHANGES cmdtbl modetbl vile.hlp buglist revlist \
-	README.X11 vile.com
+	README.X11
 
 ALLSRC = $(CSRC) $(OTHERSRC)
 
@@ -91,6 +89,7 @@ SRC =	main.c \
 	filec.c \
 	fileio.c \
 	finderr.c \
+	glob.c \
 	globals.c \
 	history.c \
 	input.c \
@@ -134,6 +133,7 @@ OBJ =	main.obj,\
 	filec.obj,\
 	fileio.obj,\
 	finderr.obj,\
+	glob.obj, \
 	globals.obj,\
 	history.obj,\
 	input.obj,\
@@ -178,17 +178,28 @@ install :
 	@ WRITE SYS$ERROR "** no rule for $@"
 	
 clean :
-	@- remove -f *.obj;* $(BUILTHDRS);* $(MKTBLS);* *.BAK;* *.LOG;* *.LIS;* *.MAP;*
+	@- if f$search("*.com") .nes. "" then delete *.com;*
+	@- if f$search("*.obj") .nes. "" then delete *.obj;*
+	@- if f$search("*.bak") .nes. "" then delete *.bak;*
+	@- if f$search("*.lis") .nes. "" then delete *.lis;*
+	@- if f$search("*.log") .nes. "" then delete *.log;*
+	@- if f$search("*.map") .nes. "" then delete *.map;*
+	@- if f$search("$(BUILTHDRS)") .nes. "" then delete $(BUILDHDRS)
+	@- if f$search("$(MKTBLS)") .nes. "" then delete $(MKTBLS)
 
 clobber : clean
-	@- remove -f $(TARGET);*
+	@- if f$search("*.exe") .nes. "" then delete *.exe;*
 
 $(OBJ) : estruct.h nemode.h edef.h proto.h
 
+main.obj :	glob.h
 bind.obj :	epath.h
+eval.obj :	glob.h
 filec.obj :	dirstuff.h
 eval.obj :	nevars.h
+glob.obj :	dirstuff.h glob.h
 externs.obj :	nebind.h nename.h nefunc.h
+random.obj :	glob.h
 vmalloc.obj :	nevars.h
 vms2unix.obj :	dirstuff.h
 
@@ -197,25 +208,47 @@ vms2unix.obj :	dirstuff.h
 	@ MKTBLS :== $SYS$DISK:'F$DIRECTORY()$(MKTBLS)	! make a foreign command
 
 .last :
-	@- remove -f *.dia;*
-	@- purge *.lis,*.obj,*.map,*.exe,*.log
+	@- if f$search("*.dia") .nes. "" then delete *.dia;*
+	@- if f$search("*.lis") .nes. "" then purge *.lis
+	@- if f$search("*.obj") .nes. "" then purge *.obj
+	@- if f$search("*.map") .nes. "" then purge *.map
+	@- if f$search("*.exe") .nes. "" then purge *.exe
+	@- if f$search("*.log") .nes. "" then purge *.log
 
+# can also use /Listing, /Show=All
 CFLAGS =-
-	/Diagnostics /Listing /Debug /Define=("os_chosen",$(SCRDEF)) -
+	/Diagnostics /Debug /Define=("os_chosen",$(SCRDEF)) -
 	/Object=$@ /Include=($(INCS)) /G_FLOAT
 
 LIB_ARGS=vms_link.opt/opt
 
 .C.OBJ :
 	$(CC) $(CFLAGS) $(MMS$SOURCE)
+	@- delete $(MMS$TARGET_NAME).dia;*
+
 .OBJ.EXE :
 	$(LINK) $(LINKFLAGS) $(MMS$TARGET_NAME)$(OBJ_ARGS),$(LIB_ARGS)
 
 $(TARGET) : $(OBJ)
-	$(LINK) $(LINKFLAGS) $(OBJ),$(LIB_ARGS)
+	$(LINK) $(LINKFLAGS) main.obj, $(SCREEN).obj,$(LIB_ARGS)
+
+# Runs VILE from the current directory (used for testing)
+vile.com :
+	@- if "''f$search("$@")'" .nes. "" then delete $@;*
+	@- copy nl: $@
+	@ open/append  test_script $@
+	@ write test_script "$ vile :== $""sys$disk:''f$directory()'vile.exe""
+	@ write test_script "$ define/user_mode sys$input  sys$command"
+	@ write test_script "$ define/user_mode sys$output sys$command"
+	@ write test_script "$ vile 'p1 'p2 'p3 'p4 'p5 'p6 'p7 'p8"
+	@ close test_script
+	@ write sys$output "** made $@"
 
 # $Log: descrip.mms,v $
-# Revision 1.3  1993/04/01 13:07:50  pgf
+# Revision 1.4  1993/04/20 12:18:32  pgf
+# see tom's 3.43 CHANGES
+#
+# Revision 1.3  1993/04/01  13:07:50  pgf
 # see tom's 3.40 CHANGES
 #
 # Revision 1.2  1993/03/25  19:50:58  pgf

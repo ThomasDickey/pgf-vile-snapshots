@@ -10,7 +10,13 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.107  1993/04/02 10:59:13  pgf
+ * Revision 1.109  1993/04/21 15:41:27  pgf
+ * changed NAMEC from SPACE to TAB
+ *
+ * Revision 1.108  1993/04/20  12:18:32  pgf
+ * see tom's 3.43 CHANGES
+ *
+ * Revision 1.107  1993/04/02  10:59:13  pgf
  * vms needs setjmp.h
  *
  * Revision 1.106  1993/04/01  14:43:39  pgf
@@ -735,6 +741,13 @@
 #include <sys/types.h>
 #include <stdio.h>
 
+/* use 'size_t' if we have it */
+#if POSIX || APOLLO || TURBO || VMS
+#define	SIZE_T	size_t
+#else
+#define	SIZE_T	int
+#endif
+
 #if APOLLO
 # ifndef __STDCPP__
 #  define ANSI_VARARGS 0
@@ -833,7 +846,13 @@ union REGS {
 
 #if MSDOS
 # define slashc(c) (c == '\\' || c == '/')
-#else
+#endif
+
+#if ST520
+# define slashc(c) (c == '\\')
+#endif
+
+#ifndef slashc
 # define slashc(c) (c == '/')
 #endif
 
@@ -948,7 +967,7 @@ union REGS {
 #define NO_CREAT FALSE
 
 /* definitions for name-completion */
-#define	NAMEC		' '	/* char for forcing name-completion */
+#define	NAMEC		'\t'	/* char for forcing name-completion */
 #define	TESTC		'?'	/* char for testing name-completion */
 
 /* kbd_string options */
@@ -1085,13 +1104,15 @@ union REGS {
 
 #if !SMALLER
 #define	_scrtch 0x8000		/* legal in scratch-buffer names */
-#define	_shpipe 0x10000		/* legal in shell/pipe-buffer names */
+#define	_shpipe 0x10000L	/* legal in shell/pipe-buffer names */
 
 #define	screen_to_bname(buf)\
-        screen_string(buf,sizeof(buf),_pathn|_scrtch|_shpipe) 
+	screen_string(buf,sizeof(buf),(CMASK)(_pathn|_scrtch|_shpipe))
+typedef	long CMASK;
 #else
 #define	screen_to_bname(buf)\
-        screen_string(buf,sizeof(buf),_pathn)
+	screen_string(buf,sizeof(buf),((CMASK)(_pathn))
+typedef short CMASK;
 #endif
 
 /* these intentionally match the ctypes.h definitions, except that
@@ -1234,8 +1255,8 @@ typedef struct	LINE {
 
 /* macros to ease the use of lines */
 #define	for_each_line(lp,bp) for (lp = lforw(bp->b_line.l); lp != bp->b_line.l; lp = lforw(lp))
-#define lforw(lp)	((lp)->l_fp)
-#define lback(lp)	((lp)->l_bp)
+#define lforw(lp)	(lp)->l_fp
+#define lback(lp)	(lp)->l_bp
 #define lgetc(lp, n)	char2int((lp)->l_text[(n)])
 #define lputc(lp, n, c) ((lp)->l_text[(n)]=(c))
 #define llength(lp)	((lp)->l_used)
@@ -1721,6 +1742,16 @@ typedef struct {
 #define	FILEC_WRITE    1
 
 #define	FILEC_PROMPT   8	/* always prompt (never from screen) */
+#define	FILEC_EXPAND   16	/* allow glob-expansion to multiple files */
+
+#if !SMALLER
+#define COMPLETE_FILES  (UNIX || MSDOS || VMS)
+#define	COMPLETE_DIRS   (UNIX || MSDOS)
+#else
+#define HAS_FILE_COMPLETION 0
+#define COMPLETE_FILES  0
+#define COMPLETE_DIRS   0
+#endif
 
 /*	The editor holds deleted text chunks in the KILL registers. The
 	kill registers are logically a stream of ascii characters, however

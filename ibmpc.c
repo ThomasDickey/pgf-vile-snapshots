@@ -7,7 +7,10 @@
  * display type.
  *
  * $Log: ibmpc.c,v $
- * Revision 1.11  1993/04/02 09:48:48  pgf
+ * Revision 1.12  1993/04/20 12:18:32  pgf
+ * see tom's 3.43 CHANGES
+ *
+ * Revision 1.11  1993/04/02  09:48:48  pgf
  * tom's changes for turbo
  *
  * Revision 1.10  1992/08/20  23:40:48  foxharp
@@ -50,7 +53,7 @@
 
 #define NROW	50			/* Max Screen size.		*/
 #define NCOL    80                      /* Edit if you want to.         */
-#define	MARGIN	8			/* size of minimim margin and	*/
+#define	MARGIN	8			/* size of minimum margin and	*/
 #define	SCRSIZ	64			/* scroll size for extended lines */
 #define	NPAUSE	200			/* # times thru update to pause */
 #define	SPACE	32			/* space character		*/
@@ -95,8 +98,19 @@ extern	void	ibmbcol   P((int));
 
 int	cfcolor = -1;		/* current forground color */
 int	cbcolor = -1;		/* current background color */
-int	ctrans[] =		/* ansi to ibm color translation table */
-	{0, 4, 2, 6, 1, 5, 3, 7};
+int	ctrans[] = {		/* ansi to ibm color translation table */
+		0,		/* black	*/
+		4,		/* red		*/
+		2,		/* green	*/
+		14,		/* yellow	*/
+		1,		/* blue		*/
+		5,		/* magenta	*/
+		3,		/* cyan		*/
+		15		/* white	*/
+	};
+#endif
+#if	SCROLLCODE
+extern	void	ibmscroll P((int,int,int));
 #endif
 
 static	void	egaopen   P((void));
@@ -107,6 +121,7 @@ static	void	vgaclose  P((void));
 static	int	scinit    P((int));
 static	int	setboard  P((int));
 static	int	getboard  P((void));
+static	int	scblank   P((void));
 
 int ibmtype;		/* pjr - what to do about screen resolution */
 
@@ -139,7 +154,9 @@ TERM    term    = {
         ibmfcol,
         ibmbcol,
 #endif
-	NULL
+#if	SCROLLCODE
+	ibmscroll
+#endif
 };
 
 #if	COLOR
@@ -172,8 +189,6 @@ ibmmove(row, col)
 void
 ibmeeol()
 {
-	unsigned short *lnptr;	/* pointer to the destination line */
-	int i;
 	int ccol,crow;	/* current column,row for cursor */
 
 	/* find the current cursor position */
@@ -208,20 +223,12 @@ int ch;
 void
 ibmeeop()
 {
-	int attr;		/* attribute to fill screen with */
-
 	rg.h.ah = 6;		/* scroll page up function code */
 	rg.h.al = 0;		/* # lines to scroll (clear it) */
 	rg.x.cx = 0;		/* upper left corner of scroll */
 	rg.h.dh = term.t_nrow;  /* lower right corner of scroll */
 	rg.h.dl = term.t_ncol - 1;
-#if	COLOR
-	if (dtype != CDMONO)
-		attr = ((ctrans[gbcolor] & 15) << 4) | (ctrans[gfcolor] & 15);
-	else
-#endif
-	 attr = 0x07;
-	rg.h.bh = attr;
+	rg.h.bh = scblank();
 	int86(0x10, &rg, &rg);
 }
 
@@ -516,17 +523,17 @@ void
 scwrite(row, col, nchar, outstr, forg, bacg)	/* write a line out*/
 int row, col, nchar;	/* row,col of screen to place outstr (len nchar) on */
 char *outstr;	/* string to write out (must be term.t_ncol long) */
-int forg;	/* forground color of string to write */
+int forg;	/* foreground color of string to write */
 int bacg;	/* background color */
 {
-	unsigned short attr;	/* attribute byte mask to place in RAM */
-	unsigned short *lnptr;	/* pointer to the destination line */
-	int i;
+	register unsigned short attr;	/* attribute byte mask to place in RAM */
+	register unsigned short *lnptr;	/* pointer to the destination line */
+	register int i;
 
 	/* build the attribute byte and setup the screen pointer */
 #if	COLOR
 	if (dtype != CDMONO)
-		attr = ((ctrans[bacg] & 15) << 4) | (ctrans[forg] & 15);
+		attr = ((ctrans[bacg] & 7) << 4) | (ctrans[forg] & 15);
 	else
 #endif
 	 attr = ((bacg & 15) << 4) | (forg & 15);
@@ -558,6 +565,74 @@ int bacg;	/* background color */
 		movmem(&sline[0], scptr[row], nchar*sizeof(short));
 	}
 }
+
+/* reads back a line into a VIDEO struct, used in line-update computation */
+VIDEO *
+scread(vp, row)
+VIDEO *vp;
+int row;
+{
+	register int	i;
+	static	VIDEO	*mine;
+
+	if (vp == 0) {
+		if (mine == 0) {
+			mine = typeallocplus(VIDEO, term.t_mcol - 4);
+			if (mine == NULL)
+			    exit(BAD(1));
+		}
+		vp = mine;
+	}
+	movmem(scptr[row], &sline[0], term.t_ncol*sizeof(short));
+	for (i = 0; i < term.t_ncol; i++)
+		vp->v_text[i] = sline[i];
+	return vp;
+}
+
+/* returns attribute for blank/empty space */
+static int
+scblank()
+{
+	register int attr;
+#if	COLOR
+	if (dtype != CDMONO)
+		attr = ((ctrans[gbcolor] & 7) << 4) | (ctrans[gfcolor] & 15);
+	else
+#endif
+	 attr = 0x07;
+	return attr;
+}
+
+#if SCROLLCODE
+/* 
+ * Move 'n' lines starting at 'from' to 'to'
+ *
+ * PRETTIER_SCROLL is prettier but slower -- it scrolls a line at a time
+ *	instead of all at once.
+ */
+void
+ibmscroll(from,to,n)
+int from, to, n;
+{
+#if PRETTIER_SCROLL_patch
+	if (absol(from-to) > 1) {
+		ibmscroll(from, (from < to) ? to-1 : to+1, n);
+		if (from < to)
+			from = to-1;
+		else
+			from = to+1;    
+	}
+#endif
+	rg.h.ah = 0x06;		/* scroll window up */
+	rg.h.al = n;		/* number of lines to scroll */
+	rg.h.bh = scblank();	/* attribute to use for line-fill */
+	rg.h.ch = min(to,from);	/* upper window row */
+	rg.h.cl = 0;		/* left window column */
+	rg.h.dh = max(to,from);	/* lower window column */
+	rg.h.dl = 0;		/* lower window column */
+	int86(0x10, &rg, &rg);
+}
+#endif	/* SCROLLCODE */
 
 #if	FLABEL
 fnclabel(f, n)		/* label a function key */
