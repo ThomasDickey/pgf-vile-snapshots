@@ -2,7 +2,10 @@
  * Written for vile by Paul Fox, (c)1990
  *
  * $Log: finderr.c,v $
- * Revision 1.11  1992/07/16 22:06:58  foxharp
+ * Revision 1.12  1992/08/19 22:57:45  foxharp
+ * no longer need to multiply NFILEN -- it's bigger
+ *
+ * Revision 1.11  1992/07/16  22:06:58  foxharp
  * honor the "Entering/Leaving directory" messages that GNU make puts out
  *
  * Revision 1.10  1992/05/16  12:00:31  pgf
@@ -69,7 +72,7 @@ int f,n;
 	
 	int errline;
 	char errfile[NFILEN];
-	char ferrfile[3*NFILEN];
+	char ferrfile[NFILEN];
 	
 	static int oerrline = -1;
 	static char oerrfile[256];

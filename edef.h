@@ -9,7 +9,10 @@
 
 /*
  * $Log: edef.h,v $
- * Revision 1.62  1992/07/24 18:20:08  foxharp
+ * Revision 1.63  1992/08/19 22:55:20  foxharp
+ * v. 3.25
+ *
+ * Revision 1.62  1992/07/24  18:20:08  foxharp
  * v. 3.24
  *
  * Revision 1.61  1992/07/15  08:53:12  foxharp
@@ -229,7 +232,7 @@
 #endif
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version three point twenty-four");
+decl_init( char version[], "version three point twenty-five");
 
 decl_init( char slash, '/'); 		/* so DOS can use '\' as path separator */
 

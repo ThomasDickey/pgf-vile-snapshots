@@ -1,4 +1,11 @@
 
+I don't have much to add to the original README -- vile has gotten a lot
+better since I first released it, thanks to a lot of users and a lot of
+bug reports.  It compiles and runs without modification on most major UNIXes,
+and under DOS.  It offers vi finger feel, and most (not all) of its features.
+I hope it fills someone's need out there.  -pgf 9/92
+------------------------------
+
 
 
 VILE -- VI Like Emacs: a vi workalike put together from Micro-Emacs by Paul Fox

@@ -10,7 +10,10 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.85  1992/08/07 17:32:47  pgf
+ * Revision 1.86  1992/08/19 22:55:55  foxharp
+ * made NFILEN bigger -- much safer
+ *
+ * Revision 1.85  1992/08/07  17:32:47  pgf
  * don't use bcopy
  *
  * Revision 1.84  1992/08/06  23:51:47  foxharp
@@ -706,7 +709,7 @@ union REGS {
 /*	internal constants	*/
 
 #define	NBINDS	100			/* max # of bound prefixed keys	*/
-#define NFILEN	80			/* # of bytes, file name	*/
+#define NFILEN	256			/* # of bytes, file name	*/
 #define NBUFN	20			/* # of bytes, buffer name	*/
 #define NLINE	256			/* # of bytes, input line	*/
 #define	NSTRING	128			/* # of bytes, string buffers	*/

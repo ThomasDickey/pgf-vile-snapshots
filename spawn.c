@@ -2,7 +2,10 @@
  *		for MicroEMACS
  *
  * $Log: spawn.c,v $
- * Revision 1.29  1992/07/07 08:37:13  foxharp
+ * Revision 1.30  1992/08/19 23:02:01  foxharp
+ * send SIGTSTP to whole pgrp, not just to pid
+ *
+ * Revision 1.29  1992/07/07  08:37:13  foxharp
  * wait() for child in filterregion()
  *
  * Revision 1.28  1992/06/25  23:00:50  foxharp
@@ -244,8 +247,11 @@ int f,n;
 	int pid;
 
 	vttidy(TRUE);
-	pid = getpid();
-	kill(pid,SIGTSTP);
+# if BERK
+	killpg(getpgrp(0), SIGTSTP);
+# else
+	kill(-getpgrp(0), SIGTSTP);
+# endif
 	return TRUE;
 #  endif
 # endif
