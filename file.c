@@ -6,7 +6,13 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.102  1993/09/06 16:25:48  pgf
+ * Revision 1.104  1993/09/16 10:57:31  pgf
+ * do an 'ls -a' when sending mail about saved files
+ *
+ * Revision 1.103  1993/09/10  16:06:49  pgf
+ * tom's 3.61 changes
+ *
+ * Revision 1.102  1993/09/06  16:25:48  pgf
  * used-before-set warning cleanup
  *
  * Revision 1.101  1993/09/03  09:11:54  pgf
@@ -1410,7 +1416,7 @@ int ok_to_ask;  /* prompts allowed? */
 				goto choosename;
 
 		} else if (j < NBUFN-2)  {
-			(void)strncpy(sp+1, "-1", 2);
+			(void)strncpy(sp+1, "-1", NBUFN-j);
 		} else {
 		choosename:
 			if (ok_to_ask) {
@@ -1421,8 +1427,11 @@ int ok_to_ask;  /* prompts allowed? */
 						 name, NBUFN);
 				} while (name[0] == EOS);
 			} else { /* can't ask, just overwrite end of name */
-				sp[-1] = '-';
-				sp[0] = '1';
+				while (j >= NBUFN-1) {
+					j--;
+					sp--;
+				}
+				(void)strncpy(sp, "-1", NBUFN-j);
 			}
 		}
 	}
@@ -1778,7 +1787,7 @@ FILE	*haveffp;
 {
 	fast_ptr LINEPTR prevp;
 	fast_ptr LINEPTR newlp;
-	fast_ptr LINEPTR nextp = NULL; /* to satisfy compiler uninit warning */
+	fast_ptr LINEPTR nextp;
         register BUFFER *bp;
         register int    s;
         int    nbytes;
@@ -1806,6 +1815,7 @@ FILE	*haveffp;
 	MK = DOT;
 
 	nline = 0;
+	nextp = null_ptr;
 	while ((s=ffgetline(&nbytes)) <= FIOSUC) {
 #if DOSFILES
 		if (b_val(curbp,MDDOS)
@@ -1967,7 +1977,7 @@ ACTUAL_SIG_DECL
 		if ((np = getenv("LOGNAME")) || (np = getenv("USER"))) {
 			(void)lsprintf(cmd,
 #if HAVE_MKDIR
-    "(echo Subject: vile died; echo Files saved: ; ls %s/* ) | /bin/mail %s",
+    "(echo Subject: vile died; echo Files saved: ; ls -a %s ) | /bin/mail %s",
 #else
     "(echo Subject: vile died; echo Files saved: ; ls %s/V* ) | /bin/mail %s",
 #endif

@@ -2,7 +2,10 @@
  *	glob.h
  *
  * $Log: glob.h,v $
- * Revision 1.3  1993/06/02 14:28:47  pgf
+ * Revision 1.4  1993/09/10 16:06:49  pgf
+ * tom's 3.61 changes
+ *
+ * Revision 1.3  1993/06/02  14:28:47  pgf
  * see tom's 3.48 CHANGES
  *
  * Revision 1.2  1993/05/11  16:22:22  pgf
@@ -44,4 +47,4 @@ extern	char **	glob_free   P((char **));
 extern	void	expand_wild_args P(( int * , char ***));
 #endif
 
-extern	int	glob P(( char * ));
+extern	int	doglob P(( char * ));

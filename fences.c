@@ -8,8 +8,12 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: fences.c,v $
- *	Revision 1.14  1993/06/28 14:27:25  pgf
- *	new arg to catnap()
+ *	Revision 1.15  1993/09/16 11:06:43  pgf
+ *	make parentheses act like braces in c-mode -- for indentation purposes, in
+ *	languages like scheme (and lisp?)
+ *
+ * Revision 1.14  1993/06/28  14:27:25  pgf
+ * new arg to catnap()
  *
  * Revision 1.13  1993/06/02  14:28:47  pgf
  * see tom's 3.48 CHANGES
@@ -486,7 +490,8 @@ fmatchindent()
 	    
 	MK = DOT;
 	    
-	if (getfence(RBRACE,FORWARD) == FALSE) {
+	if ((getfence(RPAREN,FORWARD) == FALSE) &&
+	    (getfence(RBRACE,FORWARD) == FALSE)) {
 		gomark(FALSE,1);
 		return previndent((int *)0);
 	}

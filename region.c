@@ -6,7 +6,10 @@
  * internal use.
  *
  * $Log: region.c,v $
- * Revision 1.28  1993/09/03 09:11:54  pgf
+ * Revision 1.29  1993/09/10 16:06:49  pgf
+ * tom's 3.61 changes
+ *
+ * Revision 1.28  1993/09/03  09:11:54  pgf
  * tom's 3.60 changes
  *
  * Revision 1.27  1993/08/05  14:29:12  pgf
@@ -88,18 +91,18 @@
  * revision 1.4
  * date: 1991/06/25 19:53:18;
  * massive data structure restructure
- * 
+ *
  * revision 1.3
  * date: 1991/06/16 17:40:10;
  * fixed bug in shiftlregion due to not stopping at end of line when scanning
  * for spaces, and
  * added do_fl_region() wrapper routine to do full-line region processing, and
  * rewrote shift[lr]region to use it
- * 
+ *
  * revision 1.2
  * date: 1991/05/31 11:21:54;
  * added endline pointer and offset to region struct and getregion() code
- * 
+ *
  * revision 1.1
  * date: 1990/09/21 10:25:58;
  * initial vile RCS revision
@@ -120,12 +123,12 @@ overlay	"region"
 int
 killregion()
 {
-        register int    status;
-        REGION          region;
+	register int    status;
+	REGION          region;
 
-        if ((status = getregion(&region)) == TRUE) {
+	if ((status = getregion(&region)) == TRUE) {
 		kregcirculate(TRUE);
-        	ksetup();		/* command, so do magic */
+		ksetup();		/* command, so do magic */
 		DOT = region.r_orig;
 		if (fulllineregions)
 			kregflag |= KLINES;
@@ -134,7 +137,7 @@ killregion()
 		ukb = 0;
 	}
 	rls_region();
-        return status;
+	return status;
 }
 
 /*
@@ -147,39 +150,37 @@ int
 yankregion()
 {
 	MARK		m;
-        register int    status;
-        REGION          region;
+	register int    status;
+	REGION          region;
 
-        if ((status = getregion(&region)) == TRUE) {
+	if ((status = getregion(&region)) == TRUE) {
 		kregcirculate(TRUE);
-        	ksetup();
+		ksetup();
 		m = region.r_orig;
 		if (fulllineregions)
 			kregflag |= KLINES|KYANK;
-        	while (region.r_size-- > 0) {
-                	if (m.o >= lLength(m.l)) { /* On/past end of line. */
-                        	if ((status = kinsert('\n')) != TRUE) {
+		while (region.r_size-- > 0) {
+			if (m.o >= lLength(m.l)) { /* On/past end of line. */
+				if ((status = kinsert('\n')) != TRUE) {
 					ukb = 0;
 					rls_region();
-                                	return status;
+					return status;
 				}
-                        	m.l = lFORW(m.l);
-                        	m.o = w_left_margin(curwp);
+				m.l = lFORW(m.l);
+				m.o = w_left_margin(curwp);
 #if OPT_B_LIMITS
-				if (!same_ptr(m.l, region.r_orig.l))
-					region.r_size -= w_left_margin(curwp);
 				if (same_ptr(m.l, buf_head(curbp)))
 					break;
 #endif
-                	} else {                    /* Middle of line.      */
-                        	if ((status = kinsert(char_at(m))) != TRUE) {
+			} else {                    /* Middle of line.      */
+				if ((status = kinsert(char_at(m))) != TRUE) {
 					ukb = 0;
 					rls_region();
-                                	return status;
+					return status;
 				}
-                        	++m.o;
-                	}
-        	}
+				++m.o;
+			}
+		}
 		if (do_report(klines+(kchars!=0)))
 			mlwrite("[%d line%s, %d character%s yanked]",
 				klines, PLURAL(klines),
@@ -188,7 +189,7 @@ yankregion()
 		ukb = 0;
 	}
 	rls_region();
-        return (status);
+	return (status);
 }
 
 /*
@@ -206,13 +207,13 @@ int	flag;
 		return TRUE;
 	s = curswval;
 	t = curtabval;
-	DOT.o = 0;
+	DOT.o = w_left_margin(curwp);
 	if (s) {  /* try to just insert tabs if possible */
 		if (b_val(curbp,MDTABINSERT) && s >= t && (s % t == 0)) {
 			linsert(s/t, '\t');
 		} else {
 			detabline(TRUE);
-			DOT.o = 0;
+			DOT.o = w_left_margin(curwp);
 			linsert(s, ' ');
 		}
 		if (b_val(curbp,MDTABINSERT))
@@ -258,12 +259,12 @@ int	flag;
 		i++;
 
 	if (i != 0) { /* did we find space/tabs to kill? */
-		DOT.o = 0;
+		DOT.o = w_left_margin(curwp);
 		if ((s = ldelete((long)i,FALSE)) != TRUE)
 			return s;
 	}
 
-	DOT.o = 0;
+	DOT.o = w_left_margin(curwp);
 	if (b_val(curbp,MDTABINSERT))
 		entabline(TRUE);
 	return TRUE;
@@ -328,30 +329,30 @@ charprocreg(func)
 int (*func) P((int));
 {
 	MARK		m;
-        register int    c,nc;
-        register int    status;
-        REGION          region;
+	register int    c,nc;
+	register int    status;
+	REGION          region;
 
-        if ((status = getregion(&region)) == TRUE) {
+	if ((status = getregion(&region)) == TRUE) {
 		m = region.r_orig;
-        	while (region.r_size--) {
-                	if (is_at_end_of_line(m)) {
-                        	m.l = lFORW(m.l);
-                        	m.o = 0;
-                	} else {
-                        	c = char_at(m);
+		while (region.r_size-- > 0) {
+			if (is_at_end_of_line(m)) {
+				m.l = lFORW(m.l);
+				m.o = w_left_margin(curwp);
+			} else {
+				c = char_at(m);
 				nc = (func)(c);
 				if (nc != -1) {
 					copy_for_undo(m.l);
-                                	put_char_at(m, nc);
+					put_char_at(m, nc);
 				}
-                        	++m.o;
-                	}
-        	}
+				++m.o;
+			}
+		}
 	}
 	rls_region();
 	chg_buff(curbp, WFHARD);
-        return (status);
+	return (status);
 }
 
 /*
@@ -366,88 +367,92 @@ int
 getregion(rp)
 register REGION *rp;
 {
-        register LINE   *flp;
-        register LINE   *blp;
-        long fsize;
-        long bsize;
+	register LINE   *flp;
+	register LINE   *blp;
+	B_COUNT fsize;
+	B_COUNT bsize;
 
 #if OPT_MAP_MEMORY
 	rp->r_orig.l = null_ptr;
 	rp->r_end.l  = null_ptr;
 	l_region(rp);
 #endif
-        if (l_ref(MK.l) == NULL) {
-                mlforce("BUG: getregion: no mark set in this window");
-                return FALSE;
-        }
-        if (sameline(DOT, MK)) {
-		if (fulllineregions) {
-	                rp->r_orig.l = DOT.l;
-                        rp->r_orig.o = 0;
-	                rp->r_end.l = lFORW(DOT.l);
-                        rp->r_end.o = 0;
-                        rp->r_size = (long)lLength(DOT.l)+1;
-			return TRUE;
-		}
-                rp->r_orig.l = rp->r_end.l = DOT.l;
-                if (DOT.o < MK.o) {
-                        rp->r_orig.o = DOT.o;
-                        rp->r_end.o = MK.o;
-                        rp->r_size = (long)(MK.o-DOT.o);
-                } else {
-                        rp->r_orig.o = MK.o;
-                        rp->r_end.o = DOT.o;
-                        rp->r_size = (long)(DOT.o-MK.o);
-                }
-                return TRUE;
-        }
-        blp = l_ref(DOT.l);
-        flp = l_ref(DOT.l);
-	if (fulllineregions) {
-		bsize = (long)(llength(blp)+1);
-		fsize = (long)(llength(flp)+1);
-	} else {
-		bsize = (long)DOT.o;
-		fsize = (long)(llength(flp) - DOT.o + 1);
+	if (l_ref(MK.l) == NULL) {
+		mlforce("BUG: getregion: no mark set in this window");
+		return FALSE;
 	}
-        while ((flp!=l_ref(curbp->b_line.l)) || (lback(blp) != l_ref(curbp->b_line.l))) {
-                if (flp != l_ref(curbp->b_line.l)) {
-                        flp = lforw(flp);
-                        if (flp == l_ref(MK.l)) {
-                                rp->r_orig = DOT;
+
+#define line_length(lp) (llength(lp)+1)	/* length counting newline */
+#define Line_Length(lp) (lLength(lp)+1)	/* length counting newline */
+	if (sameline(DOT, MK)) {
+		rp->r_orig =
+		rp->r_end  = DOT;
+		if (fulllineregions) {
+			rp->r_orig.o =
+			rp->r_end.o  = w_left_margin(curwp);
+			rp->r_end.l  = lFORW(DOT.l);
+			rp->r_size   = (B_COUNT)(Line_Length(DOT.l) - w_left_margin(curwp));
+		} else {
+			if (DOT.o < MK.o) {
+				rp->r_orig.o = DOT.o;
+				rp->r_end.o  = MK.o;
+			} else {
+				rp->r_orig.o = MK.o;
+				rp->r_end.o  = DOT.o;
+			}
+			rp->r_size = rp->r_end.o - rp->r_orig.o;
+		}
+		return TRUE;
+	}
+
+	blp = l_ref(DOT.l);
+	flp = l_ref(DOT.l);
+	if (fulllineregions) {
+		bsize = (B_COUNT)(line_length(blp) - w_left_margin(curwp));
+		fsize = (B_COUNT)(line_length(flp) - w_left_margin(curwp));
+	} else {
+		bsize = (B_COUNT)(DOT.o - w_left_margin(curwp));
+		fsize = (B_COUNT)(line_length(flp) - DOT.o);
+	}
+	while (1) {
+		if (flp != l_ref(buf_head(curbp))) {
+			flp = lforw(flp);
+			if (flp != l_ref(buf_head(curbp)))
+				fsize += line_length(flp) - w_left_margin(curwp);
+			if (flp == l_ref(MK.l)) {
+				rp->r_orig = DOT;
+				rp->r_end  = MK;
 				if (fulllineregions) {
-					rp->r_orig.o = 0;
-					rp->r_size = fsize + lLength(MK.l)+1;
-	                                rp->r_end.l = l_ptr(lforw(flp));
-					rp->r_end.o = 0;
-	                                return TRUE;
+					rp->r_orig.o =
+					rp->r_end.o  = w_left_margin(curwp);
+					rp->r_end.l  = lFORW(rp->r_end.l);
+				} else {
+					fsize -= (line_length(flp) - MK.o);
 				}
-				rp->r_size = fsize + MK.o;
-                                rp->r_end = MK;
-                                return TRUE;
-                        }
-                        fsize += llength(flp)+1;
-                }
-                if (lback(blp) != l_ref(curbp->b_line.l)) {
-                        blp = lback(blp);
-                        bsize += llength(blp)+1;
-                        if (blp == l_ref(MK.l)) {
-                                rp->r_orig = MK;
+				rp->r_size = fsize;
+				return TRUE;
+			}
+		} else if (lback(blp) != l_ref(buf_head(curbp))) {
+			blp = lback(blp);
+			bsize += line_length(blp) - w_left_margin(curwp);
+			if (blp == l_ref(MK.l)) {
+				rp->r_orig = MK;
+				rp->r_end  = DOT;
 				if (fulllineregions) {
-					rp->r_orig.o = 0;
-					rp->r_size = bsize;
-	                                rp->r_end.l = lFORW(DOT.l);
-					rp->r_end.o = 0;
-	                                return TRUE;
+					rp->r_orig.o =
+					rp->r_end.o  = w_left_margin(curwp);
+					rp->r_end.l  = lFORW(rp->r_end.l);
+				} else {
+					bsize -= (MK.o - w_left_margin(curwp));
 				}
-                                rp->r_end = DOT;
-				rp->r_size = bsize - MK.o;
-                                return TRUE;
-                        }
-                }
-        }
-        mlforce("BUG: lost mark");
-        return FALSE;
+				rp->r_size = bsize;
+				return TRUE;
+			}
+		} else
+			break;
+	}
+	mlforce("BUG: lost mark");
+	return FALSE;
 }
 
 int
@@ -468,24 +473,24 @@ do_fl_region(lineprocfunc,arg)
 int (*lineprocfunc) P((int));
 int arg;
 {
-        register LINE   *linep;
-        register int    status;
-        REGION          region;
+	register LINE   *linep;
+	register int    status;
+	REGION          region;
 
 	fulllineregions = TRUE;
-        if ((status=getregion(&region)) == TRUE) {
+	if ((status=getregion(&region)) == TRUE) {
 
 		/* for each line in the region, ... */
 		for ( linep = l_ref(region.r_orig.l);
 			linep != l_ref(region.r_end.l); linep = lforw(linep) ) {
 
 			/* nothing on the line? */
-			if (llength(linep) == 0)
+			if (llength(linep) <= w_left_margin(curwp))
 				continue;
 
 			/* move through the region... */
 			DOT.l = l_ptr(linep);
-			DOT.o = 0;
+			DOT.o = w_left_margin(curwp);
 
 			/* ...and process each line */
 			if ((status = (*lineprocfunc)(arg)) != TRUE) {
@@ -493,9 +498,9 @@ int arg;
 				return status;
 			}
 
-        	}
+		}
 		(void)firstnonwhite(FALSE,1);
 	}
 	rls_region();
-        return status;
+	return status;
 }

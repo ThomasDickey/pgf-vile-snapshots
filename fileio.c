@@ -3,7 +3,10 @@
  * the knowledge about files are here.
  *
  * $Log: fileio.c,v $
- * Revision 1.56  1993/09/03 09:11:54  pgf
+ * Revision 1.57  1993/09/10 16:06:49  pgf
+ * tom's 3.61 changes
+ *
+ * Revision 1.56  1993/09/03  09:11:54  pgf
  * tom's 3.60 changes
  *
  * Revision 1.55  1993/08/05  14:29:12  pgf
@@ -607,7 +610,7 @@ int *lenp;	/* to return the final length */
 		/* if it's longer, get more room */
                 if (i >= flen) {
 			/* "Small" exponential growth - EJK */
-			unsigned growth = (flen >> 3) + NSTRING;
+			ALLOC_T growth = (flen >> 3) + NSTRING;
 			if ((tmpline = castalloc(char,flen+growth)) == NULL)
                 		return(FIOMEM);
                 	(void)memcpy(tmpline, fline, (SIZE_T)flen);

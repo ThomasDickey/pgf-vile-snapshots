@@ -4,7 +4,10 @@
  * written for vile by Paul Fox, (c)1990
  *
  * $Log: opers.c,v $
- * Revision 1.33  1993/09/03 09:11:54  pgf
+ * Revision 1.34  1993/09/10 16:06:49  pgf
+ * tom's 3.61 changes
+ *
+ * Revision 1.33  1993/09/03  09:11:54  pgf
  * tom's 3.60 changes
  *
  * Revision 1.32  1993/08/13  16:32:50  pgf
@@ -240,8 +243,17 @@ int
 operdel(f,n)
 int f,n;
 {
+	int	status;
+
 	opcmd = OPDEL;
-	return operator(f,n,killregion,"Delete");
+	lines_deleted = 0;
+	status = operator(f, n, killregion,
+		fulllineregions
+			? "Delete of full lines"
+			: "Delete");
+	if (do_report(lines_deleted))
+		mlforce("[%d lines deleted]", lines_deleted);
+	return status;
 }
 
 int
@@ -249,8 +261,7 @@ operlinedel(f,n)
 int f,n;
 {
 	fulllineregions = TRUE;
-	opcmd = OPDEL;
-	return operator(f,n,killregion,"Delete of full lines");
+	return operdel(f,n);
 }
 
 static int

@@ -4,7 +4,10 @@
 	written 1986 by Daniel Lawrence
  *
  * $Log: eval.c,v $
- * Revision 1.66  1993/09/06 16:36:47  pgf
+ * Revision 1.67  1993/09/10 16:06:49  pgf
+ * tom's 3.61 changes
+ *
+ * Revision 1.66  1993/09/06  16:36:47  pgf
  * changed glob() to doglob() to avoid symbol conflicts
  *
  * Revision 1.65  1993/09/03  09:11:54  pgf
@@ -374,7 +377,7 @@ int f,n;
 	char *values;
 	register WINDOW *wp = curwp;
 	register int s;
-	register unsigned t;
+	register ALLOC_T t;
 	register char *v, *vv;
 	static	char *fmt = "$%s = %*S\n";
 	char	**Names = f ? all_modes : envars;

@@ -2,7 +2,10 @@
  * Written for vile by Paul Fox, (c)1990
  *
  * $Log: finderr.c,v $
- * Revision 1.27  1993/09/06 16:26:34  pgf
+ * Revision 1.28  1993/09/10 16:06:49  pgf
+ * tom's 3.61 changes
+ *
+ * Revision 1.27  1993/09/06  16:26:34  pgf
  * added DEC OSF/1 error message formats
  *
  * Revision 1.26  1993/09/03  16:17:24  pgf
@@ -176,7 +179,7 @@ int f,n;
 
 			if (tb_init(&tmp, EOS) != 0
 			 && tb_bappend(&tmp, dotp->l_text,
-			 	(unsigned)llength(dotp)) != 0
+			 	(ALLOC_T)llength(dotp)) != 0
 			 && tb_append(&tmp, EOS) != 0)
 			 	text = tb_values(tmp);
 			else

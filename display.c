@@ -6,7 +6,10 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.101  1993/09/06 16:24:28  pgf
+ * Revision 1.102  1993/09/10 16:06:49  pgf
+ * tom's 3.61 changes
+ *
+ * Revision 1.101  1993/09/06  16:24:28  pgf
  * used-before-set warning cleanup
  *
  * Revision 1.100  1993/09/03  09:11:54  pgf
@@ -684,18 +687,10 @@ va_list *app;
  * Line-number mode
  */
 int
-nu_mode(wp)
-WINDOW *wp;
-{
-	register BUFFER *bp = wp->w_bufp;
-	return	!b_is_temporary(bp) && w_val(wp,WMDNUMBER);
-}
-
-int
 nu_width(wp)
 WINDOW *wp;
 {
-	return nu_mode(wp) ? NU_WIDTH : 0;
+	return w_val(wp,WMDNUMBER) ? NU_WIDTH : 0;
 }
 
 int
@@ -882,7 +877,7 @@ WINDOW *wp;
 	int	skip = -vtcol,
 		list = w_val(wp,WMDLIST);
 
-	if (nu_mode(wp)) {
+	if (w_val(wp,WMDNUMBER)) {
 		register int j, k, jk;
 		L_NUM	line = line_no(wp->w_bufp, lp);
 		int	fill = ' ';
@@ -1622,7 +1617,7 @@ C_NUM	offset;
  * line's offset, taking into account the tabstop, sideways, number and list
  * modes.
  */
-#if X11 || OPT_XTERM
+#if OPT_MOUSE
 int
 col2offs(wp, lp, col)
 WINDOW	*wp;
@@ -1689,7 +1684,7 @@ LINEPTR	lp;
  * Given a row on the screen, determines which window it belongs to.  Returns
  * null only for the message line.
  */
-#if defined(WMDLINEWRAP) || defined(X11) || OPT_XTERM
+#if defined(WMDLINEWRAP) || OPT_MOUSE
 WINDOW *
 row2window (row)
 int	row;
@@ -2372,7 +2367,7 @@ typedef	struct	{
 	} SAVEWIN;
 
 static	SAVEWIN	*recomp_tbl;
-static	UINT	recomp_len;
+static	ALLOC_T	recomp_len;
 
 static void
 recompute_buffer(bp)

@@ -4,7 +4,10 @@
  * All operating systems.
  *
  * $Log: termio.c,v $
- * Revision 1.81  1993/09/03 09:11:54  pgf
+ * Revision 1.82  1993/09/10 16:06:49  pgf
+ * tom's 3.61 changes
+ *
+ * Revision 1.81  1993/09/03  09:11:54  pgf
  * tom's 3.60 changes
  *
  * Revision 1.80  1993/08/13  16:32:50  pgf
@@ -902,7 +905,7 @@ short	iochan;				/* TTY I/O channel		*/
 #endif
 
 #if     MSDOS && ((!MSC && NEWDOSCC) || LATTICE || AZTEC)
-union REGS rg;		/* cpu register for use of DOS calls */
+union REGS rg;		/* cpu register for use of DOS calls (ibmpc.c) */
 int nxtchar = -1;	/* character held from type ahead    */
 #endif
 
@@ -1187,18 +1190,28 @@ ttgetc()
 
 	}
 #endif
-#if     MSDOS && MWC86
-	{
-        return (getcnb());
 
+#if MSDOS
+	/*
+	 * If we've got a mouse, poll waiting for mouse movement and mouse
+	 * clicks until we've got a character to return.
+	 */
+# if OPT_MS_MOUSE
+	if (ms_exists()) {
+		for(;;) {
+			if (typahead())
+				break;
+			ms_processing();
+		}
 	}
+# endif /* OPT_MS_MOUSE */
+#if     MWC86
+	return getcnb();
 #endif
-#if	MSDOS && MSC
-	{
+#if	MSC || TURBO
 	return getch();
-	}
 #endif
-#if	MSDOS && ((!MSC && NEWDOSCC) || LATTICE || AZTEC)
+#if	((!(MSC||TURBO) && NEWDOSCC) || LATTICE || AZTEC)
 	{
 	int c;
 
@@ -1216,6 +1229,7 @@ ttgetc()
 	return(c & 0xff);
 	}
 #endif
+#endif	/* MSDOS */
 
 }
 
@@ -1226,6 +1240,9 @@ ttgetc()
 int
 typahead()
 {
+	if (tungotc > 0)
+		return TRUE;
+
 #if	X11
 	return x_is_pasting();
 #endif
@@ -1254,21 +1271,12 @@ typahead()
 #endif
 
 #if	MSDOS && NEWDOSCC
-	if (tungotc > 0)
-		return TRUE;
-
-	if (kbhit() != 0)
-		return(TRUE);
-	else
-		return(FALSE);
+	return (kbhit() != 0);
 #endif
 
 #if	MSDOS && (LATTICE || AZTEC || MWC86)
 	int c;		/* character read */
 	int flags;	/* cpu flags from dos call */
-
-	if (tungotc > 0)
-		return TRUE;
 
 	if (nxtchar >= 0)
 		return(TRUE);

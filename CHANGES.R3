@@ -1,4 +1,92 @@
-Changes for vile 3.60: (released  ??)
+Changes for vile 3.61: (released  Thu Sep 16, 1993)
+(pgf)
+	+ when files are saved in /tmp, and mail is sent, the list is now
+	  created with "ls -a" to make all files visible. (file.c)
+
+	+ when trying to get back to the current buffer in globber(), use
+	  set_curwp() instead of swbuffer(), since swbuffer() may not take
+	  us back to the same window we started in, if the buffer is
+	  multiply displayed. (globals.c)
+
+	+ moving the cursor with the mouse (xterm-mouse) causes showcpos()
+	  to be called, as if a ^G had been typed.  the message line needed
+	  to be cleared in any case, to delete old ^G output, so i thought
+	  i'd try updating it instead (should a similar change be made in
+	  x11.c?). (tcap.c)
+
+	+ in cmode, parentheses are treated like braces, in that if a line
+	  ends with a left one, the next line is indented, and if it starts
+	  with a right one, the line is aligned with the line containing the
+	  match.  this may be useful for parentheses-heavy languages like
+	  scheme and perhaps lisp.
+
+(tom)
+	+ nits from 3.60 integration (file.c, mktbls.c, proto.h, glob.h)
+
+	+ allow "number" mode to be set/unset in scratch buffers (modetbl,
+	  display.c, random.c).
+
+	+ use 'delay()' function in TurboC for 'catnap()' (random.c)
+
+	+ ifdef'd "dirc" and "history" modes so that they don't appear in
+	  [Settings] when not configured (modetbl, main.c).
+
+	+ brought TurboC makefile up-to-date (makefile.tbc).
+
+	+ corrected logic of 'makemodelist()' so that both buffer and window
+	  local modes are shown (modes.c).
+
+	+ corrected my last change to 'unqname()' to ensure that if the b_bname
+	  field is short enough, it will have a null terminator (file.c).
+
+	+ moved logic that reports lines-deleted from 'ldelete()' to common
+	  logic of 'operdel()' and 'operlinedel()', so that using 'ldelete()'
+	  internally won't generate spurious messages (line.c, opers.c).
+
+	+ used 'doingopcmd' to modify return-status of motion commands (h,l) to
+	  get rid of special-case handling so that when used internally they
+	  don't fail; obsoleted 'forwchar_in_line()' (basic.c).
+
+	+ use macro 'cmdBIT()' to clarify flags for CMDFUNC, added flag OPTREG
+	  to simplify test in 'execute_named_command()', and make test for
+	  optional register and/or line-count more explicit by allowing it only
+	  when non-punctuation follows the command (fixes ":s/pattern")
+	  (cmdtbl, estruct.h, exec.c, input.c).
+
+	+ corrected my last change to make "2p work correctly, by using new
+	  function 'index2ukb()' (line.c).
+
+	+ modified 'mlreply_file()' so that filename completion works on the ^W
+	  and ^R screen commands (filec.c).
+
+	+ modified 'getregion()' to use line-number to simplify computation,
+	  and to work with left-margin.  Also whitespaced (region.c).
+
+	+ corrected test in 'loop()' that caused j/k commands to go awry in the
+	  [Registers] buffer at blank lines (main.c).
+
+	+ corrected test in 'kbd_reply()' to avoid name-completion when the
+	  current-response is a shell-command, e.g., "!foo -?" (input.c).
+
+	+ corrected logic in 'forwchar_to_eol()' and 'ins_anytime()' that lets
+	  arrow-keys to go past the end of the line while in insert (or
+	  replace) mode (basic.c, insert.c).
+
+	+ corrected logic that allowed a user to begin an insertion in one
+	  buffer, then click the mouse to reposition into a readonly buffer
+	  and continue inserting -- in the readonly buffer (basic.c, insert.c).
+
+	+ added mode 'flash' (ibmpc.c, main.c, tcap.c, x11.c)
+
+	+ added logic to support msdos-mouse, using defines OPT_MS_MOUSE and
+	  OPT_MOUSE.  This version only supports repositioning clicks (basic.c,
+	  display.c, estruct.h, ibmpc.c, termio.c).
+
+	+ use symbol ALLOC_T to clarify distinction between size_t/int/unsigned
+	  (display.c, edef.h, estruct.h, eval.c, filec.c, fileio.c, finderr.c,
+	  line.c, oneliner.c, proto.h, regexp.c, tbuff.c, undo.c, x11.c)
+
+Changes for vile 3.60: (unreleased)
 (pgf)
 	+ added "stop" command (synonym for "suspend-vile", aka ^Z) (cmdtbl)
 
@@ -25,7 +113,6 @@ Changes for vile 3.60: (released  ??)
 
 	+ protect against NULL returns from getcwd, in case the directory
 	  we're in has been removed. (random.c)
-	  (tom -- could you check VMS behavior sometime?)
 
 	+ changed symbol "glob()" to "doglob()" to stop name conflict with
 	  standard libraries (glob.c, eval.c, random.c, filec.c)
@@ -126,7 +213,7 @@ Changes for vile 3.60: (released  ??)
 	+ cache home-directories looked up in 'home_path()' to make it run
 	  faster (path.c)
 
-	+ modified glob-expansion to allow "~" expansion. This doesn't work
+	+ modified glob-expansion to allow "~" expansion.  This doesn't work
 	  with wildcards in the user-portion (e.g., "~ab?"), but suffices for
 	  most cases (glob.c).
 
@@ -144,7 +231,7 @@ Changes for vile 3.60: (released  ??)
 	+ make piped-input also set error-buffer (main.c).
 
 	+ revised logic that sets VAL-structs for modes to correct places where
-	  buffer & window traits are saved without converting to local values. 
+	  buffer & window traits are saved without converting to local values.
 	  Also removed code (e.g., copy_val) that checks reference counts,
 	  since they aren't really necessary (buffer.c estruct.h main.c modes.c
 	  proto.h)
@@ -258,7 +345,7 @@ Changes for vile 3.58: (released Fri Aug 13, 1993)
 	+ refined 'imworking()' to get rid of leftover working-message
 	  (display.c, file.c).  Make working-message show up only when 'terse'
 	  mode is off (the default).
- 
+
 	+ added code to support xterm mouse-clicking (to move dot), with
 	  additional code for later use with highlighted selections.  Made this
 	  a mode (xterm-mouse) because it does not implement cut & paste yet
@@ -467,17 +554,17 @@ Changes for vile 3.56:	(released Tue Jul 27, 1993)
 	+ added mode 'newline', set to true when reading files that have a
 	  trailing newline (the normal vi-convention), modified (file.c,
 	  buffer.c, random.c).
- 
+
 	+ fixed place where ":ww" garbages the screen before reporting
 	  "wrote 0 buffers" (buffer.c).
 
 	+ simplified 'writereg()' and 'ffputline()' (fileio.c, file.c) to allow
 	  'newline' mode to control whether a trailing newline is written to
 	  output files.
- 
+
 	+ modified 'kifile()' so that it does not insert the trailing newline
 	  if it wasn't present in the file.
- 
+
 	+ made 'ldelete()' return from one point (line.c) to simplify 'report'
 	  mode.
 
@@ -581,7 +668,7 @@ Changes for vile 3.54: (released Fri Jul 09, 1993)
 	  (termio.c)
 
 	+ took out the more stringent prototype warnings (-Wstuff) from the
-	  gcc OPTFLAGS, since we don't pass them yet (someday, alistair). 
+	  gcc OPTFLAGS, since we don't pass them yet (someday, alistair).
 	  (makefile)
 
 	+ mode and variable symbol names generated by mktbls are now of the
@@ -592,7 +679,7 @@ Changes for vile 3.54: (released Fri Jul 09, 1993)
 	+ upped the max number of screen columns for x11.c.  was 150, now is
 	  200.  reduced the max rows number from 200 to 100.  the screen
 	  buffers should be made re-allocatable, so we wouldn't eat the space
-	  unless necessary.  made the normal (tcap.c) maximums match these. 
+	  unless necessary.  made the normal (tcap.c) maximums match these.
 	  (tcap.c x11.c)
 
 	+ applied Tuan Dang's fixes for my merging of his watcom and djgcc
@@ -790,13 +877,13 @@ Changes for vile 3.51:
 Changes for vile 3.50:
 (pgf)
 	+ finished (yeah, right) the changes for infinite undo. implemented
-	  mode to control how many changes are stored (called "undolimit"). 
+	  mode to control how many changes are stored (called "undolimit").
 	  the modified bit (BFCHG) now gets reset if the right number of
 	  undos is done.  (estruct.h main.c modetbl undo.c buffer.c vile.hlp)
-	  
+
 	+ rearranged calls to copy_for/tag_for/toss_to_undo and chg_buff
 	  so that the BFCHG flag is unmodified before the first call to
-	  preundocleanup().  this gives undo the true state of BFCHG. 
+	  preundocleanup().  this gives undo the true state of BFCHG.
 	  (line.c region.c)
 
 Changes for vile 3.49:
@@ -806,7 +893,7 @@ Changes for vile 3.49:
 	  don't if this will be significant or not -- i doubt we matched
 	  vi before in this regard anyway.  (undo.c, cmdtbl, buffer.c, proto.h
 	  estruct.h, vile.hlp)
-	
+
 	+ use an explicit %s when printing lone filename, to protect against
 	  filenames with % in name. (display.c)  (eric krohn)
 
@@ -1002,7 +1089,7 @@ Changes for vile 3.47:
 
 	+ supplied initialization for wp->w_dot.l and wp->w_line.l in
 	  'reframe()' (file display.c) to handle the case when vile is invoked
-	  with no filename parameters. 
+	  with no filename parameters.
 
 Changes for vile 3.46:
 (pgf)
@@ -1262,7 +1349,7 @@ Changes for vile 3.43:
 (pgf)
 	+ changed NAMEC from SPACE to TAB (estruct.h).  changed eolchar arg
 	  passed to kbd_reply in kbd_engl_stat from NAMEC to ' ', to
-	  compensate.  added check against command term'ed with ' ' in 
+	  compensate.  added check against command term'ed with ' ' in
 	  execute_named_cmd() (exec.c).
 
 	+ added check for iswild() when scanning for wildcard chars in glob.c
@@ -1282,7 +1369,7 @@ Changes for vile 3.43:
 	  display.c)
 
 	+ added AIX to machines that need sys/ioctl.h (termio.c, display.c)
-	
+
 	+ further fix to repeat counts and the '.' command, so that all cases
 	  ( 6dw , 3d2w , etc.) work.
 

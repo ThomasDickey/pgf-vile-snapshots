@@ -3,7 +3,10 @@
  * commands. There is no functional grouping here, for sure.
  *
  * $Log: random.c,v $
- * Revision 1.106  1993/09/06 16:33:24  pgf
+ * Revision 1.107  1993/09/10 16:06:49  pgf
+ * tom's 3.61 changes
+ *
+ * Revision 1.106  1993/09/06  16:33:24  pgf
  * guard against null return from getcwd(), and
  * changed glob() --> doglob()
  *
@@ -299,7 +302,7 @@
  *
  * Revision 1.17  91/08/13	12:51:29  pgf
  * make sure we pass a non-NULL arg to poll, even though the count is zero
- * 
+ *
  * Revision 1.16  1991/08/13  02:52:25	pgf
  * the fmatch() code now works if you have poll or select, and
  * is enabled by "set showmatch"
@@ -318,54 +321,54 @@
  * date: 1991/08/06 15:25:02;
  *	global/local values
  * and list changes
- * 
+ *
  * revision 1.11
  * date: 1991/06/26 09:35:48;
  * made count work correctly on flipchar, and
  * removed old ifdef BEFORE stuff
- * 
+ *
  * revision 1.10
  * date: 1991/06/25 19:53:09;
  * massive data structure restructure
- * 
+ *
  * revision 1.9
  * date: 1991/06/20 17:23:24;
  * fixed & --> && problem in indent_newline
- * 
+ *
  * revision 1.8
  * date: 1991/06/16 17:38:02;
  * switched to modulo tab calculations, and
  * converted entab, detab, and trim to work on regions,
  * and stripped some old ifdef NOCOUNT stuff for openup and opendown
  * and added support for local and globla tabstop and fillcol values
- * 
+ *
  * revision 1.7
  * date: 1991/06/15 09:09:27;
  * changed some forwchar calls to forwchar_to_eol, and
  * now prevent 'x', 's', 'r' from destroying the newline when used on
  * empty lines
- * 
+ *
  * revision 1.6
  * date: 1991/06/06 13:58:23;
  * added autoindent mode and "set all"
- * 
+ *
  * revision 1.5
  * date: 1991/05/31 11:19:06;
  * added showlength function, for "=" ex command, and
  * switched from stutterfunc to godotplus
- * 
+ *
  * revision 1.4
  * date: 1991/04/04 09:40:25;
  * fixed autoinsert bug
- * 
+ *
  * revision 1.3
  * date: 1991/02/12 09:49:33;
  * doindent had an unset return value, causing autoindents of 0 chars to fail
- * 
+ *
  * revision 1.2
  * date: 1990/10/03 16:01:00;
  * make backspace work for everyone
- * 
+ *
  * revision 1.1
  * date: 1990/09/21 10:25:54;
  * initial vile RCS revision
@@ -405,7 +408,7 @@ static	int	char2drive P(( int ));
 /*--------------------------------------------------------------------------*/
 
 /*
- * Set default parameters for an automatically-generated, view-only buffer. 
+ * Set default parameters for an automatically-generated, view-only buffer.
  * This is invoked after buffer creation, but usually before the buffer is
  * loaded with text.
  */
@@ -444,12 +447,13 @@ char *carg;
 {
 	register BUFFER *bp;
 	register int	s;
+	WINDOW  *wp;
 
 	/* create the buffer list buffer   */
 	bp = bfind(name, BFSCRTCH);
 	if (bp == NULL)
 		return FALSE;
-	    
+
 	if ((s=bclear(bp)) != TRUE) /* clear old text (?) */
 		return (s);
 	b_set_scratch(bp);
@@ -457,7 +461,12 @@ char *carg;
 		(void)zotbuf(bp);
 		return (FALSE);
 	}
-	/* call the passed in function, giving it both the integer and 
+
+	if ((wp = bp2any_wp(bp)) != NULL) {
+		make_local_w_val(wp,WMDNUMBER);
+		set_w_val(wp,WMDNUMBER,FALSE);
+	}
+	/* call the passed in function, giving it both the integer and
 		character pointer arguments */
 	(*func)(iarg,carg);
 	(void)gotobob(FALSE,1);
@@ -589,7 +598,7 @@ LINEPTR the_line;
 #else
 		register LINE	*lp;		/* current line */
 		register L_NUM	numlines = 0;	/* # of lines before point */
-	
+
 		for_each_line(lp, the_buffer) {
 			/* if we are on the specified line, record it */
 			if (lp == l_ref(the_line))
@@ -648,8 +657,8 @@ int
 gocol(n)
 int n;
 {
-	register int c; 	/* character being scanned */
-	register int i; 	/* index into current line */
+	register int c;		/* character being scanned */
+	register int i;		/* index into current line */
 	register int col;	/* current cursor column   */
 	register int llen;	/* length of line in bytes */
 
@@ -783,7 +792,7 @@ int leadingonly;
 			else {
 				backchar(TRUE, ccol - fspace);
 				(void)ldelete((long)(ccol - fspace), FALSE);
-				linsert(1, '\t');	    
+				linsert(1, '\t');
 				fspace = -1;
 			}
 
@@ -825,9 +834,9 @@ int	flag;
 {
 	register int off, orig;
 	register LINE *lp;
-	    
+
 	lp = l_ref(DOT.l);
-		    
+
 	off = llength(lp)-1;
 	orig = off;
 	while (off >= 0) {
@@ -835,12 +844,12 @@ int	flag;
 			break;
 		off--;
 	}
-	    
+
 	if (off == orig)
 		return TRUE;
 
 	DOT.o = off+1;
-		    
+
 	return ldelete((long)(orig - off),FALSE);
 }
 
@@ -1004,7 +1013,7 @@ writemsg(f, n)
 int f, n;	/* arguments ignored */
 {
 	register int status;
-	char buf[NPAT]; 	/* buffer to receive message into */
+	char buf[NPAT];		/* buffer to receive message into */
 
 	buf[0] = EOS;
 	if ((status = mlreply("Message to write: ", buf, sizeof(buf))) != TRUE)
@@ -1018,23 +1027,14 @@ int f, n;	/* arguments ignored */
 
 
 /* delay for the given number of milliseconds.  if "watchinput" is true,
-	then user input will abort the delay 
+	then user input will abort the delay
 	FIXXXX -- the second arg is only implemented for UNIX with select() */
 void
 catnap(milli,watchinput)
 int milli;
 int watchinput;
 {
-#if ! UNIX
-#if VMS
-	float	seconds = milli/1000.;
-	lib$wait(&seconds);
-#else
-	long i;
-	for (i = 0; i < term.t_pause; i++)
-		;
-#endif
-#else
+#if UNIX
 # if HAVE_SELECT
 
 	struct timeval tval;
@@ -1060,6 +1060,21 @@ int watchinput;
 
 #  endif
 # endif
+#endif
+
+#if VMS
+	float	seconds = milli/1000.;
+	lib$wait(&seconds);
+#endif
+
+#if TURBO
+	delay(milli);
+#endif
+
+#if !(UNIX|VMS|TURBO)
+	long i;
+	for (i = 0; i < term.t_pause; i++)
+		;
 #endif
 }
 
@@ -1222,7 +1237,7 @@ char *cwd;
 
 		if (cwds[n])
 			(void)strcpy(cwds[n], s);
-	}	
+	}
 }
 #endif
 

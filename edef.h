@@ -9,7 +9,10 @@
 
 /*
  * $Log: edef.h,v $
- * Revision 1.114  1993/09/03 09:11:54  pgf
+ * Revision 1.115  1993/09/10 16:06:49  pgf
+ * tom's 3.61 changes
+ *
+ * Revision 1.114  1993/09/03  09:11:54  pgf
  * tom's 3.60 changes
  *
  * Revision 1.113  1993/08/18  16:48:29  pgf
@@ -381,7 +384,7 @@
 decl_uninit( char *prog_arg );		/* argv[0] from main.c */
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version 3.60");
+decl_init( char version[], "version 3.61");
 
 decl_init( int slash, '/'); 		/* so DOS can use '\' as path separator */
 
@@ -493,6 +496,7 @@ decl_uninit( short ukb );		/* index of current kbuffs */
 decl_uninit( int kregflag );		/* info for pending kill into reg */
 decl_uninit( int kchars );		/* how much did we kill? */
 decl_uninit( int klines );
+decl_uninit( int lines_deleted );	/* from 'ldelete()', for reporting */
 
 #if !SMALLER
 decl_uninit( WINDOW *swindow );		/* saved window pointer		*/
@@ -535,7 +539,7 @@ decl_init( char	falsem[], "FALSE" );	/* false literal		*/
 decl_init( int	cmdstatus, TRUE );	/* last command status		*/
 decl_uninit( char palstr[49] );		/* palette string		*/
 decl_uninit( char *fline );		/* dynamic return line		*/
-decl_uninit( unsigned flen );		/* current length of fline	*/
+decl_uninit( ALLOC_T flen );		/* current length of fline	*/
 
 decl_uninit( int kbd_expand );		/* -1 kbd_putc shows tab as space */
 					/* +1 kbd_putc shows cr as ^M */

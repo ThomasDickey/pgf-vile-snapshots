@@ -2,7 +2,10 @@
  * code by Paul Fox, original algorithm mostly by Julia Harper May, 89
  *
  * $Log: undo.c,v $
- * Revision 1.42  1993/09/03 09:11:54  pgf
+ * Revision 1.43  1993/09/10 16:06:49  pgf
+ * tom's 3.61 changes
+ *
+ * Revision 1.42  1993/09/03  09:11:54  pgf
  * tom's 3.60 changes
  *
  * Revision 1.41  1993/08/13  16:32:50  pgf
@@ -918,7 +921,7 @@ int f,n;
 
 #if !OPT_MAP_MEMORY
 	ntext = NULL;
-	if (ulp->l_size && (ntext = malloc((UINT)(ulp->l_size))) == NULL)
+	if (ulp->l_size && (ntext = malloc((ALLOC_T)(ulp->l_size))) == NULL)
 		return (FALSE);
 #endif
 

@@ -3,7 +3,10 @@
  *		5/9/86
  *
  * $Log: input.c,v $
- * Revision 1.86  1993/09/03 09:11:54  pgf
+ * Revision 1.87  1993/09/10 16:06:49  pgf
+ * tom's 3.61 changes
+ *
+ * Revision 1.86  1993/09/03  09:11:54  pgf
  * tom's 3.60 changes
  *
  * Revision 1.85  1993/08/18  15:10:36  pgf
@@ -484,14 +487,15 @@ int	*next;		/* returns 0/1=register, 2=count */
 	int	length;
 
 	*expect = EOS;
-	if (state <= 0) {
+	if (state <= 0)
 		(void)strcat(expect, " register");
-		length = 2;
-	} else	length = sizeof(buffer);
 	if (state == 0)
 		(void)strcat(expect, " or");
-	if (state >= 0)
+	if (state >= 0) {
 		(void)strcat(expect, " line-count");
+		length = sizeof(buffer);
+	} else
+		length = 2;
 
 	(void)lsprintf(prompt, "Specify%s: ", expect);
 	*buffer = EOS;
@@ -1331,7 +1335,9 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 			if (done && (options & KBD_NULLOK) && cpos == 0)
 				;
 			else if ((done && !(options & KBD_MAYBEC))
-			 || (!EscOrQuo && (c == TESTC || c == NAMEC))) {
+			 || (!EscOrQuo
+			  && !((options & KBD_EXPCMD) && isShellOrPipe(buf))
+			  && (c == TESTC || c == NAMEC))) {
 				int	ok = ((*complete)(c, buf, &cpos));
 
 				if (ok) {

@@ -14,7 +14,10 @@
  *
  *
  * $Log: mktbls.c,v $
- * Revision 1.36  1993/09/06 16:30:01  pgf
+ * Revision 1.37  1993/09/10 16:06:49  pgf
+ * tom's 3.61 changes
+ *
+ * Revision 1.36  1993/09/06  16:30:01  pgf
  * suppress some warnings under linux
  *
  * Revision 1.35  1993/08/13  16:32:50  pgf
@@ -139,8 +142,7 @@
 #define	OPT_IFDEF_MODES	1	/* true iff we can ifdef modes */
 
 /* stuff borrowed/adapted from estruct.h */
-#if defined(__TURBOC__) || defined(__WATCOMC__) || defined(__GO32__) || \
-		(defined(__GNUC__) && (defined(sun) || defined(linux)))
+#if defined(__TURBOC__) || defined(__WATCOMC__) || defined(__GO32__) || (defined(__GNUC__) && (defined(sun) || defined(linux)))
 #include <stdlib.h>
 #define P(param) param
 #else

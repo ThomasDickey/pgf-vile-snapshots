@@ -4,7 +4,10 @@
  *	Filename prompting and completion routines
  *
  * $Log: filec.c,v $
- * Revision 1.23  1993/09/06 16:36:47  pgf
+ * Revision 1.24  1993/09/10 16:06:49  pgf
+ * tom's 3.61 changes
+ *
+ * Revision 1.23  1993/09/06  16:36:47  pgf
  * changed glob() to doglob() to avoid symbol conflicts
  *
  * Revision 1.22  1993/09/03  09:11:54  pgf
@@ -446,7 +449,7 @@ static	int	path_completion P(( int, char *, int * ));
 static	BUFFER	*MyBuff;	/* the buffer containing pathnames */
 static	char	*MyName;	/* name of buffer for name-completion */
 static	char	**MyList;	/* list, for name-completion code */
-static	unsigned MySize;	/* length of list, for (re)allocation */
+static	ALLOC_T MySize;		/* length of list, for (re)allocation */
 
 /*
  * Tests if the given path has been scanned during this prompt/reply operation
@@ -555,10 +558,14 @@ char *	name;
 					continue;
 				iflag = -TRUE;
 			} else {
+#if COMPLETE_DIRS
 				iflag = (global_g_val(GMDDIRC) && 
 						is_directory(path))
 					? -TRUE
 					: TRUE;
+#else
+				iflag = TRUE;
+#endif
 			}
 			(void)bs_find(path, (int)strlen(path), MyBuff, iflag,
 					(LINEPTR*)0);
@@ -745,7 +752,7 @@ char *	result;
 	flag &= ~ (FILEC_PROMPT | FILEC_EXPAND);
 
 #if COMPLETE_FILES
-	if (isnamedcmd && !clexec) {
+	if (do_prompt && !clexec) {
 		complete = path_completion;
 		MyBuff = 0;
 		MyName = ScratchName(FileCompletion);
