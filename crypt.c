@@ -1,7 +1,7 @@
 /*	Crypt:	Encryption routines for MicroEMACS
  *		written by Dana Hoggatt and Daniel Lawrence
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/crypt.c,v 1.13 1995/07/16 16:08:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/crypt.c,v 1.14 1996/01/19 17:16:24 pgf Exp $
  *
  */
 
@@ -12,9 +12,9 @@
 static	int	mod95 P((int));
 
 int
-ue_makekey(key, len)	/* make encryption key */
-char	*key;			/* where to write key */
-int	len;
+ue_makekey(			/* make encryption key */
+char	*key,			/* where to write key */
+int	len)
 {
 	register int status;	/* return status */
 	int odisinp = disinp;	/* original value of disinp */
@@ -41,9 +41,9 @@ int	len;
 
 /* ARGSUSED */
 int
-ue_setkey(f, n)	/* reset encryption key of current buffer */
-int f;		/* default flag */
-int n;		/* numeric argument */
+ue_setkey(	/* reset encryption key of current buffer */
+int f,		/* default flag */
+int n)		/* numeric argument */
 {
 	register int s = ue_makekey(curbp->b_key, NPAT);
 
@@ -155,9 +155,9 @@ int n;		/* numeric argument */
  **********/
 
 void
-ue_crypt(bptr, len)
-register char *bptr;	/* buffer of characters to be encrypted */
-register int len;	/* number of characters in the buffer */
+ue_crypt(
+register char *bptr,	/* buffer of characters to be encrypted */
+register int len)	/* number of characters in the buffer */
 {
 	register int cc;	/* current character being considered */
 
@@ -213,8 +213,7 @@ register int len;	/* number of characters in the buffer */
 	return;
 }
 
-static int mod95(val)
-register int val;
+static int mod95(register int val)
 {
 	/*  The mathematical MOD does not match the computer MOD  */
 

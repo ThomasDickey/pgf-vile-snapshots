@@ -1,46 +1,91 @@
 /*
  * This file contains the command processing functions for the commands
  * that take motion operators.
- * written for vile: Copyright (c) 1990, 1995 by Paul Fox
+ * written for vile by Paul Fox, (c)1990
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/opers.c,v 1.52 1995/02/08 03:29:23 pgf Exp $
+ * $Log: opers.c,v $
+ * Revision 1.14  1991/10/29 14:35:29  pgf
+ * implemented the & commands: substagain
  *
+ * Revision 1.13  1991/09/10  00:51:05  pgf
+ * only restore dot with swapmark if the buffer hasn't switched on us
+ *
+ * Revision 1.12  1991/08/13  02:50:52  pgf
+ * fixed chgreg case of butting against top of buffer
+ *
+ * Revision 1.11  1991/08/07  12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.10
+ * date: 1991/07/19 17:23:06;
+ * added status return to chgreg()
+ * 
+ * revision 1.9
+ * date: 1991/07/19 17:16:41;
+ * fix null pointer de-ref
+ * 
+ * revision 1.8
+ * date: 1991/06/25 19:53:04;
+ * massive data structure restructure
+ * 
+ * revision 1.7
+ * date: 1991/06/16 17:36:47;
+ * added entab, detab, and trim operator routines
+ * 
+ * revision 1.6
+ * date: 1991/06/15 09:11:23;
+ * hardened chgreg[ion] against motions that don't succeed, leaving
+ * the mark unset, so swapmark fails
+ * 
+ * revision 1.5
+ * date: 1991/06/03 10:26:34;
+ * cleanup, and
+ * pulled some code out of execute() into here
+ * 
+ * revision 1.4
+ * date: 1991/05/31 11:38:43;
+ * syntax error from bad merge
+ * 
+ * revision 1.3
+ * date: 1991/05/31 11:17:31;
+ * lot of cleanup, some new operators -- now use godotplus() instead of
+ * stutterfunc().  much better
+ * 
+ * revision 1.2
+ * date: 1991/04/04 09:39:56;
+ * added operfilter (!) command
+ * 
+ * revision 1.1
+ * date: 1990/09/21 10:25:52;
+ * initial vile RCS revision
  */
 
 #include	"estruct.h"
 #include        "edef.h"
+#ifndef NULL
+#define NULL 0
+#endif
 
 extern CMDFUNC f_godotplus;
-
-typedef	int	(*OpsFunc) P((void));
-
-static	int	chgreg P(( void ));
-static	int	shift_n_times P(( int, int, OpsFunc, char * ));
-
-extern REGION *haveregion;
 
 /* For the "operator" commands -- the following command is a motion, or
  *  the operator itself is repeated.  All operate on regions.
  */
-int
 operator(f,n,fn,str)
-int f,n;
-OpsFunc fn;
+int (*fn)();
 char *str;
 {
 	int c;
-	int thiskey;
+	int this1key;
 	int status;
 	CMDFUNC *cfp;			/* function to execute */
 	char tok[NSTRING];		/* command incoming */
+	MARK ourmark;
 	BUFFER *ourbp;
-#if OPT_MOUSE
-	WINDOW	*wp0 = curwp;
-#endif
 
 	doingopcmd = TRUE;
 
-	pre_op_dot = DOT;
+	ourmark = DOT;
 	ourbp = curbp;
 
 	if (havemotion != NULL) {
@@ -48,7 +93,7 @@ char *str;
 		havemotion = NULL;
 	} else {
 		mlwrite("%s operation pending...",str);
-		(void)update(FALSE);
+		update(FALSE);
 
 		/* get the next command from the keyboard */
 		/* or a command line, as approp. */
@@ -59,132 +104,99 @@ char *str;
 			else
 				cfp = engl2fnc(tok);
 		} else {
-			thiskey = lastkey;
+			this1key = last1key;
 			c = kbd_seq();
 
-#if OPT_MOUSE
-			if (curwp != wp0) {
-				unkeystroke(c);
-			    	doingopcmd = FALSE;
-				return FALSE;
-			}
-#endif
 			/* allow second chance for entering counts */
-			do_repeats(&c,&f,&n);
+			if (f == FALSE) {
+				do_num_proc(&c,&f,&n);
+				do_rept_arg_proc(&c,&f,&n);
+			}
 
-			if (thiskey == lastkey)
+			if (this1key == last1key)
 				cfp = &f_godotplus;
 			else
 				cfp = kcod2fnc(c);
 
 		}
-		if (cfp)
-			mlerase();
-		else
-			mlforce("[No such function]");
+		mlerase();
 	}
-	if (!cfp) {
-		doingopcmd = FALSE;
+	if (!cfp)
 		return FALSE;
-	}
 
 	if ((cfp->c_flags & MOTION) == 0) {
-		kbd_alarm();
-		doingopcmd = FALSE;
+		TTbeep();
 		return(ABORT);
 	}
 
 	/* motion is interpreted as affecting full lines */
-	if (regionshape == EXACT) {
-	    if (cfp->c_flags & FL)
-		    regionshape = FULLLINE;
-	    if (cfp->c_flags & RECT)
-		    regionshape = RECTANGLE;
-	}
+	if (cfp->c_flags & FL)
+		fulllineregions = TRUE;
 
 	/* and execute the motion */
-	status = execute(cfp, f,n);
+	status = execute(cfp, f, n);
 
-	if (status != TRUE) {
+	if (status != TRUE || 
+	   ( samepoint(ourmark, DOT) && fulllineregions == FALSE) ) {
 		doingopcmd = FALSE;
-		regionshape = EXACT;
-		mlforce("[Motion failed]");
+		fulllineregions = FALSE;
 		return FALSE;
 	}
 
 	opcmd = 0;
 
-	MK = pre_op_dot;
+	MK = ourmark;
 
 	/* we've successfully set up a region */
 	if (!fn) { /* be defensive */
-		mlforce("BUG -- null func pointer in operator");
+		mlwrite("BUG -- null func pointer in operator");
 		status = FALSE;
 	} else {
-		status = (fn)();
+		status = (fn)(f,n,NULL,NULL);
 	}
 
 	if (ourbp == curbp) /* in case the func switched buffers on us */
 		swapmark();
 
-	if (regionshape == FULLLINE)
-		(void)firstnonwhite(FALSE,1);
-
-	regionshape = EXACT;
+	if (fulllineregions) {
+		fulllineregions = FALSE;
+		firstnonwhite(f,n);
+	}
 
 	doingopcmd = FALSE;
-
-	haveregion = FALSE;
-
 	return status;
 }
 
-int
 operdel(f,n)
-int f,n;
 {
-	int	status;
+	extern int killregion();
 
 	opcmd = OPDEL;
-	lines_deleted = 0;
-	status = operator(f, n, killregion,
-		regionshape == FULLLINE
-			? "Delete of full lines"
-			: "Delete");
-	if (do_report(lines_deleted))
-		mlforce("[%d lines deleted]", lines_deleted);
-	return status;
+	return operator(f,n,killregion,"Delete");
 }
 
-int
 operlinedel(f,n)
-int f,n;
 {
-	regionshape = FULLLINE;
-	return operdel(f,n);
+	extern int killregion();
+
+	fulllineregions = TRUE;
+	opcmd = OPDEL;
+	return operator(f,n,killregion,"Delete of full lines");
 }
 
-static int
-chgreg()
+chgreg(f,n)
 {
-	if (regionshape == RECTANGLE) {
-		return stringrect();
-	} else {
-		killregion();
-		if (regionshape == FULLLINE) {
-			if (backline(FALSE,1) == TRUE) 
-				/* backline returns FALSE at top of buf */
-				return opendown(TRUE,1);
-			else
-				return openup(TRUE,1);
-		}
-		return ins();
+	killregion(f,n);
+	if (fulllineregions) {
+		if (backline(FALSE,1) == TRUE) /* returns FALSE at top of buffer */
+			return opendown(TRUE,1);
+		else
+			return openup(TRUE,1);
 	}
+	return insert(f,n);
 }
 
-int
 operchg(f,n)
-int f,n;
 {
 	int s;
 
@@ -194,129 +206,84 @@ int f,n;
 	return s;
 }
 
-int
 operlinechg(f,n)
-int f,n;
 {
 	int s;
 
-	regionshape = FULLLINE;
+	fulllineregions = TRUE;
 	opcmd = OPOTHER;
 	s = operator(f,n,chgreg,"Change of full lines");
 	if (s == TRUE) swapmark();
 	return s;
 }
 
-int
-operjoin(f,n)
-int f,n;
-{
-	opcmd = OPOTHER;
-	return operator(f,n,joinregion,"Join");
-}
-
-int
 operyank(f,n)
-int f,n;
 {
-	MARK savedot;
-	int s;
-	savedot = DOT;
-	opcmd = OPDEL;
-	s = operator(f,n,yankregion,"Yank");
-	DOT = savedot;
-	return s;
-}
-
-int
-operlineyank(f,n)
-int f,n;
-{
-	MARK savedot;
-	int s;
-	savedot = DOT;
-	regionshape = FULLLINE;
+	extern int yankregion();
 	opcmd = OPOTHER;
-	s = operator(f,n,yankregion,"Yank of full lines");
-	DOT = savedot;
-	return s;
+	return operator(f,n,yankregion,"Yank");
 }
 
-int
-operflip(f,n)
-int f,n;
+operlineyank(f,n)
 {
+	extern int yankregion();
+
+	fulllineregions = TRUE;
+	opcmd = OPOTHER;
+	return operator(f,n,yankregion,"Yank of full lines");
+}
+
+operflip(f,n)
+{
+	extern int flipregion();
+
 	opcmd = OPOTHER;
 	return operator(f,n,flipregion,"Flip case");
 }
 
-int
 operupper(f,n)
-int f,n;
 {
+	extern int upperregion();
+
 	opcmd = OPOTHER;
 	return operator(f,n,upperregion,"Upper case");
 }
 
-int
 operlower(f,n)
-int f,n;
 {
+	extern int lowerregion();
+
 	opcmd = OPOTHER;
 	return operator(f,n,lowerregion,"Lower case");
 }
 
-/*
- * The shift commands are special, because vi allows an implicit repeat-count
- * to be specified by repeating the '<' or '>' operators.
- */
-static int
-shift_n_times(f,n, func, msg)
-int	f,n;
-OpsFunc	func;
-char	*msg;
-{
-	register int status = FALSE;
 
-	regionshape = FULLLINE;
-	opcmd = OPOTHER;
-
-	if (havemotion != NULL) {
-		CMDFUNC *cfp = havemotion;
-		while (n-- > 0) {
-			havemotion = cfp;
-			if ((status = operator(FALSE,1, func, msg)) != TRUE)
-				break;
-		}
-	} else
-		status = operator(f,n, func, msg);
-	return status;
-}
-
-int
 operlshift(f,n)
-int f,n;
 {
-	return shift_n_times(f,n,shiftlregion,"Left shift");
+	extern int shiftlregion();
+
+	fulllineregions = TRUE;
+	opcmd = OPOTHER;
+	return operator(f,n,shiftlregion,"Left shift");
 }
 
-int
 operrshift(f,n)
-int f,n;
 {
-	return shift_n_times(f,n,shiftrregion,"Right shift");
+	extern int shiftrregion();
+
+	fulllineregions = TRUE;
+	opcmd = OPOTHER;
+	return operator(f,n,shiftrregion,"Right shift");
 }
 
-int
 operwrite(f,n)
-int f,n;
 {
         register int    s;
-        char fname[NFILEN];
+        static char fname[NFILEN];
+	extern int writeregion();
 
 	if (ukb != 0) {
-	        if ((s=mlreply_file("Write to file: ", (TBUFF **)0,
-				FILEC_WRITE|FILEC_PROMPT, fname)) != TRUE)
+	        if ((s=mlreply("Write to file: ", fname, NFILEN)) != TRUE)
 	                return s;
 		return kwrite(fname,TRUE);
 	} else {
@@ -325,112 +292,84 @@ int f,n;
 	}
 }
 
-#if OPT_FORMAT
-int
 operformat(f,n)
-int f,n;
 {
-	regionshape = FULLLINE;
+	extern int formatregion();
+
+	fulllineregions = TRUE;
 	opcmd = OPOTHER;
 	return operator(f,n,formatregion,"Format");
 }
-#endif
 
-int
 operfilter(f,n)
-int f,n;
 {
-	regionshape = FULLLINE;
+	extern int filterregion();
+
+	fulllineregions = TRUE;
 	opcmd = OPOTHER;
 	return operator(f,n,filterregion,"Filter");
 }
 
 
-int
 operprint(f,n)
-int f,n;
 {
-	regionshape = FULLLINE;
+	extern int plineregion();
+
+	fulllineregions = TRUE;
 	opcmd = OPOTHER;
 	return operator(f,n,plineregion,"Line print");
 }
 
-int
 operlist(f,n)
-int f,n;
 {
-	regionshape = FULLLINE;
+	extern int llineregion();
+
+	fulllineregions = TRUE;
 	opcmd = OPOTHER;
 	return operator(f,n,llineregion,"Line list");
 }
 
-int
 opersubst(f,n)
-int f,n;
 {
-	regionshape = FULLLINE;
+	extern int substregion();
+
+	fulllineregions = TRUE;
 	opcmd = OPOTHER;
 	return operator(f,n,substregion,"Substitute");
 }
 
-int
 opersubstagain(f,n)
-int f,n;
 {
-	regionshape = FULLLINE;
+	extern int subst_again_region();
+
+	fulllineregions = TRUE;
 	opcmd = OPOTHER;
 	return operator(f,n,subst_again_region,"Substitute-again");
 }
 
-#if OPT_AEDIT
-int
 operentab(f,n)
-int f,n;
 {
-	regionshape = FULLLINE;
+	extern int entab_region();
+
+	fulllineregions = TRUE;
 	opcmd = OPOTHER;
 	return operator(f,n,entab_region,"Spaces-->Tabs");
 }
-#endif
 
-#if OPT_AEDIT
-int
 operdetab(f,n)
-int f,n;
 {
-	regionshape = FULLLINE;
+	extern int detab_region();
+
+	fulllineregions = TRUE;
 	opcmd = OPOTHER;
 	return operator(f,n,detab_region,"Tabs-->Spaces");
 }
-#endif
 
-#if OPT_AEDIT
-int
 opertrim(f,n)
-int f,n;
 {
-	regionshape = FULLLINE;
+	extern int trim_region();
+
+	fulllineregions = TRUE;
 	opcmd = OPOTHER;
 	return operator(f,n,trim_region,"Trim whitespace");
 }
-#endif
-
-#if OPT_AEDIT
-int
-operblank(f,n)
-int f,n;
-{
-	opcmd = OPOTHER;
-	return operator(f,n,blank_region,"Blanking");
-}
-#endif
-
-int
-operopenrect(f,n)
-int f,n;
-{
-	opcmd = OPOTHER;
-	regionshape = RECTANGLE;
-	return operator(f,n,openregion,"Opening");
-}
-

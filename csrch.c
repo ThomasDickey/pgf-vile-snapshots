@@ -1,7 +1,9 @@
 /* These functions perform vi's on-this-line character scanning functions.
- * written for vile: Copyright (c) 1990, 1995 by Paul Fox
+ *	written for vile by Paul Fox, (c)1990
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/csrch.c,v 1.23 1995/04/22 03:22:53 pgf Exp $
+ * $Log: csrch.c,v $
+ * Revision 1.14  1994/02/22 11:03:15  pgf
+ * truncated RCS log for 4.0
  *
 */
 
@@ -9,7 +11,7 @@
 #include "edef.h"
 
 static short lstscan;
-static int   lstchar;
+static short lstchar;
 #define BACK 0
 #define FORW 1
 #define DIREC 1
@@ -18,11 +20,8 @@ static int   lstchar;
 #define T 2
 #define TYPE 2
 
-static	int	fscan P(( int, int, int ));
-static	int	bscan P(( int, int, int ));
-static	int	get_csrch_char P(( int * ));
 
-static int
+int
 fscan(f,n,c)
 int f,n,c;
 {
@@ -50,10 +49,8 @@ int f,n,c;
 	if ( i == lLength(DOT.l)) {
 		return(FALSE);
 	}
-	if (doingopcmd && !doingsweep)
+	if (doingopcmd)
 		doto++;
-	else if (doingsweep)
-		sweephack = TRUE;
 
 	DOT.o = doto;
 	curwp->w_flag |= WFMOVE;
@@ -61,7 +58,7 @@ int f,n,c;
 			
 }
 
-static int
+int
 bscan(f,n,c)
 int f,n,c;
 {
@@ -96,40 +93,18 @@ int f,n,c;
 
 }
 
-static int
-get_csrch_char(cp)
-int *cp;
-{
-	int c;
-
-	if (clexec || isnamedcmd) {
-		int status;
-		static char cbuf[2];
-		if ((status=mlreply("Scan for: ", cbuf, 2)) != TRUE)
-			return status;
-		c = cbuf[0];
-	} else {
-		c = keystroke();
-		if (c == quotec)
-			c = keystroke_raw8();
-		else if (ABORTED(c))
-			return FALSE;
-	}
-
-	*cp = c;
-	return TRUE;
-}
-
 /* f */
 int
 fcsrch(f,n)
 int f,n;
 {
-	int c, s;
+	register int c;
 
-	s = get_csrch_char(&c);
-	if (s != TRUE)
-		return s;
+        c = tgetc(FALSE);
+	if (c == quotec)
+		c = tgetc(TRUE);
+	else if (c == abortc)
+		return FALSE;
 
 	return(fscan(f,n,c));
 }
@@ -139,11 +114,13 @@ int
 bcsrch(f,n)
 int f,n;
 {
-	int c, s;
+	register int c;
 
-	s = get_csrch_char(&c);
-	if (s != TRUE)
-		return s;
+        c = tgetc(FALSE);
+	if (c == quotec)
+		c = tgetc(TRUE);
+	else if (c == abortc)
+		return FALSE;
 
 	return(bscan(f,n,c));
 }

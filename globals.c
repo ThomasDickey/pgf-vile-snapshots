@@ -1,17 +1,64 @@
-/* ed/vi/ex style global commands, where first the file is scanned for
- *	matching lines, then for each such line, an action is performed.
- *	written for vile: Copyright (c) 1990, 1995 by Paul Fox
- *
- * $Header: /usr/build/VCS/pgf-vile/RCS/globals.c,v 1.35 1995/09/12 13:27:44 pgf Exp $
- *
- */
-
 #include	"estruct.h"
 #include        "edef.h"
+#include        <stdio.h>
 
-extern	CMDFUNC f_godotplus; 	
-
-static	int	globber P(( int, int, int ));
+/* ed/vi/ex style global commands, where first the file is scanned for
+ *	matching lines, then for each such line, an action is performed.
+ *	written for vile by Paul Fox, (c)1990
+ *
+ * $Log: globals.c,v $
+ * Revision 1.14  1992/12/20 14:39:48  foxharp
+ * implemented 'v' command -- easy -- just do same as 'g', but invert marks
+ * before runnning the command
+ *
+ * Revision 1.13  1992/12/04  09:12:25  foxharp
+ * deleted unused assigns
+ *
+ * Revision 1.12  1992/05/16  12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.11  1992/03/07  10:21:29  pgf
+ * arg mismatch on fsearch()
+ *
+ * Revision 1.10  1992/01/05  00:06:13  pgf
+ * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
+ * often.  also normalized message appearance somewhat.
+ *
+ * Revision 1.9  1991/11/01  14:38:00  pgf
+ * saber cleanup
+ *
+ * Revision 1.8  1991/09/10  00:52:55  pgf
+ * be careful to not rely on curbp during global ops, since some commands, like
+ * print (pregion) change buffers
+ *
+ * Revision 1.7  1991/08/07  12:35:07  pgf
+ * added RCS log messages
+ *
+ * revision 1.6
+ * date: 1991/08/06 15:22:03;
+ *  global/local values
+ * 
+ * revision 1.5
+ * date: 1991/06/27 18:43:40;
+ * fixed infinite loop if a global referenced '^' or '$' as the search string
+ * 
+ * revision 1.4
+ * date: 1991/06/25 19:52:44;
+ * massive data structure restructure
+ * 
+ * revision 1.3
+ * date: 1991/05/31 11:07:32;
+ * clean up globals routine, so it doesn't need or provide extra args
+ * 
+ * revision 1.2
+ * date: 1991/04/22 09:02:42;
+ * removed non-portable initialization
+ * 
+ * revision 1.1
+ * date: 1990/09/21 10:25:21;
+ * initial vile RCS revision
+*/
+#if GLOBALS
 
 int
 globals(f,n)
@@ -28,21 +75,31 @@ int f,n;
 }
 
 /* ARGSUSED */
-static int
+int
 globber(f, n, g_or_v)
 int f, n, g_or_v;
 {
 	int c, s;
 	register LINE *lp;
 	register char *fnp;	/* ptr to the name of the cmd to exec */
-	char	cmd[NLINE];
+	char *kbd_engl();
+	CMDFUNC *engl2fnc();
 	CMDFUNC *cfp;
 	int foundone;
-	WINDOW *wp, *sw_wp;
-	L_NUM	before;
-	int	save_report;
-
-	c = kbd_delimiter();
+	WINDOW *wp;
+	extern CMDFUNC f_godotplus;
+	
+	c = '\n';
+	if (isnamedcmd) {
+		c = tpeekc();
+		if (c < 0) {
+			c = '\n';
+		} else {
+			if (ispunct(c)) {
+				(void)kbd_key();
+			}
+		}
+	}
 	if (readpattern("global pattern: ", &pat[0], &gregexp, c, FALSE) != TRUE) {
 		mlforce("[No pattern.]");
 		return FALSE;
@@ -53,12 +110,13 @@ int f, n, g_or_v;
                 searching delay is too long, and unexpected in the
                 middle of a command.  */
 
-	fnp = kbd_engl("action to perform on each matching line: ", cmd);
-	/* get the name of, and then the function to execute */
-	if (!fnp) {
+	mlprompt("action to perform on each matching line: ");
+	/* and now get the name of, and then the function to execute */
+	fnp = kbd_engl();
+	if (!fnp || !fnp[0]) {
 	        mlforce("[No function]");
 		return FALSE;
-	} else if ((cfp = engl2fnc(fnp)) == 0) {
+	} else if (!(cfp = engl2fnc(fnp))) {
 	        mlforce("[No such function]");
 		return FALSE;
 	} else if ((cfp->c_flags & GLOBOK) == 0) {
@@ -75,19 +133,20 @@ int f, n, g_or_v;
 	calledbefore = FALSE;
 	
 	if (g_or_v == 'v') {  /* invert the sense of all the matches */
-		for_each_line(lp, curbp)
+		lp = lforw(curbp->b_line.l);
+		while (lp != curbp->b_line.l) {
 			lflipmark(lp);
+			lp = lforw(lp);
+		}
 	}
 	/* loop through the buffer -- we must clear the marks no matter what */
 	s = TRUE;
-	lp = lForw(buf_head(curbp));
-	wp = sw_wp = curwp;
+	lp = lforw(curbp->b_line.l);
+	wp = curwp;
 	/* loop until there are no marked lines in the buffer */
 	foundone = FALSE;
-	before = line_count(curbp);
-	save_report = global_g_val(GVAL_REPORT);
-	for_ever {
-		if (lp == l_ref(win_head(wp))) {
+	for(;;) {
+		if (lp == wp->w_bufp->b_line.l) {
 			/* at the end -- only quit if we found no 
 				marks on the last pass through. otherwise,
 				go through again */
@@ -107,28 +166,25 @@ int f, n, g_or_v;
 					if (b_val(wp->w_bufp,MDVIEW))
 						return(rdonly());
 					mayneedundo();
-					set_global_g_val(GVAL_REPORT,0);
 				}
 				havemotion = &f_godotplus;
-				wp->w_dot.l = l_ptr(lp);
+				wp->w_dot.l = lp;
 				wp->w_dot.o = 0;
-				s = (cfp->c_func)(FALSE, 1);
-				if (curwp != wp) {
-				    /* function may have switched on us */
-				    sw_wp = curwp;
-				    (void)set_curwp(wp);
-				}
-				lp = l_ref(wp->w_dot.l);
+				s = (cfp->c_func)(FALSE, 1, NULL, NULL);
+				/* function may have switched on us */
+				swbuffer(wp->w_bufp);
+				lp = wp->w_dot.l;
 				havemotion = NULL;
 				calledbefore = TRUE;
 			}
 		}
 		lp = lforw(lp);
 	}
-	set_global_g_val(GVAL_REPORT,save_report);
-	(void)line_report(before);
-	/* if it tried to switch, do it now */
-	(void)set_curwp(sw_wp);
+
 
 	return s;
 }
+
+#else
+globalhello() { }
+#endif

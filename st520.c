@@ -4,7 +4,7 @@
  * using VT52 emulation.  The I/O services are provided here as well.  It
  * compiles into nothing if not a 520ST style device.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/st520.c,v 1.17 1995/11/17 04:03:42 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/st520.c,v 1.14 1994/11/28 19:04:20 pgf Exp $
  *
  */
 #error This module is not actively maintained as part of vile.
@@ -16,7 +16,7 @@
  * this fragment used to appear in the input stream.  function keys should
  *	be mapped these days, and this looks a lot like the ibmpc code
  *	used to, so you should be able to clone that.
- *	#if	SYS_ST520
+ *	#if	ST520
  *		if (c == 0) {
  *			c = TTgetc();
  *			return c | SPEC;
@@ -30,7 +30,7 @@
 #include	"estruct.h"
 #include	"edef.h"
 
-#if	DISP_ATARI & SYS_ST520 & MEGAMAX
+#if	ATARI & ST520 & MEGAMAX
 #include	<osbind.h>
 
 #define LINEA_INIT 0xA000
@@ -65,10 +65,9 @@ extern	int st520kopen();
 extern	int st520kclose();
 extern	int st520chgrez();
 
-#if	OPT_COLOR
+#if	COLOR
 extern	int	st520fcol();
 extern	int	st520bcol();
-extern	void	st520spal();
 
 int		cfcolor = -1;		/* current fg (character) color */
 int		cbcolor = -1;		/* current bg color */
@@ -100,7 +99,6 @@ TERM	term	= {
 	&st520kclose,
 	&ttgetc,
 	&ttputc,
-	&sttypahead,
 	&ttflush,
 	&st520move,
 	&st520eeol,
@@ -110,10 +108,9 @@ TERM	term	= {
 #if	MULTREZ
 	, &st520chgrez
 #endif
-#if	OPT_COLOR
-	, &st520fcol
-	, &st520bcol
-	, &st520spal
+#if	COLOR
+	, &st520fcol,
+	&st520bcol
 #endif
 };
 	struct KBDvecs {
@@ -156,9 +153,9 @@ st520eeol()
 st520eeop()
 {
 
-#if	OPT_COLOR
-	st520fcol(gfcolor);
-	st520bcol(gbcolor);
+#if	COLOR
+		st520fcol(gfcolor);
+		st520bcol(gbcolor);
 #endif
 	ttputc(ESC);
 	ttputc('J');
@@ -180,7 +177,7 @@ int status;	/* TRUE = reverse video, FALSE = normal video */
 	}
 }
 
-#if	OPT_COLOR
+#if	COLOR
 st520fcol(color)
 int color;      
 {
@@ -207,39 +204,6 @@ int color;
 			cbcolor = color;
 		}
 
-}
-
-/*	stkspal(pstr):	reset the current palette according to a
-			"palette string" of the form
-
-	000111222333444555666777
-
-	which contains the octal values for the palette registers
-*/
-
-stkspal(pstr)
-
-char *pstr;	/* palette string */
-
-{
-	int pal;	/* current palette position */
-	int clr;	/* current color value */
-	int i;
-
-	for (pal = 0; pal < 16; pal++) {
-		if (*pstr== 0)
-			break;
-
-		/* parse off a color */
-		clr = 0;
-		for (i = 0; i < 3; i++)
-			if (*pstr)
-				clr = clr * 16 + (*pstr++ - '0');
-		palette[pal] = clr;
-	};
-
-	/* and now set it */
-	xbios(SETPALETTE, palette);
 }
 #endif
 
@@ -273,7 +237,7 @@ st520open()
 			term.t_nrow = 25;
 			term.t_ncol  = 80;
 			grez = 1;
-#if	OPT_COLOR
+#if	COLOR
 			STncolors = 4;
 			for(i=0;i<8;i++) {
 				oldpal[i] = Setcolor(i,newpal[i]);
@@ -286,7 +250,7 @@ st520open()
 			grez = 2;
 			make_8x10(); /* create a smaller font */
 			set_40();    /* and go to 40 line mode */
-#if	OPT_COLOR
+#if	COLOR
 			STncolors = 0;
 #endif
 			break;
@@ -329,7 +293,7 @@ st520close()
 	if(grez == 2 && STrez == 2) /* b/w monitor in 40 row mode */
 		restore();
 
-#if		OPT_COLOR
+#if		COLOR
 	for(i=0;i<STncolors;i++)
 		Setcolor(i,oldpal[i]);
 #endif
@@ -559,8 +523,8 @@ int	onoff;
 	}	   
 }
 #else
+#if	ATARI & ST520 & LATTICE
 
-#if	DISP_ATARI & SYS_ST520 & CC_LATTICE
 /*
 	These routines provide support for the ATARI 1040ST using
 the LATTICE compiler using the virtual VT52 Emulator
@@ -666,7 +630,7 @@ extern	int	strez();
 extern	int	stkopen();
 extern	int	stkclose();
 
-#if	OPT_COLOR
+#if	COLOR
 extern	int	stfcol();
 extern	int	stbcol();
 #endif
@@ -697,7 +661,7 @@ TERM	term	= {
 	&stbeep,
 	&strev,
 	&strez
-#if	OPT_COLOR
+#if	COLOR
 	, &stfcol,
 	&stbcol
 #endif
@@ -719,7 +683,7 @@ steeol()
 
 steeop()
 {
-#if	OPT_COLOR
+#if	COLOR
 	stfcol(gfcolor);
 	stbcol(gbcolor);
 #endif
@@ -738,7 +702,7 @@ int status;	/* TRUE = reverse video, FALSE = normal video */
 	}
 }
 
-#if	OPT_COLOR
+#if	COLOR
 mapcol(clr)	/* medium rez color translation */
 
 int clr;	/* emacs color number to translate */
@@ -847,7 +811,7 @@ stopen()	/* open the screen */
 	}
 
 	/* and set up the default palette */
-	stkspal(palstr);
+	spal(palstr);
 
 	stputc(ESC);	/* automatic overflow off */
 	stputc('w');
@@ -883,6 +847,39 @@ stclose()
 	xbios(SETPALETTE, spalette);
 
 	ttclose();
+}
+
+/*	spal(pstr):	reset the current palette according to a
+			"palette string" of the form
+
+	000111222333444555666777
+
+	which contains the octal values for the palette registers
+*/
+
+spal(pstr)
+
+char *pstr;	/* palette string */
+
+{
+	int pal;	/* current palette position */
+	int clr;	/* current color value */
+	int i;
+
+	for (pal = 0; pal < 16; pal++) {
+		if (*pstr== 0)
+			break;
+
+		/* parse off a color */
+		clr = 0;
+		for (i = 0; i < 3; i++)
+			if (*pstr)
+				clr = clr * 16 + (*pstr++ - '0');
+		palette[pal] = clr;
+	};
+
+	/* and now set it */
+	xbios(SETPALETTE, palette);
 }
 
 stgetc()	/* get a char from the keyboard */
@@ -975,7 +972,7 @@ char *newrez;	/* requested resolution */
 	}
 
 	/* and set up the default palette */
-	stkspal(palstr);
+	spal(palstr);
 	currez = nrez;
 	strcpy(sres, resname[currez]);
 
@@ -1014,7 +1011,8 @@ char *cmd;	/* command to execute */
 				(char *)NULL));
 }
 
-sttypahead()
+#if	TYPEAH
+tttypahead()
 
 {
 	int rval;	/* return value from BIOS call */
@@ -1028,7 +1026,19 @@ sttypahead()
 	else
 		return(TRUE);
 }
+#endif
 
+#if	FLABEL
+int
+fnclabel(f, n)		/* label a function key */
+
+int f,n;	/* default flag, numeric argument [unused] */
+
+{
+	/* on machines with no function keys...don't bother */
+	return(TRUE);
+}
+#endif
 #else
 sthello()
 {
