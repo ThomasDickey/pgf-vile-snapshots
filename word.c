@@ -4,7 +4,10 @@
  * do any sentence mode commands, they are likely to be put in this file. 
  *
  * $Log: word.c,v $
- * Revision 1.17  1992/05/19 08:55:44  foxharp
+ * Revision 1.18  1992/05/31 22:11:11  foxharp
+ * added C and shell comment reformatting
+ *
+ * Revision 1.17  1992/05/19  08:55:44  foxharp
  * more prototype and shadowed decl fixups
  *
  * Revision 1.16  1992/05/16  12:00:31  pgf
@@ -351,7 +354,10 @@ formatregion()
 	register int newlen;		/* tentative new line length	*/
 	register int finished;		/* Are we at the End-Of-Paragraph? */
 	register int firstflag;		/* first word? (needs no space)	*/
-	register LINE *pastline;		/* pointer to line just past EOP */
+	register int is_comment;	/* doing a comment block?	*/
+	register int comment_char;	/* # or *, for shell or C	*/
+	register int at_nl = TRUE;	/* just saw a newline?		*/
+	register LINE *pastline;	/* pointer to line just past EOP */
 	register int sentence;		/* was the last char a period?	*/
 	char wbuf[NSTRING];		/* buffer for current word	*/
 	int secondindent;
@@ -397,6 +403,15 @@ formatregion()
 		wordlen = 0;
 		sentence = FALSE;
 
+		is_comment = ( ((c = char_at(DOT)) == '#') ||
+				(c == '*') ||
+				((c == '/') &&
+				DOT.o+1 < llength(DOT.l) &&
+				 lgetc(DOT.l,DOT.o+1) == '*'));
+
+		if (is_comment)
+			comment_char = (c == '#') ? '#':'*';
+
 		/* scan through lines, filling words */
 		firstflag = TRUE;
 		finished = FALSE;
@@ -416,8 +431,14 @@ formatregion()
 					finished = SORTOFTRUE;
 				}
 				DOT.l = lback(DOT.l);
+				at_nl = TRUE;
 			} else {
 				c = char_at(DOT);
+				if (at_nl && ( isspace(c) ||
+					is_comment && c == comment_char))
+					c = ' ';
+				else
+					at_nl = FALSE;
 			}
 			/* and then delete it */
 			if (finished == FALSE) {
@@ -443,8 +464,7 @@ formatregion()
 						s = linsert(1, ' ');
 						if (s != TRUE) return s;
 						++clength;
-					}
-					firstflag = FALSE;
+					} 
 				} else {
 			                if (lnewline() == FALSE ||
 					((i=secondindent/curtabval)!=0 &&
@@ -454,7 +474,17 @@ formatregion()
 			                        return FALSE;
 			                }
 					clength = secondindent;
+					firstflag = TRUE;
 				}
+				if (firstflag && is_comment &&
+						strncmp("/*",wbuf,2)) {
+					s = linsert(1, comment_char);
+					if (s != TRUE) return s;
+					s = linsert(1, ' ');
+					if (s != TRUE) return s;
+					clength += 2;
+				}
+				firstflag = FALSE;
 
 				/* and add the word in in either case */
 				for (i=0; i<wordlen; i++) {

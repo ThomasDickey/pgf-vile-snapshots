@@ -8,7 +8,10 @@
 
 /*
  * $Log: edef.h,v $
- * Revision 1.48  1992/05/25 22:07:45  foxharp
+ * Revision 1.49  1992/05/27 08:32:57  foxharp
+ * v 3.18
+ *
+ * Revision 1.48  1992/05/25  22:07:45  foxharp
  * v 3.17
  *
  * Revision 1.47  1992/05/25  21:09:01  foxharp
@@ -185,7 +188,7 @@
 #endif
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version three point seventeen");
+decl_init( char version[], "version three point eighteen");
 
 decl_init( int autoindented , -1);	/* how many chars (not cols) indented */
 decl_uninit( int isnamedcmd );		/* are we typing a command name */

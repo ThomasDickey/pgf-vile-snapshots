@@ -14,7 +14,10 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.66  1992/05/19 08:55:44  foxharp
+ * Revision 1.67  1992/05/31 22:11:11  foxharp
+ * paragraph regexp augmented to support reformatting of comments
+ *
+ * Revision 1.66  1992/05/19  08:55:44  foxharp
  * more prototype and shadowed decl fixups
  *
  * Revision 1.65  1992/05/16  12:00:31  pgf
@@ -778,13 +781,15 @@ global_val_init()
 	rp = (struct regexval *)malloc(sizeof (struct regexval));
 	set_global_b_val_rexp(VAL_PARAGRAPHS, rp);
 	rp->pat = 
-		strmalloc("^\\.[ILPQ]P\\s\\|^\\.P\\s\\|^\\.LI\\s\\|^\\.[plinb]p\\s\\|^\\.\\?\\s$");
+		strmalloc("^\\.[ILPQ]P\\s\\|^\\.P\\s\\|^\\.LI\\s\\|\
+^\\.[plinb]p\\s\\|^\\.\\?\\s$\\|^\\s/\\?[#*]\\+/\\?\\s$");
 	rp->reg = regcomp(rp->pat, TRUE);
 
 	/* where do sections start? */
 	rp = (struct regexval *)malloc(sizeof (struct regexval));
 	set_global_b_val_rexp(VAL_SECTIONS, rp);
-	rp->pat = strmalloc("^[{\014]\\|^\\.[NS]H\\s\\|^\\.H[ 	U]\\s\\|^\\.[us]h\\s\\|^+c\\s");
+	rp->pat = strmalloc("^[{\014]\\|^\\.[NS]H\\s\\|^\\.H[ 	U]\\s\\|\
+^\\.[us]h\\s\\|^+c\\s");
 	rp->reg = regcomp(rp->pat, TRUE);
 
 	/* where do sentences start? */

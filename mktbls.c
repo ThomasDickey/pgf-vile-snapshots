@@ -9,7 +9,10 @@
  *	the output structures.
  *
  * $Log: mktbls.c,v $
- * Revision 1.6  1991/11/07 03:29:12  pgf
+ * Revision 1.7  1992/05/29 08:34:01  foxharp
+ * prototypes, gcc -W cleanups
+ *
+ * Revision 1.6  1991/11/07  03:29:12  pgf
  * lint cleanup
  *
  * Revision 1.5  1991/11/01  14:38:00  pgf
@@ -47,9 +50,20 @@ char *progcreat = "/* %s: this header file was produced automatically by\n\
 int l = 0;
 FILE *nebind, *nefunc, *nename, *cmdtbl;
 
-char *malloc();
-char *formcond();
-void exit();
+#if __STDC__
+# define P(a) a
+#else
+# define P(a) ()
+#endif
+
+int main P(( int, char *[]));
+void badfmt P(( char * ));
+void savenames P(( char *, char *, char * ));
+void savebindings P(( char *, char *, char * ));
+void dumpnames P((void));
+void dumpbindings P((void));
+char *formcond P(( char *, char * ));
+extern char *malloc();
 
 
 struct stringl {
@@ -59,6 +73,7 @@ struct stringl {
 	struct stringl *nst;
 };
 	
+int
 main(argc, argv)
 int	argc;
 char    *argv[];
@@ -144,8 +159,7 @@ char    *argv[];
 	dumpnames();
 	dumpbindings();
 	
-	exit(0);
-	/* NOTREACHED */
+	return 0;
 }
 
 char *
@@ -162,6 +176,7 @@ char *c1, *c2;
 	return cond;
 }
 
+void
 badfmt(s)
 char *s;
 {
@@ -180,6 +195,7 @@ char *tblname[] = {"asciitbl", "ctlxtbl", "metatbl", "spectbl" };
 char *prefname[] = {"", "CTLX|", "CTLA|", "SPEC|" };
 
 /* prc2kcod: translate printable code to C-language keycode */
+void
 savebindings(s,func,cond)
 char *s, *func, *cond;
 {
@@ -237,6 +253,7 @@ char *s, *func, *cond;
 	
 }
 
+void
 dumpbindings()
 {
 	char *sctl;
@@ -301,6 +318,7 @@ dumpbindings()
 struct stringl lastname = {"\177\177\177\177\177\177", "", "", NULL};
 struct stringl firstname = {"", "", "", &lastname};
 
+void
 savenames(name,func,cond)
 char *name, *func, *cond;
 {
@@ -332,6 +350,7 @@ char *name, *func, *cond;
 	}
 }
 
+void
 dumpnames()
 {
 	struct stringl *m;

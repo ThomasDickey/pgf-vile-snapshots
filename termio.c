@@ -4,7 +4,10 @@
  * All operating systems.
  *
  * $Log: termio.c,v $
- * Revision 1.36  1992/05/25 21:34:29  foxharp
+ * Revision 1.37  1992/05/27 19:16:22  foxharp
+ * took out extra call to setbuffer()
+ *
+ * Revision 1.36  1992/05/25  21:34:29  foxharp
  * moved extern func declarations to header
  *
  * Revision 1.34  1992/05/20  18:55:42  foxharp
@@ -229,7 +232,6 @@ ttopen()
 		perror("ttopen tcgetattr");
 		exit(1);
 	}
-	setbuffer(stdout, tobuf, TBUFSIZ);
 #if ODT || ISC
 	setvbuf(stdout, tobuf, _IOLBF, TBUFSIZ);
 #else

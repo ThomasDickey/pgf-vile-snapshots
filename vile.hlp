@@ -348,7 +348,10 @@ Text manipulation command:
 		paragraph has the same boundaries used by the '{' and '}'
 		commands -- i.e.  blank lines, or lines beginning in .I .L
 		.P .Q or .b.  This make is possible to use "3^A-f}" or
-		"^A-fG" to reformat multiple paragraphs.
+		"^A-fG" to reformat multiple paragraphs.  The reformatting
+		operation know about both C and shell comments, and will
+		do the "right" thing with lines that start with '#' or '*'
+		characters.
 
 	^X-s	For every occurrence of a search string, put in a replace-
 		ment string.  This is similar to "s/pattern/replacement/g"
@@ -452,6 +455,13 @@ Miscellaneous commands
 	K	Count prefix.  The first time you type it, it is equivalent
 		to an argument of 4 to the following command.  If you repeat 
 		it, it becomes worth 16, the next time 64, etc...  
+	%	In addition to finding matching braces, brackets, and
+		parentheses, the '%' command will find matching #ifdef's and
+		C style comments.  If the cursor is on the # of "#ifdef", the '%' command will
+		find the matching "#endif" or "#else".  On an "#else" it will
+		find "#endif", and on "#endif" it will go back up to the "#if".
+		If the cursor is on any part of a "/*" or "*/" sequence, it
+		will find the appropriate corresponding C comment endpoint.
 
 Editor modes
 ------------
