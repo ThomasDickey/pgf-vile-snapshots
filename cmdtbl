@@ -95,7 +95,7 @@
 #		in '!' listed, then the flag does nothing, and should be
 #		viewed simply as documentation.
 #
-# $Header: /usr/build/VCS/pgf-vile/RCS/cmdtbl,v 1.131 1995/09/12 13:27:44 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/cmdtbl,v 1.133 1995/12/14 23:05:22 pgf Exp $
 #
 #
 
@@ -858,6 +858,10 @@ map_bang	NONE|(EXRCOK|EXTRA)
 	"map!"
 	"show-mapped!-chars"
 	<create a new map, or show list of the current insert-mode maps>
+nexttag		NONE			OPT_TAGS
+	"next-tag"			!FEWNAMES
+	'^A-^]'
+	<search the tags file(s) for another location for the last tag>
 newprocessgroup	NONE
 	"new-process-group"
 	<put editor into its own process group (X11 version only)>
@@ -1116,7 +1120,7 @@ onlywind	NONE
 poswind		NONE
 	"position-window"		!FEWNAMES
 	'z'
-	<center (. or M), bottom (- or L) or top (CR or H) justify the window>
+	<reframe with cursor at center (.,M,m), top (CR,H,t), or bottom (-,L,b)>
 prevwind	NONE
 	"previous-window"		!FEWNAMES
 	'^X-O'

@@ -4,7 +4,7 @@
  * Support functions for "popup-msgs" mode.
  * Written by T.E.Dickey for vile (august 1994).
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/msgs.c,v 1.7 1995/08/21 02:42:06 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/msgs.c,v 1.8 1995/12/05 23:28:09 pgf Exp $
  */
 #include "estruct.h"
 
@@ -22,12 +22,11 @@ create_msgs()
 {
 	BUFFER	*bp = bfind(MESSAGES_BufName, BFSCRTCH);
 
-	if (bp == NULL)
-		return FALSE;
-
-	b_set_scratch(bp);
- 	b_set_invisible(bp);
- 	bp->b_active = TRUE;
+	if (bp != NULL) {
+		b_set_scratch(bp);
+ 		b_set_invisible(bp);
+ 		bp->b_active = TRUE;
+	}
 	return bp;
 }
 
@@ -51,7 +50,10 @@ int	c;
 
 	if (savewp)
 	    savemk  = DOT;
-	bp = create_msgs();
+
+	if ((bp = create_msgs()) == 0)
+		return;
+
 	beginDisplay;
 	/*
 	 * Modify the current-buffer state as unobtrusively as possible (i.e.,
@@ -113,7 +115,10 @@ popup_msgs()
 
 	if (savewp)
 	    savemk = DOT;
-	bp = create_msgs();
+
+	if ((bp = create_msgs()) == 0)
+		return;
+
 	if (!is_empty_buf(bp)) {
 		if ((curwp == 0) || sgarbf) {
 			return;		/* CAN'T popup yet */

@@ -1,5 +1,5 @@
 
-README for vile, version 5.5
+README for vile, version 5.6
 -----------------------------
 
 vile is a text editor which is extremely compatible with vi in terms
@@ -297,5 +297,5 @@ November, 1995
 	Sladkey.
 
 -------------------------------
-$Header: /usr/build/VCS/pgf-vile/RCS/README,v 1.51 1995/11/21 14:16:46 pgf Exp $
+$Header: /usr/build/VCS/pgf-vile/RCS/README,v 1.52 1995/12/15 01:53:35 pgf Exp $
 -------------------------------

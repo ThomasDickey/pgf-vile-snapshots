@@ -3,7 +3,7 @@
  * characters, and write characters in a barely buffered fashion on the display.
  * All operating systems.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/termio.c,v 1.133 1995/11/18 00:36:16 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/termio.c,v 1.134 1995/12/12 03:59:33 pgf Exp $
  *
  */
 #include	"estruct.h"
@@ -601,13 +601,13 @@ ttgetc()
 		kbd_char_present = FALSE;
 	} else {
 		if( kbd_is_polled && fcntl( 0, F_SETFL, kbd_flags ) < 0 )
-			imdying(2);
+			imdying(SIGINT);
 		kbd_is_polled = FALSE;
 		n = read(0, &kbd_char, 1);
 		if (n <= 0) {
 			if (n < 0 && errno == EINTR)
 				return -1;
-			imdying(2);
+			imdying(SIGINT);
 		}
 	}
 	return ( kbd_char );
@@ -628,9 +628,17 @@ ttgetc()
 	c = getchar();
 #endif
 	if (c == EOF) {
+#ifdef linux
+		/*
+		 * The command "^X!vile -V" makes vile receive an EOF at this
+		 * point.
+		 */
+		return -1;
+#else
 		if (errno == EINTR)
 			return -1;
-		imdying(2);
+		imdying(SIGINT);
+#endif
 	}
 	return c;
 #endif

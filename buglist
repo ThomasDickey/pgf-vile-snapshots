@@ -1,7 +1,7 @@
 ------------------------
 vile bug/enhancement/wish list
 ------------------------
-$Header: /usr/build/VCS/pgf-vile/RCS/buglist,v 1.272 1995/11/19 00:38:59 pgf Exp $
+$Header: /usr/build/VCS/pgf-vile/RCS/buglist,v 1.274 1995/12/12 03:59:33 pgf Exp $
 ----------------------
 	(E means enhancement, L,M,H are low, medium, high priority)
 
@@ -212,7 +212,6 @@ above).
 
 --------------------
 
-
 enhancement:  reimplement error finder using regexps.
 
 ------------------------------
@@ -264,7 +263,6 @@ it doesn't get the right screen size or exits with incorrect colors).
 
 -----------------------------
 
-
 With vim 1.27 you can configure its behaviour regarding backspace using
 the 'backspace' variable. From the help file:
 
@@ -283,7 +281,6 @@ when _not_ in insert, you can rebind ^H to backward-character.
 When you do a :b you should have line completion for the name.
 
 ---------------------------
-
 
 How can I read the status of a shell command when I execute a
 shell-command? Although the shell command has a $STATUS=1 the
@@ -324,6 +321,7 @@ switches to 80x25 when it's in shell command execution.  However, technically
 it should switch back to the preferred mode when it's done.
 
 [ can anyone confirm or deny this is still true? ]
+[ I don't see it happening with ibmpc.c - dickey ]
 
 ---------------------------
 
@@ -386,11 +384,6 @@ text which does not span a line)
 
 -------------------------
 
-there should be a way to reference both the global and local values
-of modes from within macros, so that values can be saved and restored.
-
--------------------------
-
 there should be a way to reference buffer attributes of the currently-
 executing macro (or stack of macros).
 
@@ -436,12 +429,6 @@ break the insertion into multiple undoable chunks.
 
 pasting to a view-only buffer does not generate an error message.
 ----------------------------
-
-some folks would like to see smooth-scrolling enforced.  it seems they
-have keyboards that repeat just a little faster than their screen can keep up,
-and they'd like vile to scroll rather than jump with the typahead.
-
------------
 
    XVILE BUG:
 
@@ -708,7 +695,6 @@ layering of readpattern() and kbd_reply.
 
 ---------------
 
-
 While we're on the subject of bugs, let me tell you about another one that
 I've long noticed when I try to insert such text.  I would like to do
 :unsetl ai before pasting in the text (since I normally have auotindent
@@ -735,7 +721,6 @@ not worried about trailing whitespace anyway.  -- pgf ]
 
 ---------------
 
-
 I just rediscovered a small problem with the :<number> command
 to go to a certain line number. Try:
 
@@ -758,12 +743,6 @@ to work are vile -2 and vile -5 .
 under OS/2... ]
 
 ---------------------------------
-the command 
-	set tags "./tags ~/tags" does not work
-	set tags "./tags $HOME/tags" does not work
-an real path must be specified.
-
----------------------------------
 .. you can't use the mouse to select text from the command input line, I often
 use this after Ctrl+G to get the filename for a UNIX command elsewhere.
 
@@ -774,10 +753,56 @@ and drag along a sentence - first word is selected and so are subsequent
 words in the sentence as you drag.  Just the first word is selected in xvile.
 
 ---------------------------------
-it would be nice to have a variable $host to differentiate
-the case we are in a special host (remote login for example)
-to set the variable timeoutlen to a higher value to avoid 
-the problem of arrow-keys (character insertion in cursor deplacement).
 
-[this can be done using the &env function, e.g., &env "HOST" - dickey]
+I hadn't built the motif version in a long time, but just did in response
+to someone having trouble building it. I used X11R5 + Motif 1.2 on SunOS 4.1.4
+
+There were no apparent problems building, but when I ran it, there is a
+problem with resize: I tried to make the window bigger. It responded with
+a lot of screen activity and _shrank_ to 36-chars wide.
 ---------------------------------
+
+When I quit vile, the next shell prompt is now
+at the bottom of the window and there is white space between the
+previous shell prompt and the new one.  Version 5.0 left the next
+shell prompt immediately below the previous one, somewhere in the
+middle of the screen.
+[ i think we're bottom-lefting the cursor after running the TE string.
+there may not be a way to get it right in all cases.]
+
+---------------------------------
+
+link problems:  vile or xvile has link problems on:
+	- Openlook on sunos4.1.3
+ 	- SCO OpenServer 5.0 (needed -lsocket, and needed different
+		lib ordering for -lXt and -lXm for the motif version.
+	- BSD/OS 2.0.1 (X11R6) -- needed this order: -lXt -lXM -lICE -lX11
+	- IRIX 5.2 -- drop the '-lnsl' library
+
+---------------------------------
+
+vile 5.5 almost passed my macro test with only small cosmetic problem:
+
+;    !@  --mapto-->  replace "Unixcommand!@" with "Unixcommand" output
+map! !@ ^V^M^[bi:r !^[F:"adt@mm@ais^["bd$dd`m@b
+;    #@  --mapto-->  replace "@Unixcommand args#@" with "Unixcommand" output
+map! #@ ^V^M^[F@s:r !^[F:"adt@mm@ais^["bd$dd`m@b
+
+Both now produce correct results.  But the final status message doesn't
+make sense:  Delete operation pending...  when it actually in insert
+mode.  Fortunately, there is a workaround, set terse.  it would be nice
+if vile can temporary set terse before executing macros and reset back
+to original mode afterwards. Sounds easy?
+
+------------------------
+
+there are two conflicting wordwrap mechanisms in vile --
+	- the historical wrapwords setting, inherited from
+	  microemacs, will wrap words in input mode when you type a
+	  space character after you've passed the "fillcol" column.
+	- the vi-like "wrapmargin" setting sets the column past which
+	  entering more input will cause a line break. 
+
+i think we should eliminate the historical mechanism in favor of the vi-ish
+one, and i've marked it [deprecated] in vile.hlp.
+------------

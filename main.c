@@ -13,7 +13,7 @@
  *	The same goes for vile.  -pgf, 1990-1995
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/main.c,v 1.261 1995/11/21 01:50:52 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/main.c,v 1.262 1995/12/06 23:57:42 pgf Exp $
  *
  */
 
@@ -1100,7 +1100,7 @@ int *cp, *fp, *np;
 		n = 0;		/* start with a zero default */
 		f = TRUE;	/* there is a # arg */
 		mflag = 1;		/* current minus flag */
-		while (isdigit(c) || (c == '-')) {
+		while ((isdigit(c) && !isspecial(c)) || (c == '-')) {
 			if (c == '-') {
 				/* already hit a minus or digit? */
 				if ((mflag == -1) || (n != 0))
@@ -1148,7 +1148,8 @@ int *cp, *fp, *np;
 	f = TRUE;	/* there is a # arg */
 	mflag = 0;			/* that can be discarded. */
 	mlwrite("arg: %d",n);
-	while (isdigit(c=kbd_seq()) || c==reptc || c=='-'){
+	while ( (isdigit( c=kbd_seq() ) && !isspecial(c)) 
+			|| c==reptc || c=='-'){
 		if (c == reptc) {
 			/* wow.  what does this do?  -pgf */
 			/* (i've been told it controls overflow...) */

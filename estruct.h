@@ -9,7 +9,7 @@
 */
 
 /*
- * $Header: /usr/build/VCS/pgf-vile/RCS/estruct.h,v 1.270 1995/11/17 04:03:42 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/estruct.h,v 1.271 1995/12/08 19:46:09 pgf Exp $
  */
 
 #ifdef HAVE_CONFIG_H
@@ -410,6 +410,7 @@
 				   stuttered in real vi, I prefer them not
 				   to be */
 #define OPT_ICURSOR	0	/* use an insertion cursor if possible */
+  /* NOTE:  OPT_ICURSOR is _only_ supported by borland.c for a PC build!! */
 
 /* the "working..." message -- we must have the alarm() syscall, and
    system calls must be restartable after an interrupt by default or be

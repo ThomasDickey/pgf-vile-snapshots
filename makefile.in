@@ -21,7 +21,7 @@
 # gnu autoconf support by kevin buettner, 5/94
 # original makefile for uemacs: Adam Fritz July 30,1987  (do you recognize it?)
 #
-# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.in,v 1.57 1995/11/21 14:16:46 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.in,v 1.58 1995/12/07 14:02:12 pgf Exp $
 #
 
 #### Start of system configuration section. ####
@@ -295,14 +295,17 @@ zipfile: $(DISTFILES) /tmp/vilevers
 	zip -k vile$${vilevers}s.zip $(DISTFILES) ;\
 	echo Created vile$${vilevers}s.zip
 
-# watcom builds...
-# DOSBINARIES = README README.PC vile.hlp vile.exe dos4gw.exe 
-# djgpp builds...
-DOSBINARIES = README README.PC vile.hlp vile.exe go32.exe 
+# DOS builds...
+DOSBINARIES = README README.PC vile.hlp vile.exe
 
-binzip: $(DOSBINARIES) /tmp/vilevers
+binzip_djg: $(DOSBINARIES) go32.exe /tmp/vilevers
 	vilevers=`cat /tmp/vilevers | sed 's/\.//'`; \
-	zip -k vile$${vilevers}b.zip $(DOSBINARIES) ;\
+	zip -k vile$${vilevers}b.zip $(DOSBINARIES) go32.exe ;\
+	echo Created vile$${vilevers}b.zip
+
+binzip_wat: $(DOSBINARIES) dos4gw.exe /tmp/vilevers
+	vilevers=`cat /tmp/vilevers | sed 's/\.//'`; \
+	zip -k vile$${vilevers}b.zip $(DOSBINARIES) dos4gw.exe ;\
 	echo Created vile$${vilevers}b.zip
 
 patch:	/tmp/vilevers

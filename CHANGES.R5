@@ -1,3 +1,70 @@
+Changes for vile 5.6 (released Thu Dec 14, 1995)
+(pgf)
+	+ allow "position-window" to be used from macros, e.g.
+	  "position-window bottom".  giving it an arg now reframes to
+	  that line from top or bottom, e.g. "11 position-window top".
+	  (cmdtbl, eval.c, vile.hlp, window.c)
+
+(pgf)	951212 (f)
+	+ writing a region (e.g. ":.,$w foo") when the ends of the
+	  region did not fit on the screen would cause "BUG: updpos...".
+	  now fixed, by ensuring that moves are always flagged correctly.
+	  (btw, this was hidden by anything else that set a w_flag bit,
+	  like "ruler" mode.) (exec.c)
+
+	+ fixed propagation of null character when highlighting string
+	  literals that span lines.  (c-filt.c)
+
+	+ fixed description of label syntax (vile.hlp)
+
+(tom)	951209 (e)
+	+ implemented "next-tag" function, bound to ^A-^], which steps through
+	  alternate tags definitions for the last tag value (cmdtbl, tags.c).
+
+	+ ifdef'd out code that causes vile to die when it receives an EOF
+	  (linux only, termios.c)
+
+	+ modified to allow trivial (one-match only) glob-expansion of items in
+	  'tags' mode so that ~/tags and $HOME/tags work (tags.c).
+
+(pgf)	951209 (d)
+	+ take out call to wrapword() in newline(), which caused an
+	  extra newline in some wrapping cases.  the condition it was
+	  taking care of is now caught earlier on.  (insert.c)
+
+(pgf)	951208 (c)
+	+ created separate .zip targets for watcom and djgpp builds, since
+	  i seem to have to switch back and forth all the time.  (makefile.in)
+
+	+ do_num_proc and do_rept_arg_proc would accept ^X or ^A prefixes
+	  followed by digits as further modifications to the argument
+	  count, so 2 ^X-2 wouldn't work as advertised.  now it does. 
+	  (main.c)
+
+	+ fixed kbd_reply() so that starting a response with ^V now
+	  clears the existing response -- it used to append the
+	  quoted character instead.  (input.c)
+
+	+ correction for showmatch mode when the left fence is the first
+	  character in the buffer. (fences.c)
+
+	+ better explanation of difference between "wrapword" mode
+	  and newer "wrapmargin" mode.  (vile.hlp)
+
+	+ added fallback define of S_ISDIR in path.c.
+
+(tom)	951205 (b)
+	+ corrected value of 'fname' in 'readin()' after calling 'ch_fname()';
+	  this may have been the original bp->b_fname value, which is
+	  reallocated when resolving a pathname (file.c).
+
+	+ modified to check for null pointer return from 'create_msgs()'
+	  (msgs.c)
+
+(tom)	951203 (a)
+	+ corrected logic of 'line_height()' to get rid of unwanted wraparound
+	  on the last column of the screen when linewrap mode is set (display.c)
+
 Changes for vile 5.5 (released Sun Nov 19, 1995)
 (pgf)
 	+ added tags file format information to vile.hlp.

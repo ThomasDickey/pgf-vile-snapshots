@@ -5,7 +5,7 @@
  *	reading and writing of the disk are in "fileio.c".
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/file.c,v 1.172 1995/11/13 13:26:21 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/file.c,v 1.173 1995/12/05 23:28:09 pgf Exp $
  *
  */
 
@@ -726,6 +726,7 @@ int	mflg;		/* print messages? */
                 return s;
 	b_clr_flags(bp, BFINVS|BFCHG);
 	ch_fname(bp,fname);
+	fname = bp->b_fname;		/* this may have been b_fname! */
 #if OPT_DOSFILES
 	make_local_b_val(bp,MDDOS);
 	/* assume that if our OS wants it, that the buffer will have CRLF
