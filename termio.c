@@ -4,7 +4,10 @@
  * All operating systems.
  *
  * $Log: termio.c,v $
- * Revision 1.79  1993/08/05 14:29:12  pgf
+ * Revision 1.80  1993/08/13 16:32:50  pgf
+ * tom's 3.58 changes
+ *
+ * Revision 1.79  1993/08/05  14:29:12  pgf
  * tom's 3.57 changes
  *
  * Revision 1.78  1993/07/23  12:03:39  pgf
@@ -450,6 +453,7 @@ int f;
 	tcdrain(1);
 #endif
 	tcsetattr(0, TCSADRAIN, &otermios);
+	TTkclose();	/* xterm */
 	TTclose();
 	TTflush();
 #if USE_FCNTL
@@ -468,6 +472,7 @@ ttunclean()
 #endif
 	tcsetattr(0, TCSADRAIN, &ntermios);
 #endif
+	TTkopen();	/* xterm */
 }
 
 
@@ -568,6 +573,7 @@ int f;
 		TTputc('\r');
 	}
 	fflush(stdout);
+	TTkclose();	/* xterm */
 	TTflush();
 	TTclose();
 	ioctl(0, TCSETAF, (char *)&otermio);
@@ -584,6 +590,7 @@ ttunclean()
 #if ! X11
 	ioctl(0, TCSETAW, (char *)&ntermio);
 #endif
+	TTkopen();	/* xterm */
 }
 
 #endif /* USE_TERMIO */
@@ -682,6 +689,7 @@ int f;
 		TTputc('\r');
 	}
 	TTflush();
+	TTkclose();	/* xterm */
 	TTclose();
 	ioctl(0, TIOCSETN, (char *)&ostate);
 	ioctl(0, TIOCSETC, (char *)&otchars);
@@ -720,6 +728,7 @@ ttunclean()
 #endif
 
 #endif	/* APOLLO */
+	TTkopen();	/* xterm */
 #endif	/* !X11 */
 }
 
@@ -1034,6 +1043,7 @@ int f;
 void
 ttunclean()
 {
+	TTkopen();	/* xterm */
 }
 
 /*

@@ -2,7 +2,10 @@
  *		written by John Hutchinson, heavily modified by Paul Fox
  *
  * $Log: npopen.c,v $
- * Revision 1.27  1993/08/05 14:29:12  pgf
+ * Revision 1.28  1993/08/13 16:32:50  pgf
+ * tom's 3.58 changes
+ *
+ * Revision 1.27  1993/08/05  14:29:12  pgf
  * tom's 3.57 changes
  *
  * Revision 1.26  1993/06/25  11:25:55  pgf
@@ -99,7 +102,7 @@
 #include <sys/wait.h>
 #endif
 
-#if !SMALLER
+#if OPT_EVAL
 #define	user_SHELL()	gtenv("shell")
 #else
 #define	user_SHELL()	getenv("SHELL")
@@ -269,13 +272,13 @@ char *cmd;
 
 	if (cpid) { /* parent */
 		int child;
-		if_OPT_WORKING(displaying = SORTOFTRUE)
+		beginDisplay;
 		while ((child = wait ((int *)0)) != cpid) {
 			if (child < 0 && errno == EINTR) {
 				(void) kill (SIGKILL, cpid);
 			}
 		}
-		if_OPT_WORKING(displaying = FALSE)
+		endofDisplay;
 		return 0;
 	} else {
 		exec_sh_c(cmd);

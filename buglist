@@ -95,11 +95,6 @@ E	for consistency, 'execute-macro-nn' should be 'execute-macro nn';
 	doing this would allow modification to eliminate a fixed number of
 	macro-buffers.
 
-E	'updatelistbuffers()' should be revisited to make it happen at the
-	beginning of keyboard commands when the buffer list is out of date.
-	In its present form it could result in unnecessary updates, and also
-	does not always pick up size-changes from user commands.
-
 E	should ifdef the 'autobuffer' code for users who do not need vi-style
 	buffering.
 
@@ -354,18 +349,6 @@ be nice in vile.
 
 
 ------------------------
-	Got a problem with the most recent version of vile. When I try to
-load a filename from a failed patch like "foo.c#", the pound-sign seems to
-be a special character that vile's input line wants to interpret instead
-of allowing me to use as a filename character.
-
-[This is simply # expansion.  perhaps we can add a mode to turn if off?
-perhaps the mode should be a string, which is the list of chars to _not_
-be expanded.  which allows for adding new expansion chars in the future?
-otherwise, it would make more sense if it were the list of chars that
-_were_ to be expanded. -pgf ]
-----------------
-
 I wish ^X-!  could execute shell commands async'ly, i.e.  I should not have
 to wait/do nothing while waiting for the ouput of compiling.  I should be
 able to edit stuff in other buffers or even ^X-^X to edit src codes
@@ -433,16 +416,6 @@ use archie/xarchie to file fue.tar.Z (fue - folding-micro-emacs).
 
 [ i believe joseph rajkumar is working on this ]
 
-
-------------------------------------------------------------
-
-
-
-I've accumulated a couple more vi-compatible bugs:
-
-	+ type "3ifoo<nl>bar<esc>".  Vi kills the repeat count after the <nl>.
-
-	+ type "s<nl><esc>" before some whitespace.  Vi trims the whitespace.
 
 -----------
 
@@ -561,10 +534,6 @@ because it will try to reformat everything, not just the paragraph.
 
 ----------------------------------
 
-By the way the write-til command has problems when the
-file already exists.
-
---------------------------
 We are running vile under NeXT and we have
 problems to set macros with the meta key.
 Also the editor mode showram does not work (is not so important).
@@ -572,23 +541,6 @@ Also the editor mode showram does not work (is not so important).
 
 in a text (non-C) file, i couldn't get "set sw=2" to "take" until i did
 a "set csw=3", and then the '2' stuck..   ????
-
------------
-
-
-I tried to define the variable %vile_cbufname, which doesn't work.
-If I try the variable name %vile_cbufnam, which has one character
-less, it will work. Try it. I get an 
-
-
-memory allocation error: attempt to free or realloc space not in heap
-bad zone
-IOTtrap
-
-20 store-macro
-   set-variable %vile_cbufname $cbufname
-   ~endm
-bind-key execute-macro-20 ^A-l
 
 -----------------------------
 I got to compile vile at home over the weekend.  The version of
@@ -598,12 +550,6 @@ I have didn't like this bit from estruct.h, lines (561-563):
 #if ! LINUX	/* there are probably others that don't want const defined */
 # define const
 #endif
-
-
-----------------------------------
-vile 3.56 hits IOT trap on SunOS 4.1.3 and simply dumps core on some other
-platforms and dies if confirming substitution is made on the first line of
-the buffer.  Vile 3.55 had no such problem.
 
 ----------------------------------
 
@@ -629,53 +575,33 @@ The regexp for file name and line # for above message might be \1 and \2 in
 Of course, using sscanf directly and #ifdef OSF1 might be a quicker fix 
 (But other OSF1 machines like iParagon don't use DEC compilers for sure).
 
+
 ------------------------------
+core dump on startup in xterm with too many rows.
 
-I see that you were able to incorporate the hacked up map function I wrote into  
-vile. However, there is a bug which I hope you can fix. In the original module  
-that I sent you, I was doing the following:
+------------------------------
+	Another enhacement.
+	How about a history file.  SO say like I have been using vile and
+	quit out and come back in later I can use the history file.
 
-        /*
-        ** if there is a repeat count, install it to be played
-        */
-        if (n != 1)   
+--------------------------
 
-        {
-                sprintf(num, "%d", n);
-                for (c = num; *c; c++)   
+In a xterm window the down arrow (which sends ESC-O-B) works for individual
+presses.  If you hold down the key then letter Bs get peppered through out
+the file.  It appears that the ESC is occasionally being missed so that the
+following OB puts a B in the file.
 
-                {
-                        tb_append(&MapMacro, *c);
-                }
-        }
-        for (c = keymapped->kbdseq; *c; c++)
-        {
-                tb_append(&MapMacro, *c);
-        }
-        keymapped = NULL;
+In my case I'm on a workstation running 4.1.3 and xterm using rlogin to
+connect to a 690 server (lightly loaded) running 4.1.3 and running vile
+on the 690.
 
-        return start_kbm(1, DEFAULT_REG, MapMacro);
+I just ran vile locally and didn't see the problem.
 
-This was changed (at least in vile-3.55) to:
+------------------
 
-        (void)tb_init(&MapMacro, abortc);
-        if (!tb_sappend(&MapMacro, keymapped->kbdseq))
-                return FALSE;
-  
+	I did a cut and paste from one vile screen to another.
+	I was in cmode and what i did was copied a function across.
+	I started at the { and when down to the matching }
+	When I did the paste into the other vile it lost the }
 
-        keymapped = NULL;
-
-        return start_kbm(n, DEFAULT_REG, MapMacro);
-
-Unfortunately, start_kbm() does not do the right thing with repeat counts. In  
-fact, the whole reason I implemented map was to address this problem, which  
-manifested itself with "execute-macro" (guess I should have put a note here  
-:-(). To demonstrate a simple map which fails in vile, do the following:
-
-	:map t Y
-	10t
-
-This should yank 10 lines, but only yanks one (I think it just executes Y 10  
-times). I plan on updating the source to do the append trick for now, hopefully  
-a better fix can be done.
 

@@ -539,6 +539,13 @@ Editor modes
 		sequence.  (To match the behavior of earlier versions of
 		vile, should be set.) (U)
 
+	animated Controls whether vile automatically updates the contents of
+		scratch buffers when their contents would change.  The animated
+		buffers include:
+		
+			[Buffer List]
+		(B)
+
 	autobuffer (ab) Controls whether vile uses "most-recently-used"
 		style buffering, or vi-style (command-line order) buffers. 
 		That is, if autobuffer is on, then buffers are sorted in
@@ -625,6 +632,17 @@ Editor modes
 
 	fillcol (fc) Will prompt for a new value for the fill column, where
 		auto-wrapping and region formatting will break lines. (B)
+
+	expand-chars Controls the set of characters that are expanded in command
+		lines.  These include
+		
+			'%' (the current buffer),
+			'#' (the alternate buffer) and
+			':' (the token at the cursor position).
+		(U)
+
+	expand-path Controls whether %/# are expanded to the full pathname
+		of a buffer. (U)
 
 	glob	Controls how wildcard characters (e.g., '*' and '?') are
 		treated in prompts for filenames.  Set glob to 'off' to
@@ -774,6 +792,10 @@ Editor modes
 		words are moved to the next line if the current line gets
 		too long.  Unlike vi, wrapping is only attempted when a
 		space is typed. (B)
+
+	xterm-mouse Enables mouse-clicking if you are running within an xterm.
+		This mode overrides xterm's cut & paste.  Your TERM variable
+		must be "xterm" for this to work.  (U)
 
 Command History
 ---------------

@@ -34,8 +34,6 @@ current bugs & limitations:
 
 - can get badly behind auto-repeated keys
 
-- handles expose-events only when waiting for input.
-
 - the 'have_selection' field is cleared (sometimes unnecessarily), e.g.,
   when scrolling.
 

@@ -2,7 +2,10 @@
  *		for MicroEMACS
  *
  * $Log: spawn.c,v $
- * Revision 1.63  1993/08/05 14:29:12  pgf
+ * Revision 1.64  1993/08/13 16:32:50  pgf
+ * tom's 3.58 changes
+ *
+ * Revision 1.63  1993/08/05  14:29:12  pgf
  * tom's 3.57 changes
  *
  * Revision 1.62  1993/07/27  18:06:20  pgf
@@ -339,17 +342,7 @@ int f,n;
 # ifdef simulate_job_control_for_debug
 	rtfrmshell(SIGCONT);
 # else
-#  if BERK
-	killpg(getpgrp(0), SIGTSTP);
-#  else
-/* pass the 0 if we can, since it's safer --- the machines where we
-	can't are probably POSIX machines with ANSI C.  */
-#   if AIX || (defined(__STDC__) && POSIX)
-	kill(-getpgrp(), SIGTSTP);
-#   else
-	kill(-getpgrp(0), SIGTSTP);
-#   endif
-#  endif
+	(void)signal_pg(SIGTSTP);
 # endif
 	return TRUE;
 #else
@@ -820,7 +813,7 @@ filterregion()
 	s = ifile((char *)0,TRUE,fr);
 	npclose(fr);
 	(void)firstnonwhite(FALSE,1);
-	setmark();
+	(void)setmark();
 	return s;
 #else
 	mlforce("[Region filtering not available]");

@@ -4,7 +4,10 @@
  *  heavily modified by Paul Fox, 1990
  *
  * $Log: search.c,v $
- * Revision 1.51  1993/07/01 10:47:36  pgf
+ * Revision 1.52  1993/08/13 16:32:50  pgf
+ * tom's 3.58 changes
+ *
+ * Revision 1.51  1993/07/01  10:47:36  pgf
  * rearranged limit setting in scanner(), so I can understand it
  *
  * Revision 1.50  1993/06/18  15:57:06  pgf
@@ -670,6 +673,7 @@ char *s;
  * eq -- Compare two characters.  The "bc" comes from the buffer, "pc"
  *	from the pattern.  If we are in IGNCASE mode, fold out the case.
  */
+#if OPT_EVAL || UNUSED
 int	
 eq(bc, pc)
 register int	bc;
@@ -681,6 +685,7 @@ register int	pc;
 		return FALSE;
 	return nocase_eq(bc,pc);
 }
+#endif
 
 /* ARGSUSED */
 int

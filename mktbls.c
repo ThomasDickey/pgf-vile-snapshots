@@ -14,7 +14,10 @@
  *
  *
  * $Log: mktbls.c,v $
- * Revision 1.34  1993/08/05 14:29:12  pgf
+ * Revision 1.35  1993/08/13 16:32:50  pgf
+ * tom's 3.58 changes
+ *
+ * Revision 1.34  1993/08/05  14:29:12  pgf
  * tom's 3.57 changes
  *
  * Revision 1.33  1993/07/09  19:30:13  pgf
@@ -247,6 +250,7 @@ static	void	FlushIf P((FILE *));
 static	char *	AbbrevMode P((char *));
 static	char *	NormalMode P((char *));
 static	char *	c2TYPE P((int));
+static	void	CheckModes P(( char * ));
 static	char *	Mode2Key P((char *, char *, char *));
 static	char *	Name2Symbol P((char *));
 static	char *	Name2Address P((char *, char *));
@@ -664,6 +668,15 @@ int	c;
 	return value;
 }
 
+/* check that the mode-name won't be illegal */
+static void
+CheckModes(name)
+char	*name;
+{
+	if (!strncmp(name, "no", 2))
+		badfmt("illegal mode-name");
+}
+
 /* make a sort-key for mode-name */
 static char *
 Mode2Key(type, name, cond)
@@ -673,6 +686,9 @@ char	*type, *name, *cond;
 	char	*abbrev = AbbrevMode(name),
 		*normal = NormalMode(name),
 		*tmp = malloc((unsigned)(4 + strlen(normal) + strlen(abbrev)));
+
+	CheckModes(normal);
+	CheckModes(abbrev);
 
 	switch (c = *type) {
 	case 'b':
@@ -1131,24 +1147,18 @@ char	**argv;
 {
 	static	char	*head[] = {
 		"",
-		"#if !SMALLER",
+		"#if OPT_EVAL",
 		"",
 		"/*\tstructure to hold user variables and their definitions\t*/",
 		"",
 		"typedef struct UVAR {",
-		"\tchar u_name[NVSIZE + 1];\t\t/* name of user variable */",
+		"\tstruct UVAR *next;",
+		"\tchar *u_name;\t\t/* name of user variable */",
 		"\tchar *u_value;\t\t\t\t/* value (string) */",
 		"} UVAR;",
 		"",
-		"/*\tcurrent user variables (This structure will probably change)\t*/",
+		"decl_uninit( UVAR *user_vars );\t/* user variables */",
 		"",
-		"#define\tMAXVARS\t\t10 \t/* was 255 */",
-		"",
-		"#ifdef realdef",
-		"UVAR uv[MAXVARS];\t/* user variables */",
-		"#else",
-		"extern UVAR uv[];",
-		"#endif",
 		};
 
 	if (!nevars) {
@@ -1161,7 +1171,7 @@ static void
 finish_evar_h()
 {
 	if (nevars)
-		Fprintf(nevars, "\n#endif\n");
+		Fprintf(nevars, "\n#endif /* OPT_EVAL */\n");
 }
 
 /******************************************************************************/
@@ -1188,7 +1198,7 @@ char	**vec;
 	/* insert into 'all_modes' to provide for common name-completion
 	 * table, and into 'all_envars' to get name/index correspondence.
 	 */
-	InsertSorted(&all_modes,  vec[1], "env",  "", formcond("!SMALLER", vec[3]), "");
+	InsertSorted(&all_modes,  vec[1], "env",  "", formcond("OPT_EVAL", vec[3]), "");
 	InsertSorted(&all_envars, vec[1], vec[2], "", vec[3], vec[0]);
 }
 

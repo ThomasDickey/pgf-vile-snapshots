@@ -4,7 +4,10 @@
  *	written 11-feb-86 by Daniel Lawrence
  *
  * $Log: bind.c,v $
- * Revision 1.54  1993/08/05 14:29:12  pgf
+ * Revision 1.55  1993/08/13 16:32:50  pgf
+ * tom's 3.58 changes
+ *
+ * Revision 1.54  1993/08/05  14:29:12  pgf
  * tom's 3.57 changes
  *
  * Revision 1.53  1993/07/27  18:06:20  pgf
@@ -662,7 +665,7 @@ int
 desbind(f, n)
 int f,n;
 {
-        return liststuff(ScratchName(Binding List),makebindlist,1,(char *)0);
+	return liststuff(ScratchName(Binding List),makebindlist,1,(char *)0);
 }
 
 #if	APROP
@@ -672,14 +675,14 @@ apro(f, n)	/* Apropos (List functions that match a substring) */
 int f,n;
 {
 	static char mstring[NSTRING];	/* string to match cmd names to */
-        register int    s;
+	register int    s;
 
 
 	s = mlreply("Apropos string: ", mstring, sizeof(mstring));
 	if (s != TRUE)
 		return(s);
 
-        return liststuff(ScratchName(Binding List),makebindlist,1,mstring);
+	return liststuff(ScratchName(Binding List),makebindlist,1,mstring);
 }
 #endif
 
@@ -766,7 +769,7 @@ char *mstring;		/* match string if partial list, NULL to list all */
 		/* if we are executing an apropos command
 		   and current string doesn't include the search string */
 		if (mstring && (strinc(outseq, mstring) == FALSE))
-		    	continue;
+			continue;
 #endif
 		/* look in the simple ascii binding table first */
 		for (i = 0; i < N_chars; i++)
@@ -1265,8 +1268,8 @@ char *kk;		/* name of key to translate to Command key form */
 	return (int)(pref|c);
 }
 
-#if ! SMALLER
 
+#if OPT_EVAL
 /* translate printable code (like "M-r") to english command name */
 char *
 prc2engl(skey)	/* string key name to binding name.... */
@@ -1313,6 +1316,7 @@ void
 kbd_putc(c)
 	int	c;
 {
+	beginDisplay;
 	if ((kbd_expand <= 0) && isreturn(c)) {
 		TTputc(c);
 		ttcol = 0;
@@ -1326,6 +1330,7 @@ kbd_putc(c)
 		kbd_putc('^');
 		kbd_putc(toalpha(c));
 	}
+	endofDisplay;
 }
 
 /* put a string to the keyboard-prompt */
@@ -1341,6 +1346,7 @@ kbd_puts(s)
 void
 kbd_erase()
 {
+	beginDisplay;
 	if (ttcol > 0) {
 		if (--ttcol < term.t_ncol) {
 			TTputc('\b');
@@ -1349,6 +1355,7 @@ kbd_erase()
 		}
 	} else
 		ttcol = 0;
+	endofDisplay;
 }
 
 /* definitions for name-completion */
@@ -1488,12 +1495,14 @@ kbd_init()
 void
 kbd_unquery()
 {
+	beginDisplay;
 	if (testcol >= 0) {
 		while (ttcol > testcol)
 			kbd_erase();
 		TTflush();
 		testcol = -1;
 	}
+	endofDisplay;
 }
 
 /*
@@ -1580,11 +1589,11 @@ int	eolchar;
 {
 	return	(c == eolchar)
 	  ||	(
-	          cpos > 0
+		  cpos > 0
 	      &&  cpos < 3
 	      &&(
-	          (!ispunct(c)
-	        &&  ispunct(buffer[cpos-1])
+		  (!ispunct(c)
+		&&  ispunct(buffer[cpos-1])
 		  )
 		|| ((c != '!' && ispunct(c))
 		  && (buffer[cpos-1] == '!' || !ispunct(buffer[cpos-1]))

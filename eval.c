@@ -4,7 +4,10 @@
 	written 1986 by Daniel Lawrence
  *
  * $Log: eval.c,v $
- * Revision 1.63  1993/08/05 14:29:12  pgf
+ * Revision 1.64  1993/08/13 16:32:50  pgf
+ * tom's 3.58 changes
+ *
+ * Revision 1.63  1993/08/05  14:29:12  pgf
  * tom's 3.57 changes
  *
  * Revision 1.62  1993/07/27  18:06:20  pgf
@@ -208,8 +211,15 @@
 #include	"glob.h"
 
 #define	FUNC_NAMELEN	4
+
 #define	ILLEGAL_NUM	-1
 #define	MODE_NUM	-2
+#define	USER_NUM	-3
+
+/* When the command interpretor needs to get a variable's name, rather than its
+ * value, it is passed back as a VDESC variable description structure.  The
+ * v_num field is an index into the appropriate variable table.
+ */
 
 	/* macros for environment-variable switch */
 	/*  (if your compiler balks with "non-constant case expression" */
@@ -225,15 +235,24 @@
 #define	EndIf		}}
 #endif
 
-#if ! SMALLER
+#if OPT_EVAL
+typedef struct	{
+	int	v_type;	/* type of variable */
+	int	v_num;	/* index, if it's an environment-variable */
+	UVAR *	v_ptr;	/* pointer, if it's a user-variable */
+	} VDESC;
+
 #if ENVFUNC
 static	char *	GetEnv P(( char * ));
 static	char *	DftEnv P(( char *, char * ));
 static	void	SetEnv P(( char **, char * ));
 #endif
+#if !SMALLER
 static	void	makevarslist P(( int, char *));
 static	int	is_mode_name P(( char *, int, struct VALNAMES **, struct VAL ** ));
 static	char *	get_listvalue P(( char *, int ));
+#endif
+static	int	gtlbl P(( char * ));
 static	char *	gtfun P(( char * ));
 static	void	FindVar P(( char *, VDESC * ));
 static	int	vars_complete P(( int, char *, int * ));
@@ -244,7 +263,7 @@ static	char *	getkill P(( void ));
 
 /*--------------------------------------------------------------------------*/
 
-#if	ENVFUNC && !SMALLER
+#if	ENVFUNC && OPT_EVAL
 static char *
 GetEnv(s)
 	char	*s;
@@ -276,21 +295,10 @@ char	*value;
 #define	SetEnv(np,s)	(*(np) = strmalloc(s))
 #endif
 
-#if !SMALLER
+#if OPT_EVAL
 static char *shell;	/* $SHELL environment is "$shell" variable */
 static char *directory;	/* $TMP environment is "$directory" variable */
 #endif
-
-void
-varinit()		/* initialize the user variable list */
-{
-#if ! SMALLER
-	register int i;
-
-	for (i=0; i < MAXVARS; i++)
-		uv[i].u_name[0] = EOS;
-#endif
-}
 
 #if ! SMALLER
 /* list the current vars into the current buffer */
@@ -300,16 +308,15 @@ makevarslist(dum1,ptr)
 int dum1;
 char *ptr;
 {
-	register int i, j;
+	register UVAR *p;
+	register int j;
 
 	bprintf("--- Environment variables %*P\n", term.t_ncol-1, '-');
 	bprintf("%s", ptr);
-	for (i = j = 0; i < MAXVARS; i++) {
-		if (uv[i].u_name[0] != 0) {
-			if (!j++)
-				bprintf("--- User variables %*P\n", term.t_ncol-1, '-');
-			bprintf("%%%s = %s\n", uv[i].u_name, uv[i].u_value);
-		}
+	for (p = user_vars, j = 0; p != 0; p = p->next) {
+		if (!j++)
+			bprintf("--- User variables %*P", term.t_ncol-1, '-');
+		bprintf("\n%%%s = %s", p->u_name, p->u_value);
 	}
 }
 
@@ -352,14 +359,14 @@ int showall;
 		return gtenv(name);
 	return 0;
 }
-#endif
+#endif /* !SMALLER */
 
 /* ARGSUSED */
+#if !SMALLER
 int
 listvars(f, n)
 int f,n;
 {
-#if ! SMALLER
 	char *values;
 	register WINDOW *wp = curwp;
 	register int s;
@@ -394,12 +401,10 @@ int f,n;
 	/* back to the buffer whose modes we just listed */
 	swbuffer(wp->w_bufp);
 	return s;
-#else
-	return unimpl(f,n);
-#endif
 }
+#endif /* !SMALLER */
 
-#if ! SMALLER
+#if OPT_EVAL
 static
 char *gtfun(fname)	/* evaluate a function */
 char *fname;		/* name of function to evaluate */
@@ -491,22 +496,14 @@ char *fname;		/* name of function to evaluate */
 char *gtusr(vname)	/* look up a user var's value */
 char *vname;		/* name of user variable to fetch */
 {
+	register UVAR	*p;
 
-	register int vnum;	/* ordinal number of user var */
-
-	if (!vname[0])
-		return (errorm);
-
-	/* scan the list looking for the user var name */
-	for (vnum = 0; vnum < MAXVARS; vnum++)
-		if (strcmp(vname, uv[vnum].u_name) == 0)
-			break;
-
-	/* return errorm on a bad reference */
-	if (vnum == MAXVARS)
-		return(errorm);
-
-	return(uv[vnum].u_value);
+	if (vname[0] != EOS) {
+		for (p = user_vars; p != 0; p = p->next)
+			if (!strcmp(vname, p->u_name))
+				return p->u_value;
+	}
+	return (errorm);
 }
 
 char *gtenv(vname)
@@ -524,11 +521,13 @@ char *vname;		/* name of environment variable to retrieve */
 
 		/* return errorm on a bad reference */
 		if (envars[vnum] == 0) {
+#if !SMALLER
 			struct VALNAMES	*nn;
 			struct VAL	*vv;
 
 			if (is_mode_name(vname, TRUE, &nn, &vv) == TRUE)
 				value = string_mode_val(nn, vv);
+#endif
 			return (value);
 		}
 
@@ -632,11 +631,14 @@ FindVar(var, vd)	/* find a variables type and name */
 char *var;	/* name of var to get */
 VDESC *vd;	/* structure to hold type and ptr */
 {
+	register UVAR *p;
 	register int vnum;	/* subscript in variable arrays */
 	register int vtype;	/* type to return */
 
 fvar:
 	vtype = vnum = ILLEGAL_NUM;
+	vd->v_ptr = 0;
+
 	if (!var[1]) {
 		vd->v_type = vtype;
 		return;
@@ -649,6 +651,7 @@ fvar:
 					vtype = TKENV;
 					break;
 				}
+#if !SMALLER
 			if (vtype == ILLEGAL_NUM) {
 				struct VALNAMES	*nn;
 				struct VAL	*vv;
@@ -658,24 +661,27 @@ fvar:
 					vtype = TKENV;
 				}
 			}
+#endif
 			break;
 
 		case '%': /* check for existing legal user variable */
-			for (vnum = 0; vnum < MAXVARS; vnum++)
-				if (strcmp(&var[1], uv[vnum].u_name) == 0) {
+			for (p = user_vars; p != 0; p = p->next)
+				if (!strcmp(var+1, p->u_name)) {
 					vtype = TKVAR;
+					vnum  = USER_NUM;
+					vd->v_ptr = p;
 					break;
 				}
-			if (vnum < MAXVARS)
-				break;
-
-			/* create a new one??? */
-			for (vnum = 0; vnum < MAXVARS; vnum++)
-				if (uv[vnum].u_name[0] == 0) {
+			if (vd->v_ptr == 0) {
+				if ((p = typealloc(UVAR)) != 0
+				 && (p->u_name = strmalloc(var+1)) != 0) {
+					p->next    = user_vars;
+					p->u_value = 0;
+					user_vars  = vd->v_ptr = p;
 					vtype = TKVAR;
-					(void)strcpy(uv[vnum].u_name, &var[1]);
-					break;
+					vnum  = USER_NUM;
 				}
+			}
 			break;
 
 		case '&':	/* indirect operator? */
@@ -711,7 +717,8 @@ int	*pos;
 			*pos = cpos;
 			return FALSE;
 		}
-	}
+	} else if (c != NAMEC) /* cancel the unget */
+		(void)tungetc(c);
 	return TRUE;
 }
 
@@ -779,6 +786,7 @@ int	f,n;
 }
 
 /* entrypoint from modes.c, used to set environment variables */
+#if OPT_EVAL
 int
 set_variable(name)
 char	*name;
@@ -788,18 +796,21 @@ char	*name;
 		name = strcat(strcpy(temp, "$"), name);
 	return PromptAndSet(name, FALSE, 0);
 }
+#endif
 
 static int
 SetVarValue(var, value)	/* set a variable */
 VDESC *var;	/* variable to set */
 char *value;	/* value to set to */
 {
+	register UVAR *vptr;
 	register int vnum;	/* ordinal number of var referenced */
 	register int vtype;	/* type of variable to set */
 	register int status;	/* status return */
 	register int c;		/* translated character */
 
 	/* simplify the vd structure (we are gonna look at it a lot) */
+	vptr = var->v_ptr;
 	vnum = var->v_num;
 	vtype = var->v_type;
 
@@ -807,8 +818,8 @@ char *value;	/* value to set to */
 	status = TRUE;
 	switch (vtype) {
 	case TKVAR: /* set a user variable */
-		FreeIfNeeded(uv[vnum].u_value);
-		if ((uv[vnum].u_value = strmalloc(value)) == 0)
+		FreeIfNeeded(vptr->u_value);
+		if ((vptr->u_value = strmalloc(value)) == 0)
 			status = FALSE;
 		break;
 
@@ -1012,7 +1023,7 @@ char *
 tokval(tokn)	/* find the value of a token */
 char *tokn;		/* token to evaluate */
 {
-#if ! SMALLER
+#if OPT_EVAL
 	register int status;	/* error return */
 	register BUFFER *bp;	/* temp buffer pointer */
 	register int blen;	/* length of buffer argument */
@@ -1133,7 +1144,7 @@ char *val;
 	   ||   !strcmp(temp, "off"));
 }
 
-#if !SMALLER || X11
+#if OPT_EVAL || X11
 int stol(val)	/* convert a string to a numeric logical */
 char *val;	/* value to check for stol */
 {
@@ -1148,10 +1159,10 @@ char *val;	/* value to check for stol */
 }
 #endif
 
-#if ! SMALLER
+#if OPT_EVAL
 
 /* ARGSUSED */
-int
+static int
 gtlbl(tokn)	/* find the line number of the given label */
 char *tokn;	/* label name to find */
 {
@@ -1166,7 +1177,9 @@ int val;	/* value to translate */
 	else
 		return(falsem);
 }
+#endif
 
+#if OPT_EVAL || !SMALLER
 char *mkupper(str)	/* make a string upper case */
 char *str;		/* string to upper case */
 {
@@ -1202,7 +1215,7 @@ int x;
 	return(x < 0 ? -x : x);
 }
 
-#if ! SMALLER
+#if OPT_EVAL
 int ernd()	/* returns a random integer */
 {
 	seed = absol(seed * 1721 + 10007);
@@ -1240,12 +1253,14 @@ char *pattern;	/* string to look for */
 	return(0);
 }
 
-#endif
+#endif /* OPT_EVAL */
 
 #if NO_LEAKS
 void ev_leaks()
 {
+#if OPT_EVAL
 	FreeAndNull(shell);
 	FreeAndNull(directory);
+#endif
 }
 #endif

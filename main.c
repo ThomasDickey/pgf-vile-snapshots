@@ -14,7 +14,10 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.135  1993/08/05 14:29:12  pgf
+ * Revision 1.136  1993/08/13 16:32:50  pgf
+ * tom's 3.58 changes
+ *
+ * Revision 1.135  1993/08/05  14:29:12  pgf
  * tom's 3.57 changes
  *
  * Revision 1.134  1993/07/27  18:06:20  pgf
@@ -857,8 +860,7 @@ char	*argv[];
 
 	vtinit();		/* Display */
 	winit();		/* windows */
-	varinit();		/* user variables */
-        
+
 	/* this comes out to 70 on an 80 (or greater) column display */
 	{	register int fill;
 		fill = (7 * term.t_ncol) / 8;  /* must be done after vtinit() */
@@ -1038,7 +1040,7 @@ loop()
 		c = kbd_seq();
 
 		/* if there is something on the command line, clear it */
-		if (mpresf != FALSE) {
+		if (mpresf != 0) {
 			mlerase();
 			if (s != SORTOFTRUE) /* did nothing due to typeahead */
 				(void)update(FALSE);
@@ -1117,6 +1119,12 @@ global_val_init()
 #endif
 	set_global_g_val(GVAL_TIMEOUTVAL, 500);	/* catnap time -- how long
 							to wait for ESC seq */
+#if VMS || MSDOS			/* ':' gets in the way of drives */
+	set_global_g_val_ptr(GVAL_EXPAND_CHARS,strmalloc("%#"));
+#else	/* UNIX */
+	set_global_g_val_ptr(GVAL_EXPAND_CHARS,strmalloc("%#:"));
+#endif
+	set_global_g_val(GMDEXPAND_PATH,FALSE);
 #ifdef GMDGLOB
 	set_global_g_val(GMDGLOB, TRUE);
 #endif
@@ -1135,6 +1143,9 @@ global_val_init()
 	set_global_g_val(GMDRAMSIZE,	TRUE);	/* show ram-usage */
 #endif
 	set_global_g_val(GVAL_REPORT,	5);	/* report changes */
+#if	OPT_XTERM
+	set_global_g_val(GMDXTERM_MOUSE,TRUE);	/* mouse-clicking */
+#endif
 
 	/*
 	 * Buffer-mode defaults
@@ -1164,6 +1175,9 @@ global_val_init()
 	set_global_b_val(MDTABINSERT,	TRUE);	/* allow tab insertion */
 	set_global_b_val(MDTAGSRELTIV,	FALSE);	/* path relative tag lookups */
 	set_global_b_val(MDTERSE,	FALSE);	/* terse messaging */
+#if	OPT_UPBUFF
+	set_global_b_val(MDUPBUFF,	TRUE);	/* animated */
+#endif
 	set_global_b_val(MDVIEW,	FALSE); /* view-only */
 	set_global_b_val(MDWRAP,	FALSE); /* wrap */
 
@@ -1239,7 +1253,7 @@ global_val_init()
 
 }
 
-#if UNIX || MSDOS
+#if UNIX || MSDOS || VMS
 /* ARGSUSED */
 SIGT
 catchintr (ACTUAL_SIG_ARGS)
@@ -1812,6 +1826,7 @@ int maxlen;	/* maximum length */
 static void
 display_ram_usage P((void))
 {
+	beginDisplay;
 	if (global_g_val(GMDRAMSIZE)) {
 		char mbuf[20];
 		int	saverow = ttrow;
@@ -1830,6 +1845,7 @@ display_ram_usage P((void))
 			TTflush();
 		}
 	}
+	endofDisplay;
 }
 
 	/* reallocate mp with nbytes and track */

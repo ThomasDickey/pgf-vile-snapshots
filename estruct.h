@@ -10,7 +10,10 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.134  1993/08/05 14:39:55  pgf
+ * Revision 1.135  1993/08/13 16:32:50  pgf
+ * tom's 3.58 changes
+ *
+ * Revision 1.134  1993/08/05  14:39:55  pgf
  * removed conflicting #define USG 0 from djgpp settings
  *
  * Revision 1.133  1993/08/05  14:29:12  pgf
@@ -836,7 +839,16 @@
 #define	SMALLER	0	/* strip out a bunch of uemacs fluff */
 			/* 	(to each their own... :-)  pgf) */
 #define OPT_MAP_MEMORY 0	/* tiny systems can page out data */
-#define OPT_WORKING    HAS_ALARM && !SMALLER
+
+#define OPT_WORKING    HAS_ALARM && !SMALLER	/* show "working..." message */
+#define	OPT_EVAL   !SMALLER			/* expression-evaluation */
+#define OPT_UPBUFF !SMALLER			/* animated buffer-update */
+
+#if	TERMCAP && !SMALLER
+#define	OPT_XTERM	2	/* mouse-clicking support */
+#else
+#define	OPT_XTERM	0	/* vile doesn't recognize xterm mouse */
+#endif
 
 /*	Debugging options	*/
 #define	RAMSIZE	0	/* dynamic RAM memory usage tracking */
@@ -1048,6 +1060,29 @@ union REGS {
 # define if_OPT_WORKING(statement)
 #endif
 
+	/* semaphore may be needed to prevent interrupt of display-code */
+#if defined(SIGWINCH) || OPT_WORKING
+# define beginDisplay displaying++
+# define endofDisplay displaying--
+#else
+# define beginDisplay
+# define endofDisplay
+#endif
+
+	/* how to signal this process group */
+#if BERK
+# define signal_pg(sig) killpg(getpgrp(0), sig)
+#else
+/* pass the 0 if we can, since it's safer --- the machines where we can't are
+ * probably POSIX machines with ANSI C.
+ */
+# if AIX || (defined(__STDC__) && POSIX)
+#  define signal_pg(sig) kill(-getpgrp(), sig)
+# else
+#  define signal_pg(sig) kill(-getpgrp(0), sig)
+# endif
+#endif
+
 #if	IBMPC || Z309
 #define	MEMMAP	1
 #else
@@ -1087,7 +1122,6 @@ union REGS {
 #define	KBLOCK	256			/* sizeof kill buffer chunks	*/
 #define	NKREGS	36			/* number of kill buffers	*/
 #define	NBLOCK	16			/* line block chunk size	*/
-#define	NVSIZE	10			/* max #chars in a var name	*/
 
 /* SPEC is just 8th bit set, for convenience in some systems */
 #define N_chars 128			/* must be a power-of-2		*/
@@ -1717,6 +1751,9 @@ typedef struct	BUFFER {
 	long	b_modtime;		/* file's last-modification time */
 	long	b_modtime_at_warn;	/* file's modtime when user warned */
 #endif
+#if	OPT_UPBUFF
+	int	(*b_upbuff) P((struct BUFFER *)); /* call to recompute  */
+#endif
 	struct	BUFFER *b_relink; 	/* Link to next BUFFER (sorting) */
 	int	b_created;
 	int	b_last_used;
@@ -1798,6 +1835,7 @@ typedef struct	BUFFER {
 #define BFARGS     0x08			/* set for ":args" buffers */
 #define BFIMPLY    0x010		/* set for implied-# buffers */
 #define BFSIZES    0x020		/* set if byte/line counts current */
+#define BFUPBUFF   0x040		/* set if buffer should be updated */
 
 /* macros for manipulating b_flag */
 #define b_is_implied(bp)        ((bp)->b_flag & (BFIMPLY))
@@ -1807,6 +1845,7 @@ typedef struct	BUFFER {
 #define b_is_scratch(bp)        ((bp)->b_flag & (BFSCRTCH))
 #define b_is_temporary(bp)      ((bp)->b_flag & (BFINVS|BFSCRTCH))
 #define b_is_counted(bp)        ((bp)->b_flag & (BFSIZES))
+#define b_is_obsolete(bp)       ((bp)->b_flag & (BFUPBUFF))
 
 #define b_set_flags(bp,flags)   (bp)->b_flag |= (flags)
 #define b_set_changed(bp)       b_set_flags(bp, BFCHG)
@@ -1838,6 +1877,10 @@ typedef struct	WINDOW {
 	int	w_ntrows;	        /* # of rows of text in window  */
 	int	w_force; 	        /* If non-zero, forcing row.    */
 	int	w_flag;		        /* Flags.		        */
+#ifdef WMDRULER
+	int	w_ruler_line;
+	int	w_ruler_col;
+#endif
 }	WINDOW;
 
 #define	for_each_window(wp) for (wp = wheadp; wp; wp = wp->w_wndp)
@@ -1983,6 +2026,14 @@ typedef struct  VIDEO {
  *	These structures are generated automatically from the cmdtbl file,
  *	and can be found in the file nefunc.h
  */
+#if ANSI_PROTOS
+# define CMD_ARGS int f, int n
+# define CMD_DECL
+#else
+# define CMD_ARGS f, n
+# define CMD_DECL int f,n;
+#endif
+
 typedef	int	(*CmdFunc) P(( int, int ));
 
 typedef  struct {
@@ -2034,6 +2085,7 @@ typedef struct {
 #define OPER	128L	/* function is an operator, affects a region */
 #define LISTED	256L	/* internal use only -- used in describing bindings
 				to only describe each once */
+#define NOMOVE  512L	/* dot doesn't move (although address may be used) */
 
 /* these flags are ex argument descriptors. I simply moved them over 
 	from elvis.  Not all are used or honored or implemented */
@@ -2088,7 +2140,7 @@ typedef struct {
 
 #undef TMPDIR
 
-#if !SMALLER
+#if OPT_EVAL
 #define TMPDIR gtenv("directory")
 #else
 #define TMPDIR P_tmpdir		/* defined in <stdio.h> */
@@ -2112,17 +2164,6 @@ typedef struct KILLREG {
 	unsigned kused;		/* # of bytes used in kill last chunk	*/
 	short kbflag;		/* flags describing kill register	*/
 } KILLREG;
-
-/*	When the command interpretor needs to get a variable's name,
-	rather than its value, it is passed back as a VDESC variable
-	description structure. The v_num field is an index into the
-	appropriate variable table.
-*/
-
-typedef struct VDESC {
-	int v_type;	/* type of variable */
-	int v_num;	/* ordinal pointer to variable in list */
-} VDESC;
 
 /*	The !WHILE directive in the execution language needs to
 	stack references to pending whiles. These are stored linked

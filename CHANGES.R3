@@ -1,3 +1,75 @@
+Changes for vile 3.58: (released Fri Aug 13, 1993)
+(pgf)
+	+ added "sys$login:" to VMS file search path for vile.rc
+
+(tom)
+	+ refined 'imworking()' to get rid of leftover working-message
+	  (display.c, file.c).  Make working-message show up only when 'terse'
+	  mode is off (the default).
+ 
+	+ added code to support xterm mouse-clicking (to move dot), with
+	  additional code for later use with highlighted selections.  Made this
+	  a mode (xterm-mouse) because it does not implement cut & paste yet
+	  (basic.c, display.c, input.c, main.c, modes.c, tcap.c).
+
+	+ added calls to 'TTkopen()' and 'TTkclose()' to termio.c so that (for
+	  all systems) we call these within 'ttclean()' and 'ttunclean()'
+	  (termio.c, tcap.c).
+
+	+ optimized display of 'ruler' (display.c)
+
+	+ use 'displaying' as a semaphore rather than true/false flag, as a
+	  guard against interrupt by 'imworking()' which modifies ttcol and
+	  ttrow (bind.c, display.c, main.c, tcap.c, x11.c).
+
+	+ make ":=" command accept address (like vi) to show arbitrary address
+	  value (cmdtbl, estruct.h, exec.c, random.c).
+
+	+ don't let 'write-til' move dot (cmdtbl).
+
+	+ modified 'doindent()' to trim leading whitespace (like vi) from the
+	  portion of the line after dot (insert.c).
+
+	+ modified insert-code to treat the combination of repeat-count and
+	  newline like vi, causing the repeat count to apply only to the
+	  insertion-string before a newline.  (edef.h, input.c, insert.c)
+
+	+ corrected handling of '.' repeat-count for r,R commands (insert.c)
+
+	+ modified user-variables to make them dynamically-allocated, and to
+	  remove the restriction on the length of their names (mktbls.c,
+	  estruct.h, eval.c, main.c).  Also corrected treatment of newline in
+	  prompt for user-variable name.
+
+	+ used 'strncpy()' to copy return-values from 'kbd_reply()', just in
+	  case macro-tokens are too long (input.c).
+
+	+ don't expand '%' or '#' in 'kbd_reply()' if it would be the name of
+	  an invisible buffer (input.c).
+
+	+ added universal-modes 'expand-chars' to list the characters to expand
+	  in 'kbd_reply()', and 'expand-path' to control whether %/# are shown
+	  as full, or shortened paths (modetbl, input.c, main.c).
+
+	+ modified X-windows config to allow processing of events when the
+	  working-message code is executed (display.c, x11.c).  This makes the
+	  screen refresh and keyboard handling work better.
+
+	+ added 'animated' buffer-mode to control whether vile updates
+	  scratch buffers when their contents would change (e.g., the buffer
+	  list), made this work for buffer-list (buffer.c, display.c,
+	  estruct.h, modes.c, modetbl).
+
+	+ revised the 'killbuffer()' code to work properly with the animated
+	  mode (buffer.c).
+
+	+ modified mktbls to check for illegal mode-names (mktbls.c).
+
+	+ linted with SMALLER set (to get rid of unused functions), introduced
+	  new ifdef with OPT_EVAL to simplify (basic.c bind.c buffer.c cmdtbl
+	  estruct.h eval.c insert.c line.c lint.out modes.c npopen.c proto.h
+	  window.c).
+
 Changes for vile 3.57: (released Fri Aug 06, 1993)
 (pgf)
 	+ the bug check for b_ulinep pointing at a newly inserted line is

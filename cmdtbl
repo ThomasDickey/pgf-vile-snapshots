@@ -72,7 +72,10 @@
 #		here for completeness.
 #
 # $Log: cmdtbl,v $
-# Revision 1.69  1993/08/05 14:35:57  pgf
+# Revision 1.70  1993/08/13 16:32:50  pgf
+# tom's 3.58 changes
+#
+# Revision 1.69  1993/08/05  14:35:57  pgf
 # changed name of setmode to avoid library conflict with djgpp compiler
 # (also changed delmode, setgmode, and delgmode to be consistent)
 #
@@ -814,12 +817,12 @@ insstring	REDO|UNDO		!SMALLER
 joinlines	REDO|UNDO
 	"join-lines"			!FEWNAMES
 	'J'
-killbuffer	NONE
+killbuffer	GOAL
 	"delete-buffer"			!FEWNAMES
 	"kill-buffer"			!FEWNAMES
 	"ki"
 	'^X-k'
-showlength	NONE
+showlength	DFLALL|FROM|TO|NOMOVE
 	"buffer-length"			!FEWNAMES
 	"="
 lastnonwhite	MOTION			!SMALLER
@@ -997,7 +1000,7 @@ opersubstagain	OPER|REDO|UNDO|GLOBOK|(RANGE|EXTRA)
 opertransf	OPER|(RANGE+EXTRA)
 	"transfer-til"
 	"t"
-operwrite	OPER|(RANGE|BANG|FILE1|DFLALL)
+operwrite	OPER|(RANGE|BANG|FILE1|DFLALL|NOMOVE)
 	"w"
 	"W"
 	"write-til"			!FEWNAMES
@@ -1126,7 +1129,7 @@ setnmmark	NONE|(FROM+WORD1)
 	"set-named-mark"		!FEWNAMES
 	"k"
 	'm'
-setvar		NONE			!SMALLER
+setvar		NONE			OPT_EVAL
 	"setv"
 	"set-variable"
 setvmalloc	NONE			VMALLOC
@@ -1146,7 +1149,7 @@ listmodes	NONE
 	"show-global-modes"
 	"showmodes"
 	"showgmodes"
-listvars	NONE
+listvars	NONE			!SMALLER
 	"list-vars"
 	"show-vars"
 	"showvars"

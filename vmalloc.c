@@ -10,7 +10,10 @@
  *	(pgf, 1989)
  *
  * $Log: vmalloc.c,v $
- * Revision 1.15  1993/07/27 18:06:20  pgf
+ * Revision 1.16  1993/08/13 16:32:50  pgf
+ * tom's 3.58 changes
+ *
+ * Revision 1.15  1993/07/27  18:06:20  pgf
  * see tom's 3.56 CHANGES entry
  *
  * Revision 1.14  1993/07/01  16:15:54  pgf
@@ -372,9 +375,9 @@ int f,n;
 		found++;
 #if ! SMALLER && LATER
 	{ /* user vars */
-		extern UVAR uv[MAXVARS];
-		for (i=0; i < MAXVARS; i++)
-			if (uv[i].u_value) found++;
+		register UVAR *p;
+		for (p = user_vars; p != 0; p = p->next)
+			found += 3;
 	}
 #endif
 #if	FILOCK

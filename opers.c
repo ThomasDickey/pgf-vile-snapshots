@@ -4,7 +4,10 @@
  * written for vile by Paul Fox, (c)1990
  *
  * $Log: opers.c,v $
- * Revision 1.31  1993/08/05 14:29:12  pgf
+ * Revision 1.32  1993/08/13 16:32:50  pgf
+ * tom's 3.58 changes
+ *
+ * Revision 1.31  1993/08/05  14:29:12  pgf
  * tom's 3.57 changes
  *
  * Revision 1.30  1993/07/27  18:06:20  pgf
@@ -251,7 +254,7 @@ chgreg()
 		else
 			return openup(TRUE,1);
 	}
-	return ins(FALSE);
+	return ins();
 }
 
 int
