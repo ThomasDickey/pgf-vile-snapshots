@@ -72,7 +72,13 @@
 #		here for completeness.
 #
 # $Log: cmdtbl,v $
-# Revision 1.47  1993/01/23 14:26:19  foxharp
+# Revision 1.49  1993/02/08 14:53:35  pgf
+# see CHANGES, 3.32 section
+#
+# Revision 1.48  1993/01/26  22:44:07  foxharp
+# took out broken ifdef of "font" variable
+#
+# Revision 1.47  1993/01/23  14:26:19  foxharp
 # make '@' command undo/redoable
 #
 # Revision 1.46  1993/01/23  13:38:23  foxharp
@@ -1170,7 +1176,8 @@ zzquit		NONE|(BANG|NL)
 "qidentifier"	QIDENTIF		# current qualified identifier
 "pathname"	PATHNAME		# current path-like word
 "directory"	DIR			# current directory
-"font"		FONT		X11
+"font"		FONT			# current font patch: "#if X11"
+"shell"		SHELL			# shell-environment variable 
 .functions
 "add"	ADD		DYNAMIC		# add two numbers together
 "sub"	SUB		DYNAMIC		# subtraction

@@ -8,8 +8,11 @@
  * Major extensions for vile by Paul Fox, 1991
  *
  *	$Log: modes.c,v $
- *	Revision 1.7  1993/01/16 10:38:56  foxharp
- *	reordering to support some new static routines
+ *	Revision 1.8  1993/02/08 14:53:35  pgf
+ *	see CHANGES, 3.32 section
+ *
+ * Revision 1.7  1993/01/16  10:38:56  foxharp
+ * reordering to support some new static routines
  *
  * Revision 1.6  1992/12/23  09:21:56  foxharp
  * macro-ized the "[Settings]" name
@@ -39,6 +42,12 @@
  
 #define MODES_LIST_NAME  ScratchName(Settings)
 
+#if COLOR
+#define	need_color_change(wp) if (wp) wp->w_flag |= WFCOLR
+#else
+#define	need_color_change(wp)
+#endif
+
 /* listvalueset: print each value in the array according to type,
 	along with its name, until a NULL name is encountered.  Only print
 	if the value in the two arrays differs, or the second array is nil */
@@ -60,6 +69,8 @@ struct VAL *values, *globvalues;
 				j++;
 			}
 			break;
+		case VALTYPE_COLOR:
+			/* show the index-value */
 		case VALTYPE_INT:
 			if (!globvalues || values->vp->i != globvalues->v.i) {
 				bprintf("%s=%d%*P", names->name,
@@ -195,110 +206,104 @@ int kind;
 struct VALNAMES *names;
 register struct VAL *values;
 {
+	char prompt[NLINE];
 	char respbuf[NFILEN];
-	char *rp;
-	char *equp;
-	int rplen = 0;
-	int no;
+	int no = !strncmp(cp, "no", 2);
+	char *rp = no ? cp+2 : cp;
 	int nval, s;
+	register int i;
 
-	no = 0;
-	if (strncmp(cp, "no", 2) == 0) {
+	if (no)
 		kind = !kind;
-		no = 2;
-	}
-	equp = rp = strchr(cp, '=');
-	if (rp) {
-		*rp = '\0';
-		rp++;
-		rplen = strlen(rp);
-		if (!rplen)
-			goto err;
-	}
-	while(names->name != NULL) {
-		if (strncmp(cp + no, names->name, strlen(cp) - no) == 0)
-			break;
-		if (strncmp(cp + no, names->shortname, strlen(cp) - no) == 0)
+
+	while (names->name != NULL) {
+		if (!strcmp(rp, names->name)
+		 || !strcmp(rp, names->shortname))
 			break;
 		names++;
 		values++;
 	}
-	if (names->name == NULL) {
-	err:	if (equp)
-			*equp = '=';
+	if (names->name == NULL)
 		return FALSE;
+
+	if (no && (names->type != VALTYPE_BOOL))
+		return FALSE;
+
+	/* get a value if we need one */
+	if ((end_string() == '=')
+	 || (names->type != VALTYPE_BOOL)) {
+		int	regex = (names->type == VALTYPE_REGEX);
+		int	opts = regex ? 0 : KBD_NORMAL;
+
+		respbuf[0] = EOS;
+		(void)lsprintf(prompt, "New %s %s: ",
+			cp,
+			regex ? "pattern" : "value");
+
+		s = kbd_string(prompt, respbuf, sizeof(respbuf) - 1, '\n', opts, no_completion);
+		if (s != TRUE)
+			return s;
+		if (!strlen(rp = respbuf))
+			return FALSE; 	
+		if (names->type == VALTYPE_BOOL) {
+			if (!strcmp(rp, "yes") || !strcmp(rp, "true"))
+			 	kind = TRUE;
+			else if (!strcmp(rp, "no") || !strcmp(rp, "false"))
+				kind = FALSE;
+			else
+				return FALSE;
+		}
 	}
 
 	/* we matched a name -- get the value */
+	values->vp = &(values->v);
+
 	switch(names->type) {
 	case VALTYPE_BOOL:
-		if (rp) {
-			if (!strncmp(rp,"no",rplen) ||
-					!strncmp(rp,"false",rplen))
-				kind = FALSE;
-			else if (!strncmp(rp,"yes",rplen) ||
-					!strncmp(rp,"true",rplen))
-				kind = TRUE;
-			else
-				goto err;
-		}
-		values->vp = &(values->v);
 		values->vp->i = kind;
 		break;
 
+	case VALTYPE_COLOR:
+		for (i=0; i<NCOLORS; i++) {
+			if (strcmp(rp, cname[i]) == 0) {
+				values->vp->i = i;
+				need_color_change(curwp);
+				return TRUE;
+			}
+		}
+		if (!isdigit(*rp))
+			break;
+		need_color_change(curwp);
+		/* fall-thru with number */
+
 	case VALTYPE_INT:
+		nval = 0;
+		while (isdigit(*rp))
+			nval = (nval * 10) + (*rp++ - '0');
+		values->vp->i = nval;
+		break;
+
 	case VALTYPE_STRING:
+		if (values->vp->p)
+			free(values->vp->p);
+		values->vp->p = strmalloc(rp);
+		break;
+
 	case VALTYPE_REGEX:
-		if (no) goto err;
-		if (!rp) {
-			respbuf[0] = '\0';
-			if (names->type != VALTYPE_REGEX)
-				s = mlreply("New value: ", respbuf, NFILEN - 1);
-			else
-				s = kbd_string("New pattern: ", respbuf,
-					NFILEN - 1, '\n', NO_EXPAND, FALSE);
-			if (s != TRUE) {
-				if (equp)
-					*equp = '=';
-				return s;
-			}
-			rp = respbuf;
-			rplen = strlen(rp);
-			if (!rplen)
-				goto err;
+		if (!values->vp->r) {
+			values->vp->r = typealloc(struct regexval);
+		} else {
+			if (values->vp->r->pat)
+				free(values->vp->r->pat);
+			if (values->vp->r->reg)
+				free((char *)values->vp->r->reg);
 		}
-		values->vp = &(values->v);
-		switch (names->type) {
-		case VALTYPE_INT:
-			nval = 0;
-			while (isdigit(*rp))
-				nval = (nval * 10) + (*rp++ - '0');
-			values->vp->i = nval;
-			break;
-		case VALTYPE_STRING:
-			if (values->vp->p)
-				free(values->vp->p);
-			values->vp->p = strmalloc(rp);
-			break;
-		case VALTYPE_REGEX:
-			if (!values->vp->r) {
-				values->vp->r = typealloc(struct regexval);
-			} else {
-				if (values->vp->r->pat)
-					free(values->vp->r->pat);
-				if (values->vp->r->reg)
-					free((char *)values->vp->r->reg);
-			}
-			values->vp->r->pat = strmalloc(rp);
-			values->vp->r->reg = regcomp(values->vp->r->pat, TRUE);
-			break;
-		}
+		values->vp->r->pat = strmalloc(rp);
+		values->vp->r->reg = regcomp(values->vp->r->pat, TRUE);
 		break;
 
 	default:
 		mlforce("BUG: bad type %s %d",names->name,names->type);
-		if (equp)
-			*equp = '=';
 		return FALSE;
 	}
 	return TRUE;
@@ -318,102 +323,75 @@ int f,n;
 	return s;
 }
 
-static
-int
+/*
+ * This procedure is invoked from 'kbd_string()' to setup the mode-name completion
+ * and query displays.
+ */
+static int
+mode_complete(c, buf, pos)
+int	c;
+char	*buf;
+int	*pos;
+{
+	return kbd_complete(c, buf, pos, (char *)&all_modes[0], sizeof(all_modes[0]));
+}
+
+/*
+ * Process a single mode-setting
+ */
+static int
+do_a_mode(kind, global)
+int	kind;
+int	global;
+{
+	static char cbuf[NLINE]; 	/* buffer to receive mode name into */
+
+	/* prompt the user and get an answer */
+	if (!kbd_string(
+		global	? "Global value: "
+			: "Local value: ",
+		cbuf, sizeof(cbuf)-1,
+		'=', KBD_NORMAL|KBD_LOWERC, mode_complete)
+	|| (*cbuf == EOS))
+		return FALSE;
+
+	if (!strcmp(cbuf,"all"))
+		return listmodes(FALSE,1);
+
+	if (adjvalueset(cbuf, kind, b_valuenames,
+		global ? global_b_values.bv : curbp->b_values.bv )
+	 || adjvalueset(cbuf, kind, w_valuenames,
+		global ? global_w_values.wv : curwp->w_values.wv ))
+		return TRUE;
+
+	mlforce("[Not a legal set option: \"%s\"]", cbuf);
+	return FALSE;
+}
+
+/*
+ * Process the list of mode-settings
+ */
+static int
 adjustmode(kind, global)	/* change the editor mode status */
 int kind;	/* true = set,		false = delete */
 int global; /* true = global flag,	false = current buffer flag */
 {
-	register char *scan;		/* scanning pointer to convert prompt */
-	register int i; 		/* loop index */
-	register s;		/* error return on input */
-#if COLOR
-	register int uflag; 	/* was modename uppercase?	*/
-#endif
-	char prompt[50];	/* string to prompt user with */
 	int autobuff = global_b_val(MDABUFF);
-	static char cbuf[NPAT]; 	/* buffer to receive mode name into */
+	int count = 0;
 
-	/* build the proper prompt string */
-	(void)strcpy(prompt, global
-		? "Global value: "
-		: "Local value: ");
+	do {
+		if (do_a_mode(kind, global))
+			count++;
+	} while (end_string() == ' ');
 
-
-	/* prompt the user and get an answer */
-
-	s = mlreply(prompt, cbuf, NPAT - 1);
-	if (s != TRUE)
-		return(s);
-
-	/* make it lowercase */
-
-	scan = cbuf;
-#if COLOR
-	uflag = isupper(*scan);
-#endif
-	while (*scan != '\0' && *scan != '=') {
-		if (isupper(*scan))
-			*scan = tolower(*scan);
-		scan++;
-	}
-
-	if (scan == cbuf) { /* no string */
-		s = FALSE;
-		goto errout;
-	}
-
-	if (!strcmp(cbuf,"all")) {
-		return listmodes(FALSE,1);
-	}
-
-	/* colors should become another kind of value, i.e. VAL_TYPE_COLOR,
-		and then this could be handled generically in adjvalueset() */
-	/* test it first against the colors we know */
-	for (i=0; i<NCOLORS; i++) {
-		if (strcmp(cbuf, cname[i]) == 0) {
-			/* finding the match, we set the color */
-#if COLOR
-			if (uflag)
-				if (global)
-					gfcolor = i;
-				else if (curwp)
-					set_w_val(curwp, WVAL_FCOLOR, i);
-			else
-				if (global)
-					gbcolor = i;
-				else if (curwp)
-					set_w_val(curwp, WVAL_BCOLOR, i);
-
-			if (curwp)
-				curwp->w_flag |= WFCOLR;
-#endif
-			mlerase();
-			return(TRUE);
+	if (count > 0) {
+		if (global) {
+			register WINDOW *wp;
+			for_each_window(wp)
+				wp->w_flag |= WFHARD|WFMODE;
+		} else {
+			curwp->w_flag |= WFHARD|WFMODE;
 		}
-	}
-
-	s = adjvalueset(cbuf, kind, b_valuenames,
-		global ? global_b_values.bv : curbp->b_values.bv );
-	if (s == TRUE)
-		goto success;
-	s = adjvalueset(cbuf, kind, w_valuenames,
-		global ? global_w_values.wv : curwp->w_values.wv );
-	if (s == TRUE)
-		goto success;
-	if (s == FALSE) {
-	errout:
-		mlforce("[Not a legal set option: \"%s\"]", cbuf);
-	}
-	return s;
-
-success:
-	if (global) {
-		register WINDOW *wp;
-		for_each_window(wp)
-			wp->w_flag |= WFHARD|WFMODE;
-	} else {
-		curwp->w_flag |= WFHARD|WFMODE;
 	}
 
 	/* if the settings are up, redisplay them */

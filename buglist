@@ -91,9 +91,6 @@ E	:e and :n should be able to deal with multiple filenames resulting
 	vile lets you choose to choose the first such name.  if should show
 	you the first name, so you know whether to accept it or not.
 
-E	vi lets you say: "set ai nows ic".  These must be separate commands
-	in vile.
-
 E	When a line is too long to fit on the screen, you have to move
 	over it to see the rest, and when you get to the edge of the screen,
 	it jumps. I would prefer a smooth(er) scroll.
@@ -136,6 +133,14 @@ E	for consistency, 'execute-macro-nn' should be 'execute-macro nn';
 	macro-buffers.
 
 E	vile's 'view' mode is vi's 'readonly' mode.
+
+E	'updatelistbuffers()' should be revisited to make it happen at the
+	beginning of keyboard commands when the buffer list is out of date.
+	In its present form it could result in unnecessary updates, and also
+	does not always pick up size-changes from user commands.
+
+E	should ifdef the 'autobuffer' code for users who do not need vi-style
+	buffering.
 
 ===================================================
 
@@ -352,12 +357,9 @@ vile comes back to life I can no longer filter parts of text using
 ----------------------------------------------------------------------
 Some of the bugs that I have noticed (and may swat) include
 
-	* the handling of control characters in the prompts. Sometimes I have
-	  ended up with a ^U in the buffer response...
 	* '\' does not escape backspace in a prompt (sometimes I want to
 	  edit out backspace sequences from nroff-output).
-	* I think that abbreviation-resolution should apply to 'set' keywords
-	  also.
+	* variables set but never used: Enable_Abort, lineinput
 
 ----------------------------------------------------------------------
 
@@ -432,5 +434,4 @@ compiles silently (though I had to change getpgrp (0) to getpgrp () to get
 it compile) w/ make bsd or bsd_posix. But then vile behaves strangely:
 you can start it by type vile and then load file within vile, it works
 properly. If you try to load a file using vile filename, it dies:  IOT
-trap (core dumped). vile 3.25 works ok though.
-
+trap (core dumped). vile 3.25 works ok though.  

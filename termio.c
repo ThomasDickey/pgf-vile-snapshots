@@ -4,7 +4,10 @@
  * All operating systems.
  *
  * $Log: termio.c,v $
- * Revision 1.53  1993/01/16 10:42:47  foxharp
+ * Revision 1.54  1993/02/08 14:53:35  pgf
+ * see CHANGES, 3.32 section
+ *
+ * Revision 1.53  1993/01/16  10:42:47  foxharp
  * extra TTflush for apollo
  *
  * Revision 1.52  1992/12/23  09:27:52  foxharp
@@ -532,6 +535,9 @@ ttopen()
 
 #if ! X11
 	nstate = ostate;
+#if APOLLO
+        nstate.sg_flags |= RAW;		/* makes ^C, ^U work properly */
+#endif
         nstate.sg_flags |= CBREAK;
         nstate.sg_flags &= ~(ECHO|CRMOD);       /* no echo for now... */
 	ioctl(0,TIOCSETN,&nstate); /* set new state */

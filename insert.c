@@ -8,8 +8,11 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: insert.c,v $
- *	Revision 1.11  1993/01/23 14:27:23  foxharp
- *	protect against backline() failing in openup(), if we're at top of buf
+ *	Revision 1.12  1993/02/08 14:53:35  pgf
+ *	see CHANGES, 3.32 section
+ *
+ * Revision 1.11  1993/01/23  14:27:23  foxharp
+ * protect against backline() failing in openup(), if we're at top of buf
  *
  * Revision 1.10  1993/01/16  10:36:33  foxharp
  * use isreturn() macro
@@ -55,6 +58,52 @@
 #if UNIX
 #include	<signal.h>
 #endif
+
+/* returns nonzero iff wrap-margin or wrap-words is active */
+static int
+wrap_at_col()
+{
+	register int	n;
+
+	if ((n = b_val(curbp, VAL_WRAPMARGIN)) > 0
+	 && (n = col_limit(curwp) - n) > 0)
+		return n;
+
+	if (b_val(curbp, MDWRAP)
+	 && (n = b_val(curbp, VAL_FILL)) > 0)
+	 	return n;
+
+	return getccol(FALSE)+1;
+}
+
+/* advance one character past the current position, for 'append()' */
+static void
+advance_one_char()
+{
+	if (! is_header_line(DOT,curbp) && !is_at_end_of_line(DOT))
+		forwchar(TRUE,1); /* END OF LINE HACK */
+}
+
+/* common logic for i,I,a,A commands */
+static int
+ins_n_times(f,n,advance)
+int f,n,advance;
+{
+	register int s;
+
+	if (!f || n < 0)
+		n = 1;
+
+	s = ins(FALSE);
+
+	while (s && --n) {
+		if (advance)
+			advance_one_char();
+		s = ins(TRUE);
+	}
+
+	return s;
+}
 
 /* open lines up before this one */
 int
@@ -141,14 +190,7 @@ int
 insert(f, n)
 int f,n;
 {
-	int s;
-
-	if (!f || n < 0) n = 1;
-
-	s = ins(FALSE);
-
-	while (s && --n)
-		s = ins(TRUE);
+	int s = ins_n_times(f,n,FALSE);
 
 	update(FALSE);
 	return s;
@@ -159,17 +201,8 @@ int
 insertbol(f, n)
 int f,n;
 {
-	int s;
 	firstnonwhite(f,n);
-
-	if (!f || n < 0) n = 1;
-
-	s = ins(FALSE);
-
-	while (s && --n)
-		s = ins(TRUE);
-
-	return s;
+	return ins_n_times(f,n,FALSE);
 }
 
 /* ARGSUSED */
@@ -177,19 +210,9 @@ int
 append(f, n)
 int f,n;
 {
-	int s;
+	advance_one_char();
 
-	if (! is_header_line(DOT,curbp) && !is_at_end_of_line(DOT))
-		forwchar(TRUE,1); /* END OF LINE HACK */
-
-	if (!f || n < 0) n = 1;
-
-	s = ins(FALSE);
-
-	while (s && --n)
-		s = ins(TRUE);
-
-	return s;
+	return ins_n_times(f,n,TRUE);
 }
 
 /* ARGSUSED */
@@ -197,18 +220,10 @@ int
 appendeol(f, n)
 int f,n;
 {
-	int s;
 	if (!is_header_line(DOT,curbp))
 		gotoeol(FALSE,0);
 
-	if (!f || n < 0) n = 1;
-
-	s = ins(FALSE);
-
-	while (s && --n)
-		s = ins(TRUE);
-
-	return s;
+	return ins_n_times(f,n,FALSE);
 }
 
 /* ARGSUSED */
@@ -216,19 +231,11 @@ int
 overwrite(f, n)
 int f,n;
 {
-	int s;
 	insertmode = OVERWRITE;
 	if (b_val(curbp, MDSHOWMODE))
 		curwp->w_flag |= WFMODE;
 
-	if (!f || n < 0) n = 1;
-
-	s = ins(FALSE);
-
-	while (s && --n)
-		s = ins(TRUE);
-
-	return s;
+	return ins_n_times(f,n,FALSE);
 }
 
 int
@@ -286,8 +293,12 @@ int playback;
 	int    c;		/* command character */
 	int newlineyet = FALSE; /* are we on the line we started on? */
 	int startoff = DOT.o;	/* starting offset on that line */
-	static char insbuff[256];
-	char *iptr = insbuff;
+	static TBUFF *insbuff;
+
+	if (playback && (insbuff != 0))
+		tb_first(insbuff);
+	else if (!tb_init(&insbuff, abortc))
+		return FALSE;
 
 	if (insertmode == FALSE) {
 		insertmode = INSERT;
@@ -302,14 +313,11 @@ int playback;
 		n = 1;
 
 		if (playback) {
-			c = *iptr++;
+			c = tb_next(insbuff);
 		} else {
 			update(FALSE);
-			c = kbd_key();
-			if (iptr - insbuff < 255)
-				*iptr++ = c;
-			else
-				insbuff[255] = abortc;
+			if (!tb_append(&insbuff, c = kbd_key()))
+				return FALSE;
 		}
 
 		if (c == abortc ) {
@@ -356,9 +364,8 @@ int playback;
 			 * argument is non- negative, wrap mode is enabled, and
 			 * we are now past fill column, perform word wrap. 
 			 */
-			if (isspace(c) && b_val(curwp->w_bufp,MDWRAP) &&
-				b_val(curbp,VAL_FILL) > 0 && n >= 0 &&
-				getccol(FALSE) > b_val(curbp,VAL_FILL)) {
+			if (isspace(c)
+			 && getccol(FALSE) > wrap_at_col()) {
 				wrapword(FALSE,1);
 				newlineyet = TRUE;
 			}
@@ -535,8 +542,7 @@ int f,n;
 	 * negative, wrap mode is enabled, and we are now past fill column,
 	 * perform word wrap.
 	 */
-	if (b_val(curwp->w_bufp, MDWRAP) && b_val(curbp,VAL_FILL)> 0 &&
-				getccol(FALSE) > b_val(curbp,VAL_FILL))
+	if (getccol(FALSE) > wrap_at_col())
 		wrapword(FALSE,1);
 
 	/* insert some lines */
@@ -811,4 +817,3 @@ int f,n;
 	}
 	return linsert(n, c);
 }
-

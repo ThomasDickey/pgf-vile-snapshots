@@ -10,6 +10,10 @@
 # The mktbls program parses this to produce nebind.h, nename.h, and
 # nefunc.h, which are used by the rest of the build.
 #
+# Buffer/window modes are defined in the file "modetbl".
+# The mktbls program parses this to produce nemode.h, which is included in
+# 'estruct.h'.
+#
 # The version number is found near the top of edef.h, and is displayed with
 # the '*' and ":version" commands, or by invoking vile with "-V".
 #
@@ -60,14 +64,14 @@ DESTDIR2 = $(HOME)/bin
 
 REMOTE=gutso!foxharp
 
-#CC = gcc
-#OPTFLAGS = -g -Wall -Wshadow -O # -pg
-#gincdir = /usr/local/lib/gcc-include
-#GINCS = -I$(gincdir) -I$(gincdir)/sys
+CC = gcc
+OPTFLAGS = -g -Wall -Wshadow -O # -pg
+gincdir = /usr/local/lib/gcc-include
+GINCS = -I$(gincdir) -I$(gincdir)/sys
 
-CC = cc
+#CC = cc
 #OPTFLAGS = -g
-OPTFLAGS = -O
+##OPTFLAGS = -O
 
 LINK = $(CC)
 LDFLAGS = 
@@ -94,7 +98,8 @@ ALLTOOLS = $(MAKFILES)
 HDRS = estruct.h epath.h edef.h proto.h
 
 # these headers are built by the mktbls program from the information in cmdtbl
-BUILTHDRS = nebind.h nefunc.h nename.h nevars.h
+# and in modetbl
+BUILTHDRS = nebind.h nefunc.h nemode.h nename.h nevars.h
 
 ALLHDRS = $(HDRS)
 
@@ -105,7 +110,7 @@ CSRCde = dg10.c display.c eval.c exec.c externs.c
 CSRCfh = fences.c file.c fileio.c finderr.c globals.c hp110.c hp150.c
 CSRCim = ibmpc.c input.c insert.c isearch.c line.c main.c modes.c mktbls.c
 CSRCnr = npopen.c opers.c oneliner.c random.c regexp.c region.c
-CSRCst = search.c spawn.c st520.c tags.c tcap.c termio.c tipc.c
+CSRCst = search.c spawn.c st520.c tags.c tbuff.c tcap.c termio.c tipc.c
 CSRCuw = undo.c vmalloc.c vmsvt.c vt52.c window.c word.c wordmov.c
 CSRCxz = x11.c z309.c z_ibmpc.c
 
@@ -116,7 +121,7 @@ CSRC = $(CSRCac) $(CSRCde) $(CSRCfh) $(CSRCim) $(CSRCnr) \
 OTHERSRC = z100bios.asm
 
 # text and data files
-TEXTFILES = README CHANGES cmdtbl vile.hlp buglist revlist \
+TEXTFILES = README CHANGES cmdtbl modetbl vile.hlp buglist revlist \
 	README.X11
 
 ALLSRC = $(CSRC) $(OTHERSRC)
@@ -128,14 +133,14 @@ SRC = main.c $(SCREEN).c basic.c bind.c buffer.c crypt.c \
 	csrch.c display.c eval.c exec.c externs.c fences.c file.c \
 	fileio.c finderr.c globals.c input.c insert.c isearch.c \
 	line.c modes.c npopen.c oneliner.c opers.c random.c regexp.c \
-	region.c search.c spawn.c tags.c termio.c undo.c \
+	region.c search.c spawn.c tags.c tbuff.c termio.c undo.c \
 	vmalloc.c window.c word.c wordmov.c
 
 OBJ = main.$O $(SCREEN).$O basic.$O bind.$O buffer.$O crypt.$O \
 	csrch.$O display.$O eval.$O exec.$O externs.$O fences.$O file.$O \
 	fileio.$O finderr.$O globals.$O input.$O insert.$O isearch.$O \
 	line.$O modes.$O npopen.$O oneliner.$O opers.$O random.$O regexp.$O \
-	region.$O search.$O spawn.$O tags.$O termio.$O undo.$O \
+	region.$O search.$O spawn.$O tags.$O tbuff.$O termio.$O undo.$O \
 	vmalloc.$O window.$O word.$O wordmov.$O
 
 
@@ -316,8 +321,14 @@ saber_obj: $(OBJ)
 #SUFFIXES: .c .h .o .src .obj
 
 
-$(BUILTHDRS): cmdtbl $(MKTBLS)
+nebind.h \
+nefunc.h \
+nename.h \
+nevars.h :	cmdtbl $(MKTBLS)
 	$(MKTBLS) cmdtbl
+
+nemode.h:	modetbl $(MKTBLS)
+	$(MKTBLS) modetbl
 
 $(MKTBLS):  mktbls.c
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $(MKTBLS)  mktbls.c
@@ -456,7 +467,7 @@ $(EVERYTHING):
 	$(CO) -r$(revision) $@
 
 
-$(OBJ): estruct.h edef.h proto.h
+$(OBJ): estruct.h nemode.h edef.h proto.h
 
 bind.$O:	epath.h
 eval.$O:	nevars.h
@@ -464,7 +475,10 @@ externs.$O:	nebind.h nename.h nefunc.h
 vmalloc$O:	nevars.h
 
 # $Log: makefile,v $
-# Revision 1.81  1993/01/23 13:38:23  foxharp
+# Revision 1.82  1993/02/08 14:53:35  pgf
+# see CHANGES, 3.32 section
+#
+# Revision 1.81  1993/01/23  13:38:23  foxharp
 # nevars.h replaces evar.h
 #
 # Revision 1.80  1993/01/12  08:44:24  foxharp
@@ -733,10 +747,16 @@ vmalloc$O:	nevars.h
 # (dickey's rules)
 CPP_OPTS= $(CFLAGS0) -DBERK -DAPOLLO -Dos_chosen
 .SUFFIXES: .i .i2 .lint
-lintlib:	llib-lvile.ln
-llib-lvile.ln:	llib-lvile ; makellib $(CPP_OPTS) llib-lvile vile
-llib-lvile:	$(SRC) ; cproto -l $(CPP_OPTS) $(SRC) >$@
+
+lintlib::	llib-lVi1.ln
+llib-lVi1.ln:	llib-lVi1 $(ALLHDRS)	; makellib $(CPP_OPTS) llib-lVi1 Vi1
+llib-lVi1:	$(SRC)			; cproto -l $(CPP_OPTS) `find $(SRC) -print |grep '^[a-k]'` >$@
+
+lintlib::	llib-lVi2.ln
+llib-lVi2.ln:	llib-lVi2 $(ALLHDRS)	; makellib $(CPP_OPTS) llib-lVi2 Vi2
+llib-lVi2:	$(SRC)			; cproto -l $(CPP_OPTS) `find $(SRC) -print |grep '^[l-z]'` >$@
+
 lint.out:	;tdlint $(CPP_OPTS) $(SRC) >$@
 .c.i:		;$(CC)  $(CPP_OPTS) -C -E $< >$@
 .c.i2:		;/usr/lib/cpp  $(CPP_OPTS) -C -E $< >$@
-.c.lint:	;tdlint -lvile $(CPP_OPTS) $< >$@
+.c.lint:	;tdlint -lVi1 -lVi2 $(CPP_OPTS) $< >$@

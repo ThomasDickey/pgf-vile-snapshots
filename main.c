@@ -14,7 +14,10 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.92  1993/01/23 13:38:23  foxharp
+ * Revision 1.93  1993/02/08 14:53:35  pgf
+ * see CHANGES, 3.32 section
+ *
+ * Revision 1.92  1993/01/23  13:38:23  foxharp
  * writeall is now in file.c,
  * use new exit code macros
  *
@@ -340,7 +343,10 @@
 
 #include	<stdio.h>
 
+/* Make global definitions not external */
+#define realdef
 #include	"estruct.h"	/* global structures and defines */
+#include	"edef.h"	/* global definitions */
 
 extern char *pathname[];	/* startup file path/name array */
 
@@ -368,10 +374,6 @@ unsigned _stklen = 32768;
 #if UNIX || MSDOS
 #include	<signal.h>
 #endif
-
-/* Make global definitions not external */
-#define realdef
-#include	"edef.h"	/* global definitions */
 
 int
 main(argc, argv)

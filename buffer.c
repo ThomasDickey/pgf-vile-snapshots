@@ -6,7 +6,10 @@
  * for the display system.
  *
  * $Log: buffer.c,v $
- * Revision 1.48  1993/01/23 14:25:14  foxharp
+ * Revision 1.49  1993/02/08 14:53:35  pgf
+ * see CHANGES, 3.32 section
+ *
+ * Revision 1.48  1993/01/23  14:25:14  foxharp
  * use strcmp against buffer-list name instead of trying to find it
  *
  * Revision 1.47  1993/01/23  13:38:23  foxharp
@@ -604,6 +607,9 @@ char *fname;
         char bname[NBUFN*10];
         char nfname[NFILEN];
 
+	if (fname == 0)	/* didn't really have a filename */
+		return;
+
 	fname = lengthen_path(strcpy(nfname, fname));
 	if (!global_b_val(MDABUFF)
 	 && strcmp(fname, curbp->b_fname)
@@ -718,7 +724,8 @@ int f, n;	/* default flag, numeric argument */
 				return swbuffer(bp);
 		}
 	} else {			/* go forward thru args-list */
-		stopatbp = curbp;
+		if (!(stopatbp = curbp))
+			stopatbp = find_nth_created(1);
 		if (last_bp == 0)
 			last_bp = find_b_hist(0);
 		if (last_bp != 0) {
@@ -772,7 +779,10 @@ register BUFFER *bp;
 		return FALSE;
 	}
 
-	if (curbp == bp)  /* no switching to be done */
+	if (curbp == bp
+	 && curwp != 0
+	 && curwp->w_traits.w_dt.l != 0
+	 && curwp->w_bufp == bp)  /* no switching to be done */
 		return TRUE;
 
 	if (curbp) {

@@ -4,7 +4,10 @@
  *  heavily modified by Paul Fox, 1990
  *
  * $Log: search.c,v $
- * Revision 1.42  1992/12/14 09:03:25  foxharp
+ * Revision 1.43  1993/02/08 14:53:35  pgf
+ * see CHANGES, 3.32 section
+ *
+ * Revision 1.42  1992/12/14  09:03:25  foxharp
  * lint cleanup, mostly malloc
  *
  * Revision 1.41  1992/12/07  23:31:00  foxharp
@@ -689,7 +692,7 @@ int	fromscreen;
 			since they're handled by regexp directly for the
 			search pattern, and in delins() for the replacement
 			pattern */
-	 	status = kbd_string(prompt, apat, NPAT, c, NO_EXPAND, FALSE );
+	 	status = kbd_string(prompt, apat, NPAT, c, 0, no_completion);
 	}
  	if (status == TRUE) {
 		if (srchexpp) {	/* If doing the search string, compile it */

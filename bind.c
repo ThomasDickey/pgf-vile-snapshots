@@ -4,7 +4,10 @@
  *	written 11-feb-86 by Daniel Lawrence
  *
  * $Log: bind.c,v $
- * Revision 1.26  1993/01/16 10:21:17  foxharp
+ * Revision 1.27  1993/02/08 14:53:35  pgf
+ * see CHANGES, 3.32 section
+ *
+ * Revision 1.26  1993/01/16  10:21:17  foxharp
  * use new ScratchName, isShellOrPipe, and isreturn macros
  *
  * Revision 1.25  1992/12/04  09:08:45  foxharp
@@ -105,6 +108,14 @@
 /* dummy prefix binding functions */
 extern CMDFUNC f_cntl_af, f_cntl_xf, f_unarg, f_esc;
 
+static void	
+ostring(s)	/* output a string of output characters */
+char *s;	/* string to output */
+{
+	if (discmd)
+		kbd_puts(s);
+}
+
 /* give me some help!!!! bring up a buffer and read the help file into it */
 /* ARGSUSED */
 int
@@ -123,16 +134,16 @@ int f,n;
 		fname = flook(pathname[1], FL_ANYWHERE);
 		if (fname == NULL) {
 			mlforce("[Sorry, can't find the help information]");
-			zotbuf(bp);
+			(void)zotbuf(bp);
 			return(FALSE);
 		}
 		/* and read the stuff in */
 		if (readin(fname, 0, bp, TRUE) == FALSE ||
 				popupbuff(bp) == FALSE) {
-			zotbuf(bp);
+			(void)zotbuf(bp);
 			return(FALSE);
 		}
-		strcpy(bp->b_bname, ScratchName(Help));
+		(void)strcpy(bp->b_bname, ScratchName(Help));
 		{
 			char buf[80];
 	        	lsprintf(buf, "       %s   %s",prognam,version);
@@ -394,6 +405,15 @@ int f,n;
 }
 #endif
 
+/* returns a name in double-quotes */
+static char *	
+quoted(dst, src)
+char	*dst;
+char	*src;
+{
+	return strcat(strcat(strcpy(dst, "\""), src), "\"");
+}
+
 /* build a binding list (limited or full) */
 /* ARGSUSED */
 void
@@ -429,10 +449,7 @@ char *mstring;		/* match string if partial list, NULL to list all */
 			continue;
 
 		/* add in the command name */
-		strcpy(outseq,"\"");
-		strcat(outseq, nptr->n_name);
-		strcat(outseq,"\"");
-		cpos = strlen(outseq);
+		cpos = strlen(quoted(outseq, nptr->n_name));
 		while (cpos < 32)
 			outseq[cpos++] = ' ';
 		outseq[cpos] = 0;
@@ -450,7 +467,7 @@ char *mstring;		/* match string if partial list, NULL to list all */
 					outseq;
 				while(cpos & 7)
 					outseq[cpos++] = ' ';
-				outseq[cpos] = '\0';
+				outseq[cpos] = EOS;
 			}
 		}
 		/* then look in the multi-key table */
@@ -461,7 +478,7 @@ char *mstring;		/* match string if partial list, NULL to list all */
 					outseq;
 				while(cpos & 7)
 					outseq[cpos++] = ' ';
-				outseq[cpos] = '\0';
+				outseq[cpos] = EOS;
 			}
 		}
 		/* dump the line */
@@ -482,10 +499,7 @@ char *mstring;		/* match string if partial list, NULL to list all */
 				continue;
 			while (cpos < 8)
 				outseq[cpos++] = ' ';
-			outseq[cpos] = '\0';
-			strcat(outseq,"\"");
-			strcat(outseq,nptr2->n_name);
-			strcat(outseq,"\"");
+			(void)quoted(outseq+cpos, nptr2->n_name);
 			addline(curbp,outseq,-1);
 			cpos = 0;	/* and clear the line */
 
@@ -598,9 +612,11 @@ int hflag;	/* Look in the HOME environment variable first? */
 		home = getenv("HOME");
 		if (home != NULL) {
 			/* build home dir file spec */
-			strcpy(fspec, home);
-			strcat(fspec, "/");
-			strcat(fspec, fname);
+			(void)strcat(
+				strcat(
+					strcpy(fspec, home),
+					"/"),
+				fname);
 
 			/* and try it out */
 			if (ffropen(fspec) == FIOSUC) {
@@ -625,7 +641,7 @@ int hflag;	/* Look in the HOME environment variable first? */
 				*sp++ = *path++;
 			*sp++ = '/';
 			*sp = 0;
-			strcat(fspec, fname);
+			(void)strcat(fspec, fname);
 
 			/* and try it out */
 			if (ffropen(fspec) == FIOSUC) {
@@ -641,8 +657,7 @@ int hflag;	/* Look in the HOME environment variable first? */
 
 	/* look it up via the old table method */
 	for (i=2; i < NPNAMES; i++) {
-		strcpy(fspec, pathname[i]);
-		strcat(fspec, fname);
+		(void)strcat(strcpy(fspec, pathname[i]), fname);
 
 		/* and try it out */
 		if (ffropen(fspec) == FIOSUC) {
@@ -661,9 +676,7 @@ kcod2prc(c, seq)
 int c;		/* sequence to translate */
 char *seq;	/* destination string for sequence */
 {
-	char *ptr;	/* pointer into current position in sequence */
-
-	ptr = seq;
+	register char *ptr = seq; /* pointer into current position in sequence */
 
 	/* apply cntl_a sequence if needed */
 	if (c & CTLA) {
@@ -816,10 +829,7 @@ int
 prc2kcod(k)
 char *k;		/* name of key to translate to Command key form */
 {
-	register int c;	/* key sequence to return */
-
-	/* parse it up */
-	c = 0;
+	register int c = 0;	/* key sequence to return */
 
 	/* first, the CTLA prefix */
 	if (*k == '^' && *(k+1) == toalpha(cntl_a) && *(k+2) == '-') {
@@ -880,35 +890,277 @@ char *skey;	/* name of key to get binding for */
 char *
 kbd_engl()
 {
-	int status;
 	char *buf;
 
-
-	status = kbd_engl_stat(&buf);
-	if (status == SORTOFTRUE) /* something was tungetc'ed */
-		(void)tgetc();
-	if (status == TRUE)
+	if (kbd_engl_stat(&buf) == TRUE)
 		return buf;
 	return NULL;
 }
 
-/* *bufp only valid if return is TRUE */
+/* sound the alarm! */
+void
+kbd_alarm()
+{
+	TTbeep();
+	TTflush();
+}
+
+/* put a character to the keyboard-prompt, updating 'ttcol' */
+void
+kbd_putc(c)
+	int	c;
+{
+	if (isreturn(c)) {
+		ttcol = 0;
+	} else if (isprint(c)) {
+		if (ttcol < term.t_ncol)
+			TTputc(c);
+		ttcol++;
+	} else {
+		kbd_putc('^');
+		kbd_putc(toalpha(c));
+	}
+}
+
+/* put a string to the keyboard-prompt */
+void
+kbd_puts(s)
+	char	*s;
+{
+	while (*s)
+		kbd_putc(*s++);
+}
+
+/* erase a character from the display by wiping it out */
+void
+kbd_erase()
+{
+	if (ttcol > 0) {
+		if (--ttcol < term.t_ncol) {
+			TTputc('\b');
+			TTputc(' ');
+			TTputc('\b');
+		}
+	} else
+		ttcol = 0;
+}
+
+/* definitions for name-completion */
+#define	NEXT_DATA(p)	((p)+size_entry)
+#define	PREV_DATA(p)	((p)-size_entry)
+
+#ifdef	lint
+static	/*ARGSUSED*/
+char *	THIS_NAME(p)	char *p; { return 0; }
+#else
+#define	THIS_NAME(p)	(*(char **)(p))
+#endif
+#define	NEXT_NAME(p)	THIS_NAME(NEXT_DATA(p))
+
+/*
+ * Scan down until we no longer match the current input, or reach the end of
+ * the symbol table.
+ */
+static char *	
+skip_partial(buf, len, table, size_entry)
+char	*buf;
+int	len;
+char	*table;
+unsigned size_entry;
+{
+	register char *	next = NEXT_DATA(table);
+	register char *	sp;
+
+	while (sp = THIS_NAME(next)) {
+		if (strncmp(buf, sp, len) != 0)
+			break;
+		next = NEXT_DATA(next);
+	}
+	return next;
+}
+
+/*
+ * Shows a partial-match.  This is invoked in the symbol table at a partial
+ * match, and the user wants to know what characters could be typed next.
+ * If there is more than one possibility, they are shown in square-brackets.
+ * If there is only one possibility, it is shown in curly-braces.
+ */
+static void
+show_partial(buf, len, table, size_entry)
+char	*buf;
+int	len;
+char	*table;
+unsigned size_entry;
+{
+	register char	*next = skip_partial(buf, len, table, size_entry);
+	register char	*last = PREV_DATA(next);
+	register int	c;
+
+	if (THIS_NAME(table)[len] == THIS_NAME(last)[len]) {
+		kbd_putc('{');
+		while (c = THIS_NAME(table)[len]) {
+			if (c == THIS_NAME(last)[len]) {
+				kbd_putc(c);
+				len++;
+			} else
+				break;
+		}
+		kbd_putc('}');
+	}
+	if (next != NEXT_DATA(table)) {
+		c = TESTC;	/* shouldn't be in the table! */
+		kbd_putc('[');
+		while (table != next) {
+			register char *sp = THIS_NAME(table);
+			if (c != sp[len]) {
+				c = sp[len];
+				kbd_putc(c ? c : '$');
+			}
+			table = NEXT_DATA(table);
+		}
+		kbd_putc(']');
+	}
+	TTflush();
+}
+
+/*
+ * Attempt to partial-complete the string, char at a time
+ */
+static int
+fill_partial(buf, pos, first, last, size_entry)
+char	*buf;
+int	pos;
+char	*first;
+char	*last;
+unsigned size_entry;
+{
+	register char	*p;
+	register int	n = pos;
+	char	*this_name = THIS_NAME(first);
+
+	while (TRUE) {
+		buf[n] = this_name[n];	/* add the next char in */
+		buf[n+1] = EOS;
+
+		/* scan through the candidates */
+		for (p = NEXT_DATA(first); p != last; p = NEXT_DATA(p))
+			if (THIS_NAME(p)[n] != buf[n]) {
+				TTflush();
+				return n;
+			}
+
+		if (!clexec)
+			kbd_putc(buf[n]); /* add the character */
+		n++;
+	}
+}
+
+/* patch: account for
+	?-interaction with !-commands
+	^W and nonprinting chars,
+	buffer-overflow,
+	return-completion
+	null-command
+	*/
+
+static	int	testcol;	/* records the column when TESTC is decoded */
+
+/*
+ * Initializes the name-completion logic
+ */
+void
+kbd_init()
+{
+	testcol = -1;
+}
+
+/*
+ * Erases the display that was shown in response to TESTC
+ */
+void
+kbd_unquery()
+{
+	if (testcol >= 0) {
+		while (ttcol > testcol)
+			kbd_erase();
+		TTflush();
+		testcol = -1;
+	}
+}
+
+/*
+ * This is invoked to find the closest name to complete from the current buffer
+ * contents.
+ */
+int
+kbd_complete(c, buf, pos, table, size_entry)
+int	c;		/* TESTC, NAMEC or isreturn() */
+char	*buf;
+int	*pos;
+char	*table;
+unsigned size_entry;
+{
+	register int   cpos = *pos;
+	register char *nbp;	/* first ptr to entry in name binding table */
+
+	kbd_init();		/* nothing to erase */
+	buf[cpos] = 0;		/* terminate it for us */
+	nbp = table;		/* scan for matches */
+
+	while (THIS_NAME(nbp) != NULL) {
+		if (strncmp(buf,  THIS_NAME(nbp), strlen(buf)) == 0) {
+			/* a possible match! exact? no more than one? */
+			if (c == TESTC) {
+				testcol = ttcol;
+				show_partial(buf, cpos, nbp, size_entry);
+				return FALSE;
+			}
+			if (strcmp(buf,  THIS_NAME(nbp)) == 0 || /* exact? */
+				NEXT_NAME(nbp) == NULL ||
+				strncmp(buf, NEXT_NAME(nbp), strlen(buf)) != 0)
+			{
+				/* exact or only one like it.  print it */
+				if (!clexec) {
+					kbd_puts(THIS_NAME(nbp) + cpos);
+					TTflush();
+				}
+				if (c != NAMEC)  /* put it back */
+					tungetc(c);
+				lineinput = FALSE;
+				/* return complete name */
+				(void)strncpy(buf, THIS_NAME(nbp), NLINE);
+				*pos = cpos;
+				return TRUE;
+			}
+
+			/* try for a partial match against the list */
+			*pos = fill_partial(buf, cpos, nbp,
+				skip_partial(buf, cpos, nbp, size_entry),
+				size_entry);
+			return FALSE;
+
+		}
+		nbp = NEXT_DATA(nbp);
+	}
+
+	kbd_alarm();	/* no match */
+	buf[*pos = cpos] = EOS;
+	return FALSE;
+}
+
+/*
+ * Returns:
+ *	TRUE		- loads '*bufp' as a side-effect
+ *	SORTOFTRUE	- '*bufp' is null (command was empty)
+ *	FALSE		- '*bufp' is null (command was aborted)
+ */
 int
 kbd_engl_stat(bufp)
 char **bufp;
 {
-#if	ST520 & LATTICE
-#define register		
-#endif
 	register int c;
-	register int cpos;	/* current column on screen output */
-	register char *sp;	/* pointer to string for output */
-	register NTAB *nbp;	/* first ptr to entry in name binding table */
-	register NTAB *cnbp;	/* current ptr to entry in name binding table */
-	register NTAB *lnbp;	/* last ptr to entry in name binding table */
+	int	cpos = 0;		/* current column on screen output */
 	static char buf[NLINE]; /* buffer to hold tentative command name */
-
-	cpos = 0;
 
 	*bufp = NULL;
 
@@ -921,19 +1173,21 @@ char **bufp;
 		return TRUE;
 	}
 
+	testcol = -1;
 	lineinput = TRUE;
 
 	/* build a name string from the keyboard */
 	while (TRUE) {
 		c = tgetc();
+		kbd_unquery();
 
 		if (cpos == 0) {
 			if (isbackspace(c) ||
 			    c == kcod2key(abortc) ||
-			    c == kcod2key(killc) ||
+			    c == kcod2key(killc)  ||
+			    c == kcod2key(wkillc) ||
 			    isreturn(c) ||
 			    islinespecchar(c) ) {
-				tungetc(c);
 				return SORTOFTRUE;
 			}
 		}
@@ -945,28 +1199,22 @@ char **bufp;
 			return TRUE;
 
 		} else if (c == kcod2key(abortc)) {	/* Bell, abort */
-			buf[0] = '\0';
+			buf[0] = EOS;
 			lineinput = FALSE;
 			return FALSE;
 
 		} else if (isbackspace(c)) {
-			TTputc('\b');
-			TTputc(' ');
-			TTputc('\b');
-			--ttcol;
+			kbd_erase();
 			--cpos;
 			TTflush();
 
-		} else if (c == kcod2key(killc)) {	/* ^U, kill */
+		} else if (c == kcod2key(killc)		/* ^U, kill */
+		       ||  c == kcod2key(wkillc)) {	/* ^W, word-kill */
 			while (cpos != 0) {
-				TTputc('\b');
-				TTputc(' ');
-				TTputc('\b');
+				kbd_erase();
 				--cpos;
-				--ttcol;
 			}
 			TTflush();
-			tungetc(c);
 			return SORTOFTRUE;
 
 		} /* else... */
@@ -984,83 +1232,31 @@ char **bufp;
 	If we pass this "if" with c != ' ', then c is ungotten below,
 	so it can be picked up by the commands argument getter later.
 */
-		else if (c == ' ' || (cpos > 0 && cpos < 3 &&
-			     ((!ispunct(c) &&  ispunct(buf[cpos-1])) ||
-	   ((c != '!' && ispunct(c)) &&
-	   	 (buf[cpos-1] == '!' || !ispunct(buf[cpos-1]))) )
-			      		)
-			) {
-/* <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< */
-	/* attempt a completion */
-	buf[cpos] = 0;		/* terminate it for us */
-	nbp = nametbl;	/* scan for matches */
-	while (nbp->n_cmd != NULL) {
-		if (strncmp(buf, nbp->n_name, strlen(buf)) == 0) {
-			/* a possible match! exact? no more than one? */
-			if (strcmp(buf, nbp->n_name) == 0 || /* exact? */
-				(nbp + 1)->n_cmd == NULL ||
-				strncmp(buf, (nbp+1)->n_name, strlen(buf)) != 0)
-			{
-				/* exact or only one like it.  print it */
-				sp = nbp->n_name + cpos;
-				while (*sp)
-					TTputc(*sp++);
-				TTflush();
-				if (c != ' ')  /* put it back */
-					tungetc(c);
+		else if (
+		      (c == NAMEC)
+		    ||(c == TESTC)
+		    ||(
+		          cpos > 0
+		      &&  cpos < 3
+		      &&(
+		          (!ispunct(c)
+		        &&  ispunct(buf[cpos-1])
+			  )
+			|| ((c != '!' && ispunct(c))
+			  && (buf[cpos-1] == '!' || !ispunct(buf[cpos-1]))
+			  )
+			)
+		      )
+		    ) {
+			if (kbd_complete(c, buf, &cpos, (char *)&nametbl[0], sizeof(NTAB))) {
 				lineinput = FALSE;
-				/* return nbp->n_name; */
-				strncpy(buf,nbp->n_name,NLINE);
 				*bufp = buf;
 				return TRUE;
-			} else {
-/* << << << << << << << << << << << << << << << << << */
-	/* try for a partial match against the list */
-
-	/* first scan down until we no longer match the current input */
-	lnbp = (nbp + 1);
-	while ((lnbp+1)->n_cmd != NULL) {
-		if (strncmp(buf, (lnbp+1)->n_name, strlen(buf)) != 0)
-			break;
-		++lnbp;
-	}
-
-	/* and now, attempt to partial complete the string, char at a time */
-	while (TRUE) {
-		/* add the next char in */
-		buf[cpos] = nbp->n_name[cpos];
-
-		/* scan through the candidates */
-		cnbp = nbp + 1;
-		while (cnbp <= lnbp) {
-			if (cnbp->n_name[cpos] != buf[cpos])
-				goto onward;
-			++cnbp;
-		}
-
-		/* add the character */
-		TTputc(buf[cpos++]);
-	}
-/* << << << << << << << << << << << << << << << << << */
 			}
-		}
-		++nbp;
-	}
-
-	/* no match.....beep and onward */
-	TTbeep();
-onward:;
-	TTflush();
-/* <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< */
-		} else {
-			if (cpos < NLINE-1 && isprint(c)) {
-				buf[cpos++] = c;
-				TTputc(c);
-			}
-
-			++ttcol;
+		} else if (cpos < NLINE-1 && isprint(c)) {
+			kbd_putc(buf[cpos++] = c);
 			TTflush();
-		}
+		} else
+			kbd_alarm();
 	}
 }
-

@@ -2,7 +2,10 @@
  *		written by John Hutchinson, heavily modified by Paul Fox
  *
  * $Log: npopen.c,v $
- * Revision 1.15  1992/12/04 09:21:52  foxharp
+ * Revision 1.16  1993/02/08 14:53:35  pgf
+ * see CHANGES, 3.32 section
+ *
+ * Revision 1.15  1992/12/04  09:21:52  foxharp
  * don't close the half of a child's io that we're _not_ using
  *
  * Revision 1.14  1992/12/03  00:32:59  foxharp
@@ -192,7 +195,7 @@ char *cmd;
 		(void) close (i);
 
 	if (sh == NULL) {
-		if ((sh = getenv("SHELL")) == NULL || *sh == '\0') {
+		if ((sh = gtenv("shell")) == NULL || *sh == '\0') {
 			sh = "/bin/sh";
 			shname = "sh";
 		} else {

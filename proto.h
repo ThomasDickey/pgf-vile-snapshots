@@ -5,7 +5,10 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.30  1993/01/23 13:38:23  foxharp
+ * Revision 1.31  1993/02/08 14:53:35  pgf
+ * see CHANGES, 3.32 section
+ *
+ * Revision 1.30  1993/01/23  13:38:23  foxharp
  * couple of new funcs, some now static (dfout..)
  *
  * Revision 1.29  1993/01/16  10:41:21  foxharp
@@ -100,7 +103,7 @@
  *
  */
 
-#ifdef __STDC__
+#if ANSI_PROTOS
 # define P(a) a
 #else
 # define P(a) ()
@@ -163,6 +166,8 @@ extern void spal P(( char * ));
 extern void tcapbeep P(( void ));
 extern void putpad P(( char * ));
 extern void putnpad P(( char *, int ));
+
+/* basic.c */
 extern int gotobol P(( int, int ));
 extern int backchar P(( int, int ));
 extern int backchar_to_bol P(( int, int ));
@@ -205,15 +210,27 @@ extern int setmark P(( void ));
 extern int gomark P(( int, int ));
 extern int godotplus P(( int, int ));
 extern void swapmark P(( void ));
+
+/* bind.c */
 extern int help P(( int, int ));
 extern int deskey P(( int, int ));
 extern int desbind P(( int, int ));
 extern void makebindlist P(( int, char *));
 extern int strinc P(( char *, char *));
+extern int unbindkey P(( int, int ));
 extern int unbindchar P(( int ));
 extern int apro P(( int, int ));
 extern char * kbd_engl P(( void ));
+extern void kbd_alarm P(( void ));
+extern void kbd_putc P(( int ));
+extern void kbd_puts P(( char * ));
+extern void kbd_erase P(( void ));
+extern void kbd_init P(( void ));
+extern void kbd_unquery P(( void ));
+extern int kbd_complete P(( int, char *, int *, char *, unsigned ));
 extern int kbd_engl_stat P(( char ** ));
+
+/* buffer.c */
 extern int histbuff P(( int, int ));
 extern void imply_alt P(( char * ));
 extern BUFFER * find_alt P(( void ));
@@ -235,6 +252,7 @@ extern void sortlistbuffers P(( void ));
 extern int togglelistbuffers P(( int, int ));
 extern int listbuffers P(( int, int ));
 void updatelistbuffers P((void));
+
 extern int startup P(( char *));
 extern int addline P(( BUFFER *, char *, int ));
 extern int anycb P(( void ));
@@ -297,7 +315,6 @@ extern void mlforce P((char *, ... ));
 extern void mlprompt P((char *, ... ));
 extern void mlmsg P((char *, va_list * ));
 extern void dbgwrite P((char *, ... ));
-extern void mlputc P(( int ));
 extern void lspputc P(( int ));
 extern char * lsprintf P((char *, char *, ... ));
 #ifdef	UNUSED
@@ -419,32 +436,33 @@ extern void putdotback P(( BUFFER *, LINE * ));
 extern int globals P(( int, int ));
 extern int vglobals P(( int, int ));
 extern int globber P(( int, int, int ));
+
+/* input.c */
+extern int no_completion P(( int, char *, int * ));
 extern int mlyesno P(( char * ));
 extern int mlreply P(( char *, char *, int ));
 extern int mlreply_no_bs P(( char *, char *, int ));
-extern int kbd_string P((char *, char *, int, int, int, int));
+extern int mlreply_no_opts P(( char *, char *, int ));
 extern void incr_dot_kregnum P(( void ));
 extern void tungetc P(( int ));
 extern int tpeekc P(( void ));
-extern void record_char P(( int ));
 extern int get_recorded_char P(( int ));
 extern int tgetc P(( void ));
 extern int kbd_key P(( void ));
 extern int kbd_seq P(( void ));
 extern int screen_string P(( char *, int, int ));
-extern void remove_backslashes P(( char * ));
-extern void ostring P(( char * ));
-extern void outstring P(( char * ));
+extern int end_string P(( void ));
+extern int kbd_string P(( char *, char *, int, int, int, int (*func)(int,char*,int*) ));
 extern int speckey P(( int, int ));
 extern int dotcmdbegin P(( void ));
 extern int dotcmdfinish P(( void ));
 extern void dotcmdstop P(( void ));
 extern int dotcmdplay P(( int, int ));
-extern int macarg P(( char * ));
 extern int kbd_mac_begin P(( int, int ));
 extern int kbd_mac_end P(( int, int ));
 extern int kbd_mac_exec P(( int, int ));
 extern int kbd_mac_save P(( int, int ));
+
 extern int risearch P(( int, int ));
 extern int fisearch P(( int, int ));
 extern int isearch P(( int, int ));
@@ -715,7 +733,7 @@ extern int isendwordf P(( void ));
 extern int isendviwordf P(( void ));
 extern int toktyp P(( char * ));
 extern char * tokval P(( char * ));
-extern char * token P(( char *, char * ));
+extern char * token P(( char *, char *, int ));
 extern int ffgetline P(( int * ));
 extern int kinsert P(( int ));
 extern char * fnc2engl P(( CMDFUNC * ));
@@ -724,7 +742,7 @@ extern CMDFUNC * kcod2fnc P(( int ));
 extern int prc2kcod P(( char * ));
 extern char * prc2engl P(( char * ));
 extern int fnc2key P(( CMDFUNC * ));
-extern int nextarg P(( char * ));
+extern int macarg P(( char * ));
 extern int echochar P(( int, int ));
 extern int scanmore P(( char *, int ));
 extern int expandp P(( char *, char *, int ));
@@ -738,6 +756,21 @@ extern int cpp_fence P((int, char *, char *, char * ));
 extern int comment_fence P(( int ));
 extern int simple_fence P(( int, int, int ));
 extern void putdotback P(( BUFFER *, LINE * ));
+
+#ifndef	TBUFF
+/* tbuff.c */
+TBUFF *	tb_alloc P(( TBUFF **, unsigned ));
+TBUFF *	tb_init P(( TBUFF **, int ));
+void	tb_free P(( TBUFF ** ));
+TBUFF *	tb_put P(( TBUFF **, unsigned, int ));
+int	tb_get P(( TBUFF *, unsigned ));
+void	tb_unput P(( TBUFF * ));
+TBUFF *	tb_append P(( TBUFF **, int ));
+void	tb_first P(( TBUFF * ));
+int	tb_more P(( TBUFF * ));
+int	tb_next P(( TBUFF * ));
+int	tb_peek P(( TBUFF * ));
+#endif
 
 #if X11
 extern	void x_set_rv P(( void ));

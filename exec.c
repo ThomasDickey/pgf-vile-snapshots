@@ -4,7 +4,10 @@
  *	written 1986 by Daniel Lawrence	
  *
  * $Log: exec.c,v $
- * Revision 1.37  1993/01/23 13:38:23  foxharp
+ * Revision 1.38  1993/02/08 14:53:35  pgf
+ * see CHANGES, 3.32 section
+ *
+ * Revision 1.37  1993/01/23  13:38:23  foxharp
  * check return from bclear before blowing away a macro
  *
  * Revision 1.36  1993/01/16  10:31:54  foxharp
@@ -184,10 +187,7 @@ int f, n;
 			return FALSE;
 		} else if (isbackspace(c)) {
 			if (cpos != 0) {
-				TTputc('\b');
-				TTputc(' ');
-				TTputc('\b');
-				--ttcol;
+				kbd_erase();
 				--cpos;
 			} else {
 				lspec[0] = '\0';
@@ -197,11 +197,8 @@ int f, n;
 
 		} else if (c == kcod2key(killc)) {	/* ^U, kill */
 			while (cpos != 0) {
-				TTputc('\b');
-				TTputc(' ');
-				TTputc('\b');
+				kbd_erase();
 				--cpos;
-				--ttcol;
 			}
 		} else if (islinespecchar(c) ||
 			/* special test for 'a style mark references */
@@ -211,8 +208,7 @@ int f, n;
 				)
 			 ) {
 			lspec[cpos++] = c;
-			TTputc(c);
-			++ttcol;
+			kbd_putc(c);
 		} else {
 			int status;
 			tungetc(c);
@@ -221,7 +217,6 @@ int f, n;
 			if (status == TRUE) {
 				break;
 			} else if (status == SORTOFTRUE) {
-				fnp = NULL;
 				continue;
 			} else {
 				return status;
@@ -805,55 +800,56 @@ int f,n;
 */
 
 char *
-token(src, tok)
+token(src, tok, eolchar)
 char *src, *tok;	/* source string, destination token string */
+int eolchar;
 {
-	register int quotef;	/* is the current string quoted? */
+	register int quotef = EOS;	/* nonzero iff the current string quoted */
+	register int c;
 
 	/* first scan past any whitespace in the source string */
 	while (isspace(*src))
 		++src;
 
-
-	quotef = FALSE;
 	/* scan through the source string */
-	while (*src) {
+	while ((c = *src) != EOS) {
 		/* process special characters */
-		if (*src == '\\') {
-			++src;
-			if (*src == 0)
+		if (c == '\\') {
+			src++;
+			if (*src == EOS)
 				break;
-			switch (*src++) {
+			switch (c = *src++) {
 				case 'r':	*tok++ = '\r'; break;
 				case 'n':	*tok++ = '\n'; break;
 				case 't':	*tok++ = '\t';  break;
 				case 'b':	*tok++ = '\b';  break;
 				case 'f':	*tok++ = '\f'; break;
-				default:	*tok++ = *(src-1);
+				default:	*tok++ = c;
 			}
 		} else {
 			/* check for the end of the token */
 			if (quotef) {
-				if (*src == '"')
+				if (c == quotef) {
+					src++;
 					break;
+				}
 			} else {
-				if (*src == ' ' || *src == '\t')
+				if (c == eolchar) {
+					src++;
 					break;
+				} else if (c == '"') {
+					quotef = c;
+					/* patch: note that leading quote is included */
+				} else if (isspace(c)) {
+					break;
+				}
 			}
 
-			/* set quote mode if qoute found */
-			if (*src == '"')
-				quotef = TRUE;
-
-			/* record the character */
-			*tok++ = *src++;
+			*tok++ = *src++;	/* record the character */
 		}
 	}
 
-	/* terminate the token and exit */
-	if (*src)
-		++src;
-	*tok = 0;
+	*tok = EOS;
 	return src;
 }
 
@@ -866,23 +862,10 @@ char *tok;	/* buffer to place argument */
 	savcle = clexec;	/* save execution mode */
 	clexec = TRUE;		/* get the argument */
 	/* grab token and advance past */
-	execstr = token(execstr, tok);
+	execstr = token(execstr, tok, EOS);
 	/* evaluate it */
 	strcpy(tok, tokval(tok));
 	clexec = savcle;	/* restore execution mode */
-	return TRUE;
-}
-
-/*	nextarg:	get the next argument	*/
-
-int
-nextarg(buffer)
-char *buffer;		/* buffer to put token into */
-{
-	/* grab token and advance past */
-	execstr = token(execstr, buffer);
-	/* evaluate it */
-	strcpy(buffer, tokval(buffer));
 	return TRUE;
 }
 
@@ -1405,7 +1388,7 @@ nxtscan:	/* on to the next line */
 				if (execlevel == 0) {
 
 					/* grab label to jump to */
-					(void) token(eline, golabel);
+					(void) token(eline, golabel, EOS);
 					linlen = strlen(golabel);
 					glp = hlp->l_fp;
 					while (glp != hlp) {

@@ -6,7 +6,10 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.68  1993/01/23 13:38:23  foxharp
+ * Revision 1.69  1993/02/08 14:53:35  pgf
+ * see CHANGES, 3.32 section
+ *
+ * Revision 1.68  1993/01/23  13:38:23  foxharp
  * changes for updating buffer list when writing files out,
  * apollo-specific change for death conditions,
  * use new exit code macros
@@ -1896,6 +1899,9 @@ char *f;
 {
 	register int len;
 	char	temp[NFILEN];
+
+	if (isInternalName(f))
+		return f;
 
 	if (!slashc(f[0])) {
 		len = strlen(strcpy(temp, current_directory(FALSE)));
