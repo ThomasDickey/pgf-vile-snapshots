@@ -10,7 +10,16 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.69  1992/05/25 21:27:14  foxharp
+ * Revision 1.72  1992/06/12 22:23:42  foxharp
+ * changes for separate 'comments' r.e. for formatregion
+ *
+ * Revision 1.71  1992/06/04  19:42:37  foxharp
+ * use #ifdef __STDC__ in favor of #if
+ *
+ * Revision 1.70  1992/06/01  20:35:59  foxharp
+ * added "tabinsert" support
+ *
+ * Revision 1.69  1992/05/25  21:27:14  foxharp
  * some func declarations moved in here, from edef.h and other .c files
  *
  * Revision 1.68  1992/05/25  21:25:35  foxharp
@@ -1077,10 +1086,11 @@ typedef struct	W_TRAITS {
 #define MDMAGIC		7		/* regular expressions in search */
 #define	MDSHOWMAT	8		/* auto-indent */
 #define	MDSHOWMODE	9		/* show insert/replace/command mode */
-#define	MDVIEW		10		/* read-only buffer		*/
-#define	MDSWRAP 	11		/* wrap-around search mode	*/
-#define	MDWRAP		12		/* word wrap			*/
-#define	MAX_BOOL_B_VALUE	12	/* max of boolean values	*/
+#define	MDTABINSERT	10		/* okay to insert tab chars 	*/
+#define	MDVIEW		11		/* read-only buffer		*/
+#define	MDSWRAP 	12		/* wrap-around search mode	*/
+#define	MDWRAP		13		/* word wrap			*/
+#define	MAX_BOOL_B_VALUE	13	/* max of boolean values	*/
 
 #define VAL_ASAVECNT	(MAX_BOOL_B_VALUE+1)
 #define VAL_C_TAB	(MAX_BOOL_B_VALUE+2)
@@ -1095,10 +1105,11 @@ typedef struct	W_TRAITS {
 #define	MAX_STRING_B_VALUE (MAX_INT_B_VALUE+2) /* max of string-valued modes */
 
 #define VAL_CSUFFIXES	(MAX_STRING_B_VALUE+1)
-#define VAL_PARAGRAPHS	(MAX_STRING_B_VALUE+2)
-#define VAL_SECTIONS	(MAX_STRING_B_VALUE+3)
-#define VAL_SENTENCES	(MAX_STRING_B_VALUE+4)
-#define	MAX_REGEX_B_VALUE (MAX_STRING_B_VALUE+4) /* max of string-valued modes */
+#define VAL_COMMENTS	(MAX_STRING_B_VALUE+2)
+#define VAL_PARAGRAPHS	(MAX_STRING_B_VALUE+3)
+#define VAL_SECTIONS	(MAX_STRING_B_VALUE+4)
+#define VAL_SENTENCES	(MAX_STRING_B_VALUE+5)
+#define	MAX_REGEX_B_VALUE (MAX_STRING_B_VALUE+5) /* max of string-valued modes */
 
 #define	MAX_B_VALUES	(MAX_REGEX_B_VALUE) /* max of buffer values */
 
@@ -1468,15 +1479,9 @@ typedef struct WHBLOCK {
 # define NULL 0
 #endif
 
-#if __STDC__
-# define P(a) a
-#if pgf_and_no_fixincludes
-#include "/jukebox/gnu-sources/gcc/gcc-1.40/gstdarg.h"
-#else
+#ifdef __STDC__
 #include <stdarg.h>
-#endif
 #else
-# define P(a) ()
 #include <varargs.h>
 #endif
 

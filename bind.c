@@ -4,7 +4,10 @@
  *	written 11-feb-86 by Daniel Lawrence
  *
  * $Log: bind.c,v $
- * Revision 1.22  1992/05/19 08:55:44  foxharp
+ * Revision 1.23  1992/06/04 19:45:14  foxharp
+ * cast strlen() to int for new ANSI promotion semantics :-(
+ *
+ * Revision 1.22  1992/05/19  08:55:44  foxharp
  * more prototype and shadowed decl fixups
  *
  * Revision 1.21  1992/05/16  12:00:31  pgf
@@ -414,7 +417,7 @@ char *mstring;		/* match string if partial list, NULL to list all */
 			continue;
 
 		/* try to avoid alphabetizing by the real short names */
-		if (pass == 0 && strlen(nptr->n_name) <= 2)
+		if (pass == 0 && (int)strlen(nptr->n_name) <= 2)
 			continue;
 
 		/* add in the command name */

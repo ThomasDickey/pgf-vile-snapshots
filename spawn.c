@@ -2,7 +2,14 @@
  *		for MicroEMACS
  *
  * $Log: spawn.c,v $
- * Revision 1.25  1992/05/25 21:34:29  foxharp
+ * Revision 1.27  1992/06/01 21:23:40  foxharp
+ * fix ret codes on bktoshell and rtfrmshell
+ *
+ * Revision 1.26  1992/06/01  20:43:10  foxharp
+ * bktoshell() and rtfrmshell() are now always defined, but may be null
+ * if not supported
+ *
+ * Revision 1.25  1992/05/25  21:34:29  foxharp
  * added f,n args to bktoshell command
  *
  * Revision 1.23  1992/05/19  08:55:44  foxharp
@@ -213,53 +220,52 @@ int f,n;
 #endif
 }
 
-#if UNIX && defined(SIGTSTP)
 
 /* ARGSUSED */
 int
 bktoshell(f,n)		/* suspend and wait to wake up */
 int f,n;
 {
-#if     NeWS
+#if UNIX && defined(SIGTSTP)
+# if     NeWS
 	mlforce("[Not availible under NeWS]");
 	return(FALSE);
-#else
-# if X11
+# else
+#  if X11
 	mlforce("[Not availible under X11]");
 	return(FALSE);
-# else
+#  else
 	int pid;
 
 	vttidy(TRUE);
 	pid = getpid();
 	kill(pid,SIGTSTP);
 	return TRUE;
+#  endif
 # endif
-#endif
+#else
+	mlforce("[Not availible]");
+	return FALSE;
+#endif /* SIGTSTP */
 }
 
 SIGT
 rtfrmshell(signo)
 int signo;
 {
-#if     NeWS
-	mlforce("[Not available under NeWS]");
-#else
-# if X11
-	mlforce("[Not available under X11]");
-# else
+#if UNIX && defined(SIGTSTP)
+# if ! X11
 	ttunclean();
 	curwp->w_flag = WFHARD;  /* is this needed, with sgarbf == TRUE? */
 	sgarbf = TRUE;
-#if USG
+# if USG
 	signal(SIGCONT,rtfrmshell);	/* suspend & restart */
 	update(TRUE);
-#endif
-#endif
+# endif
+# endif
 #endif
 	SIGRET;
 }
-#endif /* SIGTSTP */
 
 void
 pressreturn()

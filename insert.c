@@ -8,8 +8,12 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: insert.c,v $
- *	Revision 1.1  1992/05/29 09:38:33  foxharp
- *	Initial revision
+ *	Revision 1.2  1992/06/01 20:37:31  foxharp
+ *	added tabinsert
+ *	mode
+ *
+ * Revision 1.1  1992/05/29  09:38:33  foxharp
+ * Initial revision
  *
  *
  *
@@ -551,7 +555,7 @@ int ind;
 		ldelete((long)i,FALSE);
 	if ((i=ind/curtabval)!=0) {
 		autoindented += i;
-		if (linsert(i, '\t') == FALSE)
+		if (tab(TRUE,i) == FALSE)
 			return FALSE;
 	}
 	if ((i=ind%curtabval) != 0) {
@@ -640,7 +644,16 @@ int
 tab(f, n)
 int f,n;
 {
-	return linsert(1, '\t');
+	int ccol;
+	if (!f) n = 1;
+	if (n <= 0)
+		return FALSE;
+
+	if (b_val(curbp,MDTABINSERT))
+		return linsert(n, '\t');
+
+	ccol = getccol(FALSE);
+	return linsert((nextab(ccol) - ccol) + (n-1)*curtabval,' ');
 }
 
 int
@@ -659,7 +672,8 @@ shiftwidth()
 		(getccol(FALSE) % b_val(curbp,VAL_SWIDTH));
 	if (s)
 		s = linsert(s, ' ');
-	entabline(TRUE);
+	if (b_val(curbp,MDTABINSERT))
+                entabline(TRUE);
 	if (autoindented >= 0) {
 		autoindented = firstchar(DOT.l);
 	}

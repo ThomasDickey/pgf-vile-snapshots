@@ -243,6 +243,9 @@ MISCELLANEOUS
 
 - two new functions: &rd and &wr, return whether a file is readable or writable
 
+- a new mode, "tabinsert", has been created to fill the needs of the 
+	"I hate tabs" camp.
+
 IMPLEMENTORS NOTES:
 ===================
 

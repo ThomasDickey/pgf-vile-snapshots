@@ -14,7 +14,20 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.67  1992/05/31 22:11:11  foxharp
+ * Revision 1.71  1992/06/12 22:23:42  foxharp
+ * changes for separate 'comments' r.e. for formatregion
+ *
+ * Revision 1.70  1992/06/08  08:56:05  foxharp
+ * added version no. to usage message
+ *
+ * Revision 1.69  1992/06/04  19:44:29  foxharp
+ * added -V for version info
+ *
+ * Revision 1.68  1992/06/01  20:38:12  foxharp
+ * writeall() no longer calls pressreturn() if successful, and
+ * added initialization for "tabinsert" mode
+ *
+ * Revision 1.67  1992/05/31  22:11:11  foxharp
  * paragraph regexp augmented to support reformatting of comments
  *
  * Revision 1.66  1992/05/19  08:55:44  foxharp
@@ -428,8 +441,12 @@ char	*argv[];
 				}
 				break;
 #endif
-			case 'v':	/* -v for View File */
 			case 'V':
+#ifndef DOS
+				printf("vile %s\n", version);
+				exit(0);
+#endif
+			case 'v':	/* -v for View File */
 				set_global_b_val(MDVIEW,TRUE);
 				break;
 
@@ -453,11 +470,12 @@ char	*argv[];
 	fprintf(stderr, "	-d displayname to change the default display\n");
 	fprintf(stderr, "	-r for reverse video\n");
 #endif
-#if NeWS
-	fprintf(stderr, "	-lLINES to set the screen length\n");
+#if ! DOS
+	fprintf(stderr, "	-V for version info\n");
 #endif
 	fprintf(stderr, "	use @filename to run filename as commands\n");
 	fprintf(stderr, "	 (this will suppress .vilerc)\n");
+	fprintf(stderr, "	This is vile %s\n",version);
 				exit(1);
 			}
 
@@ -763,6 +781,7 @@ global_val_init()
 	set_global_b_val(MDAIND,FALSE); /* auto-indent */
 	set_global_b_val(MDSHOWMAT,FALSE);	/* show-match */
 	set_global_b_val(MDSHOWMODE,TRUE);	/* show-mode */
+	set_global_b_val(MDTABINSERT,TRUE);	/* allow tab insertion */
 	set_global_b_val(VAL_TAB, 8);	/* tab stop */
 	set_global_b_val(VAL_SWIDTH, 8); /* shiftwidth */
 	set_global_b_val(VAL_TAGLEN, 0);	/* significant tag length */
@@ -782,7 +801,14 @@ global_val_init()
 	set_global_b_val_rexp(VAL_PARAGRAPHS, rp);
 	rp->pat = 
 		strmalloc("^\\.[ILPQ]P\\s\\|^\\.P\\s\\|^\\.LI\\s\\|\
-^\\.[plinb]p\\s\\|^\\.\\?\\s$\\|^\\s/\\?[#*]\\+/\\?\\s$");
+^\\.[plinb]p\\s\\|^\\.\\?\\s$");
+	rp->reg = regcomp(rp->pat, TRUE);
+
+	/* where do comments start and end, for formatting them */
+	rp = (struct regexval *)malloc(sizeof (struct regexval));
+	set_global_b_val_rexp(VAL_COMMENTS, rp);
+	rp->pat = 
+		strmalloc("^\\s/\\?[#*>]\\+/\\?\\s$");
 	rp->reg = regcomp(rp->pat, TRUE);
 
 	/* where do sections start? */
@@ -932,6 +958,7 @@ int f,n;
 	register BUFFER *bp;	/* scanning pointer to buffers */
 	register BUFFER *oldbp; /* original current buffer */
 	register int status = TRUE;
+	int count = 0;
 
 	oldbp = curbp;				/* save in case we fail */
 
@@ -943,15 +970,20 @@ int f,n;
 			mlforce("\n");
 			if ((status = filesave(f, n)) != TRUE)
 				break;
+			count++;
 			mlforce("\n");
 		}
 		bp = bp->b_bufp;	/* on to the next buffer */
 	}
 	make_current(oldbp);
 	mlforce("\n");
-	if (status != TRUE || f == FALSE)
+	if (status != TRUE) {
 		pressreturn();
-	sgarbf = TRUE;
+		sgarbf = TRUE;
+	} else {
+		sgarbf = TRUE;
+		mlwrite("[Wrote %d buffer%c]",count,(count==1)?' ':'s');
+	}
 	return status;
 }
 

@@ -4,7 +4,13 @@
  * do any sentence mode commands, they are likely to be put in this file. 
  *
  * $Log: word.c,v $
- * Revision 1.18  1992/05/31 22:11:11  foxharp
+ * Revision 1.20  1992/06/12 22:23:42  foxharp
+ * changes for separate 'comments' r.e. for formatregion
+ *
+ * Revision 1.19  1992/06/03  08:40:22  foxharp
+ * initialize comment_char in formatregion, to suppress gcc warning
+ *
+ * Revision 1.18  1992/05/31  22:11:11  foxharp
  * added C and shell comment reformatting
  *
  * Revision 1.17  1992/05/19  08:55:44  foxharp
@@ -355,14 +361,14 @@ formatregion()
 	register int finished;		/* Are we at the End-Of-Paragraph? */
 	register int firstflag;		/* first word? (needs no space)	*/
 	register int is_comment;	/* doing a comment block?	*/
-	register int comment_char;	/* # or *, for shell or C	*/
+	register int comment_char = -1;	/* # or *, for shell or C	*/
 	register int at_nl = TRUE;	/* just saw a newline?		*/
 	register LINE *pastline;	/* pointer to line just past EOP */
 	register int sentence;		/* was the last char a period?	*/
 	char wbuf[NSTRING];		/* buffer for current word	*/
 	int secondindent;
 	REGION region;
-	regexp *exp;
+	regexp *expP, *expC;
 	int s;
 	
 	if (!sameline(MK, DOT)) {
@@ -374,10 +380,12 @@ formatregion()
 	if (pastline != curbp->b_line.l)
 		pastline = lforw(pastline);
 
-	exp = b_val_rexp(curbp,VAL_PARAGRAPHS)->reg;
+	expP = b_val_rexp(curbp,VAL_PARAGRAPHS)->reg;
+	expC = b_val_rexp(curbp,VAL_COMMENTS)->reg;
  	finished = FALSE;
  	while (finished != TRUE) {  /* i.e. is FALSE or SORTOFTRUE */
-		while (lregexec(exp, DOT.l, 0, llength(DOT.l)) ) {
+		while (lregexec(expP, DOT.l, 0, llength(DOT.l)) ||
+			lregexec(expC, DOT.l, 0, llength(DOT.l)) ) {
 			DOT.l = lforw(DOT.l);
 			if (DOT.l == pastline) {
 				setmark();
@@ -425,8 +433,9 @@ formatregion()
 				DOT.l = lforw(DOT.l);
 				if (DOT.l == pastline) {
 					finished = TRUE;
-				} else if (lregexec(exp, DOT.l,
-					0, llength(DOT.l))) {
+				} else if (
+				lregexec(expP, DOT.l, 0, llength(DOT.l)) ||
+				lregexec(expC, DOT.l, 0, llength(DOT.l))) {
 					/* we're at a section break */
 					finished = SORTOFTRUE;
 				}
@@ -435,7 +444,7 @@ formatregion()
 			} else {
 				c = char_at(DOT);
 				if (at_nl && ( isspace(c) ||
-					is_comment && c == comment_char))
+					(is_comment && c == comment_char)))
 					c = ' ';
 				else
 					at_nl = FALSE;

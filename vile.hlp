@@ -382,6 +382,15 @@ Text manipulation command:
 		of the deleted word, whereas "^X-p" results in the word
 		being inserted on a line by itself.
 
+	R	vi's overwrite mode is supported.  Note that the combination
+		of overwrite mode and the (ANSI) arrow keys can be used to
+		give a "picture drawing" mode of operation: anything you
+		type goes into the buffer without moving adjacent text, and
+		you can move around using the arrow keys without leaving
+		overwrite mode.  Hint: start with a buffer full of lines
+		that consist entirely of blanks (as opposed to blank
+		lines).
+
 	Searching
 	---------
 	^X-/	Does a forward search for the "word" located under the
@@ -502,6 +511,13 @@ Editor modes
 	c-tabstop Will prompt for a new value for spacing of tabstops for
 		use if a file is in cmode. (B)
 
+	comments A regular expression defining commented paragraph
+		delimiters.  This is used in addition to the "paragraphs"
+		expression (see below) when reformatting a region.  The net
+		effect is that paragraphs inside of comments are preserved
+		when reformatting, but are not reachable with the '}' and
+		'{' motions.  (B)
+
 	dos	When writing the buffer, terminate lines with CR/LF pairs,
                 rather than the usual single LF.  On input, if the global
 		DOS mode is set, then incoming CR/LF pairs are taken as
@@ -541,6 +557,15 @@ Editor modes
 		which allow display of a section of code normally off the
 		screen to the right.  Also affected by the ^X-^R and ^X-^L
 		commands.  (W)
+
+	tabinsert (ti) Allow the physical insertion of tab characters into
+		the buffer.  If "notabinsert", and an attempt is made to
+		insert a tab character by explicitly typing it or by using
+		shiftwidth or the line shifting commands, then the
+		appropriate number of space characters will be inserted
+		instead.  Use '^V^I' to insert a real tab, and remember
+                that pre-existing tabs will not be affected.  Use '^A-SP'
+                to eliminate tabs from a region of text. (B)
 
 	tabstop (ts) Will prompt for a new value for spacing of normal
 		tabstops. (B)

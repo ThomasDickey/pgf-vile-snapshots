@@ -4,7 +4,13 @@
  * All operating systems.
  *
  * $Log: termio.c,v $
- * Revision 1.37  1992/05/27 19:16:22  foxharp
+ * Revision 1.39  1992/06/14 11:33:54  foxharp
+ * fcntl hack for AIX
+ *
+ * Revision 1.38  1992/06/11  09:44:10  foxharp
+ * try to avoid the fcntl() bug with better ifdefing
+ *
+ * Revision 1.37  1992/05/27  19:16:22  foxharp
  * took out extra call to setbuffer()
  *
  * Revision 1.36  1992/05/25  21:34:29  foxharp
@@ -172,24 +178,23 @@ extern int errno;
 # endif
 #endif
 
-#ifdef sun
-#undef USE_FCNTL 	/* I have trouble with this on my sun under xterm --
-				the screen doesn't always refresh correctly,
-				as if the fcntl is interfering with the
-				output drain */
-#define USE_FIONREAD 	1
-#include <sys/filio.h>		/* to get at FIONREAD */
+#if BERK
+# include "ioctl.h"
 #endif
 
-#if AUX2	/* same problem as above */
-#undef USE_FCNTL
-#define USE_FIONREAD 	1
-#include <sys/ioctl.h>		/* to get at FIONREAD */
-#endif
-
-#if X11
+#if X11	/* don't use either one */
 # undef USE_FCNTL
 # undef USE_FIONREAD
+#elif defined(FIONREAD) || defined(sun) || AUX2 || AIX
+ /* there seems to be a bug in someone's implementation of fcntl -- it
+  * causes output to be flushed if you change to ndelay input while output
+  * is pending.  for these systems, we use FIONREAD instead, if possible. 
+  * In fact, if try and use FIONREAD in any case if present.  If you have
+  * the problem with fcntl, you'll notice that the screen doesn't always
+  * refresh correctly, as if the fcntl is interfering with the output drain
+  */
+# undef USE_FCNTL
+# define USE_FIONREAD 	1
 #endif
 
 #if USE_FCNTL

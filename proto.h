@@ -5,7 +5,10 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.6  1992/05/29 08:36:53  foxharp
+ * Revision 1.7  1992/06/04 19:42:37  foxharp
+ * use #ifdef __STDC__ in favor of #if
+ *
+ * Revision 1.6  1992/05/29  08:36:53  foxharp
  * added new ..._fence routines
  *
  * Revision 1.5  1992/05/25  21:28:37  foxharp
@@ -27,7 +30,7 @@
  *
  */
 
-#if __STDC__
+#ifdef __STDC__
 # define P(a) a
 #else
 # define P(a) ()
