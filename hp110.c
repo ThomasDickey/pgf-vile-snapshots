@@ -1,7 +1,7 @@
 /*
  *	HP110:	Hewlett Packard 110 Screen Driver
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/hp110.c,v 1.9 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/hp110.c,v 1.10 1994/09/13 17:15:48 pgf Exp $
  *
  */
 #error This module is not actively maintained as part of vile.
@@ -51,8 +51,8 @@ int	cbcolor = -1;		/* current background color */
  * "termio" code.
  */
 TERM	term	= {
-	NROW-1,
-	NROW-1,
+	NROW,
+	NROW,
 	NCOL,
 	NCOL,
 	MARGIN,

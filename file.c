@@ -5,7 +5,7 @@
  *	reading and writing of the disk are in "fileio.c".
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/file.c,v 1.131 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/file.c,v 1.134 1994/08/08 16:12:29 pgf Exp $
  *
  */
 
@@ -21,7 +21,7 @@ static	int	getfile2 P(( char *, int ));
 #if DOSFILES
 static	void	guess_dosmode P(( BUFFER * ));
 /* give DOS the benefit of the doubt on ambiguous files */
-# if MSDOS || WIN31
+# if CRLF_LINES
 #  define MORETHAN >=
 # else
 #  define MORETHAN >
@@ -102,7 +102,11 @@ long	*the_time;
 	*the_time = 0;
 	if (!isInternalName(bp->b_fname)) {
 		if (stat(bp->b_fname, &statbuf) >= 0) {
+#if VMS
+			*the_time = statbuf.st_ctime; /* e.g., creation-time */
+#else
 			*the_time = statbuf.st_mtime;
+#endif
 			return TRUE;
 		}
 	}
@@ -210,8 +214,7 @@ int
 no_such_file(fname)
 char *	fname;
 {
-	mlforce("[No such file \"%s\"]", fname);
-	TTbeep();
+	mlwarn("[No such file \"%s\"]", fname);
 	return FALSE;
 }
 
@@ -241,6 +244,7 @@ BUFFER	*bp;
 {
 	char	temp[NFILEN];
 	ch_fname(bp, fgetname(ffp, temp));
+	markWFMODE(bp);
 	return bp->b_fname;
 }
 #endif
@@ -457,8 +461,7 @@ int lockfl;		/* check the file for locks? */
 	        }
 		/* okay, we've got a unique name -- create it */
 		if (bp==NULL && (bp=bfind(bname, 0))==NULL) {
-			mlforce("[Cannot create buffer]");
-			TTbeep();
+			mlwarn("[Cannot create buffer]");
 	                return FALSE;
 	        }
 		/* switch and read it in. */
@@ -496,24 +499,22 @@ static void
 guess_dosmode(bp)
 BUFFER *bp;
 {
-	if (b_val(bp, MDDOS)) { /* should we check for dos files? */
-		int	doslines = 0,
-			unixlines = 0;
-		register LINE *lp;
+	int	doslines = 0,
+		unixlines = 0;
+	register LINE *lp;
 
-		make_local_b_val(bp, MDDOS);	/* keep it local, if not */
-		for_each_line(lp,bp) {
-			if (llength(lp) > 0
-			 && lgetc(lp, llength(lp)-1) == '\r') {
-				llength(lp)--;
-				doslines++;
-			} else {
-				unixlines++;
-			}
+	make_local_b_val(bp, MDDOS);	/* keep it local, if not */
+	for_each_line(lp,bp) {
+		if (llength(lp) > 0
+		 && lgetc(lp, llength(lp)-1) == '\r') {
+			llength(lp)--;
+			doslines++;
+		} else {
+			unixlines++;
 		}
-		set_b_val(bp, MDDOS, doslines MORETHAN unixlines);
-		bp->b_bytecount -= doslines;
 	}
+	set_b_val(bp, MDDOS, doslines MORETHAN unixlines);
+	bp->b_bytecount -= doslines;
 }
 
 /*
@@ -526,9 +527,12 @@ set_dosmode(f,n)
 int	f,n;
 {
 	make_local_b_val(curbp, MDDOS);
-	set_b_val(curbp, MDDOS, !f);
+
 	guess_dosmode(curbp);
+
+	/* force dos mode on the buffer, based on the user argument */
 	set_b_val(curbp, MDDOS, !f);
+
 	markWFMODE(curbp);
 	return TRUE;
 }
@@ -572,7 +576,12 @@ int	mflg;		/* print messages? */
 	ch_fname(bp,fname);
 #if DOSFILES
 	make_local_b_val(bp,MDDOS);
-	set_b_val(bp, MDDOS, CRLF_LINES && global_b_val(MDDOS) );
+	/* assume that if our OS wants it, that the buffer will have CRLF
+	 * lines.  this may change when the file is read, based on actual
+	 * line counts, below.  otherwise, if there's an error, or the
+	 * file doesn't exist, we will keep this default.
+	 */
+	set_b_val(bp, MDDOS, CRLF_LINES);
 #endif
 	make_local_b_val(bp,MDNEWLINE);
 	set_b_val(bp, MDNEWLINE, TRUE);		/* assume we've got it */
@@ -587,9 +596,6 @@ int	mflg;		/* print messages? */
         } else if (s == FIOFNF) {		/* File not found.      */
                 if (mflg)
 			mlwrite("[New file]");
-#if DOSFILES
-		set_b_val(bp, MDDOS, CRLF_LINES && global_b_val(MDDOS));
-#endif
         } else {
 
         	if (mflg)
@@ -694,8 +700,7 @@ int *nlinep;
 	B_COUNT len, nbytes;
 
 	if ((len = ffsize()) < 0) {
-	    	mlforce("[Can't size file]");
-		TTbeep();
+	    	mlwarn("[Can't size file]");
 		return FIOERR;
 	}
 
@@ -837,7 +842,8 @@ int *nlinep;
 	if (incomplete)
 		return FIOMEM;
 #if DOSFILES
-	guess_dosmode(bp);
+	if (global_b_val(MDDOS))
+		guess_dosmode(bp);
 #endif
 	return b_val(bp, MDNEWLINE) ? FIOSUC : FIOFUN;
 }
@@ -1160,8 +1166,7 @@ int f,n;
         register int    s;
 
         if (curbp->b_fname[0] == EOS) {		/* Must have a name.    */
-                mlforce("[No file name]");
-		TTbeep();
+                mlwarn("[No file name]");
                 return FALSE;
         }
         if ((s=writeout(curbp->b_fname,curbp,TRUE)) == TRUE)
@@ -1250,8 +1255,7 @@ BUFFER	*bp;
 			  && (same_ptr(rp->r_end.l, buf_head(bp)));
 
 	if (is_internalname(fn)) {
-		mlforce("[No filename]");
-		TTbeep();
+		mlwarn("[No filename]");
 		return FALSE;
 	}
 
@@ -1276,8 +1280,7 @@ BUFFER	*bp;
 
 	fn = lengthen_path(strcpy(fname, fn));
 	if (same_fname(fn, bp, FALSE) && b_val(bp,MDVIEW)) {
-		mlforce("[Can't write-back from view mode]");
-		TTbeep();
+		mlwarn("[Can't write-back from view mode]");
 		return FALSE;
 	}
 

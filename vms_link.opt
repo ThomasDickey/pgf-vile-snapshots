@@ -1,5 +1,5 @@
 ! Link with sharable C-runtime library
-! $Header: /usr/build/VCS/pgf-vile/RCS/vms_link.opt,v 1.10 1994/07/11 22:56:20 pgf Exp $
+! $Header: /usr/build/VCS/pgf-vile/RCS/vms_link.opt,v 1.12 1994/08/08 16:12:29 pgf Exp $
 !
 ! There are too many object-files to list on the command-line.
 basic.obj
@@ -25,6 +25,7 @@ isearch.obj
 line.obj
 map.obj
 modes.obj
+msgs.obj
 npopen.obj
 oneliner.obj
 opers.obj
@@ -51,7 +52,6 @@ wordmov.obj
 ! Linking against a sharable library makes the .EXE-file smaller.
 sys$library:vaxcrtl.exe/share
 !
-! Link against DEC-Windows X-libraries in case we are building XVILE
-sys$library:decw$xlibshr.exe/share
-sys$library:decw$xtshr.exe/share
-sys$library:decw$xmlibshr.exe/share
+! Uncomment these lines if building XVILE:
+!sys$library:decw$xlibshr.exe/share
+!sys$library:decw$xtshr.exe/share

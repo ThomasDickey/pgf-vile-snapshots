@@ -2,7 +2,7 @@
  * The routines in this file provide support for the Data General Model 10
  * Microcomputer.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/dg10.c,v 1.8 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/dg10.c,v 1.9 1994/09/13 17:15:48 pgf Exp $
  *
  */
 #error This module is not actively maintained as part of vile.
@@ -55,8 +55,8 @@ int	ctrans[] = {		/* emacs -> DG10 color translation table */
  * "termio" code.
  */
 TERM	term	= {
-	NROW-1,
-	NROW-1,
+	NROW,
+	NROW,
 	NCOL,
 	NCOL,
 	MARGIN,

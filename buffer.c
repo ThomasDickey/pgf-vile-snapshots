@@ -5,7 +5,7 @@
  * keys. Like everyone else, they set hints
  * for the display system.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/buffer.c,v 1.92 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/buffer.c,v 1.97 1994/08/29 18:20:48 pgf Exp $
  *
  */
 
@@ -18,7 +18,7 @@
 static	BUFFER *find_BufferList P(( void ));
 #if	OPT_UPBUFF
 static	int	show_BufferList P(( BUFFER * ));
-#define	update_on_chg(bp) (!b_is_invisible(bp) || show_all)
+#define	update_on_chg(bp) (!b_is_temporary(bp) || show_all)
 #endif
 static	BUFFER *find_bp P(( BUFFER * ));
 static	int	countBuffers P(( void ));
@@ -29,7 +29,6 @@ static	BUFFER *find_b_file P(( char * ));
 static	BUFFER *find_b_hist P(( int ));
 static	BUFFER *find_b_number P(( char * ));
 static	BUFFER *find_any_buffer P(( char * ));
-static	int	zotwp P(( BUFFER * ));
 static	void	MarkDeleted P(( BUFFER * ));
 static	void	MarkUnused P(( BUFFER * ));
 static	void	FreeBuffer P(( BUFFER * ));
@@ -207,21 +206,35 @@ BUFFER *find_any_buffer(name)
 /*
  * Delete all instances of window pointer for a given buffer pointer
  */
-static
 int	zotwp(bp)
 	BUFFER *bp;
 {
 	register WINDOW *wp;
+	register BUFFER *nbp;
 	WINDOW	dummy;
 	int s = FALSE;
 
+	/*
+	 * Locate buffer to switch to after deleting windows.  It can't be
+	 * the same as the buffer which is being deleted and if it's an
+	 * invisible or scratch buffer, it must have been already visible.
+	 */
+	for_each_buffer(nbp) {
+		if (nbp != bp && (!b_is_temporary(nbp) || nbp->b_nwnd != 0))
+			break;
+	}
+
+	/* Delete window instances...*/
 	for_each_window(wp) {
-		if (wp->w_bufp == bp) {
+		if (wp->w_bufp == bp && wheadp->w_wndp != NULL) {
 			dummy.w_wndp = wp->w_wndp;
 			s = delwp(wp);
 			wp = &dummy;
 		}
 	}
+	if (nbp != NULL)
+		s = swbuffer(nbp);
+
 	return s;
 }
 
@@ -420,8 +433,7 @@ int f,n;
 
 	if (c >= 0) {
 		if ((bufn = hist_lookup(c)) == NULL) {
-			TTbeep();
-			mlforce("[No such buffer.]");
+			mlwarn("[No such buffer.]");
 			return FALSE;
 		}
 		/* first assume its a buffer name, then a file name */
@@ -429,8 +441,7 @@ int f,n;
 			return getfile(bufn,TRUE);
 
 	} else if (bp == 0) {
-		TTbeep();
-		mlforce("[No alternate buffer]");
+		mlwarn("[No alternate buffer]");
 		return FALSE;
 	}
 
@@ -569,8 +580,7 @@ int f,n;
 {
 	register BUFFER *bp = find_alt();
 	if (bp == 0) {
-		TTbeep();
-		mlforce("[No alternate filename to substitute for #]");
+		mlwarn("[No alternate filename to substitute for #]");
 		return FALSE;
 	} else {
 		return swbuffer(bp);
@@ -716,11 +726,16 @@ register BUFFER *bp;
 
 	if (curbp) {
 		/* if we'll have to take over this window, and it's the last */
-		if (bp->b_nwnd == 0 && --(curbp->b_nwnd) == 0) {
+		if (bp->b_nwnd == 0 && curbp->b_nwnd > 0 &&
+					--(curbp->b_nwnd) == 0) {
 			undispbuff(curbp,curwp);
 		}
 	}
 	make_current(bp);	/* sets curbp */
+
+	bp = curbp;  /* if running the bufhook caused an error, we may
+				be in a different buffer than we thought
+				we were going to */
 
 	/* get it already on the screen if possible */
 	if (bp->b_nwnd > 0)  { /* then it's on the screen somewhere */
@@ -736,14 +751,14 @@ register BUFFER *bp;
 		if (bp != find_BufferList())
 			updatelistbuffers();
 #endif
-#if PROC
-	{ 
-	    if (!bufhooking && *bufhook) {
-		    bufhooking = TRUE;
-		    run_procedure(bufhook);
-		    bufhooking = FALSE;
-	    }
-	}
+#if BEFORE && PROC
+		{ 
+		    if (!bufhooking && *bufhook) {
+			    bufhooking = TRUE;
+			    run_procedure(bufhook);
+			    bufhooking = FALSE;
+		    }
+		}
 #endif
 		return TRUE;
 	} else if (curwp == 0) {
@@ -751,6 +766,7 @@ register BUFFER *bp;
 	}
 
 	/* oh well, suck it into this window */
+
 	curwp->w_bufp  = bp;
 	curwp->w_flag |= WFMODE|WFHARD;		/* Quite nasty.		*/
 	if (bp->b_nwnd++ == 0) {		/* First use.		*/
@@ -769,7 +785,7 @@ register BUFFER *bp;
 		(void)check_modtime( bp, bp->b_fname );
 #endif
 	updatelistbuffers();
-#if PROC
+#if BEFORE && PROC
 	{ 
 	    if (!bufhooking && *bufhook) {
 		    bufhooking = TRUE;
@@ -781,6 +797,22 @@ register BUFFER *bp;
 	return s;
 }
 
+#if NEEDED
+/* check to ensure any buffer that thinks it's displayed _is_ displayed */
+void
+buf_win_sanity()
+{
+	register BUFFER *bp;
+	for_each_buffer(bp) {
+	    if (bp->b_nwnd > 0)  { /* then it's on the screen somewhere */
+		register WINDOW *wp = bp2any_wp(bp);
+		if (!wp) {
+		    dbgwrite("BUG: swbuffer 1: wp is NULL");
+		}
+	    }
+	}
+}
+#endif
 
 void
 undispbuff(bp,wp)
@@ -1175,10 +1207,12 @@ void	makebufflist(iflag,dummy)
 
 	/* output the list of buffers */
 	for_each_buffer(bp) {
-		/* skip invisible buffers and ourself if iflag is false */
-		if ((b_is_temporary(bp)) && !show_all) {
+		/* skip those buffers which don't get updated when changed */
+#if	OPT_UPBUFF
+		if (!update_on_chg(bp)) {
 			continue;
 		}
+#endif
 
 		/* output status flag (e.g., has the file been read in?) */
 		if (b_is_scratch(bp))

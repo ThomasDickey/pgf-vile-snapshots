@@ -1,10 +1,9 @@
 #!/bin/sh
-# From configure.in Revision
+# From configure.in Revision: 1.3
 
-# Use "configure -with-screen" to override the default configuration, which is
-# termcap-based on unix systems.
+### Use "configure -with-screen" to override the default configuration, which is
+### termcap-based on unix systems.
 
-# $Header: /usr/build/VCS/pgf-vile/RCS/configure,v 1.3 1994/07/11 22:56:20 pgf Exp $
 
 #!/bin/sh
 # Guess values for system-dependent variables and create Makefiles.
@@ -495,18 +494,28 @@ test -z "$INSTALL_DATA" && INSTALL_DATA='${INSTALL} -m 644'
 test -n "$verbose" && echo "	setting INSTALL_DATA to $INSTALL_DATA"
 
 
-###	use option -with-warnings to turn on all gcc warnings
+###	use option --with-warnings to turn on all gcc warnings
+# check whether --with-warnings or --without-warnings was given.
+withval="$with_warnings"
+if test -n "$withval"; then
+  with_warnings=$withval
+fi
+
 if test -n "$GCC"
 then
 	if test -z "$CFLAGS"
 	then
-CFLAGS="-O -Wall"
+CFLAGS="-O"
 	fi
 	if test -n "$with_warnings"
 	then
-CFLAGS="$CFLAGS -Wshadow -Wconversion -Wstrict-prototypes -Wmissing-prototypes"
+CFLAGS="$CFLAGS -Wall -Wshadow -Wconversion -Wstrict-prototypes -Wmissing-prototypes"
 	fi
 fi
+
+# X11 checks will sometimes add to CFLAGS.  We want the state of CFLAGS
+# prior to these checks
+saved_CFLAGS=$CFLAGS
 
 ###	checks for UNIX variants that set C preprocessor variables
 test -n "$silent" || echo "checking for AIX"
@@ -850,8 +859,8 @@ if test -n "$XENIX"; then
 fi
 
 for ac_hdr in unistd.h stdlib.h stddef.h string.h memory.h fcntl.h \
-                termios.h termio.h sgtty.h \
-		ioctl.h select.h signal.h
+                poll.h termios.h termio.h sgtty.h \
+		ioctl.h select.h setjmp.h signal.h
 do
 ac_tr_hdr=HAVE_`echo $ac_hdr | tr '[a-z]./' '[A-Z]__'`
 test -n "$silent" || echo "checking for ${ac_hdr}"
@@ -880,7 +889,7 @@ done
 
 ###	checks for <sys/xxx> header files (separate, to avoid bug in autoconf)
 for ac_hdr in sys/stat.h sys/filio.h sys/ioctl.h \
-		sys/wait.h sys/time.h sys/select.h
+		sys/resource.h sys/wait.h sys/time.h sys/select.h
 do
 ac_tr_hdr=HAVE_`echo $ac_hdr | tr '[a-z]./' '[A-Z]__'`
 test -n "$silent" || echo "checking for ${ac_hdr}"
@@ -972,14 +981,19 @@ DEFS="$DEFS -DSIGRET=return 0"
  ;;
 esac
 
-test -n "$silent" || echo "checking for size_t in sys/types.h"
-echo '#include "confdefs.h"
-#include <sys/types.h>' > conftest.${ac_ext}
-eval "$ac_cpp conftest.${ac_ext} > conftest.out 2>&1"
-if egrep "size_t" conftest.out >/dev/null 2>&1; then
+test -n "$silent" || echo "checking for size_t in <sys/types.h> or <stdio.h>"
+ cat > conftest.${ac_ext} <<EOF
+#include "confdefs.h"
+
+#include <sys/types.h>
+#include <stdio.h>
+int main() { size_t x; exit (0);}
+
+EOF
+eval $ac_compile
+if test -s conftest && (./conftest; exit) 2>/dev/null; then
   :
 else
-  rm -rf conftest*
   
 {
 test -n "$verbose" && \
@@ -989,8 +1003,7 @@ DEFS="$DEFS -Dsize_t=unsigned"
 }
 
 fi
-rm -f conftest*
-
+rm -fr conftest*
 test -n "$silent" || echo "checking for uid_t in sys/types.h"
 echo '#include "confdefs.h"
 #include <sys/types.h>' > conftest.${ac_ext}
@@ -1012,6 +1025,25 @@ test -n "$verbose" && \
 echo "	defining" gid_t to be "int"
 echo "#define" gid_t "int" >> confdefs.h
 DEFS="$DEFS -Dgid_t=int"
+}
+
+fi
+rm -f conftest*
+
+test -n "$silent" || echo "checking for pid_t in sys/types.h"
+echo '#include "confdefs.h"
+#include <sys/types.h>' > conftest.${ac_ext}
+eval "$ac_cpp conftest.${ac_ext} > conftest.out 2>&1"
+if egrep "pid_t" conftest.out >/dev/null 2>&1; then
+  :
+else
+  rm -rf conftest*
+  
+{
+test -n "$verbose" && \
+echo "	defining" pid_t to be "int"
+echo "#define" pid_t "int" >> confdefs.h
+DEFS="$DEFS -Dpid_t=int"
 }
 
 fi
@@ -1533,7 +1565,7 @@ DEFS="$DEFS -DHAVE_KILLPG=1"
 fi
 rm -fr conftest*
 
-for ac_func in select poll strchr strrchr gethostname \
+for ac_func in sigprocmask setsid select poll strchr strrchr gethostname \
 	getcwd getwd setvbuf access mkdir tcgetattr ttyname
 do
 ac_tr_func=HAVE_`echo $ac_func | tr '[a-z]' '[A-Z]'`
@@ -1911,7 +1943,7 @@ test -n "$verbose" && echo "	extra X libraries: $X_EXTRA_LIBS"
 findstddefs:
 	@echo 'im_std_defines="${STD_DEFINES}"'
 EOF
-			if (xmkmf) >/dev/null 2>/dev/null && test -f makefile; then
+			if (xmkmf) >/dev/null 2>/dev/null && test -f Makefile; then
 				# GNU make sometimes prints "make[1]: Entering...", which
 				# would confuse us.
 				eval `make findstddefs 2>/dev/null | grep -v make`
@@ -2010,7 +2042,7 @@ DEFS="$DEFS -DOL_WIDGETS=1"
 
 		if test -n "$OPENWINHOME"; then
 			X_LIBS="-L${OPENWINHOME}/lib"
-			X_CFLAGS="-I${OPENWINHOME}/include"
+			X_CFLAGS="$X_CFLAGS -I${OPENWINHOME}/include"
 		fi
 		LDFLAGS="$LDFLAGS $X_LIBS"
 		ac_save_LIBS="${LIBS}"
@@ -2310,7 +2342,217 @@ fi
 	;;
 esac
 
-###	checks for missing headers
+###	mandatory checks for missing headers
+for ac_func in \
+getenv \
+getwd \
+malloc \
+realloc \
+rindex \
+strtol \
+
+do
+ac_tr_func=`echo $ac_func | tr '[a-z]' '[A-Z]'`
+test -n "$silent" || echo "checking for missing "${ac_func}" extern"
+cat > conftest.${ac_ext} <<EOF
+#include "confdefs.h"
+
+#include <stdio.h>
+#include <sys/types.h>
+#include <setjmp.h>
+#include <signal.h>
+#include <errno.h>
+#ifdef HAVE_TYPES_H
+#include <types.h>
+#endif
+#ifdef HAVE_LIBC_H
+#include <libc.h>
+#endif
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+#ifdef HAVE_STDARG_H
+#include <stdarg.h>
+#else
+#ifdef HAVE_VARARGS_H
+#include <varargs.h>
+#endif
+#endif
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+#ifdef HAVE_STDLIB_H
+#include <stdlib.h>
+#endif
+#ifdef HAVE_STDDEF_H
+#include <stddef.h>
+#endif
+
+#if STDC_HEADERS || HAVE_STRING_H
+#include <string.h>
+  /* An ANSI string.h and pre-ANSI memory.h might conflict.  */
+#if !STDC_HEADERS && HAVE_MEMORY_H
+#include <memory.h>
+#endif /* not STDC_HEADERS and HAVE_MEMORY_H */
+#else /* not STDC_HEADERS and not HAVE_STRING_H */
+#if HAVE_STRINGS_H
+#include <strings.h>
+  /* memory.h and strings.h conflict on some systems */
+#endif
+#endif /* not STDC_HEADERS and not HAVE_STRING_H */
+
+#ifdef HAVE_FCNTL_H
+#include <fcntl.h>
+#endif
+
+/* unistd.h defines _POSIX_VERSION on POSIX.1 systems.  */
+#if defined(DIRENT) || defined(_POSIX_VERSION)
+#include <dirent.h>
+#else /* not (DIRENT or _POSIX_VERSION) */
+#ifdef SYSNDIR
+#include <sys/ndir.h>
+#endif /* SYSNDIR */
+#ifdef SYSDIR
+#include <sys/dir.h>
+#endif /* SYSDIR */
+#ifdef NDIR
+#include <ndir.h>
+#endif /* NDIR */
+#endif /* not (DIRENT or _POSIX_VERSION) */
+
+#ifdef HAVE_SYS_FILE_H
+#include <sys/file.h>
+#endif
+#ifdef HAVE_STAT_H
+#include <stat.h>
+#endif
+#ifdef HAVE_SYS_STAT_H
+#include <sys/stat.h>
+#endif
+#ifdef HAVE_DLFCN_H
+#include <dlfcn.h>
+#endif
+#ifdef HAVE_SIGINFO_H
+#include <siginfo.h>
+#endif
+
+#ifdef TIME_WITH_SYS_TIME
+#include <sys/time.h>
+#include <time.h>
+#else
+#ifdef HAVE_SYS_TIME_H
+#include <sys/time.h>
+#else
+#include <time.h>
+#endif
+#endif
+
+#ifdef HAVE_SYS_TIMES_H
+#include <sys/times.h>
+#endif
+#ifdef HAVE_UCONTEXT_H
+#include <ucontext.h>
+#endif
+#ifdef HAVE_LIBGEN_H
+#include <libgen.h>
+#else
+#ifdef HAVE_BSD_REGEX_H
+#include <bsd/regex.h>
+#endif
+#endif
+#ifdef HAVE_MATH_H
+#include <math.h>
+#endif
+#ifdef HAVE_SYS_SOCKET_H
+#include <sys/socket.h>
+#endif
+#ifdef HAVE_NETINET_IN_H
+#include <netinet/in.h>
+#endif
+#ifdef HAVE_ARPA_INET_H
+#include <arpa/inet.h>
+#endif
+#ifdef HAVE_NETDB_H
+#include <netdb.h>
+#endif
+#ifdef HAVE_SYS_UN_H
+#include <sys/un.h>
+#endif
+#ifdef HAVE_SYS_PARAM_H
+#include <sys/param.h>
+#endif
+#ifdef HAVE_SYS_WAIT_H
+#include <sys/wait.h>
+#endif
+#ifdef HAVE_SYS_IPC_H
+#include <sys/ipc.h>
+#endif
+#ifdef HAVE_SYS_MSG_H
+#include <sys/msg.h>
+#endif
+#ifdef HAVE_SYS_RESOURCE_H
+#include <sys/resource.h>
+#endif
+#ifdef HAVE_SYS_MMAN_H
+#include <sys/mman.h>
+#endif
+#ifdef HAVE_SELECT_H
+#include <select.h>
+#endif
+#ifdef HAVE_SYS_SELECT_H
+#include <sys/select.h>
+#endif
+
+#if !defined(FIONREAD)
+/* try harder to get it */
+# if HAVE_SYS_FILIO_H
+#  include <sys/filio.h>
+# else /* if you have trouble including ioctl.h, try <sys/ioctl.h> instead */
+#  if HAVE_IOCTL_H
+#   include <ioctl.h>
+#  else
+#   if HAVE_SYS_IOCTL_H
+#    include <sys/ioctl.h>
+#   endif
+#  endif
+# endif
+#endif
+
+#undef ${ac_func}
+struct zowie { int a; double b; struct zowie *c; char d; };
+extern struct zowie *${ac_func}();
+
+int main() { return 0; }
+int t() { int i;
+#if HAVE_LIBXT		/* needed for SunOS 4.0.3 or 4.1 */
+XtToolkitInitialize();
+#endif
+; return 0; }
+EOF
+if eval $ac_compile; then
+  rm -rf conftest*
+  
+{
+test -n "$verbose" && \
+echo "	defining MISSING_EXTERN_${ac_tr_func}"
+echo "#define" MISSING_EXTERN_${ac_tr_func} "1" >> confdefs.h
+DEFS="$DEFS -DMISSING_EXTERN_${ac_tr_func}=1"
+}
+
+
+else
+  rm -rf conftest*
+  
+
+fi
+rm -f conftest*
+
+done
+
+
+###	optional checks for missing headers (enabled with --with-warnings)
+if test -n "$with_warnings"
+then
 for ac_func in \
 _filbuf \
 _flsbuf \
@@ -2334,18 +2576,15 @@ fread \
 free \
 fseek \
 fwrite \
-getenv \
 gethostname \
 getpgrp \
 getpid \
 getuid \
-getwd \
 ioctl \
 isatty \
 kill \
 killpg \
 longjmp \
-malloc \
 memset \
 mkdir \
 open \
@@ -2355,16 +2594,15 @@ printf \
 puts \
 qsort \
 read \
-realloc \
-rindex \
 select \
 setbuf \
 setbuffer \
 setjmp \
+setpgrp \
+setsid \
 setvbuf \
 sleep \
 sscanf \
-strtol \
 system \
 time \
 unlink \
@@ -2569,8 +2807,10 @@ rm -f conftest*
 
 done
 
+fi
 
 ###	output makefile and config.h
+CFLAGS=$saved_CFLAGS
 
 # The preferred way to propogate these variables is regular @ substitutions.
 if test -n "$prefix"; then

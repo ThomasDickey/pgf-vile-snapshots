@@ -5,7 +5,7 @@
  * functions use hints that are left in the windows by the commands.
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/display.c,v 1.142 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/display.c,v 1.152 1994/09/23 04:21:19 pgf Exp $
  *
  */
 
@@ -22,13 +22,14 @@
 #define	MRK_EXTEND_LEFT  '<'
 #define	MRK_EXTEND_RIGHT '>'
 
-VIDEO   **vscreen;                      /* Virtual screen. */
+VIDEO	**vscreen;			/* Virtual screen. */
+VIDEO	**pscreen;			/* Physical screen. */
 #if	MEMMAP
 #define PSCREEN vscreen
 #else
 #define PSCREEN pscreen
-VIDEO   **pscreen;                      /* Physical screen. */
 #endif
+int *lmap;
 
 #if IBMPC
 #define PScreen(n) scread((VIDEO *)0,n)
@@ -366,70 +367,117 @@ WINDOW *wp;
 
 /*
  * Initialize the data structures used by the display code. The edge vectors
- * used to access the screens are set up. The operating system's terminal I/O
- * channel is set up. All the other things get initialized at compile time.
- * The original window has "WFCHG" set, so that it will get completely
- * redrawn on the first call to "update".
+ * used to access the screens are set up.
  */
-void
+int
 vtinit()
 {
     register int i;
     register VIDEO *vp;
 
-    TTopen();		/* open the screen */
-    TTkopen();		/* open the keyboard */
-    TTrev(FALSE);
-    vscreen = typeallocn(VIDEO *,term.t_mrow);
-    if (vscreen == NULL)
-	ExitProgram(BADEXIT);
+    /* allocate new display memory */
+    if (vtalloc() == FALSE) /* if we fail, only serious if not a realloc */
+    	return (vscreen != NULL);
 
-
-#if	! MEMMAP
-    pscreen = typeallocn(VIDEO *,term.t_mrow);
-
-    if (pscreen == NULL)
-	ExitProgram(BADEXIT);
-#endif
 
     for (i = 0; i < term.t_mrow; ++i) {
-    	/* struct VIDEO already has 4 of the bytes */
-        vp = typeallocplus(VIDEO, term.t_mcol - 4);
 
-        if (vp == NULL)
-	    ExitProgram(BADEXIT);
-
-
+        vp = vscreen[i];
 	vp->v_flag = 0;
-#if	COLOR
+#if COLOR
 	vp->v_rfcolor = gfcolor;
 	vp->v_rbcolor = gbcolor;
 #endif
-        vscreen[i] = vp;
+    }
+#if OPT_WORKING
+    imworking(0);
+#endif
+    return TRUE;
+}
+
+int
+vtalloc()
+{
+    register int i;
+    register VIDEO *vp;
+    static vrows, vcols;
+
+    if (term.t_mrow > vrows) {
+    	GROW(vscreen, VIDEO *, vrows, term.t_mrow);
+#if	! MEMMAP
+    	GROW(pscreen, VIDEO *, vrows, term.t_mrow);
+#endif
+    	GROW(lmap, int, vrows, term.t_mrow);
+	vrows = term.t_mrow;
+    }
+
+    if (term.t_mcol > vcols) {
+	    for (i = 0; i < term.t_mrow; ++i) {
+		/* struct VIDEO already has 4 of the bytes */
+		vp = typeallocplus(VIDEO, term.t_mcol - 4);
+		if (vp == NULL)
+			return FALSE;
+
+		if (vscreen[i])
+			FreeIfNeeded (vscreen[i]->v_attrs);
+		FreeIfNeeded(vscreen[i]);
+		vp->v_attrs = NULL;
+		vscreen[i] = vp;
 #if OPT_VIDEO_ATTRS
-	if ((vscreen[i]->v_attrs = typeallocn(VIDEO_ATTR, term.t_mcol)) == NULL)
-	    ExitProgram(BADEXIT);
+		GROW(vscreen[i]->v_attrs, VIDEO_ATTR, vcols, term.t_mcol);
 #endif
 #if	! MEMMAP
-    	/* struct VIDEO already has 4 of the bytes */
-        vp = typeallocplus(VIDEO, term.t_mcol - 4);
-
-        if (vp == NULL)
-	    ExitProgram(BADEXIT);
-
-	/* set everything to 0's unless we want nonzero */
-	(void)memset((char *)vp, 0, sizeof(VIDEO) + term.t_mcol - 4);
-
-        pscreen[i] = vp;
+		/* struct VIDEO already has 4 of the bytes */
+		vp = typeallocplus(VIDEO, term.t_mcol - 4);
+		if (vp == NULL)
+			return FALSE;
+		if (pscreen[i])
+			FreeIfNeeded (pscreen[i]->v_attrs);
+		FreeIfNeeded(pscreen[i]);
+		(void)memset((char *)vp, 0, sizeof(VIDEO) + term.t_mcol - 4);
+		pscreen[i] = vp;
 #if OPT_VIDEO_ATTRS
-	if ((pscreen[i]->v_attrs = typeallocn(VIDEO_ATTR, term.t_mcol)) == NULL)
-	    ExitProgram(BADEXIT);
+		GROW(pscreen[i]->v_attrs, VIDEO_ATTR, vcols, term.t_mcol);
 #endif
 #endif	/* !MEMMAP */
-        }
-#if OPT_WORKING
-	imworking(0);
+	    }
+    }
+
+    return TRUE;
+}
+
+/* free all video memory, in anticipation of a (growing) resize */
+void
+vtfree()
+{
+	register int i;
+
+	if (vscreen) {
+		for (i = 0; i < term.t_mrow; ++i) {
+			if (vscreen[i]) {
+#if 	OPT_VIDEO_ATTRS
+				FreeIfNeeded ((char *)vscreen[i]->v_attrs);
 #endif
+				free ((char *)vscreen[i]);
+			}
+		}
+		free ((char *)vscreen);
+	}
+
+#if	! MEMMAP
+	if (pscreen) {
+		for (i = 0; i < term.t_mrow; ++i) {
+			if (pscreen[i]) {
+#if 	OPT_VIDEO_ATTRS
+				FreeIfNeeded ((char *)pscreen[i]->v_attrs);
+#endif
+				free ((char *)pscreen[i]);
+			}
+		}
+		free ((char *)pscreen);
+	}
+#endif
+	FreeIfNeeded ((char *)lmap);
 }
 
 /*
@@ -1257,7 +1305,7 @@ updgar()
 #endif
 	register int i;
 
-	for (i = 0; i < term.t_nrow; ++i) {
+	for (i = 0; i < term.t_nrow-1; ++i) {
 		vscreen[i]->v_flag |= VFCHG;
 #if	REVSTA
 		vscreen[i]->v_flag &= ~VFREV;
@@ -1281,13 +1329,13 @@ updgar()
 	movecursor(0, 0);		 /* Erase the screen. */
 	TTeeop();
 #else
-	movecursor(term.t_nrow, 0);
+	bottomleft();
 	TTeeol();
 #endif
 	sgarbf = FALSE;			 /* Erase-page clears */
 	mpresf = 0;			 /* the message area. */
 	if (mlsave[0]) {
-		mlforce(mlsave);
+		mlforce("%s", mlsave);
 	}
 #if	COLOR
 	else
@@ -1311,10 +1359,10 @@ int force;	/* forced update flag */
 	scrflags = 0;
 #endif
 
-	for (i = 0; i < term.t_nrow; ++i) {
+	for (i = 0; i < term.t_nrow-1; ++i) {
 		/* for each line that needs to be updated*/
 		if ((vscreen[i]->v_flag & (VFCHG|VFCOL)) != 0) {
-#if	TYPEAH
+#if	TYPEAH && !X11
 			if (force == FALSE && typahead())
 				return;
 #endif
@@ -1328,7 +1376,6 @@ static void
 updattrs(wp)
     WINDOW *wp;
 {
-    int lmap[MAXROWS];
     AREGION *ap;
     int i, j;
     
@@ -1603,7 +1650,7 @@ int	on;		/* start highlighting */
 		}
 	}
 #endif
-	if (row < term.t_nrow && (colfrom >= 0 || colto <= term.t_ncol)) {
+	if (row < term.t_nrow-1 && (colfrom >= 0 || colto <= term.t_ncol)) {
 		if (colfrom < 0)
 			colfrom = 0;
 		if (colto > term.t_ncol)
@@ -1619,6 +1666,7 @@ int	on;		/* start highlighting */
 		    for (col=colfrom; col<colto; col++)
 			vscreen[row]->v_attrs[col] &= ~VAREV;
 		}
+		vscreen[row]->v_flag |= VFCHG;
 		updateline(row, 0, term.t_ncol);
 #else /* OPT_VIDEO_ATTRS */
 		if (on) {
@@ -1652,7 +1700,7 @@ int inserts;
 	if (!term.t_scroll) /* no way to scroll */
 		return FALSE;
 
-	rows = term.t_nrow ;
+	rows = term.t_nrow -1;
 	cols = term.t_ncol ;
 
 	first = -1 ;
@@ -1749,8 +1797,8 @@ int inserts;
 #define CLEAR_PLINE(a)  do {						\
 			    pscreen[a]->v_flag |= VFCHG;		\
 			    for (j = 0; j < term.t_ncol; j++) {		\
-				pscreen[a]->v_attrs[j] = VADIRTY;	\
 				pscreen[a]->v_text[j] = ' ';		\
+				pscreen[a]->v_text[j] = 0; /* FIXME: color */ \
 			    }						\
 			  } while (0)
 		if (from < to) {
@@ -2203,7 +2251,7 @@ int	colto;		/* first column on screen */
 	    while (attr == VATTRIB(*api) && api < ap1 + (cp5 - cp1))
 		api++;
 #if	REVSTA
-	    TTrev((attr & VAREV));
+	    TTrev((attr & (VAREV | VASEL)));
 #endif
 #if X11
 	    x_putline(row, cp1, api - ap1);
@@ -2404,10 +2452,16 @@ WINDOW *wp;
 
 #ifdef WMDRULER
 	if (w_val(wp,WMDRULER)) {
-		(void)lsprintf(temp, "(%d,%d)",
-			wp->w_ruler_line, wp->w_ruler_col);
-		vtcol = n - strlen(temp);
-		vtputsn(temp, sizeof(temp));
+		if (is_empty_buf(wp->w_bufp))
+		        strcpy(temp, " emp ");
+		else 
+			(void)sprintf(temp, "(%d,%d) %d%% ",
+				wp->w_ruler_line, wp->w_ruler_col,
+				wp->w_ruler_line*100 / line_count(wp->w_bufp));
+		vtcol = n - strlen(temp) - 2;
+		vtputsn(temp,sizeof(temp));
+		vtputc(lchar);
+		vtputc(lchar);
 	} else
 #endif
 	{ /* determine if top line, bottom line, or both are visible */
@@ -2595,6 +2649,12 @@ int row,col;
 	endofDisplay;
 }
 
+void
+bottomleft()
+{
+	movecursor(term.t_nrow-1, 0);
+}
+
 /* Erase the message-line from the current position */
 static void
 erase_remaining_msg (column)
@@ -2617,8 +2677,8 @@ int	column;
 #endif
 		for (i = ttcol; i < limit; i++)
 			TTputc(' ');
-		ttrow = term.t_nrow-1;	/* force the move! */
-		movecursor(term.t_nrow, column);
+		ttrow = term.t_nrow-2;	/* force the move! */
+		movecursor(term.t_nrow-1, column);
 	}
 	TTflush();
 	endofDisplay;
@@ -2635,7 +2695,7 @@ mlerase()
 {
 	beginDisplay;
 	if (mpresf != 0) {
-		movecursor(term.t_nrow, 0);
+		bottomleft();
 		if (discmd != FALSE) {
 #if	COLOR
 			TTforg(gfcolor);
@@ -2659,7 +2719,6 @@ int c;
 		*mlsavep++ = c;
 		*mlsavep = EOS;
 	}
-
 }
 
 /*
@@ -2677,7 +2736,7 @@ va_dcl
 	va_list ap;
 	/* if we are not currently echoing on the command line, abort this */
 	if (global_b_val(MDTERSE) || kbd_replaying(FALSE) || discmd == FALSE) {
-		movecursor(term.t_nrow, 0);
+		bottomleft();
 		return;
 	}
 #if	ANSI_VARARGS
@@ -2727,7 +2786,7 @@ va_dcl
 	va_list ap;
 	int osgarbf = sgarbf;
 	if (discmd == FALSE) {
-		movecursor(term.t_nrow, 0);
+		bottomleft();
 		return;
 	}
 	sgarbf = FALSE;
@@ -2779,42 +2838,65 @@ mlmsg(app)
 va_list *app;	/* ptr to current data field */
 #endif
 {
+	static	int	recur;
 
-	if (sgarbf) {
+	if (recur++) {
+		;
+	} else if (sgarbf) {
 		/* then we'll lose the message on the next update(), so save it now */
 		mlsavep = mlsave;
-		dfoutfn = mlsavec;
+#if	OPT_POPUP_MSGS
+		if (global_g_val(GMDPOPUP_MSGS) || (curwp == 0)) {
+			popup_msgs();
+			msg_putc('\n');
+			dfoutfn = msg_putc;
+		} else
+#endif
+		  dfoutfn = mlsavec;
 #if	ANSI_VARARGS
 		dofmt(fmt,app);
 #else
 		dofmt(app);
 #endif
-		return;
-	}
+	} else {
 
 #if	COLOR
-	/* set up the proper colors for the command line */
-	TTforg(gfcolor);
-	TTbacg(gbcolor);
+		/* set up the proper colors for the command line */
+		TTforg(gfcolor);
+		TTbacg(gbcolor);
 #endif
 
-	beginDisplay;
-	movecursor(term.t_nrow, 0);
+		beginDisplay;
+		bottomleft();
 
-	kbd_expand = -1;
-	dfoutfn = kbd_putc;
+		kbd_expand = -1;
+#if	OPT_POPUP_MSGS
+		if (global_g_val(GMDPOPUP_MSGS)) {
+			popup_msgs();
+			if (mlsave[0] == EOS) {
+				msg_putc('\n');
+				dfoutfn = msg_putc;
+			} else {
+				dfoutfn = kbd_putc;
+			}
+		} else
+#endif
+		  dfoutfn = kbd_putc;
+
 #if	ANSI_VARARGS
-	dofmt(fmt,app);
+		dofmt(fmt,app);
 #else
-	dofmt(app);
+		dofmt(app);
 #endif
-	kbd_expand = 0;
+		kbd_expand = 0;
 
-	/* if we can, erase to the end of screen */
-	erase_remaining_msg(ttcol);
-	mpresf = ttcol;
-	mlsave[0] = EOS;
-	endofDisplay;
+		/* if we can, erase to the end of screen */
+		erase_remaining_msg(ttcol);
+		mpresf = ttcol;
+		mlsave[0] = EOS;
+		endofDisplay;
+	}
+	recur--;
 }
 
 /*
@@ -2832,9 +2914,32 @@ char	*s;
 	else
 		es = "unknown system error";
 
-	mlforce("[Error %s: %s]", s, es);
-	TTbeep();
+	mlwarn("[Error %s: %s]", s, es);
 #endif
+}
+
+/*
+ * Emit a warning message (with alarm)
+ */
+/* VARARGS1 */
+void
+#if	ANSI_VARARGS
+mlwarn(char *fmt, ...)
+#else
+mlwarn(va_alist)
+va_dcl
+#endif
+{
+	va_list ap;
+#if	ANSI_VARARGS
+	va_start(ap,fmt);
+	mlmsg(fmt,&ap);
+#else
+	va_start(ap);
+	mlmsg(&ap);
+#endif
+	va_end(ap);
+	kbd_alarm();
 }
 
 /*
@@ -2938,7 +3043,7 @@ ACTUAL_SIG_DECL
 
 	getscreensize (&w, &h);
 
-	if ((h > 1 && h-1 != term.t_nrow) || (w > 1 && w != term.t_ncol))
+	if ((h > 1 && h != term.t_nrow) || (w > 1 && w != term.t_ncol))
 		newscreensize(h, w);
 
 	(void)signal(SIGWINCH, sizesignal);
@@ -2958,12 +3063,29 @@ int h, w;
 		return;
 	}
 	chg_width = chg_height = 0;
+#if BEFORE
 	if ((h - 1) <= term.t_mrow)
 		if (!newlength(TRUE,h))
 			return;
 	if (w <= term.t_mcol)
 		if (!newwidth(TRUE,w))
 			return;
+#else
+	if ((h > term.t_mrow) || (w > term.t_mcol)) {
+		int or, oc;
+		or = term.t_mrow;
+		oc = term.t_mcol;
+		term.t_mrow = h;
+		term.t_mcol = w;
+		if (!vtinit()) { /* allocation failure */
+			term.t_mrow = or;
+			term.t_mcol = oc;
+			return;
+		}
+	}
+	if (!newlength(TRUE,h) || !newwidth(TRUE,w))
+		return;
+#endif
 
 	(void)update(TRUE);
 }
@@ -2988,12 +3110,20 @@ ACTUAL_SIG_DECL
 	static	int	flip;
 	static	int	skip;
 
-	if (no_working)
+	if (no_working) /* brute force, for debugging */
 		return;
+
+	/* (if GMDWORKING is _not_ set, or MDTERSE is set, we're allowed
+	 * to erase, but not to write.  and if we do erase, we don't
+	 * reschedule the alarm, since setting the mode will call us
+	 * again to start things up)
+	 */
 
 	if (displaying) {	/* look at the semaphore first! */
 		;
-	} else if (!global_b_val(MDTERSE) && !doing_kbd_read) {
+	} else if (!global_b_val(MDTERSE) &&
+			global_g_val(GMDWORKING) &&
+			!doing_kbd_read) {
 		if (skip) {
 			skip = FALSE;
 		} else if (displayed) {
@@ -3002,7 +3132,7 @@ ACTUAL_SIG_DECL
 			int	show_col = LastMsgCol - 10;
 			if (show_col < 0)
 				show_col = 0;
-			movecursor(term.t_nrow, show_col);
+			movecursor(term.t_nrow-1, show_col);
 			if (cur_working != 0
 			 && cur_working != old_working) {
 				char	temp[20];
@@ -3036,15 +3166,17 @@ ACTUAL_SIG_DECL
 			int	save_row = ttrow;
 			int	save_col = ttcol;
 			int	erase_at = -(mpresf+1);
-			if (erase_at < save_col)
+			if (erase_at < save_col && reading_msg_line)
 				erase_at = save_col;
-			movecursor(term.t_nrow, erase_at);
+			movecursor(term.t_nrow-1, erase_at);
 			erase_remaining_msg(erase_at);
 			movecursor(save_row, save_col);
 			TTflush();
 			mpresf = 0;
 		}
 		skip = TRUE;
+		if (global_b_val(MDTERSE) || !global_g_val(GMDWORKING))
+			return;
 	}
 	(void)signal(SIGALRM,imworking);
 	(void)alarm(1);
@@ -3083,7 +3215,7 @@ psc_putchar(c)
 void
 psc_flush()
 {
-    updateline(term.t_nrow, 0, term.t_ncol);
+    updateline(term.t_nrow-1, 0, term.t_ncol);
     TTpflush();
 }
 
@@ -3098,7 +3230,7 @@ psc_move(row,col)
 void
 psc_eeol()
 {
-    if (ttrow >= 0 && ttrow <= term.t_nrow && ttcol >= 0) {
+    if (ttrow >= 0 && ttrow < term.t_nrow && ttcol >= 0) {
 	VIDEO_ATTR *vp = &vscreen[ttrow]->v_attrs[ttcol];
 	char *cp = &vscreen[ttrow]->v_text[ttcol];
 	char *cplim = &vscreen[ttrow]->v_text[term.t_ncol];
@@ -3115,7 +3247,7 @@ psc_eeop()
 {
     int saverow = ttrow;
     int savecol = ttcol;
-    while (ttrow <= term.t_nrow) {
+    while (ttrow < term.t_nrow) {
 	psc_eeol();
 	ttrow++;
 	ttcol = 0;
@@ -3137,24 +3269,7 @@ psc_rev(huh)
 #if NO_LEAKS
 void	vt_leaks()
 {
-	register int i;
-
-	for (i = 0; i < term.t_mrow; ++i) {
-#if 	OPT_VIDEO_ATTRS
-		free ((char *)vscreen[i]->v_attrs);
-#endif
-		free ((char *)vscreen[i]);
-#if	! MEMMAP
-#if 	OPT_VIDEO_ATTRS
-		free ((char *)pscreen[i]->v_attrs);
-#endif
-		free ((char *)pscreen[i]);
-#endif
-	}
-	free ((char *)vscreen);
-#if	! MEMMAP
-	free ((char *)pscreen);
-#endif
+	vtfree()
 #if OPT_UPBUFF
 	FreeIfNeeded(recomp_tbl);
 #endif

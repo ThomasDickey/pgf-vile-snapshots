@@ -1,7 +1,7 @@
 /*	tcap:	Unix V5, V7 and BS4.2 Termcap video driver
  *		for MicroEMACS
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/tcap.c,v 1.40 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/tcap.c,v 1.42 1994/09/23 04:21:19 pgf Exp $
  *
  */
 
@@ -17,7 +17,7 @@
 #define NPAUSE	10			/* # times thru update to pause */
 
 
-#define TCAPSLEN 315
+#define TCAPSLEN 768 
 char tcapbuf[TCAPSLEN];
 char *UP, PC, *CM, *CE, *CL, *SO, *SE;
 char *TI, *TE, *KS, *KE;
@@ -29,6 +29,48 @@ char *CS, *dl, *al, *DL, *AL, *SF, *SR;
 #if OPT_FLASH
 char *vb;	/* visible-bell */
 #endif
+
+static struct {
+    char * capname;
+    int    code;
+    char * seq;
+} keyseqs[] = {
+    /* Arrow keys */
+    { "ku",	SPEC|'A',	NULL },		/* up */
+    { "kd",	SPEC|'B',	NULL },		/* down */
+    { "kr",	SPEC|'C',	NULL },		/* right */
+    { "kl",	SPEC|'D',	NULL },		/* left */
+    /* page scroll */
+    { "kN",	SPEC|'n',	NULL },		/* next page */
+    { "kP",	SPEC|'p',	NULL },		/* previous page */
+    /* editing */
+    { "kI",	SPEC|'i',	NULL },		/* Insert */
+    { "@0",	SPEC|'f',	NULL },		/* Find */
+    { "*6",	SPEC|'s',	NULL },		/* Select */
+    /* command */
+    { "%1",	SPEC|'h',	NULL },		/* Help */
+    /* function keys */
+    { "k1",	SPEC|'1',	NULL },		/* F1 */
+    { "k2",	SPEC|'2',	NULL },
+    { "k3",	SPEC|'3',	NULL },
+    { "k4",	SPEC|'4',	NULL },
+    { "k5",	SPEC|'5',	NULL },
+    { "k6",	SPEC|'6',	NULL },
+    { "k7",	SPEC|'7',	NULL },
+    { "k8",	SPEC|'8',	NULL },
+    { "k9",	SPEC|'9',	NULL },
+    { "k;",	SPEC|'0',	NULL },		/* F10 */
+    { "F1",	ESC,		NULL },		/* F11 */
+    { "F2",	SPEC|'@',	NULL },		/* F12 */
+    { "F3",	SPEC|'#',	NULL },		/* F13 */
+    { "F4",	SPEC|'$',	NULL },
+    { "F5",	SPEC|'%',	NULL },
+    { "F6",	SPEC|'^',	NULL },
+    { "F7",	SPEC|'&',	NULL },
+    { "F8",	SPEC|'*',	NULL },
+    { "F9",	SPEC|'(',	NULL },		/* F19 */
+    { "FA",	SPEC|')',	NULL }		/* F20 */
+};
 
 extern char *tgoto P((char *, int, int));
 extern int tgetent P((char *, char *));
@@ -90,6 +132,7 @@ tcapopen()
 	char tcbuf[2048];
 	char *tv_stype;
 	char err_str[72];
+	int i;
 	static int already_open = 0;
 
 	if (already_open) 
@@ -120,7 +163,6 @@ tcapopen()
 	if ((term.t_nrow <= 1) && (term.t_nrow=(short)tgetnum("li")) == -1) {
 		term.t_nrow = 24;
 	}
-	term.t_nrow -= 1;
 
 
 	if ((term.t_ncol <= 1) &&(term.t_ncol=(short)tgetnum("co")) == -1){
@@ -142,9 +184,14 @@ tcapopen()
 			p++;
 		}
 
+#if BEFORE
 #ifdef SIGWINCH
 	term.t_mcol = 200;
 	term.t_mrow = 200;
+#else
+	term.t_mrow =  term.t_nrow;
+	term.t_mcol =  term.t_ncol;
+#endif
 #else
 	term.t_mrow =  term.t_nrow;
 	term.t_mcol =  term.t_ncol;
@@ -204,6 +251,12 @@ tcapopen()
 #if OPT_FLASH
 	vb = tgetstr("vb", &p);
 #endif
+
+	for (i = SIZEOF(keyseqs); i--; ) {
+	    keyseqs[i].seq = tgetstr(keyseqs[i].capname, &p);
+	    if (keyseqs[i].seq)
+		addtomaps(keyseqs[i].seq, keyseqs[i].code);
+	}
 	        
 	if (p >= &tcapbuf[TCAPSLEN])
 	{
@@ -310,7 +363,7 @@ int from, to, n;
 		for (i = to - from; i > 0; i--)
 			putpad(SR);
 	}
-	tcapscrollregion(0, term.t_nrow);
+	tcapscrollregion(0, term.t_nrow-1);
 }
 
 /* 
@@ -503,8 +556,8 @@ int	c;
 				firstrow = wp->w_toprow + 1;
 				lastrow  = mode_row(wp) + 1;
 			} else {		/* from message-line */
-				firstrow = term.t_nrow + 1;
-				lastrow  = term.t_nrow + 2;
+				firstrow = term.t_nrow ;
+				lastrow  = term.t_nrow + 1;
 			}
 			if (y >= lastrow)	/* don't select modeline */
 				y = lastrow - 1;
@@ -517,7 +570,7 @@ int	c;
 			 */
 			if (wp != 0
 			 && button == 1
-			 && ttrow != term.t_nrow
+			 && ttrow != term.t_nrow-1
 			 && setcursor(y-1, x-1)) {
 				mlerase();
 				(void)update(TRUE);

@@ -2,7 +2,7 @@
  * 	X11 support, Dave Lemke, 11/91
  *	X Toolkit support, Kevin Buettner, 2/94
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/x11.c,v 1.74 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/x11.c,v 1.82 1994/09/23 04:21:19 pgf Exp $
  *
  */
 /*
@@ -103,7 +103,7 @@
 extern VIDEO **pscreen;
 #define IS_DIRTY_LINE(r)	(pscreen[(r)]->v_flag & VFCHG)
 #define IS_DIRTY(r,c)		(pscreen[(r)]->v_attrs[(c)] & VADIRTY)
-#define IS_REVERSED(r,c)	((pscreen[(r)]->v_attrs[(c)] & VAREV) != 0)
+#define IS_REVERSED(r,c)	((pscreen[(r)]->v_attrs[(c)] & (VAREV|VASEL)) != 0)
 #define MARK_LINE_DIRTY(r)	(pscreen[(r)]->v_flag |= VFCHG)
 #define MARK_CELL_DIRTY(r,c)	(pscreen[(r)]->v_attrs[(c)] |= VADIRTY)
 #define CLEAR_LINE_DIRTY(r)	(pscreen[(r)]->v_flag &= ~VFCHG)
@@ -146,16 +146,20 @@ typedef struct _text_win {
     Widget	screen;		/* screen widget */
     Widget	form_widget;	/* form widget */
     Widget	pane;		/* panes in which scrollbars live */
-    Widget	scrollbars[MAXSBS];	
+    int		maxscrollbars;	/* how many scrollbars, sliders, etc. */
+    Widget	*scrollbars;	
     				/* the scrollbars */
     int		nscrollbars;	/* number of currently active scroll bars */
 #if OL_WIDGETS
-    Widget	sliders[MAXSBS-1];
+    Widget	*sliders;
 #endif
 #if NO_WIDGETS
+    Pixel	scrollbar_fg;
+    Pixel	scrollbar_bg;
+    Bool	slider_is_solid;
     GC		scrollbargc;	/* graphics context for scrollbar "thumb" */
-    ScrollInfo	scrollinfo[MAXSBS];
-    Widget	grips[MAXSBS-1]; /* grips for resizing scrollbars */
+    ScrollInfo	*scrollinfo;
+    Widget	*grips; 	/* grips for resizing scrollbars */
     Cursor	curs_sb_v_double_arrow;
     Cursor	curs_sb_up_arrow;
     Cursor	curs_sb_down_arrow;
@@ -170,6 +174,10 @@ typedef struct _text_win {
     int		blink_status;
     int		blink_interval;
     Cursor	curs_xterm;
+#if OPT_WORKING
+    Cursor	curs_watch;
+#endif
+    Bool	exposed;	/* Have we received any expose events? */
     int		visibility;	/* How visible is the window? */
 
     int		base_width;	/* width with screen widgets' width zero */
@@ -187,10 +195,19 @@ typedef struct _text_win {
     XFontStruct *pfont_boldital;
     GC          textgc;
     GC          reversegc;
+    GC		selgc;
+    GC		revselgc;
     Pixel	fg;
     Pixel	bg;
+    Pixel	modeline_fg;
+    Pixel	modeline_bg;
+    Pixel	modeline_focus_fg;
+    Pixel	modeline_focus_bg;
+    Pixel	selection_fg;
+    Pixel	selection_bg;
     int         char_width,
                 char_ascent,
+		char_descent,
                 char_height;
     Bool	left_ink,	/* font has "ink" past bounding box on left */
     		right_ink;	/* font has "ink" past bounding box on right */
@@ -229,7 +246,8 @@ typedef struct _text_win {
 }           TextWindowRec, *TextWindow;
 
 
-static	TextWindow cur_win;
+static	TextWindowRec cur_win_rec;
+static	TextWindow cur_win = &cur_win_rec;
 static	TBUFF	*PasteBuf;
 
 static	Atom	atom_WM_PROTOCOLS;
@@ -250,6 +268,16 @@ static	Atom	atom_CHARSET_ENCODING;
 
 #if MOTIF_WIDGETS
 static Bool lookfor_sb_resize = FALSE;
+#endif
+
+#if OPT_WORKING
+struct eventqueue {
+    XEvent event;
+    struct eventqueue *next;
+};
+
+static struct eventqueue *evqhead = NULL;
+static struct eventqueue *evqtail = NULL;
 #endif
 
 static	int	x_getc   P(( void )),
@@ -289,11 +317,12 @@ static	XMotionEvent * compress_motion P(( XMotionEvent * ));
 static	void	x_process_event P(( Widget, XtPointer, XEvent *, Boolean * ));
 static	void	x_configure_window P(( Widget, XtPointer, XEvent *, Boolean * ));
 static	void	x_change_focus P(( Widget, XtPointer, XEvent *, Boolean * ));
+static	void	x_typahead_timeout P(( XtPointer, XtIntervalId * ));
 static	void	x_key_press P(( Widget, XtPointer, XEvent *, Boolean * ));
 static	void	x_wm_delwin P(( Widget, XtPointer, XEvent *, Boolean * ));
 static	char *	strndup P(( char *, int ));
 static	void	wait_for_scroll P(( TextWindow ));
-static	void	flush_line P(( UCHAR *, int, VIDEO_ATTR, int, int ));
+static	void	flush_line P(( UCHAR *, int, int /*VIDEO_ATTR*/, int, int ));
 static	int	set_character_class_range P(( int, int, int ));
 static	void	x_lose_selection P(( TextWindow ));
 static	int	add2paste P(( TBUFF **, int ));
@@ -303,6 +332,7 @@ static	char *	x_get_font_atom_property P((XFontStruct *, Atom));
 static	XFontStruct *query_font P(( TextWindow, char * ));
 static	XFontStruct *alternate_font P(( char *, char * ));
 static	void	configure_bar P(( Widget, XEvent *, String *, Cardinal *));
+static	int	check_scrollbar_allocs P(( void ));
 static	void	update_scrollbar_sizes P(( void ));
 static	void	kqinit P(( TextWindow ));
 static	int	kqempty P(( TextWindow ));
@@ -311,6 +341,9 @@ static	int	kqdel P(( TextWindow ));
 static	void	kqadd P(( TextWindow, int ));
 static	int	kqpop P(( TextWindow ));
 static	void	display_cursor P(( XtPointer, XtIntervalId * ));
+#if 0
+static	void	check_visuals P(( void ));
+#endif
 #if MOTIF_WIDGETS
 static	void	JumpProc P(( Widget, XtPointer, XtPointer ));
 static	void	grip_moved P(( Widget, XtPointer, XEvent *, Boolean * ));
@@ -330,6 +363,12 @@ static	void	resize_bar P(( Widget, XEvent *, String *, Cardinal *));
 #endif /* NO_WIDGETS */
 #endif /* OL_WIDGETS */
 #endif /* MOTIF_WIDGETS */
+#if OPT_WORKING
+static	void	x_set_watch_cursor P(( int ));
+static	int	evqempty P(( void ));
+static	void	evqadd P(( const XEvent * ));
+static	void	evqdel P(( XEvent * ));
+#endif /* OPT_WORKING */
 
 #define	FONTNAME	"7x13"
 
@@ -405,7 +444,7 @@ typedef struct _BbRec {
 } BbRec;
 
 static XtGeometryResult bbGeometryManager P(( Widget, XtWidgetGeometry *, XtWidgetGeometry * ));
-static XtGeometryResult bbPreferredSize P(( Widget, XtWidgetGeometry *, XtWidgetGeometry * ));;
+static XtGeometryResult bbPreferredSize P(( Widget, XtWidgetGeometry *, XtWidgetGeometry * ));
 
 BbClassRec bbClassRec = {
   {
@@ -810,6 +849,7 @@ update_scrollbar_sizes()
 		    "scrollbar",
 		    coreWidgetClass,
 		    cur_win->pane,
+		    XtNbackground,	cur_win->scrollbar_bg,
 		    XtNborderWidth,	0,
 		    XtNheight,		1,
 		    XtNwidth,		1,
@@ -848,11 +888,9 @@ update_scrollbar_sizes()
 	    XtNheight,		new_height,
 	    XtNwidth,		cur_win->pane_width,
 	    NULL);
-	/* clear the "thumb" */
-	draw_thumb(cur_win->scrollbars[i], 0, (int)new_height-1, False);
-	cur_win->scrollinfo[i].totlen = new_height;
 	cur_win->scrollinfo[i].top = 
-	cur_win->scrollinfo[i].bot = new_height - 1;
+	cur_win->scrollinfo[i].bot =
+	cur_win->scrollinfo[i].totlen = new_height;
 	if (wp->w_wndp) {
 	    XtVaSetValues(cur_win->grips[i],
 		XtNx,		1,
@@ -861,6 +899,12 @@ update_scrollbar_sizes()
 		XtNwidth,	cur_win->pane_width,
 		NULL);
 	}
+	i++;
+    }
+
+    i = 0;
+    for_each_window(wp) {
+	XClearWindow(dpy, XtWindow(cur_win->scrollbars[i]));
 	wp->w_flag &= ~WFSBAR;
 	update_scrollbar(wp);
 	i++;
@@ -1263,6 +1307,10 @@ update_scrollbar(uwp)
 #define XtCPersistentSelections	"PersistentSelections"
 #define XtNblinkInterval	"blinkInterval"
 #define XtCBlinkInterval	"BlinkInterval"
+#define XtNsliderIsSolid	"sliderIsSolid"
+#define XtCSliderIsSolid	"SliderIsSolid"
+#define	XtNfocusForeground	"focusForeground"
+#define	XtNfocusBackground	"focusBackground"
 
 static XtResource resources[] = {
 #if NO_WIDGETS
@@ -1386,6 +1434,98 @@ static XtResource resources[] = {
     },
 };
 
+#if NO_WIDGETS
+static XtResource scrollbar_resources[] = {
+    {
+	XtNforeground,
+	XtCForeground,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, scrollbar_fg),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.fg
+    },
+    {
+	XtNbackground,
+	XtCBackground,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, scrollbar_bg),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.bg
+    },
+    {
+	XtNsliderIsSolid,
+	XtCSliderIsSolid,
+	XtRBool,
+	sizeof(Bool),
+	XtOffset(TextWindow, slider_is_solid),
+	XtRImmediate,
+	(XtPointer) False
+    },
+};
+#endif
+
+static XtResource modeline_resources[] = {
+    {
+	XtNforeground,
+	XtCBackground,				/* weird, huh? */
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, modeline_fg),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.bg
+    },
+    {
+	XtNbackground,
+	XtCForeground,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, modeline_bg),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.fg
+    },
+    {
+	XtNfocusForeground,
+	XtCBackground,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, modeline_focus_fg),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.bg
+    },
+    {
+	XtNfocusBackground,
+	XtCForeground,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, modeline_focus_bg),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.fg
+    },
+};
+
+static XtResource selection_resources[] = {
+    {
+	XtNforeground,
+	XtCBackground,				/* weird, huh? */
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, selection_fg),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.bg
+    },
+    {
+	XtNbackground,
+	XtCForeground,
+	XtRPixel,
+	sizeof(Pixel),
+	XtOffset(TextWindow, selection_bg),
+	XtRPixel,
+	(XtPointer) &cur_win_rec.fg
+    },
+};
+
 #define CHECK_MIN_MAX(v,min,max)	\
 	do {				\
 	    if ((v) > (max))		\
@@ -1403,7 +1543,7 @@ x_preparse_args(pargc, pargv)
     XFontStruct *pfont;
     XGCValues   gcvals;
     ULONG	gcmask;
-    int		geo_mask, startx, starty;
+    int		geo_mask, startx, starty, screen_depth;
     Cardinal	start_cols, start_rows;
     static XrmOptionDescRec options[] = {
 	{"-leftbar",	"*scrollbarOnLeft", XrmoptionNoArg,	"true" },
@@ -1449,15 +1589,6 @@ x_preparse_args(pargc, pargv)
 #endif /* NO_WIDGETS */
 #endif /* MOTIF_WIDGETS || OL_WIDGETS */
 
-    cur_win = (TextWindow) XCalloc(TextWindowRec);
-
-    if (!cur_win) {
-	(void)fprintf(stderr, "insufficient memory, exiting\n");
-	ExitProgram(BADEXIT);
-    }
-
-
-    	
 #if OL_WIDGETS
     /* There is a cryptic statement in the poor documentation that I have
      * on OpenLook that OlToolkitInitialize is now preferred to the older
@@ -1481,6 +1612,10 @@ x_preparse_args(pargc, pargv)
 	    NULL);
     dpy = XtDisplay(cur_win->top_widget);
 
+#if 0
+    check_visuals();
+#endif
+
     XtVaSetValues(cur_win->top_widget,
 	    XtNinput,	TRUE,
 	    NULL);
@@ -1490,6 +1625,38 @@ x_preparse_args(pargc, pargv)
 	    (XtPointer)cur_win,
 	    resources,
 	    XtNumber(resources),
+	    (ArgList)0,
+	    0);
+
+#if NO_WIDGETS
+    XtGetSubresources(
+	    cur_win->top_widget,
+	    (XtPointer)cur_win,
+	    "scrollbar",
+	    "Scrollbar",
+	    scrollbar_resources,
+	    XtNumber(scrollbar_resources),
+	    (ArgList)0,
+	    0);
+#endif	/* NO_WIDGETS */
+
+    XtGetSubresources(
+	    cur_win->top_widget,
+	    (XtPointer)cur_win,
+	    "modeline",
+	    "Modeline",
+	    modeline_resources,
+	    XtNumber(modeline_resources),
+	    (ArgList)0,
+	    0);
+
+    XtGetSubresources(
+	    cur_win->top_widget,
+	    (XtPointer)cur_win,
+	    "selection",
+	    "Selection",
+	    selection_resources,
+	    XtNumber(selection_resources),
 	    (ArgList)0,
 	    0);
 
@@ -1548,8 +1715,12 @@ x_preparse_args(pargc, pargv)
 
     /* Sanity check values obtained from XtGetApplicationResources */
     CHECK_MIN_MAX(cur_win->pane_width, PANE_WIDTH_MIN, PANE_WIDTH_MAX);
-    CHECK_MIN_MAX(cur_win->rows, MINROWS, MAXROWS);
-    CHECK_MIN_MAX(cur_win->cols, 20, MAXCOLS);
+
+    if (cur_win->bg == cur_win->fg)
+	cur_win->fg = BlackPixel(dpy,DefaultScreen(dpy));
+    if (cur_win->bg == cur_win->fg)
+	cur_win->bg = WhitePixel(dpy,DefaultScreen(dpy));
+
 
 #if MOTIF_WIDGETS
     cur_win->form_widget = XtVaCreateManagedWidget(
@@ -1622,6 +1793,7 @@ x_preparse_args(pargc, pargv)
     cur_win->textgc = XCreateGC(dpy,
             DefaultRootWindow(dpy),
 	    gcmask, &gcvals);
+    cur_win->exposed    = FALSE;
     cur_win->visibility = VisibilityUnobscured;
 
     gcvals.foreground = cur_win->bg;
@@ -1631,18 +1803,54 @@ x_preparse_args(pargc, pargv)
             DefaultRootWindow(dpy),
 	    gcmask, &gcvals);
 
+    XtVaGetValues(cur_win->screen,
+		XtNdepth, &screen_depth,
+		NULL);
+
+    /* Initialize graphics context for display of selections */
+    if (screen_depth == 1
+     || cur_win->selection_bg == cur_win->selection_fg
+     ||  (cur_win->fg == cur_win->selection_fg
+       && cur_win->bg == cur_win->selection_bg)
+     ||  (cur_win->fg == cur_win->selection_bg
+       && cur_win->bg == cur_win->selection_fg)) {
+	cur_win->selgc = cur_win->reversegc;
+	cur_win->revselgc = cur_win->textgc;
+    }
+    else {
+	gcvals.foreground = cur_win->selection_fg;
+	gcvals.background = cur_win->selection_bg;
+	cur_win->selgc = XCreateGC(dpy,
+		DefaultRootWindow(dpy),
+		gcmask, &gcvals);
+	gcvals.foreground = cur_win->selection_bg;
+	gcvals.background = cur_win->selection_fg;
+	cur_win->revselgc = XCreateGC(dpy,
+		DefaultRootWindow(dpy),
+		gcmask, &gcvals);
+    }
+
 #if NO_WIDGETS
-    gcmask = GCFillStyle | GCStipple | GCForeground | GCBackground;
-    /* FIXME: Add resource for scrollbar slider color */
-    gcvals.foreground = cur_win->fg;
-    gcvals.background = cur_win->bg;
-    gcvals.fill_style = FillOpaqueStippled;
-    gcvals.stipple = XCreatePixmapFromBitmapData(dpy,
-	    DefaultRootWindow(dpy),
-	    stippled_pixmap_bits,
-	    2, 2,
-	    cur_win->fg, cur_win->bg,
-	    1);
+    if (cur_win->scrollbar_bg == cur_win->scrollbar_fg) {
+	cur_win->scrollbar_bg = cur_win->bg;
+	cur_win->scrollbar_fg = cur_win->fg;
+    }
+    gcvals.background = cur_win->scrollbar_bg;
+    if (!cur_win->slider_is_solid) {
+	gcmask = GCFillStyle | GCStipple | GCForeground | GCBackground;
+	gcvals.foreground = cur_win->scrollbar_fg;
+	gcvals.fill_style = FillOpaqueStippled;
+	gcvals.stipple = XCreatePixmapFromBitmapData(dpy,
+		DefaultRootWindow(dpy),
+		stippled_pixmap_bits,
+		2, 2,
+		1, 0,
+		1);
+    }
+    else {
+	gcmask = GCForeground | GCBackground;
+	gcvals.foreground = cur_win->scrollbar_fg;
+    }
     cur_win->scrollbargc = XCreateGC(dpy,
 	    DefaultRootWindow(dpy),
 	    gcmask, &gcvals);
@@ -1752,8 +1960,10 @@ x_preparse_args(pargc, pargv)
 
     XtAddEventHandler(
 	    cur_win->screen,
-	    ButtonPressMask | ButtonReleaseMask | PointerMotionMask 
-	    	| ExposureMask | VisibilityChangeMask,
+	    (EventMask) (ButtonPressMask | ButtonReleaseMask 
+	    	       | (cur_win->focus_follows_mouse ? PointerMotionMask
+		                                       : ButtonMotionMask)
+	    	       | ExposureMask | VisibilityChangeMask),
 	    TRUE,
 	    x_process_event,
 	    (XtPointer)0);
@@ -1810,10 +2020,34 @@ x_preparse_args(pargc, pargv)
 	    x_wm_delwin,
 	    (XtPointer)0);
 
+#if OPT_WORKING
+    /* Set up watch cursor */
+    cur_win->curs_watch = XCreateFontCursor(dpy, XC_watch);
+#endif
     /* Change screen cursor to insertion bar */
     cur_win->curs_xterm = XCreateFontCursor(dpy, XC_xterm);
     XDefineCursor(dpy, XtWindow(cur_win->screen), cur_win->curs_xterm);
+
 }
+
+#if 0
+static void
+check_visuals()
+{
+    static char *classes[] = { "StaticGray", "GrayScale", "StaticColor", "PseudoColor", "TrueColor", "DirectColor" };
+    XVisualInfo *visuals, visual_template;
+    int nvisuals;
+    visuals = XGetVisualInfo(dpy, VisualNoMask, &visual_template, &nvisuals);
+    if (visuals != NULL) {
+	int i;
+	for (i=0; i<nvisuals; i++) {
+	    printf("Class: %s, Depth: %d\n",
+	           classes[visuals[i].class], visuals[i].depth);
+	}
+	XFree(visuals);
+    }
+}
+#endif
 
 char *
 x_current_fontname()
@@ -1876,6 +2110,7 @@ query_font(tw, fname)
 	tw->char_width  = pf->max_bounds.width;
 	tw->char_height = pf->ascent + pf->descent;
 	tw->char_ascent = pf->ascent;
+	tw->char_descent = pf->descent;
 	tw->left_ink	= (pf->min_bounds.lbearing < 0);
 	tw->right_ink	= (pf->max_bounds.rbearing > tw->char_width);
 
@@ -2054,6 +2289,10 @@ x_setfont(fname)
 
 	    XSetFont(dpy, cur_win->textgc, pfont->fid);
 	    XSetFont(dpy, cur_win->reversegc, pfont->fid);
+	    if (cur_win->textgc != cur_win->revselgc) {
+		XSetFont(dpy, cur_win->selgc, pfont->fid);
+		XSetFont(dpy, cur_win->revselgc, pfont->fid);
+	    }
 
 	    /* if size changed, resize it, otherwise refresh */
 	    if (oldw != x_width(cur_win) || oldh != x_height(cur_win)) {
@@ -2066,12 +2305,14 @@ x_setfont(fname)
 			XtNwidthInc,	cur_win->char_width,
 			NULL);
 		update_scrollbar_sizes();
+		XClearWindow(dpy, cur_win->win);
 		x_touch(cur_win, 0, 0, cur_win->cols, cur_win->rows);
 		XResizeWindow(dpy, XtWindow(cur_win->top_widget),
 			      x_width(cur_win) + cur_win->base_width,
 			      x_height(cur_win) + cur_win->base_height);
 
 	    } else {
+		XClearWindow(dpy, cur_win->win);
 		x_touch(cur_win, 0, 0, cur_win->cols, cur_win->rows);
 		x_flush();
 	    }
@@ -2098,16 +2339,39 @@ x_open()
 {
     kqinit(cur_win);
     cur_win->sel_prop = XInternAtom(dpy, "VILE_SELECTION", False);
+    cur_win->scrollbars = NULL;
+    cur_win->scrollinfo = NULL;
+    cur_win->grips = NULL;
+#if OL_WIDGETS
+    cur_win->sliders = NULL;
+#endif
 
     (void)signal(SIGHUP, x_quit);
     (void)signal(SIGINT, catchintr);
     (void)signal(SIGTERM, x_quit);
 
-    term.t_mcol = MAXCOLS;
-    term.t_mrow = MAXROWS;
     /* main code assumes that it can access a cell at nrow x ncol */
     term.t_ncol = cur_win->cols;
-    term.t_nrow = cur_win->rows - 1;
+    term.t_nrow = cur_win->rows;
+
+#ifndef HAVE_BSD_SETPGRP
+    /* 
+     * I've taken out the call to setpgrp for bsd compat systems since it
+     * seems that job control no longer works when I do this.  Some systems
+     * such as the NeXT simply ignore the job control signal.  Other systems
+     * such as SunOS actually kill the xvile process!   - kev 8-5-94
+     */
+
+    /* Break association with controlling terminal */
+# ifdef HAVE_SETSID
+    (void) setsid();
+# else 
+    (void) setpgrp();
+# endif /* HAVE_SETSID */
+#endif /* HAVE_BSD_SETPGRP */
+
+    if (check_scrollbar_allocs() != TRUE)
+	ExitProgram(BADEXIT);
 }
 
 static void
@@ -2145,7 +2409,8 @@ x_touch(tw, sc, sr, ec, er)
     for (r = sr; r < er; r++) {
 	MARK_LINE_DIRTY(r);
 	for (c = sc; c < ec; c++)
-	    MARK_CELL_DIRTY(r,c);
+	    if (CELL_TEXT(r,c) != ' ' || CELL_ATTR(r,c))
+		MARK_CELL_DIRTY(r,c);
     }
 }
 
@@ -2195,9 +2460,20 @@ x_scroll(from, to, count)
 	      x_pos(cur_win, 0), y_pos(cur_win, from),
 	      x_width(cur_win), (unsigned)(count * cur_win->char_height),
 	      x_pos(cur_win, 0), y_pos(cur_win, to));
-    XFlush(dpy);
-    if (cur_win->visibility == VisibilityPartiallyObscured)
+    if (from < to)
+	XClearArea(dpy, cur_win->win,
+        	x_pos(cur_win, 0), y_pos(cur_win,from),
+		x_width(cur_win), (unsigned)((to-from) * cur_win->char_height),
+		FALSE);
+    else
+	XClearArea(dpy, cur_win->win,
+        	x_pos(cur_win, 0), y_pos(cur_win,to+count),
+		x_width(cur_win), (unsigned)((from-to) * cur_win->char_height),
+		FALSE);
+    if (cur_win->visibility == VisibilityPartiallyObscured) {
+	XFlush(dpy);
 	wait_for_scroll(cur_win);
+    }
 
 }
 
@@ -2228,13 +2504,19 @@ flush_line(text, len, attr, sr, sc)
     int	   sr;
     int	   sc;
 {
-    GC	fore_gc = ((attr & VAREV) ? cur_win->reversegc : cur_win->textgc);
-    GC	back_gc = ((attr & VAREV) ? cur_win->textgc : cur_win->reversegc);
+    GC	fore_gc = ((attr & VASEL) ? cur_win->selgc : cur_win->textgc);
+    GC	back_gc = ((attr & VASEL) ? cur_win->revselgc : cur_win->reversegc);
     int	fore_yy = text_y_pos(cur_win, sr);
     int	back_yy = y_pos(cur_win, sr);
     char *p;
     int   cc, tlen, i, startcol;
     int   fontchanged = FALSE;
+
+    if (attr & VAREV) {
+	GC tmp_gc = fore_gc;
+	fore_gc = back_gc;
+	back_gc = tmp_gc;
+    }
 
     if (attr & (VABOLD | VAITAL)) {
 	XFontStruct *fsp = NULL;
@@ -2338,10 +2620,12 @@ trybold:
 			(int)x_pos(cur_win, sc)+1, fore_yy,
 			 p, tlen);
     }
-    if (attr & (VAUL | VAITAL))
+    if (attr & (VAUL | VAITAL)) {
+	fore_yy += cur_win->char_descent - 1;
 	XDrawLine(dpy, cur_win->win, fore_gc,
-	          x_pos(cur_win, startcol), fore_yy + 2,
-		  x_pos(cur_win, startcol + len) - 1, fore_yy + 2);
+	          x_pos(cur_win, startcol), fore_yy,
+		  x_pos(cur_win, startcol + len) - 1, fore_yy);
+    }
 
     if (fontchanged)
 	XSetFont(dpy, fore_gc, cur_win->pfont->fid);
@@ -2358,7 +2642,7 @@ x_flush()
     int r, c, sc, ec, cleanlen;
     VIDEO_ATTR attr;
 
-    if (cur_win->visibility == VisibilityFullyObscured)
+    if (cur_win->visibility == VisibilityFullyObscured || !cur_win->exposed)
 	return;		/* Why bother? */
 
     /* 
@@ -2368,7 +2652,7 @@ x_flush()
      * one) will be cleared after the new cursor is displayed.
      */
 
-    if (ttrow >=0 && ttrow <= term.t_nrow && ttcol >= 0 && ttcol < term.t_ncol
+    if (ttrow >=0 && ttrow < term.t_nrow && ttcol >= 0 && ttcol < term.t_ncol
      && !cur_win->wipe_permitted) {
 	CLEAR_CELL_DIRTY(ttrow, ttcol);
 	display_cursor((XtPointer) 0, (XtIntervalId *) 0);
@@ -2834,7 +3118,7 @@ x_stash_selection(tw)
 	tw->selection_data = data;
 
 #ifdef SABER_HACK
-	XChangeProperty(dpy, RootWindow(dpy, tw->screen), XA_CUT_BUFFER0,
+	XChangeProperty(dpy, DefaultRootWindow(dpy), XA_CUT_BUFFER0,
 		XA_STRING, 8, PropModeReplace,
 		tw->selection_data, tw->selection_len);
 #endif
@@ -3186,6 +3470,7 @@ x_process_event(w, unused, ev, continue_to_dispatch)
 	ec = CEIL(gev->x + gev->width,  cur_win->char_width);
 	er = CEIL(gev->y + gev->height, cur_win->char_height);
 	x_touch(cur_win, sc, sr, ec, er);
+	cur_win->exposed = TRUE;
 	if (ev->xexpose.count == 0)
 		x_flush();
 	break;
@@ -3288,7 +3573,6 @@ x_configure_window(w, unused, ev, continue_to_dispatch)
 {
     int nr, nc;
     Dimension new_width, new_height;
-    Boolean changed = False;
 
     if (ev->type != ConfigureNotify)
 	return;
@@ -3416,24 +3700,35 @@ x_configure_window(w, unused, ev, continue_to_dispatch)
 	return;
     }
 
-    if (nc != cur_win->cols) {
-	changed = True;
-	newwidth(True, nc);
-    }
-    if (nr != cur_win->rows) {
-	changed = True;
-	newlength(True, nr);
-    }
-    if (changed) {
+    if (nc != cur_win->cols || nr != cur_win->rows) {
+	newscreensize(nr,nc);
 	cur_win->rows = nr;
 	cur_win->cols = nc;
-	(void) refresh(True, 0);
-	update_scrollbar_sizes();
-	(void) update(TRUE);
+	if (check_scrollbar_allocs() == TRUE) /* no allocation failure */
+		update_scrollbar_sizes();
     }
 #if MOTIF_WIDGETS
     lookfor_sb_resize = FALSE;
 #endif
+}
+
+int check_scrollbar_allocs()
+{
+	int newmax = cur_win->rows/2;
+	int oldmax = cur_win->maxscrollbars;
+
+	if (newmax > oldmax) {
+
+		GROW(cur_win->scrollbars, Widget, oldmax, newmax);
+#if OL_WIDGETS
+		GROW(cur_win->sliders, Widget, oldmax-1, newmax-1);
+#endif
+		GROW(cur_win->scrollinfo, ScrollInfo, oldmax, newmax);
+		GROW(cur_win->grips, Widget, oldmax-1, newmax-1);
+
+		cur_win->maxscrollbars = newmax;
+	}
+	return TRUE;
 }
 
 #if MOTIF_WIDGETS
@@ -3605,16 +3900,6 @@ x_wm_delwin(w, unused, ev, continue_to_dispatch)
 }
 
 /*
- * Return true if there are characters remaining to be pasted.  This is used in
- * the type-ahead check.
- */
-int
-x_is_pasting()
-{
-	return !kqempty(cur_win) || tb_more(PasteBuf);
-}
-
-/*
  * Return true if we want to disable reports of the cursor position because the
  * cursor really should be on the message-line.
  */
@@ -3636,11 +3921,42 @@ void
 x_working()
 {
     XEvent ev;
+    x_set_watch_cursor(TRUE);
     while (XtAppPending(cur_win->app_context)
         && !kqfull(cur_win)) {
 
 	/* Get and dispatch next event */
 	XtAppNextEvent(cur_win->app_context, &ev);
+
+	/* 
+	 * Ignore or save certain events which could get us into trouble with
+	 * reentrancy.
+	 */
+	switch (ev.type) {
+	    case ButtonPress :
+	    case ButtonRelease :
+	    case MotionNotify :
+		/* Ignore the event */
+		continue;
+		break;
+	    case ClientMessage : 
+	    case SelectionClear :
+	    case SelectionNotify :
+	    case SelectionRequest :
+	    case ConfigureNotify :
+	    case ConfigureRequest :
+	    case PropertyNotify :
+	    case ReparentNotify :
+	    case ResizeRequest :
+		/* Queue for later processing.  */
+		evqadd(&ev);
+		continue;
+		break;
+	    default :
+		/* do nothing here...we'll dispatch the event below */
+		break;
+	}
+
 	XtDispatchEvent(&ev);
 	
 	/* 
@@ -3670,6 +3986,85 @@ x_working()
 		kqadd(cur_win, c);
 	}
     }
+}
+
+static void
+x_set_watch_cursor(onflag)
+    int onflag;
+{
+    static int watch_is_on = FALSE;
+
+    if (onflag == watch_is_on)
+	return;
+
+    watch_is_on = onflag;
+
+    if (onflag) {
+	int i;
+	XDefineCursor(dpy, XtWindow(cur_win->screen), cur_win->curs_watch);
+#if NO_WIDGETS
+	for (i=0; i<cur_win->nscrollbars; i++) {
+	    XDefineCursor(dpy,
+		    XtWindow(cur_win->scrollbars[i]), cur_win->curs_watch);
+	    if (i < cur_win->nscrollbars-1)
+		XDefineCursor(dpy,
+			XtWindow(cur_win->grips[i]), cur_win->curs_watch);
+	}
+#endif /* NO_WIDGETS */
+    }
+    else {
+	int i;
+	XDefineCursor(dpy, XtWindow(cur_win->screen), cur_win->curs_xterm);
+#if NO_WIDGETS
+	for (i=0; i<cur_win->nscrollbars; i++) {
+	    XDefineCursor(dpy,
+		    XtWindow(cur_win->scrollbars[i]),
+		    cur_win->curs_sb_v_double_arrow);
+	    if (i < cur_win->nscrollbars-1)
+		XDefineCursor(dpy,
+			XtWindow(cur_win->grips[i]),
+			cur_win->curs_double_arrow);
+	}
+#endif /* NO_WIDGETS */
+    }
+}
+
+static int
+evqempty()
+{
+    return evqhead == NULL;
+}
+
+static void
+evqadd(evp)
+    const XEvent *evp;
+{
+    struct eventqueue * newentry;
+    newentry = typealloc(struct eventqueue);
+    if (newentry == NULL)
+	return;			/* FIXME: Need method for indicating error */
+    newentry->next = NULL;
+    newentry->event = *evp;
+    if (evqhead == NULL)
+	evqhead = evqtail = newentry;
+    else {
+	evqtail->next = newentry;
+	evqtail = newentry;
+    }
+}
+
+static void
+evqdel(evp)
+    XEvent *evp;
+{
+    struct eventqueue *delentry = evqhead;
+    if (delentry == NULL)
+	return;			/* should not happen */
+    *evp = delentry->event;
+    evqhead = delentry->next;
+    if (evqhead == NULL)
+	evqtail = NULL;
+    free(delentry);
 }
 #endif /* OPT_WORKING */
 
@@ -3720,7 +4115,7 @@ kqpop(tw)
 {
     if (--(tw->kqtail) < 0)
 	tw->kqtail = KQSIZE-1;
-    return (tw->kq[tw->kqhead]);
+    return (tw->kq[tw->kqtail]);
 }
 
 static void
@@ -3729,7 +4124,6 @@ display_cursor(client_data, idp)
     XtIntervalId *idp;
 {
     static Bool am_blinking = FALSE;
-    GC gc;
 
     /*
      * Return immediately if we are either in the process of making a
@@ -3749,23 +4143,15 @@ display_cursor(client_data, idp)
     if (IS_DIRTY(ttrow,ttcol) && idp == (XtIntervalId *) 0)
 	return;	
 
-    /*
-     * Guess about which graphics context to use for display of the cursor.
-     */
-    gc = IS_REVERSED(ttrow,ttcol) ? cur_win->textgc : cur_win->reversegc;
-
     if (cur_win->show_cursor) {
 	if ( cur_win->blink_interval > 0 
-	  || ( cur_win->blink_interval < 0 && gc == cur_win->textgc ) ) {
-	    /* Reset the graphics context if its time to toggle the cursor */
-	    if (cur_win->blink_status & BLINK_TOGGLE)
-		gc = (gc == cur_win->textgc) ? cur_win->reversegc 
-		                             : cur_win->textgc;
+	  || ( cur_win->blink_interval < 0 && IS_REVERSED(ttrow, ttcol) )) {
 	    if (idp != (XtIntervalId *) 0 || !am_blinking) {
 		/* Set timer to get blinking */
 		cur_win->blink_id = XtAppAddTimeOut(
 			cur_win->app_context,
-			max(cur_win->blink_interval, -cur_win->blink_interval),
+			(unsigned long) max(cur_win->blink_interval,
+			                    -cur_win->blink_interval),
 			display_cursor,
 			(XtPointer) 0);
 		cur_win->blink_status ^= BLINK_TOGGLE;
@@ -3776,6 +4162,7 @@ display_cursor(client_data, idp)
 	}
 	else {
 	    am_blinking = FALSE;
+	    cur_win->blink_status &= ~BLINK_TOGGLE;
 	    if (cur_win->blink_id != (XtIntervalId) 0) {
 		XtRemoveTimeOut(cur_win->blink_id);
 		cur_win->blink_id = (XtIntervalId) 0;
@@ -3784,9 +4171,11 @@ display_cursor(client_data, idp)
 
 	MARK_CELL_DIRTY(ttrow,ttcol);
 	MARK_LINE_DIRTY(ttrow);
-	XDrawImageString(dpy, cur_win->win, gc,
-		x_pos(cur_win, ttcol), text_y_pos(cur_win, ttrow),
-		(char *)&CELL_TEXT(ttrow,ttcol), 1);
+	flush_line(&CELL_TEXT(ttrow,ttcol), 1,
+	           (VIDEO_ATTR) (VATTRIB(CELL_ATTR(ttrow,ttcol))
+		                ^ ((cur_win->blink_status & BLINK_TOGGLE)
+				  ? 0 : VAREV)),
+		   ttrow, ttcol);
     }
     else {
 	/* This code will get called when the window no longer has the focus. */
@@ -3797,13 +4186,12 @@ display_cursor(client_data, idp)
 	am_blinking = FALSE;
 	MARK_CELL_DIRTY(ttrow,ttcol);
 	MARK_LINE_DIRTY(ttrow);
-	gc = (gc == cur_win->textgc) ? cur_win->reversegc 
-				     : cur_win->textgc;
-	XDrawImageString(dpy, cur_win->win, gc,
-		x_pos(cur_win, ttcol), text_y_pos(cur_win, ttrow),
-		(char *)&CELL_TEXT(ttrow,ttcol), 1);
-	XDrawRectangle(dpy, cur_win->win, gc,
-	  x_pos(cur_win, ttcol), y_pos(cur_win, ttrow),
+	flush_line(&CELL_TEXT(ttrow,ttcol), 1,
+	           (VIDEO_ATTR) VATTRIB(CELL_ATTR(ttrow,ttcol)), ttrow, ttcol);
+	XDrawRectangle(dpy, cur_win->win,
+	               IS_REVERSED(ttrow,ttcol) ? cur_win->reversegc 
+		                                : cur_win->textgc,
+	               x_pos(cur_win, ttcol), y_pos(cur_win, ttrow),
 		       (unsigned)(cur_win->char_width - 1),
 		       (unsigned)(cur_win->char_height - 1));
     }
@@ -3818,13 +4206,27 @@ display_cursor(client_data, idp)
 static int
 x_getc()
 {
+    int c;
+
+#if OPT_WORKING
+    while (!evqempty()) {
+	XEvent ev;
+	evqdel(&ev);
+	XtDispatchEvent(&ev);
+    }
+    x_set_watch_cursor(FALSE);
+#endif
     while (1) {
 
-	if (tb_more(PasteBuf))	/* handle any queued pasted text */
-	    return tb_next(PasteBuf);
+	if (tb_more(PasteBuf)) {	/* handle any queued pasted text */
+	    c = tb_next(PasteBuf);
+	    break;
+	}
 
-	if (!kqempty(cur_win))
-	    return kqdel(cur_win);
+	if (!kqempty(cur_win)) {
+	    c = kqdel(cur_win);
+	    break;
+	}
 
 	/*
 	 * Get and dispatch as many X events as possible.  This permits
@@ -3840,6 +4242,83 @@ x_getc()
 	    XtDispatchEvent(&ev);
 	} while (XtAppPending(cur_win->app_context) && !kqfull(cur_win));
     }
+
+    return c;
+}
+
+/*
+ * Another event loop used for determining type-ahead.
+ */
+int
+x_typahead(milli)
+    int milli;		/* milliseconds to wait for type-ahead */
+{
+    int status;
+    XtIntervalId timeoutid = 0;
+    int timedout;
+    int olddkr = doing_kbd_read;
+
+    if (!cur_win->exposed)
+	return FALSE;
+
+    doing_kbd_read = TRUE;
+
+    status = !kqempty(cur_win) || tb_more(PasteBuf);
+
+    if (!status) {
+
+	if (milli) {
+	    timedout = 0;
+	    timeoutid = XtAppAddTimeOut(
+			    cur_win->app_context,
+			    (ULONG) milli,
+			    x_typahead_timeout,
+			    (XtPointer) &timedout);
+	}
+	else
+	    timedout = 1;
+
+#if OPT_WORKING
+	while (kqempty(cur_win) && !evqempty()) {
+	    XEvent ev;
+	    evqdel(&ev);
+	    XtDispatchEvent(&ev);
+	}
+	x_set_watch_cursor(FALSE);
+#endif
+
+	/*
+	 * Process pending events until we get some keyboard input.
+	 * Note that we do not block here.
+	 */
+	while (kqempty(cur_win) && XtAppPending(cur_win->app_context)) {
+	    XEvent ev;
+	    XtAppNextEvent(cur_win->app_context, &ev);
+	    XtDispatchEvent(&ev);
+	}
+
+	/* Now wait for timer and process events as necessary. */
+	while (!timedout && kqempty(cur_win)) {
+	    XtAppProcessEvent(cur_win->app_context, XtIMAll);
+	}
+
+	if (!timedout)
+	    XtRemoveTimeOut(timeoutid);
+
+	status = !kqempty(cur_win);
+    }
+
+    doing_kbd_read = olddkr;
+
+    return status;
+}
+
+static void
+x_typahead_timeout(flagp, id)
+    XtPointer flagp;
+    XtIntervalId *id;
+{
+    * (int *) flagp = 1;
 }
 
 /*ARGSUSED*/
@@ -3869,6 +4348,8 @@ x_key_press(w, unused, ev, continue_to_dispatch)
 	/* page scroll */
 	{XK_Next,    SPEC|'n'},
 	{XK_Prior,   SPEC|'p'},
+	{XK_Home,    SPEC|'H'},
+	{XK_End,     SPEC|'E'},
 	/* editing */
 	{XK_Insert,  SPEC|'i'},
 #if (ULTRIX || ultrix)
@@ -3920,6 +4401,8 @@ x_key_press(w, unused, ev, continue_to_dispatch)
 	    }
 	}
     }
+    else if (num == 1 && (ev->xkey.state & Mod1Mask))
+	buffer[0] |= HIGHBIT;
 
     /* FIXME: Should do something about queue full conditions */
     if (num > 0) {
@@ -4021,7 +4504,7 @@ char *name;
 {
 	XTextProperty Prop;
 
-	strncpy0(x_icon_name, name, NFILEN);
+	(void)strncpy0(x_icon_name, name, NFILEN);
 
 	Prop.value = (unsigned char *)name;
 	Prop.encoding = XA_STRING;
@@ -4043,7 +4526,7 @@ char *name;
 {
 	XTextProperty Prop;
 
-	strncpy0(x_window_name, name, NFILEN);
+	(void)strncpy0(x_window_name, name, NFILEN);
 
 	Prop.value = (unsigned char *)name;
 	Prop.encoding = XA_STRING;

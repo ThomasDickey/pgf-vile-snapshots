@@ -4,7 +4,7 @@
  * "termio.c". It compiles into nothing if not an ANSI device.
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/ansi.c,v 1.15 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/ansi.c,v 1.17 1994/09/13 17:15:48 pgf Exp $
  */
 
 #define termdef 1			/* don't define "term" external */
@@ -77,8 +77,8 @@ int coltran[8] = {2, 3, 5, 7, 0, 4, 6, 1};	/* color translation table */
  * "termio" code.
  */
 TERM	term	= {
-	MAXNROW-1,	/* max */
-	NROW-1,		/* current */
+	MAXNROW,	/* max */
+	NROW,		/* current */
 	MAXNCOL,	/* max */
 	NCOL,		/* current */
 	MARGIN,
@@ -350,7 +350,7 @@ int	bot;
 	csi();
 	ansiparm(top + 1);
 	ttputc(';');
-	if (bot != term.t_nrow) ansiparm(bot + 1);
+	if (bot != term.t_nrow-1) ansiparm(bot + 1);
 	ttputc('r');
 }
 #endif

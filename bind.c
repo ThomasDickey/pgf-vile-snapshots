@@ -3,7 +3,7 @@
  *
  *	written 11-feb-86 by Daniel Lawrence
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/bind.c,v 1.79 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/bind.c,v 1.87 1994/09/07 22:00:47 pgf Exp $
  *
  */
 
@@ -14,6 +14,9 @@
 #define HELP_BUF_NAME ScratchName(Help)
 #define BINDINGS_NAME ScratchName(Binding List)
 #define TERMCHRS_NAME ScratchName(Terminal)
+#if OPT_POPUPCHOICE
+static char COMPLETIONS_NAME[] = ScratchName(Completions);
+#endif
 
 /* dummy prefix binding functions */
 extern CMDFUNC f_cntl_af, f_cntl_xf, f_unarg, f_esc, f_speckey;
@@ -47,6 +50,11 @@ static	char *	to_tabstop P(( char * ));
 static	int	is_shift_cmd P(( char *, int ));
 static	char *	skip_partial P(( char *, SIZE_T, char *, SIZE_T ));
 static	void	show_partial P(( char *, SIZE_T, char *, SIZE_T ));
+#if OPT_POPUPCHOICE
+static	void	makecmpllist P(( int, char * ));
+static	void	show_completions P(( char *, SIZE_T, char *, SIZE_T ));
+static	void	scroll_completions P(( char *, SIZE_T, char *, SIZE_T ));
+#endif
 static	int	fill_partial P(( char *, SIZE_T, char *, char *, SIZE_T ));
 static	int	cmd_complete P(( int, char *, int * ));
 static	int	eol_command  P(( char *, int, int, int ));
@@ -61,6 +69,7 @@ int f,n;
 {
 	register BUFFER *bp;	/* buffer pointer to help */
 	char *fname;		/* ptr to file returned by flook() */
+	int alreadypopped;
 
 	/* first check if we are already here */
 	bp = bfind(HELP_BUF_NAME, BFSCRTCH);
@@ -74,6 +83,7 @@ int f,n;
 			(void)zotbuf(bp);
 			return(FALSE);
 		}
+		alreadypopped = (bp->b_nwnd != 0);
 		/* and read the stuff in */
 		if (readin(fname, 0, bp, TRUE) == FALSE ||
 				popupbuff(bp) == FALSE) {
@@ -86,6 +96,8 @@ int f,n;
 		make_local_b_val(bp,MDIGNCASE); /* easy to search, */
 		set_b_val(bp,MDIGNCASE,TRUE);
 		b_set_scratch(bp);
+		if (!alreadypopped)
+			shrinkwrap();
 	}
 	return swbuffer(bp);
 }
@@ -1133,8 +1145,11 @@ char *buffer;
 void
 kbd_alarm()
 {
-	TTbeep();
-	TTflush();
+	if (global_g_val(GMDERRORBELLS)) {
+		TTbeep();
+		TTflush();
+	}
+	warnings++;
 }
 
 /* put a character to the keyboard-prompt, updating 'ttcol' */
@@ -1275,6 +1290,159 @@ SIZE_T	size_entry;
 	TTflush();
 }
 
+#if OPT_POPUPCHOICE
+/*
+ * makecmpllist is called from liststuff to display the possible completions.
+ */
+struct compl_rec {
+    char *buf;
+    SIZE_T len;
+    char *table;
+    SIZE_T size_entry;
+};
+
+static void
+makecmpllist(dummy, cinfo)
+    int dummy;
+    char *cinfo;
+{
+    char * buf		= ((struct compl_rec *)cinfo)->buf;
+    SIZE_T len		= ((struct compl_rec *)cinfo)->len;
+    char * first	= ((struct compl_rec *)cinfo)->table;
+    SIZE_T size_entry	= ((struct compl_rec *)cinfo)->size_entry;
+    register char *last = skip_partial(buf, len, first, size_entry);
+    register char *p;
+    SIZE_T maxlen;
+    int slashcol;
+    int cmpllen;
+    int cmplcols;
+    int cmplrows;
+    int nentries;
+    int i, j;
+
+    for (p = NEXT_DATA(first), maxlen = strlen(THIS_NAME(first));
+         p != last;
+	 p = NEXT_DATA(p)) {
+	int l = strlen(THIS_NAME(p));
+	if (l > maxlen)
+	    maxlen = l;
+    }
+
+    for (slashcol = len; slashcol > 0; slashcol--)
+	if (is_slashc(buf[slashcol]))
+	    break;
+
+    if (is_slashc(buf[slashcol])) {
+	char b[NLINE];
+	slashcol++;		/* now slashcol is one past the slash */
+	strncpy(b, buf, (SIZE_T)slashcol);
+	b[slashcol] = 0;
+	bprintf("Completions prefixed by %s:\n", b);
+    }
+
+    cmplcols = term.t_ncol / (maxlen - slashcol + 1);
+
+    if (cmplcols == 0)
+	cmplcols = 1;
+
+    nentries = (last - first) / size_entry;
+    cmplrows = nentries / cmplcols;
+    cmpllen  = term.t_ncol / cmplcols;
+    if (cmplrows * cmplcols < nentries)
+	cmplrows++;
+
+    for (i = 0; i < cmplrows; i++) {
+	for (j = 0; j < cmplcols; j++) {
+	    int idx = cmplrows * j + i;
+	    if (idx < nentries) {
+		char *s = THIS_NAME(first+(idx*size_entry))+slashcol;
+		if (j == cmplcols-1)
+		    bprintf("%s\n", s);
+		else
+		    bprintf("%*s", cmpllen, s);
+	    }
+	    else {
+		bprintf("\n");
+		break;
+	    }
+	}
+    }
+}
+
+/*
+ * Pop up a window and show the possible completions.
+ */
+static void
+show_completions(buf, len, table, size_entry)
+char	*buf;
+SIZE_T	len;
+char	*table;
+SIZE_T	size_entry;
+{
+    struct compl_rec cinfo;
+    BUFFER *bp;
+    L_NUM prior_nlines = 0;
+    int alreadypopped = 0;
+
+    /*
+     * Find out if completions buffer exists and how many lines its window
+     * has prior to popping it up.
+     */
+    if ((bp = find_b_name(COMPLETIONS_NAME)) != NULL) {
+	alreadypopped = (bp->b_nwnd != 0);
+	if (alreadypopped)
+	    prior_nlines = bp2any_wp(bp)->w_ntrows;
+    }
+
+    cinfo.buf = buf;
+    cinfo.len = len;
+    cinfo.table = table;
+    cinfo.size_entry = size_entry;
+    liststuff(COMPLETIONS_NAME, makecmpllist, 0, (char *) &cinfo);
+
+    if (alreadypopped && line_count(bp) > prior_nlines)
+	shrinkwrap();
+
+    update(TRUE);
+}
+
+/*
+ * Scroll the completions window wrapping around back to the beginning
+ * of the buffer once it has been completely scrolled.  If the completions
+ * buffer is missing for some reason, we will call show_completions to pop
+ * it (back) up.
+ */
+static void
+scroll_completions(buf, len, table, size_entry)
+    char	*buf;
+    SIZE_T	len;
+    char	*table;
+    SIZE_T	size_entry;
+{
+    BUFFER *bp = find_b_name(COMPLETIONS_NAME);
+    if (bp == NULL)
+	show_completions(buf, len, table, size_entry);
+    else {
+	LINEPTR lp;
+	swbuffer(bp);
+	gotoeos(FALSE, 1);
+	lp = DOT.l;
+	forwhpage(FALSE, 1);
+	if (same_ptr(lp, DOT.l))
+	    gotobob(FALSE, 0);
+	update(TRUE);
+    }
+}
+
+void
+popdown_completions()
+{
+    BUFFER *bp;
+    if ((bp = find_b_name(COMPLETIONS_NAME)) != NULL)
+	zotwp(bp);
+}
+#endif /* OPT_POPUPCHOICE */
+
 /*
  * Attempt to partial-complete the string, char at a time
  */
@@ -1298,8 +1466,13 @@ SIZE_T	size_entry;
 		for (p = NEXT_DATA(first); p != last; p = NEXT_DATA(p)) {
 			if (THIS_NAME(p)[n] != buf[n]) {
 				buf[n] = EOS;
-				if (n == pos) TTbeep();
-				TTflush();
+				if (n == pos
+#if OPT_POPUPCHOICE
+				 && !global_g_val(GVAL_POPUP_CHOICES)
+#endif
+				)
+					kbd_alarm();
+				TTflush(); /* force out alarm or partial completion */
 				return n;
 			}
 		}
@@ -1311,6 +1484,20 @@ SIZE_T	size_entry;
 }
 
 static	int	testcol;	/* records the column when TESTC is decoded */
+#if OPT_POPUPCHOICE
+/*
+ * cmplcol is used to record the column number (on the message line) after
+ * name completion.  Its value is used to decide whether or not to display
+ * a completion list if the name completion character (tab) is pressed
+ * twice in succession.  Once the completion list has been displayed, its
+ * value will be changed to the additive inverse of the column number in
+ * order to determine whether to scroll if tab is pressed yet again.  We
+ * assume that 0 will never be a valid column number.  So long as we always
+ * display some sort of prompt prior to reading from the message line, this
+ * is a good assumption.
+ */
+static	int	cmplcol = 0;
+#endif
 
 /*
  * Initializes the name-completion logic
@@ -1328,6 +1515,10 @@ void
 kbd_unquery()
 {
 	beginDisplay;
+#if OPT_POPUPCHOICE
+	if (cmplcol != ttcol && -cmplcol != ttcol)
+		cmplcol = 0;
+#endif
 	if (testcol >= 0) {
 		while (ttcol > testcol)
 			kbd_erase();
@@ -1351,6 +1542,10 @@ SIZE_T	size_entry;
 {
 	register SIZE_T cpos = *pos;
 	register char *nbp;	/* first ptr to entry in name binding table */
+	int status = FALSE;
+#if OPT_POPUPCHOICE
+	int gvalpopup_choices = *global_g_val_ptr(GVAL_POPUP_CHOICES);
+#endif
 
 	kbd_init();		/* nothing to erase */
 	buf[cpos] = EOS;	/* terminate it for us */
@@ -1359,12 +1554,17 @@ SIZE_T	size_entry;
 	while (THIS_NAME(nbp) != NULL) {
 		if (strncmp(buf,  THIS_NAME(nbp), strlen(buf)) == 0) {
 			/* a possible match! exact? no more than one? */
+#if OPT_POPUPCHOICE
+			if (!clexec && c == NAMEC && cmplcol == -ttcol) {
+				scroll_completions(buf, cpos, nbp, size_entry);
+				return FALSE;
+			}
+#endif
 			if (c == TESTC) {
 				testcol = ttcol;
 				show_partial(buf, cpos, nbp, size_entry);
-				return FALSE;
 			}
-			if (strcmp(buf,  THIS_NAME(nbp)) == 0 || /* exact? */
+			else if (strcmp(buf,  THIS_NAME(nbp)) == 0 || /* exact? */
 				NEXT_NAME(nbp) == NULL ||
 				strncmp(buf, NEXT_NAME(nbp), strlen(buf)) != 0)
 			{
@@ -1376,21 +1576,52 @@ SIZE_T	size_entry;
 				if (c != NAMEC)  /* put it back */
 					tungetc(c);
 				/* return complete name */
-				(void)strncpy0(buf, THIS_NAME(nbp), NLINE);
-				*pos = cpos;
-				return TRUE;
+				(void)strncpy0(buf, THIS_NAME(nbp),
+						(SIZE_T)(NLINE - 1));
+				*pos = strlen(buf);
+#if OPT_POPUPCHOICE
+				if (gvalpopup_choices != 'o' && !clexec && (c == NAMEC))
+					status = FALSE;
+				else
+#endif
+					status = TRUE;
 			}
+			else {
+				/* try for a partial match against the list */
+				*pos = fill_partial(buf, cpos, nbp,
+					skip_partial(buf, cpos, nbp, size_entry),
+					size_entry);
+			}
+#if OPT_POPUPCHOICE
+#if 0
+			if (!clexec && gvalpopup_choices 
+			 && c == NAMEC && *pos == cpos) {
+				show_completions(buf, cpos, nbp, size_entry);
+				cmplcol = -ttcol;
+			}
+			else
+				cmplcol = 0;
+#endif
 
-			/* try for a partial match against the list */
-			*pos = fill_partial(buf, cpos, nbp,
-				skip_partial(buf, cpos, nbp, size_entry),
-				size_entry);
-			return FALSE;
-
+			if (!clexec && gvalpopup_choices != 'o' && c == NAMEC && *pos == cpos) {
+				if (gvalpopup_choices == 'i' || cmplcol == ttcol) {
+					show_completions(buf, cpos, nbp, size_entry);
+					cmplcol = -ttcol;
+				}
+				else
+					cmplcol = ttcol;
+			}
+			else
+				cmplcol = 0;
+#endif
+			return status;
 		}
 		nbp = NEXT_DATA(nbp);
 	}
 
+#if OPT_POPUPCHOICE
+	cmplcol = 0;
+#endif
 	kbd_alarm();	/* no match */
 	buf[*pos = cpos] = EOS;
 	return FALSE;

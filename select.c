@@ -16,9 +16,9 @@
  * transfer selected text from one application to another (or even to the
  * same application) in some platform dependent way.  The mechanics of
  * transfering the selection are not dealt with in this file.  Procedures
- * dealing with the representation are maintained in this file.
+ * for dealing with the representation are maintained in this file.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/select.c,v 1.15 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/select.c,v 1.17 1994/09/13 17:17:08 pgf Exp $
  *
  */
 
@@ -47,7 +47,7 @@ static	REGION *extended_region		P(( void ));
  *
  * selbufp and selregion are used to represent a highlighted selection.
  *
- * When starbufp or selbufp are NULL, the corresponding AREGION (strregion or
+ * When starbufp or selbufp are NULL, the corresponding AREGION (startregion or
  * selregion) is not attached to any buffer and is invalid.
  */
 
@@ -243,7 +243,7 @@ sel_extend(wiping)
     rls_region();
     rls_region();
 
-    selregion.ar_vattr = VAREV;
+    selregion.ar_vattr = VASEL;
     for_each_window(wp) {
 	if (wp->w_bufp == selbufp)
 	    wp->w_flag |= WFHARD;
@@ -336,7 +336,7 @@ pop_fake_win(oldwp)
     /* 
      * Decrement the window count, but don't update the traits.  We want
      * to give as little indication as possible that a fake window was
-     * created.  In particular, the should the user go back to a buffer
+     * created.  In particular, should the user go back to a buffer
      * which is not currently displayed, DOT should be where he last 
      * left it.
      */
@@ -431,6 +431,8 @@ extended_region()
     if (getregion(&a) == TRUE) {
         DOT.o -= 1;
 	MK = selregion.ar_region.r_end;
+	if (regionshape == FULLLINE)
+	    MK.l = lBACK(MK.l);
 	/* region b is to the end of the selection */
 	if (getregion(&b) == TRUE) {
 	    /* if a is bigger, it's the one we want */
@@ -523,7 +525,7 @@ selectregion()
 	    detach_attrib(selbufp, &selregion);
 	    selbufp = curbp;
 	    selregion.ar_region = region;
-	    selregion.ar_vattr = VAREV;
+	    selregion.ar_vattr = VASEL;
 	    selregion.ar_shape = regionshape;
 	    attach_attrib(selbufp, &selregion);
 	    OWN_SELECTION();
@@ -581,7 +583,7 @@ int f,n;
 {
       opcmd = OPOTHER;
       videoattribute = VAITAL;
-      return operator(f,n,attributeregion,"Set underline attribute");
+      return operator(f,n,attributeregion,"Set italic attribute");
 }
 
 int

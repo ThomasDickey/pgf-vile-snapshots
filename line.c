@@ -11,7 +11,16 @@
  * which means that the dot and mark values in the buffer headers are nonsense.
  *
  * $Log: line.c,v $
- * Revision 1.71  1994/06/17 00:38:56  pgf
+ * Revision 1.74  1994/09/07 22:00:47  pgf
+ * kev's 4.6g patches
+ *
+ * Revision 1.73  1994/08/29  22:15:10  pgf
+ * changed CMASK to CHARTYPE
+ *
+ * Revision 1.72  1994/08/08  16:12:29  pgf
+ * tom's 4.6e changes
+ *
+ * Revision 1.71  1994/06/17  00:38:56  pgf
  * kev's autoconf changes
  *
  * Revision 1.70  1994/04/20  19:53:07  pgf
@@ -772,10 +781,10 @@ int kflag;	/* put killed text in kill buffer flag */
 */
 #if OPT_EVAL
 #if ANSI_PROTOS
-char *getctext(CMASK type)
+char *getctext(CHARTYPE type)
 #else
 char *getctext(type)
-CMASK type;
+CHARTYPE type;
 #endif
 {
 	static char rline[NSTRING];	/* line to return */
@@ -1249,8 +1258,7 @@ REGIONSHAPE shape;
 	kregcirculate(FALSE);	/* cf: 'index2ukb()' */
 	if (kbs[ukb].kbufh == NULL) {
 		if (ukb != 0)
-			mlforce("[Nothing in register %c]", index2reg(oukb));
-		TTbeep();
+			mlwarn("[Nothing in register %c]", index2reg(oukb));
 		return(FALSE);
 	}
 
@@ -1366,6 +1374,8 @@ REGIONSHAPE shape;
 			width = kbs[ukb].kbwidth;
 			col = getcol(DOT.l, DOT.o, FALSE);
 		}
+#define SLOWPUT 0
+#if SLOWPUT
 		while (kp != NULL) {
 			i = KbSize(ukb,kp);
 			sp = (char *)kp->d_chunk;
@@ -1435,6 +1445,94 @@ REGIONSHAPE shape;
 				break;
 			kp = kp->d_next;
 		}
+#else /* SLOWPUT */
+		while (kp != NULL) {
+			i = KbSize(ukb,kp);
+			sp = (char *)kp->d_chunk;
+			if (shape == RECTANGLE) {
+				while (i--) {
+				    c = *sp++;
+				    if (width == 0 || c == '\n') {
+					    if (checkpad) {
+						    status = force_text_at_col(
+							    col, reached);
+						    if (status != TRUE)
+							    break;
+						    checkpad = FALSE;
+					    }
+					    if (width && linsert(width, ' ') 
+								!= TRUE) {
+						    status = FALSE;
+						    break;
+					    }
+					    if (next_line_at_col(col,&reached)
+							    != TRUE) {
+						    status = FALSE;
+						    break;
+					    }
+					    checkpad = TRUE;
+					    width = kbs[ukb].kbwidth;
+				    }
+				    if (c == '\n') {
+					    continue; /* did it already */
+				    } else {
+					    if (checkpad) {
+						status = force_text_at_col(
+								col, reached);
+						if (status != TRUE)
+							break;
+						checkpad = FALSE;
+					    }
+					    width--;
+
+					    if (is_header_line(DOT,curbp))
+						    suppressnl = TRUE;
+					    if (linsert(1, c) != TRUE) {
+						    status = FALSE;
+						    break;
+					    }
+					    wasnl = FALSE;
+				    }
+				}
+			} else { /* not rectangle */
+			    if (is_header_line(DOT,curbp))
+				suppressnl = TRUE;
+			    while (i-- > 0) {
+				if (*sp == '\n') {
+				    sp++;
+				    if (lnewline() != TRUE) {
+					status = FALSE;
+					break;
+				    }
+				    wasnl = TRUE;
+				}
+				else {
+				    register char *dp;
+				    register char *ep = sp+1;
+				    /* Find end of line or end of kill buffer */
+				    while (i > 0 && *ep != '\n') {
+					i--;
+					ep++;
+				    }
+				    /* Open up space in current line */
+				    status = linsert(ep - sp, ' ');
+				    if (status != TRUE)
+					break;
+				    dp = l_ref(DOT.l)->l_text 
+					    + DOT.o - (ep - sp);
+				    /* Copy killbuf portion to the line */
+				    while (sp < ep) {
+					*dp++ = *sp++;
+				    }
+				    wasnl = FALSE;
+				}
+			    }
+			}
+			if (status != TRUE)
+				break;
+			kp = kp->d_next;
+		}
+#endif /* SLOWPUT */
 		if (status != TRUE)
 			break;
 		if (wasnl) {

@@ -9,7 +9,7 @@
 */
 
 /*
- * $Header: /usr/build/VCS/pgf-vile/RCS/estruct.h,v 1.186 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/estruct.h,v 1.194 1994/09/23 04:21:19 pgf Exp $
  */
 
 #ifdef HAVE_CONFIG_H
@@ -23,9 +23,6 @@
 #ifdef VMS		/* predefined by VAX/VMS compiler */
 # define scrn_chosen
 # define VMSVT  1
-# define HAVE_GETCWD 1
-#else
-# define VMS    0
 #endif
 
 /* non-unix flavors */
@@ -155,8 +152,11 @@
 #ifndef NT
 # define NT 	0
 #endif
-#ifndef VMS
-# define VMS 0
+#ifdef VMS		/* predefined by VAX/VMS compiler (VAX C V3.2-044) */
+# define HAVE_GETCWD 1
+# define CPP_SUBS_OLDSTYLE 1
+#else
+# define VMS    0
 #endif
 #ifdef apollo
 # define APOLLO 1	/* FIXME: still more ifdefs to autoconf */
@@ -184,8 +184,26 @@
 #include <libc.h>
 #endif
 #if HAVE_FCNTL_H
+#ifndef O_RDONLY	/* prevent multiple inclusion on lame systems */
 #include <fcntl.h>	/* 'open()' */
 #endif
+#endif
+
+#ifdef TIME_WITH_SYS_TIME
+#include <sys/time.h>
+#include <time.h>
+#else
+#ifdef HAVE_SYS_TIME_H
+#include <sys/time.h>
+#else
+#include <time.h>
+#endif
+#endif
+
+#if HAVE_SYS_RESOURCE_H
+#include <sys/resource.h>
+#endif
+
 #if HAVE_SYS_WAIT_H
 #include <sys/wait.h>	/* 'wait()' */
 #endif
@@ -300,7 +318,7 @@
 #define	HP110	0			/* HP110 screen driver		*/
 #define	VMSVT	0			/* various VMS terminal entries	*/
 #define VT52	0			/* VT52 terminal (Zenith).	*/
-#define	BORLAND	1			/* Borland console I/O routines */
+#define	BORLAND	0			/* Borland console I/O routines */
 #define	IBMPC	(MSDOS && !BORLAND && !ANSI) /* IBM-PC CGA/MONO/EGA driver */
 #define	ZIBMPC	0			/* Zortech lib IBM-PC CGA/MONO/EGA driver	*/
 #define	DG10	0			/* Data General system/10	*/
@@ -374,6 +392,8 @@
 
 /* individual features that are (normally) controlled by SMALLER */
 #define OPT_B_LIMITS    !SMALLER		/* left-margin */
+#define OPT_POPUPCHOICE !SMALLER		/* popup-choices mode */
+#define OPT_POPUP_MSGS  !SMALLER		/* popup-msgs mode */
 #define OPT_EVAL        !SMALLER		/* expression-evaluation */
 #define OPT_FLASH       !SMALLER || IBMPC	/* visible-bell */
 #define OPT_HISTORY     !SMALLER		/* command-history */
@@ -442,11 +462,14 @@
 #define	OPT_GLOB_RANGE		UNIX || OS2 || (MSDOS && !SMALLER)
 
 /*	Debugging options	*/
-#define	RAMSIZE	0	/* dynamic RAM memory usage tracking */
-#define	VMALLOC	0	/* verify malloc operation (slow!) */
-#define	DEBUG	0	/* allows core dump from keyboard under UNIX */
-#define DEBUGM	0	/* $debug triggers macro debugging		*/
-#define	VISMAC	0	/* update display during keyboard macros	*/
+#define	RAMSIZE		0	/* dynamic RAM memory usage tracking */
+#define	DEBUG		0	/* allows core dump from keyboard under UNIX */
+#define DEBUGM		0	/* $debug triggers macro debugging	*/
+#define	VISMAC		0	/* update display during keyboard macros*/
+#define	VMALLOC		0	/* verify malloc operation (slow!) */
+#ifndef	DBMALLOC
+#define	DBMALLOC	0 	/* the dbmalloc package */
+#endif
 
 
 /* That's the end of the user selections -- the rest is static definition */
@@ -639,7 +662,7 @@ extern char *rindex P((const char *, int));
 /* pass the 0 if we can, since it's safer --- the machines where we can't are
  * probably POSIX machines with ANSI C.
  */
-# if STDC_HEADERS || __STDC__		/* FIXME: Design specific test */
+# if STDC_HEADERS && __STDC__		/* FIXME: Design specific test */
 #  define signal_pg(sig) kill(-getpgrp(), sig)
 # else
 #  define signal_pg(sig) kill(-getpgrp(0), sig)
@@ -753,6 +776,7 @@ typedef enum {
 #define KBD_NULLOK	iBIT(6)	/* may be empty -- or not */
 #define KBD_EXPCMD	iBIT(7)	/* expand %, #, : only in shell-command */
 #define KBD_SHPIPE	iBIT(8)	/* expand, assuming shell-command */
+#define KBD_NOMAP	iBIT(9) /* don't permit mapping via kbd_key() */
 
 /* default option for 'mlreply' (used in modes.c also) */
 #if !(MSDOS || WIN31 || OS2 || NT)
@@ -897,18 +921,17 @@ typedef enum {
 #define _nonspace chrBIT(13)		/* non-whitespace */
 #define _qident   chrBIT(14)		/* is typically legal in "qualified" identifier */
 
-#undef CMASK				/* ...in case it's in <sys/param.h> */
 #if OPT_WIDE_CTYPES
 #define _scrtch   chrBIT(15)		/* legal in scratch-buffer names */
 #define _shpipe   chrBIT(16)		/* legal in shell/pipe-buffer names */
 
 #define	screen_to_bname(buf)\
-	screen_string(buf,sizeof(buf),(CMASK)(_pathn|_scrtch|_shpipe))
-typedef	long CMASK;
+	screen_string(buf,sizeof(buf),(CHARTYPE)(_pathn|_scrtch|_shpipe))
+typedef	long CHARTYPE;
 #else
 #define	screen_to_bname(buf)\
-	screen_string(buf,sizeof(buf),(CMASK)(_pathn))
-typedef short CMASK;
+	screen_string(buf,sizeof(buf),(CHARTYPE)(_pathn))
+typedef short CHARTYPE;
 #endif
 
 #if NT
@@ -1245,6 +1268,7 @@ typedef unsigned short VIDEO_ATTR;	/* assumption: short is at least 16 bits */
 typedef unsigned char VIDEO_ATTR;
 #endif
 
+#define VASEL	0x08			/* selection */
 #define	VAREV	0x10			/* reverse video		*/
 #define	VAUL	0x20			/* underline			*/
 #define	VAITAL	0x40			/* italics			*/
@@ -1263,6 +1287,30 @@ typedef unsigned char VIDEO_ATTR;
 #define VADIRTY 0x0			/* nop for all others */
 #define VATTRIB(attr) (attr)
 #endif
+
+/* grow (or initially allocate) a vector of newsize types, pointed to by
+ * ptr.  this is used primarily for resizing the screen
+ * the studious will note this is a lot like realloc.   but realloc
+ * doesn't guarantee to preserve contents if if fails, and this also
+ * zeroes the new space.
+ */
+#define GROW(ptr, type, oldsize, newsize) \
+{ \
+	int tmpold = oldsize; \
+	type *tmpp; \
+	tmpp = typeallocn(type, newsize); \
+	if (tmpp == NULL) \
+		return FALSE; \
+ \
+	if (ptr) { \
+		memcpy(tmpp, ptr, tmpold * sizeof(type)); \
+		free((char *)ptr); \
+	} else { \
+		tmpold = 0; \
+	} \
+	ptr = tmpp; \
+	memset (ptr+tmpold, 0, (newsize - tmpold) * sizeof(type)); \
+}
 
 /*
  * An attributed region is attached to a buffer and indicates how the
@@ -1478,7 +1526,7 @@ typedef struct	BUFFER {
 #  if CPP_SUBS_BEFORE_QUOTE
 #   define	ScratchName(s) SCRTCH_LEFT    #s    SCRTCH_RIGHT
 #  else
-#   error "Cannot construct ScratchName macro"
+    error "Cannot construct ScratchName macro"
 #  endif
 # endif
 #endif
@@ -2009,13 +2057,11 @@ extern void exit P((int));
 extern void _exit P((int));
 #endif	/* HAVE_STDLIB_H */
 
-#if !defined(__GNUC__)
-# if HAVE_GETWD
+#if HAVE_GETWD && MISSING_EXTERN_GETWD
 extern char *getwd P(( char * ));
-# endif
-# if HAVE_GETCWD
+#endif
+#if HAVE_GETCWD && MISSING_EXTERN_GETCWD
 extern char *getcwd P(( char *, int ));
-# endif
 #endif
 
 /* array/table size */
@@ -2062,17 +2108,6 @@ extern char *getcwd P(( char *, int ));
 # endif
 #endif
 
-#ifdef TIME_WITH_SYS_TIME
-#include <sys/time.h>
-#include <time.h>
-#else
-#ifdef HAVE_SYS_TIME_H
-#include <sys/time.h>
-#else
-#include <time.h>
-#endif
-#endif
-
 
 /*
  * Local prototypes
@@ -2097,6 +2132,8 @@ extern char *getcwd P(( char *, int ));
 #if	DBMALLOC
 #undef strchr
 #undef strrchr
+#undef memcpy
+#undef memccpy
 #undef malloc
 #undef realloc
 #undef free

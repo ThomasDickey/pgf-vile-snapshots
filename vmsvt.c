@@ -7,7 +7,7 @@
  *  Author:  Curtis Smith
  *  Last Updated: 07/14/87
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/vmsvt.c,v 1.13 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/vmsvt.c,v 1.15 1994/09/13 17:15:48 pgf Exp $
  *
  */
 
@@ -60,8 +60,8 @@ static	char *	scroll_regn;
 
 /* Dispatch table. All hard fields just point into the terminal I/O code. */
 TERM	term	= {
-	24 - 1,				/* Max number of rows allowable */
-	/* Filled in */ - 1,		/* Current number of rows used	*/
+	24,				/* Max number of rows allowable */
+	/* Filled in */ 0,		/* Current number of rows used	*/
 	132,				/* Max number of columns	*/
 	/* Filled in */ 0,		/* Current number of columns	*/
 	64,				/* Min margin for extended lines*/
@@ -376,7 +376,7 @@ void vmsopen(void)
 	}
 		
 	/* Set sizes */
-	term.t_nrow = ((UINT) tc.t_mandl >> 24) - 1;
+	term.t_nrow = ((UINT) tc.t_mandl >> 24);
 	term.t_ncol = tc.t_width;
 
 	if (term.t_mrow < term.t_nrow)
@@ -495,7 +495,7 @@ int from, to, n;
 		for (i = to - from; i > 0; i--)
 			ttputs(scroll_back);
 	}
-	tcapscrollregion(0, term.t_nrow);
+	tcapscrollregion(0, term.t_nrow-1);
 }
 
 /* 

@@ -7,7 +7,7 @@
  * Original code probably by Dan Lawrence or Dave Conroy for MicroEMACS.
  * Major extensions for vile by Paul Fox, 1991
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/modes.c,v 1.38 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/modes.c,v 1.42 1994/09/07 22:00:47 pgf Exp $
  *
  */
 
@@ -32,6 +32,9 @@ static	int	string_to_bool P(( char *, int * ));
 #if defined(GMD_GLOB) || defined(GVAL_GLOB)
 static	int	legal_glob_mode P(( char * ));
 #endif
+static	int	is_fsm		P(( struct VALNAMES * ));
+static	int	legal_fsm	P(( char * ));
+static	int	fsm_complete	P(( int, char *, int * ));
 static	int	mode_complete P(( int, char *, int * ));
 static	int	mode_eol P(( char *, int, int, int ));
 static	int	do_a_mode P(( int, int ));
@@ -329,8 +332,7 @@ int f,n;
 		for_each_window(wp)
 			if (wp->w_bufp == curbp) wp->w_flag |= WFHARD;
 	} else if (f) {
-		mlforce("[Illegal tabstop value]");
-		TTbeep();
+		mlwarn("[Illegal tabstop value]");
 		return FALSE;
 	}
 	if (!global_b_val(MDTERSE) || !f)
@@ -351,8 +353,7 @@ int f,n;
 		make_local_b_val(curbp,VAL_FILL);
 		set_b_val(curbp,VAL_FILL,n);
 	} else if (f) {
-		mlforce("[Illegal fill-column value]");
-		TTbeep();
+		mlwarn("[Illegal fill-column value]");
 		return FALSE;
 	}
 	if (!global_b_val(MDTERSE) || !f)
@@ -561,6 +562,102 @@ char	*base;
 }
 #endif
 
+/* 
+ * FSM stands for fixed string mode, so called because the strings which the
+ * user is permitted to enter are non-arbitrary (fixed).
+ * 
+ * It is meant to handle the following sorts of things:
+ *
+ * 	:set popup-choices off
+ * 	:set popup-choices immediate
+ * 	:set popup-choices delayed
+ * 
+ * 	:set error quiet
+ * 	:set error beep
+ * 	:set error flash
+ */
+
+typedef char * FSM_CHOICES;
+
+struct FSM {
+    char * mode_name;
+    int	   count;
+    FSM_CHOICES * choices;
+};
+
+FSM_CHOICES fsm_popup_choices[] = {
+    "off",
+    "immediate",
+    "delayed",
+    (char *) 0
+};
+
+FSM_CHOICES fsm_error[] = {
+    "quiet",
+    "beep",
+    "flash",
+    (char *) 0
+};
+
+#define fsm_choice(mode_name, choices) { mode_name, SIZEOF(choices)-1, choices }
+
+struct FSM fsm_tbl[] = {
+    fsm_choice("popup-choices", fsm_popup_choices),
+    fsm_choice("error", fsm_error),
+};
+
+static int fsm_idx;
+
+static int
+is_fsm(names)
+    struct VALNAMES *names;
+{
+    if (names->type == VALTYPE_STRING) {
+	int i;
+	for (i = 0; i < SIZEOF(fsm_tbl); i++)
+	    if (strcmp(fsm_tbl[i].mode_name, names->name) == 0) {
+		fsm_idx = i;
+		return TRUE;
+	    }
+    }
+    fsm_idx = -1;
+    return FALSE;
+}
+
+static int
+legal_fsm(val)
+    char *val;
+{
+    if (fsm_idx >= 0) {
+	int i;
+	int idx = fsm_idx;
+	FSM_CHOICES *p = fsm_tbl[idx].choices;
+
+	fsm_idx = -1;
+	for (i = fsm_tbl[idx].count; i-- > 0; p++) {
+	    if (strcmp(*p, val) == 0)
+		return TRUE;
+	}
+	mlforce("[Illegal value for %s: '%s']",
+	        fsm_tbl[idx].mode_name,
+		val);
+	return FALSE;
+    }
+    else
+	return TRUE;
+}
+
+static int
+fsm_complete(c, buf, pos)
+    int  c;
+    char *buf;
+    int  *pos;
+{
+    return kbd_complete(c, buf, pos,
+                        (char *)&fsm_tbl[fsm_idx].choices[0],
+			sizeof (&fsm_tbl[fsm_idx].choices[0]) );
+}
+
 /*
  * Lookup the mode named with 'cp[]' and adjust its value.
  */
@@ -605,13 +702,18 @@ VALARGS *args;			/* symbol-table entry for the mode */
 		int	opts = regex ? 0 : KBD_NORMAL;
 		int	eolchar = (names->type == VALTYPE_REGEX
 				|| names->type == VALTYPE_STRING) ? '\n' : ' ';
+		int	(*complete) P(( int, char *, int *)) = no_completion;
 
 		respbuf[0] = EOS;
 		(void)lsprintf(prompt, "New %s %s: ",
 			cp,
 			regex ? "pattern" : "value");
 
-		s = kbd_string(prompt, respbuf, sizeof(respbuf), eolchar, opts, no_completion);
+		if (is_fsm(names))
+			complete = fsm_complete;
+
+		s = kbd_string(prompt, respbuf, sizeof(respbuf), eolchar,
+		               opts, complete);
 		if (s != TRUE)
 			return s;
 		if (!strlen(rp = respbuf))
@@ -625,6 +727,9 @@ VALARGS *args;			/* symbol-table entry for the mode */
 		 && !legal_glob_mode(rp))
 		 	return FALSE;
 #endif
+		 if (!legal_fsm(rp))
+		    return FALSE;
+		 
 	}
 #if OPT_HISTORY
 	else
@@ -853,6 +958,11 @@ int global;	/* true = global flag,	false = current buffer flag */
 #if	OPT_XTERM && !X11
 	int xterm_mouse = global_g_val(GMDXTERM_MOUSE);
 #endif
+	int was_working = 
+#if	OPT_WORKING
+		global_g_val(GMDWORKING) && 
+#endif
+			!global_b_val(MDTERSE);
 
 	while (((s = do_a_mode(kind, global)) == TRUE) && (end_string() == ' '))
 		anything++;
@@ -874,6 +984,13 @@ int global;	/* true = global flag,	false = current buffer flag */
 		set_global_g_val(GMDXTERM_MOUSE,!xterm_mouse);
 	}
 #endif
+	if (was_working != 
+#if OPT_WORKING
+		(global_g_val(GMDWORKING) && 
+#endif
+			!global_b_val(MDTERSE))) {
+		imworking(0);
+	}
 	{
 	/* this seems pretty inefficient -- i shouldn't need the extra
 		statics -- i should be told what mode matched, as a return

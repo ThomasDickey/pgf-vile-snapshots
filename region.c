@@ -5,7 +5,7 @@
  * commands. Some functions are just for
  * internal use.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/region.c,v 1.51 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/region.c,v 1.53 1994/07/22 01:45:44 pgf Exp $
  *
  */
 
@@ -310,6 +310,7 @@ shiftlregion()
  * change all tabs in the line to the right number of spaces.
  * leadingonly says only do leading whitespace
  */
+/*ARGSUSED*/
 int
 detabline(flagp, l, r)
 void *flagp;
@@ -361,6 +362,7 @@ detab_region()
  * convert all appropriate spaces in the line to tab characters.
  * leadingonly says only do leading whitespace
  */
+/*ARGSUSED*/
 int
 entabline(flagp, l, r)
 void *flagp;
@@ -547,17 +549,24 @@ int c;
 	return -1;
 }
 
+/*ARGSUSED*/
 int
 yank_line(flagp, l, r)
 void 	*flagp;
 int 	l, r;
 {
 	int s;
-	s = do_chars_in_line(_yankchar, l, r);
-	if (s && (r == lLength(DOT.l) || regionshape == RECTANGLE)) {
+	s = do_chars_in_line((void  *)_yankchar, l, r);
+	if (s) {
+	    if (r == lLength(DOT.l) || regionshape == RECTANGLE) {
 		/* we don't necessarily want to insert the last newline
 			in a region, so we delay it */
-		kinsertlater('\n');
+		    kinsertlater('\n');
+	    }
+	    else if (r > lLength(DOT.l)) {
+		/* This can happen when selecting with the mouse. */
+		kinsert('\n');
+	    }
 	}
 	return s;
 }

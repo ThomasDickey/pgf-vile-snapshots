@@ -13,7 +13,7 @@
  *	The same goes for vile.  -pgf
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/main.c,v 1.188 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/main.c,v 1.195 1994/09/23 04:21:19 pgf Exp $
  *
  */
 
@@ -322,7 +322,14 @@ char	*argv[];
 	/* initialize the editor */
 
 	siginit();
-	vtinit();		/* Display */
+
+	TTopen();		/* open the screen */
+	TTkopen();		/* open the keyboard */
+	TTrev(FALSE);
+
+	if (vtinit() != TRUE)		/* allocate display memory */
+		ExitProgram(BADEXIT);
+
 	winit();		/* windows */
 
 	/* this comes out to 70 on an 80 (or greater) column display */
@@ -337,8 +344,10 @@ char	*argv[];
 		bp = bfind(ScratchName(unnamed), 0);
 		bp->b_active = TRUE;
 #if DOSFILES
+		/* an empty non-existent buffer defaults to line-style
+			favored by the OS */
 		make_local_b_val(bp,MDDOS);
-		set_b_val(bp, MDDOS, CRLF_LINES && global_b_val(MDDOS) );
+		set_b_val(bp, MDDOS, CRLF_LINES);
 #endif
 		swbuffer(bp);
 	}
@@ -457,11 +466,19 @@ char	*argv[];
 #endif
 	}
 
+#if OPT_POPUP_MSGS
+	purge_msgs();
+#endif
 	if (startstat == TRUE)  /* else there's probably an error message */
 		mlforce(msg);
 
  begin:
 	(void)update(FALSE);
+
+#if OPT_POPUP_MSGS
+	if (global_g_val(GMDPOPUP_MSGS) == -TRUE)
+		set_global_g_val(GMDPOPUP_MSGS, FALSE);
+#endif
 
 	/* process commands */
 	loop();
@@ -530,7 +547,6 @@ loop()
 #endif /* LATERMAYBE */
 
 		do_repeats(&c,&f,&n);
-		map_check(c);
 
 		kregflag = 0;
 
@@ -611,6 +627,7 @@ global_val_init()
 #ifdef GMDDIRC
 	set_global_g_val(GMDDIRC,	FALSE); /* directory-completion */
 #endif
+	set_global_g_val(GMDERRORBELLS, TRUE);	/* alarms are noticeable */
 #if OPT_FLASH
 	set_global_g_val(GMDFLASH,  	FALSE);	/* beeps beep by default */
 #endif
@@ -619,6 +636,9 @@ global_val_init()
 #endif
 	set_global_g_val(GMDMULTIBEEP,	TRUE); /* multiple beeps for multiple
 						motion failures */
+#if OPT_WORKING
+	set_global_g_val(GMDWORKING,  	TRUE);	/* we put up "working..." */
+#endif
 	/* which 8 bit chars are printable? */
 	set_global_g_val(GVAL_PRINT_LOW, 0);
 	set_global_g_val(GVAL_PRINT_HIGH, 0);
@@ -640,11 +660,12 @@ global_val_init()
 #endif
 
 	set_global_g_val(GMDIMPLYBUFF,	FALSE); /* imply-buffer */
-#ifdef GMDPOPUP_FILEC
-	set_global_g_val(GMDPOPUP_FILEC,FALSE); /* popup-choices */
+#if	OPT_POPUPCHOICE
+	/* popup-choices */
+	set_global_g_val_ptr(GVAL_POPUP_CHOICES,strmalloc("delayed")); 
 #endif
-#ifdef GMDPOPUP_MSGS
-	set_global_g_val(GMDPOPUP_MSGS,	FALSE); /* popup-msgs */
+#if	OPT_POPUP_MSGS
+	set_global_g_val(GMDPOPUP_MSGS,-TRUE);	/* popup-msgs */
 #endif
 #ifdef GMDRAMSIZE
 	set_global_g_val(GMDRAMSIZE,	TRUE);	/* show ram-usage */
@@ -1202,12 +1223,11 @@ int
 esc(f, n)
 int f,n;
 {
-	TTbeep();
 	dotcmdmode = STOP;
 	regionshape = EXACT;
 	doingopcmd = FALSE;
 	opcmd = 0;
-	mlforce("[Aborted]");
+	mlwarn("[Aborted]");
 	return ABORT;
 }
 
@@ -1217,8 +1237,7 @@ int f,n;
 int
 rdonly()
 {
-	TTbeep();
-	mlforce("[No changes are allowed while in \"view\" mode]");
+	mlwarn("[No changes are allowed while in \"view\" mode]");
 	return FALSE;
 }
 
@@ -1227,8 +1246,7 @@ int
 unimpl(f,n)
 int f,n;
 {
-	TTbeep();
-	mlforce("[Sorry, that vi command is unimplemented in vile ]");
+	mlwarn("[Sorry, that vi command is unimplemented in vile ]");
 	return FALSE;
 }
 
@@ -1429,9 +1447,9 @@ display_ram_usage P((void))
 		int	saverow = ttrow;
 		int	savecol = ttcol;
 
-		if (saverow >= 0 && saverow <= term.t_nrow
-		 && savecol >= 0 && savecol <= term.t_ncol) {
-			movecursor(term.t_nrow, LastMsgCol);
+		if (saverow >= 0 && saverow < term.t_nrow
+		 && savecol >= 0 && savecol < term.t_ncol) {
+			movecursor(term.t_nrow-1, LastMsgCol);
 #if	COLOR
 			TTforg(gfcolor);
 			TTbacg(gbcolor);

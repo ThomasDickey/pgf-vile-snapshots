@@ -4,7 +4,7 @@
  * using VT52 emulation.  The I/O services are provided here as well.  It
  * compiles into nothing if not a 520ST style device.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/st520.c,v 1.11 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/st520.c,v 1.13 1994/09/13 17:15:48 pgf Exp $
  *
  */
 #error This module is not actively maintained as part of vile.
@@ -72,7 +72,9 @@ int STrez;			/* physical screen resolution */
  * terminal I/O code.
  */
 TERM	term	= {
-	NROW-1,
+	NROW,
+	NROW,
+	NCOL,
 	NCOL,
 	MARGIN,
 	MARGIN,
@@ -219,7 +221,7 @@ st520open()
 			/* fall thru to med res */
 
 		case 1: /* med res 25x80 4 colors */
-			term.t_nrow = 25 - 1;
+			term.t_nrow = 25;
 			term.t_ncol  = 80;
 			grez = 1;
 #if	COLOR
@@ -230,7 +232,7 @@ st520open()
 #endif
 			break;
 		case 2: /* high res 25x80 no colors */
-			term.t_nrow  = 40 - 1;
+			term.t_nrow  = 40;
 			term.t_ncol  = 80;
 			grez = 2;
 			make_8x10(); /* create a smaller font */
@@ -314,7 +316,7 @@ int nurez;
 	if(STrez == 2) { /* b/w monitor-only allow hi | med rez */
 		switch(nurez) {
 			case 2: /* high res */
-				term.t_nrow  = 40 - 1;
+				term.t_nrow  = 40;
 				term.t_ncol  = 80;
 				make_8x10(); /* create a smaller font */
 				set_40();    /* and go to 40 line mode */
@@ -323,7 +325,7 @@ int nurez;
 				onlywind(1,1);
 				break;
 			case 1: /* med res */
-				term.t_nrow  = 25 - 1;
+				term.t_nrow  = 25;
 				term.t_ncol  = 80;
 				restore();
 				grez = 1;
@@ -341,7 +343,7 @@ int nurez;
 		log  = Logbase();
 		switch(nurez) {
 			case 1:
-				term.t_nrow  = 25 - 1;
+				term.t_nrow  = 25;
 				term.t_ncol  = 80;
 				Setscreen(log, phys, 1);
 				STncolors = 4;
@@ -350,7 +352,7 @@ int nurez;
 				onlywind(1,1);
 				break;
 			case 0:
-				term.t_nrow  = 25 - 1;
+				term.t_nrow  = 25;
 				term.t_ncol  = 40;
 				Setscreen(log, phys, 0);
 				STncolors = 8;
@@ -626,8 +628,8 @@ extern	int	stbcol();
  * terminal I/O code.
  */
 TERM	term	= {
-	NROW-1,
-	NROW-1,
+	NROW,
+	NROW,
 	NCOL,
 	NCOL,
 	MARGIN,
@@ -779,19 +781,19 @@ stopen()	/* open the screen */
 
 	/* set up the screen size and palette */
 	switch (currez) {
-		case 0: term.t_mrow = 25 - 1;
-			term.t_nrow = 25 - 1;
+		case 0: term.t_mrow = 25;
+			term.t_nrow = 25;
 			term.t_ncol = 40;
 			strcpy(palstr, LOWPAL);
 			break;
 
-		case 1: term.t_mrow = 25 - 1;
-			term.t_nrow = 25 - 1;
+		case 1: term.t_mrow = 25;
+			term.t_nrow = 25;
 			strcpy(palstr, MEDPAL);
 			break;
 
-		case 2: term.t_mrow = 40 - 1;
-			term.t_nrow = 25 - 1;
+		case 2: term.t_mrow = 40;
+			term.t_nrow = 25;
 			strcpy(palstr, HIGHPAL);
 	}
 

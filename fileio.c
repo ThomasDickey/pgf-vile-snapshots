@@ -2,7 +2,7 @@
  * The routines in this file read and write ASCII files from the disk. All of
  * the knowledge about files are here.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/fileio.c,v 1.76 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/fileio.c,v 1.77 1994/08/08 16:12:29 pgf Exp $
  *
  */
 
@@ -176,7 +176,6 @@ char    *fn;
 	if (isShellOrPipe(fn)) {
 		if ((ffp=npopen(fn+1, mode)) == NULL) {
 	                mlerror("opening pipe for write");
-			/* TTbeep(); */
 	                return (FIOERR);
 		}
 		fileispipe = TRUE;
@@ -204,7 +203,6 @@ char    *fn;
 #endif
 		if ((ffp = fopen(fn, mode)) == NULL) {
 			mlerror("opening for write");
-			/* TTbeep(); */
 			return (FIOERR);
 		}
 		fileispipe = FALSE;

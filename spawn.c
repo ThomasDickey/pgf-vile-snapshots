@@ -1,7 +1,7 @@
 /*	Spawn:	various DOS access commands
  *		for MicroEMACS
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/spawn.c,v 1.84 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/spawn.c,v 1.86 1994/09/05 19:30:21 pgf Exp $
  *
  */
 
@@ -67,7 +67,7 @@ int f,n;
 	return FALSE;
 #else
 #if	UNIX
-	movecursor(term.t_nrow, 0);		/* Seek to last line.	*/
+	bottomleft();
 	ttclean(TRUE);
 	TTputc('\n');
 	(void)system_SHELL((char *)0);
@@ -86,14 +86,14 @@ int f,n;
 #endif
 
 #if	VMS
-	movecursor(term.t_nrow, 0);		/* In last line.	*/
+	bottomleft();
 	mlforce("[Starting DCL]\r\n");
 	TTflush();				/* Ignore "ttcol".	*/
 	sgarbf = TRUE;
 	return sys(NULL);			/* NULL => DCL.		*/
 #endif
 #if	MSDOS || OS2 || NT
-	movecursor(term.t_nrow, 0);		/* Seek to last line.	*/
+	bottomleft();
 	TTflush();
 	TTkclose();
 	{ 
@@ -342,7 +342,7 @@ int pressret;
 	if ((s=mlreply("cmd: !", oline, NLINE)) != TRUE)
 		return(s);
 	(void)strcpy(line,oline);
-	movecursor(term.t_nrow - 1, 0);
+	bottomleft();
 	TTclose();
 	/*
 	 * break the line into the command and its args
@@ -424,7 +424,7 @@ int pressret;
 	return FALSE;
 #endif
 #if	MSDOS || OS2 || NT || (ST520 & LATTICE)
-	movecursor(term.t_nrow, 0);
+	bottomleft();
 	TTputc('\n');
 	TTflush();
 	TTkclose();
@@ -432,7 +432,7 @@ int pressret;
 	/* If we don't reset to 80x25, parts of the shell-output will go
 	 * astray.
 	 */
-	closed = term.t_ncol != 80 || term.t_nrow != 24;
+	closed = term.t_ncol != 80 || term.t_nrow != 25;
 	if (closed)
 		TTclose();
 #endif
@@ -641,6 +641,9 @@ int f,n;
 	char	line[NLINE];	/* command line send to shell */
 	char tnam[NFILEN];	/* place to store real file name */
 	static char bname1[] = "fltinp";
+#if	UNIX
+	char	*t;
+#endif
 
 #if	AMIGA
 	static char filnam1[] = "ram:fltinp";
@@ -686,7 +689,7 @@ int f,n;
 #endif
 #if	MSDOS || OS2 || NT
 	(void)strcat(line," <fltinp >fltout");
-	movecursor(term.t_nrow - 1, 0);
+	bottomleft();
 	TTkclose();
 	system(line);
 	TTkopen();
@@ -694,8 +697,16 @@ int f,n;
 	s = TRUE;
 #endif
 #if	UNIX
+	bottomleft();
 	ttclean(TRUE);
-	(void)strcat(line," <fltinp >fltout");
+	if ((t = strchr(line, '|')) != 0) {
+		char	temp[NLINE];
+		(void)strcpy(temp, t);
+		(void)strcat(strcpy(t, " <fltinp"), temp);
+	} else {
+		(void)strcat(line, " <fltinp");
+	}
+	(void)strcat(line," >fltout");
 	system(line);
 	ttunclean();
 	TTflush();

@@ -7,7 +7,7 @@
  * Most code probably by Dan Lawrence or Dave Conroy for MicroEMACS
  * Extensions for vile by Paul Fox
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/fences.c,v 1.22 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/fences.c,v 1.23 1994/08/08 16:12:29 pgf Exp $
  *
  */
 
@@ -145,7 +145,7 @@ int f,n;
 {
 	int s = getfence(0, (!f || n > 0) ? FORWARD:REVERSE);
 	if (s == FALSE)
-		TTbeep();
+		kbd_alarm();
 	return s;
 }
 
@@ -155,7 +155,7 @@ int f,n;
 {
 	int s = getfence(0, (!f || n > 0) ? REVERSE:FORWARD);
 	if (s == FALSE)
-		TTbeep();
+		kbd_alarm();
 	return s;
 }
 

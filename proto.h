@@ -4,7 +4,7 @@
  *
  *   Created: Thu May 14 15:44:40 1992
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/proto.h,v 1.130 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/proto.h,v 1.142 1994/09/23 04:21:19 pgf Exp $
  *
  */
 
@@ -173,6 +173,7 @@ extern void kbd_init P(( void ));
 extern void kbd_unquery P(( void ));
 extern int kbd_complete P(( int, char *, int *, char *, SIZE_T ));
 extern int kbd_engl_stat P(( char *, char * ));
+extern void popdown_completions P(( void ));
 
 /* buffer.c */
 extern WINDOW *bp2any_wp P(( BUFFER * ));
@@ -192,6 +193,7 @@ extern int shiftwid_val P(( BUFFER * ));
 extern int has_C_suffix P(( BUFFER * ));
 extern int killbuffer P(( int, int ));
 extern int zotbuf P(( BUFFER * ));
+extern int zotwp P(( BUFFER * ));
 extern int namebuffer P(( int, int ));
 extern int popupbuff P(( BUFFER * ));
 extern void sortlistbuffers P(( void ));
@@ -238,7 +240,9 @@ extern int rev_csrch P(( int, int ));
 /* display.c */
 extern int nu_width P(( WINDOW * ));
 extern int col_limit P(( WINDOW * ));
-extern void vtinit P(( void ));
+extern int vtinit P(( void ));
+extern int vtalloc P(( void ));
+extern void vtfree P(( void ));
 extern void vttidy P(( int ));
 #if !SMALLER
 extern int upscreen P(( int, int ));
@@ -261,18 +265,16 @@ extern WINDOW *row2window P(( int ));
 extern void hilite P((int, int, int, int));
 extern void scrscroll P(( int, int, int ));
 extern void movecursor P(( int, int ));
+extern void bottomleft P(( void ));
 extern void mlerase P(( void ));
 extern void mlsavec P(( int ));
 extern void mlwrite P((char *, ... ));
 extern void mlforce P((char *, ... ));
 extern void mlprompt P((char *, ... ));
 extern void mlerror P(( char * ));
+extern void mlwarn P(( char *, ... ));
 extern void dbgwrite P((char *, ... ));
 extern char * lsprintf P((char *, char *, ... ));
-#ifdef	UNUSED
-extern void lssetbuf P(( char * ));
-extern char * _lsprintf P(( char *, ... ));
-#endif	/* UNUSED */
 extern void bputc P(( int ));
 extern void bprintf P((char *, ... ));
 #if !X11
@@ -296,6 +298,7 @@ extern	void	psc_rev		P(( int ));
 
 /* eval.c */
 extern char * l_itoa P(( int ));
+extern long l_strtol P(( char * ));
 extern int absol P(( int ));
 extern int is_truem P(( char * ));
 extern int is_falsem P(( char * ));
@@ -420,8 +423,8 @@ extern int resetkey P(( BUFFER *, char * ));
 
 /* filec.c */
 #if COMPLETE_DIRS || COMPLETE_FILES
-extern BUFFER *bs_init P(( char *, int ));
-extern int bs_find P(( char *, SIZE_T, BUFFER *, int, LINEPTR * ));
+extern BUFFER *bs_init P(( char * ));
+extern int bs_find P(( char *, SIZE_T, BUFFER *, LINEPTR * ));
 #endif
 extern int mlreply_file P(( char *, TBUFF **, int, char * ));
 extern int mlreply_dir P(( char *, TBUFF **, char * ));
@@ -499,13 +502,14 @@ extern int mlreply_no_bs P(( char *, char *, int ));
 extern int mlreply_no_opts P(( char *, char *, int ));
 extern void incr_dot_kregnum P(( void ));
 extern void tungetc P(( int ));
+extern void tungetstr P(( char *, int ));
 extern int get_recorded_char P(( int ));
 extern int tgetc P(( int ));
 extern int kbd_key P(( void ));
 extern int kbd_seq P(( void ));
 extern int speckey P(( int, int ));
 extern int kcod2escape_seq P(( int, char * ));
-extern int screen_string P(( char *, int, CMASK ));
+extern int screen_string P(( char *, int, CHARTYPE ));
 extern int end_string P(( void ));
 extern int kbd_delimiter P(( void ));
 extern int is_edit_char P(( int ));
@@ -584,7 +588,7 @@ extern int linsert P(( int, int ));
 extern int lnewline P(( void ));
 extern int ldelete P(( long, int ));
 #if OPT_EVAL
-extern char * getctext P(( CMASK ));
+extern char * getctext P(( CHARTYPE ));
 extern int putctext P(( char * ));
 #endif
 extern int ldelnewline P(( void ));
@@ -619,14 +623,11 @@ extern void relist_registers P(( void ));
 
 /* map.c */
 extern int map P(( int, int ));
+extern int map_bang P(( int, int ));
 extern int unmap P(( int, int ));
-extern void map_check P(( int ));
-extern int map_proc P((int, int));
-#if OPT_UPBUFF
-extern void relist_mappings P(( void ));
-#else
-#define relist_mappings()
-#endif
+extern int unmap_bang P(( int, int ));
+extern void addtomaps P(( char *, int ));
+extern int maplookup P(( int, int * ));
 
 /* mapchars.c */
 #if NEW_VI_MAP
@@ -634,6 +635,13 @@ extern void map_init P(( void ));
 extern int map_set P(( int, int ));
 extern int map_unset P(( int, int ));
 extern int map_read P(( void ));
+#endif
+
+/* msgs.c */
+#if OPT_POPUP_MSGS
+void msg_putc P((int c));
+void popup_msgs P((void));
+void purge_msgs P((void));
 #endif
 
 /* modes.c */
@@ -770,6 +778,7 @@ extern int clrmes P(( int, int ));
 extern int fmatchindent P(( int ));
 #if !SMALLER
 extern int writemsg P(( int, int ));
+extern int userbeep P(( int, int ));
 #endif
 extern void catnap P(( int, int ));
 extern char * current_directory P(( int ));
@@ -948,6 +957,7 @@ extern int splitwind P(( int, int ));
 extern int enlargewind P(( int, int ));
 extern int shrinkwind P(( int, int ));
 extern WINDOW * wpopup P(( void ));
+extern void shrinkwrap P(( void ));
 extern int scrnextup P(( int, int ));
 extern int scrnextdw P(( int, int ));
 #if !SMALLER
@@ -990,7 +1000,7 @@ extern int macroize P(( TBUFF **, char *, char * ));
 extern int macarg P(( char * ));
 extern int echochar P(( int, int ));
 extern int scanmore P(( char *, int ));
-extern int scanner P((regexp *, int, int ));
+extern int scanner P((regexp *, int, int, int * ));
 extern int insbrace P(( int, int ));
 extern int inspound P(( void ));
 extern void fmatch P(( int ));
@@ -1074,7 +1084,7 @@ extern	int	x_setfont		P(( char * ));
 extern	char *	x_current_fontname	P(( void ));
 extern	void	x_preparse_args		P(( int *, char *** ));
 extern	void	x_putline		P(( int, char *, int ));
-extern	int	x_is_pasting		P((void));
+extern	int	x_typahead		P(( int ));
 extern	int	x_on_msgline		P((void));
 #if OPT_WORKING
 extern	void	x_working		P(( void ));
@@ -1160,6 +1170,12 @@ extern	int	fprintf	P(( FILE *, const char *, ... ));
 #if MISSING_EXTERN_FPUTC
 extern	int	fputc	P(( int, FILE * ));
 #endif
+#if MISSING_EXTERN_FPUTS
+extern	int	fputs	P(( const char *, FILE * ));
+#endif
+#if MISSING_EXTERN_FPUTS
+extern	int	fputs	P(( const char *, FILE * ));
+#endif
 #if MISSING_EXTERN_FREAD
 extern	int	fread	P(( char *, int, int, FILE * ));
 #endif
@@ -1243,6 +1259,16 @@ extern	void	setbuffer P(( FILE *, char *, int ));
 #endif
 #if MISSING_EXTERN_SETJMP
 extern	int	setjmp	P((jmp_buf env));
+#endif
+#if MISSING_EXTERN_SETPGRP
+#if HAVE_BSD_SETPGRP
+extern	int	setpgrp	P(( int, int ));
+#else
+extern	pid_t	setpgrp	P(( void ));
+#endif
+#endif
+#if MISSING_EXTERN_SETSID
+extern	pid_t	setsid	P(( void ));
 #endif
 #if MISSING_EXTERN_SETVBUF
 #if SETVBUF_REVERSED

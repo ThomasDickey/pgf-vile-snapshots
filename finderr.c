@@ -1,7 +1,7 @@
 /* Find the next error in mentioned in the shell output window.
  * Written for vile by Paul Fox, (c)1990
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/finderr.c,v 1.37 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/finderr.c,v 1.38 1994/08/08 16:12:29 pgf Exp $
  *
  */
 
@@ -188,8 +188,7 @@ int f,n;
 		}
 
 		if (lforw(dotp) == l_ref(buf_head(sbp))) {
-			mlforce("[No more errors in %s buffer]", febuff);
-			TTbeep();
+			mlwarn("[No more errors in %s buffer]", febuff);
 			/* start over at the top of file */
 			putdotback(sbp, lForw(buf_head(sbp)));
 			while (l)

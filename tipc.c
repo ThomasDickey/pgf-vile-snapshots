@@ -3,7 +3,7 @@
  * compatible terminals. It goes directly to the graphics RAM to do
  * screen output. It compiles into nothing if not a TI-PC driver
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/tipc.c,v 1.6 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/tipc.c,v 1.7 1994/09/13 17:15:48 pgf Exp $
  */
 
 #define termdef 1			/* don't define "term" external */
@@ -61,8 +61,8 @@ int	ctrans[] =		/* ansi to ti color translation table */
  * "termio" code.
  */
 TERM	term	= {
-	NROW-1,
-	NROW-1,
+	NROW,
+	NROW,
 	NCOL,
 	NCOL,
 	MARGIN,

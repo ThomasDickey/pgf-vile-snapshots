@@ -5,7 +5,7 @@
  * functions that adjust the top line in the window and invalidate the
  * framing, are hard.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/basic.c,v 1.71 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/basic.c,v 1.72 1994/07/15 01:49:10 pgf Exp $
  *
  */
 
@@ -1188,7 +1188,8 @@ swapmark()
 #if OPT_MOUSE
 /*
  * Given row & column from the screen, set the MK value.
- * Note that the resulting position may be past the end-of-buffer.
+ * The resulting position will not be past end-of-buffer unless the buffer
+ * is empty.
  */
 int
 setwmark(row, col)
@@ -1226,6 +1227,10 @@ int row, col;
 			DOT.o--;
 #endif
 	}
+	if (is_header_line(DOT, curwp->w_bufp)) {
+		DOT.l = lBACK(DOT.l);
+		DOT.o = lLength(DOT.l);
+	}
 	MK  = DOT;
 	DOT = save;
 	return TRUE;
@@ -1233,7 +1238,6 @@ int row, col;
 
 /*
  * Given row & column from the screen, set the curwp and DOT values.
- * Note that the resulting position may be past the end-of-buffer.
  */
 int
 setcursor (row, col)

@@ -10,7 +10,7 @@
  *	    otherwise TurboC finds a syntax error.
  *	(2) must compile with a LARGE model
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/win31drv.c,v 1.2 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/win31drv.c,v 1.3 1994/09/05 19:30:54 pgf Exp $
  */
 
 #include <windows.h>
@@ -221,7 +221,7 @@ int	bot;
 	csi();
 	win31_parm(top + 1);
 	ttputc(';');
-	if (bot != term.t_nrow) win31_parm(bot + 1);
+	if (bot != term.t_nrow-1) win31_parm(bot + 1);
 	ttputc('r');
 }
 #endif

@@ -5,7 +5,7 @@
  * Written by T.E.Dickey for vile (march 1993).
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/filec.c,v 1.34 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/filec.c,v 1.35 1994/08/09 20:07:03 pgf Exp $
  *
  */
 
@@ -45,11 +45,8 @@ free_expansion P(( void ))
 
 static	int	trailing_slash P((char *));
 static	SIZE_T	force_slash P((char *));
-static	int	trailing__SLASH P((char *));
-static	int	force__SLASH P((char *));
-static	void	conv_path P((char *, char *, int));
 static	int	pathcmp P((LINE *, char *));
-static	LINE *	makeString P((BUFFER *, LINE *, char *));
+static	LINE *	makeString P((BUFFER *, LINE *, char *, SIZE_T));
 
 /*--------------------------------------------------------------------------*/
 
@@ -62,7 +59,7 @@ trailing_slash(path)
 char *	path;
 {
 	register int	len = strlen(path);
-	if (len > 1) {
+	if (len > 0) {
 #if VMS
 		if (is_vms_pathname(path, TRUE))
 			return TRUE;
@@ -93,159 +90,69 @@ char *	path;
 }
 
 /*
- * Test if the path has a trailing SLASH-delimiter
- */
-static int
-trailing__SLASH(path)
-char *	path;
-{
-	register int	len = strlen(path);
-	return (len > 1
-	  &&	path[len-1] == SLASH);
-}
-
-/*
- * Force a trailing SLASH on the end of the path, returns the length of the
- * resulting path.
- */
-static int
-force__SLASH(path)
-char *	path;
-{
-	register int	len = strlen(path);
-
-	if (!trailing__SLASH(path)) {
-		path[len++] = SLASH;
-		path[len] = EOS;
-	}
-	return len;
-}
-
-/*
- * Because the slash-delimiter is not necessarily lexically before any of the
- * other characters in a path, provide a conversion that makes it so.  Then,
- * using 'strcmp()', we will get lexically-sorted paths.
- */
-static void
-conv_path(dst, src, len)
-char *	dst;
-char *	src;
-int	len;
-{
-	register int	c;
-
-	while ((len-- > 0) && (c = *src++) != EOS) {
-#if VMS
-		if (strchr(":[]!", c))
-			c = SLASH;
-#endif
-		if (is_slashc(c))
-			c = SLASH;
-		*dst++ = c;
-	}
-	*dst = EOS;
-}
-
-/*
- * Compare two paths lexically.  The text-string is normally not a full-path,
- * so we must find an appropriate place along the lp-string to start the
- * comparison.
+ * Compare two paths lexically.
  */
 static int
 pathcmp(lp, text)
-LINE *	lp;
-char *	text;
+LINE *  lp;
+char *  text;
 {
-	char	refbfr[NFILEN], *ref = refbfr,
-		tstbfr[NFILEN], *tst = tstbfr;
-	int	reflen = llength(lp),	/* length, less null */
-		tstlen = strlen(text);
-	register int	j, k;
+    register char *l, *t;
+    register int lc, tc;
 
-	if (reflen <= 0)	/* cannot compare */
-		return 1;
+    if (llength(lp) <= 0)	/* Can this happen? */
+	return -1;
 
-	conv_path(ref, lp->l_text, reflen);
-	conv_path(tst, text,       tstlen);
-
-#if MSDOS || OS2 || NT
-	/*
-	 * Check to see if the drives are the same.  If not, there is no
-	 * point in further comparison.
-	 */
-	if ((ref = is_msdos_drive(refbfr)) != 0) {
-		if ((tst = is_msdos_drive(tstbfr)) != 0) {
-			if (*refbfr != *tstbfr)
-				return (*refbfr - *tstbfr);
-		} else
-			tst = tstbfr;
-	} else {
-		ref = refbfr;
-		if ((tst = is_msdos_drive(tstbfr)) == 0)
-			tst = tstbfr;
+    l = lp->l_text;
+    t = text;
+    for (;;) {
+	lc = *l++;
+	tc = *t++;
+	if (lc == tc) {
+	    if (tc == EOS)
+		return 0;
 	}
-#endif
-
-	/* If we stored a trailing slash on the ref-value, then it was known to
-	 * be a directory.  Append a slash to the tst-value in that case to
-	 * force a match if it is otherwise the same.
-	 */
-	if (trailing__SLASH(ref))
-		(void)force__SLASH(tst);
-	else if (trailing__SLASH(tst))
-		(void)force__SLASH(ref);
-
-	/* count the slashes embedded in text-string */
-	for (j = k = 0; tst[j] != EOS; j++)
-		if (tst[j] == SLASH)
-			k++;
-
-	/* skip back so we have the same number of slashes in lp-string */
-	j = strlen(ref);
-	if (k > 0) {
-		for (; j >= 0; j--)
-			if (ref[j] == SLASH)
-				if (--k <= 0)
-					break;
+	else {
+	    if (is_slashc(lc)) {
+		if (*l != EOS)
+		    lc = SLASH;
+		else
+		    lc = EOS;
+	    }
+	    if (is_slashc(tc)) {
+		if (*t != EOS)
+		    tc = SLASH;
+		else
+		    tc = EOS;
+	    }
+	    return lc - tc;
 	}
-
-	if ((k == 0) && (j > 0)) {
-		/* skip back to include the leading leaf */
-		if (tst[0] != SLASH) {
-			j--;
-			while ((j >= 0) && (ref[j] != SLASH))
-				j--;
-			if (ref[j] == SLASH)
-				j++;	/* back to the beginning of leaf */
-		}
-	} else
-		j = 0;	/* cannot get there */
-
-#if APOLLO
-	if (j == 1)		/* we have leading "//" on apollo */
-		j = 0;
-#endif
-	return strcmp(ref+j, tst);
+    }
 }
 
 /*
  * Insert a pathname at the given line-pointer.
- * Allocate 2 extra bytes for EOS and (possible) trailing slash.
+ * Allocate up to three extra bytes for possible trailing slash, EOS, and
+ * directory scan indicator.  The latter is only used when there is a trailing
+ * slash.
  */
 static LINE *
-makeString(bp, lp, text)
+makeString(bp, lp, text, len)
 BUFFER *bp;
 LINE *	lp;
 char *	text;
+SIZE_T	len;
 {
 	register LINE	*np;
-	register int	len = strlen(text);
+	int extra = (len > 0 && is_slashc(text[len-1])) ? 2 : 3;
 
-	if ((np = l_ref(lalloc(len+2,bp))) == NULL) {
+	if ((np = l_ref(lalloc((int)len+extra, bp))) == NULL) {
 		lp = 0;
 	} else {
 		(void)strcpy(np->l_text, text);
-		llength(np) -= 2;	/* hide the null */
+		np->l_text[len+extra-1] = 0; 	/* clear scan indicator */
+		llength(np) -= extra;	/* hide the null and scan indicator */
+		
 
 		set_lforw(lback(lp), np);
 		set_lback(np, lback(lp));
@@ -268,56 +175,33 @@ char *	text;
  * The tags buffer is initialized only once for a given tags-file.
  */
 BUFFER *
-bs_init(name, first)
+bs_init(name)
 char *	name;
-int	first;
 {
 	register BUFFER *bp;
 
 	if ((bp = bfind(name, BFINVS)) != 0) {
 		b_clr_flags(bp, BFSCRTCH);	/* make it nonvolatile */
-		if (first == -TRUE) {
-			(void)bclear(bp);
-			bp->b_active = TRUE;
-		}
+		(void)bclear(bp);
+		bp->b_active = TRUE;
 	}
 	return bp;
 }
 
 /*
  * Look for or insert a pathname string into the given buffer.  Start looking
- * at the given line if non-null.
+ * at the given line if non-null.  The pathname is expected to be in
+ * canonical form.
  */
 int
-bs_find(text, len,  bp, iflag, lpp)
-char *	text;	/* pathname to find */
+bs_find(fname, len,  bp, lpp)
+char *	fname;	/* pathname to find */
 SIZE_T	len;	/* ...its length */
 BUFFER *bp;	/* buffer to search */
-int	iflag;	/* true to insert if not found, -true if it is directory */
 LINEPTR *lpp;	/* in/out line pointer, for iteration */
 {
 	register LINE	*lp;
 	int	doit	= FALSE;
-	char	fname[NFILEN];
-
-	/*
-	 * If we are only looking up a name (for "looktags"), keep the name as
-	 * we are given it.  If told that we might insert the name, convert it
-	 * to absolute form.  In the special case of inserting a directory
-	 * name, append a slash on the end so that we can see this in the name
-	 * completion.
-	 */
-	strncpy(fname, text, len)[len] = EOS;
-#if VMS
-	/* name should already be in canonical form */
-#else
-	if (iflag) {
-		/* always store full paths */
-		(void)lengthen_path(fname);
-		if (iflag == -TRUE)
-			(void)force_slash(fname);
-	}
-#endif
 
 	if (lpp == NULL || (lp = l_ref(*lpp)) == NULL)
 		lp = l_ref(buf_head(bp));
@@ -327,30 +211,27 @@ LINEPTR *lpp;	/* in/out line pointer, for iteration */
 		register int r = pathcmp(lp, fname);
 
 		if (r == 0) {
-			if (iflag == -TRUE
-			 &&  trailing_slash(fname)
+			if (trailing_slash(fname)
 			 && !trailing_slash(lp->l_text)) {
 				/* reinsert so it is sorted properly! */
 				lremove(bp, l_ptr(lp));
-				return bs_find(text, len,  bp, iflag, lpp);
+				return bs_find(fname, len,  bp, lpp);
 			}
 			break;
-		} else if (iflag && (r > 0)) {
+		} else if (r > 0) {
 			doit = TRUE;
 			break;
 		}
 
 		lp = lforw(lp);
 		if (lp == l_ref(buf_head(bp))) {
-		 	if (!iflag)
-				return FALSE;
 			doit = TRUE;
 			break;
 		}
 	}
 
 	if (doit) {
-		lp = makeString(bp, lp, fname);
+		lp = makeString(bp, lp, fname, len);
 		b_clr_counted(bp);
 	}
 
@@ -364,7 +245,7 @@ LINEPTR *lpp;	/* in/out line pointer, for iteration */
 
 static	int	already_scanned P((char *));
 static	void	fillMyBuff P((char *));
-static	void	makeMyList P((void));
+static	void	makeMyList P((char *));
 #if NO_LEAKS
 static	void	freeMyList P((void));
 #endif
@@ -380,9 +261,8 @@ static	ALLOC_T MySize;		/* length of list, for (re)allocation */
  *
  * If there is anything else in the list that we can do completion with, return
  * true.  This allows the case in which we scan a directory (for directory
- * completion and then look at the subdirectories.  Note that it may result in
- * re-scanning a directory that has no subdirectories, but this happens only
- * during directory completion, which is slow anyway.
+ * completion and then look at the subdirectories.  It should not permit
+ * directories which have already been scanned to be rescanned.
  */
 static int
 already_scanned(path)
@@ -391,20 +271,28 @@ char *	path;
 	register LINE	*lp;
 	register SIZE_T	len;
 	char	fname[NFILEN];
+	LINEPTR slp;
 
 	len = force_slash(strcpy(fname, path));
 
 	for_each_line(lp,MyBuff)
-		if (!strcmp(fname, lp->l_text)) {
-			LINE	*np = lforw(lp);
-
-			if (llength(np) > 0
-			 && !strncmp(path, np->l_text, strlen(path)))
-				return TRUE;
+		if (strcmp(fname, lp->l_text) == 0) {
+		    if (lp->l_text[llength(lp)+1])
+			return TRUE;
+		    else
+			break; 	/* name should not occur more than once */
 		}
 
 	/* force the name in with a trailing slash */
-	(void)bs_find(fname, len, MyBuff, -TRUE, (LINEPTR*)0);
+	slp = buf_head(MyBuff);
+	(void)bs_find(fname, len, MyBuff, &slp);
+
+	/*
+	 * mark name as scanned (since that is what we're about to do after
+	 * returning)
+	 */
+	lp = l_ref(slp);
+	lp->l_text[llength(lp)+1] = 1;
 	return FALSE;
 }
 
@@ -424,8 +312,6 @@ char *	name;
 	DIRENT	*de;
 
 	char	path[NFILEN];
-
-	int	iflag;
 
 	(void)strcpy(path, name);
 	if (!is_directory(path)) {
@@ -480,18 +366,15 @@ char *	name;
 			if (only_dir) {
 				if (!is_directory(path))
 					continue;
-				iflag = -TRUE;
-			} else {
-#if COMPLETE_DIRS
-				iflag = (global_g_val(GMDDIRC) && 
-						is_directory(path))
-					? -TRUE
-					: TRUE;
-#else
-				iflag = TRUE;
-#endif
+				(void) force_slash(path);
 			}
-			(void)bs_find(path, (SIZE_T)strlen(path), MyBuff, iflag,
+#if COMPLETE_DIRS
+			else {
+				if (global_g_val(GMDDIRC) && is_directory(path))
+					(void) force_slash(path);
+			}
+#endif
+			(void)bs_find(path, (SIZE_T)strlen(path), MyBuff,
 					(LINEPTR*)0);
 		}
 		(void)closedir(dp);
@@ -502,10 +385,16 @@ char *	name;
  * Make the list of names needed for name-completion
  */
 static void
-makeMyList()
+makeMyList(name)
+char *name;
 {
 	register int	need, n;
 	register LINE *	lp;
+	char *slashocc;
+	int len = strlen(name);
+
+	if (is_slashc(name[len-1]))
+	    len++;
 
 	bsizes(MyBuff);
 	need = MyBuff->b_linecount + 2;
@@ -519,7 +408,11 @@ makeMyList()
 
 	n = 0;
 	for_each_line(lp,MyBuff)
-		if (only_dir || !trailing_slash(lp->l_text))
+		/* exclude listings of subdirectories below
+		   current directory */
+		if (llength(lp) >= len 
+		 && ((slashocc = strchr(lp->l_text+len, SLASHC)) == NULL
+		   || slashocc[1] == EOS))
 			MyList[n++] = lp->l_text;
 	MyList[n] = 0;
 }
@@ -577,7 +470,7 @@ int	*pos;
 		/* initialize only on demand */
 		if (MyBuff == 0) {
 			if ((MyName == 0)
-			 || (MyBuff = bs_init(MyName, -TRUE)) == 0)
+			 || (MyBuff = bs_init(MyName)) == 0)
 			 	return FALSE;
 		}
 
@@ -627,7 +520,7 @@ int	*pos;
 		oldlen = strlen(path);
 
 		fillMyBuff(path);
-		makeMyList();
+		makeMyList(path);
 
 		/* patch: should also force-dot to the matched line, as in history.c */
 		/* patch: how can I force buffer-update to show? */

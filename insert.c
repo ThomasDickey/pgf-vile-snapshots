@@ -7,7 +7,7 @@
  * Most code probably by Dan Lawrence or Dave Conroy for MicroEMACS
  * Extensions for vile by Paul Fox
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/insert.c,v 1.58 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/insert.c,v 1.60 1994/09/23 04:21:19 pgf Exp $
  *
  */
 
@@ -367,7 +367,6 @@ int *splice;
 	int backsp_limit;
 	static TBUFF *insbuff;
 	int osavedmode;
-	int is_func_prefix = FALSE;
 
 	if (DOT_ARGUMENT) {
 		max_count = cur_count + dotcmdcnt;
@@ -471,19 +470,17 @@ int *splice;
 		}
 
 
-		if (isspecial(c) /* is_func_prefix */ ) {
+		if (isspecial(c)) {
 		    	/* if we're allowed to honor meta-character bindings,
 				then see if it's bound to something, and
 				insert it if not */
 			CMDFUNC *cfp = kcod2fnc( /* SPEC| */ c);
 			if (cfp) {
-				map_check(c);
 				backsp_limit = w_left_margin(curwp);
 				if (curgoal < 0)
 					curgoal = getccol(FALSE);
 				(void)execute(cfp,FALSE,1);
 			}
-			is_func_prefix = FALSE;
 			continue;
 		}
 		if (isreturn(c)) {
@@ -523,7 +520,6 @@ int *splice;
 				insert it if not */
 			CMDFUNC *cfp = kcod2fnc(c);
 			if (cfp) {
-				map_check(c);
 				backsp_limit = w_left_margin(curwp);
 				if (curgoal < 0)
 					curgoal = getccol(FALSE);

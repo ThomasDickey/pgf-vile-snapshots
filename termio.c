@@ -3,7 +3,7 @@
  * characters, and write characters in a barely buffered fashion on the display.
  * All operating systems.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/termio.c,v 1.105 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/termio.c,v 1.108 1994/09/23 04:21:19 pgf Exp $
  *
  */
 #include	"estruct.h"
@@ -206,7 +206,7 @@ int f;
 {
 #if !X11
 	if (f) {
-		movecursor(term.t_nrow, ttcol); /* don't care about column */
+		bottomleft();
 		TTputc('\n');
 		TTputc('\r');
 	}
@@ -326,7 +326,7 @@ int f;
 {
 #if ! X11
 	if (f) {
-		movecursor(term.t_nrow, ttcol); /* don't care about column */
+		bottomleft();
 		TTputc('\n');
 		TTputc('\r');
 	}
@@ -442,7 +442,7 @@ int f;
 {
 #if ! X11
 	if (f) {
-		movecursor(term.t_nrow, ttcol); /* don't care about column */
+		bottomleft();
 		TTputc('\n');
 		TTputc('\r');
 	}
@@ -561,17 +561,12 @@ ttgetc()
 int
 typahead()
 {
-#if X11
-#if BEFORE
-this seems to think there is something ready more often than there really is
-	return x_key_events_ready();
-#else
-	return x_is_pasting() || did_tungetc();
-#endif
-#else
-
 	if (did_tungetc())
 		return TRUE;
+
+#if X11
+	return x_typahead(0);
+#else
 
 # if	USE_FIONREAD
 	{
@@ -754,7 +749,7 @@ ttopen()
                           newmode, sizeof(newmode), 0, 0, 0, 0);
         if (status!=SS$_NORMAL || (iosb[0]&0xFFFF)!=SS$_NORMAL)
 		ExitProgram(status);
-        term.t_nrow = (newmode[1]>>24) - 1;
+        term.t_nrow = (newmode[1]>>24);
         term.t_ncol = newmode[0]>>16;
 
 #endif
@@ -782,6 +777,12 @@ ttclose()
 #endif
 
 #if     VMS
+	/*
+	 * Note: this code used to check for errors when closing the output,
+	 * but it didn't work properly (left the screen set in 1-line mode)
+	 * when I was running as system manager, so I took out the error
+	 * checking -- T.Dickey 94/7/15.
+	 */
         int     status;
         int     iosb[2];
 
@@ -790,11 +791,7 @@ ttclose()
                  oldmode, sizeof(oldmode), 0, 0, 0, 0);
 	if (status == SS$_IVCHAN)
 		return;	/* already closed it */
-        if (status!=SS$_NORMAL || (iosb[0]&0xFFFF)!=SS$_NORMAL)
-		ExitProgram(status);
         status = SYS$DASSGN(iochan);
-        if (status != SS$_NORMAL)
-		ExitProgram(status);
 #endif
 #if	!VMS
 	ttclean(TRUE);
@@ -806,7 +803,7 @@ ttclean(f)
 int f;
 {
 	if (f) {
-		movecursor(term.t_nrow, ttcol); /* don't care about column */
+		bottomleft();
 		TTputc('\n');
 		TTputc('\r');
 	}
@@ -1017,7 +1014,7 @@ typahead()
 		return TRUE;
 
 #if	X11
-	return x_is_pasting();
+	return x_typahead(0);
 #endif
 
 #if	VMSVT

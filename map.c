@@ -1,138 +1,98 @@
-/*	MAP:	These routines provide a simple interface for the map command
- *		written by Otto Lind
- *		6/3/93
+/*
+ * map.c	-- map and map! interface routines
+ *	Original interface by Otto Lind, 6/3/93
+ *	Additional map and map! support by Kevin Buettner, 9/17/94
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/map.c,v 1.20 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/map.c,v 1.22 1994/09/23 18:08:11 pgf Exp $
  * 
  */
 
 #include "estruct.h"
 #include "edef.h"
 
-#define DEFAULT_REG     -1
+static char MAPPED_LIST_NAME_CM[] = ScratchName(Mapped Characters);
+static char MAPPED_LIST_NAME_IM[] = ScratchName(Map! Characters);
 
-#define	MAPPED_LIST_NAME	ScratchName(Mapped Characters)
+#define MAXLHS	NSTRING
 
-typedef struct _mapping {
-    int			key;		/* key that is mapped */
-    char		*kbdseq;	/* keyboard sequnce to replace */
-    CMDFUNC		*oldfunc;	/* used in unmap operation */
-    struct _mapping	*next;		/* used to form linked list */
-} Mapping;
+/*
+ * Picture for struct maprec
+ * -------------------------
+ *
+ * Assume the following mappings...
+ *
+ * map za abc
+ * map zb def
+ * map q  quit
+ *
+ * These may be represented by the following picture...
+ *
+ *   |
+ *   v
+ * +---+--------+---+---+   +---+--------+---+---+
+ * | z |  NULL  | o | o-+-->| q | "quit" | 0 | 0 |
+ * +---+--------+-|-+---+   +---+--------+---+---+
+ *                |
+ *		  v
+ *              +---+--------+---+---+   +---+--------+---+---+
+ *              | a | "abc"  | 0 | o-+-->| b | "def"  | 0 | 0 |
+ *              +---+--------+---+---+   +---+--------+---+---+
+ *
+ * where the pertinent fields are as follows:
+ *
+ * +----+-----+-------+-------+
+ * | ch | srv | dlink | flink |
+ * +----+-----+-------+-------+
+ *
+ * When matching a character sequence, we follow dlink when we've found a
+ * matching character.  We change the character to be matched to the next
+ * character in the sequence.  If the character doesn't match, we stay at
+ * the same level (with the same character) and follow flink.
+ *
+ */
 
-static Mapping	*mhead;			/* ptr to head of linked list */
-static Mapping	*keymapped = NULL;	/* current mapped key seq used */
-static TBUFF	*MapMacro;
+struct maprec {
+	int		ch;		/* character to match		*/
+	int		flags;		/* flags word			*/
+	struct maprec *	dlink;		/* Where to go to match the	*/
+					/*   next character in a multi-	*/
+					/*   character sequence.	*/
+	struct maprec *	flink;		/* Where to try next if match	*/
+					/*   against current character 	*/
+					/*   is unsuccessful		*/
+	int		irv;		/* system defined mapping: The	*/
+					/*   (wide) character code to	*/
+					/*   replace a matched sequence by */
+	char          *	srv;		/* user defined mapping: This	*/
+					/*   is the string to replace a	*/
+					/*   matched sequence by	*/
+};
 
-static Mapping * search_map P(( int ));
-static int install_map P(( int, char * ));
-static int remove_map P(( int ));
+#define MAPF_WAITLONGER 0x01
+
+static struct maprec *map_command = NULL;
+static struct maprec *map_insert = NULL;
+
+static	int	map_common P(( int f, struct maprec **, char * ));
+static	int	unmap_common P(( struct maprec **, char * ));
+static	void	addtomap P(( struct maprec **, char *, int, int, char * ));
+static	int	delfrommap P(( struct maprec **, char * ));
+
 
 #if OPT_SHOW_MAPS
 static void makecharslist P(( int, char * ));
-static int show_mapped_chars P(( void ));
+static int show_mapped_chars P(( char * ));
 #endif
 
 #if OPT_SHOW_MAPS && OPT_UPBUFF
 static int show_Mappings P(( BUFFER * ));
 #endif
 
-/*
-** search for key in mapped linked list
-*/
-static Mapping *
-search_map(key)
-int	key;
-{
-	register Mapping	*m;
-
-	for (m = mhead; m; m = m->next)
-		if (m->key == key)
-			return m;
-	return NULL;
-}
-
-/*
-** install key sequence into appropriate table
-*/
-static int
-install_map(key, v)
-int		key;
-char	*v;
-{
-	extern	CMDFUNC	f_map_proc;
-	register Mapping	*m;
-	char	temp[NSTRING];
-	int	test;
-	int	status;
-
-	if (key < 0) {
-		mlforce("[Illegal keycode]");
-		return FALSE;	/* not a legal key-code */
-	}
-
-	/* check for attempted recursion
-	 * patch: prc2kcod assumes only a single key-sequence
-	 * patch: assumes no null chars in v -- should be pstring.
-	 */
-	test = prc2kcod(bytes2prc(temp, v, (int)strlen(v)));
-	if (test == key || search_map(test) != NULL) {
-		mlforce("[Attempted recursion]");
-		return FALSE;
-	}
-
-	if ((m = search_map(key)) != NULL) {
-		free(m->kbdseq);
-	} else {
-		m = typealloc(Mapping);
-		if (m == NULL)
-			return FALSE;
-		m->next = mhead;
-		mhead = m;
-	}
-
-	m->kbdseq = strmalloc(v);
-	if (m->kbdseq == NULL) {
-		status = FALSE;
-	} else {
-		m->key = key;
-#if REBIND
-		status = install_bind(key, &f_map_proc, &m->oldfunc);
+#if OPT_UPBUFF
+static void relist_mappings P(( char * ));
+#else
+#define relist_mappings(name)
 #endif
-	}
-	if (status != TRUE)
-		mlforce("[Mapping failed]");
-	return status;
-}	
-
-/*
-** Remove entry from list and restore the old function pointer.
-*/
-static int
-remove_map(key)
-int	key;
-{
-	register Mapping	*m;
-	register Mapping	*pm;
-	int	status = FALSE;
-
-	for (m = mhead, pm = NULL; m; m = m->next) {
-		if (m->key == key) {
-			if (pm == NULL)
-				mhead = m->next;
-			else
-				pm->next = m->next;
-#if REBIND
-			status = rebind_key(key, m->oldfunc);
-#endif
-			free(m->kbdseq);
-			free((char *)m);
-			break;
-		}
-		pm = m;
-	}
-	return status;
-}
 
 #define relist_mappings()
 
@@ -142,6 +102,7 @@ int	key;
 static	int	show_all;
 
 /*ARGSUSED*/
+#if 0
 static void
 makecharslist(flag, ptr)
 int	flag;
@@ -168,11 +129,41 @@ char	*ptr;
 		lsettrimmed(l_ref(DOT.l));
 	}
 }
+#endif
+static void
+makecharslist(flag, ptr)
+    int   flag;
+    char *ptr;
+{
+    char lhsstr[MAXLHS];
+    struct maprec *lhsstack[MAXLHS];
+    struct maprec *mp = (struct maprec *) ptr;
+    int depth = 0;
+
+    for (;;) {
+	if (mp) {
+	    lhsstr[depth] = mp->ch;
+	    lhsstack[depth++] = mp->flink;
+	    if (mp->srv) {
+		lhsstr[depth] = 0;
+		bprintf("%*S%s\n", MAPS_PREFIX, lhsstr, mp->srv);
+	    }
+	    mp = mp->dlink;
+	}
+	else if (depth > 0)
+	    mp = lhsstack[--depth];
+	else
+	    break;
+    }
+}
 
 static int
-show_mapped_chars()
+show_mapped_chars(bname)
+    char *bname;
 {
-	return liststuff(MAPPED_LIST_NAME, makecharslist, 0, (char *)0);
+	struct maprec *mp = (strcmp(bname, MAPPED_LIST_NAME_CM) == 0)
+	                  ? map_command : map_insert;
+	return liststuff(bname, makecharslist, 0, (char *)mp);
 }
 
 #if OPT_UPBUFF
@@ -181,37 +172,22 @@ show_Mappings(bp)
 BUFFER *bp;
 {
 	b_clr_obsolete(bp);
-	return show_mapped_chars();
+	return show_mapped_chars(bp->b_bname);
 }
 
 #undef relist_mappings
 
+
+
 void
-relist_mappings()
+relist_mappings(bufname)
+    char * bufname;
 {
-	update_scratch(MAPPED_LIST_NAME, show_Mappings);
+    update_scratch(bufname, show_Mappings);
 }
 #endif	/* OPT_UPBUFF */
 
 #endif	/* OPT_SHOW_MAPS */
-
-/*
-** if a mapped char, save for subsequent processing
-*/
-void
-map_check(key)
-int	key;
-{
-	Mapping	*nkeymap;
-	nkeymap = search_map(key);
-	if (nkeymap != NULL && nkeymap == keymapped) {
-		finish_kbm();
-                mlforce("[Recursive map]");
-		keymapped = NULL;
-                return;
-        }
-	keymapped = nkeymap; 
-}
 
 /*
 ** set a map for the character/string combo
@@ -219,33 +195,51 @@ int	key;
 /* ARGSUSED */
 int
 map(f, n)
-int f,n;
+    int f, n;
 {
-	int	status;
-	char 	kbuf[NSTRING];
-	char 	val[NSTRING];
+    return map_common(f, &map_command, MAPPED_LIST_NAME_CM);
+}
+
+/* ARGSUSED */
+int
+map_bang(f, n)
+    int f, n;
+{
+    return map_common(f, &map_insert, MAPPED_LIST_NAME_IM);
+}
+
+static int
+map_common(f, mpp, bufname)
+    int f;
+    struct maprec **mpp;
+    char *bufname;
+{
+    int	 status;
+    char kbuf[NSTRING];
+    char val[NSTRING];
 
 #if OPT_SHOW_MAPS
-	if (end_named_cmd()) {
-		show_all = f;
-		return show_mapped_chars();
-	}
+    if (end_named_cmd()) {
+	show_all = f;
+	return show_mapped_chars(bufname);
+    }
 #endif
-	kbuf[0] = EOS;
-	status = mlreply("map key: ", kbuf, sizeof(kbuf));
-	if (status != TRUE)
-		return status;
-
-	hst_glue(' ');
-	val[0] = EOS;
-	status = mlreply("map value: ", val, sizeof(val));
-	if (status != TRUE)
-		return status;
-
-	if ((status = install_map(prc2kcod(kbuf), val)) == TRUE) {
-		relist_mappings();
-	}
+    kbuf[0] = EOS;
+    status = kbd_string("map key: ", kbuf, sizeof(kbuf),
+			' ', KBD_NOMAP, no_completion);
+    if (status != TRUE)
 	return status;
+
+    hst_glue(' ');
+    val[0] = EOS;
+    status = kbd_string("map value: ", val, sizeof(val),
+			'\n', KBD_NOMAP, no_completion);
+    if (status != TRUE)
+	return status;
+
+    addtomap(mpp, kbuf, 0, -1, val);
+    relist_mappings(bufname);
+    return TRUE;
 }
 
 /*
@@ -254,49 +248,215 @@ int f,n;
 /* ARGSUSED */
 int
 unmap(f, n)
-int f,n;
+    int f,n;
 {
-	int	status;
-	char 	kbuf[NSTRING];
+    return unmap_common(&map_command, MAPPED_LIST_NAME_CM);
+}
 
-	kbuf[0] = EOS;
-	status = mlreply("unmap key: ", kbuf, sizeof(kbuf));
-	if (status != TRUE)
-		return status;
+int
+unmap_bang(f, n)
+    int f, n;
+{
+    return unmap_common(&map_insert, MAPPED_LIST_NAME_IM);
+}
 
-	if (remove_map(prc2kcod(kbuf)) != TRUE) {
-		mlforce("[Key not mapped]");
-		return FALSE;
+static int
+unmap_common(mpp, bufname)
+    struct maprec **mpp;
+    char *bufname;
+{
+    int	 status;
+    char kbuf[NSTRING];
+
+    kbuf[0] = EOS;
+    status = kbd_string("unmap key: ", kbuf, sizeof(kbuf),
+			' ', KBD_NOMAP, no_completion);
+    if (status != TRUE)
+	return status;
+
+    if (delfrommap(mpp, kbuf) != TRUE) {
+	mlforce("[Key not mapped]");
+	return FALSE;
+    }
+    relist_mappings(bufname);
+    return TRUE;
+}
+    
+/* addtomaps is used to initialize both the command and input maps */
+void
+addtomaps(seq, code)
+    char * seq;
+    int    code;
+{
+    addtomap(&map_command, seq, 0, code, NULL);
+    addtomap(&map_insert,  seq, 0, code, NULL);
+}
+
+static void
+addtomap(mpp, ks, waitflag, irv, srv)
+    struct maprec **mpp;
+    char *	ks;
+    int         waitflag;
+    int		irv;
+    char *	srv;
+{
+    struct maprec *mp = NULL;
+
+    if (ks == 0 || *ks == 0)
+	return;
+
+    while (*mpp && *ks) {
+	mp = *mpp;
+	mp->flags |= waitflag;
+	if (*ks == mp->ch) {
+	    mpp = &mp->dlink;
+	    ks++;
 	}
-	relist_mappings();
-	return TRUE;
+	else
+	    mpp = &mp->flink;
+    }
+
+    while (*ks) {
+	if (!(mp = typealloc(struct maprec)))
+	    break;
+	*mpp = mp;
+	mp->dlink = mp->flink = NULL;
+	mp->ch = *ks++;
+	mp->srv = NULL;
+	mp->irv = -1;
+	mpp = &mp->dlink;
+    }
+
+    if (irv != -1)
+	mp->irv = irv;
+    if (srv) {
+	if (mp->srv)
+	    free(mp->srv);
+	mp->srv = strmalloc(srv);
+    }
+}
+
+static int
+delfrommap(mpp, ks)
+    struct maprec **mpp;
+    char * ks;
+{
+    struct maprec **mstk[MAXLHS];
+    int depth = 0;
+
+    if (ks == 0 || *ks == 0)
+	return FALSE;
+
+    while (*mpp && *ks) {
+	mstk[depth] = mpp;
+	if ((*mpp)->ch == *ks) {
+	    mpp = &(*mpp)->dlink;
+	    ks++;
+	    depth++;
+	}
+	else
+	    mpp = &(*mpp)->flink;
+    }
+
+    if (*ks)
+	return FALSE;		/* not in map */
+
+    depth--;
+    if ((*mstk[depth])->srv) {
+	free((*mstk[depth])->srv);
+	(*mstk[depth])->srv = NULL;
+    }
+    else
+	return FALSE;
+
+    for (; depth >= 0; depth--) {
+	struct maprec *mp = *mstk[depth];
+	if (mp->irv == -1 && mp->dlink == NULL && mp->srv == NULL) {
+	    *mstk[depth] = mp->flink;
+	    if (depth > 0 && (*mstk[depth-1])->dlink == mp)
+		(*mstk[depth-1])->dlink = NULL;
+	    free(mp);
+	}
+	else
+	    break;
+    }
+    return TRUE;
 }
 
 /*
-** use the keyboard replay macro code to execute the mapped command
-*/
-/*ARGSUSED*/
+ * The following function is given a character which may or may not start a
+ * mapped sequence of characters.  If it does start a mapped sequence, then
+ * that sequence is consumed via tgetc().  The first character of the
+ * mapping will be returned.  The rest of the mapping will be ungotten via
+ * tungetstr().  These mapped characters will then be read in subsequent
+ * calls to tgetc().  If the character is determined to not have started a
+ * mapped sequence, then it will be returned as the result of this function
+ * and any subsquent characters which were read are ungotten.
+ */
 int
-map_proc(f, n)
-int	f,n;
+maplookup(c, delayedptr)
+    int c;
+    int *delayedptr;
 {
-	/* Could be null if the user tries to execute map_proc directly */
-	if (keymapped == NULL || keymapped->kbdseq == NULL) {
-		mlforce("[Key not mapped]");
-		return FALSE;
+    struct maprec *mp = (reading_msg_line) 
+                            ? 0 : (insertmode) ? map_insert : map_command;
+    struct maprec *rmp = NULL;
+    char unmatched[MAXLHS];
+    register char *s = unmatched;
+    int cnt;
+
+    *s++ = c;
+    *delayedptr = 0;
+    cnt = 0;
+    while (mp) {
+	if (c == mp->ch) {
+	    int nextc;
+	    if (mp->irv != -1 || mp->srv != NULL) {
+		rmp = mp;
+		cnt += (s - unmatched);
+		s = unmatched;
+	    }
+
+	    mp = mp->dlink;
+
+	    if (!mp)
+		break;
+
+	    /* if there's no recorded input, and no user typeahead */
+	    if ((nextc = get_recorded_char(FALSE)) == -1 && !typahead()) {
+		/* give it a little extra time... */
+		/* FIXME: Use MAPF_WAITLONGER to control length of nap */
+		catnap(global_g_val(GVAL_TIMEOUTVAL),TRUE);
+		(*delayedptr)++;
+	    }
+
+	    /* and then, if there _was_ recorded input or new typahead... */
+	    if (nextc != -1 || typahead()) {
+		*s++ = c = tgetc(FALSE);
+	    }
+	    else
+		break;
 	}
+	else
+	    mp = mp->flink;
+    }
 
-	(void)tb_init(&MapMacro, abortc);
-	if (f) { /* then an arg was given */
-		char	num[10];
-		(void)lsprintf(num, "%d", n);
-		if (!tb_sappend(&MapMacro, num))
-			return FALSE;
+    if (rmp) {
+	/* unget the unmatched suffix */
+	while (s > unmatched)
+	    tungetc(*--s);
+	/* unget the mapping and elide correct number or recorded chars */
+	if (rmp->srv) {
+	    tungetstr(rmp->srv, cnt);
+	    return tgetc(FALSE);
 	}
-	if (!tb_sappend(&MapMacro, keymapped->kbdseq))
-		return FALSE;
-
-	keymapped = NULL;
-
-	return start_kbm(1, DEFAULT_REG, MapMacro);
+	else {
+	    return rmp->irv;
+	}
+    }
+    else {	/* didn't find a match */
+	while (s > unmatched+1)
+	    tungetc(*--s);
+	return unmatched[0];
+    }
 }

@@ -7,7 +7,7 @@
  * bell on the VT52 is terrible, so the "beep"
  * routine is conditionalized on defining BEL.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/vt52.c,v 1.9 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/vt52.c,v 1.10 1994/09/13 17:15:48 pgf Exp $
  *
  */
 #error This module is not actively maintained as part of vile.
@@ -55,8 +55,8 @@ extern	int	vt52bcol();
  * terminal I/O code.
  */
 TERM	term	= {
-	NROW-1,
-	NROW-1,
+	NROW,
+	NROW,
 	NCOL,
 	NCOL,
 	MARGIN,

@@ -1,7 +1,7 @@
 /* these routines take care of undo operations
  * code by Paul Fox, original algorithm mostly by Julia Harper May, 89
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/undo.c,v 1.52 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/undo.c,v 1.53 1994/08/08 16:12:29 pgf Exp $
  *
  */
 
@@ -677,13 +677,12 @@ int stkindx;
 	}
 
 	if (nopops) {
-		mlwrite("[No changes to %s]",
+		mlwarn("[No changes to %s]",
 				stkindx == BACK ? "undo" : "redo");
 		/* dbgwrite("checking undocount %d", curbp->b_udcount); */
 		if (stkindx == BACK && curbp->b_udcount != 0) {
 			mlwrite("BUG: nopop, non-0 undo count");
 		}
-		TTbeep();
 		return (FALSE);
 	}
 
@@ -783,7 +782,7 @@ int f,n;
 
 	ulp = l_ref(curbp->b_ulinep);
 	if (ulp == NULL) {
-		TTbeep();
+		kbd_alarm();
 		return FALSE;
 	}
 
@@ -794,7 +793,7 @@ int f,n;
 	    	/* then the last change affected more than one line,
 			and we can't use the saved U-line */
 		dumpuline(curbp->b_ulinep);
-		TTbeep();
+		kbd_alarm();
 		return FALSE;
 	}
 
