@@ -4,7 +4,10 @@
 	written 1986 by Daniel Lawrence
  *
  * $Log: eval.c,v $
- * Revision 1.51  1993/04/21 15:43:05  pgf
+ * Revision 1.52  1993/05/04 17:05:14  pgf
+ * see tom's CHANGES, 3.45
+ *
+ * Revision 1.51  1993/04/21  15:43:05  pgf
  * folded long line
  *
  * Revision 1.50  1993/04/20  12:18:32  pgf
@@ -639,6 +642,10 @@ int n;		/* numeric arg (can overide prompted value) */
 	}
 #endif
 
+	if (status == ABORT)
+		mlforce("[Variable %s is readonly]", var);
+	else if (status != TRUE)
+		mlforce("[Cannot set %s to %s]", var, value);
 	/* and return it */
 	return(status);
 }
@@ -689,7 +696,7 @@ char *value;	/* value to set to */
 		case EVCFNAME:	ch_fname(curbp, value);
 				curwp->w_flag |= WFMODE;
 				break;
-		case EVSRES:	status = TTrez(atoi(value));
+		case EVSRES:	status = TTrez(value);
 				break;
 		case EVDEBUG:	macbug = stol(value);
 				break;
@@ -746,6 +753,7 @@ char *value;	/* value to set to */
 					free(shell);
 				shell = strmalloc(value);
 				break;
+		default:	status = ABORT;	/* must be readonly */
 		}
 		break;
 	}

@@ -1,5 +1,127 @@
-Changes for vile 3.44:
+Changes for vile 3.45:
 (pgf)
+	+ got rid of LOOKTAGS mode, and all of its ifdefs (filec.c, main.c,
+	  modetbl, proto.h, tags.c)
+
+	+ got rid of NeWS ifdefs (basic.c, bind.c, buffer.c, edef.h,
+	  estruct.h, exec.c, file.c, input.c, isearch.c, main.c, modes.c,
+	  spawn.c, termio.c)
+
+	+ resolved vile.hlp modes documentation and modetbl (vile.hlp)
+
+	+ added missing mlreply call in goto-named-mark processing, to
+	  allow "goto-named-mark a" to be used in a command file. (basic.c,
+	  proto.h)
+
+	+ added man page (don't get excited -- it's short), and turbo makefiles
+	  vile.mak, mktbls.mak.  (makefile)
+
+	+ fix to ins/inschar/istring to correct for bad backspace limiting
+	  (insert.c)
+
+	+ fixed off-by-one bug for column count under X. (x11.c)
+
+	+ turned off typahead detection for X11.  updates were being held
+	  off incorrectly. (termio.c)  related change, possibly unnecessary:
+	  reordered initial mlforce() and initial update() in main, because
+	  xvile was not starting up properly.
+
+	+ no longer set _bspace bit in _chartypes[backspc], and isbackspace()
+	  macro tests backspc directly.  will make rebinding of backspace
+	  simpler. (estruct.h, termio.c)
+
+	+ some changes to set-terminal stuff -- took out the keys that can
+	  be rebound with bind-key, i.e. those that have effect only in
+	  command mode.  added help.  (bind.c, vile.hlp)
+
+	+ no longer strip the SPEC bit in ttgetc, so a meta key can be used
+	  to generate "function keys"  (termio.c, vile.hlp)
+
+	+ updated README
+
+Changes for vile 3.45:
+(tom)
+
+	+ more fixes for long/int complaints from TurboC (files tags.c spawn.c
+	  random.c main.c display.c bind.c).
+
+	+ added logic to fileio.c so that (MSDOS only) overwriting a file
+	  saves the old version renamed to ".bak" suffix.
+
+	+ simplified argument processing in file main.c; reduced size a little.
+
+	+ reorganized code that uses tungetc so that it isn't used as often.
+	  This also makes 'tpeekc()' obsolete.  Moved extern-defs for 'tungotc'
+	  to edef.h (files input.c, exec.c, globals.c, oneliner.c, termio.c).
+
+	+ modified 'setvar()' in eval.c to show warning message if attempt is
+	  made to modify a readonly variable, or if for some other
+	  reason an environment variable cannot be set.
+
+	+ modified 'ibmcres()' in ibmpc.c to allow user to reset using value of
+	  CDSENSE as argument.
+
+	+ corrected inequality-test in 'newscreensize()' (file display.c) that
+	  prevented user from correctly setting $sres back to VGA in IBMPC
+	  config.
+
+	+ renamed entrypoints in file crypt.c to 'ue_setkey()' and 'ue_crypt()'
+	  to avoid confusion with unix crypt(3) (files fileio.c, file.c
+	  crypt.c, main.c, cmdtbl).
+
+	+ corrected core dump when using encryption from command line by
+	  splitting out 'ue_makekey()' from 'ue_setkey()'; used this from
+	  'resetkey()' in file.c
+
+	+ corrected handling of -k (crypt option); added a global 'cryptkey'
+	  which is used to set the encryption key only in files listed as
+	  command arguments (files edef.h, main.c, buffer.c).
+
+	+ overwrite -k parameter value in main.c (for those systems where this
+	  has an effect, it changes the value shown in a "ps" command).
+
+	+ made 'quickreadf()' decrypt file.
+
+	+ corrected 'resetkey()' so that it doesn't automatically use crypt key
+	  for files that aren't the same as the buffer.
+
+	+ The prompt added to 'resetkey()' also required moving some calls on
+	  'ttclean()' (file.c).  Simplified some of the ttclean code using
+	  CleanToPipe and CleanAfterPipe macros.
+
+	+ corrected 'resetkey()' so that if no password is provided (at least
+	  for pipes), the operation will proceed properly (i.e., read/write
+	  without encryption).
+
+	+ modified 'modeline()' in display.c to show if the current buffer is
+	  encrypted.
+
+	+ made NAMEC and TESTC define to variables name_cmpl and test_cmpl,
+	  which can be modified at run-time (files estruct.h, edef.h).
+
+	+ added commands "set-terminal" and "show-terminal" to set/show special
+	  characters (including NAMEC/TESTC values!).  Put this into file
+	  bind.c (reusing pieces of 'bindkey()').
+
+	+ make '#' (special prefix-key) rebindable, like cntl_a-prefix.
+
+	+ make display-routines in bind.c show the actual characters to which
+	  CTLA and CTLX are bound (function 'kcod2str()').  Note that
+	  'prc2kcod()' still assumes that CTLA and CTLX are bound to control
+	  characters.
+
+	+ changed argument type of TERM.t_cres to 'char *' to allow consistent
+	  usage of variable 'sres[]' (files tcap.c, ibmpc.c, z_ibmpc.c).
+
+	+ changed values recognized by ibmpc.c for "$sres" to be the names
+	  that it returns (e.g., "VGA") and the number-of-lines (from main.c's
+	  arguments).
+
+	+ finished off 'npopen()' for MSDOS (allows write-pipes) and
+	  implemented 'inout_popen()'; used in file spawn.c for filter-region
+	  command.
+
+Changes for vile 3.44: (pgf)
 	+ fixed indentation if openup used in cmode, with a single word on
 	  the current line -- indentation was coming from the _next_ line,
 	  instead (insert.c).

@@ -6,7 +6,13 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.80  1993/04/28 14:34:11  pgf
+ * Revision 1.82  1993/05/05 12:25:41  pgf
+ * osf1 and ultrix keep ioctl.h in sys
+ *
+ * Revision 1.81  1993/05/04  17:05:14  pgf
+ * see tom's CHANGES, 3.45
+ *
+ * Revision 1.80  1993/04/28  14:34:11  pgf
  * see CHANGES, 3.44 (tom)
  *
  * Revision 1.79  1993/04/20  12:18:32  pgf
@@ -286,7 +292,7 @@
 #   include <termio.h>
 #  else
 #   if BERK
-#    if APOLLO || AIX
+#    if APOLLO || AIX || OSF1 || ULTRIX
 #     include <sys/ioctl.h>
 #   else
 #     include <ioctl.h>
@@ -302,7 +308,7 @@
 #endif
 
 #if OSF1
-# include <ioctl.h>
+# include <sys/ioctl.h>
 #endif
 #if LINUX
 # include <sys/ioctl.h>
@@ -410,7 +416,7 @@ int	dfputli(outfunc,l, r)
 	long l;
 	int r;
 {
-	register long q;
+	register int q;
 
 	if (l < 0) {
 		(*outfunc)('-');
@@ -1797,6 +1803,10 @@ WINDOW *wp;
 		vtputc(ic);
 	}
 	vtprintf("%c %s",lchar,bp->b_bname);
+#if CRYPT
+	if (b_val(bp,MDCRYPT))
+		vtputsn(" [crypt]", 20);
+#endif
 	if (b_val(bp,MDVIEW))
 		vtputsn(" [view only]", 20);
 	if (b_val(bp,MDDOS))
@@ -2362,7 +2372,7 @@ int h, w;
 		return;
 	}
 	chg_width = chg_height = 0;
-	if (h - 1 < term.t_mrow)
+	if ((h - 1) <= term.t_mrow)
 		if (!newlength(TRUE,h))
 			return;
 	if (w < term.t_mcol)

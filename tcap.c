@@ -2,7 +2,10 @@
  *		for MicroEMACS
  *
  * $Log: tcap.c,v $
- * Revision 1.18  1993/04/01 12:53:33  pgf
+ * Revision 1.19  1993/05/04 17:05:14  pgf
+ * see tom's CHANGES, 3.45
+ *
+ * Revision 1.18  1993/04/01  12:53:33  pgf
  * removed redundant includes and declarations
  *
  * Revision 1.17  1992/12/23  09:27:14  foxharp
@@ -299,7 +302,7 @@ int state;		/* FALSE = normal video, TRUE = reverse video */
 /*ARGSUSED*/
 int
 tcapcres(res)	/* change screen resolution */
-int	res;
+char *	res;
 {
 	return(TRUE);
 }

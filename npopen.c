@@ -2,7 +2,10 @@
  *		written by John Hutchinson, heavily modified by Paul Fox
  *
  * $Log: npopen.c,v $
- * Revision 1.23  1993/04/28 14:34:11  pgf
+ * Revision 1.24  1993/05/04 17:05:14  pgf
+ * see tom's CHANGES, 3.45
+ *
+ * Revision 1.23  1993/04/28  14:34:11  pgf
  * see CHANGES, 3.44 (tom)
  *
  * Revision 1.22  1993/04/09  13:41:01  pgf
@@ -293,83 +296,176 @@ softfork()
 #if MSDOS
 #include <fcntl.h>		/* defines O_RDWR */
 #include <io.h>			/* defines 'dup2()', etc. */
-static	FILE *	myPipe;		/* current pipe-file pointer */
-static	char *	myName;		/* name of temporary file for pipe */
+
+static	int	createTemp P(( char * ));
+static	void	deleteTemp P(( void ));
+static	void	closePipe P(( FILE *** ));
+static	FILE *	readPipe P(( char *, int, int ));
+
+static	FILE **	myPipe;		/* current pipe-file pointer */
+static	FILE **	myWrtr;		/* write-pipe pointer */
+static	char *	myName[2];	/* name of temporary file for pipe */
+static	char *	myCmds;		/* command to execute on read-pipe */
 static	int	myRval;		/* return-value of 'system()' */
-static	int	reading;
+
+static int
+createTemp (type)
+char	*type;
+{
+	register int n = (*type == 'r');
+	register int fd;
+
+	myName[n] = tempnam((char *)0 /* directory */, type);
+	if (myName[n] == 0)
+		return -1;
+	(void)close(creat(myName[n], 0666));
+	if ((fd = open(myName[n], O_RDWR)) < 0) {
+		deleteTemp();
+		return -1;
+	}
+	return fd;
+}
 
 static void
-deleteTemp P((void))
+deleteTemp ()
 {
-	if (myName != 0) {
-		(void)unlink(myName);
-		free(myName);
-		myName = 0;
+	register int n;
+
+	for (n = 0; n < 2; n++) {
+		if (myName[n] != 0) {
+			(void)unlink(myName[n]);
+			free(myName[n]);
+			myName[n] = 0;
+		}
 	}
+}
+
+static void
+closePipe(pp)
+FILE	***pp;
+{
+	if (*pp != 0) {
+		if (**pp != 0) {
+			(void)fclose(**pp);
+			**pp = 0;
+		}
+		*pp = 0;
+	}
+}
+
+static FILE *
+readPipe(cmd, in, out)
+char	*cmd;
+int	in;
+int	out;
+{
+	/* save and redirect stdin, stdout, and stderr */
+	int	old0 = dup(0);
+	int	old1 = dup(1);
+	int	old2 = dup(2);
+
+	if (in >= 0)	{
+		dup2(in, 0);
+		close(in);
+	}
+	dup2(out, 1);
+	dup2(out, 2);
+
+	myRval = system(cmd);
+
+	/* restore old std... */
+	dup2(old0, 0); close(old0);
+	dup2(old1, 1); close(old1);
+	dup2(old2, 2); close(old2);
+
+	/* rewind command output */
+	lseek(out, 0L, 0);
+	return fdopen(out, "r");
 }
 
 FILE *
 npopen (cmd, type)
 char *cmd, *type;
 {
+	FILE *ff;
+
+	if (*type == 'r') {
+		if (inout_popen(&ff, (FILE **)0, cmd) == TRUE)
+			return ff;
+	} else if (*type == 'w') {
+		if (inout_popen((FILE **)0, &ff, cmd) == TRUE)
+			return ff;
+	}
+	mlerror("pipe");
+	return NULL;
+}
+
+/*
+ * Create pipe with either write- and/or read-semantics.  Fortunately for us,
+ * on MSDOS, we don't need both at the same instant.
+ */
+int
+inout_popen(fr, fw, cmd)
+FILE **fr, **fw;
+char *cmd;
+{
+	char	*type = (fw != 0) ? "w" : "r";
 	FILE	*pp;
 	int	fd;
 
 	/* Create the file that will hold the pipe's content */
-	myName = tempnam((char *)0 /* directory */, type);
-	(void)close(creat(myName, 0666));
-	if ((fd = open(myName, O_RDWR)) < 0) {
-		deleteTemp();
-		return 0;
+	if ((fd = createTemp(type)) < 0)
+		return FALSE;
+
+	if (fw == 0) {
+		*fr = pp = readPipe(cmd, -1, fd);
+		myWrtr = 0;
+		myPipe = 0;
+		myCmds = 0;
+	} else {
+		*fw = pp = fdopen(fd, type);
+		myPipe = fr;
+		myWrtr = fw;
+		myCmds = strmalloc(cmd);
 	}
-
-	reading = (*type == 'r');
-	if (reading) {
-		/* save and redirect stdin, stdout, and stderr */
-		int	old0 = dup(0);
-		int	old1 = dup(1);
-		int	old2 = dup(2);
-#if UNUSED	/* cf: inout_popen */
-		if (in)	{
-			dup2(in, 0);
-			close(in);
-		}
-#endif
-		dup2(fd, 1);
-		dup2(fd, 2);
-		/* patch: what about stderr? */
-
-		myRval = system(cmd);
-
-		/* restore old std... */
-		dup2(old0, 0); close(old0);
-		dup2(old1, 1); close(old1);
-		dup2(old2, 2); close(old2);
-
-		/* rewind command output */
-		lseek(fd, 0L, 0);
-		pp = fdopen(fd, type);
-	} else if (*type == 'w') {
-		mlforce("[Write to pipe not implemented]");
-		deleteTemp();
-		pp = 0;
-	} else
-		pp = 0;
-	return (myPipe = pp);
+	return (pp != 0);
 }
+
+/*
+ * If we were writing to a pipe, invoke the read-process with stdin set to the
+ * temporary-file.  This is used in the filter-buffer code, which needs both
+ * read- and write-pipes.
+ */
+void
+npflush ()
+{
+	if (myCmds != 0) {
+		if (myWrtr != 0) {
+			fflush(*myWrtr);
+#if UNUSED
+			fclose(*myWrtr);
+			*myWrtr = fopen(myName[0], "r");
+#endif
+			rewind(*myWrtr);
+			*myPipe = readPipe(myCmds, fileno(*myWrtr), createTemp("r"));
+		}
+		free(myCmds);
+		myCmds = 0;
+	}
+}
+
 void
 npclose (fp)
 FILE *fp;
 {
-	/* If we were writing to a pipe, invoke the process with stdin set
-	 * to the temporary-file.
-	 */
-	if (reading) {
-		if (myPipe != 0) {
-			(void)fclose(myPipe);
-			myPipe = 0;
-		}
-	}
+	closePipe(&myWrtr);
+	closePipe(&myPipe);
 	deleteTemp();
+}
+
+int
+softfork()	/* dummy function to make filter-region work */
+{
+	return 0;
 }
 #endif

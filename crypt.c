@@ -2,7 +2,10 @@
  *		written by Dana Hoggatt and Daniel Lawrence
  *
  * $Log: crypt.c,v $
- * Revision 1.8  1993/04/28 14:34:11  pgf
+ * Revision 1.9  1993/05/04 17:05:14  pgf
+ * see tom's CHANGES, 3.45
+ *
+ * Revision 1.8  1993/04/28  14:34:11  pgf
  * see CHANGES, 3.44 (tom)
  *
  * Revision 1.7  1993/04/01  12:53:33  pgf
@@ -35,38 +38,58 @@
 static	int	mod95 P((int));
 
 int
-setkey(f, n)	/* reset encryption key of current buffer */
-int f;		/* default flag */
-int n;		/* numeric argument */
+ue_makekey(key, len)	/* make encryption key */
+char	*key;			/* where to write key */
+int	len;
 {
 	register int status;	/* return status */
-	int odisinp;		/* original vlaue of disinp */
-	char key[NPAT];		/* new encryption string */
+	int odisinp = disinp;	/* original value of disinp */
+	char	temp[NPAT];
 
 	/* turn command input echo off */
-	odisinp = disinp;
 	disinp = FALSE;
 
 	/* get the string to use as an encrytion string */
-	key[0] = 0;
-	status = mlreply("Encryption String: ", key, NPAT - 1);
+	temp[0] = EOS;
+	status = mlreply("Encryption String: ", temp, len-1);
 	disinp = odisinp;
-        if (status != TRUE)
-                return(status);
 
-	/* and encrypt it */
-	crypt((char *)NULL, 0);
-	crypt(key, strlen(key));
+        if (status == TRUE) {
+		(void)strcpy(key, temp);
 
-	/* and save it off */
-	(void)strcpy(curbp->b_key, key);
-	mlwrite(" ");		/* clear it off the bottom line */
-	return(TRUE);
+		/* and encrypt it */
+		ue_crypt((char *)NULL, 0);
+		ue_crypt(key, (int)strlen(key));
+	}
+	mlerase();		/* clear it off the bottom line */
+	return(status);
+}
+
+/* ARGSUSED */
+int
+ue_setkey(f, n)	/* reset encryption key of current buffer */
+int f;		/* default flag */
+int n;		/* numeric argument */
+{
+	register int s = ue_makekey(curbp->b_key, NPAT);
+
+	if (s == FALSE) {
+		if (curbp->b_key[0] != EOS) {
+			s = mlyesno("Discard encryption key");
+			if (s == TRUE) {
+				curbp->b_key[0] = EOS;
+				make_local_b_val(curbp, MDCRYPT);
+				set_b_val(curbp, MDCRYPT, FALSE);
+				markWFMODE(curbp);
+			}
+		}
+	}
+	return (s);
 }
 
 /**********
  *
- *	crypt - in place encryption/decryption of a buffer
+ *	ue_crypt - in place encryption/decryption of a buffer
  *
  *	(C) Copyright 1986, Dana L. Hoggatt
  *	1216, Beck Lane, Lafayette, IN
@@ -82,11 +105,11 @@ int n;		/* numeric argument */
  *	    1.	All printable characters were to be encrypted back
  *		into the printable range, control characters and
  *		high-bit characters were to remain unaffected.  this
- *		way, encrypted would still be just as cheap to 
+ *		way, encrypted would still be just as cheap to
  *		transmit down a 7-bit data path as they were before.
  *
- *	    2.	The encryption had to be portable.  The encrypted 
- *		file from one computer should be able to be decrypted 
+ *	    2.	The encryption had to be portable.  The encrypted
+ *		file from one computer should be able to be decrypted
  *		on another computer.
  *
  *	    3.	The encryption had to be inexpensive, both in terms
@@ -95,18 +118,18 @@ int n;		/* numeric argument */
  *	    4.	The system needed to be secure against all but the
  *		most determined of attackers.
  *
- *	For encryption of a block of data, one calls crypt passing 
+ *	For encryption of a block of data, one calls crypt passing
  *	a pointer to the data block and its length. The data block is 
- *	encrypted in place, that is, the encrypted output overwrites 
- *	the input.  Decryption is totally isomorphic, and is performed 
+ *	encrypted in place, that is, the encrypted output overwrites
+ *	the input.  Decryption is totally isomorphic, and is performed
  *	in the same manner by the same routine.  
  *
- *	Before using this routine for encrypting data, you are expected 
+ *	Before using this routine for encrypting data, you are expected
  *	to specify an encryption key.  This key is an arbitrary string,
  *	to be supplied by the user.  To set the key takes two calls to 
- *	crypt().  First, you call 
+ *	ue_crypt().  First, you call
  *
- *		crypt(NULL, vector)
+ *		ue_crypt(NULL, vector)
  *
  *	This resets all internal control information.  Typically (and 
  *	specifically in the case on MICRO-emacs) you would use a "vector" 
@@ -115,18 +138,18 @@ int n;		/* numeric argument */
  *	this purpose, the best results will be obtained by avoiding
  *	multiples of 95.
  *
- *	Then, you "encrypt" your password by calling 
+ *	Then, you "encrypt" your password by calling
  *
- *		crypt(pass, strlen(pass))
+ *		ue_crypt(pass, strlen(pass))
  *
  *	where "pass" is your password string.  Crypt() will destroy 
- *	the original copy of the password (it becomes encrypted), 
+ *	the original copy of the password (it becomes encrypted),
  *	which is good.  You do not want someone on a multiuser system 
  *	to peruse your memory space and bump into your password.  
  *	Still, it is a better idea to erase the password buffer to 
  *	defeat memory perusal by a more technical snooper.  
  *
- *	For the interest of cryptologists, at the heart of this 
+ *	For the interest of cryptologists, at the heart of this
  *	function is a Beaufort Cipher.  The cipher alphabet is the 
  *	range of printable characters (' ' to '~'), all "control" 
  *	and "high-bit" characters are left unaltered.
@@ -139,8 +162,8 @@ int n;		/* numeric argument */
  *	preventing attacks on the last part of the message as if 
  *	it were a pure autokey system.
  *
- *	Overall security of encrypted data depends upon three 
- *	factors:  the fundamental cryptographic system must be 
+ *	Overall security of encrypted data depends upon three
+ *	factors:  the fundamental cryptographic system must be
  *	difficult to compromise; exhaustive searching of the key 
  *	space must be computationally expensive; keys and plaintext 
  *	must remain out of sight.  This system satisfies this set
@@ -158,7 +181,7 @@ int n;		/* numeric argument */
  **********/
 
 void
-crypt(bptr, len)
+ue_crypt(bptr, len)
 register char *bptr;	/* buffer of characters to be encrypted */
 register int len;	/* number of characters in the buffer */
 {

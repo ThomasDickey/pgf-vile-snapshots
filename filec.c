@@ -4,7 +4,10 @@
  *	Filename prompting and completion routines
  *
  * $Log: filec.c,v $
- * Revision 1.11  1993/04/28 14:34:11  pgf
+ * Revision 1.12  1993/04/28 17:15:56  pgf
+ * got rid of LOOKTAGS mode and ifdefs
+ *
+ * Revision 1.11  1993/04/28  14:34:11  pgf
  * see CHANGES, 3.44 (tom)
  *
  * Revision 1.10  1993/04/20  12:18:32  pgf
@@ -74,7 +77,7 @@ free_expansion P(( void ))
 	in_glob = -1;
 }
 
-#if COMPLETE_DIRS || COMPLETE_FILES || defined(MDTAGSLOOK)
+#if COMPLETE_DIRS || COMPLETE_FILES
 
 #include "dirstuff.h"
 
@@ -315,27 +318,6 @@ int	first;
 			(void)bclear(bp);
 			bp->b_active = TRUE;
 		}
-#ifdef GMDTAGSLOOK	/* looktags keeps buffer in-place */
-		else if (first == TRUE) {	/* check if editing has broken null-endings */
-			register LINE	*lp;
-			for_each_line(lp,bp) {
-				register int	n = llength(lp);
-
-				if ((n >= lp->l_size)
-				 || (lp->l_text[n] != EOS)
-				 || (n+1 >= lp->l_size
-				  && !trailing_slash(lp->l_text))) {
-					char	temp[NLINE];
-					LINE	*np;
-					(void)strncpy(temp, lp->l_text, sizeof(temp));
-					if (np = makeString(bp, lp, temp)) {
-						lremove(bp, lp);
-						lp = lback(np);
-					}
-				}
-			}
-		}
-#endif	/* GMDTAGSLOOK */
 	}
 	return bp;
 }
@@ -412,7 +394,7 @@ LINE **	lpp;	/* in/out line pointer, for iteration */
 		*lpp = lp;
 	return TRUE;
 }
-#endif /* COMPLETE_DIRS || COMPLETE_FILES || defined(MDTAGSLOOK) */
+#endif /* COMPLETE_DIRS || COMPLETE_FILES */
 
 #if COMPLETE_DIRS || COMPLETE_FILES
 
@@ -721,11 +703,6 @@ char *	result;
 
 	flag &= ~ (FILEC_PROMPT | FILEC_EXPAND);
 
-#ifdef GMDTAGSLOOK	/* looktags overrides file completion */
-	if (flag >= FILEC_UNKNOWN && global_g_val(GMDTAGSLOOK))
-		;
-	else
-#endif
 #if COMPLETE_FILES
 	if (isnamedcmd && !clexec) {
 		complete = path_completion;
@@ -786,23 +763,6 @@ char *	result;
 	}
 
 	(void)strcpy (result, Reply);
-#ifdef GMDTAGSLOOK
-	if (flag >= FILEC_UNKNOWN && !ok_expand && global_g_val(GMDTAGSLOOK)) {
-		LINE	*lp = 0;
-		BUFFER	*bp;
-		int	count = 0;
-
-		while (flook(result, FL_HERE) == NULL) {
-			if (((bp = look_tags(count++)) == 0)
-			|| !bs_find(Reply, (int)strlen(Reply), bp, FALSE, &lp)) {
-				/* give up, and try what they asked for */
-				(void)strcpy(result, Reply);
-				break;
-			}
-			(void)strcpy(result, lp->l_text);
-		}
-	}
-#endif
 	if (flag <= FILEC_WRITE) {	/* we want to write a file */
 		if (!isInternalName(Reply)
 		 && !same_fname(Reply, curbp, TRUE)

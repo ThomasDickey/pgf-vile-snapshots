@@ -3,7 +3,10 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: globals.c,v $
- * Revision 1.18  1993/04/01 12:53:33  pgf
+ * Revision 1.19  1993/05/04 17:05:14  pgf
+ * see tom's CHANGES, 3.45
+ *
+ * Revision 1.18  1993/04/01  12:53:33  pgf
  * removed redundant includes and declarations
  *
  * Revision 1.17  1993/03/18  17:42:20  pgf
@@ -100,17 +103,7 @@ int f, n, g_or_v;
 	WINDOW *wp;
 	extern CMDFUNC f_godotplus;
 	
-	c = '\n';
-	if (isnamedcmd) {
-		c = tpeekc();
-		if (c < 0) {
-			c = '\n';
-		} else {
-			if (ispunct(c)) {
-				(void)kbd_key();
-			}
-		}
-	}
+	c = kbd_delimiter();
 	if (readpattern("global pattern: ", &pat[0], &gregexp, c, FALSE) != TRUE) {
 		mlforce("[No pattern.]");
 		return FALSE;
@@ -173,11 +166,8 @@ int f, n, g_or_v;
 				have been ok so far */
 			if (cfp && s) {
 				if (!calledbefore && (cfp->c_flags & UNDO)) {
-					if (b_val(wp->w_bufp,MDVIEW)) {
-						if (tpeekc() != -1)
-							(void)tgetc(FALSE);
+					if (b_val(wp->w_bufp,MDVIEW))
 						return(rdonly());
-					}
 					mayneedundo();
 				}
 				havemotion = &f_godotplus;

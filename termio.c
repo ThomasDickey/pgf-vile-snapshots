@@ -4,7 +4,25 @@
  * All operating systems.
  *
  * $Log: termio.c,v $
- * Revision 1.65  1993/04/28 14:34:11  pgf
+ * Revision 1.71  1993/05/05 13:52:04  pgf
+ * don't strip 8th bit in ttgetc()
+ *
+ * Revision 1.70  1993/05/05  12:25:16  pgf
+ * osf1 and ultrix keep ioctl.h in sys
+ *
+ * Revision 1.69  1993/05/05  11:41:05  pgf
+ * backspc is now handled separately from chartypes[backspc]
+ *
+ * Revision 1.68  1993/05/05  11:19:52  pgf
+ * turned off typahead detection for X11 -- it gives me false-positives
+ *
+ * Revision 1.67  1993/05/04  17:05:14  pgf
+ * see tom's CHANGES, 3.45
+ *
+ * Revision 1.66  1993/04/28  17:11:22  pgf
+ * got rid of NeWS ifdefs
+ *
+ * Revision 1.65  1993/04/28  14:34:11  pgf
  * see CHANGES, 3.44 (tom)
  *
  * Revision 1.64  1993/04/20  12:00:37  pgf
@@ -261,7 +279,7 @@
 # if SUNOS
 #  include "sys/filio.h"
 # else /* if you have trouble including ioctl.h, try "sys/ioctl.h" instead */
-#  if APOLLO || AIX
+#  if APOLLO || AIX || OSF1 || ULTRIX
 #   include <sys/ioctl.h>
 #  else
 #   include <ioctl.h>
@@ -691,8 +709,6 @@ ttflush()
         fflush(stdout);
 }
 
-extern int tungotc;
-
 /*
  * Read a character from the terminal, performing no editing and doing no echo
  * at all.
@@ -715,7 +731,7 @@ ttgetc()
 			imdying(2);
 		}
 	}
-	return ( kbd_char & 0x7f );
+	return ( kbd_char );
 #else /* USE_FCNTL */
 #if APOLLO
 	/*
@@ -736,8 +752,6 @@ ttgetc()
 		if (errno == EINTR)
 			return -1;
 		imdying(2);
-	} else {
-		c &= 0x7f;
 	}
 	return c;
 #endif
@@ -750,23 +764,25 @@ ttgetc()
 int
 typahead()
 {
-#if	NeWS
-	return(inhibit_update) ;
-#else
-# if X11
+#if X11
+#if BEFORE
+this seems to think there is something ready more often than there really is
 	return x_key_events_ready();
-# else
+#else
+	return FALSE;
+#endif
+#else
 
 	if (tungotc > 0)
 		return TRUE;
 
-#  if	USE_FIONREAD
+# if	USE_FIONREAD
 	{
 	long x;
 	return((ioctl(0,FIONREAD,(caddr_t)&x) < 0) ? 0 : (int)x);
 	}
-#  else
-#   if	USE_FCNTL
+# else
+#  if	USE_FCNTL
 	if( !kbd_char_present )
 	{
 		if( !kbd_is_polled &&
@@ -776,12 +792,11 @@ typahead()
 		kbd_char_present = (1 == read( 0, &kbd_char, 1 ));
 	}
 	return ( kbd_char_present );
-#   else
+#  else
 	return FALSE;
-#   endif/* USE_FCNTL */
-#  endif/* USE_FIONREAD */
-# endif	/* X11 */
-#endif	/* NeWS */
+#  endif/* USE_FCNTL */
+# endif/* USE_FIONREAD */
+#endif	/* X11 */
 }
 
 /* this takes care of some stuff that's common across all ttopen's.  Some of
@@ -791,9 +806,6 @@ ttmiscinit()
 {
 	/* make sure backspace is bound to backspace */
 	asciitbl[backspc] = &f_backchar_to_bol;
-
-	/* make sure backspace is considered a backspace by the code */
-	_chartypes_[backspc] |= _bspace;
 
 	/* no buffering on input */
 	setbuf(stdin, (char *)0);
@@ -932,8 +944,6 @@ ttopen()
 	/* make sure backspace is bound to backspace */
 	asciitbl[backspc] = &f_backchar_to_bol;
 
-	/* make sure backspace is considered a backspace by the code */
-	_chartypes_[backspc] |= _bspace;
 }
 
 void
@@ -1076,8 +1086,6 @@ ttflush()
 #if     MSDOS
 #endif
 }
-
-extern int tungotc;
 
 /*
  * Read a character from the terminal, performing no editing and doing no echo

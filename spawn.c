@@ -2,7 +2,13 @@
  *		for MicroEMACS
  *
  * $Log: spawn.c,v $
- * Revision 1.49  1993/04/28 14:34:11  pgf
+ * Revision 1.51  1993/05/04 17:05:14  pgf
+ * see tom's CHANGES, 3.45
+ *
+ * Revision 1.50  1993/04/28  17:11:22  pgf
+ * got rid of NeWS ifdefs
+ *
+ * Revision 1.49  1993/04/28  14:34:11  pgf
  * see CHANGES, 3.44 (tom)
  *
  * Revision 1.48  1993/04/21  14:36:41  pgf
@@ -213,14 +219,10 @@ spawncli(f, n)
 int f,n;
 {
 #if     UNIX
-# if     NeWS
-	mlforce("[Not available under NeWS]");
-	return(FALSE);
-# else
-#  if 	X11
+# if 	X11
 	mlforce("[Not available under X11]");
 	return(FALSE);
-#  else
+# else
         movecursor(term.t_nrow, 0);             /* Seek to last line.   */
 	ttclean(TRUE);
         TTputc('\n');
@@ -229,8 +231,7 @@ int f,n;
 	ttunclean();
         sgarbf = TRUE;
         return(TRUE);
-#  endif /* X11 */
-# endif /* News */
+# endif /* X11 */
 #endif /* UNIX */
 
 #if	AMIGA
@@ -282,7 +283,7 @@ int
 bktoshell(f,n)		/* suspend and wait to wake up */
 int f,n;
 {
-#if UNIX && defined(SIGTSTP) && !X11  && !NeWS
+#if UNIX && defined(SIGTSTP) && !X11
 	vttidy(TRUE);
 # if BERK
 	killpg(getpgrp(0), SIGTSTP);
@@ -433,14 +434,14 @@ spawn1(rerun)
 int rerun;
 {
 
-#if  UNIX
+#if UNIX
         register int    s;
         char	line[NLINE];	/* command line send to shell */
 
 	if ((s = ShellPrompt(&save_shell[0], line, rerun)) != TRUE)
 		return s;
 
-#if	NeWS || X11
+#if X11
 	(void)system_SHELL(line);
 #else
 	ttclean(TRUE);
@@ -451,7 +452,7 @@ int rerun;
 	TTopen();
 	TTflush();
         sgarbf = TRUE;
-#endif /* NeWS */
+#endif /* X11 */
         return (TRUE);
 #endif /* UNIX */
 
@@ -615,7 +616,7 @@ int f,n;
 
 	/* prompt ok? */
 	if (s == TRUE) {
-		if ((s = ((bp = bfind(bname, OK_CREAT, 0)) != NULL))
+		if (((s = ((bp = bfind(bname, OK_CREAT, 0)) != NULL)) == TRUE)
 		 && ((s = popupbuff(bp)) == TRUE)
 		 && ((s = swbuffer(bp)) == TRUE)
 		 && ((s = readin(line, FALSE, bp, TRUE)) == TRUE))
@@ -719,7 +720,7 @@ pipecmd(f, n)
 int
 filterregion()
 {
-#if UNIX
+#if UNIX||MSDOS
         static char oline[NLINE];	/* command line send to shell */
         char	line[NLINE];	/* command line send to shell */
 	FILE *fr, *fw;
@@ -746,10 +747,14 @@ filterregion()
 				fwrite((char *)kp->d_chunk, 1, KBLOCK, fw);
 			kp = kp->d_next;
 		}
+#if UNIX
 		fflush(fw);
 		fclose(fw);
 		exit (0);
 		/* NOTREACHED */
+#else
+		npflush();	/* fake multi-processing */
+#endif
 	}
 	fclose(fw);
 	DOT.l = lback(DOT.l);
@@ -832,16 +837,12 @@ int f,n;
 	s = TRUE;
 #endif
 #if     UNIX
-#if	! NeWS
         ttclean(TRUE);
-#endif
 	(void)strcat(line," <fltinp >fltout");
         system(line);
-#if	! NeWS
         ttunclean();
         TTflush();
         sgarbf = TRUE;
-#endif
        s = TRUE;
 #endif
 

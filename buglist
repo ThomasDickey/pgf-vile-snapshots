@@ -86,13 +86,7 @@ E	When a line is too long to fit on the screen, you have to move
 	over it to see the rest, and when you get to the edge of the screen,
 	it jumps. I would prefer a smooth(er) scroll.
 
-L	"I found a problem when using vile with encrypted files.  During a file
-	edit if I set the mode to crypt and save the file, I am prompted
-	for a encryption key.  When I try to read in this encrypted file in
-	another session using "vile -kcryptkey file".  I am prompted for
-	the encrypt key and when I type it in, I get the message
-	"Encryption String: IOT trap".  "  [ Anyone wanting to work on this,
-	I can send you more info -- pgf ]
+L	vile really ought to use unix-crypt if it is available.
 
 E	Do autoindent after labels and case statements (lines ending in ':')
 	Alternately, _back_up_ if you type either of `case ' or `default:'.
@@ -148,23 +142,11 @@ E	should ifdef the 'autobuffer' code for users who do not need vi-style
 
 PCVILE
 
-	- globbing (e.g. ":e *.c") does nothing under DOS -- the code in
-	expand_wild_args() can probably be used to accomplish this.
-
-	- filter-region -- this would be easier if I had used named pipes
-	as the conduit between child and parent, instead of regular pipes,
-	'cause then I could just replace the named pipe with a tmp file
-	under DOS.
-
 	- some function keys return 8 bit characters on the PC.  This means
 	the input path, through tgetc, has to be 8-bit clean, we need to
 	allow 256 bindings instead of the current 128, and we can't use
 	0x80 as the definition of the SPEC bit.  All this is easy -- it
 	just needs to be done.
-
-	- there used to be a "set screen {25|43|50} command -- what happened
-	to it?  should 'set-variable $sres "CGA"' do the same thing?  if not,
-	what's it for?
 
 ===================================================
 
@@ -226,33 +208,22 @@ not support for DOS).
 PCVILE
 
 
-1) PC-vile wants all of its filenames to be specified with back
-   slashes.  Blech.  Everybody's DOS products (except Microsoft) accept
-   both backward and forward slashes in filenames.
-
-2) PC-vile quickly exhausts DOS memory when it opens a large file
+1) PC-vile quickly exhausts DOS memory when it opens a large file
    or a large tags file.  This can easily be fixed with a compiler
    that supplies a DOS extender (ala Intel's CodeBuilder).  The
    problems I was experiencing with attempts to "write to PRN" may
    also be related to out-of-memory conditions that aren't being
    trapped by DOS or the editor.
 
-3) If your screen starts out in 50-line mode when you enter PC-vile,
+2) If your screen starts out in 50-line mode when you enter PC-vile,
    and then exit, PC-vile puts the screen in 25-line mode.  Not
    nice.
 
-4) If you start editing PC-vile with a full block cursor, PC-vile
+3) If you start editing PC-vile with a full block cursor, PC-vile
    switches you back to a small underscore cursor.  Veeeeerrrrrrry
    unfriendly.
 
-5) PC-vile scrolls the screen a page at a time when you browse code
-   with the 'j' or 'k' key.  This is totally contrary to the way
-   Vi scrolls code and it annoys me tremendously.
-
-6) PC-vile does not internally glob file names (e.g., :r t*.c) does
-   not work.
-
-7) The supplied makefile does not work under DOS due to command
+4) The supplied makefile does not work under DOS due to command
    line overflow (but you knew that).
 
 ===================================================
@@ -420,3 +391,53 @@ I wish ^X-!  could execute shell commands async'ly, i.e.  I should not have
 to wait/do nothing while waiting for the ouput of compiling.  I should be
 able to edit stuff in other buffers or even ^X-^X to edit src codes
 while compilation is still going on.
+
+========(VMS-VILE)=============================================================
+Unfinished items on vax/vms (dickey@software.org):
+
+	+ the response time seems a bit slow (compared with other applications
+	  running on the same machine).  possible problem areas include:
+
+		+ observed that (at least on vms) I am getting highlighting
+		  attributes being reset on each line, rather than only when
+		  they change.
+
+		+ probably am making too many calls to canonpath and
+		  lengthen_path (affects performance on vms).
+
+	+ if the current directory has changed, offer to restore it on exit. 
+	  (Note that if the _device_ portion has changed, the original
+	  directory should be restored anyway!).
+
+	+ filename-completion works too slowly on vms; may be doing stat calls
+	  or something else.  Also, it does not seem to start properly with
+
+	  	":e e?".
+
+	+ add key bindings and other support to make the vt100 keypad work for
+	  me (e.g., like EDT).
+
+	+ see if I can decode ".dia" files, if so connect it to finderr.c
+
+	+ catch exception/signals, and restore terminal settings.
+
+	+ make dec-shell names work in file-completion.  These are quasi-unix
+	  filenames, which most of the VAX-C runtime routines accept.  If _all_
+	  runtime code could use dec-shell names, I wouldn't have done any
+	  native vms pathnames (sigh).  As it is, all dec-shell names are
+	  automatically converted to vms-pathnames (i.e., by 'getname()').
+
+	+ make write-pipes work (actually, flesh out to use 'npopen' coding
+	  scheme, like the MSDOS stuff).
+
+	+ ":ww" command doesn't show files as they are written (actually,
+	  the messages are written, but the terminal shows nothing; probably
+	  something to do with CR/LF handling).
+
+	+ I had a case in which I wanted to read the contents of one file into
+	  another; they had the same buffer name; the target buffer got the
+	  filename for the source, e.g.,
+
+	  	:e []foo		- read and determined version # ok
+		:r [-.temp]foo		- current filename reset to [-.temp]foo
+

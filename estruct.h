@@ -10,7 +10,16 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.110  1993/04/28 14:34:11  pgf
+ * Revision 1.113  1993/05/05 11:41:05  pgf
+ * backspc is now handled separately from chartypes[backspc]
+ *
+ * Revision 1.112  1993/05/04  17:05:14  pgf
+ * see tom's CHANGES, 3.45
+ *
+ * Revision 1.111  1993/04/28  17:11:22  pgf
+ * got rid of NeWS ifdefs
+ *
+ * Revision 1.110  1993/04/28  14:34:11  pgf
  * see CHANGES, 3.44 (tom)
  *
  * Revision 1.109  1993/04/21  15:41:27  pgf
@@ -656,7 +665,6 @@
 #define	Z309	0			/* Zenith 100 PC family	driver	*/
 #define	MAC	0			/* Macintosh			*/
 #define	ATARI	0			/* Atari 520/1040ST screen	*/
-#define NeWS	0			/* distributed */
 #define	X11	0			/* X Window System */
 
 /*   Special keyboard definitions	     */
@@ -686,18 +694,7 @@
 #define	FILOCK	0	/* file locking under unix BSD 4.2 (uses scanf) */
 #define	ISRCH	1	/* Incremental searches like ITS EMACS		*/
 #define	FLABEL	0	/* function key label code [HP150]		*/
-
-/* WARNING:  The code in crypt.c and the entry points marked
-	with #ifdef CRYPT are UNTESTED.  Several people turned the code
-	on and have reported bugs/coredumps/other problems.  If anyone
-	would like to take on the job of fixing this, be my guest!  If
-	you could, at the same time, make it compatible with UNIX crypt(1),
-	I'd be a happy man!  :-)
-	(I can forward details of at least one frustrated person's
-	experiences, in case someone wants to look at it.)
-*/
-#define	CRYPT	0	/* file encryption? (not crypt(1) compatible!)	*/
-
+#define	CRYPT	0	/* file encryption (not crypt(1) compatible!)	*/
 #define	TAGS	1	/* tags support  				*/
 #define	WORDPRO	1	/* "Advanced" word processing features		*/
 #define	WORDCOUNT 0	/* "count-words" command"			*/
@@ -945,7 +942,7 @@ union REGS {
 #define	NBLOCK	16			/* line block chunk size	*/
 #define	NVSIZE	10			/* max #chars in a var name	*/
 
-/* SPEC is just 8th bit set, for convenience in some systems (like NeWS?) */
+/* SPEC is just 8th bit set, for convenience in some systems */
 #define N_chars 128			/* must be a power-of-2		*/
 #define SPEC	0x0080			/* special key (function keys)	*/
 #define CTLA	0x0100			/* ^A flag, or'ed in		*/
@@ -987,8 +984,8 @@ union REGS {
 #define NO_CREAT FALSE
 
 /* definitions for name-completion */
-#define	NAMEC		'\t'	/* char for forcing name-completion */
-#define	TESTC		'?'	/* char for testing name-completion */
+#define	NAMEC		name_cmpl /* char for forcing name-completion */
+#define	TESTC		test_cmpl /* char for testing name-completion */
 
 /* kbd_string options */
 #define KBD_EXPAND	0x1	/* do we want to expand %, #, : */
@@ -1151,7 +1148,7 @@ typedef short CMASK;
 #define isalnum(c)	istype(_lower|_upper|_digit, c)
 #define isident(c)	istype(_ident, c)
 #define ispath(c)	istype(_pathn, c)
-#define isbackspace(c)	istype(_bspace, c)
+#define isbackspace(c)	(istype(_bspace, c) || (c) == backspc)
 #define islinespecchar(c)	istype(_linespec, c)
 #define isfence(c)	istype(_fence, c)
 
@@ -1221,10 +1218,14 @@ typedef	struct	_tbuff	{
 	} TBUFF;
 
 /*
- * Line and column primitive types
+ * Primitive types
  */
-typedef	long	L_NUM;
-typedef	int	C_NUM;
+typedef	int		L_NUM;		/* line-number */
+typedef	int		C_NUM;		/* column-number */
+typedef	long		L_FLAG;		/* LINE-flags */
+
+typedef	unsigned long	CMDFLAGS;	/* CMDFUNC flags */
+typedef	long		B_COUNT;	/* byte-count */
 
 /*
  * All text is kept in circularly linked lists of "LINE" structures. These
@@ -1249,7 +1250,7 @@ typedef struct	LINE {
 #endif
 	union {
 	    struct  LINE *l_stklnk;	/* Link for undo stack		*/
-	    long	l_flag;		/* flags for undo ops		*/
+	    L_FLAG	l_flag;		/* flags for undo ops		*/
 	} l;
 }	LINE;
 
@@ -1411,7 +1412,7 @@ typedef struct	BUFFER {
 					/*  global values		*/
 	struct	W_TRAITS b_wtraits;	/* saved window traits, while we're */
 					/*  not displayed		*/
-	long	b_bytecount;		/* # of chars			*/
+	B_COUNT	b_bytecount;		/* # of chars			*/
 	L_NUM	b_linecount;		/* no. lines as of last read/write */
 	LINE 	*b_udstks[2];		/* undo stack pointers		*/
 	MARK 	b_uddot[2];		/* Link to "." before undoable op*/
@@ -1444,7 +1445,7 @@ typedef struct	BUFFER {
 #define	SCRTCH_RIGHT "]"
 #define	SHPIPE_LEFT  "!"
 
-/* warning:  code in file.c and fileio.c knows how long the shell, pipe, and 
+/* warning:  code in file.c and fileio.c knows how long the shell, pipe, and
 	append prefixes are (e.g. fn += 2 when appending) */
 #define	isShellOrPipe(s)  (s[0] == SHPIPE_LEFT[0])
 #define	isInternalName(s) (isShellOrPipe(s) || is_internalname(s))
@@ -1556,7 +1557,7 @@ typedef struct	WINDOW {
 typedef struct	{
 	MARK 	r_orig;			/* Origin LINE address. 	*/
 	MARK	r_end;			/* Ending LINE address. 	*/
-	long	r_size; 		/* Length in characters.	*/
+	B_COUNT	r_size; 		/* Length in characters.	*/
 }	REGION;
 
 /*
@@ -1588,7 +1589,7 @@ typedef struct	{
 	void	(*t_eeop) P((void));	/* Erase to end of page.	*/
 	void	(*t_beep) P((void));	/* Beep.			*/
 	void	(*t_rev) P((int));	/* set reverse video state	*/
-	int	(*t_rez) P((int));	/* change screen resolution	*/
+	int	(*t_rez) P((char *));	/* change screen resolution	*/
 #if	COLOR
 	void	(*t_setfor) P((int));	/* set foreground color		*/
 	void	(*t_setback) P((int));	/* set background color		*/
@@ -1655,6 +1656,12 @@ typedef struct  VIDEO {
 #define	CDVGA	3			/* VGA color adapter		*/
 #define	CDSENSE	9			/* detect the card type		*/
 
+#if COLOR
+#define	CD_25LINE	CDCGA
+#else
+#define	CD_25LINE	CDMONO
+#endif
+
 #endif
 
 
@@ -1668,8 +1675,8 @@ typedef struct  VIDEO {
 typedef	int	(*CmdFunc) P(( int, int ));
 
 typedef  struct {
-	CmdFunc       c_func;		/* function name is bound to */
-	unsigned long c_flags;		/* what sort of command is it? */
+	CmdFunc  c_func;	/* function name is bound to */
+	CMDFLAGS c_flags;	/* what sort of command is it? */
 }	CMDFUNC;
 
 /* when referencing a command by name (e.g ":e file") it is looked up in

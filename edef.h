@@ -9,7 +9,13 @@
 
 /*
  * $Log: edef.h,v $
- * Revision 1.95  1993/04/28 14:34:11  pgf
+ * Revision 1.97  1993/05/04 17:05:14  pgf
+ * see tom's CHANGES, 3.45
+ *
+ * Revision 1.96  1993/04/28  17:11:22  pgf
+ * got rid of NeWS ifdefs
+ *
+ * Revision 1.95  1993/04/28  14:34:11  pgf
  * see CHANGES, 3.44 (tom)
  *
  * Revision 1.94  1993/04/22  12:12:58  pgf
@@ -321,9 +327,9 @@
 decl_uninit( char *prog_arg );		/* argv[0] from main.c */
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version 3.44");
+decl_init( char version[], "version 3.45");
 
-decl_init( char slash, '/'); 		/* so DOS can use '\' as path separator */
+decl_init( int slash, '/'); 		/* so DOS can use '\' as path separator */
 
 decl_init( int autoindented , -1);	/* how many chars (not cols) indented */
 decl_uninit( int isnamedcmd );		/* are we typing a command name */
@@ -336,6 +342,7 @@ decl_uninit( int insertmode );		/* are we inserting or overwriting? */
 decl_uninit( int insert_mode_was );	/* were we (and will we be?)	*/
 					/*	inserting or overwriting? */
 decl_uninit( int lastkey );		/* last keystoke (tgetc)	*/
+decl_init( int tungotc , -1);		/* last un-gotten key (tungetc) */
 decl_uninit( int last1key );		/* last keystoke (kbd_key)	*/
 decl_uninit( int lastcmd );		/* last command	(kbd_seq)	*/
 decl_uninit( short fulllineregions );   /* regions should be full lines */
@@ -351,7 +358,7 @@ decl_uninit( BUFFER *curbp );           /* Current buffer               */
 decl_uninit( WINDOW *wheadp );          /* Head of list of windows      */
 decl_uninit( BUFFER *bheadp );          /* Head of list of buffers      */
 
-decl_uninit( char sres[NBUFN] );		/* current screen resolution	*/
+decl_uninit( char sres[NBUFN] );	/* current screen resolution	*/
 
 decl_uninit( char pat[NPAT] );          /* Search pattern		*/
 decl_uninit( char rpat[NPAT] );		/* replacement pattern		*/
@@ -369,9 +376,6 @@ decl_uninit( int ignorecase );
 decl_uninit( char outline[NSTRING] );
 #endif
 
-#if	NeWS
-decl_uninit( int inhibit_update );	/* prevents output to terminal */
-#endif
 
 decl_init( int curgoal, -1 );           /* column goal			*/
 decl_uninit( char *execstr );		/* pointer to string to execute	*/
@@ -410,6 +414,9 @@ decl_init( int ttrow, HUGE );           /* Row location of HW cursor	*/
 decl_init( int ttcol, HUGE );           /* Column location of HW cursor */
 decl_uninit( int taboff	);		/* tab offset for display	*/
 
+/* Special characters, used in keyboard control (some values are set on
+ * initialization in termio.c).
+ */
 decl_init( int cntl_a, tocntrl('A') );	/* current meta character	*/
 decl_init( int cntl_x, tocntrl('X') );	/* current control X prefix char */
 decl_init( int reptc, 'K' );		/* current universal repeat char */
@@ -422,6 +429,8 @@ decl_init( int suspc, tocntrl('Z') );	/* current suspend char	*/
 decl_init( int startc, tocntrl('Q') );	/* current output start char	*/
 decl_init( int stopc, tocntrl('S') );	/* current output stop char	*/
 decl_init( int backspc, '\b');		/* current backspace char	*/
+decl_init( int name_cmpl, '\t');	/* do name-completion		*/
+decl_init( int test_cmpl, '?');		/* show name-completion		*/
 
 /* these get their initial values in main.c, in global_val_init() */
 decl_uninit( W_VALUES global_w_values );
@@ -435,6 +444,7 @@ decl_uninit( int klines );
 decl_uninit( WINDOW *swindow );		/* saved window pointer		*/
 #if CRYPT
 decl_init( int cryptflag, FALSE );	/* currently encrypting?	*/
+decl_init( char * cryptkey, 0 );	/* top-level crypt-key, if any	*/
 #endif
 decl_init( int dotcmdmode, RECORD );	/* current dot command mode	*/
 decl_init( int dotcmdarg, FALSE);	/* was there an arg to '.'? */
@@ -452,7 +462,7 @@ decl_uninit( char *fline );		/* dynamic return line		*/
 decl_uninit( unsigned flen );		/* current length of fline	*/
 
 decl_uninit( int kbd_expand );		/* -1 kbd_putc shows tab as space */
-					/* +1 kbd_putc shows cr at ^M */
+					/* +1 kbd_putc shows cr as ^M */
 
 /* defined in nebind.h and nename.h */
 extern NTAB nametbl[];

@@ -5,7 +5,19 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.49  1993/04/28 14:34:11  pgf
+ * Revision 1.53  1993/05/04 17:05:14  pgf
+ * see tom's CHANGES, 3.45
+ *
+ * Revision 1.52  1993/05/03  14:24:30  pgf
+ * different args to inschar()
+ *
+ * Revision 1.51  1993/04/29  19:20:47  pgf
+ * added getnmmarkname()
+ *
+ * Revision 1.50  1993/04/28  17:15:56  pgf
+ * got rid of LOOKTAGS mode and ifdefs
+ *
+ * Revision 1.49  1993/04/28  14:34:11  pgf
  * see CHANGES, 3.44 (tom)
  *
  * Revision 1.48  1993/04/22  15:14:39  pgf
@@ -195,7 +207,7 @@ extern void tcapclose P(( void ));
 extern void tcapkopen P(( void ));
 extern void tcapkclose P(( void ));
 extern void tcaprev P(( int ));
-extern int tcapcres P(( int ));
+extern int tcapcres P(( char * ));
 extern void tcapmove P(( int, int ));
 extern void tcapeeol P(( void ));
 extern void tcapeeop P(( void ));
@@ -246,6 +258,7 @@ extern int backhpage P(( int, int ));
 extern int setnmmark P(( int, int ));
 extern int golinenmmark P(( int, int ));
 extern int goexactnmmark P(( int, int ));
+extern int getnmmarkname P(( int * ));
 extern int gonmmark P(( int ));
 extern int setmark P(( void ));
 extern int gomark P(( int, int ));
@@ -253,6 +266,10 @@ extern int godotplus P(( int, int ));
 extern void swapmark P(( void ));
 
 /* bind.c */
+#if !SMALLER
+extern int set_termchrs P(( int, int ));
+extern int show_termchrs P(( int, int ));
+#endif
 extern int help P(( int, int ));
 extern int deskey P(( int, int ));
 extern int bindkey P(( int, int ));
@@ -319,9 +336,12 @@ extern int unmark P(( int, int ));
 
 /* crypt.c */
 #if	CRYPT
-extern	int	setkey P((int, int));
-extern	void	crypt P((char *, int));
+extern	int	ue_makekey P((char *, int));
+extern	int	ue_setkey P((int, int));
+extern	void	ue_crypt P((char *, int));
 #endif	/* CRYPT */
+
+/* csrch.c */
 extern int fscan P(( int, int, int ));
 extern int bscan P(( int, int, int ));
 extern int fcsrch P(( int, int ));
@@ -484,11 +504,11 @@ extern int kifile P(( char * ));
 extern DEFINE_SIGNAL(imdying);
 extern void markWFMODE P(( BUFFER * ));
 #if CRYPT
-extern int resetkey P(( BUFFER * ));
+extern int resetkey P(( BUFFER *, char * ));
 #endif
 
 /* filec.c */
-#if COMPLETE_DIRS || COMPLETE_FILES || defined(MDTAGSLOOK)
+#if COMPLETE_DIRS || COMPLETE_FILES
 extern BUFFER *bs_init P(( char *, int ));
 extern int bs_find P(( char *, int, BUFFER *, int, LINE ** ));
 #endif
@@ -548,13 +568,13 @@ extern int mlreply_no_bs P(( char *, char *, int ));
 extern int mlreply_no_opts P(( char *, char *, int ));
 extern void incr_dot_kregnum P(( void ));
 extern void tungetc P(( int ));
-extern int tpeekc P(( void ));
 extern int get_recorded_char P(( int ));
 extern int tgetc P(( int ));
 extern int kbd_key P(( void ));
 extern int kbd_seq P(( void ));
 extern int screen_string P(( char *, int, CMASK ));
 extern int end_string P(( void ));
+extern int kbd_delimiter P(( void ));
 extern int is_edit_char P(( int ));
 extern void kbd_kill_response P(( char *, int *, int ));
 extern int kbd_show_response P(( char *, char *, int, int, int ));
@@ -631,12 +651,15 @@ extern int listmodes P(( int, int ));
 #if UNIX || MSDOS
 extern FILE * npopen P(( char *, char * ));
 extern void npclose P(( FILE * ));
+extern int inout_popen P(( FILE **, FILE **, char * ));
+extern int softfork P(( void ));
 #endif
 #if UNIX
-extern int inout_popen P(( FILE **, FILE **, char * ));
 extern void exec_sh_c P(( char * ));
 extern int system_SHELL P(( char * ));
-extern int softfork P(( void ));
+#endif
+#if MSDOS
+extern void npflush P(( void ));
 #endif
 
 /* oneliner.c */
@@ -730,7 +753,7 @@ extern int ins P(( int ));
 extern int insstring P(( int, int ));
 extern int overwstring P(( int, int ));
 extern int istring P(( int, int, int ));
-extern int inschar P(( int, int ));
+extern int inschar P(( int, int * ));
 extern int backspace P(( void ));
 extern int newline P(( int, int ));
 extern int indented_newline P(( int ));
@@ -844,9 +867,6 @@ extern int untagpop P(( int, int ));
 extern void pushuntag P(( char *, int ));
 extern int popuntag P(( char *, int * ));
 extern void tossuntag P(( void ));
-#ifdef GMDTAGSLOOK
-extern BUFFER * look_tags P(( int ));
-#endif
 #endif /* TAGS */
 
 /* termio.c */

@@ -6,7 +6,13 @@
  * for the display system.
  *
  * $Log: buffer.c,v $
- * Revision 1.57  1993/04/20 12:18:32  pgf
+ * Revision 1.59  1993/05/04 17:05:14  pgf
+ * see tom's CHANGES, 3.45
+ *
+ * Revision 1.58  1993/04/28  17:11:22  pgf
+ * got rid of NeWS ifdefs
+ *
+ * Revision 1.57  1993/04/20  12:18:32  pgf
  * see tom's 3.43 CHANGES
  *
  * Revision 1.56  1993/04/01  13:06:31  pgf
@@ -907,9 +913,6 @@ register BUFFER *bp;
 		curwp->w_dot.o = 0;
 		bp->b_active = TRUE;
 	}
-#if	NeWS
-	newsreportmodes() ;
-#endif
 	updatelistbuffers();
 	return TRUE;
 }
@@ -1498,7 +1501,12 @@ char   *bname;
 	ch_fname(bp, "");
 	(void)strcpy(bp->b_bname, bname);
 #if	CRYPT
-	bp->b_key[0] = 0;
+	if (cryptkey != 0 && *cryptkey != EOS) {
+		(void)strcpy(bp->b_key, cryptkey);
+		make_local_b_val(bp, MDCRYPT);
+		set_b_val(bp, MDCRYPT, TRUE);
+	} else
+		bp->b_key[0] = EOS;
 #endif
 	bp->b_udstks[0] = bp->b_udstks[1] = NULL;
 	bp->b_udstkindx = 0;

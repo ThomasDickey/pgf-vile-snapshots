@@ -72,7 +72,16 @@
 #		here for completeness.
 #
 # $Log: cmdtbl,v $
-# Revision 1.58  1993/04/20 12:18:32  pgf
+# Revision 1.61  1993/05/05 13:39:00  pgf
+# changed special-prefix to function-prefix
+#
+# Revision 1.60  1993/05/04  17:05:14  pgf
+# see tom's CHANGES, 3.45
+#
+# Revision 1.59  1993/04/29  19:17:50  pgf
+# comment wording
+#
+# Revision 1.58  1993/04/20  12:18:32  pgf
 # see tom's 3.43 CHANGES
 #
 # Revision 1.57  1993/04/12  19:19:37  pgf
@@ -354,7 +363,7 @@ cd		NONE
 	"cd"
 	"change-directory"
 cntl_xf		NONE
-	"cntl_x-prefix"			!FEWNAMES
+	"cntl_x-prefix"
 	'^X'
 chgchar		REDO|UNDO
 	"change-char"			!FEWNAMES
@@ -744,7 +753,7 @@ gotoline	ABS|MOTION|FL|(RANGE)
 	'G'
 # golinenmmark and goexactnmmark are special cases--	
 # 	no ABS even though they are absolute, since these are the commands
-#	that maintain the last-dot-mark
+#	that use the last-dot-mark
 golinenmmark	MOTION|FL
 	"goto-named-mark"		!FEWNAMES
 #  single quote -- can't use '''
@@ -1056,6 +1065,10 @@ settab		NONE
 	"handle-tab"			!FEWNAMES
 	"set-tab"
 	'^X-t'
+set_termchrs	NONE			REBIND&&!SMALLER
+	"set-terminal"
+show_termchrs	NONE			REBIND&&!SMALLER
+	"show-terminal"
 spawncli	NONE
 	"sh"
 	"shell"
@@ -1071,7 +1084,7 @@ scrnextdw	NONE
 setfillcol	NONE
 	"set-fill-column"
 	'^X-f'
-setkey		NONE			CRYPT
+ue_setkey	NONE			CRYPT
 	"set-crypt-key"
 	'^X-X'
 setmode		NONE|(EXRCOK|EXTRA)
@@ -1122,6 +1135,7 @@ spawn		NONE
 #	"!"
 	"shell-command"			!FEWNAMES
 speckey		NONE
+	"function-prefix"
 	'#'
 splitwind	NONE
 	"split-current-window"		!FEWNAMES

@@ -3,7 +3,18 @@
  *		5/9/86
  *
  * $Log: input.c,v $
- * Revision 1.72  1993/04/28 14:34:11  pgf
+ * Revision 1.75  1993/05/05 10:31:30  pgf
+ * cleaned up handling of SPEC keys from withing insert mode.  now, any
+ * function bound to a SPECkey (i.e. any FN-? thing) can be executed
+ * either from inside or outside insert mode.
+ *
+ * Revision 1.74  1993/05/04  17:05:14  pgf
+ * see tom's CHANGES, 3.45
+ *
+ * Revision 1.73  1993/04/28  17:11:22  pgf
+ * got rid of NeWS ifdefs
+ *
+ * Revision 1.72  1993/04/28  14:34:11  pgf
  * see CHANGES, 3.44 (tom)
  *
  * Revision 1.71  1993/04/22  11:17:00  pgf
@@ -350,15 +361,8 @@ char *prompt;
 	char c; 		/* input character */
 
 	for (;;) {
-#if	NeWS
-		newsimmediateon() ;
-		mlprompt(,"%s [y/n]? ",prompt);
-		c = tgetc(FALSE);	/* get the response */
-		newsimmediateoff() ;
-#else
 		mlprompt("%s [y/n]? ",prompt);
 		c = tgetc(FALSE);	/* get the response */
-#endif
 
 		if (c == kcod2key(abortc))		/* Bail out! */
 			return(ABORT);
@@ -442,8 +446,6 @@ incr_dot_kregnum()
 	}
 }
 
-int tungotc = -1;
-
 void
 tungetc(c)
 int c;
@@ -455,12 +457,6 @@ int c;
 			tb_unput(KbdMacro);
 	} else if (dotcmdmode != PLAY && kbdmode == RECORD)
 		tb_unput(KbdMacro);
-}
-
-int
-tpeekc()
-{
-	return tungotc;
 }
 
 /*
@@ -626,6 +622,7 @@ kbd_key()
 	c = tgetc(FALSE);
 
 #if ANSI_SPEC
+#if BEFORE
 	if (insert_mode_was && last1key == -abortc) {
 		int ic;
 		/* then we just read the command we pushed before */
@@ -636,6 +633,7 @@ kbd_key()
 		insertmode = insert_mode_was;
 		insert_mode_was = FALSE;
 	}
+#endif
 
 	if ((unsigned char)c == (unsigned char)RECORDED_ESC) {
 		/* if this is being replayed... */
@@ -665,12 +663,16 @@ kbd_key()
 					/* eat the sequence, but return abort */
 					return abortc;
 				}
+#ifdef BEFORE
 				/* remember we were in insert mode */
 				insert_mode_was = insertmode;
 				/* save the code, but return flag to
 					ins() so it can clean up */
 				tungetc(SPEC | c);
 				return(last1key = -abortc);
+#else
+				return (lastkey = SPEC|c);
+#endif
 			} else {
 				if (abortc != ESC)
 					return (last1key = c);
@@ -832,6 +834,34 @@ int
 end_string()
 {
 	return last_eolchar;
+}
+
+/*
+ * Returns an appropriate delimiter for /-commands, based on the end of the
+ * last reply.  That is, in a command such as
+ *
+ *	:s/first/last/
+ *
+ * we will get prompts for
+ *
+ *	:s/	/-delimiter saved in 'end_string()'
+ *	first/
+ *	last/
+ *
+ * If a newline is used at any stage, subsequent delimiters are forced to a
+ * newline.
+ */
+int
+kbd_delimiter()
+{
+	register int	c = '\n';
+
+	if (namedcmd) {
+		register int	d = end_string();
+		if (ispunct(d))
+			c = d;
+	}
+	return c;
 }
 
 /* turn \X into X */
@@ -1147,32 +1177,22 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 		if (c == '\r' && quotef == FALSE)
 			c = '\n';
 
-		/* if they hit the line terminate, wrap it up */
-		/* don't allow newlines in the string -- they cause real
-			problems, especially when searching for patterns
-			containing them -pgf */
-		/* terminate with newline, or unescaped eolchar */
+		/*
+		 * If they hit the line terminate (i.e., newline or unescaped
+		 * eolchar), wrap it up.
+		 *
+		 * Don't allow newlines in the string -- they cause real
+		 * problems, especially when searching for patterns
+		 * containing them -pgf
+		 */
 		done = FALSE;
 		if (c == '\n') {
 			done = TRUE;
 		} else if (!EscOrQuo && !is_edit_char(c)) {
 			if ((*endfunc)(buf,cpos,c,eolchar)) {
-				/*
-				 * If this is not an exact match for 'eolchar',
-				 * then the end-function was probably something
-				 * like 'eol_command()', e.g., an "s" that is
-				 * followed by a pattern delimiter.
-				 */
-				if (c != eolchar
-				 && c != TESTC
-				 && c != NAMEC
-				 && ispunct(c))
-					tungetc(c);
 				done = TRUE;
 			}
 		}
-		if (done)
-			last_eolchar = c;
 
 		if (complete != no_completion) {
 			if (c == EOS) {	/* conflicts with null-terminated strings */
@@ -1188,9 +1208,8 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 
 				if (ok) {
 					done = TRUE;
-					if (c != NAMEC)	/* cancel the unget */
+					if (c != NAMEC) /* cancel the unget */
 						(void)tgetc(FALSE);
-					last_eolchar = c;
 				} else {
 					if (done) {	/* stay til matched! */
 						buf[cpos] = EOS;
@@ -1203,6 +1222,7 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 		}
 
 		if (done) {
+			last_eolchar = c;
 			if (options & KBD_QUOTES)
 				remove_backslashes(buf); /* take out quoters */
 
@@ -1211,9 +1231,6 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 			return (*strcpy(extbuf, buf) == EOS) ? FALSE:TRUE;
 		}
 
-#if	NeWS	/* make sure cursor is where we think it is before output */
-		TTmove(ttrow,ttcol) ;
-#endif
 
 #if	!SMALLER
 		if (!EscOrQuo

@@ -1,4 +1,45 @@
 
+README for vile
+----------------
+
+4/93:
+
+Well, here's the second net posting of vile.  The first was a long time
+ago.  Tom Dickey has been contributing a _whole_ lot of good changes.  Vile
+now runs on VMS, and is much more stable on DOS thanks to him.
+
+One thing that's changed since I first started vile is that "lots of eager
+programmers" have now tackled rewrites of vi.  There are several good work-
+alikes out there: elvis (the "king" :-), xvi, vim, stevie, vip-mode in GNU
+emacs.  From what little I've used any of these, they all seem like real
+good programs.  Vile feels different from most of them, mainly due to its
+roots in MicroEmacs.  You may or may not like it.  If you don't, try one of
+the others.  There's certainly no reason to not have a vi-like editor on
+just about any machine you choose.  Enjoy.
+
+Oh yes -- building it.  On UNIX, type "make", and choose one of the predefined
+targets.  Like "make linux".
+
+Under DOS we have Turbo-C support -- there are two makefiles: mktbls.mak
+and vile.mak.  First build mktbls.exe, then run "mktbls cmdtbl" and "mktbls
+modetbl".  That'll build the headers you'll need to build vile.exe using
+the second makefile.  The current compiler of choice is Turbo C, but
+Microsoft C used to work, and so probably would again without too much
+work.  (The makefile support for msc is next to useless, though -- if
+anyone puts together a good nmake makefile, could you pass it along?
+
+The latest version of vile is usually available for ftp at "ftp.cayman.com",
+in the pub/vile directory.  Sometimes there's a compiled DOS binary there
+too.  I don't maintain a mailing list, or anything like that to inform folks
+of new releases -- you just sort of have to check once in a while, or send
+me mail...
+
+paul
+
+------------------------------
+
+9/92:
+
 I don't have much to add to the original README -- vile has gotten a lot
 better since I first released it, thanks to a lot of users and a lot of
 bug reports.  It compiles and runs without modification on most major UNIXes,
