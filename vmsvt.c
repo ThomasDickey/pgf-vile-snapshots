@@ -8,7 +8,10 @@
  *  Last Updated: 07/14/87
  *
  * $Log: vmsvt.c,v $
- * Revision 1.3  1992/08/20 23:40:48  foxharp
+ * Revision 1.4  1993/03/17 10:00:29  pgf
+ * initial changes to make VMS work again
+ *
+ * Revision 1.3  1992/08/20  23:40:48  foxharp
  * typo fixes -- thanks, eric
  *
  * Revision 1.2  1991/08/07  12:35:07  pgf
@@ -32,8 +35,8 @@
 #define TT$_UNKNOWN	0x00		/* Unknown terminal		*/
 
 /** Forward references **/
-int vmsopen(), ttclose(), vmskopen(), vmskclose(), ttgetc(), ttputc();
-int ttflush(), vmsmove(), vmseeol(), vmseeop(), vmsbeep(), vmsrev();
+int vmsopen(), vmskopen(), vmskclose(), ttgetc();
+int vmsmove(), vmseeol(), vmseeop(), vmsbeep(), vmsrev();
 int vmscres();
 extern int eolexist, revexist;
 extern char sres[];
@@ -423,6 +426,7 @@ int f,n;	/* default flag, numeric argument [unused] */
  *
  *  Nothing returned
  ***/
+void
 spal()
 {
 }

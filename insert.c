@@ -8,8 +8,11 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: insert.c,v $
- *	Revision 1.14  1993/03/16 10:53:21  pgf
- *	see 3.36 section of CHANGES file
+ *	Revision 1.15  1993/03/17 10:01:18  pgf
+ *	overwrite() renamed to overwritechars()
+ *
+ * Revision 1.14  1993/03/16  10:53:21  pgf
+ * see 3.36 section of CHANGES file
  *
  * Revision 1.13  1993/02/15  10:37:31  pgf
  * cleanup for gcc-2.3's -Wall warnings
@@ -249,7 +252,7 @@ int f,n;
 
 /* ARGSUSED */
 int
-overwrite(f, n)
+overwritechars(f, n)
 int f,n;
 {
 	int	s,

@@ -93,7 +93,7 @@ CFLAGS1 = $(OPTFLAGS) $(CFLAGS0)
 O = o
 
 # All of the makefiles which should be preserved
-MAKFILES = makefile make.ini
+MAKFILES = makefile make.ini descrip.mms vms_link.opt
 MKTBLS = ./mktbls
 
 ALLTOOLS = $(MAKFILES)
@@ -379,21 +379,30 @@ install2:
 	chmod 0644 $$dest/vile.hlp
 	
 
-compr-shar: link.msc
+compr-shar: link.msc /tmp/vilevers
 	[ -d cshardir ] || mkdir cshardir
 #	add -a for archive headers, add -s pgf@cayman.com for submitted-by
-	shar -p -nvile -L55 -o cshardir/vileshar \
+	vilevers=`cat /tmp/vilevers`; \
+	shar -p -nvile$${vilevers} -L55 -o cshardir/vileshar \
 		-T README -C `ls $(EVERYTHING) | sed '/^README$$/d'` link.msc
 
-shar: link.msc
+shar: link.msc /tmp/vilevers
 	[ -d shardir ] || mkdir shardir
 #	add -a for archive headers, add -s pgf@cayman.com for submitted-by
-	shar -x -a -spgf@cayman.com -nVile -L55 \
+	vilevers=`cat /tmp/vilevers`; \
+	shar -x -a -spgf@cayman.com -nvile$${vilevers} -L55 \
 			-o shardir/vileshar `ls $(EVERYTHING)` link.msc
 
-bigshar: link.msc
-	shar -spgf@cayman.com -nVile \
-	-o vileBIGshar README `ls $(EVERYTHING) | sed '/^README$$/d'` link.msc
+bigshar: link.msc /tmp/vilevers
+	vilevers=`cat /tmp/vilevers`; \
+	shar -spgf@cayman.com -nvile$${vilevers} \
+	    -o vile$${vilevers}shar README `ls $(EVERYTHING) | \
+	    sed '/^README$$/d'` link.msc ; \
+	mv vile$${vilevers}shar.01 vile$${vilevers}shar
+
+/tmp/vilevers: ALWAYS
+	expr "`egrep 'version\[\].*' edef.h`" : \
+		'.*\([0-9][0-9]*\.[0-9][0-9]*\).*' >/tmp/vilevers
 
 # only uucp things changed since last time
 uuto:
@@ -501,13 +510,21 @@ $(EVERYTHING):
 
 $(OBJ): estruct.h nemode.h edef.h proto.h
 
+ALWAYS:
+
 bind.$O:	epath.h
 eval.$O:	nevars.h
 externs.$O:	nebind.h nename.h nefunc.h
 vmalloc$O:	nevars.h
 
 # $Log: makefile,v $
-# Revision 1.90  1993/03/16 10:53:21  pgf
+# Revision 1.92  1993/03/17 10:43:53  pgf
+# made building/naming shar files easier -- gets version automatically
+#
+# Revision 1.91  1993/03/17  10:00:29  pgf
+# initial changes to make VMS work again
+#
+# Revision 1.90  1993/03/16  10:53:21  pgf
 # see 3.36 section of CHANGES file
 #
 # Revision 1.89  1993/03/08  15:24:00  pgf

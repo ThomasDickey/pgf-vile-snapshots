@@ -1,3 +1,13 @@
+Changes for vile 3.37:
+
+	+ works on osf/1 alpha now, with hacks applied to termio.c and
+	  display.c
+
+	+ added files 'descrip.mms' and 'vms_link.opt'; compiled on VAX/VMS
+	  (but did not make it run) (tom dickey)
+
+	+ pathname tracking fixes (calling shorten_path() correctly everywhere)
+
 Changes for vile 3.36 (from Tom Dickey):
 
 	+ supplied initial value for dirc-mode

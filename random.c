@@ -3,7 +3,10 @@
  * commands. There is no functional grouping here, for sure.
  *
  * $Log: random.c,v $
- * Revision 1.86  1993/03/16 10:53:21  pgf
+ * Revision 1.87  1993/03/17 10:00:29  pgf
+ * initial changes to make VMS work again
+ *
+ * Revision 1.86  1993/03/16  10:53:21  pgf
  * see 3.36 section of CHANGES file
  *
  * Revision 1.85  1993/03/05  17:50:54  pgf
@@ -999,7 +1002,7 @@ int force;
 	cwd = dirname;
 	}
 #else
-# if (MSDOS & MSC) || POSIX
+# if (MSDOS & MSC) || POSIX || VMS
 
 	cwd = getcwd(dirname, NFILEN);
 # else

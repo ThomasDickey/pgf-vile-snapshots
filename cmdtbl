@@ -72,7 +72,10 @@
 #		here for completeness.
 #
 # $Log: cmdtbl,v $
-# Revision 1.52  1993/03/16 10:53:21  pgf
+# Revision 1.53  1993/03/17 10:01:18  pgf
+# overwrite() renamed to overwritechars()
+#
+# Revision 1.52  1993/03/16  10:53:21  pgf
 # see 3.36 section of CHANGES file
 #
 # Revision 1.51  1993/03/05  17:50:54  pgf
@@ -940,7 +943,7 @@ operwrite	OPER|(RANGE|BANG|FILE1|DFLALL)
 	"W"
 	"write-til"			!FEWNAMES
 	'^W'
-overwrite	REDO|UNDO
+overwritechars	REDO|UNDO
 	"overwrite-chars"		!FEWNAMES
 	'R'
 onlywind	NONE

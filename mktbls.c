@@ -9,7 +9,10 @@
  *	the output structures.
  *
  * $Log: mktbls.c,v $
- * Revision 1.18  1993/03/05 17:50:54  pgf
+ * Revision 1.19  1993/03/17 10:00:29  pgf
+ * initial changes to make VMS work again
+ *
+ * Revision 1.18  1993/03/05  17:50:54  pgf
  * see CHANGES, 3.35 section
  *
  * Revision 1.17  1993/02/24  10:59:02  pgf
@@ -75,6 +78,18 @@
 
 #include <stdio.h>
 #include <string.h>
+
+/* argument for 'exit()' or '_exit()' */
+#if	VMS
+#include	<stsdef.h>
+#define GOOD	(STS$M_INHIB_MSG | STS$K_SUCCESS)
+#define BAD(c)	(STS$M_INHIB_MSG | STS$K_ERROR)
+#endif
+
+#ifndef GOOD
+#define GOOD	0
+#define BAD(c)	(c)
+#endif
 
 #define	MAX_BIND	4	/* total # of binding-types */
 #define	MAX_PARSE	5	/* maximum # of tokens on line */
@@ -183,7 +198,7 @@ char *s;
 {
 	Fprintf(stderr,"\"%s\", line %d: bad format:", inputfile, l);
 	Fprintf(stderr,"	%s\n",s);
-	exit(1);
+	exit(BAD(1));
 }
 
 static void
@@ -221,7 +236,7 @@ char	**argv;
 
 	if (!(fp = fopen(name, "w"))) {
 		Fprintf(stderr,"mktbls: couldn't open header file %s\n", name);
-		exit(1);
+		exit(BAD(1));
 	}
 	Fprintf(fp, progcreat, name, argv[0], argv[1]);
 	return fp;
@@ -1179,12 +1194,12 @@ char    *argv[];
 
 	if (argc != 2) {
 		Fprintf(stderr, "usage: mktbls cmd-file\n");
-		exit(1);
+		exit(BAD(1));
 	}
 
 	if ((cmdtbl = fopen(inputfile = argv[1],"r")) == NULL ) {
 		Fprintf(stderr,"mktbls: couldn't open cmd-file\n");
-		exit(1);
+		exit(BAD(1));
 	}
 
 	*old_fcond = '\0';
@@ -1348,5 +1363,6 @@ char    *argv[];
 		dump_bmodes();
 	}
 
-	return 0;
+	exit(GOOD);
+	/*NOTREACHED*/
 }

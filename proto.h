@@ -5,7 +5,10 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.35  1993/03/16 10:53:21  pgf
+ * Revision 1.36  1993/03/17 10:01:18  pgf
+ * overwrite() renamed to overwritechars()
+ *
+ * Revision 1.35  1993/03/16  10:53:21  pgf
  * see 3.36 section of CHANGES file
  *
  * Revision 1.34  1993/03/05  17:50:54  pgf
@@ -638,7 +641,7 @@ extern int insert P(( int, int ));
 extern int insertbol P(( int, int ));
 extern int append P(( int, int ));
 extern int appendeol P(( int, int ));
-extern int overwrite P(( int, int ));
+extern int overwritechars P(( int, int ));
 extern int ins P(( int ));
 extern int backspace P(( void ));
 extern int newline P(( int, int ));

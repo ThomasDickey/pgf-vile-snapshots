@@ -1,0 +1,6 @@
+! Link with sharable C-runtime library
+! $Log: vms_link.opt,v $
+! Revision 1.1  1993/03/17 09:51:20  pgf
+! Initial revision
+!
+sys$library:vaxcrtlg.exe/share

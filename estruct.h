@@ -10,7 +10,10 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.101  1993/03/16 10:53:21  pgf
+ * Revision 1.102  1993/03/17 10:00:29  pgf
+ * initial changes to make VMS work again
+ *
+ * Revision 1.101  1993/03/16  10:53:21  pgf
  * see 3.36 section of CHANGES file
  *
  * Revision 1.100  1993/03/05  17:50:54  pgf
@@ -476,6 +479,19 @@
 # define USG 0
 #endif
 
+#ifdef VMS		/* predefined by VAX/VMS compiler */
+# undef BERK
+# undef SVR3
+# undef USG
+# define BERK   0
+# define SVR3   0
+# define USG    0
+# define scrn_chosen
+# define VMSVT  1
+#else
+# define VMS    0
+#endif
+
 /* non-unix flavors */
 #undef	LATTICE		/* don't use their definitions...use ours	*/
 #undef	MSDOS
@@ -487,7 +503,6 @@
 #define ST520	0			/* ST520, TOS		       */
 #define MSDOS	0			/* MS-DOS		       */
 #define CPM	0			/* CP/M-86		       */
-#define VMS	0			/* VAX/VMS		       */
 
 /*	Compiler definitions			*/
 #define MWC86	0	/* marc williams compiler */
