@@ -18,7 +18,7 @@
  * transfering the selection are not dealt with in this file.  Procedures
  * for dealing with the representation are maintained in this file.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/select.c,v 1.32 1994/12/20 19:35:40 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/select.c,v 1.33 1995/02/19 17:35:51 pgf Exp $
  *
  */
 
@@ -862,6 +862,19 @@ attribute_cntl_a_sequences()
 		while (offset < lLength(DOT.l)) {
 		    c = lGetc(DOT.l, offset);
 		    switch (c) {
+			case 'C' :
+			    /* We have color. Get color value */
+			    offset++;
+			    c = lGetc(DOT.l, offset);
+			    if (isdigit(c))
+				videoattribute |= VCOLORATTR(c - '0');
+			    else if ('A' <= c && c <= 'F')
+				videoattribute |= VCOLORATTR(c - 'A' + 10);
+			    else if ('a' <= c && c <= 'f')
+				videoattribute |= VCOLORATTR(c - 'a' + 10);
+			    else
+				offset--; /* Invalid attribute */
+			    break;
 			case 'U' : videoattribute |= VAUL;   break;
 			case 'B' : videoattribute |= VABOLD; break;
 			case 'R' : videoattribute |= VAREV;  break;

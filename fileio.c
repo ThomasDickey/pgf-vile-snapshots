@@ -2,7 +2,7 @@
  * The routines in this file read and write ASCII files from the disk. All of
  * the knowledge about files are here.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/fileio.c,v 1.94 1995/01/15 16:30:14 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/fileio.c,v 1.95 1995/02/15 16:06:43 pgf Exp $
  *
  */
 
@@ -91,7 +91,7 @@ char	*dst;
  */
 
 #if SYS_UNIX
-# if ! HAVE_LONG_FILENAMES
+# if ! HAVE_LONG_FILE_NAMES
 #  define MAX_FN_LEN 14
 # else
 #  define MAX_FN_LEN 255

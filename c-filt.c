@@ -2,30 +2,57 @@
  * Program: A simple comment and keyword attributor for vile
  * Author : Jukka Keto, jketo@cs.joensuu.fi
  * Date   : 30.12.1994
+ * Modifications:  kevin buettner and paul fox  2/95
  * 
  * Features:
- * 	- Reads the keyword file "$HOME/.vile.keywords".
+ * 	- Reads the keyword file ".vile.keywords" from the home directory.
  *	  Keyword file consists lines "keyword:attribute" where
- *	  keyword is any alphanumeric string [#a-zA-Z0-9_] followed
+ *	  keyword is any alpahumeric string [#a-zA-Z0-9_] followed
  *	  by colon ":" and attribute character; "I" for italic, 
- *	  "U" for underline, "B" for bold or "R" for reverse presentation.
+ *	  "U" for underline, "B" for bold, "R" for reverse or
+ *	  "C#" for color (where # is a single hexadecimal digit representing
+ *	  one of 16 colors).
  *	- Attributes the file read from stdin using vile attribute sequences
  *	  and outputs the file to stdout with keywords and comments 
  *	  attributed.
- *	- Comments are attributed with underline attribute.
+ *	- Comments are handled by the pseudo-keyword "Comments".
  *	- Here is the macro that is needed with this filter:
  *        30 store-macro
- * 	     write-message "[Attaching C/C++ keyword/comment attributes...]"
+ * 	     write-message "[Attaching C/C++ attributes...]"
  * 	     goto-beginning-of-file
  * 	     filter-til end-of-file "c-filt"
  * 	     goto-beginning-of-file
  * 	     attribute-cntl_a-sequences-til end-of-file
  * 	     unmark-buffer
- * 	     write-message "[Attaching C/C++ keyword/comment attributes...done]"
+ * 	     write-message "[Attaching C/C++ attributes...done ]"
  *        ~endm
- *        bind-key execute-macro-30 ^X-q
+ *        bind-key execute-macro-30 -q
  *
- * Files: ~/.vile.keywords (my examples)
+ * example .vile.keywords files:
+ * (first, for color use)
+ *	Comments:C1
+ *	#if:C2
+ *	#ifdef:C2
+ *	#include:C2
+ *	#else:C2
+ *	#elsif:C2
+ *	#endif:C2
+ *	#define:C2
+ *	#undef:C2
+ *	if:C3
+ *	else:C3
+ *	endif:C3
+ *	for:C3
+ *	return:C3
+ *	while:C3
+ *	switch:C3
+ *	case:C3
+ *	do:C3
+ *	goto:C3
+ *	break:C3
+ *
+ * (for non-color use)
+ *	Comments:U
  *	#if:I
  *	#ifdef:I
  *	#include:I
@@ -44,53 +71,132 @@
  *	case:B
  *	do:B
  *	goto:B
- *	break:B
+ *	break:B       
  *
  * Note:
- *	- I use this to get the coloring effects (in my VT220 PC emulator)
- *	  some commercial programs and epoch offer and with a color_xterm with
- *	  appropriate terminfo.
+ *	- I use this to get the coloring effects in XVile, or when
+ *	  using a terminal emulator which supports color.  some, for
+ *	  instance, allow the mapping of bold and italic attributes to
+ *	  color.
  *
  * Known Bugs (other features):
  *	- The keyword lists should be ordered for optimal operation.
  *	- Directives with empty space after # are not attributed (may
  *	  be attributed wrongly).
  *
- * To compile (need an ANSI compiler):
- *	cc -o c-filt c-filt.c
- *
- *	$Header: /usr/build/VCS/pgf-vile/RCS/c-filt.c,v 1.3 1995/01/12 21:45:21 pgf Exp $
  */
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+# if defined(__STDC__)
+#   define ANSI_PROTOS 1
+# else
+#   define ANSI_PROTOS 0
+# endif
+#endif
+
+#ifndef HAVE_STDLIB_H
+# define HAVE_STDLIB_H 0
+#endif
+
+#ifndef ANSI_PROTOS
+# define ANSI_PROTOS 0
+#endif
+
+#if ANSI_PROTOS
+#define P(param) param
+#else
+#define P(param) ()
+#endif
+
+#include <sys/types.h>		/* sometimes needed to get size_t */
+
+#if HAVE_STDLIB_H
+#include <stdlib.h>
+#else
+# if !defined(HAVE_CONFIG_H) || MISSING_EXTERN_MALLOC
+extern	char *	malloc	P(( size_t ));
+# endif
+#endif
+
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+
 #include <stdio.h>
+
+#if MISSING_EXTERN__FILBUF
+extern	int	_filbuf	P(( FILE * ));
+#endif
+
+#if MISSING_EXTERN__FLSBUF
+extern	int	_flsbuf	P(( int, FILE * ));
+#endif
+
+#if MISSING_EXTERN_FCLOSE
+extern	int	fclose	P(( FILE * ));
+#endif
+
+#if MISSING_EXTERN_FPRINTF
+extern	int	fprintf	P(( FILE *, const char *, ... ));
+#endif
+
+#if MISSING_EXTERN_FPUTS
+extern	int	fputs	P(( const char *, FILE * ));
+#endif
+
+#if MISSING_EXTERN_PRINTF
+extern	int	printf	P(( const char *, ... ));
+#endif
+
+#if MISSING_EXTERN_SSCANF
+extern	int	sscanf	P(( const char *, const char *, ... ));
+#endif
+
 #include <ctype.h>
 
-extern	char *malloc( unsigned int );
-extern	char *getenv( const char * );
 
 #define MAX_KEYWORD_LENGTH 80
 #define HASH_LENGTH 256
 #define MAX_LINELENGTH 256
+#define MAX_ATTR_LENGTH 3
 static char *keyword_file=".vile.keywords";
 
-typedef struct _keyword {
+typedef struct _keyword KEYWORD;
+
+struct _keyword {
     char kw[MAX_KEYWORD_LENGTH+1];
-    char attribute;
+    char attribute[MAX_ATTR_LENGTH+1];
     int  length;
-    struct _keyword *next;
-} KEYWORD;
+    KEYWORD *next;
+};
 
 static KEYWORD *hashtable[HASH_LENGTH];
 static KEYWORD identifier;
-static char comment_attr = 'I';
+static char comment_attr[MAX_ATTR_LENGTH+1] = "C1"; /* color 1 */
 
-void inithash()
+static	void	inithash		P((void));
+static	void	removelist		P((KEYWORD *));
+static	void	closehash		P((void));
+static	int	hash_function		P((char *));
+static	void	insert_keyword		P((char *, char *));
+static	void	match_identifier	P((void));
+static	char *	extract_identifier	P((char *));
+static	void	read_keywords		P((void));
+static	int	has_endofcomment	P((char *));
+static	char *	skip_white		P((char *));
+extern	int	main			P((int, char **));
+
+static void
+inithash()
 {
     int i;
     for (i=0;i<HASH_LENGTH;i++) hashtable[i] = NULL; 
 }
 
-void removelist(KEYWORD *k)
+static void
+removelist(k)
+    KEYWORD *k;
 {
     if (k != NULL) {
 	if (k->next != NULL) removelist(k->next);
@@ -98,7 +204,8 @@ void removelist(KEYWORD *k)
     }
 }
 
-void closehash()
+static void
+closehash()
 {
     int i;
     for (i=0;i<HASH_LENGTH;i++) {
@@ -107,26 +214,35 @@ void closehash()
     }
 }
 
-int hash_function(char *identifier) 
+static int
+hash_function(id) 
+    char *id;
 {
     /*
      * Build more elaborate hashing scheme. If you want one.
      */
-    return ( (int) *identifier );
+    return ( (int) *id );
 }
 
-void insert_keyword(char *ident,char attribute)
+static void
+insert_keyword(ident,attribute)
+    char *ident;
+    char *attribute;
 {
     KEYWORD *first;
     KEYWORD *new;
     int index;
+    if (!strcmp(ident,"Comments")) {
+	strcpy(comment_attr,attribute);
+	return;
+    }
     new = first = NULL;
     index = hash_function(ident);
     first = hashtable[index];
     if ((new = (KEYWORD *)malloc(sizeof(struct _keyword))) != NULL) {
 	strcpy(new->kw,ident);
 	new->length = strlen(new->kw);
-	new->attribute = attribute;
+	strcpy(new->attribute,attribute);
 	new->next = first;
 	hashtable[index] = new;
 #ifdef DEBUG 
@@ -137,7 +253,8 @@ void insert_keyword(char *ident,char attribute)
 }
 
 
-void match_identifier()
+static void
+match_identifier()
 {
     KEYWORD *hash_id;
     int index, match = 0;
@@ -148,7 +265,7 @@ void match_identifier()
 	    if (strcmp(hash_id->kw,identifier.kw) == 0) {
 		match = 1;
 		/* Match found. Lets print out the result. */
-		printf("%i%c:%s",identifier.length,
+		printf("\001%i%s:%s",identifier.length,
 				   hash_id->attribute,
 				   identifier.kw);
 	    }
@@ -160,7 +277,9 @@ void match_identifier()
 }
 
 
-char *extract_identifier(char *s)
+static char *
+extract_identifier(s)
+    char *s;
 {
     register char *kwp = identifier.kw;
     identifier.kw[0] = '\0';
@@ -175,12 +294,13 @@ char *extract_identifier(char *s)
 }
 
 
-void read_keywords()
+static void
+read_keywords()
 {
     char filename[1024];
-    char identifier[MAX_KEYWORD_LENGTH+1];
+    char ident[MAX_KEYWORD_LENGTH+1];
     char line[MAX_LINELENGTH+1];
-    char attribute[2];
+    char attribute[MAX_ATTR_LENGTH+1];
     char *home;
     int  items;
     FILE *kwfile;
@@ -188,21 +308,27 @@ void read_keywords()
     sprintf(filename,"%s/%s",(home == NULL ? "" : home),keyword_file);
     if ((kwfile = fopen(filename,"r")) != NULL) {
 	fgets(line,MAX_LINELENGTH,kwfile);
-	items = sscanf(line,"%[#a-zA-Z0-9_]:%[IUBR]",identifier,attribute);
+	items = sscanf(line,"%[#a-zA-Z0-9_]:%[IUBR]",ident,attribute);
+	if (items != 2)
+	    items = sscanf(line,"%[#a-zA-Z0-9_]:%[C0-9ABCDEF]",ident,attribute);
 	while (! feof(kwfile) ) {
 #ifdef DEBUG
-	    fprintf(stderr,"read_keywords: Items %i, kw = %s, attr = %s\n",items,identifier,attribute);
+	    fprintf(stderr,"read_keywords: Items %i, kw = %s, attr = %s\n",items,ident,attribute);
 #endif
 	    if (items == 2) 
-		insert_keyword(identifier,attribute[0]);
+		insert_keyword(ident,attribute);
 	    fgets(line,MAX_LINELENGTH,kwfile);
-	    items = sscanf(line,"%[#a-zA-Z0-9_]:%[IUBR]",identifier,attribute);
+	    items = sscanf(line,"%[#a-zA-Z0-9_]:%[IUBR]",ident,attribute);
+	    if (items != 2)
+		items = sscanf(line,"%[#a-zA-Z0-9_]:%[C0-9ABCDEF]",ident,attribute);
 	}
 	fclose(kwfile);
     }
 }
 
-int has_endofcomment(char *s)
+static int
+has_endofcomment(s)
+    char *s;
 {
     char i=0;
     while (*s) {
@@ -215,8 +341,18 @@ int has_endofcomment(char *s)
     return(0);
 }
 
+static char *
+skip_white(s)
+    char *s;
+{
+    while(*s && (*s == ' ' || *s == '\t')) putchar(*s++);
+    return s;
+}
 
-main()
+int 
+main(argc, argv)
+    int argc;
+    char **argv;
 {
     char line[MAX_LINELENGTH+1];
     char *s;
@@ -227,6 +363,7 @@ main()
     read_keywords();
     while (gets(line) != NULL) {
 	s = line;
+	s = skip_white(s);
 	while (*s) {
 	    if (*s == '/' && *(s+1) == '*') {
 		c_length = has_endofcomment(s);
@@ -234,27 +371,32 @@ main()
 		    c_length = strlen(s);
 		    comment += 1;
 		}
-		printf("%iU:%.*s",c_length,c_length,s);
+		printf("\001%i%s:%.*s",c_length,comment_attr,c_length,s);
 		s = s + c_length ;
 	    } 
 	    if (*s == '/' && *(s+1) == '/') { /* C++ comments */
 	        c_length = strlen(s);
-		printf("%iU:%.*s",c_length,c_length,s);
+		printf("\001%i%s:%.*s",c_length,comment_attr,c_length,s);
 		break;
 	    } 
-	    if (comment) {
+	    if (comment && *s) {
 		if ((c_length = has_endofcomment(s)) > 0) {
-		    printf("%iU:%.*s",c_length,c_length,s);
+		    printf("\001%i%s:%.*s",c_length,comment_attr,c_length,s);
 		    s = s + c_length ;
 		    comment -= 1;
 		    if (comment < 0) comment = 0;
 		} else { /* Whole line belongs to comment */
 		    c_length = strlen(s);
-		    printf("%iU:%.*s",c_length,c_length,s);
+		    printf("\001%i%s:%.*s",c_length,comment_attr,c_length,s);
 		    s = s + c_length;
 		}
 	    } else if (*s) {
 	        if (*s == '\\' && *(s+1) == '\"') {/* Skip literal single character */
+		    putchar(*s++);
+		    putchar(*s++);
+		}
+		else if (!literal && *s == '\'' && s[1] == '"' && s[2] == '\'') {
+		    putchar(*s++);
 		    putchar(*s++);
 		    putchar(*s++);
 		}
@@ -271,6 +413,6 @@ main()
 	putchar('\n');
     }
     closehash();
+
+    exit(0);
 }
-
-

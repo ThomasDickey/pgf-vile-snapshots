@@ -1,3 +1,129 @@
+Changes for vile 5.1 (released Tue Feb 21, 1995)
+(pgf)
+	+ fix longstanding bug when keyboard macro is executed while
+	  it is being recorded.  (input.c)
+
+	+ fixed broken beginDisplay/endofDisplay nesting in xterm-mouse
+	  code, which caused lockups after a resize operation. (tcap.c)
+
+	+ fixed misspelled ifdef which caused filename truncation when using
+	  "tilde style" backups.  (fileio.c)
+
+	+ changed "X11" to "DISP_X11" in vmsbuild.com and descrip.mms.
+
+	+ fixed OPT_REVSTA ifdefs so modeline reverse-video can be turned
+	  off.  (display.c)
+	  
+	+ trimline() can be called with DOT.o == llength(lp), for instance
+	  if a macro calls "end-of-line" followed by "append-string" where
+	  the string starts with a CR.  trimline() was trimming (or not,
+	  didn't matter), and then backing DOT.o up to the last char on the
+	  line.  the CR would then break the line, instead of appending to
+	  it.  this is probably a problem in other functions as well, if
+	  called from a macro, since we don't do the "DOT.o can't sit on
+	  the newline" hack while executing macros.  (region.c)
+
+	+ replaced contents of c-filt.c with x-filt.c.  it seems to be a
+	  full superset of its functionality.  it is now installed along
+	  with manfilt, as vile-c-filt.  the help file now talks more about
+	  it.  (c-filt.c, makefile.in)
+
+	+ documented the color.[fb]color[1-16] subresources. (vile.hlp)
+
+	+ included the c-filt.flx code contributed by alistair crooks in
+	  the distribution.  (c-filt.flx, makefile.in)
+
+	+ changed the "built" names of manfilt and c-filt to vile-manfilt
+	  and vile-c-filt, to match their installed names, and to match
+	  the documentation. (makefile.in)
+
+	+ changed the new color resources to be {f,b}color[1-9,10-15],
+	  rather than A-F as before. (x11.c)
+
+	+ turned off IBM_VIDEO for linux.  it's not necessarily true.  
+	  turned on OPT_COLOR for linux and DISP_TERMCAP, which is what we
+	  were trying to imply with the above anyway.  (estruct.h)
+(kev)
+	+ patchlev.h (PATCHLEVEL): Updated to "c".
+
+	+ x11.c (update_scrollbar_sizes -- NO_WIDGETS version):
+	  Restructured loop which allocates new scrollbars and grips
+	  somewhat.  In addition to no longer creating one more grip than
+	  necessary, we also explicitly check to see which grips need to be
+	  created.
+
+	+ x11.c (check_scrollbar_allocs): Allocate the same number of grips as
+	  scrollbars.  We don't actually need this many, but allocation in this
+	  manner caused some subtle allocation problems with GROW().  GROW() was
+	  being called as follows:
+	  	GROW(cur_win->grips, Widget, oldmax-1, newmax-1);
+	  When cur_win->grips is initially allocated, cur_win->grips is
+	  NULL, oldmax is 0, and newmax is cur_win->rows/2.  Note then that
+	  -1 is being passed as the third parameter to GROW().  This causes
+	  newmax elements (rather than newmax-1 elements -- the number of
+	  elements allocated) to be zero'd near the end of the grow macro.
+
+	  The other piece of code affected (adversely) by this allocation is
+	  in update_scrollbar_sizes() where new scrollbars and grips are
+	  created.  It turns out that one more grip than necessary is created.
+	  Under certain conditions, the GROW macro would zero out this extra
+	  grip.  When reinvoked, update_scrollbar_sizes() would assume that
+	  this extra grip had been created and not bother to recreate it.
+
+  	+ patchlev.h (PATCHLEVEL): Updated to "a".
+
+	[ Note: The following changes constitute the merge of Jukka Keto's
+	  changes for color support to xvile.  Thanks Jukka! ]
+
+	+ estruct.h (OPT_COLOR): Define in terms of DISP_X11, not X11.
+
+	  (NCOLORS): Conditionally define this to be 16 instead of 8.
+
+	  (VAFGCOL, VABGCOL): Removed.
+	  
+	  (VACOLOR, VCOLORNUM, VCOLORATTR): New defines.
+
+	+ select.c (attribute_cntl_a_sequences): Color support.
+
+	+ x-filt.c: New file.  This is Jukka's syntax coloring filter for C
+	  programs.  I modified it slightly to compile clean under gcc with
+	  Tom's favorite warning flags: -Wall -Wshadow -Wconversion
+	  -Wstrict-prototypes -Wmissing-prototypes.  Also fixed a problem
+	  with "'".  It also no longer requires an ansi compiler.  Note: It
+	  should probably be merged with c-filt.  A command line switch to
+	  [xc]-filt could be used to indicate whether monochrome or color
+	  should be used.
+
+	+ x11.c (struct _text_win): New fields colors_fgc, colors_bgc,
+	  colors_fg, and colors_bg.
+
+	+ (Xt{N,C}{f,F,b,B}color{0-9,A-F} i.e, XtNfcolor0,...): New
+	  resource defines.  Kind of ugly to have to declare all of
+	  these like this, but that seems to be the way its done.
+
+	  (color_resources): Structure which defines the color subresources.
+
+	  (x_preparse_args): Get the color subresources and initialize
+	  the color GCs.
+
+	  (x_setfont): Set new font for all of the color GCs.
+
+	  (flush_line): Handle color attributes.  Also check for the
+	  most common (default) attribute first for efficiency.
+	  
+(tom)
+	+ corrected end-of-line problem with autoindent that broke 'append-string'
+	  (insert.c).
+
+	+ turn off 'access()' function for DEC C on a VAX as per bug report
+	  by amish@data.uchicago.edu (estruct.h).
+
+	+ added arrow-key definitions for VAX (vmsvt.c).
+
+	+ corrected treatment of underlining in termcap driver (tcap.c).
+
+	+ implemented termcap-based colors (tcap.c).
+
 Changes for vile 5.0 (released Fri Feb 10, 1995)
 (pgf)
 	+ rearranged ifdefs leading to OPT_WORKING def'n for clarity.

@@ -9,7 +9,7 @@
 */
 
 /*
- * $Header: /usr/build/VCS/pgf-vile/RCS/estruct.h,v 1.234 1995/02/05 04:43:45 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/estruct.h,v 1.237 1995/02/21 13:16:59 pgf Exp $
  */
 
 #ifdef HAVE_CONFIG_H
@@ -158,6 +158,9 @@
 #ifdef VMS		/* predefined by VAX/VMS compiler (VAX C V3.2-044) */
 # define SYS_VMS    1
 # define HAVE_GETCWD 1
+# if defined(__DECC) && !defined(__alpha)
+#  define HAVE_ACCESS 0	/* 'access()' is reported to not work properly */
+# endif
 #else
 # define SYS_VMS    0
 #endif
@@ -168,10 +171,8 @@
 # define SYS_SUNOS 1	/* FIXME: need to tweak lint ifdefs */
 #endif
 
-/* Linux runs on other hardware than pc's? */
-
 #define IBM_KBD 	(SYS_MSDOS || SYS_OS2 || SYS_WINNT)
-#define IBM_VIDEO 	(SYS_MSDOS || SYS_OS2 || SYS_WINNT || defined(linux))
+#define IBM_VIDEO 	(SYS_MSDOS || SYS_OS2 || SYS_WINNT)
 #define CRLF_LINES 	(SYS_MSDOS || SYS_OS2 || SYS_WINNT)
 
 #if SYS_WINNT
@@ -328,10 +329,11 @@
 #define	SMALLER	0	/* strip some fluff -- not a lot smaller, but some */
 #define OPT_MAP_MEMORY 0	/* tiny systems can page out data */
 
-/* NOTE -- OPT_COLOR doesn't currently do anything using X11 or TERMCAP */
-/* (But I think X11 may honor colors from the command line or .Xdefaults) */
-/* (and DOS definitely does do things with OPT_COLOR, but it may not work) */
-#define	OPT_COLOR (DISP_ANSI|IBM_VIDEO|X11) /* color commands and windows */
+/* various color stuff */
+/* termcap color stuff conditional on linux for now, 
+	since it's only been tested there. */
+#define	OPT_COLOR (DISP_ANSI || IBM_VIDEO || DISP_X11 || \
+			(DISP_TERMCAP && defined(linux)))
 
 /* Feature turnon/turnoff */
 #define	OPT_BSD_FILOCK	0	/* file locking under unix BSD 4.2  */
@@ -695,7 +697,11 @@ extern char *rindex P((const char *, int));
 #define NPAT	128			/* # of bytes, pattern		*/
 #define HUGE	(1<<(BITS_PER_INT-2))	/* Huge number			*/
 #define	NLOCKS	100			/* max # of file locks active	*/
+#if DISP_X11
+#define	NCOLORS	16			/* number of supported colors	*/
+#else
 #define	NCOLORS	8			/* number of supported colors	*/
+#endif
 #define	KBLOCK	256			/* sizeof kill buffer chunks	*/
 #if !OPT_SELECTIONS
 #define	NKREGS	36			/* number of kill buffers	*/
@@ -1306,8 +1312,9 @@ typedef unsigned char VIDEO_ATTR;
 #define	VAUL	0x20			/* underline			*/
 #define	VAITAL	0x40			/* italics			*/
 #define	VABOLD	0x80			/* bold				*/
-#define VAFGCOL	0xf000			/* foreground color mask	*/
-#define VABGCOL	0x0f00			/* background color mask	*/
+#define VACOLOR 0xf000			/* color mask			*/
+#define VCOLORNUM(attr) (((attr) & VACOLOR) >> 12)
+#define VCOLORATTR(num) ((num) << 12)
 
 /* The VATTRIB macro masks out those bits which should not be considered
  * for comparison purposes

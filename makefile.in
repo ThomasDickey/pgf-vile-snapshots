@@ -21,7 +21,7 @@
 # gnu autoconf support by kevin buettner, 5/94
 # original makefile for uemacs: Adam Fritz July 30,1987  (do you recognize it?)
 #
-# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.in,v 1.37 1995/02/10 03:42:18 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.in,v 1.40 1995/02/20 00:09:34 pgf Exp $
 #
 
 #### Start of system configuration section. ####
@@ -94,7 +94,7 @@ SCREENS = tcap.c x11.c ibmpc.c borland.c ansi.c ntconio.c vmsvt.c \
 
 # other source code, some used in other makefiles, some possibly obsolete
 OTHERSRC = z100bios.asm vms2unix.c vmspipe.c djhandl.c \
-	manpage.rc manfilt.pl manfilt.c c-filt.c
+	manpage.rc manfilt.pl manfilt.c c-filt.c c-filt.flx
 
 # documentation, such as it is
 DOCS = vile.hlp vile.1 macros.doc
@@ -147,14 +147,17 @@ OBJ = $(SCREEN).o \
 	tbuff.o termio.o tmp.o undo.o version.o vmalloc.o \
 	window.o word.o wordmov.o
 
-all:	$(TARGET) manfilt
+all:	$(TARGET) vile-manfilt vile-c-filt
 
 $(TARGET): $(BUILTHDRS) $(OBJ)
 	-mv $(TARGET) o$(TARGET)
 	$(LINK) $(LDFLAGS) -o $(TARGET) $(OBJ) $(X_LIBS) $(LIBS) $(X_EXTRA_LIBS)
 
-manfilt: manfilt.o
-	$(LINK) $(LDFLAGS) -o manfilt manfilt.o
+vile-manfilt: manfilt.o
+	$(LINK) $(LDFLAGS) -o vile-manfilt manfilt.o
+
+vile-c-filt: c-filt.o
+	$(LINK) $(LDFLAGS) -o vile-c-filt c-filt.o
 
 nebind.h \
 nefkeys.h \
@@ -172,6 +175,7 @@ $(MKTBLS):  $(srcdir)/mktbls.c
 install: $(INSTALL_DIRS) \
 	$(bindir)/$(TARGET) \
 	$(bindir)/vile-manfilt \
+	$(bindir)/vile-c-filt \
 	$(mandir)/$(TARGET).$(manext) \
 	$(libdir)/vile.hlp
 	@echo 'Completed installation.'
@@ -179,8 +183,11 @@ install: $(INSTALL_DIRS) \
 installdirs: $(INSTALL_DIRS)
 
 uninstall:
-	-$(RM) $(bindir)/$(TARGET) $(bindir)/vile-manfilt \
-	      $(mandir)/$(TARGET).$(manext) $(libdir)/vile.hlp
+	-$(RM) $(bindir)/$(TARGET) \
+		$(bindir)/vile-manfilt \
+		$(bindir)/vile-c-filt \
+		$(mandir)/$(TARGET).$(manext) \
+		$(libdir)/vile.hlp
 
 # The makefile is technically dependent upon the config.status file, but
 # gmake gets overly ambitious and remakes the makefile too often.
@@ -200,7 +207,7 @@ mostlyclean:
 	-$(RM) *.o o$(TARGET) $(BUILTHDRS) $(MKTBLS) core *~ *.BAK
 
 clean: mostlyclean
-	-$(RM) $(TARGET) manfilt
+	-$(RM) $(TARGET) vile-manfilt vile-c-filt
 
 distclean: clean
 	-$(RM) makefile config.status config.h
@@ -376,11 +383,13 @@ vmalloc.o:	nevars.h
 # dependency-rules for install/installdirs
 $(bindir)/$(TARGET):       $(TARGET) 
 	$(INSTALL_PROGRAM) $(TARGET) $@
-$(bindir)/vile-manfilt:    manfilt 
-	$(INSTALL_PROGRAM) manfilt $@
+$(bindir)/vile-manfilt:    vile-manfilt 
+	$(INSTALL_PROGRAM) vile-manfilt $@
+$(bindir)/vile-c-filt:     vile-c-filt 
+	$(INSTALL_PROGRAM) vile-c-filt $@
 $(mandir)/vile.$(manext):  $(srcdir)/vile.1 
 	$(INSTALL_DATA)    $(srcdir)/vile.1 $@
-$(mandir)/xvile.$(manext):  $(srcdir)/vile.1 
+$(mandir)/xvile.$(manext): $(srcdir)/vile.1 
 	$(INSTALL_DATA)    $(srcdir)/vile.1 $@
 $(libdir)/vile.hlp:        $(srcdir)/vile.hlp 
 	$(INSTALL_DATA)    $(srcdir)/vile.hlp $@

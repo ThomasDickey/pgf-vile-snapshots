@@ -7,7 +7,7 @@
  * Most code probably by Dan Lawrence or Dave Conroy for MicroEMACS
  * Extensions for vile by Paul Fox
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/insert.c,v 1.71 1995/02/06 04:06:39 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/insert.c,v 1.72 1995/02/20 00:44:35 pgf Exp $
  *
  */
 
@@ -843,9 +843,8 @@ indented_newline()
 
 	if (cmode && bracef)
 		indentwas = nextsw(indentwas);
-	if (doindent(indentwas) != TRUE)
-		return FALSE;
-	return TRUE;
+
+	return doindent(indentwas);
 }
 
 /* insert a newline and indentation for autoindent */
@@ -863,9 +862,8 @@ indented_newline_above()
 		return FALSE;
 	if (cmode && bracef)
 		indentwas = nextsw(indentwas);
-	if (doindent(indentwas) != TRUE)
-		return FALSE;
-	return TRUE;
+
+	return doindent(indentwas);
 }
 
 /* get the indent of the last previous non-blank line.	also, if arg

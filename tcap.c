@@ -1,7 +1,7 @@
 /*	tcap:	Unix V5, V7 and BS4.2 Termcap video driver
  *		for MicroEMACS
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/tcap.c,v 1.60 1995/01/05 15:03:23 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/tcap.c,v 1.63 1995/02/21 02:37:07 pgf Exp $
  *
  */
 
@@ -36,17 +36,54 @@ char *vb;	/* visible-bell */
 #endif
 
 #if OPT_COLOR
+/*
+ * This implementation is based on the description of SysVr4 curses found in
+ * ncurses 1.8.7, which lists the following terminal capabilities:
+ *
+ * Full name        Terminfo  Type   Termcap Description
+ * ---------------- -------   ----   ----    -----------------------------
+ * back_color_erase "bce"     bool   "ut"    screen erased with background color
+ * max_colors       "colors"  num    "Co"    maximum numbers of colors on screen
+ * max_pairs        "pairs"   num    "pa"    maximum number of color-pairs on the screen
+ * no_color_video   "ncv"     num    "NC"    video attributes that can't be used with colors
+ * orig_pair        "op"      str    "op"    
+ * orig_colors      "oc"      str    "oc"
+ * initialize_color "initc"   str    "Ic"
+ * initialize_pair  "initp"   str    "Ip"
+ * set_color_pair   "scp"     str    "sp"
+ * set_foreground   "setf"    str    "Sf"
+ * set_background   "setb"    str    "Sb"
+ * color_names      "colornm" str    "Yw"
+ *
+ * FIXME: In this version, we don't support color pairs, since the only
+ * platform on which it's been tested is Linux, with an IBM-PC compatible
+ * display.  Also, the color names are hardcoded.  The termcap must have
+ * the following capabilities set:
+ *	Co (hardcoded to NCOLORS)
+ *	Sf (e.g., "\E[%a+c\036%dm" for Linux)
+ *	Sb (e.g., "\E[%a+c\050%dm" for Linux)
+ *
+ * Using termcap alone, we cannot get "yellow" on IBM-PC, since that's a
+ * combination of bold+(fcolor=3).
+ */
+
+#define	Num2Color(n) ctrans[(n) & (NCOLORS-1)]
+#define NO_COLOR (-1)
+
+static	char	*Sf;
+static	char	*Sb;
+
 static	int	ctrans[NCOLORS];
 	/* ansi to ibm color translation table */
-static	char *	initpalettestr = "0 1 2 11 4 5 6 7";
+static	char *	initpalettestr = "0 1 2 3 4 5 6 7";
 	/* black, red, green, yellow, blue, magenta, cyan, white   */
 /*
  * We don't really _know_ what the default colors are set to, so the initial
  * values of the current_[fb]color are set to an illegal value to force the
  * colors to be set.
  */
-static	int	current_fcolor = -1;
-static	int	current_bcolor = -1;
+static	int	current_fcolor = NO_COLOR;
+static	int	current_bcolor = NO_COLOR;
 
 #endif /* OPT_COLOR */
 
@@ -100,6 +137,7 @@ extern char *tgoto P((char *, int, int));
 extern int tgetent P((char *, char *));
 extern int tgetnum P((char * ));
 extern char *tgetstr P((char *, char **));
+extern char *tparam P((char *, char *, int, ...));
 extern int tputs P((char *, int, void(*_f)(int) ));
 
 #if OPT_COLOR
@@ -287,19 +325,19 @@ tcapopen()
 	vb = tgetstr("vb", &p);
 #endif
 #if	OPT_COLOR
+	Sf = tgetstr("Sf", &p);
+	Sb = tgetstr("Sb", &p);
 	spal(initpalettestr);
 #endif
 #if OPT_VIDEO_ATTRS
 	ME = tgetstr("me", &p);
 	MD = tgetstr("md", &p);
-#if !(IBM_VIDEO && OPT_COLOR)
 	US = tgetstr("us", &p);		/* underline-start */
 	UE = tgetstr("ue", &p);		/* underline-end */
 	if (US == 0 && UE == 0) {	/* if we don't have underline, do bold */
 		US = MD;
 		UE = ME;
 	}
-#endif
 #endif
 
 	for (i = TABLESIZE(keyseqs); i--; ) {
@@ -351,7 +389,7 @@ tcapclose()
 	tcapeeol();
 #if OPT_COLOR
 	current_fcolor =
-	current_bcolor = -1;
+	current_bcolor = NO_COLOR;
 #endif
 
 	if (TE)
@@ -508,27 +546,24 @@ char *thePalette;
 }
 #endif /* OPT_EVAL */
 
-#if	OPT_COLOR && IBM_VIDEO
+#if	OPT_COLOR
 static void
 show_ansi_colors P((void))
 {
-	char	str[20], *s, c = '[';
+	char	*t;
 
-	s = lsprintf(str, "%c", ESC);
-	if (current_fcolor >= 0) {
-		s = lsprintf(s, "%c%d;%d",
-			c,
-			(ctrans[current_fcolor] > 7),		/* bold? */
-			30 + (ctrans[current_fcolor] & 7));	/* foreground */
-		c = ';';
+	if ((current_fcolor >= 0)
+	 && (Sf != 0)
+	 && (t = tparam(Sf, (char *)0, 0, Num2Color(current_fcolor))) != 0) {
+		putpad(t);
+		free(t);
 	}
-	if (current_bcolor >= 0) {
-		s = lsprintf(s, "%c%d",
-			c,
-			40 + (ctrans[current_bcolor] & 7));	/* background */
+	if ((current_bcolor >= 0)
+	 && (Sb != 0)
+	 && (t = tparam(Sb, (char *)0, 0, Num2Color(current_bcolor))) != 0) {
+		putpad(t);
+		free(t);
 	}
-	s = lsprintf(s, "m");
-	putpad(str);
 }
 #endif
 
@@ -538,14 +573,8 @@ tcapfcol(color)
 int color;
 {
 	if (color != current_fcolor) {
-#if IBM_VIDEO
 		current_fcolor = color;
-# ifdef linux
-		if (i_am_xterm)
-			return;
-# endif
 		show_ansi_colors();
-#endif
 	}
 }
 
@@ -554,14 +583,8 @@ tcapbcol(color)
 int color;
 {
 	if (color != current_bcolor) {
-#if IBM_VIDEO
 		current_bcolor = color;
-# ifdef linux
-		if (i_am_xterm)
-			return;
-# endif
 		show_ansi_colors();
-#endif
 	}
 }
 #endif /* OPT_COLOR */
@@ -576,7 +599,7 @@ int color;
  * The color logic is disabled for Linux xterm, because the eeop and eeol
  * operations don't seem to propagate the colors (they're left untouched). 
  * Also, setting _any_ attribute seems to clobber the color settings.  (The
- * latter problem could be "fixed" by alway emitting a complete escape sequence
+ * latter problem could be "fixed" by always emitting a complete escape sequence
  * for all attributes - boldface, reverse, color), but the former breaks the
  * screen optimization logic.
  */
@@ -591,12 +614,8 @@ int attr;
 	} tbl[] = {
 		{ &SO, &SE, VASEL|VAREV },
 		{ &US, &UE, VAUL },
-#if !(IBM_VIDEO && OPT_COLOR)
 		{ &US, &UE, VAITAL },
 		{ &MD, &ME, VABOLD },
-#else
-		{ &MD, &ME, VAITAL|VABOLD }, /* treat italics like bold */
-#endif
 	};
 	static	int last;
 
@@ -610,29 +629,37 @@ int attr;
 		int	diff = attr ^ last;
 		int	ends = FALSE;
 
+		/* turn OFF old attributes */
 		for (n = 0; n < TABLESIZE(tbl); n++) {
-			if (tbl[n].mask & diff) {
-				if (tbl[n].mask & attr) {
-					if ((s = *(tbl[n].start)) != 0) {
-						putpad(s);
-					}
-				} else if ((s = *(tbl[n].end)) != 0) {
-					putpad(s);
-					if (s == ME || s == UE) {
-#ifdef linux
-						int save_fc = current_fcolor;
-						int save_bc = current_bcolor;
-						current_fcolor = -1;
-						current_bcolor = -1;
-						tcapfcol(save_fc);
-						tcapbcol(save_bc);
+			if ((tbl[n].mask & diff) != 0
+			 && (tbl[n].mask & attr) == 0
+			 && (s = *(tbl[n].end))  != 0) {
+				putpad(s);
+				if (s == ME || s == UE) {
+#if OPT_COLOR
+					int save_fc = current_fcolor;
+					int save_bc = current_bcolor;
+					current_fcolor =
+					current_bcolor = NO_COLOR;
+					tcapfcol(save_fc);
+					tcapbcol(save_bc);
 #endif
-						ends = TRUE;
-					}
+					ends = TRUE;
 				}
 				diff &= ~(tbl[n].mask);
 			}
 		}
+
+		/* turn ON new attributes */
+		for (n = 0; n < TABLESIZE(tbl); n++) {
+			if ((tbl[n].mask & diff)  != 0
+			 && (tbl[n].mask & attr)  != 0
+			 && (s = *(tbl[n].start)) != 0) {
+				putpad(s);
+				diff &= ~(tbl[n].mask);
+			}
+		}
+
 		if (SO != 0 && SE != 0) {
 			if (ends && (attr & (VAREV|VASEL))) {
 				putpad(SO);
@@ -784,8 +811,10 @@ int	c;
 			y	= XtermPos();
 
 			button	= (event & 3) + 1;
-			if (button > 3)
+			if (button > 3) {
+				endofDisplay;
 				return TRUE; /* button up */
+			}
 			wp = row2window(y-1);
 #if OPT_XTERM >= 3
 			/* Tell the xterm how to highlight the selection.

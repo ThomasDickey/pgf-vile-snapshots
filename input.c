@@ -44,7 +44,7 @@
  *	tgetc_avail()     true if a key is avail from tgetc() or below.
  *	keystroke_avail() true if a key is avail from keystroke() or below.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/input.c,v 1.129 1995/02/08 13:29:39 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/input.c,v 1.130 1995/02/11 23:39:49 pgf Exp $
  *
  */
 
@@ -1406,6 +1406,11 @@ int
 kbd_mac_exec(f, n)
 int f,n;
 {
+	if (kbdmode != STOP) {
+		mlforce("[Can't execute macro while recording]");
+		return FALSE;
+	}
+
 	if (n <= 0)
 		return TRUE;
 

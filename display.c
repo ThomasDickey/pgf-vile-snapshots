@@ -5,7 +5,7 @@
  * functions use hints that are left in the windows by the commands.
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/display.c,v 1.185 1995/02/10 03:42:18 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/display.c,v 1.186 1995/02/15 17:11:31 pgf Exp $
  *
  */
 
@@ -2530,9 +2530,12 @@ WINDOW *wp;
     {
 	VIDEO_ATTR attr;
 	if (wp == curwp)
-	    attr = VAREV | VAMLFOC;
+	    attr = VAMLFOC;
 	else
-	    attr = VAREV | VAML;
+	    attr = VAML;
+#if	OPT_REVSTA
+	attr |= VAREV;
+#endif
 	vscreen[n]->v_flag |= VFCHG;
 	for (col=0; col < term.t_ncol; col++)
 	    vscreen[n]->v_attrs[col] = attr;
