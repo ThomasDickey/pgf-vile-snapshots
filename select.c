@@ -18,7 +18,7 @@
  * transfering the selection are not dealt with in this file.  Procedures
  * for dealing with the representation are maintained in this file.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/select.c,v 1.33 1995/02/19 17:35:51 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/select.c,v 1.39 1995/04/22 03:38:51 pgf Exp $
  *
  */
 
@@ -28,17 +28,22 @@
 #if OPT_SELECTIONS
 
 extern REGION *haveregion;
+extern CMDFUNC f_multimotion;
 
 static	void	detach_attrib		P(( BUFFER *, AREGION * ));
 static	void	attach_attrib		P(( BUFFER *, AREGION * ));
 
+static	int	attribute_cntl_a_sequences P(( void ));
 static	void	fix_dot			P(( void ));
 static	void	output_selection_position_to_message_line P(( int ));
+
 #if DISP_X11 && XTOOLKIT
 static	WINDOW *push_fake_win		P(( BUFFER * ));
 static	void	pop_fake_win		P(( WINDOW * ));
 #endif
-static REGION *extended_region		P(( void ));
+
+static	int	selectregion		P(( void ));
+static	REGION *extended_region		P(( void ));
 
 /*
  * startbufp and startregion are used to represent the start of a selection
@@ -277,7 +282,7 @@ sel_extend(wiping, include_dot)
     rls_region();
     rls_region();
 
-    selregion.ar_vattr = VASEL;
+    selregion.ar_vattr = VASEL | VOWN_SELECT;
     for_each_window(wp) {
 	if (wp->w_bufp == selbufp)
 	    wp->w_flag |= WFHARD;
@@ -391,7 +396,6 @@ pop_fake_win(oldwp)
 int
 sel_yank()
 {
-    extern REGION *haveregion;
     REGIONSHAPE save_shape;
     WINDOW *save_wp;
 
@@ -486,7 +490,7 @@ extended_region()
     return rp;
 }
 
-int doingopselect;
+static	int	doingopselect;
 
 /* ARGSUSED */
 int
@@ -534,8 +538,7 @@ int f,n;
 
 }
 
-
-int
+static int
 selectregion()
 {
 	register int    status;
@@ -561,7 +564,7 @@ selectregion()
 	    detach_attrib(selbufp, &selregion);
 	    selbufp = curbp;
 	    selregion.ar_region = region;
-	    selregion.ar_vattr = VASEL;
+	    selregion.ar_vattr = VASEL | VOWN_SELECT;
 	    selregion.ar_shape = regionshape;
 	    attach_attrib(selbufp, &selregion);
 	    OWN_SELECTION();
@@ -584,7 +587,6 @@ int f,n;
 	MARK realdot;
 	char	temp[NLINE];
 	static int wassweephack = FALSE;
-	extern CMDFUNC f_multimotion;
 
 	savedot = DOT;
 	if (doingsweep) { /* the same command terminates as starts the sweep */
@@ -641,7 +643,7 @@ int f,n;
 				"[Sweeping: Motion failed. (end with %*S)]",*temp,temp+1);
 				waserr = TRUE;
 			} else {
-				if (waserr) {
+				if (waserr && doingsweep) {
 					mlforce("[Sweeping... (end with %*S)]",*temp,temp+1);
 					waserr = FALSE;
 				}
@@ -709,23 +711,33 @@ attributeregion()
 		rls_region();
 		return FALSE;
 	    }
-	    if (videoattribute != 0) {	/* add new attribute-region */
+	    if (VATTRIB(videoattribute) != 0) {	/* add new attribute-region */
 	    	arp->ar_region = region;
-	    	arp->ar_vattr = videoattribute;
+	    	arp->ar_vattr = videoattribute; /* include ownership */
 	    	arp->ar_shape = regionshape;
 	    	attach_attrib(curbp, arp);
 	    } else { /* purge attributes in this region */
 		L_NUM first = line_no(curbp, region.r_orig.l);
 		L_NUM last  = line_no(curbp, region.r_end.l);
 		AREGION *p, *q;
+		int owner;
+
+		owner = VOWNER(videoattribute);
 
 		for (p = curbp->b_attribs; p != 0; p = q) {
-		    L_NUM f0 = line_no(curbp, p->ar_region.r_orig.l);
-		    L_NUM l0 = line_no(curbp, p->ar_region.r_end.l);
+		    L_NUM f0, l0;
+
 		    q = p->ar_next;
-		    if (l0 < first
-		     || f0 > last)
+
+		    if (owner != 0 && owner != VOWNER(p->ar_vattr))
+		    	continue;
+
+		    f0 = line_no(curbp, p->ar_region.r_orig.l);
+		    l0 = line_no(curbp, p->ar_region.r_end.l);
+
+		    if (l0 < first || f0 > last)
 		    	continue;	/* no overlap */
+
 		    /* FIXME: this removes the whole of an overlapping region;
 		     * we really only want to remove the overlapping portion...
 		     */
@@ -754,7 +766,7 @@ operattrbold(f,n)
 int f,n;
 {
       opcmd = OPOTHER;
-      videoattribute = VABOLD;
+      videoattribute = VABOLD | VOWN_OPERS;
       return operator(f,n,attributeregion,"Set bold attribute");
 }
 
@@ -763,7 +775,7 @@ operattrital(f,n)
 int f,n;
 {
       opcmd = OPOTHER;
-      videoattribute = VAITAL;
+      videoattribute = VAITAL | VOWN_OPERS;
       return operator(f,n,attributeregion,"Set italic attribute");
 }
 
@@ -772,7 +784,7 @@ operattrno(f,n)
 int f,n;
 {
       opcmd = OPOTHER;
-      videoattribute = 0;
+      videoattribute = 0;	/* clears no matter who "owns" */
       return operator(f,n,attributeregion,"Set normal attribute");
 }
 
@@ -781,7 +793,7 @@ operattrul(f,n)
 int f,n;
 {
       opcmd = OPOTHER;
-      videoattribute = VAUL;
+      videoattribute = VAUL | VOWN_OPERS;
       return operator(f,n,attributeregion,"Set underline attribute");
 }
   
@@ -791,7 +803,7 @@ operattrcaseq(f,n)
 int f,n;
 {
       opcmd = OPOTHER;
-      videoattribute = VAUL;
+      videoattribute = VAUL | VOWN_CTLA;
       return operator(f,n,attribute_cntl_a_sequences,
                       "Attribute ^A sequences");
 }
@@ -816,7 +828,7 @@ int f,n;
  */
 #define EFFICIENCY_HACK 1
 
-int
+static int
 attribute_cntl_a_sequences()
 {
     register int c;		/* current char during scan */
@@ -844,12 +856,13 @@ attribute_cntl_a_sequences()
     regionshape = EXACT;
     while (!same_ptr(DOT.l, pastline)) {
 	while (DOT.o < lLength(DOT.l)) {
-	    if (char_at(DOT) == '\001') {
+	    if (char_at(DOT) == CONTROL_A) {
 		int count = 0;
 		offset = DOT.o+1;
+start_scan:
 		while (offset < lLength(DOT.l)) {
 		    c = lGetc(DOT.l, offset);
-		    if ('0' <= c && c <= '9') {
+		    if (isdigit(c)) {
 			count = count * 10 + c - '0';
 			offset++;
 		    }
@@ -858,7 +871,7 @@ attribute_cntl_a_sequences()
 		}
 		if (count == 0)
 		    count = 1;
-		videoattribute = 0;
+		videoattribute = VOWN_CTLA;
 		while (offset < lLength(DOT.l)) {
 		    c = lGetc(DOT.l, offset);
 		    switch (c) {
@@ -879,7 +892,13 @@ attribute_cntl_a_sequences()
 			case 'B' : videoattribute |= VABOLD; break;
 			case 'R' : videoattribute |= VAREV;  break;
 			case 'I' : videoattribute |= VAITAL; break;
-			case ':' : offset++; /* fall through to default case */
+			case ':' : offset++;
+			    if (lGetc(DOT.l, offset) == CONTROL_A) {
+				count = 0;
+				offset++;
+				goto start_scan; /* recover from filter-err */
+			    }
+			    /* FALLTHROUGH */
 			default  : goto attribute_found;
 		    }
 		    offset++;
@@ -897,7 +916,7 @@ attribute_found:
 		MK.o += count;
 		if (MK.o > lLength(DOT.l))
 		    MK.o = lLength(DOT.l);
-		if (videoattribute)
+		if (VATTRIB(videoattribute))
 		    (void) attributeregion();
 	    }
 	    DOT.o++;

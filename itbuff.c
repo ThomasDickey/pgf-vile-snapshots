@@ -7,7 +7,7 @@
  *	To do:	add 'itb_ins()' and 'itb_del()' to support cursor-level command
  *		editing.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/itbuff.c,v 1.5 1995/01/27 13:52:56 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/itbuff.c,v 1.6 1995/04/22 03:22:53 pgf Exp $
  *
  */
 
@@ -15,6 +15,9 @@
 #include "edef.h"
 
 #define	NCHUNK	NLINE
+
+static	ALLOC_T	itb_seek P(( ITBUFF *, ALLOC_T, int ));
+static	ITBUFF *itb_put P(( ITBUFF **, ALLOC_T, int ));
 
 /*******(testing)************************************************************/
 #if NO_LEAKS
@@ -133,7 +136,8 @@ void	itb_free(p)
 /*
  * put a character c at the nth position of the temp-buff.  make it the last.
  */
-ITBUFF *	itb_put(p, n, c)
+static ITBUFF *
+itb_put(p, n, c)
 	ITBUFF	**p;
 	ALLOC_T	n;
 	int	c;
@@ -307,7 +311,7 @@ void	itb_unput(p)
 /*
  * Reset the iteration-count
  */
-ALLOC_T
+static ALLOC_T
 itb_seek(p, seekto, whence)
 	ITBUFF *p;
 	ALLOC_T seekto;

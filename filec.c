@@ -5,12 +5,19 @@
  * Written by T.E.Dickey for vile (march 1993).
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/filec.c,v 1.41 1995/02/06 04:06:39 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/filec.c,v 1.45 1995/04/25 02:31:21 pgf Exp $
  *
  */
 
 #include "estruct.h"
 #include "edef.h"
+
+#if SYS_OS2
+# define INCL_DOSFILEMGR
+# define INCL_ERRORS
+# include <os2.h>
+#endif
+
 
 #define	SLASH (EOS+1) /* less than everything but EOS */
 
@@ -44,7 +51,9 @@ free_expansion P(( void ))
 
 #if COMPLETE_DIRS || COMPLETE_FILES
 
-#include "dirstuff.h"
+#if !SYS_OS2
+# include "dirstuff.h"
+#endif
 
 #if OPT_VMS_PATH
 static	char *	path_suffix   P((char *));
@@ -58,6 +67,11 @@ static	int	trailing_slash P((char *));
 static	SIZE_T	force_slash P((char *));
 static	int	pathcmp P((LINE *, char *));
 static	LINE *	makeString P((BUFFER *, LINE *, char *, SIZE_T));
+
+#if COMPLETE_DIRS || COMPLETE_FILES
+static	BUFFER *bs_init P(( char * ));
+static	int	bs_find P(( char *, SIZE_T, BUFFER *, LINEPTR * ));
+#endif
 
 /*--------------------------------------------------------------------------*/
 
@@ -148,7 +162,7 @@ char *	text;
 SIZE_T	len;
 {
 	register LINE	*np;
-	int extra = (len > 0 && is_slashc(text[len-1])) ? 2 : 3;
+	int extra = (len != 0 && is_slashc(text[len-1])) ? 2 : 3;
 
 	if ((np = l_ref(lalloc((int)len+extra, bp))) == NULL) {
 		lp = 0;
@@ -178,7 +192,7 @@ SIZE_T	len;
  *
  * The tags buffer is initialized only once for a given tags-file.
  */
-BUFFER *
+static BUFFER *
 bs_init(name)
 char *	name;
 {
@@ -197,7 +211,7 @@ char *	name;
  * at the given line if non-null.  The pathname is expected to be in
  * canonical form.
  */
-int
+static int
 bs_find(fname, len,  bp, lpp)
 char *	fname;	/* pathname to find */
 SIZE_T	len;	/* ...its length */
@@ -285,7 +299,12 @@ char *	path;
 	len = force_slash(strcpy(fname, path));
 
 	for_each_line(lp,MyBuff)
-		if (strcmp(fname, lp->l_text) == 0) {
+#if SYS_OS2 && CC_CSETPP
+		if (stricmp(fname, lp->l_text) == 0)
+#else
+		if (strcmp(fname, lp->l_text) == 0)
+#endif
+		{
 		    if (lp->l_text[llength(lp)+1])
 			return TRUE;
 		    else
@@ -405,6 +424,7 @@ char *path;
 }
 #endif /* OPT_VMS_PATH */
 
+#if !SYS_OS2
 /*
  * If the given path is not in the completion-buffer, expand it, and add the
  * expanded paths to the buffer.  Because the user may be trying to get an
@@ -447,7 +467,7 @@ char *	name;
 		return;
 #endif
 
-	if ((dp = opendir(path)) != 0) {
+	if ((dp = opendir(SL_TO_BSL(path))) != 0) {
 		s = path;
 #if !OPT_VMS_PATH
 		s += force_slash(path);
@@ -504,6 +524,77 @@ char *	name;
 		(void)closedir(dp);
 	}
 }
+#endif /* !SYS_OS2 */
+
+#if SYS_OS2
+/*
+ * If the given path is not in the completion-buffer, expand it, and add the
+ * expanded paths to the buffer.
+ */
+static void
+fillMyBuff(name)
+char *	name;
+{
+	register char	*s;
+
+	FILEFINDBUF3 fb;
+	ULONG entries;
+	HDIR hdir;
+	APIRET rc;
+	char *cp;
+
+	char	path[NFILEN + 2];
+
+	(void)strcpy(path, name);
+	if (!is_directory(path)) {
+		*pathleaf(path) = EOS;
+		if (!is_directory(path))
+			return;
+	}
+
+	if (already_scanned(path))
+		return;
+
+	s = path + force_slash(path);
+	strcat(path, "*.*");
+
+	hdir = HDIR_CREATE;
+	entries = 1;
+	rc = DosFindFirst(path, &hdir, FILE_DIRECTORY | FILE_READONLY,
+			&fb, sizeof(fb), &entries, FIL_STANDARD);
+	if (rc == NO_ERROR)
+	{
+		do
+		{
+			(void) mklower(strcpy(s, fb.achName));
+
+			if (strcmp(s, ".") == 0 || strcmp(s, "..") == 0)
+			 	continue;
+
+			if (only_dir) {
+				if ((fb.attrFile & FILE_DIRECTORY) == 0)
+					continue;
+				(void) force_slash(path);
+			}
+#if COMPLETE_DIRS
+			else {
+				if (global_g_val(GMDDIRC) 
+					&& (fb.attrFile & FILE_DIRECTORY) != 0)
+				{
+					(void) force_slash(path);
+				}
+			}
+#endif
+			(void)bs_find(path, strlen(path), MyBuff, (LINEPTR*)0);
+
+		} while (entries = 1, 
+		         DosFindNext(hdir, &fb, sizeof(fb), &entries) == NO_ERROR 
+				 && entries == 1);
+
+		DosFindClose(hdir);
+	}
+}
+#endif /* OS2 */
 
 /*
  * Make the list of names needed for name-completion
@@ -581,7 +672,7 @@ int	*pos;
 		if (action) {
 			kbd_putc(c);	/* completion-chars have no meaning */
 			TTflush();
-			buf[*pos] = c;
+			buf[*pos] = (char)c;
 			*pos += 1;
 			buf[*pos] = EOS;
 		}
@@ -650,13 +741,13 @@ int	*pos;
 				;
 		}
 #if OPT_MSDOS_PATH
-		/* If the user typed "c:/x", we've got to translate it to
-		 * "c:\x" since that's how we stored the names in the file
-		 * completion buffer.
-		 */
-		for (s = path; *s != EOS; s++)
-			if (*s == '/')
-				*s = SLASHC;
+		/* if the user typed the non-SLASHC slash, we need to
+		 * convert it, since it's stored as SLASHC in the file
+		 * completion buffer */
+		if (SLASHC == '/')
+			bsl_to_sl_inplace(path);
+		else
+			sl_to_bsl_inplace(path);
 #endif
 
 		newlen =
@@ -743,7 +834,7 @@ char *	result;
 		else
 			*Reply = EOS;
 
-	        s = kbd_string(prompt, Reply, NFILEN,
+	        s = kbd_string(prompt, Reply, sizeof(Reply),
 			'\n', KBD_OPTIONS|KBD_MAYBEC, complete);
 		freeMyList();
 
@@ -756,6 +847,15 @@ char *	result;
 				(void)strcpy(Reply, curbp->b_fname);
 			else
 	                	return s;
+		} else if (kbd_is_pushed_back() && isShellOrPipe(Reply)) {
+			/*
+			 * The first call on 'kbd_string()' split the text off
+			 * the shell command.  This is needed for the logic of
+			 * colon-commands, but is inappropriate for filename
+			 * prompting.  Read the rest of the text into Reply.
+			 */
+		        s = kbd_string(prompt, Reply+1, sizeof(Reply)-1,
+				'\n', KBD_OPTIONS|KBD_MAYBEC, complete);
 		}
         } else if (!screen_to_bname(Reply)) {
 		return FALSE;
@@ -825,7 +925,7 @@ char *	result;
 			*Reply = EOS;
 
 		only_dir = TRUE;
-	        s = kbd_string(prompt, Reply, NFILEN, '\n',
+	        s = kbd_string(prompt, Reply, sizeof(Reply), '\n',
 			KBD_OPTIONS|KBD_MAYBEC, complete);
 		freeMyList();
 		only_dir = FALSE;

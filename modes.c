@@ -7,7 +7,7 @@
  * Original code probably by Dan Lawrence or Dave Conroy for MicroEMACS.
  * Major extensions for vile by Paul Fox, 1991
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/modes.c,v 1.54 1994/12/09 18:06:35 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/modes.c,v 1.64 1995/05/08 03:06:17 pgf Exp $
  *
  */
 
@@ -23,25 +23,31 @@
 
 /*--------------------------------------------------------------------------*/
 
+static	int	adjustmode P(( int, int ));
+static	int	copy_val P(( struct VAL *, struct VAL * ));
+static	int	do_a_mode P(( int, int ));
+static	int	listvalueset P(( char *, int, struct VALNAMES *, struct VAL *, struct VAL * ));
+static	int	mode_complete P(( int, char *, int * ));
+static	int	mode_eol P(( char *, int, int, int ));
 static	int	same_val P(( struct VALNAMES *, struct VAL *, struct VAL * ));
 static	int	size_val P(( struct VALNAMES *, struct VAL * ));
-static	int	listvalueset P(( char *, int, struct VALNAMES *, struct VAL *, struct VAL * ));
-static	void	makemodelist P(( int, void * ));
 static	int	string_to_bool P(( char *, int * ));
+static	void	free_val P(( struct VALNAMES *, struct VAL * ));
+static	void	makemodelist P(( int, void * ));
+
 #if defined(GMD_GLOB) || defined(GVAL_GLOB)
 static	int	legal_glob_mode P(( char * ));
 #endif
+
 #if OPT_ENUM_MODES
 static	int	is_fsm		P(( struct VALNAMES * ));
 static	int	legal_fsm	P(( char * ));
 static	int	fsm_complete	P(( int, char *, int * ));
 #endif
-static	int	mode_complete P(( int, char *, int * ));
-static	int	mode_eol P(( char *, int, int, int ));
-static	int	do_a_mode P(( int, int ));
-static	int	adjustmode P(( int, int ));
+
 #if OPT_UPBUFF
 static	int	show_Settings P(( BUFFER * ));
+static	void	relist_settings P(( void ));
 #endif
 
 #if OPT_COLOR
@@ -267,7 +273,7 @@ struct VAL *values, *globvalues;
 }
 
 #ifdef lint
-/*ARGSUSED*/ WINDOW *ptr2WINDOW(p) char *p; { return 0; }
+static	/*ARGSUSED*/ WINDOW *ptr2WINDOW(p) void *p; { return 0; }
 #else
 #define	ptr2WINDOW(p)	(WINDOW *)p
 #endif
@@ -398,7 +404,7 @@ register REGEXVAL *rp;
 /*
  * Release storage of a VAL struct
  */
-void
+static void
 free_val(names, values)
 struct VALNAMES *names;
 struct VAL *values;
@@ -418,7 +424,7 @@ struct VAL *values;
 /*
  * Copy a VAL-struct, preserving the sense of local/global.
  */
-int
+static int
 copy_val(dst, src)
 struct VAL *dst;
 struct VAL *src;
@@ -587,6 +593,7 @@ struct FSM {
 };
 
 #if OPT_POPUPCHOICE
+static
 FSM_CHOICES fsm_popup_choices[] = {
     "off",
     "immediate",
@@ -605,6 +612,7 @@ FSM_CHOICES fsm_error[] = {
 #endif
 
 #if OPT_FILEBACK
+static
 FSM_CHOICES fsm_backupstyle[] = {
     "off",
     ".bak",
@@ -617,9 +625,32 @@ FSM_CHOICES fsm_backupstyle[] = {
 };
 #endif
 
+#if OPT_HILITEMATCH
+static
+FSM_CHOICES fsm_mono_attributes[] = {
+    "none",
+    "underline",
+    "bold",
+    "italic",
+    "reverse",
+    "color",
+    (char *) 0
+};
+#endif
+
+#if OPT_MSDOS_PATH
+static
+FSM_CHOICES fsm_slash_characters[] = {
+    "/",
+    "\\",
+    (char *) 0
+};
+#endif
+
 #define fsm_choice(mode_name, choices) \
 	{ mode_name, TABLESIZE(choices)-1, choices }
 
+static
 struct FSM fsm_tbl[] = {
 #if OPT_POPUPCHOICE
     fsm_choice("popup-choices", fsm_popup_choices),
@@ -629,6 +660,12 @@ struct FSM fsm_tbl[] = {
 #endif
 #if OPT_FILEBACK
     fsm_choice("backup-style", fsm_backupstyle),
+#endif
+#if OPT_HILITEMATCH
+    fsm_choice("visual-matches", fsm_mono_attributes),
+#endif
+#if OPT_MSDOS_PATH
+    fsm_choice("slash-char", fsm_slash_characters),
 #endif
 };
 
@@ -805,6 +842,17 @@ VALARGS *args;			/* symbol-table entry for the mode */
 			}
 			values->vp->i = nval;
 			refresh(FALSE, 0);
+
+			/*
+			 * The global color values should be communicated 
+			 * to the display module the instant they're 
+			 * changed.  Egad, what a kludge.  :-)
+			 */
+			if (&values->vp->i == &gfcolor)
+			    TTforg(gfcolor);
+			else if (&values->vp->i == &gbcolor)
+			    TTbacg(gbcolor);
+
 			break;
 #endif /* OPT_COLOR */
 
@@ -1026,16 +1074,50 @@ int global;	/* true = global flag,	false = current buffer flag */
 #endif
 
 	{
-	/* this seems pretty inefficient -- i shouldn't need the extra
-		statics -- i should be told what mode matched, as a return
-		from do_a_mode()/find_mode() */
-	static int printing_8bit_low, printing_8bit_high;
-	if (printing_8bit_low != global_g_val(GVAL_PRINT_LOW) ||
-		printing_8bit_high != global_g_val(GVAL_PRINT_HIGH)) {
-		printing_8bit_low = global_g_val(GVAL_PRINT_LOW);
-		printing_8bit_high = global_g_val(GVAL_PRINT_HIGH);
-		charinit();
+		/* this seems pretty inefficient -- i shouldn't need the
+		 * extra statics -- i should be told what mode
+		 * matched, as a return from do_a_mode()/find_mode()
+		 */
+		static int printing_8bit_low, printing_8bit_high;
+		if (printing_8bit_low != global_g_val(GVAL_PRINT_LOW) ||
+			printing_8bit_high != global_g_val(GVAL_PRINT_HIGH)) {
+			printing_8bit_low = global_g_val(GVAL_PRINT_LOW);
+			printing_8bit_high = global_g_val(GVAL_PRINT_HIGH);
+			charinit();
+		}
 	}
+
+#ifdef GVAL_SLASH_CHAR
+	{
+		register BUFFER *bp;	/* scanning pointer to buffers */
+		static oslashc;
+		slashc = *global_g_val_ptr(GVAL_SLASH_CHAR);
+		if (slashc != oslashc) {
+			for_each_buffer(bp) {
+				if (slashc == '/')
+					bsl_to_sl_inplace(bp->b_fname);
+				else
+					sl_to_bsl_inplace(bp->b_fname);
+			}
+			fix_cwd_slashes();
+			oslashc = slashc;
+		}
+	}
+#endif
+	{ 
+		/* was even number of fence pairs specified? */
+		int len;
+		if (curbp)
+			len = strlen(b_val_ptr(curbp, VAL_FENCES));
+		else
+			len = strlen(global_b_val_ptr(VAL_FENCES));
+
+		if (len & 1) {
+			b_val_ptr(curbp, VAL_FENCES)[len-1] = EOS;
+			mlwrite(
+			"[Fence-pairs not in pairs:  truncating to \"%s\"",
+				b_val_ptr(curbp, VAL_FENCES));
+		}
 	}
 
 	if (curbp) {
@@ -1058,7 +1140,7 @@ BUFFER *bp;
 	return listmodes(FALSE, 1);
 }
 
-void
+static void
 relist_settings()
 {
 	update_scratch(SETTINGS_BufName, show_Settings);

@@ -1,7 +1,7 @@
 /* Find the next error in mentioned in the shell output window.
  * written for vile: Copyright (c) 1990, 1995 by Paul Fox
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/finderr.c,v 1.44 1995/02/24 00:35:23 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/finderr.c,v 1.45 1995/04/22 03:22:53 pgf Exp $
  *
  */
 
@@ -9,6 +9,9 @@
 #include "edef.h"
 
 #if OPT_FINDERR
+
+static LINE * getdot P(( BUFFER * ));
+static void putdotback P(( BUFFER *, LINE * ));
 
 static	char febuff[NBUFN+1];	/* name of buffer to find errors in */
 static	unsigned newfebuff;	/* is the name new since last time? */
@@ -237,7 +240,7 @@ int f,n;
 	return s;
 }
 
-struct LINE *
+static struct LINE *
 getdot(bp)
 struct BUFFER *bp;
 {
@@ -254,7 +257,7 @@ struct BUFFER *bp;
 	return l_ref(bp->b_dot.l);
 }
 
-void
+static void
 putdotback(bp,dotp)
 struct BUFFER *bp;
 struct LINE *dotp;

@@ -5,7 +5,7 @@
  * functions that adjust the top line in the window and invalidate the
  * framing, are hard.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/basic.c,v 1.77 1995/02/24 00:44:57 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/basic.c,v 1.82 1995/04/26 03:46:21 pgf Exp $
  *
  */
 
@@ -16,6 +16,9 @@
 
 static	int	full_pages P((int, int));
 static	int	half_pages P((int, int));
+static	int	getnmmarkname P(( int * ));
+static	void	skipblanksb P(( void ));
+static	void	skipblanksf P(( void ));
 
 /* utility routine for 'forwpage()' and 'backpage()' */
 static int
@@ -153,7 +156,12 @@ register int	n;
 	if (n < 0)
 		return (backchar(f, -n));
 	while (n--) {
-		if (is_at_end_of_line(DOT)) {
+		/* if an explicit arg was given, allow us to land
+			on the newline, else skip it */
+		if (is_at_end_of_line(DOT) || 
+				(f == FALSE && !insertmode &&
+				llength(DOT.l) && DOT.o == llength(DOT.l) - 1)
+								) {
 			if (is_header_line(DOT, curbp) ||
 					is_last_line(DOT,curbp))
 				return (FALSE);
@@ -190,7 +198,7 @@ register int	n;
 	/* normally, we're confined to the text on the line itself.  if
 	  we're doing an opcmd, then we're allowed to move to the newline
 	  as well, to take care of the internal cases:  's', 'x', and '~'. */
-	if (doingopcmd)
+	if (doingopcmd || insertmode)
 		lim = lLength(DOT.l);
 	else
 		lim = lLength(DOT.l) - 1;
@@ -202,6 +210,7 @@ register int	n;
 	} while (--n);
 	return TRUE;
 }
+
 /*
  * Implements the vi "G" command.
  *
@@ -214,13 +223,16 @@ int f,n;
 {
 	register int status;	/* status return */
 
-	/* get an argument if one doesnt exist */
+	MARK odot;
+
 	if (f == FALSE) {
 		return(gotoeob(f,n));
 	}
 
 	if (n == 0)		/* if a bogus argument...then leave */
 		return(FALSE);
+
+	odot = DOT;
 
 	DOT.o  = w_left_margin(curwp);
 	if (n < 0) {
@@ -230,11 +242,13 @@ int f,n;
 		DOT.l  = lFORW(buf_head(curbp));
 		status = forwline(f, n-1);
 	}
-	if (status == TRUE)
-		(void)firstnonwhite(FALSE,1);
-	return(status);
+	if (status != TRUE) {
+		DOT = odot;
+		return status;
+	}
+	(void)firstnonwhite(FALSE,1);
+	return TRUE;
 }
-
 /*
  * Goto the beginning of the buffer. Massive adjustment of dot. This is
  * considered to be hard motion; it really isn't if the original value of dot
@@ -365,13 +379,13 @@ int f,n;
  *
  * Move forward by full lines. If the number of lines to move is less than
  * zero, call the backward line function to actually do it. The last command
- * controls how the goal column is set. No errors are
- * possible.
+ * controls how the goal column is set.
  */
 int
 forwline(f, n)
 int f,n;
 {
+#if BEFORE
 	register LINE	*dlp;
 
 	if (f == FALSE) n = 1;
@@ -401,8 +415,35 @@ int f,n;
 	DOT.o  = getgoal(dlp);
 	curwp->w_flag |= WFMOVE;
 	return (TRUE);
-}
+#else
+	register LINE	*dlp;
 
+	if (f == FALSE) n = 1;
+	if (n < 0) return (backline(f, -n));
+	if (n == 0) return TRUE;
+
+	/* if the last command was not a line move,
+	   reset the goal column */
+	if (curgoal < 0)
+		curgoal = getccol(FALSE);
+
+	/* and move the point down */
+	dlp = l_ref(DOT.l);
+	do {
+		register LINE *nlp = lforw(dlp);
+		if (nlp == l_ref(buf_head(curbp))) {
+			return FALSE;
+		}
+		dlp = nlp;
+	} while (--n);
+
+	/* resetting the current position */
+	DOT.l  = l_ptr(dlp);
+	DOT.o  = getgoal(dlp);
+	curwp->w_flag |= WFMOVE;
+	return TRUE;
+#endif
+}
 /*
  * Implements the vi "^" command.
  *
@@ -653,14 +694,14 @@ int f,n;
 	return TRUE;
 }
 
-void
+static void
 skipblanksf()
 {
 	while (lForw(DOT.l) != l_ref(buf_head(curbp)) && lLength(DOT.l) == 0)
 		DOT.l = lFORW(DOT.l);
 }
 
-void
+static void
 skipblanksb()
 {
 	while (lBack(DOT.l) != l_ref(buf_head(curbp)) && lLength(DOT.l) == 0)
@@ -1054,7 +1095,7 @@ int f,n;
 	represented by stuttering the goto-mark command.  from
 	the command line, it's always named ' or `.  I suppose
 	this is questionable. */
-int
+static int
 getnmmarkname(cp)
 int *cp;
 {

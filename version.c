@@ -1,15 +1,13 @@
 /*
  * version & usage-messages for vile
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/version.c,v 1.22 1995/02/05 04:28:30 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/version.c,v 1.25 1995/04/25 02:31:21 pgf Exp $
  *
  */
 
 #include	"estruct.h"	/* global structures and defines */
 #include	"edef.h"	/* global definitions */
 #include	"patchlev.h"
-
-extern char *pathname[];	/* startup file path/name array */
 
 static	char	version_string[NSTRING];
 
@@ -54,7 +52,8 @@ print_usage P((void))
 	" (this will suppress .vilerc)" };
 	register int	j;
 
-	(void)fprintf(stderr, "usage: %s [-flags] [@cmdfile] files...\n", prog_arg);
+	(void)fprintf(stderr, "usage: %s [-flags] [@cmdfile] files...\n", 
+		prog_arg);
 	for (j = 0; j < TABLESIZE(options); j++)
 		(void)fprintf(stderr, "\t%s\n", options[j]);
 	ExitProgram(BADEXIT);
@@ -68,25 +67,6 @@ getversion()
 		return version_string;
 #if SYS_UNIX || SYS_VMS
 	/*
-	 * Remember the directory from which we were run, to use in finding the
-	 * help-file.
-	 */
-	{
-		char	temp[NFILEN];
-		char	*s, *t;
-		s = strmalloc(lengthen_path(strcpy(temp, prog_arg)));
-		t = pathleaf(s);
-		if (t != s) {
-# if SYS_UNIX	/* 't' points past slash */
-			t[-1] = EOS;
-# else		/* 't' points to ']' */
-			*t = EOS;
-# endif
-			pathname[2] = s;
-		}
-	}
-
-	/*
 	 * We really would like to have the date at which this program was
 	 * linked, but a.out doesn't have that in general.  COFF files do. 
 	 * Getting the executable's modification-time is a reasonable
@@ -96,8 +76,9 @@ getversion()
 				prognam, version, PATCHLEVEL, opersys);
 	{
 		char *s;
-		if ((s = flook(prog_arg, FL_PATH|FL_EXECABLE)) != NULL) {
-			long mtime = file_modified(s);
+		if ((s = flook(prog_arg, 
+				(FL_EXECDIR|FL_PATH)|FL_EXECABLE)) != NULL) {
+			time_t mtime = file_modified(s);
 			if (mtime != 0) {
 				(void)strcat(version_string, ", installed ");
 				(void)strcat(version_string, ctime(&mtime));
@@ -120,6 +101,9 @@ getversion()
 #   if CC_TURBO
 		"TurboC/BorlandC++"
 #   endif
+#   if CC_CSETPP
+		"IBM C Set ++"
+#   endif
 	);
 #  endif
 # endif /* SYS_MSDOS || SYS_OS2 */
@@ -135,6 +119,7 @@ int f,n;
 	mlforce(getversion());
 	return TRUE;
 }
+
 
 /*
  * Returns the special string consisting of program name + version, used to

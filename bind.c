@@ -3,7 +3,7 @@
  *
  *	written 11-feb-86 by Daniel Lawrence
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/bind.c,v 1.111 1995/01/31 01:58:47 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/bind.c,v 1.116 1995/04/25 00:49:15 pgf Exp $
  *
  */
 
@@ -17,6 +17,8 @@
 
 /* dummy prefix binding functions */
 extern CMDFUNC f_cntl_a_func, f_cntl_x_func, f_unarg_func, f_esc_func, f_poundc_func;
+
+static	KBIND *	kcode2kbind P(( int ));
 
 #if OPT_REBIND
 #define	isSpecialCmd(k) \
@@ -34,15 +36,27 @@ static	void	makechrslist P(( int, void *));
 static	int	update_termchrs P(( BUFFER * ));
 #  endif
 # endif
-static	int	update_binding_list P(( BUFFER * ));
-static	void	ostring P(( char * ));
+
+#if !SMALLER
+static	char *	bytes2prc P(( char *, char *, int ));
+static	char *	kcod2prc P(( int, char * ));
+#endif
+
 static	char *	quoted P(( char *, char * ));
-static	void	convert_kcode P(( int, char * ));
-static	int	key_to_bind P(( CMDFUNC * ));
-static	void	reset_prefix P(( int, CMDFUNC * ));
-static	int	converted_len P(( char * ));
 static	char *	to_tabstop P(( char * ));
+static	int	converted_len P(( char * ));
+static	int	install_bind P(( int, CMDFUNC *, CMDFUNC ** ));
+static	int	key_to_bind P(( CMDFUNC * ));
+static	int	makefuncdesc P(( NTAB * ));
+static	int	rebind_key P(( int, CMDFUNC * ));
+static	int	strinc P(( char *, char *));
+static	int	unbindchar P(( int ));
+static	int	update_binding_list P(( BUFFER * ));
+static	void	convert_kcode P(( int, char * ));
 static	void	makebindlist P(( int, void *));
+static	void	ostring P(( char * ));
+static	void	reset_prefix P(( int, CMDFUNC * ));
+
 #endif	/* OPT_REBIND */
 
 static	int	is_shift_cmd P(( char *, int ));
@@ -56,6 +70,12 @@ static	void	scroll_completions P(( char *, SIZE_T, char *, SIZE_T ));
 static	int	fill_partial P(( char *, SIZE_T, char *, char *, SIZE_T ));
 static	int	cmd_complete P(( int, char *, int * ));
 static	int	eol_command  P(( char *, int, int, int ));
+
+#if OPT_EVAL || OPT_REBIND
+static	NTAB *	fnc2ntab P(( CMDFUNC * ));
+static	char *	fnc2engl P(( CMDFUNC * ));
+static	int	prc2kcod P(( char * ));
+#endif
 
 #if OPT_REBIND
 static	KBIND	*KeyBindings = kbindtbl;
@@ -79,7 +99,8 @@ int f,n;
 		return FALSE;
 
 	if (bp->b_active == FALSE) { /* never been used */
-		fname = flook(pathname[1], FL_ANYWHERE|FL_READABLE);
+		fname = flook(pathname[PATH_HELPFILE_NAME], 
+					FL_ANYWHERE|FL_READABLE);
 		if (fname == NULL) {
 			mlforce("[Sorry, can't find the help information]");
 			(void)zotbuf(bp);
@@ -309,7 +330,7 @@ register CMDFUNC *kcmd;
  * Given a key-code and a command-function pointer, rebind the key-code to
  * the command-function.
  */
-int
+static int
 rebind_key (c, kcmd)
 register int	c;
 register CMDFUNC *kcmd;
@@ -352,7 +373,7 @@ register CMDFUNC *kcmd;
  * Bind a command-function pointer to a given key-code (saving the old
  * value of the function-pointer via an pointer given by the caller).
  */
-int
+static int
 install_bind (c, kcmd, oldfunc)
 register int	c;
 register CMDFUNC *kcmd;
@@ -431,7 +452,7 @@ int f, n;	/* command arguments [IGNORED] */
 	return(TRUE);
 }
 
-int
+static int
 unbindchar(c)
 int c;		/* command key to unbind */
 {
@@ -600,7 +621,7 @@ int f,n;
 
 	/* describe it */
 	described_cmd[0] = '^';
-	strcpy(described_cmd + 1, nptr->n_name);
+	(void)strcpy(described_cmd + 1, nptr->n_name);
 	last_apropos_string = described_cmd;
 	last_whichcmds = 0;
 	append_to_binding_list = TRUE;
@@ -658,7 +679,7 @@ char	*buffer;
 
 /* fully describe a function into the current buffer, given a pointer to
  * its name table entry */
-int
+static int
 makefuncdesc(nptr)
 NTAB *nptr;
 {
@@ -679,6 +700,12 @@ NTAB *nptr;
 			convert_kcode(i, outseq);
 
 	/* then look in the multi-key table */
+#if OPT_REBIND
+	for (kbp = KeyBindings; kbp != kbindtbl; kbp = kbp->k_link) {
+		if (kbp->k_cmd == cmd)
+			convert_kcode(kbp->k_code, outseq);
+	}
+#endif
 	for (kbp = kbindtbl; kbp->k_cmd; kbp++)
 		if (kbp->k_cmd == cmd)
 			convert_kcode(kbp->k_code, outseq);
@@ -706,12 +733,12 @@ NTAB *nptr;
 
 #if OPT_ONLINEHELP
 	if (cmd->c_help && cmd->c_help[0])
-		lsprintf(outseq,"  (%s %s )",
+		(void)lsprintf(outseq,"  (%s %s )",
 		(cmd->c_flags & MOTION) ? "motion: " :
 			(cmd->c_flags & OPER) ? "operator: " : "",
 		cmd->c_help);
 	else
-		lsprintf(outseq,"  ( no help for this command )");
+		(void)lsprintf(outseq,"  ( no help for this command )");
 	if (!addline(curbp,outseq,-1))
 		return FALSE;
 	if (cmd->c_flags & GLOBOK) {
@@ -778,7 +805,7 @@ void *mstring;		/* match string if partial list, NULL to list all */
 
 /* much like the "standard" strstr, but if the substring starts
 	with a '^', we discard it and force an exact match.  */
-int
+static int
 strinc(sourc, sub)	/* does source include sub? */
 char *sourc;	/* string to search in */
 char *sub;	/* substring to look for */
@@ -828,7 +855,7 @@ char *sfname;	/* name of startup file  */
 	char *fname;	/* resulting file name to execute */
 
 	/* look up the startup file */
-	fname = flook(sfname, FL_HERE_HOME|FL_READABLE);
+	fname = flook(sfname, (FL_HERE|FL_HOME)|FL_READABLE);
 
 	/* if it isn't around, don't sweat it */
 	if (fname == NULL) {
@@ -868,15 +895,13 @@ int hflag;	/* Look in the HOME environment variable first? */
 	else if (isShellOrPipe(fname))
 		return fname;
 
-	if ((hflag & FL_HERE)
-	 || ((hflag & FL_PATH) && is_pathname(fname))) {
-		/* always try the current directory first */
+	if (hflag & FL_HERE) {
 		if (ffaccess(fname, mode)) {
 			return(fname);
 		}
 	}
 
-#if	ENVFUNC
+#if ENVFUNC
 
 	if (hflag & FL_HOME) {
 		home = getenv("HOME");
@@ -888,16 +913,29 @@ int hflag;	/* Look in the HOME environment variable first? */
 		}
 	}
 
+#endif	/* ENVFUNC */
+
+	if (hflag & FL_EXECDIR) { /* is it where we found the executable? */
+		if (pathname[PATH_EXECDIR] && 
+				pathname[PATH_EXECDIR][0] != EOS &&
+			ffaccess(pathcat(fspec,pathname[PATH_EXECDIR],
+						fname),mode))
+			return(fspec);
+	}
+
+	if (hflag & FL_TABLE) {
+		/* then look it up via the table method */
+		for (i = PATH_TABLEDIRS; i < NPNAMES; i++) {
+			if (ffaccess(pathcat(fspec, pathname[i], fname),mode))
+				return(fspec);
+		}
+	}
+
 	if (hflag & FL_PATH) {
 
-		/* look it up via the old table method */
-		for (i=2; i < NPNAMES; i++) {
-			if (ffaccess(pathcat(fspec, pathname[i], fname),mode)) {
-				return(fspec);
-			}
-		}
-
+#if ENVFUNC
 #if OPT_PATHLOOKUP
+		/* then look along $PATH */
 #if SYS_VMS
 		/* On VAX/VMS, the PATH environment variable is only the
 		 * current-dir.  Fake up an acceptable alternative.
@@ -921,7 +959,6 @@ int hflag;	/* Look in the HOME environment variable first? */
 #else	/* UNIX or MSDOS */
 		path = getenv("PATH");	/* get the PATH variable */
 #endif
-
 		while ((path = parse_pathlist(path, fspec)) != 0) {
 			if (ffaccess(pathcat(fspec, fspec, fname), mode)) {
 				return(fspec);
@@ -967,7 +1004,8 @@ char *	ptr;
 
 
 /* translates a binding string into printable form */
-char *
+#if !SMALLER
+static char *
 bytes2prc(dst, src, n)
 char	*dst;
 char	*src;
@@ -1011,9 +1049,8 @@ int	n;
 	return base;
 }
 
-#if !SMALLER
 /* translate a 10-bit keycode to its printable name (like "M-j")  */
-char *
+static char *
 kcod2prc(c, seq)
 int c;		/* sequence to translate */
 char *seq;	/* destination string for sequence */
@@ -1027,7 +1064,7 @@ char *seq;	/* destination string for sequence */
 
 /* kcode2kbind: translate a 10-bit key-binding to the table-pointer
  */
-KBIND *
+static KBIND *
 kcode2kbind(code)
 register int code;
 {
@@ -1072,6 +1109,12 @@ CMDFUNC *f;
 		if (f == asciitbl[c])
 			return c;
 
+#if OPT_REBIND
+	for (kbp = KeyBindings; kbp != kbindtbl; kbp = kbp->k_link) {
+		if (kbp->k_cmd == f)
+			return kbp->k_code;
+	}
+#endif
 	for (kbp = kbindtbl; kbp->k_cmd != 0; kbp++) {
 		if (kbp->k_cmd == f)
 			return kbp->k_code;
@@ -1104,7 +1147,7 @@ CMDFUNC *f;
 		that function
 */
 #if OPT_EVAL || OPT_REBIND
-NTAB *
+static NTAB *
 fnc2ntab(cfp)
 CMDFUNC *cfp;
 {
@@ -1129,7 +1172,7 @@ CMDFUNC *cfp;
 	return NULL;
 }
 
-char *
+static char *
 fnc2engl(cfp)
 CMDFUNC *cfp;
 {
@@ -1143,6 +1186,8 @@ CMDFUNC *cfp;
 	translate english name to function pointer
  		 return any match or NULL if none
  */
+#define BINARY_SEARCH_IS_BROKEN 1
+#if BINARY_SEARCH_IS_BROKEN  /* then use the old linear look-up */
 CMDFUNC *
 engl2fnc(fname)
 char *fname;	/* name to attempt to match */
@@ -1168,10 +1213,63 @@ char *fname;	/* name to attempt to match */
 	return NULL;
 }
 
+#else
+
+the following code is faster, but broken.  :-)
+
+CMDFUNC *
+engl2fnc(fname)
+char *fname;	/* name to attempt to match */
+{
+	register NTAB *nptr; /* pointer to name binding table */
+	int lo, hi, cur, ncur;
+	int r;
+	register SIZE_T len = strlen(fname);
+	extern int nametblsize;
+
+	if (len == 0)
+		return NULL;
+
+	/* scan through the table, returning any match */
+	lo = 0;
+	hi = nametblsize - 2;
+
+	cur = hi / 2;
+	nptr = &nametbl[cur];
+	while (nptr->n_cmd != NULL) {
+		if ((r = strncmp(fname, nptr->n_name, len)) == 0) {
+			NTAB *test;
+			if (strcmp(fname, nptr->n_name) == 0)
+				return nptr->n_cmd;
+
+			test = (nptr+1);
+			if (test->n_name == NULL
+			 || strncmp(fname, test->n_name, len) != 0)
+				return nptr->n_cmd;
+			test = (nptr-1);
+			if (test < nametbl)
+				return nptr->n_cmd;
+			if (strncmp(fname, test->n_name, len) != 0)
+				return NULL;
+			hi = cur;
+
+		} else if (r > 0) {
+			lo = cur;
+		} else {
+			hi = cur;
+		}
+		ncur = lo + (hi - lo) / 2;
+		cur = (ncur != cur) ? ncur : ncur + 1;
+		nptr = &nametbl[cur];
+	}
+	return NULL;
+}
+#endif
+
 
 /* prc2kcod: translate printable code to 10 bit keycode */
 #if OPT_EVAL || OPT_REBIND
-int
+static int
 prc2kcod(kk)
 char *kk;		/* name of key to translate to Command key form */
 {

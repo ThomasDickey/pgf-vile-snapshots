@@ -125,6 +125,10 @@ extern	char *	malloc	P(( size_t ));
 
 #include <stdio.h>
 
+#ifdef HAVE_STRING_H
+#include <string.h>
+#endif
+
 #if MISSING_EXTERN__FILBUF
 extern	int	_filbuf	P(( FILE * ));
 #endif
@@ -231,20 +235,20 @@ insert_keyword(ident,attribute)
 {
     KEYWORD *first;
     KEYWORD *new;
-    int index;
+    int Index;
     if (!strcmp(ident,"Comments")) {
-	strcpy(comment_attr,attribute);
+	(void)strcpy(comment_attr,attribute);
 	return;
     }
     new = first = NULL;
-    index = hash_function(ident);
-    first = hashtable[index];
+    Index = hash_function(ident);
+    first = hashtable[Index];
     if ((new = (KEYWORD *)malloc(sizeof(struct _keyword))) != NULL) {
-	strcpy(new->kw,ident);
+	(void)strcpy(new->kw,ident);
 	new->length = strlen(new->kw);
-	strcpy(new->attribute,attribute);
+	(void)strcpy(new->attribute,attribute);
 	new->next = first;
-	hashtable[index] = new;
+	hashtable[Index] = new;
 #ifdef DEBUG 
     fprintf(stderr,"insert_keyword: new %li, new->kw %s, new->length %i, new->attribute %c, new->next %li\n", new,
     				    new->kw, new->length, new->attribute,new->next);
@@ -257,9 +261,9 @@ static void
 match_identifier()
 {
     KEYWORD *hash_id;
-    int index, match = 0;
-    index = hash_function(identifier.kw);
-    hash_id = hashtable[index];
+    int Index, match = 0;
+    Index = hash_function(identifier.kw);
+    hash_id = hashtable[Index];
     while (hash_id != NULL && ! match) {
 	if (hash_id->length == identifier.length) { /* Possible match */
 	    if (strcmp(hash_id->kw,identifier.kw) == 0) {

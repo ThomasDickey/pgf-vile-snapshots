@@ -45,7 +45,7 @@
  * vile will choose some appropriate fallback (such as underlining) if
  * italics are not available.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/manfilt.c,v 1.4 1994/07/11 22:56:20 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/manfilt.c,v 1.6 1995/04/22 03:22:53 pgf Exp $
  *
  */
 
@@ -90,6 +90,10 @@ extern	char *	realloc	P(( char *, size_t ));
 #endif
 
 #include <stdio.h>
+
+#ifdef HAVE_STRING_H
+#include <string.h>
+#endif
 
 #if MISSING_EXTERN__FILBUF
 extern	int	_filbuf	P(( FILE * ));
@@ -217,7 +221,7 @@ filter(fp)
 	 * Scan the line for backspace sequences
 	 */
 
-	while ((c = *inp)) {
+	while ((c = *inp) != '\0') {
 	    if (c != '\b') {
 		/* Not backspace; copy character */
 		*outp++ = c;

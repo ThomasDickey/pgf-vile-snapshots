@@ -44,7 +44,7 @@
  *	tgetc_avail()     true if a key is avail from tgetc() or below.
  *	keystroke_avail() true if a key is avail from keystroke() or below.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/input.c,v 1.130 1995/02/11 23:39:49 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/input.c,v 1.135 1995/04/22 03:22:53 pgf Exp $
  *
  */
 
@@ -70,7 +70,8 @@ typedef	struct	_kstack	{
 	} KSTACK;
 
 /*--------------------------------------------------------------------------*/
-static	ITBUFF *	TempDot P(( int ));
+static	int	mapped_keystroke_raw P(( void ));
+static	ITBUFF *TempDot P(( int ));
 static	void	record_dot_char P(( int ));
 static	void	record_kbd_char P(( int ));
 static	void	record_char P(( int ));
@@ -84,6 +85,7 @@ static	int	eol_history P(( char *, int, int, int ));
 #ifdef GMDDOTMACRO
 static	void	dot_replays_macro P(( int ));
 #endif
+static	void	finish_kbm P(( void ));
 
 static	KSTACK *KbdStack;	/* keyboard/@-macros that are replaying */
 static	ITBUFF  *KbdMacro;	/* keyboard macro, recorded	*/
@@ -422,8 +424,6 @@ int eatit;  /* consume the character? */
 	return c;
 }
 
-static ITBUFF *tungottenchars = NULL;
-
 void
 unkeystroke(c)
 int c;
@@ -467,7 +467,7 @@ keystroke_raw8()
 	}
 }
 
-int
+static int
 mapped_keystroke_raw()
 {
 	return lastkey = mapped_c(DOMAP,QUOTED);
@@ -483,8 +483,7 @@ keystroke_avail()
 int
 tgetc_avail()
 {
-	return tungotcnt > 0 ||
-		get_recorded_char(FALSE) != -1 || 
+	return get_recorded_char(FALSE) != -1 || 
 		sysmapped_c_avail();
 }
 
@@ -494,28 +493,23 @@ int quoted;
 {
 	register int c;	/* fetched character */
 
-	if (tungotcnt > 0) {
-		c = itb_get(tungottenchars, (ALLOC_T) --tungotcnt);
-		record_char(c);
-	} else {
-		if ((c = get_recorded_char(TRUE)) == -1) {
-			/* fetch a character from the terminal driver */ 
-			not_interrupted();
-			if (setjmp(read_jmp_buf)) {
-				c = kcod2key(intrc);
-			} else {
-				doing_kbd_read = TRUE;
-				do { /* if it's sysV style signals,
-					 we want to try again, since this
-					 must not have been SIGINT, but
-					 was probably SIGWINCH */
-					c = sysmapped_c();
-				} while (c == -1);
-			}
-			doing_kbd_read = FALSE;
-			if (quoted || (c != kcod2key(intrc)))
-				record_char(c);
+	if ((c = get_recorded_char(TRUE)) == -1) {
+		/* fetch a character from the terminal driver */ 
+		not_interrupted();
+		if (setjmp(read_jmp_buf)) {
+			c = kcod2key(intrc);
+		} else {
+			doing_kbd_read = TRUE;
+			do { /* if it's sysV style signals,
+				 we want to try again, since this
+				 must not have been SIGINT, but
+				 was probably SIGWINCH */
+				c = sysmapped_c();
+			} while (c == -1);
 		}
+		doing_kbd_read = FALSE;
+		if (quoted || (c != kcod2key(intrc)))
+			record_char(c);
 	}
 
 	/* and finally give the char back */
@@ -769,6 +763,11 @@ int	options;
 			cp = get_bname(bp);
 		else if (!global_g_val(GMDEXPAND_PATH))
 			cp = shorten_path(strcpy(str, cp), FALSE);
+#if OPT_MSDOS_PATH
+		/* always use backslashes if invoking an external prog */
+		if (shell)
+			cp = SL_TO_BSL(cp);
+#endif
 	} else if (c == ':') {
 		if (screen_string(str, sizeof(str), _pathn))
 			cp = str;
@@ -927,6 +926,12 @@ int	skip;
 	}
 }
 
+int
+kbd_is_pushed_back()
+{
+	return clexec && pushed_back;
+}
+
 /*	A more generalized prompt/reply function allowing the caller
 	to specify a terminator other than '\n'.  Both are accepted.
 	Assumes the buffer already contains a valid (possibly
@@ -1025,7 +1030,8 @@ int (*complete)P((int,char *,int *));	/* handles completion */
 	backslashes = 0; /* by definition, there is an even 
 					number of backslashes */
 	for (;;) {
-		int	EscOrQuo = ((quotef == TRUE) || ((backslashes & 1) != 0));
+		int	EscOrQuo = ((quotef == TRUE) || 
+				((backslashes & 1) != 0));
 
 		/*
 		 * Get a character from the user. If not quoted, treat escape
@@ -1516,7 +1522,7 @@ ITBUFF *	ptr;			/* data to interpret */
 /*
  * Finish a macro begun via 'start_kbm()'
  */
-void
+static void
 finish_kbm()
 {
 	if (kbdmode == PLAY) {

@@ -4,7 +4,7 @@
  *	need to back up to get to the char. before the transition.
  *	Written for vile: Copyright (c) 1990, 1995 by Paul Fox
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/wordmov.c,v 1.13 1995/02/08 03:29:23 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/wordmov.c,v 1.15 1995/04/22 03:22:53 pgf Exp $
  *
  */
 
@@ -22,13 +22,15 @@
 
 static int ochartype;
 
+static	int	getchartype P(( void ));
+
 void
 setchartype()
 {
 	ochartype = getchartype();
 }
 
-int
+static int
 getchartype()
 {
 	register int	c;
@@ -54,20 +56,42 @@ isnewwordf()
 	case WASNL:
 	case WASSPACE:
 		switch (type) {
-		case ISNL:    if (doingopcmd) { ret = SORTOFTRUE; break;}
-		case ISSPACE: ret = FALSE;	break;
+		case ISNL:
+			if (doingopcmd) {
+				ret = SORTOFTRUE;
+				break;
+			}
+			/* FALLTHROUGH */
+		case ISSPACE:
+			ret = FALSE;
+			break;
 		case ISIDENT:
-		case ISOTHER: ret = TRUE;	break;
+			/* FALLTHROUGH */
+		case ISOTHER:
+			ret = TRUE;
+			break;
 		}
 		break;
 	case WASIDENT:
 	case WASOTHER:
 		switch (type) {
-		case ISNL:    if (doingopcmd) { ret = SORTOFTRUE; break;}
-		case ISSPACE: if (doingopcmd && opcmd != OPDEL) 
-						{ ret = SORTOFTRUE; break;}
+		case ISNL:
+			if (doingopcmd) {
+				ret = SORTOFTRUE;
+				break;
+			}
+			/* FALLTHROUGH */
+		case ISSPACE:
+			if (doingopcmd && opcmd != OPDEL) {
+				ret = SORTOFTRUE;
+				break;
+			}
+			/* FALLTHROUGH */
 		case ISIDENT:
-		case ISOTHER: ret = FALSE;	break;
+			/* FALLTHROUGH */
+		case ISOTHER:
+			ret = FALSE;
+			break;
 		}
 		break;
 	}
@@ -120,28 +144,64 @@ isnewviwordf()
 	case WASNL:
 	case WASSPACE:
 		switch (type) {
-		case ISNL:    if (doingopcmd) { ret = SORTOFTRUE; break;}
-		case ISSPACE: ret = FALSE;	break;
+		case ISNL:
+			if (doingopcmd) {
+				ret = SORTOFTRUE;
+				break;
+			}
+			/* FALLTHROUGH */
+		case ISSPACE:
+			ret = FALSE;
+			break;
 		case ISIDENT:
-		case ISOTHER: ret = TRUE;	break;
+			/* FALLTHROUGH */
+		case ISOTHER:
+			ret = TRUE;
+			break;
 		}
 		break;
 	case WASIDENT:
 		switch (type) {
-		case ISNL:    if (doingopcmd) { ret = SORTOFTRUE; break;}
-		case ISSPACE: if (doingopcmd && opcmd != OPDEL) 
-						{ ret = SORTOFTRUE; break;}
-		case ISIDENT: ret = FALSE;	break;
-		case ISOTHER: ret = TRUE;	break;
+		case ISNL:
+			if (doingopcmd) {
+				ret = SORTOFTRUE;
+				break;
+			}
+			/* FALLTHROUGH */
+		case ISSPACE:
+			if (doingopcmd && opcmd != OPDEL) {
+				ret = SORTOFTRUE;
+				break;
+			}
+			/* FALLTHROUGH */
+		case ISIDENT:
+			ret = FALSE;
+			break;
+		case ISOTHER:
+			ret = TRUE;
+			break;
 		}
 		break;
 	case WASOTHER:
 		switch (type) {
-		case ISNL:    if (doingopcmd) { ret = SORTOFTRUE; break;}
-		case ISSPACE: if (doingopcmd && opcmd != OPDEL) 
-						{ ret = SORTOFTRUE; break;}
-		case ISOTHER: ret = FALSE;	break;
-		case ISIDENT: ret = TRUE;	break;
+		case ISNL:
+			if (doingopcmd) {
+				ret = SORTOFTRUE;
+				break;
+			}
+			/* FALLTHROUGH */
+		case ISSPACE:
+			if (doingopcmd && opcmd != OPDEL) {
+				ret = SORTOFTRUE;
+				break;
+			}
+			/* FALLTHROUGH */
+		case ISOTHER:
+			ret = FALSE;
+			break;
+		case ISIDENT:
+			ret = TRUE;
+			break;
 		}
 		break;
 	}

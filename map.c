@@ -3,7 +3,7 @@
  *	Original interface by Otto Lind, 6/3/93
  *	Additional map and map! support by Kevin Buettner, 9/17/94
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/map.c,v 1.53 1995/02/06 04:06:39 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/map.c,v 1.55 1995/04/08 18:08:35 pgf Exp $
  * 
  */
 
@@ -519,6 +519,10 @@ normal_typeahead()
       return(TTtypahead());
 }
 
+#if DOKEYLOG
+int do_keylog = 1;
+#endif
+
 int
 sysmapped_c()
 {
@@ -529,6 +533,21 @@ sysmapped_c()
 	return itb_last(sysmappedchars);
 
     c = TTgetc();
+
+#if DOKEYLOG
+    if (do_keylog) {
+	static int keyfd = -1;
+	static char *tfilenam;
+	if (!tfilenam)
+		tfilenam = tempnam("/tmp/vilekeylogs", "vilek");
+	if (tfilenam) {
+		if (keyfd < 0)
+			keyfd = open(tfilenam, O_CREAT|O_WRONLY, 0600);
+		if (keyfd >= 0)
+			write(keyfd, &c, 1);
+	}
+    }
+#endif
 
     if (suppress_sysmap)
     	return c;
@@ -554,7 +573,7 @@ void
 mapungetc(c)
 int c;
 {
-	itb_append(&mapgetc_ungottenchars, c);
+	(void)itb_append(&mapgetc_ungottenchars, c);
 	mapgetc_ungotcnt++;
 }
 
@@ -573,7 +592,7 @@ mapgetc()
 
     if (mapgetc_ungotcnt > 0) {
 	    if (infloopcount++ > TOOMANY) {
-		itb_init(&mapgetc_ungottenchars, abortc);
+		(void)itb_init(&mapgetc_ungottenchars, abortc);
 		mapgetc_ungotcnt = 0;
 		mlforce("[Infinite loop detected in %s sequence]",
 			    (insertmode) ? "map!" : "map");
@@ -608,8 +627,10 @@ int raw;
     mapgetc_raw_flag = raw;
     c = mapgetc();
 
-    if (!remap || (c & NOREMAP))
-	return (c & ~NOREMAP);
+    if ((c & YESREMAP) == 0 && (!remap || (c & NOREMAP)))
+	return (c & ~REMAPFLAGS);
+
+    c &= ~REMAPFLAGS;
 
     if (reading_msg_line)
     	mp = 0;
@@ -627,7 +648,7 @@ int raw;
     }
 
     do {
-	itb_init(&mappedchars, abortc);
+	(void)itb_init(&mappedchars, abortc);
 
 	matched = maplookup(c, &mappedchars, mp, mapgetc, mapped_c_avail);
 
@@ -639,10 +660,10 @@ int raw;
 	    in the first place.  unless they wanted it quoted.  then we
 	    leave it as is */
 	if (!raw && speckey && !matched) {
-	    c = mapgetc() & ~NOREMAP;
+	    c = mapgetc() & ~REMAPFLAGS;
 	    if (c != poundc)
 		    dbgwrite("BUG: # problem in mapped_c");
-	    return (mapgetc() & ~NOREMAP) | SPEC;
+	    return (mapgetc() & ~REMAPFLAGS) | SPEC;
 	}
 
 	c = mapgetc();
@@ -652,9 +673,10 @@ int raw;
 
 	speckey = FALSE;
 
-    } while (matched && remap && !(c & NOREMAP) );
+    } while (matched && 
+    	((remap && !(c & NOREMAP)) || (c & YESREMAP)) );
 
-    return c & ~NOREMAP;
+    return c & ~REMAPFLAGS;
 
 }
 
@@ -687,7 +709,7 @@ int *backsp_limit_p;
     	return;
     abbr_curr_off = DOT.o;
     abbr_search_lim = *backsp_limit_p;
-    itb_init(&abbr_chars, abortc);
+    (void)itb_init(&abbr_chars, abortc);
     matched = maplookup(abbr_getc(), &abbr_chars, abbr_map,
     	abbr_getc, abbr_c_avail);
 
@@ -710,7 +732,7 @@ int *backsp_limit_p;
 		    	return;
 	    }
 	    DOT.o -= matched;
-	    ldelete(matched, FALSE);
+	    ldelete((B_COUNT)matched, FALSE);
 	    while(status && itb_more(abbr_chars))
 		status = inschar(itb_last(abbr_chars), backsp_limit_p);
     }
@@ -797,7 +819,7 @@ maplookup(c, outp, mp, get, avail)
 		    break;
 	    }
 
-	    unmatched[count++] = c = (*get)() & ~NOREMAP;
+	    unmatched[count++] = c = (*get)() & ~REMAPFLAGS;
 
 	}
 	else
@@ -807,7 +829,7 @@ maplookup(c, outp, mp, get, avail)
     if (rmp) {
 	/* unget the unmatched suffix */
 	while (count > 0)
-	    itb_append(outp, unmatched[--count]);
+	    (void)itb_append(outp, unmatched[--count]);
 	/* unget the mapping and elide correct number of recorded chars */
 	if (rmp->srv) {
 	    int remapflag;
@@ -820,16 +842,16 @@ maplookup(c, outp, mp, get, avail)
 	    else
 		remapflag = 0;
 	    while (cp > rmp->srv)
-		itb_append(outp, char2int(*--cp)|remapflag);
+		(void)itb_append(outp, char2int(*--cp)|remapflag);
 	}
 	else {
-	    itb_append(outp, rmp->irv);
+	    (void)itb_append(outp, rmp->irv);
 	}
 	return matchedcnt;
     }
     else {	/* didn't find a match */
 	while (count > 0)
-	    itb_append(outp, unmatched[--count]);
+	    (void)itb_append(outp, unmatched[--count]);
 	return 0;
     }
 }

@@ -1,7 +1,7 @@
 /*	Spawn:	various DOS access commands
  *		for MicroEMACS
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/spawn.c,v 1.95 1995/01/04 18:07:46 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/spawn.c,v 1.98 1995/04/25 02:31:21 pgf Exp $
  *
  */
 
@@ -10,6 +10,10 @@
 #if SYS_UNIX || SYS_OS2 || SYS_WINNT
 #include	<sys/stat.h>
 #endif
+
+extern	CMDFUNC	f_namedcmd;
+
+static	int spawn1 P(( int, int ));
 
 #if	SYS_AMIGA
 #define  NEW	1006L
@@ -189,7 +193,6 @@ pressreturn()
 	/* loop for a CR, a space, or a : to do another named command */
 	while ((c = keystroke()) != '\r' &&
 			c != ' ' && !ABORTED(c)) {
-		extern CMDFUNC f_namedcmd;
 		if (kcod2fnc(c) == &f_namedcmd) {
 			unkeystroke(c);
 			break;
@@ -236,7 +239,7 @@ int	rerun;		/* TRUE/FALSE: spawn, -TRUE: pipecmd */
 	register SIZE_T	len;
 	static	char	bang[] = SHPIPE_LEFT;
 	BUFFER *bp;
-	int	cb	= anycb(&bp),
+	int	cb	= any_changed_buf(&bp),
 		fix	= (rerun != -TRUE);
 	char	save[NLINE],
 		temp[NLINE],
@@ -285,7 +288,7 @@ int	rerun;		/* TRUE/FALSE: spawn, -TRUE: pipecmd */
  * done.
  */
 /* the #ifdefs have been totally separated, for readability */
-int
+static int
 spawn1(rerun,pressret)
 int rerun;
 int pressret;
@@ -597,7 +600,7 @@ int
 filterregion()
 {
 /* FIXX work on this for OS2, need inout_popen support, or named pipe? */
-#if SYS_UNIX || SYS_MSDOS
+#if SYS_UNIX || SYS_MSDOS || (SYS_OS2 && CC_CSETPP)
 	static char oline[NLINE];	/* command line send to shell */
 	char	line[NLINE];	/* command line send to shell */
 	FILE *fr, *fw;
@@ -630,7 +633,9 @@ filterregion()
 		npflush();	/* fake multi-processing */
 #endif
 	}
+#if !(SYS_OS2 && CC_CSETPP)
 	(void)fclose(fw);
+#endif
 	DOT.l = lBACK(DOT.l);
 	s = ifile((char *)0,TRUE,fr);
 	npclose(fr);
@@ -652,7 +657,7 @@ int
 filter(f, n)
 int f,n;
 {
-#if !(SYS_UNIX||SYS_MSDOS) /* filterregion up above is better */
+#if !(SYS_UNIX||SYS_MSDOS || (SYS_OS2 && CC_CSETPP)) /* filterregion up above is better */
 	register int	s;	/* return status from CLI */
 	register BUFFER *bp;	/* pointer to buffer to zot */
 	static char oline[NLINE];	/* command line send to shell */
@@ -797,5 +802,3 @@ register char	*cmd;
 	return AfterShell();
 }
 #endif
-
-

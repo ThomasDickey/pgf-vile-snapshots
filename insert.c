@@ -7,7 +7,7 @@
  * Most code probably by Dan Lawrence or Dave Conroy for MicroEMACS
  * Extensions for vile by Paul Fox
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/insert.c,v 1.72 1995/02/20 00:44:35 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/insert.c,v 1.77 1995/04/25 00:49:37 pgf Exp $
  *
  */
 
@@ -20,11 +20,24 @@
 			? DOT.o\
 			: w_left_margin(curwp)
 
+static	int	backspace P(( void ));
+static	int	doindent P(( int ));
+static	int	indented_newline P(( void ));
+static	int	indented_newline_above P(( void ));
+static	int	ins_anytime P(( int, int, int, int * ));
+static	int	ins_n_times P(( int, int, int ));
+static	int	insbrace P(( int, int ));
+static	int	inspound P(( void ));
+static	int	isallspace P(( LINEPTR, int, int ));
+static	int	nextindent P(( int * ));
+static	int	openlines P(( int ));
+static	int	shiftwidth P(( int, int ));
+static	int	tab P(( int, int ));
 static	int	wrap_at_col P(( void ));
 static	void	advance_one_char P(( void ));
-static	int	ins_n_times P(( int, int, int ));
-static	int	ins_anytime P(( int, int, int, int * ));
-static	int	isallspace P(( LINEPTR, int, int ));
+#if !SMALLER
+static	int	istring P(( int, int, int ));
+#endif
 
 /* value of insertmode maintained through subfuncs */
 static	int	savedmode;  
@@ -175,7 +188,7 @@ int f,n;
  * lines to create before proceeding with inserting the string-argument of the
  * command.
  */
-int
+static int
 openlines(n)
 int n;
 {
@@ -299,7 +312,7 @@ int f,n;
 
 	if (clexec || isnamedcmd) {
 		int status;
-		static char cbuf[2];
+		static char cbuf[NLINE];
 		if ((status=mlreply("Replace with: ", cbuf, 2)) != TRUE)
 			return status;
 		c = cbuf[0];
@@ -409,7 +422,7 @@ int *splice;
 
 	last_insert_char = EOS;
 
-	while(1) {
+	for (;;) {
 
 		/*
 		 * Read another character from the insertion-string.
@@ -533,8 +546,7 @@ int *splice;
 
 #if OPT_CFENCE
 		/* check for CMODE fence matching */
-		if ((c == RBRACE || c == RPAREN || c == RBRACK ) &&
-						b_val(curbp, MDSHOWMAT))
+	        if (b_val(curbp, MDSHOWMAT))
 			fmatch(c);
 #endif
 
@@ -698,7 +710,8 @@ int *backsp_limit_p;
 
 	/* do the appropriate insertion */
 	if (allow_aindent && b_val(curbp, MDCMOD)) {
-	    if (((c == RBRACE) || (c == RPAREN) || (c == RBRACK))) {
+	    int dir;
+	    if (is_user_fence(c, &dir) && dir == REVERSE) {
 		    return insbrace(1, c);
 	    } else if (c == '#') {
 		    return inspound();
@@ -735,7 +748,7 @@ int f, n;
 
 /* ask for and insert or overwrite a string into the current */
 /* buffer at the current point */
-int
+static int
 istring(f,n,mode)
 int f,n;
 int mode;
@@ -778,7 +791,7 @@ int mode;
 }
 #endif
 
-int
+static int
 backspace()
 {
 	register int	s;
@@ -828,7 +841,7 @@ int f,n;
 }
 
 /* insert a newline and indentation for C */
-int
+static int
 indented_newline()
 {
 	int cmode = allow_aindent && b_val(curbp, MDCMOD);
@@ -848,7 +861,7 @@ indented_newline()
 }
 
 /* insert a newline and indentation for autoindent */
-int
+static int
 indented_newline_above()
 {
 	int cmode = allow_aindent && b_val(curbp, MDCMOD);
@@ -894,11 +907,11 @@ int *bracefp;
 	ind = indentlen(l_ref(DOT.l));
 	if (bracefp) {
 		int lc = lastchar(l_ref(DOT.l));
-		*bracefp = (lc >= 0 &&
-			(lGetc(DOT.l,lc) == LBRACE ||
-			 lGetc(DOT.l,lc) == LPAREN ||
-			 lGetc(DOT.l,lc) == LBRACK ||
-			 lGetc(DOT.l,lc) == ':') );
+		int c = lGetc(DOT.l,lc);
+		int dir;
+		*bracefp = (lc >= 0 && (c == ':' || 
+				(is_user_fence(c, &dir) && dir == FORWARD)));
+
 	}
 
 	(void)gomark(FALSE,1);
@@ -908,7 +921,7 @@ int *bracefp;
 
 /* get the indent of the next non-blank line.	also, if arg
 	is non-null, check if line starts in a brace */
-int
+static int
 nextindent(bracefp)
 int *bracefp;
 {
@@ -939,7 +952,7 @@ int *bracefp;
 	return ind;
 }
 
-int
+static int
 doindent(ind)
 int ind;
 {
@@ -992,7 +1005,7 @@ LINE *lp;
 
 
 /* insert a brace or paren into the text here... we are in CMODE */
-int
+static int
 insbrace(n, c)
 int n;	/* repeat count */
 int c;	/* brace/paren to insert (always '}' or ')' for now) */
@@ -1023,7 +1036,7 @@ int c;	/* brace/paren to insert (always '}' or ')' for now) */
 	return(linsert(n, c));
 }
 
-int
+static int
 inspound()	/* insert a # into the text here...we are in CMODE */
 {
 
@@ -1042,7 +1055,7 @@ inspound()	/* insert a # into the text here...we are in CMODE */
 }
 
 /* insert a tab into the file */
-int
+static int
 tab(f, n)
 int f,n;
 {
@@ -1059,7 +1072,7 @@ int f,n;
 }
 
 /*ARGSUSED*/
-int
+static int
 shiftwidth(f, n)
 int f,n;
 {

@@ -95,7 +95,7 @@
 #		in '!' listed, then the flag does nothing, and should be
 #		viewed simply as documentation.
 #
-# $Header: /usr/build/VCS/pgf-vile/RCS/cmdtbl,v 1.124 1995/02/06 04:06:39 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/cmdtbl,v 1.127 1995/04/22 03:38:51 pgf Exp $
 #
 #
 
@@ -220,6 +220,10 @@ chgtoeol	REDO|UNDO
 	"delete-to-eol-and-insert-chars" !FEWNAMES
 	'C'
 	<insert text to replace the rest of the line>
+clear_match_attrs	NONE		OPT_HILITEMATCH
+	"clear-visual-matches"
+	'='
+	<clear highlighting caused by searches when \"visual-matches\" is set>
 clrmes		NONE
 	"clear-message-line"		!FEWNAMES
 	<erase text on the bottom line of screen>
@@ -1172,7 +1176,7 @@ rep_csrch	MOTION
 replacechar	REDO|UNDO
 	"replace-character"		!FEWNAMES
 	'r'
-	<replace CNT characters at the cursor with the wiven character>
+	<replace CNT characters at the cursor with the given character>
 respawn		NONE
 	"!!"
 	"rerun-shell-command"		!FEWNAMES

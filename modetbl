@@ -11,7 +11,7 @@
 #
 # The modes are table entries in the BUFFER and WINDOW structures.
 #
-# $Header: /usr/build/VCS/pgf-vile/RCS/modetbl,v 1.56 1994/12/14 20:26:57 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/modetbl,v 1.60 1995/04/22 03:22:53 pgf Exp $
 #
 #
 # Mode-table entries.  Capitalized letters are used for abbreviations.
@@ -40,6 +40,7 @@ bool							# GMD prefix
 	"working"	WORKING		0		OPT_WORKING # "working" message
 	"usefilelock"	USEFILELOCK	0		OPT_LCKFILES # okay use filelocks
 	"view-on-readonly" RONLYVIEW	0		# set view mode for readonly files
+	"warn-unread"	WARNUNREAD	0		# warn if quitting with unread buffers
 	"xterm-mouse"	XTERM_MOUSE	0		# mode to control whether we allow mouse-clicking
 int							# VAL_ prefix
 	"printing-low"	PRINT_LOW	WFHARD		# low end of high-bit-set printable range
@@ -50,10 +51,11 @@ int							# VAL_ prefix
 regex							# VAL_ prefix
 	"C-SUFfixes"	CSUFFIXES	0		# match against filenames to turn on c-mode
 string							# VAL_ prefix
+	"backup-style"  BACKUPSTYLE	0		OPT_FILEBACK # file backup style
 	"expand-chars"	EXPAND_CHARS	0		# list of chars we can expand (%,#,:)
 	"glob"		GLOB		0		OPT_GLOB_PIPE # select filename globbing style
 	"Popup-Choices"	POPUP_CHOICES	0		OPT_POPUPCHOICE&&OPT_ENUM_MODES # popup buffer showing file-completion choices
-	"backup-style"  BACKUPSTYLE	0		OPT_FILEBACK # file backup style
+	"slash-char"	SLASH_CHAR	0		OPT_MSDOS_PATH&&!SMALLER # DOS path delimiter
 
 .buffers
 bool							# MD prefix
@@ -90,8 +92,10 @@ int							# VAL_ prefix
 	"UndoLimit"	UNDOLIM		0		# how much undo stack is saved
 	"WrapMargin"	WRAPMARGIN	0		# width of right margin for autowrap
 string							# VAL_ prefix
+	"fence-pairs"	FENCES		0		# pairs of fences {,}; (,); etc.
 	"locker"	LOCKER		0	      	OPT_LCKFILES  # Name of locker
 	"tags"		TAGS		0		# list of tags files
+	"visual-matches"  HILITEMATCH	0		OPT_HILITEMATCH # highlight all search matches
 regex							# VAL_ prefix
 	"comments"	COMMENTS	0		# matches leading comment for comment reformatting
 	"paragraphs"	PARAGRAPHS	0		# delimits a paragraph

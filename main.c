@@ -13,7 +13,7 @@
  *	The same goes for vile.  -pgf, 1990-1995
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/main.c,v 1.224 1995/02/08 03:29:23 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/main.c,v 1.239 1995/05/08 03:06:17 pgf Exp $
  *
  */
 
@@ -40,6 +40,12 @@ unsigned _stklen = 32768U;
 
 static	void	do_num_proc P(( int *, int *, int * ));
 static	void	do_rept_arg_proc P(( int *, int *, int * ));
+static	void	get_executable_dir P(( void ));
+static	void	global_val_init P(( void ));
+static	void	loop P(( void ));
+static	void	siginit P(( void ));
+static	void	siguninit P(( void ));
+static	void	start_debug_log P(( int , char ** ));
 
 /*--------------------------------------------------------------------------*/
 #define	GetArgVal(param)	if (!*(++param))\
@@ -52,7 +58,6 @@ main(argc, argv)
 int	argc;
 char	*argv[];
 {
-	int    c;			/* command character */
 	register BUFFER *bp;		/* temp buffer pointer */
 	register int	carg;		/* current arg to scan */
 	char *vileinit = NULL;		/* the startup file or VILEINIT var */
@@ -88,6 +93,8 @@ char	*argv[];
 	prog_arg = argv[0];	/* this contains our only clue to exec-path */
 
 	start_debug_log(argc,argv);
+
+	get_executable_dir();
 
 	if (strcmp(pathleaf(prog_arg), "view") == 0)
 		set_global_b_val(MDVIEW,TRUE);
@@ -205,6 +212,7 @@ char	*argv[];
 				(void)printf("%s\n", getversion());
 				ExitProgram(GOODEXIT);
 
+				/* FALLTHROUGH */
 			case 'v':	/* -v for View File */
 				set_global_b_val(MDVIEW,TRUE);
 				break;
@@ -404,12 +412,16 @@ char	*argv[];
 					don't clobber it */
 #if SYS_MSDOS || SYS_WIN31 || SYS_OS2 || SYS_WINNT
 			/* search PATH for vilerc under dos */
-			fname = flook(pathname[0], FL_ANYWHERE|FL_READABLE);
+			fname = flook(pathname[PATH_STARTUP_NAME],
+					FL_ANYWHERE|FL_READABLE);
+			if (!fname)
+				fname = pathname[PATH_STARTUP_NAME];
 #else
-			fname = pathname[0];
+			fname = pathname[PATH_STARTUP_NAME];
 #endif
 			if (firstbp != 0
-			 && eql_bname(firstbp, pathname[0])) {
+			 && eql_bname(firstbp, pathname[PATH_STARTUP_NAME])) {
+				char c;
 				c = firstbp->b_bname[0];
 				firstbp->b_bname[0] = SCRTCH_LEFT[0];
 				startstat = startup(fname);
@@ -490,13 +502,13 @@ char	*argv[];
 }
 
 /* this is nothing but the main command loop */
-void
+static void
 loop()
 {
 	CMDFUNC	*cfp, *last_cfp = NULL;
 	int s,c,f,n;
 
-	while(1) {
+	for (;;) {
 
 		/* vi doesn't let the cursor rest on the newline itself.  This
 			takes care of that. */
@@ -576,22 +588,59 @@ loop()
 				last_cfp = cfp;
 				kbd_alarm();
 			}
-		} else
+		} else {
 			last_cfp = NULL; /* avoid noise! */
+		}
+
+		attrib_matches();
+
 	}
 }
 
+/* attempt to locate the executable that contains our code.
+* leave its directory name in pathname[EXEC_DIR], and shorten prog_arg
+* to the simple filename (no path).
+*/
+static void 
+get_executable_dir()
+{
+#if SYS_UNIX || SYS_VMS
+	char	temp[NFILEN];
+	char	*s, *t;
+
+	/* if there are no slashes, we have no idea where we came from */
+	if (last_slash(prog_arg) == NULL)
+		return;
+
+	/* if there _are_ slashes, then argv[0] was either 
+		absolute or relative. lengthen_path figures it out. */
+	s = strmalloc(lengthen_path(strcpy(temp, prog_arg)));
+	t = pathleaf(s);
+	if (t != s) {
+# if SYS_UNIX	/* 't' points past slash */
+		t[-1] = EOS;
+		prog_arg = t;
+# else		/* 't' points to ']' */
+		*t = EOS;
+		prog_arg = t+1;
+# endif
+		pathname[PATH_EXECDIR] = s;
+	} else
+		free(s);
+#endif
+}
+
+#ifndef strmalloc
 char *
 strmalloc(s)
 char *s;
 {
 	register char *ns = castalloc(char,strlen(s)+1);
-	if (ns)
-		return strcpy(ns,s);
-	else
-		return NULL;
-
+	if (ns != 0)
+		(void)strcpy(ns,s);
+	return ns;
 }
+#endif
 
 int
 no_memory(s)
@@ -601,7 +650,7 @@ char	*s;
 	return FALSE;
 }
 
-void
+static void
 global_val_init()
 {
 	register int i;
@@ -687,6 +736,9 @@ global_val_init()
 	set_global_g_val_ptr(GVAL_BACKUPSTYLE, strmalloc("off"));
 # endif
 #endif
+#ifdef GVAL_SLASH_CHAR
+	set_global_g_val_ptr(GVAL_SLASH_CHAR, strmalloc("\\"));
+#endif
 #if	OPT_POPUP_MSGS
 	set_global_g_val(GMDPOPUP_MSGS,-TRUE);	/* popup-msgs */
 #endif
@@ -697,7 +749,8 @@ global_val_init()
 #if	OPT_XTERM
 	set_global_g_val(GMDXTERM_MOUSE,FALSE);	/* mouse-clicking */
 #endif
-
+	set_global_g_val(GMDWARNUNREAD,TRUE);	/* warn if quitting without
+						looking at all buffers */
 	/*
 	 * Buffer-mode defaults
 	 */
@@ -724,6 +777,9 @@ global_val_init()
 	set_global_b_val(MDTABINSERT,	TRUE);	/* allow tab insertion */
 	set_global_b_val(MDTAGSRELTIV,	FALSE);	/* path relative tag lookups */
 	set_global_b_val(MDTERSE,	FALSE);	/* terse messaging */
+#if	OPT_HILITEMATCH
+	set_global_b_val_ptr(VAL_HILITEMATCH, strmalloc("none"));
+#endif
 #if	OPT_UPBUFF
 	set_global_b_val(MDUPBUFF,	TRUE);	/* animated */
 #endif
@@ -746,6 +802,7 @@ global_val_init()
 	set_global_b_val(VAL_UNDOLIM,	10);	/* undo limit */
 
 	set_global_b_val_ptr(VAL_TAGS, strmalloc("tags")); /* tags filename */
+	set_global_b_val_ptr(VAL_FENCES, strmalloc("{}()[]")); /* fences */
 
 #if SYS_VMS
 #define	DEFAULT_CSUFFIX	"\\.\\(\\([CHIS]\\)\\|CC\\|CXX\\|HXX\\)\\(;[0-9]*\\)\\?$"
@@ -813,9 +870,6 @@ global_val_init()
 
 #if SYS_UNIX || SYS_MSDOS || SYS_WIN31 || SYS_OS2 || SYS_WINNT || SYS_VMS
 
-/* have we been interrupted/ */
-static int am_interrupted = FALSE;
-
 /* ARGSUSED */
 SIGT
 catchintr (ACTUAL_SIG_ARGS)
@@ -831,6 +885,7 @@ catchintr (ACTUAL_SIG_ARGS)
 }
 #endif
 
+#ifndef interrupted  /* i.e. unless it's a macro */
 int
 interrupted()
 {
@@ -850,10 +905,9 @@ interrupted()
 	if (am_interrupted)
 		return TRUE;
 	return FALSE;
-#else
-	return am_interrupted;
 #endif
 }
+#endif
 
 void
 not_interrupted()
@@ -886,7 +940,7 @@ not_interrupted()
 #endif
 
 
-void
+static void
 siginit()
 {
 #if SYS_UNIX
@@ -900,6 +954,7 @@ siginit()
 #endif
 	setup_handler(SIGSEGV,imdying);
 	setup_handler(SIGTERM,imdying);
+/* #define DEBUG 1 */
 #if DEBUG
 	setup_handler(SIGQUIT,imdying);
 #else
@@ -936,7 +991,7 @@ siginit()
 
 }
 
-void
+static void
 siguninit()
 {
 #if SYS_MSDOS
@@ -1085,8 +1140,6 @@ int *cp,*fp,*np;
 	}
 }
 
-int quitting;
-
 /* the vi ZZ command -- write all, then quit */
 int
 zzquit(f,n)
@@ -1097,7 +1150,7 @@ int f,n;
 	BUFFER *bp;
 
 	thiscmd = lastcmd;
-	cnt = anycb(&bp);
+	cnt = any_changed_buf(&bp);
 	if (cnt) {
 	    	if (cnt > 1) {
 		    mlprompt("Will write %d buffers.  %s ", cnt,
@@ -1112,9 +1165,7 @@ int f,n;
 				return FALSE;
 		}
 
-		quitting = TRUE;
 		if (writeall(f,n,FALSE,TRUE,FALSE) != TRUE) {
-			quitting = FALSE;
 			return FALSE;
 		}
 
@@ -1123,7 +1174,7 @@ int f,n;
 		if (thiscmd != kbd_seq())
 			return FALSE;
 	}
-	return quithard(f, n);
+	return quit(f, n);
 }
 
 /*
@@ -1135,10 +1186,8 @@ quickexit(f, n)
 int f,n;
 {
 	register int status;
-	quitting = TRUE;
 	if ((status = writeall(f,n,FALSE,TRUE,FALSE)) == TRUE)
 		status = quithard(f, n);  /* conditionally quit	*/
-	quitting = FALSE;
 	return status;
 }
 
@@ -1162,6 +1211,7 @@ int f,n;
 {
 	int cnt;
 	BUFFER *bp;
+	char *sadj, *sverb;
 
 #if OPT_PROCEDURES
 	{
@@ -1174,16 +1224,26 @@ int f,n;
 	}
 #endif
 
-	if (f == FALSE && (cnt = anycb(&bp)) != 0) {
-		if (cnt == 1)
-			mlforce(
-			"Buffer \"%s\" is modified.  Write it, or use :q!",
-				get_bname(bp));
-		else
-			mlforce(
-			"There are %d unwritten modified buffers.  Write them, or use :q!",
-				cnt);
-		return FALSE;
+	if (f == FALSE) {
+		cnt = any_changed_buf(&bp);
+		sadj = "modified";
+		sverb = "Write";
+		if (cnt == 0 && global_g_val(GMDWARNUNREAD)) {
+			cnt = any_unread_buf(&bp);
+			sadj = "unread";
+			sverb = "Look at";
+		}
+		if (cnt != 0) {
+			if (cnt == 1)
+				mlforce(
+				"Buffer \"%s\" is %s.  %s it, or use :q!",
+					get_bname(bp),sadj,sverb);
+			else
+				mlforce(
+			  "There are %d %s buffers.  %s them, or use :q!",
+					cnt,sadj,sverb);
+			return FALSE;
+		}
 	}
 #if	OPT_BSD_FILOCK
 	if (lockrel() != TRUE) {
@@ -1249,7 +1309,7 @@ int f,n;
 #endif
 
 #if SYS_UNIX
-		if (strcmp(pathname[2], ".")) free(pathname[2]);
+		FreeAndNull(pathname[PATH_EXECDIR]);
 #endif
 		/* whatever is left over must be a leak */
 		show_alloc();
@@ -1387,6 +1447,9 @@ charinit()
 
 	/* whitespace */
 	_chartypes_[' '] =
+#if OPT_ISO_8859
+		_chartypes_[0xa0] =
+#endif
 		_chartypes_['\t'] =
 		_chartypes_['\r'] =
 		_chartypes_['\n'] =
@@ -1400,10 +1463,21 @@ charinit()
 	/* lowercase */
 	for (c = 'a'; c <= 'z'; c++)
 		_chartypes_[c] |= _lower|_pathn|_ident|_qident;
-
+#if OPT_ISO_8859
+	for (c = 0xc0; c <= 0xd6; c++)
+		_chartypes_[c] |= _lower|_pathn|_ident|_qident;
+#endif
+	for (c = 0xd8; c <= 0xde; c++)
+		_chartypes_[c] |= _lower|_pathn|_ident|_qident;
 	/* uppercase */
 	for (c = 'A'; c <= 'Z'; c++)
 		_chartypes_[c] |= _upper|_pathn|_ident|_qident;
+#if OPT_ISO_8859
+	for (c = 0xdf; c <= 0xf6; c++)
+		_chartypes_[c] |= _upper|_pathn|_ident|_qident;
+	for (c = 0xf8; c <= 0xff; c++)
+		_chartypes_[c] |= _upper|_pathn|_ident|_qident;
+#endif
 
 	/* digits */
 	for (c = '0'; c <= '9'; c++)
@@ -1418,6 +1492,10 @@ charinit()
 		_chartypes_[c] |= _punct;
 	for (c = LBRACE; c <= '~'; c++)
 		_chartypes_[c] |= _punct;
+#if OPT_ISO_8859
+	for (c = 0xa1; c <= 0xbf; c++)
+		_chartypes_[c] |= _punct;
+#endif
 
 	/* printable */
 	for (c = ' '; c <= '~'; c++)
@@ -1614,7 +1692,7 @@ mallocdbg(f,n)
 FILE *FF;
 #endif
 
-void
+static void
 start_debug_log(ac,av)	/* ARGSUSED */
 int ac;
 char **av;

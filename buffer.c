@@ -5,7 +5,7 @@
  * keys. Like everyone else, they set hints
  * for the display system.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/buffer.c,v 1.115 1994/12/14 20:26:57 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/buffer.c,v 1.120 1995/04/25 02:31:21 pgf Exp $
  *
  */
 
@@ -13,30 +13,33 @@
 #include	"edef.h"
 
 /*--------------------------------------------------------------------------*/
-static	BUFFER *find_BufferList P(( void ));
 #if	OPT_UPBUFF
 static	int	show_BufferList P(( BUFFER * ));
 #define	update_on_chg(bp) (!b_is_temporary(bp) || show_all)
 #endif
-static	BUFFER *find_bp P(( BUFFER * ));
-static	int	countBuffers P(( void ));
-static	BUFFER *find_nth_created P(( int ));
-static	BUFFER *find_nth_used P(( int ));
-static	BUFFER *find_latest P(( void ));
+
+static	BUFFER *find_BufferList P(( void ));
 static	BUFFER *find_b_file P(( char * ));
 static	BUFFER *find_b_hist P(( int ));
 static	BUFFER *find_b_number P(( char * ));
+static	BUFFER *find_bp P(( BUFFER * ));
+static	BUFFER *find_latest P(( void ));
+static	BUFFER *find_nth_created P(( int ));
+static	BUFFER *find_nth_used P(( int ));
+static	char *	hist_lookup P(( int ));
+static	int	cmode_active P(( BUFFER * ));
+static	int	countBuffers P(( void ));
+static	int	hist_show P(( void ));
+static	int	lookup_hist P(( BUFFER * ));
+static	void	FreeBuffer P(( BUFFER * ));
 static	void	MarkDeleted P(( BUFFER * ));
 static	void	MarkUnused P(( BUFFER * ));
-static	void	FreeBuffer P(( BUFFER * ));
 static	void	TrackAlternate P(( BUFFER * ));
-static	char *	hist_lookup P(( int ));
-static	int	lookup_hist P(( BUFFER * ));
-static	int	hist_show P(( void ));
+static	void	makebufflist P(( int, void * ));
+
 #if !SMALLER
 static	void	footnote P(( int ));
 #endif
-static	void	makebufflist P(( int, void * ));
 
 /*--------------------------------------------------------------------------*/
 
@@ -462,11 +465,23 @@ BUFFER *find_alt()
 			bp = bheadp;
 		for (; bp; bp = bp->b_bufp) {
 			if (bp != curbp) {
+#if THIS_CANT_BE_RIGHT
 				if (b_is_temporary(bp)) {
 					if (!any_bp)
 						any_bp = bp;
 				} else
 					return bp;
+#else
+				/*
+				 * If we allow temporary buffers to be selected as the
+				 * alternate, we get into the situation where we try
+				 * to load the message buffer, which has a NULL filename.
+				 * Note that the 'noautobuffer' case, below, never selects
+				 * a temporary buffer as the alternate buffer.
+				 */
+				if (!b_is_temporary(bp))
+					return bp;
+#endif
 			}
 		}
 		return any_bp;
@@ -824,7 +839,7 @@ register WINDOW *wp;
 }
 
 /* return true iff c-mode is active for this buffer */
-int
+static int
 cmode_active(bp)
 register BUFFER *bp;
 {
@@ -1441,7 +1456,7 @@ int	len;
  * then.
  */
 int
-anycb(bpp)
+any_changed_buf(bpp)
 BUFFER **bpp;
 {
 	register BUFFER *bp;
@@ -1450,6 +1465,25 @@ BUFFER **bpp;
 
 	for_each_buffer(bp) {
 		if (!b_is_invisible(bp) && b_is_changed(bp)) {
+		    	if (bpp && !*bpp)
+				*bpp = bp;
+			cnt++;
+		}
+	}
+	return (cnt);
+}
+
+/* similar to above, for buffers that have not been visited */
+int
+any_unread_buf(bpp)
+BUFFER **bpp;
+{
+	register BUFFER *bp;
+	register int cnt = 0;
+	if (bpp) *bpp = NULL;
+
+	for_each_buffer(bp) {
+		if (!b_is_invisible(bp) && !bp->b_active) {
 		    	if (bpp && !*bpp)
 				*bpp = bp;
 			cnt++;
@@ -1734,6 +1768,7 @@ register int	flag;
 	register WINDOW *wp;
 
 	b_clr_counted(bp);
+	b_match_attrs_dirty(bp);
 	if (bp->b_nwnd != 1)		/* Ensure hard.		*/
 		flag |= WFHARD;
 	if (!b_is_changed(bp)) {	/* First change, so	*/
@@ -1773,6 +1808,7 @@ register int	flag;
 		flag |= WFMODE;			/* update mode lines.	*/
 		b_clr_changed(bp);
 		b_clr_counted(bp);
+		b_match_attrs_dirty(bp);
 
 		for_each_window(wp) {
 			if (wp->w_bufp == bp)
@@ -1889,6 +1925,9 @@ int f, n, promptuser, leaving, autowriting;
 		mlforce("[Wrote %d buffer%s]", count, PLURAL(count));
 	else
 		mlforce("[No buffers written]");
+
+	if (dirtymsgline) 
+		sgarbf = TRUE;
 
 	return status;
 }

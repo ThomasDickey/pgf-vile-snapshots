@@ -4,7 +4,7 @@
  *	Definitions to interface to unix-like DIRECTORY(3) procedures.
  *	Include this after "estruct.h"
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/dirstuff.h,v 1.16 1994/11/29 04:02:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/dirstuff.h,v 1.18 1995/04/25 02:31:21 pgf Exp $
  *
  */
 
@@ -23,28 +23,26 @@
 #define USE_D_NAMLEN 1
 #endif
 
-#if _POSIX_VERSION || DIRENT || CC_TURBO || CC_WATCOM || CC_DJGPP || SYS_OS2
-# if CC_WATCOM
+#if _POSIX_VERSION || HAVE_DIRENT_H || CC_TURBO || CC_WATCOM || CC_DJGPP || SYS_OS2
+# if CC_WATCOM || CC_CSETPP
 #   include <direct.h>
 # else
 #   include <dirent.h>
 # endif
-# undef DIRENT
 # define	DIRENT	struct dirent
 #else	/* apollo & other old bsd's */
 # define	DIRENT	struct direct
 # define USE_D_NAMLEN 1
-# if SYSNDIR
+# if HAVE_SYS_NDIR_H
 #  include <sys/ndir.h>
 # else
-#  if SYSDIR
+#  if HAVE_SYS_DIR_H
 #   include <sys/dir.h>
 #  else
-#   if NDIR
+#   if HAVE_NDIR_H
 #    include <ndir.h>
 #   else
 #    undef USE_LS_FOR_DIRS
-#    undef DIRENT
 #    undef USE_D_NAMLEN
 #    define USE_LS_FOR_DIRS 1
 #    if SYS_WINNT

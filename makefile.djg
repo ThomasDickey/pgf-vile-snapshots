@@ -3,13 +3,26 @@
 #
 # T.DANG (dang@cogit.ign.fr)
 #
-# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.djg,v 1.13 1995/02/10 14:10:45 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.djg,v 1.14 1995/03/18 16:50:27 pgf Exp $
 #
 #
 
+CC = gcc
 LONGARGS = gcc
 
-CFLAGS= -Wall -O -DDISP_IBMPC -Dscrn_chosen 
+DEBUG = -g
+#OPTIM =
+
+#DEBUG =
+OPTIM = -O2
+
+# Use these two lines for the IBM/PC display (not DPMI compatible).
+#CFLAGS= -Wall $(DEBUG) $(OPTIM) -DDISP_IBMPC -Dscrn_chosen 
+#DISP_SRC = ibmpc.c
+
+# Use these two lines for the Borland/CONIO display (DPMI compatible).
+CFLAGS= -Wall $(DEBUG) $(OPTIM) -DDISP_BORLAND -Dscrn_chosen 
+DISP_SRC = borland.c gppconio.c
 
 # these are normal editable headers
 HDRS = estruct.h epath.h edef.h proto.h dirstuff.h
@@ -18,7 +31,7 @@ HDRS = estruct.h epath.h edef.h proto.h dirstuff.h
 # and in modetbl
 BUILTHDRS = nebind.h nefunc.h nemode.h nename.h nevars.h
 
-SRC = 	main.c ibmpc.c basic.c bind.c buffer.c crypt.c \
+SRC = 	main.c $(DISP_SRC) basic.c bind.c buffer.c crypt.c \
 	csrch.c display.c eval.c exec.c externs.c fences.c file.c filec.c \
 	fileio.c finderr.c glob.c globals.c history.c \
 	input.c insert.c itbuff.c isearch.c \
@@ -28,22 +41,13 @@ SRC = 	main.c ibmpc.c basic.c bind.c buffer.c crypt.c \
 	tags.c tbuff.c termio.c tmp.c undo.c \
 	version.c vmalloc.c window.c word.c wordmov.c map.c djhandl.c
 
-OBJ = 	main.o ibmpc.o basic.o bind.o buffer.o crypt.o \
-      	csrch.o display.o eval.o exec.o externs.o fences.o file.o filec.o \
-	fileio.o finderr.o glob.o globals.o history.o \
-	input.o insert.o itbuff.o isearch.o \
-	line.o modes.o msgs.o npopen.o oneliner.o opers.o \
-	path.o random.o regexp.o \
-	region.o search.o select.o spawn.o \
-	tags.o tbuff.o termio.o tmp.o undo.o \
-	version.o vmalloc.o window.o word.o wordmov.o map.o djhandl.o
+OBJ =	$(SRC:.c=.o)
 
 %.o:	%.c estruct.h nemode.h edef.h proto.h 
-	gcc $(CFLAGS) -c $< -o $@ 
+	$(CC) $(CFLAGS) -c $< -o $@ 
 
 vile: 	$(BUILTHDRS) $(OBJ)
-#	gcc -o vile $(OBJ) -lpc 
-	ld -o vile /djgpp/lib/crt0.o $(OBJ) -L/djgpp/lib -lpc -lc -lgcc
+	$(CC) $(CFLAGS) -o vile $(OBJ) -lpc 
 	coff2exe vile
 	stubedit vile.exe globbing=no
 
@@ -80,7 +84,7 @@ nemode.h:	modetbl mktbls.exe
 	mktbls.exe modetbl
 
 mktbls.exe:  mktbls.c
-	gcc mktbls.c -o mktbls
+	$(CC) mktbls.c -o mktbls
 	coff2exe mktbls
 	rm mktbls
 

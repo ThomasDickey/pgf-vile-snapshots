@@ -5,16 +5,12 @@
  * functions use hints that are left in the windows by the commands.
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/display.c,v 1.186 1995/02/15 17:11:31 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/display.c,v 1.192 1995/04/25 02:31:21 pgf Exp $
  *
  */
 
 #include	"estruct.h"
 #include        "edef.h"
-
-#if DISP_BORLAND
-#include 	<conio.h>
-#endif
 
 #define	NU_WIDTH 8
 
@@ -29,7 +25,7 @@ VIDEO	**pscreen;			/* Physical screen. */
 #else
 #define PSCREEN pscreen
 #endif
-int *lmap;
+static	int *lmap;
 
 #if DISP_IBMPC
 #define PScreen(n) scread((VIDEO *)0,n)
@@ -50,7 +46,7 @@ static	int	allow_wrap;
 #endif
 
 /* for window size changes */
-int chg_width, chg_height;
+static	int chg_width, chg_height;
 
 /******************************************************************************/
 
@@ -59,57 +55,65 @@ typedef	void	(*OutFunc) P(( int ));
 static	OutFunc	dfoutfn;
 
 static	char *	right_num P(( char *, int, long ));
-static	int	dfputs  P(( OutFunc, char * ));
-static	int	dfputsn P(( OutFunc, char *, int ));
+static	char *	rough_position P(( WINDOW * ));
+static	int	dfputf  P(( OutFunc, int ));
 static	int	dfputi  P(( OutFunc, int,  int ));
 static	int	dfputli P(( OutFunc, long, int ));
-static	int	dfputf  P(( OutFunc, int ));
-static	void	dofmt P(( char *, va_list * ));
-static	void	mlmsg P(( char *, va_list * ));
-static	void	erase_remaining_msg P(( int ));
-
-static	void	l_to_vline P(( WINDOW *, LINEPTR, int ));
+static	int	dfputs  P(( OutFunc, char * ));
+static	int	dfputsn P(( OutFunc, char *, int ));
+static	int	endofline P(( char *, int ));
 static	int	l_to_vcol  P(( WINDOW *, int ));
+static	int	modeline_modes P(( BUFFER *, char ** ));
+static	int	modeline_show P(( WINDOW *, int ));
+static	int	texttest P(( int, int ));
+static	int	updext_before P(( int ));
+static	int	updext_past P(( int, int ));
 static	int	updpos P(( int *, int * ));
+static	int	vtalloc P(( void ));
+static	int	vtgetc P(( int ));
+static	void	dofmt P(( char *, va_list * ));
+static	void	erase_remaining_msg P(( int ));
+static	void	freeVIDEO P((VIDEO * ));
+static	void	l_to_vline P(( WINDOW *, LINEPTR, int ));
+static	void	lspputc P(( int ));
+static	void	mlmsg P(( char *, va_list * ));
+static	void	modeline P(( WINDOW * ));
+static	void	reframe P(( WINDOW * ));
+static	void	scrscroll P(( int, int, int ));
+static	void	updall P(( WINDOW * ));
+static	void	updateline P(( int, int, int ));
 static	void	upddex P(( void ));
 static	void	updgar P(( void ));
 static	void	updone P(( WINDOW * ));
-static	void	updall P(( WINDOW * ));
 static	void	updupd P(( int ));
+static	void	vteeol P(( void ));
+static	void	vtlistc P(( int ));
+static	void	vtmove P(( int, int ));
+static	void	vtputc P(( int ));
+static	void	vtputsn P(( char *, int ));
+static	void	vtset P(( LINEPTR, WINDOW * ));
+
+#if NO_LEAKS
+static	void	vtfree P(( void ));
+#endif
+
 #if OPT_VIDEO_ATTRS
 static	void	updattrs P(( WINDOW * ));
 #endif
-static	int	updext_past P(( int, int ));
-static	int	updext_before P(( int ));
-static	void	updateline P(( int, int, int ));
-static	int	endofline P(( char *, int ));
+
 #if	OPT_MLFORMAT
 static	void	mlfs_prefix P(( char **, char **, int ));
 static	void	mlfs_suffix P(( char **, char **, int ));
 static	void	mlfs_skipfix P(( char ** ));
 #endif
-static	int	modeline_modes P(( BUFFER *, char ** ));
-static	int	modeline_show P(( WINDOW *, int ));
-static	char *	rough_position P(( WINDOW * ));
-static	void	modeline P(( WINDOW * ));
+
 #if	OPT_UPBUFF
 static	void	recompute_buffer P(( BUFFER * ));
 #endif
-static	int	texttest P(( int, int ));
+
 #if CAN_SCROLL
 static	int	scrolls P(( int ));
 #endif
-
-static void freeVIDEO P((VIDEO * ));
-static void vtmove P(( int, int ));
-static void vtputc P(( int ));
-static void vtlistc P(( int ));
-static int vtgetc P(( int ));
-static void vtputsn P(( char *, int ));
-static void vtset P(( LINEPTR, WINDOW * ));
-static void vteeol P(( void ));
-
-static void lspputc P(( int ));
 
 /*--------------------------------------------------------------------------*/
 
@@ -294,7 +298,7 @@ va_list *app;
 					n = dfputi(outfunc, va_arg(*app,int), 10);
 					break;
 				}
-				/* fall through */
+				/* FALLTHROUGH */
 			case 'D':
 				n = dfputli(outfunc, va_arg(*app,long), 10);
 				break;
@@ -308,7 +312,7 @@ va_list *app;
 					n = dfputi(outfunc, va_arg(*app,int), 16);
 					break;
 				}
-				/* fall through */
+				/* FALLTHROUGH */
 			case 'X':
 				n = dfputli(outfunc, va_arg(*app,long), 16);
 				break;
@@ -328,7 +332,7 @@ va_list *app;
 			case 'P': /* output padding -- pads total output to
 					"wid" chars, using c as the pad char */
 				wid -= nchars;
-				/* fall through */
+				/* FALLTHROUGH */
 
 			case 'p': /* field padding -- puts out "wid"
 					copies of c */
@@ -437,7 +441,7 @@ VIDEO **vpp;
 	(void)memset((char *)vp, 0, sizeof(VIDEO) + term.t_mcol - 4);
 
 #if OPT_VIDEO_ATTRS
-	vp->v_attrs = (VIDEO_ATTR *)calloc(sizeof(VIDEO_ATTR), (ALLOC_T)term.t_mcol);
+	vp->v_attrs = typecallocn(VIDEO_ATTR, (ALLOC_T)term.t_mcol);
 	if (vp->v_attrs == 0) {
 		free((char *)vp);
 		return FALSE;
@@ -448,7 +452,7 @@ VIDEO **vpp;
 	return TRUE;
 }
 
-int
+static int
 vtalloc()
 {
 	register int i, first;
@@ -487,7 +491,7 @@ vtalloc()
 
 /* free all video memory, in anticipation of a (growing) resize */
 #if NO_LEAKS
-void
+static void
 vtfree()
 {
 	register int i;
@@ -561,6 +565,7 @@ int c;
 			vtcol = 0;
 			vtrow++;
 			vscreen[vtrow]->v_flag |= VFCHG;
+			taboff += term.t_ncol;
 		}
 #endif
 		return;
@@ -757,15 +762,19 @@ int base;
 	int	col = 0;
 	int	i = base;
 	int	c;
-	LINEPTR lp = wp->w_dot.l;
+	int	lim;
+	LINEPTR lp;
 
-	while (i < wp->w_dot.o || (!global_g_val(GMDALTTABPOS) && !insertmode &&
-				i <= wp->w_dot.o && i < lLength(lp))) {
+	lp = wp->w_dot.l;
+	lim = wp->w_dot.o 
+		+ ((!global_g_val(GMDALTTABPOS) && !insertmode) ? 1 : 0);
+	if (lim > lLength(lp))
+		lim = lLength(lp);
+
+	while (i < lim) {
 		c = lGetc(lp, i++);
 		if (c == '\t' && !w_val(wp,WMDLIST)) {
-			do {
-				col++;
-			} while ((col%curtabval) != 0);
+			col += curtabval - (col%curtabval);
 		} else {
 			if (!isprint(c)) {
 				col += (c & HIGHBIT) ? 3 : 1;
@@ -919,7 +928,7 @@ int force;	/* force update past type ahead? */
 
 /*	reframe:	check to see if the cursor is on in the window
 			and re-frame it if needed or wanted		*/
-void
+static void
 reframe(wp)
 WINDOW *wp;
 {
@@ -1336,6 +1345,10 @@ updgar()
 #endif
 	}
 #if !OPT_PSCREEN
+#if	OPT_COLOR
+	TTforg(gfcolor);		 /* Need to set before erasing. */
+	TTbacg(gbcolor);
+#endif
 	movecursor(0, 0);		 /* Erase the screen. */
 	TTeeop();
 #else
@@ -1439,7 +1452,7 @@ updattrs(wp)
 
 	/* Garbage collect empty visible regions */
 	if (start_rlnum == end_rlnum
-	 && ap->ar_vattr != 0
+	 && VATTRIB(ap->ar_vattr) != 0
 	 && ap->ar_region.r_orig.o >= ap->ar_region.r_end.o) {
 	    AREGION *nap = ap->ar_next;
 	    free_attrib(wp->w_bufp, ap);
@@ -1894,7 +1907,7 @@ int inserts;
 }
 
 /* move the "count" lines starting at "from" to "to" */
-void
+static void
 scrscroll(from, to, count)
 int from, to, count;
 {
@@ -2466,8 +2479,8 @@ int lchar;
 				ic = 'O';
 		}
 #endif /* !defined(insertmode) */
-#if DISP_BORLAND
-		set_cursor (ic != lchar);
+#if OPT_ICURSOR
+		TTicursor(ic != lchar);
 #endif
 	}
 	return ic;
@@ -3101,13 +3114,20 @@ void
 mlerror(s)
 char	*s;
 {
-#if SYS_UNIX || HAVE_SYS_ERRLIST || CC_NEWDOSCC
+#if SYS_UNIX || HAVE_SYS_ERRLIST || (CC_NEWDOSCC && !CC_CSETPP)
 
 	if (errno > 0 && errno < sys_nerr)
 		mlwarn("[Error %s: %s]", s, sys_errlist[errno]);
 	else
 		mlwarn("[Error %s: unknown system error %d]", s, errno);
 
+#elif CC_CSETPP
+
+	if (errno > 0)
+		mlwarn("[Error %s: %s]", s, strerror(errno));
+	else
+		mlwarn("[Error %s: unknown system error %d]", s, errno);
+	
 #else
 	mlwarn("[Error %s, errno=%d]", s, errno);
 #endif
@@ -3145,7 +3165,7 @@ va_dcl
  *
  */
 
-char *lsp;
+static	char *lsp;
 
 static void
 lspputc(c)

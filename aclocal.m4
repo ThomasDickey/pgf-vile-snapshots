@@ -1,60 +1,53 @@
 dnl
 dnl Local definitions for autoconf.
 dnl ------------------------
-dnl $Header: /usr/build/VCS/pgf-vile/RCS/aclocal.m4,v 1.10 1995/01/09 17:56:37 pgf Exp $
-dnl ------------------------
+dnl $Header: /usr/build/VCS/pgf-vile/RCS/aclocal.m4,v 1.12 1995/04/22 03:22:53 pgf Exp $
 dnl
-dnl VC_HAVE_LIBRARY is a slightly modifid version of AC_HAVE_LIBRARY from 
-dnl ac_general.m4.  This version does precisely what AC_HAVE_LIBRARY does
-dnl but builds up the library list in reverse order so that checks for
-dnl libraries which depend on other libraries won't fail for the wrong reason.
+dnl ---------------------------------------------------------------------------
 dnl
-dnl Thus the strategy is to check for the more general libraries first and
-dnl the libraries which depend on the more general libraries last.
+define([VC_ERRNO],
+[
+AC_MSG_CHECKING([for errno external decl])
+AC_CACHE_VAL(vc_cv_extern_errno,[
+	AC_TRY_COMPILE([
+#include <errno.h>],
+		[int x = errno],
+		[vc_cv_extern_errno=yes],
+		[vc_cv_extern_errno=no])
+	])
+AC_MSG_RESULT($vc_cv_extern_errno)
+test $vc_cv_extern_errno = yes && AC_DEFINE(HAVE_EXTERN_ERRNO)
+])
+dnl ---------------------------------------------------------------------------
 dnl
-define(VC_HAVE_LIBRARY, [dnl
-changequote(/,/)dnl
-define(/VC_LIB_NAME/, dnl
-patsubst(patsubst($1, /lib\([^\.]*\)\.a/, /\1/), /-l/, //))dnl
-changequote([,])dnl
-ac_save_LIBS="${LIBS}"
-LIBS="-l[]VC_LIB_NAME[] ${LIBS}"
-ac_have_lib=""
-AC_COMPILE_CHECK([-l[]VC_LIB_NAME[]], , [main();], [ac_have_lib="1"])dnl
-LIBS="${ac_save_LIBS}"
-ifelse($#, 1, [dnl
-if test -n "${ac_have_lib}"; then
-   AC_DEFINE([HAVE_LIB]translit(VC_LIB_NAME, [a-z], [A-Z]))
-   LIBS="-l[]VC_LIB_NAME[] ${LIBS}"
-fi
-undefine(VC_LIB_NAME)dnl
-], [dnl
-if test -n "${ac_have_lib}"; then
-   :; $2
-else
-   :; $3
-fi
-])])dnl
-dnl
-dnl----------------------------
 define(VC_SETPGRP,
-[AC_CHECKING([for BSD style setpgrp])
-AC_TEST_PROGRAM([
+[
+AC_MSG_CHECKING([for BSD style setpgrp])
+AC_CACHE_VAL(vc_cv_bsd_setpgrp,[
+AC_TRY_RUN([
 main()
 {
     if (setpgrp(1,1) == -1)
 	exit(0);
     else
 	exit(1);
-}],AC_DEFINE(HAVE_BSD_SETPGRP))
+}],
+	[vc_cv_bsd_setpgrp=yes],
+	[vc_cv_bsd_setpgrp=no],
+	[vc_cv_bsd_setpgrp=unknown])
+	])
+AC_MSG_RESULT($vc_cv_bsd_setpgrp)
+test $vc_cv_bsd_setpgrp = yes && AC_DEFINE(HAVE_BSD_SETPGRP)
 ])dnl
+dnl ---------------------------------------------------------------------------
 dnl
-dnl----------------------------
+dnl Note: must follow VC_SETPGRP, but cannot use AC_REQUIRE, since that messes
+dnl up the messages...
 define(VC_KILLPG,
-[AC_REQUIRE([AC_RETSIGTYPE])
-AC_REQUIRE([VC_SETPGRP])
-AC_CHECKING([if killpg is needed])
-AC_TEST_PROGRAM([
+[
+AC_MSG_CHECKING([if killpg is needed])
+AC_CACHE_VAL(vc_cv_need_killpg,[
+AC_TRY_RUN([
 #include <sys/types.h>
 #include <signal.h>
 RETSIGTYPE
@@ -74,10 +67,16 @@ main()
     (void) signal(SIGINT, handler);
     (void) kill(-getpid(), SIGINT);
     exit(1);
-}], ,AC_DEFINE(HAVE_KILLPG))
+}],
+	[vc_cv_need_killpg=no],
+	[vc_cv_need_killpg=yes],
+	[vc_cv_need_killpg=unknown]
+)])
+AC_MSG_RESULT($vc_cv_need_killpg)
+test $vc_cv_need_killpg = yes && AC_DEFINE(HAVE_KILLPG)
 ])dnl
+dnl ---------------------------------------------------------------------------
 dnl
-dnl----------------------------
 dnl VC_RESTARTABLE_PIPEREAD is a modified version of AC_RESTARTABLE_SYSCALLS
 dnl from acspecific.m4, which uses a read on a pipe (surprise!) rather than
 dnl a wait() as the test code.  apparently there is a POSIX change, which OSF/1
@@ -85,8 +84,10 @@ dnl at least has adapted to, which says reads (or writes) on pipes for which
 dnl no data has been transferred are interruptable _regardless_ of the 
 dnl SA_RESTART bit.  yuck.
 define(VC_RESTARTABLE_PIPEREAD,
-[AC_CHECKING(for restartable reads on pipes)
-AC_TEST_PROGRAM(
+[
+AC_MSG_CHECKING(for restartable reads on pipes)
+AC_CACHE_VAL(vc_can_restart_read,[
+AC_TRY_RUN(
 [/* Exit 0 (true) if wait returns something other than -1,
    i.e. the pid of the child, which means that wait was restarted
    after getting the signal.  */
@@ -129,13 +130,20 @@ main () {
   wait (&i);
   exit (status == -1);
 }
-], AC_DEFINE(HAVE_RESTARTABLE_PIPEREAD))
+],
+[vc_can_restart_read=yes],
+[vc_can_restart_read=no],
+[vc_can_restart_read=unknown])])
+AC_MSG_RESULT($vc_can_restart_read)
+test $vc_can_restart_read = yes && AC_DEFINE(HAVE_RESTARTABLE_PIPEREAD)
 ])dnl
+dnl ---------------------------------------------------------------------------
 dnl
-dnl----------------------------
 define(VC_MISSING_CHECK,
-[AC_COMPILE_CHECK([missing "$1" extern],
 [
+AC_MSG_CHECKING([for missing "$1" extern])
+AC_CACHE_VAL([vc_cv_func_$1],[
+AC_TRY_LINK([
 #include <stdio.h>
 #include <sys/types.h>
 #include <setjmp.h>
@@ -188,19 +196,19 @@ define(VC_MISSING_CHECK,
 #endif
 
 /* unistd.h defines _POSIX_VERSION on POSIX.1 systems.  */
-#if defined(DIRENT) || defined(_POSIX_VERSION)
+#if defined(HAVE_DIRENT_H) || defined(_POSIX_VERSION)
 #include <dirent.h>
-#else /* not (DIRENT or _POSIX_VERSION) */
-#ifdef SYSNDIR
+#else /* not (HAVE_DIRENT_H or _POSIX_VERSION) */
+#ifdef HAVE_SYS_NDIR_H
 #include <sys/ndir.h>
-#endif /* SYSNDIR */
-#ifdef SYSDIR
+#endif /* HAVE_SYS_NDIR_H */
+#ifdef HAVE_SYS_DIR_H
 #include <sys/dir.h>
-#endif /* SYSDIR */
-#ifdef NDIR
+#endif /* HAVE_SYS_DIR_H */
+#ifdef HAVE_NDIR_H
 #include <ndir.h>
-#endif /* NDIR */
-#endif /* not (DIRENT or _POSIX_VERSION) */
+#endif /* HAVE_NDIR_H */
+#endif /* not (HAVE_DIRENT_H or _POSIX_VERSION) */
 
 #ifdef HAVE_SYS_FILE_H
 #include <sys/file.h>
@@ -304,15 +312,18 @@ define(VC_MISSING_CHECK,
 struct zowie { int a; double b; struct zowie *c; char d; };
 extern struct zowie *$1();
 ],
-[int i;
+[
 #if HAVE_LIBXT		/* needed for SunOS 4.0.3 or 4.1 */
 XtToolkitInitialize();
 #endif
 ],
-[AC_DEFINE(MISSING_EXTERN_$2)],
-[]
-)]
-)dnl
+[eval 'vc_cv_func_'$1'=yes'],
+[eval 'vc_cv_func_'$1'=no'])])
+eval 'vc_result=$vc_cv_func_'$1
+AC_MSG_RESULT($vc_result)
+test $vc_result = yes && AC_DEFINE_UNQUOTED(MISSING_EXTERN_$2)
+])dnl
+dnl ---------------------------------------------------------------------------
 dnl
 define(VC_MISSING_EXTERN,
 [for ac_func in $1
@@ -326,38 +337,56 @@ done
 dnl ---------------------------------------------------------------------------
 dnl	On both Ultrix and CLIX, I find size_t defined in <stdio.h>
 define([VC_SIZE_T],
-[AC_CHECKING(for size_t in <sys/types.h> or <stdio.h>)
- AC_TEST_PROGRAM([
+[
+AC_MSG_CHECKING(for size_t in <sys/types.h> or <stdio.h>)
+AC_CACHE_VAL(vc_cv_type_size_t,[
+	AC_TRY_COMPILE([
 #include <sys/types.h>
-#include <stdio.h>
-int main() { size_t x; exit (0);}
-], ,
-[AC_DEFINE(size_t, unsigned)])])dnl
+#include <stdio.h>],
+		[size_t x],
+		[vc_cv_type_size_t=yes],
+		[vc_cv_type_size_t=no])
+	])
+AC_MSG_RESULT($vc_cv_type_size_t)
+test $vc_cv_type_size_t = no && AC_DEFINE(size_t, unsigned)
+])dnl
 dnl ---------------------------------------------------------------------------
 dnl	Check for declarion of sys_errlist in one of stdio.h and errno.h.  
 dnl	Declaration of sys_errlist on BSD4.4 interferes with our declaration.
 dnl	Reported by Keith Bostic.
 define([VC_SYS_ERRLIST],
-[AC_COMPILE_CHECK([declaration of sys_errlist],
 [
+AC_MSG_CHECKING([declaration of sys_errlist])
+AC_CACHE_VAL(vc_cv_dcl_sys_errlist,[
+	AC_TRY_COMPILE([
 #include <stdio.h>
 #include <sys/types.h>
-#include <errno.h>
-],
-[ char *c = (char *) *sys_errlist; ],
-[AC_DEFINE(HAVE_EXTERN_SYS_ERRLIST)])])dnl
+#include <errno.h> ],
+	[ char *c = (char *) *sys_errlist; ],
+	[vc_cv_dcl_sys_errlist=yes],
+	[vc_cv_dcl_sys_errlist=no])
+	])
+AC_MSG_RESULT($vc_cv_dcl_sys_errlist)
+test $vc_cv_dcl_sys_errlist = yes && AC_DEFINE(HAVE_EXTERN_SYS_ERRLIST)
+])dnl
 dnl ---------------------------------------------------------------------------
 dnl	Check if 'getpgrp()' accepts an argument.
 define([VC_TEST_GETPGRP],
-[AC_COMPILE_CHECK([argument of getpgrp],
 [
+AC_MSG_CHECKING([for argument of getpgrp])
+AC_CACHE_VAL(vc_cv_arg_getpgrp,[
+	AC_TRY_COMPILE([
 #include <sys/types.h>
 #if HAVE_STDLIB_H
 #include <stdlib.h>
 #endif
 #if HAVE_UNISTD_H
 #include <unistd.h>
-#endif
-],
-[ getpgrp(0) ],
-[AC_DEFINE(GETPGRP_HAS_ARG)])])dnl
+#endif],
+	[ getpgrp(0) ],
+	[vc_cv_arg_getpgrp=yes],
+	[vc_cv_arg_getpgrp=no])
+	])
+AC_MSG_RESULT($vc_cv_arg_getpgrp)
+test $vc_cv_arg_getpgrp = yes && AC_DEFINE(GETPGRP_HAS_ARG)
+])dnl

@@ -1,7 +1,7 @@
 /*
  * debugging support -- tom dickey.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/trace.h,v 1.3 1994/10/03 13:24:35 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/trace.h,v 1.4 1995/03/26 23:38:58 pgf Exp $
  *
  */
 #ifndef	_trace_h
@@ -21,7 +21,10 @@ extern	void	show_alloc P((void));
 
 #if	DOALLOC
 extern	char *	doalloc P((char *,unsigned));
+extern	char *	do_calloc P((unsigned, unsigned));
 extern	void	dofree P((char *));
+#undef	calloc
+#define	calloc(n,m)	do_calloc(n, m)
 #undef	malloc
 #define	malloc(n)	doalloc((char *)0,n)
 #undef	realloc

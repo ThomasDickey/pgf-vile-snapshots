@@ -3,7 +3,7 @@
 
 	written 1986 by Daniel Lawrence
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/eval.c,v 1.115 1994/12/15 15:01:52 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/eval.c,v 1.117 1995/04/22 03:22:53 pgf Exp $
  *
  */
 
@@ -44,24 +44,29 @@ typedef struct	{
 	} VDESC;
 
 #if ENVFUNC
-static	char *	GetEnv P(( char * ));
 static	char *	DftEnv P(( char *, char * ));
+static	char *	GetEnv P(( char * ));
 static	void	SetEnv P(( char **, char * ));
 #endif
 #if OPT_SHOW_EVAL
-static	void	makevarslist P(( int, void *));
-static	int	is_mode_name P(( char *, int, VALARGS * ));
 static	char *	get_listvalue P(( char *, int ));
+static	int	is_mode_name P(( char *, int, VALARGS * ));
+static	void	makevarslist P(( int, void *));
 #endif
 static	SIZE_T	s2size P(( char * ));
-static	char *	s2offset P(( char *, char * ));
-static	int	gtlbl P(( char * ));
+static	char *	getkill P(( void ));
 static	char *	gtfun P(( char * ));
-static	void	FindVar P(( char *, VDESC * ));
-static	int	vars_complete P(( int, char *, int * ));
+static	char *	gtusr P(( char * ));
+static	char *	ltos P(( int ));
+static	char *	s2offset P(( char *, char * ));
 static	int	PromptAndSet P(( char *, int, int ));
 static	int	SetVarValue P(( VDESC *, char * ));
-static	char *	getkill P(( void ));
+static	int	ernd P(( void ));
+static	int	gtlbl P(( char * ));
+static	int	l_strtol P(( char * ));
+static	int	sindex P(( char *, char * ));
+static	int	vars_complete P(( int, char *, int * ));
+static	void	FindVar P(( char *, VDESC * ));
 #endif
 
 /*--------------------------------------------------------------------------*/
@@ -101,7 +106,6 @@ char	*value;
 #if OPT_EVAL
 static char *shell;	/* $SHELL environment is "$shell" variable */
 static char *directory;	/* $TMP environment is "$directory" variable */
-extern char *modeline_format;	/* how the modeline is formatted */
 #endif
 
 #if OPT_SHOW_EVAL
@@ -372,7 +376,8 @@ char *fname;		/* name of function to evaluate */
 	return it;
 }
 
-char *gtusr(vname)	/* look up a user var's value */
+static char *
+gtusr(vname)		/* look up a user var's value */
 char *vname;		/* name of user variable to fetch */
 {
 	register UVAR	*p;
@@ -453,10 +458,12 @@ char *vname;		/* name of environment variable to retrieve */
 		ElseIf( EVMATCH )	value = (patmatch == NULL) ? 
 							"" : patmatch;
 		ElseIf( EVMODE )	value = current_modename();
+#if OPT_MLFORMAT
 		ElseIf( EVMLFORMAT )
 			if (modeline_format == 0)
 				mlwrite("BUG: modeline_format uninitialized");
 			value = modeline_format;
+#endif
 
 		ElseIf( EVMODIFIED )	value = ltos(b_is_changed(curbp));
 		ElseIf( EVKILL )	value = getkill();
@@ -798,8 +805,10 @@ char *value;	/* value to set to */
 		ElseIf( EVCWLINE )
 			status = forwline(TRUE, atoi(value) - getwpos());
 
+#if OPT_MLFORMAT
 		ElseIf( EVMLFORMAT )
 			SetEnv(&modeline_format, value);
+#endif
 
 		ElseIf( EVSEARCH )
 			(void)strcpy(pat, value);
@@ -919,7 +928,8 @@ int i;	/* integer to translate to a string */
 
 /* like strtol, but also allow character constants */
 #if OPT_EVAL
-int l_strtol(s)
+static int
+l_strtol(s)
 char *s;
 {
 	if (s[0] == '\'' &&
@@ -1156,7 +1166,8 @@ char *tokn;	/* label name to find */
 	return(1);
 }
 
-char *ltos(val)		/* numeric logical to string logical */
+static char *
+ltos(val)	/* numeric logical to string logical */
 int val;	/* value to translate */
 {
 	if (val)
@@ -1228,13 +1239,15 @@ int x;
 #endif
 
 #if OPT_EVAL
-int ernd()	/* returns a random integer */
+static int
+ernd()		/* returns a random integer */
 {
 	seed = absol(seed * 1721 + 10007);
 	return(seed);
 }
 
-int sindex(sourc, pattern)	/* find pattern within source */
+static int
+sindex(sourc, pattern)	/* find pattern within source */
 char *sourc;	/* source string to search */
 char *pattern;	/* string to look for */
 {
@@ -1273,6 +1286,12 @@ char *pattern;	/* string to look for */
 void ev_leaks()
 {
 #if OPT_EVAL
+	register UVAR *p;
+	while ((p = user_vars) != 0) {
+		user_vars = p->next;
+		free(p->u_name);
+		free((char *)p);
+	}
 	FreeAndNull(shell);
 	FreeAndNull(directory);
 #endif

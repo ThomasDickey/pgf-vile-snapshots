@@ -8,7 +8,7 @@
  * Modified by Pete Ruczynski (pjr) for auto-sensing and selection of
  * display type.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/ibmpc.c,v 1.69 1994/12/05 14:08:22 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/ibmpc.c,v 1.70 1995/04/22 03:22:53 pgf Exp $
  *
  */
 
@@ -792,6 +792,7 @@ ibmclose()
 
 	dtype = CDMONO;		/* ...force monochrome */
 	bottomleft();
+	TTeeol();		/* ...force colors _off_ */
 }
 
 void

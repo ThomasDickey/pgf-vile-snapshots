@@ -7,7 +7,7 @@
  *
  * original author: D. R. Banks 9-May-86
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/isearch.c,v 1.38 1994/11/29 04:02:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/isearch.c,v 1.39 1995/04/22 03:22:53 pgf Exp $
  *
  */
 
@@ -16,14 +16,18 @@
 
 #if	OPT_ISRCH
 
-static	int	promptpattern P(( char * ));
 static	char *	expandp P(( char *, char *, int ));
+static	int	get_char P(( void ));
+static	int	isearch P(( int, int ));
+static	int	promptpattern P(( char * ));
+static	int	scanmore P(( char *, int ));
+static	int	echochar P(( int, int ));
 
 /* A couple "own" variables for the command string */
 
-int             cmd_buff[CMDBUFLEN];	/* Save the command args here */
-int             cmd_offset;	/* Current offset into command buff */
-int             cmd_reexecute = -1;	/* > 0 if re-executing command */
+static	int	cmd_buff[CMDBUFLEN];	/* Save the command args here */
+static	int	cmd_offset;		/* Current offset into command buff */
+static	int	cmd_reexecute = -1;	/* > 0 if re-executing command */
 
 
 /*
@@ -114,7 +118,7 @@ fisearch(f, n)
  */
 
 /* ARGSUSED */
-int
+static int
 isearch(f, n)
 int f,n;
 {
@@ -270,7 +274,7 @@ start_over:
  * reverse searches.
  */
 
-int
+static int
 scanmore(patrn, dir)		/* search forward or back for a pattern */
 	char           *patrn;	/* string to scan for */
 	int             dir;	/* direction to search */
@@ -356,7 +360,8 @@ expandp(deststr, srcstr, maxlength)
 
 /* routine to echo i-search characters */
 
-int
+/* FIXME: should use kbd_putc() */
+static int
 echochar(c, col)
 	int             c;	/* character to be echoed */
 	int             col;	/* column to be echoed in */
@@ -380,7 +385,7 @@ echochar(c, col)
  * next character.
  */
 
-int
+static int
 get_char()
 {
 	int             c;	/* A place to get a character */

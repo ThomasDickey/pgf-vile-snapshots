@@ -1,7 +1,7 @@
 /*	tcap:	Unix V5, V7 and BS4.2 Termcap video driver
  *		for MicroEMACS
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/tcap.c,v 1.63 1995/02/21 02:37:07 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/tcap.c,v 1.67 1995/04/22 03:22:53 pgf Exp $
  *
  */
 
@@ -18,11 +18,11 @@
 
 
 #define TCAPSLEN 768 
-char tcapbuf[TCAPSLEN];
-char *UP, PC, *CM, *CE, *CL, *SO, *SE;
-char *TI, *TE, *KS, *KE;
+static	char tcapbuf[TCAPSLEN];
 
-char *CS, *dl, *al, *DL, *AL, *SF, *SR;
+static char *UP, PC, *CM, *CE, *CL, *SO, *SE;
+static char *TI, *TE, *KS, *KE;
+static char *CS, *dl, *al, *DL, *AL, *SF, *SR;
 
 #if OPT_VIDEO_ATTRS
 static char *US;	/* underline-start */
@@ -32,7 +32,7 @@ static char *MD;
 #endif
 
 #if OPT_FLASH
-char *vb;	/* visible-bell */
+static char *vb;	/* visible-bell */
 #endif
 
 #if OPT_COLOR
@@ -133,6 +133,21 @@ static struct {
     { "FA",	KEY_F20,	NULL }		/* F20 */
 };
 
+static int  tcapcres P(( char * ));
+static void putnpad P(( char *, int ));
+static void putpad P(( char * ));
+static void tcapbeep P(( void ));
+static void tcapclose P(( void ));
+static void tcapeeol P(( void ));
+static void tcapeeop P(( void ));
+static void tcapkclose P(( void ));
+static void tcapkopen P(( void ));
+static void tcapmove P(( int, int ));
+static void tcapopen P(( void ));
+static void tcapscroll_delins P(( int, int, int ));
+static void tcapscroll_reg P(( int, int, int ));
+static void tcapscrollregion P(( int, int ));
+
 extern char *tgoto P((char *, int, int));
 extern int tgetent P((char *, char *));
 extern int tgetnum P((char * ));
@@ -141,14 +156,14 @@ extern char *tparam P((char *, char *, int, ...));
 extern int tputs P((char *, int, void(*_f)(int) ));
 
 #if OPT_COLOR
-extern void tcapfcol P(( int ));
-extern void tcapbcol P(( int ));
+static void tcapfcol P(( int ));
+static void tcapbcol P(( int ));
 #endif
 
 #if OPT_VIDEO_ATTRS
-extern void tcapattr P(( int ));
+static void tcapattr P(( int ));
 #else
-extern void tcaprev  P(( int ));
+static void tcaprev  P(( int ));
 #endif
 
 TERM term = {
@@ -201,7 +216,7 @@ TERM term = {
 
 static	int	i_am_xterm;
 
-void
+static void
 tcapopen()
 {
 	char *t, *p;
@@ -378,7 +393,7 @@ tcapopen()
 	already_open = TRUE;
 }
 
-void
+static void
 tcapclose()
 {
 #if OPT_VIDEO_ATTRS
@@ -398,39 +413,51 @@ tcapclose()
 		putpad(KE);
 }
 
-void
+static void
 tcapkopen()
 {
 #if OPT_XTERM
 	if (i_am_xterm && global_g_val(GMDXTERM_MOUSE))
 		putpad(XTERM_ENABLE_TRACKING);
 #endif
+#if BEFORE
+	if (TI)
+		putnpad(TI, (int)strlen(TI));
+#endif
+	if (KS)
+		putpad(KS);
 	(void)strcpy(sres, "NORMAL");
 }
 
-void
+static void
 tcapkclose()
 {
 #if OPT_XTERM
 	if (i_am_xterm && global_g_val(GMDXTERM_MOUSE))
 		putpad(XTERM_DISABLE_TRACKING);
 #endif
+#if BEFORE
+	if (TE)
+		putnpad(TE, (int)strlen(TE));
+#endif
+	if (KE)
+		putpad(KE);
 }
 
-void
+static void
 tcapmove(row, col)
 register int row, col;
 {
 	putpad(tgoto(CM, col, row));
 }
 
-void
+static void
 tcapeeol()
 {
 	putpad(CE);
 }
 
-void
+static void
 tcapeeop()
 {
 #if	OPT_COLOR
@@ -441,7 +468,7 @@ tcapeeop()
 }
 
 /*ARGSUSED*/
-int
+static int
 tcapcres(res)	/* change screen resolution */
 char *	res;
 {
@@ -450,7 +477,7 @@ char *	res;
 
 
 /* move howmany lines starting at from to to */
-void
+static void
 tcapscroll_reg(from,to,n)
 int from, to, n;
 {
@@ -476,7 +503,7 @@ OPT_PRETTIER_SCROLL is prettier but slower -- it scrolls
 */
 
 /* move howmany lines starting at from to to */
-void
+static void
 tcapscroll_delins(from,to,n)
 int from, to, n;
 {
@@ -523,7 +550,7 @@ int from, to, n;
 }
 
 /* cs is set up just like cm, so we use tgoto... */
-void
+static void
 tcapscrollregion(top,bot)
 int top,bot;
 {
@@ -568,7 +595,7 @@ show_ansi_colors P((void))
 #endif
 
 #if	OPT_COLOR
-void
+static void
 tcapfcol(color)
 int color;
 {
@@ -578,7 +605,7 @@ int color;
 	}
 }
 
-void
+static void
 tcapbcol(color)
 int color;
 {
@@ -603,7 +630,7 @@ int color;
  * for all attributes - boldface, reverse, color), but the former breaks the
  * screen optimization logic.
  */
-void
+static void
 tcapattr(attr)
 int attr;
 {
@@ -673,7 +700,7 @@ int attr;
 
 #else	/* highlighting is a minimum attribute */
 
-void
+static void
 tcaprev(state)		/* change reverse video status */
 int state;		/* FALSE = normal video, TRUE = reverse video */
 {
@@ -692,7 +719,7 @@ int state;		/* FALSE = normal video, TRUE = reverse video */
 
 #endif	/* OPT_VIDEO_ATTRS */
 
-void
+static void
 tcapbeep()
 {
 #if OPT_FLASH
@@ -704,14 +731,14 @@ tcapbeep()
 	ttputc(BEL);
 }
 
-void
+static void
 putpad(str)
 char	*str;
 {
 	tputs(str, 1, ttputc);
 }
 
-void
+static void
 putnpad(str, n)
 char	*str;
 int n;
@@ -752,6 +779,8 @@ int n;
  *	1993/aug/6 dickey@software.org
  */
 
+static	int	xterm_button P(( int ));
+
 /*ARGSUSED*/
 int
 mouse_motion(f,n)
@@ -778,7 +807,7 @@ int f,n;
 }
 #endif	/* OPT_XTERM >= 3 */
 
-int
+static int
 xterm_button(c)
 int	c;
 {

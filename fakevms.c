@@ -4,7 +4,7 @@
  * Test-driver routines for VAX/VMS filename parsing.
  * Written by T.E.Dickey for vile (august 1994).
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/fakevms.c,v 1.2 1994/11/29 04:02:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/fakevms.c,v 1.3 1995/03/25 02:53:53 pgf Exp $
  */
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -33,16 +33,16 @@ void	abspath(path)
 	if (*path != '/')
 		pathcat(head, save, path);
 	else
-		strcpy(head, path);
+		(void)strcpy(head, path);
 	if (stat(head, &sb) < 0) {
-		strcpy(leaf, s = pathleaf(head));
+		(void)strcpy(leaf, s = pathleaf(head));
 		*s = EOS;
 		if (stat(head, &sb) < 0) {
 			return;	/* give up */
 		}
 	}
 	if ((sb.st_mode & S_IFMT) != S_IFDIR) {
-		strcpy(leaf, s = pathleaf(head));
+		(void)strcpy(leaf, s = pathleaf(head));
 		*s = EOS;
 	}
 
@@ -216,11 +216,11 @@ loop:
 		 	(void)strcat(temp, "/");
 		unix2vms_path(temp, temp);
 		if (is_vms_pathname(temp, TRUE))
-			strcat(strcpy(temp, vms_path2dir(temp)), ";");
+			(void)strcat(strcpy(temp, vms_path2dir(temp)), ";");
 		strcat(mkupper(temp), "1");	/* version */
 
 		fake_de.d_ino = sb.st_ino;
-		strcpy(fake_de.d_name, temp);
+		(void)strcpy(fake_de.d_name, temp);
 		fake_de.d_reclen = strlen(temp);
 
 		TRACE(("     => '%s'\n", temp))

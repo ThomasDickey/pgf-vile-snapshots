@@ -8,7 +8,7 @@
 */
 
 /*
- * $Header: /usr/build/VCS/pgf-vile/RCS/edef.h,v 1.172 1995/02/24 00:50:44 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/edef.h,v 1.178 1995/05/09 13:08:23 pgf Exp $
  */
 
 /* I know this declaration stuff is really ugly, and I probably won't ever
@@ -31,7 +31,7 @@ decl_init( char prognam[], "xvile");
 decl_init( char prognam[], "vile");
 #endif
 
-decl_init( char version[], "version 5.2");
+decl_init( char version[], "version 5.3");
 
 #if SYS_UNIX
 decl_init( char opersys[], "unix");
@@ -52,6 +52,9 @@ decl_init( char opersys[], "os/2");
 decl_init( char opersys[], "windows/nt");
 #endif
 
+decl_uninit( int am_interrupted );	/* have we been interrupted/ */
+
+
 decl_init( int autoindented , -1);	/* how many chars (not cols) indented */
 decl_uninit( int isnamedcmd );		/* are we typing a command name */
 decl_uninit( int calledbefore );	/* called before during this command? */
@@ -64,7 +67,6 @@ decl_uninit( jmp_buf read_jmp_buf );	/* for setjmp/longjmp on SIGINT */
 decl_uninit( int insertmode );		/* are we inserting or overwriting? */
 #endif
 decl_uninit( int lastkey );		/* last keystoke (tgetc)	*/
-decl_init( int tungotcnt, 0);		/* how many ungotten chars (tungetc) */
 decl_uninit( int lastcmd );		/* last command	(kbd_seq)	*/
 decl_uninit( REGIONSHAPE regionshape );	/* shape of region		*/
 #if OPT_VIDEO_ATTRS
@@ -76,6 +78,7 @@ decl_uninit( int doingopcmd );		/* operator command in progress */
 decl_uninit( int doingsweep );		/* operator command in progress */
 decl_uninit( int sweephack );		/* don't include dot when sweeping */
 decl_uninit( MARK pre_op_dot );		/* current pos. before operator cmd */
+decl_uninit( MARK scanboundpos );	/* oneliner/search state */
 decl_uninit( short opcmd );		/* what sort of operator?	*/
 decl_uninit( CMDFUNC *havemotion );	/* so we can use "oper" routines
 					   internally */
@@ -177,6 +180,10 @@ decl_init( int stopc, tocntrl('S') );	/* current output stop char	*/
 decl_init( int backspc, '\b');		/* current backspace char	*/
 decl_init( int name_cmpl, '\t');	/* do name-completion		*/
 decl_init( int test_cmpl, '?');		/* show name-completion		*/
+
+#if OPT_MSDOS_PATH
+decl_init( int slashc, '\\');		/* default path delimiter	*/
+#endif
 
 decl_uninit( KILLREG kbs[NKREGS] );	/* all chars, 1 thru 9, and default */
 decl_uninit( short ukb );		/* index of current kbuffs */
@@ -320,6 +327,6 @@ extern KBIND kbindtbl[];
 extern  TERM    term;                   /* Terminal information.        */
 #endif
 
-#if DISP_IBMPC || DISP_BORLAND
+#if DISP_IBMPC || DISP_BORLAND || DISP_VIO
 decl_init( char *current_res_name, "default");
 #endif	/* IBMPC */

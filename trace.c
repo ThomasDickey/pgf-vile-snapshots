@@ -1,7 +1,7 @@
 /*
  * debugging support -- tom dickey.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/trace.c,v 1.4 1994/11/29 04:02:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/trace.c,v 1.5 1995/03/26 23:38:58 pgf Exp $
  *
  */
 #ifdef __TURBOC__
@@ -40,6 +40,7 @@ static	int	contains P((char *ref, char *tst));
 #endif	/* apollo */
 
 #if	DOALLOC
+#undef	calloc
 #undef	malloc
 #undef	realloc
 #undef	free
@@ -164,17 +165,13 @@ void	fail_alloc(msg, ptr)
 }
 
 #if	DOALLOC
-#undef	malloc
-#undef	realloc
-#undef	free
-
 typedef	struct	{
 	long	size;	/* ...its size */
 	char	*text;	/* the actual segment */
 	int	note;	/* ...last value of 'count_alloc' */
 	} AREA;
 
-static	far	AREA	*area;
+static	AREA	*area;
 
 static	void	InitArea P((void));
 static	int	FindArea P((char *));
@@ -190,7 +187,7 @@ static
 void	InitArea()
 {
 	if (area == 0) {
-		area = farcalloc(DOALLOC,sizeof(AREA));
+		area = (AREA *)calloc(DOALLOC,sizeof(AREA));
 		if (area == 0)
 			abort();
 		Trace("Initialized doalloc (%d * %d) = %ld\n",
@@ -312,6 +309,16 @@ char *	doalloc (oldp, amount)
 	return (newp);
 }
 
+char *	do_calloc (nmemb, size)
+	unsigned nmemb;
+	unsigned size;
+{
+	unsigned len = nmemb * size;
+	char	*result = doalloc((char *)0, len);
+	memset(result, 0, len);
+	return result;
+}
+
 /*
  * Entrypoint so we can validate pointers
  */
@@ -330,6 +337,7 @@ void	dofree(oldp)
 }
 #endif
 
+#ifndef show_alloc
 void	show_alloc()
 {
 #if	DOALLOC
@@ -363,6 +371,7 @@ void	show_alloc()
 	}
 #endif
 }
+#endif	/* show_alloc */
 
 #ifdef	fast_ptr
 #define	isPoison(p)  ((long)p == 0xdfdfdfdfL)

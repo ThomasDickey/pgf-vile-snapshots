@@ -5,7 +5,7 @@
  * commands. Some functions are just for
  * internal use.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/region.c,v 1.70 1995/02/18 02:01:09 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/region.c,v 1.72 1995/04/22 03:22:53 pgf Exp $
  *
  */
 
@@ -13,6 +13,20 @@
 #include        "edef.h"
 
 typedef	int (*CharProcFunc) P(( int ));
+
+static	int	_to_caseflip P(( int ));
+static	int	_to_lower P(( int ));
+static	int	_to_upper P(( int ));
+static	int	_yankchar P(( int ));
+static	int	blankline P(( void *, int, int ));
+static	int	do_chars_in_line P(( void *, int, int ));
+static	int	do_lines_in_region P(( int (*)(void *,int,int), void *, int ));
+static	int	kill_line P((void *, int, int ));
+static	int	killrectmaybesave P(( int ));
+static	int	open_hole_in_line P((void *, int, int ));
+static	int	shift_left_line P(( void *, int, int ));
+static	int	shift_right_line P(( void *, int, int ));
+static	int	yank_line P((void *, int, int ));
 
 static CharProcFunc charprocfunc;
 
@@ -57,7 +71,7 @@ int save;
 	return status;
 }
 
-int
+static int
 kill_line(flagp, l, r)
 void	*flagp;
 int 	l, r;
@@ -89,7 +103,7 @@ int 	l, r;
 	return s;
 }
 
-int
+static int
 killrectmaybesave(save)
 int save;
 {
@@ -130,7 +144,7 @@ int save;
  * it is used instead.
  */
 /*ARGSUSED*/
-int
+static int
 open_hole_in_line(flagp, l, r)
 void 	*flagp;
 int 	l, r;
@@ -210,7 +224,7 @@ stringrect()
  * don't do it if we're in cmode and the line starts with '#'
  */
 /*ARGSUSED*/
-int
+static int
 shift_right_line(flagp, l, r)
 void 	*flagp;
 int 	l, r;
@@ -257,7 +271,7 @@ shiftrregion()
  * delete a shiftwidth-equivalent from the front of the line
  */
 /*ARGSUSED*/
-int
+static int
 shift_left_line(flagp, l, r)
 void    *flagp;
 int	l,r;
@@ -393,7 +407,7 @@ int l, r;
 
 	detabline(flagp, 0, 0);	/* get rid of possible existing tabs */
 	DOT.o = 0;
-	while (1) {
+	for (;;) {
 		/* see if it is time to compress */
 		if ((fspace >= 0) && (nextab(fspace) <= ccol))
 			if (ccol - fspace < 2)
@@ -497,7 +511,7 @@ trim_region()
 
 /* turn line, or part, to whitespace */
 /*ARGSUSED*/
-int
+static int
 blankline(flagp, l, r)
 void	*flagp;
 int	l, r;
@@ -567,7 +581,7 @@ int	l, r;
  * at all. This is a bit like a kill region followed
  * by a yank.
  */
-int
+static int
 _yankchar(c)
 int c;
 {
@@ -577,7 +591,7 @@ int c;
 }
 
 /*ARGSUSED*/
-int
+static int
 yank_line(flagp, l, r)
 void 	*flagp;
 int 	l, r;
@@ -635,7 +649,7 @@ int c;
 }
 #endif
 
-int
+static int
 _to_lower(c)
 int c;
 {
@@ -644,7 +658,7 @@ int c;
 	return -1;
 }
 
-int
+static int
 _to_upper(c)
 int c;
 {
@@ -653,7 +667,7 @@ int c;
 	return -1;
 }
 
-int
+static int
 _to_caseflip(c)
 int c;
 {
@@ -940,7 +954,7 @@ REGION	*rp;
 
 /* the (*linefunc)() routine that this calls _must_ be prepared to
 	to get empty lines passed to it from this routine. */
-int
+static int
 do_lines_in_region(linefunc,argp,convert_cols)
 int (*linefunc) P((void *, int, int));
 void *argp;
@@ -955,7 +969,7 @@ int convert_cols; /* if rectangle, convert columns to offsets */
 
 		/* for each line in the region, ... */
 		linep = l_ref(region.r_orig.l);
-		while (1) {
+		for (;;) {
 			/* move through the region... */
 			/* it's important that the linefunc get called
 				for every line, even if blank, since it
@@ -1027,7 +1041,7 @@ int convert_cols; /* if rectangle, convert columns to offsets */
     the ll and rr args are OFFSETS, so if you use this routine with
     	do_lines_in_region, tell it to CONVERT columns to offsets. */
 /*ARGSUSED*/
-int
+static int
 do_chars_in_line(flagp, ll, rr)
 void	*flagp;
 int	ll, rr;		/* offsets of of chars to be processed */

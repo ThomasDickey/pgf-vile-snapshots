@@ -3,7 +3,7 @@
  * compatible terminals. It goes directly to the graphics RAM to do
  * screen output. It compiles into nothing if not a TI-PC driver
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/tipc.c,v 1.9 1994/11/29 04:02:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/tipc.c,v 1.10 1995/03/25 02:53:53 pgf Exp $
  */
 
 #define termdef 1			/* don't define "term" external */
@@ -188,7 +188,7 @@ tibeep()
 
 tiopen()
 {
-	strcpy(sres, "NORMAL");
+	(void)strcpy(sres, "NORMAL");
 	revexist = TRUE;
 	ttopen();
 }
