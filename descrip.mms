@@ -184,8 +184,8 @@ clean :
 	@- if f$search("*.lis") .nes. "" then delete *.lis;*
 	@- if f$search("*.log") .nes. "" then delete *.log;*
 	@- if f$search("*.map") .nes. "" then delete *.map;*
-	@- if f$search("$(BUILTHDRS)") .nes. "" then delete $(BUILDHDRS)
-	@- if f$search("$(MKTBLS)") .nes. "" then delete $(MKTBLS)
+	@- if f$search("ne*.h") .nes. "" then delete ne*.h;
+	@- if f$search("$(MKTBLS)") .nes. "" then delete $(MKTBLS);
 
 clobber : clean
 	@- if f$search("*.exe") .nes. "" then delete *.exe;*
@@ -220,17 +220,15 @@ CFLAGS =-
 	/Diagnostics /Debug /Define=("os_chosen",$(SCRDEF)) -
 	/Object=$@ /Include=($(INCS)) /G_FLOAT
 
-LIB_ARGS=vms_link.opt/opt
-
 .C.OBJ :
 	$(CC) $(CFLAGS) $(MMS$SOURCE)
 	@- delete $(MMS$TARGET_NAME).dia;*
 
-.OBJ.EXE :
-	$(LINK) $(LINKFLAGS) $(MMS$TARGET_NAME)$(OBJ_ARGS),$(LIB_ARGS)
+$(MKTBLS) : mktbls.obj
+	$(LINK) $(LINKFLAGS) mktbls.obj,SYS$LIBRARY:VAXCRTL/LIB
 
 $(TARGET) : $(OBJ)
-	$(LINK) $(LINKFLAGS) main.obj, $(SCREEN).obj,$(LIB_ARGS)
+	$(LINK) $(LINKFLAGS) main.obj, $(SCREEN).obj,vms_link/opt
 
 # Runs VILE from the current directory (used for testing)
 vile.com :
@@ -245,7 +243,10 @@ vile.com :
 	@ write sys$output "** made $@"
 
 # $Log: descrip.mms,v $
-# Revision 1.4  1993/04/20 12:18:32  pgf
+# Revision 1.5  1993/04/28 14:34:11  pgf
+# see CHANGES, 3.44 (tom)
+#
+# Revision 1.4  1993/04/20  12:18:32  pgf
 # see tom's 3.43 CHANGES
 #
 # Revision 1.3  1993/04/01  13:07:50  pgf

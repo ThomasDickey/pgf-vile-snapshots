@@ -2,7 +2,10 @@
  *		written by John Hutchinson, heavily modified by Paul Fox
  *
  * $Log: npopen.c,v $
- * Revision 1.22  1993/04/09 13:41:01  pgf
+ * Revision 1.23  1993/04/28 14:34:11  pgf
+ * see CHANGES, 3.44 (tom)
+ *
+ * Revision 1.22  1993/04/09  13:41:01  pgf
  * include sys/wait.h on LINUX, to get prototype
  *
  * Revision 1.21  1993/04/01  12:53:33  pgf
@@ -78,7 +81,6 @@
 
 #if UNIX
 
-#include <errno.h>
 #include <sys/param.h>
 
 #if LINUX
@@ -195,7 +197,6 @@ void
 npclose (fp)
 FILE *fp;
 {
-	extern int errno;
 	int child;
 	fflush(fp);
 	fclose(fp);
@@ -287,7 +288,88 @@ softfork()
 	return fpid;
 }
 
-#else
+#endif
+
+#if MSDOS
+#include <fcntl.h>		/* defines O_RDWR */
+#include <io.h>			/* defines 'dup2()', etc. */
+static	FILE *	myPipe;		/* current pipe-file pointer */
+static	char *	myName;		/* name of temporary file for pipe */
+static	int	myRval;		/* return-value of 'system()' */
+static	int	reading;
+
+static void
+deleteTemp P((void))
+{
+	if (myName != 0) {
+		(void)unlink(myName);
+		free(myName);
+		myName = 0;
+	}
+}
+
+FILE *
+npopen (cmd, type)
+char *cmd, *type;
+{
+	FILE	*pp;
+	int	fd;
+
+	/* Create the file that will hold the pipe's content */
+	myName = tempnam((char *)0 /* directory */, type);
+	(void)close(creat(myName, 0666));
+	if ((fd = open(myName, O_RDWR)) < 0) {
+		deleteTemp();
+		return 0;
+	}
+
+	reading = (*type == 'r');
+	if (reading) {
+		/* save and redirect stdin, stdout, and stderr */
+		int	old0 = dup(0);
+		int	old1 = dup(1);
+		int	old2 = dup(2);
+#if UNUSED	/* cf: inout_popen */
+		if (in)	{
+			dup2(in, 0);
+			close(in);
+		}
+#endif
+		dup2(fd, 1);
+		dup2(fd, 2);
+		/* patch: what about stderr? */
+
+		myRval = system(cmd);
+
+		/* restore old std... */
+		dup2(old0, 0); close(old0);
+		dup2(old1, 1); close(old1);
+		dup2(old2, 2); close(old2);
+
+		/* rewind command output */
+		lseek(fd, 0L, 0);
+		pp = fdopen(fd, type);
+	} else if (*type == 'w') {
+		mlforce("[Write to pipe not implemented]");
+		deleteTemp();
+		pp = 0;
+	} else
+		pp = 0;
+	return (myPipe = pp);
+}
 void
-npopenhello() {}
+npclose (fp)
+FILE *fp;
+{
+	/* If we were writing to a pipe, invoke the process with stdin set
+	 * to the temporary-file.
+	 */
+	if (reading) {
+		if (myPipe != 0) {
+			(void)fclose(myPipe);
+			myPipe = 0;
+		}
+	}
+	deleteTemp();
+}
 #endif

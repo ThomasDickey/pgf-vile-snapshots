@@ -5,7 +5,13 @@
  *   Created: Thu May 14 15:44:40 1992
  *
  * $Log: proto.h,v $
- * Revision 1.47  1993/04/21 14:08:28  pgf
+ * Revision 1.49  1993/04/28 14:34:11  pgf
+ * see CHANGES, 3.44 (tom)
+ *
+ * Revision 1.48  1993/04/22  15:14:39  pgf
+ * do_num/rept_proc are now static
+ *
+ * Revision 1.47  1993/04/21  14:08:28  pgf
  * added do_repeats()
  *
  * Revision 1.46  1993/04/20  12:18:32  pgf
@@ -158,8 +164,6 @@ extern int no_memory P(( char * ));
 extern void global_val_init P(( void ));
 extern DEFINE_SIGNAL(catchintr);
 extern void do_repeats P(( int *, int *, int * ));
-extern void do_num_proc P(( int *, int *, int * ));
-extern void do_rept_arg_proc P(( int *, int *, int * ));
 extern int writeall P(( int, int ));
 extern int zzquit P(( int, int ));
 extern int quickexit P(( int, int ));
@@ -317,8 +321,6 @@ extern int unmark P(( int, int ));
 #if	CRYPT
 extern	int	setkey P((int, int));
 extern	void	crypt P((char *, int));
-#else
-extern void nocrypt P(( void ));
 #endif	/* CRYPT */
 extern int fscan P(( int, int, int ));
 extern int bscan P(( int, int, int ));
@@ -369,6 +371,7 @@ extern void mlwrite P((char *, ... ));
 extern void mlforce P((char *, ... ));
 extern void mlprompt P((char *, ... ));
 extern void mlmsg P((char *, va_list * ));
+extern void mlerror P(( char * ));
 extern void dbgwrite P((char *, ... ));
 extern void lspputc P(( int ));
 extern char * lsprintf P((char *, char *, ... ));
@@ -480,6 +483,9 @@ extern int ifile P(( char *, int, FILE * ));
 extern int kifile P(( char * ));
 extern DEFINE_SIGNAL(imdying);
 extern void markWFMODE P(( BUFFER * ));
+#if CRYPT
+extern int resetkey P(( BUFFER * ));
+#endif
 
 /* filec.c */
 #if COMPLETE_DIRS || COMPLETE_FILES || defined(MDTAGSLOOK)
@@ -502,10 +508,15 @@ extern int ffclose P(( void ));
 extern int ffputline P(( char [], int, int ));
 extern int ffputc P(( int ));
 extern int ffhasdata P(( void ));
+
+/* finderr.c */
+#if FINDERR
+extern void set_febuff P(( char * ));
 extern int finderr P(( int, int ));
 extern struct LINE * getdot P(( struct BUFFER * ));
 extern void putdotback P(( BUFFER *, LINE * ));
 extern int finderrbuf P(( int, int ));
+#endif
 
 /* globals.c */
 extern int globals P(( int, int ));
@@ -555,7 +566,7 @@ extern int dotcmdfinish P(( void ));
 extern void dotcmdstop P(( void ));
 extern int dotcmdplay P(( int, int ));
 extern int dotreplaying P(( int ));
-extern int kbd_replaying P(( void ));
+extern int kbd_replaying P(( int ));
 extern int kbd_mac_begin P(( int, int ));
 extern int kbd_mac_end P(( int, int ));
 extern int kbd_mac_exec P(( int, int ));
@@ -617,10 +628,12 @@ extern void free_local_vals P(( struct VALNAMES *, struct VAL *, struct VAL * ))
 extern int listmodes P(( int, int ));
 
 /* npopen.c */
-#if UNIX
+#if UNIX || MSDOS
 extern FILE * npopen P(( char *, char * ));
-extern int inout_popen P(( FILE **, FILE **, char * ));
 extern void npclose P(( FILE * ));
+#endif
+#if UNIX
+extern int inout_popen P(( FILE **, FILE **, char * ));
 extern void exec_sh_c P(( char * ));
 extern int system_SHELL P(( char * ));
 extern int softfork P(( void ));
@@ -687,6 +700,7 @@ extern int is_directory P(( char * ));
 /* random.c */
 extern int line_no P(( BUFFER *, LINE * ));
 extern int getcline P(( void ));
+extern void set_rdonly P(( BUFFER *, char * ));
 extern int liststuff P(( char *, void (*)(), int, char * ));
 extern int showcpos P(( int, int ));
 extern int showlength P(( int, int ));

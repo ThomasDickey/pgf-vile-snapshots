@@ -8,8 +8,12 @@
  * Extensions for vile by Paul Fox
  *
  *	$Log: insert.c,v $
- *	Revision 1.19  1993/04/20 12:18:32  pgf
- *	see tom's 3.43 CHANGES
+ *	Revision 1.20  1993/04/28 09:49:29  pgf
+ *	fixed indentation if openup used in cmode, with a single word on the
+ *	current line -- indentation was coming from the _next_ line, instead.
+ *
+ * Revision 1.19  1993/04/20  12:18:32  pgf
+ * see tom's 3.43 CHANGES
  *
  * Revision 1.18  1993/04/08  15:01:05  pgf
  * broke up ins(), to create inschar(), usable by insstring and ovrwstring
@@ -691,6 +695,8 @@ int *bracefp;
 	    
 	MK = DOT;
 	    
+	/* backword() will leave us either on this line, if there's something
+		non-blank here, or on the nearest previous non-blank line. */
 	if (backword(FALSE,1) == FALSE) {
 		if (bracefp) *bracefp = FALSE;
 		gomark(FALSE,1);
@@ -716,21 +722,24 @@ nextindent(bracefp)
 int *bracefp;
 {
 	int ind;
+	int fc;
 	    
 	MK = DOT;
 	    
-	if (forwword(FALSE,1) == FALSE) {
+	/* we want the indent of this line if it's non-blank, or the indent
+		of the next non-blank line otherwise */
+	fc = firstchar(DOT.l);
+	if (fc < 0 && forwword(FALSE,1) == FALSE) {
 		if (bracefp) *bracefp = FALSE;
-		gomark(FALSE,1);
+		DOT = MK;
 		return 0;
 	}
 	ind = indentlen(DOT.l);
 	if (bracefp) {
-		int fc = firstchar(DOT.l);
-		*bracefp = (fc >= 0 && lgetc(DOT.l,fc) == RBRACE);
+		*bracefp = (lgetc(DOT.l,fc) == RBRACE);
 	}
 		    
-	gomark(FALSE,1);
+	DOT = MK;
 	    
 	return ind;
 }

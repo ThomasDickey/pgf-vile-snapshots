@@ -4,7 +4,10 @@
  *	Filename prompting and completion routines
  *
  * $Log: filec.c,v $
- * Revision 1.10  1993/04/20 12:18:32  pgf
+ * Revision 1.11  1993/04/28 14:34:11  pgf
+ * see CHANGES, 3.44 (tom)
+ *
+ * Revision 1.10  1993/04/20  12:18:32  pgf
  * see tom's 3.43 CHANGES
  *
  * Revision 1.9  1993/04/02  11:00:40  pgf
@@ -710,7 +713,9 @@ char *	result;
 	static	TBUFF	*last;
 	char	Reply[NFILEN];
 	int	(*complete) P(( int, char *, int *)) = no_completion;
-	int	had_fname = (curbp != 0 && curbp->b_fname != 0);
+	int	had_fname = (curbp != 0
+			  && curbp->b_fname != 0
+			  && curbp->b_fname[0] != EOS);
 	int	do_prompt = (clexec || isnamedcmd || (flag & FILEC_PROMPT));
 	int	ok_expand = (flag & FILEC_EXPAND);
 
@@ -751,10 +756,12 @@ char *	result;
 			'\n', KBD_OPTIONS|KBD_MAYBEC, complete);
 		freeMyList();
 
+		if (s == ABORT)
+			return s;
 		if (s != TRUE) {
 			if ((flag == FILEC_REREAD)
 			 && had_fname
-			 && (mlyesno("Reread current buffer")))
+			 && ((s = mlyesno("Reread current buffer")) == TRUE))
 				(void)strcpy(Reply, curbp->b_fname);
 			else
 	                	return s;
@@ -797,7 +804,8 @@ char *	result;
 	}
 #endif
 	if (flag <= FILEC_WRITE) {	/* we want to write a file */
-		if (!same_fname(Reply, curbp, TRUE)
+		if (!isInternalName(Reply)
+		 && !same_fname(Reply, curbp, TRUE)
 		 && flook(Reply, FL_HERE)) {
 			if (mlyesno("File exists, okay to overwrite") != TRUE) {
 				mlwrite("File not written");

@@ -10,7 +10,10 @@
  *	(pgf, 1989)
  *
  * $Log: vmalloc.c,v $
- * Revision 1.10  1993/04/20 12:18:32  pgf
+ * Revision 1.11  1993/04/28 14:34:11  pgf
+ * see CHANGES, 3.44 (tom)
+ *
+ * Revision 1.10  1993/04/20  12:18:32  pgf
  * see tom's 3.43 CHANGES
  *
  * Revision 1.9  1993/01/23  13:38:23  foxharp
@@ -52,29 +55,21 @@
 #undef calloc
 #undef vverify
 
-#include "stdio.h"
-#include "string.h"
-
-char *malloc(), *calloc(), *realloc();
-
-char *vmalloc();
-void vfree();
-void rvverify();
-char *vrealloc();
-char *vcalloc();
-void vdump();
-
-
 /* max buffers alloced but not yet freed */
+#if TURBO
+#define MAXMALLOCS 1000	/* sorry, not very big ! */
+#define	ulong	unsigned long
+#else
 #define MAXMALLOCS 20000
+#endif
 
 /* known pattern, and how many of them */
 #define KP 0xaaaaaaaaL
 #define KPW (2*sizeof(unsigned long))
 
-
-static void trace();
-static void errout();
+static void dumpbuf P(( int ));
+static void trace P(( char * ));
+static void errout P(( void ));
 
 static int nummallocs = 0;
 struct mtype {
@@ -115,16 +110,16 @@ void
 rvverify(id,f,l)
 char *id;
 char *f;
+int l;
 {
 	char s[80];
-	register int c;
 	register struct mtype *mp;
 
 	
 	/* verify entire malloc heap */
 	for (mp = &m[nummallocs-1]; mp >= m; mp--) {
 		if (mp->addr != NULL) {
-			if (*(ulong *)mp->addr != KP || 
+			if (*(ulong *)mp->addr != KP ||
 				*(ulong *)(mp->addr + sizeof (ulong)) != KP)
 			{
 				sprintf(s, 
@@ -137,15 +132,19 @@ char *f;
 			}
 		}
 	}
-}		
+}
 
 char *
 vmalloc(size,f,l)
-char *f;
+SIZE_T	size;
+char	*f;
+int	l;
 {
+#ifdef VERBOSE
+	char s[80];
+#endif
 	unsigned char *buffer;
-	char *sp, s[80];
-	register int c;
+	char *sp;
 	register struct mtype *mp;
 
 	if (doverifys & VMAL)
@@ -181,8 +180,10 @@ char *f;
 
 char *
 vcalloc(n,size,f,l)
-int n, size;
-char *f;
+int	n;
+SIZE_T	size;
+char	*f;
+int	l;
 {
 	return vmalloc(n * size,f,l);
 }
@@ -190,10 +191,14 @@ char *f;
 void
 vfree(buffer,f,l)
 unsigned char *buffer;
-char *f;
+char	*f;
+int	l;
 {
+#ifdef VERBOSE
+	char *sp;
+#endif
+	char s[80];
 	unsigned char *b;
-	char s[80], *sp;
 	register struct mtype *mp;
 
 	b = buffer - KPW;
@@ -229,12 +234,12 @@ char *f;
 char *
 vrealloc(buffer,size,f,l)
 unsigned char *buffer;
-int size;
-char *f;
+SIZE_T	size;
+char	*f;
+int	l;
 {
 	unsigned char *b, *b2;
-	char *sp, s[80];
-	register int c;
+	char s[80];
 	register struct mtype *mp;
 
 	b = buffer - KPW;
@@ -245,7 +250,7 @@ char *f;
 		;
 	if (mp < m) {
 		sprintf(s,"ERROR: location to realloc is not in list. %s %d\n",
-					 sp,f,l);
+					 f,l);
 		fprintf(stderr,s);
 		trace(s);
 		errout();
@@ -302,8 +307,10 @@ static void
 errout()
 {
 	sleep(1);
+#if UNIX
 	kill(getpid(),3);
 	pause();
+#endif
 }
 
 int

@@ -4,7 +4,10 @@
  *	written 1986 by Daniel Lawrence	
  *
  * $Log: exec.c,v $
- * Revision 1.50  1993/04/22 12:18:08  pgf
+ * Revision 1.51  1993/04/28 14:34:11  pgf
+ * see CHANGES, 3.44 (tom)
+ *
+ * Revision 1.50  1993/04/22  12:18:08  pgf
  * fixed unterminated comment
  *
  * Revision 1.49  1993/04/22  11:13:09  pgf
@@ -840,7 +843,8 @@ execute(execfunc, f, n)
 CMDFUNC *execfunc;		/* ptr to function to execute */
 int f,n;
 {
-	register int status, flags;
+	register int status;
+	register long flags;
 	MARK odot;
 
 	if (execfunc == NULL) {
@@ -864,7 +868,7 @@ int f,n;
 			/* undoable command can't be permitted when read-only */
 			if (b_val(curbp,MDVIEW))
 				return rdonly();
-			if (!kbd_replaying())
+			if (!kbd_replaying(FALSE))
 				mayneedundo();
 		}
 	}
@@ -1016,13 +1020,7 @@ int n;		/* macro number to use */
 	if (!bclear(bp))
 		return FALSE;
 
-	bp->b_active = TRUE;
-	make_local_b_val(bp,MDVIEW);
-	set_b_val(bp,MDVIEW,TRUE);
-	make_local_b_val(bp,VAL_TAB);
-	set_b_val(bp,VAL_TAB,8);
-	make_local_b_val(bp,MDDOS);
-	set_b_val(bp,MDDOS,FALSE);
+	set_rdonly(bp, bp->b_fname);
 
 	/* and set the macro store pointers to it */
 	mstore = TRUE;

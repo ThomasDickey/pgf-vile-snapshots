@@ -9,7 +9,10 @@
 
 /*
  * $Log: edef.h,v $
- * Revision 1.94  1993/04/22 12:12:58  pgf
+ * Revision 1.95  1993/04/28 14:34:11  pgf
+ * see CHANGES, 3.44 (tom)
+ *
+ * Revision 1.94  1993/04/22  12:12:58  pgf
  * dotcmdkreg should be 0 to start
  *
  * Revision 1.93  1993/04/21  14:09:01  pgf
@@ -318,7 +321,7 @@
 decl_uninit( char *prog_arg );		/* argv[0] from main.c */
 
 decl_init( char prognam[], "vile");
-decl_init( char version[], "version 3.43");
+decl_init( char version[], "version 3.44");
 
 decl_init( char slash, '/'); 		/* so DOS can use '\' as path separator */
 
@@ -448,10 +451,6 @@ decl_uninit( char palstr[49] );		/* palette string		*/
 decl_uninit( char *fline );		/* dynamic return line		*/
 decl_uninit( unsigned flen );		/* current length of fline	*/
 
-#if FINDERR
-decl_init( char febuff[NBUFN], "" );	/* name of buffer to find errors in */
-decl_uninit( unsigned newfebuff );	/* is the name new since last time? */
-#endif
 decl_uninit( int kbd_expand );		/* -1 kbd_putc shows tab as space */
 					/* +1 kbd_putc shows cr at ^M */
 

@@ -14,7 +14,13 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.108  1993/04/21 14:38:16  pgf
+ * Revision 1.110  1993/04/28 14:34:11  pgf
+ * see CHANGES, 3.44 (tom)
+ *
+ * Revision 1.109  1993/04/22  15:14:39  pgf
+ * small fixups to do_num/rept_proc, and now they're static
+ *
+ * Revision 1.108  1993/04/21  14:38:16  pgf
  * support for glob mode
  *
  * Revision 1.107  1993/04/21  13:51:19  pgf
@@ -415,7 +421,7 @@ int _STKLOW = 0;		/* default is stack above heap (small only) */
 #endif
 
 #if	MSDOS & TURBO
-unsigned _stklen = 32768L;
+unsigned _stklen = 32768U;
 #endif
 
 int
@@ -447,6 +453,8 @@ char	*argv[];
 	charinit();		/* character types -- we need these pretty
 					early  */
 
+	global_val_init();	/* global buffer values */
+
 #if MSDOS
 	slash = '\\';  /* getswitchar() == '/' ? '\\' : '/'; */
 #else
@@ -462,8 +470,6 @@ char	*argv[];
 	prog_arg = argv[0];	/* this contains our only clue to exec-path */
 
 	start_debug_log(argc,argv);
-
-	global_val_init();	/* global buffer values */
 
 	if (strcmp(pathleaf(prog_arg), "view") == 0)
 		set_global_b_val(MDVIEW,TRUE);
@@ -778,15 +784,10 @@ char	*argv[];
 
 			if ((vbp=bfind(ScratchName(vileinit), OK_CREAT, 0))==NULL)
 				exit(BAD(1));
-			/* mark the buffer as read only */
-			make_local_b_val(vbp,MDVIEW);
-			set_b_val(vbp,MDVIEW,TRUE);
-
-			vbp->b_active = TRUE;
 
 			swbuffer(vbp);
 			bprintf("%s", vileinit);
-			vbp->b_flag &= ~BFCHG;
+			set_rdonly(vbp, vbp->b_fname);
 
 			/* go execute it! */
 			odiscmd = discmd;
@@ -883,9 +884,6 @@ char	*argv[];
 	/* NOTREACHED */
 	return BAD(1);
 }
-
-void do_num_proc();
-void do_rept_arg_proc();
 
 /* this is nothing but the main command loop */
 void
@@ -1095,24 +1093,8 @@ dos_crit_handler()
 }
 #endif
 
-/* handle all repeat counts */
-void
-do_repeats(cp,fp,np)
-int *cp,*fp,*np;
-{
-	do_num_proc(cp,fp,np);
-	do_rept_arg_proc(cp,fp,np);
-	if (dotcmdmode == PLAY) {
-		if (dotcmdarg)	/* then repeats are done by dotcmdcnt */
-			*np = 1;
-	} else {
-		/* then we want to cancel any dotcmdcnt repeats */
-		if (*fp) dotcmdarg = FALSE;
-	}
-}
-
 /* do number processing if needed */
-void
+static void
 do_num_proc(cp,fp,np)
 int *cp, *fp, *np;
 {
@@ -1127,6 +1109,8 @@ int *cp, *fp, *np;
 	if (iscntrl(c) || (c & (CTLA|CTLX|SPEC)))
 		return;
 
+	f = *fp;
+	n = *np;
 	if (f)
 		oldn = n;
 	else
@@ -1161,7 +1145,7 @@ int *cp, *fp, *np;
 }
 
 /* do ^U-style repeat argument processing -- vile binds this to 'K' */
-void
+static void
 do_rept_arg_proc(cp,fp,np)
 int *cp, *fp, *np;
 {
@@ -1172,6 +1156,9 @@ int *cp, *fp, *np;
 
 	if (c != reptc) 
 		return;
+
+	f = *fp;
+	n = *np;
 
 	if (f)
 		oldn = n;
@@ -1225,6 +1212,22 @@ int *cp, *fp, *np;
 	*cp = c;
 	*fp = f;
 	*np = n * oldn;
+}
+
+/* handle all repeat counts */
+void
+do_repeats(cp,fp,np)
+int *cp,*fp,*np;
+{
+	do_num_proc(cp,fp,np);
+	do_rept_arg_proc(cp,fp,np);
+	if (dotcmdmode == PLAY) {
+		if (dotcmdarg)	/* then repeats are done by dotcmdcnt */
+			*np = 1;
+	} else {
+		/* then we want to cancel any dotcmdcnt repeats */
+		if (*fp) dotcmdarg = FALSE;
+	}
 }
 
 /* the vi ZZ command -- write all, then quit */

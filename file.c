@@ -6,7 +6,10 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.81  1993/04/21 14:36:10  pgf
+ * Revision 1.82  1993/04/28 14:34:11  pgf
+ * see CHANGES, 3.44 (tom)
+ *
+ * Revision 1.81  1993/04/21  14:36:10  pgf
  * replace spaces with dashes in unix buffernames
  *
  * Revision 1.80  1993/04/20  12:18:32  pgf
@@ -337,6 +340,16 @@ explicit_version(char *version)
 	}
 	return FALSE;
 }
+
+static char *
+resolve_filename(bp)
+BUFFER	*bp;
+{
+	extern	FILE *ffp;
+	char	temp[NFILEN];
+	ch_fname(bp, fgetname(ffp, temp));
+	return bp->b_fname;
+}
 #endif
 
 /*
@@ -620,9 +633,9 @@ int	f,n;
 #endif
 
 /*
-	Read file "fname" into a buffer, blowing away any text
-	found there.  Returns the final status of the read.
-*/
+ *	Read file "fname" into a buffer, blowing away any text
+ *	found there.  Returns the final status of the read.
+ */
 
 /* ARGSUSED */
 int
@@ -661,84 +674,70 @@ int	mflg;		/* print messages? */
 	/* turn off ALL keyboard translation in case we get a dos error */
 	TTkclose();
 
-        if ((s = ffropen(fname)) == FIOERR)       /* Hard file open.      */
-                goto out;
+        if ((s = ffropen(fname)) == FIOERR) {	/* Hard file open.      */
+		mlerror(fname);
+        } else if (s == FIOFNF) {		/* File not found.      */
+                if (mflg)
+			mlwrite("[New file]");
+        } else {
 
-        if (s == FIOFNF) {                      /* File not found.      */
-                if (mflg) mlwrite("[New file]");
-                goto out;
-        }
-
-        if (mflg) {
-		 mlforce("[Reading %s ]", fname);
-	}
-
+        	if (mflg)
+			mlforce("[Reading %s ]", fname);
 #if VMS
-	{	/* fully-resolve the filename */
-		extern FILE *ffp;
-		char temp[NFILEN];
-		ch_fname(bp, fgetname(ffp, temp));
-		fname = bp->b_fname;
-	}
+		fname = resolve_filename(bp);
 #endif
-
-#if UNIX & before
-	if (fileispipe)
-		ttclean(TRUE);
-#endif
-	/* read the file in */
-        nline = 0;
+		/* read the file in */
+        	nline = 0;
 #if VMALLOC
-	/* we really think this stuff is clean... */
-	odv = doverifys;
-	doverifys = 0;
+		/* we really think this stuff is clean... */
+		odv = doverifys;
+		doverifys = 0;
 #endif
 #if ! MSDOS	/* DOS has too many 64K limits for this to work */
-	if (fileispipe || (s = quickreadf(bp, &nline)) == FIOMEM)
+		if (fileispipe || (s = quickreadf(bp, &nline)) == FIOMEM)
 #endif
-		s = slowreadf(bp, &nline);
-
-	if (s == FIOERR)
-		goto out;
+			s = slowreadf(bp, &nline);
 #if VMALLOC
-	doverifys = odv;
+		doverifys = odv;
 #endif
-	bp->b_flag &= ~BFCHG;
+		if (s == FIOERR) {
+			mlerror(fname);
+		} else {
+
+			bp->b_flag &= ~BFCHG;
 #if FINDERR
-	if (fileispipe == TRUE) {
-		(void)strncpy(febuff,bp->b_bname,NBUFN);
-		newfebuff = TRUE;
-	}
+			if (fileispipe == TRUE)
+				set_febuff(bp->b_bname);
 #endif
-        (void)ffclose();                         /* Ignore errors.       */
-	if (mflg)
-		readlinesmsg(nline,s,fname,ffronly(fname));
+        		(void)ffclose();	/* Ignore errors.       */
+			if (mflg)
+				readlinesmsg(nline, s, fname, ffronly(fname));
 
-	bp->b_linecount = nline;
+			bp->b_linecount = nline;
 
-	/* set read-only mode for read-only files */
-	if (isShellOrPipe(fname)
+			/* set read-only mode for read-only files */
+			if (isShellOrPipe(fname)
 #if RONLYVIEW
-		|| ffronly(fname) 
+			 || ffronly(fname) 
 #endif
-	) {
-		make_local_b_val(bp,MDVIEW);
-		set_b_val(bp,MDVIEW,TRUE);
-	}
+			) {
+				make_local_b_val(bp, MDVIEW);
+				set_b_val(bp, MDVIEW, TRUE);
+			}
 	
-	bp->b_active = TRUE;
+			bp->b_active = TRUE;
+		}
 
-out:
-#if DOSFILES
-	guess_dosmode(bp);
-#endif
+	}
+
 	/* set C mode for C files */
-	make_local_b_val(bp,MDCMOD); /* make it local for all, so that
+	make_local_b_val(bp, MDCMOD); /* make it local for all, so that
 					subsequent changes to global value
 					will _not_ affect this buffer */
-	set_b_val(bp,MDCMOD, (global_b_val(MDCMOD) && has_C_suffix(bp)));
+	set_b_val(bp, MDCMOD, (global_b_val(MDCMOD) && has_C_suffix(bp)));
 
 	TTkopen();	/* open the keyboard again */
+
         for_each_window(wp) {
                 if (wp->w_bufp == bp) {
                         wp->w_line.l = lforw(bp->b_line.l);
@@ -753,13 +752,7 @@ out:
         }
 	imply_alt(fname, FALSE, lockfl);
 	updatelistbuffers();
-	if (s == FIOERR || s == FIOFNF) {	/* False if error.      */
-#if UNIX
-		extern int sys_nerr, errno;
-		extern char *sys_errlist[];
-		if (errno > 0 && errno < sys_nerr)
-			mlforce("[%s: %s]",fname,sys_errlist[errno]);
-#endif
+	if (s == FIOERR) {	/* False if error.      */
                 return FALSE;
 	}
 #if     NeWS
@@ -895,6 +888,9 @@ int *nlinep;
 
 	if (incomplete)
 		return FIOMEM;
+#if DOSFILES
+	guess_dosmode(bp);
+#endif
 	return FIOSUC;
 }
 
@@ -906,29 +902,35 @@ register BUFFER *bp;
 int *nlinep;
 {
 	int s;
-	int flag = 0;
-        int len;
+	int len;
 #if DOSFILES
 	int	doslines = 0,
 		unixlines = 0;
 #endif
-#if UNIX
-        int    done_update = FALSE;
+#if UNIX || MSDOS	/* i.e., we can read from a pipe */
+	int	flag = 0;
+	int	done_update = FALSE;
 #endif
         while ((s = ffgetline(&len)) == FIOSUC) {
 #if DOSFILES
-		if (fline[len-1] == '\r') {
-			len--;
-			doslines++;
-		} else {
-			unixlines++;
+		/*
+		 * Strip CR's if we are reading in DOS-mode.  Otherwise,
+		 * keep any CR's that we read.
+		 */
+		if (global_b_val(MDDOS)) {
+			if (fline[len-1] == '\r') {
+				len--;
+				doslines++;
+			} else {
+				unixlines++;
+			}
 		}
 #endif
 		if (addline(bp,fline,len) != TRUE) {
                         s = FIOMEM;             /* Keep message on the  */
                         break;                  /* display.             */
                 } 
-#if UNIX
+#if UNIX || MSDOS
 		else {
                 	/* reading from a pipe, and internal? */
 			if (fileispipe && !ffhasdata()) {
@@ -951,10 +953,11 @@ int *nlinep;
 			        }
 
 				/* track changes in dosfile as lines arrive */
+#if DOSFILES
 				if (global_b_val(MDDOS))
 					set_b_val(bp, MDDOS, 
 						doslines > unixlines);
-
+#endif
 				curwp->w_flag |= WFMODE|WFKILLS;
 				if (!update(TRUE)) {
 					s = FIOERR;
@@ -970,6 +973,10 @@ int *nlinep;
 #endif
                 ++(*nlinep);
         }
+#if DOSFILES
+	if (global_b_val(MDDOS))
+		set_b_val(bp, MDDOS, doslines > unixlines);
+#endif
 	return s;
 }
 
@@ -1041,7 +1048,7 @@ char    fname[];
 	while (*fcp == ' ' || *fcp == '\t')
 		fcp++;
 
-#if     UNIX || VMS
+#if     UNIX || MSDOS || VMS
 	bcp = bname;
 	if (isShellOrPipe(fcp)) { 
 		/* ...it's a shell command; bname is first word */
@@ -1072,7 +1079,7 @@ char    fname[];
 
 #else
 	bcp = fcp + strlen(fcp);
-#if     AMIGA || MSDOS || ST520
+#if     AMIGA || ST520
 	while (bcp!=fcp && bcp[-1]!=':' && !slashc(bcp[-1]))
                 --bcp;
 #endif
@@ -1332,13 +1339,8 @@ BUFFER	*bp;
  out:
         if (s == FIOSUC) {                      /* No write error.      */
 #if VMS
-		if (same_fname(fn, bp, FALSE)) {
-			/* fully-resolve the filename */
-			extern FILE *ffp;
-			char temp[NFILEN];
-			ch_fname(bp, fgetname(ffp, temp));
-			fn = bp->b_fname;
-		}
+		if (same_fname(fn, bp, FALSE))
+			fn = resolve_filename(bp);
 #endif
                 s = ffclose();
                 if (s == FIOSUC && msgf) {      /* No close error.      */
@@ -1471,7 +1473,7 @@ int f,n;
         register int    s;
         char            fname[NFILEN];
 
-	if (isnamedcmd && lastkey == '\r') {
+	if (isnamedcmd && isreturn(end_string())) {
 		return showcpos(FALSE,1);
 	}
 
@@ -1743,6 +1745,7 @@ BUFFER *bp;
 }
 
 #if	CRYPT
+int
 resetkey(bp)	/* reset the encryption key if needed */
 BUFFER *bp;
 {

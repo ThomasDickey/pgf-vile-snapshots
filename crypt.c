@@ -2,7 +2,10 @@
  *		written by Dana Hoggatt and Daniel Lawrence
  *
  * $Log: crypt.c,v $
- * Revision 1.7  1993/04/01 12:53:33  pgf
+ * Revision 1.8  1993/04/28 14:34:11  pgf
+ * see CHANGES, 3.44 (tom)
+ *
+ * Revision 1.7  1993/04/01  12:53:33  pgf
  * removed redundant includes and declarations
  *
  * Revision 1.6  1992/12/23  09:16:54  foxharp
@@ -29,6 +32,8 @@
 #include	"edef.h"
 
 #if	CRYPT
+static	int	mod95 P((int));
+
 int
 setkey(f, n)	/* reset encryption key of current buffer */
 int f;		/* default flag */
@@ -152,6 +157,7 @@ int n;		/* numeric argument */
  *
  **********/
 
+void
 crypt(bptr, len)
 register char *bptr;	/* buffer of characters to be encrypted */
 register int len;	/* number of characters in the buffer */
@@ -211,9 +217,7 @@ register int len;	/* number of characters in the buffer */
 }
 
 static int mod95(val)
-
 register int val;
-
 {
 	/*  The mathematical MOD does not match the computer MOD  */
 
@@ -229,10 +233,5 @@ register int val;
 	while (val < 0)
 		val += 95;
 	return (val);
-}
-#else
-void
-nocrypt()
-{
 }
 #endif

@@ -2,7 +2,13 @@
  * Written for vile by Paul Fox, (c)1990
  *
  * $Log: finderr.c,v $
- * Revision 1.19  1993/04/20 12:18:32  pgf
+ * Revision 1.21  1993/04/28 14:34:11  pgf
+ * see CHANGES, 3.44 (tom)
+ *
+ * Revision 1.20  1993/04/28  09:41:21  pgf
+ * finderrbuff now remembers last arg
+ *
+ * Revision 1.19  1993/04/20  12:18:32  pgf
  * see tom's 3.43 CHANGES
  *
  * Revision 1.18  1993/04/13  18:49:58  pgf
@@ -71,11 +77,16 @@
 
 #if FINDERR
 
-#ifndef NULL
-#define NULL 0
-#endif
+static	char febuff[NBUFN];	/* name of buffer to find errors in */
+static	unsigned newfebuff;	/* is the name new since last time? */
 
-struct LINE *getdot();
+void
+set_febuff(name)
+char	*name;
+{
+	(void)strncpy(febuff, name, sizeof(febuff));
+	newfebuff = TRUE;
+}
 
 /* edits the file and goes to the line pointed at by the next compiler
         error in the "[output]" window.  It unfortunately doesn't mark
@@ -302,17 +313,12 @@ int f,n;
 {
         register int    s;
         char name[NFILEN];
+	static	TBUFF	*last;
 
-        if ((s = mlreply_file("Buffer to scan for \"errors\": ", (TBUFF **)0, 
+        if ((s = mlreply_file("Buffer to scan for \"errors\": ", &last,
 			FILEC_UNKNOWN, name)) == ABORT)
                 return s;
-        if (s == FALSE)
-                strcpy(febuff, ScratchName(Output));
-        else
-                strcpy(febuff, name);
-
-	newfebuff = TRUE;
-
+	set_febuff((s == FALSE) ? ScratchName(Output) : name);
         return TRUE;
 }
 #else
