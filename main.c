@@ -14,7 +14,10 @@
  *
  *
  * $Log: main.c,v $
- * Revision 1.143  1993/10/04 10:24:09  pgf
+ * Revision 1.144  1993/11/04 09:10:51  pgf
+ * tom's 3.63 changes
+ *
+ * Revision 1.143  1993/10/04  10:24:09  pgf
  * see tom's 3.62 changes
  *
  * Revision 1.142  1993/09/20  21:37:07  pgf
@@ -506,6 +509,10 @@
 #include	"glob.h"
 #include	"nevars.h"
 
+#if MSDOS
+#include <io.h>
+#endif
+
 extern char *pathname[];	/* startup file path/name array */
 
 /* for MSDOS, increase the default stack space */
@@ -776,20 +783,35 @@ char	*argv[];
 	/* if stdin isn't a terminal, assume the user is trying to pipe a
 	 * file into a buffer.
 	 */
-#if UNIX
+#if UNIX || VMS || MSDOS
 	if (!isatty(fileno(stdin))) {
 		FILE	*in;
+		int	fd;
 
 		bp = bfind(ScratchName(Standard Input), BFARGS);
 		make_current(bp); /* pull it to the front */
 		if (firstbp == 0)
 			firstbp = bp;
 		ffp = fdopen(dup(fileno(stdin)), "r");
-		if ((in = fopen("/dev/tty", "r")) != 0) {
-			(void)close(0);		/* not all systems have dup2() */
-			(void)dup(fileno(in));	/* so 'ttopen()' will work */
+#if UNIX
+		fd = open("/dev/tty", 0);
+#endif
+#if VMS
+		fd = open("tt:", 0);	/* or sys$command */
+#endif
+#if MSDOS
+		fd = fileno(stderr);	/* this normally cannot be redirected */
+#endif
+		if ((fd < 0)
+		 || (close(0) < 0)
+		 || (fd = dup(fd)) != 0
+		 || (in = fdopen(fd, "r")) == 0) {
+			(void) fprintf(stderr, "Cannot reopen stdin\n");
+			ExitProgram(BAD(1));
+		} else {
 			*stdin = *in;
 		}
+
 		(void)slowreadf(bp, &(bp->b_linecount));
 		set_rdonly(bp, bp->b_fname);
 		(void)ffclose();

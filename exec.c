@@ -4,7 +4,10 @@
  *	written 1986 by Daniel Lawrence
  *
  * $Log: exec.c,v $
- * Revision 1.73  1993/10/04 10:24:09  pgf
+ * Revision 1.74  1993/11/04 09:10:51  pgf
+ * tom's 3.63 changes
+ *
+ * Revision 1.73  1993/10/04  10:24:09  pgf
  * see tom's 3.62 changes
  *
  * Revision 1.72  1993/09/10  16:06:49  pgf
@@ -425,6 +428,11 @@ int f, n;
 							tungetc(c);
 							/* e.g., !-command */
 						 }
+					} else {	/* e.g., ":e#" */
+						c = end_string();
+						if (ispunct(c)
+						 && strchr(global_g_val_ptr(GVAL_EXPAND_CHARS),c) != 0)
+							tungetc(c);
 					}
 					break;
 				}
@@ -1333,7 +1341,7 @@ int n;		/* macro number to use */
 
 	/* get the name of the procedure */
 	bname[1] = EOS;
-	if ((status = mlreply("Procedure name: ", bname+1, sizeof(bname)-2)) != TRUE)
+	if ((status = mlreply("Procedure name: ", bname+1, (int)sizeof(bname)-2)) != TRUE)
 		return status;
 
 	/* construct the macro buffer name */

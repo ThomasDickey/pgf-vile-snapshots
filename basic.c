@@ -6,7 +6,10 @@
  * framing, are hard.
  *
  * $Log: basic.c,v $
- * Revision 1.60  1993/10/04 10:24:09  pgf
+ * Revision 1.61  1993/11/04 09:10:51  pgf
+ * tom's 3.63 changes
+ *
+ * Revision 1.60  1993/10/04  10:24:09  pgf
  * see tom's 3.62 changes
  *
  * Revision 1.59  1993/09/10  16:06:49  pgf
@@ -1087,7 +1090,7 @@ register int	n;
 		curwp->w_line.l = lp;
 		DOT.l  = lp;
 		DOT.o  = w_left_margin(curwp);
-		curwp->w_flag |= WFHARD;
+		curwp->w_flag |= WFHARD|WFMODE;
 	}
 	return status;
 }

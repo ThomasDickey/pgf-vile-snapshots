@@ -4,7 +4,10 @@
 	written 1986 by Daniel Lawrence
  *
  * $Log: eval.c,v $
- * Revision 1.68  1993/10/04 10:24:09  pgf
+ * Revision 1.69  1993/11/04 09:10:51  pgf
+ * tom's 3.63 changes
+ *
+ * Revision 1.68  1993/10/04  10:24:09  pgf
  * see tom's 3.62 changes
  *
  * Revision 1.67  1993/09/10  16:06:49  pgf
@@ -393,7 +396,7 @@ int f,n;
 		if ((vv = get_listvalue(Names[s], showall)) != 0)
 			t += strlen(Names[s]) + strlen(fmt) + strlen(vv);
 	}
-	if (!(values = malloc(t)))
+	if ((values = malloc(t)) == 0)
 		return FALSE;
 
 	for (s = 0, v = values; Names[s] != 0; s++) {

@@ -3,7 +3,10 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: globals.c,v $
- * Revision 1.24  1993/10/04 10:24:09  pgf
+ * Revision 1.25  1993/11/04 09:10:51  pgf
+ * tom's 3.63 changes
+ *
+ * Revision 1.24  1993/10/04  10:24:09  pgf
  * see tom's 3.62 changes
  *
  * Revision 1.23  1993/09/16  10:57:54  pgf
@@ -140,7 +143,7 @@ int f, n, g_or_v;
 	if (!fnp) {
 	        mlforce("[No function]");
 		return FALSE;
-	} else if (!(cfp = engl2fnc(fnp))) {
+	} else if ((cfp = engl2fnc(fnp)) == 0) {
 	        mlforce("[No such function]");
 		return FALSE;
 	} else if ((cfp->c_flags & GLOBOK) == 0) {

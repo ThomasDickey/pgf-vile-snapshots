@@ -2,7 +2,10 @@
  *		written by John Hutchinson, heavily modified by Paul Fox
  *
  * $Log: npopen.c,v $
- * Revision 1.30  1993/10/04 10:24:09  pgf
+ * Revision 1.31  1993/11/04 09:10:51  pgf
+ * tom's 3.63 changes
+ *
+ * Revision 1.30  1993/10/04  10:24:09  pgf
  * see tom's 3.62 changes
  *
  * Revision 1.29  1993/09/03  09:11:54  pgf
@@ -104,7 +107,7 @@
 
 #include <sys/param.h>
 
-#if LINUX
+#if LINUX || APOLLO
 #include <sys/wait.h>
 #endif
 

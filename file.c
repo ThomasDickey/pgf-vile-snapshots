@@ -6,7 +6,10 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.106  1993/10/11 17:21:42  pgf
+ * Revision 1.107  1993/11/04 09:10:51  pgf
+ * tom's 3.63 changes
+ *
+ * Revision 1.106  1993/10/11  17:21:42  pgf
  * in imdying, run "ls -a" output through "sort -r" to put "." last, since
  * it terminates /bin/mail
  *
@@ -1040,7 +1043,7 @@ int *nlinep;
 	/* leave an extra byte at the front, for the length of the first
 		line.  after that, lengths go in place of the newline at
 		the end of the previous line */
-	bp->b_ltext = castalloc(UCHAR, len + 2);
+	bp->b_ltext = castalloc(UCHAR, (ALLOC_T)(len + 2));
 	if (bp->b_ltext == NULL)
 		return FIOMEM;
 
@@ -1083,7 +1086,7 @@ int *nlinep;
 				/* we'll re-read the rest later */
 				if (len)  {
 					ffseek(len);
-					np = castrealloc(UCHAR, bp->b_ltext, len);
+					np = castrealloc(UCHAR, bp->b_ltext, (ALLOC_T)len);
 				} else {
 					np = NULL;
 				}
@@ -1577,6 +1580,19 @@ BUFFER	*bp;
 	int	whole_file = (l_ref(rp->r_orig.l) == lForw(bp->b_line.l))
 	        	  && (same_ptr(rp->r_end.l, bp->b_line.l));
 
+	if (is_internalname(fn)) {
+		mlforce("[No filename]");
+		return FALSE;
+	}
+
+	if (isShellOrPipe(fn)
+	 && bp->b_fname != 0
+	 && !strcmp(fn, bp->b_fname)
+	 && mlyesno("Are you sure (this was a pipe-read)") != TRUE) {
+		mlwrite("File not written");
+		return FALSE;
+	}
+
 	fn = lengthen_path(strcpy(fname, fn));
 	if (same_fname(fn, bp, FALSE) && b_val(bp,MDVIEW)) {
 		mlforce("[Can't write-back from view mode]");
@@ -1587,11 +1603,7 @@ BUFFER	*bp;
 	if ((s = resetkey(curbp, fn)) != TRUE)
 		return s;
 #endif
-        if (is_internalname(fn)) {
-        	mlforce("[No filename]");
-        	return FALSE;
-        }
- 
+
 #ifdef MDCHK_MODTIME
 	if ( ! inquire_modtime( bp, fn ) )
 		return FALSE;
@@ -1944,7 +1956,7 @@ ACTUAL_SIG_DECL
 	extern char *mktemp P(( char * ));
 
 #if APOLLO
-	extern	char	*getlogin();
+	extern	char	*getlogin(void);
 	static	int	i_am_dead;
 #endif	/* APOLLO */
 
@@ -1988,7 +2000,8 @@ ACTUAL_SIG_DECL
 		}
 	}
 	if (wrote) {
-		if ((np = getenv("LOGNAME")) || (np = getenv("USER"))) {
+		if ((np = getenv("LOGNAME")) != 0
+		 || (np = getenv("USER")) != 0) {
 			(void)lsprintf(cmd, "%s%s%s%s%s%s",
 			"(echo Subject: vile died; echo Files saved: ;",
 #if HAVE_MKDIR

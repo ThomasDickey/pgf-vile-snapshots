@@ -64,7 +64,10 @@
  *	Allow left/right scrolling of input lines (when they get too long).
  *
  * $Log: history.c,v $
- * Revision 1.11  1993/10/04 10:24:09  pgf
+ * Revision 1.12  1993/11/04 09:10:51  pgf
+ * tom's 3.63 changes
+ *
+ * Revision 1.11  1993/10/04  10:24:09  pgf
  * see tom's 3.62 changes
  *
  * Revision 1.10  1993/09/20  21:20:00  pgf
@@ -283,10 +286,6 @@ char *	cmd;
 int	glue;
 {
 	static	int	skip = 1;		/* e.g., after "!" */
-
-
-	if (clexec)
-		return;
 
 	if (clexec)				/* non-interactive? */
 		return;

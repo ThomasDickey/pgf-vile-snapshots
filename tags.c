@@ -5,7 +5,10 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: tags.c,v $
- * Revision 1.41  1993/10/04 10:24:09  pgf
+ * Revision 1.42  1993/11/04 09:10:51  pgf
+ * tom's 3.63 changes
+ *
+ * Revision 1.41  1993/10/04  10:24:09  pgf
  * see tom's 3.62 changes
  *
  * Revision 1.40  1993/09/03  09:11:54  pgf
@@ -420,9 +423,12 @@ SIZE_T len;
 int exact;
 {
 	register LINE *lp;
+	int actual = strlen(name);
 
 	if (exact)
-		len = strlen(name);
+		len = actual;
+	else if (actual < len)
+		len = actual;
 
 	for_each_line(lp, bp) {
 		if (llength(lp) >= len) {
@@ -491,9 +497,9 @@ int lineno;
 	if (!utp)
 		return;
 
-	if (!(utp->u_fname = strmalloc(fname))
+	if ((utp->u_fname = strmalloc(fname)) == 0
 #if !SMALLER
-	 || !(utp->u_templ = strmalloc(tagname))
+	 || (utp->u_templ = strmalloc(tagname)) == 0
 #endif
 	   ) {
 		free_untag(utp);

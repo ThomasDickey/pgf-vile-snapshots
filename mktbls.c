@@ -14,7 +14,10 @@
  *
  *
  * $Log: mktbls.c,v $
- * Revision 1.38  1993/10/04 10:24:09  pgf
+ * Revision 1.39  1993/11/04 09:10:51  pgf
+ * tom's 3.63 changes
+ *
+ * Revision 1.38  1993/10/04  10:24:09  pgf
  * see tom's 3.62 changes
  *
  * Revision 1.37  1993/09/10  16:06:49  pgf
@@ -145,7 +148,7 @@
 #define	OPT_IFDEF_MODES	1	/* true iff we can ifdef modes */
 
 /* stuff borrowed/adapted from estruct.h */
-#if defined(__TURBOC__) || defined(__WATCOMC__) || defined(__GO32__) || (defined(__GNUC__) && (defined(sun) || defined(linux)))
+#if defined(__TURBOC__) || defined(__WATCOMC__) || defined(__GO32__) || (defined(__GNUC__) && (defined(apollo) || defined(sun) || defined(__hpux) || defined(linux)))
 #include <stdlib.h>
 #define P(param) param
 #else
@@ -167,6 +170,8 @@ extern char *malloc();
 #define GOOD	0
 #define BAD(c)	(c)
 #endif
+
+#define	SIZEOF(v)	(sizeof(v)/sizeof(v[0]))
 
 /*--------------------------------------------------------------------------*/
 
@@ -201,7 +206,7 @@ extern char *malloc();
 
 #if defined(lint) || (defined(__GNUC__) && !defined(__GO32__))
 #if !LINUX && defined(__STDC__)		/* this ifdef needs work, clearly */
-extern       int     fprintf(FILE *, char *, ... );
+extern       int     fprintf(FILE *, const char *, ... );
 #else
 extern       int     fprintf();
 #endif
@@ -385,7 +390,7 @@ int	count;
 	while (count-- > 0)
 		Fprintf(fp, "%s\n", *list++);
 }
-#define	write_lines(fp,list) WriteLines(fp, list, sizeof(list)/sizeof(list[0]))
+#define	write_lines(fp,list) WriteLines(fp, list, (int)SIZEOF(list))
 
 /******************************************************************************/
 static FILE *
@@ -398,7 +403,7 @@ char	**argv;
 "/* %s: this header file was produced automatically by\n\
  * the %s program, based on input from the file %s\n */\n";
 
-	if (!(fp = fopen(name, "w"))) {
+	if ((fp = fopen(name, "w")) == 0) {
 		Fprintf(stderr,"mktbls: couldn't open header file %s\n", name);
 		exit(BAD(1));
 	}

@@ -10,7 +10,10 @@
 
 /*
  * $Log: estruct.h,v $
- * Revision 1.144  1993/10/11 18:50:37  pgf
+ * Revision 1.145  1993/11/04 09:10:51  pgf
+ * tom's 3.63 changes
+ *
+ * Revision 1.144  1993/10/11  18:50:37  pgf
  * turn on DOS mouse code only for turbo-c
  *
  * Revision 1.143  1993/10/04  10:24:09  pgf
@@ -553,12 +556,12 @@
 # define SVR3_PTEM	1	/* for ptem.h in display.c */
 #endif
 
-#if HPUX	/* reported to work with 7.05.  Could someone confirm these? */
+#if HPUX			/* tested with HP/UX 9.01 */
 # define HAVE_SELECT
 # undef POSIX
 # undef BERK
 # undef USG
-# define POSIX	0
+# define POSIX	1
 # define BERK	0
 # define USG	1
 #endif
@@ -596,8 +599,8 @@
 # define HAVE_POLL 0
 #endif
 
-#if ! LINUX && ! GO32
-    /* there are probably others that don't want const defined */
+#if ! LINUX && ! GO32 && !defined(__CLCC_) && !APOLLO
+    /* there are probably others that don't want/need const defined */
 # define const
 #endif
 
@@ -701,7 +704,9 @@
 /* definitions for testing apollo version with gcc warnings */
 #if APOLLO
 # ifdef __GNUC__		/* only tested for SR10.3 with gcc 1.36 */
+#  ifndef _APOLLO_SOURCE	/* ...defined in gcc 2.4.5 */
 #  define _APOLLO_SOURCE	/* appease gcc by forcing extern-defs */
+#  endif
 #  define __attribute(s)
 #  define APOLLO_STDLIB 1
 # endif
@@ -926,10 +931,15 @@ extern	char *	sys_errlist[];
 
 /* use 'size_t' if we have it */
 #if POSIX || APOLLO || VMS || NEWDOSCC
-# define SIZE_T  size_t
 # if defined(lint) && (SUNOS||APOLLO)
+#  define SIZE_T  size_t	/* note: SunOs 4.1.3 defines 'size_t' as 'int'*/
 #  define ALLOC_T unsigned
+#  if APOLLO && !APOLLO_STDLIB
+#   undef SIZE_T
+#   define SIZE_T int
+#  endif
 # else
+#  define SIZE_T  size_t
 #  define ALLOC_T size_t
 # endif
 #else
@@ -938,14 +948,14 @@ extern	char *	sys_errlist[];
 #endif
 
 #if APOLLO
-# ifndef __STDCPP__
+# if !defined(__STDCPP__) && !defined(__GNUC__)
 #  define ANSI_VARARGS 0
 #  define ANSI_PROTOS 0 /* SR10.2 does not like protos w/o variable names */
 # endif
 #endif
 
 #ifndef ANSI_PROTOS
-#  if defined(__STDC__) || VMS || NEWDOSCC
+#  if defined(__STDC__) || VMS || NEWDOSCC || defined(__CLCC__)
 #    define ANSI_PROTOS 1
 #  else
 #    define ANSI_PROTOS 0
@@ -953,7 +963,7 @@ extern	char *	sys_errlist[];
 #endif
 
 #ifndef ANSI_VARARGS
-# if defined(__STDC__) || VMS || NEWDOSCC
+# if defined(__STDC__) || VMS || NEWDOSCC || defined(__CLCC__)
 #  define ANSI_VARARGS 1	/* look in <stdarg.h> */
 # else
 #  define ANSI_VARARGS 0	/* look in <varargs.h> */
@@ -1872,7 +1882,7 @@ typedef struct	BUFFER {
 #define isRepeatable(c)   ((c) == '<' || (c) == '>')
 
 #if	defined(apollo)
-#if	defined(__STDCPP__)	/* cc 6.8 */
+#if	defined(__STDCPP__) || defined(__GNUC__) /* cc 6.8 or gcc */
 #define	ScratchName(s) SCRTCH_LEFT ## #s ## SCRTCH_RIGHT
 #else				/* cc 6.7 */
 #define	ScratchName(s)	"[s]"	/* K&R-style macro */
@@ -2076,7 +2086,7 @@ typedef struct	{
 #define	TTkopen		(*term.t_kopen)
 #define	TTkclose	(*term.t_kclose)
 #define	TTgetc		(*term.t_getchar)
-#if ! TERMCAP
+#if !TERMCAP || (APOLLO && defined(__GNUC__))
 #define	TTputc		(*term.t_putchar)
 #else
 #define	TTputc		(void)putchar
@@ -2355,7 +2365,7 @@ typedef struct WHBLOCK {
  extern char *malloc();
  extern char *realloc();
 #  endif
-#  if APOLLO
+#  if APOLLO_STDLIB
 extern void qsort P((char *, SIZE_T, SIZE_T, int (*func)(char **,char **)));
 #  endif
 extern long strtol P((char *, char **, int));

@@ -2,7 +2,10 @@
  * Written for vile by Paul Fox, (c)1990
  *
  * $Log: finderr.c,v $
- * Revision 1.29  1993/10/04 10:24:09  pgf
+ * Revision 1.30  1993/11/04 09:10:51  pgf
+ * tom's 3.63 changes
+ *
+ * Revision 1.29  1993/10/04  10:24:09  pgf
  * see tom's 3.62 changes
  *
  * Revision 1.28  1993/09/10  16:06:49  pgf
@@ -197,14 +200,20 @@ int f,n;
 				verb, &errline, errfile) == 3
 				/* sys5 lint */
 			  ||  (!strncmp(text, "    ", 4)
-			    && (sscanf(text+4, lint_fmt1,
+			    && ((sscanf(text+4, lint_fmt1,
 			    	verb, errfile, &errline) == 3)
 			     || sscanf(text+4, lint_fmt2,
 			     	verb, &num1, nofile, &num2,
-						errfile, &errline) == 6)
+						errfile, &errline) == 6))
 			  	/* C++ compiler */
 			  ||  sscanf(text,
 			  	"CC: \"%[^\"]\", line %d",
+						errfile, &errline) == 2
+#endif
+
+#if HPUX			/* C compiler */
+			  ||  sscanf(text,
+			  	"cc: \"%[^\"]\", line %d:",
 						errfile, &errline) == 2
 #endif
 #if OSF1

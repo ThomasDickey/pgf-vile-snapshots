@@ -2,7 +2,10 @@
  *		for MicroEMACS
  *
  * $Log: tcap.c,v $
- * Revision 1.30  1993/09/21 11:00:20  pgf
+ * Revision 1.31  1993/11/04 09:10:51  pgf
+ * tom's 3.63 changes
+ *
+ * Revision 1.30  1993/09/21  11:00:20  pgf
  * don't call showcpos on mouse-clicks -- call mlerase.  if someone want to
  * know position, they can use ruler mode.
  *
@@ -193,7 +196,7 @@ tcapopen()
 	if (already_open) 
 	{
 		if (TI)
-			putnpad(TI, strlen(TI));
+			putnpad(TI, (int)strlen(TI));
 		if (KS)
 			putpad(KS);
 		return;
@@ -304,7 +307,7 @@ tcapopen()
 	}
 	ttopen();
 	if (TI)
-		putnpad(TI, strlen(TI));
+		putnpad(TI, (int)strlen(TI));
 	if (KS)
 		putpad(KS);
 	already_open = TRUE;
@@ -314,7 +317,7 @@ void
 tcapclose()
 {
 	if (TE)
-		putnpad(TE, strlen(TE));
+		putnpad(TE, (int)strlen(TE));
 	if (KE)
 		putpad(KE);
 }

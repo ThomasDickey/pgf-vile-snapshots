@@ -11,7 +11,10 @@
  * which means that the dot and mark values in the buffer headers are nonsense.
  *
  * $Log: line.c,v $
- * Revision 1.54  1993/09/10 16:06:49  pgf
+ * Revision 1.55  1993/11/04 09:10:51  pgf
+ * tom's 3.63 changes
+ *
+ * Revision 1.54  1993/09/10  16:06:49  pgf
  * tom's 3.61 changes
  *
  * Revision 1.53  1993/09/03  09:11:54  pgf
@@ -527,7 +530,7 @@ int n, c;
 	nsize = llength(tmp) + n;
 	if (nsize > tmp->l_size) {		/* Hard: reallocate	*/
 		/* first, create the new image */
-		nsize = roundup(nsize);
+		nsize = roundup((int)nsize);
 		copy_for_undo(lp1);
 #if OPT_MAP_MEMORY
 		if ((tmp = l_reallocate(DOT.l, nsize, curbp)) == 0)

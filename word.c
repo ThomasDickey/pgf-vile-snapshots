@@ -4,7 +4,11 @@
  * do any sentence mode commands, they are likely to be put in this file. 
  *
  * $Log: word.c,v $
- * Revision 1.33  1993/09/28 22:24:01  pgf
+ * Revision 1.34  1993/10/12 18:46:33  pgf
+ * the change to using entabline broke formatting in some cases.  this fixes
+ * it.
+ *
+ * Revision 1.33  1993/09/28  22:24:01  pgf
  * don't allow tabs to be inserted during formatregion() if notabinsert
  * is set
  *
@@ -534,12 +538,14 @@ formatregion()
 						++clength;
 					} 
 				} else {
+					/* fix the leading indent now, if
+						some spaces should be tabs */
+					if (b_val(curbp,MDTABINSERT))
+						entabline(TRUE);
 			                if (lnewline() == FALSE)
 						return FALSE;
 				        if (linsert(secondindent,' ') == FALSE)
 						return FALSE;
-					if (b_val(curbp,MDTABINSERT))
-						entabline(TRUE);
 					clength = secondindent;
 					firstflag = TRUE;
 				}
@@ -567,6 +573,11 @@ formatregion()
 				wordlen = 0;
 			}
 		}
+		/* catch the case where we're done with a line not because
+		  there's no more room, but because we're done processing a
+		  section or the region */
+		if (b_val(curbp,MDTABINSERT))
+			entabline(TRUE);
 		DOT.l = lFORW(DOT.l);
 	}
 	return setmark();

@@ -3,7 +3,10 @@
  *		strings.
  *
  * $Log: path.c,v $
- * Revision 1.19  1993/10/04 10:24:09  pgf
+ * Revision 1.20  1993/11/04 09:10:51  pgf
+ * tom's 3.63 changes
+ *
+ * Revision 1.19  1993/10/04  10:24:09  pgf
  * see tom's 3.62 changes
  *
  * Revision 1.18  1993/09/22  10:26:08  pgf
@@ -332,15 +335,13 @@ char	*leaf;
 	s += strlen(s) - 1;
 
 #if VMS
-	if (is_vms_pathname(dst, TRUE))	/* could be DecShell */
-		s++;
-	else
+	if (!is_vms_pathname(dst, TRUE))	/* could be DecShell */
 #endif
-	 if (!slashc(*s++)) {
-		*s++ = slash;
+	 if (!slashc(*s)) {
+		*(++s) = slash;
 	 }
 
-	(void)strcpy(s, leaf);
+	(void)strcpy(s+1, leaf);
 	return dst;
 }
 
