@@ -5,7 +5,7 @@
  * functions use hints that are left in the windows by the commands.
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/display.c,v 1.202 1995/10/19 20:02:25 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/display.c,v 1.205 1995/11/17 04:03:42 pgf Exp $
  *
  */
 
@@ -528,18 +528,6 @@ vtfree()
 }
 #endif
 
-/*
- * Clean up the virtual terminal system, in anticipation for a return to the
- * operating system. Move down to the last line and advance, to make room
- * for the system prompt. Shut down the channel to the
- * terminal.
- */
-void
-vttidy(f)
-int f;
-{
-	ttclean(f);	/* does it all now */
-}
 
 /*
  * Set the virtual cursor to the specified row and column on the virtual
@@ -676,6 +664,19 @@ WINDOW *wp;
 
 	vt_octal = w_val(wp,WMDNONPRINTOCTAL);
 
+#ifdef WMDLINEWRAP
+	/*
+	 * If the window's offset is negative, we've got a case of linewrap
+	 * where the line's beginning is forced before the beginning of the
+	 * window.
+	 */
+	if (wp->w_line.o < 0) {
+		vtrow -= wp->w_line.o;
+		skip = col2offs(wp, lp, -(wp->w_line.o * term.t_ncol));
+		n -= skip;
+	}
+	else
+#endif
 	if (w_val(wp,WMDNUMBER)) {
 		register int j, k, jk;
 		L_NUM	line = line_no(bp, lp);
@@ -1203,8 +1204,9 @@ int sline;
 	 */
 #ifdef WMDLINEWRAP
 	if (w_val(wp,WMDLINEWRAP)) {
-		register int	m = (sline >= 0) ? sline : 0;
-		register int	n = sline + line_height(wp, lp);
+		int top_line = sline - wp->w_line.o;
+		register int	m = (top_line >= 0) ? top_line : 0;
+		register int	n = top_line + line_height(wp, lp);
 		while (n > m)
 			if (--n < mode_row(wp)) {
 				vscreen[n]->v_flag |= VFCHG;
@@ -1236,8 +1238,8 @@ int sline;
 	taboff = 0;
 #if	OPT_COLOR
 	if (sline >= 0) {
-		ReqFcolor(vscreen[sline]) = w_val(wp,WVAL_FCOLOR);
-		ReqBcolor(vscreen[sline]) = w_val(wp,WVAL_BCOLOR);
+		ReqFcolor(vscreen[sline]) = gfcolor;
+		ReqBcolor(vscreen[sline]) = gbcolor;
 	}
 #endif
 }
@@ -1644,7 +1646,7 @@ C_NUM	offset;
  * line's offset, taking into account the tabstop, sideways, number and list
  * modes.
  */
-#if OPT_MOUSE
+#if OPT_MOUSE || defined(WMDLINEWRAP)
 int
 col2offs(wp, lp, col)
 WINDOW	*wp;
@@ -2624,8 +2626,8 @@ WINDOW *wp;
     vscreen[n]->v_flag |= VFCHG | VFREQ | VFCOL;/* Redraw next time. */
 #endif
 #if	OPT_COLOR
-    ReqFcolor(vscreen[n]) = w_val(wp,WVAL_FCOLOR);
-    ReqBcolor(vscreen[n]) = w_val(wp,WVAL_BCOLOR);
+    ReqFcolor(vscreen[n]) = gfcolor;
+    ReqBcolor(vscreen[n]) = gbcolor;
 #endif
     bp = wp->w_bufp;
     vtmove(n, 0);                       	/* Seek to right line. */

@@ -1,9 +1,9 @@
 dnl Process this file with autoconf to produce a configure script.
-AC_REVISION($Revision: 1.30 $)
+AC_REVISION($Revision: 1.31 $)
 ### Use "configure -with-screen" to override the default configuration, which is
 ### termcap-based on unix systems.
 
-dnl $Header: /usr/build/VCS/pgf-vile/RCS/configure.in,v 1.30 1995/10/19 20:02:25 pgf Exp $
+dnl $Header: /usr/build/VCS/pgf-vile/RCS/configure.in,v 1.31 1995/11/17 14:13:20 pgf Exp $
 
 dnl
 AC_INIT(mktbls.c)
@@ -207,7 +207,8 @@ EOF
 			[AC_DEFINE(HAVE_LIBXT) LIBS="-lXt $LIBS"],
 			AC_WARN(
 [Unable to successfully link X Toolkit library (-lXt) with test program.
-You will have to check and add the proper libraries by hand to makefile.]))
+You will have to check and add the proper libraries by hand to makefile.]),
+			$X_PRE_LIBS)
 	;;
 esac
 

@@ -7,7 +7,7 @@
  *  Author:  Curtis Smith
  *  Last Updated: 07/14/87
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/vmsvt.c,v 1.24 1995/08/18 12:32:58 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/vmsvt.c,v 1.25 1995/11/17 04:03:42 pgf Exp $
  *
  */
 
@@ -83,8 +83,9 @@ TERM	term	= {
 	vmsrev,				/* Set reverse video state	*/
 	vmscres				/* Change screen resolution	*/
 #if	OPT_COLOR
-	, vmsfcol,			/* Set forground color		*/
-	vmsbcol				/* Set background color		*/
+	, vmsfcol			/* Set foreground color		*/
+	, vmsbcol			/* Set background color		*/
+	, NULL				/* Set palette colors		*/
 #endif
 	, NULL				/* set at init-time		*/
 };
@@ -477,17 +478,6 @@ vmskopen(void)
  ***/
 static void
 vmskclose(void)
-{
-}
-
-/***
- *  spal  -  Set palette type  (Are you kidding?)
- *
- *  Nothing returned
- ***/
-void
-spal(dummy)
-char	*dummy;
 {
 }
 

@@ -7,7 +7,7 @@
  * Original code probably by Dan Lawrence or Dave Conroy for MicroEMACS.
  * Major extensions for vile by Paul Fox, 1991
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/modes.c,v 1.69 1995/08/04 23:12:06 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/modes.c,v 1.71 1995/11/17 04:03:42 pgf Exp $
  *
  */
 
@@ -29,6 +29,26 @@
 #define TEST_CHGD 10
 #define TEST_LOCAL  (TEST_CHGD+FALSE)
 #define TEST_GLOBAL (TEST_CHGD+TRUE)
+
+/*
+ * The symbol tables stored in FSM_CHOICES lists are sorted by the 'choice_name'
+ * field, with a final null entry so that name-completion works on the lists.
+ */
+#if OPT_ENUM_MODES
+#define ENUM_ILLEGAL   (-2)
+#define ENUM_UNKNOWN   (-1)
+#define END_CHOICES    { (char *)0, ENUM_ILLEGAL }
+
+typedef struct {
+	char * choice_name;
+	int    choice_code;
+} FSM_CHOICES;
+
+struct FSM {
+	char * mode_name;
+	FSM_CHOICES * choices;
+};
+#endif
 
 /*--------------------------------------------------------------------------*/
 
@@ -60,15 +80,10 @@ static	int	show_Settings P(( BUFFER * ));
 static	void	relist_settings P(( void ));
 #endif
 
-#if OPT_COLOR
-	/*
-	 * These names are ordered to match the ANSI color codes.
-	 */
-static	char	*cname[] = {	/* names of colors */
-	"black", "red",     "green", "yellow",
-	"blue",  "magenta", "cyan",  "white",
-	0
-	};
+#if OPT_ENUM_MODES
+static	int	choice_to_code P(( FSM_CHOICES *, char * ));
+static	char *	choice_to_name P(( FSM_CHOICES *, int ));
+static	FSM_CHOICES * name_to_choices P(( struct VALNAMES * ));
 #endif
 
 /*--------------------------------------------------------------------------*/
@@ -101,7 +116,7 @@ struct VAL *tst, *ref;
 
 	switch (names->type) {
 	case VALTYPE_BOOL:
-	case VALTYPE_COLOR:
+	case VALTYPE_ENUM:
 	case VALTYPE_INT:
 		return	(tst->vp->i == ref->vp->i);
 	case VALTYPE_STRING:
@@ -131,10 +146,9 @@ struct VAL *values;
 	register char	*s = 0;
 
 	switch (names->type) {
-#if	OPT_COLOR && !SMALLER	/* will show the color name too */
-	case VALTYPE_COLOR:
-		n += 4;
-		s = cname[values->vp->i];
+#if	OPT_ENUM_MODES		/* will show the enum name too */
+	case VALTYPE_ENUM:
+		s = choice_to_name(name_to_choices(names), values->vp->i);
 		break;
 #endif
 	case VALTYPE_STRING:
@@ -159,13 +173,12 @@ VALARGS *args;
 	switch(names->type) {
 	case VALTYPE_BOOL:
 		return values->vp->i ? truem : falsem;
-	case VALTYPE_COLOR:
-#if OPT_COLOR && !SMALLER
+	case VALTYPE_ENUM:
+#if OPT_ENUM_MODES
 		{
 		static	char	temp[20];
-		(void)lsprintf(temp, "%d (%s)",
-			values->vp->i,
-			cname[values->vp->i]);
+		(void)strcpy(temp,
+			choice_to_name(name_to_choices(names), values->vp->i));
 		return temp;
 		}
 #endif				/* else, fall-thru to use int-code */
@@ -313,7 +326,8 @@ static	/*ARGSUSED*/ WINDOW *ptr2WINDOW(p) void *p; { return 0; }
 /* list the current modes into the current buffer */
 /* ARGSUSED */
 static
-void	makemodelist(dum1,ptr)
+void	
+makemodelist(dum1,ptr)
 	int dum1;
 	void *ptr;
 {
@@ -616,113 +630,168 @@ char	*base;
  * 	:set error flash
  */
 #if OPT_ENUM_MODES
-typedef char * FSM_CHOICES;
 
-struct FSM {
-    char * mode_name;
-    int	   count;
-    FSM_CHOICES * choices;
-};
+	/*
+	 * These names and codes match the ANSI color codes.
+	 */
+static	FSM_CHOICES fsm_color_choices[] = {	/* names of colors */
+	{ "black",     0 },
+	{ "blue",      4 },
+	{ "cyan",      6 },
+#if DISP_TERMCAP || DISP_IBMPC	/* FIXME: implement this for all drivers */
+	{ "default",   ENUM_UNKNOWN },
+#endif
+	{ "green",     2 },
+	{ "magenta",   5 },
+	{ "red",       1 },
+	{ "white",     7 },
+	{ "yellow",    3 },
+	END_CHOICES
+	};
 
 static
 FSM_CHOICES fsm_bool_choices[] = {
-    "false",	/* 0 */
-    "true",	/* 1 */
-    (char *)0
+	{ "false",     FALSE },
+	{ "true",      TRUE  },
+	END_CHOICES
 };
 
 #if OPT_POPUPCHOICE
 static
 FSM_CHOICES fsm_popup_choices[] = {
-    "off",
-    "immediate",
-    "delayed",
-    (char *) 0
+	{ "delayed",   POPUP_CHOICES_DELAYED},
+	{ "immediate", POPUP_CHOICES_IMMED},
+	{ "off",       POPUP_CHOICES_OFF},
+	END_CHOICES
 };
 #endif
 
 #if NEVER
 FSM_CHOICES fsm_error[] = {
-    "quiet",
-    "beep",
-    "flash",
-    (char *) 0
+	{ "beep",      1},
+	{ "flash",     2},
+	{ "quiet",     0},
+	END_CHOICES
 };
 #endif
 
 #if OPT_FILEBACK
 static
 FSM_CHOICES fsm_backupstyle[] = {
-    "off",
-    ".bak",
+	{ "off",       0},
+	{ ".bak",      1},
 #if SYS_UNIX
-    "tilde",
-    /* "tilde_N_existing", */
-    /* "tilde_N", */
+	{ "tilde",     2},
+	/* "tilde_N_existing", */
+	/* "tilde_N", */
 #endif
-    (char *) 0
+	END_CHOICES
 };
 #endif
 
 #if OPT_HILITEMATCH
 static
 FSM_CHOICES fsm_mono_attributes[] = {
-    "none",
-    "underline",
-    "bold",
-    "italic",
-    "reverse",
-    "color",
-    (char *) 0
+	{ "bold",       VABOLD  },
+	{ "color",      VACOLOR },
+	{ "italic",     VAITAL  },
+	{ "none",       0       },
+	{ "reverse",    VAREV   },
+	{ "underline",  VAUL    },
+	END_CHOICES
 };
-#endif
-
-#define fsm_choice(mode_name, choices) \
-	{ mode_name, TABLESIZE(choices)-1, choices }
-
-#if OPT_COLOR
-#define FSM_IDX 2
-#else
-#define FSM_IDX 1
 #endif
 
 static
 struct FSM fsm_tbl[] = {
-    fsm_choice("*bool", fsm_bool_choices),
+	{ "*bool",           fsm_bool_choices  },
 #if OPT_COLOR
-    fsm_choice("*color", cname),
+	{ "fcolor",          fsm_color_choices },
+	{ "bcolor",          fsm_color_choices },
 #endif
-    /* FSM_IDX */
 #if OPT_POPUPCHOICE
-    fsm_choice("popup-choices", fsm_popup_choices),
+	{ "popup-choices",   fsm_popup_choices },
 #endif
 #if NEVER
-    fsm_choice("error", fsm_error),
+	{ "error",           fsm_error },
 #endif
 #if OPT_FILEBACK
-    fsm_choice("backup-style", fsm_backupstyle),
+	{ "backup-style",    fsm_backupstyle },
 #endif
 #if OPT_HILITEMATCH
-    fsm_choice("visual-matches", fsm_mono_attributes),
+	{ "visual-matches",  fsm_mono_attributes },
 #endif
 };
 
 static int fsm_idx;
 
 static int
+choice_to_code (choices, name)
+FSM_CHOICES *choices;
+char *name;
+{
+	int code = ENUM_ILLEGAL;
+	register int i;
+
+	for (i = 0; choices[i].choice_name != 0; i++) {
+		if (strcmp(name, choices[i].choice_name) == 0) {
+			code = choices[i].choice_code;
+			break;
+		}
+	}
+	return code;
+}
+
+static char *
+choice_to_name (choices, code)
+FSM_CHOICES *choices;
+int code;
+{
+	char *name = 0;
+	register int i;
+
+	for (i = 0; choices[i].choice_name != 0; i++) {
+		if (choices[i].choice_code == code) {
+			name = choices[i].choice_name;
+			break;
+		}
+	}
+	return name;
+}
+
+static FSM_CHOICES *
+name_to_choices (names)
+struct VALNAMES *names;
+{
+	register int i;
+
+	for (i = 1; i < TABLESIZE(fsm_tbl); i++)
+		if (strcmp(fsm_tbl[i].mode_name, names->name) == 0)
+			return fsm_tbl[i].choices;
+
+	return 0;
+}
+
+static int
 is_fsm(names)
     struct VALNAMES *names;
 {
-    if (names->type == VALTYPE_STRING) {
-	int i;
-	for (i = FSM_IDX; i < TABLESIZE(fsm_tbl); i++)
-	    if (strcmp(fsm_tbl[i].mode_name, names->name) == 0) {
-		fsm_idx = i;
+	register int i;
+
+	if (names->type == VALTYPE_ENUM
+	 || names->type == VALTYPE_STRING) {
+		for (i = 1; i < TABLESIZE(fsm_tbl); i++) {
+			if (strcmp(fsm_tbl[i].mode_name, names->name) == 0) {
+				fsm_idx = i;
+				return TRUE;
+			}
+		}
+	} else if (names->type == VALTYPE_BOOL) {
+		fsm_idx = 0;
 		return TRUE;
-	    }
-    }
-    fsm_idx = -1;
-    return FALSE;
+	}
+	fsm_idx = -1;
+	return FALSE;
 }
 
 /*
@@ -739,18 +808,16 @@ legal_fsm(val)
 		int i;
 		int idx = fsm_idx;
 		FSM_CHOICES *p = fsm_tbl[idx].choices;
+		char *s;
 
 		if (isdigit(*val)) {
 			if (!string_to_number(val, &i))
 				return 0;
-			if (i < fsm_tbl[idx].count)
-				return p[i];
+			if ((s = choice_to_name(p, i)) != 0)
+				return s;
 		} else {
-			fsm_idx = -1;
-			for (i = fsm_tbl[idx].count; i-- > 0; p++) {
-				if (strcmp(*p, val) == 0)
-					return val;
-			}
+			if (choice_to_code(p, val) != ENUM_ILLEGAL)
+				return val;
 		}
 		mlforce("[Illegal value for %s: '%s']",
 			fsm_tbl[idx].mode_name,
@@ -772,8 +839,8 @@ fsm_complete(c, buf, pos)
 	return isspace(c);
     }
     return kbd_complete(FALSE, c, buf, pos,
-                        (char *)&fsm_tbl[fsm_idx].choices[0],
-			sizeof (&fsm_tbl[fsm_idx].choices[0]) );
+                        (char *)(fsm_tbl[fsm_idx].choices),
+			sizeof (FSM_CHOICES) );
 }
 #endif	/* OPT_ENUM_MODES */
 
@@ -798,9 +865,6 @@ VALARGS *args;			/* symbol-table entry for the mode */
 	char *rp = no ? cp+2 : cp;
 	int nval, status = TRUE;
 	int unsetting = !setting && !global;
-#if OPT_COLOR
-	register int i;
-#endif
 
 	if (no && (names->type != VALTYPE_BOOL))
 		return FALSE;		/* this shouldn't happen */
@@ -829,17 +893,6 @@ VALARGS *args;			/* symbol-table entry for the mode */
 #if OPT_ENUM_MODES
 		if (is_fsm(names))
 			complete = fsm_complete;
-
-		else if (names->type == VALTYPE_BOOL) {
-			complete = fsm_complete;
-			fsm_idx = 0;
-		}
-#if OPT_COLOR
-		else if (names->type == VALTYPE_COLOR) {
-			complete = fsm_complete;
-			fsm_idx = 1;
-		}
-#endif
 #endif
 
 		status = kbd_string(prompt, respbuf, sizeof(respbuf), eolchar,
@@ -882,26 +935,29 @@ VALARGS *args;			/* symbol-table entry for the mode */
 			values->vp->i = no ? !setting : setting;
 			break;
 
-#if OPT_COLOR
-		case VALTYPE_COLOR:
-			nval = -1;
-			(void)mklower(rp);
-			for (i = 0; i < NCOLORS; i++) {
-				if (strcmp(rp, cname[i]) == 0) {
-					nval = i;
-					break;
+		case VALTYPE_ENUM:
+#if OPT_ENUM_MODES
+			{
+				FSM_CHOICES *fp = name_to_choices(names);
+
+				(void)mklower(rp);
+				if (isdigit(*rp)) {
+					if (!string_to_number(rp, &nval))
+						return FALSE;
+					if (choice_to_name(fp, nval) == 0)
+						nval = ENUM_ILLEGAL;
+				} else {
+					nval = choice_to_code(fp, rp);
+				}
+				if (nval == ENUM_ILLEGAL) {
+					mlforce("[Not a legal enum-index: %s]",
+						rp);
+					return FALSE;
 				}
 			}
-			if ((nval < 0) && !string_to_number(rp, &nval))
-				return FALSE;
-			if (nval >= NCOLORS) {
-				mlforce("[Not a legal color-index: %d]", nval);
-				return FALSE;
-			}
 			values->vp->i = nval;
-			refresh(FALSE, 0);
 			break;
-#endif /* OPT_COLOR */
+#endif /* OPT_ENUM_MODES */
 
 		case VALTYPE_INT:
 			if (!string_to_number(rp, &nval))
@@ -1204,6 +1260,7 @@ CHGD_DECL
 		else if (&args->local->vp->i == &gbcolor)
 			TTbacg(gbcolor);
 		set_winflags(level, WFHARD|WFCOLR);
+		refresh(FALSE,0);
 	}
 	return TRUE;
 }

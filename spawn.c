@@ -1,7 +1,7 @@
 /*	Spawn:	various DOS access commands
  *		for MicroEMACS
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/spawn.c,v 1.102 1995/09/26 03:09:52 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/spawn.c,v 1.104 1995/11/14 01:04:01 pgf Exp $
  *
  */
 
@@ -144,7 +144,7 @@ int f,n;
 	if (!forced && writeall(f,n,FALSE,TRUE,TRUE) != TRUE)
 		return FALSE;
 
-	vttidy(TRUE);
+	ttclean(TRUE);
 
 /* #define simulate_job_control_for_debug */
 # ifdef simulate_job_control_for_debug
@@ -172,6 +172,7 @@ ACTUAL_SIG_DECL
 	(void)TTgetc();		/* have to skip a character */
 	ttunclean();		/* ...so that I can finally suppress echo */
 #  endif
+	TTkopen();
 	setup_handler(SIGCONT,rtfrmshell); /* suspend & restart */
 	(void)update(TRUE);
 # endif
@@ -195,7 +196,9 @@ pressreturn()
 	TTflush();
 	/* loop for a CR, a space, or a : to do another named command */
 	while ((c = keystroke()) != '\r' &&
-			c != ' ' && !ABORTED(c)) {
+			c != '\n' && 
+			c != ' ' && 
+			!ABORTED(c)) {
 		if (kcod2fnc(c) == &f_namedcmd) {
 			unkeystroke(c);
 			break;
@@ -501,11 +504,24 @@ int f,n;
 		return FALSE;
 
 
+#if BEFORE
 	if (((s = ((bp = bfind(OUTPUT_BufName, 0)) != NULL)) == TRUE)
 	 && ((s = popupbuff(bp)) == TRUE)
 	 && ((s = swbuffer(bp)) == TRUE)
 	 && ((s = readin(line, FALSE, bp, TRUE)) == TRUE))
 		set_rdonly(bp, line);
+
+#else
+	if ((s = ((bp = bfind(OUTPUT_BufName, 0)) != NULL)) != TRUE)
+		return s;
+	if ((s = popupbuff(bp)) != TRUE)
+		return s;
+	ch_fname(bp,line);
+	bp->b_active = FALSE; /* force a re-read */
+	if ((s = swbuffer_lfl(bp,FALSE)) != TRUE)
+		return s;
+	set_rdonly(bp, line);
+#endif
 
 	return (s);
 }

@@ -8,7 +8,7 @@
  * Modified by Pete Ruczynski (pjr) for auto-sensing and selection of
  * display type.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/ibmpc.c,v 1.73 1995/10/01 14:44:59 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/ibmpc.c,v 1.74 1995/11/17 04:03:42 pgf Exp $
  *
  */
 
@@ -255,6 +255,7 @@ extern	void	ibmkclose P((void));
 #if	OPT_COLOR
 extern	void	ibmfcol   P((int));
 extern	void	ibmbcol   P((int));
+extern	void	ibmspal   P((char *));
 
 int	cfcolor = -1;		/* current forground color */
 int	cbcolor = -1;		/* current background color */
@@ -334,6 +335,7 @@ TERM    term    = {
 #if	OPT_COLOR
 	ibmfcol,
 	ibmbcol,
+	ibmspal,
 #endif
 	ibmscroll
 };
@@ -462,6 +464,8 @@ void
 ibmfcol(color)		/* set the current output color */
 int color;	/* color to set */
 {
+	if (color < 0)
+		color = C_WHITE;
 	cfcolor = ctrans[color];
 }
 
@@ -469,7 +473,18 @@ void
 ibmbcol(color)		/* set the current background color */
 int color;	/* color to set */
 {
+	if (color < 0)
+		color = C_BLACK;
 	cbcolor = ctrans[color];
+}
+
+void
+ibmspal(char *thePalette)	/* reset the palette registers */
+{
+    	/* this is pretty simplistic.  big deal. */
+	(void)sscanf(thePalette, "%i %i %i %i %i %i %i %i",
+	    	&ctrans[0], &ctrans[1], &ctrans[2], &ctrans[3],
+	    	&ctrans[4], &ctrans[5], &ctrans[6], &ctrans[7] );
 }
 #endif
 
@@ -559,19 +574,6 @@ char *res;	/* resolution to change to */
 		}
 	}
 	return status;
-}
-
-void
-spal(palstr)	/* reset the palette registers */
-char *palstr;
-{
-#if OPT_COLOR
-    	/* this is pretty simplistic.  big deal. */
-	(void)sscanf(palstr,"%i %i %i %i %i %i %i %i",
-	    	&ctrans[0], &ctrans[1], &ctrans[2], &ctrans[3],
-	    	&ctrans[4], &ctrans[5], &ctrans[6], &ctrans[7] );
-#endif
-
 }
 
 #if OPT_MS_MOUSE || OPT_FLASH
@@ -757,7 +759,7 @@ ibmopen()
 #endif
 
 #if	OPT_COLOR
-	spal(initpalettestr);
+	set_palette(initpalettestr);
 #endif
 	if (!ibmcres(current_res_name))
 		(void)scinit(ORIGTYPE);

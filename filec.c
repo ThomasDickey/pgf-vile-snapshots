@@ -5,7 +5,7 @@
  * Written by T.E.Dickey for vile (march 1993).
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/filec.c,v 1.54 1995/09/10 20:48:35 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/filec.c,v 1.55 1995/11/18 00:36:16 pgf Exp $
  *
  */
 
@@ -488,7 +488,7 @@ sortMyBuff()
     for_each_line(lp, MyBuff) {
 	*slp++ = lp;
     }
-    qsort((void *) sortvec, (SIZE_T)n, sizeof(LINE *), qs_pathcmp);
+    qsort((char *) sortvec, (SIZE_T)n, sizeof(LINE *), qs_pathcmp);
 
     plp = l_ref(buf_head(MyBuff));
     slp = sortvec;
@@ -508,7 +508,7 @@ sortMyBuff()
     set_lback(lp, l_ptr(plp));
     b_clr_counted(MyBuff);
 
-    free(sortvec);
+    free((char *)sortvec);
 }
 #endif	/* HAVE_QSORT */
 

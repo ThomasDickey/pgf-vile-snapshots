@@ -9,7 +9,7 @@
  * is called whenever possible.
  * Modifications by Pete Ruczynski (pjr).
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/z_ibmpc.c,v 1.13 1994/11/29 04:02:03 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/z_ibmpc.c,v 1.14 1995/11/17 04:03:42 pgf Exp $
  *
  */
 #error This module is not actively maintained as part of vile.
@@ -118,8 +118,9 @@ TERM    term    = {
 	zibmrev,
 	zibmcres
 #if	OPT_COLOR
-	, zibmfcol,
-	zibmbcol
+	, zibmfcol
+	, zibmbcol
+	, 0		/* no palette */
 #endif
 };
 
@@ -266,20 +267,6 @@ char	*res;
 	dtype = type;	/* history */
 
 } /* end of zibmcres */
-
-
-/*
- * spal
- *
- * reset the palette registers
- */
-/*****************************************************************************/
-int
-spal()
-/*****************************************************************************/
-{
-	/* nothing here now..... */
-} /* end of spal */
 
 
 /*

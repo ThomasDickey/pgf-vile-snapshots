@@ -46,7 +46,7 @@
  * vile will choose some appropriate fallback (such as underlining) if
  * italics are not available.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/manfilt.c,v 1.12 1995/10/10 12:23:12 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/manfilt.c,v 1.14 1995/11/21 02:29:34 pgf Exp $
  *
  */
 
@@ -100,9 +100,15 @@ extern	char *	realloc	P(( char *, size_t ));
 extern	int	_filbuf	P(( FILE * ));
 #endif
 
+#ifdef lint
+#define	typecallocn(cast,ntypes)	(((cast *)0)+(ntypes))
+#define	typereallocn(cast,ptr,ntypes)	((ptr)+(ntypes))
+#else
 #define	typecallocn(cast,ntypes)	(cast *)calloc(sizeof(cast),ntypes)
 #define	typereallocn(cast,ptr,ntypes)	(cast *)realloc((char *)(ptr),\
 							(ntypes)*sizeof(cast))
+#endif
+
 #define backspace() \
 		if (cur_line != 0 \
 		 && cur_line->l_this > 0) \
@@ -165,7 +171,7 @@ static void put_cell P(( int c, int level, int ident ));
 
 static LINEDATA *all_lines;
 static LINEDATA *cur_line;
-static int	total_lines;
+static long	total_lines;
 
 static void
 failed(s)
@@ -255,8 +261,8 @@ int ident;
 		cur_line = allocate_line();
 
 	len = cur_line->l_used;
-	extend_line();
 	col = cur_line->l_this++;
+	extend_line();
 
 	p = &(cur_line->l_cell[col]);
 
@@ -454,7 +460,8 @@ flush_line()
 		}
 		putchar('\n');
 
-		free(l);
+		free((char *)l->l_cell);
+		free((char *)l);
 	}
 }
 

@@ -5,7 +5,7 @@
  *	reading and writing of the disk are in "fileio.c".
  *
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/file.c,v 1.170 1995/10/01 14:44:59 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/file.c,v 1.172 1995/11/13 13:26:21 pgf Exp $
  *
  */
 
@@ -561,14 +561,21 @@ int lockfl;
 			}
 		}
 
+#if BEFORE
 		/*
 		 * The 'swbuffer()' function will invoke 'readin()', but it
 		 * doesn't accept the 'lockfl' parameter, so we call it here.
 		 */
+/* added swbuffer_lfl() to take lockfl arg to get around this problem.  the
+ * readin() was happening before a lot of the buffer info was set up, so a
+ * user readhook couldn't use that info successfully.
+ * if this change appears successful, the bp2readin routine (4 lines) can
+ * be folded into swbuffer_lfl(), which is the only caller.  --pgf */
 		if (!(bp->b_active))
 			s = bp2readin(bp, lockfl);
+#endif
 		if (s == TRUE)
-			s = swbuffer(bp);
+			s = swbuffer_lfl(bp, lockfl);
 		if (s == TRUE)
 			curwp->w_flag |= WFMODE|WFHARD;
 	}
@@ -1903,7 +1910,7 @@ ACTUAL_SIG_DECL
 		}
 	}
 	if (signo > 2) {
-		vttidy(FALSE);
+		ttclean(FALSE);
 		abort();
 	} else {
 		tidy_exit(wrote ? BADEXIT : GOODEXIT);

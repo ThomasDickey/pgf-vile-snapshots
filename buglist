@@ -1,7 +1,7 @@
 ------------------------
 vile bug/enhancement/wish list
 ------------------------
-$Header: /usr/build/VCS/pgf-vile/RCS/buglist,v 1.260 1995/10/19 20:11:57 pgf Exp $
+$Header: /usr/build/VCS/pgf-vile/RCS/buglist,v 1.272 1995/11/19 00:38:59 pgf Exp $
 ----------------------
 	(E means enhancement, L,M,H are low, medium, high priority)
 
@@ -735,6 +735,49 @@ not worried about trailing whitespace anyway.  -- pgf ]
 
 ---------------
 
-the 'read-hook' is triggered at a point where the name of the buffer that's
-being read isn't necessarily known.  Perhaps it would be better to trigger this
-on the first use after reading it?
+
+I just rediscovered a small problem with the :<number> command
+to go to a certain line number. Try:
+
+        <esc>:a<backspace>1<return>
+
+This is not accepted by vile. You have to type <esc>:1 to recover. I am
+running under SunOS 4.1.2.
+
+--------------------------
+
+This is a report against vile v5.4 built using djgpp.  Vile is running
+in raw DOS (not in a Windows DOS box).
+
+This command:
+    vile -4
+gives me 50 lines (not 43).  The only two screen resolutions that seem
+to work are vile -2 and vile -5 .
+
+[ This is a result of the borland screen library.  43 lines are available
+under OS/2... ]
+
+---------------------------------
+the command 
+	set tags "./tags ~/tags" does not work
+	set tags "./tags $HOME/tags" does not work
+an real path must be specified.
+
+---------------------------------
+.. you can't use the mouse to select text from the command input line, I often
+use this after Ctrl+G to get the filename for a UNIX command elsewhere.
+
+---------------------------------
+.. button 1 selection doesn't work it quite the same way as other apps. e.g.
+in xterm, double click on a word (don't release button after second click)
+and drag along a sentence - first word is selected and so are subsequent
+words in the sentence as you drag.  Just the first word is selected in xvile.
+
+---------------------------------
+it would be nice to have a variable $host to differentiate
+the case we are in a special host (remote login for example)
+to set the variable timeoutlen to a higher value to avoid 
+the problem of arrow-keys (character insertion in cursor deplacement).
+
+[this can be done using the &env function, e.g., &env "HOST" - dickey]
+---------------------------------

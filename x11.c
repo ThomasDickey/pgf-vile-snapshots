@@ -2,7 +2,7 @@
  * 	X11 support, Dave Lemke, 11/91
  *	X Toolkit support, Kevin Buettner, 2/94
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/x11.c,v 1.124 1995/10/19 20:02:25 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/x11.c,v 1.125 1995/11/17 04:03:42 pgf Exp $
  *
  */
 
@@ -416,8 +416,9 @@ TERM        term = {
     x_cres
 
 #if	OPT_COLOR
-    ,x_fcol,
-    x_bcol
+    ,x_fcol
+    ,x_bcol
+    ,0			/* no palette */
 #endif
     ,x_scroll
     ,x_flush
@@ -5304,15 +5305,6 @@ int color;
 }
 
 #endif
-
-/* change palette string */
-/* ARGSUSED */
-void
-spal(dummy)
-char *dummy;
-{
-}
-
 
 /* beep */
 static void

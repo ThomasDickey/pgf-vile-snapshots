@@ -8,7 +8,7 @@
 */
 
 /*
- * $Header: /usr/build/VCS/pgf-vile/RCS/edef.h,v 1.187 1995/10/19 20:11:29 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/edef.h,v 1.190 1995/11/19 23:40:06 pgf Exp $
  */
 
 /* I know this declaration stuff is really ugly, and I probably won't ever
@@ -31,7 +31,7 @@ decl_init( char prognam[], "xvile");
 decl_init( char prognam[], "vile");
 #endif
 
-decl_init( char version[], "version 5.4");
+decl_init( char version[], "version 5.5");
 
 #if SYS_UNIX
 decl_init( char opersys[], "unix");
@@ -101,6 +101,7 @@ decl_uninit( char sres[NBUFN] );	/* current screen resolution	*/
 
 decl_uninit( char pat[NPAT] );		/* Search pattern		*/
 decl_uninit( char rpat[NPAT] );		/* replacement pattern		*/
+decl_uninit( int  last_srch_direc );		/* Direction of last search */
 
 #if OPT_PROCEDURES
 decl_uninit( char cdhook[NBUFN+1] );	/* proc to run when change dir */
@@ -251,7 +252,7 @@ decl_init( char	truem[], "TRUE" );	/* true literal			*/
 decl_init( char	falsem[], "FALSE" );	/* false literal		*/
 
 decl_init( int	cmdstatus, TRUE );	/* last command status		*/
-#if OPT_EVAL || (DISP_ATARI & SYS_ST520 & MEGAMAX)
+#if OPT_EVAL || OPT_COLOR
 decl_uninit( char palstr[NSTRING] );	/* palette string		*/
 #endif
 decl_uninit( char *fline );		/* dynamic return line		*/

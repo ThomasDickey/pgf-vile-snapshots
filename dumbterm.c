@@ -1,6 +1,6 @@
 /*	Dumb terminal driver, for I/O before we get into screen mode.
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/dumbterm.c,v 1.1 1995/08/11 02:57:27 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/dumbterm.c,v 1.2 1995/11/18 00:36:16 pgf Exp $
  *
  */
 
@@ -126,6 +126,7 @@ dumb_flush()
 	fflush(stdout);
 }
 
+/*ARGSUSED*/
 static void
 dumb_move(row, col)
 int row, col;

@@ -1,7 +1,7 @@
 #
 # makefile for vile on WIN32 using Microsoft Visual C++
 #
-# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.wnt,v 1.7 1995/09/10 20:48:35 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.wnt,v 1.8 1995/11/02 20:06:40 pgf Exp $
 #
 #
 !include <ntwin32.mak>
@@ -24,7 +24,7 @@ SRC = 	main.c ntconio.c basic.c bind.c buffer.c crypt.c \
 	path.c random.c regexp.c \
 	region.c search.c select.c spawn.c \
 	tags.c tbuff.c termio.c tmp.c undo.c \
-	version.c vmalloc.c window.c word.c wordmov.c map.c 
+	version.c window.c word.c wordmov.c map.c 
 
 OBJ = 	main.obj ntconio.obj basic.obj bind.obj buffer.obj crypt.obj \
       	csrch.obj display.obj eval.obj exec.obj externs.obj \
@@ -35,7 +35,7 @@ OBJ = 	main.obj ntconio.obj basic.obj bind.obj buffer.obj crypt.obj \
 	path.obj random.obj regexp.obj \
 	region.obj search.obj select.obj spawn.obj \
 	tags.obj tbuff.obj termio.obj tmp.obj undo.obj \
-	version.obj vmalloc.obj window.obj word.obj wordmov.obj map.obj 
+	version.obj window.obj word.obj wordmov.obj map.obj 
 
 .c.obj:	
 	cl $(CFLAGS) -c $< -Fo$@ 
@@ -69,6 +69,5 @@ eval.obj:	nevars.h
 glob.obj:	dirstuff.h
 externs.obj:	nebind.h nename.h nefunc.h
 path.obj:	dirstuff.h
-vmalloc.obj:	nevars.h
 version.obj:	patchlev.h
 

@@ -7,7 +7,7 @@
  *
  * original author: D. R. Banks 9-May-86
  *
- * $Header: /usr/build/VCS/pgf-vile/RCS/isearch.c,v 1.41 1995/08/21 02:42:06 pgf Exp $
+ * $Header: /usr/build/VCS/pgf-vile/RCS/isearch.c,v 1.42 1995/11/09 21:26:39 pgf Exp $
  *
  */
 
@@ -45,6 +45,9 @@ risearch(f, n)
 
 	curpos = DOT;		/* Save the current point */
 
+	/* Save direction */
+	last_srch_direc =  REVERSE;
+
 	/* Make sure the search doesn't match where we already are: */
 
 	backchar(TRUE, 1);	/* Back up a character */
@@ -74,6 +77,9 @@ fisearch(f, n)
 	/* remember the initial . on entry: */
 
 	curpos = DOT;		/* save current point */
+
+	/* Save direction */
+	last_srch_direc = FORWARD;
 
 	/* do the search */
 
@@ -168,9 +174,11 @@ start_over:
 		curp = DOT;
 		if (c == IS_REVERSE) {	/* forward search? */
 			n = -1;	/* No, search in reverse */
+			last_srch_direc = REVERSE;
 			backchar(TRUE, 1);	/* Be defensive about EOB */
 		} else {
 			n = 1;	/* Yes, search forward */
+			last_srch_direc = FORWARD;
 			forwchar(TRUE, 1);
 		}
 		--cmd_offset;	/* Back up over the Rubout */
@@ -186,7 +194,7 @@ start_over:
 		/* Check for special characters first: */
 		/* Most cases here change the search */
 
-		if (ABORTED(c))	/* Want to quit searching? */
+		if (ABORTED(c) || c == '\r')	/* Want to quit searching? */
 			return (TRUE);	/* Quit searching now */
 
 		if (isbackspace(c))
@@ -200,11 +208,13 @@ start_over:
 		case IS_FORWARD:	/* If forward search */
 			curp = DOT;
 			if (c == IS_REVERSE) {	/* forward search? */
+				last_srch_direc = REVERSE;
 				n = -1;	/* No, search in reverse */
 				backchar(TRUE, 1);	/* Be defensive about
 							 * EOB */
 			} else {
 				n = 1;	/* Yes, search forward */
+				last_srch_direc = FORWARD;
 				forwchar(TRUE, 1);
 			}
 			status = scanmore(pat, n);	/* Do the search */
@@ -214,10 +224,6 @@ start_over:
 			--cmd_offset;	/* Back up over the Rubout */
 			cmd_buff[--cmd_offset] = EOS;	/* Yes, del last char */
 			continue;	/* Go continue with the search */
-
-		case '\r':	/* Carriage return */
-			c = '\n';	/* Make it a new line */
-			break;	/* Make sure we use it */
 
 		case '\t':	/* Generically allowed */
 		case '\n':	/* controlled characters */

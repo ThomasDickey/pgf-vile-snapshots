@@ -1,9 +1,9 @@
 
 This is a generic document provided with most packages which use
 the GNU autoconf/configure system to achieve system portability.
-For vile-specific build/installation information, see README.CONFIG.
+For vile-specific build/installation information, see README.CFG.
 
-$Header: /usr/build/VCS/pgf-vile/RCS/INSTALL,v 1.4 1994/07/11 22:56:20 pgf Exp $
+$Header: /usr/build/VCS/pgf-vile/RCS/INSTALL,v 1.5 1995/11/09 23:16:09 pgf Exp $
 --------------------------------
 
    This is a generic INSTALL file for utilities distributions.

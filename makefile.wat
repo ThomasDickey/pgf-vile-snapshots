@@ -3,7 +3,7 @@
 # based on the original makefile of vile 3.46 (see the original makefile)
 # T.DANG (dang@cogit.ign.fr)
 #
-# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.wat,v 1.17 1995/10/01 14:44:59 pgf Exp $
+# $Header: /usr/build/VCS/pgf-vile/RCS/makefile.wat,v 1.18 1995/11/09 12:27:14 pgf Exp $
 #
 # if you use the watcom version of vile, you may want to "set DOS4G=quiet"
 # to suppress the DOS 4G/W banner that comes up from the Rational Systems
@@ -41,7 +41,7 @@ SRC = 	main.c $(SCREEN).c basic.c bind.c buffer.c crypt.c &
 	oneliner.c opers.c path.c random.c regexp.c &
 	region.c search.c select.c spawn.c &
 	tags.c tbuff.c termio.c tmp.c undo.c &
-	version.c vmalloc.c window.c word.c wordmov.c
+	version.c window.c word.c wordmov.c
 
 OBJ = 	main.obj $(SCREEN).obj basic.obj bind.obj buffer.obj crypt.obj &
       	csrch.obj display.obj eval.obj exec.obj externs.obj &
@@ -52,7 +52,7 @@ OBJ = 	main.obj $(SCREEN).obj basic.obj bind.obj buffer.obj crypt.obj &
 	oneliner.obj opers.obj path.obj random.obj regexp.obj &
 	region.obj search.obj select.obj spawn.obj &
 	tags.obj tbuff.obj termio.obj tmp.obj undo.obj &
-	version.obj vmalloc.obj window.obj word.obj wordmov.obj
+	version.obj window.obj word.obj wordmov.obj
 
 
 vile.exe: $(BUILTHDRS) $(OBJ) vile.lnk
