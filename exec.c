@@ -4,7 +4,16 @@
  *	written 1986 by Daniel Lawrence	
  *
  * $Log: exec.c,v $
- * Revision 1.25  1992/03/13 08:11:04  pgf
+ * Revision 1.28  1992/05/19 08:55:44  foxharp
+ * more prototype and shadowed decl fixups
+ *
+ * Revision 1.27  1992/05/16  12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.26  1992/04/26  13:42:33  pgf
+ * added names to "no such ..." messages
+ *
+ * Revision 1.25  1992/03/13  08:11:04  pgf
  * allow ":0" to work by honoring ZERO flag for gomark
  *
  * Revision 1.24  1992/03/03  08:41:15  pgf
@@ -105,8 +114,11 @@
 #include	"estruct.h"
 #include	"edef.h"
 
+extern CMDFUNC f_gomark;
+
 /* namedcmd:	execute a named command even if it is not bound */
 
+int
 namedcmd(f, n)
 int f, n;
 {
@@ -115,10 +127,12 @@ int f, n;
 	LINE *toline;	/* second linespec */
 	char lspec[NLINE];
 	int cpos = 0;
-	int s,c,isdfl,zero,flags;
-	char *kbd_engl();
+	int s,c,isdfl,zero;
+	long flags;
 	CMDFUNC *cfp;		/* function to execute */
-	extern CMDFUNC f_gomark;
+
+	lspec[0] = '\0';
+	fnp = NULL;
 
 	/* prompt the user to type a named command */
 	mlprompt(": ");
@@ -211,7 +225,7 @@ int f, n;
 			fnp = "";
 		}
 	} else if ((cfp = engl2fnc(fnp)) == NULL) { /* bad function */
-		mlforce("[No such function %s]",fnp);
+		mlforce("[No such function \"%s\"]",fnp);
 		return FALSE;
 	}
 	flags = cfp->c_flags;
@@ -230,7 +244,7 @@ seems like we need one more check here -- is it from a .exrc file?
 	/* was: if (!(flags & (ZERO | EXRCOK)) && fromline == NULL ) { */
 	if (zero) {
 		extern CMDFUNC f_lineputafter, f_opendown, f_insfile;
-		extern CMDFUNC f_lineputbefore, f_openup, f_gomark;
+		extern CMDFUNC f_lineputbefore, f_openup;
 		if (!(flags & ZERO)) {
 			mlforce("[Can't use address 0 with \"%s\" command]", fnp);
 			return FALSE;
@@ -493,6 +507,7 @@ LINE		**markptr;	/* where to store the mark's value */
 /* parse an ex-style line range -- code culled from elvis, file ex.c, by
 	Steve Kirkendall
 */
+int
 rangespec(specp,fromlinep,tolinep,isdefaultp,zerop)
 char		*specp;	/* string containing a line range */
 LINE		**fromlinep;	/* first linespec */
@@ -565,6 +580,7 @@ int		*zerop;
 }
 
 /* old namedcmd:	execute a named command even if it is not bound */
+int
 onamedcmd(f, n)
 int f, n;	/* command arguments [passed through to command executed] */
 {
@@ -601,6 +617,7 @@ int f, n;	/* command arguments [passed through to command executed] */
 
 #if NEVER
 /*	execcmd:	Execute a command line command by name alone */
+int
 execcmd(f, n)
 int f, n;	/* default Flag and Numeric argument */
 {
@@ -628,6 +645,7 @@ int f, n;	/* default Flag and Numeric argument */
 
 */
 
+int
 docmd(cline,newcle,f,n)
 char *cline;	/* command line to execute */
 int newcle;
@@ -638,7 +656,6 @@ int f,n;
 	char *oldestr;		/* original exec string */
 	char tkn[NSTRING];	/* next token off of command line */
 	CMDFUNC *cfp;
-	extern CMDFUNC f_godotplus;
 		
 	/* if we are scanning and not executing..go back here */
 	if (execlevel)
@@ -685,6 +702,69 @@ int f,n;
 	cmdstatus = status;		/* save the status */
 	clexec = oldcle;		/* restore clexec flag */
 	execstr = oldestr;
+	return status;
+}
+
+/*
+ * This is the general command execution routine. It takes care of checking
+ * flags, globals, etc, to be sure we're not doing something dumb.
+ * Return the status of command.
+ */
+
+int
+execute(execfunc, f, n)
+CMDFUNC *execfunc;		/* ptr to function to execute */
+int f,n;
+{
+	register int status, flags;
+	MARK odot;
+
+	if (execfunc == NULL) {
+		TTbeep();
+#if REBIND
+		mlforce("[Key not bound]");	/* complain		*/
+#else
+		mlforce("[Not a command]");	/* complain		*/
+#endif
+		return FALSE;
+	}
+
+	flags = execfunc->c_flags;
+
+	/* commands following operators can't be redone or undone */
+	if ( !doingopcmd) {
+		/* don't record non-redoable cmds */
+		if ((flags & REDO) == 0)
+			dotcmdstop();
+		if (flags & UNDO) {
+			/* undoable command can't be permitted when read-only */
+			if (b_val(curbp,MDVIEW))
+				return rdonly();
+			mayneedundo();
+		}
+	}
+
+	/* if motion is absolute, remember where we are */
+	if (flags & ABS) {
+		odot = DOT;
+	}
+
+	status = (execfunc->c_func)(f, n);
+	if ((flags & GOAL) == 0) { /* goal should not be retained */
+		curgoal = -1;
+	}
+#if VMALLOC
+	if (flags & UNDO)	/* verify malloc arena after line changers */
+		vverify("main");
+#endif
+
+	/* if motion was absolute, and it wasn't just on behalf of an
+		operator, and we moved, update the "last dot" mark */
+	if ((flags & ABS) && !doingopcmd && !sameline(DOT, odot)) {
+		curwp->w_lastdot = odot;
+	}
+
+
 	return status;
 }
 
@@ -747,6 +827,7 @@ char *src, *tok;	/* source string, destination token string */
 	return src;
 }
 
+int
 macarg(tok)	/* get a macro line argument */
 char *tok;	/* buffer to place argument */
 {
@@ -764,6 +845,7 @@ char *tok;	/* buffer to place argument */
 
 /*	nextarg:	get the next argument	*/
 
+int
 nextarg(buffer)
 char *buffer;		/* buffer to put token into */
 {
@@ -777,6 +859,7 @@ char *buffer;		/* buffer to put token into */
 /*	storemac:	Set up a macro buffer and flag to store all
 			executed command lines there			*/
 
+int
 storemac(f, n)
 int f;		/* default flag */
 int n;		/* macro number to use */
@@ -828,6 +911,7 @@ int n;		/* macro number to use */
 /*	storeproc:	Set up a procedure buffer and flag to store all
 			executed command lines there			*/
 
+int
 storeproc(f, n)
 int f;		/* default flag */
 int n;		/* macro number to use */
@@ -866,6 +950,7 @@ int n;		/* macro number to use */
 
 /*	execproc:	Execute a procedure				*/
 
+int
 execproc(f, n)
 int f, n;	/* default flag and numeric arg */
 {
@@ -885,7 +970,7 @@ int f, n;	/* default flag and numeric arg */
 
 	/* find the pointer to that buffer */
         if ((bp=bfind(bufn, NO_CREAT, 0)) == NULL) {
-		mlforce("[No such procedure]");
+		mlforce("[No such procedure \"%s\"]",bufn);
                 return FALSE;
         }
 
@@ -904,6 +989,7 @@ int f, n;	/* default flag and numeric arg */
 #if ! SMALLER
 /*	execbuf:	Execute the contents of a buffer of commands	*/
 
+int
 execbuf(f, n)
 int f, n;	/* default flag and numeric arg */
 {
@@ -920,7 +1006,7 @@ int f, n;	/* default flag and numeric arg */
 
 	/* find the pointer to that buffer */
         if ((bp=bfind(bufn, NO_CREAT, 0)) == NULL) {
-		mlforce("[No such buffer]");
+		mlforce("[No such buffer \"%s\"]",bufn);
                 return FALSE;
         }
 
@@ -958,8 +1044,20 @@ int f, n;	/* default flag and numeric arg */
 
 */
 
+void
+freewhile(wp)	/* free a list of while block pointers */
+WHBLOCK *wp;	/* head of structure to free */
+{
+	if (wp == NULL)
+		return;
+	if (wp->w_next)
+		freewhile(wp->w_next);
+	free((char *)wp);
+}
+
 #define DIRECTIVE_CHAR '~'
 
+int
 dobuf(bp)
 BUFFER *bp;	/* buffer to execute */
 {
@@ -976,7 +1074,7 @@ BUFFER *bp;	/* buffer to execute */
 	char *einit;		/* initial value of eline */
 	char *eline;		/* text of line to execute */
 #if ! SMALLER
-	WHBLOCK *scanner;	/* ptr during scan */
+	WHBLOCK *scanpt;	/* ptr during scan */
 	register LINE *glp;	/* line to goto */
 	WHBLOCK *whtemp;	/* temporary ptr to a WHBLOCK */
 	char tkn[NSTRING];	/* buffer to evaluate an expresion in */
@@ -997,7 +1095,7 @@ BUFFER *bp;	/* buffer to execute */
 	havemotion = FALSE;
 
 #if ! SMALLER
-	scanner = NULL;
+	scanpt = NULL;
 	/* scan the buffer to execute, building WHILE header blocks */
 	hlp = bp->b_line.l;
 	lp = hlp->l_fp;
@@ -1021,7 +1119,7 @@ BUFFER *bp;	/* buffer to execute */
 			whtemp = (WHBLOCK *)malloc(sizeof(WHBLOCK));
 			if (whtemp == NULL) {
 noram:				mlforce("[Out of memory during while scan]");
-failexit:			freewhile(scanner);
+failexit:			freewhile(scanpt);
 				freewhile(whlist);
 				mstore = FALSE;
 				dobufnesting--;
@@ -1029,13 +1127,13 @@ failexit:			freewhile(scanner);
 			}
 			whtemp->w_begin = lp;
 			whtemp->w_type = BTWHILE;
-			whtemp->w_next = scanner;
-			scanner = whtemp;
+			whtemp->w_next = scanpt;
+			scanpt = whtemp;
 		}
 
 		/* if is a BREAK directive, make a block... */
 		if (eline[0] == DIRECTIVE_CHAR && eline[1] == 'b' && eline[2] == 'r') {
-			if (scanner == NULL) {
+			if (scanpt == NULL) {
 				mlforce("[BREAK outside of any WHILE loop]");
 				goto failexit;
 			}
@@ -1044,25 +1142,25 @@ failexit:			freewhile(scanner);
 				goto noram;
 			whtemp->w_begin = lp;
 			whtemp->w_type = BTBREAK;
-			whtemp->w_next = scanner;
-			scanner = whtemp;
+			whtemp->w_next = scanpt;
+			scanpt = whtemp;
 		}
 
 		/* if it is an endwhile directive, record the spot... */
 		if (eline[0] == DIRECTIVE_CHAR && strncmp(&eline[1], "endw", 4) == 0) {
-			if (scanner == NULL) {
+			if (scanpt == NULL) {
 				mlforce("[ENDWHILE with no preceding WHILE in '%s']",
 					bp->b_bname);
 				goto failexit;
 			}
-			/* move top records from the scanner list to the
+			/* move top records from the scanpt list to the
 			   whlist until we have moved all BREAK records
 			   and one WHILE record */
 			do {
-				scanner->w_end = lp;
+				scanpt->w_end = lp;
 				whtemp = whlist;
-				whlist = scanner;
-				scanner = scanner->w_next;
+				whlist = scanpt;
+				scanpt = scanpt->w_next;
 				whlist->w_next = whtemp;
 			} while (whlist->w_type == BTBREAK);
 		}
@@ -1072,7 +1170,7 @@ nxtscan:	/* on to the next line */
 	}
 
 	/* while and endwhile should match! */
-	if (scanner != NULL) {
+	if (scanpt != NULL) {
 		mlforce("[WHILE with no matching ENDWHILE in '%s']",
 			bp->b_bname);
 		goto failexit;
@@ -1117,7 +1215,7 @@ nxtscan:	/* on to the next line */
 			strcat(outline, ":");
 	
 			/* debug if levels */
-			strcat(outline, itoa(execlevel));
+			strcat(outline, l_itoa(execlevel));
 			strcat(outline, ":");
 
 			/* and lastly the line */
@@ -1376,18 +1474,10 @@ eexec:	/* exit the current function */
         return TRUE;
 }
 
-freewhile(wp)	/* free a list of while block pointers */
-WHBLOCK *wp;	/* head of structure to free */
-{
-	if (wp == NULL)
-		return;
-	if (wp->w_next)
-		freewhile(wp->w_next);
-	free((char *)wp);
-}
 
 #if ! SMALLER
 /* ARGSUSED */
+int
 execfile(f, n)	/* execute a series of commands in a file */
 int f, n;	/* default flag and numeric arg to pass on to file */
 {
@@ -1422,6 +1512,7 @@ int f, n;	/* default flag and numeric arg to pass on to file */
 /*	dofile:	yank a file into a buffer and execute it
 		if there are no errors, delete the buffer on exit */
 
+int
 dofile(fname)
 char *fname;	/* file name to execute */
 {
@@ -1463,6 +1554,7 @@ char *fname;	/* file name to execute */
 
 /*	cbuf:	Execute the contents of a numbered buffer	*/
 
+int
 cbuf(f, n, bufnum)
 int f, n;	/* default flag and numeric arg */
 int bufnum;	/* number of buffer to execute */
@@ -1490,84 +1582,84 @@ int bufnum;	/* number of buffer to execute */
 	return TRUE;
 }
 
-cbuf1(f, n) int f,n; { return cbuf(f, n, 1); }
+int cbuf1(f, n) int f,n; { return cbuf(f, n, 1); }
 
-cbuf2(f, n) int f,n; { return cbuf(f, n, 2); }
+int cbuf2(f, n) int f,n; { return cbuf(f, n, 2); }
 
-cbuf3(f, n) int f,n; { return cbuf(f, n, 3); }
+int cbuf3(f, n) int f,n; { return cbuf(f, n, 3); }
 
-cbuf4(f, n) int f,n; { return cbuf(f, n, 4); }
+int cbuf4(f, n) int f,n; { return cbuf(f, n, 4); }
 
-cbuf5(f, n) int f,n; { return cbuf(f, n, 5); }
+int cbuf5(f, n) int f,n; { return cbuf(f, n, 5); }
 
-cbuf6(f, n) int f,n; { return cbuf(f, n, 6); }
+int cbuf6(f, n) int f,n; { return cbuf(f, n, 6); }
 
-cbuf7(f, n) int f,n; { return cbuf(f, n, 7); }
+int cbuf7(f, n) int f,n; { return cbuf(f, n, 7); }
 
-cbuf8(f, n) int f,n; { return cbuf(f, n, 8); }
+int cbuf8(f, n) int f,n; { return cbuf(f, n, 8); }
 
-cbuf9(f, n) int f,n; { return cbuf(f, n, 9); }
+int cbuf9(f, n) int f,n; { return cbuf(f, n, 9); }
 
-cbuf10(f, n) int f,n; { return cbuf(f, n, 10); }
+int cbuf10(f, n) int f,n; { return cbuf(f, n, 10); }
 
-cbuf11(f, n) int f,n; { return cbuf(f, n, 11); }
+int cbuf11(f, n) int f,n; { return cbuf(f, n, 11); }
 
-cbuf12(f, n) int f,n; { return cbuf(f, n, 12); }
+int cbuf12(f, n) int f,n; { return cbuf(f, n, 12); }
 
-cbuf13(f, n) int f,n; { return cbuf(f, n, 13); }
+int cbuf13(f, n) int f,n; { return cbuf(f, n, 13); }
 
-cbuf14(f, n) int f,n; { return cbuf(f, n, 14); }
+int cbuf14(f, n) int f,n; { return cbuf(f, n, 14); }
 
-cbuf15(f, n) int f,n; { return cbuf(f, n, 15); }
+int cbuf15(f, n) int f,n; { return cbuf(f, n, 15); }
 
-cbuf16(f, n) int f,n; { return cbuf(f, n, 16); }
+int cbuf16(f, n) int f,n; { return cbuf(f, n, 16); }
 
-cbuf17(f, n) int f,n; { return cbuf(f, n, 17); }
+int cbuf17(f, n) int f,n; { return cbuf(f, n, 17); }
 
-cbuf18(f, n) int f,n; { return cbuf(f, n, 18); }
+int cbuf18(f, n) int f,n; { return cbuf(f, n, 18); }
 
-cbuf19(f, n) int f,n; { return cbuf(f, n, 19); }
+int cbuf19(f, n) int f,n; { return cbuf(f, n, 19); }
 
-cbuf20(f, n) int f,n; { return cbuf(f, n, 20); }
+int cbuf20(f, n) int f,n; { return cbuf(f, n, 20); }
 
-cbuf21(f, n) int f,n; { return cbuf(f, n, 21); }
+int cbuf21(f, n) int f,n; { return cbuf(f, n, 21); }
 
-cbuf22(f, n) int f,n; { return cbuf(f, n, 22); }
+int cbuf22(f, n) int f,n; { return cbuf(f, n, 22); }
 
-cbuf23(f, n) int f,n; { return cbuf(f, n, 23); }
+int cbuf23(f, n) int f,n; { return cbuf(f, n, 23); }
 
-cbuf24(f, n) int f,n; { return cbuf(f, n, 24); }
+int cbuf24(f, n) int f,n; { return cbuf(f, n, 24); }
 
-cbuf25(f, n) int f,n; { return cbuf(f, n, 25); }
+int cbuf25(f, n) int f,n; { return cbuf(f, n, 25); }
 
-cbuf26(f, n) int f,n; { return cbuf(f, n, 26); }
+int cbuf26(f, n) int f,n; { return cbuf(f, n, 26); }
 
-cbuf27(f, n) int f,n; { return cbuf(f, n, 27); }
+int cbuf27(f, n) int f,n; { return cbuf(f, n, 27); }
 
-cbuf28(f, n) int f,n; { return cbuf(f, n, 28); }
+int cbuf28(f, n) int f,n; { return cbuf(f, n, 28); }
 
-cbuf29(f, n) int f,n; { return cbuf(f, n, 29); }
+int cbuf29(f, n) int f,n; { return cbuf(f, n, 29); }
 
-cbuf30(f, n) int f,n; { return cbuf(f, n, 30); }
+int cbuf30(f, n) int f,n; { return cbuf(f, n, 30); }
 
-cbuf31(f, n) int f,n; { return cbuf(f, n, 31); }
+int cbuf31(f, n) int f,n; { return cbuf(f, n, 31); }
 
-cbuf32(f, n) int f,n; { return cbuf(f, n, 32); }
+int cbuf32(f, n) int f,n; { return cbuf(f, n, 32); }
 
-cbuf33(f, n) int f,n; { return cbuf(f, n, 33); }
+int cbuf33(f, n) int f,n; { return cbuf(f, n, 33); }
 
-cbuf34(f, n) int f,n; { return cbuf(f, n, 34); }
+int cbuf34(f, n) int f,n; { return cbuf(f, n, 34); }
 
-cbuf35(f, n) int f,n; { return cbuf(f, n, 35); }
+int cbuf35(f, n) int f,n; { return cbuf(f, n, 35); }
 
-cbuf36(f, n) int f,n; { return cbuf(f, n, 36); }
+int cbuf36(f, n) int f,n; { return cbuf(f, n, 36); }
 
-cbuf37(f, n) int f,n; { return cbuf(f, n, 37); }
+int cbuf37(f, n) int f,n; { return cbuf(f, n, 37); }
 
-cbuf38(f, n) int f,n; { return cbuf(f, n, 38); }
+int cbuf38(f, n) int f,n; { return cbuf(f, n, 38); }
 
-cbuf39(f, n) int f,n; { return cbuf(f, n, 39); }
+int cbuf39(f, n) int f,n; { return cbuf(f, n, 39); }
 
-cbuf40(f, n) int f,n; { return cbuf(f, n, 40); }
+int cbuf40(f, n) int f,n; { return cbuf(f, n, 40); }
 
 

@@ -2,7 +2,10 @@
  *		written by Dana Hoggatt and Daniel Lawrence
  *
  * $Log: crypt.c,v $
- * Revision 1.3  1991/11/01 14:38:00  pgf
+ * Revision 1.4  1992/05/16 12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.3  1991/11/01  14:38:00  pgf
  * saber cleanup
  *
  * Revision 1.2  1991/08/07  12:35:07  pgf
@@ -18,6 +21,7 @@
 #include	"edef.h"
 
 #if	CRYPT
+int
 setkey(f, n)	/* reset encryption key of current buffer */
 int f;		/* default flag */
 int n;		/* numeric argument */
@@ -219,6 +223,7 @@ register int val;
 	return (val);
 }
 #else
+void
 nocrypt()
 {
 }

@@ -5,7 +5,10 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: tags.c,v $
- * Revision 1.17  1992/03/19 23:26:23  pgf
+ * Revision 1.18  1992/05/16 12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.17  1992/03/19  23:26:23  pgf
  * removed extra string lib externs
  *
  * Revision 1.16  1992/01/05  00:06:13  pgf
@@ -77,8 +80,11 @@ static char tagname[NFILEN];
 static char tagprefix[NFILEN];
 #endif
 
+void pushuntag();
+
 
 /* ARGSUSED */
+int
 gototag(f,n)
 int f,n;
 {
@@ -98,6 +104,7 @@ int f,n;
 	return s;
 }
 
+int
 cmdlinetag(t)
 char *t;
 {
@@ -107,6 +114,7 @@ char *t;
 
 static BUFFER *tagbp;
 
+int
 tags(tag,taglen)
 char *tag;
 int taglen;
@@ -222,6 +230,7 @@ int taglen;
 	
 }
 
+int
 gettagsfile()
 {
 	int s;
@@ -287,6 +296,7 @@ int len;
 	return NULL;
 }
 
+int
 untagpop(f,n)
 int f,n;
 {
@@ -326,6 +336,7 @@ struct untag {
 
 struct untag *untaghead = NULL;
 
+void
 pushuntag(fname,lineno)
 char *fname;
 int lineno;
@@ -337,7 +348,7 @@ int lineno;
 
 	utp->u_fname = (char *)malloc(strlen(fname)+1);
 	if (!utp->u_fname) {
-		free(utp);
+		free((char *)utp);
 		return;
 	}
 
@@ -347,6 +358,7 @@ int lineno;
 	untaghead = utp;
 }
 
+int
 popuntag(fname,linenop)
 char *fname;
 int *linenop;
@@ -359,7 +371,7 @@ int *linenop;
 		strcpy(fname, utp->u_fname);
 		*linenop = utp->u_lineno;
 		free(utp->u_fname);
-		free(utp);
+		free((char *)utp);
 		return TRUE;
 	}
 	fname[0] = '\0';
@@ -369,6 +381,7 @@ int *linenop;
 }
 
 /* discard without returning anything */
+void
 tossuntag()
 {
 	register struct untag *utp;
@@ -376,10 +389,8 @@ tossuntag()
 	if (untaghead) {
 		utp = untaghead;
 		untaghead = utp->u_stklink;
-		free(utp);
+		free((char *)utp);
 	}
-	return;
-
 }
 
 #ifdef LAZINESS
@@ -390,6 +401,7 @@ BUFFER *filesbp;
  *	the tags file.  for "dir1/dir2/file" include both that and
  *	"dir1/dir2/"
  */
+int
 makeflist()
 {
 	register LINE *tlp;
@@ -453,6 +465,7 @@ makeflist()
 
 /* look for or insert a text string into the given buffer.  start looking
 	at the given line if non-null. */
+int
 sortsearch(text, len,  bp, insert, lpp)
 char *text;
 int len;
@@ -501,5 +514,5 @@ LINE **lpp;
 
 
 #else
-taghello() { }
+void taghello() { }
 #endif

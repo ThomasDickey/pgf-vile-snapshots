@@ -2,7 +2,19 @@
  *		for MicroEMACS
  *
  * $Log: spawn.c,v $
- * Revision 1.19  1992/04/14 08:54:02  pgf
+ * Revision 1.23  1992/05/19 08:55:44  foxharp
+ * more prototype and shadowed decl fixups
+ *
+ * Revision 1.22  1992/05/16  14:02:55  pgf
+ * header/typedef fixups
+ *
+ * Revision 1.21  1992/05/16  12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.20  1992/05/13  09:13:04  pgf
+ * don't need return() from void signal handler (rtfrmshell)
+ *
+ * Revision 1.19  1992/04/14  08:54:02  pgf
  * removed #if UNIX from pressreturn
  *
  * Revision 1.18  1992/03/19  23:26:04  pgf
@@ -77,7 +89,6 @@
 #include        "edef.h"
 #include        <stdio.h>
 #if UNIX
-#include	<sys/types.h>
 #include	<sys/stat.h>
 #endif
 
@@ -124,6 +135,7 @@ extern  short   iochan;                         /* In "termio.c"        */
  * Under some (unknown) condition, you don't get one free when DCL starts up.
  */
 /* ARGSUSED */
+int
 spawncli(f, n)
 int f,n;
 {
@@ -200,6 +212,7 @@ int f,n;
 
 #if UNIX && defined(SIGTSTP)
 
+int
 bktoshell()		/* suspend and wait to wake up */
 {
 #if     NeWS
@@ -215,20 +228,20 @@ bktoshell()		/* suspend and wait to wake up */
 	vttidy(TRUE);
 	pid = getpid();
 	kill(pid,SIGTSTP);
+	return TRUE;
 # endif
 #endif
 }
 
 SIGT
-rtfrmshell()
+rtfrmshell(signo)
+int signo;
 {
 #if     NeWS
 	mlforce("[Not available under NeWS]");
-	return(FALSE);
 #else
 # if X11
 	mlforce("[Not available under X11]");
-	return(FALSE);
 # else
 	ttunclean();
 	curwp->w_flag = WFHARD;  /* is this needed, with sgarbf == TRUE? */
@@ -239,9 +252,11 @@ rtfrmshell()
 #endif
 #endif
 #endif
+	SIGRET;
 }
 #endif /* SIGTSTP */
 
+void
 pressreturn()
 {
 	int s;
@@ -259,17 +274,19 @@ pressreturn()
 }
 
 /* ARGSUSED */
+int
 respawn(f,n)
 int f,n;
 {
-	spawn1(TRUE);
+	return spawn1(TRUE);
 }
 
 /* ARGSUSED */
+int
 spawn(f,n)
 int f,n;
 {
-	spawn1(FALSE);
+	return spawn1(FALSE);
 }
 
 /*
@@ -278,6 +295,7 @@ int f,n;
  * done.
  */
 /* the #ifdefs have been totally separated, for readability */
+int
 spawn1(rerun)
 int rerun;
 {
@@ -471,6 +489,7 @@ int rerun;
  * Pipe a one line command into a window
  */
 /* ARGSUSED */
+int
 pipecmd(f, n)
 int f,n;
 {
@@ -530,6 +549,7 @@ int f,n;
 /*
  * Pipe a one line command into a window
  */
+int
 pipecmd(f, n)
 {
         register int    s;	/* return status from CLI */
@@ -628,7 +648,7 @@ pipecmd(f, n)
 		return(s);
 
 	/* split the current window to make room for the command output */
-	if (splitw(FALSE, 1) == NULL)
+	if (splitwind(FALSE, 1) == FALSE)
 			return(FALSE);
 
 	/* and read the stuff in */
@@ -656,8 +676,10 @@ pipecmd(f, n)
 #endif /* UNIX */
 
 /* run a region through an external filter, replace it with its output */
+int
 filterregion()
 {
+#if UNIX
         static char oline[NLINE];	/* command line send to shell */
         char	line[NLINE];	/* command line send to shell */
 	FILE *fr, *fw;
@@ -679,9 +701,9 @@ filterregion()
 		kp = kbs[ukb].kbufh;
 		while (kp != NULL) {
 			if (kp->d_next == NULL)
-				fwrite(kp->d_chunk, 1, kbs[ukb].kused, fw);
+				fwrite((char *)kp->d_chunk, 1, kbs[ukb].kused, fw);
 			else
-				fwrite(kp->d_chunk, 1, KBLOCK, fw);
+				fwrite((char *)kp->d_chunk, 1, KBLOCK, fw);
 			kp = kp->d_next;
 		}
 		fflush(fw);
@@ -697,6 +719,9 @@ filterregion()
 	firstnonwhite(FALSE,1);
 	setmark();
 	return s;
+#else
+	mlforce("[Region filtering not available]");
+#endif
 }
 
 /*
@@ -704,6 +729,7 @@ filterregion()
  * this is obsolete, the filterregion code is better.
  */
 /* ARGSUSED */
+int
 filter(f, n)
 int f,n;
 {
@@ -711,7 +737,7 @@ int f,n;
 	register BUFFER *bp;	/* pointer to buffer to zot */
         static char oline[NLINE];	/* command line send to shell */
         char	line[NLINE];	/* command line send to shell */
-	char tmpnam[NFILEN];	/* place to store real file name */
+	char tnam[NFILEN];	/* place to store real file name */
 	static char bname1[] = "fltinp";
 
 #if	AMIGA
@@ -738,13 +764,13 @@ int f,n;
 
 	/* setup the proper file names */
 	bp = curbp;
-	strcpy(tmpnam, bp->b_fname);	/* save the original name */
+	strcpy(tnam, bp->b_fname);	/* save the original name */
 	ch_fname(bp, bname1);		/* set it to our new one */
 
 	/* write it out, checking for errors */
 	if (writeout(filnam1,curbp,TRUE) != TRUE) {
 		mlforce("[Cannot write filter file]");
-		ch_fname(bp, tmpnam);
+		ch_fname(bp, tnam);
 		return(FALSE);
 	}
 
@@ -782,13 +808,13 @@ int f,n;
 	/* on failure, escape gracefully */
 	if (s != TRUE || (readin(filnam2,FALSE,curbp,TRUE) == FALSE)) {
 		mlforce("[Execution failed]");
-		ch_fname(bp, tmpnam);
+		ch_fname(bp, tnam);
 		unlink(filnam1);
 		unlink(filnam2);
 		return(s);
 	}
 
-	ch_fname(bp, tmpnam); /* restore name */
+	ch_fname(bp, tnam); /* restore name */
 	bp->b_flag |= BFCHG;		/* flag it as changed */
 
 	/* and get rid of the temporary file */
@@ -804,6 +830,7 @@ int f,n;
  * LIB$SPAWN works. You have to do wierd stuff with the terminal on the way in
  * and the way out, because DCL does not want the channel to be in raw mode.
  */
+int
 sys(cmd)
 register char   *cmd;
 {
@@ -848,6 +875,7 @@ register char   *cmd;
  * off "command.com". We really do not understand what it does, but if you don't
  * do it exactly "malloc" starts doing very very strange things.
  */
+int
 sys(cmd, tail)
 char    *cmd;
 char    *tail;
@@ -873,6 +901,7 @@ char    *tail;
 		that detects the proper switchar and uses it
 		written by Dana Hogget				*/
 
+int
 system(cmd)
 
 char *cmd;	/*  Incoming command line to execute  */

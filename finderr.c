@@ -2,7 +2,10 @@
  * Written for vile by Paul Fox, (c)1990
  *
  * $Log: finderr.c,v $
- * Revision 1.9  1992/03/19 23:35:27  pgf
+ * Revision 1.10  1992/05/16 12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.9  1992/03/19  23:35:27  pgf
  * use b_linecount to index from end of file instead of top, to be
  * less affected by insertions deletions up above
  *
@@ -52,6 +55,7 @@ struct LINE *getdot();
         later numbering.  Solutions to this seem messy at the moment */
 
 /* ARGSUSED */
+int
 finderr(f,n)
 int f,n;
 {
@@ -165,6 +169,7 @@ struct BUFFER *bp;
         return bp->b_dot.l;
 }
 
+void
 putdotback(bp,dotp)
 struct BUFFER *bp;
 struct LINE *dotp;

@@ -6,7 +6,10 @@
  * framing, are hard.
  *
  * $Log: basic.c,v $
- * Revision 1.35  1992/03/22 10:54:41  pgf
+ * Revision 1.36  1992/05/16 12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.35  1992/03/22  10:54:41  pgf
  * fixed bad bug in gotoline
  *
  * Revision 1.34  1992/03/19  23:30:35  pgf
@@ -154,6 +157,7 @@
  * Trivial.
  */
 /* ARGSUSED */
+int
 gotobol(f, n)
 int f,n;
 {
@@ -167,6 +171,7 @@ int f,n;
  * location. Error if you try and move out of the buffer. Set the flag if the
  * line pointer for dot changes.
  */
+int
 backchar(f, n)
 int f;
 register int n;
@@ -192,6 +197,7 @@ register int n;
 /*
  * Move the cursor backwards by "n" characters. Stop at beginning of line.
  */
+int
 backchar_to_bol(f, n)
 int f;
 register int    n;
@@ -212,6 +218,7 @@ register int    n;
 /*
  * Move the cursor to the end of the current line. Trivial. No errors.
  */
+int
 gotoeol(f, n)
 int f,n;
 {
@@ -233,6 +240,7 @@ int f,n;
  * location, and move ".". Error if you try and move off the end of the
  * buffer. Set the flag if the line pointer for dot changes.
  */
+int
 forwchar(f, n)
 int f;
 register int    n;
@@ -257,6 +265,7 @@ register int    n;
 /*
  * Move the cursor forwards by "n" characters. Don't go past end-of-line
  */
+int
 forwchar_to_eol(f, n)
 int f;
 register int    n;
@@ -275,6 +284,7 @@ register int    n;
 
 /* move to a particular line. */
 /* count from bottom of file if negative */
+int
 gotoline(f, n)
 int f,n;
 {
@@ -307,6 +317,7 @@ int f,n;
  * is the same as the new value of dot.
  */
 /* ARGSUSED */
+int
 gotobob(f, n)
 int f,n;
 {
@@ -320,6 +331,7 @@ int f,n;
  * Move to the end of the buffer. Dot is always put at the end of the file.
  */
 /* ARGSUSED */
+int
 gotoeob(f, n)
 int f,n;
 {
@@ -329,6 +341,7 @@ int f,n;
         return TRUE;
 }
 
+int
 gotobos(f,n)
 int f,n;
 {
@@ -343,12 +356,14 @@ int f,n;
 }
 
 /* ARGSUSED */
+int
 gotomos(f,n)
 int f,n;
 {
 	return gotobos(TRUE,curwp->w_ntrows/2);
 }
 
+int
 gotoeos(f,n)
 int f,n;
 {
@@ -361,6 +376,7 @@ int f,n;
  * controls how the goal column is set. No errors are
  * possible.
  */
+int
 forwline(f, n)
 int f,n;
 {
@@ -392,6 +408,7 @@ int f,n;
 }
 
 /* ARGSUSED */
+int
 firstnonwhite(f,n)
 int f,n;
 {
@@ -400,6 +417,7 @@ int f,n;
 }
 
 /* ARGSUSED */
+int
 lastnonwhite(f,n)
 int f,n;
 {
@@ -408,6 +426,7 @@ int f,n;
 }
 
 /* return the offset of the first non-white character on the line */
+int
 firstchar(lp)
 LINE *lp;
 {
@@ -418,6 +437,7 @@ LINE *lp;
 }
 
 /* return the offset of the last non-white character on the line */
+int
 lastchar(lp)
 LINE *lp;
 {
@@ -428,6 +448,7 @@ LINE *lp;
 }
 
 /* like forwline, but got to first non-white char position */
+int
 forwbline(f,n)
 int f,n;
 {
@@ -441,6 +462,7 @@ int f,n;
 }
 
 /* like backline, but got to first non-white char position */
+int
 backbline(f,n)
 int f,n;
 {
@@ -459,6 +481,7 @@ int f,n;
  * alternate. Figure out the new line and call "movedot" to perform the
  * motion. No errors are possible.
  */
+int
 backline(f, n)
 int f,n;
 {
@@ -492,6 +515,7 @@ int f,n;
 #if	WORDPRO
 
 
+int
 gotobop(f,n)
 int f,n;
 {
@@ -533,6 +557,7 @@ int f,n;
 	return TRUE;
 }
 
+int
 gotoeop(f,n)
 int f,n;
 {
@@ -574,12 +599,16 @@ int f,n;
 	return TRUE;
 }
 
-skipblanksf() {
+void
+skipblanksf()
+{
 	while (lforw(DOT.l) != curbp->b_line.l && llength(DOT.l) == 0)
 		DOT.l = lforw(DOT.l);
 }
 
-skipblanksb() {
+void
+skipblanksb()
+{
 	while (lback(DOT.l) != curbp->b_line.l && llength(DOT.l) == 0)
 		DOT.l = lback(DOT.l);
 }
@@ -600,6 +629,7 @@ getstutter()
 }
 #endif
 
+int
 gotobosec(f,n)
 int f,n;
 {
@@ -613,6 +643,8 @@ int f,n;
 	}
 	return TRUE;
 }
+
+int
 gotoeosec(f,n)
 int f,n;
 {
@@ -627,6 +659,7 @@ int f,n;
 	return TRUE;
 }
 
+int
 gotobosent(f,n)
 int f,n;
 {
@@ -662,6 +695,7 @@ int f,n;
 	return TRUE;
 }
 
+int
 gotoeosent(f,n)
 int f,n;
 {
@@ -692,6 +726,7 @@ int f,n;
  * column, return the best choice for the offset. The offset is returned.
  * Used by "C-N" and "C-P".
  */
+int
 getgoal(dlp)
 register LINE   *dlp;
 {
@@ -714,6 +749,7 @@ register LINE   *dlp;
 }
 
 /* return the next column index, given the current char and column */
+int
 next_column(c,col)
 int c, col;
 {
@@ -731,6 +767,7 @@ int c, col;
  * the overlap; this value is the default overlap value in ITS EMACS. Because
  * this zaps the top line in the display window, we have to do a hard update.
  */
+int
 forwpage(f, n)
 int f;
 register int    n;
@@ -763,6 +800,7 @@ register int    n;
  * EMACS manual. We do a hard update for exactly the same
  * reason.
  */
+int
 backpage(f, n)
 int f;
 register int    n;
@@ -795,6 +833,7 @@ register int    n;
  * the overlap; this value is the default overlap value in ITS EMACS. Because
  * this zaps the top line in the display window, we have to do a hard update.
  */
+int
 forwhpage(f, n)
 int f;
 register int    n;
@@ -830,6 +869,7 @@ register int    n;
  * EMACS manual. We do a hard update for exactly the same
  * reason.
  */
+int
 backhpage(f, n)
 int f;
 register int    n;
@@ -865,6 +905,7 @@ register int    n;
  * Set the named mark in the current window to the value of "." in the window.
  */
 /* ARGSUSED */
+int
 setnmmark(f,n)
 int f,n;
 {
@@ -902,6 +943,7 @@ int f,n;
         return TRUE;
 }
 
+int
 golinenmmark(f,n)
 int f,n;
 {
@@ -914,6 +956,7 @@ int f,n;
 }
 
 /* ARGSUSED */
+int
 goexactnmmark(f,n)
 int f,n;
 {
@@ -932,6 +975,7 @@ int f,n;
 	return gonmmark(c);
 }
 
+int
 gonmmark(c)
 int c;
 {
@@ -988,6 +1032,7 @@ int c;
  * Set the mark in the current window to the value of "." in the window. No
  * errors are possible.
  */
+int
 setmark()
 {
 	MK = DOT;
@@ -995,6 +1040,7 @@ setmark()
 }
 
 /* ARGSUSED */
+int
 gomark(f,n)
 int f,n;
 {
@@ -1006,6 +1052,7 @@ int f,n;
 /* this odd routine puts us at the internal mark, plus an offset of lines */
 /*  n == 1 leaves us at mark, n == 2 one line down, etc. */
 /*  this is for the use of stuttered commands, and line oriented regions */
+int
 godotplus(f,n)
 int f,n;
 {
@@ -1025,6 +1072,7 @@ int f,n;
  * easy, bacause all of the hard work gets done by the standard routine
  * that moves the mark about. The only possible error is "no mark".
  */
+int
 swapmark()
 {
 	MARK odot;

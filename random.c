@@ -3,7 +3,23 @@
  * commands. There is no functional grouping here, for sure.
  *
  * $Log: random.c,v $
- * Revision 1.56  1992/04/14 08:51:44  pgf
+ * Revision 1.61  1992/05/20 18:55:08  foxharp
+ * better confirmation output from cd command
+ *
+ * Revision 1.60  1992/05/19  08:55:44  foxharp
+ * more prototype and shadowed decl fixups
+ *
+ * Revision 1.59  1992/05/16  14:02:55  pgf
+ * header/typedef fixups
+ *
+ * Revision 1.58  1992/05/16  12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.57  1992/05/13  09:14:50  pgf
+ * when scanning for a fence character, don't go past end of line.
+ * i hate do/while loops.
+ *
+ * Revision 1.56  1992/04/14  08:51:44  pgf
  * missing local var in DOS ifdef
  *
  * Revision 1.55  1992/03/24  22:45:09  pgf
@@ -220,13 +236,8 @@
 #if UNIX
 #include	<signal.h>
 #endif
-#if HAVE_SELECT
-#include <sys/types.h>
-#include <sys/time.h>
-#else
-# if HAVE_POLL
+#if HAVE_POLL
 # include <poll.h>
-# endif
 #endif
 
 extern CMDFUNC f_forwchar, f_backchar, f_forwchar_to_eol, f_backchar_to_bol;
@@ -235,9 +246,10 @@ extern CMDFUNC f_forwchar, f_backchar, f_forwchar_to_eol, f_backchar_to_bol;
 /* generic "lister", which takes care of popping a window/buffer pair under
 	the given name, and calling "func" with a couple of args to fill in
 	the buffer */
+int
 liststuff(name,func,iarg,carg)
 char *name;
-int (*func)();		/* ptr to function to execute */
+void (*func)();		/* ptr to function to execute */
 int iarg;
 char *carg;
 {
@@ -279,10 +291,10 @@ char *carg;
 }
 
 /* ARGSUSED */
+int
 listmodes(f, n)
 int f,n;
 {
-	int makemodelist();
 	register WINDOW *wp = curwp;
 	register int s;
 
@@ -295,6 +307,7 @@ int f,n;
 
 /* list the current modes into the current buffer */
 /* ARGSUSED */
+void
 makemodelist(dum1,ptr)
 int dum1;
 char *ptr;
@@ -313,14 +326,14 @@ char *ptr;
 #if LAZY
 	lsprintf(line," lazy filename matching is %s",
 					(othmode & OTH_LAZY) ? "on":"off");
-	if (addline(blistp,line,-1) == FALSE)
-		return(FALSE);
+	addline(blistp,line,-1);
 #endif
 }
 
 /* listvalueset: print each value in the array according to type,
 	along with its name, until a NULL name is encountered.  Only print
 	if the value in the two arrays differs, or the second array is nil */
+int
 listvalueset(names, values, globvalues)
 struct VALNAMES *names;
 struct VAL *values, *globvalues;
@@ -386,6 +399,7 @@ struct VAL *values, *globvalues;
 /*
  * Set fill column to n.
  */
+int
 setfillcol(f, n)
 int f,n;
 {
@@ -410,15 +424,16 @@ int f,n;
  * column, but the column that would be used on an infinite width display.
  */
 /* ARGSUSED */
+int
 showcpos(f, n)
 int f,n;
 {
 	register LINE	*lp;		/* current line */
-	register long	numchars;	/* # of chars in file */
-	register int	numlines;	/* # of lines in file */
-	register long	predchars;	/* # chars preceding point */
-	register int	predlines;	/* # lines preceding point */
-	register int	curchar;	/* character under cursor */
+	register long	numchars = 0;	/* # of chars in file */
+	register int	numlines = 0;	/* # of lines in file */
+	register long	predchars = 0;	/* # chars preceding point */
+	register int	predlines = 0;	/* # lines preceding point */
+	register int	curchar = '\n';	/* character under cursor */
 	int ratio;
 	int col;
 	int savepos;			/* temp save for current offset */
@@ -428,8 +443,6 @@ int f,n;
 	lp = lforw(curbp->b_line.l);
 
 	/* start counting chars and lines */
-	numchars = 0;
-	numlines = 0;
 	while (lp != curbp->b_line.l) {
 		/* if we are on the current line, record it */
 		if (lp == DOT.l) {
@@ -472,6 +485,7 @@ int f,n;
 }
 
 /* ARGSUSED */
+int
 showlength(f,n)
 int f,n;
 {
@@ -489,6 +503,7 @@ int f,n;
 }
 
 #if ! SMALLER
+int
 getcline()	/* get the current line number */
 {
 	register LINE	*lp;		/* current line */
@@ -515,6 +530,7 @@ getcline()	/* get the current line number */
 /*
  * Return current screen column.  Stop at first non-blank given TRUE argument.
  */
+int
 getccol(bflg)
 int bflg;
 {
@@ -533,6 +549,7 @@ int bflg;
 /*
  * Set current column, based on counting from 1
  */
+int
 gotocol(f,n)
 int f,n;
 {
@@ -542,6 +559,7 @@ int f,n;
 }
 
 /* really set column, based on counting from 0, for internal use */
+int
 gocol(n)
 int n;
 {
@@ -580,6 +598,7 @@ int n;
  * This always works within a line, so "WFEDIT" is good enough.
  */
 /* ARGSUSED */
+int
 twiddle(f, n)
 int f,n;
 {
@@ -610,6 +629,7 @@ int f,n;
  * its line splitting meaning. The character is always read, even if it is
  * inserted 0 times, for regularity.
  */
+int
 quote(f, n)
 int f,n;
 {
@@ -632,6 +652,7 @@ int f,n;
 	return linsert(n, c);
 }
 
+int
 replacechar(f, n)
 int f,n;
 {
@@ -678,6 +699,7 @@ int f,n;
 /*
  * Set tab size
  */
+int
 settab(f, n)
 int f,n;
 {
@@ -710,12 +732,14 @@ int f,n;
 
 /* insert a tab into the file */
 /* ARGSUSED */
+int
 tab(f, n)
 int f,n;
 {
 	return linsert(1, '\t');
 }
 
+int
 shiftwidth()
 {
 	int s;
@@ -743,6 +767,7 @@ shiftwidth()
  * change all tabs in the line to the right number of spaces.
  * leadingonly says only do leading whitespace
  */
+int
 detabline(leadingonly)
 int leadingonly;
 {
@@ -775,6 +800,7 @@ int leadingonly;
 /*
  * change all tabs in the region to the right number of spaces
  */
+int
 detab_region()
 {
 	return do_fl_region(detabline,FALSE);
@@ -784,6 +810,7 @@ detab_region()
  * convert all appropriate spaces in the line to tab characters.
  * leadingonly says only do leading whitespace
  */
+int
 entabline(leadingonly)
 int leadingonly;
 {
@@ -838,12 +865,14 @@ int leadingonly;
 /*
  * convert all appropriate spaces in the region to tab characters
  */
+int
 entab_region()
 {
 	return do_fl_region(entabline,FALSE);
 }
 
 /* trim trailing whitespace from a line.  leave dot at end of line */
+int
 trimline()
 {
 	register int off, orig;
@@ -870,6 +899,7 @@ trimline()
 /*
  * trim trailing whitespace from a region
  */
+int
 trim_region()
 {
 	return do_fl_region(trimline,0);
@@ -878,6 +908,7 @@ trim_region()
 
 
 /* open lines up before this one */
+int
 openup(f,n)
 int f,n;
 {
@@ -914,6 +945,7 @@ int f,n;
 }
 
 /* open lines up after this one */
+int
 opendown(f,n)
 int f,n;
 {
@@ -934,6 +966,7 @@ int f,n;
  * Open up some blank space. The basic plan is to insert a bunch of newlines,
  * and then back up over them.
  */
+int
 openlines(n)
 int n;
 {
@@ -955,6 +988,7 @@ int n;
  * Go into insert mode.  I guess this isn't emacs anymore...
  */
 /* ARGSUSED */
+int
 insert(f, n)
 int f,n;
 {
@@ -962,6 +996,7 @@ int f,n;
 }
 
 /* ARGSUSED */
+int
 insertbol(f, n)
 int f,n;
 {
@@ -970,6 +1005,7 @@ int f,n;
 }
 
 /* ARGSUSED */
+int
 append(f, n)
 int f,n;
 {
@@ -981,6 +1017,7 @@ int f,n;
 }
 
 /* ARGSUSED */
+int
 appendeol(f, n)
 int f,n;
 {
@@ -990,6 +1027,7 @@ int f,n;
 }
 
 /* ARGSUSED */
+int
 overwrite(f, n)
 int f,n;
 {
@@ -1000,6 +1038,7 @@ int f,n;
 }
 
 /* grunt routine for insert mode */
+int
 ins()
 {
 	register int status;
@@ -1200,6 +1239,7 @@ ins()
 	}
 }
 
+int
 backspace()
 {
 	register int	s;
@@ -1213,6 +1253,7 @@ backspace()
  * Insert a newline. If we are in CMODE, do automatic
  * indentation as specified.
  */
+int
 newline(f, n)
 int f,n;
 {
@@ -1252,6 +1293,7 @@ int f,n;
 }
 
 /* insert a newline and indentation for C */
+int
 indented_newline(cmode)
 int cmode;
 {
@@ -1270,6 +1312,7 @@ int cmode;
 }
 
 /* insert a newline and indentation for autoindent */
+int
 indented_newline_above(cmode)
 int cmode;
 {
@@ -1337,6 +1380,7 @@ int *bracefp;
 	return ind;
 }
 
+int
 doindent(ind)
 int ind;
 {
@@ -1385,6 +1429,7 @@ LINE *lp;
 }
 
 
+int
 insbrace(n, c)	/* insert a brace into the text here...we are in CMODE */
 int n;	/* repeat count */
 int c;	/* brace to insert (always { for now) */
@@ -1415,6 +1460,7 @@ int c;	/* brace to insert (always { for now) */
 	return(linsert(n, c));
 }
 
+int
 inspound()	/* insert a # into the text here...we are in CMODE */
 {
 
@@ -1441,6 +1487,7 @@ inspound()	/* insert a # into the text here...we are in CMODE */
  * the line. Any argument is ignored.
  */
 /* ARGSUSED */
+int
 deblank(f, n)
 int f,n;
 {
@@ -1465,6 +1512,7 @@ int f,n;
 #endif
 
 /* '~' is synonymous with 'M-~<space>' */
+int
 flipchar(f, n)
 int f,n;
 {
@@ -1478,6 +1526,7 @@ int f,n;
 }
 
 /* 'x' is synonymous with 'd<space>' */
+int
 forwdelchar(f, n)
 int f,n;
 {
@@ -1487,6 +1536,7 @@ int f,n;
 }
 
 /* 'X' is synonymous with 'd<backspace>' */
+int
 backdelchar(f, n)
 int f,n;
 {
@@ -1496,6 +1546,7 @@ int f,n;
 
 /* 'D' is synonymous with 'd$' */
 /* ARGSUSED */
+int
 deltoeol(f, n)
 int f,n;
 {
@@ -1510,6 +1561,7 @@ int f,n;
 
 /* 'C' is synonymous with 'c$' */
 /* ARGSUSED */
+int
 chgtoeol(f, n)
 int f,n;
 {
@@ -1524,6 +1576,7 @@ int f,n;
 }
 
 /* 'Y' is synonymous with 'yy' */
+int
 yankline(f, n)
 int f,n;
 {
@@ -1533,6 +1586,7 @@ int f,n;
 }
 
 /* 'S' is synonymous with 'cc' */
+int
 chgline(f, n)
 int f,n;
 {
@@ -1542,6 +1596,7 @@ int f,n;
 }
 
 /* 's' is synonymous with 'c<space>' */
+int
 chgchar(f, n)
 int f,n;
 {
@@ -1550,6 +1605,7 @@ int f,n;
 }
 
 /* ARGSUSED */
+int
 setmode(f, n)	/* prompt and set an editor mode */
 int f, n;	/* default and argument */
 {
@@ -1557,6 +1613,7 @@ int f, n;	/* default and argument */
 }
 
 /* ARGSUSED */
+int
 delmode(f, n)	/* prompt and delete an editor mode */
 int f, n;	/* default and argument */
 {
@@ -1564,6 +1621,7 @@ int f, n;	/* default and argument */
 }
 
 /* ARGSUSED */
+int
 setgmode(f, n)	/* prompt and set a global editor mode */
 int f, n;	/* default and argument */
 {
@@ -1571,6 +1629,7 @@ int f, n;	/* default and argument */
 }
 
 /* ARGSUSED */
+int
 delgmode(f, n)	/* prompt and delete a global editor mode */
 int f, n;	/* default and argument */
 {
@@ -1578,6 +1637,7 @@ int f, n;	/* default and argument */
 }
 
 
+int
 adjustmode(kind, global)	/* change the editor mode status */
 int kind;	/* true = set,		false = delete */
 int global; /* true = global flag,	false = current buffer flag */
@@ -1684,6 +1744,7 @@ success:
 	return TRUE;
 }
 
+int
 adjvalueset(cp, kind, names, values)
 char *cp;
 int kind;
@@ -1784,7 +1845,7 @@ register struct VAL *values;
 				if (values->vp->r->pat)
 					free(values->vp->r->pat);
 				if (values->vp->r->reg)
-					free(values->vp->r->reg);
+					free((char *)values->vp->r->reg);
 			}
 			values->vp->r->pat = strmalloc(rp);
 			values->vp->r->reg = regcomp(values->vp->r->pat, TRUE);
@@ -1887,6 +1948,7 @@ newsadjustmode()	/* change the editor mode status */
 		mainly for macro usage			*/
 
 /* ARGSUSED */
+int
 clrmes(f, n)
 int f, n;	/* arguments ignored */
 {
@@ -1900,6 +1962,7 @@ int f, n;	/* arguments ignored */
 		mainly for macro usage			*/
 
 /* ARGSUSED */
+int
 writemsg(f, n)
 int f, n;	/* arguments ignored */
 {
@@ -1918,30 +1981,33 @@ int f, n;	/* arguments ignored */
 
 #if CFENCE
 /*	the cursor is moved to a matching fence */
+int
 matchfence(f,n)
 int f,n;
 {
 	return getfence(0, (!f || n > 0) ? FORWARD:REVERSE);
 }
 
+int
 matchfenceback(f,n)
 int f,n;
 {
 	return getfence(0, (!f || n > 0) ? REVERSE:FORWARD);
 }
 
+int
 getfence(ch,scandir)
 int ch; /* fence type to match against */
 int scandir; /* direction to scan if we're not on a fence to begin with */
 {
 	MARK	oldpos; 	/* original pointer */
 	register int sdir;	/* direction of search (1/-1) */
-	register int count; /* current fence level count */
-	register int ofence;	/* open fence */
-	register int c; /* current character in scan */
+	register int count; 	/* current fence level count */
+	register int ofence = 0;	/* open fence */
+	register int c; 	/* current character in scan */
 	int s;
 	char *otherkey = NULL;
-	char *key;
+	char *key = NULL;
 
 	/* save the original cursor position */
 	oldpos = DOT;
@@ -1954,19 +2020,23 @@ int scandir; /* direction to scan if we're not on a fence to begin with */
 				return FALSE;
 		} else if (scandir == FORWARD) {
 			/* get the current character */
-			do {
-				ch = char_at(oldpos);
-			} while(!isfence(ch) && ++oldpos.o < llength(oldpos.l));
-
+			if (oldpos.o < llength(oldpos.l)) {
+				do {
+					ch = char_at(oldpos);
+				} while(!isfence(ch) &&
+					++oldpos.o < llength(oldpos.l));
+			}
 			if (is_at_end_of_line(oldpos)) {
 				TTbeep();
 				return FALSE;
 			}
 		} else {
 			/* get the current character */
-			do {
-				ch = char_at(oldpos);
-			} while(!isfence(ch) && --oldpos.o >= 0);
+			if (oldpos.o >= 0) {
+				do {
+					ch = char_at(oldpos);
+				} while(!isfence(ch) && --oldpos.o >= 0);
+			}
 
 			if (oldpos.o < 0) {
 				TTbeep();
@@ -2130,8 +2200,9 @@ fmatchindent()
 
 /*	Close fences are matched against their partners, and if
 	on screen the cursor briefly lights there		*/
+int
 fmatch(ch)
-char ch;	/* fence type to match against */
+int ch;	/* fence type to match against */
 {
 	MARK	oldpos; 		/* original position */
 	register LINE *toplp;	/* top line in current window */
@@ -2191,6 +2262,7 @@ char ch;	/* fence type to match against */
 
 #endif /* CFENCE */
 
+void
 catnap(milli)
 int milli;
 {
@@ -2219,10 +2291,10 @@ int milli;
 #  endif
 # endif
 #endif
-	return TRUE;
 }
 
 #if ! SMALLER
+int
 istring(f, n)	/* ask for and insert a string into the current
 		   buffer at the current point */
 int f, n;
@@ -2261,17 +2333,16 @@ int f, n;
 #endif
 
 #if UNIX
-/* yes, I know DOS has directories... */
-
 #include	<sys/param.h>
+#endif
 
 /* return a string naming the current directory */
 char *
 current_directory()
 {
-	char *cd, *s;
+	char *cwd, *s;
 #if USG
-	static char	dirname[NFILEN];
+	static char	dirname[NFILEN*2];
 	FILE *f, *npopen();
 	int n;
 	f = npopen("/bin/pwd", "r");
@@ -2283,21 +2354,27 @@ current_directory()
 
 	dirname[n] = '\0';
 	fclose(f);
-	cd = dirname;
+	cwd = dirname;
 #else
-	extern char	*getwd();
-	static char	dirname[MAXPATHLEN];
-	cd = getwd(dirname);
+	extern char	*getwd(), *getcwd();
+	static char	dirname[NFILEN*2];
+# if MSDOS & MSC
+	cwd = getcwd(dirname, NFILEN*2);
+# else
+	cwd = getwd(dirname);
+# endif
 #endif
-	s = strchr(cd, '\n');
+	s = strchr(cwd, '\n');
 	if (s)
 		*s = '\0';
-	return cd;
+	return cwd;
 }
 
 
 /* ARGSUSED */
+int
 cd(f,n)
+int f, n;
 {
 	int status;
 	static char cdirname[NFILEN];
@@ -2310,7 +2387,9 @@ cd(f,n)
 }
 
 /* ARGSUSED */
+int
 pwd(f,n)
+int f, n;
 {
 	mlforce("%s",current_directory());
 	return TRUE;
@@ -2346,11 +2425,11 @@ char	*dir;
     }
 
     strcpy(exdir, dir);
-    if (!glob(exdir))
-	return FALSE;
-    if (chdir(exdir) == 0)
+    if (glob(exdir) && (chdir(exdir) == 0)) {
+	pwd(TRUE,1);
 	return TRUE;
+    }
+    mlforce("[Couldn't change to \"%s\"]", exdir);
     return FALSE;
 }
 
-#endif

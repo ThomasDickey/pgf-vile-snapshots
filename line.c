@@ -11,7 +11,10 @@
  * which means that the dot and mark values in the buffer headers are nonsense.
  *
  * $Log: line.c,v $
- * Revision 1.22  1992/03/24 07:37:35  pgf
+ * Revision 1.23  1992/05/16 12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.22  1992/03/24  07:37:35  pgf
  * usekreg now works better as a namedcmd
  *
  * Revision 1.21  1992/03/07  10:28:52  pgf
@@ -143,6 +146,7 @@ BUFFER *bp;
 	return (lp);
 }
 
+int
 lgrow(lp,howmuch,bp)
 register LINE	*lp;
 register int	howmuch;
@@ -166,6 +170,7 @@ BUFFER *bp;
 
 
 
+void
 lfree(lp,bp)
 register LINE *lp;
 register BUFFER *bp;
@@ -183,6 +188,7 @@ register BUFFER *bp;
 	}
 }
 
+void
 ltextfree(lp,bp)
 register LINE *lp;
 register BUFFER *bp;
@@ -193,12 +199,12 @@ register BUFFER *bp;
 	if (ltextp) {
 		if (bp->b_ltext) { /* could it be in the big range? */
 			if (ltextp < bp->b_ltext || ltextp >= bp->b_ltext_end) {
-				free(ltextp);
+				free((char *)ltextp);
 			} /* else {
 			could keep track of freed big range text here;
 			} */
 		} else {
-			free(ltextp);
+			free((char *)ltextp);
 		}
 		lp->l_text = NULL;
 	} /* else nothing to free */
@@ -211,6 +217,7 @@ register BUFFER *bp;
  * conditions described in the above comments don't hold here.
  * Memory is not released, so line can be saved in undo stacks.
  */
+void
 lremove(bp,lp)
 register BUFFER *bp;
 register LINE	*lp;
@@ -287,6 +294,7 @@ register LINE	*lp;
  * displayed in more than 1 window we change EDIT to HARD. Set MODE if the
  * mode line needs to be updated (the "*" has to be set).
  */
+void
 lchange(flag)
 register int	flag;
 {
@@ -307,11 +315,12 @@ register int	flag;
 	}
 }
 
+int
 insspace(f, n)	/* insert spaces forward into text */
 int f, n;	/* default flag and numeric argument */
 {
 	linsert(n, ' ');
-	backchar(f, n);
+	return backchar(f, n);
 }
 
 /*
@@ -323,6 +332,7 @@ int f, n;	/* default flag and numeric argument */
  * greater than the place where you did the insert. Return TRUE if all is
  * well, and FALSE on errors.
  */
+int
 linsert(n, c)
 int n, c;
 {
@@ -434,6 +444,7 @@ int n, c;
  * update of dot and mark is a bit easier then in the above case, because the
  * split forces more updating.
  */
+int
 lnewline()
 {
 	register char	*cp1;
@@ -542,6 +553,7 @@ lnewline()
  * deleted, and FALSE if they were not (because dot ran into the end of the
  * buffer. The "kflag" is TRUE if the text should be put in the kill buffer.
  */
+int
 ldelete(n, kflag)
 long n; 	/* # of chars to delete */
 int kflag;	/* put killed text in kill buffer flag */
@@ -663,6 +675,7 @@ int type;
 #if ! SMALLER
 /* putctext:	replace the current line with the passed in text	*/
 
+int
 putctext(iline)
 char *iline;	/* contents of new line */
 {
@@ -699,6 +712,7 @@ char *iline;	/* contents of new line */
  * about in memory. Return FALSE on error and TRUE if all looks ok. Called by
  * "ldelete" only.
  */
+int
 ldelnewline()
 {
 	register char	*cp1;
@@ -797,6 +811,7 @@ ldelnewline()
  * new kill context is being created. The kill buffer array is released, just
  * in case the buffer has grown to immense size. No errors.
  */
+void
 kdelete()
 {
 
@@ -813,6 +828,7 @@ kdelete()
  * Return TRUE if all is well, and FALSE on errors.
  */
 
+int
 kinsert(c)
 int c;		/* character to insert in the kill buffer */
 {
@@ -868,6 +884,7 @@ int c;		/* character to insert in the kill buffer */
 	easy way to handle the second case.  (The third case is handled in
 	operators(), the first in main())
 */
+int
 usekreg(f,n)
 int f,n;
 {
@@ -939,6 +956,7 @@ int f,n;
 /* buffers 0 through 9 are circulated automatically for full-line deletes */
 /* we re-use one of them until the KLINES flag is on, then we advance */
 /* to the next */
+void
 kregcirculate(killing)
 int killing;
 {
@@ -972,24 +990,28 @@ int killing;
 	
 }
 
+int
 putbefore(f,n)
 int f,n;
 {
 	return doput(f,n,FALSE,FALSE);
 }
 
+int
 putafter(f,n)
 int f,n;
 {
 	return doput(f,n,TRUE,FALSE);
 }
 
+int
 lineputbefore(f,n)
 int f,n;
 {
 	return doput(f,n,FALSE,TRUE);
 }
 
+int
 lineputafter(f,n)
 int f,n;
 {
@@ -997,6 +1019,7 @@ int f,n;
 }
 
 
+int
 doput(f,n,after,putlines)
 int f,n,after,putlines;
 {
@@ -1038,6 +1061,7 @@ int f,n,after,putlines;
 /*
  * Put text back from the kill register.
  */
+int
 put(n,aslines)
 int n,aslines;
 {
@@ -1098,6 +1122,7 @@ int n,aslines;
 }
 
 /* ARGSUSED */
+int
 execkreg(f,n)
 int f,n;
 {
@@ -1160,6 +1185,7 @@ int f,n;
 }
 
 /* ARGSUSED */
+int
 loadkreg(f,n)
 int f,n;
 {

@@ -3,7 +3,16 @@
  * the knowledge about files are here.
  *
  * $Log: fileio.c,v $
- * Revision 1.23  1992/04/14 08:51:44  pgf
+ * Revision 1.26  1992/05/19 08:55:44  foxharp
+ * more prototype and shadowed decl fixups
+ *
+ * Revision 1.25  1992/05/16  14:02:55  pgf
+ * header/typedef fixups
+ *
+ * Revision 1.24  1992/05/16  12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.23  1992/04/14  08:51:44  pgf
  * ifdef fixups for pjr and DOS
  *
  * Revision 1.22  1992/03/25  19:13:17  pgf
@@ -88,11 +97,10 @@
 #include	"estruct.h"
 #include        "edef.h"
 #if UNIX
-#include	<sys/types.h>
 #include	<sys/stat.h>
 #include        <errno.h>
-#include        <fcntl.h>
 #endif
+#include        <fcntl.h>
 #if	BERK
 #include "sys/ioctl.h"
 #endif
@@ -107,6 +115,7 @@ int eofflag;		/* end-of-file flag */
 /*
  * Open a file for reading.
  */
+int
 ffropen(fn)
 char    *fn;
 {
@@ -142,6 +151,7 @@ char    *fn;
  * Open a file for writing. Return TRUE if all is well, and FALSE on error
  * (cannot create).
  */
+int
 ffwopen(fn)
 char    *fn;
 {
@@ -182,7 +192,8 @@ char    *fn;
 }
 
 /* is the file read-only?  true or false */
-#if UNIX  /* don't know how to do it for other systems */
+/* #if UNIX  / * don't know how to do it for other systems */
+int
 ffronly(fn)
 char    *fn;
 {
@@ -198,7 +209,7 @@ char    *fn;
 		return FALSE;
 	}
 }
-#endif
+/* #endif */
 
 #if UNIX
 long
@@ -214,7 +225,7 @@ ffsize()
 #endif
 
 #if MSDOS
-unsigned long
+long
 ffsize(void)
 {
 	int fd = fileno(ffp);
@@ -222,6 +233,7 @@ ffsize(void)
 }
 #endif
 
+int
 ffread(buf,len)
 char *buf;
 long len;
@@ -229,12 +241,14 @@ long len;
 	return read(fileno(ffp), buf, (int)len);
 }
 
+void
 ffseek(n)
 long n;
 {
 	fseek (ffp,n,0);
 }
 
+void
 ffrewind()
 {
 	fseek (ffp,0L,0);
@@ -243,9 +257,10 @@ ffrewind()
 /*
  * Close a file. Should look at the status in all systems.
  */
+int
 ffclose()
 {
-	int s;
+	int s = TRUE;
 
 	/* free this since we do not need it anymore */
 	if (fline) {
@@ -263,7 +278,7 @@ ffclose()
 #if UNIX
 	
 	if (fileispipe)
-		s = npclose(ffp);
+		npclose(ffp);
 	else
 #endif
 		s = fclose(ffp);
@@ -283,6 +298,7 @@ ffclose()
  * and the "nbuf" is its length, less the free newline. Return the status.
  * Check only at the newline.
  */
+int
 ffputline(buf, nbuf, do_cr)
 char    buf[];
 int	nbuf;
@@ -328,12 +344,11 @@ int	do_cr;
  * Write a charto the already opened file.
  * Return the status.
  */
+int
 ffputc(c)
 int c;
 {
-	static lastc;
 	c &= 0xff;
-	lastc = c;
 
 #if	CRYPT
 	if (cryptflag)
@@ -354,6 +369,7 @@ int c;
  * "flen" is the length of the buffer. Reallocate and copy as necessary.
  * Check for I/O errors. Return status.
  */
+int
 ffgetline(lenp)
 int *lenp;	/* to return the final length */
 {
@@ -437,6 +453,7 @@ int *lenp;	/* to return the final length */
 # define	isready_c(p)	( (p)->_cnt > 0)
 #endif
 
+int
 ffhasdata()
 {
 	if (isready_c(ffp))

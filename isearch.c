@@ -17,7 +17,13 @@
  * ever equalled FALSE.
  * 
  * $Log: isearch.c,v $
- * Revision 1.13  1992/03/01 18:41:31  pgf
+ * Revision 1.15  1992/05/19 08:55:44  foxharp
+ * more prototype and shadowed decl fixups
+ *
+ * Revision 1.14  1992/05/16  12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.13  1992/03/01  18:41:31  pgf
  * took out the checknext optimization, since we no longer move along
  * the found string quite the way we used to
  *
@@ -61,9 +67,6 @@
 #if	ISRCH
 
 extern int      scanner();	/* Handy search routine */
-#ifndef eq
-extern int      eq();		/* Compare chars, match case */
-#endif
 
 #ifdef USE_REEAT
 /* A couple of "own" variables for re-eat */
@@ -120,6 +123,7 @@ risearch(f, n)
 
 /* Again, but for the forward direction */
 
+int
 fisearch(f, n)
 	int             f, n;
 {
@@ -179,6 +183,7 @@ fisearch(f, n)
  */
 
 /* ARGSUSED */
+int
 isearch(f, n)
 int f,n;
 {
@@ -325,56 +330,6 @@ start_over:
 	}			/* for {;;} */
 }
 
-#ifdef BEFORE
-/*
- * Trivial routine to insure that the next character in the search string is
- * still true to whatever we're pointing to in the buffer.  This routine will
- * not attempt to move the "point" if the match fails, although it will
- * implicitly move the "point" if we're forward searching, and find a match,
- * since that's the way forward isearch works.
- * 
- * If the compare fails, we return FALSE and assume the caller will call
- * scanmore or something.
- */
-
-int 
-checknext(chr, patrn, dir)	/* Check next character in search string */
-	char            chr;	/* Next char to look for */
-	char           *patrn;	/* The entire search string (incl chr) */
-	int             dir;	/* Search direction */
-{
-	register int    buffchar;	/* character at current position */
-	int             status;	/* how well things go */
-	MARK            curpos;
-
-	/* setup the local scan pointer to current "." */
-	curpos = DOT;		/* get  current point */
-
-	if (dir > 0) {		/* If searching forward */
-		if (is_at_end_of_line(curpos)) {	/* If at end of line */
-			curpos.l = lforw(curpos.l);	/* Skip to the next line */
-			if (is_header_line(curpos, curbp))
-				return FALSE;	/* Abort if at end of buffer */
-			curpos.o = 0;	/* Start at the beginning of the line */
-			buffchar = '\n';	/* And say the next char is
-						 * NL */
-		} else {
-			buffchar = char_at(curpos);	/* Get the next char */
-			curpos.o++;
-		}
-		status = eq(buffchar, chr);
-		if (status) {	/* Is it what we're looking for? */
-			DOT = curpos;	/* Yes, set the buffer's point */
-			curwp->w_flag |= WFMOVE;	/* Say that we've moved */
-		}
-		return status;	/* And return the status */
-	} else {		/* Else, if reverse search: */
-		return match_pat(patrn);	/* See if we're in the right
-						 * place */
-	}
-}
-#endif
-
 /*
  * This hack will search for the next occurrence of <pat> in the buffer,
  * either forward or backward.  It is called with the status of the prior
@@ -393,7 +348,7 @@ scanmore(patrn, dir)		/* search forward or back for a pattern */
 	int             sts;	/* search status */
 
 	if (gregexp)
-		free(gregexp);
+		free((char *)gregexp);
 	gregexp = regcomp(patrn, b_val(curbp, MDMAGIC));
 	if (!gregexp)
 		return FALSE;
@@ -462,7 +417,7 @@ promptpattern(prompt)
 
 	strcpy(tpat, prompt);	/* copy prompt to output string */
 	strcat(tpat, " [");	/* build new prompt string */
-	expandp(pat, &tpat[strlen(tpat)], NPAT / 2);	/* add old pattern */
+	(void)expandp(pat, &tpat[strlen(tpat)], NPAT / 2);	/* add old pattern */
 	strcat(tpat, "]: ");
 
 	/* check to see if we are executing a command line */
@@ -475,6 +430,7 @@ promptpattern(prompt)
 /*
  * expandp -- Expand control key sequences for output.
  */
+int
 expandp(srcstr, deststr, maxlength)
 	char           *srcstr;	/* string to expand */
 	char           *deststr;/* destination of expanded string */

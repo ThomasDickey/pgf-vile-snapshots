@@ -2,7 +2,10 @@
  *		written by John Hutchinson, heavily modified by Paul Fox
  *
  * $Log: npopen.c,v $
- * Revision 1.11  1992/03/25 19:13:17  pgf
+ * Revision 1.12  1992/05/16 12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.11  1992/03/25  19:13:17  pgf
  * BSD portability changes
  *
  * Revision 1.10  1992/03/19  23:25:04  pgf
@@ -80,6 +83,7 @@ char *cmd, *type;
 	}
 }
 
+int
 inout_popen(fr, fw, cmd)
 FILE **fr, **fw;
 char *cmd;
@@ -165,6 +169,7 @@ char *cmd;
 	return TRUE;
 }
 
+void
 npclose (fp)
 FILE *fp;
 {
@@ -174,7 +179,6 @@ FILE *fp;
 	if (wait ((int *)0) < 0 && errno == EINTR) {
 		(void) kill (SIGKILL, pid);
 	}
-	return 0;
 }
 
 #if MY_EXEC

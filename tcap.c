@@ -2,7 +2,13 @@
  *		for MicroEMACS
  *
  * $Log: tcap.c,v $
- * Revision 1.13  1992/04/10 18:47:25  pgf
+ * Revision 1.15  1992/05/19 08:55:44  foxharp
+ * more prototype and shadowed decl fixups
+ *
+ * Revision 1.14  1992/05/16  12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.13  1992/04/10  18:47:25  pgf
  * change abs to absol to get rid of name conflicts
  *
  * Revision 1.12  1992/03/24  08:46:02  pgf
@@ -63,31 +69,6 @@
 #define SCRSIZ	64
 #define NPAUSE	10			/* # times thru update to pause */
 
-extern int	ttopen();
-extern int	ttgetc();
-extern int	ttputc();
-extern int	tgetnum();
-extern int	ttflush();
-extern int	tcapclose();
-extern int	tcapkopen();
-extern int	tcapkclose();
-extern int	tcapmove();
-extern int	tcapeeol();
-extern int	tcapeeop();
-extern int	tcapbeep();
-extern int	tcaprev();
-extern int	tcapcres();
-extern int	tcapopen();
-extern int	tput();
-extern char	*tgoto();
-#if	COLOR
-extern	int	tcapfcol();
-extern	int	tcapbcol();
-#endif
-#if	SCROLLCODE
-extern	int	tcapscroll_reg();
-extern	int	tcapscroll_delins();
-#endif
 
 #define TCAPSLEN 315
 char tcapbuf[TCAPSLEN];
@@ -97,6 +78,11 @@ char *TI, *TE, *KS, *KE;
 #if	SCROLLCODE
 char *CS, *dl, *al, *DL, *AL, *SF, *SR;
 #endif
+
+extern char *tgoto P((char *, int, int));
+extern int tgetent P((char *, char *));
+extern int tgetnum P((char * ));
+extern int tputs P((char *, int, void(*_f)(int) ));
 
 TERM term = {
 	0,	/* these four values are set dynamically at open time */
@@ -128,6 +114,7 @@ TERM term = {
 #endif
 };
 
+void
 tcapopen()
 {
 	char *getenv();
@@ -229,6 +216,7 @@ tcapopen()
 		putpad(KS);
 }
 
+void
 tcapclose()
 {
 	if (TE)
@@ -237,31 +225,37 @@ tcapclose()
 		putpad(KE);
 }
 
+void
 tcapkopen()
 {
 	strcpy(sres, "NORMAL");
 }
 
+void
 tcapkclose()
 {
 }
 
+void
 tcapmove(row, col)
 register int row, col;
 {
 	putpad(tgoto(CM, col, row));
 }
 
+void
 tcapeeol()
 {
 	putpad(CE);
 }
 
+void
 tcapeeop()
 {
 	putpad(CL);
 }
 
+void
 tcaprev(state)		/* change reverse video status */
 int state;		/* FALSE = normal video, TRUE = reverse video */
 {
@@ -278,6 +272,7 @@ int state;		/* FALSE = normal video, TRUE = reverse video */
 	}
 }
 
+int
 tcapcres()	/* change screen resolution */
 {
 	return(TRUE);
@@ -286,6 +281,7 @@ tcapcres()	/* change screen resolution */
 #if SCROLLCODE
 
 /* move howmany lines starting at from to to */
+void
 tcapscroll_reg(from,to,n)
 int from, to, n;
 {
@@ -311,6 +307,7 @@ PRETTIER_SCROLL is prettier but slower -- it scrolls
 */
 
 /* move howmany lines starting at from to to */
+void
 tcapscroll_delins(from,to,n)
 int from, to, n;
 {
@@ -357,6 +354,7 @@ int from, to, n;
 }
 
 /* cs is set up just like cm, so we use tgoto... */
+void
 tcapscrollregion(top,bot)
 int top,bot;
 {
@@ -366,6 +364,7 @@ int top,bot;
 #endif
 
 /* ARGSUSED */
+void
 spal(dummy)	/* change palette string */
 char *dummy;
 {
@@ -373,26 +372,31 @@ char *dummy;
 }
 
 #if	COLOR
+void
 tcapfcol()	/* no colors here, ignore this */
 {
 }
 
+void
 tcapbcol()	/* no colors here, ignore this */
 {
 }
 #endif
 
+void
 tcapbeep()
 {
 	ttputc(BEL);
 }
 
+void
 putpad(str)
 char	*str;
 {
 	tputs(str, 1, ttputc);
 }
 
+void
 putnpad(str, n)
 char	*str;
 int n;
@@ -403,6 +407,7 @@ int n;
 
 #if	FLABEL
 /* ARGSUSED */
+int
 fnclabel(f, n)		/* label a function key */
 int f,n;	/* default flag, numeric argument [unused] */
 {
@@ -412,6 +417,7 @@ int f,n;	/* default flag, numeric argument [unused] */
 #endif
 #else
 
+void
 hello()
 {
 }

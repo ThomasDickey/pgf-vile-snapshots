@@ -6,7 +6,13 @@
  *
  *
  * $Log: file.c,v $
- * Revision 1.38  1992/04/14 08:51:44  pgf
+ * Revision 1.40  1992/05/19 08:55:44  foxharp
+ * more prototype and shadowed decl fixups
+ *
+ * Revision 1.39  1992/05/16  12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.38  1992/04/14  08:51:44  pgf
  * ifdef fixups for pjr and DOS
  *
  * Revision 1.37  1992/04/02  08:28:59  pgf
@@ -158,6 +164,7 @@ extern int fileispipe;
 int doslines, unixlines;
 
 
+void
 ch_fname(bp, name)
 BUFFER *bp;
 char *name;
@@ -190,6 +197,7 @@ char *name;
  * "read a file into the current buffer" code.
  */
 /* ARGSUSED */
+int
 fileread(f, n)
 int f,n;
 {
@@ -221,6 +229,7 @@ int f,n;
  * This is ": e"
  */
 /* ARGSUSED */
+int
 filefind(f, n)
 int f,n;
 {
@@ -259,6 +268,7 @@ int f,n;
 }
 
 /* ARGSUSED */
+int
 viewfile(f, n)	/* visit a file in VIEW mode */
 int f,n;
 {
@@ -288,6 +298,7 @@ int f,n;
 static char insfname[NFILEN];
 
 /* ARGSUSED */
+int
 insfile(f, n)
 int f,n;
 {
@@ -305,6 +316,7 @@ int f,n;
 	        return kifile(insfname);
 }
 
+int
 getfile(fname, lockfl)
 char fname[];		/* file name to find */
 int lockfl;		/* check the file for locks? */
@@ -372,6 +384,7 @@ int lockfl;		/* check the file for locks? */
 */
 
 /* ARGSUSED */
+int
 readin(fname, lockfl, bp, mflg)
 char    *fname;		/* name of file to read */
 int	lockfl;		/* check for file locks? */
@@ -513,6 +526,7 @@ out:
         return TRUE;
 }
 
+int
 quickreadf(bp, nlinep)
 register BUFFER *bp;
 int *nlinep;
@@ -539,13 +553,12 @@ int *nlinep;
 		return FIOMEM;
 
 	if ((len = ffread((char *)&bp->b_ltext[1], len)) < 0) {
-		free(bp->b_ltext);
+		free((char *)bp->b_ltext);
 		bp->b_ltext = NULL;
 		return FIOERR;
 	}
 
 
- retry:
 	/* loop through the buffer, replacing all newlines with the
 		length of the _following_ line */
 	bp->b_ltext_end = bp->b_ltext + len + 1;
@@ -564,7 +577,7 @@ int *nlinep;
 				if (np == NULL) { /* ugh.  can this happen? */
 					  /* (we're _reducing_ the size...) */
 					ffrewind();
-					free(bp->b_ltext);
+					free((char *)bp->b_ltext);
 					bp->b_ltext = NULL;
 					return FIOMEM;
 				}
@@ -583,14 +596,14 @@ int *nlinep;
 	if (nlines == 0) {
 		ffrewind();
 		if (bp->b_ltext)
-			free(bp->b_ltext);
+			free((char *)bp->b_ltext);
 		bp->b_ltext = NULL;
 		incomplete = TRUE;
 	} else {
 		/* allocate all of the line structs we'll need */
 		bp->b_LINEs = (LINE *)malloc(nlines * sizeof(LINE));
 		if (bp->b_LINEs == NULL) {
-			free(bp->b_ltext);
+			free((char *)bp->b_ltext);
 			bp->b_ltext = NULL;
 			ffrewind();
 			return FIOMEM;
@@ -638,6 +651,7 @@ int *nlinep;
 	return FIOSUC;
 }
 
+int
 slowreadf(bp, nlinep)
 register BUFFER *bp;
 int *nlinep;
@@ -698,11 +712,12 @@ int *nlinep;
 }
 
 /* utility routine for no. of lines read */
-readlinesmsg(n,s,f,rdonly)
+void
+readlinesmsg(n,s,f,rdo)
 int n;
 int s;
 char *f;
-int rdonly;
+int rdo;
 {
 	char *m;
 	switch(s) {
@@ -713,7 +728,7 @@ int rdonly;
 	}
 	if (!terse)
 		mlwrite("[%sRead %d line%s from \"%s\"%s]", m,
-			n, n != 1 ? "s":"", f, rdonly ? "  (read-only)":"" );
+			n, n != 1 ? "s":"", f, rdo ? "  (read-only)":"" );
 	else
 		mlforce("[%s%d lines]",m,n);
 }
@@ -726,6 +741,7 @@ int rdonly;
  * a better place than a line of code.
  */
 
+void
 makename(bname, fname)
 char    bname[];
 char    fname[];
@@ -743,30 +759,31 @@ char    fname[];
 #endif
 							) )
                 *(--fcp) = '\0';
+	bcp = fcp;
 	fcp = fname;
 	/* trim leading whitespace */
 	while (*fcp == ' ' || *fcp == '\t')
 		fcp++;
 
 #if     AMIGA
-        while (cp1!=fcp && cp1[-1]!=':' && cp1[-1]!='/')
-                --cp1;
+        while (bcp!=fcp && bcp[-1]!=':' && bcp[-1]!='/')
+                --bcp;
 #endif
 #if     VMS
-        while (cp1!=fcp && cp1[-1]!=':' && cp1[-1]!=']')
-                --cp1;
+        while (bcp!=fcp && bcp[-1]!=':' && bcp[-1]!=']')
+                --bcp;
 #endif
 #if     CPM
-        while (cp1!=fcp && cp1[-1]!=':')
-                --cp1;
+        while (bcp!=fcp && bcp[-1]!=':')
+                --bcp;
 #endif
 #if     MSDOS
-        while (cp1!=fcp && cp1[-1]!=':' && cp1[-1]!='\\'&&cp1[-1]!='/')
-                --cp1;
+        while (bcp!=fcp && bcp[-1]!=':' && bcp[-1]!='\\'&&bcp[-1]!='/')
+                --bcp;
 #endif
 #if     ST520
-        while (cp1!=fcp && cp1[-1]!=':' && cp1[-1]!='\\')
-                --cp1;
+        while (bcp!=fcp && bcp[-1]!=':' && bcp[-1]!='\\')
+                --bcp;
 #endif
 #if     UNIX
 	bcp = bname;
@@ -794,13 +811,14 @@ char    fname[];
 	{
         register char *cp2;
         cp2 = &bname[0];
-        while (cp2!=&bname[NBUFN-1] && *cp1!=0 && *cp1!=';')
-                *cp2++ = *cp1++;
+        while (cp2!=&bname[NBUFN-1] && *bcp!=0 && *bcp!=';')
+                *cp2++ = *bcp++;
         *cp2 = 0;
 	}
 #endif
 }
 
+void
 unqname(name,ok_to_ask)	/* make sure a buffer name is unique */
 char *name;	/* name to check on */
 int ok_to_ask;  /* prompts allowed? */
@@ -840,6 +858,7 @@ int ok_to_ask;  /* prompts allowed? */
  * contents of the current buffer to that file.
  */
 /* ARGSUSED */
+int
 filewrite(f, n)
 int f,n;
 {
@@ -880,6 +899,7 @@ int f,n;
  * name for the buffer.
  */
 /* ARGSUSED */
+int
 filesave(f, n)
 int f,n;
 {
@@ -904,6 +924,7 @@ int f,n;
  * a macro for this. Most of the grief is error
  * checking of some sort.
  */
+int
 writeout(fn,bp,msgf)
 char    *fn;
 BUFFER *bp;
@@ -930,6 +951,7 @@ int msgf;
 	return writereg(&region,fn,msgf,b_val(bp, MDDOS),&bp);
 }
 
+int
 writeregion()
 {
         REGION region;
@@ -967,6 +989,7 @@ writeregion()
 }
 
 
+int
 writereg(rp,fn,msgf, do_cr, bpp)
 REGION	*rp;
 char    *fn;
@@ -1096,6 +1119,7 @@ BUFFER	**bpp;
  * "fileio.c" package. The number of lines written is
  * displayed.
  */
+int
 kwrite(fn,msgf)
 char    *fn;
 int	msgf;
@@ -1174,6 +1198,7 @@ int	msgf;
  * prompt if you wish.
  */
 /* ARGSUSED */
+int
 filename(f, n)
 int f,n;
 {
@@ -1201,6 +1226,7 @@ int f,n;
  * buffer, Called by insert file command. Return the final
  * status of the read.
  */
+int
 ifile(fname,belowthisline,haveffp)
 char    *fname;
 int	belowthisline;
@@ -1300,6 +1326,7 @@ out:
  * Called by insert file command. Return the final
  * status of the read.
  */
+int
 kifile(fname)
 char    *fname;
 {
@@ -1420,9 +1447,13 @@ int signo;
 	vttidy(FALSE);
 	if (signo > 2) abort();
 	exit(wrote);
+
+	/* NOTREACHED */
+	SIGRET;
 }
 #endif
 
+void
 markWFMODE(bp)
 BUFFER *bp;
 {
@@ -1436,6 +1467,7 @@ BUFFER *bp;
 }
 
 /* use the shell to expand wildcards */
+int
 glob(buf)
 char *buf;
 {

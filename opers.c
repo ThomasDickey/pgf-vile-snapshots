@@ -4,7 +4,10 @@
  * written for vile by Paul Fox, (c)1990
  *
  * $Log: opers.c,v $
- * Revision 1.19  1992/01/06 23:09:33  pgf
+ * Revision 1.20  1992/05/16 12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.19  1992/01/06  23:09:33  pgf
  * error message if bad function specified for motion
  *
  * Revision 1.18  1992/01/05  00:06:13  pgf
@@ -90,6 +93,7 @@ MARK pre_op_dot;
 /* For the "operator" commands -- the following command is a motion, or
  *  the operator itself is repeated.  All operate on regions.
  */
+int
 operator(f,n,fn,str)
 int f,n;
 int (*fn)();
@@ -189,6 +193,7 @@ char *str;
 	return status;
 }
 
+int
 operdel(f,n)
 int f,n;
 {
@@ -198,6 +203,7 @@ int f,n;
 	return operator(f,n,killregion,"Delete");
 }
 
+int
 operlinedel(f,n)
 int f,n;
 {
@@ -208,6 +214,7 @@ int f,n;
 	return operator(f,n,killregion,"Delete of full lines");
 }
 
+int
 chgreg()
 {
 	killregion();
@@ -220,6 +227,7 @@ chgreg()
 	return ins();
 }
 
+int
 operchg(f,n)
 int f,n;
 {
@@ -231,6 +239,7 @@ int f,n;
 	return s;
 }
 
+int
 operlinechg(f,n)
 int f,n;
 {
@@ -243,6 +252,7 @@ int f,n;
 	return s;
 }
 
+int
 operyank(f,n)
 int f,n;
 {
@@ -251,6 +261,7 @@ int f,n;
 	return operator(f,n,yankregion,"Yank");
 }
 
+int
 operlineyank(f,n)
 int f,n;
 {
@@ -261,6 +272,7 @@ int f,n;
 	return operator(f,n,yankregion,"Yank of full lines");
 }
 
+int
 operflip(f,n)
 int f,n;
 {
@@ -270,6 +282,7 @@ int f,n;
 	return operator(f,n,flipregion,"Flip case");
 }
 
+int
 operupper(f,n)
 int f,n;
 {
@@ -279,6 +292,7 @@ int f,n;
 	return operator(f,n,upperregion,"Upper case");
 }
 
+int
 operlower(f,n)
 int f,n;
 {
@@ -289,6 +303,7 @@ int f,n;
 }
 
 
+int
 operlshift(f,n)
 int f,n;
 {
@@ -299,6 +314,7 @@ int f,n;
 	return operator(f,n,shiftlregion,"Left shift");
 }
 
+int
 operrshift(f,n)
 int f,n;
 {
@@ -309,6 +325,7 @@ int f,n;
 	return operator(f,n,shiftrregion,"Right shift");
 }
 
+int
 operwrite(f,n)
 int f,n;
 {
@@ -326,6 +343,7 @@ int f,n;
 	}
 }
 
+int
 operformat(f,n)
 int f,n;
 {
@@ -336,6 +354,7 @@ int f,n;
 	return operator(f,n,formatregion,"Format");
 }
 
+int
 operfilter(f,n)
 int f,n;
 {
@@ -347,6 +366,7 @@ int f,n;
 }
 
 
+int
 operprint(f,n)
 int f,n;
 {
@@ -357,6 +377,7 @@ int f,n;
 	return operator(f,n,plineregion,"Line print");
 }
 
+int
 operlist(f,n)
 int f,n;
 {
@@ -367,6 +388,7 @@ int f,n;
 	return operator(f,n,llineregion,"Line list");
 }
 
+int
 opersubst(f,n)
 int f,n;
 {
@@ -377,6 +399,7 @@ int f,n;
 	return operator(f,n,substregion,"Substitute");
 }
 
+int
 opersubstagain(f,n)
 int f,n;
 {
@@ -387,6 +410,7 @@ int f,n;
 	return operator(f,n,subst_again_region,"Substitute-again");
 }
 
+int
 operentab(f,n)
 int f,n;
 {
@@ -397,6 +421,7 @@ int f,n;
 	return operator(f,n,entab_region,"Spaces-->Tabs");
 }
 
+int
 operdetab(f,n)
 int f,n;
 {
@@ -407,6 +432,7 @@ int f,n;
 	return operator(f,n,detab_region,"Tabs-->Spaces");
 }
 
+int
 opertrim(f,n)
 int f,n;
 {

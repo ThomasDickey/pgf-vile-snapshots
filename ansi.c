@@ -4,7 +4,10 @@
  * "termio.c". It compiles into nothing if not an ANSI device.
  *
  * $Log: ansi.c,v $
- * Revision 1.7  1992/04/10 18:47:25  pgf
+ * Revision 1.8  1992/05/16 12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.7  1992/04/10  18:47:25  pgf
  * change abs to absol to get rid of name conflicts
  *
  * Revision 1.6  1991/11/16  18:28:25  pgf
@@ -349,6 +352,7 @@ ansikclose()	/* close the keyboard (a noop here) */
 }
 
 #if	FLABEL
+int
 fnclabel(f, n)		/* label a function key */
 int f,n;	/* default flag, numeric argument [unused] */
 {

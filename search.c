@@ -4,7 +4,10 @@
  *  heavily modified by Paul Fox, 1990
  *
  * $Log: search.c,v $
- * Revision 1.32  1992/03/19 23:46:24  pgf
+ * Revision 1.33  1992/05/16 12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.32  1992/03/19  23:46:24  pgf
  * took out scrsearchword stuff -- macros can do it
  *
  * Revision 1.31  1992/03/07  10:19:17  pgf
@@ -152,17 +155,22 @@ int    readpattern();
 int    replaces();
 #endif
 
+void savematch();
+void scanboundry();
+void nextch();
 
 int lastdirec;
 
 MARK scanboundpos;
 
+int
 scrforwsearch(f,n)
 int f,n;
 {
 	return fsearch(f,n,FALSE,TRUE);
 }
 
+int
 scrbacksearch(f,n)
 int f,n;
 {
@@ -178,6 +186,7 @@ char notfoundmsg[] = "Not found";
  *	the match string, and (perhaps) repaint the display.
  */
 
+int
 forwsearch(f, n)
 int f, n;
 {
@@ -187,6 +196,7 @@ int f, n;
 /* extra args -- marking if called from globals, and should mark lines, and
 	fromscreen, if the searchpattern is on the screen, so we don't need to
 	ask for it.  */
+int
 fsearch(f, n, marking, fromscreen)
 int f, n;
 int marking, fromscreen;
@@ -275,6 +285,7 @@ int marking, fromscreen;
  *	and (perhaps) repaint the display.
  */
 
+int
 forwhunt(f, n)
 int f, n;	/* default flag / numeric argument */
 {
@@ -336,6 +347,7 @@ int f, n;	/* default flag / numeric argument */
  *	If found "." is left pointing at the first character of the pattern
  *	(the last character that was matched).
  */
+int
 backsearch(f, n)
 int f, n;
 {
@@ -343,6 +355,7 @@ int f, n;
 }
 
 /* ARGSUSED */
+int
 rsearch(f, n, dummy, fromscreen)
 int f, n;	/* default flag / numeric argument */
 int dummy, fromscreen;
@@ -402,6 +415,7 @@ int dummy, fromscreen;
  *	If found "." is left pointing at the first character of the pattern
  *	(the last character that was matched).
  */
+int
 backhunt(f, n)
 int f, n;	/* default flag / numeric argument */
 {
@@ -461,6 +475,7 @@ int f, n;	/* default flag / numeric argument */
 	return(status);
 }
 
+int
 consearch(f,n)
 int f,n;
 {
@@ -470,6 +485,7 @@ int f,n;
 		return(backhunt(f,n));
 }
 
+int
 revsearch(f,n)
 int f,n;
 {
@@ -592,8 +608,8 @@ char *s;
  */
 int	
 eq(bc, pc)
-register char	bc;
-register char	pc;
+register int	bc;
+register int	pc;
 {
 	if (bc == pc)
 		return TRUE;
@@ -603,6 +619,7 @@ register char	pc;
 }
 
 /* ARGSUSED */
+int
 scrsearchpat(f,n)
 int f,n;
 {
@@ -622,6 +639,7 @@ int f,n;
  *	There is some do-it-yourself control expansion.
  *	An alternate termination character is passed in.
  */
+int
 readpattern(prompt, apat, srchexpp, c, fromscreen)
 char	*prompt;
 char	*apat;
@@ -645,7 +663,7 @@ int	fromscreen;
  	if (status == TRUE) {
 		if (srchexpp) {	/* If doing the search string, compile it */
 			if (*srchexpp)
-				free(*srchexpp);
+				free((char *)(*srchexpp));
 			*srchexpp = regcomp(pat, b_val(curbp, MDMAGIC));
 			if (!*srchexpp)
 				return FALSE;
@@ -661,6 +679,7 @@ int	fromscreen;
  * savematch -- We found the pattern?  Let's save it away.
  */
 
+void
 savematch(curpos,matchlen)
 MARK curpos;		/* last match */
 int matchlen;
@@ -686,6 +705,7 @@ int matchlen;
 /*
  * rvstrcpy -- Reverse string copy.
  */
+void
 rvstrcpy(rvstr, str)
 register char	*rvstr, *str;
 {
@@ -699,6 +719,7 @@ register char	*rvstr, *str;
 	*rvstr = '\0';
 }
 
+void
 rvstrncpy(rvstr, str, n)
 register char	*rvstr, *str;
 int n;
@@ -716,6 +737,7 @@ int n;
 	*rvstr = '\0';
 }
 
+void
 scanboundry(wrapok,dot,dir)
 int wrapok;
 MARK dot;
@@ -733,6 +755,7 @@ int dir;
  * nextch -- advance/retreat the given mark
  *  will wrap, and doesn't set motion flags
  */
+void
 nextch(pdot, dir)
 MARK	*pdot;
 int	dir;
@@ -764,6 +787,7 @@ int	dir;
 
 /* simple finder -- give it a compiled regex, a direction, and it takes you
 	there if it can.  no wrapping allowed  */
+int
 findpat(f,n,exp,direc)
 int f, n;
 regexp *exp;

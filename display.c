@@ -6,7 +6,16 @@
  *
  *
  * $Log: display.c,v $
- * Revision 1.35  1992/04/14 08:50:01  pgf
+ * Revision 1.38  1992/05/19 08:55:44  foxharp
+ * more prototype and shadowed decl fixups
+ *
+ * Revision 1.37  1992/05/16  12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.36  1992/04/27  19:50:43  pgf
+ * fixed ifdefs on termio inclusion
+ *
+ * Revision 1.35  1992/04/14  08:50:01  pgf
  * fix SIGWINCH handling for X11 case
  *
  * Revision 1.34  1992/03/25  19:13:17  pgf
@@ -131,40 +140,28 @@
  */
 
 
-#include        <stdio.h>
-#include        <varargs.h>
 #include	"estruct.h"
 #include        "edef.h"
 #if UNIX
-#include <signal.h>
-#if USG
-#include <termio.h>
-#if SVR3_PTEM
-#include <sys/types.h>
-#include <sys/stream.h>
-#include <sys/ptem.h>
-#endif
-#endif
+# include <signal.h>
+# if POSIX
+#  include <termios.h>
+# else
+#  if USG
+#   include <termio.h>
+#   if SVR3_PTEM
+#    include <sys/types.h>
+#    include <sys/stream.h>
+#    include <sys/ptem.h>
+#   endif
+#  else
+#   if BERK
+#    include "ioctl.h"
+#   endif
+#  endif
+# endif
 #endif
 
-typedef struct  VIDEO {
-        int	v_flag;                 /* Flags */
-#if	COLOR
-	int	v_fcolor;		/* current forground color */
-	int	v_bcolor;		/* current background color */
-	int	v_rfcolor;		/* requested forground color */
-	int	v_rbcolor;		/* requested background color */
-#endif
-	/* allocate 4 bytes here, and malloc 4 bytes less than we need,
-		to keep malloc from rounding up. */
-        char    v_text[4];              /* Screen data. */
-}       VIDEO;
-
-#define VFCHG   0x0001                  /* Changed flag			*/
-#define	VFEXT	0x0002			/* extended (beyond column 80)	*/
-#define	VFREV	0x0004			/* reverse video status		*/
-#define	VFREQ	0x0008			/* reverse video request	*/
-#define	VFCOL	0x0010			/* color change requested	*/
 
 VIDEO   **vscreen;                      /* Virtual screen. */
 #if	! MEMMAP
@@ -183,6 +180,7 @@ int chg_width, chg_height;
  * The original window has "WFCHG" set, so that it will get completely
  * redrawn on the first call to "update".
  */
+void
 vtinit()
 {
     register int i;
@@ -240,6 +238,7 @@ vtinit()
  * for the system prompt. Shut down the channel to the
  * terminal.
  */
+void
 vttidy(f)
 int f;
 {
@@ -250,6 +249,7 @@ int f;
  * Set the virtual cursor to the specified row and column on the virtual
  * screen. There is no checking for nonsense values.
  */
+void
 vtmove(row, col)
 int row,col;
 {
@@ -264,6 +264,7 @@ int row,col;
    terminal buffers. Only column overflow is checked.
 */
 
+void
 vtputc(c,list)
 int c,list;
 {
@@ -290,12 +291,14 @@ int c,list;
 	}
 }
 
+int
 vtgetc(col)
 int col;
 {
 	return vscreen[vtrow]->v_text[col];
 }
 
+void
 vtputsn(s,n)
 char *s;
 int n;
@@ -309,6 +312,7 @@ int n;
  * Erase from the end of the software cursor to the end of the line on which
  * the software cursor is located.
  */
+void
 vteeol()
 {
     while (vtcol < term.t_ncol)
@@ -318,6 +322,7 @@ vteeol()
 /* upscreen:	user routine to force a screen update
 		always finishes complete update		*/
 /* ARGSUSED */
+int
 upscreen(f, n)
 int f,n;
 {
@@ -333,6 +338,7 @@ int scrflags;
  * correct for the current window. Third, make the virtual and physical
  * screens the same.
  */
+int
 update(force)
 int force;	/* force update past type ahead? */
 {
@@ -407,16 +413,12 @@ int force;	/* force update past type ahead? */
 	/* check for lines to de-extend */
 	upddex();
 
-#if	NeWS
-	newsupd(force) ;
-#else
 	/* if screen is garbage, re-plot it */
 	if (sgarbf)
 		updgar();
 
 	/* update the virtual screen to the physical screen */
 	updupd(force);
-#endif
 
 	/* update the cursor and flush the buffers */
 	movecursor(currow, screencol);
@@ -429,15 +431,16 @@ int force;	/* force update past type ahead? */
 
 /*	reframe:	check to see if the cursor is on in the window
 			and re-frame it if needed or wanted		*/
+void
 reframe(wp)
 WINDOW *wp;
 {
 	register LINE *lp;
-	register int i;
+	register int i = 0;
 
 	/* if not a requested reframe, check for a needed one */
 	if ((wp->w_flag & WFFORCE) == 0) {
-#if SCROLLCODE
+#if SCROLLCODE && ! MEMMAP
 		/* loop from one line above the window to one line after */
 		lp = lback(wp->w_line.l);
 		for (i = -1; i <= wp->w_ntrows; i++)
@@ -450,7 +453,7 @@ WINDOW *wp;
 
 			/* if the line is in the window, no reframe */
 			if (lp == wp->w_dot.l) {
-#if SCROLLCODE
+#if SCROLLCODE && ! MEMMAP
 				/* if not _quite_ in, we'll reframe gently */
 				if ( i < 0 || i == wp->w_ntrows) {
 					/* if the terminal can't help, then
@@ -460,7 +463,7 @@ WINDOW *wp;
 					break;
 				}
 #endif
-				return(TRUE);
+				return;
 			}
 
 			/* if we are at the end of the file, reframe */
@@ -472,7 +475,7 @@ WINDOW *wp;
 		}
 	}
 
-#if SCROLLCODE
+#if SCROLLCODE && ! MEMMAP
 	if (i == -1) {	/* we're just above the window */
 		i = 1;	/* put dot at first line */
 		scrflags |= WFINS;
@@ -515,11 +518,11 @@ WINDOW *wp;
 	wp->w_line.l = lp;
 	wp->w_flag |= WFHARD;
 	wp->w_flag &= ~WFFORCE;
-	return(TRUE);
 }
 
 /*	updone:	update the current line	to the virtual screen		*/
 
+void
 updone(wp)
 WINDOW *wp;	/* window to update current line in */
 {
@@ -540,6 +543,7 @@ WINDOW *wp;	/* window to update current line in */
 
 /*	updall:	update all the lines in a window on the virtual screen */
 
+void
 updall(wp)
 WINDOW *wp;	/* window to update lines in */
 {
@@ -560,6 +564,7 @@ WINDOW *wp;	/* window to update lines in */
 }
 
 /* line to virtual screen line */
+void
 l_to_vline(wp,lp,sline)
 WINDOW *wp;	/* window to update lines in */
 LINE *lp;
@@ -598,6 +603,7 @@ int sline;
 /*	updpos:	update the position of the hardware cursor and handle extended
 		lines. This is the only update for simple moves.
 		returns the screen column for the cursor	*/
+int
 updpos()
 {
 	register LINE *lp;
@@ -647,6 +653,7 @@ updpos()
 
 /*	upddex:	de-extend any line that deserves it		*/
 
+void
 upddex()
 {
 	register WINDOW *wp;
@@ -685,6 +692,7 @@ upddex()
 
 extern char mlsave[];
 
+void
 updgar()
 {
 	register char *txt;
@@ -719,12 +727,13 @@ updgar()
 
 /*	updupd:	update the physical screen from the virtual screen	*/
 
+void
 updupd(force)
 int force;	/* forced update flag */
 {
 	register VIDEO *vp1;
 	register int i;
-#if SCROLLCODE
+#if SCROLLCODE && ! MEMMAP
 	if (scrflags & WFKILLS)
 		scrolls(FALSE);
 	if (scrflags & WFINS)
@@ -739,19 +748,18 @@ int force;	/* forced update flag */
 		if ((vp1->v_flag & VFCHG) != 0) {
 #if	TYPEAH
 			if (force == FALSE && typahead())
-				return(TRUE);
+				return;
 #endif
 #if	MEMMAP
-			updateline(i, vp1);
+			updateline(i, vp1, vp1);
 #else
 			updateline(i, vp1, pscreen[i]);
 #endif
 		}
 	}
-	return(TRUE);
 }
 
-#if SCROLLCODE
+#if SCROLLCODE && ! MEMMAP
 /* optimize out scrolls (line breaks, and newlines) */
 /* arg. chooses between looking for inserts or deletes */
 int	
@@ -762,7 +770,7 @@ int inserts;
 	struct	VIDEO *vpp ;	/* physical screen image */
 	int	i, j, k ;
 	int	rows, cols ;
-	int	first, match, count, ptarget, vtarget, end ;
+	int	first, match, count, ptarget = 0, vtarget = 0, end ;
 	int	longmatch, longcount;
 	int	from, to;
 
@@ -795,15 +803,15 @@ int inserts;
 			ptarget = first + 1 ;	/* broken line newlines */
 		else 
 			ptarget = first ;
+		from = ptarget;
 	} else {
-		vtarget = first + 1 ;
+		from = vtarget = first + 1 ;
 	}
 
 	/* find the matching shifted area */
 	match = -1 ;
 	longmatch = -1;
 	longcount = 0;
-	from = inserts ? ptarget : vtarget;
 	for (i = from+1; i < rows; i++) {
 		if (inserts ? texttest(i,from) : texttest(from,i) ) {
 			match = i ;
@@ -871,6 +879,7 @@ int inserts;
 }
 
 /* move the "count" lines starting at "from" to "to" */
+void
 scrscroll(from, to, count)
 int from, to, count;
 {
@@ -878,6 +887,7 @@ int from, to, count;
 	(*term.t_scroll)(from,to,count);
 }
 
+int
 texttest(vrow,prow)		/* return TRUE on text match */
 int	vrow, prow ;		/* virtual, physical rows */
 {
@@ -906,6 +916,7 @@ int	n;
 		on at a column greater than the terminal width. The line
 		will be scrolled right or left to let the user see where
 		the cursor is		*/
+int
 updext_past()
 {
 	register int lbound, rcursor;
@@ -942,6 +953,7 @@ updext_past()
 		on at a column less than the terminal width. The line
 		will be scrolled right or left to let the user see where
 		the cursor is		*/
+int
 updext_before()
 {
 	register int lbound, rcursor;
@@ -972,286 +984,6 @@ updext_before()
 }
 
 
-#if	NeWS
-newsupd(force)	/* update the physical screen from the virtual screen */
-int force;	/* forced update flag */
-{
-register int i ;
-struct	VIDEO *vpv ;	/* virtual screen image */
-struct	VIDEO *vpp ;	/* physical screen image */
-int	bad, badcol, rows ;
-
-	rows = term.t_nrow ;
-
-	if (force == FALSE && typahead()) return ;
-	if (sgarbf) {
-		fastupdate() ;
-		return ;
-	}
-
-	/* if enough lines are bad try to optimize scrolls/kills */	
-	for (bad = 0, i = 0; i < rows; ++i)
-		if (!texttest(i,i)) {
-			bad++ ;
-			if (bad > 3) {
-				if (!scrolls()) kills() ;
-				break ;
-			}
-		}
-
-	/* count bad lines, if enough need fixed redo whole screen */
-	for (bad = 0, badcol = 0, i = 0; i < rows; ++i) {
-		vpv = vscreen[i] ;
-		vpv->v_flag &= ~(VFCHG|VFCOL) ;		/* clear flag */
-		if (!texttest(i,i)) {
-			vpv->v_flag |= VFCHG ;
-			bad++ ;
-		}
-		if (!colortest(i)) {
-			vpv->v_flag |= VFCOL ;
-			badcol++  ;
-		}
-	}
-	if (bad == 0 && badcol > 0) {	/* pure color update */
-		colorupdate() ;
-		return ;
-	}
-	if (bad > (3*rows)/4) {		/* full update */
-		fastupdate() ;
-		return ;
-	}
-
-	/* Fix the bad lines one by one */
-	for (i = 0; i < rows; ++i)
-		if (vscreen[i]->v_flag & (VFCHG|VFCOL)) updateline(i) ;
-}
-
-
-/* optimize out scrolls (line breaks, and newlines) */
-int	scrolls()	/* returns true if it does something */
-{
-struct	VIDEO *vpv ;	/* virtual screen image */
-struct	VIDEO *vpp ;	/* physical screen image */
-int	i, j, k ;
-int	rows, cols ;
-int	first, match, count, ptarget, end ;
-
-	rows = term.t_nrow ;
-	cols = term.t_ncol ;
-
-	first = -1 ;
-	for (i = 0; i < rows; i++)	/* find first wrong line */
-		if (!texttest(i,i)) {first = i ; break ;}
-
-	if (first < 0) return(FALSE) ;		/* no text changes */
-
-	vpv = vscreen[first] ;
-	vpp = pscreen[first] ;
-
-	/* determine types of potential scrolls */
-	end = endofline(vpv->v_text,cols) ;
-	if ( end == 0 )
-		ptarget = first ;		/* newlines */
-	else if ( strncmp(vpp->v_text, vpv->v_text, end) == 0 )
-		ptarget = first + 1 ;	/* broken line newlines */
-	else return(FALSE) ;			/* no scrolls */
-
-	/* find the matching shifted area */
-	match = -1 ;
-	for (i = ptarget+1; i < rows; i++) {
-		if (texttest(i, ptarget)) {
-			match = i ;
-			count = 1 ;
-			for (j=match+1, k=ptarget+1; j<rows && k<rows; j++, k++) {
-				if (texttest(j,k))
-					count++ ;
-				else
-					break ;
-			}
-			break ;
-		}
-	}
-
-	/* do the scroll */
-	if (match>0 && count>2) {		 /* got a scroll */
-		newsscroll(ptarget, match, count) ;
-		for (i = 0; i < count; i++) {
-			vpv = vscreen[match+i] ; vpp = pscreen[match+i] ;
-			strncpy(vpp->v_text, vpv->v_text, cols) ;
-		}
-		return(TRUE) ;
-	}
-	return(FALSE) ;
-}
-
-
-/* optimize out line kills (full and with a partial kill) */
-int	kills()		/* returns true if it does something */
-{
-struct	VIDEO *vpv ;	/* virtual screen image */
-struct	VIDEO *vpp ;	/* physical screen image */
-int	i, j, k ;
-int	rows, cols ;
-int	first, match, count, vtarget, end ;
-
-	rows = term.t_nrow ;
-	cols = term.t_ncol ;
-
-	first = -1 ;
-	for (i = 0; i < rows; i++)	/* find first wrong line */
-		if (!texttest(i,i)) {first = i ; break ;}
-
-	if (first < 0) return(FALSE) ;		/* no text changes */
-
-	vpv = vscreen[first] ;
-	vpp = pscreen[first] ;
-
-	vtarget = first + 1 ;
-
-	/* find the matching shifted area */
-	match = -1 ;
-	for (i = vtarget+1; i < rows; i++) {
-		if (texttest(vtarget, i)) {
-			match = i ;
-			count = 1 ;
-			for (j=match+1, k=vtarget+1; j<rows && k<rows; j++, k++) {
-				if (texttest(k,j))
-					count++ ;
-				else
-					break ;
-			}
-			break ;
-		}
-	}
-	if (texttest(first, match-1)) {		/* full kill case */
-		vtarget-- ;
-		match-- ;
-		count++ ;
-	}
-
-	/* do the scroll */
-	if (match>0 && count>2) {		/* got a scroll */
-		newsscroll(match, vtarget, count) ;
-		for (i = 0; i < count; i++) {
-			vpv = vscreen[vtarget+i] ; vpp = pscreen[vtarget+i] ;
-			strncpy(vpp->v_text, vpv->v_text, cols) ;
-		}
-		return(TRUE) ;
-	}
-	return(FALSE) ;
-}
-
-
-texttest(vrow,prow)		/* return TRUE on text match */
-int	vrow, prow ;		/* virtual, physical rows */
-{
-struct	VIDEO *vpv = vscreen[vrow] ;	/* virtual screen image */
-struct	VIDEO *vpp = pscreen[prow]  ;	/* physical screen image */
-
-	vpp->v_text[term.t_ncol] = 0 ;
-	vpv->v_text[term.t_ncol] = 0 ;
-	return (!strncmp(vpv->v_text, vpp->v_text, term.t_ncol)) ;
-}
-
-colortest(row)			/* TRUE on color match */
-int	row ;	
-{
-struct	VIDEO *vpv = vscreen[row] ;	/* virtual screen image */
-
-	return (vpv->v_fcolor == vpv->v_rfcolor &&
-		vpv->v_bcolor == vpv->v_rbcolor) ;
-}
-
-
-updateline(row)
-int	row ;		/* row of screen to update */
-{
-struct	VIDEO *vpv = vscreen[row] ;	/* virtual screen image */
-struct	VIDEO *vpp = pscreen[row]  ;	/* physical screen image */
-int	end ;
-
-	end = endofline(vpv->v_text, term.t_ncol) ;
-	strncpy(vpp->v_text, vpv->v_text, term.t_ncol) ;
-	vpv->v_text[end] = 0 ;
-	newsputline(row, vpv->v_text, vpv->v_rfcolor, vpv->v_rbcolor) ;
-	vpv->v_text[end] = ' ' ;
-	vpv->v_fcolor = vpv->v_rfcolor;
-	vpv->v_bcolor = vpv->v_rbcolor;
-	vpv->v_flag &= ~(VFCHG|VFCOL);	/* clear flag */
-}
-
-
-colorupdate()
-{
-struct	VIDEO *vpv ;	/* virtual screen image */
-int	row ;
-	
-	for (row=0; row<term.t_nrow; row++) {	/* send the row colors */
-		vpv = vscreen[row] ;
-		if (vpv->v_flag & VFCOL) {
-			newssetrowcolors(row, vpv->v_rfcolor, vpv->v_rbcolor) ;
-			vpv->v_fcolor = vpv->v_rfcolor;
-			vpv->v_bcolor = vpv->v_rbcolor;
-		}
-		vpv->v_flag &= ~VFCOL ;
-	}
-
-	newslocalupdate() ;	/* ask for a screen refresh */
-}
-
-
-fastupdate()		/* redo the entire screen fast */
-{
-int	row ;
-register char	*cp, *first ;
-struct	VIDEO *vpv ;	/* virtual screen image */
-struct	VIDEO *vpp ;	/* physical screen image */
-
-	/* send the row colors */
-	for (row=0; row<term.t_nrow; row++) {
-		vpv = vscreen[row] ;
-		if (!colortest(row)) {
-			newssetrowcolors(row, vpv->v_rfcolor, vpv->v_rbcolor) ;
-			vpv->v_fcolor = vpv->v_rfcolor;
-			vpv->v_bcolor = vpv->v_rbcolor;
-		}
-		vpv->v_flag &= ~VFCOL ;
-	}
-
-	/* virtual -> physical buffer */
-	for (row=0; row<term.t_nrow; row++) {
-		vpv = vscreen[row] ; vpp = pscreen[row] ;
-		memcpy(vpp->v_text, vpv->v_text, term.t_ncol);
-		vpp->v_text[term.t_ncol] = 0 ;
-		vpv->v_text[term.t_ncol] = 0 ;
-		vpv->v_flag &= ~VFCHG;
-	}
-	/* send the stuff */
-	newscls() ;
-	for (row=0; row<term.t_nrow; row++) {
-		first = pscreen[row]->v_text ;
-		/* don't send trailing blanks */
-		cp = &first[endofline(first,term.t_ncol)] ;
-		if (cp > first) {
-			*cp = 0 ;
-			newsfastputline(row, first) ;
-			*cp = ' ' ;
-		}
-	}
-	sgarbf = FALSE;
-}
- 
-
-/* return the index of the first blank of trailing whitespace */
-int	endofline(s,n) 
-char 	*s ;
-{
-int	i ;
-	for (i = n - 1; i >= 0; i--)
-		if (s[i] != ' ') return(i+1) ;
-	return(0) ;
-}
-#else
 
 /*
  * Update a single line. This does not know how to use insert or delete
@@ -1262,10 +994,12 @@ int	i ;
 #if	MEMMAP
 /*	UPDATELINE specific code for the IBM-PC and other compatables */
 
-updateline(row, vp1)
+void
+updateline(row, vp1, vpdummy)
 
 int row;		/* row of screen to update */
 struct VIDEO *vp1;	/* virtual screen image */
+struct VIDEO *vpdummy;	/* virtual screen image */
 
 {
 #if	COLOR
@@ -1284,6 +1018,7 @@ struct VIDEO *vp1;	/* virtual screen image */
 
 #else
 
+void
 updateline(row, vp1, vp2)
 
 int row;		/* row of screen to update */
@@ -1382,7 +1117,7 @@ struct VIDEO *vp2;	/* physical screen image */
 		vp1->v_fcolor = vp1->v_rfcolor;
 		vp1->v_bcolor = vp1->v_rbcolor;
 #endif
-		return(TRUE);
+		return;
 	}
 #endif
 
@@ -1401,7 +1136,7 @@ struct VIDEO *vp2;	/* physical screen image */
 	/* if both lines are the same, no update needs to be done */
 	if (cp1 == &vp1->v_text[term.t_ncol]) {
  		vp1->v_flag &= ~VFCHG;		/* flag this line is changed */
-		return(TRUE);
+		return;
 	}
 
 	/* find out if there is a match on the right */
@@ -1452,12 +1187,11 @@ struct VIDEO *vp2;	/* physical screen image */
 	TTrev(FALSE);
 #endif
 	vp1->v_flag &= ~VFCHG;		/* flag this line as updated */
-	return(TRUE);
+	return;
 #endif
 }
 #endif
 
-#endif  /* NeWS */
 
 /*
  * Redisplay the mode line for the window pointed to by the "wp". This is the
@@ -1465,6 +1199,7 @@ struct VIDEO *vp2;	/* physical screen image */
  * change the modeline format by hacking at this routine. Called by "update"
  * any time there is a dirty window.
  */
+void
 modeline(wp)
 WINDOW *wp;
 {
@@ -1475,16 +1210,6 @@ WINDOW *wp;
 	n = wp->w_toprow+wp->w_ntrows;      	/* Location. */
 	vscreen[n]->v_flag |= VFCHG | VFREQ | VFCOL;/* Redraw next time. */
 
-#if	NeWS
-	vscreen[n]->v_rfcolor = 0;
-	vscreen[n]->v_rbcolor = 7;
-	if (wp == curwp) {			/* mark the current buffer */
-		lchar = '^' ;
-	} else {
-		lchar = ' ' ;
-	}
-	vtmove(n, 0);                      	/* Seek to right line. */
-#else
 
 #if	COLOR
 	vscreen[n]->v_rfcolor = 0;			/* black on */
@@ -1500,24 +1225,21 @@ WINDOW *wp;
 		else
 #endif
 			lchar = '-';
-#endif
 	}
 	bp = wp->w_bufp;
 
 	vtputc(lchar,FALSE);
 	if (b_val(bp, MDSHOWMODE)) {
 		register int ic;
+		ic = lchar;
 		if (wp == curwp) {
-			if (insertmode == FALSE)
-				ic = lchar;
-			else if (insertmode == INSERT)
+			if (insertmode == INSERT)
 				ic = 'I';
 			else if (insertmode == REPLACECHAR)
 				ic = 'R';
 			else if (insertmode == OVERWRITE)
 				ic = 'O';
-		} else
-			ic = lchar;
+		}
 		vtputc(ic,FALSE);
 	}
 	vtputc(lchar,FALSE);
@@ -1603,13 +1325,11 @@ WINDOW *wp;
 	}
 }
 
+void
 upmode()	/* update all the mode lines */
 {
 	register WINDOW *wp;
 
-#if     NeWS            /* tell workstation the current modes */
-        newsreportmodes() ;
-#endif
 	wp = wheadp;
 	while (wp != NULL) {
 		wp->w_flag |= WFMODE;
@@ -1622,12 +1342,11 @@ upmode()	/* update all the mode lines */
  * and column "col". The row and column arguments are origin 0. Optimize out
  * random calls. Update "ttrow" and "ttcol".
  */
+void
 movecursor(row, col)
 int row,col;
 {
-#if	! NeWS		/* "line buffered" */
 	if (row!=ttrow || col!=ttcol)
-#endif
         {
 	        ttrow = row;
 	        ttcol = col;
@@ -1637,36 +1356,13 @@ int row,col;
 
 
 
-#if	NeWS		/* buffer the message line stuff, newsputc is slow */
-#define NEWSBUFSIZ	256
-#undef	TTputc
-#undef	TTflush
-#define TTputc(c)	bufputc(c)
-#define TTflush()	bufputc((char)0)
-
-bufputc(c)
-char	c ;
-{
-	static		bufindex = 0 ;
-	static char	outbuf[NEWSBUFSIZ] ;
-
-	if (c == NULL || bufindex >= NEWSBUFSIZ || bufindex >= term.t_ncol) {
-		outbuf[bufindex] = NULL ;
-		newsputline(term.t_nrow, outbuf, 7, 0) ;
-		movecursor(term.t_nrow, strlen(outbuf)) ;
-		newsflush() ;
-		bufindex = 0 ;
-	}
-	else outbuf[bufindex++] = c ;
-}
-#endif
-
 
 /*
  * Erase the message line. This is a special routine because the message line
  * is not considered to be part of the virtual screen. It always works
  * immediately; the terminal buffer is flushed via a call to the flusher.
  */
+void
 mlerase()
 {
     int i;
@@ -1695,6 +1391,7 @@ mlerase()
 
 
 
+#ifndef __STDC__
 
 #ifndef va_dcl	 /* then try these out */
 
@@ -1706,9 +1403,12 @@ typedef char *va_list;
 
 #endif
 
+#endif /* __STDC__ */
+
 char *mlsavep;
 char mlsave[NSTRING];
 
+void
 mlsavec(c)
 int c;
 {
@@ -1720,8 +1420,13 @@ int c;
  * Write a message into the message line only if appropriate.
  */
 /* VARARGS1 */
+void
+#ifdef __STDC__
+mlwrite( char *fmt, ...)
+#else
 mlwrite(va_alist)
 va_dcl
+#endif
 {
 	va_list ap;
 	/* if we are not currently echoing on the command line, abort this */
@@ -1729,8 +1434,13 @@ va_dcl
 		movecursor(term.t_nrow, 0);
 		return;
 	}
+#ifdef __STDC__
+	va_start(ap,fmt);
+	mlmsg(fmt,&ap);
+#else
 	va_start(ap);
 	mlmsg(&ap);
+#endif
 	va_end(ap);
 }
 
@@ -1740,18 +1450,33 @@ va_dcl
 	Also used for most errors, to be sure they're seen.
 */
 /* VARARGS1 */
+void
+#ifdef __STDC__
+mlforce(char *fmt, ...)
+#else
 mlforce(va_alist)
 va_dcl
+#endif
 {
 	va_list ap;
+#ifdef __STDC__
+	va_start(ap,fmt);
+	mlmsg(fmt,&ap);
+#else
 	va_start(ap);
 	mlmsg(&ap);
+#endif
 	va_end(ap);
 }
 
 /* VARARGS1 */
+void
+#ifdef __STDC__
+mlprompt( char *fmt, ...)
+#else
 mlprompt(va_alist)
 va_dcl
+#endif
 {
 	va_list ap;
 	int osgarbf = sgarbf;
@@ -1760,19 +1485,34 @@ va_dcl
 		return;
 	}
 	sgarbf = FALSE;
+#ifdef __STDC__
+	va_start(ap,fmt);
+	mlmsg(fmt,&ap);
+#else
 	va_start(ap);
 	mlmsg(&ap);
+#endif
 	va_end(ap);
 	sgarbf = osgarbf;
 }
 
 /* VARARGS */
+void
+#ifdef __STDC__
+dbgwrite( char *fmt, ...)
+#else
 dbgwrite(va_alist)
 va_dcl
+#endif
 {
 	va_list ap;	/* ptr to current data field */
+#ifdef __STDC__
+	va_start(ap,fmt);
+	mlmsg(fmt,&ap);
+#else
 	va_start(ap);
 	mlmsg(&ap);
+#endif
 	va_end(ap);
 	TTgetc();
 }
@@ -1782,16 +1522,24 @@ va_dcl
  * position. A small class of printf like format items is handled.
  * Set the "message line" flag TRUE.
  */
+void
+#ifdef __STDC__
+mlmsg( char *fmt, va_list *app)
+#else
 mlmsg(app)
 va_list *app;	/* ptr to current data field */
+#endif
 {
-	int mlputc();
 
 	if (sgarbf) {
 		/* then we'll lose the message on the next update(), so save it now */
 		mlsavep = mlsave;
 		dfoutfn = mlsavec;
+#ifdef __STDC__
+		dofmt(fmt,app);
+#else
 		dofmt(app);
+#endif
 		*mlsavep = '\0';
 		return;
 	}
@@ -1812,7 +1560,11 @@ va_list *app;	/* ptr to current data field */
 	movecursor(term.t_nrow, 0);
 
 	dfoutfn = mlputc;
+#ifdef __STDC__
+	dofmt(fmt,app);
+#else
 	dofmt(app);
+#endif
 
 	/* if we can, erase to the end of screen */
 	if (eolexist == TRUE)
@@ -1827,8 +1579,9 @@ va_list *app;	/* ptr to current data field */
  * the character has width "1"; if this is not the case
  * things will get screwed up a little.
  */
+void
 mlputc(c)
-char c;
+int c;
 {
 	if (c == '\r') ttcol = 0;
 	if (c == '\t') c = ' ';
@@ -1842,16 +1595,25 @@ char c;
  * Generic string formatter.  Takes printf-like args, and calls
  * the global function (*dfoutfn)(c) for each c
  */
+void
+#ifdef __STDC__
+dofmt( char *fmt, va_list *app)
+#else
 dofmt(app)
 va_list *app;
+#endif
 {
+#ifndef __STDC__
 	register char *fmt;
+#endif
 	register int c;		/* current char in format string */
 	register int wid;
 	register int n;
 	register int nchars = 0;
 	int islong;
+#ifndef __STDC__
 	fmt = va_arg(*app, char *);
+#endif
 	while ((c = *fmt++) != 0 ) {
 		if (c != '%') {
 			(*dfoutfn)(c);
@@ -1950,6 +1712,7 @@ va_list *app;
 /*
  * Do format a string.
  */
+int
 dfputs(s)
 char *s;
 {
@@ -1964,6 +1727,7 @@ char *s;
 }
 
 /* as above, but takes a count for s's length */
+int
 dfputsn(s,n)
 char *s;
 int n;
@@ -1980,6 +1744,7 @@ int n;
 /*
  * Do format an integer, in the specified radix.
  */
+int
 dfputi(i, r)
 int i,r;
 {
@@ -2004,6 +1769,7 @@ int i,r;
 /*
  * do the same except as a long integer.
  */
+int
 dfputli(l, r)
 long l;
 int r;
@@ -2027,6 +1793,7 @@ int r;
 /*
  *	Do format a scaled integer with two decimal places
  */
+int
 dfputf(s)
 int s;	/* scaled integer to output */
 {
@@ -2055,6 +1822,7 @@ int s;	/* scaled integer to output */
 
 char *lsp;
 
+void
 lspputc(c)
 int c;
 {
@@ -2063,17 +1831,31 @@ int c;
 
 /* VARARGS1 */
 char *
-lsprintf(buf,va_alist)
-char *buf;
+#ifdef __STDC__
+lsprintf( char *buf, char *fmt, ...)
+#else
+lsprintf(va_alist)
 va_dcl
+#endif
 {
+
 	va_list ap;
+#ifdef __STDC__
+	va_start(ap,fmt);
+#else
+	char *buf;
+	va_start(ap);
+	buf = va_arg(ap, char *);
+#endif
 
 	lsp = buf;
 	dfoutfn = lspputc;
 
-	va_start(ap);
+#ifdef __STDC__
+	dofmt(fmt,&ap);
+#else
 	dofmt(&ap);
+#endif
 	va_end(ap);
 
 	*lsp = '\0';
@@ -2086,6 +1868,7 @@ va_dcl
  *
  */
 
+void
 bputc(c)
 int c;
 {
@@ -2097,18 +1880,27 @@ int c;
 
 /* printf into curbp, at curwp->w_dot */
 /* VARARGS */
+void
+#ifdef __STDC__
+bprintf( char *fmt, ...)
+#else
 bprintf(va_alist)
 va_dcl
+#endif
 {
 	va_list ap;
 
 	dfoutfn = bputc;
 
+#ifdef __STDC__
+	va_start(ap,fmt);
+	dofmt(fmt,&ap);
+#else
 	va_start(ap);
 	dofmt(&ap);
+#endif
 	va_end(ap);
 
-	return;
 } 
 
 #if RAINBOW
@@ -2130,6 +1922,7 @@ char buf[];
    Store number of lines into *heightp and width into *widthp.
    If zero or a negative number is stored, the value is not valid.  */
 
+void
 getscreensize (widthp, heightp)
 int *widthp, *heightp;
 {
@@ -2149,7 +1942,8 @@ int *widthp, *heightp;
 
 #if defined( SIGWINCH) && ! X11
 SIGT
-sizesignal ()
+sizesignal (signo)
+int signo;
 {
 	int w, h;
 	extern int errno;
@@ -2162,9 +1956,11 @@ sizesignal ()
 
 	signal (SIGWINCH, sizesignal);
 	errno = old_errno;
+	SIGRET;
 }
 #endif
 
+void
 newscreensize (h, w)
 int h, w;
 {
@@ -2181,6 +1977,5 @@ int h, w;
 		newwidth(TRUE,w);
 
 	update(TRUE);
-	return;
 }
 

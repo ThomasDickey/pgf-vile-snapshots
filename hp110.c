@@ -2,7 +2,10 @@
  *	HP110:	Hewlett Packard 110 Screen Driver
  *
  * $Log: hp110.c,v $
- * Revision 1.3  1991/09/10 01:19:35  pgf
+ * Revision 1.4  1992/05/16 12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.3  1991/09/10  01:19:35  pgf
  * re-tabbed, and moved ESC and BEL to estruct.h
  *
  * Revision 1.2  1991/08/07  12:35:07  pgf
@@ -229,6 +232,7 @@ h110kclose()
 }
 
 #if	FLABEL
+int
 fnclabel(f, n)		/* label a function key */
 
 int f,n;	/* default flag, numeric argument [unused] */

@@ -2,7 +2,10 @@
  *	written for vile by Paul Fox, (c)1990
  *
  * $Log: csrch.c,v $
- * Revision 1.4  1991/11/01 14:38:00  pgf
+ * Revision 1.5  1992/05/16 12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.4  1991/11/01  14:38:00  pgf
  * saber cleanup
  *
  * Revision 1.3  1991/08/07  12:35:07  pgf
@@ -20,8 +23,8 @@
 #include "estruct.h"
 #include "edef.h"
 
-static short lastscan;
-static short lastchar;
+static short lstscan;
+static short lstchar;
 #define BACK 0
 #define FORW 1
 #define DIREC 1
@@ -31,6 +34,7 @@ static short lastchar;
 #define TYPE 2
 
 
+int
 fscan(f,n,c)
 int f,n,c;
 {
@@ -40,8 +44,8 @@ int f,n,c;
 	if (!f || n <= 0)
 		n = 1;
 
-	lastchar = c;
-	lastscan = FORW;
+	lstchar = c;
+	lstscan = FORW;
 
 	doto = curwp->w_dot.o;
 
@@ -68,6 +72,7 @@ int f,n,c;
 			
 }
 
+int
 bscan(f,n,c)
 int f,n,c;
 {
@@ -77,8 +82,8 @@ int f,n,c;
 	if (f || n <= 0)
 		n = 1;
 
-	lastchar = c;
-	lastscan = BACK;
+	lstchar = c;
+	lstscan = BACK;
 
 	doto = curwp->w_dot.o;
 
@@ -104,6 +109,7 @@ int f,n,c;
 }
 
 /* f */
+int
 fcsrch(f,n)
 int f,n;
 {
@@ -121,6 +127,7 @@ int f,n;
 }
 
 /* F */
+int
 bcsrch(f,n)
 int f,n;
 {
@@ -138,6 +145,7 @@ int f,n;
 }
 
 /* t */
+int
 fcsrch_to(f,n)
 int f,n;
 {
@@ -145,11 +153,12 @@ int f,n;
 	s = fcsrch(f,n);
 	if (s == TRUE)
 		s = backchar(FALSE,1);
-	lastscan |= T;
+	lstscan |= T;
 	return(s);
 }
 
 /* T */
+int
 bcsrch_to(f,n)
 int f,n;
 {
@@ -157,44 +166,46 @@ int f,n;
 	s = bcsrch(f,n);
 	if (s == TRUE)
 		s = forwchar(FALSE,1);
-	lastscan |= T;
+	lstscan |= T;
 	return(s);
 }
 
 /* ; */
+int
 rep_csrch(f,n)
 int f,n;
 {
 	int s;
-	int ls = lastscan;
+	int ls = lstscan;
 
 	if ((ls & DIREC) == FORW) {
-		s = fscan(f,n,lastchar);
+		s = fscan(f,n,lstchar);
 		if ((ls & TYPE) == T) {
 			if (s == TRUE)
 				s = backchar(FALSE,1);
-			lastscan |= T;
+			lstscan |= T;
 		}
 		return(s);
 	} else {
-		s = bscan(f,n,lastchar);
+		s = bscan(f,n,lstchar);
 		if ((ls & TYPE) == T) {
 			if (s == TRUE)
 				s = forwchar(FALSE,1);
-			lastscan |= T;
+			lstscan |= T;
 		}
 		return(s);
 	}
 }
 
 /* , */
+int
 rev_csrch(f,n)
 int f,n;
 {
 	int s;
 
-	lastscan ^= DIREC;
+	lstscan ^= DIREC;
 	s = rep_csrch(f,n);
-	lastscan ^= DIREC;
+	lstscan ^= DIREC;
 	return(s);
 }

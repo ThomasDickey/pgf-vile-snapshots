@@ -5,7 +5,10 @@
  * compiles into nothing if not a 520ST style device.
  *
  * $Log: st520.c,v $
- * Revision 1.5  1992/01/05 00:06:13  pgf
+ * Revision 1.6  1992/05/16 12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.5  1992/01/05  00:06:13  pgf
  * split mlwrite into mlwrite/mlprompt/mlforce to make errors visible more
  * often.  also normalized message appearance somewhat.
  *
@@ -1027,6 +1030,7 @@ typahead()
 #endif
 
 #if	FLABEL
+int
 fnclabel(f, n)		/* label a function key */
 
 int f,n;	/* default flag, numeric argument [unused] */

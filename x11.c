@@ -2,7 +2,14 @@
  * 	X11 support, Dave Lemke, 11/91
  *
  * $Log: x11.c,v $
- * Revision 1.5  1992/04/10 18:47:25  pgf
+ * Revision 1.7  1992/05/16 12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.6  1992/05/13  09:17:23  pgf
+ * put in chris sherman's class_hint changes, changed strdup to strmalloc,
+ * which is our routine that does the same thing
+ *
+ * Revision 1.5  1992/04/10  18:47:25  pgf
  * change abs to absol to get rid of name conflicts
  *
  * Revision 1.4  1992/03/07  10:27:03  pgf
@@ -41,6 +48,8 @@
 #include	<signal.h>
 #include	<stdio.h>
 #include	<string.h>
+
+char *strmalloc();
 
 #define	MARGIN	8
 #define	SCRSIZ	64
@@ -234,23 +243,27 @@ x_current_fontname()
     return cur_win->fontname;
 }
 
+void
 x_set_rv()
 {
     reverse_video = !reverse_video;
 }
 
+void
 x_set_geometry(g)
     char       *g;
 {
     geometry = g;
 }
 
+void
 x_set_dpy(dname)
     char       *dname;
 {
     displayname = dname;
 }
 
+int
 x_setfont(fname)
     char       *fname;
 {
@@ -303,7 +316,7 @@ x_setfont(fname)
 
 	    if (cur_win->fontname)
 		free(cur_win->fontname);
-	    cur_win->fontname = strdup(fontname);
+	    cur_win->fontname = strmalloc(fontname);
 	    return 1;
 	}
 	return 0;
@@ -515,7 +528,7 @@ x_open()
 	}
 	fontname = FONTNAME;
     }
-    tw->fontname = strdup(fontname);
+    tw->fontname = strmalloc(fontname);
 
     if (pfont->max_bounds.width != pfont->min_bounds.width) {
 	fprintf(stderr, "proportional font, things will be miserable\n");
@@ -612,6 +625,16 @@ x_open()
     xwmh.input = True;
     XSetWMHints(dpy, tw->win, &xwmh);
 
+    {
+      XClassHint *class_hints;
+      class_hints = XAllocClassHint();
+      class_hints->res_name = strmalloc("xvile");
+      class_hints->res_class = strmalloc("XVile");
+      XSetClassHint(dpy,tw->win,class_hints);
+      free(class_hints->res_name);
+      free(class_hints->res_class);
+      XFree(class_hints);
+    }
     cur_win = tw;
     XMapWindow(dpy, tw->win);
 

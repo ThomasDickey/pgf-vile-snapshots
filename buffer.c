@@ -6,7 +6,10 @@
  * for the display system.
  *
  * $Log: buffer.c,v $
- * Revision 1.32  1992/03/05 09:19:55  pgf
+ * Revision 1.33  1992/05/16 12:00:31  pgf
+ * prototypes/ansi/void-int stuff/microsoftC
+ *
+ * Revision 1.32  1992/03/05  09:19:55  pgf
  * changed some mlwrite() to mlforce(), due to new terse support
  *
  * Revision 1.31  1992/01/05  00:06:13  pgf
@@ -151,6 +154,7 @@ int c;
 	return NULL;
 }
 
+int
 hist_show()
 {
 	int i;
@@ -180,6 +184,7 @@ hist_show()
 	}
 }
 
+int
 histbuff(f,n)
 int f,n;
 {
@@ -226,6 +231,7 @@ int f,n;
 
 /* switch back to the most recent buffer */
 /* ARGSUSED */
+int
 altbuff(f,n)
 int f,n;
 {
@@ -239,6 +245,7 @@ int f,n;
  * from some other window.
  */
 /* ARGSUSED */
+int
 usebuffer(f, n)
 int f,n;
 {
@@ -255,6 +262,7 @@ int f,n;
 }
 
 /* ARGSUSED */
+int
 nextbuffer(f, n)	/* switch to the next buffer in the buffer list */
 int f, n;	/* default flag, numeric argument */
 {
@@ -278,7 +286,35 @@ int f, n;	/* default flag, numeric argument */
         
 }
 
+/* bring nbp to the top of the list, where curbp _always_ lives */
+void
+make_current(nbp)
+BUFFER *nbp;
+{
+	register BUFFER *bp;
+        
+	if (nbp == bheadp) {	/* already at the head */
+		curbp = bheadp;
+		curtabval = tabstop_val(curbp);
+		return;
+	}
+	        
+	/* remove nbp from the list */
+	bp = bheadp; while(bp->b_bufp != nbp)
+		bp = bp->b_bufp;
+	bp->b_bufp = nbp->b_bufp;
+        
+	/* put it at the head */
+	nbp->b_bufp = bheadp;
+        
+	bheadp = nbp;
+	curbp = nbp;
 
+	curtabval = tabstop_val(curbp);
+}
+
+
+int
 swbuffer(bp)	/* make buffer BP current */
 register BUFFER *bp;
 {
@@ -332,6 +368,7 @@ register BUFFER *bp;
 }
 
 
+void
 undispbuff(bp,wp)
 register BUFFER *bp;
 register WINDOW *wp;
@@ -346,32 +383,7 @@ register WINDOW *wp;
 	}
 }
 
-/* bring nbp to the top of the list, where curbp _always_ lives */
-make_current(nbp)
-BUFFER *nbp;
-{
-	register BUFFER *bp;
-        
-	if (nbp == bheadp) {	/* already at the head */
-		curbp = bheadp;
-		curtabval = tabstop_val(curbp);
-		return;
-	}
-	        
-	/* remove nbp from the list */
-	bp = bheadp; while(bp->b_bufp != nbp)
-		bp = bp->b_bufp;
-	bp->b_bufp = nbp->b_bufp;
-        
-	/* put it at the head */
-	nbp->b_bufp = bheadp;
-        
-	bheadp = nbp;
-	curbp = nbp;
-
-	curtabval = tabstop_val(curbp);
-}
-
+int
 tabstop_val(bp)
 register BUFFER *bp;
 {
@@ -384,6 +396,7 @@ register BUFFER *bp;
 					 ? VAL_C_TAB : VAL_TAB);
 }
 
+int
 has_C_suffix(bp)
 register BUFFER *bp;
 {
@@ -403,6 +416,7 @@ register BUFFER *bp;
  * line and the buffer header.
  */
 /* ARGSUSED */
+int
 killbuffer(f, n)
 int f,n;
 {
@@ -446,6 +460,7 @@ int f,n;
 	return s;
 }
 
+int
 zotbuf(bp)	/* kill the buffer pointed to by bp */
 register BUFFER *bp;
 {
@@ -510,6 +525,7 @@ register BUFFER *bp;
 }
 
 /* ARGSUSED */
+int
 namebuffer(f,n) 	/*	Rename the current buffer	*/
 int f, n;		/* default Flag & Numeric arg */
 {
@@ -543,6 +559,7 @@ ask:	if (mlreply(prompt, bufn, NBUFN) != TRUE)
 /* create or find a window, and stick this buffer in it.  when 
 	done, we own the window and the buffer, but they are _not_
 	necessarily curwp and curbp */
+int
 popupbuff(bp)
 BUFFER *bp;
 {
@@ -592,6 +609,7 @@ BUFFER *bp;
 
 #define BUFFER_LIST_NAME "[Buffer List]"
 
+int
 togglelistbuffers(f, n)
 int f,n;
 {
@@ -618,10 +636,10 @@ int f,n;
 }
 
 /* ARGSUSED */
+int
 listbuffers(f, n)
 int f,n;
 {
-	int makebufflist();
 	return liststuff(BUFFER_LIST_NAME, makebufflist, f, NULL);
 }
 
@@ -635,6 +653,7 @@ int f,n;
  * indicates whether to list hidden buffers.
  */
 /* ARGSUSED */
+void
 makebufflist(iflag,dummy)
 int iflag;	/* list hidden buffer flag */
 char *dummy;
@@ -713,6 +732,7 @@ long   num;
  * on the end. Return TRUE if it worked and
  * FALSE if you ran out of room.
  */
+int
 addline(bp,text,len)
 register BUFFER *bp;
 char	*text;
@@ -746,6 +766,7 @@ int len;
  * Return FALSE if no buffers
  * have been changed.
  */
+int
 anycb()
 {
 	register BUFFER *bp;
@@ -851,6 +872,7 @@ char   *bname;
  * that are required. Return TRUE if everything
  * looks good.
  */
+int
 bclear(bp)
 register BUFFER *bp;
 {
@@ -871,12 +893,12 @@ register BUFFER *bp;
 		lfree(lp,bp);
 	}
 	if (bp->b_ltext) {
-		free(bp->b_ltext);
+		free((char *)(bp->b_ltext));
 		bp->b_ltext = NULL;
 		bp->b_ltext_end = NULL;
 	}
 	if (bp->b_LINEs) {
-		free(bp->b_LINEs);
+		free((char *)(bp->b_LINEs));
 		bp->b_LINEs = NULL;
 		bp->b_LINEs_end = NULL;
 	}
@@ -894,6 +916,7 @@ register BUFFER *bp;
 }
 
 /* ARGSUSED */
+int
 unmark(f, n)	/* unmark the current buffers change flag */
 int f, n;	/* unused command arguments */
 {

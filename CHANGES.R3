@@ -54,7 +54,8 @@ VI COMPLIANCE:
 - the '&' now works, and repeats the last ":s" or '^X-s' substitution.
 
 - there is a new operator, '^A-&', which is similar to '&' but acts on a
-	region.
+	region.  I expect that if you want it, you'll probably rebind it to
+	something else (like '&') since typing it is awkward, to say the least.
 
 - ^W and ^U are now both read from the tty settings, and they work in both
 	insert mode and on the : line.  There is a "backspacelimit" setting
@@ -78,8 +79,13 @@ VI COMPLIANCE:
 
 - the H, M, and L commands are now absolute motions
 
+- two new functions, to make normal motions more vi compliant --
+	forward-character-to-eol and backward-character-to-bol, which won't
+	move past the boundaries of the current line.
+
 - you can no longer backspace from the beginning of a line to the end of
-	the previous.
+	the previous.  (rebind 'h' and '^h' from "backward-character-to-bol"
+	to "backward-character"
 
 - a motion caused by an undo is considered absolute, and the "last dot"
 	mark is reset.
@@ -93,10 +99,6 @@ VI COMPLIANCE:
 
 - a lone ":f" without filename now gives same info as ^G
 
-- two new functions, to make normal motions more vi compliant --
-	forwchar_to_eol and backchar_to_bol, which won't move past the
-	boundaries of the current line.
-
 - 'x', 's', 'r' will no longer delete a line if used on an empty line.
 
 - after a ":e!" command, the buffer name changes to match the filename, as
@@ -108,24 +110,29 @@ VI COMPLIANCE:
 
 - the "cd" and "pwd" commands now work
 
-- shiftwidth has been implemented
+- shiftwidth has been implemented, so ^T, ^D, '<', and '>' all do pretty
+	much what they do in vi
 
 
 MISCELLANEOUS
 ===============
 
+- reading files in general is _much_ faster, unless the file contains lines
+	longer than 255 characters, in which case things slow down again.
+
 - regular expressions are more powerful and much, much faster than they
 	were.  vile now uses Henry Spencer's regexp code.  This has the
 	side effect of making '\|' a new metacharacter, for alternation
 	of expressions.  '\+' and '\?' are also new, and stand for "one
-	or more" and "zero or one" occurences.
+	or more" and "zero or one" occurrences.
+
+- in addition, \< and \> find beginnings and ends of words, and \w, \s,
+	and \d find "word" characters, "space" characters, and digits.
+	\W, \S, and \D find the converse
 
 - related to the above change, replacement metacharacters now work, so you
 	can use '&' and '\1' through '\9' in the replacement string, and
 	you'll get the right thing.
-
-- reading files in general is _much_ faster, unless the file contains lines
-	longer than 255 characters, in which case things slow down again.
 
 - Dave Lemke contributed code to support vile under X windows -- including
 	support for cutting/pasting, etc.  Thanks Dave!
@@ -140,13 +147,15 @@ MISCELLANEOUS
 - the !  filter command for running text through an external filter now
 	works
 
-- the code should now be more portable, to various compilers and systems
-
-- there's less use of variant arguments to internal routines, to help
-	portability
-
 - quite a bit of code cleanup, at least I think so -- it has ported pretty
-	easily to an R6000, linux, 386bsd, Sony NeWS, NeXT, UNIXPC
+	easily to a R6000, linux, 386bsd, Sony NeWS, NeXT, and the UNIXPC. 
+	it's close to lint-free, and Saber has very few problems with the
+	code.  it'll now use prototypes if __STDC__ is defined, and it
+	passes gcc -Wall -Wshadow with no warnings.  the code should now be
+	more portable, to various compilers and systems.  there are new
+	targets in the makefile to make building on various platforms
+	easier.  the makefile even supports microsoft C, even if the code
+	doesn't quite yet.
 
 - quite a few bug fixes, including all (I think) of those reported by users
 
@@ -205,7 +214,7 @@ MISCELLANEOUS
 
 - a line starting with '#' won't shift-right if the buffer is in C mode.
 
-- :s/s1/s2/5 now works, to change the 5th occurence on a line
+- :s/s1/s2/5 now works, to change the 5th occurrence on a line
 
 - there are new commands to write all buffers: :ww is a synonym for
 	"write-changed-buffers", and :wwq is now a synonym for
@@ -264,9 +273,6 @@ IMPLEMENTORS NOTES:
 - do_fl_region() is a convenient wrapper for writing operator commands that
 	work on full lines -- there isn't yet a similar wrapper for partial
 	line operators.
-
-- a lot of cleanup was done -- it's close to lint-free, and Saber has very
-	few problems with the code.
 
 - use mlwrite() for informative messages that $terse will suppress, mlforce()
 	for messages that _must_ be seen, and mlprompt() for messages that
